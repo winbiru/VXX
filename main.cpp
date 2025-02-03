@@ -1,25 +1,31 @@
+// main.cpp
 #include <iostream>
+#include <string>
+#include "src/include/compiler.h"
+#include "src/include/vm.h"
 
-// TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 int main() {
-    // TIP Press <shortcut actionId="RenameElement"/> when your caret is at the
-    // <b>lang</b> variable name to see how CLion can help you rename it.
-    auto lang = "C++";
-    std::cout << "Hello and welcome to " << lang << "!\n";
+    // Mã nguồn ví dụ: chương trình cộng 2 số và in kết quả
+    std::string source = R"(
+    TẢI_SỐ 2
+    TẢI_SỐ 3
+    CỘNG
+    IN
+    DỪNG
+    )";
 
-    for (int i = 1; i <= 5; i++) {
-        // TIP Press <shortcut actionId="Debug"/> to start debugging your code.
-        // We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/>
-        // breakpoint for you, but you can always add more by pressing
-        // <shortcut actionId="ToggleLineBreakpoint"/>.
-        std::cout << "i = " << i << std::endl;
+    try {
+        // Biên dịch mã nguồn thành bytecode
+        std::vector<Instruction> bytecode = compileSource(source);
+
+        // Tạo máy ảo và chạy bytecode
+        VM vm(bytecode);
+        std::cout << "Kết quả thực thi:" << std::endl;
+        vm.run();
+    } catch (const std::exception &ex) {
+        std::cerr << "Lỗi: " << ex.what() << std::endl;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
-
-// TIP See CLion help at <a
-// href="https://www.jetbrains.com/help/clion/">jetbrains.com/help/clion/</a>.
-//  Also, you can try interactive lessons for CLion by selecting
-//  'Help | Learn IDE Features' from the main menu.
