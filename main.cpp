@@ -7,9 +7,13 @@
 int main() {
     // Mã nguồn ví dụ: chương trình cộng 2 số và in kết quả
     std::string source = R"(
-    TẢI_SỐ 2
-    TẢI_SỐ 3
+    BIẾN 2
+    BIẾN 3
     CỘNG
+    IN
+    BIẾN 30
+    BIẾN 4
+    TRỪ
     IN
     DỪNG
     )";

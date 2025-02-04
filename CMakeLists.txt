@@ -1,16 +1,16 @@
 cmake_minimum_required(VERSION 3.10)
 project(VietVM)
 
-# Thêm thư mục chứa các tệp header
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 include_directories(include)
 
-# Liệt kê tất cả các tệp nguồn
 set(SOURCES
-        src/main.cpp
+        main.cpp
         src/compiler.cpp
         src/vm.cpp
-        # Thêm các tệp nguồn khác nếu có
+        # Các tệp nguồn khác nếu có
 )
 
-# Tạo executable
 add_executable(VietVM ${SOURCES})
