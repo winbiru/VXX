@@ -1,24 +1,28 @@
-// main.cpp
+// src/main.cpp
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <string>
+#include <vector>
 #include "src/include/compiler.h"
 #include "src/include/vm.h"
 
-int main() {
-    // Mã nguồn ví dụ: chương trình cộng 2 số và in kết quả
-    std::string source = R"(
-    BIẾN 2
-    BIẾN 3
-    CỘNG
-    IN
-    BIẾN 30
-    BIẾN 4
-    TRỪ
-    IN
-    DỪNG
-    )";
+std::string readFile(const std::string &filename) {
+    std::ifstream fileStream(filename);
+    if (!fileStream.is_open()) {
+        throw std::runtime_error("Không thể mở file: " + filename);
+    }
+    std::stringstream buffer;
+    buffer << fileStream.rdbuf();
+    return buffer.str();
+}
 
+int main() {
     try {
+        // Đọc nội dung từ file có đuôi .vi (ví dụ: program.vi)
+        const std::string filename = "/Users/winbiru/VietVM/tests/program.vi";
+        std::string source = readFile(filename);
+
         // Biên dịch mã nguồn thành bytecode
         std::vector<Instruction> bytecode = compileSource(source);
 
