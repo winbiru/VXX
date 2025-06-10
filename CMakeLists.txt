@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 include_directories(include)
 
 set(SOURCES
-        main.cpp
+        src/main.cpp
         src/compiler.cpp
         src/vm.cpp
         # Các tệp nguồn khác nếu có

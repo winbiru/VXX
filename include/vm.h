@@ -3,6 +3,7 @@
 #define VM_H
 
 #include <vector>
+#include <cstddef>
 #include "instruction.h"
 
 class VM {

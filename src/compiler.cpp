@@ -1,6 +1,6 @@
 // compiler.cpp
-#include "include/compiler.h"
-#include "include/instruction.h"
+#include "../include/compiler.h"
+#include "../include/instruction.h"
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -29,21 +29,43 @@ std::vector<Instruction> compileSource(const std::string &source) {
         if (token == "BIẾN") {
             int value;
             lineStream >> value;
-            bytecode.push_back({OP_BIEN, value});
+            bytecode.push_back({OP_BIEN_SO, value});
         } else if (token == "NẾU") {
             bytecode.push_back({OP_NEU, 0});
-        } else if (token == "CỘNG") {
+        } else if (token == "NGƯỢC LẠI") {
+            bytecode.push_back({OP_NGUOC_LAI, 0});
+        } else if (token == "LẶP") {
+            bytecode.push_back({OP_LAP, 0});
+        } else if (token == "KẾT THÚC") {
+            bytecode.push_back({OP_KET_THUC_LAP, 0});
+        } else if (token == "HÀM") {
+            bytecode.push_back({OP_HAM, 0});
+        } else if (token == "GỌI") {
+            bytecode.push_back({OP_GOI_HAM, 0});
+        } else if (token == "TRẢ VỀ") {
+            bytecode.push_back({OP_TRA_VE, 0});
+        } else if (token == "BỎ QUA") {
+            bytecode.push_back({OP_BO_QUA, 0});
+        } else if (token == "THOÁT") {
+            bytecode.push_back({OP_THOAT, 0});
+        } else if (token == "+") {
             bytecode.push_back({OP_CONG, 0});
-        } else if (token == "TRỪ") {
+        } else if (token == "-") {
             bytecode.push_back({OP_TRU, 0});
-        } else if (token == "NHÂN") {
+        } else if (token == "*") {
             bytecode.push_back({OP_NHAN, 0});
-        } else if (token == "CHIA") {
+        } else if (token == "/") {
             bytecode.push_back({OP_CHIA, 0});
+        } else if (token == "VÀ") {
+            bytecode.push_back({OP_VA, 0});
+        } else if (token == "HOẶC") {
+            bytecode.push_back({OP_HOAC, 0});
+        } else if (token == "KHÔNG") {
+            bytecode.push_back({OP_KHONG, 0});
         } else if (token == "IN") {
             bytecode.push_back({OP_IN, 0});
         } else if (token == "DỪNG") {
-            bytecode.push_back({OP_DUNG, 0});
+            bytecode.push_back({OP_DUNG_CHUONG_TRINH, 0});
         } else {
             throw std::runtime_error("Lỗi cú pháp: từ khóa không xác định '" + token + "'");
         }

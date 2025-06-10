@@ -4,8 +4,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include "src/include/compiler.h"
-#include "src/include/vm.h"
+#include "../include/compiler.h"
+#include "../include/vm.h"
 
 std::string readFile(const std::string &filename) {
     std::ifstream fileStream(filename);
@@ -20,7 +20,7 @@ std::string readFile(const std::string &filename) {
 int main() {
     try {
         // Đọc nội dung từ file có đuôi .vi (ví dụ: program.vi)
-        const std::string filename = "/Users/winbiru/VietVM/tests/program.vi";
+        const std::string filename = "../tests/program.vi";
         std::string source = readFile(filename);
 
         // Biên dịch mã nguồn thành bytecode

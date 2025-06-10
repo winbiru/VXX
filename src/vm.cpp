@@ -1,5 +1,5 @@
 // vm.cpp
-#include "include/vm.h"
+#include "../include/vm.h"
 #include <iostream>
 #include <stdexcept>
 
@@ -9,7 +9,7 @@ void VM::run() {
     while (pc < code.size()) {
         const Instruction &instr = code[pc];
         switch (instr.op) {
-            case OP_BIEN: {
+            case OP_BIEN_SO: {
                 // Đẩy hằng số lên stack
                 stack.push_back(instr.operand);
                 break;
@@ -79,7 +79,7 @@ void VM::run() {
                 std::cout << value << std::endl;
                 break;
             }
-            case OP_DUNG: {
+            case OP_DUNG_CHUONG_TRINH: {
                 return; // Dừng chương trình
             }
             default:
