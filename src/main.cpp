@@ -1,4 +1,3 @@
-// src/main.cpp
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -6,6 +5,7 @@
 #include <vector>
 #include "../include/compiler.h"
 #include "../include/vm.h"
+#include "../include/name_op.h"
 
 std::string readFile(const std::string &filename) {
     std::ifstream fileStream(filename);
@@ -25,6 +25,21 @@ int main() {
 
         // Biên dịch mã nguồn thành bytecode
         std::vector<Instruction> bytecode = compileSource(source);
+
+        // In toàn bộ bytecode để debug
+        std::cout << "Danh sách bytecode:" << std::endl;
+        for (size_t i = 0; i < bytecode.size(); ++i) {
+            const Instruction &instr = bytecode[i];
+            std::cout << "[" << i << "] "
+            << "op: " << instr.op   // ID opcode
+            << " (" << name_op(instr.op) << ")";      // Tên opcode
+
+            if (bytecode[i].operandIndex != -1)
+                std::cout << ", operandIndex: " << bytecode[i].operandIndex;
+            if (bytecode[i].operand != 0)
+                std::cout << ", operand: " << bytecode[i].operand;
+            std::cout << std::endl;
+        }
 
         // Tạo máy ảo và chạy bytecode
         VM vm(bytecode);

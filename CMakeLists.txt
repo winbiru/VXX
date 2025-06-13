@@ -10,7 +10,9 @@ set(SOURCES
         src/main.cpp
         src/compiler.cpp
         src/vm.cpp
+        include/name_op.h
         # Các tệp nguồn khác nếu có
 )
 
-add_executable(VietVM ${SOURCES})
+add_executable(VietVM ${SOURCES}
+        include/name_op.h)
