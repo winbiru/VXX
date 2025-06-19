@@ -1,18 +1,24 @@
-// name_op.h
 #ifndef TO_STRING_H
 #define TO_STRING_H
 
 #include <string>
+#include <unordered_map>
 #include "instruction.h" // để nhận diện enum Opcode
 
+extern const std::unordered_map<std::string, Opcode> keywordMap;
+
+std::string name_op(Opcode op);  // tên hàm ánh xạ ngược
+
+
+// Đổi Opcode thành tên chuỗi để debug
 inline std::string name_op(Opcode op) {
     switch (op) {
         case OP_CONG: return "OP_CONG";
         case OP_TRU: return "OP_TRU";
         case OP_NHAN: return "OP_NHAN";
         case OP_CHIA: return "OP_CHIA";
-        case OP_VA: return "OP_VA";
-        case OP_HOAC: return "OP_HOAC";
+        case OP_Logic_VA: return "OP_LOGIC_VA";
+        case OP_Logic_HOAC: return "OP_Logic_HOAC";
         case OP_KHONG: return "OP_KHONG";
         case OP_SO_SANH_BANG: return "OP_SO_SANH_BANG";
         case OP_KHAC_BANG: return "OP_KHAC_BANG";
@@ -30,7 +36,7 @@ inline std::string name_op(Opcode op) {
         case OP_DONG_LENH: return "OP_DONG_LENH";
         case OP_PHAY: return "OP_PHAY";
         case OP_NEU: return "OP_NEU";
-        case OP_KHAC: return "OP_KHAC";
+        case OP_HOAC: return "OP_HOAC";
         case OP_NEU_KHONG: return "OP_NEU_KHONG";
         case OP_KET_THUC_NEU: return "OP_KET_THUC_NEU";
         case OP_LAP: return "OP_LAP";
@@ -49,11 +55,13 @@ inline std::string name_op(Opcode op) {
         case OP_GOI: return "OP_GOI";
         case OP_TRA_VE: return "OP_TRA_VE";
         case OP_BIEN_SO: return "OP_BIEN_SO";
-        case OP_TEN_BIEN: return "OP_TEN_BIEN";
+        case OP_TEN_BIEN_ID: return "OP_TEN_BIEN_ID";
+        case OP_TEN_BIEN_GIA_TRI: return "OP_TEN_BIEN_GIA_TRI";
         case OP_IN: return "OP_IN";
         case OP_DUNG_CHUONG_TRINH: return "OP_DUNG_CHUONG_TRINH";
         default: return "UNKNOWN_OPCODE";
     }
 }
+
 
 #endif // TO_STRING_H

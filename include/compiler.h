@@ -6,11 +6,27 @@
 #include <string>
 #include <unordered_map>
 #include "instruction.h"
+#include "../include/name_op.h"  // Đảm bảo đã có
 
 // Hàm biên dịch: chuyển từ mã nguồn (string) sang vector<Instruction>
-std::vector<Instruction> compileSource(const std::string &source);
+std::vector<Instruction> compileSource(const std::string &source,
+                                       const std::unordered_map<std::string, Opcode> &keywordMap);
+
 extern std::unordered_map<std::string, int> symbolTable;
 extern int nextSymbolIndex;
-int getOrCreate(std::unordered_map<std::string, int>& table, const std::string& key, int& nextIndex);
+extern std::unordered_map<std::string, int> variableTable;
+extern int nextVariableID;
+
+void compileToken(const std::string & tok, const std::vector<Instruction> & vector, const std::unordered_map<std::string, int> & pairs, int next_var_id, const std::unordered_map<std::string, Opcode> & keyword_map);
+
+inline int getVariableID(const std::string& name) {
+    if (variableTable.count(name)) {
+        return variableTable[name];
+    } else {
+        int id = nextVariableID++;
+        variableTable[name] = id;
+        return id;
+    }
+}
 
 #endif // COMPILER_H

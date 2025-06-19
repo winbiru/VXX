@@ -26,6 +26,7 @@ private:
     size_t pc = 0;                       // Program counter
     int instructionPointer = 0;
     bool running = true;                 // Trạng thái thực thi
+    int vi_tri_dieu_kien = -1;
 
     // Các hàm phụ trợ
     void execute(const Instruction& inst);

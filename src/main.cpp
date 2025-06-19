@@ -24,7 +24,7 @@ int main() {
         std::string source = readFile(filename);
 
         // Biên dịch mã nguồn thành bytecode
-        std::vector<Instruction> bytecode = compileSource(source);
+        std::vector<Instruction> bytecode = compileSource(source, keywordMap);
 
         // In toàn bộ bytecode để debug
         std::cout << "Danh sách bytecode:" << std::endl;

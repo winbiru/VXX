@@ -11,6 +11,9 @@ set(SOURCES
         src/compiler.cpp
         src/vm.cpp
         include/name_op.h
+        include/common/Utility.h
+        include/common/LoopUltil.h
+        src/name_op.cpp
         # Các tệp nguồn khác nếu có
 )
 

@@ -1,6 +1,6 @@
 // compiler.cpp
 #include "../include/compiler.h"              // Include file header cho compiler
-
+#include "../include/common/Utility.h"   // để dùng Utility::trim(...)
 #include <algorithm>                         // Thư viện cho các hàm như all_of, find_first_not_of
 #include <sstream>                          // Để sử dụng istringstream tách dòng
 #include <stdexcept>                        // Để ném lỗi runtime_error
@@ -8,8 +8,15 @@
 #include <cctype>                          // Dùng các hàm kiểm tra ký tự như isspace, isdigit
 #include <iostream>                        // Dùng để debug xuất ra cerr
 #include <unordered_map>                   // Dùng bảng hash ánh xạ tên biến, opcode
-
+#include "../include/common/Utility.h"
 #include "../include/instruction.h"        // Include định nghĩa Instruction, Opcode
+#include "common/LoopUltil.h"
+
+void compileExpr(const std::string& expr,
+                 std::vector<Instruction>& bytecode,
+                 std::unordered_map<std::string, int>& symbolTable,
+                 int& nextSymbolIndex);
+
 
 // Hàm loại bỏ khoảng trắng đầu/cuối chuỗi
 static std::string trim(const std::string &s) {
@@ -24,17 +31,17 @@ std::unordered_map<std::string, int> symbolTable;
 // Biến đếm id tiếp theo
 int nextSymbolIndex = 0;
 
-// Hàm lấy hoặc tạo id cho một khóa trong bảng symbolTable
-int getOrCreate(std::unordered_map<std::string, int>& table, const std::string& key, int& nextIndex) {
-    if (table.count(key)) {                // Nếu đã tồn tại trong bảng
-        return table[key];                 // Trả về id đã có
-    } else {
-        int index = nextIndex++;           // Tạo id mới = giá trị hiện tại của nextIndex
-        table[key] = index;                // Thêm vào bảng
-        return index;                     // Trả về id mới
+/// --- 1. Helper: lấy hoặc tạo mới biến ---
+static int getOrCreate(std::unordered_map<std::string,int>& symTab,
+                       const std::string& name,
+                       int& nextId) {
+    auto it = symTab.find(name);
+    if (it == symTab.end()) {
+        symTab[name] = nextId;
+        return nextId++;
     }
+    return it->second;
 }
-
 // Hàm tách dòng code thành các token cơ bản
 static std::vector<std::string> tokenize(const std::string &line) {
     std::vector<std::string> tokens;       // Mảng token kết quả
@@ -82,247 +89,253 @@ static std::vector<std::string> tokenize(const std::string &line) {
     }
     return tokens;                              // Trả về danh sách token
 }
+// Hàm kiểm tra một chuỗi có phải số nguyên (có thể âm)
+bool isNumber(const std::string& s) {
+    if (s.empty()) return false;
+    size_t start = (s[0] == '-') ? 1 : 0;
+    return std::all_of(s.begin() + start, s.end(), ::isdigit);
+}
 
-// Hàm chính biên dịch source code thành bytecode
-std::vector<Instruction> compileSource(const std::string &source) {
-    std::vector<Instruction> bytecode;        // Vector lưu trữ lệnh bytecode sau khi biên dịch
+// --- 2. Biên dịch biểu thức ---
+void compileExpr(const std::string& expr,
+                 std::vector<Instruction>& bytecode,
+                 std::unordered_map<std::string,int>& symTab,
+                 int& nextId)
+{
+    auto toks = tokenize(trim(expr));
 
-    // Bảng ánh xạ từ khóa, toán tử thành mã opcode
-    static std::unordered_map<std::string, Opcode> keywordMap = {
-        {"nếu", OP_NEU},
-        {"khác", OP_KHAC},
-        {"nếu không", OP_NEU_KHONG},
-        {"lặp", OP_LAP},
-        {"khởi tạo", OP_KHOI_TAO},
-        {"điều kiện", OP_DIEU_KIEN},
-        {"cập nhật", OP_CAP_NHAT},
-        {"kiểm tra sau", OP_KIEM_TRA_SAU},
-        {"chuyển", OP_CHUYEN},
-        {"trường hợp", OP_TRUONG_HOP},
-        {"mặc định", OP_MAC_DINH},
-        {"hàm", OP_HAM},
-        {"gọi", OP_GOI},
-        {"trả về", OP_TRA_VE},
-        {"biến", OP_BIEN_SO},
-        {"in", OP_IN},
-        {"dừng", OP_DUNG_CHUONG_TRINH},
-        {"bỏ qua", OP_BO_QUA},
-        {"thoát", OP_THOAT},
-        {"==", OP_SO_SANH_BANG},
-        {"!=", OP_KHAC_BANG},
-        {">", OP_LON_HON},
-        {"<", OP_NHO_HON},
-        {">=", OP_LON_HON_HOAC_BANG},
-        {"<=", OP_NHO_HON_HOAC_BANG},
-        {"=", OP_GAN},
-        {"+", OP_CONG},
-        {"-", OP_TRU},
-        {"*", OP_NHAN},
-        {"/", OP_CHIA},
-        {"&&", OP_VA},
-        {"||", OP_HOAC},
-        {"{", OP_MO_KHOI},
-        {"}", OP_DONG_KHOI},
-        {"(", OP_MO_NGOAC},
-        {")", OP_DONG_NGOAC},
-        {"[", OP_MO_MANG},
-        {"]", OP_DONG_MANG},
-        {";", OP_DONG_LENH},
-        {",", OP_PHAY}
-    };
-
-    std::istringstream iss(source);            // Tạo luồng đọc dòng source
-    std::string line;                          // Biến chứa từng dòng
-
-    while (std::getline(iss, line)) {         // Đọc từng dòng trong source
-        line = trim(line);                     // Loại bỏ khoảng trắng đầu cuối
-        if (line.empty()) continue;            // Bỏ qua dòng trống
-
-        auto tokens = tokenize(line);         // Tách dòng thành token
-
-        for (size_t i = 0; i < tokens.size(); ++i) {
-            const std::string &token = tokens[i];  // Lấy token hiện tại
-
-            if (token == ";") {                 // Nếu là dấu chấm phẩy kết thúc câu lệnh
-                bytecode.push_back({OP_DONG_LENH, 0}); // Thêm opcode kết thúc dòng
-                continue;
-            }
-
-            if (keywordMap.count(token)) {    // Nếu token là từ khóa hoặc toán tử đã định nghĩa
-                const Opcode op = keywordMap[token]; // Lấy opcode tương ứng
-
-                if (op == OP_LAP) {           // Nếu là từ khóa "lặp" (vòng lặp)
-                    bytecode.push_back({OP_LAP, 0});  // <<< DÒNG QUAN TRỌNG
-                    bytecode.push_back({OP_MO_NGOAC, 0});  // <<< DÒNG QUAN TRỌNG
-                    if (i + 1 < tokens.size() && tokens[i + 1] == "(") { // Kiểm tra dấu ngoặc tròn
-                        size_t j = i + 2;     // Vị trí bắt đầu bên trong ngoặc
-                        int parenCount = 1;  // Đếm ngoặc mở để xác định ngoặc đóng
-                        std::string insideParens; // Chuỗi chứa nội dung trong ngoặc
-
-                        while (j < tokens.size() && parenCount > 0) {  // Đọc đến hết ngoặc
-                            if (tokens[j] == ")") {    // Nếu gặp ngoặc đóng
-                                --parenCount;          // Giảm đếm ngoặc mở
-                                if (parenCount == 0) break;  // Nếu hết ngoặc mở -> thoát vòng
-                            } else if (tokens[j] == "(") { // Nếu gặp ngoặc mở lồng
-                                ++parenCount;          // Tăng đếm ngoặc mở
-                            }
-                            if (parenCount > 0) {      // Chỉ thêm token nếu còn trong ngoặc
-                                insideParens += tokens[j];
-                                if (tokens[j] != ";") insideParens += " "; // Thêm dấu cách giữa token
-                            }
-                            ++j;                      // Tăng vị trí đọc token
-                        }
-
-                        // Hàm con tách phần bên trong ngoặc thành các phần theo dấu chấm phẩy
-                        auto splitLoopParts = [](const std::string& s) -> std::vector<std::string> {
-                            std::vector<std::string> parts;
-                            std::string current;
-                            int parenDepth = 0;
-
-                            for (const char c : s) {
-                                if (c == '(') parenDepth++;
-                                else if (c == ')') parenDepth--;
-
-                                if (c == ';' && parenDepth == 0) {
-                                    parts.push_back(trim(current));
-                                    current.clear();
-                                } else {
-                                    current += c;
-                                }
-                            }
-
-                            if (!current.empty()) parts.push_back(trim(current));
-                            return parts;
-                        };
-
-                        // Tách 3 phần khởi tạo; điều kiện; cập nhật của vòng lặp
-                        auto parts = splitLoopParts(insideParens);
-
-                        // Debug in ra số phần tách được (phải là 3)
-                        std::cerr << "Parts trong vòng lặp: " << parts.size() << std::endl;
-                        for (auto &p : parts) {
-                            std::cerr << "[" << p << "]" << std::endl;
-                        }
-
-                        if (parts.size() != 3) {       // Nếu không đủ 3 phần -> lỗi cú pháp
-                            throw std::runtime_error("Cú pháp lặp không hợp lệ: cần 3 phần trong dấu ()");
-                        }
-
-                        // Hàm con biên dịch từng biểu thức thành bytecode
-                        auto compileExpr = [&](const std::string& expr) {
-                            auto toks = tokenize(trim(expr));
-
-                            // Trường hợp biểu thức gán: biến = giá trị (biến hoặc số)
-                            if (toks.size() == 3 && toks[1] == "=") {
-                                int varId = getOrCreate(symbolTable, toks[0], nextSymbolIndex);
-
-                                // Nếu giá trị là số nguyên
-                                if (std::all_of(toks[2].begin(), toks[2].end(), ::isdigit)) {
-                                    bytecode.push_back({OP_BIEN_SO, std::stoi(toks[2])});
-                                } else {
-                                    // Nếu giá trị là biến
-                                    int valId = getOrCreate(symbolTable, toks[2], nextSymbolIndex);
-                                    bytecode.push_back({OP_TEN_BIEN, valId});
-                                }
-                                bytecode.push_back({OP_TEN_BIEN, varId});
-                                bytecode.push_back({OP_GAN, 0});
-                            }
-                            // Trường hợp biểu thức gán dạng: biến = biến OP số/biến (ví dụ i = i + 1)
-                            else if (toks.size() == 5 && toks[1] == "=") {
-                                int varId = getOrCreate(symbolTable, toks[0], nextSymbolIndex);
-
-                                // Đưa biến trái phải lên stack
-                                int leftId = getOrCreate(symbolTable, toks[2], nextSymbolIndex);
-                                bytecode.push_back({OP_TEN_BIEN, leftId});
-
-                                // Đưa giá trị phải (có thể là biến hoặc số)
-                                if (std::all_of(toks[4].begin(), toks[4].end(), ::isdigit)) {
-                                    bytecode.push_back({OP_BIEN_SO, std::stoi(toks[4])});
-                                } else {
-                                    int rightId = getOrCreate(symbolTable, toks[4], nextSymbolIndex);
-                                    bytecode.push_back({OP_TEN_BIEN, rightId});
-                                }
-
-                                // Thêm opcode tương ứng phép toán ở toks[3]
-                                if (toks[3] == "+") bytecode.push_back({OP_CONG, 0});
-                                else if (toks[3] == "-") bytecode.push_back({OP_TRU, 0});
-                                else if (toks[3] == "*") bytecode.push_back({OP_NHAN, 0});
-                                else if (toks[3] == "/") bytecode.push_back({OP_CHIA, 0});
-                                else throw std::runtime_error("Phép toán chưa được hỗ trợ: " + toks[3]);
-
-                                // Gán kết quả cho biến đầu tiên
-                                bytecode.push_back({OP_TEN_BIEN, varId});
-                                bytecode.push_back({OP_GAN, 0});
-                            }
-                            // Trường hợp biểu thức so sánh đơn giản: biến OP số hoặc biến
-                            else if (toks.size() == 3 && (
-                                toks[1] == "==" || toks[1] == "!=" ||
-                                toks[1] == "<" || toks[1] == ">" ||
-                                toks[1] == "<=" || toks[1] == ">=")) {
-
-                                // Lấy id biến trái
-                                int leftId = getOrCreate(symbolTable, toks[0], nextSymbolIndex);
-
-                                // Đưa biến trái lên stack
-                                bytecode.push_back({OP_TEN_BIEN, leftId});
-
-                                // Đưa giá trị phải lên stack (biến hoặc số)
-                                if (std::all_of(toks[2].begin(), toks[2].end(), ::isdigit)) {
-                                    bytecode.push_back({OP_BIEN_SO, std::stoi(toks[2])});
-                                } else {
-                                    const int rightId = getOrCreate(symbolTable, toks[2], nextSymbolIndex);
-                                    bytecode.push_back({OP_TEN_BIEN, rightId});
-                                }
-
-                                // Tùy toán tử so sánh thêm opcode tương ứng
-                                if (toks[1] == "==") bytecode.push_back({OP_SO_SANH_BANG, 0});
-                                else if (toks[1] == "!=") bytecode.push_back({OP_KHAC_BANG, 0});
-                                else if (toks[1] == "<") bytecode.push_back({OP_NHO_HON, 0});
-                                else if (toks[1] == ">") bytecode.push_back({OP_LON_HON, 0});
-                                else if (toks[1] == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG, 0});
-                                else if (toks[1] == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG, 0});
-                            }
-                            else {
-                                throw std::runtime_error("Biểu thức trong vòng lặp chưa được hỗ trợ: " + expr);
-                            }
-                        };
-
-                        // Biên dịch phần khởi tạo vòng lặp
-                        bytecode.push_back({OP_KHOI_TAO, 0});      // Opcode khởi tạo
-                        compileExpr(parts[0]);
-
-                        // Biên dịch phần điều kiện vòng lặp
-                        compileExpr(parts[1]);
-                        bytecode.push_back({OP_DIEU_KIEN, 0});     // Opcode điều kiện
-
-                        // Biên dịch phần cập nhật vòng lặp
-                        compileExpr(parts[2]);
-                        bytecode.push_back({OP_CAP_NHAT, 0});      // Opcode cập nhật
-                        bytecode.push_back({OP_DONG_NGOAC, 0});     // Opcode đóng ngoặc
-                        bytecode.push_back({OP_MO_KHOI, 0});       // Mở khối lệnh vòng lặp
-
-                        // Nhảy tới token cuối ngoặc để tiếp tục vòng for
-                        i = j;
-                        continue;     // Bỏ qua phần xử lý dưới cùng vòng for
-                    }
-                }
-
-                // Các từ khóa khác: thêm opcode tương ứng vào bytecode
-                bytecode.push_back({op, 0});
-            } else {
-                // Token không phải từ khóa, có thể là tên biến hoặc số nguyên
-
-                if (std::all_of(token.begin(), token.end(), ::isdigit)) {
-                    // Nếu token toàn chữ số -> opcode BIEN_SO với giá trị số nguyên
-                    bytecode.push_back({OP_BIEN_SO, std::stoi(token)});
-                } else {
-                    // Nếu là tên biến, lấy id biến trong bảng symbolTable
-                    int id = getOrCreate(symbolTable, token, nextSymbolIndex);
-                    bytecode.push_back({OP_TEN_BIEN, id});
-                }
-            }
+    // a = b
+    if (toks.size() == 3 && toks[1] == "=") {
+        int dst = getOrCreate(symTab, toks[0], nextId);
+        // giá trị
+        if (isNumber(toks[2]))
+            bytecode.push_back({OP_BIEN_SO, std::stoi(toks[2]), 0});
+        else {
+            int src = getOrCreate(symTab, toks[2], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, src});
         }
+        // ID đích
+        bytecode.push_back({OP_TEN_BIEN_ID, dst, 0});
+        bytecode.push_back({OP_GAN, 0, 0});
+        return;
     }
 
-    return bytecode;  // Trả về bytecode sau khi biên dịch toàn bộ source
+    // a = b + c  (hoặc -,*,/)
+    if (toks.size() == 5 && toks[1] == "=") {
+        int dst = getOrCreate(symTab, toks[0], nextId);
+        // giá trị b
+        if (isNumber(toks[2]))
+            bytecode.push_back({OP_BIEN_SO, std::stoi(toks[2]), 0});
+        else {
+            int b = getOrCreate(symTab, toks[2], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, b});
+        }
+        // giá trị c
+        if (isNumber(toks[4]))
+            bytecode.push_back({OP_BIEN_SO, std::stoi(toks[4]), 0});
+        else {
+            int c = getOrCreate(symTab, toks[4], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, c});
+        }
+        // phép toán
+        if      (toks[3] == "+") bytecode.push_back({OP_CONG, 0, 0});
+        else if (toks[3] == "-") bytecode.push_back({OP_TRU, 0, 0});
+        else if (toks[3] == "*") bytecode.push_back({OP_NHAN, 0, 0});
+        else if (toks[3] == "/") bytecode.push_back({OP_CHIA, 0, 0});
+        else throw std::runtime_error("Phép toán chưa hỗ trợ: " + toks[3]);
+        // gán
+        bytecode.push_back({OP_TEN_BIEN_ID, dst, 0});
+        bytecode.push_back({OP_GAN, 0, 0});
+        return;
+    }
+
+    // so sánh: x < 100, x>=y, v.v.
+    if (toks.size() == 3 && (
+        toks[1] == "==" || toks[1] == "!=" ||
+        toks[1] == "<"  || toks[1] == ">"  ||
+        toks[1] == "<=" || toks[1] == ">="))
+    {
+        // giá trị trái
+        if (isNumber(toks[0]))
+            bytecode.push_back({OP_BIEN_SO, std::stoi(toks[0]), 0});
+        else {
+            int l = getOrCreate(symTab, toks[0], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, l});
+        }
+        // giá trị phải
+        if (isNumber(toks[2]))
+            bytecode.push_back({OP_BIEN_SO, std::stoi(toks[2]), 0});
+        else {
+            int r = getOrCreate(symTab, toks[2], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, r});
+        }
+        // operator
+        if      (toks[1] == "==") bytecode.push_back({OP_SO_SANH_BANG,        0, 0});
+        else if (toks[1] == "!=") bytecode.push_back({OP_KHAC_BANG,           0, 0});
+        else if (toks[1] == "<")  bytecode.push_back({OP_NHO_HON,            0, 0});
+        else if (toks[1] == ">")  bytecode.push_back({OP_LON_HON,            0, 0});
+        else if (toks[1] == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG, 0, 0});
+        else if (toks[1] == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG, 0, 0});
+        return;
+    }
+
+    throw std::runtime_error("Biểu thức chưa được hỗ trợ: " + expr);
 }
+// --- 3. Biên dịch token đơn lẻ ---
+void compileToken(const std::string& tok,
+                  std::vector<Instruction>& bytecode,
+                  std::unordered_map<std::string,int>& symTab,
+                  int& nextId,
+                  const std::unordered_map<std::string,Opcode>& kwMap)
+{
+    if (kwMap.count(tok)) {
+        bytecode.push_back({kwMap.at(tok), 0, 0});
+    }
+    else if (isNumber(tok)) {
+        bytecode.push_back({OP_BIEN_SO, std::stoi(tok), 0});
+    }
+    else {
+        // đọc giá trị biến khi xuất hiện đơn lẻ (ví dụ in x; hay trong expr đơn)
+        int vid = getOrCreate(symTab, tok, nextId);
+        bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, vid});
+    }
+}
+
+
+// --- 4. Sinh phần (init; cond; update) ---
+void compileLoop(const std::vector<std::string>& parts,
+                 std::vector<Instruction>& bytecode,
+                 std::unordered_map<std::string,int>& symTab,
+                 int& nextId)
+{
+    if (parts.size() != 3) throw std::runtime_error("Cú pháp lặp sai");
+
+    bytecode.push_back({OP_LAP, 0, 0});
+    bytecode.push_back({OP_MO_NGOAC, 0, 0});
+
+    // init
+    bytecode.push_back({OP_KHOI_TAO, 0, 0});
+    compileExpr(parts[0], bytecode, symTab, nextId);
+
+    // cond
+    bytecode.push_back({OP_DIEU_KIEN, 0, 0});
+    compileExpr(parts[1], bytecode, symTab, nextId);
+
+    // update
+    bytecode.push_back({OP_CAP_NHAT, 0, 0});
+    compileExpr(parts[2], bytecode, symTab, nextId);
+
+    bytecode.push_back({OP_DONG_NGOAC, 0, 0});
+    bytecode.push_back({OP_MO_KHOI, 0, 0});
+
+}
+
+// --- 5. Biên dịch block { ... } ---
+void compileBlock(const std::string& src,
+                  std::vector<Instruction>& bytecode,
+                  std::unordered_map<std::string,int>& symTab,
+                  int& nextId,
+                  const std::unordered_map<std::string,Opcode>& kwMap)
+{
+    std::istringstream iss(src);
+    std::string line;
+    while (std::getline(iss, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+        auto toks = tokenize(line);
+        for (size_t i = 0; i < toks.size(); ++i) {
+            const auto& tk = toks[i];
+            if (tk == ";") {
+                bytecode.push_back({OP_DONG_LENH, 0, 0});
+            }
+            else if (kwMap.count(tk) && kwMap.at(tk) == OP_IN) {
+                // in x;
+                ++i;
+                int vid = getOrCreate(symTab, toks[i], nextId);
+                bytecode.push_back({OP_TEN_BIEN_GIA_TRI,0,vid});
+                bytecode.push_back({OP_IN,0,0});
+            }
+            else {
+                compileToken(tk, bytecode, symTab, nextId, kwMap);
+            }
+        }
+        bytecode.push_back({OP_DONG_LENH,0,0});
+    }
+}
+
+// --- 6. Hàm chính ---
+std::vector<Instruction> compileSource(const std::string& source,
+                                       const std::unordered_map<std::string,Opcode>& keywordMap)
+{
+    std::vector<Instruction> bytecode;
+    std::unordered_map<std::string,int> symbolTable;
+    int nextSymbolIndex = 0;
+
+    std::istringstream iss(source);
+    std::string line;
+    while (std::getline(iss, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+
+        auto tokens = tokenize(line);
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            const auto& tk = tokens[i];
+            // dấu kết thúc dòng
+            if (tk == ";") {
+                bytecode.push_back({OP_DONG_LENH,0,0});
+                continue;
+            }
+            // lặp (...)
+            if (keywordMap.count(tk) && keywordMap.at(tk) == OP_LAP) {
+                // tìm nội dung trong ()
+                size_t j = i+2; int d=1;
+                std::ostringstream oss;
+                while (j < tokens.size() && d>0) {
+                    if      (tokens[j]=="(") ++d;
+                    else if (tokens[j]==")") --d;
+                    if (d>0) oss << tokens[j]<<" ";
+                    ++j;
+                }
+                auto parts = splitLoopParts(oss.str());
+                compileLoop(parts, bytecode, symbolTable, nextSymbolIndex);
+
+                // phần thân { … }
+                if (j+1<tokens.size() && tokens[j+1]=="{") {
+                    size_t k=j+2; int bc=1;
+                    std::ostringstream bs;
+                    while (k<tokens.size()&&bc>0) {
+                        if      (tokens[k]=="{") ++bc;
+                        else if (tokens[k]=="}") --bc;
+                        if (bc>0) bs<<tokens[k]<<" ";
+                        ++k;
+                    }
+                    bytecode.push_back({OP_MO_KHOI,0,0});
+                    compileBlock(bs.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
+                    bytecode.push_back({OP_DONG_KHOI,0,0});
+                    i=k;
+                    continue;
+                }
+                i = j;
+                continue;
+            }
+            // in x;
+            if (keywordMap.count(tk) && keywordMap.at(tk) == OP_IN) {
+                ++i;
+                int vid = getOrCreate(symbolTable, tokens[i], nextSymbolIndex);
+                bytecode.push_back({OP_TEN_BIEN_GIA_TRI,0,vid});
+                bytecode.push_back({OP_IN,0,0});
+                continue;
+            }
+            // khác đều là token đơn
+            compileToken(tk, bytecode, symbolTable, nextSymbolIndex, keywordMap);
+        }
+        // kết thúc dòng
+        bytecode.push_back({OP_DONG_LENH,0,0});
+    }
+
+    bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0});
+    return bytecode;
+}
+
+
+
