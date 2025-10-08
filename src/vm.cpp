@@ -25,13 +25,18 @@ void VM::run() {
             }
 
             case OP_NEU: {
-                if (stack.empty()) throw std::runtime_error("Lỗi: không đủ giá trị cho lệnh NẾU");
-                int condition = stack.back(); stack.pop_back();
-                if (condition == 0) pc += instr.operand;
+                // if (stack.empty()) throw std::runtime_error("Lỗi: không đủ giá trị cho lệnh NẾU");
+                // int condition = stack.back(); stack.pop_back();
+                // if (condition == 0) pc += instr.operand;
+                // Biến OP_NEU thành lệnh NOP (No-Operation)
+                // Chỉ dùng để đánh dấu bắt đầu của cấu trúc IF/WHILE nếu cần cho debug
+                // hoặc cho logic xử lý phạm vi (scope) phức tạp hơn.
+                // KHÔNG cần kiểm tra Stack hay thay đổi pc.
+
                 break;
             }
 
-            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
+            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA: case OP_MODULO:
             case OP_Logic_VA: case OP_Logic_HOAC: case OP_KHONG:
             case OP_SO_SANH_BANG: case OP_KHAC_BANG:
             case OP_LON_HON: case OP_NHO_HON:
@@ -53,6 +58,7 @@ void VM::run() {
                         if (b == 0) throw std::runtime_error("Lỗi: chia cho 0");
                         stack.push_back(a / b);
                         break;
+                    case OP_MODULO: stack.push_back(a % b); break;
                     case OP_Logic_VA: stack.push_back((a && b) ? 1 : 0); break;
                     case OP_Logic_HOAC: stack.push_back((a || b) ? 1 : 0); break;
                     case OP_KHONG: stack.push_back((!a) ? 1 : 0); break;
@@ -66,113 +72,12 @@ void VM::run() {
                 }
                 break;
             }
-
-            case OP_KHOI_TAO: {
-                if (stack.empty()) throw std::runtime_error("Stack rỗng khi KHỞI_TẠO");
-                int value = stack.back(); stack.pop_back();
-                variables[instr.operandIndex] = value;
-                break;
-            }
-
-            case OP_DIEU_KIEN: {
-                vi_tri_dieu_kien = pc;
-                if (stack.empty()) throw std::runtime_error("Không đủ toán hạng cho ĐIỀU_KIỆN");
-                int cond = stack.back(); stack.pop_back();
-                if (cond == 0) {
-                    int depth = 0;
-                    while (++pc < bytecode.size()) {
-                        if (bytecode[pc].op == OP_MO_KHOI) depth++;
-                        else if (bytecode[pc].op == OP_DONG_KHOI) {
-                            if (depth == 0) break;
-                            depth--;
-                        }
-                    }
-                }
-                break;
-            }
-
-            case OP_LAP: {
-                // Kiểm tra bytecode có đủ phần ()
-                if (pc + 1 >= bytecode.size() || bytecode[pc + 1].op != OP_MO_NGOAC)
-                    throw std::runtime_error("Thiếu '(' sau LẶP, gặp: " + std::to_string(bytecode[pc + 1].op));
-
-                // Tìm tới vị trí )
-                int parenStart = pc + 1;
-                int parenEnd = parenStart + 1;
-                int openParens = 1;
-                while (parenEnd < bytecode.size()) {
-                    if (bytecode[parenEnd].op == OP_MO_NGOAC) openParens++;
-                    else if (bytecode[parenEnd].op == OP_DONG_NGOAC) openParens--;
-                    if (openParens == 0) break;
-                    parenEnd++;
-                }
-                if (openParens != 0)
-                    throw std::runtime_error("Không tìm thấy ')' cho LẶP");
-
-                // Tìm vị trí các nhãn khởi tạo, điều kiện, cập nhật
-                int khoiTaoPos = -1, dieuKienPos = -1, capNhatPos = -1;
-                for (int i = parenStart + 1; i < parenEnd; ++i) {
-                    if (bytecode[i].op == OP_KHOI_TAO) khoiTaoPos = i;
-                    else if (bytecode[i].op == OP_DIEU_KIEN) dieuKienPos = i;
-                    else if (bytecode[i].op == OP_CAP_NHAT) capNhatPos = i;
-                }
-                if (khoiTaoPos == -1 || dieuKienPos == -1 || capNhatPos == -1)
-                    throw std::runtime_error("Thiếu KHỞI_TẠO, ĐIỀU_KIỆN hoặc CẬP_NHẬT trong LẶP");
-
-                // Tách các đoạn mã con
-                int initStart = khoiTaoPos + 1, initEnd = dieuKienPos;
-                int condStart = dieuKienPos + 1, condEnd = capNhatPos;
-                int updateStart = capNhatPos + 1, updateEnd = parenEnd;
-
-                // Tìm khối thân { ... }
-                if (parenEnd + 1 >= bytecode.size() || bytecode[parenEnd + 1].op != OP_MO_KHOI)
-                    throw std::runtime_error("Thiếu '{' sau phần điều kiện LẶP");
-
-                int bodyStart = parenEnd + 1, bodyEnd = bodyStart + 1;
-                int openBraces = 1;
-                while (bodyEnd < bytecode.size()) {
-                    if (bytecode[bodyEnd].op == OP_MO_KHOI) openBraces++;
-                    else if (bytecode[bodyEnd].op == OP_DONG_KHOI) openBraces--;
-                    if (openBraces == 0) break;
-                    bodyEnd++;
-                }
-                if (openBraces != 0)
-                    throw std::runtime_error("Không tìm thấy '}' cho thân LẶP");
-
-                // Lấy các đoạn code con
-                const std::vector<Instruction> initCode(bytecode.begin() + initStart, bytecode.begin() + initEnd);
-                const std::vector<Instruction> condCode(bytecode.begin() + condStart, bytecode.begin() + condEnd);
-                const std::vector<Instruction> updateCode(bytecode.begin() + updateStart, bytecode.begin() + updateEnd);
-                const std::vector<Instruction> bodyCode(bytecode.begin() + bodyStart + 1, bytecode.begin() + bodyEnd);
-
-                // Chạy khởi tạo
-                VM initVM(initCode); initVM.variables = variables; initVM.run(); variables = initVM.variables;
-
-                // Bắt đầu vòng lặp
-                while (true) {
-                    // Kiểm tra điều kiện
-                    VM condVM(condCode); condVM.variables = variables; condVM.run(); variables = condVM.variables;
-                    if (condVM.stack.empty()) break;
-                    int cond = condVM.stack.back(); condVM.stack.pop_back();
-                    if (!cond) break;
-
-                    // Thân
-                    VM bodyVM(bodyCode); bodyVM.variables = variables; bodyVM.run(); variables = bodyVM.variables;
-
-                    // Cập nhật
-                    VM updateVM(updateCode); updateVM.variables = variables; updateVM.run(); variables = updateVM.variables;
-
-                    // // std::cout << "[DEBUG UPDATE] Variables after update:";
-                    // for (const auto& [k, val] : variables)
-                    //     std::cout << " Biến " << k << "=" << val << ";";
-                    // std::cout << std::endl;
-                }
-
-                // Nhảy qua phần thân đã xử lý
-                pc = bodyEnd + 1;
-                continue;
-            }
-
+            case OP_KHOI_TAO:
+            case OP_DIEU_KIEN:
+            case OP_LAP:
+            case OP_CAP_NHAT: // Nếu bạn giữ OP_CAP_NHAT làm nhãn
+                // Đây là các nhãn (metadata), không phải lệnh thực thi
+                break; // Chuyển sang lệnh tiếp theo (biểu thức)
 
             case OP_IN: {
                 if (stack.empty()) throw std::runtime_error("Lỗi: stack rỗng khi IN");
@@ -213,6 +118,49 @@ void VM::run() {
 
                 break;
             }
+            case OP_JUMP:
+            {
+                // 1. Đọc Operand (Vị trí nhảy)
+                // Giả định địa chỉ nhảy được lưu trong instr.operand
+                int jump_address = instr.operand;
+
+                // 2. Thực hiện Nhảy
+                pc = jump_address;
+
+                // 3. Bỏ qua pc++ ở cuối vòng lặp
+                // Quan trọng: dùng 'continue' để bắt đầu vòng lặp VM mới ngay lập tức
+                // từ địa chỉ 'jump_address' mà không tăng pc thêm 1.
+                continue;
+            }
+            case OP_JUMP_IF_FALSE:
+                {
+                // 1. Đọc Operand (Vị trí nhảy)
+                // Sử dụng instr.operand1 (hoặc instr.operand nếu bạn dùng nó cho địa chỉ)
+                // Dựa trên cách bạn dùng instruction trong OP_NEU, tôi giả định dùng operand:
+                int jump_address = instr.operand;
+
+                // 2. Kiểm tra Stack và Lấy giá trị điều kiện
+                if (stack.empty())
+                    throw std::runtime_error("Lỗi: Stack rỗng khi thực thi OP_JUMP_IF_FALSE");
+
+                int condition_value = stack.back();
+                stack.pop_back();
+
+                // 3. Kiểm tra giá trị (logic isFalse)
+                // Trong VM này, 0 là FALSE, bất kỳ thứ gì khác là TRUE.
+                if (condition_value == 0) {
+                    // 4. Thực hiện Nhảy
+                    // Cập nhật con trỏ lệnh (pc) đến địa chỉ mới.
+                    pc = jump_address;
+
+                    // Dùng 'continue' để bỏ qua pc++ ở cuối vòng lặp while,
+                    // vì pc đã được đặt đến lệnh đích.
+                    continue;
+                }
+                // Nếu điều kiện TRUE, VM sẽ tiếp tục lệnh tiếp theo (pc++ ở cuối vòng lặp while)
+
+                break;
+                }
 
             case OP_DUNG_CHUONG_TRINH:
                 return;

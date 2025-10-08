@@ -17,6 +17,9 @@ inline std::string name_op(Opcode op) {
         case OP_TRU: return "OP_TRU";
         case OP_NHAN: return "OP_NHAN";
         case OP_CHIA: return "OP_CHIA";
+        case OP_MODULO: return "OP_MODULO";
+        case OP_JUMP: return "OP_JUMP";
+        case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE";
         case OP_Logic_VA: return "OP_LOGIC_VA";
         case OP_Logic_HOAC: return "OP_Logic_HOAC";
         case OP_KHONG: return "OP_KHONG";

@@ -18,6 +18,7 @@ extern std::unordered_map<std::string, int> variableTable;
 extern int nextVariableID;
 
 void compileToken(const std::string & tok, const std::vector<Instruction> & vector, const std::unordered_map<std::string, int> & pairs, int next_var_id, const std::unordered_map<std::string, Opcode> & keyword_map);
+std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens);
 
 inline int getVariableID(const std::string& name) {
     if (variableTable.count(name)) {
