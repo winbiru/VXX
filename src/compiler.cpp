@@ -9,16 +9,15 @@
 #include <iostream>                        // Dùng để debug xuất ra cerr
 #include <stack>
 #include <unordered_map>                   // Dùng bảng hash ánh xạ tên biến, opcode
-#include "../include/common/Utility.h"
 #include "../include/instruction.h"        // Include định nghĩa Instruction, Opcode
 #include "common/LoopUltil.h"
 
 // Hàm loại bỏ khoảng trắng đầu/cuối chuỗi
 static std::string trim(const std::string &s) {
-    size_t start = s.find_first_not_of(" \t\r\n");  // Tìm vị trí ký tự đầu tiên không phải khoảng trắng
-    if (start == std::string::npos) return "";      // Nếu toàn khoảng trắng trả về chuỗi rỗng
-    size_t end = s.find_last_not_of(" \t\r\n");     // Tìm vị trí ký tự cuối cùng không phải khoảng trắng
-    return s.substr(start, end - start + 1);        // Trả về substring đã cắt khoảng trắng đầu cuối
+    size_t start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
 }
 
 // Bảng ký hiệu toàn cục lưu tên biến -> id số nguyên
@@ -37,62 +36,57 @@ static int getOrCreate(std::unordered_map<std::string,int>& symTab,
     }
     return it->second;
 }
+
 // Hàm tách dòng code thành các token cơ bản
 static std::vector<std::string> tokenize(const std::string &line) {
-    std::vector<std::string> tokens;       // Mảng token kết quả
-    size_t i = 0;                         // Chỉ số đọc trên dòng
+    std::vector<std::string> tokens;
+    size_t i = 0;
 
     while (i < line.size()) {
-        if (isspace(line[i])) {           // Bỏ qua khoảng trắng
-            ++i;
-            continue;
-        }
+        if (isspace(static_cast<unsigned char>(line[i]))) { ++i; continue; }
 
-        // Kiểm tra toán tử 2 ký tự như ==, !=, <=, >=, &&, ||, ++, --
         if (i + 1 < line.size()) {
             std::string two = line.substr(i, 2);
             if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
                 two == "&&" || two == "||" || two == "++" || two == "--") {
-                tokens.push_back(two);     // Thêm token toán tử 2 ký tự
-                i += 2;                   // Nhảy 2 bước
+                tokens.push_back(two);
+                i += 2;
                 continue;
             }
         }
 
-        // Kiểm tra toán tử/dấu đơn ký tự như + - * / ( ) { } ; , < > = !
         char c = line[i];
         if (c == '+' || c == '-' || c == '*' || c == '/' ||
             c == '(' || c == ')' || c == '{' || c == '}' ||
             c == '[' || c == ']' || c == ';' || c == ',' ||
             c == '<' || c == '>' || c == '=' || c == '!') {
-            tokens.emplace_back(1, c);    // Thêm token đơn ký tự
-            ++i;                         // Nhảy 1 bước
+            tokens.emplace_back(1, c);
+            ++i;
             continue;
         }
 
-        // Token dạng từ hoặc số: lấy chuỗi liên tục đến khi gặp khoảng trắng hoặc toán tử
         size_t j = i;
-        while (j < line.size() && !isspace(line[j]) &&
+        while (j < line.size() && !isspace(static_cast<unsigned char>(line[j])) &&
                line[j] != '+' && line[j] != '-' && line[j] != '*' && line[j] != '/' &&
                line[j] != '(' && line[j] != ')' && line[j] != '{' && line[j] != '}' &&
                line[j] != '[' && line[j] != ']' && line[j] != ';' && line[j] != ',' &&
                line[j] != '<' && line[j] != '>' && line[j] != '=' && line[j] != '!') {
-            j++;
+            ++j;
         }
-        tokens.push_back(line.substr(i, j - i)); // Thêm token vừa lấy
-        i = j;                                  // Nhảy đến vị trí mới
+        tokens.push_back(line.substr(i, j - i));
+        i = j;
     }
-    return tokens;                              // Trả về danh sách token
+    return tokens;
 }
+
 // Hàm kiểm tra một chuỗi có phải số nguyên (có thể âm)
 bool isNumber(const std::string& s) {
     if (s.empty()) return false;
     size_t start = (s[0] == '-') ? 1 : 0;
     return std::all_of(s.begin() + start, s.end(), ::isdigit);
 }
-// --- Hàm hỗ trợ cần thiết ---
 
-// 1. Kiểm tra xem token có phải là toán tử không
+// --- Hàm hỗ trợ cần thiết ---
 bool isOperator(const std::string& token) {
     static const std::unordered_map<std::string, int> ops = {
         {"=", 0}, {"||", 1}, {"&&", 2},
@@ -101,8 +95,6 @@ bool isOperator(const std::string& token) {
     };
     return ops.count(token) > 0;
 }
-
-// 2. Định nghĩa độ ưu tiên của toán tử (Giá trị càng lớn, ưu tiên càng cao)
 int precedence(const std::string& op) {
     if (op == "=") return 0;
     if (op == "||") return 1;
@@ -110,46 +102,42 @@ int precedence(const std::string& op) {
     if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=") return 3;
     if (op == "+" || op == "-") return 4;
     if (op == "*" || op == "/" || op == "%") return 5;
-    return -1; // Không phải toán tử
+    return -1;
 }
-
-// 3. Định nghĩa tính kết hợp (Associativity: left 'l' hoặc right 'r')
 char associativity(const std::string& op) {
-    if (op == "=") return 'r'; // Gán thường kết hợp phải (a = b = c)
-    if (op == "!") return 'r'; // Phủ định
-    // Hầu hết các toán tử khác (số học, logic, so sánh) kết hợp trái
+    if (op == "=") return 'r';
+    if (op == "!") return 'r';
     return 'l';
 }
-
-// Giả định hàm này kiểm tra token có phải là hằng số (số) không
-bool isNumber(const std::string& token);
-
-// Giả định hàm này kiểm tra token có phải là biến không
 bool isVariable(const std::string& token) {
     if (token.empty()) return false;
-    // 1. Không phải là số
     if (isNumber(token)) return false;
-    // 2. Không phải là toán tử đã định nghĩa
     if (isOperator(token)) return false;
-    // 3. Không phải là dấu ngoặc
     if (token == "(" || token == ")" || token == "{" || token == "}") return false;
     if (token == "[" || token == "]") return false;
     if (token == ";" || token == ",") return false;
-
-    // Thêm các từ khóa/lệnh đơn của ngôn ngữ của bạn nếu cần (ví dụ: 'in', 'neu', 'lap')
-
-    // Nếu nó không phải là bất kỳ loại token đặc biệt nào khác, ta xem nó là một biến.
     return true;
 }
 
+// --- Helper: inline compile block from token list ---
+// Định nghĩa trước để có thể gọi trong compileLoop
+void compileToken(const std::string& tok,
+                  std::vector<Instruction>& bytecode,
+                  std::unordered_map<std::string,int>& symTab,
+                  int& nextId,
+                  const std::unordered_map<std::string,Opcode>& kwMap);
+
+void compileBlockInline(std::vector<std::string>& tokens,
+                        std::vector<Instruction>& bytecode,
+                        std::unordered_map<std::string,int>& symTab,
+                        int& nextId,
+                        const std::unordered_map<std::string,Opcode>& kwMap)
+{
+    for (auto& tk : tokens)
+        compileToken(tk, bytecode, symTab, nextId, kwMap);
+}
 
 // --- Hàm Chính: convertToPostfix ---
-
-/**
- * Sử dụng thuật toán Shunting-yard để chuyển biểu thức từ trung tố sang hậu tố.
- * @param infix_tokens Vector chứa các token biểu thức ở dạng trung tố (ví dụ: {"i", "%", "2", "==", "0"})
- * @return Vector chứa các token ở dạng hậu tố RPN (ví dụ: {"i", "2", "%", "0", "=="})
- */
 std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
     std::vector<std::string> output;
     std::stack<std::string> op_stack;
@@ -158,34 +146,23 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
         if (token.empty()) continue;
 
         if (isNumber(token) || isVariable(token)) {
-            // 1. Nếu là toán hạng (biến hoặc hằng số), đẩy vào Output.
             output.push_back(token);
         } else if (isOperator(token)) {
-            // 2. Nếu là toán tử
             while (!op_stack.empty() && isOperator(op_stack.top())) {
                 const std::string& top_op = op_stack.top();
-
-                // Điều kiện dừng:
-                // a) Nếu độ ưu tiên của toán tử trên stack LỚN HƠN (hoặc bằng nếu kết hợp trái)
-                // b) Và toán tử hiện tại KHÔNG phải là toán tử kết hợp phải CÓ ĐỘ ƯU TIÊN BẰNG
                 bool condition = (
                     precedence(top_op) > precedence(token) ||
                     (precedence(top_op) == precedence(token) && associativity(token) == 'l')
                 );
-
                 if (condition) {
                     output.push_back(top_op);
                     op_stack.pop();
-                } else {
-                    break;
-                }
+                } else break;
             }
             op_stack.push(token);
         } else if (token == "(") {
-            // 3. Mở ngoặc, đẩy vào Stack.
             op_stack.push(token);
         } else if (token == ")") {
-            // 4. Đóng ngoặc, di chuyển tất cả từ Stack sang Output cho đến khi gặp mở ngoặc.
             while (!op_stack.empty() && op_stack.top() != "(") {
                 output.push_back(op_stack.top());
                 op_stack.pop();
@@ -193,13 +170,12 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
             if (op_stack.empty()) {
                 throw std::runtime_error("Lỗi cú pháp: Ngoặc đơn không khớp.");
             }
-            op_stack.pop(); // Loại bỏ "(" khỏi Stack
+            op_stack.pop();
         } else {
             throw std::runtime_error("Lỗi: Token không xác định trong biểu thức: " + token);
         }
     }
 
-    // 5. Sau khi xử lý hết token, di chuyển tất cả toán tử còn lại trong Stack sang Output.
     while (!op_stack.empty()) {
         if (op_stack.top() == "(" || op_stack.top() == ")") {
             throw std::runtime_error("Lỗi cú pháp: Ngoặc đơn không khớp.");
@@ -210,18 +186,16 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
 
     return output;
 }
+
 // --- 2. Biên dịch biểu thức (Phiên bản RPN) ---
 void compileExpr(const std::string& expr,
                  std::vector<Instruction>& bytecode,
                  std::unordered_map<std::string,int>& symTab,
                  int& nextId)
 {
-    // Giả định: Các hàm tokenize, trim, isNumber, isVariable đã tồn tại
     auto toks = tokenize(trim(expr));
     auto eq_it = std::find(toks.begin(), toks.end(), "=");
     if (eq_it != toks.end()) {
-        // Đây là câu lệnh gán: LHS = RHS
-
         if (std::distance(toks.begin(), eq_it) != 1) {
             throw std::runtime_error("Lỗi cú pháp gán: LHS phải là một tên biến đơn.");
         }
@@ -229,23 +203,10 @@ void compileExpr(const std::string& expr,
         std::string var_name = toks[0];
         int dst_id = getOrCreate(symTab, var_name, nextId);
 
-        // Tạo chuỗi biểu thức RHS (ví dụ: "b + c" hoặc "i % 2 == 0")
-        std::string rhs_expr;
-        for (auto it = eq_it + 1; it != toks.end(); ++it) {
-            rhs_expr += *it;
-            rhs_expr += " ";
-        }
-
-        // Đệ quy gọi compileExpr (hoặc tạo hàm compileMathExpr riêng) để xử lý RHS
-        // Tạm thời, gọi lại compileExpr trên RHS đã được tokenize
         std::vector<std::string> rhs_toks(eq_it + 1, toks.end());
-
-        // BƯỚC 1: Chuyển RHS thành Postfix
         std::vector<std::string> postfix_tokens = convertToPostfix(rhs_toks);
 
-        // BƯỚC 2: Sinh Bytecode cho RHS
         for (const auto& token : postfix_tokens) {
-            // Logic RPN cũ (chỉ dành cho toán tử/toán hạng, không có gán)
             if (isNumber(token)) {
                 bytecode.push_back({OP_BIEN_SO, std::stoi(token), 0});
             }
@@ -253,29 +214,20 @@ void compileExpr(const std::string& expr,
                 int varId = getOrCreate(symTab, token, nextId);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, varId});
             }
-            // ... (Phần xử lý toán tử ở đây, giống như logic cũ) ...
             else if (token == "+")  bytecode.push_back({OP_CONG, 0, 0});
             else if (token == "-")  bytecode.push_back({OP_TRU, 0, 0});
             else if (token == "*")  bytecode.push_back({OP_NHAN, 0, 0});
             else if (token == "/")  bytecode.push_back({OP_CHIA, 0, 0});
             else if (token == "%")  bytecode.push_back({OP_MODULO, 0, 0});
-            // ... các toán tử so sánh, logic khác ...
             else throw std::runtime_error("Toán tử chưa hỗ trợ: " + token);
         }
 
-        // BƯỚC 3: Thực hiện GÁN
-        // Giá trị RHS đã nằm trên đỉnh stack. Ta đẩy ID biến đích lên
         bytecode.push_back({OP_TEN_BIEN_ID, dst_id, 0});
         bytecode.push_back({OP_GAN, 0, 0});
-
         return;
     }
-    // KẾT THÚC XỬ LÝ GÁN
 
-    // Nếu không phải là gán, nó là một biểu thức đơn giản (ví dụ: x < 10)
-    // Thực hiện RPN thông thường để lại kết quả trên stack
     std::vector<std::string> postfix_tokens = convertToPostfix(toks);
-
     for (const auto& token : postfix_tokens) {
         if (isNumber(token)) {
             bytecode.push_back({OP_BIEN_SO, std::stoi(token), 0});
@@ -317,7 +269,6 @@ void compileToken(const std::string& tok,
         bytecode.push_back({OP_BIEN_SO, std::stoi(tok), 0});
     }
     else {
-        // đọc giá trị biến khi xuất hiện đơn lẻ (ví dụ in x; hay trong expr đơn)
         int vid = getOrCreate(symTab, tok, nextId);
         bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, vid});
     }
@@ -329,71 +280,82 @@ struct LoopIndices {
     int exit_jump_index;  // Địa chỉ của OP_JUMP_IF_FALSE (cần backpatching)
 };
 
-// --- 4. Sinh phần (init; cond) của vòng lặp ---
-// Hàm này phải trả về cả hai chỉ mục quan trọng
+// --- Overload wrapper để tương thích các chỗ gọi cũ ---
+// Gọi phiên bản đầy đủ bên dưới với body rỗng và kwMap rỗng.
+// Giữ nguyên chữ ký cũ: compileLoop(parts, bytecode, symTab, nextId)
+
+
+
+// --- 4. Sinh phần (init; cond; update) của vòng lặp (phiên bản đầy đủ) ---
 LoopIndices compileLoop(const std::vector<std::string> &parts,
+                        const std::string &bodyCode,  // 👈 thân vòng dạng chuỗi
                         std::vector<Instruction> &bytecode,
                         std::unordered_map<std::string, int> &symTab,
-                        int &nextId)
+                        int &nextId,
+                        const std::unordered_map<std::string, Opcode> &kwMap)
 {
-    if (parts.size() != 3) throw std::runtime_error("Cú pháp lặp sai");
+    if (parts.size() != 3)
+        throw std::runtime_error("Cú pháp lặp sai");
 
+    // --- Bắt đầu vòng ---
     bytecode.push_back({OP_LAP, 0, 0});
     bytecode.push_back({OP_MO_NGOAC, 0, 0});
 
-    // 1. init (Khởi tạo: chỉ chạy một lần)
+    // --- 1️⃣ Khởi tạo ---
     bytecode.push_back({OP_KHOI_TAO, 0, 0});
     compileExpr(parts[0], bytecode, symTab, nextId);
 
-    // 2. cond (Điều kiện: Nhãn nhảy ngược)
+    // --- 2️⃣ Ghi nhớ vị trí điều kiện ---
+    int cond_index = bytecode.size();
     bytecode.push_back({OP_DIEU_KIEN, 0, 0});
-    int cond_start_index = bytecode.size() - 1; // Địa chỉ của OP_DIEU_KIEN
-    compileExpr(parts[1], bytecode, symTab, nextId); // Sinh bytecode điều kiện
+    compileExpr(parts[1], bytecode, symTab, nextId);
 
-    // 3. JUMP_IF_FALSE (Nhảy ra khỏi vòng lặp khi điều kiện sai)
+    // --- 3️⃣ Nếu sai thì nhảy ra ---
     bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
-    int exit_jump_index = bytecode.size() - 1; // Địa chỉ cần backpatching
+    int jmp_exit_index = bytecode.size() - 1;
 
-    // Bỏ OP_CAP_NHAT ra khỏi đây! Nó thuộc về compileSource.
+    // --- 4️⃣ Thân vòng lặp ---
+    bytecode.push_back({OP_MO_KHOI, 0, 0});
+    compileBlock(bodyCode, bytecode, symTab, nextId, kwMap);  // 👈 Gọi block có sẵn
+    bytecode.push_back({OP_DONG_KHOI, 0, 0});
 
+    // --- 5️⃣ Cập nhật ---
+    bytecode.push_back({OP_CAP_NHAT, 0, 0});
+    compileExpr(parts[2], bytecode, symTab, nextId);
+
+    // --- 6️⃣ Nhảy ngược về điều kiện ---
+    bytecode.push_back({OP_JUMP, 0, cond_index});
+
+    // --- 7️⃣ Gắn nhãn nhảy ra ---
+    int end_index = bytecode.size();
+    bytecode[jmp_exit_index].operand = end_index;
+
+    // --- 8️⃣ Đóng vòng ---
     bytecode.push_back({OP_DONG_NGOAC, 0, 0});
-    // Bỏ OP_MO_KHOI ra khỏi đây! Nó thuộc về compileSource.
+    bytecode.push_back({OP_DONG_LENH, 0, 0});
 
-    return {cond_start_index, exit_jump_index};
+    return {cond_index, jmp_exit_index};
 }
 
 
-
-// --- 4. Sinh phần (init; cond; update) ---
+// --- compileCondition (IF/WHILE) ---
 int compileCondition(const std::vector<std::string> &parts,
                      std::vector<Instruction> &bytecode,
                      std::unordered_map<std::string, int> &symTab,
                      int &nextId)
 {
-    // 1. Kiểm tra cú pháp: IF/WHILE chỉ cần 1 biểu thức điều kiện
     if (parts.size() != 1) throw std::runtime_error("Cú pháp điều kiện sai");
 
     bytecode.push_back({OP_NEU, 0, 0});
     bytecode.push_back({OP_MO_NGOAC, 0, 0});
-
-    // 2. Biên dịch biểu thức điều kiện (phần tử duy nhất parts[0])
-    // Giá trị kết quả (true/false) sẽ nằm trên đỉnh stack
     compileExpr(parts[0], bytecode, symTab, nextId);
-
-    // 4. Thêm lệnh nhảy quan trọng: OP_NHAY_NEU_SAI
-    // Nếu điều kiện SAI (false), VM sẽ nhảy qua khối lệnh IF.
-    // Đích nhảy (0) sẽ được cập nhật sau (backpatching).
     bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
     int jump_instruction_index = bytecode.size() - 1;
-
     bytecode.push_back({OP_DONG_NGOAC, 0, 0});
-
     return jump_instruction_index;
-
 }
 
-
-// --- 5. Biên dịch block { ... } ---
+// --- 5. Biên dịch block { ... } (từ string source) ---
 void compileBlock(const std::string& src,
                   std::vector<Instruction>& bytecode,
                   std::unordered_map<std::string,int>& symTab,
@@ -412,17 +374,13 @@ void compileBlock(const std::string& src,
                 bytecode.push_back({OP_DONG_LENH, 0, 0});
             }
             else if (kwMap.count(tk) && kwMap.at(tk) == OP_IN) {
-                // in x;
                 ++i;
                 int vid = getOrCreate(symTab, tokens[i], nextId);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI,0,vid});
                 bytecode.push_back({OP_IN,0,0});
                 continue;
             }
-            else if (keywordMap.count(tk) && keywordMap.at(tk) == OP_NEU) {
-                // Logic này phải gần như sao chép từ khối OP_NEU trong compileSource
-
-                // 1. Tìm nội dung trong ()
+            else if (kwMap.count(tk) && kwMap.at(tk) == OP_NEU) {
                 size_t j = i + 2; int d = 1;
                 std::ostringstream oss;
                 while (j < tokens.size() && d > 0) {
@@ -435,9 +393,8 @@ void compileBlock(const std::string& src,
                 auto parts = splitLoopParts(oss.str());
                 int jump_index = compileCondition(parts, bytecode, symTab, nextId);
 
-                // 2. Phần thân { … } - Cần phải dùng đệ quy hoặc logic phức tạp
-                if (j < tokens.size() && tokens[j] == "{") { // Sửa lỗi chỉ mục đã thảo luận
-                    size_t k = j + 1; int bc = 1; // Bắt đầu sau token '{' (tại j)
+                if (j < tokens.size() && tokens[j] == "{") {
+                    size_t k = j + 1; int bc = 1;
                     std::ostringstream bs;
                     while (k < tokens.size() && bc > 0) {
                         if      (tokens[k] == "{") ++bc;
@@ -446,14 +403,13 @@ void compileBlock(const std::string& src,
                         ++k;
                     }
 
-                    // **QUAN TRỌNG:** Phải gọi compileBlock đệ quy hoặc một hàm xử lý block khác cho thân lệnh IF
                     bytecode.push_back({OP_MO_KHOI, 0, 0});
                     compileBlock(bs.str(), bytecode, symTab, nextId, kwMap);
                     bytecode.push_back({OP_DONG_KHOI, 0, 0});
 
                     int jump_target_index = bytecode.size();
                     bytecode[jump_index].operand = jump_target_index;
-                    i = k - 1; // Cập nhật i để bỏ qua khối IF đã xử lý
+                    i = k - 1;
                     continue;
                 }
                 i = j;
@@ -463,11 +419,10 @@ void compileBlock(const std::string& src,
                 compileToken(tk, bytecode, symTab, nextId, kwMap);
             }
         }
-        // bytecode.push_back({OP_DONG_LENH,0,0});
     }
 }
 
-// --- 6. Hàm chính ---
+// --- 6. Hàm chính: compileSource ---
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap)
 {
@@ -485,9 +440,8 @@ std::vector<Instruction> compileSource(const std::string& source,
 
         for (size_t i = 0; i < tokens.size(); ++i) {
             const auto& tk = tokens[i];
-            // dấu kết thúc dòng
             if (tk == "}") {
-                continue; // Bỏ qua '}' đã được xử lý bởi OP_LAP/OP_NEU
+                continue;
             }
             if (tk == ";") {
                 if (i < tokens.size() - 1 || std::getline(iss, line)) {
@@ -495,9 +449,7 @@ std::vector<Instruction> compileSource(const std::string& source,
                 }
                 continue;
             }
-            // lặp (...)
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_LAP) {
-                // tìm nội dung trong ()
                 size_t j = i+2; int d=1;
                 std::ostringstream oss;
                 while (j < tokens.size() && d>0) {
@@ -506,7 +458,6 @@ std::vector<Instruction> compileSource(const std::string& source,
 
                     if (d > 0) {
                         oss << tokens[j];
-                        // Fix: Ensures ';' is included without an extra space after it
                         if (tokens[j] != ";") {
                             oss << " ";
                         }
@@ -515,13 +466,20 @@ std::vector<Instruction> compileSource(const std::string& source,
                 }
 
                 auto parts = splitLoopParts(oss.str());
-                LoopIndices indices = compileLoop(parts, bytecode, symbolTable, nextSymbolIndex);
+                std::ostringstream body;
+                size_t k = j + 1; int depth = 1;
+                while (k < tokens.size() && depth > 0) {
+                    if      (tokens[k] == "{") ++depth;
+                    else if (tokens[k] == "}") --depth;
+                    if (depth > 0) body << tokens[k] << " ";
+                    ++k;
+                }
+                // Use the simple wrapper compileLoop (keeps compatibility)
+                LoopIndices indices = compileLoop(parts, body.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
 
                 // phần thân { … }
-                // SỬA LỖI CHỈ MỤC: j là index của token NGAY sau ')'
                 if (j < tokens.size() && tokens[j] == "{") {
-                    size_t k=j+1; // K bắt đầu sau token '{' (tại j)
-                    int bc=1;
+                    size_t k=j+1; int bc=1;
                     std::ostringstream bs;
                     while (k<tokens.size()&&bc>0) {
                         if      (tokens[k]=="{") ++bc;
@@ -530,40 +488,26 @@ std::vector<Instruction> compileSource(const std::string& source,
                         ++k;
                     }
 
-                    // 2a. Mở khối và biên dịch thân lệnh (Đúng)
                     bytecode.push_back({OP_MO_KHOI,0,0});
-
-                    // **GỌI compileBlock Ở ĐÂY** -> Biên dịch toàn bộ khối { neu (..) { in i; } }
                     compileBlock(bs.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
+                    bytecode.push_back({OP_DONG_KHOI,0,0});
 
-                    // **Đóng khối thân lệnh** (từ `OP_MO_KHOI` trong 2a)
-                    // bytecode.push_back({OP_DONG_KHOI,0,0}); // <-- Thêm DONG_KHOI cho khối body
-
-                    // 2b. XỬ LÝ UPDATE (CAP_NHAT) (Đúng)
                     bytecode.push_back({OP_CAP_NHAT, 0, 0});
                     compileExpr(parts[2], bytecode, symbolTable, nextSymbolIndex);
 
-                    // 2c. JUMP NGƯỢC (Đúng)
                     bytecode.push_back({OP_JUMP, indices.cond_start_index, 0});
 
-                    bytecode.push_back({OP_DONG_KHOI,0,0}); // <-- Khối đóng duy nhất cho [12]
-
-                    // 4. BACKPATCHING JUMP_IF_FALSE (Đúng)
                     int jump_target_index = bytecode.size();
                     bytecode[indices.exit_jump_index].operand = jump_target_index;
 
-                    i = k - 1; // i must point to the token BEFORE the closing '}'
+                    i = k - 1;
                     continue;
                 }
 
-                // If there is no block {} (single statement loop), the VM will execute
-                // the next instruction, but the update/jump logic must be handled differently.
-                // For now, assume { } is mandatory.
                 i = j;
                 continue;
             }
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_NEU) {
-                // tìm nội dung trong ()
                 size_t j = i+2; int d=1;
                 std::ostringstream oss;
                 while (j < tokens.size() && d>0) {
@@ -573,10 +517,8 @@ std::vector<Instruction> compileSource(const std::string& source,
                     ++j;
                 }
                 auto parts = splitLoopParts(oss.str());
-                // compileCondition(parts, bytecode, symbolTable, nextSymbolIndex);
-                int jump_index = compileCondition(parts, bytecode, symbolTable, nextSymbolIndex); // Chỉ mục của OP_JUMP_IF_FALSE
+                int jump_index = compileCondition(parts, bytecode, symbolTable, nextSymbolIndex);
 
-                // phần thân { … }
                 if (j < tokens.size() && tokens[j]=="{") {
                     size_t k=j+1; int bc=1;
                     std::ostringstream bs;
@@ -592,16 +534,14 @@ std::vector<Instruction> compileSource(const std::string& source,
                     bytecode.push_back({OP_DONG_KHOI,0,0});
                     int jump_target_index = bytecode.size();
 
-                    // Cập nhật operand của OP_JUMP_IF_FALSE
                     bytecode[jump_index].operand = jump_target_index;
-                    i = k - 1; // Di chuyển i đến sau dấu "}" cuối cùng
+                    i = k - 1;
                     continue;
                 }
                 i = j;
                 continue;
             }
 
-            // in x;
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_IN) {
                 ++i;
                 int vid = getOrCreate(symbolTable, tokens[i], nextSymbolIndex);
@@ -609,16 +549,10 @@ std::vector<Instruction> compileSource(const std::string& source,
                 bytecode.push_back({OP_IN,0,0});
                 continue;
             }
-            // khác đều là token đơn
             compileToken(tk, bytecode, symbolTable, nextSymbolIndex, keywordMap);
         }
-        // kết thúc dòng
-        // bytecode.push_back({OP_DONG_LENH,0,0});
     }
 
     bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0});
     return bytecode;
 }
-
-
-

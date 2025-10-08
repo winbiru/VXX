@@ -19,6 +19,13 @@ extern int nextVariableID;
 
 void compileToken(const std::string & tok, const std::vector<Instruction> & vector, const std::unordered_map<std::string, int> & pairs, int next_var_id, const std::unordered_map<std::string, Opcode> & keyword_map);
 std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens);
+void compileBlock(const std::string& src,
+                  std::vector<Instruction>& bytecode,
+                  std::unordered_map<std::string,int>& symTab,
+                  int& nextId,
+                  const std::unordered_map<std::string,Opcode>& kwMap);
+
+
 
 inline int getVariableID(const std::string& name) {
     if (variableTable.count(name)) {
