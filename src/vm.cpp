@@ -9,18 +9,17 @@ VM::VM(const std::vector<Instruction>& code) : bytecode(code), pc(0) {}
 void VM::run() {
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
+        int b = 0, a = 0;
         switch (instr.op) {
             case OP_BIEN_SO: {
                 int val = instr.operand;
                 stack.push_back(val);
-                // std::cout << "[DEBUG BIEN_SO] Push hằng số: " << val << std::endl;
                 break;
             }
 
             case OP_TEN_BIEN_ID: {
                 int varId = instr.operandIndex;
                 stack.push_back(varId);
-                // std::cout << "[DEBUG TEN_BIEN] Push biến ID: " << varId << std::endl;
                 break;
             }
 
@@ -36,14 +35,22 @@ void VM::run() {
                 break;
             }
 
-            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA: case OP_MODULO:
+            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
+            case OP_MODULO:
+                if (stack.size() < 2)
+                    throw std::runtime_error("Lỗi: thiếu toán hạng cho MODULO");
+                b = stack.back(); stack.pop_back();
+                a = stack.back(); stack.pop_back();
+                if (b == 0)
+                    throw std::runtime_error("Lỗi: chia dư cho 0");
+                stack.push_back(a % b);
+                break;
             case OP_Logic_VA: case OP_Logic_HOAC: case OP_KHONG:
             case OP_SO_SANH_BANG: case OP_KHAC_BANG:
             case OP_LON_HON: case OP_NHO_HON:
             case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
                 if ((instr.op != OP_KHONG && stack.size() < 2) || (instr.op == OP_KHONG && stack.empty()))
                     throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử " + std::to_string(instr.op));
-                int b = 0, a = 0;
                 if (instr.op != OP_KHONG) {
                     b = stack.back(); stack.pop_back();
                     a = stack.back(); stack.pop_back();
@@ -51,14 +58,19 @@ void VM::run() {
                     a = stack.back(); stack.pop_back();
                 }
                 switch (instr.op) {
-                    case OP_CONG: stack.push_back(a + b); break;
+                    case OP_CONG: stack.push_back(a + b);
+                        std::cout << "[DEBUG CỘNG] " << a << " + " << b << " = " << (a + b) << std::endl;
+                        break;
                     case OP_TRU: stack.push_back(a - b); break;
                     case OP_NHAN: stack.push_back(a * b); break;
                     case OP_CHIA:
                         if (b == 0) throw std::runtime_error("Lỗi: chia cho 0");
                         stack.push_back(a / b);
                         break;
-                    case OP_MODULO: stack.push_back(a % b); break;
+                    case OP_MODULO:
+                        if (b == 0) throw std::runtime_error("Lỗi: chia dư cho 0");
+                        stack.push_back(a % b);
+                        break;
                     case OP_Logic_VA: stack.push_back((a && b) ? 1 : 0); break;
                     case OP_Logic_HOAC: stack.push_back((a || b) ? 1 : 0); break;
                     case OP_KHONG: stack.push_back((!a) ? 1 : 0); break;
@@ -88,34 +100,26 @@ void VM::run() {
 
 
             case OP_TEN_BIEN_GIA_TRI: {
-                int id = instr.operandIndex;
-                if (variables.find(id) == variables.end()) {
-                    std::cerr << "Cảnh báo: biến ID " << id << " chưa được khởi tạo. Mặc định = 0.\n";
-                    variables[id] = 0;
-                }
-                stack.push_back(variables[id]);
+                int varId = instr.operandIndex;
+                if (variables.count(varId) == 0)
+                    throw std::runtime_error("Lỗi: biến chưa được khởi tạo");
+                stack.push_back(variables[varId]);
                 break;
             }
 
             case OP_GAN: {
                 // std::cout << "[DEBUG GÁN] Stack trước khi gán:";
-                for (auto v : stack)
-                    // std::cout << " " << v;
-                // std::cout << std::endl;
-
                 if (stack.size() < 2) throw std::runtime_error("Không đủ toán hạng để GÁN");
 
-                int varId = stack.back(); stack.pop_back();
-                int value = stack.back(); stack.pop_back();
+                int value = stack.back(); stack.pop_back();   // rồi lấy giá trị
+                int varId = stack.back(); stack.pop_back();   // lấy ID biến trước
 
                 variables[varId] = value;
                 // std::cout << "[DEBUG GÁN] Biến " << varId << " = " << value << std::endl;
-
-                // // std::cout << "[DEBUG VARIABLES] ";
+                //
                 // for (const auto& [k, val] : variables)
                 //     std::cout << "Biến " << k << "=" << val << "; ";
                 // std::cout << std::endl;
-
                 break;
             }
             case OP_JUMP:

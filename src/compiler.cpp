@@ -121,20 +121,25 @@ bool isVariable(const std::string& token) {
 
 // --- Helper: inline compile block from token list ---
 // Định nghĩa trước để có thể gọi trong compileLoop
-void compileToken(const std::string& tok,
-                  std::vector<Instruction>& bytecode,
-                  std::unordered_map<std::string,int>& symTab,
-                  int& nextId,
-                  const std::unordered_map<std::string,Opcode>& kwMap);
-
-void compileBlockInline(std::vector<std::string>& tokens,
+void compileBlockInline(const std::vector<std::string>& tokens,
                         std::vector<Instruction>& bytecode,
                         std::unordered_map<std::string,int>& symTab,
                         int& nextId,
-                        const std::unordered_map<std::string,Opcode>& kwMap)
+                        const std::unordered_map<std::string,Opcode>& keywordMap)
 {
-    for (auto& tk : tokens)
-        compileToken(tk, bytecode, symTab, nextId, kwMap);
+    std::ostringstream line;
+    for (const auto& tk : tokens) {
+        if (tk == ";") {
+            compileExpr(line.str(), bytecode, symTab, nextId, keywordMap);
+            bytecode.push_back({OP_DONG_LENH, 0, 0});
+            line.str(""); line.clear();
+        } else {
+            line << tk << " ";
+        }
+    }
+    if (!line.str().empty()) {
+        compileExpr(line.str(), bytecode, symTab, nextId, keywordMap);
+    }
 }
 
 // --- Hàm Chính: convertToPostfix ---
@@ -191,7 +196,9 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
 void compileExpr(const std::string& expr,
                  std::vector<Instruction>& bytecode,
                  std::unordered_map<std::string,int>& symTab,
-                 int& nextId)
+                 int& nextId,
+                 const std::unordered_map<std::string,Opcode>& keywordMap
+                 )
 {
     auto toks = tokenize(trim(expr));
     auto eq_it = std::find(toks.begin(), toks.end(), "=");
@@ -204,11 +211,18 @@ void compileExpr(const std::string& expr,
         int dst_id = getOrCreate(symTab, var_name, nextId);
 
         std::vector<std::string> rhs_toks(eq_it + 1, toks.end());
-        std::vector<std::string> postfix_tokens = convertToPostfix(rhs_toks);
+        std::vector<std::string> clean_tokens;
+        for (const auto& t : rhs_toks) {
+            if (t != "{" && t != "}") {
+                clean_tokens.push_back(t);
+            }
+        }
+        std::vector<std::string> postfix_tokens = convertToPostfix(clean_tokens);
 
         for (const auto& token : postfix_tokens) {
             if (isNumber(token)) {
-                bytecode.push_back({OP_BIEN_SO, std::stoi(token), 0});
+                int value = std::stoi(token);
+                bytecode.push_back({OP_BIEN_SO, 0, value});  // ✅ operand nằm ở vị trí thứ 3
             }
             else if (isVariable(token)) {
                 int varId = getOrCreate(symTab, token, nextId);
@@ -219,6 +233,7 @@ void compileExpr(const std::string& expr,
             else if (token == "*")  bytecode.push_back({OP_NHAN, 0, 0});
             else if (token == "/")  bytecode.push_back({OP_CHIA, 0, 0});
             else if (token == "%")  bytecode.push_back({OP_MODULO, 0, 0});
+            else if (token == "==")  bytecode.push_back({OP_SO_SANH_BANG, 0, 0});
             else throw std::runtime_error("Toán tử chưa hỗ trợ: " + token);
         }
 
@@ -226,11 +241,19 @@ void compileExpr(const std::string& expr,
         bytecode.push_back({OP_GAN, 0, 0});
         return;
     }
-
-    std::vector<std::string> postfix_tokens = convertToPostfix(toks);
+    std::vector<std::string> clean_tokens;
+    for (const auto& t : toks) {
+        if (t != "{" && t != "}") {
+            clean_tokens.push_back(t);
+        }
+    }
+    std::vector<std::string> postfix_tokens = convertToPostfix(clean_tokens);
     for (const auto& token : postfix_tokens) {
         if (isNumber(token)) {
-            bytecode.push_back({OP_BIEN_SO, std::stoi(token), 0});
+            if (isNumber(token)) {
+                int value = std::stoi(token);
+                bytecode.push_back({OP_BIEN_SO, 0, value});  // ✅ operand nằm ở vị trí thứ 3
+            }
         }
         else if (isVariable(token)) {
             int varId = getOrCreate(symTab, token, nextId);
@@ -260,10 +283,10 @@ void compileToken(const std::string& tok,
                   std::vector<Instruction>& bytecode,
                   std::unordered_map<std::string,int>& symTab,
                   int& nextId,
-                  const std::unordered_map<std::string,Opcode>& kwMap)
+                  const std::unordered_map<std::string,Opcode>& keywordMap)
 {
-    if (kwMap.count(tok)) {
-        bytecode.push_back({kwMap.at(tok), 0, 0});
+    if (keywordMap.count(tok)) {
+        bytecode.push_back({keywordMap.at(tok), 0, 0});
     }
     else if (isNumber(tok)) {
         bytecode.push_back({OP_BIEN_SO, std::stoi(tok), 0});
@@ -281,7 +304,7 @@ struct LoopIndices {
 };
 
 // --- Overload wrapper để tương thích các chỗ gọi cũ ---
-// Gọi phiên bản đầy đủ bên dưới với body rỗng và kwMap rỗng.
+// Gọi phiên bản đầy đủ bên dưới với body rỗng và keywordMap rỗng.
 // Giữ nguyên chữ ký cũ: compileLoop(parts, bytecode, symTab, nextId)
 
 
@@ -292,7 +315,7 @@ LoopIndices compileLoop(const std::vector<std::string> &parts,
                         std::vector<Instruction> &bytecode,
                         std::unordered_map<std::string, int> &symTab,
                         int &nextId,
-                        const std::unordered_map<std::string, Opcode> &kwMap)
+                        const std::unordered_map<std::string, Opcode> &keywordMap)
 {
     if (parts.size() != 3)
         throw std::runtime_error("Cú pháp lặp sai");
@@ -301,14 +324,10 @@ LoopIndices compileLoop(const std::vector<std::string> &parts,
     bytecode.push_back({OP_LAP, 0, 0});
     bytecode.push_back({OP_MO_NGOAC, 0, 0});
 
-    // --- 1️⃣ Khởi tạo ---
-    bytecode.push_back({OP_KHOI_TAO, 0, 0});
-    compileExpr(parts[0], bytecode, symTab, nextId);
-
     // --- 2️⃣ Ghi nhớ vị trí điều kiện ---
     int cond_index = bytecode.size();
     bytecode.push_back({OP_DIEU_KIEN, 0, 0});
-    compileExpr(parts[1], bytecode, symTab, nextId);
+    compileExpr(parts[1], bytecode, symTab, nextId, keywordMap);
 
     // --- 3️⃣ Nếu sai thì nhảy ra ---
     bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
@@ -316,12 +335,14 @@ LoopIndices compileLoop(const std::vector<std::string> &parts,
 
     // --- 4️⃣ Thân vòng lặp ---
     bytecode.push_back({OP_MO_KHOI, 0, 0});
-    compileBlock(bodyCode, bytecode, symTab, nextId, kwMap);  // 👈 Gọi block có sẵn
-    bytecode.push_back({OP_DONG_KHOI, 0, 0});
+    compileBlock(bodyCode, bytecode, symTab, nextId, keywordMap);
 
     // --- 5️⃣ Cập nhật ---
     bytecode.push_back({OP_CAP_NHAT, 0, 0});
-    compileExpr(parts[2], bytecode, symTab, nextId);
+    compileExpr(parts[2], bytecode, symTab, nextId, keywordMap);
+
+    bytecode.push_back({OP_DONG_KHOI, 0, 0});
+
 
     // --- 6️⃣ Nhảy ngược về điều kiện ---
     bytecode.push_back({OP_JUMP, 0, cond_index});
@@ -348,7 +369,7 @@ int compileCondition(const std::vector<std::string> &parts,
 
     bytecode.push_back({OP_NEU, 0, 0});
     bytecode.push_back({OP_MO_NGOAC, 0, 0});
-    compileExpr(parts[0], bytecode, symTab, nextId);
+    compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
     bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
     int jump_instruction_index = bytecode.size() - 1;
     bytecode.push_back({OP_DONG_NGOAC, 0, 0});
@@ -360,75 +381,82 @@ void compileBlock(const std::string& src,
                   std::vector<Instruction>& bytecode,
                   std::unordered_map<std::string,int>& symTab,
                   int& nextId,
-                  const std::unordered_map<std::string,Opcode>& kwMap)
+                  const std::unordered_map<std::string,Opcode>& keywordMap)
 {
-    std::istringstream iss(src);
-    std::string line;
-    while (std::getline(iss, line)) {
-        line = trim(line);
-        if (line.empty()) continue;
-        auto tokens = tokenize(line);
-        for (size_t i = 0; i < tokens.size(); ++i) {
-            const auto& tk = tokens[i];
-            if (tk == ";") {
-                bytecode.push_back({OP_DONG_LENH, 0, 0});
-            }
-            else if (kwMap.count(tk) && kwMap.at(tk) == OP_IN) {
-                ++i;
-                int vid = getOrCreate(symTab, tokens[i], nextId);
-                bytecode.push_back({OP_TEN_BIEN_GIA_TRI,0,vid});
-                bytecode.push_back({OP_IN,0,0});
-                continue;
-            }
-            else if (kwMap.count(tk) && kwMap.at(tk) == OP_NEU) {
-                size_t j = i + 2; int d = 1;
-                std::ostringstream oss;
-                while (j < tokens.size() && d > 0) {
-                    if      (tokens[j] == "(") ++d;
-                    else if (tokens[j] == ")") --d;
-                    if (d > 0) oss << tokens[j] << " ";
-                    ++j;
-                }
-
-                auto parts = splitLoopParts(oss.str());
-                int jump_index = compileCondition(parts, bytecode, symTab, nextId);
-
-                if (j < tokens.size() && tokens[j] == "{") {
-                    size_t k = j + 1; int bc = 1;
-                    std::ostringstream bs;
-                    while (k < tokens.size() && bc > 0) {
-                        if      (tokens[k] == "{") ++bc;
-                        else if (tokens[k] == "}") --bc;
-                        if (bc > 0) bs << tokens[k] << " ";
-                        ++k;
-                    }
-
-                    bytecode.push_back({OP_MO_KHOI, 0, 0});
-                    compileBlock(bs.str(), bytecode, symTab, nextId, kwMap);
-                    bytecode.push_back({OP_DONG_KHOI, 0, 0});
-
-                    int jump_target_index = bytecode.size();
-                    bytecode[jump_index].operand = jump_target_index;
-                    i = k - 1;
-                    continue;
-                }
-                i = j;
-                continue;
-            }
-            else {
-                compileToken(tk, bytecode, symTab, nextId, kwMap);
-            }
+    auto tokens = tokenize(src);
+    size_t i = 0;
+    while (i < tokens.size()) {
+        const std::string& tk = tokens[i];
+        if (tk == "{") {
+            ++i;
+            continue;
         }
+        // --- Lệnh in ---
+        if (keywordMap.count(tk) && keywordMap.at(tk) == OP_IN) {
+            ++i;
+            int vid = getOrCreate(symTab, tokens[i], nextId);
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, vid});
+            bytecode.push_back({OP_IN, 0, 0});
+            ++i;
+            continue;
+        }
+
+        // --- Lệnh nếu ---
+        if (keywordMap.count(tk) && keywordMap.at(tk) == OP_NEU) {
+            size_t j = i + 2; int d = 1;
+            std::ostringstream cond;
+            while (j < tokens.size() && d > 0) {
+                if (tokens[j] == "(") ++d;
+                else if (tokens[j] == ")") --d;
+                if (d > 0) cond << tokens[j] << " ";
+                ++j;
+            }
+
+            // auto parts = splitLoopParts(cond.str());
+            std::vector<std::string> parts = {cond.str()};
+            int jump_index = compileCondition(parts, bytecode, symTab, nextId);
+
+            // xử lý khối { ... }
+            if (j < tokens.size() && tokens[j] == "{") {
+                size_t k = j + 1; int bc = 1;
+                std::ostringstream body;
+                while (k < tokens.size() && bc > 0) {
+                    if (tokens[k] == "{") ++bc;
+                    else if (tokens[k] == "}") --bc;
+                    if (bc > 0) body << tokens[k] << " ";
+                    ++k;
+                }
+
+                bytecode.push_back({OP_MO_KHOI, 0, 0});
+                compileBlock(body.str(), bytecode, symTab, nextId, keywordMap);
+                bytecode.push_back({OP_DONG_KHOI, 0, 0});
+
+                bytecode[jump_index].operand = bytecode.size();
+                i = k;
+                continue;
+            }
+
+            i = j;
+            continue;
+        }
+
+        // --- Biểu thức thông thường ---
+        std::ostringstream expr;
+        while (i < tokens.size() && tokens[i] != ";") {
+            expr << tokens[i] << " ";
+            ++i;
+        }
+        compileExpr(expr.str(), bytecode, symTab, nextId, keywordMap);
+        bytecode.push_back({OP_DONG_LENH, 0, 0});
+        ++i;
     }
 }
-
-// --- 6. Hàm chính: compileSource ---
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap)
 {
     std::vector<Instruction> bytecode;
-    std::unordered_map<std::string,int> symbolTable;
-    int nextSymbolIndex = 0;
+    std::unordered_map<std::string,int> symTab;
+    int nextId = 0;
 
     std::istringstream iss(source);
     std::string line;
@@ -440,100 +468,83 @@ std::vector<Instruction> compileSource(const std::string& source,
 
         for (size_t i = 0; i < tokens.size(); ++i) {
             const auto& tk = tokens[i];
-            if (tk == "}") {
-                continue;
-            }
+            if (tk == "}") continue;
+
             if (tk == ";") {
-                if (i < tokens.size() - 1 || std::getline(iss, line)) {
-                    bytecode.push_back({OP_DONG_LENH,0,0});
-                }
+                bytecode.push_back({OP_DONG_LENH,0,0});
                 continue;
             }
+
+            // ✅ Xử lý vòng lặp
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_LAP) {
                 size_t j = i+2; int d=1;
                 std::ostringstream oss;
-                while (j < tokens.size() && d>0) {
-                    if      (tokens[j]=="(") ++d;
-                    else if (tokens[j]==")") --d;
-
+                while (j < tokens.size() && d > 0) {
+                    if (tokens[j] == "(") ++d;
+                    else if (tokens[j] == ")") --d;
                     if (d > 0) {
                         oss << tokens[j];
-                        if (tokens[j] != ";") {
-                            oss << " ";
-                        }
+                        if (tokens[j] != ";") oss << " ";
                     }
                     ++j;
                 }
 
                 auto parts = splitLoopParts(oss.str());
+
+                // ✅ Đọc thêm dòng để gom toàn bộ khối { ... }
+                std::ostringstream block;
+                int braceDepth = 0;
+                do {
+                    if (line.find("{") != std::string::npos) ++braceDepth;
+                    if (line.find("}") != std::string::npos) --braceDepth;
+                    block << line << "\n";
+                } while (braceDepth > 0 && std::getline(iss, line));
+
+                // ✅ Tách lại token từ toàn bộ khối
+                auto bodyTokens = tokenize(block.str());
+
+                // ✅ Gom phần thân khối từ token
                 std::ostringstream body;
-                size_t k = j + 1; int depth = 1;
-                while (k < tokens.size() && depth > 0) {
-                    if      (tokens[k] == "{") ++depth;
-                    else if (tokens[k] == "}") --depth;
-                    if (depth > 0) body << tokens[k] << " ";
-                    ++k;
-                }
-                // Use the simple wrapper compileLoop (keeps compatibility)
-                LoopIndices indices = compileLoop(parts, body.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
-
-                // phần thân { … }
-                if (j < tokens.size() && tokens[j] == "{") {
-                    size_t k=j+1; int bc=1;
-                    std::ostringstream bs;
-                    while (k<tokens.size()&&bc>0) {
-                        if      (tokens[k]=="{") ++bc;
-                        else if (tokens[k]=="}") --bc;
-                        if (bc>0) bs<<tokens[k]<<" ";
-                        ++k;
-                    }
-
-                    bytecode.push_back({OP_MO_KHOI,0,0});
-                    compileBlock(bs.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
-                    bytecode.push_back({OP_DONG_KHOI,0,0});
-
-                    bytecode.push_back({OP_CAP_NHAT, 0, 0});
-                    compileExpr(parts[2], bytecode, symbolTable, nextSymbolIndex);
-
-                    bytecode.push_back({OP_JUMP, indices.cond_start_index, 0});
-
-                    int jump_target_index = bytecode.size();
-                    bytecode[indices.exit_jump_index].operand = jump_target_index;
-
-                    i = k - 1;
-                    continue;
+                int depth = 0;
+                for (size_t k = j; k < bodyTokens.size(); ++k) {
+                    if (bodyTokens[k] == "{") ++depth;
+                    else if (bodyTokens[k] == "}") --depth;
+                    if (depth > 0) body << bodyTokens[k] << " ";
                 }
 
-                i = j;
-                continue;
+                compileLoop(parts, body.str(), bytecode, symbolTable, nextId, keywordMap);
+                break; // vì đã xử lý toàn bộ khối rồi
             }
+
+
+            // ✅ Xử lý điều kiện neu
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_NEU) {
                 size_t j = i+2; int d=1;
                 std::ostringstream oss;
-                while (j < tokens.size() && d>0) {
-                    if      (tokens[j]=="(") ++d;
-                    else if (tokens[j]==")") --d;
-                    if (d>0) oss << tokens[j]<<" ";
+                while (j < tokens.size() && d > 0) {
+                    if (tokens[j] == "(") ++d;
+                    else if (tokens[j] == ")") --d;
+                    if (d > 0) oss << tokens[j] << " ";
                     ++j;
                 }
-                auto parts = splitLoopParts(oss.str());
-                int jump_index = compileCondition(parts, bytecode, symbolTable, nextSymbolIndex);
 
-                if (j < tokens.size() && tokens[j]=="{") {
-                    size_t k=j+1; int bc=1;
+                auto parts = splitLoopParts(oss.str());
+                int jump_index = compileCondition(parts, bytecode, symTab, nextId);
+
+                if (j < tokens.size() && tokens[j] == "{") {
+                    size_t k = j+1; int bc = 1;
                     std::ostringstream bs;
-                    while (k<tokens.size()&&bc>0) {
-                        if      (tokens[k]=="{") ++bc;
-                        else if (tokens[k]=="}") --bc;
-                        if (bc>0) bs<<tokens[k]<<" ";
+                    while (k < tokens.size() && bc > 0) {
+                        if (tokens[k] == "{") ++bc;
+                        else if (tokens[k] == "}") --bc;
+                        if (bc > 0) bs << tokens[k] << " ";
                         ++k;
                     }
-
+                    std::cerr << "[DEBUG] body of loop: " << bs.str() << "\n";
                     bytecode.push_back({OP_MO_KHOI,0,0});
-                    compileBlock(bs.str(), bytecode, symbolTable, nextSymbolIndex, keywordMap);
+                    compileBlock(bs.str(), bytecode, symbolTable, nextId, keywordMap);
                     bytecode.push_back({OP_DONG_KHOI,0,0});
                     int jump_target_index = bytecode.size();
-
                     bytecode[jump_index].operand = jump_target_index;
                     i = k - 1;
                     continue;
@@ -541,18 +552,25 @@ std::vector<Instruction> compileSource(const std::string& source,
                 i = j;
                 continue;
             }
-
             if (keywordMap.count(tk) && keywordMap.at(tk) == OP_IN) {
                 ++i;
-                int vid = getOrCreate(symbolTable, tokens[i], nextSymbolIndex);
+                int vid = getOrCreate(symTab, tokens[i], nextId);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI,0,vid});
                 bytecode.push_back({OP_IN,0,0});
                 continue;
             }
-            compileToken(tk, bytecode, symbolTable, nextSymbolIndex, keywordMap);
+            // compileToken(tk, bytecode, symbolTable, nextId, keywordMap);
+            std::ostringstream expr;
+            while (i < tokens.size() && tokens[i] != ";") {
+                expr << tokens[i] << " ";
+                ++i;
+            }
+            compileExpr(expr.str(), bytecode, symTab, nextId, keywordMap);
+            bytecode.push_back({OP_DONG_LENH, 0, 0});
         }
     }
 
     bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0});
     return bytecode;
 }
+
