@@ -66,7 +66,8 @@ enum Opcode {
     OP_TEN_BIEN_ID = 60,        // Đẩy ID của biến lên stack
     OP_TEN_BIEN_GIA_TRI = 61,   // Đẩy giá trị của biến lên stack
     OP_JUMP_IF_FALSE = 62,  // Nhảy nếu điều kiện sai (stack top == 0)
-    OP_JUMP          = 63  // Nhảy vô điều kiện
+    OP_JUMP          = 63,  // Nhảy vô điều kiện
+    OP_MODULO        = 64
 };
 
 enum CompareOp {

@@ -45,5 +45,6 @@ const std::unordered_map<std::string, Opcode> keywordMap = {
     {"[", OP_MO_MANG},
     {"]", OP_DONG_MANG},
     {";", OP_DONG_LENH},
-    {",", OP_PHAY}
+    {",", OP_PHAY},
+    {"%", OP_MODULO}
 };
