@@ -34,8 +34,6 @@ void VM::run() {
 
                 break;
             }
-
-            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
             case OP_MODULO:
                 if (stack.size() < 2)
                     throw std::runtime_error("Lỗi: thiếu toán hạng cho MODULO");
@@ -45,22 +43,19 @@ void VM::run() {
                     throw std::runtime_error("Lỗi: chia dư cho 0");
                 stack.push_back(a % b);
                 break;
-            case OP_Logic_VA: case OP_Logic_HOAC: case OP_KHONG:
+
+            case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
+            case OP_Logic_VA: case OP_Logic_HOAC:
             case OP_SO_SANH_BANG: case OP_KHAC_BANG:
             case OP_LON_HON: case OP_NHO_HON:
             case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
-                if ((instr.op != OP_KHONG && stack.size() < 2) || (instr.op == OP_KHONG && stack.empty()))
+                if (stack.size() < 2)
                     throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử " + std::to_string(instr.op));
-                if (instr.op != OP_KHONG) {
-                    b = stack.back(); stack.pop_back();
-                    a = stack.back(); stack.pop_back();
-                } else {
-                    a = stack.back(); stack.pop_back();
-                }
+                b = stack.back(); stack.pop_back();
+                a = stack.back(); stack.pop_back();
+
                 switch (instr.op) {
-                    case OP_CONG: stack.push_back(a + b);
-                        std::cout << "[DEBUG CỘNG] " << a << " + " << b << " = " << (a + b) << std::endl;
-                        break;
+                    case OP_CONG: stack.push_back(a + b); break;
                     case OP_TRU: stack.push_back(a - b); break;
                     case OP_NHAN: stack.push_back(a * b); break;
                     case OP_CHIA:
@@ -73,20 +68,31 @@ void VM::run() {
                         break;
                     case OP_Logic_VA: stack.push_back((a && b) ? 1 : 0); break;
                     case OP_Logic_HOAC: stack.push_back((a || b) ? 1 : 0); break;
-                    case OP_KHONG: stack.push_back((!a) ? 1 : 0); break;
                     case OP_SO_SANH_BANG: stack.push_back((a == b) ? 1 : 0); break;
                     case OP_KHAC_BANG: stack.push_back((a != b) ? 1 : 0); break;
                     case OP_LON_HON: stack.push_back((a > b) ? 1 : 0); break;
                     case OP_NHO_HON: stack.push_back((a < b) ? 1 : 0); break;
                     case OP_LON_HON_HOAC_BANG: stack.push_back((a >= b) ? 1 : 0); break;
                     case OP_NHO_HON_HOAC_BANG: stack.push_back((a <= b) ? 1 : 0); break;
-                    default: ;
+                    default: throw std::runtime_error("Toán tử không xác định: " + std::to_string(instr.op));
                 }
                 break;
             }
+
+            case OP_KHONG: {
+                if (stack.empty())
+                    throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử");
+                a = stack.back(); stack.pop_back();
+                stack.push_back((!a) ? 1 : 0);
+                break;
+            }
             case OP_KHOI_TAO:
+                // std::cout << "[DEBUG] Bắt đầu khởi tạo vòng lặp tại pc = " << pc << std::endl;
+                break;
             case OP_DIEU_KIEN:
+                break;
             case OP_LAP:
+                break;
             case OP_CAP_NHAT: // Nếu bạn giữ OP_CAP_NHAT làm nhãn
                 // Đây là các nhãn (metadata), không phải lệnh thực thi
                 break; // Chuyển sang lệnh tiếp theo (biểu thức)
@@ -127,7 +133,6 @@ void VM::run() {
                 // 1. Đọc Operand (Vị trí nhảy)
                 // Giả định địa chỉ nhảy được lưu trong instr.operand
                 int jump_address = instr.operand;
-
                 // 2. Thực hiện Nhảy
                 pc = jump_address;
 
@@ -142,7 +147,6 @@ void VM::run() {
                 // Sử dụng instr.operand1 (hoặc instr.operand nếu bạn dùng nó cho địa chỉ)
                 // Dựa trên cách bạn dùng instruction trong OP_NEU, tôi giả định dùng operand:
                 int jump_address = instr.operand;
-
                 // 2. Kiểm tra Stack và Lấy giá trị điều kiện
                 if (stack.empty())
                     throw std::runtime_error("Lỗi: Stack rỗng khi thực thi OP_JUMP_IF_FALSE");
