@@ -17,12 +17,14 @@ std::string readFile(const std::string &filename) {
     return buffer.str();
 }
 
+void initCompileMap();
+
 int main() {
     try {
         // Đọc nội dung từ file có đuôi .vi (ví dụ: program.vi)
         const std::string filename = "../tests/program.vi";
         std::string source = readFile(filename);
-
+        initCompileMap();
         // Biên dịch mã nguồn thành bytecode
         std::vector<Instruction> bytecode = compileSource(source, keywordMap);
 

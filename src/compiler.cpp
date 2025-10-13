@@ -420,8 +420,18 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
     return {cond_index, exit_jump_index};
 }
 
+using CompileFunc = std::function<void(
+    const std::vector<std::string>& tokens,
+    size_t &pos,
+    std::vector<Instruction>& bytecode,
+    std::unordered_map<std::string,int>& symTab,
+    int& nextId,
+    const std::unordered_map<std::string,Opcode>& keywordMap)>;
+
+// Bản đồ ánh xạ keyword → compile function
+static std::unordered_map<std::string, CompileFunc> compileMap;
+
 // ---------- compileStatement ----------
-// pos is index into tokens; this function should move pos to next unprocessed token (index after the statement/block)
 static void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
                              std::vector<Instruction> &bytecode,
                              std::unordered_map<std::string,int> &symTab,
@@ -429,63 +439,59 @@ static void compileStatement(const std::vector<std::string>& tokens, size_t &pos
                              const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     if (pos >= tokens.size()) return;
-
     const std::string &tk = tokens[pos];
 
-    // If statement is a block starting with '{'
+    // ---- Trường hợp Block ----
     if (tk == "{") {
-        // compileBlock expects pos pointing at '{' and will advance pos to after '}'
         bytecode.push_back({OP_MO_KHOI,0,0});
         compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
         bytecode.push_back({OP_DONG_KHOI,0,0});
         return;
     }
 
-    // If token is a keyword
+    // ---- Trường hợp Keyword có CompileFunc riêng ----
+    auto it = compileMap.find(tk);
+    if (it != compileMap.end()) {
+        it->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
+        return;
+    }
+
+    // ---- Trường hợp Keyword chưa có compileFunc (nhưng vẫn là opcode hợp lệ) ----
     if (keywordMap.count(tk)) {
         Opcode code = keywordMap.at(tk);
-
-        if (code == OP_IN) {
-            // in <expr>;
-            // advance to next token and compile expression until semicolon
-            ++pos;
-            auto pr = extractExpressionUntilSemicolon(tokens, pos);
-            compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
-            // now expression result on stack -> call OP_IN expects value on stack
-            bytecode.push_back({OP_IN,0,0});
-            pos = pr.second;
-            return;
-        }
-
-        if (code == OP_NEU) {
-            // compile if (...) { ... }
-            // tokens[pos] == "nếu" ; next should be '('
-            // call compileConditionBlock which will move pos appropriately
-            compileConditionBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-            return;
-        }
-
-        if (code == OP_LAP) {
-            // loop
-            // call compileLoop which will extract parens and block
-            auto indices = compileLoop(tokens, pos, bytecode, symTab, nextId, keywordMap);
-            // compileLoop will handle body if block present and will leave pos after '}' if block processed
-            // We need to ensure pos is advanced: compileLoop set pos after paren and block; but if block was present it advanced pos inside; if not, pos remains after paren
-            // If block was present, compileLoop left pos at index after closing '}' because compileBlock advanced it.
-            return;
-        }
-
-        // other keywords -> push opcode token (rare)
         bytecode.push_back({code,0,0});
         ++pos;
         return;
     }
 
-    // Otherwise it's an expression or assignment ending in ';'
+    // ---- Còn lại là Biểu thức thông thường ----
     auto pr = extractExpressionUntilSemicolon(tokens, pos);
     compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
     bytecode.push_back({OP_DONG_LENH,0,0});
     pos = pr.second;
+}
+
+void initCompileMap() {
+    compileMap["in"]  = [](const std::vector<std::string>& tokens, size_t &pos,
+                           std::vector<Instruction>& bytecode,
+                           std::unordered_map<std::string,int>& symTab,
+                           int& nextId,
+                           const std::unordered_map<std::string,Opcode>& kwMap) {
+        ++pos; // bỏ qua "in"
+        auto pr = extractExpressionUntilSemicolon(tokens, pos);
+        compileExpr(pr.first, bytecode, symTab, nextId, kwMap);
+        bytecode.push_back({OP_IN, 0, 0});
+        pos = pr.second;
+    };
+
+    compileMap["nếu"] = compileConditionBlock;
+    compileMap["lặp"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                           std::vector<Instruction>& bytecode,
+                           std::unordered_map<std::string,int>& symTab,
+                           int& nextId,
+                           const std::unordered_map<std::string,Opcode>& kwMap) {
+        compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
+    };
 }
 
 // ---------- compileBlock (parse and compile until matching '}' ) ----------
