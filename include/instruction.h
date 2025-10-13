@@ -59,14 +59,14 @@ enum Opcode {
 
     // ====== 6. Khác - Miscellaneous ======
     OP_BIEN_SO = 41,             // 41 BIẾN: đẩy giá trị biến hoặc hằng số
-    // OP_TEN_BIEN = 42,            // 42 TÊN BIẾN
+    // OP_TEN_BIEN = 42,         // 42 TÊN BIẾN
 
     OP_IN = 43,                  // 43 IN: in giá trị
-    OP_DUNG_CHUONG_TRINH = 44,    // 44 DỪNG: kết thúc chương trình
-    OP_TEN_BIEN_ID = 60,        // Đẩy ID của biến lên stack
-    OP_TEN_BIEN_GIA_TRI = 61,   // Đẩy giá trị của biến lên stack
-    OP_JUMP_IF_FALSE = 62,  // Nhảy nếu điều kiện sai (stack top == 0)
-    OP_JUMP          = 63,  // Nhảy vô điều kiện
+    OP_DUNG_CHUONG_TRINH = 44,   // 44 DỪNG: kết thúc chương trình
+    OP_TEN_BIEN_ID = 60,         // Đẩy ID của biến lên stack
+    OP_TEN_BIEN_GIA_TRI = 61,    // Đẩy giá trị của biến lên stack
+    OP_JUMP_IF_FALSE = 62,       // Nhảy nếu điều kiện sai (stack top == 0)
+    OP_JUMP          = 63,       // Nhảy vô điều kiện
     OP_MODULO        = 64
 };
 

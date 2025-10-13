@@ -105,29 +105,31 @@ void VM::run() {
             }
 
 
+            // Thay thế phần xử lý đọc giá trị biến
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
-                if (variables.count(varId) == 0)
-                    throw std::runtime_error("Lỗi: biến chưa được khởi tạo");
+                // Nếu biến chưa có, khởi tạo mặc định = 0 (tránh crash)
+                if (variables.count(varId) == 0) {
+                    std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
+                    variables[varId] = 0;
+                }
                 stack.push_back(variables[varId]);
                 break;
             }
 
+            // Thay thế phần xử lý GÁN: lưu ý thứ tự pop
             case OP_GAN: {
-                // std::cout << "[DEBUG GÁN] Stack trước khi gán:";
                 if (stack.size() < 2) throw std::runtime_error("Không đủ toán hạng để GÁN");
 
-                int value = stack.back(); stack.pop_back();   // rồi lấy giá trị
-                int varId = stack.back(); stack.pop_back();   // lấy ID biến trước
-
+                // IMPORTANT: compiler đẩy RHS trước, rồi OP_TEN_BIEN_ID (varId),
+                // stack lúc này: [..., RHS_value, varId]
+                // Nên phải pop varId trước, sau đó pop value.
+                int varId = stack.back(); stack.pop_back();    // Lấy ID biến (ở trên cùng)
+                int value = stack.back(); stack.pop_back();    // Lấy giá trị RHS
                 variables[varId] = value;
-                // std::cout << "[DEBUG GÁN] Biến " << varId << " = " << value << std::endl;
-                //
-                // for (const auto& [k, val] : variables)
-                //     std::cout << "Biến " << k << "=" << val << "; ";
-                // std::cout << std::endl;
                 break;
             }
+
             case OP_JUMP:
             {
                 // 1. Đọc Operand (Vị trí nhảy)
