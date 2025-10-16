@@ -3,13 +3,21 @@
 #include <stdexcept>
 #include <vector>
 #include <stack>
+#include <variant>
+#include <string>
 
+using StackValue = std::variant<int, std::string>;
 VM::VM(const std::vector<Instruction>& code) : bytecode(code), pc(0) {}
-
+std::vector<std::string> stringPool;
+void VM::loadStringPool(const std::vector<std::string>& pool) {
+    this->stringPool = pool;
+}
 void VM::run() {
+    this->loadStringPool(stringPool); // hoặc chỉ cần loadStringPool(stringPool);
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
-        int b = 0, a = 0;
+        StackValue b = 0, a = 0;
+
         switch (instr.op) {
             case OP_BIEN_SO: {
                 int val = instr.operand;
@@ -34,15 +42,24 @@ void VM::run() {
 
                 break;
             }
-            case OP_MODULO:
+            case OP_MODULO: {
                 if (stack.size() < 2)
                     throw std::runtime_error("Lỗi: thiếu toán hạng cho MODULO");
+
                 b = stack.back(); stack.pop_back();
                 a = stack.back(); stack.pop_back();
-                if (b == 0)
+
+                if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b))
+                    throw std::runtime_error("Lỗi: MODULO chỉ áp dụng cho số nguyên");
+
+                int int_b = std::get<int>(b);
+                if (int_b == 0)
                     throw std::runtime_error("Lỗi: chia dư cho 0");
-                stack.push_back(a % b);
+
+                int int_a = std::get<int>(a);
+                stack.push_back(int_a % int_b);
                 break;
+            }
 
             case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
             case OP_Logic_VA: case OP_Logic_HOAC:
@@ -51,39 +68,98 @@ void VM::run() {
             case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
                 if (stack.size() < 2)
                     throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử " + std::to_string(instr.op));
-                b = stack.back(); stack.pop_back();
-                a = stack.back(); stack.pop_back();
+
+                StackValue b = stack.back(); stack.pop_back();
+                StackValue a = stack.back(); stack.pop_back();
 
                 switch (instr.op) {
-                    case OP_CONG: stack.push_back(a + b); break;
-                    case OP_TRU: stack.push_back(a - b); break;
-                    case OP_NHAN: stack.push_back(a * b); break;
-                    case OP_CHIA:
-                        if (b == 0) throw std::runtime_error("Lỗi: chia cho 0");
-                        stack.push_back(a / b);
+                    case OP_CONG: {
+                        if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
+                            stack.push_back(std::get<int>(a) + std::get<int>(b));
+                        } else {
+                            std::string sa = std::holds_alternative<int>(a) ? std::to_string(std::get<int>(a)) : std::get<std::string>(a);
+                            std::string sb = std::holds_alternative<int>(b) ? std::to_string(std::get<int>(b)) : std::get<std::string>(b);
+                            stack.push_back(sa + sb);
+                        }
                         break;
-                    case OP_MODULO:
-                        if (b == 0) throw std::runtime_error("Lỗi: chia dư cho 0");
-                        stack.push_back(a % b);
+                    }
+
+                    case OP_TRU: case OP_NHAN: case OP_CHIA: {
+                        if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b))
+                            throw std::runtime_error("Lỗi: toán tử số chỉ áp dụng cho số nguyên");
+
+                        int ia = std::get<int>(a);
+                        int ib = std::get<int>(b);
+
+                        if (instr.op == OP_TRU) stack.push_back(ia - ib);
+                        else if (instr.op == OP_NHAN) stack.push_back(ia * ib);
+                        else {
+                            if (ib == 0) throw std::runtime_error("Lỗi: chia cho 0");
+                            stack.push_back(ia / ib);
+                        }
                         break;
-                    case OP_Logic_VA: stack.push_back((a && b) ? 1 : 0); break;
-                    case OP_Logic_HOAC: stack.push_back((a || b) ? 1 : 0); break;
-                    case OP_SO_SANH_BANG: stack.push_back((a == b) ? 1 : 0); break;
-                    case OP_KHAC_BANG: stack.push_back((a != b) ? 1 : 0); break;
-                    case OP_LON_HON: stack.push_back((a > b) ? 1 : 0); break;
-                    case OP_NHO_HON: stack.push_back((a < b) ? 1 : 0); break;
-                    case OP_LON_HON_HOAC_BANG: stack.push_back((a >= b) ? 1 : 0); break;
-                    case OP_NHO_HON_HOAC_BANG: stack.push_back((a <= b) ? 1 : 0); break;
-                    default: throw std::runtime_error("Toán tử không xác định: " + std::to_string(instr.op));
+                    }
+
+                    case OP_Logic_VA: case OP_Logic_HOAC: {
+                        if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b))
+                            throw std::runtime_error("Lỗi: toán tử logic chỉ áp dụng cho số nguyên");
+
+                        int ia = std::get<int>(a);
+                        int ib = std::get<int>(b);
+                        if (instr.op == OP_Logic_VA) stack.push_back((ia && ib) ? 1 : 0);
+                        else stack.push_back((ia || ib) ? 1 : 0);
+                        break;
+                    }
+
+                    case OP_SO_SANH_BANG: case OP_KHAC_BANG:
+                    case OP_LON_HON: case OP_NHO_HON:
+                    case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
+                        if (a.index() != b.index())
+                            throw std::runtime_error("Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau");
+
+                        if (std::holds_alternative<int>(a)) {
+                            int ia = std::get<int>(a);
+                            int ib = std::get<int>(b);
+                            switch (instr.op) {
+                                case OP_SO_SANH_BANG: stack.emplace_back((ia == ib) ? 1 : 0); break;
+                                case OP_KHAC_BANG: stack.emplace_back((ia != ib) ? 1 : 0); break;
+                                case OP_LON_HON: stack.emplace_back((ia > ib) ? 1 : 0); break;
+                                case OP_NHO_HON: stack.emplace_back((ia < ib) ? 1 : 0); break;
+                                case OP_LON_HON_HOAC_BANG: stack.emplace_back((ia >= ib) ? 1 : 0); break;
+                                case OP_NHO_HON_HOAC_BANG: stack.emplace_back((ia <= ib) ? 1 : 0); break;
+                            }
+                        } else {
+                            std::string sa = std::get<std::string>(a);
+                            std::string sb = std::get<std::string>(b);
+                            switch (instr.op) {
+                                case OP_SO_SANH_BANG: stack.push_back((sa == sb) ? 1 : 0); break;
+                                case OP_KHAC_BANG: stack.push_back((sa != sb) ? 1 : 0); break;
+                                case OP_LON_HON: stack.push_back((sa > sb) ? 1 : 0); break;
+                                case OP_NHO_HON: stack.push_back((sa < sb) ? 1 : 0); break;
+                                case OP_LON_HON_HOAC_BANG: stack.push_back((sa >= sb) ? 1 : 0); break;
+                                case OP_NHO_HON_HOAC_BANG: stack.push_back((sa <= sb) ? 1 : 0); break;
+                            }
+                        }
+                        break;
+                    }
+
+                    default:
+                        throw std::runtime_error("Toán tử không xác định: " + std::to_string(instr.op));
                 }
                 break;
             }
 
             case OP_KHONG: {
                 if (stack.empty())
-                    throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử");
-                a = stack.back(); stack.pop_back();
-                stack.push_back((!a) ? 1 : 0);
+                    throw std::runtime_error("Lỗi: không đủ toán hạng cho toán tử phủ định");
+
+                StackValue a = stack.back(); stack.pop_back();
+
+                if (!std::holds_alternative<int>(a))
+                    throw std::runtime_error("Lỗi: toán tử phủ định chỉ áp dụng cho số nguyên");
+
+                int ia = std::get<int>(a);
+                stack.push_back((!ia) ? 1 : 0);
                 break;
             }
             case OP_KHOI_TAO:
@@ -96,11 +172,24 @@ void VM::run() {
             case OP_CAP_NHAT: // Nếu bạn giữ OP_CAP_NHAT làm nhãn
                 // Đây là các nhãn (metadata), không phải lệnh thực thi
                 break; // Chuyển sang lệnh tiếp theo (biểu thức)
-
+            case OP_CHUOI: {
+                if (instr.operandIndex >= stringPool.size()) {
+                    throw std::runtime_error("Lỗi: chỉ số chuỗi không hợp lệ");
+                }
+                stack.push_back(stringPool[instr.operandIndex]);
+                break;
+            }
             case OP_IN: {
                 if (stack.empty()) throw std::runtime_error("Lỗi: stack rỗng khi IN");
-                int value = stack.back(); stack.pop_back();
-                std::cout << "[IN] " << value << std::endl;
+                StackValue value = stack.back(); stack.pop_back();
+
+                std::cout << "[IN] ";
+                if (std::holds_alternative<int>(value)) {
+                    std::cout << std::get<int>(value);
+                } else if (std::holds_alternative<std::string>(value)) {
+                    std::cout << std::get<std::string>(value);
+                }
+                std::cout << std::endl;
                 break;
             }
 
@@ -119,14 +208,19 @@ void VM::run() {
 
             // Thay thế phần xử lý GÁN: lưu ý thứ tự pop
             case OP_GAN: {
-                if (stack.size() < 2) throw std::runtime_error("Không đủ toán hạng để GÁN");
+                if (stack.size() < 2)
+                    throw std::runtime_error("Không đủ toán hạng để GÁN");
 
-                // IMPORTANT: compiler đẩy RHS trước, rồi OP_TEN_BIEN_ID (varId),
-                // stack lúc này: [..., RHS_value, varId]
-                // Nên phải pop varId trước, sau đó pop value.
-                int varId = stack.back(); stack.pop_back();    // Lấy ID biến (ở trên cùng)
-                int value = stack.back(); stack.pop_back();    // Lấy giá trị RHS
-                variables[varId] = value;
+                StackValue varIdVal = stack.back(); stack.pop_back();
+                std::vector<std::variant<int, std::string>>::value_type valueVal = stack.back(); stack.pop_back();
+
+                if (!std::holds_alternative<int>(varIdVal))
+                    throw std::runtime_error("Lỗi: ID biến phải là số nguyên");
+
+                int varId = std::get<int>(varIdVal);
+
+                // Cho phép gán cả số và chuỗi
+                variables[varId] = valueVal;
                 break;
             }
 
@@ -143,34 +237,26 @@ void VM::run() {
                 // từ địa chỉ 'jump_address' mà không tăng pc thêm 1.
                 continue;
             }
-            case OP_JUMP_IF_FALSE:
-                {
-                // 1. Đọc Operand (Vị trí nhảy)
-                // Sử dụng instr.operand1 (hoặc instr.operand nếu bạn dùng nó cho địa chỉ)
-                // Dựa trên cách bạn dùng instruction trong OP_NEU, tôi giả định dùng operand:
+            case OP_JUMP_IF_FALSE: {
                 int jump_address = instr.operand;
-                // 2. Kiểm tra Stack và Lấy giá trị điều kiện
+
                 if (stack.empty())
                     throw std::runtime_error("Lỗi: Stack rỗng khi thực thi OP_JUMP_IF_FALSE");
 
-                int condition_value = stack.back();
-                stack.pop_back();
+                StackValue condition = stack.back(); stack.pop_back();
 
-                // 3. Kiểm tra giá trị (logic isFalse)
-                // Trong VM này, 0 là FALSE, bất kỳ thứ gì khác là TRUE.
+                if (!std::holds_alternative<int>(condition))
+                    throw std::runtime_error("Lỗi: điều kiện nhảy phải là số nguyên");
+
+                int condition_value = std::get<int>(condition);
+
                 if (condition_value == 0) {
-                    // 4. Thực hiện Nhảy
-                    // Cập nhật con trỏ lệnh (pc) đến địa chỉ mới.
                     pc = jump_address;
-
-                    // Dùng 'continue' để bỏ qua pc++ ở cuối vòng lặp while,
-                    // vì pc đã được đặt đến lệnh đích.
-                    continue;
+                    continue; // bỏ qua pc++ ở cuối vòng lặp
                 }
-                // Nếu điều kiện TRUE, VM sẽ tiếp tục lệnh tiếp theo (pc++ ở cuối vòng lặp while)
 
                 break;
-                }
+            }
 
             case OP_DUNG_CHUONG_TRINH:
                 return;
