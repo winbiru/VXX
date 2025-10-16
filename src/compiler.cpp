@@ -158,6 +158,16 @@ static std::pair<std::string, size_t> extractParens(const std::vector<std::strin
     return {trim(oss.str()), i};
 }
 
+std::string extractAssignedVar(const std::string& expr) {
+    size_t eqPos = expr.find('=');
+    if (eqPos == std::string::npos) {
+        throw std::runtime_error("Không tìm thấy toán tử '=' trong biểu thức gán");
+    }
+
+    std::string left = expr.substr(0, eqPos);
+    return trim(left); // nếu bạn có hàm trim để loại bỏ khoảng trắng
+}
+
 // extract block content from tokens[start] where start points to '{', returns content and index after closing '}'
 static std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "{")
@@ -415,17 +425,15 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
                                const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     // tokens[pos] is 'lặp' (OP_LAP)
-    // next token should be '('
     auto parenPair = extractParens(tokens, pos + 1); // returns content and index after ')'
     std::string inside = parenPair.first;
     size_t afterParen = parenPair.second;
 
-    // parse inside into 3 parts - use splitLoopParts if available (from LoopUltil.h)
+    // parse inside into 3 parts: init; condition; update
     std::vector<std::string> parts;
     try {
-        parts = splitLoopParts(inside); // expected to return vector<string> with 3 elements
+        parts = splitLoopParts(inside);
     } catch (...) {
-        // fallback: naive split by ';' into exactly 3 parts
         std::vector<std::string> tmp;
         std::istringstream iss(inside);
         std::string seg;
@@ -439,49 +447,66 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
         }
     }
 
-    // 1) compile init
-    bytecode.push_back({OP_KHOI_TAO,0,0});
-    if (!parts[0].empty()) compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
+    // 1) extract variable name from init and ensure OP_KHOI_TAO is emitted BEFORE any use
+    if (!parts[0].empty()) {
+        std::string varName = extractAssignedVar(parts[0]);
+        if (!varName.empty()) {
+            if (!varName.empty() && symTab.find(varName) == symTab.end()) {
+                symTab[varName] = nextId++;
+                int varId = symTab[varName];
+                bytecode.push_back({OP_KHOI_TAO, varId, 0});
+                // compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
 
-    // 2) mark loop start and compile condition
-    bytecode.push_back({OP_LAP,0,0});
-    int cond_index = (int)bytecode.size();
-    bytecode.push_back({OP_DIEU_KIEN,0,0});
-    if (!parts[1].empty()) compileExpr(parts[1], bytecode, symTab, nextId, keywordMap);
-
-    // 3) jump-if-false placeholder
-    bytecode.push_back({OP_JUMP_IF_FALSE,0,0});
-    int exit_jump_index = (int)bytecode.size() - 1;
-
-    // 4) body
-    // if following token is block, extract it and compile; else if the caller already has body tokens, caller will call compileBlock
-    pos = afterParen;
-    if (pos < tokens.size() && tokens[pos] == "{") {
-        bytecode.push_back({OP_MO_KHOI,0,0});
-        compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-        bytecode.push_back({OP_DONG_KHOI,0,0});
-    } else {
-        // no block, nothing to do (or caller will handle)
+            }
+                compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
+        }
     }
 
-    // 5) update
-    bytecode.push_back({OP_CAP_NHAT,0,0});
-    if (!parts[2].empty()) compileExpr(parts[2], bytecode, symTab, nextId, keywordMap);
+    // 2) compile init expression
+    if (!parts[0].empty()) {
+        compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
+    }
 
-    // 6) jump back to cond
+    // 3) mark loop start and compile condition
+    bytecode.push_back({OP_LAP, 0, 0});
+    int cond_index = (int)bytecode.size();
+    bytecode.push_back({OP_DIEU_KIEN, 0, 0});
+    if (!parts[1].empty()) {
+        compileExpr(parts[1], bytecode, symTab, nextId, keywordMap);
+    }
+
+    // 4) jump-if-false placeholder
+    bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
+    int exit_jump_index = (int)bytecode.size() - 1;
+
+    // 5) body block
+    pos = afterParen;
+    if (pos < tokens.size() && tokens[pos] == "{") {
+        bytecode.push_back({OP_MO_KHOI, 0, 0});
+        compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
+        bytecode.push_back({OP_DONG_KHOI, 0, 0});
+    }
+
+    // 6) update expression
+    bytecode.push_back({OP_CAP_NHAT, 0, 0});
+    if (!parts[2].empty()) {
+        compileExpr(parts[2], bytecode, symTab, nextId, keywordMap);
+    }
+
+    // 7) jump back to condition
     bytecode.push_back({OP_JUMP, cond_index, 0});
 
-    // 7) backpatch exit jump
+    // 8) patch exit jump
     int end_index = (int)bytecode.size();
     bytecode[exit_jump_index].operand = end_index;
 
-    // 8) close
-    bytecode.push_back({OP_DONG_NGOAC,0,0});
-    bytecode.push_back({OP_DONG_LENH,0,0});
+    // 9) close loop
+    bytecode.push_back({OP_DONG_NGOAC, 0, 0});
+    bytecode.push_back({OP_DONG_LENH, 0, 0});
 
-    // advance pos past block if there was one (extractParens already moved pos; we handled block by compileBlock which moves pos after '}' )
     return {cond_index, exit_jump_index};
 }
+
 
 using CompileFunc = std::function<void(
     const std::vector<std::string>& tokens,
@@ -553,7 +578,15 @@ void initCompileMap() {
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& kwMap) {
-        compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
+        if (tokens[pos] == "lặp") {
+            std::string loopHeader = extractParens(tokens, pos + 1).first;
+            std::string varName = extractAssignedVar(splitLoopParts(loopHeader)[0]);
+            if (!varName.empty() && symTab.find(varName) == symTab.end()) {
+                symTab[varName] = nextId++;
+                bytecode.push_back({OP_KHOI_TAO, symTab[varName], 0});
+            }
+            compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
+        }
     };
 }
 
