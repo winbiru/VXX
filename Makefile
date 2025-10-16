@@ -1,5 +1,6 @@
 VMSRC = VietVM         # Nếu file thực thi là VietVM.exe thì đổi thành VietVM.exe
 TESTDIR = tests
+EXPECTEDDIR = tests/expected
 TESTFILES = $(wildcard $(TESTDIR)/*.vi)
 
 .PHONY: test check clean
