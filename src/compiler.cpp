@@ -324,7 +324,7 @@ static void compileExpr(const std::string &expr,
             bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
         }else if (isStringLiteral(tk)) {
             int strIndex = storeString(tk.substr(1, tk.size() - 2)); // bỏ dấu ngoặc kép
-            std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
+            // std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
             bytecode.push_back({OP_CHUOI, 0, strIndex});
         } else if (isVariable(tk)) {
             int id = getOrCreate(symTab, tk, nextId);

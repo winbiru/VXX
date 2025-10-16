@@ -30,7 +30,7 @@ int main() {
         for (const auto& entry : fs::directory_iterator(testDir)) {
             if (entry.path().extension() == ".vi") {
                 const std::string filename = entry.path().string();
-                std::cout << "\n=== Đang chạy test: " << filename << " ===\n";
+                // std::cout << "\n=== Đang chạy test: " << filename << " ===\n";
 
                 std::string source = readFile(filename);
 
