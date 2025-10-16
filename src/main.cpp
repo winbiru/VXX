@@ -25,7 +25,18 @@ void initCompileMap();
 int main() {
     try {
         // Đọc nội dung từ file .vi
-        const std::string filename = "../tests/program.vi";
+        // const std::string filename = "../tests/program.vi";
+        // const std::string filename = "../tests/kiem_tra_so_chan_1-20.vi";
+        // const std::string filename = "../tests/kiem_tra_so_le_chia_het_cho_5.vi";
+        // const std::string filename = "../tests/kiem_tra_so_nguyen.vi";
+        // const std::string filename = "../tests/kiem_tra_so_chia_het_cho_3_va_4.vi";
+        // const std::string filename = "../tests/kiem_tra_noi_chuoi.vi";
+        const std::string filename = "../tests/kiem_tra_dieu_kien_long_nhieu_cap.vi";
+        // const std::string filename = "../tests/kiem_tra_dieu_kien_phu_dinh.vi";
+
+
+
+
         std::string source = readFile(filename);
 
         // Khởi tạo bảng từ khóa
