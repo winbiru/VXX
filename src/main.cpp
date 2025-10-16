@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
         initCompileMap();
 
         if (argc == 2) {
-            // ✅ Chế độ chạy 1 file (dành cho make check hoặc test riêng lẻ)
+            // ✅ Chạy đúng file được truyền qua dòng lệnh
             const std::string filename = argv[1];
             std::string source = readFile(filename);
             stringPool.clear();
@@ -36,20 +36,34 @@ int main(int argc, char* argv[]) {
             VM vm(bytecode);
             vm.loadStringPool(stringPool);
             vm.run();
-        } else {
-            // ✅ Chế độ chạy toàn bộ thư mục tests/ (dành cho test local nhanh)
-            std::string testDir = "../tests";
-            for (const auto& entry : fs::directory_iterator(testDir)) {
-                if (entry.path().extension() == ".vi") {
-                    const std::string filename = entry.path().string();
-                    std::string source = readFile(filename);
-                    stringPool.clear();
+            return EXIT_SUCCESS;
+        }
 
-                    std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-                    VM vm(bytecode);
-                    vm.loadStringPool(stringPool);
-                    vm.run();
-                }
+        const std::string defaultFile = "../tests/program.vi";
+        if (argc == 1 && fs::exists(defaultFile)) {
+            // ✅ Chạy file mặc định nếu không truyền đối số
+            std::string source = readFile(defaultFile);
+            stringPool.clear();
+
+            std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+            VM vm(bytecode);
+            vm.loadStringPool(stringPool);
+            vm.run();
+            return EXIT_SUCCESS;
+        }
+
+        // ✅ Nếu không có đối số và không có file mặc định → chạy toàn bộ thư mục
+        std::string testDir = "tests/";
+        for (const auto& entry : fs::directory_iterator(testDir)) {
+            if (entry.path().extension() == ".vi") {
+                const std::string filename = entry.path().string();
+                std::string source = readFile(filename);
+                stringPool.clear();
+
+                std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+                VM vm(bytecode);
+                vm.loadStringPool(stringPool);
+                vm.run();
             }
         }
 
