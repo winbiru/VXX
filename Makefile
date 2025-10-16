@@ -8,9 +8,9 @@ test: check
 
 check:
 	@for testfile in $(TESTFILES); do \
-		base=$${testfile%.vi}; \
-		out=$$base.output; \
-		exp=$$base.expected; \
+		base=$$(basename $${testfile%.vi}); \
+        out=$(TESTDIR)/$$base.output; \
+        exp=$(EXPECTEDDIR)/$$base.expected; \
 		echo "== Running $$testfile =="; \
 		./$(VMSRC) $$testfile > $$out; \
 		if [ -f $$exp ]; then \
