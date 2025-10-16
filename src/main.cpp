@@ -7,6 +7,9 @@
 #include "../include/vm.h"
 #include "../include/name_op.h"
 
+// Biến toàn cục chứa chuỗi hằng đã biên dịch
+extern std::vector<std::string> stringPool;
+
 std::string readFile(const std::string &filename) {
     std::ifstream fileStream(filename);
     if (!fileStream.is_open()) {
@@ -21,10 +24,13 @@ void initCompileMap();
 
 int main() {
     try {
-        // Đọc nội dung từ file có đuôi .vi (ví dụ: program.vi)
+        // Đọc nội dung từ file .vi
         const std::string filename = "../tests/program.vi";
         std::string source = readFile(filename);
+
+        // Khởi tạo bảng từ khóa
         initCompileMap();
+
         // Biên dịch mã nguồn thành bytecode
         std::vector<Instruction> bytecode = compileSource(source, keywordMap);
 
@@ -33,19 +39,27 @@ int main() {
         for (size_t i = 0; i < bytecode.size(); ++i) {
             const Instruction &instr = bytecode[i];
             std::cout << "[" << i << "] "
-            << "op: " << instr.op   // ID opcode
-            << " (" << name_op(instr.op) << ")";      // Tên opcode
-
-            if (bytecode[i].operandIndex != -1)
-                std::cout << ", operandIndex: " << bytecode[i].operandIndex;
-            if (bytecode[i].operand != 0)
-                std::cout << ", operand: " << bytecode[i].operand;
+                      << "op: " << instr.op
+                      << " (" << name_op(instr.op) << ")";
+            if (instr.operandIndex != -1)
+                std::cout << ", operandIndex: " << instr.operandIndex;
+            if (instr.operand != 0)
+                std::cout << ", operand: " << instr.operand;
             std::cout << std::endl;
         }
 
-        // Tạo máy ảo và chạy bytecode
+        // In ra stringPool để kiểm tra
+        std::cout << "\nDanh sách chuỗi đã lưu:\n";
+        for (size_t i = 0; i < stringPool.size(); ++i) {
+            std::cout << "[" << i << "] = \"" << stringPool[i] << "\"\n";
+        }
+
+        // Tạo máy ảo và truyền stringPool vào
         VM vm(bytecode);
-        std::cout << "Kết quả thực thi:" << std::endl;
+        vm.loadStringPool(stringPool);  // ✅ Truyền chuỗi đã biên dịch vào VM
+
+        // Thực thi chương trình
+        std::cout << "\nKết quả thực thi:\n";
         vm.run();
     } catch (const std::exception &ex) {
         std::cerr << "Lỗi: " << ex.what() << std::endl;

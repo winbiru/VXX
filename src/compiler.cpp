@@ -11,7 +11,8 @@
 #include <unordered_map>
 #include "../include/instruction.h"
 #include "common/LoopUltil.h" // nếu bạn đã có splitLoopParts(...) ở đây
-
+#include <functional>
+#include <string>
 // Trim helper
 static std::string trim(const std::string &s) {
     size_t start = s.find_first_not_of(" \t\r\n");
@@ -19,9 +20,6 @@ static std::string trim(const std::string &s) {
     size_t end = s.find_last_not_of(" \t\r\n");
     return s.substr(start, end - start + 1);
 }
-
-// ---------- Symbol table (per-compile run) ----------
-static std::unordered_map<std::string,int> globalSymTab; // not used directly; compileSource uses local symtab
 
 static int getOrCreate(std::unordered_map<std::string,int>& symTab,
                        const std::string& name,
@@ -39,9 +37,24 @@ static std::vector<std::string> tokenize(const std::string &src) {
     std::vector<std::string> tokens;
     size_t i = 0;
     while (i < src.size()) {
-        unsigned char ch = static_cast<unsigned char>(src[i]);
+        auto ch = static_cast<unsigned char>(src[i]);
         if (isspace(ch)) { ++i; continue; }
+        // handle string literals
+        if (ch == '"') {
+            size_t j = i + 1;
+            while (j < src.size() && src[j] != '"') ++j;
 
+            if (j < src.size()) {
+                ++j; // include closing quote
+                tokens.push_back(src.substr(i, j - i));
+                i = j;
+            } else {
+                // Không có dấu " đóng → chỉ lấy phần còn lại như một token lỗi
+                tokens.push_back(src.substr(i));
+                i = src.size();
+            }
+            continue;
+        }
         // two-char tokens
         if (i + 1 < src.size()) {
             std::string two = src.substr(i, 2);
@@ -61,16 +74,16 @@ static std::vector<std::string> tokenize(const std::string &src) {
             c == '<' || c == '>' || c == '=' || c == '!') {
             tokens.emplace_back(1, c);
             ++i;
-            continue;
+             continue;
         }
 
         // word / number
         size_t j = i;
         while (j < src.size()) {
-            unsigned char cj = static_cast<unsigned char>(src[j]);
+            auto cj = static_cast<unsigned char>(src[j]);
             if (isspace(cj)) break;
             // break on these punctuation chars
-            if (cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
+            if (cj == '"' || cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
                 cj == '(' || cj == ')' || cj == '{' || cj == '}' ||
                 cj == '[' || cj == ']' || cj == ';' || cj == ',' ||
                 cj == '<' || cj == '>' || cj == '=' || cj == '!') break;
@@ -97,14 +110,33 @@ static bool isOperator(const std::string &tok) {
     return ops.count(tok) > 0;
 }
 
+bool isStringLiteral(const std::string & tk);
+
 static bool isVariable(const std::string &tok) {
     if (tok.empty()) return false;
-    if (isNumber(tok)) return false;
-    if (isOperator(tok)) return false;
+    if (isStringLiteral(tok)) return false;
+    if (isNumber(tok) || isOperator(tok)) return false;
     if (tok == "(" || tok == ")" || tok == "{" || tok == "}" || tok == ";" || tok == ",") return false;
+
+    // Biến phải bắt đầu bằng chữ cái hoặc dấu gạch dưới
+    if (!std::isalpha(tok[0]) && tok[0] != '_') return false;
+
+    // Các ký tự còn lại phải là chữ cái, số hoặc dấu gạch dưới
+    for (char c : tok) {
+        if (!std::isalnum(c) && c != '_') return false;
+    }
+
     return true;
 }
+bool isStringLiteral(const std::string& tk) {
+    return tk.size() >= 2 && tk.front() == '"' && tk.back() == '"';
+}
+extern std::vector<std::string> stringPool;
 
+int storeString(const std::string& s) {
+    stringPool.push_back(s);
+    return static_cast<int>(stringPool.size() - 1);
+}
 // parse from tokens[start] which must be '(' -> return content string and index after closing ')'
 static std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "(")
@@ -172,40 +204,60 @@ static char associativity_op(const std::string &op) { return (op == "=") ? 'r' :
 static std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
     std::vector<std::string> output;
     std::stack<std::string> ops;
+
     for (const auto &token : infix_tokens) {
         if (token.empty()) continue;
-        if (isNumber(token) || isVariable(token)) {
+
+        // Xử lý toán hạng: số, chuỗi, biến
+        if (isNumber(token) || isStringLiteral(token) || isVariable(token)) {
             output.push_back(token);
-        } else if (isOperator(token)) {
+        }
+
+        // Xử lý toán tử
+        else if (isOperator(token)) {
             while (!ops.empty() && isOperator(ops.top())) {
                 const std::string &top = ops.top();
-                if ( (precedence_op(top) > precedence_op(token)) ||
-                     (precedence_op(top) == precedence_op(token) && associativity_op(token) == 'l') ) {
+                if ((precedence_op(top) > precedence_op(token)) ||
+                    (precedence_op(top) == precedence_op(token) && associativity_op(token) == 'l')) {
                     output.push_back(top);
                     ops.pop();
                 } else break;
             }
             ops.push(token);
-        } else if (token == "(") {
+        }
+
+        // Dấu mở ngoặc
+        else if (token == "(") {
             ops.push(token);
-        } else if (token == ")") {
+        }
+
+        // Dấu đóng ngoặc
+        else if (token == ")") {
             while (!ops.empty() && ops.top() != "(") {
                 output.push_back(ops.top());
                 ops.pop();
             }
             if (ops.empty()) throw std::runtime_error("convertToPostfix: mismatched parens");
             ops.pop(); // pop "("
-        } else {
+        }
+
+        // Token không hợp lệ
+        else {
             throw std::runtime_error("convertToPostfix: unknown token '" + token + "'");
         }
     }
+
+    // Đẩy nốt các toán tử còn lại
     while (!ops.empty()) {
-        if (ops.top() == "(" || ops.top() == ")") throw std::runtime_error("convertToPostfix: mismatched parens");
+        if (ops.top() == "(" || ops.top() == ")")
+            throw std::runtime_error("convertToPostfix: mismatched parens");
         output.push_back(ops.top());
         ops.pop();
     }
+
     return output;
 }
+
 
 // ---------- compileExpr: produce bytecode for an expression or assignment ----------
 static void compileExpr(const std::string &expr,
@@ -234,6 +286,10 @@ static void compileExpr(const std::string &expr,
         for (const auto &tk : postfix) {
             if (isNumber(tk)) {
                 bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
+            }else if (isStringLiteral(tk)) {
+                int strIndex = storeString(tk.substr(1, tk.size() - 2)); // bỏ dấu ngoặc kép
+                std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
+                bytecode.push_back({OP_CHUOI, 0, strIndex});
             } else if (isVariable(tk)) {
                 int id = getOrCreate(symTab, tk, nextId);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
@@ -266,6 +322,10 @@ static void compileExpr(const std::string &expr,
     for (const auto &tk : postfix) {
         if (isNumber(tk)) {
             bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
+        }else if (isStringLiteral(tk)) {
+            int strIndex = storeString(tk.substr(1, tk.size() - 2)); // bỏ dấu ngoặc kép
+            std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
+            bytecode.push_back({OP_CHUOI, 0, strIndex});
         } else if (isVariable(tk)) {
             int id = getOrCreate(symTab, tk, nextId);
             bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
