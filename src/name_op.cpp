@@ -27,6 +27,7 @@ const std::unordered_map<std::string, Opcode> keywordMap = {
     {"thoát", OP_THOAT},
     {"==", OP_SO_SANH_BANG},
     {"!=", OP_KHAC_BANG},
+    {"!", OP_PHU_DINH},
     {">", OP_LON_HON},
     {"<", OP_NHO_HON},
     {">=", OP_LON_HON_HOAC_BANG},

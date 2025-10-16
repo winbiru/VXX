@@ -105,7 +105,7 @@ static bool isNumber(const std::string &s) {
 static bool isOperator(const std::string &tok) {
     static const std::unordered_map<std::string,int> ops = {
         {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
-        {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}
+        {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6}
     };
     return ops.count(tok) > 0;
 }
@@ -197,6 +197,7 @@ static int precedence_op(const std::string& op) {
     if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=") return 3;
     if (op == "+" || op == "-") return 4;
     if (op == "*" || op == "/" || op == "%") return 5;
+    if (op == "!") return 6; // Phủ định
     return -1;
 }
 static char associativity_op(const std::string &op) { return (op == "=") ? 'r' : 'l'; }
@@ -300,6 +301,7 @@ static void compileExpr(const std::string &expr,
                 else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
                 else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
                 else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
+                else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
                 else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
                 else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
                 else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
@@ -335,6 +337,7 @@ static void compileExpr(const std::string &expr,
             else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
             else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
             else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
+            else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
             else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
             else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
             else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});

@@ -12,6 +12,15 @@ std::vector<std::string> stringPool;
 void VM::loadStringPool(const std::vector<std::string>& pool) {
     this->stringPool = pool;
 }
+bool toBool(const StackValue& value) {
+    if (std::holds_alternative<int>(value)) {
+        return std::get<int>(value) != 0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        return !std::get<std::string>(value).empty();
+    }
+    throw std::runtime_error("Không thể chuyển StackValue sang bool");
+}
+
 void VM::run() {
     this->loadStringPool(stringPool); // hoặc chỉ cần loadStringPool(stringPool);
     while (pc < bytecode.size()) {
@@ -269,7 +278,17 @@ void VM::run() {
                 break;
             case OP_DONG_LENH: case OP_MO_NGOAC: case OP_DONG_NGOAC:
                 break;
+            case OP_PHU_DINH: {
+                if (stack.empty()) {
+                    throw std::runtime_error("Thiếu toán hạng cho toán tử phủ định !");
+                }
+                StackValue operand = stack.back(); stack.pop_back();
 
+                // Giả sử kiểu Value là bool hoặc có thể chuyển sang bool
+                bool result = !toBool(operand);
+                stack.push_back(result); // lưu lại dưới dạng int: 0 hoặc 1
+                break;
+            }
             default:
                 throw std::runtime_error("Opcode không xác định: " + std::to_string(instr.op));
         }

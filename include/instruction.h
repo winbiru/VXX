@@ -68,7 +68,8 @@ enum Opcode {
     OP_JUMP_IF_FALSE = 62,       // Nhảy nếu điều kiện sai (stack top == 0)
     OP_JUMP          = 63,       // Nhảy vô điều kiện
     OP_MODULO        = 64,       // Chia lấy dư
-    OP_CHUOI         = 65        // chuỗi
+    OP_CHUOI         = 65,       // chuỗi
+    OP_PHU_DINH      = 66        // Phủ định cái gì đó.
 };
 
 enum CompareOp {

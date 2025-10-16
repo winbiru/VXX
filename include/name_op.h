@@ -62,6 +62,7 @@ inline std::string name_op(Opcode op) {
         case OP_TEN_BIEN_GIA_TRI: return "OP_TEN_BIEN_GIA_TRI";
         case OP_IN: return "OP_IN";
         case OP_CHUOI: return "OP_CHUOI";
+        case OP_PHU_DINH: return "OP_PHU_DINH";
         case OP_DUNG_CHUONG_TRINH: return "OP_DUNG_CHUONG_TRINH";
         default: return "UNKNOWN_OPCODE";
     }
