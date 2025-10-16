@@ -26,7 +26,7 @@ void initCompileMap();
 int main() {
     try {
         // Duyệt qua tất cả file .vi trong thư mục tests
-        std::string testDir = "../tests";
+        std::string testDir = "tests/";
         for (const auto& entry : fs::directory_iterator(testDir)) {
             if (entry.path().extension() == ".vi") {
                 const std::string filename = entry.path().string();
