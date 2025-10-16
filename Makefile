@@ -13,7 +13,7 @@ check:
 		out=$(TESTDIR)/$$base.output; \
 		exp=$(EXPECTEDDIR)/$$base.expected; \
 		echo "== Running $$testfile =="; \
-		./$(cmake-build-debug/VMSRC) $$testfile > $$out; \
+		./cmake-build-debug/$(VMSRC) $$testfile > $$out; \
 		if [ -f $$exp ]; then \
 			if diff -u $$exp $$out; then \
 				echo "PASS: $$testfile"; \
