@@ -338,7 +338,7 @@ static void compileExpr(const std::string &expr,
             }
         }
 
-        bytecode.push_back({OP_TEN_BIEN_ID, dstId, 0});
+        bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId});
         bytecode.push_back({OP_GAN,0,0});
         return;
     }
