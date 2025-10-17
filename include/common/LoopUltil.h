@@ -7,6 +7,7 @@ static std::vector<std::string> splitLoopParts(const std::string& s) {
     std::vector<std::string> parts;
     std::string current;
     int parenDepth = 0;
+
     for (char c : s) {
         if (c == '(') ++parenDepth;
         else if (c == ')') --parenDepth;

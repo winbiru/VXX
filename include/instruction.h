@@ -10,8 +10,8 @@ enum Opcode {
     OP_CHIA = 3,                // 3  /
 
     // ====== 2. Logic & So sánh - Logic and Comparisons ======
-    OP_Logic_VA = 4,                  // 4  &&
-    OP_Logic_HOAC = 5,                // 5  ||
+    OP_Logic_VA = 4,            // 4  &&
+    OP_Logic_HOAC = 5,          // 5  ||
     OP_KHONG = 6,               // 6  !
     OP_SO_SANH_BANG = 7,        // 7  ==
     OP_KHAC_BANG = 8,           // 8  !=
@@ -68,7 +68,7 @@ enum Opcode {
     OP_JUMP_IF_FALSE = 62,       // Nhảy nếu điều kiện sai (stack top == 0)
     OP_JUMP          = 63,       // Nhảy vô điều kiện
     OP_MODULO        = 64,       // Chia lấy dư
-    OP_CHUOI         = 65,       // chuỗi
+    OP_CHUOI         = 65,       // Chuỗi
     OP_PHU_DINH      = 66        // Phủ định cái gì đó.
 };
 

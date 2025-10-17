@@ -17,6 +17,7 @@ public:
     explicit VM(const std::vector<Instruction>& code);
     void run();
     void loadStringPool(const std::vector<std::string>& pool); // ← THÊM DÒNG NÀY
+    VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     using StackValue = std::variant<int, std::string>;
