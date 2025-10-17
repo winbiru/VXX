@@ -131,8 +131,7 @@ static bool isVariable(const std::string &tok) {
 bool isStringLiteral(const std::string& tk) {
     return tk.size() >= 2 && tk.front() == '"' && tk.back() == '"';
 }
-extern std::vector<std::string> stringPool;
-
+std::vector<std::string> stringPool;
 int storeString(const std::string& s) {
     stringPool.push_back(s);
     return static_cast<int>(stringPool.size() - 1);
@@ -210,6 +209,17 @@ static int precedence_op(const std::string& op) {
     if (op == "!") return 6; // Phủ định
     return -1;
 }
+// void ensureDeclared(const std::string& varName,
+//                     std::unordered_map<std::string,int>& symTab,
+//                     int& nextId,
+//                     std::vector<Instruction>& bytecode)
+// {
+//     if (symTab.find(varName) == symTab.end()) {
+//         symTab[varName] = nextId++;
+//         bytecode.push_back({OP_KHOI_TAO, symTab[varName], 0});
+//     }
+// }
+
 static char associativity_op(const std::string &op) { return (op == "=") ? 'r' : 'l'; }
 
 static std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
@@ -279,30 +289,35 @@ static void compileExpr(const std::string &expr,
 {
     if (trim(expr).empty()) return;
 
-    // Tokenize the expr string
-    auto toks = tokenize(expr);
+    // auto ensureInitialized = [&](int id) {
+    //     bool alreadyInitialized = std::any_of(bytecode.begin(), bytecode.end(), [&](const Instruction& instr) {
+    //         return instr.op == OP_KHOI_TAO && instr.operandIndex == id;
+    //     });
+    //     if (!alreadyInitialized) {
+    //         bytecode.push_back({OP_KHOI_TAO, id, 0});
+    //     }
+    // };
 
-    // Detect assignment: form: <var> = <rhs...>
+    auto toks = tokenize(expr);
     auto itEq = std::find(toks.begin(), toks.end(), "=");
+
     if (itEq != toks.end() && std::distance(toks.begin(), itEq) == 1) {
-        // LHS is single var
         std::string varName = toks[0];
         int dstId = getOrCreate(symTab, varName, nextId);
+        // ensureInitialized(dstId);
 
         std::vector<std::string> rhsTokens(itEq + 1, toks.end());
-        // convert to postfix
         auto postfix = convertToPostfix(rhsTokens);
 
-        // Generate bytecode for RHS
         for (const auto &tk : postfix) {
             if (isNumber(tk)) {
                 bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-            }else if (isStringLiteral(tk)) {
-                int strIndex = storeString(tk.substr(1, tk.size() - 2)); // bỏ dấu ngoặc kép
-                std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
+            } else if (isStringLiteral(tk)) {
+                int strIndex = storeString(tk.substr(1, tk.size() - 2));
                 bytecode.push_back({OP_CHUOI, 0, strIndex});
             } else if (isVariable(tk)) {
                 int id = getOrCreate(symTab, tk, nextId);
+                // ensureInitialized(id);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
             } else {
                 if (tk == "+") bytecode.push_back({OP_CONG,0,0});
@@ -323,23 +338,21 @@ static void compileExpr(const std::string &expr,
             }
         }
 
-        // push destination id and assign
         bytecode.push_back({OP_TEN_BIEN_ID, dstId, 0});
         bytecode.push_back({OP_GAN,0,0});
         return;
     }
 
-    // Otherwise, expression (produce value on stack)
     auto postfix = convertToPostfix(toks);
     for (const auto &tk : postfix) {
         if (isNumber(tk)) {
             bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-        }else if (isStringLiteral(tk)) {
-            int strIndex = storeString(tk.substr(1, tk.size() - 2)); // bỏ dấu ngoặc kép
-            // std::cerr << "[STORE] Chuỗi: " << tk << " → index = " << strIndex << "\n";
+        } else if (isStringLiteral(tk)) {
+            int strIndex = storeString(tk.substr(1, tk.size() - 2));
             bytecode.push_back({OP_CHUOI, 0, strIndex});
         } else if (isVariable(tk)) {
             int id = getOrCreate(symTab, tk, nextId);
+            // ensureInitialized(id);
             bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
         } else {
             if (tk == "+") bytecode.push_back({OP_CONG,0,0});
@@ -447,20 +460,17 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
         }
     }
 
-    // 1) extract variable name from init and ensure OP_KHOI_TAO is emitted BEFORE any use
-    if (!parts[0].empty()) {
-        std::string varName = extractAssignedVar(parts[0]);
-        if (!varName.empty()) {
-            if (!varName.empty() && symTab.find(varName) == symTab.end()) {
-                symTab[varName] = nextId++;
-                int varId = symTab[varName];
-                bytecode.push_back({OP_KHOI_TAO, varId, 0});
-                // compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
-
-            }
-                compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
-        }
-    }
+    // if (!parts[0].empty()) {
+    //     std::string varName = extractAssignedVar(parts[0]);
+    //     if (!varName.empty()) {
+    //         if (symTab.find(varName) == symTab.end()) {
+    //             symTab[varName] = nextId++;
+    //         }
+    //         int varId = symTab[varName];
+    //         bytecode.push_back({OP_KHOI_TAO, varId, 0});
+    //     }
+    //     // compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
+    // }
 
     // 2) compile init expression
     if (!parts[0].empty()) {
@@ -574,16 +584,20 @@ void initCompileMap() {
 
     compileMap["nếu"] = compileConditionBlock;
     compileMap["lặp"] = [](const std::vector<std::string>& tokens, size_t &pos,
-                           std::vector<Instruction>& bytecode,
-                           std::unordered_map<std::string,int>& symTab,
-                           int& nextId,
-                           const std::unordered_map<std::string,Opcode>& kwMap) {
+                       std::vector<Instruction>& bytecode,
+                       std::unordered_map<std::string,int>& symTab,
+                       int& nextId,
+                       const std::unordered_map<std::string,Opcode>& kwMap) {
         if (tokens[pos] == "lặp") {
             std::string loopHeader = extractParens(tokens, pos + 1).first;
-            std::string varName = extractAssignedVar(splitLoopParts(loopHeader)[0]);
-            if (!varName.empty() && symTab.find(varName) == symTab.end()) {
-                symTab[varName] = nextId++;
-                bytecode.push_back({OP_KHOI_TAO, symTab[varName], 0});
+            std::vector<std::string> parts = splitLoopParts(loopHeader);
+            std::string varName = extractAssignedVar(parts[0]);
+            if (!varName.empty()) {
+                if (symTab.find(varName) == symTab.end()) {
+                    symTab[varName] = nextId++;
+                }
+                int varId = symTab[varName];
+                bytecode.push_back({OP_KHOI_TAO, varId, 0});
             }
             compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
         }

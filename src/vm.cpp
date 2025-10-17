@@ -5,13 +5,14 @@
 #include <stack>
 #include <variant>
 #include <string>
+#include <map> // Thêm thư viện map nếu chưa có
 
 using StackValue = std::variant<int, std::string>;
-VM::VM(const std::vector<Instruction>& code) : bytecode(code), pc(0) {}
-std::vector<std::string> stringPool;
-void VM::loadStringPool(const std::vector<std::string>& pool) {
-    this->stringPool = pool;
-}
+
+// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi tạo thành viên
+VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool)
+    : bytecode(code), pc(0), stringPool(pool) {}
+
 bool toBool(const StackValue& value) {
     if (std::holds_alternative<int>(value)) {
         return std::get<int>(value) != 0;
@@ -22,7 +23,6 @@ bool toBool(const StackValue& value) {
 }
 
 void VM::run() {
-    this->loadStringPool(stringPool); // hoặc chỉ cần loadStringPool(stringPool);
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
         StackValue b = 0, a = 0;
@@ -171,9 +171,14 @@ void VM::run() {
                 stack.push_back((!ia) ? 1 : 0);
                 break;
             }
-            case OP_KHOI_TAO:
-                // std::cout << "[DEBUG] Bắt đầu khởi tạo vòng lặp tại pc = " << pc << std::endl;
+            case OP_KHOI_TAO: {
+                int varId = instr.operandIndex;
+                if (variables.count(varId) == 0) {
+                    variables[varId] = 0;
+                    std::cout << "[VM] Khởi tạo biến ID " << varId << " với giá trị 0\n";
+                }
                 break;
+            }
             case OP_DIEU_KIEN:
                 break;
             case OP_LAP:

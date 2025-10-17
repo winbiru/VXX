@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
             stringPool.clear();
 
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-            VM vm(bytecode);
-            vm.loadStringPool(stringPool);
+            VM vm(bytecode, stringPool);
+            // vm.loadStringPool(stringPool);
             vm.run();
             return EXIT_SUCCESS;
         }
@@ -58,16 +58,13 @@ int main(int argc, char* argv[]) {
                     std::cout << ", operandIndex: " << bytecode[i].operandIndex;
                 if (bytecode[i].operand != 0)
                     std::cout << ", operand: " << bytecode[i].operand;
-                    // << "op: " << instr.op
-                    // << " (" << name_op(instr.op) << ")";
                 if (instr.operandIndex != -1)
                     std::cout << ", operandIndex: " << instr.operandIndex;
                 if (instr.operand != 0)
                     std::cout << ", operand: " << instr.operand;
                 std::cout << std::endl;
             }
-            VM vm(bytecode);
-            vm.loadStringPool(stringPool);
+            VM vm(bytecode, stringPool);
             vm.run();
             return EXIT_SUCCESS;
         }
@@ -81,8 +78,8 @@ int main(int argc, char* argv[]) {
                 stringPool.clear();
 
                 std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-                VM vm(bytecode);
-                vm.loadStringPool(stringPool);
+                VM vm(bytecode, stringPool);
+                // vm.loadStringPool(stringPool);
                 vm.run();
             }
         }
