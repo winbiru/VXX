@@ -175,7 +175,7 @@ void VM::run() {
                 int varId = instr.operandIndex;
                 if (variables.count(varId) == 0) {
                     variables[varId] = 0;
-                    std::cout << "[VM] Khởi tạo biến ID " << varId << " với giá trị 0\n";
+                    // std::cout << "[VM] Khởi tạo biến ID " << varId << " với giá trị 0\n";
                 }
                 break;
             }
