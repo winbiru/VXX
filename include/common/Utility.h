@@ -1,37 +1,24 @@
-// utility.h
 #pragma once
-
 #include <string>
-#include <algorithm>
-#include <cctype>
+#include <vector>
+#include <utility>
 
-class Utility {
-public:
+namespace vietvm::compiler {
 
-    // Loại bỏ khoảng trắng ở đầu
-    static inline void ltrim(std::string &s) {
-        s.erase(
-            s.begin(),
-            std::find_if(s.begin(), s.end(),
-                         [](unsigned char ch){ return !std::isspace(ch); })
-        );
-    }
+    // trim helpers and token sequence extractors
+    std::string trim(const std::string &s);
 
-    // Loại bỏ khoảng trắng ở cuối
-    static inline void rtrim(std::string &s) {
-        s.erase(
-            std::find_if(s.rbegin(), s.rend(),
-                         [](unsigned char ch){ return !std::isspace(ch); })
-                .base(),
-            s.end()
-        );
-    }
+    // Extract functions operating on token vector
+    // extractParens: tokens[start] must be "(" -> returns (content, indexAfterClosingParen)
+    std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start);
 
-    // trim cả đầu và cuối
-    static inline std::string trim(const std::string &s) {
-        std::string copy = s;
-        ltrim(copy);
-        rtrim(copy);
-        return copy;
-    }
-};
+    // extractBlock: tokens[start] must be "{" -> returns (content, indexAfterClosingBrace)
+    std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start);
+
+    // extractExpressionUntilSemicolon: returns (exprString, indexAfterSemicolon)
+    std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start);
+
+    // extractAssignedVar: from an assignment expression string, return lhs trimmed
+    std::string extractAssignedVar(const std::string& expr);
+
+} // namespace vietvm::compiler

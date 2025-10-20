@@ -13,14 +13,14 @@ static std::vector<std::string> splitLoopParts(const std::string& s) {
         else if (c == ')') --parenDepth;
 
         if (c == ';' && parenDepth == 0) {
-            parts.push_back(Utility::trim(current));
+            parts.push_back(vietvm::compiler::trim(current));
             current.clear();
         } else {
             current += c;
         }
     }
     if (!current.empty()) {
-        parts.push_back(Utility::trim(current));
+        parts.push_back(vietvm::compiler::trim(current));
     }
     return parts;
 }

@@ -7,276 +7,20 @@
 #include <vector>
 #include <cctype>
 #include <iostream>
-#include <stack>
 #include <unordered_map>
 #include "../include/instruction.h"
 #include "common/LoopUltil.h" // nếu bạn đã có splitLoopParts(...) ở đây
 #include <functional>
 #include <string>
-// Trim helper
-static std::string trim(const std::string &s) {
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
-}
 
-static int getOrCreate(std::unordered_map<std::string,int>& symTab,
-                       const std::string& name,
-                       int& nextId) {
-    auto it = symTab.find(name);
-    if (it == symTab.end()) {
-        symTab[name] = nextId;
-        return nextId++;
-    }
-    return it->second;
-}
+#include "common/Expression.h"
+#include "common/Lex_utils.h"
+#include "common/SymbolTable.h"
 
-// ---------- Tokenizer ----------
-static std::vector<std::string> tokenize(const std::string &src) {
-    std::vector<std::string> tokens;
-    size_t i = 0;
-    while (i < src.size()) {
-        auto ch = static_cast<unsigned char>(src[i]);
-        if (isspace(ch)) { ++i; continue; }
-        // handle string literals
-        if (ch == '"') {
-            size_t j = i + 1;
-            while (j < src.size() && src[j] != '"') ++j;
-
-            if (j < src.size()) {
-                ++j; // include closing quote
-                tokens.push_back(src.substr(i, j - i));
-                i = j;
-            } else {
-                // Không có dấu " đóng → chỉ lấy phần còn lại như một token lỗi
-                tokens.push_back(src.substr(i));
-                i = src.size();
-            }
-            continue;
-        }
-        // two-char tokens
-        if (i + 1 < src.size()) {
-            std::string two = src.substr(i, 2);
-            if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
-                two == "&&" || two == "||" || two == "++" || two == "--") {
-                tokens.push_back(two);
-                i += 2;
-                continue;
-            }
-        }
-
-        // single char tokens that we treat separately
-        char c = src[i];
-        if (c == '+' || c == '-' || c == '*' || c == '/' ||
-            c == '(' || c == ')' || c == '{' || c == '}' ||
-            c == '[' || c == ']' || c == ';' || c == ',' ||
-            c == '<' || c == '>' || c == '=' || c == '!') {
-            tokens.emplace_back(1, c);
-            ++i;
-             continue;
-        }
-
-        // word / number
-        size_t j = i;
-        while (j < src.size()) {
-            auto cj = static_cast<unsigned char>(src[j]);
-            if (isspace(cj)) break;
-            // break on these punctuation chars
-            if (cj == '"' || cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
-                cj == '(' || cj == ')' || cj == '{' || cj == '}' ||
-                cj == '[' || cj == ']' || cj == ';' || cj == ',' ||
-                cj == '<' || cj == '>' || cj == '=' || cj == '!') break;
-            ++j;
-        }
-        tokens.push_back(src.substr(i, j - i));
-        i = j;
-    }
-    return tokens;
-}
-
-// ---------- Helpers ----------
-static bool isNumber(const std::string &s) {
-    if (s.empty()) return false;
-    size_t start = (s[0] == '-') ? 1 : 0;
-    return std::all_of(s.begin()+start, s.end(), [](char c){ return std::isdigit(static_cast<unsigned char>(c)); });
-}
-
-static bool isOperator(const std::string &tok) {
-    static const std::unordered_map<std::string,int> ops = {
-        {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
-        {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6}
-    };
-    return ops.count(tok) > 0;
-}
-
-bool isStringLiteral(const std::string & tk);
-
-static bool isVariable(const std::string &tok) {
-    if (tok.empty()) return false;
-    if (isStringLiteral(tok)) return false;
-    if (isNumber(tok) || isOperator(tok)) return false;
-    if (tok == "(" || tok == ")" || tok == "{" || tok == "}" || tok == ";" || tok == ",") return false;
-
-    // Biến phải bắt đầu bằng chữ cái hoặc dấu gạch dưới
-    if (!std::isalpha(tok[0]) && tok[0] != '_') return false;
-
-    // Các ký tự còn lại phải là chữ cái, số hoặc dấu gạch dưới
-    for (char c : tok) {
-        if (!std::isalnum(c) && c != '_') return false;
-    }
-
-    return true;
-}
-bool isStringLiteral(const std::string& tk) {
-    return tk.size() >= 2 && tk.front() == '"' && tk.back() == '"';
-}
 std::vector<std::string> stringPool;
 int storeString(const std::string& s) {
     stringPool.push_back(s);
     return static_cast<int>(stringPool.size() - 1);
-}
-// parse from tokens[start] which must be '(' -> return content string and index after closing ')'
-static std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
-    if (start >= tokens.size() || tokens[start] != "(")
-        throw std::runtime_error("extractParens: expected '('");
-    std::ostringstream oss;
-    int depth = 1;
-    size_t i = start + 1;
-    while (i < tokens.size() && depth > 0) {
-        if (tokens[i] == "(") { ++depth; }
-        else if (tokens[i] == ")") { --depth; if (depth == 0) { ++i; break; } }
-        if (depth > 0) {
-            oss << tokens[i];
-            // put space except when token is semicolon or closing brace (space is harmless)
-            oss << " ";
-        }
-        ++i;
-    }
-    if (depth != 0) throw std::runtime_error("extractParens: unbalanced parentheses");
-    return {trim(oss.str()), i};
-}
-
-std::string extractAssignedVar(const std::string& expr) {
-    size_t eqPos = expr.find('=');
-    if (eqPos == std::string::npos) {
-        throw std::runtime_error("Không tìm thấy toán tử '=' trong biểu thức gán");
-    }
-
-    std::string left = expr.substr(0, eqPos);
-    return trim(left); // nếu bạn có hàm trim để loại bỏ khoảng trắng
-}
-
-// extract block content from tokens[start] where start points to '{', returns content and index after closing '}'
-static std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start) {
-    if (start >= tokens.size() || tokens[start] != "{")
-        throw std::runtime_error("extractBlock: expected '{'");
-    std::ostringstream oss;
-    int depth = 1;
-    size_t i = start + 1;
-    while (i < tokens.size() && depth > 0) {
-        if (tokens[i] == "{") { ++depth; }
-        else if (tokens[i] == "}") { --depth; if (depth == 0) { ++i; break; } }
-        if (depth > 0) {
-            oss << tokens[i] << " ";
-        }
-        ++i;
-    }
-    if (depth != 0) throw std::runtime_error("extractBlock: unbalanced braces");
-    return {trim(oss.str()), i};
-}
-
-// Compose expression tokens until semicolon or end; returns expr string and index after semicolon
-static std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start) {
-    std::ostringstream oss;
-    size_t i = start;
-    while (i < tokens.size() && tokens[i] != ";") {
-        oss << tokens[i] << " ";
-        ++i;
-    }
-    if (i < tokens.size() && tokens[i] == ";") ++i; // skip semicolon
-    return {trim(oss.str()), i};
-}
-
-// ---------- Shunting-yard to postfix ----------
-static int precedence_op(const std::string& op) {
-    if (op == "=") return 0;
-    if (op == "||") return 1;
-    if (op == "&&") return 2;
-    if (op == "==" || op == "!=" || op == "<" || op == ">" || op == "<=" || op == ">=") return 3;
-    if (op == "+" || op == "-") return 4;
-    if (op == "*" || op == "/" || op == "%") return 5;
-    if (op == "!") return 6; // Phủ định
-    return -1;
-}
-// void ensureDeclared(const std::string& varName,
-//                     std::unordered_map<std::string,int>& symTab,
-//                     int& nextId,
-//                     std::vector<Instruction>& bytecode)
-// {
-//     if (symTab.find(varName) == symTab.end()) {
-//         symTab[varName] = nextId++;
-//         bytecode.push_back({OP_KHOI_TAO, symTab[varName], 0});
-//     }
-// }
-
-static char associativity_op(const std::string &op) { return (op == "=") ? 'r' : 'l'; }
-
-static std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
-    std::vector<std::string> output;
-    std::stack<std::string> ops;
-
-    for (const auto &token : infix_tokens) {
-        if (token.empty()) continue;
-
-        // Xử lý toán hạng: số, chuỗi, biến
-        if (isNumber(token) || isStringLiteral(token) || isVariable(token)) {
-            output.push_back(token);
-        }
-
-        // Xử lý toán tử
-        else if (isOperator(token)) {
-            while (!ops.empty() && isOperator(ops.top())) {
-                const std::string &top = ops.top();
-                if ((precedence_op(top) > precedence_op(token)) ||
-                    (precedence_op(top) == precedence_op(token) && associativity_op(token) == 'l')) {
-                    output.push_back(top);
-                    ops.pop();
-                } else break;
-            }
-            ops.push(token);
-        }
-
-        // Dấu mở ngoặc
-        else if (token == "(") {
-            ops.push(token);
-        }
-
-        // Dấu đóng ngoặc
-        else if (token == ")") {
-            while (!ops.empty() && ops.top() != "(") {
-                output.push_back(ops.top());
-                ops.pop();
-            }
-            if (ops.empty()) throw std::runtime_error("convertToPostfix: mismatched parens");
-            ops.pop(); // pop "("
-        }
-
-        // Token không hợp lệ
-        else {
-            throw std::runtime_error("convertToPostfix: unknown token '" + token + "'");
-        }
-    }
-
-    // Đẩy nốt các toán tử còn lại
-    while (!ops.empty()) {
-        if (ops.top() == "(" || ops.top() == ")")
-            throw std::runtime_error("convertToPostfix: mismatched parens");
-        output.push_back(ops.top());
-        ops.pop();
-    }
-
-    return output;
 }
 
 
@@ -287,36 +31,27 @@ static void compileExpr(const std::string &expr,
                         int &nextId,
                         const std::unordered_map<std::string,Opcode> &keywordMap)
 {
-    if (trim(expr).empty()) return;
+    if (vietvm::compiler::trim(expr).empty()) return;
 
-    // auto ensureInitialized = [&](int id) {
-    //     bool alreadyInitialized = std::any_of(bytecode.begin(), bytecode.end(), [&](const Instruction& instr) {
-    //         return instr.op == OP_KHOI_TAO && instr.operandIndex == id;
-    //     });
-    //     if (!alreadyInitialized) {
-    //         bytecode.push_back({OP_KHOI_TAO, id, 0});
-    //     }
-    // };
-
-    auto toks = tokenize(expr);
+    auto toks = vietvm::compiler::tokenize(expr);
     auto itEq = std::find(toks.begin(), toks.end(), "=");
 
     if (itEq != toks.end() && std::distance(toks.begin(), itEq) == 1) {
         std::string varName = toks[0];
-        int dstId = getOrCreate(symTab, varName, nextId);
+        int dstId = vietvm::compiler::SymbolTable::getOrCreate(symTab, varName, nextId);
         // ensureInitialized(dstId);
 
         std::vector<std::string> rhsTokens(itEq + 1, toks.end());
-        auto postfix = convertToPostfix(rhsTokens);
+        auto postfix = vietvm::compiler::convertToPostfix(rhsTokens);
 
         for (const auto &tk : postfix) {
-            if (isNumber(tk)) {
+            if (vietvm::compiler::isNumber(tk)) {
                 bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-            } else if (isStringLiteral(tk)) {
+            } else if (vietvm::compiler::isStringLiteral(tk)) {
                 int strIndex = storeString(tk.substr(1, tk.size() - 2));
                 bytecode.push_back({OP_CHUOI, 0, strIndex});
-            } else if (isVariable(tk)) {
-                int id = getOrCreate(symTab, tk, nextId);
+            } else if (vietvm::compiler::isVariable(tk)) {
+                int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
                 // ensureInitialized(id);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
             } else {
@@ -343,15 +78,15 @@ static void compileExpr(const std::string &expr,
         return;
     }
 
-    auto postfix = convertToPostfix(toks);
+    auto postfix = vietvm::compiler::convertToPostfix(toks);
     for (const auto &tk : postfix) {
-        if (isNumber(tk)) {
+        if (vietvm::compiler::isNumber(tk)) {
             bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-        } else if (isStringLiteral(tk)) {
+        } else if (vietvm::compiler::isStringLiteral(tk)) {
             int strIndex = storeString(tk.substr(1, tk.size() - 2));
             bytecode.push_back({OP_CHUOI, 0, strIndex});
-        } else if (isVariable(tk)) {
-            int id = getOrCreate(symTab, tk, nextId);
+        } else if (vietvm::compiler::isVariable(tk)) {
+            int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
             // ensureInitialized(id);
             bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
         } else {
@@ -396,7 +131,7 @@ static void compileConditionBlock(const std::vector<std::string>& tokens, size_t
 {
     // tokens[pos] is 'nếu' (OP_NEU)
     // parse parens
-    auto parenPair = extractParens(tokens, pos + 1); // expects '(' at pos+1
+    auto parenPair = vietvm::compiler::extractParens(tokens, pos + 1); // expects '(' at pos+1
     std::string condExpr = parenPair.first;
     size_t afterParen = parenPair.second;
 
@@ -438,7 +173,7 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
                                const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     // tokens[pos] is 'lặp' (OP_LAP)
-    auto parenPair = extractParens(tokens, pos + 1); // returns content and index after ')'
+    auto parenPair = vietvm::compiler::extractParens(tokens, pos + 1); // returns content and index after ')'
     std::string inside = parenPair.first;
     size_t afterParen = parenPair.second;
 
@@ -451,7 +186,7 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
         std::istringstream iss(inside);
         std::string seg;
         while (std::getline(iss, seg, ';')) {
-            tmp.push_back(trim(seg));
+            tmp.push_back(vietvm::compiler::trim(seg));
         }
         if (tmp.size() >= 3) {
             parts = {tmp[0], tmp[1], tmp[2]};
@@ -563,7 +298,7 @@ static void compileStatement(const std::vector<std::string>& tokens, size_t &pos
     }
 
     // ---- Còn lại là Biểu thức thông thường ----
-    auto pr = extractExpressionUntilSemicolon(tokens, pos);
+    auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
     compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
     bytecode.push_back({OP_DONG_LENH,0,0});
     pos = pr.second;
@@ -576,7 +311,7 @@ void initCompileMap() {
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& kwMap) {
         ++pos; // bỏ qua "in"
-        auto pr = extractExpressionUntilSemicolon(tokens, pos);
+        auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
         compileExpr(pr.first, bytecode, symTab, nextId, kwMap);
         bytecode.push_back({OP_IN, 0, 0});
         pos = pr.second;
@@ -589,9 +324,9 @@ void initCompileMap() {
                        int& nextId,
                        const std::unordered_map<std::string,Opcode>& kwMap) {
         if (tokens[pos] == "lặp") {
-            std::string loopHeader = extractParens(tokens, pos + 1).first;
+            std::string loopHeader = vietvm::compiler::extractParens(tokens, pos + 1).first;
             std::vector<std::string> parts = splitLoopParts(loopHeader);
-            std::string varName = extractAssignedVar(parts[0]);
+            std::string varName = vietvm::compiler::extractAssignedVar(parts[0]);
             if (!varName.empty()) {
                 if (symTab.find(varName) == symTab.end()) {
                     symTab[varName] = nextId++;
@@ -636,7 +371,7 @@ std::vector<Instruction> compileSource(const std::string& source,
     int nextId = 0;
 
     // Tokenize entire source (supports multi-line)
-    auto tokens = tokenize(source);
+    auto tokens = vietvm::compiler::tokenize(source);
 
     size_t pos = 0;
     while (pos < tokens.size()) {
