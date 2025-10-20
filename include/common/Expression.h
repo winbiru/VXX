@@ -11,4 +11,4 @@ namespace vietvm::compiler {
     int precedence_op(const std::string& op);
     char associativity_op(const std::string& op);
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

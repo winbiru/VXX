@@ -8,7 +8,7 @@ include_directories(include)
 
 set(SOURCES
         src/main.cpp
-        src/compiler.cpp
+        src/Compiler/compiler.cpp
         src/vm.cpp
         include/name_op.h
         include/common/Utility.h
@@ -21,6 +21,10 @@ set(SOURCES
         include/common/expression.h
         src/Helpers/SymbolTable.cpp
         include/common/SymbolTable.h
+        src/Compiler/compilerExpr.cpp
+        include/compiler/compilerExpr.h
+        src/Helpers/storeString.cpp
+        include/common/storeString.h
         # Các tệp nguồn khác nếu có
 )
 

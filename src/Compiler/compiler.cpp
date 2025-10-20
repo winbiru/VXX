@@ -1,6 +1,8 @@
-// compiler.cpp
-#include "../include/compiler.h"
-#include "../include/common/Utility.h"
+// Compiler.cpp
+
+#include "compiler/compiler.h"
+#include "compiler/compilerExpr.h"
+
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
@@ -8,113 +10,29 @@
 #include <cctype>
 #include <iostream>
 #include <unordered_map>
-#include "../include/instruction.h"
+#include "../../include/instruction.h"
 #include "common/LoopUltil.h" // nếu bạn đã có splitLoopParts(...) ở đây
 #include <functional>
 #include <string>
 
-#include "common/Expression.h"
 #include "common/Lex_utils.h"
-#include "common/SymbolTable.h"
 
-std::vector<std::string> stringPool;
-int storeString(const std::string& s) {
-    stringPool.push_back(s);
-    return static_cast<int>(stringPool.size() - 1);
-}
+using CompileFunc = std::function<void(
+    const std::vector<std::string>& tokens,
+    size_t &pos,
+    std::vector<Instruction>& bytecode,
+    std::unordered_map<std::string,int>& symTab,
+    int& nextId,
+    const std::unordered_map<std::string,Opcode>& keywordMap)>;
 
+// Bản đồ ánh xạ keyword → compile function
+static std::unordered_map<std::string, CompileFunc> compileMap;
 
-// ---------- compileExpr: produce bytecode for an expression or assignment ----------
-static void compileExpr(const std::string &expr,
-                        std::vector<Instruction> &bytecode,
-                        std::unordered_map<std::string,int> &symTab,
-                        int &nextId,
-                        const std::unordered_map<std::string,Opcode> &keywordMap)
-{
-    if (vietvm::compiler::trim(expr).empty()) return;
-
-    auto toks = vietvm::compiler::tokenize(expr);
-    auto itEq = std::find(toks.begin(), toks.end(), "=");
-
-    if (itEq != toks.end() && std::distance(toks.begin(), itEq) == 1) {
-        std::string varName = toks[0];
-        int dstId = vietvm::compiler::SymbolTable::getOrCreate(symTab, varName, nextId);
-        // ensureInitialized(dstId);
-
-        std::vector<std::string> rhsTokens(itEq + 1, toks.end());
-        auto postfix = vietvm::compiler::convertToPostfix(rhsTokens);
-
-        for (const auto &tk : postfix) {
-            if (vietvm::compiler::isNumber(tk)) {
-                bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-            } else if (vietvm::compiler::isStringLiteral(tk)) {
-                int strIndex = storeString(tk.substr(1, tk.size() - 2));
-                bytecode.push_back({OP_CHUOI, 0, strIndex});
-            } else if (vietvm::compiler::isVariable(tk)) {
-                int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
-                // ensureInitialized(id);
-                bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
-            } else {
-                if (tk == "+") bytecode.push_back({OP_CONG,0,0});
-                else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
-                else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
-                else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
-                else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
-                else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
-                else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
-                else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
-                else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
-                else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
-                else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0});
-                else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0});
-                else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0});
-                else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0});
-                else throw std::runtime_error("compileExpr: unsupported operator " + tk);
-            }
-        }
-
-        bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId});
-        bytecode.push_back({OP_GAN,0,0});
-        return;
-    }
-
-    auto postfix = vietvm::compiler::convertToPostfix(toks);
-    for (const auto &tk : postfix) {
-        if (vietvm::compiler::isNumber(tk)) {
-            bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
-        } else if (vietvm::compiler::isStringLiteral(tk)) {
-            int strIndex = storeString(tk.substr(1, tk.size() - 2));
-            bytecode.push_back({OP_CHUOI, 0, strIndex});
-        } else if (vietvm::compiler::isVariable(tk)) {
-            int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
-            // ensureInitialized(id);
-            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
-        } else {
-            if (tk == "+") bytecode.push_back({OP_CONG,0,0});
-            else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
-            else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
-            else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
-            else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
-            else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
-            else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
-            else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
-            else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
-            else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
-            else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0});
-            else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0});
-            else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0});
-            else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0});
-            else throw std::runtime_error("compileExpr: unsupported token " + tk);
-        }
-    }
-}
-
-// forward declarations
 static void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
-                             std::vector<Instruction> &bytecode,
-                             std::unordered_map<std::string,int> &symTab,
-                             int &nextId,
-                             const std::unordered_map<std::string,Opcode> &keywordMap);
+                                 std::vector<Instruction> &bytecode,
+                                 std::unordered_map<std::string,int> &symTab,
+                                 int &nextId,
+                                 const std::unordered_map<std::string,Opcode> &keywordMap);
 
 static void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
                          std::vector<Instruction> &bytecode,
@@ -195,18 +113,6 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
         }
     }
 
-    // if (!parts[0].empty()) {
-    //     std::string varName = extractAssignedVar(parts[0]);
-    //     if (!varName.empty()) {
-    //         if (symTab.find(varName) == symTab.end()) {
-    //             symTab[varName] = nextId++;
-    //         }
-    //         int varId = symTab[varName];
-    //         bytecode.push_back({OP_KHOI_TAO, varId, 0});
-    //     }
-    //     // compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
-    // }
-
     // 2) compile init expression
     if (!parts[0].empty()) {
         compileExpr(parts[0], bytecode, symTab, nextId, keywordMap);
@@ -251,18 +157,6 @@ static LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &p
 
     return {cond_index, exit_jump_index};
 }
-
-
-using CompileFunc = std::function<void(
-    const std::vector<std::string>& tokens,
-    size_t &pos,
-    std::vector<Instruction>& bytecode,
-    std::unordered_map<std::string,int>& symTab,
-    int& nextId,
-    const std::unordered_map<std::string,Opcode>& keywordMap)>;
-
-// Bản đồ ánh xạ keyword → compile function
-static std::unordered_map<std::string, CompileFunc> compileMap;
 
 // ---------- compileStatement ----------
 static void compileStatement(const std::vector<std::string>& tokens, size_t &pos,

@@ -1,6 +1,6 @@
 #pragma once
-// Lightweight lexical helpers for the compiler.
-// Put helpers into vietvm::compiler namespace and expose them as free functions.
+// Lightweight lexical helpers for the Compiler.
+// Put helpers into vietvm::Compiler namespace and expose them as free functions.
 
 #include <string>
 #include <unordered_map>
@@ -17,4 +17,4 @@ namespace vietvm::compiler {
     // Read-only access to operator precedence map.
     const std::unordered_map<std::string,int>& operatorPrecedenceMap() noexcept;
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

@@ -8,7 +8,7 @@
 #include <map> // Thêm thư viện map nếu chưa có
 using StackValue = std::variant<int, std::string>;
 
-// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi tạo thành viên
+// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi  tạo thành viên
 /**
  *
  * @param code

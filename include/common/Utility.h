@@ -21,4 +21,4 @@ namespace vietvm::compiler {
     // extractAssignedVar: from an assignment expression string, return lhs trimmed
     std::string extractAssignedVar(const std::string& expr);
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

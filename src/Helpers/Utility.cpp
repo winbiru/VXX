@@ -68,4 +68,4 @@ std::string extractAssignedVar(const std::string& expr) {
     return trim(left);
 }
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

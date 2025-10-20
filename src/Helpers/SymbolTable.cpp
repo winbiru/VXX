@@ -21,4 +21,4 @@ namespace vietvm::compiler {
         return table_.find(name) != table_.end();
     }
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

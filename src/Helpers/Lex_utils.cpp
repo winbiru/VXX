@@ -100,4 +100,4 @@ namespace vietvm::compiler {
         }
         return tokens;
     }
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

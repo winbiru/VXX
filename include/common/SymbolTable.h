@@ -18,4 +18,4 @@ namespace vietvm::compiler {
         std::unordered_map<std::string,int> table_;
         int nextId_ = 0;
     };
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler

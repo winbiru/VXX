@@ -65,4 +65,4 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     return output;
 }
 
-} // namespace vietvm::compiler
+} // namespace vietvm::Compiler
