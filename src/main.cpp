@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
             return EXIT_SUCCESS;
         }
 
-        const std::string defaultFile = "../tests/kiem_tra_mang_3_chieu.vi";
+        const std::string defaultFile = "../tests/kiem_tra_chon_ca.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             // Chạy file mặc định nếu không truyền đối số
             std::string source = readFile(defaultFile);

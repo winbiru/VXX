@@ -14,6 +14,7 @@
 // ---------- compileSource: top-level ----------
 // This replaces the old line-by-line code and uses token stream + recursive parsing.
 // It returns vector<Instruction>.
+
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap)
 {
@@ -23,6 +24,7 @@ std::vector<Instruction> compileSource(const std::string& source,
 
     // Tokenize entire source (supports multi-line)
     auto tokens = vietvm::compiler::tokenize(source);
+    tokens = vietvm::compiler::postProcessTokens(tokens);
 
     size_t pos = 0;
     while (pos < tokens.size()) {

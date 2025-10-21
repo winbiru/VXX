@@ -5,9 +5,14 @@
 #include "../include/common/Lex_utils.h"
 #include <algorithm>
 #include <cctype>
+#include <stdexcept>
+#include <variant>
+
+#include "common/Utility.h"
 
 namespace vietvm::compiler {
-
+    using Value = std::variant<int, std::string>;
+    std::vector<Value> vars; // indexed by varId
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
@@ -99,5 +104,84 @@ namespace vietvm::compiler {
             i = j;
         }
         return tokens;
+    }
+    std::string normalizeTokenForCompare(const std::string& s) {
+    std::string t = trim(s);
+    if (t.empty()) return t;
+    // Nếu token là chuỗi nguyên (bắt đầu và kết thúc bằng " hoặc '), trả về nguyên bản (để không phá chuỗi)
+    if ( (t.size() >= 2 && t.front() == '"' && t.back() == '"') ||
+         (t.size() >= 2 && t.front() == '\'' && t.back() == '\'') ) {
+        return t;
+    }
+    // Loại bỏ dấu câu cuối nếu là :, ; , hoặc .
+    char last = t.back();
+    if (last == ':' || last == ';' || last == ',' || last == '.') {
+        t.pop_back();
+        t = trim(t); // loại bỏ khoảng trắng dư nếu có
+    }
+    return t;
+}
+
+    // Hàm hậu xử lý: ghép "mặc" + "định" thành "mặc định"
+    // Giữ nguyên token chuỗi nguyên vẹn; nếu ghép được sẽ push "mặc định" (không có dấu :)
+    std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens) {
+        std::vector<std::string> result;
+        result.reserve(tokens.size());
+
+        for (size_t i = 0; i < tokens.size(); ++i) {
+            // Chuẩn bị phiên bản để so sánh (normalize) cho token hiện tại
+            std::string a_norm = normalizeTokenForCompare(tokens[i]);
+
+            // Trường hợp 1: token hiện tại đã là "mặc định" hoặc "mặc định:" (với dấu)
+            if (!a_norm.empty()) {
+                // so sánh chính xác (không phân biệt hoa thường ở đây; nếu cần, chuyển về lower)
+                if (a_norm == "mặc định") {
+                    result.push_back("mặc định");
+                    continue;
+                }
+            }
+
+            // Trường hợp 2: token hiện tại là "mặc" và token kế là "định" hoặc "định:" v.v.
+            if (a_norm == "mặc" && i + 1 < tokens.size()) {
+                std::string b_norm = normalizeTokenForCompare(tokens[i + 1]);
+                if (b_norm == "định") {
+                    result.push_back("mặc định");
+                    ++i; // tiêu thụ token kế
+                    continue;
+                }
+            }
+
+            // Nếu không thuộc trường hợp trên -> giữ token gốc (không normalize chuỗi)
+            result.push_back(tokens[i]);
+        }
+
+        return result;
+    }
+    std::string stripQuotes(const std::string& input) {
+        if (input.length() >= 2 &&
+            ((input.front() == '"' && input.back() == '"') ||
+             (input.front() == '\'' && input.back() == '\''))) {
+            return input.substr(1, input.length() - 2);
+             }
+        return input;
+    }
+
+    int getVarValueInt(int varId) {
+        if (varId < 0 || static_cast<size_t>(varId) >= vars.size()) {
+            throw std::runtime_error("getVarValueInt: varId ngoài phạm vi");
+        }
+        const Value& v = vars[varId];
+        if (std::holds_alternative<int>(v)) {
+            return std::get<int>(v);
+        }
+        // nếu là chuỗi, thử chuyển sang int; nếu không parse được thì lỗi
+        if (std::holds_alternative<std::string>(v)) {
+            try {
+                return std::stoi(std::get<std::string>(v));
+            } catch (...) {
+                throw std::runtime_error("getVarValueInt: giá trị biến không phải số");
+            }
+        }
+        throw std::runtime_error("getVarValueInt: kiểu giá trị không hỗ trợ");
     }
 } // namespace vietvm::Compiler

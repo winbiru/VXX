@@ -6,6 +6,8 @@
 #include <variant>
 #include <string>
 #include <map> // Thêm thư viện map nếu chưa có
+
+#include "common/Lex_utils.h"
 using StackValue = std::variant<int, std::string>;
 
 // ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi  tạo thành viên
@@ -210,7 +212,95 @@ void VM::run() {
                 std::cout << std::endl;
                 break;
             }
+            case OP_CHON: {
+                // Lấy giá trị trên đỉnh stack làm giá trị cần xét
+                if (stack.empty()) throw std::runtime_error("CHON: Stack rỗng");
+                switchValue = stack.back();
+                stack.pop_back();
+                inSwitchBlock = true;
+                skippingCase = true; // ban đầu bỏ qua tất cả cho đến khi gặp ca phù hợp
+                break;
+            }
 
+            case OP_CA: {
+                if (!inSwitchBlock || !switchValue.has_value()) {
+                    throw std::runtime_error("CA: Không nằm trong khối CHON");
+                }
+
+                bool match = false;
+
+                // 1) case là chuỗi (operandIndex >= 0)
+                if (instr.operandIndex >= 0) {
+                    std::string caseStr = stringPool.at(instr.operandIndex);
+
+                    if (std::holds_alternative<std::string>(*switchValue)) {
+                        match = (std::get<std::string>(*switchValue) == caseStr);
+                    } else if (std::holds_alternative<int>(*switchValue)) {
+                        // nếu switchValue là số, so sánh bằng cách convert số sang chuỗi
+                        match = (std::to_string(std::get<int>(*switchValue)) == caseStr);
+                    } else {
+                        match = false;
+                    }
+                }
+                // 2) case là số (operandIndex == -1, operand chứa số)
+                else if (instr.operandIndex == -1) {
+                    if (std::holds_alternative<int>(*switchValue)) {
+                        match = (std::get<int>(*switchValue) == instr.operand);
+                    } else if (std::holds_alternative<std::string>(*switchValue)) {
+                        // nếu switchValue là chuỗi, cố gắng chuyển chuỗi sang số để so sánh
+                        try {
+                            int sv = std::stoi(std::get<std::string>(*switchValue));
+                            match = (sv == instr.operand);
+                        } catch (...) {
+                            match = false;
+                        }
+                    } else {
+                        match = false;
+                    }
+                }
+                // 3) case là biến (operandIndex == -2, operand là varId)
+                else if (instr.operandIndex == -2) {
+                    int varId = instr.operand;
+                    // TODO: thay bằng hàm lấy giá trị biến thực tế trong VM của bạn
+                    int varValue = vietvm::compiler::getVarValueInt(varId);
+
+                    if (std::holds_alternative<int>(*switchValue)) {
+                        match = (std::get<int>(*switchValue) == varValue);
+                    } else if (std::holds_alternative<std::string>(*switchValue)) {
+                        try {
+                            int sv = std::stoi(std::get<std::string>(*switchValue));
+                            match = (sv == varValue);
+                        } catch (...) {
+                            match = false;
+                        }
+                    } else {
+                        match = false;
+                    }
+                } else {
+                    throw std::runtime_error("CA: định dạng operand không hợp lệ");
+                }
+
+                // cập nhật skippingCase dựa trên kết quả so sánh
+                skippingCase = !match;
+                break;
+            }
+            case OP_THOAT: {
+                if (!inSwitchBlock) {
+                    throw std::runtime_error("THOAT: Không nằm trong khối CHON");
+                }
+                // Tìm đến cuối khối CHON (giả sử kết thúc bằng OP_DONG_KHOI)
+                while (pc < bytecode.size()) {
+                    if (bytecode[pc].op == OP_DONG_KHOI || bytecode[pc].op == OP_DONG_NGOAC) {
+                        ++pc;
+                        break;
+                    }
+                    ++pc;
+                }
+                skippingCase = false;
+                inSwitchBlock = false;
+                switchValue.reset();
+                break;
+            }
 
             // Thay thế phần xử lý đọc giá trị biến
             case OP_TEN_BIEN_GIA_TRI: {
@@ -299,6 +389,10 @@ void VM::run() {
                 break;
             }
             default:
+                if (inSwitchBlock && skippingCase) {
+                    // Bỏ qua lệnh trong ca không khớp
+                    break;
+                }
                 throw std::runtime_error("Opcode không xác định: " + std::to_string(instr.op));
         }
         pc++;

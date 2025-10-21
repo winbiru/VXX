@@ -69,7 +69,10 @@ enum Opcode {
     OP_JUMP          = 63,       // Nhảy vô điều kiện
     OP_MODULO        = 64,       // Chia lấy dư
     OP_CHUOI         = 65,       // Chuỗi
-    OP_PHU_DINH      = 66        // Phủ định cái gì đó.
+    OP_PHU_DINH      = 66,        // Phủ định cái gì đó.
+    OP_CHON           = 67,
+    OP_CA            = 68
+
 };
 
 enum CompareOp {
