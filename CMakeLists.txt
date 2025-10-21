@@ -25,6 +25,16 @@ set(SOURCES
         include/compiler/compilerExpr.h
         src/Helpers/storeString.cpp
         include/common/storeString.h
+        src/Compiler/compileCondition.cpp
+        include/compiler/compileCondition.h
+        src/Compiler/compileBlock.cpp
+        include/compiler/compileBlock.h
+        src/Compiler/compileStatement.cpp
+        include/compiler/compileStatement.h
+        src/Compiler/CompileRegistry.cpp
+        include/compiler/CompileRegistry.h
+        src/Compiler/compileLoop.cpp
+        include/compiler/compileLoop.h
         # Các tệp nguồn khác nếu có
 )
 
