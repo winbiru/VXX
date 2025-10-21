@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 #include <filesystem> // Thêm dòng này
-#include "../include/compiler.h"
+#include "../include/compiler/compiler.h"
 #include "../include/vm.h"
 #include "../include/name_op.h"
+#include "common/storeString.h"
 
 // Biến toàn cục chứa chuỗi hằng đã biên dịch
-extern std::vector<std::string> stringPool;
 namespace fs = std::filesystem;
 
 std::string readFile(const std::string &filename) {
@@ -25,13 +25,12 @@ void initCompileMap();
 int main(int argc, char* argv[]) {
     try {
         initCompileMap();
-
+        const auto& stringPool = vietvm::compiler::StringPool::getPool();
         if (argc == 2) {
             // Chạy đúng file được truyền qua dòng lệnh
             const std::string filename = argv[1];
             std::string source = readFile(filename);
-            stringPool.clear();
-
+            vietvm::compiler::StringPool::clear();
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
             VM vm(bytecode, stringPool);
             // vm.loadStringPool(stringPool);
@@ -39,11 +38,11 @@ int main(int argc, char* argv[]) {
             return EXIT_SUCCESS;
         }
 
-        const std::string defaultFile = "../tests/kiem_tra_dieu_kien_phu_dinh.vi";
+        const std::string defaultFile = "../tests/kiem_tra_mang_3_chieu.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             // Chạy file mặc định nếu không truyền đối số
             std::string source = readFile(defaultFile);
-            stringPool.clear();
+            vietvm::compiler::StringPool::clear();
 
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
             // In toàn bộ bytecode để debug
@@ -75,11 +74,10 @@ int main(int argc, char* argv[]) {
             if (entry.path().extension() == ".vi") {
                 const std::string filename = entry.path().string();
                 std::string source = readFile(filename);
-                stringPool.clear();
+                vietvm::compiler::StringPool::clear();
 
                 std::vector<Instruction> bytecode = compileSource(source, keywordMap);
                 VM vm(bytecode, stringPool);
-                // vm.loadStringPool(stringPool);
                 vm.run();
             }
         }

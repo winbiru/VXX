@@ -6,12 +6,16 @@
 #include <variant>
 #include <string>
 #include <map> // Thêm thư viện map nếu chưa có
-
 using StackValue = std::variant<int, std::string>;
 
-// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi tạo thành viên
+// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi  tạo thành viên
+/**
+ *
+ * @param code
+ * @param pool
+ */
 VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool)
-    : bytecode(code), pc(0), stringPool(pool) {}
+    : bytecode(code), stringPool(pool), pc(0) {}
 
 bool toBool(const StackValue& value) {
     if (std::holds_alternative<int>(value)) {
@@ -30,13 +34,13 @@ void VM::run() {
         switch (instr.op) {
             case OP_BIEN_SO: {
                 int val = instr.operand;
-                stack.push_back(val);
+                stack.emplace_back(val);
                 break;
             }
 
             case OP_TEN_BIEN_ID: {
                 int varId = instr.operandIndex;
-                stack.push_back(varId);
+                stack.emplace_back(varId);
                 break;
             }
 
@@ -66,7 +70,7 @@ void VM::run() {
                     throw std::runtime_error("Lỗi: chia dư cho 0");
 
                 int int_a = std::get<int>(a);
-                stack.push_back(int_a % int_b);
+                stack.emplace_back(int_a % int_b);
                 break;
             }
 
@@ -88,7 +92,7 @@ void VM::run() {
                         } else {
                             std::string sa = std::holds_alternative<int>(a) ? std::to_string(std::get<int>(a)) : std::get<std::string>(a);
                             std::string sb = std::holds_alternative<int>(b) ? std::to_string(std::get<int>(b)) : std::get<std::string>(b);
-                            stack.push_back(sa + sb);
+                            stack.emplace_back(sa + sb);
                         }
                         break;
                     }

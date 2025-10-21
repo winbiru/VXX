@@ -16,10 +16,11 @@ class VM {
 public:
     explicit VM(const std::vector<Instruction>& code);
     void run();
-    void loadStringPool(const std::vector<std::string>& pool); // ← THÊM DÒNG NÀY
+    // void loadStringPool(const std::vector<std::string>& pool); // ← THÊM DÒNG NÀY
     VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode
+    std::vector<std::string> stringPool;
     using StackValue = std::variant<int, std::string>;
     std::vector<StackValue> stack;
     std::unordered_map<int, StackValue> variables;  // Biến tạm thời (nếu cần mở rộng)
@@ -32,7 +33,6 @@ private:
     int instructionPointer = 0;
     bool running = true;                            // Trạng thái thực thi
     int vi_tri_dieu_kien = -1;
-    std::vector<std::string> stringPool;            // Bộ nhớ lưu chuỗi hằng
     // Các hàm phụ trợ
     void execute(const Instruction& inst);
     int pop();
