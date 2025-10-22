@@ -37,10 +37,9 @@ private:
     bool running = true;                            // Trạng thái thực thi
     int vi_tri_dieu_kien = -1;
     struct SwitchFrame {
-        size_t startPc;
-        size_t endPc;           // 0 nếu chưa biết
-        int blockDepthAtStart;
-        std::optional<std::variant<int, std::string>> savedSwitchValue; // nếu cần giữ
+        std::optional<StackValue> switchValue;
+        bool skippingCase{};
+        size_t blockDepthAtStart{};
     };
     std::vector<SwitchFrame> switchStack; // khởi tạo rỗng
     int blockDepth = 0;                   // tăng khi OP_MO_KHOI, giảm khi OP_DONG_KHOI

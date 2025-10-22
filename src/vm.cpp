@@ -213,94 +213,92 @@ void VM::run() {
                 break;
             }
             case OP_CHON: {
-                // Lấy giá trị trên đỉnh stack làm giá trị cần xét
                 if (stack.empty()) throw std::runtime_error("CHON: Stack rỗng");
-                switchValue = stack.back();
+                SwitchFrame frame;
+                frame.switchValue = stack.back();
                 stack.pop_back();
-                inSwitchBlock = true;
-                skippingCase = true; // ban đầu bỏ qua tất cả cho đến khi gặp ca phù hợp
+                frame.skippingCase = true;
+                frame.blockDepthAtStart = blockStack.size();
+                switchStack.push_back(frame);
                 break;
             }
 
             case OP_CA: {
-                if (!inSwitchBlock || !switchValue.has_value()) {
+                if (switchStack.empty() || !switchStack.back().switchValue.has_value()) {
                     throw std::runtime_error("CA: Không nằm trong khối CHON");
                 }
+                auto& ctx = switchStack.back();
 
                 bool match = false;
-
-                // 1) case là chuỗi (operandIndex >= 0)
+                // 1) case là chuỗi
                 if (instr.operandIndex >= 0) {
                     std::string caseStr = stringPool.at(instr.operandIndex);
-
-                    if (std::holds_alternative<std::string>(*switchValue)) {
-                        match = (std::get<std::string>(*switchValue) == caseStr);
-                    } else if (std::holds_alternative<int>(*switchValue)) {
-                        // nếu switchValue là số, so sánh bằng cách convert số sang chuỗi
-                        match = (std::to_string(std::get<int>(*switchValue)) == caseStr);
-                    } else {
-                        match = false;
+                    if (std::holds_alternative<std::string>(*ctx.switchValue)) {
+                        match = (std::get<std::string>(*ctx.switchValue) == caseStr);
+                    } else if (std::holds_alternative<int>(*ctx.switchValue)) {
+                        match = (std::to_string(std::get<int>(*ctx.switchValue)) == caseStr);
                     }
                 }
-                // 2) case là số (operandIndex == -1, operand chứa số)
+                // 2) case là số
                 else if (instr.operandIndex == -1) {
-                    if (std::holds_alternative<int>(*switchValue)) {
-                        match = (std::get<int>(*switchValue) == instr.operand);
-                    } else if (std::holds_alternative<std::string>(*switchValue)) {
-                        // nếu switchValue là chuỗi, cố gắng chuyển chuỗi sang số để so sánh
+                    if (std::holds_alternative<int>(*ctx.switchValue)) {
+                        match = (std::get<int>(*ctx.switchValue) == instr.operand);
+                    } else if (std::holds_alternative<std::string>(*ctx.switchValue)) {
                         try {
-                            int sv = std::stoi(std::get<std::string>(*switchValue));
+                            int sv = std::stoi(std::get<std::string>(*ctx.switchValue));
                             match = (sv == instr.operand);
-                        } catch (...) {
-                            match = false;
-                        }
-                    } else {
-                        match = false;
+                        } catch (...) { match = false; }
                     }
                 }
-                // 3) case là biến (operandIndex == -2, operand là varId)
+                // 3) case là biến
                 else if (instr.operandIndex == -2) {
                     int varId = instr.operand;
-                    // TODO: thay bằng hàm lấy giá trị biến thực tế trong VM của bạn
                     int varValue = vietvm::compiler::getVarValueInt(varId);
-
-                    if (std::holds_alternative<int>(*switchValue)) {
-                        match = (std::get<int>(*switchValue) == varValue);
-                    } else if (std::holds_alternative<std::string>(*switchValue)) {
+                    if (std::holds_alternative<int>(*ctx.switchValue)) {
+                        match = (std::get<int>(*ctx.switchValue) == varValue);
+                    } else if (std::holds_alternative<std::string>(*ctx.switchValue)) {
                         try {
-                            int sv = std::stoi(std::get<std::string>(*switchValue));
+                            int sv = std::stoi(std::get<std::string>(*ctx.switchValue));
                             match = (sv == varValue);
-                        } catch (...) {
-                            match = false;
-                        }
-                    } else {
-                        match = false;
+                        } catch (...) { match = false; }
                     }
                 } else {
                     throw std::runtime_error("CA: định dạng operand không hợp lệ");
                 }
 
-                // cập nhật skippingCase dựa trên kết quả so sánh
-                skippingCase = !match;
+                // cập nhật skippingCase trong context của switch-case
+                ctx.skippingCase = !match;
                 break;
             }
+            case OP_MAC_DINH: {
+                if (switchStack.empty()) throw std::runtime_error("MAC_DINH: Không nằm trong khối CHON");
+                auto& ctx = switchStack.back();
+                ctx.skippingCase = false;
+                break;
+            }
+
             case OP_THOAT: {
-                if (!inSwitchBlock) {
-                    throw std::runtime_error("THOAT: Không nằm trong khối CHON");
-                }
-                // Tìm đến cuối khối CHON (giả sử kết thúc bằng OP_DONG_KHOI)
+                if (switchStack.empty()) throw std::runtime_error("THOAT: Không nằm trong khối CHON");
+                // Chỉ nhảy tới cuối block case hiện tại
+                int localBlockDepth = blockStack.size();
                 while (pc < bytecode.size()) {
-                    if (bytecode[pc].op == OP_DONG_KHOI || bytecode[pc].op == OP_DONG_NGOAC) {
-                        ++pc;
-                        break;
+                    if (bytecode[pc].op == OP_MO_KHOI) ++localBlockDepth;
+                    if (bytecode[pc].op == OP_DONG_KHOI) {
+                        --localBlockDepth;
+                        if (localBlockDepth < blockStack.size()) {
+                            ++pc;
+                            break;
+                        }
                     }
                     ++pc;
                 }
                 skippingCase = false;
-                inSwitchBlock = false;
                 switchValue.reset();
+                // KHÔNG pop switchStack ở đây!
                 break;
             }
+
+
 
             // Thay thế phần xử lý đọc giá trị biến
             case OP_TEN_BIEN_GIA_TRI: {
@@ -370,11 +368,20 @@ void VM::run() {
                 return;
             case OP_MO_KHOI:
                 blockStack.push(pc);
+                ++blockDepth;
                 break;
             case OP_DONG_KHOI:
                 if (blockStack.empty()) throw std::runtime_error("Lỗi: không có khối mở");
                 blockStack.pop();
+
+                // Nếu kết thúc khối CHON, pop switchStack
+                if (!switchStack.empty() && blockStack.size() == switchStack.back().blockDepthAtStart - 1) {
+                    switchStack.pop_back();
+                    skippingCase = false;
+                    switchValue.reset();
+                }
                 break;
+
             case OP_DONG_LENH: case OP_MO_NGOAC: case OP_DONG_NGOAC:
                 break;
             case OP_PHU_DINH: {
