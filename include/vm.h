@@ -8,6 +8,7 @@
 #include <string>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <variant>
 
 #include "instruction.h"
@@ -16,13 +17,15 @@ class VM {
 public:
     explicit VM(const std::vector<Instruction>& code);
     void run();
-    // void loadStringPool(const std::vector<std::string>& pool); // ← THÊM DÒNG NÀY
     VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
     using StackValue = std::variant<int, std::string>;
     std::vector<StackValue> stack;
+    std::optional<StackValue> switchValue;
+    bool skippingCase = false;
+    bool inSwitchBlock = false;
     std::unordered_map<int, StackValue> variables;  // Biến tạm thời (nếu cần mở rộng)
 
     std::stack<size_t> loopStartStack;              // Stack hỗ trợ cho vòng lặp (for/while)
@@ -33,6 +36,14 @@ private:
     int instructionPointer = 0;
     bool running = true;                            // Trạng thái thực thi
     int vi_tri_dieu_kien = -1;
+    struct SwitchFrame {
+        std::optional<StackValue> switchValue;
+        bool skippingCase{};
+        size_t blockDepthAtStart{};
+    };
+    std::vector<SwitchFrame> switchStack; // khởi tạo rỗng
+    int blockDepth = 0;                   // tăng khi OP_MO_KHOI, giảm khi OP_DONG_KHOI
+
     // Các hàm phụ trợ
     void execute(const Instruction& inst);
     int pop();

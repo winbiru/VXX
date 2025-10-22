@@ -9,6 +9,7 @@
 #include "compiler/compileCondition.h"
 #include "compiler/compileLoop.h"
 #include "compiler/compilerExpr.h"
+#include "compiler/compileSwitch.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
 
@@ -45,4 +46,5 @@ void initCompileMap() {
                                 compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
                             }
                        };
+    compileMap["chọn"] = compileSwitch;
 }

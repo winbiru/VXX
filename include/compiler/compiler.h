@@ -12,6 +12,5 @@
 std::vector<Instruction> compileSource(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap);
-    // static std::unordered_map<std::string, CompileFunc> compileMap;
 
 #endif // COMPILER_H
