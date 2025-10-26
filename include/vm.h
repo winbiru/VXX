@@ -1,4 +1,3 @@
-// vm.h
 #ifndef VM_H
 #define VM_H
 
@@ -23,9 +22,6 @@ private:
     std::vector<std::string> stringPool;
     using StackValue = std::variant<int, std::string>;
     std::vector<StackValue> stack;
-    std::optional<StackValue> switchValue;
-    bool skippingCase = false;
-    bool inSwitchBlock = false;
     std::unordered_map<int, StackValue> variables;  // Biến tạm thời (nếu cần mở rộng)
 
     std::stack<size_t> loopStartStack;              // Stack hỗ trợ cho vòng lặp (for/while)
@@ -38,9 +34,15 @@ private:
     int vi_tri_dieu_kien = -1;
     struct SwitchFrame {
         std::optional<StackValue> switchValue;
-        bool skippingCase{};
-        bool caseMatched{};
-        size_t blockDepthAtStart{};
+        bool skippingCase;
+        size_t blockDepthAtStart;
+        bool alreadyMatched; // Trạng thái đã match ca nào chưa
+
+        SwitchFrame():
+              skippingCase(true),
+              blockDepthAtStart(0),
+              alreadyMatched(false)
+        {}
     };
     std::vector<SwitchFrame> switchStack; // khởi tạo rỗng
     int blockDepth = 0;                   // tăng khi OP_MO_KHOI, giảm khi OP_DONG_KHOI
