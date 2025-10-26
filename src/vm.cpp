@@ -205,7 +205,8 @@ void VM::run() {
                 SwitchFrame frame;
                 frame.switchValue = stack.back();
                 stack.pop_back();
-                frame.skippingCase = true;
+                frame.skippingCase = true;      // mặc định bỏ qua
+                frame.caseMatched = false;      // chưa có case nào match
                 frame.blockDepthAtStart = blockStack.size();
                 frame.alreadyMatched = false; // Khởi tạo
                 switchStack.push_back(frame);
@@ -293,10 +294,12 @@ void VM::run() {
             }
 
             case OP_IN: {
-                // QUAN TRỌNG: kiểm tra skippingCase để chỉ in đúng nhánh ca đầu tiên khớp
-                if (!switchStack.empty() && switchStack.back().skippingCase) break;
                 if (stack.empty()) throw std::runtime_error("Lỗi: stack rỗng khi IN");
                 StackValue value = stack.back(); stack.pop_back();
+                if (!switchStack.empty() && switchStack.back().skippingCase) {
+                    break; // bỏ qua in
+                }
+
                 std::cout << "[IN] ";
                 if (std::holds_alternative<int>(value)) {
                     std::cout << std::get<int>(value);
@@ -306,7 +309,7 @@ void VM::run() {
                 std::cout << std::endl;
                 break;
             }
-
+            
             case OP_THOAT: {
                 if (switchStack.empty()) throw std::runtime_error("THOAT: Không nằm trong khối CHON");
 
