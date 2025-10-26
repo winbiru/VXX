@@ -39,6 +39,7 @@ private:
     struct SwitchFrame {
         std::optional<StackValue> switchValue;
         bool skippingCase{};
+        bool caseMatched{};
         size_t blockDepthAtStart{};
     };
     std::vector<SwitchFrame> switchStack; // khởi tạo rỗng

@@ -202,6 +202,9 @@ void VM::run() {
             case OP_IN: {
                 if (stack.empty()) throw std::runtime_error("Lỗi: stack rỗng khi IN");
                 StackValue value = stack.back(); stack.pop_back();
+                if (!switchStack.empty() && switchStack.back().skippingCase) {
+                    break; // bỏ qua in
+                }
 
                 std::cout << "[IN] ";
                 if (std::holds_alternative<int>(value)) {
@@ -217,7 +220,8 @@ void VM::run() {
                 SwitchFrame frame;
                 frame.switchValue = stack.back();
                 stack.pop_back();
-                frame.skippingCase = true;
+                frame.skippingCase = true;      // mặc định bỏ qua
+                frame.caseMatched = false;      // chưa có case nào match
                 frame.blockDepthAtStart = blockStack.size();
                 switchStack.push_back(frame);
                 break;
@@ -267,37 +271,47 @@ void VM::run() {
                 }
 
                 // cập nhật skippingCase trong context của switch-case
-                ctx.skippingCase = !match;
+                // Cập nhật skippingCase dựa trên caseMatched và match
+                if (!ctx.caseMatched && match) {
+                    ctx.skippingCase = false;   // thực hiện case
+                    ctx.caseMatched = true;     // đánh dấu đã match
+                } else {
+                    ctx.skippingCase = true;    // bỏ qua case này
+                }
+
                 break;
             }
             case OP_MAC_DINH: {
                 if (switchStack.empty()) throw std::runtime_error("MAC_DINH: Không nằm trong khối CHON");
                 auto& ctx = switchStack.back();
-                ctx.skippingCase = false;
+                // Default chỉ thực hiện khi chưa match case nào
+                if (!ctx.caseMatched) {
+                    ctx.skippingCase = false;
+                    ctx.caseMatched = true;
+                } else {
+                    ctx.skippingCase = true;
+                }
                 break;
             }
 
             case OP_THOAT: {
-                if (switchStack.empty()) throw std::runtime_error("THOAT: Không nằm trong khối CHON");
-                // Chỉ nhảy tới cuối block case hiện tại
-                int localBlockDepth = blockStack.size();
+                if (switchStack.empty())
+                    throw std::runtime_error("THOAT: Không nằm trong khối CHON");
+
+                auto& ctx = switchStack.back();
+                // Đánh dấu case hiện tại đã thoát, sẽ bỏ qua các case còn lại
+                ctx.skippingCase = true;
+
+                // Tăng pc cho đến hết block CHON (OP_DONG_KHOI)
                 while (pc < bytecode.size()) {
-                    if (bytecode[pc].op == OP_MO_KHOI) ++localBlockDepth;
                     if (bytecode[pc].op == OP_DONG_KHOI) {
-                        --localBlockDepth;
-                        if (localBlockDepth < blockStack.size()) {
-                            ++pc;
-                            break;
-                        }
+                        ++pc;
+                        break;
                     }
                     ++pc;
                 }
-                skippingCase = false;
-                switchValue.reset();
-                // KHÔNG pop switchStack ở đây!
-                break;
+                continue; // bỏ qua pc++ ở cuối vòng lặp
             }
-
 
 
             // Thay thế phần xử lý đọc giá trị biến

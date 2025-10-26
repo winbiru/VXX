@@ -6,17 +6,16 @@ lặp(x = 1; x <= 6; x = x + 1) {
                     nếu(x != y && y != z && x != z) {
                         nếu(!(x == 2 || z == 2)) {
                             chọn (x + y + z) {
-                                ca "9": {
+                                ca 9: {
                                     in "Tọa độ đặc biệt: tổng là 9 → (" + x + ", " + y + ", " + z + ")";
                                     thoát;
                                 }
-                                ca "15": {
+                                ca 15: {
                                     in "Tọa độ đặc biệt: tổng là 15 → (" + x + ", " + y + ", " + z + ")";
                                     thoát;
                                 }
                                 mặc định: {
                                     in "Tọa độ hợp lệ: (" + x + ", " + y + ", " + z + ")";
-                                    thoát;
                                 }
                             }
                         }
