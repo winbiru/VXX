@@ -3,13 +3,12 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <filesystem> // Thêm dòng này
+#include <filesystem>
 #include "../include/compiler/compiler.h"
 #include "../include/vm.h"
 #include "../include/name_op.h"
 #include "common/storeString.h"
 
-// Biến toàn cục chứa chuỗi hằng đã biên dịch
 namespace fs = std::filesystem;
 
 std::string readFile(const std::string &filename) {
@@ -21,69 +20,84 @@ std::string readFile(const std::string &filename) {
     buffer << fileStream.rdbuf();
     return buffer.str();
 }
+
 void initCompileMap();
+
 int main(int argc, char* argv[]) {
     try {
         initCompileMap();
-        const auto& stringPool = vietvm::compiler::StringPool::getPool();
+
+        // -----------------------------
+        // ✅ Trường hợp có đối số (chạy file được chỉ định)
+        // -----------------------------
         if (argc == 2) {
-            // Chạy đúng file được truyền qua dòng lệnh
             const std::string filename = argv[1];
             std::string source = readFile(filename);
-            vietvm::compiler::StringPool::clear();
+
+            vietvm::compiler::StringPool::clear(); // luôn clear trước khi biên dịch mới
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+
+            const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
-            // vm.loadStringPool(stringPool);
             vm.run();
+
             return EXIT_SUCCESS;
         }
 
-        const std::string defaultFile = "../tests/kiem_tra_chon_ca.vi";
+        // -----------------------------
+        // ✅ Nếu không có đối số → chạy file mặc định
+        // -----------------------------
+        const std::string defaultFile = "../tests/kiem_tra_ham.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
-            // Chạy file mặc định nếu không truyền đối số
             std::string source = readFile(defaultFile);
-            vietvm::compiler::StringPool::clear();
 
+            vietvm::compiler::StringPool::clear();
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-            // In toàn bộ bytecode để debug
-            std::cout << "Danh sách bytecode:" << std::endl;
+            const auto& stringPool = vietvm::compiler::StringPool::getPool();
+
+            // In bytecode để debug
+            std::cout << "📜 Danh sách bytecode (" << defaultFile << "):" << std::endl;
             for (size_t i = 0; i < bytecode.size(); ++i) {
                 const Instruction &instr = bytecode[i];
                 std::cout << "[" << i << "] "
-                << "op: " << instr.op   // ID opcode
-                << " (" << name_op(instr.op) << ")";      // Tên opcode
-
-                if (bytecode[i].operandIndex != -1)
-                    std::cout << ", operandIndex: " << bytecode[i].operandIndex;
-                if (bytecode[i].operand != 0)
-                    std::cout << ", operand: " << bytecode[i].operand;
+                          << "op: " << instr.op << " (" << name_op(instr.op) << ")";
                 if (instr.operandIndex != -1)
                     std::cout << ", operandIndex: " << instr.operandIndex;
                 if (instr.operand != 0)
                     std::cout << ", operand: " << instr.operand;
                 std::cout << std::endl;
             }
+
             VM vm(bytecode, stringPool);
             vm.run();
             return EXIT_SUCCESS;
         }
 
-        // ✅ Nếu không có đối số và không có file mặc định → chạy toàn bộ thư mục
+        // -----------------------------
+        // ✅ Nếu không có cả 2 → chạy toàn bộ thư mục "tests/"
+        // -----------------------------
         std::string testDir = "tests/";
-        for (const auto& entry : fs::directory_iterator(testDir)) {
-            if (entry.path().extension() == ".vi") {
-                const std::string filename = entry.path().string();
-                std::string source = readFile(filename);
-                vietvm::compiler::StringPool::clear();
+        if (fs::exists(testDir)) {
+            for (const auto& entry : fs::directory_iterator(testDir)) {
+                if (entry.path().extension() == ".vi") {
+                    const std::string filename = entry.path().string();
+                    std::cout << "\n🔹 Đang chạy test: " << filename << std::endl;
 
-                std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-                VM vm(bytecode, stringPool);
-                vm.run();
+                    std::string source = readFile(filename);
+                    vietvm::compiler::StringPool::clear();
+                    std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+                    const auto& stringPool = vietvm::compiler::StringPool::getPool();
+
+                    VM vm(bytecode, stringPool);
+                    vm.run();
+                }
             }
+        } else {
+            std::cerr << "⚠️ Thư mục tests/ không tồn tại.\n";
         }
 
     } catch (const std::exception &ex) {
-        std::cerr << "Lỗi: " << ex.what() << std::endl;
+        std::cerr << "❌ Lỗi: " << ex.what() << std::endl;
         return EXIT_FAILURE;
     }
 

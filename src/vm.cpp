@@ -32,7 +32,29 @@ void VM::run() {
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
         StackValue b = 0, a = 0;
+        std::unordered_map<std::string,int> functionTable;
+        for (size_t i = 0; i < bytecode.size(); ++i) {
+            const Instruction &instr = bytecode[i];
+            if (instr.op == OP_HAM) {
+                if (instr.operandIndex >= 0 && instr.operandIndex < (int)stringPool.size()) {
+                    std::string fname = stringPool[instr.operandIndex];
+                    functionTable[fname] = static_cast<int>(i + 1);
+                }
+            }
+        }
 
+        // helper to find end of block when skipping function body
+        auto findEndOfBlock = [&](size_t start)->size_t {
+            int depth = 0;
+            for (size_t j = start; j < bytecode.size(); ++j) {
+                if (bytecode[j].op == OP_MO_KHOI) ++depth;
+                else if (bytecode[j].op == OP_DONG_KHOI) {
+                    --depth;
+                    if (depth <= 0) return j;
+                }
+            }
+            return bytecode.size();
+        };
         switch (instr.op) {
             case OP_HAM: {
                 int hamIndex = instr.operand;
@@ -41,12 +63,22 @@ void VM::run() {
                     VM hamVM;
                     hamVM.bytecode = it->second;
                     hamVM.run(); // chạy hàm như một chương trình con
-                } else {
-                    std::cerr << "❌ Lỗi: không tìm thấy hàm với chỉ số " << hamIndex << std::endl;
                 }
 
                 break;
             }
+            case OP_GOI: {
+                int hamIndex = instr.operand;
+                auto it = hamBytecodeMap.find(hamIndex);
+                if (it != hamBytecodeMap.end()) {
+                    VM hamVM;
+                    hamVM.bytecode = it->second;
+                    hamVM.stringPool = this->stringPool; // kế thừa bảng chuỗi nếu cần
+                    hamVM.run();
+                }
+                break;
+            }
+
             case OP_BIEN_SO: {
                 int val = instr.operand;
                 stack.emplace_back(val);
@@ -428,6 +460,7 @@ void VM::run() {
                     break;
                 }
                 throw std::runtime_error("Opcode không xác định: " + std::to_string(instr.op));
+
         }
         pc++;
     }
