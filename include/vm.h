@@ -16,8 +16,10 @@
 class VM {
 public:
     explicit VM(const std::vector<Instruction>& code);
+    VM() = default;
     void run();
     VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
+    std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;

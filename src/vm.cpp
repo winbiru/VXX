@@ -34,6 +34,19 @@ void VM::run() {
         StackValue b = 0, a = 0;
 
         switch (instr.op) {
+            case OP_HAM: {
+                int hamIndex = instr.operand;
+                auto it = hamBytecodeMap.find(hamIndex);
+                if (it != hamBytecodeMap.end()) {
+                    VM hamVM;
+                    hamVM.bytecode = it->second;
+                    hamVM.run(); // chạy hàm như một chương trình con
+                } else {
+                    std::cerr << "❌ Lỗi: không tìm thấy hàm với chỉ số " << hamIndex << std::endl;
+                }
+
+                break;
+            }
             case OP_BIEN_SO: {
                 int val = instr.operand;
                 stack.emplace_back(val);
