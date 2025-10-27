@@ -1,11 +1,8 @@
-//
-// Created by nx_thang on 10/20/2025.
-//
-
 #include "common/Expression.h"
 #include "common/Lex_utils.h"   // isNumber, isOperator, isStringLiteral, isVariable
 #include <stack>
 #include <stdexcept>
+#include <sstream>
 
 #include "common/Lex_utils.h"
 
@@ -18,19 +15,56 @@ int precedence_op(const std::string& op) {
     return it->second;
 }
 
-
-
 char associativity_op(const std::string &op) { return (op == "=") ? 'r' : 'l'; }
 
+// Enhanced convertToPostfix: supports function calls.
+// Function calls are emitted as a single token in postfix with format: CALL::name::argc
 std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
     std::vector<std::string> output;
     std::stack<std::string> ops;
+    std::vector<int> argCountStack;          // parallel stack to count args for current function
+    std::vector<bool> argExpectingStack;     // whether we are expecting a new arg (true at start of arg list, or after comma)
 
-    for (const auto &token : infix_tokens) {
+    auto isFuncMarker = [](const std::string &s)->bool {
+        return s.rfind("FUNC:", 0) == 0;
+    };
+
+    for (size_t i = 0; i < infix_tokens.size(); ++i) {
+        const std::string &token = infix_tokens[i];
         if (token.empty()) continue;
+
+        // Robustness: skip block delimiters and statement terminators if they appear here.
+        // Some callers may accidentally include '{', '}', or ';' in the expression slice.
+        if (token == "{" || token == "}" || token == ";") {
+            continue;
+        }
+
+        // Detect function occurrence: identifier followed by '('
+        if (vietvm::compiler::isVariable(token) && (i + 1) < infix_tokens.size() && infix_tokens[i+1] == "(") {
+            // Push a function marker (we'll handle '(' next)
+            ops.push(std::string("FUNC:") + token);
+            continue; // do not output function name as operand
+        }
 
         if (isNumber(token) || isStringLiteral(token) || isVariable(token)) {
             output.push_back(token);
+            // If we are inside a function argument list, and expecting a new arg, count it
+            if (!argCountStack.empty() && argExpectingStack.back()) {
+                argCountStack.back() += 1;
+                argExpectingStack.back() = false;
+            }
+        } else if (token == ",") {
+            // function arg separator: pop operators until '('
+            while (!ops.empty() && ops.top() != "(") {
+                output.push_back(ops.top());
+                ops.pop();
+            }
+            if (argExpectingStack.empty()) {
+                // comma outside function parens - treat as error
+                throw std::runtime_error("convertToPostfix: unexpected ',' outside function call");
+            }
+            // next argument expected
+            argExpectingStack.back() = true;
         } else if (isOperator(token)) {
             while (!ops.empty() && isOperator(ops.top())) {
                 const std::string &top = ops.top();
@@ -42,14 +76,45 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
             }
             ops.push(token);
         } else if (token == "(") {
-            ops.push(token);
-        } else if (token == ")") {
-            while (!ops.empty() && ops.top() != "(") {
-                output.push_back(ops.top());
-                ops.pop();
+            // If top of ops is FUNC:..., then we are entering function arg list
+            if (!ops.empty() && isFuncMarker(ops.top())) {
+                // push '(' as marker; start arg count
+                ops.push("(");
+                argCountStack.push_back(0);
+                argExpectingStack.push_back(true); // ready to accept first arg (or empty)
+            } else {
+                ops.push("(");
             }
-            if (ops.empty()) throw std::runtime_error("convertToPostfix: mismatched parens");
-            ops.pop();
+        } else if (token == ")") {
+            // pop until '('
+            bool foundLeft = false;
+            while (!ops.empty()) {
+                std::string top = ops.top();
+                ops.pop();
+                if (top == "(") {
+                    foundLeft = true;
+                    break;
+                }
+                output.push_back(top);
+            }
+            if (!foundLeft) throw std::runtime_error("convertToPostfix: mismatched parens");
+            // if function marker exists just below, pop it and emit CALL token
+            if (!ops.empty() && isFuncMarker(ops.top())) {
+                std::string funcMarker = ops.top(); ops.pop();
+                std::string fname = funcMarker.substr(5); // after "FUNC:"
+                int argc = 0;
+                if (!argCountStack.empty()) {
+                    argc = argCountStack.back();
+                    argCountStack.pop_back();
+                    argExpectingStack.pop_back();
+                }
+                // Emit a CALL token in postfix with name and argc
+                std::string callTok = std::string("CALL::") + fname + std::string("::") + std::to_string(argc);
+                output.push_back(callTok);
+                // Note: function result will be pushed after CALL is executed
+            }
+        } else if (token == "(" || token == ")") {
+            // handled
         } else {
             throw std::runtime_error("convertToPostfix: unknown token '" + token + "'");
         }
@@ -65,4 +130,4 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     return output;
 }
 
-} // namespace vietvm::Compiler
+} // namespace vietvm::compiler

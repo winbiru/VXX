@@ -37,6 +37,8 @@ set(SOURCES
         include/compiler/compileLoop.h
         src/Compiler/compileSwitch.cpp
         include/compiler/compileSwitch.h
+        src/Compiler/compileFunction.cpp
+        include/compiler/compileFunction.h
         # Các tệp nguồn khác nếu có
 )
 

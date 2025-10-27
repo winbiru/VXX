@@ -37,7 +37,18 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
     ++pos;
 
     while (pos < tokens.size() && tokens[pos] != "}") {
+        // Skip stray semicolons or empty/normalized-empty tokens that may appear between cases
+        if (tokens[pos] == ";") {
+            ++pos;
+            continue;
+        }
         std::string curNorm = vietvm::compiler::normalizeTokenForCompare(tokens[pos]);
+
+        // If normalize returns empty (e.g. token was just punctuation), skip it safely.
+        if (curNorm.empty()) {
+            ++pos;
+            continue;
+        }
 
         // xử lý ca
         if (curNorm == "ca") {
