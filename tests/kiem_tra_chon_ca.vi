@@ -27,6 +27,6 @@ hàm kiemTraToaDo(){
         };
     };
 };
-Hàm main() {
-    kiemTraToaDo()
-}
+hàm main() {
+    kiemTraToaDo();
+};

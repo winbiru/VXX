@@ -8,9 +8,24 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <iostream> // debug
+#include <sstream>
 
 #include "../../include/compiler/compileStatement.h"
 #include "instruction.h"
+
+// Helper to produce a small window of tokens around pos for debugging
+static std::string tokens_context(const std::vector<std::string>& tokens, size_t pos, size_t window = 8) {
+    std::ostringstream oss;
+    size_t start = (pos > window) ? pos - window : 0;
+    size_t end = std::min(tokens.size(), pos + window);
+    oss << "tokens[" << start << ".." << end-1 << "]:";
+    for (size_t i = start; i < end; ++i) {
+        if (i == pos) oss << " >>[" << tokens[i] << "]<<";
+        else oss << " " << tokens[i];
+    }
+    return oss.str();
+}
 
 void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
                          std::vector<Instruction> &bytecode,
@@ -18,7 +33,12 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
                          int &nextId,
                          const std::unordered_map<std::string,Opcode> &keywordMap)
 {
-    if (pos >= tokens.size() || tokens[pos] != "{") throw std::runtime_error("compileBlock: expected '{'");
+    if (pos >= tokens.size() || tokens[pos] != "{") {
+        std::ostringstream msg;
+        msg << "compileBlock: expected '{' at pos=" << pos;
+        if (pos < tokens.size()) msg << ", found token='" << tokens[pos] << "'";
+        throw std::runtime_error(msg.str());
+    }
     // move past '{'
     ++pos;
 
@@ -26,7 +46,23 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
     }
 
-    if (pos >= tokens.size() || tokens[pos] != "}") throw std::runtime_error("compileBlock: missing '}'");
+    if (pos >= tokens.size() || tokens[pos] != "}") {
+        // Provide rich debug info to locate cause
+        std::ostringstream oss;
+        oss << "compileBlock: missing '}' at pos=" << pos << ". ";
+        if (!tokens.empty()) {
+            oss << "Token count=" << tokens.size() << ". ";
+            if (pos < tokens.size()) {
+                oss << "Token at pos: '" << tokens[pos] << "'. ";
+            } else {
+                oss << "pos is beyond tokens (pos >= tokens.size()). ";
+            }
+            oss << "\nContext: " << tokens_context(tokens, (pos < tokens.size() ? pos : tokens.size()-1));
+        }
+        // Also print to stderr for immediate visibility in console
+        std::cerr << oss.str() << std::endl;
+        throw std::runtime_error(oss.str());
+    }
     // move pos to token after '}'
     ++pos;
 }

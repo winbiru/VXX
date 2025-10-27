@@ -48,14 +48,23 @@ void compileExpr(const std::string &expr,
                 int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
                 // ensureInitialized(id);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
+            } else if (tk.rfind("CALL::", 0) == 0) {
+                // format: CALL::name::argc
+                size_t p1 = tk.find("::", 6); // find second ::
+                if (p1 == std::string::npos) throw std::runtime_error("compileExpr: malformed CALL token");
+                std::string name = tk.substr(6, p1 - 6);
+                std::string argcStr = tk.substr(p1 + 2);
+                int argc = std::stoi(argcStr);
+                int nameIndex = vietvm::compiler::StringPool::storeString(name);
+                bytecode.push_back({OP_GOI, argc, nameIndex});
             } else {
                 if (tk == "+") bytecode.push_back({OP_CONG,0,0});
                 else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
                 else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
                 else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
                 else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
-                else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
                 else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
+                else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
                 else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
                 else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
                 else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
@@ -83,6 +92,15 @@ void compileExpr(const std::string &expr,
             int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
             // ensureInitialized(id);
             bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
+        } else if (tk.rfind("CALL::", 0) == 0) {
+            // format: CALL::name::argc
+            size_t p1 = tk.find("::", 6); // find second ::
+            if (p1 == std::string::npos) throw std::runtime_error("compileExpr: malformed CALL token");
+            std::string name = tk.substr(6, p1 - 6);
+            std::string argcStr = tk.substr(p1 + 2);
+            int argc = std::stoi(argcStr);
+            int nameIndex = vietvm::compiler::StringPool::storeString(name);
+            bytecode.push_back({OP_GOI, argc, nameIndex});
         } else {
             if (tk == "+") bytecode.push_back({OP_CONG,0,0});
             else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
