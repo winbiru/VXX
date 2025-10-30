@@ -1,14 +1,14 @@
 // Compiler.cpp
 
-#include "compiler/compiler.h"
+#include "../../include/compiler/compiler.h"
 #include <sstream>
 #include <vector>
 #include <cctype>
 #include <unordered_map>
-#include "instruction.h"
+#include "../../include/instruction.h"
 #include <string>
-#include "common/Lex_utils.h"
-#include "compiler/compileStatement.h"
+#include "../../include/common/Lex_utils.h"
+#include "../../include/compiler/compileStatement.h"
 
 
 // ---------- compileSource: top-level ----------

@@ -8,11 +8,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
-#include "common/Utility.h"
-#include "compiler/compileBlock.h"
-#include "compiler/CompileRegistry.h"
-#include "compiler/compilerExpr.h"
+#include "../../include/instruction.h"
+#include "../../include/common/Utility.h"
+#include "../../include/compiler/compileBlock.h"
+#include "../../include/compiler/CompileRegistry.h"
+#include "../../include/compiler/compilerExpr.h"
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
                              std::vector<Instruction> &bytecode,

@@ -7,10 +7,8 @@
 #include <string>
 #include <map> // Thêm thư viện map nếu chưa có
 
-#include "common/Lex_utils.h"
+#include "../include/common/Lex_utils.h"
 using StackValue = std::variant<int, std::string>;
-
-// ✅ THAY ĐỔI CONSTRUCTOR: Nhận string pool và khởi  tạo thành viên
 /**
  *
  * @param code
@@ -42,19 +40,6 @@ void VM::run() {
                 }
             }
         }
-
-        // helper to find end of block when skipping function body
-        auto findEndOfBlock = [&](size_t start)->size_t {
-            int depth = 0;
-            for (size_t j = start; j < bytecode.size(); ++j) {
-                if (bytecode[j].op == OP_MO_KHOI) ++depth;
-                else if (bytecode[j].op == OP_DONG_KHOI) {
-                    --depth;
-                    if (depth <= 0) return j;
-                }
-            }
-            return bytecode.size();
-        };
         switch (instr.op) {
             case OP_HAM: {
                 int hamIndex = instr.operand;
@@ -376,8 +361,31 @@ void VM::run() {
                 if (stack.size() < 2)
                     throw std::runtime_error("Không đủ toán hạng để GÁN");
 
-                StackValue varIdVal = stack.back(); stack.pop_back();
-                std::vector<std::variant<int, std::string>>::value_type valueVal = stack.back(); stack.pop_back();
+                // Không pop ngay — đọc top hai phần tử để quyết định thứ tự an toàn
+                StackValue top = stack.back();
+                StackValue second = stack[stack.size() - 2];
+
+                StackValue varIdVal;
+                StackValue valueVal;
+
+                // Nếu một trong hai là string thì chắc chắn đó là value
+                if (std::holds_alternative<std::string>(top) && std::holds_alternative<int>(second)) {
+                    varIdVal = second;
+                    valueVal = top;
+                } else if (std::holds_alternative<std::string>(second) && std::holds_alternative<int>(top)) {
+                    varIdVal = top;
+                    valueVal = second;
+                } else {
+                    // Trường hợp cả hai đều int hoặc cả hai đều int/string: theo chuẩn compiler hiện tại
+                    // compiler push value trước, sau đó push varId => top = varId, second = value.
+                    // Do đó ưu tiên coi top là varId trong trường hợp mơ hồ.
+                    varIdVal = top;
+                    valueVal = second;
+                }
+
+                // Bây giờ pop hai phần tử
+                stack.pop_back();
+                stack.pop_back();
 
                 if (!std::holds_alternative<int>(varIdVal))
                     throw std::runtime_error("Lỗi: ID biến phải là số nguyên");
@@ -425,22 +433,36 @@ void VM::run() {
 
             case OP_DUNG_CHUONG_TRINH:
                 return;
-            case OP_MO_KHOI:
-                blockStack.push(pc);
+            case OP_MO_KHOI: {
+                blockStack.push_back(pc);
                 ++blockDepth;
                 break;
-            case OP_DONG_KHOI:
+            }
+            // --- OP_DONG_KHOI (đóng khối) ---
+            case OP_DONG_KHOI: {
                 if (blockStack.empty()) throw std::runtime_error("Lỗi: không có khối mở");
-                blockStack.pop();
+                // Lấy vị trí bắt đầu khối (nếu cần đối chiếu với switch)
+                int blockStartPc = blockStack.back();
+                blockStack.pop_back();
+
+                // Giảm blockDepth khi đóng khối (fix off-by-one)
+                if (blockDepth > 0) --blockDepth;
 
                 // Nếu kết thúc khối CHON, pop switchStack
-                if (!switchStack.empty() && blockStack.size() == switchStack.back().blockDepthAtStart - 1) {
-                    switchStack.pop_back();
-                    skippingCase = false;
-                    switchValue.reset();
+                // Lưu ý: logic so sánh dựa trên blockDepthAtStart trước đây — sau khi sửa giảm blockDepth ở đúng chỗ,
+                // điều kiện dựa trên kích thước stack hay giá trị blockDepthAtStart sẽ chính xác hơn.
+                if (!switchStack.empty()) {
+                    // Nếu switchStack lưu blockDepthAtStart, điều kiện ban đầu có thể dùng:
+                    if (blockStack.size() == switchStack.back().blockDepthAtStart - 1) {
+                        switchStack.pop_back();
+                        skippingCase = false;
+                        switchValue.reset();
+                    }
+                    // Nếu bạn đã mở rộng SwitchContext để lưu blockStartPc thì có thể dùng:
+                    // if (switchStack.back().blockStartPc == blockStartPc) { ... }
                 }
                 break;
-
+            }
             case OP_DONG_LENH: case OP_MO_NGOAC: case OP_DONG_NGOAC:
                 break;
             case OP_PHU_DINH: {
@@ -449,11 +471,26 @@ void VM::run() {
                 }
                 StackValue operand = stack.back(); stack.pop_back();
 
-                // Giả sử kiểu Value là bool hoặc có thể chuyển sang bool
-                bool result = !toBool(operand);
-                stack.push_back(result); // lưu lại dưới dạng int: 0 hoặc 1
+                // Chuyển sang int 0/1 thay vì push bool trực tiếp
+                bool b = false;
+                // Nếu có hàm tiện ích toBool, dùng nó; nếu không, chuyển thủ công
+                #ifdef HAS_TOBOOL_HELPER
+                b = toBool(operand);
+                #else
+                if (std::holds_alternative<int>(operand)) {
+                    b = (std::get<int>(operand) != 0);
+                } else if (std::holds_alternative<std::string>(operand)) {
+                    b = (!std::get<std::string>(operand).empty());
+                } else {
+                    // an toàn: coi như false
+                    b = false;
+                }
+                #endif
+                int result = b ? 0 : 1;
+                stack.push_back(result); // luôn push int (0/1)
                 break;
             }
+
             default:
                 if (inSwitchBlock && skippingCase) {
                     // Bỏ qua lệnh trong ca không khớp

@@ -30,9 +30,9 @@ private:
     bool inSwitchBlock = false;
     std::unordered_map<int, StackValue> variables;  // Biến tạm thời (nếu cần mở rộng)
 
-    std::stack<size_t> loopStartStack;              // Stack hỗ trợ cho vòng lặp (for/while)
-    std::stack<size_t> ifElseStack;                 // Stack hỗ trợ khối if/else
-    std::stack<size_t> blockStack;                  // Stack theo dõi các khối {}
+    std::vector<size_t> loopStartStack;              // Stack hỗ trợ cho vòng lặp (for/while)
+    std::vector<size_t> ifElseStack;                 // Stack hỗ trợ khối if/else
+    std::vector<size_t> blockStack;                  // Stack theo dõi các khối {}
 
     size_t pc = 0;                                  // Program counter
     int instructionPointer = 0;
