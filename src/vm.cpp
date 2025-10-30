@@ -1,4 +1,3 @@
-#include "../include/vm.h"
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -6,8 +5,10 @@
 #include <variant>
 #include <string>
 #include <map> // Thêm thư viện map nếu chưa có
+#include "vm.h"
+#include <common/Lex_utils.h>
 
-#include "../include/common/Lex_utils.h"
+
 using StackValue = std::variant<int, std::string>;
 /**
  *

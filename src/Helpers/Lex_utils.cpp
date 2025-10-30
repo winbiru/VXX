@@ -2,14 +2,14 @@
 // Created by nx_thang on 10/20/2025.
 //
 
-#include "../../include/common/Lex_utils.h"
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
 #include <variant>
 
-#include "../../include/common/Utility.h"
+#include "common/Lex_utils.h"
+#include "common/Utility.h"
 
 namespace vietvm::compiler {
     using Value = std::variant<int, std::string>;
