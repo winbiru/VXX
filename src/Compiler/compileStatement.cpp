@@ -7,18 +7,17 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <common/Utility.h>
+#include <compiler/compileBlock.h>
+#include <compiler/CompileRegistry.h>
+#include <compiler/compilerExpr.h>
 
-#include "instruction.h"
-#include "common/Utility.h"
-#include "compiler/compileBlock.h"
-#include "compiler/CompileRegistry.h"
-#include "compiler/compilerExpr.h"
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
-                             std::vector<Instruction> &bytecode,
-                             std::unordered_map<std::string,int> &symTab,
-                             int &nextId,
-                             const std::unordered_map<std::string,Opcode> &keywordMap)
+                      std::vector<Instruction> &bytecode,
+                      std::unordered_map<std::string,int> &symTab,
+                      int &nextId,
+                      const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     if (pos >= tokens.size()) return;
     const std::string &tk = tokens[pos];

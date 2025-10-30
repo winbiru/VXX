@@ -2,12 +2,13 @@
 // Created by nx_thang on 10/20/2025.
 //
 
-#include "../include/common/Lex_utils.h"
 #include <algorithm>
 #include <cctype>
+#include <sstream>
 #include <stdexcept>
 #include <variant>
 
+#include "common/Lex_utils.h"
 #include "common/Utility.h"
 
 namespace vietvm::compiler {
@@ -122,36 +123,64 @@ namespace vietvm::compiler {
     return t;
 }
 
-    // Hàm hậu xử lý: ghép "mặc" + "định" thành "mặc định"
-    // Giữ nguyên token chuỗi nguyên vẹn; nếu ghép được sẽ push "mặc định" (không có dấu :)
+       // (Đoạn hàm postProcessTokens được cập nhật để hỗ trợ ghép từ khóa nhiều từ)
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens) {
         std::vector<std::string> result;
         result.reserve(tokens.size());
+
+        // Danh sách các multi-word keywords (bằng token gốc, lower-case)
+        // Nếu sau này thêm multi-word keyword, cập nhật danh sách này.
+        const std::vector<std::vector<std::string>> multiKeywords = {
+            {"mặc", "định"},
+            {"nếu", "không"},
+            {"nếu", "không:"}, // trường hợp có dấu hai chấm gắn luôn
+            // thêm các cụm khác nếu cần
+        };
 
         for (size_t i = 0; i < tokens.size(); ++i) {
             // Chuẩn bị phiên bản để so sánh (normalize) cho token hiện tại
             std::string a_norm = normalizeTokenForCompare(tokens[i]);
 
+            bool matchedMulti = false;
+
+            // Thử khớp các multi-word keywords (ưu tiên các cụm dài hơn nếu thêm)
+            for (const auto &phrase : multiKeywords) {
+                size_t len = phrase.size();
+                if (i + len - 1 >= tokens.size()) continue;
+
+                bool ok = true;
+                for (size_t k = 0; k < len; ++k) {
+                    std::string tk_norm = normalizeTokenForCompare(tokens[i + k]);
+                    // so sánh chính xác với từng phần của phrase
+                    if (tk_norm != phrase[k]) { ok = false; break; }
+                }
+                if (ok) {
+                    // Tạo token ghép (giữ dạng không dấu/chuẩn: nối bằng space)
+                    std::ostringstream oss;
+                    for (size_t k = 0; k < len; ++k) {
+                        if (k) oss << ' ';
+                        oss << phrase[k];
+                    }
+                    result.push_back(oss.str());
+                    i += len - 1; // nhảy qua các token đã ghép
+                    matchedMulti = true;
+                    break;
+                }
+            }
+
+            if (matchedMulti) continue;
+
             // Trường hợp 1: token hiện tại đã là "mặc định" hoặc "mặc định:" (với dấu)
             if (!a_norm.empty()) {
-                // so sánh chính xác (không phân biệt hoa thường ở đây; nếu cần, chuyển về lower)
                 if (a_norm == "mặc định") {
                     result.push_back("mặc định");
                     continue;
                 }
             }
 
-            // Trường hợp 2: token hiện tại là "mặc" và token kế là "định" hoặc "định:" v.v.
-            if (a_norm == "mặc" && i + 1 < tokens.size()) {
-                std::string b_norm = normalizeTokenForCompare(tokens[i + 1]);
-                if (b_norm == "định") {
-                    result.push_back("mặc định");
-                    ++i; // tiêu thụ token kế
-                    continue;
-                }
-            }
-
-            // Nếu không thuộc trường hợp trên -> giữ token gốc (không normalize chuỗi)
+            // Các xử lý khác (giữ nguyên logic cũ)
+            // (copy phần xử lý token gốc ở đây, ví dụ xử lý dấu ':' nối, số, chuỗi, etc.)
+            // Nếu không có xử lý đặc biệt, đẩy token gốc vào result:
             result.push_back(tokens[i]);
         }
 
