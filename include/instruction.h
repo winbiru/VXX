@@ -71,7 +71,8 @@ enum Opcode {
     OP_CHUOI         = 65,       // Chuỗi
     OP_PHU_DINH      = 66,        // Phủ định cái gì đó.
     OP_CHON           = 67,
-    OP_CA            = 68
+    OP_CA            = 68,
+    OP_PARAM = 69
 
 };
 
@@ -89,6 +90,7 @@ struct Instruction {
     Opcode op;
     int operand; // chỉ dùng cho OP_BIEN_SO (đẩy giá trị biến hoặc hằng số)
     int operandIndex; // Thêm dòng này để xác định chỉ số biến (ví dụ: i trong for)
+    int operandValue;
 };
 
 #endif // INSTRUCTION_H

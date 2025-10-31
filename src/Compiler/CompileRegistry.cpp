@@ -55,7 +55,7 @@ void initCompileMap() {
                                 ++pos; // bỏ qua "in"
                                 auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
                                 compileExpr(pr.first, bytecode, symTab, nextId, kwMap);
-                                bytecode.push_back({OP_IN, 0, 0});
+                                bytecode.push_back({OP_IN, 0, 0,0});
                                 pos = pr.second;
     };
 
@@ -74,99 +74,126 @@ void initCompileMap() {
                                         symTab[varName] = nextId++;
                                     }
                                     int varId = symTab[varName];
-                                    bytecode.push_back({OP_KHOI_TAO, varId, 0});
+                                    bytecode.push_back({OP_KHOI_TAO, varId, 0,0});
                                 }
                                 compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
                             }
                        };
     compileMap["chọn"] = compileSwitch;
 
-    // ---- Handler: khai báo hàm ----
+    // Handler "hàm" (robust pos handling)
     compileMap["hàm"] = [](const std::vector<std::string>& tokens, size_t &pos,
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& kwMap) {
-        // tokens[pos] == "hàm"
-        ++pos;
+        ++pos; // skip 'hàm'
         if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
-        std::string fname = tokens[pos];
-        // lưu tên hàm vào string pool
+        std::string fname = tokens[pos++];
         int nameIndex = vietvm::compiler::StringPool::storeString(fname);
-        // emit OP_HAM với operandIndex = nameIndex
-        bytecode.push_back({OP_HAM, 0, nameIndex});
-        ++pos;
 
-        // parse params if any: expect '(' ... ')'
+        // assign function id
+        int hamId = nextId++;
+        symTab[fname] = hamId;
+
+        // parse parameter list if present
         std::vector<std::string> params;
         if (pos < tokens.size() && tokens[pos] == "(") {
             auto pr = vietvm::compiler::extractParens(tokens, pos);
+            // extractParens should return pair<inside, newPos>
             std::string inside = pr.first;
             pos = pr.second;
-            // split by comma
+            // split args
             std::stringstream ss(inside);
             std::string item;
             while (std::getline(ss, item, ',')) {
-                // trim
                 size_t a = item.find_first_not_of(" \t\n\r");
                 size_t b = item.find_last_not_of(" \t\n\r");
-                if (a != std::string::npos) {
-                    params.push_back(item.substr(a, b - a + 1));
-                }
-            }
-            // register params in symTab (assign ids) - these ids will be used by compiler to refer to param names if accessed
-            for (auto &pname : params) {
-                if (!pname.empty() && symTab.find(pname) == symTab.end()) {
-                    symTab[pname] = nextId++;
-                }
-                // emit init for param variable? Optional: Expect compiler to read params from stack by varId convention.
+                if (a != std::string::npos) params.push_back(item.substr(a, b - a + 1));
             }
         }
 
-        // Now expect body: either single statement or block
-        if (pos < tokens.size() && tokens[pos] == "{") {
-            // Emit block markers and compile body
-            bytecode.push_back({OP_MO_KHOI, 0, 0});
-            compileBlock(tokens, pos, bytecode, symTab, nextId, kwMap);
-            bytecode.push_back({OP_DONG_KHOI, 0, 0});
-        } else {
-            // single statement as body
-            compileStatement(tokens, pos, bytecode, symTab, nextId, kwMap);
+        // Now pos should be at the next token after params. Expect '{'
+        if (pos >= tokens.size() || tokens[pos] != "{") {
+            throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
+                                     + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
         }
-        // end function: optional OP_DONG_LENH to terminate last expression
-        bytecode.push_back({OP_DONG_LENH, 0, 0});
+        // consume '{'
+        ++pos;
+
+        // compile function body into temporary vector
+        std::vector<Instruction> funcCode;
+        funcCode.push_back({OP_MO_KHOI, 0, 0, 0});
+
+        // emit OP_PARAM prologue
+        for (size_t i = 0; i < params.size(); ++i) {
+            const std::string &pname = params[i];
+            if (pname.empty()) continue;
+            if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
+            int varId = symTab[pname];
+            funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+        }
+
+        // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
+        compileBlock(tokens, pos, funcCode, symTab, nextId, kwMap);
+
+        // ensure compileBlock left pos at token after '}', if not adjust as needed
+        // function epilogue
+        funcCode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
+
+        // store function code
+        hamBytecodeMap[hamId] = std::move(funcCode);
+
+        // Optionally emit an OP_HAM marker into outer bytecode for discovery
+        bytecode.push_back({OP_HAM, hamId, nameIndex, 0});
     };
 
     // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
     // cú pháp: gọi <tên>(arg1, arg2, ...)
+    // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
     compileMap["gọi"] = [](const std::vector<std::string>& tokens, size_t &pos,
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& kwMap) {
-        ++pos; // skip 'gọi'
+        ++pos;
         if (pos >= tokens.size()) throw std::runtime_error("gọi: thiếu tên hàm");
         std::string fname = tokens[pos++];
-        int nameIndex = vietvm::compiler::StringPool::storeString(fname);
 
-        // expect parens
-        if (pos >= tokens.size() || tokens[pos] != "(") {
-            throw std::runtime_error("gọi: thiếu '(' sau tên hàm");
+        // resolve function id from symTab (must have been set when compiling declaration)
+        int hamId = -1;
+        auto itSym = symTab.find(fname);
+        if (itSym != symTab.end()) {
+            hamId = itSym->second;
+        } else {
+            // fallback: store name in string pool and emit OP_GOI with nameIndex (VM fallback will try resolve)
+            hamId = -1;
         }
+
+        // parse args
+        if (pos >= tokens.size() || tokens[pos] != "(") throw std::runtime_error("gọi: thiếu '(' sau tên hàm");
         auto pr = vietvm::compiler::extractParens(tokens, pos);
         std::string inside = pr.first;
         pos = pr.second;
 
-        // split args and compile each arg expression (left-to-right)
         std::vector<std::string> args = splitArgs(inside);
+        int compiledArgs = 0;
         for (const auto &aexpr : args) {
             if (aexpr.empty()) continue;
             compileExpr(aexpr, bytecode, symTab, nextId, kwMap);
+            ++compiledArgs;
         }
-        int argc = 0;
-        for (auto &a : args) if (!a.empty()) ++argc;
-        bytecode.push_back({OP_GOI, argc, nameIndex});
-        // add statement terminator if next token is ';'
+
+        if (hamId >= 0) {
+            // emit with hamId in operand and argc in operandIndex
+            bytecode.push_back({OP_GOI, hamId, compiledArgs, 0});
+        } else {
+            // fallback: emit with nameIndex so VM fallback can resolve (less ideal)
+            int nameIndex = vietvm::compiler::StringPool::storeString(fname);
+            bytecode.push_back({OP_GOI, nameIndex, compiledArgs, 0});
+        }
+
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
     };
 }

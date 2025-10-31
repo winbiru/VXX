@@ -24,9 +24,9 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
 
     // ---- Trường hợp Block ----
     if (tk == "{") {
-        bytecode.push_back({OP_MO_KHOI,0,0});
+        bytecode.push_back({OP_MO_KHOI,0,0,0});
         compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-        bytecode.push_back({OP_DONG_KHOI,0,0});
+        bytecode.push_back({OP_DONG_KHOI,0,0,0});
         return;
     }
 
@@ -40,7 +40,7 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
     // ---- Trường hợp Keyword chưa có compileFunc (nhưng vẫn là opcode hợp lệ) ----
     if (keywordMap.count(tk)) {
         Opcode code = keywordMap.at(tk);
-        bytecode.push_back({code,0,0});
+        bytecode.push_back({code,0,0,0});
         ++pos;
         return;
     }
@@ -48,6 +48,6 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
     // ---- Còn lại là Biểu thức thông thường ----
     auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
     compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
-    bytecode.push_back({OP_DONG_LENH,0,0});
+    bytecode.push_back({OP_DONG_LENH,0,0,0});
     pos = pr.second;
 }
