@@ -26,12 +26,12 @@ Máy tính có thể hiểu tiếng Việt – nếu ta định nghĩa nó đủ
 VietVM là bước đầu để tiếng Việt có “hình thức toán học”, có thể biên dịch, thực thi, và tối ưu hóa.
 
 III. MỤC TIÊU DÀI HẠN
-Lĩnh vực	Mục tiêu cụ thể của VietVM
-🧠 Ngôn ngữ học hình thức	Hình thức hóa tiếng Việt thành cú pháp – ngữ nghĩa – logic có thể biên dịch.
-🧩 Giáo dục lập trình	Tạo môi trường lập trình dễ hiểu cho học sinh Việt, học bằng tiếng mẹ đẻ.
-⚙️ Khoa học máy tính	Xây dựng máy ảo VietVM thực thi bytecode, hướng tới compiler tiếng Việt → LLVM.
-🤖 AI & NLP Việt hóa	Dữ liệu từ VietVM giúp huấn luyện mô hình AI hiểu ngữ pháp, từ khóa và logic Việt.
-🏛️ Văn hóa & tri thức Việt	Xây dựng “ngôn ngữ số Việt” – nền tảng cho công nghệ bản địa.
+Lĩnh vực	                Mục tiêu cụ thể của VietVM
+Ngôn ngữ học hình thức	  Hình thức hóa tiếng Việt thành cú pháp – ngữ nghĩa – logic có thể biên dịch.
+Giáo dục lập trình	      Tạo môi trường lập trình dễ hiểu cho học sinh Việt, học bằng tiếng mẹ đẻ.
+Khoa học máy tính	        Xây dựng máy ảo VietVM thực thi bytecode, hướng tới compiler tiếng Việt → LLVM.
+AI & NLP Việt hóa	        Dữ liệu từ VietVM giúp huấn luyện mô hình AI hiểu ngữ pháp, từ khóa và logic Việt.
+Văn hóa & tri thức Việt	  Xây dựng “ngôn ngữ số Việt” – nền tảng cho công nghệ bản địa.
 IV. NGUYÊN TẮC THIẾT KẾ
 
 Đơn giản nhưng hình thức.
@@ -87,3 +87,4 @@ VIII. KẾT TỪ
 “Khi con người có thể viết chương trình bằng chính ngôn ngữ mình nghĩ, đó không còn là lập trình – đó là sáng tạo.”
 
 VietVM là ngọn đèn mở đường cho tương lai nơi tiếng Việt không chỉ là ngôn ngữ nói, mà là ngôn ngữ của máy, của tri thức và của tự do sáng tạo.
+
