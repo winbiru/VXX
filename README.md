@@ -1,4 +1,5 @@
 Ngôn ngữ lập trình Việt đầu tiên – nơi tiếng Việt trở thành ngôn ngữ của máy và tư duy.
+
 I. LỜI MỞ ĐẦU
 
 Chúng ta đang sống trong kỷ nguyên mà ngôn ngữ lập trình định hình thế giới.
@@ -87,4 +88,5 @@ VIII. KẾT TỪ
 “Khi con người có thể viết chương trình bằng chính ngôn ngữ mình nghĩ, đó không còn là lập trình – đó là sáng tạo.”
 
 VietVM là ngọn đèn mở đường cho tương lai nơi tiếng Việt không chỉ là ngôn ngữ nói, mà là ngôn ngữ của máy, của tri thức và của tự do sáng tạo.
+
 
