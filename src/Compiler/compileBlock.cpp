@@ -13,6 +13,8 @@
 
 #include "../../include/compiler/compileStatement.h"
 #include "instruction.h"
+#include "compiler/CompileRegistry.h" // for compileMap
+#include "common/Lex_utils.h" // if normalizeTokenForCompare declared here
 
 // Helper to produce a small window of tokens around pos for debugging
 static std::string tokens_context(const std::vector<std::string>& tokens, size_t pos, size_t window = 8) {
@@ -43,7 +45,34 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
     ++pos;
 
     while (pos < tokens.size() && tokens[pos] != "}") {
+        // skip empties and stray semicolons inside blocks
+        if (tokens[pos].empty() || tokens[pos] == ";") { ++pos; continue; }
+
+        // normalize token for lookup using project's normalization
+        std::string key = vietvm::compiler::normalizeTokenForCompare(tokens[pos]);
+
+        auto itHandler = compileMap.find(key);
+        if (itHandler != compileMap.end()) {
+            size_t oldPos = pos;
+            itHandler->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
+            if (pos == oldPos) {
+                std::ostringstream oss;
+                oss << "compileBlock: handler for '" << tokens[oldPos] << "' did not advance pos (pos=" << pos << ")\nContext: "
+                    << tokens_context(tokens, oldPos);
+                throw std::runtime_error(oss.str());
+            }
+            continue;
+        }
+
+        // Otherwise treat as a normal statement (assignment/implicit call/expression)
+        size_t oldPos = pos;
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
+        if (pos == oldPos) {
+            std::ostringstream oss;
+            oss << "compileBlock: compileStatement did not advance pos at token '" << tokens[oldPos]
+                << "' (pos=" << pos << ")\nContext: " << tokens_context(tokens, oldPos);
+            throw std::runtime_error(oss.str());
+        }
     }
 
     if (pos >= tokens.size() || tokens[pos] != "}") {

@@ -1,4 +1,7 @@
 #include "common/Expression.h"
+
+#include <iostream>
+
 #include "common/Lex_utils.h"   // isNumber, isOperator, isStringLiteral, isVariable
 #include <stack>
 #include <stdexcept>
@@ -24,6 +27,13 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     std::stack<std::string> ops;
     std::vector<int> argCountStack;          // parallel stack to count args for current function
     std::vector<bool> argExpectingStack;     // whether we are expecting a new arg (true at start of arg list, or after comma)
+
+    if (infix_tokens.empty()) return {};
+    std::ostringstream dbg;
+    dbg << "convertToPostfix called with tokens:";
+    for (auto &t : infix_tokens) dbg << " '" << t << "'";
+    std::cerr << dbg.str() << std::endl;
+
 
     auto isFuncMarker = [](const std::string &s)->bool {
         return s.rfind("FUNC:", 0) == 0;

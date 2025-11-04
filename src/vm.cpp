@@ -60,12 +60,12 @@ void VM::run() {
 
         switch (instr.op) {
             case OP_HAM: {
-                int hamIndex = instr.operand;
-                auto it = hamBytecodeMap.find(hamIndex);
-                if (it != hamBytecodeMap.end()) {
-                    VM hamVM(it->second, this->stringPool);
-                    hamVM.run(); // run function as sub-program
-                }
+                // int hamIndex = instr.operand;
+                // auto it = hamBytecodeMap.find(hamIndex);
+                // if (it != hamBytecodeMap.end()) {
+                //     VM hamVM(it->second, this->stringPool);
+                //     hamVM.run(); // run function as sub-program
+                // }
                 break;
             }
 

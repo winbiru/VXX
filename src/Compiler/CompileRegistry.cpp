@@ -18,6 +18,10 @@
 #include "compiler/compileStatement.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
+namespace vietvm::compiler {
+    // single definition of global function-body map
+    std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
+} // namespace vietvm::compiler
 
 static std::vector<std::string> splitArgs(const std::string &s) {
     std::vector<std::string> res;
@@ -81,7 +85,7 @@ void initCompileMap() {
                        };
     compileMap["chọn"] = compileSwitch;
 
-    // Handler "hàm" (robust pos handling)
+    // Handler "hàm" (robust pos handling) — use getOrInsertString to avoid duplicate string indices
     compileMap["hàm"] = [](const std::vector<std::string>& tokens, size_t &pos,
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
@@ -90,20 +94,19 @@ void initCompileMap() {
         ++pos; // skip 'hàm'
         if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
         std::string fname = tokens[pos++];
-        int nameIndex = vietvm::compiler::StringPool::storeString(fname);
+        int nameIndex = vietvm::compiler::StringPool::getOrInsertString(fname);
 
-        // assign function id
+        // assign function id (global)
         int hamId = nextId++;
-        symTab[fname] = hamId;
+        symTab[fname] = hamId;  // register function name globally
 
         // parse parameter list if present
         std::vector<std::string> params;
         if (pos < tokens.size() && tokens[pos] == "(") {
             auto pr = vietvm::compiler::extractParens(tokens, pos);
-            // extractParens should return pair<inside, newPos>
             std::string inside = pr.first;
             pos = pr.second;
-            // split args
+            // split args by comma, trim
             std::stringstream ss(inside);
             std::string item;
             while (std::getline(ss, item, ',')) {
@@ -113,39 +116,33 @@ void initCompileMap() {
             }
         }
 
-        // Now pos should be at the next token after params. Expect '{'
-        if (pos >= tokens.size() || tokens[pos] != "{") {
-            throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
-                                     + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
-        }
-        // consume '{'
-        ++pos;
-
-        // compile function body into temporary vector
+        // compile function body into temporary vector, using a local symbol table
         std::vector<Instruction> funcCode;
         funcCode.push_back({OP_MO_KHOI, 0, 0, 0});
 
-        // emit OP_PARAM prologue
+        // Create a local symbol table for parameters and locals.
+        std::unordered_map<std::string,int> localSym;
+        // Allocate local ids for parameters (do not write them into global symTab)
         for (size_t i = 0; i < params.size(); ++i) {
             const std::string &pname = params[i];
             if (pname.empty()) continue;
-            if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
-            int varId = symTab[pname];
-            funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+            int localId = nextId++;            // allocate global-unique id, but keep in localSym only
+            localSym[pname] = localId;
+            // Emit OP_PARAM: operandIndex = localId, operandValue = argIndex
+            funcCode.push_back({OP_PARAM, 0, localId, (int)i});
         }
 
-        // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
-        compileBlock(tokens, pos, funcCode, symTab, nextId, kwMap);
+        // Now compile the block using the local symbol table so locals/params are resolved locally.
+        compileBlock(tokens, pos, funcCode, localSym, nextId, kwMap);
 
-        // ensure compileBlock left pos at token after '}', if not adjust as needed
         // function epilogue
         funcCode.push_back({OP_DONG_KHOI, 0, 0, 0});
         funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
 
-        // store function code
+        // store function code under hamId
         hamBytecodeMap[hamId] = std::move(funcCode);
 
-        // Optionally emit an OP_HAM marker into outer bytecode for discovery
+        // emit OP_HAM marker into outer bytecode: operand = hamId, operandIndex = nameIndex
         bytecode.push_back({OP_HAM, hamId, nameIndex, 0});
     };
 
@@ -190,10 +187,21 @@ void initCompileMap() {
             bytecode.push_back({OP_GOI, hamId, compiledArgs, 0});
         } else {
             // fallback: emit with nameIndex so VM fallback can resolve (less ideal)
-            int nameIndex = vietvm::compiler::StringPool::storeString(fname);
+            int nameIndex = vietvm::compiler::StringPool::getOrInsertString(fname);
             bytecode.push_back({OP_GOI, nameIndex, compiledArgs, 0});
         }
 
+        if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+    };
+    compileMap["thoát"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                             std::vector<Instruction>& bytecode,
+                             std::unordered_map<std::string,int>&,
+                             int& nextId,
+                             const std::unordered_map<std::string,Opcode>& kwMap) {
+        ++pos; // consume 'thoát'
+        // emit the OP_THOAT instruction (operand fields zeroed)
+        bytecode.push_back({OP_THOAT, 0, 0, 0});
+        // consume optional semicolon
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
     };
 }
