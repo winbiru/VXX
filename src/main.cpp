@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
             // In bytecode để debug
-            std::cout << "📜 Danh sách bytecode (" << defaultFile << "):" << std::endl;
+            std::cout << "=> Danh sách bytecode cho file mã nguồn (" << defaultFile << "):" << std::endl;
             for (size_t i = 0; i < bytecode.size(); ++i) {
                 const Instruction &instr = bytecode[i];
                 std::cout << "[" << i << "] "
@@ -69,13 +69,13 @@ int main(int argc, char* argv[]) {
             }
 
             VM vm(bytecode, stringPool);
+
+            // copy compiled functions into VM
+            vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
             vm.run();
             return EXIT_SUCCESS;
         }
 
-        // -----------------------------
-        // ✅ Nếu không có cả 2 → chạy toàn bộ thư mục "tests/"
-        // -----------------------------
         std::string testDir = "tests/";
         if (fs::exists(testDir)) {
             for (const auto& entry : fs::directory_iterator(testDir)) {
@@ -89,6 +89,8 @@ int main(int argc, char* argv[]) {
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
                     VM vm(bytecode, stringPool);
+                    // copy compiled functions into VM
+                    vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
                     vm.run();
                 }
             }

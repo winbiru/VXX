@@ -1,0 +1,34 @@
+hàm main() {
+    kiemTraToaDo(2, 8);
+    in "Chương trình hoàn thành";
+}
+hàm kiemTraToaDo(batDau, ketThuc) {
+    lặp (x = batDau; x <= ketThuc; x = x + 1) {
+        lặp (y = batDau; y <= ketThuc; y = y + 1) {
+            lặp (z = batDau; z <= ketThuc; z = z + 1) {
+                nếu ((x + y + z) % 2 != 0) {
+                    nếu ((x * y * z) % 3 == 0) {
+                        nếu (x != y && y != z && x != z) {
+                            nếu (!(x == 2 || z == 2)) {
+                                chọn (x + y + z) {
+                                    ca 9: {
+                                        in "Tọa độ đặc biệt: tổng là 9 → (" + x + ", " + y + ", " + z + ")";
+                                        thoát;
+                                    };
+                                    ca 15: {
+                                        in "Tọa độ đặc biệt: tổng là 15 → (" + x + ", " + y + ", " + z + ")";
+                                        thoát;
+                                    };
+                                    mặc định: {
+                                        in "Tọa độ hợp lệ: (" + x + ", " + y + ", " + z + ")";
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+}
+

@@ -1,9 +1,15 @@
 #pragma once
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-namespace vietvm::compiler {
+#include "instruction.h"
 
+namespace vietvm::compiler {
+    class hamMap {
+    public:
+        static std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
+    };
     class StringPool {
     public:
         static int storeString(const std::string& s);

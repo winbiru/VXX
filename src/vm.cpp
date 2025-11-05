@@ -7,8 +7,10 @@
 #include <map>
 #include <unordered_map>
 #include "vm.h"
+
+#include <algorithm>
 #include <common/Lex_utils.h>
-#include "../include/vm_utils.h" // adjust include path according to project
+#include "../include/common/vm_utils.h" // adjust include path according to project
 
 using StackValue = std::variant<int, std::string>;
 
@@ -40,40 +42,94 @@ bool toBool(const StackValue& value) {
 void VM::run() {
     // Precompute function table once (avoid rebuilding each iteration)
     std::unordered_map<std::string,int> functionTable;
+    std::unordered_map<int,int> functionTableByNameIndex;
     for (size_t i = 0; i < bytecode.size(); ++i) {
         const Instruction &ci = bytecode[i];
         if (ci.op == OP_HAM) {
-            if (ci.operandIndex >= 0 && ci.operandIndex < (int)stringPool.size()) {
-                std::string fname = stringPool[ci.operandIndex];
-                functionTable[fname] = static_cast<int>(i + 1);
+            // Convention: OP_HAM: operand = nameIndex, operandIndex = hamId
+            if (ci.operand >= 0) {
+                int nameIndex = ci.operand;
+                int hamId = ci.operandIndex;
+                functionTableByNameIndex[nameIndex] = hamId;
             }
         }
     }
 
-    while (pc < (int)bytecode.size()) {
+    while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
-
-        // Helpful debug (can be gated behind a debug flag)
-        // std::cerr << "[VM] pc=" << pc << " op=" << name_op(instr.op) << " stack=" << stack.size() << "\n";
-
         switch (instr.op) {
             case OP_HAM: {
-                int hamIndex = instr.operand;
-                auto it = hamBytecodeMap.find(hamIndex);
-                if (it != hamBytecodeMap.end()) {
-                    VM hamVM(it->second, this->stringPool);
-                    hamVM.run(); // run function as sub-program
-                }
                 break;
             }
 
             case OP_GOI: {
-                int hamIndex = instr.operand;
-                auto it = hamBytecodeMap.find(hamIndex);
-                if (it != hamBytecodeMap.end()) {
-                    VM hamVM(it->second, this->stringPool);
-                    hamVM.run();
+                // Compiler convention: instr.operand = argc, instr.operandIndex = hamId (or nameIndex fallback)
+                int argc = instr.operand;
+                int hamIdOrName = instr.operandIndex;
+
+                // Collect argc args from caller stack (last pushed = last arg)
+                std::vector<StackValue> args;
+                args.reserve(argc);
+                for (int i = 0; i < argc; ++i) {
+                    if (stack.empty()) {
+                        args.emplace_back(0);
+                    } else {
+                        args.push_back(stack.back());
+                        stack.pop_back();
+                    }
                 }
+                std::reverse(args.begin(), args.end());
+
+                // Push call frame for caller (so OP_PARAM can access args via frame)
+                CallFrame frame;
+                frame.args = args;
+                frame.localsIndexed = true;
+                frame.returnPc = static_cast<int>(pc + 1);
+                callStack.push_back(frame);
+
+                // Lookup function by hamIdOrName:
+                auto it = hamBytecodeMap.find(hamIdOrName);
+
+                if (it == hamBytecodeMap.end()) {
+                    int nameIndex = hamIdOrName;
+                    auto ftIt = functionTableByNameIndex.find(nameIndex);
+                    if (ftIt != functionTableByNameIndex.end()) {
+                        int foundHamId = ftIt->second;
+                        it = hamBytecodeMap.find(foundHamId);
+                    } else {
+                        // As a final fallback, scan OP_HAMs in top-level bytecode (robustness)
+                        for (size_t i = 0; i < bytecode.size(); ++i) {
+                            const Instruction &hinst = bytecode[i];
+                            if (hinst.op == OP_HAM) {
+                                // hinst.operand = nameIndex, hinst.operandIndex = hamId
+                                if (hinst.operand == nameIndex) {
+                                    int foundHamId = hinst.operandIndex;
+                                    auto it2 = hamBytecodeMap.find(foundHamId);
+                                    if (it2 != hamBytecodeMap.end()) { it = it2; break; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (it == hamBytecodeMap.end()) {
+                    // cleanup and error
+                    callStack.pop_back();
+                    throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");
+                }
+                VM funcVM(it->second, this->stringPool);
+                funcVM.callStack.clear();
+                funcVM.callStack.push_back(callStack.back());
+                funcVM.hamBytecodeMap = this->hamBytecodeMap;
+                funcVM.run();
+
+                if (!funcVM.stack.empty()) {
+                    stack.push_back(funcVM.stack.back());
+                }
+
+                // Pop caller frame
+                if (!callStack.empty()) callStack.pop_back();
+
                 break;
             }
 
@@ -174,6 +230,7 @@ void VM::run() {
                                 case OP_NHO_HON: stack.emplace_back((ia < ib) ? 1 : 0); break;
                                 case OP_LON_HON_HOAC_BANG: stack.emplace_back((ia >= ib) ? 1 : 0); break;
                                 case OP_NHO_HON_HOAC_BANG: stack.emplace_back((ia <= ib) ? 1 : 0); break;
+                                default:     break;
                             }
                         } else {
                             std::string sa = std::get<std::string>(a);
@@ -185,6 +242,7 @@ void VM::run() {
                                 case OP_NHO_HON: stack.push_back((sa < sb) ? 1 : 0); break;
                                 case OP_LON_HON_HOAC_BANG: stack.push_back((sa >= sb) ? 1 : 0); break;
                                 case OP_NHO_HON_HOAC_BANG: stack.push_back((sa <= sb) ? 1 : 0); break;
+                                default:     break;
                             }
                         }
                         break;
@@ -325,7 +383,7 @@ void VM::run() {
                 auto& ctx = switchStack.back();
                 ctx.skippingCase = true;
 
-                while (pc < (int)bytecode.size()) {
+                while (pc < bytecode.size()) {
                     if (bytecode[pc].op == OP_DONG_KHOI) {
                         ++pc;
                         break;
@@ -337,9 +395,26 @@ void VM::run() {
 
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
+
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            stack.push_back(frame.localsVec[varId]);
+                            break;
+                        }
+                    } else {
+                        auto it = frame.localsMap.find(varId);
+                        if (it != frame.localsMap.end()) {
+                            stack.push_back(it->second);
+                            break;
+                        }
+                    }
+                }
+
                 if (variables.count(varId) == 0) {
                     std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
-                    variables[varId] = 0;
+                    variables[varId] = make_int_value(0);
                 }
                 stack.push_back(variables[varId]);
                 break;
@@ -386,8 +461,6 @@ void VM::run() {
                 if (jump_address < 0 || jump_address >= (int)bytecode.size()) {
                     throw runtime_error_op("Lỗi: địa chỉ nhảy ngoài phạm vi", instr.op, pc);
                 }
-                // dispatch loop increments pc manually at end of loop,
-                // so set pc directly and continue to avoid extra ++ at end
                 pc = jump_address;
                 continue;
             }
@@ -421,7 +494,6 @@ void VM::run() {
 
             case OP_DONG_KHOI: {
                 if (blockStack.empty()) throw runtime_error_op("Lỗi: không có khối mở", instr.op, pc);
-                int blockStartPc = blockStack.back();
                 blockStack.pop_back();
 
                 if (blockDepth > 0) --blockDepth;
@@ -445,7 +517,30 @@ void VM::run() {
                 stack.push_back(result);
                 break;
             }
+            case OP_PARAM: {
+                int localId = instr.operandIndex;
+                int argIndex = instr.operandValue;
 
+                if (callStack.empty()) {
+                    variables[localId] = make_int_value(0);
+                    break;
+                }
+                CallFrame &frame = callStack.back();
+                StackValue v;
+                if (argIndex >= 0 && argIndex < (int)frame.args.size()) {
+                    v = frame.args[argIndex];
+                } else {
+                    v = make_int_value(0);
+                    vmLog("Cảnh báo: OP_PARAM argIndex ngoài phạm vi, gán mặc định 0");
+                }
+                if (frame.localsIndexed) {
+                    if (localId >= (int)frame.localsVec.size()) frame.localsVec.resize(localId + 1, make_int_value(0));
+                    frame.localsVec[localId] = v;
+                } else {
+                    frame.localsMap[localId] = v;
+                }
+                break;
+            }
             default:
                 // If in a skipping switch block, ignore instructions
                 if (!switchStack.empty() && switchStack.back().skippingCase) {
@@ -453,8 +548,6 @@ void VM::run() {
                 }
                 throw runtime_error_op("Opcode không xác định", instr.op, pc);
         }
-
-        // advance program counter (manual dispatch)
         ++pc;
     }
 }

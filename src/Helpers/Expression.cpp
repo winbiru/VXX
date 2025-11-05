@@ -1,4 +1,7 @@
 #include "common/Expression.h"
+
+#include <iostream>
+
 #include "common/Lex_utils.h"   // isNumber, isOperator, isStringLiteral, isVariable
 #include <stack>
 #include <stdexcept>
@@ -25,6 +28,7 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     std::vector<int> argCountStack;          // parallel stack to count args for current function
     std::vector<bool> argExpectingStack;     // whether we are expecting a new arg (true at start of arg list, or after comma)
 
+    if (infix_tokens.empty()) return {};
     auto isFuncMarker = [](const std::string &s)->bool {
         return s.rfind("FUNC:", 0) == 0;
     };
@@ -33,15 +37,10 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
         const std::string &token = infix_tokens[i];
         if (token.empty()) continue;
 
-        // Robustness: skip block delimiters and statement terminators if they appear here.
-        // Some callers may accidentally include '{', '}', or ';' in the expression slice.
         if (token == "{" || token == "}" || token == ";") {
             continue;
         }
-
-        // Detect function occurrence: identifier followed by '('
-        if (vietvm::compiler::isVariable(token) && (i + 1) < infix_tokens.size() && infix_tokens[i+1] == "(") {
-            // Push a function marker (we'll handle '(' next)
+        if (isVariable(token) && (i + 1) < infix_tokens.size() && infix_tokens[i+1] == "(") {
             ops.push(std::string("FUNC:") + token);
             continue; // do not output function name as operand
         }

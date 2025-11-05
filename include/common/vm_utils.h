@@ -3,7 +3,7 @@
 #include <string>
 #include <stdexcept>
 #include <sstream>
-#include "instruction.h"
+#include "../instruction.h"
 
 // Lưu ý: chỉnh đường dẫn "../instruction.h" nếu project dùng include khác.
 // Hàm name_op(Opcode) đã có trong project (name_op.cpp) — link tự resolve tại link-time.
@@ -38,4 +38,19 @@ inline int as_int(const StackValue &v, Opcode op = (Opcode)0, int pc = -1) {
 inline std::string as_string(const StackValue &v) {
     if (std::holds_alternative<int>(v)) return std::to_string(std::get<int>(v));
     return std::get<std::string>(v);
+}
+
+// Helper tạo giá trị số nguyên
+inline StackValue make_int_value(int v) {
+    return StackValue(v);
+}
+
+// Helper tạo chuỗi
+inline StackValue make_string_value(const std::string &s) {
+    return StackValue(s);
+}
+
+// Logging helper (tuỳ chọn)
+inline void vmLog(const std::string &msg) {
+    std::cerr << "[VM] " << msg << std::endl;
 }

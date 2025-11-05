@@ -1,4 +1,3 @@
-// vm.h
 #ifndef VM_H
 #define VM_H
 
@@ -12,6 +11,7 @@
 #include <variant>
 
 #include "instruction.h"
+#include "common/vm_callframe.h"
 
 class VM {
 public:
@@ -19,39 +19,53 @@ public:
     VM() = default;
     void run();
     VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
+
     std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
+
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
-    using StackValue = std::variant<int, std::string>;
-    std::vector<StackValue> stack;
-    std::optional<StackValue> switchValue;
-    bool skippingCase = false;
-    bool inSwitchBlock = false;
-    std::unordered_map<int, StackValue> variables;  // Biến tạm thời (nếu cần mở rộng)
 
-    std::vector<size_t> loopStartStack;              // Stack hỗ trợ cho vòng lặp (for/while)
-    std::vector<size_t> ifElseStack;                 // Stack hỗ trợ khối if/else
-    std::vector<size_t> blockStack;                  // Stack theo dõi các khối {}
+    using StackValue = std::variant<int, std::string>;
+    std::vector<StackValue> stack;                  // data stack (values)
+
+    std::unordered_map<int, StackValue> variables;  // fallback global var store
+
+    // Call stack for function calls
+    std::vector<CallFrame> callStack;
+
+    // helper stacks for control-flow
+    std::vector<size_t> loopStartStack;
+    std::vector<size_t> ifElseStack;
+    std::vector<size_t> blockStack;
 
     size_t pc = 0;                                  // Program counter
-    int instructionPointer = 0;
-    bool running = true;                            // Trạng thái thực thi
+    bool running = true;
     int vi_tri_dieu_kien = -1;
+
     struct SwitchFrame {
         std::optional<StackValue> switchValue;
         bool skippingCase{};
         bool caseMatched{};
         size_t blockDepthAtStart{};
     };
-    std::vector<SwitchFrame> switchStack; // khởi tạo rỗng
-    int blockDepth = 0;                   // tăng khi OP_MO_KHOI, giảm khi OP_DONG_KHOI
+    std::vector<SwitchFrame> switchStack;
+    int blockDepth = 0;
 
     // Các hàm phụ trợ
     void execute(const Instruction& inst);
-    int pop();
-    void push(int value);
+    int popInt();                // helper pop int from stack (or throw)
+    void pushInt(int value);
+    StackValue popValue();
+    void pushValue(const StackValue &v);
 
+    // CallFrame helpers
+    StackValue getArgFromCurrentFrame(int argIndex) const;
+    void setLocalInCurrentFrame(int localId, const StackValue& value);
+
+    // Function call helpers
+    void enterFunctionFrame(const std::vector<StackValue>& args, int returnPc);
+    void leaveCurrentFrame();
 };
 
 #endif // VM_H

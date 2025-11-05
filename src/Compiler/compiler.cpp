@@ -4,6 +4,7 @@
 #include <vector>
 #include <cctype>
 #include <instruction.h>
+#include <iostream>
 #include <unordered_map>
 #include <string>
 #include <common/Lex_utils.h>
@@ -30,10 +31,14 @@ std::vector<Instruction> compileSource(const std::string& source,
         // skip stray semicolons or closing braces at top-level
         if (tokens[pos] == ";") { ++pos; continue; }
         if (tokens[pos] == "}") { ++pos; continue; }
-
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
     }
-
-    bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0});
+    auto it = symTab.find("main");
+    if (it != symTab.end()) {
+        int mainHamId = it->second;
+        // Emit OP_GOI with hamId and argc = 0 so VM will run main
+        bytecode.push_back({OP_GOI, 0,mainHamId, 0});
+    }
+    bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0,0});
     return bytecode;
 }
