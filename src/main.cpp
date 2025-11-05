@@ -8,7 +8,6 @@
 #include "../include/vm.h"
 #include "../include/name_op.h"
 #include "common/storeString.h"
-#include "compiler/CompileRegistry.h" // ensure hamBytecodeMap declaration is visible
 
 namespace fs = std::filesystem;
 
@@ -40,14 +39,6 @@ int main(int argc, char* argv[]) {
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
-            // copy compiled function bodies into VM so OP_GOI can resolve hamId
-            vm.hamBytecodeMap = vietvm::compiler::hamBytecodeMap;
-
-            // debug: list compiled function ids
-            for (auto &p : vietvm::compiler::hamBytecodeMap) {
-                std::cerr << "[DBG-HAMMAP] hamId=" << p.first << " size=" << p.second.size() << "\n";
-            }
-
             vm.run();
 
             return EXIT_SUCCESS;
@@ -77,19 +68,11 @@ int main(int argc, char* argv[]) {
                 std::cout << std::endl;
             }
 
-            // debug: list compiled function ids
-            for (auto &p : vietvm::compiler::hamBytecodeMap) {
-                std::cerr << "[DBG-HAMMAP] hamId=" << p.first << " size=" << p.second.size() << "\n";
-            }
-
             VM vm(bytecode, stringPool);
-            // ensure VM has compiled function bodies so OP_GOI can resolve hamId
-            vm.hamBytecodeMap = vietvm::compiler::hamBytecodeMap;
-            std::cerr << "[DBG] vm.hamBytecodeMap.size=" << vm.hamBytecodeMap.size() << "\n";
-            if (vm.hamBytecodeMap.find(6) != vm.hamBytecodeMap.end())
-                std::cerr << "[DBG] vm has hamId=6\n";
-            else
-                std::cerr << "[DBG] vm missing hamId=6\n";
+
+            // copy compiled functions into VM
+            vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+            std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
 
             vm.run();
             return EXIT_SUCCESS;
@@ -110,13 +93,11 @@ int main(int argc, char* argv[]) {
                     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
-                    // debug: list compiled function ids for this test
-                    for (auto &p : vietvm::compiler::hamBytecodeMap) {
-                        std::cerr << "[DBG-HAMMAP] hamId=" << p.first << " size=" << p.second.size() << "\n";
-                    }
-
                     VM vm(bytecode, stringPool);
-                    vm.hamBytecodeMap = vietvm::compiler::hamBytecodeMap;
+                    // copy compiled functions into VM
+                    vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+                    std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
+
                     vm.run();
                 }
             }

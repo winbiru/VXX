@@ -1,20 +1,22 @@
-// Replace or merge into your existing compileStatement implementation.
-// Adds support for implicit function calls like: name(arg1, arg2);
+//
+// Created by nx_thang on 10/21/2025.
+//
 
-#include "compiler/compileStatement.h"
-#include "compiler/compilerExpr.h"
-#include "common/Utility.h"
-#include "common/storeString.h"
-#include <stdexcept>
-#include <sstream>
+#include "../../include/compiler/compileStatement.h"
+
+#include <string>
+#include <unordered_map>
 #include <vector>
-#include <algorithm>
+#include <common/Utility.h>
+#include <compiler/compileBlock.h>
+#include <compiler/CompileRegistry.h>
+#include <compiler/compilerExpr.h>
+#include "common/storeString.h"
+#include <sstream>
 #include <iostream>
 
-#include "common/Lex_utils.h"
-
-// Forward-declare splitArgs if not available elsewhere (or reuse your repo's splitArgs)
-static std::vector<std::string> splitArgsLocal(const std::string &s) {
+// Helper to split arguments string into individual argument expressions (handles nested parens)
+static std::vector<std::string> splitArgsString(const std::string &s) {
     std::vector<std::string> res;
     std::string cur;
     int depth = 0;
@@ -23,87 +25,95 @@ static std::vector<std::string> splitArgsLocal(const std::string &s) {
         if (c == '(') { depth++; cur.push_back(c); }
         else if (c == ')') { depth--; cur.push_back(c); }
         else if (c == ',' && depth == 0) {
-            res.push_back(cur);
+            // push trimmed current
+            size_t a = cur.find_first_not_of(" \t\n\r");
+            size_t b = cur.find_last_not_of(" \t\n\r");
+            if (a == std::string::npos) res.push_back("");
+            else res.push_back(cur.substr(a, b - a + 1));
             cur.clear();
         } else {
             cur.push_back(c);
         }
     }
-    if (!cur.empty()) res.push_back(cur);
-    // trim spaces
-    for (auto &t : res) {
-        size_t a = t.find_first_not_of(" \t\n\r");
-        size_t b = t.find_last_not_of(" \t\n\r");
-        if (a == std::string::npos) t = "";
-        else t = t.substr(a, b - a + 1);
+    if (!cur.empty()) {
+        size_t a = cur.find_first_not_of(" \t\n\r");
+        size_t b = cur.find_last_not_of(" \t\n\r");
+        if (a == std::string::npos) res.push_back("");
+        else res.push_back(cur.substr(a, b - a + 1));
     }
     return res;
 }
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
-                      std::vector<Instruction>& bytecode,
-                      std::unordered_map<std::string,int>& symTab,
+                      std::vector<Instruction> &bytecode,
+                      std::unordered_map<std::string,int> &symTab,
                       int &nextId,
-                      const std::unordered_map<std::string,Opcode>& kwMap)
+                      const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     if (pos >= tokens.size()) return;
-
     const std::string &tk = tokens[pos];
 
-    // If token is a keyword handled via compileMap elsewhere, assume dispatcher handles it.
-    // Here we implement implicit function call detection: identifier followed by '('
-    if (vietvm::compiler::isVariable(tk) && (pos + 1) < tokens.size() && tokens[pos+1] == "(") {
-        std::string fname = tk;
-        ++pos; // move to '('
-        auto pr = vietvm::compiler::extractParens(tokens, pos);
-        std::string inside = pr.first;
-        pos = pr.second; // position after ')'
+    // ---- Trường hợp Block ----
+    if (tk == "{") {
+        bytecode.push_back({OP_MO_KHOI,0,0,0});
+        compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
+        bytecode.push_back({OP_DONG_KHOI,0,0,0});
+        return;
+    }
 
-        // split and compile args left-to-right
-        std::vector<std::string> args = splitArgsLocal(inside);
+    // ---- Trường hợp Keyword có CompileFunc riêng ----
+    auto it = compileMap.find(tk);
+    if (it != compileMap.end()) {
+        it->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
+        return;
+    }
+
+    // ---- Trường hợp Keyword chưa có compileFunc (nhưng vẫn là opcode hợp lệ) ----
+    if (keywordMap.count(tk)) {
+        Opcode code = keywordMap.at(tk);
+        bytecode.push_back({code,0,0,0});
+        ++pos;
+        return;
+    }
+
+    // ---- Trường hợp gọi hàm dạng identifier(args); ----
+    if ((pos + 1) < tokens.size() && tokens[pos+1] == "(") {
+        std::string ident = tokens[pos];
+
+        // extract content inside parens; extractParens expects the position of '('
+        auto pr = vietvm::compiler::extractParens(tokens, pos + 1);
+        std::string inside = pr.first;
+        pos = pr.second; // pos now points after ')'
+
+        // split args and compile each expression
+        std::vector<std::string> args = splitArgsString(inside);
         int compiledArgs = 0;
         for (const auto &aexpr : args) {
             if (aexpr.empty()) continue;
-            compileExpr(aexpr, bytecode, symTab, nextId, kwMap);
+            compileExpr(aexpr, bytecode, symTab, nextId, keywordMap);
             ++compiledArgs;
         }
 
-        // resolve function id from symTab (set when compiling function) if possible
-        int funcId = -1;
-        auto it = symTab.find(fname);
-        if (it != symTab.end()) funcId = it->second;
+        // resolve function id if declared, otherwise emit nameIndex fallback
+        int hamId = -1;
+        auto itSym = symTab.find(ident);
+        if (itSym != symTab.end()) hamId = itSym->second;
 
-        if (funcId >= 0) {
-            std::cerr << "[DBG] compileStatement: emitting OP_GOI fname=" << fname
-          << " funcId=" << funcId << " argc=" << compiledArgs << " pos=" << pos << std::endl;
-
-            bytecode.push_back({OP_GOI, funcId, compiledArgs, 0});
+        if (hamId >= 0) {
+            bytecode.push_back({OP_GOI, compiledArgs, hamId, 0});
         } else {
-          //   std::cerr << "[DBG] compileStatement: emitting OP_GOI fname=" << fname
-          // << " funcId=" << funcId << " argc=" << compiledArgs << " pos=" << pos << std::endl;
-
-            // fallback: emit using string pool index; VM will try to resolve nameIndex -> hamId
-            int nameIndex = vietvm::compiler::StringPool::getOrInsertString(fname);
-            bytecode.push_back({OP_GOI, nameIndex, compiledArgs, 0});
-            // size_t idx = bytecode.size()-1;
-            // std::cerr << "[DBG-BYTECODE] OP_GOI pushed into bytecode vector at idx=" << idx
-            //           << " op=" << bytecode[idx].op
-            //           << " operand=" << bytecode[idx].operand
-            //           << " operandIndex=" << bytecode[idx].operandIndex << std::endl;
+            int nameIndex = vietvm::compiler::StringPool::storeString(ident);
+            bytecode.push_back({OP_GOI, compiledArgs, nameIndex, 0});
         }
 
-        // consume optional semicolon
+        // optional semicolon
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
         return;
     }
 
-    // Fallback: treat as expression or other statement
-    // Use existing extractExpressionUntilSemicolon + compileExpr
-    {
-        auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
-        if (!pr.first.empty()) {
-            compileExpr(pr.first, bytecode, symTab, nextId, kwMap);
-        }
-        pos = pr.second;
-    }
+    // ---- Còn lại là Biểu thức thông thường ----
+    auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
+    compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
+    bytecode.push_back({OP_DONG_LENH,0,0,0});
+    pos = pr.second;
 }

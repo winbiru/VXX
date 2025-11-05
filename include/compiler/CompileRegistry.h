@@ -18,6 +18,4 @@ using CompileFunc = std::function<void(
     const std::unordered_map<std::string,Opcode>& keywordMap)>;
 
 extern std::unordered_map<std::string, CompileFunc> compileMap;
-inline std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
-
 void initCompileMap();
