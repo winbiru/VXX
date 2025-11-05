@@ -1,4 +1,4 @@
-hàm chính() {
+hàm main() {
     kiemTraToaDo();
     in "Chương trình hoàn thành";
 };
