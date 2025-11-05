@@ -112,11 +112,11 @@ void VM::run() {
                     }
                 }
 
-                if (it == hamBytecodeMap.end()) {
-                    // cleanup and error
-                    callStack.pop_back();
-                    throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");
-                }
+                // if (it == hamBytecodeMap.end()) {
+                //     // cleanup and error
+                //     callStack.pop_back();
+                //     throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");
+                // }
                 VM funcVM(it->second, this->stringPool);
                 funcVM.callStack.clear();
                 funcVM.callStack.push_back(callStack.back());
