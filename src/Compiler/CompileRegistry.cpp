@@ -5,6 +5,7 @@
 #include "../../include/compiler/CompileRegistry.h"
 
 #include <iostream>
+#include <sstream>
 
 #include "common/LoopUltil.h"
 #include "common/Utility.h"
@@ -13,11 +14,7 @@
 #include "compiler/compilerExpr.h"
 #include "compiler/compileSwitch.h"
 #include "common/storeString.h"
-#include "common/SymbolTable.h"
-#include <sstream>
-
 #include "compiler/compileBlock.h"
-#include "compiler/compileStatement.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
 
@@ -131,6 +128,7 @@ void initCompileMap() {
             if (pname.empty()) continue;
             if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
             int varId = symTab[pname];
+            funcCode.push_back({OP_KHOI_TAO, 0, varId, 0});
             funcCode.push_back({OP_PARAM, 0, varId, (int)i});
         }
         // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'

@@ -1,17 +1,17 @@
-hàm kiemTraToaDo(){
-    lặp(x = 1; x <= 6; x = x + 1) {
-        lặp(y = 1; y <= 6; y = y + 1) {
-            lặp(z = 1; z <= 6; z = z + 1) {
-                nếu((x + y + z) % 2 != 0) {
-                    nếu((x * y * z) % 3 == 0) {
-                        nếu(x != y && y != z && x != z) {
-                            nếu(!(x == 2 || z == 2)) {
+hàm kiemTraToaDo(batDau, ketThuc) {
+    lặp (x = batDau; x <= ketThuc; x = x + 1) {
+        lặp (y = batDau; y <= ketThuc; y = y + 1) {
+            lặp (z = batDau; z <= ketThuc; z = z + 1) {
+                nếu ((x + y + z) % 2 != 0) {
+                    nếu ((x * y * z) % 3 == 0) {
+                        nếu (x != y && y != z && x != z) {
+                            nếu (!(x == 2 || z == 2)) {
                                 chọn (x + y + z) {
-                                    ca "9": {
+                                    ca 9: {
                                         in "Tọa độ đặc biệt: tổng là 9 → (" + x + ", " + y + ", " + z + ")";
                                         thoát;
                                     };
-                                    ca "15": {
+                                    ca 15: {
                                         in "Tọa độ đặc biệt: tổng là 15 → (" + x + ", " + y + ", " + z + ")";
                                         thoát;
                                     };
@@ -26,8 +26,9 @@ hàm kiemTraToaDo(){
             };
         };
     };
-};
+}
+
 hàm main() {
-    kiemTraToaDo();
+    kiemTraToaDo(2, 8);
     in "Chương trình hoàn thành";
-};
+}

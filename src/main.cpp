@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         // -----------------------------
         // ✅ Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../tests/kiem_tra_ham.vi";
+        const std::string defaultFile = "../tests/kiem_tra_ham_tham_so.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 
@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
             // In bytecode để debug
-            std::cout << "📜 Danh sách bytecode (" << defaultFile << "):" << std::endl;
+            std::cout << "=> Danh sách bytecode cho file mã nguồn (" << defaultFile << "):" << std::endl;
             for (size_t i = 0; i < bytecode.size(); ++i) {
                 const Instruction &instr = bytecode[i];
                 std::cout << "[" << i << "] "
@@ -72,15 +72,10 @@ int main(int argc, char* argv[]) {
 
             // copy compiled functions into VM
             vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
-            std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
-
             vm.run();
             return EXIT_SUCCESS;
         }
 
-        // -----------------------------
-        // ✅ Nếu không có cả 2 → chạy toàn bộ thư mục "tests/"
-        // -----------------------------
         std::string testDir = "tests/";
         if (fs::exists(testDir)) {
             for (const auto& entry : fs::directory_iterator(testDir)) {
@@ -96,8 +91,6 @@ int main(int argc, char* argv[]) {
                     VM vm(bytecode, stringPool);
                     // copy compiled functions into VM
                     vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
-                    std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
-
                     vm.run();
                 }
             }

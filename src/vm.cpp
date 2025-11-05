@@ -42,44 +42,36 @@ bool toBool(const StackValue& value) {
 void VM::run() {
     // Precompute function table once (avoid rebuilding each iteration)
     std::unordered_map<std::string,int> functionTable;
+    std::unordered_map<int,int> functionTableByNameIndex;
     for (size_t i = 0; i < bytecode.size(); ++i) {
         const Instruction &ci = bytecode[i];
         if (ci.op == OP_HAM) {
-            if (ci.operandIndex >= 0 && ci.operandIndex < (int)stringPool.size()) {
-                std::string fname = stringPool[ci.operandIndex];
-                functionTable[fname] = static_cast<int>(i + 1);
+            // Convention: OP_HAM: operand = nameIndex, operandIndex = hamId
+            if (ci.operand >= 0) {
+                int nameIndex = ci.operand;
+                int hamId = ci.operandIndex;
+                functionTableByNameIndex[nameIndex] = hamId;
             }
         }
     }
 
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
-
-        // Helpful debug (can be gated behind a debug flag)
-        // std::cerr << "[VM] pc=" << pc << " op=" << name_op(instr.op) << " stack=" << stack.size() << "\n";
-
         switch (instr.op) {
             case OP_HAM: {
-                // int hamIndex = instr.operand;
-                // auto it = hamBytecodeMap.find(hamIndex);
-                // if (it != hamBytecodeMap.end()) {
-                //     VM hamVM(it->second, this->stringPool);
-                //     hamVM.run(); // run function as sub-program
-                // }
                 break;
             }
 
             case OP_GOI: {
-                // convention: ideally instr.operand = hamId, instr.operandIndex = argc
-                int candidate = instr.operand;
-                int argc = instr.operandIndex;
+                // Compiler convention: instr.operand = argc, instr.operandIndex = hamId (or nameIndex fallback)
+                int argc = instr.operand;
+                int hamIdOrName = instr.operandIndex;
 
-                // Collect argc args from caller stack.
+                // Collect argc args from caller stack (last pushed = last arg)
                 std::vector<StackValue> args;
                 args.reserve(argc);
                 for (int i = 0; i < argc; ++i) {
                     if (stack.empty()) {
-                        // missing arg -> default 0
                         args.emplace_back(0);
                     } else {
                         args.push_back(stack.back());
@@ -88,30 +80,32 @@ void VM::run() {
                 }
                 std::reverse(args.begin(), args.end());
 
-                // Push a new CallFrame for the callee
+                // Push call frame for caller (so OP_PARAM can access args via frame)
                 CallFrame frame;
                 frame.args = args;
                 frame.localsIndexed = true;
                 frame.returnPc = static_cast<int>(pc + 1);
                 callStack.push_back(frame);
 
-                // Try to find function by hamId = candidate
-                auto it = hamBytecodeMap.find(candidate);
+                // Lookup function by hamIdOrName:
+                auto it = hamBytecodeMap.find(hamIdOrName);
 
-                // Fallback: if not found, treat candidate as nameIndex (string pool index)
                 if (it == hamBytecodeMap.end()) {
-                    int nameIndex = candidate;
-                    // scan current top-level bytecode for OP_HAM entries with operandIndex == nameIndex
-                    // and use its operand as hamId (if compiler emitted OP_HAM with operand=hamId and operandIndex=nameIndex)
-                    for (size_t i = 0; i < bytecode.size(); ++i) {
-                        const Instruction &hinst = bytecode[i];
-                        if (hinst.op == OP_HAM) {
-                            if (hinst.operandIndex == nameIndex) {
-                                int foundHamId = hinst.operand;
-                                auto it2 = hamBytecodeMap.find(foundHamId);
-                                if (it2 != hamBytecodeMap.end()) {
-                                    it = it2;
-                                    break;
+                    int nameIndex = hamIdOrName;
+                    auto ftIt = functionTableByNameIndex.find(nameIndex);
+                    if (ftIt != functionTableByNameIndex.end()) {
+                        int foundHamId = ftIt->second;
+                        it = hamBytecodeMap.find(foundHamId);
+                    } else {
+                        // As a final fallback, scan OP_HAMs in top-level bytecode (robustness)
+                        for (size_t i = 0; i < bytecode.size(); ++i) {
+                            const Instruction &hinst = bytecode[i];
+                            if (hinst.op == OP_HAM) {
+                                // hinst.operand = nameIndex, hinst.operandIndex = hamId
+                                if (hinst.operand == nameIndex) {
+                                    int foundHamId = hinst.operandIndex;
+                                    auto it2 = hamBytecodeMap.find(foundHamId);
+                                    if (it2 != hamBytecodeMap.end()) { it = it2; break; }
                                 }
                             }
                         }
@@ -121,24 +115,19 @@ void VM::run() {
                 if (it == hamBytecodeMap.end()) {
                     // cleanup and error
                     callStack.pop_back();
-                    throw std::runtime_error("OP_GOI: hàm không tồn tại (id=" + std::to_string(candidate) + ")");
+                    throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");
                 }
-
-                // Run function in sub-VM, copy the top frame so OP_PARAM can read args
                 VM funcVM(it->second, this->stringPool);
                 funcVM.callStack.clear();
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
-
                 funcVM.run();
 
-                // propagate possible return value from sub-VM
                 if (!funcVM.stack.empty()) {
-                    StackValue ret = funcVM.stack.back();
-                    stack.push_back(ret);
+                    stack.push_back(funcVM.stack.back());
                 }
 
-                // pop caller's frame (we added earlier)
+                // Pop caller frame
                 if (!callStack.empty()) callStack.pop_back();
 
                 break;
@@ -406,9 +395,26 @@ void VM::run() {
 
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
+
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            stack.push_back(frame.localsVec[varId]);
+                            break;
+                        }
+                    } else {
+                        auto it = frame.localsMap.find(varId);
+                        if (it != frame.localsMap.end()) {
+                            stack.push_back(it->second);
+                            break;
+                        }
+                    }
+                }
+
                 if (variables.count(varId) == 0) {
                     std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
-                    variables[varId] = 0;
+                    variables[varId] = make_int_value(0);
                 }
                 stack.push_back(variables[varId]);
                 break;
@@ -455,8 +461,6 @@ void VM::run() {
                 if (jump_address < 0 || jump_address >= (int)bytecode.size()) {
                     throw runtime_error_op("Lỗi: địa chỉ nhảy ngoài phạm vi", instr.op, pc);
                 }
-                // dispatch loop increments pc manually at end of loop,
-                // so set pc directly and continue to avoid extra ++ at end
                 pc = jump_address;
                 continue;
             }
@@ -514,37 +518,26 @@ void VM::run() {
                 break;
             }
             case OP_PARAM: {
-                // instr.operandIndex = localId
-                // instr.operandValue = argIndex
                 int localId = instr.operandIndex;
                 int argIndex = instr.operandValue;
 
-                // If no call frame, fall back to global variables map
                 if (callStack.empty()) {
-                    // assign default value 0 to global variable slot (variables map in vm.h)
-                    variables[localId] = make_int_value(0); // make_int_value from vm_utils.h
+                    variables[localId] = make_int_value(0);
                     break;
                 }
-
                 CallFrame &frame = callStack.back();
+                StackValue v;
                 if (argIndex >= 0 && argIndex < (int)frame.args.size()) {
-                    StackValue v = frame.args[argIndex];
-                    if (frame.localsIndexed) {
-                        if (localId >= (int)frame.localsVec.size()) frame.localsVec.resize(localId + 1);
-                        frame.localsVec[localId] = v;
-                    } else {
-                        frame.localsMap[localId] = v;
-                    }
+                    v = frame.args[argIndex];
                 } else {
-                    // out-of-range -> default 0
-                    StackValue def = make_int_value(0);
-                    if (frame.localsIndexed) {
-                        if (localId >= (int)frame.localsVec.size()) frame.localsVec.resize(localId + 1);
-                        frame.localsVec[localId] = def;
-                    } else {
-                        frame.localsMap[localId] = def;
-                    }
+                    v = make_int_value(0);
                     vmLog("Cảnh báo: OP_PARAM argIndex ngoài phạm vi, gán mặc định 0");
+                }
+                if (frame.localsIndexed) {
+                    if (localId >= (int)frame.localsVec.size()) frame.localsVec.resize(localId + 1, make_int_value(0));
+                    frame.localsVec[localId] = v;
+                } else {
+                    frame.localsMap[localId] = v;
                 }
                 break;
             }
@@ -555,8 +548,6 @@ void VM::run() {
                 }
                 throw runtime_error_op("Opcode không xác định", instr.op, pc);
         }
-
-        // advance program counter (manual dispatch)
         ++pc;
     }
 }
