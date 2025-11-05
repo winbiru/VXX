@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
         // -----------------------------
         // ✅ Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../tests/kiem_tra_ham_tham_so.vi";
+        const std::string defaultFile = "../tests/kiem_tra_ham.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 
