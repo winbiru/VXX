@@ -4,6 +4,8 @@
 
 #include "../../include/compiler/CompileRegistry.h"
 
+#include <iostream>
+
 #include "common/LoopUltil.h"
 #include "common/Utility.h"
 #include "compiler/compileCondition.h"
@@ -118,8 +120,6 @@ void initCompileMap() {
             throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
                                      + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
         }
-        // consume '{'
-        ++pos;
 
         // compile function body into temporary vector
         std::vector<Instruction> funcCode;
@@ -133,7 +133,6 @@ void initCompileMap() {
             int varId = symTab[pname];
             funcCode.push_back({OP_PARAM, 0, varId, (int)i});
         }
-
         // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
         compileBlock(tokens, pos, funcCode, symTab, nextId, kwMap);
 
@@ -143,10 +142,10 @@ void initCompileMap() {
         funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
 
         // store function code
-        hamBytecodeMap[hamId] = std::move(funcCode);
+        vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
 
         // Optionally emit an OP_HAM marker into outer bytecode for discovery
-        bytecode.push_back({OP_HAM, hamId, nameIndex, 0});
+        bytecode.push_back({OP_HAM, nameIndex , hamId, 0});
     };
 
     // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
@@ -187,11 +186,11 @@ void initCompileMap() {
 
         if (hamId >= 0) {
             // emit with hamId in operand and argc in operandIndex
-            bytecode.push_back({OP_GOI, hamId, compiledArgs, 0});
+            bytecode.push_back({OP_GOI, compiledArgs, hamId, 0});
         } else {
             // fallback: emit with nameIndex so VM fallback can resolve (less ideal)
             int nameIndex = vietvm::compiler::StringPool::storeString(fname);
-            bytecode.push_back({OP_GOI, nameIndex, compiledArgs, 0});
+            bytecode.push_back({OP_GOI, compiledArgs, nameIndex, 0});
         }
 
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;

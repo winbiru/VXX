@@ -39,6 +39,11 @@ int main(int argc, char* argv[]) {
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
+
+            // copy compiled functions into VM so OP_GOI can find them at runtime
+            vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+            std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
+
             vm.run();
 
             return EXIT_SUCCESS;
@@ -69,6 +74,11 @@ int main(int argc, char* argv[]) {
             }
 
             VM vm(bytecode, stringPool);
+
+            // copy compiled functions into VM
+            vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+            std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
+
             vm.run();
             return EXIT_SUCCESS;
         }
@@ -89,6 +99,10 @@ int main(int argc, char* argv[]) {
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
                     VM vm(bytecode, stringPool);
+                    // copy compiled functions into VM
+                    vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+                    std::cerr << "[main] copied hamBytecodeMap size=" << vm.hamBytecodeMap.size() << std::endl;
+
                     vm.run();
                 }
             }

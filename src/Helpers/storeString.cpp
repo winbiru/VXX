@@ -3,7 +3,9 @@
 #include <vector>
 
 namespace vietvm::compiler {
+
     std::vector<std::string> StringPool::pool_;
+    std::unordered_map<int, std::vector<Instruction>> hamMap::hamBytecodeMap;
 
     int StringPool::storeString(const std::string& s) {
         pool_.push_back(s);
