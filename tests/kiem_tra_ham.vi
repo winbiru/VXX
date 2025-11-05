@@ -1,3 +1,7 @@
+hàm chính() {
+    kiemTraToaDo();
+    in "Chương trình hoàn thành";
+};
 hàm kiemTraToaDo(){
     lặp(x = 1; x <= 6; x = x + 1) {
         lặp(y = 1; y <= 6; y = y + 1) {
@@ -26,8 +30,4 @@ hàm kiemTraToaDo(){
             };
         };
     };
-};
-hàm main() {
-    kiemTraToaDo();
-    in "Chương trình hoàn thành";
 };

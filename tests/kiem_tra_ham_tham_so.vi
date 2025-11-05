@@ -1,3 +1,7 @@
+hàm chính() {
+    kiemTraToaDo(2, 8);
+    in "Chương trình hoàn thành";
+}
 hàm kiemTraToaDo(batDau, ketThuc) {
     lặp (x = batDau; x <= ketThuc; x = x + 1) {
         lặp (y = batDau; y <= ketThuc; y = y + 1) {
@@ -28,7 +32,3 @@ hàm kiemTraToaDo(batDau, ketThuc) {
     };
 }
 
-hàm main() {
-    kiemTraToaDo(2, 8);
-    in "Chương trình hoàn thành";
-}

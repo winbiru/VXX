@@ -33,7 +33,7 @@ std::vector<Instruction> compileSource(const std::string& source,
         if (tokens[pos] == "}") { ++pos; continue; }
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
     }
-    auto it = symTab.find("main");
+    auto it = symTab.find("chính");
     if (it != symTab.end()) {
         int mainHamId = it->second;
         // Emit OP_GOI with hamId and argc = 0 so VM will run main
