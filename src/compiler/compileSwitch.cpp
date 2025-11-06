@@ -11,7 +11,7 @@
 
 #include "compiler/compilerExpr.h"
 #include "compiler/compileBlock.h"
-#include "common/Lex_utils.h"
+#include "common/lexer.h"
 #include "common/storeString.h"
 #include "common/Utility.h"
 

@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <variant>
 
-#include "common/Lex_utils.h"
+#include "common/lexer.h"
 #include "common/Utility.h"
 
 namespace vietvm::compiler {

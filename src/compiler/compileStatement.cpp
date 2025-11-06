@@ -9,7 +9,7 @@
 #include <vector>
 #include <common/Utility.h>
 #include <compiler/compileBlock.h>
-#include <compiler/CompileRegistry.h>
+#include <compiler/compileRegistry.h>
 #include <compiler/compilerExpr.h>
 #include "common/storeString.h"
 #include <sstream>

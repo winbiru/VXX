@@ -2,7 +2,7 @@
 // Created by nx_thang on 10/21/2025.
 //
 
-#include "../../include/compiler/CompileRegistry.h"
+#include "../../include/compiler/compileRegistry.h"
 
 #include <iostream>
 #include <sstream>

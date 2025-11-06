@@ -13,8 +13,8 @@
 
 #include "../../include/compiler/compileStatement.h"
 #include "instruction.h"
-#include "compiler/CompileRegistry.h" // for compileMap
-#include "common/Lex_utils.h" // if normalizeTokenForCompare declared here
+#include "compiler/compileRegistry.h" // for compileMap
+#include "common/lexer.h" // if normalizeTokenForCompare declared here
 
 // Helper to produce a small window of tokens around pos for debugging
 static std::string tokens_context(const std::vector<std::string>& tokens, size_t pos, size_t window = 8) {

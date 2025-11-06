@@ -2,12 +2,12 @@
 
 #include <iostream>
 
-#include "common/Lex_utils.h"   // isNumber, isOperator, isStringLiteral, isVariable
+#include "common/lexer.h"   // isNumber, isOperator, isStringLiteral, isVariable
 #include <stack>
 #include <stdexcept>
 #include <sstream>
 
-#include "common/Lex_utils.h"
+#include "common/lexer.h"
 
 namespace vietvm::compiler {
 

@@ -11,7 +11,7 @@
 
 #include "instruction.h"
 #include "common/Expression.h"
-#include "common/Lex_utils.h"
+#include "common/lexer.h"
 #include "common/storeString.h"
 #include "common/SymbolTable.h"
 #include "common/Utility.h"

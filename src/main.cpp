@@ -6,7 +6,7 @@
 #include <filesystem>
 #include "../include/compiler/compiler.h"
 #include "../include/vm.h"
-#include "../include/name_op.h"
+#include "../include/keywords.h"
 #include "common/storeString.h"
 
 namespace fs = std::filesystem;

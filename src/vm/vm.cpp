@@ -9,8 +9,8 @@
 #include "vm.h"
 
 #include <algorithm>
-#include <common/Lex_utils.h>
-#include "../include/common/vm_utils.h" // adjust include path according to project
+#include <common/lexer.h>
+#include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
 using StackValue = std::variant<int, std::string>;
