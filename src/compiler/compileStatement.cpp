@@ -7,7 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <common/Utility.h>
+#include <common/utility.h>
 #include <compiler/compileBlock.h>
 #include <compiler/compileRegistry.h>
 #include <compiler/compilerExpr.h>

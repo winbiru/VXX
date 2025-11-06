@@ -11,9 +11,9 @@
 
 #include "compiler/compilerExpr.h"
 #include "compiler/compileBlock.h"
-#include "common/lexer.h"
+#include "../../include/frontend/lexer.h"
 #include "common/storeString.h"
-#include "common/Utility.h"
+#include "common/utility.h"
 
 void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                    std::vector<Instruction>& bytecode,

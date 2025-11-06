@@ -11,8 +11,8 @@
 #include <vector>
 
 #include "instruction.h"
-#include "common/LoopUltil.h"
-#include "common/Utility.h"
+#include "common/loopUltil.h"
+#include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compilerExpr.h"
 

@@ -7,8 +7,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "common/LoopUltil.h"
-#include "common/Utility.h"
+#include "common/loopUltil.h"
+#include "common/utility.h"
 #include "compiler/compileCondition.h"
 #include "compiler/compileLoop.h"
 #include "compiler/compilerExpr.h"

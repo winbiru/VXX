@@ -1,13 +1,13 @@
-#include "common/Expression.h"
+#include "common/expression.h"
 
 #include <iostream>
 
-#include "common/lexer.h"   // isNumber, isOperator, isStringLiteral, isVariable
+#include "../../include/frontend/lexer.h"
 #include <stack>
 #include <stdexcept>
 #include <sstream>
 
-#include "common/lexer.h"
+#include "../../include/frontend/lexer.h"
 
 namespace vietvm::compiler {
 

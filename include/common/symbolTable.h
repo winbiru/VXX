@@ -8,7 +8,7 @@
 
 namespace vietvm::compiler {
 
-    class SymbolTable {
+    class symbolTable {
     public:
         // static int getOrCreate(const std::string& name);
         bool contains(const std::string& name) const noexcept;

@@ -8,8 +8,8 @@
 #include <stdexcept>
 #include <variant>
 
-#include "common/lexer.h"
-#include "common/Utility.h"
+#include "../../include/frontend/lexer.h"
+#include "common/utility.h"
 
 namespace vietvm::compiler {
     using Value = std::variant<int, std::string>;

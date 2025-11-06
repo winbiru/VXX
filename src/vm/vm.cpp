@@ -4,12 +4,10 @@
 #include <stack>
 #include <variant>
 #include <string>
-#include <map>
 #include <unordered_map>
 #include "vm.h"
 
 #include <algorithm>
-#include <common/lexer.h>
 #include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
