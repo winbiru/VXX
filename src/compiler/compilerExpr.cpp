@@ -10,11 +10,11 @@
 #include <vector>
 
 #include "instruction.h"
-#include "common/Expression.h"
-#include "common/Lex_utils.h"
+#include "common/expression.h"
+#include "../../include/frontend/lexer.h"
 #include "common/storeString.h"
-#include "common/SymbolTable.h"
-#include "common/Utility.h"
+#include "common/symbolTable.h"
+#include "common/utility.h"
 
 
 struct Instruction;
@@ -33,7 +33,7 @@ void compileExpr(const std::string &expr,
 
     if (itEq != toks.end() && std::distance(toks.begin(), itEq) == 1) {
         std::string varName = toks[0];
-        int dstId = vietvm::compiler::SymbolTable::getOrCreate(symTab, varName, nextId);
+        int dstId = vietvm::compiler::symbolTable::getOrCreate(symTab, varName, nextId);
         // ensureInitialized(dstId);
 
         std::vector<std::string> rhsTokens(itEq + 1, toks.end());
@@ -46,7 +46,7 @@ void compileExpr(const std::string &expr,
                 int strIndex = vietvm::compiler::StringPool::storeString(tk.substr(1, tk.size() - 2));
                 bytecode.push_back({OP_CHUOI, 0, strIndex,0});
             } else if (vietvm::compiler::isVariable(tk)) {
-                int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
+                int id = vietvm::compiler::symbolTable::getOrCreate(symTab, tk, nextId);
                 // ensureInitialized(id);
                 bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id,0});
             } else if (tk.rfind("CALL::", 0) == 0) {
@@ -90,7 +90,7 @@ void compileExpr(const std::string &expr,
             int strIndex = vietvm::compiler::StringPool::storeString(tk.substr(1, tk.size() - 2));
             bytecode.push_back({OP_CHUOI, 0, strIndex,0});
         } else if (vietvm::compiler::isVariable(tk)) {
-            int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
+            int id = vietvm::compiler::symbolTable::getOrCreate(symTab, tk, nextId);
             // ensureInitialized(id);
             bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id,0});
         } else if (tk.rfind("CALL::", 0) == 0) {

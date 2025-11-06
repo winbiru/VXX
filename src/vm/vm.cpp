@@ -4,13 +4,11 @@
 #include <stack>
 #include <variant>
 #include <string>
-#include <map>
 #include <unordered_map>
 #include "vm.h"
 
 #include <algorithm>
-#include <common/Lex_utils.h>
-#include "../include/common/vm_utils.h" // adjust include path according to project
+#include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
 using StackValue = std::variant<int, std::string>;

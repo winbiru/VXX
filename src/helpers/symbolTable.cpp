@@ -2,11 +2,11 @@
 // Created by nx_thang on 10/20/2025.
 //
 
-#include "common/SymbolTable.h"
+#include "common/symbolTable.h"
 
 namespace vietvm::compiler {
 
-    int SymbolTable::getOrCreate(std::unordered_map<std::string,int>& symTab,
+    int symbolTable::getOrCreate(std::unordered_map<std::string,int>& symTab,
                                                const std::string& name,
                                                int& nextId) {
         auto it = symTab.find(name);
@@ -17,7 +17,7 @@ namespace vietvm::compiler {
         return it->second;
     }
 
-    bool SymbolTable::contains(const std::string& name) const noexcept {
+    bool symbolTable::contains(const std::string& name) const noexcept {
         return table_.find(name) != table_.end();
     }
 

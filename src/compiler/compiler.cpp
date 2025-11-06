@@ -7,7 +7,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <string>
-#include <common/Lex_utils.h>
+#include <../include/frontend/lexer.h>
 #include <compiler/compileStatement.h>
 
 

@@ -10,7 +10,7 @@
 
 #include "../../include/compiler/compileStatement.h"
 #include "instruction.h"
-#include "common/Utility.h"
+#include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compilerExpr.h"
 
