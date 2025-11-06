@@ -39,6 +39,10 @@ int main(int argc, char* argv[]) {
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
+
+            // <-- ADD: copy compiled functions into VM so OP_GOI can find them
+            vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+
             vm.run();
 
             return EXIT_SUCCESS;
