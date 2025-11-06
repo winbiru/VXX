@@ -1,0 +1,64 @@
+hàm main() {
+    xuLyDuLieuKhongGian(2, 8, 2, 8);
+    in "Chương trình xử lý dữ liệu không gian hoàn thành";
+    locGiaoDichDacBiet(1000, 5000, 10, 15);
+    in "Chương trình lọc giao dịch hoàn thành";
+
+}
+hàm xuLyDuLieuKhongGian(x_batDau, x_ketThuc, yz_batDau, yz_ketThuc) {
+    lặp (x = x_batDau; x <= x_ketThuc; x = x + 1) {
+        lặp (y = yz_batDau; y <= yz_ketThuc; y = y + 1) {
+            lặp (z = yz_batDau; z <= yz_ketThuc; z = z + 1) {
+                nếu ((x + y + z) % 2 != 0) {
+                    nếu ((x * y * z) % 3 == 0) {
+                        nếu (x != y && y != z && x != z) {
+                            nếu (!(x == 2 || z == 2)) {
+                                chọn (x + y + z) {
+                                    ca 9: {
+                                        in "Tọa độ đặc biệt: tổng là 9 → (" + x + ", " + y + ", " + z + ")";
+                                        thoát;
+                                    };
+                                    ca 15: {
+                                        in "Tọa độ đặc biệt: tổng là 15 → (" + x + ", " + y + ", " + z + ")";
+                                        thoát;
+                                    };
+                                    mặc định: {
+                                        in "Tọa độ hợp lệ: (" + x + ", " + y + ", " + z + ")";
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+}
+
+hàm locGiaoDichDacBiet(giaTriMin, giaTriMax, sanPhamBatDau, sanPhamKetThuc) {
+    lặp (GiaTri = giaTriMin; GiaTri <= giaTriMax; GiaTri = GiaTri + 500) {
+        lặp (SanPham = sanPhamBatDau; SanPham <= sanPhamKetThuc; SanPham = SanPham + 1) {
+            lặp (Thang = 1; Thang <= 12; Thang = Thang + 1) {
+                nếu (Thang <= 3 || Thang >= 10) {
+                    nếu (GiaTri % 1000 == 0 && GiaTri <= 4000) {
+                        nếu (SanPham % 2 != 0 && SanPham != 11) {
+                            chọn (GiaTri / 1000) {
+                                ca 3: {
+                                    in "Giao dịch ĐỘT PHÁ: " + SanPham + ", " + GiaTri + " trong Tháng " + Thang;
+                                    thoát;
+                                };
+                                ca 4: {
+                                    in "Giao dịch ƯU TIÊN: " + SanPham + ", " + GiaTri + " trong Tháng " + Thang;
+                                    thoát;
+                                };
+                                mặc định: {
+                                    in "Giao dịch Hợp lệ: " + SanPham + ", " + GiaTri + " trong Tháng " + Thang;
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+}

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <common/Lex_utils.h>
 #include "../include/common/vm_utils.h" // adjust include path according to project
+#include "common/storeString.h"
 
 using StackValue = std::variant<int, std::string>;
 
@@ -54,7 +55,15 @@ void VM::run() {
             }
         }
     }
-
+    // Merge compiler-provided hamNameIndexMap (guaranteed by compiler when registering functions)
+    for (const auto &p : vietvm::compiler::hamMap::hamNameIndexMap) {
+        int hamId = p.first;
+        int nameIndex = p.second;
+        // Only set if not already present (bytecode OP_HAM should be authoritative), but ensure mapping exists
+        if (functionTableByNameIndex.find(nameIndex) == functionTableByNameIndex.end()) {
+            functionTableByNameIndex[nameIndex] = hamId;
+        }
+    }
     while (pc < bytecode.size()) {
         const Instruction &instr = bytecode[pc];
         switch (instr.op) {
@@ -63,11 +72,10 @@ void VM::run() {
             }
 
             case OP_GOI: {
-                // Compiler convention: instr.operand = argc, instr.operandIndex = hamId (or nameIndex fallback)
                 int argc = instr.operand;
                 int hamIdOrName = instr.operandIndex;
 
-                // Collect argc args from caller stack (last pushed = last arg)
+                // 1. Thu thập Đối số (Args) từ stack của VM mẹ
                 std::vector<StackValue> args;
                 args.reserve(argc);
                 for (int i = 0; i < argc; ++i) {
@@ -80,16 +88,17 @@ void VM::run() {
                 }
                 std::reverse(args.begin(), args.end());
 
-                // Push call frame for caller (so OP_PARAM can access args via frame)
+                // 2. Tạo Khung Gọi (Call Frame) cho VM con
                 CallFrame frame;
                 frame.args = args;
                 frame.localsIndexed = true;
                 frame.returnPc = static_cast<int>(pc + 1);
-                callStack.push_back(frame);
+                callStack.push_back(frame); // Đẩy vào stack của VM mẹ (để chuyển cho VM con)
 
-                // Lookup function by hamIdOrName:
+                // 3. Tra cứu Hàm
                 auto it = hamBytecodeMap.find(hamIdOrName);
 
+                // Xử lý tra cứu thất bại (Khối này cần được dọn dẹp và sửa lỗi cú pháp)
                 if (it == hamBytecodeMap.end()) {
                     int nameIndex = hamIdOrName;
                     auto ftIt = functionTableByNameIndex.find(nameIndex);
@@ -97,32 +106,58 @@ void VM::run() {
                         int foundHamId = ftIt->second;
                         it = hamBytecodeMap.find(foundHamId);
                     } else {
-                        // As a final fallback, scan OP_HAMs in top-level bytecode (robustness)
+                        // Fallback scan (Chỉ nên sử dụng nếu cần)
                         for (size_t i = 0; i < bytecode.size(); ++i) {
                             const Instruction &hinst = bytecode[i];
-                            if (hinst.op == OP_HAM) {
-                                // hinst.operand = nameIndex, hinst.operandIndex = hamId
-                                if (hinst.operand == nameIndex) {
-                                    int foundHamId = hinst.operandIndex;
-                                    auto it2 = hamBytecodeMap.find(foundHamId);
-                                    if (it2 != hamBytecodeMap.end()) { it = it2; break; }
-                                }
+                            if (hinst.op == OP_HAM && hinst.operand == nameIndex) {
+                                int foundHamId = hinst.operandIndex;
+                                auto it2 = hamBytecodeMap.find(foundHamId);
+                                if (it2 != hamBytecodeMap.end()) { it = it2; break; }
                             }
                         }
                     }
                 }
 
+                // 4. KIỂM TRA LỖI CUỐI CÙNG & THỰC THI (Đã sửa lỗi cú pháp/logic)
                 if (it == hamBytecodeMap.end()) {
+                    // --- PHẦN BỊ LỖI CÚ PHÁP TRONG MÃ GỐC BẠN GỬI ĐÃ ĐƯỢC XÓA BỎ ---
+
+                    // Dump debug info to stderr
+                    std::cerr << "DEBUG: OP_GOI not found. trying id/nameIndex=" << hamIdOrName
+                              << " ; hamBytecodeMap.size=" << hamBytecodeMap.size() << "\n";
+                    std::cerr << "DEBUG: hamBytecodeMap keys:";
+                    for (const auto &p : hamBytecodeMap) std::cerr << " " << p.first;
+                    std::cerr << std::endl;
+
+                    // Thử truy cập tên hàm để debug tốt hơn
+                    std::string funcName = "Unknown";
+                    // Thử dùng hamIdOrName để truy cập stringPool (nếu nó là nameIndex)
+                    if (hamIdOrName >= 0 && hamIdOrName < (int)stringPool.size()) {
+                        funcName = stringPool.at(hamIdOrName);
+                        std::cerr << "DEBUG: Tra cuu ham that bai. ID=" << hamIdOrName << " co the la ten: " << funcName << std::endl;
+                    }
                     // cleanup and error
-                    callStack.pop_back();
+                    if (!callStack.empty()) callStack.pop_back();
                     throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");
                 }
+
+                // 5. Chạy VM con và Chia sẻ Trạng thái
                 VM funcVM(it->second, this->stringPool);
+
+                // Sao chép trạng thái hiện tại (Biến toàn cục và khung gọi)
+                funcVM.variables = this->variables; // **CHIA SẺ BIẾN TOÀN CỤC TRƯỚC KHI CHẠY**
                 funcVM.callStack.clear();
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
+
+                // Thực thi hàm
                 funcVM.run();
 
+                // 6. Cập nhật Trạng thái về VM mẹ
+                // CẬP NHẬT BIẾN TOÀN CỤC TỪ VM CON VỀ VM MẸ
+                this->variables = funcVM.variables;
+
+                // Cập nhật giá trị trả về
                 if (!funcVM.stack.empty()) {
                     stack.push_back(funcVM.stack.back());
                 }

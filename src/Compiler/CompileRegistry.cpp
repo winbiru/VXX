@@ -92,7 +92,7 @@ void initCompileMap() {
         int nameIndex = vietvm::compiler::StringPool::storeString(fname);
 
         // assign function id
-        int hamId = nextId++;
+        int hamId = vietvm::compiler::hamMap::allocHamId();
         symTab[fname] = hamId;
 
         // parse parameter list if present
@@ -141,6 +141,7 @@ void initCompileMap() {
 
         // store function code
         vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
+        vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
 
         // Optionally emit an OP_HAM marker into outer bytecode for discovery
         bytecode.push_back({OP_HAM, nameIndex , hamId, 0});
