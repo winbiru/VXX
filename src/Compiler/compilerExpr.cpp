@@ -40,14 +40,14 @@ void compileExpr(const std::string &expr,
 
         for (const auto &tk : postfix) {
             if (vietvm::compiler::isNumber(tk)) {
-                bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
+                bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0,0});
             } else if (vietvm::compiler::isStringLiteral(tk)) {
                 int strIndex = vietvm::compiler::StringPool::storeString(tk.substr(1, tk.size() - 2));
-                bytecode.push_back({OP_CHUOI, 0, strIndex});
+                bytecode.push_back({OP_CHUOI, 0, strIndex,0});
             } else if (vietvm::compiler::isVariable(tk)) {
                 int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
                 // ensureInitialized(id);
-                bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
+                bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id,0});
             } else if (tk.rfind("CALL::", 0) == 0) {
                 // format: CALL::name::argc
                 size_t p1 = tk.find("::", 6); // find second ::
@@ -58,40 +58,40 @@ void compileExpr(const std::string &expr,
                 int nameIndex = vietvm::compiler::StringPool::storeString(name);
                 bytecode.push_back({OP_GOI, argc, nameIndex});
             } else {
-                if (tk == "+") bytecode.push_back({OP_CONG,0,0});
-                else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
-                else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
-                else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
-                else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
-                else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
-                else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
-                else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
-                else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
-                else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
-                else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0});
-                else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0});
-                else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0});
-                else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0});
+                if (tk == "+") bytecode.push_back({OP_CONG,0,0,0});
+                else if (tk == "-") bytecode.push_back({OP_TRU,0,0,0});
+                else if (tk == "*") bytecode.push_back({OP_NHAN,0,0,0});
+                else if (tk == "/") bytecode.push_back({OP_CHIA,0,0,0});
+                else if (tk == "%") bytecode.push_back({OP_MODULO,0,0,0});
+                else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0,0});
+                else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0,0});
+                else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0,0});
+                else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0,0});
+                else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0,0});
+                else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0,0});
+                else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0,0});
+                else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0,0});
+                else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0,0});
                 else throw std::runtime_error("compileExpr: unsupported operator " + tk);
             }
         }
 
-        bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId});
-        bytecode.push_back({OP_GAN,0,0});
+        bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId,0});
+        bytecode.push_back({OP_GAN,0,0,0});
         return;
     }
 
     auto postfix = vietvm::compiler::convertToPostfix(toks);
     for (const auto &tk : postfix) {
         if (vietvm::compiler::isNumber(tk)) {
-            bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0});
+            bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0,0});
         } else if (vietvm::compiler::isStringLiteral(tk)) {
             int strIndex = vietvm::compiler::StringPool::storeString(tk.substr(1, tk.size() - 2));
-            bytecode.push_back({OP_CHUOI, 0, strIndex});
+            bytecode.push_back({OP_CHUOI, 0, strIndex,0});
         } else if (vietvm::compiler::isVariable(tk)) {
             int id = vietvm::compiler::SymbolTable::getOrCreate(symTab, tk, nextId);
             // ensureInitialized(id);
-            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id});
+            bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, id,0});
         } else if (tk.rfind("CALL::", 0) == 0) {
             // format: CALL::name::argc
             size_t p1 = tk.find("::", 6); // find second ::
@@ -100,22 +100,22 @@ void compileExpr(const std::string &expr,
             std::string argcStr = tk.substr(p1 + 2);
             int argc = std::stoi(argcStr);
             int nameIndex = vietvm::compiler::StringPool::storeString(name);
-            bytecode.push_back({OP_GOI, argc, nameIndex});
+            bytecode.push_back({OP_GOI, argc, nameIndex,0});
         } else {
-            if (tk == "+") bytecode.push_back({OP_CONG,0,0});
-            else if (tk == "-") bytecode.push_back({OP_TRU,0,0});
-            else if (tk == "*") bytecode.push_back({OP_NHAN,0,0});
-            else if (tk == "/") bytecode.push_back({OP_CHIA,0,0});
-            else if (tk == "%") bytecode.push_back({OP_MODULO,0,0});
-            else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0});
-            else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0});
-            else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0});
-            else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0});
-            else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0});
-            else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0});
-            else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0});
-            else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0});
-            else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0});
+            if (tk == "+") bytecode.push_back({OP_CONG,0,0,0});
+            else if (tk == "-") bytecode.push_back({OP_TRU,0,0,0});
+            else if (tk == "*") bytecode.push_back({OP_NHAN,0,0,0});
+            else if (tk == "/") bytecode.push_back({OP_CHIA,0,0,0});
+            else if (tk == "%") bytecode.push_back({OP_MODULO,0,0,0});
+            else if (tk == "!") bytecode.push_back({OP_PHU_DINH,0,0,0});
+            else if (tk == "==") bytecode.push_back({OP_SO_SANH_BANG,0,0,0});
+            else if (tk == "!=") bytecode.push_back({OP_KHAC_BANG,0,0,0});
+            else if (tk == "<") bytecode.push_back({OP_NHO_HON,0,0,0});
+            else if (tk == ">") bytecode.push_back({OP_LON_HON,0,0,0});
+            else if (tk == "<=") bytecode.push_back({OP_NHO_HON_HOAC_BANG,0,0,0});
+            else if (tk == ">=") bytecode.push_back({OP_LON_HON_HOAC_BANG,0,0,0});
+            else if (tk == "&&") bytecode.push_back({OP_Logic_VA,0,0,0});
+            else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0,0});
             else throw std::runtime_error("compileExpr: unsupported token " + tk);
         }
     }

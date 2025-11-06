@@ -51,41 +51,41 @@ LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &pos,
     }
 
     // 3) mark loop start and compile condition
-    bytecode.push_back({OP_LAP, 0, 0});
+    bytecode.push_back({OP_LAP, 0, 0,0});
     int cond_index = (int)bytecode.size();
-    bytecode.push_back({OP_DIEU_KIEN, 0, 0});
+    bytecode.push_back({OP_DIEU_KIEN, 0, 0,0});
     if (!parts[1].empty()) {
         compileExpr(parts[1], bytecode, symTab, nextId, keywordMap);
     }
 
     // 4) jump-if-false placeholder
-    bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
+    bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0,0});
     int exit_jump_index = (int)bytecode.size() - 1;
 
     // 5) body block
     pos = afterParen;
     if (pos < tokens.size() && tokens[pos] == "{") {
-        bytecode.push_back({OP_MO_KHOI, 0, 0});
+        bytecode.push_back({OP_MO_KHOI, 0, 0,0});
         compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-        bytecode.push_back({OP_DONG_KHOI, 0, 0});
+        bytecode.push_back({OP_DONG_KHOI, 0, 0,0});
     }
 
     // 6) update expression
-    bytecode.push_back({OP_CAP_NHAT, 0, 0});
+    bytecode.push_back({OP_CAP_NHAT, 0, 0,0});
     if (!parts[2].empty()) {
         compileExpr(parts[2], bytecode, symTab, nextId, keywordMap);
     }
 
     // 7) jump back to condition
-    bytecode.push_back({OP_JUMP, cond_index, 0});
+    bytecode.push_back({OP_JUMP, cond_index, 0,0});
 
     // 8) patch exit jump
     int end_index = (int)bytecode.size();
     bytecode[exit_jump_index].operand = end_index;
 
     // 9) close loop
-    bytecode.push_back({OP_DONG_NGOAC, 0, 0});
-    bytecode.push_back({OP_DONG_LENH, 0, 0});
+    bytecode.push_back({OP_DONG_NGOAC, 0, 0,0});
+    bytecode.push_back({OP_DONG_LENH, 0, 0,0});
 
     return {cond_index, exit_jump_index};
 }
