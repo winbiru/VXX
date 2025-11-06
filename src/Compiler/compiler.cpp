@@ -31,14 +31,6 @@ std::vector<Instruction> compileSource(const std::string& source,
         // skip stray semicolons or closing braces at top-level
         if (tokens[pos] == ";") { ++pos; continue; }
         if (tokens[pos] == "}") { ++pos; continue; }
-        std::cerr << "DEBUG tokens.size=" << tokens.size() << ", pos=" << pos << std::endl;
-        size_t start = (pos > 5) ? pos - 5 : 0;
-        size_t end = std::min(tokens.size(), pos + 6);
-        for (size_t i = start; i < end; ++i) {
-            std::cerr << "[" << i << "] '" << tokens[i] << "'";
-            if (i == pos) std::cerr << "  <-- pos";
-            std::cerr << std::endl;
-        }
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
     }
     auto it = symTab.find("main");

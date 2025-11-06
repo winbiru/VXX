@@ -120,22 +120,6 @@ void VM::run() {
 
                 // 4. KIỂM TRA LỖI CUỐI CÙNG & THỰC THI (Đã sửa lỗi cú pháp/logic)
                 if (it == hamBytecodeMap.end()) {
-                    // --- PHẦN BỊ LỖI CÚ PHÁP TRONG MÃ GỐC BẠN GỬI ĐÃ ĐƯỢC XÓA BỎ ---
-
-                    // Dump debug info to stderr
-                    std::cerr << "DEBUG: OP_GOI not found. trying id/nameIndex=" << hamIdOrName
-                              << " ; hamBytecodeMap.size=" << hamBytecodeMap.size() << "\n";
-                    std::cerr << "DEBUG: hamBytecodeMap keys:";
-                    for (const auto &p : hamBytecodeMap) std::cerr << " " << p.first;
-                    std::cerr << std::endl;
-
-                    // Thử truy cập tên hàm để debug tốt hơn
-                    std::string funcName = "Unknown";
-                    // Thử dùng hamIdOrName để truy cập stringPool (nếu nó là nameIndex)
-                    if (hamIdOrName >= 0 && hamIdOrName < (int)stringPool.size()) {
-                        funcName = stringPool.at(hamIdOrName);
-                        std::cerr << "DEBUG: Tra cuu ham that bai. ID=" << hamIdOrName << " co the la ten: " << funcName << std::endl;
-                    }
                     // cleanup and error
                     if (!callStack.empty()) callStack.pop_back();
                     throw std::runtime_error("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")");

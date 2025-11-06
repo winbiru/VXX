@@ -38,7 +38,7 @@ namespace vietvm::compiler {
         int idx = static_cast<int>(pool_.size() - 1);
         poolIndexMap_.emplace(s, idx);
         // debug log (temporary) to show additions
-        std::cerr << "DEBUG: StringPool added [" << idx << "] = \"" << s << "\"\n";
+        // std::cerr << "DEBUG: StringPool added [" << idx << "] = \"" << s << "\"\n";
         return idx;
     }
 
