@@ -50,10 +50,10 @@ void initCompileMap() {
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
-                           const std::unordered_map<std::string,Opcode>& kwMap) {
+                           const std::unordered_map<std::string,Opcode>& keywordMap) {
                                 ++pos; // bỏ qua "in"
                                 auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
-                                compileExpr(pr.first, bytecode, symTab, nextId, kwMap);
+                                compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
                                 bytecode.push_back({OP_IN, 0, 0,0});
                                 pos = pr.second;
     };
@@ -63,7 +63,7 @@ void initCompileMap() {
                        std::vector<Instruction>& bytecode,
                        std::unordered_map<std::string,int>& symTab,
                        int& nextId,
-                       const std::unordered_map<std::string,Opcode>& kwMap) {
+                       const std::unordered_map<std::string,Opcode>& keywordMap) {
                             if (tokens[pos] == "lặp") {
                                 std::string loopHeader = vietvm::compiler::extractParens(tokens, pos + 1).first;
                                 std::vector<std::string> parts = splitLoopParts(loopHeader);
@@ -75,7 +75,7 @@ void initCompileMap() {
                                     int varId = symTab[varName];
                                     bytecode.push_back({OP_KHOI_TAO, varId, 0,0});
                                 }
-                                compileLoop(tokens, pos, bytecode, symTab, nextId, kwMap);
+                                compileLoop(tokens, pos, bytecode, symTab, nextId, keywordMap);
                             }
                        };
     compileMap["chọn"] = compileSwitch;
@@ -85,7 +85,7 @@ void initCompileMap() {
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
-                           const std::unordered_map<std::string,Opcode>& kwMap) {
+                           const std::unordered_map<std::string,Opcode>& keywordMap) {
         ++pos; // skip 'hàm'
         if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
         std::string fname = tokens[pos++];
@@ -132,7 +132,7 @@ void initCompileMap() {
             funcCode.push_back({OP_PARAM, 0, varId, (int)i});
         }
         // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
-        compileBlock(tokens, pos, funcCode, symTab, nextId, kwMap);
+        compileBlock(tokens, pos, funcCode, symTab, nextId, keywordMap);
 
         // ensure compileBlock left pos at token after '}', if not adjust as needed
         // function epilogue
@@ -154,7 +154,7 @@ void initCompileMap() {
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
-                           const std::unordered_map<std::string,Opcode>& kwMap) {
+                           const std::unordered_map<std::string,Opcode>& keywordMap) {
         ++pos;
         if (pos >= tokens.size()) throw std::runtime_error("gọi: thiếu tên hàm");
         std::string fname = tokens[pos++];
@@ -179,7 +179,7 @@ void initCompileMap() {
         int compiledArgs = 0;
         for (const auto &aexpr : args) {
             if (aexpr.empty()) continue;
-            compileExpr(aexpr, bytecode, symTab, nextId, kwMap);
+            compileExpr(aexpr, bytecode, symTab, nextId, keywordMap);
             ++compiledArgs;
         }
 

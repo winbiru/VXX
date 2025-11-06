@@ -25,6 +25,7 @@ void compileExpr(const std::string &expr,
                         int &nextId,
                         const std::unordered_map<std::string,Opcode> &keywordMap)
 {
+    (void)keywordMap; // không dùng ở handler này
     if (vietvm::compiler::trim(expr).empty()) return;
 
     auto toks = vietvm::compiler::tokenize(expr);
@@ -56,7 +57,7 @@ void compileExpr(const std::string &expr,
                 std::string argcStr = tk.substr(p1 + 2);
                 int argc = std::stoi(argcStr);
                 int nameIndex = vietvm::compiler::StringPool::storeString(name);
-                bytecode.push_back({OP_GOI, argc, nameIndex});
+                bytecode.push_back({OP_GOI, argc, nameIndex,0});
             } else {
                 if (tk == "+") bytecode.push_back({OP_CONG,0,0,0});
                 else if (tk == "-") bytecode.push_back({OP_TRU,0,0,0});
