@@ -5,6 +5,7 @@
 #include "compiler/compileFunction.h"
 #include "compiler/compileBlock.h"
 #include "instruction.h"
+#include "common/storeString.h"
 
 void compileFunction(const std::vector<std::string>& tokens, size_t& pos,
                      std::unordered_map<std::string, int>& symTab,
@@ -19,6 +20,8 @@ void compileFunction(const std::vector<std::string>& tokens, size_t& pos,
     if (pos >= tokens.size()) return;
     std::string hamTen = tokens[pos]; // tên hàm
     pos++;
+
+    int nameIndex = vietvm::compiler::StringPool::storeString(hamTen);
 
     // --- parse parameter list if present ---
     std::vector<std::string> params;
@@ -43,7 +46,7 @@ void compileFunction(const std::vector<std::string>& tokens, size_t& pos,
     pos++; // skip '{'
 
     // Gán ID cho hàm
-    int hamId = nextId++;
+    int hamId = vietvm::compiler::hamMap::allocHamId();
     symTab[hamTen] = hamId;
 
     std::vector<Instruction> bytecode;
@@ -55,4 +58,7 @@ void compileFunction(const std::vector<std::string>& tokens, size_t& pos,
 
     // Lưu vào bảng hàm
     hamBytecodeMap[hamId] = std::move(bytecode);
+
+    // IMPORTANT: record nameIndex <-> hamId mapping so OP_GOI fallbacks can resolve
+    vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
 }

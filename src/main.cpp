@@ -34,7 +34,10 @@ int main(int argc, char* argv[]) {
             const std::string filename = argv[1];
             std::string source = readFile(filename);
 
-            vietvm::compiler::StringPool::clear(); // luôn clear trước khi biên dịch mới
+            vietvm::compiler::StringPool::clear();
+            vietvm::compiler::hamMap::hamBytecodeMap.clear();
+            vietvm::compiler::hamMap::clearHamNameIndexMap();
+            vietvm::compiler::hamMap::resetHamIdCounter();
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
@@ -51,11 +54,15 @@ int main(int argc, char* argv[]) {
         // -----------------------------
         // ✅ Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../tests/kiem_tra_ham.vi";
+        const std::string defaultFile = "../tests/kiem_tra_ham_4_tham_so.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 
             vietvm::compiler::StringPool::clear();
+            vietvm::compiler::hamMap::hamBytecodeMap.clear();
+            vietvm::compiler::hamMap::clearHamNameIndexMap();
+            vietvm::compiler::hamMap::resetHamIdCounter();
+
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
@@ -71,7 +78,6 @@ int main(int argc, char* argv[]) {
                     std::cout << ", operand: " << instr.operand;
                 std::cout << std::endl;
             }
-
             VM vm(bytecode, stringPool);
 
             // copy compiled functions into VM
