@@ -29,23 +29,23 @@ void compileCondition(const std::vector<std::string>& tokens, size_t &pos,
     size_t afterParen = parenPair.second;
 
     // compile condition: push OP_NEU/OP_MO_NGOAC markers similar to earlier design
-    bytecode.push_back({OP_NEU,0,0});
-    bytecode.push_back({OP_MO_NGOAC,0,0});
+    bytecode.push_back({OP_NEU,0,0,0});
+    bytecode.push_back({OP_MO_NGOAC,0,0,0});
     // compile condition expression
     compileExpr(condExpr, bytecode, symTab, nextId, keywordMap);
     // push jump if false placeholder
-    bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0});
+    bytecode.push_back({OP_JUMP_IF_FALSE, 0, 0,0});
     int jumpIndex = (int)bytecode.size() - 1;
-    bytecode.push_back({OP_DONG_NGOAC,0,0});
+    bytecode.push_back({OP_DONG_NGOAC,0,0,0});
 
     pos = afterParen; // pos after ')'
 
     // Now expect block
     if (pos < tokens.size() && tokens[pos] == "{") {
         // open block
-        bytecode.push_back({OP_MO_KHOI,0,0});
+        bytecode.push_back({OP_MO_KHOI,0,0,0});
         compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-        bytecode.push_back({OP_DONG_KHOI,0,0});
+        bytecode.push_back({OP_DONG_KHOI,0,0,0});
     } else {
         // single statement after if
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);

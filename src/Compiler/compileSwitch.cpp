@@ -31,7 +31,7 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
     pos = pr.second;
 
     compileExpr(expr, bytecode, symTab, nextId, keywordMap);
-    bytecode.push_back({OP_CHON, 0, 0});
+    bytecode.push_back({OP_CHON, 0, 0,0});
 
     if (pos >= tokens.size() || tokens[pos] != "{") throw std::runtime_error("compileSwitch: thiếu dấu '{'");
     ++pos;
@@ -64,14 +64,14 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                 std::string nextNorm = vietvm::compiler::normalizeTokenForCompare(tokens[pos + 1]);
                 if (nextNorm == "định") {
                     // xử lý mặc định
-                    bytecode.push_back({OP_MAC_DINH, 0, 0});
+                    bytecode.push_back({OP_MAC_DINH, 0, 0,0});
                     pos += 2; // bỏ "mặc" và "định"
                     // bỏ qua dấu ':' nếu có
                     if (pos < tokens.size() && tokens[pos] == ":") ++pos;
                     if (pos < tokens.size() && tokens[pos] == "{") {
-                        bytecode.push_back({OP_MO_KHOI, 0, 0});
+                        bytecode.push_back({OP_MO_KHOI, 0, 0,0});
                         compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-                        bytecode.push_back({OP_DONG_KHOI, 0, 0});
+                        bytecode.push_back({OP_DONG_KHOI, 0, 0,0});
                     }
                     continue;
                 }
@@ -79,13 +79,13 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
 
             // Nếu token là "mặc định" nguyên vẹn (có thể có dấu ':')
             if (caseNorm == "mặc định") {
-                bytecode.push_back({OP_MAC_DINH, 0, 0});
+                bytecode.push_back({OP_MAC_DINH, 0, 0,0});
                 ++pos;
                 if (pos < tokens.size() && tokens[pos] == ":") ++pos;
                 if (pos < tokens.size() && tokens[pos] == "{") {
-                    bytecode.push_back({OP_MO_KHOI, 0, 0});
+                    bytecode.push_back({OP_MO_KHOI, 0, 0,0});
                     compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-                    bytecode.push_back({OP_DONG_KHOI, 0, 0});
+                    bytecode.push_back({OP_DONG_KHOI, 0, 0,0});
                 }
                 continue;
             }
@@ -99,10 +99,10 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
             if (vietvm::compiler::isStringLiteral(caseExpr)) {
                 std::string raw = vietvm::compiler::stripQuotes(caseExpr);
                 int strIndex = vietvm::compiler::StringPool::storeString(raw);
-                bytecode.push_back({OP_CA, 0, strIndex}); // operandIndex = chuỗi
+                bytecode.push_back({OP_CA, 0, strIndex,0}); // operandIndex = chuỗi
             } else if (vietvm::compiler::isNumber(caseExprNorm)) {
                 int value = std::stoi(caseExprNorm);
-                bytecode.push_back({OP_CA, value, -1}); // operand = số, operandIndex = -1
+                bytecode.push_back({OP_CA, value, -1,0}); // operand = số, operandIndex = -1
             } else {
                 // giả sử là biến (sử dụng caseExprNorm)
                 std::string varName = caseExprNorm;
@@ -110,7 +110,7 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                     symTab[varName] = nextId++;
                 }
                 int varId = symTab[varName];
-                bytecode.push_back({OP_CA, varId, -2}); // operand = id biến, operandIndex = -2
+                bytecode.push_back({OP_CA, varId, -2,0}); // operand = id biến, operandIndex = -2
             }
 
             // bỏ qua ':' nếu có
@@ -118,24 +118,24 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
 
             // nếu có block ngay sau case
             if (pos < tokens.size() && tokens[pos] == "{") {
-                bytecode.push_back({OP_MO_KHOI, 0, 0});
+                bytecode.push_back({OP_MO_KHOI, 0, 0,0});
                 compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-                bytecode.push_back({OP_DONG_KHOI, 0, 0});
+                bytecode.push_back({OP_DONG_KHOI, 0, 0,0});
             }
 
         } else if (curNorm == "mặc định") {
             // trường hợp tokenizer không đặt "ca" trước (không nên), nhưng vẫn xử lý an toàn
-            bytecode.push_back({OP_MAC_DINH, 0, 0});
+            bytecode.push_back({OP_MAC_DINH, 0, 0,0});
             ++pos;
             if (pos < tokens.size() && tokens[pos] == ":") ++pos;
             if (pos < tokens.size() && tokens[pos] == "{") {
-                bytecode.push_back({OP_MO_KHOI, 0, 0});
+                bytecode.push_back({OP_MO_KHOI, 0, 0,0});
                 compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
-                bytecode.push_back({OP_DONG_KHOI, 0, 0});
+                bytecode.push_back({OP_DONG_KHOI, 0, 0,0});
             }
 
         } else if (curNorm == "thoát") {
-            bytecode.push_back({OP_THOAT, 0, 0});
+            bytecode.push_back({OP_THOAT, 0, 0,0});
             ++pos;
         } else {
             std::cerr << "Token không hợp lệ trong khối chọn: '" << tokens[pos] << "' (normalized='" << curNorm << "')" << std::endl;
