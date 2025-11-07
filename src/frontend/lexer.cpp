@@ -1,12 +1,14 @@
-//
 // Created by nx_thang on 10/20/2025.
-//
+// Updated: bổ sung hỗ trợ comment, escape trong string, cải thiện nhận diện identifier UTF-8,
+// and ổn định post-processing multi-word keywords.
 
 #include <algorithm>
 #include <cctype>
 #include <sstream>
 #include <stdexcept>
 #include <variant>
+#include <string>
+#include <unordered_map>
 
 #include "../../include/frontend/lexer.h"
 #include "common/utility.h"
@@ -14,6 +16,7 @@
 namespace vietvm::compiler {
     using Value = std::variant<int, std::string>;
     std::vector<Value> vars; // indexed by varId
+
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
@@ -39,6 +42,7 @@ namespace vietvm::compiler {
         return tk.size() >= 2 && tk.front() == '"' && tk.back() == '"';
     }
 
+    // Heuristic identifier check that tolerates UTF-8 bytes (simple & pragmatic)
     bool isVariable(const std::string &tok) noexcept {
         if (tok.empty()) return false;
         if (isStringLiteral(tok)) return false;
@@ -46,54 +50,122 @@ namespace vietvm::compiler {
         if (tok == "(" || tok == ")" || tok == "{" || tok == "}" || tok == ";" || tok == ",") return false;
 
         unsigned char first = static_cast<unsigned char>(tok[0]);
-        if (!std::isalpha(first) && tok[0] != '_') return false;
+        // allow ascii letter or underscore or non-ascii (start of UTF-8)
+        if (!std::isalpha(first) && tok[0] != '_' && first < 0x80) return false;
 
         for (unsigned char uc : tok) {
-            if (!std::isalnum(uc) && uc != '_') return false;
+            if (uc == '_' ) continue;
+            if (uc < 0x80) {
+                if (!std::isalnum(uc)) return false;
+            } else {
+                // non-ascii byte: accept (assume valid UTF-8 sequence),
+                // this is a permissive heuristic; a stricter implementation would validate UTF-8.
+                continue;
+            }
         }
 
         return true;
     }
+
+    // Helper: lowercase ASCII characters (keep non-ascii unchanged)
+    std::string toLowerAscii(const std::string &s) {
+        std::string out;
+        out.reserve(s.size());
+        for (unsigned char c : s) {
+            if (c < 0x80) out.push_back(static_cast<char>(std::tolower(c)));
+            else out.push_back(static_cast<char>(c));
+        }
+        return out;
+    }
+
+    // Tokenize, with comment and improved string handling
     std::vector<std::string> tokenize(const std::string &src) {
         std::vector<std::string> tokens;
         size_t i = 0;
-        while (i < src.size()) {
+        const size_t n = src.size();
+        while (i < n) {
             auto ch = static_cast<unsigned char>(src[i]);
+            // whitespace
             if (std::isspace(ch)) { ++i; continue; }
-            if (ch == '"') {
-                size_t j = i + 1;
-                while (j < src.size() && src[j] != '"') ++j;
-                if (j < src.size()) {
-                    ++j;
-                    tokens.push_back(src.substr(i, j - i));
-                    i = j;
-                } else {
-                    tokens.push_back(src.substr(i));
-                    i = src.size();
+
+            // comments: // line or /* block */
+            if (ch == '/' && i + 1 < n) {
+                unsigned char n1 = static_cast<unsigned char>(src[i+1]);
+                if (n1 == '/') {
+                    // skip until newline
+                    i += 2;
+                    while (i < n && src[i] != '\n') ++i;
+                    continue;
+                } else if (n1 == '*') {
+                    // skip block comment
+                    i += 2;
+                    while (i + 1 < n) {
+                        if (src[i] == '*' && src[i+1] == '/') { i += 2; break; }
+                        ++i;
+                    }
+                    continue;
                 }
+            }
+
+            // String literal with escape handling (keep quotes in token)
+            if (ch == '"' || ch == '\'') {
+                char quote = static_cast<char>(ch);
+                size_t j = i + 1;
+                std::ostringstream oss;
+                while (j < n) {
+                    char c = src[j];
+                    if (c == '\\' && j + 1 < n) {
+                        // escape sequence - keep escaped char so token includes raw content
+                        char esc = src[j+1];
+                        // we will store as raw text including escapes (strip later if needed)
+                        oss.put('\\');
+                        oss.put(esc);
+                        j += 2;
+                        continue;
+                    }
+                    if (c == quote) {
+                        // include closing quote
+                        ++j;
+                        break;
+                    }
+                    oss.put(c);
+                    ++j;
+                }
+                // if closing quote not found j may reach end; keep whatever is found
+                std::string raw = src.substr(i, std::min(j, n) - i);
+                tokens.push_back(raw);
+                i = j;
                 continue;
             }
-            if (i + 1 < src.size()) {
+
+            // two-char operators
+            if (i + 1 < n) {
                 std::string two = src.substr(i, 2);
                 if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
                     two == "&&" || two == "||" || two == "++" || two == "--") {
                     tokens.push_back(two);
                     i += 2;
                     continue;
-                    }
+                }
             }
+
+            // single-char punctuation/operators
             char c = src[i];
             if (c == '+' || c == '-' || c == '*' || c == '/' ||
                 c == '(' || c == ')' || c == '{' || c == '}' ||
                 c == '[' || c == ']' || c == ';' || c == ',' ||
-                c == '<' || c == '>' || c == '=' || c == '!') {
+                c == '<' || c == '>' || c == '=' || c == '!'
+            ) {
                 tokens.emplace_back(1, c);
                 ++i;
                 continue;
-                }
+            }
+
+            // identifier/number/word tokenization (UTF-8 friendly: read until separator)
             size_t j = i;
-            while (j < src.size()) {
+            while (j < n) {
                 auto cj = static_cast<unsigned char>(src[j]);
+                // stop at whitespace or any delimiter/punctuations we treat separately
                 if (std::isspace(cj)) break;
                 if (cj == '"' || cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
                     cj == '(' || cj == ')' || cj == '{' || cj == '}' ||
@@ -106,34 +178,40 @@ namespace vietvm::compiler {
         }
         return tokens;
     }
-    std::string normalizeTokenForCompare(const std::string& s) {
-    std::string t = trim(s);
-    if (t.empty()) return t;
-    // Nếu token là chuỗi nguyên (bắt đầu và kết thúc bằng " hoặc '), trả về nguyên bản (để không phá chuỗi)
-    if ( (t.size() >= 2 && t.front() == '"' && t.back() == '"') ||
-         (t.size() >= 2 && t.front() == '\'' && t.back() == '\'') ) {
-        return t;
-    }
-    // Loại bỏ dấu câu cuối nếu là :, ; , hoặc .
-    char last = t.back();
-    if (last == ':' || last == ';' || last == ',' || last == '.') {
-        t.pop_back();
-        t = trim(t); // loại bỏ khoảng trắng dư nếu có
-    }
-    return t;
-}
 
-       // (Đoạn hàm postProcessTokens được cập nhật để hỗ trợ ghép từ khóa nhiều từ)
+    std::string normalizeTokenForCompare(const std::string& s) {
+        std::string t = trim(s);
+        if (t.empty()) return t;
+        // If token is a quoted string, return as-is (do not modify inner content)
+        if ( (t.size() >= 2 && t.front() == '"' && t.back() == '"') ||
+             (t.size() >= 2 && t.front() == '\'' && t.back() == '\'') ) {
+            return t;
+        }
+        // Remove trailing punctuation commonly attached to tokens
+        char last = t.back();
+        if (last == ':' || last == ';' || last == ',' || last == '.') {
+            t.pop_back();
+            t = trim(t);
+            if (t.empty()) return t;
+        }
+        // Lowercase ASCII for comparison (keep non-ascii unchanged)
+        return toLowerAscii(t);
+    }
+
+    // (Đoạn hàm postProcessTokens được cập nhật để hỗ trợ ghép từ khóa nhiều từ)
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens) {
         std::vector<std::string> result;
         result.reserve(tokens.size());
 
-        // Danh sách các multi-word keywords (bằng token gốc, lower-case)
-        // Nếu sau này thêm multi-word keyword, cập nhật danh sách này.
+        // Danh sách các multi-word keywords (bằng token gốc, lower-case ASCII)
+        // Nếu muốn mở rộng, thêm vào cả dạng có dấu và không dấu khi cần.
         const std::vector<std::vector<std::string>> multiKeywords = {
             {"mặc", "định"},
+            {"mặc", "định:"},
             {"nếu", "không"},
-            {"nếu", "không:"}, // trường hợp có dấu hai chấm gắn luôn
+            {"nếu", "không:"},
+            {"trường", "hợp"},
+            {"trường", "hợp:"}
             // thêm các cụm khác nếu cần
         };
 
@@ -152,17 +230,18 @@ namespace vietvm::compiler {
                 for (size_t k = 0; k < len; ++k) {
                     std::string tk_norm = normalizeTokenForCompare(tokens[i + k]);
                     // so sánh chính xác với từng phần của phrase
-                    if (tk_norm != phrase[k]) { ok = false; break; }
+                    // Note: phrase entries are expected to be already lower-cased ASCII-ish; we compare normalized forms
+                    if (tk_norm != toLowerAscii(phrase[k])) { ok = false; break; }
                 }
                 if (ok) {
-                    // Tạo token ghép (giữ dạng không dấu/chuẩn: nối bằng space)
+                    // Tạo token ghép (giữ dạng nối bằng space để tương thích)
                     std::ostringstream oss;
                     for (size_t k = 0; k < len; ++k) {
                         if (k) oss << ' ';
                         oss << phrase[k];
                     }
                     result.push_back(oss.str());
-                    i += len - 1; // nhảy qua các token đã ghép
+                    i += len - 1; // skip matched tokens
                     matchedMulti = true;
                     break;
                 }
@@ -170,28 +249,47 @@ namespace vietvm::compiler {
 
             if (matchedMulti) continue;
 
-            // Trường hợp 1: token hiện tại đã là "mặc định" hoặc "mặc định:" (với dấu)
+            // Trường hợp token hiện tại đã là "mặc định" hoặc tương tự (đã normalize)
             if (!a_norm.empty()) {
-                if (a_norm == "mặc định") {
+                if (a_norm == "mặc định" || a_norm == "mặc định:") {
                     result.push_back("mặc định");
                     continue;
                 }
             }
 
-            // Các xử lý khác (giữ nguyên logic cũ)
-            // (copy phần xử lý token gốc ở đây, ví dụ xử lý dấu ':' nối, số, chuỗi, etc.)
-            // Nếu không có xử lý đặc biệt, đẩy token gốc vào result:
+            // Giữ nguyên token gốc nếu không có xử lý đặc biệt
             result.push_back(tokens[i]);
         }
 
         return result;
     }
+
     std::string stripQuotes(const std::string& input) {
         if (input.length() >= 2 &&
             ((input.front() == '"' && input.back() == '"') ||
              (input.front() == '\'' && input.back() == '\''))) {
-            return input.substr(1, input.length() - 2);
-             }
+            // Process escape sequences inside when returning stripped content
+            std::string inner = input.substr(1, input.length() - 2);
+            std::ostringstream oss;
+            for (size_t i = 0; i < inner.size(); ++i) {
+                if (inner[i] == '\\' && i + 1 < inner.size()) {
+                    char esc = inner[i+1];
+                    switch (esc) {
+                        case 'n': oss.put('\n'); break;
+                        case 'r': oss.put('\r'); break;
+                        case 't': oss.put('\t'); break;
+                        case '\\': oss.put('\\'); break;
+                        case '\'': oss.put('\''); break;
+                        case '"': oss.put('"'); break;
+                        default: oss.put(esc); break;
+                    }
+                    ++i; // skip escape char
+                } else {
+                    oss.put(inner[i]);
+                }
+            }
+            return oss.str();
+        }
         return input;
     }
 
@@ -213,4 +311,5 @@ namespace vietvm::compiler {
         }
         throw std::runtime_error("getVarValueInt: kiểu giá trị không hỗ trợ");
     }
-} // namespace vietvm::Compiler
+
+} // namespace vietvm::compiler
