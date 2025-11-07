@@ -1,0 +1,157 @@
+//# VietVM grammar (BNF-style)
+//# Based on branch `developer` (keywords in include/keywords.h).
+//# Terminals shown in quotes; some Vietnamese keywords provided as both accented and ASCII alternatives.
+//# Map common opcodes from include/keywords.h:
+//#  - OP_NEU -> "nếu" / "neu"        (if)
+//#  - OP_NEU_KHONG -> "nếu không"/"neu khong" (else if / elif)  *adjust as needed
+//#  - OP_HOAC -> logical OR ("hoặc"/"hoac")
+//#  - OP_KHONG -> logical NOT ("không"/"khong")
+//#  - OP_LAP -> loop ("lặp"/"lap") (for/while style)
+//#  - OP_HAM -> "hàm"/"ham" (function)
+//#  - OP_GOI -> "gọi"/"goi" (call)
+//#  - OP_TRA_VE -> "trả về"/"tra ve" (return)
+//#  - OP_IN -> "in" (print)
+//#  - OP_CHUYEN -> "chuyển"/"chuyen" (switch)
+//#  - OP_TRUONG_HOP -> "trường hợp"/"truong hop" (case)
+//#  - OP_MAC_DINH -> "mặc định"/"mac dinh" (default)
+//#  - OP_BO_QUA -> "bỏ qua"/"bo qua" (continue)
+//#  - OP_THOAT -> "thoát"/"thoat" (break/exit)
+//#
+//# Note: adapt token names to the lexer used in the project (lexer likely in src/frontend).
+//#
+<program>               ::= <top_level_list>
+<top_level_list>        ::= <top_level_decl> | <top_level_decl> <top_level_list>
+
+<top_level_decl>        ::= <function_decl>
+                         | <var_decl>
+                         | <statement>
+
+//# Function: hàm <id>( <param_list_opt> ) { <stmt_list> }
+<function_decl>         ::= <FUNC_KW> <identifier> "(" <param_list_opt> ")" <block>
+<FUNC_KW>               ::= "hàm" | "ham"
+
+<param_list_opt>        ::= <param_list> | ""
+<param_list>            ::= <param> | <param> "," <param_list>
+<param>                 ::= <identifier> ( "[" "]" )?  //# allow array params
+
+
+//# Variable declaration: e.g. khai báo x = expr; or var-like: <id> = <expr> ;
+<var_decl>              ::= <VAR_KW_OPT> <identifier> <var_init_opt> ";"
+<VAR_KW_OPT>            ::= "khởi tạo" | "khoi tao" | ""  //# OP_KHOI_TAO
+<var_init_opt>          ::= "=" <expression> | ""
+
+//# Blocks and statements
+<block>                 ::= "{" <stmt_list_opt> "}"
+<stmt_list_opt>         ::= <stmt_list> | ""
+<stmt_list>             ::= <statement> | <statement> <stmt_list>
+
+<statement>             ::= <expr_stmt>
+                         | <if_stmt>
+                         | <while_stmt>
+                         | <for_stmt>
+                         | <switch_stmt>
+                         | <return_stmt>
+                         | <print_stmt>
+                         | <break_stmt>
+                         | <continue_stmt>
+                         | <var_decl>
+                         | <block>
+
+<expr_stmt>             ::= <expression> ";"
+
+//# If / Else If / Else
+<if_stmt>               ::= <IF_KW> "(" <expression> ")" <block> <if_tail_opt>
+<if_tail_opt>           ::= <ELIF_LIST> <else_opt> | <else_opt> | ""
+<ELIF_LIST>             ::= <elif> | <elif> <ELIF_LIST>
+<elif>                  ::= <ELIF_KW> "(" <expression> ")" <block>
+<else_opt>              ::= <ELSE_KW> <block> | ""
+<IF_KW>                 ::= "nếu" | "neu"
+<ELIF_KW>               ::= "nếu không" | "neu khong"  //# OP_NEU_KHONG, adapt if different
+<ELSE_KW>               ::= "hoặc" | "hoac" | "không thì" | "khong thi" // # OP_HOAC or alternative, adjust as needed
+
+//# While
+<while_stmt>            ::= <WHILE_KW> "(" <expression> ")" <block>
+<WHILE_KW>              ::= "lặp" | "lap" | "trong khi" | "trongkhi"
+
+//# For (C-style): lặp (khởi tạo; điều kiện; cập nhật) { ... }
+<for_stmt>              ::= <FOR_KW> "(" <for_init_opt> ";" <expression_opt> ";" <for_update_opt> ")" <block>
+<FOR_KW>                ::= "lặp" | "lap"  //# reuse OP_LAP
+<for_init_opt>          ::= <var_decl_no_semi> | <expression> | ""
+<var_decl_no_semi>      ::= <VAR_KW_OPT> <identifier> <var_init_opt>
+<for_update_opt>        ::= <expression> | ""
+<expression_opt>        ::= <expression> | ""
+
+//# Switch / Case
+<switch_stmt>           ::= <SWITCH_KW> "(" <expression> ")" "{" <case_list> <default_opt> "}"
+<case_list>             ::= <case> | <case> <case_list>
+<case>                  ::= <CASE_KW> <literal> ":" <stmt_list_opt>
+<default_opt>           ::= <DEFAULT_KW> ":" <stmt_list_opt> | ""
+<SWITCH_KW>             ::= "chuyển" | "chuyen"
+<CASE_KW>               ::= "trường hợp" | "truong hop"
+<DEFAULT_KW>            ::= "mặc định" | "mac dinh"
+
+//# Return, print, break, continue
+<return_stmt>           ::= <RETURN_KW> <expression_opt> ";"
+<RETURN_KW>             ::= "trả về" | "tra ve"
+
+<print_stmt>            ::= <PRINT_KW> "(" <arg_list_opt> ")" ";"
+<PRINT_KW>              ::= "in"
+
+<break_stmt>            ::= <BREAK_KW> ";"
+<BREAK_KW>              ::= "thoát" | "thoat" | "dừng" | "dung"  //# OP_THOAT
+
+<continue_stmt>         ::= <CONTINUE_KW> ";"
+<CONTINUE_KW>           ::= "bỏ qua" | "bo qua"  //# OP_BO_QUA
+
+//# Expressions (precedence levels)
+<expression>            ::= <assignment>
+<assignment>            ::= <logical_or> | <identifier> "=" <assignment>
+<logical_or>            ::= <logical_and> | <logical_or> <OR_OP> <logical_and>
+<logical_and>           ::= <equality> | <logical_and> <AND_OP> <equality>
+<equality>              ::= <relational> | <equality> <EQ_OP> <relational>
+<relational>            ::= <additive> | <relational> <REL_OP> <additive>
+<additive>              ::= <multiplicative> | <additive> <ADD_OP> <multiplicative>
+<multiplicative>        ::= <unary> | <multiplicative> <MUL_OP> <unary>
+<unary>                 ::= <UNARY_OP> <unary> | <primary>
+<primary>               ::= <literal>
+                         | <identifier>
+                         | <call_expr>
+                         | "(" <expression> ")"
+                         | <array_access>
+
+//# Operators terminals (map to opcodes)
+<ADD_OP>                ::= "+" | "cộng" | "cong"    //# OP_CONG
+<MUL_OP>                ::= "*" | "nhân" | "nhan"    //# OP_NHAN
+<ADD_OP>                ::= "-" | "trừ" | "tru"      //# OP_TRU / unary minus handled in UNARY_OP
+<MUL_OP>                ::= "/" | "chia" | "chia"    //# OP_CHIA
+<MUL_OP>                ::= "%" | "modulo" | "mod"   //# OP_MODULO
+
+<EQ_OP>                 ::= "==" | "=" | "bằng" | "bang"  //# OP_SO_SANH_BANG (be careful: "=" used for assign)
+<NEQ_OP>                ::= "!=" | "khác" | "khac"        // OP_KHAC_BANG
+<REL_OP>                ::= "<" | ">" | "<=" | ">=" | ">" | "nhỏ hơn" | "lon hon" | "nho hon"
+<AND_OP>                ::= "&&" | "và" | "va" | "va"     //# OP_Logic_VA
+<OR_OP>                 ::= "||" | "hoặc" | "hoac"        ///# OP_Logic_HOAC
+<UNARY_OP>              ::= "!" | "không" | "khong"       //# OP_KHONG
+                         | "-"  //# OP_PHU_DINH (unary minus)
+
+//# Function call
+<call_expr>             ::= <identifier> "(" <arg_list_opt> ")"
+<arg_list_opt>          ::= <arg_list> | ""
+<arg_list>              ::= <expression> | <expression> "," <arg_list>
+
+//# Array access
+<array_access>          ::= <identifier> "[" <expression> "]"
+
+//# Literals and identifiers
+<literal>               ::= <number> | <string> | <boolean> | <null>
+<number>                ::= <digit> | <digit> <number>
+<string>                ::= '"' <string_chars> '"'
+<boolean>               ::= "true" | "false" | "đúng" | "sai" | "dung" | "sai"
+<null>                  ::= "null" | "rỗng" | "rong"
+<identifier>            ::= <LETTER> ( <LETTER> | <DIGIT> | "_" )*
+<digit>                 ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<LETTER>                ::= /* any Unicode letter or ASCII a-z A-Z, allow Vietnamese letters */
+
+//# Convenience: optional productions
+<expression_opt>        ::= <expression> | ""
+<arg_list_opt>          ::= <arg_list> | ""

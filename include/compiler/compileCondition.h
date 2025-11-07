@@ -7,11 +7,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../vm/instruction.h"
 
 
 void compileCondition(const std::vector<std::string>& tokens, size_t &pos,
-                                  std::vector<Instruction> &bytecode,
-                                  std::unordered_map<std::string,int> &symTab,
-                                  int &nextId,
-                                  const std::unordered_map<std::string,Opcode> &keywordMap);
+                      std::vector<Instruction> &bytecode,
+                      std::unordered_map<std::string,int> &symTab,
+                      int &nextId,
+                      const std::unordered_map<std::string,Opcode> &keywordMap);

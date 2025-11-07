@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../../include/vm/instruction.h"
 #include "common/loopUltil.h"
 #include "common/utility.h"
 #include "compiler/compileBlock.h"

@@ -11,7 +11,7 @@
 #include <variant>
 
 #include "instruction.h"
-#include "common/vm_callframe.h"
+#include "../common/vm_callframe.h"
 
 class VM {
 public:

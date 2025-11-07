@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
-#include "../instruction.h"
+#include "../vm/instruction.h"
 
 using CompileFunc = std::function<void(
     const std::vector<std::string>& tokens,

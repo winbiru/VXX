@@ -5,7 +5,7 @@
 #include <variant>
 #include <string>
 #include <unordered_map>
-#include "vm.h"
+#include "../../include/vm/vm.h"
 
 #include <algorithm>
 #include "../../include/common/vm_utils.h"

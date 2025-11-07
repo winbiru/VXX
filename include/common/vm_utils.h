@@ -3,7 +3,7 @@
 #include <string>
 #include <stdexcept>
 #include <sstream>
-#include "../instruction.h"
+#include "../vm/instruction.h"
 
 // Lưu ý: chỉnh đường dẫn "../instruction.h" nếu project dùng include khác.
 // Hàm name_op(Opcode) đã có trong project (name_op.cpp) — link tự resolve tại link-time.

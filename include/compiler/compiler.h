@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "../instruction.h"
+#include "../vm/instruction.h"
 
 // Public API: chỉ cần compileSource ở header
 // (mọi helper/chi tiết nội bộ để ở Compiler.cpp và là static/internal)

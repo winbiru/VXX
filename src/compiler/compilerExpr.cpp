@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../../include/vm/instruction.h"
 #include "common/expression.h"
 #include "../../include/frontend/lexer.h"
 #include "common/storeString.h"

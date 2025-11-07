@@ -2,8 +2,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "instruction.h"
-#include "keywords.h"
+#include "../vm/instruction.h"
+#include "../frontend/keywords.h"
 
 void compileExpr(const std::string &expr,
                  std::vector<Instruction> &bytecode,

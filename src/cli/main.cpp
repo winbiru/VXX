@@ -5,8 +5,8 @@
 #include <vector>
 #include <filesystem>
 #include "../../include/compiler/compiler.h"
-#include "../../include/vm.h"
-#include "../../include/keywords.h"
+#include "../../include/vm/vm.h"
+#include "../../include/frontend/keywords.h"
 #include "common/storeString.h"
 
 namespace fs = std::filesystem;

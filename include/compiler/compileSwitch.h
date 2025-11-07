@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
-#include "instruction.h"
+#include "../vm/instruction.h"
 
 void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                    std::vector<Instruction>& bytecode,
