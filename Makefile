@@ -13,7 +13,7 @@ BUILD_DIR ?= build
 # Try to locate typical binary names produced by various CMake setups.
 BIN := $(firstword $(wildcard $(BUILD_DIR)/$(VMSRC) $(BUILD_DIR)/vietvm-cli $(BUILD_DIR)/VietVM $(BUILD_DIR)/vietvm-cli cmake-build-debug/$(VMSRC) cmake-build-debug/vietvm-cli))
 
-TESTDIR ?= ../src/tests
+TESTDIR ?= tests
 EXPECTEDDIR ?= $(TESTDIR)/expected
 TESTFILES := $(wildcard $(TESTDIR)/*.vi)
 
