@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../vm/instruction.h"
 
 namespace vietvm::compiler {
     class hamMap {

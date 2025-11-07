@@ -12,7 +12,7 @@
 #include <sstream>
 
 #include "../../include/compiler/compileStatement.h"
-#include "instruction.h"
+#include "../../include/vm/instruction.h"
 #include "compiler/compileRegistry.h" // for compileMap
 #include "../../include/frontend/lexer.h"
 

@@ -3,7 +3,7 @@
 
 #include <string>
 #include <unordered_map>
-#include "instruction.h" // để nhận diện enum Opcode
+#include "../vm/instruction.h"
 
 extern const std::unordered_map<std::string, Opcode> keywordMap;
 

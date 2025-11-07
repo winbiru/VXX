@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../vm/instruction.h"
 struct LoopIndices { int cond_index; int exit_jump_index; };
 
 LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &pos,

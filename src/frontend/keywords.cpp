@@ -2,7 +2,7 @@
 // Created by Nguyễn Xuân Thắng on 19/6/25.
 //
 
-#include "keywords.h"
+#include "../../include/frontend/keywords.h"
 
 // Ánh xạ từ từ khóa (chuỗi) sang Opcode
 const std::unordered_map<std::string, Opcode> keywordMap = {

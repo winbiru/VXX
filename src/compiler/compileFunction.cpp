@@ -4,7 +4,7 @@
 
 #include "compiler/compileFunction.h"
 #include "compiler/compileBlock.h"
-#include "instruction.h"
+#include "../../include/vm/instruction.h"
 #include "common/storeString.h"
 
 void compileFunction(const std::vector<std::string>& tokens, size_t& pos,

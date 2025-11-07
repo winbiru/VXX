@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.h"
+#include "../vm/instruction.h"
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
                       std::vector<Instruction> &bytecode,
