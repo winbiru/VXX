@@ -3,7 +3,7 @@
 #include <sstream>
 #include <vector>
 #include <cctype>
-#include <../../include/vm/instruction.h>
+#include <../include/vm/instruction.h>
 #include <iostream>
 #include <unordered_map>
 #include <string>
