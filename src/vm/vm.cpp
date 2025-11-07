@@ -215,7 +215,7 @@ void VM::run() {
                         else if (instr.op == OP_NHAN) stack.push_back(ia * ib);
                         else {
                             if (ib == 0) throw runtime_error_op("Lỗi: chia cho 0", instr.op, pc);
-                            stack.push_back(ia / ib);
+                            stack.emplace_back(ia / ib);
                         }
                         break;
                     }
@@ -556,6 +556,79 @@ void VM::run() {
                 } else {
                     frame.localsMap[localId] = v;
                 }
+                break;
+            }
+            case OP_CONG_MOT: {
+                // Hành vi: nếu đỉnh stack là ID biến (int) → tăng giá trị biến và push giá trị mới (prefix ++ semantics).
+                // Nếu đỉnh stack là một giá trị số (int hoặc chuỗi có thể chuyển sang int) → tăng và push lại.
+                if (stack.empty()) throw runtime_error_op("OP_CONG_MOT: stack rỗng", instr.op, pc);
+
+                StackValue top = stack.back();
+                stack.pop_back();
+
+                // Helper lambda để push int value
+                auto push_int = [&](int v) { stack.push_back(make_int_value(v)); };
+
+                if (std::holds_alternative<int>(top)) {
+                    int idOrVal = std::get<int>(top);
+
+                    // Nếu có call frame hiện tại, ưu tiên cập nhật local trong frame (tương tự OP_TEN_BIEN_GIA_TRI / OP_PARAM)
+                    bool updated = false;
+                    if (!callStack.empty()) {
+                        CallFrame &frame = callStack.back();
+                        if (frame.localsIndexed) {
+                            // ensure size
+                            if (idOrVal < 0) throw runtime_error_op("OP_CONG_MOT: id biến âm không hợp lệ", instr.op, pc);
+                            if (idOrVal >= (int)frame.localsVec.size()) frame.localsVec.resize(idOrVal + 1, make_int_value(0));
+                            int cur = as_int(frame.localsVec[idOrVal], instr.op, pc);
+                            int nw = cur + 1;
+                            frame.localsVec[idOrVal] = make_int_value(nw);
+                            push_int(nw);
+                            updated = true;
+                        } else {
+                            int cur = 0;
+                            auto itLoc = frame.localsMap.find(idOrVal);
+                            if (itLoc == frame.localsMap.end()) {
+                                frame.localsMap[idOrVal] = make_int_value(0);
+                                cur = 0;
+                            } else {
+                                cur = as_int(itLoc->second, instr.op, pc);
+                            }
+                            int nw = cur + 1;
+                            frame.localsMap[idOrVal] = make_int_value(nw);
+                            push_int(nw);
+                            updated = true;
+                        }
+                    }
+
+                    // Nếu không cập nhật local thì cập nhật biến global 'variables'
+                    if (!updated) {
+                        int cur = 0;
+                        if (variables.count(idOrVal)) {
+                            cur = as_int(variables[idOrVal], instr.op, pc);
+                        } else {
+                            // khởi tạo mặc định = 0
+                            variables[idOrVal] = make_int_value(0);
+                            cur = 0;
+                        }
+                        int nw = cur + 1;
+                        variables[idOrVal] = make_int_value(nw);
+                        push_int(nw);
+                    }
+                } else if (std::holds_alternative<std::string>(top)) {
+                    // Thử chuyển chuỗi sang int rồi tăng; nếu không chuyển được thì báo lỗi
+                    const std::string &s = std::get<std::string>(top);
+                    try {
+                        int cur = std::stoi(s);
+                        int nw = cur + 1;
+                        push_int(nw);
+                    } catch (...) {
+                        throw runtime_error_op("OP_CONG_MOT: không thể tăng chuỗi không phải số", instr.op, pc);
+                    }
+                } else {
+                    throw runtime_error_op("OP_CONG_MOT: kiểu dữ liệu không hỗ trợ tăng 1", instr.op, pc);
+                }
+
                 break;
             }
             default:

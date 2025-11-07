@@ -70,9 +70,10 @@ enum Opcode {
     OP_MODULO        = 64,       // Chia lấy dư
     OP_CHUOI         = 65,       // Chuỗi
     OP_PHU_DINH      = 66,        // Phủ định cái gì đó.
-    OP_CHON           = 67,
-    OP_CA            = 68,
-    OP_PARAM = 69
+    OP_CHON           = 67,      // switch chọn
+    OP_CA            = 68,       // case ca
+    OP_PARAM = 69,               // tham số
+    OP_CONG_MOT = 70             //tương đương với i = i + 1
 
 };
 

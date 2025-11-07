@@ -67,6 +67,7 @@ inline std::string name_op(Opcode op) {
         case OP_CA: return "OP_CA";
         case OP_PARAM: return "OP_PARAM";
         case OP_DUNG_CHUONG_TRINH: return "OP_DUNG_CHUONG_TRINH";
+        case OP_CONG_MOT : return "OP_CONG_MOT";
         default: return "UNKNOWN_OPCODE";
     }
 }
