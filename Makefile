@@ -1,6 +1,6 @@
 VMSRC = VietVM
-TESTDIR = tests
-EXPECTEDDIR = tests/expected
+TESTDIR = ./src/tests
+EXPECTEDDIR = ./src/tests/expected
 TESTFILES = $(wildcard $(TESTDIR)/*.vi)
 
 .PHONY: test check clean
