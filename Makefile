@@ -1,4 +1,17 @@
 VMSRC = VietVM
+BUILD_DIR ?= build
+
+BIN := $(firstword $(wildcard \
+    $(BUILD_DIR)/$(VMSRC) \
+    $(BUILD_DIR)/vietvm-cli \
+    $(BUILD_DIR)/bin/vietvm-cli \
+    $(BUILD_DIR)/bin/$(VMSRC) \
+    $(BUILD_DIR)/bin/*vietvm* \
+    cmake-build-debug/$(VMSRC) \
+    cmake-build-debug/vietvm-cli \
+    cmake-build-debug/bin/vietvm-cli))
+
+
 TESTDIR = ./src/tests
 EXPECTEDDIR = ./src/tests/expected
 TESTFILES = $(wildcard $(TESTDIR)/*.vi)
@@ -27,4 +40,12 @@ check:
     done
 
 clean:
+	@echo "Removing test outputs..."
 	rm -f $(TESTDIR)/*.output
+
+show:
+	@echo "BUILD_DIR = $(BUILD_DIR)"
+	@echo "VMSRC     = $(VMSRC)"
+	@echo "BIN       = $(BIN)"
+	@echo "TESTDIR   = $(TESTDIR)"
+	@echo "TESTFILES = $(TESTFILES)"
