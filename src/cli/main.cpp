@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
         // -----------------------------
         // ✅ Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../tests/kiem_tra_ham_4_tham_so.vi";
+        const std::string defaultFile = "../../src/tests/kiem_tra_ham_4_tham_so.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 
@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
             return EXIT_SUCCESS;
         }
 
-        std::string testDir = "tests/";
+        std::string testDir = "../../src/tests";
         if (fs::exists(testDir)) {
             for (const auto& entry : fs::directory_iterator(testDir)) {
                 if (entry.path().extension() == ".vi") {
