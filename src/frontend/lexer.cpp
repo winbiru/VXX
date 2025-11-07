@@ -28,7 +28,8 @@ namespace vietvm::compiler {
     const std::unordered_map<std::string,int>& operatorPrecedenceMap() noexcept {
         static const std::unordered_map<std::string,int> ops = {
             {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
-            {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6}
+            {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6},
+            {"++",7}
         };
         return ops;
     }
