@@ -294,3 +294,12 @@ Copyright © 2025.
 Điều khoản sử dụng được nêu trong file `LICENSE`.
 
 Dự án không chứa mã nguồn GPL và có thể được sử dụng cho mục đích nghiên cứu, giáo dục hoặc cá nhân theo giấy phép tương ứng.
+
+
+
+## Liên hệ
+
+- Chủ repo: `winbiru`
+- Báo lỗi hoặc thảo luận: tạo Issue tại [Issues](https://github.com/winbiru/VietVM/issues)
+
+---
