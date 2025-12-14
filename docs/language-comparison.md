@@ -209,7 +209,7 @@ public class Main {
 
 #### Kết luận so sánh:
 
-* **VietVM** phú hợp cho: Learning VM internals, educational projects
+* **VietVM** phù hợp cho: Learning VM internals, educational projects
 * **Java** phù hợp cho: Enterprise applications, Android, large-scale systems
 * **Trade-off**: Java mature và production-ready, VietVM tập trung vào simplicity
 
