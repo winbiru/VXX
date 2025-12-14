@@ -1,96 +1,296 @@
-Ngôn ngữ lập trình Việt đầu tiên – nơi tiếng Việt trở thành ngôn ngữ của máy và tư duy.
+# VIETVM
 
-I. LỜI MỞ ĐẦU
+## English
 
-Chúng ta đang sống trong kỷ nguyên mà ngôn ngữ lập trình định hình thế giới.
-Mọi hệ thống, từ chiếc điện thoại đến vệ tinh, đều bắt nguồn từ những dòng lệnh được viết bằng ngôn ngữ con người – nhưng dành cho máy tính.
+This repository contains **VIETVM**, a custom-designed virtual machine and compiler infrastructure for a structured, imperative programming language.
 
-Từ C, Python, Java đến Rust — tất cả đều mang trong mình dấu ấn văn hóa của quốc gia đã sinh ra chúng.
-Nhưng cho đến nay, người Việt Nam vẫn phải suy nghĩ và lập trình bằng ngôn ngữ của người khác.
+VIETVM is an experimental system focused on **explicit execution semantics**, **transparent control flow**, and **deterministic behavior**.
+It is intended for study, experimentation, and long-term reference rather than mass adoption.
 
-VietVM ra đời để thay đổi điều đó.
-VietVM không chỉ là một máy ảo hay một cú pháp mới, mà là một tuyên bố rằng tiếng Việt có thể trở thành ngôn ngữ của logic, của tư duy, và của sáng tạo công nghệ.
+Copyright © 2025. All rights reserved by the author.
 
-II. TRIẾT LÝ CỐT LÕI
+See the end of this file for copyright and license information.
 
-“Khi máy tính hiểu được tiếng mẹ đẻ, dân tộc ấy bước vào kỷ nguyên tri thức tự chủ.”
+---
 
-VietVM được sáng tạo với 3 triết lý nền:
+## Contents
 
-Ngôn ngữ là linh hồn dân tộc.
-Khi ngôn ngữ lập trình phản ánh tiếng nói bản địa, nó giúp dân tộc đó tự viết nên tương lai của mình.
+* General Information
+* Project Scope
+* Repository Structure
+* Building VIETVM
+* Running Programs
+* Execution Model
+* Testing
+* Documentation
+* Versioning
+* Copyright and License Information
 
-Lập trình là tư duy.
-Nếu con người phải dịch tư duy sang ngôn ngữ khác, họ đã mất một phần tự do sáng tạo.
+---
 
-Máy tính có thể hiểu tiếng Việt – nếu ta định nghĩa nó đủ chặt.
-VietVM là bước đầu để tiếng Việt có “hình thức toán học”, có thể biên dịch, thực thi, và tối ưu hóa.
+## General Information
 
-III. MỤC TIÊU DÀI HẠN
+* Project name: **VIETVM**
+* Type: Virtual Machine + Compiler toolchain
+* Implementation language: C++
+* Status: Experimental / Research-oriented
+* Target audience: system programmers, compiler learners, VM designers
 
-Lĩnh vực	                Mục tiêu cụ thể của VietVM
-Ngôn ngữ học hình thức	  Hình thức hóa tiếng Việt thành cú pháp – ngữ nghĩa – logic có thể biên dịch.
-Giáo dục lập trình	      Tạo môi trường lập trình dễ hiểu cho học sinh Việt, học bằng tiếng mẹ đẻ.
-Khoa học máy tính	        Xây dựng máy ảo VietVM thực thi bytecode, hướng tới compiler tiếng Việt → LLVM.
-AI & NLP Việt hóa	        Dữ liệu từ VietVM giúp huấn luyện mô hình AI hiểu ngữ pháp, từ khóa và logic Việt.
-Văn hóa & tri thức Việt	  Xây dựng “ngôn ngữ số Việt” – nền tảng cho công nghệ bản địa.
-IV. NGUYÊN TẮC THIẾT KẾ
+This project does not aim to replace existing languages or runtimes.
 
-Đơn giản nhưng hình thức.
-Cú pháp VietVM phải dễ hiểu như tiếng Việt tự nhiên, nhưng có thể phân tích hình thức như Pascal hay C.
+---
 
-Đọc như nói – hiểu như toán.
-Một dòng lệnh phải vừa “nghe được bằng tai” vừa “phân tích được bằng máy”.
+## Project Scope
 
-Ví dụ: nếu (x > 10) thì in "Lớn hơn 10"
+VIETVM focuses on:
 
-Có thể biên dịch – có thể giảng dạy.
-VietVM phải vừa là công cụ giáo dục, vừa là nền tảng kỹ thuật thật.
+* A custom bytecode format
+* A stack-based execution model
+* Explicit control flow (blocks, loops, conditions)
+* Minimal runtime assumptions
+* Clear separation between parsing, compilation, and execution
 
-Trung lập với nền tảng.
-Bytecode VietVM có thể chạy trên mọi hệ điều hành, mọi kiến trúc — từ máy tính đến vi điều khiển.
+Out of scope (by design):
 
-Mở và phát triển cộng đồng.
-VietVM không thuộc về một cá nhân, mà là tài sản tri thức của cộng đồng người Việt toàn cầu.
+* Large standard libraries
+* Framework-level abstractions
+* Automatic parallelism
+* Dynamic reflection-heavy features
 
-V. ẢNH HƯỞNG KỲ VỌNG
+---
 
-Lĩnh vực	  Tác động dự kiến
-Giáo dục	  Học sinh học lập trình bằng tiếng mẹ đẻ.
-Khoa học	  Hình thành cú pháp logic tiếng Việt chuẩn cho máy tính.
-Công nghệ	  Tạo hệ sinh thái compiler, VM, IDE, và AI hiểu tiếng Việt.
-Văn hóa	    Tiếng Việt bước vào kỷ nguyên số với tư cách ngôn ngữ sáng tạo.
-Toàn cầu	  Đưa hình ảnh Việt Nam vào bản đồ ngôn ngữ lập trình thế giới.
+## Repository Structure
 
-VI. LỜI CAM KẾT
+```
+/
+├── src/            Core VM and compiler source code
+├── include/        Public headers
+├── examples/       Small example programs
+├── docs/           Design notes and specifications
+├── tests/          Test cases
+└── README.md
+```
 
-“Chúng ta không chỉ dạy máy hiểu con người, mà còn dạy con người hiểu chính ngôn ngữ của mình.”
+The layout may evolve as the project stabilizes.
 
-VietVM cam kết sẽ:
+---
 
-Trung thành với tiếng Việt, tôn trọng cấu trúc ngữ pháp tự nhiên.
+## Building VIETVM
 
-Giữ mã nguồn mở, cho phép mọi người Việt cùng đóng góp.
+### On Unix-like systems (Linux, macOS, BSD)
 
-Mở đường cho các thế hệ sau viết phần mềm, AI, và khoa học bằng tiếng mẹ đẻ.
+Requirements:
 
-VII. TẦM NHÌN 2040
+* C++17-compatible compiler (clang or gcc)
+* Make or CMake
 
-Đến năm 2040, VietVM hướng tới:
+Example build:
 
-Một compiler tiếng Việt hoàn chỉnh, có thể chuyển sang C, LLVM hoặc WebAssembly.
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
 
-Một IDE học tập tiếng Việt, dạy học sinh viết thuật toán bằng tiếng mẹ đẻ.
+No system-wide installation is required.
 
-Một AI Việt ngữ, hiểu ngôn ngữ tự nhiên qua cú pháp VietVM.
+---
 
-Một cộng đồng mở: lập trình viên Việt viết code, thư viện và game hoàn toàn bằng tiếng Việt.
+## Running Programs
 
-VIII. KẾT TỪ
+After building, programs can be executed by invoking the VIETVM runtime with compiled bytecode:
 
-“Khi con người có thể viết chương trình bằng chính ngôn ngữ mình nghĩ, đó không còn là lập trình – đó là sáng tạo.”
+```bash
+./vietvm example.bytecode
+```
 
-VietVM là ngọn đèn mở đường cho tương lai nơi tiếng Việt không chỉ là ngôn ngữ nói, mà là ngôn ngữ của máy, của tri thức và của tự do sáng tạo.
+---
 
+## Execution Model
 
+VIETVM uses:
 
+* A stack-based virtual machine
+* Explicit instructions for variable initialization, condition evaluation, loop control, and block entry/exit
+* Deterministic instruction dispatch
+
+There is no hidden control flow or implicit runtime behavior.
+
+See `docs/DESIGN.md` for details.
+
+---
+
+## Testing
+
+```bash
+make test
+```
+
+Tests focus on instruction correctness and control-flow behavior.
+
+---
+
+## Documentation
+
+Documentation is provided under `docs/`:
+
+* `DESIGN.md` — execution model and design decisions
+* `SPEC.md` — language syntax and semantics
+* `BYTECODE.md` — instruction set reference
+
+---
+
+## Versioning
+
+VIETVM does not follow a fixed release schedule.
+Backward compatibility is not guaranteed during early development.
+
+---
+
+## Copyright and License Information
+
+Copyright © 2025.
+
+Licensing terms are specified in the `LICENSE` file.
+
+This project contains no GPL-licensed code.
+
+---
+
+# VIETVM (Tiếng Việt)
+
+## Giới thiệu chung
+
+Kho mã nguồn này chứa **VIETVM** — một **máy ảo (virtual machine)** và **hạ tầng compiler** được thiết kế riêng cho một ngôn ngữ lập trình có cấu trúc, dạng mệnh lệnh.
+
+VIETVM là một hệ thống **thử nghiệm**, tập trung vào:
+
+* Ngữ nghĩa thực thi tường minh
+* Luồng điều khiển rõ ràng
+* Hành vi xác định, có thể truy vết
+
+Dự án này được xây dựng cho mục đích **nghiên cứu, học tập và tham khảo lâu dài**, không nhằm mục tiêu phổ cập đại trà.
+
+---
+
+## Phạm vi dự án
+
+VIETVM tập trung vào:
+
+* Định nghĩa bytecode riêng
+* Mô hình thực thi dựa trên stack
+* Luồng điều khiển tường minh (khối lệnh, vòng lặp, điều kiện)
+* Runtime tối giản
+* Phân tách rõ ràng giữa: phân tích cú pháp, biên dịch và thực thi
+
+Những thứ **cố tình không làm**:
+
+* Thư viện chuẩn lớn
+* Abstraction cấp framework
+* Tự động song song hóa
+* Cơ chế phản xạ (reflection) động phức tạp
+
+---
+
+## Cấu trúc thư mục
+
+```
+/
+├── src/            Mã nguồn lõi của VM và compiler
+├── include/        Header public
+├── examples/       Ví dụ chương trình nhỏ
+├── docs/           Tài liệu thiết kế và đặc tả
+├── tests/          Các ca kiểm thử
+└── README.md
+```
+
+---
+
+## Biên dịch VIETVM
+
+### Trên các hệ Unix-like (Linux, macOS, BSD)
+
+Yêu cầu:
+
+* Trình biên dịch C++ hỗ trợ C++17
+* Make hoặc CMake
+
+Ví dụ:
+
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+
+Không yêu cầu cài đặt toàn hệ thống.
+
+---
+
+## Thực thi chương trình
+
+Sau khi biên dịch, có thể chạy chương trình thông qua runtime của VIETVM với file bytecode:
+
+```bash
+./vietvm example.bytecode
+```
+
+---
+
+## Mô hình thực thi
+
+VIETVM sử dụng:
+
+* Máy ảo dựa trên stack
+* Tập lệnh tường minh cho:
+
+  * khởi tạo biến
+  * kiểm tra điều kiện
+  * điều khiển vòng lặp
+  * mở/đóng khối lệnh
+* Cơ chế dispatch xác định, không ẩn
+
+Không tồn tại luồng điều khiển ngầm hay hành vi runtime khó truy vết.
+
+Chi tiết xem `docs/DESIGN.md`.
+
+---
+
+## Kiểm thử
+
+```bash
+make test
+```
+
+Các kiểm thử tập trung vào tính đúng đắn của lệnh và luồng điều khiển.
+
+---
+
+## Tài liệu
+
+Tài liệu được đặt trong thư mục `docs/`, bao gồm:
+
+* `DESIGN.md` — mô hình thực thi và quyết định thiết kế
+* `SPEC.md` — cú pháp và ngữ nghĩa ngôn ngữ
+* `BYTECODE.md` — đặc tả tập lệnh bytecode
+
+Tài liệu mang tính mô tả kỹ thuật, không mang tính quảng bá.
+
+---
+
+## Phiên bản
+
+VIETVM không theo lịch phát hành cố định.
+Trong giai đoạn đầu, **không đảm bảo tương thích ngược**.
+
+---
+
+## Bản quyền và giấy phép
+
+Copyright © 2025.
+
+Điều khoản sử dụng được nêu trong file `LICENSE`.
+
+Dự án không chứa mã nguồn GPL và có thể được sử dụng cho mục đích nghiên cứu, giáo dục hoặc cá nhân theo giấy phép tương ứng.
