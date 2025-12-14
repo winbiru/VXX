@@ -135,9 +135,11 @@ Tests focus on instruction correctness and control-flow behavior.
 
 Documentation is provided under `docs/`:
 
-* `DESIGN.md` — execution model and design decisions
-* `SPEC.md` — language syntax and semantics
-* `BYTECODE.md` — instruction set reference
+* `architecture.md` — project structure and design decisions
+* `bytecode.md` — instruction set and bytecode format reference
+* `grammar.bnf` — language grammar specification
+* `language-comparison-en.md` — comparison with other programming languages (English)
+* `language-comparison.md` — so sánh với các ngôn ngữ lập trình khác (Tiếng Việt)
 
 ---
 
@@ -272,9 +274,11 @@ Các kiểm thử tập trung vào tính đúng đắn của lệnh và luồng 
 
 Tài liệu được đặt trong thư mục `docs/`, bao gồm:
 
-* `DESIGN.md` — mô hình thực thi và quyết định thiết kế
-* `SPEC.md` — cú pháp và ngữ nghĩa ngôn ngữ
-* `BYTECODE.md` — đặc tả tập lệnh bytecode
+* `architecture.md` — cấu trúc dự án và quyết định thiết kế
+* `bytecode.md` — đặc tả tập lệnh bytecode và định dạng bytecode
+* `grammar.bnf` — đặc tả ngữ pháp ngôn ngữ
+* `language-comparison.md` — so sánh với các ngôn ngữ lập trình khác (Tiếng Việt)
+* `language-comparison-en.md` — comparison with other programming languages (English)
 
 Tài liệu mang tính mô tả kỹ thuật, không mang tính quảng bá.
 
