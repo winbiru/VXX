@@ -64,7 +64,9 @@ check: build
 
 	for testfile in $(TESTFILES); do
 		base=$$(basename $${testfile%.vi})
-		out=$(TESTDIR)/$$base.output
+		tmpdir=$(TESTDIR)/.tmp
+		mkdir -p $$tmpdir
+		out=$$tmpdir/$$base.output
 		exp=$(EXPECTEDDIR)/$$base.expected
 		echo "== Running $$testfile =="
 		$$EXEC $$testfile > $$out 2>&1
@@ -73,16 +75,21 @@ check: build
 				echo "PASS: $$testfile"
 			else
 				echo "FAIL: $$testfile"
+				rm -rf $$tmpdir
 				exit 1
 			fi
 		else
-			echo "No expected file ($$exp), skipping compare"
+			echo "Creating expected file: $$exp"
+			mkdir -p $(EXPECTEDDIR)
+			mv $$out $$exp
 		fi
 	done
+	# cleanup temp outputs
+	rm -rf $(TESTDIR)/.tmp
 
 clean:
 	echo "Removing test outputs..."
-	rm -f $(TESTDIR)/*.output
+	rm -rf $(TESTDIR)/actual
 
 distclean: clean
 	echo "Removing build directory $(BUILD_DIR)..."
