@@ -4,10 +4,7 @@
 #include <stdexcept>
 #include <sstream>
 #include "../vm/instruction.h"
-
-// Lưu ý: chỉnh đường dẫn "../instruction.h" nếu project dùng include khác.
-// Hàm name_op(Opcode) đã có trong project (name_op.cpp) — link tự resolve tại link-time.
-std::string name_op(Opcode op);
+#include "../frontend/keywords.h"  // for name_op()
 
 // StackValue typedef nếu chưa có chung (nếu đã có, bỏ hoặc đồng bộ)
 using StackValue = std::variant<int, std::string>;
