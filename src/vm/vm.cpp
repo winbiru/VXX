@@ -132,6 +132,27 @@ void VM::run() {
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
 
+                // Pre-size callee's local storage based on function bytecode to avoid
+                // uninitialized-variable warnings when a local is accessed before
+                // OP_PARAM populates it (defensive). We scan for instructions that
+                // reference local indices and ensure the call frame has space.
+                int maxLocalId = -1;
+                for (const Instruction &fi : it->second) {
+                    if (fi.op == OP_PARAM || fi.op == OP_KHOI_TAO || fi.op == OP_TEN_BIEN_ID || fi.op == OP_TEN_BIEN_GIA_TRI) {
+                        if (fi.operandIndex > maxLocalId) maxLocalId = fi.operandIndex;
+                    }
+                }
+                if (maxLocalId >= 0) {
+                    if (!funcVM.callStack.empty()) {
+                        CallFrame &calleeFrame = funcVM.callStack.back();
+                        if (calleeFrame.localsIndexed) {
+                            if ((int)calleeFrame.localsVec.size() <= maxLocalId) {
+                                calleeFrame.localsVec.resize(maxLocalId + 1, make_int_value(0));
+                            }
+                        }
+                    }
+                }
+
                 // Thực thi hàm
                 funcVM.run();
 
@@ -286,8 +307,22 @@ void VM::run() {
 
             case OP_KHOI_TAO: {
                 int varId = instr.operandIndex;
-                if (variables.count(varId) == 0) {
-                    variables[varId] = 0;
+                // If we are inside a call frame, initialize local storage there.
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        if (varId >= 0 && varId >= (int)frame.localsVec.size()) {
+                            frame.localsVec.resize(varId + 1, make_int_value(0));
+                        } else if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            frame.localsVec[varId] = make_int_value(0);
+                        }
+                    } else {
+                        frame.localsMap[varId] = make_int_value(0);
+                    }
+                } else {
+                    if (variables.count(varId) == 0) {
+                        variables[varId] = make_int_value(0);
+                    }
                 }
                 break;
             }
@@ -413,17 +448,24 @@ void VM::run() {
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
 
+                // Prefer locals if inside a call frame
                 if (!callStack.empty()) {
                     CallFrame &frame = callStack.back();
                     if (frame.localsIndexed) {
-                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
-                            stack.push_back(frame.localsVec[varId]);
-                            break;
+                        if (varId >= 0 && varId >= (int)frame.localsVec.size()) {
+                            // Resize to accommodate and initialize to 0
+                            frame.localsVec.resize(varId + 1, make_int_value(0));
                         }
+                        stack.push_back(frame.localsVec[varId]);
+                        break;
                     } else {
-                        auto it = frame.localsMap.find(varId);
-                        if (it != frame.localsMap.end()) {
-                            stack.push_back(it->second);
+                        auto itloc = frame.localsMap.find(varId);
+                        if (itloc == frame.localsMap.end()) {
+                            frame.localsMap[varId] = make_int_value(0);
+                            stack.push_back(frame.localsMap[varId]);
+                            break;
+                        } else {
+                            stack.push_back(itloc->second);
                             break;
                         }
                     }

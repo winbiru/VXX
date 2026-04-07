@@ -1,6 +1,7 @@
 // Created by nx_thang on 10/20/2025.
 // Updated: bổ sung hỗ trợ comment, escape trong string, cải thiện nhận diện identifier UTF-8,
 // and ổn định post-processing multi-word keywords.
+// Updated: thêm error handling và exception cho các trường hợp ngoài mong đợi.
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +17,42 @@
 namespace vietvm::compiler {
     using Value = std::variant<int, std::string>;
     std::vector<Value> vars; // indexed by varId
+
+    // ==================== Helper Functions Implementation ====================
+
+    std::pair<size_t, size_t> getLineAndColumn(const std::string& src, size_t index) {
+        size_t line = 1;
+        size_t col = 1;
+        for (size_t i = 0; i < index && i < src.size(); ++i) {
+            if (src[i] == '\n') {
+                ++line;
+                col = 1;
+            } else {
+                ++col;
+            }
+        }
+        return {line, col};
+    }
+
+    std::string getErrorContext(const std::string& src, size_t index, size_t contextLen) {
+        size_t start = (index > contextLen) ? index - contextLen : 0;
+        size_t end = std::min(index + contextLen, src.size());
+
+        // Tìm đầu dòng
+        while (start > 0 && src[start - 1] != '\n') --start;
+        // Tìm cuối dòng
+        while (end < src.size() && src[end] != '\n') ++end;
+
+        std::string context = src.substr(start, end - start);
+        // Thay thế các ký tự điều khiển
+        for (char& c : context) {
+            if (c == '\t') c = ' ';
+            else if (c < 32 && c != '\n') c = '?';
+        }
+        return context;
+    }
+
+    // ==================== Core Lexer Functions ====================
 
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
@@ -80,6 +117,7 @@ namespace vietvm::compiler {
     }
 
     // Tokenize, with comment and improved string handling
+    // Bổ sung: error handling cho các trường hợp ngoài mong đợi
     std::vector<std::string> tokenize(const std::string &src) {
         std::vector<std::string> tokens;
         size_t i = 0;
@@ -99,10 +137,21 @@ namespace vietvm::compiler {
                     continue;
                 } else if (n1 == '*') {
                     // skip block comment
+                    size_t commentStart = i;
                     i += 2;
+                    bool closed = false;
                     while (i + 1 < n) {
-                        if (src[i] == '*' && src[i+1] == '/') { i += 2; break; }
+                        if (src[i] == '*' && src[i+1] == '/') {
+                            i += 2;
+                            closed = true;
+                            break;
+                        }
                         ++i;
+                    }
+                    // Kiểm tra comment không đóng
+                    if (!closed) {
+                        auto [line, col] = getLineAndColumn(src, commentStart);
+                        throw UnclosedCommentError(line, col);
                     }
                     continue;
                 }
@@ -111,14 +160,22 @@ namespace vietvm::compiler {
             // String literal with escape handling (keep quotes in token)
             if (ch == '"' || ch == '\'') {
                 char quote = static_cast<char>(ch);
+                size_t stringStart = i;
                 size_t j = i + 1;
                 std::ostringstream oss;
+                bool closed = false;
                 while (j < n) {
                     char c = src[j];
                     if (c == '\\' && j + 1 < n) {
-                        // escape sequence - keep escaped char so token includes raw content
+                        // escape sequence - validate and keep
                         char esc = src[j+1];
-                        // we will store as raw text including escapes (strip later if needed)
+                        // Kiểm tra escape sequence hợp lệ (permissive mode - chỉ cảnh báo, không throw)
+                        // Nếu muốn strict mode, bỏ comment dòng dưới:
+                        // if (esc != 'n' && esc != 'r' && esc != 't' && esc != '\\' &&
+                        //     esc != '\'' && esc != '"' && esc != '0') {
+                        //     auto [line, col] = getLineAndColumn(src, j);
+                        //     throw InvalidEscapeSequenceError(esc, line, col);
+                        // }
                         oss.put('\\');
                         oss.put(esc);
                         j += 2;
@@ -127,12 +184,24 @@ namespace vietvm::compiler {
                     if (c == quote) {
                         // include closing quote
                         ++j;
+                        closed = true;
                         break;
+                    }
+                    // Kiểm tra newline không được phép trong chuỗi (trừ khi escaped)
+                    if (c == '\n') {
+                        auto [line, col] = getLineAndColumn(src, stringStart);
+                        std::string partial = src.substr(stringStart + 1, std::min(j - stringStart - 1, (size_t)20));
+                        throw UnclosedStringError(line, col, partial);
                     }
                     oss.put(c);
                     ++j;
                 }
-                // if closing quote not found j may reach end; keep whatever is found
+                // Kiểm tra chuỗi không đóng
+                if (!closed) {
+                    auto [line, col] = getLineAndColumn(src, stringStart);
+                    std::string partial = src.substr(stringStart + 1, std::min(n - stringStart - 1, (size_t)20));
+                    throw UnclosedStringError(line, col, partial);
+                }
                 std::string raw = src.substr(i, std::min(j, n) - i);
                 tokens.push_back(raw);
                 i = j;
@@ -155,7 +224,7 @@ namespace vietvm::compiler {
             if (c == '+' || c == '-' || c == '*' || c == '/' ||
                 c == '(' || c == ')' || c == '{' || c == '}' ||
                 c == '[' || c == ']' || c == ';' || c == ',' ||
-                c == '<' || c == '>' || c == '=' || c == '!'
+                c == '<' || c == '>' || c == '=' || c == '!' || c == ':'
             ) {
                 tokens.emplace_back(1, c);
                 ++i;
@@ -171,9 +240,16 @@ namespace vietvm::compiler {
                 if (cj == '"' || cj == '+' || cj == '-' || cj == '*' || cj == '/' ||
                     cj == '(' || cj == ')' || cj == '{' || cj == '}' ||
                     cj == '[' || cj == ']' || cj == ';' || cj == ',' ||
-                    cj == '<' || cj == '>' || cj == '=' || cj == '!') break;
+                    cj == '<' || cj == '>' || cj == '=' || cj == '!' || cj == ':') break;
                 ++j;
             }
+
+            // Kiểm tra token rỗng (không nên xảy ra, nhưng phòng ngừa)
+            if (j == i) {
+                auto [line, col] = getLineAndColumn(src, i);
+                throw InvalidCharacterError(src[i], line, col);
+            }
+
             tokens.push_back(src.substr(i, j - i));
             i = j;
         }
@@ -199,7 +275,6 @@ namespace vietvm::compiler {
         return toLowerAscii(t);
     }
 
-    // (Đoạn hàm postProcessTokens được cập nhật để hỗ trợ ghép từ khóa nhiều từ)
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens) {
         std::vector<std::string> result;
         result.reserve(tokens.size());
@@ -282,7 +357,12 @@ namespace vietvm::compiler {
                         case '\\': oss.put('\\'); break;
                         case '\'': oss.put('\''); break;
                         case '"': oss.put('"'); break;
-                        default: oss.put(esc); break;
+                        case '0': oss.put('\0'); break;
+                        default:
+                            // Escape không được nhận diện - cảnh báo hoặc giữ nguyên
+                            // Có thể throw InvalidEscapeSequenceError nếu muốn strict mode
+                            oss.put(esc);
+                            break;
                     }
                     ++i; // skip escape char
                 } else {
@@ -296,7 +376,8 @@ namespace vietvm::compiler {
 
     int getVarValueInt(int varId) {
         if (varId < 0 || static_cast<size_t>(varId) >= vars.size()) {
-            throw std::runtime_error("getVarValueInt: varId ngoài phạm vi");
+            throw std::runtime_error("getVarValueInt: varId ngoài phạm vi (id=" + std::to_string(varId) +
+                                     ", size=" + std::to_string(vars.size()) + ")");
         }
         const Value& v = vars[varId];
         if (std::holds_alternative<int>(v)) {
@@ -304,13 +385,69 @@ namespace vietvm::compiler {
         }
         // nếu là chuỗi, thử chuyển sang int; nếu không parse được thì lỗi
         if (std::holds_alternative<std::string>(v)) {
+            const std::string& strVal = std::get<std::string>(v);
             try {
-                return std::stoi(std::get<std::string>(v));
-            } catch (...) {
-                throw std::runtime_error("getVarValueInt: giá trị biến không phải số");
+                return std::stoi(strVal);
+            } catch (const std::invalid_argument&) {
+                throw std::runtime_error("getVarValueInt: giá trị biến không phải số hợp lệ: '" + strVal + "'");
+            } catch (const std::out_of_range&) {
+                throw std::runtime_error("getVarValueInt: giá trị số quá lớn: '" + strVal + "'");
             }
         }
         throw std::runtime_error("getVarValueInt: kiểu giá trị không hỗ trợ");
+    }
+
+    // ==================== Validation Functions Implementation ====================
+
+    void validateNumber(const std::string& token, size_t line, size_t column) {
+        if (token.empty()) {
+            throw InvalidNumberError(token, line, column);
+        }
+
+        size_t start = 0;
+        if (token[0] == '-' || token[0] == '+') {
+            start = 1;
+            if (token.size() == 1) {
+                throw InvalidNumberError(token, line, column);
+            }
+        }
+
+        bool hasDecimal = false;
+        for (size_t i = start; i < token.size(); ++i) {
+            if (token[i] == '.') {
+                if (hasDecimal) {
+                    throw InvalidNumberError(token, line, column);
+                }
+                hasDecimal = true;
+            } else if (!std::isdigit(static_cast<unsigned char>(token[i]))) {
+                throw InvalidNumberError(token, line, column);
+            }
+        }
+    }
+
+    void validateIdentifier(const std::string& token, size_t line, size_t column) {
+        if (token.empty()) {
+            throw LexerError("Tên định danh không được rỗng", line, column, "");
+        }
+
+        unsigned char first = static_cast<unsigned char>(token[0]);
+        // Phải bắt đầu bằng chữ cái, underscore, hoặc ký tự UTF-8
+        if (std::isdigit(first)) {
+            throw InvalidIdentifierError(token, line, column);
+        }
+    }
+
+    void validateStringLiteral(const std::string& token, size_t line, size_t column) {
+        if (token.size() < 2) {
+            throw LexerError("Chuỗi không hợp lệ: '" + token + "'", line, column, "");
+        }
+
+        char openQuote = token.front();
+        char closeQuote = token.back();
+
+        if ((openQuote != '"' && openQuote != '\'') || openQuote != closeQuote) {
+            throw LexerError("Chuỗi không được đóng đúng cách: '" + token + "'", line, column, "");
+        }
     }
 
 } // namespace vietvm::compiler

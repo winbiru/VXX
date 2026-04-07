@@ -71,12 +71,13 @@ endif()
 # CLI executable (thin wrapper that uses libs above)
 add_executable(vietvm-cli ${CLI_SOURCES})
 
-# Link libraries conditionally (only those targets that exist)
-set(VIETVM_CLI_LIBS vietvm-frontend vietvm-compiler vietvm-vm)
+# Link only to the top-level library - transitive dependencies will pull in the rest
+# This avoids duplicate library warnings from the linker
 if (TARGET vietvm-stdlib)
-    list(APPEND VIETVM_CLI_LIBS vietvm-stdlib)
+    target_link_libraries(vietvm-cli PRIVATE vietvm-stdlib)
+else()
+    target_link_libraries(vietvm-cli PRIVATE vietvm-vm)
 endif()
-target_link_libraries(vietvm-cli PRIVATE ${VIETVM_CLI_LIBS})
 target_include_directories(vietvm-cli PRIVATE ${VIETVM_INCLUDE_DIR})
 
 if (MSVC)

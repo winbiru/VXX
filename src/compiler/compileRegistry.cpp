@@ -3,9 +3,13 @@
 //
 
 #include "../../include/compiler/compileRegistry.h"
+#include "../../include/compiler/compiler.h"
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
+#include <filesystem>
+#include <unordered_set>
 
 #include "common/loopUltil.h"
 #include "common/utility.h"
@@ -17,6 +21,11 @@
 #include "compiler/compileBlock.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
+
+namespace vietvm { namespace compiler {
+    std::unordered_set<std::string> importedFiles;
+    void clearImportedFiles() { importedFiles.clear(); }
+} }
 
 static std::vector<std::string> splitArgs(const std::string &s) {
     std::vector<std::string> res;
@@ -191,6 +200,81 @@ void initCompileMap() {
             int nameIndex = vietvm::compiler::StringPool::storeString(fname);
             bytecode.push_back({OP_GOI, compiledArgs, nameIndex, 0});
         }
+
+        if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+    };
+
+    // ---- Handler: nhập (import modules/files) ----
+    // Syntax (MVP):
+    //   nhập "path/to/module.vi";
+    //   nhập moduleName;    // resolves to moduleName.vi in cwd
+    compileMap["nhập"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                             std::vector<Instruction>& bytecode,
+                             std::unordered_map<std::string,int>& symTab,
+                             int& nextId,
+                             const std::unordered_map<std::string,Opcode>& keywordMap) {
+        ++pos; // skip 'nhập'
+        if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
+        std::string target = tokens[pos++];
+
+        // optional semicolon will be consumed later
+
+        // Determine path
+        std::string path;
+        if (target.size() >= 2 && (target.front() == '"' || target.front() == '\'')) {
+            // strip quotes (no escape processing here)
+            path = target.substr(1, target.size() - 2);
+        } else {
+            // treat identifier as file name with .vi
+            path = target + ".vi";
+        }
+
+        namespace fs = std::filesystem;
+        fs::path p(path);
+        // Make absolute and normalized path (if possible)
+        fs::path abs;
+        try {
+            abs = fs::absolute(p).lexically_normal();
+        } catch (...) {
+            abs = p;
+        }
+
+        // If resolved path does not exist, attempt to locate the file by searching
+        // upward from the current working directory and appending the requested path.
+        // This helps with imports like "src/tests/..." when the process cwd is build/bin.
+        if (!fs::exists(abs)) {
+            for (fs::path dir = fs::current_path(); ; dir = dir.parent_path()) {
+                fs::path cand = dir / p;
+                if (fs::exists(cand)) {
+                    abs = fs::absolute(cand).lexically_normal();
+                    break;
+                }
+                if (dir == dir.parent_path()) break; // reached filesystem root
+            }
+        }
+
+        std::string canonical = abs.string();
+
+        if (vietvm::compiler::importedFiles.find(canonical) != vietvm::compiler::importedFiles.end()) {
+            // already imported in this compile session — no-op
+            if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+            return;
+        }
+
+        // read file
+        std::ifstream ifs(canonical);
+        if (!ifs.is_open()) {
+            throw std::runtime_error(std::string("nhập: không thể mở file '") + canonical + "'");
+        }
+        std::stringstream ss;
+        ss << ifs.rdbuf();
+        std::string src = ss.str();
+
+        // compile module without emitting main call
+        auto moduleBC = compileSource(src, keywordMap, false);
+
+        // functions and strings from module are already registered in global StringPool and hamMap
+        vietvm::compiler::importedFiles.insert(canonical);
 
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
     };

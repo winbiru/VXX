@@ -5,7 +5,7 @@ hàm main() {
     in "Chương trình lọc giao dịch hoàn thành";
 
 }
-//đây là comment
+//đây là commentS
 hàm xuLyDuLieuKhongGian(x_batDau, x_ketThuc, yz_batDau, yz_ketThuc) {
     lặp (x = x_batDau; x <= x_ketThuc; x = x + 1) {
         lặp (y = yz_batDau; y <= yz_ketThuc; y = y + 1) {

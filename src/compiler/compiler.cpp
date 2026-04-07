@@ -16,7 +16,8 @@
 // It returns vector<Instruction>.
 
 std::vector<Instruction> compileSource(const std::string& source,
-                                       const std::unordered_map<std::string,Opcode>& keywordMap)
+                                       const std::unordered_map<std::string,Opcode>& keywordMap,
+                                       bool emitMainCall)
 {
     std::vector<Instruction> bytecode;
     std::unordered_map<std::string,int> symTab;
@@ -33,12 +34,14 @@ std::vector<Instruction> compileSource(const std::string& source,
         if (tokens[pos] == "}") { ++pos; continue; }
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
     }
-    auto it = symTab.find("main");
-    if (it != symTab.end()) {
-        int mainHamId = it->second;
-        // Emit OP_GOI with hamId and argc = 0 so VM will run main
-        bytecode.push_back({OP_GOI, 0,mainHamId, 0});
+    if (emitMainCall) {
+        auto it = symTab.find("main");
+        if (it != symTab.end()) {
+            int mainHamId = it->second;
+            // Emit OP_GOI with hamId and argc = 0 so VM will run main
+            bytecode.push_back({OP_GOI, 0,mainHamId, 0});
+        }
+        bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0,0});
     }
-    bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0,0});
     return bytecode;
 }

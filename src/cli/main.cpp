@@ -8,6 +8,7 @@
 #include "../../include/vm/vm.h"
 #include "../../include/frontend/keywords.h"
 #include "common/storeString.h"
+#include "../../include/compiler/compileRegistry.h"
 
 namespace fs = std::filesystem;
 
@@ -21,24 +22,33 @@ std::string readFile(const std::string &filename) {
     return buffer.str();
 }
 
-void initCompileMap();
 
 int main(int argc, char* argv[]) {
     try {
         initCompileMap();
 
         // -----------------------------
-        // ✅ Trường hợp có đối số (chạy file được chỉ định)
+        // Trường hợp có đối số (chạy file được chỉ định)
         // -----------------------------
         if (argc == 2) {
             const std::string filename = argv[1];
             std::string source = readFile(filename);
 
+            // Ensure relative imports inside the compiled file resolve relative to the file's directory
+            auto prev_cwd = fs::current_path();
+            if (!fs::path(filename).parent_path().empty()) {
+                fs::current_path(fs::path(filename).parent_path());
+            }
+
             vietvm::compiler::StringPool::clear();
+            // Reset imported files tracking between compilations
+            vietvm::compiler::clearImportedFiles();
             vietvm::compiler::hamMap::hamBytecodeMap.clear();
             vietvm::compiler::hamMap::clearHamNameIndexMap();
             vietvm::compiler::hamMap::resetHamIdCounter();
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+            // restore cwd
+            fs::current_path(prev_cwd);
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
@@ -52,18 +62,27 @@ int main(int argc, char* argv[]) {
         }
 
         // -----------------------------
-        // ✅ Nếu không có đối số → chạy file mặc định
+        // Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../../src/tests/program.vi";
+        const std::string defaultFile = "../../src/tests/import_main.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 
+            // run default file with cwd set to its parent so imports resolve
+            auto prev_cwd = fs::current_path();
+            if (!fs::path(defaultFile).parent_path().empty()) {
+                fs::current_path(fs::path(defaultFile).parent_path());
+            }
+
             vietvm::compiler::StringPool::clear();
+            // Reset imported files tracking between compilations
+            vietvm::compiler::clearImportedFiles();
             vietvm::compiler::hamMap::hamBytecodeMap.clear();
             vietvm::compiler::hamMap::clearHamNameIndexMap();
             vietvm::compiler::hamMap::resetHamIdCounter();
 
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+            fs::current_path(prev_cwd);
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
             // In bytecode để debug
@@ -94,8 +113,16 @@ int main(int argc, char* argv[]) {
                     std::cout << "\n🔹 Đang chạy test: " << filename << std::endl;
 
                     std::string source = readFile(filename);
+                    // Ensure imports inside each test file resolve relative to the test file location
+                    auto prev_cwd = fs::current_path();
+                    if (!fs::path(filename).parent_path().empty()) {
+                        fs::current_path(fs::path(filename).parent_path());
+                    }
                     vietvm::compiler::StringPool::clear();
+                    // Reset imported files tracking between compilations
+                    vietvm::compiler::clearImportedFiles();
                     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+                    fs::current_path(prev_cwd);
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
                     VM vm(bytecode, stringPool);
@@ -105,11 +132,11 @@ int main(int argc, char* argv[]) {
                 }
             }
         } else {
-            std::cerr << "⚠️ Thư mục tests/ không tồn tại.\n";
+            std::cerr << "Thư mục tests/ không tồn tại.\n";
         }
 
     } catch (const std::exception &ex) {
-        std::cerr << "❌ Lỗi: " << ex.what() << std::endl;
+        std::cerr << "Lỗi: " << ex.what() << std::endl;
         return EXIT_FAILURE;
     }
 
