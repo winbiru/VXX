@@ -458,7 +458,9 @@ void VM::run() {
 
                 // Fallback to global variables
                 if (variables.count(varId) == 0) {
-                    std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
+                    // Silently initialize to 0 - this can happen for:
+                    // 1. Variables that are implicitly declared
+                    // 2. First access before explicit assignment
                     variables[varId] = make_int_value(0);
                 }
                 stack.push_back(variables[varId]);
@@ -496,7 +498,28 @@ void VM::run() {
 
                 int varId = std::get<int>(varIdVal);
 
-                // store variant into variables map
+                // Prefer writing to locals if inside a call frame
+                // This ensures consistency with OP_TEN_BIEN_GIA_TRI which reads from locals first
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        // Check if this varId is within local scope (was initialized by OP_PARAM/OP_KHOI_TAO)
+                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            frame.localsVec[varId] = valueVal;
+                            break;
+                        }
+                        // If not in locals, fall through to global
+                    } else {
+                        auto itloc = frame.localsMap.find(varId);
+                        if (itloc != frame.localsMap.end()) {
+                            frame.localsMap[varId] = valueVal;
+                            break;
+                        }
+                        // If not in locals, fall through to global
+                    }
+                }
+
+                // Fallback: store in global variables map
                 variables[varId] = valueVal;
                 break;
             }

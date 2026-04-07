@@ -95,18 +95,18 @@ int main(int argc, char* argv[]) {
             // cwd will be restored by CwdGuard destructor
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
-            // In bytecode để debug
-            std::cout << "=> Danh sách bytecode cho file mã nguồn (" << defaultFile << "):" << std::endl;
-            for (size_t i = 0; i < bytecode.size(); ++i) {
-                const Instruction &instr = bytecode[i];
-                std::cout << "[" << i << "] "
-                          << "op: " << instr.op << " (" << name_op(instr.op) << ")";
-                if (instr.operandIndex != -1)
-                    std::cout << ", operandIndex: " << instr.operandIndex;
-                if (instr.operand != 0)
-                    std::cout << ", operand: " << instr.operand;
-                std::cout << std::endl;
-            }
+            // // In bytecode để debug
+            // std::cout << "=> Danh sách bytecode cho file mã nguồn (" << defaultFile << "):" << std::endl;
+            // for (size_t i = 0; i < bytecode.size(); ++i) {
+            //     const Instruction &instr = bytecode[i];
+            //     std::cout << "[" << i << "] "
+            //               << "op: " << instr.op << " (" << name_op(instr.op) << ")";
+            //     if (instr.operandIndex != -1)
+            //         std::cout << ", operandIndex: " << instr.operandIndex;
+            //     if (instr.operand != 0)
+            //         std::cout << ", operand: " << instr.operand;
+            //     std::cout << std::endl;
+            // }
             VM vm(bytecode, stringPool);
 
             // copy compiled functions into VM
