@@ -12,6 +12,15 @@
 
 namespace fs = std::filesystem;
 
+// RAII guard to restore current working directory on scope exit
+struct CwdGuard {
+    fs::path saved;
+    explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
+    ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
+    CwdGuard(const CwdGuard&) = delete;
+    CwdGuard& operator=(const CwdGuard&) = delete;
+};
+
 std::string readFile(const std::string &filename) {
     std::ifstream fileStream(filename);
     if (!fileStream.is_open()) {
@@ -36,13 +45,7 @@ int main(int argc, char* argv[]) {
 
             // Ensure relative imports inside the compiled file resolve relative to the file's directory
             // Use RAII-style guard to always restore cwd even on exception
-            auto prev_cwd = fs::current_path();
-            struct CwdGuard {
-                fs::path saved;
-                explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
-                ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
-            } cwdGuard(prev_cwd);
-
+            CwdGuard cwdGuard(fs::current_path());
             if (!fs::path(filename).parent_path().empty()) {
                 fs::current_path(fs::path(filename).parent_path());
             }
@@ -76,13 +79,7 @@ int main(int argc, char* argv[]) {
 
             // run default file with cwd set to its parent so imports resolve
             // Use RAII-style guard to always restore cwd even on exception
-            auto prev_cwd = fs::current_path();
-            struct CwdGuard {
-                fs::path saved;
-                explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
-                ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
-            } cwdGuard(prev_cwd);
-
+            CwdGuard cwdGuard(fs::current_path());
             if (!fs::path(defaultFile).parent_path().empty()) {
                 fs::current_path(fs::path(defaultFile).parent_path());
             }
@@ -128,18 +125,13 @@ int main(int argc, char* argv[]) {
                     std::string source = readFile(filename);
                     // Ensure imports inside each test file resolve relative to the test file location
                     // Use RAII-style guard to always restore cwd even on exception
-                    auto prev_cwd = fs::current_path();
-                    struct CwdGuard {
-                        fs::path saved;
-                        explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
-                        ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
-                    } cwdGuard(prev_cwd);
-
+                    CwdGuard cwdGuard(fs::current_path());
                     if (!fs::path(filename).parent_path().empty()) {
                         fs::current_path(fs::path(filename).parent_path());
                     }
+
                     vietvm::compiler::StringPool::clear();
-                    // Reset imported files tracking between compilations
+                    // Reset imported files tracking giữa các lần biên dịch
                     vietvm::compiler::clearImportedFiles();
                     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
                     // cwd will be restored by CwdGuard destructor

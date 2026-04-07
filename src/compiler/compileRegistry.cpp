@@ -214,7 +214,7 @@ void initCompileMap() {
                              int& nextId,
                              const std::unordered_map<std::string,Opcode>& keywordMap) {
         // These parameters are required by CompileFunc signature but not used by nhập
-        // because import only causes side-effects (registering functions/strings)
+        // because import only causes side effects (registering functions/strings)
         (void)bytecode;
         (void)symTab;
         (void)nextId;
