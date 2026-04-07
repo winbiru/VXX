@@ -132,6 +132,14 @@ void VM::run() {
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
 
+                // Do not pre-size callee locals using operandIndex values gathered
+                // from bytecode. These ids may come from a global symbol table rather
+                // than a function-local index space, so resizing localsVec to
+                // maxLocalId + 1 can cause excessive allocation and can also make
+                // variable reads incorrectly resolve as locals instead of falling back
+                // to globals. Keep local storage sparse/on-demand and let the normal
+                // parameter/initialization instructions populate it.
+
                 // Thực thi hàm
                 funcVM.run();
 
@@ -286,8 +294,22 @@ void VM::run() {
 
             case OP_KHOI_TAO: {
                 int varId = instr.operandIndex;
-                if (variables.count(varId) == 0) {
-                    variables[varId] = 0;
+                // If we are inside a call frame, initialize local storage there.
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        if (varId >= 0 && varId >= (int)frame.localsVec.size()) {
+                            frame.localsVec.resize(varId + 1, make_int_value(0));
+                        } else if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            frame.localsVec[varId] = make_int_value(0);
+                        }
+                    } else {
+                        frame.localsMap[varId] = make_int_value(0);
+                    }
+                } else {
+                    if (variables.count(varId) == 0) {
+                        variables[varId] = make_int_value(0);
+                    }
                 }
                 break;
             }
@@ -413,24 +435,32 @@ void VM::run() {
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
 
+                // Prefer locals if inside a call frame AND local has been initialized
                 if (!callStack.empty()) {
                     CallFrame &frame = callStack.back();
                     if (frame.localsIndexed) {
+                        // Only use local if it exists (was set by OP_PARAM/OP_KHOI_TAO)
                         if (varId >= 0 && varId < (int)frame.localsVec.size()) {
                             stack.push_back(frame.localsVec[varId]);
                             break;
                         }
+                        // Otherwise fall through to global variables
                     } else {
-                        auto it = frame.localsMap.find(varId);
-                        if (it != frame.localsMap.end()) {
-                            stack.push_back(it->second);
+                        auto itloc = frame.localsMap.find(varId);
+                        if (itloc != frame.localsMap.end()) {
+                            // Local exists, use it
+                            stack.push_back(itloc->second);
                             break;
                         }
+                        // Otherwise fall through to global variables
                     }
                 }
 
+                // Fallback to global variables
                 if (variables.count(varId) == 0) {
-                    std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
+                    // Silently initialize to 0 - this can happen for:
+                    // 1. Variables that are implicitly declared
+                    // 2. First access before explicit assignment
                     variables[varId] = make_int_value(0);
                 }
                 stack.push_back(variables[varId]);
@@ -468,7 +498,28 @@ void VM::run() {
 
                 int varId = std::get<int>(varIdVal);
 
-                // store variant into variables map
+                // Prefer writing to locals if inside a call frame
+                // This ensures consistency with OP_TEN_BIEN_GIA_TRI which reads from locals first
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    if (frame.localsIndexed) {
+                        // Check if this varId is within local scope (was initialized by OP_PARAM/OP_KHOI_TAO)
+                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            frame.localsVec[varId] = valueVal;
+                            break;
+                        }
+                        // If not in locals, fall through to global
+                    } else {
+                        auto itloc = frame.localsMap.find(varId);
+                        if (itloc != frame.localsMap.end()) {
+                            frame.localsMap[varId] = valueVal;
+                            break;
+                        }
+                        // If not in locals, fall through to global
+                    }
+                }
+
+                // Fallback: store in global variables map
                 variables[varId] = valueVal;
                 break;
             }

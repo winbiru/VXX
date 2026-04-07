@@ -8,8 +8,116 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 namespace vietvm::compiler {
+
+    // ==================== Exception Classes ====================
+
+    // Lớp exception cơ bản cho lexer - cung cấp thông tin vị trí lỗi
+    class LexerError : public std::runtime_error {
+    public:
+        size_t line;
+        size_t column;
+        std::string context;
+
+        explicit LexerError(const std::string& message, size_t line = 0, size_t column = 0, const std::string& context = "")
+            : std::runtime_error(formatMessage(message, line, column, context)),
+              line(line), column(column), context(context) {}
+
+    private:
+        static std::string formatMessage(const std::string& msg, size_t line, size_t col, const std::string& ctx) {
+            std::ostringstream oss;
+            oss << "Lỗi lexer";
+            if (line > 0) {
+                oss << " [dòng " << line;
+                if (col > 0) oss << ", cột " << col;
+                oss << "]";
+            }
+            oss << ": " << msg;
+            if (!ctx.empty()) {
+                oss << "\n  --> " << ctx;
+            }
+            return oss.str();
+        }
+    };
+
+    // Exception cho chuỗi không đóng (thiếu dấu nháy kết thúc)
+    class UnclosedStringError : public LexerError {
+    public:
+        UnclosedStringError(size_t line, size_t column, const std::string& partialString)
+            : LexerError("Chuỗi không được đóng (thiếu dấu nháy kết thúc)", line, column,
+                         "\"" + (partialString.length() > 20 ? partialString.substr(0, 20) + "..." : partialString)) {}
+    };
+
+    // Exception cho comment block không đóng (thiếu */)
+    class UnclosedCommentError : public LexerError {
+    public:
+        UnclosedCommentError(size_t line, size_t column)
+            : LexerError("Comment block không được đóng (thiếu */)", line, column, "/*...") {}
+    };
+
+    // Exception cho ký tự không hợp lệ
+    class InvalidCharacterError : public LexerError {
+    public:
+        InvalidCharacterError(char c, size_t line, size_t column)
+            : LexerError(std::string("Ký tự không hợp lệ: '") + c + "' (mã: " + std::to_string((int)(unsigned char)c) + ")",
+                         line, column, "") {}
+    };
+
+    // Exception cho escape sequence không hợp lệ (ví dụ: \x không được hỗ trợ)
+    class InvalidEscapeSequenceError : public LexerError {
+    public:
+        InvalidEscapeSequenceError(char escChar, size_t line, size_t column)
+            : LexerError(std::string("Escape sequence không hợp lệ: \\") + escChar, line, column, "") {}
+    };
+
+    // Exception cho token không mong đợi
+    class UnexpectedTokenError : public LexerError {
+    public:
+        UnexpectedTokenError(const std::string& token, const std::string& expected, size_t line, size_t column)
+            : LexerError("Token không mong đợi: '" + token + "'" + (expected.empty() ? "" : ", mong đợi: " + expected),
+                         line, column, "") {}
+    };
+
+    // Exception cho số không hợp lệ
+    class InvalidNumberError : public LexerError {
+    public:
+        InvalidNumberError(const std::string& token, size_t line, size_t column)
+            : LexerError("Số không hợp lệ: '" + token + "'", line, column, "") {}
+    };
+
+    // Exception cho identifier không hợp lệ
+    class InvalidIdentifierError : public LexerError {
+    public:
+        InvalidIdentifierError(const std::string& token, size_t line, size_t column)
+            : LexerError("Tên định danh không hợp lệ: '" + token + "'", line, column, "") {}
+    };
+
+    // ==================== Helper Functions ====================
+
+    // Tính vị trí dòng và cột từ index trong source code
+    std::pair<size_t, size_t> getLineAndColumn(const std::string& src, size_t index);
+
+    // Trích xuất ngữ cảnh xung quanh vị trí lỗi (để hiển thị trong thông báo lỗi)
+    std::string getErrorContext(const std::string& src, size_t index, size_t contextLen = 30);
+
+    // ==================== Validation Functions ====================
+
+    // Kiểm tra tính hợp lệ của một số (integer hoặc float)
+    // Ném InvalidNumberError nếu không hợp lệ
+    void validateNumber(const std::string& token, size_t line, size_t column);
+
+    // Kiểm tra tính hợp lệ của identifier
+    // Ném LexerError nếu không hợp lệ (bắt đầu bằng số, rỗng, v.v.)
+    void validateIdentifier(const std::string& token, size_t line, size_t column);
+
+    // Kiểm tra chuỗi có đúng định dạng không (có dấu nháy mở/đóng đúng)
+    // Ném LexerError nếu không hợp lệ
+    void validateStringLiteral(const std::string& token, size_t line, size_t column);
+
+    // ==================== Core Lexer Functions ====================
 
     // Trả về true nếu chuỗi biểu diễn một số nguyên (có thể có dấu '-' ở đầu).
     bool isNumber(const std::string &s) noexcept;
@@ -30,6 +138,8 @@ namespace vietvm::compiler {
 
     // Bộ phân tích token cơ bản: chia source thành các token thô.
     // Hàm này hỗ trợ UTF-8 và xử lý comment/chuỗi/toán tử tương đối.
+    // Ném exception (UnclosedStringError, UnclosedCommentError, InvalidCharacterError)
+    // khi gặp các trường hợp lỗi.
     std::vector<std::string> tokenize(const std::string &src);
 
     // Xử lý hậu token: gộp các từ khóa nhiều từ (ví dụ "mặc định", "nếu không"),
@@ -49,4 +159,5 @@ namespace vietvm::compiler {
     // Trợ giúp runtime/utility: lấy giá trị số (int) từ biến theo id.
     // Implementation có thể chuyển chuỗi sang số hoặc ném ngoại lệ nếu không hợp lệ.
     int getVarValueInt(int varId);
+
 } // namespace vietvm::compiler

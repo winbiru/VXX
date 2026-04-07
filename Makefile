@@ -64,7 +64,9 @@ check: build
 
 	for testfile in $(TESTFILES); do
 		base=$$(basename $${testfile%.vi})
-		out=$(TESTDIR)/$$base.output
+		tmpdir=$(TESTDIR)/.tmp
+		mkdir -p $$tmpdir
+		out=$$tmpdir/$$base.output
 		exp=$(EXPECTEDDIR)/$$base.expected
 		echo "== Running $$testfile =="
 		$$EXEC $$testfile > $$out 2>&1
@@ -73,16 +75,39 @@ check: build
 				echo "PASS: $$testfile"
 			else
 				echo "FAIL: $$testfile"
+				rm -rf $$tmpdir
 				exit 1
 			fi
 		else
-			echo "No expected file ($$exp), skipping compare"
+			echo "FAIL: $$testfile (no expected file: $$exp)"
+			echo "  Run 'make bless' to create expected files"
+			rm -rf $$tmpdir
+			exit 1
 		fi
+	done
+	# cleanup temp outputs
+	rm -rf $(TESTDIR)/.tmp
+
+# Create/update expected output files from current test runs
+# Use this when you've verified the output is correct
+bless: build
+	if [ -n "$(BIN)" ]; then
+		EXEC="$(BIN)"
+	else
+		EXEC="$(BUILD_DIR)/bin/vietvm-cli"
+	fi
+	mkdir -p $(EXPECTEDDIR)
+	for testfile in $(TESTFILES); do
+		base=$$(basename $${testfile%.vi})
+		exp=$(EXPECTEDDIR)/$$base.expected
+		echo "== Blessing $$testfile =="
+		$$EXEC $$testfile > $$exp 2>&1
+		echo "Created: $$exp"
 	done
 
 clean:
 	echo "Removing test outputs..."
-	rm -f $(TESTDIR)/*.output
+	rm -rf $(TESTDIR)/.tmp
 
 distclean: clean
 	echo "Removing build directory $(BUILD_DIR)..."

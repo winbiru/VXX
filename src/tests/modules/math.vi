@@ -1,0 +1,9 @@
+// Module: math.vi
+hàm tong(a, b) {
+    trả về a + b;
+};
+
+hàm mul(a, b) {
+    trả về a * b;
+};
+

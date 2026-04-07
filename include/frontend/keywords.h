@@ -7,8 +7,6 @@
 
 extern const std::unordered_map<std::string, Opcode> keywordMap;
 
-std::string name_op(Opcode op);  // tên hàm ánh xạ ngược
-
 
 // Đổi Opcode thành tên chuỗi để debug
 inline std::string name_op(Opcode op) {
