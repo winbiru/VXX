@@ -89,7 +89,7 @@ check: build
 
 clean:
 	echo "Removing test outputs..."
-	rm -rf $(TESTDIR)/actual
+	rm -rf $(TESTDIR)/.tmp
 
 distclean: clean
 	echo "Removing build directory $(BUILD_DIR)..."

@@ -35,7 +35,14 @@ int main(int argc, char* argv[]) {
             std::string source = readFile(filename);
 
             // Ensure relative imports inside the compiled file resolve relative to the file's directory
+            // Use RAII-style guard to always restore cwd even on exception
             auto prev_cwd = fs::current_path();
+            struct CwdGuard {
+                fs::path saved;
+                explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
+                ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
+            } cwdGuard(prev_cwd);
+
             if (!fs::path(filename).parent_path().empty()) {
                 fs::current_path(fs::path(filename).parent_path());
             }
@@ -47,8 +54,7 @@ int main(int argc, char* argv[]) {
             vietvm::compiler::hamMap::clearHamNameIndexMap();
             vietvm::compiler::hamMap::resetHamIdCounter();
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-            // restore cwd
-            fs::current_path(prev_cwd);
+            // cwd will be restored by CwdGuard destructor
 
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
             VM vm(bytecode, stringPool);
@@ -69,7 +75,14 @@ int main(int argc, char* argv[]) {
             std::string source = readFile(defaultFile);
 
             // run default file with cwd set to its parent so imports resolve
+            // Use RAII-style guard to always restore cwd even on exception
             auto prev_cwd = fs::current_path();
+            struct CwdGuard {
+                fs::path saved;
+                explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
+                ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
+            } cwdGuard(prev_cwd);
+
             if (!fs::path(defaultFile).parent_path().empty()) {
                 fs::current_path(fs::path(defaultFile).parent_path());
             }
@@ -82,7 +95,7 @@ int main(int argc, char* argv[]) {
             vietvm::compiler::hamMap::resetHamIdCounter();
 
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-            fs::current_path(prev_cwd);
+            // cwd will be restored by CwdGuard destructor
             const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
             // In bytecode để debug
@@ -114,7 +127,14 @@ int main(int argc, char* argv[]) {
 
                     std::string source = readFile(filename);
                     // Ensure imports inside each test file resolve relative to the test file location
+                    // Use RAII-style guard to always restore cwd even on exception
                     auto prev_cwd = fs::current_path();
+                    struct CwdGuard {
+                        fs::path saved;
+                        explicit CwdGuard(fs::path p) : saved(std::move(p)) {}
+                        ~CwdGuard() { try { fs::current_path(saved); } catch(...) {} }
+                    } cwdGuard(prev_cwd);
+
                     if (!fs::path(filename).parent_path().empty()) {
                         fs::current_path(fs::path(filename).parent_path());
                     }
@@ -122,7 +142,7 @@ int main(int argc, char* argv[]) {
                     // Reset imported files tracking between compilations
                     vietvm::compiler::clearImportedFiles();
                     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
-                    fs::current_path(prev_cwd);
+                    // cwd will be restored by CwdGuard destructor
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
 
                     VM vm(bytecode, stringPool);

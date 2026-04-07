@@ -132,26 +132,13 @@ void VM::run() {
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
 
-                // Pre-size callee's local storage based on function bytecode to avoid
-                // uninitialized-variable warnings when a local is accessed before
-                // OP_PARAM populates it (defensive). We scan for instructions that
-                // reference local indices and ensure the call frame has space.
-                int maxLocalId = -1;
-                for (const Instruction &fi : it->second) {
-                    if (fi.op == OP_PARAM || fi.op == OP_KHOI_TAO || fi.op == OP_TEN_BIEN_ID || fi.op == OP_TEN_BIEN_GIA_TRI) {
-                        if (fi.operandIndex > maxLocalId) maxLocalId = fi.operandIndex;
-                    }
-                }
-                if (maxLocalId >= 0) {
-                    if (!funcVM.callStack.empty()) {
-                        CallFrame &calleeFrame = funcVM.callStack.back();
-                        if (calleeFrame.localsIndexed) {
-                            if ((int)calleeFrame.localsVec.size() <= maxLocalId) {
-                                calleeFrame.localsVec.resize(maxLocalId + 1, make_int_value(0));
-                            }
-                        }
-                    }
-                }
+                // Do not pre-size callee locals using operandIndex values gathered
+                // from bytecode. These ids may come from a global symbol table rather
+                // than a function-local index space, so resizing localsVec to
+                // maxLocalId + 1 can cause excessive allocation and can also make
+                // variable reads incorrectly resolve as locals instead of falling back
+                // to globals. Keep local storage sparse/on-demand and let the normal
+                // parameter/initialization instructions populate it.
 
                 // Thực thi hàm
                 funcVM.run();
@@ -448,29 +435,28 @@ void VM::run() {
             case OP_TEN_BIEN_GIA_TRI: {
                 int varId = instr.operandIndex;
 
-                // Prefer locals if inside a call frame
+                // Prefer locals if inside a call frame AND local has been initialized
                 if (!callStack.empty()) {
                     CallFrame &frame = callStack.back();
                     if (frame.localsIndexed) {
-                        if (varId >= 0 && varId >= (int)frame.localsVec.size()) {
-                            // Resize to accommodate and initialize to 0
-                            frame.localsVec.resize(varId + 1, make_int_value(0));
+                        // Only use local if it exists (was set by OP_PARAM/OP_KHOI_TAO)
+                        if (varId >= 0 && varId < (int)frame.localsVec.size()) {
+                            stack.push_back(frame.localsVec[varId]);
+                            break;
                         }
-                        stack.push_back(frame.localsVec[varId]);
-                        break;
+                        // Otherwise fall through to global variables
                     } else {
                         auto itloc = frame.localsMap.find(varId);
-                        if (itloc == frame.localsMap.end()) {
-                            frame.localsMap[varId] = make_int_value(0);
-                            stack.push_back(frame.localsMap[varId]);
-                            break;
-                        } else {
+                        if (itloc != frame.localsMap.end()) {
+                            // Local exists, use it
                             stack.push_back(itloc->second);
                             break;
                         }
+                        // Otherwise fall through to global variables
                     }
                 }
 
+                // Fallback to global variables
                 if (variables.count(varId) == 0) {
                     std::cerr << "Cảnh báo: biến ID " << varId << " chưa được khởi tạo. Mặc định = 0.\n";
                     variables[varId] = make_int_value(0);

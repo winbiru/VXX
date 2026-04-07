@@ -213,6 +213,12 @@ void initCompileMap() {
                              std::unordered_map<std::string,int>& symTab,
                              int& nextId,
                              const std::unordered_map<std::string,Opcode>& keywordMap) {
+        // These parameters are required by CompileFunc signature but not used by nhập
+        // because import only causes side-effects (registering functions/strings)
+        (void)bytecode;
+        (void)symTab;
+        (void)nextId;
+
         ++pos; // skip 'nhập'
         if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
         std::string target = tokens[pos++];
@@ -261,20 +267,28 @@ void initCompileMap() {
             return;
         }
 
-        // read file
-        std::ifstream ifs(canonical);
-        if (!ifs.is_open()) {
-            throw std::runtime_error(std::string("nhập: không thể mở file '") + canonical + "'");
-        }
-        std::stringstream ss;
-        ss << ifs.rdbuf();
-        std::string src = ss.str();
-
-        // compile module without emitting main call
-        auto moduleBC = compileSource(src, keywordMap, false);
-
-        // functions and strings from module are already registered in global StringPool and hamMap
+        // Mark as in-progress before reading/compiling to prevent circular imports
         vietvm::compiler::importedFiles.insert(canonical);
+
+        try {
+            // read file
+            std::ifstream ifs(canonical);
+            if (!ifs.is_open()) {
+                throw std::runtime_error(std::string("nhập: không thể mở file '") + canonical + "'");
+            }
+            std::stringstream ss;
+            ss << ifs.rdbuf();
+            std::string src = ss.str();
+
+            // Compile the module for its registration side effects only.
+            // Imported functions/strings are recorded in the global registries;
+            // the returned module bytecode is not merged or executed here.
+            (void)compileSource(src, keywordMap, false);
+        } catch (...) {
+            // Rollback on failure
+            vietvm::compiler::importedFiles.erase(canonical);
+            throw;
+        }
 
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
     };

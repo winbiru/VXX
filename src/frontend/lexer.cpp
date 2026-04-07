@@ -77,7 +77,10 @@ namespace vietvm::compiler {
     }
 
     bool isStringLiteral(const std::string &tk) noexcept {
-        return tk.size() >= 2 && tk.front() == '"' && tk.back() == '"';
+        if (tk.size() < 2) return false;
+        // Accept both double quotes ("...") and single quotes ('...')
+        return (tk.front() == '"' && tk.back() == '"') ||
+               (tk.front() == '\'' && tk.back() == '\'');
     }
 
     // Heuristic identifier check that tolerates UTF-8 bytes (simple & pragmatic)
