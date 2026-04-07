@@ -1,10 +1,12 @@
-# VIETVM
+# Viet-crafting-interpreters
 
 ## English
+– A simple virtual machine and compiler 
+for a Vietnamese-like programming language.
 
-This repository contains **VIETVM**, a custom-designed virtual machine and compiler infrastructure for a structured, imperative programming language.
+This repository contains **Viet-crafting-interpreters**, a custom-designed virtual machine and compiler infrastructure for a structured, imperative programming language.
 
-VIETVM is an experimental system focused on **explicit execution semantics**, **transparent control flow**, and **deterministic behavior**.
+Viet-crafting-interpreters is an experimental system focused on **explicit execution semantics**, **transparent control flow**, and **deterministic behavior**.
 It is intended for study, experimentation, and long-term reference rather than mass adoption.
 
 Copyright © 2025. All rights reserved by the author.
@@ -307,3 +309,4 @@ Dự án không chứa mã nguồn GPL và có thể được sử dụng cho m�
 - Báo lỗi hoặc thảo luận: tạo Issue tại [Issues](https://github.com/winbiru/VietVM/issues)
 
 ---
+
