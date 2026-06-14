@@ -73,7 +73,15 @@ enum Opcode {
     OP_CHON           = 67,      // switch chọn
     OP_CA            = 68,       // case ca
     OP_PARAM = 69,               // tham số
-    OP_CONG_MOT = 70             //tương đương với i = i + 1
+    OP_CONG_MOT = 70,            // tương đương với i = i + 1
+    OP_TRU_MOT = 71,             // tương đương với i = i - 1 (--)
+    OP_CONG_GAN = 72,            // +=
+    OP_TRU_GAN = 73,             // -=
+    OP_NHAN_GAN = 74,            // *=
+    OP_CHIA_GAN = 75,            // /=
+    OP_MODULO_GAN = 76,          // %=
+    OP_DUNG_GIA_TRI = 77,        // true (đúng) → push 1
+    OP_SAI_GIA_TRI = 78          // false (sai) → push 0
 
 };
 

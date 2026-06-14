@@ -19,7 +19,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Helper: collect sources per module (prefer explicit lists for production)
 file(GLOB_RECURSE FRONTEND_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/frontend/*.cpp ${CMAKE_SOURCE_DIR}/src/helpers/*.cpp)
 file(GLOB_RECURSE COMPILER_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/compiler/*.cpp ${CMAKE_SOURCE_DIR}/src/compiler/*.cxx ${CMAKE_SOURCE_DIR}/src/compiler/*.cc)
-file(GLOB_RECURSE VM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/vm/*.cpp ${CMAKE_SOURCE_DIR}/src/vm/*.cxx ${CMAKE_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE VM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/vm/*.cpp)
 file(GLOB_RECURSE STDLIB_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/stdlib/*.cpp)
 set(CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
 

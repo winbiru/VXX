@@ -73,7 +73,7 @@ int main(int argc, char* argv[]) {
         // -----------------------------
         // Nếu không có đối số → chạy file mặc định
         // -----------------------------
-        const std::string defaultFile = "../../src/tests/import_main.vi";
+        const std::string defaultFile = "../../src/tests/kiem_tra_tra_ve.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
             std::string source = readFile(defaultFile);
 

@@ -1,44 +1,28 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
+# Build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+out/
+# CMake generated
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+# Compiled binaries
+*.a
 *.so
 *.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
-*.out
-*.app
-
-# IDE files
+bin/
+# Editor
 .idea/
-.vs/
+.vscode/
 *.swp
 *.swo
 *~
-
-# Build directories
-build/
-cmake-build-*/
-out/
+# macOS
+.DS_Store
+# Test artifacts
+src/tests/.tmp/
+*.actual

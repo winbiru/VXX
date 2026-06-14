@@ -110,7 +110,11 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
                 // Emit a CALL token in postfix with name and argc
                 std::string callTok = std::string("CALL::") + fname + std::string("::") + std::to_string(argc);
                 output.push_back(callTok);
-                // Note: function result will be pushed after CALL is executed
+                // The CALL result is a value, so count it as an arg if we're inside another function's arglist
+                if (!argExpectingStack.empty() && argExpectingStack.back()) {
+                    argCountStack.back() += 1;
+                    argExpectingStack.back() = false;
+                }
             }
         } else if (token == "(" || token == ")") {
             // handled

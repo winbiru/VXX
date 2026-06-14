@@ -1,0 +1,26 @@
+hàm main() {
+    // Test -- (giảm 1)
+    x = 5;
+    x--;
+    in x;
+    // Test +=
+    a = 10;
+    a += 5;
+    in a;
+    // Test -=
+    b = 20;
+    b -= 3;
+    in b;
+    // Test *=
+    c = 4;
+    c *= 3;
+    in c;
+    // Test /=
+    d = 15;
+    d /= 3;
+    in d;
+    // Test %=
+    e = 17;
+    e %= 5;
+    in e;
+}

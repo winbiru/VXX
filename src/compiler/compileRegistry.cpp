@@ -82,7 +82,7 @@ void initCompileMap() {
                                         symTab[varName] = nextId++;
                                     }
                                     int varId = symTab[varName];
-                                    bytecode.push_back({OP_KHOI_TAO, varId, 0,0});
+                                    bytecode.push_back({OP_KHOI_TAO, 0, varId, 0});
                                 }
                                 compileLoop(tokens, pos, bytecode, symTab, nextId, keywordMap);
                             }
@@ -202,6 +202,47 @@ void initCompileMap() {
         }
 
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+    };
+
+    // ---- Handler: trả về ----
+    // Syntax:
+    //   trả về <expr>;
+    //   trả về;
+    auto compileReturn = [](const std::vector<std::string>& tokens, size_t &pos,
+                            std::vector<Instruction>& bytecode,
+                            std::unordered_map<std::string,int>& symTab,
+                            int& nextId,
+                            const std::unordered_map<std::string,Opcode>& keywordMap) {
+        ++pos; // skip 'trả về'
+
+        bool hasExpr = (pos < tokens.size() && tokens[pos] != ";");
+        if (hasExpr) {
+            auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
+            if (!pr.first.empty()) {
+                compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
+            } else {
+                bytecode.push_back({OP_BIEN_SO, 0, 0, 0});
+            }
+            pos = pr.second;
+        } else {
+            if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+            bytecode.push_back({OP_BIEN_SO, 0, 0, 0});
+        }
+
+        bytecode.push_back({OP_TRA_VE, 0, 0, 0});
+    };
+
+    compileMap["trả về"] = compileReturn;
+
+    // ---- Handler: bỏ qua (continue) ----
+    compileMap["bỏ qua"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                               std::vector<Instruction>& bytecode,
+                               std::unordered_map<std::string,int>&,
+                               int&,
+                               const std::unordered_map<std::string,Opcode>&) {
+        ++pos; // skip 'bỏ qua'
+        if (pos < tokens.size() && tokens[pos] == ";") ++pos;
+        bytecode.push_back({OP_BO_QUA, 0, 0, 0});
     };
 
     // ---- Handler: nhập (import modules/files) ----

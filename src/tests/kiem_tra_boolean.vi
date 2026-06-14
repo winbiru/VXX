@@ -1,0 +1,16 @@
+hàm main() {
+    nếu (đúng) {
+        in "dung";
+    }
+    nếu (!sai) {
+        in "phu-dinh-sai";
+    }
+    ket = đúng;
+    nếu (ket) {
+        in "ket-dung";
+    }
+    x = sai;
+    nếu (!x) {
+        in "phu-dinh-x-sai";
+    }
+}

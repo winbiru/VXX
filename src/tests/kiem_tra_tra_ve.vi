@@ -1,0 +1,13 @@
+hàm congHai(a, b) {
+    trả về a + b;
+}
+
+hàm khongGiaTri() {
+    trả về;
+}
+
+hàm main() {
+    in congHai(2, 3);
+    in khongGiaTri();
+}
+

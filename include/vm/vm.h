@@ -21,6 +21,8 @@ public:
     VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool);
 
     std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
+    // nameIndex → hamId mapping for function name lookup (shared with child VMs for recursion)
+    std::unordered_map<int, int> functionTableByNameIndex;
 
 private:
     std::vector<Instruction> bytecode;              // Mã bytecode

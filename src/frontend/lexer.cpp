@@ -57,6 +57,7 @@ namespace vietvm::compiler {
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
+        if (start >= s.size()) return false;  // "-" alone is not a number
         return std::all_of(s.begin() + start, s.end(), [](unsigned char c) {
             return std::isdigit(c);
         });
@@ -66,7 +67,8 @@ namespace vietvm::compiler {
         static const std::unordered_map<std::string,int> ops = {
             {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
             {"+",4},{"-",4},{"*",5},{"/",5},{"%",5}, {"!",6},
-            {"++",7}
+            {"++",7},{"--",7},
+            {"+=",0},{"-=",0},{"*=",0},{"/=",0},{"%=",0}
         };
         return ops;
     }
@@ -215,7 +217,8 @@ namespace vietvm::compiler {
             if (i + 1 < n) {
                 std::string two = src.substr(i, 2);
                 if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
-                    two == "&&" || two == "||" || two == "++" || two == "--") {
+                    two == "&&" || two == "||" || two == "++" || two == "--" ||
+                    two == "+=" || two == "-=" || two == "*=" || two == "/=" || two == "%=") {
                     tokens.push_back(two);
                     i += 2;
                     continue;
@@ -282,6 +285,10 @@ namespace vietvm::compiler {
         std::vector<std::string> result;
         result.reserve(tokens.size());
 
+        auto throwMissingAccent = [](const std::string& kw) {
+            throw std::runtime_error("Từ khóa phải có dấu tiếng Việt: '" + kw + "'");
+        };
+
         // Danh sách các multi-word keywords (bằng token gốc, lower-case ASCII)
         // Nếu muốn mở rộng, thêm vào cả dạng có dấu và không dấu khi cần.
         const std::vector<std::vector<std::string>> multiKeywords = {
@@ -290,13 +297,42 @@ namespace vietvm::compiler {
             {"nếu", "không"},
             {"nếu", "không:"},
             {"trường", "hợp"},
-            {"trường", "hợp:"}
-            // thêm các cụm khác nếu cần
+            {"trường", "hợp:"},
+            {"trả", "về"},
+            {"bỏ", "qua"},
+            {"khởi", "tạo"},
+            {"điều", "kiện"},
+            {"cập", "nhật"},
+            {"kiểm", "tra", "sau"}
         };
 
         for (size_t i = 0; i < tokens.size(); ++i) {
             // Chuẩn bị phiên bản để so sánh (normalize) cho token hiện tại
             std::string a_norm = normalizeTokenForCompare(tokens[i]);
+
+            // Enforce Vietnamese diacritics for multi-word keywords
+            if (i + 1 < tokens.size()) {
+                std::string b_norm = normalizeTokenForCompare(tokens[i + 1]);
+                if ((a_norm == "neu" && b_norm == "khong") ||
+                    (a_norm == "tra" && b_norm == "ve") ||
+                    (a_norm == "khoi" && b_norm == "tao") ||
+                    (a_norm == "dieu" && b_norm == "kien") ||
+                    (a_norm == "cap" && b_norm == "nhat") ||
+                    (a_norm == "kiem" && b_norm == "tra") ||
+                    (a_norm == "truong" && b_norm == "hop") ||
+                    (a_norm == "mac" && b_norm == "dinh") ||
+                    (a_norm == "bo" && b_norm == "qua")) {
+                    throwMissingAccent(a_norm + " " + b_norm);
+                }
+            }
+
+            // Enforce Vietnamese diacritics for single-word keywords
+            if (a_norm == "neu" || a_norm == "hoac" || a_norm == "lap" ||
+                a_norm == "ham" || a_norm == "goi" || a_norm == "bien" ||
+                a_norm == "dung" || a_norm == "thoat" || a_norm == "chon" ||
+                a_norm == "chuyen") {
+                throwMissingAccent(a_norm);
+            }
 
             bool matchedMulti = false;
 

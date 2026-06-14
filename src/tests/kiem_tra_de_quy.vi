@@ -1,0 +1,21 @@
+hàm fibonacci(n) {
+    nếu (n <= 1) {
+        trả về n;
+    }
+    trả về fibonacci(n - 1) + fibonacci(n - 2);
+}
+hàm giaiThua(n) {
+    nếu (n <= 1) {
+        trả về 1;
+    }
+    trả về n * giaiThua(n - 1);
+}
+hàm main() {
+    in fibonacci(0);
+    in fibonacci(1);
+    in fibonacci(5);
+    in fibonacci(7);
+    in giaiThua(1);
+    in giaiThua(5);
+    in giaiThua(6);
+}

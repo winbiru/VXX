@@ -1,0 +1,9 @@
+hàm main() {
+    // Chỉ in số lẻ từ 1 đến 9
+    lặp(i = 1; i <= 9; i++) {
+        nếu (i % 2 == 0) {
+            bỏ qua;
+        }
+        in i;
+    }
+}

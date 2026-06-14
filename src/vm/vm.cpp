@@ -39,27 +39,21 @@ bool toBool(const StackValue& value) {
 }
 
 void VM::run() {
-    // Precompute function table once (avoid rebuilding each iteration)
-    std::unordered_map<std::string,int> functionTable;
-    std::unordered_map<int,int> functionTableByNameIndex;
-    for (size_t i = 0; i < bytecode.size(); ++i) {
-        const Instruction &ci = bytecode[i];
-        if (ci.op == OP_HAM) {
-            // Convention: OP_HAM: operand = nameIndex, operandIndex = hamId
-            if (ci.operand >= 0) {
-                int nameIndex = ci.operand;
-                int hamId = ci.operandIndex;
-                functionTableByNameIndex[nameIndex] = hamId;
+    // Build function name→id table if not already populated (inherited from parent in recursive calls)
+    if (functionTableByNameIndex.empty()) {
+        for (size_t i = 0; i < bytecode.size(); ++i) {
+            const Instruction &ci = bytecode[i];
+            if (ci.op == OP_HAM && ci.operand >= 0) {
+                functionTableByNameIndex[ci.operand] = ci.operandIndex;
             }
         }
-    }
-    // Merge compiler-provided hamNameIndexMap (guaranteed by compiler when registering functions)
-    for (const auto &p : vietvm::compiler::hamMap::hamNameIndexMap) {
-        int hamId = p.first;
-        int nameIndex = p.second;
-        // Only set if not already present (bytecode OP_HAM should be authoritative), but ensure mapping exists
-        if (functionTableByNameIndex.find(nameIndex) == functionTableByNameIndex.end()) {
-            functionTableByNameIndex[nameIndex] = hamId;
+        // Merge compiler-provided hamNameIndexMap
+        for (const auto &p : vietvm::compiler::hamMap::hamNameIndexMap) {
+            int hamId = p.first;
+            int nameIndex = p.second;
+            if (functionTableByNameIndex.find(nameIndex) == functionTableByNameIndex.end()) {
+                functionTableByNameIndex[nameIndex] = hamId;
+            }
         }
     }
     while (pc < bytecode.size()) {
@@ -127,10 +121,11 @@ void VM::run() {
                 VM funcVM(it->second, this->stringPool);
 
                 // Sao chép trạng thái hiện tại (Biến toàn cục và khung gọi)
-                funcVM.variables = this->variables; // **CHIA SẺ BIẾN TOÀN CỤC TRƯỚC KHI CHẠY**
+                funcVM.variables = this->variables;
                 funcVM.callStack.clear();
                 funcVM.callStack.push_back(callStack.back());
                 funcVM.hamBytecodeMap = this->hamBytecodeMap;
+                funcVM.functionTableByNameIndex = this->functionTableByNameIndex;
 
                 // Do not pre-size callee locals using operandIndex values gathered
                 // from bytecode. These ids may come from a global symbol table rather
@@ -343,6 +338,28 @@ void VM::run() {
                 break;
             }
 
+            case OP_TRA_VE: {
+                if (stack.empty()) {
+                    stack.push_back(make_int_value(0));
+                }
+                return;
+            }
+
+            case OP_BO_QUA: {
+                // Nhảy đến OP_CAP_NHAT gần nhất (bắt đầu phần update của vòng lặp)
+                size_t scanPc = pc + 1;
+                while (scanPc < bytecode.size()) {
+                    if (bytecode[scanPc].op == OP_CAP_NHAT) {
+                        pc = (int)scanPc;
+                        goto bo_qua_done;
+                    }
+                    ++scanPc;
+                }
+                throw runtime_error_op("BO_QUA: không tìm thấy OP_CAP_NHAT trong vòng lặp", instr.op, pc);
+                bo_qua_done:
+                break;
+            }
+
             case OP_CHON: {
                 if (stack.empty()) throw runtime_error_op("CHON: Stack rỗng", instr.op, pc);
                 SwitchFrame frame;
@@ -512,6 +529,7 @@ void VM::run() {
                     } else {
                         auto itloc = frame.localsMap.find(varId);
                         if (itloc != frame.localsMap.end()) {
+                            // Local exists, use it
                             frame.localsMap[varId] = valueVal;
                             break;
                         }
@@ -610,76 +628,71 @@ void VM::run() {
                 break;
             }
             case OP_CONG_MOT: {
-                // Hành vi: nếu đỉnh stack là ID biến (int) → tăng giá trị biến và push giá trị mới (prefix ++ semantics).
-                // Nếu đỉnh stack là một giá trị số (int hoặc chuỗi có thể chuyển sang int) → tăng và push lại.
-                if (stack.empty()) throw runtime_error_op("OP_CONG_MOT: stack rỗng", instr.op, pc);
-
-                StackValue top = stack.back();
-                stack.pop_back();
-
-                // Helper lambda để push int value
+                if (stack.empty()) throw runtime_error_op("OP_CONG_MOT: stack rong", instr.op, pc);
+                StackValue top = stack.back(); stack.pop_back();
                 auto push_int = [&](int v) { stack.push_back(make_int_value(v)); };
-
                 if (std::holds_alternative<int>(top)) {
                     int idOrVal = std::get<int>(top);
-
-                    // Nếu có call frame hiện tại, ưu tiên cập nhật local trong frame (tương tự OP_TEN_BIEN_GIA_TRI / OP_PARAM)
                     bool updated = false;
                     if (!callStack.empty()) {
                         CallFrame &frame = callStack.back();
                         if (frame.localsIndexed) {
-                            // ensure size
-                            if (idOrVal < 0) throw runtime_error_op("OP_CONG_MOT: id biến âm không hợp lệ", instr.op, pc);
-                            if (idOrVal >= (int)frame.localsVec.size()) frame.localsVec.resize(idOrVal + 1, make_int_value(0));
-                            int cur = as_int(frame.localsVec[idOrVal], instr.op, pc);
-                            int nw = cur + 1;
-                            frame.localsVec[idOrVal] = make_int_value(nw);
-                            push_int(nw);
-                            updated = true;
-                        } else {
-                            int cur = 0;
-                            auto itLoc = frame.localsMap.find(idOrVal);
-                            if (itLoc == frame.localsMap.end()) {
-                                frame.localsMap[idOrVal] = make_int_value(0);
-                                cur = 0;
-                            } else {
-                                cur = as_int(itLoc->second, instr.op, pc);
+                            // Only use localsVec if slot already exists (do NOT resize)
+                            if (idOrVal >= 0 && idOrVal < (int)frame.localsVec.size()) {
+                                int cur = as_int(frame.localsVec[idOrVal], instr.op, pc);
+                                frame.localsVec[idOrVal] = make_int_value(cur + 1);
+                                push_int(cur + 1); updated = true;
                             }
-                            int nw = cur + 1;
-                            frame.localsMap[idOrVal] = make_int_value(nw);
-                            push_int(nw);
-                            updated = true;
+                        } else {
+                            auto itLoc = frame.localsMap.find(idOrVal);
+                            if (itLoc != frame.localsMap.end()) {
+                                int cur = as_int(itLoc->second, instr.op, pc);
+                                itLoc->second = make_int_value(cur + 1);
+                                push_int(cur + 1); updated = true;
+                            }
                         }
                     }
-
-                    // Nếu không cập nhật local thì cập nhật biến global 'variables'
                     if (!updated) {
-                        int cur = 0;
-                        if (variables.count(idOrVal)) {
-                            cur = as_int(variables[idOrVal], instr.op, pc);
-                        } else {
-                            // khởi tạo mặc định = 0
-                            variables[idOrVal] = make_int_value(0);
-                            cur = 0;
-                        }
-                        int nw = cur + 1;
-                        variables[idOrVal] = make_int_value(nw);
-                        push_int(nw);
+                        int cur = variables.count(idOrVal) ? as_int(variables[idOrVal], instr.op, pc) : 0;
+                        variables[idOrVal] = make_int_value(cur + 1);
+                        push_int(cur + 1);
                     }
                 } else if (std::holds_alternative<std::string>(top)) {
-                    // Thử chuyển chuỗi sang int rồi tăng; nếu không chuyển được thì báo lỗi
-                    const std::string &s = std::get<std::string>(top);
-                    try {
-                        int cur = std::stoi(s);
-                        int nw = cur + 1;
-                        push_int(nw);
-                    } catch (...) {
-                        throw runtime_error_op("OP_CONG_MOT: không thể tăng chuỗi không phải số", instr.op, pc);
+                    try { push_int(std::stoi(std::get<std::string>(top)) + 1); }
+                    catch (...) { throw runtime_error_op("OP_CONG_MOT: khong the tang chuoi", instr.op, pc); }
+                } else { throw runtime_error_op("OP_CONG_MOT: kieu du lieu khong ho tro", instr.op, pc); }
+                break;
+            }
+            case OP_TRU_MOT: {
+                if (stack.empty()) throw runtime_error_op("OP_TRU_MOT: stack rong", instr.op, pc);
+                StackValue top = stack.back(); stack.pop_back();
+                auto push_int2 = [&](int v) { stack.push_back(make_int_value(v)); };
+                if (std::holds_alternative<int>(top)) {
+                    int idOrVal = std::get<int>(top);
+                    bool updated = false;
+                    if (!callStack.empty()) {
+                        CallFrame &frame = callStack.back();
+                        if (frame.localsIndexed) {
+                            if (idOrVal >= 0 && idOrVal < (int)frame.localsVec.size()) {
+                                int cur = as_int(frame.localsVec[idOrVal], instr.op, pc);
+                                frame.localsVec[idOrVal] = make_int_value(cur - 1);
+                                push_int2(cur - 1); updated = true;
+                            }
+                        } else {
+                            auto itLoc = frame.localsMap.find(idOrVal);
+                            if (itLoc != frame.localsMap.end()) {
+                                int cur = as_int(itLoc->second, instr.op, pc);
+                                itLoc->second = make_int_value(cur - 1);
+                                push_int2(cur - 1); updated = true;
+                            }
+                        }
                     }
-                } else {
-                    throw runtime_error_op("OP_CONG_MOT: kiểu dữ liệu không hỗ trợ tăng 1", instr.op, pc);
-                }
-
+                    if (!updated) {
+                        int cur = variables.count(idOrVal) ? as_int(variables[idOrVal], instr.op, pc) : 0;
+                        variables[idOrVal] = make_int_value(cur - 1);
+                        push_int2(cur - 1);
+                    }
+                } else { throw runtime_error_op("OP_TRU_MOT: kieu du lieu khong ho tro", instr.op, pc); }
                 break;
             }
             default:
