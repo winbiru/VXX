@@ -28,7 +28,7 @@ private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
 
-    using StackValue = std::variant<int, std::string>;
+    using StackValue = std::variant<int, double, std::string>;
     std::vector<StackValue> stack;                  // data stack (values)
 
     std::unordered_map<int, StackValue> variables;  // fallback global var store
@@ -53,6 +53,14 @@ private:
     };
     std::vector<SwitchFrame> switchStack;
     int blockDepth = 0;
+
+    // Exception handling: try stack
+    struct TryFrame {
+        int catchAddr;        // PC of OP_BAT_LOI
+        int stackDepth;       // stack size when try started
+        int errVarId;         // variable id to bind error (-1 = none)
+    };
+    std::vector<TryFrame> tryStack;
 
     // Các hàm phụ trợ
     void execute(const Instruction& inst);

@@ -240,9 +240,87 @@ void initCompileMap() {
                                std::unordered_map<std::string,int>&,
                                int&,
                                const std::unordered_map<std::string,Opcode>&) {
-        ++pos; // skip 'bỏ qua'
+        ++pos;
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
         bytecode.push_back({OP_BO_QUA, 0, 0, 0});
+    };
+
+    // ---- Handler: ném (throw) ----
+    compileMap["ném"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                            std::vector<Instruction>& bytecode,
+                            std::unordered_map<std::string,int>& symTab,
+                            int& nextId,
+                            const std::unordered_map<std::string,Opcode>& keywordMap) {
+        ++pos; // skip 'ném'
+        auto pr = vietvm::compiler::extractExpressionUntilSemicolon(tokens, pos);
+        if (!pr.first.empty()) {
+            compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
+        } else {
+            // ném; without value → push empty string
+            int strIdx = vietvm::compiler::StringPool::storeString("lỗi không xác định");
+            bytecode.push_back({OP_CHUOI, 0, strIdx, 0});
+        }
+        bytecode.push_back({OP_NEM, 0, 0, 0});
+        pos = pr.second;
+    };
+
+    // ---- Handler: thử ... bắt lỗi ... ----
+    // Syntax: thử { ... } bắt lỗi { ... }
+    //      OR: thử { ... } bắt lỗi (errVar) { ... }
+    compileMap["thử"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                            std::vector<Instruction>& bytecode,
+                            std::unordered_map<std::string,int>& symTab,
+                            int& nextId,
+                            const std::unordered_map<std::string,Opcode>& keywordMap) {
+        ++pos; // skip 'thử'
+
+        // Emit OP_THU with placeholder for catch address
+        int thuIdx = (int)bytecode.size();
+        bytecode.push_back({OP_THU, 0, -1, 0}); // operand = catch_addr (patched later)
+
+        // Compile try body
+        if (pos < tokens.size() && tokens[pos] == "{") {
+            bytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+            compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
+            bytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        }
+
+        // Emit OP_THU_KET_THUC with placeholder for past-catch address
+        int thuKetThucIdx = (int)bytecode.size();
+        bytecode.push_back({OP_THU_KET_THUC, 0, 0, 0}); // operand = past_catch (patched later)
+
+        // Patch OP_THU to point here (catch handler start)
+        int catchAddr = (int)bytecode.size();
+        bytecode[thuIdx].operand = catchAddr;
+
+        // Expect 'bắt lỗi'
+        if (pos < tokens.size() && tokens[pos] == "bắt lỗi") ++pos;
+
+        // Optional: (errVar)
+        int errVarId = -1;
+        if (pos < tokens.size() && tokens[pos] == "(") {
+            auto pr = vietvm::compiler::extractParens(tokens, pos);
+            std::string varName = vietvm::compiler::trim(pr.first);
+            if (!varName.empty()) {
+                if (symTab.find(varName) == symTab.end()) symTab[varName] = nextId++;
+                errVarId = symTab[varName];
+            }
+            pos = pr.second;
+        }
+
+        // Emit OP_BAT_LOI
+        bytecode.push_back({OP_BAT_LOI, 0, errVarId, 0});
+
+        // Compile catch body
+        if (pos < tokens.size() && tokens[pos] == "{") {
+            bytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+            compileBlock(tokens, pos, bytecode, symTab, nextId, keywordMap);
+            bytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        }
+
+        // Patch OP_THU_KET_THUC to jump here (past catch)
+        int pastCatch = (int)bytecode.size();
+        bytecode[thuKetThucIdx].operand = pastCatch;
     };
 
     // ---- Handler: nhập (import modules/files) ----

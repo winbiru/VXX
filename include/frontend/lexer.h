@@ -121,6 +121,7 @@ namespace vietvm::compiler {
 
     // Trả về true nếu chuỗi biểu diễn một số nguyên (có thể có dấu '-' ở đầu).
     bool isNumber(const std::string &s) noexcept;
+    bool isFloat(const std::string &s) noexcept;
 
     // True nếu tok là một toán tử đã biết (==, !=, +, -, ...).
     bool isOperator(const std::string &tok) noexcept;

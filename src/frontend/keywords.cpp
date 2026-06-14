@@ -58,7 +58,10 @@ const std::unordered_map<std::string, Opcode> keywordMap = {
     {"/=", OP_CHIA_GAN},
     {"%=", OP_MODULO_GAN},
     {"đúng", OP_DUNG_GIA_TRI},
-    {"sai", OP_SAI_GIA_TRI}
+    {"sai", OP_SAI_GIA_TRI},
+    {"ném", OP_NEM},
+    {"thử", OP_THU},
+    {"bắt lỗi", OP_BAT_LOI}
 };
 
 std::string name_op(Opcode op) {
@@ -126,6 +129,11 @@ std::string name_op(Opcode op) {
         case OP_MODULO_GAN: return "OP_MODULO_GAN";
         case OP_DUNG_GIA_TRI: return "OP_DUNG_GIA_TRI";
         case OP_SAI_GIA_TRI: return "OP_SAI_GIA_TRI";
+        case OP_BIEN_SO_FLOAT: return "OP_BIEN_SO_FLOAT";
+        case OP_NEM: return "OP_NEM";
+        case OP_THU: return "OP_THU";
+        case OP_THU_KET_THUC: return "OP_THU_KET_THUC";
+        case OP_BAT_LOI: return "OP_BAT_LOI";
         default: return "UNKNOWN_OPCODE";
     }
 }

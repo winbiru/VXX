@@ -81,7 +81,12 @@ enum Opcode {
     OP_CHIA_GAN = 75,            // /=
     OP_MODULO_GAN = 76,          // %=
     OP_DUNG_GIA_TRI = 77,        // true (đúng) → push 1
-    OP_SAI_GIA_TRI = 78          // false (sai) → push 0
+    OP_SAI_GIA_TRI = 78,         // false (sai) → push 0
+    OP_BIEN_SO_FLOAT = 79,       // push float literal (operandIndex = string pool index)
+    OP_NEM = 80,                 // ném (throw)
+    OP_THU = 81,                 // thử (try begin, operand = catch_addr)
+    OP_THU_KET_THUC = 82,        // kết thúc try block, operand = past_catch_addr
+    OP_BAT_LOI = 83              // bắt lỗi (catch begin, operandIndex = err_var_id or -1)
 
 };
 

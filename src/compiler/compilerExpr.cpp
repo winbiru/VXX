@@ -56,6 +56,11 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             }
             continue;
         }
+        if (vietvm::compiler::isFloat(tk)) {
+            int strIdx = vietvm::compiler::StringPool::storeString(tk);
+            bytecode.push_back({OP_BIEN_SO_FLOAT, 0, strIdx, 0});
+            continue;
+        }
         if (vietvm::compiler::isStringLiteral(tk)) {
             int strIndex = vietvm::compiler::StringPool::storeString(tk.substr(1, tk.size() - 2));
             bytecode.push_back({OP_CHUOI, 0, strIndex,0});

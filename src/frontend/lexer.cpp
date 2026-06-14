@@ -15,7 +15,7 @@
 #include "common/utility.h"
 
 namespace vietvm::compiler {
-    using Value = std::variant<int, std::string>;
+    using Value = std::variant<int, double, std::string>;
     std::vector<Value> vars; // indexed by varId
 
     // ==================== Helper Functions Implementation ====================
@@ -57,10 +57,26 @@ namespace vietvm::compiler {
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
-        if (start >= s.size()) return false;  // "-" alone is not a number
+        if (start >= s.size()) return false;
         return std::all_of(s.begin() + start, s.end(), [](unsigned char c) {
             return std::isdigit(c);
         });
+    }
+
+    bool isFloat(const std::string &s) noexcept {
+        if (s.empty()) return false;
+        size_t start = (s[0] == '-') ? 1 : 0;
+        if (start >= s.size()) return false;
+        bool hasDot = false;
+        for (size_t i = start; i < s.size(); ++i) {
+            if (s[i] == '.') {
+                if (hasDot) return false;  // two dots → not a float
+                hasDot = true;
+            } else if (!std::isdigit(static_cast<unsigned char>(s[i]))) {
+                return false;
+            }
+        }
+        return hasDot;  // must have exactly one dot
     }
 
     const std::unordered_map<std::string,int>& operatorPrecedenceMap() noexcept {
@@ -303,7 +319,8 @@ namespace vietvm::compiler {
             {"khởi", "tạo"},
             {"điều", "kiện"},
             {"cập", "nhật"},
-            {"kiểm", "tra", "sau"}
+            {"kiểm", "tra", "sau"},
+            {"bắt", "lỗi"}
         };
 
         for (size_t i = 0; i < tokens.size(); ++i) {
@@ -330,7 +347,7 @@ namespace vietvm::compiler {
             if (a_norm == "neu" || a_norm == "hoac" || a_norm == "lap" ||
                 a_norm == "ham" || a_norm == "goi" || a_norm == "bien" ||
                 a_norm == "dung" || a_norm == "thoat" || a_norm == "chon" ||
-                a_norm == "chuyen") {
+                a_norm == "chuyen" || a_norm == "nem" || a_norm == "thu") {
                 throwMissingAccent(a_norm);
             }
 

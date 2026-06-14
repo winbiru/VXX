@@ -4,7 +4,7 @@
 #include <variant>
 
 // Use the same StackValue/Value type as your VM (adjust if you use different type)
-using Value = std::variant<int, std::string>;
+using Value = std::variant<int, double, std::string>;
 
 struct CallFrame {
     std::vector<Value> args;                      // argument values, args[0] = first param

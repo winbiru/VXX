@@ -1,0 +1,13 @@
+hàm main() {
+    thử {
+        ném "lỗi thử nghiệm";
+        in "khong in";
+    } bắt lỗi (e) {
+        in e;
+    }
+    thử {
+        in "binh thuong";
+    } bắt lỗi {
+        in "sai";
+    }
+}

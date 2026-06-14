@@ -11,7 +11,7 @@
 #include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
-using StackValue = std::variant<int, std::string>;
+using StackValue = std::variant<int, double, std::string>;
 
 /**
  * VM ctor
@@ -29,12 +29,9 @@ VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& poo
 
 // Convert StackValue to boolean
 bool toBool(const StackValue& value) {
-    if (std::holds_alternative<int>(value)) {
-        return std::get<int>(value) != 0;
-    } else if (std::holds_alternative<std::string>(value)) {
-        return !std::get<std::string>(value).empty();
-    }
-    // default false for unknown
+    if (std::holds_alternative<int>(value))    return std::get<int>(value) != 0;
+    if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
+    if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
     return false;
 }
 
@@ -172,15 +169,11 @@ void VM::run() {
 
             case OP_MODULO: {
                 if (stack.size() < 2) throw runtime_error_op("Lỗi: thiếu toán hạng cho MODULO", instr.op, pc);
-
                 StackValue b = stack.back(); stack.pop_back();
                 StackValue a = stack.back(); stack.pop_back();
-
                 int int_b = as_int(b, instr.op, pc);
                 if (int_b == 0) throw runtime_error_op("Lỗi: chia dư cho 0", instr.op, pc);
-
-                int int_a = as_int(a, instr.op, pc);
-                stack.emplace_back(int_a % int_b);
+                stack.emplace_back(as_int(a, instr.op, pc) % int_b);
                 break;
             }
 
@@ -196,37 +189,26 @@ void VM::run() {
 
                 switch (instr.op) {
                     case OP_CONG: {
-                        // int + int or string concat
-                        if (std::holds_alternative<int>(a) && std::holds_alternative<int>(b)) {
-                            stack.push_back(as_int(a, instr.op, pc) + as_int(b, instr.op, pc));
+                        if (isNumeric(a) && isNumeric(b)) {
+                            stack.push_back(numAdd(a, b));
                         } else {
-                            std::string sa = sv_to_string(a);
-                            std::string sb = sv_to_string(b);
-                            stack.emplace_back(sa + sb);
+                            stack.emplace_back(sv_to_string(a) + sv_to_string(b));
                         }
                         break;
                     }
 
                     case OP_TRU: case OP_NHAN: case OP_CHIA: {
-                        if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b))
-                            throw runtime_error_op("Lỗi: toán tử số chỉ áp dụng cho số nguyên", instr.op, pc);
-
-                        int ia = as_int(a, instr.op, pc);
-                        int ib = as_int(b, instr.op, pc);
-
-                        if (instr.op == OP_TRU) stack.push_back(ia - ib);
-                        else if (instr.op == OP_NHAN) stack.push_back(ia * ib);
-                        else {
-                            if (ib == 0) throw runtime_error_op("Lỗi: chia cho 0", instr.op, pc);
-                            stack.emplace_back(ia / ib);
-                        }
+                        if (!isNumeric(a) || !isNumeric(b))
+                            throw runtime_error_op("Lỗi: toán tử số chỉ áp dụng cho số", instr.op, pc);
+                        if (instr.op == OP_TRU)  stack.push_back(numSub(a, b));
+                        else if (instr.op == OP_NHAN) stack.push_back(numMul(a, b));
+                        else stack.push_back(numDiv(a, b, instr.op, pc));
                         break;
                     }
 
                     case OP_Logic_VA: case OP_Logic_HOAC: {
-                        if (!std::holds_alternative<int>(a) || !std::holds_alternative<int>(b))
-                            throw runtime_error_op("Lỗi: toán tử logic chỉ áp dụng cho số nguyên", instr.op, pc);
-
+                        if (!isNumeric(a) || !isNumeric(b))
+                            throw runtime_error_op("Lỗi: toán tử logic chỉ áp dụng cho số", instr.op, pc);
                         int ia = as_int(a, instr.op, pc);
                         int ib = as_int(b, instr.op, pc);
                         if (instr.op == OP_Logic_VA) stack.push_back((ia && ib) ? 1 : 0);
@@ -237,34 +219,33 @@ void VM::run() {
                     case OP_SO_SANH_BANG: case OP_KHAC_BANG:
                     case OP_LON_HON: case OP_NHO_HON:
                     case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
-                        if (a.index() != b.index())
-                            throw runtime_error_op("Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau", instr.op, pc);
-
-                        if (std::holds_alternative<int>(a)) {
-                            int ia = std::get<int>(a);
-                            int ib = std::get<int>(b);
+                        int result = 0;
+                        if (isNumeric(a) && isNumeric(b)) {
+                            double da = toDouble(a), db = toDouble(b);
                             switch (instr.op) {
-                                case OP_SO_SANH_BANG: stack.emplace_back((ia == ib) ? 1 : 0); break;
-                                case OP_KHAC_BANG: stack.emplace_back((ia != ib) ? 1 : 0); break;
-                                case OP_LON_HON: stack.emplace_back((ia > ib) ? 1 : 0); break;
-                                case OP_NHO_HON: stack.emplace_back((ia < ib) ? 1 : 0); break;
-                                case OP_LON_HON_HOAC_BANG: stack.emplace_back((ia >= ib) ? 1 : 0); break;
-                                case OP_NHO_HON_HOAC_BANG: stack.emplace_back((ia <= ib) ? 1 : 0); break;
-                                default:     break;
+                                case OP_SO_SANH_BANG: result = (da == db) ? 1 : 0; break;
+                                case OP_KHAC_BANG:    result = (da != db) ? 1 : 0; break;
+                                case OP_LON_HON:      result = (da >  db) ? 1 : 0; break;
+                                case OP_NHO_HON:      result = (da <  db) ? 1 : 0; break;
+                                case OP_LON_HON_HOAC_BANG: result = (da >= db) ? 1 : 0; break;
+                                case OP_NHO_HON_HOAC_BANG: result = (da <= db) ? 1 : 0; break;
+                                default: break;
+                            }
+                        } else if (std::holds_alternative<std::string>(a) && std::holds_alternative<std::string>(b)) {
+                            std::string sa = std::get<std::string>(a), sb = std::get<std::string>(b);
+                            switch (instr.op) {
+                                case OP_SO_SANH_BANG: result = (sa == sb) ? 1 : 0; break;
+                                case OP_KHAC_BANG:    result = (sa != sb) ? 1 : 0; break;
+                                case OP_LON_HON:      result = (sa >  sb) ? 1 : 0; break;
+                                case OP_NHO_HON:      result = (sa <  sb) ? 1 : 0; break;
+                                case OP_LON_HON_HOAC_BANG: result = (sa >= sb) ? 1 : 0; break;
+                                case OP_NHO_HON_HOAC_BANG: result = (sa <= sb) ? 1 : 0; break;
+                                default: break;
                             }
                         } else {
-                            std::string sa = std::get<std::string>(a);
-                            std::string sb = std::get<std::string>(b);
-                            switch (instr.op) {
-                                case OP_SO_SANH_BANG: stack.push_back((sa == sb) ? 1 : 0); break;
-                                case OP_KHAC_BANG: stack.push_back((sa != sb) ? 1 : 0); break;
-                                case OP_LON_HON: stack.push_back((sa > sb) ? 1 : 0); break;
-                                case OP_NHO_HON: stack.push_back((sa < sb) ? 1 : 0); break;
-                                case OP_LON_HON_HOAC_BANG: stack.push_back((sa >= sb) ? 1 : 0); break;
-                                case OP_NHO_HON_HOAC_BANG: stack.push_back((sa <= sb) ? 1 : 0); break;
-                                default:     break;
-                            }
+                            throw runtime_error_op("Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau", instr.op, pc);
                         }
+                        stack.push_back(result);
                         break;
                     }
 
@@ -276,14 +257,8 @@ void VM::run() {
 
             case OP_KHONG: {
                 if (stack.empty()) throw runtime_error_op("Lỗi: không đủ toán hạng cho toán tử phủ định", instr.op, pc);
-
                 StackValue a = stack.back(); stack.pop_back();
-
-                if (!std::holds_alternative<int>(a))
-                    throw runtime_error_op("Lỗi: toán tử phủ định chỉ áp dụng cho số nguyên", instr.op, pc);
-
-                int ia = as_int(a, instr.op, pc);
-                stack.push_back((!ia) ? 1 : 0);
+                stack.push_back((as_int(a, instr.op, pc) == 0) ? 1 : 0);
                 break;
             }
 
@@ -324,6 +299,18 @@ void VM::run() {
                     throw runtime_error_op("Lỗi: chỉ số chuỗi không hợp lệ", instr.op, pc);
                 }
                 stack.push_back(stringPool[instr.operandIndex]);
+                break;
+            }
+
+            case OP_BIEN_SO_FLOAT: {
+                if (instr.operandIndex < 0 || instr.operandIndex >= (int)stringPool.size())
+                    throw runtime_error_op("Lỗi: chỉ số float không hợp lệ", instr.op, pc);
+                try {
+                    double d = std::stod(stringPool[instr.operandIndex]);
+                    stack.push_back(make_float_value(d));
+                } catch (...) {
+                    throw runtime_error_op("Lỗi: không thể chuyển '" + stringPool[instr.operandIndex] + "' thành số thực", instr.op, pc);
+                }
                 break;
             }
 
@@ -663,6 +650,53 @@ void VM::run() {
                 } else { throw runtime_error_op("OP_CONG_MOT: kieu du lieu khong ho tro", instr.op, pc); }
                 break;
             }
+            case OP_THU: {
+                // operand = address of OP_BAT_LOI handler, operandIndex = errVarId (-1 = none)
+                TryFrame tf;
+                tf.catchAddr = instr.operand;
+                tf.stackDepth = (int)stack.size();
+                tf.errVarId = instr.operandIndex;
+                tryStack.push_back(tf);
+                break;
+            }
+
+            case OP_THU_KET_THUC: {
+                // Normal exit from try block: pop tryStack, jump past catch handler
+                if (!tryStack.empty()) tryStack.pop_back();
+                pc = instr.operand;  // jump past catch
+                continue;
+            }
+
+            case OP_BAT_LOI: {
+                // Catch handler entry: pop tryStack (already popped by OP_NEM)
+                // operandIndex = errVarId (-1 if no variable binding)
+                // The error value is on top of stack (pushed by OP_NEM)
+                int errVarId = instr.operandIndex;
+                if (errVarId >= 0 && !stack.empty()) {
+                    StackValue errVal = stack.back(); stack.pop_back();
+                    variables[errVarId] = errVal;
+                } else if (!stack.empty()) {
+                    stack.pop_back();  // discard error value
+                }
+                break;
+            }
+
+            case OP_NEM: {
+                if (stack.empty()) stack.push_back(make_string_value("lỗi không xác định"));
+                StackValue errVal = stack.back(); stack.pop_back();
+                if (tryStack.empty()) {
+                    // No catch handler: propagate as C++ exception
+                    throw std::runtime_error("Lỗi không bắt được: " + sv_to_string(errVal));
+                }
+                TryFrame tf = tryStack.back(); tryStack.pop_back();
+                // Unwind stack to try entry depth
+                while ((int)stack.size() > tf.stackDepth) stack.pop_back();
+                // Push error value for OP_BAT_LOI to consume
+                stack.push_back(errVal);
+                pc = tf.catchAddr;  // jump to catch handler
+                continue;
+            }
+
             case OP_TRU_MOT: {
                 if (stack.empty()) throw runtime_error_op("OP_TRU_MOT: stack rong", instr.op, pc);
                 StackValue top = stack.back(); stack.pop_back();
