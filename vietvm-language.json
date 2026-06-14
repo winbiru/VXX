@@ -1,0 +1,11 @@
+{
+  "name": "vietvm-language",
+  "displayName": "VietVM Language",
+  "version": "0.0.1",
+  "publisher": "vietvm",
+  "languageId": "vietvm",
+  "extensions": [".vi", ".vvm"],
+  "grammar": "syntaxes/vietvm.tmLanguage.json",
+  "configuration": "language-configuration.json",
+  "readme": "INSTALL_EDITOR_HIGHLIGHT.md"
+}

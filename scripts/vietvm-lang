@@ -1,0 +1,291 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+MANIFEST="$ROOT_DIR/vietvm-language.json"
+
+NAME="vietvm-language"
+DISPLAY_NAME="VietVM Language"
+VERSION="0.0.1"
+PUBLISHER="vietvm"
+LANGUAGE_ID="vietvm"
+EXTENSION_ID="$PUBLISHER.$NAME-$VERSION"
+
+usage() {
+  cat <<EOF
+VietVM language installer
+
+Usage:
+  vietvm-lang install [--editor vscode|cursor|vscodium|all]
+  vietvm-lang uninstall [--editor vscode|cursor|vscodium|all]
+  vietvm-lang list
+  vietvm-lang pack
+  vietvm-lang self-install [--prefix DIR]
+  vietvm-lang self-uninstall [--prefix DIR]
+  vietvm-lang help
+
+Examples:
+  ./scripts/vietvm-lang self-install
+  vietvm-lang install
+  vietvm-lang install --editor vscode
+  vietvm-lang uninstall --editor cursor
+  vietvm-lang pack
+EOF
+}
+
+parse_prefix() {
+  prefix="$HOME/.local/bin"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --prefix)
+        [ "$#" -ge 2 ] || {
+          echo "Missing value after --prefix" >&2
+          exit 2
+        }
+        prefix="$2"
+        shift 2
+        ;;
+      --prefix=*)
+        prefix=${1#--prefix=}
+        shift
+        ;;
+      *)
+        echo "Unknown argument: $1" >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+editor_dir() {
+  case "$1" in
+    vscode) printf '%s\n' "$HOME/.vscode/extensions/$EXTENSION_ID" ;;
+    cursor) printf '%s\n' "$HOME/.cursor/extensions/$EXTENSION_ID" ;;
+    vscodium) printf '%s\n' "$HOME/.vscode-oss/extensions/$EXTENSION_ID" ;;
+    *) return 1 ;;
+  esac
+}
+
+all_editors() {
+  printf '%s\n' vscode cursor vscodium
+}
+
+parse_editor() {
+  editor="all"
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --editor)
+        [ "$#" -ge 2 ] || {
+          echo "Missing value after --editor" >&2
+          exit 2
+        }
+        editor="$2"
+        shift 2
+        ;;
+      --editor=*)
+        editor=${1#--editor=}
+        shift
+        ;;
+      *)
+        echo "Unknown argument: $1" >&2
+        exit 2
+        ;;
+    esac
+  done
+
+  case "$editor" in
+    vscode|cursor|vscodium|all) ;;
+    *)
+      echo "Unknown editor: $editor" >&2
+      exit 2
+      ;;
+  esac
+}
+
+write_vscode_package_json() {
+  package_json_dest="$1/package.json"
+  cat > "$package_json_dest" <<EOF
+{
+  "name": "$NAME",
+  "displayName": "$DISPLAY_NAME",
+  "description": "Syntax highlighting for VietVM",
+  "version": "$VERSION",
+  "publisher": "$PUBLISHER",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "$LANGUAGE_ID",
+        "aliases": ["VietVM", "vietvm"],
+        "extensions": [".vvm", ".vi"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "$LANGUAGE_ID",
+        "scopeName": "source.vietvm",
+        "path": "./syntaxes/vietvm.tmLanguage.json"
+      }
+    ]
+  }
+}
+EOF
+}
+
+install_one() {
+  editor_name="$1"
+  dest=$(editor_dir "$editor_name")
+  parent=$(dirname "$dest")
+
+  if [ ! -d "$parent" ]; then
+    echo "skip $editor_name: extension folder not found: $parent"
+    return 1
+  fi
+
+  echo "install $NAME@$VERSION -> $editor_name"
+  rm -rf "$dest"
+  mkdir -p "$dest/syntaxes"
+
+  cp "$ROOT_DIR/syntaxes/vietvm.tmLanguage.json" "$dest/syntaxes/vietvm.tmLanguage.json"
+  cp "$ROOT_DIR/language-configuration.json" "$dest/language-configuration.json"
+  cp "$ROOT_DIR/INSTALL_EDITOR_HIGHLIGHT.md" "$dest/README.md"
+  cp "$MANIFEST" "$dest/vietvm-language.json"
+  write_vscode_package_json "$dest"
+
+  echo "installed: $dest"
+  return 0
+}
+
+install_cmd() {
+  parse_editor "$@"
+  installed=0
+
+  if [ "$editor" = "all" ]; then
+    for e in $(all_editors); do
+      if install_one "$e"; then
+        installed=$((installed + 1))
+      fi
+    done
+  else
+    if install_one "$editor"; then
+      installed=$((installed + 1))
+    fi
+  fi
+
+  if [ "$installed" -eq 0 ]; then
+    echo "No supported editor profile was found." >&2
+    exit 1
+  fi
+
+  echo "Reload your editor window to activate VietVM highlighting."
+}
+
+uninstall_one() {
+  editor_name="$1"
+  dest=$(editor_dir "$editor_name")
+  if [ -d "$dest" ]; then
+    rm -rf "$dest"
+    echo "removed: $dest"
+    return 0
+  fi
+  echo "not installed for $editor_name"
+  return 1
+}
+
+uninstall_cmd() {
+  parse_editor "$@"
+  removed=0
+
+  if [ "$editor" = "all" ]; then
+    for e in $(all_editors); do
+      if uninstall_one "$e"; then
+        removed=$((removed + 1))
+      fi
+    done
+  else
+    if uninstall_one "$editor"; then
+      removed=$((removed + 1))
+    fi
+  fi
+
+  [ "$removed" -gt 0 ] || exit 1
+}
+
+list_cmd() {
+  for e in $(all_editors); do
+    dest=$(editor_dir "$e")
+    if [ -d "$dest" ]; then
+      echo "$e: installed at $dest"
+    else
+      echo "$e: not installed"
+    fi
+  done
+}
+
+pack_cmd() {
+  dist="$ROOT_DIR/dist"
+  package="$dist/$NAME-$VERSION.vlang"
+  mkdir -p "$dist"
+  rm -f "$package"
+
+  tar -czf "$package" \
+    -C "$ROOT_DIR" \
+    vietvm-language.json \
+    language-configuration.json \
+    INSTALL_EDITOR_HIGHLIGHT.md \
+    syntaxes/vietvm.tmLanguage.json
+
+  echo "packed: $package"
+}
+
+self_install_cmd() {
+  parse_prefix "$@"
+  mkdir -p "$prefix"
+  wrapper="$prefix/vietvm-lang"
+  cat > "$wrapper" <<EOF
+#!/usr/bin/env sh
+exec "$ROOT_DIR/scripts/vietvm-lang" "\$@"
+EOF
+  chmod +x "$wrapper"
+  echo "installed command: $wrapper"
+  echo "Make sure this directory is in PATH: $prefix"
+}
+
+self_uninstall_cmd() {
+  parse_prefix "$@"
+  wrapper="$prefix/vietvm-lang"
+  if [ -f "$wrapper" ]; then
+    rm -f "$wrapper"
+    echo "removed command: $wrapper"
+  else
+    echo "not installed: $wrapper"
+  fi
+}
+
+cmd=${1:-help}
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$cmd" in
+  install) install_cmd "$@" ;;
+  uninstall) uninstall_cmd "$@" ;;
+  list) list_cmd "$@" ;;
+  pack) pack_cmd "$@" ;;
+  self-install) self_install_cmd "$@" ;;
+  self-uninstall) self_uninstall_cmd "$@" ;;
+  help|-h|--help) usage ;;
+  *)
+    echo "Unknown command: $cmd" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

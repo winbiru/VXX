@@ -1,0 +1,81 @@
+{
+  "scopeName": "source.vietvm",
+  "name": "VietVM",
+  "patterns": [
+    {
+      "begin": "/\\*",
+      "end": "\\*/",
+      "name": "comment.block.vietvm"
+    },
+    {
+      "match": "//.*$",
+      "name": "comment.line.vietvm"
+    },
+    {
+      "match": "(hàm)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "name": "meta.function.definition.vietvm",
+      "captures": {
+        "1": {
+          "name": "storage.type.function.vietvm"
+        },
+        "2": {
+          "name": "entity.name.function.vietvm"
+        }
+      }
+    },
+    {
+      "match": "(gọi)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "name": "meta.function.call.vietvm",
+      "captures": {
+        "1": {
+          "name": "keyword.control.call.vietvm"
+        },
+        "2": {
+          "name": "entity.name.function.vietvm"
+        }
+      }
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(nếu không|trả về|mặc định|bỏ qua|bắt lỗi|khởi tạo|điều kiện|cập nhật|kiểm tra sau|trường hợp|hàm|nếu|hoặc|lặp|chọn|ca|thoát|nhập|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
+      "name": "keyword.control.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(đúng|sai)(?![\\p{L}\\p{N}_])",
+      "name": "constant.language.boolean.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(biến)(?![\\p{L}\\p{N}_])",
+      "name": "storage.type.variable.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(in)(?![\\p{L}\\p{N}_])",
+      "name": "support.function.builtin.vietvm"
+    },
+    {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double.vietvm"
+    },
+    {
+      "begin": "'",
+      "end": "'",
+      "name": "string.quoted.single.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])([0-9]+\\.[0-9]+|[0-9]+)(?![\\p{L}\\p{N}_])",
+      "name": "constant.numeric.vietvm"
+    },
+    {
+      "match": "(\\+\\+|--|\\+=|-=|\\*=|/=|%=|==|!=|<=|>=|&&|\\|\\||[+\\-*/%=!<>])",
+      "name": "keyword.operator.vietvm"
+    },
+    {
+      "match": "[{}()\\[\\];,:]",
+      "name": "punctuation.separator.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_]*(?![\\p{L}\\p{N}_])",
+      "name": "variable.vietvm"
+    }
+  ]
+}

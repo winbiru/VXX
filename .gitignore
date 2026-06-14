@@ -26,3 +26,5 @@ bin/
 # Test artifacts
 src/tests/.tmp/
 *.actual
+dist/
+*.vsix

@@ -1,0 +1,42 @@
+{
+  "name": "vietvm-language",
+  "displayName": "VietVM Language",
+  "description": "Syntax highlighting for VietVM",
+  "version": "0.0.1",
+  "publisher": "vietvm",
+  "license": "UNLICENSED",
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "vietvm",
+    "viet",
+    "vietnamese",
+    "syntax"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "vietvm": {
+    "manifest": "./vietvm-language.json",
+    "installer": "./scripts/vietvm-lang",
+    "packageFormat": "vlang"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "vietvm",
+        "aliases": ["VietVM", "vietvm"],
+        "extensions": [".vvm", ".vi"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vietvm",
+        "scopeName": "source.vietvm",
+        "path": "./syntaxes/vietvm.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+**
+!package.json
+!README.md
+!INSTALL_EDITOR_HIGHLIGHT.md
+!language-configuration.json
+!syntaxes/**
+!syntaxes/vietvm.tmLanguage.json
