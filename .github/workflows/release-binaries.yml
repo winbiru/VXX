@@ -1,0 +1,92 @@
+name: Release Binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: vpp-linux-x64.tar.gz
+          - os: macos-latest
+            asset_name: vpp-macos.tar.gz
+          - os: windows-latest
+            asset_name: vpp-windows-x64.zip
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build vpp-cli
+        run: cmake --build build --config Release --target vpp-cli
+
+      - name: Package (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eu
+          BIN_PATH=""
+          for p in \
+            "build/bin/vpp-cli" \
+            "build/Release/vpp-cli" \
+            "build/vpp-cli"; do
+            if [ -f "$p" ]; then BIN_PATH="$p"; break; fi
+          done
+
+          if [ -z "$BIN_PATH" ]; then
+            echo "Khong tim thay file vpp-cli sau khi build" >&2
+            exit 1
+          fi
+
+          mkdir -p dist
+          cp "$BIN_PATH" dist/vpp
+          chmod +x dist/vpp
+          tar -czf "${{ matrix.asset_name }}" -C dist vpp
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "build/bin/Release/vpp-cli.exe",
+            "build/Release/vpp-cli.exe",
+            "build/vpp-cli.exe"
+          )
+
+          $bin = $null
+          foreach ($p in $candidates) {
+            if (Test-Path $p) { $bin = $p; break }
+          }
+
+          if (-not $bin) {
+            Write-Error "Khong tim thay file vpp-cli.exe sau khi build"
+            exit 1
+          }
+
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $bin dist/vpp.exe
+          Compress-Archive -Path dist/vpp.exe -DestinationPath "${{ matrix.asset_name }}" -Force
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset_name }}

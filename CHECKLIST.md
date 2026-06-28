@@ -243,12 +243,62 @@
 | Không có duplicate library warnings | ✅ |
 | `.gitignore` cho build artefacts | ✅ |
 | CI/CD (GitHub Actions) | ✅ |
-| Disassembler (xem bytecode) | ⬜ |
-| REPL (interactive shell) | ⬜ |
-| Language Server Protocol (LSP) | ⬜ |
+| Disassembler (xem bytecode) | ✅ |
+| REPL (interactive shell) | ✅ |
+| Language Server Protocol (LSP) | ✅ |
 | Syntax highlighting (VSCode/Vim) | ✅ |
-| Formatter / linter | ⬜ |
-| Package manager | ⬜ |
+| Formatter / linter | ✅ |
+| Package manager (`vpp-cli install`, `vpp-cli cai`) | ✅ |
+
+### 11.1 Thư Viện & Phụ Thuộc Mã Nguồn
+#### Đang sử dụng (đầy đủ theo quét include/CMake)
+| Thành phần | Loại | Vai trò trong source code | Trạng thái |
+|-----------|------|----------------------------|-----------|
+| C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | ✅ |
+| C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | ✅ |
+| `curl` (binary hệ thống, gọi qua shell) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get(url)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
+| CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-frontend`, `vpp-compiler`, `vpp-vm`, `vpp-cli`) | ✅ |
+
+#### Không sử dụng (không phát hiện trong include/CMake hiện tại)
+| Thành phần | Trạng thái |
+|-----------|-----------|
+| `find_package(...)` cho thư viện bên thứ ba trong `CMakeLists.txt` | ✅ Không sử dụng |
+| `Boost` | ✅ Không sử dụng |
+| `OpenSSL` | ✅ Không sử dụng |
+| `libcurl` (link trực tiếp qua CMake) | ✅ Không sử dụng *(chỉ gọi binary `curl` runtime)* |
+| `fmt`, `spdlog` | ✅ Không sử dụng |
+| `nlohmann/json`, `yaml-cpp` | ✅ Không sử dụng |
+| `gRPC`, `protobuf` | ✅ Không sử dụng |
+| `SQLite` | ✅ Không sử dụng |
+| `Qt`/`wxWidgets` | ✅ Không sử dụng |
+| `gtest`/`catch2` qua CMake | ✅ Không sử dụng |
+
+### 11.2 Thư Viện Hỗ Trợ Ngôn Ngữ V++ (Theo Module Chức Năng)
+| Thư viện/Module | Trạng thái | Ghi chú |
+|-----------------|-----------|--------|
+| I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
+| Hệ thống tệp (filesystem) | ✅ | Dùng `std::filesystem` cho import, package manager, CLI |
+| Mạng TCP/UDP | ⬜ | Chưa có API socket native |
+| HTTP client | 🚧 | Có `mang_http_get(url)` qua `curl` shell, chưa có HTTP lib native |
+| Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
+| Collections (array/map) | ✅ | Array, map literal đã hỗ trợ |
+| Xử lý chuỗi | ✅ | Nối chuỗi, thao tác chuỗi cơ bản |
+| Toán học | ✅ | Có nhóm hàm stdlib tính toán |
+| Ngày giờ | ✅ | Có `lay_thoi_gian_hien_tai()` |
+| Serialization JSON/XML/YAML | ⬜ | Chưa có module serialize chuẩn |
+| Logging chuẩn | ⬜ | Chưa có module log chuyên dụng |
+| Cấu hình (config) | ✅ | Có `doc_config(path)` |
+| Xử lý lỗi/ngoại lệ | ✅ | Có `thử` / `bắt lỗi` / `ném lỗi` |
+| Testing framework nội bộ ngôn ngữ | 🚧 | Có `run_tests.sh`, chưa có test framework API trong V++ |
+| Reflection/Metadata | ⬜ | Chưa có introspection runtime |
+| FFI (gọi thư viện ngoài) | ⬜ | Chưa có cơ chế FFI chính thức |
+| Quản lý gói & phiên bản | ✅ | Có `vpp cài đặt`, `vpp danh sách`, `vpp phiên bản` |
+| Bảo mật/Crypto | ⬜ | Chưa có module mã hóa/hash chuẩn |
+| Sandboxing/Permission | ⬜ | Chưa có hệ quyền/sandbox runtime |
+| i18n/l10n | ⬜ | Chưa có module locale/translation |
+| Diagnostics/Profiling | 🚧 | Có `vpp bác sĩ`, chưa có profiler chuyên sâu |
+| GUI/Đồ họa | ⬜ | Chưa có thư viện GUI chuẩn |
+| OS bindings nâng cao | 🚧 | Có mức cơ bản qua file/process, chưa có syscall API đầy đủ |
 
 ---
 

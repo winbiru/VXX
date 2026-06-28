@@ -1,312 +1,161 @@
-# Viet-crafting-interpreters
+# V++
 
-## English
-– A simple virtual machine and compiler 
-for a Vietnamese-like programming language.
+V++ là một bộ compiler + virtual machine thử nghiệm cho một ngôn ngữ lập trình kiểu Việt hoá. Repo này tập trung vào bytecode rõ ràng, luồng điều khiển minh bạch và khả năng kiểm thử tốt.
 
-This repository contains **Viet-crafting-interpreters**, a custom-designed virtual machine and compiler infrastructure for a structured, imperative programming language.
-
-Viet-crafting-interpreters is an experimental system focused on **explicit execution semantics**, **transparent control flow**, and **deterministic behavior**.
-It is intended for study, experimentation, and long-term reference rather than mass adoption.
-
-Copyright © 2025. All rights reserved by the author.
-
-See the end of this file for copyright and license information.
-
----
-
-## Contents
-
-* General Information
-* Project Scope
-* Repository Structure
-* Building V++
-* Running Programs
-* Execution Model
-* Testing
-* Documentation
-* Versioning
-* Copyright and License Information
-
----
-
-## General Information
-
-* Project name: **V++**
-* Type: Virtual Machine + Compiler toolchain
-* Implementation language: C++
-* Status: Experimental / Research-oriented
-* Target audience: system programmers, compiler learners, VM designers
-
-This project does not aim to replace existing languages or runtimes.
-
----
-
-## Project Scope
-
-V++ focuses on:
-
-* A custom bytecode format
-* A stack-based execution model
-* Explicit control flow (blocks, loops, conditions)
-* Minimal runtime assumptions
-* Clear separation between parsing, compilation, and execution
-
-Out of scope (by design):
-
-* Large standard libraries
-* Framework-level abstractions
-* Automatic parallelism
-* Dynamic reflection-heavy features
-
----
-
-## Repository Structure
-
-```
-/
-├── src/            Core VM and compiler source code
-├── include/        Public headers
-├── examples/       Small example programs
-├── docs/           Design notes and specifications
-├── tests/          Test cases
-└── README.md
-```
-
-The layout may evolve as the project stabilizes.
-
----
-
-## Building V++
-
-### On Unix-like systems (Linux, macOS, BSD)
-
-Requirements:
-
-* C++17-compatible compiler (clang or gcc)
-* Make or CMake
-
-Example build:
+## Nhanh Chóng
 
 ```bash
-mkdir build
-cd build
+mkdir -p cmake-build-debug
+cd cmake-build-debug
 cmake ..
-make
+make -j
 ```
 
-No system-wide installation is required.
-
----
-
-## Running Programs
-
-After building, programs can be executed by invoking the V++ runtime with compiled bytecode:
+Chạy một chương trình:
 
 ```bash
-./vietvm example.bytecode
+./bin/vpp-cli ../src/tests/program.vi
 ```
 
----
-
-## Execution Model
-
-V++ uses:
-
-* A stack-based virtual machine
-* Explicit instructions for variable initialization, condition evaluation, loop control, and block entry/exit
-* Deterministic instruction dispatch
-
-There is no hidden control flow or implicit runtime behavior.
-
-See `docs/DESIGN.md` for details.
-
----
-
-## Testing
+Chạy toàn bộ test:
 
 ```bash
-make test
+cd /Users/winbiru/V++
+./run_tests.sh
 ```
 
-Tests focus on instruction correctness and control-flow behavior.
+## Cài Nhanh Không Cần Clone
 
----
+Ban co the tai file da build san tu GitHub Release.
 
-## Documentation
-
-Documentation is provided under `docs/`:
-
-* `architecture.md` — project structure and design decisions
-* `bytecode.md` — instruction set and bytecode format reference
-* `grammar.bnf` — language grammar specification
-* `language-comparison-en.md` — comparison with other programming languages (English)
-* `language-comparison.md` — so sánh với các ngôn ngữ lập trình khác (Tiếng Việt)
-
----
-
-## Versioning
-
-V++ does not follow a fixed release schedule.
-Backward compatibility is not guaranteed during early development.
-
----
-
-## Copyright and License Information
-
-Copyright © 2025.
-
-Licensing terms are specified in the `LICENSE` file.
-
-This project contains no GPL-licensed code.
-
----
-
-# V++ (Tiếng Việt)
-
-## Giới thiệu chung
-
-Kho mã nguồn này chứa **V++** — một **máy ảo (virtual machine)** và **hạ tầng compiler** được thiết kế riêng cho một ngôn ngữ lập trình có cấu trúc, dạng mệnh lệnh.
-
-V++ là một hệ thống **thử nghiệm**, tập trung vào:
-
-* Ngữ nghĩa thực thi tường minh
-* Luồng điều khiển rõ ràng
-* Hành vi xác định, có thể truy vết
-
-Dự án này được xây dựng cho mục đích **nghiên cứu, học tập và tham khảo lâu dài**, không nhằm mục tiêu phổ cập đại trà.
-
----
-
-## Phạm vi dự án
-
-V++ tập trung vào:
-
-* Định nghĩa bytecode riêng
-* Mô hình thực thi dựa trên stack
-* Luồng điều khiển tường minh (khối lệnh, vòng lặp, điều kiện)
-* Runtime tối giản
-* Phân tách rõ ràng giữa: phân tích cú pháp, biên dịch và thực thi
-
-Những thứ **cố tình không làm**:
-
-* Thư viện chuẩn lớn
-* Abstraction cấp framework
-* Tự động song song hóa
-* Cơ chế phản xạ (reflection) động phức tạp
-
----
-
-## Cấu trúc thư mục
-
-```
-/
-├── src/            Mã nguồn lõi của VM và compiler
-├── include/        Header public
-├── examples/       Ví dụ chương trình nhỏ
-├── docs/           Tài liệu thiết kế và đặc tả
-├── tests/          Các ca kiểm thử
-└── README.md
-```
-
----
-
-## Biên dịch V++
-
-### Trên các hệ Unix-like (Linux, macOS, BSD)
-
-Yêu cầu:
-
-* Trình biên dịch C++ hỗ trợ C++17
-* Make hoặc CMake
-
-Ví dụ:
+### Linux
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+tar -xzf vpp-linux-x64.tar.gz
+chmod +x ./vpp
+./vpp giúp đỡ
 ```
 
-Không yêu cầu cài đặt toàn hệ thống.
-
----
-
-## Thực thi chương trình
-
-Sau khi biên dịch, có thể chạy chương trình thông qua runtime của V++ với file bytecode:
+### macOS
 
 ```bash
-./vietvm example.bytecode
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
+tar -xzf vpp-macos.tar.gz
+chmod +x ./vpp
+./vpp giúp đỡ
 ```
 
----
+### Windows (PowerShell)
 
-## Mô hình thực thi
+```powershell
+Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
+Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
+.\vpp-bin\vpp.exe giúp đỡ
+```
 
-V++ sử dụng:
+Luu y: release asset se duoc tao boi workflow `.github/workflows/release-binaries.yml` khi ban publish Release.
 
-* Máy ảo dựa trên stack
-* Tập lệnh tường minh cho:
+## Cài Đặt Hỗ Trợ Ngôn Ngữ
 
-  * khởi tạo biến
-  * kiểm tra điều kiện
-  * điều khiển vòng lặp
-  * mở/đóng khối lệnh
-* Cơ chế dispatch xác định, không ẩn
+Repo này có extension cục bộ để tô màu cú pháp cho file `.vi` và `.vvm`.
 
-Không tồn tại luồng điều khiển ngầm hay hành vi runtime khó truy vết.
-
-Chi tiết xem `docs/DESIGN.md`.
-
----
-
-## Kiểm thử
+### Cách 1: Cài vào VS Code
 
 ```bash
-make test
+./scripts/vpp-lang self-install
+vpp-lang install --editor vscode
 ```
 
-Các kiểm thử tập trung vào tính đúng đắn của lệnh và luồng điều khiển.
+Sau đó reload VS Code và mở file `.vi`.
 
----
+### Cách 2: Dùng trực tiếp trong workspace
 
-## Tài liệu
+1. Mở repo này trong VS Code.
+2. Nhấn `F5`.
+3. Ở cửa sổ Extension Development Host, mở file `.vi`.
 
-Tài liệu được đặt trong thư mục `docs/`, bao gồm:
+### Các lệnh hữu ích
 
-* `architecture.md` — cấu trúc dự án và quyết định thiết kế
-* `bytecode.md` — đặc tả tập lệnh bytecode và định dạng bytecode
-* `grammar.bnf` — đặc tả ngữ pháp ngôn ngữ
-* `language-comparison.md` — so sánh với các ngôn ngữ lập trình khác (Tiếng Việt)
-* `language-comparison-en.md` — comparison with other programming languages (English)
+```bash
+./scripts/vpp-lang list
+./scripts/vpp-lang pack
+./scripts/vpp-lang uninstall --editor vscode
+./scripts/vpp-lang self-uninstall
+```
 
-Tài liệu mang tính mô tả kỹ thuật, không mang tính quảng bá.
+`pack` sẽ tạo file `.vlang` trong `dist/`.
 
----
+## Tooling CLI
 
-## Phiên bản
+CLI chính hiện có các lệnh hỗ trợ phát triển:
 
-V++ không theo lịch phát hành cố định.
-Trong giai đoạn đầu, **không đảm bảo tương thích ngược**.
+```bash
+./VPP giúp đỡ
+./VPP phiên bản
+./VPP bác sĩ
+./VPP nơi
+./VPP thống kê
+./VPP chạy example.vi
+./VPP cài đặt ./lib/stdlib.vi stdlib
+./VPP caidat ./duong-dan/goi.vi ten-goi
+./VPP xóa ten-goi
+./VPP thông tin stdlib
+./VPP kiểm tra stdlib
 
----
+./bin/vpp-cli --giải-mã example.vi
+./bin/vpp-cli --lint example.vi
+./bin/vpp-cli --định-dạng example.vi
+./bin/vpp-cli --định-dạng example.vi --in-place
+./bin/vpp-cli --repl
+./bin/vpp-cli --lsp
+./bin/vpp-cli khởi tạo demo
+./bin/vpp-cli cài đặt ./lib/stdlib.vi stdlib
+./bin/vpp-cli danh sách
+./bin/vpp-cli xóa stdlib
+./bin/vpp-cli thông tin stdlib
+./bin/vpp-cli kiểm tra stdlib
+./bin/vpp-cli thống kê
+./bin/vpp-cli pkg khởi tạo demo
+./bin/vpp-cli pkg thêm lib.vi mypkg
+./bin/vpp-cli pkg xóa mypkg
+./bin/vpp-cli pkg thông tin mypkg
+./bin/vpp-cli pkg kiểm tra mypkg
+./bin/vpp-cli pkg danh sách
+```
 
-## Bản quyền và giấy phép
+`cài đặt` là lệnh chính cho package manager, và `caidat` cũng được hỗ trợ:
 
-Copyright © 2025.
+```bash
+./bin/vpp-cli caidat ./duong-dan/goi.vi ten-goi
+```
 
-Điều khoản sử dụng được nêu trong file `LICENSE`.
+Windows có thể dùng trực tiếp:
 
-Dự án không chứa mã nguồn GPL và có thể được sử dụng cho mục đích nghiên cứu, giáo dục hoặc cá nhân theo giấy phép tương ứng.
+```cmd
+VPP.cmd caidat duong-dan\goi.vi ten-goi
+```
 
+`nhập "stdlib";` vẫn hoạt động, và package local sẽ được tìm trong `packages/<name>/main.vi`.
 
+## Cấu Trúc Chính
 
-## Liên hệ
+- `src/cli/main.cpp`: entrypoint của CLI
+- `src/frontend/`: lexer + keyword map
+- `src/compiler/`: compile tokens thành bytecode
+- `src/vm/`: runtime VM
+- `docs/`: bytecode, grammar, kiến trúc
+- `src/tests/`: chương trình kiểm thử
 
-- Chủ repo: `winbiru`
-- Báo lỗi hoặc thảo luận: tạo Issue tại [Issues](https://github.com/winbiru/V++/issues)
+## Tài Liệu
 
----
+- `docs/architecture.md`
+- `docs/bytecode.md`
+- `docs/grammar.bnf`
+- `docs/language-comparison.md`
+- `docs/language-comparison-en.md`
 
+## Ghi Chú
+
+- Đây là project thử nghiệm, chưa cam kết tương thích ổn định lâu dài.
+- Bytecode, parser và CLI vẫn đang tiếp tục hoàn thiện.

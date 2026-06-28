@@ -1,0 +1,229 @@
+// V++ stdlib tiếng Việt
+// Mục tiêu: API dễ nhớ, không phá tương thích ngược.
+
+// ===== Toán học cơ bản =====
+hàm cong(a, b) {
+    trả về a + b;
+};
+
+hàm tru(a, b) {
+    trả về a - b;
+};
+
+hàm nhan(a, b) {
+    trả về a * b;
+};
+
+hàm chia(a, b) {
+    nếu (b == 0 || b == 0.0) {
+        trả về 0;
+    };
+    trả về a / b;
+};
+
+hàm chia_du(a, b) {
+    nếu (b == 0) {
+        trả về 0;
+    };
+    trả về a % b;
+};
+
+hàm mod(a, b) {
+    trả về chia_du(a, b);
+};
+
+hàm chia_an_toan(a, b, mac_dinh = 0) {
+    nếu (b == 0 || b == 0.0) {
+        trả về mac_dinh;
+    };
+    trả về a / b;
+};
+
+// ===== Lũy thừa / Giai thừa =====
+hàm luy_thua(co_so, so_mu) {
+    nếu (so_mu < 0) {
+        trả về 0;
+    };
+
+    ket_qua = 1;
+    lặp (i = 0; i < so_mu; i = i + 1) {
+        ket_qua = ket_qua * co_so;
+    };
+    trả về ket_qua;
+};
+
+hàm giai_thua(n) {
+    nếu (n <= 1) {
+        trả về 1;
+    };
+    trả về n * giai_thua(n - 1);
+};
+
+// ===== Hàm tiện ích số học =====
+hàm tri_tuyet_doi(x) {
+    nếu (x < 0) {
+        trả về 0 - x;
+    };
+    trả về x;
+};
+
+hàm max2(a, b) {
+    nếu (a > b) {
+        trả về a;
+    };
+    trả về b;
+};
+
+hàm min2(a, b) {
+    nếu (a < b) {
+        trả về a;
+    };
+    trả về b;
+};
+
+hàm clamp(x, min_val, max_val) {
+    nếu (x < min_val) {
+        trả về min_val;
+    };
+    nếu (x > max_val) {
+        trả về max_val;
+    };
+    trả về x;
+};
+
+hàm trung_binh(a, b) {
+    trả về (a + b) / 2;
+};
+
+hàm phan_tram(gia_tri, tong) {
+    nếu (tong == 0 || tong == 0.0) {
+        trả về 0;
+    };
+    trả về (gia_tri * 100) / tong;
+};
+
+hàm la_chan(n) {
+    trả về n % 2 == 0;
+};
+
+hàm la_le(n) {
+    trả về n % 2 != 0;
+};
+
+// ===== Backward compatibility =====
+hàm bình_phương(x) {
+    trả về nhan(x, x);
+};
+
+hàm binh_phuong(x) {
+    trả về bình_phương(x);
+};
+
+hàm tong2(a, b) {
+    trả về cong(a, b);
+};
+
+// ===== Chuỗi (API hiện hỗ trợ ở mức cơ bản) =====
+hàm noi_chuoi(a, b) {
+    trả về a + b;
+};
+
+hàm noi_3(a, b, c) {
+    trả về a + b + c;
+};
+
+hàm bang_nhau_chuoi(a, b) {
+    trả về a == b;
+};
+
+hàm khac_nhau_chuoi(a, b) {
+    trả về a != b;
+};
+
+hàm la_chuoi_rong(s) {
+    trả về s == "";
+};
+
+hàm bang_nhau(a, b) {
+    trả về a == b;
+};
+
+hàm khac_nhau(a, b) {
+    trả về a != b;
+};
+
+// ===== Logic / điều kiện =====
+hàm tat_ca(a, b) {
+    nếu (a && b) {
+        trả về đúng;
+    };
+    trả về sai;
+};
+
+hàm mot_trong_hai(a, b) {
+    nếu (a || b) {
+        trả về đúng;
+    };
+    trả về sai;
+};
+
+// ===== Logging =====
+hàm log_thong_tin(msg) {
+    in "[INFO] " + msg;
+    trả về 0;
+};
+
+hàm log_canh_bao(msg) {
+    in "[WARN] " + msg;
+    trả về 0;
+};
+
+hàm log_loi(msg) {
+    in "[ERROR] " + msg;
+    trả về 0;
+};
+
+// ===== Native APIs (được VM xử lý trực tiếp) =====
+// Lưu ý: các hàm dưới đây được thực thi bởi runtime native trong VM.
+// Phần ném lỗi chỉ là fallback an toàn nếu native hook không khả dụng.
+
+hàm io_doc_file(_duong_dan) {
+    ném "stdlib: io_doc_file native hook không khả dụng";
+};
+
+hàm io_ghi_file(_duong_dan, _noi_dung) {
+    ném "stdlib: io_ghi_file native hook không khả dụng";
+};
+
+hàm mang_http_get(_url) {
+    ném "stdlib: mang_http_get native hook không khả dụng";
+};
+
+hàm lay_thoi_gian_hien_tai() {
+    ném "stdlib: lay_thoi_gian_hien_tai native hook không khả dụng";
+};
+
+hàm doc_config(_duong_dan) {
+    ném "stdlib: doc_config native hook không khả dụng";
+};
+
+// ===== Wrapper thân thiện =====
+hàm doc_file(duong_dan) {
+    trả về io_doc_file(duong_dan);
+};
+
+hàm ghi_file(duong_dan, noi_dung) {
+    trả về io_ghi_file(duong_dan, noi_dung);
+};
+
+hàm http_get(url) {
+    trả về mang_http_get(url);
+};
+
+hàm gio_hien_tai() {
+    trả về lay_thoi_gian_hien_tai();
+};
+
+hàm doc_file_config(duong_dan) {
+    trả về doc_config(duong_dan);
+};

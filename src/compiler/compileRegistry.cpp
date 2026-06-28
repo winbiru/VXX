@@ -425,6 +425,23 @@ void initCompileMap() {
                     abs = fs::absolute(cand).lexically_normal();
                     break;
                 }
+                if (p.parent_path().empty() && p.extension().empty()) {
+                    fs::path packageMain = dir / "packages" / p / "main.vi";
+                    fs::path packageRoot = dir / "packages" / p;
+                    fs::path packageSource = dir / "packages" / (p.string() + ".vi");
+                    if (fs::exists(packageMain)) {
+                        abs = fs::absolute(packageMain).lexically_normal();
+                        break;
+                    }
+                    if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
+                        abs = fs::absolute(packageRoot).lexically_normal();
+                        break;
+                    }
+                    if (fs::exists(packageSource)) {
+                        abs = fs::absolute(packageSource).lexically_normal();
+                        break;
+                    }
+                }
                 if (dir == dir.parent_path()) break; // reached filesystem root
             }
         }
