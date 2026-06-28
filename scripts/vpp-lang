@@ -17,20 +17,20 @@ usage() {
 V++ language installer
 
 Usage:
-  vietvm-lang install [--editor vscode|cursor|vscodium|all]
-  vietvm-lang uninstall [--editor vscode|cursor|vscodium|all]
-  vietvm-lang list
-  vietvm-lang pack
-  vietvm-lang self-install [--prefix DIR]
-  vietvm-lang self-uninstall [--prefix DIR]
-  vietvm-lang help
+  vpp-lang install [--editor vscode|cursor|vscodium|all]
+  vpp-lang uninstall [--editor vscode|cursor|vscodium|all]
+  vpp-lang list
+  vpp-lang pack
+  vpp-lang self-install [--prefix DIR]
+  vpp-lang self-uninstall [--prefix DIR]
+  vpp-lang help
 
 Examples:
-  ./scripts/vietvm-lang self-install
-  vietvm-lang install
-  vietvm-lang install --editor vscode
-  vietvm-lang uninstall --editor cursor
-  vietvm-lang pack
+  ./scripts/vpp-lang self-install
+  vpp-lang install
+  vpp-lang install --editor vscode
+  vpp-lang uninstall --editor cursor
+  vpp-lang pack
 EOF
 }
 
@@ -112,6 +112,7 @@ write_vscode_package_json() {
   "description": "Syntax highlighting for V++",
   "version": "$VERSION",
   "publisher": "$PUBLISHER",
+  "icon": "assets/icons/vpp-file.png",
   "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.80.0"
@@ -125,14 +126,18 @@ write_vscode_package_json() {
         "id": "$LANGUAGE_ID",
         "aliases": ["V++", "vpp", "vietvm"],
         "extensions": [".vvm", ".vi"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./assets/icons/vpp-file.png",
+          "dark": "./assets/icons/vpp-file.png"
+        }
       }
     ],
     "grammars": [
       {
         "language": "$LANGUAGE_ID",
         "scopeName": "source.vietvm",
-        "path": "./syntaxes/vietvm.tmLanguage.json"
+        "path": "./syntaxes/vpp.tmLanguage.json"
       }
     ]
   }
@@ -152,9 +157,10 @@ install_one() {
 
   echo "install $NAME@$VERSION -> $editor_name"
   rm -rf "$dest"
-  mkdir -p "$dest/syntaxes"
+  mkdir -p "$dest/syntaxes" "$dest/assets/icons"
 
-  cp "$ROOT_DIR/syntaxes/vietvm.tmLanguage.json" "$dest/syntaxes/vietvm.tmLanguage.json"
+  cp "$ROOT_DIR/syntaxes/vpp.tmLanguage.json" "$dest/syntaxes/vpp.tmLanguage.json"
+  cp "$ROOT_DIR/assets/icons/vpp-file.png" "$dest/assets/icons/vpp-file.png"
   cp "$ROOT_DIR/language-configuration.json" "$dest/language-configuration.json"
   cp "$ROOT_DIR/INSTALL_EDITOR_HIGHLIGHT.md" "$dest/README.md"
   cp "$MANIFEST" "$dest/vpp-language.json"
@@ -241,7 +247,8 @@ pack_cmd() {
     vpp-language.json \
     language-configuration.json \
     INSTALL_EDITOR_HIGHLIGHT.md \
-    syntaxes/vietvm.tmLanguage.json
+    assets/icons/vpp-file.png \
+    syntaxes/vpp.tmLanguage.json
 
   echo "packed: $package"
 }
@@ -249,10 +256,10 @@ pack_cmd() {
 self_install_cmd() {
   parse_prefix "$@"
   mkdir -p "$prefix"
-  wrapper="$prefix/vietvm-lang"
+  wrapper="$prefix/vpp-lang"
   cat > "$wrapper" <<EOF
 #!/usr/bin/env sh
-exec "$ROOT_DIR/scripts/vietvm-lang" "\$@"
+exec "$ROOT_DIR/scripts/vpp-lang" "\$@"
 EOF
   chmod +x "$wrapper"
   echo "installed command: $wrapper"
@@ -261,7 +268,7 @@ EOF
 
 self_uninstall_cmd() {
   parse_prefix "$@"
-  wrapper="$prefix/vietvm-lang"
+  wrapper="$prefix/vpp-lang"
   if [ -f "$wrapper" ]; then
     rm -f "$wrapper"
     echo "removed command: $wrapper"

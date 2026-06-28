@@ -3,5 +3,9 @@
 !README.md
 !INSTALL_EDITOR_HIGHLIGHT.md
 !language-configuration.json
+!assets/**
+!assets/icons/**
+!assets/icons/vpp-file.svg
+!assets/icons/vpp-file.png
 !syntaxes/**
-!syntaxes/vietvm.tmLanguage.json
+!syntaxes/vpp.tmLanguage.json

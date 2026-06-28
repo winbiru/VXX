@@ -4,6 +4,7 @@
   "description": "Syntax highlighting for V++",
   "version": "0.0.1",
   "publisher": "vpp",
+  "icon": "assets/icons/vpp-file.png",
   "license": "UNLICENSED",
   "categories": [
     "Programming Languages"
@@ -19,7 +20,7 @@
   },
   "vpp": {
     "manifest": "./vpp-language.json",
-    "installer": "./scripts/vietvm-lang",
+    "installer": "./scripts/vpp-lang",
     "packageFormat": "vlang"
   },
   "contributes": {
@@ -28,14 +29,18 @@
         "id": "vpp",
         "aliases": ["V++", "vpp", "vietvm"],
         "extensions": [".vvm", ".vi"],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./assets/icons/vpp-file.png",
+          "dark": "./assets/icons/vpp-file.png"
+        }
       }
     ],
     "grammars": [
       {
         "language": "vpp",
         "scopeName": "source.vietvm",
-        "path": "./syntaxes/vietvm.tmLanguage.json"
+        "path": "./syntaxes/vpp.tmLanguage.json"
       }
     ]
   }

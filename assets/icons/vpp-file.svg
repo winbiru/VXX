@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="V++ file icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06122e"/>
+      <stop offset="100%" stop-color="#0a1c46"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#24d2ff"/>
+      <stop offset="100%" stop-color="#7a39ff"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#d6dcff"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="240" height="240" rx="46" fill="url(#bg)"/>
+  <path d="M40 78 L128 30 L216 78 M40 178 L128 226 L216 178" fill="none" stroke="url(#stroke)" stroke-width="10" stroke-linecap="round"/>
+  <text x="74" y="158" font-size="104" font-weight="800" font-family="Segoe UI, Arial, sans-serif" fill="url(#textGrad)">V</text>
+  <text x="154" y="162" font-size="70" font-weight="700" font-family="Segoe UI, Arial, sans-serif" fill="url(#stroke)">++</text>
+</svg>
