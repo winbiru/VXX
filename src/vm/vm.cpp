@@ -17,6 +17,11 @@
 #include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
+#if defined(_WIN32)
+#define popen _popen
+#define pclose _pclose
+#endif
+
 static std::string trim_copy(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
     if (a == std::string::npos) return "";
