@@ -8,8 +8,10 @@
 #include <sstream>
 #include <ctime>
 #include <cstdio>
+#include <stdio.h>
 #include <cstdlib>
 #include <functional>
+#include <optional>
 #include <unordered_map>
 #include "../../include/vm/vm.h"
 
@@ -17,10 +19,56 @@
 #include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
-#if defined(_WIN32)
-#define popen _popen
-#define pclose _pclose
-#endif
+static FILE *openCommandPipe(const std::string &cmd) {
+    #if defined(_MSC_VER)
+        return _popen(cmd.c_str(), "r");
+    #else
+        return popen(cmd.c_str(), "r");
+    #endif
+    }
+
+    static int closeCommandPipe(FILE *pipe) {
+    #if defined(_MSC_VER)
+        return _pclose(pipe);
+    #else
+        return pclose(pipe);
+    #endif
+    }
+
+    static bool hasEnvVar(const char *name) {
+    #if defined(_MSC_VER)
+        char *value = nullptr;
+        size_t len = 0;
+        errno_t err = _dupenv_s(&value, &len, name);
+        (void)len;
+        if (err != 0 || value == nullptr) {
+            return false;
+        }
+        std::free(value);
+        return true;
+    #else
+        return std::getenv(name) != nullptr;
+    #endif
+    }
+
+    static std::optional<std::string> getEnvVar(const char *name) {
+    #if defined(_MSC_VER)
+        char *value = nullptr;
+        size_t len = 0;
+        errno_t err = _dupenv_s(&value, &len, name);
+        (void)len;
+        if (err != 0 || value == nullptr) {
+            return std::nullopt;
+        }
+        std::string result(value);
+        std::free(value);
+        return result;
+    #else
+        const char *value = std::getenv(name);
+        if (value == nullptr) return std::nullopt;
+        return std::string(value);
+    #endif
+    }
 
 static std::string trim_copy(const std::string &s) {
     size_t a = s.find_first_not_of(" \t\r\n");
@@ -106,7 +154,12 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
 
     if (fn == "lay_thoi_gian_hien_tai") {
         std::time_t now = std::time(nullptr);
+        std::tm tmBuf{};
+    #if defined(_MSC_VER)
+        std::tm *tmNow = (localtime_s(&tmBuf, &now) == 0) ? &tmBuf : nullptr;
+    #else
         std::tm *tmNow = std::localtime(&now);
+    #endif
         char buf[32] = {0};
         if (!tmNow || std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tmNow) == 0) {
             err = "lay_thoi_gian_hien_tai: format thời gian thất bại";
@@ -162,7 +215,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         if (args.size() != 1) { err = "mang_http_get yêu cầu 1 tham số"; return true; }
         std::string url = argToRawString(args[0]);
         std::string cmd = "curl -Ls --max-time 20 " + shellQuoteSingle(url);
-        FILE *pipe = popen(cmd.c_str(), "r");
+        FILE *pipe = openCommandPipe(cmd);
         if (!pipe) { err = "mang_http_get: không mở được tiến trình curl"; return true; }
 
         std::string data;
@@ -170,7 +223,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         while (fgets(chunk, sizeof(chunk), pipe) != nullptr) {
             data += chunk;
         }
-        int rc = pclose(pipe);
+        int rc = closeCommandPipe(pipe);
         if (rc != 0) { err = "mang_http_get: curl trả về lỗi"; return true; }
 
         result = make_string_value(data);
@@ -497,18 +550,18 @@ bool VM::runJitCompiledLinear() {
 }
 
 void VM::run() {
-    const bool gcEnabled = (std::getenv("VPP_ENABLE_GC") != nullptr) || (std::getenv("VIETVM_ENABLE_GC") != nullptr);
+    const bool gcEnabled = hasEnvVar("VPP_ENABLE_GC") || hasEnvVar("VIETVM_ENABLE_GC");
     int gcInterval = 2048;
-    const char *gcEnv = std::getenv("VPP_GC_INTERVAL");
-    if (!gcEnv) gcEnv = std::getenv("VIETVM_GC_INTERVAL");
+    std::optional<std::string> gcEnv = getEnvVar("VPP_GC_INTERVAL");
+    if (!gcEnv) gcEnv = getEnvVar("VIETVM_GC_INTERVAL");
     if (gcEnv) {
         try {
-            int parsed = std::stoi(gcEnv);
+            int parsed = std::stoi(*gcEnv);
             if (parsed > 0) gcInterval = parsed;
         } catch (...) {}
     }
 
-    if ((std::getenv("VPP_ENABLE_JIT") != nullptr) || (std::getenv("VIETVM_ENABLE_JIT") != nullptr)) {
+    if (hasEnvVar("VPP_ENABLE_JIT") || hasEnvVar("VIETVM_ENABLE_JIT")) {
         if (runJitCompiledLinear()) {
             return;
         }
