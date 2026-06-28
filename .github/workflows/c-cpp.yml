@@ -19,7 +19,7 @@ jobs:
       - name: Configure CMake
         run: cmake -S . -B cmake-build-debug
 
-      - name: Build VietVM
+      - name: Build V++
         run: cmake --build cmake-build-debug
 
       - name: Run tests

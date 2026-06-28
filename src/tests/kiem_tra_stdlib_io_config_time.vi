@@ -1,0 +1,13 @@
+nhập "stdlib";
+
+hàm main() {
+    io_ghi_file(".tmp_stdlib_io.txt", "xin chao io");
+    in io_doc_file(".tmp_stdlib_io.txt");
+
+    io_ghi_file(".tmp_stdlib_cfg.ini", "port=8080\nname=vietvm\nbat=đúng\nhe_so=2.5\n");
+    cfg = doc_config(".tmp_stdlib_cfg.ini");
+    in cfg;
+
+    now = lay_thoi_gian_hien_tai();
+    in now != "";
+};

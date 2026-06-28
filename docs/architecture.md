@@ -1,4 +1,4 @@
-# Kiến trúc tổng quan — VietVM (nhánh `developer`)
+# Kiến trúc tổng quan — V++ (nhánh `developer`)
 
 Mục đích: tài liệu hóa cấu trúc dự án hiện tại (theo nhánh `developer`), quy ước đặt file/namespace, luồng build, và các bước đề xuất để dự án có cấu trúc giống hơn với mô hình module/assembly như Java/C#.
 
@@ -51,7 +51,7 @@ Root:
     - helpers/
     - tests/
 - tests/  (tách ngoài nếu muốn)
-- src/frontend/grammar.bnf (hoặc VietVM.g4 nếu dùng ANTLR)
+- src/frontend/grammar.bnf (hoặc V++.g4 nếu dùng ANTLR)
 
 Lý do: tương tự Java/C# là có "root namespace" (vietvm) và thư mục con tương ứng module; public headers nằm dưới `include/vietvm/...` để dễ include như `#include <vietvm/vm/vm.h>`.
 
@@ -62,7 +62,7 @@ Lý do: tương tự Java/C# là có "root namespace" (vietvm) và thư mục co
     - Ví dụ: add_library(vietvm::vm STATIC ...)
     - Lợi ích: rõ ràng khi target_link_libraries(app PRIVATE vietvm::vm)
 - Namespace trong code: `namespace vietvm::vm { ... }`, `namespace vietvm::frontend { ... }`
-- Header guards / pragma once: theo đường dẫn, ví dụ `VIETVM_VM_VM_H` hoặc `VIETVM_VM_VM_HPP`.
+- Header guards / pragma once: theo đường dẫn, ví dụ `V++_VM_VM_H` hoặc `V++_VM_VM_HPP`.
 - Include style: `#include <vietvm/vm/vm.h>`
 
 ---
@@ -74,7 +74,7 @@ Hiện tại: CMakeLists.txt gốc thu thập sources bằng GLOB_RECURSE và t�
 - Giữ CMake gốc làm top-level, nhưng tách `src/<module>/CMakeLists.txt` cho từng module; trong top-level gọi add_subdirectory(src/<module>).
 - Trong mỗi CMakeLists module, dùng:
     - add_library(vietvm::vm STATIC ${SOURCES})
-    - target_include_directories(vietvm::vm PUBLIC ${VIETVM_INCLUDE_DIR})
+    - target_include_directories(vietvm::vm PUBLIC ${V++_INCLUDE_DIR})
     - target_compile_features(... PUBLIC cxx_std_17)
 - Tránh GLOB cho production — liệt kê nguồn tường minh (giúp CI detect changes).
 - Thiết lập export và cài đặt (install) nếu cần.
@@ -94,7 +94,7 @@ Hiện tại: CMakeLists.txt gốc thu thập sources bằng GLOB_RECURSE và t�
 ## 6. Lexer / Parser / Grammar
 - Đã có bản thô grammar.bnf (mình soạn dựa trên include/keywords.h). Đặt file grammar ở `src/frontend/grammar.bnf`.
 - Gợi ý: chọn parser-generator:
-    - Nếu ANTLR: tạo `src/frontend/VietVM.g4` (parser + lexer).
+    - Nếu ANTLR: tạo `src/frontend/V++.g4` (parser + lexer).
     - Nếu flex/bison: tạo `src/frontend/lexer.l` + `src/frontend/parser.y`.
 - Normalize keywords: quyết định dùng dạng có dấu hay không; lexer nên map cả hai biến thể (`"nếu"` và `"neu"`) về một token IF.
 - Multi-word keywords (ví dụ "trường hợp", "mặc định", "nếu không") cần lexer xử lý là single token (ghi nhận cụm) hoặc grammar phải chấp nhận chuỗi token.
@@ -120,7 +120,7 @@ Hiện tại: CMakeLists.txt gốc thu thập sources bằng GLOB_RECURSE và t�
 3. Cập nhật tất cả #include trong src/ để dùng `<vietvm/...>` style.
 4. Thêm namespace trong files nếu chưa có: `namespace vietvm::<module> { ... }`
 5. Tách CMakeLists.txt: mỗi module có CMakeLists con và export target `vietvm::<module>`.
-6. Di chuyển grammar.bnf -> src/frontend/grammar.bnf; nếu dùng ANTLR, tạo `VietVM.g4`.
+6. Di chuyển grammar.bnf -> src/frontend/grammar.bnf; nếu dùng ANTLR, tạo `V++.g4`.
 7. Viết CI workflow để build & test trên nhánh developer.
 
 ---

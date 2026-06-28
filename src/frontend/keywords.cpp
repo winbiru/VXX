@@ -134,6 +134,10 @@ std::string name_op(Opcode op) {
         case OP_THU: return "OP_THU";
         case OP_THU_KET_THUC: return "OP_THU_KET_THUC";
         case OP_BAT_LOI: return "OP_BAT_LOI";
+        case OP_RONG_GIA_TRI: return "OP_RONG_GIA_TRI";
+        case OP_MAP_LITERAL: return "OP_MAP_LITERAL";
+        case OP_GOI_GIAN_TIEP: return "OP_GOI_GIAN_TIEP";
+        case OP_PARAM_MAC_DINH: return "OP_PARAM_MAC_DINH";
         default: return "UNKNOWN_OPCODE";
     }
 }

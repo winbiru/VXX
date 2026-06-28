@@ -1,10 +1,10 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
-#include <variant>
+#include "vm_utils.h"
 
 // Use the same StackValue/Value type as your VM (adjust if you use different type)
-using Value = std::variant<int, double, std::string>;
+using Value = StackValue;
 
 struct CallFrame {
     std::vector<Value> args;                      // argument values, args[0] = first param

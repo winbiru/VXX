@@ -1,16 +1,20 @@
 # Makefile (sửa lại để tránh lỗi "expecting fi" bằng .ONESHELL)
 SHELL := /bin/sh
-# Simple test runner Makefile for VietVM projects
+# Simple test runner Makefile for V++ projects
 
-VMSRC ?= VietVM
+VMSRC ?= V++
 BUILD_DIR ?= build
 
 BIN := $(firstword $(wildcard \
+	$(BUILD_DIR)/bin/vpp-cli \
     $(BUILD_DIR)/bin/vietvm-cli \
     $(BUILD_DIR)/bin/$(VMSRC) \
+	$(BUILD_DIR)/vpp-cli \
     $(BUILD_DIR)/vietvm-cli \
     $(BUILD_DIR)/$(VMSRC) \
+	cmake-build-debug/bin/vpp-cli \
     cmake-build-debug/bin/vietvm-cli \
+	cmake-build-debug/vpp-cli \
     cmake-build-debug/$(VMSRC) \
     cmake-build-debug/vietvm-cli))
 
@@ -41,10 +45,16 @@ check: build
 	echo "CHECK_TESTFILES = $(CHECK_TESTFILES)"; \
 	EXEC="$(BIN)"; \
 	if [ -z "$$EXEC" ]; then \
-		if [ -x "$(BUILD_DIR)/bin/vietvm-cli" ]; then \
+		if [ -x "$(BUILD_DIR)/bin/vpp-cli" ]; then \
+			EXEC="$(BUILD_DIR)/bin/vpp-cli"; \
+		elif [ -x "$(BUILD_DIR)/bin/vietvm-cli" ]; then \
 			EXEC="$(BUILD_DIR)/bin/vietvm-cli"; \
+		elif [ -x "$(BUILD_DIR)/vpp-cli" ]; then \
+			EXEC="$(BUILD_DIR)/vpp-cli"; \
 		elif [ -x "$(BUILD_DIR)/vietvm-cli" ]; then \
 			EXEC="$(BUILD_DIR)/vietvm-cli"; \
+		elif [ -x "cmake-build-debug/bin/vpp-cli" ]; then \
+			EXEC="cmake-build-debug/bin/vpp-cli"; \
 		elif [ -x "cmake-build-debug/bin/vietvm-cli" ]; then \
 			EXEC="cmake-build-debug/bin/vietvm-cli"; \
 		else \
@@ -91,7 +101,11 @@ bless: build
 	@set -e; \
 	EXEC="$(BIN)"; \
 	if [ -z "$$EXEC" ]; then \
-		EXEC="$(BUILD_DIR)/bin/vietvm-cli"; \
+		if [ -x "$(BUILD_DIR)/bin/vpp-cli" ]; then \
+			EXEC="$(BUILD_DIR)/bin/vpp-cli"; \
+		else \
+			EXEC="$(BUILD_DIR)/bin/vietvm-cli"; \
+		fi; \
 	fi; \
 	mkdir -p $(EXPECTEDDIR); \
 	for testfile in $(TESTFILES); do \

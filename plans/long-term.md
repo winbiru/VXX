@@ -1,6 +1,6 @@
 # Kế hoạch Dài hạn (3–12+ tháng)
 
-Mục tiêu: Chuẩn hoá bytecode, nâng cao hiệu năng runtime, xác định API công khai để nhúng VietVM vào ứng dụng khác và có quy trình phát hành (releases).
+Mục tiêu: Chuẩn hoá bytecode, nâng cao hiệu năng runtime, xác định API công khai để nhúng V++ vào ứng dụng khác và có quy trình phát hành (releases).
 
 Ưu tiên: Medium → Low (tùy roadmap)
 

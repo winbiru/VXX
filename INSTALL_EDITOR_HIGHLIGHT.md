@@ -1,10 +1,10 @@
-# VietVM syntax highlighting
+# V++ syntax highlighting
 
 This project includes a local VS Code language extension for `.vi` and `.vvm` files.
 
-## VietVM-style installer
+## V++-style installer
 
-This is the VietVM installer for VietVM language support. It does not require external package managers.
+This is the V++ installer for V++ language support. It does not require external package managers.
 
 ```bash
 ./scripts/vietvm-lang install

@@ -1,0 +1,15 @@
+nhan_doi = hàm(x) { trả về x * 2; };
+in nhan_doi(21);
+
+hàm ap_dung(f, x) {
+    trả về f(x);
+}
+
+in ap_dung(nhan_doi, 5);
+
+hàm cong_mac_dinh(a, b = 10) {
+    trả về a + b;
+}
+
+in cong_mac_dinh(5);
+in cong_mac_dinh(5, 2);

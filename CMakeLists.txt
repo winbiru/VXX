@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(VietVM LANGUAGES CXX)
+project(VPP LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -9,7 +9,7 @@ option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 
 # Public include dir for headers
-set(VIETVM_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(VPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
 # Output directories for libs and binaries
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -24,7 +24,7 @@ file(GLOB_RECURSE STDLIB_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/stdli
 set(CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
 
 # Create library helper (accepts sources passed directly)
-function(vietvm_add_module name)
+function(vpp_add_module name)
     set(sources ${ARGN})
     if (NOT sources)
         message(FATAL_ERROR "No sources provided for module ${name}")
@@ -34,7 +34,7 @@ function(vietvm_add_module name)
     else()
         add_library(${name} STATIC ${sources})
     endif()
-    target_include_directories(${name} PUBLIC ${VIETVM_INCLUDE_DIR})
+    target_include_directories(${name} PUBLIC ${VPP_INCLUDE_DIR})
     target_compile_features(${name} PUBLIC cxx_std_17)
     if (MSVC)
         target_compile_options(${name} PRIVATE /W4 /permissive-)
@@ -45,46 +45,52 @@ endfunction()
 
 # Create libraries per module only if sources exist
 if (FRONTEND_SOURCES)
-    vietvm_add_module(vietvm-frontend ${FRONTEND_SOURCES})
+    vpp_add_module(vpp-frontend ${FRONTEND_SOURCES})
 else()
     message(FATAL_ERROR "No frontend sources found in src/frontend")
 endif()
 
 if (COMPILER_SOURCES)
-    vietvm_add_module(vietvm-compiler ${COMPILER_SOURCES})
-    target_link_libraries(vietvm-compiler PUBLIC vietvm-frontend)
+    vpp_add_module(vpp-compiler ${COMPILER_SOURCES})
+    target_link_libraries(vpp-compiler PUBLIC vpp-frontend)
 endif()
 
 if (VM_SOURCES)
-    vietvm_add_module(vietvm-vm ${VM_SOURCES})
-    target_link_libraries(vietvm-vm PUBLIC vietvm-compiler)
+    vpp_add_module(vpp-vm ${VM_SOURCES})
+    target_link_libraries(vpp-vm PUBLIC vpp-compiler)
 endif()
 
 # stdlib is optional: only create if there are sources
 if (STDLIB_SOURCES)
-    vietvm_add_module(vietvm-stdlib ${STDLIB_SOURCES})
-    target_link_libraries(vietvm-stdlib PUBLIC vietvm-vm)
+    vpp_add_module(vpp-stdlib ${STDLIB_SOURCES})
+    target_link_libraries(vpp-stdlib PUBLIC vpp-vm)
 else()
-    message(STATUS "No stdlib sources found; skipping vietvm-stdlib")
+    message(STATUS "No stdlib sources found; skipping vpp-stdlib")
 endif()
 
 # CLI executable (thin wrapper that uses libs above)
-add_executable(vietvm-cli ${CLI_SOURCES})
+add_executable(vpp-cli ${CLI_SOURCES})
 
 # Link only to the top-level library - transitive dependencies will pull in the rest
 # This avoids duplicate library warnings from the linker
-if (TARGET vietvm-stdlib)
-    target_link_libraries(vietvm-cli PRIVATE vietvm-stdlib)
+if (TARGET vpp-stdlib)
+    target_link_libraries(vpp-cli PRIVATE vpp-stdlib)
 else()
-    target_link_libraries(vietvm-cli PRIVATE vietvm-vm)
+    target_link_libraries(vpp-cli PRIVATE vpp-vm)
 endif()
-target_include_directories(vietvm-cli PRIVATE ${VIETVM_INCLUDE_DIR})
+target_include_directories(vpp-cli PRIVATE ${VPP_INCLUDE_DIR})
 
 if (MSVC)
-    target_compile_options(vietvm-cli PRIVATE /W4 /permissive-)
+    target_compile_options(vpp-cli PRIVATE /W4 /permissive-)
 else()
-    target_compile_options(vietvm-cli PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(vpp-cli PRIVATE -Wall -Wextra -Wpedantic)
 endif()
+
+# Backward-compat: keep legacy binary name available for existing scripts.
+add_custom_command(TARGET vpp-cli POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:vpp-cli>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vietvm-cli)
 
 # Tests (unit tests in src/tests) and integration runner if present
 if (BUILD_TESTS)
@@ -95,7 +101,7 @@ if (BUILD_TESTS)
 endif()
 
 # Install rules (optional)
-install(TARGETS vietvm-cli vietvm-frontend vietvm-compiler vietvm-vm
+install(TARGETS vpp-cli vpp-frontend vpp-compiler vpp-vm
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)

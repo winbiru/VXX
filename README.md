@@ -20,7 +20,7 @@ See the end of this file for copyright and license information.
 * General Information
 * Project Scope
 * Repository Structure
-* Building VIETVM
+* Building V++
 * Running Programs
 * Execution Model
 * Testing
@@ -32,7 +32,7 @@ See the end of this file for copyright and license information.
 
 ## General Information
 
-* Project name: **VIETVM**
+* Project name: **V++**
 * Type: Virtual Machine + Compiler toolchain
 * Implementation language: C++
 * Status: Experimental / Research-oriented
@@ -44,7 +44,7 @@ This project does not aim to replace existing languages or runtimes.
 
 ## Project Scope
 
-VIETVM focuses on:
+V++ focuses on:
 
 * A custom bytecode format
 * A stack-based execution model
@@ -77,7 +77,7 @@ The layout may evolve as the project stabilizes.
 
 ---
 
-## Building VIETVM
+## Building V++
 
 ### On Unix-like systems (Linux, macOS, BSD)
 
@@ -101,7 +101,7 @@ No system-wide installation is required.
 
 ## Running Programs
 
-After building, programs can be executed by invoking the VIETVM runtime with compiled bytecode:
+After building, programs can be executed by invoking the V++ runtime with compiled bytecode:
 
 ```bash
 ./vietvm example.bytecode
@@ -111,7 +111,7 @@ After building, programs can be executed by invoking the VIETVM runtime with com
 
 ## Execution Model
 
-VIETVM uses:
+V++ uses:
 
 * A stack-based virtual machine
 * Explicit instructions for variable initialization, condition evaluation, loop control, and block entry/exit
@@ -147,7 +147,7 @@ Documentation is provided under `docs/`:
 
 ## Versioning
 
-VIETVM does not follow a fixed release schedule.
+V++ does not follow a fixed release schedule.
 Backward compatibility is not guaranteed during early development.
 
 ---
@@ -162,13 +162,13 @@ This project contains no GPL-licensed code.
 
 ---
 
-# VIETVM (Tiếng Việt)
+# V++ (Tiếng Việt)
 
 ## Giới thiệu chung
 
-Kho mã nguồn này chứa **VIETVM** — một **máy ảo (virtual machine)** và **hạ tầng compiler** được thiết kế riêng cho một ngôn ngữ lập trình có cấu trúc, dạng mệnh lệnh.
+Kho mã nguồn này chứa **V++** — một **máy ảo (virtual machine)** và **hạ tầng compiler** được thiết kế riêng cho một ngôn ngữ lập trình có cấu trúc, dạng mệnh lệnh.
 
-VIETVM là một hệ thống **thử nghiệm**, tập trung vào:
+V++ là một hệ thống **thử nghiệm**, tập trung vào:
 
 * Ngữ nghĩa thực thi tường minh
 * Luồng điều khiển rõ ràng
@@ -180,7 +180,7 @@ Dự án này được xây dựng cho mục đích **nghiên cứu, học tập
 
 ## Phạm vi dự án
 
-VIETVM tập trung vào:
+V++ tập trung vào:
 
 * Định nghĩa bytecode riêng
 * Mô hình thực thi dựa trên stack
@@ -211,7 +211,7 @@ Những thứ **cố tình không làm**:
 
 ---
 
-## Biên dịch VIETVM
+## Biên dịch V++
 
 ### Trên các hệ Unix-like (Linux, macOS, BSD)
 
@@ -235,7 +235,7 @@ Không yêu cầu cài đặt toàn hệ thống.
 
 ## Thực thi chương trình
 
-Sau khi biên dịch, có thể chạy chương trình thông qua runtime của VIETVM với file bytecode:
+Sau khi biên dịch, có thể chạy chương trình thông qua runtime của V++ với file bytecode:
 
 ```bash
 ./vietvm example.bytecode
@@ -245,7 +245,7 @@ Sau khi biên dịch, có thể chạy chương trình thông qua runtime của 
 
 ## Mô hình thực thi
 
-VIETVM sử dụng:
+V++ sử dụng:
 
 * Máy ảo dựa trên stack
 * Tập lệnh tường minh cho:
@@ -288,7 +288,7 @@ Tài liệu mang tính mô tả kỹ thuật, không mang tính quảng bá.
 
 ## Phiên bản
 
-VIETVM không theo lịch phát hành cố định.
+V++ không theo lịch phát hành cố định.
 Trong giai đoạn đầu, **không đảm bảo tương thích ngược**.
 
 ---
@@ -306,7 +306,7 @@ Dự án không chứa mã nguồn GPL và có thể được sử dụng cho m�
 ## Liên hệ
 
 - Chủ repo: `winbiru`
-- Báo lỗi hoặc thảo luận: tạo Issue tại [Issues](https://github.com/winbiru/VietVM/issues)
+- Báo lỗi hoặc thảo luận: tạo Issue tại [Issues](https://github.com/winbiru/V++/issues)
 
 ---
 

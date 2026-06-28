@@ -1,0 +1,19 @@
+nhập "stdlib";
+
+hàm tao_chuoi(i) {
+    trả về "m" + i;
+};
+
+hàm main() {
+    tong = 0;
+    lặp (i = 0; i < 50; i = i + 1) {
+        s = tao_chuoi(i);
+        nếu (i % 2 == 0) {
+            tong = tong + i;
+        };
+    };
+
+    in tong;
+    in {"a": 1, "b": rỗng};
+    in tri_tuyet_doi(-7);
+};

@@ -1,6 +1,6 @@
-# Bytecode — VietVM (nhánh `developer`)
+# Bytecode — V++ (nhánh `developer`)
 
-Tài liệu này mô tả định dạng bytecode đề xuất cho VietVM, cách mã hóa instructions/operands, layout file/section, một số opcode chính lấy cảm hứng từ `include/keywords.h`, và ví dụ mẫu. Mục tiêu: có spec đủ rõ để hiện thực assembler/disassembler, loader và verifier trong `src/vm`/`src/compiler`.
+Tài liệu này mô tả định dạng bytecode đề xuất cho V++, cách mã hóa instructions/operands, layout file/section, một số opcode chính lấy cảm hứng từ `include/keywords.h`, và ví dụ mẫu. Mục tiêu: có spec đủ rõ để hiện thực assembler/disassembler, loader và verifier trong `src/vm`/`src/compiler`.
 
 > Ghi chú: đây là đề xuất dựa trên cấu trúc repo hiện tại. Sau khi thống nhất spec, cần đồng bộ `include/instruction.h` (enum Opcode) và lexer/parser/assembler.
 

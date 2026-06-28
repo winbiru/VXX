@@ -45,7 +45,7 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
             continue; // do not output function name as operand
         }
 
-        if (isNumber(token) || isFloat(token) || isStringLiteral(token) || isVariable(token)) {
+        if (isNumber(token) || isFloat(token) || isStringLiteral(token) || token == "rỗng" || isVariable(token)) {
             output.push_back(token);
             // If we are inside a function argument list, and expecting a new arg, count it
             if (!argCountStack.empty() && argExpectingStack.back()) {

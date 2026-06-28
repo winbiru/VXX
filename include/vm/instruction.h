@@ -86,7 +86,11 @@ enum Opcode {
     OP_NEM = 80,                 // ném (throw)
     OP_THU = 81,                 // thử (try begin, operand = catch_addr)
     OP_THU_KET_THUC = 82,        // kết thúc try block, operand = past_catch_addr
-    OP_BAT_LOI = 83              // bắt lỗi (catch begin, operandIndex = err_var_id or -1)
+    OP_BAT_LOI = 83,             // bắt lỗi (catch begin, operandIndex = err_var_id or -1)
+    OP_RONG_GIA_TRI = 84,        // rỗng (null)
+    OP_MAP_LITERAL = 85,         // map literal (operandIndex = encoded map in string pool)
+    OP_GOI_GIAN_TIEP = 86,       // gọi hàm qua giá trị biến (function ref)
+    OP_PARAM_MAC_DINH = 87       // bind tham số với giá trị mặc định
 
 };
 

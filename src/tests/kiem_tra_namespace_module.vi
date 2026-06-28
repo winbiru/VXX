@@ -1,0 +1,6 @@
+nhập "src/tests/modules/math.vi" như toan;
+
+hàm main() {
+    in toan.tong(2, 3);
+    in toan.mul(4, 5);
+};

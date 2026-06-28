@@ -1,6 +1,6 @@
-# VietVM — Kế hoạch cập nhật & Tóm tắt nhanh
+# V++ — Kế hoạch cập nhật & Tóm tắt nhanh
 
-Tài liệu này tóm tắt cấu trúc chính của project VietVM và đưa ra các hướng cập nhật/đổi mới cho tương lai. Nội dung bằng tiếng Việt, mục tiêu để dán trực tiếp vào repository.
+Tài liệu này tóm tắt cấu trúc chính của project V++ và đưa ra các hướng cập nhật/đổi mới cho tương lai. Nội dung bằng tiếng Việt, mục tiêu để dán trực tiếp vào repository.
 
 ## Mục đích
 - Giúp contributor mới hiểu nhanh các modules chính và luồng compile → bytecode → VM.
@@ -67,7 +67,7 @@ Lưu ý: các lệnh trên giả định bạn đang làm việc trên macOS / L
 ## Đề xuất cấp cao
 - Ngắn hạn: ổn định build, thêm unit tests cơ bản, cập nhật README và xoá artefacts build khỏi repo.
 - Trung hạn: tách `VM::run()` thành các handler, viết unit tests cho opcode handlers, thêm CI (matrix), coverage, linter.
-- Dài hạn: chuẩn hoá bytecode (spec), viết assembler/disassembler + round-trip tests, profiling & tối ưu hoá VM, public API để nhúng VietVM.
+- Dài hạn: chuẩn hoá bytecode (spec), viết assembler/disassembler + round-trip tests, profiling & tối ưu hoá VM, public API để nhúng V++.
 
 Xem chi tiết trong `plans/`.
 

@@ -3,18 +3,18 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-MANIFEST="$ROOT_DIR/vietvm-language.json"
+MANIFEST="$ROOT_DIR/vpp-language.json"
 
-NAME="vietvm-language"
-DISPLAY_NAME="VietVM Language"
+NAME="vpp-language"
+DISPLAY_NAME="V++ Language"
 VERSION="0.0.1"
-PUBLISHER="vietvm"
-LANGUAGE_ID="vietvm"
+PUBLISHER="vpp"
+LANGUAGE_ID="vpp"
 EXTENSION_ID="$PUBLISHER.$NAME-$VERSION"
 
 usage() {
   cat <<EOF
-VietVM language installer
+V++ language installer
 
 Usage:
   vietvm-lang install [--editor vscode|cursor|vscodium|all]
@@ -109,7 +109,7 @@ write_vscode_package_json() {
 {
   "name": "$NAME",
   "displayName": "$DISPLAY_NAME",
-  "description": "Syntax highlighting for VietVM",
+  "description": "Syntax highlighting for V++",
   "version": "$VERSION",
   "publisher": "$PUBLISHER",
   "license": "UNLICENSED",
@@ -123,7 +123,7 @@ write_vscode_package_json() {
     "languages": [
       {
         "id": "$LANGUAGE_ID",
-        "aliases": ["VietVM", "vietvm"],
+        "aliases": ["V++", "vpp", "vietvm"],
         "extensions": [".vvm", ".vi"],
         "configuration": "./language-configuration.json"
       }
@@ -157,7 +157,7 @@ install_one() {
   cp "$ROOT_DIR/syntaxes/vietvm.tmLanguage.json" "$dest/syntaxes/vietvm.tmLanguage.json"
   cp "$ROOT_DIR/language-configuration.json" "$dest/language-configuration.json"
   cp "$ROOT_DIR/INSTALL_EDITOR_HIGHLIGHT.md" "$dest/README.md"
-  cp "$MANIFEST" "$dest/vietvm-language.json"
+  cp "$MANIFEST" "$dest/vpp-language.json"
   write_vscode_package_json "$dest"
 
   echo "installed: $dest"
@@ -185,7 +185,7 @@ install_cmd() {
     exit 1
   fi
 
-  echo "Reload your editor window to activate VietVM highlighting."
+  echo "Reload your editor window to activate V++ highlighting."
 }
 
 uninstall_one() {
@@ -238,7 +238,7 @@ pack_cmd() {
 
   tar -czf "$package" \
     -C "$ROOT_DIR" \
-    vietvm-language.json \
+    vpp-language.json \
     language-configuration.json \
     INSTALL_EDITOR_HIGHLIGHT.md \
     syntaxes/vietvm.tmLanguage.json

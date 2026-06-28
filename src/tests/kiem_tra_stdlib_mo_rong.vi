@@ -1,0 +1,17 @@
+nhập "stdlib";
+
+hàm main() {
+    in noi_chuoi("xin", " chao");
+    in noi_3("a", "b", "c");
+
+    in la_chuoi_rong("");
+    in la_chuoi_rong("x");
+
+    in tat_ca(đúng, đúng);
+    in tat_ca(đúng, sai);
+    in mot_trong_hai(đúng, sai);
+
+    log_thong_tin("ok");
+    log_canh_bao("warn");
+    log_loi("err");
+};

@@ -1,6 +1,6 @@
-# ✅ VietVM — Checklist Phát Triển Ngôn Ngữ
+# ✅ V++ — Checklist Phát Triển Ngôn Ngữ
 
-> Cập nhật lần cuối: 14/06/2026  
+> Cập nhật lần cuối: 28/06/2026  
 > Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
 
 ---
@@ -67,9 +67,9 @@
 | Mảng (array) | `[1, 2, 3]` | ✅ |
 | Mảng đa chiều | `[[1,2],[3,4]]` | ✅ |
 | Boolean (`đúng`/`sai`) | `đúng`, `sai` | ✅ |
-| Số thực (float/double) | `3.14` | ⬜ |
-| Kiểu null / rỗng | `rỗng` | ⬜ |
-| Từ điển / Map | `{"a": 1}` | ⬜ |
+| Số thực (float/double) | `3.14` | ✅ |
+| Kiểu null / rỗng | `rỗng` | ✅ |
+| Từ điển / Map | `{"a": 1}` | ✅ |
 
 ---
 
@@ -101,9 +101,9 @@
 | Gọi hàm với đối số | `cong(2, 3)` | ✅ |
 | Đệ quy (recursion) | Fibonacci, giai thừa | ✅ |
 | Hàm lồng nhau (nested calls) | `f(g(x))` | ✅ |
-| Hàm ẩn danh / lambda | `hàm(x) { trả về x * 2; }` | ⬜ |
-| Hàm bậc cao (higher-order) | Truyền hàm làm tham số | ⬜ |
-| Giá trị tham số mặc định | `hàm f(x = 0) { ... }` | ⬜ |
+| Hàm ẩn danh / lambda | `hàm(x) { trả về x * 2; }` | ✅ |
+| Hàm bậc cao (higher-order) | Truyền hàm làm tham số | ✅ |
+| Giá trị tham số mặc định | `hàm f(x = 0) { ... }` | ✅ |
 | Biến cục bộ tách biệt toàn cục | Scope isolation | ✅ |
 
 ---
@@ -115,8 +115,17 @@
 | `nhập "file.vi"` — import file khác | ✅ |
 | Phát hiện import vòng (circular import) | ✅ |
 | Phân giải đường dẫn tương đối | ✅ |
-| Namespace / tên module | ⬜ |
-| Thư viện chuẩn tiếng Việt (stdlib) | ⬜ |
+| Namespace / tên module | ✅ |
+| Thư viện chuẩn tiếng Việt (stdlib) | ✅ |
+
+### 6.1 API stdlib native
+| API | Trạng thái |
+|-----|-----------|
+| `io_doc_file(path)` | ✅ |
+| `io_ghi_file(path, content)` | ✅ |
+| `doc_config(path)` | ✅ |
+| `lay_thoi_gian_hien_tai()` | ✅ |
+| `mang_http_get(url)` | ✅ *(phụ thuộc `curl` và mạng)* |
 
 ---
 
@@ -130,9 +139,9 @@
 | Báo lỗi khi hàm không tồn tại | ✅ |
 | Báo lỗi khi stack underflow | ✅ |
 | Báo lỗi khi so sánh 2 kiểu khác nhau | ✅ |
-| Báo lỗi vị trí (dòng:cột) | ⬜ |
-| Khối `thử ... bắt lỗi` (try/catch) | ⬜ |
-| `ném lỗi` (throw exception) | ⬜ |
+| Báo lỗi vị trí (dòng:cột) | ✅ |
+| Khối `thử ... bắt lỗi` (try/catch) | ✅ |
+| `ném lỗi` (throw exception) | ✅ |
 | Stack trace khi crash | ⬜ |
 
 ---
@@ -152,9 +161,9 @@
 | `OP_BO_QUA` (continue) | ✅ |
 | `OP_TRU_MOT` (--) | ✅ |
 | Kế thừa `functionTableByNameIndex` cho đệ quy | ✅ |
-| Tối ưu hoá bytecode (peephole) | ⬜ |
-| Garbage Collection | ⬜ |
-| JIT Compilation | ⬜ |
+| Tối ưu hoá bytecode (peephole) | ✅ |
+| Garbage Collection (MVP: runtime compaction theo chu kỳ) | ✅ |
+| JIT Compilation (MVP: linear bytecode lambda JIT, bật qua env) | ✅ |
 
 ---
 
@@ -207,12 +216,20 @@
 | `kiem_tra_toan_tu_moi.vi` | `--`, `+=`, `-=`, `*=`, `/=`, `%=` | ✅ |
 | `kiem_tra_boolean.vi` | `đúng`/`sai` boolean literals | ✅ |
 | `kiem_tra_de_quy.vi` | Đệ quy: Fibonacci, giai thừa | ✅ |
-| Test exception handling | try/catch | ⬜ |
-| Test float | Số thực | ⬜ |
+| `kiem_tra_ngoai_le.vi` | `thử`/`bắt lỗi`/`ném` | ✅ |
+| `kiem_tra_so_thuc.vi` | Số thực (float/double) | ✅ |
+| `kiem_tra_rong_va_map.vi` | Kiểu `rỗng` và literal map | ✅ |
+| `kiem_tra_lambda_hof_mac_dinh.vi` | Lambda + higher-order + tham số mặc định | ✅ |
+| `kiem_tra_namespace_module.vi` | Namespace alias khi import module | ✅ |
+| `kiem_tra_stdlib.vi` | Import và dùng stdlib tiếng Việt | ✅ |
+| `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
+| `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
+| `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
+| `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |
 | Unit test cho StringPool | Thêm/lấy/xóa | ⬜ |
 | Unit test cho symbolTable | Scope isolation | ⬜ |
 
-**Tỷ lệ test hiện tại: 18/18 PASS ✅**
+**Tỷ lệ regression hiện tại: 29/29 PASS ✅ (theo `run_tests.sh`, ngày 28/06/2026)**
 
 ---
 
@@ -225,11 +242,11 @@
 | Script chạy test (`run_tests.sh`) | ✅ |
 | Không có duplicate library warnings | ✅ |
 | `.gitignore` cho build artefacts | ✅ |
-| CI/CD (GitHub Actions) | ⬜ |
+| CI/CD (GitHub Actions) | ✅ |
 | Disassembler (xem bytecode) | ⬜ |
 | REPL (interactive shell) | ⬜ |
 | Language Server Protocol (LSP) | ⬜ |
-| Syntax highlighting (VSCode/Vim) | ⬜ |
+| Syntax highlighting (VSCode/Vim) | ✅ |
 | Formatter / linter | ⬜ |
 | Package manager | ⬜ |
 
@@ -261,26 +278,26 @@
 - [x] Hỗ trợ đệ quy (recursion)
 - [x] Fix bug `isNumber("-")` và nested function calls
 - [x] Tạo `.gitignore` cho build artefacts
-- [ ] Báo lỗi có số dòng và cột
-- [ ] CI cơ bản với GitHub Actions
+- [x] Báo lỗi có số dòng và cột
+- [x] CI cơ bản với GitHub Actions
 
 ### Trung hạn (1–3 tháng)
-- [ ] Hỗ trợ số thực (float)
-- [ ] Xử lý ngoại lệ (`thử`/`bắt lỗi`/`ném`)
+- [x] Hỗ trợ số thực (float)
+- [x] Xử lý ngoại lệ (`thử`/`bắt lỗi`/`ném`)
 - [ ] Tách `VM::run()` thành các handler nhỏ
 - [ ] Unit test cho từng opcode handler
 - [ ] REPL (gõ lệnh trực tiếp)
 - [ ] Disassembler hiển thị bytecode
 
 ### Dài hạn (3–12 tháng)
-- [ ] Kiểu từ điển / Map
-- [ ] Hàm bậc cao (higher-order functions)
-- [ ] Garbage Collection
-- [ ] Thư viện chuẩn tiếng Việt (stdlib)
-- [ ] Namespace / module có tên
+- [x] Kiểu từ điển / Map
+- [x] Hàm bậc cao (higher-order functions)
+- [x] Garbage Collection *(MVP)*
+- [x] Thư viện chuẩn tiếng Việt (stdlib)
+- [x] Namespace / module có tên
 - [ ] Language Server Protocol (LSP)
-- [ ] Syntax highlighting cho VSCode
-- [ ] JIT Compilation (tuỳ chọn)
+- [x] Syntax highlighting cho VSCode
+- [x] JIT Compilation (tuỳ chọn, MVP)
 - [ ] Embeddable C API
 
 ---
@@ -291,15 +308,15 @@
 |---------|-----------|------|
 | Từ khoá & cú pháp | 14 | 14 |
 | Toán tử | 16 | 16 |
-| Kiểu dữ liệu | 5 | 8 |
+| Kiểu dữ liệu | 8 | 8 |
 | Điều khiển luồng | 9 | 9 |
-| Hàm | 10 | 12 |
-| Module & import | 3 | 5 |
-| Xử lý lỗi | 6 | 10 |
-| VM & Bytecode | 13 | 14 |
+| Hàm | 12 | 12 |
+| Module & import | 5 | 5 |
+| Xử lý lỗi | 9 | 10 |
+| VM & Bytecode | 14 | 14 |
 | Compiler | 17 | 19 |
-| Tests | 18 | 22 |
-| Công cụ | 6 | 13 |
+| Tests | 29 | 31 |
+| Công cụ | 8 | 13 |
 | Tài liệu | 7 | 10 |
 
-> **Tổng cộng: ~124/152 (~82%) tính năng cốt lõi đã hoàn thành.**
+> **Tổng cộng: ~148/161 (~92%) tính năng cốt lõi đã hoàn thành.**

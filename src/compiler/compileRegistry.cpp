@@ -19,6 +19,7 @@
 #include "compiler/compileSwitch.h"
 #include "common/storeString.h"
 #include "compiler/compileBlock.h"
+#include "../../include/frontend/lexer.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
 
@@ -100,12 +101,26 @@ void initCompileMap() {
         std::string fname = tokens[pos++];
         int nameIndex = vietvm::compiler::StringPool::storeString(fname);
 
-        // assign function id
-        int hamId = vietvm::compiler::hamMap::allocHamId();
-        symTab[fname] = hamId;
+        // assign/reuse function id (predeclared in compileSource when available)
+        int hamId = -1;
+        auto itFn = symTab.find(fname);
+        if (itFn != symTab.end()) {
+            hamId = itFn->second;
+        } else {
+            hamId = vietvm::compiler::hamMap::allocHamId();
+            symTab[fname] = hamId;
+        }
+        // Ensure registration exists so recursive/self calls can resolve while compiling body.
+        vietvm::compiler::hamMap::hamBytecodeMap[hamId] = {};
+        vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
 
         // parse parameter list if present
-        std::vector<std::string> params;
+        struct ParamSpec {
+            std::string name;
+            bool hasDefault = false;
+            std::string defaultEncoded; // i:10, d:3.14, s:text, n:
+        };
+        std::vector<ParamSpec> params;
         if (pos < tokens.size() && tokens[pos] == "(") {
             auto pr = vietvm::compiler::extractParens(tokens, pos);
             // extractParens should return pair<inside, newPos>
@@ -117,7 +132,26 @@ void initCompileMap() {
             while (std::getline(ss, item, ',')) {
                 size_t a = item.find_first_not_of(" \t\n\r");
                 size_t b = item.find_last_not_of(" \t\n\r");
-                if (a != std::string::npos) params.push_back(item.substr(a, b - a + 1));
+                if (a == std::string::npos) continue;
+
+                std::string token = item.substr(a, b - a + 1);
+                ParamSpec p;
+                size_t eq = token.find('=');
+                if (eq == std::string::npos) {
+                    p.name = vietvm::compiler::trim(token);
+                } else {
+                    p.name = vietvm::compiler::trim(token.substr(0, eq));
+                    std::string dv = vietvm::compiler::trim(token.substr(eq + 1));
+                    p.hasDefault = true;
+                    if (vietvm::compiler::isNumber(dv)) p.defaultEncoded = "i:" + dv;
+                    else if (vietvm::compiler::isFloat(dv)) p.defaultEncoded = "d:" + dv;
+                    else if (vietvm::compiler::isStringLiteral(dv)) p.defaultEncoded = "s:" + vietvm::compiler::stripQuotes(dv);
+                    else if (dv == "đúng") p.defaultEncoded = "i:1";
+                    else if (dv == "sai") p.defaultEncoded = "i:0";
+                    else if (dv == "rỗng") p.defaultEncoded = "n:";
+                    else throw std::runtime_error("hàm: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
+                }
+                if (!p.name.empty()) params.push_back(p);
             }
         }
 
@@ -133,12 +167,17 @@ void initCompileMap() {
 
         // emit OP_PARAM prologue
         for (size_t i = 0; i < params.size(); ++i) {
-            const std::string &pname = params[i];
+            const std::string &pname = params[i].name;
             if (pname.empty()) continue;
             if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
             int varId = symTab[pname];
             funcCode.push_back({OP_KHOI_TAO, 0, varId, 0});
-            funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+            if (params[i].hasDefault) {
+                int dIdx = vietvm::compiler::StringPool::storeString(params[i].defaultEncoded);
+                funcCode.push_back({OP_PARAM_MAC_DINH, dIdx, varId, (int)i});
+            } else {
+                funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+            }
         }
         // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
         compileBlock(tokens, pos, funcCode, symTab, nextId, keywordMap);
@@ -150,7 +189,6 @@ void initCompileMap() {
 
         // store function code
         vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
-        vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
 
         // Optionally emit an OP_HAM marker into outer bytecode for discovery
         bytecode.push_back({OP_HAM, nameIndex , hamId, 0});
@@ -198,7 +236,7 @@ void initCompileMap() {
         } else {
             // fallback: emit with nameIndex so VM fallback can resolve (less ideal)
             int nameIndex = vietvm::compiler::StringPool::storeString(fname);
-            bytecode.push_back({OP_GOI, compiledArgs, nameIndex, 0});
+            bytecode.push_back({OP_GOI, compiledArgs, -(nameIndex + 1), 0});
         }
 
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
@@ -327,20 +365,28 @@ void initCompileMap() {
     // Syntax (MVP):
     //   nhập "path/to/module.vi";
     //   nhập moduleName;    // resolves to moduleName.vi in cwd
+    //   nhập "path/to/module.vi" như ten_module;
     compileMap["nhập"] = [](const std::vector<std::string>& tokens, size_t &pos,
                              std::vector<Instruction>& bytecode,
                              std::unordered_map<std::string,int>& symTab,
                              int& nextId,
                              const std::unordered_map<std::string,Opcode>& keywordMap) {
-        // These parameters are required by CompileFunc signature but not used by nhập
-        // because import only causes side effects (registering functions/strings)
+        // Import mainly causes side effects (registering functions/strings).
+        // `nextId` is updated below to avoid var-id collisions with imported function ids.
         (void)bytecode;
         (void)symTab;
-        (void)nextId;
 
         ++pos; // skip 'nhập'
         if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
         std::string target = tokens[pos++];
+
+        // Optional alias namespace: nhập "..." như ns;
+        std::string moduleAlias;
+        if (pos < tokens.size() && tokens[pos] == "như") {
+            ++pos;
+            if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu tên namespace sau 'như'");
+            moduleAlias = tokens[pos++];
+        }
 
         // optional semicolon will be consumed later
 
@@ -352,6 +398,11 @@ void initCompileMap() {
         } else {
             // treat identifier as file name with .vi
             path = target + ".vi";
+        }
+
+        // stdlib shortcut
+        if (path == "stdlib" || path == "thư viện chuẩn" || path == "thu_vien_chuan") {
+            path = "lib/stdlib.vi";
         }
 
         namespace fs = std::filesystem;
@@ -402,7 +453,28 @@ void initCompileMap() {
             // Compile the module for its registration side effects only.
             // Imported functions/strings are recorded in the global registries;
             // the returned module bytecode is not merged or executed here.
-            (void)compileSource(src, keywordMap, false);
+            auto moduleBytecode = compileSource(src, keywordMap, false);
+
+            // Namespace alias: register ns.funcName -> same function id
+            if (!moduleAlias.empty()) {
+                for (const auto &ins : moduleBytecode) {
+                    if (ins.op != OP_HAM) continue;
+                    int oldNameIndex = ins.operand;
+                    int hamId = ins.operandIndex;
+                    if (oldNameIndex < 0 || oldNameIndex >= (int)vietvm::compiler::StringPool::size()) continue;
+                    const std::string &funcName = vietvm::compiler::StringPool::getString(oldNameIndex);
+                    std::string namespaced = moduleAlias + "." + funcName;
+                    int newNameIndex = vietvm::compiler::StringPool::storeString(namespaced);
+                    vietvm::compiler::hamMap::setHamNameIndex(hamId, newNameIndex);
+                }
+            }
+
+            // Keep variable IDs in caller module disjoint from imported function IDs.
+            int maxHamId = -1;
+            for (const auto &kv : vietvm::compiler::hamMap::hamBytecodeMap) {
+                if (kv.first > maxHamId) maxHamId = kv.first;
+            }
+            if (nextId <= maxHamId) nextId = maxHamId + 1;
         } catch (...) {
             // Rollback on failure
             vietvm::compiler::importedFiles.erase(canonical);

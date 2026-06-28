@@ -1,2 +1,2 @@
-# Định nghĩa file .vi là ngôn ngữ VietVM cho repo này
-*.vi linguist-language=VietVM
+# Định nghĩa file .vi là ngôn ngữ V++ cho repo này
+*.vi linguist-language=V++

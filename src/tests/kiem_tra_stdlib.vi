@@ -1,0 +1,8 @@
+nhập "stdlib";
+
+hàm main() {
+    in bình_phương(6);
+    in la_chan(8);
+    in la_chan(7);
+    in tong2(10, 5);
+};

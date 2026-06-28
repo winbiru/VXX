@@ -1,4 +1,4 @@
-//# VietVM grammar (BNF-style)
+//# V++ grammar (BNF-style)
 //# Based on branch `developer` (keywords in include/keywords.h).
 //# Terminals shown in quotes; some Vietnamese keywords provided as both accented and ASCII alternatives.
 //# Map common opcodes from include/keywords.h:

@@ -3,3 +3,13 @@ lặp(i = 1; i <= 10; i = i + 1) {
         in "Số nguyên tố: " + i;
     }
 };
+lặp(i = 1; i <= 10; i = i + 1) {
+    nếu(i == 1 || i == 4 || i == 6 || i == 8 || i == 9 || i == 10){
+        in "Số nguyên không phải là số nguyên tố: " + i;
+    }
+};
+lặp(i = 1; i <= 10; i = i + 1) {
+    nếu(i == 0 || i < 0){
+        in "Số nguyên không phải là số nguyên dương: " + i;
+    }
+};

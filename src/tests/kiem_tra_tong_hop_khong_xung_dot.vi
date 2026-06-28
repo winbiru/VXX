@@ -1,0 +1,99 @@
+nhập "stdlib";
+
+// Giả lập dữ liệu theo chỉ số để tránh phụ thuộc API mảng chưa ổn định.
+hàm lay_gia_tri(i) {
+    chọn (i) {
+        ca 0: { trả về 10; }
+        ca 1: { trả về 16; }
+        ca 2: { trả về 0; }
+        ca 3: { trả về 20; }
+        ca 4: { trả về 24; }
+        ca 5: { trả về 40; }
+        mặc định: { trả về 0; }
+    }
+};
+
+hàm la_rong_theo_chi_so(i) {
+    trả về i == 2;
+};
+
+// ===== HÀM PHỨC TẠP =====
+hàm xu_ly_du_lieu() {
+    thử {
+        tong = 0;
+        dem = 0;
+
+        // ===== LOOP LỒNG LOGIC =====
+        lặp (i = 0; i < 6; i = i + 1) {
+            gia_tri = lay_gia_tri(i);
+            la_rong = la_rong_theo_chi_so(i);
+
+            // chế độ lỗi: ép một giá trị âm để kiểm tra catch
+            nếu (che_do_hien_tai == 1 && i == 4) {
+                gia_tri = -1;
+            };
+
+            // bỏ qua null
+            nếu (la_rong) {
+                bỏ qua;
+            };
+
+            // kiểm tra lỗi
+            nếu (gia_tri < 0) {
+                ném "gia_tri_am";
+            };
+
+            // lambda inline
+            hop_le = hàm(x) {
+                trả về x % 2 == 0;
+            };
+
+            // nếu là số chẵn thì xử lý
+            nếu (hop_le(gia_tri)) {
+                tong = tong + tri_tuyet_doi(gia_tri);
+                dem = dem + 1;
+            };
+        };
+
+        nếu (dem == 0) {
+            trả về "loi:khong_co_du_lieu_hop_le";
+        };
+
+        tb = tong / dem;
+
+        // ===== SWITCH =====
+        muc = 1;
+        nếu (tb > 50) {
+            muc = 3;
+        };
+        nếu (tb > 20 && tb <= 50) {
+            muc = 2;
+        };
+
+        ket_luan = "";
+        chọn (muc) {
+            ca 1: { ket_luan = "thap"; }
+            ca 2: { ket_luan = "trung_binh"; }
+            ca 3: { ket_luan = "cao"; }
+            mặc định: { ket_luan = "khong_xac_dinh"; }
+        };
+
+        // map + null vẫn được dùng trong cùng flow
+        thong_tin = {"co_loi": rỗng, "da_xu_ly": 1};
+
+        trả về "ok|tong=" + tong + "|dem=" + dem + "|tb=" + tb + "|muc=" + ket_luan + "|meta=" + thong_tin;
+    } bắt lỗi (e) {
+        trả về "loi:" + e;
+    };
+};
+
+
+// ===== MAIN =====
+hàm main() {
+    in "BAT_DAU";
+    che_do_hien_tai = 0;
+    in xu_ly_du_lieu();
+    che_do_hien_tai = 1;
+    in xu_ly_du_lieu();
+    in "KET_THUC";
+};

@@ -51,7 +51,24 @@ std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& toke
 std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start) {
     std::ostringstream oss;
     size_t i = start;
-    while (i < tokens.size() && tokens[i] != ";") {
+    int parenDepth = 0;
+    int braceDepth = 0;
+    int bracketDepth = 0;
+
+    while (i < tokens.size()) {
+        const std::string &tk = tokens[i];
+
+        if (tk == "(") ++parenDepth;
+        else if (tk == ")" && parenDepth > 0) --parenDepth;
+        else if (tk == "{") ++braceDepth;
+        else if (tk == "}" && braceDepth > 0) --braceDepth;
+        else if (tk == "[") ++bracketDepth;
+        else if (tk == "]" && bracketDepth > 0) --bracketDepth;
+
+        if (tk == ";" && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
+            break;
+        }
+
         oss << tokens[i] << ' ';
         ++i;
     }

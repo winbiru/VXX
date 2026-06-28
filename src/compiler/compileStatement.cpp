@@ -12,6 +12,7 @@
 #include <compiler/compileRegistry.h>
 #include <compiler/compilerExpr.h>
 #include "common/storeString.h"
+#include "common/symbolTable.h"
 #include <sstream>
 #include <iostream>
 
@@ -42,6 +43,26 @@ static std::vector<std::string> splitArgsString(const std::string &s) {
         else res.push_back(cur.substr(a, b - a + 1));
     }
     return res;
+}
+
+static int resolveFunctionIdByName(const std::string &name,
+                                   const std::unordered_map<std::string,int> &symTab) {
+    auto itSym = symTab.find(name);
+    if (itSym != symTab.end()) {
+        int maybeId = itSym->second;
+        auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
+        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() && !itCode->second.empty()) {
+            return maybeId;
+        }
+    }
+
+    int nameIndex = vietvm::compiler::StringPool::findString(name);
+    if (nameIndex >= 0) {
+        for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
+            if (kv.second == nameIndex) return kv.first;
+        }
+    }
+    return -1;
 }
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
@@ -94,16 +115,21 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
             ++compiledArgs;
         }
 
-        // resolve function id if declared, otherwise emit nameIndex fallback
-        int hamId = -1;
-        auto itSym = symTab.find(ident);
-        if (itSym != symTab.end()) hamId = itSym->second;
+        // Direct call for known function id; otherwise indirect call via variable value.
+        int hamId = resolveFunctionIdByName(ident, symTab);
 
         if (hamId >= 0) {
             bytecode.push_back({OP_GOI, compiledArgs, hamId, 0});
         } else {
-            int nameIndex = vietvm::compiler::StringPool::storeString(ident);
-            bytecode.push_back({OP_GOI, compiledArgs, nameIndex, 0});
+            auto itSym = symTab.find(ident);
+            if (itSym == symTab.end()) {
+                int nameIndex = vietvm::compiler::StringPool::storeString(ident);
+                bytecode.push_back({OP_GOI, compiledArgs, -(nameIndex + 1), 0});
+            } else {
+                int varId = itSym->second;
+                bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, varId, 0});
+                bytecode.push_back({OP_GOI_GIAN_TIEP, compiledArgs, 0, 0});
+            }
         }
 
         // optional semicolon

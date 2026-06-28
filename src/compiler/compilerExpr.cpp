@@ -3,6 +3,7 @@
 #include "compiler/compilerExpr.h"
 
 #include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -14,9 +15,239 @@
 #include "common/storeString.h"
 #include "common/symbolTable.h"
 #include "common/utility.h"
+#include "compiler/compileBlock.h"
 
 
 struct Instruction;
+
+static int resolveFunctionIdByNameExpr(const std::string &name,
+                                       const std::unordered_map<std::string,int> &symTab) {
+    auto itSym = symTab.find(name);
+    if (itSym != symTab.end()) {
+        int maybeId = itSym->second;
+        auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
+        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() && !itCode->second.empty()) {
+            return maybeId;
+        }
+    }
+
+    int nameIndex = vietvm::compiler::StringPool::findString(name);
+    if (nameIndex >= 0) {
+        for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
+            if (kv.second == nameIndex) return kv.first;
+        }
+    }
+    return -1;
+}
+
+static std::string encodeEscaped(const std::string &s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        if (c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\x1e' || c == '\x1f') {
+            out.push_back('\\');
+            if (c == '\n') out.push_back('n');
+            else if (c == '\r') out.push_back('r');
+            else if (c == '\t') out.push_back('t');
+            else if (c == '\x1e') out.push_back('e');
+            else if (c == '\x1f') out.push_back('f');
+            else out.push_back('\\');
+        } else {
+            out.push_back(static_cast<char>(c));
+        }
+    }
+    return out;
+}
+
+static bool isMapLiteralTokens(const std::vector<std::string> &tokens) {
+    return tokens.size() >= 2 && tokens.front() == "{" && tokens.back() == "}";
+}
+
+static bool isUnaryMinusContext(const std::string &prev) {
+    return prev == "(" || prev == "," || prev == "=" || prev == "+" || prev == "-" ||
+           prev == "*" || prev == "/" || prev == "%" || prev == "!" || prev == "&&" ||
+           prev == "||" || prev == "==" || prev == "!=" || prev == "<" || prev == ">" ||
+           prev == "<=" || prev == ">=";
+}
+
+static std::vector<std::string> mergeUnaryMinusNumbers(const std::vector<std::string> &tokens) {
+    std::vector<std::string> out;
+    out.reserve(tokens.size());
+
+    for (size_t i = 0; i < tokens.size(); ++i) {
+        if (tokens[i] == "-" && (i + 1) < tokens.size()) {
+            const std::string &next = tokens[i + 1];
+            bool nextIsNumeric = vietvm::compiler::isNumber(next) || vietvm::compiler::isFloat(next);
+            bool unaryPos = out.empty() || isUnaryMinusContext(out.back());
+            if (nextIsNumeric && unaryPos) {
+                out.push_back("-" + next);
+                ++i;
+                continue;
+            }
+        }
+        out.push_back(tokens[i]);
+    }
+
+    return out;
+}
+
+struct ParamSpecExpr {
+    std::string name;
+    bool hasDefault = false;
+    std::string defaultEncoded;
+};
+
+static std::vector<ParamSpecExpr> parseParamsWithDefaultExpr(const std::string &inside) {
+    std::vector<ParamSpecExpr> params;
+    std::stringstream ss(inside);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        std::string token = vietvm::compiler::trim(item);
+        if (token.empty()) continue;
+
+        ParamSpecExpr p;
+        size_t eq = token.find('=');
+        if (eq == std::string::npos) {
+            p.name = vietvm::compiler::trim(token);
+        } else {
+            p.name = vietvm::compiler::trim(token.substr(0, eq));
+            std::string dv = vietvm::compiler::trim(token.substr(eq + 1));
+            p.hasDefault = true;
+            if (vietvm::compiler::isNumber(dv)) p.defaultEncoded = "i:" + dv;
+            else if (vietvm::compiler::isFloat(dv)) p.defaultEncoded = "d:" + dv;
+            else if (vietvm::compiler::isStringLiteral(dv)) p.defaultEncoded = "s:" + vietvm::compiler::stripQuotes(dv);
+            else if (dv == "đúng") p.defaultEncoded = "i:1";
+            else if (dv == "sai") p.defaultEncoded = "i:0";
+            else if (dv == "rỗng") p.defaultEncoded = "n:";
+            else throw std::runtime_error("lambda: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
+        }
+        if (!p.name.empty()) params.push_back(p);
+    }
+    return params;
+}
+
+static bool tryCompileLambdaLiteral(const std::vector<std::string> &tokens,
+                                    std::vector<Instruction> &bytecode,
+                                    std::unordered_map<std::string,int> &symTab,
+                                    int &nextId,
+                                    const std::unordered_map<std::string,Opcode> &keywordMap)
+{
+    if (tokens.size() < 5) return false;
+    if (tokens[0] != "hàm" || tokens[1] != "(") return false;
+
+    auto pr = vietvm::compiler::extractParens(tokens, 1);
+    std::string inside = pr.first;
+    size_t pos = pr.second;
+    if (pos >= tokens.size() || tokens[pos] != "{") return false;
+
+    auto params = parseParamsWithDefaultExpr(inside);
+
+    int hamId = vietvm::compiler::hamMap::allocHamId();
+
+    std::vector<Instruction> funcCode;
+    funcCode.push_back({OP_MO_KHOI, 0, 0, 0});
+
+    for (size_t i = 0; i < params.size(); ++i) {
+        if (symTab.find(params[i].name) == symTab.end()) symTab[params[i].name] = nextId++;
+        int varId = symTab[params[i].name];
+        funcCode.push_back({OP_KHOI_TAO, 0, varId, 0});
+        if (params[i].hasDefault) {
+            int dIdx = vietvm::compiler::StringPool::storeString(params[i].defaultEncoded);
+            funcCode.push_back({OP_PARAM_MAC_DINH, dIdx, varId, (int)i});
+        } else {
+            funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+        }
+    }
+
+    compileBlock(tokens, pos, funcCode, symTab, nextId, keywordMap);
+    funcCode.push_back({OP_DONG_KHOI, 0, 0, 0});
+    funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
+
+    vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
+
+    // Lambda value is represented as function id.
+    bytecode.push_back({OP_BIEN_SO, hamId, 0, 0});
+    return true;
+}
+
+static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &tokens) {
+    if (!isMapLiteralTokens(tokens)) {
+        throw std::runtime_error("Map literal không hợp lệ");
+    }
+
+    constexpr char RS = '\x1e'; // record separator
+    constexpr char FS = '\x1f'; // field separator
+
+    std::ostringstream encoded;
+    bool first = true;
+
+    size_t i = 1; // after '{'
+    while (i + 1 < tokens.size()) {
+        if (tokens[i] == "}") break;
+
+        std::string key;
+        if (vietvm::compiler::isStringLiteral(tokens[i])) {
+            key = vietvm::compiler::stripQuotes(tokens[i]);
+        } else if (vietvm::compiler::isVariable(tokens[i])) {
+            key = tokens[i];
+        } else {
+            throw std::runtime_error("Map literal: key phải là chuỗi hoặc identifier");
+        }
+        ++i;
+
+        if (i >= tokens.size() || tokens[i] != ":") {
+            throw std::runtime_error("Map literal: thiếu dấu ':' sau key");
+        }
+        ++i;
+
+        if (i >= tokens.size()) {
+            throw std::runtime_error("Map literal: thiếu value");
+        }
+
+        std::string typeTag;
+        std::string encodedValue;
+        const std::string &valTk = tokens[i];
+        if (vietvm::compiler::isNumber(valTk)) {
+            typeTag = "i";
+            encodedValue = valTk;
+        } else if (vietvm::compiler::isFloat(valTk)) {
+            typeTag = "d";
+            encodedValue = valTk;
+        } else if (vietvm::compiler::isStringLiteral(valTk)) {
+            typeTag = "s";
+            encodedValue = vietvm::compiler::stripQuotes(valTk);
+        } else if (valTk == "đúng") {
+            typeTag = "i";
+            encodedValue = "1";
+        } else if (valTk == "sai") {
+            typeTag = "i";
+            encodedValue = "0";
+        } else if (valTk == "rỗng") {
+            typeTag = "n";
+            encodedValue = "";
+        } else {
+            throw std::runtime_error("Map literal: value chỉ hỗ trợ int/float/string/đúng/sai/rỗng");
+        }
+        ++i;
+
+        if (!first) encoded << RS;
+        first = false;
+        encoded << encodeEscaped(key) << FS << typeTag << FS << encodeEscaped(encodedValue);
+
+        if (i < tokens.size() && tokens[i] == ",") {
+            ++i;
+            continue;
+        }
+        if (i < tokens.size() && tokens[i] == "}") {
+            break;
+        }
+        if (i < tokens.size() - 1) {
+            throw std::runtime_error("Map literal: thiếu dấu ',' giữa các cặp key/value");
+        }
+    }
+
+    return encoded.str();
+}
 
 // Helper: emit operator opcode
 static void emitOp(const std::string &tk, std::vector<Instruction> &bytecode) {
@@ -66,11 +297,22 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             bytecode.push_back({OP_CHUOI, 0, strIndex,0});
             continue;
         }
+        if (tk == "rỗng") {
+            bytecode.push_back({OP_RONG_GIA_TRI, 0, 0, 0});
+            continue;
+        }
         // Boolean literals
         if (tk == "đúng") { bytecode.push_back({OP_BIEN_SO, 1, 0, 0}); continue; }
         if (tk == "sai")  { bytecode.push_back({OP_BIEN_SO, 0, 0, 0}); continue; }
 
         if (vietvm::compiler::isVariable(tk)) {
+            int maybeFuncId = resolveFunctionIdByNameExpr(tk, symTab);
+            if (maybeFuncId >= 0) {
+                // Bare function name used as value (higher-order): push function reference.
+                bytecode.push_back({OP_BIEN_SO, maybeFuncId, 0, 0});
+                continue;
+            }
+
             int id = vietvm::compiler::symbolTable::getOrCreate(symTab, tk, nextId);
             // Postfix ++ or --: emit variable ID so handler can update in place
             if (i + 1 < postfix.size() && (postfix[i + 1] == "++" || postfix[i + 1] == "--")) {
@@ -87,8 +329,21 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             std::string argcStr = tk.substr(p1 + 2);
             if (argcStr.empty()) throw std::runtime_error("compileExpr: empty argc in CALL token: " + tk);
             int argc = std::stoi(argcStr);
-            int nameIndex = vietvm::compiler::StringPool::storeString(name);
-            bytecode.push_back({OP_GOI, argc, nameIndex,0});
+
+            int hamId = resolveFunctionIdByNameExpr(name, symTab);
+            if (hamId >= 0) {
+                bytecode.push_back({OP_GOI, argc, hamId, 0});
+            } else {
+                auto itSym = symTab.find(name);
+                if (itSym == symTab.end()) {
+                    int nameIndex = vietvm::compiler::StringPool::storeString(name);
+                    bytecode.push_back({OP_GOI, argc, -(nameIndex + 1), 0});
+                } else {
+                    int varId = itSym->second;
+                    bytecode.push_back({OP_TEN_BIEN_GIA_TRI, 0, varId, 0});
+                    bytecode.push_back({OP_GOI_GIAN_TIEP, argc, 0, 0});
+                }
+            }
             continue;
         }
 
@@ -107,6 +362,20 @@ void compileExpr(const std::string &expr,
     if (vietvm::compiler::trim(expr).empty()) return;
 
     auto toks = vietvm::compiler::tokenize(expr);
+    toks = vietvm::compiler::postProcessTokens(toks);
+    toks = mergeUnaryMinusNumbers(toks);
+
+    if (tryCompileLambdaLiteral(toks, bytecode, symTab, nextId, keywordMap)) {
+        return;
+    }
+
+    // Direct map literal expression: {"a": 1}
+    if (isMapLiteralTokens(toks)) {
+        std::string encodedMap = parseAndEncodeMapLiteral(toks);
+        int mapIndex = vietvm::compiler::StringPool::storeString(encodedMap);
+        bytecode.push_back({OP_MAP_LITERAL, 0, mapIndex, 0});
+        return;
+    }
 
     // ---- Compound assignments: x += e, x -= e, x *= e, x /= e, x %= e ----
     // Pattern: toks[0] = varName, toks[1] = op=, rest = rhs
@@ -143,6 +412,22 @@ void compileExpr(const std::string &expr,
         int dstId = vietvm::compiler::symbolTable::getOrCreate(symTab, varName, nextId);
 
         std::vector<std::string> rhsTokens(itEq + 1, toks.end());
+
+        if (tryCompileLambdaLiteral(rhsTokens, bytecode, symTab, nextId, keywordMap)) {
+            bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId,0});
+            bytecode.push_back({OP_GAN,0,0,0});
+            return;
+        }
+
+        if (isMapLiteralTokens(rhsTokens)) {
+            std::string encodedMap = parseAndEncodeMapLiteral(rhsTokens);
+            int mapIndex = vietvm::compiler::StringPool::storeString(encodedMap);
+            bytecode.push_back({OP_MAP_LITERAL, 0, mapIndex, 0});
+            bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId,0});
+            bytecode.push_back({OP_GAN,0,0,0});
+            return;
+        }
+
         auto postfix = vietvm::compiler::convertToPostfix(rhsTokens);
         emitPostfix(postfix, bytecode, symTab, nextId);
 

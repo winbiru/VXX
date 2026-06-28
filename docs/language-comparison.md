@@ -1,19 +1,19 @@
-# So sánh VietVM với các ngôn ngữ lập trình khác
+# So sánh V++ với các ngôn ngữ lập trình khác
 
 ## Mục lục
 
 1. [Giới thiệu](#giới-thiệu)
 2. [So sánh tổng quan](#so-sánh-tổng-quan)
 3. [So sánh chi tiết theo ngôn ngữ](#so-sánh-chi-tiết-theo-ngôn-ngữ)
-4. [Đặc điểm độc đáo của VietVM](#đặc-điểm-độc-đáo-của-vietvm)
-5. [Khi nào nên sử dụng VietVM](#khi-nào-nên-sử-dụng-vietvm)
+4. [Đặc điểm độc đáo của V++](#đặc-điểm-độc-đáo-của-vietvm)
+5. [Khi nào nên sử dụng V++](#khi-nào-nên-sử-dụng-vietvm)
 6. [Kết luận](#kết-luận)
 
 ---
 
 ## Giới thiệu
 
-VietVM là một ngôn ngữ lập trình thử nghiệm với các đặc điểm sau:
+V++ là một ngôn ngữ lập trình thử nghiệm với các đặc điểm sau:
 
 * **Từ khóa tiếng Việt**: Sử dụng từ khóa tiếng Việt (có dấu hoặc không dấu) để tăng khả năng tiếp cận cho người Việt
 * **Máy ảo stack-based**: Dựa trên kiến trúc stack machine, tương tự JVM và Python VM
@@ -21,7 +21,7 @@ VietVM là một ngôn ngữ lập trình thử nghiệm với các đặc đi�
 * **Mục đích nghiên cứu**: Được thiết kế cho học tập, nghiên cứu compiler/VM design
 * **C++ implementation**: Được viết bằng C++17, hiệu năng cao
 
-Tài liệu này so sánh VietVM với các ngôn ngữ lập trình phổ biến để giúp người dùng hiểu vị trí, ưu nhược điểm của VietVM.
+Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến để giúp người dùng hiểu vị trí, ưu nhược điểm của V++.
 
 ---
 
@@ -29,7 +29,7 @@ Tài liệu này so sánh VietVM với các ngôn ngữ lập trình phổ biế
 
 ### Bảng so sánh nhanh
 
-| Tiêu chí | VietVM | Python | JavaScript | Java | C++ | Go |
+| Tiêu chí | V++ | Python | JavaScript | Java | C++ | Go |
 |----------|--------|--------|------------|------|-----|----|
 | **Paradigm** | Imperative, Structured | Multi-paradigm | Multi-paradigm | OOP | Multi-paradigm | Imperative, Concurrent |
 | **Typing** | Static (planned) | Dynamic | Dynamic | Static | Static | Static |
@@ -48,7 +48,7 @@ Tài liệu này so sánh VietVM với các ngôn ngữ lập trình phổ biế
 
 ## So sánh chi tiết theo ngôn ngữ
 
-### 1. VietVM vs Python
+### 1. V++ vs Python
 
 #### Điểm giống:
 
@@ -58,7 +58,7 @@ Tài liệu này so sánh VietVM với các ngôn ngữ lập trình phổ biế
 
 #### Điểm khác:
 
-| Khía cạnh | VietVM | Python |
+| Khía cạnh | V++ | Python |
 |-----------|--------|--------|
 | **Từ khóa** | Tiếng Việt (`hàm`, `nếu`, `lặp`) | Tiếng Anh (`def`, `if`, `while`) |
 | **Typing** | Static typing (dự kiến) | Dynamic typing |
@@ -71,7 +71,7 @@ Tài liệu này so sánh VietVM với các ngôn ngữ lập trình phổ biế
 
 #### Ví dụ cú pháp:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm tính_tổng(a, b) {
     trả về a + b;
@@ -104,13 +104,13 @@ for i in range(10):
 
 #### Kết luận so sánh:
 
-* **VietVM** phù hợp cho: Người Việt học lập trình, nghiên cứu compiler/VM
+* **V++** phù hợp cho: Người Việt học lập trình, nghiên cứu compiler/VM
 * **Python** phù hợp cho: Production, ML/AI, scripting, prototyping
-* **Trade-off**: VietVM đổi ecosystem và maturity lấy Vietnamese-native và explicit semantics
+* **Trade-off**: V++ đổi ecosystem và maturity lấy Vietnamese-native và explicit semantics
 
 ---
 
-### 2. VietVM vs JavaScript
+### 2. V++ vs JavaScript
 
 #### Điểm giống:
 
@@ -120,7 +120,7 @@ for i in range(10):
 
 #### Điểm khác:
 
-| Khía cạnh | VietVM | JavaScript |
+| Khía cạnh | V++ | JavaScript |
 |-----------|--------|------------|
 | **Runtime** | Custom stack VM | V8, JSC, SpiderMonkey (JIT) |
 | **Environment** | Standalone | Browser + Node.js |
@@ -135,7 +135,7 @@ for i in range(10):
 
 #### Ví dụ cú pháp:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm giai_thừa(n) {
     nếu (n <= 1) {
@@ -157,24 +157,24 @@ function giaiThua(n) {
 
 #### Kết luận so sánh:
 
-* **VietVM** phù hợp cho: Education, embedded scripting (trong tương lai)
+* **V++** phù hợp cho: Education, embedded scripting (trong tương lai)
 * **JavaScript** phù hợp cho: Web development, full-stack, cross-platform
-* **Trade-off**: VietVM có explicit semantics nhưng thiếu web ecosystem
+* **Trade-off**: V++ có explicit semantics nhưng thiếu web ecosystem
 
 ---
 
-### 3. VietVM vs Java
+### 3. V++ vs Java
 
 #### Điểm giống:
 
 * **Bytecode + VM**: Cả hai compile sang bytecode và chạy trên VM
-* **Static typing**: Java dùng static typing, VietVM dự kiến sẽ có
+* **Static typing**: Java dùng static typing, V++ dự kiến sẽ có
 * **Platform-independent**: Bytecode không phụ thuộc nền tảng
 * **Explicit semantics**: Luồng điều khiển rõ ràng
 
 #### Điểm khác:
 
-| Khía cạnh | VietVM | Java |
+| Khía cạnh | V++ | Java |
 |-----------|--------|------|
 | **OOP** | Limited/Planned | Full OOP (classes, inheritance) |
 | **Garbage Collection** | Planned | Automatic, sophisticated GC |
@@ -189,7 +189,7 @@ function giaiThua(n) {
 
 #### Ví dụ cú pháp:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm main() {
     khởi tạo tên = "Việt";
@@ -209,23 +209,23 @@ public class Main {
 
 #### Kết luận so sánh:
 
-* **VietVM** phù hợp cho: Learning VM internals, educational projects
+* **V++** phù hợp cho: Learning VM internals, educational projects
 * **Java** phù hợp cho: Enterprise applications, Android, large-scale systems
-* **Trade-off**: Java mature và production-ready, VietVM tập trung vào simplicity
+* **Trade-off**: Java mature và production-ready, V++ tập trung vào simplicity
 
 ---
 
-### 4. VietVM vs C++
+### 4. V++ vs C++
 
 #### Điểm giống:
 
 * **Imperative/Procedural**: Cả hai hỗ trợ imperative programming
-* **Performance-oriented**: C++ native, VietVM optimize cho stack VM
-* **Low-level control**: C++ full control, VietVM có bytecode-level control
+* **Performance-oriented**: C++ native, V++ optimize cho stack VM
+* **Low-level control**: C++ full control, V++ có bytecode-level control
 
 #### Điểm khác:
 
-| Khía cạnh | VietVM | C++ |
+| Khía cạnh | V++ | C++ |
 |-----------|--------|-----|
 | **Compilation** | Bytecode (interpreted) | Native machine code |
 | **Memory management** | Managed/GC (planned) | Manual (RAII, smart pointers) |
@@ -241,7 +241,7 @@ public class Main {
 
 #### Ví dụ cú pháp:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm swap(a[], i, j) {
     khởi tạo temp = a[i];
@@ -262,24 +262,24 @@ void swap(int a[], int i, int j) {
 
 #### Kết luận so sánh:
 
-* **VietVM** phù hợp cho: Safe scripting, education, rapid prototyping
+* **V++** phù hợp cho: Safe scripting, education, rapid prototyping
 * **C++** phù hợp cho: OS, drivers, games, HPC, embedded systems
-* **Trade-off**: C++ có performance tuyệt đối, VietVM có safety và simplicity
+* **Trade-off**: C++ có performance tuyệt đối, V++ có safety và simplicity
 
 ---
 
-### 5. VietVM vs Go
+### 5. V++ vs Go
 
 #### Điểm giống:
 
 * **Simplicity focus**: Cả hai nhấn mạnh simple, explicit design
 * **Imperative**: Structured, imperative programming
-* **Fast compilation**: Go compile nhanh, VietVM bytecode generation nhanh
-* **Minimal runtime**: Go có GC nhẹ, VietVM có minimal VM
+* **Fast compilation**: Go compile nhanh, V++ bytecode generation nhanh
+* **Minimal runtime**: Go có GC nhẹ, V++ có minimal VM
 
 #### Điểm khác:
 
-| Khía cạnh | VietVM | Go |
+| Khía cạnh | V++ | Go |
 |-----------|--------|----|
 | **Concurrency** | Planned | Built-in (goroutines, channels) |
 | **Compilation** | Bytecode | Native binary |
@@ -294,7 +294,7 @@ void swap(int a[], int i, int j) {
 
 #### Ví dụ cú pháp:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm fibonacci(n) {
     nếu (n <= 1) {
@@ -316,13 +316,13 @@ func fibonacci(n int) int {
 
 #### Kết luận so sánh:
 
-* **VietVM** phù hợp cho: Vietnamese learners, VM research
+* **V++** phù hợp cho: Vietnamese learners, VM research
 * **Go** phù hợp cho: Cloud services, microservices, CLI tools
-* **Trade-off**: Go có concurrency và production readiness, VietVM có Vietnamese-native
+* **Trade-off**: Go có concurrency và production readiness, V++ có Vietnamese-native
 
 ---
 
-## Đặc điểm độc đáo của VietVM
+## Đặc điểm độc đáo của V++
 
 ### 1. Vietnamese-first language design
 
@@ -363,7 +363,7 @@ func fibonacci(n int) int {
 
 ---
 
-## Khi nào nên sử dụng VietVM
+## Khi nào nên sử dụng V++
 
 ### ✅ Phù hợp cho:
 
@@ -414,13 +414,13 @@ func fibonacci(n int) int {
 
 ## Kết luận
 
-### Tóm tắt vị trí của VietVM
+### Tóm tắt vị trí của V++
 
-VietVM là một **ngôn ngữ thử nghiệm, định hướng giáo dục** với điểm độc đáo là **Vietnamese-native keywords** và **explicit execution semantics**. 
+V++ là một **ngôn ngữ thử nghiệm, định hướng giáo dục** với điểm độc đáo là **Vietnamese-native keywords** và **explicit execution semantics**. 
 
 **So với các ngôn ngữ mainstream:**
 
-| Ngôn ngữ | Khi chọn nó thay vì VietVM | Khi chọn VietVM thay vì nó |
+| Ngôn ngữ | Khi chọn nó thay vì V++ | Khi chọn V++ thay vì nó |
 |----------|---------------------------|----------------------------|
 | **Python** | Production, ML/AI, large ecosystem | Học lập trình cơ bản (Việt), VM research |
 | **JavaScript** | Web development, full-stack | Không cần web, muốn explicit semantics |
@@ -428,14 +428,14 @@ VietVM là một **ngôn ngữ thử nghiệm, định hướng giáo dục** v�
 | **C++** | Performance-critical, systems | Safety, educational scripting |
 | **Go** | Cloud services, production | Vietnamese learners, VM study |
 
-### Điểm mạnh của VietVM:
+### Điểm mạnh của V++:
 
 1. ✅ **Vietnamese-first**: Giảm rào cản học lập trình cho người Việt
 2. ✅ **Educational**: Thiết kế đơn giản, rõ ràng, dễ học VM internals
 3. ✅ **Explicit**: Không có magic, behavior dễ predict và debug
 4. ✅ **Research-friendly**: Tự do thử nghiệm, không legacy burden
 
-### Điểm yếu của VietVM:
+### Điểm yếu của V++:
 
 1. ❌ **Experimental**: Chưa production-ready, có thể thay đổi
 2. ❌ **Minimal ecosystem**: Không có libraries, frameworks, tools
@@ -444,14 +444,14 @@ VietVM là một **ngôn ngữ thử nghiệm, định hướng giáo dục** v�
 
 ### Lời khuyên:
 
-* **Nếu bạn là người Việt mới học lập trình**: Thử VietVM để hiểu concepts cơ bản, sau đó chuyển sang Python/JavaScript để làm projects thực tế
-* **Nếu bạn muốn học compiler/VM**: VietVM là excellent reference implementation để học
+* **Nếu bạn là người Việt mới học lập trình**: Thử V++ để hiểu concepts cơ bản, sau đó chuyển sang Python/JavaScript để làm projects thực tế
+* **Nếu bạn muốn học compiler/VM**: V++ là excellent reference implementation để học
 * **Nếu bạn cần làm production app**: Dùng Python, Java, Go, hoặc JavaScript
-* **Nếu bạn nghiên cứu academic**: VietVM có thể là platform tốt cho experiments
+* **Nếu bạn nghiên cứu academic**: V++ có thể là platform tốt cho experiments
 
-### Tương lai của VietVM:
+### Tương lai của V++:
 
-VietVM không nhằm thay thế các ngôn ngữ mainstream. Mục tiêu là:
+V++ không nhằm thay thế các ngôn ngữ mainstream. Mục tiêu là:
 
 * Công cụ giáo dục cho người Việt
 * Reference implementation cho VM/compiler learners
@@ -462,9 +462,9 @@ VietVM không nhằm thay thế các ngôn ngữ mainstream. Mục tiêu là:
 
 ## Tài liệu tham khảo
 
-* [VietVM Architecture](./architecture.md)
-* [VietVM Bytecode Specification](./bytecode.md)
-* [VietVM Grammar](./grammar.bnf)
+* [V++ Architecture](./architecture.md)
+* [V++ Bytecode Specification](./bytecode.md)
+* [V++ Grammar](./grammar.bnf)
 * [Python Language Reference](https://docs.python.org/)
 * [JavaScript (ECMAScript) Specification](https://tc39.es/ecma262/)
 * [Java Language Specification](https://docs.oracle.com/javase/specs/)
@@ -473,6 +473,6 @@ VietVM không nhằm thay thế các ngôn ngữ mainstream. Mục tiêu là:
 
 ---
 
-**Copyright © 2025. VietVM Project.**
+**Copyright © 2025. V++ Project.**
 
-Tài liệu này được viết cho mục đích giáo dục và tham khảo. Các so sánh dựa trên tình trạng hiện tại của VietVM (experimental phase).
+Tài liệu này được viết cho mục đích giáo dục và tham khảo. Các so sánh dựa trên tình trạng hiện tại của V++ (experimental phase).

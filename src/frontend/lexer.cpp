@@ -113,7 +113,7 @@ namespace vietvm::compiler {
         if (!std::isalpha(first) && tok[0] != '_' && first < 0x80) return false;
 
         for (unsigned char uc : tok) {
-            if (uc == '_' ) continue;
+            if (uc == '_' || uc == '.') continue;
             if (uc < 0x80) {
                 if (!std::isalnum(uc)) return false;
             } else {

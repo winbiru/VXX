@@ -12,6 +12,7 @@
 
 #include "instruction.h"
 #include "../common/vm_callframe.h"
+#include "../common/vm_utils.h"
 
 class VM {
 public:
@@ -28,7 +29,6 @@ private:
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
 
-    using StackValue = std::variant<int, double, std::string>;
     std::vector<StackValue> stack;                  // data stack (values)
 
     std::unordered_map<int, StackValue> variables;  // fallback global var store
@@ -76,6 +76,10 @@ private:
     // Function call helpers
     void enterFunctionFrame(const std::vector<StackValue>& args, int returnPc);
     void leaveCurrentFrame();
+
+    // Runtime optimization/maintenance (MVP)
+    bool runJitCompiledLinear();
+    void collectGarbage();
 };
 
 #endif // VM_H

@@ -1,19 +1,19 @@
-# VietVM Language Comparison with Other Programming Languages
+# V++ Language Comparison with Other Programming Languages
 
 ## Table of Contents
 
 1. [Introduction](#introduction)
 2. [Overview Comparison](#overview-comparison)
 3. [Detailed Language-by-Language Comparison](#detailed-language-by-language-comparison)
-4. [VietVM's Unique Features](#vietvms-unique-features)
-5. [When to Use VietVM](#when-to-use-vietvm)
+4. [V++'s Unique Features](#vietvms-unique-features)
+5. [When to Use V++](#when-to-use-vietvm)
 6. [Conclusion](#conclusion)
 
 ---
 
 ## Introduction
 
-VietVM is an experimental programming language with the following characteristics:
+V++ is an experimental programming language with the following characteristics:
 
 * **Vietnamese Keywords**: Uses Vietnamese keywords (with or without diacritics) to increase accessibility for Vietnamese speakers
 * **Stack-based Virtual Machine**: Based on stack machine architecture, similar to JVM and Python VM
@@ -21,7 +21,7 @@ VietVM is an experimental programming language with the following characteristic
 * **Research Purpose**: Designed for learning, compiler/VM design research
 * **C++ Implementation**: Written in C++17, high performance
 
-This document compares VietVM with popular programming languages to help users understand VietVM's position, strengths, and weaknesses.
+This document compares V++ with popular programming languages to help users understand V++'s position, strengths, and weaknesses.
 
 ---
 
@@ -29,7 +29,7 @@ This document compares VietVM with popular programming languages to help users u
 
 ### Quick Comparison Table
 
-| Criteria | VietVM | Python | JavaScript | Java | C++ | Go |
+| Criteria | V++ | Python | JavaScript | Java | C++ | Go |
 |----------|--------|--------|------------|------|-----|----|
 | **Paradigm** | Imperative, Structured | Multi-paradigm | Multi-paradigm | OOP | Multi-paradigm | Imperative, Concurrent |
 | **Typing** | Static (planned) | Dynamic | Dynamic | Static | Static | Static |
@@ -48,7 +48,7 @@ This document compares VietVM with popular programming languages to help users u
 
 ## Detailed Language-by-Language Comparison
 
-### 1. VietVM vs Python
+### 1. V++ vs Python
 
 #### Similarities:
 
@@ -58,7 +58,7 @@ This document compares VietVM with popular programming languages to help users u
 
 #### Differences:
 
-| Aspect | VietVM | Python |
+| Aspect | V++ | Python |
 |--------|--------|--------|
 | **Keywords** | Vietnamese (`hàm`, `nếu`, `lặp`) | English (`def`, `if`, `while`) |
 | **Typing** | Static typing (planned) | Dynamic typing |
@@ -71,7 +71,7 @@ This document compares VietVM with popular programming languages to help users u
 
 #### Syntax Examples:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm tính_tổng(a, b) {
     trả về a + b;
@@ -104,13 +104,13 @@ for i in range(10):
 
 #### Comparison Conclusion:
 
-* **VietVM** is suitable for: Vietnamese programming learners, compiler/VM research
+* **V++** is suitable for: Vietnamese programming learners, compiler/VM research
 * **Python** is suitable for: Production, ML/AI, scripting, prototyping
-* **Trade-off**: VietVM trades ecosystem and maturity for Vietnamese-native and explicit semantics
+* **Trade-off**: V++ trades ecosystem and maturity for Vietnamese-native and explicit semantics
 
 ---
 
-### 2. VietVM vs JavaScript
+### 2. V++ vs JavaScript
 
 #### Similarities:
 
@@ -120,7 +120,7 @@ for i in range(10):
 
 #### Differences:
 
-| Aspect | VietVM | JavaScript |
+| Aspect | V++ | JavaScript |
 |--------|--------|------------|
 | **Runtime** | Custom stack VM | V8, JSC, SpiderMonkey (JIT) |
 | **Environment** | Standalone | Browser + Node.js |
@@ -135,7 +135,7 @@ for i in range(10):
 
 #### Syntax Examples:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm giai_thừa(n) {
     nếu (n <= 1) {
@@ -157,24 +157,24 @@ function factorial(n) {
 
 #### Comparison Conclusion:
 
-* **VietVM** is suitable for: Education, embedded scripting (future)
+* **V++** is suitable for: Education, embedded scripting (future)
 * **JavaScript** is suitable for: Web development, full-stack, cross-platform
-* **Trade-off**: VietVM has explicit semantics but lacks web ecosystem
+* **Trade-off**: V++ has explicit semantics but lacks web ecosystem
 
 ---
 
-### 3. VietVM vs Java
+### 3. V++ vs Java
 
 #### Similarities:
 
 * **Bytecode + VM**: Both compile to bytecode and run on a VM
-* **Static typing**: Java uses static typing, VietVM plans to have it
+* **Static typing**: Java uses static typing, V++ plans to have it
 * **Platform-independent**: Bytecode is platform-independent
 * **Explicit semantics**: Clear control flow
 
 #### Differences:
 
-| Aspect | VietVM | Java |
+| Aspect | V++ | Java |
 |--------|--------|------|
 | **OOP** | Limited/Planned | Full OOP (classes, inheritance) |
 | **Garbage Collection** | Planned | Automatic, sophisticated GC |
@@ -189,7 +189,7 @@ function factorial(n) {
 
 #### Syntax Examples:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm main() {
     khởi tạo tên = "Việt";
@@ -209,23 +209,23 @@ public class Main {
 
 #### Comparison Conclusion:
 
-* **VietVM** is suitable for: Learning VM internals, educational projects
+* **V++** is suitable for: Learning VM internals, educational projects
 * **Java** is suitable for: Enterprise applications, Android, large-scale systems
-* **Trade-off**: Java is mature and production-ready, VietVM focuses on simplicity
+* **Trade-off**: Java is mature and production-ready, V++ focuses on simplicity
 
 ---
 
-### 4. VietVM vs C++
+### 4. V++ vs C++
 
 #### Similarities:
 
 * **Imperative/Procedural**: Both support imperative programming
-* **Performance-oriented**: C++ is native, VietVM is optimized for stack VM
-* **Low-level control**: C++ has full control, VietVM has bytecode-level control
+* **Performance-oriented**: C++ is native, V++ is optimized for stack VM
+* **Low-level control**: C++ has full control, V++ has bytecode-level control
 
 #### Differences:
 
-| Aspect | VietVM | C++ |
+| Aspect | V++ | C++ |
 |--------|--------|-----|
 | **Compilation** | Bytecode (interpreted) | Native machine code |
 | **Memory management** | Managed/GC (planned) | Manual (RAII, smart pointers) |
@@ -241,7 +241,7 @@ public class Main {
 
 #### Syntax Examples:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm swap(a[], i, j) {
     khởi tạo temp = a[i];
@@ -262,24 +262,24 @@ void swap(int a[], int i, int j) {
 
 #### Comparison Conclusion:
 
-* **VietVM** is suitable for: Safe scripting, education, rapid prototyping
+* **V++** is suitable for: Safe scripting, education, rapid prototyping
 * **C++** is suitable for: OS, drivers, games, HPC, embedded systems
-* **Trade-off**: C++ has absolute performance, VietVM has safety and simplicity
+* **Trade-off**: C++ has absolute performance, V++ has safety and simplicity
 
 ---
 
-### 5. VietVM vs Go
+### 5. V++ vs Go
 
 #### Similarities:
 
 * **Simplicity focus**: Both emphasize simple, explicit design
 * **Imperative**: Structured, imperative programming
-* **Fast compilation**: Go compiles fast, VietVM bytecode generation is fast
-* **Minimal runtime**: Go has lightweight GC, VietVM has minimal VM
+* **Fast compilation**: Go compiles fast, V++ bytecode generation is fast
+* **Minimal runtime**: Go has lightweight GC, V++ has minimal VM
 
 #### Differences:
 
-| Aspect | VietVM | Go |
+| Aspect | V++ | Go |
 |--------|--------|----|
 | **Concurrency** | Planned | Built-in (goroutines, channels) |
 | **Compilation** | Bytecode | Native binary |
@@ -294,7 +294,7 @@ void swap(int a[], int i, int j) {
 
 #### Syntax Examples:
 
-**VietVM:**
+**V++:**
 ```vietvm
 hàm fibonacci(n) {
     nếu (n <= 1) {
@@ -316,13 +316,13 @@ func fibonacci(n int) int {
 
 #### Comparison Conclusion:
 
-* **VietVM** is suitable for: Vietnamese learners, VM research
+* **V++** is suitable for: Vietnamese learners, VM research
 * **Go** is suitable for: Cloud services, microservices, CLI tools
-* **Trade-off**: Go has concurrency and production readiness, VietVM has Vietnamese-native support
+* **Trade-off**: Go has concurrency and production readiness, V++ has Vietnamese-native support
 
 ---
 
-## VietVM's Unique Features
+## V++'s Unique Features
 
 ### 1. Vietnamese-first Language Design
 
@@ -363,7 +363,7 @@ func fibonacci(n int) int {
 
 ---
 
-## When to Use VietVM
+## When to Use V++
 
 ### ✅ Suitable for:
 
@@ -414,13 +414,13 @@ func fibonacci(n int) int {
 
 ## Conclusion
 
-### Summary of VietVM's Position
+### Summary of V++'s Position
 
-VietVM is an **experimental, education-oriented language** with unique features of **Vietnamese-native keywords** and **explicit execution semantics**.
+V++ is an **experimental, education-oriented language** with unique features of **Vietnamese-native keywords** and **explicit execution semantics**.
 
 **Compared to Mainstream Languages:**
 
-| Language | Choose it over VietVM when | Choose VietVM over it when |
+| Language | Choose it over V++ when | Choose V++ over it when |
 |----------|---------------------------|----------------------------|
 | **Python** | Production, ML/AI, large ecosystem | Learning basics (Vietnamese), VM research |
 | **JavaScript** | Web development, full-stack | Don't need web, want explicit semantics |
@@ -428,14 +428,14 @@ VietVM is an **experimental, education-oriented language** with unique features 
 | **C++** | Performance-critical, systems | Safety, educational scripting |
 | **Go** | Cloud services, production | Vietnamese learners, VM study |
 
-### VietVM's Strengths:
+### V++'s Strengths:
 
 1. ✅ **Vietnamese-first**: Reduces learning barrier for Vietnamese speakers
 2. ✅ **Educational**: Simple, clear design, easy to learn VM internals
 3. ✅ **Explicit**: No magic, behavior is easy to predict and debug
 4. ✅ **Research-friendly**: Free to experiment, no legacy burden
 
-### VietVM's Weaknesses:
+### V++'s Weaknesses:
 
 1. ❌ **Experimental**: Not production-ready, subject to change
 2. ❌ **Minimal ecosystem**: No libraries, frameworks, tools
@@ -444,14 +444,14 @@ VietVM is an **experimental, education-oriented language** with unique features 
 
 ### Recommendations:
 
-* **If you're a Vietnamese beginner**: Try VietVM to understand basic concepts, then move to Python/JavaScript for real projects
-* **If you want to learn compiler/VM**: VietVM is an excellent reference implementation
+* **If you're a Vietnamese beginner**: Try V++ to understand basic concepts, then move to Python/JavaScript for real projects
+* **If you want to learn compiler/VM**: V++ is an excellent reference implementation
 * **If you need to build production apps**: Use Python, Java, Go, or JavaScript
-* **If you're doing academic research**: VietVM can be a good platform for experiments
+* **If you're doing academic research**: V++ can be a good platform for experiments
 
-### VietVM's Future:
+### V++'s Future:
 
-VietVM does not aim to replace mainstream languages. Its goals are:
+V++ does not aim to replace mainstream languages. Its goals are:
 
 * Educational tool for Vietnamese speakers
 * Reference implementation for VM/compiler learners
@@ -462,9 +462,9 @@ VietVM does not aim to replace mainstream languages. Its goals are:
 
 ## References
 
-* [VietVM Architecture](./architecture.md)
-* [VietVM Bytecode Specification](./bytecode.md)
-* [VietVM Grammar](./grammar.bnf)
+* [V++ Architecture](./architecture.md)
+* [V++ Bytecode Specification](./bytecode.md)
+* [V++ Grammar](./grammar.bnf)
 * [Python Language Reference](https://docs.python.org/)
 * [JavaScript (ECMAScript) Specification](https://tc39.es/ecma262/)
 * [Java Language Specification](https://docs.oracle.com/javase/specs/)
@@ -473,6 +473,6 @@ VietVM does not aim to replace mainstream languages. Its goals are:
 
 ---
 
-**Copyright © 2025. VietVM Project.**
+**Copyright © 2025. V++ Project.**
 
-This document is written for educational and reference purposes. Comparisons are based on VietVM's current state (experimental phase).
+This document is written for educational and reference purposes. Comparisons are based on V++'s current state (experimental phase).

@@ -1,15 +1,15 @@
 {
-  "name": "vietvm-language",
-  "displayName": "VietVM Language",
-  "description": "Syntax highlighting for VietVM",
+  "name": "vpp-language",
+  "displayName": "V++ Language",
+  "description": "Syntax highlighting for V++",
   "version": "0.0.1",
-  "publisher": "vietvm",
+  "publisher": "vpp",
   "license": "UNLICENSED",
   "categories": [
     "Programming Languages"
   ],
   "keywords": [
-    "vietvm",
+    "vpp",
     "viet",
     "vietnamese",
     "syntax"
@@ -17,23 +17,23 @@
   "engines": {
     "vscode": "^1.80.0"
   },
-  "vietvm": {
-    "manifest": "./vietvm-language.json",
+  "vpp": {
+    "manifest": "./vpp-language.json",
     "installer": "./scripts/vietvm-lang",
     "packageFormat": "vlang"
   },
   "contributes": {
     "languages": [
       {
-        "id": "vietvm",
-        "aliases": ["VietVM", "vietvm"],
+        "id": "vpp",
+        "aliases": ["V++", "vpp", "vietvm"],
         "extensions": [".vvm", ".vi"],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "vietvm",
+        "language": "vpp",
         "scopeName": "source.vietvm",
         "path": "./syntaxes/vietvm.tmLanguage.json"
       }

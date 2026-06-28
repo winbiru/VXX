@@ -1,0 +1,5 @@
+nhập "stdlib";
+
+hàm main() {
+    in mang_http_get("https://example.com") != "";
+};

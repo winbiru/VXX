@@ -1,0 +1,6 @@
+nhập "stdlib";
+
+hàm main() {
+    // Manual test: phụ thuộc mạng/curl
+    in mang_http_get("https://google.com") != "";
+};
