@@ -14,6 +14,8 @@ if exist "%ROOT%build\bin\vietvm-cli.exe" (
 )
 
 echo VPP: khong tim thay binary CLI. Hay build truoc.
+echo   scripts\build-vpp-cli.bat
+echo Hoac:
 echo   cmake -S . -B cmake-build-debug
 echo   cmake --build cmake-build-debug --config Debug
 exit /b 1

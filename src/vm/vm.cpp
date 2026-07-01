@@ -20,20 +20,20 @@
 #include "common/storeString.h"
 
 static FILE *openCommandPipe(const std::string &cmd) {
-    #if defined(_MSC_VER)
-        return _popen(cmd.c_str(), "r");
-    #else
-        return popen(cmd.c_str(), "r");
-    #endif
-    }
+#if defined(_WIN32) && defined(_MSC_VER)
+    return _popen(cmd.c_str(), "r");
+#else
+    return popen(cmd.c_str(), "r");
+#endif
+}
 
-    static int closeCommandPipe(FILE *pipe) {
-    #if defined(_MSC_VER)
-        return _pclose(pipe);
-    #else
-        return pclose(pipe);
-    #endif
-    }
+static int closeCommandPipe(FILE *pipe) {
+#if defined(_WIN32) && defined(_MSC_VER)
+    return _pclose(pipe);
+#else
+    return pclose(pipe);
+#endif
+}
 
     static bool hasEnvVar(const char *name) {
     #if defined(_MSC_VER)

@@ -4,12 +4,28 @@ V++ là một bộ compiler + virtual machine thử nghiệm cho một ngôn ng�
 
 ## Nhanh Chóng
 
+### Linux/macOS
+
 ```bash
 mkdir -p cmake-build-debug
 cd cmake-build-debug
 cmake ..
 make -j
 ```
+
+Hoặc:
+
+```bash
+./scripts/build-vpp-cli.sh
+```
+
+### Windows (MSVC Developer Command Prompt)
+
+```bat
+scripts\build-vpp-cli.bat
+```
+
+Lưu ý: không build bằng `c++ src/cli/main.cpp -o main` vì thiếu toàn bộ source files và cờ chuẩn C++17.
 
 Chạy một chương trình:
 
