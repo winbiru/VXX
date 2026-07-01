@@ -37,6 +37,12 @@ function(vpp_add_module name)
     target_include_directories(${name} PUBLIC ${VPP_INCLUDE_DIR})
     target_compile_features(${name} PUBLIC cxx_std_17)
     if (MSVC)
+        target_compile_definitions(${name} PRIVATE
+            _CRT_SECURE_NO_WARNINGS
+            _CRT_NONSTDC_NO_WARNINGS
+            popen=_popen
+            pclose=_pclose
+        )
         target_compile_options(${name} PRIVATE /W4 /permissive-)
     else()
         target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
@@ -81,6 +87,12 @@ endif()
 target_include_directories(vpp-cli PRIVATE ${VPP_INCLUDE_DIR})
 
 if (MSVC)
+    target_compile_definitions(vpp-cli PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        _CRT_NONSTDC_NO_WARNINGS
+        popen=_popen
+        pclose=_pclose
+    )
     target_compile_options(vpp-cli PRIVATE /W4 /permissive-)
 else()
     target_compile_options(vpp-cli PRIVATE -Wall -Wextra -Wpedantic)
