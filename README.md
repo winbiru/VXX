@@ -49,8 +49,8 @@ Ban co the tai file da build san tu GitHub Release.
 ```bash
 curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
-chmod +x ./vpp
-./vpp giúp đỡ
+./install-vpp.sh
+vpp giúp đỡ
 ```
 
 ### macOS
@@ -58,8 +58,8 @@ chmod +x ./vpp
 ```bash
 curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
-chmod +x ./vpp
-./vpp giúp đỡ
+./install-vpp.sh
+vpp giúp đỡ
 ```
 
 ### Windows (PowerShell)
@@ -67,7 +67,14 @@ chmod +x ./vpp
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
 Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
-.\vpp-bin\vpp.exe giúp đỡ
+.\vpp-bin\install-vpp.ps1
+vpp giúp đỡ
+```
+
+Hoặc chạy file batch:
+
+```cmd
+.\vpp-bin\install-vpp.cmd
 ```
 
 Luu y: release asset se duoc tao boi workflow `.github/workflows/release-binaries.yml` khi ban publish Release.
