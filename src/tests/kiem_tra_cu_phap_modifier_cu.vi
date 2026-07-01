@@ -1,0 +1,9 @@
+lớp công khai Toan {
+    công khai hàm tinh(a, b) {
+        trả về a + b;
+    };
+};
+
+hàm main() {
+    in Toan.tinh(2, 3);
+};

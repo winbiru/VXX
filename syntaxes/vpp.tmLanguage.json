@@ -12,16 +12,42 @@
       "name": "comment.line.vietvm"
     },
     {
-      "match": "(hàm)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "match": "(hàm)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_.]*)",
       "name": "meta.function.definition.vietvm",
       "captures": {
         "1": {
           "name": "storage.type.function.vietvm"
         },
         "2": {
+          "name": "storage.modifier.access.vietvm"
+        },
+        "3": {
           "name": "entity.name.function.vietvm"
         }
       }
+    },
+    {
+      "match": "(lớp)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "name": "meta.class.definition.vietvm",
+      "captures": {
+        "1": {
+          "name": "storage.type.class.vietvm"
+        },
+        "2": {
+          "name": "storage.modifier.access.vietvm"
+        },
+        "3": {
+          "name": "entity.name.type.class.vietvm"
+        }
+      }
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)(?![\\p{L}\\p{N}_])",
+      "name": "storage.modifier.access.vietvm"
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])(công\\s+khai|riêng\\s+tư|bảo\\s+vệ)(?![\\p{L}\\p{N}_])",
+      "name": "storage.modifier.access.vietvm"
     },
     {
       "match": "(gọi)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
@@ -36,7 +62,7 @@
       }
     },
     {
-      "match": "(?<![\\p{L}\\p{N}_])(nếu không|trả về|mặc định|bỏ qua|bắt lỗi|khởi tạo|điều kiện|cập nhật|kiểm tra sau|trường hợp|hàm|nếu|hoặc|lặp|chọn|ca|thoát|nhập|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
+      "match": "(?<![\\p{L}\\p{N}_])(nếu không|trả về|mặc định|bỏ qua|bắt lỗi|khởi tạo|điều kiện|cập nhật|kiểm tra sau|trường hợp|lớp|hàm|nếu|hoặc|lặp|chọn|ca|thoát|nhập|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
       "name": "keyword.control.vietvm"
     },
     {

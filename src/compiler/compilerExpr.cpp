@@ -16,13 +16,17 @@
 #include "common/symbolTable.h"
 #include "common/utility.h"
 #include "compiler/compileBlock.h"
+#include "compiler/compileRegistry.h"
 
 
 struct Instruction;
 
 static int resolveFunctionIdByNameExpr(const std::string &name,
                                        const std::unordered_map<std::string,int> &symTab) {
-    auto itSym = symTab.find(name);
+    std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
+    vietvm::compiler::validateCallableAccess(resolvedName);
+
+    auto itSym = symTab.find(resolvedName);
     if (itSym != symTab.end()) {
         int maybeId = itSym->second;
         auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
@@ -31,7 +35,7 @@ static int resolveFunctionIdByNameExpr(const std::string &name,
         }
     }
 
-    int nameIndex = vietvm::compiler::StringPool::findString(name);
+    int nameIndex = vietvm::compiler::StringPool::findString(resolvedName);
     if (nameIndex >= 0) {
         for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
             if (kv.second == nameIndex) return kv.first;
@@ -326,6 +330,8 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             size_t p1 = tk.find("::", 6);
             if (p1 == std::string::npos) throw std::runtime_error("compileExpr: malformed CALL token");
             std::string name = tk.substr(6, p1 - 6);
+            std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
+            vietvm::compiler::validateCallableAccess(resolvedName);
             std::string argcStr = tk.substr(p1 + 2);
             if (argcStr.empty()) throw std::runtime_error("compileExpr: empty argc in CALL token: " + tk);
             int argc = std::stoi(argcStr);
@@ -334,9 +340,9 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             if (hamId >= 0) {
                 bytecode.push_back({OP_GOI, argc, hamId, 0});
             } else {
-                auto itSym = symTab.find(name);
+                auto itSym = symTab.find(resolvedName);
                 if (itSym == symTab.end()) {
-                    int nameIndex = vietvm::compiler::StringPool::storeString(name);
+                    int nameIndex = vietvm::compiler::StringPool::storeString(resolvedName);
                     bytecode.push_back({OP_GOI, argc, -(nameIndex + 1), 0});
                 } else {
                     int varId = itSym->second;

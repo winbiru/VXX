@@ -31,6 +31,22 @@
 | Từ khoá PHẢI có dấu (ví dụ: `trả về`, không phải `tra ve`) | ✅ |
 | Lexer phát hiện và báo lỗi rõ ràng khi thiếu dấu | ✅ |
 
+### 1.3 Lớp & Quyền truy cập (Public/Private/Protected tương đương)
+| Công việc | Trạng thái |
+|-----------|-----------|
+| Thêm cú pháp khai báo lớp: `lớp [công khai|riêng tư|bảo vệ] TenClass { ... }` | ✅ |
+| Thêm modifier thành viên lớp theo thứ tự ưu tiên: `hàm công khai`, `hàm riêng tư`, `hàm bảo vệ` | ✅ |
+| Không hỗ trợ cú pháp cũ: `công khai hàm`, `riêng tư hàm`, `bảo vệ hàm` (báo lỗi hướng dẫn cú pháp mới) | ✅ |
+| Biên dịch method lớp thành tên đầy đủ dạng `TenClass.tenHam` | ✅ |
+| Hỗ trợ gọi nội bộ trong cùng lớp bằng tên ngắn (ví dụ `nhanNoiBo(...)`) | ✅ |
+| Chặn truy cập `riêng tư` từ ngoài lớp | ✅ |
+| Chặn truy cập `bảo vệ` từ ngoài lớp (MVP chưa có kế thừa) | ✅ |
+| Cập nhật syntax highlighting cho `lớp`, `công khai`, `riêng tư`, `bảo vệ` | ✅ |
+| Bổ sung test hồi quy cho lớp + quyền truy cập | ✅ |
+| Mở rộng `bảo vệ` theo mô hình kế thừa thật sự (khi có inheritance) | ⬜ |
+| Hỗ trợ thuộc tính lớp (field) với quyền truy cập tương ứng | ⬜ |
+| Hỗ trợ tạo đối tượng/instance (`new`) và gọi method theo instance | ⬜ |
+
 ---
 
 ## 2. 🧮 Toán Tử (Operators)

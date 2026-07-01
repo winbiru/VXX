@@ -40,6 +40,17 @@ The `pack` command creates a `.vlang` package in `dist/`.
 
 After installing, reload VS Code and open any `.vi` file.
 
+To apply the requested highlight colors:
+
+1. Open Command Palette (`Cmd+Shift+P`).
+2. Run `Preferences: Color Theme`.
+3. Select `V++ Bright`.
+
+In `V++ Bright`:
+
+- `Lớp` is orange.
+- Access modifiers `công khai`, `riêng tư`, `bảo vệ` are bright and bold across the full words.
+
 For development without installing:
 
 1. Open this project in VS Code.

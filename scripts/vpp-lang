@@ -139,6 +139,13 @@ write_vscode_package_json() {
         "scopeName": "source.vietvm",
         "path": "./syntaxes/vpp.tmLanguage.json"
       }
+    ],
+    "themes": [
+      {
+        "label": "V++ Bright",
+        "uiTheme": "vs-dark",
+        "path": "./themes/vpp-bright-color-theme.json"
+      }
     ]
   }
 }
@@ -157,9 +164,10 @@ install_one() {
 
   echo "install $NAME@$VERSION -> $editor_name"
   rm -rf "$dest"
-  mkdir -p "$dest/syntaxes" "$dest/assets/icons"
+  mkdir -p "$dest/syntaxes" "$dest/themes" "$dest/assets/icons"
 
   cp "$ROOT_DIR/syntaxes/vpp.tmLanguage.json" "$dest/syntaxes/vpp.tmLanguage.json"
+  cp "$ROOT_DIR/themes/vpp-bright-color-theme.json" "$dest/themes/vpp-bright-color-theme.json"
   cp "$ROOT_DIR/assets/icons/vpp-file.png" "$dest/assets/icons/vpp-file.png"
   cp "$ROOT_DIR/language-configuration.json" "$dest/language-configuration.json"
   cp "$ROOT_DIR/INSTALL_EDITOR_HIGHLIGHT.md" "$dest/README.md"
@@ -248,6 +256,7 @@ pack_cmd() {
     language-configuration.json \
     INSTALL_EDITOR_HIGHLIGHT.md \
     assets/icons/vpp-file.png \
+    themes/vpp-bright-color-theme.json \
     syntaxes/vpp.tmLanguage.json
 
   echo "packed: $package"

@@ -1,0 +1,17 @@
+lớp công khai Toan {
+    hàm riêng tư nhanNoiBo(a, b) {
+        trả về a * b;
+    };
+
+    hàm bảo vệ congBaoVe(a, b) {
+        trả về a + b;
+    };
+
+    hàm công khai tinhTongHop(a, b) {
+        trả về nhanNoiBo(a, b) + congBaoVe(a, b);
+    };
+};
+
+hàm main() {
+    in Toan.tinhTongHop(2, 3);
+};

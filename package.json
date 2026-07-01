@@ -42,6 +42,13 @@
         "scopeName": "source.vietvm",
         "path": "./syntaxes/vpp.tmLanguage.json"
       }
+    ],
+    "themes": [
+      {
+        "label": "V++ Bright",
+        "uiTheme": "vs-dark",
+        "path": "./themes/vpp-bright-color-theme.json"
+      }
     ]
   }
 }

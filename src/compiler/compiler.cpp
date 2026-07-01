@@ -89,7 +89,13 @@ std::vector<Instruction> compileSource(const std::string& source,
         if (tokens[i] == "}") { if (topLevelDepth > 0) --topLevelDepth; continue; }
 
         if (topLevelDepth == 0 && tokens[i] == "hàm" && i + 1 < tokens.size()) {
-            const std::string &fname = tokens[i + 1];
+            size_t namePos = i + 1;
+            if (tokens[namePos] == "công khai" || tokens[namePos] == "riêng tư" || tokens[namePos] == "bảo vệ") {
+                ++namePos;
+            }
+            if (namePos >= tokens.size()) continue;
+
+            const std::string &fname = tokens[namePos];
             if (symTab.find(fname) == symTab.end()) {
                 int hamId = vietvm::compiler::hamMap::allocHamId();
                 symTab[fname] = hamId;

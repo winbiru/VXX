@@ -1,5 +1,7 @@
 #!/bin/zsh
-if [ -x "cmake-build-debug/bin/vpp-cli" ]; then
+if [ -x "bin/vpp-cli" ]; then
+  EXEC="bin/vpp-cli"
+elif [ -x "cmake-build-debug/bin/vpp-cli" ]; then
   EXEC="cmake-build-debug/bin/vpp-cli"
 else
   EXEC="cmake-build-debug/bin/vietvm-cli"
@@ -36,6 +38,8 @@ TESTS=(
   src/tests/kiem_tra_stdlib_io_config_time.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
   src/tests/kiem_tra_toan_tu_moi.vi
+  src/tests/kiem_tra_lop_truy_cap.vi
+  src/tests/kiem_tra_cu_phap_modifier_cu.vi
   src/tests/kiem_tra_tra_ve.vi
   src/tests/program.vi
 )

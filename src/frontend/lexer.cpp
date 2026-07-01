@@ -320,7 +320,10 @@ namespace vietvm::compiler {
             {"điều", "kiện"},
             {"cập", "nhật"},
             {"kiểm", "tra", "sau"},
-            {"bắt", "lỗi"}
+            {"bắt", "lỗi"},
+            {"công", "khai"},
+            {"riêng", "tư"},
+            {"bảo", "vệ"}
         };
 
         for (size_t i = 0; i < tokens.size(); ++i) {
@@ -338,8 +341,17 @@ namespace vietvm::compiler {
                     (a_norm == "kiem" && b_norm == "tra") ||
                     (a_norm == "truong" && b_norm == "hop") ||
                     (a_norm == "mac" && b_norm == "dinh") ||
-                    (a_norm == "bo" && b_norm == "qua")) {
+                    (a_norm == "bo" && b_norm == "qua") ||
+                    (a_norm == "cong" && b_norm == "khai") ||
+                    (a_norm == "rieng" && b_norm == "tu")) {
                     throwMissingAccent(a_norm + " " + b_norm);
+                }
+
+                if (i + 2 < tokens.size()) {
+                    std::string c_norm = normalizeTokenForCompare(tokens[i + 2]);
+                    if (a_norm == "duoc" && b_norm == "bao" && c_norm == "ve") {
+                        throwMissingAccent(a_norm + " " + b_norm + " " + c_norm);
+                    }
                 }
             }
 
@@ -347,7 +359,8 @@ namespace vietvm::compiler {
             if (a_norm == "neu" || a_norm == "hoac" || a_norm == "lap" ||
                 a_norm == "ham" || a_norm == "goi" || a_norm == "bien" ||
                 a_norm == "dung" || a_norm == "thoat" || a_norm == "chon" ||
-                a_norm == "chuyen" || a_norm == "nem" || a_norm == "thu") {
+                a_norm == "chuyen" || a_norm == "nem" || a_norm == "thu" ||
+                a_norm == "lop") {
                 throwMissingAccent(a_norm);
             }
 

@@ -39,6 +39,7 @@ std::string readFile(const std::string &filename) {
 static void resetCompilerState() {
     vietvm::compiler::StringPool::clear();
     vietvm::compiler::clearImportedFiles();
+    vietvm::compiler::clearClassAccessState();
     vietvm::compiler::hamMap::hamBytecodeMap.clear();
     vietvm::compiler::hamMap::clearHamNameIndexMap();
     vietvm::compiler::hamMap::resetHamIdCounter();

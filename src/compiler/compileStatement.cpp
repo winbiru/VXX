@@ -47,7 +47,10 @@ static std::vector<std::string> splitArgsString(const std::string &s) {
 
 static int resolveFunctionIdByName(const std::string &name,
                                    const std::unordered_map<std::string,int> &symTab) {
-    auto itSym = symTab.find(name);
+    std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
+    vietvm::compiler::validateCallableAccess(resolvedName);
+
+    auto itSym = symTab.find(resolvedName);
     if (itSym != symTab.end()) {
         int maybeId = itSym->second;
         auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
@@ -56,7 +59,7 @@ static int resolveFunctionIdByName(const std::string &name,
         }
     }
 
-    int nameIndex = vietvm::compiler::StringPool::findString(name);
+    int nameIndex = vietvm::compiler::StringPool::findString(resolvedName);
     if (nameIndex >= 0) {
         for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
             if (kv.second == nameIndex) return kv.first;
@@ -73,6 +76,32 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
 {
     if (pos >= tokens.size()) return;
     const std::string &tk = tokens[pos];
+
+    if (vietvm::compiler::isVisibilityToken(tk) &&
+        (pos + 1) < tokens.size() && tokens[pos + 1] == "hàm") {
+        throw std::runtime_error(
+            "Dùng cú pháp 'hàm <quyền>' (ví dụ: 'hàm " + tk +
+            " tenHam(...)') thay vì '<quyền> hàm'");
+    }
+
+    // Defensive fallback: ensure "trả về" never falls through to expression parsing.
+    // This prevents convertToPostfix errors when token normalization varies by context.
+    if (tk == "trả về") {
+        auto itReturn = compileMap.find("trả về");
+        if (itReturn != compileMap.end()) {
+            itReturn->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
+            return;
+        }
+    }
+    if (tk == "trả" && (pos + 1) < tokens.size() && tokens[pos + 1] == "về") {
+        {
+            auto itReturn = compileMap.find("trả");
+            if (itReturn != compileMap.end()) {
+                itReturn->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
+                return;
+            }
+        }
+    }
 
     // ---- Trường hợp Block ----
     if (tk == "{") {
@@ -100,6 +129,8 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
     // ---- Trường hợp gọi hàm dạng identifier(args); ----
     if ((pos + 1) < tokens.size() && tokens[pos+1] == "(") {
         std::string ident = tokens[pos];
+        std::string resolvedIdent = vietvm::compiler::resolveCallableNameInContext(ident, symTab);
+        vietvm::compiler::validateCallableAccess(resolvedIdent);
 
         // extract content inside parens; extractParens expects the position of '('
         auto pr = vietvm::compiler::extractParens(tokens, pos + 1);
@@ -121,9 +152,9 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
         if (hamId >= 0) {
             bytecode.push_back({OP_GOI, compiledArgs, hamId, 0});
         } else {
-            auto itSym = symTab.find(ident);
+            auto itSym = symTab.find(resolvedIdent);
             if (itSym == symTab.end()) {
-                int nameIndex = vietvm::compiler::StringPool::storeString(ident);
+                int nameIndex = vietvm::compiler::StringPool::storeString(resolvedIdent);
                 bytecode.push_back({OP_GOI, compiledArgs, -(nameIndex + 1), 0});
             } else {
                 int varId = itSym->second;

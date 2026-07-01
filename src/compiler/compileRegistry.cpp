@@ -9,6 +9,7 @@
 #include <sstream>
 #include <fstream>
 #include <filesystem>
+#include <stdexcept>
 #include <unordered_set>
 
 #include "common/loopUltil.h"
@@ -26,7 +27,201 @@ std::unordered_map<std::string, CompileFunc> compileMap;
 namespace vietvm { namespace compiler {
     std::unordered_set<std::string> importedFiles;
     void clearImportedFiles() { importedFiles.clear(); }
+
+    struct MethodAccessInfo {
+        std::string ownerClass;
+        std::string visibility;
+    };
+
+    static std::unordered_map<std::string, MethodAccessInfo> g_methodAccess;
+    static std::vector<std::string> g_classContextStack;
+
+    void clearClassAccessState() {
+        g_methodAccess.clear();
+        g_classContextStack.clear();
+    }
+
+    bool isVisibilityToken(const std::string &token) {
+        return token == "công khai" || token == "riêng tư" || token == "bảo vệ";
+    }
+
+    void pushClassContext(const std::string &className) {
+        g_classContextStack.push_back(className);
+    }
+
+    void popClassContext() {
+        if (!g_classContextStack.empty()) g_classContextStack.pop_back();
+    }
+
+    std::string currentClassContext() {
+        if (g_classContextStack.empty()) return "";
+        return g_classContextStack.back();
+    }
+
+    void registerClassMethodVisibility(const std::string &fullMethodName,
+                                       const std::string &ownerClass,
+                                       const std::string &visibility) {
+        g_methodAccess[fullMethodName] = MethodAccessInfo{ownerClass, visibility};
+    }
+
+    std::string resolveCallableNameInContext(const std::string &name,
+                                             const std::unordered_map<std::string,int> &symTab) {
+        if (name.find('.') != std::string::npos) return name;
+
+        std::string cls = currentClassContext();
+        if (cls.empty()) return name;
+
+        std::string scopedName = cls + "." + name;
+        if (symTab.find(scopedName) != symTab.end()) return scopedName;
+
+        int scopedNameIndex = vietvm::compiler::StringPool::findString(scopedName);
+        if (scopedNameIndex >= 0) return scopedName;
+
+        return name;
+    }
+
+    void validateCallableAccess(const std::string &resolvedName) {
+        auto it = g_methodAccess.find(resolvedName);
+        if (it == g_methodAccess.end()) return;
+
+        const std::string &owner = it->second.ownerClass;
+        const std::string &visibility = it->second.visibility;
+        const std::string currentClass = currentClassContext();
+
+        if (visibility == "công khai") return;
+        if (visibility == "riêng tư") {
+            if (currentClass != owner) {
+                throw std::runtime_error("Không thể gọi phương thức riêng tư '" + resolvedName +
+                                         "' từ phạm vi hiện tại");
+            }
+            return;
+        }
+        if (visibility == "bảo vệ") {
+            if (currentClass != owner) {
+                throw std::runtime_error("Không thể gọi phương thức bảo vệ '" + resolvedName +
+                                         "' từ phạm vi hiện tại");
+            }
+            return;
+        }
+    }
 } }
+
+static void compileFunctionDeclaration(const std::vector<std::string>& tokens,
+                                       size_t &pos,
+                                       std::vector<Instruction>& bytecode,
+                                       std::unordered_map<std::string,int>& symTab,
+                                       int& nextId,
+                                       const std::unordered_map<std::string,Opcode>& keywordMap,
+                                       const std::string &namePrefix,
+                                       const std::string &classOwner,
+                                       const std::string &visibility)
+{
+    ++pos; // skip 'hàm'
+    std::string effectiveVisibility = visibility;
+    if (pos < tokens.size() && vietvm::compiler::isVisibilityToken(tokens[pos])) {
+        effectiveVisibility = tokens[pos++];
+    }
+
+    if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
+    std::string rawName = tokens[pos++];
+    std::string fullName = namePrefix.empty() ? rawName : (namePrefix + rawName);
+    int nameIndex = vietvm::compiler::StringPool::storeString(fullName);
+
+    // assign/reuse function id (predeclared in compileSource when available)
+    int hamId = -1;
+    auto itFn = symTab.find(fullName);
+    if (itFn != symTab.end()) {
+        hamId = itFn->second;
+    } else {
+        hamId = vietvm::compiler::hamMap::allocHamId();
+        symTab[fullName] = hamId;
+    }
+
+    // Keep variable ids in a separate range from function ids.
+    // Without this, class method params like "a", "b" may collide with hamId
+    // and later be misread as function references in expressions.
+    if (hamId >= nextId) {
+        nextId = hamId + 1;
+    }
+
+    if (!classOwner.empty()) {
+        vietvm::compiler::registerClassMethodVisibility(fullName, classOwner, effectiveVisibility);
+    }
+
+    // Ensure registration exists so recursive/self calls can resolve while compiling body.
+    vietvm::compiler::hamMap::hamBytecodeMap[hamId] = {};
+    vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
+
+    struct ParamSpec {
+        std::string name;
+        bool hasDefault = false;
+        std::string defaultEncoded; // i:10, d:3.14, s:text, n:
+    };
+    std::vector<ParamSpec> params;
+
+    if (pos < tokens.size() && tokens[pos] == "(") {
+        auto pr = vietvm::compiler::extractParens(tokens, pos);
+        std::string inside = pr.first;
+        pos = pr.second;
+
+        std::stringstream ss(inside);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            size_t a = item.find_first_not_of(" \t\n\r");
+            size_t b = item.find_last_not_of(" \t\n\r");
+            if (a == std::string::npos) continue;
+
+            std::string token = item.substr(a, b - a + 1);
+            ParamSpec p;
+            size_t eq = token.find('=');
+            if (eq == std::string::npos) {
+                p.name = vietvm::compiler::trim(token);
+            } else {
+                p.name = vietvm::compiler::trim(token.substr(0, eq));
+                std::string dv = vietvm::compiler::trim(token.substr(eq + 1));
+                p.hasDefault = true;
+                if (vietvm::compiler::isNumber(dv)) p.defaultEncoded = "i:" + dv;
+                else if (vietvm::compiler::isFloat(dv)) p.defaultEncoded = "d:" + dv;
+                else if (vietvm::compiler::isStringLiteral(dv)) p.defaultEncoded = "s:" + vietvm::compiler::stripQuotes(dv);
+                else if (dv == "đúng") p.defaultEncoded = "i:1";
+                else if (dv == "sai") p.defaultEncoded = "i:0";
+                else if (dv == "rỗng") p.defaultEncoded = "n:";
+                else throw std::runtime_error("hàm: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
+            }
+            if (!p.name.empty()) params.push_back(p);
+        }
+    }
+
+    if (pos >= tokens.size() || tokens[pos] != "{") {
+        throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
+                                 + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
+    }
+
+    std::vector<Instruction> funcCode;
+    funcCode.push_back({OP_MO_KHOI, 0, 0, 0});
+
+    for (size_t i = 0; i < params.size(); ++i) {
+        const std::string &pname = params[i].name;
+        if (pname.empty()) continue;
+        if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
+        int varId = symTab[pname];
+        funcCode.push_back({OP_KHOI_TAO, 0, varId, 0});
+        if (params[i].hasDefault) {
+            int dIdx = vietvm::compiler::StringPool::storeString(params[i].defaultEncoded);
+            funcCode.push_back({OP_PARAM_MAC_DINH, dIdx, varId, (int)i});
+        } else {
+            funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+        }
+    }
+
+    compileBlock(tokens, pos, funcCode, symTab, nextId, keywordMap);
+
+    funcCode.push_back({OP_DONG_KHOI, 0, 0, 0});
+    funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
+
+    vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
+    bytecode.push_back({OP_HAM, nameIndex, hamId, 0});
+}
 
 static std::vector<std::string> splitArgs(const std::string &s) {
     std::vector<std::string> res;
@@ -96,102 +291,68 @@ void initCompileMap() {
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& keywordMap) {
-        ++pos; // skip 'hàm'
-        if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
-        std::string fname = tokens[pos++];
-        int nameIndex = vietvm::compiler::StringPool::storeString(fname);
+        compileFunctionDeclaration(tokens, pos, bytecode, symTab, nextId, keywordMap, "", "", "công khai");
+    };
 
-        // assign/reuse function id (predeclared in compileSource when available)
-        int hamId = -1;
-        auto itFn = symTab.find(fname);
-        if (itFn != symTab.end()) {
-            hamId = itFn->second;
-        } else {
-            hamId = vietvm::compiler::hamMap::allocHamId();
-            symTab[fname] = hamId;
-        }
-        // Ensure registration exists so recursive/self calls can resolve while compiling body.
-        vietvm::compiler::hamMap::hamBytecodeMap[hamId] = {};
-        vietvm::compiler::hamMap::setHamNameIndex(hamId, nameIndex);
+    // Handler lớp: lớp [công khai|riêng tư|bảo vệ] TenClass { ... }
+    compileMap["lớp"] = [](const std::vector<std::string>& tokens, size_t &pos,
+                            std::vector<Instruction>& bytecode,
+                            std::unordered_map<std::string,int>& symTab,
+                            int& nextId,
+                            const std::unordered_map<std::string,Opcode>& keywordMap) {
+        ++pos; // skip 'lớp'
 
-        // parse parameter list if present
-        struct ParamSpec {
-            std::string name;
-            bool hasDefault = false;
-            std::string defaultEncoded; // i:10, d:3.14, s:text, n:
-        };
-        std::vector<ParamSpec> params;
-        if (pos < tokens.size() && tokens[pos] == "(") {
-            auto pr = vietvm::compiler::extractParens(tokens, pos);
-            // extractParens should return pair<inside, newPos>
-            std::string inside = pr.first;
-            pos = pr.second;
-            // split args
-            std::stringstream ss(inside);
-            std::string item;
-            while (std::getline(ss, item, ',')) {
-                size_t a = item.find_first_not_of(" \t\n\r");
-                size_t b = item.find_last_not_of(" \t\n\r");
-                if (a == std::string::npos) continue;
-
-                std::string token = item.substr(a, b - a + 1);
-                ParamSpec p;
-                size_t eq = token.find('=');
-                if (eq == std::string::npos) {
-                    p.name = vietvm::compiler::trim(token);
-                } else {
-                    p.name = vietvm::compiler::trim(token.substr(0, eq));
-                    std::string dv = vietvm::compiler::trim(token.substr(eq + 1));
-                    p.hasDefault = true;
-                    if (vietvm::compiler::isNumber(dv)) p.defaultEncoded = "i:" + dv;
-                    else if (vietvm::compiler::isFloat(dv)) p.defaultEncoded = "d:" + dv;
-                    else if (vietvm::compiler::isStringLiteral(dv)) p.defaultEncoded = "s:" + vietvm::compiler::stripQuotes(dv);
-                    else if (dv == "đúng") p.defaultEncoded = "i:1";
-                    else if (dv == "sai") p.defaultEncoded = "i:0";
-                    else if (dv == "rỗng") p.defaultEncoded = "n:";
-                    else throw std::runtime_error("hàm: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
-                }
-                if (!p.name.empty()) params.push_back(p);
-            }
+        std::string classVisibility = "công khai";
+        if (pos < tokens.size() && vietvm::compiler::isVisibilityToken(tokens[pos])) {
+            classVisibility = tokens[pos++];
         }
 
-        // Now pos should be at the next token after params. Expect '{'
+        if (pos >= tokens.size()) {
+            throw std::runtime_error("lớp: thiếu tên lớp");
+        }
+        std::string className = tokens[pos++];
+
         if (pos >= tokens.size() || tokens[pos] != "{") {
-            throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
-                                     + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
+            throw std::runtime_error("lớp: thiếu '{' sau tên lớp");
         }
 
-        // compile function body into temporary vector
-        std::vector<Instruction> funcCode;
-        funcCode.push_back({OP_MO_KHOI, 0, 0, 0});
+        ++pos; // skip '{'
+        vietvm::compiler::pushClassContext(className);
+        try {
+            while (pos < tokens.size() && tokens[pos] != "}") {
+                if (tokens[pos].empty() || tokens[pos] == ";") {
+                    ++pos;
+                    continue;
+                }
 
-        // emit OP_PARAM prologue
-        for (size_t i = 0; i < params.size(); ++i) {
-            const std::string &pname = params[i].name;
-            if (pname.empty()) continue;
-            if (symTab.find(pname) == symTab.end()) symTab[pname] = nextId++;
-            int varId = symTab[pname];
-            funcCode.push_back({OP_KHOI_TAO, 0, varId, 0});
-            if (params[i].hasDefault) {
-                int dIdx = vietvm::compiler::StringPool::storeString(params[i].defaultEncoded);
-                funcCode.push_back({OP_PARAM_MAC_DINH, dIdx, varId, (int)i});
-            } else {
-                funcCode.push_back({OP_PARAM, 0, varId, (int)i});
+                if (vietvm::compiler::isVisibilityToken(tokens[pos])) {
+                    std::string oldOrderVisibility = tokens[pos];
+                    if ((pos + 1) < tokens.size() && tokens[pos + 1] == "hàm") {
+                        throw std::runtime_error(
+                            "lớp: dùng cú pháp 'hàm <quyền>' (ví dụ: 'hàm " + oldOrderVisibility +
+                            " tenHam(...)') thay vì '<quyền> hàm'");
+                    }
+                }
+
+                if (pos < tokens.size() && tokens[pos] == "hàm") {
+                    compileFunctionDeclaration(tokens, pos, bytecode, symTab, nextId, keywordMap,
+                                               className + ".", className, classVisibility);
+                    continue;
+                }
+
+                throw std::runtime_error("lớp: hiện chỉ hỗ trợ khai báo hàm trong thân lớp");
             }
+        } catch (...) {
+            vietvm::compiler::popClassContext();
+            throw;
         }
-        // Let compileBlock consume until matching '}' — compileBlock must update pos to point after '}'
-        compileBlock(tokens, pos, funcCode, symTab, nextId, keywordMap);
+        vietvm::compiler::popClassContext();
 
-        // ensure compileBlock left pos at token after '}', if not adjust as needed
-        // function epilogue
-        funcCode.push_back({OP_DONG_KHOI, 0, 0, 0});
-        funcCode.push_back({OP_DONG_LENH, 0, 0, 0});
-
-        // store function code
-        vietvm::compiler::hamMap::hamBytecodeMap[hamId] = std::move(funcCode);
-
-        // Optionally emit an OP_HAM marker into outer bytecode for discovery
-        bytecode.push_back({OP_HAM, nameIndex , hamId, 0});
+        if (pos >= tokens.size() || tokens[pos] != "}") {
+            throw std::runtime_error("lớp: thiếu '}' kết thúc lớp");
+        }
+        ++pos; // skip '}'
+        if (pos < tokens.size() && tokens[pos] == ";") ++pos;
     };
 
     // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
@@ -204,7 +365,9 @@ void initCompileMap() {
                            const std::unordered_map<std::string,Opcode>& keywordMap) {
         ++pos;
         if (pos >= tokens.size()) throw std::runtime_error("gọi: thiếu tên hàm");
-        std::string fname = tokens[pos++];
+        std::string originalName = tokens[pos++];
+        std::string fname = vietvm::compiler::resolveCallableNameInContext(originalName, symTab);
+        vietvm::compiler::validateCallableAccess(fname);
 
         // resolve function id from symTab (must have been set when compiling declaration)
         int hamId = -1;
@@ -271,6 +434,18 @@ void initCompileMap() {
     };
 
     compileMap["trả về"] = compileReturn;
+    compileMap["trả"] = [compileReturn](const std::vector<std::string>& tokens, size_t &pos,
+                                         std::vector<Instruction>& bytecode,
+                                         std::unordered_map<std::string,int>& symTab,
+                                         int& nextId,
+                                         const std::unordered_map<std::string,Opcode>& keywordMap) {
+        if (pos + 1 < tokens.size() && tokens[pos + 1] == "về") {
+            ++pos; // skip "trả", move to "về"
+            compileReturn(tokens, pos, bytecode, symTab, nextId, keywordMap);
+            return;
+        }
+        throw std::runtime_error("'trả' phải đi cùng 'về'");
+    };
 
     // ---- Handler: bỏ qua (continue) ----
     compileMap["bỏ qua"] = [](const std::vector<std::string>& tokens, size_t &pos,

@@ -1,0 +1,110 @@
+{
+  "name": "V++ Bright",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#2B2B2B",
+    "editor.foreground": "#A9B7C6"
+  },
+  "tokenColors": [
+    {
+      "scope": "comment.line.vietvm",
+      "settings": {
+        "foreground": "#808080",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "comment.block.vietvm",
+      "settings": {
+        "foreground": "#808080",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "keyword.control.vietvm",
+      "settings": {
+        "foreground": "#2d1502"
+      }
+    },
+    {
+      "scope": "storage.type.class.vietvm",
+      "settings": {
+        "foreground": "#532804",
+        "fontStyle": ""
+      }
+    },
+    {
+      "scope": "storage.modifier.access.vietvm",
+      "settings": {
+        "foreground": "#592902",
+        "fontStyle": ""
+      }
+    },
+    {
+      "scope": "storage.type.function.vietvm",
+      "settings": {
+        "foreground": "#693204"
+      }
+    },
+    {
+      "scope": "entity.name.type.class.vietvm",
+      "settings": {
+        "foreground": "#A9B7C6"
+      }
+    },
+    {
+      "scope": "entity.name.function.vietvm",
+      "settings": {
+        "foreground": "#021540"
+      }
+    },
+    {
+      "scope": "support.function.builtin.vietvm",
+      "settings": {
+        "foreground": "#A9B7C6"
+      }
+    },
+    {
+      "scope": "constant.language.boolean.vietvm",
+      "settings": {
+        "foreground": "#351902"
+      }
+    },
+    {
+      "scope": "constant.numeric.vietvm",
+      "settings": {
+        "foreground": "#6897BB"
+      }
+    },
+    {
+      "scope": "string.quoted.double.vietvm",
+      "settings": {
+        "foreground": "#6A8759"
+      }
+    },
+    {
+      "scope": "string.quoted.single.vietvm",
+      "settings": {
+        "foreground": "#6A8759"
+      }
+    },
+    {
+      "scope": "keyword.operator.vietvm",
+      "settings": {
+        "foreground": "#A9B7C6"
+      }
+    },
+    {
+      "scope": "punctuation.separator.vietvm",
+      "settings": {
+        "foreground": "#A9B7C6"
+      }
+    },
+    {
+      "scope": "variable.vietvm",
+      "settings": {
+        "foreground": "#A9B7C6"
+      }
+    }
+  ]
+}
