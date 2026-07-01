@@ -19,6 +19,15 @@
 #include "../../include/common/vm_utils.h"
 #include "common/storeString.h"
 
+#if defined(_WIN32) && defined(_MSC_VER)
+#ifndef popen
+#define popen _popen
+#endif
+#ifndef pclose
+#define pclose _pclose
+#endif
+#endif
+
 static FILE *openCommandPipe(const std::string &cmd) {
 #if defined(_WIN32) && defined(_MSC_VER)
     return _popen(cmd.c_str(), "r");
