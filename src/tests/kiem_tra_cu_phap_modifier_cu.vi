@@ -1,5 +1,5 @@
-lớp công khai Toan {
-    hàm công khai  tinh(a, b) {
+lớp Toan {
+    hàm công khai tinh(a, b) {
         trả về a + b;
     };
 };
