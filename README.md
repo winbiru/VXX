@@ -177,8 +177,3 @@ VPP.cmd caidat duong-dan\goi.vi ten-goi
 - `docs/grammar.bnf`
 - `docs/language-comparison.md`
 - `docs/language-comparison-en.md`
-
-## Ghi Chú
-
-- Đây là project thử nghiệm, chưa cam kết tương thích ổn định lâu dài.
-- Bytecode, parser và CLI vẫn đang tiếp tục hoàn thiện.
