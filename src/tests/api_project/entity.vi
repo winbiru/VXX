@@ -1,0 +1,56 @@
+// Mô hình entity cho user trong api_project.
+
+lớp công khai UserEntity {
+    // Trả về schema đầy đủ của User entity.
+    hàm công khai schema() {
+        trả về {
+            "id": 0,
+            "address": "",
+            "city": "",
+            "country": "",
+            "country_code": "",
+            "created_at": "",
+            "delete_flag": 0,
+            "email": "",
+            "first_names": "",
+            "is_active": 1,
+            "last_name": "",
+            "password": "",
+            "phone_number": "",
+            "postal_code": "",
+            "updated_at": "",
+            "user_code": "",
+            "username": "",
+            "vatnumber": "",
+            "company_code": "",
+            "role_id": 0
+        };
+    };
+
+    // Tạo entity mặc định từ username.
+    hàm công khai ofUsername(username) {
+        nếu (username == "") {
+            trả về "ENTITY_ERR|missing-username";
+        };
+        trả về "ENTITY_OK|username=" + username;
+    };
+
+    // Tạo entity theo tên user.
+    hàm công khai ofName(name) {
+        nếu (name == "") {
+            trả về "ENTITY_ERR|missing-name";
+        };
+        trả về "ENTITY_OK|name=" + name;
+    };
+
+    // Hợp nhất tên cũ và tên mới khi cập nhật.
+    hàm công khai mergeName(currentName, nextName) {
+        nếu (nextName == "") {
+            trả về "ENTITY_ERR|missing-name";
+        };
+        nếu (currentName == nextName) {
+            trả về "ENTITY_OK|unchanged";
+        };
+        trả về "ENTITY_OK|updated=" + nextName;
+    };
+};

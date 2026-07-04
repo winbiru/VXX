@@ -152,6 +152,122 @@ write_vscode_package_json() {
 EOF
 }
 
+sync_workspace_settings() {
+  action="$1"
+  settings_path="$ROOT_DIR/.vscode/settings.json"
+  theme_path="$ROOT_DIR/themes/vpp-bright-color-theme.json"
+
+  mkdir -p "$ROOT_DIR/.vscode"
+
+  ACTION="$action" SETTINGS_PATH="$settings_path" THEME_PATH="$theme_path" node <<'NODE'
+const fs = require('fs');
+
+const action = process.env.ACTION;
+const settingsPath = process.env.SETTINGS_PATH;
+const themePath = process.env.THEME_PATH;
+
+const CLASS_SCOPE = 'storage.type.class.vietvm';
+const ACCESS_SCOPE = 'storage.modifier.access.vietvm';
+const VPP_SCOPES = new Set([CLASS_SCOPE, ACCESS_SCOPE]);
+
+function readJson(path, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(path, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function isVppRule(rule) {
+  if (!rule || typeof rule !== 'object') {
+    return false;
+  }
+
+  const scope = rule.scope;
+  if (typeof scope === 'string') {
+    return VPP_SCOPES.has(scope);
+  }
+  if (Array.isArray(scope)) {
+    return scope.some((item) => typeof item === 'string' && VPP_SCOPES.has(item));
+  }
+  return false;
+}
+
+const settings = readJson(settingsPath, {});
+const theme = readJson(themePath, { tokenColors: [] });
+
+const tokenColorByScope = new Map();
+for (const token of theme.tokenColors || []) {
+  if (!token || typeof token !== 'object') {
+    continue;
+  }
+  if (typeof token.scope !== 'string') {
+    continue;
+  }
+  const color = token.settings && token.settings.foreground;
+  if (typeof color === 'string' && color.length > 0) {
+    tokenColorByScope.set(token.scope, color);
+  }
+}
+
+if (action === 'install') {
+  if (!settings['files.associations'] || typeof settings['files.associations'] !== 'object') {
+    settings['files.associations'] = {};
+  }
+  settings['files.associations']['*.vi'] = 'vpp';
+  settings['files.associations']['*.vvm'] = 'vpp';
+
+  const customizations = settings['editor.tokenColorCustomizations'] || {};
+  let rules = Array.isArray(customizations.textMateRules) ? customizations.textMateRules : [];
+  rules = rules.filter((rule) => !isVppRule(rule));
+
+  const classColor = tokenColorByScope.get(CLASS_SCOPE) || '#CC7832';
+  const accessColor = tokenColorByScope.get(ACCESS_SCOPE) || classColor;
+
+  rules.push({
+    scope: CLASS_SCOPE,
+    settings: {
+      foreground: classColor,
+      fontStyle: ''
+    }
+  });
+  rules.push({
+    scope: ACCESS_SCOPE,
+    settings: {
+      foreground: accessColor,
+      fontStyle: ''
+    }
+  });
+
+  customizations.textMateRules = rules;
+  settings['editor.tokenColorCustomizations'] = customizations;
+} else {
+  if (settings['files.associations'] && typeof settings['files.associations'] === 'object') {
+    delete settings['files.associations']['*.vi'];
+    delete settings['files.associations']['*.vvm'];
+    if (Object.keys(settings['files.associations']).length === 0) {
+      delete settings['files.associations'];
+    }
+  }
+
+  const customizations = settings['editor.tokenColorCustomizations'];
+  if (customizations && typeof customizations === 'object' && Array.isArray(customizations.textMateRules)) {
+    customizations.textMateRules = customizations.textMateRules.filter((rule) => !isVppRule(rule));
+
+    if (customizations.textMateRules.length === 0) {
+      delete customizations.textMateRules;
+    }
+    if (Object.keys(customizations).length === 0) {
+      delete settings['editor.tokenColorCustomizations'];
+    }
+  }
+}
+
+fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+console.log(`synced: ${settingsPath} (${action})`);
+NODE
+}
+
 install_one() {
   editor_name="$1"
   dest=$(editor_dir "$editor_name")
@@ -199,6 +315,8 @@ install_cmd() {
     exit 1
   fi
 
+  sync_workspace_settings install
+
   echo "Reload your editor window to activate V++ highlighting."
 }
 
@@ -228,6 +346,10 @@ uninstall_cmd() {
     if uninstall_one "$editor"; then
       removed=$((removed + 1))
     fi
+  fi
+
+  if [ "$removed" -gt 0 ]; then
+    sync_workspace_settings uninstall
   fi
 
   [ "$removed" -gt 0 ] || exit 1

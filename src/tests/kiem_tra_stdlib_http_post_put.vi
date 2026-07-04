@@ -1,0 +1,9 @@
+nhập gói/thư viện/main.vi;
+
+hàm main() {
+    in mạng gửi("https://example.com", "{\"nguon\":\"vpp\",\"ok\":1}") != "";
+    in mạng gửi("https://example.com", "{\"wrapper\":\"post\"}") != "";
+
+    in mạng cập nhật("https://example.com", "{\"nguon\":\"vpp\",\"ok\":1}") != "";
+    in mạng cập nhật("https://example.com", "{\"wrapper\":\"put\"}") != "";
+};

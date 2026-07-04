@@ -26,11 +26,21 @@ static int resolveFunctionIdByNameExpr(const std::string &name,
     std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
     vietvm::compiler::validateCallableAccess(resolvedName);
 
+    auto idMatchesResolvedName = [&](int candidateId) {
+        int resolvedNameIndex = vietvm::compiler::StringPool::findString(resolvedName);
+        if (resolvedNameIndex < 0) return false;
+        auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
+        if (itName == vietvm::compiler::hamMap::hamNameIndexMap.end()) return false;
+        return itName->second == resolvedNameIndex;
+    };
+
     auto itSym = symTab.find(resolvedName);
     if (itSym != symTab.end()) {
         int maybeId = itSym->second;
         auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
-        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() && !itCode->second.empty()) {
+        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
+            !itCode->second.empty() &&
+            idMatchesResolvedName(maybeId)) {
             return maybeId;
         }
     }
@@ -72,6 +82,54 @@ static bool isUnaryMinusContext(const std::string &prev) {
            prev == "*" || prev == "/" || prev == "%" || prev == "!" || prev == "&&" ||
            prev == "||" || prev == "==" || prev == "!=" || prev == "<" || prev == ">" ||
            prev == "<=" || prev == ">=";
+}
+
+static bool isIdentifierLikeToken(const std::string &tk) {
+    if (tk.empty()) return false;
+    if (tk == "đúng" || tk == "sai" || tk == "rỗng") return false;
+    return vietvm::compiler::isVariable(tk);
+}
+
+static bool isMultiWordIdentifier(const std::string &tk) {
+    if (tk.find(' ') == std::string::npos) return false;
+    std::stringstream ss(tk);
+    std::string part;
+    bool sawPart = false;
+    while (std::getline(ss, part, ' ')) {
+        if (part.empty()) continue;
+        sawPart = true;
+        if (!isIdentifierLikeToken(part)) return false;
+    }
+    return sawPart;
+}
+
+static std::vector<std::string> mergeAdjacentIdentifierTokens(const std::vector<std::string> &tokens) {
+    std::vector<std::string> out;
+    out.reserve(tokens.size());
+
+    size_t i = 0;
+    while (i < tokens.size()) {
+        if (!isIdentifierLikeToken(tokens[i])) {
+            out.push_back(tokens[i]);
+            ++i;
+            continue;
+        }
+
+        size_t j = i + 1;
+        while (j < tokens.size() && isIdentifierLikeToken(tokens[j])) {
+            ++j;
+        }
+
+        std::string merged = tokens[i];
+        for (size_t k = i + 1; k < j; ++k) {
+            merged += " ";
+            merged += tokens[k];
+        }
+        out.push_back(merged);
+        i = j;
+    }
+
+    return out;
 }
 
 static std::vector<std::string> mergeUnaryMinusNumbers(const std::vector<std::string> &tokens) {
@@ -309,7 +367,7 @@ static void emitPostfix(const std::vector<std::string> &postfix,
         if (tk == "đúng") { bytecode.push_back({OP_BIEN_SO, 1, 0, 0}); continue; }
         if (tk == "sai")  { bytecode.push_back({OP_BIEN_SO, 0, 0, 0}); continue; }
 
-        if (vietvm::compiler::isVariable(tk)) {
+        if (vietvm::compiler::isVariable(tk) || isMultiWordIdentifier(tk)) {
             int maybeFuncId = resolveFunctionIdByNameExpr(tk, symTab);
             if (maybeFuncId >= 0) {
                 // Bare function name used as value (higher-order): push function reference.
@@ -369,6 +427,7 @@ void compileExpr(const std::string &expr,
 
     auto toks = vietvm::compiler::tokenize(expr);
     toks = vietvm::compiler::postProcessTokens(toks);
+    toks = mergeAdjacentIdentifierTokens(toks);
     toks = mergeUnaryMinusNumbers(toks);
 
     if (tryCompileLambdaLiteral(toks, bytecode, symTab, nextId, keywordMap)) {

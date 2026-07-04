@@ -1,26 +1,26 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm main() {
-    in cong(2, 3);
-    in tru(10, 4);
-    in nhan(6, 7);
+    in cộng(2, 3);
+    in trừ(10, 4);
+    in nhân(6, 7);
     in chia(7.0, 2.0);
-    in chia_du(17, 5);
+    in chia dư(17, 5);
 
-    in luy_thua(2, 8);
-    in giai_thua(5);
+    in lũy thừa(2, 8);
+    in giai thừa(5);
 
-    in tri_tuyet_doi(-9);
-    in max2(9, 4);
-    in min2(9, 4);
-    in clamp(15, 0, 10);
+    in trị tuyệt đối(-9);
+    in lớn nhất hai(9, 4);
+    in nhỏ nhất hai(9, 4);
+    in giới hạn(15, 0, 10);
 
-    in trung_binh(5, 7);
-    in phan_tram(2, 8);
+    in trung bình(5, 7);
+    in phần trăm(2, 8);
 
-    in la_chan(8);
-    in la_le(7);
+    in là chẵn(8);
+    in là lẻ(7);
 
-    in bình_phương(9);
-    in tong2(11, 22);
+    in bình phương(9);
+    in tổng hai(11, 22);
 };

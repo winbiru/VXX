@@ -1,13 +1,13 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm main() {
-    io_ghi_file(".tmp_stdlib_io.txt", "xin chao io");
-    in io_doc_file(".tmp_stdlib_io.txt");
+    ghi tệp(".tmp_stdlib_io.txt", "xin chao io");
+    in đọc tệp(".tmp_stdlib_io.txt");
 
-    io_ghi_file(".tmp_stdlib_cfg.ini", "port=8080\nname=vietvm\nbat=đúng\nhe_so=2.5\n");
-    cfg = doc_config(".tmp_stdlib_cfg.ini");
+    ghi tệp(".tmp_stdlib_cfg.ini", "port=8080\nname=vietvm\nbat=đúng\nhe_so=2.5\n");
+    cfg = đọc cấu hình(".tmp_stdlib_cfg.ini");
     in cfg;
 
-    now = lay_thoi_gian_hien_tai();
+    now = lấy thời gian hiện tại();
     in now != "";
 };

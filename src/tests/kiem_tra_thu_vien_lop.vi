@@ -1,0 +1,9 @@
+nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+
+hàm main() {
+    NhậtKý.ghi thông tin("dịch vụ khởi động");
+    NhậtKý.ghi cảnh báo("cấu hình mặc định");
+    NhậtKý.ghi lỗi("mạng chậm");
+
+    in NhậtKý.ghi thông tin("xong") == 0;
+};

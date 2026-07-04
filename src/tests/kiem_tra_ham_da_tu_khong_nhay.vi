@@ -1,0 +1,17 @@
+hàm main() {
+    in cộng hai số(2, 3);
+    gọi in lời chào();
+    in cộng ba số(1, 2, 3);
+};
+
+hàm cộng hai số(a, b) {
+    trả về a + b;
+};
+
+hàm in lời chào() {
+    in "xin chào";
+};
+
+hàm cộng ba số(a, b, c) {
+    trả về cộng hai số(a, b) + c;
+};

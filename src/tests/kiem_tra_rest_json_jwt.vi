@@ -1,0 +1,8 @@
+nhập gói/thư viện/mạng/rest.vi;
+
+hàm main() {
+    token = "eyJhbGciOiJIUzUxMiJ9.demo-token";
+    refresh = "eyJhbGciOiJIUzUxMiJ9.demo-refresh";
+
+    rest in json thành công jwt("Đăng nhập thành công", token, refresh);
+};

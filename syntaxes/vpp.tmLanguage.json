@@ -12,7 +12,7 @@
       "name": "comment.line.vietvm"
     },
     {
-      "match": "(hàm)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_.]*)",
+      "match": "(hàm)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)",
       "name": "meta.function.definition.vietvm",
       "captures": {
         "1": {
@@ -50,13 +50,22 @@
       "name": "storage.modifier.access.vietvm"
     },
     {
-      "match": "(gọi)\\s+([\\p{L}_][\\p{L}\\p{N}_]*)",
+      "match": "(gọi)\\s+([\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)",
       "name": "meta.function.call.vietvm",
       "captures": {
         "1": {
           "name": "keyword.control.call.vietvm"
         },
         "2": {
+          "name": "entity.name.function.vietvm"
+        }
+      }
+    },
+    {
+      "match": "(?<![\\p{L}\\p{N}_])((?!(?:nếu|lặp|chọn|ca|nhập|gọi|hàm|lớp|in|trả|ném|thử|dừng)\\b)[\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)(?=[ \\t]*\\()",
+      "name": "meta.function.call.vietvm",
+      "captures": {
+        "1": {
           "name": "entity.name.function.vietvm"
         }
       }

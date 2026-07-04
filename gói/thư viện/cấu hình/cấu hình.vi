@@ -1,0 +1,13 @@
+// Module: thư viện.cấu hình.cấu hình
+// Mục đích: cung cấp API đọc cấu hình ở tầng thư viện.
+// Ghi chú: hiện phụ thuộc native hook của VM.
+
+// Ghi chú hàm: đọc cấu hình.
+hàm đọc cấu hình(đường dẫn) {
+    ném "thư viện: đọc cấu hình native hook không khả dụng";
+};
+
+// Ghi chú hàm: đọc một khóa cấu hình với giá trị mặc định.
+hàm đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) {
+    ném "thư viện: đọc cấu hình khóa native hook không khả dụng";
+};

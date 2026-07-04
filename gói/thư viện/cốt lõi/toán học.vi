@@ -1,0 +1,136 @@
+// Module: thư viện.cốt lõi.toán học
+// Mục đích: cung cấp phép toán số học và tiện ích tính toán thông dụng.
+// Nhóm hàm: số học cơ bản, lũy thừa/giai thừa, giới hạn, kiểm tra chẵn lẻ.
+
+// Ghi chú hàm: cộng.
+hàm cộng(a, b) {
+    trả về a + b;
+};
+
+// Ghi chú hàm: trừ.
+hàm trừ(a, b) {
+    trả về a - b;
+};
+
+// Ghi chú hàm: nhân.
+hàm nhân(a, b) {
+    trả về a * b;
+};
+
+// Ghi chú hàm: chia.
+hàm chia(a, b) {
+    nếu (b == 0 || b == 0.0) {
+        trả về 0;
+    };
+    trả về a / b;
+};
+
+// Ghi chú hàm: chia dư.
+hàm chia dư(a, b) {
+    nếu (b == 0) {
+        trả về 0;
+    };
+    trả về a % b;
+};
+
+// Ghi chú hàm: chia lấy dư.
+hàm chia lấy dư(a, b) {
+    trả về chia dư(a, b);
+};
+
+// Ghi chú hàm: chia an toàn.
+hàm chia an toàn(a, b, mặc định = 0) {
+    nếu (b == 0 || b == 0.0) {
+        trả về mặc định;
+    };
+    trả về a / b;
+};
+
+// Ghi chú hàm: lũy thừa.
+hàm lũy thừa(cơ sở, số mũ) {
+    nếu (số mũ < 0) {
+        trả về 0;
+    };
+
+    kết quả = 1;
+    lặp (i = 0; i < số mũ; i = i + 1) {
+        kết quả = kết quả * cơ sở;
+    };
+    trả về kết quả;
+};
+
+// Ghi chú hàm: giai thừa.
+hàm giai thừa(n) {
+    nếu (n <= 1) {
+        trả về 1;
+    };
+    trả về n * giai thừa(n - 1);
+};
+
+// Ghi chú hàm: trị tuyệt đối.
+hàm trị tuyệt đối(x) {
+    nếu (x < 0) {
+        trả về 0 - x;
+    };
+    trả về x;
+};
+
+// Ghi chú hàm: lớn nhất hai.
+hàm lớn nhất hai(a, b) {
+    nếu (a > b) {
+        trả về a;
+    };
+    trả về b;
+};
+
+// Ghi chú hàm: nhỏ nhất hai.
+hàm nhỏ nhất hai(a, b) {
+    nếu (a < b) {
+        trả về a;
+    };
+    trả về b;
+};
+
+// Ghi chú hàm: giới hạn.
+hàm giới hạn(x, nhỏ nhất, lớn nhất) {
+    nếu (x < nhỏ nhất) {
+        trả về nhỏ nhất;
+    };
+    nếu (x > lớn nhất) {
+        trả về lớn nhất;
+    };
+    trả về x;
+};
+
+// Ghi chú hàm: trung bình.
+hàm trung bình(a, b) {
+    trả về (a + b) / 2;
+};
+
+// Ghi chú hàm: phần trăm.
+hàm phần trăm(giá trị, tổng) {
+    nếu (tổng == 0 || tổng == 0.0) {
+        trả về 0;
+    };
+    trả về (giá trị * 100) / tổng;
+};
+
+// Ghi chú hàm: là chẵn.
+hàm là chẵn(n) {
+    trả về n % 2 == 0;
+};
+
+// Ghi chú hàm: là lẻ.
+hàm là lẻ(n) {
+    trả về n % 2 != 0;
+};
+
+// Ghi chú hàm: bình phương.
+hàm bình phương(x) {
+    trả về nhân(x, x);
+};
+
+// Ghi chú hàm: tổng hai.
+hàm tổng hai(a, b) {
+    trả về cộng(a, b);
+};

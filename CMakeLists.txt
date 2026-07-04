@@ -23,6 +23,14 @@ file(GLOB_RECURSE VM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/vm/*.cpp)
 file(GLOB_RECURSE STDLIB_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/stdlib/*.cpp)
 set(CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
 
+# VM-specific helpers should live with VM linkage, not frontend linkage.
+set(VM_NATIVE_HELPERS
+    ${CMAKE_SOURCE_DIR}/src/helpers/vm_native_http_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/helpers/vm_native_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/helpers/vm_low_level_http_server.cpp)
+list(REMOVE_ITEM FRONTEND_SOURCES ${VM_NATIVE_HELPERS})
+list(APPEND VM_SOURCES ${VM_NATIVE_HELPERS})
+
 # Create library helper (accepts sources passed directly)
 function(vpp_add_module name)
     set(sources ${ARGN})

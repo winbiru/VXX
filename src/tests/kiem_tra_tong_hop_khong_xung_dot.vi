@@ -1,4 +1,4 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 // Giả lập dữ liệu theo chỉ số để tránh phụ thuộc API mảng chưa ổn định.
 hàm lay_gia_tri(i) {
@@ -50,7 +50,7 @@ hàm xu_ly_du_lieu() {
 
             // nếu là số chẵn thì xử lý
             nếu (hop_le(gia_tri)) {
-                tong = tong + tri_tuyet_doi(gia_tri);
+                tong = tong + trị tuyệt đối(gia_tri);
                 dem = dem + 1;
             };
         };

@@ -32,6 +32,30 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     auto isFuncMarker = [](const std::string &s)->bool {
         return s.rfind("FUNC:", 0) == 0;
     };
+    auto isIdentifierLikeToken = [](const std::string &tk)->bool {
+        if (tk.empty()) return false;
+        if (tk == "đúng" || tk == "sai" || tk == "rỗng") return false;
+        return isVariable(tk);
+    };
+    auto isCallableNamePiece = [](const std::string &tk) {
+        if (isVariable(tk)) return true;
+        if (tk.find(' ') == std::string::npos) return false;
+        std::stringstream ss(tk);
+        std::string part;
+        while (std::getline(ss, part, ' ')) {
+            if (part.empty()) continue;
+            if (!isVariable(part)) return false;
+        }
+        return true;
+    };
+    auto joinNameTokens = [](const std::vector<std::string> &tokens, size_t begin, size_t end) {
+        std::string out;
+        for (size_t j = begin; j < end; ++j) {
+            if (!out.empty()) out.push_back(' ');
+            out += tokens[j];
+        }
+        return out;
+    };
 
     for (size_t i = 0; i < infix_tokens.size(); ++i) {
         const std::string &token = infix_tokens[i];
@@ -40,12 +64,37 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
         if (token == "{" || token == "}" || token == ";") {
             continue;
         }
-        if (isVariable(token) && (i + 1) < infix_tokens.size() && infix_tokens[i+1] == "(") {
-            ops.push(std::string("FUNC:") + token);
-            continue; // do not output function name as operand
+        if (isCallableNamePiece(token)) {
+            size_t j = i;
+            while (j < infix_tokens.size() && isCallableNamePiece(infix_tokens[j])) {
+                ++j;
+            }
+            if (j < infix_tokens.size() && infix_tokens[j] == "(") {
+                std::string fname = joinNameTokens(infix_tokens, i, j);
+                ops.push(std::string("FUNC:") + fname);
+                i = j - 1;
+                continue; // do not output function name as operand
+            }
         }
 
-        if (isNumber(token) || isFloat(token) || isStringLiteral(token) || token == "rỗng" || isVariable(token)) {
+        bool isSpacedIdentifier = false;
+        if (token.find(' ') != std::string::npos) {
+            std::stringstream ss(token);
+            std::string part;
+            bool sawPart = false;
+            isSpacedIdentifier = true;
+            while (std::getline(ss, part, ' ')) {
+                if (part.empty()) continue;
+                sawPart = true;
+                if (!isIdentifierLikeToken(part)) {
+                    isSpacedIdentifier = false;
+                    break;
+                }
+            }
+            if (!sawPart) isSpacedIdentifier = false;
+        }
+
+        if (isNumber(token) || isFloat(token) || isStringLiteral(token) || token == "rỗng" || isVariable(token) || isSpacedIdentifier) {
             output.push_back(token);
             // If we are inside a function argument list, and expecting a new arg, count it
             if (!argCountStack.empty() && argExpectingStack.back()) {

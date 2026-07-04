@@ -358,7 +358,7 @@ namespace vietvm::compiler {
             // Enforce Vietnamese diacritics for single-word keywords
             if (a_norm == "neu" || a_norm == "hoac" || a_norm == "lap" ||
                 a_norm == "ham" || a_norm == "goi" || a_norm == "bien" ||
-                a_norm == "dung" || a_norm == "thoat" || a_norm == "chon" ||
+                a_norm == "thoat" || a_norm == "chon" ||
                 a_norm == "chuyen" || a_norm == "nem" || a_norm == "thu" ||
                 a_norm == "lop") {
                 throwMissingAccent(a_norm);

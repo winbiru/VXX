@@ -10,13 +10,27 @@
 #include <cstdio>
 #include <stdio.h>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <optional>
 #include <unordered_map>
+#include <regex>
 #include "../../include/vm/vm.h"
 
 #include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <deque>
+#include <memory>
+#include <atomic>
 #include "../../include/common/vm_utils.h"
+#include "common/vm_native_helpers.h"
+#include "common/vm_native_constants.h"
+#include "common/vm_native_http_helpers.h"
+#include "common/vm_low_level_http_server.h"
 #include "common/storeString.h"
 
 #if defined(_WIN32) && defined(_MSC_VER)
@@ -28,96 +42,106 @@
 #endif
 #endif
 
-static FILE *openCommandPipe(const std::string &cmd) {
-#if defined(_WIN32) && defined(_MSC_VER)
-    return _popen(cmd.c_str(), "r");
-#else
-    return popen(cmd.c_str(), "r");
-#endif
-}
-
-static int closeCommandPipe(FILE *pipe) {
-#if defined(_WIN32) && defined(_MSC_VER)
-    return _pclose(pipe);
-#else
-    return pclose(pipe);
-#endif
-}
-
-    static bool hasEnvVar(const char *name) {
-    #if defined(_MSC_VER)
-        char *value = nullptr;
-        size_t len = 0;
-        errno_t err = _dupenv_s(&value, &len, name);
-        (void)len;
-        if (err != 0 || value == nullptr) {
-            return false;
-        }
-        std::free(value);
-        return true;
-    #else
-        return std::getenv(name) != nullptr;
-    #endif
+static bool handleNativeHttpClientFunction(const std::string &fn,
+                                           const std::vector<StackValue> &args,
+                                           StackValue &result,
+                                           std::string &err) {
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpGet)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        std::string url = vietvm::helpers::argToRawString(args[0]);
+        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodGet, fn, url, std::nullopt, result, err);
     }
 
-    static std::optional<std::string> getEnvVar(const char *name) {
-    #if defined(_MSC_VER)
-        char *value = nullptr;
-        size_t len = 0;
-        errno_t err = _dupenv_s(&value, &len, name);
-        (void)len;
-        if (err != 0 || value == nullptr) {
-            return std::nullopt;
-        }
-        std::string result(value);
-        std::free(value);
-        return result;
-    #else
-        const char *value = std::getenv(name);
-        if (value == nullptr) return std::nullopt;
-        return std::string(value);
-    #endif
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPost)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        std::string url = vietvm::helpers::argToRawString(args[0]);
+        std::string payload = vietvm::helpers::argToRawString(args[1]);
+        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodPost, fn, url, payload, result, err);
     }
 
-static std::string trim_copy(const std::string &s) {
-    size_t a = s.find_first_not_of(" \t\r\n");
-    if (a == std::string::npos) return "";
-    size_t b = s.find_last_not_of(" \t\r\n");
-    return s.substr(a, b - a + 1);
-}
-
-static std::string argToRawString(const StackValue &v) {
-    if (std::holds_alternative<std::string>(v)) return std::get<std::string>(v);
-    return sv_to_string(v);
-}
-
-static std::string shellQuoteSingle(const std::string &s) {
-    std::string out = "'";
-    for (char c : s) {
-        if (c == '\'') out += "'\\''";
-        else out.push_back(c);
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPut)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        std::string url = vietvm::helpers::argToRawString(args[0]);
+        std::string payload = vietvm::helpers::argToRawString(args[1]);
+        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodPut, fn, url, payload, result, err);
     }
-    out += "'";
-    return out;
+
+    return false;
 }
 
-static std::string decodeSimpleEscapes(const std::string &s) {
-    std::string out;
-    out.reserve(s.size());
-    for (size_t i = 0; i < s.size(); ++i) {
-        if (s[i] == '\\' && i + 1 < s.size()) {
-            char n = s[i + 1];
-            if (n == 'n') out.push_back('\n');
-            else if (n == 'r') out.push_back('\r');
-            else if (n == 't') out.push_back('\t');
-            else if (n == '\\') out.push_back('\\');
-            else out.push_back(n);
-            ++i;
-            continue;
-        }
-        out.push_back(s[i]);
+static bool handleNativeLowLevelHttpFunction(const std::string &fn,
+                                             const std::vector<StackValue> &args,
+                                             StackValue &result,
+                                             std::string &err) {
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerOpen)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        int port = 0;
+        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelPort, port, err)) return true;
+        return vietvm::helpers::runLowLevelHttpServerOpen(port, result, err);
     }
-    return out;
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerNext)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        int serverId = 0;
+        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelServerId, serverId, err)) return true;
+        return vietvm::helpers::runLowLevelHttpServerNext(serverId, result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqMethod)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldMethod, std::nullopt, result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqPath)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldPath, std::nullopt, result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqQuery)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldQuery, std::nullopt, result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqBody)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldBody, std::nullopt, result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqHeader)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldHeader, vietvm::helpers::argToRawString(args[1]), result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqQueryParam)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldQueryParam, vietvm::helpers::argToRawString(args[1]), result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqJsonField)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldJsonField, vietvm::helpers::argToRawString(args[1]), result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqPathSuffix)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldPathSuffix, vietvm::helpers::argToRawString(args[1]), result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerSend)) {
+        if (args.size() != 3) { err = fn + " yêu cầu 3 tham số"; return true; }
+        int status = 200;
+        if (!vietvm::helpers::parseIntArgFromStack(args[1], fn, vietvm::constants::kArgLabelStatus, status, err)) return true;
+        return vietvm::helpers::runLowLevelHttpServerSend(vietvm::helpers::argToRawString(args[0]), status, vietvm::helpers::argToRawString(args[2]), result, err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerClose)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        int serverId = 0;
+        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelServerId, serverId, err)) return true;
+        return vietvm::helpers::runLowLevelHttpServerClose(serverId, result, err);
+    }
+
+    return false;
 }
 
 static bool executeNativeStdlibFunction(int hamIdOrName,
@@ -134,34 +158,38 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         int nameIdx = -(hamIdOrName + 1);
         if (nameIdx >= 0 && nameIdx < (int)stringPool.size()) fn = stringPool[nameIdx];
     } else if (hamIdOrName >= 0 && hamIdOrName < (int)stringPool.size()) {
-        // When OP_GOI carries nameIndex directly.
-        fn = stringPool[hamIdOrName];
+        // Compatibility path: only treat positive value as a nameIndex
+        // when it is not already a concrete function id.
+        auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(hamIdOrName);
+        if (itCode == vietvm::compiler::hamMap::hamBytecodeMap.end()) {
+            fn = stringPool[hamIdOrName];
+        }
     }
 
     if (fn.empty()) return false;
 
-    if (fn == "io_doc_file") {
-        if (args.size() != 1) { err = "io_doc_file yêu cầu 1 tham số"; return true; }
-        std::ifstream ifs(argToRawString(args[0]));
-        if (!ifs.is_open()) { err = "io_doc_file: không thể mở file"; return true; }
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadFile)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        std::ifstream ifs(vietvm::helpers::argToRawString(args[0]));
+        if (!ifs.is_open()) { err = fn + ": không thể mở file"; return true; }
         std::ostringstream ss;
         ss << ifs.rdbuf();
         result = make_string_value(ss.str());
         return true;
     }
 
-    if (fn == "io_ghi_file") {
-        if (args.size() != 2) { err = "io_ghi_file yêu cầu 2 tham số"; return true; }
-        std::ofstream ofs(argToRawString(args[0]));
-        if (!ofs.is_open()) { err = "io_ghi_file: không thể mở file để ghi"; return true; }
-        std::string content = argToRawString(args[1]);
-        ofs << decodeSimpleEscapes(content);
-        if (!ofs.good()) { err = "io_ghi_file: ghi file thất bại"; return true; }
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteFile)) {
+        if (args.size() != 2) { err = fn + " yêu cầu 2 tham số"; return true; }
+        std::ofstream ofs(vietvm::helpers::argToRawString(args[0]));
+        if (!ofs.is_open()) { err = fn + ": không thể mở file để ghi"; return true; }
+        std::string content = vietvm::helpers::argToRawString(args[1]);
+        ofs << vietvm::helpers::decodeSimpleEscapes(content);
+        if (!ofs.good()) { err = fn + ": ghi file thất bại"; return true; }
         result = make_int_value(1);
         return true;
     }
 
-    if (fn == "lay_thoi_gian_hien_tai") {
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNow)) {
         std::time_t now = std::time(nullptr);
         std::tm tmBuf{};
     #if defined(_MSC_VER)
@@ -178,21 +206,21 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         return true;
     }
 
-    if (fn == "doc_config") {
-        if (args.size() != 1) { err = "doc_config yêu cầu 1 tham số"; return true; }
-        std::ifstream ifs(argToRawString(args[0]));
-        if (!ifs.is_open()) { err = "doc_config: không thể mở file"; return true; }
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfig)) {
+        if (args.size() != 1) { err = fn + " yêu cầu 1 tham số"; return true; }
+        std::ifstream ifs(vietvm::helpers::argToRawString(args[0]));
+        if (!ifs.is_open()) { err = fn + ": không thể mở file"; return true; }
 
         MapValue cfg;
         std::string line;
         while (std::getline(ifs, line)) {
-            std::string t = trim_copy(line);
+            std::string t = vietvm::helpers::trimCopy(line);
             if (t.empty() || t[0] == '#') continue;
             size_t eq = t.find('=');
             if (eq == std::string::npos) continue;
 
-            std::string key = trim_copy(t.substr(0, eq));
-            std::string val = trim_copy(t.substr(eq + 1));
+            std::string key = vietvm::helpers::trimCopy(t.substr(0, eq));
+            std::string val = vietvm::helpers::trimCopy(t.substr(eq + 1));
             if (key.empty()) continue;
 
             if (val == "đúng") cfg[key] = 1;
@@ -220,24 +248,38 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         return true;
     }
 
-    if (fn == "mang_http_get") {
-        if (args.size() != 1) { err = "mang_http_get yêu cầu 1 tham số"; return true; }
-        std::string url = argToRawString(args[0]);
-        std::string cmd = "curl -Ls --max-time 20 " + shellQuoteSingle(url);
-        FILE *pipe = openCommandPipe(cmd);
-        if (!pipe) { err = "mang_http_get: không mở được tiến trình curl"; return true; }
-
-        std::string data;
-        char chunk[512];
-        while (fgets(chunk, sizeof(chunk), pipe) != nullptr) {
-            data += chunk;
-        }
-        int rc = closeCommandPipe(pipe);
-        if (rc != 0) { err = "mang_http_get: curl trả về lỗi"; return true; }
-
-        result = make_string_value(data);
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfigKey)) {
+        if (args.size() != 3) { err = fn + " yêu cầu 3 tham số"; return true; }
+        std::string filePath = vietvm::helpers::argToRawString(args[0]);
+        std::string key = vietvm::helpers::argToRawString(args[1]);
+        std::string fallback = vietvm::helpers::argToRawString(args[2]);
+        result = make_string_value(vietvm::helpers::readPropertyByKey(filePath, key, fallback));
         return true;
     }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbConnect)) {
+        if (args.size() != 4) { err = "db_native_connect yêu cầu 4 tham số"; return true; }
+        return vietvm::helpers::runDbConnect(vietvm::helpers::argToRawString(args[0]),
+                    vietvm::helpers::argToRawString(args[1]),
+                    vietvm::helpers::argToRawString(args[2]),
+                    vietvm::helpers::argToRawString(args[3]),
+                            result,
+                            err);
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbQuery)) {
+        if (args.size() != 5) { err = "db_native_query yêu cầu 5 tham số"; return true; }
+        return vietvm::helpers::runDbQuery(vietvm::helpers::argToRawString(args[0]),
+                  vietvm::helpers::argToRawString(args[1]),
+                  vietvm::helpers::argToRawString(args[2]),
+                  vietvm::helpers::argToRawString(args[3]),
+                  vietvm::helpers::argToRawString(args[4]),
+                          result,
+                          err);
+    }
+
+    if (handleNativeHttpClientFunction(fn, args, result, err)) return true;
+    if (handleNativeLowLevelHttpFunction(fn, args, result, err)) return true;
 
     return false;
 }
@@ -278,7 +320,7 @@ static MapValue decodeMapFromStringPool(const std::string &encoded) {
             size_t p1 = record.find(FS);
             size_t p2 = (p1 == std::string::npos) ? std::string::npos : record.find(FS, p1 + 1);
             if (p1 == std::string::npos || p2 == std::string::npos) {
-                throw std::runtime_error("Map literal encode không hợp lệ");
+                throw std::runtime_error(vietvm::constants::kErrMapLiteralEncodeInvalid);
             }
 
             std::string key = decodeEscaped(record.substr(0, p1));
@@ -294,7 +336,7 @@ static MapValue decodeMapFromStringPool(const std::string &encoded) {
             } else if (typeTag == "n") {
                 m[key] = std::monostate{};
             } else {
-                throw std::runtime_error("Map literal: typeTag không hợp lệ");
+                throw std::runtime_error(vietvm::constants::kErrMapLiteralTypeTagInvalid);
             }
         }
 
@@ -308,7 +350,7 @@ static MapValue decodeMapFromStringPool(const std::string &encoded) {
 static StackValue decodeDefaultParamValue(const std::string &encoded) {
     size_t colon = encoded.find(':');
     if (colon == std::string::npos) {
-        throw std::runtime_error("Default param encode không hợp lệ");
+        throw std::runtime_error(vietvm::constants::kErrDefaultParamEncodeInvalid);
     }
     std::string tag = encoded.substr(0, colon);
     std::string payload = encoded.substr(colon + 1);
@@ -317,7 +359,7 @@ static StackValue decodeDefaultParamValue(const std::string &encoded) {
     if (tag == "d") return make_float_value(std::stod(payload));
     if (tag == "s") return make_string_value(payload);
     if (tag == "n") return make_null_value();
-    throw std::runtime_error("Default param type không hợp lệ");
+    throw std::runtime_error(vietvm::constants::kErrDefaultParamTypeInvalid);
 }
 
 /**
@@ -412,7 +454,7 @@ bool VM::runJitCompiledLinear() {
                 int idx = instr.operandIndex;
                 program.push_back([this, idx]() {
                     if (idx < 0 || idx >= (int)stringPool.size())
-                        throw runtime_error_op("Lỗi: chỉ số float không hợp lệ", OP_BIEN_SO_FLOAT, (int)pc);
+                        throw runtime_error_op(vietvm::constants::kErrInvalidFloatIndex, OP_BIEN_SO_FLOAT, (int)pc);
                     stack.push_back(make_float_value(std::stod(stringPool[idx])));
                 });
                 break;
@@ -421,7 +463,7 @@ bool VM::runJitCompiledLinear() {
                 int idx = instr.operandIndex;
                 program.push_back([this, idx]() {
                     if (idx < 0 || idx >= (int)stringPool.size())
-                        throw runtime_error_op("Lỗi: chỉ số chuỗi không hợp lệ", OP_CHUOI, (int)pc);
+                        throw runtime_error_op(vietvm::constants::kErrInvalidStringIndex, OP_CHUOI, (int)pc);
                     stack.push_back(stringPool[idx]);
                 });
                 break;
@@ -444,7 +486,7 @@ bool VM::runJitCompiledLinear() {
             case OP_NHO_HON_HOAC_BANG: {
                 Opcode op = instr.op;
                 program.push_back([this, op]() {
-                    if (stack.size() < 2) throw runtime_error_op("Lỗi: không đủ toán hạng cho toán tử", op, (int)pc);
+                    if (stack.size() < 2) throw runtime_error_op(vietvm::constants::kErrNotEnoughOperands, op, (int)pc);
                     StackValue b = stack.back(); stack.pop_back();
                     StackValue a = stack.back(); stack.pop_back();
 
@@ -457,7 +499,7 @@ bool VM::runJitCompiledLinear() {
                         case OP_NHAN:
                         case OP_CHIA:
                             if (!isNumeric(a) || !isNumeric(b))
-                                throw runtime_error_op("Lỗi: toán tử số chỉ áp dụng cho số", op, (int)pc);
+                                throw runtime_error_op(vietvm::constants::kErrNumericOnlyOperator, op, (int)pc);
                             if (op == OP_TRU) stack.push_back(numSub(a, b));
                             else if (op == OP_NHAN) stack.push_back(numMul(a, b));
                             else stack.push_back(numDiv(a, b, op, (int)pc));
@@ -465,7 +507,7 @@ bool VM::runJitCompiledLinear() {
                         case OP_Logic_VA:
                         case OP_Logic_HOAC: {
                             if (!isNumeric(a) || !isNumeric(b))
-                                throw runtime_error_op("Lỗi: toán tử logic chỉ áp dụng cho số", op, (int)pc);
+                                throw runtime_error_op(vietvm::constants::kErrLogicOnlyOperator, op, (int)pc);
                             int ia = as_int(a, op, (int)pc);
                             int ib = as_int(b, op, (int)pc);
                             stack.push_back((op == OP_Logic_VA) ? ((ia && ib) ? 1 : 0) : ((ia || ib) ? 1 : 0));
@@ -496,13 +538,13 @@ bool VM::runJitCompiledLinear() {
                                 else if (op == OP_LON_HON_HOAC_BANG) result = (sa >= sb) ? 1 : 0;
                                 else result = (sa <= sb) ? 1 : 0;
                             } else {
-                                throw runtime_error_op("Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau", op, (int)pc);
+                                throw runtime_error_op(vietvm::constants::kErrCannotCompareDifferentTypes, op, (int)pc);
                             }
                             stack.push_back(result);
                             break;
                         }
                         default:
-                            throw runtime_error_op("Toán tử không xác định", op, (int)pc);
+                            throw runtime_error_op(vietvm::constants::kErrUnknownOperator, op, (int)pc);
                     }
                 });
                 break;
@@ -510,18 +552,18 @@ bool VM::runJitCompiledLinear() {
 
             case OP_MODULO:
                 program.push_back([this]() {
-                    if (stack.size() < 2) throw runtime_error_op("Lỗi: thiếu toán hạng cho MODULO", OP_MODULO, (int)pc);
+                    if (stack.size() < 2) throw runtime_error_op(vietvm::constants::kErrMissingModuloOperands, OP_MODULO, (int)pc);
                     StackValue b = stack.back(); stack.pop_back();
                     StackValue a = stack.back(); stack.pop_back();
                     int ib = as_int(b, OP_MODULO, (int)pc);
-                    if (ib == 0) throw runtime_error_op("Lỗi: chia dư cho 0", OP_MODULO, (int)pc);
+                    if (ib == 0) throw runtime_error_op(vietvm::constants::kErrModuloByZero, OP_MODULO, (int)pc);
                     stack.emplace_back(as_int(a, OP_MODULO, (int)pc) % ib);
                 });
                 break;
 
             case OP_PHU_DINH:
                 program.push_back([this]() {
-                    if (stack.empty()) throw runtime_error_op("Thiếu toán hạng cho toán tử phủ định !", OP_PHU_DINH, (int)pc);
+                    if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrMissingNegationOperand, OP_PHU_DINH, (int)pc);
                     StackValue operand = stack.back(); stack.pop_back();
                     stack.push_back(toBool(operand) ? 0 : 1);
                 });
@@ -529,9 +571,9 @@ bool VM::runJitCompiledLinear() {
 
             case OP_IN:
                 program.push_back([this]() {
-                    if (stack.empty()) throw runtime_error_op("Lỗi: stack rỗng khi IN", OP_IN, (int)pc);
+                    if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrEmptyStackWhenPrint, OP_IN, (int)pc);
                     StackValue value = stack.back(); stack.pop_back();
-                    std::cout << "[IN] " << sv_to_string(value) << std::endl;
+                    std::cout << vietvm::constants::kOutputPrefixIn << sv_to_string(value) << std::endl;
                 });
                 break;
 
@@ -559,10 +601,11 @@ bool VM::runJitCompiledLinear() {
 }
 
 void VM::run() {
-    const bool gcEnabled = hasEnvVar("VPP_ENABLE_GC") || hasEnvVar("VIETVM_ENABLE_GC");
-    int gcInterval = 2048;
-    std::optional<std::string> gcEnv = getEnvVar("VPP_GC_INTERVAL");
-    if (!gcEnv) gcEnv = getEnvVar("VIETVM_GC_INTERVAL");
+    const bool gcEnabled = vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableGc)
+                        || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableGc);
+    int gcInterval = vietvm::constants::kDefaultGcInterval;
+    std::optional<std::string> gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVppGcInterval);
+    if (!gcEnv) gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVietvmGcInterval);
     if (gcEnv) {
         try {
             int parsed = std::stoi(*gcEnv);
@@ -570,7 +613,8 @@ void VM::run() {
         } catch (...) {}
     }
 
-    if (hasEnvVar("VPP_ENABLE_JIT") || hasEnvVar("VIETVM_ENABLE_JIT")) {
+    if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit)
+     || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
         if (runJitCompiledLinear()) {
             return;
         }
@@ -650,7 +694,16 @@ void VM::run() {
 
         if (it == hamBytecodeMap.end()) {
             if (!callStack.empty()) callStack.pop_back();
-            throw runtime_error_op("OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ")", op, curPc);
+            int nameIndex = (hamIdOrName < 0) ? -(hamIdOrName + 1) : hamIdOrName;
+            std::string fnName = "?";
+            if (nameIndex >= 0 && nameIndex < static_cast<int>(stringPool.size())) {
+                fnName = stringPool[nameIndex];
+            }
+            throw runtime_error_op(
+                "OP_GOI: hàm không tồn tại (id/nameIndex=" + std::to_string(hamIdOrName) + ", name='" + fnName + "')",
+                op,
+                curPc
+            );
         }
 
         // 4. Chạy VM con và Chia sẻ Trạng thái
@@ -695,7 +748,7 @@ void VM::run() {
             case OP_GOI_GIAN_TIEP: {
                 int argc = instr.operand;
                 if (stack.empty()) {
-                    throw runtime_error_op("OP_GOI_GIAN_TIEP: thiếu function reference", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrIndirectCallMissingRef, instr.op, pc);
                 }
 
                 StackValue calleeVal = stack.back();
@@ -711,10 +764,10 @@ void VM::run() {
                     } catch (...) {
                         int idx = vietvm::compiler::StringPool::findString(s);
                         if (idx >= 0) hamIdOrName = -(idx + 1);
-                        else throw runtime_error_op("OP_GOI_GIAN_TIEP: function reference không hợp lệ", instr.op, pc);
+                        else throw runtime_error_op(vietvm::constants::kErrIndirectCallInvalidRef, instr.op, pc);
                     }
                 } else {
-                    throw runtime_error_op("OP_GOI_GIAN_TIEP: kiểu function reference không hỗ trợ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrIndirectCallUnsupportedRefType, instr.op, pc);
                 }
 
                 invokeFunction(argc, hamIdOrName, instr.op, (int)pc);
@@ -739,11 +792,11 @@ void VM::run() {
             }
 
             case OP_MODULO: {
-                if (stack.size() < 2) throw runtime_error_op("Lỗi: thiếu toán hạng cho MODULO", instr.op, pc);
+                if (stack.size() < 2) throw runtime_error_op(vietvm::constants::kErrMissingModuloOperands, instr.op, pc);
                 StackValue b = stack.back(); stack.pop_back();
                 StackValue a = stack.back(); stack.pop_back();
                 int int_b = as_int(b, instr.op, pc);
-                if (int_b == 0) throw runtime_error_op("Lỗi: chia dư cho 0", instr.op, pc);
+                if (int_b == 0) throw runtime_error_op(vietvm::constants::kErrModuloByZero, instr.op, pc);
                 stack.emplace_back(as_int(a, instr.op, pc) % int_b);
                 break;
             }
@@ -753,7 +806,7 @@ void VM::run() {
             case OP_SO_SANH_BANG: case OP_KHAC_BANG:
             case OP_LON_HON: case OP_NHO_HON:
             case OP_LON_HON_HOAC_BANG: case OP_NHO_HON_HOAC_BANG: {
-                if (stack.size() < 2) throw runtime_error_op("Lỗi: không đủ toán hạng cho toán tử", instr.op, pc);
+                if (stack.size() < 2) throw runtime_error_op(vietvm::constants::kErrNotEnoughOperands, instr.op, pc);
 
                 StackValue b = stack.back(); stack.pop_back();
                 StackValue a = stack.back(); stack.pop_back();
@@ -770,7 +823,7 @@ void VM::run() {
 
                     case OP_TRU: case OP_NHAN: case OP_CHIA: {
                         if (!isNumeric(a) || !isNumeric(b))
-                            throw runtime_error_op("Lỗi: toán tử số chỉ áp dụng cho số", instr.op, pc);
+                            throw runtime_error_op(vietvm::constants::kErrNumericOnlyOperator, instr.op, pc);
                         if (instr.op == OP_TRU)  stack.push_back(numSub(a, b));
                         else if (instr.op == OP_NHAN) stack.push_back(numMul(a, b));
                         else stack.push_back(numDiv(a, b, instr.op, pc));
@@ -779,7 +832,7 @@ void VM::run() {
 
                     case OP_Logic_VA: case OP_Logic_HOAC: {
                         if (!isNumeric(a) || !isNumeric(b))
-                            throw runtime_error_op("Lỗi: toán tử logic chỉ áp dụng cho số", instr.op, pc);
+                            throw runtime_error_op(vietvm::constants::kErrLogicOnlyOperator, instr.op, pc);
                         int ia = as_int(a, instr.op, pc);
                         int ib = as_int(b, instr.op, pc);
                         if (instr.op == OP_Logic_VA) stack.push_back((ia && ib) ? 1 : 0);
@@ -814,20 +867,20 @@ void VM::run() {
                                 default: break;
                             }
                         } else {
-                            throw runtime_error_op("Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau", instr.op, pc);
+                            throw runtime_error_op(vietvm::constants::kErrCannotCompareDifferentTypes, instr.op, pc);
                         }
                         stack.push_back(result);
                         break;
                     }
 
                     default:
-                        throw runtime_error_op("Toán tử không xác định", instr.op, pc);
+                        throw runtime_error_op(vietvm::constants::kErrUnknownOperator, instr.op, pc);
                 }
                 break;
             }
 
             case OP_KHONG: {
-                if (stack.empty()) throw runtime_error_op("Lỗi: không đủ toán hạng cho toán tử phủ định", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrMissingNotOperands, instr.op, pc);
                 StackValue a = stack.back(); stack.pop_back();
                 stack.push_back((as_int(a, instr.op, pc) == 0) ? 1 : 0);
                 break;
@@ -867,7 +920,7 @@ void VM::run() {
 
             case OP_CHUOI: {
                 if (instr.operandIndex < 0 || instr.operandIndex >= (int)stringPool.size()) {
-                    throw runtime_error_op("Lỗi: chỉ số chuỗi không hợp lệ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrInvalidStringIndex, instr.op, pc);
                 }
                 stack.push_back(stringPool[instr.operandIndex]);
                 break;
@@ -875,12 +928,12 @@ void VM::run() {
 
             case OP_BIEN_SO_FLOAT: {
                 if (instr.operandIndex < 0 || instr.operandIndex >= (int)stringPool.size())
-                    throw runtime_error_op("Lỗi: chỉ số float không hợp lệ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrInvalidFloatIndex, instr.op, pc);
                 try {
                     double d = std::stod(stringPool[instr.operandIndex]);
                     stack.push_back(make_float_value(d));
                 } catch (...) {
-                    throw runtime_error_op("Lỗi: không thể chuyển '" + stringPool[instr.operandIndex] + "' thành số thực", instr.op, pc);
+                    throw runtime_error_op(std::string(vietvm::constants::kErrCannotConvertToFloatPrefix) + stringPool[instr.operandIndex] + vietvm::constants::kErrCannotConvertToFloatSuffix, instr.op, pc);
                 }
                 break;
             }
@@ -892,25 +945,25 @@ void VM::run() {
 
             case OP_MAP_LITERAL: {
                 if (instr.operandIndex < 0 || instr.operandIndex >= (int)stringPool.size()) {
-                    throw runtime_error_op("Lỗi: chỉ số map không hợp lệ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrInvalidMapIndex, instr.op, pc);
                 }
                 try {
                     MapValue parsed = decodeMapFromStringPool(stringPool[instr.operandIndex]);
                     stack.push_back(make_map_value(parsed));
                 } catch (const std::exception &ex) {
-                    throw runtime_error_op(std::string("Lỗi parse map literal: ") + ex.what(), instr.op, pc);
+                    throw runtime_error_op(std::string(vietvm::constants::kErrParseMapLiteralPrefix) + ex.what(), instr.op, pc);
                 }
                 break;
             }
 
             case OP_IN: {
-                if (stack.empty()) throw runtime_error_op("Lỗi: stack rỗng khi IN", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrEmptyStackWhenPrint, instr.op, pc);
                 StackValue value = stack.back(); stack.pop_back();
                 if (!switchStack.empty() && switchStack.back().skippingCase) {
                     break;
                 }
 
-                std::cout << "[IN] " << sv_to_string(value) << std::endl;
+                std::cout << vietvm::constants::kOutputPrefixIn << sv_to_string(value) << std::endl;
                 break;
             }
 
@@ -931,13 +984,13 @@ void VM::run() {
                     }
                     ++scanPc;
                 }
-                throw runtime_error_op("BO_QUA: không tìm thấy OP_CAP_NHAT trong vòng lặp", instr.op, pc);
+                throw runtime_error_op(vietvm::constants::kErrContinueMissingUpdate, instr.op, pc);
                 bo_qua_done:
                 break;
             }
 
             case OP_CHON: {
-                if (stack.empty()) throw runtime_error_op("CHON: Stack rỗng", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrSwitchEmptyStack, instr.op, pc);
                 SwitchFrame frame;
                 frame.switchValue = stack.back();
                 stack.pop_back();
@@ -950,7 +1003,7 @@ void VM::run() {
 
             case OP_CA: {
                 if (switchStack.empty() || !switchStack.back().switchValue.has_value()) {
-                    throw runtime_error_op("CA: Không nằm trong khối CHON", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrCaseOutsideSwitch, instr.op, pc);
                 }
                 auto& ctx = switchStack.back();
 
@@ -986,7 +1039,7 @@ void VM::run() {
                         } catch (...) { match = false; }
                     }
                 } else {
-                    throw runtime_error_op("CA: định dạng operand không hợp lệ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrCaseInvalidOperandFormat, instr.op, pc);
                 }
 
                 if (!ctx.caseMatched && match) {
@@ -999,7 +1052,7 @@ void VM::run() {
             }
 
             case OP_MAC_DINH: {
-                if (switchStack.empty()) throw runtime_error_op("MAC_DINH: Không nằm trong khối CHON", instr.op, pc);
+                if (switchStack.empty()) throw runtime_error_op(vietvm::constants::kErrDefaultOutsideSwitch, instr.op, pc);
                 auto& ctx = switchStack.back();
                 if (!ctx.caseMatched) {
                     ctx.skippingCase = false;
@@ -1011,7 +1064,7 @@ void VM::run() {
             }
 
             case OP_THOAT: {
-                if (switchStack.empty()) throw runtime_error_op("THOAT: Không nằm trong khối CHON", instr.op, pc);
+                if (switchStack.empty()) throw runtime_error_op(vietvm::constants::kErrBreakOutsideSwitch, instr.op, pc);
                 auto& ctx = switchStack.back();
                 ctx.skippingCase = true;
 
@@ -1061,7 +1114,7 @@ void VM::run() {
             }
 
             case OP_GAN: {
-                if (stack.size() < 2) throw runtime_error_op("Không đủ toán hạng để GÁN", instr.op, pc);
+                if (stack.size() < 2) throw runtime_error_op(vietvm::constants::kErrAssignNotEnoughOperands, instr.op, pc);
 
                 StackValue top = stack.back();
                 StackValue second = stack[stack.size() - 2];
@@ -1087,7 +1140,7 @@ void VM::run() {
                 stack.pop_back();
 
                 if (!std::holds_alternative<int>(varIdVal))
-                    throw runtime_error_op("Lỗi: ID biến phải là số nguyên", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrVarIdMustBeInt, instr.op, pc);
 
                 int varId = std::get<int>(varIdVal);
 
@@ -1140,7 +1193,7 @@ void VM::run() {
             case OP_JUMP: {
                 int jump_address = instr.operand;
                 if (jump_address < 0 || jump_address >= (int)bytecode.size()) {
-                    throw runtime_error_op("Lỗi: địa chỉ nhảy ngoài phạm vi", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrJumpAddressOutOfRange, instr.op, pc);
                 }
                 pc = jump_address;
                 continue;
@@ -1148,16 +1201,16 @@ void VM::run() {
 
             case OP_JUMP_IF_FALSE: {
                 int jump_address = instr.operand;
-                if (stack.empty()) throw runtime_error_op("Lỗi: Stack rỗng khi thực thi OP_JUMP_IF_FALSE", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrJumpIfFalseEmptyStack, instr.op, pc);
                 StackValue condition = stack.back(); stack.pop_back();
 
                 if (!std::holds_alternative<int>(condition))
-                    throw runtime_error_op("Lỗi: điều kiện nhảy phải là số nguyên", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrJumpConditionMustBeInt, instr.op, pc);
 
                 int condition_value = as_int(condition, instr.op, pc);
                 if (condition_value == 0) {
                     if (jump_address < 0 || jump_address >= (int)bytecode.size())
-                        throw runtime_error_op("Lỗi: địa chỉ nhảy ngoài phạm vi", instr.op, pc);
+                        throw runtime_error_op(vietvm::constants::kErrJumpAddressOutOfRange, instr.op, pc);
                     pc = jump_address;
                     continue;
                 }
@@ -1174,7 +1227,7 @@ void VM::run() {
             }
 
             case OP_DONG_KHOI: {
-                if (blockStack.empty()) throw runtime_error_op("Lỗi: không có khối mở", instr.op, pc);
+                if (blockStack.empty()) throw runtime_error_op(vietvm::constants::kErrNoOpenBlock, instr.op, pc);
                 blockStack.pop_back();
 
                 if (blockDepth > 0) --blockDepth;
@@ -1191,7 +1244,7 @@ void VM::run() {
                 break;
 
             case OP_PHU_DINH: {
-                if (stack.empty()) throw runtime_error_op("Thiếu toán hạng cho toán tử phủ định !", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrMissingNegationOperand, instr.op, pc);
                 StackValue operand = stack.back(); stack.pop_back();
                 bool b = toBool(operand);
                 int result = b ? 0 : 1;
@@ -1212,7 +1265,7 @@ void VM::run() {
                     v = frame.args[argIndex];
                 } else {
                     v = make_int_value(0);
-                    vmLog("Cảnh báo: OP_PARAM argIndex ngoài phạm vi, gán mặc định 0");
+                    vmLog(vietvm::constants::kWarnParamArgIndexOutOfRange);
                 }
                 if (frame.localsIndexed) {
                     if (localId >= (int)frame.localsVec.size()) frame.localsVec.resize(localId + 1, make_int_value(0));
@@ -1228,7 +1281,7 @@ void VM::run() {
                 int argIndex = instr.operandValue;
 
                 if (defaultIndex < 0 || defaultIndex >= (int)stringPool.size()) {
-                    throw runtime_error_op("OP_PARAM_MAC_DINH: default index không hợp lệ", instr.op, pc);
+                    throw runtime_error_op(vietvm::constants::kErrDefaultParamIndexInvalid, instr.op, pc);
                 }
 
                 StackValue v;
@@ -1253,7 +1306,7 @@ void VM::run() {
                 break;
             }
             case OP_CONG_MOT: {
-                if (stack.empty()) throw runtime_error_op("OP_CONG_MOT: stack rong", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrIncEmptyStack, instr.op, pc);
                 StackValue top = stack.back(); stack.pop_back();
                 auto push_int = [&](int v) { stack.push_back(make_int_value(v)); };
                 if (std::holds_alternative<int>(top)) {
@@ -1284,8 +1337,8 @@ void VM::run() {
                     }
                 } else if (std::holds_alternative<std::string>(top)) {
                     try { push_int(std::stoi(std::get<std::string>(top)) + 1); }
-                    catch (...) { throw runtime_error_op("OP_CONG_MOT: khong the tang chuoi", instr.op, pc); }
-                } else { throw runtime_error_op("OP_CONG_MOT: kieu du lieu khong ho tro", instr.op, pc); }
+                    catch (...) { throw runtime_error_op(vietvm::constants::kErrIncCannotIncreaseString, instr.op, pc); }
+                } else { throw runtime_error_op(vietvm::constants::kErrIncUnsupportedType, instr.op, pc); }
                 break;
             }
             case OP_THU: {
@@ -1320,11 +1373,11 @@ void VM::run() {
             }
 
             case OP_NEM: {
-                if (stack.empty()) stack.push_back(make_string_value("lỗi không xác định"));
+                if (stack.empty()) stack.push_back(make_string_value(vietvm::constants::kErrUnknownThrownValue));
                 StackValue errVal = stack.back(); stack.pop_back();
                 if (tryStack.empty()) {
                     // No catch handler: propagate as C++ exception
-                    throw std::runtime_error("Lỗi không bắt được: " + sv_to_string(errVal));
+                    throw std::runtime_error(std::string(vietvm::constants::kErrUncaughtPrefix) + sv_to_string(errVal));
                 }
                 TryFrame tf = tryStack.back(); tryStack.pop_back();
                 // Unwind stack to try entry depth
@@ -1336,7 +1389,7 @@ void VM::run() {
             }
 
             case OP_TRU_MOT: {
-                if (stack.empty()) throw runtime_error_op("OP_TRU_MOT: stack rong", instr.op, pc);
+                if (stack.empty()) throw runtime_error_op(vietvm::constants::kErrDecEmptyStack, instr.op, pc);
                 StackValue top = stack.back(); stack.pop_back();
                 auto push_int2 = [&](int v) { stack.push_back(make_int_value(v)); };
                 if (std::holds_alternative<int>(top)) {
@@ -1364,7 +1417,7 @@ void VM::run() {
                         variables[idOrVal] = make_int_value(cur - 1);
                         push_int2(cur - 1);
                     }
-                } else { throw runtime_error_op("OP_TRU_MOT: kieu du lieu khong ho tro", instr.op, pc); }
+                } else { throw runtime_error_op(vietvm::constants::kErrDecUnsupportedType, instr.op, pc); }
                 break;
             }
             default:
@@ -1372,7 +1425,7 @@ void VM::run() {
                 if (!switchStack.empty() && switchStack.back().skippingCase) {
                     break;
                 }
-                throw runtime_error_op("Opcode không xác định", instr.op, pc);
+                throw runtime_error_op(vietvm::constants::kErrUnknownOpcode, instr.op, pc);
         }
         ++pc;
     }

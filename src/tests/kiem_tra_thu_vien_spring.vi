@@ -1,0 +1,10 @@
+nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+
+hàm main() {
+    in banner ứng dụng("VPP", "1.0");
+    in độ dời dữ liệu(2, 10);
+    in tổng số trang(95, 10);
+    in nối đường dẫn url("https://api.example.com", "/nguoi-dung");
+    in yêu cầu đúng(đúng, "không hợp lệ");
+    in yêu cầu không rỗng("ok", "không được rỗng");
+};

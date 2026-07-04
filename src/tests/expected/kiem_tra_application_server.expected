@@ -1,0 +1,16 @@
+[IN] :: V++ API Project ::
+[IN] (V++ style startup)
+[IN] Datasource: mysql://localhost:3306/testVXX
+[IN] Tomcat started on port(s): 8080 (http) with context path ''
+[IN] Started ApiProjectApplication in 0.000 seconds
+[IN] Press Ctrl+C to stop
+[IN] {\"data\":{\"status\":\"UP\"},\"success\":true,\"message\":\"UP\"}
+[IN] {\"data\":{\"token\":\"eyJhbGciOiJIUzUxMiJ9.demo-token\",\"refreshToken\":\"eyJhbGciOiJIUzUxMiJ9.demo-refresh\"},\"success\":true,\"message\":\"Đăng nhập thành công\"}
+[IN] {\"data\":{\"requestId\":\"req-001\"},\"success\":false,\"message\":\"missing-token\"}
+[IN] {\"data\":{\"requestId\":\"req-002\"},\"success\":false,\"message\":\"invalid-token\"}
+[IN] {\"data\":{\"requestId\":\"req-003\",\"users\":[\"an\",\"binh\"]},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"req-004\",\"value\":\"created-user\"},\"success\":true,\"message\":\"Tạo mới thành công\"}
+[IN] {\"data\":{\"requestId\":\"req-005\",\"value\":\"updated-user\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"req-006\",\"value\":\"deleted\"},\"success\":true,\"message\":\"Xóa thành công\"}
+[IN] {\"data\":{\"requestId\":\"req-007\"},\"success\":false,\"message\":\"not-found\"}
+[IN] Stopping V++ API Project

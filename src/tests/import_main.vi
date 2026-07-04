@@ -1,5 +1,5 @@
 // Test import
-nhập "src/tests/modules/math.vi";
+nhập src/tests/modules/math.vi;
 
 hàm main() {
     in tong(2,3);

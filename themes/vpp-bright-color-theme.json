@@ -23,27 +23,27 @@
     {
       "scope": "keyword.control.vietvm",
       "settings": {
-        "foreground": "#2d1502"
+        "foreground": "#CC7832"
       }
     },
     {
       "scope": "storage.type.class.vietvm",
       "settings": {
-        "foreground": "#532804",
+        "foreground": "#A9B7C6",
         "fontStyle": ""
       }
     },
     {
       "scope": "storage.modifier.access.vietvm",
       "settings": {
-        "foreground": "#592902",
+        "foreground": "#CC7832",
         "fontStyle": ""
       }
     },
     {
       "scope": "storage.type.function.vietvm",
       "settings": {
-        "foreground": "#693204"
+        "foreground": "#CC7832"
       }
     },
     {
@@ -55,7 +55,7 @@
     {
       "scope": "entity.name.function.vietvm",
       "settings": {
-        "foreground": "#021540"
+        "foreground": "#FFC66D"
       }
     },
     {
@@ -67,7 +67,7 @@
     {
       "scope": "constant.language.boolean.vietvm",
       "settings": {
-        "foreground": "#351902"
+        "foreground": "#CC7832"
       }
     },
     {

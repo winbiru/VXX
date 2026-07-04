@@ -1,0 +1,115 @@
+nhập src/tests/api_project/repository.vi;
+nhập src/tests/api_project/entity.vi;
+nhập src/tests/api_project/dto.vi;
+nhập src/tests/api_project/mapper.vi;
+
+lớp công khai UserService {
+    hàm riêng tư validateToken(token) {
+        nếu (token == "") {
+            trả về "401|missing-token";
+        };
+        nếu (token != "Bearer demo-token") {
+            trả về "401|invalid-token";
+        };
+        trả về "";
+    };
+
+    hàm công khai getUsers(dbSession, token) {
+        tokenErr = validateToken(token);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+
+        dbRes = UserRepository.findAllUsers(dbSession);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "200|users=[an,binh,chi]";
+    };
+
+    hàm công khai createUser(dbSession, token, payload) {
+        tokenErr = validateToken(token);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapperRes = UserMapper.toCreateEntity(payload);
+        nếu (mapperRes == "MAPPER_ERR|missing-body") {
+            trả về "400|missing-body";
+        };
+
+        entityRes = UserEntity.ofUsername("an");
+        nếu (entityRes == "ENTITY_ERR|missing-username") {
+            trả về "400|missing-body";
+        };
+
+        dbRes = UserRepository.createUser(dbSession, payload);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "201|created-user";
+    };
+
+    hàm công khai updateUser(dbSession, token, userId, payload) {
+        tokenErr = validateToken(token);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapperRes = UserMapper.toUpdateEntity(userId, payload);
+        nếu (mapperRes == "MAPPER_ERR|missing-user-id") {
+            trả về "400|missing-user-id";
+        };
+        nếu (mapperRes == "MAPPER_ERR|missing-body") {
+            trả về "400|missing-body";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+
+        entityRes = UserEntity.mergeName("an", "an-nguyen");
+        nếu (entityRes == "ENTITY_ERR|missing-name") {
+            trả về "400|missing-body";
+        };
+
+        dbRes = UserRepository.updateUser(dbSession, userId, payload);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "200|updated-user";
+    };
+
+    hàm công khai deleteUser(dbSession, token, userId) {
+        tokenErr = validateToken(token);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        nếu (userId == "") {
+            trả về "400|missing-user-id";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+
+        dbRes = UserRepository.deleteUser(dbSession, userId);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về "204|deleted";
+    };
+
+    hàm công khai searchUsers(dbSession, token, keyword) {
+        tokenErr = validateToken(token);
+        nếu (tokenErr != "") {
+            trả về tokenErr;
+        };
+        mapperRes = UserMapper.toSearchEntity(keyword);
+        nếu (mapperRes == "MAPPER_ERR|missing-keyword") {
+            trả về "400|missing-keyword";
+        };
+
+        dbRes = UserRepository.searchUsers(dbSession, keyword);
+        nếu (dbRes == "DB_ERR|not-connected") {
+            trả về "500|db-not-connected";
+        };
+        trả về UserMapper.toUsersResponse(dbRes);
+    };
+};

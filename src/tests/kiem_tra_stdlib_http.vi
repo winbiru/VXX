@@ -1,5 +1,5 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm main() {
-    in mang_http_get("https://example.com") != "";
+    in mạng lấy("https://example.com") != "";
 };

@@ -1,6 +1,6 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm main() {
     // Manual test: phụ thuộc mạng/curl
-    in mang_http_get("https://google.com") != "";
+    in mạng lấy("https://google.com") != "";
 };

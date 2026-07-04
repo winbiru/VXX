@@ -1,4 +1,4 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm tao_chuoi(i) {
     trả về "m" + i;
@@ -15,5 +15,5 @@ hàm main() {
 
     in tong;
     in {"a": 1, "b": rỗng};
-    in tri_tuyet_doi(-7);
+    in trị tuyệt đối(-7);
 };

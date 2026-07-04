@@ -1,0 +1,15 @@
+nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;
+
+hàm main() {
+    app in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");
+    in app json health();
+    in app json login thành công("eyJhbGciOiJIUzUxMiJ9.demo-token", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");
+    in app json missing token("req-001");
+    in app json invalid token("req-002");
+    in app json users("req-003", "[\"an\",\"binh\"]");
+    in app json created user("req-004");
+    in app json updated user("req-005");
+    in app json deleted user("req-006");
+    in app json not found("req-007");
+    app in tắt vpp("V++ API Project");
+};

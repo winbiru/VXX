@@ -1,0 +1,14 @@
+nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;
+nhập src/tests/api_project/controller.vi;
+
+hàm main() {
+    app chạy máy chủ từ cấu hình project(
+        "V++ API Project",
+        "",
+        "src/tests/api_project/application.properties",
+        api project path health(),
+        api project path login(),
+        api project path admin users(),
+        api project path admin users search()
+    );
+};

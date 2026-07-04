@@ -1,0 +1,83 @@
+// Module: thư viện.mạng.mạng web
+// Mục đích: adapter mạng mức thấp (GET/POST/PUT) qua native hook.
+// Ghi chú: nếu VM chưa bật native hook, các hàm sẽ ném lỗi.
+
+// Ghi chú hàm: mạng lấy.
+hàm mạng lấy(đường dẫn) {
+    ném "thư viện: mạng lấy native hook không khả dụng";
+};
+
+// Ghi chú hàm: mạng gửi.
+hàm mạng gửi(đường dẫn, dữ liệu) {
+    ném "thư viện: mạng gửi native hook không khả dụng";
+};
+
+// Ghi chú hàm: mạng cập nhật.
+hàm mạng cập nhật(đường dẫn, dữ liệu) {
+    ném "thư viện: mạng cập nhật native hook không khả dụng";
+};
+
+// Ghi chú hàm: chạy HTTP server native cho api_project.
+hàm mạng chạy máy chủ api(cổng, driver, jdbcUrl, username, password) {
+    ném "thư viện: mạng chạy máy chủ api native hook không khả dụng";
+};
+
+// Ghi chú hàm: mở máy chủ HTTP low-level.
+hàm mạng mở máy chủ api(cổng) {
+    ném "thư viện: mạng mở máy chủ api native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy request kế tiếp từ hàng đợi server.
+hàm mạng lấy yêu cầu kế tiếp(serverId) {
+    ném "thư viện: mạng lấy yêu cầu kế tiếp native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy method của request.
+hàm mạng method yêu cầu(requestId) {
+    ném "thư viện: mạng method yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy path của request.
+hàm mạng path yêu cầu(requestId) {
+    ném "thư viện: mạng path yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy query raw của request.
+hàm mạng query yêu cầu(requestId) {
+    ném "thư viện: mạng query yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy body raw của request.
+hàm mạng body yêu cầu(requestId) {
+    ném "thư viện: mạng body yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy header theo key (case-insensitive).
+hàm mạng header yêu cầu(requestId, key) {
+    ném "thư viện: mạng header yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy query param theo key.
+hàm mạng query param yêu cầu(requestId, key) {
+    ném "thư viện: mạng query param yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy json field chuỗi từ request body.
+hàm mạng json field yêu cầu(requestId, key) {
+    ném "thư viện: mạng json field yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: lấy path suffix sau prefix.
+hàm mạng path suffix yêu cầu(requestId, prefix) {
+    ném "thư viện: mạng path suffix yêu cầu native hook không khả dụng";
+};
+
+// Ghi chú hàm: gửi phản hồi JSON về client.
+hàm mạng trả phản hồi(requestId, status, body) {
+    ném "thư viện: mạng trả phản hồi native hook không khả dụng";
+};
+
+// Ghi chú hàm: đóng server HTTP low-level.
+hàm mạng đóng máy chủ api(serverId) {
+    ném "thư viện: mạng đóng máy chủ api native hook không khả dụng";
+};

@@ -1,0 +1,26 @@
+[IN] HTTP Method: GET
+[IN] CASE-OK
+[IN] 200
+[IN] users=[an,binh,chi]
+[IN] req-001
+[IN] HTTP Method: POST
+[IN] CASE-CREATED
+[IN] 201
+[IN] created-user
+[IN] req-002
+[IN] HTTP Method: PUT
+[IN] CASE-OK
+[IN] 200
+[IN] updated-user
+[IN] req-003
+[IN] HTTP Method: DELETE
+[IN] CASE-NO-CONTENT
+[IN] 204
+[IN] deleted
+[IN] req-004
+[IN] HTTP Method: DELETE
+[IN] [LỖI] ERR user-not-found
+[IN] CASE-NOT-FOUND
+[IN] 404
+[IN] user-not-found
+[IN] req-005

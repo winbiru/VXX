@@ -1,0 +1,11 @@
+[IN] {\"data\":{\"requestId\":\"db-bootstrap\",\"result\":\"DB_OK|connected\"},\"success\":true,\"message\":\"Khởi tạo kết nối\"}
+[IN] {\"data\":{\"requestId\":\"db-req-001\",\"value\":\"users=[an,binh,chi]\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-001a\",\"value\":\"users=[an]\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-002\",\"value\":\"created-user\"},\"success\":true,\"message\":\"Tạo mới thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-003\",\"value\":\"updated-user\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-003a\",\"value\":\"users=[an-nguyen]\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-004\",\"value\":\"deleted\"},\"success\":true,\"message\":\"Xóa thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-004a\",\"value\":\"users=[]\"},\"success\":true,\"message\":\"Thành công\"}
+[IN] {\"data\":{\"requestId\":\"db-req-005\"},\"success\":false,\"message\":\"user-not-found\"}
+[IN] {\"data\":{\"requestId\":\"db-shutdown\",\"result\":\"DB_OK|disconnected\"},\"success\":true,\"message\":\"Đóng kết nối\"}
+[IN] {\"data\":{\"requestId\":\"db-req-006\"},\"success\":false,\"message\":\"db-not-connected\"}

@@ -1,0 +1,21 @@
+// Module: thư viện.ứng dụng.vòng đời
+// Mục đích: hỗ trợ vòng đời ứng dụng (banner, chạy, dừng).
+// Nhóm hàm: banner ứng dụng, chạy ứng dụng, dừng ứng dụng.
+
+// Ghi chú hàm: banner ứng dụng.
+hàm banner ứng dụng(tên ứng dụng, phiên bản) {
+    trả về "[ỨNG DỤNG] " + tên ứng dụng + " v" + phiên bản;
+};
+
+// Ghi chú hàm: chạy ứng dụng.
+hàm chạy ứng dụng(tên ứng dụng, phiên bản) {
+    in banner ứng dụng(tên ứng dụng, phiên bản);
+    in "[ỨNG DỤNG] sẵn sàng";
+    trả về 1;
+};
+
+// Ghi chú hàm: dừng ứng dụng.
+hàm dừng ứng dụng(tên ứng dụng) {
+    in "[ỨNG DỤNG] dừng " + tên ứng dụng;
+    trả về 0;
+};

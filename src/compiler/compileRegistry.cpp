@@ -116,6 +116,27 @@ static void compileFunctionDeclaration(const std::vector<std::string>& tokens,
                                        const std::string &classOwner,
                                        const std::string &visibility)
 {
+    auto isCallableNamePiece = [](const std::string &tk) {
+        if (vietvm::compiler::isVariable(tk)) return true;
+        if (tk.find(' ') == std::string::npos) return false;
+        std::stringstream ss(tk);
+        std::string part;
+        while (std::getline(ss, part, ' ')) {
+            if (part.empty()) continue;
+            if (!vietvm::compiler::isVariable(part)) return false;
+        }
+        return true;
+    };
+
+    auto joinNameTokens = [](const std::vector<std::string>& toks, size_t begin, size_t end) {
+        std::string out;
+        for (size_t i = begin; i < end; ++i) {
+            if (!out.empty()) out.push_back(' ');
+            out += toks[i];
+        }
+        return out;
+    };
+
     ++pos; // skip 'hàm'
     std::string effectiveVisibility = visibility;
     if (pos < tokens.size() && vietvm::compiler::isVisibilityToken(tokens[pos])) {
@@ -123,7 +144,16 @@ static void compileFunctionDeclaration(const std::vector<std::string>& tokens,
     }
 
     if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
-    std::string rawName = tokens[pos++];
+    size_t nameBegin = pos;
+    while (pos < tokens.size() && tokens[pos] != "(" && tokens[pos] != "{" && tokens[pos] != ";") {
+        if (!isCallableNamePiece(tokens[pos])) {
+            break;
+        }
+        ++pos;
+    }
+    if (nameBegin == pos) throw std::runtime_error("compile: tên hàm không hợp lệ sau 'hàm'");
+
+    std::string rawName = joinNameTokens(tokens, nameBegin, pos);
     std::string fullName = namePrefix.empty() ? rawName : (namePrefix + rawName);
     int nameIndex = vietvm::compiler::StringPool::storeString(fullName);
 
@@ -264,6 +294,14 @@ void initCompileMap() {
     };
 
     compileMap["nếu"] = compileCondition;
+    compileMap["hoặc"] = [](const std::vector<std::string>&,
+                              size_t &,
+                              std::vector<Instruction>&,
+                              std::unordered_map<std::string,int>&,
+                              int&,
+                              const std::unordered_map<std::string,Opcode>&) {
+        throw std::runtime_error("'hoặc' phải đi ngay sau một khối 'nếu'");
+    };
     compileMap["lặp"] = [](const std::vector<std::string>& tokens, size_t &pos,
                        std::vector<Instruction>& bytecode,
                        std::unordered_map<std::string,int>& symTab,
@@ -363,9 +401,40 @@ void initCompileMap() {
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& keywordMap) {
+        auto isCallableNamePiece = [](const std::string &tk) {
+            if (vietvm::compiler::isVariable(tk)) return true;
+            if (tk.find(' ') == std::string::npos) return false;
+            std::stringstream ss(tk);
+            std::string part;
+            while (std::getline(ss, part, ' ')) {
+                if (part.empty()) continue;
+                if (!vietvm::compiler::isVariable(part)) return false;
+            }
+            return true;
+        };
+
+        auto joinNameTokens = [](const std::vector<std::string>& toks, size_t begin, size_t end) {
+            std::string out;
+            for (size_t i = begin; i < end; ++i) {
+                if (!out.empty()) out.push_back(' ');
+                out += toks[i];
+            }
+            return out;
+        };
+
         ++pos;
         if (pos >= tokens.size()) throw std::runtime_error("gọi: thiếu tên hàm");
-        std::string originalName = tokens[pos++];
+
+        size_t nameBegin = pos;
+        while (pos < tokens.size() && tokens[pos] != "(" && tokens[pos] != ";") {
+            if (!isCallableNamePiece(tokens[pos])) {
+                break;
+            }
+            ++pos;
+        }
+        if (nameBegin == pos) throw std::runtime_error("gọi: tên hàm không hợp lệ");
+
+        std::string originalName = joinNameTokens(tokens, nameBegin, pos);
         std::string fname = vietvm::compiler::resolveCallableNameInContext(originalName, symTab);
         vietvm::compiler::validateCallableAccess(fname);
 
@@ -373,7 +442,17 @@ void initCompileMap() {
         int hamId = -1;
         auto itSym = symTab.find(fname);
         if (itSym != symTab.end()) {
-            hamId = itSym->second;
+            int candidateId = itSym->second;
+            int fnameIndex = vietvm::compiler::StringPool::findString(fname);
+            auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
+            auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(candidateId);
+            if (fnameIndex >= 0 &&
+                itName != vietvm::compiler::hamMap::hamNameIndexMap.end() &&
+                itName->second == fnameIndex &&
+                itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
+                !itCode->second.empty()) {
+                hamId = candidateId;
+            }
         } else {
             // fallback: store name in string pool and emit OP_GOI with nameIndex (VM fallback will try resolve)
             hamId = -1;
@@ -538,9 +617,9 @@ void initCompileMap() {
 
     // ---- Handler: nhập (import modules/files) ----
     // Syntax (MVP):
-    //   nhập "path/to/module.vi";
+    //   nhập path/to/module.vi;
     //   nhập moduleName;    // resolves to moduleName.vi in cwd
-    //   nhập "path/to/module.vi" như ten_module;
+    //   nhập path/to/module.vi như ten_module;
     compileMap["nhập"] = [](const std::vector<std::string>& tokens, size_t &pos,
                              std::vector<Instruction>& bytecode,
                              std::unordered_map<std::string,int>& symTab,
@@ -553,9 +632,31 @@ void initCompileMap() {
 
         ++pos; // skip 'nhập'
         if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
-        std::string target = tokens[pos++];
+        std::string target;
 
-        // Optional alias namespace: nhập "..." như ns;
+        bool quotedTarget = (tokens[pos].size() >= 2 &&
+                             (tokens[pos].front() == '"' || tokens[pos].front() == '\''));
+        if (quotedTarget) {
+            target = tokens[pos++];
+        } else {
+            // Unquoted target may contain spaces in path segments (e.g. "thư viện").
+            while (pos < tokens.size() && tokens[pos] != ";" && tokens[pos] != "như") {
+                const std::string piece = tokens[pos++];
+                if (piece == "/" || piece == "\\") {
+                    target += piece;
+                    continue;
+                }
+                if (target.empty() || target.back() == '/' || target.back() == '\\') {
+                    target += piece;
+                } else {
+                    target.push_back(' ');
+                    target += piece;
+                }
+            }
+            if (target.empty()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
+        }
+
+        // Optional alias namespace: nhập ... như ns;
         std::string moduleAlias;
         if (pos < tokens.size() && tokens[pos] == "như") {
             ++pos;
@@ -565,22 +666,27 @@ void initCompileMap() {
 
         // optional semicolon will be consumed later
 
-        // Determine path
-        std::string path;
-        if (target.size() >= 2 && (target.front() == '"' || target.front() == '\'')) {
-            // strip quotes (no escape processing here)
-            path = target.substr(1, target.size() - 2);
-        } else {
-            // treat identifier as file name with .vi
-            path = target + ".vi";
-        }
-
-        // stdlib shortcut
-        if (path == "stdlib" || path == "thư viện chuẩn" || path == "thu_vien_chuan") {
-            path = "lib/stdlib.vi";
-        }
-
         namespace fs = std::filesystem;
+
+        // Determine path
+        std::string path = quotedTarget ? target.substr(1, target.size() - 2) : target;
+
+        // package shortcuts
+        if (path == "thư viện chuẩn" || path == "thu_vien_chuan") {
+            path = "gói/thư viện/main.vi";
+        }
+        if (path == "thư viện" || path == "thu_vien") {
+            path = "gói/thư viện/main.vi";
+        }
+
+        // For unquoted targets, append .vi only when there is no extension.
+        if (!quotedTarget) {
+            fs::path rawPath(path);
+            if (rawPath.extension().empty()) {
+                path += ".vi";
+            }
+        }
+
         fs::path p(path);
         // Make absolute and normalized path (if possible)
         fs::path abs;
@@ -601,19 +707,29 @@ void initCompileMap() {
                     break;
                 }
                 if (p.parent_path().empty() && p.extension().empty()) {
-                    fs::path packageMain = dir / "packages" / p / "main.vi";
-                    fs::path packageRoot = dir / "packages" / p;
-                    fs::path packageSource = dir / "packages" / (p.string() + ".vi");
-                    if (fs::exists(packageMain)) {
-                        abs = fs::absolute(packageMain).lexically_normal();
-                        break;
+                    std::vector<fs::path> packageBases = {
+                        dir / "gói",
+                        dir / "goi",
+                        dir / "packages"
+                    };
+                    for (const auto &base : packageBases) {
+                        fs::path packageMain = base / p / "main.vi";
+                        fs::path packageRoot = base / p;
+                        fs::path packageSource = base / (p.string() + ".vi");
+                        if (fs::exists(packageMain)) {
+                            abs = fs::absolute(packageMain).lexically_normal();
+                            break;
+                        }
+                        if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
+                            abs = fs::absolute(packageRoot).lexically_normal();
+                            break;
+                        }
+                        if (fs::exists(packageSource)) {
+                            abs = fs::absolute(packageSource).lexically_normal();
+                            break;
+                        }
                     }
-                    if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
-                        abs = fs::absolute(packageRoot).lexically_normal();
-                        break;
-                    }
-                    if (fs::exists(packageSource)) {
-                        abs = fs::absolute(packageSource).lexically_normal();
+                    if (fs::exists(abs)) {
                         break;
                     }
                 }

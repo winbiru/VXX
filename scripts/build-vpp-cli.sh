@@ -15,6 +15,9 @@ c++ -std=c++17 -Iinclude \
   src/helpers/symbolTable.cpp \
   src/helpers/tooling.cpp \
   src/helpers/utility.cpp \
+  src/helpers/vm_native_helpers.cpp \
+  src/helpers/vm_native_http_helpers.cpp \
+  src/helpers/vm_low_level_http_server.cpp \
   src/compiler/compileBlock.cpp \
   src/compiler/compileCondition.cpp \
   src/compiler/compileFunction.cpp \

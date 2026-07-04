@@ -1,0 +1,28 @@
+// Module: thư viện.cốt lõi.chuỗi
+// Mục đích: gom các phép xử lý chuỗi cơ bản.
+// Nhóm hàm: nối chuỗi, so sánh chuỗi, kiểm tra rỗng.
+
+// Ghi chú hàm: nối chuỗi.
+hàm nối chuỗi(a, b) {
+    trả về a + b;
+};
+
+// Ghi chú hàm: nối ba.
+hàm nối ba(a, b, c) {
+    trả về a + b + c;
+};
+
+// Ghi chú hàm: bằng nhau chuỗi.
+hàm bằng nhau chuỗi(a, b) {
+    trả về a == b;
+};
+
+// Ghi chú hàm: khác nhau chuỗi.
+hàm khác nhau chuỗi(a, b) {
+    trả về a != b;
+};
+
+// Ghi chú hàm: là chuỗi rỗng.
+hàm là chuỗi rỗng(s) {
+    trả về s == "";
+};

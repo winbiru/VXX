@@ -65,12 +65,12 @@ static void printUsage() {
         << "  vpp danh sách\n"
         << "  vpp thông tin <tên>\n"
         << "  vpp kiểm tra <tên>\n"
-        << "  vpp pkg khởi tạo [tên]\n"
-        << "  vpp pkg thêm <nguồn> [tên]\n"
-        << "  vpp pkg xóa <tên>\n"
-        << "  vpp pkg danh sách\n"
-        << "  vpp pkg thông tin <tên>\n"
-        << "  vpp pkg kiểm tra <tên>\n";
+        << "  vpp gói khởi tạo [tên]\n"
+        << "  vpp gói thêm <nguồn> [tên]\n"
+        << "  vpp gói xóa <tên>\n"
+        << "  vpp gói danh sách\n"
+        << "  vpp gói thông tin <tên>\n"
+        << "  vpp gói kiểm tra <tên>\n";
 }
 
 static void printVersion() {
@@ -153,9 +153,22 @@ static std::string packageManifestPath(const fs::path &root) {
     return (root / "vpp.json").string();
 }
 
+static fs::path packageRootPath(const fs::path &root) {
+    fs::path goiDir = root / "gói";
+    if (fs::exists(goiDir)) return goiDir;
+
+    fs::path goiAsciiDir = root / "goi";
+    if (fs::exists(goiAsciiDir)) return goiAsciiDir;
+
+    fs::path legacyDir = root / "packages";
+    if (fs::exists(legacyDir)) return legacyDir;
+
+    return goiDir;
+}
+
 static std::vector<std::string> listPackages(const fs::path &root) {
     std::vector<std::string> packages;
-    fs::path packagesDir = root / "packages";
+    fs::path packagesDir = packageRootPath(root);
     if (!fs::exists(packagesDir)) return packages;
     for (const auto &entry : fs::directory_iterator(packagesDir)) {
         if (entry.is_directory()) {
@@ -173,7 +186,7 @@ static void writePackageManifest(const fs::path &root, const std::string &name) 
     manifest << "{\n"
              << "  \"name\": \"" << name << "\",\n"
              << "  \"version\": \"0.1.0\",\n"
-             << "  \"packages\": [";
+             << "  \"gói\": [";
     auto packages = listPackages(root);
     for (size_t i = 0; i < packages.size(); ++i) {
         if (i > 0) manifest << ", ";
@@ -186,7 +199,7 @@ static void writePackageManifest(const fs::path &root, const std::string &name) 
 
 static int pkgInit(const std::string &name) {
     fs::path root = fs::current_path();
-    fs::create_directories(root / "packages");
+    fs::create_directories(root / "gói");
     if (name.empty()) {
         writePackageManifest(root, root.filename().string());
     } else {
@@ -203,7 +216,7 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
         return EXIT_FAILURE;
     }
 
-    fs::path packageRoot = fs::current_path() / "packages";
+    fs::path packageRoot = packageRootPath(fs::current_path());
     fs::create_directories(packageRoot);
 
     std::string packageName = packageNameArg;
@@ -256,7 +269,7 @@ static int pkgRemove(const std::string &packageName) {
         return EXIT_FAILURE;
     }
 
-    fs::path targetDir = fs::current_path() / "packages" / packageName;
+    fs::path targetDir = packageRootPath(fs::current_path()) / packageName;
     if (!fs::exists(targetDir)) {
         std::cerr << "Khong tim thay goi: " << packageName << std::endl;
         return EXIT_FAILURE;
@@ -276,7 +289,7 @@ static int pkgRemove(const std::string &packageName) {
 
 static bool packageExists(const fs::path &root, const std::string &packageName) {
     if (packageName.empty()) return false;
-    fs::path packageMain = root / "packages" / packageName / "main.vi";
+    fs::path packageMain = packageRootPath(root) / packageName / "main.vi";
     return fs::exists(packageMain);
 }
 
@@ -287,7 +300,7 @@ static int pkgInfo(const std::string &packageName) {
     }
 
     fs::path root = fs::current_path();
-    fs::path packageDir = root / "packages" / packageName;
+    fs::path packageDir = packageRootPath(root) / packageName;
     fs::path mainFile = packageDir / "main.vi";
 
     if (!fs::exists(packageDir)) {
@@ -628,7 +641,7 @@ int main(int argc, char* argv[]) {
                 }
                 return EXIT_SUCCESS;
             }
-            if (command == "pkg") {
+            if (command == "pkg" || command == "gói") {
                 return runPackageCommand(argc, argv);
             }
             if (command == "init" || command == "khởi tạo") {

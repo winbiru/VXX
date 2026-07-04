@@ -1,0 +1,18 @@
+// Module: thư viện.khởi động.khởi động ứng dụng
+// Mục đích: facade full-stack cho ứng dụng hoàn chỉnh.
+// Thành phần: core + io + web + config + time + support + data + lifecycle.
+
+nhập gói/thư viện/cốt lõi/toán học.vi;
+nhập gói/thư viện/cốt lõi/chuỗi.vi;
+nhập gói/thư viện/cốt lõi/luận lý.vi;
+nhập gói/thư viện/vào ra/tệp.vi;
+nhập gói/thư viện/mạng/mạng web.vi;
+nhập gói/thư viện/mạng/rest.vi;
+nhập gói/thư viện/mạng/api.vi;
+nhập gói/thư viện/cấu hình/cấu hình.vi;
+nhập gói/thư viện/thời gian/đồng hồ.vi;
+nhập gói/thư viện/hỗ trợ/nhật ký.vi;
+nhập gói/thư viện/hỗ trợ/xác thực.vi;
+nhập gói/thư viện/dữ liệu/phân trang.vi;
+nhập gói/thư viện/ứng dụng/vòng đời.vi;
+nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;

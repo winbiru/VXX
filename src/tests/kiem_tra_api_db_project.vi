@@ -1,0 +1,34 @@
+nhập src/tests/api_project/database.vi;
+nhập src/tests/api_project/controller.vi;
+nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;
+
+lớp công khai ApiDbProjectTest {
+    hàm công khai runAll() {
+        dbSession = "OPEN";
+
+        connectRes = db connect("");
+        in app json db bootstrap(connectRes);
+
+        AdminRestController.getUsers(dbSession, "Bearer demo-token", "db-req-001");
+        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
+        AdminRestController.createUser(dbSession, "Bearer demo-token", "{\"name\":\"An\"}", "db-req-002");
+        AdminRestController.updateUser(dbSession, "Bearer demo-token", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
+        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-003a");
+        AdminRestController.deleteUser(dbSession, "Bearer demo-token", "12", "db-req-004");
+        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-004a");
+        AdminRestController.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
+
+        disconnectRes = db disconnect();
+        in app json db shutdown(disconnectRes);
+        dbSession = "CLOSED";
+
+        // verify API behavior when DB is disconnected
+        AdminRestController.getUsers(dbSession, "Bearer demo-token", "db-req-006");
+
+        trả về 0;
+    };
+};
+
+hàm main() {
+    ApiDbProjectTest.runAll();
+};

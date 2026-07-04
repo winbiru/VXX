@@ -1,0 +1,41 @@
+// Module: thư viện.dữ liệu.phân trang
+// Mục đích: hỗ trợ tính toán phân trang cho API/list data.
+// Nhóm hàm: chuẩn hóa trang/kích thước, tính offset và tổng số trang.
+
+// Ghi chú hàm: trang hợp lệ.
+hàm trang hợp lệ(trang) {
+    nếu (trang < 0) {
+        trả về 0;
+    };
+    trả về trang;
+};
+
+// Ghi chú hàm: kích thước hợp lệ.
+hàm kích thước hợp lệ(kích thước) {
+    nếu (kích thước <= 0) {
+        trả về 1;
+    };
+    trả về kích thước;
+};
+
+// Ghi chú hàm: độ dời dữ liệu.
+hàm độ dời dữ liệu(trang, kích thước) {
+    trang hợp = trang hợp lệ(trang);
+    kích thước hợp = kích thước hợp lệ(kích thước);
+    trả về trang hợp * kích thước hợp;
+};
+
+// Ghi chú hàm: tổng số trang.
+hàm tổng số trang(tổng bản ghi, kích thước) {
+    nếu (tổng bản ghi <= 0) {
+        trả về 0;
+    };
+
+    kích thước hợp = kích thước hợp lệ(kích thước);
+    tổng trang = 0;
+    lặp (còn lại = tổng bản ghi; còn lại > 0; còn lại = còn lại - kích thước hợp) {
+        tổng trang = tổng trang + 1;
+    };
+
+    trả về tổng trang;
+};

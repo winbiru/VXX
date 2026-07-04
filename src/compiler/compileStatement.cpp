@@ -15,6 +15,7 @@
 #include "common/symbolTable.h"
 #include <sstream>
 #include <iostream>
+#include "../../include/frontend/lexer.h"
 
 // Helper to split arguments string into individual argument expressions (handles nested parens)
 static std::vector<std::string> splitArgsString(const std::string &s) {
@@ -50,11 +51,21 @@ static int resolveFunctionIdByName(const std::string &name,
     std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
     vietvm::compiler::validateCallableAccess(resolvedName);
 
+    auto idMatchesResolvedName = [&](int candidateId) {
+        int resolvedNameIndex = vietvm::compiler::StringPool::findString(resolvedName);
+        if (resolvedNameIndex < 0) return false;
+        auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
+        if (itName == vietvm::compiler::hamMap::hamNameIndexMap.end()) return false;
+        return itName->second == resolvedNameIndex;
+    };
+
     auto itSym = symTab.find(resolvedName);
     if (itSym != symTab.end()) {
         int maybeId = itSym->second;
         auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
-        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() && !itCode->second.empty()) {
+        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
+            !itCode->second.empty() &&
+            idMatchesResolvedName(maybeId)) {
             return maybeId;
         }
     }
@@ -66,6 +77,56 @@ static int resolveFunctionIdByName(const std::string &name,
         }
     }
     return -1;
+}
+
+static std::string joinNameTokens(const std::vector<std::string> &tokens, size_t begin, size_t end) {
+    std::string out;
+    for (size_t i = begin; i < end; ++i) {
+        if (!out.empty()) out.push_back(' ');
+        out += tokens[i];
+    }
+    return out;
+}
+
+static bool isCallableNamePiece(const std::string &token) {
+    if (vietvm::compiler::isVariable(token)) return true;
+    if (token.find(' ') == std::string::npos) return false;
+    std::stringstream ss(token);
+    std::string part;
+    while (std::getline(ss, part, ' ')) {
+        if (part.empty()) continue;
+        if (!vietvm::compiler::isVariable(part)) return false;
+    }
+    return true;
+}
+
+static bool tryParseCallableNameBeforeParen(const std::vector<std::string> &tokens,
+                                            size_t start,
+                                            size_t &parenPos,
+                                            std::string &nameOut) {
+    if (start >= tokens.size() || !isCallableNamePiece(tokens[start])) return false;
+
+    size_t i = start;
+    while (i < tokens.size()) {
+        if (tokens[i] == "(") {
+            parenPos = i;
+            nameOut = joinNameTokens(tokens, start, i);
+            return !nameOut.empty();
+        }
+
+        if (tokens[i] == ";" || tokens[i] == "," || tokens[i] == "=" ||
+            tokens[i] == "{" || tokens[i] == "}" || tokens[i] == "[" || tokens[i] == "]" ||
+            tokens[i] == ")" || vietvm::compiler::isOperator(tokens[i])) {
+            return false;
+        }
+
+        if (!isCallableNamePiece(tokens[i])) {
+            return false;
+        }
+        ++i;
+    }
+
+    return false;
 }
 
 void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
@@ -127,13 +188,14 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
     }
 
     // ---- Trường hợp gọi hàm dạng identifier(args); ----
-    if ((pos + 1) < tokens.size() && tokens[pos+1] == "(") {
-        std::string ident = tokens[pos];
+    size_t callParenPos = 0;
+    std::string ident;
+    if (tryParseCallableNameBeforeParen(tokens, pos, callParenPos, ident)) {
         std::string resolvedIdent = vietvm::compiler::resolveCallableNameInContext(ident, symTab);
         vietvm::compiler::validateCallableAccess(resolvedIdent);
 
         // extract content inside parens; extractParens expects the position of '('
-        auto pr = vietvm::compiler::extractParens(tokens, pos + 1);
+        auto pr = vietvm::compiler::extractParens(tokens, callParenPos);
         std::string inside = pr.first;
         pos = pr.second; // pos now points after ')'
 

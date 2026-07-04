@@ -21,6 +21,7 @@ TESTS=(
   src/tests/kiem_tra_dieu_kien_phu_dinh.vi
   src/tests/kiem_tra_ham_4_tham_so.vi
   src/tests/kiem_tra_ham_tham_so.vi
+  src/tests/kiem_tra_ham_da_tu_khong_nhay.vi
   src/tests/kiem_tra_mang_3_chieu.vi
   src/tests/kiem_tra_noi_chuoi.vi
   src/tests/kiem_tra_so_chan_1-20.vi
@@ -32,10 +33,18 @@ TESTS=(
   src/tests/kiem_tra_rong_va_map.vi
   src/tests/kiem_tra_namespace_module.vi
   src/tests/kiem_tra_stdlib.vi
+  src/tests/kiem_tra_stdlib_starter.vi
   src/tests/kiem_tra_stdlib_http.vi
+  src/tests/kiem_tra_stdlib_http_post_put.vi
+  src/tests/kiem_tra_application_server.vi
+  src/tests/kiem_tra_rest_json_jwt.vi
   src/tests/kiem_tra_stdlib_tinh_toan.vi
   src/tests/kiem_tra_stdlib_mo_rong.vi
   src/tests/kiem_tra_stdlib_io_config_time.vi
+  src/tests/kiem_tra_api_thuc_thu.vi
+  src/tests/kiem_tra_api_db_project.vi
+  src/tests/kiem_tra_thu_vien_spring.vi
+  src/tests/kiem_tra_thu_vien_lop.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi

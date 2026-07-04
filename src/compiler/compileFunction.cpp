@@ -45,9 +45,16 @@ void compileFunction(const std::vector<std::string>& tokens, size_t& pos,
     if (pos >= tokens.size() || tokens[pos] != "{") return;
     pos++; // skip '{'
 
-    // Gán ID cho hàm
-    int hamId = vietvm::compiler::hamMap::allocHamId();
-    symTab[hamTen] = hamId;
+    // Reuse predeclared hamId when available so name-based fallback calls
+    // do not become ambiguous across imported modules.
+    int hamId;
+    auto itExisting = symTab.find(hamTen);
+    if (itExisting != symTab.end()) {
+        hamId = itExisting->second;
+    } else {
+        hamId = vietvm::compiler::hamMap::allocHamId();
+        symTab[hamTen] = hamId;
+    }
 
     std::vector<Instruction> bytecode;
 

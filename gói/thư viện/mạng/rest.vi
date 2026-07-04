@@ -1,0 +1,111 @@
+// Module: thư viện.mạng.rest
+// Mục đích: wrapper REST tiện dụng trên nền module mạng web.
+// Nhóm hàm: nối URL, rest lấy, rest gửi, rest cập nhật.
+
+// Ghi chú hàm: nối đường dẫn url.
+hàm nối đường dẫn url(gốc, đường dẫn) {
+    nếu (đường dẫn == "") {
+        trả về gốc;
+    };
+    nếu (gốc == "") {
+        trả về đường dẫn;
+    };
+    trả về gốc + đường dẫn;
+};
+
+// Ghi chú hàm: rest lấy.
+hàm rest lấy(gốc, đường dẫn) {
+    trả về mạng lấy(nối đường dẫn url(gốc, đường dẫn));
+};
+
+// Ghi chú hàm: rest gửi.
+hàm rest gửi(gốc, đường dẫn, dữ liệu) {
+    trả về mạng gửi(nối đường dẫn url(gốc, đường dẫn), dữ liệu);
+};
+
+// Ghi chú hàm: rest cập nhật.
+hàm rest cập nhật(gốc, đường dẫn, dữ liệu) {
+    trả về mạng cập nhật(nối đường dẫn url(gốc, đường dẫn), dữ liệu);
+};
+
+// Ghi chú hàm: dựng JSON response thành công chuẩn API.
+hàm rest json thành công object(message, dataJson) {
+    trả về "{\"data\":" + dataJson + ",\"success\":true,\"message\":\"" + message + "\"}";
+};
+
+// Ghi chú hàm: dựng JSON response lỗi chuẩn API với data object tùy biến.
+hàm rest json lỗi object(message, dataJson) {
+    trả về "{\"data\":" + dataJson + ",\"success\":false,\"message\":\"" + message + "\"}";
+};
+
+// Ghi chú hàm: dựng JSON response thành công chuẩn API.
+hàm rest json thành công(message, dataValue, requestId) {
+    dataJson = "{\"requestId\":\"" + requestId + "\",\"value\":\"" + dataValue + "\"}";
+    trả về rest json thành công object(message, dataJson);
+};
+
+// Ghi chú hàm: dựng JSON response lỗi chuẩn API.
+hàm rest json lỗi(message, requestId) {
+    dataJson = "{\"requestId\":\"" + requestId + "\"}";
+    trả về rest json lỗi object(message, dataJson);
+};
+
+// Ghi chú hàm: dựng JSON thành công với data object gồm requestId và một key bất kỳ.
+hàm rest json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+    dataJson = "{\"requestId\":\"" + requestId + "\",\"" + dataKey + "\":\"" + dataValue + "\"}";
+    trả về rest json thành công object(message, dataJson);
+};
+
+// Ghi chú hàm: dựng JSON lỗi với data object gồm requestId và một key bất kỳ.
+hàm rest json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+    dataJson = "{\"requestId\":\"" + requestId + "\",\"" + dataKey + "\":\"" + dataValue + "\"}";
+    trả về rest json lỗi object(message, dataJson);
+};
+
+// Ghi chú hàm: in JSON response thành công với data object tùy biến.
+hàm rest in json thành công object(message, dataJson) {
+    in rest json thành công object(message, dataJson);
+    trả về 0;
+};
+
+// Ghi chú hàm: in JSON response lỗi với data object tùy biến.
+hàm rest in json lỗi object(message, dataJson) {
+    in rest json lỗi object(message, dataJson);
+    trả về 0;
+};
+
+// Ghi chú hàm: in JSON thành công với data object requestId + key/value.
+hàm rest in json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+    in rest json thành công dữ liệu(message, requestId, dataKey, dataValue);
+    trả về 0;
+};
+
+// Ghi chú hàm: in JSON lỗi với data object requestId + key/value.
+hàm rest in json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+    in rest json lỗi dữ liệu(message, requestId, dataKey, dataValue);
+    trả về 0;
+};
+
+// Ghi chú hàm: dựng JSON thành công cho luồng đăng nhập JWT.
+hàm rest json thành công jwt(message, token, refreshToken) {
+    dataJson = "{\"token\":\"" + token + "\",\"refreshToken\":\"" + refreshToken + "\"}";
+    trả về rest json thành công object(message, dataJson);
+};
+
+// Ghi chú hàm: in JSON thành công cho luồng đăng nhập JWT.
+hàm rest in json thành công jwt(message, token, refreshToken) {
+    in rest json thành công jwt(message, token, refreshToken);
+    trả về 0;
+};
+
+// Ghi chú hàm: in JSON response thành công.
+hàm rest in json thành công(message, dataValue, requestId) {
+    in rest json thành công(message, dataValue, requestId);
+    trả về 0;
+};
+
+// Ghi chú hàm: in JSON response lỗi.
+hàm rest in json lỗi(message, requestId) {
+    in rest json lỗi(message, requestId);
+    trả về 0;
+};

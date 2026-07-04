@@ -1,0 +1,189 @@
+nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+
+// Java-style API implementation in test: Controller -> Service -> ResponseEntity
+lớp công khai UserService {
+    hàm công khai getUsers() {
+        request = api get("/admin/users");
+        nếu (request == "GET|/admin/users") {
+            trả về "200|users=[an,binh,chi]";
+        };
+        trả về "400|invalid-get";
+    };
+
+    hàm công khai createUser(payload) {
+        request = api post("/admin/users", payload);
+        nếu (payload == "") {
+            trả về "400|missing-body";
+        };
+        nếu (request != "") {
+            trả về "201|created-user";
+        };
+        trả về "400|invalid-post";
+    };
+
+    hàm công khai updateUser(userId, payload) {
+        request = api put("/admin/users/" + userId, payload);
+        nếu (userId == "") {
+            trả về "400|missing-user-id";
+        };
+        nếu (payload == "") {
+            trả về "400|missing-body";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+        nếu (request != "") {
+            trả về "200|updated-user";
+        };
+        trả về "400|invalid-put";
+    };
+
+    hàm công khai deleteUser(userId) {
+        request = api delete("/admin/users/" + userId);
+        nếu (userId == "") {
+            trả về "400|missing-user-id";
+        };
+        nếu (userId == "404") {
+            trả về "404|user-not-found";
+        };
+        nếu (request != "") {
+            trả về "204|deleted";
+        };
+        trả về "400|invalid-delete";
+    };
+};
+
+lớp công khai ResponseEntity {
+    hàm công khai ok(body, requestId) {
+        in "CASE-OK";
+        in 200;
+        in body;
+        in requestId;
+        trả về 0;
+    };
+
+    hàm công khai created(body, requestId) {
+        in "CASE-CREATED";
+        in 201;
+        in body;
+        in requestId;
+        trả về 0;
+    };
+
+    hàm công khai badRequest(message, requestId) {
+        ghi lỗi("ERR " + message);
+        in "CASE-BAD-REQUEST";
+        in 400;
+        in message;
+        in requestId;
+        trả về 0;
+    };
+
+    hàm công khai notFound(message, requestId) {
+        ghi lỗi("ERR " + message);
+        in "CASE-NOT-FOUND";
+        in 404;
+        in message;
+        in requestId;
+        trả về 0;
+    };
+
+    hàm công khai noContent(requestId) {
+        in "CASE-NO-CONTENT";
+        in 204;
+        in "deleted";
+        in requestId;
+        trả về 0;
+    };
+};
+
+lớp công khai AdminRestController {
+    hàm công khai getUsers(requestId) {
+        in "HTTP Method: GET";
+        result = UserService.getUsers();
+        nếu (result == "200|users=[an,binh,chi]") {
+            trả về ResponseEntity.ok("users=[an,binh,chi]", requestId);
+        };
+        trả về ResponseEntity.badRequest("unknown-get-error", requestId);
+    };
+
+    hàm công khai createUser(requestBody, requestId) {
+        in "HTTP Method: POST";
+        result = UserService.createUser(requestBody);
+        nếu (result == "400|missing-body") {
+            trả về ResponseEntity.badRequest("missing-body", requestId);
+        };
+        nếu (result == "201|created-user") {
+            trả về ResponseEntity.created("created-user", requestId);
+        };
+        trả về ResponseEntity.badRequest("unknown-post-error", requestId);
+    };
+
+    hàm công khai updateUser(userId, requestBody, requestId) {
+        in "HTTP Method: PUT";
+        result = UserService.updateUser(userId, requestBody);
+        nếu (result == "400|missing-user-id") {
+            trả về ResponseEntity.badRequest("missing-user-id", requestId);
+        };
+        nếu (result == "400|missing-body") {
+            trả về ResponseEntity.badRequest("missing-body", requestId);
+        };
+        nếu (result == "404|user-not-found") {
+            trả về ResponseEntity.notFound("user-not-found", requestId);
+        };
+        nếu (result == "200|updated-user") {
+            trả về ResponseEntity.ok("updated-user", requestId);
+        };
+        trả về ResponseEntity.badRequest("unknown-put-error", requestId);
+    };
+
+    hàm công khai deleteUser(userId, requestId) {
+        in "HTTP Method: DELETE";
+        result = UserService.deleteUser(userId);
+        nếu (result == "400|missing-user-id") {
+            trả về ResponseEntity.badRequest("missing-user-id", requestId);
+        };
+        nếu (result == "404|user-not-found") {
+            trả về ResponseEntity.notFound("user-not-found", requestId);
+        };
+        nếu (result == "204|deleted") {
+            trả về ResponseEntity.noContent(requestId);
+        };
+        trả về ResponseEntity.badRequest("unknown-delete-error", requestId);
+    };
+};
+
+lớp công khai AdminRestControllerCrudTest {
+    hàm công khai testGetUsers() {
+        trả về AdminRestController.getUsers("req-001");
+    };
+
+    hàm công khai testCreateUser() {
+        trả về AdminRestController.createUser("{\"name\":\"An\"}", "req-002");
+    };
+
+    hàm công khai testUpdateUser() {
+        trả về AdminRestController.updateUser("12", "{\"name\":\"An Nguyen\"}", "req-003");
+    };
+
+    hàm công khai testDeleteUser() {
+        trả về AdminRestController.deleteUser("12", "req-004");
+    };
+
+    hàm công khai testDeleteNotFound() {
+        trả về AdminRestController.deleteUser("404", "req-005");
+    };
+
+    hàm công khai runAll() {
+        testGetUsers();
+        testCreateUser();
+        testUpdateUser();
+        testDeleteUser();
+        testDeleteNotFound();
+        trả về 0;
+    };
+};
+
+hàm main() {
+    AdminRestControllerCrudTest.runAll();
+};

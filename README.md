@@ -139,12 +139,12 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./bin/vpp-cli thông tin stdlib
 ./bin/vpp-cli kiểm tra stdlib
 ./bin/vpp-cli thống kê
-./bin/vpp-cli pkg khởi tạo demo
-./bin/vpp-cli pkg thêm lib.vi mypkg
-./bin/vpp-cli pkg xóa mypkg
-./bin/vpp-cli pkg thông tin mypkg
-./bin/vpp-cli pkg kiểm tra mypkg
-./bin/vpp-cli pkg danh sách
+./bin/vpp-cli gói khởi tạo demo
+./bin/vpp-cli gói thêm lib.vi mypkg
+./bin/vpp-cli gói xóa mypkg
+./bin/vpp-cli gói thông tin mypkg
+./bin/vpp-cli gói kiểm tra mypkg
+./bin/vpp-cli gói danh sách
 ```
 
 `cài đặt` là lệnh chính cho package manager, và `caidat` cũng được hỗ trợ:
@@ -159,7 +159,21 @@ Windows có thể dùng trực tiếp:
 VPP.cmd caidat duong-dan\goi.vi ten-goi
 ```
 
-`nhập "stdlib";` vẫn hoạt động, và package local sẽ được tìm trong `packages/<name>/main.vi`.
+`nhập thu_vien;` hoạt động như alias của `gói/thư viện/main.vi`, và gói local sẽ được tìm trong `gói/<name>/main.vi`.
+
+### Starter modules (Spring-style facade)
+
+Ngoài `nhập thu_vien;`, có thể import theo nhu cầu bằng starter facade:
+
+```vi
+nhập gói/thư viện/khởi động/khởi động web.vi;
+nhập gói/thư viện/khởi động/khởi động dữ liệu.vi;
+nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+```
+
+- `stdlib-web-starter`: string + logic + http + logging + time.
+- `stdlib-data-starter`: math + string + logic + file + config + time + logging.
+- `stdlib-app-starter`: full stack (core + io + web + config + time + support).
 
 ## Cấu Trúc Chính
 

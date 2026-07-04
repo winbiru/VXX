@@ -128,7 +128,7 @@
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| `nhập "file.vi"` — import file khác | ✅ |
+| `nhập file.vi` — import file khác | ✅ |
 | Phát hiện import vòng (circular import) | ✅ |
 | Phân giải đường dẫn tương đối | ✅ |
 | Namespace / tên module | ✅ |
@@ -142,6 +142,23 @@
 | `doc_config(path)` | ✅ |
 | `lay_thoi_gian_hien_tai()` | ✅ |
 | `mang_http_get(url)` | ✅ *(phụ thuộc `curl` và mạng)* |
+| `mang_http_post(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
+| `mang_http_put(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
+
+### 6.2 Kiến trúc stdlib theo module (Spring-style)
+| Hạng mục | Trạng thái |
+|----------|-----------|
+| Entry-point `lib/stdlib.vi` đóng vai trò aggregator | ✅ |
+| Entry-point `gói/stdlib/main.vi` đóng vai trò aggregator | ✅ |
+| Module `core` (math/string/logic) | ✅ |
+| Module `web` (HTTP get/post/put) | ✅ |
+| Module `io` (đọc/ghi file) | ✅ |
+| Module `time` (clock/time API) | ✅ |
+| Module `config` (đọc cấu hình) | ✅ |
+| Module `support` (logging) | ✅ |
+| Facade `stdlib-web-starter` (import chọn lọc web stack) | ✅ |
+| Facade `stdlib-data-starter` (import chọn lọc data stack) | ✅ |
+| Facade `stdlib-app-starter` (import full app stack) | ✅ |
 
 ---
 
@@ -238,14 +255,16 @@
 | `kiem_tra_lambda_hof_mac_dinh.vi` | Lambda + higher-order + tham số mặc định | ✅ |
 | `kiem_tra_namespace_module.vi` | Namespace alias khi import module | ✅ |
 | `kiem_tra_stdlib.vi` | Import và dùng stdlib tiếng Việt | ✅ |
+| `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | ✅ |
 | `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
+| `kiem_tra_stdlib_http_post_put.vi` | Native API: HTTP POST/PUT thành công | ✅ |
 | `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
 | `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
 | `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |
 | Unit test cho StringPool | Thêm/lấy/xóa | ⬜ |
 | Unit test cho symbolTable | Scope isolation | ⬜ |
 
-**Tỷ lệ regression hiện tại: 29/29 PASS ✅ (theo `run_tests.sh`, ngày 28/06/2026)**
+**Tỷ lệ regression hiện tại: 35/35 PASS ✅ (theo `run_tests.sh`, ngày 04/07/2026)**
 
 ---
 
@@ -272,7 +291,7 @@
 |-----------|------|----------------------------|-----------|
 | C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | ✅ |
 | C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | ✅ |
-| `curl` (binary hệ thống, gọi qua shell) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get(url)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
+| `curl` (binary hệ thống, gọi qua shell) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put(...)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
 | CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-frontend`, `vpp-compiler`, `vpp-vm`, `vpp-cli`) | ✅ |
 
 #### Không sử dụng (không phát hiện trong include/CMake hiện tại)
@@ -295,7 +314,7 @@
 | I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
 | Hệ thống tệp (filesystem) | ✅ | Dùng `std::filesystem` cho import, package manager, CLI |
 | Mạng TCP/UDP | ⬜ | Chưa có API socket native |
-| HTTP client | 🚧 | Có `mang_http_get(url)` qua `curl` shell, chưa có HTTP lib native |
+| HTTP client | ✅ | Có `mang_http_get/post/put(...)` qua `curl` shell; chưa link `libcurl` trực tiếp |
 | Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
 | Collections (array/map) | ✅ | Array, map literal đã hỗ trợ |
 | Xử lý chuỗi | ✅ | Nối chuỗi, thao tác chuỗi cơ bản |

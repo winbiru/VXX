@@ -1,17 +1,17 @@
-nhập "stdlib";
+nhập gói/thư viện/main.vi;
 
 hàm main() {
-    in noi_chuoi("xin", " chao");
-    in noi_3("a", "b", "c");
+    in nối chuỗi("xin", " chao");
+    in nối ba("a", "b", "c");
 
-    in la_chuoi_rong("");
-    in la_chuoi_rong("x");
+    in là chuỗi rỗng("");
+    in là chuỗi rỗng("x");
 
-    in tat_ca(đúng, đúng);
-    in tat_ca(đúng, sai);
-    in mot_trong_hai(đúng, sai);
+    in tất cả(đúng, đúng);
+    in tất cả(đúng, sai);
+    in một trong hai(đúng, sai);
 
-    log_thong_tin("ok");
-    log_canh_bao("warn");
-    log_loi("err");
+    ghi thông tin("ok");
+    ghi cảnh báo("warn");
+    ghi lỗi("err");
 };

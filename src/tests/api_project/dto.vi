@@ -1,0 +1,95 @@
+// DTO cho request/response trong api_project.
+
+lớp công khai UserDto {
+    // Schema DTO đầy đủ theo danh sách field nghiệp vụ.
+    hàm công khai schema() {
+        trả về {
+            "id": 0,
+            "address": "",
+            "city": "",
+            "country": "",
+            "country_code": "",
+            "created_at": "",
+            "delete_flag": 0,
+            "email": "",
+            "first_names": "",
+            "is_active": 1,
+            "last_name": "",
+            "password": "",
+            "phone_number": "",
+            "postal_code": "",
+            "updated_at": "",
+            "user_code": "",
+            "username": "",
+            "vatnumber": "",
+            "company_code": "",
+            "role_id": 0
+        };
+    };
+};
+
+lớp công khai UserCreateRequestDto {
+    hàm công khai validate(payload) {
+        nếu (payload == "") {
+            trả về "DTO_ERR|missing-body";
+        };
+        trả về "DTO_OK|create";
+    };
+
+    // DTO mẫu cho request tạo user.
+    hàm công khai template() {
+        trả về UserDto.schema();
+    };
+};
+
+lớp công khai UserUpdateRequestDto {
+    hàm công khai validate(userId, payload) {
+        nếu (userId == "") {
+            trả về "DTO_ERR|missing-user-id";
+        };
+        nếu (payload == "") {
+            trả về "DTO_ERR|missing-body";
+        };
+        trả về "DTO_OK|update";
+    };
+
+    // DTO mẫu cho request cập nhật user.
+    hàm công khai template() {
+        trả về UserDto.schema();
+    };
+};
+
+lớp công khai UserSearchRequestDto {
+    hàm công khai validate(keyword) {
+        nếu (keyword == "") {
+            trả về "DTO_ERR|missing-keyword";
+        };
+        trả về "DTO_OK|search";
+    };
+};
+
+lớp công khai UserResponseDto {
+    // DTO mẫu cho response user.
+    hàm công khai template() {
+        trả về UserDto.schema();
+    };
+
+    hàm công khai normalizeUsersResponse(dbRes) {
+        nếu (dbRes == "DB_OK|users=[an]") {
+            trả về "DB_OK|users=[an]";
+        };
+        nếu (dbRes == "DB_OK|users=[binh]") {
+            trả về "DB_OK|users=[binh]";
+        };
+        nếu (dbRes == "DB_OK|users=[chi]") {
+            trả về "DB_OK|users=[chi]";
+        };
+        nếu (dbRes == "DB_OK|users=[an-nguyen]") {
+            trả về "DB_OK|users=[an-nguyen]";
+        };
+        nếu (dbRes == "DB_OK|users=[]") {
+            trả về "DB_OK|users=[]";
+        };
+        trả về dbRes;
+    };
+};

@@ -1,0 +1,13 @@
+// Module: thư viện.vào ra.tệp
+// Mục đích: đọc/ghi tệp ở tầng thư viện.
+// Ghi chú: hiện phụ thuộc native hook của VM.
+
+// Ghi chú hàm: đọc tệp.
+hàm đọc tệp(đường dẫn) {
+    ném "stdlib: đọc tệp native hook không khả dụng";
+};
+
+// Ghi chú hàm: ghi tệp.
+hàm ghi tệp(đường dẫn, nội dung) {
+    ném "stdlib: ghi tệp native hook không khả dụng";
+};

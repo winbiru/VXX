@@ -1,4 +1,4 @@
 [IN] BAT_DAU
-[IN] ok|tong=10|dem=1|tb=10|muc=khong_xac_dinh|meta={"co_loi": rỗng, "da_xu_ly": 1}
-[IN] ok|tong=10|dem=1|tb=10|muc=khong_xac_dinh|meta={"co_loi": rỗng, "da_xu_ly": 1}
+[IN] ok|tong=50|dem=5|tb=10|muc=khong_xac_dinh|meta={"co_loi": rỗng, "da_xu_ly": 1}
+[IN] ok|tong=50|dem=5|tb=10|muc=khong_xac_dinh|meta={"co_loi": rỗng, "da_xu_ly": 1}
 [IN] KET_THUC

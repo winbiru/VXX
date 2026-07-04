@@ -1,0 +1,54 @@
+// Module: thư viện.dữ liệu.kết nối cơ sở dữ liệu
+// Mục đích: cung cấp API cấu hình và thực thi truy vấn cho nhiều engine DB.
+// Hỗ trợ hiện tại: MySQL, PostgreSQL, SQLite qua JDBC URL + driver class.
+
+// Ghi chú hàm: mở kết nối DB thông qua native hook của VM.
+hàm db_ket_noi(driverClassName, jdbcUrl, username, password) {
+    trả về db_native_connect(
+        driverClassName,
+        jdbcUrl,
+        username,
+        password
+    );
+};
+
+// Ghi chú hàm: thực thi câu lệnh SQL bất kỳ.
+hàm db_truy_van(driverClassName, jdbcUrl, username, password, sql) {
+    trả về db_native_query(
+        driverClassName,
+        jdbcUrl,
+        username,
+        password,
+        sql
+    );
+};
+
+// Ghi chú hàm: ngắt kết nối logic ở tầng thư viện.
+hàm db_ngat_ket_noi(driverClassName, jdbcUrl, username, password) {
+    trả về "DB_OK|disconnected";
+};
+
+// Ghi chú hàm: kiểm tra nhanh kết nối bằng SELECT 1.
+hàm db_ping(driverClassName, jdbcUrl, username, password) {
+    trả về db_truy_van(driverClassName, jdbcUrl, username, password, "SELECT 1;");
+};
+
+// Ghi chú hàm: wrapper tên đa từ để giữ cú pháp thân thiện.
+hàm db kết nối(driverClassName, jdbcUrl, username, password) {
+    trả về db_ket_noi(driverClassName, jdbcUrl, username, password);
+};
+
+// Ghi chú hàm: wrapper tên đa từ để giữ cú pháp thân thiện.
+hàm db truy vấn(driverClassName, jdbcUrl, username, password, sql) {
+    trả về db_truy_van(driverClassName, jdbcUrl, username, password, sql);
+};
+
+// Ghi chú hàm: wrapper tên đa từ để giữ cú pháp thân thiện.
+hàm db ngắt kết nối(driverClassName, jdbcUrl, username, password) {
+    trả về db_ngat_ket_noi(driverClassName, jdbcUrl, username, password);
+};
+
+// Ghi chú hàm: wrapper tên đa từ để giữ cú pháp thân thiện.
+hàm db ping(driverClassName, jdbcUrl, username, password) {
+    trả về db_ping(driverClassName, jdbcUrl, username, password);
+};

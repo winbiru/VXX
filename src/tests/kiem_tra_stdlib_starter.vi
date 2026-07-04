@@ -1,0 +1,11 @@
+nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+
+hàm main() {
+    ghi tệp(".tmp_starter_runtime.txt", "xin");
+    in đọc tệp(".tmp_starter_runtime.txt");
+
+    in cộng(2, 3);
+    in là chuỗi rỗng("");
+    in tất cả(đúng, đúng);
+    in giờ hiện tại() != "";
+};
