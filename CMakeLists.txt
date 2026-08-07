@@ -8,6 +8,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 
+find_package(Threads REQUIRED)
+
 # Public include dir for headers
 set(VPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
 
@@ -71,7 +73,10 @@ endif()
 
 if (VM_SOURCES)
     vpp_add_module(vpp-vm ${VM_SOURCES})
-    target_link_libraries(vpp-vm PUBLIC vpp-compiler)
+    target_link_libraries(vpp-vm PUBLIC vpp-compiler Threads::Threads)
+    if (WIN32)
+        target_link_libraries(vpp-vm PUBLIC ws2_32)
+    endif()
 endif()
 
 # stdlib is optional: only create if there are sources
@@ -118,6 +123,12 @@ if (BUILD_TESTS)
     if (EXISTS ${CMAKE_SOURCE_DIR}/src/tests/CMakeLists.txt)
         add_subdirectory(src/tests)
     endif()
+    if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
+        add_test(NAME vpp-integration
+                 COMMAND ${CMAKE_SOURCE_DIR}/run_tests.sh)
+        set_tests_properties(vpp-integration PROPERTIES
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    endif()
 endif()
 
 # Install rules (optional)
@@ -125,6 +136,8 @@ install(TARGETS vpp-cli vpp-frontend vpp-compiler vpp-vm
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
+        DESTINATION gói)
 
 # Developer notes:
 # - Prefer explicit source lists; GLOB is fine for prototyping but can hide missing files.

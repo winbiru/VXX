@@ -1,0 +1,13 @@
+// HTTP fixture chạy hoàn toàn bằng V++ cho các integration test.
+nhập gói/thư viện/mạng/mạng web.vi;
+
+hàm main() {
+    serverId = mạng mở máy chủ api(18080);
+    lặp(i = 0; i < 2147483647; i = i + 1) {
+        requestId = mạng lấy yêu cầu kế tiếp(serverId);
+        nếu (requestId == "") {
+            bỏ qua;
+        };
+        mạng trả phản hồi(requestId, 200, "{\"ok\":true}");
+    };
+};

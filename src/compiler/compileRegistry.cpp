@@ -9,6 +9,7 @@
 #include <sstream>
 #include <fstream>
 #include <filesystem>
+#include <cstdlib>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -734,6 +735,18 @@ void initCompileMap() {
                     }
                 }
                 if (dir == dir.parent_path()) break; // reached filesystem root
+            }
+        }
+
+        // Installed releases keep the standard library beside the executable.
+        // The installer exposes that location through VPP_HOME, so a project
+        // outside the repository can still import gói/thư viện/... .
+        if (!fs::exists(abs)) {
+            if (const char *vppHome = std::getenv("VPP_HOME")) {
+                fs::path bundled = fs::path(vppHome) / p;
+                if (fs::exists(bundled)) {
+                    abs = fs::absolute(bundled).lexically_normal();
+                }
             }
         }
 

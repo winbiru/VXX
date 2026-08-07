@@ -487,12 +487,6 @@ hàm app chạy máy chủ từ cấu hình project(tên ứng dụng, cổng, �
     nếu (driver == "") {
         trả về "APP_ERR|missing-driver";
     };
-    nếu (username == "") {
-        trả về "APP_ERR|missing-username";
-    };
-    nếu (password == "") {
-        trả về "APP_ERR|missing-password";
-    };
     nếu (authToken == "") {
         trả về "APP_ERR|missing-auth-token";
     };

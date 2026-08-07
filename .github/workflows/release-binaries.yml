@@ -53,9 +53,10 @@ jobs:
           mkdir -p dist
           cp "$BIN_PATH" dist/vpp
           chmod +x dist/vpp
+          cp -R gói dist/gói
           cp scripts/unix/install-vpp.sh dist/install-vpp.sh
           chmod +x dist/install-vpp.sh
-          tar -czf "${{ matrix.asset_name }}" -C dist vpp install-vpp.sh
+          tar -czf "${{ matrix.asset_name }}" -C dist vpp gói install-vpp.sh
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -79,6 +80,7 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item $bin dist/vpp.exe
+          Copy-Item gói dist/gói -Recurse
           Copy-Item scripts/windows/install-vpp.ps1 dist/install-vpp.ps1
           Copy-Item scripts/windows/install-vpp.cmd dist/install-vpp.cmd
           Compress-Archive -Path dist/* -DestinationPath "${{ matrix.asset_name }}" -Force

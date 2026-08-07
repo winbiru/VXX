@@ -1,6 +1,6 @@
 # ✅ V++ — Checklist Phát Triển Ngôn Ngữ
 
-> Cập nhật lần cuối: 28/06/2026  
+> Cập nhật lần cuối: 07/08/2026
 > Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
 
 ---
@@ -258,13 +258,14 @@
 | `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | ✅ |
 | `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
 | `kiem_tra_stdlib_http_post_put.vi` | Native API: HTTP POST/PUT thành công | ✅ |
+| `http_fixture.vi` | HTTP fixture nội bộ viết bằng V++ cho test GET/POST/PUT | ✅ |
 | `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
 | `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
 | `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |
 | Unit test cho StringPool | Thêm/lấy/xóa | ⬜ |
 | Unit test cho symbolTable | Scope isolation | ⬜ |
 
-**Tỷ lệ regression hiện tại: 35/35 PASS ✅ (theo `run_tests.sh`, ngày 04/07/2026)**
+**Tỷ lệ regression hiện tại: 42/42 PASS ✅ (theo `run_tests.sh`, ngày 07/08/2026)**
 
 ---
 
@@ -278,12 +279,15 @@
 | Không có duplicate library warnings | ✅ |
 | `.gitignore` cho build artefacts | ✅ |
 | CI/CD (GitHub Actions) | ✅ |
+| CTest integration target | ✅ |
+| AddressSanitizer / UndefinedBehaviorSanitizer trên CI | ✅ |
 | Disassembler (xem bytecode) | ✅ |
 | REPL (interactive shell) | ✅ |
 | Language Server Protocol (LSP) | ✅ |
 | Syntax highlighting (VSCode/Vim) | ✅ |
 | Formatter / linter | ✅ |
 | Package manager (`vpp-cli install`, `vpp-cli cai`) | ✅ |
+| Mẫu backend/API server | 🚧 — có `src/tests/api_project`, chưa có lệnh scaffold backend hoàn chỉnh |
 
 ### 11.1 Thư Viện & Phụ Thuộc Mã Nguồn
 #### Đang sử dụng (đầy đủ theo quét include/CMake)
@@ -314,7 +318,7 @@
 | I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
 | Hệ thống tệp (filesystem) | ✅ | Dùng `std::filesystem` cho import, package manager, CLI |
 | Mạng TCP/UDP | ⬜ | Chưa có API socket native |
-| HTTP client | ✅ | Có `mang_http_get/post/put(...)` qua `curl` shell; chưa link `libcurl` trực tiếp |
+| HTTP client | ✅ | Có `mang_http_get/post/put(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
 | Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
 | Collections (array/map) | ✅ | Array, map literal đã hỗ trợ |
 | Xử lý chuỗi | ✅ | Nối chuỗi, thao tác chuỗi cơ bản |
@@ -348,7 +352,7 @@
 | `docs/grammar.bnf` — Ngữ pháp BNF | ✅ |
 | `docs/language-comparison.md` — So sánh với ngôn ngữ khác | ✅ |
 | `CHECKLIST.md` — File này | ✅ |
-| `CONTRIBUTING.md` — Hướng dẫn đóng góp | ⬜ |
+| `CONTRIBUTING.md` — Hướng dẫn đóng góp | ✅ |
 | Tutorial / ví dụ từng bước | ⬜ |
 | API reference cho embedding | ⬜ |
 
@@ -371,8 +375,8 @@
 - [x] Xử lý ngoại lệ (`thử`/`bắt lỗi`/`ném`)
 - [ ] Tách `VM::run()` thành các handler nhỏ
 - [ ] Unit test cho từng opcode handler
-- [ ] REPL (gõ lệnh trực tiếp)
-- [ ] Disassembler hiển thị bytecode
+- [x] REPL (gõ lệnh trực tiếp)
+- [x] Disassembler hiển thị bytecode
 
 ### Dài hạn (3–12 tháng)
 - [x] Kiểu từ điển / Map
@@ -380,7 +384,7 @@
 - [x] Garbage Collection *(MVP)*
 - [x] Thư viện chuẩn tiếng Việt (stdlib)
 - [x] Namespace / module có tên
-- [ ] Language Server Protocol (LSP)
+- [x] Language Server Protocol (LSP, MVP)
 - [x] Syntax highlighting cho VSCode
 - [x] JIT Compilation (tuỳ chọn, MVP)
 - [ ] Embeddable C API

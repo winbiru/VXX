@@ -1,4 +1,6 @@
-#!/bin/zsh
+#!/usr/bin/env bash
+set -u
+
 if [ -x "bin/vpp-cli" ]; then
   EXEC="bin/vpp-cli"
 elif [ -x "cmake-build-debug/bin/vpp-cli" ]; then
@@ -9,6 +11,31 @@ fi
 tmpdir="src/tests/.tmp"
 mkdir -p "$tmpdir"
 PASS=0; FAIL=0
+
+# HTTP tests must not depend on an external service or internet access. Start a
+# tiny server implemented in V++ itself, which accepts GET/POST/PUT and returns JSON.
+HTTP_FIXTURE_PID=""
+cleanup() {
+  if [ -n "$HTTP_FIXTURE_PID" ]; then
+    kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
+    wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
+  fi
+  rm -rf "$tmpdir"
+}
+trap cleanup EXIT INT TERM
+
+"$EXEC" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
+HTTP_FIXTURE_PID=$!
+for _ in $(seq 1 50); do
+  if curl -fsS --max-time 1 http://127.0.0.1:18080/health >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.1
+done
+if ! curl -fsS --max-time 1 http://127.0.0.1:18080/health >/dev/null 2>&1; then
+  echo "ERROR: local HTTP test fixture did not start" >&2
+  exit 2
+fi
 
 TESTS=(
   src/tests/import_main.vi
@@ -90,7 +117,9 @@ else
   echo "FAIL: src/tests/kiem_tra_gc_mvp.vi [GC]"; FAIL=$((FAIL+1))
 fi
 
-rm -rf "$tmpdir"
 echo ""
 echo "=== PASS: $PASS, FAIL: $FAIL ==="
 
+if [ "$FAIL" -ne 0 ]; then
+  exit 1
+fi

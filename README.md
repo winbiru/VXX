@@ -133,6 +133,7 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./bin/vpp-cli --repl
 ./bin/vpp-cli --lsp
 ./bin/vpp-cli khởi tạo demo
+./bin/vpp-cli khởi tạo backend my-api
 ./bin/vpp-cli cài đặt ./lib/stdlib.vi stdlib
 ./bin/vpp-cli danh sách
 ./bin/vpp-cli xóa stdlib
@@ -160,6 +161,20 @@ VPP.cmd caidat duong-dan\goi.vi ten-goi
 ```
 
 `nhập thu_vien;` hoạt động như alias của `gói/thư viện/main.vi`, và gói local sẽ được tìm trong `gói/<name>/main.vi`.
+Các bản cài từ release đặt thư viện chuẩn cạnh binary và installer tự cấu hình `VPP_HOME` để các import này hoạt động ngoài repository.
+
+HTTP server native hỗ trợ Linux, macOS và Windows.
+
+Tạo backend tối giản:
+
+```bash
+vpp khởi tạo backend my-api
+cd my-api
+vpp application.vi
+curl http://127.0.0.1:8080/health
+```
+
+Endpoint mẫu trả JSON boolean `true`.
 
 ### Starter modules (Spring-style facade)
 

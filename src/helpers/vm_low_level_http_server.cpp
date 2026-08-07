@@ -15,7 +15,13 @@
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_http_helpers.h"
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -27,7 +33,49 @@ namespace vietvm::helpers {
 
 namespace {
 
-bool recvHttpRequest(int fd,
+#if defined(_WIN32)
+using SocketHandle = SOCKET;
+using SocketLength = int;
+constexpr SocketHandle kInvalidSocket = INVALID_SOCKET;
+
+bool initializeSockets(std::string &err) {
+    static std::once_flag initFlag;
+    static int initResult = 0;
+    std::call_once(initFlag, []() {
+        WSADATA data{};
+        initResult = WSAStartup(MAKEWORD(2, 2), &data);
+    });
+    if (initResult != 0) {
+        err = "mang_http_server_open: WSAStartup thất bại";
+        return false;
+    }
+    return true;
+}
+
+void closeSocket(SocketHandle socket) {
+    if (socket != kInvalidSocket) closesocket(socket);
+}
+
+void shutdownSocket(SocketHandle socket) {
+    if (socket != kInvalidSocket) shutdown(socket, SD_BOTH);
+}
+#else
+using SocketHandle = int;
+using SocketLength = socklen_t;
+constexpr SocketHandle kInvalidSocket = -1;
+
+bool initializeSockets(std::string &) { return true; }
+
+void closeSocket(SocketHandle socket) {
+    if (socket != kInvalidSocket) close(socket);
+}
+
+void shutdownSocket(SocketHandle socket) {
+    if (socket != kInvalidSocket) shutdown(socket, SHUT_RDWR);
+}
+#endif
+
+bool recvHttpRequest(SocketHandle fd,
                      std::string &method,
                      std::string &target,
                      std::unordered_map<std::string, std::string> &headers,
@@ -42,7 +90,7 @@ bool recvHttpRequest(int fd,
     char buf[4096];
 
     while (raw.find("\r\n\r\n") == std::string::npos) {
-        ssize_t n = recv(fd, buf, sizeof(buf), 0);
+        int n = recv(fd, buf, static_cast<int>(sizeof(buf)), 0);
         if (n <= 0) return false;
         raw.append(buf, (size_t)n);
         if (raw.size() > 1024 * 1024) return false;
@@ -82,7 +130,7 @@ bool recvHttpRequest(int fd,
 
     body = raw.substr(bodyStart);
     while (body.size() < contentLength) {
-        ssize_t n = recv(fd, buf, sizeof(buf), 0);
+        int n = recv(fd, buf, static_cast<int>(sizeof(buf)), 0);
         if (n <= 0) break;
         body.append(buf, (size_t)n);
     }
@@ -103,7 +151,7 @@ const char *httpStatusText(int code) {
     }
 }
 
-bool sendHttpJsonResponse(int fd, int status, const std::string &body) {
+bool sendHttpJsonResponse(SocketHandle fd, int status, const std::string &body) {
     std::ostringstream oss;
     oss << "HTTP/1.1 " << status << " " << httpStatusText(status) << "\r\n"
         << "Content-Type: application/json; charset=utf-8\r\n"
@@ -114,7 +162,7 @@ bool sendHttpJsonResponse(int fd, int status, const std::string &body) {
     std::string out = oss.str();
     size_t sent = 0;
     while (sent < out.size()) {
-        ssize_t n = send(fd, out.data() + sent, out.size() - sent, 0);
+        int n = send(fd, out.data() + sent, static_cast<int>(out.size() - sent), 0);
         if (n <= 0) return false;
         sent += (size_t)n;
     }
@@ -123,7 +171,7 @@ bool sendHttpJsonResponse(int fd, int status, const std::string &body) {
 
 struct LowLevelHttpRequest {
     int serverId = 0;
-    int clientFd = -1;
+    SocketHandle clientFd = kInvalidSocket;
     std::string requestId;
     std::string method;
     std::string path;
@@ -134,7 +182,7 @@ struct LowLevelHttpRequest {
 
 struct LowLevelHttpServer {
     int id = 0;
-    int listenFd = -1;
+    SocketHandle listenFd = kInvalidSocket;
     std::atomic<bool> running{false};
     std::thread acceptThread;
     std::mutex mtx;
@@ -174,25 +222,22 @@ bool getLowHttpRequestCopy(const std::string &reqId, LowLevelHttpRequest &out) {
 } // namespace
 
 bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
-#if defined(_WIN32)
-    (void)port;
-    (void)result;
-    err = "mang_http_server_open: Windows chưa hỗ trợ low-level listen socket trong bản này";
-    return true;
-#else
     if (port <= 0 || port > 65535) {
         err = "mang_http_server_open: cổng không hợp lệ";
         return true;
     }
 
-    int listenFd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenFd < 0) {
+    if (!initializeSockets(err)) return true;
+
+    SocketHandle listenFd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listenFd == kInvalidSocket) {
         err = "mang_http_server_open: không tạo được socket";
         return true;
     }
 
     int reuse = 1;
-    setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+    setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR,
+               reinterpret_cast<const char *>(&reuse), sizeof(reuse));
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -200,13 +245,13 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     addr.sin_port = htons((uint16_t)port);
 
     if (bind(listenFd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-        close(listenFd);
+        closeSocket(listenFd);
         err = "mang_http_server_open: bind thất bại";
         return true;
     }
 
     if (listen(listenFd, 64) < 0) {
-        close(listenFd);
+        closeSocket(listenFd);
         err = "mang_http_server_open: listen thất bại";
         return true;
     }
@@ -222,9 +267,9 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     server->acceptThread = std::thread([server]() {
         while (server->running.load()) {
             sockaddr_in clientAddr{};
-            socklen_t clientLen = sizeof(clientAddr);
-            int clientFd = accept(server->listenFd, reinterpret_cast<sockaddr *>(&clientAddr), &clientLen);
-            if (clientFd < 0) {
+            SocketLength clientLen = sizeof(clientAddr);
+            SocketHandle clientFd = accept(server->listenFd, reinterpret_cast<sockaddr *>(&clientAddr), &clientLen);
+            if (clientFd == kInvalidSocket) {
                 if (!server->running.load()) break;
                 continue;
             }
@@ -232,7 +277,7 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
             std::string method, target, body;
             std::unordered_map<std::string, std::string> headers;
             if (!recvHttpRequest(clientFd, method, target, headers, body)) {
-                close(clientFd);
+                closeSocket(clientFd);
                 continue;
             }
 
@@ -271,7 +316,6 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     std::cout << "[HTTP] low-level server listening on 0.0.0.0:" << port << std::endl;
     result = make_int_value(server->id);
     return true;
-#endif
 }
 
 bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &err) {
@@ -351,11 +395,11 @@ bool runLowLevelHttpServerSend(const std::string &reqId,
     }
 
     if (!sendHttpJsonResponse(req.clientFd, status, body)) {
-        close(req.clientFd);
+        closeSocket(req.clientFd);
         err = "mang_http_server_send: gửi phản hồi thất bại";
         return true;
     }
-    close(req.clientFd);
+    closeSocket(req.clientFd);
     result = make_int_value(1);
     return true;
 }
@@ -369,10 +413,8 @@ bool runLowLevelHttpServerClose(int serverId, StackValue &result, std::string &e
     }
 
     server->running = false;
-#if !defined(_WIN32)
-    shutdown(server->listenFd, SHUT_RDWR);
-    close(server->listenFd);
-#endif
+    shutdownSocket(server->listenFd);
+    closeSocket(server->listenFd);
     server->cv.notify_all();
     if (server->acceptThread.joinable()) server->acceptThread.join();
 
@@ -381,7 +423,7 @@ bool runLowLevelHttpServerClose(int serverId, StackValue &result, std::string &e
         gLowHttpServers.erase(serverId);
         for (auto it = gLowHttpRequests.begin(); it != gLowHttpRequests.end();) {
             if (it->second.serverId == serverId) {
-                if (it->second.clientFd >= 0) close(it->second.clientFd);
+                closeSocket(it->second.clientFd);
                 it = gLowHttpRequests.erase(it);
             } else {
                 ++it;

@@ -6,26 +6,10 @@ cd "$ROOT_DIR"
 
 mkdir -p bin
 
-c++ -std=c++17 -Iinclude \
-  src/cli/main.cpp \
-  src/frontend/keywords.cpp \
-  src/frontend/lexer.cpp \
-  src/helpers/expression.cpp \
-  src/helpers/storeString.cpp \
-  src/helpers/symbolTable.cpp \
-  src/helpers/tooling.cpp \
-  src/helpers/utility.cpp \
-  src/helpers/vm_native_helpers.cpp \
-  src/helpers/vm_native_http_helpers.cpp \
-  src/helpers/vm_low_level_http_server.cpp \
-  src/compiler/compileBlock.cpp \
-  src/compiler/compileCondition.cpp \
-  src/compiler/compileFunction.cpp \
-  src/compiler/compileLoop.cpp \
-  src/compiler/compileRegistry.cpp \
-  src/compiler/compileStatement.cpp \
-  src/compiler/compileSwitch.cpp \
-  src/compiler/compiler.cpp \
-  src/compiler/compilerExpr.cpp \
-  src/vm/vm.cpp \
-  -o bin/vpp-cli
+# Discover production sources so this shortcut cannot drift from new modules.
+# Tests are intentionally excluded; they are run through run_tests.sh.
+SOURCES=()
+while IFS= read -r source; do
+  SOURCES+=("$source")
+done < <(find src -type f -name '*.cpp' ! -path 'src/tests/*' -print | sort)
+c++ -std=c++17 -Iinclude "${SOURCES[@]}" -pthread -o bin/vpp-cli

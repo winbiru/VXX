@@ -61,6 +61,7 @@ static void printUsage() {
         << "  vpp --định-dạng <file.vi> [--in-place]\n"
         << "  vpp --repl\n"
         << "  vpp khởi tạo [tên-dự-án]\n"
+        << "  vpp khởi tạo backend <tên-dự-án>\n"
         << "  vpp cài đặt <nguồn> [tên]\n"
         << "  vpp danh sách\n"
         << "  vpp thông tin <tên>\n"
@@ -206,6 +207,53 @@ static int pkgInit(const std::string &name) {
         writePackageManifest(root, name);
     }
     std::cout << "Da tao manifest tai " << packageManifestPath(root) << std::endl;
+    return EXIT_SUCCESS;
+}
+
+static int backendInit(const std::string &name) {
+    if (name.empty()) {
+        std::cerr << "backend init: thieu ten du an\n";
+        return EXIT_FAILURE;
+    }
+
+    fs::path root = fs::current_path() / name;
+    if (fs::exists(root)) {
+        std::cerr << "backend init: thu muc da ton tai: " << root << '\n';
+        return EXIT_FAILURE;
+    }
+
+    fs::create_directories(root / "gói");
+    writePackageManifest(root, name);
+
+    const std::string application = R"VPP(nhập gói/thư viện/mạng/mạng web.vi;
+
+hàm main() {
+    serverId = mạng mở máy chủ api(8080);
+    lặp(i = 0; i < 2147483647; i = i + 1) {
+        requestId = mạng lấy yêu cầu kế tiếp(serverId);
+        nếu (requestId == "") {
+            bỏ qua;
+        };
+        mạng trả phản hồi(requestId, 200, "true");
+    };
+};
+)VPP";
+    const std::string properties = "port=8080\n";
+    const std::string readme =
+        "# " + name + "\n\n"
+        "Backend V++ tối giản.\n\n"
+        "## Chạy\n\n"
+        "```bash\nvpp application.vi\n```\n\n"
+        "Server lắng nghe tại `http://127.0.0.1:8080`.\n\n"
+        "```bash\ncurl http://127.0.0.1:8080/health\n```\n\n"
+        "Yêu cầu V++ được cài bằng installer để `VPP_HOME` trỏ tới thư viện chuẩn. "
+        "HTTP server native hiện hỗ trợ Linux/macOS.\n";
+
+    std::ofstream(root / "application.vi") << application;
+    std::ofstream(root / "application.properties") << properties;
+    std::ofstream(root / "README.md") << readme;
+
+    std::cout << "Da tao backend project tai " << root << std::endl;
     return EXIT_SUCCESS;
 }
 
@@ -646,6 +694,10 @@ int main(int argc, char* argv[]) {
             }
             if (command == "init" || command == "khởi tạo") {
                 std::string name = (argc >= (3 + commandWordOffset)) ? argv[2 + commandWordOffset] : "";
+                if (name == "backend") {
+                    std::string backendName = (argc >= (4 + commandWordOffset)) ? argv[3 + commandWordOffset] : "";
+                    return backendInit(backendName);
+                }
                 return pkgInit(name);
             }
             if (command == "install" || command == "cai" || command == "caidat" || command == "cài đặt") {
