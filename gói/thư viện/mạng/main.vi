@@ -1,2 +1,2 @@
 // Gói mạng: HTTP native và adapter máy chủ mức thấp.
-nhập "gói/thư viện/mạng/mạng web.vi";
+nhập "gói/thư viện/mạng/mạng.vi";

@@ -690,7 +690,11 @@ void initCompileMap() {
         // without a path component or extension as a package candidate whether
         // it was quoted or not, while continuing to resolve an actual file
         // before trying package directories.
-        const fs::path requestedPath(path);
+        // `std::filesystem::path(const char*)` uses the active Windows code
+        // page on MSVC. Import targets and bundled directory names are UTF-8,
+        // so construct every such path explicitly as UTF-8. Otherwise imports
+        // such as `nhập mạng;` fall back to `<project>/mạng.vi` on Windows.
+        const fs::path requestedPath = fs::u8path(path);
         const bool bareModuleName = requestedPath.parent_path().empty() &&
                                     requestedPath.extension().empty();
         const std::string bareModule = path;
@@ -729,13 +733,13 @@ void initCompileMap() {
 
         // For unquoted targets, append .vi only when there is no extension.
         if (!quotedTarget) {
-            fs::path rawPath(path);
+            fs::path rawPath = fs::u8path(path);
             if (rawPath.extension().empty()) {
                 path += ".vi";
             }
         }
 
-        fs::path p(path);
+        fs::path p = fs::u8path(path);
 
         // Compatibility fallbacks for the former flat package layout and the
         // retired leaf shims. They are intentionally fallbacks so a project
@@ -744,8 +748,9 @@ void initCompileMap() {
         {
             fs::path normalized = p.lexically_normal();
             auto root = normalized.begin();
+            const std::string rootName = (root != normalized.end()) ? root->u8string() : "";
             if (root != normalized.end() &&
-                (*root == "gói" || *root == "goi" || *root == "packages")) {
+                (rootName == "gói" || rootName == "goi" || rootName == "packages")) {
                 fs::path relativePath;
                 for (auto item = std::next(root); item != normalized.end(); ++item) {
                     relativePath /= *item;
@@ -761,22 +766,25 @@ void initCompileMap() {
                     {"thư viện/ứng dụng/ứng dụng máy chủ.vi", "thư viện/ứng dụng/tương thích/api project.vi"},
                 };
 
-                auto leafRedirect = legacyModuleRedirects.find(relativePath.generic_string());
+                auto leafRedirect = legacyModuleRedirects.find(relativePath.generic_u8string());
                 if (leafRedirect != legacyModuleRedirects.end()) {
-                    legacyPackageRedirect = fs::path("gói") / leafRedirect->second;
+                    legacyPackageRedirect = fs::u8path(u8"gói") / fs::u8path(leafRedirect->second);
                 } else {
                     auto package = relativePath.begin();
                     if (package != relativePath.end()) {
                         std::string canonicalPackage;
-                        auto alias = packageAliases.find(package->string());
+                        const std::string packageName = package->u8string();
+                        auto alias = packageAliases.find(packageName);
                         if (alias != packageAliases.end()) {
                             canonicalPackage = alias->second;
-                        } else if (bundledPackageNames.find(package->string()) != bundledPackageNames.end()) {
-                            canonicalPackage = package->string();
+                        } else if (bundledPackageNames.find(packageName) != bundledPackageNames.end()) {
+                            canonicalPackage = packageName;
                         }
 
                         if (!canonicalPackage.empty()) {
-                            legacyPackageRedirect = fs::path("gói") / "thư viện" / canonicalPackage;
+                            legacyPackageRedirect = fs::u8path(u8"gói") /
+                                                    fs::u8path(u8"thư viện") /
+                                                    fs::u8path(canonicalPackage);
                             for (auto rest = std::next(package); rest != relativePath.end(); ++rest) {
                                 legacyPackageRedirect /= *rest;
                             }
@@ -794,9 +802,10 @@ void initCompileMap() {
         }
 
         auto resolvePackageAtBase = [&](const fs::path &base, const std::string &packageName) {
-            fs::path packageMain = base / packageName / "main.vi";
-            fs::path packageRoot = base / packageName;
-            fs::path packageSource = base / (packageName + ".vi");
+            const fs::path packagePath = fs::u8path(packageName);
+            fs::path packageMain = base / packagePath / "main.vi";
+            fs::path packageRoot = base / packagePath;
+            fs::path packageSource = base / fs::u8path(packageName + ".vi");
             if (fs::exists(packageMain)) {
                 abs = fs::absolute(packageMain).lexically_normal();
                 return true;
@@ -810,7 +819,7 @@ void initCompileMap() {
                 return true;
             }
             if (bundledPackageNames.find(packageName) != bundledPackageNames.end()) {
-                fs::path bundledMain = base / "thư viện" / packageName / "main.vi";
+                fs::path bundledMain = base / fs::u8path(u8"thư viện") / packagePath / "main.vi";
                 if (fs::exists(bundledMain)) {
                     abs = fs::absolute(bundledMain).lexically_normal();
                     return true;
@@ -838,9 +847,9 @@ void initCompileMap() {
                 }
                 if (bareModuleName) {
                     std::vector<fs::path> packageBases = {
-                        dir / "gói",
-                        dir / "goi",
-                        dir / "packages"
+                        dir / fs::u8path(u8"gói"),
+                        dir / fs::u8path("goi"),
+                        dir / fs::u8path("packages")
                     };
                     for (const auto &base : packageBases) {
                         for (const auto &packageName : packageCandidates) {
@@ -866,12 +875,13 @@ void initCompileMap() {
         // module names.
         if (!fs::exists(abs)) {
             if (const char *vppHome = std::getenv("VPP_HOME")) {
-                fs::path bundled = fs::path(vppHome) / p;
+                const fs::path vppHomePath = fs::u8path(vppHome);
+                fs::path bundled = vppHomePath / p;
                 if (fs::exists(bundled)) {
                     abs = fs::absolute(bundled).lexically_normal();
                 }
                 if (!fs::exists(abs) && !legacyPackageRedirect.empty()) {
-                    fs::path redirected = fs::path(vppHome) / legacyPackageRedirect;
+                    fs::path redirected = vppHomePath / legacyPackageRedirect;
                     if (fs::exists(redirected)) {
                         abs = fs::absolute(redirected).lexically_normal();
                     }
@@ -879,7 +889,7 @@ void initCompileMap() {
                 if (!fs::exists(abs) && bareModuleName) {
                     for (const char *packageDir : {"gói", "goi", "packages"}) {
                         for (const auto &packageName : packageCandidates) {
-                            if (resolvePackageAtBase(fs::path(vppHome) / packageDir, packageName)) {
+                            if (resolvePackageAtBase(vppHomePath / fs::u8path(packageDir), packageName)) {
                                 break;
                             }
                         }
@@ -891,7 +901,7 @@ void initCompileMap() {
             }
         }
 
-        std::string canonical = abs.string();
+        std::string canonical = abs.u8string();
 
         if (vietvm::compiler::importedFiles.find(canonical) != vietvm::compiler::importedFiles.end()) {
             // already imported in this compile session — no-op
@@ -904,7 +914,7 @@ void initCompileMap() {
 
         try {
             // read file
-            std::ifstream ifs(canonical);
+            std::ifstream ifs(abs);
             if (!ifs.is_open()) {
                 throw std::runtime_error(std::string("nhập: không thể mở file '") + canonical + "'");
             }

@@ -10,6 +10,8 @@ $vpp = (Resolve-Path $VppExecutable).Path
 $example = Join-Path $repoRoot "examples\api_project\application.vi"
 $stdoutLog = Join-Path ([System.IO.Path]::GetTempPath()) ("vpp-http-" + [guid]::NewGuid().ToString() + ".out.log")
 $stderrLog = Join-Path ([System.IO.Path]::GetTempPath()) ("vpp-http-" + [guid]::NewGuid().ToString() + ".err.log")
+$importProbeDir = Join-Path ([System.IO.Path]::GetTempPath()) ("vpp-import-" + [guid]::NewGuid().ToString())
+$importProbe = Join-Path $importProbeDir "import-utf8.vi"
 $previousVppHome = $env:VPP_HOME
 $server = $null
 
@@ -17,6 +19,25 @@ try {
     # The example is a V++ HTTP server, so this validates the native Winsock
     # adapter through the same public module path used by an installed project.
     $env:VPP_HOME = $repoRoot
+
+    # Keep UTF-8 bundled module lookup separate from the server assertion. The
+    # source runs outside the repository, so imports must resolve through
+    # VPP_HOME/gói/thư viện rather than a relative project path.
+    [System.IO.Directory]::CreateDirectory($importProbeDir) | Out-Null
+    $probeSource = @'
+nhập mạng;
+nhập "vào ra";
+'@
+    [System.IO.File]::WriteAllText(
+        $importProbe,
+        $probeSource,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $probeOutput = & $vpp $importProbe 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "V++ could not resolve UTF-8 bundled imports through VPP_HOME. output: $probeOutput"
+    }
+
     $startArgs = @{
         FilePath = $vpp
         ArgumentList = @($example)
@@ -58,4 +79,5 @@ try {
         $env:VPP_HOME = $previousVppHome
     }
     Remove-Item $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+    Remove-Item $importProbeDir -Recurse -Force -ErrorAction SilentlyContinue
 }
