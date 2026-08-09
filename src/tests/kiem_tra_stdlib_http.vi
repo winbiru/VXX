@@ -1,5 +1,5 @@
 nhập gói/thư viện/main.vi;
 
 hàm main() {
-    in mạng lấy("http://127.0.0.1:18080/get") != "";
+    in mạng lấy("http://127.0.0.1:18080/get") == "GET|";
 };

@@ -230,7 +230,7 @@ static int backendInit(const std::string &name) {
 
     fs::path templateRoot;
     if (const char *vppHome = std::getenv("VPP_HOME")) {
-        fs::path candidate = fs::path(vppHome) / "templates" / "backend";
+        fs::path candidate = fs::u8path(vppHome) / "templates" / "backend";
         if (fs::exists(candidate)) templateRoot = candidate;
     }
     if (templateRoot.empty()) {

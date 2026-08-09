@@ -8,6 +8,13 @@ hàm main() {
         nếu (requestId == "") {
             bỏ qua;
         };
-        mạng trả phản hồi(requestId, 200, "{\"ok\":true}");
+        path = mạng path yêu cầu(requestId);
+        method = mạng method yêu cầu(requestId);
+        body = mạng body yêu cầu(requestId);
+        response = method + "|" + body;
+        nếu (path == "/health") {
+            response = "{\"ok\":true}";
+        };
+        mạng trả phản hồi(requestId, 200, response);
     };
 };

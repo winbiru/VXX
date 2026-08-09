@@ -258,7 +258,7 @@
 | `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | ✅ |
 | `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
 | `kiem_tra_stdlib_http_post_put.vi` | Native API: HTTP POST/PUT thành công | ✅ |
-| `http_fixture.vi` | HTTP fixture nội bộ viết bằng V++ cho test GET/POST/PUT | ✅ |
+| `http_fixture.vi` | HTTP fixture nội bộ viết bằng V++ cho test GET/POST/PUT/DELETE và body request | ✅ |
 | `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
 | `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
 | `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |

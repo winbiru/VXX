@@ -144,6 +144,22 @@ if (BUILD_TESTS)
                          ${CMAKE_SOURCE_DIR}/run_tests.sh)
         set_tests_properties(vpp-integration PROPERTIES
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+    elseif (WIN32 AND EXISTS ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1)
+        # The bundled module names are UTF-8 Vietnamese text.  PowerShell 7
+        # reads UTF-8 scripts consistently, unlike legacy Windows PowerShell.
+        find_program(VPP_POWERSHELL_EXECUTABLE NAMES pwsh)
+        if (VPP_POWERSHELL_EXECUTABLE)
+            add_test(NAME vpp-integration
+                     COMMAND ${VPP_POWERSHELL_EXECUTABLE}
+                             -NoLogo -NoProfile -NonInteractive
+                             -ExecutionPolicy Bypass
+                             -File ${CMAKE_SOURCE_DIR}/scripts/windows/run-tests.ps1
+                             -VppExecutable $<TARGET_FILE:vpp-cli>)
+            set_tests_properties(vpp-integration PROPERTIES
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        else()
+            message(WARNING "PowerShell 7 (pwsh) was not found; Windows integration tests are disabled")
+        endif()
     endif()
 endif()
 

@@ -1,12 +1,15 @@
 nhập gói/thư viện/main.vi;
 
 hàm main() {
-    in mạng gửi("http://127.0.0.1:18080/post", "{\"nguon\":\"vpp\",\"ok\":1}") != "";
-    in mạng gửi("http://127.0.0.1:18080/post", "{\"wrapper\":\"post\"}") != "";
+    in mạng gửi("http://127.0.0.1:18080/post", "{\"nguon\":\"vpp\",\"ok\":1}") == "POST|{\"nguon\":\"vpp\",\"ok\":1}";
+    in mạng gửi("http://127.0.0.1:18080/post", "{\"wrapper\":\"post\"}") == "POST|{\"wrapper\":\"post\"}";
 
-    in mạng cập nhật("http://127.0.0.1:18080/put", "{\"nguon\":\"vpp\",\"ok\":1}") != "";
-    in mạng cập nhật("http://127.0.0.1:18080/put", "{\"wrapper\":\"put\"}") != "";
+    in mạng cập nhật("http://127.0.0.1:18080/put", "{\"nguon\":\"vpp\",\"ok\":1}") == "PUT|{\"nguon\":\"vpp\",\"ok\":1}";
+    in mạng cập nhật("http://127.0.0.1:18080/put", "{\"wrapper\":\"put\"}") == "PUT|{\"wrapper\":\"put\"}";
 
-    in mạng xóa("http://127.0.0.1:18080/delete") != "";
-    in rest xóa("http://127.0.0.1:18080", "/delete") != "";
+    payload = "{\"text\":\"xin chào \\\"V++\\\" \\\\ 100% &\"}";
+    in mạng gửi("http://127.0.0.1:18080/post", payload) == "POST|" + payload;
+
+    in mạng xóa("http://127.0.0.1:18080/delete") == "DELETE|";
+    in rest xóa("http://127.0.0.1:18080", "/delete") == "DELETE|";
 };

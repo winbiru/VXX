@@ -6,10 +6,19 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <limits>
 #include <optional>
 #include <regex>
 #include <sstream>
 #include <string>
+#include <vector>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
 
 #include "vpp/runtime/value.h"
 
@@ -51,6 +60,166 @@ std::string shellQuoteSingle(const std::string &s) {
     out += "'";
     return out;
 }
+
+#if defined(_WIN32)
+std::optional<std::wstring> utf8ToWide(const std::string &text) {
+    if (text.empty()) return std::wstring{};
+    if (text.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return std::nullopt;
+    }
+
+    const int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                           text.data(), static_cast<int>(text.size()),
+                                           nullptr, 0);
+    if (length <= 0) return std::nullopt;
+
+    std::wstring wide(static_cast<size_t>(length), L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                            text.data(), static_cast<int>(text.size()),
+                            wide.data(), length) != length) {
+        return std::nullopt;
+    }
+    return wide;
+}
+
+void appendWindowsCommandArgument(std::wstring &command, const std::wstring &argument) {
+    if (!command.empty()) command.push_back(L' ');
+
+    if (!argument.empty() && argument.find_first_of(L" \t\n\v\"") == std::wstring::npos) {
+        command += argument;
+        return;
+    }
+
+    command.push_back(L'"');
+    size_t backslashes = 0;
+    for (wchar_t c : argument) {
+        if (c == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        if (c == L'"') {
+            command.append(backslashes * 2 + 1, L'\\');
+            command.push_back(L'"');
+        } else {
+            command.append(backslashes, L'\\');
+            command.push_back(c);
+        }
+        backslashes = 0;
+    }
+    command.append(backslashes * 2, L'\\');
+    command.push_back(L'"');
+}
+
+bool runWindowsProcess(const std::vector<std::string> &arguments,
+                       std::string &output,
+                       DWORD &exitCode) {
+    std::wstring command;
+    for (const std::string &argument : arguments) {
+        auto wide = utf8ToWide(argument);
+        if (!wide.has_value()) return false;
+        appendWindowsCommandArgument(command, *wide);
+    }
+
+    SECURITY_ATTRIBUTES attributes{};
+    attributes.nLength = sizeof(attributes);
+    attributes.bInheritHandle = TRUE;
+
+    HANDLE readPipe = nullptr;
+    HANDLE writePipe = nullptr;
+    HANDLE nullInput = INVALID_HANDLE_VALUE;
+    PROCESS_INFORMATION processInfo{};
+    bool started = false;
+
+    if (!CreatePipe(&readPipe, &writePipe, &attributes, 0) ||
+        !SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0)) {
+        if (readPipe) CloseHandle(readPipe);
+        if (writePipe) CloseHandle(writePipe);
+        return false;
+    }
+
+    nullInput = CreateFileW(L"NUL", GENERIC_READ,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, &attributes,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (nullInput == INVALID_HANDLE_VALUE) {
+        CloseHandle(readPipe);
+        CloseHandle(writePipe);
+        return false;
+    }
+
+    STARTUPINFOW startupInfo{};
+    startupInfo.cb = sizeof(startupInfo);
+    startupInfo.dwFlags = STARTF_USESTDHANDLES;
+    startupInfo.hStdInput = nullInput;
+    startupInfo.hStdOutput = writePipe;
+    startupInfo.hStdError = writePipe;
+
+    std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+    mutableCommand.push_back(L'\0');
+    started = CreateProcessW(nullptr, mutableCommand.data(), nullptr, nullptr,
+                             TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
+                             &startupInfo, &processInfo) != FALSE;
+    CloseHandle(nullInput);
+    CloseHandle(writePipe);
+    writePipe = nullptr;
+    if (!started) {
+        CloseHandle(readPipe);
+        return false;
+    }
+
+    output.clear();
+    char chunk[512];
+    DWORD bytesRead = 0;
+    bool readOk = true;
+    while (true) {
+        if (ReadFile(readPipe, chunk, sizeof(chunk), &bytesRead, nullptr)) {
+            if (bytesRead == 0) break;
+            output.append(chunk, bytesRead);
+            continue;
+        }
+        if (GetLastError() != ERROR_BROKEN_PIPE) readOk = false;
+        break;
+    }
+
+    CloseHandle(readPipe);
+    WaitForSingleObject(processInfo.hProcess, INFINITE);
+    const bool gotExitCode = GetExitCodeProcess(processInfo.hProcess, &exitCode) != FALSE;
+    CloseHandle(processInfo.hThread);
+    CloseHandle(processInfo.hProcess);
+    return readOk && gotExitCode;
+}
+
+bool runCurlHttpRequestWindows(const std::string &method,
+                               const std::string &fnName,
+                               const std::string &url,
+                               const std::optional<std::string> &payload,
+                               StackValue &result,
+                               std::string &err) {
+    std::vector<std::string> arguments = {
+        "curl.exe", "-Ls", "--max-time", "20", "-X", method
+    };
+    if (payload.has_value()) {
+        arguments.push_back("-H");
+        arguments.push_back("Content-Type: application/json");
+        arguments.push_back("--data-raw");
+        arguments.push_back(*payload);
+    }
+    arguments.push_back(url);
+
+    std::string data;
+    DWORD exitCode = 0;
+    if (!runWindowsProcess(arguments, data, exitCode)) {
+        err = fnName + ": không mở được tiến trình curl";
+        return true;
+    }
+    if (exitCode != 0) {
+        err = fnName + ": curl trả về lỗi";
+        return true;
+    }
+
+    result = make_string_value(data);
+    return true;
+}
+#endif
 
 std::string sanitizeDbToken(const std::string &s) {
     std::string out = trimCopy(s);
@@ -507,6 +676,12 @@ bool runCurlHttpRequest(const std::string &method,
                         const std::optional<std::string> &payload,
                         StackValue &result,
                         std::string &err) {
+#if defined(_WIN32)
+    // _popen routes through cmd.exe, whose quoting rules are incompatible with
+    // JSON and with the POSIX single-quote command used below. Execute curl
+    // directly so each URL/header/payload remains one argument on Windows.
+    return runCurlHttpRequestWindows(method, fnName, url, payload, result, err);
+#else
     std::string cmd = "curl -Ls --max-time 20 -X " + method;
     if (payload.has_value()) {
         cmd += " -H 'Content-Type: application/json' --data " + shellQuoteSingle(*payload);
@@ -533,6 +708,7 @@ bool runCurlHttpRequest(const std::string &method,
 
     result = make_string_value(data);
     return true;
+#endif
 }
 
 } // namespace vietvm::helpers

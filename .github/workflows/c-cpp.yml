@@ -22,8 +22,8 @@ jobs:
       - name: Build V++
         run: cmake --build cmake-build-debug
 
-      - name: Run tests
-        run: ctest --test-dir cmake-build-debug --output-on-failure
+      - name: Run full V++ regression suite
+        run: ctest --test-dir cmake-build-debug --output-on-failure --verbose --no-tests=error
 
       - name: Run AddressSanitizer and UndefinedBehaviorSanitizer tests
         run: |
@@ -32,7 +32,7 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized
-          ctest --test-dir cmake-build-sanitized --output-on-failure
+          ctest --test-dir cmake-build-sanitized --output-on-failure --verbose --no-tests=error
 
   windows-build:
     runs-on: windows-latest
@@ -41,17 +41,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure CMake
-        run: cmake -S . -B build -DBUILD_TESTS=OFF
+        run: cmake -S . -B build
 
       - name: Build Windows HTTP server support
         run: cmake --build build --config Release
 
-      - name: Run Windows native HTTP server smoke test
+      - name: Run Windows full V++ regression suite
         shell: pwsh
         run: |
-          $vpp = Get-ChildItem -Path build -Recurse -Filter vpp-cli.exe |
-            Select-Object -First 1 -ExpandProperty FullName
-          if ([string]::IsNullOrWhiteSpace($vpp)) {
-            throw "Khong tim thay vpp-cli.exe sau khi build"
-          }
-          & scripts/windows/test-http-server.ps1 -VppExecutable $vpp
+          ctest --test-dir build -C Release --output-on-failure --verbose --no-tests=error
