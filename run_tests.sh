@@ -51,14 +51,18 @@ trap cleanup EXIT INT TERM
 
 "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
+fixture_ready=0
 for _ in $(seq 1 50); do
-  if curl -fsS --max-time 1 http://127.0.0.1:18080/health >/dev/null 2>&1; then
+  if curl -fsS --max-time 1 http://127.0.0.1:18080/health >"$tmpdir/http_fixture.output" 2>/dev/null &&
+     [ "$(cat "$tmpdir/http_fixture.output")" = '{"ok":true}' ]; then
+    fixture_ready=1
     break
   fi
   sleep 0.1
 done
-if ! curl -fsS --max-time 1 http://127.0.0.1:18080/health >/dev/null 2>&1; then
-  echo "ERROR: local HTTP test fixture did not start" >&2
+if [ "$fixture_ready" -ne 1 ]; then
+  echo "ERROR: local HTTP test fixture did not return the expected /health response" >&2
+  cat "$tmpdir/http_fixture.log" >&2
   exit 2
 fi
 

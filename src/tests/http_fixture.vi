@@ -13,7 +13,7 @@ hàm main() {
         body = mạng body yêu cầu(requestId);
         response = method + "|" + body;
         nếu (path == "/health") {
-            response = "{\"ok\":true}";
+            response = '{"ok":true}';
         };
         mạng trả phản hồi(requestId, 200, response);
     };
