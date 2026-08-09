@@ -14,6 +14,9 @@
 #include <vector>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -64,7 +67,7 @@ std::string shellQuoteSingle(const std::string &s) {
 #if defined(_WIN32)
 std::optional<std::wstring> utf8ToWide(const std::string &text) {
     if (text.empty()) return std::wstring{};
-    if (text.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)())) {
         return std::nullopt;
     }
 
