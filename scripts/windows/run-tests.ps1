@@ -13,6 +13,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $script:Vpp = (Resolve-Path -LiteralPath $VppExecutable).Path
 $script:PassCount = 0
 $script:FailCount = 0
+$script:LastHttpProbeError = ""
 $sessionDir = Join-Path (Join-Path $repoRoot "src\tests\.tmp") ("windows-" + [guid]::NewGuid().ToString())
 $externalVppHome = $null
 $fixtureProcess = $null
@@ -165,14 +166,17 @@ function Wait-ForHttp {
         [int]$Attempts = 50
     )
 
+    $script:LastHttpProbeError = ""
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 1
+            # Local fixture checks must not inherit a corporate/runner proxy.
+            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -NoProxy -TimeoutSec 1
             if ($response.StatusCode -eq 200 -and $response.Content.Trim() -eq $ExpectedContent) {
                 return $true
             }
+            $script:LastHttpProbeError = "unexpected response: status $($response.StatusCode), body '$($response.Content.Trim())'"
         } catch {
-            # The child server is still starting.
+            $script:LastHttpProbeError = $_.Exception.Message
         }
         Start-Sleep -Milliseconds 100
     }
@@ -253,7 +257,7 @@ try {
         $fixtureProcess = $null
         $fixtureOutput = Get-NormalizedUtf8Text $fixtureStdOut
         $fixtureError = Get-NormalizedUtf8Text $fixtureStdErr
-        throw "Local HTTP test fixture did not start (pid: $fixturePid, exit code: $fixtureExitCode). stdout: $fixtureOutput stderr: $fixtureError"
+        throw "Local HTTP test fixture did not start (pid: $fixturePid, exit code: $fixtureExitCode, probe: $script:LastHttpProbeError). stdout: $fixtureOutput stderr: $fixtureError"
     }
 
     # This helper also checks the native Winsock adapter and the UTF-8 import

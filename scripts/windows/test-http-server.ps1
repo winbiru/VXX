@@ -49,16 +49,19 @@ nhập "vào ra";
     $server = Start-Process @startArgs
 
     $healthy = $false
+    $lastProbeError = ""
     for ($attempt = 0; $attempt -lt 50; $attempt++) {
         try {
-            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" -UseBasicParsing -TimeoutSec 1
+            $response = Invoke-WebRequest -Uri "http://127.0.0.1:8080/health" -UseBasicParsing -NoProxy -TimeoutSec 1
             if ($response.StatusCode -eq 200 -and $response.Content.Trim() -eq "true") {
                 $healthy = $true
                 break
             }
+            $lastProbeError = "unexpected response: status $($response.StatusCode), body '$($response.Content.Trim())'"
         } catch {
-            Start-Sleep -Milliseconds 100
+            $lastProbeError = $_.Exception.Message
         }
+        Start-Sleep -Milliseconds 100
     }
 
     if (-not $healthy) {
@@ -76,7 +79,7 @@ nhập "vào ra";
         }
         $stdout = if (Test-Path $stdoutLog) { Get-Content -Raw $stdoutLog } else { "" }
         $stderr = if (Test-Path $stderrLog) { Get-Content -Raw $stderrLog } else { "" }
-        throw "V++ HTTP server did not answer /health. stdout: $stdout stderr: $stderr"
+        throw "V++ HTTP server did not answer /health. probe: $lastProbeError stdout: $stdout stderr: $stderr"
     }
 
     Write-Host "Windows native HTTP server smoke test passed."

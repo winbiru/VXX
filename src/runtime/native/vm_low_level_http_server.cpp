@@ -235,9 +235,24 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
         return true;
     }
 
+#if defined(_WIN32)
+    // SO_REUSEADDR has different semantics on Winsock: another process can
+    // bind the same address/port and receive connections unpredictably.  The
+    // low-level server owns its port, so make that ownership explicit.
+    BOOL exclusive = TRUE;
+    if (setsockopt(listenFd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                   reinterpret_cast<const char *>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR) {
+        const int socketError = WSAGetLastError();
+        closeSocket(listenFd);
+        err = "mang_http_server_open: không thể giữ riêng cổng (WSA=" +
+              std::to_string(socketError) + ")";
+        return true;
+    }
+#else
     int reuse = 1;
     setsockopt(listenFd, SOL_SOCKET, SO_REUSEADDR,
                reinterpret_cast<const char *>(&reuse), sizeof(reuse));
+#endif
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
