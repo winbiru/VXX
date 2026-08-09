@@ -40,6 +40,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install SQLite CLI
+        shell: pwsh
+        run: |
+          choco install sqlite --yes --no-progress
+          if ($LASTEXITCODE -notin @(0, 3010)) {
+            throw "SQLite installation failed with exit code $LASTEXITCODE"
+          }
+          Get-Command sqlite3.exe -ErrorAction Stop | Out-Null
+
       - name: Configure CMake
         run: cmake -S . -B build
 

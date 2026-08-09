@@ -436,6 +436,20 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
                     const std::string &sql,
                     std::string &output,
                     std::string &reason) {
+#if defined(_WIN32)
+    // _popen runs through cmd.exe on Windows, where neither POSIX command
+    // substitution nor single-quote escaping works. Invoke SQLite directly so
+    // the database path and SQL remain individual UTF-8 arguments.
+    DWORD exitCode = 0;
+    if (!runWindowsProcess({"sqlite3.exe", cfg.sqlitePath, sql}, output, exitCode)) {
+        reason = "cannot-open-sqlite-process";
+        return false;
+    }
+    if (exitCode != 0) {
+        reason = sanitizeDbToken(output);
+        return false;
+    }
+#else
     std::string sqliteBin = "$(command -v sqlite3 || echo sqlite3)";
     std::string cmd = sqliteBin + " " + shellQuoteSingle(cfg.sqlitePath) +
                       " " + shellQuoteSingle(sql) + " 2>&1";
@@ -449,6 +463,7 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
         reason = sanitizeDbToken(output);
         return false;
     }
+#endif
 
     output = trimCopy(output);
     return true;

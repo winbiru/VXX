@@ -276,6 +276,10 @@ try {
     New-Item -ItemType Directory -Path $scaffoldRoot -Force | Out-Null
     $scaffoldStdOut = Join-Path $sessionDir "backend-init.output"
     $scaffoldStdErr = Join-Path $sessionDir "backend-init.stderr"
+    $backendStdOut = $null
+    $backendStdErr = $null
+    $backendProbeError = ""
+    $backendFailureReason = ""
     $scaffoldExit = Invoke-Vpp -Arguments @("init", "backend", "demo-api") -StdOut $scaffoldStdOut -StdErr $scaffoldStdErr -WorkingDirectory $scaffoldRoot
     $scaffoldProject = Join-Path $scaffoldRoot "demo-api"
     $properties = Join-Path $scaffoldProject "application.properties"
@@ -285,20 +289,42 @@ try {
     }
     if ($scaffoldOk) {
         $propertiesText = [System.IO.File]::ReadAllText($properties, [System.Text.UTF8Encoding]::new($false))
-        $propertiesText = [regex]::Replace($propertiesText, "(?m)^port=8080$", "port=18081")
-        [System.IO.File]::WriteAllText($properties, $propertiesText, [System.Text.UTF8Encoding]::new($false))
-        $backendStdOut = Join-Path $sessionDir "backend-server.output"
-        $backendStdErr = Join-Path $sessionDir "backend-server.stderr"
-        $backendProcess = Start-VppServer -Source (Join-Path $scaffoldProject "application.vi") -StdOut $backendStdOut -StdErr $backendStdErr -WorkingDirectory $scaffoldProject
-        $scaffoldOk = Wait-ForHttp -Uri "http://127.0.0.1:18081/health" -ExpectedContent "true"
-        Stop-VppServer $backendProcess
-        $backendProcess = $null
+        # `$` in multiline regex sits before `\n`, not before a preceding
+        # CRLF `\r`; accept both checkout line endings before changing the port.
+        $updatedPropertiesText = [regex]::Replace($propertiesText, "(?m)^port=8080\r?$", "port=18081")
+        if ($updatedPropertiesText -notmatch "(?m)^port=18081\r?$") {
+            $scaffoldOk = $false
+            $backendFailureReason = "Could not change the scaffold server port to 18081."
+        } else {
+            [System.IO.File]::WriteAllText($properties, $updatedPropertiesText, [System.Text.UTF8Encoding]::new($false))
+            $backendStdOut = Join-Path $sessionDir "backend-server.output"
+            $backendStdErr = Join-Path $sessionDir "backend-server.stderr"
+            $backendProcess = Start-VppServer -Source (Join-Path $scaffoldProject "application.vi") -StdOut $backendStdOut -StdErr $backendStdErr -WorkingDirectory $scaffoldProject
+            $scaffoldOk = Wait-ForHttp -Uri "http://127.0.0.1:18081/health" -ExpectedContent "true"
+            $backendProbeError = $script:LastHttpProbeError
+            Stop-VppServer $backendProcess
+            $backendProcess = $null
+        }
     }
     if ($scaffoldOk) {
         Add-Pass "backend scaffold"
     } else {
         Add-Fail "backend scaffold"
-        Show-FailureDetails -StdErr $scaffoldStdErr -ExitCode $scaffoldExit
+        if ($scaffoldExit -ne 0) {
+            Show-FailureDetails -StdErr $scaffoldStdErr -ExitCode $scaffoldExit
+        } elseif (-not [string]::IsNullOrWhiteSpace($backendFailureReason)) {
+            Write-Host "  $backendFailureReason"
+        } else {
+            Write-Host "  health probe: $backendProbeError"
+            $backendOutput = Get-NormalizedUtf8Text $backendStdOut
+            $backendError = Get-NormalizedUtf8Text $backendStdErr
+            if (-not [string]::IsNullOrWhiteSpace($backendOutput)) {
+                Write-Host "  stdout: $backendOutput"
+            }
+            if (-not [string]::IsNullOrWhiteSpace($backendError)) {
+                Write-Host "  stderr: $backendError"
+            }
+        }
     }
 
     Write-Host "== Running Vietnamese package import via VPP_HOME =="
