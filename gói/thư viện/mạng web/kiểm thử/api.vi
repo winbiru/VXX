@@ -1,0 +1,70 @@
+// Module: thư viện.mạng web.kiểm thử.api
+// Mục đích: helper tạo request theo HTTP verb để test/mô phỏng controller.
+// Nhóm hàm: api get, api post, api put, api delete và biến thể json/query.
+
+// Ghi chú hàm: api url hợp lệ.
+hàm api url hợp lệ(url) {
+    nếu (url == "") {
+        trả về sai;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: api payload mặc định.
+hàm api payload mặc định(payload) {
+    nếu (payload == "") {
+        trả về "{}";
+    };
+    trả về payload;
+};
+
+// Ghi chú hàm: api tạo yêu cầu.
+hàm api tạo yêu cầu(method, url, payload) {
+    nếu (!api url hợp lệ(url)) {
+        trả về "ERR|missing-url";
+    };
+
+    nếu (method == "GET" || method == "DELETE") {
+        trả về method + "|" + url;
+    };
+
+    trả về method + "|" + url + "|" + payload;
+};
+
+// Ghi chú hàm: api get.
+hàm api get(url) {
+    trả về api tạo yêu cầu("GET", url, "");
+};
+
+// Ghi chú hàm: api post.
+hàm api post(url, payload) {
+    trả về api tạo yêu cầu("POST", url, payload);
+};
+
+// Ghi chú hàm: api put.
+hàm api put(url, payload) {
+    trả về api tạo yêu cầu("PUT", url, payload);
+};
+
+// Ghi chú hàm: api delete.
+hàm api delete(url) {
+    trả về api tạo yêu cầu("DELETE", url, "");
+};
+
+// Ghi chú hàm: api post json.
+hàm api post json(url, payload) {
+    trả về api post(url, api payload mặc định(payload));
+};
+
+// Ghi chú hàm: api put json.
+hàm api put json(url, payload) {
+    trả về api put(url, api payload mặc định(payload));
+};
+
+// Ghi chú hàm: api get có query.
+hàm api get có query(url, query) {
+    nếu (query == "") {
+        trả về api get(url);
+    };
+    trả về api get(url + "?" + query);
+};

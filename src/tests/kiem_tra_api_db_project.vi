@@ -1,6 +1,6 @@
-nhập src/tests/api_project/database.vi;
-nhập src/tests/api_project/controller.vi;
-nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;
+nhập src/tests/fixtures/api_project/database.vi;
+nhập src/tests/fixtures/api_project/controller.vi;
+nhập "gói/thư viện/ứng dụng/tương thích/api project.vi";
 
 lớp công khai ApiDbProjectTest {
     hàm công khai runAll() {

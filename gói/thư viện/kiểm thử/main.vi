@@ -1,0 +1,3 @@
+// Gói kiểm thử: assertion cơ bản cho mã V++.
+// Không tự import vào gói/thư viện/main.vi để production không kéo API test.
+nhập "gói/thư viện/kiểm thử/khẳng định.vi";

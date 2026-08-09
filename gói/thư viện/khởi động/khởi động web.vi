@@ -1,12 +1,3 @@
-// Module: thư viện.khởi động.khởi động web
-// Mục đích: facade gom các module thường dùng cho web/service.
-// Cách dùng: nhập một file này để mở nhanh stack web + auth + log.
-
-nhập gói/thư viện/cốt lõi/chuỗi.vi;
-nhập gói/thư viện/cốt lõi/luận lý.vi;
-nhập gói/thư viện/mạng/mạng web.vi;
-nhập gói/thư viện/mạng/rest.vi;
-nhập gói/thư viện/mạng/api.vi;
-nhập gói/thư viện/hỗ trợ/nhật ký.vi;
-nhập gói/thư viện/hỗ trợ/xác thực.vi;
-nhập gói/thư viện/thời gian/đồng hồ.vi;
+// Đường dẫn tương thích cũ; giữ API test builder của starter web trước đây.
+nhập "gói/thư viện/khởi động/web.vi";
+nhập "gói/thư viện/mạng web/kiểm thử/api.vi";

@@ -145,20 +145,18 @@
 | `mang_http_post(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
 | `mang_http_put(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
 
-### 6.2 Kiến trúc stdlib theo module (Spring-style)
+### 6.2 Kiến trúc thư viện/framework theo module
 | Hạng mục | Trạng thái |
 |----------|-----------|
-| Entry-point `lib/stdlib.vi` đóng vai trò aggregator | ✅ |
-| Entry-point `gói/stdlib/main.vi` đóng vai trò aggregator | ✅ |
-| Module `core` (math/string/logic) | ✅ |
-| Module `web` (HTTP get/post/put) | ✅ |
-| Module `io` (đọc/ghi file) | ✅ |
-| Module `time` (clock/time API) | ✅ |
-| Module `config` (đọc cấu hình) | ✅ |
-| Module `support` (logging) | ✅ |
-| Facade `stdlib-web-starter` (import chọn lọc web stack) | ✅ |
-| Facade `stdlib-data-starter` (import chọn lọc data stack) | ✅ |
-| Facade `stdlib-app-starter` (import full app stack) | ✅ |
+| `gói/thư viện/cốt lõi` (toán/chuỗi/luận lý/xác thực) | ✅ |
+| `gói/thư viện/vào ra` (tệp/cấu hình/thời gian/nhật ký) | ✅ |
+| `gói/thư viện/mạng` (HTTP native client/server wrapper) | ✅ |
+| `gói/thư viện/mạng web` (REST helpers; test API tách riêng) | ✅ |
+| `gói/thư viện/dữ liệu` (phân trang/database adapter) | ✅ *(phụ thuộc driver CLI của host)* |
+| `gói/thư viện/ứng dụng` (lifecycle chung, không tự import full stack) | ✅ |
+| `gói/thư viện/khởi động` (facade web/dữ liệu/ứng dụng; `ứng dụng` là full stack) | ✅ |
+| `gói/thư viện/main.vi` (entrypoint đầy đủ) | ✅ |
+| Shim tên starter cũ trong cùng cây `gói/thư viện/khởi động` | ✅ |
 
 ---
 
@@ -254,6 +252,8 @@
 | `kiem_tra_rong_va_map.vi` | Kiểu `rỗng` và literal map | ✅ |
 | `kiem_tra_lambda_hof_mac_dinh.vi` | Lambda + higher-order + tham số mặc định | ✅ |
 | `kiem_tra_namespace_module.vi` | Namespace alias khi import module | ✅ |
+| `kiem_tra_package_modules.vi` | Import trực tiếp toàn bộ entrypoint package tiếng Việt | ✅ |
+| `kiem_tra_package_tieng_viet.vi` | Import bare/quoted package tiếng Việt, kể cả qua `VPP_HOME` ngoài repo | ✅ |
 | `kiem_tra_stdlib.vi` | Import và dùng stdlib tiếng Việt | ✅ |
 | `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | ✅ |
 | `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
@@ -265,7 +265,7 @@
 | Unit test cho StringPool | Thêm/lấy/xóa | ⬜ |
 | Unit test cho symbolTable | Scope isolation | ⬜ |
 
-**Tỷ lệ regression hiện tại: 42/42 PASS ✅ (theo `run_tests.sh`, ngày 07/08/2026)**
+**Regression suite: 49 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
 
 ---
 
@@ -287,7 +287,7 @@
 | Syntax highlighting (VSCode/Vim) | ✅ |
 | Formatter / linter | ✅ |
 | Package manager (`vpp-cli install`, `vpp-cli cai`) | ✅ |
-| Mẫu backend/API server | 🚧 — có `src/tests/api_project`, chưa có lệnh scaffold backend hoàn chỉnh |
+| Mẫu backend/API server | ✅ — `examples/api_project` và `vpp khởi tạo backend <tên>` từ `templates/backend` |
 
 ### 11.1 Thư Viện & Phụ Thuộc Mã Nguồn
 #### Đang sử dụng (đầy đủ theo quét include/CMake)
@@ -296,7 +296,7 @@
 | C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | ✅ |
 | C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | ✅ |
 | `curl` (binary hệ thống, gọi qua shell) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put(...)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
-| CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-frontend`, `vpp-compiler`, `vpp-vm`, `vpp-cli`) | ✅ |
+| CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vpp-compiler`, `vpp-runtime`, `vpp-tooling`, `vpp-cli`) | ✅ |
 
 #### Không sử dụng (không phát hiện trong include/CMake hiện tại)
 | Thành phần | Trạng thái |
@@ -318,17 +318,17 @@
 | I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
 | Hệ thống tệp (filesystem) | ✅ | Dùng `std::filesystem` cho import, package manager, CLI |
 | Mạng TCP/UDP | ⬜ | Chưa có API socket native |
-| HTTP client | ✅ | Có `mang_http_get/post/put(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
+| HTTP client | ✅ | Có `mang_http_get/post/put/delete(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
 | Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
-| Collections (array/map) | ✅ | Array, map literal đã hỗ trợ |
+| Collections (array/map) | 🚧 | Có map literal scalar; array literal/index và map get/set chưa là API runtime ổn định |
 | Xử lý chuỗi | ✅ | Nối chuỗi, thao tác chuỗi cơ bản |
 | Toán học | ✅ | Có nhóm hàm stdlib tính toán |
 | Ngày giờ | ✅ | Có `lay_thoi_gian_hien_tai()` |
-| Serialization JSON/XML/YAML | ⬜ | Chưa có module serialize chuẩn |
-| Logging chuẩn | ⬜ | Chưa có module log chuyên dụng |
+| Serialization JSON/XML/YAML | 🚧 | Có `mạng web/json.vi` cho escape/quote và dựng object chuỗi; chưa có parser hoặc array/nested-object runtime |
+| Logging chuẩn | ✅ | Có module `gói/thư viện/vào ra/nhật ký.vi` cơ bản |
 | Cấu hình (config) | ✅ | Có `doc_config(path)` |
 | Xử lý lỗi/ngoại lệ | ✅ | Có `thử` / `bắt lỗi` / `ném lỗi` |
-| Testing framework nội bộ ngôn ngữ | 🚧 | Có `run_tests.sh`, chưa có test framework API trong V++ |
+| Testing framework nội bộ ngôn ngữ | 🚧 | Có `run_tests.sh` và `kiểm thử` với assertion cơ bản; chưa có discovery/runner API trong V++ |
 | Reflection/Metadata | ⬜ | Chưa có introspection runtime |
 | FFI (gọi thư viện ngoài) | ⬜ | Chưa có cơ chế FFI chính thức |
 | Quản lý gói & phiên bản | ✅ | Có `vpp cài đặt`, `vpp danh sách`, `vpp phiên bản` |
@@ -353,7 +353,7 @@
 | `docs/language-comparison.md` — So sánh với ngôn ngữ khác | ✅ |
 | `CHECKLIST.md` — File này | ✅ |
 | `CONTRIBUTING.md` — Hướng dẫn đóng góp | ✅ |
-| Tutorial / ví dụ từng bước | ⬜ |
+| Tutorial / ví dụ HTTP tối giản | ✅ — `examples/api_project` |
 | API reference cho embedding | ⬜ |
 
 ---

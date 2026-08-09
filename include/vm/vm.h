@@ -12,7 +12,7 @@
 
 #include "instruction.h"
 #include "../common/vm_callframe.h"
-#include "../common/vm_utils.h"
+#include "vpp/runtime/value.h"
 
 class VM {
 public:

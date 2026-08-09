@@ -6,4 +6,7 @@ hàm main() {
 
     in mạng cập nhật("http://127.0.0.1:18080/put", "{\"nguon\":\"vpp\",\"ok\":1}") != "";
     in mạng cập nhật("http://127.0.0.1:18080/put", "{\"wrapper\":\"put\"}") != "";
+
+    in mạng xóa("http://127.0.0.1:18080/delete") != "";
+    in rest xóa("http://127.0.0.1:18080", "/delete") != "";
 };

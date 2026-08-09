@@ -30,13 +30,12 @@ Lưu ý: không build bằng `c++ src/cli/main.cpp -o main` vì thiếu toàn b�
 Chạy một chương trình:
 
 ```bash
-./bin/vpp-cli ../src/tests/program.vi
+./bin/vpp-cli src/tests/program.vi
 ```
 
 Chạy toàn bộ test:
 
 ```bash
-cd /Users/winbiru/V++
 ./run_tests.sh
 ```
 
@@ -120,11 +119,11 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./VPP nơi
 ./VPP thống kê
 ./VPP chạy example.vi
-./VPP cài đặt ./lib/stdlib.vi stdlib
+./VPP cài đặt "./gói/thư viện"
 ./VPP caidat ./duong-dan/goi.vi ten-goi
 ./VPP xóa ten-goi
-./VPP thông tin stdlib
-./VPP kiểm tra stdlib
+./VPP thông tin "thư viện"
+./VPP kiểm tra "thư viện"
 
 ./bin/vpp-cli --giải-mã example.vi
 ./bin/vpp-cli --lint example.vi
@@ -134,11 +133,11 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./bin/vpp-cli --lsp
 ./bin/vpp-cli khởi tạo demo
 ./bin/vpp-cli khởi tạo backend my-api
-./bin/vpp-cli cài đặt ./lib/stdlib.vi stdlib
+./bin/vpp-cli cài đặt "./gói/thư viện"
 ./bin/vpp-cli danh sách
-./bin/vpp-cli xóa stdlib
-./bin/vpp-cli thông tin stdlib
-./bin/vpp-cli kiểm tra stdlib
+./bin/vpp-cli xóa mypkg
+./bin/vpp-cli thông tin "thư viện"
+./bin/vpp-cli kiểm tra "thư viện"
 ./bin/vpp-cli thống kê
 ./bin/vpp-cli gói khởi tạo demo
 ./bin/vpp-cli gói thêm lib.vi mypkg
@@ -160,8 +159,42 @@ Windows có thể dùng trực tiếp:
 VPP.cmd caidat duong-dan\goi.vi ten-goi
 ```
 
-`nhập thu_vien;` hoạt động như alias của `gói/thư viện/main.vi`, và gói local sẽ được tìm trong `gói/<name>/main.vi`.
-Các bản cài từ release đặt thư viện chuẩn cạnh binary và installer tự cấu hình `VPP_HOME` để các import này hoạt động ngoài repository.
+Thư viện chuẩn là một package duy nhất tại `gói/thư viện`. Program mới nên
+import module tiếng Việt nhỏ nhất cần dùng. Khi import theo tên module, tên có
+khoảng trắng có thể để trần hoặc đặt trong dấu nháy; đường dẫn file có khoảng
+trắng luôn phải đặt trong dấu nháy:
+
+```vi
+nhập cốt lõi;
+nhập "vào ra";
+nhập mạng;
+nhập "mạng web";
+nhập dữ liệu;
+nhập "ứng dụng";
+nhập "kiểm thử";
+```
+
+- `gói/thư viện/cốt lõi`: toán học, chuỗi, luận lý và validation.
+- `gói/thư viện/vào ra`: tệp, cấu hình, thời gian và logging.
+- `gói/thư viện/mạng`: HTTP client GET/POST/PUT/DELETE cùng HTTP server mức thấp.
+- `gói/thư viện/mạng web`: REST helpers và JSON scalar an toàn, phụ thuộc `gói/thư viện/mạng`.
+- `gói/thư viện/dữ liệu`: phân trang và database adapter.
+- `gói/thư viện/ứng dụng`: chỉ lifecycle ứng dụng chung; không tự kéo web, HTTP hay data.
+- `gói/thư viện/khởi động`: facade tiện dụng cho web, dữ liệu và ứng dụng full stack.
+- `gói/thư viện/kiểm thử`: khẳng định cơ bản trong mã V++ (`khẳng định đúng`, `khẳng định sai`, `khẳng định bằng`, `khẳng định khác`).
+
+`gói/thư viện/main.vi` là entrypoint đầy đủ. Mỗi module có `main.vi` tại
+`gói/thư viện/<tên tiếng Việt>/main.vi`. Có thể import theo tên module như
+trên, hoặc dùng đường dẫn tường minh khi cần module con, ví dụ
+`nhập "gói/thư viện/mạng web/kiểm thử/api.vi";`. Các bản cài từ release đặt thư viện
+chuẩn cạnh binary và installer tự cấu hình `VPP_HOME`, vì vậy các import này
+vẫn hoạt động ngoài repository.
+
+`kiểm thử` và `mạng web/kiểm thử/api.vi` là module tùy chọn, không được import
+tự động bởi `main.vi`; mã production không bị kéo theo API kiểm thử.
+
+Các module trên được bundle cùng V++; package manager xem `thư viện` là một
+package và chưa tự resolve dependency/version cho module con.
 
 HTTP server native hỗ trợ Linux, macOS và Windows.
 
@@ -176,26 +209,39 @@ curl http://127.0.0.1:8080/health
 
 Endpoint mẫu trả JSON boolean `true`.
 
-### Starter modules (Spring-style facade)
+### Module khởi động
 
-Ngoài `nhập thu_vien;`, có thể import theo nhu cầu bằng starter facade:
+Các entrypoint khởi động canonical có thể import bằng đường dẫn:
 
 ```vi
-nhập gói/thư viện/khởi động/khởi động web.vi;
-nhập gói/thư viện/khởi động/khởi động dữ liệu.vi;
-nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+nhập "gói/thư viện/khởi động/web.vi";
+nhập "gói/thư viện/khởi động/dữ liệu.vi";
+nhập "gói/thư viện/khởi động/ứng dụng.vi";
 ```
 
-- `stdlib-web-starter`: string + logic + http + logging + time.
-- `stdlib-data-starter`: math + string + logic + file + config + time + logging.
-- `stdlib-app-starter`: full stack (core + io + web + config + time + support).
+- `web`: cốt lõi + vào ra + mạng web.
+- `dữ liệu`: cốt lõi + vào ra + dữ liệu.
+- `ứng dụng`: cốt lõi + vào ra + mạng web + dữ liệu + lifecycle.
+
+Vì vậy hãy dùng `gói/thư viện/ứng dụng` khi chỉ cần lifecycle, và dùng
+`gói/thư viện/khởi động/ứng dụng.vi` khi chủ ý cần full stack. Test request builders ở
+`gói/thư viện/mạng web/kiểm thử/api.vi` không được import tự động bởi cả hai entrypoint.
+
+Ba tên starter cũ `khởi động dữ liệu.vi`, `khởi động web.vi` và `khởi động ứng dụng.vi`
+được giữ làm shim nhỏ trong cùng cây module; chúng không tạo thêm package hay
+copy implementation.
 
 ## Cấu Trúc Chính
 
 - `src/cli/main.cpp`: entrypoint của CLI
+- `src/core/`: tiện ích dùng chung
 - `src/frontend/`: lexer + keyword map
-- `src/compiler/`: compile tokens thành bytecode
-- `src/vm/`: runtime VM
+- `src/compiler/`: compile tokens thành bytecode và compiler support
+- `src/runtime/`: VM + native adapters (HTTP, file, DB)
+- `src/tooling/`: formatter, linter, disassembler
+- `examples/`: ứng dụng mẫu chạy độc lập
+- `templates/`: template do CLI scaffold sử dụng
+- `src/tests/fixtures/`: dữ liệu/fixture cho regression test
 - `docs/`: bytecode, grammar, kiến trúc
 - `src/tests/`: chương trình kiểm thử
 

@@ -3,8 +3,18 @@ setlocal
 
 set ROOT=%~dp0
 
+if exist "%ROOT%bin\vpp-cli.exe" (
+  "%ROOT%bin\vpp-cli.exe" %*
+  exit /b %ERRORLEVEL%
+)
+
 if exist "%ROOT%cmake-build-debug\bin\vpp-cli.exe" (
   "%ROOT%cmake-build-debug\bin\vpp-cli.exe" %*
+  exit /b %ERRORLEVEL%
+)
+
+if exist "%ROOT%build\bin\vpp-cli.exe" (
+  "%ROOT%build\bin\vpp-cli.exe" %*
   exit /b %ERRORLEVEL%
 )
 

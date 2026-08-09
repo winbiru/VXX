@@ -1,0 +1,23 @@
+nhập src/tests/fixtures/api_project/database.vi;
+
+lớp công khai UserRepository {
+    hàm công khai findAllUsers(dbSession) {
+        trả về db query(dbSession, "SELECT * FROM users");
+    };
+
+    hàm công khai createUser(dbSession, payload) {
+        trả về db query(dbSession, "INSERT INTO users");
+    };
+
+    hàm công khai updateUser(dbSession, userId, payload) {
+        trả về db query(dbSession, "UPDATE users");
+    };
+
+    hàm công khai deleteUser(dbSession, userId) {
+        trả về db query(dbSession, "DELETE users");
+    };
+
+    hàm công khai searchUsers(dbSession, keyword) {
+        trả về db search users(dbSession, keyword);
+    };
+};

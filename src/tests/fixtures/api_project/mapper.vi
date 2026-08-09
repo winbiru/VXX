@@ -1,0 +1,41 @@
+nhập src/tests/fixtures/api_project/entity.vi;
+nhập src/tests/fixtures/api_project/dto.vi;
+
+// Mapper cho luồng chuyển đổi DTO <-> Entity trong api_project.
+
+lớp công khai UserMapper {
+    // Map create request sang entity logic.
+    hàm công khai toCreateEntity(payload) {
+        dtoRes = UserCreateRequestDto.validate(payload);
+        nếu (dtoRes == "DTO_ERR|missing-body") {
+            trả về "MAPPER_ERR|missing-body";
+        };
+        trả về UserEntity.ofUsername("an");
+    };
+
+    // Map update request sang entity logic.
+    hàm công khai toUpdateEntity(userId, payload) {
+        dtoRes = UserUpdateRequestDto.validate(userId, payload);
+        nếu (dtoRes == "DTO_ERR|missing-user-id") {
+            trả về "MAPPER_ERR|missing-user-id";
+        };
+        nếu (dtoRes == "DTO_ERR|missing-body") {
+            trả về "MAPPER_ERR|missing-body";
+        };
+        trả về UserEntity.mergeName("an", "an-nguyen");
+    };
+
+    // Map keyword search sang entity logic.
+    hàm công khai toSearchEntity(keyword) {
+        dtoRes = UserSearchRequestDto.validate(keyword);
+        nếu (dtoRes == "DTO_ERR|missing-keyword") {
+            trả về "MAPPER_ERR|missing-keyword";
+        };
+        trả về "MAPPER_OK|keyword=" + keyword;
+    };
+
+    // Map response DB về DTO response chuẩn.
+    hàm công khai toUsersResponse(dbRes) {
+        trả về UserResponseDto.normalizeUsersResponse(dbRes);
+    };
+};

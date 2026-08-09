@@ -1,0 +1,13 @@
+// Module: thư viện.vào ra.đồng hồ
+// Mục đích: cung cấp API thời gian hiện tại cho ứng dụng.
+// Ghi chú: phụ thuộc native hook của VM.
+
+// Ghi chú hàm: lấy thời gian hiện tại.
+hàm lấy thời gian hiện tại() {
+    ném "stdlib: lấy thời gian hiện tại native hook không khả dụng";
+};
+
+// Ghi chú hàm: giờ hiện tại.
+hàm giờ hiện tại() {
+    trả về lấy thời gian hiện tại();
+};

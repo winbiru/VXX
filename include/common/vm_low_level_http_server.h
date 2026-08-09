@@ -3,7 +3,7 @@
 #include <optional>
 #include <string>
 
-#include "vm/vm.h"
+#include "vpp/runtime/value.h"
 
 namespace vietvm::helpers {
 

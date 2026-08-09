@@ -17,6 +17,11 @@ hàm mạng cập nhật(đường dẫn, dữ liệu) {
     ném "thư viện: mạng cập nhật native hook không khả dụng";
 };
 
+// Ghi chú hàm: mạng xóa.
+hàm mạng xóa(đường dẫn) {
+    ném "thư viện: mạng xóa native hook không khả dụng";
+};
+
 // Ghi chú hàm: chạy HTTP server native cho api_project.
 hàm mạng chạy máy chủ api(cổng, driver, jdbcUrl, username, password) {
     ném "thư viện: mạng chạy máy chủ api native hook không khả dụng";

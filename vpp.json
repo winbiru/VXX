@@ -1,5 +1,7 @@
 {
   "name": "V++",
   "version": "0.1.0",
-  "gói": ["thư viện"]
+  "gói": [
+    "thư viện"
+  ]
 }

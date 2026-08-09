@@ -45,3 +45,13 @@ jobs:
 
       - name: Build Windows HTTP server support
         run: cmake --build build --config Release
+
+      - name: Run Windows native HTTP server smoke test
+        shell: pwsh
+        run: |
+          $vpp = Get-ChildItem -Path build -Recurse -Filter vpp-cli.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          if ([string]::IsNullOrWhiteSpace($vpp)) {
+            throw "Khong tim thay vpp-cli.exe sau khi build"
+          }
+          & scripts/windows/test-http-server.ps1 -VppExecutable $vpp

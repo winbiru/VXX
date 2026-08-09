@@ -3,13 +3,15 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
-if [ -x "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" ]; then
-  exec "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" "$@"
-fi
-
-if [ -x "$SCRIPT_DIR/build/bin/vietvm-cli" ]; then
-  exec "$SCRIPT_DIR/build/bin/vietvm-cli" "$@"
-fi
+for candidate in \
+  "$SCRIPT_DIR/bin/vpp-cli" \
+  "$SCRIPT_DIR/cmake-build-debug/bin/vpp-cli" \
+  "$SCRIPT_DIR/build/bin/vpp-cli" \
+  "$SCRIPT_DIR/build/bin/vietvm-cli"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
 
 echo "VPP: chưa tìm thấy binary CLI. Hãy build trước:" >&2
 echo "  mkdir -p cmake-build-debug && cd cmake-build-debug && cmake .. && make -j" >&2

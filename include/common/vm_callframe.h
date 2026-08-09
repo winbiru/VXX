@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
-#include "vm_utils.h"
+#include "vpp/runtime/value.h"
 
 // Use the same StackValue/Value type as your VM (adjust if you use different type)
 using Value = StackValue;

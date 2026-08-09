@@ -1,0 +1,5 @@
+[IN] "xin"
+[IN] {"tên":"V++","trạng thái":"sẵn sàng"}
+[IN] dòng \"một\" \\ đường\ndòng hai
+[IN] {"data":{"id":"req-1"},"success":true,"message":"hoàn tất"}
+[IN] {"data":{},"success":false,"message":"không tìm thấy"}

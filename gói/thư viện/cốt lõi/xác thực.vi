@@ -1,0 +1,19 @@
+// Module: thư viện.cốt lõi.xác thực
+// Mục đích: hỗ trợ validate điều kiện đầu vào theo kiểu guard clause.
+// Nhóm hàm: yêu cầu đúng, yêu cầu không rỗng.
+
+// Ghi chú hàm: yêu cầu đúng.
+hàm yêu cầu đúng(điều kiện, thông điệp) {
+    nếu (!điều kiện) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: yêu cầu không rỗng.
+hàm yêu cầu không rỗng(giá trị, thông điệp) {
+    nếu (giá trị == "") {
+        ném thông điệp;
+    };
+    trả về đúng;
+};

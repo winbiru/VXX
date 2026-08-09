@@ -1,0 +1,5 @@
+// Gói cốt lõi: các tiện ích không phụ thuộc mạng, dữ liệu hoặc ứng dụng.
+nhập "gói/thư viện/cốt lõi/toán học.vi";
+nhập "gói/thư viện/cốt lõi/chuỗi.vi";
+nhập "gói/thư viện/cốt lõi/luận lý.vi";
+nhập "gói/thư viện/cốt lõi/xác thực.vi";

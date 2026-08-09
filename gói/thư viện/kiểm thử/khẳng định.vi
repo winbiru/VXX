@@ -1,0 +1,34 @@
+// Module: thư viện.kiểm thử.khẳng định
+// Mục đích: assertion cơ bản có thể dùng trực tiếp trong chương trình V++.
+
+// Ghi chú hàm: khẳng định điều kiện đúng.
+hàm khẳng định đúng(điều kiện, thông điệp = "khẳng định đúng thất bại") {
+    nếu (!điều kiện) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: khẳng định điều kiện sai.
+hàm khẳng định sai(điều kiện, thông điệp = "khẳng định sai thất bại") {
+    nếu (điều kiện) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: khẳng định hai giá trị bằng nhau.
+hàm khẳng định bằng(thực tế, kỳ vọng, thông điệp = "khẳng định bằng thất bại") {
+    nếu (thực tế != kỳ vọng) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: khẳng định hai giá trị khác nhau.
+hàm khẳng định khác(thực tế, giá trị khác, thông điệp = "khẳng định khác thất bại") {
+    nếu (thực tế == giá trị khác) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};

@@ -1,0 +1,8 @@
+nhập kiểm thử;
+
+hàm main() {
+    in khẳng định đúng(2 > 1);
+    in khẳng định sai(2 < 1);
+    in khẳng định bằng("vpp", "vpp");
+    in khẳng định khác("vpp", "vietvm");
+};

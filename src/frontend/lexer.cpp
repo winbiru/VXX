@@ -12,7 +12,7 @@
 #include <unordered_map>
 
 #include "../../include/frontend/lexer.h"
-#include "common/utility.h"
+#include "vpp/core/text.h"
 
 namespace vietvm::compiler {
     using Value = std::variant<int, double, std::string>;
@@ -279,7 +279,7 @@ namespace vietvm::compiler {
     }
 
     std::string normalizeTokenForCompare(const std::string& s) {
-        std::string t = trim(s);
+        std::string t = vietvm::core::trim(s);
         if (t.empty()) return t;
         // If token is a quoted string, return as-is (do not modify inner content)
         if ( (t.size() >= 2 && t.front() == '"' && t.back() == '"') ||
@@ -290,7 +290,7 @@ namespace vietvm::compiler {
         char last = t.back();
         if (last == ':' || last == ';' || last == ',' || last == '.') {
             t.pop_back();
-            t = trim(t);
+            t = vietvm::core::trim(t);
             if (t.empty()) return t;
         }
         // Lowercase ASCII for comparison (keep non-ascii unchanged)

@@ -1,0 +1,19 @@
+nhập mạng;
+nhập "vào ra";
+
+hàm main() {
+    cổng = đọc cấu hình khóa("application.properties", "port", "8080");
+    serverId = mạng mở máy chủ api(cổng);
+    lặp(i = 0; i < 2147483647; i = i + 1) {
+        requestId = mạng lấy yêu cầu kế tiếp(serverId);
+        nếu (requestId == "") {
+            bỏ qua;
+        };
+        path = mạng path yêu cầu(requestId);
+        nếu (path == "/health") {
+            mạng trả phản hồi(requestId, 200, "true");
+        } hoặc {
+            mạng trả phản hồi(requestId, 404, "null");
+        };
+    };
+};

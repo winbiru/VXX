@@ -1,0 +1,38 @@
+// Module: thư viện.mạng web.json
+// Mục đích: dựng chuỗi JSON an toàn cho các giá trị scalar.
+// Giới hạn v1: chưa parse JSON và chưa biểu diễn array/object lồng nhau ở runtime.
+
+// Ghi chú hàm: escape một chuỗi theo JSON (quote, backslash và ký tự điều khiển).
+hàm json thoát(giá trị) {
+    ném "thư viện: json thoát native hook không khả dụng";
+};
+
+// Ghi chú hàm: tạo literal JSON string, gồm cả dấu quote bao ngoài.
+hàm json chuỗi(giá trị) {
+    ném "thư viện: json chuỗi native hook không khả dụng";
+};
+
+// Ghi chú hàm: tạo một property JSON có giá trị chuỗi.
+hàm json thuộc tính chuỗi(khóa, giá trị) {
+    trả về json chuỗi(khóa) + ":" + json chuỗi(giá trị);
+};
+
+// Ghi chú hàm: tạo một property JSON với giá trị raw đã hợp lệ.
+hàm json thuộc tính thô(khóa, giá trịRaw) {
+    trả về json chuỗi(khóa) + ":" + giá trịRaw;
+};
+
+// Ghi chú hàm: tạo object JSON rỗng.
+hàm json đối tượng rỗng() {
+    trả về "{}";
+};
+
+// Ghi chú hàm: tạo object JSON một property chuỗi.
+hàm json đối tượng một chuỗi(khóa, giá trị) {
+    trả về "{" + json thuộc tính chuỗi(khóa, giá trị) + "}";
+};
+
+// Ghi chú hàm: tạo object JSON hai property chuỗi.
+hàm json đối tượng hai chuỗi(khóa một, giá trị một, khóa hai, giá trị hai) {
+    trả về "{" + json thuộc tính chuỗi(khóa một, giá trị một) + "," + json thuộc tính chuỗi(khóa hai, giá trị hai) + "}";
+};

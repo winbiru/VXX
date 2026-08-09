@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -7,6 +8,7 @@
 #include <regex>
 #include <unordered_map>
 #include <filesystem>
+#include <cstdlib>
 #include "../../include/compiler/compiler.h"
 #include "../../include/vm/vm.h"
 #include "../../include/frontend/keywords.h"
@@ -99,6 +101,9 @@ static int runSnippet(const std::string &source, const fs::path &cwd, bool execu
 
     VM vm(bytecode, stringPool);
     vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
+    for (const auto &entry : vietvm::compiler::hamMap::hamNameIndexMap) {
+        vm.functionTableByNameIndex[entry.second] = entry.first;
+    }
     vm.run();
     return EXIT_SUCCESS;
 }
@@ -179,6 +184,7 @@ static std::vector<std::string> listPackages(const fs::path &root) {
             }
         }
     }
+    std::sort(packages.begin(), packages.end());
     return packages;
 }
 
@@ -222,36 +228,36 @@ static int backendInit(const std::string &name) {
         return EXIT_FAILURE;
     }
 
+    fs::path templateRoot;
+    if (const char *vppHome = std::getenv("VPP_HOME")) {
+        fs::path candidate = fs::path(vppHome) / "templates" / "backend";
+        if (fs::exists(candidate)) templateRoot = candidate;
+    }
+    if (templateRoot.empty()) {
+        for (fs::path dir = fs::current_path(); ; dir = dir.parent_path()) {
+            fs::path candidate = dir / "templates" / "backend";
+            if (fs::exists(candidate)) {
+                templateRoot = candidate;
+                break;
+            }
+            if (dir == dir.parent_path()) break;
+        }
+    }
+    if (templateRoot.empty()) {
+        std::cerr << "backend init: khong tim thay templates/backend\n";
+        return EXIT_FAILURE;
+    }
+
     fs::create_directories(root / "gói");
     writePackageManifest(root, name);
-
-    const std::string application = R"VPP(nhập gói/thư viện/mạng/mạng web.vi;
-
-hàm main() {
-    serverId = mạng mở máy chủ api(8080);
-    lặp(i = 0; i < 2147483647; i = i + 1) {
-        requestId = mạng lấy yêu cầu kế tiếp(serverId);
-        nếu (requestId == "") {
-            bỏ qua;
-        };
-        mạng trả phản hồi(requestId, 200, "true");
-    };
-};
-)VPP";
-    const std::string properties = "port=8080\n";
-    const std::string readme =
-        "# " + name + "\n\n"
-        "Backend V++ tối giản.\n\n"
-        "## Chạy\n\n"
-        "```bash\nvpp application.vi\n```\n\n"
-        "Server lắng nghe tại `http://127.0.0.1:8080`.\n\n"
-        "```bash\ncurl http://127.0.0.1:8080/health\n```\n\n"
-        "Yêu cầu V++ được cài bằng installer để `VPP_HOME` trỏ tới thư viện chuẩn. "
-        "HTTP server native hiện hỗ trợ Linux/macOS.\n";
-
-    std::ofstream(root / "application.vi") << application;
-    std::ofstream(root / "application.properties") << properties;
-    std::ofstream(root / "README.md") << readme;
+    for (const char *filename : {"application.vi", "application.properties", "README.md", ".gitignore"}) {
+        std::error_code ec;
+        fs::copy_file(templateRoot / filename, root / filename, fs::copy_options::none, ec);
+        if (ec) {
+            std::cerr << "backend init: khong the copy template " << filename << ": " << ec.message() << '\n';
+            return EXIT_FAILURE;
+        }
+    }
 
     std::cout << "Da tao backend project tai " << root << std::endl;
     return EXIT_SUCCESS;

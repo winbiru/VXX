@@ -10,7 +10,9 @@
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
+#include <iterator>
 #include <stdexcept>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "common/loopUltil.h"
@@ -672,12 +674,57 @@ void initCompileMap() {
         // Determine path
         std::string path = quotedTarget ? target.substr(1, target.size() - 2) : target;
 
-        // package shortcuts
-        if (path == "thư viện chuẩn" || path == "thu_vien_chuan") {
+        // Package shortcuts for the bundled standard library.
+        if (path == "thư viện chuẩn" || path == "thu_vien_chuan" || path == "stdlib") {
             path = "gói/thư viện/main.vi";
         }
         if (path == "thư viện" || path == "thu_vien") {
             path = "gói/thư viện/main.vi";
+        }
+
+        // A package name may be quoted when it contains spaces, for example:
+        //
+        //     nhập "cốt lõi";
+        //
+        // Quoting must not turn that into a file-only import.  Treat a target
+        // without a path component or extension as a package candidate whether
+        // it was quoted or not, while continuing to resolve an actual file
+        // before trying package directories.
+        const fs::path requestedPath(path);
+        const bool bareModuleName = requestedPath.parent_path().empty() &&
+                                    requestedPath.extension().empty();
+        const std::string bareModule = path;
+
+        // Keep the previous bare `vpp_*` imports working. Bundled modules now
+        // live under the single `gói/thư viện` package; local project packages
+        // with the same name still take precedence during lookup below.
+        static const std::unordered_map<std::string, std::string> packageAliases = {
+            {"vpp_core", "cốt lõi"},
+            {"vpp_io", "vào ra"},
+            {"vpp_http", "mạng"},
+            {"vpp_web", "mạng web"},
+            {"vpp_data", "dữ liệu"},
+            {"vpp_app", "ứng dụng"},
+            {"vpp_starters", "khởi động"},
+        };
+        static const std::unordered_set<std::string> bundledPackageNames = {
+            "cốt lõi",
+            "vào ra",
+            "mạng",
+            "mạng web",
+            "dữ liệu",
+            "ứng dụng",
+            "khởi động",
+            "kiểm thử",
+        };
+
+        std::vector<std::string> packageCandidates;
+        if (bareModuleName) {
+            packageCandidates.push_back(bareModule);
+            auto alias = packageAliases.find(bareModule);
+            if (alias != packageAliases.end()) {
+                packageCandidates.push_back(alias->second);
+            }
         }
 
         // For unquoted targets, append .vi only when there is no extension.
@@ -689,6 +736,55 @@ void initCompileMap() {
         }
 
         fs::path p(path);
+
+        // Compatibility fallbacks for the former flat package layout and the
+        // retired leaf shims. They are intentionally fallbacks so a project
+        // that owns a real file at an old path keeps working unchanged.
+        fs::path legacyPackageRedirect;
+        {
+            fs::path normalized = p.lexically_normal();
+            auto root = normalized.begin();
+            if (root != normalized.end() &&
+                (*root == "gói" || *root == "goi" || *root == "packages")) {
+                fs::path relativePath;
+                for (auto item = std::next(root); item != normalized.end(); ++item) {
+                    relativePath /= *item;
+                }
+
+                static const std::unordered_map<std::string, std::string> legacyModuleRedirects = {
+                    {"thư viện/cấu hình/cấu hình.vi", "thư viện/vào ra/cấu hình.vi"},
+                    {"thư viện/hỗ trợ/nhật ký.vi", "thư viện/vào ra/nhật ký.vi"},
+                    {"thư viện/hỗ trợ/xác thực.vi", "thư viện/cốt lõi/xác thực.vi"},
+                    {"thư viện/thời gian/đồng hồ.vi", "thư viện/vào ra/đồng hồ.vi"},
+                    {"thư viện/mạng/rest.vi", "thư viện/mạng web/rest.vi"},
+                    {"thư viện/mạng/api.vi", "thư viện/mạng web/kiểm thử/api.vi"},
+                    {"thư viện/ứng dụng/ứng dụng máy chủ.vi", "thư viện/ứng dụng/tương thích/api project.vi"},
+                };
+
+                auto leafRedirect = legacyModuleRedirects.find(relativePath.generic_string());
+                if (leafRedirect != legacyModuleRedirects.end()) {
+                    legacyPackageRedirect = fs::path("gói") / leafRedirect->second;
+                } else {
+                    auto package = relativePath.begin();
+                    if (package != relativePath.end()) {
+                        std::string canonicalPackage;
+                        auto alias = packageAliases.find(package->string());
+                        if (alias != packageAliases.end()) {
+                            canonicalPackage = alias->second;
+                        } else if (bundledPackageNames.find(package->string()) != bundledPackageNames.end()) {
+                            canonicalPackage = package->string();
+                        }
+
+                        if (!canonicalPackage.empty()) {
+                            legacyPackageRedirect = fs::path("gói") / "thư viện" / canonicalPackage;
+                            for (auto rest = std::next(package); rest != relativePath.end(); ++rest) {
+                                legacyPackageRedirect /= *rest;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // Make absolute and normalized path (if possible)
         fs::path abs;
         try {
@@ -696,6 +792,32 @@ void initCompileMap() {
         } catch (...) {
             abs = p;
         }
+
+        auto resolvePackageAtBase = [&](const fs::path &base, const std::string &packageName) {
+            fs::path packageMain = base / packageName / "main.vi";
+            fs::path packageRoot = base / packageName;
+            fs::path packageSource = base / (packageName + ".vi");
+            if (fs::exists(packageMain)) {
+                abs = fs::absolute(packageMain).lexically_normal();
+                return true;
+            }
+            if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
+                abs = fs::absolute(packageRoot).lexically_normal();
+                return true;
+            }
+            if (fs::exists(packageSource)) {
+                abs = fs::absolute(packageSource).lexically_normal();
+                return true;
+            }
+            if (bundledPackageNames.find(packageName) != bundledPackageNames.end()) {
+                fs::path bundledMain = base / "thư viện" / packageName / "main.vi";
+                if (fs::exists(bundledMain)) {
+                    abs = fs::absolute(bundledMain).lexically_normal();
+                    return true;
+                }
+            }
+            return false;
+        };
 
         // If resolved path does not exist, attempt to locate the file by searching
         // upward from the current working directory and appending the requested path.
@@ -707,26 +829,26 @@ void initCompileMap() {
                     abs = fs::absolute(cand).lexically_normal();
                     break;
                 }
-                if (p.parent_path().empty() && p.extension().empty()) {
+                if (!legacyPackageRedirect.empty()) {
+                    fs::path redirected = dir / legacyPackageRedirect;
+                    if (fs::exists(redirected)) {
+                        abs = fs::absolute(redirected).lexically_normal();
+                        break;
+                    }
+                }
+                if (bareModuleName) {
                     std::vector<fs::path> packageBases = {
                         dir / "gói",
                         dir / "goi",
                         dir / "packages"
                     };
                     for (const auto &base : packageBases) {
-                        fs::path packageMain = base / p / "main.vi";
-                        fs::path packageRoot = base / p;
-                        fs::path packageSource = base / (p.string() + ".vi");
-                        if (fs::exists(packageMain)) {
-                            abs = fs::absolute(packageMain).lexically_normal();
-                            break;
+                        for (const auto &packageName : packageCandidates) {
+                            if (resolvePackageAtBase(base, packageName)) {
+                                break;
+                            }
                         }
-                        if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
-                            abs = fs::absolute(packageRoot).lexically_normal();
-                            break;
-                        }
-                        if (fs::exists(packageSource)) {
-                            abs = fs::absolute(packageSource).lexically_normal();
+                        if (fs::exists(abs)) {
                             break;
                         }
                     }
@@ -740,12 +862,31 @@ void initCompileMap() {
 
         // Installed releases keep the standard library beside the executable.
         // The installer exposes that location through VPP_HOME, so a project
-        // outside the repository can still import gói/thư viện/... .
+        // outside the repository can import gói/thư viện/... and bare bundled
+        // module names.
         if (!fs::exists(abs)) {
             if (const char *vppHome = std::getenv("VPP_HOME")) {
                 fs::path bundled = fs::path(vppHome) / p;
                 if (fs::exists(bundled)) {
                     abs = fs::absolute(bundled).lexically_normal();
+                }
+                if (!fs::exists(abs) && !legacyPackageRedirect.empty()) {
+                    fs::path redirected = fs::path(vppHome) / legacyPackageRedirect;
+                    if (fs::exists(redirected)) {
+                        abs = fs::absolute(redirected).lexically_normal();
+                    }
+                }
+                if (!fs::exists(abs) && bareModuleName) {
+                    for (const char *packageDir : {"gói", "goi", "packages"}) {
+                        for (const auto &packageName : packageCandidates) {
+                            if (resolvePackageAtBase(fs::path(vppHome) / packageDir, packageName)) {
+                                break;
+                            }
+                        }
+                        if (fs::exists(abs)) {
+                            break;
+                        }
+                    }
                 }
             }
         }

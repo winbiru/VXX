@@ -1,14 +1,2 @@
-// Module: thư viện.khởi động.khởi động dữ liệu
-// Mục đích: facade gom các module phục vụ bài toán data/file/config.
-// Cách dùng: nhập một file này để có bộ API nền tảng cho xử lý dữ liệu.
-
-nhập gói/thư viện/cốt lõi/toán học.vi;
-nhập gói/thư viện/cốt lõi/chuỗi.vi;
-nhập gói/thư viện/cốt lõi/luận lý.vi;
-nhập gói/thư viện/vào ra/tệp.vi;
-nhập gói/thư viện/cấu hình/cấu hình.vi;
-nhập gói/thư viện/thời gian/đồng hồ.vi;
-nhập gói/thư viện/hỗ trợ/nhật ký.vi;
-nhập gói/thư viện/hỗ trợ/xác thực.vi;
-nhập gói/thư viện/dữ liệu/phân trang.vi;
-nhập gói/thư viện/dữ liệu/kết nối cơ sở dữ liệu.vi;
+// Đường dẫn tương thích cũ; dùng "gói/thư viện/khởi động/dữ liệu.vi" cho mã mới.
+nhập "gói/thư viện/khởi động/dữ liệu.vi";

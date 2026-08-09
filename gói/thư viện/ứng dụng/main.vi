@@ -1,0 +1,3 @@
+// Gói ứng dụng: helper vòng đời chung, tùy chọn.
+// It intentionally does not pull HTTP, web, data, or API-project code.
+nhập "gói/thư viện/ứng dụng/vòng đời.vi";

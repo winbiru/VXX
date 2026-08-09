@@ -1,0 +1,5 @@
+// Gói vào ra: tệp, cấu hình, thời gian và nhật ký.
+nhập "gói/thư viện/vào ra/tệp.vi";
+nhập "gói/thư viện/vào ra/cấu hình.vi";
+nhập "gói/thư viện/vào ra/đồng hồ.vi";
+nhập "gói/thư viện/vào ra/nhật ký.vi";

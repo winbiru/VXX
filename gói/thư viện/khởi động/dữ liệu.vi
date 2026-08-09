@@ -1,0 +1,4 @@
+// Khởi động cho ứng dụng dữ liệu.
+nhập "gói/thư viện/cốt lõi/main.vi";
+nhập "gói/thư viện/vào ra/main.vi";
+nhập "gói/thư viện/dữ liệu/main.vi";

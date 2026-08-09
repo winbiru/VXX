@@ -1,0 +1,20 @@
+// Đường dẫn package tiếng Việt có khoảng trắng phải dùng chuỗi được trích dẫn.
+// Test này xác nhận toàn bộ entrypoint canonical trong cây gói/thư viện/.
+nhập "gói/thư viện/cốt lõi/main.vi";
+nhập "gói/thư viện/vào ra/main.vi";
+nhập "gói/thư viện/mạng/main.vi";
+nhập "gói/thư viện/mạng web/main.vi";
+nhập "gói/thư viện/dữ liệu/main.vi";
+nhập "gói/thư viện/ứng dụng/main.vi";
+nhập "gói/thư viện/khởi động/main.vi";
+
+// Các đường dẫn phẳng và shim cũ phải redirect về cùng module canonical.
+nhập "gói/cốt lõi/main.vi";
+nhập "gói/thư viện/hỗ trợ/xác thực.vi";
+nhập "stdlib";
+
+hàm main() {
+    in nối chuỗi("cốt", " lõi");
+    in nối đường dẫn url("https://example.test", "/health");
+    in banner ứng dụng("VPP", "1");
+};

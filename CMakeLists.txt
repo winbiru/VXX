@@ -18,20 +18,37 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Helper: collect sources per module (prefer explicit lists for production)
-file(GLOB_RECURSE FRONTEND_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/frontend/*.cpp ${CMAKE_SOURCE_DIR}/src/helpers/*.cpp)
-file(GLOB_RECURSE COMPILER_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/compiler/*.cpp ${CMAKE_SOURCE_DIR}/src/compiler/*.cxx ${CMAKE_SOURCE_DIR}/src/compiler/*.cc)
-file(GLOB_RECURSE VM_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/vm/*.cpp)
-file(GLOB_RECURSE STDLIB_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/stdlib/*.cpp)
-set(CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
-
-# VM-specific helpers should live with VM linkage, not frontend linkage.
-set(VM_NATIVE_HELPERS
-    ${CMAKE_SOURCE_DIR}/src/helpers/vm_native_http_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/helpers/vm_native_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/helpers/vm_low_level_http_server.cpp)
-list(REMOVE_ITEM FRONTEND_SOURCES ${VM_NATIVE_HELPERS})
-list(APPEND VM_SOURCES ${VM_NATIVE_HELPERS})
+# Explicit ownership keeps target dependencies directional; no target is
+# allowed to use the old catch-all `helpers` grouping.
+set(VPP_CORE_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/core/text.cpp)
+set(VPP_FRONTEND_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/frontend/keywords.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/lexer.cpp)
+set(VPP_BYTECODE_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/bytecode/opcode.cpp)
+set(VPP_COMPILER_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/compiler/support/expression.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/support/storeString.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/support/token_utils.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileBlock.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileCondition.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileFunction.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileLoop.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileStatement.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileSwitch.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compiler.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compilerExpr.cpp)
+set(VPP_RUNTIME_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_http_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_low_level_http_server.cpp)
+set(VPP_TOOLING_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/tooling/tooling.cpp)
+set(VPP_CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
 
 # Create library helper (accepts sources passed directly)
 function(vpp_add_module name)
@@ -53,50 +70,47 @@ function(vpp_add_module name)
             popen=_popen
             pclose=_pclose
         )
-        target_compile_options(${name} PRIVATE /W4 /permissive-)
+        # Source and bundled module paths contain Vietnamese UTF-8 text.
+        target_compile_options(${name} PRIVATE /W4 /permissive- /utf-8)
     else()
         target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
 endfunction()
 
-# Create libraries per module only if sources exist
-if (FRONTEND_SOURCES)
-    vpp_add_module(vpp-frontend ${FRONTEND_SOURCES})
-else()
-    message(FATAL_ERROR "No frontend sources found in src/frontend")
+# The dependency graph is intentionally one-way:
+# core -> frontend -> compiler; runtime consumes bytecode and receives function
+# metadata from the CLI instead of reading compiler globals. Tooling depends on
+# compiler; CLI composes runtime and tooling.
+vpp_add_module(vpp-core ${VPP_CORE_SOURCES})
+
+vpp_add_module(vpp-frontend ${VPP_FRONTEND_SOURCES})
+target_link_libraries(vpp-frontend PUBLIC vpp-core)
+
+vpp_add_module(vpp-bytecode ${VPP_BYTECODE_SOURCES})
+target_link_libraries(vpp-bytecode PUBLIC vpp-core)
+
+vpp_add_module(vpp-compiler ${VPP_COMPILER_SOURCES})
+target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
+
+vpp_add_module(vpp-runtime ${VPP_RUNTIME_SOURCES})
+target_link_libraries(vpp-runtime PUBLIC vpp-bytecode Threads::Threads)
+if (WIN32)
+    target_link_libraries(vpp-runtime PUBLIC ws2_32)
 endif()
 
-if (COMPILER_SOURCES)
-    vpp_add_module(vpp-compiler ${COMPILER_SOURCES})
-    target_link_libraries(vpp-compiler PUBLIC vpp-frontend)
-endif()
+vpp_add_module(vpp-tooling ${VPP_TOOLING_SOURCES})
+target_link_libraries(vpp-tooling PUBLIC vpp-compiler)
 
-if (VM_SOURCES)
-    vpp_add_module(vpp-vm ${VM_SOURCES})
-    target_link_libraries(vpp-vm PUBLIC vpp-compiler Threads::Threads)
-    if (WIN32)
-        target_link_libraries(vpp-vm PUBLIC ws2_32)
-    endif()
-endif()
+add_library(vpp::core ALIAS vpp-core)
+add_library(vpp::bytecode ALIAS vpp-bytecode)
+add_library(vpp::frontend ALIAS vpp-frontend)
+add_library(vpp::compiler ALIAS vpp-compiler)
+add_library(vpp::runtime ALIAS vpp-runtime)
+add_library(vpp::tooling ALIAS vpp-tooling)
 
-# stdlib is optional: only create if there are sources
-if (STDLIB_SOURCES)
-    vpp_add_module(vpp-stdlib ${STDLIB_SOURCES})
-    target_link_libraries(vpp-stdlib PUBLIC vpp-vm)
-else()
-    message(STATUS "No stdlib sources found; skipping vpp-stdlib")
-endif()
-
-# CLI executable (thin wrapper that uses libs above)
-add_executable(vpp-cli ${CLI_SOURCES})
-
-# Link only to the top-level library - transitive dependencies will pull in the rest
-# This avoids duplicate library warnings from the linker
-if (TARGET vpp-stdlib)
-    target_link_libraries(vpp-cli PRIVATE vpp-stdlib)
-else()
-    target_link_libraries(vpp-cli PRIVATE vpp-vm)
-endif()
+# CLI executable composes runtime and developer tooling.
+add_executable(vpp-cli ${VPP_CLI_SOURCES})
+target_link_libraries(vpp-cli PRIVATE vpp-runtime vpp-tooling)
 target_include_directories(vpp-cli PRIVATE ${VPP_INCLUDE_DIR})
 
 if (MSVC)
@@ -106,7 +120,7 @@ if (MSVC)
         popen=_popen
         pclose=_pclose
     )
-    target_compile_options(vpp-cli PRIVATE /W4 /permissive-)
+    target_compile_options(vpp-cli PRIVATE /W4 /permissive- /utf-8)
 else()
     target_compile_options(vpp-cli PRIVATE -Wall -Wextra -Wpedantic)
 endif()
@@ -125,21 +139,33 @@ if (BUILD_TESTS)
     endif()
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
-                 COMMAND ${CMAKE_SOURCE_DIR}/run_tests.sh)
+                 COMMAND ${CMAKE_COMMAND} -E env
+                         "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                         ${CMAKE_SOURCE_DIR}/run_tests.sh)
         set_tests_properties(vpp-integration PROPERTIES
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
     endif()
 endif()
 
 # Install rules (optional)
-install(TARGETS vpp-cli vpp-frontend vpp-compiler vpp-vm
+install(TARGETS vpp-cli vpp-core vpp-frontend vpp-bytecode vpp-compiler vpp-runtime vpp-tooling
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
-        DESTINATION gói)
+        DESTINATION gói
+        PATTERN ".DS_Store" EXCLUDE)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/templates/
+        DESTINATION templates
+        PATTERN ".DS_Store" EXCLUDE)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/examples/
+        DESTINATION examples
+        PATTERN ".DS_Store" EXCLUDE)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
+        DESTINATION include
+        PATTERN ".DS_Store" EXCLUDE)
 
 # Developer notes:
-# - Prefer explicit source lists; GLOB is fine for prototyping but can hide missing files.
-# - Move public headers to include/vietvm/ and include them as <vietvm/...>.
-# - Use target-based API as above.
+# - Keep source ownership explicit; do not add new files to a generic helpers target.
+# - Move public headers to include/vpp/<module>/ as modules stabilize.
+# - Keep dependencies pointing toward lower-level modules only.

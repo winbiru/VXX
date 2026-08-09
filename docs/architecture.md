@@ -1,149 +1,107 @@
-# Kiến trúc tổng quan — V++ (nhánh `developer`)
+# Kiến trúc V++
 
-Mục đích: tài liệu hóa cấu trúc dự án hiện tại (theo nhánh `developer`), quy ước đặt file/namespace, luồng build, và các bước đề xuất để dự án có cấu trúc giống hơn với mô hình module/assembly như Java/C#.
+V++ tách compiler, runtime, tooling và thư viện ngôn ngữ thành các lớp có dependency một chiều. Mục tiêu là để CLI chỉ ghép các thành phần; parser không biết HTTP/DB, và runtime không đọc compiler global state.
 
-Ghi chú: mình soạn theo tình trạng hiện tại của nhánh `developer` (src/, include/, CMakeLists.txt) và các từ khóa/tên module tìm được trong repo. Tài liệu này nhằm làm đường dẫn cho refactor tiếp theo (di chuyển headers, tách CMake per-module, mapping namespace ↔ thư mục, v.v.).
+## C++ modules
 
----
-
-## 1. Tổng quan modules chính
-- frontend: phân tích cú pháp (lexer, parser), chuyển sang AST/bytecode.
-    - source: src/frontend
-    - public headers: include/vietvm/frontend/...
-- compiler: các bước biên dịch (AST → bytecode / tối ưu).
-    - source: src/compiler
-    - public headers: include/vietvm/compiler/...
-- vm: runtime, bytecode interpreter, instruction set.
-    - source: src/vm
-    - public headers: include/vietvm/vm/...
-    - ví dụ: instruction.h, vm.h → nên đặt vào include/vietvm/vm/
-- stdlib (tùy chọn): thư viện chuẩn, utils.
-    - source: src/stdlib
-    - public headers: include/vietvm/stdlib/...
-- cli: ứng dụng dòng lệnh/entrypoint.
-    - source: src/cli
-    - ít khi cần public headers; nếu có, include/vietvm/cli/...
-- helpers / common: helper functions, utilities.
-    - source: src/helpers
-    - public headers: include/vietvm/common/...
-
----
-
-## 2. Cấu trúc thư mục đề xuất (chuẩn hoá)
-Root:
-- CMakeLists.txt
-- README.md
-- architechture.md (this file)
-- docs/
-- include/
-    - vietvm/
-        - frontend/
-        - compiler/
-        - vm/
-        - stdlib/
-        - common/
-- src/
-    - frontend/
-    - compiler/
-    - vm/
-    - stdlib/
-    - cli/
-    - helpers/
-    - tests/
-- tests/  (tách ngoài nếu muốn)
-- src/frontend/grammar.bnf (hoặc V++.g4 nếu dùng ANTLR)
-
-Lý do: tương tự Java/C# là có "root namespace" (vietvm) và thư mục con tương ứng module; public headers nằm dưới `include/vietvm/...` để dễ include như `#include <vietvm/vm/vm.h>`.
-
----
-
-## 3. Quy ước tên target & namespace
-- CMake targets: dùng tên target theo namespace kiểu `vietvm::frontend`, `vietvm::compiler`, `vietvm::vm`.
-    - Ví dụ: add_library(vietvm::vm STATIC ...)
-    - Lợi ích: rõ ràng khi target_link_libraries(app PRIVATE vietvm::vm)
-- Namespace trong code: `namespace vietvm::vm { ... }`, `namespace vietvm::frontend { ... }`
-- Header guards / pragma once: theo đường dẫn, ví dụ `V++_VM_VM_H` hoặc `V++_VM_VM_HPP`.
-- Include style: `#include <vietvm/vm/vm.h>`
-
----
-
-## 4. Build system hiện tại & đề xuất
-Hiện tại: CMakeLists.txt gốc thu thập sources bằng GLOB_RECURSE và tạo các target vietvm-frontend, vietvm-compiler, vietvm-vm, vietvm-stdlib, vietvm-cli. Public include dir là `${CMAKE_SOURCE_DIR}/include`.
-
-Đề xuất:
-- Giữ CMake gốc làm top-level, nhưng tách `src/<module>/CMakeLists.txt` cho từng module; trong top-level gọi add_subdirectory(src/<module>).
-- Trong mỗi CMakeLists module, dùng:
-    - add_library(vietvm::vm STATIC ${SOURCES})
-    - target_include_directories(vietvm::vm PUBLIC ${V++_INCLUDE_DIR})
-    - target_compile_features(... PUBLIC cxx_std_17)
-- Tránh GLOB cho production — liệt kê nguồn tường minh (giúp CI detect changes).
-- Thiết lập export và cài đặt (install) nếu cần.
-
----
-
-## 5. Public API vs internal headers
-- Public headers: tất cả header dùng bởi các module khác hoặc người dùng library phải nằm dưới `include/vietvm/<module>/`.
-- Internal/private headers: đặt trong `src/<module>/internal/` hoặc cùng `src/<module>/` và không đưa vào include path để tránh leak API.
-- Ví dụ chuyển:
-    - `include/vm.h` -> `include/vietvm/vm/vm.h`
-    - `include/instruction.h` -> `include/vietvm/vm/instruction.h`
-    - `include/keywords.h` -> `include/vietvm/frontend/keywords.h` (hoặc compiler nếu phù hợp)
-
----
-
-## 6. Lexer / Parser / Grammar
-- Đã có bản thô grammar.bnf (mình soạn dựa trên include/keywords.h). Đặt file grammar ở `src/frontend/grammar.bnf`.
-- Gợi ý: chọn parser-generator:
-    - Nếu ANTLR: tạo `src/frontend/V++.g4` (parser + lexer).
-    - Nếu flex/bison: tạo `src/frontend/lexer.l` + `src/frontend/parser.y`.
-- Normalize keywords: quyết định dùng dạng có dấu hay không; lexer nên map cả hai biến thể (`"nếu"` và `"neu"`) về một token IF.
-- Multi-word keywords (ví dụ "trường hợp", "mặc định", "nếu không") cần lexer xử lý là single token (ghi nhận cụm) hoặc grammar phải chấp nhận chuỗi token.
-
----
-
-## 7. Tests & CI
-- Thư mục tests nên mirror cấu trúc module: `tests/frontend/*`, `tests/vm/*`, ...
-- Thêm workflow GitHub Actions:
-    - Build matrix (linux / windows / macos) nếu cần
-    - Steps: checkout, configure cmake, build, run tests (ctest)
-    - Lint: clang-tidy, clang-format
-- Unit tests: dùng GoogleTest (gtest) hoặc framework tương tự; link test target với module targets.
-
----
-
-## 8. Checklist refactor & chuyển đổi (hành động cụ thể)
-1. Tạo thư mục `include/vietvm/` và các subfolders: vm, frontend, compiler, stdlib, common.
-2. Di chuyển:
-    - include/vm.h -> include/vietvm/vm/vm.h
-    - include/instruction.h -> include/vietvm/vm/instruction.h
-    - include/keywords.h -> include/vietvm/frontend/keywords.h (hoặc compiler)
-3. Cập nhật tất cả #include trong src/ để dùng `<vietvm/...>` style.
-4. Thêm namespace trong files nếu chưa có: `namespace vietvm::<module> { ... }`
-5. Tách CMakeLists.txt: mỗi module có CMakeLists con và export target `vietvm::<module>`.
-6. Di chuyển grammar.bnf -> src/frontend/grammar.bnf; nếu dùng ANTLR, tạo `V++.g4`.
-7. Viết CI workflow để build & test trên nhánh developer.
-
----
-
-## 9. Ví dụ include & code snippet
-- Trước:
-    - #include "vm.h"
-- Sau:
-    - #include <vietvm/vm/vm.h>
-
-- Namespace:
-```cpp
-namespace vietvm::vm {
-    class VM { ... };
-}
+```text
+vpp-core ───────┬──> vpp-frontend ──> vpp-compiler ──> vpp-tooling
+                └──> vpp-bytecode ───────────────────> vpp-runtime
+                                                           │
+vpp-cli <─────────────────────────────────────────────────┘
 ```
 
----
+- `vpp-core`: text và tiện ích dùng chung không phụ thuộc ngôn ngữ.
+- `vpp-bytecode`: opcode và mô tả bytecode dùng chung cho compiler/runtime.
+- `vpp-frontend`: lexer và keyword map.
+- `vpp-compiler`: compile expression/statement/import cùng symbol state.
+- `vpp-runtime`: VM và native adapters HTTP, file, config, database.
+- `vpp-tooling`: formatter, linter và disassembler.
+- `vpp-cli`: REPL, LSP command loop, package/scaffold commands và entrypoint.
 
-## 10. Ghi chú về từ khóa tiếng Việt vs ASCII
-- Quyết định chuẩn hoá: gợi ý là chấp nhận cả hai trong lexer nhưng map về cùng token. Ví dụ:
-    - "nếu" và "neu" => IF
-    - "hàm" và "ham" => FUNC
-- Tài liệu lexer nên nêu rõ mapping này để contributors biết viết test.
+Source hiện nằm tại:
 
----
+```text
+src/core/
+src/bytecode/
+src/frontend/
+src/compiler/{support,...}
+src/runtime/{native,...}
+src/tooling/
+src/cli/
+```
+
+CMake định nghĩa các target `vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vpp-compiler`, `vpp-runtime`, `vpp-tooling` và `vpp-cli`. Không dùng `GLOB_RECURSE`; mỗi source có owner rõ ràng.
+
+## Runtime boundary
+
+CLI compile source rồi copy function bytecode/name table vào `VM`. VM không còn đọc `compiler::hamMap` hay `StringPool` global ở runtime. Điều này làm runtime có thể nhận bytecode từ nguồn khác ngoài CLI.
+
+Compiler vẫn dùng mutable state nội bộ trong phiên compile. Bước tiếp theo của API embedding là thay state này bằng `CompilationContext` và `BytecodeProgram` bất biến; không xem các header `compile*.h` là public API ổn định.
+
+## Headers
+
+Header public mới bắt đầu dưới `include/vpp/`, ví dụ `vpp/core/text.h`, `vpp/bytecode/{instruction,opcode}.h`, `vpp/compiler/compiler.h`, `vpp/runtime/{value,vm}.h` và `vpp/tooling/tooling.h`. `vpp/runtime/value.h` là ranh giới chung cho VM và native adapters, nên native header không phải kéo theo `VM`. Header legacy dưới `include/common`, `include/compiler` và `include/vm` còn được giữ để tránh phá vỡ mã hiện có. Header compiler detail, VM call frame và native implementation là internal implementation, không phải embedding API.
+
+## Thư viện V++ và framework modules
+
+Thư viện chuẩn là package `.vi` duy nhất dưới `gói/`; các module tiếng Việt
+nằm bên trong nó:
+
+```text
+gói/
+└── thư viện/
+    ├── main.vi             # entrypoint đầy đủ
+    ├── cốt lõi/            # toán, chuỗi, luận lý, xác thực
+    ├── vào ra/             # tệp, cấu hình, đồng hồ, nhật ký
+    ├── mạng/               # HTTP client GET/POST/PUT/DELETE và HTTP server native mức thấp
+    ├── mạng web/           # REST/JSON helpers; kiểm thử/api không được import mặc định
+    ├── dữ liệu/            # phân trang và database adapter
+    ├── ứng dụng/           # lifecycle/bootstrap chung
+    ├── khởi động/          # facade web, dữ liệu và ứng dụng full stack
+    └── kiểm thử/           # assertion helpers, không import mặc định
+```
+
+Program mới nên import package hẹp nhất. Tên package có khoảng trắng có thể
+để trần hoặc đặt trong dấu nháy; đường dẫn trực tiếp có khoảng trắng phải dùng
+dấu nháy:
+
+```vi
+nhập cốt lõi;
+nhập mạng;
+nhập "gói/thư viện/mạng web/kiểm thử/api.vi";
+```
+
+Bare import ưu tiên package cùng tên của project, rồi mới tìm module bundle
+dưới `gói/thư viện/`. Các đường dẫn phẳng cũ như `gói/cốt lõi/...` được
+redirect khi không còn file local tương ứng.
+`gói/thư viện/ứng dụng/main.vi` không import API-project adapter tương thích;
+routes/schema/token của một project mẫu không phải standard library.
+
+Các module này là bundled optional modules, chưa phải package độc lập có dependency/version resolver. Cài riêng module mạng web mà không có module mạng chưa được package manager tự giải quyết.
+
+## Examples, templates và tests
+
+```text
+examples/api_project/              # ví dụ HTTP chạy độc lập
+templates/backend/                 # nguồn cho `vpp khởi tạo backend <tên>`
+src/tests/fixtures/api_project/    # fixture DTO/repository/database deterministic
+src/tests/*.vi                     # regression entrypoints
+src/tests/expected/*.expected      # output của entrypoint
+```
+
+Không đặt application sample trong `src/tests/`. Fixture DB viết vào `src/tests/.tmp/`, không vào file database được track trong repository.
+
+## Build và phát hành
+
+- CMake cài binary, `gói/`, `templates/` và `examples/`.
+- Release archive chứa cùng các resource này.
+- Installer đặt chúng cạnh CLI và đặt `VPP_HOME`; import resolver tìm local project trước, sau đó tìm `$VPP_HOME/gói`.
+- HTTP server native dùng POSIX sockets trên Unix và Winsock2 trên Windows.
+
+## Quy tắc thay đổi
+
+1. Source mới phải có một CMake target owner; không thêm lại thư mục `helpers` chung.
+2. Không để frontend phụ thuộc runtime/native.
+3. Không đưa framework web/dữ liệu/ứng dụng vào `gói/thư viện/cốt lõi` hoặc import full-stack mặc định.
+4. Thay đổi public behavior cần test `.vi` và expected output; example/scaffold cần smoke test.

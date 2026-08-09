@@ -25,6 +25,18 @@ inline constexpr std::array<const char *, 3> kFnHttpPut = {
     "mang_http_put", "mạngcậpnhật", "mạng cập nhật"
 };
 
+inline constexpr std::array<const char *, 3> kFnHttpDelete = {
+    "mang_http_delete", "mạngxóa", "mạng xóa"
+};
+
+inline constexpr std::array<const char *, 3> kFnJsonEscape = {
+    "json_escape", "jsonthoát", "json thoát"
+};
+
+inline constexpr std::array<const char *, 3> kFnJsonString = {
+    "json_quote", "jsonchuỗi", "json chuỗi"
+};
+
 inline constexpr std::array<const char *, 3> kFnHttpServerOpen = {
     "mang_http_server_open", "mạngmởmáychủapi", "mạng mở máy chủ api"
 };

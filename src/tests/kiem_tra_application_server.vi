@@ -1,4 +1,4 @@
-nhập gói/thư viện/ứng dụng/ứng dụng máy chủ.vi;
+nhập "gói/thư viện/ứng dụng/tương thích/api project.vi";
 
 hàm main() {
     app in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");

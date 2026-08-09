@@ -1,5 +1,5 @@
 // HTTP fixture chạy hoàn toàn bằng V++ cho các integration test.
-nhập gói/thư viện/mạng/mạng web.vi;
+nhập "gói/thư viện/mạng/main.vi";
 
 hàm main() {
     serverId = mạng mở máy chủ api(18080);

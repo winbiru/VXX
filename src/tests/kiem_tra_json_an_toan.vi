@@ -1,0 +1,15 @@
+nhập "gói/thư viện/mạng web/json.vi";
+nhập "gói/thư viện/mạng web/rest.vi";
+nhập "gói/thư viện/vào ra/tệp.vi";
+
+hàm main() {
+    in json chuỗi("xin");
+    in json đối tượng hai chuỗi("tên", "V++", "trạng thái", "sẵn sàng");
+
+    ghi tệp(".tmp_json_escape.txt", "dòng \"một\" \\ đường\ndòng hai");
+    in json thoát(đọc tệp(".tmp_json_escape.txt"));
+
+    dataJson = json đối tượng một chuỗi("id", "req-1");
+    in rest json thành công an toàn("hoàn tất", dataJson);
+    in rest json lỗi an toàn("không tìm thấy", json đối tượng rỗng());
+};

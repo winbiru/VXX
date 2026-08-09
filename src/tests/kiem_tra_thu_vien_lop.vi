@@ -1,4 +1,4 @@
-nhập gói/thư viện/khởi động/khởi động ứng dụng.vi;
+nhập "gói/thư viện/khởi động/ứng dụng.vi";
 
 hàm main() {
     NhậtKý.ghi thông tin("dịch vụ khởi động");
