@@ -62,6 +62,18 @@ nhập "vào ra";
     }
 
     if (-not $healthy) {
+        # Start-Process can retain exclusive handles for redirected logs until
+        # the child exits. Release them before collecting diagnostics.
+        if ($null -ne $server) {
+            try {
+                if (-not $server.HasExited) {
+                    Stop-Process -Id $server.Id -Force
+                }
+                $server.WaitForExit()
+            } catch {
+                # The process can exit between HasExited and Stop-Process.
+            }
+        }
         $stdout = if (Test-Path $stdoutLog) { Get-Content -Raw $stdoutLog } else { "" }
         $stderr = if (Test-Path $stderrLog) { Get-Content -Raw $stderrLog } else { "" }
         throw "V++ HTTP server did not answer /health. stdout: $stdout stderr: $stderr"

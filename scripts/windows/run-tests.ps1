@@ -40,9 +40,21 @@ function Get-NormalizedUtf8Text {
         return $null
     }
 
-    $bytes = [System.IO.File]::ReadAllBytes($Path)
-    $text = [System.Text.UTF8Encoding]::new($false).GetString($bytes)
-    return $text.Replace("`r`n", "`n").Replace("`r", "`n")
+    # Start-Process may release redirected log handles a moment after its
+    # child has exited. Retry transient sharing violations so diagnostics do
+    # not hide the original server startup failure.
+    $lastError = $null
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        try {
+            $bytes = [System.IO.File]::ReadAllBytes($Path)
+            $text = [System.Text.UTF8Encoding]::new($false).GetString($bytes)
+            return $text.Replace("`r`n", "`n").Replace("`r", "`n")
+        } catch [System.IO.IOException] {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    return "[không thể đọc log sau 2 giây: $lastError]"
 }
 
 function Show-FailureDetails {
@@ -139,8 +151,8 @@ function Stop-VppServer {
     try {
         if (-not $Process.HasExited) {
             Stop-Process -Id $Process.Id -Force -ErrorAction Stop
-            $Process.WaitForExit()
         }
+        $Process.WaitForExit()
     } catch {
         # Best-effort cleanup: the process may already have exited.
     }
@@ -227,9 +239,21 @@ try {
     $fixtureStdErr = Join-Path $sessionDir "http_fixture.stderr"
     $fixtureProcess = Start-VppServer -Source (Join-Path $repoRoot "src\tests\http_fixture.vi") -StdOut $fixtureStdOut -StdErr $fixtureStdErr -WorkingDirectory $repoRoot
     if (-not (Wait-ForHttp -Uri "http://127.0.0.1:18080/health" -ExpectedContent '{"ok":true}')) {
+        # Start-Process keeps redirected log handles open on Windows. Stop and
+        # wait for the fixture before reading its diagnostics, otherwise the
+        # lock itself masks the real startup error.
+        $fixturePid = $fixtureProcess.Id
+        Stop-VppServer $fixtureProcess
+        $fixtureExitCode = "unknown"
+        try {
+            $fixtureExitCode = $fixtureProcess.ExitCode
+        } catch {
+            # Keep the timeout diagnostic useful even if process metadata is unavailable.
+        }
+        $fixtureProcess = $null
         $fixtureOutput = Get-NormalizedUtf8Text $fixtureStdOut
         $fixtureError = Get-NormalizedUtf8Text $fixtureStdErr
-        throw "Local HTTP test fixture did not start. stdout: $fixtureOutput stderr: $fixtureError"
+        throw "Local HTTP test fixture did not start (pid: $fixturePid, exit code: $fixtureExitCode). stdout: $fixtureOutput stderr: $fixtureError"
     }
 
     # This helper also checks the native Winsock adapter and the UTF-8 import
