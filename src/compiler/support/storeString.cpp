@@ -1,4 +1,5 @@
 #include "common/storeString.h"
+#include "vpp/core/message_constants.h"
 #include <stdexcept>
 #include <vector>
 #include <iostream>
@@ -43,7 +44,10 @@ namespace vietvm::compiler {
     }
 
     const std::string& StringPool::getString(int idx)  {
-        if (idx < 0 || static_cast<size_t>(idx) >= pool_.size()) throw std::out_of_range("StringPool: index");
+        if (idx < 0 || static_cast<size_t>(idx) >= pool_.size()) {
+            throw std::out_of_range(vietvm::messages::formatMessage(
+                vietvm::messages::kInternalStringPoolIndex));
+        }
         return pool_[idx];
     }
     const std::vector<std::string>& StringPool::getPool() {

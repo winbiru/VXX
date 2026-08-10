@@ -13,6 +13,7 @@
 #include <compiler/compilerExpr.h>
 #include "common/storeString.h"
 #include "common/symbolTable.h"
+#include "vpp/core/message_constants.h"
 #include <sstream>
 #include <iostream>
 #include "../../include/frontend/lexer.h"
@@ -46,71 +47,17 @@ static std::vector<std::string> splitArgsString(const std::string &s) {
     return res;
 }
 
-static int resolveFunctionIdByName(const std::string &name,
-                                   const std::unordered_map<std::string,int> &symTab) {
-    std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
-    vietvm::compiler::validateCallableAccess(resolvedName);
-
-    auto idMatchesResolvedName = [&](int candidateId) {
-        int resolvedNameIndex = vietvm::compiler::StringPool::findString(resolvedName);
-        if (resolvedNameIndex < 0) return false;
-        auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
-        if (itName == vietvm::compiler::hamMap::hamNameIndexMap.end()) return false;
-        return itName->second == resolvedNameIndex;
-    };
-
-    auto itSym = symTab.find(resolvedName);
-    if (itSym != symTab.end()) {
-        int maybeId = itSym->second;
-        auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
-        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
-            !itCode->second.empty() &&
-            idMatchesResolvedName(maybeId)) {
-            return maybeId;
-        }
-    }
-
-    int nameIndex = vietvm::compiler::StringPool::findString(resolvedName);
-    if (nameIndex >= 0) {
-        for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
-            if (kv.second == nameIndex) return kv.first;
-        }
-    }
-    return -1;
-}
-
-static std::string joinNameTokens(const std::vector<std::string> &tokens, size_t begin, size_t end) {
-    std::string out;
-    for (size_t i = begin; i < end; ++i) {
-        if (!out.empty()) out.push_back(' ');
-        out += tokens[i];
-    }
-    return out;
-}
-
-static bool isCallableNamePiece(const std::string &token) {
-    if (vietvm::compiler::isVariable(token)) return true;
-    if (token.find(' ') == std::string::npos) return false;
-    std::stringstream ss(token);
-    std::string part;
-    while (std::getline(ss, part, ' ')) {
-        if (part.empty()) continue;
-        if (!vietvm::compiler::isVariable(part)) return false;
-    }
-    return true;
-}
-
 static bool tryParseCallableNameBeforeParen(const std::vector<std::string> &tokens,
                                             size_t start,
                                             size_t &parenPos,
                                             std::string &nameOut) {
-    if (start >= tokens.size() || !isCallableNamePiece(tokens[start])) return false;
+    if (start >= tokens.size() || !vietvm::compiler::isCallableNamePiece(tokens[start])) return false;
 
     size_t i = start;
     while (i < tokens.size()) {
         if (tokens[i] == "(") {
             parenPos = i;
-            nameOut = joinNameTokens(tokens, start, i);
+            nameOut = vietvm::compiler::joinNameTokens(tokens, start, i);
             return !nameOut.empty();
         }
 
@@ -120,7 +67,7 @@ static bool tryParseCallableNameBeforeParen(const std::vector<std::string> &toke
             return false;
         }
 
-        if (!isCallableNamePiece(tokens[i])) {
+        if (!vietvm::compiler::isCallableNamePiece(tokens[i])) {
             return false;
         }
         ++i;
@@ -140,9 +87,8 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
 
     if (vietvm::compiler::isVisibilityToken(tk) &&
         (pos + 1) < tokens.size() && tokens[pos + 1] == "hàm") {
-        throw std::runtime_error(
-            "Dùng cú pháp 'hàm <quyền>' (ví dụ: 'hàm " + tk +
-            " tenHam(...)') thay vì '<quyền> hàm'");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxModifierBeforeFunction, {tk}));
     }
 
     // Defensive fallback: ensure "trả về" never falls through to expression parsing.
@@ -209,7 +155,7 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
         }
 
         // Direct call for known function id; otherwise indirect call via variable value.
-        int hamId = resolveFunctionIdByName(ident, symTab);
+        int hamId = vietvm::compiler::resolveFunctionIdByName(ident, symTab);
 
         if (hamId >= 0) {
             bytecode.push_back({OP_GOI, compiledArgs, hamId, 0});

@@ -1,60 +1,67 @@
-# Kế hoạch Ngắn hạn (1–2 tuần)
+# Kế hoạch ngắn hạn (1–2 tuần)
 
-Mục tiêu: ổn định build, bổ sung test tối thiểu, sửa một số bug rõ ràng và cải thiện tài liệu để contributor mới có thể chạy dự án dễ dàng.
+> Cập nhật: 09/08/2026
+> Mục tiêu là củng cố baseline build/test và tài liệu. Các mục đánh dấu hoàn tất chỉ
+> xác nhận source hoặc workflow đã có trong repo, không thay cho kết quả CI của một
+> commit cụ thể.
 
-Ưu tiên: High
+## Nền tảng đã có
 
-Estimated effort: 1–5 man-days
+- [x] Build artefact phổ biến đã được ignore qua .gitignore; CMake build ở thư mục
+  ngoài source.
+- [x] README.md, README-updates.md và CONTRIBUTING.md đã tồn tại.
+- [x] CI GitHub Actions đã có cho nhánh developer: Ubuntu chạy full regression và
+  sanitizer, Windows chạy full regression Release.
+- [x] Release workflow đã có riêng; matrix đóng gói Ubuntu, macOS và Windows nằm ở
+  .github/workflows/release-binaries.yml.
+- [x] CTest đã có ba baseline C++ unit target trong src/tests/: compiler support
+  (StringPool, symbolTable, hamMap), canonical opcode/native constants và VM opcode smoke.
+- [x] Hồi quy end-to-end đã có run_tests.sh trên Unix, runner PowerShell trên Windows,
+  cùng các file expected trong src/tests/expected/.
 
-## Tasks & chi tiết
+## Việc còn lại
 
-1) Làm sạch repository
-   - Mục tiêu: loại bỏ/ignore build artefacts (`cmake-build-debug/`) khỏi VCS.
-   - Files/đường dẫn: `.gitignore`, xóa `cmake-build-debug/` nếu đã bị commit.
-   - Effort: small (0.5 day)
+1. Đồng bộ tài liệu bytecode
 
-2) Update README chính và thêm `README-updates.md`
-   - Mục tiêu: đảm bảo hướng dẫn build/run rõ ràng. (đã thêm `README-updates.md`)
-   - Files: `README.md`, `README-updates.md`
-   - Effort: small (0.5 day)
+   - [ ] Đối chiếu docs/bytecode.md với Instruction/Opcode và src/bytecode/opcode.cpp
+     đang thực thi.
+   - [ ] Ghi rõ phần nào là proposal format tuần tự hoá, phần nào là contract runtime
+     hiện tại.
 
-3) Thiết lập CI tối thiểu (GitHub Actions)
-   - Mục tiêu: build project trên Ubuntu/macOS, chạy một tập test đơn giản.
-   - Files: `.github/workflows/ci.yml`
-   - Effort: small (1 day)
-   - Ghi chú: nếu repo dùng GitLab, tạo `gitlab-ci.yml` tương đương.
+2. Củng cố test baseline
 
-4) Tạo skeleton unit tests
-   - Mục tiêu: thêm thư mục `tests/unit/` với vài unit test cho `StringPool`, `symbolTable`, và một bài test chạy `vm` trên 1-2 file `.vi`.
-   - Files: `tests/unit/test_stringpool.cpp`, `tests/unit/CMakeLists.txt`
-   - Effort: small → medium (1–2 days)
+   - [ ] Mở rộng compiler support test cho đường lỗi và lifecycle khi compile nhiều
+     chương trình.
+   - [ ] Thêm case cho opcode còn lại theo từng nhóm (stack, jump, gọi hàm, native
+     adapter); smoke test hiện chỉ bao phủ số học, so sánh và chuỗi.
+   - [ ] Giữ mọi regression V++ có expected output và chạy được từ CTest trên nền tảng
+     phù hợp.
 
-5) Fix bugs nhỏ & code hygiene
-   - Ví dụ: rà soát `OP_GOI` semantics trong `src/vm/vm.cpp` và `compileFunction.cpp` để đảm bảo function lookup nhất quán.
-   - Files: `src/vm/vm.cpp`, `src/compiler/compileFunction.cpp`, `src/compiler/compileRegistry.cpp`
-   - Effort: small (1 day)
+3. Làm rõ bug và hygiene
 
-6) Document bytecode (quick update)
-   - Mục tiêu: đồng bộ `docs/bytecode.md` với `include/vm/instruction.h` và thực thi hiện tại.
-   - Files: `docs/bytecode.md`, `include/vm/instruction.h`
-   - Effort: small (0.5–1 day)
+   - [ ] Rà soát contract OP_GOI/call frame bằng test có thể tái hiện trước khi thay
+     đổi implementation; không coi task cũ là đã sửa khi chưa có regression.
+   - [ ] Tài liệu hoá điểm reset/lifecycle của StringPool và các map compiler còn có
+     state chung.
+   - [ ] Không thêm source mới vào một target helpers tổng quát; khai báo ownership
+     rõ trong CMake.
 
-## Checklist PR (mỗi PR)
-- Build passes on CI (matrix entries included)
-- Unit tests added / updated, with instructions
-- Docs updated if behavior changed
-- No new global state leak; `StringPool` lifecycle documented
+4. Kiểm tra CI thực tế
 
-## Tests cần viết
-- Unit tests cho `StringPool` (`src/helpers/storeString.cpp`): add/get/clear behavior
-- Unit tests cho `symbolTable` (`src/helpers/symbolTable.cpp`)
-- Integration test: compile a small `.vi` sample and run with `vietvm-cli`, assert expected output (stdout)
+   - [ ] Khi thay đổi runner hoặc native adapter, xác nhận cả job Ubuntu và Windows
+     trên GitHub Actions; macOS hiện được build trong workflow release, chưa phải job
+     regression thường trực.
 
-## Rủi ro & dependency
-- Nếu project sử dụng globals và singletons (vd. `StringPool`), tests cần reset state between cases.
-- CMake setup may need tweaking to include test targets.
+## Tiêu chí cho mỗi PR
 
----
+- Build và CTest phù hợp với nền tảng thay đổi.
+- Có test hoặc expected output cho hành vi mới/sửa lỗi.
+- Cập nhật docs khi grammar, bytecode, package hoặc CLI thay đổi.
+- Không mở rộng global state mà không có reset contract và test tương ứng.
 
-Sau khi hoàn thành các bước ngắn hạn, repository sẽ có CI cơ bản, tests skeleton và tài liệu tốt hơn cho contributor mới.
+## Rủi ro
 
+- Các fixture HTTP dùng port cục bộ nên runner phải dọn process và thư mục tạm đáng
+  tin cậy trên cả Unix lẫn Windows.
+- Unit test không được che giấu lỗi tích hợp: bộ src/tests/*.vi vẫn là regression
+  contract của CLI và package/thư viện chuẩn.

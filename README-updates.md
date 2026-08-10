@@ -1,82 +1,75 @@
-# V++ — Kế hoạch cập nhật & Tóm tắt nhanh
+# V++ — Trạng thái repo và hướng cập nhật
 
-Tài liệu này tóm tắt cấu trúc chính của project V++ và đưa ra các hướng cập nhật/đổi mới cho tương lai. Nội dung bằng tiếng Việt, mục tiêu để dán trực tiếp vào repository.
+> Cập nhật: 09/08/2026
+> Tài liệu này mô tả những gì đang có trong source tree và các hạng mục còn lại. Sự
+> tồn tại của workflow không đồng nghĩa mọi lần chạy CI đều đã thành công; trạng thái
+> từng lần chạy cần xem trên GitHub Actions.
 
 ## Mục đích
-- Giúp contributor mới hiểu nhanh các modules chính và luồng compile → bytecode → VM.
-- Liệt kê các vấn đề hiện tại, cơ hội cải tiến.
-- Trình bày bộ kế hoạch theo 3 timeframe: ngắn hạn, trung hạn, dài hạn.
 
-Xem chi tiết kế hoạch trong thư mục `plans/`:
-- `plans/short-term.md` — Ngắn hạn (1–2 tuần)
-- `plans/medium-term.md` — Trung hạn (1–3 tháng)
-- `plans/long-term.md` — Dài hạn (3–12+ tháng)
+- Giúp contributor định vị đúng module, test và script hiện hành.
+- Phân biệt phần đã có trong repo với roadmap còn dang dở.
+- Dẫn đến kế hoạch ngắn, trung và dài hạn trong thư mục plans/.
 
----
+## Những nền tảng đã có
 
-## Tổng quan cấu trúc project (đường dẫn tham khảo)
-- CLI / entrypoint:
-  - `src/cli/main.cpp`
-- Frontend / Lexer:
-  - `include/frontend/lexer.h`, `src/frontend/lexer.cpp`
-  - `include/frontend/keywords.h`, `src/frontend/keywords.cpp`
-- Compiler / codegen:
-  - `include/compiler/*.h`, `src/compiler/*.cpp` (ví dụ `compileStatement.cpp`, `compileFunction.cpp`, `compileRegistry.cpp`)
-- Helpers / utilities:
-  - `include/common/*`, `src/helpers/*` (ví dụ `storeString.cpp`, `symbolTable.cpp`)
-- VM / runtime:
-  - `include/vm/instruction.h`, `include/vm/vm.h`, `src/vm/vm.cpp`
-- Docs & tests:
-  - `docs/` (architecture, bytecode, grammar)
-  - `src/tests/` (tập chương trình `.vi` dùng cho testing/manual)
-- Build:
-  - `CMakeLists.txt`, `Makefile`, `cmake-build-debug/` (hiện có artefact trong repo)
+| Hạng mục | Trạng thái hiện tại | Vị trí |
+| --- | --- | --- |
+| CI hồi quy | Đã có workflow Ubuntu chạy CTest đầy đủ và ASan/UBSan; có job Windows chạy CTest bản Release. | .github/workflows/c-cpp.yml |
+| Đóng gói release | Đã có workflow tạo binary cho Ubuntu, macOS và Windows khi publish Release hoặc chạy thủ công. | .github/workflows/release-binaries.yml |
+| Hướng dẫn đóng góp | Đã có hướng dẫn cơ bản cho contributor. | CONTRIBUTING.md |
+| Hồi quy tích hợp | CTest gọi run_tests.sh trên Unix và scripts/windows/run-tests.ps1 trên Windows. Các chương trình V++ và output mong đợi nằm cạnh nhau. | run_tests.sh, scripts/windows/, src/tests/ |
+| Unit test C++ nền tảng | Đã có target CTest cho StringPool, symbolTable/hamMap, canonical opcode/native constants và smoke test opcode VM. Đây là baseline, chưa phải coverage từng handler. | src/tests/CMakeLists.txt, src/tests/compiler_support_tests.cpp, src/tests/opcode_and_native_constants_tests.cpp, src/tests/vm_opcode_smoke_tests.cpp |
+| Vệ sinh build | Các thư mục build phổ biến, output test và binary đã được ignore; không dùng build artefact làm source. | .gitignore |
 
-## Kiến trúc & luồng xử lý (tóm tắt)
-1. Frontend (lexer) đọc source và sinh tokens (`src/frontend/lexer.cpp`).
-2. Compiler (`src/compiler/compiler.cpp` và các `compile*.cpp`) chuyển tokens thành `std::vector<Instruction>` (bytecode) và ghi vào các cấu trúc như `StringPool` / `hamBytecodeMap`.
-3. `StringPool` / `storeString.cpp` quản lý chuỗi/hàm và ánh xạ tên ↔ id.
-4. `VM` (`src/vm/vm.cpp`) nhận bytecode + string pool và thực thi bằng một vòng lặp opcode (implemented as `VM::run()`).
-5. CLI (`src/cli/main.cpp`) kết hợp tất cả: compile nguồn, khởi tạo VM, chạy, và in kết quả.
+## Cấu trúc source hiện hành
 
-## Vấn đề chính & cơ hội cải tiến (tóm tắt)
-- Thiết kế: `VM::run()` khá monolithic — khó bảo trì và test.
-- Trạng thái toàn cục: `StringPool`/hamMap có state global; cần làm rõ lifecycle để tránh leak khi compile nhiều lần.
-- Testing: thiếu unit tests cho compiler/VM; hiện chỉ có chương trình ví dụ (`src/tests/*.vi`).
-- CI: repository có cấu hình tối thiểu; khuyến nghị thiết lập GitHub Actions đầy đủ (build matrix, unit tests, code coverage).
-- Docs: `docs/*.md` tốt nhưng có thể không khớp hoàn toàn với hiện trạng code (cần cập nhật bytecode spec & instruction semantics).
-- Build artefacts: `cmake-build-debug/` hiện ở repo — nên loại bỏ khỏi VCS hoặc di chuyển vào `.gitignore`.
+- CLI: src/cli/main.cpp.
+- Core và frontend: src/core/, src/frontend/; header tương ứng ở include/common/ và
+  include/frontend/.
+- Compiler: src/compiler/; các thành phần hỗ trợ ở src/compiler/support/ (không còn
+  nằm tại src/helpers/).
+- Bytecode: src/bytecode/; header theo hướng module mới ở include/vpp/bytecode/ và
+  header tương thích cũ vẫn ở include/vm/.
+- Runtime và native adapter: src/runtime/ và src/runtime/native/ (không còn
+  src/vm/).
+- Tooling CLI: src/tooling/; các header theo namespace vpp đang được gom ở
+  include/vpp/.
+- Test: chương trình hồi quy V++ ở src/tests/*.vi, output ở src/tests/expected/,
+  C++ unit test ở src/tests/*.cpp. src/tests/.tmp/ chỉ là workspace tạm được tạo
+  khi chạy test.
+- Package/thư viện chuẩn, template và ví dụ: gói/, templates/ và examples/.
 
-## Quickstart (local)
-1. Build (CMake):
+Các header trong include/vpp/ là hướng tổ chức API theo module; chúng chưa được
+cam kết là C/C++ embedding API ổn định.
 
-```bash
-mkdir -p cmake-build-debug && cd cmake-build-debug
-cmake ..
-make -j
-```
+## Build và test cục bộ
 
-2. Chạy CLI với file thử nghiệm:
+Từ root của repository:
 
-```bash
-./cmake-build-debug/bin/vietvm-cli src/tests/kiem_tra_ham.vi
-```
+    cmake -S . -B cmake-build-debug
+    cmake --build cmake-build-debug
+    ctest --test-dir cmake-build-debug --output-on-failure --verbose --no-tests=error
 
-Lưu ý: các lệnh trên giả định bạn đang làm việc trên macOS / Linux với CMake & make đã cài.
+Binary được CMake đặt trong cmake-build-debug/bin/. Có thể chạy riêng bộ hồi quy
+Unix bằng cách đặt VPP_EXEC trỏ đến binary rồi gọi run_tests.sh. Trên Windows,
+CTest tự gọi PowerShell 7 và scripts/windows/run-tests.ps1 khi pwsh có mặt.
 
-## Đề xuất cấp cao
-- Ngắn hạn: ổn định build, thêm unit tests cơ bản, cập nhật README và xoá artefacts build khỏi repo.
-- Trung hạn: tách `VM::run()` thành các handler, viết unit tests cho opcode handlers, thêm CI (matrix), coverage, linter.
-- Dài hạn: chuẩn hoá bytecode (spec), viết assembler/disassembler + round-trip tests, profiling & tối ưu hoá VM, public API để nhúng V++.
+## Việc còn lại theo thứ tự ưu tiên
 
-Xem chi tiết trong `plans/`.
+1. Chốt chính sách kiểu dữ liệu (dynamic, static hoặc gradual) trước khi thiết kế
+   AST, semantic analysis và Typed IR.
+2. Tách VM::run() theo handler, rồi mở rộng test từ smoke test sang coverage từng
+   opcode, đường lỗi và call frame.
+3. Đồng bộ docs/bytecode.md với bytecode thực thi; chỉ version hoá/serialize khi
+   contract opcode đã ổn định.
+4. Thiết kế C API/C++ embedding API không phụ thuộc state compiler toàn cục.
+5. Nâng MVP GC/JIT thành thiết kế có benchmark, profiling và kiểm thử hồi quy trước
+   khi xem là runtime production.
+6. Bổ sung coverage report, C++ linter và benchmark; chúng chưa có trong CI hiện tại.
 
----
+Xem chi tiết và trạng thái từng nhóm ở:
 
-Những file kế hoạch đã được tạo trong `plans/`. Nếu bạn muốn, tôi có thể tiếp tục:
-- tạo skeleton unit tests (`tests/unit/`),
-- thêm pipeline GitHub Actions mẫu (`.github/workflows/ci.yml`),
-- hoặc tạo PR với các sửa đổi ban đầu (vd. xóa `cmake-build-debug/` khỏi VCS).
-
-Ghi chú: nội dung kế hoạch chi tiết nằm trong các file `plans/*.md` được tạo cùng lúc.
-
+- plans/short-term.md — việc có thể hoàn tất trong vòng 1–2 tuần.
+- plans/medium-term.md — refactor và độ tin cậy trong 1–3 tháng.
+- plans/long-term.md — nền tảng ngôn ngữ/runtime và phát hành dài hạn.

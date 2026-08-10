@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <sstream>
 
+#include "vpp/core/message_constants.h"
+
 namespace vietvm::compiler {
 
     // ==================== Exception Classes ====================
@@ -29,13 +31,22 @@ namespace vietvm::compiler {
     private:
         static std::string formatMessage(const std::string& msg, size_t line, size_t col, const std::string& ctx) {
             std::ostringstream oss;
+            std::string_view detail(msg);
+            const std::string_view code = vietvm::messages::messageCodeFromFormatted(detail);
+            if (!code.empty()) {
+                // Put the code first so CLI/LSP can identify lexer diagnostics
+                // with the same lightweight prefix parser as all other layers.
+                oss << '[' << code << "] ";
+                detail.remove_prefix(code.size() + 2); // '[' + code + ']'
+                if (!detail.empty() && detail.front() == ' ') detail.remove_prefix(1);
+            }
             oss << "Lỗi lexer";
             if (line > 0) {
                 oss << " [dòng " << line;
                 if (col > 0) oss << ", cột " << col;
                 oss << "]";
             }
-            oss << ": " << msg;
+            oss << ": " << detail;
             if (!ctx.empty()) {
                 oss << "\n  --> " << ctx;
             }
@@ -47,7 +58,7 @@ namespace vietvm::compiler {
     class UnclosedStringError : public LexerError {
     public:
         UnclosedStringError(size_t line, size_t column, const std::string& partialString)
-            : LexerError("Chuỗi không được đóng (thiếu dấu nháy kết thúc)", line, column,
+            : LexerError(messages::formatMessage(messages::kLexerUnclosedString), line, column,
                          "\"" + (partialString.length() > 20 ? partialString.substr(0, 20) + "..." : partialString)) {}
     };
 
@@ -55,14 +66,16 @@ namespace vietvm::compiler {
     class UnclosedCommentError : public LexerError {
     public:
         UnclosedCommentError(size_t line, size_t column)
-            : LexerError("Comment block không được đóng (thiếu */)", line, column, "/*...") {}
+            : LexerError(messages::formatMessage(messages::kLexerUnclosedComment), line, column, "/*...") {}
     };
 
     // Exception cho ký tự không hợp lệ
     class InvalidCharacterError : public LexerError {
     public:
         InvalidCharacterError(char c, size_t line, size_t column)
-            : LexerError(std::string("Ký tự không hợp lệ: '") + c + "' (mã: " + std::to_string((int)(unsigned char)c) + ")",
+            : LexerError(messages::formatMessage(messages::kLexerInvalidCharacter,
+                                                  {std::string(1, c),
+                                                   std::to_string(static_cast<int>(static_cast<unsigned char>(c)))}),
                          line, column, "") {}
     };
 
@@ -70,14 +83,19 @@ namespace vietvm::compiler {
     class InvalidEscapeSequenceError : public LexerError {
     public:
         InvalidEscapeSequenceError(char escChar, size_t line, size_t column)
-            : LexerError(std::string("Escape sequence không hợp lệ: \\") + escChar, line, column, "") {}
+            : LexerError(messages::formatMessage(messages::kLexerInvalidEscapeSequence,
+                                                  {std::string(1, escChar)}),
+                         line, column, "") {}
     };
 
     // Exception cho token không mong đợi
     class UnexpectedTokenError : public LexerError {
     public:
         UnexpectedTokenError(const std::string& token, const std::string& expected, size_t line, size_t column)
-            : LexerError("Token không mong đợi: '" + token + "'" + (expected.empty() ? "" : ", mong đợi: " + expected),
+            : LexerError(expected.empty()
+                             ? messages::formatMessage(messages::kLexerUnexpectedToken, {token})
+                             : messages::formatMessage(messages::kLexerUnexpectedTokenWithExpectation,
+                                                       {token, expected}),
                          line, column, "") {}
     };
 
@@ -85,14 +103,14 @@ namespace vietvm::compiler {
     class InvalidNumberError : public LexerError {
     public:
         InvalidNumberError(const std::string& token, size_t line, size_t column)
-            : LexerError("Số không hợp lệ: '" + token + "'", line, column, "") {}
+            : LexerError(messages::formatMessage(messages::kLexerInvalidNumber, {token}), line, column, "") {}
     };
 
     // Exception cho identifier không hợp lệ
     class InvalidIdentifierError : public LexerError {
     public:
         InvalidIdentifierError(const std::string& token, size_t line, size_t column)
-            : LexerError("Tên định danh không hợp lệ: '" + token + "'", line, column, "") {}
+            : LexerError(messages::formatMessage(messages::kLexerInvalidIdentifier, {token}), line, column, "") {}
     };
 
     // ==================== Helper Functions ====================

@@ -3,6 +3,8 @@
 #include <iostream>
 
 #include "frontend/lexer.h"
+#include "common/utility.h"
+#include "vpp/core/message_constants.h"
 #include <stack>
 #include <stdexcept>
 #include <sstream>
@@ -30,30 +32,6 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
     if (infix_tokens.empty()) return {};
     auto isFuncMarker = [](const std::string &s)->bool {
         return s.rfind("FUNC:", 0) == 0;
-    };
-    auto isIdentifierLikeToken = [](const std::string &tk)->bool {
-        if (tk.empty()) return false;
-        if (tk == "đúng" || tk == "sai" || tk == "rỗng") return false;
-        return isVariable(tk);
-    };
-    auto isCallableNamePiece = [](const std::string &tk) {
-        if (isVariable(tk)) return true;
-        if (tk.find(' ') == std::string::npos) return false;
-        std::stringstream ss(tk);
-        std::string part;
-        while (std::getline(ss, part, ' ')) {
-            if (part.empty()) continue;
-            if (!isVariable(part)) return false;
-        }
-        return true;
-    };
-    auto joinNameTokens = [](const std::vector<std::string> &tokens, size_t begin, size_t end) {
-        std::string out;
-        for (size_t j = begin; j < end; ++j) {
-            if (!out.empty()) out.push_back(' ');
-            out += tokens[j];
-        }
-        return out;
     };
 
     for (size_t i = 0; i < infix_tokens.size(); ++i) {
@@ -108,7 +86,8 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
             }
             if (argExpectingStack.empty()) {
                 // comma outside function parens - treat as error
-                throw std::runtime_error("convertToPostfix: unexpected ',' outside function call");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSyntaxUnexpectedCommaOutsideCall));
             }
             // next argument expected
             argExpectingStack.back() = true;
@@ -144,7 +123,8 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
                 }
                 output.push_back(top);
             }
-            if (!foundLeft) throw std::runtime_error("convertToPostfix: mismatched parens");
+            if (!foundLeft) throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMismatchedExpressionParens));
             // if function marker exists just below, pop it and emit CALL token
             if (!ops.empty() && isFuncMarker(ops.top())) {
                 std::string funcMarker = ops.top(); ops.pop();
@@ -167,13 +147,15 @@ std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_
         } else if (token == "(" || token == ")") {
             // handled
         } else {
-            throw std::runtime_error("convertToPostfix: unknown token '" + token + "'");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxUnknownExpressionToken, {token}));
         }
     }
 
     while (!ops.empty()) {
         if (ops.top() == "(" || ops.top() == ")")
-            throw std::runtime_error("convertToPostfix: mismatched parens");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMismatchedExpressionParens));
         output.push_back(ops.top());
         ops.pop();
     }

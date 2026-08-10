@@ -1,49 +1,62 @@
-# Kế hoạch Trung hạn (1–3 tháng)
+# Kế hoạch trung hạn (1–3 tháng)
 
-Mục tiêu: Tăng độ tin cậy và maintainability của compiler & VM, mở rộng test coverage, và thêm tooling (linters, coverage, benchmarks).
+> Cập nhật: 09/08/2026
+> Mục tiêu là giảm coupling của compiler/runtime và tăng độ tin cậy. Baseline hiện
+> có regression CTest, sanitizer trên Ubuntu và vài C++ unit test, nhưng chưa phải
+> coverage đầy đủ.
 
-Ưu tiên: High → Medium
+## Nền tảng đã có
 
-Estimated effort: 5–20 man-days
+- [x] CMake đã tách target theo core, frontend, bytecode, compiler, runtime, tooling
+  và CLI; dependency graph có chiều rõ ràng thay vì target helpers tổng quát.
+- [x] Hồi quy tích hợp đã được đăng ký với CTest trên Unix và Windows.
+- [x] Job Ubuntu có AddressSanitizer và UndefinedBehaviorSanitizer.
+- [x] Có baseline test cho compiler support và một nhóm opcode VM.
 
-## Tasks & chi tiết
+## Việc còn lại
 
-1) Tách `VM::run()` thành các opcode handler
-   - Mục tiêu: chia nhỏ `src/vm/vm.cpp` thành các hàm nhỏ (vd. `handleOP_GOI`, `handleOP_JUMP`, `handleOP_PUSH`), dễ unit-test và profiling.
-   - Files: `src/vm/vm.cpp`, `include/vm/vm.h` (cập nhật chữ ký nếu cần)
-   - Effort: medium (3–7 days)
+1. Tách VM::run() theo opcode handler
 
-2) Viết unit tests cho opcode handlers
-   - Mục tiêu: đảm bảo từng opcode hoạt động đúng, viết tests giả lập `VM` state.
-   - Files: `tests/unit/test_vm_handlers.cpp`
-   - Effort: medium (3–7 days)
+   - [ ] Chia dispatch hiện tại thành handler nhỏ, bảo toàn semantics và call frame.
+   - [ ] Đưa state cần thiết vào API nội bộ có thể dựng trong test; không dựa vào
+     stdout/global state để kiểm thử từng handler.
+   - [ ] Giữ test tích hợp trước/sau mỗi nhánh refactor.
 
-3) Tăng cường CI: coverage + sanitizer + linter
-   - Mục tiêu: thêm Codecov, AddressSanitizer/UndefinedBehaviorSanitizer trong CI, chạy clang-tidy hoặc cpplint.
-   - Files: `.github/workflows/ci.yml`, thêm `ci/` scripts nếu cần.
-   - Effort: medium (2–4 days)
+2. Mở rộng test opcode và compiler
 
-4) Improve compiler modularity
-   - Mục tiêu: giảm coupling giữa `compileRegistry`, `compileFunction`, và `compileStatement`; rõ ràng interfaces cho compile handlers.
-   - Files: `src/compiler/*`, `include/compiler/*`
-   - Effort: medium (3–7 days)
+   - [ ] Chuyển VM opcode smoke test thành ma trận test cho arithmetic, stack,
+     branch, call/return, native call, lỗi runtime và boundary value.
+   - [ ] Thêm regression cho lexer/compiler khi phát hiện lỗi thay vì chỉ sửa output
+     của fixture.
+   - [ ] Xác định test discovery rõ ràng: C++ unit target riêng, regression V++ riêng,
+     fixture network riêng.
 
-5) Add integration tests + harness
-   - Mục tiêu: harness để chạy nhiều `.vi` tests headless and assert outputs; add regression tests for previously failing cases.
-   - Files: `tests/integration/run_tests.py` or C++ runner + `tests/expected/*`
-   - Effort: medium (2–5 days)
+3. Hoàn thiện CI chất lượng
 
-6) Add basic benchmarks & profiling harness
-   - Mục tiêu: microbench opcode dispatch and hot functions, collect baseline for optimizations.
-   - Files: `benchmarks/` (Google Benchmark or simple harness)
-   - Effort: medium (2–5 days)
+   - [ ] Thêm coverage report có ngưỡng và cách loại trừ code generated/fixture.
+   - [ ] Thêm C++ static linter (ví dụ clang-tidy) với config được version hoá.
+   - [ ] Cân nhắc macOS regression CI nếu native runtime có nhánh platform-specific;
+     workflow release hiện mới xác nhận build/package macOS.
 
-## Checklist PR
-- Unit tests for modified modules
-- CI updated to run tests and report coverage
-- Documentation for any changed bytecode behavior
+4. Giảm state toàn cục trong compiler
 
-## Rủi ro & dependency
-- Large refactors of VM/internal state may introduce regressions; keep integration tests to detect.
-- Sanitizers may reveal undefined behavior that requires careful fixes.
+   - [ ] Thiết kế CompilationContext/BytecodeProgram để thay StringPool và registry
+     mutable toàn cục dần theo context per-compilation.
+   - [ ] Tách interface compile block/function/statement theo dữ liệu vào-ra cụ thể
+     thay vì chia module chỉ theo file.
+   - [ ] Có test biên dịch liên tiếp/đồng thời trước khi tuyên bố compiler re-entrant.
 
+5. Benchmark và profiling
+
+   - [ ] Tạo benchmark lặp lại được cho dispatch opcode, lexer/compiler và native
+     HTTP path.
+   - [ ] Ghi baseline trước mọi tối ưu JIT/VM, đưa kết quả vào tài liệu hoặc CI
+     không-chặn.
+
+## Rủi ro và dependency
+
+- Tách VM có thể làm thay đổi thứ tự side effect; cần expected output và test call
+  frame trước khi tối ưu.
+- Sanitizer là tín hiệu lỗi tốt nhưng không thay thế coverage hoặc review ownership.
+- AST/semantic/type system là dependency kiến trúc cho refactor compiler lớn hơn; cần
+  chốt chính sách kiểu dữ liệu trước khi đưa Typed IR vào roadmap thực thi.

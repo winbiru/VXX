@@ -1,14 +1,24 @@
-# Bytecode — V++ (nhánh `developer`)
+# Bytecode — V++: proposal cho định dạng `.vbc`
 
-Tài liệu này mô tả định dạng bytecode đề xuất cho V++, cách mã hóa instructions/operands, layout file/section, một số opcode chính lấy cảm hứng từ `include/keywords.h`, và ví dụ mẫu. Mục tiêu: có spec đủ rõ để hiện thực assembler/disassembler, loader và verifier trong `src/vm`/`src/compiler`.
+Tài liệu này là **proposal thiết kế cho một định dạng `.vbc` được tuần tự hóa trong tương
+lai**. Nó không phải format runtime hiện hành và không phải compatibility contract.
 
-> Ghi chú: đây là đề xuất dựa trên cấu trúc repo hiện tại. Sau khi thống nhất spec, cần đồng bộ `include/instruction.h` (enum Opcode) và lexer/parser/assembler.
+> **Trạng thái hiện tại:** compiler tokenize source rồi phát trực tiếp
+> `std::vector<Instruction>` trong [`src/compiler/compiler.cpp`](../src/compiler/compiler.cpp).
+> VM nhận cấu trúc đó trong [`include/vm/vm.h`](../include/vm/vm.h) và thực thi tại
+> [`src/runtime/vm.cpp`](../src/runtime/vm.cpp). `Instruction` và enum `Opcode` hiện có nằm ở
+> [`include/vm/instruction.h`](../include/vm/instruction.h). Repo chưa có serializer,
+> loader hay verifier `.vbc`; hàm disassemble hiện có chỉ in biểu diễn bytecode trong bộ nhớ
+> tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp).
+
+Phần còn lại mô tả layout file/section, mã hóa instruction/operand và một opcode set có thể
+dùng khi dự án chọn hiện thực assembler, disassembler, loader và verifier cho `.vbc`.
 
 ---
 
 ## 1. Tổng quan
-- Kiến trúc: stack-based VM (nghiên cứu các opcodes thấy thuận lợi cho stack machine).
-- Bytecode là chuỗi bytes độc lập nền tảng, little-endian, với cấu trúc file có header + sections.
+- Runtime hiện dùng `Instruction { Opcode op; int operand; int operandIndex; int operandValue; }` trong bộ nhớ; đây **không** là layout file.
+- Mục tiêu của proposal là một chuỗi bytes độc lập nền tảng, little-endian, có header + sections.
 - Giá trị số nguyên được mã hóa bằng unsigned LEB128 (ULEB128) để tiết kiệm không gian cho hầu hết các constants/offset nhỏ.
 - String, symbol, constant được tham chiếu qua Constant Pool (indices).
 
@@ -62,8 +72,13 @@ Ví dụ encoding mẫu:
 
 ---
 
-## 4. Opcode đề xuất & ý nghĩa (mapping từ include/keywords.h)
-Dưới đây là danh sách opcode tên gợi ý (cần đồng bộ enum trong `include/instruction.h`). Mỗi mục gồm tên, mô tả ngắn và operands nếu có.
+## 4. Opcode đề xuất & ý nghĩa
+Danh sách dưới đây là opcode set **đề xuất cho file `.vbc`**, không phải bảng mã đang dùng
+trong runtime. Các giá trị số trong proposal không được dùng để decode `Instruction` hiện tại:
+enum thực tế có các opcode và giá trị riêng trong
+[`include/vm/instruction.h`](../include/vm/instruction.h), còn bảng từ khóa source nằm ở
+[`include/frontend/keywords.h`](../include/frontend/keywords.h) và
+[`src/frontend/keywords.cpp`](../src/frontend/keywords.cpp).
 
 - OP_NOP (0x00) — no-op
 - OP_PUSH_CONST (0x01) — push constant pool[idx] onto stack. operand: uleb128 const_index
@@ -105,7 +120,7 @@ Structured / other:
 - OP_KET_THUC_LAP / OP_BO_QUA / OP_THOAT — mapped to control flow (continue, break, exit) implemented by jumps
 
 Notes:
-- Tên opcode ở trên lấy cảm hứng từ file keywords.h; khi đồng bộ hãy sửa enum value và gắn số opcode cụ thể.
+- Tên opcode ở trên là một mapping mục tiêu; không thay đổi hoặc gán lại enum runtime hiện hành chỉ để khớp proposal.
 - Một số khái niệm (ví dụ OP_MO_KHOI) là cú pháp bậc cao; bytecode có thể không cần những opcode tương ứng nếu compiler chuyển chúng thành jump/call/stack ops.
 
 ---
@@ -129,10 +144,11 @@ Notes:
 
 ---
 
-## 7. Assembler / Disassembler API
-- Assembler: input là human-readable mnemonics (ví dụ PUSH_CONST 10; LOAD_LOCAL 0; OP_CONG), output là bytecode file.
-- Disassembler: đọc bytes, map opcode -> mnemonic, resolve constant pool indices to readable forms.
-- Đề xuất sử dụng JSON hoặc TOML cho intermediate representation (IR) giữa compiler và assembler.
+## 7. Assembler / Disassembler API (mục tiêu)
+- Assembler: input là human-readable mnemonics (ví dụ PUSH_CONST 10; LOAD_LOCAL 0; OP_CONG), output là file `.vbc`.
+- Disassembler `.vbc`: đọc bytes, map opcode -> mnemonic, resolve constant-pool indices.
+- Hiện tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp) chỉ disassemble `std::vector<Instruction>` trong bộ nhớ; nó chưa đọc file `.vbc`.
+- JSON/TOML IR giữa compiler và assembler chỉ là một lựa chọn thiết kế tương lai; chưa có IR như vậy trong pipeline hiện tại.
 
 ---
 
@@ -184,18 +200,16 @@ Mã byte (hex, ULEB128 for indices small => single byte):
 ---
 
 ## 11. Next steps thực thi (gợi ý tasks)
-1. Đồng bộ enum Opcode trong `include/instruction.h` với danh sách opcode và gán mã byte (0x00..).
-2. Viết assembler prototype `src/tools/assembler`:
-    - parse mnemonics -> emit bytes, build constant pool.
-3. Viết disassembler `src/tools/disasm` để debug.
-4. Implement loader + verifier trong `src/vm/loader.cpp`.
-5. Tạo tests: unit test round-trip assemble → disassemble, và small program run tests (sum, if/else, loop).
-6. Document final format (patch `bytecode.md`) và add example .vbc files under `tests/fixtures`.
+1. Chốt ABI/versioning của `.vbc`, opcode set và constant-pool trước khi thay đổi enum runtime.
+2. Thêm serializer/deserializer `.vbc` và một assembler; chọn vị trí module trong cây `src/` khi thiết kế được chấp thuận.
+3. Thêm disassembler `.vbc` riêng; giữ disassembler in-memory hiện có ở `src/tooling/` hoạt động độc lập.
+4. Thêm loader + verifier cho format đã chốt, thay vì giả định một path chưa tồn tại.
+5. Tạo test round-trip assemble → disassemble và test chạy chương trình nhỏ dưới `src/tests/`.
+6. Sau khi có implementation, thay phần proposal này bằng spec versioned và fixture `.vbc` thật.
 
 ---
 
 ## 12. Lời kết
-Tài liệu này là bản đề xuất chi tiết đủ để:
-- implement assembler/disassembler,
-- sửa `include/instruction.h`,
-- xây loader/verifier trong VM.
+Tài liệu này là điểm xuất phát để thiết kế assembler/disassembler và loader/verifier `.vbc`.
+Cho đến khi các thành phần đó tồn tại, nguồn chuẩn cho runtime là `Instruction`/`Opcode` và
+VM hiện hành, không phải các mã byte minh họa ở đây.

@@ -24,6 +24,8 @@
 #include "common/storeString.h"
 #include "compiler/compileBlock.h"
 #include "../../include/frontend/lexer.h"
+#include "vpp/core/message_constants.h"
+#include "vpp/core/project_layout.h"
 
 std::unordered_map<std::string, CompileFunc> compileMap;
 
@@ -94,18 +96,54 @@ namespace vietvm { namespace compiler {
         if (visibility == "công khai") return;
         if (visibility == "riêng tư") {
             if (currentClass != owner) {
-                throw std::runtime_error("Không thể gọi phương thức riêng tư '" + resolvedName +
-                                         "' từ phạm vi hiện tại");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSemanticPrivateMethodAccess, {resolvedName}));
             }
             return;
         }
         if (visibility == "bảo vệ") {
             if (currentClass != owner) {
-                throw std::runtime_error("Không thể gọi phương thức bảo vệ '" + resolvedName +
-                                         "' từ phạm vi hiện tại");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSemanticProtectedMethodAccess, {resolvedName}));
             }
             return;
         }
+    }
+
+    int resolveFunctionIdByName(const std::string &name,
+                                const std::unordered_map<std::string,int> &symTab,
+                                bool includeGlobalFallback) {
+        std::string resolvedName = resolveCallableNameInContext(name, symTab);
+        validateCallableAccess(resolvedName);
+
+        auto idMatchesResolvedName = [&](int candidateId) {
+            int resolvedNameIndex = StringPool::findString(resolvedName);
+            if (resolvedNameIndex < 0) return false;
+            auto itName = hamMap::hamNameIndexMap.find(candidateId);
+            if (itName == hamMap::hamNameIndexMap.end()) return false;
+            return itName->second == resolvedNameIndex;
+        };
+
+        auto itSym = symTab.find(resolvedName);
+        if (itSym != symTab.end()) {
+            int maybeId = itSym->second;
+            auto itCode = hamMap::hamBytecodeMap.find(maybeId);
+            if (itCode != hamMap::hamBytecodeMap.end() &&
+                !itCode->second.empty() &&
+                idMatchesResolvedName(maybeId)) {
+                return maybeId;
+            }
+        }
+
+        if (!includeGlobalFallback) return -1;
+
+        int nameIndex = StringPool::findString(resolvedName);
+        if (nameIndex >= 0) {
+            for (const auto &kv : hamMap::hamNameIndexMap) {
+                if (kv.second == nameIndex) return kv.first;
+            }
+        }
+        return -1;
     }
 } }
 
@@ -119,44 +157,29 @@ static void compileFunctionDeclaration(const std::vector<std::string>& tokens,
                                        const std::string &classOwner,
                                        const std::string &visibility)
 {
-    auto isCallableNamePiece = [](const std::string &tk) {
-        if (vietvm::compiler::isVariable(tk)) return true;
-        if (tk.find(' ') == std::string::npos) return false;
-        std::stringstream ss(tk);
-        std::string part;
-        while (std::getline(ss, part, ' ')) {
-            if (part.empty()) continue;
-            if (!vietvm::compiler::isVariable(part)) return false;
-        }
-        return true;
-    };
-
-    auto joinNameTokens = [](const std::vector<std::string>& toks, size_t begin, size_t end) {
-        std::string out;
-        for (size_t i = begin; i < end; ++i) {
-            if (!out.empty()) out.push_back(' ');
-            out += toks[i];
-        }
-        return out;
-    };
-
     ++pos; // skip 'hàm'
     std::string effectiveVisibility = visibility;
     if (pos < tokens.size() && vietvm::compiler::isVisibilityToken(tokens[pos])) {
         effectiveVisibility = tokens[pos++];
     }
 
-    if (pos >= tokens.size()) throw std::runtime_error("compile: thiếu tên hàm sau 'hàm'");
+    if (pos >= tokens.size()) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxMissingFunctionName));
+    }
     size_t nameBegin = pos;
     while (pos < tokens.size() && tokens[pos] != "(" && tokens[pos] != "{" && tokens[pos] != ";") {
-        if (!isCallableNamePiece(tokens[pos])) {
+        if (!vietvm::compiler::isCallableNamePiece(tokens[pos])) {
             break;
         }
         ++pos;
     }
-    if (nameBegin == pos) throw std::runtime_error("compile: tên hàm không hợp lệ sau 'hàm'");
+    if (nameBegin == pos) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxInvalidFunctionName));
+    }
 
-    std::string rawName = joinNameTokens(tokens, nameBegin, pos);
+    std::string rawName = vietvm::compiler::joinNameTokens(tokens, nameBegin, pos);
     std::string fullName = namePrefix.empty() ? rawName : (namePrefix + rawName);
     int nameIndex = vietvm::compiler::StringPool::storeString(fullName);
 
@@ -219,15 +242,17 @@ static void compileFunctionDeclaration(const std::vector<std::string>& tokens,
                 else if (dv == "đúng") p.defaultEncoded = "i:1";
                 else if (dv == "sai") p.defaultEncoded = "i:0";
                 else if (dv == "rỗng") p.defaultEncoded = "n:";
-                else throw std::runtime_error("hàm: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
+                else throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSemanticUnsupportedDefaultParameter, {"hàm"}));
             }
             if (!p.name.empty()) params.push_back(p);
         }
     }
 
     if (pos >= tokens.size() || tokens[pos] != "{") {
-        throw std::runtime_error(std::string("compileBlock: expected '{' at pos=") + std::to_string(pos)
-                                 + ", found token='" + (pos < tokens.size() ? tokens[pos] : "EOF") + "'");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxExpectedBlockAtPosition,
+            {std::to_string(pos), pos < tokens.size() ? tokens[pos] : "EOF"}));
     }
 
     std::vector<Instruction> funcCode;
@@ -303,7 +328,8 @@ void initCompileMap() {
                               std::unordered_map<std::string,int>&,
                               int&,
                               const std::unordered_map<std::string,Opcode>&) {
-        throw std::runtime_error("'hoặc' phải đi ngay sau một khối 'nếu'");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxElseWithoutIf));
     };
     compileMap["lặp"] = [](const std::vector<std::string>& tokens, size_t &pos,
                        std::vector<Instruction>& bytecode,
@@ -349,12 +375,14 @@ void initCompileMap() {
         }
 
         if (pos >= tokens.size()) {
-            throw std::runtime_error("lớp: thiếu tên lớp");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMissingClassName));
         }
         std::string className = tokens[pos++];
 
         if (pos >= tokens.size() || tokens[pos] != "{") {
-            throw std::runtime_error("lớp: thiếu '{' sau tên lớp");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMissingClassOpeningBlock));
         }
 
         ++pos; // skip '{'
@@ -369,9 +397,8 @@ void initCompileMap() {
                 if (vietvm::compiler::isVisibilityToken(tokens[pos])) {
                     std::string oldOrderVisibility = tokens[pos];
                     if ((pos + 1) < tokens.size() && tokens[pos + 1] == "hàm") {
-                        throw std::runtime_error(
-                            "lớp: dùng cú pháp 'hàm <quyền>' (ví dụ: 'hàm " + oldOrderVisibility +
-                            " tenHam(...)') thay vì '<quyền> hàm'");
+                        throw std::runtime_error(vietvm::messages::formatMessage(
+                            vietvm::messages::kSyntaxModifierBeforeFunction, {oldOrderVisibility}));
                     }
                 }
 
@@ -381,7 +408,8 @@ void initCompileMap() {
                     continue;
                 }
 
-                throw std::runtime_error("lớp: hiện chỉ hỗ trợ khai báo hàm trong thân lớp");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSyntaxUnsupportedClassMember));
             }
         } catch (...) {
             vietvm::compiler::popClassContext();
@@ -390,7 +418,8 @@ void initCompileMap() {
         vietvm::compiler::popClassContext();
 
         if (pos >= tokens.size() || tokens[pos] != "}") {
-            throw std::runtime_error("lớp: thiếu '}' kết thúc lớp");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMissingClassClosingBlock));
         }
         ++pos; // skip '}'
         if (pos < tokens.size() && tokens[pos] == ";") ++pos;
@@ -398,71 +427,41 @@ void initCompileMap() {
 
     // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
     // cú pháp: gọi <tên>(arg1, arg2, ...)
-    // ---- Handler: gọi hàm bằng từ khóa 'gọi' ----
     compileMap["gọi"] = [](const std::vector<std::string>& tokens, size_t &pos,
                            std::vector<Instruction>& bytecode,
                            std::unordered_map<std::string,int>& symTab,
                            int& nextId,
                            const std::unordered_map<std::string,Opcode>& keywordMap) {
-        auto isCallableNamePiece = [](const std::string &tk) {
-            if (vietvm::compiler::isVariable(tk)) return true;
-            if (tk.find(' ') == std::string::npos) return false;
-            std::stringstream ss(tk);
-            std::string part;
-            while (std::getline(ss, part, ' ')) {
-                if (part.empty()) continue;
-                if (!vietvm::compiler::isVariable(part)) return false;
-            }
-            return true;
-        };
-
-        auto joinNameTokens = [](const std::vector<std::string>& toks, size_t begin, size_t end) {
-            std::string out;
-            for (size_t i = begin; i < end; ++i) {
-                if (!out.empty()) out.push_back(' ');
-                out += toks[i];
-            }
-            return out;
-        };
-
         ++pos;
-        if (pos >= tokens.size()) throw std::runtime_error("gọi: thiếu tên hàm");
+        if (pos >= tokens.size()) {
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMissingCallName));
+        }
 
         size_t nameBegin = pos;
         while (pos < tokens.size() && tokens[pos] != "(" && tokens[pos] != ";") {
-            if (!isCallableNamePiece(tokens[pos])) {
+            if (!vietvm::compiler::isCallableNamePiece(tokens[pos])) {
                 break;
             }
             ++pos;
         }
-        if (nameBegin == pos) throw std::runtime_error("gọi: tên hàm không hợp lệ");
-
-        std::string originalName = joinNameTokens(tokens, nameBegin, pos);
-        std::string fname = vietvm::compiler::resolveCallableNameInContext(originalName, symTab);
-        vietvm::compiler::validateCallableAccess(fname);
-
-        // resolve function id from symTab (must have been set when compiling declaration)
-        int hamId = -1;
-        auto itSym = symTab.find(fname);
-        if (itSym != symTab.end()) {
-            int candidateId = itSym->second;
-            int fnameIndex = vietvm::compiler::StringPool::findString(fname);
-            auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
-            auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(candidateId);
-            if (fnameIndex >= 0 &&
-                itName != vietvm::compiler::hamMap::hamNameIndexMap.end() &&
-                itName->second == fnameIndex &&
-                itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
-                !itCode->second.empty()) {
-                hamId = candidateId;
-            }
-        } else {
-            // fallback: store name in string pool and emit OP_GOI with nameIndex (VM fallback will try resolve)
-            hamId = -1;
+        if (nameBegin == pos) {
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxInvalidCallName));
         }
 
+        std::string originalName = vietvm::compiler::joinNameTokens(tokens, nameBegin, pos);
+        std::string fname = vietvm::compiler::resolveCallableNameInContext(originalName, symTab);
+
+        // Keep `gọi`'s historical name-based VM fallback when no local ID is
+        // ready, while sharing the local validation/resolution logic.
+        int hamId = vietvm::compiler::resolveFunctionIdByName(fname, symTab, false);
+
         // parse args
-        if (pos >= tokens.size() || tokens[pos] != "(") throw std::runtime_error("gọi: thiếu '(' sau tên hàm");
+        if (pos >= tokens.size() || tokens[pos] != "(") {
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMissingCallOpeningParen));
+        }
         auto pr = vietvm::compiler::extractParens(tokens, pos);
         std::string inside = pr.first;
         pos = pr.second;
@@ -526,7 +525,8 @@ void initCompileMap() {
             compileReturn(tokens, pos, bytecode, symTab, nextId, keywordMap);
             return;
         }
-        throw std::runtime_error("'trả' phải đi cùng 'về'");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxReturnMustUseVe));
     };
 
     // ---- Handler: bỏ qua (continue) ----
@@ -552,7 +552,8 @@ void initCompileMap() {
             compileExpr(pr.first, bytecode, symTab, nextId, keywordMap);
         } else {
             // ném; without value → push empty string
-            int strIdx = vietvm::compiler::StringPool::storeString("lỗi không xác định");
+            int strIdx = vietvm::compiler::StringPool::storeString(
+                vietvm::messages::messageText(vietvm::messages::kVmUnknownThrownValue));
             bytecode.push_back({OP_CHUOI, 0, strIdx, 0});
         }
         bytecode.push_back({OP_NEM, 0, 0, 0});
@@ -634,7 +635,10 @@ void initCompileMap() {
         (void)symTab;
 
         ++pos; // skip 'nhập'
-        if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
+        if (pos >= tokens.size()) {
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kImportMissingTarget));
+        }
         std::string target;
 
         bool quotedTarget = (tokens[pos].size() >= 2 &&
@@ -656,14 +660,20 @@ void initCompileMap() {
                     target += piece;
                 }
             }
-            if (target.empty()) throw std::runtime_error("nhập: thiếu đường dẫn hoặc tên module");
+            if (target.empty()) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kImportMissingTarget));
+            }
         }
 
         // Optional alias namespace: nhập ... như ns;
         std::string moduleAlias;
         if (pos < tokens.size() && tokens[pos] == "như") {
             ++pos;
-            if (pos >= tokens.size()) throw std::runtime_error("nhập: thiếu tên namespace sau 'như'");
+            if (pos >= tokens.size()) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kImportMissingNamespaceAlias));
+            }
             moduleAlias = tokens[pos++];
         }
 
@@ -676,10 +686,10 @@ void initCompileMap() {
 
         // Package shortcuts for the bundled standard library.
         if (path == "thư viện chuẩn" || path == "thu_vien_chuan" || path == "stdlib") {
-            path = "gói/thư viện/main.vi";
+            path = vietvm::core::kBundledLibraryMainFile;
         }
-        if (path == "thư viện" || path == "thu_vien") {
-            path = "gói/thư viện/main.vi";
+        if (path == vietvm::core::kBundledLibraryDirectory || path == "thu_vien") {
+            path = vietvm::core::kBundledLibraryMainFile;
         }
 
         // A package name may be quoted when it contains spaces, for example:
@@ -694,7 +704,7 @@ void initCompileMap() {
         // page on MSVC. Import targets and bundled directory names are UTF-8,
         // so construct every such path explicitly as UTF-8. Otherwise imports
         // such as `nhập mạng;` fall back to `<project>/mạng.vi` on Windows.
-        const fs::path requestedPath = fs::u8path(path);
+        const fs::path requestedPath = vietvm::core::utf8Path(path);
         const bool bareModuleName = requestedPath.parent_path().empty() &&
                                     requestedPath.extension().empty();
         const std::string bareModule = path;
@@ -733,13 +743,13 @@ void initCompileMap() {
 
         // For unquoted targets, append .vi only when there is no extension.
         if (!quotedTarget) {
-            fs::path rawPath = fs::u8path(path);
+            fs::path rawPath = vietvm::core::utf8Path(path);
             if (rawPath.extension().empty()) {
                 path += ".vi";
             }
         }
 
-        fs::path p = fs::u8path(path);
+        fs::path p = vietvm::core::utf8Path(path);
 
         // Compatibility fallbacks for the former flat package layout and the
         // retired leaf shims. They are intentionally fallbacks so a project
@@ -750,7 +760,7 @@ void initCompileMap() {
             auto root = normalized.begin();
             const std::string rootName = (root != normalized.end()) ? root->u8string() : "";
             if (root != normalized.end() &&
-                (rootName == "gói" || rootName == "goi" || rootName == "packages")) {
+                vietvm::core::isPackageDirectoryName(rootName)) {
                 fs::path relativePath;
                 for (auto item = std::next(root); item != normalized.end(); ++item) {
                     relativePath /= *item;
@@ -768,7 +778,8 @@ void initCompileMap() {
 
                 auto leafRedirect = legacyModuleRedirects.find(relativePath.generic_u8string());
                 if (leafRedirect != legacyModuleRedirects.end()) {
-                    legacyPackageRedirect = fs::u8path(u8"gói") / fs::u8path(leafRedirect->second);
+                    legacyPackageRedirect = vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory) /
+                                            vietvm::core::utf8Path(leafRedirect->second);
                 } else {
                     auto package = relativePath.begin();
                     if (package != relativePath.end()) {
@@ -782,9 +793,9 @@ void initCompileMap() {
                         }
 
                         if (!canonicalPackage.empty()) {
-                            legacyPackageRedirect = fs::u8path(u8"gói") /
-                                                    fs::u8path(u8"thư viện") /
-                                                    fs::u8path(canonicalPackage);
+                            legacyPackageRedirect = vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory) /
+                                                    vietvm::core::utf8Path(vietvm::core::kBundledLibraryDirectory) /
+                                                    vietvm::core::utf8Path(canonicalPackage);
                             for (auto rest = std::next(package); rest != relativePath.end(); ++rest) {
                                 legacyPackageRedirect /= *rest;
                             }
@@ -802,10 +813,10 @@ void initCompileMap() {
         }
 
         auto resolvePackageAtBase = [&](const fs::path &base, const std::string &packageName) {
-            const fs::path packagePath = fs::u8path(packageName);
-            fs::path packageMain = base / packagePath / "main.vi";
+            const fs::path packagePath = vietvm::core::utf8Path(packageName);
+            fs::path packageMain = vietvm::core::packageEntryPath(base / packagePath);
             fs::path packageRoot = base / packagePath;
-            fs::path packageSource = base / fs::u8path(packageName + ".vi");
+            fs::path packageSource = base / vietvm::core::utf8Path(packageName + ".vi");
             if (fs::exists(packageMain)) {
                 abs = fs::absolute(packageMain).lexically_normal();
                 return true;
@@ -819,7 +830,8 @@ void initCompileMap() {
                 return true;
             }
             if (bundledPackageNames.find(packageName) != bundledPackageNames.end()) {
-                fs::path bundledMain = base / fs::u8path(u8"thư viện") / packagePath / "main.vi";
+                fs::path bundledMain = vietvm::core::packageEntryPath(
+                    base / vietvm::core::utf8Path(vietvm::core::kBundledLibraryDirectory) / packagePath);
                 if (fs::exists(bundledMain)) {
                     abs = fs::absolute(bundledMain).lexically_normal();
                     return true;
@@ -846,12 +858,8 @@ void initCompileMap() {
                     }
                 }
                 if (bareModuleName) {
-                    std::vector<fs::path> packageBases = {
-                        dir / fs::u8path(u8"gói"),
-                        dir / fs::u8path("goi"),
-                        dir / fs::u8path("packages")
-                    };
-                    for (const auto &base : packageBases) {
+                    for (const char *packageDirectory : vietvm::core::kPackageDirectoryNames) {
+                        const fs::path base = dir / vietvm::core::utf8Path(packageDirectory);
                         for (const auto &packageName : packageCandidates) {
                             if (resolvePackageAtBase(base, packageName)) {
                                 break;
@@ -874,8 +882,8 @@ void initCompileMap() {
         // outside the repository can import gói/thư viện/... and bare bundled
         // module names.
         if (!fs::exists(abs)) {
-            if (const char *vppHome = std::getenv("VPP_HOME")) {
-                const fs::path vppHomePath = fs::u8path(vppHome);
+            if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
+                const fs::path vppHomePath = vietvm::core::utf8Path(vppHome);
                 fs::path bundled = vppHomePath / p;
                 if (fs::exists(bundled)) {
                     abs = fs::absolute(bundled).lexically_normal();
@@ -887,9 +895,9 @@ void initCompileMap() {
                     }
                 }
                 if (!fs::exists(abs) && bareModuleName) {
-                    for (const char *packageDir : {"gói", "goi", "packages"}) {
+                    for (const char *packageDir : vietvm::core::kPackageDirectoryNames) {
                         for (const auto &packageName : packageCandidates) {
-                            if (resolvePackageAtBase(vppHomePath / fs::u8path(packageDir), packageName)) {
+                            if (resolvePackageAtBase(vppHomePath / vietvm::core::utf8Path(packageDir), packageName)) {
                                 break;
                             }
                         }
@@ -916,7 +924,8 @@ void initCompileMap() {
             // read file
             std::ifstream ifs(abs);
             if (!ifs.is_open()) {
-                throw std::runtime_error(std::string("nhập: không thể mở file '") + canonical + "'");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kImportCannotOpenFile, {canonical}));
             }
             std::stringstream ss;
             ss << ifs.rdbuf();

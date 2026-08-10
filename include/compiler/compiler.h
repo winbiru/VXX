@@ -7,6 +7,15 @@
 #include <unordered_map>
 #include "../vm/instruction.h"
 
+namespace vietvm::compiler {
+
+// Reset all process-wide compiler registries before starting a new top-level
+// compilation.  Do not call this while compileSource is recursively compiling
+// an imported module: imports intentionally share the active registry.
+void resetCompilationState();
+
+} // namespace vietvm::compiler
+
 // Public API: chỉ cần compileSource ở header
 // (mọi helper/chi tiết nội bộ để ở Compiler.cpp và là static/internal)
 // emitMainCall: nếu true (mặc định) thì sau khi compile sẽ tự động emit OP_GOI cho hàm main

@@ -12,6 +12,7 @@
 #include <unordered_map>
 
 #include "../../include/frontend/lexer.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 
 namespace vietvm::compiler {
@@ -128,13 +129,7 @@ namespace vietvm::compiler {
 
     // Helper: lowercase ASCII characters (keep non-ascii unchanged)
     std::string toLowerAscii(const std::string &s) {
-        std::string out;
-        out.reserve(s.size());
-        for (unsigned char c : s) {
-            if (c < 0x80) out.push_back(static_cast<char>(std::tolower(c)));
-            else out.push_back(static_cast<char>(c));
-        }
-        return out;
+        return vietvm::core::toLowerAscii(s);
     }
 
     // Tokenize, with comment and improved string handling
@@ -302,7 +297,8 @@ namespace vietvm::compiler {
         result.reserve(tokens.size());
 
         auto throwMissingAccent = [](const std::string& kw) {
-            throw std::runtime_error("Từ khóa phải có dấu tiếng Việt: '" + kw + "'");
+            throw std::runtime_error(
+                vietvm::messages::formatMessage(vietvm::messages::kLexerMissingVietnameseAccent, {kw}));
         };
 
         // Danh sách các multi-word keywords (bằng token gốc, lower-case ASCII)
@@ -445,8 +441,9 @@ namespace vietvm::compiler {
 
     int getVarValueInt(int varId) {
         if (varId < 0 || static_cast<size_t>(varId) >= vars.size()) {
-            throw std::runtime_error("getVarValueInt: varId ngoài phạm vi (id=" + std::to_string(varId) +
-                                     ", size=" + std::to_string(vars.size()) + ")");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kCompilerVariableIdOutOfRange,
+                {std::to_string(varId), std::to_string(vars.size())}));
         }
         const Value& v = vars[varId];
         if (std::holds_alternative<int>(v)) {
@@ -458,12 +455,15 @@ namespace vietvm::compiler {
             try {
                 return std::stoi(strVal);
             } catch (const std::invalid_argument&) {
-                throw std::runtime_error("getVarValueInt: giá trị biến không phải số hợp lệ: '" + strVal + "'");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kCompilerVariableNotInteger, {strVal}));
             } catch (const std::out_of_range&) {
-                throw std::runtime_error("getVarValueInt: giá trị số quá lớn: '" + strVal + "'");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kCompilerVariableIntegerOverflow, {strVal}));
             }
         }
-        throw std::runtime_error("getVarValueInt: kiểu giá trị không hỗ trợ");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kCompilerUnsupportedVariableValue));
     }
 
     // ==================== Validation Functions Implementation ====================
@@ -496,7 +496,8 @@ namespace vietvm::compiler {
 
     void validateIdentifier(const std::string& token, size_t line, size_t column) {
         if (token.empty()) {
-            throw LexerError("Tên định danh không được rỗng", line, column, "");
+            throw LexerError(vietvm::messages::formatMessage(vietvm::messages::kLexerEmptyIdentifier),
+                             line, column, "");
         }
 
         unsigned char first = static_cast<unsigned char>(token[0]);
@@ -508,14 +509,16 @@ namespace vietvm::compiler {
 
     void validateStringLiteral(const std::string& token, size_t line, size_t column) {
         if (token.size() < 2) {
-            throw LexerError("Chuỗi không hợp lệ: '" + token + "'", line, column, "");
+            throw LexerError(vietvm::messages::formatMessage(vietvm::messages::kLexerInvalidString, {token}),
+                             line, column, "");
         }
 
         char openQuote = token.front();
         char closeQuote = token.back();
 
         if ((openQuote != '"' && openQuote != '\'') || openQuote != closeQuote) {
-            throw LexerError("Chuỗi không được đóng đúng cách: '" + token + "'", line, column, "");
+            throw LexerError(vietvm::messages::formatMessage(vietvm::messages::kLexerMalformedString, {token}),
+                             line, column, "");
         }
     }
 

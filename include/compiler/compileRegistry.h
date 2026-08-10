@@ -38,4 +38,10 @@ namespace vietvm { namespace compiler {
     std::string resolveCallableNameInContext(const std::string &name,
                                              const std::unordered_map<std::string,int> &symTab);
     void validateCallableAccess(const std::string &resolvedName);
+    // Resolve a callable through the local symbol table.  Imported/global
+    // fallback is enabled for expression/statement calls and can be disabled
+    // for `gọi`, which intentionally emits a name-based VM fallback instead.
+    int resolveFunctionIdByName(const std::string &name,
+                                const std::unordered_map<std::string,int> &symTab,
+                                bool includeGlobalFallback = true);
 } }

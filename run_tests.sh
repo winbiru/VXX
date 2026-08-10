@@ -196,8 +196,12 @@ for testfile in "${TESTS[@]}"; do
   exp="src/tests/expected/$base.expected"
   echo "== Running $testfile =="
   "$EXEC_PATH" "$testfile" > "$out" 2>&1
+  test_status=$?
   if [ -f "$exp" ]; then
-    if diff -u "$exp" "$out"; then
+    if [ "$test_status" -ne 0 ]; then
+      echo "FAIL: $testfile (exit code: $test_status)"; FAIL=$((FAIL+1))
+      cat "$out" >&2
+    elif diff -u "$exp" "$out"; then
       echo "PASS: $testfile"; PASS=$((PASS+1))
     else
       echo "FAIL: $testfile"; FAIL=$((FAIL+1))
@@ -211,7 +215,11 @@ echo "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
 jit_out="$tmpdir/kiem_tra_jit_mvp.output"
 jit_exp="src/tests/expected/kiem_tra_jit_mvp.expected"
 VPP_ENABLE_JIT=1 "$EXEC_PATH" src/tests/kiem_tra_jit_mvp.vi > "$jit_out" 2>&1
-if diff -u "$jit_exp" "$jit_out"; then
+jit_status=$?
+if [ "$jit_status" -ne 0 ]; then
+  echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT] (exit code: $jit_status)"; FAIL=$((FAIL+1))
+  cat "$jit_out" >&2
+elif diff -u "$jit_exp" "$jit_out"; then
   echo "PASS: src/tests/kiem_tra_jit_mvp.vi [JIT]"; PASS=$((PASS+1))
 else
   echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT]"; FAIL=$((FAIL+1))
@@ -221,7 +229,11 @@ echo "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
 gc_out="$tmpdir/kiem_tra_gc_mvp.output"
 gc_exp="src/tests/expected/kiem_tra_gc_mvp.expected"
 VPP_ENABLE_GC=1 VPP_GC_INTERVAL=1 "$EXEC_PATH" src/tests/kiem_tra_gc_mvp.vi > "$gc_out" 2>&1
-if diff -u "$gc_exp" "$gc_out"; then
+gc_status=$?
+if [ "$gc_status" -ne 0 ]; then
+  echo "FAIL: src/tests/kiem_tra_gc_mvp.vi [GC] (exit code: $gc_status)"; FAIL=$((FAIL+1))
+  cat "$gc_out" >&2
+elif diff -u "$gc_exp" "$gc_out"; then
   echo "PASS: src/tests/kiem_tra_gc_mvp.vi [GC]"; PASS=$((PASS+1))
 else
   echo "FAIL: src/tests/kiem_tra_gc_mvp.vi [GC]"; FAIL=$((FAIL+1))

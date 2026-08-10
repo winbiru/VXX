@@ -9,4 +9,17 @@ std::string trim(const std::string &value) {
     return value.substr(start, end - start + 1);
 }
 
+std::string toLowerAscii(const std::string &value) {
+    std::string result;
+    result.reserve(value.size());
+    for (unsigned char c : value) {
+        if (c >= static_cast<unsigned char>('A') && c <= static_cast<unsigned char>('Z')) {
+            result.push_back(static_cast<char>(c + ('a' - 'A')));
+        } else {
+            result.push_back(static_cast<char>(c));
+        }
+    }
+    return result;
+}
+
 } // namespace vietvm::core

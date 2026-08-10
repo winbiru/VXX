@@ -27,6 +27,7 @@ std::string opcodeName(Opcode op) {
         case OP_DONG_NGOAC: return "OP_DONG_NGOAC";
         case OP_MO_MANG: return "OP_MO_MANG";
         case OP_DONG_MANG: return "OP_DONG_MANG";
+        case OP_DONG_LENH: return "OP_DONG_LENH";
         case OP_PHAY: return "OP_PHAY";
         case OP_NEU: return "OP_NEU";
         case OP_HOAC: return "OP_HOAC";

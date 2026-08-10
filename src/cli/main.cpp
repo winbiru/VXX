@@ -15,9 +15,12 @@
 #include "common/storeString.h"
 #include "../../include/compiler/compileRegistry.h"
 #include "../../include/common/tooling.h"
+#include "vpp/core/message_constants.h"
+#include "vpp/core/project_layout.h"
+#include "vpp/core/text.h"
 
 namespace fs = std::filesystem;
-static constexpr const char* kVppCliVersion = "0.1.0";
+namespace messages = vietvm::messages;
 
 // RAII guard to restore current working directory on scope exit
 struct CwdGuard {
@@ -28,56 +31,33 @@ struct CwdGuard {
     CwdGuard& operator=(const CwdGuard&) = delete;
 };
 
+static void printErrorMessage(const messages::MessageDefinition &fallback,
+                              const std::string &detail) {
+    if (messages::hasMessageCode(detail)) {
+        std::cerr << detail << std::endl;
+        return;
+    }
+    std::cerr << messages::formatMessage(fallback, {detail}) << std::endl;
+}
+
 std::string readFile(const std::string &filename) {
-    std::ifstream fileStream(filename);
+    std::ifstream fileStream(vietvm::core::utf8Path(filename));
     if (!fileStream.is_open()) {
-        throw std::runtime_error("Không thể mở file: " + filename);
+        throw std::runtime_error(
+            messages::formatMessage(messages::kCliFileOpenFailed, {filename}));
     }
     std::stringstream buffer;
     buffer << fileStream.rdbuf();
     return buffer.str();
 }
 
-static void resetCompilerState() {
-    vietvm::compiler::StringPool::clear();
-    vietvm::compiler::clearImportedFiles();
-    vietvm::compiler::clearClassAccessState();
-    vietvm::compiler::hamMap::hamBytecodeMap.clear();
-    vietvm::compiler::hamMap::clearHamNameIndexMap();
-    vietvm::compiler::hamMap::resetHamIdCounter();
-}
-
 static void printUsage() {
-    std::cout
-        << "V++ CLI\n"
-        << "Cách dùng:\n"
-        << "  vpp giúp đỡ\n"
-        << "  vpp phiên bản\n"
-        << "  vpp bác sĩ\n"
-        << "  vpp nơi\n"
-        << "  vpp thống kê\n"
-        << "  vpp <file.vi>\n"
-        << "  vpp chạy <file.vi>\n"
-        << "  vpp --giải-mã <file.vi>\n"
-        << "  vpp --lint <file.vi>\n"
-        << "  vpp --định-dạng <file.vi> [--in-place]\n"
-        << "  vpp --repl\n"
-        << "  vpp khởi tạo [tên-dự-án]\n"
-        << "  vpp khởi tạo backend <tên-dự-án>\n"
-        << "  vpp cài đặt <nguồn> [tên]\n"
-        << "  vpp danh sách\n"
-        << "  vpp thông tin <tên>\n"
-        << "  vpp kiểm tra <tên>\n"
-        << "  vpp gói khởi tạo [tên]\n"
-        << "  vpp gói thêm <nguồn> [tên]\n"
-        << "  vpp gói xóa <tên>\n"
-        << "  vpp gói danh sách\n"
-        << "  vpp gói thông tin <tên>\n"
-        << "  vpp gói kiểm tra <tên>\n";
+    std::cout << messages::messageText(messages::kCliUsage);
 }
 
 static void printVersion() {
-    std::cout << "Phiên bản V++ CLI: " << kVppCliVersion << '\n';
+    std::cout << messages::messageText(messages::kCliVersion,
+                                       {vietvm::core::kCliVersion});
 }
 
 static int runSnippet(const std::string &source, const fs::path &cwd, bool execute, bool dumpBytecode) {
@@ -86,7 +66,7 @@ static int runSnippet(const std::string &source, const fs::path &cwd, bool execu
         fs::current_path(cwd);
     }
 
-    resetCompilerState();
+    vietvm::compiler::resetCompilationState();
     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
     const auto &stringPool = vietvm::compiler::StringPool::getPool();
 
@@ -110,16 +90,17 @@ static int runSnippet(const std::string &source, const fs::path &cwd, bool execu
 
 static int runFile(const std::string &filename, bool dumpBytecode, bool lintOnly) {
     std::string source = readFile(filename);
-    fs::path filePath(filename);
+    fs::path filePath = vietvm::core::utf8Path(filename);
     fs::path fileDir = filePath.parent_path();
 
     if (lintOnly) {
         std::string errorMessage;
         if (vietvm::tooling::lintSource(source, errorMessage)) {
-            std::cout << filename << ": OK\n";
+            std::cout << messages::messageText(messages::kToolLintPassed, {filename});
             return EXIT_SUCCESS;
         }
-        std::cerr << filename << ": " << errorMessage << std::endl;
+        std::cerr << messages::formatMessage(messages::kToolLintFailed,
+                                             {filename, errorMessage}) << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -127,21 +108,17 @@ static int runFile(const std::string &filename, bool dumpBytecode, bool lintOnly
 }
 
 static int runRepl() {
-    std::cout << "V++ REPL. Nhập :quit để thoát.\n";
+    std::cout << messages::messageText(messages::kReplWelcome);
     std::string line;
     while (true) {
-        std::cout << "vpp> ";
+        std::cout << messages::messageText(messages::kReplPrompt);
         if (!std::getline(std::cin, line)) break;
 
-        std::string trimmed = line;
-        size_t start = trimmed.find_first_not_of(" \t\r\n");
-        if (start == std::string::npos) continue;
-        size_t end = trimmed.find_last_not_of(" \t\r\n");
-        trimmed = trimmed.substr(start, end - start + 1);
+        const std::string trimmed = vietvm::core::trim(line);
         if (trimmed.empty()) continue;
         if (trimmed == ":quit" || trimmed == ":exit") break;
         if (trimmed == ":help") {
-            std::cout << ":quit, :exit, :help\n";
+            std::cout << messages::messageText(messages::kReplHelp);
             continue;
         }
 
@@ -149,27 +126,22 @@ static int runRepl() {
         try {
             (void)runSnippet(source, fs::current_path(), true, false);
         } catch (const std::exception &ex) {
-            std::cerr << "Lỗi: " << ex.what() << std::endl;
+            printErrorMessage(messages::kReplExecutionFailed, ex.what());
         }
     }
     return EXIT_SUCCESS;
 }
 
-static std::string packageManifestPath(const fs::path &root) {
-    return (root / "vpp.json").string();
+static fs::path packageManifestPath(const fs::path &root) {
+    return root / vietvm::core::utf8Path(vietvm::core::kProjectManifestFile);
 }
 
 static fs::path packageRootPath(const fs::path &root) {
-    fs::path goiDir = root / "gói";
-    if (fs::exists(goiDir)) return goiDir;
-
-    fs::path goiAsciiDir = root / "goi";
-    if (fs::exists(goiAsciiDir)) return goiAsciiDir;
-
-    fs::path legacyDir = root / "packages";
-    if (fs::exists(legacyDir)) return legacyDir;
-
-    return goiDir;
+    for (const char *directoryName : vietvm::core::kPackageDirectoryNames) {
+        const fs::path candidate = root / vietvm::core::utf8Path(directoryName);
+        if (fs::exists(candidate)) return candidate;
+    }
+    return root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory);
 }
 
 static std::vector<std::string> listPackages(const fs::path &root) {
@@ -178,9 +150,9 @@ static std::vector<std::string> listPackages(const fs::path &root) {
     if (!fs::exists(packagesDir)) return packages;
     for (const auto &entry : fs::directory_iterator(packagesDir)) {
         if (entry.is_directory()) {
-            fs::path mainFile = entry.path() / "main.vi";
+            fs::path mainFile = vietvm::core::packageEntryPath(entry.path());
             if (fs::exists(mainFile)) {
-                packages.push_back(entry.path().filename().string());
+                packages.push_back(entry.path().filename().u8string());
             }
         }
     }
@@ -192,7 +164,7 @@ static void writePackageManifest(const fs::path &root, const std::string &name) 
     std::ostringstream manifest;
     manifest << "{\n"
              << "  \"name\": \"" << name << "\",\n"
-             << "  \"version\": \"0.1.0\",\n"
+             << "  \"version\": \"" << vietvm::core::kCliVersion << "\",\n"
              << "  \"gói\": [";
     auto packages = listPackages(root);
     for (size_t i = 0; i < packages.size(); ++i) {
@@ -206,30 +178,32 @@ static void writePackageManifest(const fs::path &root, const std::string &name) 
 
 static int pkgInit(const std::string &name) {
     fs::path root = fs::current_path();
-    fs::create_directories(root / "gói");
+    fs::create_directories(root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory));
     if (name.empty()) {
-        writePackageManifest(root, root.filename().string());
+        writePackageManifest(root, root.filename().u8string());
     } else {
         writePackageManifest(root, name);
     }
-    std::cout << "Da tao manifest tai " << packageManifestPath(root) << std::endl;
+    std::cout << messages::messageText(messages::kPkgManifestCreated,
+                                       {packageManifestPath(root).u8string()});
     return EXIT_SUCCESS;
 }
 
 static int backendInit(const std::string &name) {
     if (name.empty()) {
-        std::cerr << "backend init: thieu ten du an\n";
+        std::cerr << messages::formatMessage(messages::kPkgBackendNameMissing) << '\n';
         return EXIT_FAILURE;
     }
 
-    fs::path root = fs::current_path() / name;
+    fs::path root = fs::current_path() / vietvm::core::utf8Path(name);
     if (fs::exists(root)) {
-        std::cerr << "backend init: thu muc da ton tai: " << root << '\n';
+        std::cerr << messages::formatMessage(messages::kPkgBackendDirectoryExists,
+                                             {root.u8string()}) << '\n';
         return EXIT_FAILURE;
     }
 
     fs::path templateRoot;
-    if (const char *vppHome = std::getenv("VPP_HOME")) {
+    if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
         fs::path candidate = fs::u8path(vppHome) / "templates" / "backend";
         if (fs::exists(candidate)) templateRoot = candidate;
     }
@@ -244,29 +218,30 @@ static int backendInit(const std::string &name) {
         }
     }
     if (templateRoot.empty()) {
-        std::cerr << "backend init: khong tim thay templates/backend\n";
+        std::cerr << messages::formatMessage(messages::kPkgBackendTemplatesMissing) << '\n';
         return EXIT_FAILURE;
     }
 
-    fs::create_directories(root / "gói");
+    fs::create_directories(root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory));
     writePackageManifest(root, name);
     for (const char *filename : {"application.vi", "application.properties", "README.md", ".gitignore"}) {
         std::error_code ec;
         fs::copy_file(templateRoot / filename, root / filename, fs::copy_options::none, ec);
         if (ec) {
-            std::cerr << "backend init: khong the copy template " << filename << ": " << ec.message() << '\n';
+            std::cerr << messages::formatMessage(messages::kPkgBackendTemplateCopyFailed,
+                                                 {filename, ec.message()}) << '\n';
             return EXIT_FAILURE;
         }
     }
 
-    std::cout << "Da tao backend project tai " << root << std::endl;
+    std::cout << messages::messageText(messages::kPkgBackendCreated, {root.u8string()});
     return EXIT_SUCCESS;
 }
 
 static int pkgAdd(const std::string &sourceArg, const std::string &packageNameArg) {
-    fs::path sourcePath = fs::path(sourceArg);
+    fs::path sourcePath = vietvm::core::utf8Path(sourceArg);
     if (!fs::exists(sourcePath)) {
-        std::cerr << "Khong tim thay nguon: " << sourceArg << std::endl;
+        std::cerr << messages::formatMessage(messages::kPkgSourceNotFound, {sourceArg}) << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -275,13 +250,13 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
 
     std::string packageName = packageNameArg;
     if (packageName.empty()) {
-        packageName = sourcePath.filename().string();
+        packageName = sourcePath.filename().u8string();
         if (sourcePath.has_extension()) {
-            packageName = sourcePath.stem().string();
+            packageName = sourcePath.stem().u8string();
         }
     }
 
-    fs::path targetDir = packageRoot / packageName;
+    fs::path targetDir = packageRoot / vietvm::core::utf8Path(packageName);
     fs::create_directories(targetDir);
 
     if (fs::is_directory(sourcePath)) {
@@ -296,19 +271,19 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
             }
         }
     } else {
-        fs::path target = targetDir / "main.vi";
+        fs::path target = vietvm::core::packageEntryPath(targetDir);
         fs::copy_file(sourcePath, target, fs::copy_options::overwrite_existing);
     }
 
-    writePackageManifest(fs::current_path(), fs::current_path().filename().string());
-    std::cout << "Da cai goi: " << packageName << std::endl;
+    writePackageManifest(fs::current_path(), fs::current_path().filename().u8string());
+    std::cout << messages::messageText(messages::kPkgInstalled, {packageName});
     return EXIT_SUCCESS;
 }
 
 static int pkgList() {
     auto packages = listPackages(fs::current_path());
     if (packages.empty()) {
-        std::cout << "Chua co goi nao duoc cai.\n";
+        std::cout << messages::messageText(messages::kPkgListEmpty);
         return EXIT_SUCCESS;
     }
     for (const auto &pkg : packages) {
@@ -319,75 +294,86 @@ static int pkgList() {
 
 static int pkgRemove(const std::string &packageName) {
     if (packageName.empty()) {
-        std::cerr << "pkg xoa: thieu ten goi\n";
+        std::cerr << messages::formatMessage(messages::kPkgRemoveNameMissing) << '\n';
         return EXIT_FAILURE;
     }
 
-    fs::path targetDir = packageRootPath(fs::current_path()) / packageName;
+    fs::path targetDir = packageRootPath(fs::current_path()) /
+                         vietvm::core::utf8Path(packageName);
     if (!fs::exists(targetDir)) {
-        std::cerr << "Khong tim thay goi: " << packageName << std::endl;
+        std::cerr << messages::formatMessage(messages::kPkgNotFound, {packageName}) << std::endl;
         return EXIT_FAILURE;
     }
 
     std::error_code ec;
     fs::remove_all(targetDir, ec);
     if (ec) {
-        std::cerr << "Khong the xoa goi: " << packageName << " (" << ec.message() << ")\n";
+        std::cerr << messages::formatMessage(messages::kPkgRemoveFailed,
+                                             {packageName, ec.message()}) << '\n';
         return EXIT_FAILURE;
     }
 
-    writePackageManifest(fs::current_path(), fs::current_path().filename().string());
-    std::cout << "Da xoa goi: " << packageName << std::endl;
+    writePackageManifest(fs::current_path(), fs::current_path().filename().u8string());
+    std::cout << messages::messageText(messages::kPkgRemoved, {packageName});
     return EXIT_SUCCESS;
 }
 
 static bool packageExists(const fs::path &root, const std::string &packageName) {
     if (packageName.empty()) return false;
-    fs::path packageMain = packageRootPath(root) / packageName / "main.vi";
+    fs::path packageMain = vietvm::core::packageEntryPath(
+        packageRootPath(root) / vietvm::core::utf8Path(packageName));
     return fs::exists(packageMain);
 }
 
 static int pkgInfo(const std::string &packageName) {
     if (packageName.empty()) {
-        std::cerr << "pkg thong tin: thieu ten goi\n";
+        std::cerr << messages::formatMessage(messages::kPkgInfoNameMissing) << '\n';
         return EXIT_FAILURE;
     }
 
     fs::path root = fs::current_path();
-    fs::path packageDir = packageRootPath(root) / packageName;
-    fs::path mainFile = packageDir / "main.vi";
+    fs::path packageDir = packageRootPath(root) / vietvm::core::utf8Path(packageName);
+    fs::path mainFile = vietvm::core::packageEntryPath(packageDir);
 
     if (!fs::exists(packageDir)) {
-        std::cerr << "Khong tim thay goi: " << packageName << std::endl;
+        std::cerr << messages::formatMessage(messages::kPkgNotFound, {packageName}) << std::endl;
         return EXIT_FAILURE;
     }
 
-    std::cout << "ten: " << packageName << '\n';
-    std::cout << "duong_dan: " << packageDir.string() << '\n';
-    std::cout << "tep_chinh: " << (fs::exists(mainFile) ? mainFile.string() : "khong") << '\n';
+    std::cout << messages::messageText(messages::kPkgInfoName, {packageName});
+    std::cout << messages::messageText(messages::kPkgInfoPath, {packageDir.u8string()});
+    std::cout << messages::messageText(
+        messages::kPkgInfoMainFile,
+        {fs::exists(mainFile) ? mainFile.u8string()
+                              : messages::messageText(messages::kPkgValueAbsent)});
     return EXIT_SUCCESS;
 }
 
 static int pkgHas(const std::string &packageName) {
     bool exists = packageExists(fs::current_path(), packageName);
-    std::cout << (exists ? "co" : "khong") << std::endl;
+    std::cout << messages::messageText(exists ? messages::kPkgValuePresent
+                                               : messages::kPkgValueAbsent) << std::endl;
     return exists ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 static int pkgStats() {
     fs::path root = fs::current_path();
     auto packages = listPackages(root);
-    fs::path manifestPath = root / "vpp.json";
+    fs::path manifestPath = root / vietvm::core::utf8Path(vietvm::core::kProjectManifestFile);
 
-    std::cout << "du_an: " << root.filename().string() << '\n';
-    std::cout << "manifest: " << (fs::exists(manifestPath) ? "co" : "khong") << '\n';
-    std::cout << "so_goi: " << packages.size() << '\n';
+    std::cout << messages::messageText(messages::kPkgStatsProject, {root.filename().u8string()});
+    std::cout << messages::messageText(
+        messages::kPkgStatsManifest,
+        {messages::messageText(fs::exists(manifestPath) ? messages::kPkgValuePresent
+                                                         : messages::kPkgValueAbsent)});
+    std::cout << messages::messageText(messages::kPkgStatsCount,
+                                       {std::to_string(packages.size())});
     return EXIT_SUCCESS;
 }
 
 static int runPackageCommand(int argc, char *argv[]) {
     if (argc < 3) {
-        std::cerr << "pkg: thieu lenh con\n";
+        std::cerr << messages::formatMessage(messages::kPkgSubcommandMissing) << '\n';
         return EXIT_FAILURE;
     }
     std::string sub = argv[2];
@@ -407,7 +393,7 @@ static int runPackageCommand(int argc, char *argv[]) {
     }
     if (sub == "add" || sub == "thêm") {
         if (argc < (4 + subWordOffset)) {
-            std::cerr << "pkg them: thieu duong dan nguon\n";
+            std::cerr << messages::formatMessage(messages::kPkgAddSourceMissing) << '\n';
             return EXIT_FAILURE;
         }
         std::string sourceArg = argv[3 + subWordOffset];
@@ -419,21 +405,21 @@ static int runPackageCommand(int argc, char *argv[]) {
     }
     if (sub == "remove" || sub == "xóa") {
         if (argc < (4 + subWordOffset)) {
-            std::cerr << "pkg xoa: thieu ten goi\n";
+            std::cerr << messages::formatMessage(messages::kPkgRemoveNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgRemove(argv[3 + subWordOffset]);
     }
     if (sub == "info" || sub == "thông tin") {
         if (argc < (4 + subWordOffset)) {
-            std::cerr << "pkg thong tin: thieu ten goi\n";
+            std::cerr << messages::formatMessage(messages::kPkgInfoNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgInfo(argv[3 + subWordOffset]);
     }
     if (sub == "has" || sub == "kiểm tra") {
         if (argc < (4 + subWordOffset)) {
-            std::cerr << "pkg kiem tra: thieu ten goi\n";
+            std::cerr << messages::formatMessage(messages::kPkgHasNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgHas(argv[3 + subWordOffset]);
@@ -441,29 +427,29 @@ static int runPackageCommand(int argc, char *argv[]) {
     if (sub == "stats" || sub == "thống kê") {
         return pkgStats();
     }
-    std::cerr << "pkg: lenh con khong hop le: " << sub << std::endl;
+    std::cerr << messages::formatMessage(messages::kPkgInvalidSubcommand, {sub}) << std::endl;
     return EXIT_FAILURE;
 }
 
 static int runDoctor(const std::string &execPath) {
-    std::cout << "Chan doan V++ CLI\n";
-    std::cout << "  phien_ban: " << kVppCliVersion << '\n';
-    std::cout << "  tep_thuc_thi: " << execPath << '\n';
-    std::cout << "  thu_muc_hien_tai: " << fs::current_path().string() << '\n';
+    std::cout << messages::messageText(messages::kCliDoctorHeading);
+    std::cout << messages::messageText(messages::kCliDoctorVersion,
+                                       {vietvm::core::kCliVersion});
+    std::cout << messages::messageText(messages::kCliDoctorExecutable, {execPath});
+    std::cout << messages::messageText(messages::kCliDoctorCurrentDirectory,
+                                       {fs::current_path().u8string()});
 
-    fs::path manifestPath = fs::current_path() / "vpp.json";
-    std::cout << "  manifest: " << (fs::exists(manifestPath) ? "co" : "khong") << '\n';
+    fs::path manifestPath = fs::current_path() /
+                            vietvm::core::utf8Path(vietvm::core::kProjectManifestFile);
+    std::cout << messages::messageText(
+        messages::kCliDoctorManifest,
+        {messages::messageText(fs::exists(manifestPath) ? messages::kPkgValuePresent
+                                                         : messages::kPkgValueAbsent)});
 
     auto packages = listPackages(fs::current_path());
-    std::cout << "  so_goi: " << packages.size() << '\n';
+    std::cout << messages::messageText(messages::kCliDoctorPackageCount,
+                                       {std::to_string(packages.size())});
     return EXIT_SUCCESS;
-}
-
-static std::string trimCopy(const std::string &s) {
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
 }
 
 static std::string jsonEscape(const std::string &s) {
@@ -508,10 +494,10 @@ static std::optional<std::string> readLspMessage() {
     int contentLength = -1;
     while (std::getline(std::cin, line)) {
         if (line == "\r" || line.empty()) break;
-        std::string normalized = trimCopy(line);
+        std::string normalized = vietvm::core::trim(line);
         const std::string prefix = "Content-Length:";
         if (normalized.rfind(prefix, 0) == 0) {
-            contentLength = std::stoi(trimCopy(normalized.substr(prefix.size())));
+            contentLength = std::stoi(vietvm::core::trim(normalized.substr(prefix.size())));
         }
     }
     if (contentLength < 0) return std::nullopt;
@@ -535,7 +521,7 @@ static std::string extractJsonRawField(const std::string &body, const std::strin
     std::regex rx("\"" + field + "\"\\s*:\\s*([^,}]+)");
     std::smatch match;
     if (std::regex_search(body, match, rx) && match.size() > 1) {
-        return trimCopy(match[1].str());
+        return vietvm::core::trim(match[1].str());
     }
     return "";
 }
@@ -548,10 +534,15 @@ static void publishDiagnostics(const std::string &uri, const std::string &text) 
     std::string errorMessage;
     std::string result = "[]";
     if (!vietvm::tooling::lintSource(text, errorMessage)) {
+        const std::string diagnosticCode(
+            messages::messageCodeFromFormatted(errorMessage));
         std::ostringstream diag;
         diag << "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":1}},"
-             << "\"severity\":1,\"source\":\"vpp\",\"message\":\""
-             << jsonEscape(errorMessage) << "\"}]";
+             << "\"severity\":1,\"source\":\"vpp\"";
+        if (!diagnosticCode.empty()) {
+            diag << ",\"code\":\"" << jsonEscape(diagnosticCode) << "\"";
+        }
+        diag << ",\"message\":\"" << jsonEscape(errorMessage) << "\"}]";
         result = diag.str();
     }
 
@@ -645,7 +636,7 @@ int main(int argc, char* argv[]) {
                 return runDoctor(argv[0]);
             }
             if (command == "where" || command == "nơi") {
-                std::cout << fs::current_path().string() << std::endl;
+                std::cout << fs::current_path().u8string() << std::endl;
                 return EXIT_SUCCESS;
             }
             if (command == "--lsp") {
@@ -656,28 +647,28 @@ int main(int argc, char* argv[]) {
             }
             if (command == "run" || command == "chạy") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "chay: thieu duong dan tep\n";
+                    std::cerr << messages::formatMessage(messages::kCliRunMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], false, false);
             }
             if (command == "--disassemble" || command == "--giải mã" || command == "--giải-mã") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "--giai-ma can duong dan tep\n";
+                    std::cerr << messages::formatMessage(messages::kCliDisassembleMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], true, false);
             }
             if (command == "--lint") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "--lint can duong dan tep\n";
+                    std::cerr << messages::formatMessage(messages::kCliLintMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], false, true);
             }
             if (command == "--format" || command == "--định dạng" || command == "--định-dạng") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "--dinh-dang can duong dan tep\n";
+                    std::cerr << messages::formatMessage(messages::kCliFormatMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 std::string filename = argv[2 + commandWordOffset];
@@ -708,7 +699,7 @@ int main(int argc, char* argv[]) {
             }
             if (command == "install" || command == "cai" || command == "caidat" || command == "cài đặt") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "caidat: thieu duong dan nguon\n";
+                    std::cerr << messages::formatMessage(messages::kPkgInstallSourceMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 std::string sourceArg = argv[2 + commandWordOffset];
@@ -720,21 +711,21 @@ int main(int argc, char* argv[]) {
             }
             if (command == "remove" || command == "xoa" || command == "xóa") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "xoa: thieu ten goi\n";
+                    std::cerr << messages::formatMessage(messages::kPkgTopLevelRemoveNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgRemove(argv[2 + commandWordOffset]);
             }
             if (command == "info" || command == "thông tin") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "thong tin: thieu ten goi\n";
+                    std::cerr << messages::formatMessage(messages::kPkgTopLevelInfoNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgInfo(argv[2 + commandWordOffset]);
             }
             if (command == "has" || command == "kiểm tra") {
                 if (argc < (3 + commandWordOffset)) {
-                    std::cerr << "kiem tra: thieu ten goi\n";
+                    std::cerr << messages::formatMessage(messages::kPkgTopLevelHasNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgHas(argv[2 + commandWordOffset]);
@@ -761,16 +752,12 @@ int main(int argc, char* argv[]) {
             // run default file with cwd set to its parent so imports resolve
             // Use RAII-style guard to always restore cwd even on exception
             CwdGuard cwdGuard(fs::current_path());
-            if (!fs::path(defaultFile).parent_path().empty()) {
-                fs::current_path(fs::path(defaultFile).parent_path());
+            const fs::path defaultPath = vietvm::core::utf8Path(defaultFile);
+            if (!defaultPath.parent_path().empty()) {
+                fs::current_path(defaultPath.parent_path());
             }
 
-            vietvm::compiler::StringPool::clear();
-            // Reset imported files tracking between compilations
-            vietvm::compiler::clearImportedFiles();
-            vietvm::compiler::hamMap::hamBytecodeMap.clear();
-            vietvm::compiler::hamMap::clearHamNameIndexMap();
-            vietvm::compiler::hamMap::resetHamIdCounter();
+            vietvm::compiler::resetCompilationState();
 
             std::vector<Instruction> bytecode = compileSource(source, keywordMap);
             // cwd will be restored by CwdGuard destructor
@@ -800,20 +787,20 @@ int main(int argc, char* argv[]) {
         if (fs::exists(testDir)) {
             for (const auto& entry : fs::directory_iterator(testDir)) {
                 if (entry.path().extension() == ".vi") {
-                    const std::string filename = entry.path().string();
-                    std::cout << "\n🔹 Đang chạy test: " << filename << std::endl;
+                    const std::string filename = entry.path().u8string();
+                    std::cout << messages::messageText(messages::kCliTestRunning, {filename})
+                              << std::endl;
 
                     std::string source = readFile(filename);
                     // Ensure imports inside each test file resolve relative to the test file location
                     // Use RAII-style guard to always restore cwd even on exception
                     CwdGuard cwdGuard(fs::current_path());
-                    if (!fs::path(filename).parent_path().empty()) {
-                        fs::current_path(fs::path(filename).parent_path());
+                    const fs::path testPath = vietvm::core::utf8Path(filename);
+                    if (!testPath.parent_path().empty()) {
+                        fs::current_path(testPath.parent_path());
                     }
 
-                    vietvm::compiler::StringPool::clear();
-                    // Reset imported files tracking giữa các lần biên dịch
-                    vietvm::compiler::clearImportedFiles();
+                    vietvm::compiler::resetCompilationState();
                     std::vector<Instruction> bytecode = compileSource(source, keywordMap);
                     // cwd will be restored by CwdGuard destructor
                     const auto& stringPool = vietvm::compiler::StringPool::getPool();
@@ -825,11 +812,11 @@ int main(int argc, char* argv[]) {
                 }
             }
         } else {
-            std::cerr << "Thư mục tests/ không tồn tại.\n";
+            std::cerr << messages::formatMessage(messages::kCliTestsDirectoryMissing) << '\n';
         }
 
     } catch (const std::exception &ex) {
-        std::cerr << "Lỗi: " << ex.what() << std::endl;
+        printErrorMessage(messages::kCliUnhandledException, ex.what());
         return EXIT_FAILURE;
     }
 

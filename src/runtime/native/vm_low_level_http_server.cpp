@@ -12,8 +12,10 @@
 
 #include "common/vm_low_level_http_server.h"
 
+#include "common/vm_native_constants.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_http_helpers.h"
+#include "vpp/core/message_constants.h"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -46,7 +48,8 @@ bool initializeSockets(std::string &err) {
         initResult = WSAStartup(MAKEWORD(2, 2), &data);
     });
     if (initResult != 0) {
-        err = "mang_http_server_open: WSAStartup thất bại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerWsaStartupFailed);
         return false;
     }
     return true;
@@ -141,7 +144,7 @@ bool recvHttpRequest(SocketHandle fd,
 
 const char *httpStatusText(int code) {
     switch (code) {
-        case 200: return "OK";
+        case vietvm::constants::kHttpStatusOk: return "OK";
         case 201: return "Created";
         case 400: return "Bad Request";
         case 401: return "Unauthorized";
@@ -223,7 +226,8 @@ bool getLowHttpRequestCopy(const std::string &reqId, LowLevelHttpRequest &out) {
 
 bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     if (port <= 0 || port > 65535) {
-        err = "mang_http_server_open: cổng không hợp lệ";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerInvalidPort);
         return true;
     }
 
@@ -231,7 +235,8 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
 
     SocketHandle listenFd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenFd == kInvalidSocket) {
-        err = "mang_http_server_open: không tạo được socket";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerSocketCreateFailed);
         return true;
     }
 
@@ -244,8 +249,9 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
                    reinterpret_cast<const char *>(&exclusive), sizeof(exclusive)) == SOCKET_ERROR) {
         const int socketError = WSAGetLastError();
         closeSocket(listenFd);
-        err = "mang_http_server_open: không thể giữ riêng cổng (WSA=" +
-              std::to_string(socketError) + ")";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerExclusivePortFailed,
+            {std::to_string(socketError)});
         return true;
     }
 #else
@@ -261,13 +267,15 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
 
     if (bind(listenFd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
         closeSocket(listenFd);
-        err = "mang_http_server_open: bind thất bại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerBindFailed);
         return true;
     }
 
     if (listen(listenFd, 64) < 0) {
         closeSocket(listenFd);
-        err = "mang_http_server_open: listen thất bại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerListenFailed);
         return true;
     }
 
@@ -328,7 +336,8 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
         gLowHttpServers[server->id] = server;
     }
 
-    std::cout << "[HTTP] low-level server listening on 0.0.0.0:" << port << std::endl;
+    std::cout << vietvm::messages::messageText(
+        vietvm::messages::kNativeHttpServerListening, {std::to_string(port)}) << std::endl;
     result = make_int_value(server->id);
     return true;
 }
@@ -336,7 +345,8 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
 bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &err) {
     auto server = getLowHttpServer(serverId);
     if (!server) {
-        err = "mang_http_server_next: server không tồn tại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerNotFound);
         return true;
     }
 
@@ -363,30 +373,32 @@ bool runLowLevelHttpReqField(const std::string &reqId,
                              std::string &err) {
     LowLevelHttpRequest req;
     if (!getLowHttpRequestCopy(reqId, req)) {
-        err = "mang_http_req_field: request không tồn tại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpRequestNotFound, {"mang_http_req_field"});
         return true;
     }
 
-    if (field == "method") result = make_string_value(req.method);
-    else if (field == "path") result = make_string_value(req.path);
-    else if (field == "query") result = make_string_value(req.query);
-    else if (field == "body") result = make_string_value(req.body);
-    else if (field == "header") {
+    if (field == vietvm::constants::kReqFieldMethod) result = make_string_value(req.method);
+    else if (field == vietvm::constants::kReqFieldPath) result = make_string_value(req.path);
+    else if (field == vietvm::constants::kReqFieldQuery) result = make_string_value(req.query);
+    else if (field == vietvm::constants::kReqFieldBody) result = make_string_value(req.body);
+    else if (field == vietvm::constants::kReqFieldHeader) {
         std::string k = key.has_value() ? toLowerAscii(*key) : "";
         auto it = req.headers.find(k);
         result = make_string_value(it == req.headers.end() ? "" : it->second);
-    } else if (field == "query_param") {
+    } else if (field == vietvm::constants::kReqFieldQueryParam) {
         std::string k = key.has_value() ? *key : "";
         result = make_string_value(queryParam(req.query, k));
-    } else if (field == "json_field") {
+    } else if (field == vietvm::constants::kReqFieldJsonField) {
         std::string k = key.has_value() ? *key : "";
         result = make_string_value(extractSimpleJsonStringField(req.body, k));
-    } else if (field == "path_suffix") {
+    } else if (field == vietvm::constants::kReqFieldPathSuffix) {
         std::string prefix = key.has_value() ? *key : "";
         if (!startsWith(req.path, prefix)) result = make_string_value("");
         else result = make_string_value(req.path.substr(prefix.size()));
     } else {
-        err = "mang_http_req_field: field không hợp lệ";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpRequestFieldInvalid);
     }
 
     return true;
@@ -402,7 +414,8 @@ bool runLowLevelHttpServerSend(const std::string &reqId,
         std::lock_guard<std::mutex> lk(gLowHttpMu);
         auto it = gLowHttpRequests.find(reqId);
         if (it == gLowHttpRequests.end()) {
-            err = "mang_http_server_send: request không tồn tại";
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeHttpRequestNotFound, {"mang_http_server_send"});
             return true;
         }
         req = it->second;
@@ -411,7 +424,8 @@ bool runLowLevelHttpServerSend(const std::string &reqId,
 
     if (!sendHttpJsonResponse(req.clientFd, status, body)) {
         closeSocket(req.clientFd);
-        err = "mang_http_server_send: gửi phản hồi thất bại";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpResponseSendFailed);
         return true;
     }
     closeSocket(req.clientFd);

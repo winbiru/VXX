@@ -5,13 +5,13 @@ V++ tách compiler, runtime, tooling và thư viện ngôn ngữ thành các l�
 ## C++ modules
 
 ```text
-vpp-core ───────┬──> vpp-frontend ──> vpp-compiler ──> vpp-tooling
-                └──> vpp-bytecode ───────────────────> vpp-runtime
-                                                           │
-vpp-cli <─────────────────────────────────────────────────┘
+vpp-core ──> vpp-bytecode ──┬──> vpp-frontend ──> vpp-compiler ──> vpp-tooling
+                             └──────────────────────────────────> vpp-runtime
+                                                                   │
+vpp-cli <─────────────────────────────────────────────────────────┘
 ```
 
-- `vpp-core`: text và tiện ích dùng chung không phụ thuộc ngôn ngữ.
+- `vpp-core`: text, UTF-8 path và layout project/package dùng chung, không phụ thuộc ngôn ngữ.
 - `vpp-bytecode`: opcode và mô tả bytecode dùng chung cho compiler/runtime.
 - `vpp-frontend`: lexer và keyword map.
 - `vpp-compiler`: compile expression/statement/import cùng symbol state.
@@ -38,6 +38,25 @@ CMake định nghĩa các target `vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vp
 CLI compile source rồi copy function bytecode/name table vào `VM`. VM không còn đọc `compiler::hamMap` hay `StringPool` global ở runtime. Điều này làm runtime có thể nhận bytecode từ nguồn khác ngoài CLI.
 
 Compiler vẫn dùng mutable state nội bộ trong phiên compile. Bước tiếp theo của API embedding là thay state này bằng `CompilationContext` và `BytecodeProgram` bất biến; không xem các header `compile*.h` là public API ổn định.
+
+## Compiler pipeline hiện tại và hướng đi
+
+Pipeline hiện tại là một compiler một lượt: lexer tạo token, compiler hậu xử lý
+token rồi phát bytecode trực tiếp. Chưa có AST chuẩn, name resolver độc lập,
+semantic analyzer, type checker hoặc IR. Runtime mang giá trị động
+(`int`/`double`/`string`/`rỗng`/map scalar), vì vậy không được mô tả nó như một
+compiler static typed.
+
+```text
+Hiện tại:  source -> lexer/token post-processing -> compiler -> bytecode -> stack VM
+Mục tiêu:  source -> lexer/parser -> AST -> name resolution -> semantic analysis
+                                    -> type policy -> IR -> bytecode -> VM/JIT
+```
+
+AST có source span và name resolution có thể được xây dựng trước. Trước bước
+`type policy`/Typed IR, dự án phải chốt một ADR: dynamic, static hay gradual
+typing. GC và JIT hiện chỉ là MVP runtime; chúng không phải tracing collector
+hay compiler sinh mã máy production-grade.
 
 ## Headers
 
@@ -90,7 +109,9 @@ src/tests/*.vi                     # regression entrypoints
 src/tests/expected/*.expected      # output của entrypoint
 ```
 
-Không đặt application sample trong `src/tests/`. Fixture DB viết vào `src/tests/.tmp/`, không vào file database được track trong repository.
+Không đặt application sample trong `src/tests/`. Regression có vài fixture
+legacy được track (`src/tests/api_project.db`, `.tmp_*`); dữ liệu runtime mới
+phải dùng `src/tests/.tmp/` đã ignore, không thêm artifact database mới vào Git.
 
 ## Build và phát hành
 

@@ -5,8 +5,6 @@
 #include "compiler/compileSwitch.h"
 #include "compiler/compileSwitch.h"
 
-#include <iostream>
-#include <ostream>
 #include <stdexcept>
 
 #include "compiler/compilerExpr.h"
@@ -14,6 +12,7 @@
 #include "../../include/frontend/lexer.h"
 #include "common/storeString.h"
 #include "common/utility.h"
+#include "vpp/core/message_constants.h"
 
 void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                    std::vector<Instruction>& bytecode,
@@ -22,7 +21,8 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
                    const std::unordered_map<std::string,Opcode>& keywordMap)
 {
     if (pos >= tokens.size() || vietvm::compiler::normalizeTokenForCompare(tokens[pos]) != "chọn") {
-        throw std::runtime_error("compileSwitch: không phải token 'chọn' tại vị trí pos");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxSwitchWrongEntryToken));
     }
 
     ++pos; // bỏ qua "chọn"
@@ -33,7 +33,10 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
     compileExpr(expr, bytecode, symTab, nextId, keywordMap);
     bytecode.push_back({OP_CHON, 0, 0,0});
 
-    if (pos >= tokens.size() || tokens[pos] != "{") throw std::runtime_error("compileSwitch: thiếu dấu '{'");
+    if (pos >= tokens.size() || tokens[pos] != "{") {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxSwitchMissingOpeningBlock));
+    }
     ++pos;
 
     while (pos < tokens.size() && tokens[pos] != "}") {
@@ -53,7 +56,10 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
         // xử lý ca
         if (curNorm == "ca") {
             ++pos; // tiêu thụ "ca"
-            if (pos >= tokens.size()) throw std::runtime_error("compileSwitch: thiếu biểu thức sau 'ca'");
+            if (pos >= tokens.size()) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kSyntaxSwitchMissingCaseExpression));
+            }
 
             // Nếu tokenizer tách "mặc" và "định" thành 2 token, normalize sẽ xử lý ở nhánh mặc định bên dưới.
             std::string caseToken = tokens[pos];
@@ -138,11 +144,14 @@ void compileSwitch(const std::vector<std::string>& tokens, size_t &pos,
             bytecode.push_back({OP_THOAT, 0, 0,0});
             ++pos;
         } else {
-            std::cerr << "Token không hợp lệ trong khối chọn: '" << tokens[pos] << "' (normalized='" << curNorm << "')" << std::endl;
-            throw std::runtime_error("compileSwitch: từ khóa không hợp lệ trong khối chọn");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxSwitchInvalidToken, {tokens[pos], curNorm}));
         }
     }
 
-    if (pos >= tokens.size() || tokens[pos] != "}") throw std::runtime_error("compileSwitch: thiếu dấu '}'");
+    if (pos >= tokens.size() || tokens[pos] != "}") {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxSwitchMissingClosingBlock));
+    }
     ++pos;
 }

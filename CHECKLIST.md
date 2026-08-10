@@ -1,6 +1,6 @@
 # ✅ V++ — Checklist Phát Triển Ngôn Ngữ
 
-> Cập nhật lần cuối: 07/08/2026
+> Cập nhật lần cuối: 09/08/2026
 > Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
 
 ---
@@ -80,8 +80,8 @@
 |------|-------|-----------|
 | Số nguyên (int) | `42`, `-7` | ✅ |
 | Chuỗi (string) | `"xin chào"` | ✅ |
-| Mảng (array) | `[1, 2, 3]` | ✅ |
-| Mảng đa chiều | `[[1,2],[3,4]]` | ✅ |
+| Mảng (array) | `[1, 2, 3]` | ⬜ — token cú pháp có mặt, nhưng literal/index chưa có runtime API ổn định |
+| Mảng đa chiều | `[[1,2],[3,4]]` | ⬜ — chưa có model dữ liệu mảng thực thi |
 | Boolean (`đúng`/`sai`) | `đúng`, `sai` | ✅ |
 | Số thực (float/double) | `3.14` | ✅ |
 | Kiểu null / rỗng | `rỗng` | ✅ |
@@ -193,8 +193,8 @@
 | `OP_TRU_MOT` (--) | ✅ |
 | Kế thừa `functionTableByNameIndex` cho đệ quy | ✅ |
 | Tối ưu hoá bytecode (peephole) | ✅ |
-| Garbage Collection (MVP: runtime compaction theo chu kỳ) | ✅ |
-| JIT Compilation (MVP: linear bytecode lambda JIT, bật qua env) | ✅ |
+| Garbage Collection (MVP: runtime compaction theo chu kỳ) | 🚧 |
+| JIT Compilation (MVP: linear bytecode lambda JIT, bật qua env) | 🚧 |
 
 ---
 
@@ -203,16 +203,15 @@
 | Tính năng | Trạng thái |
 |-----------|-----------|
 | Tokenizer / Lexer | ✅ |
-| Parser → Bytecode (single-pass) | ✅ |
+| Token stream → Bytecode (single-pass) | ✅ |
 | Biên dịch biểu thức số học | ✅ |
 | Biên dịch chuỗi và nối chuỗi | ✅ |
 | Biên dịch điều kiện `nếu/hoặc` | ✅ |
-| Biên dịch vòng lặp | ✅ |
 | Biên dịch switch/case | ✅ |
 | Biên dịch hàm và gọi hàm | ✅ |
 | Biên dịch `trả về` | ✅ |
 | Biên dịch `nhập` (import) | ✅ |
-| Biên dịch mảng | ✅ |
+| Cú pháp token mảng (chưa codegen/runtime stable) | 🚧 |
 | Biên dịch `bỏ qua` (continue) | ✅ |
 | Biên dịch `--`, `+=`, `-=`, `*=`, `/=`, `%=` | ✅ |
 | Biên dịch `đúng`/`sai` (boolean literals) | ✅ |
@@ -236,7 +235,7 @@
 | `kiem_tra_dieu_kien_phu_dinh.vi` | Điều kiện phủ định | ✅ |
 | `kiem_tra_dieu_kien_long_nhieu_cap.vi` | Điều kiện lồng nhau | ✅ |
 | `kiem_tra_noi_chuoi.vi` | Nối chuỗi | ✅ |
-| `kiem_tra_mang_3_chieu.vi` | Mảng 3 chiều | ✅ |
+| `kiem_tra_mang_3_chieu.vi` | Vòng lặp lồng ba chiều (không phải runtime array) | ✅ |
 | `kiem_tra_chon_ca.vi` | Switch/case | ✅ |
 | `kiem_tra_ham_tham_so.vi` | Hàm có tham số | ✅ |
 | `kiem_tra_ham_4_tham_so.vi` | Hàm 4 tham số | ✅ |
@@ -262,8 +261,9 @@
 | `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
 | `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
 | `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |
-| Unit test cho StringPool | Thêm/lấy/xóa | ⬜ |
-| Unit test cho symbolTable | Scope isolation | ⬜ |
+| `compiler_support_tests.cpp` — StringPool | Thêm/lấy/xóa, dedupe, invalid index | ✅ |
+| `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | ✅ |
+| `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | ✅ — smoke, chưa bao phủ mọi opcode |
 
 **Regression suite: 49 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
 
@@ -283,10 +283,10 @@
 | AddressSanitizer / UndefinedBehaviorSanitizer trên CI | ✅ |
 | Disassembler (xem bytecode) | ✅ |
 | REPL (interactive shell) | ✅ |
-| Language Server Protocol (LSP) | ✅ |
+| Language Server Protocol (LSP) | 🚧 — MVP |
 | Syntax highlighting (VSCode/Vim) | ✅ |
 | Formatter / linter | ✅ |
-| Package manager (`vpp-cli install`, `vpp-cli cai`) | ✅ |
+| Package manager (`vpp-cli install`, `vpp-cli cai`) | 🚧 — MVP, chưa có dependency/version resolver |
 | Mẫu backend/API server | ✅ — `examples/api_project` và `vpp khởi tạo backend <tên>` từ `templates/backend` |
 
 ### 11.1 Thư Viện & Phụ Thuộc Mã Nguồn
@@ -295,7 +295,7 @@
 |-----------|------|----------------------------|-----------|
 | C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | ✅ |
 | C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | ✅ |
-| `curl` (binary hệ thống, gọi qua shell) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put(...)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
+| `curl` (binary hệ thống, gọi qua process/shell tuỳ nền tảng) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put/delete(...)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
 | CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vpp-compiler`, `vpp-runtime`, `vpp-tooling`, `vpp-cli`) | ✅ |
 
 #### Không sử dụng (không phát hiện trong include/CMake hiện tại)
@@ -308,7 +308,7 @@
 | `fmt`, `spdlog` | ✅ Không sử dụng |
 | `nlohmann/json`, `yaml-cpp` | ✅ Không sử dụng |
 | `gRPC`, `protobuf` | ✅ Không sử dụng |
-| `SQLite` | ✅ Không sử dụng |
+| `SQLite` C++ library | ✅ Không link trực tiếp; database adapter dùng `sqlite3` CLI runtime khi được cấu hình |
 | `Qt`/`wxWidgets` | ✅ Không sử dụng |
 | `gtest`/`catch2` qua CMake | ✅ Không sử dụng |
 
@@ -317,7 +317,7 @@
 |-----------------|-----------|--------|
 | I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
 | Hệ thống tệp (filesystem) | ✅ | Dùng `std::filesystem` cho import, package manager, CLI |
-| Mạng TCP/UDP | ⬜ | Chưa có API socket native |
+| Mạng TCP/UDP | ⬜ | Có TCP nội bộ cho HTTP server; chưa có API TCP/UDP tổng quát cho V++ |
 | HTTP client | ✅ | Có `mang_http_get/post/put/delete(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
 | Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
 | Collections (array/map) | 🚧 | Có map literal scalar; array literal/index và map get/set chưa là API runtime ổn định |
@@ -331,7 +331,7 @@
 | Testing framework nội bộ ngôn ngữ | 🚧 | Có `run_tests.sh` và `kiểm thử` với assertion cơ bản; chưa có discovery/runner API trong V++ |
 | Reflection/Metadata | ⬜ | Chưa có introspection runtime |
 | FFI (gọi thư viện ngoài) | ⬜ | Chưa có cơ chế FFI chính thức |
-| Quản lý gói & phiên bản | ✅ | Có `vpp cài đặt`, `vpp danh sách`, `vpp phiên bản` |
+| Quản lý gói & phiên bản | 🚧 | Có CLI MVP; chưa có dependency/version resolver |
 | Bảo mật/Crypto | ⬜ | Chưa có module mã hóa/hash chuẩn |
 | Sandboxing/Permission | ⬜ | Chưa có hệ quyền/sandbox runtime |
 | i18n/l10n | ⬜ | Chưa có module locale/translation |
@@ -346,7 +346,7 @@
 | Tài liệu | Trạng thái |
 |---------|-----------|
 | `README.md` — Giới thiệu & build guide | ✅ |
-| `README-updates.md` — Changelog | ✅ |
+| `README-updates.md` — Trạng thái repo & roadmap | ✅ |
 | `docs/architecture.md` — Kiến trúc | ✅ |
 | `docs/bytecode.md` — Mô tả bytecode | ✅ |
 | `docs/grammar.bnf` — Ngữ pháp BNF | ✅ |
@@ -369,43 +369,160 @@
 - [x] Tạo `.gitignore` cho build artefacts
 - [x] Báo lỗi có số dòng và cột
 - [x] CI cơ bản với GitHub Actions
+- [x] CTest unit target cho StringPool, hamMap và symbolTable
+- [x] CTest unit target cho canonical opcode và native HTTP constants
+- [x] CTest smoke target cho opcode số học, so sánh và chuỗi của VM
 
 ### Trung hạn (1–3 tháng)
 - [x] Hỗ trợ số thực (float)
 - [x] Xử lý ngoại lệ (`thử`/`bắt lỗi`/`ném`)
 - [ ] Tách `VM::run()` thành các handler nhỏ
-- [ ] Unit test cho từng opcode handler
+- [ ] Unit test cho từng opcode handler *(MVP smoke test đang được mở rộng; chưa đủ coverage từng handler)*
 - [x] REPL (gõ lệnh trực tiếp)
 - [x] Disassembler hiển thị bytecode
 
 ### Dài hạn (3–12 tháng)
 - [x] Kiểu từ điển / Map
 - [x] Hàm bậc cao (higher-order functions)
-- [x] Garbage Collection *(MVP)*
+- [x] Runtime compaction theo chu kỳ *(GC MVP; tracing GC còn mở)*
 - [x] Thư viện chuẩn tiếng Việt (stdlib)
 - [x] Namespace / module có tên
 - [x] Language Server Protocol (LSP, MVP)
 - [x] Syntax highlighting cho VSCode
-- [x] JIT Compilation (tuỳ chọn, MVP)
+- [x] Linear bytecode JIT path (tuỳ chọn, MVP; chưa sinh mã máy)
 - [ ] Embeddable C API
+
+---
+
+## 14. 🧭 Đánh Giá Kiến Trúc & Hướng Phát Triển
+
+Phần này phân biệt rõ **mức hoàn thành checklist nội bộ** với mức trưởng thành
+của một platform như Java, C# hoặc Python. Nó được đối chiếu với source hiện
+có; không tính các mục chỉ nằm trên roadmap.
+
+### 14.1 So sánh capability hiện tại
+
+| Thành phần | V++ hiện tại | Java | C# | Python |
+|---|---|---|---|---|
+| Lexer / parser | ✅ Single-pass, sinh bytecode trực tiếp | ✅ Trưởng thành | ✅ Trưởng thành | ✅ Trưởng thành |
+| AST chuẩn | ⬜ | ✅ | ✅ | ✅ |
+| Name resolution / semantic analysis | ⬜ | ✅ | ✅ | ✅ |
+| Static typing | ⬜ Chưa quyết định mô hình kiểu | ✅ Mạnh | ✅ Mạnh | 🟡 Dynamic + type hints |
+| Bytecode / VM | ✅ Stack bytecode và V++ VM | ✅ JVM | ✅ CLR | ✅ CPython VM |
+| GC / JIT | 🚧 MVP, chưa production-grade | ✅ Mature | ✅ Mature | ✅/🟡 Tuỳ runtime |
+| Exception / function / lambda-HOF | ✅ | ✅ | ✅ | ✅ |
+| Array / map | 🚧 Map scalar; chưa có array/index API ổn định | ✅ | ✅ | ✅ |
+| Module / import | ✅ | ✅ | ✅ | ✅ |
+| Class / object / inheritance | 🚧 Class-method và modifier; chưa có instance/inheritance | ✅ | ✅ | ✅ |
+| Generics / reflection | ⬜ (reflection hiện không là mục tiêu mặc định) | ✅ | ✅ | ✅ |
+| Concurrency / async / FFI | ⬜ | ✅ | ✅ | ✅ |
+| Standard library | 🚧 Nhỏ, theo module | ✅ Rất lớn | ✅ Rất lớn | ✅ Rất lớn |
+| HTTP / package / REPL | ✅ HTTP cơ bản, package MVP, REPL | ✅ | ✅ | ✅ |
+| LSP / debugger / profiler | 🚧 LSP MVP; chưa có debugger/profiler | ✅ | ✅ | ✅ |
+| Cross-platform | 🚧 Unix + Windows CI; còn phụ thuộc binary host | ✅ | ✅ | ✅ |
+| Production maturity | ⬜ Experimental | ✅✅✅ | ✅✅✅ | ✅✅✅ |
+
+### 14.2 Thước đo đúng
+
+Mốc **~92% checklist của V++** chỉ đo các hạng mục mà roadmap cũ đã liệt kê.
+Nó **không** có nghĩa V++ bằng 92% Java. Nếu lấy Java platform là 100, đây là
+ước lượng kiến trúc để định hướng đầu tư, không phải KPI sản phẩm:
+
+| Lớp | V++ | Java |
+|---|---:|---:|
+| Syntax | 85% | 100% |
+| Functions | 80% | 100% |
+| Control flow | 90% | 100% |
+| Data types | 60% | 100% |
+| Compiler pipeline | 40% | 100% |
+| VM | 35% | 100% |
+| GC | 15% | 100% |
+| JIT | 5–10% | 100% |
+| OOP | 25% | 100% |
+| Standard library | 15% | 100% |
+| Concurrency | 0–5% | 100% |
+| Tooling | 20% | 100% |
+| Ecosystem | <1% | 100% |
+
+Theo góc nhìn platform engineering, V++ hiện phù hợp khoảng **15–25%** của
+một Java platform. Đây là điều bình thường với một runtime nghiên cứu nhỏ;
+Java đã tích luỹ hơn ba thập kỷ cùng hệ sinh thái rất lớn.
+
+### 14.3 Tài sản runtime và khoảng trống compiler
+
+V++ không cần bỏ VM. Stack bytecode VM, call frame, globals/locals, recursion,
+GC MVP, peephole optimizer và JIT MVP là nền tảng đúng hướng, gần Java/C# hơn
+là một interpreter thuần source:
+
+```text
+.vi → V++ compiler → V++ bytecode → V++ VM → interpreter / JIT MVP → CPU
+```
+
+Khoảng trống quan trọng là phần giữa frontend và bytecode. Hiện compiler đi
+thẳng từ token/source sang bytecode; kiến trúc trưởng thành hơn nên tiến dần
+đến:
+
+```text
+Source
+  ↓ Lexer / parser
+AST (có source span)
+  ↓ Name resolution
+Semantic analysis
+  ↓ Type policy
+IR
+  ↓ Optimization
+Bytecode
+  ↓ VM / JIT
+```
+
+### 14.4 Quyết định bắt buộc trước Typed IR
+
+V++ hiện hành xử gần dynamic hơn static: giá trị được mang ở runtime và chưa
+có type checker. Trước khi làm Typed IR hoặc static checker, dự án phải chốt
+một ADR cho một trong ba hướng:
+
+| Hướng | Lợi ích | Hệ quả |
+|---|---|---|
+| Dynamic như Python | Linh hoạt, dễ phát triển frontend | Cần runtime checks và tối ưu kiểu suy đoán |
+| Static như Java/C# | Chẩn đoán sớm, tối ưu dễ hơn | Cần annotation/inference, compatibility policy |
+| Gradual typing | Lộ trình chuyển đổi mềm | Thiết kế phức tạp nhất, cần boundary rõ ràng |
+
+Cho tới khi ADR này được chốt, có thể làm AST không kiểu, source span và name
+resolution; không được ngầm áp đặt static typing vào bytecode hiện có.
+
+### 14.5 Sáu milestone ưu tiên
+
+1. **AST** — node ổn định, source span và test parser.
+2. **Semantic analyzer** — scope, name resolution, diagnostics độc lập codegen.
+3. **IR** — sau khi quyết định type policy.
+4. **VM refactor + opcode tests** — chia handler, thêm test đơn vị theo opcode.
+5. **Object model + GC v2** — instance/field trước inheritance/generics.
+6. **JSON + networking + concurrency** — mở rộng sau khi nền runtime ổn định.
+
+Nếu mục tiêu cuối là backend, ưu tiên chiều sâu ở các milestone này hơn việc
+thêm nhiều keyword giống Java. TLS, socket, thread/async, connection pooling,
+driver DB, crypto, logging, config, debugger, profiler, security và monitoring
+đều là phần của platform — không chỉ là cú pháp.
+
+### 14.6 Backlog kiến trúc có điều kiện chấp nhận
+
+- [ ] Chốt ADR type policy (dynamic, static hoặc gradual) trước Typed IR.
+- [ ] Parser/AST: có node ổn định, source span và parser unit tests.
+- [ ] Name resolution + semantic diagnostics: test được shadowing, import và lỗi tên.
+- [ ] IR/codegen boundary: bytecode tests không phụ thuộc parser token-level.
+- [ ] VM: tách handler và bổ sung unit test từng opcode trước tối ưu mới.
+- [ ] Object heap/GC v2: instance/field và tracing/lifetime test trước inheritance.
+- [ ] JSON/network/concurrency: mỗi API có contract, error path và integration test.
 
 ---
 
 ## 📊 Tổng Kết
 
-| Hạng mục | Hoàn thành | Tổng |
-|---------|-----------|------|
-| Từ khoá & cú pháp | 14 | 14 |
-| Toán tử | 16 | 16 |
-| Kiểu dữ liệu | 8 | 8 |
-| Điều khiển luồng | 9 | 9 |
-| Hàm | 12 | 12 |
-| Module & import | 5 | 5 |
-| Xử lý lỗi | 9 | 10 |
-| VM & Bytecode | 14 | 14 |
-| Compiler | 17 | 19 |
-| Tests | 29 | 31 |
-| Công cụ | 8 | 13 |
-| Tài liệu | 7 | 10 |
+| Thước đo | Ý nghĩa |
+|---------|---------|
+| `~148/161 (~92%)` | Snapshot của roadmap legacy, không còn là bộ đếm live sau khi tách MVP/đang làm/chưa có runtime API. |
+| Capability hiện tại | Xem phần 14: V++ là runtime/compiler thử nghiệm, khoảng 15–25% Java platform theo ước lượng kiến trúc. |
+| Backlog thực thi | Các checkbox ở §13 và §14.6 là nguồn trạng thái hiện hành. |
 
-> **Tổng cộng: ~148/161 (~92%) tính năng cốt lõi đã hoàn thành.**
+> Không diễn giải phần trăm roadmap nội bộ như mức tương đương với Java, C# hoặc
+> Python. Mỗi hạng mục `🚧`/`⬜` phía trên có phạm vi và điều kiện chấp nhận riêng.

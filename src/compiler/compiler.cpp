@@ -10,17 +10,22 @@
 #include <functional>
 #include <../include/frontend/lexer.h>
 #include <compiler/compileStatement.h>
+#include <compiler/compileRegistry.h>
 #include "common/storeString.h"
+#include "common/utility.h"
 
-static std::string joinNameTokens(const std::vector<std::string>& tokens, size_t begin, size_t end) {
-    std::string out;
-    for (size_t i = begin; i < end; ++i) {
-        if (!out.empty()) out.push_back(' ');
-        out += tokens[i];
-    }
-    return out;
+namespace vietvm::compiler {
+
+void resetCompilationState() {
+    StringPool::clear();
+    clearImportedFiles();
+    clearClassAccessState();
+    hamMap::hamBytecodeMap.clear();
+    hamMap::clearHamNameIndexMap();
+    hamMap::resetHamIdCounter();
 }
 
+} // namespace vietvm::compiler
 
 // ---------- compileSource: top-level ----------
 // This replaces the old line-by-line code and uses token stream + recursive parsing.
@@ -79,18 +84,6 @@ static std::vector<Instruction> optimizeBytecodePeephole(const std::vector<Instr
     return out;
 }
 
-static bool isCallableNamePiece(const std::string &tk) {
-    if (vietvm::compiler::isVariable(tk)) return true;
-    if (tk.find(' ') == std::string::npos) return false;
-    std::stringstream ss(tk);
-    std::string part;
-    while (std::getline(ss, part, ' ')) {
-        if (part.empty()) continue;
-        if (!vietvm::compiler::isVariable(part)) return false;
-    }
-    return true;
-}
-
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap,
                                        bool emitMainCall)
@@ -118,12 +111,12 @@ std::vector<Instruction> compileSource(const std::string& source,
 
             size_t nameEnd = namePos;
             while (nameEnd < tokens.size() && tokens[nameEnd] != "(" && tokens[nameEnd] != "{" && tokens[nameEnd] != ";") {
-                if (!isCallableNamePiece(tokens[nameEnd])) break;
+                if (!vietvm::compiler::isCallableNamePiece(tokens[nameEnd])) break;
                 ++nameEnd;
             }
             if (nameEnd == namePos) continue;
 
-            std::string fname = joinNameTokens(tokens, namePos, nameEnd);
+            std::string fname = vietvm::compiler::joinNameTokens(tokens, namePos, nameEnd);
             if (symTab.find(fname) == symTab.end()) {
                 int hamId = vietvm::compiler::hamMap::allocHamId();
                 symTab[fname] = hamId;

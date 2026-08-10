@@ -15,13 +15,26 @@
 
 V++ is an experimental programming language with the following characteristics:
 
-* **Vietnamese Keywords**: Uses Vietnamese keywords (with or without diacritics) to increase accessibility for Vietnamese speakers
-* **Stack-based Virtual Machine**: Based on stack machine architecture, similar to JVM and Python VM
+* **Vietnamese Keywords**: Canonical keywords currently use Vietnamese diacritics (for example, `hàm`, `nếu`, `lặp`)
+* **Stack-based Virtual Machine**: Executes in-memory `Instruction` bytecode on a custom VM
 * **Explicit Semantics**: No hidden control flow, deterministic and traceable behavior
 * **Research Purpose**: Designed for learning, compiler/VM design research
-* **C++ Implementation**: Written in C++17, high performance
+* **C++ Implementation**: Written in C++17
 
 This document compares V++ with popular programming languages to help users understand V++'s position, strengths, and weaknesses.
+
+### Current implementation status
+
+V++ remains **experimental** and is not production-ready. The compiler tokenizes source
+and emits `std::vector<Instruction>` directly; it has no materialized AST, semantic-analysis
+pass, static type checker, or separate IR. Runtime values are dynamic (`int`, `double`,
+`string`, `rỗng`, and maps), and the long-term type-system policy is undecided.
+
+GC and JIT are MVPs: GC only compacts runtime containers when enabled by environment
+variables, while JIT builds lambdas for supported linear bytecode and otherwise falls back to
+the interpreter. `lớp` groups methods and visibility metadata only; there are no instances or
+inheritance. The CLI has MVP package commands, formatter/linter, and LSP support, but no
+dependency/version resolver or complete debugger/IDE integration.
 
 ---
 
@@ -32,17 +45,18 @@ This document compares V++ with popular programming languages to help users unde
 | Criteria | V++ | Python | JavaScript | Java | C++ | Go |
 |----------|--------|--------|------------|------|-----|----|
 | **Paradigm** | Imperative, Structured | Multi-paradigm | Multi-paradigm | OOP | Multi-paradigm | Imperative, Concurrent |
-| **Typing** | Static (planned) | Dynamic | Dynamic | Static | Static | Static |
-| **Runtime** | Custom VM (Stack) | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
-| **Memory** | Manual/GC (planned) | GC | GC | GC | Manual | GC |
-| **Compilation** | Bytecode | Bytecode | JIT | Bytecode + JIT | Native | Native |
-| **Concurrency** | Planned | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
+| **Typing** | Dynamic runtime; no type checker | Dynamic | Dynamic | Static | Static | Static |
+| **Runtime** | Custom stack VM with in-memory `Instruction` | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
+| **Memory** | MVP container compaction, not a tracing GC | GC | GC | GC | Manual | GC |
+| **Compilation** | Direct source/token → bytecode | Bytecode | JIT | Bytecode + JIT | Native | Native |
+| **Concurrency** | No general concurrency model | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
 | **Maturity** | Experimental | Mature | Mature | Mature | Mature | Mature |
 | **Ecosystem** | Minimal | Very Large | Very Large | Large | Large | Growing |
 | **Learning curve** | Medium | Easy | Easy | Medium | Hard | Medium |
 | **Vietnamese support** | Native | External | External | External | External | External |
 | **Performance** | Medium (VM) | Slow | Fast (JIT) | Fast | Very Fast | Fast |
 | **Use case** | Education, Research | General, ML, Scripting | Web, Full-stack | Enterprise, Android | Systems, Games | Cloud, Systems |
+| **Tooling** | Package/LSP/format/lint MVP | Mature | Mature | Mature | Mature | Mature |
 
 ---
 
@@ -61,12 +75,12 @@ This document compares V++ with popular programming languages to help users unde
 | Aspect | V++ | Python |
 |--------|--------|--------|
 | **Keywords** | Vietnamese (`hàm`, `nếu`, `lặp`) | English (`def`, `if`, `while`) |
-| **Typing** | Static typing (planned) | Dynamic typing |
+| **Typing** | Dynamic runtime; no static checking | Dynamic typing |
 | **Ecosystem** | Minimal, build-your-own | Very large (PyPI, NumPy, pandas, Django) |
 | **Maturity** | Experimental | Production-ready (30+ years) |
-| **Performance** | Optimized for stack VM | Slow (CPython), faster with PyPy |
+| **Performance** | Experimental VM; no stable benchmark suite | Slow (CPython), faster with PyPy |
 | **Standard lib** | Minimal (by design) | Comprehensive ("batteries included") |
-| **OOP** | Planned/Limited | Full OOP support |
+| **OOP** | Method/visibility MVP; no instances/inheritance | Full OOP support |
 | **Meta-programming** | Limited | Extensive (decorators, metaclasses) |
 
 #### Syntax Examples:
@@ -124,10 +138,10 @@ for i in range(10):
 |--------|--------|------------|
 | **Runtime** | Custom stack VM | V8, JSC, SpiderMonkey (JIT) |
 | **Environment** | Standalone | Browser + Node.js |
-| **Typing** | Static (planned) | Dynamic (TypeScript for static) |
-| **Async** | Synchronous (async planned) | Native async/await, Promises |
+| **Typing** | Dynamic runtime; no static checking | Dynamic (TypeScript for static) |
+| **Async** | No general async model | Native async/await, Promises |
 | **Prototypal OOP** | No | Yes |
-| **Closures** | Planned | Full support |
+| **Closures** | Lambda/HOF MVP; lexical closure semantics are not stable | Full support |
 | **Event-driven** | No | Yes (core feature) |
 | **Ecosystem** | Minimal | Massive (npm, 2M+ packages) |
 | **Keywords** | Vietnamese | English |
@@ -168,19 +182,17 @@ function factorial(n) {
 #### Similarities:
 
 * **Bytecode + VM**: Both compile to bytecode and run on a VM
-* **Static typing**: Java uses static typing, V++ plans to have it
-* **Platform-independent**: Bytecode is platform-independent
 * **Explicit semantics**: Clear control flow
 
 #### Differences:
 
 | Aspect | V++ | Java |
 |--------|--------|------|
-| **OOP** | Limited/Planned | Full OOP (classes, inheritance) |
-| **Garbage Collection** | Planned | Automatic, sophisticated GC |
+| **OOP** | Method/visibility MVP; no instances/inheritance | Full OOP (classes, inheritance) |
+| **Garbage Collection** | MVP container compaction, not a tracing GC | Automatic, sophisticated GC |
 | **Generics** | No | Yes (with type erasure) |
 | **Reflection** | No (by design) | Full reflection support |
-| **Multithreading** | Planned | Built-in (Thread, synchronized) |
+| **Multithreading** | No general concurrency model | Built-in (Thread, synchronized) |
 | **Standard Library** | Minimal | Very comprehensive (java.*, javax.*) |
 | **Compilation** | Simple bytecode | Bytecode + JIT optimization |
 | **Enterprise features** | No | Yes (EJB, Spring, etc.) |
@@ -220,7 +232,7 @@ public class Main {
 #### Similarities:
 
 * **Imperative/Procedural**: Both support imperative programming
-* **Performance-oriented**: C++ is native, V++ is optimized for stack VM
+* **Different execution models**: C++ is native; V++ runs on an experimental VM
 * **Low-level control**: C++ has full control, V++ has bytecode-level control
 
 #### Differences:
@@ -228,43 +240,38 @@ public class Main {
 | Aspect | V++ | C++ |
 |--------|--------|-----|
 | **Compilation** | Bytecode (interpreted) | Native machine code |
-| **Memory management** | Managed/GC (planned) | Manual (RAII, smart pointers) |
+| **Memory management** | Dynamic runtime values; MVP container compaction only | Manual (RAII, smart pointers) |
 | **Performance** | VM overhead | Native, zero overhead |
-| **Portability** | Bytecode portable | Source portable, needs recompilation |
+| **Portability** | No serialized `.vbc` bytecode format yet | Source portable, needs recompilation |
 | **Templates** | No | Full template metaprogramming |
 | **RAII** | No | Core pattern |
 | **Operator overloading** | No | Yes |
 | **Multiple inheritance** | No | Yes |
 | **Learning curve** | Medium | Steep |
-| **Safety** | Memory safe (VM) | Manual safety |
+| **Safety** | No formal memory-safety guarantee | Manual safety |
 | **Use case** | Education, scripting | Systems, games, performance-critical |
 
 #### Syntax Examples:
 
 **V++:**
 ```vietvm
-hàm swap(a[], i, j) {
-    khởi tạo temp = a[i];
-    a[i] = a[j];
-    a[j] = temp;
+hàm cộng(a, b) {
+    trả về a + b;
 }
 ```
 
 **C++:**
 ```cpp
-void swap(int a[], int i, int j) {
-    int temp = a[i];
-    a[i] = a[j];
-    a[j] = temp;
+int add(int a, int b) {
+    return a + b;
 }
-// Or use std::swap
 ```
 
 #### Comparison Conclusion:
 
-* **V++** is suitable for: Safe scripting, education, rapid prototyping
+* **V++** is suitable for: Education, VM experiments, small language examples
 * **C++** is suitable for: OS, drivers, games, HPC, embedded systems
-* **Trade-off**: C++ has absolute performance, V++ has safety and simplicity
+* **Trade-off**: C++ has systems performance and ecosystem; V++ favors a small VM model for learning
 
 ---
 
@@ -274,19 +281,19 @@ void swap(int a[], int i, int j) {
 
 * **Simplicity focus**: Both emphasize simple, explicit design
 * **Imperative**: Structured, imperative programming
-* **Fast compilation**: Go compiles fast, V++ bytecode generation is fast
+* **Compile-to-run workflow**: Go emits a native binary; V++ emits in-memory bytecode
 * **Minimal runtime**: Go has lightweight GC, V++ has minimal VM
 
 #### Differences:
 
 | Aspect | V++ | Go |
 |--------|--------|----|
-| **Concurrency** | Planned | Built-in (goroutines, channels) |
+| **Concurrency** | Not available as a general model | Built-in (goroutines, channels) |
 | **Compilation** | Bytecode | Native binary |
-| **Garbage Collection** | Planned | Concurrent GC |
+| **Garbage Collection** | MVP container compaction, not a tracing GC | Concurrent GC |
 | **Interfaces** | No | Duck-typed interfaces |
 | **Generics** | No | Yes (since Go 1.18) |
-| **Error handling** | Exceptions (planned) | Multiple return values |
+| **Error handling** | MVP `thử`/`ném`/`bắt lỗi` | Multiple return values |
 | **Standard library** | Minimal | Comprehensive |
 | **Deployment** | VM required | Single binary |
 | **Vietnamese** | Native keywords | English keywords |
@@ -327,17 +334,11 @@ func fibonacci(n int) int {
 ### 1. Vietnamese-first Language Design
 
 * **Motivation**: Reduce language barrier for Vietnamese programming learners
-* **Flexible**: Accepts both keywords with diacritics (`nếu`) and without (`neu`)
+* **Current convention**: Uses diacritic keywords (`nếu`, `hàm`, `trả về`) from the compiler keyword table
 * **Example**:
   ```vietvm
   hàm tính_bình_phương(số) {
       trả về số * số;
-  }
-  ```
-  vs
-  ```vietvm
-  ham tinh_binh_phuong(so) {
-      tra ve so * so;
   }
   ```
 
@@ -351,8 +352,8 @@ func fibonacci(n int) int {
 ### 3. Educational Focus
 
 * **Minimal design**: No unnecessary feature complexity
-* **Clear separation**: Parser, compiler, VM are clearly separated
-* **Documented internals**: Architecture, bytecode format are well-documented
+* **Current path**: Lexer/tokenizer, direct bytecode compiler, and VM are separate source modules
+* **Current limit**: There is no independent parser/AST/semantic/IR pipeline; the `.vbc` format in the bytecode document is a proposal
 * **Reference implementation**: C++ source code is readable and learnable
 
 ### 4. Research-oriented
@@ -397,7 +398,7 @@ func fibonacci(n int) int {
 
 2. **Performance-critical Applications**
    * VM overhead, not native
-   * No JIT optimization yet
+   * JIT is a linear MVP path and does not generate native machine code
    * Not suitable for systems programming
 
 3. **Team Collaboration (International)**
@@ -425,7 +426,7 @@ V++ is an **experimental, education-oriented language** with unique features of 
 | **Python** | Production, ML/AI, large ecosystem | Learning basics (Vietnamese), VM research |
 | **JavaScript** | Web development, full-stack | Don't need web, want explicit semantics |
 | **Java** | Enterprise, Android, large-scale | Learning, minimal complexity |
-| **C++** | Performance-critical, systems | Safety, educational scripting |
+| **C++** | Performance-critical, systems | Education, VM experiments |
 | **Go** | Cloud services, production | Vietnamese learners, VM study |
 
 ### V++'s Strengths:
@@ -438,8 +439,8 @@ V++ is an **experimental, education-oriented language** with unique features of 
 ### V++'s Weaknesses:
 
 1. ❌ **Experimental**: Not production-ready, subject to change
-2. ❌ **Minimal ecosystem**: No libraries, frameworks, tools
-3. ❌ **Limited features**: No OOP, generics, concurrency yet
+2. ❌ **Minimal ecosystem**: Bundled libraries and tooling are MVPs; there is no broad third-party ecosystem
+3. ❌ **Limited features**: No object instances/inheritance, generics, concurrency, or type checker
 4. ❌ **Small community**: Limited documentation, limited support
 
 ### Recommendations:

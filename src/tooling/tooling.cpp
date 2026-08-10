@@ -10,6 +10,7 @@
 #include "compiler/compileRegistry.h"
 #include "frontend/keywords.h"
 #include "frontend/lexer.h"
+#include "vpp/bytecode/opcode.h"
 
 namespace vietvm::tooling {
 
@@ -29,7 +30,7 @@ std::string disassembleBytecode(const std::vector<Instruction> &bytecode,
     std::ostringstream out;
     for (size_t i = 0; i < bytecode.size(); ++i) {
         const Instruction &instr = bytecode[i];
-        out << std::setw(4) << i << "  " << name_op(instr.op)
+        out << std::setw(4) << i << "  " << vietvm::bytecode::opcodeName(instr.op)
             << " op=" << instr.operand
             << " idx=" << instr.operandIndex
             << " val=" << instr.operandValue
@@ -95,11 +96,7 @@ std::string formatSource(const std::string &source) {
 
 bool lintSource(const std::string &source, std::string &errorMessage) {
     try {
-        vietvm::compiler::StringPool::clear();
-        vietvm::compiler::clearImportedFiles();
-        vietvm::compiler::hamMap::hamBytecodeMap.clear();
-        vietvm::compiler::hamMap::clearHamNameIndexMap();
-        vietvm::compiler::hamMap::resetHamIdCounter();
+        vietvm::compiler::resetCompilationState();
         (void)compileSource(source, keywordMap, false);
         return true;
     } catch (const std::exception &ex) {

@@ -15,13 +15,26 @@
 
 V++ là một ngôn ngữ lập trình thử nghiệm với các đặc điểm sau:
 
-* **Từ khóa tiếng Việt**: Sử dụng từ khóa tiếng Việt (có dấu hoặc không dấu) để tăng khả năng tiếp cận cho người Việt
-* **Máy ảo stack-based**: Dựa trên kiến trúc stack machine, tương tự JVM và Python VM
+* **Từ khóa tiếng Việt**: Từ khóa chuẩn hiện dùng tiếng Việt có dấu (ví dụ `hàm`, `nếu`, `lặp`)
+* **Máy ảo stack-based**: Chạy bytecode `Instruction` trong bộ nhớ trên VM riêng
 * **Ngữ nghĩa tường minh**: Không có luồng điều khiển ẩn, hành vi xác định và có thể truy vết
 * **Mục đích nghiên cứu**: Được thiết kế cho học tập, nghiên cứu compiler/VM design
-* **C++ implementation**: Được viết bằng C++17, hiệu năng cao
+* **C++ implementation**: Được viết bằng C++17
 
 Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến để giúp người dùng hiểu vị trí, ưu nhược điểm của V++.
+
+### Trạng thái triển khai hiện tại
+
+V++ vẫn là dự án **experimental**, không phải ngôn ngữ production-ready. Compiler hiện
+tokenize source rồi phát trực tiếp `std::vector<Instruction>`; chưa có AST materialized,
+semantic-analysis pass, static type checker hoặc IR riêng. Giá trị runtime là động
+(`int`, `double`, `string`, `rỗng` và map); chính sách hệ kiểu dài hạn chưa được chọn.
+
+GC và JIT hiện là MVP: GC chỉ compact các container runtime theo biến môi trường, còn
+JIT chỉ tạo chuỗi lambda cho bytecode tuyến tính được hỗ trợ rồi fallback về interpreter.
+`lớp` hiện chỉ gom method và metadata quyền truy cập, chưa có instance hay inheritance.
+CLI đã có package commands, formatter/linter và LSP ở mức MVP; chưa có resolver phụ thuộc,
+versioning hay debugger/IDE đầy đủ.
 
 ---
 
@@ -32,17 +45,18 @@ Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến �
 | Tiêu chí | V++ | Python | JavaScript | Java | C++ | Go |
 |----------|--------|--------|------------|------|-----|----|
 | **Paradigm** | Imperative, Structured | Multi-paradigm | Multi-paradigm | OOP | Multi-paradigm | Imperative, Concurrent |
-| **Typing** | Static (planned) | Dynamic | Dynamic | Static | Static | Static |
-| **Runtime** | Custom VM (Stack) | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
-| **Memory** | Manual/GC (planned) | GC | GC | GC | Manual | GC |
-| **Compilation** | Bytecode | Bytecode | JIT | Bytecode + JIT | Native | Native |
-| **Concurrency** | Planned | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
+| **Typing** | Dynamic runtime; chưa có type checker | Dynamic | Dynamic | Static | Static | Static |
+| **Runtime** | Custom stack VM, in-memory `Instruction` | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
+| **Memory** | MVP container compaction, không phải tracing GC | GC | GC | GC | Manual | GC |
+| **Compilation** | Source/token → bytecode trực tiếp | Bytecode | JIT | Bytecode + JIT | Native | Native |
+| **Concurrency** | Chưa có mô hình concurrency tổng quát | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
 | **Maturity** | Experimental | Mature | Mature | Mature | Mature | Mature |
 | **Ecosystem** | Minimal | Very Large | Very Large | Large | Large | Growing |
 | **Learning curve** | Medium | Easy | Easy | Medium | Hard | Medium |
 | **Vietnamese support** | Native | External | External | External | External | External |
 | **Performance** | Medium (VM) | Slow | Fast (JIT) | Fast | Very Fast | Fast |
 | **Use case** | Education, Research | General, ML, Scripting | Web, Full-stack | Enterprise, Android | Systems, Games | Cloud, Systems |
+| **Tooling** | Package/LSP/format/lint MVP | Mature | Mature | Mature | Mature | Mature |
 
 ---
 
@@ -61,12 +75,12 @@ Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến �
 | Khía cạnh | V++ | Python |
 |-----------|--------|--------|
 | **Từ khóa** | Tiếng Việt (`hàm`, `nếu`, `lặp`) | Tiếng Anh (`def`, `if`, `while`) |
-| **Typing** | Static typing (dự kiến) | Dynamic typing |
+| **Typing** | Dynamic runtime; chưa có static checking | Dynamic typing |
 | **Ecosystem** | Minimal, tự xây dựng | Rất lớn (PyPI, NumPy, pandas, Django) |
 | **Maturity** | Experimental | Production-ready (30+ năm) |
-| **Performance** | Tối ưu cho stack VM | Chậm (CPython), nhanh hơn với PyPy |
+| **Performance** | VM thử nghiệm; chưa có benchmark ổn định | Chậm (CPython), nhanh hơn với PyPy |
 | **Standard lib** | Tối giản (by design) | Comprehensive ("batteries included") |
-| **OOP** | Planned/Limited | Full OOP support |
+| **OOP** | Method/visibility MVP; không có instance/inheritance | Full OOP support |
 | **Meta-programming** | Limited | Extensive (decorators, metaclasses) |
 
 #### Ví dụ cú pháp:
@@ -124,10 +138,10 @@ for i in range(10):
 |-----------|--------|------------|
 | **Runtime** | Custom stack VM | V8, JSC, SpiderMonkey (JIT) |
 | **Environment** | Standalone | Browser + Node.js |
-| **Typing** | Static (planned) | Dynamic (TypeScript for static) |
-| **Async** | Synchronous (async planned) | Native async/await, Promises |
+| **Typing** | Dynamic runtime; chưa có static checking | Dynamic (TypeScript for static) |
+| **Async** | Chưa có async model tổng quát | Native async/await, Promises |
 | **Prototypal OOP** | No | Yes |
-| **Closures** | Planned | Full support |
+| **Closures** | Lambda/HOF MVP; closure lexical chưa là ngữ nghĩa ổn định | Full support |
 | **Event-driven** | No | Yes (core feature) |
 | **Ecosystem** | Minimal | Massive (npm, 2M+ packages) |
 | **From keywords** | Vietnamese | English |
@@ -168,19 +182,17 @@ function giaiThua(n) {
 #### Điểm giống:
 
 * **Bytecode + VM**: Cả hai compile sang bytecode và chạy trên VM
-* **Static typing**: Java dùng static typing, V++ dự kiến sẽ có
-* **Platform-independent**: Bytecode không phụ thuộc nền tảng
 * **Explicit semantics**: Luồng điều khiển rõ ràng
 
 #### Điểm khác:
 
 | Khía cạnh | V++ | Java |
 |-----------|--------|------|
-| **OOP** | Limited/Planned | Full OOP (classes, inheritance) |
-| **Garbage Collection** | Planned | Automatic, sophisticated GC |
+| **OOP** | Method/visibility MVP; không có instance/inheritance | Full OOP (classes, inheritance) |
+| **Garbage Collection** | MVP container compaction, không phải tracing GC | Automatic, sophisticated GC |
 | **Generics** | No | Yes (with type erasure) |
 | **Reflection** | No (by design) | Full reflection support |
-| **Multithreading** | Planned | Built-in (Thread, synchronized) |
+| **Multithreading** | Chưa có mô hình concurrency tổng quát | Built-in (Thread, synchronized) |
 | **Standard Library** | Minimal | Very comprehensive (java.*, javax.*) |
 | **Compilation** | Simple bytecode | Bytecode + JIT optimization |
 | **Enterprise features** | No | Yes (EJB, Spring, etc.) |
@@ -220,7 +232,7 @@ public class Main {
 #### Điểm giống:
 
 * **Imperative/Procedural**: Cả hai hỗ trợ imperative programming
-* **Performance-oriented**: C++ native, V++ optimize cho stack VM
+* **Mô hình thực thi khác nhau**: C++ native; V++ chạy trên VM thử nghiệm
 * **Low-level control**: C++ full control, V++ có bytecode-level control
 
 #### Điểm khác:
@@ -228,43 +240,38 @@ public class Main {
 | Khía cạnh | V++ | C++ |
 |-----------|--------|-----|
 | **Compilation** | Bytecode (interpreted) | Native machine code |
-| **Memory management** | Managed/GC (planned) | Manual (RAII, smart pointers) |
+| **Memory management** | Giá trị runtime động; chỉ có MVP container compaction | Manual (RAII, smart pointers) |
 | **Performance** | VM overhead | Native, zero overhead |
-| **Portability** | Bytecode portable | Source portable, need recompile |
+| **Portability** | Chưa có format bytecode `.vbc` tuần tự hóa | Source portable, need recompile |
 | **Templates** | No | Full template metaprogramming |
 | **RAII** | No | Core pattern |
 | **Operator overloading** | No | Yes |
 | **Multiple inheritance** | No | Yes |
 | **Learning curve** | Medium | Steep |
-| **Safety** | Memory safe (VM) | Manual safety |
+| **Safety** | Không có bảo đảm memory safety chính thức | Manual safety |
 | **Use case** | Education, scripting | Systems, games, performance-critical |
 
 #### Ví dụ cú pháp:
 
 **V++:**
 ```vietvm
-hàm swap(a[], i, j) {
-    khởi tạo temp = a[i];
-    a[i] = a[j];
-    a[j] = temp;
+hàm cộng(a, b) {
+    trả về a + b;
 }
 ```
 
 **C++:**
 ```cpp
-void swap(int a[], int i, int j) {
-    int temp = a[i];
-    a[i] = a[j];
-    a[j] = temp;
+int cong(int a, int b) {
+    return a + b;
 }
-// Or use std::swap
 ```
 
 #### Kết luận so sánh:
 
-* **V++** phù hợp cho: Safe scripting, education, rapid prototyping
+* **V++** phù hợp cho: Education, VM experiments, small language examples
 * **C++** phù hợp cho: OS, drivers, games, HPC, embedded systems
-* **Trade-off**: C++ có performance tuyệt đối, V++ có safety và simplicity
+* **Trade-off**: C++ có performance và hệ sinh thái systems; V++ ưu tiên mô hình VM nhỏ để học tập
 
 ---
 
@@ -274,19 +281,19 @@ void swap(int a[], int i, int j) {
 
 * **Simplicity focus**: Cả hai nhấn mạnh simple, explicit design
 * **Imperative**: Structured, imperative programming
-* **Fast compilation**: Go compile nhanh, V++ bytecode generation nhanh
+* **Compile-to-run workflow**: Go sinh native binary, V++ sinh bytecode trong bộ nhớ
 * **Minimal runtime**: Go có GC nhẹ, V++ có minimal VM
 
 #### Điểm khác:
 
 | Khía cạnh | V++ | Go |
 |-----------|--------|----|
-| **Concurrency** | Planned | Built-in (goroutines, channels) |
+| **Concurrency** | Chưa có mô hình concurrency tổng quát | Built-in (goroutines, channels) |
 | **Compilation** | Bytecode | Native binary |
-| **Garbage Collection** | Planned | Concurrent GC |
+| **Garbage Collection** | MVP container compaction, không phải tracing GC | Concurrent GC |
 | **Interfaces** | No | Duck-typed interfaces |
 | **Generics** | No | Yes (since Go 1.18) |
-| **Error handling** | Exceptions (planned) | Multiple return values |
+| **Error handling** | `thử`/`ném`/`bắt lỗi` ở mức MVP | Multiple return values |
 | **Standard library** | Minimal | Comprehensive |
 | **Deployment** | VM required | Single binary |
 | **Vietnamese** | Native keywords | English keywords |
@@ -327,17 +334,11 @@ func fibonacci(n int) int {
 ### 1. Vietnamese-first language design
 
 * **Động lực**: Giảm rào cản ngôn ngữ cho người học lập trình Việt Nam
-* **Linh hoạt**: Chấp nhận cả từ khóa có dấu (`nếu`) và không dấu (`neu`)
+* **Quy ước hiện tại**: Dùng từ khóa có dấu (`nếu`, `hàm`, `trả về`) theo bảng keyword của compiler
 * **Ví dụ**:
   ```vietvm
   hàm tính_bình_phương(số) {
       trả về số * số;
-  }
-  ```
-  vs
-  ```vietvm
-  ham tinh_binh_phuong(so) {
-      tra ve so * so;
   }
   ```
 
@@ -351,8 +352,8 @@ func fibonacci(n int) int {
 ### 3. Educational focus
 
 * **Minimal design**: Không phức tạp hóa với features không cần thiết
-* **Clear separation**: Parser, compiler, VM tách biệt rõ ràng
-* **Documented internals**: Architecture, bytecode format được tài liệu hóa kỹ
+* **Đường đi hiện tại**: Lexer/tokenizer, compiler phát bytecode trực tiếp và VM là các module riêng
+* **Giới hạn hiện tại**: Chưa có pipeline parser/AST/semantic/IR độc lập; định dạng `.vbc` trong tài liệu bytecode chỉ là proposal
 * **Reference implementation**: Source code C++ dễ đọc, dễ học
 
 ### 4. Research-oriented
@@ -397,7 +398,7 @@ func fibonacci(n int) int {
 
 2. **Performance-critical applications**
    * VM overhead, không native
-   * Chưa có JIT optimization
+   * JIT chỉ là đường chạy tuyến tính MVP, không sinh native machine code
    * Không phù hợp cho systems programming
 
 3. **Team collaboration (international)**
@@ -425,7 +426,7 @@ V++ là một **ngôn ngữ thử nghiệm, định hướng giáo dục** với
 | **Python** | Production, ML/AI, large ecosystem | Học lập trình cơ bản (Việt), VM research |
 | **JavaScript** | Web development, full-stack | Không cần web, muốn explicit semantics |
 | **Java** | Enterprise, Android, large-scale | Learning, minimal complexity |
-| **C++** | Performance-critical, systems | Safety, educational scripting |
+| **C++** | Performance-critical, systems | Education, VM experiments |
 | **Go** | Cloud services, production | Vietnamese learners, VM study |
 
 ### Điểm mạnh của V++:
@@ -438,8 +439,8 @@ V++ là một **ngôn ngữ thử nghiệm, định hướng giáo dục** với
 ### Điểm yếu của V++:
 
 1. ❌ **Experimental**: Chưa production-ready, có thể thay đổi
-2. ❌ **Minimal ecosystem**: Không có libraries, frameworks, tools
-3. ❌ **Limited features**: Chưa có OOP, generics, concurrency
+2. ❌ **Minimal ecosystem**: Thư viện và tooling bundled mới ở mức MVP, chưa có hệ sinh thái bên thứ ba rộng
+3. ❌ **Limited features**: Chưa có object instance/inheritance, generics, concurrency hoặc type checker
 4. ❌ **Small community**: Ít tài liệu, ít hỗ trợ
 
 ### Lời khuyên:

@@ -17,42 +17,10 @@
 #include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compileRegistry.h"
+#include "vpp/core/message_constants.h"
 
 
 struct Instruction;
-
-static int resolveFunctionIdByNameExpr(const std::string &name,
-                                       const std::unordered_map<std::string,int> &symTab) {
-    std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
-    vietvm::compiler::validateCallableAccess(resolvedName);
-
-    auto idMatchesResolvedName = [&](int candidateId) {
-        int resolvedNameIndex = vietvm::compiler::StringPool::findString(resolvedName);
-        if (resolvedNameIndex < 0) return false;
-        auto itName = vietvm::compiler::hamMap::hamNameIndexMap.find(candidateId);
-        if (itName == vietvm::compiler::hamMap::hamNameIndexMap.end()) return false;
-        return itName->second == resolvedNameIndex;
-    };
-
-    auto itSym = symTab.find(resolvedName);
-    if (itSym != symTab.end()) {
-        int maybeId = itSym->second;
-        auto itCode = vietvm::compiler::hamMap::hamBytecodeMap.find(maybeId);
-        if (itCode != vietvm::compiler::hamMap::hamBytecodeMap.end() &&
-            !itCode->second.empty() &&
-            idMatchesResolvedName(maybeId)) {
-            return maybeId;
-        }
-    }
-
-    int nameIndex = vietvm::compiler::StringPool::findString(resolvedName);
-    if (nameIndex >= 0) {
-        for (const auto &kv : vietvm::compiler::hamMap::hamNameIndexMap) {
-            if (kv.second == nameIndex) return kv.first;
-        }
-    }
-    return -1;
-}
 
 static std::string encodeEscaped(const std::string &s) {
     std::string out;
@@ -84,12 +52,6 @@ static bool isUnaryMinusContext(const std::string &prev) {
            prev == "<=" || prev == ">=";
 }
 
-static bool isIdentifierLikeToken(const std::string &tk) {
-    if (tk.empty()) return false;
-    if (tk == "đúng" || tk == "sai" || tk == "rỗng") return false;
-    return vietvm::compiler::isVariable(tk);
-}
-
 static bool isMultiWordIdentifier(const std::string &tk) {
     if (tk.find(' ') == std::string::npos) return false;
     std::stringstream ss(tk);
@@ -98,7 +60,7 @@ static bool isMultiWordIdentifier(const std::string &tk) {
     while (std::getline(ss, part, ' ')) {
         if (part.empty()) continue;
         sawPart = true;
-        if (!isIdentifierLikeToken(part)) return false;
+        if (!vietvm::compiler::isIdentifierLikeToken(part)) return false;
     }
     return sawPart;
 }
@@ -109,14 +71,14 @@ static std::vector<std::string> mergeAdjacentIdentifierTokens(const std::vector<
 
     size_t i = 0;
     while (i < tokens.size()) {
-        if (!isIdentifierLikeToken(tokens[i])) {
+        if (!vietvm::compiler::isIdentifierLikeToken(tokens[i])) {
             out.push_back(tokens[i]);
             ++i;
             continue;
         }
 
         size_t j = i + 1;
-        while (j < tokens.size() && isIdentifierLikeToken(tokens[j])) {
+        while (j < tokens.size() && vietvm::compiler::isIdentifierLikeToken(tokens[j])) {
             ++j;
         }
 
@@ -181,7 +143,8 @@ static std::vector<ParamSpecExpr> parseParamsWithDefaultExpr(const std::string &
             else if (dv == "đúng") p.defaultEncoded = "i:1";
             else if (dv == "sai") p.defaultEncoded = "i:0";
             else if (dv == "rỗng") p.defaultEncoded = "n:";
-            else throw std::runtime_error("lambda: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)");
+            else throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSemanticUnsupportedDefaultParameter, {"lambda"}));
         }
         if (!p.name.empty()) params.push_back(p);
     }
@@ -234,7 +197,8 @@ static bool tryCompileLambdaLiteral(const std::vector<std::string> &tokens,
 
 static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &tokens) {
     if (!isMapLiteralTokens(tokens)) {
-        throw std::runtime_error("Map literal không hợp lệ");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxInvalidMapLiteral));
     }
 
     constexpr char RS = '\x1e'; // record separator
@@ -253,17 +217,20 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
         } else if (vietvm::compiler::isVariable(tokens[i])) {
             key = tokens[i];
         } else {
-            throw std::runtime_error("Map literal: key phải là chuỗi hoặc identifier");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxInvalidMapKey));
         }
         ++i;
 
         if (i >= tokens.size() || tokens[i] != ":") {
-            throw std::runtime_error("Map literal: thiếu dấu ':' sau key");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMapMissingColon));
         }
         ++i;
 
         if (i >= tokens.size()) {
-            throw std::runtime_error("Map literal: thiếu value");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMapMissingValue));
         }
 
         std::string typeTag;
@@ -288,7 +255,8 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
             typeTag = "n";
             encodedValue = "";
         } else {
-            throw std::runtime_error("Map literal: value chỉ hỗ trợ int/float/string/đúng/sai/rỗng");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxUnsupportedMapValue));
         }
         ++i;
 
@@ -304,7 +272,8 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
             break;
         }
         if (i < tokens.size() - 1) {
-            throw std::runtime_error("Map literal: thiếu dấu ',' giữa các cặp key/value");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxMapMissingComma));
         }
     }
 
@@ -329,7 +298,8 @@ static void emitOp(const std::string &tk, std::vector<Instruction> &bytecode) {
     else if (tk == "||") bytecode.push_back({OP_Logic_HOAC,0,0,0});
     else if (tk == "++") bytecode.push_back({OP_CONG_MOT,0,0,0});
     else if (tk == "--") bytecode.push_back({OP_TRU_MOT,0,0,0});
-    else throw std::runtime_error("compileExpr: unsupported operator " + tk);
+    else throw std::runtime_error(vietvm::messages::formatMessage(
+        vietvm::messages::kSyntaxUnsupportedOperator, {tk}));
 }
 
 // Helper: emit postfix tokens (shared by both assignment and non-assignment branches)
@@ -345,7 +315,8 @@ static void emitPostfix(const std::vector<std::string> &postfix,
             try {
                 bytecode.push_back({OP_BIEN_SO, std::stoi(tk), 0,0});
             } catch (...) {
-                throw std::runtime_error("compileExpr: isNumber=true but stoi failed for token: '" + tk + "'");
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kInternalNumberParseMismatch, {tk}));
             }
             continue;
         }
@@ -368,7 +339,7 @@ static void emitPostfix(const std::vector<std::string> &postfix,
         if (tk == "sai")  { bytecode.push_back({OP_BIEN_SO, 0, 0, 0}); continue; }
 
         if (vietvm::compiler::isVariable(tk) || isMultiWordIdentifier(tk)) {
-            int maybeFuncId = resolveFunctionIdByNameExpr(tk, symTab);
+            int maybeFuncId = vietvm::compiler::resolveFunctionIdByName(tk, symTab);
             if (maybeFuncId >= 0) {
                 // Bare function name used as value (higher-order): push function reference.
                 bytecode.push_back({OP_BIEN_SO, maybeFuncId, 0, 0});
@@ -386,15 +357,21 @@ static void emitPostfix(const std::vector<std::string> &postfix,
         }
         if (tk.rfind("CALL::", 0) == 0) {
             size_t p1 = tk.find("::", 6);
-            if (p1 == std::string::npos) throw std::runtime_error("compileExpr: malformed CALL token");
+            if (p1 == std::string::npos) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kInternalMalformedCallToken));
+            }
             std::string name = tk.substr(6, p1 - 6);
             std::string resolvedName = vietvm::compiler::resolveCallableNameInContext(name, symTab);
             vietvm::compiler::validateCallableAccess(resolvedName);
             std::string argcStr = tk.substr(p1 + 2);
-            if (argcStr.empty()) throw std::runtime_error("compileExpr: empty argc in CALL token: " + tk);
+            if (argcStr.empty()) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kInternalEmptyCallArgCount, {tk}));
+            }
             int argc = std::stoi(argcStr);
 
-            int hamId = resolveFunctionIdByNameExpr(name, symTab);
+            int hamId = vietvm::compiler::resolveFunctionIdByName(name, symTab);
             if (hamId >= 0) {
                 bytecode.push_back({OP_GOI, argc, hamId, 0});
             } else {

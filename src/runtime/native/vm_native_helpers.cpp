@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "common/vm_native_helpers.h"
+#include "common/vm_native_constants.h"
 
 #include <cctype>
 #include <cstdio>
@@ -24,6 +25,8 @@
 #endif
 
 #include "vpp/runtime/value.h"
+#include "vpp/core/message_constants.h"
+#include "vpp/core/text.h"
 
 #if defined(_WIN32) && defined(_MSC_VER)
 #ifndef popen
@@ -211,11 +214,13 @@ bool runCurlHttpRequestWindows(const std::string &method,
     std::string data;
     DWORD exitCode = 0;
     if (!runWindowsProcess(arguments, data, exitCode)) {
-        err = fnName + ": không mở được tiến trình curl";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlProcessOpenFailed, {fnName});
         return true;
     }
     if (exitCode != 0) {
-        err = fnName + ": curl trả về lỗi";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlFailed, {fnName});
         return true;
     }
 
@@ -226,7 +231,7 @@ bool runCurlHttpRequestWindows(const std::string &method,
 
 std::string sanitizeDbToken(const std::string &s) {
     std::string out = trimCopy(s);
-    if (out.empty()) return "db-command-failed";
+    if (out.empty()) return vietvm::constants::kDbReasonCommandFailed;
     for (char &c : out) {
         if (c == '\n' || c == '\r' || c == '\t') c = ' ';
         if (c == '|') c = '/';
@@ -255,16 +260,16 @@ bool parseJdbcTcpUrl(const std::string &jdbcUrl,
                      const std::string &prefix,
                      int defaultPort,
                      JdbcDbConfig &cfg,
-                     std::string &reason) {
+    std::string &reason) {
     if (!startsWith(jdbcUrl, prefix)) {
-        reason = "invalid-jdbc-prefix";
+        reason = vietvm::constants::kDbReasonInvalidJdbcPrefix;
         return false;
     }
 
     std::string rest = jdbcUrl.substr(prefix.size());
     size_t slash = rest.find('/');
     if (slash == std::string::npos || slash == 0) {
-        reason = "invalid-host-or-database";
+        reason = vietvm::constants::kDbReasonInvalidHostOrDatabase;
         return false;
     }
 
@@ -281,19 +286,19 @@ bool parseJdbcTcpUrl(const std::string &jdbcUrl,
         cfg.host = trimCopy(hostPort.substr(0, colon));
         std::string portText = trimCopy(hostPort.substr(colon + 1));
         if (portText.empty()) {
-            reason = "invalid-port";
+            reason = vietvm::constants::kDbReasonInvalidPort;
             return false;
         }
         try {
             cfg.port = std::stoi(portText);
         } catch (...) {
-            reason = "invalid-port";
+            reason = vietvm::constants::kDbReasonInvalidPort;
             return false;
         }
     }
 
     if (cfg.host.empty()) {
-        reason = "missing-host";
+        reason = vietvm::constants::kDbReasonMissingHost;
         return false;
     }
 
@@ -310,7 +315,7 @@ bool parseJdbcTcpUrl(const std::string &jdbcUrl,
     }
 
     if (cfg.database.empty()) {
-        reason = "missing-database";
+        reason = vietvm::constants::kDbReasonMissingDatabase;
         return false;
     }
 
@@ -339,13 +344,13 @@ bool parseJdbcDbConfig(const std::string &driverClass,
         cfg.engine = "sqlite";
         cfg.sqlitePath = trimCopy(jdbcUrl.substr(std::string("jdbc:sqlite:").size()));
         if (cfg.sqlitePath.empty()) {
-            reason = "missing-sqlite-path";
+            reason = vietvm::constants::kDbReasonMissingSqlitePath;
             return false;
         }
         return true;
     }
 
-    reason = "unsupported-driver";
+    reason = vietvm::constants::kDbReasonUnsupportedDriver;
     return false;
 }
 
@@ -368,9 +373,9 @@ bool runMySqlQuery(const JdbcDbConfig &cfg,
                    const std::string &sql,
                    bool useDatabase,
                    std::string &output,
-                   std::string &reason) {
+    std::string &reason) {
     if (user.empty()) {
-        reason = "missing-username";
+        reason = vietvm::constants::kDbReasonMissingUsername;
         return false;
     }
 
@@ -385,7 +390,7 @@ bool runMySqlQuery(const JdbcDbConfig &cfg,
 
     int rc = 0;
     if (!runCommandCapture(cmd, output, rc)) {
-        reason = "cannot-open-mysql-process";
+        reason = vietvm::constants::kDbReasonCannotOpenMysqlProcess;
         return false;
     }
     if (rc != 0) {
@@ -403,9 +408,9 @@ bool runPostgresQuery(const JdbcDbConfig &cfg,
                       const std::string &sql,
                       bool useDatabase,
                       std::string &output,
-                      std::string &reason) {
+    std::string &reason) {
     if (user.empty()) {
-        reason = "missing-username";
+        reason = vietvm::constants::kDbReasonMissingUsername;
         return false;
     }
 
@@ -420,7 +425,7 @@ bool runPostgresQuery(const JdbcDbConfig &cfg,
 
     int rc = 0;
     if (!runCommandCapture(cmd, output, rc)) {
-        reason = "cannot-open-psql-process";
+        reason = vietvm::constants::kDbReasonCannotOpenPsqlProcess;
         return false;
     }
     if (rc != 0) {
@@ -442,7 +447,7 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
     // the database path and SQL remain individual UTF-8 arguments.
     DWORD exitCode = 0;
     if (!runWindowsProcess({"sqlite3.exe", cfg.sqlitePath, sql}, output, exitCode)) {
-        reason = "cannot-open-sqlite-process";
+        reason = vietvm::constants::kDbReasonCannotOpenSqliteProcess;
         return false;
     }
     if (exitCode != 0) {
@@ -456,7 +461,7 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
 
     int rc = 0;
     if (!runCommandCapture(cmd, output, rc)) {
-        reason = "cannot-open-sqlite-process";
+        reason = vietvm::constants::kDbReasonCannotOpenSqliteProcess;
         return false;
     }
     if (rc != 0) {
@@ -475,7 +480,7 @@ bool ensureDatabaseIfRequested(const JdbcDbConfig &cfg,
                                std::string &reason) {
     if (!cfg.createIfNotExist) return true;
     if (!isSafeDbIdentifier(cfg.database)) {
-        reason = "unsafe-database-name";
+        reason = vietvm::constants::kDbReasonUnsafeDatabaseName;
         return false;
     }
 
@@ -538,10 +543,7 @@ bool startsWith(const std::string &value, const std::string &prefix) {
 }
 
 std::string trimCopy(const std::string &s) {
-    size_t a = s.find_first_not_of(" \t\r\n");
-    if (a == std::string::npos) return "";
-    size_t b = s.find_last_not_of(" \t\r\n");
-    return s.substr(a, b - a + 1);
+    return vietvm::core::trim(s);
 }
 
 std::string argToRawString(const StackValue &v) {
@@ -606,7 +608,8 @@ bool parseIntArgFromStack(const StackValue &arg,
         out = std::stoi(argToRawString(arg));
         return true;
     } catch (...) {
-        err = fn + ": " + label + " không hợp lệ";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeInvalidArgument, {fn, label});
         return false;
     }
 }
@@ -621,12 +624,14 @@ bool runDbConnect(const std::string &driverClass,
     JdbcDbConfig cfg;
     std::string reason;
     if (!parseJdbcDbConfig(driverClass, jdbcUrl, cfg, reason)) {
-        result = make_string_value("DB_ERR|" + reason);
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbErrorResult, {reason}));
         return true;
     }
 
     if (!ensureDatabaseIfRequested(cfg, user, password, reason)) {
-        result = make_string_value("DB_ERR|" + reason);
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbErrorResult, {reason}));
         return true;
     }
 
@@ -641,11 +646,13 @@ bool runDbConnect(const std::string &driverClass,
     }
 
     if (!ok) {
-        result = make_string_value("DB_ERR|" + reason);
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbErrorResult, {reason}));
         return true;
     }
 
-    result = make_string_value("DB_OK|connected");
+    result = make_string_value(vietvm::messages::messageText(
+        vietvm::messages::kNativeDbConnectedResult));
     return true;
 }
 
@@ -660,7 +667,8 @@ bool runDbQuery(const std::string &driverClass,
     JdbcDbConfig cfg;
     std::string reason;
     if (!parseJdbcDbConfig(driverClass, jdbcUrl, cfg, reason)) {
-        result = make_string_value("DB_ERR|" + reason);
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbErrorResult, {reason}));
         return true;
     }
 
@@ -675,16 +683,19 @@ bool runDbQuery(const std::string &driverClass,
     }
 
     if (!ok) {
-        result = make_string_value("DB_ERR|" + reason);
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbErrorResult, {reason}));
         return true;
     }
 
     if (output.empty()) {
-        result = make_string_value("DB_OK|affected=1");
+        result = make_string_value(vietvm::messages::messageText(
+            vietvm::messages::kNativeDbAffectedOneResult));
         return true;
     }
 
-    result = make_string_value("DB_OK|" + sanitizeDbToken(output));
+    result = make_string_value(vietvm::messages::messageText(
+        vietvm::messages::kNativeDbQueryResult, {sanitizeDbToken(output)}));
     return true;
 }
 
@@ -708,7 +719,8 @@ bool runCurlHttpRequest(const std::string &method,
 
     FILE *pipe = openCommandPipe(cmd);
     if (!pipe) {
-        err = fnName + ": không mở được tiến trình curl";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlProcessOpenFailed, {fnName});
         return true;
     }
 
@@ -720,7 +732,8 @@ bool runCurlHttpRequest(const std::string &method,
 
     int rc = closeCommandPipe(pipe);
     if (rc != 0) {
-        err = fnName + ": curl trả về lỗi";
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlFailed, {fnName});
         return true;
     }
 

@@ -78,28 +78,28 @@ function(vpp_add_module name)
 endfunction()
 
 # The dependency graph is intentionally one-way:
-# core -> frontend -> compiler; runtime consumes bytecode and receives function
-# metadata from the CLI instead of reading compiler globals. Tooling depends on
-# compiler; CLI composes runtime and tooling.
+# core -> bytecode -> frontend -> compiler; runtime consumes bytecode and
+# receives function metadata from the CLI instead of reading compiler globals.
+# Tooling depends on compiler; CLI composes runtime and tooling.
 vpp_add_module(vpp-core ${VPP_CORE_SOURCES})
 
 vpp_add_module(vpp-frontend ${VPP_FRONTEND_SOURCES})
-target_link_libraries(vpp-frontend PUBLIC vpp-core)
 
 vpp_add_module(vpp-bytecode ${VPP_BYTECODE_SOURCES})
 target_link_libraries(vpp-bytecode PUBLIC vpp-core)
+target_link_libraries(vpp-frontend PUBLIC vpp-bytecode vpp-core)
 
 vpp_add_module(vpp-compiler ${VPP_COMPILER_SOURCES})
 target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 
 vpp_add_module(vpp-runtime ${VPP_RUNTIME_SOURCES})
-target_link_libraries(vpp-runtime PUBLIC vpp-bytecode Threads::Threads)
+target_link_libraries(vpp-runtime PUBLIC vpp-bytecode vpp-core Threads::Threads)
 if (WIN32)
     target_link_libraries(vpp-runtime PUBLIC ws2_32)
 endif()
 
 vpp_add_module(vpp-tooling ${VPP_TOOLING_SOURCES})
-target_link_libraries(vpp-tooling PUBLIC vpp-compiler)
+target_link_libraries(vpp-tooling PUBLIC vpp-compiler vpp-bytecode)
 
 add_library(vpp::core ALIAS vpp-core)
 add_library(vpp::bytecode ALIAS vpp-bytecode)

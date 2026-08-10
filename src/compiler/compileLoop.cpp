@@ -15,6 +15,7 @@
 #include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compilerExpr.h"
+#include "vpp/core/message_constants.h"
 
 LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &pos,
                                std::vector<Instruction> &bytecode,
@@ -41,7 +42,8 @@ LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &pos,
         if (tmp.size() >= 3) {
             parts = {tmp[0], tmp[1], tmp[2]};
         } else {
-            throw std::runtime_error("compileLoop: cannot parse loop parts");
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kSyntaxInvalidLoopParts));
         }
     }
 

@@ -1,39 +1,64 @@
-# Kế hoạch Dài hạn (3–12+ tháng)
+# Kế hoạch dài hạn (3–12+ tháng)
 
-Mục tiêu: Chuẩn hoá bytecode, nâng cao hiệu năng runtime, xác định API công khai để nhúng V++ vào ứng dụng khác và có quy trình phát hành (releases).
+> Cập nhật: 09/08/2026
+> Các mục dưới đây là công việc nền tảng chưa hoàn tất. V++ hiện có compiler, bytecode
+> VM, package/thư viện chuẩn, tooling MVP và pipeline release; không nên diễn giải
+> điều đó là mức hoàn thiện tương đương Java, C# hay Python.
 
-Ưu tiên: Medium → Low (tùy roadmap)
+## Nền tảng đã có
 
-Estimated effort: 20+ man-days
+- [x] Workflow release tạo artifact cho Linux, macOS và Windows, bao gồm binary,
+  gói/thư viện, template và ví dụ.
+- [x] CONTRIBUTING.md đã có hướng dẫn đóng góp cơ bản.
+- [x] Runtime có MVP cho GC/JIT và CI có regression/sanitizer nền tảng; các phần này
+  chưa phải implementation production-grade có profiling đầy đủ.
 
-## Tasks & chi tiết
+## Việc lớn còn lại
 
-1) Chuẩn hoá & version hoá bytecode
-   - Mục tiêu: định nghĩa rõ `bytecode.md` (binary layout, Instruction fields, versioning), viết disassembler/assembler.
-   - Files: `docs/bytecode.md`, `tools/assembler.cpp`, `tools/disassembler.cpp`
-   - Effort: large (5–10 days)
+1. Frontend và semantic pipeline
 
-2) Thiết kế API nhúng (C API / C++ API)
-   - Mục tiêu: expose an embeddable interface for creating VM instances, loading bytecode, and running with callbacks for I/O.
-   - Files: `include/vietvm.h`, `src/vietvm_api.cpp`
-   - Effort: large (5–10 days)
+   - [ ] Chốt chiến lược dynamic, static hoặc gradual typing.
+   - [ ] Xây AST độc lập với lexer, name resolution, semantic diagnostics và test
+     lỗi nguồn.
+   - [ ] Sau khi có contract kiểu, thiết kế IR/Typed IR rồi hẵng thay bytecode/codegen
+     hiện tại.
 
-3) Tối ưu hoá VM (JIT/bytecode optimizations)
-   - Mục tiêu: profile-hotspots, implement optimizations (immediate operands, threaded code, inline caches), cân nhắc JIT nếu cần.
-   - Files: `src/vm/*`, `benchmarks/*`
-   - Effort: large (10–40 days)
+2. Chuẩn hoá bytecode
 
-4) Release process & packaging
-   - Mục tiêu: tạo release artifacts (pre-built binaries), package manager support (Homebrew formula / Debian package), và tạo changelog templates.
-   - Files: `.github/workflows/release.yml`, `packaging/` scripts
-   - Effort: medium (5–10 days)
+   - [ ] Định nghĩa format, versioning, validation và compatibility policy sau khi
+     opcode ổn định.
+   - [ ] Viết assembler/disassembler và round-trip test; tránh coi tài liệu proposal
+     là format runtime đã phát hành.
 
-5) Community & contributors
-   - Mục tiêu: thêm CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue/PR templates, maintainers guide.
-   - Files: `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE`, `.github/PULL_REQUEST_TEMPLATE.md`
-   - Effort: small (2–4 days)
+3. Runtime và object model
 
-## Rủi ro & dependency
-- JIT / big optimizations đa phần phức tạp và dễ gây regressions; cần benchmark và nhiều tests.
-- API nhúng yêu cầu lock-down các dữ liệu global; cân nhắc làm không có global state.
+   - [ ] Thiết kế value/object/instance, inheritance hoặc trait/generic theo quyết
+     định ngôn ngữ; class namespace/visibility hiện có không thay thế object model.
+   - [ ] Nâng MVP GC thành quản lý object graph an toàn nếu object/closure cần heap
+     lâu dài.
+   - [ ] Chỉ tối ưu JIT/dispatch sau benchmark; cần fallback interpreter và regression
+     cross-platform.
+   - [ ] Thiết kế concurrency/async và native/FFI với ownership/cancellation rõ ràng.
 
+4. API embedding
+
+   - [ ] Thiết kế C API/C++ API cho lifecycle VM, load/chạy program và callback I/O.
+   - [ ] Loại dependency vào global compiler state trước khi công bố API ổn định.
+   - [ ] Thêm ABI/versioning, sample host và test API độc lập.
+
+5. Phát hành và cộng đồng
+
+   - [ ] Duy trì workflow release hiện có, thêm smoke test artifact cài từ package nếu
+     cần.
+   - [ ] Đánh giá Homebrew, Debian/MSI hoặc package manager khác sau khi install
+     contract ổn định; chúng chưa có trong repo.
+   - [ ] Bổ sung CODE_OF_CONDUCT, issue/PR template, changelog/release-note process
+     và maintainer guide. CONTRIBUTING.md đã hoàn thành phần đầu tiên.
+
+## Điều kiện thực hiện
+
+- Không bắt đầu Typed IR hay public embedding API trước khi quyết định type policy và
+  lifecycle dữ liệu.
+- Mọi tối ưu runtime phải có benchmark, test lỗi và regression cross-platform.
+- Roadmap cần được cập nhật cùng code để trạng thái checklist không bị nhầm với mức
+  hoàn thiện của các platform trưởng thành.

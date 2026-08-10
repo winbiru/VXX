@@ -1,5 +1,7 @@
 #include "common/utility.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
+#include "frontend/lexer.h"
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -10,9 +12,37 @@ std::string trim(const std::string &s) {
     return vietvm::core::trim(s);
 }
 
+std::string joinNameTokens(const std::vector<std::string>& tokens, size_t begin, size_t end) {
+    std::string out;
+    for (size_t i = begin; i < end; ++i) {
+        if (!out.empty()) out.push_back(' ');
+        out += tokens[i];
+    }
+    return out;
+}
+
+bool isIdentifierLikeToken(const std::string &token) {
+    if (token.empty()) return false;
+    if (token == "đúng" || token == "sai" || token == "rỗng") return false;
+    return isVariable(token);
+}
+
+bool isCallableNamePiece(const std::string &token) {
+    if (isVariable(token)) return true;
+    if (token.find(' ') == std::string::npos) return false;
+    std::stringstream ss(token);
+    std::string part;
+    while (std::getline(ss, part, ' ')) {
+        if (part.empty()) continue;
+        if (!isVariable(part)) return false;
+    }
+    return true;
+}
+
 std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "(")
-        throw std::runtime_error("extractParens: expected '('");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxExpectedOpeningParen));
     std::ostringstream oss;
     int depth = 1;
     size_t i = start + 1;
@@ -24,13 +54,15 @@ std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tok
         }
         ++i;
     }
-    if (depth != 0) throw std::runtime_error("extractParens: unbalanced parentheses");
+    if (depth != 0) throw std::runtime_error(vietvm::messages::formatMessage(
+        vietvm::messages::kSyntaxUnbalancedParens));
     return {trim(oss.str()), i};
 }
 
 std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "{")
-        throw std::runtime_error("extractBlock: expected '{'");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxExpectedOpeningBlock));
     std::ostringstream oss;
     int depth = 1;
     size_t i = start + 1;
@@ -42,7 +74,8 @@ std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& toke
         }
         ++i;
     }
-    if (depth != 0) throw std::runtime_error("extractBlock: unbalanced braces");
+    if (depth != 0) throw std::runtime_error(vietvm::messages::formatMessage(
+        vietvm::messages::kSyntaxUnbalancedBraces));
     return {trim(oss.str()), i};
 }
 
@@ -77,7 +110,8 @@ std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector
 std::string extractAssignedVar(const std::string& expr) {
     size_t eqPos = expr.find('=');
     if (eqPos == std::string::npos) {
-        throw std::runtime_error("extractAssignedVar: no '=' found");
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxMissingAssignmentOperator));
     }
     std::string left = expr.substr(0, eqPos);
     return trim(left);

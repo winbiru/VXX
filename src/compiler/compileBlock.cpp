@@ -8,13 +8,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <iostream> // debug
 #include <sstream>
 
 #include "../../include/compiler/compileStatement.h"
 #include "../../include/vm/instruction.h"
 #include "compiler/compileRegistry.h" // for compileMap
 #include "../../include/frontend/lexer.h"
+#include "vpp/core/message_constants.h"
 
 // Helper to produce a small window of tokens around pos for debugging
 static std::string tokens_context(const std::vector<std::string>& tokens, size_t pos, size_t window = 8) {
@@ -36,10 +36,10 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
                          const std::unordered_map<std::string,Opcode> &keywordMap)
 {
     if (pos >= tokens.size() || tokens[pos] != "{") {
-        std::ostringstream msg;
-        msg << "compileBlock: expected '{' at pos=" << pos;
-        if (pos < tokens.size()) msg << ", found token='" << tokens[pos] << "'";
-        throw std::runtime_error(msg.str());
+        const std::string foundToken = pos < tokens.size() ? tokens[pos] : "EOF";
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxExpectedBlockAtPosition,
+            {std::to_string(pos), foundToken}));
     }
     // move past '{'
     ++pos;
@@ -56,10 +56,9 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
             size_t oldPos = pos;
             itHandler->second(tokens, pos, bytecode, symTab, nextId, keywordMap);
             if (pos == oldPos) {
-                std::ostringstream oss;
-                oss << "compileBlock: handler for '" << tokens[oldPos] << "' did not advance pos (pos=" << pos << ")\nContext: "
-                    << tokens_context(tokens, oldPos);
-                throw std::runtime_error(oss.str());
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kInternalBlockHandlerDidNotAdvance,
+                    {tokens[oldPos], std::to_string(pos), tokens_context(tokens, oldPos)}));
             }
             continue;
         }
@@ -68,29 +67,20 @@ void compileBlock(const std::vector<std::string>& tokens, size_t &pos,
         size_t oldPos = pos;
         compileStatement(tokens, pos, bytecode, symTab, nextId, keywordMap);
         if (pos == oldPos) {
-            std::ostringstream oss;
-            oss << "compileBlock: compileStatement did not advance pos at token '" << tokens[oldPos]
-                << "' (pos=" << pos << ")\nContext: " << tokens_context(tokens, oldPos);
-            throw std::runtime_error(oss.str());
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kInternalStatementDidNotAdvance,
+                {tokens[oldPos], std::to_string(pos), tokens_context(tokens, oldPos)}));
         }
     }
 
     if (pos >= tokens.size() || tokens[pos] != "}") {
-        // Provide rich debug info to locate cause
-        std::ostringstream oss;
-        oss << "compileBlock: missing '}' at pos=" << pos << ". ";
-        if (!tokens.empty()) {
-            oss << "Token count=" << tokens.size() << ". ";
-            if (pos < tokens.size()) {
-                oss << "Token at pos: '" << tokens[pos] << "'. ";
-            } else {
-                oss << "pos is beyond tokens (pos >= tokens.size()). ";
-            }
-            oss << "\nContext: " << tokens_context(tokens, (pos < tokens.size() ? pos : tokens.size()-1));
-        }
-        // Also print to stderr for immediate visibility in console
-        std::cerr << oss.str() << std::endl;
-        throw std::runtime_error(oss.str());
+        const std::string foundToken = pos < tokens.size() ? tokens[pos] : "EOF";
+        const std::string context = tokens.empty()
+            ? std::string()
+            : tokens_context(tokens, pos < tokens.size() ? pos : tokens.size() - 1);
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kInternalMissingClosingBlock,
+            {std::to_string(pos), std::to_string(tokens.size()), foundToken, context}));
     }
     // move pos to token after '}'
     ++pos;
