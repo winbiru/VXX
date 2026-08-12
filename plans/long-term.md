@@ -1,6 +1,6 @@
 # Kế hoạch dài hạn (3–12+ tháng)
 
-> Cập nhật: 09/08/2026
+> Cập nhật: 12/08/2026
 > Các mục dưới đây là công việc nền tảng chưa hoàn tất. V++ hiện có compiler, bytecode
 > VM, package/thư viện chuẩn, tooling MVP và pipeline release; không nên diễn giải
 > điều đó là mức hoàn thiện tương đương Java, C# hay Python.
@@ -12,16 +12,21 @@
 - [x] CONTRIBUTING.md đã có hướng dẫn đóng góp cơ bản.
 - [x] Runtime có MVP cho GC/JIT và CI có regression/sanitizer nền tảng; các phần này
   chưa phải implementation production-grade có profiling đầy đủ.
+- [x] Pipeline incremental đã có token mang span, AST cấu trúc ban đầu, semantic model
+  cho khai báo/lời gọi trực tiếp và cầu nối IR không kiểu, lossless tới backend
+  bytecode legacy.
 
 ## Việc lớn còn lại
 
 1. Frontend và semantic pipeline
 
    - [ ] Chốt chiến lược dynamic, static hoặc gradual typing.
-   - [ ] Xây AST độc lập với lexer, name resolution, semantic diagnostics và test
-     lỗi nguồn.
-   - [ ] Sau khi có contract kiểu, thiết kế IR/Typed IR rồi hẵng thay bytecode/codegen
-     hiện tại.
+   - [ ] Mở rộng AST cấu trúc mang span hiện có thành AST biểu thức đầy đủ, cùng test
+     parser và lỗi nguồn.
+   - [ ] Mở rộng semantic model từ khai báo/lời gọi trực tiếp tới scope, name
+     resolution, import, lớp và semantic diagnostics đầy đủ.
+   - [ ] Sau khi có contract kiểu, thiết kế Typed IR trên cầu nối IR không kiểu,
+     lossless hiện có rồi mới thay dần bytecode/codegen legacy.
 
 2. Chuẩn hoá bytecode
 

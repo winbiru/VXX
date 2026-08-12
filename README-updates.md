@@ -19,7 +19,7 @@
 | Đóng gói release | Đã có workflow tạo binary cho Ubuntu, macOS và Windows khi publish Release hoặc chạy thủ công. | .github/workflows/release-binaries.yml |
 | Hướng dẫn đóng góp | Đã có hướng dẫn cơ bản cho contributor. | CONTRIBUTING.md |
 | Hồi quy tích hợp | CTest gọi run_tests.sh trên Unix và scripts/windows/run-tests.ps1 trên Windows. Các chương trình V++ và output mong đợi nằm cạnh nhau. | run_tests.sh, scripts/windows/, src/tests/ |
-| Unit test C++ nền tảng | Đã có target CTest cho StringPool, symbolTable/hamMap, canonical opcode/native constants và smoke test opcode VM. Đây là baseline, chưa phải coverage từng handler. | src/tests/CMakeLists.txt, src/tests/compiler_support_tests.cpp, src/tests/opcode_and_native_constants_tests.cpp, src/tests/vm_opcode_smoke_tests.cpp |
+| Unit test C++ nền tảng | Đã có target CTest cho StringPool, symbolTable/hamMap, canonical opcode/native constants và smoke test opcode VM. Đây là baseline, chưa phải coverage từng handler. | test/CMakeLists.txt, test/compiler_support_tests.cpp, test/opcode_and_native_constants_tests.cpp, test/vm_opcode_smoke_tests.cpp |
 | Vệ sinh build | Các thư mục build phổ biến, output test và binary đã được ignore; không dùng build artefact làm source. | .gitignore |
 
 ## Cấu trúc source hiện hành
@@ -35,9 +35,9 @@
   src/vm/).
 - Tooling CLI: src/tooling/; các header theo namespace vpp đang được gom ở
   include/vpp/.
-- Test: chương trình hồi quy V++ ở src/tests/*.vi, output ở src/tests/expected/,
-  C++ unit test ở src/tests/*.cpp. src/tests/.tmp/ chỉ là workspace tạm được tạo
-  khi chạy test.
+- Test: chương trình hồi quy V++ ở src/tests/*.vi, output ở src/tests/expected/;
+  C++ unit test ở test/*.cpp. src/tests/.tmp/ chỉ là workspace tạm được tạo khi
+  chạy test.
 - Package/thư viện chuẩn, template và ví dụ: gói/, templates/ và examples/.
 
 Các header trong include/vpp/ là hướng tổ chức API theo module; chúng chưa được

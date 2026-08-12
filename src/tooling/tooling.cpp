@@ -1,4 +1,4 @@
-#include "common/tooling.h"
+#include "vpp/tooling/tooling.h"
 
 #include <filesystem>
 #include <iomanip>
@@ -13,6 +13,49 @@
 #include "vpp/bytecode/opcode.h"
 
 namespace vietvm::tooling {
+
+namespace {
+
+std::string formatSpan(const vietvm::frontend::SourceSpan &span) {
+    std::ostringstream out;
+    out << span.begin.line << ':' << span.begin.column
+        << ".."
+        << span.end.line << ':' << span.end.column;
+    return out.str();
+}
+
+void writeIndent(std::ostringstream &out, std::size_t depth) {
+    for (std::size_t i = 0; i < depth; ++i) out << "  ";
+}
+
+void writeAstStatement(std::ostringstream &out,
+                       const vietvm::frontend::AstStatement &statement,
+                       std::size_t depth) {
+    writeIndent(out, depth);
+    out << vietvm::frontend::astStatementKindName(statement.kind)
+        << " span=" << formatSpan(statement.span)
+        << " tokens=[" << statement.tokenBegin << ", " << statement.tokenEnd << ')';
+    if (!statement.declarationName.empty()) {
+        out << " declaration=" << std::quoted(statement.declarationName);
+    }
+    out << '\n';
+
+    for (const vietvm::frontend::AstStatement &child : statement.children) {
+        writeAstStatement(out, child, depth + 1);
+    }
+}
+
+void writeTokenLexemes(std::ostringstream &out,
+                       const std::vector<vietvm::frontend::Token> &tokens) {
+    out << '[';
+    for (std::size_t i = 0; i < tokens.size(); ++i) {
+        if (i != 0) out << ", ";
+        out << std::quoted(tokens[i].lexeme);
+    }
+    out << ']';
+}
+
+} // namespace
 
 static std::string operandLabel(const Instruction &instr,
                                 const std::vector<std::string> &stringPool) {
@@ -36,6 +79,31 @@ std::string disassembleBytecode(const std::vector<Instruction> &bytecode,
             << " val=" << instr.operandValue
             << operandLabel(instr, stringPool)
             << '\n';
+    }
+    return out.str();
+}
+
+std::string dumpAst(const vietvm::frontend::AstProgram &program) {
+    std::ostringstream out;
+    out << "AST tokens=" << program.tokens.size()
+        << " span=" << formatSpan(program.span) << '\n';
+    for (const vietvm::frontend::AstStatement &statement : program.statements) {
+        writeAstStatement(out, statement, 0);
+    }
+    return out.str();
+}
+
+std::string dumpIr(const vietvm::compiler::IrProgram &program) {
+    std::ostringstream out;
+    out << "IR instructions=" << program.instructions.size() << '\n';
+    for (std::size_t i = 0; i < program.instructions.size(); ++i) {
+        const vietvm::compiler::IrInstruction &instruction = program.instructions[i];
+        out << i << "  " << vietvm::compiler::irOpcodeName(instruction.opcode)
+            << " span=" << formatSpan(instruction.span)
+            << " symbol=" << instruction.symbolId
+            << " tokens=";
+        writeTokenLexemes(out, instruction.tokens);
+        out << '\n';
     }
     return out.str();
 }

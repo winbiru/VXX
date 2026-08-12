@@ -14,7 +14,8 @@
 #include "../../include/frontend/keywords.h"
 #include "common/storeString.h"
 #include "../../include/compiler/compileRegistry.h"
-#include "../../include/common/tooling.h"
+#include "vpp/compiler/pipeline.h"
+#include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
 #include "vpp/core/text.h"
@@ -60,26 +61,45 @@ static void printVersion() {
                                        {vietvm::core::kCliVersion});
 }
 
-static int runSnippet(const std::string &source, const fs::path &cwd, bool execute, bool dumpBytecode) {
+enum class SnippetMode {
+    Execute,
+    Disassemble,
+    DumpAst,
+    DumpIr,
+};
+
+static int runSnippet(const std::string &source,
+                      const fs::path &cwd,
+                      SnippetMode mode) {
     CwdGuard cwdGuard(fs::current_path());
     if (!cwd.empty()) {
         fs::current_path(cwd);
     }
 
     vietvm::compiler::resetCompilationState();
-    std::vector<Instruction> bytecode = compileSource(source, keywordMap);
+    const bool emitMainCall = mode == SnippetMode::Execute ||
+                              mode == SnippetMode::Disassemble;
+    vietvm::compiler::CompilationArtifacts artifacts =
+        vietvm::compiler::compilePipeline(source, keywordMap, emitMainCall);
     const auto &stringPool = vietvm::compiler::StringPool::getPool();
 
-    if (dumpBytecode) {
-        std::cout << vietvm::tooling::disassembleBytecode(bytecode, stringPool);
-        return EXIT_SUCCESS;
+    switch (mode) {
+        case SnippetMode::DumpAst:
+            std::cout << vietvm::tooling::dumpAst(artifacts.ast);
+            return EXIT_SUCCESS;
+        case SnippetMode::DumpIr:
+            // compilePipeline returns the post-optimizer IR, so this is the
+            // representation that the compatibility bytecode bridge consumes.
+            std::cout << vietvm::tooling::dumpIr(artifacts.ir);
+            return EXIT_SUCCESS;
+        case SnippetMode::Disassemble:
+            std::cout << vietvm::tooling::disassembleBytecode(artifacts.bytecode, stringPool);
+            return EXIT_SUCCESS;
+        case SnippetMode::Execute:
+            break;
     }
 
-    if (!execute) {
-        return EXIT_SUCCESS;
-    }
-
-    VM vm(bytecode, stringPool);
+    VM vm(artifacts.bytecode, stringPool);
     vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
     for (const auto &entry : vietvm::compiler::hamMap::hamNameIndexMap) {
         vm.functionTableByNameIndex[entry.second] = entry.first;
@@ -88,7 +108,9 @@ static int runSnippet(const std::string &source, const fs::path &cwd, bool execu
     return EXIT_SUCCESS;
 }
 
-static int runFile(const std::string &filename, bool dumpBytecode, bool lintOnly) {
+static int runFile(const std::string &filename,
+                   SnippetMode mode,
+                   bool lintOnly = false) {
     std::string source = readFile(filename);
     fs::path filePath = vietvm::core::utf8Path(filename);
     fs::path fileDir = filePath.parent_path();
@@ -104,7 +126,7 @@ static int runFile(const std::string &filename, bool dumpBytecode, bool lintOnly
         return EXIT_FAILURE;
     }
 
-    return runSnippet(source, fileDir.empty() ? fs::current_path() : fileDir, true, dumpBytecode);
+    return runSnippet(source, fileDir.empty() ? fs::current_path() : fileDir, mode);
 }
 
 static int runRepl() {
@@ -124,7 +146,7 @@ static int runRepl() {
 
         std::string source = "nhập \"stdlib\";\n" + line;
         try {
-            (void)runSnippet(source, fs::current_path(), true, false);
+            (void)runSnippet(source, fs::current_path(), SnippetMode::Execute);
         } catch (const std::exception &ex) {
             printErrorMessage(messages::kReplExecutionFailed, ex.what());
         }
@@ -650,21 +672,35 @@ int main(int argc, char* argv[]) {
                     std::cerr << messages::formatMessage(messages::kCliRunMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], false, false);
+                return runFile(argv[2 + commandWordOffset], SnippetMode::Execute);
             }
             if (command == "--disassemble" || command == "--giải mã" || command == "--giải-mã") {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliDisassembleMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], true, false);
+                return runFile(argv[2 + commandWordOffset], SnippetMode::Disassemble);
+            }
+            if (command == "--dump-ast") {
+                if (argc < (3 + commandWordOffset)) {
+                    std::cerr << messages::formatMessage(messages::kCliDumpAstMissingFile) << '\n';
+                    return EXIT_FAILURE;
+                }
+                return runFile(argv[2 + commandWordOffset], SnippetMode::DumpAst);
+            }
+            if (command == "--dump-ir") {
+                if (argc < (3 + commandWordOffset)) {
+                    std::cerr << messages::formatMessage(messages::kCliDumpIrMissingFile) << '\n';
+                    return EXIT_FAILURE;
+                }
+                return runFile(argv[2 + commandWordOffset], SnippetMode::DumpIr);
             }
             if (command == "--lint") {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliLintMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], false, true);
+                return runFile(argv[2 + commandWordOffset], SnippetMode::Execute, true);
             }
             if (command == "--format" || command == "--định dạng" || command == "--định-dạng") {
                 if (argc < (3 + commandWordOffset)) {
@@ -739,7 +775,7 @@ int main(int argc, char* argv[]) {
         // Trường hợp có đối số (chạy file được chỉ định)
         // -----------------------------
         if (argc == 2) {
-            return runFile(argv[1], false, false);
+            return runFile(argv[1], SnippetMode::Execute);
         }
 
         // -----------------------------

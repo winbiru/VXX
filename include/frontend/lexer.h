@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "vpp/core/message_constants.h"
+#include "vpp/frontend/token.h"
 
 namespace vietvm::compiler {
 
@@ -161,9 +162,19 @@ namespace vietvm::compiler {
     // khi gặp các trường hợp lỗi.
     std::vector<std::string> tokenize(const std::string &src);
 
+    // Canonical lexer output used by the parser pipeline.  It keeps the legacy
+    // token spelling while attaching byte offsets and one-based line/column
+    // spans for AST, semantic diagnostics and tooling.
+    std::vector<vietvm::frontend::Token> tokenizeWithSpans(const std::string &src);
+
     // Xử lý hậu token: gộp các từ khóa nhiều từ (ví dụ "mặc định", "nếu không"),
     // loại bỏ các dấu câu đuôi khi so sánh, v.v.
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens);
+
+    // Span-preserving counterpart of postProcessTokens.  Multi-word keywords
+    // receive a span covering all source tokens that were merged.
+    std::vector<vietvm::frontend::Token> postProcessTokensWithSpans(
+        const std::vector<vietvm::frontend::Token> &tokens);
 
     // Chuẩn hóa token để so sánh (trim, bỏ dấu câu như ':'/','/';', và chuyển ký tự ASCII về chữ thường).
     std::string normalizeTokenForCompare(const std::string& s);

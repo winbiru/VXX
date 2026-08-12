@@ -30,11 +30,43 @@ target_link_libraries(vpp-message-constants-unit PRIVATE vpp-core)
 add_test(NAME vpp-message-constants-unit
          COMMAND vpp-message-constants-unit)
 
+add_executable(vpp-pipeline-unit
+    pipeline_tests.cpp)
+
+target_link_libraries(vpp-pipeline-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-pipeline-unit
+         COMMAND vpp-pipeline-unit)
+
+add_executable(vpp-tooling-unit
+    tooling_tests.cpp)
+
+target_link_libraries(vpp-tooling-unit PRIVATE vpp-tooling)
+
+add_test(NAME vpp-tooling-unit
+         COMMAND vpp-tooling-unit)
+
+add_test(NAME vpp-cli-dump-ast
+         COMMAND $<TARGET_FILE:vpp-cli>
+                 --dump-ast
+                 ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_tra_ve.vi)
+set_tests_properties(vpp-cli-dump-ast PROPERTIES
+    PASS_REGULAR_EXPRESSION "function")
+
+add_test(NAME vpp-cli-dump-ir
+         COMMAND $<TARGET_FILE:vpp-cli>
+                 --dump-ir
+                 ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_tra_ve.vi)
+set_tests_properties(vpp-cli-dump-ir PROPERTIES
+    PASS_REGULAR_EXPRESSION "define_function")
+
 foreach(vpp_test_target IN ITEMS
         vpp-compiler-support-unit
         vpp-vm-opcode-smoke-unit
         vpp-opcode-and-native-constants-unit
-        vpp-message-constants-unit)
+        vpp-message-constants-unit
+        vpp-pipeline-unit
+        vpp-tooling-unit)
     target_compile_features(${vpp_test_target} PRIVATE cxx_std_17)
     if (MSVC)
         # Test sources also contain Vietnamese UTF-8 literals.

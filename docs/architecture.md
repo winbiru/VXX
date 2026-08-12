@@ -16,7 +16,7 @@ vpp-cli <───────────────────────�
 - `vpp-frontend`: lexer và keyword map.
 - `vpp-compiler`: compile expression/statement/import cùng symbol state.
 - `vpp-runtime`: VM và native adapters HTTP, file, config, database.
-- `vpp-tooling`: formatter, linter và disassembler.
+- `vpp-tooling`: formatter, linter, disassembler và renderer AST/IR cho debug.
 - `vpp-cli`: REPL, LSP command loop, package/scaffold commands và entrypoint.
 
 Source hiện nằm tại:
@@ -39,28 +39,58 @@ CLI compile source rồi copy function bytecode/name table vào `VM`. VM không 
 
 Compiler vẫn dùng mutable state nội bộ trong phiên compile. Bước tiếp theo của API embedding là thay state này bằng `CompilationContext` và `BytecodeProgram` bất biến; không xem các header `compile*.h` là public API ổn định.
 
-## Compiler pipeline hiện tại và hướng đi
+## Compiler pipeline
 
-Pipeline hiện tại là một compiler một lượt: lexer tạo token, compiler hậu xử lý
-token rồi phát bytecode trực tiếp. Chưa có AST chuẩn, name resolver độc lập,
-semantic analyzer, type checker hoặc IR. Runtime mang giá trị động
-(`int`/`double`/`string`/`rỗng`/map scalar), vì vậy không được mô tả nó như một
-compiler static typed.
+Pipeline compiler được tách thành các bước rõ ràng, nhưng được đưa vào theo
+hướng incremental để giữ nguyên hành vi đang có:
 
 ```text
-Hiện tại:  source -> lexer/token post-processing -> compiler -> bytecode -> stack VM
-Mục tiêu:  source -> lexer/parser -> AST -> name resolution -> semantic analysis
-                                    -> type policy -> IR -> bytecode -> VM/JIT
+Source
+  ↓
+Lexer (token mang span)
+  ↓
+Parser
+  ↓
+AST
+  ↓
+Semantic Analysis
+  ↓
+IR không kiểu
+  ↓
+Optimizer
+  ↓
+Bytecode
+  ↓
+V++ VM
 ```
 
-AST có source span và name resolution có thể được xây dựng trước. Trước bước
-`type policy`/Typed IR, dự án phải chốt một ADR: dynamic, static hay gradual
-typing. GC và JIT hiện chỉ là MVP runtime; chúng không phải tracing collector
-hay compiler sinh mã máy production-grade.
+Lexer gắn span nguồn vào token để parser, AST và các diagnostic sau đó có cùng
+toạ độ nguồn. Parser tạo AST cấu trúc; semantic analysis hiện xử lý khai báo và
+lời gọi trực tiếp, rồi sẽ mở rộng thành scope/name resolution đầy đủ. IR cho
+optimizer là biểu diễn trung gian **không kiểu**.
+
+V++ vẫn là runtime giá trị động (`int`/`double`/`string`/`rỗng`/map scalar).
+Vì vậy pipeline hiện chưa áp dụng typed IR hay một type policy tĩnh: không suy
+ra rằng semantic analysis đồng nghĩa với static type checker. Một quyết định
+riêng về dynamic, static hay gradual typing là điều kiện trước khi bổ sung IR
+có kiểu.
+
+Giai đoạn Bytecode dùng một *legacy bytecode backend bridge*: IR đã tối ưu đi
+qua cầu nối này để dùng backend bytecode hiện có. Cách làm này bảo toàn tương
+thích với bytecode, CLI và V++ VM trong khi từng bước mới được hoàn thiện; nó
+không biến backend cũ thành API compiler public lâu dài.
+
+CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
+`--dump-ir <file.vi>`. AST dump hiển thị cây cấu trúc/span của parser; IR dump
+hiển thị IR sau optimizer, tức dữ liệu đi vào legacy bytecode bridge. Các dump
+không chạy VM và được in ra stdout để có thể redirect hoặc dùng trong test.
+
+GC và JIT hiện chỉ là MVP runtime; chúng không phải tracing collector hay
+compiler sinh mã máy production-grade.
 
 ## Headers
 
-Header public mới bắt đầu dưới `include/vpp/`, ví dụ `vpp/core/text.h`, `vpp/bytecode/{instruction,opcode}.h`, `vpp/compiler/compiler.h`, `vpp/runtime/{value,vm}.h` và `vpp/tooling/tooling.h`. `vpp/runtime/value.h` là ranh giới chung cho VM và native adapters, nên native header không phải kéo theo `VM`. Header legacy dưới `include/common`, `include/compiler` và `include/vm` còn được giữ để tránh phá vỡ mã hiện có. Header compiler detail, VM call frame và native implementation là internal implementation, không phải embedding API.
+Header public mới bắt đầu dưới `include/vpp/`, ví dụ `vpp/core/text.h`, `vpp/bytecode/{instruction,opcode}.h`, `vpp/compiler/compiler.h`, `vpp/runtime/{value,vm}.h` và `vpp/tooling/tooling.h`. Đường dẫn header được quy hoạch cho pipeline là `include/vpp/frontend/{token,ast,parser}.h` và `include/vpp/compiler/{semantic,ir,optimizer,pipeline}.h`; chúng mô tả ranh giới frontend/compiler mới và chưa nên được xem là embedding API ổn định cho đến khi policy kiểu được chốt. `vpp/runtime/value.h` là ranh giới chung cho VM và native adapters, nên native header không phải kéo theo `VM`. Header legacy dưới `include/common`, `include/compiler` và `include/vm` còn được giữ để tránh phá vỡ mã hiện có. Header compiler detail, VM call frame và native implementation là internal implementation, không phải embedding API.
 
 ## Thư viện V++ và framework modules
 
@@ -104,14 +134,17 @@ Các module này là bundled optional modules, chưa phải package độc lập
 ```text
 examples/api_project/              # ví dụ HTTP chạy độc lập
 templates/backend/                 # nguồn cho `vpp khởi tạo backend <tên>`
+test/*.cpp                         # source C++ cho CTest unit/tooling
 src/tests/fixtures/api_project/    # fixture DTO/repository/database deterministic
 src/tests/*.vi                     # regression entrypoints
 src/tests/expected/*.expected      # output của entrypoint
 ```
 
-Không đặt application sample trong `src/tests/`. Regression có vài fixture
-legacy được track (`src/tests/api_project.db`, `.tmp_*`); dữ liệu runtime mới
-phải dùng `src/tests/.tmp/` đã ignore, không thêm artifact database mới vào Git.
+`src/tests/` chỉ chứa chương trình regression V++ (`.vi`), expected output và
+fixture runtime; source C++ của CTest nằm ở `test/`. Không đặt application
+sample trong `src/tests/`. Regression có vài fixture legacy được track
+(`src/tests/api_project.db`, `.tmp_*`); dữ liệu runtime mới phải dùng
+`src/tests/.tmp/` đã ignore, không thêm artifact database mới vào Git.
 
 ## Build và phát hành
 

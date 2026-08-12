@@ -1,6 +1,6 @@
 # ✅ V++ — Checklist Phát Triển Ngôn Ngữ
 
-> Cập nhật lần cuối: 09/08/2026
+> Cập nhật lần cuối: 12/08/2026
 > Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
 
 ---
@@ -202,8 +202,11 @@
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| Tokenizer / Lexer | ✅ |
-| Token stream → Bytecode (single-pass) | ✅ |
+| Tokenizer / Lexer (token mang span) | ✅ |
+| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — bytecode đi qua cầu nối backend legacy |
+| AST cấu trúc ban đầu, không kiểu và mang span | ✅ — giữ token/range lossless; chưa phải AST biểu thức đầy đủ |
+| Semantic model khai báo và lời gọi trực tiếp | ✅ — chưa có scope/name resolution/import/lớp đầy đủ |
+| IR không kiểu, lossless và optimizer IR ban đầu | ✅ — làm cầu nối tới backend bytecode legacy |
 | Biên dịch biểu thức số học | ✅ |
 | Biên dịch chuỗi và nối chuỗi | ✅ |
 | Biên dịch điều kiện `nếu/hoặc` | ✅ |
@@ -219,8 +222,9 @@
 | Fix `isNumber("-")` bug | ✅ |
 | Fix `convertToPostfix` nested call argc | ✅ |
 | Kiểm tra kiểu tĩnh (type checking) | ⬜ |
-| AST (cây cú pháp trừu tượng) | ⬜ |
-| Phân tích ngữ nghĩa (semantic analysis) | ⬜ |
+| AST biểu thức đầy đủ | ⬜ |
+| Scope/name resolution, import và lớp trong semantic analysis đầy đủ | ⬜ |
+| Type policy và Typed IR | ⬜ |
 
 ---
 
@@ -404,9 +408,9 @@ có; không tính các mục chỉ nằm trên roadmap.
 
 | Thành phần | V++ hiện tại | Java | C# | Python |
 |---|---|---|---|---|
-| Lexer / parser | ✅ Single-pass, sinh bytecode trực tiếp | ✅ Trưởng thành | ✅ Trưởng thành | ✅ Trưởng thành |
-| AST chuẩn | ⬜ | ✅ | ✅ | ✅ |
-| Name resolution / semantic analysis | ⬜ | ✅ | ✅ | ✅ |
+| Lexer / parser | ✅ Token mang span, parser cấu trúc | ✅ Trưởng thành | ✅ Trưởng thành | ✅ Trưởng thành |
+| AST chuẩn | 🚧 AST cấu trúc mang span; chưa có AST biểu thức đầy đủ | ✅ | ✅ | ✅ |
+| Name resolution / semantic analysis | 🚧 Khai báo và lời gọi trực tiếp; chưa có scope/import/lớp đầy đủ | ✅ | ✅ | ✅ |
 | Static typing | ⬜ Chưa quyết định mô hình kiểu | ✅ Mạnh | ✅ Mạnh | 🟡 Dynamic + type hints |
 | Bytecode / VM | ✅ Stack bytecode và V++ VM | ✅ JVM | ✅ CLR | ✅ CPython VM |
 | GC / JIT | 🚧 MVP, chưa production-grade | ✅ Mature | ✅ Mature | ✅/🟡 Tuỳ runtime |
@@ -458,22 +462,24 @@ là một interpreter thuần source:
 .vi → V++ compiler → V++ bytecode → V++ VM → interpreter / JIT MVP → CPU
 ```
 
-Khoảng trống quan trọng là phần giữa frontend và bytecode. Hiện compiler đi
-thẳng từ token/source sang bytecode; kiến trúc trưởng thành hơn nên tiến dần
-đến:
+Khoảng trống quan trọng vẫn là chiều sâu của phần giữa frontend và bytecode.
+Pipeline incremental đã có ranh giới cấu trúc sau; bước bytecode dùng cầu nối
+backend legacy để giữ tương thích:
 
 ```text
 Source
-  ↓ Lexer / parser
-AST (có source span)
-  ↓ Name resolution
-Semantic analysis
-  ↓ Type policy
-IR
-  ↓ Optimization
+  ↓ Lexer (token mang span)
+  ↓ Parser
+AST cấu trúc, không kiểu
+  ↓ Semantic model (khai báo/lời gọi trực tiếp)
+IR không kiểu, lossless
+  ↓ Optimizer
 Bytecode
   ↓ VM / JIT
 ```
+
+AST biểu thức đầy đủ, scope/name resolution, semantic cho import/lớp, type
+policy và Typed IR vẫn là các khoảng trống cần hoàn thiện.
 
 ### 14.4 Quyết định bắt buộc trước Typed IR
 
@@ -487,14 +493,16 @@ một ADR cho một trong ba hướng:
 | Static như Java/C# | Chẩn đoán sớm, tối ưu dễ hơn | Cần annotation/inference, compatibility policy |
 | Gradual typing | Lộ trình chuyển đổi mềm | Thiết kế phức tạp nhất, cần boundary rõ ràng |
 
-Cho tới khi ADR này được chốt, có thể làm AST không kiểu, source span và name
-resolution; không được ngầm áp đặt static typing vào bytecode hiện có.
+AST cấu trúc mang span, semantic model khai báo/lời gọi trực tiếp và cầu nối IR
+không kiểu, lossless đã có. Cho tới khi ADR này được chốt, không được ngầm áp
+đặt static typing vào bytecode hiện có; việc mở rộng AST biểu thức, scope/name
+resolution, semantic import/lớp và Typed IR phải giữ hợp đồng runtime động.
 
 ### 14.5 Sáu milestone ưu tiên
 
-1. **AST** — node ổn định, source span và test parser.
-2. **Semantic analyzer** — scope, name resolution, diagnostics độc lập codegen.
-3. **IR** — sau khi quyết định type policy.
+1. **AST** — mở rộng AST cấu trúc mang span thành node biểu thức ổn định và test parser.
+2. **Semantic analyzer** — thêm scope, name resolution, import/lớp và diagnostics độc lập codegen.
+3. **Typed IR** — mở rộng cầu nối IR không kiểu sau khi quyết định type policy.
 4. **VM refactor + opcode tests** — chia handler, thêm test đơn vị theo opcode.
 5. **Object model + GC v2** — instance/field trước inheritance/generics.
 6. **JSON + networking + concurrency** — mở rộng sau khi nền runtime ổn định.
@@ -507,9 +515,9 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 ### 14.6 Backlog kiến trúc có điều kiện chấp nhận
 
 - [ ] Chốt ADR type policy (dynamic, static hoặc gradual) trước Typed IR.
-- [ ] Parser/AST: có node ổn định, source span và parser unit tests.
-- [ ] Name resolution + semantic diagnostics: test được shadowing, import và lỗi tên.
-- [ ] IR/codegen boundary: bytecode tests không phụ thuộc parser token-level.
+- [ ] Parser/AST: mở rộng AST cấu trúc mang span thành AST biểu thức ổn định và parser unit tests.
+- [ ] Name resolution + semantic diagnostics: mở rộng model khai báo/lời gọi trực tiếp để test shadowing, import, lớp và lỗi tên.
+- [ ] IR/codegen boundary: mở rộng cầu nối IR không kiểu, lossless để bytecode tests không phụ thuộc parser token-level.
 - [ ] VM: tách handler và bổ sung unit test từng opcode trước tối ưu mới.
 - [ ] Object heap/GC v2: instance/field và tracing/lifetime test trước inheritance.
 - [ ] JSON/network/concurrency: mỗi API có contract, error path và integration test.

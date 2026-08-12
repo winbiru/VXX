@@ -122,6 +122,10 @@ inline constexpr MessageDefinition kSemanticProtectedMethodAccess{
     "VPP-SEM-002", "Không thể gọi phương thức bảo vệ '{0}' từ phạm vi hiện tại"};
 inline constexpr MessageDefinition kSemanticUnsupportedDefaultParameter{
     "VPP-SEM-003", "{0}: tham số mặc định chỉ hỗ trợ literal (int/float/string/đúng/sai/rỗng)"};
+inline constexpr MessageDefinition kSemanticDuplicateDeclaration{
+    "VPP-SEM-004", "Khai báo '{0}' bị trùng trong cùng một đơn vị biên dịch"};
+inline constexpr MessageDefinition kSemanticMissingDeclarationName{
+    "VPP-SEM-005", "Không thể xác định tên của khai báo {0}"};
 
 // Module/package import diagnostics.
 inline constexpr MessageDefinition kImportMissingTarget{

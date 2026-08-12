@@ -24,7 +24,9 @@ set(VPP_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/text.cpp)
 set(VPP_FRONTEND_SOURCES
     ${CMAKE_SOURCE_DIR}/src/frontend/keywords.cpp
-    ${CMAKE_SOURCE_DIR}/src/frontend/lexer.cpp)
+    ${CMAKE_SOURCE_DIR}/src/frontend/lexer.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/ast.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/parser.cpp)
 set(VPP_BYTECODE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/bytecode/opcode.cpp)
 set(VPP_COMPILER_SOURCES
@@ -32,6 +34,9 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/support/storeString.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/token_utils.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/semantic.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/ir.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/optimizer.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileBlock.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileCondition.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileFunction.cpp
@@ -131,11 +136,12 @@ add_custom_command(TARGET vpp-cli POST_BUILD
             $<TARGET_FILE:vpp-cli>
             ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vietvm-cli)
 
-# Tests (unit tests in src/tests) and integration runner if present
+# C++ unit-test sources live in test/; src/tests/ is reserved for V++ .vi
+# regression programs and their runtime fixtures.
 if (BUILD_TESTS)
     enable_testing()
-    if (EXISTS ${CMAKE_SOURCE_DIR}/src/tests/CMakeLists.txt)
-        add_subdirectory(src/tests)
+    if (EXISTS ${CMAKE_SOURCE_DIR}/test/CMakeLists.txt)
+        add_subdirectory(test)
     endif()
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
