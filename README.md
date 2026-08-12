@@ -126,6 +126,8 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./VPP kiểm tra "thư viện"
 
 ./bin/vpp-cli --giải-mã example.vi
+./bin/vpp-cli --dump-ast example.vi
+./bin/vpp-cli --dump-ir example.vi
 ./bin/vpp-cli --lint example.vi
 ./bin/vpp-cli --định-dạng example.vi
 ./bin/vpp-cli --định-dạng example.vi --in-place
@@ -146,6 +148,10 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ./bin/vpp-cli gói kiểm tra mypkg
 ./bin/vpp-cli gói danh sách
 ```
+
+`--dump-ast` in AST cấu trúc có span do parser tạo; `--dump-ir` in IR **sau
+optimizer** mà cầu nối bytecode nhận. Cả hai chỉ xuất thông tin phát triển ra
+stdout, không chạy V++ VM, nên có thể redirect vào file khi cần kiểm tra.
 
 `cài đặt` là lệnh chính cho package manager, và `caidat` cũng được hỗ trợ:
 
@@ -235,15 +241,51 @@ copy implementation.
 
 - `src/cli/main.cpp`: entrypoint của CLI
 - `src/core/`: tiện ích dùng chung
-- `src/frontend/`: lexer + keyword map
-- `src/compiler/`: compile tokens thành bytecode và compiler support
+- `src/frontend/`: lexer (token mang span), parser, AST và keyword map
+- `src/compiler/`: semantic analysis, IR không kiểu, optimizer và cầu nối bytecode legacy
 - `src/runtime/`: VM + native adapters (HTTP, file, DB)
-- `src/tooling/`: formatter, linter, disassembler
+- `src/tooling/`: formatter, linter, disassembler và AST/IR dump renderer
 - `examples/`: ứng dụng mẫu chạy độc lập
 - `templates/`: template do CLI scaffold sử dụng
 - `src/tests/fixtures/`: dữ liệu/fixture cho regression test
+- `src/tests/`: chương trình regression V++ (`.vi`) và expected output/fixture
+- `test/`: source C++ cho CTest unit và CLI tooling checks
 - `docs/`: bytecode, grammar, kiến trúc
-- `src/tests/`: chương trình kiểm thử
+
+## Pipeline Biên Dịch
+
+V++ tổ chức quá trình biên dịch theo các bước tăng dần:
+
+```text
+Source
+  ↓
+Lexer (token mang span)
+  ↓
+Parser
+  ↓
+AST
+  ↓
+Semantic Analysis
+  ↓
+IR không kiểu
+  ↓
+Optimizer
+  ↓
+Bytecode
+  ↓
+V++ VM
+```
+
+Runtime vẫn dùng giá trị động, nên IR hiện chủ ý **không mang kiểu**. Dự án
+chưa có chính sách typed IR; việc chọn dynamic, static hoặc gradual typing sẽ
+được quyết định riêng trước khi thêm một lớp IR có kiểu. Backend bytecode cũ
+được giữ sau một cầu nối tương thích, để pipeline mới không làm thay đổi hành
+vi bytecode/VM đang có.
+
+Các header pipeline được quy hoạch dưới
+`include/vpp/frontend/{token,ast,parser}.h` và
+`include/vpp/compiler/{semantic,ir,optimizer,pipeline}.h`. Xem
+`docs/architecture.md` để biết ranh giới từng bước và trạng thái API.
 
 ## Tài Liệu
 

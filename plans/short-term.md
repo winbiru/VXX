@@ -14,7 +14,7 @@
   sanitizer, Windows chạy full regression Release.
 - [x] Release workflow đã có riêng; matrix đóng gói Ubuntu, macOS và Windows nằm ở
   .github/workflows/release-binaries.yml.
-- [x] CTest đã có ba baseline C++ unit target trong src/tests/: compiler support
+- [x] CTest đã có ba baseline C++ unit target trong test/: compiler support
   (StringPool, symbolTable, hamMap), canonical opcode/native constants và VM opcode smoke.
 - [x] Hồi quy end-to-end đã có run_tests.sh trên Unix, runner PowerShell trên Windows,
   cùng các file expected trong src/tests/expected/.

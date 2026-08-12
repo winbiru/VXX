@@ -20,6 +20,8 @@ inline constexpr MessageDefinition kCliUsage = {
     "  vpp <file.vi>\n"
     "  vpp chạy <file.vi>\n"
     "  vpp --giải-mã <file.vi>\n"
+    "  vpp --dump-ast <file.vi>\n"
+    "  vpp --dump-ir <file.vi>\n"
     "  vpp --lint <file.vi>\n"
     "  vpp --định-dạng <file.vi> [--in-place]\n"
     "  vpp --repl\n"
@@ -65,6 +67,10 @@ inline constexpr MessageDefinition kCliFormatMissingFile = {
     "VPP-CLI-1005", "--dinh-dang can duong dan tep"};
 inline constexpr MessageDefinition kCliTestsDirectoryMissing = {
     "VPP-CLI-1006", "Thư mục tests/ không tồn tại."};
+inline constexpr MessageDefinition kCliDumpAstMissingFile = {
+    "VPP-CLI-1007", "--dump-ast can duong dan tep"};
+inline constexpr MessageDefinition kCliDumpIrMissingFile = {
+    "VPP-CLI-1008", "--dump-ir can duong dan tep"};
 inline constexpr MessageDefinition kCliUnhandledException = {
     "VPP-CLI-1099", "Lỗi: {0}"};
 

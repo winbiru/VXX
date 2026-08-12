@@ -13,6 +13,7 @@
 #include <compiler/compileRegistry.h>
 #include "common/storeString.h"
 #include "common/utility.h"
+#include "vpp/compiler/pipeline.h"
 
 namespace vietvm::compiler {
 
@@ -27,9 +28,10 @@ void resetCompilationState() {
 
 } // namespace vietvm::compiler
 
-// ---------- compileSource: top-level ----------
-// This replaces the old line-by-line code and uses token stream + recursive parsing.
-// It returns vector<Instruction>.
+// ---------- legacy bytecode lowering ----------
+// Features not yet handled by the direct IR emitter still use this established
+// VM backend. Its input is materialized from IR rather than read directly from
+// the lexer, preserving behavior while fallback coverage shrinks.
 
 static std::vector<Instruction> optimizeBytecodePeephole(const std::vector<Instruction> &input) {
     if (input.empty()) return input;
@@ -84,17 +86,18 @@ static std::vector<Instruction> optimizeBytecodePeephole(const std::vector<Instr
     return out;
 }
 
-std::vector<Instruction> compileSource(const std::string& source,
-                                       const std::unordered_map<std::string,Opcode>& keywordMap,
-                                       bool emitMainCall)
+static std::vector<Instruction> compileLegacyTokens(
+    const std::vector<std::string> &tokens,
+    const std::unordered_map<std::string,Opcode> &keywordMap,
+    bool emitMainCall)
 {
     std::vector<Instruction> bytecode;
     std::unordered_map<std::string,int> symTab;
     int nextId = 0;
 
-    // Tokenize entire source (supports multi-line)
-    auto tokens = vietvm::compiler::tokenize(source);
-    tokens = vietvm::compiler::postProcessTokens(tokens);
+    // compileMap was historically initialized by the CLI.  Keep direct API
+    // users safe now that compilation can start at the pipeline boundary.
+    if (compileMap.empty()) initCompileMap();
 
     // Predeclare top-level functions so forward calls resolve by name reliably.
     int topLevelDepth = 0;
@@ -156,4 +159,53 @@ std::vector<Instruction> compileSource(const std::string& source,
         bytecode.push_back({OP_DUNG_CHUONG_TRINH,0,0,0});
     }
     return bytecode;
+}
+
+namespace vietvm::compiler {
+
+CompilationArtifacts compilePipeline(
+    const std::string &source,
+    const std::unordered_map<std::string, Opcode> &keywordMap,
+    bool emitMainCall) {
+    CompilationArtifacts artifacts;
+
+    // Lexer normalization (including multi-word keywords) remains part of the
+    // lexing stage, and preserves source spans when tokens are merged.
+    artifacts.tokens = postProcessTokensWithSpans(tokenizeWithSpans(source));
+    artifacts.ast = vietvm::frontend::parseTokens(artifacts.tokens);
+    artifacts.semantic = analyzeSemantics(artifacts.ast);
+
+    for (const SemanticDiagnostic &diagnostic : artifacts.semantic.diagnostics) {
+        if (diagnostic.severity == SemanticDiagnosticSeverity::Error) {
+            throw std::runtime_error("[" + diagnostic.code + "] " + diagnostic.message);
+        }
+    }
+
+    artifacts.ir = lowerToIr(artifacts.ast, artifacts.semantic);
+    artifacts.optimization = optimizeIr(artifacts.ir);
+
+    const DirectIrSupport directSupport = analyzeDirectIrSupport(artifacts.ir);
+    artifacts.legacyFallbackRegions = directSupport.fallbackRegions;
+
+    if (directSupport.supported) {
+        artifacts.backend = BytecodeBackend::DirectIr;
+        artifacts.bytecode = emitDirectBytecode(artifacts.ir, emitMainCall);
+    } else {
+        // A fallback is whole-program for now. Mixing backends before they
+        // share explicit function/slot/fixup allocation would make IDs depend
+        // on which regions happened to migrate.
+        artifacts.backend = BytecodeBackend::LegacyTokenBridge;
+        artifacts.bytecode = compileLegacyTokens(
+            materializeIrTokens(artifacts.ir), keywordMap, emitMainCall);
+    }
+    return artifacts;
+}
+
+} // namespace vietvm::compiler
+
+std::vector<Instruction> compileSource(const std::string& source,
+                                       const std::unordered_map<std::string,Opcode>& keywordMap,
+                                       bool emitMainCall)
+{
+    return vietvm::compiler::compilePipeline(source, keywordMap, emitMainCall).bytecode;
 }

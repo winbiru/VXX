@@ -10,6 +10,8 @@
 #include <variant>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 
 #include "../../include/frontend/lexer.h"
 #include "vpp/core/message_constants.h"
@@ -132,10 +134,45 @@ namespace vietvm::compiler {
         return vietvm::core::toLowerAscii(s);
     }
 
-    // Tokenize, with comment and improved string handling
-    // Bổ sung: error handling cho các trường hợp ngoài mong đợi
-    std::vector<std::string> tokenize(const std::string &src) {
-        std::vector<std::string> tokens;
+    static vietvm::frontend::TokenKind classifyTokenKind(const std::string &lexeme) {
+        using vietvm::frontend::TokenKind;
+        if (isStringLiteral(lexeme)) return TokenKind::String;
+        if (isNumber(lexeme)) return TokenKind::Integer;
+        if (isFloat(lexeme)) return TokenKind::Float;
+        if (isOperator(lexeme)) return TokenKind::Operator;
+        if (lexeme == "(" || lexeme == ")" || lexeme == "{" || lexeme == "}" ||
+            lexeme == "[" || lexeme == "]" || lexeme == ";" || lexeme == "," ||
+            lexeme == ":") {
+            return TokenKind::Punctuation;
+        }
+
+        static const std::unordered_set<std::string> keywords = {
+            "nếu", "hoặc", "nếu không", "lặp", "khởi tạo", "điều kiện",
+            "cập nhật", "kiểm tra sau", "chuyển", "trường hợp", "mặc định",
+            "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
+            "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",
+            "bắt lỗi", "nhập", "lớp", "công khai", "riêng tư", "bảo vệ"
+        };
+        return keywords.find(lexeme) != keywords.end() ? TokenKind::Keyword : TokenKind::Identifier;
+    }
+
+    static vietvm::frontend::SourceSpan sourceSpanFor(const std::string &source,
+                                                       size_t begin,
+                                                       size_t end) {
+        const auto [beginLine, beginColumn] = getLineAndColumn(source, begin);
+        const auto [endLine, endColumn] = getLineAndColumn(source, end);
+        return {{begin, beginLine, beginColumn}, {end, endLine, endColumn}};
+    }
+
+    // Tokenize, with comment and improved string handling.  The span-carrying
+    // representation is canonical; the legacy string-only API projects it.
+    std::vector<vietvm::frontend::Token> tokenizeWithSpans(const std::string &src) {
+        std::vector<vietvm::frontend::Token> tokens;
+        auto pushToken = [&](size_t begin, size_t end) {
+            std::string lexeme = src.substr(begin, end - begin);
+            tokens.push_back({classifyTokenKind(lexeme), std::move(lexeme),
+                              sourceSpanFor(src, begin, end)});
+        };
         size_t i = 0;
         const size_t n = src.size();
         while (i < n) {
@@ -218,8 +255,7 @@ namespace vietvm::compiler {
                     std::string partial = src.substr(stringStart + 1, std::min(n - stringStart - 1, (size_t)20));
                     throw UnclosedStringError(line, col, partial);
                 }
-                std::string raw = src.substr(i, std::min(j, n) - i);
-                tokens.push_back(raw);
+                pushToken(i, std::min(j, n));
                 i = j;
                 continue;
             }
@@ -230,7 +266,7 @@ namespace vietvm::compiler {
                 if (two == "==" || two == "!=" || two == "<=" || two == ">=" ||
                     two == "&&" || two == "||" || two == "++" || two == "--" ||
                     two == "+=" || two == "-=" || two == "*=" || two == "/=" || two == "%=") {
-                    tokens.push_back(two);
+                    pushToken(i, i + 2);
                     i += 2;
                     continue;
                 }
@@ -243,7 +279,7 @@ namespace vietvm::compiler {
                 c == '[' || c == ']' || c == ';' || c == ',' ||
                 c == '<' || c == '>' || c == '=' || c == '!' || c == ':'
             ) {
-                tokens.emplace_back(1, c);
+                pushToken(i, i + 1);
                 ++i;
                 continue;
             }
@@ -267,10 +303,14 @@ namespace vietvm::compiler {
                 throw InvalidCharacterError(src[i], line, col);
             }
 
-            tokens.push_back(src.substr(i, j - i));
+            pushToken(i, j);
             i = j;
         }
         return tokens;
+    }
+
+    std::vector<std::string> tokenize(const std::string &src) {
+        return vietvm::frontend::tokenLexemes(tokenizeWithSpans(src));
     }
 
     std::string normalizeTokenForCompare(const std::string& s) {
@@ -405,6 +445,57 @@ namespace vietvm::compiler {
         return result;
     }
 
+    std::vector<vietvm::frontend::Token> postProcessTokensWithSpans(
+        const std::vector<vietvm::frontend::Token> &tokens) {
+        const std::vector<std::string> sourceLexemes = vietvm::frontend::tokenLexemes(tokens);
+        const std::vector<std::string> processed = postProcessTokens(sourceLexemes);
+
+        std::vector<vietvm::frontend::Token> result;
+        result.reserve(processed.size());
+        size_t cursor = 0;
+
+        for (const std::string &lexeme : processed) {
+            if (cursor < tokens.size() && tokens[cursor].lexeme == lexeme) {
+                result.push_back(tokens[cursor++]);
+                continue;
+            }
+
+            // postProcessTokens only creates a new spelling by joining
+            // adjacent keyword tokens with spaces.  Align it with the longest
+            // matching source sequence so its span remains precise.
+            size_t matchedEnd = cursor;
+            std::string joined;
+            while (matchedEnd < tokens.size()) {
+                if (!joined.empty()) joined.push_back(' ');
+                joined += tokens[matchedEnd].lexeme;
+                ++matchedEnd;
+                if (joined == lexeme) break;
+                if (joined.size() > lexeme.size()) break;
+            }
+
+            if (matchedEnd > cursor && joined == lexeme) {
+                vietvm::frontend::Token merged;
+                merged.kind = classifyTokenKind(lexeme);
+                merged.lexeme = lexeme;
+                merged.span = {tokens[cursor].span.begin, tokens[matchedEnd - 1].span.end};
+                result.push_back(std::move(merged));
+                cursor = matchedEnd;
+                continue;
+            }
+
+            // This is defensive only: preserve the post-processed token even
+            // if a future normalization rule does not map one-to-one.
+            vietvm::frontend::Token fallback;
+            fallback.kind = classifyTokenKind(lexeme);
+            fallback.lexeme = lexeme;
+            if (cursor < tokens.size()) {
+                fallback.span = tokens[cursor].span;
+            }
+            result.push_back(std::move(fallback));
+        }
+        return result;
+    }
+
     std::string stripQuotes(const std::string& input) {
         if (input.length() >= 2 &&
             ((input.front() == '"' && input.back() == '"') ||
@@ -523,3 +614,16 @@ namespace vietvm::compiler {
     }
 
 } // namespace vietvm::compiler
+
+namespace vietvm::frontend {
+
+std::vector<std::string> tokenLexemes(const std::vector<Token> &tokens) {
+    std::vector<std::string> lexemes;
+    lexemes.reserve(tokens.size());
+    for (const Token &token : tokens) {
+        lexemes.push_back(token.lexeme);
+    }
+    return lexemes;
+}
+
+} // namespace vietvm::frontend
