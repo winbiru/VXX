@@ -15,9 +15,9 @@ public:
     const SourceSpan span;
 };
 
-// A tolerant recursive parser for the current language surface.  It creates a
-// structural, span-carrying AST and leaves detailed expression lowering to the
-// existing backend during the migration to a fully typed AST.
+// A tolerant recursive parser for the current language surface. It creates a
+// structural statement AST plus an untyped expression arena. Token ranges stay
+// available whenever a legacy construct cannot yet be represented safely.
 class Parser {
 public:
     explicit Parser(std::vector<Token> tokens);
@@ -31,11 +31,15 @@ private:
     std::string declarationName(std::size_t begin,
                                 std::size_t end,
                                 AstStatementKind kind) const;
+    void attachDeclarationPayload(AstStatement &statement);
     SourceSpan spanFor(std::size_t begin, std::size_t end) const noexcept;
+    ExprId tryParseExpression(std::size_t begin, std::size_t end);
+    void attachExpressionRoots(AstStatement &statement);
     bool isCompound(AstStatementKind kind) const noexcept;
     bool isContinuation(std::size_t tokenIndex) const noexcept;
 
     std::vector<Token> tokens_;
+    std::vector<AstExpression> expressions_;
     std::size_t pos_ = 0;
 };
 

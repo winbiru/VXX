@@ -24,4 +24,32 @@ const char *astStatementKindName(AstStatementKind kind) noexcept {
     return "unknown";
 }
 
+const char *astExpressionKindName(AstExpressionKind kind) noexcept {
+    switch (kind) {
+        case AstExpressionKind::Literal: return "literal";
+        case AstExpressionKind::Name: return "name";
+        case AstExpressionKind::Unary: return "unary";
+        case AstExpressionKind::Binary: return "binary";
+        case AstExpressionKind::Assignment: return "assignment";
+        case AstExpressionKind::CompoundAssignment: return "compound_assignment";
+        case AstExpressionKind::Postfix: return "postfix";
+        case AstExpressionKind::Call: return "call";
+        case AstExpressionKind::Lambda: return "lambda";
+        case AstExpressionKind::MapLiteral: return "map_literal";
+    }
+    return "unknown";
+}
+
+const char *astLiteralKindName(AstLiteralKind kind) noexcept {
+    switch (kind) {
+        case AstLiteralKind::None: return "none";
+        case AstLiteralKind::Integer: return "integer";
+        case AstLiteralKind::Float: return "float";
+        case AstLiteralKind::String: return "string";
+        case AstLiteralKind::Boolean: return "boolean";
+        case AstLiteralKind::Null: return "null";
+    }
+    return "none";
+}
+
 } // namespace vietvm::frontend

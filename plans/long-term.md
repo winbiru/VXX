@@ -15,18 +15,39 @@
 - [x] Pipeline incremental đã có token mang span, AST cấu trúc ban đầu, semantic model
   cho khai báo/lời gọi trực tiếp và cầu nối IR không kiểu, lossless tới backend
   bytecode legacy.
+- [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
+  fingerprint bytecode, StringPool và function registries với baseline legacy
+  đóng băng dưới `test/data/`.
 
 ## Việc lớn còn lại
 
 1. Frontend và semantic pipeline
 
-   - [ ] Chốt chiến lược dynamic, static hoặc gradual typing.
-   - [ ] Mở rộng AST cấu trúc mang span hiện có thành AST biểu thức đầy đủ, cùng test
-     parser và lỗi nguồn.
-   - [ ] Mở rộng semantic model từ khai báo/lời gọi trực tiếp tới scope, name
-     resolution, import, lớp và semantic diagnostics đầy đủ.
-   - [ ] Sau khi có contract kiểu, thiết kế Typed IR trên cầu nối IR không kiểu,
-     lossless hiện có rồi mới thay dần bytecode/codegen legacy.
+   Thứ tự migration bắt buộc, mỗi bước phải giữ regression bytecode/VM của toàn bộ
+   corpus `.vi` trước khi chuyển bước tiếp theo:
+
+   1. [x] **Expression AST** — parse literal, name, unary/binary, assignment,
+      call, lambda và map theo precedence hiện hành; vẫn giữ source span/token
+      range làm fallback tạm thời.
+   2. [x] **Scope tree** — tạo global/class/function/block/lambda/catch scope,
+      parent/child link và khai báo parameter/local/import alias.
+   3. [x] **Real name resolution** — bind expression node tới symbol lexical,
+      phân biệt direct call, indirect value call và dynamic/native fallback.
+   4. [x] **Recursive IR lowering** — hạ expression arena, parameter defaults và
+      statement children; control-flow header chưa có label vẫn là fallback rõ ràng.
+   5. [x] **IR → bytecode trực tiếp, cohort đầu** — emitter đã phát trực tiếp
+      literal/name/unary-binary/assignment/print/primitive map và tự sở hữu bảng
+      name → VM slot; function/control-flow cần context ID/label tiếp theo.
+   6. [ ] **Bỏ dần token bridge** — vùng chưa migrate phải là fallback tường minh
+      và được đếm; chỉ xóa `materializeIrTokens`/legacy compiler khi corpus `.vi`
+      đạt zero fallback và vẫn cùng bytecode/compiler state.
+
+   Hiện direct backend bao phủ 1/57 regression program; parity gate khóa con số
+   tối thiểu này và vẫn đối chiếu đầy đủ bytecode/StringPool/function registries.
+
+   Chốt dynamic/static/gradual typing và Typed IR là quyết định riêng. Expression
+   AST, scope tree, name resolution và structured **untyped IR** không phải chờ
+   quyết định kiểu này.
 
 2. Chuẩn hoá bytecode
 
@@ -63,7 +84,7 @@
 ## Điều kiện thực hiện
 
 - Không bắt đầu Typed IR hay public embedding API trước khi quyết định type policy và
-  lifecycle dữ liệu.
+  lifecycle dữ liệu; điều kiện này không chặn sáu bước migration untyped ở trên.
 - Mọi tối ưu runtime phải có benchmark, test lỗi và regression cross-platform.
 - Roadmap cần được cập nhật cùng code để trạng thái checklist không bị nhầm với mức
   hoàn thiện của các platform trưởng thành.

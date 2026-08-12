@@ -29,10 +29,9 @@ void resetCompilationState() {
 } // namespace vietvm::compiler
 
 // ---------- legacy bytecode lowering ----------
-// The language backend still emits the established VM bytecode.  Its input is
-// now materialized from IR by compilePipeline(), rather than directly from the
-// lexer, so behavior remains compatible while AST/semantic/IR migration is in
-// progress.
+// Features not yet handled by the direct IR emitter still use this established
+// VM backend. Its input is materialized from IR rather than read directly from
+// the lexer, preserving behavior while fallback coverage shrinks.
 
 static std::vector<Instruction> optimizeBytecodePeephole(const std::vector<Instruction> &input) {
     if (input.empty()) return input;
@@ -185,12 +184,20 @@ CompilationArtifacts compilePipeline(
     artifacts.ir = lowerToIr(artifacts.ast, artifacts.semantic);
     artifacts.optimization = optimizeIr(artifacts.ir);
 
-    // The IR-to-bytecode bridge is deliberately lossless.  Existing statement
-    // and expression lowering therefore continues to be the compatibility
-    // backend while later changes replace individual IR operations with native
-    // bytecode lowering.
-    artifacts.bytecode = compileLegacyTokens(
-        materializeIrTokens(artifacts.ir), keywordMap, emitMainCall);
+    const DirectIrSupport directSupport = analyzeDirectIrSupport(artifacts.ir);
+    artifacts.legacyFallbackRegions = directSupport.fallbackRegions;
+
+    if (directSupport.supported) {
+        artifacts.backend = BytecodeBackend::DirectIr;
+        artifacts.bytecode = emitDirectBytecode(artifacts.ir, emitMainCall);
+    } else {
+        // A fallback is whole-program for now. Mixing backends before they
+        // share explicit function/slot/fixup allocation would make IDs depend
+        // on which regions happened to migrate.
+        artifacts.backend = BytecodeBackend::LegacyTokenBridge;
+        artifacts.bytecode = compileLegacyTokens(
+            materializeIrTokens(artifacts.ir), keywordMap, emitMainCall);
+    }
     return artifacts;
 }
 

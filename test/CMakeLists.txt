@@ -38,6 +38,34 @@ target_link_libraries(vpp-pipeline-unit PRIVATE vpp-compiler)
 add_test(NAME vpp-pipeline-unit
          COMMAND vpp-pipeline-unit)
 
+add_executable(vpp-recursive-ir-unit
+    recursive_ir_tests.cpp)
+
+target_link_libraries(vpp-recursive-ir-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-recursive-ir-unit
+         COMMAND vpp-recursive-ir-unit)
+
+add_executable(vpp-direct-codegen-unit
+    direct_codegen_tests.cpp)
+
+target_link_libraries(vpp-direct-codegen-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-direct-codegen-unit
+         COMMAND vpp-direct-codegen-unit)
+
+add_executable(vpp-pipeline-legacy-parity
+    pipeline_legacy_parity_tests.cpp)
+
+target_link_libraries(vpp-pipeline-legacy-parity PRIVATE vpp-compiler)
+
+add_test(NAME vpp-pipeline-legacy-parity
+         COMMAND vpp-pipeline-legacy-parity
+                 ${CMAKE_SOURCE_DIR}
+                 ${CMAKE_SOURCE_DIR}/test/data/legacy_compiler_snapshots.tsv)
+set_tests_properties(vpp-pipeline-legacy-parity PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 add_executable(vpp-tooling-unit
     tooling_tests.cpp)
 
@@ -66,6 +94,9 @@ foreach(vpp_test_target IN ITEMS
         vpp-opcode-and-native-constants-unit
         vpp-message-constants-unit
         vpp-pipeline-unit
+        vpp-recursive-ir-unit
+        vpp-direct-codegen-unit
+        vpp-pipeline-legacy-parity
         vpp-tooling-unit)
     target_compile_features(${vpp_test_target} PRIVATE cxx_std_17)
     if (MSVC)

@@ -89,7 +89,11 @@ static int runSnippet(const std::string &source,
             return EXIT_SUCCESS;
         case SnippetMode::DumpIr:
             // compilePipeline returns the post-optimizer IR, so this is the
-            // representation that the compatibility bytecode bridge consumes.
+            // representation used for direct-emitter/bridge selection.
+            std::cout << "backend="
+                      << vietvm::compiler::bytecodeBackendName(artifacts.backend)
+                      << " codegen-fallback-regions="
+                      << artifacts.legacyFallbackRegions << '\n';
             std::cout << vietvm::tooling::dumpIr(artifacts.ir);
             return EXIT_SUCCESS;
         case SnippetMode::Disassemble:

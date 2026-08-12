@@ -114,6 +114,8 @@ inline constexpr MessageDefinition kSyntaxUnknownExpressionToken{
     "VPP-SYN-033", "convertToPostfix: unknown token '{0}'"};
 inline constexpr MessageDefinition kSyntaxUnsupportedOperator{
     "VPP-SYN-034", "compileExpr: unsupported operator {0}"};
+inline constexpr MessageDefinition kSyntaxUnbalancedBrackets{
+    "VPP-SYN-035", "parser: unbalanced square brackets"};
 
 // Semantic diagnostics.
 inline constexpr MessageDefinition kSemanticPrivateMethodAccess{
@@ -126,6 +128,10 @@ inline constexpr MessageDefinition kSemanticDuplicateDeclaration{
     "VPP-SEM-004", "Khai báo '{0}' bị trùng trong cùng một đơn vị biên dịch"};
 inline constexpr MessageDefinition kSemanticMissingDeclarationName{
     "VPP-SEM-005", "Không thể xác định tên của khai báo {0}"};
+inline constexpr MessageDefinition kSemanticUnresolvedName{
+    "VPP-SEM-006", "Không thể phân giải tên '{0}' trong phạm vi hiện tại"};
+inline constexpr MessageDefinition kSemanticUnresolvedCall{
+    "VPP-SEM-007", "Không thể phân giải hàm được gọi '{0}'"};
 
 // Module/package import diagnostics.
 inline constexpr MessageDefinition kImportMissingTarget{

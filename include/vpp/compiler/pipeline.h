@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "vpp/compiler/codegen.h"
 #include "vpp/compiler/ir.h"
 #include "vpp/compiler/optimizer.h"
 #include "vpp/frontend/parser.h"
@@ -17,6 +18,8 @@ struct CompilationArtifacts {
     SemanticModel semantic;
     IrProgram ir;
     OptimizationReport optimization;
+    BytecodeBackend backend = BytecodeBackend::LegacyTokenBridge;
+    std::size_t legacyFallbackRegions = 0;
     std::vector<Instruction> bytecode;
 };
 

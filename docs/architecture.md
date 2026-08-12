@@ -81,9 +81,56 @@ thích với bytecode, CLI và V++ VM trong khi từng bước mới được ho
 không biến backend cũ thành API compiler public lâu dài.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
-`--dump-ir <file.vi>`. AST dump hiển thị cây cấu trúc/span của parser; IR dump
-hiển thị IR sau optimizer, tức dữ liệu đi vào legacy bytecode bridge. Các dump
-không chạy VM và được in ra stdout để có thể redirect hoặc dùng trong test.
+`--dump-ir <file.vi>`. AST dump hiển thị statement tree, expression arena và
+span; IR dump hiển thị value arena, statement children và fallback count sau
+optimizer, tức dữ liệu dùng để chọn direct emitter hoặc bridge. Các dump không
+chạy VM và được in ra stdout để có thể redirect hoặc dùng trong test.
+
+### Thứ tự thay legacy bridge
+
+Không được xem sơ đồ pipeline là bằng chứng rằng mọi feature đã hoàn thiện.
+Expression arena, scope tree, ExprId-based resolution và recursive untyped IR đã
+có. Direct emitter hiện nhận cohort literal/name/unary-binary/assignment/print
+và primitive map; function, import và control flow vẫn đi qua bridge. Migration
+tiếp tục theo thứ tự:
+
+```text
+Expression AST
+  ↓
+Scope tree
+  ↓
+Real name resolution
+  ↓
+Recursive IR lowering
+  ↓
+Direct IR → bytecode emission theo từng opcode/feature
+  ↓
+Giảm dần legacy token fallback về 0 rồi mới xóa bridge
+```
+
+Trong giai đoạn chuyển tiếp, feature chưa migrate phải dùng một legacy region
+tường minh và có bộ đếm trong artifacts/test. Emitter “trực tiếp” nghĩa là đọc
+IR operands/control-flow, không parse token lần nữa; một IR opcode vẫn có thể
+phát nhiều VM instruction. Mỗi nhóm feature chỉ được chuyển sang emitter mới
+khi parity test xác nhận fingerprint của top-level bytecode, StringPool,
+function bytecode và function-name map vẫn khớp baseline legacy đã đóng băng
+trên toàn bộ corpus `.vi`.
+
+CTest `vpp-pipeline-legacy-parity` tự động quét `src/tests/**/*.vi` và thực hiện
+so sánh pipeline hiện tại với manifest `test/data/legacy_compiler_snapshots.tsv`.
+Production compiler không chứa API, mode hay nhánh code dành riêng cho test.
+Test là compile-only để không mở cổng HTTP hay gọi native/external service;
+regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm. Không
+được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
+được review như một thay đổi bytecode/compiler-state có chủ ý.
+
+Gate hiện xác nhận 57/57 compiler snapshots khớp và khóa ít nhất
+`kiem_tra_rong_va_map.vi` phải dùng direct IR backend (1/57 chương trình). Con số
+này phải tăng theo từng cohort; không được quay lại bridge mà test vẫn xanh.
+
+Các bước trên dùng IR không kiểu và giữ semantics động hiện hành. Quyết định
+dynamic/static/gradual chỉ là điều kiện cho type checking/Typed IR, không phải
+điều kiện để xây Expression AST, scope hay name resolution.
 
 GC và JIT hiện chỉ là MVP runtime; chúng không phải tracing collector hay
 compiler sinh mã máy production-grade.

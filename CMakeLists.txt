@@ -37,6 +37,7 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/semantic.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/ir.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/optimizer.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/codegen.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileBlock.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileCondition.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileFunction.cpp

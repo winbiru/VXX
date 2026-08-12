@@ -222,8 +222,12 @@
 | Fix `isNumber("-")` bug | ✅ |
 | Fix `convertToPostfix` nested call argc | ✅ |
 | Kiểm tra kiểu tĩnh (type checking) | ⬜ |
-| AST biểu thức đầy đủ | ⬜ |
-| Scope/name resolution, import và lớp trong semantic analysis đầy đủ | ⬜ |
+| Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | ✅ — lambda body còn giữ token range |
+| Scope tree (global/class/function/block/lambda/catch) | ✅ |
+| Lexical name/call resolution và class visibility | ✅ — module graph/import exports còn tiếp tục |
+| Recursive IR lowering cho body/block/expression | ✅ — control-flow headers còn fallback |
+| IR → bytecode trực tiếp, không parse token lại | 🚧 — expression/print/assignment/map cohort |
+| Legacy token fallback = 0 trên toàn bộ corpus `.vi` | 🚧 — direct 1/57 chương trình |
 | Type policy và Typed IR | ⬜ |
 
 ---
@@ -268,6 +272,10 @@
 | `compiler_support_tests.cpp` — StringPool | Thêm/lấy/xóa, dedupe, invalid index | ✅ |
 | `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | ✅ |
 | `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | ✅ — smoke, chưa bao phủ mọi opcode |
+| `pipeline_tests.cpp` | Parser báo unmatched `]`/unclosed `[` bằng `VPP-SYN-035` và span nguồn | ✅ |
+| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | ✅ — 57 file, compile-only; production không có test API |
+| `recursive_ir_tests.cpp` | Expression/default parameter/body/block lowering đệ quy và reachable fallback count | ✅ |
+| `direct_codegen_tests.cpp` | Direct IR emitter cho literal/operator/assignment/print/map và bridge selection | ✅ |
 
 **Regression suite: 49 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
 
@@ -498,14 +506,18 @@ không kiểu, lossless đã có. Cho tới khi ADR này được chốt, không
 đặt static typing vào bytecode hiện có; việc mở rộng AST biểu thức, scope/name
 resolution, semantic import/lớp và Typed IR phải giữ hợp đồng runtime động.
 
-### 14.5 Sáu milestone ưu tiên
+### 14.5 Sáu milestone compiler theo thứ tự
 
-1. **AST** — mở rộng AST cấu trúc mang span thành node biểu thức ổn định và test parser.
-2. **Semantic analyzer** — thêm scope, name resolution, import/lớp và diagnostics độc lập codegen.
-3. **Typed IR** — mở rộng cầu nối IR không kiểu sau khi quyết định type policy.
-4. **VM refactor + opcode tests** — chia handler, thêm test đơn vị theo opcode.
-5. **Object model + GC v2** — instance/field trước inheritance/generics.
-6. **JSON + networking + concurrency** — mở rộng sau khi nền runtime ổn định.
+1. **Expression AST** — node biểu thức có span và precedence ổn định.
+2. **Scope tree** — global/class/function/block/lambda/catch với parent/child rõ ràng.
+3. **Real name resolution** — bind node → symbol, phân biệt direct/indirect/dynamic call.
+4. **Recursive IR lowering** — hạ body, block, expression và control flow, không chỉ top-level.
+5. **Direct IR → bytecode** — emitter đọc IR và phát instruction/fixup, không parse token lại.
+6. **Bỏ token bridge** — đếm fallback, giảm về 0 trên corpus `.vi`, rồi mới xóa legacy path.
+
+Typed IR là roadmap riêng sau quyết định type policy; nó không chặn sáu milestone
+untyped này. VM/object model/platform work tiếp tục sau khi compiler boundary đủ
+ổn định để không phải sửa cùng lúc cả frontend lẫn runtime.
 
 Nếu mục tiêu cuối là backend, ưu tiên chiều sâu ở các milestone này hơn việc
 thêm nhiều keyword giống Java. TLS, socket, thread/async, connection pooling,
@@ -516,8 +528,10 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 
 - [ ] Chốt ADR type policy (dynamic, static hoặc gradual) trước Typed IR.
 - [ ] Parser/AST: mở rộng AST cấu trúc mang span thành AST biểu thức ổn định và parser unit tests.
-- [ ] Name resolution + semantic diagnostics: mở rộng model khai báo/lời gọi trực tiếp để test shadowing, import, lớp và lỗi tên.
-- [ ] IR/codegen boundary: mở rộng cầu nối IR không kiểu, lossless để bytecode tests không phụ thuộc parser token-level.
+- [ ] Scope tree: tạo lexical scopes và khai báo parameter/local/import alias trước resolution.
+- [ ] Name resolution + semantic diagnostics: bind expression node tới symbol và test shadowing, recursion, import, lớp và lỗi tên.
+- [ ] Recursive IR: hạ mọi statement/expression/control-flow child, có label/branch rõ ràng.
+- [ ] IR/codegen boundary: migrate emitter theo opcode/feature, đo legacy fallback và chỉ xóa token bridge khi đạt zero.
 - [ ] VM: tách handler và bổ sung unit test từng opcode trước tối ưu mới.
 - [ ] Object heap/GC v2: instance/field và tracing/lifetime test trước inheritance.
 - [ ] JSON/network/concurrency: mỗi API có contract, error path và integration test.

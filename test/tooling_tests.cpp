@@ -38,6 +38,9 @@ void testAstDumpUsesStructuralNamesAndTree() {
                "AST dump exposes each node's half-open token range");
         expect(dump.find("span=1:1..") != std::string::npos,
                "AST dump exposes source line and column spans");
+        expect(dump.find("expressions:\n") != std::string::npos &&
+                   dump.find(" literal=") != std::string::npos,
+               "AST dump exposes expression kinds and literal categories");
     } catch (const std::exception &error) {
         expect(false, std::string("AST dump compilation unexpectedly threw: ") + error.what());
     }
@@ -55,8 +58,12 @@ void testIrDumpUsesOptimizedPipelineInstructions() {
                 keywordMap, false);
         const std::string dump = vietvm::tooling::dumpIr(artifacts.ir);
 
-        expect(dump.rfind("IR instructions=2\n", 0) == 0,
+        expect(dump.rfind("IR instructions=2 values=", 0) == 0,
                "IR dump reports the post-optimization instruction count");
+        expect(dump.find("legacy-regions=") != std::string::npos &&
+                   dump.find("values:\n") != std::string::npos &&
+                   dump.find("instructions:\n") != std::string::npos,
+               "IR dump exposes structured values and explicit fallback accounting");
         expect(dump.find("print ") != std::string::npos,
                "IR dump renders the print opcode name");
         expect(dump.find("define_function ") != std::string::npos,
@@ -65,6 +72,9 @@ void testIrDumpUsesOptimizedPipelineInstructions() {
                "IR dump reflects that the optimizer removed no-op instructions");
         expect(dump.find("tokens=[\"in\", \"1\", \";\"]") != std::string::npos,
                "IR dump quotes token lexemes without ambiguity");
+        expect(dump.find("const_int") != std::string::npos &&
+                   dump.find("roots=[") != std::string::npos,
+               "IR dump makes recursive expression roots inspectable");
         expect(dump.find("symbol=") != std::string::npos,
                "IR dump includes semantic symbol IDs");
         expect(dump.find("span=2:1..") != std::string::npos,

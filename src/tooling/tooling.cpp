@@ -28,6 +28,9 @@ void writeIndent(std::ostringstream &out, std::size_t depth) {
     for (std::size_t i = 0; i < depth; ++i) out << "  ";
 }
 
+void writeTokenLexemes(std::ostringstream &out,
+                       const std::vector<vietvm::frontend::Token> &tokens);
+
 void writeAstStatement(std::ostringstream &out,
                        const vietvm::frontend::AstStatement &statement,
                        std::size_t depth) {
@@ -40,8 +43,36 @@ void writeAstStatement(std::ostringstream &out,
     }
     out << '\n';
 
+    for (vietvm::frontend::ExprId root : statement.expressionRoots) {
+        writeIndent(out, depth + 1);
+        out << "expr-root #" << root << '\n';
+    }
+
     for (const vietvm::frontend::AstStatement &child : statement.children) {
         writeAstStatement(out, child, depth + 1);
+    }
+}
+
+void writeIrInstruction(std::ostringstream &out,
+                        const vietvm::compiler::IrInstruction &instruction,
+                        std::size_t depth,
+                        std::size_t &index) {
+    writeIndent(out, depth);
+    out << index++ << "  " << vietvm::compiler::irOpcodeName(instruction.opcode)
+        << " span=" << formatSpan(instruction.span)
+        << " symbol=" << instruction.symbolId
+        << " fallback=" << (instruction.legacyRegion ? "yes" : "no")
+        << " roots=[";
+    for (std::size_t rootIndex = 0; rootIndex < instruction.expressionRoots.size(); ++rootIndex) {
+        if (rootIndex != 0) out << ", ";
+        out << instruction.expressionRoots[rootIndex];
+    }
+    out << "] tokens=";
+    writeTokenLexemes(out, instruction.tokens);
+    out << '\n';
+
+    for (const vietvm::compiler::IrInstruction &child : instruction.children) {
+        writeIrInstruction(out, child, depth + 1, index);
     }
 }
 
@@ -86,24 +117,50 @@ std::string disassembleBytecode(const std::vector<Instruction> &bytecode,
 std::string dumpAst(const vietvm::frontend::AstProgram &program) {
     std::ostringstream out;
     out << "AST tokens=" << program.tokens.size()
+        << " expressions=" << program.expressions.size()
         << " span=" << formatSpan(program.span) << '\n';
     for (const vietvm::frontend::AstStatement &statement : program.statements) {
         writeAstStatement(out, statement, 0);
+    }
+    out << "expressions:\n";
+    for (const vietvm::frontend::AstExpression &expression : program.expressions) {
+        out << "  #" << expression.id << ' '
+            << vietvm::frontend::astExpressionKindName(expression.kind)
+            << " literal=" << vietvm::frontend::astLiteralKindName(expression.literalKind)
+            << " span=" << formatSpan(expression.span)
+            << " tokens=[" << expression.tokenBegin << ", " << expression.tokenEnd << ')'
+            << " text=" << std::quoted(expression.text)
+            << '\n';
     }
     return out.str();
 }
 
 std::string dumpIr(const vietvm::compiler::IrProgram &program) {
     std::ostringstream out;
-    out << "IR instructions=" << program.instructions.size() << '\n';
-    for (std::size_t i = 0; i < program.instructions.size(); ++i) {
-        const vietvm::compiler::IrInstruction &instruction = program.instructions[i];
-        out << i << "  " << vietvm::compiler::irOpcodeName(instruction.opcode)
-            << " span=" << formatSpan(instruction.span)
-            << " symbol=" << instruction.symbolId
-            << " tokens=";
-        writeTokenLexemes(out, instruction.tokens);
-        out << '\n';
+    out << "IR instructions=" << program.instructions.size()
+        << " values=" << program.values.size()
+        << " legacy-regions=" << program.legacyRegionCount << '\n';
+
+    out << "values:\n";
+    for (const vietvm::compiler::IrValue &value : program.values) {
+        out << "  #" << value.id << ' '
+            << vietvm::compiler::irValueOpcodeName(value.opcode)
+            << " expr=#" << value.sourceExprId
+            << " symbol=" << value.symbolId
+            << " span=" << formatSpan(value.span)
+            << " text=" << std::quoted(value.text)
+            << " operands=[";
+        for (std::size_t operandIndex = 0; operandIndex < value.operands.size(); ++operandIndex) {
+            if (operandIndex != 0) out << ", ";
+            out << value.operands[operandIndex];
+        }
+        out << "]\n";
+    }
+
+    out << "instructions:\n";
+    std::size_t index = 0;
+    for (const vietvm::compiler::IrInstruction &instruction : program.instructions) {
+        writeIrInstruction(out, instruction, 1, index);
     }
     return out.str();
 }
