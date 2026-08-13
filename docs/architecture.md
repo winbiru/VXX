@@ -65,9 +65,11 @@ V++ VM
 ```
 
 Lexer gắn span nguồn vào token để parser, AST và các diagnostic sau đó có cùng
-toạ độ nguồn. Parser tạo AST cấu trúc; semantic analysis hiện xử lý khai báo và
-lời gọi trực tiếp, rồi sẽ mở rộng thành scope/name resolution đầy đủ. IR cho
-optimizer là biểu diễn trung gian **không kiểu**.
+toạ độ nguồn. Parser tạo statement tree và expression arena; semantic analysis tạo
+scope tree rồi bind expression/call theo ExprId. Lambda body có scope, binding và
+capture metadata riêng; module graph/import exports và các tolerant token region
+vẫn chưa được resolve hoàn toàn. IR cho optimizer là
+biểu diễn trung gian **không kiểu**.
 
 V++ vẫn là runtime giá trị động (`int`/`double`/`string`/`rỗng`/map scalar).
 Vì vậy pipeline hiện chưa áp dụng typed IR hay một type policy tĩnh: không suy
@@ -75,10 +77,10 @@ ra rằng semantic analysis đồng nghĩa với static type checker. Một quy�
 riêng về dynamic, static hay gradual typing là điều kiện trước khi bổ sung IR
 có kiểu.
 
-Giai đoạn Bytecode dùng một *legacy bytecode backend bridge*: IR đã tối ưu đi
-qua cầu nối này để dùng backend bytecode hiện có. Cách làm này bảo toàn tương
-thích với bytecode, CLI và V++ VM trong khi từng bước mới được hoàn thiện; nó
-không biến backend cũ thành API compiler public lâu dài.
+Backend selector phát bytecode trực tiếp từ IR khi toàn program thuộc cohort được
+hỗ trợ. Nếu còn instruction/value chưa hỗ trợ, compiler materialize token payload và
+dùng legacy backend cho toàn program. Cách chuyển tiếp này bảo toàn bytecode/VM
+contract; backend cũ không trở thành API compiler public lâu dài.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
 `--dump-ir <file.vi>`. AST dump hiển thị statement tree, expression arena và
@@ -90,8 +92,11 @@ chạy VM và được in ra stdout để có thể redirect hoặc dùng trong 
 
 Không được xem sơ đồ pipeline là bằng chứng rằng mọi feature đã hoàn thiện.
 Expression arena, scope tree, ExprId-based resolution và recursive untyped IR đã
-có. Direct emitter hiện nhận cohort literal/name/unary-binary/assignment/print
-và primitive map; function, import và control flow vẫn đi qua bridge. Migration
+có. Direct emitter hiện nhận literal/name/operator/assignment/postfix/print/primitive map,
+top-level function, primitive default parameter, return, resolved function call, structured
+if/else/for-loop/switch/try-catch, continue, break, throw và class namespace/method.
+Lambda capture-free và dynamic/native/indirect call đã phát trực tiếp; lambda có
+capture và Import vẫn đi qua bridge. Migration
 tiếp tục theo thứ tự:
 
 ```text
@@ -108,9 +113,11 @@ Direct IR → bytecode emission theo từng opcode/feature
 Giảm dần legacy token fallback về 0 rồi mới xóa bridge
 ```
 
-Trong giai đoạn chuyển tiếp, feature chưa migrate phải dùng một legacy region
-tường minh và có bộ đếm trong artifacts/test. Emitter “trực tiếp” nghĩa là đọc
-IR operands/control-flow, không parse token lần nữa; một IR opcode vẫn có thể
+Trong giai đoạn chuyển tiếp, IR đánh dấu explicit legacy regions cho phần còn
+phụ thuộc token; direct-support analyzer còn đếm top-level instruction đã có IR
+cấu trúc nhưng emitter chưa hỗ trợ. Chỉ khi toàn program supported mới chọn
+direct backend. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow, không
+parse token lần nữa; một IR opcode vẫn có thể
 phát nhiều VM instruction. Mỗi nhóm feature chỉ được chuyển sang emitter mới
 khi parity test xác nhận fingerprint của top-level bytecode, StringPool,
 function bytecode và function-name map vẫn khớp baseline legacy đã đóng băng
@@ -124,9 +131,12 @@ regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm
 được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
 được review như một thay đổi bytecode/compiler-state có chủ ý.
 
-Gate hiện xác nhận 57/57 compiler snapshots khớp và khóa ít nhất
-`kiem_tra_rong_va_map.vi` phải dùng direct IR backend (1/57 chương trình). Con số
-này phải tăng theo từng cohort; không được quay lại bridge mà test vẫn xanh.
+Gate hiện xác nhận 57/57 compiler snapshots khớp và khóa chính xác
+28 direct program trong `requiredDirectPrograms` của
+`test/pipeline_legacy_parity_tests.cpp`. Tập này bao phủ expression/map,
+function/return/call, condition, recursion, loop/continue, switch/break,
+try/throw và class method. Con số phải tăng theo
+từng cohort; không được quay lại bridge mà test vẫn xanh.
 
 Các bước trên dùng IR không kiểu và giữ semantics động hiện hành. Quyết định
 dynamic/static/gradual chỉ là điều kiện cho type checking/Typed IR, không phải

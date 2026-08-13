@@ -12,9 +12,8 @@
 - [x] CONTRIBUTING.md đã có hướng dẫn đóng góp cơ bản.
 - [x] Runtime có MVP cho GC/JIT và CI có regression/sanitizer nền tảng; các phần này
   chưa phải implementation production-grade có profiling đầy đủ.
-- [x] Pipeline incremental đã có token mang span, AST cấu trúc ban đầu, semantic model
-  cho khai báo/lời gọi trực tiếp và cầu nối IR không kiểu, lossless tới backend
-  bytecode legacy.
+- [x] Pipeline đã có expression AST mang span, scope tree, ExprId-based resolution,
+  recursive untyped IR, optimizer, direct backend cohort đầu và legacy compatibility fallback.
 - [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
   fingerprint bytecode, StringPool và function registries với baseline legacy
   đóng băng dưới `test/data/`.
@@ -34,15 +33,19 @@
    3. [x] **Real name resolution** — bind expression node tới symbol lexical,
       phân biệt direct call, indirect value call và dynamic/native fallback.
    4. [x] **Recursive IR lowering** — hạ expression arena, parameter defaults và
-      statement children; control-flow header chưa có label vẫn là fallback rõ ràng.
+      statement children; conditional/loop/switch/try/class đã có structured payload;
+      import metadata vẫn chưa hoàn tất.
    5. [x] **IR → bytecode trực tiếp, cohort đầu** — emitter đã phát trực tiếp
-      literal/name/unary-binary/assignment/print/primitive map và tự sở hữu bảng
-      name → VM slot; function/control-flow cần context ID/label tiếp theo.
+      literal/name/operator/assignment/postfix/print/primitive map, top-level function,
+      primitive default, return, direct/dynamic/indirect calls, structured lambda,
+      if/else/for-loop/switch/try, continue, break, throw và class namespace/method.
+      Emitter tự sở hữu function ID, VM slot và jump
+      fixup; shared mixed-backend context còn thiếu.
    6. [ ] **Bỏ dần token bridge** — vùng chưa migrate phải là fallback tường minh
       và được đếm; chỉ xóa `materializeIrTokens`/legacy compiler khi corpus `.vi`
       đạt zero fallback và vẫn cùng bytecode/compiler state.
 
-   Hiện direct backend bao phủ 1/57 regression program; parity gate khóa con số
+   Hiện direct backend bao phủ 29/57 regression program; parity gate khóa con số
    tối thiểu này và vẫn đối chiếu đầy đủ bytecode/StringPool/function registries.
 
    Chốt dynamic/static/gradual typing và Typed IR là quyết định riêng. Expression

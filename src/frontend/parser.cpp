@@ -1,5 +1,6 @@
 #include "vpp/frontend/parser.h"
 
+#include <functional>
 #include <utility>
 
 #include "vpp/core/message_constants.h"
@@ -19,6 +20,11 @@ bool isNamePiece(const std::string &lexeme) {
            lexeme != "*" && lexeme != "/" && lexeme != "%" && lexeme != "!" &&
            lexeme != "==" && lexeme != "!=" && lexeme != "<" && lexeme != ">" &&
            lexeme != "<=" && lexeme != ">=" && lexeme != "&&" && lexeme != "||";
+}
+
+bool hasViSuffix(const std::string &target) {
+    return target.size() > 3 &&
+           target.compare(target.size() - 3, 3, ".vi") == 0;
 }
 
 bool isExpressionNamePiece(const Token &token) {
@@ -126,11 +132,17 @@ AstVisibility visibilityFor(const std::string &lexeme) {
 // slice has been consumed.
 class ExpressionReader {
 public:
+    using LambdaBodyReader =
+        std::function<bool(std::size_t, std::size_t, AstStatement &)>;
+
     ExpressionReader(const std::vector<Token> &tokens,
                      std::vector<AstExpression> &expressions,
+                     std::vector<AstLambda> &lambdas,
                      std::size_t begin,
-                     std::size_t end)
-        : tokens_(tokens), expressions_(expressions), pos_(begin), end_(end) {}
+                     std::size_t end,
+                     LambdaBodyReader readLambdaBody)
+        : tokens_(tokens), expressions_(expressions), lambdas_(lambdas),
+          pos_(begin), end_(end), readLambdaBody_(std::move(readLambdaBody)) {}
 
     ExprId parse() { return parseExpression(0); }
     std::size_t position() const noexcept { return pos_; }
@@ -239,6 +251,7 @@ private:
             }
             ExprId call = parseCall(callee);
             if (call != kInvalidExprId) {
+                expressions_[call].explicitCall = true;
                 expressions_[call].tokenBegin = begin;
                 expressions_[call].span = tokenRangeSpan(
                     tokens_, begin, expressions_[call].tokenEnd);
@@ -328,11 +341,69 @@ private:
 
     ExprId parseLambda() {
         const std::size_t begin = pos_;
+        const std::size_t expressionCheckpoint = expressions_.size();
+        const std::size_t lambdaCheckpoint = lambdas_.size();
+        auto rollback = [&]() {
+            pos_ = begin;
+            expressions_.resize(expressionCheckpoint);
+            lambdas_.resize(lambdaCheckpoint);
+            return kInvalidExprId;
+        };
+
         ++pos_;
-        if (pos_ >= end_ || tokens_[pos_].lexeme != "(") return kInvalidExprId;
+        if (pos_ >= end_ || tokens_[pos_].lexeme != "(") return rollback();
         ++pos_;
 
-        std::vector<std::string> parameters;
+        std::vector<AstParameter> parameters;
+        auto addParameter = [&](std::size_t parameterBegin,
+                                std::size_t parameterEnd) {
+            if (parameterBegin >= parameterEnd) return false;
+
+            std::size_t equals = parameterEnd;
+            int nestedParenDepth = 0;
+            int nestedBracketDepth = 0;
+            int nestedBraceDepth = 0;
+            for (std::size_t cursor = parameterBegin;
+                 cursor < parameterEnd; ++cursor) {
+                const std::string &token = tokens_[cursor].lexeme;
+                if (token == "(") ++nestedParenDepth;
+                else if (token == ")") --nestedParenDepth;
+                else if (token == "[") ++nestedBracketDepth;
+                else if (token == "]") --nestedBracketDepth;
+                else if (token == "{") ++nestedBraceDepth;
+                else if (token == "}") --nestedBraceDepth;
+                else if (token == "=" && nestedParenDepth == 0 &&
+                         nestedBracketDepth == 0 && nestedBraceDepth == 0) {
+                    equals = cursor;
+                    break;
+                }
+            }
+            if (equals == parameterBegin) return false;
+
+            AstParameter parameter;
+            parameter.name = joinTokenText(tokens_, parameterBegin, equals);
+            parameter.span = tokenRangeSpan(tokens_, parameterBegin, parameterEnd);
+            parameter.hasDefault = equals < parameterEnd;
+            if (parameter.name.empty()) return false;
+            if (parameter.hasDefault) {
+                if (equals + 1 >= parameterEnd) return false;
+                const std::size_t expressionSave = expressions_.size();
+                const std::size_t lambdaSave = lambdas_.size();
+                ExpressionReader defaultReader(
+                    tokens_, expressions_, lambdas_, equals + 1, parameterEnd,
+                    readLambdaBody_);
+                parameter.defaultValue = defaultReader.parse();
+                if (parameter.defaultValue == kInvalidExprId ||
+                    defaultReader.position() != parameterEnd) {
+                    expressions_.resize(expressionSave);
+                    lambdas_.resize(lambdaSave);
+                    return false;
+                }
+            }
+            parameters.push_back(std::move(parameter));
+            return true;
+        };
+
         std::size_t parameterBegin = pos_;
         int parenDepth = 0;
         int bracketDepth = 0;
@@ -342,13 +413,8 @@ private:
             if (token == "(" ) ++parenDepth;
             else if (token == ")") {
                 if (parenDepth == 0 && bracketDepth == 0 && braceDepth == 0) {
-                    if (parameterBegin < pos_) {
-                        std::size_t nameEnd = parameterBegin;
-                        while (nameEnd < pos_ && tokens_[nameEnd].lexeme != "=") ++nameEnd;
-                        if (parameterBegin < nameEnd) {
-                            parameters.push_back(joinTokenText(tokens_, parameterBegin, nameEnd));
-                        }
-                    }
+                    if (parameterBegin < pos_ &&
+                        !addParameter(parameterBegin, pos_)) return rollback();
                     break;
                 }
                 --parenDepth;
@@ -357,18 +423,15 @@ private:
             else if (token == "{") ++braceDepth;
             else if (token == "}") --braceDepth;
             else if (token == "," && parenDepth == 0 && bracketDepth == 0 && braceDepth == 0) {
-                std::size_t nameEnd = parameterBegin;
-                while (nameEnd < pos_ && tokens_[nameEnd].lexeme != "=") ++nameEnd;
-                if (parameterBegin < nameEnd) {
-                    parameters.push_back(joinTokenText(tokens_, parameterBegin, nameEnd));
-                }
+                if (parameterBegin >= pos_ ||
+                    !addParameter(parameterBegin, pos_)) return rollback();
                 parameterBegin = pos_ + 1;
             }
             ++pos_;
         }
-        if (pos_ >= end_ || tokens_[pos_].lexeme != ")") return kInvalidExprId;
+        if (pos_ >= end_ || tokens_[pos_].lexeme != ")") return rollback();
         ++pos_;
-        if (pos_ >= end_ || tokens_[pos_].lexeme != "{") return kInvalidExprId;
+        if (pos_ >= end_ || tokens_[pos_].lexeme != "{") return rollback();
 
         const std::size_t bodyBegin = pos_;
         int depth = 0;
@@ -383,16 +446,31 @@ private:
             }
             ++pos_;
         }
-        if (depth != 0) return kInvalidExprId;
+        if (depth != 0) return rollback();
+
+        AstStatement body;
+        if (!readLambdaBody_ || !readLambdaBody_(bodyBegin, pos_, body) ||
+            body.kind != AstStatementKind::Block || body.tokenBegin != bodyBegin ||
+            body.tokenEnd != pos_) {
+            return rollback();
+        }
+
+        AstLambda payload;
+        payload.id = lambdas_.size();
+        payload.span = tokenRangeSpan(tokens_, begin, pos_);
+        payload.parameters = std::move(parameters);
+        payload.body = std::move(body);
+        const LambdaId lambdaId = payload.id;
+        lambdas_.push_back(std::move(payload));
 
         AstExpression lambda;
         lambda.kind = AstExpressionKind::Lambda;
         lambda.tokenBegin = begin;
         lambda.tokenEnd = pos_;
-        lambda.parameters = std::move(parameters);
-        lambda.bodyTokenBegin = bodyBegin;
-        lambda.bodyTokenEnd = pos_;
-        return append(std::move(lambda));
+        lambda.lambdaId = lambdaId;
+        const ExprId expressionId = append(std::move(lambda));
+        lambdas_[lambdaId].expression = expressionId;
+        return expressionId;
     }
 
     ExprId parseMapLiteral() {
@@ -427,8 +505,10 @@ private:
 
     const std::vector<Token> &tokens_;
     std::vector<AstExpression> &expressions_;
+    std::vector<AstLambda> &lambdas_;
     std::size_t pos_;
     std::size_t end_;
+    LambdaBodyReader readLambdaBody_;
 };
 
 std::size_t matchingDelimiter(const std::vector<Token> &tokens,
@@ -468,6 +548,7 @@ AstProgram Parser::parseProgram() {
     }
 
     program.expressions = std::move(expressions_);
+    program.lambdas = std::move(lambdas_);
     program.tokens = std::move(tokens_);
     return program;
 }
@@ -501,6 +582,114 @@ AstStatement Parser::parseBlock() {
     return block;
 }
 
+bool Parser::tryParseStructuredSwitch(AstStatement &statement) {
+    const std::size_t savedPosition = pos_;
+    const std::size_t expressionCheckpoint = expressions_.size();
+    const std::size_t lambdaCheckpoint = lambdas_.size();
+    auto rollback = [&]() {
+        pos_ = savedPosition;
+        expressions_.resize(expressionCheckpoint);
+        lambdas_.resize(lambdaCheckpoint);
+    };
+
+    if (pos_ >= tokens_.size() || tokens_[pos_].lexeme != "chọn") return false;
+    const std::size_t begin = pos_++;
+    if (pos_ >= tokens_.size() || tokens_[pos_].lexeme != "(") {
+        rollback();
+        return false;
+    }
+
+    const std::size_t selectorOpen = pos_;
+    const std::size_t selectorClose = matchingDelimiter(
+        tokens_, selectorOpen, tokens_.size(), "(", ")");
+    if (selectorClose >= tokens_.size()) {
+        rollback();
+        return false;
+    }
+    const ExprId selector = tryParseExpression(selectorOpen + 1, selectorClose);
+    if (selector == kInvalidExprId || selectorClose + 1 >= tokens_.size() ||
+        tokens_[selectorClose + 1].lexeme != "{") {
+        rollback();
+        return false;
+    }
+
+    AstStatement parsed;
+    parsed.kind = AstStatementKind::Switch;
+    parsed.tokenBegin = begin;
+    parsed.switchForm = AstSwitchForm::Structured;
+    parsed.expressionRoots.push_back(selector);
+    pos_ = selectorClose + 2;
+
+    try {
+        while (pos_ < tokens_.size() && tokens_[pos_].lexeme != "}") {
+            if (tokens_[pos_].lexeme == ";") {
+                ++pos_;
+                continue;
+            }
+
+            const std::size_t armBegin = pos_;
+            AstSwitchArm arm;
+            if (tokens_[pos_].lexeme == "ca") {
+                arm.prefixedByCase = true;
+                ++pos_;
+                if (pos_ >= tokens_.size() || tokens_[pos_].lexeme == "}") {
+                    rollback();
+                    return false;
+                }
+            }
+
+            if (pos_ < tokens_.size() && tokens_[pos_].lexeme == "mặc định") {
+                arm.kind = AstSwitchArmKind::Default;
+                arm.labelSpan = tokens_[pos_].span;
+                ++pos_;
+            } else {
+                if (!arm.prefixedByCase || pos_ >= tokens_.size()) {
+                    rollback();
+                    return false;
+                }
+                const std::size_t labelBegin = pos_;
+                const ExprId label = tryParseExpression(labelBegin, labelBegin + 1);
+                if (label == kInvalidExprId) {
+                    rollback();
+                    return false;
+                }
+                arm.kind = AstSwitchArmKind::Case;
+                arm.label = label;
+                arm.labelSpan = tokens_[labelBegin].span;
+                parsed.expressionRoots.push_back(label);
+                ++pos_;
+            }
+
+            if (pos_ < tokens_.size() && tokens_[pos_].lexeme == ":") {
+                arm.hasColon = true;
+                ++pos_;
+            }
+            if (pos_ >= tokens_.size() || tokens_[pos_].lexeme != "{") {
+                rollback();
+                return false;
+            }
+
+            arm.bodyChildIndex = parsed.children.size();
+            parsed.children.push_back(parseBlock());
+            arm.span = spanFor(armBegin, parsed.children.back().tokenEnd);
+            parsed.switchArms.push_back(std::move(arm));
+        }
+    } catch (const ParseError &) {
+        rollback();
+        return false;
+    }
+
+    if (pos_ >= tokens_.size() || tokens_[pos_].lexeme != "}") {
+        rollback();
+        return false;
+    }
+    ++pos_;
+    parsed.tokenEnd = pos_;
+    parsed.span = spanFor(begin, pos_);
+    statement = std::move(parsed);
+    return true;
+}
+
 AstStatement Parser::parseStatement(bool insideBlock) {
     if (pos_ >= tokens_.size()) {
         return {};
@@ -519,6 +708,12 @@ AstStatement Parser::parseStatement(bool insideBlock) {
     }
     if (kind == AstStatementKind::Block) {
         return parseBlock();
+    }
+    if (kind == AstStatementKind::Switch) {
+        AstStatement structuredSwitch;
+        if (tryParseStructuredSwitch(structuredSwitch)) {
+            return structuredSwitch;
+        }
     }
 
     AstStatement statement;
@@ -632,7 +827,12 @@ AstStatement Parser::parseStatement(bool insideBlock) {
     statement.span = spanFor(begin, pos_);
     statement.declarationName = declarationName(begin, pos_, kind);
     attachDeclarationPayload(statement);
+    attachImportForm(statement);
     attachExpressionRoots(statement);
+    attachClassForm(statement);
+    attachConditionalForm(statement);
+    attachLoopForm(statement);
+    attachTryForm(statement);
     return statement;
 }
 
@@ -755,18 +955,116 @@ void Parser::attachDeclarationPayload(AstStatement &statement) {
     addParameter(parameterBegin, close);
 }
 
+void Parser::attachImportForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::Import) return;
+
+    const std::size_t begin = statement.tokenBegin;
+    const std::size_t end = statement.tokenEnd;
+    if (begin + 2 >= end || end > tokens_.size() ||
+        tokens_[begin].lexeme != "nhập" || tokens_[end - 1].lexeme != ";") {
+        return;
+    }
+
+    AstImportSpec spec;
+    spec.hasSemicolon = true;
+    std::size_t cursor = begin + 1;
+    if (tokens_[cursor].kind == TokenKind::String) {
+        const std::string &spelling = tokens_[cursor].lexeme;
+        if (spelling.size() < 2 ||
+            !((spelling.front() == '"' && spelling.back() == '"') ||
+              (spelling.front() == '\'' && spelling.back() == '\''))) {
+            return;
+        }
+        spec.quoted = true;
+        spec.target = spelling.substr(1, spelling.size() - 2);
+        spec.targetSpan = tokens_[cursor].span;
+        ++cursor;
+    } else {
+        const std::size_t targetBegin = cursor;
+        std::size_t targetEnd = cursor;
+        while (cursor < end - 1 && tokens_[cursor].lexeme != "như") {
+            const std::string &piece = tokens_[cursor].lexeme;
+            const bool separator = piece == "/" || piece == "\\";
+            if (separator) {
+                spec.target += piece;
+            } else {
+                if (!spec.target.empty() && spec.target.back() != '/' &&
+                    spec.target.back() != '\\') {
+                    spec.target.push_back(' ');
+                }
+                spec.target += piece;
+            }
+            targetEnd = ++cursor;
+        }
+        if (targetBegin == targetEnd) return;
+        spec.targetSpan = tokenRangeSpan(tokens_, targetBegin, targetEnd);
+    }
+
+    if (!hasViSuffix(spec.target)) return;
+
+    if (cursor < end - 1 && tokens_[cursor].lexeme == "như") {
+        ++cursor;
+        if (cursor >= end - 1 || tokens_[cursor].kind != TokenKind::Identifier) {
+            return;
+        }
+        spec.alias = tokens_[cursor].lexeme;
+        spec.aliasSpan = tokens_[cursor].span;
+        ++cursor;
+    }
+    if (cursor != end - 1) return;
+
+    statement.importForm = AstImportForm::LocalSourceFile;
+    statement.importSpec = std::move(spec);
+}
+
 ExprId Parser::tryParseExpression(std::size_t begin, std::size_t end) {
     while (end > begin && tokens_[end - 1].lexeme == ";") --end;
     if (begin >= end || end > tokens_.size()) return kInvalidExprId;
 
     const std::size_t checkpoint = expressions_.size();
-    ExpressionReader reader(tokens_, expressions_, begin, end);
+    const std::size_t lambdaCheckpoint = lambdas_.size();
+    ExpressionReader reader(
+        tokens_, expressions_, lambdas_, begin, end,
+        [this](std::size_t bodyBegin, std::size_t bodyEnd, AstStatement &body) {
+            return tryParseLambdaBody(bodyBegin, bodyEnd, body);
+        });
     const ExprId root = reader.parse();
     if (root == kInvalidExprId || reader.position() != end) {
         expressions_.resize(checkpoint);
+        lambdas_.resize(lambdaCheckpoint);
         return kInvalidExprId;
     }
     return root;
+}
+
+bool Parser::tryParseLambdaBody(std::size_t begin,
+                                std::size_t end,
+                                AstStatement &body) {
+    if (begin >= end || end > tokens_.size() || tokens_[begin].lexeme != "{") {
+        return false;
+    }
+
+    const std::size_t savedPosition = pos_;
+    const std::size_t expressionCheckpoint = expressions_.size();
+    const std::size_t lambdaCheckpoint = lambdas_.size();
+    pos_ = begin;
+    try {
+        AstStatement parsed = parseBlock();
+        if (pos_ != end) {
+            pos_ = savedPosition;
+            expressions_.resize(expressionCheckpoint);
+            lambdas_.resize(lambdaCheckpoint);
+            return false;
+        }
+        body = std::move(parsed);
+        pos_ = savedPosition;
+        return true;
+    } catch (const ParseError &) {
+        pos_ = savedPosition;
+        expressions_.resize(expressionCheckpoint);
+        lambdas_.resize(lambdaCheckpoint);
+        return false;
+    }
 }
 
 void Parser::attachExpressionRoots(AstStatement &statement) {
@@ -824,6 +1122,165 @@ void Parser::attachExpressionRoots(AstStatement &statement) {
         }
     }
     attach(partBegin, close);
+}
+
+void Parser::attachClassForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::Class ||
+        !statement.expressionRoots.empty() || statement.children.size() != 1) {
+        return;
+    }
+
+    const std::size_t begin = statement.tokenBegin;
+    const std::size_t end = statement.tokenEnd;
+    if (begin >= end || tokens_[begin].lexeme != "lớp") return;
+
+    std::size_t cursor = begin + 1;
+    if (cursor < end && isVisibility(tokens_[cursor].lexeme)) ++cursor;
+    if (cursor >= end || tokens_[cursor].kind != TokenKind::Identifier ||
+        tokens_[cursor].lexeme.empty()) {
+        return;
+    }
+    ++cursor;
+
+    const AstStatement &body = statement.children.front();
+    if (cursor >= end || tokens_[cursor].lexeme != "{" ||
+        body.kind != AstStatementKind::Block || body.tokenBegin != cursor ||
+        body.tokenEnd != end) {
+        return;
+    }
+    for (const AstStatement &member : body.children) {
+        if (member.kind != AstStatementKind::Function &&
+            member.kind != AstStatementKind::Empty) {
+            return;
+        }
+    }
+
+    statement.classForm = AstClassForm::MethodBlock;
+}
+
+void Parser::attachConditionalForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::Conditional ||
+        statement.expressionRoots.size() != 1) {
+        return;
+    }
+
+    const std::size_t begin = statement.tokenBegin;
+    const std::size_t end = statement.tokenEnd;
+    if (begin + 1 >= end || tokens_[begin].lexeme != "nếu" ||
+        tokens_[begin + 1].lexeme != "(") {
+        return;
+    }
+    const std::size_t conditionClose = matchingDelimiter(
+        tokens_, begin + 1, end, "(", ")");
+    if (conditionClose >= end || conditionClose + 1 >= end ||
+        tokens_[conditionClose + 1].lexeme != "{" ||
+        statement.children.empty()) {
+        return;
+    }
+
+    const AstStatement &thenBlock = statement.children.front();
+    if (thenBlock.kind != AstStatementKind::Block ||
+        thenBlock.tokenBegin != conditionClose + 1) {
+        return;
+    }
+    if (thenBlock.tokenEnd == end && statement.children.size() == 1) {
+        statement.conditionalForm = AstConditionalForm::IfBlock;
+        return;
+    }
+
+    if (statement.children.size() != 2 || thenBlock.tokenEnd >= end) return;
+    const std::size_t continuation = thenBlock.tokenEnd;
+    if (tokens_[continuation].lexeme != "hoặc" &&
+        tokens_[continuation].lexeme != "nếu không") {
+        return;
+    }
+    const AstStatement &elseBlock = statement.children[1];
+    if (elseBlock.kind != AstStatementKind::Block ||
+        elseBlock.tokenBegin != continuation + 1 || elseBlock.tokenEnd != end) {
+        return;
+    }
+    statement.conditionalForm = AstConditionalForm::IfElseBlocks;
+}
+
+void Parser::attachLoopForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::Loop ||
+        statement.expressionRoots.size() != 3 ||
+        statement.children.size() != 1) {
+        return;
+    }
+    const std::size_t begin = statement.tokenBegin;
+    const std::size_t end = statement.tokenEnd;
+    if (begin + 1 >= end || tokens_[begin].lexeme != "lặp" ||
+        tokens_[begin + 1].lexeme != "(") {
+        return;
+    }
+    const std::size_t close = matchingDelimiter(
+        tokens_, begin + 1, end, "(", ")");
+    if (close >= end || close + 1 >= end ||
+        tokens_[close + 1].lexeme != "{") {
+        return;
+    }
+    const AstStatement &body = statement.children.front();
+    if (body.kind != AstStatementKind::Block ||
+        body.tokenBegin != close + 1 || body.tokenEnd != end) {
+        return;
+    }
+
+    std::size_t separators = 0;
+    int parenDepth = 0;
+    int bracketDepth = 0;
+    int braceDepth = 0;
+    for (std::size_t cursor = begin + 2; cursor < close; ++cursor) {
+        const std::string &token = tokens_[cursor].lexeme;
+        if (token == "(") ++parenDepth;
+        else if (token == ")") --parenDepth;
+        else if (token == "[") ++bracketDepth;
+        else if (token == "]") --bracketDepth;
+        else if (token == "{") ++braceDepth;
+        else if (token == "}") --braceDepth;
+        else if (token == ";" && parenDepth == 0 && bracketDepth == 0 &&
+                 braceDepth == 0) {
+            ++separators;
+        }
+    }
+    if (separators == 2) statement.loopForm = AstLoopForm::ForBlock;
+}
+
+void Parser::attachTryForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::Try ||
+        statement.children.size() != 2 ||
+        !statement.expressionRoots.empty()) {
+        return;
+    }
+
+    const AstStatement &tryBody = statement.children[0];
+    const AstStatement &catchBody = statement.children[1];
+    if (tryBody.kind != AstStatementKind::Block ||
+        catchBody.kind != AstStatementKind::Block ||
+        tryBody.tokenBegin != statement.tokenBegin + 1 ||
+        tryBody.tokenEnd >= statement.tokenEnd ||
+        catchBody.tokenEnd != statement.tokenEnd ||
+        tokens_[tryBody.tokenEnd].lexeme != "bắt lỗi") {
+        return;
+    }
+
+    std::size_t cursor = tryBody.tokenEnd + 1;
+    if (cursor < catchBody.tokenBegin && tokens_[cursor].lexeme == "(") {
+        const std::size_t close = matchingDelimiter(
+            tokens_, cursor, catchBody.tokenBegin, "(", ")");
+        if (close >= catchBody.tokenBegin) return;
+        // Omitting parentheses is the no-binding form. Once a binding list is
+        // opened, the structured grammar requires exactly one catch name.
+        if (close != cursor + 2 || !isNamePiece(tokens_[cursor + 1].lexeme)) {
+            return;
+        }
+        statement.catchVariable = tokens_[cursor + 1].lexeme;
+        statement.catchVariableSpan = tokens_[cursor + 1].span;
+        cursor = close + 1;
+    }
+
+    if (cursor != catchBody.tokenBegin || tokens_[cursor].lexeme != "{") return;
+    statement.tryForm = AstTryForm::TryCatchBlocks;
 }
 
 SourceSpan Parser::spanFor(std::size_t begin, std::size_t end) const noexcept {

@@ -38,6 +38,14 @@ target_link_libraries(vpp-pipeline-unit PRIVATE vpp-compiler)
 add_test(NAME vpp-pipeline-unit
          COMMAND vpp-pipeline-unit)
 
+add_executable(vpp-module-graph-unit
+    module_graph_tests.cpp)
+
+target_link_libraries(vpp-module-graph-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-module-graph-unit
+         COMMAND vpp-module-graph-unit)
+
 add_executable(vpp-recursive-ir-unit
     recursive_ir_tests.cpp)
 
@@ -94,6 +102,7 @@ foreach(vpp_test_target IN ITEMS
         vpp-opcode-and-native-constants-unit
         vpp-message-constants-unit
         vpp-pipeline-unit
+        vpp-module-graph-unit
         vpp-recursive-ir-unit
         vpp-direct-codegen-unit
         vpp-pipeline-legacy-parity

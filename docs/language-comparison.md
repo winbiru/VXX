@@ -26,14 +26,13 @@ Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến �
 ### Trạng thái triển khai hiện tại
 
 V++ vẫn là dự án **experimental**, không phải ngôn ngữ production-ready. Compiler hiện
-đi qua pipeline incremental: lexer tạo token mang span, parser tạo AST cấu trúc ban đầu,
-semantic model xử lý khai báo và lời gọi trực tiếp, rồi IR không kiểu, lossless đi qua
-optimizer tới backend bytecode legacy. Giá trị runtime là động (`int`, `double`,
+đi qua pipeline: lexer/span, statement + expression AST, scope/name resolution, recursive
+untyped IR và optimizer. Cohort được hỗ trợ emit bytecode trực tiếp; program còn
+feature chưa migrate dùng whole-program legacy bridge. Giá trị runtime là động (`int`, `double`,
 `string`, `rỗng` và map); chính sách hệ kiểu dài hạn chưa được chọn.
 
-Đây chưa phải AST biểu thức hoặc semantic pipeline đầy đủ: scope/name resolution,
-semantic cho import/lớp, type policy, Typed IR và static type checker vẫn chưa hoàn
-thiện.
+Lambda capture-free đã có AST/scope/IR và direct codegen. Closure capture,
+module graph/import exports, type policy, Typed IR và static type checker vẫn chưa hoàn thiện.
 
 GC và JIT hiện là MVP: GC chỉ compact các container runtime theo biến môi trường, còn
 JIT chỉ tạo chuỗi lambda cho bytecode tuyến tính được hỗ trợ rồi fallback về interpreter.
@@ -53,7 +52,7 @@ versioning hay debugger/IDE đầy đủ.
 | **Typing** | Dynamic runtime; chưa có type checker | Dynamic | Dynamic | Static | Static | Static |
 | **Runtime** | Custom stack VM, in-memory `Instruction` | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
 | **Memory** | MVP container compaction, không phải tracing GC | GC | GC | GC | Manual | GC |
-| **Compilation** | Source → lexer/span → parser/AST cấu trúc → semantic → IR không kiểu → optimizer → bytecode legacy | Bytecode | JIT | Bytecode + JIT | Native | Native |
+| **Compilation** | Source → lexer/span → AST → scope/resolution → recursive untyped IR → optimizer → direct bytecode hoặc compatibility bridge | Bytecode | JIT | Bytecode + JIT | Native | Native |
 | **Concurrency** | Chưa có mô hình concurrency tổng quát | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
 | **Maturity** | Experimental | Mature | Mature | Mature | Mature | Mature |
 | **Ecosystem** | Minimal | Very Large | Very Large | Large | Large | Growing |
@@ -357,8 +356,8 @@ func fibonacci(n int) int {
 ### 3. Educational focus
 
 * **Minimal design**: Không phức tạp hóa với features không cần thiết
-* **Đường đi hiện tại**: Lexer tạo token mang span; parser/AST cấu trúc, semantic model và IR không kiểu tạo thành pipeline trước backend bytecode/VM legacy
-* **Giới hạn hiện tại**: AST biểu thức, scope/name resolution, semantic import/lớp, type policy và Typed IR chưa đầy đủ; định dạng `.vbc` trong tài liệu bytecode vẫn chỉ là proposal
+* **Đường đi hiện tại**: Lexer/span, expression AST, scope/resolution và recursive untyped IR tạo pipeline trước direct emitter hoặc compatibility bridge và VM
+* **Giới hạn hiện tại**: Closure capture, module graph/import exports, type policy và Typed IR chưa đầy đủ; định dạng `.vbc` trong tài liệu bytecode vẫn chỉ là proposal
 * **Reference implementation**: Source code C++ dễ đọc, dễ học
 
 ### 4. Research-oriented

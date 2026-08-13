@@ -8,9 +8,9 @@
 
 namespace vietvm::compiler {
 
-// The first IR is deliberately untyped.  It provides a stable compiler-stage
-// boundary now, while preserving the dynamic VM contract and legacy bytecode
-// lowering until a type-policy ADR is accepted.
+// The first IR is deliberately untyped. It provides a stable compiler-stage
+// boundary while preserving the dynamic VM contract. Legacy lowering is a
+// feature-migration fallback, independent of any future type-policy ADR.
 enum class IrOpcode {
     NoOp,
     Block,
@@ -31,9 +31,11 @@ enum class IrOpcode {
 
 using IrValueId = std::size_t;
 inline constexpr IrValueId kInvalidIrValueId = static_cast<IrValueId>(-1);
+using IrLambdaId = std::size_t;
+inline constexpr IrLambdaId kInvalidIrLambdaId = static_cast<IrLambdaId>(-1);
 
-// Keep the originating expression-arena identity on every IR value.  This is
-// the stable hook through which name resolution can attach bindings later;
+// Keep the originating expression-arena identity on every IR value. Semantic
+// resolution and lowering exchange bindings through this stable identity;
 // source spans are diagnostic data and are not unique expression identities.
 using AstExprId = vietvm::frontend::ExprId;
 inline constexpr AstExprId kInvalidAstExprId = vietvm::frontend::kInvalidExprId;
@@ -55,6 +57,7 @@ enum class IrValueOpcode {
     Binary,
     Call,
     CallDynamic,
+    Lambda,
 };
 
 struct IrValue {
@@ -70,9 +73,34 @@ struct IrValue {
     // Literal spelling, name, or operator depending on opcode.
     std::string text;
 
+    // `gọi tên(...)` has a distinct legacy forward-call contract from the
+    // ordinary `tên(...)` form, so lowering preserves that source-level mode.
+    bool explicitCall = false;
+    CallTargetKind callTarget = CallTargetKind::Invalid;
+    IrLambdaId lambdaId = kInvalidIrLambdaId;
+
     // Evaluation order is source order.  Calls store the callee first and then
     // their arguments.  Stores keep the target expression before the value.
     std::vector<IrValueId> operands;
+};
+
+struct IrParameter {
+    std::string name;
+    vietvm::frontend::SourceSpan span{};
+    int symbolId = -1;
+    bool hasDefault = false;
+    IrValueId defaultValue = kInvalidIrValueId;
+};
+
+struct IrSwitchArm {
+    vietvm::frontend::AstSwitchArmKind kind =
+        vietvm::frontend::AstSwitchArmKind::Case;
+    vietvm::frontend::SourceSpan span{};
+    vietvm::frontend::SourceSpan labelSpan{};
+    IrValueId label = kInvalidIrValueId;
+    std::size_t bodyChildIndex = 0;
+    bool hasColon = false;
+    bool prefixedByCase = false;
 };
 
 struct IrInstruction {
@@ -80,9 +108,27 @@ struct IrInstruction {
     vietvm::frontend::SourceSpan span{};
     int symbolId = -1;
 
-    // Aligned with AstStatement::parameters for declarations. Parameters
-    // without a default retain kInvalidIrValueId, preserving parameter index.
-    std::vector<IrValueId> parameterDefaults;
+    // Declaration metadata is explicit IR data. The direct backend must not
+    // recover function names or parameter defaults by reparsing source tokens.
+    std::string declarationName;
+    vietvm::frontend::AstVisibility visibility =
+        vietvm::frontend::AstVisibility::Unspecified;
+    SemanticVisibility effectiveVisibility = SemanticVisibility::Unspecified;
+    vietvm::frontend::AstClassForm classForm =
+        vietvm::frontend::AstClassForm::Unstructured;
+    vietvm::frontend::AstConditionalForm conditionalForm =
+        vietvm::frontend::AstConditionalForm::Unstructured;
+    vietvm::frontend::AstLoopForm loopForm =
+        vietvm::frontend::AstLoopForm::Unstructured;
+    vietvm::frontend::AstSwitchForm switchForm =
+        vietvm::frontend::AstSwitchForm::Unstructured;
+    vietvm::frontend::AstTryForm tryForm =
+        vietvm::frontend::AstTryForm::Unstructured;
+    std::string catchVariable;
+    vietvm::frontend::SourceSpan catchVariableSpan{};
+    int catchSymbolId = -1;
+    std::vector<IrParameter> parameters;
+    std::vector<IrSwitchArm> switchArms;
     std::vector<IrValueId> expressionRoots;
     std::vector<IrInstruction> children;
 
@@ -96,13 +142,28 @@ struct IrInstruction {
     std::vector<vietvm::frontend::Token> tokens;
 };
 
+struct IrLambda {
+    IrLambdaId id = kInvalidIrLambdaId;
+    IrValueId ownerValue = kInvalidIrValueId;
+    AstExprId sourceExprId = kInvalidAstExprId;
+    vietvm::frontend::SourceSpan span{};
+    std::vector<IrParameter> parameters;
+    IrInstruction body;
+    std::vector<int> captures;
+};
+
 struct IrProgram {
     std::vector<IrValue> values;
+    std::vector<IrLambda> lambdas;
     std::vector<IrInstruction> instructions;
     std::size_t legacyRegionCount = 0;
 
     const IrValue *value(IrValueId id) const noexcept {
         return id < values.size() ? &values[id] : nullptr;
+    }
+
+    const IrLambda *lambda(IrLambdaId id) const noexcept {
+        return id < lambdas.size() ? &lambdas[id] : nullptr;
     }
 };
 

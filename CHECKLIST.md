@@ -203,10 +203,10 @@
 | Tính năng | Trạng thái |
 |-----------|-----------|
 | Tokenizer / Lexer (token mang span) | ✅ |
-| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — bytecode đi qua cầu nối backend legacy |
-| AST cấu trúc ban đầu, không kiểu và mang span | ✅ — giữ token/range lossless; chưa phải AST biểu thức đầy đủ |
-| Semantic model khai báo và lời gọi trực tiếp | ✅ — chưa có scope/name resolution/import/lớp đầy đủ |
-| IR không kiểu, lossless và optimizer IR ban đầu | ✅ — làm cầu nối tới backend bytecode legacy |
+| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — chọn direct IR cho program được hỗ trợ; phần còn lại dùng whole-program legacy bridge |
+| AST cấu trúc không kiểu và mang span | ✅ — expression arena + statement tree lossless; lambda có parameter/default/body cấu trúc |
+| Semantic model, scope tree và name/call resolution | ✅ — bind theo ExprId; lambda scope/capture đã có, module graph/import exports còn tiếp tục |
+| IR không kiểu, đệ quy và optimizer IR | ✅ — direct emitter đọc structured IR; token payload chỉ còn cho compatibility fallback |
 | Biên dịch biểu thức số học | ✅ |
 | Biên dịch chuỗi và nối chuỗi | ✅ |
 | Biên dịch điều kiện `nếu/hoặc` | ✅ |
@@ -222,12 +222,12 @@
 | Fix `isNumber("-")` bug | ✅ |
 | Fix `convertToPostfix` nested call argc | ✅ |
 | Kiểm tra kiểu tĩnh (type checking) | ⬜ |
-| Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | ✅ — lambda body còn giữ token range |
+| Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | ✅ — lambda body là recursive Block và vẫn giữ span/range lossless |
 | Scope tree (global/class/function/block/lambda/catch) | ✅ |
 | Lexical name/call resolution và class visibility | ✅ — module graph/import exports còn tiếp tục |
-| Recursive IR lowering cho body/block/expression | ✅ — control-flow headers còn fallback |
-| IR → bytecode trực tiếp, không parse token lại | 🚧 — expression/print/assignment/map cohort |
-| Legacy token fallback = 0 trên toàn bộ corpus `.vi` | 🚧 — direct 1/57 chương trình |
+| Recursive IR lowering cho body/block/expression | ✅ — conditional/loop/switch/try/class đã có structured payload; import còn tiếp tục |
+| IR → bytecode trực tiếp, không parse token lại | 🚧 — expression/function/lambda/call + structured control-flow/try/class-method cohort |
+| Legacy token fallback = 0 trên toàn bộ corpus `.vi` | 🚧 — direct 29/57 chương trình; 28 program còn dùng whole-program bridge |
 | Type policy và Typed IR | ⬜ |
 
 ---
@@ -470,9 +470,10 @@ là một interpreter thuần source:
 .vi → V++ compiler → V++ bytecode → V++ VM → interpreter / JIT MVP → CPU
 ```
 
-Khoảng trống quan trọng vẫn là chiều sâu của phần giữa frontend và bytecode.
-Pipeline incremental đã có ranh giới cấu trúc sau; bước bytecode dùng cầu nối
-backend legacy để giữ tương thích:
+Khoảng trống quan trọng vẫn là loại bỏ phần token-backed còn lại giữa
+frontend và bytecode. Pipeline incremental đã có các ranh giới cấu trúc sau;
+backend selector chọn direct IR cho cohort đã migrate và whole-program legacy bridge
+khi program còn vùng chưa được emitter hỗ trợ:
 
 ```text
 Source
@@ -486,8 +487,10 @@ Bytecode
   ↓ VM / JIT
 ```
 
-AST biểu thức đầy đủ, scope/name resolution, semantic cho import/lớp, type
-policy và Typed IR vẫn là các khoảng trống cần hoàn thiện.
+Expression AST, scope tree, lexical resolution và recursive untyped IR đã có.
+Lambda body đã có AST/scope/IR và capture-free codegen; closure capture,
+module graph/import exports, strict unresolved-name policy, type policy và
+Typed IR vẫn cần hoàn thiện.
 
 ### 14.4 Quyết định bắt buộc trước Typed IR
 
@@ -501,10 +504,10 @@ một ADR cho một trong ba hướng:
 | Static như Java/C# | Chẩn đoán sớm, tối ưu dễ hơn | Cần annotation/inference, compatibility policy |
 | Gradual typing | Lộ trình chuyển đổi mềm | Thiết kế phức tạp nhất, cần boundary rõ ràng |
 
-AST cấu trúc mang span, semantic model khai báo/lời gọi trực tiếp và cầu nối IR
-không kiểu, lossless đã có. Cho tới khi ADR này được chốt, không được ngầm áp
-đặt static typing vào bytecode hiện có; việc mở rộng AST biểu thức, scope/name
-resolution, semantic import/lớp và Typed IR phải giữ hợp đồng runtime động.
+Expression AST mang span, scope tree, ExprId-based resolution và recursive untyped IR đã
+có. Cho tới khi ADR này được chốt, không được ngầm áp đặt static typing
+hợp đồng runtime động. Việc hoàn thiện closure capture/import và Typed IR phải giữ
+hợp đồng runtime động.
 
 ### 14.5 Sáu milestone compiler theo thứ tự
 
@@ -527,10 +530,10 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 ### 14.6 Backlog kiến trúc có điều kiện chấp nhận
 
 - [ ] Chốt ADR type policy (dynamic, static hoặc gradual) trước Typed IR.
-- [ ] Parser/AST: mở rộng AST cấu trúc mang span thành AST biểu thức ổn định và parser unit tests.
-- [ ] Scope tree: tạo lexical scopes và khai báo parameter/local/import alias trước resolution.
-- [ ] Name resolution + semantic diagnostics: bind expression node tới symbol và test shadowing, recursion, import, lớp và lỗi tên.
-- [ ] Recursive IR: hạ mọi statement/expression/control-flow child, có label/branch rõ ràng.
+- [x] Parser/Expression AST: arena mang span cho literal/name/operator/assignment/call/lambda/map và parser unit tests.
+- [x] Scope tree: global/class/function/block/lambda/catch, parameter/local/import alias và parent/child link.
+- [x] Name resolution MVP: bind expression/call/lambda body theo ExprId, shadowing/capture/recursion/class visibility; còn module graph.
+- [x] Recursive IR control flow: expression/body/block/lambda/if/loop/switch/try/class đã hạ; import là cohort còn lại.
 - [ ] IR/codegen boundary: migrate emitter theo opcode/feature, đo legacy fallback và chỉ xóa token bridge khi đạt zero.
 - [ ] VM: tách handler và bổ sung unit test từng opcode trước tối ưu mới.
 - [ ] Object heap/GC v2: instance/field và tracing/lifetime test trước inheritance.
