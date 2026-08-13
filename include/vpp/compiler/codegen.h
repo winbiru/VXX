@@ -22,8 +22,8 @@ struct DirectIrSupport {
 };
 
 // Reports whether the complete program can be emitted without materializing
-// source tokens.  Mixed direct/legacy emission is intentionally deferred until
-// function IDs, local slots and control-flow fixups share one explicit context.
+// source tokens. Mixed direct/legacy emission is intentionally deferred until
+// both backends share one explicit allocation/compiler-state/fixup context.
 DirectIrSupport analyzeDirectIrSupport(const IrProgram &program);
 
 // Emit the currently supported stack-IR cohort.  Callers must check

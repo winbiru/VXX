@@ -134,6 +134,18 @@ struct CallBinding {
     std::string runtimeName;
 };
 
+struct SemanticLambda {
+    vietvm::frontend::ExprId expression = vietvm::frontend::kInvalidExprId;
+    vietvm::frontend::LambdaId syntax = vietvm::frontend::kInvalidLambdaId;
+    ScopeId scope = kInvalidScopeId;
+    ScopeId bodyScope = kInvalidScopeId;
+    std::vector<SymbolId> parameterSymbols;
+
+    // Unique source symbols captured across this lambda boundary. Individual
+    // name uses continue to carry BindingResult::captured and lexicalDepth.
+    std::vector<SymbolId> captures;
+};
+
 struct SemanticReference {
     std::string name;
     vietvm::frontend::SourceSpan span{};
@@ -168,11 +180,12 @@ struct SemanticModel {
     std::vector<SemanticSymbol> symbols;
     std::vector<BindingResult> expressionBindings;
     std::vector<CallBinding> callBindings;
+    std::vector<SemanticLambda> lambdas;
     std::vector<SemanticReference> references;
     std::vector<SemanticDiagnostic> diagnostics;
 
-    // Compatibility map used by the current IR bridge. New lowering should
-    // retain SymbolId and perform a separate symbol-to-bytecode-slot mapping.
+    // Declaration lookup used by IR lowering. Codegen retains SymbolId and
+    // performs a separate symbol-to-bytecode function/slot mapping.
     std::unordered_map<std::size_t, int> declarationSymbols;
 
     // AST ownership maps make scope selection deterministic for later lowering
@@ -188,16 +201,19 @@ struct SemanticModel {
         vietvm::frontend::ExprId expression) const noexcept;
     const CallBinding *callBindingForExpression(
         vietvm::frontend::ExprId expression) const noexcept;
+    const SemanticLambda *lambdaForExpression(
+        vietvm::frontend::ExprId expression) const noexcept;
 };
 
 // Compatibility entry point. It preserves implicit variables and dynamic-name
-// calls while producing bindings for the expressions represented in the AST.
-// Lambda bodies and tolerant-parser fallback regions remain token-backed until
-// those regions expose expression/statement roots of their own.
+// calls while producing bindings for represented expressions, including
+// recursive lambda bodies. Tolerant-parser fallback regions remain token-backed.
 SemanticModel analyzeSemantics(const vietvm::frontend::AstProgram &program);
 
 SemanticModel analyzeSemantics(const vietvm::frontend::AstProgram &program,
                                const SemanticEnvironment &environment,
                                ResolutionPolicy policy = ResolutionPolicy::PreserveLegacy);
+
+const char *callTargetKindName(CallTargetKind kind) noexcept;
 
 } // namespace vietvm::compiler

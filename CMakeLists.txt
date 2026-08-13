@@ -34,6 +34,7 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/support/storeString.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/token_utils.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/module_graph.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/semantic.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/ir.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/optimizer.cpp

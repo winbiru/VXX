@@ -242,7 +242,7 @@ copy implementation.
 - `src/cli/main.cpp`: entrypoint của CLI
 - `src/core/`: tiện ích dùng chung
 - `src/frontend/`: lexer (token mang span), parser, AST và keyword map
-- `src/compiler/`: semantic analysis, IR không kiểu, optimizer và cầu nối bytecode legacy
+- `src/compiler/`: semantic analysis, IR không kiểu, optimizer, direct bytecode emitter và compatibility legacy bridge
 - `src/runtime/`: VM + native adapters (HTTP, file, DB)
 - `src/tooling/`: formatter, linter, disassembler và AST/IR dump renderer
 - `examples/`: ứng dụng mẫu chạy độc lập

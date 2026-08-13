@@ -28,6 +28,9 @@ void removeNoOps(std::vector<IrInstruction> &instructions,
 OptimizationReport optimizeIr(IrProgram &program) {
     OptimizationReport report;
     removeNoOps(program.instructions, report);
+    for (IrLambda &lambda : program.lambdas) {
+        removeNoOps(lambda.body.children, report);
+    }
 
     // Passes may remove a statement that carried a fallback marker, so the
     // public count is derived state rather than an incrementally maintained

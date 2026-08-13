@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <unordered_set>
 #include <utility>
 
 #include "vpp/core/message_constants.h"
@@ -11,6 +12,7 @@ namespace {
 
 using vietvm::frontend::AstExpression;
 using vietvm::frontend::AstExpressionKind;
+using vietvm::frontend::AstLambda;
 using vietvm::frontend::AstProgram;
 using vietvm::frontend::AstStatement;
 using vietvm::frontend::AstStatementKind;
@@ -79,8 +81,9 @@ std::string joinName(const std::vector<Token> &tokens,
 }
 
 // Declaration payloads not yet represented in the AST remain confined to this
-// compatibility adapter. Function parameters come from AstStatement directly;
-// only import aliases and catch variables still need token ranges.
+// compatibility adapter. Function parameters and structured local-file import
+// aliases come from AstStatement directly; unstructured imports and catches
+// still need token ranges.
 namespace legacy_payload {
 
 std::pair<std::string, SourceSpan> importAlias(const AstProgram &program,
@@ -293,7 +296,11 @@ private:
         for (const AstStatement &statement : statements) {
             (void)predeclare(statement, scope, ownerClass);
             if (statement.kind == AstStatementKind::Import) {
-                const auto alias = legacy_payload::importAlias(program_, statement);
+                const auto alias = statement.importForm ==
+                        vietvm::frontend::AstImportForm::LocalSourceFile
+                    ? std::make_pair(statement.importSpec.alias,
+                                     statement.importSpec.aliasSpan)
+                    : legacy_payload::importAlias(program_, statement);
                 if (!alias.first.empty()) {
                     (void)addSymbol(scope, SemanticSymbolKind::ImportAlias,
                                     alias.first, alias.first, alias.second,
@@ -377,7 +384,13 @@ private:
             for (std::size_t index = 1; index < statement.children.size(); ++index) {
                 const AstStatement &body = statement.children[index];
                 const ScopeId catchScope = addScope(ScopeKind::Catch, containingScope, body.span);
-                const auto variable = legacy_payload::catchVariable(program_, statement, index);
+                const auto variable =
+                    statement.tryForm ==
+                            vietvm::frontend::AstTryForm::TryCatchBlocks &&
+                        index == 1
+                    ? std::make_pair(statement.catchVariable,
+                                     statement.catchVariableSpan)
+                    : legacy_payload::catchVariable(program_, statement, index);
                 if (!variable.first.empty()) {
                     (void)addSymbol(catchScope, SemanticSymbolKind::CatchVariable,
                                     variable.first, variable.first, variable.second,
@@ -460,13 +473,44 @@ private:
         const ScopeId scope = addScope(ScopeKind::Lambda, parent, expression.span,
                                        kInvalidSymbolId, expression.id);
         lambdaScopes_.emplace(expression.id, scope);
-        for (const std::string &parameter : expression.parameters) {
-            (void)addSymbol(scope, SemanticSymbolKind::Parameter,
-                            parameter, parameter, expression.span,
-                            SemanticVisibility::Unspecified, kInvalidSymbolId,
-                            SymbolOrigin::Source, true, nullptr);
+
+        SemanticLambda semanticLambda;
+        semanticLambda.expression = expression.id;
+        semanticLambda.syntax = expression.lambdaId;
+        semanticLambda.scope = scope;
+        const std::size_t semanticIndex = model_.lambdas.size();
+        model_.lambdas.push_back(std::move(semanticLambda));
+        lambdaModelIndices_.emplace(expression.id, semanticIndex);
+        lambdaScopeModels_.emplace(scope, semanticIndex);
+
+        const AstLambda *lambda = program_.lambda(expression.lambdaId);
+        if (lambda == nullptr || lambda->expression != expression.id) return scope;
+        for (const auto &parameter : lambda->parameters) {
+            const SymbolId symbol = addSymbol(
+                scope, SemanticSymbolKind::Parameter, parameter.name,
+                parameter.name, parameter.span, SemanticVisibility::Unspecified,
+                kInvalidSymbolId, SymbolOrigin::Source, true, nullptr);
+            model_.lambdas[semanticIndex].parameterSymbols.push_back(symbol);
         }
         return scope;
+    }
+
+    ScopeId ensureLambdaBody(const AstExpression &expression, ScopeId parent) {
+        const ScopeId lambdaScope = ensureLambdaScope(expression, parent);
+        if (!builtLambdaBodies_.insert(expression.id).second) return lambdaScope;
+
+        const AstLambda *lambda = program_.lambda(expression.lambdaId);
+        if (lambda == nullptr || lambda->expression != expression.id ||
+            lambda->body.kind != AstStatementKind::Block) {
+            return lambdaScope;
+        }
+        buildOrdinaryBlock(lambda->body, lambdaScope, enclosingClass(parent));
+        const auto semanticIndex = lambdaModelIndices_.find(expression.id);
+        if (semanticIndex != lambdaModelIndices_.end()) {
+            model_.lambdas[semanticIndex->second].bodyScope =
+                model_.scopeForStatement(lambda->body.tokenBegin);
+        }
+        return lambdaScope;
     }
 
     void declareExpression(ExprId id, ScopeId scope) {
@@ -493,7 +537,17 @@ private:
                 for (ExprId argument : expression->arguments) declareExpression(argument, scope);
                 break;
             case AstExpressionKind::Lambda:
-                (void)ensureLambdaScope(*expression, scope);
+                {
+                    const ScopeId lambdaScope = ensureLambdaBody(*expression, scope);
+                    const AstLambda *lambda = program_.lambda(expression->lambdaId);
+                    if (lambda != nullptr && lambda->expression == expression->id &&
+                        declaredLambdaBodies_.insert(expression->id).second) {
+                        for (const auto &parameter : lambda->parameters) {
+                            declareExpression(parameter.defaultValue, lambdaScope);
+                        }
+                        declareExpressionVariables(lambda->body.children);
+                    }
+                }
                 break;
             case AstExpressionKind::MapLiteral:
                 for (const auto &entry : expression->mapEntries) {
@@ -544,6 +598,23 @@ private:
             current = model_.scopes[current].parent;
         }
         return false;
+    }
+
+    void recordLambdaCaptures(ScopeId useScope, const SemanticSymbol &symbol) {
+        ScopeId current = useScope;
+        while (current != kInvalidScopeId && current != symbol.declaringScope) {
+            if (model_.scopes[current].kind == ScopeKind::Lambda) {
+                const auto owner = lambdaScopeModels_.find(current);
+                if (owner != lambdaScopeModels_.end()) {
+                    auto &captures = model_.lambdas[owner->second].captures;
+                    if (std::find(captures.begin(), captures.end(), symbol.id) ==
+                        captures.end()) {
+                        captures.push_back(symbol.id);
+                    }
+                }
+            }
+            current = model_.scopes[current].parent;
+        }
     }
 
     SymbolId enclosingClass(ScopeId scope) const noexcept {
@@ -598,6 +669,9 @@ private:
             binding.captured = isCapturableKind(model_.symbols[found.symbol].kind) &&
                                crossesCallableBoundary(
                                    scope, model_.symbols[found.symbol].declaringScope);
+            if (binding.captured) {
+                recordLambdaCaptures(scope, model_.symbols[found.symbol]);
+            }
             validateMemberAccess(model_.symbols[found.symbol], scope, expression.span);
         } else if (callableUse && isKnownNative(expression.text)) {
             binding.kind = BindingKind::NativeCallable;
@@ -688,10 +762,17 @@ private:
                 break;
             }
             case AstExpressionKind::Lambda:
-                // The current expression AST records the lambda body token
-                // range but does not yet expose its statement roots. Its scope
-                // and parameters are still explicit and ready for that link.
-                (void)ensureLambdaScope(*expression, scope);
+                {
+                    const ScopeId lambdaScope = ensureLambdaBody(*expression, scope);
+                    const AstLambda *lambda = program_.lambda(expression->lambdaId);
+                    if (lambda != nullptr && lambda->expression == expression->id &&
+                        resolvedLambdaBodies_.insert(expression->id).second) {
+                        for (const auto &parameter : lambda->parameters) {
+                            resolveExpression(parameter.defaultValue, lambdaScope);
+                        }
+                        resolveStatementList(lambda->body.children);
+                    }
+                }
                 break;
             case AstExpressionKind::MapLiteral:
                 for (const auto &entry : expression->mapEntries) {
@@ -765,6 +846,11 @@ private:
     std::vector<ScopeBindings> bindings_;
     std::unordered_map<std::size_t, ScopeId> declarationScopes_;
     std::unordered_map<ExprId, ScopeId> lambdaScopes_;
+    std::unordered_map<ExprId, std::size_t> lambdaModelIndices_;
+    std::unordered_map<ScopeId, std::size_t> lambdaScopeModels_;
+    std::unordered_set<ExprId> builtLambdaBodies_;
+    std::unordered_set<ExprId> declaredLambdaBodies_;
+    std::unordered_set<ExprId> resolvedLambdaBodies_;
     std::unordered_map<std::string, SymbolId> qualifiedValues_;
 };
 
@@ -804,6 +890,15 @@ const CallBinding *SemanticModel::callBindingForExpression(ExprId expression) co
     return &callBindings[expression];
 }
 
+const SemanticLambda *SemanticModel::lambdaForExpression(ExprId expression) const noexcept {
+    const auto found = std::find_if(
+        lambdas.begin(), lambdas.end(),
+        [expression](const SemanticLambda &lambda) {
+            return lambda.expression == expression;
+        });
+    return found == lambdas.end() ? nullptr : &*found;
+}
+
 SemanticModel analyzeSemantics(const AstProgram &program) {
     return analyzeSemantics(program, SemanticEnvironment{}, ResolutionPolicy::PreserveLegacy);
 }
@@ -812,6 +907,17 @@ SemanticModel analyzeSemantics(const AstProgram &program,
                                const SemanticEnvironment &environment,
                                ResolutionPolicy policy) {
     return Analyzer(program, environment, policy).run();
+}
+
+const char *callTargetKindName(CallTargetKind kind) noexcept {
+    switch (kind) {
+        case CallTargetKind::Invalid: return "invalid";
+        case CallTargetKind::DirectFunction: return "direct_function";
+        case CallTargetKind::IndirectValue: return "indirect_value";
+        case CallTargetKind::Native: return "native";
+        case CallTargetKind::DynamicName: return "dynamic_name";
+    }
+    return "invalid";
 }
 
 } // namespace vietvm::compiler

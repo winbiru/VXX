@@ -52,4 +52,71 @@ const char *astLiteralKindName(AstLiteralKind kind) noexcept {
     return "none";
 }
 
+const char *astVisibilityName(AstVisibility visibility) noexcept {
+    switch (visibility) {
+        case AstVisibility::Unspecified: return "unspecified";
+        case AstVisibility::Public: return "public";
+        case AstVisibility::Private: return "private";
+        case AstVisibility::Protected: return "protected";
+    }
+    return "unspecified";
+}
+
+const char *astImportFormName(AstImportForm form) noexcept {
+    switch (form) {
+        case AstImportForm::Unstructured: return "unstructured";
+        case AstImportForm::LocalSourceFile: return "local_source_file";
+    }
+    return "unstructured";
+}
+
+const char *astClassFormName(AstClassForm form) noexcept {
+    switch (form) {
+        case AstClassForm::Unstructured: return "unstructured";
+        case AstClassForm::MethodBlock: return "method_block";
+    }
+    return "unstructured";
+}
+
+const char *astConditionalFormName(AstConditionalForm form) noexcept {
+    switch (form) {
+        case AstConditionalForm::Unstructured: return "unstructured";
+        case AstConditionalForm::IfBlock: return "if_block";
+        case AstConditionalForm::IfElseBlocks: return "if_else_blocks";
+    }
+    return "unstructured";
+}
+
+const char *astLoopFormName(AstLoopForm form) noexcept {
+    switch (form) {
+        case AstLoopForm::Unstructured: return "unstructured";
+        case AstLoopForm::ForBlock: return "for_block";
+    }
+    return "unstructured";
+}
+
+const char *astSwitchFormName(AstSwitchForm form) noexcept {
+    switch (form) {
+        case AstSwitchForm::Unstructured: return "unstructured";
+        case AstSwitchForm::Structured: return "structured";
+    }
+    return "unstructured";
+}
+
+const char *astSwitchArmKindName(AstSwitchArmKind kind) noexcept {
+    switch (kind) {
+        case AstSwitchArmKind::Case: return "case";
+        case AstSwitchArmKind::Default: return "default";
+    }
+    return "case";
+}
+
+const char *astTryFormName(AstTryForm form) noexcept {
+    switch (form) {
+        case AstTryForm::Unstructured: return "unstructured";
+        case AstTryForm::TryCatchBlocks: return "try_catch_blocks";
+    }
+    return "unstructured";
+}
+
 } // namespace vietvm::frontend

@@ -314,8 +314,19 @@ void testExpressionAstCallsAssignmentsAndPostfix() {
         : findExpression(program, explicitCall->callee);
     expect(explicitCall != nullptr &&
                explicitCall->kind == vietvm::frontend::AstExpressionKind::Call &&
-               explicitCallee != nullptr && explicitCallee->text == "tác vụ nền",
-           "the explicit 'gọi' form also produces a call expression");
+               explicitCall->explicitCall && explicitCallee != nullptr &&
+               explicitCallee->text == "tác vụ nền",
+           "the explicit 'gọi' form produces a source-mode-preserving call expression");
+
+    const vietvm::frontend::AstProgram groupedExplicit = parseSource(
+        "in (gọi tác vụ nền());");
+    const auto *groupedCall = groupedExplicit.statements.empty() ||
+            groupedExplicit.statements.front().expressionRoots.empty()
+        ? nullptr
+        : findExpression(groupedExplicit,
+                         groupedExplicit.statements.front().expressionRoots.front());
+    expect(groupedCall != nullptr && groupedCall->explicitCall,
+           "grouping widens a call span without erasing explicit-call syntax metadata");
 
     const auto *keywordCall = program.statements[3].expressionRoots.empty()
         ? nullptr
@@ -389,6 +400,403 @@ void testExpressionAstCallsAssignmentsAndPostfix() {
     }
 }
 
+void testParserRecordsExactConditionalForms() {
+    const vietvm::frontend::AstProgram program = parseSource(
+        "nếu (đúng) { in 1; }\n"
+        "nếu (đúng) { in 1; } hoặc { in 2; }\n"
+        "nếu (đúng) { in 1; } hoặc nếu (sai) { in 2; }\n"
+        "nếu (đúng) in 1;");
+    expect(program.statements.size() == 4,
+           "conditional form fixture remains four source statements");
+    if (program.statements.size() != 4) return;
+
+    expect(program.statements[0].conditionalForm ==
+               vietvm::frontend::AstConditionalForm::IfBlock,
+           "parser marks an exact brace-delimited if form");
+    expect(program.statements[1].conditionalForm ==
+               vietvm::frontend::AstConditionalForm::IfElseBlocks,
+           "parser marks an exact brace-delimited if/else form");
+    expect(program.statements[2].conditionalForm ==
+               vietvm::frontend::AstConditionalForm::Unstructured,
+           "else-if remains unstructured until its second condition has an AST role");
+    expect(program.statements[3].conditionalForm ==
+               vietvm::frontend::AstConditionalForm::Unstructured,
+           "single-statement conditional remains on the compatibility grammar");
+
+    const vietvm::compiler::SemanticModel semantic =
+        vietvm::compiler::analyzeSemantics(program);
+    const vietvm::compiler::IrProgram ir =
+        vietvm::compiler::lowerToIr(program, semantic);
+    expect(ir.instructions.size() == 4 &&
+               ir.instructions[0].conditionalForm ==
+                   vietvm::frontend::AstConditionalForm::IfBlock &&
+               ir.instructions[1].conditionalForm ==
+                   vietvm::frontend::AstConditionalForm::IfElseBlocks,
+           "recursive IR lowering carries parser-owned conditional form metadata");
+}
+
+void testParserRecordsExactLoopForms() {
+    const vietvm::frontend::AstProgram program = parseSource(
+        "lặp (i = 0; i < 2; i++) { in i; }\n"
+        "lặp (i = 0; i < 2; i++) in i;\n"
+        "lặp (; i < 2; i++) { in i; }");
+    expect(program.statements.size() == 3,
+           "loop form fixture remains three source statements");
+    if (program.statements.size() != 3) return;
+    expect(program.statements[0].loopForm ==
+               vietvm::frontend::AstLoopForm::ForBlock &&
+               program.statements[0].expressionRoots.size() == 3,
+           "parser marks an exact three-clause brace-delimited loop");
+    expect(program.statements[1].loopForm ==
+               vietvm::frontend::AstLoopForm::Unstructured,
+           "single-statement loop remains on the compatibility grammar");
+    expect(program.statements[2].loopForm ==
+               vietvm::frontend::AstLoopForm::Unstructured,
+           "loop with an empty clause is not mislabeled as complete structured IR");
+
+    const vietvm::compiler::SemanticModel semantic =
+        vietvm::compiler::analyzeSemantics(program);
+    const vietvm::compiler::IrProgram ir =
+        vietvm::compiler::lowerToIr(program, semantic);
+    expect(ir.instructions.size() == 3 &&
+               ir.instructions[0].loopForm ==
+                   vietvm::frontend::AstLoopForm::ForBlock,
+           "recursive IR lowering carries parser-owned loop form metadata");
+}
+
+void testParserRecordsExactClassFormsAndQualifiedMethodIr() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const AstProgram program = parseSource(
+        "lớp riêng tư Toan { "
+        "hàm công khai cộng(a) { trả về a; }; "
+        "hàm ẩn() { trả về 1; } }\n"
+        "lớp Hai Tên { hàm ok() { } }\n"
+        "lớp CoTruong { value = 1; }\n"
+        "lớp ThuTuCu { công khai hàm old() { } }");
+    expect(program.statements.size() == 4,
+           "class form fixture remains four source statements");
+    if (program.statements.size() != 4) return;
+
+    const AstStatement &structured = program.statements[0];
+    expect(structured.kind == AstStatementKind::Class &&
+               structured.classForm == AstClassForm::MethodBlock &&
+               structured.visibility == AstVisibility::Private &&
+               structured.declarationName == "Toan" &&
+               structured.children.size() == 1 &&
+               structured.children.front().kind == AstStatementKind::Block &&
+               structured.children.front().tokenEnd == structured.tokenEnd,
+           "parser marks an exact single-name method-only class block");
+    expect(program.statements[1].classForm == AstClassForm::Unstructured,
+           "a multi-token class name remains on the compatibility grammar");
+    expect(program.statements[2].classForm == AstClassForm::Unstructured,
+           "class fields remain on the compatibility grammar");
+    expect(program.statements[3].classForm == AstClassForm::Unstructured,
+           "modifier-before-function class syntax remains on the compatibility grammar");
+
+    const SemanticModel semantic = analyzeSemantics(program);
+    const IrProgram ir = lowerToIr(program, semantic);
+    expect(ir.instructions.size() == 4 &&
+               ir.instructions[0].classForm == AstClassForm::MethodBlock &&
+               !ir.instructions[0].legacyRegion &&
+               ir.instructions[1].legacyRegion &&
+               ir.instructions[2].legacyRegion &&
+               ir.instructions[3].legacyRegion,
+           "only the exact class form leaves the class-level legacy region");
+    if (ir.instructions.empty() || ir.instructions[0].children.empty()) return;
+
+    const IrInstruction &body = ir.instructions[0].children.front();
+    const IrInstruction *publicMethod = nullptr;
+    const IrInstruction *inheritedMethod = nullptr;
+    for (const IrInstruction &member : body.children) {
+        if (member.opcode != IrOpcode::DefineFunction) continue;
+        if (member.declarationName == "Toan.cộng") publicMethod = &member;
+        if (member.declarationName == "Toan.ẩn") inheritedMethod = &member;
+    }
+    expect(publicMethod != nullptr &&
+               publicMethod->visibility == AstVisibility::Public &&
+               publicMethod->effectiveVisibility == SemanticVisibility::Public,
+           "IR uses the resolved qualified method name and explicit visibility");
+    expect(inheritedMethod != nullptr &&
+               inheritedMethod->visibility == AstVisibility::Unspecified &&
+               inheritedMethod->effectiveVisibility == SemanticVisibility::Private,
+           "IR carries semantic visibility inherited from the declaring class");
+}
+
+void testParserBuildsStructuredLocalFileImports() {
+    using namespace vietvm::frontend;
+
+    const std::string source =
+        "nhập src/tests/thư viện/math.vi như toan;\n"
+        "nhập \"modules/quoted.vi\";\n"
+        "nhập 'modules/single.vi' như mot;\n"
+        "nhập /tmp/vpp/ /absolute.vi;";
+    const AstProgram program = parseSource(source);
+    expect(program.statements.size() == 4,
+           "local-file import fixture produces four statements");
+    if (program.statements.size() != 4) return;
+
+    const AstStatement &unquoted = program.statements[0];
+    const AstStatement &quoted = program.statements[1];
+    const AstStatement &singleQuoted = program.statements[2];
+    expect(unquoted.kind == AstStatementKind::Import &&
+               unquoted.importForm == AstImportForm::LocalSourceFile &&
+               unquoted.importSpec.target == "src/tests/thư viện/math.vi" &&
+               !unquoted.importSpec.quoted &&
+               unquoted.importSpec.alias == "toan" &&
+               unquoted.importSpec.hasSemicolon,
+           "unquoted local import reconstructs slash-separated and spaced path segments");
+    expect(unquoted.importSpec.targetSpan.begin.offset == source.find("src/tests") &&
+               unquoted.importSpec.targetSpan.end.offset == source.find(" như toan") &&
+               unquoted.importSpec.aliasSpan.begin.offset == source.find("toan"),
+           "structured import target and alias retain their exact source spans");
+    expect(quoted.importForm == AstImportForm::LocalSourceFile &&
+               quoted.importSpec.target == "modules/quoted.vi" &&
+               quoted.importSpec.quoted && quoted.importSpec.alias.empty() &&
+               quoted.importSpec.hasSemicolon,
+           "double-quoted local import stores dequoted target and source quoting metadata");
+    expect(singleQuoted.importForm == AstImportForm::LocalSourceFile &&
+               singleQuoted.importSpec.target == "modules/single.vi" &&
+               singleQuoted.importSpec.quoted &&
+               singleQuoted.importSpec.alias == "mot",
+           "single-quoted local import uses the same exact structured payload");
+    expect(program.statements[3].importForm == AstImportForm::LocalSourceFile &&
+               program.statements[3].importSpec.target ==
+                   "/tmp/vpp//absolute.vi",
+           "unquoted target reconstruction preserves leading and repeated separators exactly");
+}
+
+void testNonExactImportsStayOnTolerantPath() {
+    using namespace vietvm::frontend;
+
+    const AstProgram packageImports = parseSource(
+        "nhập \"cốt lõi\";\n"
+        "nhập vpp_core;\n"
+        "nhập modules/a.vi như;\n"
+        "nhập modules/b.vi như alias extra;\n"
+        "nhập \"modules/c.vi\" extra;");
+    expect(packageImports.statements.size() == 5,
+           "non-exact import fixture remains losslessly statement-delimited");
+    for (const AstStatement &statement : packageImports.statements) {
+        expect(statement.kind == AstStatementKind::Import &&
+                   statement.importForm == AstImportForm::Unstructured &&
+                   statement.importSpec.target.empty(),
+               "package shortcuts and malformed local imports do not receive structured metadata");
+    }
+
+    const AstProgram missingSemicolon = parseSource("nhập modules/a.vi");
+    expect(missingSemicolon.statements.size() == 1 &&
+               missingSemicolon.statements.front().importForm ==
+                   AstImportForm::Unstructured &&
+               missingSemicolon.statements.front().tokenEnd ==
+                   missingSemicolon.tokens.size(),
+           "local-file import without semicolon stays on the tolerant token path");
+}
+
+void testSemanticImportAliasUsesStructuredAstPayload() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    AstProgram program = parseSource(
+        "nhập modules/math.vi như token_alias;");
+    expect(program.statements.size() == 1 &&
+               program.statements.front().importForm ==
+                   AstImportForm::LocalSourceFile,
+           "semantic import fixture starts with a structured local import");
+    if (program.statements.size() != 1) return;
+
+    AstStatement &statement = program.statements.front();
+    statement.importSpec.alias = "ast_alias";
+    for (Token &token : program.tokens) {
+        if (token.lexeme == "token_alias") token.lexeme = "token_bridge_alias";
+    }
+    const SemanticModel structured = analyzeSemantics(program);
+    const SemanticSymbol *astAlias = findSymbol(
+        structured, SemanticSymbolKind::ImportAlias, "ast_alias");
+    expect(astAlias != nullptr &&
+               findSymbol(structured, SemanticSymbolKind::ImportAlias,
+                          "token_bridge_alias") == nullptr &&
+               astAlias->declaration.begin.offset ==
+                   statement.importSpec.aliasSpan.begin.offset,
+           "semantic analysis consumes structured import alias metadata instead of rescanning tokens");
+
+    AstProgram legacy = parseSource("nhập cốt lõi như package_alias;");
+    expect(legacy.statements.size() == 1 &&
+               legacy.statements.front().importForm == AstImportForm::Unstructured,
+           "bare package import remains explicitly unstructured");
+    const SemanticModel legacySemantic = analyzeSemantics(legacy);
+    expect(findSymbol(legacySemantic, SemanticSymbolKind::ImportAlias,
+                      "package_alias") != nullptr,
+           "unstructured imports retain the compatibility token adapter for aliases");
+}
+
+void testParserBuildsStructuredTryCatchMetadata() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const std::string source =
+        "thử { in 1; } bắt lỗi (e) { in e; }\n"
+        "thử { in 2; } bắt lỗi { in 3; }";
+    const AstProgram program = parseSource(source);
+    expect(program.statements.size() == 2,
+           "try/catch fixture remains two source statements");
+    if (program.statements.size() != 2) return;
+
+    const AstStatement &bound = program.statements[0];
+    const AstStatement &unbound = program.statements[1];
+    expect(bound.kind == AstStatementKind::Try &&
+               bound.tryForm == AstTryForm::TryCatchBlocks &&
+               bound.children.size() == 2 &&
+               bound.children[0].kind == AstStatementKind::Block &&
+               bound.children[1].kind == AstStatementKind::Block,
+           "parser marks exact try and catch blocks as structured syntax");
+    expect(bound.catchVariable == "e" &&
+               bound.catchVariableSpan.begin.offset == source.find("(e)") + 1 &&
+               bound.catchVariableSpan.end.offset == source.find("(e)") + 2,
+           "parser records the optional catch binding and its exact source span");
+    expect(unbound.kind == AstStatementKind::Try &&
+               unbound.tryForm == AstTryForm::TryCatchBlocks &&
+               unbound.children.size() == 2 && unbound.catchVariable.empty(),
+           "try/catch without a binding has the same structured form and no fake name");
+
+    // Corrupt only the retained compatibility token after parsing. Semantic
+    // analysis must use the parser-owned catch metadata for structured syntax.
+    AstProgram metadataOwned = parseSource(
+        "thử { in 1; } bắt lỗi (e) { in e; }");
+    AstStatement &metadataTry = metadataOwned.statements.front();
+    for (Token &token : metadataOwned.tokens) {
+        if (token.span.begin.offset == metadataTry.catchVariableSpan.begin.offset) {
+            token.lexeme = "token_bridge_name";
+            break;
+        }
+    }
+    const SemanticModel semantic = analyzeSemantics(metadataOwned);
+    const SemanticSymbol *catchSymbol = findSymbol(
+        semantic, SemanticSymbolKind::CatchVariable, "e");
+    expect(catchSymbol != nullptr &&
+               findSymbol(semantic, SemanticSymbolKind::CatchVariable,
+                          "token_bridge_name") == nullptr &&
+               catchSymbol->declaration.begin.offset ==
+                   metadataTry.catchVariableSpan.begin.offset,
+           "semantic catch declaration comes from AST metadata, not token recovery");
+
+    const AstStatement &catchBody = metadataTry.children[1];
+    const AstStatement *printed = catchBody.children.empty()
+        ? nullptr
+        : &catchBody.children.front();
+    const BindingResult *binding = printed == nullptr ||
+                                           printed->expressionRoots.empty()
+        ? nullptr
+        : semantic.bindingForExpression(printed->expressionRoots.front());
+    expect(catchSymbol != nullptr && binding != nullptr &&
+               binding->kind == BindingKind::Symbol &&
+               binding->symbol == catchSymbol->id,
+           "name resolution inside the catch block resolves to its AST-declared binding");
+}
+
+void testMalformedTryBindingsStayOnLegacyPath() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const AstProgram program = parseSource(
+        "thử { in 1; } bắt lỗi () { in 2; }\n"
+        "thử { in 3; } bắt lỗi (e extra) { in 4; }");
+    expect(program.statements.size() == 2,
+           "malformed catch-binding fixture remains two tolerant statements");
+    if (program.statements.size() != 2) return;
+
+    const SemanticModel semantic = analyzeSemantics(program);
+    const IrProgram ir = lowerToIr(program, semantic);
+    expect(program.statements[0].tryForm == AstTryForm::Unstructured &&
+               program.statements[0].catchVariable.empty(),
+           "empty catch parentheses do not masquerade as the no-binding grammar");
+    expect(program.statements[1].tryForm == AstTryForm::Unstructured &&
+               program.statements[1].catchVariable.empty(),
+           "multi-token catch binding remains unstructured");
+    expect(ir.instructions.size() == 2 &&
+               ir.instructions[0].legacyRegion &&
+               ir.instructions[1].legacyRegion,
+           "malformed catch bindings remain explicit legacy IR regions");
+}
+
+void testParserBuildsStructuredSwitchArms() {
+    using namespace vietvm::frontend;
+
+    const AstProgram program = parseSource(
+        "x = 2; key = 2; chọn (x) { "
+        "ca 1: { in 1; thoát; }; "
+        "ca \"hai\" { in 2; } "
+        "ca key: { in 3; } "
+        "mặc định: { in 0; } }");
+    expect(program.statements.size() == 3,
+           "structured switch fixture keeps preceding declarations separate");
+    if (program.statements.size() != 3) return;
+
+    const AstStatement &selection = program.statements[2];
+    expect(selection.kind == AstStatementKind::Switch &&
+               selection.switchForm == AstSwitchForm::Structured,
+           "parser records the exact structured switch form");
+    expect(selection.switchArms.size() == 4 && selection.children.size() == 4 &&
+               selection.expressionRoots.size() == 4,
+           "selector and three case labels are roots while four arm bodies are children");
+    if (selection.switchArms.size() != 4 || selection.children.size() != 4) return;
+
+    for (std::size_t index = 0; index < selection.switchArms.size(); ++index) {
+        expect(selection.switchArms[index].bodyChildIndex == index &&
+                   selection.children[index].kind == AstStatementKind::Block,
+               "each switch arm addresses its ordinary block child without recursion");
+    }
+    expect(selection.switchArms[0].kind == AstSwitchArmKind::Case &&
+               selection.switchArms[0].hasColon &&
+               selection.switchArms[0].prefixedByCase &&
+               selection.switchArms[3].kind == AstSwitchArmKind::Default &&
+               selection.switchArms[3].label == kInvalidExprId &&
+               !selection.switchArms[3].prefixedByCase,
+           "case/default grammar distinctions survive parsing explicitly");
+
+    const AstExpression *integerLabel =
+        program.expression(selection.switchArms[0].label);
+    const AstExpression *stringLabel =
+        program.expression(selection.switchArms[1].label);
+    const AstExpression *nameLabel =
+        program.expression(selection.switchArms[2].label);
+    expect(integerLabel != nullptr && integerLabel->literalKind == AstLiteralKind::Integer &&
+               stringLabel != nullptr && stringLabel->literalKind == AstLiteralKind::String &&
+               nameLabel != nullptr && nameLabel->kind == AstExpressionKind::Name &&
+               nameLabel->text == "key",
+           "case label expression kinds are preserved without token recovery");
+
+    const AstStatement &firstBody = selection.children[0];
+    expect(firstBody.children.size() == 2 &&
+               firstBody.children[1].kind == AstStatementKind::Break,
+           "break inside a case body is an ordinary nested AST statement");
+
+    const vietvm::compiler::SemanticModel semantic =
+        vietvm::compiler::analyzeSemantics(program);
+    const auto *labelBinding = semantic.bindingForExpression(
+        selection.switchArms[2].label);
+    expect(labelBinding != nullptr &&
+               labelBinding->kind == vietvm::compiler::BindingKind::Symbol,
+           "semantic analysis resolves a name-valued case label by ExprId");
+    expect(semantic.scopeForStatement(selection.children[0].tokenBegin) !=
+               semantic.scopeForStatement(selection.children[1].tokenBegin),
+           "switch arm blocks receive sibling lexical scopes");
+}
+
+void testMalformedSwitchKeepsTolerantFallbackShape() {
+    using namespace vietvm::frontend;
+    const AstProgram program = parseSource("chọn (x) { ca 1: in 1; }");
+    expect(program.statements.size() == 1 &&
+               program.statements.front().kind == AstStatementKind::Switch &&
+               program.statements.front().switchForm == AstSwitchForm::Unstructured &&
+               program.statements.front().switchArms.empty(),
+           "blockless switch arm remains on the lossless tolerant parser path");
+    if (program.statements.empty()) return;
+    expect(program.statements.front().tokenEnd == program.tokens.size(),
+           "unstructured switch retains its complete token range for compatibility lowering");
+}
+
 void testExpressionAstLambdaMapAndLiteralCategories() {
     const vietvm::frontend::AstProgram program = parseSource(
         "handler = hàm(x, y = 2) { trả về x + y; };\n"
@@ -404,10 +812,33 @@ void testExpressionAstLambdaMapAndLiteralCategories() {
     const auto *lambda = lambdaAssignment == nullptr
         ? nullptr
         : findExpression(program, lambdaAssignment->right);
+    const auto *lambdaPayload = lambda == nullptr
+        ? nullptr
+        : program.lambda(lambda->lambdaId);
     expect(lambda != nullptr && lambda->kind == vietvm::frontend::AstExpressionKind::Lambda &&
-               lambda->parameters == std::vector<std::string>({"x", "y"}) &&
-               lambda->bodyTokenBegin < lambda->bodyTokenEnd,
-           "lambda AST stores parameters and a lossless body token range");
+               lambdaPayload != nullptr && lambdaPayload->expression == lambda->id &&
+               lambdaPayload->parameters.size() == 2 &&
+               lambdaPayload->parameters[0].name == "x" &&
+               lambdaPayload->parameters[1].name == "y" &&
+               lambdaPayload->parameters[1].hasDefault &&
+               lambdaPayload->body.kind ==
+                   vietvm::frontend::AstStatementKind::Block &&
+               !lambdaPayload->body.children.empty(),
+           "lambda AST owns structured parameters/defaults and a recursive block body");
+    if (lambdaPayload != nullptr && lambdaPayload->parameters.size() == 2) {
+        const auto *defaultValue = findExpression(
+            program, lambdaPayload->parameters[1].defaultValue);
+        expect(defaultValue != nullptr &&
+                   defaultValue->literalKind ==
+                       vietvm::frontend::AstLiteralKind::Integer &&
+                   defaultValue->text == "2",
+               "lambda parameter default points into the shared expression arena");
+        expect(lambdaPayload->body.tokenBegin < lambdaPayload->body.tokenEnd &&
+                   lambdaPayload->body.children.front().kind ==
+                       vietvm::frontend::AstStatementKind::Return &&
+                   lambdaPayload->body.children.front().expressionRoots.size() == 1,
+               "lambda body retains its lossless range and parsed statement roots");
+    }
 
     const auto *mapAssignment = program.statements[1].expressionRoots.empty()
         ? nullptr
@@ -433,6 +864,33 @@ void testExpressionAstLambdaMapAndLiteralCategories() {
                floatValue != nullptr && floatValue->literalKind == vietvm::frontend::AstLiteralKind::Float &&
                stringValue != nullptr && stringValue->literalKind == vietvm::frontend::AstLiteralKind::String,
            "literal nodes preserve integer, float, string, boolean and null categories");
+}
+
+void testLambdaParseRollbackDoesNotLeakNestedArenas() {
+    using namespace vietvm::frontend;
+    const AstProgram program = parseSource(
+        "bad = hàm(x) { nested = hàm(y) { trả về y; }; trả về x; } trailing;\n"
+        "good = 1;");
+    expect(program.statements.size() == 2 &&
+               program.statements.front().expressionRoots.empty(),
+           "an expression with trailing tokens remains on the tolerant token path");
+    expect(program.lambdas.empty(),
+           "failed outer expression rollback removes both outer and nested lambda payloads");
+    expect(program.statements.size() == 2 &&
+               program.statements[1].expressionRoots.size() == 1,
+           "a later valid expression still parses after lambda rollback");
+    for (std::size_t index = 0; index < program.expressions.size(); ++index) {
+        expect(program.expressions[index].id == index,
+               "lambda rollback preserves contiguous stable expression IDs");
+    }
+
+    const AstProgram fallbackSwitch = parseSource(
+        "chọn (hàm(x) { trả về x; }) { ca 1: in 1; }");
+    expect(fallbackSwitch.statements.size() == 1 &&
+               fallbackSwitch.statements.front().switchForm ==
+                   AstSwitchForm::Unstructured &&
+               fallbackSwitch.lambdas.size() == 1,
+           "structured-switch rollback does not leak the lambda selector parsed before fallback");
 }
 
 void testExpressionRootsOnDeclarationsAndControlFlow() {
@@ -652,6 +1110,87 @@ void testSemanticBuildsScopesAndDeclarations() {
                model.scopes[catchVariable->declaringScope].kind ==
                    vietvm::compiler::ScopeKind::Catch,
            "catch variable belongs only to the catch scope");
+}
+
+void testSemanticResolvesLambdaBodiesAndCaptures() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const AstProgram program = parseSource(
+        "hàm outer(p) {\n"
+        "  local = 1;\n"
+        "  handler = hàm(x = 2) {\n"
+        "    nested = hàm(local) { trả về local + p; };\n"
+        "    trả về x + local;\n"
+        "  };\n"
+        "}");
+    const SemanticModel model = analyzeSemantics(program);
+
+    const AstLambda *outerSyntax = nullptr;
+    const AstLambda *innerSyntax = nullptr;
+    for (const AstLambda &lambda : program.lambdas) {
+        if (!lambda.parameters.empty() && lambda.parameters.front().name == "x") {
+            outerSyntax = &lambda;
+        } else if (!lambda.parameters.empty() &&
+                   lambda.parameters.front().name == "local") {
+            innerSyntax = &lambda;
+        }
+    }
+    expect(outerSyntax != nullptr && innerSyntax != nullptr &&
+               model.lambdas.size() == 2,
+           "semantic analysis receives both recursive lambda bodies from the AST arena");
+    if (outerSyntax == nullptr || innerSyntax == nullptr) return;
+
+    const SemanticLambda *outer = model.lambdaForExpression(outerSyntax->expression);
+    const SemanticLambda *inner = model.lambdaForExpression(innerSyntax->expression);
+    const SemanticSymbol *parameterP = findSymbol(model, SymbolKind::Parameter, "p");
+    const SemanticSymbol *local = findSymbol(model, SymbolKind::LocalVariable, "local");
+    expect(outer != nullptr && inner != nullptr && parameterP != nullptr &&
+               local != nullptr,
+           "lambda semantic records and enclosing declarations are addressable by stable IDs");
+    if (outer == nullptr || inner == nullptr || parameterP == nullptr || local == nullptr) {
+        return;
+    }
+
+    const auto capturedBy = [](const SemanticLambda &lambda, SymbolId symbol) {
+        return std::find(lambda.captures.begin(), lambda.captures.end(), symbol) !=
+               lambda.captures.end();
+    };
+    expect(capturedBy(*outer, local->id) && capturedBy(*outer, parameterP->id),
+           "outer lambda records direct and transitively required captures");
+    expect(capturedBy(*inner, parameterP->id) && !capturedBy(*inner, local->id),
+           "inner parameter shadowing prevents a false capture of the outer local");
+    expect(outer->scope < model.scopes.size() &&
+               outer->bodyScope < model.scopes.size() &&
+               model.scopes[outer->scope].kind == ScopeKind::Lambda &&
+               model.scopes[outer->bodyScope].kind == ScopeKind::Block &&
+               model.scopes[outer->bodyScope].parent == outer->scope &&
+               model.scopeForStatement(outerSyntax->body.tokenBegin) == outer->bodyScope,
+           "lambda scope owns a recursively analyzed block-body scope");
+    expect(outer->parameterSymbols.size() == 1 &&
+               outer->parameterSymbols.front() < model.symbols.size() &&
+               model.symbols[outer->parameterSymbols.front()].lookupName == "x" &&
+               model.symbols[outer->parameterSymbols.front()].declaringScope == outer->scope,
+           "lambda parameters are real symbols in the lambda scope");
+
+    bool sawCapturedOuterLocal = false;
+    bool sawUncapturedShadow = false;
+    for (const AstExpression &expression : program.expressions) {
+        if (expression.kind != AstExpressionKind::Name ||
+            expression.text != "local") {
+            continue;
+        }
+        const BindingResult *binding = model.bindingForExpression(expression.id);
+        if (binding == nullptr || binding->kind != BindingKind::Symbol) continue;
+        if (binding->symbol == local->id && binding->captured) {
+            sawCapturedOuterLocal = true;
+        }
+        if (binding->symbol != local->id && !binding->captured) {
+            sawUncapturedShadow = true;
+        }
+    }
+    expect(sawCapturedOuterLocal && sawUncapturedShadow,
+           "per-expression bindings distinguish captures from shadowed lambda parameters");
 }
 
 void testSemanticResolvesExpressionNamesAndCallKinds() {
@@ -976,12 +1515,24 @@ int main() {
     testParserRejectsCrossedDelimiterNesting();
     testExpressionAstUsesStableIdsAndLegacyPrecedence();
     testExpressionAstCallsAssignmentsAndPostfix();
+    testParserRecordsExactConditionalForms();
+    testParserRecordsExactLoopForms();
+    testParserRecordsExactClassFormsAndQualifiedMethodIr();
+    testParserBuildsStructuredLocalFileImports();
+    testNonExactImportsStayOnTolerantPath();
+    testSemanticImportAliasUsesStructuredAstPayload();
+    testParserBuildsStructuredTryCatchMetadata();
+    testMalformedTryBindingsStayOnLegacyPath();
+    testParserBuildsStructuredSwitchArms();
+    testMalformedSwitchKeepsTolerantFallbackShape();
     testExpressionAstLambdaMapAndLiteralCategories();
+    testLambdaParseRollbackDoesNotLeakNestedArenas();
     testExpressionRootsOnDeclarationsAndControlFlow();
     testExpressionAstFallsBackWithoutLosingStatementTokens();
     testExpressionRollbackPreservesArenaIdsAndGroupedSpans();
     testSemanticForwardAndDynamicCalls();
     testSemanticBuildsScopesAndDeclarations();
+    testSemanticResolvesLambdaBodiesAndCaptures();
     testSemanticResolvesExpressionNamesAndCallKinds();
     testSemanticKeepsSiblingFunctionBindingsIsolated();
     testSemanticAssignmentReusesCatchBindingAndPostfixDeclaresOnce();
