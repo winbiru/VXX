@@ -17,8 +17,11 @@ cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
 cmake --build "$BUILD_DIR" --parallel
 ctest --test-dir "$BUILD_DIR" --output-on-failure --no-tests=error
 
-lcov --capture --directory "$BUILD_DIR" --output-file "$BUILD_DIR/coverage.raw.info"
+lcov --capture --directory "$BUILD_DIR" \
+  --rc geninfo_unexecuted_blocks=1 \
+  --output-file "$BUILD_DIR/coverage.raw.info"
 lcov --remove "$BUILD_DIR/coverage.raw.info" \
+  --ignore-errors unused \
   '/usr/*' \
   '*/test/*' \
   '*/src/tests/*' \
