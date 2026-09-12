@@ -13,7 +13,7 @@
 - [x] Runtime có MVP cho GC/JIT và CI có regression/sanitizer nền tảng; các phần này
   chưa phải implementation production-grade có profiling đầy đủ.
 - [x] Pipeline đã có expression AST mang span, scope tree, ExprId-based resolution,
-  recursive untyped IR, optimizer, direct backend cohort đầu và legacy compatibility fallback.
+  recursive untyped IR, optimizer và direct bytecode backend; production token bridge đã bị xóa.
 - [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
   fingerprint bytecode, StringPool và function registries với baseline legacy
   đóng băng dưới `test/data/`.
@@ -42,17 +42,17 @@
       if/else/for-loop/switch/try, continue, break, throw và class namespace/method.
       Emitter tự sở hữu function ID, VM slot và jump
       fixup; shared mixed-backend context còn thiếu.
-   6. [ ] **Bỏ dần token bridge** — vùng chưa migrate phải là fallback tường minh
-      và được đếm; chỉ xóa `materializeIrTokens`/legacy compiler khi corpus `.vi`
-      đạt zero fallback và vẫn cùng bytecode/compiler state.
+   6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
+      vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
+      đạt 61/61 direct IR và vẫn giữ cùng bytecode/compiler state.
 
    Hiện direct backend bao phủ 61/61 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
    Helper loop cũ và implementation `compileFunction` không còn caller đã được xóa.
-   Compatibility bridge vẫn còn cho các cú pháp ngoài regression corpus; cần audit
-   các fallback unit/diagnostic case trước khi xóa `materializeIrTokens`.
+   `materializeIrTokens()` chỉ còn phục vụ lossless IR test/debug; nó không còn nằm
+   trên production compile path. Các cú pháp ngoài direct cohort được diagnostic.
 
    Chốt dynamic/static/gradual typing và Typed IR là quyết định riêng. Expression
    AST, scope tree, name resolution và structured **untyped IR** không phải chờ

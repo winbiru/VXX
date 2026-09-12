@@ -37,7 +37,11 @@ CMake định nghĩa các target `vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vp
 
 CLI compile source rồi copy function bytecode/name table vào `VM`. VM không còn đọc `compiler::hamMap` hay `StringPool` global ở runtime. Điều này làm runtime có thể nhận bytecode từ nguồn khác ngoài CLI.
 
-Compiler vẫn dùng mutable state nội bộ trong phiên compile. Bước tiếp theo của API embedding là thay state này bằng `CompilationContext` và `BytecodeProgram` bất biến; không xem các header `compile*.h` là public API ổn định.
+Top-level compile hiện đã có `CompilationContext`, nhưng compiler internals vẫn còn
+dùng một số mutable global registries. `CompilationContext` hiện là ranh giới lifecycle
+để reset/snapshot/cleanup state; bước tiếp theo của API embedding là dời toàn bộ
+registries vào context và trả về một `BytecodeProgram` bất biến. Cho tới lúc đó compiler
+chưa re-entrant/parallel-safe hoàn toàn và các header `compile*.h` chưa phải public API ổn định.
 
 Lifecycle hiện tại được khóa như sau: một top-level compilation phải đi qua
 `resetCompilationState()` hoặc overload `compilePipeline(CompilationContext&, ...)`.
@@ -86,18 +90,18 @@ ra rằng semantic analysis đồng nghĩa với static type checker. Một quy�
 riêng về dynamic, static hay gradual typing là điều kiện trước khi bổ sung IR
 có kiểu.
 
-Backend selector phát bytecode trực tiếp từ IR khi toàn program thuộc cohort được
-hỗ trợ. Nếu còn instruction/value chưa hỗ trợ, compiler materialize token payload và
-dùng legacy backend cho toàn program. Cách chuyển tiếp này bảo toàn bytecode/VM
-contract; backend cũ không trở thành API compiler public lâu dài.
+Compiler hiện chỉ có một production backend: **Direct IR → bytecode**. Nếu program chứa
+region mà direct emitter chưa hỗ trợ, pipeline báo lỗi compiler tường minh thay vì
+materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **61 chương
+trình `.vi`** trong corpus ở direct IR.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
 `--dump-ir <file.vi>`. AST dump hiển thị statement tree, expression arena và
-span; IR dump hiển thị value arena, statement children và fallback count sau
-optimizer, tức dữ liệu dùng để chọn direct emitter hoặc bridge. Các dump không
+span; IR dump hiển thị value arena, statement children và số region chưa được direct
+emitter hỗ trợ sau optimizer. Các dump không
 chạy VM và được in ra stdout để có thể redirect hoặc dùng trong test.
 
-### Thứ tự thay legacy bridge
+### Direct IR migration
 
 Không được xem sơ đồ pipeline là bằng chứng rằng mọi feature đã hoàn thiện.
 Expression arena, scope tree, ExprId-based resolution và recursive untyped IR đã
@@ -105,8 +109,9 @@ có. Direct emitter hiện nhận literal/name/operator/assignment/postfix/print
 top-level function, primitive default parameter, return, resolved function call, structured
 if/else/for-loop/switch/try-catch, continue, break, throw và class namespace/method.
 Lambda capture-free, dynamic/native/indirect call và structured import đã có direct
-emission trong regression corpus. Compatibility bridge vẫn tồn tại cho các grammar
-edge/malformed case chưa thuộc direct cohort. Migration tiếp tục theo thứ tự:
+emission trong regression corpus. Grammar edge/malformed case chưa được hỗ trợ sẽ bị
+từ chối bằng diagnostic thay vì rơi sang token compiler. Mốc migration toàn corpus và
+việc xóa production bridge đều đã đạt:
 
 ```text
 Expression AST
@@ -119,18 +124,14 @@ Recursive IR lowering
   ↓
 Direct IR → bytecode emission theo từng opcode/feature
   ↓
-Giảm dần legacy token fallback về 0 rồi mới xóa bridge
+Unsupported Direct IR = 0 trên regression corpus (đã đạt 61/61)
 ```
 
-Trong giai đoạn chuyển tiếp, IR đánh dấu explicit legacy regions cho phần còn
-phụ thuộc token; direct-support analyzer còn đếm top-level instruction đã có IR
-cấu trúc nhưng emitter chưa hỗ trợ. Chỉ khi toàn program supported mới chọn
-direct backend. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow, không
-parse token lần nữa; một IR opcode vẫn có thể
-phát nhiều VM instruction. Mỗi nhóm feature chỉ được chuyển sang emitter mới
-khi parity test xác nhận fingerprint của top-level bytecode, StringPool,
-function bytecode và function-name map vẫn khớp baseline legacy đã đóng băng
-trên toàn bộ corpus `.vi`.
+IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận diện phần chưa
+được direct emitter hỗ trợ. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow,
+không parse token lần nữa; một IR opcode vẫn có thể phát nhiều VM instruction.
+Parity test khóa fingerprint của top-level bytecode, StringPool, function bytecode và
+function-name map theo baseline đã đóng băng trên toàn bộ corpus `.vi`.
 
 CTest `vpp-pipeline-legacy-parity` tự động quét `src/tests/**/*.vi` và thực hiện
 so sánh pipeline hiện tại với manifest `test/data/legacy_compiler_snapshots.tsv`.
@@ -140,12 +141,11 @@ regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm
 được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
 được review như một thay đổi bytecode/compiler-state có chủ ý.
 
-Gate hiện xác nhận 57/57 compiler snapshots khớp và khóa chính xác
-28 direct program trong `requiredDirectPrograms` của
-`test/pipeline_legacy_parity_tests.cpp`. Tập này bao phủ expression/map,
-function/return/call, condition, recursion, loop/continue, switch/break,
-try/throw và class method. Con số phải tăng theo
-từng cohort; không được quay lại bridge mà test vẫn xanh.
+Gate hiện tự động quét **61/61** chương trình `.vi`, xác nhận compiler snapshots khớp
+và yêu cầu mọi program có `unsupportedDirectIrRegions == 0`. Source test dùng
+`CompilationContext` cho từng top-level compile, sau đó chạy lại corpus theo thứ tự
+ngược trong cùng process để khóa reset/CWD isolation. Toàn corpus chính là direct-IR
+contract; không còn backend selector hay token compiler để quay lại.
 
 Các bước trên dùng IR không kiểu và giữ semantics động hiện hành. Quyết định
 dynamic/static/gradual chỉ là điều kiện cho type checking/Typed IR, không phải

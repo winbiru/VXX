@@ -28,7 +28,7 @@ This document compares V++ with popular programming languages to help users unde
 V++ remains **experimental** and is not production-ready. Its compiler pipeline has
 span-carrying tokens, statement and expression ASTs, scope/name resolution, recursive
 untyped IR, and optimization. Supported cohorts emit bytecode directly; programs with
-features not yet migrated use a whole-program compatibility bridge. Runtime values are dynamic (`int`, `double`, `string`,
+features not yet supported by the direct emitter are rejected with a compiler diagnostic. Runtime values are dynamic (`int`, `double`, `string`,
 `rỗng`, and maps), and the long-term type-system policy is undecided.
 
 Capture-free lambdas now have AST/scope/IR and direct codegen. Closure capture,
@@ -52,7 +52,7 @@ dependency/version resolver or complete debugger/IDE integration.
 | **Typing** | Dynamic runtime; no type checker | Dynamic | Dynamic | Static | Static | Static |
 | **Runtime** | Custom stack VM with in-memory `Instruction` | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
 | **Memory** | MVP container compaction, not a tracing GC | GC | GC | GC | Manual | GC |
-| **Compilation** | Source → lexer/span → AST → scope/resolution → recursive untyped IR → optimizer → direct bytecode or compatibility bridge | Bytecode | JIT | Bytecode + JIT | Native | Native |
+| **Compilation** | Source → lexer/span → AST → scope/resolution → recursive untyped IR → optimizer → direct bytecode | Bytecode | JIT | Bytecode + JIT | Native | Native |
 | **Concurrency** | No general concurrency model | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
 | **Maturity** | Experimental | Mature | Mature | Mature | Mature | Mature |
 | **Ecosystem** | Minimal | Very Large | Very Large | Large | Large | Growing |
@@ -356,7 +356,7 @@ func fibonacci(n int) int {
 ### 3. Educational Focus
 
 * **Minimal design**: No unnecessary feature complexity
-* **Current path**: Span-carrying lexer tokens, expression AST, scope/resolution, and recursive untyped IR form the pipeline before a direct emitter or compatibility bridge and VM
+* **Current path**: Span-carrying lexer tokens, expression AST, scope/resolution, and recursive untyped IR form the pipeline before the direct emitter and VM
 * **Current limit**: Closure capture, the module/import export graph, type policy, and typed IR are incomplete; the `.vbc` format in the bytecode document remains a proposal
 * **Reference implementation**: C++ source code is readable and learnable
 

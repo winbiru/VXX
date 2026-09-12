@@ -9,8 +9,8 @@
 namespace vietvm::compiler {
 
 // The first IR is deliberately untyped. It provides a stable compiler-stage
-// boundary while preserving the dynamic VM contract. Legacy lowering is a
-// feature-migration fallback, independent of any future type-policy ADR.
+// boundary while preserving the dynamic VM contract. Unsupported direct-IR
+// regions are diagnostics, independent of any future type-policy ADR.
 enum class IrOpcode {
     NoOp,
     Block,
@@ -40,11 +40,10 @@ inline constexpr IrLambdaId kInvalidIrLambdaId = static_cast<IrLambdaId>(-1);
 using AstExprId = vietvm::frontend::ExprId;
 inline constexpr AstExprId kInvalidAstExprId = vietvm::frontend::kInvalidExprId;
 
-// Stack-oriented value operations.  Structured operations coexist with an
-// explicit fallback marker while the legacy token backend is retired one
-// expression family at a time.
+// Stack-oriented value operations. Structured operations coexist with an
+// explicit marker for syntax that the direct emitter cannot compile yet.
 enum class IrValueOpcode {
-    LegacyRegion,
+    UnsupportedDirectRegion,
     ConstInt,
     ConstFloat,
     ConstString,
@@ -65,7 +64,7 @@ enum class IrValueOpcode {
 
 struct IrValue {
     IrValueId id = kInvalidIrValueId;
-    IrValueOpcode opcode = IrValueOpcode::LegacyRegion;
+    IrValueOpcode opcode = IrValueOpcode::UnsupportedDirectRegion;
     vietvm::frontend::SourceSpan span{};
     AstExprId sourceExprId = kInvalidAstExprId;
 
@@ -140,7 +139,7 @@ struct IrInstruction {
 
     // True when this statement still needs the compatibility backend even if
     // some nested expressions or child statements have structured IR.
-    bool legacyRegion = false;
+    bool unsupportedDirectRegion = false;
 
     // Lossless compatibility payload.  Only top-level instructions own this
     // slice; recursive children are represented structurally and deliberately
@@ -162,7 +161,7 @@ struct IrProgram {
     std::vector<IrValue> values;
     std::vector<IrLambda> lambdas;
     std::vector<IrInstruction> instructions;
-    std::size_t legacyRegionCount = 0;
+    std::size_t unsupportedDirectRegionCount = 0;
 
     const IrValue *value(IrValueId id) const noexcept {
         return id < values.size() ? &values[id] : nullptr;
@@ -178,9 +177,9 @@ IrProgram lowerToIr(const vietvm::frontend::AstProgram &program,
 
 std::vector<std::string> materializeIrTokens(const IrProgram &program);
 
-// Recalculate the number of explicitly marked fallback nodes after a pass has
-// rewritten either the statement tree or value arena.
-std::size_t recomputeLegacyRegionCount(IrProgram &program);
+// Recalculate the number of explicitly marked unsupported direct-IR nodes after
+// a pass has rewritten either the statement tree or value arena.
+std::size_t recomputeUnsupportedDirectRegionCount(IrProgram &program);
 
 const char *irOpcodeName(IrOpcode opcode) noexcept;
 const char *irValueOpcodeName(IrValueOpcode opcode) noexcept;

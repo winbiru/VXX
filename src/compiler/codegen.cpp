@@ -407,8 +407,7 @@ bool supportsValue(const IrProgram &program,
             break;
 
         case IrValueOpcode::Index:
-            // Indexing is direct-only for now: the token bridge has no
-            // equivalent expression grammar. A chained index remains safe
+            // Indexing is direct-only for now. A chained index remains safe
             // because its innermost base is still a named runtime value.
             supported = value->operands.size() == 2 &&
                         isDirectIndexBase(program.value(value->operands[0])) &&
@@ -604,7 +603,7 @@ bool supportsValue(const IrProgram &program,
             break;
         }
 
-        case IrValueOpcode::LegacyRegion:
+        case IrValueOpcode::UnsupportedDirectRegion:
             supported = false;
             break;
     }
@@ -628,9 +627,8 @@ bool supportsFunction(const IrProgram &program,
     for (const IrParameter &parameter : instruction.parameters) {
         if (parameter.name.empty() ||
             context.functionNames.find(parameter.name) != context.functionNames.end()) {
-            // The legacy expression emitter gives a same-spelled function
-            // priority over a parameter value. Keep this compatibility edge
-            // on the bridge until symbol-based codegen becomes authoritative.
+            // Keep this historical name-precedence edge unsupported until
+            // symbol-based codegen becomes authoritative.
             return false;
         }
         if (!parameter.hasDefault) {
@@ -653,7 +651,7 @@ bool supportsInstruction(const IrProgram &program,
                          bool insideBlock,
                          std::size_t switchDepth,
                          bool topLevel) {
-    if (instruction.legacyRegion) return false;
+    if (instruction.unsupportedDirectRegion) return false;
 
     if (instruction.opcode == IrOpcode::NoOp) {
         return instruction.expressionRoots.empty() && instruction.children.empty();
@@ -679,14 +677,14 @@ bool supportsInstruction(const IrProgram &program,
             !instruction.expressionRoots.empty() ||
             instruction.children.size() != 1 ||
             instruction.children.front().opcode != IrOpcode::Block ||
-            instruction.children.front().legacyRegion ||
+            instruction.children.front().unsupportedDirectRegion ||
             !instruction.children.front().expressionRoots.empty()) {
             return false;
         }
         for (const IrInstruction &member :
              instruction.children.front().children) {
             if (member.opcode == IrOpcode::NoOp) {
-                if (member.legacyRegion || !member.expressionRoots.empty() ||
+                if (member.unsupportedDirectRegion || !member.expressionRoots.empty() ||
                     !member.children.empty()) {
                     return false;
                 }
@@ -1422,7 +1420,7 @@ struct Emitter {
                 output.push_back({OP_BIEN_SO, functionId, 0, 0});
                 return;
             }
-            case IrValueOpcode::LegacyRegion:
+            case IrValueOpcode::UnsupportedDirectRegion:
                 throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedValue));
         }
     }
@@ -1672,7 +1670,7 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
         if (!supportsInstruction(program, instruction, instruction, context,
                                  false, false, 0, true)) {
             support.supported = false;
-            ++support.fallbackRegions;
+            ++support.unsupportedRegions;
         }
     }
     return support;
@@ -1690,14 +1688,6 @@ std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
     Emitter emitter{program, keywordMap};
     emitter.emitProgram(emitMainCall);
     return std::move(emitter.bytecode);
-}
-
-const char *bytecodeBackendName(BytecodeBackend backend) noexcept {
-    switch (backend) {
-        case BytecodeBackend::DirectIr: return "direct-ir";
-        case BytecodeBackend::LegacyTokenBridge: return "legacy-token-bridge";
-    }
-    return "legacy-token-bridge";
 }
 
 } // namespace vietvm::compiler

@@ -206,7 +206,8 @@ struct SemanticModel {
 
 // Compatibility entry point. It preserves implicit variables and dynamic-name
 // calls while producing bindings for represented expressions, including
-// recursive lambda bodies. Tolerant-parser fallback regions remain token-backed.
+// recursive lambda bodies. Tolerant-parser unsupported regions retain token payloads
+// for diagnostics/lossless tooling.
 SemanticModel analyzeSemantics(const vietvm::frontend::AstProgram &program);
 
 SemanticModel analyzeSemantics(const vietvm::frontend::AstProgram &program,

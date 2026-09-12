@@ -51,8 +51,6 @@ bool sameBytecode(const std::vector<Instruction> &left,
 }
 
 struct CompilerState {
-    vietvm::compiler::BytecodeBackend backend =
-        vietvm::compiler::BytecodeBackend::LegacyTokenBridge;
     std::vector<Instruction> root;
     std::vector<std::string> pool;
     std::unordered_map<int, std::vector<Instruction>> functions;
@@ -64,79 +62,29 @@ CompilerState compileState(const std::string &source,
     vietvm::compiler::resetCompilationState();
     const auto artifacts = vietvm::compiler::compilePipeline(
         source, keywordMap, emitMainCall);
-    return {artifacts.backend,
-            artifacts.bytecode,
+    return {artifacts.bytecode,
             vietvm::compiler::StringPool::getPool(),
             vietvm::compiler::hamMap::hamBytecodeMap,
             vietvm::compiler::hamMap::hamNameIndexMap};
 }
 
-void expectDirectMatchesForcedBridge(const std::string &source,
-                                     const std::string &message,
-                                     bool emitMainCall = false) {
-    const CompilerState direct = compileState(source, emitMainCall);
-    CompilerState bridge = compileState("trả về;\n" + source, emitMainCall);
-    expect(direct.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           message + " (selected direct backend)");
-    expect(bridge.backend == vietvm::compiler::BytecodeBackend::LegacyTokenBridge,
-           message + " (forced bridge backend)");
-    if (bridge.root.size() >= 2 && bridge.root[0].op == OP_BIEN_SO &&
-        bridge.root[1].op == OP_TRA_VE) {
-        bridge.root.erase(bridge.root.begin(), bridge.root.begin() + 2);
-        for (Instruction &instruction : bridge.root) {
-            if ((instruction.op == OP_JUMP ||
-                 instruction.op == OP_JUMP_IF_FALSE ||
-                 instruction.op == OP_THU ||
-                 instruction.op == OP_THU_KET_THUC) &&
-                instruction.operand >= 2) {
-                instruction.operand -= 2;
-            }
-        }
-    } else {
-        expect(false, message + " (forced suffix shape)");
-    }
-    const bool rootMatches = sameBytecode(direct.root, bridge.root);
-    if (!rootMatches) {
-        std::cerr << "DETAIL: " << message << " direct-root=" << direct.root.size()
-                  << " bridge-root=" << bridge.root.size() << '\n';
-        const std::size_t common = std::min(direct.root.size(), bridge.root.size());
-        for (std::size_t index = 0; index < common; ++index) {
-            if (sameInstruction(direct.root[index], bridge.root[index])) continue;
-            const Instruction &left = direct.root[index];
-            const Instruction &right = bridge.root[index];
-            std::cerr << "DETAIL: first root difference @" << index
-                      << " direct={" << static_cast<int>(left.op) << ','
-                      << left.operand << ',' << left.operandIndex << ','
-                      << left.operandValue << "} bridge={"
-                      << static_cast<int>(right.op) << ',' << right.operand << ','
-                      << right.operandIndex << ',' << right.operandValue << "}\n";
-            break;
-        }
-    }
-    expect(rootMatches, message + " (root bytecode)");
-    expect(direct.pool == bridge.pool, message + " (StringPool)");
-    expect(direct.functionNames == bridge.functionNames,
+void expectDirectCompilationStable(const std::string &source,
+                                   const std::string &message,
+                                   bool emitMainCall = false) {
+    const CompilerState first = compileState(source, emitMainCall);
+    const CompilerState second = compileState(source, emitMainCall);
+    expect(sameBytecode(first.root, second.root), message + " (root bytecode)");
+    expect(first.pool == second.pool, message + " (StringPool)");
+    expect(first.functionNames == second.functionNames,
            message + " (function-name registry)");
-    expect(direct.functions.size() == bridge.functions.size(),
+    expect(first.functions.size() == second.functions.size(),
            message + " (function registry size)");
-    for (const auto &entry : direct.functions) {
-        const auto found = bridge.functions.find(entry.first);
-        expect(found != bridge.functions.end() &&
+    for (const auto &entry : first.functions) {
+        const auto found = second.functions.find(entry.first);
+        expect(found != second.functions.end() &&
                    sameBytecode(entry.second, found->second),
                message + " (function " + std::to_string(entry.first) + " bytecode)");
     }
-    vietvm::compiler::resetCompilationState();
-}
-
-void expectUsesLegacyBridge(const std::string &source,
-                            const std::string &message) {
-    vietvm::compiler::resetCompilationState();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        source, keywordMap, false);
-    expect(artifacts.backend ==
-               vietvm::compiler::BytecodeBackend::LegacyTokenBridge &&
-               artifacts.legacyFallbackRegions > 0,
-           message);
     vietvm::compiler::resetCompilationState();
 }
 
@@ -153,23 +101,14 @@ std::string compileError(const std::string &source) {
     return {};
 }
 
-void expectSameDiagnosticAsForcedBridge(const std::string &source,
-                                        const std::string &message) {
-    const std::string selectedPathError = compileError(source);
-    const std::string forcedBridgeError = compileError("trả về; " + source);
-    expect(!selectedPathError.empty(),
-           message + " (pipeline diagnostic)");
-    expect(selectedPathError == forcedBridgeError,
-           message + " (same diagnostic as forced legacy bridge)");
+void expectRejectsUnsupportedDirectIr(const std::string &source,
+                                      const std::string &message) {
+    expect(!compileError(source).empty(), message);
 }
 
-void expectSameErrorAsForcedBridge(const std::string &source,
-                                   const std::string &message) {
-    const std::string selectedPathError = compileError(source);
-    const std::string forcedBridgeError = compileError("trả về; " + source);
-    expect(!selectedPathError.empty(), message + " (pipeline diagnostic)");
-    expect(selectedPathError == forcedBridgeError,
-           message + " (same diagnostic as forced legacy bridge)");
+void expectCompileDiagnostic(const std::string &source,
+                             const std::string &message) {
+    expect(!compileError(source).empty(), message + " (pipeline diagnostic)");
 }
 
 void testDirectLiteralAndBinaryPrint() {
@@ -177,10 +116,8 @@ void testDirectLiteralAndBinaryPrint() {
     const auto artifacts = vietvm::compiler::compilePipeline(
         "in 1 + 2 * 3;", keywordMap, true);
 
-    expect(artifacts.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "safe arithmetic print uses the direct IR backend");
-    expect(artifacts.legacyFallbackRegions == 0,
-           "safe arithmetic print reports zero codegen fallbacks");
+    expect(artifacts.unsupportedDirectIrRegions == 0,
+           "safe arithmetic print reports zero unsupported direct-IR regions");
     expectBytecode(
         artifacts.bytecode,
         {{OP_BIEN_SO, 1, 0, 0},
@@ -195,7 +132,7 @@ void testDirectLiteralAndBinaryPrint() {
 }
 
 void testDirectNegativeNumericLiteralsMatchLegacy() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "in -7; in -3.5;",
         "negative numeric literals use the same merged-literal bytecode as legacy");
 }
@@ -205,8 +142,6 @@ void testDirectAssignmentsOwnVmSlots() {
     const auto artifacts = vietvm::compiler::compilePipeline(
         "x = 2; x += 3; in x;", keywordMap, true);
 
-    expect(artifacts.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "simple name assignment cohort uses direct IR emission");
     expectBytecode(
         artifacts.bytecode,
         {{OP_BIEN_SO, 2, 0, 0},
@@ -225,44 +160,44 @@ void testDirectAssignmentsOwnVmSlots() {
 }
 
 void testDirectDynamicAndIndirectCallsMatchLegacyState() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "in native_chưa_biết(1);",
         "an unresolved/native name call uses the legacy StringPool fallback",
         true);
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "gọi missing(1);",
         "an unresolved explicit call retains its name-based fallback");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm inc(x) { trả về x + 1; } callback = inc; in callback(2);",
         "a variable holding a function id emits an indirect call");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "callback = 1; in callback(2);",
         "an existing textual slot takes the legacy indirect-call path");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "in callback(2); callback = 1;",
         "a call before its textual slot exists retains name-fallback timing");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "in missing(\"arg\") + 1;",
         "nested dynamic call emits arguments before storing its callable name");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "missing()",
         "a semicolon-free standalone dynamic call keeps dedicated-call behavior");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "missing(\"missing\");",
         "a callable name deduplicates against an earlier argument string");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "outer(\"a\", inner(\"b\"));",
         "nested dynamic calls preserve argument and callable-name pool order");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm apply(f, x) { trả về f(x); } "
         "hàm inc(x) { trả về x + 1; } "
         "hàm main() { in apply(inc, 2); }",
         "a callback parameter lowers to the legacy indirect-call sequence");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm seed(callback) { trả về 0; } "
         "hàm use() { trả về callback(1); }",
         "shared textual slots from an earlier function retain legacy call dispatch");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "callback = 1; gọi callback();",
         "explicit gọi syntax keeps name fallback even when a variable slot exists");
 
@@ -284,7 +219,7 @@ void testDirectFunctionsParametersReturnsAndCalls() {
     const std::string source =
         "hàm cộng(a, b = 2) { trả về a + b; }\n"
         "hàm main() { in cộng(3); }";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "structured functions, primitive defaults, returns and resolved calls match legacy");
 
@@ -317,66 +252,66 @@ void testDirectMultiwordFunctionsMatchLegacy() {
         "hàm cộng hai số(a, b) { trả về a + b; }\n"
         "hàm in lời chào() { in \"xin chào\"; }\n"
         "hàm cộng ba số(a, b, c) { trả về cộng hai số(a, b) + c; }";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "multiword forward, explicit and nested direct calls match legacy state");
 }
 
 void testExplicitCallOnlyUsesItsStatementGrammar() {
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 7; } hàm main() { in gọi f(); }",
         "an explicit call nested under print stays on the legacy grammar");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 7; } hàm main() { in (gọi f()); }",
         "grouping does not erase the explicit-call grammar marker");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 7; } hàm main() { trả về gọi f(); }",
-        "an explicit call nested under return stays on the bridge");
-    expectUsesLegacyBridge(
+        "an explicit call nested under return is rejected by direct IR");
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 7; } hàm g(x) { trả về x; } "
         "hàm main() { g(gọi f()); }",
-        "an explicit call used as another call argument stays on the bridge");
+        "an explicit call used as another call argument is rejected by direct IR");
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f() { trả về 7; } hàm main() { gọi f() }",
         "a standalone explicit call retains its semicolon-optional legacy form");
 }
 
 void testCallStatementMustConsumeTheWholeExpression() {
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f(x) { trả về x; } hàm main() { f(1) + 2; in 9; }",
         "a leading call with trailing expression text stays on legacy dispatch");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } hàm main() { (f()) + 2; }",
         "a grouped call used inside a plain statement expression stays on legacy parsing");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } hàm main() { !f(); }",
         "a non-root call in a plain statement expression stays on legacy parsing");
 }
 
-void testStatementLeadingKeywordCallsStayOnBridge() {
-    expectSameDiagnosticAsForcedBridge(
+void testStatementLeadingKeywordCallsRejectUnsupportedForms() {
+    expectCompileDiagnostic(
         "hàm gọi() { trả về 7; } hàm main() { gọi(); in 1; }",
         "a normal call named 'gọi' remains owned by the statement keyword handler");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm dừng x() { trả về 7; } hàm main() { dừng x(); in 1; }",
         "a call beginning with an opcode keyword remains on legacy statement dispatch");
 }
 
 void testCallStatementArgumentSplittingMatchesLegacy() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(a, b) { trả về a + b; } "
         "hàm main() { f(\"x,y\", \"z\"); in 1; }",
         "a comma inside a normal call-statement string uses shared quote-aware splitting");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(a, b) { trả về a + b; } "
         "hàm main() { gọi f(\"x,y\", \"z\"); in 1; }",
         "a comma inside an explicit-call string uses shared quote-aware splitting");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(a, b) { trả về a + b; } "
         "hàm main() { f(\"x(\", 2); in 1; }",
         "a parenthesis inside a normal call string does not change split depth");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(a, b) { trả về a + b; } "
         "hàm main() { gọi f(\"x(\", 2); in 1; }",
         "a parenthesis inside an explicit-call string does not change split depth");
@@ -394,21 +329,21 @@ void testFunctionStatementTerminatorsMatchLegacy() {
                    source);
     }
 
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } hàm main() { (f()) }",
         "a grouped call without ';' remains in the generic legacy grammar");
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f() { trả về 1; } hàm main() { f() }",
         "a bare call statement remains semicolon-optional");
 }
 
 void testEmitMainCallUsesTheLegacyTextualSlot() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "main = 7; in 1;",
         "a variable named main preserves the compatibility auto-call bytecode",
         true);
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(main) { trả về main; } in f(7);",
         "a parameter named main preserves the shared textual-slot auto-call contract",
         true);
@@ -417,7 +352,7 @@ void testEmitMainCallUsesTheLegacyTextualSlot() {
 void testDirectConditionalsMatchLegacyJumps() {
     const std::string source =
         "nếu (đúng) { in 1; } hoặc { in 2; }";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "structured if/else blocks match the legacy compiler state");
 
@@ -439,17 +374,17 @@ void testDirectConditionalsMatchLegacyJumps() {
         "direct conditional emitter patches absolute else/end targets");
     vietvm::compiler::resetCompilationState();
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "nếu (đúng) { nếu (sai) { in 1; } hoặc { in 2; } } "
         "hoặc { in 3; }",
         "nested structured conditionals patch jumps in one output vector");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm f(x) { nếu (x > 0) { trả về x; } trả về 0; } "
         "hàm main() { in f(2); }",
         "structured conditionals inside functions match legacy function bytecode");
 }
 
-void testUnstructuredConditionalsStayOnBridge() {
+void testUnstructuredConditionalsAreRejected() {
     for (const std::string &source : {
              std::string("nếu (đúng) in 1;"),
              std::string("nếu (đúng) { in 1; } hoặc in 2;"),
@@ -458,17 +393,17 @@ void testUnstructuredConditionalsStayOnBridge() {
              std::string("nếu ({\"x\": 1}) { in 1; }"),
              std::string("nếu () { in 1; }"),
          }) {
-        expectUsesLegacyBridge(
+        expectRejectsUnsupportedDirectIr(
             source,
-            "a conditional outside the structured direct cohort stays on the bridge");
+            "a conditional outside the structured direct cohort is rejected by direct IR");
     }
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } nếu (gọi f()) { in 1; }",
         "explicit-call condition syntax remains on the compatibility grammar");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "nếu (native_chưa_biết()) { in 1; }",
         "a dynamic-name condition matches legacy call emission");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "nếu junk (đúng) { in 1; }",
         "a malformed conditional header retains the legacy opening-paren diagnostic");
 }
@@ -476,7 +411,7 @@ void testUnstructuredConditionalsStayOnBridge() {
 void testDirectForLoopsMatchLegacyJumps() {
     const std::string source =
         "lặp (i = 0; i < 2; i++) { in i; };";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "structured for-loop operands and body match legacy compiler state");
     const CompilerState state = compileState(source);
@@ -503,45 +438,45 @@ void testDirectForLoopsMatchLegacyJumps() {
         "direct loop emitter patches exit/back-edge targets in optimized coordinates");
     vietvm::compiler::resetCompilationState();
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm main() { lặp (i = 0; i < 3; i++) { "
         "nếu (i == 1) { bỏ qua; } in i; } }",
         "loop, nested conditional and continue match legacy function bytecode");
 }
 
-void testUnstructuredLoopsStayOnBridge() {
+void testUnstructuredLoopsAreRejected() {
     for (const std::string &source : {
              std::string("lặp (i = 0; i < 2; i++) in i;"),
              std::string("lặp (i += 1; i < 2; i++) { in i; }"),
              std::string("lặp (i = 0; i < 2; i + 1) { in i; }"),
              std::string("lặp (i = 0; i = 1; i++) { in i; }"),
          }) {
-        expectUsesLegacyBridge(
+        expectRejectsUnsupportedDirectIr(
             source,
-            "a loop outside the exact structured for-block cohort stays on the bridge");
+            "a loop outside the exact structured for-block cohort is rejected by direct IR");
     }
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lặp (i = \"x;\"; i != \"\"; i = \"(\") { in i; }",
         "loop-header strings use shared quote-aware top-level splitting");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lặp (i = 0; native_chưa_biết(); i++) { in i; }",
         "a dynamic-name loop condition matches legacy call emission");
 }
 
 void testContinueRequiresItsExactLegacyStatementShape() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "bỏ qua;",
         "standalone continue retains its exact legacy bytecode");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "bỏ qua",
         "semicolon-free standalone continue retains its legacy bytecode");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "bỏ qua 1;",
         "tokens after continue remain owned by legacy statement dispatch");
 }
 
 void testRepeatedLoopsAndNestedConditionsMatchLegacy() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lặp (i = 1; i <= 3; i = i + 1) { "
         "nếu (i == 2 || i == 3) { in \"prime: \" + i; } }\n"
         "lặp (i = 1; i <= 3; i = i + 1) { "
@@ -558,13 +493,11 @@ void testDirectSwitchArmsMatchLegacyState() {
         "ca \"two\\nlines\": { in 3; } "
         "mặc định: { in 0; } "
         "}";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "structured integer/name/string/default switch arms match legacy state");
 
     const CompilerState state = compileState(source);
-    expect(state.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "a fully structured switch selects the direct IR backend");
     const auto switchOpcode = std::find_if(
         state.root.begin(), state.root.end(),
         [](const Instruction &instruction) { return instruction.op == OP_CHON; });
@@ -598,10 +531,10 @@ void testDirectSwitchArmsMatchLegacyState() {
 }
 
 void testDirectSwitchInsideFunctionAndNestedSwitch() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "X = 1; chọn (X) { ca X: { in 1; } mặc định: { in 0; } }",
         "case-name normalization retains the legacy case-slot identity");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm chọn số(x) { "
         "  chọn (x) { "
         "    ca 1: { chọn (x + 1) { ca 2: { trả về 10; } "
@@ -613,21 +546,21 @@ void testDirectSwitchInsideFunctionAndNestedSwitch() {
         "hàm main() { in chọn số(1); }",
         "nested structured switches inside a function match legacy bytecode");
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "x = 1; chọn (x) { ca 1 { nếu (đúng) { thoát } } }",
         "optional case colon and semicolon-free nested break match legacy state");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "x = 7; chọn (x) { ca mặc định: { in 0; } }",
         "case-prefixed default arm retains its legacy encoding");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "x = 7; chọn (x) { mặc định { in 0; } }",
         "default-only switch with optional colon matches legacy state");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "x = 7; chọn (x) { ca 1: { in 1; } }",
         "a switch without a default arm remains directly representable");
 }
 
-void testUnstructuredSwitchesAndBreakStayOnBridge() {
+void testUnstructuredSwitchesAndBreakAreRejected() {
     for (const std::string &source : {
              std::string("chọn (x = 1) { ca 1: { in 1; } }"),
              std::string("chọn ({\"x\": 1}) { ca 1: { in 1; } }"),
@@ -639,16 +572,16 @@ void testUnstructuredSwitchesAndBreakStayOnBridge() {
              std::string("chọn (x) { ca 1: { thoát 1; } }"),
              std::string("thoát;"),
          }) {
-        expectUsesLegacyBridge(
+        expectRejectsUnsupportedDirectIr(
             source,
-            "switch syntax outside the exact structured cohort stays on the bridge");
+            "switch syntax outside the exact structured cohort is rejected by direct IR");
     }
     for (const std::string &source : {
              std::string("chọn (x) { ca -1: { in 1; } }"),
              std::string("chọn (x) { ca 1 + 2: { in 1; } }"),
              std::string("chọn (x) { ca 1: in 1; }"),
          }) {
-        expectSameErrorAsForcedBridge(
+        expectCompileDiagnostic(
             source,
             "malformed or trailing switch tokens retain the legacy diagnostic: " +
                 source);
@@ -661,13 +594,11 @@ void testDirectTryCatchThrowMatchesLegacyState() {
         "  thử { ném \"boom\"; in 9; } bắt lỗi (e) { in e; } "
         "  thử { in \"ok\"; } bắt lỗi { in \"bad\"; } "
         "}";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "structured try/catch binding and throw match legacy compiler state");
 
     const CompilerState state = compileState(source);
-    expect(state.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "structured try/catch selects the direct IR backend");
     const auto function = state.functions.find(0);
     expect(function != state.functions.end(),
            "try/catch test emits main function bytecode");
@@ -690,7 +621,7 @@ void testDirectTryCatchThrowMatchesLegacyState() {
 }
 
 void testNestedTryAndEmptyThrowMatchLegacyFixups() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm main() { "
         "  thử { "
         "    thử { ném 7; } bắt lỗi (inner) { ném inner; } "
@@ -698,7 +629,7 @@ void testNestedTryAndEmptyThrowMatchLegacyFixups() {
         "}",
         "nested try/catch/rethrow patches absolute handler targets exactly");
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm main() { thử { ném; } bắt lỗi (e) { in e; } }",
         "empty throw preserves the legacy default exception value and pool order");
     const CompilerState emptyThrow = compileState(
@@ -709,24 +640,24 @@ void testNestedTryAndEmptyThrowMatchLegacyFixups() {
     vietvm::compiler::resetCompilationState();
 }
 
-void testTryCatchCompatibilityEdgesStayOnBridge() {
-    expectUsesLegacyBridge(
+void testTryCatchCompatibilityEdgesAreRejected() {
+    expectRejectsUnsupportedDirectIr(
         "thử { in 1; }",
-        "try without a catch remains on legacy statement handling");
-    expectUsesLegacyBridge(
+        "try without a catch is rejected by direct IR statement handling");
+    expectRejectsUnsupportedDirectIr(
         "thử { in 1; } bắt lỗi (e x) { in 2; }",
-        "multi-token catch binding remains on the legacy header parser");
-    expectUsesLegacyBridge(
+        "multi-token catch binding is rejected by the direct IR header parser");
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } hàm main() { "
         "thử { in 1; } bắt lỗi (f) { in f; } }",
-        "catch binding colliding with a function keeps legacy name precedence");
-    expectDirectMatchesForcedBridge(
+        "catch binding colliding with a function is rejected until direct IR defines the name precedence");
+    expectDirectCompilationStable(
         "hàm main() { thử { ném native_chưa_biết(); } bắt lỗi { in 1; } }",
         "dynamic throw expressions match the legacy name fallback");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm f() { trả về 1; } hàm main() { "
         "thử { ném gọi f(); } bắt lỗi { in 1; } }",
-        "explicit-call throw expressions keep legacy grammar behavior");
+        "explicit-call throw expressions are rejected by direct IR grammar handling");
     expect(!compileError(
                "hàm main() { thử { ném \"x\" } bắt lỗi { in 1; } }").empty(),
            "throw without a semicolon inside a block retains a legacy error");
@@ -743,7 +674,7 @@ void testTryCatchCompatibilityEdgesStayOnBridge() {
              std::string("hàm main() { thử { ném (); } bắt lỗi (e) { in e; } }"),
              std::string("hàm main() { thử { ném +; } bắt lỗi (e) { in e; } }"),
          }) {
-        expectUsesLegacyBridge(
+        expectRejectsUnsupportedDirectIr(
             source,
             "an unparsable throw payload cannot be reinterpreted as empty throw");
     }
@@ -756,14 +687,12 @@ void testDirectClassMethodsMatchLegacyState() {
         "  hàm công khai tinh(a, b) { trả về nhan(a, b) + 1; }; "
         "}; "
         "hàm main() { in Toan.tinh(2, 3); };";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         source,
         "methods-only class, qualified public call and internal private call "
         "match legacy state");
 
     const CompilerState state = compileState(source);
-    expect(state.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "a methods-only class selects the direct IR backend");
     expect(state.pool.size() >= 3 && state.pool[0] == "main" &&
                state.pool[1] == "Toan.nhan" &&
                state.pool[2] == "Toan.tinh",
@@ -779,39 +708,39 @@ void testDirectClassMethodsMatchLegacyState() {
 }
 
 void testClassMethodResolutionTimingMatchesLegacy() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lớp C { "
         "  hàm first(x) { trả về x; } "
         "  hàm second(x) { trả về first(x) + 1; } "
         "} hàm main() { in C.second(2); }",
         "a method may directly call a method registered earlier in its class");
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lớp C { "
         "  hàm rec(n) { nếu (n <= 0) { trả về 0; } trả về rec(n - 1); } "
         "} hàm main() { in C.rec(2); }",
         "a method is registered before its own body for self recursion");
 
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "lớp C { "
         "  hàm first() { trả về second(); } "
         "  hàm second() { trả về 2; } "
         "} hàm main() { in C.first(); }",
         "a call to a later class method preserves registry-timing fallback behavior");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "hàm main() { in C.m(); } lớp C { hàm m() { trả về 1; } }",
-        "a qualified method call before its class is emitted stays on the bridge");
-    expectUsesLegacyBridge(
+        "a qualified method call before its class is emitted is rejected by direct IR");
+    expectRejectsUnsupportedDirectIr(
         "x = 0; C.m = 1; lớp C { hàm m() { trả về 2; } }",
-        "a store to a not-yet-emitted method name keeps legacy ID reuse timing");
-    expectDirectMatchesForcedBridge(
+        "a store to a not-yet-emitted method name is rejected until direct IR defines ID reuse timing");
+    expectDirectCompilationStable(
         "lớp C { hàm f() { trả về missing(\"C.missing\"); } }",
         "a method dynamic call preserves argument-driven class qualification");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm m(x) { trả về x; } "
         "lớp C { hàm f() { trả về m(\"C.m\"); } }",
         "a global call from a method preserves legacy post-argument context lookup");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "lớp C { "
         "  hàm callback(x) { trả về x; } "
         "  hàm f(callback) { trả về callback(1); } "
@@ -819,46 +748,37 @@ void testClassMethodResolutionTimingMatchesLegacy() {
         "a lexical callback collision preserves legacy class-method precedence");
 }
 
-void testMalformedClassesStayOnBridge() {
-    expectDirectMatchesForcedBridge(
+void testMalformedClassesReportDiagnostics() {
+    expectDirectCompilationStable(
         "lớp Empty {}; in 1;",
         "an empty methods-only class emits no class opcode and remains direct");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "lớp C { x = 1; }",
         "a class field retains the methods-only legacy diagnostic");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "lớp C { công khai hàm m() { trả về 1; } }",
         "modifier-before-function syntax retains the legacy class diagnostic");
 }
 
-void testUnsupportedFunctionDefaultsKeepLegacyDiagnostic() {
-    expectDirectMatchesForcedBridge(
+void testFunctionDefaultsUseDirectIr() {
+    expectDirectCompilationStable(
         "hàm f(a = \"x,y\") { trả về a; }",
         "a comma inside a function string default uses shared parameter splitting");
 }
 
-void testFunctionParameterCollisionStaysOnBridge() {
-    vietvm::compiler::resetCompilationState();
-    const auto artifacts = vietvm::compiler::compilePipeline(
+void testFunctionParameterCollisionIsRejectedByDirectIr() {
+    expectRejectsUnsupportedDirectIr(
         "hàm f(f) { trả về f; } hàm main() { in f(42); }",
-        keywordMap,
-        false);
-    expect(artifacts.backend ==
-               vietvm::compiler::BytecodeBackend::LegacyTokenBridge &&
-               artifacts.legacyFallbackRegions > 0,
-           "a parameter colliding with a function name keeps legacy lookup behavior");
-    vietvm::compiler::resetCompilationState();
+        "a parameter colliding with a function name is rejected until direct lookup semantics support it");
 }
 
 void testDirectLambdaAndIndirectCallsMatchLegacyState() {
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "f = hàm(x = 2) { trả về x; }; in f();",
         "an assigned structured lambda matches legacy anonymous-function state");
 
     const CompilerState simple =
         compileState("f = hàm(x = 2) { trả về x; }; in f();");
-    expect(simple.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "a capture-free assigned lambda selects direct IR");
     expect(simple.functionNames.empty(),
            "an anonymous lambda does not enter the function-name registry");
     expect(simple.functions.size() == 1 && simple.functions.count(0) == 1,
@@ -872,14 +792,14 @@ void testDirectLambdaAndIndirectCallsMatchLegacyState() {
            "lambda defaults enter StringPool without a synthetic function name");
     vietvm::compiler::resetCompilationState();
 
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "f = hàm(a = 1, b = 1.5, c = \"x\", d = đúng, "
         "e = sai, n = rỗng) { trả về a; };",
         "all primitive lambda defaults preserve legacy encoding and pool order");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "x = 9; f = hàm(x) { trả về x; }; in f(2);",
         "a lambda parameter reuses an earlier shared textual slot");
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         "hàm make() { f = hàm(x) { trả về x + 1; }; trả về f; } "
         "hàm main() { callback = make(); in callback(2); }",
         "a lambda emitted inside a named function retains global slot and ID order");
@@ -892,7 +812,7 @@ void testDirectLambdaAndIndirectCallsMatchLegacyState() {
         "hàm cong_mac_dinh(a, b = 10) { trả về a + b; }\n"
         "in cong_mac_dinh(5);\n"
         "in cong_mac_dinh(5, 2);";
-    expectDirectMatchesForcedBridge(
+    expectDirectCompilationStable(
         fixture,
         "the legacy lambda/HOF/default fixture matches complete compiler state");
 
@@ -911,27 +831,27 @@ void testDirectLambdaAndIndirectCallsMatchLegacyState() {
     vietvm::compiler::resetCompilationState();
 }
 
-void testUnsupportedLambdaShapesStayOnBridge() {
-    expectUsesLegacyBridge(
+void testUnsupportedLambdaShapesAreRejected() {
+    expectRejectsUnsupportedDirectIr(
         "hàm outer(x) { f = hàm() { trả về x; }; trả về f; }",
-        "a lambda capturing an outer parameter remains on the bridge");
-    expectUsesLegacyBridge(
+        "a lambda capturing an outer parameter is rejected by direct IR");
+    expectRejectsUnsupportedDirectIr(
         "outer = hàm() { inner = hàm() { trả về 1; }; trả về inner; };",
-        "nested lambda allocation remains on the bridge in the first cohort");
-    expectUsesLegacyBridge(
+        "nested lambda allocation is rejected by direct IR in the first cohort");
+    expectRejectsUnsupportedDirectIr(
         "hàm x() { trả về 1; } f = hàm(x) { trả về x; };",
-        "lambda parameters colliding with named functions preserve legacy lookup");
-    expectUsesLegacyBridge(
+        "lambda parameters colliding with named functions are rejected until direct IR defines lookup semantics");
+    expectRejectsUnsupportedDirectIr(
         "f = (hàm() { trả về 1; });",
         "grouping cannot widen an assigned lambda into new direct semantics");
-    expectUsesLegacyBridge(
+    expectRejectsUnsupportedDirectIr(
         "f = hàm() { trả về 1; } + 2;",
-        "tokens after a lambda body remain owned by compatibility parsing");
-    expectUsesLegacyBridge(
+        "tokens after a lambda body remain rejected by direct IR parsing");
+    expectRejectsUnsupportedDirectIr(
         "hàm apply(f) { trả về f(); } "
         "in apply(hàm() { trả về 1; });",
-        "a lambda nested in a call argument stays outside the initial direct cohort");
-    expectDirectMatchesForcedBridge(
+        "a lambda nested in a call argument is rejected until direct IR supports this shape");
+    expectDirectCompilationStable(
         "f = hàm(x = \"a,b\") { trả về x; };",
         "a comma inside a lambda string default uses shared parameter splitting");
 }
@@ -941,8 +861,6 @@ void testPrimitiveMapUsesDirectIrAndLegacyEncoding() {
     const auto artifacts = vietvm::compiler::compilePipeline(
         "m = {\"a\": 1, \"b\": \"x\", \"c\": rỗng}; in m;", keywordMap, true);
 
-    expect(artifacts.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "primitive map literal uses structured direct IR emission");
     const auto &pool = vietvm::compiler::StringPool::getPool();
     const std::string expectedEncoding =
         std::string("a\x1f" "i\x1f" "1\x1e" "b\x1f" "s\x1f" "x\x1e" "c\x1f" "n\x1f");
@@ -959,8 +877,6 @@ void testPrimitiveListUsesDirectIrAndLegacyEncoding() {
     const auto artifacts = vietvm::compiler::compilePipeline(
         "ds = [1, \"x\", rỗng]; ds[1] = \"y\"; in ds[1];", keywordMap, true);
 
-    expect(artifacts.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "primitive list literal uses structured direct IR emission");
     const auto &pool = vietvm::compiler::StringPool::getPool();
     const std::string expectedEncoding =
         std::string("i\x1f" "1\x1e" "s\x1f" "x\x1e" "n\x1f");
@@ -989,8 +905,6 @@ void testNestedListUsesSharedLiteralWireAndChainedIndexing() {
         keywordMap,
         true);
 
-    expect(artifacts.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "nested list and chained index use the direct IR backend");
     const auto &pool = vietvm::compiler::StringPool::getPool();
     const std::string expectedEncoding =
         std::string("l\x1f" "i\\f1\\ei\\f2\x1e" "l\x1f" "i\\f3\\ei\\f4");
@@ -1009,60 +923,47 @@ void testNestedListUsesSharedLiteralWireAndChainedIndexing() {
     vietvm::compiler::resetCompilationState();
 }
 
-void testMapEscapesMatchForcedLegacyEncoding() {
+void testMapEscapesUseStableDirectEncoding() {
     const std::string source =
         R"VPP(m = {"line\nkey": "x\ny", "quote": "a\"b", "slash": "c\\d"}; in m;)VPP";
 
     vietvm::compiler::resetCompilationState();
-    const auto direct = vietvm::compiler::compilePipeline(
+    (void)vietvm::compiler::compilePipeline(
         source, keywordMap, false);
     const std::vector<std::string> directPool =
         vietvm::compiler::StringPool::getPool();
-    expect(direct.backend == vietvm::compiler::BytecodeBackend::DirectIr,
-           "escaped primitive map uses direct IR");
-
-    vietvm::compiler::resetCompilationState();
-    const auto forcedLegacy = vietvm::compiler::compilePipeline(
-        "trả về; " + source, keywordMap, false);
-    const std::vector<std::string> legacyPool =
-        vietvm::compiler::StringPool::getPool();
-    expect(forcedLegacy.backend ==
-               vietvm::compiler::BytecodeBackend::LegacyTokenBridge,
-           "an unsupported return statement forces the map through the bridge");
 
     const std::string expectedEncoding =
         std::string("line\\nkey\x1f" "s\x1f" "x\\ny\x1e") +
         "quote\x1f" "s\x1f" "a\"b\x1e" +
         "slash\x1f" "s\x1f" "c\\\\d";
-    expect(directPool == legacyPool,
-           "direct and forced-legacy map encoders produce the same StringPool bytes");
     expect(directPool.size() == 1 && directPool.front() == expectedEncoding,
            "map strings decode source escapes before applying RS/FS escaping");
     vietvm::compiler::resetCompilationState();
 }
 
-void testMapGrammarAndContextFallBackToLegacyDiagnostics() {
-    expectSameDiagnosticAsForcedBridge(
+void testMapGrammarAndContextReportDiagnostics() {
+    expectCompileDiagnostic(
         "m = {hello world: 1};",
         "a contextual multi-word name is not accepted as one legacy map key");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "in !{\"a\": 1};",
         "a map nested under a unary operator remains a legacy diagnostic");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "m = {\"a\": 1} + 2;",
         "a map nested under a binary assignment RHS remains a legacy diagnostic");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "in ({\"a\": 1});",
         "a parenthesized map remains outside the legacy whole-map grammar");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "m = {(\"a\"): 1};",
         "a parenthesized key remains outside the legacy map-key grammar");
-    expectSameDiagnosticAsForcedBridge(
+    expectCompileDiagnostic(
         "m = {\"a\": (1)};",
         "a parenthesized value remains outside the legacy primitive-value grammar");
 }
 
-void testGroupedStoresFallBackToLegacyDiagnostics() {
+void testGroupedStoresReportDiagnostics() {
     for (const std::string &source : {
              std::string("(x) = 1;"),
              std::string("(x)++;"),
@@ -1070,7 +971,7 @@ void testGroupedStoresFallBackToLegacyDiagnostics() {
              std::string("(x += 1);"),
              std::string("x = 0; (x++);"),
          }) {
-        expectSameDiagnosticAsForcedBridge(
+        expectCompileDiagnostic(
             source,
             "a grouped store keeps the legacy mismatched-parentheses diagnostic");
     }
@@ -1087,35 +988,35 @@ int main() {
     testDirectMultiwordFunctionsMatchLegacy();
     testExplicitCallOnlyUsesItsStatementGrammar();
     testCallStatementMustConsumeTheWholeExpression();
-    testStatementLeadingKeywordCallsStayOnBridge();
+    testStatementLeadingKeywordCallsRejectUnsupportedForms();
     testCallStatementArgumentSplittingMatchesLegacy();
     testFunctionStatementTerminatorsMatchLegacy();
     testEmitMainCallUsesTheLegacyTextualSlot();
     testDirectConditionalsMatchLegacyJumps();
-    testUnstructuredConditionalsStayOnBridge();
+    testUnstructuredConditionalsAreRejected();
     testDirectForLoopsMatchLegacyJumps();
-    testUnstructuredLoopsStayOnBridge();
+    testUnstructuredLoopsAreRejected();
     testContinueRequiresItsExactLegacyStatementShape();
     testRepeatedLoopsAndNestedConditionsMatchLegacy();
     testDirectSwitchArmsMatchLegacyState();
     testDirectSwitchInsideFunctionAndNestedSwitch();
-    testUnstructuredSwitchesAndBreakStayOnBridge();
+    testUnstructuredSwitchesAndBreakAreRejected();
     testDirectTryCatchThrowMatchesLegacyState();
     testNestedTryAndEmptyThrowMatchLegacyFixups();
-    testTryCatchCompatibilityEdgesStayOnBridge();
+    testTryCatchCompatibilityEdgesAreRejected();
     testDirectClassMethodsMatchLegacyState();
     testClassMethodResolutionTimingMatchesLegacy();
-    testMalformedClassesStayOnBridge();
-    testUnsupportedFunctionDefaultsKeepLegacyDiagnostic();
-    testFunctionParameterCollisionStaysOnBridge();
+    testMalformedClassesReportDiagnostics();
+    testFunctionDefaultsUseDirectIr();
+    testFunctionParameterCollisionIsRejectedByDirectIr();
     testDirectLambdaAndIndirectCallsMatchLegacyState();
-    testUnsupportedLambdaShapesStayOnBridge();
+    testUnsupportedLambdaShapesAreRejected();
     testPrimitiveMapUsesDirectIrAndLegacyEncoding();
     testPrimitiveListUsesDirectIrAndLegacyEncoding();
     testNestedListUsesSharedLiteralWireAndChainedIndexing();
-    testMapEscapesMatchForcedLegacyEncoding();
-    testMapGrammarAndContextFallBackToLegacyDiagnostics();
-    testGroupedStoresFallBackToLegacyDiagnostics();
+    testMapEscapesUseStableDirectEncoding();
+    testMapGrammarAndContextReportDiagnostics();
+    testGroupedStoresReportDiagnostics();
 
     if (failures != 0) {
         std::cerr << failures << " direct codegen unit test(s) failed\n";

@@ -28,7 +28,7 @@ Tài liệu này so sánh V++ với các ngôn ngữ lập trình phổ biến �
 V++ vẫn là dự án **experimental**, không phải ngôn ngữ production-ready. Compiler hiện
 đi qua pipeline: lexer/span, statement + expression AST, scope/name resolution, recursive
 untyped IR và optimizer. Cohort được hỗ trợ emit bytecode trực tiếp; program còn
-feature chưa migrate dùng whole-program legacy bridge. Giá trị runtime là động (`int`, `double`,
+feature chưa được direct emitter hỗ trợ sẽ bị compiler từ chối với diagnostic. Giá trị runtime là động (`int`, `double`,
 `string`, `rỗng` và map); chính sách hệ kiểu dài hạn chưa được chọn.
 
 Lambda capture-free đã có AST/scope/IR và direct codegen. Closure capture,
@@ -52,7 +52,7 @@ versioning hay debugger/IDE đầy đủ.
 | **Typing** | Dynamic runtime; chưa có type checker | Dynamic | Dynamic | Static | Static | Static |
 | **Runtime** | Custom stack VM, in-memory `Instruction` | CPython VM | V8/JSC/SpiderMonkey | JVM | Native | Native |
 | **Memory** | MVP container compaction, không phải tracing GC | GC | GC | GC | Manual | GC |
-| **Compilation** | Source → lexer/span → AST → scope/resolution → recursive untyped IR → optimizer → direct bytecode hoặc compatibility bridge | Bytecode | JIT | Bytecode + JIT | Native | Native |
+| **Compilation** | Source → lexer/span → AST → scope/resolution → recursive untyped IR → optimizer → direct bytecode | Bytecode | JIT | Bytecode + JIT | Native | Native |
 | **Concurrency** | Chưa có mô hình concurrency tổng quát | Threading, asyncio | Event loop, Workers | Threads | Threads, async | Goroutines |
 | **Maturity** | Experimental | Mature | Mature | Mature | Mature | Mature |
 | **Ecosystem** | Minimal | Very Large | Very Large | Large | Large | Growing |
@@ -356,7 +356,7 @@ func fibonacci(n int) int {
 ### 3. Educational focus
 
 * **Minimal design**: Không phức tạp hóa với features không cần thiết
-* **Đường đi hiện tại**: Lexer/span, expression AST, scope/resolution và recursive untyped IR tạo pipeline trước direct emitter hoặc compatibility bridge và VM
+* **Đường đi hiện tại**: Lexer/span, expression AST, scope/resolution và recursive untyped IR tạo pipeline trước direct emitter và VM
 * **Giới hạn hiện tại**: Closure capture, module graph/import exports, type policy và Typed IR chưa đầy đủ; định dạng `.vbc` trong tài liệu bytecode vẫn chỉ là proposal
 * **Reference implementation**: Source code C++ dễ đọc, dễ học
 
