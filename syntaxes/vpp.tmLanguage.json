@@ -1,116 +1,246 @@
 {
-  "scopeName": "source.vietvm",
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "V++",
+  "scopeName": "source.vietvm",
+  "fileTypes": ["vi", "vvm"],
   "patterns": [
-    {
-      "begin": "/\\*",
-      "end": "\\*/",
-      "name": "comment.block.vietvm"
-    },
-    {
-      "match": "//.*$",
-      "name": "comment.line.vietvm"
-    },
-    {
-      "match": "(hàm)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)",
-      "name": "meta.function.definition.vietvm",
-      "captures": {
-        "1": {
-          "name": "storage.type.function.vietvm"
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#imports" },
+    { "include": "#classDefinitions" },
+    { "include": "#functionDefinitions" },
+    { "include": "#controlKeywords" },
+    { "include": "#storageKeywords" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#builtins" },
+    { "include": "#memberCalls" },
+    { "include": "#functionCalls" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "begin": "/\\*\\*",
+          "end": "\\*/",
+          "name": "comment.block.documentation.vietvm",
+          "patterns": [
+            {
+              "match": "@[\\p{L}_][\\p{L}\\p{N}_-]*",
+              "name": "storage.type.annotation.vietvm"
+            }
+          ]
         },
-        "2": {
+        {
+          "begin": "/\\*",
+          "end": "\\*/",
+          "name": "comment.block.vietvm"
+        },
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.vietvm"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vietvm" } },
+          "end": "\"",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.vietvm" } },
+          "name": "string.quoted.double.vietvm",
+          "patterns": [
+            {
+              "match": "\\\\(?:[\\\\\"'nrt0]|u[0-9A-Fa-f]{4}|x[0-9A-Fa-f]{2})",
+              "name": "constant.character.escape.vietvm"
+            },
+            {
+              "match": "\\\\.",
+              "name": "invalid.illegal.escape.vietvm"
+            }
+          ]
+        },
+        {
+          "begin": "'",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vietvm" } },
+          "end": "'",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.vietvm" } },
+          "name": "string.quoted.single.vietvm",
+          "patterns": [
+            {
+              "match": "\\\\(?:[\\\\\"'nrt0]|u[0-9A-Fa-f]{4}|x[0-9A-Fa-f]{2})",
+              "name": "constant.character.escape.vietvm"
+            },
+            {
+              "match": "\\\\.",
+              "name": "invalid.illegal.escape.vietvm"
+            }
+          ]
+        }
+      ]
+    },
+    "imports": {
+      "patterns": [
+        {
+          "begin": "(?<![\\p{L}\\p{N}_])(nhập)(?=\\s)",
+          "beginCaptures": { "1": { "name": "keyword.control.import.vietvm" } },
+          "end": "(?=;|$)",
+          "name": "meta.import.vietvm",
+          "patterns": [
+            { "include": "#strings" },
+            { "match": "[\\p{L}\\p{N}_./\\-]+\\.vi\\b", "name": "string.unquoted.import-path.vietvm" },
+            { "match": "[\\p{L}_][\\p{L}\\p{N}_./\\-]*", "name": "string.unquoted.import-path.vietvm" }
+          ]
+        }
+      ]
+    },
+    "classDefinitions": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(lớp)(?:[ \\t]+(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ))?[ \\t]+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "name": "meta.class.definition.vietvm",
+          "captures": {
+            "1": { "name": "storage.type.class.vietvm" },
+            "2": { "name": "storage.modifier.access.vietvm" },
+            "3": { "name": "entity.name.type.class.vietvm" }
+          }
+        }
+      ]
+    },
+    "functionDefinitions": {
+      "patterns": [
+        {
+          "begin": "(?<![\\p{L}\\p{N}_])(hàm)(?:[ \\t]+(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ))?[ \\t]+([\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*?)[ \\t]*(\\()",
+          "beginCaptures": {
+            "1": { "name": "storage.type.function.vietvm" },
+            "2": { "name": "storage.modifier.access.vietvm" },
+            "3": { "name": "entity.name.function.vietvm" },
+            "4": { "name": "punctuation.section.parameters.begin.vietvm" }
+          },
+          "end": "\\)",
+          "endCaptures": { "0": { "name": "punctuation.section.parameters.end.vietvm" } },
+          "name": "meta.function.parameters.vietvm",
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#constants" },
+            { "include": "#numbers" },
+            {
+              "match": "(?<![\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_]*(?![\\p{L}\\p{N}_])",
+              "name": "variable.parameter.vietvm"
+            },
+            { "match": ",", "name": "punctuation.separator.parameter.vietvm" }
+          ]
+        }
+      ]
+    },
+    "controlKeywords": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(nếu[ \\t]+không|trả[ \\t]+về|mặc[ \\t]+định|bỏ[ \\t]+qua|bắt[ \\t]+lỗi|khởi[ \\t]+tạo|điều[ \\t]+kiện|cập[ \\t]+nhật|kiểm[ \\t]+tra[ \\t]+sau|trường[ \\t]+hợp|nếu|hoặc|lặp|chọn|ca|thoát|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
+          "name": "keyword.control.vietvm"
+        }
+      ]
+    },
+    "storageKeywords": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)(?![\\p{L}\\p{N}_])",
           "name": "storage.modifier.access.vietvm"
         },
-        "3": {
-          "name": "entity.name.function.vietvm"
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(biến)(?![\\p{L}\\p{N}_])",
+          "name": "storage.type.variable.vietvm"
         }
-      }
+      ]
     },
-    {
-      "match": "(lớp)\\s+((?:công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)[ \\t]+)?([\\p{L}_][\\p{L}\\p{N}_]*)",
-      "name": "meta.class.definition.vietvm",
-      "captures": {
-        "1": {
-          "name": "storage.type.class.vietvm"
+    "constants": {
+      "patterns": [
+        { "match": "(?<![\\p{L}\\p{N}_])(đúng|sai)(?![\\p{L}\\p{N}_])", "name": "constant.language.boolean.vietvm" },
+        { "match": "(?<![\\p{L}\\p{N}_])(rỗng)(?![\\p{L}\\p{N}_])", "name": "constant.language.null.vietvm" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(?:0[xX][0-9A-Fa-f]+|0[bB][01]+|(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?)(?![\\p{L}\\p{N}_])",
+          "name": "constant.numeric.vietvm"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        { "match": "(?<![\\p{L}\\p{N}_])(in)(?![\\p{L}\\p{N}_])", "name": "support.function.builtin.output.vietvm" },
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(độ[ \\t]+dài|thêm|xóa[ \\t]+tại|xóa[ \\t]+trùng|sắp[ \\t]+xếp|đảo[ \\t]+ngược|tìm[ \\t]+chỉ[ \\t]+số|tổng[ \\t]+list|nhỏ[ \\t]+nhất[ \\t]+list|lớn[ \\t]+nhất[ \\t]+list|lấy[ \\t]+map|đặt[ \\t]+map|có[ \\t]+khóa|khóa[ \\t]+map|xóa[ \\t]+khóa|tập[ \\t]+hợp|hợp[ \\t]+tập|giao[ \\t]+tập|rời[ \\t]+nhau|thành[ \\t]+tuple|thành[ \\t]+list|ghi[ \\t]+tệp|đọc[ \\t]+tệp|đếm[ \\t]+dòng[ \\t]+tệp|đếm[ \\t]+từ[ \\t]+tệp)(?=[ \\t]*\\()",
+          "name": "support.function.builtin.collection.vietvm"
         },
-        "2": {
-          "name": "storage.modifier.access.vietvm"
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(đảo[ \\t]+ngược|đếm[ \\t]+ký[ \\t]+tự|chứa[ \\t]+chuỗi|thay[ \\t]+thế|chuỗi[ \\t]+thường|chuỗi[ \\t]+hoa|chuẩn[ \\t]+hóa[ \\t]+khoảng[ \\t]+trắng|đếm[ \\t]+từ|từ[ \\t]+dài[ \\t]+nhất|viết[ \\t]+hoa[ \\t]+đầu[ \\t]+từ|là[ \\t]+palindrome|là[ \\t]+anagram|mã[ \\t]+hóa[ \\t]+caesar)(?=[ \\t]*\\()",
+          "name": "support.function.builtin.string.vietvm"
         },
-        "3": {
-          "name": "entity.name.type.class.vietvm"
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(mạng[ \\t]+lấy|mạng[ \\t]+gửi|mạng[ \\t]+cập[ \\t]+nhật|mạng[ \\t]+xóa|mạng[ \\t]+mở[ \\t]+máy[ \\t]+chủ[ \\t]+api|mạng[ \\t]+đóng[ \\t]+máy[ \\t]+chủ[ \\t]+api|mạng[ \\t]+lấy[ \\t]+yêu[ \\t]+cầu[ \\t]+kế[ \\t]+tiếp|mạng[ \\t]+trả[ \\t]+phản[ \\t]+hồi|mạng[ \\t]+method[ \\t]+yêu[ \\t]+cầu|mạng[ \\t]+path[ \\t]+yêu[ \\t]+cầu|mạng[ \\t]+query[ \\t]+yêu[ \\t]+cầu|mạng[ \\t]+body[ \\t]+yêu[ \\t]+cầu)(?=[ \\t]*\\()",
+          "name": "support.function.builtin.network.vietvm"
         }
-      }
+      ]
     },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ)(?![\\p{L}\\p{N}_])",
-      "name": "storage.modifier.access.vietvm"
-    },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(công\\s+khai|riêng\\s+tư|bảo\\s+vệ)(?![\\p{L}\\p{N}_])",
-      "name": "storage.modifier.access.vietvm"
-    },
-    {
-      "match": "(gọi)\\s+([\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)",
-      "name": "meta.function.call.vietvm",
-      "captures": {
-        "1": {
-          "name": "keyword.control.call.vietvm"
+    "memberCalls": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])([\\p{Lu}_][\\p{L}\\p{N}_]*)\\.([\\p{L}_][\\p{L}\\p{N}_]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_]*)*)(?=[ \\t]*\\()",
+          "name": "meta.function-call.member.vietvm",
+          "captures": {
+            "1": { "name": "entity.name.type.class.vietvm" },
+            "2": { "name": "entity.name.function.member.vietvm" }
+          }
         },
-        "2": {
-          "name": "entity.name.function.vietvm"
+        {
+          "match": "(?<![\\p{L}\\p{N}_])([\\p{L}_][\\p{L}\\p{N}_]*)\\.([\\p{L}_][\\p{L}\\p{N}_]*)(?![\\p{L}\\p{N}_])",
+          "name": "meta.member.access.vietvm",
+          "captures": {
+            "1": { "name": "variable.other.object.vietvm" },
+            "2": { "name": "variable.other.property.vietvm" }
+          }
         }
-      }
+      ]
     },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])((?!(?:nếu|lặp|chọn|ca|nhập|gọi|hàm|lớp|in|trả|ném|thử|dừng)\\b)[\\p{L}_][\\p{L}\\p{N}_.]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_.]*)*)(?=[ \\t]*\\()",
-      "name": "meta.function.call.vietvm",
-      "captures": {
-        "1": {
-          "name": "entity.name.function.vietvm"
+    "functionCalls": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_.])((?!(?:nếu|lặp|chọn|ca|hàm|lớp|in|trả|ném|thử|dừng|nhập)\\b)[\\p{L}_][\\p{L}\\p{N}_]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_]*)*)(?=[ \\t]*\\()",
+          "name": "meta.function-call.vietvm",
+          "captures": { "1": { "name": "entity.name.function.vietvm" } }
         }
-      }
+      ]
     },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(nếu không|trả về|mặc định|bỏ qua|bắt lỗi|khởi tạo|điều kiện|cập nhật|kiểm tra sau|trường hợp|lớp|hàm|nếu|hoặc|lặp|chọn|ca|thoát|nhập|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
-      "name": "keyword.control.vietvm"
+    "operators": {
+      "patterns": [
+        { "match": "\\+\\+|--|\\+=|-=|\\*=|/=|%=|==|!=|<=|>=|&&|\\|\\||[+\\-*/%=!<>]", "name": "keyword.operator.vietvm" }
+      ]
     },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(đúng|sai)(?![\\p{L}\\p{N}_])",
-      "name": "constant.language.boolean.vietvm"
+    "punctuation": {
+      "patterns": [
+        { "match": "\\{", "name": "punctuation.section.block.begin.vietvm" },
+        { "match": "\\}", "name": "punctuation.section.block.end.vietvm" },
+        { "match": "\\(", "name": "punctuation.section.group.begin.vietvm" },
+        { "match": "\\)", "name": "punctuation.section.group.end.vietvm" },
+        { "match": "\\[", "name": "punctuation.section.brackets.begin.vietvm" },
+        { "match": "\\]", "name": "punctuation.section.brackets.end.vietvm" },
+        { "match": ";", "name": "punctuation.terminator.statement.vietvm" },
+        { "match": ",", "name": "punctuation.separator.comma.vietvm" },
+        { "match": ":", "name": "punctuation.separator.key-value.vietvm" },
+        { "match": "\\.", "name": "punctuation.accessor.dot.vietvm" }
+      ]
     },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(biến)(?![\\p{L}\\p{N}_])",
-      "name": "storage.type.variable.vietvm"
-    },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])(in)(?![\\p{L}\\p{N}_])",
-      "name": "support.function.builtin.vietvm"
-    },
-    {
-      "begin": "\"",
-      "end": "\"",
-      "name": "string.quoted.double.vietvm"
-    },
-    {
-      "begin": "'",
-      "end": "'",
-      "name": "string.quoted.single.vietvm"
-    },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])([0-9]+\\.[0-9]+|[0-9]+)(?![\\p{L}\\p{N}_])",
-      "name": "constant.numeric.vietvm"
-    },
-    {
-      "match": "(\\+\\+|--|\\+=|-=|\\*=|/=|%=|==|!=|<=|>=|&&|\\|\\||[+\\-*/%=!<>])",
-      "name": "keyword.operator.vietvm"
-    },
-    {
-      "match": "[{}()\\[\\];,:]",
-      "name": "punctuation.separator.vietvm"
-    },
-    {
-      "match": "(?<![\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_]*(?![\\p{L}\\p{N}_])",
-      "name": "variable.vietvm"
+    "identifiers": {
+      "patterns": [
+        { "match": "(?<![\\p{L}\\p{N}_])[\\p{Lu}_][\\p{L}\\p{N}_]*(?![\\p{L}\\p{N}_])", "name": "entity.name.type.vietvm" },
+        { "match": "(?<![\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_]*(?![\\p{L}\\p{N}_])", "name": "variable.other.vietvm" }
+      ]
     }
-  ]
+  }
 }

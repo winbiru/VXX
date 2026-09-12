@@ -155,7 +155,6 @@ struct SemanticReference {
 
 struct SemanticDiagnostic {
     SemanticDiagnosticSeverity severity = SemanticDiagnosticSeverity::Error;
-    std::string code;
     std::string message;
     vietvm::frontend::SourceSpan span{};
 };

@@ -10,11 +10,15 @@
 
 #include "common/storeString.h"
 #include "common/utility.h"
+#include "compiler/compileRegistry.h"
 #include "frontend/lexer.h"
+#include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/message_constants.h"
 
 namespace vietvm::compiler {
 namespace {
+
+using vietvm::bytecode::escapeLiteralWireField;
 
 bool isBinaryOperator(const std::string &op) noexcept {
     return op == "+" || op == "-" || op == "*" || op == "/" || op == "%" ||
@@ -170,62 +174,6 @@ bool containsCall(const IrProgram &program,
     return false;
 }
 
-bool containsCallSplitterStringHazard(const IrProgram &program,
-                                      IrValueId id,
-                                      std::unordered_set<IrValueId> &visiting) {
-    const IrValue *value = program.value(id);
-    if (value == nullptr || !visiting.insert(id).second) return true;
-    if (value->opcode == IrValueOpcode::ConstString &&
-        (value->text.find(',') != std::string::npos ||
-         value->text.find('(') != std::string::npos ||
-         value->text.find(')') != std::string::npos)) {
-        visiting.erase(id);
-        return true;
-    }
-    for (IrValueId operand : value->operands) {
-        if (containsCallSplitterStringHazard(program, operand, visiting)) {
-            visiting.erase(id);
-            return true;
-        }
-    }
-    visiting.erase(id);
-    return false;
-}
-
-bool containsCallSplitterHazard(const IrProgram &program,
-                                const IrValue &call) {
-    for (std::size_t index = 1; index < call.operands.size(); ++index) {
-        std::unordered_set<IrValueId> visiting;
-        if (containsCallSplitterStringHazard(
-                program, call.operands[index], visiting)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool containsLoopHeaderStringHazard(const IrProgram &program,
-                                    IrValueId id,
-                                    std::unordered_set<IrValueId> &visiting) {
-    const IrValue *value = program.value(id);
-    if (value == nullptr || !visiting.insert(id).second) return true;
-    if (value->opcode == IrValueOpcode::ConstString &&
-        (value->text.find(';') != std::string::npos ||
-         value->text.find('(') != std::string::npos ||
-         value->text.find(')') != std::string::npos)) {
-        visiting.erase(id);
-        return true;
-    }
-    for (IrValueId operand : value->operands) {
-        if (containsLoopHeaderStringHazard(program, operand, visiting)) {
-            visiting.erase(id);
-            return true;
-        }
-    }
-    visiting.erase(id);
-    return false;
-}
-
 bool expressionConsumesStatement(const IrInstruction &sourceOwner,
                                  const IrInstruction &instruction,
                                  const IrValue &root) noexcept {
@@ -244,19 +192,21 @@ bool expressionConsumesStatement(const IrInstruction &sourceOwner,
            lastExpressionToken->span.end.offset == root.span.end.offset;
 }
 
-bool hasLegacyMapBounds(const IrInstruction &instruction,
-                        const IrValue &value) noexcept {
-    bool startsWithBrace = false;
-    bool endsWithBrace = false;
+bool hasDelimitedLiteralBounds(const IrInstruction &instruction,
+                               const IrValue &value,
+                               const char *opening,
+                               const char *closing) noexcept {
+    bool startsWithOpening = false;
+    bool endsWithClosing = false;
     for (const vietvm::frontend::Token &token : instruction.tokens) {
         if (token.span.begin.offset == value.span.begin.offset) {
-            startsWithBrace = token.lexeme == "{";
+            startsWithOpening = token.lexeme == opening;
         }
         if (token.span.end.offset == value.span.end.offset) {
-            endsWithBrace = token.lexeme == "}";
+            endsWithClosing = token.lexeme == closing;
         }
     }
-    return startsWithBrace && endsWithBrace;
+    return startsWithOpening && endsWithClosing;
 }
 
 bool isMapKey(const IrInstruction &instruction,
@@ -274,8 +224,8 @@ bool isMapKey(const IrInstruction &instruction,
     return false;
 }
 
-bool isMapValue(const IrInstruction &instruction,
-                const IrValue *value) noexcept {
+bool isLegacyScalarLiteral(const IrInstruction &instruction,
+                           const IrValue *value) noexcept {
     if (value == nullptr || !value->operands.empty()) return false;
     if (!isExactSourceToken(instruction, *value)) return false;
     switch (value->opcode) {
@@ -287,6 +237,23 @@ bool isMapValue(const IrInstruction &instruction,
         case IrValueOpcode::ConstNull: return value->text == "rỗng";
         default: return false;
     }
+}
+
+bool isListLiteralValue(const IrProgram &program,
+                        const IrInstruction &instruction,
+                        const IrValue *value) noexcept {
+    if (isLegacyScalarLiteral(instruction, value)) return true;
+    if (value == nullptr || value->opcode != IrValueOpcode::ListLiteral) return false;
+    for (IrValueId element : value->operands) {
+        if (!isListLiteralValue(program, instruction, program.value(element))) return false;
+    }
+    return true;
+}
+
+bool isDirectIndexBase(const IrValue *value) noexcept {
+    return value != nullptr &&
+           (value->opcode == IrValueOpcode::LoadName ||
+            value->opcode == IrValueOpcode::Index);
 }
 
 enum class ValueContext {
@@ -301,7 +268,6 @@ struct SupportContext {
     std::unordered_set<int> functionSymbols;
     std::unordered_set<std::string> functionNames;
     std::unordered_set<int> methodSymbols;
-    std::unordered_set<std::string> methodRawNames;
     std::unordered_map<int, std::size_t> methodDeclarationOffsets;
     std::unordered_map<std::string, std::size_t> methodNameDeclarationOffsets;
 };
@@ -418,24 +384,55 @@ bool supportsValue(const IrProgram &program,
             // It does not parse a map nested under unary/binary/compound ops.
             supported = valueContext != ValueContext::Nested &&
                         valueContext != ValueContext::DedicatedCallStatementRoot &&
-                        hasLegacyMapBounds(sourceOwner, *value) &&
+                        hasDelimitedLiteralBounds(sourceOwner, *value, "{", "}") &&
                         value->operands.size() % 2 == 0;
             for (std::size_t index = 0; supported && index < value->operands.size(); index += 2) {
                 supported = isMapKey(
                                 sourceOwner,
                                 program.value(value->operands[index])) &&
-                            isMapValue(
+                            isLegacyScalarLiteral(
                                 sourceOwner,
                                 program.value(value->operands[index + 1]));
             }
             break;
 
-        case IrValueOpcode::Unary:
-            supported = value->operands.size() == 1 &&
-                        value->text == "!" &&
-                        supportsValue(program, sourceOwner, context,
-                                      value->operands.front(),
+        case IrValueOpcode::ListLiteral:
+            supported = valueContext != ValueContext::Nested &&
+                        valueContext != ValueContext::DedicatedCallStatementRoot &&
+                        hasDelimitedLiteralBounds(sourceOwner, *value, "[", "]");
+            for (IrValueId element : value->operands) {
+                supported = supported && isListLiteralValue(
+                    program, sourceOwner, program.value(element));
+            }
+            break;
+
+        case IrValueOpcode::Index:
+            // Indexing is direct-only for now: the token bridge has no
+            // equivalent expression grammar. A chained index remains safe
+            // because its innermost base is still a named runtime value.
+            supported = value->operands.size() == 2 &&
+                        isDirectIndexBase(program.value(value->operands[0])) &&
+                        supportsValue(program, sourceOwner, context, value->operands[0],
+                                      ValueContext::Nested, visiting) &&
+                        supportsValue(program, sourceOwner, context, value->operands[1],
                                       ValueContext::Nested, visiting);
+            break;
+
+        case IrValueOpcode::Unary:
+            if (value->operands.size() != 1) break;
+            if (value->text == "!") {
+                supported = supportsValue(program, sourceOwner, context,
+                                          value->operands.front(),
+                                          ValueContext::Nested, visiting);
+                break;
+            }
+            if (value->text == "-") {
+                const IrValue *operand = program.value(value->operands.front());
+                supported = operand != nullptr && operand->operands.empty() &&
+                            (operand->opcode == IrValueOpcode::ConstInt ||
+                             operand->opcode == IrValueOpcode::ConstFloat) &&
+                            isExactSourceToken(sourceOwner, *operand);
+            }
             break;
 
         case IrValueOpcode::Binary:
@@ -472,6 +469,27 @@ bool supportsValue(const IrProgram &program,
                             value->text == "=" ? ValueContext::SimpleAssignmentRhs
                                                : ValueContext::Nested,
                             visiting);
+            break;
+        }
+
+        case IrValueOpcode::StoreIndex: {
+            if (valueContext != ValueContext::ExpressionStatementRoot ||
+                value->text != "=" || value->operands.size() != 2) {
+                break;
+            }
+            const IrValue *target = program.value(value->operands[0]);
+            if (target == nullptr || target->opcode != IrValueOpcode::Index ||
+                target->operands.size() != 2) {
+                break;
+            }
+            const IrValue *base = program.value(target->operands[0]);
+            supported = isDirectIndexBase(base) &&
+                        supportsValue(program, sourceOwner, context, target->operands[0],
+                                      ValueContext::Nested, visiting) &&
+                        supportsValue(program, sourceOwner, context, target->operands[1],
+                                      ValueContext::Nested, visiting) &&
+                        supportsValue(program, sourceOwner, context, value->operands[1],
+                                      ValueContext::Nested, visiting);
             break;
         }
 
@@ -558,9 +576,7 @@ bool supportsValue(const IrProgram &program,
                 }
                 const IrValue *defaultValue =
                     program.value(parameter.defaultValue);
-                if (!isMapValue(sourceOwner, defaultValue) ||
-                    (defaultValue->opcode == IrValueOpcode::ConstString &&
-                     defaultValue->text.find(',') != std::string::npos)) {
+                if (!isLegacyScalarLiteral(sourceOwner, defaultValue)) {
                     supported = false;
                     break;
                 }
@@ -597,107 +613,10 @@ bool supportsValue(const IrProgram &program,
     return supported;
 }
 
-bool classMethodCallsAreContextStableValue(
-    const IrProgram &program,
-    IrValueId id,
-    const SupportContext &context,
-    std::unordered_set<IrValueId> &visited);
-
-bool classMethodCallsAreContextStableInstruction(
-    const IrProgram &program,
-    const IrInstruction &instruction,
-    const SupportContext &context,
-    std::unordered_set<IrValueId> &visited) {
-    for (const IrParameter &parameter : instruction.parameters) {
-        if (parameter.defaultValue != kInvalidIrValueId &&
-            !classMethodCallsAreContextStableValue(
-                program, parameter.defaultValue, context, visited)) {
-            return false;
-        }
-    }
-    for (IrValueId root : instruction.expressionRoots) {
-        if (!classMethodCallsAreContextStableValue(
-                program, root, context, visited)) {
-            return false;
-        }
-    }
-    for (const IrInstruction &child : instruction.children) {
-        if (!classMethodCallsAreContextStableInstruction(
-                program, child, context, visited)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool classMethodCallsAreContextStableValue(
-    const IrProgram &program,
-    IrValueId id,
-    const SupportContext &context,
-    std::unordered_set<IrValueId> &visited) {
-    const IrValue *value = program.value(id);
-    if (value == nullptr) return false;
-    if (!visited.insert(id).second) return true;
-
-    if (value->opcode == IrValueOpcode::LoadName &&
-        value->text.find('.') == std::string::npos &&
-        context.methodRawNames.find(value->text) !=
-            context.methodRawNames.end() &&
-        (value->symbolId < 0 ||
-         context.methodSymbols.find(value->symbolId) ==
-             context.methodSymbols.end())) {
-        // In a class context the legacy expression emitter resolves a raw
-        // method spelling before a lexical parameter/local/catch of the same
-        // name. Semantic lookup intentionally does the opposite. Keep this
-        // compatibility collision on the bridge until symbol semantics own
-        // bytecode behavior outright.
-        return false;
-    }
-
-    if ((value->opcode == IrValueOpcode::Call ||
-         value->opcode == IrValueOpcode::CallDynamic) &&
-        value->text.find('.') == std::string::npos) {
-        // The compatibility resolver runs after argument emission and treats
-        // an already-present `Class.name` StringPool entry as evidence for a
-        // class-qualified call. An argument can therefore change dispatch of
-        // an otherwise global/dynamic/indirect unqualified call. Only a
-        // semantically resolved method has a stable unqualified meaning here.
-        if (value->opcode != IrValueOpcode::Call || value->symbolId < 0 ||
-            context.methodSymbols.find(value->symbolId) ==
-                context.methodSymbols.end()) {
-            return false;
-        }
-    }
-
-    for (IrValueId operand : value->operands) {
-        if (!classMethodCallsAreContextStableValue(
-                program, operand, context, visited)) {
-            return false;
-        }
-    }
-    if (value->opcode == IrValueOpcode::Lambda) {
-        const IrLambda *lambda = program.lambda(value->lambdaId);
-        if (lambda == nullptr || lambda->ownerValue != id) return false;
-        for (const IrParameter &parameter : lambda->parameters) {
-            if (parameter.defaultValue != kInvalidIrValueId &&
-                !classMethodCallsAreContextStableValue(
-                    program, parameter.defaultValue, context, visited)) {
-                return false;
-            }
-        }
-        if (!classMethodCallsAreContextStableInstruction(
-                program, lambda->body, context, visited)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool supportsFunction(const IrProgram &program,
                       const IrInstruction &instruction,
                       const IrInstruction &sourceOwner,
-                      const SupportContext &context,
-                      bool classMethod) {
+                      const SupportContext &context) {
     if (instruction.symbolId < 0 || instruction.declarationName.empty() ||
         context.functionSymbols.find(instruction.symbolId) ==
             context.functionSymbols.end() ||
@@ -719,22 +638,7 @@ bool supportsFunction(const IrProgram &program,
             continue;
         }
         const IrValue *defaultValue = program.value(parameter.defaultValue);
-        if (!isMapValue(sourceOwner, defaultValue)) return false;
-        if (defaultValue->opcode == IrValueOpcode::ConstString &&
-            defaultValue->text.find(',') != std::string::npos) {
-            // The legacy function header parser splits parameters at every
-            // comma, including commas inside a string default. Keep that
-            // diagnostic contract until the old header parser is retired.
-            return false;
-        }
-    }
-
-    if (classMethod) {
-        std::unordered_set<IrValueId> visited;
-        if (!classMethodCallsAreContextStableInstruction(
-                program, instruction.children.front(), context, visited)) {
-            return false;
-        }
+        if (!isLegacyScalarLiteral(sourceOwner, defaultValue)) return false;
     }
 
     return supportsInstruction(program, instruction.children.front(), sourceOwner,
@@ -754,9 +658,18 @@ bool supportsInstruction(const IrProgram &program,
     if (instruction.opcode == IrOpcode::NoOp) {
         return instruction.expressionRoots.empty() && instruction.children.empty();
     }
+    if (instruction.opcode == IrOpcode::Import) {
+        return topLevel &&
+               instruction.importForm ==
+                   vietvm::frontend::AstImportForm::LocalSourceFile &&
+               !instruction.importSpec.target.empty() &&
+               instruction.importSpec.hasSemicolon &&
+               instruction.expressionRoots.empty() &&
+               instruction.children.empty();
+    }
     if (instruction.opcode == IrOpcode::DefineFunction) {
         return topLevel && supportsFunction(
-            program, instruction, sourceOwner, context, false);
+            program, instruction, sourceOwner, context);
     }
     if (instruction.opcode == IrOpcode::DefineClass) {
         if (!topLevel ||
@@ -780,7 +693,7 @@ bool supportsInstruction(const IrProgram &program,
                 continue;
             }
             if (member.opcode != IrOpcode::DefineFunction ||
-                !supportsFunction(program, member, sourceOwner, context, true)) {
+                !supportsFunction(program, member, sourceOwner, context)) {
                 return false;
             }
         }
@@ -847,13 +760,6 @@ bool supportsInstruction(const IrProgram &program,
             condition->opcode == IrValueOpcode::MapLiteral) {
             return false;
         }
-        for (IrValueId root : instruction.expressionRoots) {
-            std::unordered_set<IrValueId> hazardSearch;
-            if (containsLoopHeaderStringHazard(program, root, hazardSearch)) {
-                return false;
-            }
-        }
-
         std::unordered_set<IrValueId> initVisit;
         std::unordered_set<IrValueId> conditionVisit;
         std::unordered_set<IrValueId> updateVisit;
@@ -1034,8 +940,7 @@ bool supportsInstruction(const IrProgram &program,
          startsWithDedicatedCallSyntax(sourceOwner, instruction));
     if (dedicatedCall &&
          (!rootIsCall ||
-         !expressionConsumesStatement(sourceOwner, instruction, *root) ||
-         containsCallSplitterHazard(program, *root))) {
+         !expressionConsumesStatement(sourceOwner, instruction, *root))) {
         // Legacy compileStatement dispatches a leading `name(...)` before the
         // generic expression parser. Text following ')' is therefore not part
         // of that call statement and must not silently gain new semantics.
@@ -1079,7 +984,7 @@ Opcode binaryOpcode(const std::string &op) {
     if (op == ">=") return OP_LON_HON_HOAC_BANG;
     if (op == "&&") return OP_Logic_VA;
     if (op == "||") return OP_Logic_HOAC;
-    throw std::logic_error("unsupported direct IR binary operator");
+    throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedBinaryOperator));
 }
 
 Opcode compoundOpcode(const std::string &op) {
@@ -1088,7 +993,7 @@ Opcode compoundOpcode(const std::string &op) {
     if (op == "*=") return OP_NHAN;
     if (op == "/=") return OP_CHIA;
     if (op == "%=") return OP_MODULO;
-    throw std::logic_error("unsupported direct IR compound assignment");
+    throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedCompoundAssignment));
 }
 
 std::string unquote(const std::string &text) {
@@ -1100,63 +1005,70 @@ std::string unquote(const std::string &text) {
     return text;
 }
 
-std::string encodeMapField(const std::string &text) {
-    std::string encoded;
-    encoded.reserve(text.size() + 8);
-    for (unsigned char byte : text) {
-        if (byte == '\\' || byte == '\n' || byte == '\r' || byte == '\t' ||
-            byte == '\x1e' || byte == '\x1f') {
-            encoded.push_back('\\');
-            if (byte == '\n') encoded.push_back('n');
-            else if (byte == '\r') encoded.push_back('r');
-            else if (byte == '\t') encoded.push_back('t');
-            else if (byte == '\x1e') encoded.push_back('e');
-            else if (byte == '\x1f') encoded.push_back('f');
-            else encoded.push_back('\\');
-        } else {
-            encoded.push_back(static_cast<char>(byte));
-        }
+bool appendTaggedScalarLiteral(std::ostringstream &encoded,
+                               const IrValue &value,
+                               char fieldSeparator) {
+    switch (value.opcode) {
+        case IrValueOpcode::ConstInt:
+        case IrValueOpcode::ConstBool:
+            encoded << 'i' << fieldSeparator;
+            if (value.opcode == IrValueOpcode::ConstBool) {
+                encoded << (value.text == "đúng" ? '1' : '0');
+            } else {
+                encoded << escapeLiteralWireField(value.text);
+            }
+            return true;
+        case IrValueOpcode::ConstFloat:
+            encoded << 'd' << fieldSeparator << escapeLiteralWireField(value.text);
+            return true;
+        case IrValueOpcode::ConstString:
+            // Map/list literal payloads decode source escapes before applying
+            // the wire escaping. Ordinary string-expression emission keeps
+            // its different legacy contract in `unquote` above.
+            encoded << 's' << fieldSeparator
+                    << escapeLiteralWireField(stripQuotes(value.text));
+            return true;
+        case IrValueOpcode::ConstNull:
+            encoded << 'n' << fieldSeparator;
+            return true;
+        default:
+            return false;
     }
-    return encoded;
 }
 
 std::string encodeMapLiteral(const IrProgram &program, const IrValue &map) {
-    constexpr char recordSeparator = '\x1e';
-    constexpr char fieldSeparator = '\x1f';
+    constexpr char recordSeparator = vietvm::bytecode::kLiteralRecordSeparator;
+    constexpr char fieldSeparator = vietvm::bytecode::kLiteralFieldSeparator;
     std::ostringstream encoded;
     for (std::size_t index = 0; index < map.operands.size(); index += 2) {
         const IrValue &key = *program.value(map.operands[index]);
         const IrValue &value = *program.value(map.operands[index + 1]);
         if (index != 0) encoded << recordSeparator;
-        encoded << encodeMapField(key.opcode == IrValueOpcode::ConstString
-                                      ? stripQuotes(key.text)
-                                      : key.text)
+        encoded << escapeLiteralWireField(key.opcode == IrValueOpcode::ConstString
+                                              ? stripQuotes(key.text)
+                                              : key.text)
                 << fieldSeparator;
-        switch (value.opcode) {
-            case IrValueOpcode::ConstInt:
-            case IrValueOpcode::ConstBool:
-                encoded << 'i' << fieldSeparator;
-                if (value.opcode == IrValueOpcode::ConstBool) {
-                    encoded << (value.text == "đúng" ? '1' : '0');
-                } else {
-                    encoded << encodeMapField(value.text);
-                }
-                break;
-            case IrValueOpcode::ConstFloat:
-                encoded << 'd' << fieldSeparator << encodeMapField(value.text);
-                break;
-            case IrValueOpcode::ConstString:
-                // Unlike ordinary string expressions, the legacy map encoder
-                // decodes source escapes before applying its RS/FS escaping.
-                encoded << 's' << fieldSeparator
-                        << encodeMapField(stripQuotes(value.text));
-                break;
-            case IrValueOpcode::ConstNull:
-                encoded << 'n' << fieldSeparator;
-                break;
-            default:
-                throw std::logic_error("unsupported direct IR map value");
+        if (!appendTaggedScalarLiteral(encoded, value, fieldSeparator)) {
+            throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedMapValue));
         }
+    }
+    return encoded.str();
+}
+
+std::string encodeListLiteral(const IrProgram &program, const IrValue &list) {
+    constexpr char recordSeparator = vietvm::bytecode::kLiteralRecordSeparator;
+    constexpr char fieldSeparator = vietvm::bytecode::kLiteralFieldSeparator;
+    std::ostringstream encoded;
+    for (std::size_t index = 0; index < list.operands.size(); ++index) {
+        const IrValue &value = *program.value(list.operands[index]);
+        if (index != 0) encoded << recordSeparator;
+        if (appendTaggedScalarLiteral(encoded, value, fieldSeparator)) continue;
+        if (value.opcode == IrValueOpcode::ListLiteral) {
+            encoded << 'l' << fieldSeparator
+                    << escapeLiteralWireField(encodeListLiteral(program, value));
+            continue;
+        }
+        throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedListValue));
     }
     return encoded.str();
 }
@@ -1170,12 +1082,13 @@ std::string encodeDefaultValue(const IrValue &value) {
             return value.text == "đúng" ? "i:1" : "i:0";
         case IrValueOpcode::ConstNull: return "n:";
         default:
-            throw std::logic_error("unsupported direct IR default parameter value");
+            throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedDefaultValue));
     }
 }
 
 struct Emitter {
     const IrProgram &program;
+    const std::unordered_map<std::string, Opcode> &keywordMap;
     std::vector<Instruction> bytecode;
     std::unordered_map<std::string, int> slots;
     std::unordered_map<int, int> functionIdsBySymbol;
@@ -1184,7 +1097,19 @@ struct Emitter {
     std::unordered_map<IrLambdaId, int> lambdaIds;
     int nextSlot = 0;
 
-    explicit Emitter(const IrProgram &ir) : program(ir) {}
+    struct ClassContextGuard {
+        explicit ClassContextGuard(const std::string &className) {
+            pushClassContext(className);
+        }
+        ~ClassContextGuard() { popClassContext(); }
+
+        ClassContextGuard(const ClassContextGuard &) = delete;
+        ClassContextGuard &operator=(const ClassContextGuard &) = delete;
+    };
+
+    Emitter(const IrProgram &ir,
+            const std::unordered_map<std::string, Opcode> &keywords)
+        : program(ir), keywordMap(keywords) {}
 
     void allocateFunction(const IrInstruction &instruction) {
         if (functionIdsBySymbol.find(instruction.symbolId) !=
@@ -1218,9 +1143,41 @@ struct Emitter {
         return slot;
     }
 
+    void emitCallArguments(const IrValue &call,
+                           std::vector<Instruction> &output) {
+        for (std::size_t index = 1; index < call.operands.size(); ++index) {
+            emitValue(call.operands[index], output);
+        }
+    }
+
+    void emitParameterBindings(const std::vector<IrParameter> &parameters,
+                               std::vector<Instruction> &output,
+                               std::string_view missingDefaultMessage) {
+        for (std::size_t index = 0; index < parameters.size(); ++index) {
+            const IrParameter &parameter = parameters[index];
+            const int slot = slotFor(parameter.name);
+            output.push_back({OP_KHOI_TAO, 0, slot, 0});
+            if (!parameter.hasDefault) {
+                output.push_back({OP_PARAM, 0, slot, static_cast<int>(index)});
+                continue;
+            }
+
+            const IrValue *defaultValue = program.value(parameter.defaultValue);
+            if (defaultValue == nullptr) {
+                throw std::logic_error(std::string(missingDefaultMessage));
+            }
+            const int defaultIndex = StringPool::storeString(
+                encodeDefaultValue(*defaultValue));
+            output.push_back(
+                {OP_PARAM_MAC_DINH, defaultIndex, slot, static_cast<int>(index)});
+        }
+    }
+
     void emitValue(IrValueId id, std::vector<Instruction> &output) {
         const IrValue *value = program.value(id);
-        if (value == nullptr) throw std::logic_error("invalid direct IR value id");
+        if (value == nullptr) {
+            throw std::logic_error(std::string(messages::kInternalDirectIrInvalidValueId));
+        }
 
         switch (value->opcode) {
             case IrValueOpcode::ConstInt:
@@ -1252,20 +1209,62 @@ struct Emitter {
                 output.push_back({OP_MAP_LITERAL, 0, index, 0});
                 return;
             }
+            case IrValueOpcode::ListLiteral: {
+                const int index = StringPool::storeString(encodeListLiteral(program, *value));
+                output.push_back({OP_LIST_LITERAL, 0, index, 0});
+                return;
+            }
+            case IrValueOpcode::Index:
+                emitValue(value->operands[0], output);
+                emitValue(value->operands[1], output);
+                output.push_back({OP_DOC_CHI_SO, 0, 0, 0});
+                return;
             case IrValueOpcode::LoadName: {
                 const auto function = functionIdsBySymbol.find(value->symbolId);
                 if (function != functionIdsBySymbol.end()) {
                     output.push_back({OP_BIEN_SO, function->second, 0, 0});
                     return;
                 }
+                const int registeredFunction =
+                    resolveFunctionIdByName(value->text, slots);
+                if (registeredFunction >= 0) {
+                    output.push_back({OP_BIEN_SO, registeredFunction, 0, 0});
+                    return;
+                }
                 const int slot = slotFor(value->text);
                 output.push_back({OP_TEN_BIEN_GIA_TRI, 0, slot, 0});
                 return;
             }
-            case IrValueOpcode::Unary:
+            case IrValueOpcode::Unary: {
+                if (value->text == "-") {
+                    const IrValue *operand = program.value(value->operands.front());
+                    if (operand == nullptr) {
+                        throw std::logic_error(std::string(
+                            messages::kInternalDirectIrInvalidValueId));
+                    }
+                    if (operand->opcode == IrValueOpcode::ConstInt) {
+                        try {
+                            output.push_back(
+                                {OP_BIEN_SO, -std::stoi(operand->text), 0, 0});
+                        } catch (...) {
+                            throw std::runtime_error(vietvm::messages::formatMessage(
+                                vietvm::messages::kInternalNumberParseMismatch,
+                                {"-" + operand->text}));
+                        }
+                        return;
+                    }
+                    if (operand->opcode == IrValueOpcode::ConstFloat) {
+                        const int index = StringPool::storeString("-" + operand->text);
+                        output.push_back({OP_BIEN_SO_FLOAT, 0, index, 0});
+                        return;
+                    }
+                    throw std::logic_error(std::string(
+                        messages::kInternalDirectIrUnsupportedValue));
+                }
                 emitValue(value->operands.front(), output);
                 output.push_back({OP_PHU_DINH, 0, 0, 0});
                 return;
+            }
             case IrValueOpcode::Binary:
                 emitValue(value->operands[0], output);
                 emitValue(value->operands[1], output);
@@ -1273,7 +1272,9 @@ struct Emitter {
                 return;
             case IrValueOpcode::StoreName: {
                 const IrValue *target = program.value(value->operands.front());
-                if (target == nullptr) throw std::logic_error("invalid direct IR store target");
+                if (target == nullptr) {
+                    throw std::logic_error(std::string(messages::kInternalDirectIrInvalidStoreTarget));
+                }
 
                 // The legacy compiler assigns the target slot before compiling
                 // the RHS.  Preserve that ordering even though the target ID is
@@ -1296,25 +1297,46 @@ struct Emitter {
                 output.push_back({OP_GAN, 0, 0, 0});
                 return;
             }
+            case IrValueOpcode::StoreIndex: {
+                const IrValue *target = program.value(value->operands.front());
+                if (target == nullptr || target->opcode != IrValueOpcode::Index ||
+                    target->operands.size() != 2) {
+                    throw std::logic_error(std::string(messages::kInternalDirectIrInvalidIndexedStoreTarget));
+                }
+                emitValue(target->operands[0], output);
+                emitValue(target->operands[1], output);
+                emitValue(value->operands[1], output);
+                output.push_back({OP_GAN_CHI_SO, 0, 0, 0});
+                return;
+            }
             case IrValueOpcode::Call: {
                 const auto function = functionIdsBySymbol.find(value->symbolId);
                 if (function == functionIdsBySymbol.end()) {
-                    throw std::logic_error("direct IR call has no VM function mapping");
+                    throw std::logic_error(std::string(messages::kInternalDirectIrMissingVmFunctionMapping));
                 }
-                for (std::size_t index = 1; index < value->operands.size(); ++index) {
-                    emitValue(value->operands[index], output);
-                }
-                int target = function->second;
+                std::string resolvedName = value->text;
+                int target = -1;
                 if (value->explicitCall) {
-                    const auto code = hamMap::hamBytecodeMap.find(function->second);
-                    if (code == hamMap::hamBytecodeMap.end() || code->second.empty()) {
-                        const auto name = functionNameIndices.find(value->symbolId);
-                        if (name == functionNameIndices.end()) {
-                            throw std::logic_error(
-                                "direct IR explicit call has no function name mapping");
-                        }
-                        target = -(name->second + 1);
-                    }
+                    // `gọi` resolves before arguments and only accepts a local
+                    // function whose bytecode is already available.
+                    resolvedName = resolveCallableNameInContext(value->text, slots);
+                    validateCallableAccess(resolvedName);
+                    target = resolveFunctionIdByName(resolvedName, slots, false);
+                }
+
+                emitCallArguments(*value, output);
+
+                if (!value->explicitCall) {
+                    // Ordinary expression calls resolve after arguments. This
+                    // preserves the legacy class-context/StringPool timing,
+                    // even when semantic analysis already knows the function.
+                    resolvedName = resolveCallableNameInContext(value->text, slots);
+                    validateCallableAccess(resolvedName);
+                    target = resolveFunctionIdByName(value->text, slots);
+                }
+                if (target < 0) {
+                    const int nameIndex = StringPool::storeString(resolvedName);
+                    target = -(nameIndex + 1);
                 }
                 output.push_back({OP_GOI,
                                   static_cast<int>(value->operands.size() - 1),
@@ -1323,20 +1345,37 @@ struct Emitter {
                 return;
             }
             case IrValueOpcode::CallDynamic: {
-                for (std::size_t index = 1; index < value->operands.size(); ++index) {
-                    emitValue(value->operands[index], output);
+                std::string resolvedName = value->text;
+                if (value->explicitCall) {
+                    // `gọi name(...)` resolves the callable before compiling
+                    // arguments in the compatibility backend.
+                    resolvedName = resolveCallableNameInContext(value->text, slots);
+                    validateCallableAccess(resolvedName);
                 }
+                emitCallArguments(*value, output);
                 const int argumentCount =
                     static_cast<int>(value->operands.size() - 1);
 
                 if (!value->explicitCall) {
-                    const auto function = functionIdsByName.find(value->text);
+                    // Ordinary expression calls resolve after argument
+                    // emission. StringPool changes from arguments can affect
+                    // legacy class qualification, so preserve that ordering.
+                    resolvedName = resolveCallableNameInContext(value->text, slots);
+                    validateCallableAccess(resolvedName);
+                    const int registeredFunction =
+                        resolveFunctionIdByName(value->text, slots);
+                    if (registeredFunction >= 0) {
+                        output.push_back(
+                            {OP_GOI, argumentCount, registeredFunction, 0});
+                        return;
+                    }
+                    const auto function = functionIdsByName.find(resolvedName);
                     if (function != functionIdsByName.end()) {
                         output.push_back(
                             {OP_GOI, argumentCount, function->second, 0});
                         return;
                     }
-                    const auto variable = slots.find(value->text);
+                    const auto variable = slots.find(resolvedName);
                     if (variable != slots.end()) {
                         output.push_back(
                             {OP_TEN_BIEN_GIA_TRI, 0, variable->second, 0});
@@ -1346,7 +1385,7 @@ struct Emitter {
                     }
                 }
 
-                const int nameIndex = StringPool::storeString(value->text);
+                const int nameIndex = StringPool::storeString(resolvedName);
                 output.push_back(
                     {OP_GOI, argumentCount, -(nameIndex + 1), 0});
                 return;
@@ -1372,28 +1411,9 @@ struct Emitter {
 
                 std::vector<Instruction> functionBytecode;
                 functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
-                for (std::size_t index = 0;
-                     index < lambda->parameters.size(); ++index) {
-                    const IrParameter &parameter = lambda->parameters[index];
-                    const int slot = slotFor(parameter.name);
-                    functionBytecode.push_back({OP_KHOI_TAO, 0, slot, 0});
-                    if (parameter.hasDefault) {
-                        const IrValue *defaultValue =
-                            program.value(parameter.defaultValue);
-                        if (defaultValue == nullptr) {
-                            throw std::logic_error(
-                                "direct IR lambda parameter has no default value");
-                        }
-                        const int defaultIndex = StringPool::storeString(
-                            encodeDefaultValue(*defaultValue));
-                        functionBytecode.push_back(
-                            {OP_PARAM_MAC_DINH, defaultIndex, slot,
-                             static_cast<int>(index)});
-                    } else {
-                        functionBytecode.push_back(
-                            {OP_PARAM, 0, slot, static_cast<int>(index)});
-                    }
-                }
+                emitParameterBindings(
+                    lambda->parameters, functionBytecode,
+                    messages::kInternalDirectIrMissingLambdaDefaultValue);
 
                 emitInstruction(lambda->body, functionBytecode, false);
                 functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
@@ -1403,7 +1423,7 @@ struct Emitter {
                 return;
             }
             case IrValueOpcode::LegacyRegion:
-                throw std::logic_error("unsupported value reached direct IR emitter");
+                throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedValue));
         }
     }
 
@@ -1412,6 +1432,9 @@ struct Emitter {
                          bool blockMarkers = true) {
         switch (instruction.opcode) {
             case IrOpcode::NoOp:
+                return;
+            case IrOpcode::Import:
+                compileImportSpec(instruction.importSpec, nextSlot, keywordMap);
                 return;
             case IrOpcode::Block:
                 if (blockMarkers) output.push_back({OP_MO_KHOI, 0, 0, 0});
@@ -1446,7 +1469,8 @@ struct Emitter {
                     ? nullptr
                     : program.value(init->operands.front());
                 if (target == nullptr) {
-                    throw std::logic_error("direct IR loop has no init target");
+                    throw std::logic_error(std::string(
+                        messages::kInternalDirectIrLoopMissingInitializerTarget));
                 }
                 const int initSlot = slotFor(target->text);
                 // The legacy loop wrapper emits KHỞI_TẠO on every loop,
@@ -1476,8 +1500,8 @@ struct Emitter {
                     } else {
                         const IrValue *label = program.value(arm.label);
                         if (label == nullptr) {
-                            throw std::logic_error(
-                                "direct IR switch has no case label");
+                            throw std::logic_error(std::string(
+                                messages::kInternalDirectIrSwitchMissingCaseLabel));
                         }
                         if (label->opcode == IrValueOpcode::ConstInt) {
                             output.push_back(
@@ -1492,14 +1516,14 @@ struct Emitter {
                             const std::string legacyName =
                                 normalizeTokenForCompare(label->text);
                             if (legacyName.empty()) {
-                                throw std::logic_error(
-                                    "direct IR switch has an empty normalized label");
+                                throw std::logic_error(std::string(
+                                    messages::kInternalDirectIrSwitchEmptyNormalizedLabel));
                             }
                             output.push_back(
                                 {OP_CA, slotFor(legacyName), -2, 0});
                         } else {
-                            throw std::logic_error(
-                                "unsupported direct IR switch label");
+                            throw std::logic_error(std::string(
+                                messages::kInternalDirectIrUnsupportedSwitchLabel));
                         }
                     }
                     emitInstruction(
@@ -1555,7 +1579,8 @@ struct Emitter {
                 emitValue(instruction.expressionRoots.front(), output);
                 return;
             default:
-                throw std::logic_error("unsupported statement reached direct IR emitter");
+                throw std::logic_error(std::string(
+                    messages::kInternalDirectIrUnsupportedStatement));
         }
     }
 
@@ -1563,29 +1588,15 @@ struct Emitter {
         const auto function = functionIdsBySymbol.find(instruction.symbolId);
         const auto name = functionNameIndices.find(instruction.symbolId);
         if (function == functionIdsBySymbol.end() || name == functionNameIndices.end()) {
-            throw std::logic_error("direct IR function was not predeclared");
+            throw std::logic_error(std::string(
+                messages::kInternalDirectIrFunctionNotPredeclared));
         }
 
         std::vector<Instruction> functionBytecode;
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
-        for (std::size_t index = 0; index < instruction.parameters.size(); ++index) {
-            const IrParameter &parameter = instruction.parameters[index];
-            const int slot = slotFor(parameter.name);
-            functionBytecode.push_back({OP_KHOI_TAO, 0, slot, 0});
-            if (parameter.hasDefault) {
-                const IrValue *defaultValue = program.value(parameter.defaultValue);
-                if (defaultValue == nullptr) {
-                    throw std::logic_error("direct IR parameter has no default value");
-                }
-                const int defaultIndex = StringPool::storeString(
-                    encodeDefaultValue(*defaultValue));
-                functionBytecode.push_back(
-                    {OP_PARAM_MAC_DINH, defaultIndex, slot, static_cast<int>(index)});
-            } else {
-                functionBytecode.push_back(
-                    {OP_PARAM, 0, slot, static_cast<int>(index)});
-            }
-        }
+        emitParameterBindings(
+            instruction.parameters, functionBytecode,
+            messages::kInternalDirectIrMissingParameterDefaultValue);
 
         emitInstruction(instruction.children.front(), functionBytecode, false);
         functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
@@ -1594,6 +1605,7 @@ struct Emitter {
     }
 
     void emitClass(const IrInstruction &instruction) {
+        ClassContextGuard classContext(instruction.declarationName);
         const IrInstruction &body = instruction.children.front();
         for (const IrInstruction &member : body.children) {
             if (member.opcode == IrOpcode::NoOp) continue;
@@ -1640,12 +1652,6 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
             context.functionNames.insert(instruction.declarationName);
             if (insideClass) {
                 context.methodSymbols.insert(instruction.symbolId);
-                const std::size_t separator =
-                    instruction.declarationName.rfind('.');
-                context.methodRawNames.insert(
-                    separator == std::string::npos
-                        ? instruction.declarationName
-                        : instruction.declarationName.substr(separator + 1));
                 context.methodDeclarationOffsets.emplace(
                     instruction.symbolId, instruction.span.begin.offset);
                 context.methodNameDeclarationOffsets.emplace(
@@ -1673,13 +1679,15 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
 }
 
 std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
+                                            const std::unordered_map<std::string, Opcode> &keywordMap,
                                             bool emitMainCall) {
     const DirectIrSupport support = analyzeDirectIrSupport(program);
     if (!support.supported) {
-        throw std::logic_error("program contains IR regions unsupported by direct bytecode emission");
+        throw std::logic_error(std::string(
+            messages::kInternalDirectIrProgramHasUnsupportedRegion));
     }
 
-    Emitter emitter{program};
+    Emitter emitter{program, keywordMap};
     emitter.emitProgram(emitMainCall);
     return std::move(emitter.bytecode);
 }

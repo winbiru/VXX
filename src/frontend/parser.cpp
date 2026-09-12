@@ -166,6 +166,24 @@ private:
                 continue;
             }
 
+            if (tokens_[pos_].lexeme == "[") {
+                const std::size_t begin = expressions_[left].tokenBegin;
+                ++pos_;
+                ExprId index = parseExpression(0);
+                if (index == kInvalidExprId || pos_ >= end_ || tokens_[pos_].lexeme != "]") {
+                    return kInvalidExprId;
+                }
+                ++pos_;
+                AstExpression indexed;
+                indexed.kind = AstExpressionKind::Index;
+                indexed.tokenBegin = begin;
+                indexed.tokenEnd = pos_;
+                indexed.left = left;
+                indexed.right = index;
+                left = append(std::move(indexed));
+                continue;
+            }
+
             if (tokens_[pos_].lexeme == "++" || tokens_[pos_].lexeme == "--") {
                 const std::size_t begin = expressions_[left].tokenBegin;
                 const std::string op = tokens_[pos_].lexeme;
@@ -238,6 +256,7 @@ private:
         }
 
         if (lexeme == "{") return parseMapLiteral();
+        if (lexeme == "[") return parseListLiteral();
         if (beginsLambda(tokens_, pos_, end_)) {
             return parseLambda();
         }
@@ -501,6 +520,28 @@ private:
         map.tokenEnd = pos_;
         map.mapEntries = std::move(entries);
         return append(std::move(map));
+    }
+
+    ExprId parseListLiteral() {
+        const std::size_t begin = pos_;
+        ++pos_;
+        std::vector<ExprId> elements;
+        while (pos_ < end_ && tokens_[pos_].lexeme != "]") {
+            ExprId element = parseExpression(0);
+            if (element == kInvalidExprId) return kInvalidExprId;
+            elements.push_back(element);
+            if (pos_ >= end_ || tokens_[pos_].lexeme != ",") break;
+            ++pos_;
+            if (pos_ >= end_ || tokens_[pos_].lexeme == "]") return kInvalidExprId;
+        }
+        if (pos_ >= end_ || tokens_[pos_].lexeme != "]") return kInvalidExprId;
+        ++pos_;
+        AstExpression list;
+        list.kind = AstExpressionKind::ListLiteral;
+        list.tokenBegin = begin;
+        list.tokenEnd = pos_;
+        list.listElements = std::move(elements);
+        return append(std::move(list));
     }
 
     const std::vector<Token> &tokens_;
@@ -1000,7 +1041,15 @@ void Parser::attachImportForm(AstStatement &statement) {
         spec.targetSpan = tokenRangeSpan(tokens_, targetBegin, targetEnd);
     }
 
-    if (!hasViSuffix(spec.target)) return;
+    const bool hasSeparator = spec.target.find('/') != std::string::npos ||
+                              spec.target.find('\\') != std::string::npos;
+    const std::size_t lastSeparator = spec.target.find_last_of("/\\");
+    const std::size_t lastDot = spec.target.find_last_of('.');
+    const bool hasExtension = lastDot != std::string::npos &&
+                              (lastSeparator == std::string::npos ||
+                               lastDot > lastSeparator);
+    const bool barePackageTarget = !hasSeparator && !hasExtension;
+    if (!hasViSuffix(spec.target) && !barePackageTarget) return;
 
     if (cursor < end - 1 && tokens_[cursor].lexeme == "như") {
         ++cursor;

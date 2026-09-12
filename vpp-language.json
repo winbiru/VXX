@@ -1,7 +1,7 @@
 {
   "name": "vpp-language",
   "displayName": "V++ Language",
-  "version": "0.0.1",
+  "version": "0.1.2",
   "publisher": "vpp",
   "icon": "assets/icons/vpp-file.png",
   "languageId": "vpp",

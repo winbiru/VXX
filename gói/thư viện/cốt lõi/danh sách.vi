@@ -1,0 +1,46 @@
+// Module: thư viện.cốt lõi.danh sách
+// List MVP: literal, length, read/write index và append được thực thi native.
+
+// Thêm giá trị vào cuối list; trả về rỗng.
+hàm thêm(ds, giá trị) {
+    ném "stdlib: thêm native hook không khả dụng";
+};
+
+// Xóa phần tử tại chỉ số, trả về phần tử vừa xóa.
+hàm xóa tại(ds, chỉ số) {
+    ném "stdlib: xóa tại native hook không khả dụng";
+};
+
+// Đảo ngược list tại chỗ, trả về rỗng.
+hàm đảo ngược(ds) {
+    ném "stdlib: đảo ngược native hook không khả dụng";
+};
+
+// Tìm chỉ số đầu tiên của giá trị; trả về -1 nếu không có.
+hàm tìm chỉ số(ds, giá trị) {
+    ném "stdlib: tìm chỉ số native hook không khả dụng";
+};
+
+// Loại bỏ phần tử trùng lặp, giữ thứ tự xuất hiện đầu tiên.
+hàm xóa trùng(ds) {
+    ném "stdlib: xóa trùng native hook không khả dụng";
+};
+
+// Sắp xếp list số hoặc list chuỗi tại chỗ.
+hàm sắp xếp(ds) {
+    ném "stdlib: sắp xếp native hook không khả dụng";
+};
+
+// Tổng phần tử số trong list.
+hàm tổng list(ds) {
+    ném "stdlib: tổng list native hook không khả dụng";
+};
+
+// Giá trị nhỏ nhất/lớn nhất trong list số hoặc list chuỗi.
+hàm nhỏ nhất list(ds) {
+    ném "stdlib: nhỏ nhất list native hook không khả dụng";
+};
+
+hàm lớn nhất list(ds) {
+    ném "stdlib: lớn nhất list native hook không khả dụng";
+};

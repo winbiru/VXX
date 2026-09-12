@@ -1,4 +1,5 @@
 #include "vpp/compiler/module_graph.h"
+#include "vpp/core/message_constants.h"
 
 #include <chrono>
 #include <filesystem>
@@ -222,8 +223,9 @@ void testReadAndScanFailureCanRetry() {
     try {
         (void)builder.build("entry", {absoluteImport});
     } catch (const std::runtime_error &error) {
-        readFailed = std::string(error.what()).find("VPP-IMP-003") !=
-                     std::string::npos;
+        const std::string_view messageTemplate = vietvm::messages::kImportCannotOpenFile;
+        const std::string prefix(messageTemplate.substr(0, messageTemplate.find("{0}")));
+        readFailed = std::string(error.what()).find(prefix) != std::string::npos;
     }
     expect(readFailed, "a missing resolved file reports the public import diagnostic");
 

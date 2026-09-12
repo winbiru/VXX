@@ -2,6 +2,9 @@
 build/
 cmake-build-debug/
 cmake-build-release/
+build-coverage/
+build-tidy/
+build-benchmark/
 out/
 # CMake generated
 CMakeFiles/
@@ -23,8 +26,10 @@ bin/
 *~
 # macOS
 .DS_Store
+*.dmg
 # Test artifacts
 src/tests/.tmp/
+src/tests/.tmp_*
 *.actual
 dist/
 *.vsix

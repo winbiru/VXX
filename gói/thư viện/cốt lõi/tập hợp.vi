@@ -1,0 +1,18 @@
+// Module: thư viện.cốt lõi.tập hợp
+// Set MVP được biểu diễn bởi list không trùng lặp, giữ thứ tự xuất hiện.
+
+hàm tập hợp(ds) {
+    ném "stdlib: tập hợp native hook không khả dụng";
+};
+
+hàm hợp tập(a, b) {
+    ném "stdlib: hợp tập native hook không khả dụng";
+};
+
+hàm giao tập(a, b) {
+    ném "stdlib: giao tập native hook không khả dụng";
+};
+
+hàm rời nhau(a, b) {
+    ném "stdlib: rời nhau native hook không khả dụng";
+};

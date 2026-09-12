@@ -1,0 +1,65 @@
+// Regression P1: list literal scalar, in và native độ dài.
+ds = [1, "hai", rỗng];
+in ds;
+in ds[1];
+ds[1] = "đã đổi";
+in ds;
+in độ dài(ds);
+in độ dài("abc");
+
+nums = [1, 2, 3];
+tổng = 0;
+lặp(i = 0; i < độ dài(nums); i++) {
+    tổng += nums[i];
+};
+in tổng;
+
+thêm(nums, 4);
+in nums;
+in độ dài(nums);
+
+trùng = [3, 1, 3, 2];
+in tổng list(trùng);
+in nhỏ nhất list(trùng);
+in lớn nhất list(trùng);
+xóa trùng(trùng);
+sắp xếp(trùng);
+in trùng;
+in tìm chỉ số(trùng, 2);
+in xóa tại(trùng, 1);
+đảo ngược(trùng);
+in trùng;
+
+thông tin = {"tên": "V++", "phiên bản": 1};
+in lấy map(thông tin, "tên", "không có");
+in lấy map(thông tin, "thiếu", "mặc định");
+đặt map(thông tin, "phiên bản", 2);
+in có khóa(thông tin, "phiên bản");
+in lấy map(thông tin, "phiên bản", 0);
+in khóa map(thông tin);
+in xóa khóa(thông tin, "tên");
+in thông tin;
+đặt map(thông tin, "nums", nums);
+nums từ map = lấy map(thông tin, "nums", rỗng);
+in nums từ map[0];
+
+a = [1, 2, 2, 3];
+b = [3, 4, 4];
+tập a = tập hợp(a);
+tập b = tập hợp(b);
+in tập a;
+in hợp tập(tập a, tập b);
+in giao tập(tập a, tập b);
+in rời nhau(tập a, tập b);
+
+bộ = thành tuple(tập a);
+in bộ;
+in bộ[1];
+list lại = thành list(bộ);
+thêm(list lại, 9);
+in list lại;
+
+ma trận = [[1, 2], [3, 4]];
+in ma trận[1][0];
+ma trận[0][1] = 9;
+in ma trận;

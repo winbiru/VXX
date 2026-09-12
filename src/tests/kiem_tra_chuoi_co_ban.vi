@@ -1,0 +1,14 @@
+// Regression cho API chuỗi MVP (ASCII/byte UTF-8).
+in đảo ngược("abc");
+in đếm ký tự("banana", "a");
+in chứa chuỗi("xin chào", "chào");
+in thay thế("một-một", "một", "hai");
+in chuỗi thường("AbC");
+in chuỗi hoa("AbC");
+in chuẩn hóa khoảng trắng("  xin   chào  bạn ");
+in đếm từ("  xin   chào  bạn ");
+in từ dài nhất("một hai baaaaaa");
+in viết hoa đầu từ("xIN chAO");
+in là palindrome("Level");
+in là anagram("listen", "silent");
+in mã hóa caesar("Abc-Z", 2);

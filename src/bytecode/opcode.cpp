@@ -76,6 +76,9 @@ std::string opcodeName(Opcode op) {
         case OP_MAP_LITERAL: return "OP_MAP_LITERAL";
         case OP_GOI_GIAN_TIEP: return "OP_GOI_GIAN_TIEP";
         case OP_PARAM_MAC_DINH: return "OP_PARAM_MAC_DINH";
+        case OP_LIST_LITERAL: return "OP_LIST_LITERAL";
+        case OP_DOC_CHI_SO: return "OP_DOC_CHI_SO";
+        case OP_GAN_CHI_SO: return "OP_GAN_CHI_SO";
         default: return "UNKNOWN_OPCODE";
     }
 }

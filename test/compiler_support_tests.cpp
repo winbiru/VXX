@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -10,6 +11,8 @@
 #include "common/storeString.h"
 #include "common/symbolTable.h"
 #include "common/utility.h"
+#include "frontend/keywords.h"
+#include "vpp/compiler/pipeline.h"
 #include "vpp/core/project_layout.h"
 #include "vpp/core/text.h"
 
@@ -118,6 +121,87 @@ void testCompilationStateReset() {
     vietvm::compiler::resetCompilationState();
 }
 
+void testRepeatedTopLevelCompilationLifecycle() {
+    using vietvm::compiler::StringPool;
+    using vietvm::compiler::hamMap;
+
+    const std::string firstSource = "hàm main() { in \"alpha-lifecycle\"; }";
+    const std::string secondSource = "hàm main() { in \"beta-lifecycle\"; }";
+
+    vietvm::compiler::resetCompilationState();
+    const auto first = vietvm::compiler::compilePipeline(firstSource, keywordMap, true);
+    const std::vector<std::string> firstPool = StringPool::getPool();
+    const auto firstNames = hamMap::hamNameIndexMap;
+    const std::size_t firstFunctionCount = hamMap::hamBytecodeMap.size();
+
+    expect(StringPool::findString("alpha-lifecycle") >= 0,
+           "first top-level compilation records its own string literal");
+
+    vietvm::compiler::resetCompilationState();
+    (void)vietvm::compiler::compilePipeline(secondSource, keywordMap, true);
+    expect(StringPool::findString("alpha-lifecycle") == -1,
+           "second top-level compilation does not retain the first StringPool");
+    expect(StringPool::findString("beta-lifecycle") >= 0,
+           "second top-level compilation records its own string literal");
+
+    vietvm::compiler::resetCompilationState();
+    const auto firstAgain = vietvm::compiler::compilePipeline(firstSource, keywordMap, true);
+    expect(StringPool::getPool() == firstPool,
+           "recompiling the same source after reset reproduces StringPool state");
+    expect(hamMap::hamNameIndexMap == firstNames,
+           "recompiling the same source after reset reproduces function-name IDs");
+    expect(hamMap::hamBytecodeMap.size() == firstFunctionCount,
+           "recompiling the same source after reset reproduces function count");
+    expect(firstAgain.backend == first.backend &&
+               firstAgain.bytecode.size() == first.bytecode.size(),
+           "recompiling the same source after reset preserves backend and root bytecode shape");
+
+    vietvm::compiler::resetCompilationState();
+}
+
+void testCompilationContextLifecycle() {
+    using vietvm::compiler::StringPool;
+    using vietvm::compiler::hamMap;
+
+    const std::string firstSource = "hàm main() { in \"alpha-context\"; }";
+    const std::string secondSource = "hàm main() { in \"beta-context\"; }";
+
+    vietvm::compiler::CompilationContext firstContext;
+    const auto first = vietvm::compiler::compilePipeline(
+        firstContext, firstSource, keywordMap, true);
+
+    expect(std::find(firstContext.stringPool.begin(), firstContext.stringPool.end(),
+                     "alpha-context") != firstContext.stringPool.end(),
+           "CompilationContext snapshots the first compilation StringPool");
+    expect(StringPool::size() == 0 && hamMap::hamBytecodeMap.empty() &&
+               hamMap::hamNameIndexMap.empty(),
+           "context-driven compilation clears legacy registries after success");
+
+    vietvm::compiler::CompilationContext secondContext;
+    (void)vietvm::compiler::compilePipeline(
+        secondContext, secondSource, keywordMap, true);
+
+    expect(std::find(secondContext.stringPool.begin(), secondContext.stringPool.end(),
+                     "alpha-context") == secondContext.stringPool.end(),
+           "independent CompilationContext does not retain previous strings");
+    expect(std::find(secondContext.stringPool.begin(), secondContext.stringPool.end(),
+                     "beta-context") != secondContext.stringPool.end(),
+           "independent CompilationContext snapshots its own strings");
+
+    vietvm::compiler::CompilationContext firstAgainContext;
+    const auto firstAgain = vietvm::compiler::compilePipeline(
+        firstAgainContext, firstSource, keywordMap, true);
+    expect(firstAgainContext.stringPool == firstContext.stringPool,
+           "repeated context-driven compilation reproduces StringPool state");
+    expect(firstAgainContext.functionNameIndices == firstContext.functionNameIndices,
+           "repeated context-driven compilation reproduces function-name IDs");
+    expect(firstAgainContext.functionBytecode.size() == firstContext.functionBytecode.size(),
+           "repeated context-driven compilation reproduces function count");
+    expect(firstAgain.backend == first.backend &&
+               firstAgain.bytecode.size() == first.bytecode.size(),
+           "repeated context-driven compilation preserves backend and root bytecode shape");
+}
+
 void testSymbolTableIds() {
     std::unordered_map<std::string, int> symbols;
     int nextId = 10;
@@ -149,6 +233,26 @@ void testSharedTokenHelpers() {
            "shared identifier helper accepts identifiers");
     expect(!vietvm::compiler::isIdentifierLikeToken("đúng"),
            "shared identifier helper excludes boolean literals");
+
+    expect(vietvm::compiler::splitTopLevelArguments("a, nested(b, c), d") ==
+               std::vector<std::string>({"a", "nested(b, c)", "d"}),
+           "shared argument splitter ignores commas inside nested parentheses");
+    expect(vietvm::compiler::splitTopLevelArguments("  a  ,  b  ") ==
+               std::vector<std::string>({"a", "b"}),
+           "shared argument splitter trims top-level arguments");
+    expect(vietvm::compiler::splitTopLevelArguments("\"x,y\", z") ==
+               std::vector<std::string>({"\"x,y\"", "z"}),
+           "shared argument splitter ignores commas inside quoted strings");
+    expect(vietvm::compiler::splitTopLevelArguments("\"x(,)\", 'a,b', z") ==
+               std::vector<std::string>({"\"x(,)\"", "'a,b'", "z"}),
+           "shared argument splitter ignores punctuation inside both quote styles");
+    expect(vietvm::compiler::splitTopLevelArguments("\"a\\\"(,b\", z") ==
+               std::vector<std::string>({"\"a\\\"(,b\"", "z"}),
+           "shared argument splitter keeps escaped quotes inside a string literal");
+    expect(vietvm::compiler::splitTopLevelFields(
+               "i = \"x;\"; i != \"\"; i = \"(\"", ';') ==
+               std::vector<std::string>({"i = \"x;\"", "i != \"\"", "i = \"(\""}),
+           "shared top-level splitter ignores loop delimiters inside strings");
 }
 
 void testSharedFunctionResolution() {
@@ -198,6 +302,8 @@ int main() {
     testStringPool();
     testHamMapAllocator();
     testCompilationStateReset();
+    testRepeatedTopLevelCompilationLifecycle();
+    testCompilationContextLifecycle();
     testSymbolTableIds();
     testSharedTokenHelpers();
     testSharedFunctionResolution();

@@ -187,15 +187,15 @@ std::unordered_map<std::string, std::uint64_t> readExpectedSnapshots(
 }
 
 CompilerSnapshot capturePipeline(const std::string &source) {
-    vietvm::compiler::resetCompilationState();
     CompilerSnapshot snapshot;
+    vietvm::compiler::CompilationContext context;
     vietvm::compiler::CompilationArtifacts artifacts =
-        vietvm::compiler::compilePipeline(source, keywordMap, true);
+        vietvm::compiler::compilePipeline(context, source, keywordMap, true);
     snapshot.backend = artifacts.backend;
     snapshot.rootBytecode = std::move(artifacts.bytecode);
-    snapshot.stringPool = vietvm::compiler::StringPool::getPool();
-    snapshot.functionBytecode = vietvm::compiler::hamMap::hamBytecodeMap;
-    snapshot.functionNameIndices = vietvm::compiler::hamMap::hamNameIndexMap;
+    snapshot.stringPool = std::move(context.stringPool);
+    snapshot.functionBytecode = std::move(context.functionBytecode);
+    snapshot.functionNameIndices = std::move(context.functionNameIndices);
     return snapshot;
 }
 
@@ -238,37 +238,6 @@ int main(int argc, char **argv) {
     int failures = 0;
     std::size_t directPrograms = 0;
     std::unordered_set<std::string> visited;
-    const std::unordered_set<std::string> requiredDirectPrograms = {
-        "src/tests/kiem_tra_bo_qua.vi",
-        "src/tests/kiem_tra_boolean.vi",
-        "src/tests/kiem_tra_de_quy.vi",
-        "src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi",
-        "src/tests/kiem_tra_dieu_kien_phu_dinh.vi",
-        "src/tests/kiem_tra_chon_ca.vi",
-        "src/tests/kiem_tra_cu_phap_modifier_cu.vi",
-        "src/tests/kiem_tra_ham.vi",
-        "src/tests/kiem_tra_ham_4_tham_so.vi",
-        "src/tests/kiem_tra_ham_da_tu_khong_nhay.vi",
-        "src/tests/kiem_tra_ham_tham_so.vi",
-        "src/tests/kiem_tra_jit_mvp.vi",
-        "src/tests/kiem_tra_lambda_hof_mac_dinh.vi",
-        "src/tests/kiem_tra_lop_truy_cap.vi",
-        "src/tests/kiem_tra_mang_3_chieu.vi",
-        "src/tests/kiem_tra_noi_chuoi.vi",
-        "src/tests/kiem_tra_ngoai_le.vi",
-        "src/tests/kiem_tra_rong_va_map.vi",
-        "src/tests/kiem_tra_so_chan_1-20.vi",
-        "src/tests/kiem_tra_so_chia_het_cho_3_va_4.vi",
-        "src/tests/kiem_tra_so_le_chia_het_cho_5.vi",
-        "src/tests/kiem_tra_so_nguyen.vi",
-        "src/tests/kiem_tra_so_thuc.vi",
-        "src/tests/kiem_tra_toan_tu_moi.vi",
-        "src/tests/kiem_tra_tra_ve.vi",
-        "src/tests/modules/math.vi",
-        "src/tests/fixtures/api_project/dto.vi",
-        "src/tests/fixtures/api_project/entity.vi",
-        "src/tests/program.vi",
-    };
     for (const fs::path &testFile : testFiles) {
         const std::string relative =
             fs::relative(testFile, repositoryRoot).generic_u8string();
@@ -289,8 +258,7 @@ int main(int argc, char **argv) {
             if (pipeline.backend == vietvm::compiler::BytecodeBackend::DirectIr) {
                 ++directPrograms;
             }
-            if (requiredDirectPrograms.find(relative) != requiredDirectPrograms.end() &&
-                pipeline.backend != vietvm::compiler::BytecodeBackend::DirectIr) {
+            if (pipeline.backend != vietvm::compiler::BytecodeBackend::DirectIr) {
                 ++failures;
                 std::cerr << "FAIL: " << relative
                           << " returned to the legacy token bridge\n";
@@ -317,8 +285,35 @@ int main(int argc, char **argv) {
                       << entry.first << '\n';
         }
     }
-    vietvm::compiler::resetCompilationState();
 
+    // Run the same corpus again in reverse order inside the same process.
+    // This turns compiler reset/CWD isolation into a regression contract rather
+    // than relying on CTest process isolation or a favorable source-file order.
+    for (auto testFile = testFiles.rbegin(); testFile != testFiles.rend(); ++testFile) {
+        const std::string relative =
+            fs::relative(*testFile, repositoryRoot).generic_u8string();
+        const auto expectedEntry = expected.find(relative);
+        if (expectedEntry == expected.end()) continue;
+
+        try {
+            const std::string source = readSource(*testFile);
+            CurrentPathGuard cwdGuard;
+            fs::current_path(testFile->parent_path());
+            const CompilerSnapshot pipeline = capturePipeline(source);
+            const std::uint64_t actual = hashSnapshot(pipeline);
+            if (actual != expectedEntry->second) {
+                ++failures;
+                std::cerr << "FAIL: reverse-order lifecycle parity for " << relative
+                          << ": legacy snapshot="
+                          << formatHash(expectedEntry->second)
+                          << ", pipeline=" << formatHash(actual) << '\n';
+            }
+        } catch (const std::exception &error) {
+            ++failures;
+            std::cerr << "FAIL: reverse-order lifecycle compile for " << relative
+                      << " threw: " << error.what() << '\n';
+        }
+    }
     if (failures != 0) {
         std::cerr << failures << " legacy compiler snapshot check(s) failed\n";
         return 1;

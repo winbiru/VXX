@@ -1,0 +1,10 @@
+// Module: thư viện.cốt lõi.tuple
+// Tuple MVP là collection bất biến, tạo từ list và chuyển ngược về list.
+
+hàm thành tuple(ds) {
+    ném "stdlib: thành tuple native hook không khả dụng";
+};
+
+hàm thành list(giá trị) {
+    ném "stdlib: thành list native hook không khả dụng";
+};

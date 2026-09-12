@@ -1,6 +1,6 @@
 # Kế hoạch dài hạn (3–12+ tháng)
 
-> Cập nhật: 12/08/2026
+> Cập nhật: 12/09/2026
 > Các mục dưới đây là công việc nền tảng chưa hoàn tất. V++ hiện có compiler, bytecode
 > VM, package/thư viện chuẩn, tooling MVP và pipeline release; không nên diễn giải
 > điều đó là mức hoàn thiện tương đương Java, C# hay Python.
@@ -34,7 +34,8 @@
       phân biệt direct call, indirect value call và dynamic/native fallback.
    4. [x] **Recursive IR lowering** — hạ expression arena, parameter defaults và
       statement children; conditional/loop/switch/try/class đã có structured payload;
-      import metadata vẫn chưa hoàn tất.
+      import local/package đã có structured `AstImportSpec`/IR payload và module graph;
+      export semantics vẫn còn là phần tiếp theo.
    5. [x] **IR → bytecode trực tiếp, cohort đầu** — emitter đã phát trực tiếp
       literal/name/operator/assignment/postfix/print/primitive map, top-level function,
       primitive default, return, direct/dynamic/indirect calls, structured lambda,
@@ -45,8 +46,13 @@
       và được đếm; chỉ xóa `materializeIrTokens`/legacy compiler khi corpus `.vi`
       đạt zero fallback và vẫn cùng bytecode/compiler state.
 
-   Hiện direct backend bao phủ 29/57 regression program; parity gate khóa con số
-   tối thiểu này và vẫn đối chiếu đầy đủ bytecode/StringPool/function registries.
+   Hiện direct backend bao phủ 61/61 regression program; parity gate yêu cầu toàn bộ
+   corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
+   registries. Call argument, function/lambda parameter và loop header đã dùng chung
+   splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
+   Helper loop cũ và implementation `compileFunction` không còn caller đã được xóa.
+   Compatibility bridge vẫn còn cho các cú pháp ngoài regression corpus; cần audit
+   các fallback unit/diagnostic case trước khi xóa `materializeIrTokens`.
 
    Chốt dynamic/static/gradual typing và Typed IR là quyết định riêng. Expression
    AST, scope tree, name resolution và structured **untyped IR** không phải chờ

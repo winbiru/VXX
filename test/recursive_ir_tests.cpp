@@ -627,7 +627,7 @@ void testStructuredLambdasLowerBodiesDefaultsCapturesAndNestedIds() {
     }
 }
 
-void testLambdaBodyFallbackAccountingAndOptimizationAreRecursive() {
+void testLambdaBodyImportAccountingAndOptimizationAreRecursive() {
     using namespace vietvm::frontend;
     using namespace vietvm::compiler;
 
@@ -635,8 +635,8 @@ void testLambdaBodyFallbackAccountingAndOptimizationAreRecursive() {
         "handler = hàm() { ; nhập package; };\n");
     const SemanticModel semantic = analyzeSemantics(program);
     IrProgram ir = lowerToIr(program, semantic);
-    expect(ir.lambdas.size() == 1 && ir.legacyRegionCount == 1,
-           "fallback accounting reaches an import nested only inside a lambda body");
+    expect(ir.lambdas.size() == 1 && ir.legacyRegionCount == 0,
+           "structured import inside a lambda body no longer creates a legacy fallback");
     if (ir.lambdas.empty()) return;
 
     const OptimizationReport report = optimizeIr(ir);
@@ -644,11 +644,11 @@ void testLambdaBodyFallbackAccountingAndOptimizationAreRecursive() {
                ir.lambdas.front().body.children.size() == 1 &&
                ir.lambdas.front().body.children.front().opcode == IrOpcode::Import,
            "IR optimization recursively removes no-op statements inside lambda bodies");
-    expect(ir.legacyRegionCount == 1,
-           "recursive optimization preserves the remaining lambda-body fallback count");
-    ir.lambdas.front().body.children.front().legacyRegion = false;
-    expect(recomputeLegacyRegionCount(ir) == 0,
-           "recomputed fallback accounting follows rewritten lambda-body instructions");
+    expect(ir.legacyRegionCount == 0,
+           "recursive optimization preserves zero fallback for a structured lambda import");
+    ir.lambdas.front().body.children.front().legacyRegion = true;
+    expect(recomputeLegacyRegionCount(ir) == 1,
+           "recomputed fallback accounting still reaches rewritten lambda-body instructions");
 }
 
 void testUnsupportedExpressionsAreExplicitLegacyRegions() {
@@ -729,7 +729,7 @@ int main() {
     testStructuredTryMetadataLowersRecursively();
     testStructuredClassMetadataLowersQualifiedMethods();
     testStructuredLambdasLowerBodiesDefaultsCapturesAndNestedIds();
-    testLambdaBodyFallbackAccountingAndOptimizationAreRecursive();
+    testLambdaBodyImportAccountingAndOptimizationAreRecursive();
     testUnsupportedExpressionsAreExplicitLegacyRegions();
 
     if (failures != 0) {

@@ -51,6 +51,9 @@ enum class IrValueOpcode {
     ConstBool,
     ConstNull,
     MapLiteral,
+    ListLiteral,
+    Index,
+    StoreIndex,
     LoadName,
     StoreName,
     Unary,
@@ -114,6 +117,9 @@ struct IrInstruction {
     vietvm::frontend::AstVisibility visibility =
         vietvm::frontend::AstVisibility::Unspecified;
     SemanticVisibility effectiveVisibility = SemanticVisibility::Unspecified;
+    vietvm::frontend::AstImportForm importForm =
+        vietvm::frontend::AstImportForm::Unstructured;
+    vietvm::frontend::AstImportSpec importSpec;
     vietvm::frontend::AstClassForm classForm =
         vietvm::frontend::AstClassForm::Unstructured;
     vietvm::frontend::AstConditionalForm conditionalForm =

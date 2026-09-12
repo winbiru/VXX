@@ -11,6 +11,7 @@
 #include "vpp/compiler/optimizer.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/compiler/semantic.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/frontend/parser.h"
 
 namespace {
@@ -22,6 +23,11 @@ void expect(bool condition, const std::string &message) {
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+std::string messagePrefix(std::string_view messageTemplate) {
+    const std::size_t placeholder = messageTemplate.find("{0}");
+    return std::string(messageTemplate.substr(0, placeholder));
 }
 
 std::vector<vietvm::frontend::Token> lexSource(const std::string &source) {
@@ -169,8 +175,9 @@ void testParserReportsUnmatchedClosingBracket() {
         (void)parseSource(source);
     } catch (const vietvm::frontend::ParseError &error) {
         rejected = true;
-        expect(std::string(error.what()).find("[VPP-SYN-035]") != std::string::npos,
-               "unmatched ']' uses the stable square-bracket diagnostic code");
+        expect(std::string(error.what()).find(
+                   vietvm::messages::kSyntaxUnbalancedBrackets) != std::string::npos,
+               "unmatched ']' reports the square-bracket diagnostic");
         expect(error.span.begin.offset == unmatchedOffset &&
                    error.span.end.offset == unmatchedOffset + 1 &&
                    error.span.begin.line == 1 &&
@@ -187,8 +194,9 @@ void testParserReportsUnclosedOpeningBracket() {
         (void)parseSource(source);
     } catch (const vietvm::frontend::ParseError &error) {
         rejected = true;
-        expect(std::string(error.what()).find("[VPP-SYN-035]") != std::string::npos,
-               "unclosed '[' uses the stable square-bracket diagnostic code");
+        expect(std::string(error.what()).find(
+                   vietvm::messages::kSyntaxUnbalancedBrackets) != std::string::npos,
+               "unclosed '[' reports the square-bracket diagnostic");
         expect(error.span.begin.offset == 0 && error.span.end.offset == source.size() &&
                    error.span.begin.line == 1 && error.span.begin.column == 1,
                "unclosed '[' diagnostic spans the incomplete statement");
@@ -204,7 +212,8 @@ void testParserRejectsCrossedDelimiterNesting() {
         (void)parseSource(source);
     } catch (const vietvm::frontend::ParseError &error) {
         rejected = true;
-        expect(std::string(error.what()).find("[VPP-SYN-002]") != std::string::npos,
+        expect(std::string(error.what()).find(
+                   vietvm::messages::kSyntaxUnbalancedParens) != std::string::npos,
                "crossed parenthesis/bracket nesting reports the closing delimiter family");
         expect(error.span.begin.offset == closingOffset &&
                    error.span.end.offset == closingOffset + 1,
@@ -217,7 +226,8 @@ void testParserRejectsCrossedDelimiterNesting() {
         (void)parseSource("in ([1;");
     } catch (const vietvm::frontend::ParseError &error) {
         rejected = true;
-        expect(std::string(error.what()).find("[VPP-SYN-035]") != std::string::npos,
+        expect(std::string(error.what()).find(
+                   vietvm::messages::kSyntaxUnbalancedBrackets) != std::string::npos,
                "EOF reports the innermost unclosed delimiter from the nesting stack");
     }
     expect(rejected, "parser rejects multiple unclosed delimiter families at EOF");
@@ -578,11 +588,22 @@ void testNonExactImportsStayOnTolerantPath() {
         "nhập \"modules/c.vi\" extra;");
     expect(packageImports.statements.size() == 5,
            "non-exact import fixture remains losslessly statement-delimited");
-    for (const AstStatement &statement : packageImports.statements) {
+    expect(packageImports.statements[0].importForm ==
+               AstImportForm::LocalSourceFile &&
+               packageImports.statements[0].importSpec.target == "cốt lõi" &&
+               packageImports.statements[0].importSpec.quoted,
+           "quoted package shortcut receives structured import metadata");
+    expect(packageImports.statements[1].importForm ==
+               AstImportForm::LocalSourceFile &&
+               packageImports.statements[1].importSpec.target == "vpp_core" &&
+               !packageImports.statements[1].importSpec.quoted,
+           "bare package shortcut receives structured import metadata");
+    for (std::size_t index = 2; index < packageImports.statements.size(); ++index) {
+        const AstStatement &statement = packageImports.statements[index];
         expect(statement.kind == AstStatementKind::Import &&
                    statement.importForm == AstImportForm::Unstructured &&
                    statement.importSpec.target.empty(),
-               "package shortcuts and malformed local imports do not receive structured metadata");
+               "malformed imports do not receive structured metadata");
     }
 
     const AstProgram missingSemicolon = parseSource("nhập modules/a.vi");
@@ -623,8 +644,10 @@ void testSemanticImportAliasUsesStructuredAstPayload() {
 
     AstProgram legacy = parseSource("nhập cốt lõi như package_alias;");
     expect(legacy.statements.size() == 1 &&
-               legacy.statements.front().importForm == AstImportForm::Unstructured,
-           "bare package import remains explicitly unstructured");
+               legacy.statements.front().importForm == AstImportForm::LocalSourceFile &&
+               legacy.statements.front().importSpec.target == "cốt lõi" &&
+               legacy.statements.front().importSpec.alias == "package_alias",
+           "bare package import exposes the same structured alias metadata as file imports");
     const SemanticModel legacySemantic = analyzeSemantics(legacy);
     expect(findSymbol(legacySemantic, SemanticSymbolKind::ImportAlias,
                       "package_alias") != nullptr,
@@ -936,38 +959,57 @@ void testExpressionRootsOnDeclarationsAndControlFlow() {
            "switch header exposes its selector root");
 }
 
-void testExpressionAstFallsBackWithoutLosingStatementTokens() {
+void testExpressionAstBuildsIndexWithoutLosingStatementTokens() {
     const vietvm::frontend::AstProgram program = parseSource("in danh_sách[0];");
     expect(program.statements.size() == 1 &&
                program.statements.front().kind == vietvm::frontend::AstStatementKind::Print &&
-               program.statements.front().expressionRoots.empty(),
-           "unsupported expression syntax keeps the statement and declines to attach a partial root");
+               program.statements.front().expressionRoots.size() == 1,
+           "an indexed print expression receives one complete AST root");
+    if (!program.statements.empty() &&
+        program.statements.front().expressionRoots.size() == 1) {
+        const auto *indexed = findExpression(
+            program, program.statements.front().expressionRoots.front());
+        const auto *base = indexed == nullptr ? nullptr : findExpression(program, indexed->left);
+        const auto *subscript = indexed == nullptr
+            ? nullptr
+            : findExpression(program, indexed->right);
+        expect(indexed != nullptr &&
+                   indexed->kind == vietvm::frontend::AstExpressionKind::Index &&
+                   base != nullptr &&
+                   base->kind == vietvm::frontend::AstExpressionKind::Name &&
+                   base->text == "danh_sách" &&
+                   subscript != nullptr &&
+                   subscript->kind == vietvm::frontend::AstExpressionKind::Literal &&
+                   subscript->literalKind == vietvm::frontend::AstLiteralKind::Integer &&
+                   subscript->text == "0",
+               "index AST retains its named base and integer subscript");
+    }
     expect(program.tokens.size() == 6 && program.tokens[1].lexeme == "danh_sách" &&
                program.tokens[2].lexeme == "[" && program.tokens[4].lexeme == "]",
-           "tolerant expression fallback retains the complete legacy token range");
+           "indexed expression retains the complete source token range");
 }
 
-void testExpressionRollbackPreservesArenaIdsAndGroupedSpans() {
+void testExpressionArenaPreservesIdsAndGroupedSpansWithIndexes() {
     const vietvm::frontend::AstProgram program = parseSource(
         "in a[0];\n"
         "in b + 1;\n"
         "hàm f(a = 1, unsupported = q[0], c = 2) { trả về (c + 1); }");
     expect(program.statements.size() == 3 &&
-               program.statements[0].expressionRoots.empty() &&
+               program.statements[0].expressionRoots.size() == 1 &&
                program.statements[1].expressionRoots.size() == 1,
-           "a failed expression slice rolls back without suppressing the next statement root");
+           "indexed and ordinary expression slices each receive complete roots");
 
     const auto *function = findFunction(program, "f");
     expect(function != nullptr && function->parameters.size() == 3,
-           "failed default parsing keeps the complete function parameter payload");
+           "indexed default parsing keeps the complete function parameter payload");
     if (function != nullptr && function->parameters.size() == 3) {
         expect(function->parameters[0].hasDefault &&
                    function->parameters[0].defaultValue != vietvm::frontend::kInvalidExprId &&
                    function->parameters[1].hasDefault &&
-                   function->parameters[1].defaultValue == vietvm::frontend::kInvalidExprId &&
+                   function->parameters[1].defaultValue != vietvm::frontend::kInvalidExprId &&
                    function->parameters[2].hasDefault &&
                    function->parameters[2].defaultValue != vietvm::frontend::kInvalidExprId,
-               "default presence survives fallback while surrounding default roots remain valid");
+               "all supported defaults retain valid expression roots");
     }
 
     const auto validId = [&](vietvm::frontend::ExprId id) {
@@ -976,7 +1018,7 @@ void testExpressionRollbackPreservesArenaIdsAndGroupedSpans() {
     for (std::size_t index = 0; index < program.expressions.size(); ++index) {
         const auto &expression = program.expressions[index];
         expect(expression.id == index,
-               "rollback leaves expression IDs contiguous and equal to arena indices");
+               "expression IDs remain contiguous and equal to arena indices");
         expect(expression.tokenBegin < expression.tokenEnd &&
                    expression.tokenEnd <= program.tokens.size() &&
                    expression.span.begin.offset ==
@@ -986,13 +1028,13 @@ void testExpressionRollbackPreservesArenaIdsAndGroupedSpans() {
                "grouped and ordinary expressions keep spans aligned to their token ranges");
         expect(validId(expression.operand) && validId(expression.left) &&
                    validId(expression.right) && validId(expression.callee),
-               "rollback leaves no dangling fixed expression edge");
+               "index-aware parsing leaves no dangling fixed expression edge");
         for (vietvm::frontend::ExprId argument : expression.arguments) {
-            expect(validId(argument), "rollback leaves no dangling call argument edge");
+            expect(validId(argument), "index-aware parsing leaves no dangling call argument edge");
         }
         for (const auto &entry : expression.mapEntries) {
             expect(validId(entry.key) && validId(entry.value),
-                   "rollback leaves no dangling map entry edge");
+                   "index-aware parsing leaves no dangling map entry edge");
         }
     }
 }
@@ -1351,7 +1393,10 @@ void testSemanticResolvesClassMembersAndEnforcesVisibility() {
         vietvm::compiler::analyzeSemantics(deniedProgram);
     const bool hasPrivateDiagnostic = std::any_of(
         denied.diagnostics.begin(), denied.diagnostics.end(),
-        [](const auto &diagnostic) { return diagnostic.code == "VPP-SEM-001"; });
+        [](const auto &diagnostic) {
+            return diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticPrivateMethodAccess)) != std::string::npos;
+        });
     expect(denied.hasErrors() && hasPrivateDiagnostic,
            "private method access outside its class emits the stable semantic diagnostic");
 
@@ -1364,7 +1409,10 @@ void testSemanticResolvesClassMembersAndEnforcesVisibility() {
         inherited, vietvm::compiler::SemanticSymbolKind::Method, "ẩn");
     const auto privateDiagnosticCount = std::count_if(
         inherited.diagnostics.begin(), inherited.diagnostics.end(),
-        [](const auto &diagnostic) { return diagnostic.code == "VPP-SEM-001"; });
+        [](const auto &diagnostic) {
+            return diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticPrivateMethodAccess)) != std::string::npos;
+        });
     expect(inheritedMethod != nullptr &&
                inheritedMethod->visibility == vietvm::compiler::SemanticVisibility::Private,
            "an unannotated method inherits its declaring class visibility");
@@ -1372,13 +1420,13 @@ void testSemanticResolvesClassMembersAndEnforcesVisibility() {
            "private-member validation covers both a method call and a method used as a value");
 }
 
-void testSemanticFallbackCoversOnlyMissingLoopHeaderParts() {
+void testSemanticLoopHeaderResolvesIndexedCallArguments() {
     const vietvm::frontend::AstProgram program = parseSource(
         "hàm known() { trả về 1; }\n"
         "lặp(i = 0; known(items[0]); i++) { thoát; }");
     expect(program.statements.size() == 2 &&
-               program.statements[1].expressionRoots.size() == 2,
-           "loop regression fixture has two AST roots and one token-backed header part");
+               program.statements[1].expressionRoots.size() == 3,
+           "loop header exposes init, indexed-call condition, and update roots");
     const vietvm::compiler::SemanticModel model =
         vietvm::compiler::analyzeSemantics(program);
     const auto *known = findSymbol(
@@ -1386,12 +1434,12 @@ void testSemanticFallbackCoversOnlyMissingLoopHeaderParts() {
     const auto *reference = findReference(model, "known");
     expect(known != nullptr && reference != nullptr && !reference->dynamic &&
                reference->resolvedSymbolId == static_cast<int>(known->id),
-           "semantic fallback resolves calls in a loop part that lacks an expression root");
+           "semantic analysis resolves a call whose argument is an index expression");
     const auto referenceCount = std::count_if(
         model.references.begin(), model.references.end(),
         [](const auto &candidate) { return candidate.name == "known"; });
     expect(referenceCount == 1,
-           "loop fallback does not duplicate references covered by existing expression roots");
+           "complete loop-header roots do not duplicate resolved call references");
 }
 
 void testSemanticStrictPolicyRejectsUnresolvedNames() {
@@ -1401,14 +1449,17 @@ void testSemanticStrictPolicyRejectsUnresolvedNames() {
         vietvm::compiler::analyzeSemantics(
             program, {}, vietvm::compiler::ResolutionPolicy::Strict);
 
-    const auto hasCode = [&](const std::string &code) {
+    const auto hasMessage = [&](std::string_view messageTemplate) {
         return std::any_of(model.diagnostics.begin(), model.diagnostics.end(),
                            [&](const auto &diagnostic) {
-                               return diagnostic.code == code;
+                               return diagnostic.message.find(messagePrefix(messageTemplate)) !=
+                                      std::string::npos;
                            });
     };
-    expect(model.hasErrors() && hasCode("VPP-SEM-006") && hasCode("VPP-SEM-007"),
-           "strict resolution reports unresolved values and calls with stable diagnostics");
+    expect(model.hasErrors() &&
+               hasMessage(vietvm::messages::kSemanticUnresolvedName) &&
+               hasMessage(vietvm::messages::kSemanticUnresolvedCall),
+           "strict resolution reports unresolved values and calls");
 }
 
 void testSemanticDuplicateDeclarationDiagnostic() {
@@ -1423,11 +1474,11 @@ void testSemanticDuplicateDeclarationDiagnostic() {
         model.diagnostics.begin(), model.diagnostics.end(),
         [](const vietvm::compiler::SemanticDiagnostic &diagnostic) {
             return diagnostic.severity == vietvm::compiler::SemanticDiagnosticSeverity::Error &&
-                   diagnostic.code == "VPP-SEM-004";
+                   diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticDuplicateDeclaration)) != std::string::npos;
         });
     expect(model.hasErrors(), "duplicate declarations are semantic errors");
-    expect(hasDuplicateDiagnostic,
-           "duplicate declarations receive the stable semantic diagnostic code");
+    expect(hasDuplicateDiagnostic, "duplicate declarations receive a Vietnamese diagnostic");
 
     const auto expectSingleOwnedScope = [&](vietvm::compiler::SemanticSymbolKind symbolKind,
                                             vietvm::compiler::ScopeKind scopeKind,
@@ -1528,8 +1579,8 @@ int main() {
     testExpressionAstLambdaMapAndLiteralCategories();
     testLambdaParseRollbackDoesNotLeakNestedArenas();
     testExpressionRootsOnDeclarationsAndControlFlow();
-    testExpressionAstFallsBackWithoutLosingStatementTokens();
-    testExpressionRollbackPreservesArenaIdsAndGroupedSpans();
+    testExpressionAstBuildsIndexWithoutLosingStatementTokens();
+    testExpressionArenaPreservesIdsAndGroupedSpansWithIndexes();
     testSemanticForwardAndDynamicCalls();
     testSemanticBuildsScopesAndDeclarations();
     testSemanticResolvesLambdaBodiesAndCaptures();
@@ -1537,7 +1588,7 @@ int main() {
     testSemanticKeepsSiblingFunctionBindingsIsolated();
     testSemanticAssignmentReusesCatchBindingAndPostfixDeclaresOnce();
     testSemanticResolvesClassMembersAndEnforcesVisibility();
-    testSemanticFallbackCoversOnlyMissingLoopHeaderParts();
+    testSemanticLoopHeaderResolvesIndexedCallArguments();
     testSemanticStrictPolicyRejectsUnresolvedNames();
     testSemanticDuplicateDeclarationDiagnostic();
     testIrLoweringPreservesTokensAndOptimizerRemovesNoOps();

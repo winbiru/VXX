@@ -34,6 +34,37 @@ jobs:
           cmake --build cmake-build-sanitized
           ctest --test-dir cmake-build-sanitized --output-on-failure --verbose --no-tests=error
 
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install quality tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov
+
+      - name: Run clang-tidy baseline
+        run: |
+          cmake -S . -B build-tidy \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTS=OFF \
+            -DVPP_ENABLE_CLANG_TIDY=ON
+          cmake --build build-tidy --parallel 2
+
+      - name: Run coverage gate
+        env:
+          VPP_COVERAGE_MINIMUM: "45"
+        run: ./scripts/quality/run-coverage.sh
+
+      - name: Build and run benchmark baseline
+        run: |
+          cmake -S . -B build-benchmark \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCHMARKS=ON
+          cmake --build build-benchmark --target vpp-benchmark-baseline --parallel 2
+          ./build-benchmark/bin/vpp-benchmark-baseline
+
   windows-build:
     runs-on: windows-latest
 

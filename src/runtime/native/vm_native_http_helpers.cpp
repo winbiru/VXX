@@ -1,14 +1,8 @@
 #include "common/vm_native_http_helpers.h"
 
-#include "vpp/core/text.h"
-
 #include <regex>
 
 namespace vietvm::helpers {
-
-std::string toLowerAscii(std::string s) {
-    return vietvm::core::toLowerAscii(s);
-}
 
 std::string extractSimpleJsonStringField(const std::string &body, const std::string &key) {
     try {

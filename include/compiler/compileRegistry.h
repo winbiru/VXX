@@ -10,6 +10,7 @@
 #include <functional>
 #include <vector>
 #include "../vm/instruction.h"
+#include "vpp/frontend/ast.h"
 
 using CompileFunc = std::function<void(
     const std::vector<std::string>& tokens,
@@ -44,4 +45,9 @@ namespace vietvm { namespace compiler {
     int resolveFunctionIdByName(const std::string &name,
                                 const std::unordered_map<std::string,int> &symTab,
                                 bool includeGlobalFallback = true);
+
+    void compileImportSpec(
+        const vietvm::frontend::AstImportSpec &spec,
+        int &nextId,
+        const std::unordered_map<std::string,Opcode> &keywordMap);
 } }

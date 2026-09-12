@@ -32,22 +32,13 @@ namespace vietvm::compiler {
     private:
         static std::string formatMessage(const std::string& msg, size_t line, size_t col, const std::string& ctx) {
             std::ostringstream oss;
-            std::string_view detail(msg);
-            const std::string_view code = vietvm::messages::messageCodeFromFormatted(detail);
-            if (!code.empty()) {
-                // Put the code first so CLI/LSP can identify lexer diagnostics
-                // with the same lightweight prefix parser as all other layers.
-                oss << '[' << code << "] ";
-                detail.remove_prefix(code.size() + 2); // '[' + code + ']'
-                if (!detail.empty() && detail.front() == ' ') detail.remove_prefix(1);
-            }
             oss << "Lỗi lexer";
             if (line > 0) {
                 oss << " [dòng " << line;
                 if (col > 0) oss << ", cột " << col;
                 oss << "]";
             }
-            oss << ": " << detail;
+            oss << ": " << msg;
             if (!ctx.empty()) {
                 oss << "\n  --> " << ctx;
             }

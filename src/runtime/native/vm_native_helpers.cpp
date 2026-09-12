@@ -2,7 +2,9 @@
 
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
+#include "common/vm_low_level_http_server.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -570,6 +572,18 @@ std::string decodeSimpleEscapes(const std::string &s) {
     return out;
 }
 
+std::optional<std::pair<std::string, std::string>> parsePropertyAssignment(
+    const std::string &line) {
+    const std::string trimmed = trimCopy(line);
+    if (trimmed.empty() || trimmed.front() == '#') return std::nullopt;
+
+    const std::size_t equals = trimmed.find('=');
+    if (equals == std::string::npos) return std::nullopt;
+
+    return std::make_pair(trimCopy(trimmed.substr(0, equals)),
+                          trimCopy(trimmed.substr(equals + 1)));
+}
+
 std::string readPropertyByKey(const std::string &filePath,
                               const std::string &key,
                               const std::string &fallback) {
@@ -580,16 +594,9 @@ std::string readPropertyByKey(const std::string &filePath,
 
     std::string line;
     while (std::getline(ifs, line)) {
-        std::string t = trimCopy(line);
-        if (t.empty() || t[0] == '#') continue;
-
-        size_t eq = t.find('=');
-        if (eq == std::string::npos) continue;
-
-        std::string k = trimCopy(t.substr(0, eq));
-        if (k != key) continue;
-
-        return trimCopy(t.substr(eq + 1));
+        const auto assignment = parsePropertyAssignment(line);
+        if (!assignment.has_value() || assignment->first != key) continue;
+        return assignment->second;
     }
 
     return fallback;
@@ -612,6 +619,82 @@ bool parseIntArgFromStack(const StackValue &arg,
             vietvm::messages::kNativeInvalidArgument, {fn, label});
         return false;
     }
+}
+
+std::string nativeArgumentCountError(const std::string &fn, int expectedCount) {
+    return vietvm::messages::formatMessage(
+        vietvm::messages::kNativeArgumentCount, {fn, std::to_string(expectedCount)});
+}
+
+bool requireNativeArgumentCount(const std::vector<StackValue> &args,
+                                const std::string &fn,
+                                int expectedCount,
+                                std::string &err) {
+    if (args.size() == static_cast<std::size_t>(expectedCount)) {
+        return true;
+    }
+    err = nativeArgumentCountError(fn, expectedCount);
+    return false;
+}
+
+namespace {
+
+template <typename Handle>
+bool getNativeHandleArgument(const std::vector<StackValue> &args,
+                             std::size_t index,
+                             const std::string &fn,
+                             const char *typeName,
+                             bool firstArgumentDiagnostic,
+                             Handle &out,
+                             std::string &err) {
+    if (index >= args.size() || !std::holds_alternative<Handle>(args[index])) {
+        err = fn + " chỉ nhận " + typeName;
+        if (firstArgumentDiagnostic) err += " ở đối số đầu tiên";
+        return false;
+    }
+    out = std::get<Handle>(args[index]);
+    if (out == nullptr) {
+        err = fn + " không thể thao tác trên " + typeName + " rỗng nội bộ";
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+bool getFirstListArgument(const std::vector<StackValue> &args,
+                          const std::string &fn,
+                          ListHandle &out,
+                          std::string &err) {
+    return getNativeHandleArgument(args, 0, fn, "danh sách", true, out, err);
+}
+
+bool getListArgument(const std::vector<StackValue> &args,
+                     std::size_t index,
+                     const std::string &fn,
+                     ListHandle &out,
+                     std::string &err) {
+    return getNativeHandleArgument(args, index, fn, "danh sách", false, out, err);
+}
+
+bool getFirstMapArgument(const std::vector<StackValue> &args,
+                         const std::string &fn,
+                         MapHandle &out,
+                         std::string &err) {
+    return getNativeHandleArgument(args, 0, fn, "ánh xạ", true, out, err);
+}
+
+bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &err) {
+    if (!std::holds_alternative<int>(value)) {
+        err = "chỉ số danh sách phải là số nguyên";
+        return false;
+    }
+    index = std::get<int>(value);
+    if (index < 0) {
+        err = "chỉ số danh sách vượt phạm vi";
+        return false;
+    }
+    return true;
 }
 
 bool runDbConnect(const std::string &driverClass,
@@ -705,6 +788,13 @@ bool runCurlHttpRequest(const std::string &method,
                         const std::optional<std::string> &payload,
                         StackValue &result,
                         std::string &err) {
+    bool fileTransportHandled = false;
+    if (tryLowLevelHttpFileTransportRequest(
+            method, url, payload, result, err, fileTransportHandled) &&
+        fileTransportHandled) {
+        return true;
+    }
+
 #if defined(_WIN32)
     // _popen routes through cmd.exe, whose quoting rules are incompatible with
     // JSON and with the POSIX single-quote command used below. Execute curl

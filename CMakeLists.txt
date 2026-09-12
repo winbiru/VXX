@@ -6,7 +6,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
+option(VPP_ENABLE_COVERAGE "Enable GCC/Clang coverage instrumentation" OFF)
+option(VPP_ENABLE_CLANG_TIDY "Run clang-tidy while compiling C++ targets" OFF)
+
+if (VPP_ENABLE_COVERAGE)
+    if (MSVC)
+        message(FATAL_ERROR "VPP_ENABLE_COVERAGE currently requires GCC or Clang")
+    endif()
+    if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        message(FATAL_ERROR "Unsupported compiler for coverage: ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+    add_compile_options(-O0 -g --coverage)
+    add_link_options(--coverage)
+endif()
+
+if (VPP_ENABLE_CLANG_TIDY)
+    find_program(VPP_CLANG_TIDY_EXECUTABLE NAMES clang-tidy)
+    if (NOT VPP_CLANG_TIDY_EXECUTABLE)
+        message(FATAL_ERROR "VPP_ENABLE_CLANG_TIDY=ON but clang-tidy was not found")
+    endif()
+    set(CMAKE_CXX_CLANG_TIDY
+        "${VPP_CLANG_TIDY_EXECUTABLE};--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy")
+endif()
 
 find_package(Threads REQUIRED)
 
@@ -41,8 +64,8 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/codegen.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileBlock.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileCondition.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileFunction.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileLoop.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/compileFunctionDeclaration.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileStatement.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileSwitch.cpp
@@ -50,8 +73,10 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/compilerExpr.cpp)
 set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_http_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_text_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_low_level_http_server.cpp)
 set(VPP_TOOLING_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tooling/tooling.cpp)
@@ -169,6 +194,10 @@ if (BUILD_TESTS)
             message(WARNING "PowerShell 7 (pwsh) was not found; Windows integration tests are disabled")
         endif()
     endif()
+endif()
+
+if (BUILD_BENCHMARKS)
+    add_subdirectory(benchmark)
 endif()
 
 # Install rules (optional)

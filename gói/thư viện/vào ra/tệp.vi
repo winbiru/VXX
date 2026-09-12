@@ -11,3 +11,13 @@ hàm đọc tệp(đường dẫn) {
 hàm ghi tệp(đường dẫn, nội dung) {
     ném "stdlib: ghi tệp native hook không khả dụng";
 };
+
+// Đếm dòng vật lý; tệp rỗng có 0 dòng.
+hàm đếm dòng tệp(đường dẫn) {
+    ném "stdlib: đếm dòng tệp native hook không khả dụng";
+};
+
+// Đếm từ phân tách bởi ASCII whitespace.
+hàm đếm từ tệp(đường dẫn) {
+    ném "stdlib: đếm từ tệp native hook không khả dụng";
+};

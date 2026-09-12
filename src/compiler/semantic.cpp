@@ -203,7 +203,6 @@ private:
             if (diagnoseDuplicate) {
                 model_.diagnostics.push_back({
                     SemanticDiagnosticSeverity::Error,
-                    std::string(vietvm::messages::kSemanticDuplicateDeclaration.code),
                     vietvm::messages::messageText(
                         vietvm::messages::kSemanticDuplicateDeclaration, {lookupName}),
                     declaration,
@@ -253,7 +252,6 @@ private:
         if (statement.declarationName.empty()) {
             model_.diagnostics.push_back({
                 SemanticDiagnosticSeverity::Error,
-                std::string(vietvm::messages::kSemanticMissingDeclarationName.code),
                 vietvm::messages::messageText(
                     vietvm::messages::kSemanticMissingDeclarationName,
                     {isFunction ? "hàm" : "lớp"}),
@@ -558,6 +556,15 @@ private:
                     declareExpression(entry.value, scope);
                 }
                 break;
+            case AstExpressionKind::ListLiteral:
+                for (ExprId element : expression->listElements) {
+                    declareExpression(element, scope);
+                }
+                break;
+            case AstExpressionKind::Index:
+                declareExpression(expression->left, scope);
+                declareExpression(expression->right, scope);
+                break;
             case AstExpressionKind::Literal:
             case AstExpressionKind::Name:
                 break;
@@ -643,7 +650,6 @@ private:
             : vietvm::messages::kSemanticProtectedMethodAccess;
         model_.diagnostics.push_back({
             SemanticDiagnosticSeverity::Error,
-            std::string(definition.code),
             vietvm::messages::messageText(definition, {symbol.qualifiedName}),
             useSpan,
         });
@@ -685,7 +691,6 @@ private:
                 : vietvm::messages::kSemanticUnresolvedName;
             model_.diagnostics.push_back({
                 SemanticDiagnosticSeverity::Error,
-                std::string(definition.code),
                 vietvm::messages::messageText(definition, {expression.text}),
                 expression.span,
             });
@@ -778,6 +783,15 @@ private:
                 for (const auto &entry : expression->mapEntries) {
                     resolveExpression(entry.value, scope);
                 }
+                break;
+            case AstExpressionKind::ListLiteral:
+                for (ExprId element : expression->listElements) {
+                    resolveExpression(element, scope);
+                }
+                break;
+            case AstExpressionKind::Index:
+                resolveExpression(expression->left, scope);
+                resolveExpression(expression->right, scope);
                 break;
         }
     }

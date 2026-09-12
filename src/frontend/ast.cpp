@@ -36,6 +36,8 @@ const char *astExpressionKindName(AstExpressionKind kind) noexcept {
         case AstExpressionKind::Call: return "call";
         case AstExpressionKind::Lambda: return "lambda";
         case AstExpressionKind::MapLiteral: return "map_literal";
+        case AstExpressionKind::ListLiteral: return "list_literal";
+        case AstExpressionKind::Index: return "index";
     }
     return "unknown";
 }
