@@ -4,14 +4,12 @@
 
 #include "compiler/compileLoop.h"
 
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "../../include/vm/instruction.h"
-#include "common/loopUltil.h"
 #include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compilerExpr.h"
@@ -29,22 +27,11 @@ LoopIndices compileLoop(const std::vector<std::string>& tokens, size_t &pos,
     size_t afterParen = parenPair.second;
 
     // parse inside into 3 parts: init; condition; update
-    std::vector<std::string> parts;
-    try {
-        parts = splitLoopParts(inside);
-    } catch (...) {
-        std::vector<std::string> tmp;
-        std::istringstream iss(inside);
-        std::string seg;
-        while (std::getline(iss, seg, ';')) {
-            tmp.push_back(vietvm::compiler::trim(seg));
-        }
-        if (tmp.size() >= 3) {
-            parts = {tmp[0], tmp[1], tmp[2]};
-        } else {
-            throw std::runtime_error(vietvm::messages::formatMessage(
-                vietvm::messages::kSyntaxInvalidLoopParts));
-        }
+    std::vector<std::string> parts =
+        vietvm::compiler::splitTopLevelFields(inside, ';');
+    if (parts.size() != 3) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kSyntaxInvalidLoopParts));
     }
 
     // 2) compile init expression

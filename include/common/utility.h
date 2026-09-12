@@ -14,6 +14,14 @@ namespace vietvm::compiler {
     bool isIdentifierLikeToken(const std::string &token);
     bool isCallableNamePiece(const std::string &token);
 
+    // Split a delimited payload only at top level. Parentheses and quoted
+    // strings protect delimiter characters nested inside them.
+    std::vector<std::string> splitTopLevelFields(const std::string &text,
+                                                 char delimiter);
+
+    // Convenience wrapper for function/call parameter and argument lists.
+    std::vector<std::string> splitTopLevelArguments(const std::string &text);
+
     // Extract functions operating on token vector
     // extractParens: tokens[start] must be "(" -> returns (content, indexAfterClosingParen)
     std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start);

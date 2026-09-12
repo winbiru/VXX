@@ -1,7 +1,11 @@
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -16,6 +20,7 @@
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_http_helpers.h"
 #include "vpp/core/message_constants.h"
+#include "vpp/core/text.h"
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -119,7 +124,7 @@ bool recvHttpRequest(SocketHandle fd,
         if (line.empty()) continue;
         size_t colon = line.find(':');
         if (colon == std::string::npos) continue;
-        std::string k = toLowerAscii(trimCopy(line.substr(0, colon)));
+        std::string k = vietvm::core::toLowerAscii(trimCopy(line.substr(0, colon)));
         std::string v = trimCopy(line.substr(colon + 1));
         headers[k] = v;
     }
@@ -175,6 +180,7 @@ bool sendHttpJsonResponse(SocketHandle fd, int status, const std::string &body) 
 struct LowLevelHttpRequest {
     int serverId = 0;
     SocketHandle clientFd = kInvalidSocket;
+    std::string fileResponsePath;
     std::string requestId;
     std::string method;
     std::string path;
@@ -186,6 +192,9 @@ struct LowLevelHttpRequest {
 struct LowLevelHttpServer {
     int id = 0;
     SocketHandle listenFd = kInvalidSocket;
+    bool fileTransport = false;
+    int port = 0;
+    std::string transportDir;
     std::atomic<bool> running{false};
     std::thread acceptThread;
     std::mutex mtx;
@@ -222,13 +231,267 @@ bool getLowHttpRequestCopy(const std::string &reqId, LowLevelHttpRequest &out) {
     return true;
 }
 
+std::optional<std::filesystem::path> httpFileTransportRoot() {
+    const char *value = std::getenv("VPP_HTTP_FILE_TRANSPORT_DIR");
+    if (value == nullptr || *value == '\0') return std::nullopt;
+    return std::filesystem::path(value);
+}
+
+std::filesystem::path httpFilePortDir(const std::filesystem::path &root, int port) {
+    return root / ("port-" + std::to_string(port));
+}
+
+std::string makeFileTransportToken() {
+    static std::atomic<unsigned long long> counter{1};
+    const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    return std::to_string(now) + "-" + std::to_string(counter.fetch_add(1));
+}
+
+bool writeAtomicFile(const std::filesystem::path &path, const std::string &data) {
+    const std::filesystem::path temporary = path.string() + ".tmp-" + makeFileTransportToken();
+    {
+        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
+        if (!out.is_open()) return false;
+        out.write(data.data(), static_cast<std::streamsize>(data.size()));
+        if (!out.good()) {
+            out.close();
+            std::error_code removeError;
+            std::filesystem::remove(temporary, removeError);
+            return false;
+        }
+    }
+    std::error_code renameError;
+    std::filesystem::rename(temporary, path, renameError);
+    if (renameError) {
+        std::error_code removeError;
+        std::filesystem::remove(temporary, removeError);
+        return false;
+    }
+    return true;
+}
+
+bool readWholeFile(const std::filesystem::path &path, std::string &data) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in.is_open()) return false;
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    data = buffer.str();
+    return in.good() || in.eof();
+}
+
+bool parseLoopbackHttpUrl(const std::string &url, int &port, std::string &target) {
+    constexpr std::string_view prefix = "http://";
+    if (url.compare(0, prefix.size(), prefix) != 0) return false;
+    const std::size_t authorityStart = prefix.size();
+    const std::size_t slash = url.find('/', authorityStart);
+    const std::string authority = url.substr(
+        authorityStart, slash == std::string::npos ? std::string::npos : slash - authorityStart);
+    target = slash == std::string::npos ? "/" : url.substr(slash);
+
+    std::string host = authority;
+    port = 80;
+    const std::size_t colon = authority.rfind(':');
+    if (colon != std::string::npos) {
+        host = authority.substr(0, colon);
+        try {
+            port = std::stoi(authority.substr(colon + 1));
+        } catch (...) {
+            return false;
+        }
+    }
+    return host == "127.0.0.1" || host == "localhost";
+}
+
+bool decodeFileTransportRequest(const std::filesystem::path &path,
+                                std::string &method,
+                                std::string &target,
+                                std::string &body) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in.is_open()) return false;
+    std::string bodySizeText;
+    if (!std::getline(in, method) || !std::getline(in, target) || !std::getline(in, bodySizeText)) {
+        return false;
+    }
+    std::size_t bodySize = 0;
+    try {
+        bodySize = static_cast<std::size_t>(std::stoull(bodySizeText));
+    } catch (...) {
+        return false;
+    }
+    body.assign(bodySize, '\0');
+    if (bodySize != 0) {
+        in.read(body.data(), static_cast<std::streamsize>(bodySize));
+        if (static_cast<std::size_t>(in.gcount()) != bodySize) return false;
+    }
+    return true;
+}
+
+bool enqueueNextFileTransportRequest(const std::shared_ptr<LowLevelHttpServer> &server,
+                                     StackValue &result) {
+    const std::filesystem::path requestsDir =
+        std::filesystem::path(server->transportDir) / "requests";
+    while (server->running.load()) {
+        std::filesystem::path requestPath;
+        std::error_code iterateError;
+        for (const auto &entry : std::filesystem::directory_iterator(requestsDir, iterateError)) {
+            if (iterateError) break;
+            if (!entry.is_regular_file() || entry.path().extension() != ".req") continue;
+            if (requestPath.empty() || entry.path().filename() < requestPath.filename()) {
+                requestPath = entry.path();
+            }
+        }
+        if (!requestPath.empty()) {
+            std::string method, target, body;
+            if (!decodeFileTransportRequest(requestPath, method, target, body)) {
+                std::error_code removeError;
+                std::filesystem::remove(requestPath, removeError);
+                continue;
+            }
+            std::string path, query;
+            splitPathAndQuery(target, path, query);
+            const std::string requestId = requestPath.stem().string();
+
+            LowLevelHttpRequest req;
+            req.serverId = server->id;
+            req.requestId = requestId;
+            req.method = method;
+            req.path = path;
+            req.query = query;
+            req.body = body;
+            if (!body.empty()) req.headers["content-type"] = "application/json";
+            req.fileResponsePath =
+                (std::filesystem::path(server->transportDir) / "responses" /
+                 (requestId + ".resp")).string();
+            {
+                std::lock_guard<std::mutex> lk(gLowHttpMu);
+                gLowHttpRequests[requestId] = std::move(req);
+            }
+            std::error_code removeError;
+            std::filesystem::remove(requestPath, removeError);
+            result = make_string_value(requestId);
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    result = make_string_value("");
+    return true;
+}
+
+bool openFileTransportServer(const std::filesystem::path &root,
+                             int port,
+                             StackValue &result,
+                             std::string &err) {
+    std::error_code fsError;
+    const std::filesystem::path portDir = httpFilePortDir(root, port);
+    std::filesystem::create_directories(portDir / "requests", fsError);
+    if (!fsError) std::filesystem::create_directories(portDir / "responses", fsError);
+    if (fsError) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerBindFailed, {std::to_string(fsError.value())});
+        return true;
+    }
+
+    auto server = std::make_shared<LowLevelHttpServer>();
+    {
+        std::lock_guard<std::mutex> lk(gLowHttpMu);
+        server->id = gLowHttpNextServerId++;
+        server->fileTransport = true;
+        server->port = port;
+        server->transportDir = portDir.string();
+        server->running = true;
+        gLowHttpServers[server->id] = server;
+    }
+    if (!writeAtomicFile(portDir / "ready", std::to_string(server->id))) {
+        std::lock_guard<std::mutex> lk(gLowHttpMu);
+        gLowHttpServers.erase(server->id);
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpServerBindFailed, {"file"});
+        return true;
+    }
+    result = make_int_value(server->id);
+    return true;
+}
+
 } // namespace
+
+bool tryLowLevelHttpFileTransportRequest(const std::string &method,
+                                         const std::string &url,
+                                         const std::optional<std::string> &payload,
+                                         StackValue &result,
+                                         std::string &err,
+                                         bool &handled) {
+    handled = false;
+    const auto root = httpFileTransportRoot();
+    if (!root.has_value()) return false;
+
+    int port = 0;
+    std::string target;
+    if (!parseLoopbackHttpUrl(url, port, target)) return false;
+    handled = true;
+
+    const std::filesystem::path portDir = httpFilePortDir(*root, port);
+    const std::filesystem::path ready = portDir / "ready";
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    while (!std::filesystem::exists(ready)) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeHttpCurlFailed, {"http-file-transport"});
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    const std::string requestId = "req-file-" + makeFileTransportToken();
+    const std::filesystem::path requestPath = portDir / "requests" / (requestId + ".req");
+    const std::filesystem::path responsePath = portDir / "responses" / (requestId + ".resp");
+    const std::string body = payload.value_or("");
+    const std::string requestData = method + "\n" + target + "\n" +
+                                    std::to_string(body.size()) + "\n" + body;
+    if (!writeAtomicFile(requestPath, requestData)) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlFailed, {"http-file-transport"});
+        return true;
+    }
+
+    while (!std::filesystem::exists(responsePath)) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            std::error_code removeError;
+            std::filesystem::remove(requestPath, removeError);
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeHttpCurlFailed, {"http-file-transport"});
+            return true;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    std::string responseData;
+    if (!readWholeFile(responsePath, responseData)) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlFailed, {"http-file-transport"});
+        return true;
+    }
+    std::error_code removeError;
+    std::filesystem::remove(responsePath, removeError);
+    const std::size_t newline = responseData.find('\n');
+    if (newline == std::string::npos) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeHttpCurlFailed, {"http-file-transport"});
+        return true;
+    }
+    result = make_string_value(responseData.substr(newline + 1));
+    return true;
+}
 
 bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     if (port <= 0 || port > 65535) {
         err = vietvm::messages::formatMessage(
             vietvm::messages::kNativeHttpServerInvalidPort);
         return true;
+    }
+
+    if (const auto fileRoot = httpFileTransportRoot(); fileRoot.has_value()) {
+        return openFileTransportServer(*fileRoot, port, result, err);
     }
 
     if (!initializeSockets(err)) return true;
@@ -266,9 +529,15 @@ bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err) {
     addr.sin_port = htons((uint16_t)port);
 
     if (bind(listenFd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+#if defined(_WIN32)
+        const int bindError = WSAGetLastError();
+#else
+        const int bindError = errno;
+#endif
         closeSocket(listenFd);
         err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpServerBindFailed);
+            vietvm::messages::kNativeHttpServerBindFailed,
+            {std::to_string(bindError)});
         return true;
     }
 
@@ -350,6 +619,10 @@ bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &er
         return true;
     }
 
+    if (server->fileTransport) {
+        return enqueueNextFileTransportRequest(server, result);
+    }
+
     std::unique_lock<std::mutex> lk(server->mtx);
     server->cv.wait(lk, [&]() {
         return !server->running.load() || !server->queue.empty();
@@ -383,7 +656,7 @@ bool runLowLevelHttpReqField(const std::string &reqId,
     else if (field == vietvm::constants::kReqFieldQuery) result = make_string_value(req.query);
     else if (field == vietvm::constants::kReqFieldBody) result = make_string_value(req.body);
     else if (field == vietvm::constants::kReqFieldHeader) {
-        std::string k = key.has_value() ? toLowerAscii(*key) : "";
+        std::string k = key.has_value() ? vietvm::core::toLowerAscii(*key) : "";
         auto it = req.headers.find(k);
         result = make_string_value(it == req.headers.end() ? "" : it->second);
     } else if (field == vietvm::constants::kReqFieldQueryParam) {
@@ -422,6 +695,17 @@ bool runLowLevelHttpServerSend(const std::string &reqId,
         gLowHttpRequests.erase(it);
     }
 
+    if (!req.fileResponsePath.empty()) {
+        const std::string response = std::to_string(status) + "\n" + body;
+        if (!writeAtomicFile(req.fileResponsePath, response)) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeHttpResponseSendFailed);
+            return true;
+        }
+        result = make_int_value(1);
+        return true;
+    }
+
     if (!sendHttpJsonResponse(req.clientFd, status, body)) {
         closeSocket(req.clientFd);
         err = vietvm::messages::formatMessage(
@@ -442,10 +726,15 @@ bool runLowLevelHttpServerClose(int serverId, StackValue &result, std::string &e
     }
 
     server->running = false;
-    shutdownSocket(server->listenFd);
-    closeSocket(server->listenFd);
-    server->cv.notify_all();
-    if (server->acceptThread.joinable()) server->acceptThread.join();
+    if (server->fileTransport) {
+        std::error_code removeError;
+        std::filesystem::remove(std::filesystem::path(server->transportDir) / "ready", removeError);
+    } else {
+        shutdownSocket(server->listenFd);
+        closeSocket(server->listenFd);
+        server->cv.notify_all();
+        if (server->acceptThread.joinable()) server->acceptThread.join();
+    }
 
     {
         std::lock_guard<std::mutex> lk(gLowHttpMu);

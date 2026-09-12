@@ -2,6 +2,11 @@
 // Mục đích: gom các phép xử lý chuỗi cơ bản.
 // Nhóm hàm: nối chuỗi, so sánh chuỗi, kiểm tra rỗng.
 
+// Ghi chú hàm: độ dài của chuỗi hoặc list. Native runtime cung cấp implementation.
+hàm độ dài(giá trị) {
+    ném "stdlib: độ dài native hook không khả dụng";
+};
+
 // Ghi chú hàm: nối chuỗi.
 hàm nối chuỗi(a, b) {
     trả về a + b;
@@ -25,4 +30,54 @@ hàm khác nhau chuỗi(a, b) {
 // Ghi chú hàm: là chuỗi rỗng.
 hàm là chuỗi rỗng(s) {
     trả về s == "";
+};
+
+// Các API dưới đây dùng byte UTF-8/ASCII cho MVP; runtime giữ nguyên byte
+// tiếng Việt thay vì chuyển hoa/thường Unicode toàn diện.
+hàm đếm ký tự(s, ký tự) {
+    ném "stdlib: đếm ký tự native hook không khả dụng";
+};
+
+hàm chứa chuỗi(s, chuỗi con) {
+    ném "stdlib: chứa chuỗi native hook không khả dụng";
+};
+
+hàm thay thế(s, cũ, mới) {
+    ném "stdlib: thay thế native hook không khả dụng";
+};
+
+hàm chuỗi thường(s) {
+    ném "stdlib: chuỗi thường native hook không khả dụng";
+};
+
+hàm chuỗi hoa(s) {
+    ném "stdlib: chuỗi hoa native hook không khả dụng";
+};
+
+hàm chuẩn hóa khoảng trắng(s) {
+    ném "stdlib: chuẩn hóa khoảng trắng native hook không khả dụng";
+};
+
+hàm đếm từ(s) {
+    ném "stdlib: đếm từ native hook không khả dụng";
+};
+
+hàm từ dài nhất(s) {
+    ném "stdlib: từ dài nhất native hook không khả dụng";
+};
+
+hàm viết hoa đầu từ(s) {
+    ném "stdlib: viết hoa đầu từ native hook không khả dụng";
+};
+
+hàm là palindrome(s) {
+    ném "stdlib: là palindrome native hook không khả dụng";
+};
+
+hàm là anagram(a, b) {
+    ném "stdlib: là anagram native hook không khả dụng";
+};
+
+hàm mã hóa caesar(s, khóa) {
+    ném "stdlib: mã hóa caesar native hook không khả dụng";
 };

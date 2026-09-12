@@ -90,7 +90,10 @@ enum Opcode {
     OP_RONG_GIA_TRI = 84,        // rỗng (null)
     OP_MAP_LITERAL = 85,         // map literal (operandIndex = encoded map in string pool)
     OP_GOI_GIAN_TIEP = 86,       // gọi hàm qua giá trị biến (function ref)
-    OP_PARAM_MAC_DINH = 87       // bind tham số với giá trị mặc định
+    OP_PARAM_MAC_DINH = 87,      // bind tham số với giá trị mặc định
+    OP_LIST_LITERAL = 88,        // list literal (operandIndex = encoded list in string pool)
+    OP_DOC_CHI_SO = 89,          // read list/string element by integer index
+    OP_GAN_CHI_SO = 90           // assign list element by integer index
 
 };
 

@@ -113,6 +113,146 @@ inline constexpr std::array<const char *, 1> kFnDbQuery = {
     "db_native_query"
 };
 
+inline constexpr std::array<const char *, 2> kFnLength = {
+    "do_dai", "độ dài"
+};
+
+inline constexpr std::array<const char *, 2> kFnListAppend = {
+    "them", "thêm"
+};
+
+inline constexpr std::array<const char *, 2> kFnListRemoveAt = {
+    "xoa_tai", "xóa tại"
+};
+
+inline constexpr std::array<const char *, 2> kFnListReverse = {
+    "dao_nguoc", "đảo ngược"
+};
+
+inline constexpr std::array<const char *, 2> kFnListFindIndex = {
+    "tim_chi_so", "tìm chỉ số"
+};
+
+inline constexpr std::array<const char *, 2> kFnListUnique = {
+    "xoa_trung", "xóa trùng"
+};
+
+inline constexpr std::array<const char *, 2> kFnListSort = {
+    "sap_xep", "sắp xếp"
+};
+
+inline constexpr std::array<const char *, 2> kFnListSum = {
+    "tong_list", "tổng list"
+};
+
+inline constexpr std::array<const char *, 2> kFnListMin = {
+    "nho_nhat_list", "nhỏ nhất list"
+};
+
+inline constexpr std::array<const char *, 2> kFnListMax = {
+    "lon_nhat_list", "lớn nhất list"
+};
+
+inline constexpr std::array<const char *, 2> kFnMapGet = {
+    "lay_map", "lấy map"
+};
+
+inline constexpr std::array<const char *, 2> kFnMapSet = {
+    "dat_map", "đặt map"
+};
+
+inline constexpr std::array<const char *, 2> kFnMapHasKey = {
+    "co_khoa", "có khóa"
+};
+
+inline constexpr std::array<const char *, 2> kFnMapRemove = {
+    "xoa_khoa", "xóa khóa"
+};
+
+inline constexpr std::array<const char *, 2> kFnMapKeys = {
+    "khoa_map", "khóa map"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringCountChar = {
+    "dem_ky_tu", "đếm ký tự"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringContains = {
+    "chua_chuoi", "chứa chuỗi"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringReplace = {
+    "thay_the", "thay thế"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringLower = {
+    "chuoi_thuong", "chuỗi thường"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringUpper = {
+    "chuoi_hoa", "chuỗi hoa"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringTrimSpaces = {
+    "chuan_hoa_khoang_trang", "chuẩn hóa khoảng trắng"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringWordCount = {
+    "dem_tu", "đếm từ"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringLongestWord = {
+    "tu_dai_nhat", "từ dài nhất"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringTitle = {
+    "viet_hoa_dau_tu", "viết hoa đầu từ"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringPalindrome = {
+    "la_palindrome", "là palindrome"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringAnagram = {
+    "la_anagram", "là anagram"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringCaesar = {
+    "ma_hoa_caesar", "mã hóa caesar"
+};
+
+inline constexpr std::array<const char *, 2> kFnSetFromList = {
+    "tap_hop", "tập hợp"
+};
+
+inline constexpr std::array<const char *, 2> kFnSetUnion = {
+    "hop_tap", "hợp tập"
+};
+
+inline constexpr std::array<const char *, 2> kFnSetIntersection = {
+    "giao_tap", "giao tập"
+};
+
+inline constexpr std::array<const char *, 2> kFnSetDisjoint = {
+    "roi_nhau", "rời nhau"
+};
+
+inline constexpr std::array<const char *, 2> kFnFileLineCount = {
+    "dem_dong_tep", "đếm dòng tệp"
+};
+
+inline constexpr std::array<const char *, 2> kFnFileWordCount = {
+    "dem_tu_tep", "đếm từ tệp"
+};
+
+inline constexpr std::array<const char *, 2> kFnToTuple = {
+    "thanh_tuple", "thành tuple"
+};
+
+inline constexpr std::array<const char *, 2> kFnToList = {
+    "thanh_list", "thành list"
+};
+
 inline constexpr const char *kHttpMethodGet = "GET";
 inline constexpr const char *kHttpMethodPost = "POST";
 inline constexpr const char *kHttpMethodPut = "PUT";
@@ -121,8 +261,8 @@ inline constexpr const char *kHttpMethodDelete = "DELETE";
 inline constexpr int kHttpStatusOk = 200;
 
 inline constexpr const char *kArgLabelPort = "cổng";
-inline constexpr const char *kArgLabelServerId = "server id";
-inline constexpr const char *kArgLabelStatus = "status";
+inline constexpr const char *kArgLabelServerId = "mã máy chủ";
+inline constexpr const char *kArgLabelStatus = "trạng thái";
 
 inline constexpr const char *kReqFieldMethod = "method";
 inline constexpr const char *kReqFieldPath = "path";

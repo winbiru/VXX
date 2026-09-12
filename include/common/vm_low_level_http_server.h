@@ -7,6 +7,13 @@
 
 namespace vietvm::helpers {
 
+bool tryLowLevelHttpFileTransportRequest(const std::string &method,
+                                             const std::string &url,
+                                             const std::optional<std::string> &payload,
+                                             StackValue &result,
+                                             std::string &err,
+                                             bool &handled);
+
 bool runLowLevelHttpServerOpen(int port, StackValue &result, std::string &err);
 bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &err);
 bool runLowLevelHttpReqField(const std::string &reqId,

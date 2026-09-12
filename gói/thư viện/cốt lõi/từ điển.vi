@@ -1,0 +1,27 @@
+// Module: thư viện.cốt lõi.từ điển
+// Map MVP: literal scalar, lấy/đặt/xóa key và liệt kê key được thực thi native.
+
+// Lấy value theo key; trả về mặc định khi key không tồn tại.
+hàm lấy map(bảng, khóa, mặc định) {
+    ném "stdlib: lấy map native hook không khả dụng";
+};
+
+// Đặt value theo key; list/map cũng được giữ theo tham chiếu. Trả về rỗng.
+hàm đặt map(bảng, khóa, giá trị) {
+    ném "stdlib: đặt map native hook không khả dụng";
+};
+
+// Kiểm tra key tồn tại, trả về đúng/sai theo quy ước số 1/0.
+hàm có khóa(bảng, khóa) {
+    ném "stdlib: có khóa native hook không khả dụng";
+};
+
+// Xóa key, trả về value cũ hoặc rỗng.
+hàm xóa khóa(bảng, khóa) {
+    ném "stdlib: xóa khóa native hook không khả dụng";
+};
+
+// Trả về list key đã sắp theo thứ tự từ điển.
+hàm khóa map(bảng) {
+    ném "stdlib: khóa map native hook không khả dụng";
+};

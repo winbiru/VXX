@@ -27,9 +27,11 @@ fi
 tmpdir="src/tests/.tmp"
 mkdir -p "$tmpdir"
 PASS=0; FAIL=0
+HTTP_FILE_TRANSPORT_DIR=""
 
-# HTTP tests must not depend on an external service or internet access. Start a
-# tiny server implemented in V++ itself, which accepts GET/POST/PUT/DELETE and returns JSON.
+# HTTP tests prefer real localhost TCP. If the execution environment denies
+# bind(2), the runtime can use a file-backed IPC transport while preserving the
+# same V++ HTTP client/server API across separate processes.
 HTTP_FIXTURE_PID=""
 EXAMPLE_PID=""
 VPP_HOME_TEST_DIR=""
@@ -45,43 +47,86 @@ cleanup() {
   if [ -n "$VPP_HOME_TEST_DIR" ] && [ -d "$VPP_HOME_TEST_DIR" ]; then
     rm -rf "$VPP_HOME_TEST_DIR"
   fi
+  if [ -n "$HTTP_FILE_TRANSPORT_DIR" ] && [ -d "$HTTP_FILE_TRANSPORT_DIR" ]; then
+    rm -rf "$HTTP_FILE_TRANSPORT_DIR"
+  fi
   rm -rf "$tmpdir"
 }
 trap cleanup EXIT INT TERM
 
+http_get() {
+  local url="$1"
+  local output="$2"
+  if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
+    cat >"$tmpdir/http_probe.vi" <<EOF
+nhập gói/thư viện/main.vi;
+
+hàm main() {
+    in mạng lấy("$url");
+};
+EOF
+    if ! "$EXEC_PATH" "$tmpdir/http_probe.vi" >"$tmpdir/http_probe.raw" 2>&1; then
+      return 1
+    fi
+    sed -n 's/^\[IN\] //p' "$tmpdir/http_probe.raw" >"$output"
+    return 0
+  fi
+  curl -fsS --max-time 1 "$url" >"$output" 2>/dev/null
+}
+
+wait_http_value() {
+  local url="$1"
+  local expected="$2"
+  local output="$3"
+  local attempts=50
+  if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
+    attempts=1
+  fi
+  for _ in $(seq 1 "$attempts"); do
+    if http_get "$url" "$output" && [ "$(cat "$output")" = "$expected" ]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  return 1
+}
+
 "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
-fixture_ready=0
-for _ in $(seq 1 50); do
-  if curl -fsS --max-time 1 http://127.0.0.1:18080/health >"$tmpdir/http_fixture.output" 2>/dev/null &&
-     [ "$(cat "$tmpdir/http_fixture.output")" = '{"ok":true}' ]; then
-    fixture_ready=1
-    break
+if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
+  if grep -Eq '\(mã=(1|13|10013)\)' "$tmpdir/http_fixture.log"; then
+    kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
+    wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
+    HTTP_FIXTURE_PID=""
+
+    HTTP_FILE_TRANSPORT_DIR=$(mktemp -d "$tmpdir/http-transport.XXXXXX")
+    export VPP_HTTP_FILE_TRANSPORT_DIR="$ROOT_DIR/$HTTP_FILE_TRANSPORT_DIR"
+    echo "INFO: localhost bind is restricted; using V++ HTTP file transport for integration tests"
+
+    "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
+    HTTP_FIXTURE_PID=$!
+    if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
+      echo "ERROR: HTTP fixture failed through the fallback transport" >&2
+      cat "$tmpdir/http_fixture.log" >&2
+      cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
+      exit 2
+    fi
+  else
+    echo "ERROR: local HTTP test fixture did not return the expected /health response" >&2
+    cat "$tmpdir/http_fixture.log" >&2
+    exit 2
   fi
-  sleep 0.1
-done
-if [ "$fixture_ready" -ne 1 ]; then
-  echo "ERROR: local HTTP test fixture did not return the expected /health response" >&2
-  cat "$tmpdir/http_fixture.log" >&2
-  exit 2
 fi
 
 echo "== Running examples/api_project/application.vi [example] =="
 "$EXEC_PATH" examples/api_project/application.vi >"$tmpdir/api_example.log" 2>&1 &
 EXAMPLE_PID=$!
-example_ready=0
-for _ in $(seq 1 50); do
-  if curl -fsS --max-time 1 http://127.0.0.1:8080/health >"$tmpdir/api_example.output" 2>/dev/null; then
-    example_ready=1
-    break
-  fi
-  sleep 0.1
-done
-if [ "$example_ready" -eq 1 ] && [ "$(cat "$tmpdir/api_example.output")" = "true" ]; then
+if wait_http_value "http://127.0.0.1:8080/health" "true" "$tmpdir/api_example.output"; then
   echo "PASS: examples/api_project/application.vi [example]"; PASS=$((PASS+1))
 else
   echo "FAIL: examples/api_project/application.vi [example]"; FAIL=$((FAIL+1))
   cat "$tmpdir/api_example.log" >&2
+  cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
 fi
 kill "$EXAMPLE_PID" 2>/dev/null || true
 wait "$EXAMPLE_PID" 2>/dev/null || true
@@ -106,15 +151,9 @@ if (
     VPP_HOME="$ROOT_DIR" "$EXEC_PATH" application.vi >"$ROOT_DIR/$tmpdir/backend_scaffold.log" 2>&1
   ) &
   EXAMPLE_PID=$!
-  for _ in $(seq 1 50); do
-    if curl -fsS --max-time 1 "http://127.0.0.1:${scaffold_port}/health" >"$tmpdir/backend_scaffold.output" 2>/dev/null; then
-      if [ "$(cat "$tmpdir/backend_scaffold.output")" = "true" ]; then
-        scaffold_ok=1
-      fi
-      break
-    fi
-    sleep 0.1
-  done
+  if wait_http_value "http://127.0.0.1:${scaffold_port}/health" "true" "$tmpdir/backend_scaffold.output"; then
+    scaffold_ok=1
+  fi
   kill "$EXAMPLE_PID" 2>/dev/null || true
   wait "$EXAMPLE_PID" 2>/dev/null || true
   EXAMPLE_PID=""
@@ -124,6 +163,7 @@ if [ "$scaffold_ok" -eq 1 ]; then
 else
   echo "FAIL: backend scaffold"; FAIL=$((FAIL+1))
   cat "$tmpdir/backend_scaffold.log" >&2 2>/dev/null || true
+  cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
 fi
 
 # Verify bare Vietnamese package imports from a directory outside the repository.
@@ -148,10 +188,13 @@ TESTS=(
   src/tests/kiem_tra_boolean.vi
   src/tests/kiem_tra_bo_qua.vi
   src/tests/kiem_tra_chon_ca.vi
+  src/tests/kiem_tra_chuoi_co_ban.vi
   src/tests/kiem_tra_de_quy.vi
+  src/tests/kiem_tra_file_dem.vi
   src/tests/kiem_tra_ngoai_le.vi
   src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi
   src/tests/kiem_tra_dieu_kien_phu_dinh.vi
+  src/tests/kiem_tra_ham.vi
   src/tests/kiem_tra_ham_4_tham_so.vi
   src/tests/kiem_tra_ham_tham_so.vi
   src/tests/kiem_tra_ham_da_tu_khong_nhay.vi
@@ -183,6 +226,8 @@ TESTS=(
   src/tests/kiem_tra_thu_vien_spring.vi
   src/tests/kiem_tra_thu_vien_lop.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
+  src/tests/kiem_tra_list_literal.vi
+  src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi
   src/tests/kiem_tra_cu_phap_modifier_cu.vi

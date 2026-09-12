@@ -26,6 +26,12 @@ void resetCompilationState() {
     hamMap::resetHamIdCounter();
 }
 
+void CompilationContext::clear() {
+    stringPool.clear();
+    functionBytecode.clear();
+    functionNameIndices.clear();
+}
+
 } // namespace vietvm::compiler
 
 // ---------- legacy bytecode lowering ----------
@@ -177,7 +183,7 @@ CompilationArtifacts compilePipeline(
 
     for (const SemanticDiagnostic &diagnostic : artifacts.semantic.diagnostics) {
         if (diagnostic.severity == SemanticDiagnosticSeverity::Error) {
-            throw std::runtime_error("[" + diagnostic.code + "] " + diagnostic.message);
+            throw std::runtime_error(diagnostic.message);
         }
     }
 
@@ -189,7 +195,8 @@ CompilationArtifacts compilePipeline(
 
     if (directSupport.supported) {
         artifacts.backend = BytecodeBackend::DirectIr;
-        artifacts.bytecode = emitDirectBytecode(artifacts.ir, emitMainCall);
+        artifacts.bytecode = emitDirectBytecode(
+            artifacts.ir, keywordMap, emitMainCall);
     } else {
         // A fallback is whole-program for now. Mixing backends before they
         // share explicit function/slot/fixup allocation would make IDs depend
@@ -199,6 +206,34 @@ CompilationArtifacts compilePipeline(
             materializeIrTokens(artifacts.ir), keywordMap, emitMainCall);
     }
     return artifacts;
+}
+
+CompilationArtifacts compilePipeline(
+    CompilationContext &context,
+    const std::string &source,
+    const std::unordered_map<std::string, Opcode> &keywordMap,
+    bool emitMainCall) {
+    context.clear();
+    resetCompilationState();
+
+    try {
+        CompilationArtifacts artifacts =
+            compilePipeline(source, keywordMap, emitMainCall);
+
+        context.stringPool = StringPool::getPool();
+        context.functionBytecode = hamMap::hamBytecodeMap;
+        context.functionNameIndices = hamMap::hamNameIndexMap;
+
+        // The context now owns the complete runtime snapshot required by the
+        // caller, so the legacy process-wide registries must not leak into the
+        // next top-level compilation.
+        resetCompilationState();
+        return artifacts;
+    } catch (...) {
+        context.clear();
+        resetCompilationState();
+        throw;
+    }
 }
 
 } // namespace vietvm::compiler

@@ -39,6 +39,62 @@ bool isCallableNamePiece(const std::string &token) {
     return true;
 }
 
+std::vector<std::string> splitTopLevelFields(const std::string &text,
+                                             char delimiter) {
+    std::vector<std::string> fields;
+    std::string current;
+    int parenthesisDepth = 0;
+    char quote = '\0';
+    bool escaped = false;
+
+    const auto appendCurrent = [&]() {
+        const std::size_t begin = current.find_first_not_of(" \t\n\r");
+        const std::size_t end = current.find_last_not_of(" \t\n\r");
+        if (begin == std::string::npos) fields.emplace_back();
+        else fields.push_back(current.substr(begin, end - begin + 1));
+        current.clear();
+    };
+
+    for (char ch : text) {
+        if (quote != '\0') {
+            current.push_back(ch);
+            if (escaped) {
+                escaped = false;
+            } else if (ch == '\\') {
+                escaped = true;
+            } else if (ch == quote) {
+                quote = '\0';
+            }
+            continue;
+        }
+
+        if (ch == '"' || ch == '\'') {
+            quote = ch;
+            current.push_back(ch);
+            continue;
+        }
+
+        if (ch == '(') {
+            ++parenthesisDepth;
+            current.push_back(ch);
+        } else if (ch == ')') {
+            --parenthesisDepth;
+            current.push_back(ch);
+        } else if (ch == delimiter && parenthesisDepth == 0) {
+            appendCurrent();
+        } else {
+            current.push_back(ch);
+        }
+    }
+
+    if (!current.empty()) appendCurrent();
+    return fields;
+}
+
+std::vector<std::string> splitTopLevelArguments(const std::string &text) {
+    return splitTopLevelFields(text, ',');
+}
+
 std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "(")
         throw std::runtime_error(vietvm::messages::formatMessage(

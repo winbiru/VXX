@@ -18,35 +18,6 @@
 #include <iostream>
 #include "../../include/frontend/lexer.h"
 
-// Helper to split arguments string into individual argument expressions (handles nested parens)
-static std::vector<std::string> splitArgsString(const std::string &s) {
-    std::vector<std::string> res;
-    std::string cur;
-    int depth = 0;
-    for (size_t i = 0; i < s.size(); ++i) {
-        char c = s[i];
-        if (c == '(') { depth++; cur.push_back(c); }
-        else if (c == ')') { depth--; cur.push_back(c); }
-        else if (c == ',' && depth == 0) {
-            // push trimmed current
-            size_t a = cur.find_first_not_of(" \t\n\r");
-            size_t b = cur.find_last_not_of(" \t\n\r");
-            if (a == std::string::npos) res.push_back("");
-            else res.push_back(cur.substr(a, b - a + 1));
-            cur.clear();
-        } else {
-            cur.push_back(c);
-        }
-    }
-    if (!cur.empty()) {
-        size_t a = cur.find_first_not_of(" \t\n\r");
-        size_t b = cur.find_last_not_of(" \t\n\r");
-        if (a == std::string::npos) res.push_back("");
-        else res.push_back(cur.substr(a, b - a + 1));
-    }
-    return res;
-}
-
 static bool tryParseCallableNameBeforeParen(const std::vector<std::string> &tokens,
                                             size_t start,
                                             size_t &parenPos,
@@ -146,7 +117,7 @@ void compileStatement(const std::vector<std::string>& tokens, size_t &pos,
         pos = pr.second; // pos now points after ')'
 
         // split args and compile each expression
-        std::vector<std::string> args = splitArgsString(inside);
+        std::vector<std::string> args = vietvm::compiler::splitTopLevelArguments(inside);
         int compiledArgs = 0;
         for (const auto &aexpr : args) {
             if (aexpr.empty()) continue;

@@ -1,9 +1,10 @@
 {
   "name": "vpp-language",
   "displayName": "V++ Language",
-  "description": "Syntax highlighting for V++",
-  "version": "0.0.1",
+  "description": "Vietnamese-first language support and syntax highlighting for V++ source files",
+  "version": "0.1.2",
   "publisher": "vpp",
+  "main": "./extension.js",
   "icon": "assets/icons/vpp-file.png",
   "license": "UNLICENSED",
   "categories": [
@@ -13,17 +14,48 @@
     "vpp",
     "viet",
     "vietnamese",
-    "syntax"
+    "syntax",
+    "highlighting"
   ],
   "engines": {
     "vscode": "^1.80.0"
   },
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:vpp.installVm",
+    "onCommand:vpp.showVmInfo",
+    "onCommand:vpp.openReleases"
+  ],
   "vpp": {
     "manifest": "./vpp-language.json",
     "installer": "./scripts/vpp-lang",
     "packageFormat": "vlang"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "vpp.installVm",
+        "title": "V++: Install/Update VM from GitHub"
+      },
+      {
+        "command": "vpp.showVmInfo",
+        "title": "V++: Show VM Installation"
+      },
+      {
+        "command": "vpp.openReleases",
+        "title": "V++: Open GitHub Releases"
+      }
+    ],
+    "configuration": {
+      "title": "V++",
+      "properties": {
+        "vpp.vm.autoPromptInstall": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer to install the V++ VM from GitHub Releases when no extension-managed VM is installed."
+        }
+      }
+    },
     "languages": [
       {
         "id": "vpp",
@@ -43,12 +75,105 @@
         "path": "./syntaxes/vpp.tmLanguage.json"
       }
     ],
-    "themes": [
-      {
-        "label": "V++ Bright",
-        "uiTheme": "vs-dark",
-        "path": "./themes/vpp-bright-color-theme.json"
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": [
+              "comment.line.double-slash.vietvm",
+              "comment.block.vietvm",
+              "comment.block.documentation.vietvm"
+            ],
+            "settings": {
+              "foreground": "#808080",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "scope": [
+              "keyword.control.vietvm",
+              "keyword.control.import.vietvm",
+              "storage.type.class.vietvm",
+              "storage.type.function.vietvm",
+              "storage.type.variable.vietvm",
+              "storage.modifier.access.vietvm",
+              "constant.language.boolean.vietvm",
+              "constant.language.null.vietvm"
+            ],
+            "settings": {
+              "foreground": "#CC7832"
+            }
+          },
+          {
+            "scope": [
+              "entity.name.function.vietvm",
+              "entity.name.function.member.vietvm",
+              "support.function.builtin.output.vietvm",
+              "support.function.builtin.collection.vietvm",
+              "support.function.builtin.string.vietvm",
+              "support.function.builtin.network.vietvm"
+            ],
+            "settings": {
+              "foreground": "#FFC66D"
+            }
+          },
+          {
+            "scope": [
+              "string.quoted.double.vietvm",
+              "string.quoted.single.vietvm",
+              "string.unquoted.import-path.vietvm"
+            ],
+            "settings": {
+              "foreground": "#6A8759"
+            }
+          },
+          {
+            "scope": "constant.numeric.vietvm",
+            "settings": {
+              "foreground": "#6897BB"
+            }
+          },
+          {
+            "scope": [
+              "entity.name.type.class.vietvm",
+              "entity.name.type.vietvm"
+            ],
+            "settings": {
+              "foreground": "#A9B7C6"
+            }
+          },
+          {
+            "scope": "variable.parameter.vietvm",
+            "settings": {
+              "foreground": "#9876AA"
+            }
+          },
+          {
+            "scope": [
+              "variable.other.vietvm",
+              "variable.other.object.vietvm",
+              "variable.other.property.vietvm",
+              "keyword.operator.vietvm"
+            ],
+            "settings": {
+              "foreground": "#A9B7C6"
+            }
+          },
+          {
+            "scope": "constant.character.escape.vietvm",
+            "settings": {
+              "foreground": "#CC7832",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "invalid.illegal.escape.vietvm",
+            "settings": {
+              "foreground": "#BC3F3C"
+            }
+          }
+        ]
       }
-    ]
+    }
   }
 }

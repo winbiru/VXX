@@ -131,8 +131,9 @@ void testStructuredImportPayloadIsVisibleInAstDump() {
                dump.find("quoted=no semicolon=yes alias=\"toan\"") !=
                    std::string::npos,
            "AST dump exposes structured local-file import spelling and alias metadata");
-    expect(dump.find("form=unstructured") != std::string::npos,
-           "AST dump identifies package imports that remain on the tolerant path");
+    expect(dump.find("target=\"cốt lõi\" quoted=yes semicolon=yes") !=
+               std::string::npos,
+           "AST dump exposes structured quoted package-import metadata");
 }
 
 void testLoopFormIsVisibleInAstAndIrDumps() {

@@ -7,7 +7,7 @@ MANIFEST="$ROOT_DIR/vpp-language.json"
 
 NAME="vpp-language"
 DISPLAY_NAME="V++ Language"
-VERSION="0.0.1"
+VERSION="0.1.2"
 PUBLISHER="vpp"
 LANGUAGE_ID="vpp"
 EXTENSION_ID="$PUBLISHER.$NAME-$VERSION"
@@ -105,51 +105,7 @@ parse_editor() {
 
 write_vscode_package_json() {
   package_json_dest="$1/package.json"
-  cat > "$package_json_dest" <<EOF
-{
-  "name": "$NAME",
-  "displayName": "$DISPLAY_NAME",
-  "description": "Syntax highlighting for V++",
-  "version": "$VERSION",
-  "publisher": "$PUBLISHER",
-  "icon": "assets/icons/vpp-file.png",
-  "license": "UNLICENSED",
-  "engines": {
-    "vscode": "^1.80.0"
-  },
-  "categories": [
-    "Programming Languages"
-  ],
-  "contributes": {
-    "languages": [
-      {
-        "id": "$LANGUAGE_ID",
-        "aliases": ["V++", "vpp", "vietvm"],
-        "extensions": [".vvm", ".vi"],
-        "configuration": "./language-configuration.json",
-        "icon": {
-          "light": "./assets/icons/vpp-file.png",
-          "dark": "./assets/icons/vpp-file.png"
-        }
-      }
-    ],
-    "grammars": [
-      {
-        "language": "$LANGUAGE_ID",
-        "scopeName": "source.vietvm",
-        "path": "./syntaxes/vpp.tmLanguage.json"
-      }
-    ],
-    "themes": [
-      {
-        "label": "V++ Bright",
-        "uiTheme": "vs-dark",
-        "path": "./themes/vpp-bright-color-theme.json"
-      }
-    ]
-  }
-}
-EOF
+  cp "$ROOT_DIR/package.json" "$package_json_dest"
 }
 
 sync_workspace_settings() {
@@ -286,6 +242,7 @@ install_one() {
   cp "$ROOT_DIR/themes/vpp-bright-color-theme.json" "$dest/themes/vpp-bright-color-theme.json"
   cp "$ROOT_DIR/assets/icons/vpp-file.png" "$dest/assets/icons/vpp-file.png"
   cp "$ROOT_DIR/language-configuration.json" "$dest/language-configuration.json"
+  cp "$ROOT_DIR/extension.js" "$dest/extension.js"
   cp "$ROOT_DIR/INSTALL_EDITOR_HIGHLIGHT.md" "$dest/README.md"
   cp "$MANIFEST" "$dest/vpp-language.json"
   write_vscode_package_json "$dest"
@@ -374,6 +331,8 @@ pack_cmd() {
 
   tar -czf "$package" \
     -C "$ROOT_DIR" \
+    package.json \
+    extension.js \
     vpp-language.json \
     language-configuration.json \
     INSTALL_EDITOR_HIGHLIGHT.md \

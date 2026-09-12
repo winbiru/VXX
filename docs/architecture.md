@@ -39,6 +39,14 @@ CLI compile source rồi copy function bytecode/name table vào `VM`. VM không 
 
 Compiler vẫn dùng mutable state nội bộ trong phiên compile. Bước tiếp theo của API embedding là thay state này bằng `CompilationContext` và `BytecodeProgram` bất biến; không xem các header `compile*.h` là public API ổn định.
 
+Lifecycle hiện tại được khóa như sau: một top-level compilation phải đi qua
+`resetCompilationState()` hoặc overload `compilePipeline(CompilationContext&, ...)`.
+Reset này xóa `StringPool`, function bytecode/name registries (`hamMap`), danh sách
+file đã import và class/access-control state. Overload có `CompilationContext` tự
+reset trước compile, snapshot StringPool/function registries sau compile rồi cleanup
+global state cả ở success lẫn exception. Recursive import không được reset giữa
+chừng vì module con phải dùng chung registry của compilation đang hoạt động.
+
 ## Compiler pipeline
 
 Pipeline compiler được tách thành các bước rõ ràng, nhưng được đưa vào theo
@@ -67,8 +75,9 @@ V++ VM
 Lexer gắn span nguồn vào token để parser, AST và các diagnostic sau đó có cùng
 toạ độ nguồn. Parser tạo statement tree và expression arena; semantic analysis tạo
 scope tree rồi bind expression/call theo ExprId. Lambda body có scope, binding và
-capture metadata riêng; module graph/import exports và các tolerant token region
-vẫn chưa được resolve hoàn toàn. IR cho optimizer là
+capture metadata riêng; import local/package đã có `AstImportSpec`, module graph và
+structured IR payload, còn export semantics và các tolerant token region chưa được
+resolve hoàn toàn. IR cho optimizer là
 biểu diễn trung gian **không kiểu**.
 
 V++ vẫn là runtime giá trị động (`int`/`double`/`string`/`rỗng`/map scalar).
@@ -95,9 +104,9 @@ Expression arena, scope tree, ExprId-based resolution và recursive untyped IR �
 có. Direct emitter hiện nhận literal/name/operator/assignment/postfix/print/primitive map,
 top-level function, primitive default parameter, return, resolved function call, structured
 if/else/for-loop/switch/try-catch, continue, break, throw và class namespace/method.
-Lambda capture-free và dynamic/native/indirect call đã phát trực tiếp; lambda có
-capture và Import vẫn đi qua bridge. Migration
-tiếp tục theo thứ tự:
+Lambda capture-free, dynamic/native/indirect call và structured import đã có direct
+emission trong regression corpus. Compatibility bridge vẫn tồn tại cho các grammar
+edge/malformed case chưa thuộc direct cohort. Migration tiếp tục theo thứ tự:
 
 ```text
 Expression AST

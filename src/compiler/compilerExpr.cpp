@@ -17,32 +17,17 @@
 #include "common/utility.h"
 #include "compiler/compileBlock.h"
 #include "compiler/compileRegistry.h"
+#include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/message_constants.h"
-
 
 struct Instruction;
 
-static std::string encodeEscaped(const std::string &s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (unsigned char c : s) {
-        if (c == '\\' || c == '\n' || c == '\r' || c == '\t' || c == '\x1e' || c == '\x1f') {
-            out.push_back('\\');
-            if (c == '\n') out.push_back('n');
-            else if (c == '\r') out.push_back('r');
-            else if (c == '\t') out.push_back('t');
-            else if (c == '\x1e') out.push_back('e');
-            else if (c == '\x1f') out.push_back('f');
-            else out.push_back('\\');
-        } else {
-            out.push_back(static_cast<char>(c));
-        }
-    }
-    return out;
-}
-
 static bool isMapLiteralTokens(const std::vector<std::string> &tokens) {
     return tokens.size() >= 2 && tokens.front() == "{" && tokens.back() == "}";
+}
+
+static bool isListLiteralTokens(const std::vector<std::string> &tokens) {
+    return tokens.size() >= 2 && tokens.front() == "[" && tokens.back() == "]";
 }
 
 static bool isUnaryMinusContext(const std::string &prev) {
@@ -123,9 +108,8 @@ struct ParamSpecExpr {
 
 static std::vector<ParamSpecExpr> parseParamsWithDefaultExpr(const std::string &inside) {
     std::vector<ParamSpecExpr> params;
-    std::stringstream ss(inside);
-    std::string item;
-    while (std::getline(ss, item, ',')) {
+    for (const std::string &item :
+         vietvm::compiler::splitTopLevelArguments(inside)) {
         std::string token = vietvm::compiler::trim(item);
         if (token.empty()) continue;
 
@@ -201,8 +185,8 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
             vietvm::messages::kSyntaxInvalidMapLiteral));
     }
 
-    constexpr char RS = '\x1e'; // record separator
-    constexpr char FS = '\x1f'; // field separator
+    constexpr char RS = vietvm::bytecode::kLiteralRecordSeparator;
+    constexpr char FS = vietvm::bytecode::kLiteralFieldSeparator;
 
     std::ostringstream encoded;
     bool first = true;
@@ -262,7 +246,9 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
 
         if (!first) encoded << RS;
         first = false;
-        encoded << encodeEscaped(key) << FS << typeTag << FS << encodeEscaped(encodedValue);
+        encoded << vietvm::bytecode::escapeLiteralWireField(key)
+                << FS << typeTag << FS
+                << vietvm::bytecode::escapeLiteralWireField(encodedValue);
 
         if (i < tokens.size() && tokens[i] == ",") {
             ++i;
@@ -277,6 +263,41 @@ static std::string parseAndEncodeMapLiteral(const std::vector<std::string> &toke
         }
     }
 
+    return encoded.str();
+}
+
+static std::string parseAndEncodeListLiteral(const std::vector<std::string> &tokens) {
+    if (!isListLiteralTokens(tokens)) {
+        throw std::runtime_error(std::string(vietvm::messages::kSyntaxInvalidListLiteral));
+    }
+    constexpr char RS = vietvm::bytecode::kLiteralRecordSeparator;
+    constexpr char FS = vietvm::bytecode::kLiteralFieldSeparator;
+    std::ostringstream encoded;
+    bool first = true;
+    for (size_t index = 1; index + 1 < tokens.size();) {
+        const std::string &value = tokens[index];
+        std::string tag;
+        std::string payload;
+        if (vietvm::compiler::isNumber(value)) { tag = "i"; payload = value; }
+        else if (vietvm::compiler::isFloat(value)) { tag = "d"; payload = value; }
+        else if (vietvm::compiler::isStringLiteral(value)) { tag = "s"; payload = vietvm::compiler::stripQuotes(value); }
+        else if (value == "đúng") { tag = "i"; payload = "1"; }
+        else if (value == "sai") { tag = "i"; payload = "0"; }
+        else if (value == "rỗng") { tag = "n"; }
+        else throw std::runtime_error(std::string(vietvm::messages::kSyntaxUnsupportedListValue));
+        if (!first) encoded << RS;
+        first = false;
+        encoded << tag << FS << vietvm::bytecode::escapeLiteralWireField(payload);
+        ++index;
+        if (index + 1 == tokens.size()) break;
+        if (tokens[index] != ",") {
+            throw std::runtime_error(std::string(vietvm::messages::kSyntaxListMissingComma));
+        }
+        ++index;
+        if (index + 1 == tokens.size()) {
+            throw std::runtime_error(std::string(vietvm::messages::kSyntaxListMissingValue));
+        }
+    }
     return encoded.str();
 }
 
@@ -418,6 +439,12 @@ void compileExpr(const std::string &expr,
         bytecode.push_back({OP_MAP_LITERAL, 0, mapIndex, 0});
         return;
     }
+    if (isListLiteralTokens(toks)) {
+        const int listIndex = vietvm::compiler::StringPool::storeString(
+            parseAndEncodeListLiteral(toks));
+        bytecode.push_back({OP_LIST_LITERAL, 0, listIndex, 0});
+        return;
+    }
 
     // ---- Compound assignments: x += e, x -= e, x *= e, x /= e, x %= e ----
     // Pattern: toks[0] = varName, toks[1] = op=, rest = rhs
@@ -467,6 +494,14 @@ void compileExpr(const std::string &expr,
             bytecode.push_back({OP_MAP_LITERAL, 0, mapIndex, 0});
             bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId,0});
             bytecode.push_back({OP_GAN,0,0,0});
+            return;
+        }
+        if (isListLiteralTokens(rhsTokens)) {
+            const int listIndex = vietvm::compiler::StringPool::storeString(
+                parseAndEncodeListLiteral(rhsTokens));
+            bytecode.push_back({OP_LIST_LITERAL, 0, listIndex, 0});
+            bytecode.push_back({OP_TEN_BIEN_ID, 0, dstId, 0});
+            bytecode.push_back({OP_GAN, 0, 0, 0});
             return;
         }
 

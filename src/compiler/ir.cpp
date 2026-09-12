@@ -116,11 +116,15 @@ bool statementNeedsLegacyRegion(const AstStatement &statement) noexcept {
                    statement.children[0].kind != AstStatementKind::Block ||
                    statement.children[1].kind != AstStatementKind::Block;
 
-        // These nodes still contain grammar-significant information only in
-        // their token slice (for example import resolution and class member
-        // roles). Their nested bodies are still
-        // recursively lowered so migration can proceed inside the region.
         case AstStatementKind::Import:
+            return statement.importForm !=
+                       vietvm::frontend::AstImportForm::LocalSourceFile ||
+                   statement.importSpec.target.empty() ||
+                   !statement.importSpec.hasSemicolon;
+
+        // Unknown nodes still contain grammar-significant information only in
+        // their token slice. Their nested bodies are recursively lowered so
+        // migration can proceed inside the region.
         case AstStatementKind::Unknown:
             return true;
     }
@@ -259,9 +263,12 @@ private:
                 break;
 
             case AstExpressionKind::Assignment:
-                result.opcode = IrValueOpcode::StoreName;
+                result.opcode = hasNameKind(program_, source.left)
+                    ? IrValueOpcode::StoreName : IrValueOpcode::StoreIndex;
                 if (result.text.empty()) result.text = "=";
-                supported = hasNameKind(program_, source.left);
+                supported = hasNameKind(program_, source.left) ||
+                            (program_.expression(source.left) != nullptr &&
+                             program_.expression(source.left)->kind == AstExpressionKind::Index);
                 addOperand(source.left);
                 addOperand(source.right);
                 break;
@@ -371,6 +378,17 @@ private:
                     addOperand(entry.value);
                 }
                 break;
+
+            case AstExpressionKind::ListLiteral:
+                result.opcode = IrValueOpcode::ListLiteral;
+                for (ExprId element : source.listElements) addOperand(element);
+                break;
+
+            case AstExpressionKind::Index:
+                result.opcode = IrValueOpcode::Index;
+                addOperand(source.left);
+                addOperand(source.right);
+                break;
         }
 
         if (!supported || cyclicExpression_[sourceId]) {
@@ -388,6 +406,8 @@ private:
         instruction.span = statement.span;
         instruction.declarationName = statement.declarationName;
         instruction.visibility = statement.visibility;
+        instruction.importForm = statement.importForm;
+        instruction.importSpec = statement.importSpec;
         instruction.classForm = statement.classForm;
         instruction.conditionalForm = statement.conditionalForm;
         instruction.loopForm = statement.loopForm;
@@ -616,6 +636,9 @@ const char *irValueOpcodeName(IrValueOpcode opcode) noexcept {
         case IrValueOpcode::ConstBool: return "const_bool";
         case IrValueOpcode::ConstNull: return "const_null";
         case IrValueOpcode::MapLiteral: return "map_literal";
+        case IrValueOpcode::ListLiteral: return "list_literal";
+        case IrValueOpcode::Index: return "index";
+        case IrValueOpcode::StoreIndex: return "store_index";
         case IrValueOpcode::LoadName: return "load_name";
         case IrValueOpcode::StoreName: return "store_name";
         case IrValueOpcode::Unary: return "unary";

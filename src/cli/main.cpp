@@ -32,12 +32,8 @@ struct CwdGuard {
     CwdGuard& operator=(const CwdGuard&) = delete;
 };
 
-static void printErrorMessage(const messages::MessageDefinition &fallback,
+static void printErrorMessage(std::string_view fallback,
                               const std::string &detail) {
-    if (messages::hasMessageCode(detail)) {
-        std::cerr << detail << std::endl;
-        return;
-    }
     std::cerr << messages::formatMessage(fallback, {detail}) << std::endl;
 }
 
@@ -76,12 +72,13 @@ static int runSnippet(const std::string &source,
         fs::current_path(cwd);
     }
 
-    vietvm::compiler::resetCompilationState();
     const bool emitMainCall = mode == SnippetMode::Execute ||
                               mode == SnippetMode::Disassemble;
+    vietvm::compiler::CompilationContext compilationContext;
     vietvm::compiler::CompilationArtifacts artifacts =
-        vietvm::compiler::compilePipeline(source, keywordMap, emitMainCall);
-    const auto &stringPool = vietvm::compiler::StringPool::getPool();
+        vietvm::compiler::compilePipeline(
+            compilationContext, source, keywordMap, emitMainCall);
+    const auto &stringPool = compilationContext.stringPool;
 
     switch (mode) {
         case SnippetMode::DumpAst:
@@ -104,8 +101,8 @@ static int runSnippet(const std::string &source,
     }
 
     VM vm(artifacts.bytecode, stringPool);
-    vm.hamBytecodeMap = vietvm::compiler::hamMap::hamBytecodeMap;
-    for (const auto &entry : vietvm::compiler::hamMap::hamNameIndexMap) {
+    vm.hamBytecodeMap = compilationContext.functionBytecode;
+    for (const auto &entry : compilationContext.functionNameIndices) {
         vm.functionTableByNameIndex[entry.second] = entry.first;
     }
     vm.run();
@@ -560,14 +557,9 @@ static void publishDiagnostics(const std::string &uri, const std::string &text) 
     std::string errorMessage;
     std::string result = "[]";
     if (!vietvm::tooling::lintSource(text, errorMessage)) {
-        const std::string diagnosticCode(
-            messages::messageCodeFromFormatted(errorMessage));
         std::ostringstream diag;
         diag << "[{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":1}},"
              << "\"severity\":1,\"source\":\"vpp\"";
-        if (!diagnosticCode.empty()) {
-            diag << ",\"code\":\"" << jsonEscape(diagnosticCode) << "\"";
-        }
         diag << ",\"message\":\"" << jsonEscape(errorMessage) << "\"}]";
         result = diag.str();
     }

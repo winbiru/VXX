@@ -2,6 +2,28 @@
 
 This project includes a local VS Code language extension for `.vi` and `.vvm` files.
 
+## Cài V++ VM trực tiếp từ GitHub
+
+Extension có thể tải và cài V++ VM từ GitHub Releases chính thức:
+
+`https://github.com/winbiru/VXX/releases`
+
+Sau khi cài extension, mở Command Palette (`Cmd/Ctrl+Shift+P`) và chạy:
+
+```text
+V++: Install/Update VM from GitHub
+```
+
+Extension tải release mới nhất phù hợp với hệ điều hành, cài vào vùng lưu trữ riêng của extension và tự thêm thư mục VM vào `PATH`/`VPP_HOME` cho các terminal mới mở trong VS Code.
+
+Các asset release hiện được hỗ trợ:
+
+- macOS: `vpp-macos.tar.gz`
+- Linux x64: `vpp-linux-x64.tar.gz`
+- Windows x64: `vpp-windows-x64.zip`
+
+Bạn cũng có thể dùng `V++: Show VM Installation` để xem VM đang được cài ở đâu, hoặc `V++: Open GitHub Releases` để mở trang release.
+
 ## V++-style installer
 
 This is the V++ installer for V++ language support. It does not require external package managers.
@@ -40,16 +62,19 @@ The `pack` command creates a `.vlang` package in `dist/`.
 
 After installing, reload VS Code and open any `.vi` file.
 
-To apply the requested highlight colors:
+The extension does **not** replace your current VS Code color theme. It only
+adds TextMate colors for V++-specific `.vietvm` scopes, so the workbench,
+sidebar, tabs, status bar and other languages keep the theme you already use.
 
-1. Open Command Palette (`Cmd+Shift+P`).
-2. Run `Preferences: Color Theme`.
-3. Select `V++ Bright`.
+For `.vi` / `.vvm` source code only:
 
-In `V++ Bright`:
-
-- `Lớp` is orange.
-- Access modifiers `công khai`, `riêng tư`, `bảo vệ` are bright and bold across the full words.
+- keywords such as `nếu`, `lặp`, `trả về`, `nhập`, `hàm`, `lớp`: `#CC7832`;
+- function and built-in calls: `#FFC66D`;
+- strings and import paths: `#6A8759`;
+- numbers: `#6897BB`;
+- comments: `#808080`;
+- regular variables and operators: `#A9B7C6`;
+- parameters: `#9876AA`.
 
 For development without installing:
 

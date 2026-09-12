@@ -1,0 +1,165 @@
+// Regression cho các bài collection 63-75 trong backlog giáo trình Python.
+// Mục tiêu: chứng minh các bài này ghép được từ primitive P1 hiện có.
+
+// 63 - Tổng hai ma trận.
+a = [[1, 2], [3, 4]];
+b = [[5, 6], [7, 8]];
+tong_ma_tran = [];
+lặp(i = 0; i < độ dài(a); i++) {
+    hang = [];
+    lặp(j = 0; j < độ dài(a[i]); j++) {
+        thêm(hang, a[i][j] + b[i][j]);
+    };
+    thêm(tong_ma_tran, hang);
+};
+in tong_ma_tran;
+
+// 64 - Làm phẳng list lồng nhau khi biết cấu trúc hai tầng.
+long_nhau = [[1, 2], [3], [4, 5]];
+phang = [];
+lặp(i = 0; i < độ dài(long_nhau); i++) {
+    lặp(j = 0; j < độ dài(long_nhau[i]); j++) {
+        thêm(phang, long_nhau[i][j]);
+    };
+};
+in phang;
+
+// 65 - Trộn hai list đã sắp xếp.
+trai = [1, 3, 5];
+phai = [2, 4, 6, 8];
+tron = [];
+i = 0;
+j = 0;
+lặp(k = 0; k < độ dài(trai) + độ dài(phai); k++) {
+    nếu (j >= độ dài(phai)) {
+        thêm(tron, trai[i]);
+        i++;
+    } nếu không {
+        nếu (i >= độ dài(trai)) {
+            thêm(tron, phai[j]);
+            j++;
+        } nếu không {
+            nếu (trai[i] <= phai[j]) {
+                thêm(tron, trai[i]);
+                i++;
+            } nếu không {
+                thêm(tron, phai[j]);
+                j++;
+            };
+        };
+    };
+};
+in tron;
+
+// 66 - Phần tử xuất hiện nhiều nhất.
+du_lieu = [2, 1, 2, 3, 2, 1];
+tan_suat = {};
+lặp(i = 0; i < độ dài(du_lieu); i++) {
+    gia_tri = du_lieu[i];
+    đặt map(tan_suat, gia_tri, lấy map(tan_suat, gia_tri, 0) + 1);
+};
+in lấy map(tan_suat, 2, 0);
+
+// 67 - Xoay list sang trái hai vị trí.
+nguon = [1, 2, 3, 4, 5];
+xoay = [];
+lặp(i = 0; i < độ dài(nguon); i++) {
+    thêm(xoay, nguon[(i + 2) % độ dài(nguon)]);
+};
+in xoay;
+
+// 68 - Kiểm tra list con liên tiếp.
+lon = [1, 2, 3, 4, 5];
+con = [3, 4];
+co_list_con = sai;
+lặp(i = 0; i <= độ dài(lon) - độ dài(con); i++) {
+    khop = đúng;
+    lặp(j = 0; j < độ dài(con); j++) {
+        nếu (lon[i + j] != con[j]) {
+            khop = sai;
+        };
+    };
+    nếu (khop) {
+        co_list_con = đúng;
+    };
+};
+in co_list_con;
+
+// 69 - Tổng đường chéo chính.
+ma_tran = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+duong_cheo = 0;
+lặp(i = 0; i < độ dài(ma_tran); i++) {
+    duong_cheo += ma_tran[i][i];
+};
+in duong_cheo;
+
+// 70 - Chia list thành nhóm tối đa hai phần tử.
+nguon_nhom = [1, 2, 3, 4, 5];
+cac_nhom = [];
+lặp(i = 0; i < độ dài(nguon_nhom); i += 2) {
+    nhom = [];
+    lặp(j = 0; j < 2 && i + j < độ dài(nguon_nhom); j++) {
+        thêm(nhom, nguon_nhom[i + j]);
+    };
+    thêm(cac_nhom, nhom);
+};
+in cac_nhom;
+
+// 71 - List <-> tuple.
+ban_dau = [7, 8, 9];
+bo = thành tuple(ban_dau);
+tro_lai = thành list(bo);
+thêm(tro_lai, 10);
+in bo;
+in tro_lai;
+
+// 72 - Đếm từ bằng dictionary với token đã tách sẵn.
+// Tokenizer câu tự do vẫn thuộc P2; phần này regression primitive dictionary.
+tu = ["vpp", "hoc", "vpp", "tot"];
+dem_tu = {};
+lặp(i = 0; i < độ dài(tu); i++) {
+    t = tu[i];
+    đặt map(dem_tu, t, lấy map(dem_tu, t, 0) + 1);
+};
+in lấy map(dem_tu, "vpp", 0);
+
+// 73 - Gộp hai dictionary, dictionary sau ghi đè key trùng.
+map_a = {"a": 1, "b": 2};
+map_b = {"b": 20, "c": 3};
+map_gop = {};
+khoa = khóa map(map_a);
+lặp(i = 0; i < độ dài(khoa); i++) {
+    k = khoa[i];
+    đặt map(map_gop, k, lấy map(map_a, k, rỗng));
+};
+khoa = khóa map(map_b);
+lặp(i = 0; i < độ dài(khoa); i++) {
+    k = khoa[i];
+    đặt map(map_gop, k, lấy map(map_b, k, rỗng));
+};
+in map_gop;
+
+// 74 - Key có giá trị lớn nhất.
+diem = {"an": 7, "binh": 9, "chi": 8};
+khoa = khóa map(diem);
+khoa_max = khoa[0];
+gia_tri_max = lấy map(diem, khoa_max, 0);
+lặp(i = 1; i < độ dài(khoa); i++) {
+    k = khoa[i];
+    v = lấy map(diem, k, 0);
+    nếu (v > gia_tri_max) {
+        khoa_max = k;
+        gia_tri_max = v;
+    };
+};
+in khoa_max;
+
+// 75 - Đảo key/value dictionary với value scalar duy nhất.
+goc = {"a": "x", "b": "y"};
+dao = {};
+khoa = khóa map(goc);
+lặp(i = 0; i < độ dài(khoa); i++) {
+    k = khoa[i];
+    đặt map(dao, lấy map(goc, k, rỗng), k);
+};
+in dao;

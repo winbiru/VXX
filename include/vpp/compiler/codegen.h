@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstddef>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "vpp/compiler/ir.h"
@@ -30,6 +32,7 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program);
 // analyzeDirectIrSupport() first.  Semantic symbol IDs are deliberately not
 // copied into bytecode operands; this emitter owns a separate name-to-slot map.
 std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
+                                            const std::unordered_map<std::string, Opcode> &keywordMap,
                                             bool emitMainCall = true);
 
 const char *bytecodeBackendName(BytecodeBackend backend) noexcept;

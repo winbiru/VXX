@@ -24,6 +24,8 @@ enum class AstExpressionKind {
     Call,
     Lambda,
     MapLiteral,
+    ListLiteral,
+    Index,
 };
 
 enum class AstLiteralKind {
@@ -101,9 +103,9 @@ struct AstParameter {
     ExprId defaultValue = kInvalidExprId;
 };
 
-// Exact source metadata for the first structured import cohort. Package and
-// bare-module shortcuts deliberately remain token-backed until module
-// resolution can model them without changing legacy lookup behavior.
+// Exact source metadata for imports whose target/alias shape is fully parsed.
+// The target may be a .vi path or a bare/quoted package shortcut; resolution
+// remains a compiler concern so parser metadata does not depend on the cwd.
 struct AstImportSpec {
     std::string target;
     SourceSpan targetSpan{};
@@ -151,6 +153,7 @@ struct AstExpression {
     LambdaId lambdaId = kInvalidLambdaId;
 
     std::vector<AstMapEntry> mapEntries;
+    std::vector<ExprId> listElements;
 };
 
 // This is intentionally an untyped, lossless syntax AST.  The language is
