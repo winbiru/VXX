@@ -21,6 +21,7 @@ lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \
   --output-file "$BUILD_DIR/coverage.raw.info"
 lcov --remove "$BUILD_DIR/coverage.raw.info" \
+  --ignore-errors unused \
   '/usr/*' \
   '*/test/*' \
   '*/src/tests/*' \
