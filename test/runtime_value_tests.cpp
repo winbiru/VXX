@@ -88,6 +88,13 @@ void testSharedStackValueSemantics() {
     std::get<MapHandle>(cyclicMap)->entries["self"] = cyclicMap;
     expect(sv_to_string(cyclicMap) == "{\"self\": <cycle>}",
            "self-referential maps render without unbounded recursion");
+
+    // These cycles are created intentionally to exercise cycle-safe rendering.
+    // Break the shared_ptr ownership cycles before leaving the test so leak
+    // sanitizers can verify the runtime-value test without reporting the test
+    // fixtures themselves as leaked allocations.
+    std::get<ListHandle>(cyclicList)->elements.clear();
+    std::get<MapHandle>(cyclicMap)->entries.clear();
 }
 
 void testSharedNativeValidation() {
