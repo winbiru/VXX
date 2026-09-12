@@ -34,7 +34,7 @@ endif()
 find_package(Threads REQUIRED)
 
 # Public include dir for headers
-set(VPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
+set(VPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/include)
 
 # Output directories for libs and binaries
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -62,15 +62,8 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/ir.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/optimizer.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/codegen.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileBlock.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileCondition.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileLoop.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileFunctionDeclaration.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/compileRegistry.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileStatement.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compileSwitch.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compiler.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/compilerExpr.cpp)
+    ${CMAKE_SOURCE_DIR}/src/compiler/compiler.cpp)
 set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
@@ -214,11 +207,11 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/templates/
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/examples/
         DESTINATION examples
         PATTERN ".DS_Store" EXCLUDE)
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/include/
         DESTINATION include
         PATTERN ".DS_Store" EXCLUDE)
 
 # Developer notes:
 # - Keep source ownership explicit; do not add new files to a generic helpers target.
-# - Move public headers to include/vpp/<module>/ as modules stabilize.
+# - Move public headers to src/include/vpp/<module>/ as modules stabilize.
 # - Keep dependencies pointing toward lower-level modules only.

@@ -120,8 +120,8 @@ void testRecursiveExpressionLowering() {
     expect(binaryValue != nullptr && binaryValue->opcode == IrValueOpcode::Binary &&
                binaryValue->text == "+" && binaryValue->operands.size() == 2,
            "assignment value retains the recursive binary-expression topology");
-    expect(ir.legacyRegionCount == 0,
-           "fully represented expression trees do not claim a legacy region");
+    expect(ir.unsupportedDirectRegionCount == 0,
+           "fully represented expression trees do not claim an unsupported direct region");
 
     SemanticModel boundSemantic;
     BindingResult calleeBinding;
@@ -187,7 +187,7 @@ void testRecursiveStatementsKeepOneLegacyTokenOwner() {
 
     const IrInstruction &loweredBlock = ir.instructions.front();
     expect(loweredBlock.tokens.size() == program.tokens.size(),
-           "only the top-level IR statement owns the complete legacy token slice");
+           "only the top-level IR statement owns the complete source token slice");
     bool childrenOwnNoTokens = true;
     for (const IrInstruction &child : loweredBlock.children) {
         childrenOwnNoTokens = childrenOwnNoTokens && child.tokens.empty();
@@ -258,7 +258,7 @@ void testFunctionParameterDefaultsKeepParameterIndices() {
            "parameter default recursively lowers through its source expression ID");
     expect(ir.instructions.front().declarationName == "f" &&
                parameters[1].hasDefault &&
-               !ir.instructions.front().legacyRegion && ir.legacyRegionCount == 0,
+               !ir.instructions.front().unsupportedDirectRegion && ir.unsupportedDirectRegionCount == 0,
            "a fully structured function header no longer needs a token fallback region");
 }
 
@@ -343,7 +343,7 @@ void testStructuredSwitchMetadataLowersRecursively() {
     expect(lowered.children[0].children.size() == 1 &&
                lowered.children[0].children.front().opcode == IrOpcode::Break,
            "case body statements are recursively lowered rather than token-reparsed");
-    expect(!lowered.legacyRegion && ir.legacyRegionCount == 0,
+    expect(!lowered.unsupportedDirectRegion && ir.unsupportedDirectRegionCount == 0,
            "fully structured switch syntax no longer marks a statement fallback region");
     expect(lowered.tokens.size() == program.tokens.size() &&
                lowered.children[0].tokens.empty() && lowered.children[1].tokens.empty(),
@@ -455,7 +455,7 @@ void testStructuredTryMetadataLowersRecursively() {
     expect(caught != nullptr && caught->opcode == IrValueOpcode::LoadName &&
                caught->symbolId == 0,
            "catch-body IR value retains the same resolved catch SymbolId");
-    expect(!lowered.legacyRegion && ir.legacyRegionCount == 0 &&
+    expect(!lowered.unsupportedDirectRegion && ir.unsupportedDirectRegionCount == 0 &&
                lowered.tokens.size() == program.tokens.size() &&
                lowered.children[0].tokens.empty() &&
                lowered.children[1].tokens.empty(),
@@ -524,7 +524,7 @@ void testStructuredClassMetadataLowersQualifiedMethods() {
     expect(ir.instructions.size() == 1 &&
                ir.instructions.front().opcode == IrOpcode::DefineClass &&
                ir.instructions.front().classForm == AstClassForm::MethodBlock &&
-               !ir.instructions.front().legacyRegion,
+               !ir.instructions.front().unsupportedDirectRegion,
            "structured class metadata lowers without a class-level fallback");
     if (ir.instructions.empty() || ir.instructions.front().children.empty() ||
         ir.instructions.front().children.front().children.empty()) {
@@ -541,7 +541,7 @@ void testStructuredClassMetadataLowersQualifiedMethods() {
                loweredMethod.effectiveVisibility == SemanticVisibility::Protected &&
                loweredMethod.symbolId == 1,
            "class and method IR retain source/effective visibility and semantic identity");
-    expect(!loweredMethod.legacyRegion && ir.legacyRegionCount == 0 &&
+    expect(!loweredMethod.unsupportedDirectRegion && ir.unsupportedDirectRegionCount == 0 &&
                loweredClass.tokens.size() == program.tokens.size() &&
                loweredClass.children.front().tokens.empty() &&
                loweredMethod.tokens.empty(),
@@ -614,7 +614,7 @@ void testStructuredLambdasLowerBodiesDefaultsCapturesAndNestedIds() {
                outer->captures.size() == outerSemantic->captures.size() &&
                inner->captures.size() == innerSemantic->captures.size(),
            "lambda IR carries the semantic capture set without token recovery");
-    expect(ir.legacyRegionCount == 0,
+    expect(ir.unsupportedDirectRegionCount == 0,
            "fully structured nested lambda trees contain no fallback regions");
 
     const std::vector<std::string> materialized = materializeIrTokens(ir);
@@ -635,8 +635,8 @@ void testLambdaBodyImportAccountingAndOptimizationAreRecursive() {
         "handler = hàm() { ; nhập package; };\n");
     const SemanticModel semantic = analyzeSemantics(program);
     IrProgram ir = lowerToIr(program, semantic);
-    expect(ir.lambdas.size() == 1 && ir.legacyRegionCount == 0,
-           "structured import inside a lambda body no longer creates a legacy fallback");
+    expect(ir.lambdas.size() == 1 && ir.unsupportedDirectRegionCount == 0,
+           "structured import inside a lambda body remains fully direct");
     if (ir.lambdas.empty()) return;
 
     const OptimizationReport report = optimizeIr(ir);
@@ -644,14 +644,14 @@ void testLambdaBodyImportAccountingAndOptimizationAreRecursive() {
                ir.lambdas.front().body.children.size() == 1 &&
                ir.lambdas.front().body.children.front().opcode == IrOpcode::Import,
            "IR optimization recursively removes no-op statements inside lambda bodies");
-    expect(ir.legacyRegionCount == 0,
+    expect(ir.unsupportedDirectRegionCount == 0,
            "recursive optimization preserves zero fallback for a structured lambda import");
-    ir.lambdas.front().body.children.front().legacyRegion = true;
-    expect(recomputeLegacyRegionCount(ir) == 1,
+    ir.lambdas.front().body.children.front().unsupportedDirectRegion = true;
+    expect(recomputeUnsupportedDirectRegionCount(ir) == 1,
            "recomputed fallback accounting still reaches rewritten lambda-body instructions");
 }
 
-void testUnsupportedExpressionsAreExplicitLegacyRegions() {
+void testUnsupportedExpressionsAreExplicitUnsupportedDirectRegions() {
     using namespace vietvm::frontend;
     using namespace vietvm::compiler;
 
@@ -697,25 +697,25 @@ void testUnsupportedExpressionsAreExplicitLegacyRegions() {
 
     const IrValue *lambdaValue = ir.value(ir.instructions[0].expressionRoots[0]);
     const IrValue *mapValue = ir.value(ir.instructions[1].expressionRoots[0]);
-    expect(lambdaValue != nullptr && lambdaValue->opcode == IrValueOpcode::LegacyRegion,
-           "lambda without an arena-owned payload is explicitly marked as a legacy region");
+    expect(lambdaValue != nullptr && lambdaValue->opcode == IrValueOpcode::UnsupportedDirectRegion,
+           "lambda without an arena-owned payload is explicitly marked as unsupported direct IR");
     expect(mapValue != nullptr && mapValue->opcode == IrValueOpcode::MapLiteral &&
                mapValue->operands.size() == 2,
            "map literal has a structured opcode and retains its recursive entry graph");
-    expect(ir.legacyRegionCount == 1,
+    expect(ir.unsupportedDirectRegionCount == 1,
            "program exposes a deterministic count of explicit fallback nodes");
 
     if (lambdaValue != nullptr) {
         ir.values[lambdaValue->id].opcode = IrValueOpcode::LoadName;
     }
-    expect(recomputeLegacyRegionCount(ir) == 0 && ir.legacyRegionCount == 0,
-           "legacy-region count is recomputed after an IR rewrite instead of becoming stale");
+    expect(recomputeUnsupportedDirectRegionCount(ir) == 0 && ir.unsupportedDirectRegionCount == 0,
+           "unsupported-direct count is recomputed after an IR rewrite instead of becoming stale");
 
     IrValue orphan;
     orphan.id = ir.values.size();
-    orphan.opcode = IrValueOpcode::LegacyRegion;
+    orphan.opcode = IrValueOpcode::UnsupportedDirectRegion;
     ir.values.push_back(std::move(orphan));
-    expect(recomputeLegacyRegionCount(ir) == 0,
+    expect(recomputeUnsupportedDirectRegionCount(ir) == 0,
            "fallback accounting ignores value-arena nodes no longer reachable from statements");
 }
 
@@ -730,7 +730,7 @@ int main() {
     testStructuredClassMetadataLowersQualifiedMethods();
     testStructuredLambdasLowerBodiesDefaultsCapturesAndNestedIds();
     testLambdaBodyImportAccountingAndOptimizationAreRecursive();
-    testUnsupportedExpressionsAreExplicitLegacyRegions();
+    testUnsupportedExpressionsAreExplicitUnsupportedDirectRegions();
 
     if (failures != 0) {
         std::cerr << failures << " recursive IR unit test(s) failed\n";

@@ -1,6 +1,6 @@
 # ✅ V++ — Checklist Phát Triển Ngôn Ngữ
 
-> Cập nhật lần cuối: 12/08/2026
+> Cập nhật lần cuối: 12/09/2026
 > Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
 
 ---
@@ -203,10 +203,10 @@
 | Tính năng | Trạng thái |
 |-----------|-----------|
 | Tokenizer / Lexer (token mang span) | ✅ |
-| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — chọn direct IR cho program được hỗ trợ; phần còn lại dùng whole-program legacy bridge |
+| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — production compiler chỉ còn Direct IR → bytecode; unsupported region báo lỗi |
 | AST cấu trúc không kiểu và mang span | ✅ — expression arena + statement tree lossless; lambda có parameter/default/body cấu trúc |
 | Semantic model, scope tree và name/call resolution | ✅ — bind theo ExprId; lambda scope/capture đã có, module graph/import exports còn tiếp tục |
-| IR không kiểu, đệ quy và optimizer IR | ✅ — direct emitter đọc structured IR; token payload chỉ còn cho compatibility fallback |
+| IR không kiểu, đệ quy và optimizer IR | ✅ — direct emitter đọc structured IR; token materialization chỉ còn cho test/debug |
 | Biên dịch biểu thức số học | ✅ |
 | Biên dịch chuỗi và nối chuỗi | ✅ |
 | Biên dịch điều kiện `nếu/hoặc` | ✅ |
@@ -225,9 +225,10 @@
 | Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | ✅ — lambda body là recursive Block và vẫn giữ span/range lossless |
 | Scope tree (global/class/function/block/lambda/catch) | ✅ |
 | Lexical name/call resolution và class visibility | ✅ — module graph/import exports còn tiếp tục |
-| Recursive IR lowering cho body/block/expression | ✅ — conditional/loop/switch/try/class đã có structured payload; import còn tiếp tục |
-| IR → bytecode trực tiếp, không parse token lại | 🚧 — expression/function/lambda/call + structured control-flow/try/class-method cohort |
-| Legacy token fallback = 0 trên toàn bộ corpus `.vi` | 🚧 — direct 29/57 chương trình; 28 program còn dùng whole-program bridge |
+| Recursive IR lowering cho body/block/expression | ✅ — conditional/loop/switch/try/class/import đã có structured payload trong regression corpus |
+| IR → bytecode trực tiếp, không parse token lại | ✅ — toàn bộ regression corpus đi qua direct emitter; token compiler đã bị xóa khỏi production source |
+| Unsupported Direct IR = 0 trên toàn bộ corpus `.vi` | ✅ — 61/61 chương trình compile trực tiếp; unsupported region làm compile thất bại |
+| Milestone V++ 0.6 — Direct IR migration | ✅ — migration corpus và việc xóa legacy token bridge đã hoàn thành |
 | Type policy và Typed IR | ⬜ |
 
 ---
@@ -273,11 +274,11 @@
 | `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | ✅ |
 | `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | ✅ — smoke, chưa bao phủ mọi opcode |
 | `pipeline_tests.cpp` | Parser báo unmatched `]`/unclosed `[` bằng `VPP-SYN-035` và span nguồn | ✅ |
-| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | ✅ — 57 file, compile-only; production không có test API |
+| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | ✅ — 61 file, compile-only; bắt buộc 61/61 dùng `DirectIr`; production không có test API |
 | `recursive_ir_tests.cpp` | Expression/default parameter/body/block lowering đệ quy và reachable fallback count | ✅ |
 | `direct_codegen_tests.cpp` | Direct IR emitter cho literal/operator/assignment/print/map và bridge selection | ✅ |
 
-**Regression suite: 49 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
+**Regression suite: 54 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
 
 ---
 
@@ -293,6 +294,9 @@
 | CI/CD (GitHub Actions) | ✅ |
 | CTest integration target | ✅ |
 | AddressSanitizer / UndefinedBehaviorSanitizer trên CI | ✅ |
+| `clang-tidy` quality gate | ✅ |
+| Coverage gate | ✅ — minimum hiện tại 45% |
+| Benchmark baseline | ✅ — VM dispatch, lexer, compiler pipeline, native HTTP helpers |
 | Disassembler (xem bytecode) | ✅ |
 | REPL (interactive shell) | ✅ |
 | Language Server Protocol (LSP) | 🚧 — MVP |
@@ -417,8 +421,8 @@ có; không tính các mục chỉ nằm trên roadmap.
 | Thành phần | V++ hiện tại | Java | C# | Python |
 |---|---|---|---|---|
 | Lexer / parser | ✅ Token mang span, parser cấu trúc | ✅ Trưởng thành | ✅ Trưởng thành | ✅ Trưởng thành |
-| AST chuẩn | 🚧 AST cấu trúc mang span; chưa có AST biểu thức đầy đủ | ✅ | ✅ | ✅ |
-| Name resolution / semantic analysis | 🚧 Khai báo và lời gọi trực tiếp; chưa có scope/import/lớp đầy đủ | ✅ | ✅ | ✅ |
+| AST chuẩn | ✅ Statement tree + expression arena mang span; lambda body cấu trúc | ✅ | ✅ | ✅ |
+| Name resolution / semantic analysis | 🚧 Scope tree/ExprId binding/class visibility đã có; module export/cross-module semantic còn mở | ✅ | ✅ | ✅ |
 | Static typing | ⬜ Chưa quyết định mô hình kiểu | ✅ Mạnh | ✅ Mạnh | 🟡 Dynamic + type hints |
 | Bytecode / VM | ✅ Stack bytecode và V++ VM | ✅ JVM | ✅ CLR | ✅ CPython VM |
 | GC / JIT | 🚧 MVP, chưa production-grade | ✅ Mature | ✅ Mature | ✅/🟡 Tuỳ runtime |
@@ -434,31 +438,37 @@ có; không tính các mục chỉ nằm trên roadmap.
 | Cross-platform | 🚧 Unix + Windows CI; còn phụ thuộc binary host | ✅ | ✅ | ✅ |
 | Production maturity | ⬜ Experimental | ✅✅✅ | ✅✅✅ | ✅✅✅ |
 
-### 14.2 Thước đo đúng
+### 14.2 Snapshot tiến độ hiện tại
 
-Mốc **~92% checklist của V++** chỉ đo các hạng mục mà roadmap cũ đã liệt kê.
-Nó **không** có nghĩa V++ bằng 92% Java. Nếu lấy Java platform là 100, đây là
-ước lượng kiến trúc để định hướng đầu tư, không phải KPI sản phẩm:
+Các phần trăm dưới đây là ước lượng readiness nội bộ hướng tới V++ 1.0, dùng để
+ưu tiên công việc; chúng không phải mức tương đương với Java/C#/Python.
 
-| Lớp | V++ | Java |
-|---|---:|---:|
-| Syntax | 85% | 100% |
-| Functions | 80% | 100% |
-| Control flow | 90% | 100% |
-| Data types | 60% | 100% |
-| Compiler pipeline | 40% | 100% |
-| VM | 35% | 100% |
-| GC | 15% | 100% |
-| JIT | 5–10% | 100% |
-| OOP | 25% | 100% |
-| Standard library | 15% | 100% |
-| Concurrency | 0–5% | 100% |
-| Tooling | 20% | 100% |
-| Ecosystem | <1% | 100% |
+| Thành phần | Tiến độ ước lượng |
+|---|---:|
+| Lexer + SourceSpan | 95% |
+| Parser | 90–95% |
+| Expression AST | 90% |
+| Scope tree | 85–90% |
+| Name resolution | 85% |
+| Semantic analysis | 80–85% |
+| Recursive untyped IR | 90% |
+| Direct IR → Bytecode | ~95% cho corpus hiện tại |
+| Legacy backend migration | ~90–95% |
+| Compilation lifecycle/context | 60–70% |
+| Module/import architecture | 70% |
+| IR optimizer | 30–35% |
+| VM core | 70–75% |
+| Tests/CI/quality tooling | 85–90% |
+| GC | 30% |
+| JIT | 15% |
+| Object model | 30% |
+| Production readiness | ~55% |
 
-Theo góc nhìn platform engineering, V++ hiện phù hợp khoảng **15–25%** của
-một Java platform. Đây là điều bình thường với một runtime nghiên cứu nhỏ;
-Java đã tích luỹ hơn ba thập kỷ cùng hệ sinh thái rất lớn.
+Đánh giá tổng hợp hiện tại: compiler architecture khoảng **88–92%**, runtime/VM
+khoảng **70%**, tooling/CI khoảng **85%**, language core khoảng **80%** và platform
+overall khoảng **55%**. Theo thang trưởng thành nội bộ 0–8, V++ đang ở khoảng
+**5.4–5.6 / 8**: compiler core gần hoàn tất migration, còn khoảng cách lớn nhất
+tới 1.0 nằm ở runtime robustness và platform maturity.
 
 ### 14.3 Tài sản runtime và khoảng trống compiler
 
@@ -470,10 +480,9 @@ là một interpreter thuần source:
 .vi → V++ compiler → V++ bytecode → V++ VM → interpreter / JIT MVP → CPU
 ```
 
-Khoảng trống quan trọng vẫn là loại bỏ phần token-backed còn lại giữa
-frontend và bytecode. Pipeline incremental đã có các ranh giới cấu trúc sau;
-backend selector chọn direct IR cho cohort đã migrate và whole-program legacy bridge
-khi program còn vùng chưa được emitter hỗ trợ:
+Khoảng trống compiler lớn nhất giờ là dời mutable compiler registries vào
+`CompilationContext`. Regression gate hiện yêu cầu toàn bộ 61 chương trình `.vi`
+không có unsupported direct-IR region; token bridge đã bị xóa khỏi production source:
 
 ```text
 Source
@@ -516,7 +525,7 @@ hợp đồng runtime động.
 3. **Real name resolution** — bind node → symbol, phân biệt direct/indirect/dynamic call.
 4. **Recursive IR lowering** — hạ body, block, expression và control flow, không chỉ top-level.
 5. **Direct IR → bytecode** — emitter đọc IR và phát instruction/fixup, không parse token lại.
-6. **Bỏ token bridge** — đếm fallback, giảm về 0 trên corpus `.vi`, rồi mới xóa legacy path.
+6. **Bỏ token bridge** — hoàn thành: corpus đạt 61/61 direct IR và production token compiler/source path đã bị xóa.
 
 Typed IR là roadmap riêng sau quyết định type policy; nó không chặn sáu milestone
 untyped này. VM/object model/platform work tiếp tục sau khi compiler boundary đủ
@@ -534,7 +543,9 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 - [x] Scope tree: global/class/function/block/lambda/catch, parameter/local/import alias và parent/child link.
 - [x] Name resolution MVP: bind expression/call/lambda body theo ExprId, shadowing/capture/recursion/class visibility; còn module graph.
 - [x] Recursive IR control flow: expression/body/block/lambda/if/loop/switch/try/class đã hạ; import là cohort còn lại.
-- [ ] IR/codegen boundary: migrate emitter theo opcode/feature, đo legacy fallback và chỉ xóa token bridge khi đạt zero.
+- [x] IR/codegen boundary trên regression corpus: 61/61 `.vi` dùng direct IR và parity gate chặn unsupported region.
+- [x] Xóa legacy token bridge và token-backed compatibility path khỏi production compiler/source set.
+- [ ] Dời toàn bộ compiler global registries vào `CompilationContext` để tiến tới re-entrant/embeddable/parallel-safe.
 - [ ] VM: tách handler và bổ sung unit test từng opcode trước tối ưu mới.
 - [ ] Object heap/GC v2: instance/field và tracing/lifetime test trước inheritance.
 - [ ] JSON/network/concurrency: mỗi API có contract, error path và integration test.
@@ -546,7 +557,7 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 | Thước đo | Ý nghĩa |
 |---------|---------|
 | `~148/161 (~92%)` | Snapshot của roadmap legacy, không còn là bộ đếm live sau khi tách MVP/đang làm/chưa có runtime API. |
-| Capability hiện tại | Xem phần 14: V++ là runtime/compiler thử nghiệm, khoảng 15–25% Java platform theo ước lượng kiến trúc. |
+| Capability hiện tại | Xem phần 14: compiler migration gần hoàn tất; production readiness nội bộ hiện khoảng 55%. |
 | Backlog thực thi | Các checkbox ở §13 và §14.6 là nguồn trạng thái hiện hành. |
 
 > Không diễn giải phần trăm roadmap nội bộ như mức tương đương với Java, C# hoặc

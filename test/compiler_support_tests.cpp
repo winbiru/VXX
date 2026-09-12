@@ -152,9 +152,8 @@ void testRepeatedTopLevelCompilationLifecycle() {
            "recompiling the same source after reset reproduces function-name IDs");
     expect(hamMap::hamBytecodeMap.size() == firstFunctionCount,
            "recompiling the same source after reset reproduces function count");
-    expect(firstAgain.backend == first.backend &&
-               firstAgain.bytecode.size() == first.bytecode.size(),
-           "recompiling the same source after reset preserves backend and root bytecode shape");
+    expect(firstAgain.bytecode.size() == first.bytecode.size(),
+           "recompiling the same source after reset preserves root bytecode shape");
 
     vietvm::compiler::resetCompilationState();
 }
@@ -197,9 +196,8 @@ void testCompilationContextLifecycle() {
            "repeated context-driven compilation reproduces function-name IDs");
     expect(firstAgainContext.functionBytecode.size() == firstContext.functionBytecode.size(),
            "repeated context-driven compilation reproduces function count");
-    expect(firstAgain.backend == first.backend &&
-               firstAgain.bytecode.size() == first.bytecode.size(),
-           "repeated context-driven compilation preserves backend and root bytecode shape");
+    expect(firstAgain.bytecode.size() == first.bytecode.size(),
+           "repeated context-driven compilation preserves root bytecode shape");
 }
 
 void testSymbolTableIds() {

@@ -7,21 +7,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
-#include <functional>
 #include <vector>
 #include "../vm/instruction.h"
 #include "vpp/frontend/ast.h"
-
-using CompileFunc = std::function<void(
-    const std::vector<std::string>& tokens,
-    size_t &pos,
-    std::vector<Instruction>& bytecode,
-    std::unordered_map<std::string,int>& symTab,
-    int& nextId,
-    const std::unordered_map<std::string,Opcode>& keywordMap)>;
-
-extern std::unordered_map<std::string, CompileFunc> compileMap;
-void initCompileMap();
 // Imported files tracking (shared for a single compilation session)
 namespace vietvm { namespace compiler {
     extern std::unordered_set<std::string> importedFiles;
@@ -29,7 +17,6 @@ namespace vietvm { namespace compiler {
 
     // Class/access-control compile state
     void clearClassAccessState();
-    bool isVisibilityToken(const std::string &token);
     void pushClassContext(const std::string &className);
     void popClassContext();
     std::string currentClassContext();

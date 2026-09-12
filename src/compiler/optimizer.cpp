@@ -32,10 +32,10 @@ OptimizationReport optimizeIr(IrProgram &program) {
         removeNoOps(lambda.body.children, report);
     }
 
-    // Passes may remove a statement that carried a fallback marker, so the
+    // Passes may remove a statement that carried an unsupported-direct marker, so the
     // public count is derived state rather than an incrementally maintained
     // counter.
-    recomputeLegacyRegionCount(program);
+    recomputeUnsupportedDirectRegionCount(program);
     return report;
 }
 

@@ -69,10 +69,10 @@ void testIrDumpUsesOptimizedPipelineInstructions() {
 
         expect(dump.rfind("IR instructions=2 values=", 0) == 0,
                "IR dump reports the post-optimization instruction count");
-        expect(dump.find("legacy-regions=") != std::string::npos &&
+        expect(dump.find("unsupported-direct-regions=") != std::string::npos &&
                    dump.find("values:\n") != std::string::npos &&
                    dump.find("instructions:\n") != std::string::npos,
-               "IR dump exposes structured values and explicit fallback accounting");
+               "IR dump exposes structured values and explicit unsupported-direct accounting");
         expect(dump.find("print ") != std::string::npos,
                "IR dump renders the print opcode name");
         expect(dump.find("define_function ") != std::string::npos,
@@ -234,7 +234,7 @@ void testStructuredLambdaPayloadsAreVisibleInAstAndIrDumps() {
                ast.find("\n    block ") != std::string::npos &&
                ast.find("\n      return ") != std::string::npos,
            "AST dump exposes lambda arena identity, parameters/default and recursive body");
-    expect(ir.find(" lambdas=1 legacy-regions=0") != std::string::npos &&
+    expect(ir.find(" lambdas=1 unsupported-direct-regions=0") != std::string::npos &&
                ir.find(" lambda=#0") != std::string::npos &&
                ir.find("#0 owner=#") != std::string::npos &&
                ir.find("params=[\"x\":symbol=") != std::string::npos &&

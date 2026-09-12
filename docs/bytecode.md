@@ -5,9 +5,9 @@ lai**. Nó không phải format runtime hiện hành và không phải compatibi
 
 > **Trạng thái hiện tại:** compiler tokenize source rồi phát trực tiếp
 > `std::vector<Instruction>` trong [`src/compiler/compiler.cpp`](../src/compiler/compiler.cpp).
-> VM nhận cấu trúc đó trong [`include/vm/vm.h`](../include/vm/vm.h) và thực thi tại
+> VM nhận cấu trúc đó trong [`src/include/vm/vm.h`](../src/include/vm/vm.h) và thực thi tại
 > [`src/runtime/vm.cpp`](../src/runtime/vm.cpp). `Instruction` và enum `Opcode` hiện có nằm ở
-> [`include/vm/instruction.h`](../include/vm/instruction.h). Repo chưa có serializer,
+> [`src/include/vm/instruction.h`](../src/include/vm/instruction.h). Repo chưa có serializer,
 > loader hay verifier `.vbc`; hàm disassemble hiện có chỉ in biểu diễn bytecode trong bộ nhớ
 > tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp).
 
@@ -76,8 +76,8 @@ Ví dụ encoding mẫu:
 Danh sách dưới đây là opcode set **đề xuất cho file `.vbc`**, không phải bảng mã đang dùng
 trong runtime. Các giá trị số trong proposal không được dùng để decode `Instruction` hiện tại:
 enum thực tế có các opcode và giá trị riêng trong
-[`include/vm/instruction.h`](../include/vm/instruction.h), còn bảng từ khóa source nằm ở
-[`include/frontend/keywords.h`](../include/frontend/keywords.h) và
+[`src/include/vm/instruction.h`](../src/include/vm/instruction.h), còn bảng từ khóa source nằm ở
+[`src/include/frontend/keywords.h`](../src/include/frontend/keywords.h) và
 [`src/frontend/keywords.cpp`](../src/frontend/keywords.cpp).
 
 - OP_NOP (0x00) — no-op
@@ -148,7 +148,7 @@ Notes:
 - Assembler: input là human-readable mnemonics (ví dụ PUSH_CONST 10; LOAD_LOCAL 0; OP_CONG), output là file `.vbc`.
 - Disassembler `.vbc`: đọc bytes, map opcode -> mnemonic, resolve constant-pool indices.
 - Hiện tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp) chỉ disassemble `std::vector<Instruction>` trong bộ nhớ; nó chưa đọc file `.vbc`.
-- JSON/TOML IR giữa compiler và assembler vẫn chỉ là một lựa chọn thiết kế tương lai. Compiler hiện có IR nội bộ không kiểu: program thuộc cohort được hỗ trợ được emit bytecode trực tiếp, program còn lại dùng legacy token bridge. IR này không phải JSON/TOML, serializer hay compatibility contract cho `.vbc`.
+- JSON/TOML IR giữa compiler và assembler vẫn chỉ là một lựa chọn thiết kế tương lai. Compiler hiện có IR nội bộ không kiểu và chỉ emit bytecode qua Direct IR; region chưa được hỗ trợ làm compilation thất bại với diagnostic. IR này không phải JSON/TOML, serializer hay compatibility contract cho `.vbc`.
 
 ---
 

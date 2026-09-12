@@ -22,8 +22,6 @@ namespace {
 namespace fs = std::filesystem;
 
 struct CompilerSnapshot {
-    vietvm::compiler::BytecodeBackend backend =
-        vietvm::compiler::BytecodeBackend::LegacyTokenBridge;
     std::vector<Instruction> rootBytecode;
     std::vector<std::string> stringPool;
     std::unordered_map<int, std::vector<Instruction>> functionBytecode;
@@ -191,7 +189,6 @@ CompilerSnapshot capturePipeline(const std::string &source) {
     vietvm::compiler::CompilationContext context;
     vietvm::compiler::CompilationArtifacts artifacts =
         vietvm::compiler::compilePipeline(context, source, keywordMap, true);
-    snapshot.backend = artifacts.backend;
     snapshot.rootBytecode = std::move(artifacts.bytecode);
     snapshot.stringPool = std::move(context.stringPool);
     snapshot.functionBytecode = std::move(context.functionBytecode);
@@ -236,7 +233,6 @@ int main(int argc, char **argv) {
     }
 
     int failures = 0;
-    std::size_t directPrograms = 0;
     std::unordered_set<std::string> visited;
     for (const fs::path &testFile : testFiles) {
         const std::string relative =
@@ -255,14 +251,6 @@ int main(int argc, char **argv) {
             CurrentPathGuard cwdGuard;
             fs::current_path(testFile.parent_path());
             const CompilerSnapshot pipeline = capturePipeline(source);
-            if (pipeline.backend == vietvm::compiler::BytecodeBackend::DirectIr) {
-                ++directPrograms;
-            }
-            if (pipeline.backend != vietvm::compiler::BytecodeBackend::DirectIr) {
-                ++failures;
-                std::cerr << "FAIL: " << relative
-                          << " returned to the legacy token bridge\n";
-            }
             const std::uint64_t actual = hashSnapshot(pipeline);
             if (actual != expectedEntry->second) {
                 ++failures;
@@ -319,8 +307,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    std::cout << "pipeline matches frozen legacy compiler state for "
-              << testFiles.size() << " .vi files; direct IR backend covers "
-              << directPrograms << " program(s)\n";
+    std::cout << "direct IR pipeline matches frozen compiler state for "
+              << testFiles.size() << " .vi files\n";
     return 0;
 }

@@ -509,10 +509,10 @@ void testParserRecordsExactClassFormsAndQualifiedMethodIr() {
     const IrProgram ir = lowerToIr(program, semantic);
     expect(ir.instructions.size() == 4 &&
                ir.instructions[0].classForm == AstClassForm::MethodBlock &&
-               !ir.instructions[0].legacyRegion &&
-               ir.instructions[1].legacyRegion &&
-               ir.instructions[2].legacyRegion &&
-               ir.instructions[3].legacyRegion,
+               !ir.instructions[0].unsupportedDirectRegion &&
+               ir.instructions[1].unsupportedDirectRegion &&
+               ir.instructions[2].unsupportedDirectRegion &&
+               ir.instructions[3].unsupportedDirectRegion,
            "only the exact class form leaves the class-level legacy region");
     if (ir.instructions.empty() || ir.instructions[0].children.empty()) return;
 
@@ -738,8 +738,8 @@ void testMalformedTryBindingsStayOnLegacyPath() {
                program.statements[1].catchVariable.empty(),
            "multi-token catch binding remains unstructured");
     expect(ir.instructions.size() == 2 &&
-               ir.instructions[0].legacyRegion &&
-               ir.instructions[1].legacyRegion,
+               ir.instructions[0].unsupportedDirectRegion &&
+               ir.instructions[1].unsupportedDirectRegion,
            "malformed catch bindings remain explicit legacy IR regions");
 }
 

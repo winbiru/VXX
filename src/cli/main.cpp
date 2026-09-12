@@ -9,11 +9,10 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
-#include "../../include/compiler/compiler.h"
-#include "../../include/vm/vm.h"
-#include "../../include/frontend/keywords.h"
+#include "compiler/compiler.h"
+#include "vm/vm.h"
+#include "frontend/keywords.h"
 #include "common/storeString.h"
-#include "../../include/compiler/compileRegistry.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
@@ -85,12 +84,11 @@ static int runSnippet(const std::string &source,
             std::cout << vietvm::tooling::dumpAst(artifacts.ast);
             return EXIT_SUCCESS;
         case SnippetMode::DumpIr:
-            // compilePipeline returns the post-optimizer IR, so this is the
-            // representation used for direct-emitter/bridge selection.
-            std::cout << "backend="
-                      << vietvm::compiler::bytecodeBackendName(artifacts.backend)
-                      << " codegen-fallback-regions="
-                      << artifacts.legacyFallbackRegions << '\n';
+            // compilePipeline returns the post-optimizer IR consumed by the
+            // direct emitter. Unsupported regions are rejected instead of
+            // falling back to a token backend.
+            std::cout << "backend=direct-ir codegen-unsupported-regions="
+                      << artifacts.unsupportedDirectIrRegions << '\n';
             std::cout << vietvm::tooling::dumpIr(artifacts.ir);
             return EXIT_SUCCESS;
         case SnippetMode::Disassemble:
@@ -625,8 +623,6 @@ static int runLanguageServer() {
 
 int main(int argc, char* argv[]) {
     try {
-        initCompileMap();
-
         if (argc >= 2) {
             std::string command = argv[1];
             int commandWordOffset = 0;

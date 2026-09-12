@@ -45,13 +45,11 @@
 - [ ] **Compiler state:** đã có `CompilationContext` cho top-level compile theo cơ chế
   reset + snapshot + cleanup, và CLI `runSnippet()` đã dùng context này. Nội bộ
   `StringPool`/`hamMap` vẫn là mutable global state nên compiler chưa re-entrant.
-- [ ] **Bỏ token bridge:** regression corpus hiện đạt 61/61 direct IR. Import local
-  đã dùng metadata AST/IR có cấu trúc và common import/allocation contract giữa
-  legacy với direct backend. Call/parameter/loop header hiện dùng chung splitter
-  top-level quote-aware; `loopUltil.h` và đường `compileFunction.cpp` không còn caller
-  đã được xóa. `materializeIrTokens()` và legacy compiler
-  vẫn tồn tại làm compatibility fallback cho các vùng cú pháp chưa được direct
-  backend chấp nhận trong unit/diagnostic cases; cần audit các vùng này trước khi xóa.
+- [x] **Bỏ token bridge:** production compiler chỉ còn Direct IR → bytecode. Import local
+  dùng metadata AST/IR có cấu trúc và compile đệ quy qua pipeline hiện tại; token-dispatch
+  compiler và các `compile*.cpp` cũ đã bị xóa khỏi source/CMake. Region chưa được direct
+  emitter hỗ trợ giờ làm compile thất bại với diagnostic tường minh. `materializeIrTokens()`
+  chỉ còn phục vụ lossless IR test/debug, không nằm trên production compile path.
 - [ ] **CI quality:** coverage threshold và clang-tidy đã có trong job Ubuntu; macOS
   regression CI thường trực vẫn chưa có.
 
@@ -83,6 +81,6 @@ Long-term: 10/23
 2. [x] Mở rộng VM opcode matrix cho branch + call/return trước khi tách `VM::run()`.
 3. [x] Hoàn tất bước đầu `CompilationContext`: top-level reset/snapshot/cleanup và
    migrate `runSnippet()`; tiếp tục dời registry nội bộ ở các bước sau.
-4. [x] Đưa toàn bộ regression corpus 61/61 sang direct IR và khóa bằng parity gate;
-   bước xóa hẳn compatibility bridge được theo dõi riêng ở mục "Bỏ token bridge".
+4. [x] Đưa toàn bộ regression corpus 61/61 sang direct IR, khóa bằng parity gate và
+   xóa token bridge khỏi production compiler/source set.
 5. [x] Sau khi test architecture ổn định, thêm coverage + clang-tidy + benchmark baseline.

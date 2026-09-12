@@ -43,7 +43,7 @@ bool hasNameKind(const AstProgram &program, ExprId id) noexcept {
     return expression != nullptr && expression->kind == AstExpressionKind::Name;
 }
 
-bool statementNeedsLegacyRegion(const AstStatement &statement) noexcept {
+bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexcept {
     const std::size_t expressionCount = statement.expressionRoots.size();
     switch (statement.kind) {
         case AstStatementKind::Empty:
@@ -156,7 +156,7 @@ public:
         for (const AstStatement &statement : program_.statements) {
             ir_.instructions.push_back(lowerStatement(statement, true));
         }
-        recomputeLegacyRegionCount(ir_);
+        recomputeUnsupportedDirectRegionCount(ir_);
         return std::move(ir_);
     }
 
@@ -173,7 +173,7 @@ private:
                                 vietvm::frontend::SourceSpan span = {}) {
         IrValue value;
         value.id = ir_.values.size();
-        value.opcode = IrValueOpcode::LegacyRegion;
+        value.opcode = IrValueOpcode::UnsupportedDirectRegion;
         value.span = span;
         value.sourceExprId = sourceExprId;
         ir_.values.push_back(std::move(value));
@@ -190,7 +190,7 @@ private:
             const IrValueId existing = expressionMap_[sourceId];
             cyclicExpression_[sourceId] = true;
             if (existing < ir_.values.size()) {
-                ir_.values[existing].opcode = IrValueOpcode::LegacyRegion;
+                ir_.values[existing].opcode = IrValueOpcode::UnsupportedDirectRegion;
             }
             return existing;
         }
@@ -202,7 +202,7 @@ private:
 
         IrValue placeholder;
         placeholder.id = resultId;
-        placeholder.opcode = IrValueOpcode::LegacyRegion;
+        placeholder.opcode = IrValueOpcode::UnsupportedDirectRegion;
         placeholder.span = source.span;
         placeholder.sourceExprId = sourceId;
         placeholder.symbolId = expressionSymbols_[sourceId];
@@ -392,7 +392,7 @@ private:
         }
 
         if (!supported || cyclicExpression_[sourceId]) {
-            result.opcode = IrValueOpcode::LegacyRegion;
+            result.opcode = IrValueOpcode::UnsupportedDirectRegion;
         }
 
         ir_.values[resultId] = std::move(result);
@@ -430,7 +430,7 @@ private:
                 instruction.declarationName = symbol.qualifiedName;
             }
         }
-        instruction.legacyRegion = statementNeedsLegacyRegion(statement);
+        instruction.unsupportedDirectRegion = statementNeedsUnsupportedDirectRegion(statement);
 
         const ScopeId declarationScope = semantic_.scopeForStatement(statement.tokenBegin);
         instruction.parameters.reserve(statement.parameters.size());
@@ -504,7 +504,7 @@ private:
                     program_.tokens.begin() + static_cast<std::ptrdiff_t>(begin),
                     program_.tokens.begin() + static_cast<std::ptrdiff_t>(end));
             } else if (begin != end || statement.kind != AstStatementKind::Empty) {
-                instruction.legacyRegion = true;
+                instruction.unsupportedDirectRegion = true;
             }
         }
 
@@ -521,59 +521,59 @@ private:
     std::vector<const CallBinding *> callBindings_;
 };
 
-std::size_t countInstructionLegacyRegions(
+std::size_t countInstructionUnsupportedDirectRegions(
     const IrProgram &program,
     const std::vector<IrInstruction> &instructions,
     std::vector<unsigned char> &visitedValues);
 
-std::size_t countReachableLegacyValue(const IrProgram &program,
+std::size_t countReachableUnsupportedDirectValue(const IrProgram &program,
                                       IrValueId id,
                                       std::vector<unsigned char> &visited) {
     if (id >= program.values.size() || visited[id] != 0) return 0;
     visited[id] = 1;
 
     const IrValue &value = program.values[id];
-    std::size_t count = value.opcode == IrValueOpcode::LegacyRegion ? 1 : 0;
+    std::size_t count = value.opcode == IrValueOpcode::UnsupportedDirectRegion ? 1 : 0;
     for (IrValueId operand : value.operands) {
-        count += countReachableLegacyValue(program, operand, visited);
+        count += countReachableUnsupportedDirectValue(program, operand, visited);
     }
     if (value.opcode == IrValueOpcode::Lambda) {
         const IrLambda *lambda = program.lambda(value.lambdaId);
         if (lambda != nullptr && lambda->ownerValue == id) {
             for (const IrParameter &parameter : lambda->parameters) {
                 if (parameter.defaultValue != kInvalidIrValueId) {
-                    count += countReachableLegacyValue(
+                    count += countReachableUnsupportedDirectValue(
                         program, parameter.defaultValue, visited);
                 }
             }
-            if (lambda->body.legacyRegion) ++count;
+            if (lambda->body.unsupportedDirectRegion) ++count;
             for (IrValueId root : lambda->body.expressionRoots) {
-                count += countReachableLegacyValue(program, root, visited);
+                count += countReachableUnsupportedDirectValue(program, root, visited);
             }
-            count += countInstructionLegacyRegions(
+            count += countInstructionUnsupportedDirectRegions(
                 program, lambda->body.children, visited);
         }
     }
     return count;
 }
 
-std::size_t countInstructionLegacyRegions(
+std::size_t countInstructionUnsupportedDirectRegions(
     const IrProgram &program,
     const std::vector<IrInstruction> &instructions,
     std::vector<unsigned char> &visitedValues) {
     std::size_t count = 0;
     for (const IrInstruction &instruction : instructions) {
-        if (instruction.legacyRegion) ++count;
+        if (instruction.unsupportedDirectRegion) ++count;
         for (const IrParameter &parameter : instruction.parameters) {
             if (parameter.defaultValue != kInvalidIrValueId) {
-                count += countReachableLegacyValue(
+                count += countReachableUnsupportedDirectValue(
                     program, parameter.defaultValue, visitedValues);
             }
         }
         for (IrValueId root : instruction.expressionRoots) {
-            count += countReachableLegacyValue(program, root, visitedValues);
+            count += countReachableUnsupportedDirectValue(program, root, visitedValues);
         }
-        count += countInstructionLegacyRegions(
+        count += countInstructionUnsupportedDirectRegions(
             program, instruction.children, visitedValues);
     }
     return count;
@@ -598,11 +598,11 @@ std::vector<std::string> materializeIrTokens(const IrProgram &program) {
     return tokens;
 }
 
-std::size_t recomputeLegacyRegionCount(IrProgram &program) {
+std::size_t recomputeUnsupportedDirectRegionCount(IrProgram &program) {
     std::vector<unsigned char> visitedValues(program.values.size(), 0);
-    const std::size_t count = countInstructionLegacyRegions(
+    const std::size_t count = countInstructionUnsupportedDirectRegions(
         program, program.instructions, visitedValues);
-    program.legacyRegionCount = count;
+    program.unsupportedDirectRegionCount = count;
     return count;
 }
 
@@ -629,7 +629,7 @@ const char *irOpcodeName(IrOpcode opcode) noexcept {
 
 const char *irValueOpcodeName(IrValueOpcode opcode) noexcept {
     switch (opcode) {
-        case IrValueOpcode::LegacyRegion: return "legacy_region";
+        case IrValueOpcode::UnsupportedDirectRegion: return "unsupported_direct_region";
         case IrValueOpcode::ConstInt: return "const_int";
         case IrValueOpcode::ConstFloat: return "const_float";
         case IrValueOpcode::ConstString: return "const_string";
@@ -647,7 +647,7 @@ const char *irValueOpcodeName(IrValueOpcode opcode) noexcept {
         case IrValueOpcode::CallDynamic: return "call_dynamic";
         case IrValueOpcode::Lambda: return "lambda";
     }
-    return "legacy_region";
+    return "unsupported_direct_region";
 }
 
 } // namespace vietvm::compiler

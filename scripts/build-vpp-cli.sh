@@ -12,4 +12,4 @@ SOURCES=()
 while IFS= read -r source; do
   SOURCES+=("$source")
 done < <(find src -type f -name '*.cpp' ! -path 'src/tests/*' -print | sort)
-c++ -std=c++17 -Iinclude "${SOURCES[@]}" -pthread -o bin/vpp-cli
+c++ -std=c++17 -Isrc/include "${SOURCES[@]}" -pthread -o bin/vpp-cli

@@ -1,7 +1,7 @@
 //# V++ grammar (BNF-style)
-//# Based on branch `developer` (keywords in include/keywords.h).
+//# Based on branch `developer` (keywords in src/include/frontend/keywords.h).
 //# Terminals shown in quotes; some Vietnamese keywords provided as both accented and ASCII alternatives.
-//# Map common opcodes from include/keywords.h:
+//# Map common opcodes from src/include/frontend/keywords.h:
 //#  - OP_NEU -> "nếu" / "neu"        (if)
 //#  - OP_NEU_KHONG -> "nếu không"/"neu khong" (else if / elif)  *adjust as needed
 //#  - OP_HOAC -> logical OR ("hoặc"/"hoac")

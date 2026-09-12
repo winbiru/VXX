@@ -111,7 +111,7 @@ void writeIrInstruction(std::ostringstream &out,
     out << index++ << "  " << vietvm::compiler::irOpcodeName(instruction.opcode)
         << " span=" << formatSpan(instruction.span)
         << " symbol=" << instruction.symbolId
-        << " fallback=" << (instruction.legacyRegion ? "yes" : "no");
+        << " unsupported-direct=" << (instruction.unsupportedDirectRegion ? "yes" : "no");
     if (!instruction.declarationName.empty()) {
         out << " declaration=" << std::quoted(instruction.declarationName);
     }
@@ -263,7 +263,7 @@ std::string dumpIr(const vietvm::compiler::IrProgram &program) {
     out << "IR instructions=" << program.instructions.size()
         << " values=" << program.values.size()
         << " lambdas=" << program.lambdas.size()
-        << " legacy-regions=" << program.legacyRegionCount << '\n';
+        << " unsupported-direct-regions=" << program.unsupportedDirectRegionCount << '\n';
 
     out << "values:\n";
     for (const vietvm::compiler::IrValue &value : program.values) {

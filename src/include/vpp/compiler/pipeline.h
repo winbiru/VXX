@@ -18,12 +18,11 @@ struct CompilationArtifacts {
     SemanticModel semantic;
     IrProgram ir;
     OptimizationReport optimization;
-    BytecodeBackend backend = BytecodeBackend::LegacyTokenBridge;
-    std::size_t legacyFallbackRegions = 0;
+    std::size_t unsupportedDirectIrRegions = 0;
     std::vector<Instruction> bytecode;
 };
 
-// Per-top-level-compilation view of the legacy registries.  The compiler still
+// Per-top-level-compilation view of the process-wide registries. The compiler still
 // uses process-wide registries internally while imports are being compiled,
 // but callers no longer need to read those globals directly after a compile.
 // This is the migration boundary for moving the registries fully into context.
@@ -37,14 +36,14 @@ struct CompilationContext {
 
 // Runs the canonical compiler path:
 // source -> lexer -> parser -> AST -> semantic analysis -> IR -> optimizer
-// -> bytecode.  It does not reset global legacy registries; callers that begin
+// -> bytecode. It does not reset process-wide compiler registries; callers that begin
 // a top-level compilation must use resetCompilationState() first.
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
     bool emitMainCall = true);
 
-// Top-level entry point. It owns reset/error cleanup and snapshots the legacy
+// Top-level entry point. It owns reset/error cleanup and snapshots the compiler
 // registries into `context`. Recursive import compilation must keep using the
 // context-less overload above so imported modules share the active session.
 CompilationArtifacts compilePipeline(

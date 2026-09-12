@@ -25,22 +25,22 @@
 ## Cấu trúc source hiện hành
 
 - CLI: src/cli/main.cpp.
-- Core và frontend: src/core/, src/frontend/; header tương ứng ở include/common/ và
-  include/frontend/.
+- Core và frontend: src/core/, src/frontend/; header tương ứng ở src/include/common/ và
+  src/include/frontend/.
 - Compiler: src/compiler/; các thành phần hỗ trợ ở src/compiler/support/ (không còn
   nằm tại src/helpers/).
-- Bytecode: src/bytecode/; header theo hướng module mới ở include/vpp/bytecode/ và
-  header tương thích cũ vẫn ở include/vm/.
+- Bytecode: src/bytecode/; header theo hướng module mới ở src/include/vpp/bytecode/ và
+  header tương thích cũ vẫn ở src/include/vm/.
 - Runtime và native adapter: src/runtime/ và src/runtime/native/ (không còn
   src/vm/).
 - Tooling CLI: src/tooling/; các header theo namespace vpp đang được gom ở
-  include/vpp/.
+  src/include/vpp/.
 - Test: chương trình hồi quy V++ ở src/tests/*.vi, output ở src/tests/expected/;
   C++ unit test ở test/*.cpp. src/tests/.tmp/ chỉ là workspace tạm được tạo khi
   chạy test.
 - Package/thư viện chuẩn, template và ví dụ: gói/, templates/ và examples/.
 
-Các header trong include/vpp/ là hướng tổ chức API theo module; chúng chưa được
+Các header trong src/include/vpp/ là hướng tổ chức API theo module; chúng chưa được
 cam kết là C/C++ embedding API ổn định.
 
 ## Build và test cục bộ

@@ -15,7 +15,7 @@
 #include <optional>
 #include <unordered_map>
 #include <regex>
-#include "../../include/vm/vm.h"
+#include "vm/vm.h"
 
 #include <algorithm>
 #include <cctype>
@@ -26,7 +26,7 @@
 #include <deque>
 #include <memory>
 #include <atomic>
-#include "../../include/common/vm_utils.h"
+#include "common/vm_utils.h"
 #include "common/vm_native_collection_helpers.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
