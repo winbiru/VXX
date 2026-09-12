@@ -283,8 +283,8 @@ chưa có chính sách typed IR; việc chọn dynamic, static hoặc gradual ty
 vi bytecode/VM đang có.
 
 Các header pipeline được quy hoạch dưới
-`include/vpp/frontend/{token,ast,parser}.h` và
-`include/vpp/compiler/{semantic,ir,optimizer,pipeline}.h`. Xem
+`src/include/vpp/frontend/{token,ast,parser}.h` và
+`src/include/vpp/compiler/{semantic,ir,optimizer,pipeline}.h`. Xem
 `docs/architecture.md` để biết ranh giới từng bước và trạng thái API.
 
 ## Tài Liệu

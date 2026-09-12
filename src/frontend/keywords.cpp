@@ -2,7 +2,7 @@
 // Created by Nguyễn Xuân Thắng on 19/6/25.
 //
 
-#include "../../include/frontend/keywords.h"
+#include "frontend/keywords.h"
 
 #include "vpp/bytecode/opcode.h"
 

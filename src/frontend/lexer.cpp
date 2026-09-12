@@ -13,7 +13,7 @@
 #include <unordered_set>
 #include <utility>
 
-#include "../../include/frontend/lexer.h"
+#include "frontend/lexer.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 

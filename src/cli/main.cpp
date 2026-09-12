@@ -9,9 +9,9 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
-#include "../../include/compiler/compiler.h"
-#include "../../include/vm/vm.h"
-#include "../../include/frontend/keywords.h"
+#include "compiler/compiler.h"
+#include "vm/vm.h"
+#include "frontend/keywords.h"
 #include "common/storeString.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/tooling/tooling.h"

@@ -8,7 +8,7 @@ Các lỗi do V++ phát ra theo định dạng sau:
 
 Mã là định danh ổn định cho automation, IDE và LSP; nội dung có thể được cải
 thiện mà không làm mất khả năng nhận diện lỗi. Catalog nguồn duy nhất nằm tại
-[`include/vpp/core/message_constants.h`](../include/vpp/core/message_constants.h)
+[`src/include/vpp/core/message_constants.h`](../src/include/vpp/core/message_constants.h)
 và các catalog con đi kèm.
 
 | Nhóm mã | Phạm vi |

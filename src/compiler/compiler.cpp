@@ -1,10 +1,10 @@
 // Compiler.cpp
 
-#include <../include/vm/instruction.h>
+#include "vm/instruction.h"
 #include <unordered_map>
 #include <string>
-#include <../include/frontend/lexer.h>
-#include <compiler/compileRegistry.h>
+#include "frontend/lexer.h"
+#include "compiler/compileRegistry.h"
 #include "common/storeString.h"
 #include "vpp/compiler/pipeline.h"
 
