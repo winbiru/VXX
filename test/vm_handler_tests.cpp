@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/vm_native_stdlib_helpers.h"
+#include "vpp/runtime/object.h"
 #include "vpp/runtime/vm_fixture.h"
 
 namespace {
@@ -251,13 +252,33 @@ void testRuntimeModuleInitializationRunsOnce() {
 }
 
 void testObjectHandlerState() {
-    VM vm({}, {"Counter", "value", "add"});
+    VM vm({}, {"Counter", "value", "add", "read", "Base", "Child", "speak", "callBase"});
     vm.hamBytecodeMap.emplace(7, std::vector<Instruction>{
         instruction(OP_PARAM, 0, 0, 0),
         instruction(OP_PARAM, 0, 1, 1),
         instruction(OP_TEN_BIEN_GIA_TRI, 0, 0, 0),
         instruction(OP_TEN_BIEN_GIA_TRI, 0, 1, 0),
         instruction(OP_CONG),
+        instruction(OP_TRA_VE),
+    });
+    vm.hamBytecodeMap.emplace(8, std::vector<Instruction>{
+        instruction(OP_PARAM, 0, 2, -1),
+        instruction(OP_TEN_BIEN_GIA_TRI, 0, 2, 0),
+        instruction(OP_DOC_THUOC_TINH, 0, 1, 0),
+        instruction(OP_TRA_VE),
+    });
+    vm.hamBytecodeMap.emplace(9, std::vector<Instruction>{
+        instruction(OP_BIEN_SO, 11, 0, 0),
+        instruction(OP_TRA_VE),
+    });
+    vm.hamBytecodeMap.emplace(10, std::vector<Instruction>{
+        instruction(OP_BIEN_SO, 22, 0, 0),
+        instruction(OP_TRA_VE),
+    });
+    vm.hamBytecodeMap.emplace(11, std::vector<Instruction>{
+        instruction(OP_PARAM, 0, 0, -1),
+        instruction(OP_TEN_BIEN_GIA_TRI, 0, 0, 0),
+        instruction(OP_GOI_PHUONG_THUC, 0, 6, 1),
         instruction(OP_TRA_VE),
     });
     VMRuntimeFixture access(vm);
@@ -283,6 +304,87 @@ void testObjectHandlerState() {
     access.executeObject(instruction(OP_GOI_PHUONG_THUC, 2, 2, 0));
     expect(asInt(access.top(), "object method handler") == 5,
            "object method handler", "bound dispatch must call the registered method function");
+
+    access.executeObject(instruction(OP_THEM_PHUONG_THUC, 0, 3, 8));
+    access.push(instance);
+    access.executeObject(instruction(OP_GOI_PHUONG_THUC, 0, 3, 0));
+    expect(asInt(access.top(), "implicit receiver handler") == 9,
+           "implicit receiver handler",
+           "bound dispatch must expose the instance through hidden OP_PARAM index -1");
+
+    const ClassHandle base = vietvm::runtime::createClass("Base");
+    const ClassHandle child = vietvm::runtime::createClass("Child", base);
+    (void)vietvm::runtime::defineMethod(base, "speak", 9);
+    (void)vietvm::runtime::defineMethod(child, "speak", 10);
+    (void)vietvm::runtime::defineMethod(child, "callBase", 11);
+    access.setClass("Base", base);
+    access.setClass("Child", child);
+    const InstanceHandle childInstance = vietvm::runtime::createInstance(child);
+    access.push(make_instance_value(childInstance));
+    access.executeObject(instruction(OP_GOI_PHUONG_THUC, 0, 7, 0));
+    expect(asInt(access.top(), "super receiver handler") == 11,
+           "super receiver handler",
+           "gốc dispatch must skip the child override and call the superclass method");
+}
+
+void testTracingGcKeepsRootsAndCollectsCycles() {
+    VM vm({}, {});
+    VMRuntimeFixture access(vm);
+
+    ClassHandle klass = vietvm::runtime::createClass("Node");
+    access.setClass("Node", klass);
+    StackValue listValue = make_list_value({});
+    ListHandle list = std::get<ListHandle>(listValue);
+    InstanceHandle instance = vietvm::runtime::createInstance(klass);
+    StackValue instanceValue = make_instance_value(instance);
+    (void)vietvm::runtime::setInstanceField(instance, "items", listValue);
+    list->elements.push_back(instanceValue);
+
+    const std::weak_ptr<vietvm::runtime::ListValue> weakList = list;
+    const std::weak_ptr<vietvm::runtime::RuntimeInstance> weakInstance = instance;
+    access.trackHeapValue(instanceValue);
+    access.setVariable(77, instanceValue);
+
+    list.reset();
+    instance.reset();
+    listValue = make_null_value();
+    instanceValue = make_null_value();
+
+    access.collectGarbage();
+    expect(!weakList.expired() && !weakInstance.expired(),
+           "tracing GC roots",
+           "a cycle reachable through VM variables must survive mark/sweep");
+    expect(access.gcStats().marked >= 3 && access.gcStats().swept == 0,
+           "tracing GC roots",
+           "reachable class, instance and list must all be marked without sweeping");
+
+    access.eraseVariable(77);
+    access.collectGarbage();
+    expect(weakList.expired() && weakInstance.expired(),
+           "tracing GC cycle sweep",
+           "an unreachable instance/list cycle must be broken and released");
+    expect(access.gcStats().swept >= 1 && access.trackedHeapObjects() == 1,
+           "tracing GC cycle sweep",
+           "sweep must retain only the class rooted by the VM class table");
+}
+
+void testTracingGcHeapTeardownBreaksRootedCycles() {
+    std::weak_ptr<vietvm::runtime::ListValue> weakList;
+    {
+        VM vm({}, {});
+        VMRuntimeFixture access(vm);
+        StackValue cycleValue = make_list_value({});
+        ListHandle cycle = std::get<ListHandle>(cycleValue);
+        cycle->elements.push_back(cycleValue);
+        weakList = cycle;
+        access.trackHeapValue(cycleValue);
+        access.setVariable(91, cycleValue);
+        cycle.reset();
+        cycleValue = make_null_value();
+    }
+    expect(weakList.expired(),
+           "tracing GC heap teardown",
+           "destroying the final VM heap owner must break cycles still held by VM roots");
 }
 
 } // namespace
@@ -300,6 +402,8 @@ int main() {
     testFilesystemPredicatesTreatMissingPathAsFalse();
     testRuntimeModuleInitializationRunsOnce();
     testObjectHandlerState();
+    testTracingGcKeepsRootsAndCollectsCycles();
+    testTracingGcHeapTeardownBreaksRootedCycles();
 
     if (failures != 0) {
         std::cerr << failures << " VM handler unit test(s) failed\n";

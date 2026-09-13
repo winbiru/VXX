@@ -1,0 +1,26 @@
+lớp Counter {
+    hàm set(value) {
+        mình.value = value;
+    }
+
+    hàm get() {
+        trả về mình.value;
+    }
+
+    hàm addEvenUntil(limit) {
+        lặp(i = 1; i <= limit; i = i + 1) {
+            nếu(i % 2 == 0) {
+                mình.set(mình.get() + i);
+            }
+        }
+        trả về mình.get();
+    }
+};
+
+hàm main() {
+    c = Counter();
+    c.set(1);
+    in c.addEvenUntil(6);
+    in c.addEvenUntil(3);
+    in c.get();
+};

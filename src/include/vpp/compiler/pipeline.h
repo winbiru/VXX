@@ -15,6 +15,7 @@
 
 namespace vietvm::compiler {
 
+// Gom kết quả các pha compiler trong một lần chạy: AST, semantic model, IR, bytecode và metadata backend để CLI/test có thể kiểm tra từng lớp.
 struct CompilationArtifacts {
     std::vector<vietvm::frontend::Token> tokens;
     vietvm::frontend::AstProgram ast;
@@ -26,27 +27,19 @@ struct CompilationArtifacts {
     std::vector<Instruction> bytecode;
 };
 
-// Owns mutable compiler registry state and the import resolution base for one
-// top-level compilation. Legacy StringPool/hamMap helpers are facades over the
-// context bound to the current thread, so recursive imports keep sharing this
-// state without exposing it to callers.
+// Sở hữu trạng thái registry cùng thông tin phân giải import cho một pipeline; truyền context riêng giúp nhiều lần biên dịch không rò global state.
 struct CompilationContext : CompilationRegistryState {
+    // Xóa clear; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clear();
 };
 
-// Runs the canonical compiler path:
-// source -> lexer -> parser -> AST -> semantic analysis -> IR -> optimizer
-// -> bytecode. It uses the registry state currently bound to the thread; callers that
-// begin legacy/context-less top-level compilation must use resetCompilationState()
-// first.
+// Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
     bool emitMainCall = true);
 
-// Top-level entry point. It binds `context` as the active registry owner and manages
-// reset/error cleanup. Recursive import compilation must keep using the context-less
-// overload above so imported modules share the active session.
+// Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
 CompilationArtifacts compilePipeline(
     CompilationContext &context,
     const std::string &source,

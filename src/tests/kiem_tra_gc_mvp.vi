@@ -4,6 +4,27 @@ hàm tao_chuoi(i) {
     trả về "m" + i;
 };
 
+hàm tao_gia_tri_giu_lai() {
+    trả về [41];
+};
+
+hàm tao_gia_tri_thu_hai() {
+    tam = [];
+    thêm(tam, tam);
+    trả về 1;
+};
+
+hàm cong_hai_doi_so(a, b) {
+    trả về a[0] + b;
+};
+
+lớp NodeGc {
+    hàm khởi tạo() {
+        mình.links = [];
+        thêm(mình.links, mình);
+    }
+};
+
 hàm main() {
     tong = 0;
     lặp (i = 0; i < 50; i = i + 1) {
@@ -16,4 +37,21 @@ hàm main() {
     in tong;
     in {"a": 1, "b": rỗng};
     in trị tuyệt đối(-7);
+
+    // Self-cycle list/map phải được tracing GC thu khi root bị gỡ.
+    danh_sach_vong = [];
+    thêm(danh_sach_vong, danh_sach_vong);
+    danh_sach_vong = rỗng;
+
+    map_vong = {};
+    đặt map(map_vong, "self", map_vong);
+    map_vong = rỗng;
+
+    // Instance và field list giữ lẫn nhau; bỏ biến root phải không gây leak cycle.
+    node = NodeGc();
+    node = rỗng;
+
+    // Khi đối số thứ hai gọi function riêng, đối số thứ nhất đang nằm trên stack
+    // của caller vẫn phải được xem là GC root.
+    in cong_hai_doi_so(tao_gia_tri_giu_lai(), tao_gia_tri_thu_hai());
 };

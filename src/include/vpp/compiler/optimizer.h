@@ -6,12 +6,12 @@
 
 namespace vietvm::compiler {
 
+// Ghi thống kê thay đổi của optimizer, chẳng hạn số no-op bị loại; caller dùng report để kiểm thử và quan sát tác động tối ưu.
 struct OptimizationReport {
     std::size_t removedNoOps = 0;
 };
 
-// Optimizes the IR, not the runtime VM.  Bytecode peephole cleanup remains a
-// backend detail while its transformations are migrated into IR passes.
+// Tối ưu `IrProgram` tại chỗ; hiện optimizer loại no-op và tính lại metadata vùng direct IR để artifact sau tối ưu vẫn nhất quán.
 OptimizationReport optimizeIr(IrProgram &program);
 
 } // namespace vietvm::compiler

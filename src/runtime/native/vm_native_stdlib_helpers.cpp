@@ -18,14 +18,17 @@ namespace {
 
 namespace fs = std::filesystem;
 
+// Chuyển chuỗi UTF-8 thành `std::filesystem::path` theo quy tắc của nền tảng để đường dẫn Unicode hoạt động nhất quán.
 fs::path utf8Path(const StackValue &value) {
     return fs::u8path(argToRawString(value));
 }
 
+// Chuyển `std::filesystem::path` thành chuỗi UTF-8 để runtime/API trả đường dẫn nhất quán giữa Windows và Unix.
 std::string pathToUtf8(const fs::path &path) {
     return path.generic_u8string();
 }
 
+// Chuyển `std::error_code` filesystem thành lỗi runtime có ngữ cảnh; hàm ghép thao tác, đường dẫn và thông điệp hệ điều hành.
 bool filesystemError(const std::error_code &ec,
                      const std::string &operation,
                      std::string &err) {
@@ -34,11 +37,13 @@ bool filesystemError(const std::error_code &ec,
     return true;
 }
 
+// Kiểm tra điều kiện của `isMissingPathError`.
 bool isMissingPathError(const std::error_code &ec) noexcept {
     return ec == std::errc::no_such_file_or_directory ||
            ec == std::errc::not_a_directory;
 }
 
+// Chuyển nghiêm ngặt số nguyên; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 bool toStrictInt(const StackValue &value, int &out) {
     if (std::holds_alternative<int>(value)) {
         out = std::get<int>(value);
@@ -61,6 +66,7 @@ bool toStrictInt(const StackValue &value, int &out) {
     }
 }
 
+// Chuyển nghiêm ngặt double; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 bool toStrictDouble(const StackValue &value, double &out) {
     if (std::holds_alternative<int>(value)) {
         out = static_cast<double>(std::get<int>(value));
@@ -83,6 +89,7 @@ bool toStrictDouble(const StackValue &value, double &out) {
     }
 }
 
+// Chạy kiểu tên; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 std::string runtimeTypeName(const StackValue &value) {
     if (std::holds_alternative<int>(value)) return "số nguyên";
     if (std::holds_alternative<double>(value)) return "số thực";
@@ -96,6 +103,7 @@ std::string runtimeTypeName(const StackValue &value) {
     return "không rõ";
 }
 
+// Trả tên văn bản ổn định cho nền tảng; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 std::string platformName() {
 #if defined(_WIN32)
     return "windows";
@@ -110,6 +118,7 @@ std::string platformName() {
 
 } // namespace
 
+// Dispatch nhóm hàm native nền tảng/thư viện chuẩn; handler kiểm tra tên hàm và thực hiện filesystem, time, environment hoặc utility tương ứng.
 bool handleNativeFoundationFunction(const std::string &fn,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,

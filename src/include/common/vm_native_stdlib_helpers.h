@@ -7,9 +7,7 @@
 
 namespace vietvm::helpers {
 
-// Native primitives shared by the core, I/O, and system standard-library
-// facades. Keeping these below VM lets both CLI and embedded runtimes expose
-// the same behavior without console dependencies.
+// Dispatch nhóm hàm native nền tảng/thư viện chuẩn; handler kiểm tra tên hàm và thực hiện filesystem, time, environment hoặc utility tương ứng.
 bool handleNativeFoundationFunction(const std::string &fn,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,

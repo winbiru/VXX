@@ -7,10 +7,7 @@
 
 namespace vietvm::helpers {
 
-// Handles native stdlib functions whose behavior is centered on runtime
-// collections (list/map/set/tuple), plus the shared length/reverse operations
-// that accept both collections and strings. Returns false when fn is not part
-// of this native surface.
+// Dispatch các hàm native thao tác list/map/tập hợp theo tên; handler kiểm tra đối số, thực hiện phép toán collection và đẩy kết quả trở lại stack.
 bool handleNativeCollectionFunction(const std::string &fn,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,

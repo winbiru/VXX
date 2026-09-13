@@ -1,0 +1,24 @@
+lớp Counter {
+    hàm set(value) {
+        mình.value = value;
+    }
+
+    hàm get() {
+        trả về mình.value;
+    }
+
+    hàm sumDown(n) {
+        nếu(n <= 0) {
+            trả về mình.get();
+        }
+        mình.set(mình.get() + n);
+        trả về mình.sumDown(n - 1);
+    }
+};
+
+hàm main() {
+    c = Counter();
+    c.set(0);
+    in c.sumDown(4);
+    in c.get();
+};

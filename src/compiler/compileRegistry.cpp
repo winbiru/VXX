@@ -16,33 +16,40 @@
 #include "vpp/core/project_layout.h"
 
 namespace vietvm { namespace compiler {
+    // Trả tập đường dẫn file đã import trong compilation registry; compiler dùng tập này để ngăn import cùng source lặp lại.
     std::unordered_set<std::string> &importedFileSet() {
         return activeCompilationRegistryState().importedFiles;
     }
 
+    // Xóa imported files; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clearImportedFiles() { importedFileSet().clear(); }
 
+    // Xóa lớp access trạng thái; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clearClassAccessState() {
         auto &state = activeCompilationRegistryState();
         state.methodAccess.clear();
         state.classContextStack.clear();
     }
 
+    // Đưa vào lớp ngữ cảnh; hàm thêm phần tử vào ngăn xếp hoặc ngữ cảnh hiện tại để được dùng trước khi rời phạm vi.
     void pushClassContext(const std::string &className) {
         activeCompilationRegistryState().classContextStack.push_back(className);
     }
 
+    // Lấy ra khỏi lớp ngữ cảnh; hàm loại bỏ phần tử/ngữ cảnh trên cùng và khôi phục trạng thái trước đó.
     void popClassContext() {
         auto &stack = activeCompilationRegistryState().classContextStack;
         if (!stack.empty()) stack.pop_back();
     }
 
+    // Trả tên lớp đang ở đỉnh class-context stack; lookup method/visibility dùng giá trị này khi phân giải lời gọi không ghi rõ lớp.
     std::string currentClassContext() {
         const auto &stack = activeCompilationRegistryState().classContextStack;
         if (stack.empty()) return "";
         return stack.back();
     }
 
+    // Đăng ký lớp phương thức phạm vi truy cập; hàm thêm metadata vào bảng đăng ký để các bước phân giải/thực thi có thể tra cứu về sau.
     void registerClassMethodVisibility(const std::string &fullMethodName,
                                        const std::string &ownerClass,
                                        const std::string &visibility) {
@@ -50,6 +57,7 @@ namespace vietvm { namespace compiler {
             MethodAccessInfo{ownerClass, visibility};
     }
 
+    // Phân giải callable tên in ngữ cảnh; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
     std::string resolveCallableNameInContext(const std::string &name,
                                              const std::unordered_map<std::string,int> &symTab) {
         if (name.find('.') != std::string::npos) return name;
@@ -66,6 +74,7 @@ namespace vietvm { namespace compiler {
         return name;
     }
 
+    // Kiểm tra điều kiện của `validateCallableAccess`.
     void validateCallableAccess(const std::string &resolvedName) {
         const auto &methodAccess = activeCompilationRegistryState().methodAccess;
         auto it = methodAccess.find(resolvedName);
@@ -92,6 +101,7 @@ namespace vietvm { namespace compiler {
         }
     }
 
+    // Phân giải hàm mã định danh by tên; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
     int resolveFunctionIdByName(const std::string &name,
                                 const std::unordered_map<std::string,int> &symTab,
                                 bool includeGlobalFallback) {
@@ -130,6 +140,7 @@ namespace vietvm { namespace compiler {
         return -1;
     }
 
+    // Biên dịch nhập spec; hàm đưa dữ liệu qua các pha compiler cần thiết và tạo artifact thực thi cho bước sau.
     void compileImportSpec(
         const vietvm::frontend::AstImportSpec &spec,
         int &nextId,

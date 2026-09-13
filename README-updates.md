@@ -1,6 +1,6 @@
 # V++ — Trạng thái repo và hướng cập nhật
 
-> Cập nhật: 13/09/2026
+> Cập nhật: 14/09/2026
 > Tài liệu này mô tả những gì đang có trong source tree và các hạng mục còn lại. Sự
 > tồn tại của workflow không đồng nghĩa mọi lần chạy CI đều đã thành công; trạng thái
 > từng lần chạy cần xem trên GitHub Actions.
@@ -60,19 +60,22 @@ Binary được CMake đặt trong build/bin/. Có thể chạy riêng bộ hồ
 Unix bằng cách đặt VPP_EXEC trỏ đến binary rồi gọi run_tests.sh. Trên Windows,
 CTest tự gọi PowerShell 7 và scripts/windows/run-tests.ps1 khi pwsh có mặt.
 
-Baseline local ngày 13/09/2026: **15/15 CTest pass**, integration regression
-**61/61**, direct-IR parity **70/70**.
+Baseline local ngày 14/09/2026: **16/16 CTest pass**, integration regression
+**69/69**, direct-IR parity **78/78**.
 
 ## Việc còn lại theo thứ tự ưu tiên
 
 1. Module Semantics Phase 1 và runtime lifecycle đã có: identity/export index, alias
    namespace, semantic `ImportedFunction`, runtime `ModuleTable` và initialization
-   dependency-first đúng một lần. Object model đã chạy end-to-end zero-arg construction,
-   field read/write và bound method dispatch; bước tiếp theo là implicit receiver,
-   constructor có tham số, inheritance syntax và instance visibility. Explicit
-   export/re-export và richer cycle diagnostic vẫn tiếp tục trong module semantics.
-2. Sau khi hoàn tất phần object semantics còn lại: nâng GC MVP thành tracing GC và
-   bổ sung stack trace/debugger hook trên call frame + source span ổn định.
+   dependency-first đúng một lần. Object model theo contract hiện tại đã hoàn tất:
+   `Class(args...)` qua `hàm khởi tạo(...)`, field động, bound method, `mình`/`gốc`,
+   inheritance và private/protected method visibility ở cả semantic lẫn runtime. Interface
+   compile-time dùng `giao diện`, hỗ trợ interface kế thừa nhiều interface và class
+   `triển khai` nhiều interface trong khi vẫn chỉ có một superclass; semantic buộc class
+   cung cấp đúng hợp đồng method công khai, kể cả khi implementation được kế thừa từ lớp cha.
+2. Tracing GC object graph đã hoàn tất và chạy mặc định: heap per-VM, root qua
+   stack/variables/call frame/class table, cycle sweep và bảo toàn caller root qua child VM.
+   Lát cắt runtime tiếp theo là stack trace/debugger hook trên call frame + source span ổn định.
 3. Tách package/bare-module lookup thành package resolver riêng trước khi thêm
    version/dependency/lockfile.
 4. Chốt chính sách kiểu dữ liệu (dynamic, static hoặc gradual) trước khi thêm type

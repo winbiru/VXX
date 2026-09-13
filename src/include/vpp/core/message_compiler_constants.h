@@ -75,6 +75,18 @@ inline constexpr std::string_view kSemanticDuplicateDeclaration = "Khai báo '{0
 inline constexpr std::string_view kSemanticMissingDeclarationName = "Không thể xác định tên của khai báo {0}";
 inline constexpr std::string_view kSemanticUnresolvedName = "Không thể phân giải tên '{0}' trong phạm vi hiện tại";
 inline constexpr std::string_view kSemanticUnresolvedCall = "Không thể phân giải hàm được gọi '{0}'";
+inline constexpr std::string_view kSemanticUnresolvedSuperclass = "Không thể phân giải lớp cha '{0}'";
+inline constexpr std::string_view kSemanticSelfInheritance = "Lớp '{0}' không thể kế thừa chính nó";
+inline constexpr std::string_view kSemanticInheritanceCycle = "Phát hiện chu trình kế thừa tại lớp '{0}'";
+inline constexpr std::string_view kSemanticUnresolvedInterface = "Không thể phân giải giao diện '{0}'";
+inline constexpr std::string_view kSemanticExpectedInterface = "'{0}' không phải là một giao diện";
+inline constexpr std::string_view kSemanticDuplicateInterface = "Giao diện '{0}' bị lặp trong cùng danh sách kế thừa/triển khai";
+inline constexpr std::string_view kSemanticSelfInterfaceInheritance = "Giao diện '{0}' không thể kế thừa chính nó";
+inline constexpr std::string_view kSemanticInterfaceInheritanceCycle = "Phát hiện chu trình kế thừa tại giao diện '{0}'";
+inline constexpr std::string_view kSemanticInvalidInterfaceBody = "Giao diện '{0}' chỉ được chứa các chữ ký hàm không có thân";
+inline constexpr std::string_view kSemanticInterfaceMethodMustBePublic = "Hàm '{0}' trong giao diện '{1}' phải có phạm vi công khai";
+inline constexpr std::string_view kSemanticMissingInterfaceMethod = "Lớp '{0}' chưa triển khai hàm '{1}' với {2} tham số theo giao diện '{3}'";
+inline constexpr std::string_view kSemanticInterfaceImplementationMustBePublic = "Lớp '{0}' phải triển khai hàm '{1}' của giao diện '{2}' bằng phương thức công khai";
 
 // Module/package import diagnostics.
 inline constexpr std::string_view kImportMissingTarget = "nhập: thiếu đường dẫn hoặc tên mô-đun";
@@ -108,6 +120,8 @@ inline constexpr std::string_view kInternalDirectIrSwitchEmptyNormalizedLabel = 
 inline constexpr std::string_view kInternalDirectIrUnsupportedSwitchLabel = "nhãn khối chọn của IR trực tiếp chưa được hỗ trợ";
 inline constexpr std::string_view kInternalDirectIrUnsupportedStatement = "bộ phát IR trực tiếp nhận câu lệnh chưa được hỗ trợ";
 inline constexpr std::string_view kInternalDirectIrFunctionNotPredeclared = "hàm IR trực tiếp chưa được khai báo trước";
+inline constexpr std::string_view kInternalDirectIrSuperclassNotFound = "IR trực tiếp không tìm thấy lớp cha nguồn '{0}'";
+inline constexpr std::string_view kInternalDirectIrInheritanceCycle = "IR trực tiếp phát hiện chu trình kế thừa tại lớp '{0}'";
 inline constexpr std::string_view kInternalDirectIrMissingParameterDefaultValue = "tham số của IR trực tiếp không có giá trị mặc định";
 inline constexpr std::string_view kInternalDirectIrProgramHasUnsupportedRegion = "chương trình chứa vùng IR chưa được bộ phát bytecode trực tiếp hỗ trợ";
 

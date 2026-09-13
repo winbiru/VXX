@@ -1,6 +1,6 @@
 # Kế hoạch dài hạn (3–12+ tháng)
 
-> Cập nhật: 13/09/2026
+> Cập nhật: 14/09/2026
 > Các mục dưới đây là công việc nền tảng chưa hoàn tất. V++ hiện có compiler, bytecode
 > VM, package/gói chuẩn, tooling MVP và pipeline release; không nên diễn giải
 > điều đó là mức hoàn thiện tương đương Java, C# hay Python.
@@ -43,9 +43,9 @@
       fixup; shared mixed-backend context còn thiếu.
    6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
       vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
-      đạt 70/70 direct IR và vẫn giữ cùng bytecode/compiler state.
+      đạt 78/78 direct IR và vẫn giữ snapshot compiler state đã chốt.
 
-   Hiện direct backend bao phủ 70/70 regression program; parity gate yêu cầu toàn bộ
+   Hiện direct backend bao phủ 78/78 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
@@ -78,18 +78,42 @@
 
 3. Runtime, object model và debugger
 
-   - [ ] Hoàn tất value/object/instance semantics ở mức ngôn ngữ. Runtime substrate đã
+   - [x] Hoàn tất value/object/instance semantics ở mức ngôn ngữ. Runtime substrate đã
      có `RuntimeClass`/`RuntimeInstance`, field storage, method table, inheritance lookup
      và identity equality. Lát cắt đầu tiên đã chạy end-to-end qua semantic → untyped IR
      → bytecode → VM: `obj = Class()`, `obj.field = value`, `obj.field` và
-     `obj.method(args)`. Còn phải chốt implicit receiver (`this`/`self`), constructor có
-     tham số, inheritance syntax + visibility của instance member trước khi coi object
-     model hoàn chỉnh. Trait/generic tiếp tục phụ thuộc quyết định ngôn ngữ.
+     `obj.method(args)`. Implicit receiver đã chốt dùng `mình` cho current instance và `gốc`
+     cho superclass dispatch; bound call mang cả receiver và defining-class qua call frame nên
+     tham số nguồn không đổi ABI. `gốc.method(...)` đã có runtime test khóa việc bỏ qua override
+     của lớp hiện tại. Inheritance syntax `lớp Con kế thừa Cha { ... }` đã đi qua parser → semantic
+     → IR → bytecode → VM, gồm forward superclass emission và kiểm tra superclass/cycle.
+     Interface dùng cú pháp `giao diện Tên { hàm tácVụ(...); }`; giao diện có thể kế thừa
+     nhiều giao diện qua `giao diện B kế thừa A, C`, còn lớp giữ đúng một superclass nhưng có thể
+     `triển khai` nhiều giao diện, ví dụ `lớp Con kế thừa Cha triển khai A, B`. Semantic kiểm tra
+     target, duplicate/cycle, tên + số tham số và visibility công khai; method kế thừa từ
+     superclass cũng có thể thỏa hợp đồng. Interface hiện là contract compile-time nên không
+     tạo runtime class/vtable riêng và không thay đổi dynamic method dispatch.
+     Constructor có tham số đã chạy end-to-end bằng `hàm khởi tạo(...)`: lời gọi
+     `Class(args...)` chuyển đối số qua opcode tạo instance, bind receiver `mình`, hỗ trợ
+     default parameter và giữ instance làm kết quả biểu thức. Constructor lớp cha không tự
+     chạy; lớp con có thể gọi tường minh `gốc.khởi tạo(...)`. Visibility của method qua
+     instance hiện được kiểm tra hai tầng: semantic suy luận lớp từ `Class(...)`/alias và
+     hierarchy để chặn private/protected sớm, còn runtime mang visibility trong method table
+     để chặn cả receiver động đi qua parameter. Private chỉ gọi được trong chính lớp sở hữu;
+     protected gọi được trong lớp sở hữu và subclass. Field hiện là thuộc tính động tạo qua
+     phép gán (`mình.x = ...`), không có khai báo field nên chưa có modifier visibility riêng;
+     theo contract hiện tại field động là public/dynamic. Trait/generic và runtime interface
+     introspection tiếp tục phụ thuộc quyết định ngôn ngữ/metadata.
    - [ ] **Reflection/metadata** — chốt rõ V++ có chủ đích không hỗ trợ reflection
      tổng quát hay cung cấp introspection giới hạn. Nếu hỗ trợ, metadata class/method/
      field/module phải có contract ổn định và không phá visibility/sandbox.
-   - [ ] Nâng MVP GC thành tracing GC quản lý object graph an toàn, với root từ VM
-     stack/call frame/global/module table và regression cycle/ownership.
+   - [x] Nâng MVP GC thành tracing GC quản lý object graph an toàn. Runtime có
+     `RuntimeHeap` riêng theo VM, registry weak cho map/list/tuple/class/instance và
+     mark từ stack, global/local variable, call frame receiver/args/locals, class table
+     cùng switch value. Function/module child VM chia sẻ heap và mang snapshot root của
+     caller để collection lồng nhau không quét nhầm object còn sống. Sweep cắt cạnh của
+     object không reachable nên thu được cả shared_ptr cycle; regression khóa
+     instance↔list, self-cycle list/map và argument đang nằm trên caller stack.
    - [ ] Xây stack trace có source span/function/module identity và debugger hook cho
      breakpoint, step, frame/variable inspection trước khi làm debugger UI đầy đủ.
    - [ ] **Profiler production** — bổ sung CPU/timing/allocation sampling hoặc event

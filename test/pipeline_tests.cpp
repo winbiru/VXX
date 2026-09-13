@@ -534,6 +534,120 @@ void testParserRecordsExactClassFormsAndQualifiedMethodIr() {
            "IR carries semantic visibility inherited from the declaring class");
 }
 
+void testClassInheritanceMetadataAndDiagnostics() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const AstProgram program = parseSource(
+        "lớp Child kế thừa Base { hàm value() { trả về gốc.value(); } }\n"
+        "lớp Base { hàm value() { trả về 10; } }");
+    expect(program.statements.size() == 2 &&
+               program.statements[0].classForm == AstClassForm::MethodBlock &&
+               program.statements[0].superclassName == "Base",
+           "parser records optional class superclass metadata");
+
+    const SemanticModel semantic = analyzeSemantics(program);
+    const auto *child = findSymbol(semantic, SemanticSymbolKind::Class, "Child");
+    const auto *base = findSymbol(semantic, SemanticSymbolKind::Class, "Base");
+    expect(!semantic.hasErrors() && child != nullptr && base != nullptr &&
+               child->superclass == base->id,
+           "semantic analysis resolves a forward-declared superclass in type space");
+
+    const IrProgram ir = lowerToIr(program, semantic);
+    expect(ir.instructions.size() == 2 &&
+               ir.instructions[0].superclassName == "Base" &&
+               base != nullptr &&
+               ir.instructions[0].superclassSymbolId == static_cast<int>(base->id),
+           "IR carries resolved superclass identity without reparsing tokens");
+
+    const SemanticModel missing = analyzeSemantics(parseSource(
+        "lớp Child kế thừa Missing { hàm value() { trả về 1; } }"));
+    expect(missing.hasErrors(),
+           "semantic analysis rejects an unresolved superclass");
+
+    const SemanticModel cycle = analyzeSemantics(parseSource(
+        "lớp A kế thừa B { } lớp B kế thừa A { }"));
+    expect(cycle.hasErrors(),
+           "semantic analysis rejects inheritance cycles");
+}
+
+void testInterfaceImplementationContracts() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    const AstProgram program = parseSource(
+        "giao diện Đọc { hàm đọc(x); }\n"
+        "giao diện Ghi { hàm ghi(x); }\n"
+        "giao diện Kho kế thừa Đọc, Ghi { hàm đếm(); }\n"
+        "lớp Nền { hàm đọc(x) { trả về x; } }\n"
+        "lớp BộNhớ kế thừa Nền triển khai Kho { "
+        "hàm ghi(x) { trả về x; } hàm đếm() { trả về 1; } }");
+
+    expect(program.statements.size() == 5 &&
+               program.statements[0].kind == AstStatementKind::Interface &&
+               program.statements[0].interfaceForm == AstInterfaceForm::MethodSignatures &&
+               program.statements[2].extendedInterfaces.size() == 2 &&
+               program.statements[4].implementedInterfaces.size() == 1 &&
+               program.statements[4].implementedInterfaces.front().name == "Kho",
+           "parser records interface signatures, interface inheritance and class implementation metadata");
+
+    const SemanticModel semantic = analyzeSemantics(program);
+    const auto *contract = findSymbol(semantic, SemanticSymbolKind::Interface, "Kho");
+    const auto *implementation = findSymbol(semantic, SemanticSymbolKind::Class, "BộNhớ");
+    expect(!semantic.hasErrors() && contract != nullptr && implementation != nullptr &&
+               contract->extendedInterfaces.size() == 2 &&
+               implementation->implementedInterfaces.size() == 1 &&
+               implementation->implementedInterfaces.front() == contract->id,
+           "semantic analysis accepts multiple inherited interface contracts and an implementation inherited from the superclass");
+
+    const IrProgram ir = lowerToIr(program, semantic);
+    expect(ir.instructions.size() == 5 &&
+               ir.instructions[0].opcode == IrOpcode::NoOp &&
+               ir.instructions[1].opcode == IrOpcode::NoOp &&
+               ir.instructions[2].opcode == IrOpcode::NoOp &&
+               !ir.instructions[0].unsupportedDirectRegion &&
+               ir.instructions[0].children.empty(),
+           "interfaces lower to compile-time-only no-ops without creating direct-IR fallback regions");
+
+    const SemanticModel missing = analyzeSemantics(parseSource(
+        "giao diện CóGiáTrị { hàm giáTrị(); } "
+        "lớp Thiếu triển khai CóGiáTrị { }"));
+    expect(missing.hasErrors() && std::any_of(
+               missing.diagnostics.begin(), missing.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("chưa triển khai hàm 'giáTrị'") !=
+                          std::string::npos;
+               }),
+           "semantic analysis rejects a class that omits a required interface method");
+
+    const SemanticModel wrongTarget = analyzeSemantics(parseSource(
+        "lớp KhôngPhảiGiaoDiện { } "
+        "lớp Sai triển khai KhôngPhảiGiaoDiện { }"));
+    expect(wrongTarget.hasErrors() && std::any_of(
+               wrongTarget.diagnostics.begin(), wrongTarget.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("không phải là một giao diện") !=
+                          std::string::npos;
+               }),
+           "semantic analysis rejects class-to-class use of `triển khai`");
+
+    const SemanticModel hidden = analyzeSemantics(parseSource(
+        "giao diện TácVụ { hàm chạy(); } "
+        "lớp SaiPhạmVi triển khai TácVụ { hàm riêng tư chạy() { trả về 1; } }"));
+    expect(hidden.hasErrors() && std::any_of(
+               hidden.diagnostics.begin(), hidden.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("bằng phương thức công khai") !=
+                          std::string::npos;
+               }),
+           "an interface contract cannot be satisfied by a private method");
+
+    const SemanticModel cycle = analyzeSemantics(parseSource(
+        "giao diện A kế thừa B { } giao diện B kế thừa A { }"));
+    expect(cycle.hasErrors(),
+           "semantic analysis rejects interface inheritance cycles");
+}
+
 void testParserBuildsStructuredLocalFileImports() {
     using namespace vietvm::frontend;
 
@@ -1420,6 +1534,74 @@ void testSemanticResolvesClassMembersAndEnforcesVisibility() {
            "private-member validation covers both a method call and a method used as a value");
 }
 
+void testSemanticEnforcesVisibilityThroughInstances() {
+    const vietvm::frontend::AstProgram deniedProgram = parseSource(
+        "lớp Vault { hàm riêng tư secret() { trả về 7; } }\n"
+        "hàm main() { v = Vault(); alias = v; in alias.secret(); }");
+    const vietvm::compiler::SemanticModel denied =
+        vietvm::compiler::analyzeSemantics(deniedProgram);
+    const bool hasPrivateDiagnostic = std::any_of(
+        denied.diagnostics.begin(), denied.diagnostics.end(),
+        [](const auto &diagnostic) {
+            return diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticPrivateMethodAccess)) != std::string::npos;
+        });
+    const auto *vault = findSymbol(
+        denied, vietvm::compiler::SemanticSymbolKind::Class, "Vault");
+    const auto *alias = findSymbol(
+        denied, vietvm::compiler::SemanticSymbolKind::LocalVariable, "alias");
+    expect(denied.hasErrors() && hasPrivateDiagnostic,
+           "private method access through a constructed instance alias is rejected");
+    expect(vault != nullptr && alias != nullptr && alias->inferredClass == vault->id,
+           "instance class inference propagates through a local alias");
+
+    const vietvm::frontend::AstProgram protectedAllowedProgram = parseSource(
+        "lớp Base { hàm bảo vệ token() { trả về 3; } }\n"
+        "lớp Child kế thừa Base { hàm công khai read() { trả về mình.token(); } }");
+    const vietvm::compiler::SemanticModel protectedAllowed =
+        vietvm::compiler::analyzeSemantics(protectedAllowedProgram);
+    expect(!protectedAllowed.hasErrors(),
+           "a subclass may call a protected inherited method through mình");
+
+    const vietvm::frontend::AstProgram protectedDeniedProgram = parseSource(
+        "lớp Base { hàm bảo vệ token() { trả về 3; } }\n"
+        "lớp Child kế thừa Base { hàm công khai read() { trả về mình.token(); } }\n"
+        "hàm main() { child = Child(); in child.token(); }");
+    const vietvm::compiler::SemanticModel protectedDenied =
+        vietvm::compiler::analyzeSemantics(protectedDeniedProgram);
+    const bool hasProtectedDiagnostic = std::any_of(
+        protectedDenied.diagnostics.begin(), protectedDenied.diagnostics.end(),
+        [](const auto &diagnostic) {
+            return diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticProtectedMethodAccess)) != std::string::npos;
+        });
+    expect(protectedDenied.hasErrors() && hasProtectedDiagnostic,
+           "protected inherited method access through an external instance is rejected");
+
+    const vietvm::frontend::AstProgram privateSubclassProgram = parseSource(
+        "lớp Base { hàm riêng tư secret() { trả về 1; } }\n"
+        "lớp Child kế thừa Base { hàm read() { trả về mình.secret(); } }");
+    const vietvm::compiler::SemanticModel privateSubclass =
+        vietvm::compiler::analyzeSemantics(privateSubclassProgram);
+    const bool subclassPrivateDiagnostic = std::any_of(
+        privateSubclass.diagnostics.begin(), privateSubclass.diagnostics.end(),
+        [](const auto &diagnostic) {
+            return diagnostic.message.find(messagePrefix(
+                       vietvm::messages::kSemanticPrivateMethodAccess)) != std::string::npos;
+        });
+    expect(privateSubclass.hasErrors() && subclassPrivateDiagnostic,
+           "a subclass cannot call a private method declared by its superclass");
+
+    const vietvm::frontend::AstProgram ambiguousProgram = parseSource(
+        "lớp PublicBox { hàm công khai read() { trả về 1; } }\n"
+        "lớp PrivateBox { hàm riêng tư read() { trả về 2; } }\n"
+        "hàm main() { box = PublicBox(); flag = 0; nếu (flag) { box = PrivateBox(); } in box.read(); }");
+    const vietvm::compiler::SemanticModel ambiguous =
+        vietvm::compiler::analyzeSemantics(ambiguousProgram);
+    expect(!ambiguous.hasErrors(),
+           "conflicting instance classes across control flow defer visibility enforcement to runtime");
+}
+
 void testSemanticResolvesObjectConstructionAndInstanceMembers() {
     const vietvm::frontend::AstProgram program = parseSource(
         "lớp Counter { hàm add(a, b) { trả về a + b; } }\n"
@@ -1458,6 +1640,49 @@ void testSemanticResolvesObjectConstructionAndInstanceMembers() {
     }
     expect(foundFieldBinding,
            "dotted local-variable field access carries receiver/member semantic metadata");
+}
+
+void testSemanticBindsImplicitMethodReceiver() {
+    const vietvm::frontend::AstProgram program = parseSource(
+        "lớp Counter { "
+        "  hàm set(v) { mình.value = v; gốc.other = v; trả về mình.value; } "
+        "}");
+    const vietvm::compiler::SemanticModel model =
+        vietvm::compiler::analyzeSemantics(program);
+    expect(!model.hasErrors(),
+           "method mình/gốc receivers resolve without semantic diagnostics");
+
+    const auto *method = findSymbol(
+        model, vietvm::compiler::SemanticSymbolKind::Method, "set");
+    const auto *currentReceiver = findSymbol(
+        model, vietvm::compiler::SemanticSymbolKind::Parameter, "mình");
+    const auto *superReceiver = findSymbol(
+        model, vietvm::compiler::SemanticSymbolKind::Parameter, "gốc");
+    expect(method != nullptr && currentReceiver != nullptr && superReceiver != nullptr &&
+               currentReceiver->declaringScope == method->memberScope &&
+               superReceiver->declaringScope == method->memberScope,
+           "method scope declares mình and gốc as implicit receivers");
+
+    int currentBindings = 0;
+    int superBindings = 0;
+    for (const auto &expression : program.expressions) {
+        if (expression.kind != vietvm::frontend::AstExpressionKind::Name) continue;
+        const auto *binding = model.bindingForExpression(expression.id);
+        if ((expression.text == "mình.value") && binding != nullptr &&
+            binding->kind == vietvm::compiler::BindingKind::InstanceMember &&
+            currentReceiver != nullptr && binding->symbol == currentReceiver->id &&
+            binding->receiverName == "mình" && binding->memberName == "value") {
+            ++currentBindings;
+        }
+        if (expression.text == "gốc.other" && binding != nullptr &&
+            binding->kind == vietvm::compiler::BindingKind::InstanceMember &&
+            superReceiver != nullptr && binding->symbol == superReceiver->id &&
+            binding->receiverName == "gốc" && binding->memberName == "other") {
+            ++superBindings;
+        }
+    }
+    expect(currentBindings == 2 && superBindings == 1,
+           "mình and gốc member access bind through the hidden receiver contract");
 }
 
 void testSemanticLoopHeaderResolvesIndexedCallArguments() {
@@ -1609,6 +1834,8 @@ int main() {
     testParserRecordsExactConditionalForms();
     testParserRecordsExactLoopForms();
     testParserRecordsExactClassFormsAndQualifiedMethodIr();
+    testClassInheritanceMetadataAndDiagnostics();
+    testInterfaceImplementationContracts();
     testParserBuildsStructuredLocalFileImports();
     testNonExactImportsStayOnTolerantPath();
     testSemanticImportAliasUsesStructuredAstPayload();
@@ -1628,7 +1855,9 @@ int main() {
     testSemanticKeepsSiblingFunctionBindingsIsolated();
     testSemanticAssignmentReusesCatchBindingAndPostfixDeclaresOnce();
     testSemanticResolvesClassMembersAndEnforcesVisibility();
+    testSemanticEnforcesVisibilityThroughInstances();
     testSemanticResolvesObjectConstructionAndInstanceMembers();
+    testSemanticBindsImplicitMethodReceiver();
     testSemanticLoopHeaderResolvesIndexedCallArguments();
     testSemanticStrictPolicyRejectsUnresolvedNames();
     testSemanticDuplicateDeclarationDiagnostic();

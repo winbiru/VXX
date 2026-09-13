@@ -20,16 +20,19 @@ namespace {
 
 using vietvm::bytecode::escapeLiteralWireField;
 
+// Kiểm tra điều kiện của `isBinaryOperator`.
 bool isBinaryOperator(const std::string &op) noexcept {
     return op == "+" || op == "-" || op == "*" || op == "/" || op == "%" ||
            op == "==" || op == "!=" || op == "<" || op == ">" ||
            op == "<=" || op == ">=" || op == "&&" || op == "||";
 }
 
+// Kiểm tra điều kiện của `isCompoundAssignment`.
 bool isCompoundAssignment(const std::string &op) noexcept {
     return op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=";
 }
 
+// Tách runtime thành viên tên; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
 std::pair<std::string, std::string> splitRuntimeMemberName(
     const std::string &name) {
     const std::size_t separator = name.find('.');
@@ -40,6 +43,7 @@ std::pair<std::string, std::string> splitRuntimeMemberName(
     return {name.substr(0, separator), name.substr(separator + 1)};
 }
 
+// Kiểm tra điều kiện của `isExactSourceToken`.
 bool isExactSourceToken(const IrInstruction &instruction,
                         const IrValue &value) noexcept {
     for (const vietvm::frontend::Token &token : instruction.tokens) {
@@ -52,6 +56,7 @@ bool isExactSourceToken(const IrInstruction &instruction,
     return false;
 }
 
+// Kiểm tra điều kiện của `isExactSourceName`.
 bool isExactSourceName(const IrInstruction &instruction,
                        const IrValue &value) {
     std::string sourceName;
@@ -80,6 +85,7 @@ bool isExactSourceName(const IrInstruction &instruction,
            lastOffset == value.span.end.offset && sourceName == value.text;
 }
 
+// Kiểm tra điều kiện của `endsWithSourceToken`.
 bool endsWithSourceToken(const IrInstruction &instruction,
                          const IrValue &value,
                          const std::string &lexeme) noexcept {
@@ -91,6 +97,7 @@ bool endsWithSourceToken(const IrInstruction &instruction,
     return false;
 }
 
+// Tìm token nguồn đầu tiên tương ứng với một `IrValue`; hàm so span/lexeme trong token của instruction để kiểm tra parity chính xác.
 const vietvm::frontend::Token *firstTokenFor(
     const IrInstruction &sourceOwner,
     const IrInstruction &instruction) noexcept {
@@ -102,6 +109,7 @@ const vietvm::frontend::Token *firstTokenFor(
     return nullptr;
 }
 
+// Kiểm tra điều kiện của `endsWithStatementToken`.
 bool endsWithStatementToken(const IrInstruction &sourceOwner,
                             const IrInstruction &instruction,
                             const std::string &lexeme) noexcept {
@@ -113,6 +121,7 @@ bool endsWithStatementToken(const IrInstruction &sourceOwner,
     return false;
 }
 
+// Kiểm tra điều kiện của `hasExactStatementLexemes`.
 bool hasExactStatementLexemes(
     const IrInstruction &sourceOwner,
     const IrInstruction &instruction,
@@ -131,6 +140,7 @@ bool hasExactStatementLexemes(
     return nextExpected == expected.end();
 }
 
+// Kiểm tra điều kiện của `startsWithDedicatedCallSyntax`.
 bool startsWithDedicatedCallSyntax(const IrInstruction &sourceOwner,
                                    const IrInstruction &instruction) noexcept {
     const vietvm::frontend::Token *first = firstTokenFor(sourceOwner, instruction);
@@ -164,6 +174,7 @@ bool startsWithDedicatedCallSyntax(const IrInstruction &sourceOwner,
     return false;
 }
 
+// Kiểm tra điều kiện của `containsCall`.
 bool containsCall(const IrProgram &program,
                   IrValueId id,
                   std::unordered_set<IrValueId> &visiting) {
@@ -184,6 +195,7 @@ bool containsCall(const IrProgram &program,
     return false;
 }
 
+// Kiểm tra expression có bao phủ toàn bộ phần biểu thức của statement hay không; hàm so biên token/span để loại trường hợp chỉ parse được tiền tố.
 bool expressionConsumesStatement(const IrInstruction &sourceOwner,
                                  const IrInstruction &instruction,
                                  const IrValue &root) noexcept {
@@ -202,6 +214,7 @@ bool expressionConsumesStatement(const IrInstruction &sourceOwner,
            lastExpressionToken->span.end.offset == root.span.end.offset;
 }
 
+// Kiểm tra điều kiện của `hasDelimitedLiteralBounds`.
 bool hasDelimitedLiteralBounds(const IrInstruction &instruction,
                                const IrValue &value,
                                const char *opening,
@@ -219,6 +232,7 @@ bool hasDelimitedLiteralBounds(const IrInstruction &instruction,
     return startsWithOpening && endsWithClosing;
 }
 
+// Kiểm tra điều kiện của `isMapKey`.
 bool isMapKey(const IrInstruction &instruction,
               const IrValue *value) noexcept {
     if (value == nullptr || !value->operands.empty()) return false;
@@ -234,6 +248,7 @@ bool isMapKey(const IrInstruction &instruction,
     return false;
 }
 
+// Kiểm tra điều kiện của `isLegacyScalarLiteral`.
 bool isLegacyScalarLiteral(const IrInstruction &instruction,
                            const IrValue *value) noexcept {
     if (value == nullptr || !value->operands.empty()) return false;
@@ -249,6 +264,7 @@ bool isLegacyScalarLiteral(const IrInstruction &instruction,
     }
 }
 
+// Kiểm tra điều kiện của `isCollectionLiteralValue`.
 bool isCollectionLiteralValue(const IrProgram &program,
                               const IrInstruction &instruction,
                               const IrValue *value) noexcept {
@@ -284,6 +300,7 @@ bool isCollectionLiteralValue(const IrProgram &program,
     return false;
 }
 
+// Kiểm tra điều kiện của `isDirectIndexBase`.
 bool isDirectIndexBase(const IrValue *value) noexcept {
     return value != nullptr &&
            (value->opcode == IrValueOpcode::LoadName ||
@@ -298,6 +315,7 @@ enum class ValueContext {
     SimpleAssignmentRhs,
 };
 
+// Giữ ngữ cảnh khi kiểm tra direct-IR support, gồm tập hàm/phương thức đã thấy và thông tin cần để quyết định một lệnh có thể codegen trực tiếp hay không.
 struct SupportContext {
     std::unordered_set<int> functionSymbols;
     std::unordered_set<std::string> functionNames;
@@ -306,6 +324,7 @@ struct SupportContext {
     std::unordered_map<std::string, std::size_t> methodNameDeclarationOffsets;
 };
 
+// Kiểm tra phương thức đã được cấp function id trước điểm gọi hiện tại; direct codegen dùng điều kiện này để giữ timing tương thích compiler cũ.
 bool methodIsAllocatedBeforeUse(const SupportContext &context,
                                 const IrValue &value) noexcept {
     if (value.symbolId >= 0 &&
@@ -321,6 +340,7 @@ bool methodIsAllocatedBeforeUse(const SupportContext &context,
            namedDeclaration->second <= value.span.begin.offset;
 }
 
+// Kiểm tra điều kiện của `supportsInstruction`.
 bool supportsInstruction(const IrProgram &program,
                          const IrInstruction &instruction,
                          const IrInstruction &sourceOwner,
@@ -330,6 +350,7 @@ bool supportsInstruction(const IrProgram &program,
                          std::size_t switchDepth,
                          bool topLevel);
 
+// Kiểm tra điều kiện của `hasExactLambdaSourceShape`.
 bool hasExactLambdaSourceShape(const IrInstruction &sourceOwner,
                                const IrValue &value,
                                const IrLambda &lambda) noexcept {
@@ -354,10 +375,12 @@ bool hasExactLambdaSourceShape(const IrInstruction &sourceOwner,
     return startsWithLambda && endsWithBlock;
 }
 
+// Kiểm tra điều kiện của `containsLambdaValue`.
 bool containsLambdaValue(const IrProgram &program,
                          IrValueId id,
                          std::unordered_set<IrValueId> &visited);
 
+// Kiểm tra điều kiện của `containsLambdaInstruction`.
 bool containsLambdaInstruction(const IrProgram &program,
                                const IrInstruction &instruction,
                                std::unordered_set<IrValueId> &visited) {
@@ -376,6 +399,7 @@ bool containsLambdaInstruction(const IrProgram &program,
     return false;
 }
 
+// Kiểm tra điều kiện của `containsLambdaValue`.
 bool containsLambdaValue(const IrProgram &program,
                          IrValueId id,
                          std::unordered_set<IrValueId> &visited) {
@@ -388,6 +412,7 @@ bool containsLambdaValue(const IrProgram &program,
     return false;
 }
 
+// Kiểm tra điều kiện của `supportsValue`.
 bool supportsValue(const IrProgram &program,
                    const IrInstruction &sourceOwner,
                    const SupportContext &context,
@@ -576,7 +601,7 @@ bool supportsValue(const IrProgram &program,
             if (value->operands.empty() || value->text.empty()) break;
             const IrValue *callee = program.value(value->operands.front());
             if (value->callTarget == CallTargetKind::ClassConstructor) {
-                supported = value->operands.size() == 1 && callee != nullptr &&
+                supported = !value->operands.empty() && callee != nullptr &&
                             callee->opcode == IrValueOpcode::LoadName &&
                             callee->text == value->text &&
                             isExactSourceName(sourceOwner, *callee);
@@ -669,6 +694,7 @@ bool supportsValue(const IrProgram &program,
     return supported;
 }
 
+// Kiểm tra điều kiện của `supportsFunction`.
 bool supportsFunction(const IrProgram &program,
                       const IrInstruction &instruction,
                       const IrInstruction &sourceOwner,
@@ -700,6 +726,7 @@ bool supportsFunction(const IrProgram &program,
                                context, true, true, 0, false);
 }
 
+// Kiểm tra điều kiện của `supportsInstruction`.
 bool supportsInstruction(const IrProgram &program,
                          const IrInstruction &instruction,
                          const IrInstruction &sourceOwner,
@@ -1025,6 +1052,7 @@ bool supportsInstruction(const IrProgram &program,
                          valueContext, visiting);
 }
 
+// Ánh xạ toán tử nhị phân IR sang opcode VM tương ứng; hàm trả opcode chính xác cho số học, so sánh và luận lý.
 Opcode binaryOpcode(const std::string &op) {
     if (op == "+") return OP_CONG;
     if (op == "-") return OP_TRU;
@@ -1042,6 +1070,7 @@ Opcode binaryOpcode(const std::string &op) {
     throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedBinaryOperator));
 }
 
+// Ánh xạ toán tử gán kết hợp như `+=`/`-=` sang opcode VM thực hiện phép toán nền tương ứng.
 Opcode compoundOpcode(const std::string &op) {
     if (op == "+=") return OP_CONG;
     if (op == "-=") return OP_TRU;
@@ -1051,6 +1080,7 @@ Opcode compoundOpcode(const std::string &op) {
     throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedCompoundAssignment));
 }
 
+// Bỏ dấu nháy của literal chuỗi IR và giải phần bao ngoài trước khi lưu nội dung thực vào `StringPool`.
 std::string unquote(const std::string &text) {
     if (text.size() >= 2 &&
         ((text.front() == '"' && text.back() == '"') ||
@@ -1060,6 +1090,7 @@ std::string unquote(const std::string &text) {
     return text;
 }
 
+// Nối thêm tagged scalar giá trị trực tiếp; hàm đưa dữ liệu mới vào cuối cấu trúc đích theo đúng thứ tự hiện có.
 bool appendTaggedScalarLiteral(std::ostringstream &encoded,
                                const IrValue &value,
                                char fieldSeparator) {
@@ -1091,8 +1122,10 @@ bool appendTaggedScalarLiteral(std::ostringstream &encoded,
     }
 }
 
+// Mã hóa danh sách giá trị trực tiếp; hàm chuyển cấu trúc dữ liệu sang dạng chuỗi/wire ổn định để lưu trong bytecode hoặc truyền qua ranh giới module.
 std::string encodeListLiteral(const IrProgram &program, const IrValue &list);
 
+// Mã hóa ánh xạ giá trị trực tiếp; hàm chuyển cấu trúc dữ liệu sang dạng chuỗi/wire ổn định để lưu trong bytecode hoặc truyền qua ranh giới module.
 std::string encodeMapLiteral(const IrProgram &program, const IrValue &map) {
     constexpr char recordSeparator = vietvm::bytecode::kLiteralRecordSeparator;
     constexpr char fieldSeparator = vietvm::bytecode::kLiteralFieldSeparator;
@@ -1121,6 +1154,7 @@ std::string encodeMapLiteral(const IrProgram &program, const IrValue &map) {
     return encoded.str();
 }
 
+// Mã hóa danh sách giá trị trực tiếp; hàm chuyển cấu trúc dữ liệu sang dạng chuỗi/wire ổn định để lưu trong bytecode hoặc truyền qua ranh giới module.
 std::string encodeListLiteral(const IrProgram &program, const IrValue &list) {
     constexpr char recordSeparator = vietvm::bytecode::kLiteralRecordSeparator;
     constexpr char fieldSeparator = vietvm::bytecode::kLiteralFieldSeparator;
@@ -1144,6 +1178,7 @@ std::string encodeListLiteral(const IrProgram &program, const IrValue &list) {
     return encoded.str();
 }
 
+// Mã hóa mặc định giá trị; hàm chuyển cấu trúc dữ liệu sang dạng chuỗi/wire ổn định để lưu trong bytecode hoặc truyền qua ranh giới module.
 std::string encodeDefaultValue(const IrValue &value) {
     switch (value.opcode) {
         case IrValueOpcode::ConstInt: return "i:" + value.text;
@@ -1157,6 +1192,7 @@ std::string encodeDefaultValue(const IrValue &value) {
     }
 }
 
+// Giữ trạng thái của direct-IR codegen trong một lượt phát mã; struct quản lý bytecode, slot, function id, lambda và thứ tự phát lớp cha/con.
 struct Emitter {
     const IrProgram &program;
     const std::unordered_map<std::string, Opcode> &keywordMap;
@@ -1166,22 +1202,32 @@ struct Emitter {
     std::unordered_map<std::string, int> functionIdsByName;
     std::unordered_map<int, int> functionNameIndices;
     std::unordered_map<IrLambdaId, int> lambdaIds;
+    std::unordered_map<std::string, const IrInstruction *> classesByName;
+    std::unordered_set<std::string> emittedClasses;
+    std::unordered_set<std::string> emittingClasses;
     int nextSlot = 0;
 
+    // Quản lý class context theo RAII; guard đẩy tên lớp trước khi phát method và tự pop khi rời scope để lookup visibility/`gốc` không rò sang lớp kế tiếp.
     struct ClassContextGuard {
+        // Đưa tên lớp hiện tại lên class-context stack trước khi codegen các phương thức của lớp đó.
         explicit ClassContextGuard(const std::string &className) {
             pushClassContext(className);
         }
+        // Gỡ class context vừa đẩy khi codegen lớp kết thúc, kể cả khi việc phát bytecode ném exception.
         ~ClassContextGuard() { popClassContext(); }
 
+        // Cấm sao chép vì mỗi guard phải pop đúng một context mà chính nó đã push.
         ClassContextGuard(const ClassContextGuard &) = delete;
+        // Cấm phép gán để không làm thay đổi ownership của thao tác pop class context.
         ClassContextGuard &operator=(const ClassContextGuard &) = delete;
     };
 
+    // Khởi tạo emitter cho một `IrProgram`; object giữ tham chiếu IR/keyword map và bắt đầu với các bảng slot/function/class rỗng cho lượt phát mã hiện tại.
     Emitter(const IrProgram &ir,
             const std::unordered_map<std::string, Opcode> &keywords)
         : program(ir), keywordMap(keywords) {}
 
+    // Cấp phát hàm; hàm lấy mã định danh hoặc vùng lưu trữ mới và đăng ký nó vào trạng thái quản lý hiện tại.
     void allocateFunction(const IrInstruction &instruction) {
         if (functionIdsBySymbol.find(instruction.symbolId) !=
             functionIdsBySymbol.end()) {
@@ -1198,14 +1244,18 @@ struct Emitter {
         if (functionId >= nextSlot) nextSlot = functionId + 1;
     }
 
+    // Quét các lệnh top-level trước khi phát thân hàm; hàm cấp function id sớm và lập bảng lớp để hỗ trợ đệ quy/forward reference khi codegen.
     void predeclareFunctions() {
         for (const IrInstruction &instruction : program.instructions) {
             if (instruction.opcode == IrOpcode::DefineFunction) {
                 allocateFunction(instruction);
+            } else if (instruction.opcode == IrOpcode::DefineClass) {
+                classesByName.emplace(instruction.declarationName, &instruction);
             }
         }
     }
 
+    // Trả slot VM gắn với một tên; hàm tái sử dụng slot đã cấp hoặc tạo slot mới bằng `nextSlot` rồi ghi vào bảng `slots`.
     int slotFor(const std::string &name) {
         const auto found = slots.find(name);
         if (found != slots.end()) return found->second;
@@ -1214,6 +1264,7 @@ struct Emitter {
         return slot;
     }
 
+    // Phát mã cho lời gọi đối số; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     void emitCallArguments(const IrValue &call,
                            std::vector<Instruction> &output) {
         for (std::size_t index = 1; index < call.operands.size(); ++index) {
@@ -1221,6 +1272,7 @@ struct Emitter {
         }
     }
 
+    // Phát mã cho tham số bindings; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     void emitParameterBindings(const std::vector<IrParameter> &parameters,
                                std::vector<Instruction> &output,
                                std::string_view missingDefaultMessage) {
@@ -1244,6 +1296,7 @@ struct Emitter {
         }
     }
 
+    // Phát một `IrValue` thành chuỗi opcode VM phù hợp; hàm xử lý literal, biến, thuộc tính, index, phép toán, lời gọi và lambda theo từng opcode IR.
     void emitValue(IrValueId id, std::vector<Instruction> &output) {
         const IrValue *value = program.value(id);
         if (value == nullptr) {
@@ -1448,12 +1501,16 @@ struct Emitter {
             }
             case IrValueOpcode::CallDynamic: {
                 if (value->callTarget == CallTargetKind::ClassConstructor) {
-                    if (value->operands.size() != 1) {
+                    if (value->operands.empty()) {
                         throw std::logic_error(std::string(
                             messages::kInternalDirectIrUnsupportedValue));
                     }
+                    emitCallArguments(*value, output);
                     const int classNameIndex = StringPool::storeString(value->text);
-                    output.push_back({OP_TAO_DOI_TUONG, 0, classNameIndex, 0});
+                    output.push_back({OP_TAO_DOI_TUONG,
+                                      static_cast<int>(value->operands.size() - 1),
+                                      classNameIndex,
+                                      0});
                     return;
                 }
 
@@ -1470,7 +1527,7 @@ struct Emitter {
                     output.push_back({OP_GOI_PHUONG_THUC,
                                       static_cast<int>(value->operands.size() - 1),
                                       methodNameIndex,
-                                      0});
+                                      member.first == "gốc" ? 1 : 0});
                     return;
                 }
 
@@ -1556,6 +1613,7 @@ struct Emitter {
         }
     }
 
+    // Phát mã cho khối; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     void emitBlock(const IrInstruction &block,
                    std::vector<Instruction> &output,
                    bool blockMarkers = true) {
@@ -1566,6 +1624,7 @@ struct Emitter {
         if (blockMarkers) output.push_back({OP_DONG_KHOI, 0, 0, 0});
     }
 
+    // Phát một `IrInstruction` sang bytecode hoặc chuyển tiếp đến bộ phát chuyên biệt cho khối, điều kiện, vòng lặp và câu lệnh phức hợp.
     void emitInstruction(const IrInstruction &instruction,
                          std::vector<Instruction> &output) {
         if (instruction.opcode == IrOpcode::Block) {
@@ -1575,6 +1634,7 @@ struct Emitter {
         emitStatement(instruction, output);
     }
 
+    // Phát mã cho câu lệnh; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     void emitStatement(const IrInstruction &instruction,
                        std::vector<Instruction> &output) {
         switch (instruction.opcode) {
@@ -1724,10 +1784,16 @@ struct Emitter {
         }
     }
 
+    // Phát mã cho hàm body; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     std::vector<Instruction> emitFunctionBody(
         const IrInstruction &instruction) {
         std::vector<Instruction> functionBytecode;
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+        for (const std::string &receiverName : instruction.implicitReceiverNames) {
+            const int receiverSlot = slotFor(receiverName);
+            functionBytecode.push_back({OP_KHOI_TAO, 0, receiverSlot, 0});
+            functionBytecode.push_back({OP_PARAM, 0, receiverSlot, -1});
+        }
         emitParameterBindings(
             instruction.parameters, functionBytecode,
             messages::kInternalDirectIrMissingParameterDefaultValue);
@@ -1736,6 +1802,7 @@ struct Emitter {
         return functionBytecode;
     }
 
+    // Đăng ký metadata của hàm rồi phát thân hàm vào `hamMap`, bảo đảm function id và tên trong `StringPool` nhất quán.
     void emitFunction(const IrInstruction &instruction) {
         const auto function = functionIdsBySymbol.find(instruction.symbolId);
         const auto name = functionNameIndices.find(instruction.symbolId);
@@ -1748,10 +1815,15 @@ struct Emitter {
         bytecode.push_back({OP_HAM, name->second, function->second, 0});
     }
 
+    // Đăng ký lớp runtime và các phương thức của lớp; lớp cha được mã hóa qua chỉ số `StringPool` để VM nối quan hệ kế thừa.
     void emitClass(const IrInstruction &instruction) {
         ClassContextGuard classContext(instruction.declarationName);
         const int classNameIndex = StringPool::storeString(instruction.declarationName);
-        bytecode.push_back({OP_TAO_LOP, 0, classNameIndex, 0});
+        int encodedSuperclass = 0;
+        if (!instruction.superclassName.empty()) {
+            encodedSuperclass = StringPool::storeString(instruction.superclassName) + 1;
+        }
+        bytecode.push_back({OP_TAO_LOP, 0, classNameIndex, encodedSuperclass});
         const IrInstruction &body = instruction.children.front();
         for (const IrInstruction &member : body.children) {
             if (member.opcode == IrOpcode::NoOp) continue;
@@ -1768,20 +1840,50 @@ struct Emitter {
                 methodName.erase(0, prefix.size());
             }
             const int methodNameIndex = StringPool::storeString(methodName);
+            int encodedClassNameIndex = classNameIndex;
+            int encodedFunctionId = function->second;
+            if (member.effectiveVisibility == SemanticVisibility::Private) {
+                encodedFunctionId = -(encodedFunctionId + 1);
+            } else if (member.effectiveVisibility == SemanticVisibility::Protected) {
+                encodedClassNameIndex = -(encodedClassNameIndex + 1);
+            }
             bytecode.push_back({OP_THEM_PHUONG_THUC,
-                                classNameIndex,
+                                encodedClassNameIndex,
                                 methodNameIndex,
-                                function->second});
+                                encodedFunctionId});
         }
     }
 
+    // Phát lớp theo thứ tự cha trước con; hàm đệ quy qua metadata superclass và chặn chu trình bằng tập lớp đang phát.
+    void emitClassWithSuperclass(const IrInstruction &instruction) {
+        if (emittedClasses.find(instruction.declarationName) != emittedClasses.end()) return;
+        if (!emittingClasses.insert(instruction.declarationName).second) {
+            throw std::logic_error(vietvm::messages::messageText(
+                messages::kInternalDirectIrInheritanceCycle,
+                {instruction.declarationName}));
+        }
+        if (!instruction.superclassName.empty()) {
+            const auto parent = classesByName.find(instruction.superclassName);
+            if (parent == classesByName.end()) {
+                throw std::logic_error(vietvm::messages::messageText(
+                    messages::kInternalDirectIrSuperclassNotFound,
+                    {instruction.superclassName}));
+            }
+            emitClassWithSuperclass(*parent->second);
+        }
+        emitClass(instruction);
+        emittingClasses.erase(instruction.declarationName);
+        emittedClasses.insert(instruction.declarationName);
+    }
+
+    // Phát toàn bộ chương trình IR theo thứ tự top-level rồi thêm lời gọi `main`/opcode kết thúc theo hợp đồng bytecode hiện tại.
     void emitProgram(bool emitMainCall) {
         predeclareFunctions();
         for (const IrInstruction &instruction : program.instructions) {
             if (instruction.opcode == IrOpcode::DefineFunction) {
                 emitFunction(instruction);
             } else if (instruction.opcode == IrOpcode::DefineClass) {
-                emitClass(instruction);
+                emitClassWithSuperclass(instruction);
             } else {
                 emitInstruction(instruction, bytecode);
             }
@@ -1801,6 +1903,7 @@ struct Emitter {
 
 } // namespace
 
+// Duyệt IR để xác định phần nào backend direct IR có thể phát bytecode mà không cần rơi về đường biên dịch cũ.
 DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
     DirectIrSupport support{true, 0};
     SupportContext context;
@@ -1839,6 +1942,7 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
     return support;
 }
 
+// Phát bytecode trực tiếp từ IR đã được xác nhận hỗ trợ; emitter ánh xạ lệnh/giá trị IR thành opcode VM và metadata tương ứng.
 std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
                                             const std::unordered_map<std::string, Opcode> &keywordMap,
                                             bool emitMainCall) {

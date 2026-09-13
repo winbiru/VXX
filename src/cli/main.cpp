@@ -20,9 +20,12 @@
 namespace fs = std::filesystem;
 namespace messages = vietvm::messages;
 
+// Giữ lại thư mục làm việc hiện tại theo RAII; constructor chụp `current_path()` và destructor tự khôi phục khi rời scope để lệnh CLI tạm đổi thư mục không làm ảnh hưởng caller.
 class RuntimeCwdGuard {
 public:
+    // Ghi nhớ thư mục làm việc tại thời điểm guard được tạo; giá trị này sẽ được dùng để khôi phục ở destructor.
     RuntimeCwdGuard() : saved_(fs::current_path()) {}
+    // Khôi phục thư mục làm việc đã lưu khi guard hết vòng đời; lỗi phục hồi được nuốt để destructor không ném exception trong quá trình unwind.
     ~RuntimeCwdGuard() {
         try {
             fs::current_path(saved_);
@@ -30,22 +33,27 @@ public:
         }
     }
 
+    // Cấm sao chép guard để hai object không cùng cố khôi phục một trạng thái thư mục đã chụp ở thời điểm khác nhau.
     RuntimeCwdGuard(const RuntimeCwdGuard &) = delete;
+    // Cấm phép gán để ownership của trạng thái thư mục đã lưu luôn gắn với đúng một guard.
     RuntimeCwdGuard &operator=(const RuntimeCwdGuard &) = delete;
 
 private:
     fs::path saved_;
 };
 
+// In lỗi thông báo; hàm chuyển dữ liệu thành chuỗi và gửi tới luồng đầu ra theo định dạng quy định.
 static void printErrorMessage(std::string_view fallback,
                               const std::string &detail) {
     std::cerr << messages::formatMessage(fallback, {detail}) << std::endl;
 }
 
+// Nối output sink của VM với stdout/collector của CLI; mọi opcode `in` sau đó đi qua callback này thay vì ghi trực tiếp trong VM.
 static void connectVmOutput(VM &vm) {
     vm.setOutputSink([](const std::string &text) { std::cout << text; });
 }
 
+// Đọc tệp; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
 std::string readFile(const std::string &filename) {
     std::ifstream fileStream(vietvm::core::utf8Path(filename));
     if (!fileStream.is_open()) {
@@ -57,10 +65,12 @@ std::string readFile(const std::string &filename) {
     return buffer.str();
 }
 
+// In usage; hàm chuyển dữ liệu thành chuỗi và gửi tới luồng đầu ra theo định dạng quy định.
 static void printUsage() {
     std::cout << messages::messageText(messages::kCliUsage);
 }
 
+// In version; hàm chuyển dữ liệu thành chuỗi và gửi tới luồng đầu ra theo định dạng quy định.
 static void printVersion() {
     std::cout << messages::messageText(messages::kCliVersion,
                                        {vietvm::core::kCliVersion});
@@ -73,6 +83,7 @@ enum class SnippetMode {
     DumpIr,
 };
 
+// Chạy snippet; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runSnippet(const std::string &source,
                       const fs::path &resolutionBase,
                       SnippetMode mode) {
@@ -125,6 +136,7 @@ static int runSnippet(const std::string &source,
     return EXIT_SUCCESS;
 }
 
+// Chạy tệp; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runFile(const std::string &filename,
                    SnippetMode mode,
                    bool lintOnly = false) {
@@ -146,6 +158,7 @@ static int runFile(const std::string &filename,
     return runSnippet(source, fileDir.empty() ? fs::current_path() : fileDir, mode);
 }
 
+// Chạy repl; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runRepl() {
     std::cout << messages::messageText(messages::kReplWelcome);
     std::string line;
@@ -171,10 +184,12 @@ static int runRepl() {
     return EXIT_SUCCESS;
 }
 
+// Tạo đường dẫn tới manifest của package từ thư mục package; hàm ghép root với tên file manifest theo layout chuẩn.
 static fs::path packageManifestPath(const fs::path &root) {
     return root / vietvm::core::utf8Path(vietvm::core::kProjectManifestFile);
 }
 
+// Xác định thư mục gốc package từ working directory hiện tại; hàm chuẩn hóa path trước khi các lệnh `pkg` đọc/ghi metadata.
 static fs::path packageRootPath(const fs::path &root) {
     for (const char *directoryName : vietvm::core::kPackageDirectoryNames) {
         const fs::path candidate = root / vietvm::core::utf8Path(directoryName);
@@ -183,6 +198,7 @@ static fs::path packageRootPath(const fs::path &root) {
     return root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory);
 }
 
+// Đọc danh sách package đã khai báo trong manifest/config; hàm parse từng entry và trả danh sách đã chuẩn hóa cho lệnh CLI.
 static std::vector<std::string> listPackages(const fs::path &root) {
     std::vector<std::string> packages;
     fs::path packagesDir = packageRootPath(root);
@@ -199,6 +215,7 @@ static std::vector<std::string> listPackages(const fs::path &root) {
     return packages;
 }
 
+// Ghi gói manifest; hàm tuần tự hóa hoặc chuyển dữ liệu đầu vào sang đích ghi tương ứng.
 static void writePackageManifest(const fs::path &root, const std::string &name) {
     std::ostringstream manifest;
     manifest << "{\n"
@@ -215,6 +232,7 @@ static void writePackageManifest(const fs::path &root, const std::string &name) 
     out << manifest.str() << std::endl;
 }
 
+// Khởi tạo package V++ mới; lệnh tạo cấu trúc thư mục/manifest mặc định sau khi kiểm tra đích chưa xung đột.
 static int pkgInit(const std::string &name) {
     fs::path root = fs::current_path();
     fs::create_directories(root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory));
@@ -228,6 +246,7 @@ static int pkgInit(const std::string &name) {
     return EXIT_SUCCESS;
 }
 
+// Khởi tạo backend/config dự án theo tùy chọn CLI; hàm tạo các file nền cần thiết để compiler/runtime nhận diện dự án.
 static int backendInit(const std::string &name) {
     if (name.empty()) {
         std::cerr << messages::formatMessage(messages::kPkgBackendNameMissing) << '\n';
@@ -277,6 +296,7 @@ static int backendInit(const std::string &name) {
     return EXIT_SUCCESS;
 }
 
+// Thêm dependency/package vào manifest; hàm kiểm tra trùng, cập nhật metadata rồi ghi lại file cấu hình.
 static int pkgAdd(const std::string &sourceArg, const std::string &packageNameArg) {
     fs::path sourcePath = vietvm::core::utf8Path(sourceArg);
     if (!fs::exists(sourcePath)) {
@@ -319,6 +339,7 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
     return EXIT_SUCCESS;
 }
 
+// In các package/dependency đang khai báo; hàm đọc manifest và định dạng từng entry cho CLI.
 static int pkgList() {
     auto packages = listPackages(fs::current_path());
     if (packages.empty()) {
@@ -331,6 +352,7 @@ static int pkgList() {
     return EXIT_SUCCESS;
 }
 
+// Xóa package khỏi manifest; hàm tìm entry theo tên, loại bỏ rồi ghi lại cấu hình khi có thay đổi.
 static int pkgRemove(const std::string &packageName) {
     if (packageName.empty()) {
         std::cerr << messages::formatMessage(messages::kPkgRemoveNameMissing) << '\n';
@@ -357,6 +379,7 @@ static int pkgRemove(const std::string &packageName) {
     return EXIT_SUCCESS;
 }
 
+// Kiểm tra package đã tồn tại trong manifest hay chưa; hàm duyệt danh sách package và so tên chuẩn hóa.
 static bool packageExists(const fs::path &root, const std::string &packageName) {
     if (packageName.empty()) return false;
     fs::path packageMain = vietvm::core::packageEntryPath(
@@ -364,6 +387,7 @@ static bool packageExists(const fs::path &root, const std::string &packageName) 
     return fs::exists(packageMain);
 }
 
+// In thông tin chi tiết của một package; hàm tra manifest theo tên rồi hiển thị metadata và trạng thái liên quan.
 static int pkgInfo(const std::string &packageName) {
     if (packageName.empty()) {
         std::cerr << messages::formatMessage(messages::kPkgInfoNameMissing) << '\n';
@@ -388,6 +412,7 @@ static int pkgInfo(const std::string &packageName) {
     return EXIT_SUCCESS;
 }
 
+// Trả kết quả CLI cho việc package có tồn tại hay không; hàm dùng `packageExists` và chuyển boolean thành exit/output phù hợp.
 static int pkgHas(const std::string &packageName) {
     bool exists = packageExists(fs::current_path(), packageName);
     std::cout << messages::messageText(exists ? messages::kPkgValuePresent
@@ -395,6 +420,7 @@ static int pkgHas(const std::string &packageName) {
     return exists ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
+// Tính và in thống kê package hiện tại; hàm tổng hợp số package cùng metadata cần thiết từ manifest.
 static int pkgStats() {
     fs::path root = fs::current_path();
     auto packages = listPackages(root);
@@ -410,6 +436,7 @@ static int pkgStats() {
     return EXIT_SUCCESS;
 }
 
+// Chạy gói lệnh; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runPackageCommand(int argc, char *argv[]) {
     if (argc < 3) {
         std::cerr << messages::formatMessage(messages::kPkgSubcommandMissing) << '\n';
@@ -470,6 +497,7 @@ static int runPackageCommand(int argc, char *argv[]) {
     return EXIT_FAILURE;
 }
 
+// Chạy doctor; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runDoctor(const std::string &execPath) {
     std::cout << messages::messageText(messages::kCliDoctorHeading);
     std::cout << messages::messageText(messages::kCliDoctorVersion,
@@ -491,6 +519,7 @@ static int runDoctor(const std::string &execPath) {
     return EXIT_SUCCESS;
 }
 
+// Escape chuỗi để nhúng an toàn vào JSON của LSP/CLI; hàm thay dấu nháy, backslash và ký tự điều khiển bằng escape sequence.
 static std::string jsonEscape(const std::string &s) {
     std::string out;
     out.reserve(s.size() + 16);
@@ -507,6 +536,7 @@ static std::string jsonEscape(const std::string &s) {
     return out;
 }
 
+// Giải escape từ chuỗi JSON đơn giản; hàm đọc backslash sequence và khôi phục ký tự gốc cho parser LSP.
 static std::string jsonUnescape(const std::string &s) {
     std::string out;
     out.reserve(s.size());
@@ -528,6 +558,7 @@ static std::string jsonUnescape(const std::string &s) {
     return out;
 }
 
+// Đọc LSP thông báo; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
 static std::optional<std::string> readLspMessage() {
     std::string line;
     int contentLength = -1;
@@ -547,6 +578,7 @@ static std::optional<std::string> readLspMessage() {
     return body;
 }
 
+// Trích xuất JSON chuỗi trường; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 static std::string extractJsonStringField(const std::string &body, const std::string &field) {
     std::regex rx("\"" + field + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
     std::smatch match;
@@ -556,6 +588,7 @@ static std::string extractJsonStringField(const std::string &body, const std::st
     return "";
 }
 
+// Trích xuất JSON thô trường; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 static std::string extractJsonRawField(const std::string &body, const std::string &field) {
     std::regex rx("\"" + field + "\"\\s*:\\s*([^,}]+)");
     std::smatch match;
@@ -565,10 +598,12 @@ static std::string extractJsonRawField(const std::string &body, const std::strin
     return "";
 }
 
+// Ghi LSP thông báo; hàm tuần tự hóa hoặc chuyển dữ liệu đầu vào sang đích ghi tương ứng.
 static void writeLspMessage(const std::string &payload) {
     std::cout << "Content-Length: " << payload.size() << "\r\n\r\n" << payload << std::flush;
 }
 
+// Gửi `textDocument/publishDiagnostics` qua LSP; hàm chuyển diagnostic compiler thành JSON-RPC notification kèm range/message.
 static void publishDiagnostics(const std::string &uri, const std::string &text) {
     std::string errorMessage;
     std::string result = "[]";
@@ -587,6 +622,7 @@ static void publishDiagnostics(const std::string &uri, const std::string &text) 
     writeLspMessage(notif.str());
 }
 
+// Chạy language máy chủ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runLanguageServer() {
     std::unordered_map<std::string, std::string> openDocuments;
     bool shutdownRequested = false;
@@ -639,6 +675,7 @@ static int runLanguageServer() {
 }
 
 
+// Điểm vào chính của chương trình.
 int main(int argc, char* argv[]) {
     try {
         if (argc >= 2) {

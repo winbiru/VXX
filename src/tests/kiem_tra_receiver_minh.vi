@@ -1,0 +1,21 @@
+lớp Counter {
+    hàm set(value) {
+        mình.value = value;
+    }
+
+    hàm get() {
+        trả về mình.value;
+    }
+
+    hàm bump(delta) {
+        mình.set(mình.get() + delta);
+        trả về mình.get();
+    }
+};
+
+hàm main() {
+    c = Counter();
+    c.set(7);
+    in c.get();
+    in c.bump(5);
+};

@@ -12,6 +12,7 @@
 
 namespace vietvm::compiler {
 
+// Trả độ ưu tiên của toán tử khi chuyển biểu thức sang postfix; hàm tra bảng precedence dùng chung của lexer/compiler.
 int precedence_op(const std::string& op) {
     const auto &m = operatorPrecedenceMap();
     auto it = m.find(op);
@@ -19,10 +20,10 @@ int precedence_op(const std::string& op) {
     return it->second;
 }
 
+// Xác định toán tử kết hợp trái hay phải; kết quả được thuật toán shunting-yard dùng khi quyết định pop toán tử khỏi stack.
 char associativity_op(const std::string &op) { return (op == "=") ? 'r' : 'l'; }
 
-// Enhanced convertToPostfix: supports function calls.
-// Function calls are emitted as a single token in postfix with format: CALL::name::argc
+// Chuyển đổi to postfix; hàm biến dữ liệu từ biểu diễn hiện tại sang biểu diễn đích và giữ nguyên ý nghĩa logic.
 std::vector<std::string> convertToPostfix(const std::vector<std::string>& infix_tokens) {
     std::vector<std::string> output;
     std::stack<std::string> ops;

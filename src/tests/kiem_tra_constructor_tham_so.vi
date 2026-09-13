@@ -1,0 +1,24 @@
+lớp Base {
+    hàm khởi tạo(base) {
+        mình.base = base;
+    }
+}
+
+lớp Child kế thừa Base {
+    hàm khởi tạo(base, extra = 2) {
+        gốc.khởi tạo(base);
+        mình.extra = extra;
+    }
+
+    hàm total() {
+        trả về mình.base + mình.extra;
+    }
+}
+
+hàm main() {
+    first = Child(10, 5);
+    second = Child(20);
+
+    in first.total();
+    in second.total();
+}

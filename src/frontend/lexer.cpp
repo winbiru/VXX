@@ -23,6 +23,7 @@ namespace vietvm::compiler {
 
     // ==================== Helper Functions Implementation ====================
 
+    // Lấy dòng and cột; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
     std::pair<size_t, size_t> getLineAndColumn(const std::string& src, size_t index) {
         size_t line = 1;
         size_t col = 1;
@@ -37,6 +38,7 @@ namespace vietvm::compiler {
         return {line, col};
     }
 
+    // Lấy lỗi ngữ cảnh; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
     std::string getErrorContext(const std::string& src, size_t index, size_t contextLen) {
         size_t start = (index > contextLen) ? index - contextLen : 0;
         size_t end = std::min(index + contextLen, src.size());
@@ -57,6 +59,7 @@ namespace vietvm::compiler {
 
     // ==================== Core Lexer Functions ====================
 
+    // Kiểm tra điều kiện của `isNumber`.
     bool isNumber(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
@@ -66,6 +69,7 @@ namespace vietvm::compiler {
         });
     }
 
+    // Kiểm tra điều kiện của `isFloat`.
     bool isFloat(const std::string &s) noexcept {
         if (s.empty()) return false;
         size_t start = (s[0] == '-') ? 1 : 0;
@@ -82,6 +86,7 @@ namespace vietvm::compiler {
         return hasDot;  // must have exactly one dot
     }
 
+    // Định nghĩa `operatorPrecedenceMap` cho kiểu hiện tại; toán tử chuyển các toán hạng đầu vào thành kết quả theo quy tắc của kiểu.
     const std::unordered_map<std::string,int>& operatorPrecedenceMap() noexcept {
         static const std::unordered_map<std::string,int> ops = {
             {"=",0},{"||",1},{"&&",2},{"==",3},{"!=",3},{"<",3},{">",3},{"<=",3},{">=",3},
@@ -92,11 +97,13 @@ namespace vietvm::compiler {
         return ops;
     }
 
+    // Kiểm tra điều kiện của `isOperator`.
     bool isOperator(const std::string &tok) noexcept {
         const auto &m = operatorPrecedenceMap();
         return m.find(tok) != m.end();
     }
 
+    // Kiểm tra điều kiện của `isStringLiteral`.
     bool isStringLiteral(const std::string &tk) noexcept {
         if (tk.size() < 2) return false;
         // Accept both double quotes ("...") and single quotes ('...')
@@ -104,7 +111,7 @@ namespace vietvm::compiler {
                (tk.front() == '\'' && tk.back() == '\'');
     }
 
-    // Heuristic identifier check that tolerates UTF-8 bytes (simple & pragmatic)
+    // Kiểm tra điều kiện của `isVariable`.
     bool isVariable(const std::string &tok) noexcept {
         if (tok.empty()) return false;
         if (isStringLiteral(tok)) return false;
@@ -129,11 +136,12 @@ namespace vietvm::compiler {
         return true;
     }
 
-    // Helper: lowercase ASCII characters (keep non-ascii unchanged)
+    // Chuyển lower ascii; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
     std::string toLowerAscii(const std::string &s) {
         return vietvm::core::toLowerAscii(s);
     }
 
+    // Phân loại token loại; hàm đối chiếu dữ liệu với các quy tắc đã biết rồi trả enum/nhóm tương ứng.
     static vietvm::frontend::TokenKind classifyTokenKind(const std::string &lexeme) {
         using vietvm::frontend::TokenKind;
         if (isStringLiteral(lexeme)) return TokenKind::String;
@@ -151,11 +159,13 @@ namespace vietvm::compiler {
             "cập nhật", "kiểm tra sau", "chuyển", "trường hợp", "mặc định",
             "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
             "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",
-            "bắt lỗi", "nhập", "lớp", "công khai", "riêng tư", "bảo vệ"
+            "bắt lỗi", "nhập", "lớp", "giao diện", "kế thừa", "triển khai",
+            "công khai", "riêng tư", "bảo vệ"
         };
         return keywords.find(lexeme) != keywords.end() ? TokenKind::Keyword : TokenKind::Identifier;
     }
 
+    // Tạo `SourceSpan` bao phủ một dải token; hàm lấy vị trí bắt đầu từ token đầu và vị trí kết thúc từ token cuối của dải.
     static vietvm::frontend::SourceSpan sourceSpanFor(const std::string &source,
                                                        size_t begin,
                                                        size_t end) {
@@ -164,8 +174,7 @@ namespace vietvm::compiler {
         return {{begin, beginLine, beginColumn}, {end, endLine, endColumn}};
     }
 
-    // Tokenize, with comment and improved string handling.  The span-carrying
-    // representation is canonical; the legacy string-only API projects it.
+    // Tách token cho with spans; hàm quét chuỗi nguồn từ trái sang phải và tạo dãy token, đồng thời bảo toàn thông tin vị trí khi cần.
     std::vector<vietvm::frontend::Token> tokenizeWithSpans(const std::string &src) {
         std::vector<vietvm::frontend::Token> tokens;
         auto pushToken = [&](size_t begin, size_t end) {
@@ -309,10 +318,12 @@ namespace vietvm::compiler {
         return tokens;
     }
 
+    // Tách token cho tokenize; hàm quét chuỗi nguồn từ trái sang phải và tạo dãy token, đồng thời bảo toàn thông tin vị trí khi cần.
     std::vector<std::string> tokenize(const std::string &src) {
         return vietvm::frontend::tokenLexemes(tokenizeWithSpans(src));
     }
 
+    // Chuẩn hóa token trước khi so sánh cú pháp; hàm đưa các biến thể tương đương về cùng biểu diễn để các nhánh parser dùng một quy tắc thống nhất.
     std::string normalizeTokenForCompare(const std::string& s) {
         std::string t = vietvm::core::trim(s);
         if (t.empty()) return t;
@@ -332,6 +343,7 @@ namespace vietvm::compiler {
         return toLowerAscii(t);
     }
 
+    // Hậu xử lý danh sách token sau lexer; hàm gộp/chuẩn hóa các mẫu token đặc biệt để tương thích với ngữ pháp và compiler hiện tại.
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens) {
         std::vector<std::string> result;
         result.reserve(tokens.size());
@@ -357,6 +369,9 @@ namespace vietvm::compiler {
             {"cập", "nhật"},
             {"kiểm", "tra", "sau"},
             {"bắt", "lỗi"},
+            {"giao", "diện"},
+            {"kế", "thừa"},
+            {"triển", "khai"},
             {"công", "khai"},
             {"riêng", "tư"},
             {"bảo", "vệ"}
@@ -378,6 +393,9 @@ namespace vietvm::compiler {
                     (a_norm == "truong" && b_norm == "hop") ||
                     (a_norm == "mac" && b_norm == "dinh") ||
                     (a_norm == "bo" && b_norm == "qua") ||
+                    (a_norm == "giao" && b_norm == "dien") ||
+                    (a_norm == "ke" && b_norm == "thua") ||
+                    (a_norm == "trien" && b_norm == "khai") ||
                     (a_norm == "cong" && b_norm == "khai") ||
                     (a_norm == "rieng" && b_norm == "tu")) {
                     throwMissingAccent(a_norm + " " + b_norm);
@@ -445,6 +463,7 @@ namespace vietvm::compiler {
         return result;
     }
 
+    // Hậu xử lý token nhưng giữ `SourceSpan`; hàm thực hiện cùng quy tắc chuẩn hóa như bản chuỗi đồng thời hợp nhất vị trí nguồn của token được gộp.
     std::vector<vietvm::frontend::Token> postProcessTokensWithSpans(
         const std::vector<vietvm::frontend::Token> &tokens) {
         const std::vector<std::string> sourceLexemes = vietvm::frontend::tokenLexemes(tokens);
@@ -496,6 +515,7 @@ namespace vietvm::compiler {
         return result;
     }
 
+    // Bỏ cặp dấu nháy bao quanh chuỗi literal khi có; hàm chỉ cắt ký tự đầu/cuối nếu chúng tạo thành cặp nháy hợp lệ.
     std::string stripQuotes(const std::string& input) {
         if (input.length() >= 2 &&
             ((input.front() == '"' && input.back() == '"') ||
@@ -530,6 +550,7 @@ namespace vietvm::compiler {
         return input;
     }
 
+    // Lấy var giá trị số nguyên; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
     int getVarValueInt(int varId) {
         if (varId < 0 || static_cast<size_t>(varId) >= vars.size()) {
             throw std::runtime_error(vietvm::messages::formatMessage(
@@ -559,6 +580,7 @@ namespace vietvm::compiler {
 
     // ==================== Validation Functions Implementation ====================
 
+    // Kiểm tra điều kiện của `validateNumber`.
     void validateNumber(const std::string& token, size_t line, size_t column) {
         if (token.empty()) {
             throw InvalidNumberError(token, line, column);
@@ -585,6 +607,7 @@ namespace vietvm::compiler {
         }
     }
 
+    // Kiểm tra điều kiện của `validateIdentifier`.
     void validateIdentifier(const std::string& token, size_t line, size_t column) {
         if (token.empty()) {
             throw LexerError(vietvm::messages::formatMessage(vietvm::messages::kLexerEmptyIdentifier),
@@ -598,6 +621,7 @@ namespace vietvm::compiler {
         }
     }
 
+    // Kiểm tra điều kiện của `validateStringLiteral`.
     void validateStringLiteral(const std::string& token, size_t line, size_t column) {
         if (token.size() < 2) {
             throw LexerError(vietvm::messages::formatMessage(vietvm::messages::kLexerInvalidString, {token}),
@@ -617,6 +641,7 @@ namespace vietvm::compiler {
 
 namespace vietvm::frontend {
 
+// Chuyển lexeme; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 std::vector<std::string> tokenLexemes(const std::vector<Token> &tokens) {
     std::vector<std::string> lexemes;
     lexemes.reserve(tokens.size());

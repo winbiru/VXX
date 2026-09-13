@@ -78,6 +78,14 @@ target_link_libraries(vpp-direct-codegen-unit PRIVATE vpp-compiler)
 add_test(NAME vpp-direct-codegen-unit
          COMMAND vpp-direct-codegen-unit)
 
+add_executable(vpp-object-model-integration-unit
+    object_model_integration_tests.cpp)
+
+target_link_libraries(vpp-object-model-integration-unit PRIVATE vpp-compiler vpp-runtime)
+
+add_test(NAME vpp-object-model-integration-unit
+         COMMAND vpp-object-model-integration-unit)
+
 add_executable(vpp-pipeline-legacy-parity
     pipeline_legacy_parity_tests.cpp)
 
@@ -103,14 +111,14 @@ add_test(NAME vpp-cli-dump-ast
                  --dump-ast
                  ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_tra_ve.vi)
 set_tests_properties(vpp-cli-dump-ast PROPERTIES
-    PASS_REGULAR_EXPRESSION "function")
+    PASS_REGULAR_EXPRESSION "hàm")
 
 add_test(NAME vpp-cli-dump-ir
          COMMAND $<TARGET_FILE:vpp-cli>
                  --dump-ir
                  ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_tra_ve.vi)
 set_tests_properties(vpp-cli-dump-ir PROPERTIES
-    PASS_REGULAR_EXPRESSION "define_function")
+    PASS_REGULAR_EXPRESSION "định nghĩa hàm")
 
 foreach(vpp_test_target IN ITEMS
         vpp-compiler-support-unit
@@ -123,6 +131,7 @@ foreach(vpp_test_target IN ITEMS
         vpp-module-graph-unit
         vpp-recursive-ir-unit
         vpp-direct-codegen-unit
+        vpp-object-model-integration-unit
         vpp-pipeline-legacy-parity
         vpp-tooling-unit)
     target_compile_features(${vpp_test_target} PRIVATE cxx_std_17)

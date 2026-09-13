@@ -44,6 +44,7 @@ namespace vietvm::helpers {
 
 namespace {
 
+// Mở pipe để chạy lệnh hệ thống và đọc stdout; helper chọn API phù hợp nền tảng rồi trả handle dùng cho quá trình capture.
 FILE *openCommandPipe(const std::string &cmd) {
 #if defined(_WIN32) && defined(_MSC_VER)
     return _popen(cmd.c_str(), "r");
@@ -52,6 +53,7 @@ FILE *openCommandPipe(const std::string &cmd) {
 #endif
 }
 
+// Đóng pipe tiến trình đã mở và trả exit status; helper dùng API nền tảng tương ứng để tránh rò handle.
 int closeCommandPipe(FILE *pipe) {
 #if defined(_WIN32) && defined(_MSC_VER)
     return _pclose(pipe);
@@ -60,6 +62,7 @@ int closeCommandPipe(FILE *pipe) {
 #endif
 }
 
+// Quote một đối số shell bằng dấu nháy đơn; hàm escape dấu nháy đơn bên trong để chuỗi có thể ghép an toàn vào command line POSIX.
 std::string shellQuoteSingle(const std::string &s) {
     std::string out = "'";
     for (char c : s) {
@@ -71,6 +74,7 @@ std::string shellQuoteSingle(const std::string &s) {
 }
 
 #if defined(_WIN32)
+// Chuyển chuỗi UTF-8 sang chuỗi wide trên Windows; hàm dùng API chuyển mã để truyền đường dẫn/command Unicode cho Win32.
 std::optional<std::wstring> utf8ToWide(const std::string &text) {
     if (text.empty()) return std::wstring{};
     if (text.size() > static_cast<size_t>((std::numeric_limits<int>::max)())) {
@@ -91,6 +95,7 @@ std::optional<std::wstring> utf8ToWide(const std::string &text) {
     return wide;
 }
 
+// Nối thêm windows lệnh đối số; hàm đưa dữ liệu mới vào cuối cấu trúc đích theo đúng thứ tự hiện có.
 void appendWindowsCommandArgument(std::wstring &command, const std::wstring &argument) {
     if (!command.empty()) command.push_back(L' ');
 
@@ -119,6 +124,7 @@ void appendWindowsCommandArgument(std::wstring &command, const std::wstring &arg
     command.push_back(L'"');
 }
 
+// Chạy windows process; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runWindowsProcess(const std::vector<std::string> &arguments,
                        std::string &output,
                        DWORD &exitCode) {
@@ -197,6 +203,7 @@ bool runWindowsProcess(const std::vector<std::string> &arguments,
     return readOk && gotExitCode;
 }
 
+// Chạy curl HTTP yêu cầu windows; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runCurlHttpRequestWindows(const std::string &method,
                                const std::string &fnName,
                                const std::string &url,
@@ -232,6 +239,7 @@ bool runCurlHttpRequestWindows(const std::string &method,
 }
 #endif
 
+// Chuẩn hóa token dùng trong câu lệnh DB phụ trợ; hàm loại/escape ký tự ngoài tập an toàn trước khi ghép vào lệnh client.
 std::string sanitizeDbToken(const std::string &s) {
     std::string out = trimCopy(s);
     if (out.empty()) return vietvm::constants::kDbReasonCommandFailed;
@@ -242,6 +250,7 @@ std::string sanitizeDbToken(const std::string &s) {
     return trimCopy(out);
 }
 
+// Kiểm tra điều kiện của `isSafeDbIdentifier`.
 bool isSafeDbIdentifier(const std::string &name) {
     if (name.empty()) return false;
     for (unsigned char c : name) {
@@ -250,6 +259,7 @@ bool isSafeDbIdentifier(const std::string &name) {
     return true;
 }
 
+// Lưu cấu hình kết nối DB đã parse từ JDBC URL như driver, host, port, database và credential để helper dựng lệnh client tương ứng.
 struct JdbcDbConfig {
     std::string engine;
     std::string host;
@@ -259,6 +269,7 @@ struct JdbcDbConfig {
     bool createIfNotExist = false;
 };
 
+// Phân tích JDBC tcp url; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseJdbcTcpUrl(const std::string &jdbcUrl,
                      const std::string &prefix,
                      int defaultPort,
@@ -325,6 +336,7 @@ bool parseJdbcTcpUrl(const std::string &jdbcUrl,
     return true;
 }
 
+// Phân tích JDBC cơ sở dữ liệu cấu hình; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseJdbcDbConfig(const std::string &driverClass,
                        const std::string &jdbcUrl,
                        JdbcDbConfig &cfg,
@@ -357,6 +369,7 @@ bool parseJdbcDbConfig(const std::string &driverClass,
     return false;
 }
 
+// Chạy lệnh biến bắt giữ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runCommandCapture(const std::string &cmd, std::string &output, int &rc) {
     output.clear();
     FILE *pipe = openCommandPipe(cmd);
@@ -370,6 +383,7 @@ bool runCommandCapture(const std::string &cmd, std::string &output, int &rc) {
     return true;
 }
 
+// Chạy my SQL query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runMySqlQuery(const JdbcDbConfig &cfg,
                    const std::string &user,
                    const std::string &password,
@@ -405,6 +419,7 @@ bool runMySqlQuery(const JdbcDbConfig &cfg,
     return true;
 }
 
+// Chạy PostgreSQL query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runPostgresQuery(const JdbcDbConfig &cfg,
                       const std::string &user,
                       const std::string &password,
@@ -440,6 +455,7 @@ bool runPostgresQuery(const JdbcDbConfig &cfg,
     return true;
 }
 
+// Chạy SQLite query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runSqliteQuery(const JdbcDbConfig &cfg,
                     const std::string &sql,
                     std::string &output,
@@ -477,6 +493,7 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
     return true;
 }
 
+// Tạo database khi cấu hình yêu cầu; hàm kiểm tra driver/config rồi phát câu lệnh tạo DB trước truy vấn chính nếu cần.
 bool ensureDatabaseIfRequested(const JdbcDbConfig &cfg,
                                const std::string &user,
                                const std::string &password,
@@ -506,6 +523,7 @@ bool ensureDatabaseIfRequested(const JdbcDbConfig &cfg,
 
 } // namespace
 
+// Kiểm tra điều kiện của `hasEnvVar`.
 bool hasEnvVar(const char *name) {
 #if defined(_MSC_VER)
     char *value = nullptr;
@@ -522,6 +540,7 @@ bool hasEnvVar(const char *name) {
 #endif
 }
 
+// Lấy env var; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 std::optional<std::string> getEnvVar(const char *name) {
 #if defined(_MSC_VER)
     char *value = nullptr;
@@ -541,19 +560,23 @@ std::optional<std::string> getEnvVar(const char *name) {
 #endif
 }
 
+// Kiểm tra điều kiện của `startsWith`.
 bool startsWith(const std::string &value, const std::string &prefix) {
     return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
 }
 
+// Tạo bản sao chuỗi đã bỏ whitespace ở hai đầu; hàm không sửa dữ liệu gốc nên phù hợp cho parser helper/native argument.
 std::string trimCopy(const std::string &s) {
     return vietvm::core::trim(s);
 }
 
+// Chuyển một `StackValue` đối số thành chuỗi thô mà native helper cần; hàm giữ nội dung chuỗi nguyên bản và định dạng scalar theo quy tắc runtime.
 std::string argToRawString(const StackValue &v) {
     if (std::holds_alternative<std::string>(v)) return std::get<std::string>(v);
     return sv_to_string(v);
 }
 
+// Giải mã đơn giản escapes; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 std::string decodeSimpleEscapes(const std::string &s) {
     std::string out;
     out.reserve(s.size());
@@ -573,6 +596,7 @@ std::string decodeSimpleEscapes(const std::string &s) {
     return out;
 }
 
+// Phân tích thuộc tính phép gán; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 std::optional<std::pair<std::string, std::string>> parsePropertyAssignment(
     const std::string &line) {
     const std::string trimmed = trimCopy(line);
@@ -585,6 +609,7 @@ std::optional<std::pair<std::string, std::string>> parsePropertyAssignment(
                           trimCopy(trimmed.substr(equals + 1)));
 }
 
+// Đọc thuộc tính by khóa; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
 std::string readPropertyByKey(const std::string &filePath,
                               const std::string &key,
                               const std::string &fallback) {
@@ -603,6 +628,7 @@ std::string readPropertyByKey(const std::string &filePath,
     return fallback;
 }
 
+// Phân tích số nguyên arg from stack; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseIntArgFromStack(const StackValue &arg,
                           const std::string &fn,
                           const std::string &label,
@@ -622,11 +648,13 @@ bool parseIntArgFromStack(const StackValue &arg,
     }
 }
 
+// Tạo exception/thông báo lỗi khi số đối số native không đúng; hàm đóng gói tên hàm và arity mong đợi vào diagnostic thống nhất.
 std::string nativeArgumentCountError(const std::string &fn, int expectedCount) {
     return vietvm::messages::formatMessage(
         vietvm::messages::kNativeArgumentCount, {fn, std::to_string(expectedCount)});
 }
 
+// Xác minh số đối số trên stack đúng arity yêu cầu; nếu sai hàm ném lỗi chuẩn trước khi native handler đọc tham số.
 bool requireNativeArgumentCount(const std::vector<StackValue> &args,
                                 const std::string &fn,
                                 int expectedCount,
@@ -640,6 +668,7 @@ bool requireNativeArgumentCount(const std::vector<StackValue> &args,
 
 namespace {
 
+// Lấy native handle đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 template <typename Handle>
 bool getNativeHandleArgument(const std::vector<StackValue> &args,
                              std::size_t index,
@@ -663,6 +692,7 @@ bool getNativeHandleArgument(const std::vector<StackValue> &args,
 
 } // namespace
 
+// Lấy first danh sách đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getFirstListArgument(const std::vector<StackValue> &args,
                           const std::string &fn,
                           ListHandle &out,
@@ -670,6 +700,7 @@ bool getFirstListArgument(const std::vector<StackValue> &args,
     return getNativeHandleArgument(args, 0, fn, "danh sách", true, out, err);
 }
 
+// Lấy danh sách đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getListArgument(const std::vector<StackValue> &args,
                      std::size_t index,
                      const std::string &fn,
@@ -678,6 +709,7 @@ bool getListArgument(const std::vector<StackValue> &args,
     return getNativeHandleArgument(args, index, fn, "danh sách", false, out, err);
 }
 
+// Lấy first ánh xạ đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getFirstMapArgument(const std::vector<StackValue> &args,
                          const std::string &fn,
                          MapHandle &out,
@@ -685,6 +717,7 @@ bool getFirstMapArgument(const std::vector<StackValue> &args,
     return getNativeHandleArgument(args, 0, fn, "ánh xạ", true, out, err);
 }
 
+// Lấy non negative danh sách chỉ số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &err) {
     if (!std::holds_alternative<int>(value)) {
         err = "chỉ số danh sách phải là số nguyên";
@@ -698,6 +731,7 @@ bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &e
     return true;
 }
 
+// Chạy cơ sở dữ liệu connect; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runDbConnect(const std::string &driverClass,
                   const std::string &jdbcUrl,
                   const std::string &user,
@@ -740,6 +774,7 @@ bool runDbConnect(const std::string &driverClass,
     return true;
 }
 
+// Chạy cơ sở dữ liệu query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runDbQuery(const std::string &driverClass,
                 const std::string &jdbcUrl,
                 const std::string &user,
@@ -783,6 +818,7 @@ bool runDbQuery(const std::string &driverClass,
     return true;
 }
 
+// Chạy curl HTTP yêu cầu; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runCurlHttpRequest(const std::string &method,
                         const std::string &fnName,
                         const std::string &url,

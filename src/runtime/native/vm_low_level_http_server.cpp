@@ -44,6 +44,7 @@ using SocketHandle = SOCKET;
 using SocketLength = int;
 constexpr SocketHandle kInvalidSocket = INVALID_SOCKET;
 
+// Khởi tạo `sockets`; hàm chuẩn bị trạng thái/phụ thuộc theo thứ tự cần thiết trước khi cho phép phần còn lại sử dụng.
 bool initializeSockets(std::string &err) {
     static std::once_flag initFlag;
     static int initResult = 0;
@@ -59,10 +60,12 @@ bool initializeSockets(std::string &err) {
     return true;
 }
 
+// Đóng socket hệ điều hành sau khi request/server kết thúc; wrapper chọn `closesocket` hoặc `close` theo nền tảng.
 void closeSocket(SocketHandle socket) {
     if (socket != kInvalidSocket) closesocket(socket);
 }
 
+// Ngắt hai chiều truyền nhận trước khi đóng socket; wrapper gọi API shutdown phù hợp để peer nhận EOF sạch.
 void shutdownSocket(SocketHandle socket) {
     if (socket != kInvalidSocket) shutdown(socket, SD_BOTH);
 }
@@ -71,17 +74,21 @@ using SocketHandle = int;
 using SocketLength = socklen_t;
 constexpr SocketHandle kInvalidSocket = -1;
 
+// Khởi tạo `sockets`; hàm chuẩn bị trạng thái/phụ thuộc theo thứ tự cần thiết trước khi cho phép phần còn lại sử dụng.
 bool initializeSockets(std::string &) { return true; }
 
+// Đóng socket hệ điều hành sau khi request/server kết thúc; wrapper chọn `closesocket` hoặc `close` theo nền tảng.
 void closeSocket(SocketHandle socket) {
     if (socket != kInvalidSocket) close(socket);
 }
 
+// Ngắt hai chiều truyền nhận trước khi đóng socket; wrapper gọi API shutdown phù hợp để peer nhận EOF sạch.
 void shutdownSocket(SocketHandle socket) {
     if (socket != kInvalidSocket) shutdown(socket, SHUT_RDWR);
 }
 #endif
 
+// Đọc HTTP request thô từ socket; hàm nhận dữ liệu cho tới khi đủ header/body theo `Content-Length` hoặc kết nối kết thúc.
 bool recvHttpRequest(SocketHandle fd,
                      std::string &method,
                      std::string &target,
@@ -146,6 +153,7 @@ bool recvHttpRequest(SocketHandle fd,
     return true;
 }
 
+// Ánh xạ mã trạng thái HTTP sang reason phrase như `OK` hoặc `Not Found`; response builder dùng chuỗi này để tạo status line.
 const char *httpStatusText(int code) {
     switch (code) {
         case vietvm::constants::kHttpStatusOk: return "OK";
@@ -158,6 +166,7 @@ const char *httpStatusText(int code) {
     }
 }
 
+// Gửi HTTP response JSON qua socket; hàm dựng status line/header `Content-Length` rồi truyền toàn bộ header và body.
 bool sendHttpJsonResponse(SocketHandle fd, int status, const std::string &body) {
     std::ostringstream oss;
     oss << "HTTP/1.1 " << status << " " << httpStatusText(status) << "\r\n"
@@ -176,6 +185,7 @@ bool sendHttpJsonResponse(SocketHandle fd, int status, const std::string &body) 
     return true;
 }
 
+// Gom dữ liệu một HTTP request đã nhận như method, path, header/body và metadata transport để native API truy cập theo request id.
 struct LowLevelHttpRequest {
     int serverId = 0;
     SocketHandle clientFd = kInvalidSocket;
@@ -188,6 +198,7 @@ struct LowLevelHttpRequest {
     std::unordered_map<std::string, std::string> headers;
 };
 
+// Giữ trạng thái server HTTP mức thấp gồm socket/file transport, cổng và hàng đợi request đang chờ xử lý.
 struct LowLevelHttpServer {
     int id = 0;
     SocketHandle listenFd = kInvalidSocket;
@@ -207,6 +218,7 @@ int gLowHttpNextReqSeed = 1;
 std::unordered_map<int, std::shared_ptr<LowLevelHttpServer>> gLowHttpServers;
 std::unordered_map<std::string, LowLevelHttpRequest> gLowHttpRequests;
 
+// Tạo low HTTP req mã định danh; hàm dựng giá trị mới từ đầu vào theo định dạng runtime và trả kết quả cho caller.
 std::string makeLowHttpReqId() {
     std::lock_guard<std::mutex> lk(gLowHttpMu);
     int seed = gLowHttpNextReqSeed++;
@@ -215,6 +227,7 @@ std::string makeLowHttpReqId() {
     return "req-" + std::to_string(nowMs) + "-" + std::to_string(seed);
 }
 
+// Lấy low HTTP máy chủ; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 std::shared_ptr<LowLevelHttpServer> getLowHttpServer(int serverId) {
     std::lock_guard<std::mutex> lk(gLowHttpMu);
     auto it = gLowHttpServers.find(serverId);
@@ -222,6 +235,7 @@ std::shared_ptr<LowLevelHttpServer> getLowHttpServer(int serverId) {
     return it->second;
 }
 
+// Lấy low HTTP yêu cầu copy; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getLowHttpRequestCopy(const std::string &reqId, LowLevelHttpRequest &out) {
     std::lock_guard<std::mutex> lk(gLowHttpMu);
     auto it = gLowHttpRequests.find(reqId);
@@ -230,16 +244,19 @@ bool getLowHttpRequestCopy(const std::string &reqId, LowLevelHttpRequest &out) {
     return true;
 }
 
+// Trả thư mục gốc cho HTTP file-transport fallback; hàm lấy cấu hình/env và tạo path ổn định cho request/response trao đổi qua file.
 std::optional<std::filesystem::path> httpFileTransportRoot() {
     const char *value = std::getenv("VPP_HTTP_FILE_TRANSPORT_DIR");
     if (value == nullptr || *value == '\0') return std::nullopt;
     return std::filesystem::path(value);
 }
 
+// Tạo thư mục con của file transport theo cổng server; cách tách theo port ngăn request của nhiều server trộn lẫn.
 std::filesystem::path httpFilePortDir(const std::filesystem::path &root, int port) {
     return root / ("port-" + std::to_string(port));
 }
 
+// Tạo tệp transport token; hàm dựng giá trị mới từ đầu vào theo định dạng runtime và trả kết quả cho caller.
 std::string makeFileTransportToken() {
     static std::atomic<unsigned long long> counter{1};
     const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -247,6 +264,7 @@ std::string makeFileTransportToken() {
     return std::to_string(now) + "-" + std::to_string(counter.fetch_add(1));
 }
 
+// Ghi atomic tệp; hàm tuần tự hóa hoặc chuyển dữ liệu đầu vào sang đích ghi tương ứng.
 bool writeAtomicFile(const std::filesystem::path &path, const std::string &data) {
     const std::filesystem::path temporary = path.string() + ".tmp-" + makeFileTransportToken();
     {
@@ -270,6 +288,7 @@ bool writeAtomicFile(const std::filesystem::path &path, const std::string &data)
     return true;
 }
 
+// Đọc toàn bộ tệp; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
 bool readWholeFile(const std::filesystem::path &path, std::string &data) {
     std::ifstream in(path, std::ios::binary);
     if (!in.is_open()) return false;
@@ -279,6 +298,7 @@ bool readWholeFile(const std::filesystem::path &path, std::string &data) {
     return in.good() || in.eof();
 }
 
+// Phân tích loopback HTTP url; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseLoopbackHttpUrl(const std::string &url, int &port, std::string &target) {
     constexpr std::string_view prefix = "http://";
     if (url.compare(0, prefix.size(), prefix) != 0) return false;
@@ -302,6 +322,7 @@ bool parseLoopbackHttpUrl(const std::string &url, int &port, std::string &target
     return host == "127.0.0.1" || host == "localhost";
 }
 
+// Giải mã tệp transport yêu cầu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 bool decodeFileTransportRequest(const std::filesystem::path &path,
                                 std::string &method,
                                 std::string &target,
@@ -326,6 +347,7 @@ bool decodeFileTransportRequest(const std::filesystem::path &path,
     return true;
 }
 
+// Đưa request file-transport kế tiếp vào hàng đợi server; hàm quét file mới, decode nội dung và tạo record request runtime.
 bool enqueueNextFileTransportRequest(const std::shared_ptr<LowLevelHttpServer> &server,
                                      StackValue &result) {
     const std::filesystem::path requestsDir =
@@ -377,6 +399,7 @@ bool enqueueNextFileTransportRequest(const std::shared_ptr<LowLevelHttpServer> &
     return true;
 }
 
+// Khởi tạo server HTTP giả lập bằng filesystem; hàm tạo thư mục/metadata cổng để client và server trao đổi request mà không cần socket.
 bool openFileTransportServer(const std::filesystem::path &root,
                              int port,
                              StackValue &result,
@@ -414,6 +437,7 @@ bool openFileTransportServer(const std::filesystem::path &root,
 
 } // namespace
 
+// Thử xử lý HTTP loopback qua cơ chế file transport; hàm đọc request đã mã hóa từ thư mục trao đổi và trả `false` nếu không có request phù hợp.
 bool tryLowLevelHttpFileTransportRequest(const std::string &method,
                                          const std::string &url,
                                          const std::optional<std::string> &payload,
@@ -482,6 +506,7 @@ bool tryLowLevelHttpFileTransportRequest(const std::string &method,
     return true;
 }
 
+// Chạy low level HTTP máy chủ open; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runLowLevelHttpServerOpen(int port,
                                StackValue &result,
                                std::string &err,
@@ -615,6 +640,7 @@ bool runLowLevelHttpServerOpen(int port,
     return true;
 }
 
+// Chạy low level HTTP máy chủ next; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &err) {
     auto server = getLowHttpServer(serverId);
     if (!server) {
@@ -643,6 +669,7 @@ bool runLowLevelHttpServerNext(int serverId, StackValue &result, std::string &er
     return true;
 }
 
+// Chạy low level HTTP req trường; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runLowLevelHttpReqField(const std::string &reqId,
                              const std::string &field,
                              const std::optional<std::string> &key,
@@ -681,6 +708,7 @@ bool runLowLevelHttpReqField(const std::string &reqId,
     return true;
 }
 
+// Chạy low level HTTP máy chủ send; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runLowLevelHttpServerSend(const std::string &reqId,
                                int status,
                                const std::string &body,
@@ -721,6 +749,7 @@ bool runLowLevelHttpServerSend(const std::string &reqId,
     return true;
 }
 
+// Chạy low level HTTP máy chủ close; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runLowLevelHttpServerClose(int serverId, StackValue &result, std::string &err) {
     (void)err;
     auto server = getLowHttpServer(serverId);

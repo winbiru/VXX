@@ -1,13 +1,13 @@
 # Frozen from the pre-pipeline token -> bytecode compiler path.
 # Format: source path<TAB>FNV-1a-64 fingerprint of root bytecode, ordered
 # StringPool, sorted function bytecode, and sorted function-name map.
-src/tests/fixtures/api_project/controller.vi	8d1dfad83f2b2503
+src/tests/fixtures/api_project/controller.vi	26bfcfe9c126f01b
 src/tests/fixtures/api_project/database.vi	53f8950bcbe03aeb
 src/tests/fixtures/api_project/dto.vi	fcb85f468f0d94df
 src/tests/fixtures/api_project/entity.vi	5e84ac188b536f6d
 src/tests/fixtures/api_project/mapper.vi	8864a9cee102e3d3
 src/tests/fixtures/api_project/repository.vi	5b92e424b1f0a5f2
-src/tests/fixtures/api_project/service.vi	ed45aaf694945f15
+src/tests/fixtures/api_project/service.vi	73fce71e65f482dd
 src/tests/http_fixture.vi	6cceac98c48dad6c
 src/tests/import_main.vi	cadd316cb4187fb7
 src/tests/kiem_tra_api_db_project.vi	1fe1c63db9a30ba3
@@ -23,7 +23,8 @@ src/tests/kiem_tra_de_quy.vi	f877cfb6bcc9238d
 src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi	8e5edfd13a7c30cf
 src/tests/kiem_tra_dieu_kien_phu_dinh.vi	7c9f5f0b0b143946
 src/tests/kiem_tra_file_dem.vi	5e5b5ef28e429a58
-src/tests/kiem_tra_gc_mvp.vi	8cf8c0d842c35402
+src/tests/kiem_tra_gc_mvp.vi	4b501beeb37615bf
+src/tests/kiem_tra_giao_dien_trien_khai.vi	085f8ca4a836ac4e
 src/tests/kiem_tra_ham.vi	805e36a8a28fa85b
 src/tests/kiem_tra_ham_4_tham_so.vi	5f289c12458f7000
 src/tests/kiem_tra_ham_da_tu_khong_nhay.vi	aa8f1327ee2fd7d4
@@ -33,8 +34,15 @@ src/tests/kiem_tra_json_an_toan.vi	1e464f73957145af
 src/tests/kiem_tra_json_phan_tich.vi	29e1d2ff1a239e75
 src/tests/kiem_tra_lambda_hof_mac_dinh.vi	663e89819fd8eb77
 src/tests/kiem_tra_list_literal.vi	a77ff1eec5e941b5
-src/tests/kiem_tra_lop_truy_cap.vi	876f230d9b43be50
+src/tests/kiem_tra_lop_truy_cap.vi	c881aa88fc71f950
 src/tests/kiem_tra_object_model.vi	e1150c602e176f9a
+src/tests/kiem_tra_constructor_tham_so.vi	4170bff4913f6992
+src/tests/kiem_tra_visibility_instance.vi	514704b85d60a4ef
+src/tests/kiem_tra_ke_thua.vi	5064b23ec3c2eb61
+src/tests/kiem_tra_receiver_minh.vi	3f0600bbc376a5e8
+src/tests/kiem_tra_receiver_minh_de_quy.vi	2dd58d88fb108139
+src/tests/kiem_tra_receiver_minh_dieu_khien.vi	6081f8645e976155
+src/tests/kiem_tra_receiver_minh_nhieu_instance.vi	684ec42c27149b64
 src/tests/kiem_tra_mang_3_chieu.vi	f5a8b4612c59d658
 src/tests/kiem_tra_module_alias_lifecycle.vi	9ce9e4095e0e0368
 src/tests/kiem_tra_module_khoi_tao_mot_lan.vi	60c2723f27a07da1

@@ -14,16 +14,21 @@ namespace vietvm::compiler {
 
 namespace {
 
+// Gắn tạm một `CompilationRegistryState` làm registry đang hoạt động theo RAII; constructor lưu registry cũ và destructor khôi phục lại để các pipeline lồng nhau không giẫm trạng thái của nhau.
 class CompilationRegistryBinding {
 public:
+    // Kích hoạt registry mới và giữ con trỏ registry trước đó để có thể phục hồi chính xác khi rời scope.
     explicit CompilationRegistryBinding(CompilationRegistryState &state)
         : previous_(setActiveCompilationRegistryState(&state)) {}
 
+    // Khôi phục registry đã hoạt động trước khi binding được tạo, kể cả khi pipeline thoát bằng exception.
     ~CompilationRegistryBinding() {
         setActiveCompilationRegistryState(previous_);
     }
 
+    // Cấm sao chép để không có hai RAII guard cùng nghĩ rằng chúng sở hữu quyền phục hồi một registry trước đó.
     CompilationRegistryBinding(const CompilationRegistryBinding &) = delete;
+    // Cấm phép gán vì việc thay ownership giữa chừng sẽ phá thứ tự khôi phục registry theo stack scope.
     CompilationRegistryBinding &operator=(const CompilationRegistryBinding &) = delete;
 
 private:
@@ -32,22 +37,28 @@ private:
 
 thread_local std::size_t pipelineDepth = 0;
 
+// Theo dõi độ sâu pipeline theo RAII để biết lượt biên dịch hiện tại có phải top-level hay đang chạy lồng do import; constructor tăng bộ đếm và destructor luôn giảm lại.
 class PipelineDepthGuard {
 public:
+    // Đánh dấu `topLevel_` khi đây là pipeline ngoài cùng, sau đó tăng `pipelineDepth` cho các lượt compile lồng bên trong.
     PipelineDepthGuard() : topLevel_(pipelineDepth++ == 0) {}
+    // Giảm lại độ sâu pipeline khi rời scope để lần biên dịch tiếp theo quan sát đúng trạng thái nesting.
     ~PipelineDepthGuard() { --pipelineDepth; }
 
+    // Cho biết guard đại diện cho pipeline ngoài cùng; caller dùng cờ này để chỉ reset/finalize trạng thái toàn cục ở đúng tầng.
     bool topLevel() const noexcept { return topLevel_; }
 
 private:
     bool topLevel_ = false;
 };
 
+// Xóa transient compilation trạng thái; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
 void clearTransientCompilationState() {
     clearImportedFiles();
     clearClassAccessState();
 }
 
+// Lấy các import source-file trực tiếp của AST hiện tại; compiler dùng danh sách này để biên dịch dependency trước module đang xét.
 std::vector<vietvm::frontend::AstImportSpec> directLocalSourceImports(
     const vietvm::frontend::AstProgram &program) {
     std::vector<vietvm::frontend::AstImportSpec> imports;
@@ -69,6 +80,7 @@ std::vector<vietvm::frontend::AstImportSpec> directLocalSourceImports(
 
 } // namespace
 
+// Đặt lại trạng thái toàn cục của compiler như StringPool, function map, import và class context để lần biên dịch mới độc lập.
 void resetCompilationState() {
     StringPool::clear();
     clearTransientCompilationState();
@@ -77,6 +89,7 @@ void resetCompilationState() {
     hamMap::resetHamIdCounter();
 }
 
+// Xóa clear; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
 void CompilationContext::clear() {
     CompilationRegistryState::clear();
 }
@@ -85,6 +98,7 @@ void CompilationContext::clear() {
 
 namespace vietvm::compiler {
 
+// Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
@@ -131,6 +145,7 @@ CompilationArtifacts compilePipeline(
     return artifacts;
 }
 
+// Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
 CompilationArtifacts compilePipeline(
     CompilationContext &context,
     const std::string &source,
@@ -170,6 +185,7 @@ CompilationArtifacts compilePipeline(
 
 } // namespace vietvm::compiler
 
+// Biên dịch chuỗi nguồn thành bytecode bằng pipeline hiện hành và trả về artifact phục vụ CLI/runtime.
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap,
                                        bool emitMainCall)

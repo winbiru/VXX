@@ -6,6 +6,7 @@
 namespace vietvm::compiler {
 namespace {
 
+// Loại bỏ no ops; hàm tìm phần tử tương ứng rồi xóa nó khỏi cấu trúc trạng thái hiện tại.
 void removeNoOps(std::vector<IrInstruction> &instructions,
                  OptimizationReport &report) {
     for (IrInstruction &instruction : instructions) {
@@ -25,6 +26,7 @@ void removeNoOps(std::vector<IrInstruction> &instructions,
 
 } // namespace
 
+// Tối ưu `IrProgram` tại chỗ; hiện optimizer loại no-op và tính lại metadata vùng direct IR để artifact sau tối ưu vẫn nhất quán.
 OptimizationReport optimizeIr(IrProgram &program) {
     OptimizationReport report;
     removeNoOps(program.instructions, report);

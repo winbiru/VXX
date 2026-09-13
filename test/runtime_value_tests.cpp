@@ -147,6 +147,10 @@ void testRuntimeObjectModel() {
     const auto inherited = lookupMethod(child, "speak");
     expect(inherited.has_value() && *inherited == 11,
            "method lookup walks the superclass chain");
+    const auto inheritedBinding = resolveMethod(child, "speak");
+    expect(inheritedBinding.has_value() && inheritedBinding->functionId == 11 &&
+               inheritedBinding->owner == base,
+           "method resolution reports the class that owns an inherited method");
     expect(isSubclassOf(child, base) && !isSubclassOf(base, child),
            "runtime class hierarchy reports subclass relationships");
 
@@ -155,6 +159,10 @@ void testRuntimeObjectModel() {
     const auto overridden = lookupMethod(child, "speak");
     expect(overridden.has_value() && *overridden == 13,
            "method lookup prefers the nearest override");
+    const auto overriddenBinding = resolveMethod(child, "speak");
+    expect(overriddenBinding.has_value() && overriddenBinding->functionId == 13 &&
+               overriddenBinding->owner == child,
+           "method resolution reports the nearest overriding owner");
 
     const InstanceHandle first = createInstance(child);
     const InstanceHandle second = createInstance(child);

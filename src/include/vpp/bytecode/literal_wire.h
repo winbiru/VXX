@@ -10,6 +10,7 @@ namespace vietvm::bytecode {
 inline constexpr char kLiteralRecordSeparator = '\x1e';
 inline constexpr char kLiteralFieldSeparator = '\x1f';
 
+// Escape `literal wire field`; hàm thay ký tự đặc biệt bằng dạng an toàn cho định dạng đích trước khi tuần tự hóa.
 inline std::string escapeLiteralWireField(const std::string &value) {
     std::string escaped;
     escaped.reserve(value.size() + 8);
@@ -35,6 +36,7 @@ inline std::string escapeLiteralWireField(const std::string &value) {
     return escaped;
 }
 
+// Giải escape của một trường literal-wire; hàm quét chuỗi, nhận escape marker và khôi phục separator/backslash gốc trước khi decode giá trị.
 inline std::string unescapeLiteralWireField(const std::string &value) {
     std::string decoded;
     decoded.reserve(value.size());

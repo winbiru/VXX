@@ -9,9 +9,7 @@
 
 namespace vietvm::compiler {
 
-// Reset all process-wide compiler registries before starting a new top-level
-// compilation.  Do not call this while compileSource is recursively compiling
-// an imported module: imports intentionally share the active registry.
+// Đặt lại trạng thái toàn cục của compiler như StringPool, function map, import và class context để lần biên dịch mới độc lập.
 void resetCompilationState();
 
 } // namespace vietvm::compiler

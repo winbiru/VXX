@@ -66,6 +66,7 @@ const std::unordered_map<std::string, Opcode> keywordMap = {
     {"bắt lỗi", OP_BAT_LOI}
 };
 
+// Trả tên văn bản ổn định cho tên op; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 std::string name_op(Opcode op) {
     return vietvm::bytecode::opcodeName(op);
 }

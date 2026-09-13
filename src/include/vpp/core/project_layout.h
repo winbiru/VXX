@@ -25,18 +25,22 @@ inline constexpr std::array<const char *, 3> kPackageDirectoryNames = {
     "packages",
 };
 
+// Chuyển chuỗi UTF-8 thành `std::filesystem::path` theo quy tắc của nền tảng để đường dẫn Unicode hoạt động nhất quán.
 inline std::filesystem::path utf8Path(const char *value) {
     return std::filesystem::u8path(value);
 }
 
+// Chuyển chuỗi UTF-8 thành `std::filesystem::path` theo quy tắc của nền tảng để đường dẫn Unicode hoạt động nhất quán.
 inline std::filesystem::path utf8Path(const std::string &value) {
     return std::filesystem::u8path(value);
 }
 
+// Tạo đường dẫn entry point của package từ thư mục gốc/manifest; hàm ghép các thành phần layout theo quy ước dự án V++.
 inline std::filesystem::path packageEntryPath(const std::filesystem::path &packageDirectory) {
     return packageDirectory / utf8Path(kPackageEntryFile);
 }
 
+// Kiểm tra điều kiện của `isPackageDirectoryName`.
 inline bool isPackageDirectoryName(const std::string &name) {
     for (const char *candidate : kPackageDirectoryNames) {
         if (name == candidate) return true;

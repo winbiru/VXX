@@ -72,7 +72,7 @@ enum Opcode {
     OP_PHU_DINH      = 66,        // Phủ định cái gì đó.
     OP_CHON           = 67,      // switch chọn
     OP_CA            = 68,       // case ca
-    OP_PARAM = 69,               // tham số
+    OP_PARAM = 69,               // tham số; operandValue = -1 bind implicit method receiver
     OP_CONG_MOT = 70,            // tương đương với i = i + 1
     OP_TRU_MOT = 71,             // tương đương với i = i - 1 (--)
     OP_CONG_GAN = 72,            // +=
@@ -94,12 +94,12 @@ enum Opcode {
     OP_LIST_LITERAL = 88,        // list literal (operandIndex = encoded list in string pool)
     OP_DOC_CHI_SO = 89,          // read list/string element by integer index
     OP_GAN_CHI_SO = 90,          // assign list element by integer index
-    OP_TAO_LOP = 91,             // register runtime class (operandIndex = class name)
-    OP_THEM_PHUONG_THUC = 92,    // class/method/function-id tuple
-    OP_TAO_DOI_TUONG = 93,       // zero-arg instance construction
+    OP_TAO_LOP = 91,             // class name=operandIndex; operandValue=superclass string index+1, 0=none
+    OP_THEM_PHUONG_THUC = 92,    // đăng ký method; function id âm=private, class index âm=protected
+    OP_TAO_DOI_TUONG = 93,       // tạo instance; operand = số đối số truyền cho hàm `khởi tạo`
     OP_DOC_THUOC_TINH = 94,      // instance field read
     OP_GAN_THUOC_TINH = 95,      // instance field write
-    OP_GOI_PHUONG_THUC = 96      // bound method dispatch
+    OP_GOI_PHUONG_THUC = 96      // bound method dispatch; operandValue = 1 starts at superclass
 
 };
 
