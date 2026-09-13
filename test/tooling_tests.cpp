@@ -33,22 +33,22 @@ void testAstDumpUsesStructuralNamesAndTree() {
                 "hàm chào() {\n  trả về 1;\n}", keywordMap, false);
         const std::string dump = vietvm::tooling::dumpAst(artifacts.ast);
 
-        expect(dump.rfind("AST tokens=", 0) == 0,
+        expect(dump.rfind("AST từ tố=", 0) == 0,
                "AST dump starts with its program summary");
-        expect(dump.find("\nfunction ") != std::string::npos,
+        expect(dump.find("\nhàm ") != std::string::npos,
                "AST dump renders the function statement kind");
-        expect(dump.find("\n  block ") != std::string::npos,
+        expect(dump.find("\n  khối ") != std::string::npos,
                "AST dump indents the function body block");
-        expect(dump.find("\n    return ") != std::string::npos,
+        expect(dump.find("\n    trả về ") != std::string::npos,
                "AST dump renders nested return statements");
-        expect(dump.find("declaration=\"chào\"") != std::string::npos,
+        expect(dump.find("khai báo=\"chào\"") != std::string::npos,
                "AST dump quotes a declaration name with UTF-8 text intact");
-        expect(dump.find("tokens=[0, ") != std::string::npos,
+        expect(dump.find("từ tố=[0, ") != std::string::npos,
                "AST dump exposes each node's half-open token range");
-        expect(dump.find("span=1:1..") != std::string::npos,
+        expect(dump.find("vị trí=1:1..") != std::string::npos,
                "AST dump exposes source line and column spans");
-        expect(dump.find("expressions:\n") != std::string::npos &&
-                   dump.find(" literal=") != std::string::npos,
+        expect(dump.find("biểu thức:\n") != std::string::npos &&
+                   dump.find(" kiểu trực tiếp=") != std::string::npos,
                "AST dump exposes expression kinds and literal categories");
     } catch (const std::exception &error) {
         expect(false, std::string("AST dump compilation unexpectedly threw: ") + error.what());
@@ -67,29 +67,29 @@ void testIrDumpUsesOptimizedPipelineInstructions() {
                 keywordMap, false);
         const std::string dump = vietvm::tooling::dumpIr(artifacts.ir);
 
-        expect(dump.rfind("IR instructions=2 values=", 0) == 0,
+        expect(dump.rfind("IR câu lệnh=2 giá trị=", 0) == 0,
                "IR dump reports the post-optimization instruction count");
-        expect(dump.find("unsupported-direct-regions=") != std::string::npos &&
-                   dump.find("values:\n") != std::string::npos &&
-                   dump.find("instructions:\n") != std::string::npos,
+        expect(dump.find("vùng chưa hỗ trợ trực tiếp=") != std::string::npos &&
+                   dump.find("giá trị:\n") != std::string::npos &&
+                   dump.find("câu lệnh:\n") != std::string::npos,
                "IR dump exposes structured values and explicit unsupported-direct accounting");
-        expect(dump.find("print ") != std::string::npos,
+        expect(dump.find("in ") != std::string::npos,
                "IR dump renders the print opcode name");
-        expect(dump.find("define_function ") != std::string::npos,
+        expect(dump.find("định nghĩa hàm ") != std::string::npos,
                "IR dump renders the function-definition opcode name");
-        expect(dump.find("declaration=\"chào\"") != std::string::npos &&
-                   dump.find("params=[") != std::string::npos,
+        expect(dump.find("khai báo=\"chào\"") != std::string::npos &&
+                   dump.find("tham số=[") != std::string::npos,
                "IR dump exposes declaration and structured parameter metadata");
-        expect(dump.find("noop") == std::string::npos,
+        expect(dump.find("không thao tác") == std::string::npos,
                "IR dump reflects that the optimizer removed no-op instructions");
-        expect(dump.find("tokens=[\"in\", \"1\", \";\"]") != std::string::npos,
+        expect(dump.find("từ tố=[\"in\", \"1\", \";\"]") != std::string::npos,
                "IR dump quotes token lexemes without ambiguity");
-        expect(dump.find("const_int") != std::string::npos &&
-                   dump.find("roots=[") != std::string::npos,
+        expect(dump.find("hằng số nguyên") != std::string::npos &&
+                   dump.find("gốc=[") != std::string::npos,
                "IR dump makes recursive expression roots inspectable");
-        expect(dump.find("symbol=") != std::string::npos,
+        expect(dump.find("ký hiệu=") != std::string::npos,
                "IR dump includes semantic symbol IDs");
-        expect(dump.find("span=2:1..") != std::string::npos,
+        expect(dump.find("vị trí=2:1..") != std::string::npos,
                "IR dump exposes source line and column spans");
     } catch (const std::exception &error) {
         expect(false, std::string("IR dump compilation unexpectedly threw: ") + error.what());
@@ -106,11 +106,11 @@ void testConditionalFormIsVisibleInAstAndIrDumps() {
                 keywordMap, false);
         const std::string ast = vietvm::tooling::dumpAst(artifacts.ast);
         const std::string ir = vietvm::tooling::dumpIr(artifacts.ir);
-        expect(ast.find("conditional ") != std::string::npos &&
-                   ast.find("form=if_else_blocks") != std::string::npos,
+        expect(ast.find("điều kiện ") != std::string::npos &&
+                   ast.find("dạng=khối nếu hoặc") != std::string::npos,
                "AST dump exposes parser-owned conditional form metadata");
-        expect(ir.find("conditional ") != std::string::npos &&
-                   ir.find("form=if_else_blocks") != std::string::npos,
+        expect(ir.find("điều kiện ") != std::string::npos &&
+                   ir.find("dạng=khối nếu hoặc") != std::string::npos,
                "IR dump exposes lowered conditional form metadata");
     } catch (const std::exception &error) {
         expect(false, std::string("conditional dump unexpectedly threw: ") + error.what());
@@ -124,14 +124,14 @@ void testStructuredImportPayloadIsVisibleInAstDump() {
         "nhập \"cốt lõi\";");
     const std::string dump = vietvm::tooling::dumpAst(program);
 
-    expect(dump.find("import ") != std::string::npos &&
-               dump.find("form=local_source_file ") != std::string::npos &&
-               dump.find("target=\"src/tests/gói/math.vi\"") !=
+    expect(dump.find("nhập ") != std::string::npos &&
+               dump.find("dạng=tệp nguồn cục bộ ") != std::string::npos &&
+               dump.find("đích=\"src/tests/gói/math.vi\"") !=
                    std::string::npos &&
-               dump.find("quoted=no semicolon=yes alias=\"toan\"") !=
+               dump.find("có dấu nháy=không dấu chấm phẩy=có bí danh=\"toan\"") !=
                    std::string::npos,
            "AST dump exposes structured local-file import spelling and alias metadata");
-    expect(dump.find("target=\"cốt lõi\" quoted=yes semicolon=yes") !=
+    expect(dump.find("đích=\"cốt lõi\" có dấu nháy=có dấu chấm phẩy=có") !=
                std::string::npos,
            "AST dump exposes structured quoted package-import metadata");
 }
@@ -145,11 +145,11 @@ void testLoopFormIsVisibleInAstAndIrDumps() {
                 keywordMap, false);
         const std::string ast = vietvm::tooling::dumpAst(artifacts.ast);
         const std::string ir = vietvm::tooling::dumpIr(artifacts.ir);
-        expect(ast.find("loop ") != std::string::npos &&
-                   ast.find("form=for_block") != std::string::npos,
+        expect(ast.find("lặp ") != std::string::npos &&
+                   ast.find("dạng=khối lặp") != std::string::npos,
                "AST dump exposes parser-owned loop form metadata");
-        expect(ir.find("loop ") != std::string::npos &&
-                   ir.find("form=for_block") != std::string::npos,
+        expect(ir.find("lặp ") != std::string::npos &&
+                   ir.find("dạng=khối lặp") != std::string::npos,
                "IR dump exposes lowered loop form metadata");
     } catch (const std::exception &error) {
         expect(false, std::string("loop dump unexpectedly threw: ") + error.what());
@@ -167,19 +167,19 @@ void testClassFormVisibilityAndQualifiedMethodsAreVisibleInDumps() {
                 keywordMap, false);
         const std::string ast = vietvm::tooling::dumpAst(artifacts.ast);
         const std::string ir = vietvm::tooling::dumpIr(artifacts.ir);
-        expect(ast.find("class ") != std::string::npos &&
-                   ast.find("declaration=\"Toan\" visibility=private "
-                            "form=method_block") != std::string::npos,
+        expect(ast.find("lớp ") != std::string::npos &&
+                   ast.find("khai báo=\"Toan\" phạm vi=riêng tư "
+                            "dạng=khối phương thức") != std::string::npos,
                "AST dump exposes exact class form and source visibility");
-        expect(ast.find("declaration=\"cộng\" visibility=public") !=
+        expect(ast.find("khai báo=\"cộng\" phạm vi=công khai") !=
                    std::string::npos,
                "AST dump keeps a method's unqualified source declaration");
-        expect(ir.find("define_class ") != std::string::npos &&
-                   ir.find("declaration=\"Toan\" visibility=private "
-                           "form=method_block") != std::string::npos,
+        expect(ir.find("định nghĩa lớp ") != std::string::npos &&
+                   ir.find("khai báo=\"Toan\" phạm vi=riêng tư "
+                           "dạng=khối phương thức") != std::string::npos,
                "IR dump exposes lowered class form and visibility");
-        expect(ir.find("define_function ") != std::string::npos &&
-                   ir.find("declaration=\"Toan.cộng\" visibility=public") !=
+        expect(ir.find("định nghĩa hàm ") != std::string::npos &&
+                   ir.find("khai báo=\"Toan.cộng\" phạm vi=công khai") !=
                        std::string::npos,
                "IR dump exposes the semantic qualified method name");
     } catch (const std::exception &error) {
@@ -197,19 +197,19 @@ void testTryFormAndCatchBindingAreVisibleInAstAndIrDumps() {
                 keywordMap, false);
         const std::string ast = vietvm::tooling::dumpAst(artifacts.ast);
         const std::string ir = vietvm::tooling::dumpIr(artifacts.ir);
-        const std::size_t firstAstBlock = ast.find("\n  block ");
-        const std::size_t firstIrBlock = ir.find("  block ");
-        expect(ast.find("try ") != std::string::npos &&
-                   ast.find("form=try_catch_blocks catch=\"e\"") !=
+        const std::size_t firstAstBlock = ast.find("\n  khối ");
+        const std::size_t firstIrBlock = ir.find("  khối ");
+        expect(ast.find("thử ") != std::string::npos &&
+                   ast.find("dạng=khối thử bắt lỗi biến bắt lỗi=\"e\"") !=
                        std::string::npos &&
                    firstAstBlock != std::string::npos &&
-                   ast.find("\n  block ", firstAstBlock + 1) != std::string::npos,
+                   ast.find("\n  khối ", firstAstBlock + 1) != std::string::npos,
                "AST dump exposes try form, catch binding and both block children");
-        expect(ir.find("try ") != std::string::npos &&
-                   ir.find("form=try_catch_blocks catch=\"e\":symbol=") !=
+        expect(ir.find("thử ") != std::string::npos &&
+                   ir.find("dạng=khối thử bắt lỗi biến bắt lỗi=\"e\":ký hiệu=") !=
                        std::string::npos &&
                    firstIrBlock != std::string::npos &&
-                   ir.find("  block ", firstIrBlock + 1) != std::string::npos,
+                   ir.find("  khối ", firstIrBlock + 1) != std::string::npos,
                "IR dump exposes lowered try form, catch SymbolId and both blocks");
     } catch (const std::exception &error) {
         expect(false, std::string("try/catch dump unexpectedly threw: ") + error.what());
@@ -227,20 +227,20 @@ void testStructuredLambdaPayloadsAreVisibleInAstAndIrDumps() {
     const std::string ast = vietvm::tooling::dumpAst(program);
     const std::string ir = vietvm::tooling::dumpIr(irProgram);
 
-    expect(ast.find(" lambdas=1 ") != std::string::npos &&
-               ast.find(" lambda=#0") != std::string::npos &&
-               ast.find("params=[\"x\", \"y\":default=#") !=
+    expect(ast.find(" hàm vô danh=1 ") != std::string::npos &&
+               ast.find(" hàm vô danh=#0") != std::string::npos &&
+               ast.find("tham số=[\"x\", \"y\":mặc định=#") !=
                    std::string::npos &&
-               ast.find("\n    block ") != std::string::npos &&
-               ast.find("\n      return ") != std::string::npos,
+               ast.find("\n    khối ") != std::string::npos &&
+               ast.find("\n      trả về ") != std::string::npos,
            "AST dump exposes lambda arena identity, parameters/default and recursive body");
-    expect(ir.find(" lambdas=1 unsupported-direct-regions=0") != std::string::npos &&
-               ir.find(" lambda=#0") != std::string::npos &&
-               ir.find("#0 owner=#") != std::string::npos &&
-               ir.find("params=[\"x\":symbol=") != std::string::npos &&
-               ir.find(":default=#") != std::string::npos &&
-               ir.find("captures=[") != std::string::npos &&
-               ir.find("\n    0  block ") != std::string::npos,
+    expect(ir.find(" hàm vô danh=1 vùng chưa hỗ trợ trực tiếp=0") != std::string::npos &&
+               ir.find(" hàm vô danh=#0") != std::string::npos &&
+               ir.find("#0 chủ sở hữu=#") != std::string::npos &&
+               ir.find("tham số=[\"x\":ký hiệu=") != std::string::npos &&
+               ir.find(":mặc định=#") != std::string::npos &&
+               ir.find("biến bắt giữ=[") != std::string::npos &&
+               ir.find("\n    0  khối ") != std::string::npos,
            "IR dump exposes lambda owner, semantic parameters/captures and recursive block");
 }
 
@@ -260,10 +260,10 @@ void testCallTargetKindsAreVisibleInIrDump() {
     addCall(IrValueOpcode::CallDynamic, CallTargetKind::DynamicName);
 
     const std::string dump = vietvm::tooling::dumpIr(program);
-    expect(dump.find("call-target=direct_function") != std::string::npos &&
-               dump.find("call-target=indirect_value") != std::string::npos &&
-               dump.find("call-target=native") != std::string::npos &&
-               dump.find("call-target=dynamic_name") != std::string::npos,
+    expect(dump.find("đích gọi=hàm trực tiếp") != std::string::npos &&
+               dump.find("đích gọi=giá trị gián tiếp") != std::string::npos &&
+               dump.find("đích gọi=hàm bản địa") != std::string::npos &&
+               dump.find("đích gọi=tên động") != std::string::npos,
            "IR dump renders semantic direct/indirect/native/dynamic call classification");
 }
 
@@ -279,17 +279,17 @@ void testDisassemblerLabelsOnlyRealStringPoolOperands() {
     const std::string dump = vietvm::tooling::disassembleBytecode(
         bytecode, {"text", "function", "i:2"});
 
-    expect(dump.find("OP_BIEN_SO op=7 idx=0 val=0 pool=") == std::string::npos,
+    expect(dump.find("OP_BIEN_SO toán hạng=7 chỉ số=0 giá trị=0 bể chuỗi=") == std::string::npos,
            "integer constants are not mislabeled as StringPool references");
-    expect(dump.find("OP_PARAM op=0 idx=0 val=0 pool=") == std::string::npos,
+    expect(dump.find("OP_PARAM toán hạng=0 chỉ số=0 giá trị=0 bể chuỗi=") == std::string::npos,
            "parameter local slots are not mislabeled as StringPool references");
-    expect(dump.find("OP_CHUOI op=0 idx=0 val=0 pool=\"text\"") != std::string::npos,
+    expect(dump.find("OP_CHUOI toán hạng=0 chỉ số=0 giá trị=0 bể chuỗi=\"text\"") != std::string::npos,
            "string literals label their operandIndex pool entry");
-    expect(dump.find("OP_HAM op=1 idx=3 val=0 pool=\"function\"") != std::string::npos,
+    expect(dump.find("OP_HAM toán hạng=1 chỉ số=3 giá trị=0 bể chuỗi=\"function\"") != std::string::npos,
            "function declarations label their operand name entry");
-    expect(dump.find("OP_GOI op=0 idx=-2 val=0 pool=\"function\"") != std::string::npos,
+    expect(dump.find("OP_GOI toán hạng=0 chỉ số=-2 giá trị=0 bể chuỗi=\"function\"") != std::string::npos,
            "name-based calls decode their negative operandIndex pool entry");
-    expect(dump.find("OP_PARAM_MAC_DINH op=2 idx=0 val=0 pool=\"i:2\"") !=
+    expect(dump.find("OP_PARAM_MAC_DINH toán hạng=2 chỉ số=0 giá trị=0 bể chuỗi=\"i:2\"") !=
                std::string::npos,
            "default parameters label the pool entry stored in operand");
 }

@@ -1,0 +1,30 @@
+lớp Box {
+    hàm set(value) {
+        mình.value = value;
+    }
+
+    hàm get() {
+        trả về mình.value;
+    }
+
+    hàm copyFrom(other) {
+        mình.set(other.get());
+        trả về mình.get();
+    }
+};
+
+hàm main() {
+    a = Box();
+    b = Box();
+
+    a.set(7);
+    b.set(20);
+    in a.get();
+    in b.get();
+
+    in b.copyFrom(a);
+    a.set(99);
+
+    in a.get();
+    in b.get();
+};

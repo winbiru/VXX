@@ -52,6 +52,36 @@
 
 using vietvm::helpers::requireNativeArgumentCount;
 
+// Kiểm tra quyền gọi một method runtime dựa trên visibility, lớp đang thực thi
+// và lớp sở hữu method. Private chỉ cho chính lớp sở hữu; protected cho cả lớp con.
+static bool canAccessRuntimeMethod(
+    vietvm::runtime::RuntimeMemberVisibility visibility,
+    const ClassHandle &callerClass,
+    const ClassHandle &ownerClass) {
+    switch (visibility) {
+        case vietvm::runtime::RuntimeMemberVisibility::Public:
+            return true;
+        case vietvm::runtime::RuntimeMemberVisibility::Private:
+            return callerClass != nullptr && callerClass == ownerClass;
+        case vietvm::runtime::RuntimeMemberVisibility::Protected:
+            return callerClass != nullptr &&
+                   vietvm::runtime::isSubclassOf(callerClass, ownerClass);
+    }
+    return false;
+}
+
+// Trả message runtime phù hợp khi một method bị visibility chặn; hàm giữ
+// diagnostic private/protected ổn định cho cả constructor và bound method call.
+static std::string runtimeMethodAccessMessage(
+    vietvm::runtime::RuntimeMemberVisibility visibility,
+    const std::string &methodName) {
+    const auto &message = visibility == vietvm::runtime::RuntimeMemberVisibility::Private
+        ? vietvm::messages::kVmObjectPrivateMethodAccess
+        : vietvm::messages::kVmObjectProtectedMethodAccess;
+    return vietvm::messages::formatMessage(message, {methodName});
+}
+
+// Xử lý `native http client function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
 static bool handleNativeHttpClientFunction(const std::string &fn,
                                            const std::vector<StackValue> &args,
                                            StackValue &result,
@@ -85,6 +115,7 @@ static bool handleNativeHttpClientFunction(const std::string &fn,
     return false;
 }
 
+// Xử lý `native json function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
 static bool handleNativeJsonFunction(const std::string &fn,
                                      const std::vector<StackValue> &args,
                                      StackValue &result,
@@ -122,6 +153,7 @@ static bool handleNativeJsonFunction(const std::string &fn,
     return false;
 }
 
+// Xử lý `native low level http function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
 static bool handleNativeLowLevelHttpFunction(const std::string &fn,
                                              const std::vector<StackValue> &args,
                                              StackValue &result,
@@ -198,6 +230,7 @@ static bool handleNativeLowLevelHttpFunction(const std::string &fn,
     return false;
 }
 
+// Thực thi native thư viện chuẩn hàm; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
 static bool executeNativeStdlibFunction(int hamIdOrName,
                                         const std::vector<StackValue> &args,
                                         const std::vector<std::string> &stringPool,
@@ -393,9 +426,12 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
     return false;
 }
 
+// Giải mã ánh xạ from chuỗi bể dữ liệu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 static MapValue decodeMapFromStringPool(const std::string &encoded);
+// Giải mã danh sách from chuỗi bể dữ liệu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 static std::vector<StackValue> decodeListFromStringPool(const std::string &encoded);
 
+// Giải mã ánh xạ from chuỗi bể dữ liệu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 static MapValue decodeMapFromStringPool(const std::string &encoded) {
     constexpr char RS = vietvm::bytecode::kLiteralRecordSeparator;
     constexpr char FS = vietvm::bytecode::kLiteralFieldSeparator;
@@ -445,6 +481,7 @@ static MapValue decodeMapFromStringPool(const std::string &encoded) {
     return m;
 }
 
+// Giải mã danh sách from chuỗi bể dữ liệu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 static std::vector<StackValue> decodeListFromStringPool(const std::string &encoded) {
     constexpr char RS = vietvm::bytecode::kLiteralRecordSeparator;
     constexpr char FS = vietvm::bytecode::kLiteralFieldSeparator;
@@ -482,6 +519,7 @@ static std::vector<StackValue> decodeListFromStringPool(const std::string &encod
     return list;
 }
 
+// Giải mã mặc định param giá trị; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
 static StackValue decodeDefaultParamValue(const std::string &encoded) {
     size_t colon = encoded.find(':');
     if (colon == std::string::npos) {
@@ -499,34 +537,28 @@ static StackValue decodeDefaultParamValue(const std::string &encoded) {
         vietvm::messages::kVmDefaultParamTypeInvalid));
 }
 
-/**
- * VM ctor
- * (Keep existing constructors in vm.h / vm.cpp; this file assumes members:
- *  std::vector<Instruction> bytecode;
- *  std::vector<std::string> stringPool;
- *  std::vector<StackValue> stack;
- *  std::unordered_map<int, StackValue> variables;  // or map
- *  std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
- *  int pc;
- *  etc.)
- */
+// Khởi tạo máy ảo với bytecode hoặc trạng thái runtime được cung cấp; constructor thiết lập stack, frame và các bảng cần cho vòng thực thi.
 VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool)
     : bytecode(code), stringPool(pool), pc(0) {}
 
+// Thiết lập đầu ra sink; hàm ghi giá trị đầu vào vào trạng thái đích và thay thế giá trị cũ nếu đã tồn tại.
 void VM::setOutputSink(OutputSink sink) {
     outputSink = std::move(sink);
 }
 
+// Thêm mô-đun khởi tạo; hàm chèn dữ liệu mới vào cấu trúc trạng thái hiện tại và duy trì các chỉ mục liên quan.
 bool VM::addModuleInitializer(std::string identity,
                               std::vector<Instruction> initializer) {
     return moduleTable.add(std::move(identity), std::move(initializer));
 }
 
+// Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
 std::optional<vietvm::runtime::ModuleState> VM::moduleState(
     std::string_view identity) const noexcept {
     return moduleTable.state(identity);
 }
 
+// Khởi tạo các module runtime theo thứ tự phụ thuộc; tracker bảo đảm mỗi initializer chỉ chạy một lần và ghi trạng thái thành công/thất bại.
 void VM::initializeModules() {
     for (const std::string &identity : moduleTable.order()) {
         const auto state = moduleTable.state(identity);
@@ -546,6 +578,8 @@ void VM::initializeModules() {
             VM initializer(module == nullptr ? std::vector<Instruction>{}
                                              : module->initializer,
                            stringPool);
+            initializer.runtimeHeap = runtimeHeap;
+            initializer.inheritedGcRoots = gcRoots();
             initializer.outputSink = outputSink;
             initializer.variables = variables;
             initializer.classTable = classTable;
@@ -562,13 +596,14 @@ void VM::initializeModules() {
     }
 }
 
+// Phát mã cho đầu ra; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
 void VM::emitOutput(const StackValue& value) {
     if (!outputSink) return;
     outputSink(vietvm::messages::messageText(vietvm::messages::kVmOutputPrefix)
                + sv_to_string(value) + "\n");
 }
 
-// Convert StackValue to boolean
+// Chuyển `StackValue` thành điều kiện luận lý theo quy tắc runtime của V++, dùng cho nhánh và vòng lặp.
 bool toBool(const StackValue& value) {
     if (std::holds_alternative<int>(value))    return std::get<int>(value) != 0;
     if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
@@ -595,9 +630,14 @@ bool toBool(const StackValue& value) {
     return false;
 }
 
+// Thực hiện chu kỳ thu gom bộ nhớ runtime theo cơ chế GC hiện tại, duyệt các root đang sống trước khi giải phóng đối tượng không còn tham chiếu.
 void VM::collectGarbage() {
-    // MVP GC: compact runtime containers to release unused memory back to allocator.
-    // This is intentionally conservative and does not alter value semantics.
+    if (runtimeHeap != nullptr) {
+        lastGcStats = runtimeHeap->collect(gcRoots());
+    }
+
+    // Sau mark/sweep, thu gọn sức chứa của các container điều khiển để trả phần
+    // bộ nhớ dự phòng không còn cần thiết về allocator.
     stack.shrink_to_fit();
     callStack.shrink_to_fit();
     loopStartStack.shrink_to_fit();
@@ -614,6 +654,30 @@ void VM::collectGarbage() {
     variables.rehash(variables.size());
 }
 
+// Chụp root của VM cho tracing GC; child VM nhận thêm snapshot của caller để GC
+// trong lời gọi lồng nhau không quét object mà frame/stack bên ngoài vẫn cần dùng.
+std::vector<StackValue> VM::gcRoots() const {
+    std::vector<StackValue> roots = inheritedGcRoots;
+    roots.insert(roots.end(), stack.begin(), stack.end());
+    for (const auto &entry : variables) roots.push_back(entry.second);
+    for (const auto &entry : classTable) roots.push_back(make_class_value(entry.second));
+
+    for (const CallFrame &frame : callStack) {
+        roots.insert(roots.end(), frame.args.begin(), frame.args.end());
+        roots.insert(roots.end(), frame.localsVec.begin(), frame.localsVec.end());
+        for (const auto &entry : frame.localsMap) roots.push_back(entry.second);
+        if (frame.receiver != nullptr) roots.push_back(make_instance_value(frame.receiver));
+        if (frame.methodOwnerClass != nullptr) {
+            roots.push_back(make_class_value(frame.methodOwnerClass));
+        }
+    }
+    for (const SwitchFrame &frame : switchStack) {
+        if (frame.switchValue.has_value()) roots.push_back(*frame.switchValue);
+    }
+    return roots;
+}
+
+// Chạy JIT đã biên dịch tuyến tính; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool VM::runJitCompiledLinear() {
     // MVP JIT: compile linear, non-control-flow bytecode into executable lambdas.
     // Unsupported opcodes fall back to the normal interpreter.
@@ -753,7 +817,13 @@ bool VM::runJitCompiledLinear() {
     return true;
 }
 
-void VM::invokeFunction(int argc, int hamIdOrName, Opcode op, int curPc) {
+// Tạo call frame và thực thi bytecode của một function id với danh sách đối số/receiver đã chuẩn bị, sau đó trả kết quả về caller.
+void VM::invokeFunction(int argc,
+                        int hamIdOrName,
+                        Opcode op,
+                        int curPc,
+                        InstanceHandle receiver,
+                        ClassHandle methodOwnerClass) {
     std::vector<StackValue> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
@@ -780,6 +850,8 @@ void VM::invokeFunction(int argc, int hamIdOrName, Opcode op, int curPc) {
 
     CallFrame frame;
     frame.args = args;
+    frame.receiver = std::move(receiver);
+    frame.methodOwnerClass = std::move(methodOwnerClass);
     frame.localsIndexed = true;
     frame.returnPc = curPc + 1;
     callStack.push_back(frame);
@@ -819,6 +891,8 @@ void VM::invokeFunction(int argc, int hamIdOrName, Opcode op, int curPc) {
     }
 
     VM funcVM(it->second, stringPool);
+    funcVM.runtimeHeap = runtimeHeap;
+    funcVM.inheritedGcRoots = gcRoots();
     funcVM.outputSink = outputSink;
     funcVM.variables = variables;
     funcVM.classTable = classTable;
@@ -836,6 +910,7 @@ void VM::invokeFunction(int argc, int hamIdOrName, Opcode op, int curPc) {
     if (!callStack.empty()) callStack.pop_back();
 }
 
+// Xử lý nhóm opcode gọi hàm/phương thức; hàm lấy đối số từ stack, xác định đích gọi và chuyển quyền điều khiển sang function tương ứng.
 void VM::executeCallOpcode(const Instruction& instr) {
     if (instr.op == OP_GOI) {
         invokeFunction(instr.operand, instr.operandIndex, instr.op, static_cast<int>(pc));
@@ -877,6 +952,7 @@ void VM::executeCallOpcode(const Instruction& instr) {
     invokeFunction(instr.operand, hamIdOrName, instr.op, static_cast<int>(pc));
 }
 
+// Xử lý opcode tạo hoặc biến đổi giá trị trên stack, bao gồm literal và các phép toán số/chuỗi.
 void VM::executeValueOpcode(const Instruction& instr) {
     switch (instr.op) {
         case OP_BIEN_SO:
@@ -978,6 +1054,7 @@ void VM::executeValueOpcode(const Instruction& instr) {
     }
 }
 
+// Xử lý truy cập theo chỉ số cho list/map/string; hàm đọc toán hạng trên stack và áp dụng quy tắc kiểm tra biên/khóa runtime.
 void VM::executeIndexOpcode(const Instruction& instr) {
     if (instr.op == OP_DOC_CHI_SO) {
         if (stack.size() < 2) {
@@ -1055,6 +1132,7 @@ void VM::executeIndexOpcode(const Instruction& instr) {
     list->elements[static_cast<std::size_t>(index)] = std::move(value);
 }
 
+// Xử lý opcode object model như tạo lớp, tạo instance, đọc/ghi field và gọi phương thức có receiver.
 void VM::executeObjectOpcode(const Instruction& instr) {
     auto stringAt = [&](int index, std::string_view errorMessage) -> const std::string & {
         if (index < 0 || index >= static_cast<int>(stringPool.size())) {
@@ -1068,13 +1146,39 @@ void VM::executeObjectOpcode(const Instruction& instr) {
             const std::string &className = stringAt(
                 instr.operandIndex, vietvm::messages::kVmObjectInvalidClassNameIndex);
             if (classTable.find(className) == classTable.end()) {
-                classTable.emplace(className, vietvm::runtime::createClass(className));
+                ClassHandle superclass;
+                if (instr.operandValue > 0) {
+                    const std::string &superclassName = stringAt(
+                        instr.operandValue - 1,
+                        vietvm::messages::kVmObjectInvalidClassNameIndex);
+                    const auto foundSuperclass = classTable.find(superclassName);
+                    if (foundSuperclass == classTable.end()) {
+                        throw runtime_error_op(vietvm::messages::formatMessage(
+                            vietvm::messages::kVmObjectClassNotFound,
+                            {superclassName}), instr.op, pc);
+                    }
+                    superclass = foundSuperclass->second;
+                }
+                classTable.emplace(
+                    className,
+                    vietvm::runtime::createClass(className, std::move(superclass)));
             }
             return;
         }
         case OP_THEM_PHUONG_THUC: {
+            int classNameIndex = instr.operand;
+            int functionId = instr.operandValue;
+            vietvm::runtime::RuntimeMemberVisibility visibility =
+                vietvm::runtime::RuntimeMemberVisibility::Public;
+            if (functionId < 0) {
+                visibility = vietvm::runtime::RuntimeMemberVisibility::Private;
+                functionId = -(functionId + 1);
+            } else if (classNameIndex < 0) {
+                visibility = vietvm::runtime::RuntimeMemberVisibility::Protected;
+                classNameIndex = -(classNameIndex + 1);
+            }
             const std::string &className = stringAt(
-                instr.operand, vietvm::messages::kVmObjectInvalidClassNameIndex);
+                classNameIndex, vietvm::messages::kVmObjectInvalidClassNameIndex);
             const std::string &methodName = stringAt(
                 instr.operandIndex, vietvm::messages::kVmObjectInvalidMemberNameIndex);
             const auto foundClass = classTable.find(className);
@@ -1083,7 +1187,7 @@ void VM::executeObjectOpcode(const Instruction& instr) {
                     vietvm::messages::kVmObjectClassNotFound, {className}), instr.op, pc);
             }
             (void)vietvm::runtime::defineMethod(
-                foundClass->second, methodName, instr.operandValue);
+                foundClass->second, methodName, functionId, visibility);
             return;
         }
         case OP_TAO_DOI_TUONG: {
@@ -1094,8 +1198,36 @@ void VM::executeObjectOpcode(const Instruction& instr) {
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmObjectClassNotFound, {className}), instr.op, pc);
             }
-            stack.push_back(make_instance_value(
-                vietvm::runtime::createInstance(foundClass->second)));
+            const int argc = instr.operand;
+            if (argc < 0 || stack.size() < static_cast<std::size_t>(argc)) {
+                throw runtime_error_op(vietvm::messages::formatMessage(
+                    vietvm::messages::kVmObjectNotEnoughOperands), instr.op, pc);
+            }
+
+            const ClassHandle &klass = foundClass->second;
+            const InstanceHandle instance = vietvm::runtime::createInstance(klass);
+            const auto constructor = klass->methods.find("khởi tạo");
+            if (constructor != klass->methods.end()) {
+                const ClassHandle callerClass = callStack.empty()
+                    ? nullptr
+                    : callStack.back().methodOwnerClass;
+                if (!canAccessRuntimeMethod(
+                        constructor->second.visibility, callerClass, klass)) {
+                    throw runtime_error_op(
+                        runtimeMethodAccessMessage(
+                            constructor->second.visibility, "khởi tạo"),
+                        instr.op, pc);
+                }
+                const std::size_t stackBase = stack.size() - static_cast<std::size_t>(argc);
+                invokeFunction(argc, constructor->second.functionId,
+                               instr.op, static_cast<int>(pc),
+                               instance, klass);
+                stack.resize(stackBase);
+            } else if (argc != 0) {
+                throw runtime_error_op(vietvm::messages::formatMessage(
+                    vietvm::messages::kVmObjectMethodNotFound, {"khởi tạo"}), instr.op, pc);
+            }
+            stack.push_back(make_instance_value(instance));
             return;
         }
         case OP_DOC_THUOC_TINH: {
@@ -1163,15 +1295,34 @@ void VM::executeObjectOpcode(const Instruction& instr) {
                     vietvm::messages::kVmObjectExpectedInstance), instr.op, pc);
             }
             const InstanceHandle &instance = std::get<InstanceHandle>(receiver);
-            const auto method = instance == nullptr
-                ? std::optional<int>{}
-                : vietvm::runtime::lookupMethod(instance->klass, methodName);
+            ClassHandle dispatchClass;
+            if (instance != nullptr) {
+                if (instr.operandValue == 1) {
+                    if (!callStack.empty() &&
+                        callStack.back().methodOwnerClass != nullptr) {
+                        dispatchClass = callStack.back().methodOwnerClass->superclass;
+                    }
+                } else {
+                    dispatchClass = instance->klass;
+                }
+            }
+            const auto method = vietvm::runtime::resolveMethod(dispatchClass, methodName);
             if (!method.has_value()) {
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmObjectMethodNotFound, {methodName}), instr.op, pc);
             }
+            const ClassHandle callerClass = callStack.empty()
+                ? nullptr
+                : callStack.back().methodOwnerClass;
+            if (!canAccessRuntimeMethod(
+                    method->visibility, callerClass, method->owner)) {
+                throw runtime_error_op(
+                    runtimeMethodAccessMessage(method->visibility, methodName),
+                    instr.op, pc);
+            }
             for (const StackValue &argument : args) stack.push_back(argument);
-            invokeFunction(argc, *method, instr.op, static_cast<int>(pc));
+            invokeFunction(argc, method->functionId, instr.op, static_cast<int>(pc),
+                           instance, method->owner);
             return;
         }
         default:
@@ -1180,6 +1331,7 @@ void VM::executeObjectOpcode(const Instruction& instr) {
     }
 }
 
+// Xử lý opcode biến cục bộ/tham số bằng cách đọc hoặc ghi slot trong call frame hiện tại.
 void VM::executeVariableOpcode(const Instruction& instr) {
     switch (instr.op) {
         case OP_KHOI_TAO: {
@@ -1291,7 +1443,13 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             }
             CallFrame &frame = callStack.back();
             StackValue value;
-            if (argIndex >= 0 && argIndex < static_cast<int>(frame.args.size())) {
+            if (argIndex == -1) {
+                if (frame.receiver == nullptr) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmObjectExpectedInstance), instr.op, pc);
+                }
+                value = make_instance_value(frame.receiver);
+            } else if (argIndex >= 0 && argIndex < static_cast<int>(frame.args.size())) {
                 value = frame.args[argIndex];
             } else {
                 value = make_int_value(0);
@@ -1396,6 +1554,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
     }
 }
 
+// Điều khiển trạng thái của câu lệnh `chọn`, theo dõi nhánh đã khớp và việc bỏ qua các nhánh còn lại.
 bool VM::executeSwitchOpcode(const Instruction& instr) {
     switch (instr.op) {
         case OP_CHON: {
@@ -1492,6 +1651,7 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
     }
 }
 
+// Xử lý `thoát` và `tiếp tục` bằng metadata điều khiển vòng lặp đã được codegen gắn vào bytecode.
 void VM::executeLoopControlOpcode(const Instruction& instr) {
     if (instr.op != OP_BO_QUA) {
         throw runtime_error_op(vietvm::messages::formatMessage(
@@ -1509,6 +1669,7 @@ void VM::executeLoopControlOpcode(const Instruction& instr) {
         vietvm::messages::kVmContinueMissingUpdate), instr.op, pc);
 }
 
+// Cập nhật trạng thái khi VM đi vào hoặc rời block, phục vụ các cấu trúc điều khiển và exception scope.
 void VM::executeBlockOpcode(const Instruction& instr) {
     if (instr.op == OP_MO_KHOI) {
         blockStack.push_back(pc);
@@ -1529,6 +1690,7 @@ void VM::executeBlockOpcode(const Instruction& instr) {
     }
 }
 
+// Xử lý `thử`, `bắt lỗi` và `ném`; hàm quản lý try frame và chuyển điều khiển tới handler phù hợp.
 bool VM::executeExceptionOpcode(const Instruction& instr) {
     switch (instr.op) {
         case OP_THU: {
@@ -1575,6 +1737,7 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
     }
 }
 
+// Xử lý opcode nhảy có điều kiện/không điều kiện bằng cách cập nhật program counter dựa trên giá trị trên stack.
 bool VM::executeBranchOpcode(const Instruction& instr) {
     const int jumpAddress = instr.operand;
     if (instr.op == OP_JUMP) {
@@ -1604,6 +1767,7 @@ bool VM::executeBranchOpcode(const Instruction& instr) {
     return true;
 }
 
+// Xử lý opcode xuất dữ liệu, chuyển `StackValue` thành chuỗi rồi gửi tới output sink đã cấu hình.
 void VM::executeOutputOpcode(const Instruction& instr) {
     if (instr.op != OP_IN) {
         throw runtime_error_op(vietvm::messages::formatMessage(
@@ -1621,11 +1785,11 @@ void VM::executeOutputOpcode(const Instruction& instr) {
     }
 }
 
+// Chạy vòng lặp VM từ bytecode hiện tại; mỗi bước đọc opcode tại program counter và chuyển tới handler tương ứng cho tới khi dừng.
 void VM::run() {
     VMRuntimeFixture runtime(*this);
+    vietvm::runtime::RuntimeHeapScope heapScope(*runtimeHeap);
     initializeModules();
-    const bool gcEnabled = vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableGc)
-                        || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableGc);
     int gcInterval = vietvm::constants::kDefaultGcInterval;
     std::optional<std::string> gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVppGcInterval);
     if (!gcEnv) gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVietvmGcInterval);
@@ -1653,12 +1817,10 @@ void VM::run() {
     }
 
     while (pc < bytecode.size()) {
-        if (gcEnabled) {
-            ++executedSinceGc;
-            if (executedSinceGc >= gcInterval) {
-                collectGarbage();
-                executedSinceGc = 0;
-            }
+        ++executedSinceGc;
+        if (executedSinceGc >= gcInterval) {
+            collectGarbage();
+            executedSinceGc = 0;
         }
 
         const Instruction &instr = bytecode[pc];
@@ -1754,6 +1916,7 @@ void VM::run() {
                 break;
 
             case OP_DUNG_CHUONG_TRINH:
+                collectGarbage();
                 return;
 
             case OP_MO_KHOI:
@@ -1777,4 +1940,5 @@ void VM::run() {
         }
         ++pc;
     }
+    collectGarbage();
 }

@@ -1,0 +1,25 @@
+lớp Base {
+    hàm riêng tư secret(value) {
+        trả về value + 1;
+    }
+
+    hàm bảo vệ token(value) {
+        trả về value + 2;
+    }
+
+    hàm công khai viaPrivate(value) {
+        trả về mình.secret(value);
+    }
+}
+
+lớp Child kế thừa Base {
+    hàm công khai read(value) {
+        trả về mình.token(value) + gốc.viaPrivate(value);
+    }
+}
+
+hàm main() {
+    child = Child();
+    in child.read(5);
+    in child.viaPrivate(10);
+}

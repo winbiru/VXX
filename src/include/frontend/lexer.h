@@ -25,11 +25,13 @@ namespace vietvm::compiler {
         size_t column;
         std::string context;
 
+        // Khởi tạo lỗi lexer với thông điệp và vị trí nguồn; object giữ dữ liệu diagnostic để CLI có thể hiển thị dòng/cột chính xác.
         explicit LexerError(const std::string& message, size_t line = 0, size_t column = 0, const std::string& context = "")
             : std::runtime_error(formatMessage(message, line, column, context)),
               line(line), column(column), context(context) {}
 
     private:
+        // Định dạng thông báo; hàm chuyển dữ liệu đầu vào thành biểu diễn chuỗi ổn định để hiển thị hoặc ghi log.
         static std::string formatMessage(const std::string& msg, size_t line, size_t col, const std::string& ctx) {
             std::ostringstream oss;
             oss << "Lỗi lexer";
@@ -49,6 +51,7 @@ namespace vietvm::compiler {
     // Exception cho chuỗi không đóng (thiếu dấu nháy kết thúc)
     class UnclosedStringError : public LexerError {
     public:
+        // Tạo lỗi cho chuỗi chưa đóng; constructor gắn vị trí bắt đầu literal và thông điệp chuyên biệt từ lexer.
         UnclosedStringError(size_t line, size_t column, const std::string& partialString)
             : LexerError(messages::formatMessage(messages::kLexerUnclosedString), line, column,
                          "\"" + (partialString.length() > 20 ? partialString.substr(0, 20) + "..." : partialString)) {}
@@ -57,6 +60,7 @@ namespace vietvm::compiler {
     // Exception cho comment block không đóng (thiếu */)
     class UnclosedCommentError : public LexerError {
     public:
+        // Tạo lỗi cho comment khối chưa đóng; constructor giữ vị trí nguồn để diagnostic chỉ đúng nơi comment bắt đầu.
         UnclosedCommentError(size_t line, size_t column)
             : LexerError(messages::formatMessage(messages::kLexerUnclosedComment), line, column, "/*...") {}
     };
@@ -64,6 +68,7 @@ namespace vietvm::compiler {
     // Exception cho ký tự không hợp lệ
     class InvalidCharacterError : public LexerError {
     public:
+        // Tạo lỗi ký tự không hợp lệ; constructor ghi ký tự và vị trí gặp lỗi vào diagnostic lexer.
         InvalidCharacterError(char c, size_t line, size_t column)
             : LexerError(messages::formatMessage(messages::kLexerInvalidCharacter,
                                                   {std::string(1, c),
@@ -74,6 +79,7 @@ namespace vietvm::compiler {
     // Exception cho escape sequence không hợp lệ (ví dụ: \x không được hỗ trợ)
     class InvalidEscapeSequenceError : public LexerError {
     public:
+        // Tạo lỗi escape sequence không hợp lệ trong chuỗi; constructor giữ sequence và vị trí để thông báo rõ nguyên nhân.
         InvalidEscapeSequenceError(char escChar, size_t line, size_t column)
             : LexerError(messages::formatMessage(messages::kLexerInvalidEscapeSequence,
                                                   {std::string(1, escChar)}),
@@ -83,6 +89,7 @@ namespace vietvm::compiler {
     // Exception cho token không mong đợi
     class UnexpectedTokenError : public LexerError {
     public:
+        // Tạo lỗi khi lexer/parser gặp token ngoài ngữ cảnh cho phép; constructor đóng gói token thực tế cùng vị trí nguồn.
         UnexpectedTokenError(const std::string& token, const std::string& expected, size_t line, size_t column)
             : LexerError(expected.empty()
                              ? messages::formatMessage(messages::kLexerUnexpectedToken, {token})
@@ -94,6 +101,7 @@ namespace vietvm::compiler {
     // Exception cho số không hợp lệ
     class InvalidNumberError : public LexerError {
     public:
+        // Tạo lỗi literal số sai định dạng; constructor giữ lexeme số và vị trí để báo lỗi chính xác.
         InvalidNumberError(const std::string& token, size_t line, size_t column)
             : LexerError(messages::formatMessage(messages::kLexerInvalidNumber, {token}), line, column, "") {}
     };
@@ -101,6 +109,7 @@ namespace vietvm::compiler {
     // Exception cho identifier không hợp lệ
     class InvalidIdentifierError : public LexerError {
     public:
+        // Tạo lỗi identifier không hợp lệ; constructor lưu tên và vị trí vi phạm quy tắc đặt tên.
         InvalidIdentifierError(const std::string& token, size_t line, size_t column)
             : LexerError(messages::formatMessage(messages::kLexerInvalidIdentifier, {token}), line, column, "") {}
     };
@@ -131,6 +140,7 @@ namespace vietvm::compiler {
 
     // Trả về true nếu chuỗi biểu diễn một số nguyên (có thể có dấu '-' ở đầu).
     bool isNumber(const std::string &s) noexcept;
+    // Kiểm tra điều kiện của `isFloat`.
     bool isFloat(const std::string &s) noexcept;
 
     // True nếu tok là một toán tử đã biết (==, !=, +, -, ...).
@@ -153,17 +163,14 @@ namespace vietvm::compiler {
     // khi gặp các trường hợp lỗi.
     std::vector<std::string> tokenize(const std::string &src);
 
-    // Canonical lexer output used by the parser pipeline.  It keeps the legacy
-    // token spelling while attaching byte offsets and one-based line/column
-    // spans for AST, semantic diagnostics and tooling.
+    // Tách token cho with spans; hàm quét chuỗi nguồn từ trái sang phải và tạo dãy token, đồng thời bảo toàn thông tin vị trí khi cần.
     std::vector<vietvm::frontend::Token> tokenizeWithSpans(const std::string &src);
 
     // Xử lý hậu token: gộp các từ khóa nhiều từ (ví dụ "mặc định", "nếu không"),
     // loại bỏ các dấu câu đuôi khi so sánh, v.v.
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens);
 
-    // Span-preserving counterpart of postProcessTokens.  Multi-word keywords
-    // receive a span covering all source tokens that were merged.
+    // Hậu xử lý token nhưng giữ `SourceSpan`; hàm thực hiện cùng quy tắc chuẩn hóa như bản chuỗi đồng thời hợp nhất vị trí nguồn của token được gộp.
     std::vector<vietvm::frontend::Token> postProcessTokensWithSpans(
         const std::vector<vietvm::frontend::Token> &tokens);
 

@@ -9,6 +9,7 @@ namespace vietvm::core {
 
 namespace {
 
+// Xác định số byte của một code point UTF-8 từ byte đầu tiên; hàm kiểm tra các bit tiền tố để trả độ dài 1–4 byte hoặc 0 nếu byte mở đầu không hợp lệ.
 std::size_t utf8SequenceLength(unsigned char lead) {
     if ((lead & 0x80u) == 0) return 1;
     if ((lead & 0xe0u) == 0xc0u) return 2;
@@ -17,6 +18,7 @@ std::size_t utf8SequenceLength(unsigned char lead) {
     return 1;
 }
 
+// Kiểm tra một chuỗi byte có tạo thành đúng một đơn vị UTF-8 hợp lệ hay không; hàm xác định độ dài mong đợi rồi xác minh từng byte tiếp diễn có tiền tố `10`.
 bool validUtf8Unit(const std::string &value, std::size_t offset, std::size_t length) {
     if (length == 1) return true;
     if (offset + length > value.size()) return false;
@@ -29,6 +31,7 @@ bool validUtf8Unit(const std::string &value, std::size_t offset, std::size_t len
 
 } // namespace
 
+// Loại bỏ khoảng trắng ở đầu và cuối chuỗi; hàm tìm biên trái/phải đầu tiên không phải whitespace rồi trả lát cắt tương ứng.
 std::string trim(const std::string &value) {
     const size_t start = value.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -36,6 +39,7 @@ std::string trim(const std::string &value) {
     return value.substr(start, end - start + 1);
 }
 
+// Chuyển lower ascii; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 std::string toLowerAscii(const std::string &value) {
     std::string result;
     result.reserve(value.size());
@@ -49,6 +53,7 @@ std::string toLowerAscii(const std::string &value) {
     return result;
 }
 
+// Chuyển upper ascii; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 std::string toUpperAscii(const std::string &value) {
     std::string result;
     result.reserve(value.size());
@@ -62,6 +67,7 @@ std::string toUpperAscii(const std::string &value) {
     return result;
 }
 
+// Tách ascii words; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
 std::vector<std::string> splitAsciiWords(const std::string &value) {
     std::vector<std::string> words;
     std::string current;
@@ -79,6 +85,7 @@ std::vector<std::string> splitAsciiWords(const std::string &value) {
     return words;
 }
 
+// Ghép with spaces; hàm nối các phần tử theo thứ tự bằng dấu phân cách quy định để tạo kết quả duy nhất.
 std::string joinWithSpaces(const std::vector<std::string> &words) {
     std::ostringstream output;
     for (std::size_t index = 0; index < words.size(); ++index) {
@@ -88,6 +95,7 @@ std::string joinWithSpaces(const std::vector<std::string> &words) {
     return output.str();
 }
 
+// Đếm số code point UTF-8 trong chuỗi; hàm tiến qua dữ liệu theo độ dài từng sequence thay vì đếm trực tiếp số byte.
 std::size_t utf8CodePointCount(const std::string &value) {
     std::size_t count = 0;
     for (std::size_t offset = 0; offset < value.size();) {
@@ -99,6 +107,7 @@ std::size_t utf8CodePointCount(const std::string &value) {
     return count;
 }
 
+// Đảo thứ tự code point UTF-8 mà không làm vỡ byte đa phần; hàm tách ranh giới từng code point rồi ghép chúng theo thứ tự ngược.
 std::string reverseUtf8CodePoints(const std::string &value) {
     std::vector<std::string> units;
     units.reserve(value.size());
@@ -115,6 +124,7 @@ std::string reverseUtf8CodePoints(const std::string &value) {
     return result;
 }
 
+// Đếm số lần chuỗi con xuất hiện; hàm lặp `find` từ vị trí kế tiếp cho tới khi không còn kết quả.
 std::size_t countSubstring(const std::string &value, const std::string &needle) {
     if (needle.empty()) return 0;
     std::size_t count = 0;
@@ -126,6 +136,7 @@ std::size_t countSubstring(const std::string &value, const std::string &needle) 
     return count;
 }
 
+// Thay mọi lần xuất hiện của chuỗi nguồn bằng chuỗi đích; hàm tìm tuần tự và cập nhật vị trí sau mỗi lần thay để tránh lặp vô hạn.
 std::string replaceAll(const std::string &value,
                        const std::string &from,
                        const std::string &to) {
@@ -139,6 +150,7 @@ std::string replaceAll(const std::string &value,
     return result;
 }
 
+// Tìm từ ASCII dài nhất trong chuỗi; hàm tách theo ranh giới từ rồi giữ phần tử có độ dài lớn nhất.
 std::string longestAsciiWord(const std::string &value) {
     const std::vector<std::string> words = splitAsciiWords(value);
     std::string longest;
@@ -148,6 +160,7 @@ std::string longestAsciiWord(const std::string &value) {
     return longest;
 }
 
+// Viết hoa ký tự đầu của từng từ ASCII; hàm theo dõi ranh giới từ và chỉ đổi chữ cái đầu tiên sau mỗi khoảng phân cách.
 std::string titleAsciiWords(const std::string &value) {
     std::vector<std::string> words = splitAsciiWords(value);
     for (std::string &word : words) {
@@ -159,11 +172,13 @@ std::string titleAsciiWords(const std::string &value) {
     return joinWithSpaces(words);
 }
 
+// Kiểm tra điều kiện của `isAsciiCaseInsensitivePalindrome`.
 bool isAsciiCaseInsensitivePalindrome(const std::string &value) {
     const std::string normalized = toLowerAscii(value);
     return normalized == reverseUtf8CodePoints(normalized);
 }
 
+// Kiểm tra hai chuỗi có phải hoán vị ký tự ASCII của nhau; hàm chuẩn hóa rồi so sánh tần suất ký tự của hai phía.
 bool areAsciiAnagrams(const std::string &left, const std::string &right) {
     auto normalize = [](const std::string &value) {
         std::string normalized;
@@ -176,6 +191,7 @@ bool areAsciiAnagrams(const std::string &left, const std::string &right) {
     return normalize(left) == normalize(right);
 }
 
+// Dịch chữ cái ASCII theo khóa Caesar; hàm xoay ký tự trong miền A–Z/a–z và giữ nguyên ký tự ngoài bảng chữ cái.
 std::string caesarAscii(const std::string &value, int shift) {
     const int normalized = ((shift % 26) + 26) % 26;
     std::string result = value;

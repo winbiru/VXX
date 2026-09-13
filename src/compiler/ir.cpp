@@ -1,7 +1,10 @@
 #include "vpp/compiler/ir.h"
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 namespace vietvm::compiler {
@@ -15,6 +18,7 @@ using vietvm::frontend::AstStatement;
 using vietvm::frontend::AstStatementKind;
 using vietvm::frontend::ExprId;
 
+// Hạ opcode; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
 IrOpcode lowerOpcode(AstStatementKind kind) noexcept {
     switch (kind) {
         case AstStatementKind::Empty: return IrOpcode::NoOp;
@@ -22,6 +26,7 @@ IrOpcode lowerOpcode(AstStatementKind kind) noexcept {
         case AstStatementKind::Import: return IrOpcode::Import;
         case AstStatementKind::Function: return IrOpcode::DefineFunction;
         case AstStatementKind::Class: return IrOpcode::DefineClass;
+        case AstStatementKind::Interface: return IrOpcode::NoOp;
         case AstStatementKind::Conditional: return IrOpcode::Conditional;
         case AstStatementKind::Loop: return IrOpcode::Loop;
         case AstStatementKind::Switch: return IrOpcode::Switch;
@@ -38,11 +43,13 @@ IrOpcode lowerOpcode(AstStatementKind kind) noexcept {
     return IrOpcode::Statement;
 }
 
+// Kiểm tra điều kiện của `hasNameKind`.
 bool hasNameKind(const AstProgram &program, ExprId id) noexcept {
     const AstExpression *expression = program.expression(id);
     return expression != nullptr && expression->kind == AstExpressionKind::Name;
 }
 
+// Kiểm tra statement cần đánh dấu vùng direct IR chưa hỗ trợ hay không; hàm đối chiếu hình dạng AST/metadata với các trường hợp codegen hỗ trợ.
 bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexcept {
     const std::size_t expressionCount = statement.expressionRoots.size();
     switch (statement.kind) {
@@ -109,6 +116,12 @@ bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexce
                    expressionCount != 0 || statement.children.size() != 1 ||
                    statement.children.front().kind != AstStatementKind::Block;
 
+        case AstStatementKind::Interface:
+            return statement.interfaceForm !=
+                       vietvm::frontend::AstInterfaceForm::MethodSignatures ||
+                   expressionCount != 0 || statement.children.size() != 1 ||
+                   statement.children.front().kind != AstStatementKind::Block;
+
         case AstStatementKind::Try:
             return statement.tryForm !=
                        vietvm::frontend::AstTryForm::TryCatchBlocks ||
@@ -131,8 +144,10 @@ bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexce
     return true;
 }
 
+// Chuyển biểu diễn cấp cao sang bộ hạ IR; lớp giữ AST/semantic model và tạo các lệnh, giá trị IR cùng metadata liên kết.
 class Lowerer {
 public:
+    // Hạ bộ hạ IR; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
     Lowerer(const AstProgram &program, const SemanticModel &semantic)
         : program_(program), semantic_(semantic), expressionMap_(program.expressions.size(),
           kInvalidIrValueId), expressionState_(program.expressions.size(), 0),
@@ -153,6 +168,7 @@ public:
         }
     }
 
+    // Hạ lower; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
     IrProgram lower() {
         ir_.instructions.reserve(program_.statements.size());
         for (const AstStatement &statement : program_.statements) {
@@ -163,6 +179,7 @@ public:
     }
 
 private:
+    // Chuyển `SymbolId` semantic sang kiểu id tương thích IR; hàm đổi sentinel `kInvalidSymbolId` thành `-1` và giữ id hợp lệ.
     static int compatibleSymbolId(SymbolId symbol) noexcept {
         if (symbol == kInvalidSymbolId ||
             symbol > static_cast<SymbolId>(std::numeric_limits<int>::max())) {
@@ -182,6 +199,7 @@ private:
         return ir_.values.back().id;
     }
 
+    // Hạ biểu thức; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
     IrValueId lowerExpression(ExprId sourceId) {
         if (sourceId >= program_.expressions.size()) {
             return appendLegacyValue(sourceId);
@@ -418,6 +436,7 @@ private:
         return resultId;
     }
 
+    // Hạ câu lệnh; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
     IrInstruction lowerStatement(const AstStatement &statement, bool ownsTokens) {
         IrInstruction instruction;
         instruction.opcode = lowerOpcode(statement.kind);
@@ -427,6 +446,7 @@ private:
         instruction.importForm = statement.importForm;
         instruction.importSpec = statement.importSpec;
         instruction.classForm = statement.classForm;
+        instruction.superclassName = statement.superclassName;
         instruction.conditionalForm = statement.conditionalForm;
         instruction.loopForm = statement.loopForm;
         instruction.switchForm = statement.switchForm;
@@ -442,6 +462,7 @@ private:
             const SemanticSymbol &symbol = semantic_.symbols[
                 static_cast<std::size_t>(instruction.symbolId)];
             instruction.effectiveVisibility = symbol.visibility;
+            instruction.superclassSymbolId = compatibleSymbolId(symbol.superclass);
             if (statement.kind == AstStatementKind::Function &&
                 symbol.kind == SemanticSymbolKind::Method &&
                 !symbol.qualifiedName.empty()) {
@@ -451,6 +472,37 @@ private:
         instruction.unsupportedDirectRegion = statementNeedsUnsupportedDirectRegion(statement);
 
         const ScopeId declarationScope = semantic_.scopeForStatement(statement.tokenBegin);
+        if (statement.kind == AstStatementKind::Function &&
+            instruction.symbolId >= 0 &&
+            static_cast<std::size_t>(instruction.symbolId) < semantic_.symbols.size() &&
+            semantic_.symbols[static_cast<std::size_t>(instruction.symbolId)].kind ==
+                SemanticSymbolKind::Method) {
+            constexpr std::array<std::string_view, 2> receiverNames = {
+                "mình",
+                "gốc",
+            };
+            for (std::string_view receiverName : receiverNames) {
+                SymbolId receiverSymbol = kInvalidSymbolId;
+                for (const SemanticSymbol &symbol : semantic_.symbols) {
+                    if (symbol.kind == SemanticSymbolKind::Parameter &&
+                        symbol.declaringScope == declarationScope &&
+                        symbol.lookupName == receiverName) {
+                        receiverSymbol = symbol.id;
+                        break;
+                    }
+                }
+                if (receiverSymbol == kInvalidSymbolId) continue;
+                const bool used = std::any_of(
+                    semantic_.expressionBindings.begin(),
+                    semantic_.expressionBindings.end(),
+                    [receiverSymbol](const BindingResult &binding) {
+                        return binding.symbol == receiverSymbol;
+                    });
+                if (used) {
+                    instruction.implicitReceiverNames.emplace_back(receiverName);
+                }
+            }
+        }
         instruction.parameters.reserve(statement.parameters.size());
         for (const vietvm::frontend::AstParameter &parameter : statement.parameters) {
             IrParameter lowered;
@@ -508,9 +560,11 @@ private:
             }
         }
 
-        instruction.children.reserve(statement.children.size());
-        for (const AstStatement &child : statement.children) {
-            instruction.children.push_back(lowerStatement(child, false));
+        if (statement.kind != AstStatementKind::Interface) {
+            instruction.children.reserve(statement.children.size());
+            for (const AstStatement &child : statement.children) {
+                instruction.children.push_back(lowerStatement(child, false));
+            }
         }
 
         if (ownsTokens) {
@@ -540,11 +594,13 @@ private:
     std::vector<const CallBinding *> callBindings_;
 };
 
+// Đếm vùng direct IR chưa hỗ trợ trong cây lệnh; hàm duyệt đệ quy instruction con và cộng marker của từng node.
 std::size_t countInstructionUnsupportedDirectRegions(
     const IrProgram &program,
     const std::vector<IrInstruction> &instructions,
     std::vector<unsigned char> &visitedValues);
 
+// Đếm `IrValue` chưa hỗ trợ có thể đi tới từ một root; hàm DFS theo operands và dùng tập visited để không đếm lặp.
 std::size_t countReachableUnsupportedDirectValue(const IrProgram &program,
                                       IrValueId id,
                                       std::vector<unsigned char> &visited) {
@@ -576,6 +632,7 @@ std::size_t countReachableUnsupportedDirectValue(const IrProgram &program,
     return count;
 }
 
+// Đếm vùng direct IR chưa hỗ trợ trong cây lệnh; hàm duyệt đệ quy instruction con và cộng marker của từng node.
 std::size_t countInstructionUnsupportedDirectRegions(
     const IrProgram &program,
     const std::vector<IrInstruction> &instructions,
@@ -600,11 +657,13 @@ std::size_t countInstructionUnsupportedDirectRegions(
 
 } // namespace
 
+// Chuyển AST đã có semantic model thành `IrProgram`; quá trình lowering giữ liên kết symbol và đánh dấu vùng direct IR chưa hỗ trợ.
 IrProgram lowerToIr(const vietvm::frontend::AstProgram &program,
                     const SemanticModel &semantic) {
     return Lowerer(program, semantic).lower();
 }
 
+// Ghép lại token nguồn được lưu trong các lệnh IR theo thứ tự, phục vụ kiểm tra parity và debug quá trình lowering.
 std::vector<std::string> materializeIrTokens(const IrProgram &program) {
     std::vector<std::string> tokens;
     // Recursive children intentionally own no compatibility tokens.  Walking
@@ -617,6 +676,7 @@ std::vector<std::string> materializeIrTokens(const IrProgram &program) {
     return tokens;
 }
 
+// Tính lại số vùng IR chưa hỗ trợ sau khi IR bị biến đổi, tránh dùng bộ đếm cũ không còn đúng.
 std::size_t recomputeUnsupportedDirectRegionCount(IrProgram &program) {
     std::vector<unsigned char> visitedValues(program.values.size(), 0);
     const std::size_t count = countInstructionUnsupportedDirectRegions(
@@ -625,6 +685,7 @@ std::size_t recomputeUnsupportedDirectRegionCount(IrProgram &program) {
     return count;
 }
 
+// Trả tên ổn định của opcode câu lệnh IR bằng `switch`, chủ yếu dùng cho debug và tooling nội bộ.
 const char *irOpcodeName(IrOpcode opcode) noexcept {
     switch (opcode) {
         case IrOpcode::NoOp: return "noop";
@@ -646,6 +707,7 @@ const char *irOpcodeName(IrOpcode opcode) noexcept {
     return "statement";
 }
 
+// Trả tên ổn định của opcode giá trị IR bằng `switch`, phục vụ dump và kiểm thử compiler.
 const char *irValueOpcodeName(IrValueOpcode opcode) noexcept {
     switch (opcode) {
         case IrValueOpcode::UnsupportedDirectRegion: return "unsupported_direct_region";

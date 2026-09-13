@@ -743,6 +743,151 @@ void testDirectObjectModelOps() {
     vietvm::compiler::resetCompilationState();
 }
 
+void testDirectParameterizedConstructor() {
+    vietvm::compiler::resetCompilationState();
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        "lớp Box { "
+        "  hàm khởi tạo(value, extra = 1) { mình.value = value + extra; } "
+        "  hàm get() { trả về mình.value; } "
+        "} "
+        "hàm main() { b = Box(7, 5); in b.get(); }",
+        keywordMap, true);
+    expect(artifacts.unsupportedDirectIrRegions == 0 &&
+               !artifacts.semantic.hasErrors(),
+           "parameterized class construction stays on direct IR");
+
+    const auto &functions = vietvm::compiler::hamMap::bytecodeMap();
+    const int mainName = vietvm::compiler::StringPool::findString("main");
+    int mainId = -1;
+    for (const auto &entry : vietvm::compiler::hamMap::nameIndexMap()) {
+        if (entry.second == mainName) mainId = entry.first;
+    }
+    const auto main = functions.find(mainId);
+    bool hasParameterizedConstruct = false;
+    if (main != functions.end()) {
+        for (const Instruction &instruction : main->second) {
+            hasParameterizedConstruct = hasParameterizedConstruct ||
+                (instruction.op == OP_TAO_DOI_TUONG && instruction.operand == 2);
+        }
+    }
+    expect(main != functions.end() && hasParameterizedConstruct,
+           "constructor call encodes its source argument count in OP_TAO_DOI_TUONG");
+    vietvm::compiler::resetCompilationState();
+}
+
+void testDirectMethodVisibilityMetadata() {
+    vietvm::compiler::resetCompilationState();
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        "lớp Access { "
+        "  hàm riêng tư secret() { trả về 1; } "
+        "  hàm bảo vệ guarded() { trả về 2; } "
+        "  hàm công khai open() { trả về 3; } "
+        "}",
+        keywordMap, false);
+    expect(artifacts.unsupportedDirectIrRegions == 0 &&
+               !artifacts.semantic.hasErrors(),
+           "method visibility metadata stays on direct IR");
+
+    bool hasPrivate = false;
+    bool hasProtected = false;
+    bool hasPublic = false;
+    for (const Instruction &instruction : artifacts.bytecode) {
+        if (instruction.op != OP_THEM_PHUONG_THUC) continue;
+        if (instruction.operandValue < 0) {
+            hasPrivate = true;
+        } else if (instruction.operand < 0) {
+            hasProtected = true;
+        } else {
+            hasPublic = true;
+        }
+    }
+    expect(hasPrivate && hasProtected && hasPublic,
+           "OP_THEM_PHUONG_THUC preserves private, protected, and public runtime visibility");
+    vietvm::compiler::resetCompilationState();
+}
+
+void testDirectImplicitMethodReceiver() {
+    vietvm::compiler::resetCompilationState();
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        "lớp Counter { "
+        "  hàm set(v) { mình.value = v; gốc.reset(); trả về mình.value; } "
+        "}",
+        keywordMap, false);
+    expect(artifacts.unsupportedDirectIrRegions == 0,
+           "implicit mình/gốc receivers stay on direct IR");
+
+    const int methodName = vietvm::compiler::StringPool::findString("Counter.set");
+    int methodId = -1;
+    for (const auto &entry : vietvm::compiler::hamMap::nameIndexMap()) {
+        if (entry.second == methodName) methodId = entry.first;
+    }
+    const auto method = vietvm::compiler::hamMap::bytecodeMap().find(methodId);
+    int receiverBindingCount = 0;
+    bool hasStoreProperty = false;
+    bool hasLoadProperty = false;
+    bool hasSuperMethodCall = false;
+    if (method != vietvm::compiler::hamMap::bytecodeMap().end()) {
+        for (const Instruction &instruction : method->second) {
+            if (instruction.op == OP_PARAM && instruction.operandValue == -1) {
+                ++receiverBindingCount;
+            }
+            hasStoreProperty = hasStoreProperty ||
+                instruction.op == OP_GAN_THUOC_TINH;
+            hasLoadProperty = hasLoadProperty ||
+                instruction.op == OP_DOC_THUOC_TINH;
+            hasSuperMethodCall = hasSuperMethodCall ||
+                (instruction.op == OP_GOI_PHUONG_THUC && instruction.operandValue == 1);
+        }
+    }
+    expect(method != vietvm::compiler::hamMap::bytecodeMap().end() &&
+               receiverBindingCount == 2 && hasStoreProperty && hasLoadProperty &&
+               hasSuperMethodCall,
+           "method bytecode binds mình/gốc and marks gốc method dispatch as superclass lookup");
+
+    const CompilerState noReceiverUse = compileState(
+        "lớp Counter { hàm add(a, b) { trả về a + b; } }");
+    const int plainName = vietvm::compiler::StringPool::findString("Counter.add");
+    int plainId = -1;
+    for (const auto &entry : noReceiverUse.functionNames) {
+        if (entry.second == plainName) plainId = entry.first;
+    }
+    const auto plainMethod = noReceiverUse.functions.find(plainId);
+    const bool plainHasHiddenBinding = plainMethod != noReceiverUse.functions.end() &&
+        std::any_of(plainMethod->second.begin(), plainMethod->second.end(),
+                    [](const Instruction &instruction) {
+                        return instruction.op == OP_PARAM &&
+                               instruction.operandValue == -1;
+                    });
+    expect(!plainHasHiddenBinding,
+           "methods that do not use mình/gốc preserve their existing bytecode shape");
+    vietvm::compiler::resetCompilationState();
+}
+
+void testDirectClassInheritanceEmission() {
+    vietvm::compiler::resetCompilationState();
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        "lớp Child kế thừa Base { hàm value() { trả về gốc.value() + 5; } } "
+        "lớp Base { hàm value() { trả về 10; } }",
+        keywordMap, false);
+    expect(artifacts.unsupportedDirectIrRegions == 0 &&
+               !artifacts.semantic.hasErrors(),
+           "inheritance syntax stays on direct IR even when the superclass is declared later");
+
+    const int baseName = vietvm::compiler::StringPool::findString("Base");
+    const int childName = vietvm::compiler::StringPool::findString("Child");
+    std::vector<Instruction> classDefinitions;
+    for (const Instruction &instruction : artifacts.bytecode) {
+        if (instruction.op == OP_TAO_LOP) classDefinitions.push_back(instruction);
+    }
+    expect(classDefinitions.size() == 2 && baseName >= 0 && childName >= 0 &&
+               classDefinitions[0].operandIndex == baseName &&
+               classDefinitions[0].operandValue == 0 &&
+               classDefinitions[1].operandIndex == childName &&
+               classDefinitions[1].operandValue == baseName + 1,
+           "direct emitter registers the superclass first and encodes its string index on the child");
+    vietvm::compiler::resetCompilationState();
+}
+
 void testClassMethodResolutionTimingMatchesLegacy() {
     expectDirectCompilationStable(
         "lớp C { "
@@ -1059,6 +1204,10 @@ int main() {
     testTryCatchCompatibilityEdgesAreRejected();
     testDirectClassMethodsMatchLegacyState();
     testDirectObjectModelOps();
+    testDirectParameterizedConstructor();
+    testDirectMethodVisibilityMetadata();
+    testDirectImplicitMethodReceiver();
+    testDirectClassInheritanceEmission();
     testClassMethodResolutionTimingMatchesLegacy();
     testMalformedClassesReportDiagnostics();
     testFunctionDefaultsUseDirectIr();

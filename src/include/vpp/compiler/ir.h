@@ -66,6 +66,7 @@ enum class IrValueOpcode {
     Lambda,
 };
 
+// Biểu diễn một giá trị trong untyped IR; record lưu opcode, source ExprId, symbol, text và operand ids để codegen dựng giá trị theo đồ thị phụ thuộc.
 struct IrValue {
     IrValueId id = kInvalidIrValueId;
     IrValueOpcode opcode = IrValueOpcode::UnsupportedDirectRegion;
@@ -90,6 +91,7 @@ struct IrValue {
     std::vector<IrValueId> operands;
 };
 
+// Lưu metadata một tham số IR gồm tên, symbol id và default-value id; emitter dùng record này để phát binding `OP_PARAM`/default.
 struct IrParameter {
     std::string name;
     vietvm::frontend::SourceSpan span{};
@@ -98,6 +100,7 @@ struct IrParameter {
     IrValueId defaultValue = kInvalidIrValueId;
 };
 
+// Biểu diễn một nhánh của IR `chọn`, giữ loại ca/mặc định, label value và child block để codegen tạo control flow.
 struct IrSwitchArm {
     vietvm::frontend::AstSwitchArmKind kind =
         vietvm::frontend::AstSwitchArmKind::Case;
@@ -109,6 +112,7 @@ struct IrSwitchArm {
     bool prefixedByCase = false;
 };
 
+// Biểu diễn một câu lệnh IR có cấu trúc; record giữ opcode, metadata semantic, expression roots, token nguồn và các instruction con cho block/control flow.
 struct IrInstruction {
     IrOpcode opcode = IrOpcode::Statement;
     vietvm::frontend::SourceSpan span{};
@@ -125,6 +129,8 @@ struct IrInstruction {
     vietvm::frontend::AstImportSpec importSpec;
     vietvm::frontend::AstClassForm classForm =
         vietvm::frontend::AstClassForm::Unstructured;
+    std::string superclassName;
+    int superclassSymbolId = -1;
     vietvm::frontend::AstConditionalForm conditionalForm =
         vietvm::frontend::AstConditionalForm::Unstructured;
     vietvm::frontend::AstLoopForm loopForm =
@@ -136,6 +142,10 @@ struct IrInstruction {
     std::string catchVariable;
     vietvm::frontend::SourceSpan catchVariableSpan{};
     int catchSymbolId = -1;
+    // Source-level receiver names actually referenced by this method. `mình`
+    // is the current instance; `gốc` carries the same instance but method
+    // calls dispatch from the defining class's superclass.
+    std::vector<std::string> implicitReceiverNames;
     std::vector<IrParameter> parameters;
     std::vector<IrSwitchArm> switchArms;
     std::vector<IrValueId> expressionRoots;
@@ -151,6 +161,7 @@ struct IrInstruction {
     std::vector<vietvm::frontend::Token> tokens;
 };
 
+// Lưu lambda đã lowering gồm owner value, source ExprId, tham số, capture và body IR để emitter tạo function ẩn tương ứng.
 struct IrLambda {
     IrLambdaId id = kInvalidIrLambdaId;
     IrValueId ownerValue = kInvalidIrValueId;
@@ -161,31 +172,37 @@ struct IrLambda {
     std::vector<int> captures;
 };
 
+// Là container gốc của IR sau lowering, sở hữu các instruction top-level, arena giá trị/lambda và bộ đếm vùng direct IR chưa hỗ trợ.
 struct IrProgram {
     std::vector<IrValue> values;
     std::vector<IrLambda> lambdas;
     std::vector<IrInstruction> instructions;
     std::size_t unsupportedDirectRegionCount = 0;
 
+    // Trả `IrValue` theo id; accessor kiểm tra id hợp lệ rồi trả con trỏ tới arena `values` mà không sao chép giá trị.
     const IrValue *value(IrValueId id) const noexcept {
         return id < values.size() ? &values[id] : nullptr;
     }
 
+    // Trả `lambda` hiện tại từ trạng thái nội bộ; accessor chỉ đọc dữ liệu để caller/test kiểm tra mà không làm thay đổi đối tượng.
     const IrLambda *lambda(IrLambdaId id) const noexcept {
         return id < lambdas.size() ? &lambdas[id] : nullptr;
     }
 };
 
+// Chuyển AST đã có semantic model thành `IrProgram`; quá trình lowering giữ liên kết symbol và đánh dấu vùng direct IR chưa hỗ trợ.
 IrProgram lowerToIr(const vietvm::frontend::AstProgram &program,
                     const SemanticModel &semantic);
 
+// Ghép lại token nguồn được lưu trong các lệnh IR theo thứ tự, phục vụ kiểm tra parity và debug quá trình lowering.
 std::vector<std::string> materializeIrTokens(const IrProgram &program);
 
-// Recalculate the number of explicitly marked unsupported direct-IR nodes after
-// a pass has rewritten either the statement tree or value arena.
+// Tính lại số vùng IR chưa hỗ trợ sau khi IR bị biến đổi, tránh dùng bộ đếm cũ không còn đúng.
 std::size_t recomputeUnsupportedDirectRegionCount(IrProgram &program);
 
+// Trả tên ổn định của opcode câu lệnh IR bằng `switch`, chủ yếu dùng cho debug và tooling nội bộ.
 const char *irOpcodeName(IrOpcode opcode) noexcept;
+// Trả tên ổn định của opcode giá trị IR bằng `switch`, phục vụ dump và kiểm thử compiler.
 const char *irValueOpcodeName(IrValueOpcode opcode) noexcept;
 
 } // namespace vietvm::compiler

@@ -5,6 +5,7 @@
 
 namespace vietvm::constants {
 
+// Trả tên văn bản ổn định cho matches any; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 template <size_t N>
 inline bool matchesAnyName(const std::string &fn, const std::array<const char *, N> &names) {
     for (const char *name : names) {

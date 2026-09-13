@@ -68,6 +68,8 @@ inline constexpr std::string_view kVmObjectClassNotFound = "Lỗi: lớp runtime
 inline constexpr std::string_view kVmObjectExpectedInstance = "Lỗi: thao tác thuộc tính/phương thức yêu cầu một đối tượng";
 inline constexpr std::string_view kVmObjectPropertyNotFound = "Lỗi: thuộc tính không tồn tại: {0}";
 inline constexpr std::string_view kVmObjectMethodNotFound = "Lỗi: phương thức không tồn tại: {0}";
+inline constexpr std::string_view kVmObjectPrivateMethodAccess = "Lỗi: không thể gọi phương thức riêng tư: {0}";
+inline constexpr std::string_view kVmObjectProtectedMethodAccess = "Lỗi: không thể gọi phương thức bảo vệ: {0}";
 inline constexpr std::string_view kVmObjectNotEnoughOperands = "Lỗi: không đủ toán hạng cho thao tác đối tượng";
 
 // Native-function invocation and file/time diagnostics.

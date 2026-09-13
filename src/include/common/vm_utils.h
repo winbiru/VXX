@@ -9,6 +9,7 @@
 #include "vpp/core/message_constants.h"
 #include "vpp/runtime/value.h"
 
+// Chạy lỗi op; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 inline std::runtime_error runtime_error_op(const std::string &msg, Opcode op, int pc = -1) {
     std::ostringstream oss;
     oss << msg << " (lệnh=" << vietvm::bytecode::opcodeName(op) << ")";
@@ -16,6 +17,7 @@ inline std::runtime_error runtime_error_op(const std::string &msg, Opcode op, in
     return std::runtime_error(oss.str());
 }
 
+// Chạy lỗi op; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 inline std::runtime_error runtime_error_op(const std::string &msg, Opcode op, std::size_t pc) {
     std::ostringstream oss;
     oss << msg << " (lệnh=" << vietvm::bytecode::opcodeName(op) << ") tại vị trí=" << pc;
@@ -30,6 +32,7 @@ inline int as_int(const StackValue &v, Opcode op = (Opcode)0, int pc = -1) {
         vietvm::messages::kVmInvalidIntegerValue), op, pc);
 }
 
+// Chuyển `StackValue` số sang `int`; hàm chấp nhận kiểu số runtime hợp lệ và báo lỗi khi giá trị không thể dùng như số nguyên.
 inline int as_int(const StackValue &v, Opcode op, std::size_t pc) {
     if (std::holds_alternative<int>(v))    return std::get<int>(v);
     if (std::holds_alternative<double>(v)) return static_cast<int>(std::get<double>(v));
@@ -37,22 +40,25 @@ inline int as_int(const StackValue &v, Opcode op, std::size_t pc) {
         vietvm::messages::kVmInvalidIntegerValue), op, pc);
 }
 
-// Arithmetic helper: promote to double if either is double, else int
+// Cộng hai giá trị số runtime; hàm giữ kiểu số nguyên khi có thể và nâng lên số thực khi một toán hạng là `double`.
 inline StackValue numAdd(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) + toDouble(b);
     return std::get<int>(a) + std::get<int>(b);
 }
+// Trừ hai giá trị số runtime; hàm áp dụng quy tắc nâng kiểu int/double giống các phép toán số khác của VM.
 inline StackValue numSub(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) - toDouble(b);
     return std::get<int>(a) - std::get<int>(b);
 }
+// Nhân hai giá trị số runtime; hàm bảo toàn số nguyên nếu cả hai toán hạng là int, ngược lại tính bằng double.
 inline StackValue numMul(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) * toDouble(b);
     return std::get<int>(a) * std::get<int>(b);
 }
+// Chia hai giá trị số runtime; hàm kiểm tra chia cho 0 và chọn kết quả int/double theo overload đang được gọi.
 inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, int pc) {
     double db = toDouble(b);
     if (db == 0.0) throw runtime_error_op(vietvm::messages::formatMessage(
@@ -65,6 +71,7 @@ inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, in
     return std::get<int>(a) / ib;
 }
 
+// Chia hai giá trị số runtime; hàm kiểm tra chia cho 0 và chọn kết quả int/double theo overload đang được gọi.
 inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, std::size_t pc) {
     double db = toDouble(b);
     if (db == 0.0) throw runtime_error_op(vietvm::messages::formatMessage(
@@ -77,8 +84,7 @@ inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, st
     return std::get<int>(a) / ib;
 }
 
-// Keep the JIT and interpreter on one operator contract.  Callers handle
-// stack underflow; this helper only evaluates already-popped operands.
+// Thực thi toán tử nhị phân của VM trên hai `StackValue`; hàm dispatch số, chuỗi, so sánh và luận lý theo ký hiệu toán tử.
 inline StackValue evaluateBinaryOperator(Opcode op,
                                          const StackValue &a,
                                          const StackValue &b,
@@ -157,6 +163,7 @@ inline StackValue evaluateBinaryOperator(Opcode op,
     }
 }
 
+// Thực thi phép chia lấy dư; hàm yêu cầu toán hạng số nguyên và kiểm tra mẫu số khác 0 trước khi tính `%`.
 inline StackValue evaluateModuloOperator(const StackValue &a,
                                          const StackValue &b,
                                          Opcode op,
@@ -169,6 +176,7 @@ inline StackValue evaluateModuloOperator(const StackValue &a,
     return make_int_value(as_int(a, op, pc) % divisor);
 }
 
+// Ghi thông tin debug của VM khi chế độ log được bật; hàm gom tham số thành một dòng nhưng không ảnh hưởng trạng thái thực thi.
 inline void vmLog(const std::string &msg) {
     std::cerr << vietvm::messages::messageText(vietvm::messages::kVmLogPrefix)
               << msg << std::endl;

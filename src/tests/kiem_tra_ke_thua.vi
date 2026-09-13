@@ -1,0 +1,21 @@
+lớp Base {
+    hàm value() {
+        trả về 10;
+    }
+
+    hàm inherited() {
+        trả về 3;
+    }
+};
+
+lớp Child kế thừa Base {
+    hàm value() {
+        trả về gốc.value() + 5;
+    }
+};
+
+hàm main() {
+    c = Child();
+    in c.value();
+    in c.inherited();
+};

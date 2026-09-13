@@ -2,6 +2,7 @@
 
 namespace vietvm::frontend {
 
+// Trả tên văn bản ổn định cho AST câu lệnh loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astStatementKindName(AstStatementKind kind) noexcept {
     switch (kind) {
         case AstStatementKind::Empty: return "empty";
@@ -9,6 +10,7 @@ const char *astStatementKindName(AstStatementKind kind) noexcept {
         case AstStatementKind::Import: return "import";
         case AstStatementKind::Function: return "function";
         case AstStatementKind::Class: return "class";
+        case AstStatementKind::Interface: return "interface";
         case AstStatementKind::Conditional: return "conditional";
         case AstStatementKind::Loop: return "loop";
         case AstStatementKind::Switch: return "switch";
@@ -24,6 +26,7 @@ const char *astStatementKindName(AstStatementKind kind) noexcept {
     return "unknown";
 }
 
+// Trả tên văn bản ổn định cho AST biểu thức loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astExpressionKindName(AstExpressionKind kind) noexcept {
     switch (kind) {
         case AstExpressionKind::Literal: return "literal";
@@ -42,6 +45,7 @@ const char *astExpressionKindName(AstExpressionKind kind) noexcept {
     return "unknown";
 }
 
+// Trả tên văn bản ổn định cho AST giá trị trực tiếp loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astLiteralKindName(AstLiteralKind kind) noexcept {
     switch (kind) {
         case AstLiteralKind::None: return "none";
@@ -54,6 +58,7 @@ const char *astLiteralKindName(AstLiteralKind kind) noexcept {
     return "none";
 }
 
+// Trả tên văn bản ổn định cho AST phạm vi truy cập; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astVisibilityName(AstVisibility visibility) noexcept {
     switch (visibility) {
         case AstVisibility::Unspecified: return "unspecified";
@@ -64,6 +69,7 @@ const char *astVisibilityName(AstVisibility visibility) noexcept {
     return "unspecified";
 }
 
+// Trả tên văn bản ổn định cho AST nhập form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astImportFormName(AstImportForm form) noexcept {
     switch (form) {
         case AstImportForm::Unstructured: return "unstructured";
@@ -72,6 +78,7 @@ const char *astImportFormName(AstImportForm form) noexcept {
     return "unstructured";
 }
 
+// Trả tên văn bản ổn định cho AST lớp form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astClassFormName(AstClassForm form) noexcept {
     switch (form) {
         case AstClassForm::Unstructured: return "unstructured";
@@ -80,6 +87,16 @@ const char *astClassFormName(AstClassForm form) noexcept {
     return "unstructured";
 }
 
+// Trả tên văn bản ổn định cho AST giao diện form; hàm ánh xạ metadata parser sang chuỗi ổn định cho tooling và test.
+const char *astInterfaceFormName(AstInterfaceForm form) noexcept {
+    switch (form) {
+        case AstInterfaceForm::Unstructured: return "unstructured";
+        case AstInterfaceForm::MethodSignatures: return "method_signatures";
+    }
+    return "unstructured";
+}
+
+// Trả tên văn bản ổn định cho AST conditional form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astConditionalFormName(AstConditionalForm form) noexcept {
     switch (form) {
         case AstConditionalForm::Unstructured: return "unstructured";
@@ -89,6 +106,7 @@ const char *astConditionalFormName(AstConditionalForm form) noexcept {
     return "unstructured";
 }
 
+// Trả tên văn bản ổn định cho AST vòng lặp form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astLoopFormName(AstLoopForm form) noexcept {
     switch (form) {
         case AstLoopForm::Unstructured: return "unstructured";
@@ -97,6 +115,7 @@ const char *astLoopFormName(AstLoopForm form) noexcept {
     return "unstructured";
 }
 
+// Trả tên văn bản ổn định cho AST khối chọn form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astSwitchFormName(AstSwitchForm form) noexcept {
     switch (form) {
         case AstSwitchForm::Unstructured: return "unstructured";
@@ -105,6 +124,7 @@ const char *astSwitchFormName(AstSwitchForm form) noexcept {
     return "unstructured";
 }
 
+// Trả tên văn bản ổn định cho AST khối chọn arm loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astSwitchArmKindName(AstSwitchArmKind kind) noexcept {
     switch (kind) {
         case AstSwitchArmKind::Case: return "case";
@@ -113,6 +133,7 @@ const char *astSwitchArmKindName(AstSwitchArmKind kind) noexcept {
     return "case";
 }
 
+// Trả tên văn bản ổn định cho AST khối thử form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astTryFormName(AstTryForm form) noexcept {
     switch (form) {
         case AstTryForm::Unstructured: return "unstructured";

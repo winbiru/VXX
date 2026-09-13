@@ -17,6 +17,7 @@ namespace {
 
 namespace fs = std::filesystem;
 
+// Chuẩn hóa path thành dạng tuyệt đối theo lexical rules mà không yêu cầu file tồn tại; module graph dùng path này làm khóa ổn định.
 fs::path absoluteLexical(const fs::path &path) {
     try {
         return fs::absolute(path).lexically_normal();
@@ -30,11 +31,13 @@ enum class VisitState {
     Loaded,
 };
 
+// Phân tích mô-đun nguồn; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 vietvm::frontend::AstProgram parseModuleSource(const std::string &source) {
     return vietvm::frontend::parseTokens(
         postProcessTokensWithSpans(tokenizeWithSpans(source)));
 }
 
+// Trích các import local đã được parser nhận diện từ AST; hàm chỉ lấy `LocalSourceFile` để module graph không phải parse token thô.
 std::vector<vietvm::frontend::AstImportSpec> structuredLocalImports(
     const vietvm::frontend::AstProgram &program) {
     std::vector<vietvm::frontend::AstImportSpec> imports;
@@ -57,11 +60,13 @@ std::vector<vietvm::frontend::AstImportSpec> structuredLocalImports(
     return imports;
 }
 
+// Kiểm tra điều kiện của `isModuleExportVisibility`.
 bool isModuleExportVisibility(vietvm::frontend::AstVisibility visibility) noexcept {
     return visibility == vietvm::frontend::AstVisibility::Unspecified ||
            visibility == vietvm::frontend::AstVisibility::Public;
 }
 
+// Thu thập symbol được phép export của một module; hàm duyệt semantic model và giữ khai báo có visibility phù hợp cho module khác.
 std::vector<ModuleExportSymbol> moduleExports(
     const vietvm::frontend::AstProgram &program) {
     std::vector<ModuleExportSymbol> exports;
@@ -76,6 +81,8 @@ std::vector<ModuleExportSymbol> moduleExports(
             kind = SemanticSymbolKind::Function;
         } else if (statement.kind == vietvm::frontend::AstStatementKind::Class) {
             kind = SemanticSymbolKind::Class;
+        } else if (statement.kind == vietvm::frontend::AstStatementKind::Interface) {
+            kind = SemanticSymbolKind::Interface;
         } else {
             continue;
         }
@@ -85,12 +92,14 @@ std::vector<ModuleExportSymbol> moduleExports(
     return exports;
 }
 
+// Giữ trạng thái DFS khi dựng module graph, gồm resolver, graph đang tạo và dấu vết module để phát hiện import cycle.
 struct BuildContext {
     const LocalModuleResolver &resolver;
     const LocalModuleImportScanner &scanner;
     LocalModuleGraph graph;
     std::unordered_map<std::string, VisitState> states;
 
+    // Duyệt một module khi xây dependency graph; hàm đánh dấu trạng thái DFS, đọc import con và phát hiện chu trình trước khi thêm cạnh.
     void visit(const std::string &importerIdentity,
                const vietvm::frontend::AstImportSpec &importSpec) {
         const LocalModuleLocation location = resolver.resolve(importSpec);
@@ -134,13 +143,16 @@ struct BuildContext {
 
 } // namespace
 
+// Khởi tạo `LocalModuleResolver` từ các tham số đầu vào; constructor lưu trạng thái ban đầu cần thiết để các phương thức của đối tượng hoạt động nhất quán.
 LocalModuleResolver::LocalModuleResolver(fs::path resolutionBase)
     : resolutionBase_(absoluteLexical(std::move(resolutionBase))) {}
 
+// Trả thư mục gốc dùng để phân giải import tương đối; resolver chuẩn hóa giá trị constructor thành path tuyệt đối/lexical ổn định.
 const fs::path &LocalModuleResolver::resolutionBase() const noexcept {
     return resolutionBase_;
 }
 
+// Phân giải phân giải; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
 LocalModuleLocation LocalModuleResolver::resolve(
     const vietvm::frontend::AstImportSpec &importSpec) const {
     const fs::path requested = vietvm::core::utf8Path(importSpec.target);
@@ -165,6 +177,7 @@ LocalModuleLocation LocalModuleResolver::resolve(
     return {resolved, resolved.u8string()};
 }
 
+// Đọc read; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
 LocalModuleSource LocalModuleResolver::read(
     const LocalModuleLocation &location) const {
     std::ifstream input(location.path);
@@ -182,6 +195,7 @@ LocalModuleSource LocalModuleResolver::read(
     return {location.path, location.identity, source.str()};
 }
 
+// Trả tên văn bản ổn định cho cục bộ mô-đun edge action; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *localModuleEdgeActionName(LocalModuleEdgeAction action) noexcept {
     switch (action) {
         case LocalModuleEdgeAction::Load: return "load";
@@ -191,6 +205,7 @@ const char *localModuleEdgeActionName(LocalModuleEdgeAction action) noexcept {
     return "unknown";
 }
 
+// Khởi tạo `LocalModuleGraphBuilder` từ các tham số đầu vào; constructor lưu trạng thái ban đầu cần thiết để các phương thức của đối tượng hoạt động nhất quán.
 LocalModuleGraphBuilder::LocalModuleGraphBuilder(
     LocalModuleResolver resolver,
     LocalModuleImportScanner importScanner)
@@ -202,6 +217,7 @@ LocalModuleGraphBuilder::LocalModuleGraphBuilder(
     }
 }
 
+// Dựng build; hàm tổng hợp các phần tử đầu vào thành cấu trúc hoàn chỉnh, đồng thời thiết lập các quan hệ/chỉ mục cần thiết.
 LocalModuleGraph LocalModuleGraphBuilder::build(
     std::string entryIdentity,
     const std::vector<vietvm::frontend::AstImportSpec> &rootImports) const {
@@ -213,6 +229,7 @@ LocalModuleGraph LocalModuleGraphBuilder::build(
     return std::move(context.graph);
 }
 
+// Tra `RuntimeModule` theo tên hoặc chỉ mục; hàm trả con trỏ/tham chiếu tới record đang được `ModuleTable` quản lý.
 const LocalModuleSemanticRecord *LocalModuleSemanticIndex::module(
     std::string_view identity) const noexcept {
     for (const LocalModuleSemanticRecord &candidate : modules) {
@@ -221,6 +238,7 @@ const LocalModuleSemanticRecord *LocalModuleSemanticIndex::module(
     return nullptr;
 }
 
+// Tra symbol được export từ một module semantic record; hàm tìm theo tên public và trả metadata cần cho module khác import.
 const ModuleExportSymbol *LocalModuleSemanticIndex::exportedSymbol(
     std::string_view moduleIdentity,
     std::string_view name) const noexcept {
@@ -232,6 +250,7 @@ const ModuleExportSymbol *LocalModuleSemanticIndex::exportedSymbol(
     return nullptr;
 }
 
+// Tạo `SemanticEnvironment` cho một module; hàm gom các export từ dependency đã phân giải thành external symbol mà analyzer có thể nhìn thấy.
 SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
     std::string_view importerIdentity) const {
     SemanticEnvironment environment;
@@ -256,6 +275,7 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
     return environment;
 }
 
+// Dựng cục bộ mô-đun ngữ nghĩa chỉ số; hàm tổng hợp các phần tử đầu vào thành cấu trúc hoàn chỉnh, đồng thời thiết lập các quan hệ/chỉ mục cần thiết.
 LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
     LocalModuleResolver resolver,
     std::string entryIdentity,
@@ -330,6 +350,7 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
     return index;
 }
 
+// Trả tên văn bản ổn định cho mô-đun khởi tạo trạng thái; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *moduleInitializationStateName(
     ModuleInitializationState state) noexcept {
     switch (state) {
@@ -341,6 +362,7 @@ const char *moduleInitializationStateName(
     return "unknown";
 }
 
+// Khởi tạo `ModuleInitializationTracker` từ các tham số đầu vào; constructor lưu trạng thái ban đầu cần thiết để các phương thức của đối tượng hoạt động nhất quán.
 ModuleInitializationTracker::ModuleInitializationTracker(
     const LocalModuleSemanticIndex &index) {
     for (const LocalModuleSemanticRecord &module : index.modules) {
@@ -349,6 +371,7 @@ ModuleInitializationTracker::ModuleInitializationTracker(
     }
 }
 
+// Trả trạng thái hiện tại của đối tượng quản lý; hàm chỉ tra dữ liệu nội bộ tương ứng với khóa/module được yêu cầu.
 std::optional<ModuleInitializationState> ModuleInitializationTracker::state(
     std::string_view identity) const noexcept {
     const auto found = states_.find(std::string(identity));
@@ -356,6 +379,7 @@ std::optional<ModuleInitializationState> ModuleInitializationTracker::state(
     return found->second;
 }
 
+// Chuyển thực thể sang trạng thái đang khởi tạo/đang xử lý; hàm kiểm tra trạng thái trước đó để ngăn bắt đầu lặp sai quy trình.
 bool ModuleInitializationTracker::begin(std::string_view identity) {
     const auto found = states_.find(std::string(identity));
     if (found == states_.end() ||
@@ -366,6 +390,7 @@ bool ModuleInitializationTracker::begin(std::string_view identity) {
     return true;
 }
 
+// Đánh dấu thao tác/module đã hoàn tất thành công; hàm cập nhật trạng thái và thứ tự hoàn tất dùng cho các lần tra cứu sau.
 bool ModuleInitializationTracker::complete(std::string_view identity) {
     const auto found = states_.find(std::string(identity));
     if (found == states_.end() ||
@@ -376,6 +401,7 @@ bool ModuleInitializationTracker::complete(std::string_view identity) {
     return true;
 }
 
+// Đánh dấu thao tác/module thất bại; hàm lưu trạng thái lỗi để caller không xem thực thể là đã khởi tạo thành công.
 bool ModuleInitializationTracker::fail(std::string_view identity) {
     const auto found = states_.find(std::string(identity));
     if (found == states_.end() ||

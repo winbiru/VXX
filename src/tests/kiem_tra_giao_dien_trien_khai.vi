@@ -1,0 +1,36 @@
+// Kiểm tra giao diện chỉ khai báo hợp đồng, giao diện có thể kế thừa nhiều giao diện
+// và lớp có thể vừa kế thừa một lớp cha vừa triển khai giao diện tổng hợp.
+giao diện CóGiáTrị {
+    hàm giáTrị();
+};
+
+giao diện CóNhãn {
+    hàm nhãn();
+};
+
+giao diện CóTổng kế thừa CóGiáTrị, CóNhãn {
+    hàm tổng(x);
+};
+
+lớp Nền {
+    hàm giáTrị() {
+        trả về 10;
+    }
+};
+
+lớp Mẫu kế thừa Nền triển khai CóTổng {
+    hàm nhãn() {
+        trả về "V++";
+    }
+
+    hàm tổng(x) {
+        trả về mình.giáTrị() + x;
+    }
+};
+
+hàm main() {
+    đốiTượng = Mẫu();
+    in đốiTượng.giáTrị();
+    in đốiTượng.nhãn();
+    in đốiTượng.tổng(5);
+};

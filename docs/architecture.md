@@ -64,6 +64,14 @@ control stacks rồi gọi handler trực tiếp. Fixture cũng cấu hình `Out
 `OP_IN` không phụ thuộc stdout. Fixture này là internal test boundary, không phải API
 embedding ổn định.
 
+Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance
+đăng ký weak handle vào heap đang active; collector mark từ stack, variables, call frame,
+receiver, class table và switch value rồi cắt cạnh của object không reachable để phá
+shared_ptr cycle. Function/module child VM chia sẻ cùng heap và nhận snapshot root của
+caller, vì vậy collection trong lời gọi lồng nhau không làm mất object còn nằm trên stack
+bên ngoài. GC chạy mặc định với interval 2048 opcode; `VPP_GC_INTERVAL` dùng để điều chỉnh
+interval và regression ép xuống 1 để stress root boundary.
+
 ## Compiler pipeline
 
 Pipeline compiler được tách thành các bước rõ ràng, nhưng được đưa vào theo
@@ -111,8 +119,9 @@ Runtime sở hữu `vietvm::runtime::ModuleTable` và không phụ thuộc compi
 Mỗi module đi qua `uninitialized → initializing → initialized/failed`; initializer chỉ
 chạy một lần, module `Initialized` không chạy lại ở lần `VM::run()` sau, còn lỗi khởi tạo
 để lại state `Failed`. Child VM dùng cho function call không khởi tạo lại module. Module
-table này cũng là ranh giới runtime rõ ràng để bổ sung module/global roots khi tracing GC
-được triển khai.
+initializer ghi state runtime vào cùng variable/class state được VM đưa vào tracing roots;
+module table tự thân chỉ giữ bytecode initializer và lifecycle state, không sở hữu
+`StackValue` cần mark riêng.
 
 V++ vẫn là runtime giá trị động. `StackValue` hiện mang scalar
 (`int`/`double`/`string`/`rỗng`), collection handle và object handle. Runtime object
@@ -128,9 +137,28 @@ tên class được đánh dấu `ClassConstructor`; call tới instance member 
 `InstanceMethod`. Untyped IR có `LoadProperty`/`StoreProperty`, còn bytecode bổ sung
 `OP_TAO_LOP`, `OP_THEM_PHUONG_THUC`, `OP_TAO_DOI_TUONG`, `OP_DOC_THUOC_TINH`,
 `OP_GAN_THUOC_TINH` và `OP_GOI_PHUONG_THUC`. Vì vậy `obj = Class()`, field read/write và
-bound-method dispatch chạy qua production Direct IR. Constructor hiện chỉ zero-arg và
-method receiver chỉ dùng để dispatch; chưa có implicit `this`/`self`, inheritance syntax
-hay enforcement visibility cho instance member. Đây là phần còn lại trước tracing GC.
+bound-method dispatch chạy qua production Direct IR. Instance method giờ có hai receiver ẩn
+thuần Việt: `mình` là instance hiện tại, còn `gốc` giữ cùng instance nhưng method call bắt đầu
+lookup từ superclass của lớp đã cung cấp method hiện tại. Semantic scope khai báo hai tên,
+direct emitter chỉ phát hidden receiver binding cho tên thật sự được dùng, và
+`OP_GOI_PHUONG_THUC` chuyển instance cùng owner-class qua call frame mà không làm lệch chỉ số
+tham số nguồn. Vì vậy `mình.field`/`mình.method(...)` dùng current instance, còn
+`gốc.method(...)` bỏ qua override hiện tại để gọi superclass; field storage hiện vẫn nằm trên
+instance nên `gốc.field` truy cập cùng field map. `self` và `this` không còn là implicit
+receiver. Source inheritance dùng `lớp Con kế thừa Cha { ... }`; parser giữ superclass metadata,
+semantic phân giải trong type space và chặn superclass không tồn tại/tự kế thừa/chu trình,
+direct emitter đảm bảo lớp cha được đăng ký trước lớp con, còn VM nối superclass thật vào
+`RuntimeClass`. Interface dùng `giao diện I { hàm f(...); }`; một interface có thể kế thừa
+nhiều interface qua `giao diện J kế thừa I, K`, còn class dùng
+`lớp C kế thừa Base triển khai I, J` để giữ một superclass nhưng nhận nhiều hợp đồng. Semantic
+kiểm tra target interface, duplicate/cycle, tên + số tham số method và visibility công khai;
+method kế thừa từ superclass được phép thỏa hợp đồng. Interface hiện chỉ tồn tại ở frontend/
+semantic và hạ thành no-op compile-time, không thêm runtime interface table hay thay đổi
+dynamic method dispatch. Constructor dùng `hàm khởi tạo(...)`, nhận tham số/default parameter và có
+thể gọi constructor cha tường minh qua `gốc.khởi tạo(...)`. Method visibility được kiểm tra
+cả ở semantic khi suy luận được lớp receiver và ở runtime method table cho receiver động;
+private chỉ dùng trong lớp sở hữu, protected dùng trong lớp sở hữu/subclass. Field vẫn là
+thuộc tính động public vì ngôn ngữ chưa có declaration/modifier field riêng.
 
 Vì vậy pipeline hiện chưa áp dụng typed IR hay một type policy tĩnh: không suy
 ra rằng semantic analysis đồng nghĩa với static type checker. Một quyết định
@@ -139,7 +167,7 @@ có kiểu.
 
 Compiler hiện chỉ có một production backend: **Direct IR → bytecode**. Nếu program chứa
 region mà direct emitter chưa hỗ trợ, pipeline báo lỗi compiler tường minh thay vì
-materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **70 chương
+materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **78 chương
 trình `.vi`** trong corpus ở direct IR.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
@@ -199,8 +227,8 @@ Các bước trên dùng IR không kiểu và giữ semantics động hiện hà
 dynamic/static/gradual chỉ là điều kiện cho type checking/Typed IR, không phải
 điều kiện để xây Expression AST, scope hay name resolution.
 
-GC và JIT hiện chỉ là MVP runtime; chúng không phải tracing collector hay
-compiler sinh mã máy production-grade.
+GC hiện là tracing collector cho object graph runtime và có cycle sweep; profiler/allocation
+telemetry vẫn còn thiếu. JIT vẫn là MVP và chưa phải compiler sinh mã máy production-grade.
 
 ## Headers
 

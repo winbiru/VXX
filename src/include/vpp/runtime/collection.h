@@ -9,6 +9,7 @@
 
 namespace vietvm::runtime {
 
+// Kiểm tra điều kiện của `containsStackValue`.
 inline bool containsStackValue(const std::vector<StackValue> &values,
                                const StackValue &target) {
     for (const StackValue &value : values) {
@@ -17,6 +18,7 @@ inline bool containsStackValue(const std::vector<StackValue> &values,
     return false;
 }
 
+// Tìm stack giá trị chỉ số; hàm tra cứu dữ liệu theo tiêu chí đầu vào và trả về vị trí hoặc phần tử phù hợp nếu có.
 inline std::optional<std::size_t> findStackValueIndex(
     const std::vector<StackValue> &values,
     const StackValue &target) {
@@ -26,6 +28,7 @@ inline std::optional<std::size_t> findStackValueIndex(
     return std::nullopt;
 }
 
+// Loại phần tử trùng khỏi danh sách `StackValue`; hàm giữ lần xuất hiện đầu tiên theo equality runtime và bảo toàn thứ tự tương đối.
 inline std::vector<StackValue> uniqueStackValues(
     const std::vector<StackValue> &values) {
     std::vector<StackValue> unique;
@@ -36,6 +39,7 @@ inline std::vector<StackValue> uniqueStackValues(
     return unique;
 }
 
+// Kiểm tra hai collection có giao nhau hay không; hàm so từng phần tử theo equality runtime và dừng ngay khi tìm thấy phần tử chung.
 inline bool areStackValueCollectionsDisjoint(
     const std::vector<StackValue> &left,
     const std::vector<StackValue> &right) {
@@ -45,6 +49,7 @@ inline bool areStackValueCollectionsDisjoint(
     return true;
 }
 
+// Tạo hợp của hai dãy `StackValue`; hàm nối phần tử chưa xuất hiện để kết quả không chứa bản sao trùng theo equality runtime.
 inline std::vector<StackValue> unionStackValues(
     const std::vector<StackValue> &left,
     const std::vector<StackValue> &right) {
@@ -55,6 +60,7 @@ inline std::vector<StackValue> unionStackValues(
     return uniqueStackValues(combined);
 }
 
+// Tạo giao của hai dãy `StackValue`; hàm chỉ giữ phần tử xuất hiện ở cả hai phía và loại duplicate trong kết quả.
 inline std::vector<StackValue> intersectStackValues(
     const std::vector<StackValue> &left,
     const std::vector<StackValue> &right) {
@@ -69,6 +75,7 @@ inline std::vector<StackValue> intersectStackValues(
     return intersection;
 }
 
+// Kiểm tra điều kiện của `isUniformSortableStackValues`.
 inline bool isUniformSortableStackValues(const std::vector<StackValue> &values) {
     if (values.empty()) return true;
 

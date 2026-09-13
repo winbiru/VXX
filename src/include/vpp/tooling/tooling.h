@@ -7,10 +7,9 @@
 
 namespace vietvm::tooling {
 
-// Human-readable, deterministic views of the compiler's structural stages.
-// They are intentionally diagnostic output rather than a stable serialized
-// interchange format.
+// Tạo bản dump toàn bộ AST gồm thống kê chương trình, cây câu lệnh, biểu thức và lambda để kiểm tra kết quả parser.
 std::string dumpAst(const vietvm::frontend::AstProgram &program);
+// Tạo bản dump IR sau lowering/optimization, gồm giá trị, lambda và cây lệnh để kiểm tra semantic binding và direct IR.
 std::string dumpIr(const vietvm::compiler::IrProgram &program);
 
 } // namespace vietvm::tooling

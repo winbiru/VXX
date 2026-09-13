@@ -63,6 +63,11 @@ enum class AstClassForm {
     MethodBlock,
 };
 
+enum class AstInterfaceForm {
+    Unstructured,
+    MethodSignatures,
+};
+
 enum class AstImportForm {
     Unstructured,
     LocalSourceFile,
@@ -83,9 +88,7 @@ enum class AstSwitchArmKind {
     Default,
 };
 
-// Switch bodies remain ordinary AstStatement children. Keeping only an index
-// here avoids a recursive AstStatement/AstSwitchArm value type while giving
-// every case label an explicit grammar role.
+// Biểu diễn một nhánh `ca`/`mặc định` trong AST, giữ label ExprId và chỉ số block con để semantic/lowering duyệt đúng nhánh.
 struct AstSwitchArm {
     AstSwitchArmKind kind = AstSwitchArmKind::Case;
     SourceSpan span{};
@@ -96,6 +99,7 @@ struct AstSwitchArm {
     bool prefixedByCase = false;
 };
 
+// Lưu tên, source span và ExprId giá trị mặc định của một tham số hàm/lambda sau parser.
 struct AstParameter {
     std::string name;
     SourceSpan span{};
@@ -103,9 +107,13 @@ struct AstParameter {
     ExprId defaultValue = kInvalidExprId;
 };
 
-// Exact source metadata for imports whose target/alias shape is fully parsed.
-// The target may be a .vi path or a bare/quoted package shortcut; resolution
-// remains a compiler concern so parser metadata does not depend on the cwd.
+// Lưu một tham chiếu kiểu theo tên cùng vị trí nguồn; dùng cho danh sách lớp/giao diện cha và các giao diện mà lớp cam kết triển khai.
+struct AstTypeReference {
+    std::string name;
+    SourceSpan span{};
+};
+
+// Lưu cấu trúc câu lệnh nhập đã parse như target, alias, quoted và semicolon để module resolver không phải phân tích token thô.
 struct AstImportSpec {
     std::string target;
     SourceSpan targetSpan{};
@@ -115,16 +123,14 @@ struct AstImportSpec {
     bool hasSemicolon = false;
 };
 
+// Biểu diễn một cặp khóa–giá trị trong map literal bằng ExprId, cho phép arena biểu thức giữ cấu trúc lồng nhau ổn định.
 struct AstMapEntry {
     ExprId key = kInvalidExprId;
     ExprId value = kInvalidExprId;
     SourceSpan span{};
 };
 
-// Expressions live in AstProgram::expressions.  ExprId is the stable arena
-// index, so tree edges remain valid when the backing vector grows or moves.
-// Every node also keeps its lossless token range for incremental migration of
-// the legacy expression backend.
+// Biểu diễn một expression trong arena AST, giữ kind/literal/span/token range cùng operand/child ids để semantic duyệt không cần reparsing.
 struct AstExpression {
     ExprId id = kInvalidExprId;
     AstExpressionKind kind = AstExpressionKind::Name;
@@ -165,6 +171,7 @@ enum class AstStatementKind {
     Import,
     Function,
     Class,
+    Interface,
     Conditional,
     Loop,
     Switch,
@@ -178,6 +185,7 @@ enum class AstStatementKind {
     Unknown,
 };
 
+// Biểu diễn một câu lệnh AST có cấu trúc, gồm loại, span, token range, khai báo, expression roots và các statement con.
 struct AstStatement {
     AstStatementKind kind = AstStatementKind::Unknown;
     SourceSpan span{};
@@ -193,6 +201,11 @@ struct AstStatement {
     AstImportForm importForm = AstImportForm::Unstructured;
     AstImportSpec importSpec;
     AstClassForm classForm = AstClassForm::Unstructured;
+    std::string superclassName;
+    SourceSpan superclassSpan{};
+    std::vector<AstTypeReference> implementedInterfaces;
+    AstInterfaceForm interfaceForm = AstInterfaceForm::Unstructured;
+    std::vector<AstTypeReference> extendedInterfaces;
     AstConditionalForm conditionalForm = AstConditionalForm::Unstructured;
     AstLoopForm loopForm = AstLoopForm::Unstructured;
     AstSwitchForm switchForm = AstSwitchForm::Unstructured;
@@ -211,6 +224,7 @@ struct AstStatement {
     std::vector<AstStatement> children;
 };
 
+// Lưu một lambda trong arena riêng với tham số, body và expression owner để semantic tạo scope/capture độc lập.
 struct AstLambda {
     LambdaId id = kInvalidLambdaId;
     ExprId expression = kInvalidExprId;
@@ -219,6 +233,7 @@ struct AstLambda {
     AstStatement body;
 };
 
+// Là nút gốc của frontend, sở hữu token, statement, expression arena và lambda arena của toàn bộ source file.
 struct AstProgram {
     SourceSpan span{};
     std::vector<Token> tokens;
@@ -226,25 +241,40 @@ struct AstProgram {
     std::vector<AstLambda> lambdas;
     std::vector<AstStatement> statements;
 
+    // Trả `expression` hiện tại từ trạng thái nội bộ; accessor chỉ đọc dữ liệu để caller/test kiểm tra mà không làm thay đổi đối tượng.
     const AstExpression *expression(ExprId id) const noexcept {
         return id < expressions.size() ? &expressions[id] : nullptr;
     }
 
+    // Trả `lambda` hiện tại từ trạng thái nội bộ; accessor chỉ đọc dữ liệu để caller/test kiểm tra mà không làm thay đổi đối tượng.
     const AstLambda *lambda(LambdaId id) const noexcept {
         return id < lambdas.size() ? &lambdas[id] : nullptr;
     }
 };
 
+// Trả tên văn bản ổn định cho AST câu lệnh loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astStatementKindName(AstStatementKind kind) noexcept;
+// Trả tên văn bản ổn định cho AST biểu thức loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astExpressionKindName(AstExpressionKind kind) noexcept;
+// Trả tên văn bản ổn định cho AST giá trị trực tiếp loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astLiteralKindName(AstLiteralKind kind) noexcept;
+// Trả tên văn bản ổn định cho AST phạm vi truy cập; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astVisibilityName(AstVisibility visibility) noexcept;
+// Trả tên văn bản ổn định cho AST nhập form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astImportFormName(AstImportForm form) noexcept;
+// Trả tên văn bản ổn định cho AST lớp form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astClassFormName(AstClassForm form) noexcept;
+// Trả tên văn bản ổn định cho dạng khai báo giao diện để tooling/test hiển thị metadata parser nhất quán.
+const char *astInterfaceFormName(AstInterfaceForm form) noexcept;
+// Trả tên văn bản ổn định cho AST conditional form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astConditionalFormName(AstConditionalForm form) noexcept;
+// Trả tên văn bản ổn định cho AST vòng lặp form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astLoopFormName(AstLoopForm form) noexcept;
+// Trả tên văn bản ổn định cho AST khối chọn form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astSwitchFormName(AstSwitchForm form) noexcept;
+// Trả tên văn bản ổn định cho AST khối chọn arm loại; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astSwitchArmKindName(AstSwitchArmKind kind) noexcept;
+// Trả tên văn bản ổn định cho AST khối thử form; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 const char *astTryFormName(AstTryForm form) noexcept;
 
 } // namespace vietvm::frontend

@@ -8,10 +8,12 @@
 
 namespace vietvm::compiler {
 
+// Loại bỏ khoảng trắng ở đầu và cuối chuỗi; hàm tìm biên trái/phải đầu tiên không phải whitespace rồi trả lát cắt tương ứng.
 std::string trim(const std::string &s) {
     return vietvm::core::trim(s);
 }
 
+// Ghép tên token; hàm nối các phần tử theo thứ tự bằng dấu phân cách quy định để tạo kết quả duy nhất.
 std::string joinNameTokens(const std::vector<std::string>& tokens, size_t begin, size_t end) {
     std::string out;
     for (size_t i = begin; i < end; ++i) {
@@ -21,12 +23,14 @@ std::string joinNameTokens(const std::vector<std::string>& tokens, size_t begin,
     return out;
 }
 
+// Kiểm tra điều kiện của `isIdentifierLikeToken`.
 bool isIdentifierLikeToken(const std::string &token) {
     if (token.empty()) return false;
     if (token == "đúng" || token == "sai" || token == "rỗng") return false;
     return isVariable(token);
 }
 
+// Kiểm tra điều kiện của `isCallableNamePiece`.
 bool isCallableNamePiece(const std::string &token) {
     if (isVariable(token)) return true;
     if (token.find(' ') == std::string::npos) return false;
@@ -39,6 +43,7 @@ bool isCallableNamePiece(const std::string &token) {
     return true;
 }
 
+// Tách top level fields; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
 std::vector<std::string> splitTopLevelFields(const std::string &text,
                                              char delimiter) {
     std::vector<std::string> fields;
@@ -91,10 +96,12 @@ std::vector<std::string> splitTopLevelFields(const std::string &text,
     return fields;
 }
 
+// Tách top level đối số; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
 std::vector<std::string> splitTopLevelArguments(const std::string &text) {
     return splitTopLevelFields(text, ',');
 }
 
+// Trích xuất parens; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "(")
         throw std::runtime_error(vietvm::messages::formatMessage(
@@ -115,6 +122,7 @@ std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tok
     return {trim(oss.str()), i};
 }
 
+// Trích xuất khối; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "{")
         throw std::runtime_error(vietvm::messages::formatMessage(
@@ -135,6 +143,7 @@ std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& toke
     return {trim(oss.str()), i};
 }
 
+// Trích xuất biểu thức until semicolon; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start) {
     std::ostringstream oss;
     size_t i = start;
@@ -163,6 +172,7 @@ std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector
     return {trim(oss.str()), i};
 }
 
+// Trích xuất assigned var; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::string extractAssignedVar(const std::string& expr) {
     size_t eqPos = expr.find('=');
     if (eqPos == std::string::npos) {

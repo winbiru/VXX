@@ -237,6 +237,14 @@ TESTS=(
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi
   src/tests/kiem_tra_object_model.vi
+  src/tests/kiem_tra_constructor_tham_so.vi
+  src/tests/kiem_tra_visibility_instance.vi
+  src/tests/kiem_tra_receiver_minh.vi
+  src/tests/kiem_tra_receiver_minh_dieu_khien.vi
+  src/tests/kiem_tra_receiver_minh_nhieu_instance.vi
+  src/tests/kiem_tra_receiver_minh_de_quy.vi
+  src/tests/kiem_tra_ke_thua.vi
+  src/tests/kiem_tra_giao_dien_trien_khai.vi
   src/tests/kiem_tra_cu_phap_modifier_cu.vi
   src/tests/kiem_tra_tra_ve.vi
   src/tests/program.vi

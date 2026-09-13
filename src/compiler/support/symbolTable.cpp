@@ -6,6 +6,7 @@
 
 namespace vietvm::compiler {
 
+    // Lấy or create; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
     int symbolTable::getOrCreate(std::unordered_map<std::string,int>& symTab,
                                                const std::string& name,
                                                int& nextId) {
@@ -17,6 +18,7 @@ namespace vietvm::compiler {
         return it->second;
     }
 
+    // Kiểm tra điều kiện của `contains`.
     bool symbolTable::contains(const std::string& name) const noexcept {
         return table_.find(name) != table_.end();
     }
