@@ -648,6 +648,57 @@ void testInterfaceImplementationContracts() {
            "semantic analysis rejects interface inheritance cycles");
 }
 
+void testMethodOverrideContracts() {
+    using namespace vietvm::compiler;
+
+    const SemanticModel valid = analyzeSemantics(parseSource(
+        "lớp Nền { "
+        "hàm bảo vệ tính(x) { trả về x; } "
+        "hàm riêng tư nộiBộ(x) { trả về x; } "
+        "hàm khởi tạo(x) { } "
+        "} "
+        "lớp Con kế thừa Nền { "
+        "hàm công khai tính(x) { trả về gốc.tính(x); } "
+        "hàm riêng tư nộiBộ(x, y) { trả về x + y; } "
+        "hàm khởi tạo(x, y = 1) { gốc.khởi tạo(x); } "
+        "}"));
+    expect(!valid.hasErrors(),
+           "override accepts equal arity with wider visibility, ignores private ancestor methods, and treats constructors separately");
+
+    const SemanticModel wrongArity = analyzeSemantics(parseSource(
+        "lớp Nền { hàm công khai tính(x) { trả về x; } } "
+        "lớp Con kế thừa Nền { hàm công khai tính(x, y) { trả về x + y; } }"));
+    expect(wrongArity.hasErrors() && std::any_of(
+               wrongArity.diagnostics.begin(), wrongArity.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("có 2 tham số") != std::string::npos &&
+                          diagnostic.message.find("có 1 tham số") != std::string::npos;
+               }),
+           "override rejects an arity mismatch with a deterministic diagnostic");
+
+    const SemanticModel narrowedPublic = analyzeSemantics(parseSource(
+        "lớp Nền { hàm công khai tính(x) { trả về x; } } "
+        "lớp Con kế thừa Nền { hàm bảo vệ tính(x) { trả về x; } }"));
+    expect(narrowedPublic.hasErrors() && std::any_of(
+               narrowedPublic.diagnostics.begin(), narrowedPublic.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("không được thu hẹp phạm vi truy cập") !=
+                          std::string::npos;
+               }),
+           "override rejects public-to-protected visibility narrowing");
+
+    const SemanticModel narrowedProtected = analyzeSemantics(parseSource(
+        "lớp Nền { hàm bảo vệ tính(x) { trả về x; } } "
+        "lớp Con kế thừa Nền { hàm riêng tư tính(x) { trả về x; } }"));
+    expect(narrowedProtected.hasErrors() && std::any_of(
+               narrowedProtected.diagnostics.begin(), narrowedProtected.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("không được thu hẹp phạm vi truy cập") !=
+                          std::string::npos;
+               }),
+           "override rejects protected-to-private visibility narrowing");
+}
+
 void testParserBuildsStructuredLocalFileImports() {
     using namespace vietvm::frontend;
 
@@ -689,6 +740,17 @@ void testParserBuildsStructuredLocalFileImports() {
                program.statements[3].importSpec.target ==
                    "/tmp/vpp//absolute.vi",
            "unquoted target reconstruction preserves leading and repeated separators exactly");
+
+    const AstProgram publicImport = parseSource(
+        "công khai nhập modules/public.vi như api;");
+    expect(publicImport.statements.size() == 1 &&
+               publicImport.statements.front().kind == AstStatementKind::Import &&
+               publicImport.statements.front().visibility == AstVisibility::Public &&
+               publicImport.statements.front().importForm == AstImportForm::LocalSourceFile &&
+               publicImport.statements.front().importSpec.reExport &&
+               publicImport.statements.front().importSpec.target == "modules/public.vi" &&
+               publicImport.statements.front().importSpec.alias == "api",
+           "`công khai nhập` is parsed as an explicit module re-export");
 }
 
 void testNonExactImportsStayOnTolerantPath() {
@@ -1770,6 +1832,66 @@ void testSemanticDuplicateDeclarationDiagnostic() {
                            "a duplicate class cannot replace or add ownership for the first symbol");
 }
 
+void testDynamicTypePolicyCallBoundaries() {
+    using namespace vietvm::compiler;
+
+    const SemanticModel valid = analyzeSemantics(parseSource(
+        "hàm cộng(a, b = 2) { trả về a + b; } "
+        "lớp Hộp { "
+        "hàm khởi tạo(v = 1) { mình.v = v; } "
+        "hàm đặt(v) { mình.v = v; } "
+        "} "
+        "hàm main() { "
+        "x = 1; x = \"động\"; "
+        "in cộng(3); in cộng(3, 4); "
+        "h = Hộp(); h.đặt(\"chuỗi\"); "
+        "}"));
+    expect(!valid.hasErrors(),
+           "dynamic type policy accepts value type changes and valid default-argument calls");
+
+    const SemanticModel tooFew = analyzeSemantics(parseSource(
+        "hàm cộng(a, b = 2) { trả về a + b; } hàm main() { in cộng(); }"));
+    expect(tooFew.hasErrors() && std::any_of(
+               tooFew.diagnostics.begin(), tooFew.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("cộng") != std::string::npos &&
+                          diagnostic.message.find("nhận 0 đối số") != std::string::npos &&
+                          diagnostic.message.find("từ 1 đến 2") != std::string::npos;
+               }),
+           "known direct calls reject too few required arguments");
+
+    const SemanticModel tooMany = analyzeSemantics(parseSource(
+        "hàm cộng(a, b = 2) { trả về a + b; } hàm main() { in cộng(1, 2, 3); }"));
+    expect(tooMany.hasErrors() && std::any_of(
+               tooMany.diagnostics.begin(), tooMany.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("nhận 3 đối số") != std::string::npos &&
+                          diagnostic.message.find("từ 1 đến 2") != std::string::npos;
+               }),
+           "known direct calls reject excess arguments");
+
+    const SemanticModel constructorArity = analyzeSemantics(parseSource(
+        "lớp Hộp { hàm khởi tạo(v) { mình.v = v; } } hàm main() { h = Hộp(); }"));
+    expect(constructorArity.hasErrors() && std::any_of(
+               constructorArity.diagnostics.begin(), constructorArity.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("Hộp") != std::string::npos &&
+                          diagnostic.message.find("từ 1 đến 1") != std::string::npos;
+               }),
+           "known constructor calls enforce constructor arity");
+
+    const SemanticModel methodArity = analyzeSemantics(parseSource(
+        "lớp Hộp { hàm đặt(v) { mình.v = v; } } "
+        "hàm main() { h = Hộp(); h.đặt(); }"));
+    expect(methodArity.hasErrors() && std::any_of(
+               methodArity.diagnostics.begin(), methodArity.diagnostics.end(),
+               [](const SemanticDiagnostic &diagnostic) {
+                   return diagnostic.message.find("đặt") != std::string::npos &&
+                          diagnostic.message.find("từ 1 đến 1") != std::string::npos;
+               }),
+           "statically known instance methods enforce method arity");
+}
+
 void testIrLoweringPreservesTokensAndOptimizerRemovesNoOps() {
     const vietvm::frontend::AstProgram program = parseSource("; in 1;");
     const vietvm::compiler::SemanticModel semantic = vietvm::compiler::analyzeSemantics(program);
@@ -1836,6 +1958,7 @@ int main() {
     testParserRecordsExactClassFormsAndQualifiedMethodIr();
     testClassInheritanceMetadataAndDiagnostics();
     testInterfaceImplementationContracts();
+    testMethodOverrideContracts();
     testParserBuildsStructuredLocalFileImports();
     testNonExactImportsStayOnTolerantPath();
     testSemanticImportAliasUsesStructuredAstPayload();
@@ -1861,6 +1984,7 @@ int main() {
     testSemanticLoopHeaderResolvesIndexedCallArguments();
     testSemanticStrictPolicyRejectsUnresolvedNames();
     testSemanticDuplicateDeclarationDiagnostic();
+    testDynamicTypePolicyCallBoundaries();
     testIrLoweringPreservesTokensAndOptimizerRemovesNoOps();
     testCompilePipelineProducesBasicBytecodeShape();
 

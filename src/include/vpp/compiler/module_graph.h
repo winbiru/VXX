@@ -13,6 +13,9 @@
 
 namespace vietvm::compiler {
 
+inline constexpr std::string_view kCurrentCompilationModuleIdentity =
+    "entry://current-compilation";
+
 // Mô tả vị trí một module local đã phân giải, gồm đường dẫn chuẩn và thông tin cần để resolver đọc source ổn định.
 struct LocalModuleLocation {
     std::filesystem::path path;
@@ -105,6 +108,7 @@ struct LocalModuleSemanticRecord {
     std::filesystem::path path;
     std::string identity;
     std::vector<ModuleExportSymbol> exports;
+    std::vector<ModuleExportSymbol> hiddenSymbols;
 };
 
 // Compile-time module index. The graph owns import identity/order while this

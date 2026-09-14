@@ -165,114 +165,141 @@ lớp công khai ResponseEntity {
 };
 
 lớp công khai UserRestController triển khai UserCrudControllerContract {
+    // Controller chỉ điều phối HTTP; service và response helper được inject từ ngoài.
+    hàm khởi tạo(service, responseEntity) {
+        mình.service = service;
+        mình.responseEntity = responseEntity;
+    };
+
     hàm riêng tư mapResult(result, requestId) {
+        responseEntity = mình.responseEntity;
         nếu (result == "200|users=[an,binh,chi]") {
-            trả về ResponseEntity.ok("users=[an,binh,chi]", requestId);
+            trả về responseEntity.ok("users=[an,binh,chi]", requestId);
         };
         nếu (result == "DB_OK|users=[an]") {
-            trả về ResponseEntity.ok("users=[an]", requestId);
+            trả về responseEntity.ok("users=[an]", requestId);
         };
         nếu (result == "DB_OK|users=[binh]") {
-            trả về ResponseEntity.ok("users=[binh]", requestId);
+            trả về responseEntity.ok("users=[binh]", requestId);
         };
         nếu (result == "DB_OK|users=[chi]") {
-            trả về ResponseEntity.ok("users=[chi]", requestId);
+            trả về responseEntity.ok("users=[chi]", requestId);
         };
         nếu (result == "DB_OK|users=[an-nguyen]") {
-            trả về ResponseEntity.ok("users=[an-nguyen]", requestId);
+            trả về responseEntity.ok("users=[an-nguyen]", requestId);
         };
         nếu (result == "DB_OK|users=[]") {
-            trả về ResponseEntity.ok("users=[]", requestId);
+            trả về responseEntity.ok("users=[]", requestId);
         };
         nếu (result == "201|created-user") {
-            trả về ResponseEntity.created("created-user", requestId);
+            trả về responseEntity.created("created-user", requestId);
         };
         nếu (result == "200|updated-user") {
-            trả về ResponseEntity.ok("updated-user", requestId);
+            trả về responseEntity.ok("updated-user", requestId);
         };
         nếu (result == "204|deleted") {
-            trả về ResponseEntity.noContent(requestId);
+            trả về responseEntity.noContent(requestId);
         };
         nếu (result == "400|missing-body") {
-            trả về ResponseEntity.badRequest("missing-body", requestId);
+            trả về responseEntity.badRequest("missing-body", requestId);
         };
         nếu (result == "400|missing-user-id") {
-            trả về ResponseEntity.badRequest("missing-user-id", requestId);
+            trả về responseEntity.badRequest("missing-user-id", requestId);
         };
         nếu (result == "400|missing-keyword") {
-            trả về ResponseEntity.badRequest("missing-keyword", requestId);
+            trả về responseEntity.badRequest("missing-keyword", requestId);
         };
         nếu (result == "401|missing-token") {
-            trả về ResponseEntity.unauthorized("missing-token", requestId);
+            trả về responseEntity.unauthorized("missing-token", requestId);
         };
         nếu (result == "401|invalid-token") {
-            trả về ResponseEntity.unauthorized("invalid-token", requestId);
+            trả về responseEntity.unauthorized("invalid-token", requestId);
         };
         nếu (result == "404|user-not-found") {
-            trả về ResponseEntity.notFound("user-not-found", requestId);
+            trả về responseEntity.notFound("user-not-found", requestId);
         };
         nếu (result == "500|db-not-connected") {
-            trả về ResponseEntity.serverError("db-not-connected", requestId);
+            trả về responseEntity.serverError("db-not-connected", requestId);
         };
-        trả về ResponseEntity.serverError("unknown-error", requestId);
+        trả về responseEntity.serverError("unknown-error", requestId);
     };
 
     hàm công khai getUsers(dbSession, token, requestId) {
         req = api get(ApiProjectRoutes.adminUsers());
         nếu (req == "ERR|missing-url") {
-            trả về ResponseEntity.badRequest("invalid-url", requestId);
+            responseEntity = mình.responseEntity;
+            trả về responseEntity.badRequest("invalid-url", requestId);
         };
-        serviceRes = UserService.getUsers(dbSession, token);
-        trả về mapResult(serviceRes, requestId);
+        service = mình.service;
+        serviceRes = service.getUsers(dbSession, token);
+        trả về mình.mapResult(serviceRes, requestId);
     };
 
     hàm công khai createUser(dbSession, token, requestBody, requestId) {
         req = api post json(ApiProjectRoutes.adminUsers(), requestBody);
         nếu (req == "ERR|missing-url") {
-            trả về ResponseEntity.badRequest("invalid-url", requestId);
+            responseEntity = mình.responseEntity;
+            trả về responseEntity.badRequest("invalid-url", requestId);
         };
-        serviceRes = UserService.createUser(dbSession, token, requestBody);
-        trả về mapResult(serviceRes, requestId);
+        service = mình.service;
+        serviceRes = service.createUser(dbSession, token, requestBody);
+        trả về mình.mapResult(serviceRes, requestId);
     };
 
     hàm công khai updateUser(dbSession, token, userId, requestBody, requestId) {
         req = api put json(ApiProjectRoutes.adminUserById(userId), requestBody);
         nếu (req == "ERR|missing-url") {
-            trả về ResponseEntity.badRequest("invalid-url", requestId);
+            responseEntity = mình.responseEntity;
+            trả về responseEntity.badRequest("invalid-url", requestId);
         };
-        serviceRes = UserService.updateUser(dbSession, token, userId, requestBody);
-        trả về mapResult(serviceRes, requestId);
+        service = mình.service;
+        serviceRes = service.updateUser(dbSession, token, userId, requestBody);
+        trả về mình.mapResult(serviceRes, requestId);
     };
 
     hàm công khai deleteUser(dbSession, token, userId, requestId) {
         req = api delete(ApiProjectRoutes.adminUserById(userId));
         nếu (req == "ERR|missing-url") {
-            trả về ResponseEntity.badRequest("invalid-url", requestId);
+            responseEntity = mình.responseEntity;
+            trả về responseEntity.badRequest("invalid-url", requestId);
         };
-        serviceRes = UserService.deleteUser(dbSession, token, userId);
-        trả về mapResult(serviceRes, requestId);
+        service = mình.service;
+        serviceRes = service.deleteUser(dbSession, token, userId);
+        trả về mình.mapResult(serviceRes, requestId);
     };
 
     hàm công khai searchUsers(dbSession, token, keyword, requestId) {
         req = api get có query(ApiProjectRoutes.adminUsersSearch(), "keyword=" + keyword);
         nếu (req == "ERR|missing-url") {
-            trả về ResponseEntity.badRequest("invalid-url", requestId);
+            responseEntity = mình.responseEntity;
+            trả về responseEntity.badRequest("invalid-url", requestId);
         };
-        serviceRes = UserService.searchUsers(dbSession, token, keyword);
-        trả về mapResult(serviceRes, requestId);
+        service = mình.service;
+        serviceRes = service.searchUsers(dbSession, token, keyword);
+        trả về mình.mapResult(serviceRes, requestId);
     };
 };
 
 // Ghi chú lớp: controller tách riêng endpoint health.
 lớp công khai HealthRestController triển khai HealthControllerContract {
+    hàm khởi tạo(responseEntity) {
+        mình.responseEntity = responseEntity;
+    };
+
     hàm công khai health(requestId) {
-        trả về ResponseEntity.ok("UP", requestId);
+        responseEntity = mình.responseEntity;
+        trả về responseEntity.ok("UP", requestId);
     };
 };
 
 // Ghi chú lớp: controller tách riêng endpoint auth.
 lớp công khai AuthRestController triển khai AuthControllerContract {
+    hàm khởi tạo(responseEntity) {
+        mình.responseEntity = responseEntity;
+    };
+
     hàm công khai login(usernameBody, passwordBody, requestId) {
+        responseEntity = mình.responseEntity;
         thiếu = sai;
         nếu (usernameBody == "") {
             thiếu = đúng;
@@ -281,33 +308,16 @@ lớp công khai AuthRestController triển khai AuthControllerContract {
             thiếu = đúng;
         };
         nếu (thiếu) {
-            trả về ResponseEntity.badRequest("missing-credentials", requestId);
+            trả về responseEntity.badRequest("missing-credentials", requestId);
         };
-        trả về ResponseEntity.ok("login-success", requestId);
+        trả về responseEntity.ok("login-success", requestId);
     };
 };
 
-// Ghi chú lớp: tương thích ngược cho test cũ đang gọi AdminRestController.
-// AdminRestController kế thừa contract/hành vi của UserRestController nhưng vẫn giữ
-// các method forwarding hiện có để tương thích với kiểu gọi Class.method của fixture cũ.
+// Admin controller kế thừa toàn bộ CRUD từ UserRestController và chỉ nối constructor
+// sang lớp cha; runtime phải dispatch các method được kế thừa trên instance thật.
 lớp công khai AdminRestController kế thừa UserRestController {
-    hàm công khai getUsers(dbSession, token, requestId) {
-        trả về UserRestController.getUsers(dbSession, token, requestId);
-    };
-
-    hàm công khai createUser(dbSession, token, requestBody, requestId) {
-        trả về UserRestController.createUser(dbSession, token, requestBody, requestId);
-    };
-
-    hàm công khai updateUser(dbSession, token, userId, requestBody, requestId) {
-        trả về UserRestController.updateUser(dbSession, token, userId, requestBody, requestId);
-    };
-
-    hàm công khai deleteUser(dbSession, token, userId, requestId) {
-        trả về UserRestController.deleteUser(dbSession, token, userId, requestId);
-    };
-
-    hàm công khai searchUsers(dbSession, token, keyword, requestId) {
-        trả về UserRestController.searchUsers(dbSession, token, keyword, requestId);
+    hàm khởi tạo(service, responseEntity) {
+        gốc.khởi tạo(service, responseEntity);
     };
 };

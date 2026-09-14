@@ -56,7 +56,7 @@
 
    - [ ] Khi thay đổi runner hoặc native adapter, xác nhận các job Ubuntu, Windows và
      macOS trên GitHub Actions. Workflow hiện đã có regression thường trực cho cả ba
-     nền tảng; local baseline ngày 14/09/2026 đạt integration 70/70, parity 79/79 và
+     nền tảng; local baseline ngày 14/09/2026 đạt integration 73/73, parity 86/86 và
      các CTest còn lại 15/15 khi tách GCOV output khỏi build tree. Cần commit/push thay
      đổi để có bằng chứng Actions cho revision đó.
 

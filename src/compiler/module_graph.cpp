@@ -1,5 +1,6 @@
 #include "vpp/compiler/module_graph.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -92,12 +93,57 @@ std::vector<ModuleExportSymbol> moduleExports(
     return exports;
 }
 
+// Thu thập các khai báo top-level có tên nhưng không được export để semantic có thể
+// phân biệt truy cập nhầm symbol ẩn với một tên động hoàn toàn không tồn tại.
+std::vector<ModuleExportSymbol> moduleHiddenSymbols(
+    const vietvm::frontend::AstProgram &program) {
+    std::vector<ModuleExportSymbol> hidden;
+    for (const vietvm::frontend::AstStatement &statement : program.statements) {
+        if (statement.declarationName.empty() ||
+            isModuleExportVisibility(statement.visibility)) {
+            continue;
+        }
+
+        SemanticSymbolKind kind;
+        if (statement.kind == vietvm::frontend::AstStatementKind::Function) {
+            kind = SemanticSymbolKind::Function;
+        } else if (statement.kind == vietvm::frontend::AstStatementKind::Class) {
+            kind = SemanticSymbolKind::Class;
+        } else if (statement.kind == vietvm::frontend::AstStatementKind::Interface) {
+            kind = SemanticSymbolKind::Interface;
+        } else {
+            continue;
+        }
+        hidden.push_back(
+            ModuleExportSymbol{statement.declarationName, kind, statement.span});
+    }
+    return hidden;
+}
+
+// Ghép chuỗi identity của các module trong cycle để diagnostic chỉ ra chính xác
+// đường import gây vòng lặp.
+std::string formatImportCycle(const std::vector<std::string> &stack,
+                              const std::string &repeatedIdentity) {
+    const auto begin = std::find(stack.begin(), stack.end(), repeatedIdentity);
+    std::ostringstream chain;
+    bool first = true;
+    for (auto it = begin; it != stack.end(); ++it) {
+        if (!first) chain << " -> ";
+        chain << *it;
+        first = false;
+    }
+    if (!first) chain << " -> ";
+    chain << repeatedIdentity;
+    return chain.str();
+}
+
 // Giữ trạng thái DFS khi dựng module graph, gồm resolver, graph đang tạo và dấu vết module để phát hiện import cycle.
 struct BuildContext {
     const LocalModuleResolver &resolver;
     const LocalModuleImportScanner &scanner;
     LocalModuleGraph graph;
     std::unordered_map<std::string, VisitState> states;
+    std::vector<std::string> activeStack;
 
     // Duyệt một module khi xây dependency graph; hàm đánh dấu trạng thái DFS, đọc import con và phát hiện chu trình trước khi thêm cạnh.
     void visit(const std::string &importerIdentity,
@@ -111,9 +157,12 @@ struct BuildContext {
 
         const auto existing = states.find(location.identity);
         if (existing != states.end()) {
-            edge.action = existing->second == VisitState::Active
-                              ? LocalModuleEdgeAction::CycleNoOp
-                              : LocalModuleEdgeAction::DuplicateNoOp;
+            if (existing->second == VisitState::Active) {
+                throw std::runtime_error(vietvm::messages::formatMessage(
+                    vietvm::messages::kImportModuleCycle,
+                    {formatImportCycle(activeStack, location.identity)}));
+            }
+            edge.action = LocalModuleEdgeAction::DuplicateNoOp;
             graph.edges.push_back(std::move(edge));
             return;
         }
@@ -121,6 +170,7 @@ struct BuildContext {
         // Mark before reading or parsing.  A recursive import can now observe
         // this identity as Active, while any failure below rolls the mark back.
         states.emplace(location.identity, VisitState::Active);
+        activeStack.push_back(location.identity);
         edge.action = LocalModuleEdgeAction::Load;
         graph.edges.push_back(std::move(edge));
 
@@ -134,7 +184,11 @@ struct BuildContext {
                 visit(location.identity, nestedImport);
             }
             states[location.identity] = VisitState::Loaded;
+            activeStack.pop_back();
         } catch (...) {
+            if (!activeStack.empty() && activeStack.back() == location.identity) {
+                activeStack.pop_back();
+            }
             states.erase(location.identity);
             throw;
         }
@@ -221,7 +275,7 @@ LocalModuleGraphBuilder::LocalModuleGraphBuilder(
 LocalModuleGraph LocalModuleGraphBuilder::build(
     std::string entryIdentity,
     const std::vector<vietvm::frontend::AstImportSpec> &rootImports) const {
-    BuildContext context{resolver_, importScanner_, {}, {}};
+    BuildContext context{resolver_, importScanner_, {}, {}, {}};
     context.graph.entryIdentity = std::move(entryIdentity);
     for (const vietvm::frontend::AstImportSpec &rootImport : rootImports) {
         context.visit(context.graph.entryIdentity, rootImport);
@@ -271,8 +325,42 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
                                        exported.kind,
                                        exported.declaration});
         }
+        for (const ModuleExportSymbol &hidden : record->hiddenSymbols) {
+            const std::string importedName = edge.importSpec.alias.empty()
+                ? hidden.name
+                : edge.importSpec.alias + "." + hidden.name;
+            environment.hiddenImportedSymbols.push_back(
+                SemanticHiddenImportedSymbol{importedName,
+                                             record->identity,
+                                             hidden.declaration});
+        }
     }
     return environment;
+}
+
+// Bổ sung các export được chuyển tiếp bởi `công khai nhập`. Vì graph đã cấm cycle,
+// thứ tự reverse DFS đảm bảo dependency có bề mặt export hoàn chỉnh trước importer.
+void applyModuleReExports(LocalModuleSemanticIndex &index) {
+    for (auto recordIt = index.modules.rbegin(); recordIt != index.modules.rend(); ++recordIt) {
+        LocalModuleSemanticRecord &record = *recordIt;
+        std::unordered_set<std::string> seen;
+        for (const ModuleExportSymbol &symbol : record.exports) seen.insert(symbol.name);
+
+        for (const LocalModuleEdge &edge : index.graph.edges) {
+            if (edge.importerIdentity != record.identity || !edge.importSpec.reExport) continue;
+            const LocalModuleSemanticRecord *dependency = index.module(edge.importedIdentity);
+            if (dependency == nullptr) continue;
+            for (const ModuleExportSymbol &symbol : dependency->exports) {
+                ModuleExportSymbol forwarded = symbol;
+                if (!edge.importSpec.alias.empty()) {
+                    forwarded.name = edge.importSpec.alias + "." + forwarded.name;
+                }
+                if (seen.insert(forwarded.name).second) {
+                    record.exports.push_back(std::move(forwarded));
+                }
+            }
+        }
+    }
 }
 
 // Dựng cục bộ mô-đun ngữ nghĩa chỉ số; hàm tổng hợp các phần tử đầu vào thành cấu trúc hoàn chỉnh, đồng thời thiết lập các quan hệ/chỉ mục cần thiết.
@@ -308,7 +396,8 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
             index.modules.push_back(
                 LocalModuleSemanticRecord{source.path,
                                           source.identity,
-                                          moduleExports(program)});
+                                          moduleExports(program),
+                                          moduleHiddenSymbols(program)});
             index.graph.modules.push_back(std::move(source));
         }
         return index;
@@ -345,8 +434,10 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
         index.modules.push_back(
             LocalModuleSemanticRecord{source.path,
                                       source.identity,
-                                      moduleExports(program)});
+                                      moduleExports(program),
+                                      moduleHiddenSymbols(program)});
     }
+    applyModuleReExports(index);
     return index;
 }
 

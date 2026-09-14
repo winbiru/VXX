@@ -487,12 +487,87 @@ namespace vietvm { namespace compiler {
             ss << ifs.rdbuf();
             std::string src = ss.str();
 
-            auto moduleBytecode = compilePipelineInRegistry(
-                state, src, keywordMap, false, false).bytecode;
+            // Import tương đối bên trong module phải resolve từ thư mục chứa chính
+            // module đó. Khôi phục base của importer ngay sau recursive compile để
+            // sibling import ở scope ngoài không bị đổi nghĩa.
+            const fs::path previousResolutionBase = state.importResolutionBase;
+            state.importResolutionBase = abs.parent_path();
+            CompilationArtifacts moduleArtifacts;
+            try {
+                moduleArtifacts = compilePipelineInRegistry(
+                    state, src, keywordMap, false, false);
+            } catch (...) {
+                state.importResolutionBase = previousResolutionBase;
+                throw;
+            }
+            state.importResolutionBase = previousResolutionBase;
+            auto moduleBytecode = moduleArtifacts.bytecode;
             state.moduleInitializers.push_back(
                 CompiledModuleInitializer{canonical, moduleBytecode});
 
+            std::vector<CompiledModuleFunctionExport> moduleExports;
+            std::unordered_set<std::string> exportedDirectFunctions;
+            for (const auto &statement : moduleArtifacts.ast.statements) {
+                if (statement.kind != vietvm::frontend::AstStatementKind::Function ||
+                    statement.declarationName.empty()) {
+                    continue;
+                }
+                if (statement.visibility == vietvm::frontend::AstVisibility::Unspecified ||
+                    statement.visibility == vietvm::frontend::AstVisibility::Public) {
+                    exportedDirectFunctions.insert(statement.declarationName);
+                }
+            }
+            for (const auto &ins : moduleBytecode) {
+                if (ins.op != OP_HAM || ins.operand < 0 ||
+                    ins.operand >= static_cast<int>(state.stringCount())) {
+                    continue;
+                }
+                const std::string &functionName = state.getString(ins.operand);
+                if (exportedDirectFunctions.count(functionName) != 0) {
+                    moduleExports.push_back({functionName, ins.operandIndex});
+                }
+            }
+
+            if (moduleArtifacts.moduleIndex.has_value()) {
+                for (const LocalModuleEdge &edge : moduleArtifacts.moduleIndex->graph.edges) {
+                    if (edge.importerIdentity != kCurrentCompilationModuleIdentity ||
+                        !edge.importSpec.reExport) {
+                        continue;
+                    }
+                    const LocalModuleSemanticRecord *dependency =
+                        moduleArtifacts.moduleIndex->module(edge.importedIdentity);
+                    if (dependency == nullptr) continue;
+                    for (const ModuleExportSymbol &exported : dependency->exports) {
+                        if (exported.kind != SemanticSymbolKind::Function) continue;
+                        const std::string visibleName = edge.importSpec.alias.empty()
+                            ? exported.name
+                            : edge.importSpec.alias + "." + exported.name;
+                        const int visibleNameIndex = state.findString(visibleName);
+                        if (visibleNameIndex < 0) continue;
+                        for (const auto &entry : state.functionNameIndices) {
+                            if (entry.second == visibleNameIndex) {
+                                moduleExports.push_back({visibleName, entry.first});
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            std::unordered_set<std::string> seenModuleExports;
+            std::vector<CompiledModuleFunctionExport> uniqueModuleExports;
+            uniqueModuleExports.reserve(moduleExports.size());
+            for (auto &exported : moduleExports) {
+                if (exported.functionId >= 0 &&
+                    seenModuleExports.insert(exported.name).second) {
+                    uniqueModuleExports.push_back(std::move(exported));
+                }
+            }
+            state.moduleFunctionExports[canonical] = std::move(uniqueModuleExports);
+
             if (!moduleAlias.empty()) {
+                // Namespace mọi function khai báo trực tiếp, kể cả private, để chúng
+                // không rò thành callable không-qualified ở module nhập.
                 for (const auto &ins : moduleBytecode) {
                     if (ins.op != OP_HAM) continue;
                     const int oldNameIndex = ins.operand;
@@ -505,6 +580,18 @@ namespace vietvm { namespace compiler {
                     const std::string namespaced = moduleAlias + "." + funcName;
                     const int newNameIndex = state.storeString(namespaced);
                     state.setFunctionNameIndex(hamId, newNameIndex);
+                }
+
+                // Re-export không có OP_HAM trong bytecode của module trung gian. Dùng
+                // export metadata để prefix chúng qua alias ngoài cùng, ví dụ
+                // `api.toán.nhân` từ `api` -> `công khai nhập math như toán`.
+                const auto exportedSurface = state.moduleFunctionExports.find(canonical);
+                if (exportedSurface != state.moduleFunctionExports.end()) {
+                    for (const auto &exported : exportedSurface->second) {
+                        const int newNameIndex = state.storeString(
+                            moduleAlias + "." + exported.name);
+                        state.setFunctionNameIndex(exported.functionId, newNameIndex);
+                    }
                 }
             }
 

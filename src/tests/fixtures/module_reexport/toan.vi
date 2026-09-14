@@ -1,0 +1,7 @@
+hàm công khai nhân(a, b) {
+    trả về a * b;
+}
+
+hàm riêng tư bí mật() {
+    trả về 999;
+}

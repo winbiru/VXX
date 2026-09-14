@@ -53,9 +53,10 @@ Lifecycle production hiện tại được khóa như sau: top-level caller tạ
 `CompilationContext`, `compilePipeline(CompilationContext&, ...)` xóa state transient cũ
 rồi truyền context xuyên suốt frontend → codegen. Recursive import gọi
 `compilePipelineInRegistry(..., topLevel=false)` trên chính registry đó nên module con giữ
-chung StringPool/function/module metadata mà không cần global binding. Relative import được
-resolve từ `CompilationContext.importResolutionBase`; CLI truyền thư mục của entry source
-vào context nên compiler không cần đổi process cwd. Để giữ hành vi tương thích cho native
+chung StringPool/function/module metadata mà không cần global binding. Relative import của
+entry bắt đầu từ `CompilationContext.importResolutionBase`; khi đi vào module con compiler
+tạm chuyển base sang thư mục chứa module đó rồi khôi phục importer base sau khi biên dịch.
+Vì vậy recursive import không phụ thuộc process cwd. Để giữ hành vi tương thích cho native
 file/database dùng path tương đối, CLI chỉ đổi cwd trong scope `VM::run()`.
 
 `VM::run()` hiện giữ lifecycle/GC và routing; logic opcode đã được tách thành các
@@ -65,9 +66,9 @@ control stacks rồi gọi handler trực tiếp. Fixture cũng cấu hình `Out
 `OP_IN` không phụ thuộc stdout. Fixture này là internal test boundary, không phải API
 embedding ổn định.
 
-Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance
+Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance/closure
 đăng ký weak handle vào heap đang active; collector mark từ stack, variables, call frame,
-receiver, class table và switch value rồi cắt cạnh của object không reachable để phá
+capture cell, receiver, class table và switch value rồi cắt cạnh của object không reachable để phá
 shared_ptr cycle. Function/module child VM chia sẻ cùng heap và nhận snapshot root của
 caller, vì vậy collection trong lời gọi lồng nhau không làm mất object còn nằm trên stack
 bên ngoài. GC chạy mặc định với interval 2048 opcode; `VPP_GC_INTERVAL` dùng để điều chỉnh
@@ -100,15 +101,15 @@ V++ VM
 
 Lexer gắn span nguồn vào token để parser, AST và các diagnostic sau đó có cùng
 toạ độ nguồn. Parser tạo statement tree và expression arena; semantic analysis tạo
-scope tree rồi bind expression/call theo ExprId. Lambda body có scope, binding và
-capture metadata riêng. Import local/package đã có `AstImportSpec`, module graph và
-structured IR payload. Với local `.vi`, Phase 1 module semantics đã bổ sung stable
-module identity, export index cho top-level function/class public hoặc không ghi
-visibility, namespace alias đưa vào `SemanticEnvironment`, và semantic call kind
-`ImportedFunction`. Production semantic pass chỉ index direct imports để tránh quét
-lặp trong recursive compile; graph API vẫn hỗ trợ traversal đệ quy cho tooling.
-Explicit export/re-export và package/bare-module resolver vẫn chưa hoàn tất. IR cho optimizer là
-biểu diễn trung gian **không kiểu**.
+scope tree rồi bind expression/call theo ExprId. Lambda body có scope, binding và capture
+metadata riêng; direct IR tạo `RuntimeClosure` khi lambda capture lexical binding và VM dùng
+shared cell để giữ mutation/lifetime qua call frame. Import local/package có `AstImportSpec`,
+module graph và structured IR payload. Với local `.vi`, module index duyệt dependency đệ quy
+để phát hiện cycle và tính re-export, còn `SemanticEnvironment` của mỗi importer chỉ nhận bề
+mặt import trực tiếp đã được flatten theo `công khai nhập`. Top-level public/unspecified được
+export; private/protected bị ẩn và có diagnostic khi truy cập. Runtime linker giữ export
+function metadata để alias ngoài cùng tiếp tục prefix được cả re-export. Package/bare-module
+resolver đầy đủ vẫn chưa hoàn tất. IR cho optimizer là biểu diễn trung gian **không kiểu**.
 
 Module lifecycle có hai lớp tách biệt. Compiler dùng `ModuleInitializationTracker` cho
 semantic/indexing contract và giữ top-level bytecode của từng local module trong
@@ -125,10 +126,10 @@ module table tự thân chỉ giữ bytecode initializer và lifecycle state, kh
 `StackValue` cần mark riêng.
 
 V++ vẫn là runtime giá trị động. `StackValue` hiện mang scalar
-(`int`/`double`/`string`/`rỗng`), collection handle và object handle. Runtime object
+(`int`/`double`/`string`/`rỗng`), collection handle, object handle và closure handle. Runtime object
 substrate gồm `RuntimeClass` với optional superclass + method table theo runtime function
 ID, và `RuntimeInstance` với field map. Method lookup đi từ class hiện tại lên superclass,
-field lưu `StackValue`, class/instance so sánh theo identity. Runtime layer này không phụ
+field lưu `StackValue`, class/instance/closure so sánh theo identity. Runtime layer này không phụ
 thuộc compiler.
 
 Object model hiện có lát cắt ngôn ngữ end-to-end đầu tiên. Dotted name vẫn là một token
@@ -161,14 +162,14 @@ cả ở semantic khi suy luận được lớp receiver và ở runtime method 
 private chỉ dùng trong lớp sở hữu, protected dùng trong lớp sở hữu/subclass. Field vẫn là
 thuộc tính động public vì ngôn ngữ chưa có declaration/modifier field riêng.
 
-Vì vậy pipeline hiện chưa áp dụng typed IR hay một type policy tĩnh: không suy
-ra rằng semantic analysis đồng nghĩa với static type checker. Một quyết định
-riêng về dynamic, static hay gradual typing là điều kiện trước khi bổ sung IR
-có kiểu.
+ADR `docs/adr/0001-type-policy.md` đã chốt V++ 1.0 dùng dynamic typing. Semantic analysis
+không phải static type checker: nó khóa name/scope/visibility/inheritance và arity khi callable
+đích biết chắc, còn loại `StackValue` được kiểm tra tại runtime. Typed IR/static checker được
+hoãn sau 1.0 và không nằm trên production pipeline hiện tại.
 
 Compiler hiện chỉ có một production backend: **Direct IR → bytecode**. Nếu program chứa
 region mà direct emitter chưa hỗ trợ, pipeline báo lỗi compiler tường minh thay vì
-materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **79 chương
+materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **86 chương
 trình `.vi`** trong corpus ở direct IR.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và
@@ -201,7 +202,7 @@ Recursive IR lowering
   ↓
 Direct IR → bytecode emission theo từng opcode/feature
   ↓
-Unsupported Direct IR = 0 trên regression corpus (đã đạt 70/70)
+Unsupported Direct IR = 0 trên regression corpus (đã đạt 86/86)
 ```
 
 IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận diện phần chưa
@@ -218,15 +219,15 @@ regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm
 được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
 được review như một thay đổi bytecode/compiler-state có chủ ý.
 
-Gate hiện tự động quét **70/70** chương trình `.vi`, xác nhận compiler snapshots khớp
+Gate hiện tự động quét **86/86** chương trình `.vi`, xác nhận compiler snapshots khớp
 và yêu cầu mọi program có `unsupportedDirectIrRegions == 0`. Source test dùng
 `CompilationContext` cho từng top-level compile, sau đó chạy lại corpus theo thứ tự
 ngược trong cùng process để khóa reset/import-base isolation. Toàn corpus chính là direct-IR
 contract; không còn backend selector hay token compiler để quay lại.
 
-Các bước trên dùng IR không kiểu và giữ semantics động hiện hành. Quyết định
-dynamic/static/gradual chỉ là điều kiện cho type checking/Typed IR, không phải
-điều kiện để xây Expression AST, scope hay name resolution.
+Các bước trên dùng IR không kiểu theo type policy động đã chốt cho 1.0. Typed IR hoặc
+static/gradual checker nếu bổ sung sau này là lớp tính năng mới; Expression AST, scope và name
+resolution hiện tại không phụ thuộc vào chúng.
 
 GC hiện là tracing collector cho object graph runtime và có cycle sweep; profiler/allocation
 telemetry vẫn còn thiếu. JIT vẫn là MVP và chưa phải compiler sinh mã máy production-grade.

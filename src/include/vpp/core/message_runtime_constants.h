@@ -52,12 +52,15 @@ inline constexpr std::string_view kVmIncrementUnsupportedType = "OP_CONG_MOT: ki
 inline constexpr std::string_view kVmDecrementEmptyStack = "OP_TRU_MOT: ngăn xếp rỗng";
 inline constexpr std::string_view kVmDecrementUnsupportedType = "OP_TRU_MOT: kiểu dữ liệu chưa được hỗ trợ";
 inline constexpr std::string_view kVmFunctionNotFound = "OP_GOI: hàm không tồn tại (mã/chỉ số tên={0}, tên='{1}')";
+inline constexpr std::string_view kVmCallArityMismatch = "Lỗi: lời gọi '{0}' nhận {1} đối số nhưng yêu cầu từ {2} đến {3}";
+inline constexpr std::string_view kVmRequiredArgumentMissing = "Lỗi: thiếu đối số bắt buộc tại vị trí {0}";
 inline constexpr std::string_view kVmIndirectCallMissingReference = "OP_GOI_GIAN_TIEP: thiếu tham chiếu hàm";
 inline constexpr std::string_view kVmIndirectCallInvalidReference = "OP_GOI_GIAN_TIEP: tham chiếu hàm không hợp lệ";
 inline constexpr std::string_view kVmIndirectCallUnsupportedReferenceType = "OP_GOI_GIAN_TIEP: kiểu tham chiếu hàm chưa được hỗ trợ";
+inline constexpr std::string_view kVmClosureMissingCaptures = "closure: không đủ slot capture trên ngăn xếp";
+inline constexpr std::string_view kVmClosureInvalidCapture = "closure: mã slot capture phải là số nguyên";
 inline constexpr std::string_view kVmUnknownThrownValue = "lỗi không xác định";
 inline constexpr std::string_view kVmUncaughtException = "Lỗi không bắt được: {0}";
-inline constexpr std::string_view kVmParamArgIndexOutOfRange = "Cảnh báo: OP_PARAM có chỉ số đối số ngoài phạm vi, dùng mặc định 0";
 inline constexpr std::string_view kVmOutputPrefix = "[IN] ";
 inline constexpr std::string_view kVmLogPrefix = "[VM] ";
 inline constexpr std::string_view kVmModuleInitializationInvalidState = "Lỗi: trạng thái khởi tạo mô-đun không hợp lệ: {0}";

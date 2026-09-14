@@ -565,12 +565,16 @@ void VM::initializeModules() {
         if (!state.has_value()) continue;
         if (*state == vietvm::runtime::ModuleState::Initialized) continue;
         if (*state == vietvm::runtime::ModuleState::Failed) {
-            throw std::runtime_error(vietvm::messages::formatMessage(
-                vietvm::messages::kVmModuleInitializationFailed, {identity}));
+            throw vietvm::runtime::RuntimeError(
+                vietvm::messages::formatMessage(
+                    vietvm::messages::kVmModuleInitializationFailed, {identity}),
+                vietvm::runtime::RuntimeErrorKind::ModuleInitialization);
         }
         if (!moduleTable.begin(identity)) {
-            throw std::runtime_error(vietvm::messages::formatMessage(
-                vietvm::messages::kVmModuleInitializationInvalidState, {identity}));
+            throw vietvm::runtime::RuntimeError(
+                vietvm::messages::formatMessage(
+                    vietvm::messages::kVmModuleInitializationInvalidState, {identity}),
+                vietvm::runtime::RuntimeErrorKind::ModuleInitialization);
         }
 
         const vietvm::runtime::RuntimeModule *module = moduleTable.module(identity);
@@ -605,29 +609,7 @@ void VM::emitOutput(const StackValue& value) {
 
 // Chuyển `StackValue` thành điều kiện luận lý theo quy tắc runtime của V++, dùng cho nhánh và vòng lặp.
 bool toBool(const StackValue& value) {
-    if (std::holds_alternative<int>(value))    return std::get<int>(value) != 0;
-    if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
-    if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
-    if (std::holds_alternative<std::monostate>(value)) return false;
-    if (std::holds_alternative<MapHandle>(value)) {
-        const MapHandle &map = std::get<MapHandle>(value);
-        return map != nullptr && !map->entries.empty();
-    }
-    if (std::holds_alternative<ListHandle>(value)) {
-        const ListHandle &list = std::get<ListHandle>(value);
-        return list != nullptr && !list->elements.empty();
-    }
-    if (std::holds_alternative<TupleHandle>(value)) {
-        const TupleHandle &tuple = std::get<TupleHandle>(value);
-        return tuple != nullptr && !tuple->elements.empty();
-    }
-    if (std::holds_alternative<ClassHandle>(value)) {
-        return std::get<ClassHandle>(value) != nullptr;
-    }
-    if (std::holds_alternative<InstanceHandle>(value)) {
-        return std::get<InstanceHandle>(value) != nullptr;
-    }
-    return false;
+    return stackValueTruthy(value);
 }
 
 // Thực hiện chu kỳ thu gom bộ nhớ runtime theo cơ chế GC hiện tại, duyệt các root đang sống trước khi giải phóng đối tượng không còn tham chiếu.
@@ -666,6 +648,9 @@ std::vector<StackValue> VM::gcRoots() const {
         roots.insert(roots.end(), frame.args.begin(), frame.args.end());
         roots.insert(roots.end(), frame.localsVec.begin(), frame.localsVec.end());
         for (const auto &entry : frame.localsMap) roots.push_back(entry.second);
+        for (const auto &entry : frame.capturedCells) {
+            if (entry.second != nullptr) roots.push_back(entry.second->value);
+        }
         if (frame.receiver != nullptr) roots.push_back(make_instance_value(frame.receiver));
         if (frame.methodOwnerClass != nullptr) {
             roots.push_back(make_class_value(frame.methodOwnerClass));
@@ -817,13 +802,88 @@ bool VM::runJitCompiledLinear() {
     return true;
 }
 
+// Suy ra biên arity từ bytecode parameter binding. `operandValue` của OP_PARAM/
+// OP_PARAM_MAC_DINH là chỉ số đối số nguồn; receiver ngầm dùng -1 nên không tính.
+struct RuntimeFunctionArity {
+    int minimum = 0;
+    int maximum = 0;
+};
+
+static RuntimeFunctionArity inferRuntimeFunctionArity(const std::vector<Instruction> &code) {
+    RuntimeFunctionArity arity;
+    for (const Instruction &instruction : code) {
+        if (instruction.op != OP_PARAM && instruction.op != OP_PARAM_MAC_DINH) continue;
+        const int argumentIndex = instruction.operandValue;
+        if (argumentIndex < 0) continue;
+        arity.maximum = std::max(arity.maximum, argumentIndex + 1);
+        if (instruction.op == OP_PARAM) {
+            arity.minimum = std::max(arity.minimum, argumentIndex + 1);
+        }
+    }
+    return arity;
+}
+
+static std::string runtimeCallTargetName(int hamIdOrName,
+                                         const std::vector<std::string> &stringPool) {
+    if (hamIdOrName < 0) {
+        const int nameIndex = -(hamIdOrName + 1);
+        if (nameIndex >= 0 && nameIndex < static_cast<int>(stringPool.size())) {
+            return stringPool[static_cast<std::size_t>(nameIndex)];
+        }
+    }
+    return std::to_string(hamIdOrName);
+}
+
+// Lấy hoặc tạo shared cell cho một slot đang sống trong frame hiện tại. Từ lúc
+// slot được capture, mọi đọc/ghi qua frame đều ưu tiên cell để closure và scope
+// tạo closure quan sát cùng một giá trị.
+CellHandle VM::captureCellForSlot(int varId) {
+    if (!callStack.empty()) {
+        CallFrame &frame = callStack.back();
+        const auto existing = frame.capturedCells.find(varId);
+        if (existing != frame.capturedCells.end() && existing->second != nullptr) {
+            return existing->second;
+        }
+
+        StackValue current = make_int_value(0);
+        bool found = false;
+        if (frame.localsIndexed) {
+            if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
+                current = frame.localsVec[varId];
+                found = true;
+            }
+        } else {
+            const auto local = frame.localsMap.find(varId);
+            if (local != frame.localsMap.end()) {
+                current = local->second;
+                found = true;
+            }
+        }
+        if (!found) {
+            const auto global = variables.find(varId);
+            if (global != variables.end()) current = global->second;
+        }
+
+        CellHandle cell = std::make_shared<vietvm::runtime::RuntimeCell>();
+        cell->value = std::move(current);
+        frame.capturedCells[varId] = cell;
+        return cell;
+    }
+
+    CellHandle cell = std::make_shared<vietvm::runtime::RuntimeCell>();
+    const auto global = variables.find(varId);
+    cell->value = global == variables.end() ? make_int_value(0) : global->second;
+    return cell;
+}
+
 // Tạo call frame và thực thi bytecode của một function id với danh sách đối số/receiver đã chuẩn bị, sau đó trả kết quả về caller.
 void VM::invokeFunction(int argc,
                         int hamIdOrName,
                         Opcode op,
                         int curPc,
                         InstanceHandle receiver,
-                        ClassHandle methodOwnerClass) {
+                        ClassHandle methodOwnerClass,
+                        ClosureHandle closure) {
     std::vector<StackValue> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
@@ -854,6 +914,7 @@ void VM::invokeFunction(int argc,
     frame.methodOwnerClass = std::move(methodOwnerClass);
     frame.localsIndexed = true;
     frame.returnPc = curPc + 1;
+    if (closure != nullptr) frame.capturedCells = closure->captures;
     callStack.push_back(frame);
 
     auto it = hamBytecodeMap.find(hamIdOrName);
@@ -890,6 +951,18 @@ void VM::invokeFunction(int argc,
         );
     }
 
+    const RuntimeFunctionArity arity = inferRuntimeFunctionArity(it->second);
+    if (argc < arity.minimum || argc > arity.maximum) {
+        if (!callStack.empty()) callStack.pop_back();
+        throw vietvm::runtime::RuntimeError(
+            vietvm::messages::formatMessage(
+                vietvm::messages::kVmCallArityMismatch,
+                {runtimeCallTargetName(hamIdOrName, stringPool),
+                 std::to_string(argc), std::to_string(arity.minimum),
+                 std::to_string(arity.maximum)}),
+            vietvm::runtime::RuntimeErrorKind::CallBoundary);
+    }
+
     VM funcVM(it->second, stringPool);
     funcVM.runtimeHeap = runtimeHeap;
     funcVM.inheritedGcRoots = gcRoots();
@@ -900,10 +973,19 @@ void VM::invokeFunction(int argc,
     funcVM.callStack.push_back(callStack.back());
     funcVM.hamBytecodeMap = hamBytecodeMap;
     funcVM.functionTableByNameIndex = functionTableByNameIndex;
-    funcVM.run();
+    try {
+        funcVM.run();
+    } catch (...) {
+        // Side effects đã xảy ra trước lỗi vẫn thuộc semantics imperative của V++;
+        // chỉ transient call frame của caller phải được unwind trước khi truyền lỗi lên.
+        variables = std::move(funcVM.variables);
+        classTable = std::move(funcVM.classTable);
+        if (!callStack.empty()) callStack.pop_back();
+        throw;
+    }
 
-    variables = funcVM.variables;
-    classTable = funcVM.classTable;
+    variables = std::move(funcVM.variables);
+    classTable = std::move(funcVM.classTable);
     if (!funcVM.stack.empty()) {
         stack.push_back(funcVM.stack.back());
     }
@@ -944,6 +1026,15 @@ void VM::executeCallOpcode(const Instruction& instr) {
             }
             hamIdOrName = -static_cast<int>(std::distance(stringPool.begin(), it)) - 1;
         }
+    } else if (std::holds_alternative<ClosureHandle>(calleeVal)) {
+        const ClosureHandle &closure = std::get<ClosureHandle>(calleeVal);
+        if (closure == nullptr || closure->functionId < 0) {
+            throw runtime_error_op(vietvm::messages::formatMessage(
+                vietvm::messages::kVmIndirectCallInvalidReference), instr.op, pc);
+        }
+        invokeFunction(instr.operand, closure->functionId, instr.op,
+                       static_cast<int>(pc), nullptr, nullptr, closure);
+        return;
     } else {
         throw runtime_error_op(vietvm::messages::formatMessage(
             vietvm::messages::kVmIndirectCallUnsupportedReferenceType), instr.op, pc);
@@ -961,6 +1052,33 @@ void VM::executeValueOpcode(const Instruction& instr) {
         case OP_TEN_BIEN_ID:
             stack.emplace_back(instr.operandIndex);
             return;
+        case OP_TAO_DONG_BAO: {
+            const int captureCount = instr.operandIndex;
+            if (captureCount < 0 || stack.size() < static_cast<std::size_t>(captureCount)) {
+                throw runtime_error_op(vietvm::messages::formatMessage(
+                    vietvm::messages::kVmClosureMissingCaptures), instr.op, pc);
+            }
+            std::vector<int> captureSlots;
+            captureSlots.reserve(static_cast<std::size_t>(captureCount));
+            for (int index = 0; index < captureCount; ++index) {
+                StackValue slot = stack.back();
+                stack.pop_back();
+                if (!std::holds_alternative<int>(slot)) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmClosureInvalidCapture), instr.op, pc);
+                }
+                captureSlots.push_back(std::get<int>(slot));
+            }
+            std::reverse(captureSlots.begin(), captureSlots.end());
+
+            ClosureHandle closure = std::make_shared<vietvm::runtime::RuntimeClosure>();
+            closure->functionId = instr.operand;
+            for (int slot : captureSlots) {
+                closure->captures[slot] = captureCellForSlot(slot);
+            }
+            stack.push_back(make_closure_value(std::move(closure)));
+            return;
+        }
         case OP_MODULO: {
             if (stack.size() < 2) throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmMissingModuloOperands), instr.op, pc);
@@ -1224,8 +1342,11 @@ void VM::executeObjectOpcode(const Instruction& instr) {
                                instance, klass);
                 stack.resize(stackBase);
             } else if (argc != 0) {
-                throw runtime_error_op(vietvm::messages::formatMessage(
-                    vietvm::messages::kVmObjectMethodNotFound, {"khởi tạo"}), instr.op, pc);
+                throw vietvm::runtime::RuntimeError(
+                    vietvm::messages::formatMessage(
+                        vietvm::messages::kVmCallArityMismatch,
+                        {className, std::to_string(argc), "0", "0"}),
+                    vietvm::runtime::RuntimeErrorKind::CallBoundary);
             }
             stack.push_back(make_instance_value(instance));
             return;
@@ -1356,6 +1477,11 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             const int varId = instr.operandIndex;
             if (!callStack.empty()) {
                 CallFrame &frame = callStack.back();
+                const auto captured = frame.capturedCells.find(varId);
+                if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                    stack.push_back(captured->second->value);
+                    return;
+                }
                 if (frame.localsIndexed) {
                     if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
                         stack.push_back(frame.localsVec[varId]);
@@ -1403,6 +1529,11 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             const int varId = std::get<int>(varIdVal);
             if (!callStack.empty()) {
                 CallFrame &frame = callStack.back();
+                const auto captured = frame.capturedCells.find(varId);
+                if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                    captured->second->value = valueVal;
+                    return;
+                }
                 if (frame.localsIndexed) {
                     if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
                         frame.localsVec[varId] = valueVal;
@@ -1452,9 +1583,11 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             } else if (argIndex >= 0 && argIndex < static_cast<int>(frame.args.size())) {
                 value = frame.args[argIndex];
             } else {
-                value = make_int_value(0);
-                vmLog(vietvm::messages::formatMessage(
-                    vietvm::messages::kVmParamArgIndexOutOfRange));
+                throw vietvm::runtime::RuntimeError(
+                    vietvm::messages::formatMessage(
+                        vietvm::messages::kVmRequiredArgumentMissing,
+                        {std::to_string(argIndex)}),
+                    vietvm::runtime::RuntimeErrorKind::CallBoundary);
             }
             if (frame.localsIndexed) {
                 if (localId >= static_cast<int>(frame.localsVec.size())) {
@@ -1510,14 +1643,21 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                 bool updated = false;
                 if (!callStack.empty()) {
                     CallFrame &frame = callStack.back();
-                    if (frame.localsIndexed) {
+                    const auto captured = frame.capturedCells.find(idOrVal);
+                    if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                        const int current = as_int(captured->second->value, instr.op, pc);
+                        captured->second->value = make_int_value(current + delta);
+                        pushResult(current + delta);
+                        updated = true;
+                    }
+                    if (!updated && frame.localsIndexed) {
                         if (idOrVal >= 0 && idOrVal < static_cast<int>(frame.localsVec.size())) {
                             const int current = as_int(frame.localsVec[idOrVal], instr.op, pc);
                             frame.localsVec[idOrVal] = make_int_value(current + delta);
                             pushResult(current + delta);
                             updated = true;
                         }
-                    } else {
+                    } else if (!updated) {
                         auto itLoc = frame.localsMap.find(idOrVal);
                         if (itLoc != frame.localsMap.end()) {
                             const int current = as_int(itLoc->second, instr.op, pc);
@@ -1698,6 +1838,11 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
             frame.catchAddr = instr.operand;
             frame.stackDepth = static_cast<int>(stack.size());
             frame.errVarId = instr.operandIndex;
+            frame.blockStackDepth = blockStack.size();
+            frame.switchStackDepth = switchStack.size();
+            frame.loopStackDepth = loopStartStack.size();
+            frame.ifElseStackDepth = ifElseStack.size();
+            frame.blockDepth = blockDepth;
             tryStack.push_back(frame);
             return false;
         }
@@ -1716,25 +1861,37 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
             return false;
         }
         case OP_NEM: {
-            if (stack.empty()) {
-                stack.push_back(make_string_value(
-                    vietvm::messages::formatMessage(vietvm::messages::kVmUnknownThrownValue)));
-            }
-            StackValue errVal = stack.back(); stack.pop_back();
-            if (tryStack.empty()) {
-                throw std::runtime_error(vietvm::messages::formatMessage(
-                    vietvm::messages::kVmUncaughtException, {sv_to_string(errVal)}));
-            }
-            TryFrame frame = tryStack.back(); tryStack.pop_back();
-            while (static_cast<int>(stack.size()) > frame.stackDepth) stack.pop_back();
-            stack.push_back(errVal);
-            pc = frame.catchAddr;
-            return true;
+            StackValue errVal = stack.empty()
+                ? make_string_value(vietvm::messages::formatMessage(
+                      vietvm::messages::kVmUnknownThrownValue))
+                : stack.back();
+            if (!stack.empty()) stack.pop_back();
+            if (transferThrownValue(errVal)) return true;
+            throw vietvm::runtime::LanguageException(std::move(errVal));
         }
         default:
             throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmUnknownOpcode), instr.op, pc);
     }
+}
+
+// Chuyển giá trị `ném` tới handler gần nhất và unwind toàn bộ trạng thái điều khiển
+// tạm được tạo sau khi `thử` bắt đầu. Giá trị lỗi được giữ nguyên trên stack để
+// `OP_BAT_LOI` bind vào biến catch.
+bool VM::transferThrownValue(const StackValue &value) {
+    if (tryStack.empty()) return false;
+
+    TryFrame frame = tryStack.back();
+    tryStack.pop_back();
+    while (static_cast<int>(stack.size()) > frame.stackDepth) stack.pop_back();
+    if (blockStack.size() > frame.blockStackDepth) blockStack.resize(frame.blockStackDepth);
+    if (switchStack.size() > frame.switchStackDepth) switchStack.resize(frame.switchStackDepth);
+    if (loopStartStack.size() > frame.loopStackDepth) loopStartStack.resize(frame.loopStackDepth);
+    if (ifElseStack.size() > frame.ifElseStackDepth) ifElseStack.resize(frame.ifElseStackDepth);
+    blockDepth = frame.blockDepth;
+    stack.push_back(value);
+    pc = static_cast<std::size_t>(frame.catchAddr);
+    return true;
 }
 
 // Xử lý opcode nhảy có điều kiện/không điều kiện bằng cách cập nhật program counter dựa trên giá trị trên stack.
@@ -1824,7 +1981,8 @@ void VM::run() {
         }
 
         const Instruction &instr = bytecode[pc];
-        switch (instr.op) {
+        try {
+            switch (instr.op) {
             case OP_HAM:
             case OP_NEU:
             case OP_DIEU_KIEN:
@@ -1864,6 +2022,7 @@ void VM::run() {
             case OP_MAP_LITERAL:
             case OP_LIST_LITERAL:
             case OP_PHU_DINH:
+            case OP_TAO_DONG_BAO:
                 runtime.executeValue(instr);
                 break;
 
@@ -1937,6 +2096,10 @@ void VM::run() {
                 }
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmUnknownOpcode), instr.op, pc);
+            }
+        } catch (const vietvm::runtime::LanguageException &thrown) {
+            if (!transferThrownValue(thrown.value())) throw;
+            continue;
         }
         ++pc;
     }

@@ -54,9 +54,9 @@ concurrency/async phức tạp không phải release blocker mặc định của
       fixup; shared mixed-backend context còn thiếu.
    6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
       vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
-      đạt 79/79 direct IR và vẫn giữ snapshot compiler state đã chốt.
+      đạt 86/86 direct IR và vẫn giữ snapshot compiler state đã chốt.
 
-   Hiện direct backend bao phủ 79/79 regression program; parity gate yêu cầu toàn bộ
+   Hiện direct backend bao phủ 86/86 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
@@ -64,13 +64,13 @@ concurrency/async phức tạp không phải release blocker mặc định của
    `materializeIrTokens()` chỉ còn phục vụ lossless IR test/debug; nó không còn nằm
    trên production compile path. Các cú pháp ngoài direct cohort được diagnostic.
 
-   Chốt dynamic/static/gradual typing và Typed IR là quyết định riêng. Expression
-   AST, scope tree, name resolution và structured **untyped IR** không phải chờ
-   quyết định kiểu này.
+   Type policy đã được chốt bằng ADR 0001: V++ 1.0 dùng dynamic typing. Expression AST,
+   scope tree, name resolution và structured **untyped IR** tiếp tục là production contract;
+   Typed IR/static checker được hoãn sau 1.0.
 
-   - [ ] **Type policy + Typed IR** — chốt ADR cho dynamic/static/gradual typing,
-     kiểu của symbol/expression/call boundary và chiến lược diagnostic trước khi
-     đưa Typed IR hoặc static checker vào production pipeline.
+   - [x] **Type policy 1.0** — dynamic typing; value/call boundary và arity đã có contract,
+     semantic chỉ kiểm tra phần biết chắc còn runtime kiểm tra loại giá trị động. Typed IR /
+     static hoặc gradual checker được hoãn hậu 1.0 và không đổi contract dynamic hiện tại.
 
 2. Module semantics
 
@@ -84,8 +84,9 @@ concurrency/async phức tạp không phải release blocker mặc định của
      module identity, CLI chuyển metadata sang VM, và runtime chạy initializer theo thứ
      tự dependency-first đúng một lần với state `uninitialized → initializing →
      initialized/failed`.
-   - [ ] Chốt cycle behavior giàu diagnostic hơn, explicit export/re-export và diagnostic
-     khi truy cập symbol không export.
+   - [x] Chốt module semantics 1.0: `công khai nhập` tạo re-export có alias, private/protected
+     không lọt vào export surface, truy cập symbol ẩn có semantic diagnostic; local import cycle
+     bị từ chối với chuỗi path/identity rõ ràng và recursive relative import resolve từ module cha.
 
 3. Runtime, object model và debugger
 
@@ -119,12 +120,13 @@ concurrency/async phức tạp không phải release blocker mặc định của
      tổng quát hay cung cấp introspection giới hạn. Nếu hỗ trợ, metadata class/method/
      field/module phải có contract ổn định và không phá visibility/sandbox.
    - [x] Nâng MVP GC thành tracing GC quản lý object graph an toàn. Runtime có
-     `RuntimeHeap` riêng theo VM, registry weak cho map/list/tuple/class/instance và
+     `RuntimeHeap` riêng theo VM, registry weak cho map/list/tuple/class/instance/closure và
      mark từ stack, global/local variable, call frame receiver/args/locals, class table
      cùng switch value. Function/module child VM chia sẻ heap và mang snapshot root của
      caller để collection lồng nhau không quét nhầm object còn sống. Sweep cắt cạnh của
-     object không reachable nên thu được cả shared_ptr cycle; regression khóa
-     instance↔list, self-cycle list/map và argument đang nằm trên caller stack.
+     object không reachable nên thu được cả shared_ptr cycle; closure capture dùng shared cell
+     theo tham chiếu, giữ lifetime qua outer return và GC cắt được closure↔cell cycle. Regression
+     khóa instance↔list, self-cycle list/map, argument caller và nested closure mutation.
    - [ ] **Runtime/GC stress trước 1.0** — khóa object graph lớn, allocation liên tục,
      cycle sâu, caller roots qua child VM, recursion sâu, nested exception và stack overflow;
      runtime error không được làm corrupt stack/call frame/module/heap state cho lần chạy sau.
@@ -208,7 +210,7 @@ concurrency/async phức tạp không phải release blocker mặc định của
 
 ## Điều kiện thực hiện
 
-- Không bắt đầu Typed IR hay public embedding API trước khi quyết định type policy và
+- Không bắt đầu Typed IR trước 1.0; public embedding API phải tuân theo dynamic type policy và
   lifecycle dữ liệu; điều kiện này không chặn sáu bước migration untyped ở trên.
 - Không mở FFI/crypto/network quyền cao trước khi có sandbox/permission model tối thiểu;
   native boundary phải là nơi enforce policy cuối cùng.

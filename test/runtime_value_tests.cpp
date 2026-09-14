@@ -9,6 +9,7 @@
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/text.h"
 #include "vpp/runtime/collection.h"
+#include "vpp/runtime/heap.h"
 #include "vpp/runtime/object.h"
 
 namespace {
@@ -31,6 +32,22 @@ void testSharedStackValueSemantics() {
            "scalar and stack float formatting share the same whole-number spelling");
     expect(sameStackValue(one, oneFloat), "numeric collection equality promotes int and float");
     expect(sameStackValue(nullValue, make_null_value()), "null values compare equal");
+    expect(!sameStackValue(nullValue, make_int_value(0)),
+           "null and numeric zero are different equality values");
+
+    expect(!stackValueTruthy(make_int_value(0)) &&
+               stackValueTruthy(make_int_value(-1)) &&
+               !stackValueTruthy(make_float_value(0.0)) &&
+               stackValueTruthy(make_float_value(0.5)) &&
+               !stackValueTruthy(make_string_value("")) &&
+               stackValueTruthy(make_string_value("x")) &&
+               !stackValueTruthy(nullValue),
+           "scalar truthiness follows the frozen runtime contract");
+    expect(!stackValueTruthy(make_list_value({})) &&
+               stackValueTruthy(make_list_value({make_int_value(1)})) &&
+               !stackValueTruthy(make_map_value({})) &&
+               stackValueTruthy(make_map_value(MapValue{{{"x", make_int_value(1)}}})),
+           "collection truthiness depends on whether the collection is empty");
 
     const StackValue firstList = make_list_value({make_int_value(1)});
     const StackValue secondList = make_list_value({make_int_value(1)});
@@ -97,6 +114,33 @@ void testSharedStackValueSemantics() {
     // fixtures themselves as leaked allocations.
     std::get<ListHandle>(cyclicList)->elements.clear();
     std::get<MapHandle>(cyclicMap)->entries.clear();
+}
+
+void testClosureValueAndGcSemantics() {
+    using namespace vietvm::runtime;
+
+    RuntimeHeap heap;
+    RuntimeHeapScope heapScope(heap);
+    ClosureHandle closure = std::make_shared<RuntimeClosure>();
+    closure->functionId = 7;
+    CellHandle cell = std::make_shared<RuntimeCell>();
+    closure->captures[3] = cell;
+    StackValue closureValue = make_closure_value(closure);
+    cell->value = closureValue;
+
+    expect(stackValueTruthy(closureValue) &&
+               sameStackValue(closureValue, closureValue) &&
+               sv_to_string(closureValue) == "<closure 7>",
+           "closure values are truthy, use handle identity, and render stably");
+    expect(heap.trackedObjectCount() == 1,
+           "runtime heap tracks a closure allocation");
+
+    closureValue = make_null_value();
+    closure.reset();
+    cell.reset();
+    const RuntimeHeapStats stats = heap.collect({});
+    expect(stats.swept == 1 && heap.trackedObjectCount() == 0,
+           "tracing GC breaks an unreachable closure/capture-cell ownership cycle");
 }
 
 void testSharedNativeValidation() {
@@ -236,6 +280,32 @@ void testSharedOperatorEvaluation() {
     expect(sv_to_string(evaluateBinaryOperator(
                OP_SO_SANH_BANG, make_int_value(1), make_float_value(1.0), 0)) == "1",
            "shared binary evaluator preserves numeric comparison");
+    expect(sv_to_string(evaluateBinaryOperator(
+               OP_SO_SANH_BANG, make_null_value(), make_null_value(), 0)) == "1" &&
+               sv_to_string(evaluateBinaryOperator(
+                   OP_KHAC_BANG, make_null_value(), make_int_value(0), 0)) == "1",
+           "shared binary evaluator uses StackValue equality for null and mixed types");
+    const StackValue list = make_list_value({make_int_value(1)});
+    expect(sv_to_string(evaluateBinaryOperator(
+               OP_SO_SANH_BANG, list, list, 0)) == "1" &&
+               sv_to_string(evaluateBinaryOperator(
+                   OP_SO_SANH_BANG, list, make_list_value({make_int_value(1)}), 0)) == "0",
+           "shared binary evaluator keeps reference identity equality");
+    expect(sv_to_string(evaluateBinaryOperator(
+               OP_Logic_VA, make_string_value("x"), make_list_value({make_int_value(1)}), 0)) == "1" &&
+               sv_to_string(evaluateBinaryOperator(
+                   OP_Logic_HOAC, make_string_value(""), make_null_value(), 0)) == "0",
+           "logical operators share branch truthiness for every runtime value kind");
+
+    bool rejectedMixedOrdering = false;
+    try {
+        (void)evaluateBinaryOperator(
+            OP_NHO_HON, make_int_value(1), make_string_value("2"), 0);
+    } catch (const std::runtime_error &) {
+        rejectedMixedOrdering = true;
+    }
+    expect(rejectedMixedOrdering,
+           "ordering rejects values without a shared numeric or string ordering");
     expect(sv_to_string(evaluateModuloOperator(
                make_int_value(7), make_int_value(3), OP_MODULO, 0)) == "1",
            "shared modulo evaluator preserves integer modulo");
@@ -246,6 +316,7 @@ void testSharedOperatorEvaluation() {
 int main() {
     try {
         testSharedStackValueSemantics();
+        testClosureValueAndGcSemantics();
         testSharedNativeValidation();
         testRuntimeObjectModel();
         testSharedTextAndWireHelpers();

@@ -13,6 +13,7 @@ struct CallFrame {
     ClassHandle methodOwnerClass;                 // class that supplied the active method
     std::vector<Value> localsVec;                 // indexed locals if used
     std::unordered_map<int, Value> localsMap;     // or map keyed by localId
+    std::unordered_map<int, CellHandle> capturedCells; // shared cells inherited from/in use by closures
     bool localsIndexed = true;                     // true => use localsVec
     int returnPc = -1;                             // PC to return to after function ends
     int returnBytecodeOwner = -1;                  // optional owner id if multi-bytecode

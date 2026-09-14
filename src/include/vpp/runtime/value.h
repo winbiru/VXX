@@ -29,14 +29,20 @@ struct TupleValue;
 struct RuntimeClass;
 // Lưu class handle và field map riêng của một object; method dispatch dùng class còn đọc/ghi thuộc tính thao tác trên field map này.
 struct RuntimeInstance;
+// Ô nhớ chia sẻ cho biến bị closure capture; nhiều frame/closure cùng giữ handle này để mutation nhìn thấy cùng một giá trị.
+struct RuntimeCell;
+// Giá trị hàm đóng gói function id cùng các ô nhớ đã capture để closure sống độc lập với frame tạo ra nó.
+struct RuntimeClosure;
 using MapHandle = std::shared_ptr<MapValue>;
 using ListHandle = std::shared_ptr<ListValue>;
 using TupleHandle = std::shared_ptr<TupleValue>;
 using ClassHandle = std::shared_ptr<RuntimeClass>;
 using InstanceHandle = std::shared_ptr<RuntimeInstance>;
+using CellHandle = std::shared_ptr<RuntimeCell>;
+using ClosureHandle = std::shared_ptr<RuntimeClosure>;
 using StackValue = std::variant<int, double, std::string, std::monostate,
                                 MapHandle, ListHandle, TupleHandle,
-                                ClassHandle, InstanceHandle>;
+                                ClassHandle, InstanceHandle, ClosureHandle>;
 
 // Đăng ký allocation vào heap của VM đang hoạt động; các overload được định
 // nghĩa trong runtime heap và là no-op khi value được tạo ngoài một VM run.
@@ -45,6 +51,7 @@ void trackRuntimeAllocation(const ListHandle &value);
 void trackRuntimeAllocation(const TupleHandle &value);
 void trackRuntimeAllocation(const ClassHandle &value);
 void trackRuntimeAllocation(const InstanceHandle &value);
+void trackRuntimeAllocation(const ClosureHandle &value);
 
 // Biểu diễn mức truy cập method tại runtime; VM dùng metadata này để chặn lời gọi
 // private/protected cả khi kiểu receiver không thể suy luận tĩnh ở semantic.
@@ -89,6 +96,17 @@ struct RuntimeInstance {
     std::unordered_map<std::string, StackValue> fields;
 };
 
+// Chứa một StackValue có lifetime độc lập với call frame; closure capture theo tham chiếu bằng cách chia sẻ `CellHandle` này.
+struct RuntimeCell {
+    StackValue value{std::monostate{}};
+};
+
+// Chứa đích function và bảng slot → cell đã capture. Slot giữ nguyên id bytecode để lambda body đọc/ghi qua cơ chế biến hiện có.
+struct RuntimeClosure {
+    int functionId = -1;
+    std::unordered_map<int, CellHandle> captures;
+};
+
 // Kiểm tra điều kiện của `isNumeric`.
 inline bool isNumeric(const StackValue &value) {
     return std::holds_alternative<int>(value) || std::holds_alternative<double>(value);
@@ -124,6 +142,37 @@ inline double toDouble(const StackValue &value) {
     throw std::runtime_error(std::string(vietvm::messages::kRuntimeValueNotNumeric));
 }
 
+// Chuyển một `StackValue` thành điều kiện luận lý thống nhất của V++. Số 0,
+// chuỗi rỗng, `rỗng`, collection rỗng và handle null là sai; các giá trị còn
+// lại là đúng. Helper này là nguồn contract chung cho nhánh, `!`, `&&` và `||`.
+inline bool stackValueTruthy(const StackValue &value) {
+    if (std::holds_alternative<int>(value)) return std::get<int>(value) != 0;
+    if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
+    if (std::holds_alternative<std::string>(value)) {
+        return !std::get<std::string>(value).empty();
+    }
+    if (std::holds_alternative<std::monostate>(value)) return false;
+    if (std::holds_alternative<MapHandle>(value)) {
+        const MapHandle &map = std::get<MapHandle>(value);
+        return map != nullptr && !map->entries.empty();
+    }
+    if (std::holds_alternative<ListHandle>(value)) {
+        const ListHandle &list = std::get<ListHandle>(value);
+        return list != nullptr && !list->elements.empty();
+    }
+    if (std::holds_alternative<TupleHandle>(value)) {
+        const TupleHandle &tuple = std::get<TupleHandle>(value);
+        return tuple != nullptr && !tuple->elements.empty();
+    }
+    if (std::holds_alternative<ClassHandle>(value)) {
+        return std::get<ClassHandle>(value) != nullptr;
+    }
+    if (std::holds_alternative<InstanceHandle>(value)) {
+        return std::get<InstanceHandle>(value) != nullptr;
+    }
+    return std::get<ClosureHandle>(value) != nullptr;
+}
+
 // So sánh hai `StackValue` theo ngữ nghĩa equality của runtime; scalar so theo giá trị còn collection/object dùng identity hoặc quy tắc riêng.
 inline bool sameStackValue(const StackValue &left, const StackValue &right) {
     if (isNumeric(left) && isNumeric(right)) return toDouble(left) == toDouble(right);
@@ -146,6 +195,9 @@ inline bool sameStackValue(const StackValue &left, const StackValue &right) {
     }
     if (std::holds_alternative<InstanceHandle>(left)) {
         return std::get<InstanceHandle>(left) == std::get<InstanceHandle>(right);
+    }
+    if (std::holds_alternative<ClosureHandle>(left)) {
+        return std::get<ClosureHandle>(left) == std::get<ClosureHandle>(right);
     }
     return false;
 }
@@ -223,6 +275,12 @@ inline std::string stackValueToString(
         return "<instance " + instance->klass->name + ">";
     }
 
+    if (std::holds_alternative<ClosureHandle>(value)) {
+        const ClosureHandle &closure = std::get<ClosureHandle>(value);
+        return closure == nullptr ? "<closure>"
+                                  : "<closure " + std::to_string(closure->functionId) + ">";
+    }
+
     const MapHandle &map = std::get<MapHandle>(value);
     if (map != nullptr && !activeCollections.insert(map.get()).second) {
         return "<cycle>";
@@ -295,6 +353,11 @@ inline StackValue make_class_value(ClassHandle value) {
 inline StackValue make_instance_value(InstanceHandle value) {
     return StackValue(std::move(value));
 }
+// Tạo closure value và đăng ký vào runtime heap để GC có thể lần theo/cắt các cycle đi qua capture cell.
+inline StackValue make_closure_value(ClosureHandle value) {
+    trackRuntimeAllocation(value);
+    return StackValue(std::move(value));
+}
 
 } // namespace vietvm::runtime
 
@@ -307,6 +370,8 @@ using TupleHandle = vietvm::runtime::TupleHandle;
 using ListHandle = vietvm::runtime::ListHandle;
 using ClassHandle = vietvm::runtime::ClassHandle;
 using InstanceHandle = vietvm::runtime::InstanceHandle;
+using CellHandle = vietvm::runtime::CellHandle;
+using ClosureHandle = vietvm::runtime::ClosureHandle;
 using StackValue = vietvm::runtime::StackValue;
 using vietvm::runtime::isNumeric;
 using vietvm::runtime::formatRuntimeFloat;
@@ -317,10 +382,12 @@ using vietvm::runtime::make_list_value;
 using vietvm::runtime::make_tuple_value;
 using vietvm::runtime::make_class_value;
 using vietvm::runtime::make_instance_value;
+using vietvm::runtime::make_closure_value;
 using vietvm::runtime::make_null_value;
 using vietvm::runtime::make_string_value;
 using vietvm::runtime::scalar_to_string;
 using vietvm::runtime::sameStackValue;
 using vietvm::runtime::stackValueLess;
+using vietvm::runtime::stackValueTruthy;
 using vietvm::runtime::sv_to_string;
 using vietvm::runtime::toDouble;

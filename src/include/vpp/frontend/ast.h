@@ -121,6 +121,8 @@ struct AstImportSpec {
     std::string alias;
     SourceSpan aliasSpan{};
     bool hasSemicolon = false;
+    // `công khai nhập ...` re-exports the imported module surface.
+    bool reExport = false;
 };
 
 // Biểu diễn một cặp khóa–giá trị trong map literal bằng ExprId, cho phép arena biểu thức giữ cấu trúc lồng nhau ổn định.

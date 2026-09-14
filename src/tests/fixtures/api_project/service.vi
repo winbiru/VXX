@@ -5,6 +5,12 @@ nhập src/tests/fixtures/api_project/mapper.vi;
 nhập src/tests/fixtures/api_project/giao_dien/service.vi;
 
 lớp công khai UserService triển khai UserServiceContract {
+    // Nhận dependency từ composition root để service không tự tạo repository/mapper.
+    hàm khởi tạo(repository, mapper) {
+        mình.repository = repository;
+        mình.mapper = mapper;
+    };
+
     hàm riêng tư validateToken(token) {
         nếu (token == "") {
             trả về "401|missing-token";
@@ -16,12 +22,13 @@ lớp công khai UserService triển khai UserServiceContract {
     };
 
     hàm công khai getUsers(dbSession, token) {
-        tokenErr = validateToken(token);
+        tokenErr = mình.validateToken(token);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
 
-        dbRes = UserRepository.findAllUsers(dbSession);
+        repository = mình.repository;
+        dbRes = repository.findAllUsers(dbSession);
         nếu (dbRes == "DB_ERR|not-connected") {
             trả về "500|db-not-connected";
         };
@@ -29,11 +36,12 @@ lớp công khai UserService triển khai UserServiceContract {
     };
 
     hàm công khai createUser(dbSession, token, payload) {
-        tokenErr = validateToken(token);
+        tokenErr = mình.validateToken(token);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
-        mapperRes = UserMapper.toCreateEntity(payload);
+        mapper = mình.mapper;
+        mapperRes = mapper.toCreateEntity(payload);
         nếu (mapperRes == "MAPPER_ERR|missing-body") {
             trả về "400|missing-body";
         };
@@ -43,7 +51,8 @@ lớp công khai UserService triển khai UserServiceContract {
             trả về "400|missing-body";
         };
 
-        dbRes = UserRepository.createUser(dbSession, payload);
+        repository = mình.repository;
+        dbRes = repository.createUser(dbSession, payload);
         nếu (dbRes == "DB_ERR|not-connected") {
             trả về "500|db-not-connected";
         };
@@ -51,11 +60,12 @@ lớp công khai UserService triển khai UserServiceContract {
     };
 
     hàm công khai updateUser(dbSession, token, userId, payload) {
-        tokenErr = validateToken(token);
+        tokenErr = mình.validateToken(token);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
-        mapperRes = UserMapper.toUpdateEntity(userId, payload);
+        mapper = mình.mapper;
+        mapperRes = mapper.toUpdateEntity(userId, payload);
         nếu (mapperRes == "MAPPER_ERR|missing-user-id") {
             trả về "400|missing-user-id";
         };
@@ -71,7 +81,8 @@ lớp công khai UserService triển khai UserServiceContract {
             trả về "400|missing-body";
         };
 
-        dbRes = UserRepository.updateUser(dbSession, userId, payload);
+        repository = mình.repository;
+        dbRes = repository.updateUser(dbSession, userId, payload);
         nếu (dbRes == "DB_ERR|not-connected") {
             trả về "500|db-not-connected";
         };
@@ -79,7 +90,7 @@ lớp công khai UserService triển khai UserServiceContract {
     };
 
     hàm công khai deleteUser(dbSession, token, userId) {
-        tokenErr = validateToken(token);
+        tokenErr = mình.validateToken(token);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
@@ -90,7 +101,8 @@ lớp công khai UserService triển khai UserServiceContract {
             trả về "404|user-not-found";
         };
 
-        dbRes = UserRepository.deleteUser(dbSession, userId);
+        repository = mình.repository;
+        dbRes = repository.deleteUser(dbSession, userId);
         nếu (dbRes == "DB_ERR|not-connected") {
             trả về "500|db-not-connected";
         };
@@ -98,19 +110,21 @@ lớp công khai UserService triển khai UserServiceContract {
     };
 
     hàm công khai searchUsers(dbSession, token, keyword) {
-        tokenErr = validateToken(token);
+        tokenErr = mình.validateToken(token);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
-        mapperRes = UserMapper.toSearchEntity(keyword);
+        mapper = mình.mapper;
+        mapperRes = mapper.toSearchEntity(keyword);
         nếu (mapperRes == "MAPPER_ERR|missing-keyword") {
             trả về "400|missing-keyword";
         };
 
-        dbRes = UserRepository.searchUsers(dbSession, keyword);
+        repository = mình.repository;
+        dbRes = repository.searchUsers(dbSession, keyword);
         nếu (dbRes == "DB_ERR|not-connected") {
             trả về "500|db-not-connected";
         };
-        trả về UserMapper.toUsersResponse(dbRes);
+        trả về mapper.toUsersResponse(dbRes);
     };
 };

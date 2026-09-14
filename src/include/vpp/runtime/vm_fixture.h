@@ -62,6 +62,9 @@ public:
     // Đưa vào lời gọi khung; hàm thêm phần tử vào ngăn xếp hoặc ngữ cảnh hiện tại để được dùng trước khi rời phạm vi.
     void pushCallFrame(const CallFrame &frame) { vm_.callStack.push_back(frame); }
 
+    // Trả số call frame đang hoạt động để test xác nhận unwind sau lời gọi thành công hoặc lỗi.
+    std::size_t callDepth() const { return vm_.callStack.size(); }
+
     // Trả call frame đang hoạt động; hàm đọc frame trên cùng để handler/test truy cập tham số, local, receiver và địa chỉ quay về.
     const CallFrame &currentCallFrame() const {
         if (vm_.callStack.empty()) throw std::logic_error("VM fixture call stack is empty");
@@ -88,6 +91,8 @@ public:
 
     // Trả độ sâu block runtime hiện tại; test dùng giá trị này để xác nhận opcode mở/đóng khối cân bằng.
     int blockDepth() const { return vm_.blockDepth; }
+    // Trả số block frame đang giữ để test khóa contract unwind của `ném`.
+    std::size_t blockStackDepth() const { return vm_.blockStack.size(); }
     // Trả số `TryFrame` đang hoạt động; fixture dùng để kiểm tra phạm vi bắt lỗi được đẩy/pop đúng.
     std::size_t tryDepth() const { return vm_.tryStack.size(); }
 

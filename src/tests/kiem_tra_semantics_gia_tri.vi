@@ -1,0 +1,56 @@
+// Khóa contract 1.0 cho truthiness, equality, so sánh, coercion và scope cơ bản.
+
+lớp Hop {};
+
+hàm kiem_tra_scope() {
+    gia_tri = 1;
+    nếu (đúng) {
+        gia_tri = 2;
+        tao_trong_khoi = 3;
+    };
+    in gia_tri;
+    in tao_trong_khoi;
+
+    tinh = hàm(gia_tri) {
+        trả về gia_tri + 10;
+    };
+    in tinh(5);
+    in gia_tri;
+}
+
+hàm main() {
+    // `rỗng` là một giá trị riêng, falsy và chỉ bằng chính `rỗng`.
+    in rỗng == rỗng;
+    in rỗng != 0;
+    in 1 == 1.0;
+
+    // `!`, `&&`, `||` dùng cùng một bảng truthiness như `nếu`.
+    in !rỗng;
+    in !"";
+    in !"x";
+    in "" || "x";
+    in "x" && [1];
+    in [] || {};
+
+    ds = [1];
+    cung_ds = ds;
+    ds_khac = [1];
+    in ds == cung_ds;
+    in ds == ds_khac;
+
+    a = Hop();
+    cung_a = a;
+    b = Hop();
+    in a == cung_a;
+    in a == b;
+
+    // Ordering chỉ có cho numeric-numeric và string-string.
+    in 2 < 2.5;
+    in "a" < "b";
+
+    // `+` giữ phép cộng số, còn khi có giá trị phi số thì nối biểu diễn chuỗi.
+    in 2 + 0.5;
+    in "v" + 2;
+
+    kiem_tra_scope();
+}

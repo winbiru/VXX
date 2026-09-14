@@ -20,6 +20,13 @@ namespace vietvm::compiler {
         std::vector<Instruction> bytecode;
     };
 
+    // Ghi một hàm thuộc bề mặt export của module bằng tên nhìn từ chính module đó
+    // và function id runtime; metadata này cho phép import alias tiếp tục prefix cả re-export.
+    struct CompiledModuleFunctionExport {
+        std::string name;
+        int functionId = -1;
+    };
+
     // Gom toàn bộ trạng thái mutable của một lượt biên dịch như bytecode hàm, StringPool, import và class context để các pipeline độc lập không dùng chung dữ liệu cũ.
     struct CompilationRegistryState {
         std::vector<std::string> stringPool;
@@ -28,6 +35,8 @@ namespace vietvm::compiler {
         std::unordered_map<int, int> functionNameIndices;
         std::unordered_set<std::string> importedFiles;
         std::vector<CompiledModuleInitializer> moduleInitializers;
+        std::unordered_map<std::string, std::vector<CompiledModuleFunctionExport>>
+            moduleFunctionExports;
         std::unordered_map<std::string, MethodAccessInfo> methodAccess;
         std::vector<std::string> classContextStack;
         // Base directory used to resolve relative imports for this compilation.
@@ -58,6 +67,7 @@ namespace vietvm::compiler {
             functionNameIndices.clear();
             importedFiles.clear();
             moduleInitializers.clear();
+            moduleFunctionExports.clear();
             methodAccess.clear();
             classContextStack.clear();
             nextFunctionId = 0;

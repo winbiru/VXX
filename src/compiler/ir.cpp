@@ -399,8 +399,13 @@ private:
                     lowered.body = lowerStatement(lambda->body, false);
                     if (semanticLambda != nullptr) {
                         lowered.captures.reserve(semanticLambda->captures.size());
+                        lowered.captureNames.reserve(semanticLambda->captures.size());
                         for (SymbolId capture : semanticLambda->captures) {
                             lowered.captures.push_back(compatibleSymbolId(capture));
+                            lowered.captureNames.push_back(
+                                capture < semantic_.symbols.size()
+                                    ? semantic_.symbols[capture].lookupName
+                                    : std::string{});
                         }
                     }
                     ir_.lambdas[result.lambdaId] = std::move(lowered);

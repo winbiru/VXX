@@ -126,6 +126,7 @@ struct SemanticSymbol {
     std::vector<SymbolId> implementedInterfaces;
     std::vector<SymbolId> extendedInterfaces;
     std::size_t parameterCount = 0;
+    std::size_t minimumArgumentCount = 0;
     // Lớp instance được suy luận cho biến/receiver khi nguồn gán là `Class(...)`
     // hoặc một symbol đã mang cùng lớp. Dữ liệu này chỉ phục vụ semantic member
     // access; runtime vẫn giữ mô hình động và không phụ thuộc vào type tĩnh.
@@ -189,9 +190,18 @@ struct SemanticExternalSymbol {
     vietvm::frontend::SourceSpan declaration{};
 };
 
+// Mô tả một tên có tồn tại trong module đã nhập nhưng không thuộc bề mặt export;
+// semantic dùng record này để báo lỗi rõ ràng thay vì coi tên đó là tên động bất kỳ.
+struct SemanticHiddenImportedSymbol {
+    std::string name;
+    std::string moduleIdentity;
+    vietvm::frontend::SourceSpan declaration{};
+};
+
 // Chứa các external symbol khả dụng cho một lượt semantic analysis, thường được module graph xây từ export của dependency.
 struct SemanticEnvironment {
     std::vector<SemanticExternalSymbol> importedSymbols;
+    std::vector<SemanticHiddenImportedSymbol> hiddenImportedSymbols;
     std::vector<std::string> nativeCallables;
 };
 

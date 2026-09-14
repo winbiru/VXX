@@ -55,6 +55,14 @@ void markInstance(const InstanceHandle &instance,
     for (const auto &field : instance->fields) markValue(field.second, marked);
 }
 
+void markClosure(const ClosureHandle &closure,
+                 std::unordered_set<const void *> &marked) {
+    if (closure == nullptr || !marked.insert(closure.get()).second) return;
+    for (const auto &capture : closure->captures) {
+        if (capture.second != nullptr) markValue(capture.second->value, marked);
+    }
+}
+
 void markValue(const StackValue &value,
                std::unordered_set<const void *> &marked) {
     if (std::holds_alternative<MapHandle>(value)) {
@@ -81,6 +89,10 @@ void markValue(const StackValue &value,
     }
     if (std::holds_alternative<InstanceHandle>(value)) {
         markInstance(std::get<InstanceHandle>(value), marked);
+        return;
+    }
+    if (std::holds_alternative<ClosureHandle>(value)) {
+        markClosure(std::get<ClosureHandle>(value), marked);
     }
 }
 
@@ -110,6 +122,7 @@ void RuntimeHeap::track(const ListHandle &value) { trackWeak(lists_, value); }
 void RuntimeHeap::track(const TupleHandle &value) { trackWeak(tuples_, value); }
 void RuntimeHeap::track(const ClassHandle &value) { trackWeak(classes_, value); }
 void RuntimeHeap::track(const InstanceHandle &value) { trackWeak(instances_, value); }
+void RuntimeHeap::track(const ClosureHandle &value) { trackWeak(closures_, value); }
 
 void RuntimeHeap::trackValue(const StackValue &value) {
     std::unordered_set<const void *> visited;
@@ -143,14 +156,23 @@ void RuntimeHeap::trackValue(const StackValue &value) {
             }
             return;
         }
-        if (!std::holds_alternative<InstanceHandle>(current)) return;
-        const InstanceHandle &instance = std::get<InstanceHandle>(current);
-        if (instance == nullptr || !visited.insert(instance.get()).second) return;
-        track(instance);
-        if (instance->klass != nullptr) {
-            self(self, make_class_value(instance->klass));
+        if (std::holds_alternative<InstanceHandle>(current)) {
+            const InstanceHandle &instance = std::get<InstanceHandle>(current);
+            if (instance == nullptr || !visited.insert(instance.get()).second) return;
+            track(instance);
+            if (instance->klass != nullptr) {
+                self(self, make_class_value(instance->klass));
+            }
+            for (const auto &field : instance->fields) self(self, field.second);
+            return;
         }
-        for (const auto &field : instance->fields) self(self, field.second);
+        if (!std::holds_alternative<ClosureHandle>(current)) return;
+        const ClosureHandle &closure = std::get<ClosureHandle>(current);
+        if (closure == nullptr || !visited.insert(closure.get()).second) return;
+        track(closure);
+        for (const auto &capture : closure->captures) {
+            if (capture.second != nullptr) self(self, capture.second->value);
+        }
     };
     walk(walk, value);
 }
@@ -161,10 +183,11 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
     pruneExpired(tuples_);
     pruneExpired(classes_);
     pruneExpired(instances_);
+    pruneExpired(closures_);
 
     RuntimeHeapStats stats;
     stats.trackedBefore = maps_.size() + lists_.size() + tuples_.size() +
-                          classes_.size() + instances_.size();
+                          classes_.size() + instances_.size() + closures_.size();
 
     std::unordered_set<const void *> marked;
     for (const StackValue &root : roots) markValue(root, marked);
@@ -186,14 +209,17 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
             value.superclass.reset();
             value.methods.clear();
         });
+    stats.swept += sweepRegistry(
+        closures_, marked, [](RuntimeClosure &value) { value.captures.clear(); });
 
     pruneExpired(maps_);
     pruneExpired(lists_);
     pruneExpired(tuples_);
     pruneExpired(classes_);
     pruneExpired(instances_);
+    pruneExpired(closures_);
     stats.trackedAfter = maps_.size() + lists_.size() + tuples_.size() +
-                         classes_.size() + instances_.size();
+                         classes_.size() + instances_.size() + closures_.size();
     return stats;
 }
 
@@ -203,8 +229,9 @@ std::size_t RuntimeHeap::trackedObjectCount() {
     pruneExpired(tuples_);
     pruneExpired(classes_);
     pruneExpired(instances_);
+    pruneExpired(closures_);
     return liveCount(maps_) + liveCount(lists_) + liveCount(tuples_) +
-           liveCount(classes_) + liveCount(instances_);
+           liveCount(classes_) + liveCount(instances_) + liveCount(closures_);
 }
 
 RuntimeHeapScope::RuntimeHeapScope(RuntimeHeap &heap) noexcept
@@ -231,6 +258,10 @@ void trackRuntimeAllocation(const ClassHandle &value) {
 }
 
 void trackRuntimeAllocation(const InstanceHandle &value) {
+    if (activeHeap != nullptr) activeHeap->track(value);
+}
+
+void trackRuntimeAllocation(const ClosureHandle &value) {
     if (activeHeap != nullptr) activeHeap->track(value);
 }
 
