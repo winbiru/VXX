@@ -1,10 +1,14 @@
 # Frozen from the pre-pipeline token -> bytecode compiler path.
 # Format: source path<TAB>FNV-1a-64 fingerprint of root bytecode, ordered
 # StringPool, sorted function bytecode, and sorted function-name map.
-src/tests/fixtures/api_project/controller.vi	26bfcfe9c126f01b
+src/tests/fixtures/api_project/controller.vi	47196ab6884a2e2c
 src/tests/fixtures/api_project/database.vi	53f8950bcbe03aeb
-src/tests/fixtures/api_project/dto.vi	fcb85f468f0d94df
+src/tests/fixtures/api_project/dto.vi	d81b26fbe28ee89f
 src/tests/fixtures/api_project/entity.vi	5e84ac188b536f6d
+src/tests/fixtures/api_project/giao_dien/controller.vi	b040e3884d083258
+src/tests/fixtures/api_project/giao_dien/mapper.vi	b040e3884d083258
+src/tests/fixtures/api_project/giao_dien/repository.vi	b040e3884d083258
+src/tests/fixtures/api_project/giao_dien/service.vi	b040e3884d083258
 src/tests/fixtures/api_project/mapper.vi	8864a9cee102e3d3
 src/tests/fixtures/api_project/repository.vi	5b92e424b1f0a5f2
 src/tests/fixtures/api_project/service.vi	73fce71e65f482dd
@@ -71,6 +75,7 @@ src/tests/kiem_tra_stdlib_tinh_toan.vi	ccbb953b7d3c7fdb
 src/tests/kiem_tra_goi_kiem_thu.vi	fadd240294575e2a
 src/tests/kiem_tra_goi_dung.vi	8a7fe166c4e1f47e
 src/tests/kiem_tra_goi_mang.vi	bcd7fb63aad93e21
+src/tests/kiem_tra_hoi_quy_tong_hop.vi	6946a935ed9c253b
 src/tests/kiem_tra_nhat_ky.vi	07f1155f37ac3232
 src/tests/kiem_tra_toan_tu_moi.vi	dc09ddd03879b5b0
 src/tests/kiem_tra_tong_hop_khong_xung_dot.vi	2241618546ce6868

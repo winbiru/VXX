@@ -5,13 +5,24 @@
 > VM, package/gói chuẩn, tooling MVP và pipeline release; không nên diễn giải
 > điều đó là mức hoàn thiện tương đương Java, C# hay Python.
 
+## Đích phát hành 1.0
+
+Roadmap phát hành chi tiết nằm tại `plans/roadmap-1.0.md`. Từ trạng thái hiện tại,
+ưu tiên 1.0 chuyển từ "thêm cú pháp" sang sáu nhóm: đóng semantics, runtime/VM hardening,
+module + package system, stdlib, compiler hardening và toolchain đa nền tảng.
+
+JIT production-grade, LLVM backend, generic, reflection đầy đủ, GUI, FFI đầy đủ và
+concurrency/async phức tạp không phải release blocker mặc định của 1.0. Chúng chỉ được
+đưa vào nếu cần để hoàn tất một contract nền tảng đã chốt.
+
 ## Nền tảng đã có
 
 - [x] Workflow release tạo artifact cho Linux, macOS và Windows, bao gồm binary,
   gói/chuẩn, template và ví dụ.
 - [x] CONTRIBUTING.md đã có hướng dẫn đóng góp cơ bản.
-- [x] Runtime có MVP cho GC/JIT và CI có regression/sanitizer nền tảng; các phần này
-  chưa phải implementation production-grade có profiling đầy đủ.
+- [x] Runtime đã có tracing GC quản lý object graph + cycle sweep; JIT vẫn ở mức MVP.
+  CI có regression/sanitizer nền tảng, còn profiler và stress/leak gate production vẫn
+  nằm trong roadmap 1.0.
 - [x] Pipeline đã có expression AST mang span, scope tree, ExprId-based resolution,
   recursive untyped IR, optimizer và direct bytecode backend; production token bridge đã bị xóa.
 - [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
@@ -43,9 +54,9 @@
       fixup; shared mixed-backend context còn thiếu.
    6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
       vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
-      đạt 78/78 direct IR và vẫn giữ snapshot compiler state đã chốt.
+      đạt 79/79 direct IR và vẫn giữ snapshot compiler state đã chốt.
 
-   Hiện direct backend bao phủ 78/78 regression program; parity gate yêu cầu toàn bộ
+   Hiện direct backend bao phủ 79/79 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
@@ -114,6 +125,11 @@
      caller để collection lồng nhau không quét nhầm object còn sống. Sweep cắt cạnh của
      object không reachable nên thu được cả shared_ptr cycle; regression khóa
      instance↔list, self-cycle list/map và argument đang nằm trên caller stack.
+   - [ ] **Runtime/GC stress trước 1.0** — khóa object graph lớn, allocation liên tục,
+     cycle sâu, caller roots qua child VM, recursion sâu, nested exception và stack overflow;
+     runtime error không được làm corrupt stack/call frame/module/heap state cho lần chạy sau.
+   - [ ] **Leak/sanitizer gate** — chạy stress suite qua ASan/UBSan và leak checker phù hợp;
+     mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC.
    - [ ] Xây stack trace có source span/function/module identity và debugger hook cho
      breakpoint, step, frame/variable inspection trước khi làm debugger UI đầy đủ.
    - [ ] **Profiler production** — bổ sung CPU/timing/allocation sampling hoặc event
@@ -156,7 +172,8 @@
 7. API embedding
 
    - [ ] Thiết kế C API/C++ API cho lifecycle VM, load/chạy program và callback I/O.
-   - [ ] Loại dependency vào global compiler state trước khi công bố API ổn định.
+   - [x] Loại dependency production compiler vào global/active registry trước khi công bố
+     API ổn định; context-driven compile hiện truyền state tường minh xuyên codegen/import.
    - [ ] Thêm ABI/versioning, sample host và test API độc lập.
 
 8. Phát hành và cộng đồng
@@ -167,6 +184,27 @@
      contract ổn định; chúng chưa có trong repo.
    - [ ] Bổ sung CODE_OF_CONDUCT, issue/PR template, changelog/release-note process
      và maintainer guide. CONTRIBUTING.md đã hoàn thành phần đầu tiên.
+
+9. Standard library 1.0
+
+   - [ ] Audit UTF-8 cho text/string API và malformed input; tiếng Việt phải giữ semantics
+     ổn định qua lexer, runtime text và package chuẩn.
+   - [ ] Hoàn thiện filesystem/path và time/date contract đa nền tảng.
+   - [ ] Bổ sung process API tối thiểu nếu permission model cho phép.
+   - [ ] Nâng testing package và audit collection/file/JSON/HTTP/math/random/env/log/config
+     bằng regression đa nền tảng trước release candidate.
+
+10. Compiler hardening và release candidate
+
+   - [x] Loại mutable global/facade khỏi production compiler: direct codegen/import/callable
+     lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
+     Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
+     context-driven compile không đọc/ghi một active registry khác.
+   - [ ] Fuzz lexer/parser, malformed AST/IR test, bytecode verification và deterministic
+     compilation/reproducible bytecode.
+   - [ ] Stress source/project lớn và theo dõi compiler memory/time regression.
+   - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
+     bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.
 
 ## Điều kiện thực hiện
 

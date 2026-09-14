@@ -61,7 +61,7 @@ Unix bằng cách đặt VPP_EXEC trỏ đến binary rồi gọi run_tests.sh. 
 CTest tự gọi PowerShell 7 và scripts/windows/run-tests.ps1 khi pwsh có mặt.
 
 Baseline local ngày 14/09/2026: **16/16 CTest pass**, integration regression
-**69/69**, direct-IR parity **78/78**.
+**70/70**, direct-IR parity **79/79**.
 
 ## Việc còn lại theo thứ tự ưu tiên
 

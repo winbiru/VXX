@@ -282,7 +282,16 @@ static int backendInit(const std::string &name) {
 
     fs::create_directories(root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory));
     writePackageManifest(root, name);
-    for (const char *filename : {"application.vi", "application.properties", "README.md", ".gitignore"}) {
+    for (const char *filename : {
+             "application.vi",
+             "config.vi",
+             "controller.vi",
+             "router.vi",
+             "server.vi",
+             "application.properties",
+             "README.md",
+             ".gitignore",
+         }) {
         std::error_code ec;
         fs::copy_file(templateRoot / filename, root / filename, fs::copy_options::none, ec);
         if (ec) {

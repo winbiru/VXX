@@ -206,6 +206,40 @@ void testCompilationContextLifecycle() {
            "repeated context-driven compilation preserves root bytecode shape");
 }
 
+void testContextCompilationIgnoresLegacyActiveRegistry() {
+    vietvm::compiler::CompilationRegistryState legacyState;
+    const int legacyName = legacyState.storeString("legacy-registry-poison");
+    legacyState.functionBytecode.emplace(
+        41, std::vector<Instruction>{{OP_DUNG_CHUONG_TRINH, 0, 0, 0}});
+    legacyState.setFunctionNameIndex(41, legacyName);
+    legacyState.nextFunctionId = 42;
+
+    vietvm::compiler::CompilationContext context;
+    auto *previous = vietvm::compiler::setActiveCompilationRegistryState(&legacyState);
+    std::exception_ptr compileError;
+    try {
+        (void)vietvm::compiler::compilePipeline(
+            context,
+            "hàm main() { in \"context-registry-only\"; }",
+            keywordMap,
+            true);
+    } catch (...) {
+        compileError = std::current_exception();
+    }
+    vietvm::compiler::setActiveCompilationRegistryState(previous);
+
+    expect(compileError == nullptr,
+           "context-driven production pipeline compiles while a different legacy registry is active");
+    expect(context.findString("context-registry-only") >= 0 &&
+               context.findString("legacy-registry-poison") == -1,
+           "context-driven production pipeline writes only to its explicit CompilationContext");
+    expect(legacyState.findString("context-registry-only") == -1 &&
+               legacyState.findString("legacy-registry-poison") == legacyName &&
+               legacyState.functionBytecode.count(41) == 1 &&
+               legacyState.nextFunctionId == 42,
+           "context-driven production pipeline leaves the legacy active registry untouched");
+}
+
 void testConcurrentCompilationContexts() {
     const std::string firstSource = "hàm main() { in \"alpha-concurrent\"; }";
     const std::string secondSource = "hàm main() { in \"beta-concurrent\"; }";
@@ -346,6 +380,31 @@ void testConcurrentCompilationContextsWithIndependentImportRoots() {
     expect(dependencyFirst,
            "recursive imports retain dependency-before-importer module initializer order");
 
+    // A recursively compiled module must receive the semantic exports of its own
+    // direct imports. This is required when implementations and interfaces live
+    // in separate source files.
+    writeFile(firstRoot / "contract.vi",
+              "giao diện WorkerContract { hàm run(); };\n");
+    writeFile(firstRoot / "implementation.vi",
+              "nhập contract.vi;\n"
+              "lớp Worker triển khai WorkerContract {\n"
+              "    hàm run() { trả về 1; };\n"
+              "};\n");
+    const std::string recursiveInterfaceSource =
+        "nhập implementation.vi;\n"
+        "hàm main() { in 1; };\n";
+    vietvm::compiler::CompilationContext recursiveInterfaceContext;
+    recursiveInterfaceContext.importResolutionBase = firstRoot;
+    bool recursiveInterfaceCompiled = true;
+    try {
+        (void)vietvm::compiler::compilePipeline(
+            recursiveInterfaceContext, recursiveInterfaceSource, keywordMap, true);
+    } catch (...) {
+        recursiveInterfaceCompiled = false;
+    }
+    expect(recursiveInterfaceCompiled,
+           "recursive module compilation resolves interfaces from direct imports");
+
     std::error_code ignored;
     fs::remove_all(tempRoot, ignored);
 }
@@ -452,6 +511,7 @@ int main() {
     testCompilationStateReset();
     testRepeatedTopLevelCompilationLifecycle();
     testCompilationContextLifecycle();
+    testContextCompilationIgnoresLegacyActiveRegistry();
     testConcurrentCompilationContexts();
     testConcurrentCompilationContextsWithIndependentImportRoots();
     testSymbolTableIds();

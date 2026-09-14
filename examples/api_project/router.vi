@@ -1,0 +1,28 @@
+nhập mạng;
+nhập "controller.vi";
+
+// Router nhận controller qua constructor thay vì tự tạo dependency.
+lớp BộĐịnhTuyến {
+    // Nhận controller health và fallback để router không tự tạo dependency.
+    hàm khởi tạo(healthController, notFoundController) {
+        mình.healthController = healthController;
+        mình.notFoundController = notFoundController;
+    }
+
+    // Đọc path của request rồi chuyển quyền xử lý cho controller tương ứng.
+    hàm xửLý(requestId) {
+        path = mạng path yêu cầu(requestId);
+        nếu (path == "/health") {
+            controller = mình.healthController;
+            trả về controller.xửLý(requestId);
+        };
+
+        controller = mình.notFoundController;
+        trả về controller.xửLý(requestId);
+    }
+};
+
+// Tạo router đã được inject đủ các controller cần thiết.
+hàm công khai tạo bộ định tuyến(healthController, notFoundController) {
+    trả về BộĐịnhTuyến(healthController, notFoundController);
+}

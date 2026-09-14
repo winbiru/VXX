@@ -1,0 +1,9 @@
+// Contract truy cập dữ liệu user cho tầng repository.
+
+giao diện UserRepositoryContract {
+    hàm findAllUsers(dbSession);
+    hàm createUser(dbSession, payload);
+    hàm updateUser(dbSession, userId, payload);
+    hàm deleteUser(dbSession, userId);
+    hàm searchUsers(dbSession, keyword);
+};

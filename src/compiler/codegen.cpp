@@ -1194,6 +1194,7 @@ std::string encodeDefaultValue(const IrValue &value) {
 
 // Giữ trạng thái của direct-IR codegen trong một lượt phát mã; struct quản lý bytecode, slot, function id, lambda và thứ tự phát lớp cha/con.
 struct Emitter {
+    CompilationRegistryState &registry;
     const IrProgram &program;
     const std::unordered_map<std::string, Opcode> &keywordMap;
     std::vector<Instruction> bytecode;
@@ -1209,12 +1210,16 @@ struct Emitter {
 
     // Quản lý class context theo RAII; guard đẩy tên lớp trước khi phát method và tự pop khi rời scope để lookup visibility/`gốc` không rò sang lớp kế tiếp.
     struct ClassContextGuard {
+        CompilationRegistryState &registry;
+
         // Đưa tên lớp hiện tại lên class-context stack trước khi codegen các phương thức của lớp đó.
-        explicit ClassContextGuard(const std::string &className) {
-            pushClassContext(className);
+        ClassContextGuard(CompilationRegistryState &state,
+                          const std::string &className)
+            : registry(state) {
+            pushClassContext(registry, className);
         }
         // Gỡ class context vừa đẩy khi codegen lớp kết thúc, kể cả khi việc phát bytecode ném exception.
-        ~ClassContextGuard() { popClassContext(); }
+        ~ClassContextGuard() { popClassContext(registry); }
 
         // Cấm sao chép vì mỗi guard phải pop đúng một context mà chính nó đã push.
         ClassContextGuard(const ClassContextGuard &) = delete;
@@ -1223,9 +1228,10 @@ struct Emitter {
     };
 
     // Khởi tạo emitter cho một `IrProgram`; object giữ tham chiếu IR/keyword map và bắt đầu với các bảng slot/function/class rỗng cho lượt phát mã hiện tại.
-    Emitter(const IrProgram &ir,
+    Emitter(CompilationRegistryState &state,
+            const IrProgram &ir,
             const std::unordered_map<std::string, Opcode> &keywords)
-        : program(ir), keywordMap(keywords) {}
+        : registry(state), program(ir), keywordMap(keywords) {}
 
     // Cấp phát hàm; hàm lấy mã định danh hoặc vùng lưu trữ mới và đăng ký nó vào trạng thái quản lý hiện tại.
     void allocateFunction(const IrInstruction &instruction) {
@@ -1233,14 +1239,14 @@ struct Emitter {
             functionIdsBySymbol.end()) {
             return;
         }
-        const int functionId = hamMap::allocHamId();
-        const int nameIndex = StringPool::storeString(instruction.declarationName);
+        const int functionId = registry.allocateFunctionId();
+        const int nameIndex = registry.storeString(instruction.declarationName);
         functionIdsBySymbol.emplace(instruction.symbolId, functionId);
         functionIdsByName.emplace(instruction.declarationName, functionId);
         functionNameIndices.emplace(instruction.symbolId, nameIndex);
         slots.emplace(instruction.declarationName, functionId);
-        hamMap::bytecodeMap()[functionId] = {};
-        hamMap::setHamNameIndex(functionId, nameIndex);
+        registry.functionBytecode[functionId] = {};
+        registry.setFunctionNameIndex(functionId, nameIndex);
         if (functionId >= nextSlot) nextSlot = functionId + 1;
     }
 
@@ -1289,7 +1295,7 @@ struct Emitter {
             if (defaultValue == nullptr) {
                 throw std::logic_error(std::string(missingDefaultMessage));
             }
-            const int defaultIndex = StringPool::storeString(
+            const int defaultIndex = registry.storeString(
                 encodeDefaultValue(*defaultValue));
             output.push_back(
                 {OP_PARAM_MAC_DINH, defaultIndex, slot, static_cast<int>(index)});
@@ -1313,12 +1319,12 @@ struct Emitter {
                 }
                 return;
             case IrValueOpcode::ConstFloat: {
-                const int index = StringPool::storeString(value->text);
+                const int index = registry.storeString(value->text);
                 output.push_back({OP_BIEN_SO_FLOAT, 0, index, 0});
                 return;
             }
             case IrValueOpcode::ConstString: {
-                const int index = StringPool::storeString(unquote(value->text));
+                const int index = registry.storeString(unquote(value->text));
                 output.push_back({OP_CHUOI, 0, index, 0});
                 return;
             }
@@ -1329,12 +1335,12 @@ struct Emitter {
                 output.push_back({OP_RONG_GIA_TRI, 0, 0, 0});
                 return;
             case IrValueOpcode::MapLiteral: {
-                const int index = StringPool::storeString(encodeMapLiteral(program, *value));
+                const int index = registry.storeString(encodeMapLiteral(program, *value));
                 output.push_back({OP_MAP_LITERAL, 0, index, 0});
                 return;
             }
             case IrValueOpcode::ListLiteral: {
-                const int index = StringPool::storeString(encodeListLiteral(program, *value));
+                const int index = registry.storeString(encodeListLiteral(program, *value));
                 output.push_back({OP_LIST_LITERAL, 0, index, 0});
                 return;
             }
@@ -1350,7 +1356,7 @@ struct Emitter {
                     return;
                 }
                 const int registeredFunction =
-                    resolveFunctionIdByName(value->text, slots);
+                    resolveFunctionIdByName(registry, value->text, slots);
                 if (registeredFunction >= 0) {
                     output.push_back({OP_BIEN_SO, registeredFunction, 0, 0});
                     return;
@@ -1366,7 +1372,7 @@ struct Emitter {
                         messages::kInternalDirectIrUnsupportedValue));
                 }
                 const int receiverSlot = slotFor(member.first);
-                const int memberIndex = StringPool::storeString(member.second);
+                const int memberIndex = registry.storeString(member.second);
                 output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                 output.push_back({OP_DOC_THUOC_TINH, 0, memberIndex, 0});
                 return;
@@ -1390,7 +1396,7 @@ struct Emitter {
                         return;
                     }
                     if (operand->opcode == IrValueOpcode::ConstFloat) {
-                        const int index = StringPool::storeString("-" + operand->text);
+                        const int index = registry.storeString("-" + operand->text);
                         output.push_back({OP_BIEN_SO_FLOAT, 0, index, 0});
                         return;
                     }
@@ -1446,7 +1452,7 @@ struct Emitter {
                         messages::kInternalDirectIrInvalidStoreTarget));
                 }
                 const int receiverSlot = slotFor(member.first);
-                const int memberIndex = StringPool::storeString(member.second);
+                const int memberIndex = registry.storeString(member.second);
                 output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                 emitValue(value->operands[1], output);
                 output.push_back({OP_GAN_THUOC_TINH, 0, memberIndex, 0});
@@ -1474,9 +1480,11 @@ struct Emitter {
                 if (value->explicitCall) {
                     // `gọi` resolves before arguments and only accepts a local
                     // function whose bytecode is already available.
-                    resolvedName = resolveCallableNameInContext(value->text, slots);
-                    validateCallableAccess(resolvedName);
-                    target = resolveFunctionIdByName(resolvedName, slots, false);
+                    resolvedName = resolveCallableNameInContext(
+                        registry, value->text, slots);
+                    validateCallableAccess(registry, resolvedName);
+                    target = resolveFunctionIdByName(
+                        registry, resolvedName, slots, false);
                 }
 
                 emitCallArguments(*value, output);
@@ -1485,12 +1493,13 @@ struct Emitter {
                     // Ordinary expression calls resolve after arguments. This
                     // preserves the legacy class-context/StringPool timing,
                     // even when semantic analysis already knows the function.
-                    resolvedName = resolveCallableNameInContext(value->text, slots);
-                    validateCallableAccess(resolvedName);
-                    target = resolveFunctionIdByName(value->text, slots);
+                    resolvedName = resolveCallableNameInContext(
+                        registry, value->text, slots);
+                    validateCallableAccess(registry, resolvedName);
+                    target = resolveFunctionIdByName(registry, value->text, slots);
                 }
                 if (target < 0) {
-                    const int nameIndex = StringPool::storeString(resolvedName);
+                    const int nameIndex = registry.storeString(resolvedName);
                     target = -(nameIndex + 1);
                 }
                 output.push_back({OP_GOI,
@@ -1506,7 +1515,7 @@ struct Emitter {
                             messages::kInternalDirectIrUnsupportedValue));
                     }
                     emitCallArguments(*value, output);
-                    const int classNameIndex = StringPool::storeString(value->text);
+                    const int classNameIndex = registry.storeString(value->text);
                     output.push_back({OP_TAO_DOI_TUONG,
                                       static_cast<int>(value->operands.size() - 1),
                                       classNameIndex,
@@ -1521,7 +1530,7 @@ struct Emitter {
                             messages::kInternalDirectIrUnsupportedValue));
                     }
                     const int receiverSlot = slotFor(member.first);
-                    const int methodNameIndex = StringPool::storeString(member.second);
+                    const int methodNameIndex = registry.storeString(member.second);
                     output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                     emitCallArguments(*value, output);
                     output.push_back({OP_GOI_PHUONG_THUC,
@@ -1535,8 +1544,9 @@ struct Emitter {
                 if (value->explicitCall) {
                     // `gọi name(...)` resolves the callable before compiling
                     // arguments in the compatibility backend.
-                    resolvedName = resolveCallableNameInContext(value->text, slots);
-                    validateCallableAccess(resolvedName);
+                    resolvedName = resolveCallableNameInContext(
+                        registry, value->text, slots);
+                    validateCallableAccess(registry, resolvedName);
                 }
                 emitCallArguments(*value, output);
                 const int argumentCount =
@@ -1546,10 +1556,11 @@ struct Emitter {
                     // Ordinary expression calls resolve after argument
                     // emission. StringPool changes from arguments can affect
                     // legacy class qualification, so preserve that ordering.
-                    resolvedName = resolveCallableNameInContext(value->text, slots);
-                    validateCallableAccess(resolvedName);
+                    resolvedName = resolveCallableNameInContext(
+                        registry, value->text, slots);
+                    validateCallableAccess(registry, resolvedName);
                     const int registeredFunction =
-                        resolveFunctionIdByName(value->text, slots);
+                        resolveFunctionIdByName(registry, value->text, slots);
                     if (registeredFunction >= 0) {
                         output.push_back(
                             {OP_GOI, argumentCount, registeredFunction, 0});
@@ -1571,7 +1582,7 @@ struct Emitter {
                     }
                 }
 
-                const int nameIndex = StringPool::storeString(resolvedName);
+                const int nameIndex = registry.storeString(resolvedName);
                 output.push_back(
                     {OP_GOI, argumentCount, -(nameIndex + 1), 0});
                 return;
@@ -1592,7 +1603,7 @@ struct Emitter {
                 // Anonymous functions are allocated exactly when their value
                 // is emitted. They deliberately have no OP_HAM declaration,
                 // no name mapping and no StringPool name entry.
-                const int functionId = hamMap::allocHamId();
+                const int functionId = registry.allocateFunctionId();
                 lambdaIds.emplace(value->lambdaId, functionId);
 
                 std::vector<Instruction> functionBytecode;
@@ -1603,7 +1614,7 @@ struct Emitter {
 
                 emitBlock(lambda->body, functionBytecode, false);
                 functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
-                hamMap::bytecodeMap()[functionId] =
+                registry.functionBytecode[functionId] =
                     std::move(functionBytecode);
                 output.push_back({OP_BIEN_SO, functionId, 0, 0});
                 return;
@@ -1641,7 +1652,7 @@ struct Emitter {
             case IrOpcode::NoOp:
                 return;
             case IrOpcode::Import:
-                compileImportSpec(instruction.importSpec, nextSlot, keywordMap);
+                compileImportSpec(registry, instruction.importSpec, nextSlot, keywordMap);
                 return;
             case IrOpcode::Conditional: {
                 output.push_back({OP_NEU, 0, 0, 0});
@@ -1708,7 +1719,7 @@ struct Emitter {
                                 {OP_CA, std::stoi(label->text), -1, 0});
                         } else if (label->opcode ==
                                    IrValueOpcode::ConstString) {
-                            const int poolIndex = StringPool::storeString(
+                            const int poolIndex = registry.storeString(
                                 stripQuotes(label->text));
                             output.push_back({OP_CA, 0, poolIndex, 0});
                         } else if (label->opcode ==
@@ -1751,7 +1762,7 @@ struct Emitter {
             }
             case IrOpcode::Throw:
                 if (instruction.expressionRoots.empty()) {
-                    const int messageIndex = StringPool::storeString(
+                    const int messageIndex = registry.storeString(
                         vietvm::messages::messageText(
                             vietvm::messages::kVmUnknownThrownValue));
                     output.push_back({OP_CHUOI, 0, messageIndex, 0});
@@ -1811,17 +1822,17 @@ struct Emitter {
                 messages::kInternalDirectIrFunctionNotPredeclared));
         }
 
-        hamMap::bytecodeMap()[function->second] = emitFunctionBody(instruction);
+        registry.functionBytecode[function->second] = emitFunctionBody(instruction);
         bytecode.push_back({OP_HAM, name->second, function->second, 0});
     }
 
     // Đăng ký lớp runtime và các phương thức của lớp; lớp cha được mã hóa qua chỉ số `StringPool` để VM nối quan hệ kế thừa.
     void emitClass(const IrInstruction &instruction) {
-        ClassContextGuard classContext(instruction.declarationName);
-        const int classNameIndex = StringPool::storeString(instruction.declarationName);
+        ClassContextGuard classContext(registry, instruction.declarationName);
+        const int classNameIndex = registry.storeString(instruction.declarationName);
         int encodedSuperclass = 0;
         if (!instruction.superclassName.empty()) {
-            encodedSuperclass = StringPool::storeString(instruction.superclassName) + 1;
+            encodedSuperclass = registry.storeString(instruction.superclassName) + 1;
         }
         bytecode.push_back({OP_TAO_LOP, 0, classNameIndex, encodedSuperclass});
         const IrInstruction &body = instruction.children.front();
@@ -1839,7 +1850,7 @@ struct Emitter {
             if (methodName.rfind(prefix, 0) == 0) {
                 methodName.erase(0, prefix.size());
             }
-            const int methodNameIndex = StringPool::storeString(methodName);
+            const int methodNameIndex = registry.storeString(methodName);
             int encodedClassNameIndex = classNameIndex;
             int encodedFunctionId = function->second;
             if (member.effectiveVisibility == SemanticVisibility::Private) {
@@ -1943,7 +1954,8 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
 }
 
 // Phát bytecode trực tiếp từ IR đã được xác nhận hỗ trợ; emitter ánh xạ lệnh/giá trị IR thành opcode VM và metadata tương ứng.
-std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
+std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
+                                            const IrProgram &program,
                                             const std::unordered_map<std::string, Opcode> &keywordMap,
                                             bool emitMainCall) {
     const DirectIrSupport support = analyzeDirectIrSupport(program);
@@ -1952,7 +1964,7 @@ std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
             messages::kInternalDirectIrProgramHasUnsupportedRegion));
     }
 
-    Emitter emitter{program, keywordMap};
+    Emitter emitter{state, program, keywordMap};
     emitter.emitProgram(emitMainCall);
     return std::move(emitter.bytecode);
 }

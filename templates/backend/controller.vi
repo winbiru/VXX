@@ -1,0 +1,35 @@
+nhập mạng;
+
+// Hợp đồng chung cho object có thể xử lý một HTTP request.
+giao diện TrìnhXửLýHttp {
+    // Nhận mã request và chịu trách nhiệm tạo phản hồi HTTP tương ứng.
+    hàm xửLý(requestId);
+};
+
+// Xử lý endpoint kiểm tra sức khỏe và trả về trạng thái thành công.
+lớp HealthController triển khai TrìnhXửLýHttp {
+    // Gửi phản hồi 200 với JSON boolean true cho request health.
+    hàm xửLý(requestId) {
+        mạng trả phản hồi(requestId, 200, "true");
+        trả về 200;
+    }
+};
+
+// Xử lý mọi request không khớp route đã đăng ký.
+lớp NotFoundController triển khai TrìnhXửLýHttp {
+    // Gửi phản hồi 404 với JSON null cho request không tìm thấy.
+    hàm xửLý(requestId) {
+        mạng trả phản hồi(requestId, 404, "null");
+        trả về 404;
+    }
+};
+
+// Tạo controller health dưới dạng instance triển khai TrìnhXửLýHttp.
+hàm công khai tạo health controller() {
+    trả về HealthController();
+}
+
+// Tạo controller fallback dùng khi router không tìm thấy route phù hợp.
+hàm công khai tạo not found controller() {
+    trả về NotFoundController();
+}

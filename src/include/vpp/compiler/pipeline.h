@@ -33,7 +33,16 @@ struct CompilationContext : CompilationRegistryState {
     void clear();
 };
 
-// Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
+// Chạy một pipeline trong registry/session đã có mà không reset state; dùng nội bộ cho
+// recursive import để toàn bộ dependency dùng chung StringPool/function/module metadata.
+CompilationArtifacts compilePipelineInRegistry(
+    CompilationRegistryState &state,
+    const std::string &source,
+    const std::unordered_map<std::string, Opcode> &keywordMap,
+    bool emitMainCall,
+    bool topLevel);
+
+// API compatibility dùng registry thread-local cũ; production caller nên dùng overload nhận `CompilationContext`.
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,

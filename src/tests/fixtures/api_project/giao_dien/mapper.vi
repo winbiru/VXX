@@ -1,0 +1,8 @@
+// Contract chuyển đổi dữ liệu giữa DTO và Entity.
+
+giao diện UserMapperContract {
+    hàm toCreateEntity(payload);
+    hàm toUpdateEntity(userId, payload);
+    hàm toSearchEntity(keyword);
+    hàm toUsersResponse(dbRes);
+};

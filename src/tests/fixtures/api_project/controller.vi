@@ -1,6 +1,7 @@
 nhập "mạng";
 nhập "gói/mạng/kiểm thử/api.vi";
 nhập src/tests/fixtures/api_project/service.vi;
+nhập src/tests/fixtures/api_project/giao_dien/controller.vi;
 
 // Ghi chú lớp: gom route chuẩn của API project theo kiểu cấu hình tập trung.
 lớp công khai ApiProjectRoutes {
@@ -163,7 +164,7 @@ lớp công khai ResponseEntity {
     };
 };
 
-lớp công khai UserRestController {
+lớp công khai UserRestController triển khai UserCrudControllerContract {
     hàm riêng tư mapResult(result, requestId) {
         nếu (result == "200|users=[an,binh,chi]") {
             trả về ResponseEntity.ok("users=[an,binh,chi]", requestId);
@@ -263,14 +264,14 @@ lớp công khai UserRestController {
 };
 
 // Ghi chú lớp: controller tách riêng endpoint health.
-lớp công khai HealthRestController {
+lớp công khai HealthRestController triển khai HealthControllerContract {
     hàm công khai health(requestId) {
         trả về ResponseEntity.ok("UP", requestId);
     };
 };
 
 // Ghi chú lớp: controller tách riêng endpoint auth.
-lớp công khai AuthRestController {
+lớp công khai AuthRestController triển khai AuthControllerContract {
     hàm công khai login(usernameBody, passwordBody, requestId) {
         thiếu = sai;
         nếu (usernameBody == "") {
@@ -287,7 +288,9 @@ lớp công khai AuthRestController {
 };
 
 // Ghi chú lớp: tương thích ngược cho test cũ đang gọi AdminRestController.
-lớp công khai AdminRestController {
+// AdminRestController kế thừa contract/hành vi của UserRestController nhưng vẫn giữ
+// các method forwarding hiện có để tương thích với kiểu gọi Class.method của fixture cũ.
+lớp công khai AdminRestController kế thừa UserRestController {
     hàm công khai getUsers(dbSession, token, requestId) {
         trả về UserRestController.getUsers(dbSession, token, requestId);
     };

@@ -1,9 +1,10 @@
 nhập src/tests/fixtures/api_project/entity.vi;
 nhập src/tests/fixtures/api_project/dto.vi;
+nhập src/tests/fixtures/api_project/giao_dien/mapper.vi;
 
 // Mapper cho luồng chuyển đổi DTO <-> Entity trong api_project.
 
-lớp công khai UserMapper {
+lớp công khai UserMapper triển khai UserMapperContract {
     // Map create request sang entity logic.
     hàm công khai toCreateEntity(payload) {
         dtoRes = UserCreateRequestDto.validate(payload);

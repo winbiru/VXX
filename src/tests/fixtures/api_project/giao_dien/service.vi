@@ -1,0 +1,9 @@
+// Contract nghiệp vụ user mà tầng controller được phép gọi.
+
+giao diện UserServiceContract {
+    hàm getUsers(dbSession, token);
+    hàm createUser(dbSession, token, payload);
+    hàm updateUser(dbSession, token, userId, payload);
+    hàm deleteUser(dbSession, token, userId);
+    hàm searchUsers(dbSession, token, keyword);
+};
