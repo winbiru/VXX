@@ -1,0 +1,8 @@
+Lỗi: không thể chia 10 cho 0
+Điều đã xảy ra: Chương trình đang cố lấy 10 chia cho 0. Số chia bằng 0 nên phép chia không thể cho ra kết quả hợp lệ.
+Cách sửa: Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước.
+Dấu vết lỗi:
+  ở MáyTính.chia (src/tests/kiem_tra_stack_trace.vi:5:20) [mô đun=src/tests/kiem_tra_stack_trace.vi]
+  ở MáyTính.tính (src/tests/kiem_tra_stack_trace.vi:9:20) [mô đun=src/tests/kiem_tra_stack_trace.vi]
+  ở trungGian (src/tests/kiem_tra_stack_trace.vi:15:16) [mô đun=src/tests/kiem_tra_stack_trace.vi]
+  ở main (src/tests/kiem_tra_stack_trace.vi:19:8) [mô đun=src/tests/kiem_tra_stack_trace.vi]

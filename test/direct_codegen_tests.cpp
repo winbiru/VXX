@@ -708,6 +708,31 @@ void testDirectClassMethodsMatchLegacyState() {
     vietvm::compiler::resetCompilationState();
 }
 
+void testClassRegistrationCarriesSourceDebugMetadata() {
+    vietvm::compiler::CompilationContext context;
+    context.currentSourceIdentity = "debug_class.vi";
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        context,
+        "lớp Counter {\n"
+        "  hàm add(a, b) { trả về a + b; }\n"
+        "}\n",
+        keywordMap,
+        false);
+
+    expect(artifacts.bytecodeDebugInfo.size() == artifacts.bytecode.size(),
+           "class registration debug metadata stays aligned with root bytecode");
+    for (std::size_t index = 0; index < artifacts.bytecode.size(); ++index) {
+        const Opcode opcode = artifacts.bytecode[index].op;
+        if (opcode != OP_TAO_LOP && opcode != OP_THEM_PHUONG_THUC) continue;
+        expect(index < artifacts.bytecodeDebugInfo.size() &&
+                   artifacts.bytecodeDebugInfo[index].valid(),
+               "class and method registration opcodes carry a source location");
+        expect(index < artifacts.bytecodeDebugInfo.size() &&
+                   artifacts.bytecodeDebugInfo[index].sourceFile == "debug_class.vi",
+               "class registration debug metadata keeps the source identity");
+    }
+}
+
 void testDirectObjectModelOps() {
     const std::string source =
         "lớp Counter { hàm add(a, b) { trả về a + b; } } "
@@ -1217,6 +1242,7 @@ int main() {
     testNestedTryAndEmptyThrowMatchLegacyFixups();
     testTryCatchCompatibilityEdgesAreRejected();
     testDirectClassMethodsMatchLegacyState();
+    testClassRegistrationCarriesSourceDebugMetadata();
     testDirectObjectModelOps();
     testDirectParameterizedConstructor();
     testDirectMethodVisibilityMetadata();

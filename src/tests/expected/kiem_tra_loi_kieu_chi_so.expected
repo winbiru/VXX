@@ -1,0 +1,5 @@
+Lỗi: chỉ số phải là số nguyên
+Điều đã xảy ra: Chương trình đang chọn một phần tử bằng vị trí không phải số nguyên nên V++ không biết phải lấy phần tử thứ mấy.
+Cách sửa: Hãy dùng số nguyên làm vị trí, ví dụ 0 cho phần tử đầu tiên, 1 cho phần tử thứ hai.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_kieu_chi_so.vi:3:8) [mô đun=src/tests/kiem_tra_loi_kieu_chi_so.vi]

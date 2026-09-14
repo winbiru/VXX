@@ -1,0 +1,5 @@
+// Một số nguyên không thể được gọi như một hàm.
+hàm main() {
+    gia_tri = 7;
+    in gia_tri();
+};

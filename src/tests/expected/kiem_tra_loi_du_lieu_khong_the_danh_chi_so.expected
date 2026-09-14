@@ -1,0 +1,5 @@
+Lỗi: truy cập chỉ số chỉ áp dụng cho danh sách, bộ hoặc chuỗi
+Điều đã xảy ra: Bạn đang dùng dấu [] với một giá trị không có các phần tử được đánh số vị trí.
+Cách sửa: Hãy dùng [] với danh sách, bộ hoặc chuỗi; với đối tượng hãy dùng thuộc tính hay phương thức phù hợp.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi:4:8) [mô đun=src/tests/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi]

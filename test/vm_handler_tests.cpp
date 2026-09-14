@@ -112,6 +112,30 @@ void testCallHandlerState() {
            "call handler", "direct function handler must return 42");
 }
 
+void testCallRejectsMissingStackArgument() {
+    VM vm({}, {});
+    vm.hamBytecodeMap.emplace(8, std::vector<Instruction>{
+        instruction(OP_PARAM, 0, 0, 0),
+        instruction(OP_TEN_BIEN_GIA_TRI, 0, 0, 0),
+        instruction(OP_TRA_VE),
+    });
+    VMRuntimeFixture access(vm);
+
+    bool sawMissingOperand = false;
+    try {
+        access.executeCall(instruction(OP_GOI, 1, 8, 0));
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawMissingOperand =
+            vietvm::runtime::detectRuntimeDiagnostic(error.diagnosticContext()) ==
+            vietvm::runtime::RuntimeDiagnosticKind::MissingOperand;
+    }
+
+    expect(sawMissingOperand, "call stack operand contract",
+           "a call must fail when bytecode requests more arguments than the stack contains");
+    expect(access.callDepth() == 0, "call stack operand contract",
+           "missing call operands must fail before a temporary call frame is created");
+}
+
 void testBranchHandlerState() {
     VM vm({instruction(OP_BIEN_SO), instruction(OP_BIEN_SO), instruction(OP_DUNG_CHUONG_TRINH)}, {});
     VMRuntimeFixture access(vm);
@@ -218,6 +242,238 @@ void testCallBoundaryArityRuntimeError() {
            "arity failure must unwind the temporary caller frame");
 }
 
+void testCallDepthLimitRaisesControlledRuntimeError() {
+    VM vm({}, {});
+    vm.hamBytecodeMap.emplace(31, std::vector<Instruction>{
+        instruction(OP_GOI, 0, 31, 0),
+        instruction(OP_TRA_VE),
+    });
+    VMRuntimeFixture access(vm);
+    access.setMaxCallDepth(3);
+
+    bool sawCallBoundary = false;
+    std::string message;
+    try {
+        access.executeCall(instruction(OP_GOI, 0, 31, 0));
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawCallBoundary = error.kind() == vietvm::runtime::RuntimeErrorKind::CallBoundary;
+        message = error.what();
+    }
+    expect(sawCallBoundary, "call depth limit",
+           "deep recursion must raise a controlled CallBoundary error");
+    expect(message.find("Độ sâu lời gọi vượt giới hạn 3") != std::string::npos,
+           "call depth limit", "diagnostic must report the configured call-depth limit");
+    expect(access.callDepth() == 0, "call depth limit",
+           "call-depth failure must unwind every temporary caller frame");
+}
+
+// Khóa định dạng stack trace có cấu trúc và xác nhận lỗi được nhận diện từ
+// opcode + giá trị thực tế thay vì caller truyền sẵn một mã lỗi.
+void testRuntimeErrorFormatsStructuredStackTrace() {
+    vietvm::runtime::RuntimeDiagnosticContext context;
+    context.opcode = OP_CHIA;
+    context.operandTexts = {"10", "0"};
+    context.operandNumeric = {true, true};
+    vietvm::runtime::RuntimeError error(
+        "lỗi thử nghiệm",
+        vietvm::runtime::RuntimeErrorKind::VmFault,
+        context);
+    const vietvm::runtime::RuntimeSourceLocation recursiveFrame{
+        "src/tests/trace.vi", "src/tests/trace.vi", "điSâu", 4, 16};
+    const vietvm::runtime::RuntimeSourceLocation callerFrame{
+        "src/tests/trace.vi", "src/tests/trace.vi", "main", 8, 8};
+
+    error.addFrame(recursiveFrame);
+    error.addFrame(recursiveFrame);
+    error.addFrame(callerFrame);
+
+    const std::string formatted = vietvm::runtime::formatRuntimeError(error);
+    expect(formatted.find("Mã lỗi:") == std::string::npos,
+           "runtime diagnostic hides error code",
+           "user-facing runtime errors must not expose an error code");
+    expect(formatted.find("Điều đã xảy ra: Chương trình đang cố lấy 10 chia cho 0") != std::string::npos,
+           "inferred runtime explanation",
+           "formatter must infer division by zero from opcode and observed operands");
+    expect(formatted.find("Cách sửa: Hãy kiểm tra số chia trước khi chia") != std::string::npos,
+           "inferred runtime suggestion",
+           "formatter must resolve an actionable suggestion from the inferred failure");
+    expect(formatted.find(
+               "ở điSâu (src/tests/trace.vi:4:16) [mô đun=src/tests/trace.vi] "
+               "[lặp lại 2 khung]") != std::string::npos,
+           "structured stack trace",
+           "consecutive identical recursive frames must be compressed");
+    const std::size_t recursivePosition = formatted.find("ở điSâu");
+    const std::size_t callerPosition = formatted.find("ở main");
+    expect(recursivePosition != std::string::npos &&
+               callerPosition != std::string::npos &&
+               recursivePosition < callerPosition,
+           "structured stack trace",
+           "stack frames must be rendered from failure site toward caller");
+}
+
+// Khóa cơ chế tự nhận diện chẩn đoán từ dữ kiện thực thi cho nhiều họ lỗi. Test
+// không truyền `RuntimeDiagnosticKind` vào RuntimeError; enum chỉ dùng để kiểm tra
+// kết quả mà bộ nhận diện trung tâm suy ra.
+void testRuntimeDiagnosticInferenceCoversCommonErrors() {
+    using vietvm::runtime::RuntimeDiagnosticContext;
+    using vietvm::runtime::RuntimeDiagnosticKind;
+    std::vector<std::pair<RuntimeDiagnosticContext, RuntimeDiagnosticKind>> cases;
+
+    auto withOpcode = [](RuntimeDiagnosticContext context, Opcode opcode) {
+        context.opcode = static_cast<int>(opcode);
+        return context;
+    };
+
+    RuntimeDiagnosticContext division;
+    division.operandTexts = {"10", "0"};
+    division.operandNumeric = {true, true};
+    cases.push_back({withOpcode(division, OP_CHIA), RuntimeDiagnosticKind::DivisionByZero});
+
+    RuntimeDiagnosticContext modulo = division;
+    cases.push_back({withOpcode(modulo, OP_MODULO), RuntimeDiagnosticKind::ModuloByZero});
+
+    RuntimeDiagnosticContext numeric;
+    numeric.operandTexts = {"abc", "2"};
+    numeric.operandNumeric = {false, true};
+    cases.push_back({withOpcode(numeric, OP_NHAN), RuntimeDiagnosticKind::NumericOperandRequired});
+
+    RuntimeDiagnosticContext compare;
+    compare.operandTexts = {"1", "abc"};
+    cases.push_back({withOpcode(compare, OP_LON_HON), RuntimeDiagnosticKind::ComparisonTypeMismatch});
+
+    RuntimeDiagnosticContext integer;
+    integer.expectsInteger = true;
+    integer.actualType = "chuỗi";
+    cases.push_back({withOpcode(integer, OP_KHONG), RuntimeDiagnosticKind::IntegerRequired});
+
+    cases.push_back({withOpcode(vietvm::runtime::runtimeConversionFacts("abc", "số thực", false), OP_BIEN_SO_FLOAT),
+                     RuntimeDiagnosticKind::FloatConversionFailed});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeIndexFacts(0, false, -1, true, "chuỗi"), OP_DOC_CHI_SO),
+                     RuntimeDiagnosticKind::IndexTypeInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeIndexFacts(5, true, 3, true), OP_DOC_CHI_SO),
+                     RuntimeDiagnosticKind::IndexOutOfRange});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeIndexFacts(0, true, -1, false, "đối tượng"), OP_DOC_CHI_SO),
+                     RuntimeDiagnosticKind::ContainerNotIndexable});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeTargetLookupFacts("tính", false), OP_GOI),
+                     RuntimeDiagnosticKind::FunctionNotFound});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeTargetLookupFacts("biếnHàm", false), OP_GOI_GIAN_TIEP),
+                     RuntimeDiagnosticKind::InvalidCallable});
+    cases.push_back({vietvm::runtime::runtimeCallFacts("tính", 3, 1, 2),
+                     RuntimeDiagnosticKind::CallArityMismatch});
+    cases.push_back({vietvm::runtime::runtimeCallDepthFacts("điSâu", 257, 256),
+                     RuntimeDiagnosticKind::CallDepthExceeded});
+    cases.push_back({vietvm::runtime::runtimeRequiredArgumentFacts(2),
+                     RuntimeDiagnosticKind::RequiredArgumentMissing});
+    cases.push_back({vietvm::runtime::runtimeModuleFacts("demo", false),
+                     RuntimeDiagnosticKind::ModuleInitializationFailed});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeTargetLookupFacts("Con", false), OP_TAO_DOI_TUONG),
+                     RuntimeDiagnosticKind::ClassNotFound});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeMemberFacts("tên", false, false, true), OP_DOC_THUOC_TINH),
+                     RuntimeDiagnosticKind::ObjectRequired});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeMemberFacts("tên", true, true, false), OP_DOC_THUOC_TINH),
+                     RuntimeDiagnosticKind::PropertyNotFound});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeMemberFacts("chạy", true, true, false), OP_GOI_PHUONG_THUC),
+                     RuntimeDiagnosticKind::MethodNotFound});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeMemberFacts("bíMật", true, true, true, true, false), OP_GOI_PHUONG_THUC),
+                     RuntimeDiagnosticKind::MemberAccessDenied});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeStackFacts(1, 2), OP_CONG),
+                     RuntimeDiagnosticKind::MissingOperand});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeTypeFacts("chuỗi"), OP_CONG_MOT),
+                     RuntimeDiagnosticKind::IncrementTypeInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeTypeFacts("danh sách"), OP_TRU_MOT),
+                     RuntimeDiagnosticKind::DecrementTypeInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeConstantReferenceFacts(false), OP_CHUOI),
+                     RuntimeDiagnosticKind::ConstantReferenceInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeLiteralDecodeFacts("dữ liệu hỏng", false), OP_LIST_LITERAL),
+                     RuntimeDiagnosticKind::LiteralDecodeFailed});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeClosureFacts("capture", false), OP_TAO_DONG_BAO),
+                     RuntimeDiagnosticKind::ClosureCaptureInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeJumpFacts(999, false), OP_JUMP),
+                     RuntimeDiagnosticKind::JumpTargetInvalid});
+    cases.push_back({withOpcode(vietvm::runtime::runtimeControlFacts("ca ngoài chọn", false), OP_CA),
+                     RuntimeDiagnosticKind::ControlFlowStateInvalid});
+    cases.push_back({vietvm::runtime::runtimeNativeFacts("đọc tệp", "không mở được tệp", false),
+                     RuntimeDiagnosticKind::NativeOperationFailed});
+
+    RuntimeDiagnosticContext internal;
+    internal.internalInvariantChecked = true;
+    internal.internalInvariantValid = false;
+    cases.push_back({internal, RuntimeDiagnosticKind::InternalRuntimeState});
+
+    for (const auto &[context, expectedKind] : cases) {
+        const RuntimeDiagnosticKind detected = vietvm::runtime::detectRuntimeDiagnostic(context);
+        const vietvm::runtime::RuntimeDiagnosticInfo info =
+            vietvm::runtime::runtimeDiagnosticInfo(context);
+        expect(detected == expectedKind,
+               "runtime diagnostic inference",
+               "runtime facts must resolve to the expected diagnostic kind");
+        expect(!info.category.empty() && !info.explanation.empty() && !info.suggestion.empty(),
+               "runtime diagnostic explanation coverage",
+               "every inferred runtime failure must have a complete explanation and fix");
+    }
+}
+
+// Khóa invariant sau lỗi fatal ở child VM: stack/root của caller phải còn nguyên,
+// call frame tạm phải được unwind và cùng VM vẫn gọi được function hợp lệ tiếp theo.
+void testRuntimeErrorPreservesCallerStateForNextCall() {
+    VM vm({}, {});
+    vm.hamBytecodeMap.emplace(41, std::vector<Instruction>{
+        instruction(OP_BIEN_SO, 1),
+        instruction(OP_BIEN_SO, 0),
+        instruction(OP_CHIA),
+        instruction(OP_TRA_VE),
+    });
+    vm.hamBytecodeMap.emplace(42, std::vector<Instruction>{
+        instruction(OP_BIEN_SO, 7),
+        instruction(OP_TRA_VE),
+    });
+    VMRuntimeFixture access(vm);
+
+    StackValue rootedValue = make_list_value({});
+    ListHandle rooted = std::get<ListHandle>(rootedValue);
+    rooted->elements.push_back(rootedValue);
+    const std::weak_ptr<vietvm::runtime::ListValue> weakRoot = rooted;
+    access.trackHeapValue(rootedValue);
+    access.setVariable(88, rootedValue);
+    rooted.reset();
+    rootedValue = make_null_value();
+
+    access.push(make_int_value(1234));
+    bool sawVmFault = false;
+    try {
+        access.executeCall(instruction(OP_GOI, 0, 41, 0));
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawVmFault = error.kind() == vietvm::runtime::RuntimeErrorKind::VmFault;
+    }
+
+    expect(sawVmFault, "runtime state after error",
+           "the intentionally failing child call must raise VmFault");
+    expect(access.callDepth() == 0, "runtime state after error",
+           "a failed child call must leave no temporary caller frame");
+    expect(access.stack().size() == 1 &&
+               asInt(access.top(), "runtime state after error") == 1234,
+           "runtime state after error",
+           "a zero-argument failed call must preserve unrelated caller stack values");
+
+    access.collectGarbage();
+    expect(!weakRoot.expired(), "runtime state after error",
+           "a heap graph rooted in caller variables must survive GC after child failure");
+
+    access.executeCall(instruction(OP_GOI, 0, 42, 0));
+    expect(access.callDepth() == 0, "runtime reuse after error",
+           "a later successful call must also leave the call stack balanced");
+    expect(access.stack().size() == 2 &&
+               asInt(access.top(), "runtime reuse after error") == 7,
+           "runtime reuse after error",
+           "the same VM must remain usable for a successful call after a prior VmFault");
+
+    access.eraseVariable(88);
+    access.clearStack();
+    access.collectGarbage();
+    expect(weakRoot.expired(), "runtime state after error",
+           "the preserved heap graph must still become collectible after its final root is removed");
+}
+
 void testLoopControlHandlerState() {
     VM vm({
         instruction(OP_BO_QUA),
@@ -294,7 +550,9 @@ void testRuntimeModuleInitializationRunsOnce() {
 
     VM failing({}, {});
     const std::vector<Instruction> invalidInitializer = {
-        instruction(static_cast<Opcode>(999)),
+        instruction(OP_BIEN_SO, 1),
+        instruction(OP_BIEN_SO, 0),
+        instruction(OP_CHIA),
     };
     (void)failing.addModuleInitializer("module://broken", invalidInitializer);
     bool failed = false;
@@ -454,6 +712,94 @@ void testTracingGcHeapTeardownBreaksRootedCycles() {
            "destroying the final VM heap owner must break cycles still held by VM roots");
 }
 
+// Khóa việc marker/track traversal xử lý graph rất sâu bằng worklist thay vì
+// phụ thuộc native C++ recursion; cycle vẫn phải sống khi còn root và được sweep khi bỏ root.
+void testTracingGcHandlesDeepGraphWithoutNativeRecursion() {
+    constexpr std::size_t kNodeCount = 4096;
+    VM vm({}, {});
+    VMRuntimeFixture access(vm);
+
+    StackValue rootValue = make_list_value({});
+    std::vector<ListHandle> nodes;
+    nodes.reserve(kNodeCount);
+    nodes.push_back(std::get<ListHandle>(rootValue));
+    for (std::size_t i = 1; i < kNodeCount; ++i) {
+        StackValue nodeValue = make_list_value({});
+        nodes.push_back(std::get<ListHandle>(nodeValue));
+    }
+    for (std::size_t i = 0; i + 1 < kNodeCount; ++i) {
+        nodes[i]->elements.emplace_back(nodes[i + 1]);
+    }
+    nodes.back()->elements.emplace_back(nodes.front());
+
+    const std::weak_ptr<vietvm::runtime::ListValue> weakFirst = nodes.front();
+    const std::weak_ptr<vietvm::runtime::ListValue> weakMiddle = nodes[kNodeCount / 2];
+    const std::weak_ptr<vietvm::runtime::ListValue> weakLast = nodes.back();
+
+    access.trackHeapValue(rootValue);
+    access.setVariable(101, rootValue);
+    nodes.clear();
+    rootValue = make_null_value();
+
+    access.collectGarbage();
+    expect(!weakFirst.expired() && !weakMiddle.expired() && !weakLast.expired(),
+           "tracing GC deep graph",
+           "a deeply linked cycle reachable from a VM root must survive collection");
+    expect(access.gcStats().marked >= kNodeCount &&
+               access.trackedHeapObjects() == kNodeCount,
+           "tracing GC deep graph",
+           "the iterative marker must visit the complete deep graph without native recursion");
+
+    access.eraseVariable(101);
+    access.collectGarbage();
+    expect(weakFirst.expired() && weakMiddle.expired() && weakLast.expired(),
+           "tracing GC deep graph sweep",
+           "removing the final root must release the entire deep cyclic graph");
+    expect(access.trackedHeapObjects() == 0,
+           "tracing GC deep graph sweep",
+           "deep-cycle sweep must leave no tracked list allocation behind");
+}
+
+// Tạo một burst lớn các self-cycle không có root để kiểm tra registry/sweep dọn
+// toàn bộ allocation liên tục trong một chu kỳ GC mà không để weak entry sống sót.
+void testTracingGcSweepsAllocationBurst() {
+    constexpr std::size_t kAllocationCount = 1024;
+    VM vm({}, {});
+    VMRuntimeFixture access(vm);
+    std::vector<std::weak_ptr<vietvm::runtime::ListValue>> weakLists;
+    weakLists.reserve(kAllocationCount);
+
+    for (std::size_t i = 0; i < kAllocationCount; ++i) {
+        StackValue value = make_list_value({});
+        ListHandle list = std::get<ListHandle>(value);
+        list->elements.push_back(value);
+        weakLists.push_back(list);
+        access.trackHeapValue(value);
+        list.reset();
+        value = make_null_value();
+    }
+
+    expect(access.trackedHeapObjects() == kAllocationCount,
+           "tracing GC allocation burst",
+           "all cyclic allocations must remain registered before collection");
+    access.collectGarbage();
+
+    bool allReleased = true;
+    for (const auto &weak : weakLists) {
+        if (!weak.expired()) {
+            allReleased = false;
+            break;
+        }
+    }
+    expect(allReleased, "tracing GC allocation burst",
+           "one collection must release an allocation burst with no live roots");
+    expect(access.gcStats().trackedBefore == kAllocationCount &&
+               access.gcStats().trackedAfter == 0 &&
+               access.trackedHeapObjects() == 0,
+           "tracing GC allocation burst",
+           "heap stats must report the burst fully removed after sweep");
+}
+
 } // namespace
 
 int main() {
@@ -461,11 +807,16 @@ int main() {
     testIndexHandlerState();
     testVariableAndCallFrameHandlerState();
     testCallHandlerState();
+    testCallRejectsMissingStackArgument();
     testBranchHandlerState();
     testSwitchAndBlockHandlerState();
     testExceptionHandlerState();
     testFatalRuntimeErrorUnwindsCallFrame();
     testCallBoundaryArityRuntimeError();
+    testCallDepthLimitRaisesControlledRuntimeError();
+    testRuntimeErrorFormatsStructuredStackTrace();
+    testRuntimeDiagnosticInferenceCoversCommonErrors();
+    testRuntimeErrorPreservesCallerStateForNextCall();
     testLoopControlHandlerState();
     testOutputHandlerUsesSink();
     testFilesystemPredicatesTreatMissingPathAsFalse();
@@ -473,6 +824,8 @@ int main() {
     testObjectHandlerState();
     testTracingGcKeepsRootsAndCollectsCycles();
     testTracingGcHeapTeardownBreaksRootedCycles();
+    testTracingGcHandlesDeepGraphWithoutNativeRecursion();
+    testTracingGcSweepsAllocationBurst();
 
     if (failures != 0) {
         std::cerr << failures << " VM handler unit test(s) failed\n";

@@ -1,0 +1,5 @@
+Lỗi: thành số thực: giá trị không thể chuyển đổi
+Điều đã xảy ra: Chương trình muốn đổi 'abc' thành số thực, nhưng nội dung đó không có dạng số mà V++ hiểu.
+Cách sửa: Hãy kiểm tra dữ liệu đầu vào. Ví dụ 12, -3 và 4.5 là các cách viết số hợp lệ.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi]

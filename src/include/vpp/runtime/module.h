@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "vm/instruction.h"
+#include "vpp/runtime/debug.h"
 
 namespace vietvm::runtime {
 
@@ -24,6 +25,7 @@ const char *moduleStateName(ModuleState state) noexcept;
 struct RuntimeModule {
     std::string identity;
     std::vector<Instruction> initializer;
+    std::vector<RuntimeSourceLocation> debugInfo;
     ModuleState state = ModuleState::Uninitialized;
 };
 
@@ -31,7 +33,9 @@ struct RuntimeModule {
 class ModuleTable {
 public:
     // Thêm add; hàm chèn dữ liệu mới vào cấu trúc trạng thái hiện tại và duy trì các chỉ mục liên quan.
-    bool add(std::string identity, std::vector<Instruction> initializer);
+    bool add(std::string identity,
+             std::vector<Instruction> initializer,
+             std::vector<RuntimeSourceLocation> debugInfo = {});
     // Trả trạng thái hiện tại của đối tượng quản lý; hàm chỉ tra dữ liệu nội bộ tương ứng với khóa/module được yêu cầu.
     std::optional<ModuleState> state(std::string_view identity) const noexcept;
     // Chuyển thực thể sang trạng thái đang khởi tạo/đang xử lý; hàm kiểm tra trạng thái trước đó để ngăn bắt đầu lặp sai quy trình.

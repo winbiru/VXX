@@ -1,0 +1,5 @@
+Lỗi: phương thức không tồn tại: khongCo
+Điều đã xảy ra: Đối tượng hiện tại không có phương thức 'khongCo' phù hợp để gọi.
+Cách sửa: Hãy kiểm tra tên phương thức, lớp của đối tượng và các lớp cha của nó.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi:9:8) [mô đun=src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi]

@@ -11,10 +11,10 @@
 | --- | ---: | ---: | ---: |
 | Ngắn hạn | 14/15 | 1 | 93% |
 | Trung hạn | 18/18 | 0 | 100% |
-| Dài hạn | 7/34 | 27 | 21% |
-| **Tổng** | **39/67** | **28** | **58%** |
+| Dài hạn | 15/40 | 25 | 38% |
+| **Tổng** | **47/73** | **26** | **64%** |
 
-> Số liệu dài hạn được đếm trực tiếp từ 34 checkbox trong phần `Việc lớn còn lại`
+> Số liệu dài hạn được đếm trực tiếp từ 40 checkbox trong phần `Việc lớn còn lại`
 > của `plans/long-term.md`; 5 checkbox ở `Nền tảng đã có` là baseline lịch sử và không
 > cộng thêm vào mẫu số roadmap. Bảng tổng quan vì vậy phản ánh đúng các đầu việc còn được
 > theo dõi thay vì cộng baseline đã hoàn thành vào tiến độ roadmap.
@@ -28,7 +28,7 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | Mốc | Trạng thái | Trọng tâm còn lại |
 | --- | --- | --- |
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
-| 0.8 | Gần hoàn tất | GC/runtime stress, stack overflow/nested exception, stack trace |
+| 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
 | 0.9 | Chưa hoàn tất | Package solver + lockfile, stdlib audit, test/tooling/LSP |
 | 1.0 RC | Chưa bắt đầu | Freeze contract, fuzz/stress/sanitizer, release smoke đa nền tảng |
 
@@ -58,8 +58,8 @@ hơn nhiều so với một checkbox tính năng thông thường.
 - [x] Có regression cho lỗi parser/compiler/semantic, không chỉ expected-output fixture.
 - [x] Test discovery đã phân biệt `test/` cho C++ unit và `src/tests/` cho regression
   V++; HTTP fixture được khởi động riêng trong integration runner.
-- [x] Parity gate hiện đối chiếu 86 chương trình `.vi`; direct IR backend bao phủ
-  86/86 chương trình.
+- [x] Parity gate hiện đối chiếu 94 chương trình `.vi`; direct IR backend bao phủ
+  94/94 chương trình.
 - [x] Parity gate chạy lại cùng corpus theo thứ tự đảo trong cùng process; regression
   compile A → B → A đã khóa lifecycle reset giữa nhiều lần biên dịch.
 - [x] VM opcode smoke đã có branch (`OP_JUMP`, `OP_JUMP_IF_FALSE`) và call/return
@@ -69,7 +69,13 @@ hơn nhiều so với một checkbox tính năng thông thường.
   trực tiếp cho `OP_DUNG_GIA_TRI` và `OP_SAI_GIA_TRI`.
 - [x] `VM::run()` đã được thu gọn thành lifecycle/GC + opcode routing; call, value,
   index, variable/call-frame, switch/block, loop-control, exception và branch có
-  handler riêng. Baseline regression hiện tại đạt 73/73.
+  handler riêng. Baseline regression hiện tại đạt 78/78.
+- [x] Stack trace runtime giữ frame có cấu trúc mà không đổi bytecode ABI: source file,
+  line/column, function/method và module identity đi qua function/module child VM; CLI
+  hiển thị trace từ điểm lỗi về caller và gộp các frame đệ quy liên tiếp. Regression khóa
+  cả method chain, function caller, imported-module frame và recursion overflow. Runtime
+  diagnostic dùng catalog mã ổn định `VPP-Rxxxx` thay vì dò chuỗi: lỗi mang code + context,
+  CLI sinh nhóm lỗi, giải thích và gợi ý sửa cho các nhóm lỗi runtime phổ biến.
 - [x] VM opcode matrix hiện khóa arithmetic, logic/comparison boundary, stack,
   branch, call/return, native call, default parameter, switch/default, throw/catch,
   uncaught error và các lỗi boundary chính.
@@ -108,8 +114,9 @@ hơn nhiều so với một checkbox tính năng thông thường.
   job build + full CTest thường trực bên cạnh Ubuntu và Windows.
 - [x] **Module runtime:** runtime có `ModuleTable` độc lập compiler; CLI chuyển module
   initializer metadata vào VM, initializer chạy dependency-first đúng một lần và giữ
-  state `failed` khi khởi tạo ném lỗi. Explicit export/re-export, richer cycle diagnostic
-  và package resolver vẫn còn theo roadmap.
+  state `failed` khi khởi tạo ném lỗi. Module semantics 1.0 đã có `công khai nhập`,
+  re-export/alias, chặn symbol ẩn và diagnostic import cycle có chuỗi module; package
+  resolver/versioning vẫn còn theo roadmap.
 - [x] Regression `.vi` cho module runtime đã khóa ba contract end-to-end qua CLI:
   dependency-first initialization, duplicate import chỉ khởi tạo một lần và alias
   namespace vẫn gọi được imported function sau khi initializer chạy.
@@ -172,13 +179,20 @@ hơn nhiều so với một checkbox tính năng thông thường.
   default parameter; dynamic/indirect/imported call được kiểm tra lại ở VM và không còn tự bù
   `0` cho đối số bắt buộc thiếu. Regression `kiem_tra_kieu_dong_call_boundary.vi` khóa đổi kiểu
   binding + default parameter; pipeline/VM unit khóa direct và runtime arity error.
+- [x] **Closure/finalizer semantics 1.0:** closure capture dùng shared cell theo tham chiếu;
+  mutation nhìn thấy hai chiều, captured value sống sau khi outer function trả về và nested
+  closure dùng chung cell. V++ 1.0 không có destructor/finalizer do người dùng định nghĩa;
+  hành vi chương trình không được phụ thuộc thời điểm GC. Regression
+  `kiem_tra_closure_capture.vi` và runtime-value/GC unit khóa contract này.
 - [x] **Tracing GC:** `RuntimeHeap` theo từng VM đăng ký map/list/tuple/class/instance bằng
   weak registry, mark từ stack, biến global/local, call frame, receiver, class table và
   switch value rồi sweep bằng cách cắt cạnh của graph không reachable. Child VM dùng chung
   heap và kế thừa snapshot root của caller nên GC trong function/module lồng nhau không làm
   mất giá trị còn nằm trên stack bên ngoài. GC chạy mặc định với interval 2048 opcode và
-  `VPP_GC_INTERVAL` có thể hạ interval cho stress test. `kiem_tra_gc_mvp.vi` hiện khóa
-  self-cycle list/map, instance cycle và nested-call caller root ở interval 1.
+  `VPP_GC_INTERVAL` có thể hạ interval cho stress test. Marker và `trackValue()` đã chuyển
+  sang worklist lặp để graph sâu không phụ thuộc native C++ recursion. Unit stress khóa cycle
+  4.096 node + burst 1.024 self-cycle; `kiem_tra_gc_mvp.vi` khóa self-cycle list/map,
+  instance cycle, graph sâu, allocation burst và nested-call caller root ở interval 1.
 
 ## Khoảng trống nền tảng đã chốt
 
@@ -197,7 +211,7 @@ hơn nhiều so với một checkbox tính năng thông thường.
 
 ## Rủi ro cần xử lý sớm
 
-- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 86 chương trình
+- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 94 chương trình
   chạy thuận và đảo thứ tự trong cùng process đều khớp snapshot; chạy riêng parity
   và bộ CTest không gồm integration đều qua.
 - [x] Handler VM vẫn thao tác trên state của instance, nhưng `VMRuntimeFixture` đã tạo
@@ -211,14 +225,15 @@ hơn nhiều so với một checkbox tính năng thông thường.
 
 ```text
 VM opcode smoke (build trực tiếp bằng C++17): passed
-Integration regression: 73/73 passed
+Integration regression: 78/78 passed
 CTest baseline gần nhất: 16/16 passed
-Pipeline parity baseline gần nhất: 86 chương trình, direct IR 86 chương trình
+ASan+UBSan local CTest: 16/16 passed; LSan chờ Ubuntu CI `detect_leaks=1`
+Pipeline parity baseline gần nhất: 94 chương trình, direct IR 94 chương trình
 Coverage cross-check: 75.77% line coverage (8,884/11,725), gate 45%
 Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
 Short-term: 14/15
 Medium-term: 18/18
-Long-term: 10/40
+Long-term: 15/40
 ```
 
 ## Ưu tiên tiếp theo
@@ -231,7 +246,7 @@ Long-term: 10/40
    xóa token bridge khỏi production compiler/source set.
 5. [x] Sau khi test architecture ổn định, thêm coverage + clang-tidy + benchmark baseline.
 6. [x] Tách nốt variable/index/switch/block/exception khỏi `VM::run()` và mở rộng
-   opcode matrix; full regression hiện tại đạt 73/73.
+   opcode matrix; full regression hiện tại đạt 78/78.
 7. [x] Tạo internal VM state fixture/API và output sink để test handler trực tiếp
    không phụ thuộc stdout; khóa bằng `vpp-vm-handler-unit`.
 8. [x] Dời `StringPool`, function registry, import set và class/access state vào
@@ -240,7 +255,7 @@ Long-term: 10/40
 9. [x] Tách import resolution khỏi process cwd bằng `CompilationContext.importResolutionBase`
    và khóa bằng regression song song cho hai module cùng tên ở hai thư mục độc lập.
 10. [x] Tách ranh giới direct emitter thành `emitBlock`, `emitStatement` và
-    `emitFunctionBody` với output bytecode tường minh; parity hiện tại 86/86 và full CTest vẫn xanh.
+    `emitFunctionBody` với output bytecode tường minh; parity hiện tại 94/94 và full CTest vẫn xanh.
 11. [x] Hoàn tất Module Semantics Phase 1: index local `.vi` exports, alias namespace,
     semantic `ImportedFunction`, lifecycle state contract và production top-level
     indexing; package/compat imports vẫn do resolver hiện hữu xử lý.
@@ -250,11 +265,16 @@ Long-term: 10/40
     `hàm khởi tạo(...)`, property động read/write, bound-method dispatch, receiver
     `mình`/`gốc`, inheritance, interface/`triển khai` compile-time và method visibility đã
     chạy qua semantic/direct IR/VM.
-14. [ ] **Semantics freeze:** scope/shadowing, `rỗng`, equality/coercion, runtime error,
-    override và dynamic type policy/call boundary đã chốt; còn closure capture,
-    export/re-export, import cycle và finalizer policy.
-15. [ ] **Runtime hardening:** thêm GC/object-graph/allocation stress, recursion/stack overflow,
-    nested exception, VM-state integrity, leak/sanitizer suite và stack trace có source span.
+14. [x] **Semantics freeze:** scope/shadowing, `rỗng`, equality/coercion, runtime error,
+    override, dynamic type policy/call boundary, closure shared-cell capture, module
+    export/re-export + import cycle và no-finalizer policy đều đã chốt bằng docs/regression.
+15. [ ] **Runtime hardening:** call-stack stress đã khóa recursion sâu, nested exception và
+    stack overflow bằng giới hạn 256 với `CallBoundary` có kiểm soát; GC stress đã khóa graph
+    sâu/allocation burst/caller roots ở interval 1. VM-state invariant đã chứng minh cùng VM
+    dùng tiếp được sau `VmFault` mà không mất caller stack/heap root/call-frame balance.
+    Local ASan+UBSan full CTest hiện 16/16 sau khi sửa hai lỗi sanitizer; Ubuntu CI đã bật
+    leak detection tường minh. Stack trace source span/function/method/module đã hoàn tất;
+    còn CI Linux leak gate để đóng runtime hardening 0.8.
 16. [ ] **Package 0.9:** chốt manifest/project layout; tách resolver; xây semver/range,
     dependency conflict diagnostic, deterministic lockfile, cache/offline + local/Git/registry source.
 17. [ ] **Stdlib 1.0:** audit UTF-8, filesystem/path, time/date và các package hiện có;

@@ -1181,6 +1181,7 @@ struct Emitter {
     const IrProgram &program;
     const std::unordered_map<std::string, Opcode> &keywordMap;
     std::vector<Instruction> bytecode;
+    std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<std::string, int> slots;
     std::unordered_map<int, int> functionIdsBySymbol;
     std::unordered_map<std::string, int> functionIdsByName;
@@ -1190,6 +1191,50 @@ struct Emitter {
     std::unordered_set<std::string> emittedClasses;
     std::unordered_set<std::string> emittingClasses;
     int nextSlot = 0;
+    std::vector<vietvm::runtime::RuntimeSourceLocation> *activeDebugInfo =
+        &bytecodeDebugInfo;
+    std::string activeFunctionName;
+
+    // Chuyển source span của IR thành vị trí runtime hiện tại, giữ tên function
+    // đang phát để VM có thể dựng frame mà không cần đọc lại AST/IR khi lỗi xảy ra.
+    vietvm::runtime::RuntimeSourceLocation debugLocation(
+        const vietvm::frontend::SourceSpan &span) const {
+        vietvm::runtime::RuntimeSourceLocation location;
+        location.sourceFile = registry.currentSourceIdentity.empty()
+            ? std::string("<memory>")
+            : registry.currentSourceIdentity;
+        location.moduleIdentity = location.sourceFile;
+        location.functionName = activeFunctionName;
+        location.line = span.begin.line;
+        location.column = span.begin.column;
+        return location;
+    }
+
+    // Điền metadata cho các instruction vừa phát nhưng chưa được child expression /
+    // statement gắn span chính xác hơn. Cách này giữ bytecode nguyên vẹn và cho phép
+    // nested IR tự thắng metadata của parent bằng source span hẹp hơn.
+    struct DebugRangeGuard {
+        std::vector<Instruction> &output;
+        std::vector<vietvm::runtime::RuntimeSourceLocation> *debug;
+        std::size_t start;
+        vietvm::runtime::RuntimeSourceLocation location;
+
+        DebugRangeGuard(Emitter &emitter,
+                        std::vector<Instruction> &target,
+                        const vietvm::frontend::SourceSpan &span)
+            : output(target),
+              debug(emitter.activeDebugInfo),
+              start(target.size()),
+              location(emitter.debugLocation(span)) {}
+
+        ~DebugRangeGuard() {
+            if (debug == nullptr || output.size() <= start) return;
+            debug->resize(output.size());
+            for (std::size_t index = start; index < output.size(); ++index) {
+                if (!(*debug)[index].valid()) (*debug)[index] = location;
+            }
+        }
+    };
 
     // Quản lý class context theo RAII; guard đẩy tên lớp trước khi phát method và tự pop khi rời scope để lookup visibility/`gốc` không rò sang lớp kế tiếp.
     struct ClassContextGuard {
@@ -1309,6 +1354,7 @@ struct Emitter {
         if (value == nullptr) {
             throw std::logic_error(std::string(messages::kInternalDirectIrInvalidValueId));
         }
+        DebugRangeGuard debugGuard(*this, output, value->span);
 
         switch (value->opcode) {
             case IrValueOpcode::ConstInt:
@@ -1608,15 +1654,30 @@ struct Emitter {
                 lambdaIds.emplace(value->lambdaId, functionId);
 
                 std::vector<Instruction> functionBytecode;
-                functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
-                emitParameterBindings(
-                    lambda->parameters, functionBytecode,
-                    messages::kInternalDirectIrMissingLambdaDefaultValue);
+                std::vector<vietvm::runtime::RuntimeSourceLocation> functionDebugInfo;
+                auto *previousDebugInfo = activeDebugInfo;
+                const std::string previousFunctionName = activeFunctionName;
+                activeDebugInfo = &functionDebugInfo;
+                activeFunctionName = "<lambda@" +
+                    std::to_string(lambda->span.begin.line) + ":" +
+                    std::to_string(lambda->span.begin.column) + ">";
+                {
+                    DebugRangeGuard functionGuard(*this, functionBytecode, lambda->span);
+                    functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+                    emitParameterBindings(
+                        lambda->parameters, functionBytecode,
+                        messages::kInternalDirectIrMissingLambdaDefaultValue);
 
-                emitBlock(lambda->body, functionBytecode, false);
-                functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+                    emitBlock(lambda->body, functionBytecode, false);
+                    functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+                }
+                functionDebugInfo.resize(functionBytecode.size());
+                activeDebugInfo = previousDebugInfo;
+                activeFunctionName = previousFunctionName;
                 registry.functionBytecode[functionId] =
                     std::move(functionBytecode);
+                registry.functionDebugInfo[functionId] =
+                    std::move(functionDebugInfo);
                 emitLambdaReference(*lambda, functionId, output);
                 return;
             }
@@ -1639,6 +1700,7 @@ struct Emitter {
     // Phát một `IrInstruction` sang bytecode hoặc chuyển tiếp đến bộ phát chuyên biệt cho khối, điều kiện, vòng lặp và câu lệnh phức hợp.
     void emitInstruction(const IrInstruction &instruction,
                          std::vector<Instruction> &output) {
+        DebugRangeGuard debugGuard(*this, output, instruction.span);
         if (instruction.opcode == IrOpcode::Block) {
             emitBlock(instruction, output);
             return;
@@ -1798,8 +1860,14 @@ struct Emitter {
 
     // Phát mã cho hàm body; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     std::vector<Instruction> emitFunctionBody(
-        const IrInstruction &instruction) {
+        const IrInstruction &instruction,
+        std::vector<vietvm::runtime::RuntimeSourceLocation> &functionDebugInfo) {
         std::vector<Instruction> functionBytecode;
+        auto *previousDebugInfo = activeDebugInfo;
+        const std::string previousFunctionName = activeFunctionName;
+        activeDebugInfo = &functionDebugInfo;
+        activeFunctionName = instruction.declarationName;
+        DebugRangeGuard functionGuard(*this, functionBytecode, instruction.span);
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
         for (const std::string &receiverName : instruction.implicitReceiverNames) {
             const int receiverSlot = slotFor(receiverName);
@@ -1811,6 +1879,9 @@ struct Emitter {
             messages::kInternalDirectIrMissingParameterDefaultValue);
         emitBlock(instruction.children.front(), functionBytecode, false);
         functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        functionDebugInfo.resize(functionBytecode.size());
+        activeDebugInfo = previousDebugInfo;
+        activeFunctionName = previousFunctionName;
         return functionBytecode;
     }
 
@@ -1823,12 +1894,19 @@ struct Emitter {
                 messages::kInternalDirectIrFunctionNotPredeclared));
         }
 
-        registry.functionBytecode[function->second] = emitFunctionBody(instruction);
-        bytecode.push_back({OP_HAM, name->second, function->second, 0});
+        std::vector<vietvm::runtime::RuntimeSourceLocation> functionDebugInfo;
+        registry.functionBytecode[function->second] =
+            emitFunctionBody(instruction, functionDebugInfo);
+        registry.functionDebugInfo[function->second] = std::move(functionDebugInfo);
+        {
+            DebugRangeGuard debugGuard(*this, bytecode, instruction.span);
+            bytecode.push_back({OP_HAM, name->second, function->second, 0});
+        }
     }
 
     // Đăng ký lớp runtime và các phương thức của lớp; lớp cha được mã hóa qua chỉ số `StringPool` để VM nối quan hệ kế thừa.
     void emitClass(const IrInstruction &instruction) {
+        DebugRangeGuard classDebugGuard(*this, bytecode, instruction.span);
         ClassContextGuard classContext(registry, instruction.declarationName);
         const int classNameIndex = registry.storeString(instruction.declarationName);
         int encodedSuperclass = 0;
@@ -1859,10 +1937,13 @@ struct Emitter {
             } else if (member.effectiveVisibility == SemanticVisibility::Protected) {
                 encodedClassNameIndex = -(encodedClassNameIndex + 1);
             }
-            bytecode.push_back({OP_THEM_PHUONG_THUC,
-                                encodedClassNameIndex,
-                                methodNameIndex,
-                                encodedFunctionId});
+            {
+                DebugRangeGuard memberDebugGuard(*this, bytecode, member.span);
+                bytecode.push_back({OP_THEM_PHUONG_THUC,
+                                    encodedClassNameIndex,
+                                    methodNameIndex,
+                                    encodedFunctionId});
+            }
         }
     }
 
@@ -1910,6 +1991,7 @@ struct Emitter {
             bytecode.push_back({OP_GOI, 0, main->second, 0});
         }
         bytecode.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
+        bytecodeDebugInfo.resize(bytecode.size());
     }
 };
 
@@ -1967,6 +2049,9 @@ std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
 
     Emitter emitter{state, program, keywordMap};
     emitter.emitProgram(emitMainCall);
+    // Root debug metadata được lấy qua state tạm bên dưới bởi compiler pipeline;
+    // function metadata đã được ghi trực tiếp vào registry theo function id.
+    state.rootBytecodeDebugInfo = emitter.bytecodeDebugInfo;
     return std::move(emitter.bytecode);
 }
 

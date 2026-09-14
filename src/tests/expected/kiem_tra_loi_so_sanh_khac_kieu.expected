@@ -1,0 +1,5 @@
+Lỗi: không thể so sánh hai kiểu dữ liệu khác nhau
+Điều đã xảy ra: Hai giá trị đang được so sánh không cùng loại có thể xếp thứ tự với nhau.
+Cách sửa: Hãy đưa hai giá trị về cùng loại, ví dụ cùng là số hoặc cùng là chuỗi, rồi mới so sánh.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_so_sanh_khac_kieu.vi:3:8) [mô đun=src/tests/kiem_tra_loi_so_sanh_khac_kieu.vi]

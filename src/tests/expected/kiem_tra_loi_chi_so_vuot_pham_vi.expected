@@ -1,0 +1,5 @@
+Lỗi: chỉ số vượt phạm vi
+Điều đã xảy ra: Chương trình đang yêu cầu phần tử ở vị trí 5, nhưng dữ liệu chỉ có 3 phần tử.
+Cách sửa: Hãy kiểm tra số lượng phần tử trước khi truy cập. Vị trí hợp lệ bắt đầu từ 0 và phải nhỏ hơn số lượng phần tử.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi:3:8) [mô đun=src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi]

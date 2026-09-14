@@ -1,0 +1,5 @@
+Lỗi: không thể chia 10 cho 0
+Điều đã xảy ra: Chương trình đang cố lấy 10 chia cho 0. Số chia bằng 0 nên phép chia không thể cho ra kết quả hợp lệ.
+Cách sửa: Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_chia_cho_0.vi:3:8) [mô đun=src/tests/kiem_tra_loi_chia_cho_0.vi]

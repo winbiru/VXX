@@ -1,0 +1,4 @@
+// Gọi một tên hàm chưa tồn tại để kiểm tra tra cứu callable tại runtime.
+hàm main() {
+    in hamKhongTonTai();
+};

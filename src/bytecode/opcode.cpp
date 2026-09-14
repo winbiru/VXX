@@ -4,7 +4,13 @@ namespace vietvm::bytecode {
 
 // Trả tên văn bản ổn định cho opcode; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 std::string opcodeName(Opcode op) {
-    switch (op) {
+    return opcodeName(static_cast<int>(op));
+}
+
+// Trả tên opcode từ mã số thô; overload này giữ đường diagnostic cho input chưa
+// kiểm chứng mà không phải static_cast một số tùy ý thành enum `Opcode`.
+std::string opcodeName(int rawOpcode) {
+    switch (rawOpcode) {
         case OP_CONG: return "OP_CONG";
         case OP_TRU: return "OP_TRU";
         case OP_NHAN: return "OP_NHAN";

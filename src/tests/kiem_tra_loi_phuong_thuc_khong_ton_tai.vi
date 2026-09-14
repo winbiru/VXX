@@ -1,0 +1,10 @@
+lớp HocSinh {
+    hàm chao() {
+        trả về "xin chao";
+    }
+};
+
+hàm main() {
+    ban = HocSinh();
+    in ban.khongCo();
+};

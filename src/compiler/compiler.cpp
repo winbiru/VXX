@@ -100,6 +100,7 @@ CompilationArtifacts compilePipelineInRegistry(
     artifacts.unsupportedDirectIrRegions = directSupport.unsupportedRegions;
     artifacts.bytecode = emitDirectBytecode(
         state, artifacts.ir, keywordMap, emitMainCall);
+    artifacts.bytecodeDebugInfo = state.rootBytecodeDebugInfo;
     return artifacts;
 }
 

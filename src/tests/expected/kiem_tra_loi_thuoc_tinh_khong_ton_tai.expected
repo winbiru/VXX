@@ -1,0 +1,5 @@
+Lỗi: thuộc tính không tồn tại: ten
+Điều đã xảy ra: Đối tượng hiện tại không có thuộc tính 'ten'.
+Cách sửa: Hãy kiểm tra chính tả tên thuộc tính và phần khai báo của lớp.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_thuoc_tinh_khong_ton_tai.vi:10:8) [mô đun=src/tests/kiem_tra_loi_thuoc_tinh_khong_ton_tai.vi]

@@ -1,0 +1,7 @@
+// Hàm đóng yêu cầu hai đối số nhưng lời gọi chỉ truyền một đối số.
+hàm main() {
+    cong = hàm(a, b) {
+        trả về a + b;
+    };
+    in cong(1);
+};

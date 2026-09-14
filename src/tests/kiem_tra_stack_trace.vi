@@ -1,0 +1,20 @@
+// Regression stack trace: lỗi runtime đi qua phương thức và hàm thường phải giữ
+// tên hàm/phương thức cùng vị trí nguồn để CLI chỉ đúng chuỗi lời gọi gây lỗi.
+lớp MáyTính {
+    hàm chia(a, b) {
+        trả về a / b;
+    }
+
+    hàm tính() {
+        trả về mình.chia(10, 0);
+    }
+};
+
+hàm trungGian() {
+    máy = MáyTính();
+    trả về máy.tính();
+}
+
+hàm main() {
+    in trungGian();
+}

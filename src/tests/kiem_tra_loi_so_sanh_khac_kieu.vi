@@ -1,0 +1,4 @@
+// So sánh thứ tự giữa chuỗi và số là không tương thích.
+hàm main() {
+    in "abc" < 1;
+};

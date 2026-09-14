@@ -1,0 +1,7 @@
+// Regression stack trace xuyên module: frame trong hàm import phải trỏ về
+// module nguồn, sau đó mới tới frame main của file entry.
+nhập fixtures/stack_trace/module_loi.vi như môđun;
+
+hàm main() {
+    in môđun.gâyLỗi();
+}

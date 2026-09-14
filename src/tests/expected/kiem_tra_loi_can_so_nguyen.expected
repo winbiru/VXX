@@ -1,0 +1,5 @@
+Lỗi: giá trị không phải số nguyên
+Điều đã xảy ra: Chỗ này cần một số nguyên, nhưng chương trình đang đưa vào giá trị thuộc loại 'danh sách'.
+Cách sửa: Hãy dùng một số nguyên như 0, 1, -2 hoặc chuyển giá trị hiện tại sang số trước khi dùng.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_can_so_nguyen.vi:4:8) [mô đun=src/tests/kiem_tra_loi_can_so_nguyen.vi]

@@ -1,0 +1,5 @@
+Lỗi: OP_GOI: hàm không tồn tại (mã/chỉ số tên=-2, tên='hamKhongTonTai')
+Điều đã xảy ra: Chương trình muốn gọi hàm 'hamKhongTonTai', nhưng không tìm thấy hàm đó trong phạm vi hiện tại.
+Cách sửa: Hãy kiểm tra tên hàm, phần khai báo hàm và mô đun chứa hàm đã được nhập hay chưa.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_ham_khong_ton_tai.vi:3:8) [mô đun=src/tests/kiem_tra_loi_ham_khong_ton_tai.vi]

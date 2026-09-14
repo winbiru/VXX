@@ -1,0 +1,4 @@
+// Chia cho 0: hệ thống phải nhận ra số chia bằng 0 từ hai toán hạng thực tế.
+hàm main() {
+    in 10 / 0;
+};

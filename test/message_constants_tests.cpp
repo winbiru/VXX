@@ -34,8 +34,8 @@ void testCentralizedVietnameseCatalog() {
                "extractParens: thiếu dấu '(' mở",
            "compiler syntax diagnostic uses the centralized Vietnamese catalog");
     expect(vietvm::messages::messageText(vietvm::messages::kVmInvalidListIndex) ==
-               "Lỗi: chỉ số danh sách không hợp lệ",
-           "runtime collection diagnostic uses the centralized Vietnamese catalog");
+               "chỉ số danh sách không hợp lệ",
+           "runtime diagnostic exposes detail text without duplicating the CLI error prefix");
     expect(vietvm::messages::formatMessage(vietvm::messages::kNativeArgumentCount,
                                            {"mang_http_get", "1"}) ==
                "mang_http_get yêu cầu 1 tham số",

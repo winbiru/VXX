@@ -65,6 +65,10 @@ public:
     // Trả số call frame đang hoạt động để test xác nhận unwind sau lời gọi thành công hoặc lỗi.
     std::size_t callDepth() const { return vm_.callStack.size(); }
 
+    // Hạ/nâng giới hạn độ sâu lời gọi trong test để kiểm tra guard đệ quy mà
+    // không cần tạo hàng trăm native stack frame.
+    void setMaxCallDepth(std::size_t value) { vm_.maxCallDepth = value; }
+
     // Trả call frame đang hoạt động; hàm đọc frame trên cùng để handler/test truy cập tham số, local, receiver và địa chỉ quay về.
     const CallFrame &currentCallFrame() const {
         if (vm_.callStack.empty()) throw std::logic_error("VM fixture call stack is empty");

@@ -224,6 +224,23 @@ namespace vietvm { namespace compiler {
             }
         };
 
+        // Tạo tên nguồn dễ đọc cho debug metadata. Module vẫn dùng đường dẫn
+        // tuyệt đối làm khóa runtime, còn stack trace ưu tiên đường dẫn tương đối
+        // khi file nằm dưới thư mục làm việc hiện tại để kết quả ổn định giữa máy.
+        auto debugIdentityForPath = [](const fs::path &sourcePath) {
+            try {
+                const fs::path relative = sourcePath.lexically_relative(
+                    fs::current_path().lexically_normal());
+                const std::string display = relative.generic_u8string();
+                if (!display.empty() && display != ".." &&
+                    display.rfind("../", 0) != 0) {
+                    return display;
+                }
+            } catch (...) {
+            }
+            return sourcePath.lexically_normal().u8string();
+        };
+
         // Determine path
         std::string path = spec.target;
 
@@ -491,19 +508,24 @@ namespace vietvm { namespace compiler {
             // module đó. Khôi phục base của importer ngay sau recursive compile để
             // sibling import ở scope ngoài không bị đổi nghĩa.
             const fs::path previousResolutionBase = state.importResolutionBase;
+            const std::string previousSourceIdentity = state.currentSourceIdentity;
             state.importResolutionBase = abs.parent_path();
+            state.currentSourceIdentity = debugIdentityForPath(abs);
             CompilationArtifacts moduleArtifacts;
             try {
                 moduleArtifacts = compilePipelineInRegistry(
                     state, src, keywordMap, false, false);
             } catch (...) {
                 state.importResolutionBase = previousResolutionBase;
+                state.currentSourceIdentity = previousSourceIdentity;
                 throw;
             }
             state.importResolutionBase = previousResolutionBase;
+            state.currentSourceIdentity = previousSourceIdentity;
             auto moduleBytecode = moduleArtifacts.bytecode;
             state.moduleInitializers.push_back(
-                CompiledModuleInitializer{canonical, moduleBytecode});
+                CompiledModuleInitializer{canonical, moduleBytecode,
+                                          moduleArtifacts.bytecodeDebugInfo});
 
             std::vector<CompiledModuleFunctionExport> moduleExports;
             std::unordered_set<std::string> exportedDirectFunctions;

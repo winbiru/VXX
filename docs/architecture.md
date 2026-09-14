@@ -69,10 +69,16 @@ embedding ổn định.
 Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance/closure
 đăng ký weak handle vào heap đang active; collector mark từ stack, variables, call frame,
 capture cell, receiver, class table và switch value rồi cắt cạnh của object không reachable để phá
-shared_ptr cycle. Function/module child VM chia sẻ cùng heap và nhận snapshot root của
+shared_ptr cycle. Marker và `trackValue()` duyệt graph bằng worklist lặp thay vì native C++
+recursion, nên cycle/graph sâu không làm đầy call stack của tiến trình. Function/module child VM chia sẻ cùng heap và nhận snapshot root của
 caller, vì vậy collection trong lời gọi lồng nhau không làm mất object còn nằm trên stack
 bên ngoài. GC chạy mặc định với interval 2048 opcode; `VPP_GC_INTERVAL` dùng để điều chỉnh
 interval và regression ép xuống 1 để stress root boundary.
+
+Runtime error boundary giữ state có chủ đích: child VM luôn unwind call frame tạm trước khi
+truyền `RuntimeError` lên caller, còn side effect đã xảy ra trước lỗi vẫn theo imperative
+semantics của V++. Handler regression giữ một caller stack sentinel + cyclic heap root qua
+`VmFault`, chạy GC, rồi gọi tiếp một function hợp lệ trên cùng VM để khóa invariant này.
 
 ## Compiler pipeline
 
@@ -202,7 +208,7 @@ Recursive IR lowering
   ↓
 Direct IR → bytecode emission theo từng opcode/feature
   ↓
-Unsupported Direct IR = 0 trên regression corpus (đã đạt 86/86)
+Unsupported Direct IR = 0 trên regression corpus (đã đạt 94/94)
 ```
 
 IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận diện phần chưa
@@ -219,11 +225,29 @@ regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm
 được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
 được review như một thay đổi bytecode/compiler-state có chủ ý.
 
-Gate hiện tự động quét **86/86** chương trình `.vi`, xác nhận compiler snapshots khớp
+Gate hiện tự động quét **94/94** chương trình `.vi`, xác nhận compiler snapshots khớp
 và yêu cầu mọi program có `unsupportedDirectIrRegions == 0`. Source test dùng
 `CompilationContext` cho từng top-level compile, sau đó chạy lại corpus theo thứ tự
 ngược trong cùng process để khóa reset/import-base isolation. Toàn corpus chính là direct-IR
 contract; không còn backend selector hay token compiler để quay lại.
+
+Debug source metadata được lưu **song song** với bytecode thay vì nhúng vào `Instruction`.
+Direct emitter ghi `RuntimeSourceLocation` cho root bytecode và từng function; recursive
+import giữ metadata riêng cho module initializer/function. VM truyền metadata này sang child
+VM, ánh xạ program counter về source file, line/column, function/method và module identity,
+rồi gắn frame có cấu trúc vào `RuntimeError` trong quá trình unwind. CLI chỉ format metadata
+ở ranh giới host và gộp các frame đệ quy liên tiếp giống nhau, nên `RuntimeError::what()` và
+fingerprint bytecode/StringPool/function registry cũ vẫn giữ contract tương thích.
+
+Runtime diagnostic không phụ thuộc việc dò chuỗi `what()` và handler không gắn sẵn tên lỗi.
+`RuntimeError` mang `RuntimeDiagnosticContext` chứa các dữ kiện mà VM quan sát được như opcode,
+toán hạng, kiểu giá trị, chỉ số/kích thước, kết quả lookup, số đối số, độ sâu lời gọi, receiver,
+member, đích nhảy và trạng thái native/control-flow. `runtime/diagnostic.h` dùng
+`detectRuntimeDiagnostic()` để tự suy ra loại lỗi từ các dữ kiện đó rồi catalog tạo phần
+`Điều đã xảy ra` và `Cách sửa`. CLI không xuất mã lỗi; chi tiết phân loại chỉ tồn tại nội bộ để
+kiểm thử và mở rộng cơ chế chẩn đoán. Catalog hiện bao phủ số học, kiểu dữ liệu, truy cập phần
+tử, chuyển kiểu, gọi hàm, mô đun, object model, quyền truy cập, closure, control-flow, literal,
+constant pool, native operation và lỗi nội bộ runtime.
 
 Các bước trên dùng IR không kiểu theo type policy động đã chốt cho 1.0. Typed IR hoặc
 static/gradual checker nếu bổ sung sau này là lớp tính năng mới; Expression AST, scope và name

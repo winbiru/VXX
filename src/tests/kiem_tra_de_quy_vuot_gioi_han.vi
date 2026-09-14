@@ -1,0 +1,9 @@
+// Regression cho giới hạn call depth của runtime. Chương trình cố ý đệ quy vô
+// hạn; VM phải dừng bằng lỗi CallBoundary có kiểm soát thay vì tràn C++ stack.
+hàm điSâu(n) {
+    trả về điSâu(n + 1);
+}
+
+hàm main() {
+    in điSâu(0);
+}

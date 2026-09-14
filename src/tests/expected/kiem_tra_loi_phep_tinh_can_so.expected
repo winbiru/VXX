@@ -1,0 +1,5 @@
+Lỗi: toán tử số chỉ áp dụng cho số
+Điều đã xảy ra: Phép tính này cần số ở cả hai bên, nhưng ít nhất một giá trị hiện tại không phải là số.
+Cách sửa: Hãy kiểm tra hai giá trị trong phép tính và đổi giá trị không phải số thành số trước khi tính.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_phep_tinh_can_so.vi:3:8) [mô đun=src/tests/kiem_tra_loi_phep_tinh_can_so.vi]

@@ -64,6 +64,24 @@ hàm ápDụng(f, value) {
     trả về f(value);
 }
 
+// Tạo chuỗi child VM đủ sâu để smoke test phát hiện lỗi truyền call-depth/root
+// giữa các lời gọi lồng nhau, nhưng vẫn nằm dưới giới hạn an toàn của runtime.
+hàm đệQuySâu(n) {
+    nếu (n <= 0) {
+        trả về 0;
+    }
+    trả về đệQuySâu(n - 1) + 1;
+}
+
+// Ném lỗi ở đáy chuỗi lời gọi để kiểm tra unwind qua nhiều child VM trước khi
+// `thử/bắt lỗi` ở caller nhận lại đúng giá trị lỗi ban đầu.
+hàm némLỗiSâu(n) {
+    nếu (n <= 0) {
+        ném "lỗi sâu";
+    }
+    trả về némLỗiSâu(n - 1);
+}
+
 hàm main() {
     bộĐếm = BộĐếm(10, 2);
     mặcĐịnh = BộĐếm(20);
@@ -97,6 +115,14 @@ hàm main() {
 
     thử {
         ném "lỗi smoke";
+    } bắt lỗi (e) {
+        in e;
+    }
+
+    in đệQuySâu(64);
+
+    thử {
+        némLỗiSâu(32);
     } bắt lỗi (e) {
         in e;
     }

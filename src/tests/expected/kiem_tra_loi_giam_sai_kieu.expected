@@ -1,0 +1,5 @@
+Lỗi: giá trị không phải số nguyên
+Điều đã xảy ra: Chương trình đang giảm 1 trên một giá trị thuộc loại 'chuỗi', loại này không thể giảm như một con số.
+Cách sửa: Hãy dùng -- với giá trị số hoặc chuyển dữ liệu sang số trước khi giảm.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_giam_sai_kieu.vi:4:5) [mô đun=src/tests/kiem_tra_loi_giam_sai_kieu.vi]

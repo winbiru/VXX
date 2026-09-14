@@ -25,6 +25,7 @@ struct CompilationArtifacts {
     OptimizationReport optimization;
     std::size_t unsupportedDirectIrRegions = 0;
     std::vector<Instruction> bytecode;
+    std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
 };
 
 // Sở hữu trạng thái registry cùng thông tin phân giải import cho một pipeline; truyền context riêng giúp nhiều lần biên dịch không rò global state.

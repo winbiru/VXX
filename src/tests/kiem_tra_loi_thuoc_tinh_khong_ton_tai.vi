@@ -1,0 +1,11 @@
+// Đọc một thuộc tính chưa tồn tại trên đối tượng hợp lệ.
+lớp HocSinh {
+    hàm chao() {
+        trả về "xin chao";
+    }
+};
+
+hàm main() {
+    ban = HocSinh();
+    in ban.ten;
+};

@@ -27,8 +27,25 @@ Nếu không còn handler V++, runtime phát `LanguageException` ra host với d
 
 Lỗi như chia cho 0, opcode/operand sai, truy cập index ngoài phạm vi, lỗi native hoặc vi phạm
 invariant runtime là lỗi fatal của lần chạy hiện tại. Chúng dùng `RuntimeError` với
-`RuntimeErrorKind::VmFault`. Khi lỗi gắn với opcode, message giữ tên lệnh và program counter
-để CLI/test có thể xác định vị trí bytecode.
+`RuntimeErrorKind::VmFault`. Chi tiết opcode và program counter là thông tin nội bộ của VM;
+người viết V++ nhận vị trí file/dòng/cột từ dấu vết lỗi thay vì phải hiểu bytecode.
+
+Chẩn đoán runtime dùng `RuntimeDiagnosticContext` để thu các dữ kiện thực tế mà VM đang thấy:
+opcode đang chạy, toán hạng, kiểu giá trị, chỉ số và kích thước tập hợp, kết quả tra hàm/lớp,
+số đối số, độ sâu lời gọi, receiver/member, đích nhảy, trạng thái control-flow và lỗi từ native.
+Nơi phát sinh lỗi không chọn sẵn `DivisionByZero`, `PropertyNotFound` hay một mã lỗi cụ thể.
+`detectRuntimeDiagnostic()` suy ra loại lỗi từ các dữ kiện này rồi catalog tạo phần `Điều đã
+xảy ra` và `Cách sửa`. Cơ chế không phân tích chuỗi `what()` để đoán lỗi.
+
+Mã phân loại chỉ là chi tiết nội bộ phục vụ kiểm thử và mở rộng catalog; CLI không xuất mã lỗi
+cho người dùng. Thông báo tập trung vào biểu hiện thực tế, nguyên nhân dễ hiểu, vị trí nguồn và
+cách sửa.
+
+Thông báo hướng tới người mới học lập trình: nói cụ thể chương trình đang làm gì, vì sao thao
+tác đó không thể tiếp tục và người dùng cần thay đổi gì. Ví dụ chia `10 / 0` phải nói rõ đang
+lấy `10` chia cho `0`, số chia bằng `0`, rồi hướng dẫn kiểm tra số chia trước khi thực hiện phép
+chia. Các thuật ngữ nội bộ như opcode, program counter hoặc stack slot không xuất hiện trong
+phần giải thích dành cho người dùng.
 
 Trong V++ 1.0, `bắt lỗi` chỉ bắt giá trị sinh bởi `ném`; nó không bắt `RuntimeError`. Một
 `RuntimeError` dừng lần `run()` hiện tại. Caller host không được resume VM từ program counter
@@ -50,11 +67,34 @@ khởi tạo lại module đã failed phát `RuntimeErrorKind::ModuleInitializat
 chạy initializer lần hai trong cùng VM. Lỗi gốc phát sinh bên trong initializer vẫn được truyền
 lên sau khi trạng thái module đã được đánh dấu failed.
 
+## Phạm vi kiểm thử bằng mã nguồn `.vi`
+
+Các lỗi mà người viết V++ có thể tạo trực tiếp từ mã nguồn đều có regression `.vi` riêng.
+Bộ hiện tại bao phủ chia cho 0, chia dư cho 0, yêu cầu số nguyên, phép toán cần số, so
+sánh khác kiểu, sai kiểu/vượt biên chỉ số, dữ liệu không thể đánh chỉ số, hàm không tồn
+tại, gọi giá trị không phải hàm, sai số lượng đối số, đệ quy quá sâu, receiver không phải
+đối tượng, thuộc tính/phương thức không tồn tại, quyền truy cập, `++`/`--` sai kiểu, chuyển
+số thực thất bại và thao tác native thất bại.
+
+Một số diagnostic chỉ có thể xuất hiện khi bytecode hoặc trạng thái nội bộ VM bị hỏng, nên
+không thể tạo trung thực bằng một file `.vi` hợp lệ: thiếu toán hạng trên VM stack, tham chiếu
+bảng hằng hỏng, literal đã mã hóa hỏng, closure capture hỏng, jump target hỏng, trạng thái
+control-flow bất khả thi, lớp runtime bị mất sau compile, thiếu tham số sau khi arity check đã
+qua, module đã ở trạng thái failed rồi bị chạy lại, và invariant nội bộ VM. Các trường hợp này
+được khóa bằng `test/vm_handler_tests.cpp`, nơi tạo trực tiếp dữ kiện runtime tương ứng.
+
 ## Regression
 
 - `src/tests/kiem_tra_ngoai_le.vi`: bắt lỗi cục bộ cơ bản.
 - `src/tests/kiem_tra_ngoai_le_xuyen_ham.vi`: exception xuyên function boundary, catch gần
   nhất, rethrow và tiếp tục chạy sau catch.
 - `test/vm_handler_tests.cpp`: unwind data/control stack, typed fatal runtime error và cleanup
-  call frame.
+  call frame; đồng thời khóa khoảng 30 trường hợp suy luận từ dữ kiện thực thi và bảo đảm CLI
+  không xuất `Mã lỗi:`.
+- `src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi`: tự phát hiện chỉ số vượt kích thước thật.
+- `src/tests/kiem_tra_loi_kieu_chi_so.vi`: tự phát hiện giá trị dùng làm chỉ số không phải số nguyên.
+- `src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi`: tự phát hiện method lookup thất bại.
 - `test/vm_opcode_smoke_tests.cpp`: uncaught exception và các runtime fault opcode cơ bản.
+- `src/tests/kiem_tra_stack_trace.vi`: lỗi số học kèm giá trị thật và dấu vết file/dòng/cột.
+- `src/tests/kiem_tra_de_quy_vuot_gioi_han.vi`: lỗi đệ quy quá sâu với diễn giải nguyên nhân và
+  hướng sửa cho người mới học.

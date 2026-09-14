@@ -1,0 +1,15 @@
+// Đi qua hàm giữ kiểu động để quyền riêng tư được kiểm tra thật sự tại runtime.
+hàm giữ(v) {
+    trả về v;
+}
+
+lớp Hop {
+    hàm riêng tư bíMat() {
+        trả về 42;
+    }
+};
+
+hàm main() {
+    hop = giữ(Hop());
+    in hop.bíMat();
+};

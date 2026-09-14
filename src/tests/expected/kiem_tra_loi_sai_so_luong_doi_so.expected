@@ -1,0 +1,5 @@
+Lỗi: lời gọi '1' nhận 1 đối số nhưng yêu cầu từ 2 đến 2
+Điều đã xảy ra: Hàm '1' được gọi với 1 giá trị, trong khi hàm này nhận từ 2 đến 2 giá trị.
+Cách sửa: Hãy thêm hoặc bớt giá trị khi gọi hàm để khớp với phần khai báo của hàm.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_sai_so_luong_doi_so.vi:6:8) [mô đun=src/tests/kiem_tra_loi_sai_so_luong_doi_so.vi]
