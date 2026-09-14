@@ -101,13 +101,25 @@ public:
     std::size_t tryDepth() const { return vm_.tryStack.size(); }
 
     // Thực thi lời gọi; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
-    void executeCall(const Instruction &instruction) { vm_.executeCallOpcode(instruction); }
+    void executeCall(const Instruction &instruction) {
+        const std::size_t executionDepth = vm_.executionStack.size();
+        vm_.executeCallOpcode(instruction);
+        if (vm_.executionStack.size() > executionDepth) {
+            vm_.runInterpreterLoop(executionDepth);
+        }
+    }
     // Thực thi giá trị; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
     void executeValue(const Instruction &instruction) { vm_.executeValueOpcode(instruction); }
     // Thực thi chỉ số; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
     void executeIndex(const Instruction &instruction) { vm_.executeIndexOpcode(instruction); }
     // Thực thi đối tượng; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
-    void executeObject(const Instruction &instruction) { vm_.executeObjectOpcode(instruction); }
+    void executeObject(const Instruction &instruction) {
+        const std::size_t executionDepth = vm_.executionStack.size();
+        vm_.executeObjectOpcode(instruction);
+        if (vm_.executionStack.size() > executionDepth) {
+            vm_.runInterpreterLoop(executionDepth);
+        }
+    }
     // Thực thi variable; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
     void executeVariable(const Instruction &instruction) { vm_.executeVariableOpcode(instruction); }
     // Thực thi khối chọn; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
