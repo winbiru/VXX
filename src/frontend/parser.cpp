@@ -910,6 +910,10 @@ AstStatement Parser::parseStatement(bool insideBlock) {
 AstStatementKind Parser::classify(std::size_t begin) const noexcept {
     if (begin >= tokens_.size()) return AstStatementKind::Unknown;
     const std::string &lexeme = tokens_[begin].lexeme;
+    if (lexeme == "công khai" && begin + 1 < tokens_.size() &&
+        tokens_[begin + 1].lexeme == "nhập") {
+        return AstStatementKind::Import;
+    }
     if (lexeme == ";") return AstStatementKind::Empty;
     if (lexeme == "{") return AstStatementKind::Block;
     if (lexeme == "nhập") return AstStatementKind::Import;
@@ -1037,13 +1041,21 @@ void Parser::attachImportForm(AstStatement &statement) {
     const std::size_t begin = statement.tokenBegin;
     const std::size_t end = statement.tokenEnd;
     if (begin + 2 >= end || end > tokens_.size() ||
-        tokens_[begin].lexeme != "nhập" || tokens_[end - 1].lexeme != ";") {
+        tokens_[end - 1].lexeme != ";") {
         return;
     }
 
     AstImportSpec spec;
     spec.hasSemicolon = true;
-    std::size_t cursor = begin + 1;
+    std::size_t cursor = begin;
+    if (tokens_[cursor].lexeme == "công khai") {
+        statement.visibility = AstVisibility::Public;
+        spec.reExport = true;
+        ++cursor;
+    }
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != "nhập") return;
+    ++cursor;
+    if (cursor >= end - 1) return;
     if (tokens_[cursor].kind == TokenKind::String) {
         const std::string &spelling = tokens_[cursor].lexeme;
         if (spelling.size() < 2 ||

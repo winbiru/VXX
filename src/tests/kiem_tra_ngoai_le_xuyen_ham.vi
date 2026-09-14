@@ -1,0 +1,30 @@
+// Khóa contract exception 1.0: ném đi xuyên function boundary, bắt gần nhất và rethrow.
+
+hàm nem_sau() {
+    nếu (đúng) {
+        ném "loi-sau";
+    };
+}
+
+hàm goi_giua() {
+    nem_sau();
+    in "khong-duoc-in";
+}
+
+hàm bat_va_nem_lai() {
+    thử {
+        goi_giua();
+    } bắt lỗi (e) {
+        in "bat-trong:" + e;
+        ném e + "-lai";
+    }
+}
+
+hàm main() {
+    thử {
+        bat_va_nem_lai();
+    } bắt lỗi (e) {
+        in "bat-ngoai:" + e;
+    }
+    in "sau-bat";
+}

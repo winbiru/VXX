@@ -1,34 +1,51 @@
 nhập src/tests/fixtures/api_project/database.vi;
 nhập src/tests/fixtures/api_project/controller.vi;
+nhập src/tests/fixtures/api_project/repository.vi;
+nhập src/tests/fixtures/api_project/mapper.vi;
+nhập src/tests/fixtures/api_project/service.vi;
 nhập "gói/ứng dụng/cầu nối/api.vi";
 
 lớp công khai ApiDbProjectTest {
+    // Nhận controller đã ghép đủ dependency để test không tự tạo tầng nghiệp vụ.
+    hàm khởi tạo(controller) {
+        mình.controller = controller;
+    };
+
+    // Chạy toàn bộ CRUD/search qua một controller instance xuyên suốt vòng đời test.
     hàm công khai runAll() {
+        controller = mình.controller;
         dbSession = "OPEN";
 
         connectRes = db connect("");
         in app json db bootstrap(connectRes);
 
-        AdminRestController.getUsers(dbSession, "Bearer demo-token", "db-req-001");
-        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
-        AdminRestController.createUser(dbSession, "Bearer demo-token", "{\"name\":\"An\"}", "db-req-002");
-        AdminRestController.updateUser(dbSession, "Bearer demo-token", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
-        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-003a");
-        AdminRestController.deleteUser(dbSession, "Bearer demo-token", "12", "db-req-004");
-        AdminRestController.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-004a");
-        AdminRestController.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-001");
+        controller.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
+        controller.createUser(dbSession, "Bearer demo-token", "{\"name\":\"An\"}", "db-req-002");
+        controller.updateUser(dbSession, "Bearer demo-token", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-003a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "12", "db-req-004");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-004a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
 
         disconnectRes = db disconnect();
         in app json db shutdown(disconnectRes);
         dbSession = "CLOSED";
 
         // verify API behavior when DB is disconnected
-        AdminRestController.getUsers(dbSession, "Bearer demo-token", "db-req-006");
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-006");
 
         trả về 0;
     };
 };
 
 hàm main() {
-    ApiDbProjectTest.runAll();
+    // Composition root của fixture: tạo object graph một lần rồi inject từ ngoài vào.
+    repository = UserRepository();
+    mapper = UserMapper();
+    service = UserService(repository, mapper);
+    responseEntity = ResponseEntity();
+    controller = AdminRestController(service, responseEntity);
+    test = ApiDbProjectTest(controller);
+    test.runAll();
 };

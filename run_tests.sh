@@ -196,6 +196,7 @@ TESTS=(
   src/tests/kiem_tra_de_quy.vi
   src/tests/kiem_tra_file_dem.vi
   src/tests/kiem_tra_ngoai_le.vi
+  src/tests/kiem_tra_ngoai_le_xuyen_ham.vi
   src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi
   src/tests/kiem_tra_dieu_kien_phu_dinh.vi
   src/tests/kiem_tra_ham.vi
@@ -215,6 +216,7 @@ TESTS=(
   src/tests/kiem_tra_module_lifecycle.vi
   src/tests/kiem_tra_module_khoi_tao_mot_lan.vi
   src/tests/kiem_tra_module_alias_lifecycle.vi
+  src/tests/kiem_tra_module_reexport.vi
   src/tests/kiem_tra_package_modules.vi
   src/tests/kiem_tra_package_tieng_viet.vi
   src/tests/kiem_tra_stdlib.vi
@@ -236,6 +238,7 @@ TESTS=(
   src/tests/kiem_tra_goi_dung.vi
   src/tests/kiem_tra_nhat_ky.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
+  src/tests/kiem_tra_closure_capture.vi
   src/tests/kiem_tra_list_literal.vi
   src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
@@ -249,6 +252,8 @@ TESTS=(
   src/tests/kiem_tra_receiver_minh_de_quy.vi
   src/tests/kiem_tra_ke_thua.vi
   src/tests/kiem_tra_giao_dien_trien_khai.vi
+  src/tests/kiem_tra_semantics_gia_tri.vi
+  src/tests/kiem_tra_kieu_dong_call_boundary.vi
   src/tests/kiem_tra_hoi_quy_tong_hop.vi
   src/tests/kiem_tra_cu_phap_modifier_cu.vi
   src/tests/kiem_tra_tra_ve.vi

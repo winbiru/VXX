@@ -36,6 +36,8 @@ public:
     void track(const ClassHandle &value);
     // Đăng ký instance runtime để GC có thể lần theo class và toàn bộ field của object.
     void track(const InstanceHandle &value);
+    // Đăng ký closure để GC có thể lần theo các capture cell và cắt cycle closure ↔ cell khi không còn root.
+    void track(const ClosureHandle &value);
 
     // Đăng ký toàn bộ object graph đang nằm dưới một StackValue; helper này dùng
     // khi VM nhận giá trị được tạo ngoài active heap scope hoặc khi test dựng graph tay.
@@ -54,6 +56,7 @@ private:
     std::vector<std::weak_ptr<TupleValue>> tuples_;
     std::vector<std::weak_ptr<RuntimeClass>> classes_;
     std::vector<std::weak_ptr<RuntimeInstance>> instances_;
+    std::vector<std::weak_ptr<RuntimeClosure>> closures_;
 };
 
 // Gắn một heap làm đích đăng ký allocation trên thread hiện tại trong thời gian
@@ -77,5 +80,6 @@ void trackRuntimeAllocation(const ListHandle &value);
 void trackRuntimeAllocation(const TupleHandle &value);
 void trackRuntimeAllocation(const ClassHandle &value);
 void trackRuntimeAllocation(const InstanceHandle &value);
+void trackRuntimeAllocation(const ClosureHandle &value);
 
 } // namespace vietvm::runtime

@@ -1013,12 +1013,9 @@ void testDirectLambdaAndIndirectCallsMatchLegacyState() {
 }
 
 void testUnsupportedLambdaShapesAreRejected() {
-    expectRejectsUnsupportedDirectIr(
-        "hàm outer(x) { f = hàm() { trả về x; }; trả về f; }",
-        "a lambda capturing an outer parameter is rejected by direct IR");
-    expectRejectsUnsupportedDirectIr(
+    expectDirectCompilationStable(
         "outer = hàm() { inner = hàm() { trả về 1; }; trả về inner; };",
-        "nested lambda allocation is rejected by direct IR in the first cohort");
+        "nested lambda allocation is supported by structured direct IR");
     expectRejectsUnsupportedDirectIr(
         "hàm x() { trả về 1; } f = hàm(x) { trả về x; };",
         "lambda parameters colliding with named functions are rejected until direct IR defines lookup semantics");
@@ -1035,6 +1032,23 @@ void testUnsupportedLambdaShapesAreRejected() {
     expectDirectCompilationStable(
         "f = hàm(x = \"a,b\") { trả về x; };",
         "a comma inside a lambda string default uses shared parameter splitting");
+}
+
+void testCapturedLambdaEmitsRuntimeClosure() {
+    const CompilerState state = compileState(
+        "hàm outer(x) { f = hàm() { x += 1; trả về x; }; x = 10; trả về f; }");
+
+    bool sawClosure = false;
+    for (const auto &function : state.functions) {
+        for (const Instruction &instruction : function.second) {
+            if (instruction.op == OP_TAO_DONG_BAO && instruction.operandIndex == 1) {
+                sawClosure = true;
+            }
+        }
+    }
+    expect(sawClosure,
+           "a lambda capturing an outer value emits a runtime closure with one shared cell");
+    vietvm::compiler::resetCompilationState();
 }
 
 void testPrimitiveMapUsesDirectIrAndLegacyEncoding() {
@@ -1213,6 +1227,7 @@ int main() {
     testFunctionDefaultsUseDirectIr();
     testFunctionParameterCollisionIsRejectedByDirectIr();
     testDirectLambdaAndIndirectCallsMatchLegacyState();
+    testCapturedLambdaEmitsRuntimeClosure();
     testUnsupportedLambdaShapesAreRejected();
     testPrimitiveMapUsesDirectIrAndLegacyEncoding();
     testPrimitiveListUsesDirectIrAndLegacyEncoding();

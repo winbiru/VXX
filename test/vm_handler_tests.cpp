@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "common/vm_native_stdlib_helpers.h"
+#include "vpp/runtime/error.h"
 #include "vpp/runtime/object.h"
 #include "vpp/runtime/vm_fixture.h"
 
@@ -143,15 +144,25 @@ void testSwitchAndBlockHandlerState() {
 }
 
 void testExceptionHandlerState() {
-    VM vm(std::vector<Instruction>(5, instruction(OP_DONG_LENH)), {});
+    VM vm(std::vector<Instruction>(10, instruction(OP_DONG_LENH)), {});
     VMRuntimeFixture access(vm);
-    access.executeException(instruction(OP_THU, 4, 1, 0));
+    access.executeBlock(instruction(OP_MO_KHOI));
+    access.executeException(instruction(OP_THU, 8, 1, 0));
     expect(access.tryDepth() == 1, "exception handler", "OP_THU must push a try frame");
+
+    // State created after entering `thử` must be removed before control reaches catch.
+    access.executeBlock(instruction(OP_MO_KHOI));
+    access.push(make_int_value(2));
+    access.executeSwitch(instruction(OP_CHON));
+    expect(access.blockDepth() == 2 && access.switchDepth() == 1,
+           "exception handler", "nested control state must exist before throw");
 
     access.push(make_string_value("boom"));
     const bool jumped = access.executeException(instruction(OP_NEM));
     expect(jumped, "exception handler", "OP_NEM with a handler must jump to catch");
-    expect(access.pc() == 4, "exception handler", "throw must set pc to catch address");
+    expect(access.pc() == 8, "exception handler", "throw must set pc to catch address");
+    expect(access.blockDepth() == 1 && access.blockStackDepth() == 1 && access.switchDepth() == 0,
+           "exception handler", "throw must restore block/switch state captured by try");
     expect(asString(access.top(), "exception handler") == "boom",
            "exception handler", "thrown value must survive stack unwind");
 
@@ -159,6 +170,52 @@ void testExceptionHandlerState() {
     expect(access.hasVariable(1), "exception handler", "catch must bind the error variable");
     expect(asString(access.variable(1), "exception handler") == "boom",
            "exception handler", "catch variable must contain thrown value");
+}
+
+void testFatalRuntimeErrorUnwindsCallFrame() {
+    VM vm({}, {});
+    vm.hamBytecodeMap.emplace(12, std::vector<Instruction>{
+        instruction(OP_BIEN_SO, 1),
+        instruction(OP_BIEN_SO, 0),
+        instruction(OP_CHIA),
+        instruction(OP_TRA_VE),
+    });
+    VMRuntimeFixture access(vm);
+
+    bool sawTypedRuntimeError = false;
+    try {
+        access.executeCall(instruction(OP_GOI, 0, 12, 0));
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawTypedRuntimeError = error.kind() == vietvm::runtime::RuntimeErrorKind::VmFault;
+    }
+    expect(sawTypedRuntimeError, "runtime error contract",
+           "fatal VM faults must propagate as typed RuntimeError");
+    expect(access.callDepth() == 0, "runtime error contract",
+           "failed child VM calls must unwind the caller call frame");
+}
+
+void testCallBoundaryArityRuntimeError() {
+    VM vm({}, {"i:2"});
+    vm.hamBytecodeMap.emplace(21, std::vector<Instruction>{
+        instruction(OP_KHOI_TAO, 0, 0, 0),
+        instruction(OP_PARAM, 0, 0, 0),
+        instruction(OP_KHOI_TAO, 0, 1, 0),
+        instruction(OP_PARAM_MAC_DINH, 0, 1, 1),
+        instruction(OP_TEN_BIEN_GIA_TRI, 0, 0, 0),
+        instruction(OP_TRA_VE),
+    });
+    VMRuntimeFixture access(vm);
+
+    bool sawCallBoundary = false;
+    try {
+        access.executeCall(instruction(OP_GOI, 0, 21, 0));
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawCallBoundary = error.kind() == vietvm::runtime::RuntimeErrorKind::CallBoundary;
+    }
+    expect(sawCallBoundary, "call boundary arity",
+           "runtime calls with missing required arguments must raise CallBoundary");
+    expect(access.callDepth() == 0, "call boundary arity",
+           "arity failure must unwind the temporary caller frame");
 }
 
 void testLoopControlHandlerState() {
@@ -249,6 +306,16 @@ void testRuntimeModuleInitializationRunsOnce() {
     expect(failed && failing.moduleState("module://broken") ==
                          vietvm::runtime::ModuleState::Failed,
            "module runtime", "initializer exception permanently records failed state");
+
+    bool sawModuleFailureKind = false;
+    try {
+        failing.run();
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        sawModuleFailureKind =
+            error.kind() == vietvm::runtime::RuntimeErrorKind::ModuleInitialization;
+    }
+    expect(sawModuleFailureKind, "module runtime",
+           "rerunning a failed module must report typed module-initialization failure");
 }
 
 void testObjectHandlerState() {
@@ -397,6 +464,8 @@ int main() {
     testBranchHandlerState();
     testSwitchAndBlockHandlerState();
     testExceptionHandlerState();
+    testFatalRuntimeErrorUnwindsCallFrame();
+    testCallBoundaryArityRuntimeError();
     testLoopControlHandlerState();
     testOutputHandlerUsesSink();
     testFilesystemPredicatesTreatMissingPathAsFalse();

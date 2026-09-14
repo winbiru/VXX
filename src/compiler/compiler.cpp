@@ -76,14 +76,13 @@ CompilationArtifacts compilePipelineInRegistry(
         namespace fs = std::filesystem;
         fs::path resolutionBase = state.importResolutionBase;
         if (resolutionBase.empty()) resolutionBase = fs::current_path();
-        constexpr std::string_view kEntryIdentity = "entry://current-compilation";
         artifacts.moduleIndex = buildLocalModuleSemanticIndex(
             LocalModuleResolver(resolutionBase),
-            std::string(kEntryIdentity),
+            std::string(kCurrentCompilationModuleIdentity),
             localImports,
-            ModuleIndexMode::DirectOnly);
+            ModuleIndexMode::Recursive);
         semanticEnvironment = artifacts.moduleIndex->semanticEnvironmentFor(
-            kEntryIdentity);
+            kCurrentCompilationModuleIdentity);
     }
     artifacts.semantic = analyzeSemantics(
         artifacts.ast, semanticEnvironment, ResolutionPolicy::PreserveLegacy);

@@ -100,6 +100,7 @@ std::string runtimeTypeName(const StackValue &value) {
     if (std::holds_alternative<TupleHandle>(value)) return "tuple";
     if (std::holds_alternative<ClassHandle>(value)) return "lớp";
     if (std::holds_alternative<InstanceHandle>(value)) return "đối tượng";
+    if (std::holds_alternative<ClosureHandle>(value)) return "hàm";
     return "không rõ";
 }
 

@@ -181,6 +181,7 @@ public:
         addExternalSymbols();
         buildStatementList(program_.statements, model_.globalScope, kInvalidSymbolId);
         validateClassInheritance();
+        validateMethodOverrides();
         validateInterfaceInheritance();
         validateInterfaceContracts();
         declareExpressionVariables(program_.statements);
@@ -329,7 +330,14 @@ private:
         if (symbol == kInvalidSymbolId || !inserted) return kInvalidSymbolId;
 
         if (isFunction) {
-            model_.symbols[symbol].parameterCount = statement.parameters.size();
+            SemanticSymbol &callable = model_.symbols[symbol];
+            callable.parameterCount = statement.parameters.size();
+            callable.minimumArgumentCount = 0;
+            for (std::size_t index = 0; index < statement.parameters.size(); ++index) {
+                if (!statement.parameters[index].hasDefault) {
+                    callable.minimumArgumentCount = index + 1;
+                }
+            }
         }
 
         const ScopeKind scopeKind = isClass
@@ -653,6 +661,100 @@ private:
         };
         for (const SemanticSymbol &symbol : model_.symbols) {
             if (symbol.kind == SemanticSymbolKind::Class) visit(visit, symbol.id);
+        }
+    }
+
+    // Trả mức độ mở của visibility để kiểm tra override. `Unspecified` ở semantic
+    // hiện có hành vi public khi truy cập, nên được xếp cùng mức với `Public`.
+    static int overrideVisibilityRank(SemanticVisibility visibility) noexcept {
+        switch (visibility) {
+            case SemanticVisibility::Private: return 0;
+            case SemanticVisibility::Protected: return 1;
+            case SemanticVisibility::Public:
+            case SemanticVisibility::Unspecified: return 2;
+        }
+        return 2;
+    }
+
+    // Tìm method cùng tên gần nhất trong chuỗi lớp cha có thể tham gia override.
+    // Method private thuộc riêng lớp khai báo nên bị bỏ qua; constructor `khởi tạo`
+    // có lifecycle riêng và không tham gia override giữa lớp cha/con.
+    SymbolId lookupOverriddenMethod(SymbolId classSymbol,
+                                    const std::string &memberName) const noexcept {
+        if (memberName == "khởi tạo" || classSymbol == kInvalidSymbolId ||
+            classSymbol >= model_.symbols.size()) {
+            return kInvalidSymbolId;
+        }
+
+        std::unordered_set<SymbolId> visited;
+        for (SymbolId current = model_.symbols[classSymbol].superclass;
+             current != kInvalidSymbolId && visited.insert(current).second;) {
+            if (current >= model_.symbols.size()) return kInvalidSymbolId;
+            const ScopeId memberScope = model_.symbols[current].memberScope;
+            if (memberScope != kInvalidScopeId && memberScope < bindings_.size()) {
+                const SymbolId member = symbolInScope(
+                    memberScope, SymbolSpace::Value, memberName);
+                if (member != kInvalidSymbolId && member < model_.symbols.size() &&
+                    model_.symbols[member].kind == SemanticSymbolKind::Method &&
+                    model_.symbols[member].visibility != SemanticVisibility::Private) {
+                    return member;
+                }
+            }
+            current = model_.symbols[current].superclass;
+        }
+        return kInvalidSymbolId;
+    }
+
+    // Khóa contract override của 1.0: cùng tên trong lớp con là override nếu tìm
+    // thấy method không-private ở ancestor; override phải giữ nguyên arity và không
+    // được thu hẹp visibility. Constructor không phải override và được kiểm tra theo
+    // contract constructor riêng.
+    void validateMethodOverrides() {
+        for (const SemanticSymbol &klass : model_.symbols) {
+            if (klass.kind != SemanticSymbolKind::Class ||
+                klass.memberScope == kInvalidScopeId ||
+                klass.memberScope >= model_.scopes.size()) {
+                continue;
+            }
+
+            for (SymbolId declaration : model_.scopes[klass.memberScope].declarations) {
+                if (declaration >= model_.symbols.size()) continue;
+                const SemanticSymbol &method = model_.symbols[declaration];
+                if (method.kind != SemanticSymbolKind::Method ||
+                    method.lookupName == "khởi tạo") {
+                    continue;
+                }
+
+                const SymbolId overriddenId =
+                    lookupOverriddenMethod(klass.id, method.lookupName);
+                if (overriddenId == kInvalidSymbolId) continue;
+                const SemanticSymbol &overridden = model_.symbols[overriddenId];
+
+                if (method.parameterCount != overridden.parameterCount) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticOverrideArityMismatch,
+                            {method.lookupName, klass.lookupName,
+                             std::to_string(method.parameterCount),
+                             model_.symbols[overridden.ownerClass].lookupName,
+                             std::to_string(overridden.parameterCount)}),
+                        method.declaration,
+                    });
+                }
+
+                if (overrideVisibilityRank(method.visibility) <
+                    overrideVisibilityRank(overridden.visibility)) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticOverrideVisibilityNarrowing,
+                            {method.lookupName, klass.lookupName,
+                             model_.symbols[overridden.ownerClass].lookupName}),
+                        method.declaration,
+                    });
+                }
+            }
         }
     }
 
@@ -1092,7 +1194,10 @@ private:
         if (expression->kind == AstExpressionKind::Name &&
             id < model_.expressionBindings.size()) {
             const BindingResult &binding = model_.expressionBindings[id];
-            if (binding.symbol != kInvalidSymbolId &&
+            // Chỉ alias trực tiếp của một symbol mới kế thừa inferred class. Member/field
+            // là động trong V++ 1.0; `x = mình.field` không đủ dữ liệu để suy ra lớp của x.
+            if (binding.kind == BindingKind::Symbol &&
+                binding.symbol != kInvalidSymbolId &&
                 binding.symbol < model_.symbols.size()) {
                 return model_.symbols[binding.symbol].inferredClass;
             }
@@ -1196,9 +1301,41 @@ private:
             if (callableUse && isKnownNative(expression.text)) {
                 binding.kind = BindingKind::NativeCallable;
             } else if (callableUse && policy_ == ResolutionPolicy::PreserveLegacy) {
-                binding.kind = BindingKind::DynamicName;
+                const auto hidden = std::find_if(
+                    environment_.hiddenImportedSymbols.begin(),
+                    environment_.hiddenImportedSymbols.end(),
+                    [&](const SemanticHiddenImportedSymbol &symbol) {
+                        return symbol.name == expression.text;
+                    });
+                if (hidden != environment_.hiddenImportedSymbols.end()) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticModuleSymbolNotExported,
+                            {expression.text, hidden->moduleIdentity}),
+                        expression.span,
+                    });
+                } else {
+                    binding.kind = BindingKind::DynamicName;
+                }
             } else if (!callableUse && policy_ == ResolutionPolicy::PreserveLegacy) {
-                binding.kind = BindingKind::LegacyImplicitValue;
+                const auto hidden = std::find_if(
+                    environment_.hiddenImportedSymbols.begin(),
+                    environment_.hiddenImportedSymbols.end(),
+                    [&](const SemanticHiddenImportedSymbol &symbol) {
+                        return symbol.name == expression.text;
+                    });
+                if (hidden != environment_.hiddenImportedSymbols.end()) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticModuleSymbolNotExported,
+                            {expression.text, hidden->moduleIdentity}),
+                        expression.span,
+                    });
+                } else {
+                    binding.kind = BindingKind::LegacyImplicitValue;
+                }
             } else {
                 const auto &definition = callableUse
                     ? vietvm::messages::kSemanticUnresolvedCall
@@ -1212,6 +1349,72 @@ private:
         }
         model_.expressionBindings[expression.id] = binding;
         return binding;
+    }
+
+    // Kiểm tra arity khi semantic biết chắc callable đích. V++ vẫn dynamic typing:
+    // kiểm tra này chỉ khóa call boundary về số đối số, không suy luận kiểu đối số.
+    void validateKnownCallArity(const AstExpression &call,
+                                const AstExpression *callee,
+                                const BindingResult &calleeBinding,
+                                const CallBinding &binding) {
+        const SemanticSymbol *callable = nullptr;
+        std::string displayName = callee == nullptr ? binding.runtimeName : callee->text;
+
+        if (binding.kind == CallTargetKind::DirectFunction &&
+            binding.symbol != kInvalidSymbolId && binding.symbol < model_.symbols.size()) {
+            const SemanticSymbol &candidate = model_.symbols[binding.symbol];
+            if (candidate.origin == SymbolOrigin::Source) callable = &candidate;
+        } else if (binding.kind == CallTargetKind::ClassConstructor &&
+                   binding.symbol != kInvalidSymbolId && binding.symbol < model_.symbols.size()) {
+            const SemanticSymbol &klass = model_.symbols[binding.symbol];
+            // Imported class symbols hiện chưa mang member/constructor metadata qua
+            // SemanticEnvironment; runtime linker sẽ kiểm tra arity sau khi resolve class.
+            if (klass.origin != SymbolOrigin::Source) return;
+            displayName = klass.lookupName;
+            const SymbolId constructor = klass.memberScope == kInvalidScopeId
+                ? kInvalidSymbolId
+                : symbolInScope(klass.memberScope, SymbolSpace::Value, "khởi tạo");
+            if (constructor == kInvalidSymbolId) {
+                if (!call.arguments.empty()) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticCallArityMismatch,
+                            {displayName, std::to_string(call.arguments.size()), "0", "0"}),
+                        call.span,
+                    });
+                }
+                return;
+            }
+            if (constructor < model_.symbols.size()) callable = &model_.symbols[constructor];
+        } else if (binding.kind == CallTargetKind::InstanceMethod &&
+                   calleeBinding.kind == BindingKind::InstanceMember &&
+                   calleeBinding.symbol != kInvalidSymbolId &&
+                   calleeBinding.symbol < model_.symbols.size()) {
+            SymbolId receiverClass = model_.symbols[calleeBinding.symbol].inferredClass;
+            if (calleeBinding.receiverName == "gốc" && receiverClass != kInvalidSymbolId &&
+                receiverClass < model_.symbols.size()) {
+                receiverClass = model_.symbols[receiverClass].superclass;
+            }
+            const SymbolId method = lookupMethodSymbol(receiverClass, calleeBinding.memberName);
+            if (method != kInvalidSymbolId && method < model_.symbols.size()) {
+                callable = &model_.symbols[method];
+                displayName = calleeBinding.memberName;
+            }
+        }
+
+        if (callable == nullptr || callable->origin != SymbolOrigin::Source) return;
+        const std::size_t actual = call.arguments.size();
+        if (actual >= callable->minimumArgumentCount && actual <= callable->parameterCount) return;
+        model_.diagnostics.push_back({
+            SemanticDiagnosticSeverity::Error,
+            vietvm::messages::messageText(
+                vietvm::messages::kSemanticCallArityMismatch,
+                {displayName, std::to_string(actual),
+                 std::to_string(callable->minimumArgumentCount),
+                 std::to_string(callable->parameterCount)}),
+            call.span,
+        });
     }
 
     // Ghi binding của call expression sau khi phân giải callee; hàm phân loại direct/imported/method/native/dynamic và lưu metadata dispatch.
@@ -1247,6 +1450,7 @@ private:
             }
         }
         model_.callBindings[call.id] = result;
+        validateKnownCallArity(call, callee, calleeBinding, result);
 
         if (callee != nullptr && callee->kind == AstExpressionKind::Name) {
             SemanticReference reference;

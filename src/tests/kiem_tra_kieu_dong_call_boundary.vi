@@ -1,0 +1,38 @@
+// Regression cho type policy động và call boundary hợp lệ của V++ 1.0.
+
+hàm giữ(v) {
+    trả về v;
+}
+
+hàm cộng(a, b = 2) {
+    trả về a + b;
+}
+
+lớp Hộp {
+    hàm khởi tạo(v = 1) {
+        mình.v = v;
+    }
+
+    hàm đặt(v) {
+        mình.v = v;
+    }
+
+    hàm lấy() {
+        trả về mình.v;
+    }
+};
+
+hàm main() {
+    giá_trị = 7;
+    in giữ(giá_trị);
+    giá_trị = "động";
+    in giữ(giá_trị);
+
+    in cộng(3);
+    in cộng(3, 4);
+
+    hộp = Hộp();
+    in hộp.lấy();
+    hộp.đặt("chuỗi");
+    in hộp.lấy();
+}

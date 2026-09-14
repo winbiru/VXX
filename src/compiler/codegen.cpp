@@ -380,25 +380,6 @@ bool containsLambdaValue(const IrProgram &program,
                          IrValueId id,
                          std::unordered_set<IrValueId> &visited);
 
-// Kiểm tra điều kiện của `containsLambdaInstruction`.
-bool containsLambdaInstruction(const IrProgram &program,
-                               const IrInstruction &instruction,
-                               std::unordered_set<IrValueId> &visited) {
-    for (const IrParameter &parameter : instruction.parameters) {
-        if (parameter.defaultValue != kInvalidIrValueId &&
-            containsLambdaValue(program, parameter.defaultValue, visited)) {
-            return true;
-        }
-    }
-    for (IrValueId root : instruction.expressionRoots) {
-        if (containsLambdaValue(program, root, visited)) return true;
-    }
-    for (const IrInstruction &child : instruction.children) {
-        if (containsLambdaInstruction(program, child, visited)) return true;
-    }
-    return false;
-}
-
 // Kiểm tra điều kiện của `containsLambdaValue`.
 bool containsLambdaValue(const IrProgram &program,
                          IrValueId id,
@@ -636,9 +617,15 @@ bool supportsValue(const IrProgram &program,
             if (lambda == nullptr || lambda->ownerValue != value->id ||
                 lambda->sourceExprId != value->sourceExprId ||
                 lambda->body.opcode != IrOpcode::Block ||
-                !lambda->captures.empty() ||
+                lambda->captures.size() != lambda->captureNames.size() ||
                 !hasExactLambdaSourceShape(sourceOwner, *value, *lambda)) {
                 break;
+            }
+
+            for (const std::string &captureName : lambda->captureNames) {
+                if (captureName.empty()) {
+                    return false;
+                }
             }
 
             supported = true;
@@ -672,10 +659,6 @@ bool supportsValue(const IrProgram &program,
                     supported = false;
                     break;
                 }
-            }
-            if (supported && containsLambdaInstruction(
-                                 program, lambda->body, nestedSearch)) {
-                supported = false;
             }
             if (supported) {
                 supported = supportsInstruction(
@@ -1302,6 +1285,24 @@ struct Emitter {
         }
     }
 
+    // Phát giá trị closure cho một lambda đã có function id; mỗi capture được mã hóa
+    // bằng slot id để VM liên kết tới shared cell của frame tại thời điểm tạo closure.
+    void emitLambdaReference(const IrLambda &lambda,
+                             int functionId,
+                             std::vector<Instruction> &output) {
+        if (lambda.captureNames.empty()) {
+            output.push_back({OP_BIEN_SO, functionId, 0, 0});
+            return;
+        }
+        for (const std::string &captureName : lambda.captureNames) {
+            output.push_back({OP_TEN_BIEN_ID, 0, slotFor(captureName), 0});
+        }
+        output.push_back({OP_TAO_DONG_BAO,
+                          functionId,
+                          static_cast<int>(lambda.captureNames.size()),
+                          0});
+    }
+
     // Phát một `IrValue` thành chuỗi opcode VM phù hợp; hàm xử lý literal, biến, thuộc tính, index, phép toán, lời gọi và lambda theo từng opcode IR.
     void emitValue(IrValueId id, std::vector<Instruction> &output) {
         const IrValue *value = program.value(id);
@@ -1596,7 +1597,7 @@ struct Emitter {
 
                 const auto existing = lambdaIds.find(value->lambdaId);
                 if (existing != lambdaIds.end()) {
-                    output.push_back({OP_BIEN_SO, existing->second, 0, 0});
+                    emitLambdaReference(*lambda, existing->second, output);
                     return;
                 }
 
@@ -1616,7 +1617,7 @@ struct Emitter {
                 functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
                 registry.functionBytecode[functionId] =
                     std::move(functionBytecode);
-                output.push_back({OP_BIEN_SO, functionId, 0, 0});
+                emitLambdaReference(*lambda, functionId, output);
                 return;
             }
             case IrValueOpcode::UnsupportedDirectRegion:

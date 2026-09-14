@@ -92,6 +92,11 @@ private:
         int catchAddr;        // PC of OP_BAT_LOI
         int stackDepth;       // stack size when try started
         int errVarId;         // variable id to bind error (-1 = none)
+        std::size_t blockStackDepth{};
+        std::size_t switchStackDepth{};
+        std::size_t loopStackDepth{};
+        std::size_t ifElseStackDepth{};
+        int blockDepth{};
     };
     std::vector<TryFrame> tryStack;
 
@@ -121,7 +126,10 @@ private:
                         Opcode op,
                         int curPc,
                         InstanceHandle receiver = nullptr,
-                        ClassHandle methodOwnerClass = nullptr);
+                        ClassHandle methodOwnerClass = nullptr,
+                        ClosureHandle closure = nullptr);
+    // Lấy hoặc tạo ô nhớ chia sẻ cho slot bị closure capture trong frame hiện tại.
+    CellHandle captureCellForSlot(int varId);
     // Xử lý nhóm opcode gọi hàm/phương thức; hàm lấy đối số từ stack, xác định đích gọi và chuyển quyền điều khiển sang function tương ứng.
     void executeCallOpcode(const Instruction& instr);
     // Xử lý opcode tạo hoặc biến đổi giá trị trên stack, bao gồm literal và các phép toán số/chuỗi.
@@ -140,6 +148,8 @@ private:
     void executeBlockOpcode(const Instruction& instr);
     // Xử lý `thử`, `bắt lỗi` và `ném`; hàm quản lý try frame và chuyển điều khiển tới handler phù hợp.
     bool executeExceptionOpcode(const Instruction& instr);
+    // Chuyển một giá trị `ném` tới handler gần nhất và phục hồi các control stack về trạng thái lúc bắt đầu `thử`.
+    bool transferThrownValue(const StackValue &value);
     // Xử lý opcode nhảy có điều kiện/không điều kiện bằng cách cập nhật program counter dựa trên giá trị trên stack.
     bool executeBranchOpcode(const Instruction& instr);
     // Xử lý opcode xuất dữ liệu, chuyển `StackValue` thành chuỗi rồi gửi tới output sink đã cấu hình.

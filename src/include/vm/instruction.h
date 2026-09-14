@@ -99,7 +99,8 @@ enum Opcode {
     OP_TAO_DOI_TUONG = 93,       // tạo instance; operand = số đối số truyền cho hàm `khởi tạo`
     OP_DOC_THUOC_TINH = 94,      // instance field read
     OP_GAN_THUOC_TINH = 95,      // instance field write
-    OP_GOI_PHUONG_THUC = 96      // bound method dispatch; operandValue = 1 starts at superclass
+    OP_GOI_PHUONG_THUC = 96,     // bound method dispatch; operandValue = 1 starts at superclass
+    OP_TAO_DONG_BAO = 97         // tạo closure; operand=function id, operandIndex=số slot capture trên stack
 
 };
 

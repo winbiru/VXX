@@ -1,0 +1,36 @@
+// Khóa semantics closure V++ 1.0: capture theo tham chiếu, sống qua khi hàm ngoài trả về
+// và mutation ở các lần gọi sau cùng tác động lên một ô nhớ chia sẻ.
+
+hàm tạo(bắtđầu) {
+    giátrị = bắtđầu;
+    tăng = hàm() {
+        giátrị += 1;
+        trả về giátrị;
+    };
+
+    // Mutation sau thời điểm tạo closure cũng phải được closure quan sát.
+    giátrị = 10;
+    trả về tăng;
+}
+
+hàm tạolồng(bắtđầu) {
+    ngoài = hàm() {
+        trong = hàm() {
+            bắtđầu += 1;
+            trả về bắtđầu;
+        };
+        trả về trong;
+    };
+    trả về ngoài;
+}
+
+hàm main() {
+    bộđếm = tạo(3);
+    in bộđếm();
+    in bộđếm();
+
+    ngoài = tạolồng(20);
+    trong = ngoài();
+    in trong();
+    in trong();
+}

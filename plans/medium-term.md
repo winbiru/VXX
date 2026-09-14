@@ -25,7 +25,7 @@
      hiện cho phép dựng stack/PC/variables/call frame/control state, gọi handler trực
      tiếp và cấu hình output sink; `vpp-vm-handler-unit` khóa các nhóm handler chính.
    - [x] Giữ test tích hợp trước/sau mỗi nhánh refactor. Baseline trước refactor và
-     hiện tại đều giữ suite xanh; baseline hiện tại đạt 70/70 regression.
+     hiện tại đều giữ suite xanh; baseline hiện tại đạt 73/73 regression.
 
 2. Mở rộng test opcode và compiler
 

@@ -22,19 +22,19 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 
 ## 1. Đóng băng semantics ngôn ngữ
 
-- [ ] Viết ADR chốt type policy: dynamic, static hoặc gradual typing. 1.0 không bắt buộc
-  static typing, nhưng behavior của value/call boundary phải được định nghĩa rõ.
-- [ ] Đóng contract cho scope, shadowing, `rỗng`, truthiness, equality, so sánh và chuyển
+- [x] Viết ADR chốt type policy: V++ 1.0 dùng dynamic typing; value/call boundary,
+  default parameter và arity compile-time/runtime đã có contract + regression.
+- [x] Đóng contract cho scope, shadowing, `rỗng`, truthiness, equality, so sánh và chuyển
   đổi kiểu ngầm; thêm regression cho các trường hợp biên.
-- [ ] Đóng contract lỗi runtime: loại lỗi, thông điệp, unwind và trạng thái VM sau lỗi.
+- [x] Đóng contract lỗi runtime: loại lỗi, thông điệp, unwind và trạng thái VM sau lỗi.
 - [x] Đóng semantics object hiện tại: `mình`, `gốc`, constructor có tham số, đơn kế thừa
   class, nhiều interface compile-time và visibility method private/protected/public.
-- [ ] Chốt override method đầy đủ: arity, visibility narrowing, constructor interaction và
+- [x] Chốt override method đầy đủ: arity, visibility narrowing, constructor interaction và
   diagnostic cho override không hợp lệ.
-- [ ] Chốt module semantics còn lại: explicit export/re-export, truy cập symbol không export,
+- [x] Chốt module semantics còn lại: explicit export/re-export, truy cập symbol không export,
   import cycle và diagnostic có đường dẫn module rõ ràng.
-- [ ] Chốt lambda/closure capture: capture theo value/reference, lifetime và mutation.
-- [ ] Quyết định destructor/finalizer: không hỗ trợ trong 1.0 hoặc định nghĩa lifecycle rõ ràng;
+- [x] Chốt lambda/closure capture: capture theo value/reference, lifetime và mutation.
+- [x] Quyết định destructor/finalizer: không hỗ trợ trong 1.0 hoặc định nghĩa lifecycle rõ ràng;
   không để behavior ngầm phụ thuộc GC.
 
 ## 2. Runtime và VM ổn định dưới tải

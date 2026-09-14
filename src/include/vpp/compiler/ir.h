@@ -170,6 +170,7 @@ struct IrLambda {
     std::vector<IrParameter> parameters;
     IrInstruction body;
     std::vector<int> captures;
+    std::vector<std::string> captureNames;
 };
 
 // Là container gốc của IR sau lowering, sở hữu các instruction top-level, arena giá trị/lambda và bộ đếm vùng direct IR chưa hỗ trợ.

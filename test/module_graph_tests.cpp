@@ -3,6 +3,7 @@
 #include "frontend/lexer.h"
 #include "vpp/frontend/parser.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -82,7 +83,8 @@ void writeFile(const fs::path &path, const std::string &contents) {
 
 AstImportSpec importSpec(std::string target,
                          std::string alias = {},
-                         bool quoted = false) {
+                         bool quoted = false,
+                         bool reExport = false) {
     AstImportSpec spec;
     spec.target = std::move(target);
     spec.targetSpan.begin.offset = 11;
@@ -92,6 +94,7 @@ AstImportSpec importSpec(std::string target,
     spec.aliasSpan.begin.offset = 25;
     spec.aliasSpan.end.offset = 29;
     spec.hasSemicolon = true;
+    spec.reExport = reExport;
     return spec;
 }
 
@@ -148,7 +151,7 @@ void testOrderedGraphActionsAndMetadata() {
                     importSpec("graph/../graph/b.vi")};
             }
             if (source == "module-b") {
-                return std::vector<AstImportSpec>{importSpec("graph/a.vi")};
+                return std::vector<AstImportSpec>{};
             }
             return std::vector<AstImportSpec>{};
         });
@@ -171,7 +174,6 @@ void testOrderedGraphActionsAndMetadata() {
     const std::vector<LocalModuleEdgeAction> expectedActions = {
         LocalModuleEdgeAction::Load,
         LocalModuleEdgeAction::Load,
-        LocalModuleEdgeAction::CycleNoOp,
         LocalModuleEdgeAction::Load,
         LocalModuleEdgeAction::DuplicateNoOp,
         LocalModuleEdgeAction::DuplicateNoOp,
@@ -186,9 +188,7 @@ void testOrderedGraphActionsAndMetadata() {
         }
         expect(graph.edges[0].importerIdentity == "entry://main.vi",
                "root edge is attributed to the entry module");
-        expect(graph.edges[2].importedIdentity == graph.edges[0].importedIdentity,
-               "an import of an Active identity is classified as a cycle");
-        expect(graph.edges[4].importedIdentity == graph.edges[1].importedIdentity,
+        expect(graph.edges[3].importedIdentity == graph.edges[1].importedIdentity,
                "lexically equivalent paths share one module identity");
         expect(graph.edges[0].importSpec.alias == "alpha" &&
                    graph.edges[0].importSpec.quoted &&
@@ -203,6 +203,40 @@ void testOrderedGraphActionsAndMetadata() {
     expect(std::string(vietvm::compiler::localModuleEdgeActionName(
                LocalModuleEdgeAction::DuplicateNoOp)) == "duplicate_no_op",
            "edge action has stable tooling text");
+}
+
+void testImportCycleIsRejectedWithPath() {
+    TemporaryTree tree;
+    const fs::path resolutionBase = tree.root() / "build";
+    fs::create_directories(resolutionBase);
+    writeFile(tree.root() / "a.vi", "module-a");
+    writeFile(tree.root() / "b.vi", "module-b");
+
+    LocalModuleGraphBuilder builder(
+        LocalModuleResolver(resolutionBase),
+        [&](const std::string &source, const fs::path &) {
+            if (source == "module-a") {
+                return std::vector<AstImportSpec>{importSpec("b.vi")};
+            }
+            if (source == "module-b") {
+                return std::vector<AstImportSpec>{importSpec("a.vi")};
+            }
+            return std::vector<AstImportSpec>{};
+        });
+
+    bool rejected = false;
+    std::string message;
+    try {
+        (void)builder.build("entry://main.vi", {importSpec("a.vi")});
+    } catch (const std::runtime_error &error) {
+        message = error.what();
+        rejected = message.find("chu trình mô-đun") != std::string::npos &&
+                   message.find("a.vi") != std::string::npos &&
+                   message.find("b.vi") != std::string::npos &&
+                   message.find(" -> ") != std::string::npos;
+    }
+    expect(rejected,
+           "module import cycle is a compile-time error with the import path chain");
 }
 
 void testReadAndScanFailureCanRetry() {
@@ -265,7 +299,7 @@ void testSemanticIndexExportsNamespacesAndLifecycle() {
     const fs::path moduleB = tree.root() / "b.vi";
     writeFile(
         moduleA,
-        u8"nhập b.vi như bee;\n"
+        u8"công khai nhập b.vi như bee;\n"
         u8"hàm công khai cộng(a, b) { trả về a + b; }\n"
         u8"hàm riêng tư bí mật() { trả về 0; }\n"
         u8"lớp công khai MáyTính { hàm công khai id() { trả về 1; } }\n");
@@ -286,8 +320,9 @@ void testSemanticIndexExportsNamespacesAndLifecycle() {
            "semantic index can look up modules by stable identity");
     expect(index.exportedSymbol(aIdentity, u8"cộng") != nullptr &&
                index.exportedSymbol(aIdentity, u8"MáyTính") != nullptr &&
-               index.exportedSymbol(aIdentity, u8"bí mật") == nullptr,
-           "module export surface keeps public/default declarations and hides private declarations");
+               index.exportedSymbol(aIdentity, u8"bí mật") == nullptr &&
+               index.exportedSymbol(aIdentity, u8"bee.nhân") != nullptr,
+           "module export surface keeps public/default declarations, hides private declarations, and includes public re-exports");
     expect(index.exportedSymbol(bIdentity, u8"nhân") != nullptr,
            "unspecified top-level visibility remains exported for compatibility");
 
@@ -304,6 +339,13 @@ void testSemanticIndexExportsNamespacesAndLifecycle() {
     }
     expect(sawQualifiedAdd && sawQualifiedClass && sawFlatMultiply && !leakedPrivate,
            "direct import environment applies aliases while preserving flat unaliased imports");
+    bool sawQualifiedReExport = false;
+    for (const auto &symbol : rootEnvironment.importedSymbols) {
+        sawQualifiedReExport = sawQualifiedReExport ||
+                               symbol.name == u8"toan.bee.nhân";
+    }
+    expect(sawQualifiedReExport,
+           "public import re-exports the dependency surface while preserving aliases");
 
     const auto aEnvironment = index.semanticEnvironmentFor(aIdentity);
     expect(aEnvironment.importedSymbols.size() == 1 &&
@@ -330,6 +372,21 @@ void testSemanticIndexExportsNamespacesAndLifecycle() {
     }
     expect(resolvedQualified && resolvedFlat,
            "semantic analysis consumes module-index exports as resolved imported symbols");
+
+    const auto hiddenProgram = vietvm::frontend::parseTokens(
+        vietvm::compiler::postProcessTokensWithSpans(
+            vietvm::compiler::tokenizeWithSpans(
+                u8"hàm main() { gọi toan.bí mật(); }")));
+    const auto hiddenSemantic = vietvm::compiler::analyzeSemantics(
+        hiddenProgram, rootEnvironment,
+        vietvm::compiler::ResolutionPolicy::PreserveLegacy);
+    expect(hiddenSemantic.hasErrors() && std::any_of(
+               hiddenSemantic.diagnostics.begin(), hiddenSemantic.diagnostics.end(),
+               [](const auto &diagnostic) {
+                   return diagnostic.message.find(u8"không được mô-đun") !=
+                          std::string::npos;
+               }),
+           "accessing a non-exported imported symbol produces a module-specific diagnostic");
 
     ModuleInitializationTracker lifecycle(index);
     expect(lifecycle.state(aIdentity) == ModuleInitializationState::Uninitialized,
@@ -359,6 +416,7 @@ void testSemanticIndexExportsNamespacesAndLifecycle() {
 int main() {
     testResolveUpwardAndReadUtf8Source();
     testOrderedGraphActionsAndMetadata();
+    testImportCycleIsRejectedWithPath();
     testReadAndScanFailureCanRetry();
     testScannerIsRequired();
     testSemanticIndexExportsNamespacesAndLifecycle();

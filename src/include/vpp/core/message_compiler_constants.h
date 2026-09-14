@@ -75,9 +75,12 @@ inline constexpr std::string_view kSemanticDuplicateDeclaration = "Khai báo '{0
 inline constexpr std::string_view kSemanticMissingDeclarationName = "Không thể xác định tên của khai báo {0}";
 inline constexpr std::string_view kSemanticUnresolvedName = "Không thể phân giải tên '{0}' trong phạm vi hiện tại";
 inline constexpr std::string_view kSemanticUnresolvedCall = "Không thể phân giải hàm được gọi '{0}'";
+inline constexpr std::string_view kSemanticCallArityMismatch = "Lời gọi '{0}' nhận {1} đối số nhưng yêu cầu từ {2} đến {3}";
 inline constexpr std::string_view kSemanticUnresolvedSuperclass = "Không thể phân giải lớp cha '{0}'";
 inline constexpr std::string_view kSemanticSelfInheritance = "Lớp '{0}' không thể kế thừa chính nó";
 inline constexpr std::string_view kSemanticInheritanceCycle = "Phát hiện chu trình kế thừa tại lớp '{0}'";
+inline constexpr std::string_view kSemanticOverrideArityMismatch = "Phương thức '{0}' của lớp '{1}' có {2} tham số nhưng phương thức được ghi đè từ lớp '{3}' có {4} tham số";
+inline constexpr std::string_view kSemanticOverrideVisibilityNarrowing = "Phương thức '{0}' của lớp '{1}' không được thu hẹp phạm vi truy cập so với phương thức được ghi đè từ lớp '{2}'";
 inline constexpr std::string_view kSemanticUnresolvedInterface = "Không thể phân giải giao diện '{0}'";
 inline constexpr std::string_view kSemanticExpectedInterface = "'{0}' không phải là một giao diện";
 inline constexpr std::string_view kSemanticDuplicateInterface = "Giao diện '{0}' bị lặp trong cùng danh sách kế thừa/triển khai";
@@ -87,11 +90,13 @@ inline constexpr std::string_view kSemanticInvalidInterfaceBody = "Giao diện '
 inline constexpr std::string_view kSemanticInterfaceMethodMustBePublic = "Hàm '{0}' trong giao diện '{1}' phải có phạm vi công khai";
 inline constexpr std::string_view kSemanticMissingInterfaceMethod = "Lớp '{0}' chưa triển khai hàm '{1}' với {2} tham số theo giao diện '{3}'";
 inline constexpr std::string_view kSemanticInterfaceImplementationMustBePublic = "Lớp '{0}' phải triển khai hàm '{1}' của giao diện '{2}' bằng phương thức công khai";
+inline constexpr std::string_view kSemanticModuleSymbolNotExported = "Ký hiệu '{0}' không được mô-đun '{1}' xuất công khai";
 
 // Module/package import diagnostics.
 inline constexpr std::string_view kImportMissingTarget = "nhập: thiếu đường dẫn hoặc tên mô-đun";
 inline constexpr std::string_view kImportMissingNamespaceAlias = "nhập: thiếu tên không gian tên sau 'như'";
 inline constexpr std::string_view kImportCannotOpenFile = "nhập: không thể mở tệp '{0}'";
+inline constexpr std::string_view kImportModuleCycle = "nhập: phát hiện chu trình mô-đun: {0}";
 inline constexpr std::string_view kInternalImportHandlerMissing = "trình biên dịch nội bộ chưa đăng ký bộ xử lý câu lệnh nhập";
 
 // Compiler invariants. These indicate a compiler bug or malformed internal IR.

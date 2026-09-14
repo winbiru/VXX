@@ -7,21 +7,22 @@
 #include "../vm/instruction.h"
 #include "vpp/bytecode/opcode.h"
 #include "vpp/core/message_constants.h"
+#include "vpp/runtime/error.h"
 #include "vpp/runtime/value.h"
 
 // Chạy lỗi op; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-inline std::runtime_error runtime_error_op(const std::string &msg, Opcode op, int pc = -1) {
+inline vietvm::runtime::RuntimeError runtime_error_op(const std::string &msg, Opcode op, int pc = -1) {
     std::ostringstream oss;
     oss << msg << " (lệnh=" << vietvm::bytecode::opcodeName(op) << ")";
     if (pc >= 0) oss << " tại vị trí=" << pc;
-    return std::runtime_error(oss.str());
+    return vietvm::runtime::RuntimeError(oss.str());
 }
 
 // Chạy lỗi op; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-inline std::runtime_error runtime_error_op(const std::string &msg, Opcode op, std::size_t pc) {
+inline vietvm::runtime::RuntimeError runtime_error_op(const std::string &msg, Opcode op, std::size_t pc) {
     std::ostringstream oss;
     oss << msg << " (lệnh=" << vietvm::bytecode::opcodeName(op) << ") tại vị trí=" << pc;
-    return std::runtime_error(oss.str());
+    return vietvm::runtime::RuntimeError(oss.str());
 }
 
 // Lấy int từ StackValue
@@ -107,18 +108,19 @@ inline StackValue evaluateBinaryOperator(Opcode op,
 
         case OP_Logic_VA:
         case OP_Logic_HOAC: {
-            if (!isNumeric(a) || !isNumeric(b)) {
-                throw runtime_error_op(vietvm::messages::formatMessage(
-                    vietvm::messages::kVmLogicOnlyOperator), op, pc);
-            }
-            const int left = as_int(a, op, pc);
-            const int right = as_int(b, op, pc);
+            const bool left = stackValueTruthy(a);
+            const bool right = stackValueTruthy(b);
             return make_int_value(op == OP_Logic_VA ? (left && right ? 1 : 0)
-                                                        : (left || right ? 1 : 0));
+                                                     : (left || right ? 1 : 0));
         }
 
         case OP_SO_SANH_BANG:
-        case OP_KHAC_BANG:
+        case OP_KHAC_BANG: {
+            const bool equal = sameStackValue(a, b);
+            return make_int_value(op == OP_SO_SANH_BANG ? (equal ? 1 : 0)
+                                                         : (equal ? 0 : 1));
+        }
+
         case OP_LON_HON:
         case OP_NHO_HON:
         case OP_LON_HON_HOAC_BANG:
@@ -128,8 +130,6 @@ inline StackValue evaluateBinaryOperator(Opcode op,
                 const double left = toDouble(a);
                 const double right = toDouble(b);
                 switch (op) {
-                    case OP_SO_SANH_BANG: result = left == right ? 1 : 0; break;
-                    case OP_KHAC_BANG: result = left != right ? 1 : 0; break;
                     case OP_LON_HON: result = left > right ? 1 : 0; break;
                     case OP_NHO_HON: result = left < right ? 1 : 0; break;
                     case OP_LON_HON_HOAC_BANG: result = left >= right ? 1 : 0; break;
@@ -143,8 +143,6 @@ inline StackValue evaluateBinaryOperator(Opcode op,
                 const std::string &left = std::get<std::string>(a);
                 const std::string &right = std::get<std::string>(b);
                 switch (op) {
-                    case OP_SO_SANH_BANG: result = left == right ? 1 : 0; break;
-                    case OP_KHAC_BANG: result = left != right ? 1 : 0; break;
                     case OP_LON_HON: result = left > right ? 1 : 0; break;
                     case OP_NHO_HON: result = left < right ? 1 : 0; break;
                     case OP_LON_HON_HOAC_BANG: result = left >= right ? 1 : 0; break;

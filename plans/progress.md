@@ -11,14 +11,13 @@
 | --- | ---: | ---: | ---: |
 | Ngắn hạn | 14/15 | 1 | 93% |
 | Trung hạn | 18/18 | 0 | 100% |
-| Dài hạn | 12/40 | 28 | 30% |
-| **Tổng** | **44/73** | **29** | **60%** |
+| Dài hạn | 7/34 | 27 | 21% |
+| **Tổng** | **39/67** | **28** | **58%** |
 
-> Số liệu dài hạn được đếm trực tiếp từ 40 checkbox trong phần `Việc lớn còn lại`
-> của `plans/long-term.md`; các checkbox ở `Nền tảng đã có` là baseline lịch sử và
-> không cộng thêm vào mẫu số roadmap. Tỷ lệ tổng giảm so với lần cập nhật trước vì
-> roadmap vừa được mở rộng bằng các release gate 1.0; đây không phải phần việc đã hoàn
-> tất bị mất đi.
+> Số liệu dài hạn được đếm trực tiếp từ 34 checkbox trong phần `Việc lớn còn lại`
+> của `plans/long-term.md`; 5 checkbox ở `Nền tảng đã có` là baseline lịch sử và không
+> cộng thêm vào mẫu số roadmap. Bảng tổng quan vì vậy phản ánh đúng các đầu việc còn được
+> theo dõi thay vì cộng baseline đã hoàn thành vào tiến độ roadmap.
 
 ## Đích V++ 1.0
 
@@ -47,6 +46,11 @@ hơn nhiều so với một checkbox tính năng thông thường.
   `MáyChủApi` và `ApiApplication`; dependency được ghép tại composition root rồi inject
   qua constructor. Lệnh `khởi tạo backend` copy đầy đủ các module OOP và smoke test
   xác nhận project sinh mới vẫn phục vụ `/health` thành công.
+- [x] Regression `fixtures/api_project` cũng đã chuyển khỏi kiểu gọi class như namespace:
+  contract nằm riêng trong `giao_dien/`, còn `UserRepository` + `UserMapper` được inject
+  vào `UserService`, rồi `UserService` + `ResponseEntity` được inject vào controller.
+  `AdminRestController` dùng kế thừa thật từ `UserRestController`; test tạo object graph tại
+  composition root và gọi CRUD/search qua instance để khóa OOP + DI end-to-end.
 - [x] `docs/bytecode.md` đã phân biệt rõ proposal `.vbc` với runtime contract hiện tại
   (`Instruction`/`Opcode`) và chỉ ra implementation đang thực thi.
 - [x] Pipeline đã có Expression AST, scope tree, name resolution, recursive IR và
@@ -54,8 +58,8 @@ hơn nhiều so với một checkbox tính năng thông thường.
 - [x] Có regression cho lỗi parser/compiler/semantic, không chỉ expected-output fixture.
 - [x] Test discovery đã phân biệt `test/` cho C++ unit và `src/tests/` cho regression
   V++; HTTP fixture được khởi động riêng trong integration runner.
-- [x] Parity gate hiện đối chiếu 79 chương trình `.vi`; direct IR backend bao phủ
-  79/79 chương trình.
+- [x] Parity gate hiện đối chiếu 86 chương trình `.vi`; direct IR backend bao phủ
+  86/86 chương trình.
 - [x] Parity gate chạy lại cùng corpus theo thứ tự đảo trong cùng process; regression
   compile A → B → A đã khóa lifecycle reset giữa nhiều lần biên dịch.
 - [x] VM opcode smoke đã có branch (`OP_JUMP`, `OP_JUMP_IF_FALSE`) và call/return
@@ -65,7 +69,7 @@ hơn nhiều so với một checkbox tính năng thông thường.
   trực tiếp cho `OP_DUNG_GIA_TRI` và `OP_SAI_GIA_TRI`.
 - [x] `VM::run()` đã được thu gọn thành lifecycle/GC + opcode routing; call, value,
   index, variable/call-frame, switch/block, loop-control, exception và branch có
-  handler riêng. Baseline regression hiện tại đạt 70/70.
+  handler riêng. Baseline regression hiện tại đạt 73/73.
 - [x] VM opcode matrix hiện khóa arithmetic, logic/comparison boundary, stack,
   branch, call/return, native call, default parameter, switch/default, throw/catch,
   uncaught error và các lỗi boundary chính.
@@ -143,6 +147,31 @@ hơn nhiều so với một checkbox tính năng thông thường.
   implementation hợp lệ. Interface là contract compile-time ở milestone này nên không thêm
   runtime vtable/dispatch mới. Regression `kiem_tra_giao_dien_trien_khai.vi` khóa interface
   inheritance, class inheritance và nhiều hợp đồng trong một chương trình chạy thật.
+- [x] **Override contract 1.0:** semantic coi method cùng tên ở subclass là override của
+  method không-private gần nhất trong hierarchy; override phải giữ cùng arity và không được
+  thu hẹp visibility. Constructor `khởi tạo` có lifecycle riêng nên không tham gia override,
+  còn method private của lớp cha không tạo ràng buộc override. Pipeline unit test khóa cả
+  case hợp lệ và diagnostic sai arity/public→protected/protected→private.
+- [x] **Value/scope semantics 1.0:** `docs/semantics.md` đã khóa contract cho scope gán
+  biến theo function/lambda, shadowing của parameter, `rỗng`, truthiness, equality theo
+  value/identity, ordering và implicit coercion. Runtime dùng chung `stackValueTruthy()` cho
+  branch, `!`, `&&`, `||`; `==/!=` dùng chung `sameStackValue()` nên null/reference/mixed-type
+  không còn lệch giữa collection helper và toán tử ngôn ngữ. Regression
+  `kiem_tra_semantics_gia_tri.vi` khóa các trường hợp biên end-to-end, còn
+  `vpp-runtime-value-unit` khóa helper và mixed ordering error.
+- [x] **Runtime error contract 1.0:** `docs/runtime-errors.md` phân biệt exception do
+  chương trình `ném` với lỗi VM fatal. `LanguageException` giữ nguyên `StackValue` qua child
+  VM/function boundary; handler unwind data/block/switch/control state về snapshot của `thử`,
+  còn failed child call luôn pop call frame trước khi truyền lỗi. `RuntimeError` mang kind
+  `VmFault`/`CallBoundary`/`ModuleInitialization`; lỗi module giữ trạng thái `failed` và không
+  chạy initializer lần hai. Regression `kiem_tra_ngoai_le_xuyen_ham.vi` khóa catch + rethrow
+  xuyên nhiều hàm, còn `vpp-vm-handler-unit` khóa control-stack/call-frame/module-state cleanup.
+- [x] **Type policy 1.0:** ADR `docs/adr/0001-type-policy.md` chốt V++ dùng dynamic typing.
+  Binding/parameter/field/return không có kiểu tĩnh bắt buộc; semantic chỉ kiểm tra arity khi
+  callable đích biết chắc. Function/method/constructor có biên đối số tối thiểu/tối đa theo
+  default parameter; dynamic/indirect/imported call được kiểm tra lại ở VM và không còn tự bù
+  `0` cho đối số bắt buộc thiếu. Regression `kiem_tra_kieu_dong_call_boundary.vi` khóa đổi kiểu
+  binding + default parameter; pipeline/VM unit khóa direct và runtime arity error.
 - [x] **Tracing GC:** `RuntimeHeap` theo từng VM đăng ký map/list/tuple/class/instance bằng
   weak registry, mark từ stack, biến global/local, call frame, receiver, class table và
   switch value rồi sweep bằng cách cắt cạnh của graph không reachable. Child VM dùng chung
@@ -162,13 +191,13 @@ hơn nhiều so với một checkbox tính năng thông thường.
 | Sandbox / permission | Chưa có | Capability cho file/network/process/env/FFI, enforce tại runtime boundary |
 | Profiler | Benchmark có, profiler còn thiếu | CPU/timing/allocation sampling hoặc VM event hooks |
 | Package dependency solver | Resolver theo tên/path, chưa có solver | Version/range, conflict resolution, lockfile, cache/offline |
-| Typed IR | Chưa quyết định | Chốt ADR type policy trước Typed IR/static checker |
+| Typed IR | Hoãn sau 1.0 | Dynamic typing đã chốt; Typed IR/static/gradual checker là tính năng hậu 1.0 |
 | GC production | Tracing GC đã chạy mặc định, có cycle sweep + root graph | Tiếp tục đo allocation/latency cùng profiler trước tối ưu sâu |
 | Object model | Hoàn tất contract hiện tại: object/field động, bound-call, `mình`/`gốc`, đơn kế thừa class, nhiều interface compile-time, constructor có tham số, method visibility semantic + runtime | Trait/generic, runtime interface introspection và field declaration nếu bổ sung sẽ cần contract mới |
 
 ## Rủi ro cần xử lý sớm
 
-- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 79 chương trình
+- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 86 chương trình
   chạy thuận và đảo thứ tự trong cùng process đều khớp snapshot; chạy riêng parity
   và bộ CTest không gồm integration đều qua.
 - [x] Handler VM vẫn thao tác trên state của instance, nhưng `VMRuntimeFixture` đã tạo
@@ -182,9 +211,9 @@ hơn nhiều so với một checkbox tính năng thông thường.
 
 ```text
 VM opcode smoke (build trực tiếp bằng C++17): passed
-Integration regression: 70/70 passed
+Integration regression: 73/73 passed
 CTest baseline gần nhất: 16/16 passed
-Pipeline parity baseline gần nhất: 79 chương trình, direct IR 79 chương trình
+Pipeline parity baseline gần nhất: 86 chương trình, direct IR 86 chương trình
 Coverage cross-check: 75.77% line coverage (8,884/11,725), gate 45%
 Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
 Short-term: 14/15
@@ -202,7 +231,7 @@ Long-term: 10/40
    xóa token bridge khỏi production compiler/source set.
 5. [x] Sau khi test architecture ổn định, thêm coverage + clang-tidy + benchmark baseline.
 6. [x] Tách nốt variable/index/switch/block/exception khỏi `VM::run()` và mở rộng
-   opcode matrix; full regression hiện tại đạt 70/70.
+   opcode matrix; full regression hiện tại đạt 73/73.
 7. [x] Tạo internal VM state fixture/API và output sink để test handler trực tiếp
    không phụ thuộc stdout; khóa bằng `vpp-vm-handler-unit`.
 8. [x] Dời `StringPool`, function registry, import set và class/access state vào
@@ -211,7 +240,7 @@ Long-term: 10/40
 9. [x] Tách import resolution khỏi process cwd bằng `CompilationContext.importResolutionBase`
    và khóa bằng regression song song cho hai module cùng tên ở hai thư mục độc lập.
 10. [x] Tách ranh giới direct emitter thành `emitBlock`, `emitStatement` và
-    `emitFunctionBody` với output bytecode tường minh; parity hiện tại 79/79 và full CTest vẫn xanh.
+    `emitFunctionBody` với output bytecode tường minh; parity hiện tại 86/86 và full CTest vẫn xanh.
 11. [x] Hoàn tất Module Semantics Phase 1: index local `.vi` exports, alias namespace,
     semantic `ImportedFunction`, lifecycle state contract và production top-level
     indexing; package/compat imports vẫn do resolver hiện hữu xử lý.
@@ -221,8 +250,9 @@ Long-term: 10/40
     `hàm khởi tạo(...)`, property động read/write, bound-method dispatch, receiver
     `mình`/`gốc`, inheritance, interface/`triển khai` compile-time và method visibility đã
     chạy qua semantic/direct IR/VM.
-14. [ ] **Semantics freeze:** chốt type policy và behavior của scope/shadowing, `rỗng`,
-    equality/coercion, runtime error, override, closure capture, export/re-export và import cycle.
+14. [ ] **Semantics freeze:** scope/shadowing, `rỗng`, equality/coercion, runtime error,
+    override và dynamic type policy/call boundary đã chốt; còn closure capture,
+    export/re-export, import cycle và finalizer policy.
 15. [ ] **Runtime hardening:** thêm GC/object-graph/allocation stress, recursion/stack overflow,
     nested exception, VM-state integrity, leak/sanitizer suite và stack trace có source span.
 16. [ ] **Package 0.9:** chốt manifest/project layout; tách resolver; xây semver/range,
