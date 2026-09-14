@@ -18,6 +18,7 @@
 #include "vpp/runtime/value.h"
 #include "vpp/runtime/module.h"
 #include "vpp/runtime/debug.h"
+#include "vpp/runtime/error.h"
 
 // Cung cấp bề mặt kiểm thử nội bộ cho VM; fixture cho test push stack, đặt frame/class và gọi trực tiếp từng opcode handler mà không chạy cả chương trình.
 class VMRuntimeFixture;
@@ -52,7 +53,7 @@ public:
         std::string_view identity) const noexcept;
 
     std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
-    // nameIndex → hamId mapping for function name lookup (shared with child VMs for recursion)
+    // nameIndex → hamId mapping for function name lookup across execution contexts.
     std::unordered_map<int, int> functionTableByNameIndex;
 
 private:
@@ -78,12 +79,11 @@ private:
 
     // Call stack for function calls
     std::vector<CallFrame> callStack;
-    // Theo dõi độ sâu lời gọi xuyên qua chuỗi child VM; mỗi child VM chỉ giữ một
-    // call frame cục bộ nên không thể dùng riêng `callStack.size()` để phát hiện
-    // đệ quy quá sâu.
+    // Theo dõi độ sâu lời gọi V++; việc thực thi hàm dùng explicit execution
+    // contexts nên độ sâu này không còn tiêu thụ native C++ stack.
     std::size_t callDepthFromRoot = 0;
-    // Giới hạn độ sâu lời gọi để lỗi đệ quy được báo có kiểm soát trước khi làm
-    // tràn native C++ stack. Fixture có thể hạ giới hạn này cho regression test.
+    // Giới hạn độ sâu lời gọi để đệ quy không dừng được báo có kiểm soát và không
+    // tăng vô hạn lượng trạng thái interpreter. Fixture có thể hạ giới hạn này cho regression test.
     std::size_t maxCallDepth = 256;
 
     // helper stacks for control-flow
@@ -118,6 +118,32 @@ private:
     };
     std::vector<TryFrame> tryStack;
 
+    // Cách caller xử lý giá trị khi callee kết thúc. Constructor bỏ giá trị trả
+    // về của `khởi tạo` và thay bằng instance vừa được tạo.
+    enum class CallReturnMode {
+        Value,
+        ConstructorInstance,
+    };
+
+    // Snapshot trạng thái thực thi của caller khi VM chuyển sang bytecode của
+    // callee. Đây là call stack ở cấp interpreter, thay cho việc gọi lồng
+    // `VM::run()` bằng native C++ recursion.
+    struct ExecutionContext {
+        std::vector<Instruction> bytecode;
+        std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
+        std::vector<StackValue> stack;
+        std::vector<size_t> loopStartStack;
+        std::vector<size_t> ifElseStack;
+        std::vector<size_t> blockStack;
+        std::vector<SwitchFrame> switchStack;
+        std::vector<TryFrame> tryStack;
+        size_t pc = 0;
+        int blockDepth = 0;
+        CallReturnMode returnMode = CallReturnMode::Value;
+        InstanceHandle constructorInstance;
+    };
+    std::vector<ExecutionContext> executionStack;
+
     // Các hàm phụ trợ
     void execute(const Instruction& inst);
     // Lấy ra khỏi số nguyên; hàm loại bỏ phần tử/ngữ cảnh trên cùng và khôi phục trạng thái trước đó.
@@ -145,7 +171,20 @@ private:
                         int curPc,
                         InstanceHandle receiver = nullptr,
                         ClassHandle methodOwnerClass = nullptr,
-                        ClosureHandle closure = nullptr);
+                        ClosureHandle closure = nullptr,
+                        CallReturnMode returnMode = CallReturnMode::Value,
+                        InstanceHandle constructorInstance = nullptr);
+    // Khôi phục caller sau khi function bytecode kết thúc; giá trị trả về được
+    // chuyển sang caller theo return mode đã lưu trong execution context.
+    bool completeFunctionCall();
+    // Unwind một giá trị `ném` qua các execution context cho tới `thử/bắt lỗi`
+    // gần nhất mà không dùng native exception recursion qua nhiều VM con.
+    bool unwindLanguageException(const StackValue &value);
+    // Bổ sung source frame của từng caller rồi phục hồi trạng thái gốc trước khi
+    // RuntimeError thoát khỏi `run()`.
+    void unwindRuntimeError(vietvm::runtime::RuntimeError &error);
+    // Khôi phục snapshot caller gần nhất và pop call frame của callee hiện tại.
+    void restoreCallerExecutionContext();
     // Lấy hoặc tạo ô nhớ chia sẻ cho slot bị closure capture trong frame hiện tại.
     CellHandle captureCellForSlot(int varId);
     // Xử lý nhóm opcode gọi hàm/phương thức; hàm lấy đối số từ stack, xác định đích gọi và chuyển quyền điều khiển sang function tương ứng.
@@ -185,6 +224,9 @@ private:
 
     // Chạy JIT đã biên dịch tuyến tính; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
     bool runJitCompiledLinear();
+    // Chạy interpreter trên context hiện tại. Khi `stopExecutionDepth` có giá trị,
+    // hàm dừng ngay sau khi lời gọi trực tiếp của fixture đã quay về độ sâu đó.
+    void runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth = std::nullopt);
     // Thực hiện chu kỳ thu gom bộ nhớ runtime theo cơ chế GC hiện tại, duyệt các root đang sống trước khi giải phóng đối tượng không còn tham chiếu.
     void collectGarbage();
 };

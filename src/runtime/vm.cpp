@@ -663,11 +663,20 @@ void VM::collectGarbage() {
     variables.rehash(variables.size());
 }
 
-// Chụp root của VM cho tracing GC; child VM nhận thêm snapshot của caller để GC
-// trong lời gọi lồng nhau không quét object mà frame/stack bên ngoài vẫn cần dùng.
+// Chụp root của VM cho tracing GC; các execution context đang tạm dừng vẫn giữ
+// stack/control state của caller để object còn sống không bị quét giữa lời gọi lồng nhau.
 std::vector<StackValue> VM::gcRoots() const {
     std::vector<StackValue> roots = inheritedGcRoots;
     roots.insert(roots.end(), stack.begin(), stack.end());
+    for (const ExecutionContext &context : executionStack) {
+        roots.insert(roots.end(), context.stack.begin(), context.stack.end());
+        for (const SwitchFrame &frame : context.switchStack) {
+            if (frame.switchValue.has_value()) roots.push_back(*frame.switchValue);
+        }
+        if (context.constructorInstance != nullptr) {
+            roots.push_back(make_instance_value(context.constructorInstance));
+        }
+    }
     for (const auto &entry : variables) roots.push_back(entry.second);
     for (const auto &entry : classTable) roots.push_back(make_class_value(entry.second));
 
@@ -919,7 +928,9 @@ void VM::invokeFunction(int argc,
                         int curPc,
                         InstanceHandle receiver,
                         ClassHandle methodOwnerClass,
-                        ClosureHandle closure) {
+                        ClosureHandle closure,
+                        CallReturnMode returnMode,
+                        InstanceHandle constructorInstance) {
     if (argc < 0) {
         vietvm::runtime::RuntimeDiagnosticContext context;
         context.internalInvariantChecked = true;
@@ -963,7 +974,11 @@ void VM::invokeFunction(int argc,
             }
             throw runtime_error_op(nativeErr, op, curPc, std::move(context));
         }
-        stack.push_back(nativeResult);
+        if (returnMode == CallReturnMode::ConstructorInstance) {
+            stack.push_back(make_instance_value(std::move(constructorInstance)));
+        } else {
+            stack.push_back(nativeResult);
+        }
         return;
     }
 
@@ -979,15 +994,6 @@ void VM::invokeFunction(int argc,
             vietvm::runtime::runtimeCallDepthFacts(
                 targetName, static_cast<int>(nextCallDepth), static_cast<int>(maxCallDepth)));
     }
-
-    CallFrame frame;
-    frame.args = args;
-    frame.receiver = std::move(receiver);
-    frame.methodOwnerClass = std::move(methodOwnerClass);
-    frame.localsIndexed = true;
-    frame.returnPc = curPc + 1;
-    if (closure != nullptr) frame.capturedCells = closure->captures;
-    callStack.push_back(frame);
 
     auto it = hamBytecodeMap.find(hamIdOrName);
     if (it == hamBytecodeMap.end()) {
@@ -1009,7 +1015,6 @@ void VM::invokeFunction(int argc,
     }
 
     if (it == hamBytecodeMap.end()) {
-        if (!callStack.empty()) callStack.pop_back();
         const int nameIndex = (hamIdOrName < 0) ? -(hamIdOrName + 1) : hamIdOrName;
         std::string fnName = "?";
         if (nameIndex >= 0 && nameIndex < static_cast<int>(stringPool.size())) {
@@ -1026,7 +1031,6 @@ void VM::invokeFunction(int argc,
 
     const RuntimeFunctionArity arity = inferRuntimeFunctionArity(it->second);
     if (argc < arity.minimum || argc > arity.maximum) {
-        if (!callStack.empty()) callStack.pop_back();
         const std::string targetName = runtimeCallTargetName(
             hamIdOrName, stringPool, functionTableByNameIndex);
         throw vietvm::runtime::RuntimeError(
@@ -1040,40 +1044,115 @@ void VM::invokeFunction(int argc,
                 targetName, argc, arity.minimum, arity.maximum));
     }
 
-    VM funcVM(it->second, stringPool);
-    funcVM.runtimeHeap = runtimeHeap;
-    funcVM.inheritedGcRoots = gcRoots();
-    funcVM.callDepthFromRoot = nextCallDepth;
-    funcVM.maxCallDepth = maxCallDepth;
-    funcVM.outputSink = outputSink;
-    funcVM.variables = variables;
-    funcVM.classTable = classTable;
-    funcVM.callStack.clear();
-    funcVM.callStack.push_back(callStack.back());
-    funcVM.hamBytecodeMap = hamBytecodeMap;
-    funcVM.functionTableByNameIndex = functionTableByNameIndex;
-    funcVM.functionDebugInfo = functionDebugInfo;
+    CallFrame frame;
+    frame.args = std::move(args);
+    frame.receiver = std::move(receiver);
+    frame.methodOwnerClass = std::move(methodOwnerClass);
+    frame.localsIndexed = true;
+    frame.returnPc = curPc + 1;
+    if (closure != nullptr) frame.capturedCells = closure->captures;
+
+    std::vector<vietvm::runtime::RuntimeSourceLocation> calleeDebugInfo;
     const auto debugEntry = functionDebugInfo.find(it->first);
     if (debugEntry != functionDebugInfo.end()) {
-        funcVM.bytecodeDebugInfo = debugEntry->second;
-    }
-    try {
-        funcVM.run();
-    } catch (...) {
-        // Side effects đã xảy ra trước lỗi vẫn thuộc semantics imperative của V++;
-        // chỉ transient call frame của caller phải được unwind trước khi truyền lỗi lên.
-        variables = std::move(funcVM.variables);
-        classTable = std::move(funcVM.classTable);
-        if (!callStack.empty()) callStack.pop_back();
-        throw;
+        calleeDebugInfo = debugEntry->second;
     }
 
-    variables = std::move(funcVM.variables);
-    classTable = std::move(funcVM.classTable);
-    if (!funcVM.stack.empty()) {
-        stack.push_back(funcVM.stack.back());
-    }
+    // Chuyển interpreter sang callee bằng explicit execution context thay vì
+    // gọi `funcVM.run()` lồng nhau. Nhờ đó recursion V++ không làm sâu native
+    // C++ call stack và giới hạn `maxCallDepth` luôn là guard đầu tiên.
+    ExecutionContext caller;
+    caller.bytecode = std::move(bytecode);
+    caller.bytecodeDebugInfo = std::move(bytecodeDebugInfo);
+    caller.stack = std::move(stack);
+    caller.loopStartStack = std::move(loopStartStack);
+    caller.ifElseStack = std::move(ifElseStack);
+    caller.blockStack = std::move(blockStack);
+    caller.switchStack = std::move(switchStack);
+    caller.tryStack = std::move(tryStack);
+    caller.pc = pc;
+    caller.blockDepth = blockDepth;
+    caller.returnMode = returnMode;
+    caller.constructorInstance = std::move(constructorInstance);
+    executionStack.push_back(std::move(caller));
+
+    callStack.push_back(std::move(frame));
+    callDepthFromRoot = nextCallDepth;
+    bytecode = it->second;
+    bytecodeDebugInfo = std::move(calleeDebugInfo);
+    stack.clear();
+    loopStartStack.clear();
+    ifElseStack.clear();
+    blockStack.clear();
+    switchStack.clear();
+    tryStack.clear();
+    blockDepth = 0;
+    pc = 0;
+}
+
+// Khôi phục trạng thái interpreter của caller gần nhất sau khi callee kết thúc
+// hoặc bị unwind. CallFrame của callee được bỏ cùng lúc với execution context.
+void VM::restoreCallerExecutionContext() {
+    if (executionStack.empty()) return;
+
+    ExecutionContext caller = std::move(executionStack.back());
+    executionStack.pop_back();
     if (!callStack.empty()) callStack.pop_back();
+    if (callDepthFromRoot > 0) --callDepthFromRoot;
+
+    bytecode = std::move(caller.bytecode);
+    bytecodeDebugInfo = std::move(caller.bytecodeDebugInfo);
+    stack = std::move(caller.stack);
+    loopStartStack = std::move(caller.loopStartStack);
+    ifElseStack = std::move(caller.ifElseStack);
+    blockStack = std::move(caller.blockStack);
+    switchStack = std::move(caller.switchStack);
+    tryStack = std::move(caller.tryStack);
+    pc = caller.pc;
+    blockDepth = caller.blockDepth;
+}
+
+// Hoàn tất function hiện tại rồi tiếp tục caller mà không quay qua native C++
+// recursion. Constructor dùng continuation riêng để bỏ return value của hàm
+// `khởi tạo` và đưa instance vừa tạo lên caller stack.
+bool VM::completeFunctionCall() {
+    if (executionStack.empty()) return false;
+
+    const bool hasReturnValue = !stack.empty();
+    StackValue returnValue = hasReturnValue ? stack.back() : make_null_value();
+    const CallReturnMode returnMode = executionStack.back().returnMode;
+    InstanceHandle constructorInstance = executionStack.back().constructorInstance;
+
+    restoreCallerExecutionContext();
+    if (returnMode == CallReturnMode::ConstructorInstance) {
+        stack.push_back(make_instance_value(std::move(constructorInstance)));
+    } else if (hasReturnValue) {
+        stack.push_back(std::move(returnValue));
+    }
+    ++pc;
+    return true;
+}
+
+// Tìm handler gần nhất xuyên qua explicit execution contexts. Side effect trên
+// variables/classTable đã nằm chung trong VM nên không cần copy/move state khi
+// unwind như mô hình child VM cũ.
+bool VM::unwindLanguageException(const StackValue &value) {
+    if (transferThrownValue(value)) return true;
+    while (!executionStack.empty()) {
+        restoreCallerExecutionContext();
+        if (transferThrownValue(value)) return true;
+    }
+    return false;
+}
+
+// RuntimeError không được bắt bởi `thử/bắt lỗi`; gom source frame của callee và
+// từng caller trong lúc unwind explicit contexts để giữ nguyên stack trace.
+void VM::unwindRuntimeError(vietvm::runtime::RuntimeError &error) {
+    error.addFrame(sourceLocationForPc(pc));
+    while (!executionStack.empty()) {
+        restoreCallerExecutionContext();
+        error.addFrame(sourceLocationForPc(pc));
+    }
 }
 
 // Xử lý nhóm opcode gọi hàm/phương thức; hàm lấy đối số từ stack, xác định đích gọi và chuyển quyền điều khiển sang function tương ứng.
@@ -1463,11 +1542,11 @@ void VM::executeObjectOpcode(const Instruction& instr) {
                         vietvm::runtime::runtimeMemberFacts(
                             "khởi tạo", true, true, true, true, false));
                 }
-                const std::size_t stackBase = stack.size() - static_cast<std::size_t>(argc);
                 invokeFunction(argc, constructor->second.functionId,
                                instr.op, static_cast<int>(pc),
-                               instance, klass);
-                stack.resize(stackBase);
+                               instance, klass, nullptr,
+                               CallReturnMode::ConstructorInstance, instance);
+                return;
             } else if (argc != 0) {
                 throw vietvm::runtime::RuntimeError(
                     vietvm::messages::formatMessage(
@@ -2097,9 +2176,32 @@ void VM::executeOutputOpcode(const Instruction& instr) {
 
 // Chạy vòng lặp VM từ bytecode hiện tại; mỗi bước đọc opcode tại program counter và chuyển tới handler tương ứng cho tới khi dừng.
 void VM::run() {
-    VMRuntimeFixture runtime(*this);
     vietvm::runtime::RuntimeHeapScope heapScope(*runtimeHeap);
     initializeModules();
+
+    if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit)
+     || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
+        if (runJitCompiledLinear()) {
+            return;
+        }
+    }
+
+    if (functionTableByNameIndex.empty()) {
+        for (const Instruction &candidate : bytecode) {
+            if (candidate.op == OP_HAM && candidate.operand >= 0) {
+                functionTableByNameIndex[candidate.operand] = candidate.operandIndex;
+            }
+        }
+    }
+
+    runInterpreterLoop();
+}
+
+// Thực thi bytecode bằng một vòng lặp duy nhất. Mỗi lời gọi V++ chỉ thay context
+// hiện tại và đẩy snapshot caller vào `executionStack`, vì vậy recursion của
+// ngôn ngữ không tạo thêm native C++ stack frame.
+void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
+    VMRuntimeFixture runtime(*this);
     int gcInterval = vietvm::constants::kDefaultGcInterval;
     std::optional<std::string> gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVppGcInterval);
     if (!gcEnv) gcEnv = vietvm::helpers::getEnvVar(vietvm::constants::kEnvVietvmGcInterval);
@@ -2110,23 +2212,18 @@ void VM::run() {
         } catch (...) {}
     }
 
-    if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit)
-     || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
-        if (runJitCompiledLinear()) {
+    int executedSinceGc = 0;
+    while (true) {
+        if (stopExecutionDepth.has_value() &&
+            executionStack.size() <= *stopExecutionDepth) {
             return;
         }
-    }
-
-    int executedSinceGc = 0;
-    if (functionTableByNameIndex.empty()) {
-        for (const Instruction &candidate : bytecode) {
-            if (candidate.op == OP_HAM && candidate.operand >= 0) {
-                functionTableByNameIndex[candidate.operand] = candidate.operandIndex;
-            }
+        if (pc >= bytecode.size()) {
+            if (completeFunctionCall()) continue;
+            collectGarbage();
+            return;
         }
-    }
 
-    while (pc < bytecode.size()) {
         ++executedSinceGc;
         if (executedSinceGc >= gcInterval) {
             collectGarbage();
@@ -2147,9 +2244,12 @@ void VM::run() {
                 break;
 
             case OP_GOI:
-            case OP_GOI_GIAN_TIEP:
-                runtime.executeCall(instr);
+            case OP_GOI_GIAN_TIEP: {
+                const std::size_t executionDepth = executionStack.size();
+                executeCallOpcode(instr);
+                if (executionStack.size() > executionDepth) continue;
                 break;
+            }
 
             case OP_BIEN_SO:
             case OP_TEN_BIEN_ID:
@@ -2199,9 +2299,12 @@ void VM::run() {
             case OP_TAO_DOI_TUONG:
             case OP_DOC_THUOC_TINH:
             case OP_GAN_THUOC_TINH:
-            case OP_GOI_PHUONG_THUC:
-                runtime.executeObject(instr);
+            case OP_GOI_PHUONG_THUC: {
+                const std::size_t executionDepth = executionStack.size();
+                executeObjectOpcode(instr);
+                if (executionStack.size() > executionDepth) continue;
                 break;
+            }
 
             case OP_IN:
                 runtime.executeOutput(instr);
@@ -2209,6 +2312,7 @@ void VM::run() {
 
             case OP_TRA_VE:
                 if (stack.empty()) stack.push_back(make_int_value(0));
+                if (completeFunctionCall()) continue;
                 return;
 
             case OP_BO_QUA:
@@ -2228,6 +2332,7 @@ void VM::run() {
                 break;
 
             case OP_DUNG_CHUONG_TRINH:
+                if (completeFunctionCall()) continue;
                 collectGarbage();
                 return;
 
@@ -2251,13 +2356,12 @@ void VM::run() {
                     vietvm::messages::kVmUnknownOpcode), instr.op, pc);
             }
         } catch (const vietvm::runtime::LanguageException &thrown) {
-            if (!transferThrownValue(thrown.value())) throw;
+            if (!unwindLanguageException(thrown.value())) throw;
             continue;
         } catch (vietvm::runtime::RuntimeError &error) {
-            error.addFrame(sourceLocationForPc(pc));
+            unwindRuntimeError(error);
             throw;
         }
         ++pc;
     }
-    collectGarbage();
 }
