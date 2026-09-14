@@ -12,6 +12,7 @@
 #include "vm/vm.h"
 #include "frontend/keywords.h"
 #include "vpp/compiler/pipeline.h"
+#include "vpp/runtime/error.h"
 #include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
@@ -86,11 +87,18 @@ enum class SnippetMode {
 // Chạy snippet; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runSnippet(const std::string &source,
                       const fs::path &resolutionBase,
-                      SnippetMode mode) {
+                      SnippetMode mode,
+                      const fs::path &sourceIdentity = {}) {
     const bool emitMainCall = mode == SnippetMode::Execute ||
                               mode == SnippetMode::Disassemble;
     vietvm::compiler::CompilationContext compilationContext;
     compilationContext.importResolutionBase = resolutionBase;
+    if (!sourceIdentity.empty()) {
+        compilationContext.currentSourceIdentity =
+            sourceIdentity.lexically_normal().u8string();
+    } else {
+        compilationContext.currentSourceIdentity = "<memory>";
+    }
     vietvm::compiler::CompilationArtifacts artifacts =
         vietvm::compiler::compilePipeline(
             compilationContext, source, keywordMap, emitMainCall);
@@ -118,11 +126,14 @@ static int runSnippet(const std::string &source,
     VM vm(artifacts.bytecode, stringPool);
     connectVmOutput(vm);
     vm.hamBytecodeMap = compilationContext.functionBytecode;
+    vm.setDebugInfo(artifacts.bytecodeDebugInfo,
+                    compilationContext.functionDebugInfo);
     for (const auto &entry : compilationContext.functionNameIndices) {
         vm.functionTableByNameIndex[entry.second] = entry.first;
     }
     for (const auto &module : compilationContext.moduleInitializers) {
-        (void)vm.addModuleInitializer(module.identity, module.bytecode);
+        (void)vm.addModuleInitializer(module.identity, module.bytecode,
+                                      module.debugInfo);
     }
 
     // Relative runtime file/database paths historically resolve beside the
@@ -155,7 +166,10 @@ static int runFile(const std::string &filename,
         return EXIT_FAILURE;
     }
 
-    return runSnippet(source, fileDir.empty() ? fs::current_path() : fileDir, mode);
+    return runSnippet(source,
+                      fileDir.empty() ? fs::current_path() : fileDir,
+                      mode,
+                      filePath);
 }
 
 // Chạy repl; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
@@ -176,7 +190,11 @@ static int runRepl() {
 
         std::string source = "nhập \"stdlib\";\n" + line;
         try {
-            (void)runSnippet(source, fs::current_path(), SnippetMode::Execute);
+            (void)runSnippet(source, fs::current_path(), SnippetMode::Execute,
+                             fs::path("<repl>"));
+        } catch (const vietvm::runtime::RuntimeError &error) {
+            printErrorMessage(messages::kReplExecutionFailed,
+                              vietvm::runtime::formatRuntimeError(error));
         } catch (const std::exception &ex) {
             printErrorMessage(messages::kReplExecutionFailed, ex.what());
         }
@@ -846,7 +864,8 @@ int main(int argc, char* argv[]) {
                 defaultPath.parent_path().empty()
                     ? fs::current_path()
                     : defaultPath.parent_path(),
-                SnippetMode::Execute);
+                SnippetMode::Execute,
+                defaultPath);
         }
 
         std::string testDir = "../../src/tests";
@@ -864,13 +883,18 @@ int main(int argc, char* argv[]) {
                         testPath.parent_path().empty()
                             ? fs::current_path()
                             : testPath.parent_path(),
-                        SnippetMode::Execute);
+                        SnippetMode::Execute,
+                        testPath);
                 }
             }
         } else {
             std::cerr << messages::formatMessage(messages::kCliTestsDirectoryMissing) << '\n';
         }
 
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        printErrorMessage(messages::kCliUnhandledException,
+                          vietvm::runtime::formatRuntimeError(error));
+        return EXIT_FAILURE;
     } catch (const std::exception &ex) {
         printErrorMessage(messages::kCliUnhandledException, ex.what());
         return EXIT_FAILURE;

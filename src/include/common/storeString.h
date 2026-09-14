@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../vm/instruction.h"
+#include "vpp/runtime/debug.h"
 
 namespace vietvm::compiler {
     // Lưu metadata truy cập của một phương thức đã biên dịch như lớp sở hữu và visibility; registry dùng nó để kiểm tra lời gọi hợp lệ.
@@ -18,6 +19,7 @@ namespace vietvm::compiler {
     struct CompiledModuleInitializer {
         std::string identity;
         std::vector<Instruction> bytecode;
+        std::vector<vietvm::runtime::RuntimeSourceLocation> debugInfo;
     };
 
     // Ghi một hàm thuộc bề mặt export của module bằng tên nhìn từ chính module đó
@@ -33,6 +35,9 @@ namespace vietvm::compiler {
         std::unordered_map<std::string, int> stringPoolIndexMap;
         std::unordered_map<int, std::vector<Instruction>> functionBytecode;
         std::unordered_map<int, int> functionNameIndices;
+        std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
+            functionDebugInfo;
+        std::vector<vietvm::runtime::RuntimeSourceLocation> rootBytecodeDebugInfo;
         std::unordered_set<std::string> importedFiles;
         std::vector<CompiledModuleInitializer> moduleInitializers;
         std::unordered_map<std::string, std::vector<CompiledModuleFunctionExport>>
@@ -42,6 +47,9 @@ namespace vietvm::compiler {
         // Base directory used to resolve relative imports for this compilation.
         // This is configuration, so clear() intentionally preserves it.
         std::filesystem::path importResolutionBase;
+        // Identity của source đang được hạ IR. Recursive import tạm đổi trường
+        // này sang module con rồi khôi phục module cha sau khi compile xong.
+        std::string currentSourceIdentity;
         int nextFunctionId = 0;
 
         // Tìm chuỗi trong bể của chính compilation state này mà không phụ thuộc active context ẩn.
@@ -65,6 +73,8 @@ namespace vietvm::compiler {
             stringPoolIndexMap.clear();
             functionBytecode.clear();
             functionNameIndices.clear();
+            functionDebugInfo.clear();
+            rootBytecodeDebugInfo.clear();
             importedFiles.clear();
             moduleInitializers.clear();
             moduleFunctionExports.clear();

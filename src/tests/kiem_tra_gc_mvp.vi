@@ -18,6 +18,29 @@ hàm cong_hai_doi_so(a, b) {
     trả về a[0] + b;
 };
 
+hàm tao_vong_sau(so_luong) {
+    goc = [];
+    hien_tai = goc;
+    lặp (i = 0; i < so_luong; i = i + 1) {
+        nut_moi = [];
+        thêm(hien_tai, nut_moi);
+        hien_tai = nut_moi;
+    };
+    thêm(hien_tai, goc);
+    trả về goc;
+};
+
+hàm tao_burst_vong(so_luong) {
+    dem = 0;
+    lặp (i = 0; i < so_luong; i = i + 1) {
+        tam = [];
+        thêm(tam, tam);
+        tam = rỗng;
+        dem = dem + 1;
+    };
+    trả về dem;
+};
+
 lớp NodeGc {
     hàm khởi tạo() {
         mình.links = [];
@@ -54,4 +77,12 @@ hàm main() {
     // Khi đối số thứ hai gọi function riêng, đối số thứ nhất đang nằm trên stack
     // của caller vẫn phải được xem là GC root.
     in cong_hai_doi_so(tao_gia_tri_giu_lai(), tao_gia_tri_thu_hai());
+
+    // Graph sâu có cycle phải sống khi còn root và được thu sau khi bỏ root.
+    vong_sau = tao_vong_sau(96);
+    vong_sau = rỗng;
+
+    // Allocation burst tạo nhiều self-cycle liên tục; integration runner ép
+    // VPP_GC_INTERVAL=1 để collection chen giữa gần như mọi opcode.
+    in tao_burst_vong(128);
 };

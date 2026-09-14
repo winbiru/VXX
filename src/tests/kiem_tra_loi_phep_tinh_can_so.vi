@@ -1,0 +1,4 @@
+// Phép trừ cần hai số; chuỗi ở vế trái phải được hệ thống phát hiện.
+hàm main() {
+    in "abc" - 1;
+};

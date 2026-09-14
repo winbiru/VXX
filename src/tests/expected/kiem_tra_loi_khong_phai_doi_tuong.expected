@@ -1,0 +1,5 @@
+Lỗi: thao tác thuộc tính/phương thức yêu cầu một đối tượng
+Điều đã xảy ra: Chương trình đang cố dùng thuộc tính hoặc phương thức trên một giá trị không phải đối tượng.
+Cách sửa: Hãy kiểm tra giá trị đứng trước dấu chấm và bảo đảm nó là một đối tượng được tạo từ lớp.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_khong_phai_doi_tuong.vi:4:8) [mô đun=src/tests/kiem_tra_loi_khong_phai_doi_tuong.vi]

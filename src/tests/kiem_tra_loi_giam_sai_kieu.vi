@@ -1,0 +1,5 @@
+// -- chỉ có ý nghĩa với giá trị số; chuỗi không số phải bị từ chối rõ ràng.
+hàm main() {
+    chuoi = "abc";
+    chuoi--;
+};

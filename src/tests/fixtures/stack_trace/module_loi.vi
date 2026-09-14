@@ -1,0 +1,5 @@
+// Module fixture cố ý phát sinh lỗi runtime để kiểm tra frame của hàm import
+// giữ đúng file/module nguồn thay vì bị gán sang chương trình entry.
+hàm công khai gâyLỗi() {
+    trả về 21 / 0;
+}

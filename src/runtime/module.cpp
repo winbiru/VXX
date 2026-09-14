@@ -17,9 +17,10 @@ const char *moduleStateName(ModuleState state) noexcept {
 
 // Thêm add; hàm chèn dữ liệu mới vào cấu trúc trạng thái hiện tại và duy trì các chỉ mục liên quan.
 bool ModuleTable::add(std::string identity,
-                      std::vector<Instruction> initializer) {
+                      std::vector<Instruction> initializer,
+                      std::vector<RuntimeSourceLocation> debugInfo) {
     if (identity.empty() || modules_.find(identity) != modules_.end()) return false;
-    RuntimeModule record{identity, std::move(initializer),
+    RuntimeModule record{identity, std::move(initializer), std::move(debugInfo),
                          ModuleState::Uninitialized};
     order_.push_back(identity);
     modules_.emplace(identity, std::move(record));

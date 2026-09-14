@@ -1,0 +1,5 @@
+// Số nguyên không có phần tử để truy cập bằng dấu [].
+hàm main() {
+    gia_tri = 7;
+    in gia_tri[0];
+};

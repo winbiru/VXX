@@ -1,0 +1,5 @@
+Lỗi: không thể gọi phương thức riêng tư: bíMat
+Điều đã xảy ra: Thành viên 'bíMat' có tồn tại nhưng đoạn mã hiện tại không được phép sử dụng nó.
+Cách sửa: Hãy gọi thành viên từ phạm vi được phép hoặc đổi mức truy cập nếu thiết kế của lớp cho phép.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.vi:14:8) [mô đun=src/tests/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.vi]

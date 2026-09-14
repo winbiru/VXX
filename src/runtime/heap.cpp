@@ -39,60 +39,56 @@ std::size_t liveCount(const std::vector<std::weak_ptr<T>> &registry) {
         [](const std::weak_ptr<T> &entry) { return !entry.expired(); }));
 }
 
-void markValue(const StackValue &value,
-               std::unordered_set<const void *> &marked);
-
-void markClass(const ClassHandle &klass,
-               std::unordered_set<const void *> &marked) {
-    if (klass == nullptr || !marked.insert(klass.get()).second) return;
-    markClass(klass->superclass, marked);
-}
-
-void markInstance(const InstanceHandle &instance,
-                  std::unordered_set<const void *> &marked) {
-    if (instance == nullptr || !marked.insert(instance.get()).second) return;
-    markClass(instance->klass, marked);
-    for (const auto &field : instance->fields) markValue(field.second, marked);
-}
-
-void markClosure(const ClosureHandle &closure,
-                 std::unordered_set<const void *> &marked) {
-    if (closure == nullptr || !marked.insert(closure.get()).second) return;
-    for (const auto &capture : closure->captures) {
-        if (capture.second != nullptr) markValue(capture.second->value, marked);
-    }
-}
-
+// Đánh dấu toàn bộ object graph reachable từ một StackValue bằng worklist lặp;
+// cách này tránh dùng native C++ recursion khi list/map/instance graph rất sâu.
 void markValue(const StackValue &value,
                std::unordered_set<const void *> &marked) {
-    if (std::holds_alternative<MapHandle>(value)) {
-        const MapHandle &map = std::get<MapHandle>(value);
-        if (map == nullptr || !marked.insert(map.get()).second) return;
-        for (const auto &entry : map->entries) markValue(entry.second, marked);
-        return;
-    }
-    if (std::holds_alternative<ListHandle>(value)) {
-        const ListHandle &list = std::get<ListHandle>(value);
-        if (list == nullptr || !marked.insert(list.get()).second) return;
-        for (const StackValue &element : list->elements) markValue(element, marked);
-        return;
-    }
-    if (std::holds_alternative<TupleHandle>(value)) {
-        const TupleHandle &tuple = std::get<TupleHandle>(value);
-        if (tuple == nullptr || !marked.insert(tuple.get()).second) return;
-        for (const StackValue &element : tuple->elements) markValue(element, marked);
-        return;
-    }
-    if (std::holds_alternative<ClassHandle>(value)) {
-        markClass(std::get<ClassHandle>(value), marked);
-        return;
-    }
-    if (std::holds_alternative<InstanceHandle>(value)) {
-        markInstance(std::get<InstanceHandle>(value), marked);
-        return;
-    }
-    if (std::holds_alternative<ClosureHandle>(value)) {
-        markClosure(std::get<ClosureHandle>(value), marked);
+    std::vector<StackValue> pending;
+    pending.push_back(value);
+
+    while (!pending.empty()) {
+        StackValue current = std::move(pending.back());
+        pending.pop_back();
+
+        if (std::holds_alternative<MapHandle>(current)) {
+            const MapHandle &map = std::get<MapHandle>(current);
+            if (map == nullptr || !marked.insert(map.get()).second) continue;
+            for (const auto &entry : map->entries) pending.push_back(entry.second);
+            continue;
+        }
+        if (std::holds_alternative<ListHandle>(current)) {
+            const ListHandle &list = std::get<ListHandle>(current);
+            if (list == nullptr || !marked.insert(list.get()).second) continue;
+            for (const StackValue &element : list->elements) pending.push_back(element);
+            continue;
+        }
+        if (std::holds_alternative<TupleHandle>(current)) {
+            const TupleHandle &tuple = std::get<TupleHandle>(current);
+            if (tuple == nullptr || !marked.insert(tuple.get()).second) continue;
+            for (const StackValue &element : tuple->elements) pending.push_back(element);
+            continue;
+        }
+        if (std::holds_alternative<ClassHandle>(current)) {
+            ClassHandle klass = std::get<ClassHandle>(current);
+            while (klass != nullptr && marked.insert(klass.get()).second) {
+                klass = klass->superclass;
+            }
+            continue;
+        }
+        if (std::holds_alternative<InstanceHandle>(current)) {
+            const InstanceHandle &instance = std::get<InstanceHandle>(current);
+            if (instance == nullptr || !marked.insert(instance.get()).second) continue;
+            if (instance->klass != nullptr) pending.emplace_back(instance->klass);
+            for (const auto &field : instance->fields) pending.push_back(field.second);
+            continue;
+        }
+        if (!std::holds_alternative<ClosureHandle>(current)) continue;
+
+        const ClosureHandle &closure = std::get<ClosureHandle>(current);
+        if (closure == nullptr || !marked.insert(closure.get()).second) continue;
+        for (const auto &capture : closure->captures) {
+            if (capture.second != nullptr) pending.push_back(capture.second->value);
+        }
     }
 }
 
@@ -100,13 +96,21 @@ template <typename T, typename Clear>
 std::size_t sweepRegistry(std::vector<std::weak_ptr<T>> &registry,
                           const std::unordered_set<const void *> &marked,
                           Clear clearEdges) {
-    std::size_t swept = 0;
+    // Giữ strong handle cho toàn bộ object sắp sweep trước khi cắt cạnh. Nếu chỉ
+    // lock từng object rồi clear ngay, một graph sâu dạng linked-cycle có thể bị
+    // hủy dây chuyền qua shared_ptr destructor và làm tràn native stack.
+    std::vector<std::shared_ptr<T>> garbage;
+    garbage.reserve(registry.size());
     for (const std::weak_ptr<T> &entry : registry) {
         const std::shared_ptr<T> value = entry.lock();
         if (value == nullptr || marked.count(value.get()) != 0) continue;
-        clearEdges(*value);
-        ++swept;
+        garbage.push_back(value);
     }
+    for (const std::shared_ptr<T> &value : garbage) {
+        clearEdges(*value);
+    }
+    const std::size_t swept = garbage.size();
+    garbage.clear();
     pruneExpired(registry);
     return swept;
 }
@@ -124,29 +128,37 @@ void RuntimeHeap::track(const ClassHandle &value) { trackWeak(classes_, value); 
 void RuntimeHeap::track(const InstanceHandle &value) { trackWeak(instances_, value); }
 void RuntimeHeap::track(const ClosureHandle &value) { trackWeak(closures_, value); }
 
+// Đăng ký toàn bộ object graph bên dưới một StackValue bằng worklist lặp để test,
+// embedding và giá trị tạo ngoài active heap scope không làm tràn native stack.
 void RuntimeHeap::trackValue(const StackValue &value) {
     std::unordered_set<const void *> visited;
-    const auto walk = [&](const auto &self, const StackValue &current) -> void {
+    std::vector<StackValue> pending;
+    pending.push_back(value);
+
+    while (!pending.empty()) {
+        StackValue current = std::move(pending.back());
+        pending.pop_back();
+
         if (std::holds_alternative<MapHandle>(current)) {
             const MapHandle &map = std::get<MapHandle>(current);
-            if (map == nullptr || !visited.insert(map.get()).second) return;
+            if (map == nullptr || !visited.insert(map.get()).second) continue;
             track(map);
-            for (const auto &entry : map->entries) self(self, entry.second);
-            return;
+            for (const auto &entry : map->entries) pending.push_back(entry.second);
+            continue;
         }
         if (std::holds_alternative<ListHandle>(current)) {
             const ListHandle &list = std::get<ListHandle>(current);
-            if (list == nullptr || !visited.insert(list.get()).second) return;
+            if (list == nullptr || !visited.insert(list.get()).second) continue;
             track(list);
-            for (const StackValue &element : list->elements) self(self, element);
-            return;
+            for (const StackValue &element : list->elements) pending.push_back(element);
+            continue;
         }
         if (std::holds_alternative<TupleHandle>(current)) {
             const TupleHandle &tuple = std::get<TupleHandle>(current);
-            if (tuple == nullptr || !visited.insert(tuple.get()).second) return;
+            if (tuple == nullptr || !visited.insert(tuple.get()).second) continue;
             track(tuple);
-            for (const StackValue &element : tuple->elements) self(self, element);
-            return;
+            for (const StackValue &element : tuple->elements) pending.push_back(element);
+            continue;
         }
         if (std::holds_alternative<ClassHandle>(current)) {
             ClassHandle klass = std::get<ClassHandle>(current);
@@ -154,27 +166,25 @@ void RuntimeHeap::trackValue(const StackValue &value) {
                 track(klass);
                 klass = klass->superclass;
             }
-            return;
+            continue;
         }
         if (std::holds_alternative<InstanceHandle>(current)) {
             const InstanceHandle &instance = std::get<InstanceHandle>(current);
-            if (instance == nullptr || !visited.insert(instance.get()).second) return;
+            if (instance == nullptr || !visited.insert(instance.get()).second) continue;
             track(instance);
-            if (instance->klass != nullptr) {
-                self(self, make_class_value(instance->klass));
-            }
-            for (const auto &field : instance->fields) self(self, field.second);
-            return;
+            if (instance->klass != nullptr) pending.emplace_back(instance->klass);
+            for (const auto &field : instance->fields) pending.push_back(field.second);
+            continue;
         }
-        if (!std::holds_alternative<ClosureHandle>(current)) return;
+        if (!std::holds_alternative<ClosureHandle>(current)) continue;
+
         const ClosureHandle &closure = std::get<ClosureHandle>(current);
-        if (closure == nullptr || !visited.insert(closure.get()).second) return;
+        if (closure == nullptr || !visited.insert(closure.get()).second) continue;
         track(closure);
         for (const auto &capture : closure->captures) {
-            if (capture.second != nullptr) self(self, capture.second->value);
+            if (capture.second != nullptr) pending.push_back(capture.second->value);
         }
-    };
-    walk(walk, value);
+    }
 }
 
 RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {

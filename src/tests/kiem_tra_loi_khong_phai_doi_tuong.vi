@@ -1,0 +1,5 @@
+// Số nguyên không thể nhận lời gọi phương thức như một đối tượng.
+hàm main() {
+    gia_tri = 7;
+    in gia_tri.chao();
+};

@@ -17,6 +17,7 @@
 #include "vpp/runtime/heap.h"
 #include "vpp/runtime/value.h"
 #include "vpp/runtime/module.h"
+#include "vpp/runtime/debug.h"
 
 // Cung cấp bề mặt kiểm thử nội bộ cho VM; fixture cho test push stack, đặt frame/class và gọi trực tiếp từng opcode handler mà không chạy cả chương trình.
 class VMRuntimeFixture;
@@ -38,7 +39,14 @@ public:
     void setOutputSink(OutputSink sink);
     // Đăng ký initializer bytecode cho một module theo identity; hàm từ chối identity trùng và lưu code để `initializeModules()` chạy đúng một lần.
     bool addModuleInitializer(std::string identity,
-                              std::vector<Instruction> initializer);
+                              std::vector<Instruction> initializer,
+                              std::vector<vietvm::runtime::RuntimeSourceLocation> debugInfo = {});
+    // Gắn debug metadata song song với root/function bytecode. Metadata không
+    // tham gia semantics bytecode và chỉ được dùng khi dựng stack trace lỗi.
+    void setDebugInfo(
+        std::vector<vietvm::runtime::RuntimeSourceLocation> rootDebugInfo,
+        std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
+            functionDebugInfo);
     // Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
     std::optional<vietvm::runtime::ModuleState> moduleState(
         std::string_view identity) const noexcept;
@@ -53,6 +61,9 @@ private:
 
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
+    std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
+    std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
+        functionDebugInfo;
 
     std::vector<StackValue> stack;                  // data stack (values)
 
@@ -67,6 +78,13 @@ private:
 
     // Call stack for function calls
     std::vector<CallFrame> callStack;
+    // Theo dõi độ sâu lời gọi xuyên qua chuỗi child VM; mỗi child VM chỉ giữ một
+    // call frame cục bộ nên không thể dùng riêng `callStack.size()` để phát hiện
+    // đệ quy quá sâu.
+    std::size_t callDepthFromRoot = 0;
+    // Giới hạn độ sâu lời gọi để lỗi đệ quy được báo có kiểm soát trước khi làm
+    // tràn native C++ stack. Fixture có thể hạ giới hạn này cho regression test.
+    std::size_t maxCallDepth = 256;
 
     // helper stacks for control-flow
     std::vector<size_t> loopStartStack;
@@ -158,6 +176,8 @@ private:
     void emitOutput(const StackValue& value);
     // Khởi tạo các module runtime theo thứ tự phụ thuộc; tracker bảo đảm mỗi initializer chỉ chạy một lần và ghi trạng thái thành công/thất bại.
     void initializeModules();
+    // Trả source frame ứng với PC hiện tại nếu compiler đã cung cấp debug metadata.
+    vietvm::runtime::RuntimeSourceLocation sourceLocationForPc(std::size_t value) const;
 
     // Chụp toàn bộ root StackValue mà tracing GC phải giữ sống, gồm stack, biến,
     // call frame, class table, switch value và root kế thừa từ VM caller.

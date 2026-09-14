@@ -1,0 +1,5 @@
+Lỗi: đọc tệp: không thể mở tệp để đọc
+Điều đã xảy ra: Tác vụ 'đọc tệp' đã được gọi nhưng hệ điều hành hoặc thư viện bên dưới không thực hiện được. Chi tiết: đọc tệp: không thể mở tệp để đọc
+Cách sửa: Hãy kiểm tra dữ liệu truyền vào, tệp/đường dẫn, quyền truy cập hoặc kết nối mà tác vụ này cần.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_doc_tep_that_bai.vi:5:8) [mô đun=src/tests/kiem_tra_loi_doc_tep_that_bai.vi]

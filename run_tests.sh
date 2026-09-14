@@ -281,6 +281,85 @@ for testfile in "${TESTS[@]}"; do
   fi
 done
 
+echo "== Running src/tests/kiem_tra_de_quy_vuot_gioi_han.vi [expected runtime failure] =="
+call_depth_test="src/tests/kiem_tra_de_quy_vuot_gioi_han.vi"
+call_depth_out="$tmpdir/kiem_tra_de_quy_vuot_gioi_han.output"
+call_depth_exp="src/tests/expected/kiem_tra_de_quy_vuot_gioi_han.expected"
+"$EXEC_PATH" "$call_depth_test" > "$call_depth_out" 2>&1
+call_depth_status=$?
+if [ "$call_depth_status" -eq 0 ]; then
+  echo "FAIL: $call_depth_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
+elif diff -u "$call_depth_exp" "$call_depth_out"; then
+  echo "PASS: $call_depth_test"; PASS=$((PASS+1))
+else
+  echo "FAIL: $call_depth_test"; FAIL=$((FAIL+1))
+fi
+
+echo "== Running src/tests/kiem_tra_stack_trace.vi [expected runtime failure] =="
+stack_trace_test="src/tests/kiem_tra_stack_trace.vi"
+stack_trace_out="$tmpdir/kiem_tra_stack_trace.output"
+stack_trace_exp="src/tests/expected/kiem_tra_stack_trace.expected"
+"$EXEC_PATH" "$stack_trace_test" > "$stack_trace_out" 2>&1
+stack_trace_status=$?
+if [ "$stack_trace_status" -eq 0 ]; then
+  echo "FAIL: $stack_trace_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
+elif diff -u "$stack_trace_exp" "$stack_trace_out"; then
+  echo "PASS: $stack_trace_test"; PASS=$((PASS+1))
+else
+  echo "FAIL: $stack_trace_test"; FAIL=$((FAIL+1))
+fi
+
+echo "== Running src/tests/kiem_tra_stack_trace_module.vi [expected runtime failure] =="
+stack_trace_module_test="src/tests/kiem_tra_stack_trace_module.vi"
+stack_trace_module_out="$tmpdir/kiem_tra_stack_trace_module.output"
+stack_trace_module_exp="src/tests/expected/kiem_tra_stack_trace_module.expected"
+"$EXEC_PATH" "$stack_trace_module_test" > "$stack_trace_module_out" 2>&1
+stack_trace_module_status=$?
+if [ "$stack_trace_module_status" -eq 0 ]; then
+  echo "FAIL: $stack_trace_module_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
+elif diff -u "$stack_trace_module_exp" "$stack_trace_module_out"; then
+  echo "PASS: $stack_trace_module_test"; PASS=$((PASS+1))
+else
+  echo "FAIL: $stack_trace_module_test"; FAIL=$((FAIL+1))
+fi
+
+# Các ca lỗi runtime dưới đây khóa cơ chế chẩn đoán từ trạng thái thực tế: VM phải
+# tự suy ra nguyên nhân và giải thích mà không cần nơi phát sinh gắn mã lỗi.
+for runtime_failure_test in \
+  src/tests/kiem_tra_loi_chia_cho_0.vi \
+  src/tests/kiem_tra_loi_chia_du_cho_0.vi \
+  src/tests/kiem_tra_loi_can_so_nguyen.vi \
+  src/tests/kiem_tra_loi_phep_tinh_can_so.vi \
+  src/tests/kiem_tra_loi_so_sanh_khac_kieu.vi \
+  src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi \
+  src/tests/kiem_tra_loi_kieu_chi_so.vi \
+  src/tests/kiem_tra_loi_du_lieu_khong_the_danh_chi_so.vi \
+  src/tests/kiem_tra_loi_ham_khong_ton_tai.vi \
+  src/tests/kiem_tra_loi_gia_tri_khong_the_goi.vi \
+  src/tests/kiem_tra_loi_sai_so_luong_doi_so.vi \
+  src/tests/kiem_tra_loi_khong_phai_doi_tuong.vi \
+  src/tests/kiem_tra_loi_thuoc_tinh_khong_ton_tai.vi \
+  src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi \
+  src/tests/kiem_tra_loi_truy_cap_thanh_vien_bi_cam.vi \
+  src/tests/kiem_tra_loi_tang_sai_kieu.vi \
+  src/tests/kiem_tra_loi_giam_sai_kieu.vi \
+  src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi \
+  src/tests/kiem_tra_loi_doc_tep_that_bai.vi; do
+  runtime_failure_name="$(basename "$runtime_failure_test" .vi)"
+  runtime_failure_out="$tmpdir/${runtime_failure_name}.output"
+  runtime_failure_exp="src/tests/expected/${runtime_failure_name}.expected"
+  echo "== Running $runtime_failure_test [expected runtime failure] =="
+  "$EXEC_PATH" "$runtime_failure_test" > "$runtime_failure_out" 2>&1
+  runtime_failure_status=$?
+  if [ "$runtime_failure_status" -eq 0 ]; then
+    echo "FAIL: $runtime_failure_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
+  elif diff -u "$runtime_failure_exp" "$runtime_failure_out"; then
+    echo "PASS: $runtime_failure_test"; PASS=$((PASS+1))
+  else
+    echo "FAIL: $runtime_failure_test"; FAIL=$((FAIL+1))
+  fi
+done
+
 echo "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
 jit_out="$tmpdir/kiem_tra_jit_mvp.output"
 jit_exp="src/tests/expected/kiem_tra_jit_mvp.expected"

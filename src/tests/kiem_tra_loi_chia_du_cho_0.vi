@@ -1,0 +1,4 @@
+// Chia lấy dư cho 0: phép % không thể thực hiện khi số chia bằng 0.
+hàm main() {
+    in 10 % 0;
+};

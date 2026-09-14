@@ -1,0 +1,6 @@
+// Đọc tệp chắc chắn không tồn tại để kiểm tra lỗi từ thư viện/hệ điều hành.
+nhập gói/chuẩn/main.vi;
+
+hàm main() {
+    in đọc tệp(".vpp_tep_chac_chan_khong_ton_tai_kiem_tra_loi.txt");
+};

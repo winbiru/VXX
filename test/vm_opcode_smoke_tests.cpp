@@ -171,7 +171,8 @@ void testOpcodeErrorMatrix() {
 
     expectRuntimeError(
         {integer(4), integer(0), opcode(OP_CHIA), opcode(OP_DUNG_CHUONG_TRINH)},
-        std::string(vietvm::messages::kVmDivisionByZero),
+        vietvm::messages::formatMessage(vietvm::messages::kVmDivisionByZero,
+                                        {"4", "0"}),
         "division rejects zero divisor");
 
     expectRuntimeError(

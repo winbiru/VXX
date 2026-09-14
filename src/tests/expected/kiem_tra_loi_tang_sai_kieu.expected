@@ -1,0 +1,5 @@
+Lỗi: giá trị không phải số nguyên
+Điều đã xảy ra: Chương trình đang tăng thêm 1 cho một giá trị thuộc loại 'danh sách', loại này không thể tăng như một con số.
+Cách sửa: Hãy dùng ++ với giá trị số hoặc chuyển dữ liệu sang số trước khi tăng.
+Dấu vết lỗi:
+  ở main (src/tests/kiem_tra_loi_tang_sai_kieu.vi:4:5) [mô đun=src/tests/kiem_tra_loi_tang_sai_kieu.vi]

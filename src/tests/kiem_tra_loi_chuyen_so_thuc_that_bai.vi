@@ -1,0 +1,6 @@
+// Chuyển một chuỗi không phải số thành số thực phải được giải thích là lỗi chuyển kiểu.
+nhập gói/chuẩn/main.vi;
+
+hàm main() {
+    in thành số thực("abc");
+};

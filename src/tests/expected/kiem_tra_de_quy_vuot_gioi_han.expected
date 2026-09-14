@@ -1,0 +1,6 @@
+Lỗi: Độ sâu lời gọi vượt giới hạn 256 khi gọi 'điSâu'
+Điều đã xảy ra: Hàm 'điSâu' đã gọi lồng quá 256 lần. Thường là một hàm cứ gọi lại chính nó mà chưa đi tới điều kiện dừng.
+Cách sửa: Hãy kiểm tra điều kiện dừng. Mỗi lần gọi lại phải làm dữ liệu tiến gần hơn tới trường hợp dừng.
+Dấu vết lỗi:
+  ở điSâu (src/tests/kiem_tra_de_quy_vuot_gioi_han.vi:4:16) [mô đun=src/tests/kiem_tra_de_quy_vuot_gioi_han.vi] [lặp lại 255 khung]
+  ở main (src/tests/kiem_tra_de_quy_vuot_gioi_han.vi:8:8) [mô đun=src/tests/kiem_tra_de_quy_vuot_gioi_han.vi]

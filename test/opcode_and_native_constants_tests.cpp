@@ -51,7 +51,7 @@ int main() {
 
     ok &= expect(vietvm::bytecode::opcodeName(OP_DONG_LENH) == "OP_DONG_LENH",
                  "OP_DONG_LENH must have a canonical name");
-    ok &= expect(vietvm::bytecode::opcodeName(static_cast<Opcode>(-1)) == "UNKNOWN_OPCODE",
+    ok &= expect(vietvm::bytecode::opcodeName(-1) == "UNKNOWN_OPCODE",
                  "unknown opcodes must preserve their fallback name");
 
     ok &= expect(std::string(vietvm::constants::kHttpMethodDelete) == "DELETE",

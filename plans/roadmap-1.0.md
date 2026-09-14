@@ -40,15 +40,23 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 ## 2. Runtime và VM ổn định dưới tải
 
 - [x] Runtime object model, superclass dispatch và tracing GC có cycle sweep đã chạy end-to-end.
-- [ ] Xây GC stress suite: object graph lớn, allocation liên tục, cycle sâu/phức tạp, object
-  sống qua function/module con và collection ở interval thấp.
-- [ ] Stress call stack: recursion sâu, nested call, nested exception và stack overflow phải
-  báo lỗi có kiểm soát thay vì làm hỏng VM state.
-- [ ] Bổ sung invariant/regression để runtime error không làm corrupt stack, call frame,
-  module lifecycle hoặc heap roots cho lần chạy tiếp theo.
-- [ ] Chạy ASan/UBSan/LSan hoặc công cụ tương đương cho stress suite; xử lý leak/use-after-free
-  trước release candidate.
-- [ ] Xây stack trace có source file, line/column, function/method và module identity.
+- [x] Xây GC stress suite: marker/`trackValue()` dùng worklist lặp; unit test khóa cycle sâu
+  4.096 node + burst 1.024 self-cycle, còn regression `.vi` khóa graph sâu/allocation liên tục,
+  caller root qua child VM và collection với `VPP_GC_INTERVAL=1`.
+- [x] Stress call stack: regression `.vi` chạy recursion sâu + exception xuyên nhiều child VM;
+  VM giới hạn độ sâu lời gọi ở 256 và trả `CallBoundary` có diagnostic ổn định thay vì tràn
+  native C++ stack. Handler unit khóa việc unwind call frame sau lỗi.
+- [x] Bổ sung invariant/regression để runtime error không làm corrupt stack, call frame,
+  module lifecycle hoặc heap roots cho lần chạy tiếp theo. Handler unit khóa cùng VM tiếp tục
+  gọi function hợp lệ sau `VmFault`, caller stack/root vẫn nguyên và module failed-state ổn định.
+- [ ] Chạy ASan/UBSan/LSan hoặc công cụ tương đương cho stress suite; local AppleClang
+  ASan+UBSan hiện xanh 16/16 sau khi sửa UB opcode và GC destructor-chain stack overflow.
+  Ubuntu CI đã ép `detect_leaks=1`; cần một lượt CI Linux xanh để đóng leak gate.
+- [x] Xây stack trace có source file, line/column, function/method và module identity;
+  debug metadata đi song song bytecode nên không thay đổi layout `Instruction`/ABI snapshot,
+  `RuntimeError` giữ frame có cấu trúc và CLI nén frame đệ quy lặp liên tiếp. Diagnostic runtime
+  dùng mã ổn định `VPP-Rxxxx` + catalog tập trung để sinh nhóm lỗi, giải thích và gợi ý mà
+  không parse chuỗi `what()` hoặc lộ opcode/program counter nội bộ.
 - [ ] Bổ sung benchmark dài hạn và profiler/event hook cho CPU/timing/allocation/GC latency;
   chỉ tối ưu JIT/dispatch dựa trên số đo.
 
@@ -117,8 +125,8 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [x] Object model + `mình`/`gốc` + constructor.
 - [x] Kế thừa class + interface/`triển khai`.
 - [x] Tracing GC + cycle sweep.
-- [ ] GC/runtime stress suite + stack overflow/nested exception hardening.
-- [ ] Stack trace có source span/function/module.
+- [x] GC/runtime stress + VM-state invariant + stack overflow/nested exception hardening.
+- [x] Stack trace có source span/function/module.
 
 ### V++ 0.9 — Developer ecosystem
 

@@ -1,0 +1,5 @@
+// Phép chia dư cần số nguyên; danh sách không thể dùng làm số chia.
+hàm main() {
+    ds = [1, 2];
+    in 10 % ds;
+};

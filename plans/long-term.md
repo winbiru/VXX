@@ -54,9 +54,9 @@ concurrency/async phức tạp không phải release blocker mặc định của
       fixup; shared mixed-backend context còn thiếu.
    6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
       vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
-      đạt 86/86 direct IR và vẫn giữ snapshot compiler state đã chốt.
+      đạt 94/94 direct IR và vẫn giữ snapshot compiler state đã chốt.
 
-   Hiện direct backend bao phủ 86/86 regression program; parity gate yêu cầu toàn bộ
+   Hiện direct backend bao phủ 94/94 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
@@ -127,13 +127,22 @@ concurrency/async phức tạp không phải release blocker mặc định của
      object không reachable nên thu được cả shared_ptr cycle; closure capture dùng shared cell
      theo tham chiếu, giữ lifetime qua outer return và GC cắt được closure↔cell cycle. Regression
      khóa instance↔list, self-cycle list/map, argument caller và nested closure mutation.
-   - [ ] **Runtime/GC stress trước 1.0** — khóa object graph lớn, allocation liên tục,
+   - [x] **Runtime/GC stress trước 1.0** — khóa object graph lớn, allocation liên tục,
      cycle sâu, caller roots qua child VM, recursion sâu, nested exception và stack overflow;
      runtime error không được làm corrupt stack/call frame/module/heap state cho lần chạy sau.
+     Phần call stack đã có regression recursion sâu + exception xuyên child VM và giới hạn
+     256 tầng trả `CallBoundary` có kiểm soát. GC stress đã có graph 4.096 node, burst 1.024
+     cycle và `.vi` interval 1. Handler invariant khóa stack/call frame/heap root sau `VmFault`,
+     cùng VM gọi tiếp được function hợp lệ; module failed-state vẫn giữ contract riêng.
    - [ ] **Leak/sanitizer gate** — chạy stress suite qua ASan/UBSan và leak checker phù hợp;
-     mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC.
-   - [ ] Xây stack trace có source span/function/module identity và debugger hook cho
-     breakpoint, step, frame/variable inspection trước khi làm debugger UI đầy đủ.
+     mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC. Local
+     AppleClang ASan+UBSan đã chạy full CTest 16/16; quá trình này phát hiện và đã sửa
+     invalid-enum UB cùng destructor-chain stack overflow ở GC. Ubuntu CI hiện ép
+     `ASAN_OPTIONS=detect_leaks=1`; leak gate chờ CI Linux xác nhận.
+   - [ ] Stack trace có source span/function/method/module identity đã hoàn tất bằng debug
+     metadata song song bytecode, structured `RuntimeError` và CLI formatter có nén frame
+     đệ quy. Phần còn lại của đầu việc là debugger hook cho breakpoint, step và
+     frame/variable inspection trước khi làm debugger UI đầy đủ.
    - [ ] **Profiler production** — bổ sung CPU/timing/allocation sampling hoặc event
      hooks có thể gắn vào VM/compiler; benchmark hiện tại chỉ là baseline đo lặp lại,
      chưa phải profiler cho chương trình V++.
