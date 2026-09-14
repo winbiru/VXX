@@ -1,6 +1,7 @@
 nhập src/tests/fixtures/api_project/database.vi;
+nhập src/tests/fixtures/api_project/giao_dien/repository.vi;
 
-lớp công khai UserRepository {
+lớp công khai UserRepository triển khai UserRepositoryContract {
     hàm công khai findAllUsers(dbSession) {
         trả về db query(dbSession, "SELECT * FROM users");
     };

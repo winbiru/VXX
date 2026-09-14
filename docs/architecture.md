@@ -39,23 +39,24 @@ CMake định nghĩa các target `vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vp
 CLI compile source rồi copy function bytecode/name table vào `VM`. VM không còn đọc `compiler::hamMap` hay `StringPool` global ở runtime. Điều này làm runtime có thể nhận bytecode từ nguồn khác ngoài CLI.
 
 Top-level compile hiện đã có `CompilationContext` sở hữu `StringPool`, function maps,
-import set, class/access state và `importResolutionBase` của riêng compilation. Các API
-legacy `StringPool` và `hamMap` chỉ còn là facade trỏ tới context đang active trên thread
-hiện tại, nên recursive import vẫn dùng chung đúng session mà caller không phải đọc
-global state. Hai top-level compilation độc lập trên hai thread đã có regression kiểm
-tra isolation cả registry lẫn import path, kể cả hai module cùng tên nằm ở hai thư mục
-khác nhau. Public embedding API/`BytecodeProgram` vẫn chưa chốt.
+import set, class/access state và `importResolutionBase` của riêng compilation. Production
+pipeline truyền registry tường minh qua direct codegen, callable lookup và recursive import;
+không còn bind `CompilationContext` vào active registry thread-local. `StringPool`, `hamMap`,
+context-less `compilePipeline(...)` và `resetCompilationState()` chỉ còn là compatibility API
+cho test/caller cũ. CLI, tooling lint và `compileSource()` đều tạo/dùng `CompilationContext`
+riêng. Hai top-level compilation độc lập trên hai thread đã có regression kiểm tra isolation
+cả registry lẫn import path, kể cả hai module cùng tên nằm ở hai thư mục khác nhau; regression
+khác cố ý đặt một legacy active registry chứa dữ liệu "poison" rồi xác nhận context-driven
+compile không đọc hay ghi registry đó. Public embedding API/`BytecodeProgram` vẫn chưa chốt.
 
-Lifecycle hiện tại được khóa như sau: một top-level compilation phải đi qua
-`resetCompilationState()` hoặc overload `compilePipeline(CompilationContext&, ...)`.
-Reset này xóa state của registry đang active. Overload có `CompilationContext` bind
-context làm owner trước compile; `StringPool`, function bytecode/name registries,
-import set và class/access-control state vì thế được ghi trực tiếp vào context thay vì
-snapshot từ storage toàn cục sau cùng. Recursive import không reset giữa chừng vì
-module con phải dùng chung registry của compilation đang hoạt động. Relative import
-được resolve từ `CompilationContext.importResolutionBase`; CLI truyền thư mục của entry
-source vào context nên compiler không cần đổi process cwd. Để giữ hành vi tương thích
-cho native file/database dùng path tương đối, CLI chỉ đổi cwd trong scope `VM::run()`.
+Lifecycle production hiện tại được khóa như sau: top-level caller tạo
+`CompilationContext`, `compilePipeline(CompilationContext&, ...)` xóa state transient cũ
+rồi truyền context xuyên suốt frontend → codegen. Recursive import gọi
+`compilePipelineInRegistry(..., topLevel=false)` trên chính registry đó nên module con giữ
+chung StringPool/function/module metadata mà không cần global binding. Relative import được
+resolve từ `CompilationContext.importResolutionBase`; CLI truyền thư mục của entry source
+vào context nên compiler không cần đổi process cwd. Để giữ hành vi tương thích cho native
+file/database dùng path tương đối, CLI chỉ đổi cwd trong scope `VM::run()`.
 
 `VM::run()` hiện giữ lifecycle/GC và routing; logic opcode đã được tách thành các
 handler theo nhóm. Unit test handler dùng `VMRuntimeFixture` ở
@@ -167,7 +168,7 @@ có kiểu.
 
 Compiler hiện chỉ có một production backend: **Direct IR → bytecode**. Nếu program chứa
 region mà direct emitter chưa hỗ trợ, pipeline báo lỗi compiler tường minh thay vì
-materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **78 chương
+materialize token rồi chuyển sang backend cũ. Regression gate khóa toàn bộ **79 chương
 trình `.vi`** trong corpus ở direct IR.
 
 CLI đưa ranh giới này ra dùng thực tế qua `--dump-ast <file.vi>` và

@@ -140,6 +140,10 @@ if (
   cd "$scaffold_dir" &&
   VPP_HOME="$ROOT_DIR" "$EXEC_PATH" khởi tạo backend demo-api &&
   test -f demo-api/application.vi &&
+  test -f demo-api/config.vi &&
+  test -f demo-api/controller.vi &&
+  test -f demo-api/router.vi &&
+  test -f demo-api/server.vi &&
   test -f demo-api/application.properties &&
   test -f demo-api/README.md &&
   test -f demo-api/.gitignore &&
@@ -245,6 +249,7 @@ TESTS=(
   src/tests/kiem_tra_receiver_minh_de_quy.vi
   src/tests/kiem_tra_ke_thua.vi
   src/tests/kiem_tra_giao_dien_trien_khai.vi
+  src/tests/kiem_tra_hoi_quy_tong_hop.vi
   src/tests/kiem_tra_cu_phap_modifier_cu.vi
   src/tests/kiem_tra_tra_ve.vi
   src/tests/program.vi

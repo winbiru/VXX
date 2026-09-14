@@ -10,6 +10,8 @@
 
 namespace vietvm::compiler {
 
+struct CompilationRegistryState;
+
 // Tổng hợp kết quả kiểm tra backend direct IR, gồm số vùng chưa hỗ trợ và thông tin để pipeline quyết định có thể phát bytecode trực tiếp hay không.
 struct DirectIrSupport {
     bool supported = false;
@@ -20,7 +22,8 @@ struct DirectIrSupport {
 DirectIrSupport analyzeDirectIrSupport(const IrProgram &program);
 
 // Phát bytecode trực tiếp từ IR đã được xác nhận hỗ trợ; emitter ánh xạ lệnh/giá trị IR thành opcode VM và metadata tương ứng.
-std::vector<Instruction> emitDirectBytecode(const IrProgram &program,
+std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
+                                            const IrProgram &program,
                                             const std::unordered_map<std::string, Opcode> &keywordMap,
                                             bool emitMainCall = true);
 

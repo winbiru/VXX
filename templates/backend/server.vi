@@ -1,0 +1,29 @@
+nhập mạng;
+
+// Adapter bao đóng native HTTP server và chuyển request đến router của ứng dụng.
+lớp MáyChủApi {
+    // Nhận cổng lắng nghe và router qua constructor injection.
+    hàm khởi tạo(cổng, router) {
+        mình.cổng = cổng;
+        mình.router = router;
+    }
+
+    // Mở native server và duy trì vòng lặp nhận, định tuyến request liên tục.
+    hàm chạy() {
+        cổng = mình.cổng;
+        router = mình.router;
+        serverId = mạng mở máy chủ api(cổng);
+        lặp(i = 0; i < 2147483647; i = i + 1) {
+            requestId = mạng lấy yêu cầu kế tiếp(serverId);
+            nếu (requestId == "") {
+                bỏ qua;
+            };
+            router.xửLý(requestId);
+        };
+    }
+};
+
+// Tạo server instance đã gắn router nhưng chưa khởi động vòng lặp HTTP.
+hàm công khai tạo máy chủ api(cổng, router) {
+    trả về MáyChủApi(cổng, router);
+}

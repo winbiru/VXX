@@ -28,7 +28,9 @@ lớp công khai UserDto {
     };
 };
 
-lớp công khai UserCreateRequestDto {
+// Các DTO chuyên biệt kế thừa schema chung của UserDto, tương tự mô hình DTO base
+// trong project OOP thực tế.
+lớp công khai UserCreateRequestDto kế thừa UserDto {
     hàm công khai validate(payload) {
         nếu (payload == "") {
             trả về "DTO_ERR|missing-body";
@@ -42,7 +44,7 @@ lớp công khai UserCreateRequestDto {
     };
 };
 
-lớp công khai UserUpdateRequestDto {
+lớp công khai UserUpdateRequestDto kế thừa UserDto {
     hàm công khai validate(userId, payload) {
         nếu (userId == "") {
             trả về "DTO_ERR|missing-user-id";
@@ -59,7 +61,7 @@ lớp công khai UserUpdateRequestDto {
     };
 };
 
-lớp công khai UserSearchRequestDto {
+lớp công khai UserSearchRequestDto kế thừa UserDto {
     hàm công khai validate(keyword) {
         nếu (keyword == "") {
             trả về "DTO_ERR|missing-keyword";
@@ -68,7 +70,7 @@ lớp công khai UserSearchRequestDto {
     };
 };
 
-lớp công khai UserResponseDto {
+lớp công khai UserResponseDto kế thừa UserDto {
     // DTO mẫu cho response user.
     hàm công khai template() {
         trả về UserDto.schema();

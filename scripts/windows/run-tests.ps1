@@ -284,7 +284,16 @@ try {
     $scaffoldProject = Join-Path $scaffoldRoot "demo-api"
     $properties = Join-Path $scaffoldProject "application.properties"
     $scaffoldOk = $scaffoldExit -eq 0
-    foreach ($required in @("application.vi", "application.properties", "README.md", ".gitignore")) {
+    foreach ($required in @(
+        "application.vi",
+        "config.vi",
+        "controller.vi",
+        "router.vi",
+        "server.vi",
+        "application.properties",
+        "README.md",
+        ".gitignore"
+    )) {
         $scaffoldOk = $scaffoldOk -and (Test-Path -LiteralPath (Join-Path $scaffoldProject $required))
     }
     if ($scaffoldOk) {
@@ -396,6 +405,7 @@ try {
         "src/tests/kiem_tra_constructor_tham_so.vi",
         "src/tests/kiem_tra_visibility_instance.vi",
         "src/tests/kiem_tra_giao_dien_trien_khai.vi",
+        "src/tests/kiem_tra_hoi_quy_tong_hop.vi",
         "src/tests/kiem_tra_cu_phap_modifier_cu.vi",
         "src/tests/kiem_tra_tra_ve.vi",
         "src/tests/program.vi"

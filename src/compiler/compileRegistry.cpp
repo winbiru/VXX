@@ -16,73 +16,112 @@
 #include "vpp/core/project_layout.h"
 
 namespace vietvm { namespace compiler {
-    // Trả tập đường dẫn file đã import trong compilation registry; compiler dùng tập này để ngăn import cùng source lặp lại.
-    std::unordered_set<std::string> &importedFileSet() {
-        return activeCompilationRegistryState().importedFiles;
+    // Trả tập import của registry cụ thể để production path không phụ thuộc state thread-local.
+    std::unordered_set<std::string> &importedFileSet(CompilationRegistryState &state) {
+        return state.importedFiles;
     }
 
-    // Xóa imported files; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
-    void clearImportedFiles() { importedFileSet().clear(); }
+    // Trả tập đường dẫn file đã import trong compilation registry; compiler dùng tập này để ngăn import cùng source lặp lại.
+    std::unordered_set<std::string> &importedFileSet() {
+        return importedFileSet(activeCompilationRegistryState());
+    }
 
-    // Xóa lớp access trạng thái; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
-    void clearClassAccessState() {
-        auto &state = activeCompilationRegistryState();
+    // Xóa import state của registry cụ thể.
+    void clearImportedFiles(CompilationRegistryState &state) { state.importedFiles.clear(); }
+
+    // Xóa imported files; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
+    void clearImportedFiles() { clearImportedFiles(activeCompilationRegistryState()); }
+
+    // Xóa access metadata/class-context của registry cụ thể.
+    void clearClassAccessState(CompilationRegistryState &state) {
         state.methodAccess.clear();
         state.classContextStack.clear();
     }
 
+    // Xóa lớp access trạng thái; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
+    void clearClassAccessState() {
+        clearClassAccessState(activeCompilationRegistryState());
+    }
+
+    // Đưa class context vào registry cụ thể.
+    void pushClassContext(CompilationRegistryState &state, const std::string &className) {
+        state.classContextStack.push_back(className);
+    }
+
     // Đưa vào lớp ngữ cảnh; hàm thêm phần tử vào ngăn xếp hoặc ngữ cảnh hiện tại để được dùng trước khi rời phạm vi.
     void pushClassContext(const std::string &className) {
-        activeCompilationRegistryState().classContextStack.push_back(className);
+        pushClassContext(activeCompilationRegistryState(), className);
+    }
+
+    // Pop class context khỏi registry cụ thể.
+    void popClassContext(CompilationRegistryState &state) {
+        auto &stack = state.classContextStack;
+        if (!stack.empty()) stack.pop_back();
     }
 
     // Lấy ra khỏi lớp ngữ cảnh; hàm loại bỏ phần tử/ngữ cảnh trên cùng và khôi phục trạng thái trước đó.
     void popClassContext() {
-        auto &stack = activeCompilationRegistryState().classContextStack;
-        if (!stack.empty()) stack.pop_back();
+        popClassContext(activeCompilationRegistryState());
+    }
+
+    // Trả class context hiện tại từ registry cụ thể.
+    std::string currentClassContext(const CompilationRegistryState &state) {
+        if (state.classContextStack.empty()) return "";
+        return state.classContextStack.back();
     }
 
     // Trả tên lớp đang ở đỉnh class-context stack; lookup method/visibility dùng giá trị này khi phân giải lời gọi không ghi rõ lớp.
     std::string currentClassContext() {
-        const auto &stack = activeCompilationRegistryState().classContextStack;
-        if (stack.empty()) return "";
-        return stack.back();
+        return currentClassContext(activeCompilationRegistryState());
+    }
+
+    // Đăng ký visibility phương thức trực tiếp vào registry cụ thể.
+    void registerClassMethodVisibility(CompilationRegistryState &state,
+                                       const std::string &fullMethodName,
+                                       const std::string &ownerClass,
+                                       const std::string &visibility) {
+        state.methodAccess[fullMethodName] = MethodAccessInfo{ownerClass, visibility};
     }
 
     // Đăng ký lớp phương thức phạm vi truy cập; hàm thêm metadata vào bảng đăng ký để các bước phân giải/thực thi có thể tra cứu về sau.
     void registerClassMethodVisibility(const std::string &fullMethodName,
                                        const std::string &ownerClass,
                                        const std::string &visibility) {
-        activeCompilationRegistryState().methodAccess[fullMethodName] =
-            MethodAccessInfo{ownerClass, visibility};
+        registerClassMethodVisibility(
+            activeCompilationRegistryState(), fullMethodName, ownerClass, visibility);
     }
 
-    // Phân giải callable tên in ngữ cảnh; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
-    std::string resolveCallableNameInContext(const std::string &name,
+    // Phân giải callable theo class context của registry cụ thể.
+    std::string resolveCallableNameInContext(CompilationRegistryState &state,
+                                             const std::string &name,
                                              const std::unordered_map<std::string,int> &symTab) {
         if (name.find('.') != std::string::npos) return name;
 
-        std::string cls = currentClassContext();
+        std::string cls = currentClassContext(state);
         if (cls.empty()) return name;
 
         std::string scopedName = cls + "." + name;
         if (symTab.find(scopedName) != symTab.end()) return scopedName;
 
-        int scopedNameIndex = vietvm::compiler::StringPool::findString(scopedName);
-        if (scopedNameIndex >= 0) return scopedName;
-
+        if (state.findString(scopedName) >= 0) return scopedName;
         return name;
     }
 
-    // Kiểm tra điều kiện của `validateCallableAccess`.
-    void validateCallableAccess(const std::string &resolvedName) {
-        const auto &methodAccess = activeCompilationRegistryState().methodAccess;
-        auto it = methodAccess.find(resolvedName);
-        if (it == methodAccess.end()) return;
+    // Phân giải callable tên in ngữ cảnh; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
+    std::string resolveCallableNameInContext(const std::string &name,
+                                             const std::unordered_map<std::string,int> &symTab) {
+        return resolveCallableNameInContext(activeCompilationRegistryState(), name, symTab);
+    }
+
+    // Kiểm tra visibility dựa trên registry cụ thể.
+    void validateCallableAccess(const CompilationRegistryState &state,
+                                const std::string &resolvedName) {
+        const auto it = state.methodAccess.find(resolvedName);
+        if (it == state.methodAccess.end()) return;
 
         const std::string &owner = it->second.ownerClass;
         const std::string &visibility = it->second.visibility;
-        const std::string currentClass = currentClassContext();
+        const std::string currentClass = currentClassContext(state);
 
         if (visibility == "công khai") return;
         if (visibility == "riêng tư") {
@@ -101,47 +140,59 @@ namespace vietvm { namespace compiler {
         }
     }
 
-    // Phân giải hàm mã định danh by tên; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
-    int resolveFunctionIdByName(const std::string &name,
+    // Kiểm tra điều kiện của `validateCallableAccess`.
+    void validateCallableAccess(const std::string &resolvedName) {
+        validateCallableAccess(activeCompilationRegistryState(), resolvedName);
+    }
+
+    // Phân giải function id trực tiếp trong registry cụ thể.
+    int resolveFunctionIdByName(CompilationRegistryState &state,
+                                const std::string &name,
                                 const std::unordered_map<std::string,int> &symTab,
                                 bool includeGlobalFallback) {
-        std::string resolvedName = resolveCallableNameInContext(name, symTab);
-        validateCallableAccess(resolvedName);
+        std::string resolvedName = resolveCallableNameInContext(state, name, symTab);
+        validateCallableAccess(state, resolvedName);
 
         auto idMatchesResolvedName = [&](int candidateId) {
-            int resolvedNameIndex = StringPool::findString(resolvedName);
+            const int resolvedNameIndex = state.findString(resolvedName);
             if (resolvedNameIndex < 0) return false;
-            auto &nameMap = hamMap::nameIndexMap();
-            auto itName = nameMap.find(candidateId);
-            if (itName == nameMap.end()) return false;
+            const auto itName = state.functionNameIndices.find(candidateId);
+            if (itName == state.functionNameIndices.end()) return false;
             return itName->second == resolvedNameIndex;
         };
 
-        auto itSym = symTab.find(resolvedName);
+        const auto itSym = symTab.find(resolvedName);
         if (itSym != symTab.end()) {
-            int maybeId = itSym->second;
-            auto &bytecodeMap = hamMap::bytecodeMap();
-            auto itCode = bytecodeMap.find(maybeId);
-            if (itCode != bytecodeMap.end() &&
-                !itCode->second.empty() &&
-                idMatchesResolvedName(maybeId)) {
+            const int maybeId = itSym->second;
+            const auto itCode = state.functionBytecode.find(maybeId);
+            if (itCode != state.functionBytecode.end() &&
+                !itCode->second.empty() && idMatchesResolvedName(maybeId)) {
                 return maybeId;
             }
         }
 
         if (!includeGlobalFallback) return -1;
 
-        int nameIndex = StringPool::findString(resolvedName);
+        const int nameIndex = state.findString(resolvedName);
         if (nameIndex >= 0) {
-            for (const auto &kv : hamMap::nameIndexMap()) {
-                if (kv.second == nameIndex) return kv.first;
+            for (const auto &entry : state.functionNameIndices) {
+                if (entry.second == nameIndex) return entry.first;
             }
         }
         return -1;
     }
 
-    // Biên dịch nhập spec; hàm đưa dữ liệu qua các pha compiler cần thiết và tạo artifact thực thi cho bước sau.
+    // Phân giải hàm mã định danh by tên; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
+    int resolveFunctionIdByName(const std::string &name,
+                                const std::unordered_map<std::string,int> &symTab,
+                                bool includeGlobalFallback) {
+        return resolveFunctionIdByName(
+            activeCompilationRegistryState(), name, symTab, includeGlobalFallback);
+    }
+
+    // Biên dịch import vào registry cụ thể và giữ recursive imports trong cùng compilation session.
     void compileImportSpec(
+        CompilationRegistryState &state,
         const vietvm::frontend::AstImportSpec &spec,
         int &nextId,
         const std::unordered_map<std::string,Opcode> &keywordMap) {
@@ -152,10 +203,8 @@ namespace vietvm { namespace compiler {
         const std::string &moduleAlias = spec.alias;
         namespace fs = std::filesystem;
 
-        fs::path resolutionBase = activeCompilationRegistryState().importResolutionBase;
+        fs::path resolutionBase = state.importResolutionBase;
         if (resolutionBase.empty()) {
-            // Compatibility path for context-less compilation. Context-driven
-            // callers capture/set this base before compilation begins.
             resolutionBase = fs::current_path();
         }
         try {
@@ -421,17 +470,14 @@ namespace vietvm { namespace compiler {
 
         std::string canonical = abs.u8string();
 
-        auto &importedFiles = vietvm::compiler::importedFileSet();
+        auto &importedFiles = state.importedFiles;
         if (importedFiles.find(canonical) != importedFiles.end()) {
-            // already imported in this compile session — no-op
             return;
         }
 
-        // Mark as in-progress before reading/compiling to prevent circular imports
         importedFiles.insert(canonical);
 
         try {
-            // read file
             std::ifstream ifs(abs);
             if (!ifs.is_open()) {
                 throw std::runtime_error(vietvm::messages::formatMessage(
@@ -441,37 +487,43 @@ namespace vietvm { namespace compiler {
             ss << ifs.rdbuf();
             std::string src = ss.str();
 
-            // Compile the module once for registration side effects and retain its
-            // top-level bytecode as a runtime initializer. Recursive imports append
-            // their initializers first, producing dependency-before-importer order.
-            auto moduleBytecode = compilePipeline(src, keywordMap, false).bytecode;
-            activeCompilationRegistryState().moduleInitializers.push_back(
+            auto moduleBytecode = compilePipelineInRegistry(
+                state, src, keywordMap, false, false).bytecode;
+            state.moduleInitializers.push_back(
                 CompiledModuleInitializer{canonical, moduleBytecode});
 
-            // Namespace alias: register ns.funcName -> same function id
             if (!moduleAlias.empty()) {
                 for (const auto &ins : moduleBytecode) {
                     if (ins.op != OP_HAM) continue;
-                    int oldNameIndex = ins.operand;
-                    int hamId = ins.operandIndex;
-                    if (oldNameIndex < 0 || oldNameIndex >= (int)vietvm::compiler::StringPool::size()) continue;
-                    const std::string &funcName = vietvm::compiler::StringPool::getString(oldNameIndex);
-                    std::string namespaced = moduleAlias + "." + funcName;
-                    int newNameIndex = vietvm::compiler::StringPool::storeString(namespaced);
-                    vietvm::compiler::hamMap::setHamNameIndex(hamId, newNameIndex);
+                    const int oldNameIndex = ins.operand;
+                    const int hamId = ins.operandIndex;
+                    if (oldNameIndex < 0 ||
+                        oldNameIndex >= static_cast<int>(state.stringCount())) {
+                        continue;
+                    }
+                    const std::string &funcName = state.getString(oldNameIndex);
+                    const std::string namespaced = moduleAlias + "." + funcName;
+                    const int newNameIndex = state.storeString(namespaced);
+                    state.setFunctionNameIndex(hamId, newNameIndex);
                 }
             }
 
-            // Keep variable IDs in caller module disjoint from imported function IDs.
             int maxHamId = -1;
-            for (const auto &kv : vietvm::compiler::hamMap::bytecodeMap()) {
-                if (kv.first > maxHamId) maxHamId = kv.first;
+            for (const auto &entry : state.functionBytecode) {
+                if (entry.first > maxHamId) maxHamId = entry.first;
             }
             if (nextId <= maxHamId) nextId = maxHamId + 1;
         } catch (...) {
-            // Rollback on failure
             importedFiles.erase(canonical);
             throw;
         }
+    }
+
+    // Biên dịch nhập spec; hàm đưa dữ liệu qua các pha compiler cần thiết và tạo artifact thực thi cho bước sau.
+    void compileImportSpec(
+        const vietvm::frontend::AstImportSpec &spec,
+        int &nextId,
+        const std::unordered_map<std::string,Opcode> &keywordMap) {
+        compileImportSpec(activeCompilationRegistryState(), spec, nextId, keywordMap);
     }
 } }

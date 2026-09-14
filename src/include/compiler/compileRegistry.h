@@ -12,35 +12,71 @@
 #include "vpp/frontend/ast.h"
 // Imported files tracking (shared for a single compilation session)
 namespace vietvm { namespace compiler {
+    struct CompilationRegistryState;
+
+    // Trả tập file import của registry được truyền tường minh; production compiler dùng overload này để không phụ thuộc active context ẩn.
+    std::unordered_set<std::string> &importedFileSet(CompilationRegistryState &state);
     // Trả tập đường dẫn file đã import trong compilation registry; compiler dùng tập này để ngăn import cùng source lặp lại.
     std::unordered_set<std::string> &importedFileSet();
+    // Xóa imported files trong registry được truyền tường minh.
+    void clearImportedFiles(CompilationRegistryState &state);
     // Xóa imported files; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clearImportedFiles();
 
+    // Xóa metadata access/class-context trong registry được truyền tường minh.
+    void clearClassAccessState(CompilationRegistryState &state);
     // Xóa lớp access trạng thái; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clearClassAccessState();
+    // Đưa class context vào registry được truyền tường minh.
+    void pushClassContext(CompilationRegistryState &state, const std::string &className);
     // Đưa vào lớp ngữ cảnh; hàm thêm phần tử vào ngăn xếp hoặc ngữ cảnh hiện tại để được dùng trước khi rời phạm vi.
     void pushClassContext(const std::string &className);
+    // Pop class context khỏi registry được truyền tường minh.
+    void popClassContext(CompilationRegistryState &state);
     // Lấy ra khỏi lớp ngữ cảnh; hàm loại bỏ phần tử/ngữ cảnh trên cùng và khôi phục trạng thái trước đó.
     void popClassContext();
+    // Trả class context hiện tại từ registry được truyền tường minh.
+    std::string currentClassContext(const CompilationRegistryState &state);
     // Trả tên lớp đang ở đỉnh class-context stack; lookup method/visibility dùng giá trị này khi phân giải lời gọi không ghi rõ lớp.
     std::string currentClassContext();
+    // Đăng ký visibility phương thức vào registry được truyền tường minh.
+    void registerClassMethodVisibility(CompilationRegistryState &state,
+                                       const std::string &fullMethodName,
+                                       const std::string &ownerClass,
+                                       const std::string &visibility);
     // Đăng ký lớp phương thức phạm vi truy cập; hàm thêm metadata vào bảng đăng ký để các bước phân giải/thực thi có thể tra cứu về sau.
     void registerClassMethodVisibility(const std::string &fullMethodName,
                                        const std::string &ownerClass,
                                        const std::string &visibility);
+    // Phân giải callable theo class context trong registry được truyền tường minh.
+    std::string resolveCallableNameInContext(CompilationRegistryState &state,
+                                             const std::string &name,
+                                             const std::unordered_map<std::string,int> &symTab);
     // Phân giải callable tên in ngữ cảnh; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
     std::string resolveCallableNameInContext(const std::string &name,
                                              const std::unordered_map<std::string,int> &symTab);
+    // Kiểm tra quyền gọi dựa trên metadata trong registry được truyền tường minh.
+    void validateCallableAccess(const CompilationRegistryState &state,
+                                const std::string &resolvedName);
     // Kiểm tra điều kiện của `validateCallableAccess`.
     void validateCallableAccess(const std::string &resolvedName);
     // Resolve a callable through the local symbol table.  Imported/global
     // fallback is enabled for expression/statement calls and can be disabled
     // for `gọi`, which intentionally emits a name-based VM fallback instead.
+    int resolveFunctionIdByName(CompilationRegistryState &state,
+                                const std::string &name,
+                                const std::unordered_map<std::string,int> &symTab,
+                                bool includeGlobalFallback = true);
     int resolveFunctionIdByName(const std::string &name,
                                 const std::unordered_map<std::string,int> &symTab,
                                 bool includeGlobalFallback = true);
 
+    // Biên dịch import vào registry được truyền tường minh; recursive import tiếp tục dùng cùng registry/session.
+    void compileImportSpec(
+        CompilationRegistryState &state,
+        const vietvm::frontend::AstImportSpec &spec,
+        int &nextId,
+        const std::unordered_map<std::string,Opcode> &keywordMap);
     // Biên dịch nhập spec; hàm đưa dữ liệu qua các pha compiler cần thiết và tạo artifact thực thi cho bước sau.
     void compileImportSpec(
         const vietvm::frontend::AstImportSpec &spec,

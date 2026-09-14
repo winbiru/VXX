@@ -11,6 +11,7 @@
 #include "frontend/keywords.h"
 #include "frontend/lexer.h"
 #include "vpp/bytecode/opcode.h"
+#include "vpp/compiler/pipeline.h"
 
 namespace vietvm::tooling {
 
@@ -615,8 +616,8 @@ std::string formatSource(const std::string &source) {
 // Phân tích nguồn để thu thập lỗi lexer/parser/semantic và trả về danh sách chẩn đoán thay vì trực tiếp thực thi chương trình.
 bool lintSource(const std::string &source, std::string &errorMessage) {
     try {
-        vietvm::compiler::resetCompilationState();
-        (void)compileSource(source, keywordMap, false);
+        vietvm::compiler::CompilationContext context;
+        (void)vietvm::compiler::compilePipeline(context, source, keywordMap, false);
         return true;
     } catch (const std::exception &ex) {
         errorMessage = ex.what();

@@ -1,0 +1,20 @@
+nhập "vào ra";
+
+// Bao đóng nguồn cấu hình của API để các lớp khác không phụ thuộc trực tiếp vào file.
+lớp CấuHìnhApi {
+    // Ghi nhớ đường dẫn file cấu hình cho instance hiện tại.
+    hàm khởi tạo(đườngDẫn) {
+        mình.đườngDẫn = đườngDẫn;
+    }
+
+    // Đọc cổng HTTP từ cấu hình, dùng 8080 khi khóa port không tồn tại.
+    hàm cổng() {
+        đườngDẫn = mình.đườngDẫn;
+        trả về đọc cấu hình khóa(đườngDẫn, "port", "8080");
+    }
+};
+
+// Tạo một object cấu hình để module khác nhận dependency qua API công khai.
+hàm công khai tạo cấu hình api(đườngDẫn) {
+    trả về CấuHìnhApi(đườngDẫn);
+}

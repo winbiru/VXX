@@ -1,6 +1,6 @@
 # Kế hoạch trung hạn (1–3 tháng)
 
-> Cập nhật: 13/09/2026
+> Cập nhật: 14/09/2026
 > Mục tiêu là giảm coupling của compiler/runtime và tăng độ tin cậy. Baseline hiện
 > có regression CTest, sanitizer trên Ubuntu và vài C++ unit test, nhưng chưa phải
 > coverage đầy đủ.
@@ -25,7 +25,7 @@
      hiện cho phép dựng stack/PC/variables/call frame/control state, gọi handler trực
      tiếp và cấu hình output sink; `vpp-vm-handler-unit` khóa các nhóm handler chính.
    - [x] Giữ test tích hợp trước/sau mỗi nhánh refactor. Baseline trước refactor và
-     hiện tại đều giữ suite xanh; baseline hiện tại đạt 61/61 regression.
+     hiện tại đều giữ suite xanh; baseline hiện tại đạt 70/70 regression.
 
 2. Mở rộng test opcode và compiler
 

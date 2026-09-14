@@ -1,6 +1,6 @@
 # Kế hoạch ngắn hạn (1–2 tuần)
 
-> Cập nhật: 13/09/2026
+> Cập nhật: 14/09/2026
 > Mục tiêu là củng cố baseline build/test và tài liệu. Các mục đánh dấu hoàn tất chỉ
 > xác nhận source hoặc workflow đã có trong repo, không thay cho kết quả CI của một
 > commit cụ thể.
@@ -56,8 +56,9 @@
 
    - [ ] Khi thay đổi runner hoặc native adapter, xác nhận các job Ubuntu, Windows và
      macOS trên GitHub Actions. Workflow hiện đã có regression thường trực cho cả ba
-     nền tảng; local baseline ngày 13/09/2026 đã qua 15/15 CTest (integration 61/61,
-     parity 70/70). Cần commit/push thay đổi để có bằng chứng Actions cho revision đó.
+     nền tảng; local baseline ngày 14/09/2026 đạt integration 70/70, parity 79/79 và
+     các CTest còn lại 15/15 khi tách GCOV output khỏi build tree. Cần commit/push thay
+     đổi để có bằng chứng Actions cho revision đó.
 
 ## Tiêu chí cho mỗi PR
 

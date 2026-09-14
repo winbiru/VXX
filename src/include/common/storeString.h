@@ -35,6 +35,21 @@ namespace vietvm::compiler {
         std::filesystem::path importResolutionBase;
         int nextFunctionId = 0;
 
+        // Tìm chuỗi trong bể của chính compilation state này mà không phụ thuộc active context ẩn.
+        int findString(const std::string &value) const;
+        // Lưu chuỗi vào bể của chính compilation state này, tái sử dụng chỉ số nếu chuỗi đã tồn tại.
+        int storeString(const std::string &value);
+        // Lấy chuỗi theo chỉ số từ compilation state hiện tại và báo lỗi nếu chỉ số vượt biên.
+        const std::string &getString(int index) const;
+        // Trả số chuỗi hiện có trong compilation state mà không thay đổi dữ liệu.
+        size_t stringCount() const noexcept;
+        // Cấp function id mới trực tiếp từ compilation state để codegen không cần facade toàn cục.
+        int allocateFunctionId() noexcept;
+        // Ghi ánh xạ function id sang chỉ số tên trực tiếp vào compilation state.
+        void setFunctionNameIndex(int functionId, int nameIndex);
+        // Đặt lại bộ đếm function id của compilation state về đầu phiên biên dịch.
+        void resetFunctionIdCounter() noexcept;
+
         // Xóa clear; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
         void clear() {
             stringPool.clear();
@@ -49,13 +64,13 @@ namespace vietvm::compiler {
         }
     };
 
-    // Trả con trỏ tới trạng thái registry đang được compiler sử dụng; các helper static dựa vào đây để thao tác đúng `CompilationContext` hiện hành.
+    // Trả registry compatibility của thread hiện tại; production compiler truyền `CompilationRegistryState` tường minh và không dùng API này.
     CompilationRegistryState &activeCompilationRegistryState();
-    // Thiết lập active compilation bảng đăng ký trạng thái; hàm ghi giá trị đầu vào vào trạng thái đích và thay thế giá trị cũ nếu đã tồn tại.
+    // Đổi registry compatibility của thread hiện tại cho test/caller cũ; production pipeline không bind context qua hàm này.
     CompilationRegistryState *setActiveCompilationRegistryState(
         CompilationRegistryState *state);
 
-    // Quản lý ánh xạ function id sang bytecode và name-index; các hàm static đọc/ghi vào `CompilationRegistryState` đang hoạt động.
+    // Facade tương thích cho test/caller cũ; production codegen ghi function metadata trực tiếp vào `CompilationRegistryState` được truyền vào.
     class hamMap {
     public:
         // Trả bảng ánh xạ function id sang bytecode của registry đang hoạt động; caller sửa trực tiếp bảng dùng chung trong một lượt biên dịch.
@@ -71,7 +86,7 @@ namespace vietvm::compiler {
         // Đặt lại ham mã định danh counter; hàm khôi phục trạng thái về giá trị ban đầu và xóa dữ liệu tạm của lần chạy trước.
         static void resetHamIdCounter();
     };
-    // Quản lý bể chuỗi dùng chung của bytecode; lớp deduplicate chuỗi, cấp chỉ số ổn định và cho compiler/runtime tra lại nội dung theo index.
+    // Facade tương thích cho bể chuỗi cũ; production compiler dùng các phương thức state-explicit trên `CompilationRegistryState`.
     class StringPool {
     public:
         // Lưu chuỗi; hàm ghi dữ liệu đầu vào vào cấu trúc lưu trữ tương ứng để có thể truy xuất ở bước sau.

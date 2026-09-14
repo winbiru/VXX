@@ -1,0 +1,103 @@
+// Smoke regression tổng hợp chạy sau mỗi thay đổi compiler/runtime.
+// File cố ý ghép nhiều tính năng trong cùng một chương trình để bắt lỗi tương tác
+// giữa parser, semantic, direct IR, bytecode và VM thay vì chỉ kiểm tra từng phần riêng lẻ.
+
+giao diện CóGiáTrị {
+    hàm giáTrị();
+};
+
+giao diện CóNhãn {
+    hàm nhãn();
+};
+
+giao diện CóThểTăng kế thừa CóGiáTrị, CóNhãn {
+    hàm tăng(delta);
+};
+
+lớp Nền {
+    hàm khởi tạo(base) {
+        mình.base = base;
+    }
+
+    hàm giáTrị() {
+        trả về mình.base;
+    }
+
+    hàm bảo vệ cộngVớiNền(delta) {
+        trả về mình.base + delta;
+    }
+
+    hàm riêng tư bíMật() {
+        trả về mình.base + 100;
+    }
+
+    hàm công khai quaRiêngTư() {
+        trả về mình.bíMật();
+    }
+};
+
+lớp BộĐếm kế thừa Nền triển khai CóThểTăng {
+    hàm khởi tạo(base, bước = 1) {
+        gốc.khởi tạo(base);
+        mình.bước = bước;
+    }
+
+    hàm giáTrị() {
+        trả về gốc.giáTrị() + mình.bước;
+    }
+
+    hàm nhãn() {
+        trả về "V++ smoke";
+    }
+
+    hàm tăng(delta) {
+        mình.bước = mình.bước + delta;
+        trả về mình.giáTrị();
+    }
+
+    hàm công khai kiểmTraBảoVệ(delta) {
+        trả về mình.cộngVớiNền(delta);
+    }
+};
+
+hàm ápDụng(f, value) {
+    trả về f(value);
+}
+
+hàm main() {
+    bộĐếm = BộĐếm(10, 2);
+    mặcĐịnh = BộĐếm(20);
+
+    in bộĐếm.nhãn();
+    in bộĐếm.giáTrị();
+    in bộĐếm.tăng(3);
+    in bộĐếm.kiểmTraBảoVệ(7);
+    in bộĐếm.quaRiêngTư();
+    in mặcĐịnh.giáTrị();
+
+    dữLiệu = [1, 2, 3];
+    tổng = 0;
+    lặp(i = 0; i < độ dài(dữLiệu); i++) {
+        tổng += dữLiệu[i];
+    };
+    in tổng;
+
+    kếtQuả = {"tổng": 0};
+    đặt map(kếtQuả, "tổng", tổng);
+    in lấy map(kếtQuả, "tổng", -1);
+
+    nhânĐôi = hàm(x) { trả về x * 2; };
+    in ápDụng(nhânĐôi, 6);
+
+    nếu (bộĐếm.giáTrị() == 15 && tổng == 6) {
+        in "nhánh đúng";
+    } nếu không {
+        in "nhánh sai";
+    };
+
+    thử {
+        ném "lỗi smoke";
+    } bắt lỗi (e) {
+        in e;
+    }
+}

@@ -1,19 +1,32 @@
-nhập mạng;
-nhập "vào ra";
+nhập "config.vi";
+nhập "controller.vi";
+nhập "router.vi";
+nhập "server.vi";
 
+// Đại diện cho ứng dụng API đã được ghép đủ dependency. Lớp chỉ sở hữu vòng đời
+// ứng dụng và khởi động server đã được truyền vào qua constructor.
+lớp ApiApplication {
+    // Nhận server hoàn chỉnh từ composition root để lớp không tự tạo dependency.
+    hàm khởi tạo(server) {
+        mình.server = server;
+    }
+
+    // Khởi động vòng lặp HTTP của server thuộc ứng dụng hiện tại.
+    hàm chạy() {
+        server = mình.server;
+        server.chạy();
+    }
+};
+
+// Composition root: tạo object graph một lần, nối dependency từ ngoài vào trong
+// rồi trao server hoàn chỉnh cho ApiApplication quản lý vòng đời.
 hàm main() {
-    cổng = đọc cấu hình khóa("application.properties", "port", "8080");
-    serverId = mạng mở máy chủ api(cổng);
-    lặp(i = 0; i < 2147483647; i = i + 1) {
-        requestId = mạng lấy yêu cầu kế tiếp(serverId);
-        nếu (requestId == "") {
-            bỏ qua;
-        };
-        path = mạng path yêu cầu(requestId);
-        nếu (path == "/health") {
-            mạng trả phản hồi(requestId, 200, "true");
-        } hoặc {
-            mạng trả phản hồi(requestId, 404, "null");
-        };
-    };
+    config = tạo cấu hình api("application.properties");
+    healthController = tạo health controller();
+    notFoundController = tạo not found controller();
+    router = tạo bộ định tuyến(healthController, notFoundController);
+    port = config.cổng();
+    server = tạo máy chủ api(port, router);
+    application = ApiApplication(server);
+    application.chạy();
 };

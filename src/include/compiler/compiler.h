@@ -9,7 +9,7 @@
 
 namespace vietvm::compiler {
 
-// Đặt lại trạng thái toàn cục của compiler như StringPool, function map, import và class context để lần biên dịch mới độc lập.
+// Đặt lại registry compatibility của thread hiện tại; production caller nên tạo `CompilationContext` riêng cho mỗi lượt compile.
 void resetCompilationState();
 
 } // namespace vietvm::compiler
