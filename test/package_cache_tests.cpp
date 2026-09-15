@@ -1,5 +1,6 @@
 #include "vpp/core/package_cache.h"
 #include "vpp/core/package_manifest.h"
+#include "vpp/core/project_layout.h"
 
 #include <chrono>
 #include <filesystem>
@@ -46,7 +47,10 @@ void writeText(const fs::path &path, const std::string &text) {
 
 void testContentAddressedCache() {
     TemporaryTree tree;
-    const fs::path installed = tree.root() / "project" / "gói" / "demo";
+    const fs::path installed = tree.root() / "project" /
+                               vietvm::core::utf8Path(
+                                   vietvm::core::kPrimaryPackageDirectory) /
+                               "demo";
     writeText(installed / "main.vi", "hàm main() { trả về 1; }\n");
     const std::string fingerprint =
         vietvm::core::fingerprintPackageTree(installed);

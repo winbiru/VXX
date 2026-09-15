@@ -25,18 +25,21 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp --repl\n"
     "  vpp khởi tạo [tên-dự-án]\n"
     "  vpp khởi tạo backend <tên-dự-án>\n"
-    "  vpp cài đặt <nguồn> [tên]\n"
+    "  vpp cài đặt [<nguồn> [tên] | --offline]\n"
     "  vpp đồng bộ\n"
+    "  vpp cập nhật\n"
     "  vpp khóa\n"
-    "  vpp phục hồi\n"
+    "  vpp phục hồi [--offline]\n"
     "  vpp danh sách\n"
     "  vpp thông tin <tên>\n"
     "  vpp kiểm tra <tên>\n"
     "  vpp gói khởi tạo [tên]\n"
     "  vpp gói thêm <nguồn> [tên]\n"
+    "  vpp gói cài đặt [<nguồn> [tên] | --offline]\n"
     "  vpp gói đồng bộ\n"
+    "  vpp gói cập nhật\n"
     "  vpp gói khóa\n"
-    "  vpp gói phục hồi\n"
+    "  vpp gói phục hồi [--offline]\n"
     "  vpp gói xóa <tên>\n"
     "  vpp gói danh sách\n"
     "  vpp gói thông tin <tên>\n"
@@ -109,7 +112,11 @@ inline constexpr std::string_view kPkgSyncManifestMissing = "đồng bộ: khôn
 inline constexpr std::string_view kPkgRestoreLockMissing = "phục hồi: không tìm thấy vpp.lock";
 inline constexpr std::string_view kPkgLockDependencyMissing = "khóa: dependency chưa được cài: {0}";
 inline constexpr std::string_view kPkgLockVersionConflict = "khóa: phiên bản {1} của dependency '{0}' không thỏa range {2}";
+inline constexpr std::string_view kPkgLockInstalledVersionMismatch = "khóa: package '{0}' đang cài version {1}, resolver yêu cầu {2}; chạy 'vpp cập nhật' trước khi khóa";
 inline constexpr std::string_view kPkgRestoreVersionMismatch = "phục hồi: dependency '{0}' có version source {1}, lock yêu cầu {2}";
+inline constexpr std::string_view kPkgOfflineCacheMissing = "phục hồi --offline: cache không có package '{0}' với fingerprint {1}";
+inline constexpr std::string_view kPkgLockedPackageMissing = "vpp.lock yêu cầu package '{0}' nhưng chưa được cài tại {1}; chạy 'vpp phục hồi'";
+inline constexpr std::string_view kPkgLockedPackageChanged = "package '{0}' không khớp vpp.lock (lock {1}, hiện tại {2}); chạy 'vpp phục hồi' để khôi phục hoặc 'vpp khóa' để chấp nhận thay đổi";
 inline constexpr std::string_view kPkgTopLevelRemoveNameMissing = "xóa: thiếu tên gói";
 inline constexpr std::string_view kPkgTopLevelInfoNameMissing = "thông tin: thiếu tên gói";
 inline constexpr std::string_view kPkgTopLevelHasNameMissing = "kiểm tra: thiếu tên gói";

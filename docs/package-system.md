@@ -1,7 +1,9 @@
 # Package system V++ 0.9
 
 Tài liệu này mô tả contract package hiện được triển khai trong compiler và CLI.
-Các phần cache, tải Git/registry và restore hoàn toàn từ lockfile vẫn thuộc roadmap 0.9.
+Local path package, dependency graph transitive, deterministic lockfile, cache theo
+fingerprint và restore/install offline từ lockfile đã chạy end-to-end. Git/registry
+transport và registry publish vẫn thuộc roadmap 0.9.
 
 ## Project layout
 
@@ -41,8 +43,9 @@ Manifest canonical:
 
 `name` bắt buộc khác rỗng. `version` phải là Semantic Versioning 2.0 đầy đủ
 `major.minor.patch`. Dependency name không được trùng. `source` hiện có ba giá trị
-được dành sẵn trong contract: `path`, `git`, `registry`. CLI 0.9 hiện cài trực tiếp
-được `path`; Git/registry fetch và cache vẫn chưa triển khai.
+được dành sẵn trong contract: `path`, `git`, `registry`. CLI 0.9 hiện resolve/cài trực
+tiếp được `path`; Git/registry đã có schema nhưng solver từ chối rõ ràng cho tới khi
+transport tương ứng được triển khai.
 
 Reader vẫn nhận manifest cũ:
 
@@ -111,10 +114,68 @@ mật mã hoặc security integrity hash.
 Khi package có `vpp.json`, `vpp khóa` dùng exact version của package đã cài và kiểm tra
 nó có thỏa range trong manifest project hay không. Xung đột version làm lệnh thất bại.
 
+`vpp cài đặt <nguồn>`, `vpp cập nhật`/`vpp đồng bộ` và `vpp khóa` đều giữ lockfile
+đồng bộ với graph vừa materialize. Trước khi ghi lock, CLI đối chiếu version trong
+package đã cài với exact version solver đã chọn để tránh tạo lockfile mang version mới
+nhưng fingerprint của bytes cũ.
+
+## Dependency graph
+
+Solver duyệt toàn graph local path package theo thứ tự dependency-first. Cùng một
+dependency được deduplicate nếu các range tương thích. Range xung đột bị từ chối với
+tên dependency rõ ràng; cycle bị từ chối với đường đi xác định như `a -> b -> a`.
+
+Package được materialize qua staging directory. `vpp.lock`, `.vpp/` và cây `gói/`
+đã cài của source project không bị vendored vào artifact package con.
+
+## Cache và offline
+
+Project dùng cache content-addressed tại:
+
+```text
+.vpp/cache/fnv1a64-<digest>/
+```
+
+Sau install/sync hoặc khi khóa graph, bytes đã cài được snapshot vào cache bằng đúng
+fingerprint ghi trong `vpp.lock`. Cache entry chỉ được dùng nếu fingerprint tính lại
+vẫn khớp; entry bị sửa ngoài ý muốn không được coi là hợp lệ.
+
+`vpp phục hồi` đọc `vpp.lock`, ưu tiên cache trước và chỉ quay về local path source khi
+cache chưa có. Vì vậy một source path có thể bị xóa mà project vẫn phục hồi được chính
+xác bytes đã khóa nếu snapshot còn trong `.vpp/cache`.
+
+`vpp phục hồi --offline` (hoặc `--ngoại-tuyến`) là cache-only: thiếu bất kỳ fingerprint
+nào thì lệnh thất bại thay vì truy cập source. `vpp cài đặt --offline` dùng cùng đường
+restore này; `vpp cài đặt` không truyền source cũng cài lại graph từ lockfile.
+
+`vpp xóa <tên>` resolve trạng thái manifest sau khi xóa trước khi commit, rồi ghi lại
+lockfile cho graph còn lại để lock cũ không thể phục hồi nhầm package vừa bị xóa.
+
+Khi chạy một file `.vi`, CLI đi lên từ thư mục source để tìm `vpp.lock` gần nhất. Nếu
+project đã có lock, toàn bộ package được khóa phải tồn tại và fingerprint trên đĩa phải
+khớp trước khi compiler chạy. Package bị sửa tay hoặc bị thiếu làm run/dump compile thất
+bại với hướng dẫn `vpp phục hồi` hoặc `vpp khóa`; vì vậy một project đã khóa không thể âm
+thầm chạy trên dependency bytes khác với lockfile.
+
+## CLI dependency flow
+
+Các lệnh local path hiện có:
+
+```text
+vpp cài đặt <nguồn> [tên]
+vpp cập nhật          # alias workflow của đồng bộ
+vpp đồng bộ
+vpp khóa
+vpp phục hồi [--offline]
+vpp cài đặt --offline
+vpp xóa <tên>
+vpp danh sách
+```
+
+Các dạng `vpp gói ...` tương ứng dùng cùng implementation.
+
 ## Phần còn lại của Package 0.9
 
-- dependency solver cho graph transitive và conflict giữa nhiều requester;
-- restore/install từ `vpp.lock`;
-- cache/offline mode;
 - Git source fetch và registry source fetch/publish;
+- registry metadata/version selection và update policy cho remote package;
 - cryptographic integrity khi registry contract được chốt.

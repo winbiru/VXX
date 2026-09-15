@@ -1,4 +1,5 @@
 #include "vpp/core/package_installer.h"
+#include "vpp/core/project_layout.h"
 
 #include <chrono>
 #include <filesystem>
@@ -53,7 +54,10 @@ std::string readText(const fs::path &path) {
 void testStagedInstallAndFingerprintGuard() {
     TemporaryTree tree;
     const fs::path source = tree.root() / "source";
-    const fs::path target = tree.root() / "project" / "gói" / "demo";
+    const fs::path target = tree.root() / "project" /
+                            vietvm::core::utf8Path(
+                                vietvm::core::kPrimaryPackageDirectory) /
+                            "demo";
     writeText(source / "main.vi", "hàm main() { trả về 1; }\n");
     writeText(source / "data" / "a.txt", "alpha\n");
 
@@ -84,7 +88,10 @@ void testStagedInstallAndFingerprintGuard() {
 void testSingleFileSourceBecomesMain() {
     TemporaryTree tree;
     const fs::path source = tree.root() / "single.vi";
-    const fs::path target = tree.root() / "project" / "gói" / "single";
+    const fs::path target = tree.root() / "project" /
+                            vietvm::core::utf8Path(
+                                vietvm::core::kPrimaryPackageDirectory) /
+                            "single";
     writeText(source, "hàm single() { trả về 9; }\n");
 
     (void)vietvm::core::materializePathPackage(source, target);
@@ -95,18 +102,21 @@ void testSingleFileSourceBecomesMain() {
 void testManagedPackageStateIsNotVendored() {
     TemporaryTree tree;
     const fs::path source = tree.root() / "source";
-    const fs::path target = tree.root() / "project" / "gói" / "clean";
+    const fs::path packageDirectory =
+        vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory);
+    const fs::path target = tree.root() / "project" / packageDirectory / "clean";
     writeText(source / "main.vi", "hàm clean() { trả về 1; }\n");
     writeText(source / "vpp.lock", "generated-lock");
     writeText(source / ".vpp" / "cache" / "blob", "cached");
-    writeText(source / "gói" / "nested" / "main.vi", "nested-installed-dependency");
+    writeText(source / packageDirectory / "nested" / "main.vi",
+              "nested-installed-dependency");
 
     (void)vietvm::core::materializePathPackage(source, target);
     expect(fs::exists(target / "main.vi"),
            "package source files remain in vendored package");
     expect(!fs::exists(target / "vpp.lock") &&
                !fs::exists(target / ".vpp") &&
-               !fs::exists(target / "gói"),
+               !fs::exists(target / packageDirectory),
            "generated lock/cache/installed dependency trees are excluded from package artifact");
 }
 

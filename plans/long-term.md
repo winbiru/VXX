@@ -1,6 +1,6 @@
 # Kế hoạch dài hạn (3–12+ tháng)
 
-> Cập nhật: 14/09/2026
+> Cập nhật: 15/09/2026
 > Các mục dưới đây là công việc nền tảng chưa hoàn tất. V++ hiện có compiler, bytecode
 > VM, package/gói chuẩn, tooling MVP và pipeline release; không nên diễn giải
 > điều đó là mức hoàn thiện tương đương Java, C# hay Python.
@@ -54,9 +54,9 @@ concurrency/async phức tạp không phải release blocker mặc định của
       fixup; shared mixed-backend context còn thiếu.
    6. [x] **Bỏ token bridge** — production compiler chỉ còn Direct IR → bytecode;
       vùng chưa được direct emitter hỗ trợ bị từ chối tường minh. Corpus `.vi`
-      đạt 94/94 direct IR và vẫn giữ snapshot compiler state đã chốt.
+      đạt 116/116 direct IR và vẫn giữ snapshot compiler state đã chốt.
 
-   Hiện direct backend bao phủ 94/94 regression program; parity gate yêu cầu toàn bộ
+   Hiện direct backend bao phủ 116/116 regression program; parity gate yêu cầu toàn bộ
    corpus phải giữ direct IR và vẫn đối chiếu đầy đủ bytecode/StringPool/function
    registries. Call argument, function/lambda parameter và loop header đã dùng chung
    splitter top-level quote-aware; string chứa delimiter không còn tự tạo fallback.
@@ -161,8 +161,11 @@ concurrency/async phức tạp không phải release blocker mặc định của
      bundled standard packages, compatibility redirect và `VPP_HOME` đi qua `PackageResolver`
      độc lập; unit test khóa precedence, alias, UTF-8 và installation-home fallback.
    - [ ] **Dependency solver** — manifest schema 1, source kind `path/git/registry`, SemVer/range,
-     version conflict check khi khóa và deterministic `vpp.lock` đã có. Còn graph transitive,
-     restore/install từ lockfile, registry/Git fetch và offline/cache behavior.
+     transitive local-path graph, conflict/cycle detection, staged installer, deterministic
+     `vpp.lock` và project-local content-addressed cache đã có. Restore/install cache-only offline
+     phục hồi exact lock bytes khi source mất; install/update/remove giữ lock đồng bộ và CLI
+     từ chối run nếu installed fingerprint lệch lock. Còn registry/Git fetch và remote
+     metadata/version selection.
 
 5. An toàn và bảo mật runtime
 
