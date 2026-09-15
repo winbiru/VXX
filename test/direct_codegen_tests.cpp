@@ -722,7 +722,7 @@ void testClassRegistrationCarriesSourceDebugMetadata() {
     expect(artifacts.bytecodeDebugInfo.size() == artifacts.bytecode.size(),
            "class registration debug metadata stays aligned with root bytecode");
     for (std::size_t index = 0; index < artifacts.bytecode.size(); ++index) {
-        const Opcode opcode = artifacts.bytecode[index].op;
+        const Opcode opcode = static_cast<Opcode>(artifacts.bytecode[index].op);
         if (opcode != OP_TAO_LOP && opcode != OP_THEM_PHUONG_THUC) continue;
         expect(index < artifacts.bytecodeDebugInfo.size() &&
                    artifacts.bytecodeDebugInfo[index].valid(),

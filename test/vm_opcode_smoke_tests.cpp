@@ -142,7 +142,7 @@ void testBranchBoundaryError() {
 
 void testVerifierRejectsUnknownOpcodeBeforeDispatch() {
     expectRuntimeError(
-        {{static_cast<Opcode>(999), 0, 0, 0}},
+        {{999, 0, 0, 0}},
         "bytecode không hợp lệ trong chương trình chính tại lệnh 0",
         "VM chạy bytecode verifier trước opcode dispatch");
 }

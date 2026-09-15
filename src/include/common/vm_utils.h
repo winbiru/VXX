@@ -43,10 +43,10 @@ inline vietvm::runtime::RuntimeDiagnosticContext runtime_binary_facts(
 // giá trị thực tế nhưng không phải chỉ định trước tên hay mã của loại lỗi.
 inline vietvm::runtime::RuntimeError runtime_error_op(
     const std::string &msg,
-    Opcode op,
+    int op,
     int /*pc*/ = -1,
     vietvm::runtime::RuntimeDiagnosticContext context = {}) {
-    context.opcode = static_cast<int>(op);
+    context.opcode = op;
     return vietvm::runtime::RuntimeError(
         msg,
         vietvm::runtime::RuntimeErrorKind::VmFault,
@@ -57,10 +57,10 @@ inline vietvm::runtime::RuntimeError runtime_error_op(
 // vị trí nguồn vẫn được stack trace bổ sung khi lỗi unwind khỏi VM.
 inline vietvm::runtime::RuntimeError runtime_error_op(
     const std::string &msg,
-    Opcode op,
+    int op,
     std::size_t /*pc*/,
     vietvm::runtime::RuntimeDiagnosticContext context = {}) {
-    context.opcode = static_cast<int>(op);
+    context.opcode = op;
     return vietvm::runtime::RuntimeError(
         msg,
         vietvm::runtime::RuntimeErrorKind::VmFault,
@@ -69,7 +69,7 @@ inline vietvm::runtime::RuntimeError runtime_error_op(
 
 // Lấy số nguyên từ StackValue; nếu giá trị không phải số, hàm gửi kiểu thực tế
 // cho bộ chẩn đoán để hệ thống tự nhận ra lỗi kiểu dữ liệu.
-inline int as_int(const StackValue &v, Opcode op = (Opcode)0, int pc = -1) {
+inline int as_int(const StackValue &v, int op = 0, int pc = -1) {
     if (std::holds_alternative<int>(v)) return std::get<int>(v);
     if (std::holds_alternative<double>(v)) return static_cast<int>(std::get<double>(v));
     vietvm::runtime::RuntimeDiagnosticContext context;
@@ -81,7 +81,7 @@ inline int as_int(const StackValue &v, Opcode op = (Opcode)0, int pc = -1) {
 
 // Chuyển `StackValue` số sang `int`; overload này giữ program counter `size_t`
 // nhưng thu cùng dữ kiện kiểu thực tế như overload dùng `int`.
-inline int as_int(const StackValue &v, Opcode op, std::size_t pc) {
+inline int as_int(const StackValue &v, int op, std::size_t pc) {
     if (std::holds_alternative<int>(v)) return std::get<int>(v);
     if (std::holds_alternative<double>(v)) return static_cast<int>(std::get<double>(v));
     vietvm::runtime::RuntimeDiagnosticContext context;
@@ -114,7 +114,7 @@ inline StackValue numMul(const StackValue &a, const StackValue &b) {
 
 // Chia hai giá trị số runtime; khi số chia bằng 0, hàm gửi hai giá trị thật cho
 // bộ chẩn đoán và không gắn nhãn `DivisionByZero` tại vị trí này.
-inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, int pc) {
+inline StackValue numDiv(const StackValue &a, const StackValue &b, int op, int pc) {
     double db = toDouble(b);
     if (db == 0.0) {
         throw runtime_error_op(vietvm::messages::formatMessage(
@@ -128,7 +128,7 @@ inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, in
 
 // Chia hai giá trị số runtime; overload `size_t` dùng cùng cơ chế suy luận từ
 // hai toán hạng thực tế như overload `int`.
-inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, std::size_t pc) {
+inline StackValue numDiv(const StackValue &a, const StackValue &b, int op, std::size_t pc) {
     double db = toDouble(b);
     if (db == 0.0) {
         throw runtime_error_op(vietvm::messages::formatMessage(
@@ -142,7 +142,7 @@ inline StackValue numDiv(const StackValue &a, const StackValue &b, Opcode op, st
 
 // Thực thi toán tử nhị phân của VM; khi kiểu dữ liệu không phù hợp, hàm gửi các
 // giá trị thực tế để bộ chẩn đoán tự phân biệt lỗi phép tính và lỗi so sánh.
-inline StackValue evaluateBinaryOperator(Opcode op,
+inline StackValue evaluateBinaryOperator(int op,
                                          const StackValue &a,
                                          const StackValue &b,
                                          int pc) {
@@ -227,7 +227,7 @@ inline StackValue evaluateBinaryOperator(Opcode op,
 // cho bộ chẩn đoán để hệ thống tự nhận diện lỗi số học.
 inline StackValue evaluateModuloOperator(const StackValue &a,
                                          const StackValue &b,
-                                         Opcode op,
+                                         int op,
                                          int pc) {
     auto strictInteger = [&](const StackValue &value) -> int {
         if (std::holds_alternative<int>(value)) return std::get<int>(value);

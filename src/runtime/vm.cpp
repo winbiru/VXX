@@ -777,7 +777,7 @@ bool VM::runJitCompiledLinear() {
             case OP_NHO_HON:
             case OP_LON_HON_HOAC_BANG:
             case OP_NHO_HON_HOAC_BANG: {
-                Opcode op = instr.op;
+                const int op = instr.op;
                 program.push_back([this, op]() {
                     if (stack.size() < 2) throw runtime_error_op(vietvm::messages::formatMessage(
                         vietvm::messages::kVmNotEnoughOperands), op, (int)pc);
@@ -921,7 +921,7 @@ CellHandle VM::captureCellForSlot(int varId) {
 // Tạo call frame và thực thi bytecode của một function id với danh sách đối số/receiver đã chuẩn bị, sau đó trả kết quả về caller.
 void VM::invokeFunction(int argc,
                         int hamIdOrName,
-                        Opcode op,
+                        int op,
                         int curPc,
                         InstanceHandle receiver,
                         ClassHandle methodOwnerClass,
