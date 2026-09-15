@@ -1,16 +1,16 @@
-[IN] xin chao
-[IN] abc
-[IN] 1
-[IN] 0
-[IN] 1
-[IN] 0
-[IN] 1
-[IN] [THÔNG TIN] ok
-[IN] [CẢNH BÁO] warn
-[IN] [LỖI] err
-[IN] [THÔNG TIN] Tiếng Việt 𠀀
-[IN] 1
-[IN] [CẢNH BÁO] 42
-[IN] 1
-[IN] [LỖI] 1
-[IN] 1
+xin chao
+abc
+1
+0
+1
+0
+1
+[THÔNG TIN] ok
+[CẢNH BÁO] warn
+[LỖI] err
+[THÔNG TIN] Tiếng Việt 𠀀
+1
+[CẢNH BÁO] 42
+1
+[LỖI] 1
+1

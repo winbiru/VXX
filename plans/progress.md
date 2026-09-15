@@ -330,8 +330,11 @@ Long-term: 20/41
     không có ngoặc vuông. Math không còn âm thầm cắt số thực có phần lẻ ở `%`/`chia dư`, còn
     `giới hạn` từ chối cận nhỏ nhất lớn hơn cận lớn nhất. Integer parser dùng chung đã chặn
     suffix/phần lẻ thay vì `stoi` cắt ngầm; `cắt chuỗi` và `mã hóa caesar` dùng cùng contract,
-    chấp nhận số thực tích phân và từ chối số thực có phần lẻ. Phần còn lại là xác nhận các contract
-    này trên release matrix; bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
+    chấp nhận số thực tích phân và từ chối số thực có phần lẻ. Package `kiểm thử` đã được nâng
+    với assertion rỗng/không rỗng, expected-error callback và wrapper setup/teardown; CLI discovery
+    đệ quy + thứ tự xác định được khóa bằng contract test và tài liệu `docs/testing.md`.
+    Phần còn lại là xác nhận các contract này trên release matrix; process/crypto chỉ mở khi
+    permission model tương ứng được chốt.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
 19. [x] **Compiler hardening:** deterministic/reproducible compile đã khóa bằng regression

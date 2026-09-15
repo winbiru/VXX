@@ -1,10 +1,10 @@
-[IN] xin chao io
-[IN] 2
-[IN] 4
-[IN] {"bat": 1, "he_so": 2.5, "name": "vietvm", "port": 8080}
-[IN] vietvm
-[IN] mặc định
-[IN] 1
-[IN] 1
-[IN] 1
-[IN] 1
+xin chao io
+2
+4
+{"bat": 1, "he_so": 2.5, "name": "vietvm", "port": 8080}
+vietvm
+mặc định
+1
+1
+1
+1

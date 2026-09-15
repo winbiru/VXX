@@ -63,7 +63,7 @@ void testIntegerArithmeticAndModulo() {
     };
 
     expectEqual(runAndCapture(code),
-                "[IN] 12\n[IN] 5\n[IN] 42\n[IN] 4\n[IN] 2\n",
+                "12\n5\n42\n4\n2\n",
                 "integer arithmetic and modulo");
 }
 
@@ -77,7 +77,7 @@ void testIntegerComparisons() {
     };
 
     expectEqual(runAndCapture(code),
-                "[IN] 1\n[IN] 1\n[IN] 1\n[IN] 1\n",
+                "1\n1\n1\n1\n",
                 "integer comparisons");
 }
 
@@ -91,7 +91,7 @@ void testLogicAndComparisonBoundaryMatrix() {
     };
 
     expectEqual(runAndCapture(code),
-                "[IN] 0\n[IN] 1\n[IN] 1\n[IN] 1\n",
+                "0\n1\n1\n1\n",
                 "logic and comparison boundary matrix");
 }
 
@@ -102,7 +102,7 @@ void testBranchOpcodes() {
         integer(7), opcode(OP_IN),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(falseBranch), "[IN] 7\n",
+    expectEqual(runAndCapture(falseBranch), "7\n",
                 "jump-if-false takes the false branch");
 
     const std::vector<Instruction> trueBranch = {
@@ -110,7 +110,7 @@ void testBranchOpcodes() {
         integer(8), opcode(OP_IN),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(trueBranch), "[IN] 8\n",
+    expectEqual(runAndCapture(trueBranch), "8\n",
                 "jump-if-false falls through for a true condition");
 
     const std::vector<Instruction> unconditional = {
@@ -119,7 +119,7 @@ void testBranchOpcodes() {
         integer(5), opcode(OP_IN),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(unconditional), "[IN] 5\n",
+    expectEqual(runAndCapture(unconditional), "5\n",
                 "unconditional jump changes the program counter");
 }
 
@@ -213,7 +213,7 @@ void testFunctionCallParameterAndReturn() {
     vm.setOutputSink([&output](const std::string &text) { output += text; });
     vm.hamBytecodeMap.emplace(7, function);
     vm.run();
-    expectEqual(output, "[IN] 42\n",
+    expectEqual(output, "42\n",
                 "function call binds an argument and returns a value");
 }
 
@@ -235,7 +235,7 @@ void testDefaultParameterBinding() {
     vm.setOutputSink([&output](const std::string &text) { output += text; });
     vm.hamBytecodeMap.emplace(7, function);
     vm.run();
-    expectEqual(output, "[IN] 7\n",
+    expectEqual(output, "7\n",
                 "default parameter binds when an argument is omitted");
 }
 
@@ -249,7 +249,7 @@ void testSwitchCaseAndDefault() {
         opcode(OP_DONG_KHOI),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(matchingCase), "[IN] 20\n",
+    expectEqual(runAndCapture(matchingCase), "20\n",
                 "switch selects a matching integer case");
 
     const std::vector<Instruction> defaultCase = {
@@ -260,7 +260,7 @@ void testSwitchCaseAndDefault() {
         opcode(OP_DONG_KHOI),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(defaultCase), "[IN] 30\n",
+    expectEqual(runAndCapture(defaultCase), "30\n",
                 "switch falls through to default when no case matches");
 }
 
@@ -275,7 +275,7 @@ void testThrowCatchAndUncaughtError() {
         opcode(OP_IN),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(caught, {"boom"}), "[IN] boom\n",
+    expectEqual(runAndCapture(caught, {"boom"}), "boom\n",
                 "throw transfers control to catch and binds the error value");
 
     expectRuntimeError(
@@ -293,7 +293,7 @@ void testStringPushAndPrint() {
     };
 
     expectEqual(runAndCapture(code, {"xin chào"}),
-                "[IN] xin chào\n",
+                "xin chào\n",
                 "string push and print");
 }
 
@@ -308,7 +308,7 @@ void testStackLiteralAndUnaryOpcodes() {
     };
 
     expectEqual(runAndCapture(code),
-                "[IN] 1\n[IN] 0\n[IN] 1\n[IN] 1\n[IN] 0\n",
+                "1\n0\n1\n1\n0\n",
                 "stack literals and unary boolean operators");
 }
 
@@ -324,7 +324,7 @@ void testVariableStackIncrementAndDecrement() {
     };
 
     expectEqual(runAndCapture(code),
-                "[IN] 10\n[IN] 11\n[IN] 11\n[IN] 10\n[IN] 10\n",
+                "10\n11\n11\n10\n10\n",
                 "variable stack assignment increment and decrement");
 }
 
@@ -336,7 +336,7 @@ void testNativeAdapterCalls() {
         opcode(OP_DUNG_CHUONG_TRINH),
     };
     expectEqual(runAndCapture(direct, {"do_dai", "chuoi_hoa", "abcd", "Abc"}),
-                "[IN] 4\n",
+                "4\n",
                 "direct call uses the native collection adapter");
 
     const std::vector<Instruction> indirect = {
@@ -347,7 +347,7 @@ void testNativeAdapterCalls() {
         opcode(OP_DUNG_CHUONG_TRINH),
     };
     expectEqual(runAndCapture(indirect, {"do_dai", "chuoi_hoa", "abcd", "Abc"}),
-                "[IN] ABC\n",
+                "ABC\n",
                 "indirect call uses the native text adapter");
 }
 
@@ -358,7 +358,7 @@ void testListLiteralAndPrint() {
     // i=integer, s=string and n=null; fields use the same escaping protocol
     // as map literals, but list records have no key.
     expectEqual(runAndCapture(code, {"i\x1f" "1" "\x1e" "s\x1f" "xin" "\x1e" "n\x1f"}),
-                "[IN] [1, xin, rỗng]\n",
+                "[1, xin, rỗng]\n",
                 "list literal push and print");
 }
 
@@ -368,7 +368,7 @@ void testListIndexRead() {
         opcode(OP_DUNG_CHUONG_TRINH),
     };
     expectEqual(runAndCapture(code, {"i\x1f" "4" "\x1e" "s\x1f" "hai"}),
-                "[IN] hai\n", "list index read");
+                "hai\n", "list index read");
 }
 
 void testListIndexOutOfRange() {
@@ -396,7 +396,7 @@ void testListIndexAssignment() {
         {OP_TEN_BIEN_GIA_TRI, 0, 0, 0}, integer(0), opcode(OP_DOC_CHI_SO), opcode(OP_IN),
         opcode(OP_DUNG_CHUONG_TRINH),
     };
-    expectEqual(runAndCapture(code, {"i\x1f" "1"}), "[IN] 9\n",
+    expectEqual(runAndCapture(code, {"i\x1f" "1"}), "9\n",
                 "list index assignment");
 }
 
@@ -412,7 +412,7 @@ void testNestedListWireDecodeAndChainedRead() {
                     std::string("l\x1f" "i\\f1\\ei\\f2") +
                     "\x1e" "l\x1f" "i\\f3"
                 }),
-                "[IN] 2\n",
+                "2\n",
                 "nested list literal decode and chained index read");
 }
 
@@ -433,7 +433,7 @@ void testNestedMapListWireDecode() {
         std::string("i") + fs + "1" + rs + "m" + fs +
         vietvm::bytecode::escapeLiteralWireField(innerMap);
     expectEqual(runAndCapture(code, {encoded}),
-                "[IN] [1, {\"a\": [2, 3]}]\n",
+                "[1, {\"a\": [2, 3]}]\n",
                 "nested map/list literal decode");
 }
 

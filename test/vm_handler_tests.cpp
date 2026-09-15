@@ -502,7 +502,7 @@ void testOutputHandlerUsesSink() {
     access.push(make_int_value(42));
     access.executeOutput(instruction(OP_IN));
 
-    expect(output == "[IN] 42\n",
+    expect(output == "42\n",
            "output handler", "OP_IN must emit through the configured sink");
     expect(access.stack().empty(),
            "output handler", "OP_IN must consume the emitted value");
@@ -711,11 +711,11 @@ void testRuntimeModuleInitializationRunsOnce() {
     expect(vm.moduleState("module://alpha") ==
                vietvm::runtime::ModuleState::Initialized,
            "module runtime", "successful initializer becomes initialized");
-    expect(output == "[IN] module-init\n[IN] entry\n",
+    expect(output == "module-init\nentry\n",
            "module runtime", "module initializer runs before entry bytecode");
 
     vm.run();
-    expect(output == "[IN] module-init\n[IN] entry\n",
+    expect(output == "module-init\nentry\n",
            "module runtime", "initialized module is never executed twice");
 
     VM failing({}, {});

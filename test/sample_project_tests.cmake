@@ -38,7 +38,7 @@ if(built EQUAL -1)
 endif()
 
 run_sample(chạy src/main.vi)
-string(FIND "${LAST_STDOUT}" "[IN] 125000" total)
+string(FIND "${LAST_STDOUT}" "125000" total)
 if(total EQUAL -1)
     message(FATAL_ERROR "sample không tính đúng tổng thanh toán: ${LAST_STDOUT}")
 endif()

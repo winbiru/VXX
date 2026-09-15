@@ -51,7 +51,7 @@ int main() {
         "}";
 
     const std::string receiverOutput = runProgram(receiverSource);
-    if (receiverOutput != "[IN] 7\n[IN] 12\n") {
+    if (receiverOutput != "7\n12\n") {
         std::cerr << "FAIL: implicit receiver end-to-end output mismatch\n"
                   << "actual:\n" << receiverOutput;
         return 1;
@@ -71,7 +71,7 @@ int main() {
         "}";
 
     const std::string constructorOutput = runProgram(constructorSource);
-    if (constructorOutput != "[IN] 12\n[IN] 21\n") {
+    if (constructorOutput != "12\n21\n") {
         std::cerr << "FAIL: parameterized constructor end-to-end output mismatch\n"
                   << "actual:\n" << constructorOutput;
         return 1;

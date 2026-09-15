@@ -32,3 +32,41 @@ hàm khẳng định khác(thực tế, giá trị khác, thông điệp = "kh�
     };
     trả về đúng;
 };
+
+// Ghi chú hàm: khẳng định giá trị là rỗng.
+hàm khẳng định rỗng(thực tế, thông điệp = "khẳng định rỗng thất bại") {
+    nếu (thực tế != rỗng) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: khẳng định giá trị không phải rỗng.
+hàm khẳng định không rỗng(thực tế, thông điệp = "khẳng định không rỗng thất bại") {
+    nếu (thực tế == rỗng) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};
+
+// Ghi chú hàm: chạy callback và yêu cầu callback phải ném lỗi. Nếu `lỗi kỳ vọng`
+// khác rỗng thì giá trị lỗi bắt được phải bằng chính xác giá trị đó.
+hàm khẳng định ném lỗi(hành động, lỗi kỳ vọng = rỗng, thông điệp = "khẳng định ném lỗi thất bại") {
+    đãNém = sai;
+    lỗiBắtĐược = rỗng;
+
+    thử {
+        hành động();
+    } bắt lỗi (e) {
+        đãNém = đúng;
+        lỗiBắtĐược = e;
+    }
+
+    nếu (!đãNém) {
+        ném thông điệp;
+    };
+    nếu (lỗi kỳ vọng != rỗng && lỗiBắtĐược != lỗi kỳ vọng) {
+        ném thông điệp;
+    };
+    trả về đúng;
+};

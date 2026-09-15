@@ -68,7 +68,7 @@ EOF
     if ! "$EXEC_PATH" "$tmpdir/http_probe.vi" >"$tmpdir/http_probe.raw" 2>&1; then
       return 1
     fi
-    sed -n 's/^\[IN\] //p' "$tmpdir/http_probe.raw" >"$output"
+    cat "$tmpdir/http_probe.raw" >"$output"
     return 0
   fi
   curl -fsS --max-time 1 "$url" >"$output" 2>/dev/null

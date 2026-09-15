@@ -107,7 +107,9 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [ ] Bổ sung process API tối thiểu nếu permission model cho phép.
 - [ ] Bổ sung crypto cơ bản bằng implementation đã được kiểm chứng: secure random, hash/HMAC;
   không tự viết primitive mật mã trong VM.
-- [ ] Nâng package testing: assertion, expected error, setup/teardown và test discovery rõ ràng.
+- [x] Nâng package testing: assertion cơ bản + rỗng/không rỗng, expected error qua callback,
+  setup/teardown bảo đảm cleanup khi thân test lỗi và test discovery CLI đệ quy theo thứ tự
+  xác định; contract được khóa bằng regression và mô tả trong `docs/testing.md`.
 - [ ] Audit các package đã có: collection, file, JSON, HTTP client/server, math, random,
   environment, logging và config; đóng behavior + lỗi + cross-platform test cho 1.0. Slice
   file/config/random đã khóa UTF-8 path, line/word count, config key/fallback và strict integer

@@ -1,3 +1,4 @@
-// Gói kiểm thử: assertion cơ bản cho mã V++.
+// Gói kiểm thử: assertion + lifecycle helper cho mã V++.
 // Không tự import vào gói/chuẩn/main.vi để production không kéo API test.
 nhập "gói/kiểm thử/khẳng định.vi";
+nhập "gói/kiểm thử/vòng đời.vi";

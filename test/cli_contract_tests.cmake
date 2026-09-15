@@ -6,7 +6,7 @@ if(NOT DEFINED TEST_ROOT OR TEST_ROOT STREQUAL "")
 endif()
 
 file(REMOVE_RECURSE "${TEST_ROOT}")
-file(MAKE_DIRECTORY "${TEST_ROOT}/du-an/tests" "${TEST_ROOT}/alias-new")
+file(MAKE_DIRECTORY "${TEST_ROOT}/du-an/tests/nested" "${TEST_ROOT}/alias-new")
 
 function(run_vpp working_directory)
     execute_process(
@@ -65,6 +65,8 @@ file(WRITE "${TEST_ROOT}/du-an/tests/a.vi"
     "hàm main() { in \"A\"; }\n")
 file(WRITE "${TEST_ROOT}/du-an/tests/b.vi"
     "hàm main() { in \"B\"; }\n")
+file(WRITE "${TEST_ROOT}/du-an/tests/nested/c.vi"
+    "hàm main() { in \"C\"; }\n")
 
 run_vpp("${TEST_ROOT}/du-an" dựng main.vi)
 string(FIND "${LAST_STDOUT}" "Đã dựng thành công main.vi" build_vi)
@@ -79,23 +81,31 @@ if(build_alias EQUAL -1)
 endif()
 
 run_vpp("${TEST_ROOT}/du-an" chạy main.vi)
-if(NOT LAST_STDOUT STREQUAL "[IN] 42\n")
+if(NOT LAST_STDOUT STREQUAL "42\n")
     message(FATAL_ERROR "lệnh chạy cho output không mong đợi: ${LAST_STDOUT}")
 endif()
 
 run_vpp("${TEST_ROOT}/du-an" run main.vi)
-if(NOT LAST_STDOUT STREQUAL "[IN] 42\n")
+if(NOT LAST_STDOUT STREQUAL "42\n")
     message(FATAL_ERROR "alias run không giữ contract chạy: ${LAST_STDOUT}")
 endif()
 
 run_vpp("${TEST_ROOT}/du-an" kiểm thử tests)
-string(FIND "${LAST_STDOUT}" "Kiểm thử hoàn tất: 2/2 tệp đạt." test_vi)
+string(FIND "${LAST_STDOUT}" "Kiểm thử hoàn tất: 3/3 tệp đạt." test_vi)
 if(test_vi EQUAL -1)
     message(FATAL_ERROR "lệnh kiểm thử không trả summary chuẩn: ${LAST_STDOUT}")
 endif()
+string(FIND "${LAST_STDOUT}" "tests/a.vi" test_a)
+string(FIND "${LAST_STDOUT}" "tests/b.vi" test_b)
+string(FIND "${LAST_STDOUT}" "tests/nested/c.vi" test_c)
+if(test_a EQUAL -1 OR test_b EQUAL -1 OR test_c EQUAL -1 OR
+   NOT test_a LESS test_b OR NOT test_b LESS test_c)
+    message(FATAL_ERROR
+        "kiểm thử không discovery đệ quy theo thứ tự xác định: ${LAST_STDOUT}")
+endif()
 
 run_vpp("${TEST_ROOT}/du-an" test tests)
-string(FIND "${LAST_STDOUT}" "Kiểm thử hoàn tất: 2/2 tệp đạt." test_alias)
+string(FIND "${LAST_STDOUT}" "Kiểm thử hoàn tất: 3/3 tệp đạt." test_alias)
 if(test_alias EQUAL -1)
     message(FATAL_ERROR "alias test không giữ contract kiểm thử: ${LAST_STDOUT}")
 endif()

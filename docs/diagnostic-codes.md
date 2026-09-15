@@ -22,7 +22,7 @@ và các catalog con đi kèm.
 | `VPP-VM-*` | VM/bytecode |
 | `VPP-NATIVE-*` | Hàm native: file, HTTP, thời gian và DB |
 
-Thông báo thông tin trên `stdout` (ví dụ `[IN]`, kết quả package và JSON-RPC
+Thông báo thông tin trên `stdout` (ví dụ output của `in`, kết quả package và JSON-RPC
 LSP framing) vẫn giữ nguyên nội dung cũ để không phá script hiện có. Chúng vẫn
 được định nghĩa tập trung trong catalog và có mã nội bộ tương ứng. Với lỗi LSP,
 trường JSON `code` dùng mã `VPP-*` khi lỗi đã có mã.

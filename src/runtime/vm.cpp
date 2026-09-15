@@ -627,8 +627,7 @@ void VM::initializeModules() {
 // Phát mã cho đầu ra; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
 void VM::emitOutput(const StackValue& value) {
     if (!outputSink) return;
-    outputSink(vietvm::messages::messageText(vietvm::messages::kVmOutputPrefix)
-               + sv_to_string(value) + "\n");
+    outputSink(sv_to_string(value) + "\n");
 }
 
 // Chuyển `StackValue` thành điều kiện luận lý theo quy tắc runtime của V++, dùng cho nhánh và vòng lặp.

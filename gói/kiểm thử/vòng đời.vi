@@ -1,0 +1,26 @@
+// Module: kiểm thử.vòng đời
+// Mục đích: wrapper nhỏ cho một ca kiểm thử có setup/teardown.
+
+// Chạy một ca kiểm thử. `thiếtLập` chạy trước thân khi khác rỗng; `dọnDẹp`
+// luôn chạy sau thân nếu setup đã hoàn tất, kể cả khi thân ném lỗi. Lỗi của thân
+// được ném lại sau cleanup để CLI vẫn đánh dấu tệp kiểm thử là thất bại.
+hàm chạy ca kiểm thử(thân, thiếtLập = rỗng, dọnDẹp = rỗng) {
+    nếu (thiếtLập != rỗng) {
+        thiếtLập();
+    };
+
+    kếtQuả = rỗng;
+    thử {
+        kếtQuả = thân();
+    } bắt lỗi (e) {
+        nếu (dọnDẹp != rỗng) {
+            dọnDẹp();
+        };
+        ném e;
+    }
+
+    nếu (dọnDẹp != rỗng) {
+        dọnDẹp();
+    };
+    trả về kếtQuả;
+};

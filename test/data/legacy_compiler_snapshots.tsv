@@ -81,7 +81,7 @@ src/tests/kiem_tra_namespace_module.vi	0663e9803622ba6e
 src/tests/kiem_tra_ngoai_le.vi	4e19f9c2294a8c6b
 src/tests/kiem_tra_ngoai_le_xuyen_ham.vi	2cee09b8a5583ec3
 src/tests/kiem_tra_noi_chuoi.vi	c4237d35e9f90100
-src/tests/kiem_tra_package_modules.vi	162087e7d91b9c4d
+src/tests/kiem_tra_package_modules.vi	a7409c602df52c73
 src/tests/kiem_tra_package_tieng_viet.vi	392557b6771f7751
 src/tests/kiem_tra_rest_json_jwt.vi	f8952602d8d8ce3e
 src/tests/kiem_tra_rong_va_map.vi	7bd8ddd5a74c63c1
@@ -100,7 +100,7 @@ src/tests/kiem_tra_stdlib_mo_rong.vi	4f14b7ab43441cb6
 src/tests/kiem_tra_stdlib_nen_tang.vi	48190e3963617d52
 src/tests/kiem_tra_stdlib_starter.vi	dd866eec8513e43e
 src/tests/kiem_tra_stdlib_tinh_toan.vi	4c9815fcaffff86b
-src/tests/kiem_tra_goi_kiem_thu.vi	fadd240294575e2a
+src/tests/kiem_tra_goi_kiem_thu.vi	bb844d08a645947c
 src/tests/kiem_tra_goi_dung.vi	8027ae82a0d27a86
 src/tests/kiem_tra_goi_mang.vi	bcd7fb63aad93e21
 src/tests/kiem_tra_hoi_quy_tong_hop.vi	e038c1777c9e7f70
