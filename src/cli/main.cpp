@@ -13,6 +13,12 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 #include "vm/vm.h"
 #include "frontend/keywords.h"
 #include "frontend/lexer.h"
@@ -2051,8 +2057,9 @@ static int runLanguageServer() {
 }
 
 
-// Điểm vào chính của chương trình.
-int main(int argc, char* argv[]) {
+// Chạy CLI với argv đã chuẩn hóa UTF-8. Trên Windows, entry point `wmain`
+// chuyển command line UTF-16 sang UTF-8 trước khi đi vào parser này.
+static int runCli(int argc, char* argv[]) {
     try {
         if (argc >= 2) {
             std::string command = argv[1];
@@ -2249,6 +2256,14 @@ int main(int argc, char* argv[]) {
             return runFile(argv[1], SnippetMode::Execute);
         }
 
+        // Regression legacy chỉ được phép chạy khi CLI thực sự không nhận đối
+        // số. Một command có nhiều đối số nhưng không khớp parser không được
+        // phép vô tình kích hoạt toàn bộ src/tests.
+        if (argc > 1) {
+            printUsage();
+            return EXIT_FAILURE;
+        }
+
         // -----------------------------
         // Nếu không có đối số → chạy file mặc định
         // -----------------------------
@@ -2299,3 +2314,53 @@ int main(int argc, char* argv[]) {
 
     return EXIT_SUCCESS;
 }
+
+#if defined(_WIN32)
+// Chuyển một đối số UTF-16 do Windows CRT cung cấp thành UTF-8 để toàn bộ
+// parser CLI dùng cùng encoding với source code và thông báo tiếng Việt.
+static std::string wideArgumentToUtf8(const wchar_t *argument) {
+    if (argument == nullptr) return {};
+    const int required = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, argument, -1, nullptr, 0, nullptr, nullptr);
+    if (required <= 0) {
+        throw std::runtime_error("không thể chuyển đối số dòng lệnh Windows sang UTF-8");
+    }
+
+    std::string utf8(static_cast<std::size_t>(required), '\0');
+    const int written = WideCharToMultiByte(
+        CP_UTF8, WC_ERR_INVALID_CHARS, argument, -1,
+        utf8.data(), required, nullptr, nullptr);
+    if (written != required) {
+        throw std::runtime_error("không thể chuyển đối số dòng lệnh Windows sang UTF-8");
+    }
+    utf8.pop_back();
+    return utf8;
+}
+
+// Windows truyền command line Unicode qua `wmain`; chuẩn hóa một lần tại biên
+// hệ điều hành rồi giữ parser/command contract nội bộ hoàn toàn bằng UTF-8.
+int wmain(int argc, wchar_t *argv[]) {
+    try {
+        std::vector<std::string> utf8Arguments;
+        utf8Arguments.reserve(static_cast<std::size_t>(argc));
+        for (int index = 0; index < argc; ++index) {
+            utf8Arguments.push_back(wideArgumentToUtf8(argv[index]));
+        }
+
+        std::vector<char *> utf8Argv;
+        utf8Argv.reserve(utf8Arguments.size());
+        for (std::string &argument : utf8Arguments) {
+            utf8Argv.push_back(argument.data());
+        }
+        return runCli(static_cast<int>(utf8Argv.size()), utf8Argv.data());
+    } catch (const std::exception &error) {
+        printErrorMessage(messages::kCliUnhandledException, error.what());
+        return EXIT_FAILURE;
+    }
+}
+#else
+// POSIX argv đã được môi trường CI/shell cung cấp dưới dạng UTF-8.
+int main(int argc, char* argv[]) {
+    return runCli(argc, argv);
+}
+#endif

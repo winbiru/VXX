@@ -9,6 +9,7 @@ function(run_sample)
     execute_process(
         COMMAND "${VPP_EXEC}" ${ARGN}
         WORKING_DIRECTORY "${SAMPLE_ROOT}"
+        TIMEOUT 30
         RESULT_VARIABLE result
         OUTPUT_VARIABLE stdout
         ERROR_VARIABLE stderr)

@@ -224,6 +224,7 @@ add_test(NAME vpp-sample-project-unit
                  -DVPP_EXEC=$<TARGET_FILE:vpp-cli>
                  -DSAMPLE_ROOT=${CMAKE_SOURCE_DIR}/examples/hoa-don-cua-hang
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/sample_project_tests.cmake)
+set_tests_properties(vpp-sample-project-unit PROPERTIES TIMEOUT 60)
 
 foreach(vpp_test_target IN ITEMS
         vpp-compiler-support-unit
