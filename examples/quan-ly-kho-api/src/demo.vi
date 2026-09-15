@@ -2,6 +2,7 @@ nhập lõi;
 nhập mạng;
 nhập "nhập xuất";
 nhập "app/bootstrap.vi";
+nhập "diagnostics/language_features.vi";
 
 hàm ghi dữ liệu demo() {
     nếu (!đường dẫn tồn tại("data")) {
@@ -19,6 +20,9 @@ hàm ghi dữ liệu demo() {
 };
 
 hàm main() {
+    in "=== KIEM TRA TINH NANG NGON NGU ===";
+    in json tạo(báo cáo tính năng());
+
     ghi dữ liệu demo();
     ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
     dịchVụKho = lấy map(ứngDụng, "dichVuKho", rỗng);

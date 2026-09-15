@@ -1,0 +1,13 @@
+nhập gói/chuẩn/main.vi;
+nhập "diagnostics/language_features.vi";
+nhập "app/bootstrap.vi";
+
+hàm main() {
+    chạy kiểm tra tính năng();
+
+    ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
+    yêuCầu(lấy map(ứngDụng, "dichVuKho", rỗng) != rỗng, "warehouse service graph");
+    yêuCầu(lấy map(ứngDụng, "router", rỗng) != rỗng, "warehouse router graph");
+
+    in json tạo(báo cáo tính năng());
+};

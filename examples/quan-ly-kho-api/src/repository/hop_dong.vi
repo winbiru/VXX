@@ -5,6 +5,7 @@ giao diện công khai KhoSảnPhẩm {
     hàm tìmTheoId(id);
     hàm lưu(sảnPhẩm);
     hàm tạoMới(sảnPhẩm);
+    hàm loạiBỏ(id);
 };
 
 giao diện công khai KhoĐơnHàng {

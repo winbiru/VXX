@@ -2,8 +2,9 @@ nhập lõi;
 nhập mạng;
 
 lớp công khai RouterApi {
-    hàm khởi tạo(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
+    hàm khởi tạo(healthController, featuresController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
         mình.healthController = healthController;
+        mình.featuresController = featuresController;
         mình.sảnPhẩmController = sảnPhẩmController;
         mình.đơnHàngController = đơnHàngController;
         mình.báoCáoController = báoCáoController;
@@ -17,11 +18,15 @@ lớp công khai RouterApi {
             controller = mình.healthController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/san-pham" || path == "/san-pham/thong-ke" || path == "/san-pham/nhap-kho") {
+        nếu (path == "/features") {
+            controller = mình.featuresController;
+            trả về controller.xửLý(requestId);
+        };
+        nếu (path == "/san-pham" || path == "/san-pham/thong-ke" || path == "/san-pham/nhap-kho" || path == "/san-pham/chi-tiet" || path == "/san-pham/tim-kiem") {
             controller = mình.sảnPhẩmController;
             trả về controller.xửLý(requestId);
         };
-        nếu (path == "/don-hang" || path == "/don-hang/huy") {
+        nếu (path == "/don-hang" || path == "/don-hang/huy" || path == "/don-hang/chi-tiet") {
             controller = mình.đơnHàngController;
             trả về controller.xửLý(requestId);
         };
@@ -35,6 +40,6 @@ lớp công khai RouterApi {
     }
 };
 
-hàm công khai tạo router api(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
-    trả về RouterApi(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController);
+hàm công khai tạo router api(healthController, featuresController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
+    trả về RouterApi(healthController, featuresController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController);
 };

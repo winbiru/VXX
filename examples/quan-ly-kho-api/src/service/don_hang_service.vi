@@ -28,6 +28,11 @@ lớp công khai DịchVụĐơnHàng {
         trả về đơn;
     }
 
+    hàm chiTiết(id) {
+        đơn = mình.tìmTheoId(id);
+        trả về đơn.thànhMap();
+    }
+
     hàm gomSốLượng(cácMục) {
         nếu (độ dài(cácMục) == 0) {
             ném "Dịch vụ đơn hàng: danh sách sản phẩm rỗng";
@@ -47,6 +52,37 @@ lớp công khai DịchVụĐơnHàng {
             đặt map(tổngTheoMã, mã, hiệnTại + sốLượng);
         };
         trả về tổngTheoMã;
+    }
+
+
+    hàm snapshotProducts(cácSảnPhẩm) {
+        kếtQuả = [];
+        lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
+            sảnPhẩm = cácSảnPhẩm[i];
+            thêm(kếtQuả, {
+                "id": sảnPhẩm.id,
+                "tonKho": sảnPhẩm.tồnKho,
+                "daBan": sảnPhẩm.đãBán,
+                "phienBan": sảnPhẩm.phiênBản
+            });
+        };
+        trả về kếtQuả;
+    }
+
+    hàm restoreProducts(snapshot) {
+        khoSảnPhẩm = mình.khoSảnPhẩm;
+        lặp(i = 0; i < độ dài(snapshot); i = i + 1) {
+            trạngThái = snapshot[i];
+            id = lấy map(trạngThái, "id", "");
+            sảnPhẩm = khoSảnPhẩm.tìmTheoId(id);
+            nếu (sảnPhẩm != rỗng) {
+                sảnPhẩm.tồnKho = lấy map(trạngThái, "tonKho", sảnPhẩm.tồnKho);
+                sảnPhẩm.đãBán = lấy map(trạngThái, "daBan", sảnPhẩm.đãBán);
+                sảnPhẩm.phiênBản = lấy map(trạngThái, "phienBan", sảnPhẩm.phiênBản);
+                khoSảnPhẩm.lưu(sảnPhẩm);
+            };
+        };
+        trả về đúng;
     }
 
     hàm đặtHàng(kháchHàng, cácMục) {
@@ -73,25 +109,31 @@ lớp công khai DịchVụĐơnHàng {
             thêm(cácSảnPhẩm, sảnPhẩm);
         };
 
-        // Pass 2: tạo snapshot dòng đơn và cập nhật tồn kho.
-        cácDòng = [];
-        lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
-            sảnPhẩm = cácSảnPhẩm[i];
-            sốLượng = lấy map(tổngTheoMã, sảnPhẩm.id, 0);
-            dòng = DòngĐơnHàng(sảnPhẩm.id, sảnPhẩm.tên, sảnPhẩm.giá, sốLượng);
-            dòng.kiểmTraHợpLệ();
-            thêm(cácDòng, dòng);
-            sảnPhẩm.xuấtKho(sốLượng);
-            khoSảnPhẩm.lưu(sảnPhẩm);
-        };
+        snapshot = mình.snapshotProducts(cácSảnPhẩm);
+        thử {
+            // Pass 2: tạo dòng đơn và persist tồn kho.
+            cácDòng = [];
+            lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
+                sảnPhẩm = cácSảnPhẩm[i];
+                sốLượng = lấy map(tổngTheoMã, sảnPhẩm.id, 0);
+                dòng = DòngĐơnHàng(sảnPhẩm.id, sảnPhẩm.tên, sảnPhẩm.giá, sốLượng);
+                dòng.kiểmTraHợpLệ();
+                thêm(cácDòng, dòng);
+                sảnPhẩm.xuấtKho(sốLượng);
+                khoSảnPhẩm.lưu(sảnPhẩm);
+            };
 
-        khoĐơnHàng = mình.khoĐơnHàng;
-        mãĐơn = tạo mã hóa đơn(khoĐơnHàng.sốLượng() + 1);
-        đơn = ĐơnHàng(mãĐơn, kháchHàng, cácDòng, "MOI");
-        đơn.kiểmTraHợpLệ();
-        đơn.xácNhận();
-        khoĐơnHàng.tạoMới(đơn);
-        trả về đơn;
+            khoĐơnHàng = mình.khoĐơnHàng;
+            mãĐơn = tạo mã hóa đơn(khoĐơnHàng.sốLượng() + 1);
+            đơn = ĐơnHàng(mãĐơn, kháchHàng, cácDòng, "MOI");
+            đơn.kiểmTraHợpLệ();
+            đơn.xácNhận();
+            khoĐơnHàng.tạoMới(đơn);
+            trả về đơn;
+        } bắt lỗi (e) {
+            mình.restoreProducts(snapshot);
+            ném e;
+        }
     }
 
     hàm hủy(id) {

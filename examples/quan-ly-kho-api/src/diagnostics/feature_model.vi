@@ -1,0 +1,57 @@
+giao diện CóMôTả {
+    hàm môTả();
+};
+
+giao diện CóGiá {
+    hàm giá();
+};
+
+giao diện HàngHóa kế thừa CóMôTả, CóGiá {
+    hàm thànhTiền(sốLượng);
+};
+
+lớp ThựcThể {
+    hàm công khai mãGốc() {
+        trả về mình.id;
+    }
+
+    hàm bảo vệ tiềnTố() {
+        trả về "SP-";
+    }
+
+    hàm riêng tư bíMật() {
+        trả về 7;
+    }
+
+    hàm công khai kiểmTraRiêngTư() {
+        trả về mình.bíMật();
+    }
+};
+
+lớp SảnPhẩmChẩnĐoán kế thừa ThựcThể triển khai HàngHóa {
+    hàm khởi tạo(id, tên, đơnGiá) {
+        mình.id = id;
+        mình.tên = tên;
+        mình.đơnGiá = đơnGiá;
+    }
+
+    hàm công khai mã() {
+        trả về mình.tiềnTố() + gốc.mãGốc();
+    }
+
+    hàm công khai môTả() {
+        trả về mình.mã() + ":" + mình.tên;
+    }
+
+    hàm công khai giá() {
+        trả về mình.đơnGiá;
+    }
+
+    hàm công khai thànhTiền(sốLượng) {
+        trả về mình.đơnGiá * sốLượng;
+    }
+};
+
+hàm công khai tạo sản phẩm chẩn đoán() {
+    trả về SảnPhẩmChẩnĐoán(12, "Cà phê", 25);
+}

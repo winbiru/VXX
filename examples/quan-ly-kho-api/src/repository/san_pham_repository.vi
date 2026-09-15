@@ -88,6 +88,25 @@ lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
         mình.ghiMap(raw);
         trả về sảnPhẩm;
     }
+
+    hàm loạiBỏ(id) {
+        raw = mình.đọcMap();
+        kếtQuả = [];
+        đãBỏ = sai;
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            item = raw[i];
+            nếu (lấy map(item, "id", "") == id) {
+                đãBỏ = đúng;
+            } nếu không {
+                thêm(kếtQuả, item);
+            };
+        };
+        nếu (!đãBỏ) {
+            ném "Kho sản phẩm: không tìm thấy " + id;
+        };
+        mình.ghiMap(kếtQuả);
+        trả về đúng;
+    }
 };
 
 hàm công khai tạo kho sản phẩm tệp(đườngDẫn) {

@@ -1,5 +1,6 @@
 nhập lõi;
 nhập mạng;
+nhập "../diagnostics/language_features.vi";
 
 giao diện công khai TrìnhXửLýHttp {
     hàm xửLý(requestId);
@@ -23,6 +24,15 @@ lớp công khai HealthController triển khai TrìnhXửLýHttp {
             "thanhCong": đúng,
             "trangThai": "UP",
             "ungDung": "quan-ly-kho-api"
+        });
+    }
+};
+
+lớp công khai FeaturesController triển khai TrìnhXửLýHttp {
+    hàm xửLý(requestId) {
+        trả về phản hồi json(requestId, 200, {
+            "thanhCong": đúng,
+            "duLieu": báo cáo tính năng()
         });
     }
 };
@@ -83,6 +93,65 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
             }
         };
 
+        nếu (method == "POST" && path == "/san-pham/chi-tiet") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": dịchVụ.chiTiết(id)
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 404, e);
+            }
+        };
+
+        nếu (method == "POST" && path == "/san-pham/tim-kiem") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                từKhóa = lấy map(body, "tuKhoa", "");
+                trang = lấy map(body, "trang", 1);
+                kíchThước = lấy map(body, "kichThuoc", 10);
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": dịchVụ.tìmKiếm(từKhóa, trang, kíchThước)
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        nếu (method == "PUT" && path == "/san-pham") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                tên = lấy map(body, "ten", "");
+                giá = lấy map(body, "gia", -1);
+                tồnKho = lấy map(body, "tonKho", -1);
+                sảnPhẩm = dịchVụ.cậpNhật(id, tên, giá, tồnKho);
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": sảnPhẩm.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        nếu (method == "DELETE" && path == "/san-pham") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                sảnPhẩm = dịchVụ.loạiBỏ(id);
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": sảnPhẩm.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
         trả về phản hồi lỗi(requestId, 404, "Endpoint sản phẩm không tồn tại");
     }
 };
@@ -130,6 +199,19 @@ lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
                 });
             } bắt lỗi (e) {
                 trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        nếu (method == "POST" && path == "/don-hang/chi-tiet") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": dịchVụ.chiTiết(id)
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 404, e);
             }
         };
 

@@ -16,6 +16,7 @@ hàm công khai tạo ngữ cảnh ứng dụng(đườngDẫnSảnPhẩm, đư�
     dịchVụBáoCáo = tạo dịch vụ báo cáo(khoSảnPhẩm, khoĐơnHàng);
 
     healthController = HealthController();
+    featuresController = FeaturesController();
     sảnPhẩmController = SảnPhẩmController(dịchVụKho);
     đơnHàngController = ĐơnHàngController(dịchVụĐơnHàng);
     báoCáoController = BáoCáoController(dịchVụBáoCáo);
@@ -23,6 +24,7 @@ hàm công khai tạo ngữ cảnh ứng dụng(đườngDẫnSảnPhẩm, đư�
 
     router = tạo router api(
         healthController,
+        featuresController,
         sảnPhẩmController,
         đơnHàngController,
         báoCáoController,
