@@ -26,11 +26,17 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp khởi tạo [tên-dự-án]\n"
     "  vpp khởi tạo backend <tên-dự-án>\n"
     "  vpp cài đặt <nguồn> [tên]\n"
+    "  vpp đồng bộ\n"
+    "  vpp khóa\n"
+    "  vpp phục hồi\n"
     "  vpp danh sách\n"
     "  vpp thông tin <tên>\n"
     "  vpp kiểm tra <tên>\n"
     "  vpp gói khởi tạo [tên]\n"
     "  vpp gói thêm <nguồn> [tên]\n"
+    "  vpp gói đồng bộ\n"
+    "  vpp gói khóa\n"
+    "  vpp gói phục hồi\n"
     "  vpp gói xóa <tên>\n"
     "  vpp gói danh sách\n"
     "  vpp gói thông tin <tên>\n"
@@ -69,8 +75,11 @@ inline constexpr std::string_view kToolLintFailed = "{0}: {1}";
 inline constexpr std::string_view kPkgManifestCreated = "Đã tạo tệp khai báo tại {0}\n";
 inline constexpr std::string_view kPkgBackendCreated = "Đã tạo dự án backend tại {0}\n";
 inline constexpr std::string_view kPkgInstalled = "Đã cài gói: {0}\n";
+inline constexpr std::string_view kPkgSynced = "Đã đồng bộ {0} gói từ manifest.\n";
 inline constexpr std::string_view kPkgListEmpty = "Chưa có gói nào được cài.\n";
 inline constexpr std::string_view kPkgRemoved = "Đã xóa gói: {0}\n";
+inline constexpr std::string_view kPkgLocked = "Đã tạo lockfile: {0}\n";
+inline constexpr std::string_view kPkgRestored = "Đã phục hồi {0} gói từ lockfile.\n";
 inline constexpr std::string_view kPkgInfoName = "tên: {0}\n";
 inline constexpr std::string_view kPkgInfoPath = "đường_dẫn: {0}\n";
 inline constexpr std::string_view kPkgInfoMainFile = "tệp_chính: {0}\n";
@@ -95,6 +104,12 @@ inline constexpr std::string_view kPkgAddSourceMissing = "gói thêm: thiếu đ
 inline constexpr std::string_view kPkgHasNameMissing = "gói kiểm tra: thiếu tên gói";
 inline constexpr std::string_view kPkgInvalidSubcommand = "gói: lệnh con không hợp lệ: {0}";
 inline constexpr std::string_view kPkgInstallSourceMissing = "cài đặt: thiếu đường dẫn nguồn";
+inline constexpr std::string_view kPkgLockManifestMissing = "khóa: không tìm thấy vpp.json";
+inline constexpr std::string_view kPkgSyncManifestMissing = "đồng bộ: không tìm thấy vpp.json";
+inline constexpr std::string_view kPkgRestoreLockMissing = "phục hồi: không tìm thấy vpp.lock";
+inline constexpr std::string_view kPkgLockDependencyMissing = "khóa: dependency chưa được cài: {0}";
+inline constexpr std::string_view kPkgLockVersionConflict = "khóa: phiên bản {1} của dependency '{0}' không thỏa range {2}";
+inline constexpr std::string_view kPkgRestoreVersionMismatch = "phục hồi: dependency '{0}' có version source {1}, lock yêu cầu {2}";
 inline constexpr std::string_view kPkgTopLevelRemoveNameMissing = "xóa: thiếu tên gói";
 inline constexpr std::string_view kPkgTopLevelInfoNameMissing = "thông tin: thiếu tên gói";
 inline constexpr std::string_view kPkgTopLevelHasNameMissing = "kiểm tra: thiếu tên gói";

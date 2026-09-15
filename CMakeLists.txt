@@ -50,7 +50,12 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # Explicit ownership keeps target dependencies directional; no target is
 # allowed to use the old catch-all `helpers` grouping.
 set(VPP_CORE_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/core/text.cpp)
+    ${CMAKE_SOURCE_DIR}/src/core/text.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/semver.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/package_manifest.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/package_solver.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/package_installer.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/package_cache.cpp)
 set(VPP_FRONTEND_SOURCES
     ${CMAKE_SOURCE_DIR}/src/frontend/keywords.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/lexer.cpp
@@ -64,6 +69,7 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/token_utils.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/module_graph.cpp
+    ${CMAKE_SOURCE_DIR}/src/compiler/package_resolver.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/semantic.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/ir.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/optimizer.cpp

@@ -114,3 +114,6 @@ src/tests/program.vi	323c9db3bb1d49cc
 src/tests/fixtures/stack_trace/module_loi.vi	d8ed471d80469f77
 src/tests/kiem_tra_stack_trace.vi	62e0ed4af0d910ca
 src/tests/kiem_tra_stack_trace_module.vi	71123bd135a68458
+src/tests/kiem_tra_package_09.vi	7a95d945f38e8552
+src/tests/parent.vi	da2b920eacd36c90
+src/tests/shared.vi	2c71c969de247380

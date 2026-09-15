@@ -157,12 +157,12 @@ concurrency/async phức tạp không phải release blocker mặc định của
 
 4. Package resolver
 
-   - [ ] Tách package/bare-module lookup khỏi `compileRegistry`: project package,
-     bundled standard packages, compatibility redirect và `VPP_HOME` phải đi qua resolver có
-     identity/dependency policy rõ ràng trước khi thêm version/lockfile.
-   - [ ] **Dependency solver** — định nghĩa manifest dependency, semantic version/range,
-     source registry/path, conflict resolution, deterministic lockfile và offline/cache
-     behavior; resolver hiện tại mới dừng ở tìm package/module theo tên/path.
+   - [x] Tách package/bare-module lookup khỏi `compileRegistry`: project package,
+     bundled standard packages, compatibility redirect và `VPP_HOME` đi qua `PackageResolver`
+     độc lập; unit test khóa precedence, alias, UTF-8 và installation-home fallback.
+   - [ ] **Dependency solver** — manifest schema 1, source kind `path/git/registry`, SemVer/range,
+     version conflict check khi khóa và deterministic `vpp.lock` đã có. Còn graph transitive,
+     restore/install từ lockfile, registry/Git fetch và offline/cache behavior.
 
 5. An toàn và bảo mật runtime
 
