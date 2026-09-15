@@ -15,6 +15,7 @@
 #include "vpp/runtime/error.h"
 #include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
+#include "vpp/core/package_cache.h"
 #include "vpp/core/package_installer.h"
 #include "vpp/core/package_manifest.h"
 #include "vpp/core/package_solver.h"
@@ -87,6 +88,8 @@ enum class SnippetMode {
     DumpAst,
     DumpIr,
 };
+
+static void verifyLockedProjectForSource(const fs::path &sourcePath);
 
 // Chạy snippet; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runSnippet(const std::string &source,
@@ -170,6 +173,8 @@ static int runFile(const std::string &filename,
         return EXIT_FAILURE;
     }
 
+    verifyLockedProjectForSource(filePath);
+
     return runSnippet(source,
                       fileDir.empty() ? fs::current_path() : fileDir,
                       mode,
@@ -222,6 +227,46 @@ static fs::path packageRootPath(const fs::path &root) {
         if (fs::exists(candidate)) return candidate;
     }
     return root / vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory);
+}
+
+static void verifyLockedProjectForSource(const fs::path &sourcePath) {
+    fs::path start = sourcePath.parent_path();
+    if (start.empty()) start = fs::current_path();
+    try {
+        start = fs::absolute(start).lexically_normal();
+    } catch (...) {
+        start = start.lexically_normal();
+    }
+
+    std::optional<fs::path> projectRoot;
+    for (fs::path dir = start;; dir = dir.parent_path()) {
+        if (fs::exists(packageLockPath(dir))) {
+            projectRoot = dir;
+            break;
+        }
+        if (dir == dir.parent_path()) break;
+    }
+    if (!projectRoot.has_value()) return;
+
+    const auto lockfile =
+        vietvm::core::readPackageLockfile(packageLockPath(*projectRoot));
+    const fs::path installedRoot = packageRootPath(*projectRoot);
+    for (const auto &entry : lockfile.packages) {
+        const fs::path installed =
+            installedRoot / vietvm::core::utf8Path(entry.name);
+        if (!fs::exists(installed) || !fs::is_directory(installed)) {
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPkgLockedPackageMissing,
+                {entry.name, installed.u8string()}));
+        }
+        const std::string actual =
+            vietvm::core::fingerprintPackageTree(installed);
+        if (actual != entry.fingerprint) {
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPkgLockedPackageChanged,
+                {entry.name, entry.fingerprint, actual}));
+        }
+    }
 }
 
 // Quét package đã có trên đĩa để tương thích project cũ chưa có manifest schema 1.
@@ -317,12 +362,64 @@ static void materializeResolvedPackages(
     const fs::path &root,
     const vietvm::core::ResolvedPackageGraph &graph) {
     const fs::path packageRoot = packageRootPath(root);
+    const fs::path cacheRoot = vietvm::core::packageCacheRoot(root);
     fs::create_directories(packageRoot);
     for (const auto &package : graph.packages) {
         const fs::path target =
             packageRoot / vietvm::core::utf8Path(package.name);
-        (void)vietvm::core::materializePathPackage(package.sourcePath, target);
+        const std::string fingerprint =
+            vietvm::core::materializePathPackage(package.sourcePath, target);
+        (void)vietvm::core::cachePackageTree(target, cacheRoot, fingerprint);
     }
+}
+
+static int writeResolvedPackageLock(
+    const fs::path &root,
+    const vietvm::core::ResolvedPackageGraph &graph,
+    bool announce) {
+    vietvm::core::PackageLockfile lockfile;
+    const fs::path packageRoot = packageRootPath(root);
+    const fs::path cacheRoot = vietvm::core::packageCacheRoot(root);
+
+    for (const auto &dependency : graph.packages) {
+        const fs::path installed =
+            packageRoot / vietvm::core::utf8Path(dependency.name);
+        if (!fs::exists(installed) || !fs::is_directory(installed)) {
+            std::cerr << messages::formatMessage(
+                messages::kPkgLockDependencyMissing, {dependency.name}) << '\n';
+            return EXIT_FAILURE;
+        }
+
+        const std::string installedVersion = packageSourceVersion(installed);
+        if (installedVersion != dependency.version) {
+            std::cerr << messages::formatMessage(
+                messages::kPkgLockInstalledVersionMismatch,
+                {dependency.name, installedVersion, dependency.version}) << '\n';
+            return EXIT_FAILURE;
+        }
+
+        vietvm::core::PackageLockEntry entry;
+        entry.name = dependency.name;
+        entry.version = dependency.version;
+        entry.sourceKind = dependency.sourceKind;
+        entry.location = relativePackageLocation(dependency.sourcePath, root);
+        try {
+            entry.resolvedPath = fs::relative(installed, root).generic_u8string();
+        } catch (...) {
+            entry.resolvedPath = installed.lexically_normal().generic_u8string();
+        }
+        entry.fingerprint = vietvm::core::fingerprintPackageTree(installed);
+        (void)vietvm::core::cachePackageTree(
+            installed, cacheRoot, entry.fingerprint);
+        lockfile.packages.push_back(std::move(entry));
+    }
+
+    const fs::path lockPath = packageLockPath(root);
+    vietvm::core::writePackageLockfile(lockPath, lockfile);
+    if (announce) {
+        std::cout << messages::messageText(messages::kPkgLocked, {lockPath.u8string()});
+    }
+    return EXIT_SUCCESS;
 }
 
 // Ghi manifest schema 1 theo model package chung thay vì tự ghép JSON trong CLI.
@@ -460,6 +557,9 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
     const auto graph = resolveProjectPackages(projectRoot, manifest);
     materializeResolvedPackages(projectRoot, graph);
     vietvm::core::writeProjectManifest(packageManifestPath(projectRoot), manifest);
+    if (writeResolvedPackageLock(projectRoot, graph, false) != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
     std::cout << messages::messageText(messages::kPkgInstalled, {packageName});
     return EXIT_SUCCESS;
 }
@@ -474,6 +574,9 @@ static int pkgSync() {
     const auto manifest = vietvm::core::readProjectManifest(manifestPath);
     const auto graph = resolveProjectPackages(root, manifest);
     materializeResolvedPackages(root, graph);
+    if (writeResolvedPackageLock(root, graph, false) != EXIT_SUCCESS) {
+        return EXIT_FAILURE;
+    }
     std::cout << messages::messageText(
         messages::kPkgSynced, {std::to_string(graph.packages.size())});
     return EXIT_SUCCESS;
@@ -503,11 +606,30 @@ static int pkgRemove(const std::string &packageName) {
         return EXIT_FAILURE;
     }
 
-    fs::path targetDir = packageRootPath(fs::current_path()) /
+    const fs::path projectRoot = fs::current_path();
+    fs::path targetDir = packageRootPath(projectRoot) /
                          vietvm::core::utf8Path(packageName);
     if (!fs::exists(targetDir)) {
         std::cerr << messages::formatMessage(messages::kPkgNotFound, {packageName}) << std::endl;
         return EXIT_FAILURE;
+    }
+
+    const fs::path manifestPath = packageManifestPath(projectRoot);
+    std::optional<vietvm::core::ProjectManifest> updatedManifest;
+    std::optional<vietvm::core::ResolvedPackageGraph> updatedGraph;
+    if (fs::exists(manifestPath)) {
+        updatedManifest = vietvm::core::readProjectManifest(manifestPath);
+        updatedManifest->dependencies.erase(
+            std::remove_if(
+                updatedManifest->dependencies.begin(), updatedManifest->dependencies.end(),
+                [&](const vietvm::core::PackageDependencySpec &dependency) {
+                    return dependency.name == packageName;
+                }),
+            updatedManifest->dependencies.end());
+
+        // Resolve trạng thái sau khi xóa trước khi thay đổi file trên đĩa. Nếu
+        // graph còn lại có conflict/source lỗi, lệnh dừng mà package cũ vẫn còn.
+        updatedGraph = resolveProjectPackages(projectRoot, *updatedManifest);
     }
 
     std::error_code ec;
@@ -518,17 +640,12 @@ static int pkgRemove(const std::string &packageName) {
         return EXIT_FAILURE;
     }
 
-    const fs::path manifestPath = packageManifestPath(fs::current_path());
-    if (fs::exists(manifestPath)) {
-        auto manifest = vietvm::core::readProjectManifest(manifestPath);
-        manifest.dependencies.erase(
-            std::remove_if(
-                manifest.dependencies.begin(), manifest.dependencies.end(),
-                [&](const vietvm::core::PackageDependencySpec &dependency) {
-                    return dependency.name == packageName;
-                }),
-            manifest.dependencies.end());
-        vietvm::core::writeProjectManifest(manifestPath, manifest);
+    if (updatedManifest.has_value() && updatedGraph.has_value()) {
+        materializeResolvedPackages(projectRoot, *updatedGraph);
+        vietvm::core::writeProjectManifest(manifestPath, *updatedManifest);
+        if (writeResolvedPackageLock(projectRoot, *updatedGraph, false) != EXIT_SUCCESS) {
+            return EXIT_FAILURE;
+        }
     }
     std::cout << messages::messageText(messages::kPkgRemoved, {packageName});
     return EXIT_SUCCESS;
@@ -604,39 +721,14 @@ static int pkgLock() {
 
     const auto manifest = vietvm::core::readProjectManifest(manifestPath);
     const auto graph = resolveProjectPackages(root, manifest);
-    vietvm::core::PackageLockfile lockfile;
-    const fs::path packageRoot = packageRootPath(root);
-
-    for (const auto &dependency : graph.packages) {
-        const fs::path installed =
-            packageRoot / vietvm::core::utf8Path(dependency.name);
-        if (!fs::exists(installed) || !fs::is_directory(installed)) {
-            std::cerr << messages::formatMessage(
-                messages::kPkgLockDependencyMissing, {dependency.name}) << '\n';
-            return EXIT_FAILURE;
-        }
-
-        vietvm::core::PackageLockEntry entry;
-        entry.name = dependency.name;
-        entry.version = dependency.version;
-        entry.sourceKind = dependency.sourceKind;
-        entry.location = relativePackageLocation(dependency.sourcePath, root);
-        try {
-            entry.resolvedPath = fs::relative(installed, root).generic_u8string();
-        } catch (...) {
-            entry.resolvedPath = installed.lexically_normal().generic_u8string();
-        }
-        entry.fingerprint = vietvm::core::fingerprintPackageTree(installed);
-        lockfile.packages.push_back(std::move(entry));
-    }
-
-    const fs::path lockPath = packageLockPath(root);
-    vietvm::core::writePackageLockfile(lockPath, lockfile);
-    std::cout << messages::messageText(messages::kPkgLocked, {lockPath.u8string()});
-    return EXIT_SUCCESS;
+    return writeResolvedPackageLock(root, graph, true);
 }
 
-static int pkgRestore() {
+static bool isOfflineFlag(const std::string &argument) {
+    return argument == "--offline" || argument == "--ngoại-tuyến";
+}
+
+static int pkgRestore(bool offlineOnly = false) {
     const fs::path root = fs::current_path();
     const fs::path lockPath = packageLockPath(root);
     if (!fs::exists(lockPath)) {
@@ -646,9 +738,38 @@ static int pkgRestore() {
 
     const auto lockfile = vietvm::core::readPackageLockfile(lockPath);
     const fs::path packageRoot = packageRootPath(root);
+    const fs::path cacheRoot = vietvm::core::packageCacheRoot(root);
     fs::create_directories(packageRoot);
 
     for (const auto &entry : lockfile.packages) {
+        const fs::path target =
+            packageRoot / vietvm::core::utf8Path(entry.name);
+
+        if (fs::exists(target) && fs::is_directory(target)) {
+            const std::string installedFingerprint =
+                vietvm::core::fingerprintPackageTree(target);
+            if (installedFingerprint == entry.fingerprint) {
+                (void)vietvm::core::cachePackageTree(
+                    target, cacheRoot, entry.fingerprint);
+                continue;
+            }
+        }
+
+        const auto cached =
+            vietvm::core::findCachedPackage(cacheRoot, entry.fingerprint);
+        if (cached.has_value()) {
+            (void)vietvm::core::materializePathPackage(
+                *cached, target, entry.fingerprint);
+            continue;
+        }
+
+        if (offlineOnly) {
+            std::cerr << messages::formatMessage(
+                messages::kPkgOfflineCacheMissing,
+                {entry.name, entry.fingerprint}) << '\n';
+            return EXIT_FAILURE;
+        }
+
         if (entry.sourceKind != vietvm::core::PackageSourceKind::Path) {
             throw std::runtime_error(
                 "phục hồi: source '" +
@@ -677,10 +798,10 @@ static int pkgRestore() {
             return EXIT_FAILURE;
         }
 
-        const fs::path target =
-            packageRoot / vietvm::core::utf8Path(entry.name);
         (void)vietvm::core::materializePathPackage(
             sourcePath, target, entry.fingerprint);
+        (void)vietvm::core::cachePackageTree(
+            target, cacheRoot, entry.fingerprint);
     }
 
     std::cout << messages::messageText(
@@ -718,17 +839,32 @@ static int runPackageCommand(int argc, char *argv[]) {
         std::string name = (argc >= (5 + subWordOffset)) ? argv[4 + subWordOffset] : "";
         return pkgAdd(sourceArg, name);
     }
+    if (sub == "install" || sub == "cài đặt") {
+        if (argc < (4 + subWordOffset)) {
+            return pkgRestore(false);
+        }
+        std::string sourceArg = argv[3 + subWordOffset];
+        if (isOfflineFlag(sourceArg)) return pkgRestore(true);
+        std::string name = (argc >= (5 + subWordOffset)) ? argv[4 + subWordOffset] : "";
+        return pkgAdd(sourceArg, name);
+    }
     if (sub == "list" || sub == "danh sách") {
         return pkgList();
     }
     if (sub == "sync" || sub == "đồng bộ") {
         return pkgSync();
     }
+    if (sub == "update" || sub == "cập nhật") {
+        return pkgSync();
+    }
     if (sub == "lock" || sub == "khóa") {
         return pkgLock();
     }
     if (sub == "restore" || sub == "phục hồi") {
-        return pkgRestore();
+        const bool offlineOnly =
+            argc >= (4 + subWordOffset) &&
+            isOfflineFlag(argv[3 + subWordOffset]);
+        return pkgRestore(offlineOnly);
     }
     if (sub == "remove" || sub == "xóa") {
         if (argc < (4 + subWordOffset)) {
@@ -1042,11 +1178,9 @@ int main(int argc, char* argv[]) {
                 return pkgInit(name);
             }
             if (command == "install" || command == "cai" || command == "caidat" || command == "cài đặt") {
-                if (argc < (3 + commandWordOffset)) {
-                    std::cerr << messages::formatMessage(messages::kPkgInstallSourceMissing) << '\n';
-                    return EXIT_FAILURE;
-                }
+                if (argc < (3 + commandWordOffset)) return pkgRestore(false);
                 std::string sourceArg = argv[2 + commandWordOffset];
+                if (isOfflineFlag(sourceArg)) return pkgRestore(true);
                 std::string name = (argc >= (4 + commandWordOffset)) ? argv[3 + commandWordOffset] : "";
                 return pkgAdd(sourceArg, name);
             }
@@ -1056,11 +1190,17 @@ int main(int argc, char* argv[]) {
             if (command == "sync" || command == "đồng bộ") {
                 return pkgSync();
             }
+            if (command == "update" || command == "cập nhật") {
+                return pkgSync();
+            }
             if (command == "lock" || command == "khóa") {
                 return pkgLock();
             }
             if (command == "restore" || command == "phục hồi") {
-                return pkgRestore();
+                const bool offlineOnly =
+                    argc >= (3 + commandWordOffset) &&
+                    isOfflineFlag(argv[2 + commandWordOffset]);
+                return pkgRestore(offlineOnly);
             }
             if (command == "remove" || command == "xoa" || command == "xóa") {
                 if (argc < (3 + commandWordOffset)) {

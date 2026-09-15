@@ -1,6 +1,6 @@
 # Roadmap V++ 1.0
 
-> Cập nhật: 14/09/2026
+> Cập nhật: 15/09/2026
 >
 > Mục tiêu 1.0 không còn là mở rộng cú pháp theo chiều rộng. Trọng tâm là đóng băng
 > semantics, làm cứng compiler/runtime, hoàn thiện package + stdlib + toolchain và chứng
@@ -70,13 +70,18 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   khóa thứ tự ưu tiên và UTF-8 package name.
 - [x] Hỗ trợ Semantic Versioning 2.0 + range `*`, exact, `^`, `~`, comparator AND; `vpp khóa`
   kiểm tra exact version đã cài với range manifest và trả conflict rõ ràng.
-- [ ] Tạo deterministic lockfile và reproducible install/build.
-  `vpp.lock` schema 1 + deterministic writer/content fingerprint đã có; còn restore/install
-  từ lockfile và bắt buộc build dùng lock để đóng đầy đủ mục này.
+- [x] Tạo deterministic lockfile và reproducible install/build.
+  `vpp.lock` schema 1 + deterministic writer/content fingerprint đã có; install/update/sync
+  tự ghi lock, restore/install từ lock ưu tiên exact cache bytes và có cache-only offline.
+  CLI run/compile path tìm lock gần nhất và từ chối package thiếu hoặc fingerprint lệch trước
+  khi compiler chạy, nên project đã khóa luôn dùng đúng dependency bytes đã chấp nhận.
 - [ ] Hỗ trợ package cache/offline, local path package và Git package.
+  Local path package + project-local content-addressed cache đã chạy; `restore/install --offline`
+  phục hồi được khi source path không còn. Còn Git transport trước khi đóng mục tổng hợp này.
 - [ ] Thiết kế registry package và metadata tối thiểu cho publish/install.
 - [ ] Hoàn thiện CLI dependency flow tương đương `vpp cài`, `vpp cập nhật`, `vpp xóa`,
-  `vpp khóa` sau khi contract manifest/lockfile ổn định.
+  `vpp khóa` sau khi contract manifest/lockfile ổn định. Local path flow hiện đã có
+  install/update(sync)/remove/lock/restore và giữ lock đồng bộ; phần remote source còn thiếu.
 
 ## 4. Standard library 1.0
 
@@ -136,7 +141,7 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 
 ### V++ 0.9 — Developer ecosystem
 
-- [ ] Package resolver + semver + lockfile + cache.
+- [x] Package resolver + semver + lockfile + cache.
 - [ ] Standard library audit/completeness cho 1.0.
 - [ ] Test framework nâng cấp.
 - [ ] Formatter/linter/LSP/VS Code integration hoàn thiện.
