@@ -11,10 +11,10 @@
 | --- | ---: | ---: | ---: |
 | Ngắn hạn | 14/15 | 1 | 93% |
 | Trung hạn | 18/18 | 0 | 100% |
-| Dài hạn | 15/40 | 25 | 38% |
-| **Tổng** | **47/73** | **26** | **64%** |
+| Dài hạn | 20/41 | 21 | 49% |
+| **Tổng** | **52/74** | **22** | **70%** |
 
-> Số liệu dài hạn được đếm trực tiếp từ 40 checkbox trong phần `Việc lớn còn lại`
+> Số liệu dài hạn được đếm trực tiếp từ 41 checkbox trong phần `Việc lớn còn lại`
 > của `plans/long-term.md`; 5 checkbox ở `Nền tảng đã có` là baseline lịch sử và không
 > cộng thêm vào mẫu số roadmap. Bảng tổng quan vì vậy phản ánh đúng các đầu việc còn được
 > theo dõi thay vì cộng baseline đã hoàn thành vào tiến độ roadmap.
@@ -29,7 +29,7 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | --- | --- | --- |
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
 | 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
-| 0.9 | Chưa hoàn tất | Stdlib audit, test/tooling/LSP |
+| 0.9 | Chưa hoàn tất | Stdlib audit, test framework/templates |
 | 1.0 RC | Chưa bắt đầu | Freeze contract, fuzz/stress/sanitizer, release smoke đa nền tảng |
 
 Ước lượng theo khối lượng kỹ thuật hiện tại: còn khoảng **25–30%** để đạt 1.0. Con số
@@ -226,15 +226,15 @@ hơn nhiều so với một checkbox tính năng thông thường.
 ```text
 VM opcode smoke (build trực tiếp bằng C++17): passed
 Integration regression: 99/99 passed
-CTest baseline gần nhất: 24/24 passed
+CTest baseline gần nhất: 30/30 passed
 Package workflow: 6/6 passed, gồm Git install/update/exact-revision restore/offline + path -> Git graph + registry
 ASan+UBSan local CTest: 16/16 passed; LSan chờ Ubuntu CI `detect_leaks=1`
 Pipeline parity baseline gần nhất: 117 chương trình, direct IR 117 chương trình
 Coverage cross-check: 75.77% line coverage (8,884/11,725), gate 45%
-Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
+Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers; compiler stress theo dõi compile time/peak RSS
 Short-term: 14/15
 Medium-term: 18/18
-Long-term: 17/40
+Long-term: 20/41
 ```
 
 ## Ưu tiên tiếp theo
@@ -334,10 +334,27 @@ Long-term: 17/40
     này trên release matrix; bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
-19. [ ] **Compiler hardening còn lại:** deterministic/reproducible compile đã khóa bằng regression
-    so khớp toàn bộ bytecode + compiler/module metadata trên cùng dependency graph; phần còn lại là
-    fuzz lexer/parser, malformed AST/IR, bytecode verification và stress project lớn.
-20. [ ] **Toolchain 1.0:** đóng public CLI, formatter/linter/LSP/VS Code integration,
-    project templates, docs và installer/update path Windows/macOS/Linux.
+19. [x] **Compiler hardening:** deterministic/reproducible compile đã khóa bằng regression
+    so khớp toàn bộ bytecode + compiler/module metadata trên cùng dependency graph. Malformed AST
+    (ExprId ngoài arena/chu trình) và invalid IR đã có regression từ chối có kiểm soát; bytecode
+    verifier chạy trước VM dispatch cho root/function code và khóa opcode, jump/try target,
+    StringPool cùng metadata đối số/closure/function. Fuzz lexer/parser đã khóa corpus malformed
+    cố định + 512 input sinh xác định từ seed `0x56505031`. Stress compiler khóa source 800 hàm,
+    project 24 module × 24 hàm, repeated compile state và xuất compile time/peak RSS để theo dõi
+    regression trước RC.
+20. [ ] **Toolchain 1.0:** public CLI contract đã chốt theo tiếng Việt với
+    `khởi tạo/chạy/kiểm thử/dựng/gói`; `new/run/test/build` giữ làm alias tương thích và có
+    regression riêng. Formatter/linter cũng đã chốt contract CI/editor: formatter giữ comment,
+    idempotent và có check/write mode cho cả thư mục; linter trả severity + source span và CLI
+    xuất `tệp:dòng:cột`, LSP dùng cùng range. LSP semantic đã có completion, go-to-definition,
+    hover và rename theo `SymbolId`, giữ range UTF-16 cho identifier tiếng Việt và có regression
+    JSON-RPC end-to-end. VS Code extension đã tự chạy `vpp --lsp`, đồng bộ tài liệu và nối
+    diagnostic/completion/definition/hover/rename/format, đồng thời grammar đã cập nhật
+    `giao diện`/`kế thừa`/`triển khai`/`mình`/`gốc`. Template `khởi tạo ứng dụng` đã tạo
+    layout schema 1 có source/test/README; sample `examples/hoa-don-cua-hang` được khóa bằng
+    CTest dựng + chạy + kiểm thử. Installer/update path đã dùng staged replace trên Unix/Windows,
+    có release-install smoke cho Ubuntu/macOS/Windows và đánh giá Homebrew/winget trong
+    `docs/installation.md`; smoke cục bộ trên macOS đã xác nhận cài lần hai xóa file stale.
+    Phần còn lại của Toolchain 1.0 là documentation 1.0.
 21. [ ] **1.0 RC:** freeze syntax/semantics/bytecode/package/CLI; chạy fuzz + stress +
     sanitizer/leak + release-install smoke và sample project thực tế trên cả ba nền tảng.

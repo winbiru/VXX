@@ -81,7 +81,8 @@ Luu y: release asset se duoc tao boi workflow `.github/workflows/release-binarie
 
 ## Cài Đặt Hỗ Trợ Ngôn Ngữ
 
-Repo này có extension cục bộ để tô màu cú pháp cho file `.vi` và `.vvm`.
+Repo này có extension cục bộ cho file `.vi` và `.vvm`, gồm tô màu cú pháp và tích hợp
+language server V++ cho diagnostic, completion, go-to-definition, hover, rename và format.
 
 ### Cách 1: Cài vào VS Code
 
@@ -91,6 +92,11 @@ vpp-lang install --editor vscode
 ```
 
 Sau đó reload VS Code và mở file `.vi`.
+
+Extension sẽ tự khởi động `vpp --lsp` khi có tài liệu V++ đang mở. Mặc định extension ưu tiên
+VM do chính extension quản lý, sau đó dùng lệnh `vpp` trong `PATH`. Có thể đặt executable riêng
+qua `vpp.lsp.executable`, tắt LSP bằng `vpp.lsp.enabled`, hoặc chạy lệnh
+`V++: Khởi động lại máy chủ ngôn ngữ` từ Command Palette.
 
 ### Cách 2: Dùng trực tiếp trong workspace
 
@@ -109,6 +115,24 @@ Sau đó reload VS Code và mở file `.vi`.
 
 `pack` sẽ tạo file `.vlang` trong `dist/`.
 
+## Khởi tạo project
+
+Template ứng dụng chuẩn tạo project schema 1 có `src/`, `tests/` và thư mục dependency `gói/`:
+
+```bash
+vpp khởi tạo ứng dụng my-app
+cd my-app
+vpp dựng src/main.vi
+vpp chạy src/main.vi
+vpp kiểm thử tests
+```
+
+Template backend vẫn có thể tạo bằng `vpp khởi tạo backend <tên>`. Project mẫu thực tế
+`examples/hoa-don-cua-hang` minh họa module, class/constructor, import tương đối và smoke test.
+
+Hướng dẫn cài/cập nhật release cho Linux, macOS, Windows và đánh giá Homebrew/winget nằm tại
+`docs/installation.md`.
+
 ## Tooling CLI
 
 CLI chính hiện có các lệnh hỗ trợ phát triển:
@@ -116,54 +140,71 @@ CLI chính hiện có các lệnh hỗ trợ phát triển:
 ```bash
 ./VPP giúp đỡ
 ./VPP phiên bản
-./VPP bác sĩ
+./VPP chẩn đoán
 ./VPP nơi
 ./VPP thống kê
 ./VPP chạy example.vi
-./VPP cài đặt "./gói/lõi"
-./VPP caidat ./duong-dan/goi.vi ten-goi
-./VPP xóa ten-goi
-./VPP thông tin "lõi"
-./VPP kiểm tra "lõi"
+./VPP dựng example.vi
+./VPP kiểm thử tests
+./VPP gói cài đặt "./gói/lõi"
+./VPP gói xóa ten-goi
+./VPP gói thông tin "lõi"
+./VPP gói kiểm tra "lõi"
 
 ./bin/vpp-cli --giải-mã example.vi
 ./bin/vpp-cli --dump-ast example.vi
 ./bin/vpp-cli --dump-ir example.vi
-./bin/vpp-cli --lint example.vi
+./bin/vpp-cli --soát-lỗi example.vi
+./bin/vpp-cli --soát-lỗi src/
 ./bin/vpp-cli --định-dạng example.vi
-./bin/vpp-cli --định-dạng example.vi --in-place
+./bin/vpp-cli --định-dạng example.vi --ghi-tệp
+./bin/vpp-cli --định-dạng src/ --kiểm-tra
 ./bin/vpp-cli --repl
 ./bin/vpp-cli --lsp
 ./bin/vpp-cli khởi tạo demo
 ./bin/vpp-cli khởi tạo backend my-api
-./bin/vpp-cli cài đặt "./gói/lõi"
-./bin/vpp-cli danh sách
-./bin/vpp-cli xóa mypkg
-./bin/vpp-cli thông tin "lõi"
-./bin/vpp-cli kiểm tra "lõi"
-./bin/vpp-cli thống kê
+./bin/vpp-cli chạy example.vi
+./bin/vpp-cli dựng example.vi
+./bin/vpp-cli kiểm thử tests
 ./bin/vpp-cli gói khởi tạo demo
 ./bin/vpp-cli gói thêm lib.vi mypkg
+./bin/vpp-cli gói cài đặt "./gói/lõi"
 ./bin/vpp-cli gói xóa mypkg
 ./bin/vpp-cli gói thông tin mypkg
 ./bin/vpp-cli gói kiểm tra mypkg
 ./bin/vpp-cli gói danh sách
 ```
 
+CLI 1.0 lấy tên lệnh tiếng Việt làm contract chính. Các alias `new`, `run`, `test`,
+`build` và tên package command tiếng Anh vẫn được giữ để tương thích với script cũ.
+LSP (`vpp-cli --lsp`) dùng cùng diagnostic với linter và hỗ trợ completion,
+go-to-definition, hover, rename dựa trên semantic model; vị trí/range tuân theo UTF-16 của LSP.
+Lệnh `dựng` hiện chạy toàn bộ compiler pipeline và xác nhận bytecode/metadata trong bộ nhớ;
+nó chưa ghi file `.vbc` cho tới khi format bytecode 1.0 được đóng băng.
+
+`--soát-lỗi` là tên canonical của linter (`--lint` vẫn là alias). Lệnh nhận một tệp hoặc
+thư mục, quét `.vi` đệ quy theo thứ tự xác định và trả mã lỗi khác 0 nếu có diagnostic lỗi;
+output có dạng `tệp:dòng:cột: lỗi: ...` để CI/editor có thể định vị nguồn. `--định-dạng`
+giữ nguyên comment và literal, có tính idempotent, hỗ trợ `--ghi-tệp` để sửa tại chỗ và
+`--kiểm-tra` để CI chỉ kiểm tra mà không thay đổi file. Các alias `--in-place`/`--check`
+được giữ cho script cũ.
+
 `--dump-ast` in AST cấu trúc có span do parser tạo; `--dump-ir` in IR **sau
 optimizer** mà cầu nối bytecode nhận. Cả hai chỉ xuất thông tin phát triển ra
 stdout, không chạy V++ VM, nên có thể redirect vào file khi cần kiểm tra.
 
-`cài đặt` là lệnh chính cho package manager, và `caidat` cũng được hỗ trợ:
+Các lệnh quản lý gói canonical nằm dưới namespace `gói`. Tên tiếng Anh và các alias
+không dấu cũ vẫn được giữ để script hiện có không bị hỏng:
 
 ```bash
-./bin/vpp-cli caidat ./duong-dan/goi.vi ten-goi
+./bin/vpp-cli gói cài đặt ./duong-dan/goi.vi ten-goi
+# tương thích: ./bin/vpp-cli install ./duong-dan/goi.vi ten-goi
 ```
 
 Windows có thể dùng trực tiếp:
 
 ```cmd
-VPP.cmd caidat duong-dan\goi.vi ten-goi
+VPP.cmd gói cài đặt duong-dan\goi.vi ten-goi
 ```
 
 Thư viện chuẩn là tập các package tiếng Việt nằm trực tiếp dưới `gói/`.

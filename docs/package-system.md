@@ -86,8 +86,8 @@ registry/
         └── main.vi
 ```
 
-`vpp publish <registry-root>` xuất artifact hiện tại vào
-`<registry>/<name>/<version>/`. Version đã publish là bất biến: publish lại cùng bytes
+`vpp gói phát hành <registry-root>` xuất artifact hiện tại vào
+`<registry>/<name>/<version>/`. Phiên bản đã phát hành là bất biến: phát hành lại cùng bytes
 là idempotent, nhưng cùng `name@version` với bytes khác bị từ chối. `vpp.json` nằm trong
 artifact là metadata tối thiểu cho name/version/dependencies; root có marker schema
 `vpp-registry.json`.
@@ -95,8 +95,8 @@ artifact là metadata tối thiểu cho name/version/dependencies; root có mark
 Install hỗ trợ cả registry root tường minh và default root qua môi trường:
 
 ```text
-vpp cài đặt registry+/srv/vpp-registry#thu-vien@^1.2.0
-VPP_REGISTRY=/srv/vpp-registry vpp cài đặt registry:thu-vien@^1.2.0
+vpp gói cài đặt registry+/srv/vpp-registry#thu-vien@^1.2.0
+VPP_REGISTRY=/srv/vpp-registry vpp gói cài đặt registry:thu-vien@^1.2.0
 ```
 
 Reader vẫn nhận manifest cũ:
@@ -140,7 +140,7 @@ File project thật luôn được ưu tiên trước fallback package để kh�
 
 ## `vpp.lock`
 
-`vpp khóa` hoặc `vpp gói khóa` khóa trạng thái package vendored hiện tại:
+`vpp gói khóa` khóa trạng thái package vendored hiện tại:
 
 ```json
 {
@@ -167,13 +167,13 @@ Git entry lưu thêm `revision` là exact commit đã resolve từ `ref`. `ref` 
 branch/tag/commit trong `vpp.json`, nhưng `vpp.lock` luôn pin commit bất biến để restore
 không phụ thuộc branch/tag có di chuyển về sau hay không.
 
-Khi package có `vpp.json`, `vpp khóa` dùng exact version của package đã cài và kiểm tra
+Khi package có `vpp.json`, `vpp gói khóa` dùng exact version của package đã cài và kiểm tra
 nó có thỏa range trong manifest project hay không. Xung đột version làm lệnh thất bại.
 
-`vpp cài đặt <nguồn>`, `vpp cập nhật`/`vpp đồng bộ` và `vpp khóa` đều giữ lockfile
+`vpp gói cài đặt <nguồn>`, `vpp gói cập nhật`/`vpp gói đồng bộ` và `vpp gói khóa` đều giữ lockfile
 đồng bộ với graph vừa materialize. Trước khi ghi lock, CLI đối chiếu version và artifact
 bytes đã cài với source vừa resolve. Vì vậy Git ref di chuyển nhưng package vendored còn
-cũ làm `vpp khóa` thất bại và yêu cầu `vpp cập nhật`/`vpp đồng bộ`, thay vì tạo lockfile
+cũ làm `vpp gói khóa` thất bại và yêu cầu `vpp gói cập nhật`/`vpp gói đồng bộ`, thay vì tạo lockfile
 ghép revision mới với fingerprint cũ.
 
 ## Dependency graph
@@ -198,22 +198,23 @@ Sau install/sync hoặc khi khóa graph, bytes đã cài được snapshot vào 
 fingerprint ghi trong `vpp.lock`. Cache entry chỉ được dùng nếu fingerprint tính lại
 vẫn khớp; entry bị sửa ngoài ý muốn không được coi là hợp lệ.
 
-`vpp phục hồi` đọc `vpp.lock` và ưu tiên cache trước. Khi cache chưa có, path package
+`vpp gói phục hồi` đọc `vpp.lock` và ưu tiên cache trước. Khi cache chưa có, path package
 quay về source path; Git package clone source rồi checkout exact `revision`; registry package
 resolve exact version đã khóa từ registry root rồi kiểm fingerprint. Vì vậy branch/tag có
 thể đã di chuyển hoặc registry có thêm version mới mà restore vẫn lấy đúng dependency đã khóa.
 
-`vpp phục hồi --offline` (hoặc `--ngoại-tuyến`) là cache-only: thiếu bất kỳ fingerprint
-nào thì lệnh thất bại thay vì truy cập source. `vpp cài đặt --offline` dùng cùng đường
-restore này; `vpp cài đặt` không truyền source cũng cài lại graph từ lockfile.
+`vpp gói phục hồi --ngoại-tuyến` là chế độ chỉ dùng cache: thiếu bất kỳ fingerprint
+nào thì lệnh thất bại thay vì truy cập source. `--offline` vẫn là alias tương thích.
+`vpp gói cài đặt --ngoại-tuyến` dùng cùng đường restore này; `vpp gói cài đặt` không truyền
+source cũng cài lại graph từ lockfile.
 
-`vpp xóa <tên>` resolve trạng thái manifest sau khi xóa trước khi commit, rồi ghi lại
+`vpp gói xóa <tên>` resolve trạng thái manifest sau khi xóa trước khi commit, rồi ghi lại
 lockfile cho graph còn lại để lock cũ không thể phục hồi nhầm package vừa bị xóa.
 
 Khi chạy một file `.vi`, CLI đi lên từ thư mục source để tìm `vpp.lock` gần nhất. Nếu
 project đã có lock, toàn bộ package được khóa phải tồn tại và fingerprint trên đĩa phải
 khớp trước khi compiler chạy. Package bị sửa tay hoặc bị thiếu làm run/dump compile thất
-bại với hướng dẫn `vpp phục hồi` hoặc `vpp khóa`; vì vậy một project đã khóa không thể âm
+bại với hướng dẫn `vpp gói phục hồi` hoặc `vpp gói khóa`; vì vậy một project đã khóa không thể âm
 thầm chạy trên dependency bytes khác với lockfile.
 
 ## CLI dependency flow
@@ -221,21 +222,21 @@ thầm chạy trên dependency bytes khác với lockfile.
 Các lệnh path/Git/registry hiện có:
 
 ```text
-vpp cài đặt <nguồn> [tên]
-vpp cài đặt git+<repository>[#<ref>] [tên]
-vpp cài đặt registry:<tên>[@<range>]
-vpp cài đặt registry+<root>#<tên>[@<range>]
-vpp publish <registry-root>
-vpp cập nhật          # alias workflow của đồng bộ
-vpp đồng bộ
-vpp khóa
-vpp phục hồi [--offline]
-vpp cài đặt --offline
-vpp xóa <tên>
-vpp danh sách
+vpp gói cài đặt <nguồn> [tên]
+vpp gói cài đặt git+<repository>[#<ref>] [tên]
+vpp gói cài đặt registry:<tên>[@<range>]
+vpp gói cài đặt registry+<root>#<tên>[@<range>]
+vpp gói phát hành <registry-root>
+vpp gói cập nhật          # cùng workflow với đồng bộ
+vpp gói đồng bộ
+vpp gói khóa
+vpp gói phục hồi [--ngoại-tuyến]
+vpp gói cài đặt --ngoại-tuyến
+vpp gói xóa <tên>
+vpp gói danh sách
 ```
 
-Các dạng `vpp gói ...` tương ứng dùng cùng implementation.
+Các tên lệnh tiếng Anh tương ứng vẫn được giữ làm alias tương thích cho script cũ.
 
 ## Giới hạn sau Package 0.9
 

@@ -2,7 +2,9 @@
 #include <string>
 #include <vector>
 
+#include "common/storeString.h"
 #include "frontend/lexer.h"
+#include "vpp/compiler/codegen.h"
 #include "vpp/compiler/ir.h"
 #include "vpp/compiler/optimizer.h"
 #include "vpp/frontend/parser.h"
@@ -719,6 +721,97 @@ void testUnsupportedExpressionsAreExplicitUnsupportedDirectRegions() {
            "fallback accounting ignores value-arena nodes no longer reachable from statements");
 }
 
+void testMalformedAstReferencesBecomeUnsupportedIr() {
+    using namespace vietvm::frontend;
+    using namespace vietvm::compiler;
+
+    AstProgram program;
+    program.tokens.push_back(token("hỏng"));
+
+    AstStatement statement;
+    statement.kind = AstStatementKind::Expression;
+    statement.tokenEnd = program.tokens.size();
+    statement.expressionRoots.push_back(42);
+    program.statements.push_back(std::move(statement));
+
+    IrProgram ir = lowerToIr(program, {});
+    expect(ir.instructions.size() == 1 &&
+               ir.instructions.front().expressionRoots.size() == 1,
+           "AST lỗi vẫn hạ thành một vùng IR có thể chẩn đoán");
+    if (ir.instructions.empty() || ir.instructions.front().expressionRoots.empty()) return;
+
+    const IrValue *value = ir.value(ir.instructions.front().expressionRoots.front());
+    expect(value != nullptr &&
+               value->opcode == IrValueOpcode::UnsupportedDirectRegion &&
+               value->sourceExprId == 42,
+           "ExprId ngoài arena được đánh dấu unsupported thay vì truy cập ngoài biên");
+    expect(ir.unsupportedDirectRegionCount == 1,
+           "AST lỗi được tính vào unsupported-direct region ổn định");
+
+    AstProgram cyclicProgram;
+    cyclicProgram.tokens.push_back(token("!"));
+    AstExpression cyclic;
+    cyclic.id = 0;
+    cyclic.kind = AstExpressionKind::Unary;
+    cyclic.text = "!";
+    cyclic.operand = 0;
+    cyclicProgram.expressions.push_back(std::move(cyclic));
+
+    AstStatement cyclicStatement;
+    cyclicStatement.kind = AstStatementKind::Expression;
+    cyclicStatement.tokenEnd = cyclicProgram.tokens.size();
+    cyclicStatement.expressionRoots.push_back(0);
+    cyclicProgram.statements.push_back(std::move(cyclicStatement));
+
+    IrProgram cyclicIr = lowerToIr(cyclicProgram, {});
+    const IrValue *cyclicValue = cyclicIr.value(0);
+    expect(cyclicValue != nullptr &&
+               cyclicValue->opcode == IrValueOpcode::UnsupportedDirectRegion,
+           "chu trình ExprId trong AST bị chặn trước codegen");
+}
+
+void testInvalidIrIsRejectedBeforeEmission() {
+    using namespace vietvm::compiler;
+
+    IrProgram program;
+    IrValue invalidBinary;
+    invalidBinary.id = 0;
+    invalidBinary.opcode = IrValueOpcode::Binary;
+    invalidBinary.text = "+";
+    invalidBinary.operands = {1, 2};
+    program.values.push_back(std::move(invalidBinary));
+
+    IrInstruction print;
+    print.opcode = IrOpcode::Print;
+    print.expressionRoots.push_back(0);
+    program.instructions.push_back(std::move(print));
+
+    const DirectIrSupport support = analyzeDirectIrSupport(program);
+    expect(!support.supported && support.unsupportedRegions == 1,
+           "IR chứa operand id ngoài arena bị phân loại không hỗ trợ");
+
+    CompilationRegistryState state;
+    bool rejected = false;
+    try {
+        (void)emitDirectBytecode(state, program, {}, true);
+    } catch (const std::logic_error &) {
+        rejected = true;
+    }
+    expect(rejected,
+           "direct codegen từ chối IR lỗi trước khi truy cập operand ngoài biên");
+
+    IrProgram malformedControlFlow;
+    IrInstruction conditional;
+    conditional.opcode = IrOpcode::Conditional;
+    conditional.conditionalForm =
+        vietvm::frontend::AstConditionalForm::IfBlock;
+    malformedControlFlow.instructions.push_back(std::move(conditional));
+    const DirectIrSupport controlFlowSupport =
+        analyzeDirectIrSupport(malformedControlFlow);
+    expect(!controlFlowSupport.supported,
+           "IR điều kiện thiếu expression/body bị từ chối có kiểm soát");
+}
+
 } // namespace
 
 int main() {
@@ -731,6 +824,8 @@ int main() {
     testStructuredLambdasLowerBodiesDefaultsCapturesAndNestedIds();
     testLambdaBodyImportAccountingAndOptimizationAreRecursive();
     testUnsupportedExpressionsAreExplicitUnsupportedDirectRegions();
+    testMalformedAstReferencesBecomeUnsupportedIr();
+    testInvalidIrIsRejectedBeforeEmission();
 
     if (failures != 0) {
         std::cerr << failures << " recursive IR unit test(s) failed\n";

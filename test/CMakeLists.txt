@@ -38,6 +38,31 @@ target_link_libraries(vpp-opcode-and-native-constants-unit PRIVATE vpp-frontend)
 add_test(NAME vpp-opcode-and-native-constants-unit
          COMMAND vpp-opcode-and-native-constants-unit)
 
+add_executable(vpp-frontend-fuzz-unit
+    frontend_fuzz_tests.cpp)
+
+target_link_libraries(vpp-frontend-fuzz-unit PRIVATE vpp-frontend)
+
+add_test(NAME vpp-frontend-fuzz-unit
+         COMMAND vpp-frontend-fuzz-unit)
+
+add_executable(vpp-bytecode-verifier-unit
+    bytecode_verifier_tests.cpp)
+
+target_link_libraries(vpp-bytecode-verifier-unit PRIVATE vpp-bytecode)
+
+add_test(NAME vpp-bytecode-verifier-unit
+         COMMAND vpp-bytecode-verifier-unit)
+
+add_executable(vpp-compiler-stress-unit
+    compiler_stress_tests.cpp)
+
+target_link_libraries(vpp-compiler-stress-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-compiler-stress-unit
+         COMMAND vpp-compiler-stress-unit)
+set_tests_properties(vpp-compiler-stress-unit PROPERTIES TIMEOUT 90)
+
 add_executable(vpp-message-constants-unit
     message_constants_tests.cpp)
 
@@ -182,12 +207,33 @@ add_test(NAME vpp-package-cli-unit
                  -DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package-cli-case
                  -P ${CMAKE_CURRENT_SOURCE_DIR}/package_cli_tests.cmake)
 
+add_test(NAME vpp-cli-contract-unit
+         COMMAND ${CMAKE_COMMAND}
+                 -DVPP_EXEC=$<TARGET_FILE:vpp-cli>
+                 -DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/cli-contract-case
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_contract_tests.cmake)
+
+add_test(NAME vpp-lsp-semantic-unit
+         COMMAND ${CMAKE_COMMAND}
+                 -DVPP_EXEC=$<TARGET_FILE:vpp-cli>
+                 -DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/lsp-semantic-case
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/lsp_semantic_tests.cmake)
+
+add_test(NAME vpp-sample-project-unit
+         COMMAND ${CMAKE_COMMAND}
+                 -DVPP_EXEC=$<TARGET_FILE:vpp-cli>
+                 -DSAMPLE_ROOT=${CMAKE_SOURCE_DIR}/examples/hoa-don-cua-hang
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/sample_project_tests.cmake)
+
 foreach(vpp_test_target IN ITEMS
         vpp-compiler-support-unit
         vpp-vm-opcode-smoke-unit
         vpp-vm-handler-unit
         vpp-runtime-value-unit
         vpp-opcode-and-native-constants-unit
+        vpp-frontend-fuzz-unit
+        vpp-bytecode-verifier-unit
+        vpp-compiler-stress-unit
         vpp-message-constants-unit
         vpp-semver-unit
         vpp-package-manifest-unit

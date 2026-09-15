@@ -89,6 +89,18 @@ jobs:
           Copy-Item scripts/windows/install-vpp.cmd dist/install-vpp.cmd
           Compress-Archive -Path dist/* -DestinationPath "${{ matrix.asset_name }}" -Force
 
+      - name: Smoke installed release (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/quality/release-install-smoke.sh
+          scripts/quality/release-install-smoke.sh dist
+
+      - name: Smoke installed release (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: scripts/windows/test-release-install.ps1 -BundleDir dist
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:

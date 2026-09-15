@@ -35,6 +35,7 @@
 #include "common/vm_native_stdlib_helpers.h"
 #include "common/vm_native_text_helpers.h"
 #include "vpp/bytecode/literal_wire.h"
+#include "vpp/bytecode/verifier.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 #include "vpp/runtime/vm_fixture.h"
@@ -2181,6 +2182,30 @@ void VM::executeOutputOpcode(const Instruction& instr) {
 // Chạy vòng lặp VM từ bytecode hiện tại; mỗi bước đọc opcode tại program counter và chuyển tới handler tương ứng cho tới khi dừng.
 void VM::run() {
     vietvm::runtime::RuntimeHeapScope heapScope(*runtimeHeap);
+
+    vietvm::bytecode::BytecodeVerificationContext verificationContext;
+    verificationContext.stringPoolSize = stringPool.size();
+    for (const auto &entry : hamBytecodeMap) {
+        verificationContext.functionIds.insert(entry.first);
+    }
+
+    const auto verifyOrThrow = [&](const std::vector<Instruction> &code,
+                                   const std::string &scope) {
+        const auto verification =
+            vietvm::bytecode::verifyBytecode(code, verificationContext);
+        if (!verification.has_value()) return;
+        throw vietvm::runtime::RuntimeError(
+            "bytecode không hợp lệ trong " + scope + " tại lệnh " +
+            std::to_string(verification->instructionIndex) + ": " +
+            verification->message,
+            vietvm::runtime::RuntimeErrorKind::VmFault);
+    };
+
+    verifyOrThrow(bytecode, "chương trình chính");
+    for (const auto &entry : hamBytecodeMap) {
+        verifyOrThrow(entry.second, "hàm " + std::to_string(entry.first));
+    }
+
     initializeModules();
 
     if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit)

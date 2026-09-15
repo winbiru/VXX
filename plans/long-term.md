@@ -238,11 +238,18 @@ concurrency/async phức tạp không phải release blocker mặc định của
      lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
      Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
      context-driven compile không đọc/ghi một active registry khác.
-   - [ ] Fuzz lexer/parser, malformed AST/IR test và bytecode verification. Deterministic
-     compilation/reproducible bytecode đã được khóa bằng regression so khớp toàn bộ root/function
-     bytecode, StringPool, function metadata, debug metadata và module metadata trên cùng import graph;
+   - [x] Fuzz lexer/parser và malformed-source corpus có seed cố định. `vpp-frontend-fuzz-unit`
+     khóa corpus malformed cố định + 512 input sinh từ seed `0x56505031`, đồng thời kiểm tra
+     parser chỉ kết thúc bằng AST hợp lệ hoặc lỗi có kiểm soát. Malformed AST/invalid IR
+     regression + bytecode verifier cũng đã hoàn tất: VM kiểm tra opcode, jump/try target, StringPool,
+     argument/capture count và function metadata trước dispatch. Deterministic compilation/
+     reproducible bytecode cũng đã được khóa bằng regression so khớp toàn bộ root/function bytecode,
+     StringPool, function metadata, debug metadata và module metadata trên cùng import graph;
      package lock đã pin exact dependency bytes/fingerprint.
-   - [ ] Stress source/project lớn và theo dõi compiler memory/time regression.
+   - [x] Stress source/project lớn và theo dõi compiler memory/time regression.
+     `vpp-compiler-stress-unit` tạo source 800 hàm và import graph 24 module × 24 hàm,
+     ghi `compile_ms` + peak RSS trên Unix/macOS, áp budget rộng 30 giây/scenario + 1 GiB
+     và khóa repeated compilation không tích lũy function/StringPool state.
    - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
      bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.
 

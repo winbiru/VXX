@@ -140,6 +140,13 @@ void testBranchBoundaryError() {
     }
 }
 
+void testVerifierRejectsUnknownOpcodeBeforeDispatch() {
+    expectRuntimeError(
+        {{static_cast<Opcode>(999), 0, 0, 0}},
+        "bytecode không hợp lệ trong chương trình chính tại lệnh 0",
+        "VM chạy bytecode verifier trước opcode dispatch");
+}
+
 void testOpcodeErrorMatrix() {
     expectRuntimeError(
         {integer(1), opcode(OP_CONG), opcode(OP_DUNG_CHUONG_TRINH)},
@@ -439,6 +446,7 @@ int main() {
         testLogicAndComparisonBoundaryMatrix();
         testBranchOpcodes();
         testBranchBoundaryError();
+        testVerifierRejectsUnknownOpcodeBeforeDispatch();
         testOpcodeErrorMatrix();
         testFunctionCallParameterAndReturn();
         testDefaultParameterBinding();

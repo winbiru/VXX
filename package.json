@@ -2,7 +2,7 @@
   "name": "vpp-language",
   "displayName": "V++ Language",
   "description": "Vietnamese-first language support and syntax highlighting for V++ source files",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "vpp",
   "main": "./extension.js",
   "icon": "assets/icons/vpp-file.png",
@@ -22,9 +22,11 @@
   },
   "activationEvents": [
     "onStartupFinished",
+    "onLanguage:vpp",
     "onCommand:vpp.installVm",
     "onCommand:vpp.showVmInfo",
-    "onCommand:vpp.openReleases"
+    "onCommand:vpp.openReleases",
+    "onCommand:vpp.restartLanguageServer"
   ],
   "vpp": {
     "manifest": "./vpp-language.json",
@@ -35,15 +37,19 @@
     "commands": [
       {
         "command": "vpp.installVm",
-        "title": "V++: Install/Update VM from GitHub"
+        "title": "V++: Cài đặt/Cập nhật VM từ GitHub"
       },
       {
         "command": "vpp.showVmInfo",
-        "title": "V++: Show VM Installation"
+        "title": "V++: Hiển thị thông tin VM"
       },
       {
         "command": "vpp.openReleases",
-        "title": "V++: Open GitHub Releases"
+        "title": "V++: Mở GitHub Releases"
+      },
+      {
+        "command": "vpp.restartLanguageServer",
+        "title": "V++: Khởi động lại máy chủ ngôn ngữ"
       }
     ],
     "configuration": {
@@ -52,7 +58,17 @@
         "vpp.vm.autoPromptInstall": {
           "type": "boolean",
           "default": true,
-          "description": "Offer to install the V++ VM from GitHub Releases when no extension-managed VM is installed."
+          "description": "Đề nghị cài V++ VM từ GitHub Releases khi extension chưa quản lý VM nào."
+        },
+        "vpp.lsp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Bật máy chủ ngôn ngữ V++ cho diagnostic, completion, go-to-definition, hover, rename và format."
+        },
+        "vpp.lsp.executable": {
+          "type": "string",
+          "default": "",
+          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Để trống để ưu tiên VM do extension quản lý rồi tới lệnh vpp trong PATH."
         }
       }
     },
@@ -94,9 +110,11 @@
               "keyword.control.vietvm",
               "keyword.control.import.vietvm",
               "storage.type.class.vietvm",
+              "storage.type.interface.vietvm",
               "storage.type.function.vietvm",
               "storage.type.variable.vietvm",
               "storage.modifier.access.vietvm",
+              "keyword.other.inheritance.vietvm",
               "constant.language.boolean.vietvm",
               "constant.language.null.vietvm"
             ],
@@ -153,6 +171,7 @@
               "variable.other.vietvm",
               "variable.other.object.vietvm",
               "variable.other.property.vietvm",
+              "variable.language.receiver.vietvm",
               "keyword.operator.vietvm"
             ],
             "settings": {

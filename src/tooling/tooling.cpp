@@ -1,5 +1,6 @@
 #include "vpp/tooling/tooling.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
@@ -12,6 +13,8 @@
 #include "frontend/lexer.h"
 #include "vpp/bytecode/opcode.h"
 #include "vpp/compiler/pipeline.h"
+#include "vpp/compiler/semantic.h"
+#include "vpp/frontend/parser.h"
 
 namespace vietvm::tooling {
 
@@ -558,71 +561,346 @@ std::string dumpIr(const vietvm::compiler::IrProgram &program) {
     return out.str();
 }
 
-// Định dạng lại mã nguồn từ chuỗi token; hàm quản lý thụt lề theo dấu ngoặc khối và xuống dòng tại dấu chấm phẩy.
+namespace {
+
+enum class FormatItemKind {
+    Token,
+    LineComment,
+    BlockComment,
+};
+
+struct FormatItem {
+    FormatItemKind kind = FormatItemKind::Token;
+    std::string text;
+    std::size_t begin = 0;
+    std::size_t end = 0;
+};
+
+void appendGapComments(const std::string &source,
+                       std::size_t begin,
+                       std::size_t end,
+                       std::vector<FormatItem> &items) {
+    std::size_t index = begin;
+    while (index < end) {
+        if (source[index] == '/' && index + 1 < end && source[index + 1] == '/') {
+            const std::size_t commentBegin = index;
+            index += 2;
+            while (index < end && source[index] != '\n') ++index;
+            items.push_back({FormatItemKind::LineComment,
+                             source.substr(commentBegin, index - commentBegin),
+                             commentBegin, index});
+            continue;
+        }
+        if (source[index] == '/' && index + 1 < end && source[index + 1] == '*') {
+            const std::size_t commentBegin = index;
+            index += 2;
+            while (index + 1 < end &&
+                   !(source[index] == '*' && source[index + 1] == '/')) {
+                ++index;
+            }
+            if (index + 1 < end) index += 2;
+            items.push_back({FormatItemKind::BlockComment,
+                             source.substr(commentBegin, index - commentBegin),
+                             commentBegin, index});
+            continue;
+        }
+        ++index;
+    }
+}
+
+std::vector<FormatItem> formatItems(const std::string &source) {
+    // Dùng lexer thật để formatter có cùng validation cho string/comment/UTF-8
+    // với compiler. Comment không nằm trong token stream nên được lấy lại từ
+    // các khoảng nguồn giữa hai token bằng offset mà lexer đã giữ.
+    const auto tokens = vietvm::compiler::tokenizeWithSpans(source);
+    std::vector<FormatItem> items;
+    items.reserve(tokens.size() + 8);
+    std::size_t cursor = 0;
+    for (const auto &token : tokens) {
+        appendGapComments(source, cursor, token.span.begin.offset, items);
+        items.push_back({FormatItemKind::Token,
+                         token.lexeme,
+                         token.span.begin.offset,
+                         token.span.end.offset});
+        cursor = token.span.end.offset;
+    }
+    appendGapComments(source, cursor, source.size(), items);
+    return items;
+}
+
+bool containsNewline(std::string_view text) noexcept {
+    return text.find('\n') != std::string_view::npos;
+}
+
+bool isOperatorToken(const std::string &token) noexcept {
+    return vietvm::compiler::isOperator(token);
+}
+
+bool isControlBeforeParen(const std::string &token) noexcept {
+    return token == "nếu" || token == "lặp" || token == "chọn" ||
+           token == "bắt" || token == "bắt lỗi";
+}
+
+bool isBlockContinuation(const std::vector<FormatItem> &items,
+                         std::size_t itemIndex) noexcept {
+    std::vector<std::string_view> nextTokens;
+    for (std::size_t index = itemIndex + 1;
+         index < items.size() && nextTokens.size() < 2; ++index) {
+        if (items[index].kind == FormatItemKind::Token) {
+            nextTokens.push_back(items[index].text);
+        } else {
+            break;
+        }
+    }
+    if (nextTokens.empty()) return false;
+    if (nextTokens[0] == "hoặc" || nextTokens[0] == "bắt") return true;
+    return nextTokens.size() >= 2 && nextTokens[0] == "nếu" && nextTokens[1] == "không";
+}
+
+vietvm::frontend::SourceSpan singlePointSpan(std::size_t line,
+                                              std::size_t column) noexcept {
+    vietvm::frontend::SourceSpan span;
+    span.begin.line = line == 0 ? 1 : line;
+    span.begin.column = column == 0 ? 1 : column;
+    span.end = span.begin;
+    ++span.end.column;
+    return span;
+}
+
+} // namespace
+
+// Định dạng mã nguồn theo token của lexer nhưng giữ nguyên nội dung comment và literal.
+// Kết quả có tính idempotent: định dạng lại output không làm thay đổi bytes lần thứ hai.
 std::string formatSource(const std::string &source) {
-    auto tokens = vietvm::compiler::tokenize(source);
-    tokens = vietvm::compiler::postProcessTokens(tokens);
+    const std::vector<FormatItem> items = formatItems(source);
 
     std::ostringstream out;
     int indent = 0;
+    int parenDepth = 0;
     bool atLineStart = true;
+    bool hasOutput = false;
+    char lastOutput = '\0';
+    std::string previousToken;
 
-    auto writeIndent = [&]() {
-        for (int i = 0; i < indent; ++i) out << "    ";
+    const auto write = [&](std::string_view text) {
+        out << text;
+        if (!text.empty()) {
+            hasOutput = true;
+            lastOutput = text.back();
+        }
+    };
+    const auto writeChar = [&](char value) {
+        out << value;
+        hasOutput = true;
+        lastOutput = value;
     };
 
-    auto newline = [&]() {
-        out << '\n';
+    const auto writeIndent = [&]() {
+        if (!atLineStart) return;
+        for (int level = 0; level < indent; ++level) write("    ");
+        atLineStart = false;
+    };
+    const auto newline = [&]() {
+        if (!hasOutput || lastOutput != '\n') writeChar('\n');
         atLineStart = true;
+        previousToken.clear();
+    };
+    const auto spaceIfNeeded = [&]() {
+        if (atLineStart) return;
+        if (hasOutput && lastOutput != ' ' && lastOutput != '\n') writeChar(' ');
     };
 
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        const std::string &tk = tokens[i];
-        if (tk.empty()) continue;
+    for (std::size_t itemIndex = 0; itemIndex < items.size(); ++itemIndex) {
+        const FormatItem &item = items[itemIndex];
 
-        if (tk == "}") {
-            if (!atLineStart) newline();
-            if (indent > 0) --indent;
-            writeIndent();
-            out << tk;
-            atLineStart = false;
+        if (item.kind != FormatItemKind::Token) {
+            const bool multiline = item.kind == FormatItemKind::LineComment ||
+                                   containsNewline(item.text);
+            if (multiline) {
+                if (!atLineStart) newline();
+                writeIndent();
+                write(item.text);
+                newline();
+            } else {
+                spaceIfNeeded();
+                writeIndent();
+                write(item.text);
+                previousToken.clear();
+            }
             continue;
         }
 
-        if (atLineStart) {
+        const std::string &token = item.text;
+        if (token.empty()) continue;
+
+        if (token == "}") {
+            if (!atLineStart) newline();
+            if (indent > 0) --indent;
             writeIndent();
-            atLineStart = false;
-        } else if (tk != ";" && tk != "," && tk != ")" && tk != "]" && tk != "(" && tk != "[") {
-            out << ' ';
+            write(token);
+            previousToken = token;
+            if (!isBlockContinuation(items, itemIndex)) newline();
+            continue;
         }
 
-        out << tk;
-
-        if (tk == "{") {
+        if (token == "{") {
+            spaceIfNeeded();
+            writeIndent();
+            write(token);
+            previousToken = token;
             ++indent;
             newline();
-        } else if (tk == ";") {
-            newline();
-        } else if (tk == ",") {
-            out << ' ';
+            continue;
         }
+
+        if (token == ";") {
+            writeIndent();
+            write(token);
+            previousToken = token;
+            if (parenDepth > 0) {
+                writeChar(' ');
+            } else {
+                newline();
+            }
+            continue;
+        }
+
+        if (token == "," || token == ":") {
+            writeIndent();
+            write(token);
+            previousToken = token;
+            continue;
+        }
+
+        if (token == "(") {
+            if (isControlBeforeParen(previousToken)) spaceIfNeeded();
+            writeIndent();
+            write(token);
+            previousToken = token;
+            ++parenDepth;
+            continue;
+        }
+
+        if (token == ")") {
+            writeIndent();
+            write(token);
+            previousToken = token;
+            if (parenDepth > 0) --parenDepth;
+            continue;
+        }
+
+        if (token == "[") {
+            const bool indexing = !previousToken.empty() &&
+                                  previousToken != "=" && previousToken != "(" &&
+                                  previousToken != "[" && previousToken != "," &&
+                                  !isOperatorToken(previousToken);
+            if (!indexing) spaceIfNeeded();
+            writeIndent();
+            write(token);
+            previousToken = token;
+            continue;
+        }
+
+        if (token == "]") {
+            writeIndent();
+            write(token);
+            previousToken = token;
+            continue;
+        }
+
+        if (isOperatorToken(token)) {
+            if (token == "!" || token == "++" || token == "--") {
+                writeIndent();
+                write(token);
+            } else {
+                spaceIfNeeded();
+                writeIndent();
+                write(token);
+                writeChar(' ');
+            }
+            previousToken = token;
+            continue;
+        }
+
+        if (!atLineStart && previousToken != "(" && previousToken != "[" &&
+            previousToken != "!" && previousToken != "++" && previousToken != "--") {
+            spaceIfNeeded();
+        }
+        writeIndent();
+        write(token);
+        previousToken = token;
     }
 
     std::string formatted = out.str();
+    while (formatted.size() > 1 && formatted.back() == '\n' &&
+           formatted[formatted.size() - 2] == '\n') {
+        formatted.pop_back();
+    }
     if (!formatted.empty() && formatted.back() != '\n') formatted.push_back('\n');
     return formatted;
 }
 
-// Phân tích nguồn để thu thập lỗi lexer/parser/semantic và trả về danh sách chẩn đoán thay vì trực tiếp thực thi chương trình.
-bool lintSource(const std::string &source, std::string &errorMessage) {
+std::vector<LintDiagnostic> lintDiagnostics(
+    const std::string &source,
+    const std::filesystem::path &resolutionBase) {
+    std::vector<LintDiagnostic> diagnostics;
     try {
-        vietvm::compiler::CompilationContext context;
-        (void)vietvm::compiler::compilePipeline(context, source, keywordMap, false);
-        return true;
-    } catch (const std::exception &ex) {
-        errorMessage = ex.what();
-        return false;
+        const auto tokens = vietvm::compiler::postProcessTokensWithSpans(
+            vietvm::compiler::tokenizeWithSpans(source));
+        const auto program = vietvm::frontend::parseTokens(tokens);
+        const auto semantic = vietvm::compiler::analyzeSemantics(program);
+        diagnostics.reserve(semantic.diagnostics.size());
+        for (const auto &diagnostic : semantic.diagnostics) {
+            diagnostics.push_back({
+                diagnostic.severity == vietvm::compiler::SemanticDiagnosticSeverity::Warning
+                    ? DiagnosticSeverity::Warning
+                    : DiagnosticSeverity::Error,
+                diagnostic.message,
+                diagnostic.span,
+            });
+        }
+
+        const bool hasError = std::any_of(
+            diagnostics.begin(), diagnostics.end(),
+            [](const LintDiagnostic &diagnostic) {
+                return diagnostic.severity == DiagnosticSeverity::Error;
+            });
+        if (!hasError) {
+            try {
+                vietvm::compiler::CompilationContext context;
+                context.importResolutionBase = resolutionBase;
+                (void)vietvm::compiler::compilePipeline(context, source, keywordMap, false);
+            } catch (const std::exception &error) {
+                diagnostics.push_back({DiagnosticSeverity::Error, error.what(), {}});
+            }
+        }
+    } catch (const vietvm::compiler::LexerError &error) {
+        diagnostics.push_back({DiagnosticSeverity::Error,
+                               error.what(),
+                               singlePointSpan(error.line, error.column)});
+    } catch (const vietvm::frontend::ParseError &error) {
+        diagnostics.push_back({DiagnosticSeverity::Error, error.what(), error.span});
+    } catch (const std::exception &error) {
+        diagnostics.push_back({DiagnosticSeverity::Error, error.what(), {}});
     }
+    return diagnostics;
+}
+
+std::vector<LintDiagnostic> lintDiagnostics(const std::string &source) {
+    return lintDiagnostics(source, std::filesystem::current_path());
+}
+
+// API tương thích cho caller cũ: true khi không có lỗi; warning không làm lint thất bại.
+bool lintSource(const std::string &source, std::string &errorMessage) {
+    const auto diagnostics = lintDiagnostics(source);
+    for (const auto &diagnostic : diagnostics) {
+        if (diagnostic.severity == DiagnosticSeverity::Error) {
+            errorMessage = diagnostic.message;
+            return false;
+        }
+    }
+    errorMessage.clear();
+    return true;
 }
 
 } // namespace vietvm::tooling

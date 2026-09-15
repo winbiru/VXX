@@ -2,6 +2,96 @@
 
 namespace vietvm::bytecode {
 
+bool isKnownOpcode(int rawOpcode) noexcept {
+    switch (rawOpcode) {
+        case OP_CONG:
+        case OP_TRU:
+        case OP_NHAN:
+        case OP_CHIA:
+        case OP_Logic_VA:
+        case OP_Logic_HOAC:
+        case OP_KHONG:
+        case OP_SO_SANH_BANG:
+        case OP_KHAC_BANG:
+        case OP_LON_HON:
+        case OP_NHO_HON:
+        case OP_LON_HON_HOAC_BANG:
+        case OP_NHO_HON_HOAC_BANG:
+        case OP_GAN:
+        case OP_MO_KHOI:
+        case OP_DONG_KHOI:
+        case OP_MO_NGOAC:
+        case OP_DONG_NGOAC:
+        case OP_MO_MANG:
+        case OP_DONG_MANG:
+        case OP_DONG_LENH:
+        case OP_PHAY:
+        case OP_NEU:
+        case OP_HOAC:
+        case OP_NEU_KHONG:
+        case OP_KET_THUC_NEU:
+        case OP_LAP:
+        case OP_KHOI_TAO:
+        case OP_DIEU_KIEN:
+        case OP_CAP_NHAT:
+        case OP_KIEM_TRA_SAU:
+        case OP_KET_THUC_LAP:
+        case OP_BO_QUA:
+        case OP_THOAT:
+        case OP_CHUYEN:
+        case OP_TRUONG_HOP:
+        case OP_MAC_DINH:
+        case OP_KET_THUC_CHUYEN:
+        case OP_HAM:
+        case OP_GOI:
+        case OP_TRA_VE:
+        case OP_BIEN_SO:
+        case OP_IN:
+        case OP_DUNG_CHUONG_TRINH:
+        case OP_TEN_BIEN_ID:
+        case OP_TEN_BIEN_GIA_TRI:
+        case OP_JUMP_IF_FALSE:
+        case OP_JUMP:
+        case OP_MODULO:
+        case OP_CHUOI:
+        case OP_PHU_DINH:
+        case OP_CHON:
+        case OP_CA:
+        case OP_PARAM:
+        case OP_CONG_MOT:
+        case OP_TRU_MOT:
+        case OP_CONG_GAN:
+        case OP_TRU_GAN:
+        case OP_NHAN_GAN:
+        case OP_CHIA_GAN:
+        case OP_MODULO_GAN:
+        case OP_DUNG_GIA_TRI:
+        case OP_SAI_GIA_TRI:
+        case OP_BIEN_SO_FLOAT:
+        case OP_NEM:
+        case OP_THU:
+        case OP_THU_KET_THUC:
+        case OP_BAT_LOI:
+        case OP_RONG_GIA_TRI:
+        case OP_MAP_LITERAL:
+        case OP_GOI_GIAN_TIEP:
+        case OP_PARAM_MAC_DINH:
+        case OP_LIST_LITERAL:
+        case OP_DOC_CHI_SO:
+        case OP_GAN_CHI_SO:
+        case OP_TAO_LOP:
+        case OP_THEM_PHUONG_THUC:
+        case OP_TAO_DOI_TUONG:
+        case OP_DOC_THUOC_TINH:
+        case OP_GAN_THUOC_TINH:
+        case OP_GOI_PHUONG_THUC:
+        case OP_TAO_DONG_BAO:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // Trả tên văn bản ổn định cho opcode; hàm ánh xạ enum/giá trị nội bộ sang chuỗi để tooling, log hoặc test có thể hiển thị nhất quán.
 std::string opcodeName(Opcode op) {
     return opcodeName(static_cast<int>(op));
