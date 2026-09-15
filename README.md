@@ -128,7 +128,7 @@ vpp kiểm thử tests
 ```
 
 Template backend vẫn có thể tạo bằng `vpp khởi tạo backend <tên>`. Project mẫu thực tế
-`examples/hoa-don-cua-hang` minh họa module, class/constructor, import tương đối và smoke test.
+`examples/hoa-don-cua-hang` minh họa module, class/constructor và import tương đối.
 
 Hướng dẫn cài/cập nhật release cho Linux, macOS, Windows và đánh giá Homebrew/winget nằm tại
 `docs/installation.md`.

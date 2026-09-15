@@ -3,6 +3,9 @@
 V++ 1.0 có hai lớp hỗ trợ kiểm thử: lệnh CLI `vpp kiểm thử` để discovery/chạy tệp
 test và package tùy chọn `kiểm thử` để viết assertion/lifecycle trong mã V++.
 
+Regression của chính repository cũng dùng chương trình `.vi` trong `src/tests/`; CTest chỉ
+đăng ký runner `vpp-integration` để chạy các file này và so sánh expected output.
+
 ## Discovery của CLI
 
 ```text

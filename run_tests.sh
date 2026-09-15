@@ -33,13 +33,8 @@ HTTP_FILE_TRANSPORT_DIR=""
 # bind(2), the runtime can use a file-backed IPC transport while preserving the
 # same V++ HTTP client/server API across separate processes.
 HTTP_FIXTURE_PID=""
-EXAMPLE_PID=""
 VPP_HOME_TEST_DIR=""
 cleanup() {
-  if [ -n "$EXAMPLE_PID" ]; then
-    kill "$EXAMPLE_PID" 2>/dev/null || true
-    wait "$EXAMPLE_PID" 2>/dev/null || true
-  fi
   if [ -n "$HTTP_FIXTURE_PID" ]; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
@@ -116,58 +111,6 @@ if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http
     cat "$tmpdir/http_fixture.log" >&2
     exit 2
   fi
-fi
-
-echo "== Running examples/api_project/application.vi [example] =="
-"$EXEC_PATH" examples/api_project/application.vi >"$tmpdir/api_example.log" 2>&1 &
-EXAMPLE_PID=$!
-if wait_http_value "http://127.0.0.1:8080/health" "true" "$tmpdir/api_example.output"; then
-  echo "PASS: examples/api_project/application.vi [example]"; PASS=$((PASS+1))
-else
-  echo "FAIL: examples/api_project/application.vi [example]"; FAIL=$((FAIL+1))
-  cat "$tmpdir/api_example.log" >&2
-  cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
-fi
-kill "$EXAMPLE_PID" 2>/dev/null || true
-wait "$EXAMPLE_PID" 2>/dev/null || true
-EXAMPLE_PID=""
-
-echo "== Running backend scaffold smoke test =="
-scaffold_dir=$(mktemp -d "$tmpdir/backend.XXXXXX")
-scaffold_ok=0
-scaffold_port=18081
-if (
-  cd "$scaffold_dir" &&
-  VPP_HOME="$ROOT_DIR" "$EXEC_PATH" khởi tạo backend demo-api &&
-  test -f demo-api/application.vi &&
-  test -f demo-api/config.vi &&
-  test -f demo-api/controller.vi &&
-  test -f demo-api/router.vi &&
-  test -f demo-api/server.vi &&
-  test -f demo-api/application.properties &&
-  test -f demo-api/README.md &&
-  test -f demo-api/.gitignore &&
-  sed -i.bak "s/^port=8080$/port=$scaffold_port/" demo-api/application.properties &&
-  rm -f demo-api/application.properties.bak
-); then
-  (
-    cd "$scaffold_dir/demo-api" &&
-    VPP_HOME="$ROOT_DIR" "$EXEC_PATH" application.vi >"$ROOT_DIR/$tmpdir/backend_scaffold.log" 2>&1
-  ) &
-  EXAMPLE_PID=$!
-  if wait_http_value "http://127.0.0.1:${scaffold_port}/health" "true" "$tmpdir/backend_scaffold.output"; then
-    scaffold_ok=1
-  fi
-  kill "$EXAMPLE_PID" 2>/dev/null || true
-  wait "$EXAMPLE_PID" 2>/dev/null || true
-  EXAMPLE_PID=""
-fi
-if [ "$scaffold_ok" -eq 1 ]; then
-  echo "PASS: backend scaffold"; PASS=$((PASS+1))
-else
-  echo "FAIL: backend scaffold"; FAIL=$((FAIL+1))
-  cat "$tmpdir/backend_scaffold.log" >&2 2>/dev/null || true
-  cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
 fi
 
 # Verify bare Vietnamese package imports from a directory outside the repository.

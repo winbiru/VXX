@@ -13,16 +13,3 @@ on the same machine and build mode before treating a change as a regression.
 
 The benchmark executable prints the same machine-readable fields on every run:
 `benchmark`, `iterations`, `total_ms`, and `ns_per_iteration`.
-
-## Compiler stress guard
-
-`vpp-compiler-stress-unit` complements the microbenchmarks with larger compiler inputs:
-
-- one source containing 800 functions;
-- an import graph with 24 modules × 24 functions;
-- five repeated compilations through the same `CompilationContext`.
-
-The test prints `compile_ms`, `peak_rss_bytes`, bytecode size, function count and StringPool
-size. The CTest gate intentionally uses broad runaway limits (30 seconds per large scenario
-and 1 GiB peak RSS when the platform exposes it); compare the printed metrics on the same
-machine/build mode for smaller performance regressions.

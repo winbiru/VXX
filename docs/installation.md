@@ -51,13 +51,6 @@ Mặc định V++ được cài tại `%LOCALAPPDATA%\Programs\VPP`. Có thể �
 `-InstallDir`. `-NoPathUpdate` dành cho CI hoặc môi trường tự quản lý `PATH`/`VPP_HOME`.
 Chạy lại installer trên cùng `InstallDir` để cập nhật.
 
-## Release smoke
-
-Workflow release chạy smoke test sau khi dựng bundle và trước khi upload artifact trên cả
-Linux, macOS và Windows. Smoke test cài vào prefix tạm, chạy `vpp phiên bản`, tạo project bằng
-`vpp khởi tạo ứng dụng`, dựng/chạy/test project đó, dựng/test sample hóa đơn, rồi cài lần hai
-để xác nhận update loại bỏ file stale.
-
 ## Đánh giá Homebrew và winget
 
 **Homebrew:** phù hợp sau khi contract 1.0 được freeze. Formula nên cài nội dung artifact macOS
@@ -69,5 +62,4 @@ package có metadata/version/hash cố định). ZIP + PowerShell installer hi�
 tiếp, nhưng chưa phải format tốt để gửi manifest vào winget community repository.
 
 **Linux package manager:** tarball + installer là contract portable 1.0. Debian/RPM có thể thêm
-sau khi layout/versioning đã freeze; không cần chặn 1.0 vì release smoke đã kiểm tra artifact
-generic trên Ubuntu.
+sau khi layout/versioning đã freeze.
