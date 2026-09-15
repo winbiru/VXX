@@ -1,13 +1,31 @@
 nhập gói/chuẩn/main.vi;
 
 hàm main() {
-    ghi tệp(".tmp_stdlib_io.txt", "xin chao io");
-    in đọc tệp(".tmp_stdlib_io.txt");
+    tệp_io = ".tmp_stdlib_io_𠀀.txt";
+    ghi tệp(tệp_io, "xin chao io");
+    in đọc tệp(tệp_io);
 
-    ghi tệp(".tmp_stdlib_cfg.ini", "port=8080\nname=vietvm\nbat=đúng\nhe_so=2.5\n");
-    cfg = đọc cấu hình(".tmp_stdlib_cfg.ini");
+    tệp_đếm = ".tmp_stdlib_đếm_𠀀.txt";
+    ghi tệp(tệp_đếm, "mot hai\nba bon\n");
+    in đếm dòng tệp(tệp_đếm);
+    in đếm từ tệp(tệp_đếm);
+
+    tệp_cấu_hình = ".tmp_stdlib_cấu_hình_𠀀.ini";
+    ghi tệp(tệp_cấu_hình, "port=8080\nname=vietvm\nbat=đúng\nhe_so=2.5\n");
+    cfg = đọc cấu hình(tệp_cấu_hình);
     in cfg;
+    in đọc cấu hình khóa(tệp_cấu_hình, "name", "không có");
+    in đọc cấu hình khóa(tệp_cấu_hình, "missing", "mặc định");
 
     now = lấy thời gian hiện tại();
     in now != "";
+    utc = lấy thời gian utc();
+    in utc != "";
+    offset = độ lệch múi giờ();
+    in offset >= -1440 && offset <= 1440;
+    in giờ hiện tại() != "";
+
+    xóa đường dẫn(tệp_io);
+    xóa đường dẫn(tệp_đếm);
+    xóa đường dẫn(tệp_cấu_hình);
 };

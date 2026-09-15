@@ -1,10 +1,12 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <vector>
 
 #include "vpp/core/package_manifest.h"
+#include "vpp/core/package_source.h"
 
 namespace vietvm::core {
 
@@ -17,6 +19,8 @@ struct ResolvedPackageDependency {
     PackageSourceKind sourceKind = PackageSourceKind::Path;
     std::string declaredLocation;
     std::filesystem::path sourcePath;
+    std::string resolvedLocation;
+    std::string sourceRevision;
     std::vector<std::string> requestedRanges;
 };
 
@@ -24,12 +28,16 @@ struct ResolvedPackageGraph {
     std::vector<ResolvedPackageDependency> packages;
 };
 
-// Giải dependency graph từ manifest gốc. Package 0.9 hiện resolve được source
-// `path`; Git/registry có schema nhưng chưa có fetch transport nên solver từ chối
-// chúng thay vì âm thầm chọn source khác. Conflict cùng tên/path/version và cycle
-// đều tạo diagnostic xác định.
+using PackageSourceMaterializer = std::function<MaterializedPackageSource(
+    const PackageDependencySpec &dependency,
+    const std::filesystem::path &declaringRoot)>;
+
+// Giải dependency graph từ manifest gốc. Transport được inject để solver chỉ
+// xử lý graph/version/cycle, không tự clone/fetch. Khi không truyền materializer,
+// behavior tương thích cũ chỉ resolve local `path` và từ chối remote source.
 ResolvedPackageGraph resolvePackageDependencyGraph(
     const ProjectManifest &manifest,
-    const std::filesystem::path &projectRoot);
+    const std::filesystem::path &projectRoot,
+    PackageSourceMaterializer materializer = {});
 
 } // namespace vietvm::core

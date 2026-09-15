@@ -1,6 +1,8 @@
 #pragma once
+#include <cmath>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -227,12 +229,29 @@ inline StackValue evaluateModuloOperator(const StackValue &a,
                                          const StackValue &b,
                                          Opcode op,
                                          int pc) {
-    const int divisor = as_int(b, op, pc);
+    auto strictInteger = [&](const StackValue &value) -> int {
+        if (std::holds_alternative<int>(value)) return std::get<int>(value);
+        if (std::holds_alternative<double>(value)) {
+            const double number = std::get<double>(value);
+            if (std::isfinite(number) && std::trunc(number) == number &&
+                number >= static_cast<double>(std::numeric_limits<int>::min()) &&
+                number <= static_cast<double>(std::numeric_limits<int>::max())) {
+                return static_cast<int>(number);
+            }
+        }
+        vietvm::runtime::RuntimeDiagnosticContext context;
+        context.expectsInteger = true;
+        context.actualType = runtime_value_type_name(value);
+        throw runtime_error_op(vietvm::messages::formatMessage(
+            vietvm::messages::kVmInvalidIntegerValue), op, pc, std::move(context));
+    };
+
+    const int divisor = strictInteger(b);
     if (divisor == 0) {
         throw runtime_error_op(vietvm::messages::formatMessage(
             vietvm::messages::kVmModuloByZero), op, pc, runtime_binary_facts(a, b));
     }
-    return make_int_value(as_int(a, op, pc) % divisor);
+    return make_int_value(strictInteger(a) % divisor);
 }
 
 // Ghi thông tin debug của VM khi chế độ log được bật; hàm gom tham số thành một dòng nhưng không ảnh hưởng trạng thái thực thi.

@@ -37,6 +37,7 @@ bool isManagedRootEntry(const fs::path &relative) {
     const auto first = relative.begin();
     if (first == relative.end()) return false;
     const std::string rootName = first->u8string();
+    if (rootName == ".git") return true;
     if (rootName == kPackageStateDirectory) return true;
     if (rootName == kPackageLockFile && std::next(first) == relative.end()) return true;
     return isPackageDirectoryName(rootName);

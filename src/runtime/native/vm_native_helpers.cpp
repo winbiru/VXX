@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -71,6 +72,96 @@ std::string shellQuoteSingle(const std::string &s) {
     }
     out += "'";
     return out;
+}
+
+// Chuẩn hóa lỗi URL trước khi giao cho curl để hành vi không phụ thuộc phiên
+// bản curl hay hệ điều hành. URL HTTP client phải là UTF-8 hợp lệ, có scheme
+// HTTP(S), có host và không chứa whitespace/ký tự điều khiển chưa percent-encode.
+bool validateHttpUrl(const std::string &url, std::string &reason) {
+    if (url.empty()) {
+        reason = "URL rỗng";
+        return false;
+    }
+    if (!vietvm::core::isValidUtf8(url)) {
+        reason = "URL không phải UTF-8 hợp lệ";
+        return false;
+    }
+    for (unsigned char byte : url) {
+        if (byte <= 0x20u || byte == 0x7fu) {
+            reason = "URL chứa khoảng trắng hoặc ký tự điều khiển; hãy percent-encode trước";
+            return false;
+        }
+    }
+
+    const std::string lowered = vietvm::core::toLowerAscii(url);
+    std::size_t authorityStart = std::string::npos;
+    if (vietvm::helpers::startsWith(lowered, "http://")) {
+        authorityStart = 7;
+    } else if (vietvm::helpers::startsWith(lowered, "https://")) {
+        authorityStart = 8;
+    } else {
+        reason = "URL phải dùng scheme http:// hoặc https://";
+        return false;
+    }
+    const std::size_t authorityEnd = url.find_first_of("/?#", authorityStart);
+    const std::string authority = url.substr(
+        authorityStart,
+        authorityEnd == std::string::npos ? std::string::npos : authorityEnd - authorityStart);
+    if (authority.empty()) {
+        reason = "URL thiếu host";
+        return false;
+    }
+
+    const std::size_t userInfoEnd = authority.rfind('@');
+    const std::string hostPort = userInfoEnd == std::string::npos
+        ? authority
+        : authority.substr(userInfoEnd + 1);
+    if (hostPort.empty()) {
+        reason = "URL thiếu host";
+        return false;
+    }
+
+    auto validPort = [&](const std::string &port) {
+        if (port.empty()) return false;
+        unsigned long value = 0;
+        for (unsigned char c : port) {
+            if (c < '0' || c > '9') return false;
+            value = value * 10u + static_cast<unsigned long>(c - '0');
+            if (value > 65535u) return false;
+        }
+        return true;
+    };
+
+    if (hostPort.front() == '[') {
+        const std::size_t close = hostPort.find(']');
+        if (close == std::string::npos || close == 1) {
+            reason = "URL host IPv6 không hợp lệ";
+            return false;
+        }
+        const std::string suffix = hostPort.substr(close + 1);
+        if (!suffix.empty() &&
+            (suffix.front() != ':' || !validPort(suffix.substr(1)))) {
+            reason = "URL port không hợp lệ";
+            return false;
+        }
+    } else {
+        const std::size_t firstColon = hostPort.find(':');
+        if (firstColon == 0) {
+            reason = "URL thiếu host";
+            return false;
+        }
+        if (firstColon != std::string::npos) {
+            if (hostPort.find(':', firstColon + 1) != std::string::npos) {
+                reason = "URL host IPv6 phải đặt trong ngoặc vuông";
+                return false;
+            }
+            if (!validPort(hostPort.substr(firstColon + 1))) {
+                reason = "URL port không hợp lệ";
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 #if defined(_WIN32)
@@ -638,14 +729,30 @@ bool parseIntArgFromStack(const StackValue &arg,
         out = std::get<int>(arg);
         return true;
     }
-    try {
-        out = std::stoi(argToRawString(arg));
-        return true;
-    } catch (...) {
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeInvalidArgument, {fn, label});
-        return false;
+    if (std::holds_alternative<double>(arg)) {
+        const double number = std::get<double>(arg);
+        if (std::isfinite(number) && std::trunc(number) == number &&
+            number >= static_cast<double>(std::numeric_limits<int>::min()) &&
+            number <= static_cast<double>(std::numeric_limits<int>::max())) {
+            out = static_cast<int>(number);
+            return true;
+        }
+    } else if (std::holds_alternative<std::string>(arg)) {
+        try {
+            const std::string &text = std::get<std::string>(arg);
+            std::size_t consumed = 0;
+            const int parsed = std::stoi(text, &consumed);
+            if (consumed == text.size()) {
+                out = parsed;
+                return true;
+            }
+        } catch (...) {
+        }
     }
+
+    err = vietvm::messages::formatMessage(
+        vietvm::messages::kNativeInvalidArgument, {fn, label});
+    return false;
 }
 
 // Tạo exception/thông báo lỗi khi số đối số native không đúng; hàm đóng gói tên hàm và arity mong đợi vào diagnostic thống nhất.
@@ -825,6 +932,12 @@ bool runCurlHttpRequest(const std::string &method,
                         const std::optional<std::string> &payload,
                         StackValue &result,
                         std::string &err) {
+    std::string invalidUrlReason;
+    if (!validateHttpUrl(url, invalidUrlReason)) {
+        err = fnName + ": URL HTTP không hợp lệ: " + invalidUrlReason;
+        return true;
+    }
+
     bool fileTransportHandled = false;
     if (tryLowLevelHttpFileTransportRequest(
             method, url, payload, result, err, fileTransportHandled) &&

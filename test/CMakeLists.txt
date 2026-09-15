@@ -86,6 +86,14 @@ target_link_libraries(vpp-package-cache-unit PRIVATE vpp-core)
 add_test(NAME vpp-package-cache-unit
          COMMAND vpp-package-cache-unit)
 
+add_executable(vpp-package-source-unit
+    package_source_tests.cpp)
+
+target_link_libraries(vpp-package-source-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-package-source-unit
+         COMMAND vpp-package-source-unit)
+
 add_executable(vpp-pipeline-unit
     pipeline_tests.cpp)
 
@@ -186,6 +194,7 @@ foreach(vpp_test_target IN ITEMS
         vpp-package-solver-unit
         vpp-package-installer-unit
         vpp-package-cache-unit
+        vpp-package-source-unit
         vpp-pipeline-unit
         vpp-module-graph-unit
         vpp-package-resolver-unit

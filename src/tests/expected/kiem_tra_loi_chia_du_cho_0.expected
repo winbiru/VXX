@@ -2,4 +2,5 @@ Lỗi: chia dư cho 0
 Điều đã xảy ra: Chương trình đang tìm phần dư của phép chia cho 0. Không thể tính phần dư khi số chia bằng 0.
 Cách sửa: Hãy kiểm tra số chia trước khi dùng phép chia lấy dư và xử lý riêng trường hợp bằng 0.
 Dấu vết lỗi:
-  ở main (src/tests/kiem_tra_loi_chia_du_cho_0.vi:3:8) [mô đun=src/tests/kiem_tra_loi_chia_du_cho_0.vi]
+  ở chia dư (gói/lõi/toán học.vi:28:16) [mô đun=gói/lõi/toán học.vi]
+  ở main (src/tests/kiem_tra_loi_chia_du_cho_0.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_du_cho_0.vi]

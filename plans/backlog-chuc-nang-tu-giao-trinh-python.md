@@ -28,7 +28,7 @@
 ## Hợp đồng hiện có và khoảng trống sau P1
 
 1. **Array/list:** direct compiler nhận literal scalar và list lồng nhau; hỗ trợ đọc/ghi
-   index list không âm, kể cả chain trên list lồng nhau; chuỗi hỗ trợ đọc index byte
+   index list không âm, kể cả chain trên list lồng nhau; chuỗi hỗ trợ đọc index code point UTF-8
    không âm. API đi kèm gồm `độ dài`, `thêm`, `xóa tại`,
    `đảo ngược`, `tìm chỉ số`, `xóa trùng`, `sắp xếp`, `tổng list`, `nhỏ nhất list`,
    `lớn nhất list`. Chưa có `for-each`, slice hay equality sâu cho collection.
@@ -41,8 +41,8 @@
    collection theo identity handle; chưa có set runtime độc lập/hash tổng quát.
 4. **Tuple:** `thành tuple`/`thành list`, `độ dài` và đọc index đã có; tuple bất biến.
    Chưa có tuple literal hay destructuring/multiple assignment.
-5. **Chuỗi:** API đếm/tìm/thay/case/word/Caesar đã có, nhưng `độ dài` và index dùng
-   **byte UTF-8**, còn case/whitespace là ASCII. Cần Unicode code point trước khi
+5. **Chuỗi:** API đếm/tìm/thay/case/word/Caesar đã có; `độ dài`, index, reverse và slice dùng
+   code point UTF-8; case/NFC tập trung tiếng Việt, còn whitespace tokenizer giữ contract ASCII. Cần
    cam kết hành vi tiếng Việt đầy đủ.
 6. **Tệp và lỗi:** đọc/ghi tệp cùng đếm dòng/từ đã có; còn contract I/O có span,
    input parse và exception có type do người dùng định nghĩa.
@@ -109,19 +109,19 @@
 | Bài | Chức năng | Trạng thái | Công việc còn thiếu |
 |---:|---|---|---|
 | 41 | Đếm ký tự | Có nền tảng | `đếm ký tự`; hiện đếm byte/subsequence, chưa phải code point Unicode. |
-| 42 | Đảo ngược chuỗi | Có nền tảng | `đảo ngược(s)`; hiện đảo byte UTF-8, chưa an toàn cho Unicode đa byte. |
-| 43 | Palindrome | Có nền tảng | `là palindrome`; hiện ASCII case-fold, không bỏ dấu câu/khoảng trắng. |
+| 42 | Đảo ngược chuỗi | Hoàn tất nền tảng | `đảo ngược(s)` đảo theo code point UTF-8, đã có regression tiếng Việt + Unicode ngoài BMP. |
+| 43 | Palindrome | Có nền tảng | `là palindrome`; NFC + case-fold tiếng Việt, không bỏ dấu câu/khoảng trắng. |
 | 44 | Đếm nguyên âm/phụ âm | Cần hoàn thiện | Cần phân loại ký tự và policy tiếng Việt. |
-| 45 | Viết hoa chữ cái đầu mỗi từ | Có nền tảng | `viết hoa đầu từ`; ASCII case conversion. |
+| 45 | Viết hoa chữ cái đầu mỗi từ | Có nền tảng | `viết hoa đầu từ`; NFC + case tiếng Việt. |
 | 46 | Đếm lần xuất hiện một ký tự | Có nền tảng | `đếm ký tự`; byte/subsequence semantics MVP. |
 | 47 | Loại khoảng trắng thừa | Có nền tảng | `chuẩn hóa khoảng trắng`; ASCII whitespace. |
-| 48 | Kiểm tra anagram | Có nền tảng | `là anagram`; ASCII case/whitespace normalization. |
-| 49 | Tìm từ dài nhất trong câu | Có nền tảng | `từ dài nhất`; byte length and ASCII whitespace. |
+| 48 | Kiểm tra anagram | Có nền tảng | `là anagram`; NFC + case tiếng Việt và bỏ whitespace. |
+| 49 | Tìm từ dài nhất trong câu | Có nền tảng | `từ dài nhất`; độ dài theo code point, tách từ theo ASCII whitespace. |
 | 50 | Thay thế ký tự | Có nền tảng | `thay thế`; thay mọi substring không rỗng. |
 | 51 | Nối chuỗi từ danh sách | Có nền tảng | Cài được bằng `độ dài`/index và `nối chuỗi`; chưa có `join` hay kiểm tra list chuỗi chuyên dụng. |
 | 52 | Đếm số từ trong câu | Có nền tảng | `đếm từ`; ASCII whitespace. |
 | 53 | Kiểm tra chuỗi con | Có nền tảng | `chứa chuỗi`. |
-| 54 | Chuyển hoa/thường | Có nền tảng | `chuỗi hoa`/`chuỗi thường`; ASCII-only. |
+| 54 | Chuyển hoa/thường | Có nền tảng | `chuỗi hoa`/`chuỗi thường`; hỗ trợ toàn bộ case pair dựng sẵn tiếng Việt. |
 | 55 | Mã hóa Caesar đơn giản | Có nền tảng | `mã hóa caesar`; ASCII Latin. |
 
 ### Nhóm 5 — List (56–70)
@@ -175,7 +175,7 @@
 | 86 | Lambda | Có nền tảng | Regression lambda không capture. |
 | 87 | `map`, `filter` với lambda | Cần hoàn thiện | Phụ thuộc list + HOF + iteration. |
 | 88 | Hàm chuyển đổi nhiệt độ | Có nền tảng | Tutorial/regression. |
-| 89 | Hàm palindrome | Có nền tảng | `là palindrome` đã có cho case-fold ASCII; cần policy dấu câu/Unicode nếu bài yêu cầu. |
+| 89 | Hàm palindrome | Có nền tảng | `là palindrome` dùng NFC + case-fold tiếng Việt; giữ nguyên policy dấu câu/khoảng trắng. |
 | 90 | Đệ quy tính giai thừa | Có nền tảng | Regression base case và call frame. |
 
 ### Nhóm 8 — Đệ quy (91–95)
@@ -184,7 +184,7 @@
 |---:|---|---|---|
 | 91 | Đệ quy tổng 1…n | Có nền tảng | Regression. |
 | 92 | Fibonacci thứ n | Có nền tảng | Regression. |
-| 93 | Đệ quy đảo chuỗi | Cần hoàn thiện | Index chuỗi (byte) đã có, nhưng chưa có slice; bài đệ quy cần truyền index/độ dài hoặc bổ sung helper. |
+| 93 | Đệ quy đảo chuỗi | Có nền tảng | Index và `cắt chuỗi` đã dùng code point; có thể viết bài đệ quy không phụ thuộc byte UTF-8. |
 | 94 | Đệ quy ƯCLN | Có nền tảng | Regression. |
 | 95 | Đệ quy đếm chữ số | Có nền tảng | Chốt số âm/0. |
 

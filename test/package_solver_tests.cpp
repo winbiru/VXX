@@ -56,7 +56,7 @@ void writePackage(const fs::path &root,
 PackageDependencySpec pathDependency(const std::string &name,
                                      const std::string &range,
                                      const std::string &location) {
-    return PackageDependencySpec{name, range, PackageSourceKind::Path, location};
+    return PackageDependencySpec{name, range, PackageSourceKind::Path, location, ""};
 }
 
 void testTransitiveGraphIsDependencyFirstAndDeterministic() {
@@ -147,7 +147,7 @@ void testUnsupportedTransportIsRejected() {
     root.name = "app";
     root.dependencies = {
         PackageDependencySpec{"remote", "^1.0.0", PackageSourceKind::Git,
-                              "https://example.invalid/repo.git"},
+                              "https://example.invalid/repo.git", "HEAD"},
     };
     bool rejected = false;
     try {

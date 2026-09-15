@@ -20,6 +20,9 @@ struct PackageDependencySpec {
     std::string versionRange = "*";
     PackageSourceKind sourceKind = PackageSourceKind::Path;
     std::string location;
+    // Git-only symbolic ref (branch/tag/commit). Canonical manifests use HEAD
+    // when omitted so a mutable ref can later be pinned to an exact lock commit.
+    std::string reference;
 };
 
 struct ProjectManifest {
@@ -40,6 +43,9 @@ struct PackageLockEntry {
     // Stable content fingerprint for reproducibility/change detection. This is
     // deliberately not a cryptographic integrity signature.
     std::string fingerprint;
+    // Git-only exact commit id resolved from the manifest ref. Path/registry
+    // entries leave this empty.
+    std::string revision;
 };
 
 struct PackageLockfile {

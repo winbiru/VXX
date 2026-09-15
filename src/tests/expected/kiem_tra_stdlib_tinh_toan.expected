@@ -3,12 +3,20 @@
 [IN] 42
 [IN] 3.5
 [IN] 2
+[IN] 99
 [IN] 256
+[IN] 1
 [IN] 120
+[IN] 1
+[IN] lũy thừa: số mũ phải là số nguyên không âm
+[IN] lũy thừa: số mũ phải là số nguyên không âm
+[IN] giai thừa: đối số phải là số nguyên không âm
+[IN] giai thừa: đối số phải là số nguyên không âm
 [IN] 9
 [IN] 9
 [IN] 4
 [IN] 10
+[IN] giới hạn: cận nhỏ nhất không được lớn hơn cận lớn nhất
 [IN] 6
 [IN] 25
 [IN] 1

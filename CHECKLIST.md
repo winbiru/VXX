@@ -1,381 +1,381 @@
-# ✅ V++ — Checklist Phát Triển Ngôn Ngữ
+# V++ — Checklist Phát Triển Ngôn Ngữ
 
 > Cập nhật lần cuối: 12/09/2026
-> Trạng thái: `✅ Hoàn thành` · `🚧 Đang làm` · `⬜ Chưa làm` · `❌ Lỗi / Cần sửa`
+> Trạng thái: `Hoàn thành` · `Đang làm` · `Chưa làm` · `Lỗi / Cần sửa`
 
 ---
 
-## 1. 🔤 Từ Khoá & Cú Pháp (Syntax)
+## 1. Từ Khoá & Cú Pháp (Syntax)
 
 ### 1.1 Từ khoá cơ bản
 | Từ khoá | Ý nghĩa | Trạng thái |
 |---------|---------|-----------|
-| `in` | In ra màn hình (print) | ✅ |
-| `nếu` | Điều kiện if | ✅ |
-| `hoặc` | Else | ✅ |
-| `nếu không` | Else if | ✅ |
-| `lặp` | Vòng lặp (for / while) | ✅ |
-| `hàm` | Định nghĩa hàm | ✅ |
-| `trả về` | Trả về giá trị (return) | ✅ |
-| `nhập` | Import module | ✅ |
-| `chọn` | Switch | ✅ |
-| `ca` | Case | ✅ |
-| `mặc định` | Default (trong switch) | ✅ |
-| `thoát` | Break | ✅ |
-| `bỏ qua` | Continue | ✅ |
-| `khởi tạo` | Khai báo biến | ✅ |
+| `in` | In ra màn hình (print) | |
+| `nếu` | Điều kiện if | |
+| `hoặc` | Else | |
+| `nếu không` | Else if | |
+| `lặp` | Vòng lặp (for / while) | |
+| `hàm` | Định nghĩa hàm | |
+| `trả về` | Trả về giá trị (return) | |
+| `nhập` | Import module | |
+| `chọn` | Switch | |
+| `ca` | Case | |
+| `mặc định` | Default (trong switch) | |
+| `thoát` | Break | |
+| `bỏ qua` | Continue | |
+| `khởi tạo` | Khai báo biến | |
 
 ### 1.2 Bắt buộc dấu tiếng Việt
 | Yêu cầu | Trạng thái |
 |---------|-----------|
-| Từ khoá PHẢI có dấu (ví dụ: `trả về`, không phải `tra ve`) | ✅ |
-| Lexer phát hiện và báo lỗi rõ ràng khi thiếu dấu | ✅ |
+| Từ khoá PHẢI có dấu (ví dụ: `trả về`, không phải `tra ve`) | |
+| Lexer phát hiện và báo lỗi rõ ràng khi thiếu dấu | |
 
 ### 1.3 Lớp & Quyền truy cập (Public/Private/Protected tương đương)
 | Công việc | Trạng thái |
 |-----------|-----------|
-| Thêm cú pháp khai báo lớp: `lớp [công khai|riêng tư|bảo vệ] TenClass { ... }` | ✅ |
-| Thêm modifier thành viên lớp theo thứ tự ưu tiên: `hàm công khai`, `hàm riêng tư`, `hàm bảo vệ` | ✅ |
-| Không hỗ trợ cú pháp cũ: `công khai hàm`, `riêng tư hàm`, `bảo vệ hàm` (báo lỗi hướng dẫn cú pháp mới) | ✅ |
-| Biên dịch method lớp thành tên đầy đủ dạng `TenClass.tenHam` | ✅ |
-| Hỗ trợ gọi nội bộ trong cùng lớp bằng tên ngắn (ví dụ `nhanNoiBo(...)`) | ✅ |
-| Chặn truy cập `riêng tư` từ ngoài lớp | ✅ |
-| Chặn truy cập `bảo vệ` từ ngoài lớp (MVP chưa có kế thừa) | ✅ |
-| Cập nhật syntax highlighting cho `lớp`, `công khai`, `riêng tư`, `bảo vệ` | ✅ |
-| Bổ sung test hồi quy cho lớp + quyền truy cập | ✅ |
-| Mở rộng `bảo vệ` theo mô hình kế thừa thật sự (khi có inheritance) | ⬜ |
-| Hỗ trợ thuộc tính lớp (field) với quyền truy cập tương ứng | ⬜ |
-| Hỗ trợ tạo đối tượng/instance (`new`) và gọi method theo instance | ⬜ |
+| Thêm cú pháp khai báo lớp: `lớp [công khai|riêng tư|bảo vệ] TenClass { ... }` | |
+| Thêm modifier thành viên lớp theo thứ tự ưu tiên: `hàm công khai`, `hàm riêng tư`, `hàm bảo vệ` | |
+| Không hỗ trợ cú pháp cũ: `công khai hàm`, `riêng tư hàm`, `bảo vệ hàm` (báo lỗi hướng dẫn cú pháp mới) | |
+| Biên dịch method lớp thành tên đầy đủ dạng `TenClass.tenHam` | |
+| Hỗ trợ gọi nội bộ trong cùng lớp bằng tên ngắn (ví dụ `nhanNoiBo(...)`) | |
+| Chặn truy cập `riêng tư` từ ngoài lớp | |
+| Chặn truy cập `bảo vệ` từ ngoài lớp (MVP chưa có kế thừa) | |
+| Cập nhật syntax highlighting cho `lớp`, `công khai`, `riêng tư`, `bảo vệ` | |
+| Bổ sung test hồi quy cho lớp + quyền truy cập | |
+| Mở rộng `bảo vệ` theo mô hình kế thừa thật sự (khi có inheritance) | |
+| Hỗ trợ thuộc tính lớp (field) với quyền truy cập tương ứng | |
+| Hỗ trợ tạo đối tượng/instance (`new`) và gọi method theo instance | |
 
 ---
 
-## 2. 🧮 Toán Tử (Operators)
+## 2. Toán Tử (Operators)
 
 | Toán tử | Mô tả | Trạng thái |
 |---------|-------|-----------|
-| `+` | Cộng số / nối chuỗi | ✅ |
-| `-` | Trừ | ✅ |
-| `*` | Nhân | ✅ |
-| `/` | Chia | ✅ |
-| `%` | Chia lấy dư | ✅ |
-| `==` | So sánh bằng | ✅ |
-| `!=` | Khác bằng | ✅ |
-| `>` | Lớn hơn | ✅ |
-| `<` | Nhỏ hơn | ✅ |
-| `>=` | Lớn hơn hoặc bằng | ✅ |
-| `<=` | Nhỏ hơn hoặc bằng | ✅ |
-| `&&` / `và` | Logic AND | ✅ |
-| `\|\|` / `hoặc` | Logic OR | ✅ |
-| `!` | Phủ định logic | ✅ |
-| `=` | Gán giá trị | ✅ |
-| `++` | Tăng một đơn vị | ✅ |
-| `--` | Giảm một đơn vị | ✅ |
-| `+=`, `-=`, `*=`, `/=`, `%=` | Gán kết hợp | ✅ |
+| `+` | Cộng số / nối chuỗi | |
+| `-` | Trừ | |
+| `*` | Nhân | |
+| `/` | Chia | |
+| `%` | Chia lấy dư | |
+| `==` | So sánh bằng | |
+| `!=` | Khác bằng | |
+| `>` | Lớn hơn | |
+| `<` | Nhỏ hơn | |
+| `>=` | Lớn hơn hoặc bằng | |
+| `<=` | Nhỏ hơn hoặc bằng | |
+| `&&` / `và` | Logic AND | |
+| `\|\|` / `hoặc` | Logic OR | |
+| `!` | Phủ định logic | |
+| `=` | Gán giá trị | |
+| `++` | Tăng một đơn vị | |
+| `--` | Giảm một đơn vị | |
+| `+=`, `-=`, `*=`, `/=`, `%=` | Gán kết hợp | |
 
 ---
 
-## 3. 📦 Kiểu Dữ Liệu (Data Types)
+## 3. Kiểu Dữ Liệu (Data Types)
 
 | Kiểu | Ví dụ | Trạng thái |
 |------|-------|-----------|
-| Số nguyên (int) | `42`, `-7` | ✅ |
-| Chuỗi (string) | `"xin chào"` | ✅ |
-| Mảng (array) | `[1, 2, 3]` | ⬜ — token cú pháp có mặt, nhưng literal/index chưa có runtime API ổn định |
-| Mảng đa chiều | `[[1,2],[3,4]]` | ⬜ — chưa có model dữ liệu mảng thực thi |
-| Boolean (`đúng`/`sai`) | `đúng`, `sai` | ✅ |
-| Số thực (float/double) | `3.14` | ✅ |
-| Kiểu null / rỗng | `rỗng` | ✅ |
-| Từ điển / Map | `{"a": 1}` | ✅ |
+| Số nguyên (int) | `42`, `-7` | |
+| Chuỗi (string) | `"xin chào"` | |
+| Mảng (array) | `[1, 2, 3]` | — token cú pháp có mặt, nhưng literal/index chưa có runtime API ổn định |
+| Mảng đa chiều | `[[1,2],[3,4]]` | — chưa có model dữ liệu mảng thực thi |
+| Boolean (`đúng`/`sai`) | `đúng`, `sai` | |
+| Số thực (float/double) | `3.14` | |
+| Kiểu null / rỗng | `rỗng` | |
+| Từ điển / Map | `{"a": 1}` | |
 
 ---
 
-## 4. 🔧 Cấu Trúc Điều Khiển (Control Flow)
+## 4. Cấu Trúc Điều Khiển (Control Flow)
 
 | Tính năng | Ví dụ | Trạng thái |
 |-----------|-------|-----------|
-| `nếu ... hoặc ...` | if / else | ✅ |
-| `nếu không ... hoặc ...` | else if / else | ✅ |
-| Điều kiện lồng nhiều cấp | if trong if | ✅ |
-| Vòng lặp `for` kiểu C | `lặp(i=0; i<10; i++)` | ✅ |
-| Vòng lặp `while` | `lặp(điều kiện)` | ✅ |
-| `thoát` (break) | Thoát vòng lặp/switch | ✅ |
-| `bỏ qua` (continue) | Bỏ qua lần lặp hiện tại | ✅ |
-| `chọn ... ca ...` | switch / case | ✅ |
-| `mặc định` | default trong switch | ✅ |
+| `nếu ... hoặc ...` | if / else | |
+| `nếu không ... hoặc ...` | else if / else | |
+| Điều kiện lồng nhiều cấp | if trong if | |
+| Vòng lặp `for` kiểu C | `lặp(i=0; i<10; i++)` | |
+| Vòng lặp `while` | `lặp(điều kiện)` | |
+| `thoát` (break) | Thoát vòng lặp/switch | |
+| `bỏ qua` (continue) | Bỏ qua lần lặp hiện tại | |
+| `chọn ... ca ...` | switch / case | |
+| `mặc định` | default trong switch | |
 
 ---
 
-## 5. 🏗️ Hàm (Functions)
+## 5. Hàm (Functions)
 
 | Tính năng | Ví dụ | Trạng thái |
 |-----------|-------|-----------|
-| Định nghĩa hàm không tham số | `hàm xinChao() { ... }` | ✅ |
-| Định nghĩa hàm có tham số | `hàm cong(a, b) { ... }` | ✅ |
-| Hàm nhiều tham số (≥4) | `hàm f(a,b,c,d) { ... }` | ✅ |
-| `trả về` giá trị | `trả về a + b;` | ✅ |
-| `trả về` không có giá trị | `trả về;` (mặc định = 0) | ✅ |
-| Gọi hàm với đối số | `cong(2, 3)` | ✅ |
-| Đệ quy (recursion) | Fibonacci, giai thừa | ✅ |
-| Hàm lồng nhau (nested calls) | `f(g(x))` | ✅ |
-| Hàm ẩn danh / lambda | `hàm(x) { trả về x * 2; }` | ✅ |
-| Hàm bậc cao (higher-order) | Truyền hàm làm tham số | ✅ |
-| Giá trị tham số mặc định | `hàm f(x = 0) { ... }` | ✅ |
-| Biến cục bộ tách biệt toàn cục | Scope isolation | ✅ |
+| Định nghĩa hàm không tham số | `hàm xinChao() { ... }` | |
+| Định nghĩa hàm có tham số | `hàm cong(a, b) { ... }` | |
+| Hàm nhiều tham số (≥4) | `hàm f(a,b,c,d) { ... }` | |
+| `trả về` giá trị | `trả về a + b;` | |
+| `trả về` không có giá trị | `trả về;` (mặc định = 0) | |
+| Gọi hàm với đối số | `cong(2, 3)` | |
+| Đệ quy (recursion) | Fibonacci, giai thừa | |
+| Hàm lồng nhau (nested calls) | `f(g(x))` | |
+| Hàm ẩn danh / lambda | `hàm(x) { trả về x * 2; }` | |
+| Hàm bậc cao (higher-order) | Truyền hàm làm tham số | |
+| Giá trị tham số mặc định | `hàm f(x = 0) { ... }` | |
+| Biến cục bộ tách biệt toàn cục | Scope isolation | |
 
 ---
 
-## 6. 📁 Module & Import
+## 6. Module & Import
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| `nhập file.vi` — import file khác | ✅ |
-| Phát hiện import vòng (circular import) | ✅ |
-| Phân giải đường dẫn tương đối | ✅ |
-| Namespace / tên module | ✅ |
-| Thư viện chuẩn tiếng Việt (stdlib) | ✅ |
+| `nhập file.vi` — import file khác | |
+| Phát hiện import vòng (circular import) | |
+| Phân giải đường dẫn tương đối | |
+| Namespace / tên module | |
+| Thư viện chuẩn tiếng Việt (stdlib) | |
 
 ### 6.1 API stdlib native
 | API | Trạng thái |
 |-----|-----------|
-| `io_doc_file(path)` | ✅ |
-| `io_ghi_file(path, content)` | ✅ |
-| `doc_config(path)` | ✅ |
-| `lay_thoi_gian_hien_tai()` | ✅ |
-| `mang_http_get(url)` | ✅ *(phụ thuộc `curl` và mạng)* |
-| `mang_http_post(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
-| `mang_http_put(url, payload)` | ✅ *(phụ thuộc `curl` và mạng)* |
+| `io_doc_file(path)` | |
+| `io_ghi_file(path, content)` | |
+| `doc_config(path)` | |
+| `lay_thoi_gian_hien_tai()` | |
+| `mang_http_get(url)` | *(phụ thuộc `curl` và mạng)* |
+| `mang_http_post(url, payload)` | *(phụ thuộc `curl` và mạng)* |
+| `mang_http_put(url, payload)` | *(phụ thuộc `curl` và mạng)* |
 
 ### 6.2 Kiến trúc gói/framework theo module
 | Hạng mục | Trạng thái |
 |----------|-----------|
-| `gói/lõi` (toán/chuỗi/collections/chuyển kiểu/random/luận lý/xác thực) | ✅ |
-| `gói/nhập xuất` (tệp/đường dẫn/thư mục/cấu hình/thời gian/nhật ký) | ✅ |
-| `gói/hệ thống` (env/nền tảng/sleep) | ✅ |
-| `gói/mạng` (HTTP client/server + REST + JSON; test API tách riêng) | ✅ |
-| `gói/dữ liệu` (phân trang/database adapter) | ✅ *(phụ thuộc driver CLI của host)* |
-| `gói/ứng dụng` (lifecycle chung, không tự import full stack) | ✅ |
-| `gói/dựng` (facade web/dữ liệu/ứng dụng; `ứng dụng` là full stack) | ✅ |
-| `gói/chuẩn/main.vi` (entrypoint đầy đủ) | ✅ |
-| Shim tên starter cũ trong cùng cây `gói/dựng` | ✅ |
+| `gói/lõi` (toán/chuỗi/collections/chuyển kiểu/random/luận lý/xác thực) | |
+| `gói/nhập xuất` (tệp/đường dẫn/thư mục/cấu hình/thời gian/nhật ký) | |
+| `gói/hệ thống` (env/nền tảng/sleep) | |
+| `gói/mạng` (HTTP client/server + REST + JSON; test API tách riêng) | |
+| `gói/dữ liệu` (phân trang/database adapter) | *(phụ thuộc driver CLI của host)* |
+| `gói/ứng dụng` (lifecycle chung, không tự import full stack) | |
+| `gói/dựng` (facade web/dữ liệu/ứng dụng; `ứng dụng` là full stack) | |
+| `gói/chuẩn/main.vi` (entrypoint đầy đủ) | |
+| Shim tên starter cũ trong cùng cây `gói/dựng` | |
 
 ---
 
-## 7. ⚠️ Xử Lý Lỗi (Error Handling)
+## 7. Cảnh báo Xử Lý Lỗi (Error Handling)
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| Báo lỗi khi chia cho 0 | ✅ |
-| Báo lỗi khi thiếu dấu tiếng Việt | ✅ |
-| Báo lỗi khi import file không tồn tại | ✅ |
-| Báo lỗi khi hàm không tồn tại | ✅ |
-| Báo lỗi khi stack underflow | ✅ |
-| Báo lỗi khi so sánh 2 kiểu khác nhau | ✅ |
-| Báo lỗi vị trí (dòng:cột) | ✅ |
-| Khối `thử ... bắt lỗi` (try/catch) | ✅ |
-| `ném lỗi` (throw exception) | ✅ |
-| Stack trace khi crash | ⬜ |
+| Báo lỗi khi chia cho 0 | |
+| Báo lỗi khi thiếu dấu tiếng Việt | |
+| Báo lỗi khi import file không tồn tại | |
+| Báo lỗi khi hàm không tồn tại | |
+| Báo lỗi khi stack underflow | |
+| Báo lỗi khi so sánh 2 kiểu khác nhau | |
+| Báo lỗi vị trí (dòng:cột) | |
+| Khối `thử ... bắt lỗi` (try/catch) | |
+| `ném lỗi` (throw exception) | |
+| Stack trace khi crash | |
 
 ---
 
-## 8. 🖥️ VM & Bytecode
+## 8. VM & Bytecode
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| Thực thi bytecode stack-based | ✅ |
-| String pool (tránh trùng lặp chuỗi) | ✅ |
-| Call frame cho hàm | ✅ |
-| Biến cục bộ trong frame (localsVec) | ✅ |
-| Biến toàn cục | ✅ |
-| Chia sẻ biến toàn cục giữa hàm con và mẹ | ✅ |
-| Truyền tham số qua `OP_PARAM` | ✅ |
-| `OP_TRA_VE` trả về giá trị từ hàm | ✅ |
-| `OP_BO_QUA` (continue) | ✅ |
-| `OP_TRU_MOT` (--) | ✅ |
-| Kế thừa `functionTableByNameIndex` cho đệ quy | ✅ |
-| Tối ưu hoá bytecode (peephole) | ✅ |
-| Garbage Collection (MVP: runtime compaction theo chu kỳ) | 🚧 |
-| JIT Compilation (MVP: linear bytecode lambda JIT, bật qua env) | 🚧 |
+| Thực thi bytecode stack-based | |
+| String pool (tránh trùng lặp chuỗi) | |
+| Call frame cho hàm | |
+| Biến cục bộ trong frame (localsVec) | |
+| Biến toàn cục | |
+| Chia sẻ biến toàn cục giữa hàm con và mẹ | |
+| Truyền tham số qua `OP_PARAM` | |
+| `OP_TRA_VE` trả về giá trị từ hàm | |
+| `OP_BO_QUA` (continue) | |
+| `OP_TRU_MOT` (--) | |
+| Kế thừa `functionTableByNameIndex` cho đệ quy | |
+| Tối ưu hoá bytecode (peephole) | |
+| Garbage Collection (MVP: runtime compaction theo chu kỳ) | |
+| JIT Compilation (MVP: linear bytecode lambda JIT, bật qua env) | |
 
 ---
 
-## 9. 🧩 Compiler
+## 9. Compiler
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| Tokenizer / Lexer (token mang span) | ✅ |
-| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | ✅ — production compiler chỉ còn Direct IR → bytecode; unsupported region báo lỗi |
-| AST cấu trúc không kiểu và mang span | ✅ — expression arena + statement tree lossless; lambda có parameter/default/body cấu trúc |
-| Semantic model, scope tree và name/call resolution | ✅ — bind theo ExprId; lambda scope/capture đã có, module graph/import exports còn tiếp tục |
-| IR không kiểu, đệ quy và optimizer IR | ✅ — direct emitter đọc structured IR; token materialization chỉ còn cho test/debug |
-| Biên dịch biểu thức số học | ✅ |
-| Biên dịch chuỗi và nối chuỗi | ✅ |
-| Biên dịch điều kiện `nếu/hoặc` | ✅ |
-| Biên dịch switch/case | ✅ |
-| Biên dịch hàm và gọi hàm | ✅ |
-| Biên dịch `trả về` | ✅ |
-| Biên dịch `nhập` (import) | ✅ |
-| Cú pháp token mảng (chưa codegen/runtime stable) | 🚧 |
-| Biên dịch `bỏ qua` (continue) | ✅ |
-| Biên dịch `--`, `+=`, `-=`, `*=`, `/=`, `%=` | ✅ |
-| Biên dịch `đúng`/`sai` (boolean literals) | ✅ |
-| Symbol table | ✅ |
-| Fix `isNumber("-")` bug | ✅ |
-| Fix `convertToPostfix` nested call argc | ✅ |
-| Kiểm tra kiểu tĩnh (type checking) | ⬜ |
-| Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | ✅ — lambda body là recursive Block và vẫn giữ span/range lossless |
-| Scope tree (global/class/function/block/lambda/catch) | ✅ |
-| Lexical name/call resolution và class visibility | ✅ — module graph/import exports còn tiếp tục |
-| Recursive IR lowering cho body/block/expression | ✅ — conditional/loop/switch/try/class/import đã có structured payload trong regression corpus |
-| IR → bytecode trực tiếp, không parse token lại | ✅ — toàn bộ regression corpus đi qua direct emitter; token compiler đã bị xóa khỏi production source |
-| Unsupported Direct IR = 0 trên toàn bộ corpus `.vi` | ✅ — 61/61 chương trình compile trực tiếp; unsupported region làm compile thất bại |
-| Milestone V++ 0.6 — Direct IR migration | ✅ — migration corpus và việc xóa legacy token bridge đã hoàn thành |
-| Type policy và Typed IR | ⬜ |
+| Tokenizer / Lexer (token mang span) | |
+| Pipeline source → lexer → parser → AST → semantic → IR → optimizer → bytecode | — production compiler chỉ còn Direct IR → bytecode; unsupported region báo lỗi |
+| AST cấu trúc không kiểu và mang span | — expression arena + statement tree lossless; lambda có parameter/default/body cấu trúc |
+| Semantic model, scope tree và name/call resolution | — bind theo ExprId; lambda scope/capture đã có, module graph/import exports còn tiếp tục |
+| IR không kiểu, đệ quy và optimizer IR | — direct emitter đọc structured IR; token materialization chỉ còn cho test/debug |
+| Biên dịch biểu thức số học | |
+| Biên dịch chuỗi và nối chuỗi | |
+| Biên dịch điều kiện `nếu/hoặc` | |
+| Biên dịch switch/case | |
+| Biên dịch hàm và gọi hàm | |
+| Biên dịch `trả về` | |
+| Biên dịch `nhập` (import) | |
+| Cú pháp token mảng (chưa codegen/runtime stable) | |
+| Biên dịch `bỏ qua` (continue) | |
+| Biên dịch `--`, `+=`, `-=`, `*=`, `/=`, `%=` | |
+| Biên dịch `đúng`/`sai` (boolean literals) | |
+| Symbol table | |
+| Fix `isNumber("-")` bug | |
+| Fix `convertToPostfix` nested call argc | |
+| Kiểm tra kiểu tĩnh (type checking) | |
+| Expression AST arena: literal/name/operator/assignment/call/lambda/map + span | — lambda body là recursive Block và vẫn giữ span/range lossless |
+| Scope tree (global/class/function/block/lambda/catch) | |
+| Lexical name/call resolution và class visibility | — module graph/import exports còn tiếp tục |
+| Recursive IR lowering cho body/block/expression | — conditional/loop/switch/try/class/import đã có structured payload trong regression corpus |
+| IR → bytecode trực tiếp, không parse token lại | — toàn bộ regression corpus đi qua direct emitter; token compiler đã bị xóa khỏi production source |
+| Unsupported Direct IR = 0 trên toàn bộ corpus `.vi` | — 61/61 chương trình compile trực tiếp; unsupported region làm compile thất bại |
+| Milestone V++ 0.6 — Direct IR migration | — migration corpus và việc xóa legacy token bridge đã hoàn thành |
+| Type policy và Typed IR | |
 
 ---
 
-## 10. 🧪 Tests
+## 10. Tests
 
 | Bài test | Mô tả | Trạng thái |
 |---------|-------|-----------|
-| `kiem_tra_so_nguyen.vi` | Số nguyên và phép tính | ✅ |
-| `kiem_tra_so_chan_1-20.vi` | Lọc số chẵn 1–20 | ✅ |
-| `kiem_tra_so_le_chia_het_cho_5.vi` | Số lẻ chia hết cho 5 | ✅ |
-| `kiem_tra_so_chia_het_cho_3_va_4.vi` | Chia hết 3 và 4 | ✅ |
-| `kiem_tra_dieu_kien_phu_dinh.vi` | Điều kiện phủ định | ✅ |
-| `kiem_tra_dieu_kien_long_nhieu_cap.vi` | Điều kiện lồng nhau | ✅ |
-| `kiem_tra_noi_chuoi.vi` | Nối chuỗi | ✅ |
-| `kiem_tra_mang_3_chieu.vi` | Vòng lặp lồng ba chiều (không phải runtime array) | ✅ |
-| `kiem_tra_chon_ca.vi` | Switch/case | ✅ |
-| `kiem_tra_ham_tham_so.vi` | Hàm có tham số | ✅ |
-| `kiem_tra_ham_4_tham_so.vi` | Hàm 4 tham số | ✅ |
-| `kiem_tra_tra_ve.vi` | `trả về` có/không có giá trị | ✅ |
-| `import_main.vi` | Import module | ✅ |
-| `program.vi` | Chương trình tổng hợp | ✅ |
-| `kiem_tra_bo_qua.vi` | `bỏ qua` (continue) | ✅ |
-| `kiem_tra_toan_tu_moi.vi` | `--`, `+=`, `-=`, `*=`, `/=`, `%=` | ✅ |
-| `kiem_tra_boolean.vi` | `đúng`/`sai` boolean literals | ✅ |
-| `kiem_tra_de_quy.vi` | Đệ quy: Fibonacci, giai thừa | ✅ |
-| `kiem_tra_ngoai_le.vi` | `thử`/`bắt lỗi`/`ném` | ✅ |
-| `kiem_tra_so_thuc.vi` | Số thực (float/double) | ✅ |
-| `kiem_tra_rong_va_map.vi` | Kiểu `rỗng` và literal map | ✅ |
-| `kiem_tra_lambda_hof_mac_dinh.vi` | Lambda + higher-order + tham số mặc định | ✅ |
-| `kiem_tra_namespace_module.vi` | Namespace alias khi import module | ✅ |
-| `kiem_tra_package_modules.vi` | Import trực tiếp toàn bộ entrypoint package tiếng Việt | ✅ |
-| `kiem_tra_package_tieng_viet.vi` | Import bare/quoted package tiếng Việt, kể cả qua `VPP_HOME` ngoài repo | ✅ |
-| `kiem_tra_stdlib.vi` | Import và dùng stdlib tiếng Việt | ✅ |
-| `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | ✅ |
-| `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | ✅ |
-| `kiem_tra_stdlib_http_post_put.vi` | Native API: HTTP POST/PUT thành công | ✅ |
-| `http_fixture.vi` | HTTP fixture nội bộ viết bằng V++ cho test GET/POST/PUT/DELETE và body request | ✅ |
-| `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | ✅ |
-| `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | ✅ |
-| `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | ✅ |
-| `compiler_support_tests.cpp` — StringPool | Thêm/lấy/xóa, dedupe, invalid index | ✅ |
-| `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | ✅ |
-| `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | ✅ — smoke, chưa bao phủ mọi opcode |
-| `pipeline_tests.cpp` | Parser báo unmatched `]`/unclosed `[` bằng `VPP-SYN-035` và span nguồn | ✅ |
-| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | ✅ — 61 file, compile-only; bắt buộc 61/61 dùng `DirectIr`; production không có test API |
-| `recursive_ir_tests.cpp` | Expression/default parameter/body/block lowering đệ quy và reachable fallback count | ✅ |
-| `direct_codegen_tests.cpp` | Direct IR emitter cho literal/operator/assignment/print/map và bridge selection | ✅ |
+| `kiem_tra_so_nguyen.vi` | Số nguyên và phép tính | |
+| `kiem_tra_so_chan_1-20.vi` | Lọc số chẵn 1–20 | |
+| `kiem_tra_so_le_chia_het_cho_5.vi` | Số lẻ chia hết cho 5 | |
+| `kiem_tra_so_chia_het_cho_3_va_4.vi` | Chia hết 3 và 4 | |
+| `kiem_tra_dieu_kien_phu_dinh.vi` | Điều kiện phủ định | |
+| `kiem_tra_dieu_kien_long_nhieu_cap.vi` | Điều kiện lồng nhau | |
+| `kiem_tra_noi_chuoi.vi` | Nối chuỗi | |
+| `kiem_tra_mang_3_chieu.vi` | Vòng lặp lồng ba chiều (không phải runtime array) | |
+| `kiem_tra_chon_ca.vi` | Switch/case | |
+| `kiem_tra_ham_tham_so.vi` | Hàm có tham số | |
+| `kiem_tra_ham_4_tham_so.vi` | Hàm 4 tham số | |
+| `kiem_tra_tra_ve.vi` | `trả về` có/không có giá trị | |
+| `import_main.vi` | Import module | |
+| `program.vi` | Chương trình tổng hợp | |
+| `kiem_tra_bo_qua.vi` | `bỏ qua` (continue) | |
+| `kiem_tra_toan_tu_moi.vi` | `--`, `+=`, `-=`, `*=`, `/=`, `%=` | |
+| `kiem_tra_boolean.vi` | `đúng`/`sai` boolean literals | |
+| `kiem_tra_de_quy.vi` | Đệ quy: Fibonacci, giai thừa | |
+| `kiem_tra_ngoai_le.vi` | `thử`/`bắt lỗi`/`ném` | |
+| `kiem_tra_so_thuc.vi` | Số thực (float/double) | |
+| `kiem_tra_rong_va_map.vi` | Kiểu `rỗng` và literal map | |
+| `kiem_tra_lambda_hof_mac_dinh.vi` | Lambda + higher-order + tham số mặc định | |
+| `kiem_tra_namespace_module.vi` | Namespace alias khi import module | |
+| `kiem_tra_package_modules.vi` | Import trực tiếp toàn bộ entrypoint package tiếng Việt | |
+| `kiem_tra_package_tieng_viet.vi` | Import bare/quoted package tiếng Việt, kể cả qua `VPP_HOME` ngoài repo | |
+| `kiem_tra_stdlib.vi` | Import và dùng stdlib tiếng Việt | |
+| `kiem_tra_stdlib_starter.vi` | Import starter facade và dùng API cốt lõi | |
+| `kiem_tra_stdlib_http.vi` | Native API: HTTP call thành công | |
+| `kiem_tra_stdlib_http_post_put.vi` | Native API: HTTP POST/PUT thành công | |
+| `http_fixture.vi` | HTTP fixture nội bộ viết bằng V++ cho test GET/POST/PUT/DELETE và body request | |
+| `kiem_tra_stdlib_tinh_toan.vi` | Bộ hàm tính toán stdlib đầy đủ | |
+| `kiem_tra_stdlib_io_config_time.vi` | Native API: file/config/time | |
+| `kiem_tra_tong_hop_khong_xung_dot.vi` | Test tích hợp nhiều tính năng trong cùng chương trình | |
+| `compiler_support_tests.cpp` — StringPool | Thêm/lấy/xóa, dedupe, invalid index | |
+| `compiler_support_tests.cpp` — symbolTable / hamMap | ID ổn định, caller-map độc lập, reset allocator | |
+| `vm_opcode_smoke_tests.cpp` | Số học, modulo, so sánh và chuỗi ở VM | — smoke, chưa bao phủ mọi opcode |
+| `pipeline_tests.cpp` | Parser báo unmatched `]`/unclosed `[` bằng `VPP-SYN-035` và span nguồn | |
+| `pipeline_legacy_parity_tests.cpp` | So fingerprint bytecode + StringPool + function maps của pipeline với baseline legacy đóng băng cho toàn bộ `src/tests/**/*.vi` | — 61 file, compile-only; bắt buộc 61/61 dùng `DirectIr`; production không có test API |
+| `recursive_ir_tests.cpp` | Expression/default parameter/body/block lowering đệ quy và reachable fallback count | |
+| `direct_codegen_tests.cpp` | Direct IR emitter cho literal/operator/assignment/print/map và bridge selection | |
 
 **Regression suite: 54 checks trong `run_tests.sh`; full run cần cổng fixture `18080` khả dụng.**
 
 ---
 
-## 11. 🛠️ Công Cụ & Hạ Tầng (Tooling)
+## 11. Công Cụ & Hạ Tầng (Tooling)
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| CLI (`vietvm-cli`) | ✅ |
-| Build với CMake | ✅ |
-| Script chạy test (`run_tests.sh`) | ✅ |
-| Không có duplicate library warnings | ✅ |
-| `.gitignore` cho build artefacts | ✅ |
-| CI/CD (GitHub Actions) | ✅ |
-| CTest integration target | ✅ |
-| AddressSanitizer / UndefinedBehaviorSanitizer trên CI | ✅ |
-| `clang-tidy` quality gate | ✅ |
-| Coverage gate | ✅ — minimum hiện tại 45% |
-| Benchmark baseline | ✅ — VM dispatch, lexer, compiler pipeline, native HTTP helpers |
-| Disassembler (xem bytecode) | ✅ |
-| REPL (interactive shell) | ✅ |
-| Language Server Protocol (LSP) | 🚧 — MVP |
-| Syntax highlighting (VSCode/Vim) | ✅ |
-| Formatter / linter | ✅ |
-| Package manager (`vpp-cli install`, `vpp-cli cai`) | 🚧 — MVP, chưa có dependency/version resolver |
-| Mẫu backend/API server | ✅ — `examples/api_project` và `vpp khởi tạo backend <tên>` từ `templates/backend` |
+| CLI (`vietvm-cli`) | |
+| Build với CMake | |
+| Script chạy test (`run_tests.sh`) | |
+| Không có duplicate library warnings | |
+| `.gitignore` cho build artefacts | |
+| CI/CD (GitHub Actions) | |
+| CTest integration target | |
+| AddressSanitizer / UndefinedBehaviorSanitizer trên CI | |
+| `clang-tidy` quality gate | |
+| Coverage gate | — minimum hiện tại 45% |
+| Benchmark baseline | — VM dispatch, lexer, compiler pipeline, native HTTP helpers |
+| Disassembler (xem bytecode) | |
+| REPL (interactive shell) | |
+| Language Server Protocol (LSP) | — MVP |
+| Syntax highlighting (VSCode/Vim) | |
+| Formatter / linter | |
+| Package manager (`vpp-cli install`, `vpp-cli cai`) | — MVP, chưa có dependency/version resolver |
+| Mẫu backend/API server | — `examples/api_project` và `vpp khởi tạo backend <tên>` từ `templates/backend` |
 
 ### 11.1 Thư Viện & Phụ Thuộc Mã Nguồn
 #### Đang sử dụng (đầy đủ theo quét include/CMake)
 | Thành phần | Loại | Vai trò trong source code | Trạng thái |
 |-----------|------|----------------------------|-----------|
-| C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | ✅ |
-| C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | ✅ |
-| `curl` (binary hệ thống, gọi qua process/shell tuỳ nền tảng) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put/delete(...)` của stdlib native | ✅ *(tuỳ chọn; cần cài trên máy chạy)* |
-| CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vpp-compiler`, `vpp-runtime`, `vpp-tooling`, `vpp-cli`) | ✅ |
+| C++ Standard Library: `algorithm`, `cctype`, `cmath`, `cstddef`, `cstdint`, `filesystem`, `fstream`, `functional`, `iomanip`, `iostream`, `map`, `optional`, `ostream`, `regex`, `sstream`, `stack`, `stdexcept`, `string`, `unordered_map`, `unordered_set`, `utility`, `variant`, `vector` | Thư viện chuẩn C++17 | Nền tảng chính cho lexer, compiler, VM, CLI, package manager, LSP parser mini | |
+| C/C++ runtime headers: `cstdio`, `cstdlib`, `ctime` | Thư viện chuẩn runtime | Hỗ trợ thao tác tiến trình/phụ trợ runtime (`popen`, thời gian hệ thống,...) | |
+| `curl` (binary hệ thống, gọi qua process/shell tuỳ nền tảng) | Phụ thuộc runtime tuỳ chọn | Dùng trong `mang_http_get/post/put/delete(...)` của stdlib native | *(tuỳ chọn; cần cài trên máy chạy)* |
+| CMake >= 3.15 | Build system | Cấu hình module, compile/link (`vpp-core`, `vpp-bytecode`, `vpp-frontend`, `vpp-compiler`, `vpp-runtime`, `vpp-tooling`, `vpp-cli`) | |
 
 #### Không sử dụng (không phát hiện trong include/CMake hiện tại)
 | Thành phần | Trạng thái |
 |-----------|-----------|
-| `find_package(...)` cho phụ thuộc bên thứ ba trong `CMakeLists.txt` | ✅ Không sử dụng |
-| `Boost` | ✅ Không sử dụng |
-| `OpenSSL` | ✅ Không sử dụng |
-| `libcurl` (link trực tiếp qua CMake) | ✅ Không sử dụng *(chỉ gọi binary `curl` runtime)* |
-| `fmt`, `spdlog` | ✅ Không sử dụng |
-| `nlohmann/json`, `yaml-cpp` | ✅ Không sử dụng |
-| `gRPC`, `protobuf` | ✅ Không sử dụng |
-| `SQLite` C++ library | ✅ Không link trực tiếp; database adapter dùng `sqlite3` CLI runtime khi được cấu hình |
-| `Qt`/`wxWidgets` | ✅ Không sử dụng |
-| `gtest`/`catch2` qua CMake | ✅ Không sử dụng |
+| `find_package(...)` cho phụ thuộc bên thứ ba trong `CMakeLists.txt` | Không sử dụng |
+| `Boost` | Không sử dụng |
+| `OpenSSL` | Không sử dụng |
+| `libcurl` (link trực tiếp qua CMake) | Không sử dụng *(chỉ gọi binary `curl` runtime)* |
+| `fmt`, `spdlog` | Không sử dụng |
+| `nlohmann/json`, `yaml-cpp` | Không sử dụng |
+| `gRPC`, `protobuf` | Không sử dụng |
+| `SQLite` C++ library | Không link trực tiếp; database adapter dùng `sqlite3` CLI runtime khi được cấu hình |
+| `Qt`/`wxWidgets` | Không sử dụng |
+| `gtest`/`catch2` qua CMake | Không sử dụng |
 
 ### 11.2 Thư Viện Hỗ Trợ Ngôn Ngữ V++ (Theo Module Chức Năng)
 | Thư viện/Module | Trạng thái | Ghi chú |
 |-----------------|-----------|--------|
-| I/O tệp & luồng | ✅ | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
-| Hệ thống tệp (filesystem) | ✅ | Có API V++ nối/tách/kiểm tra path, tạo/liệt kê/xóa thư mục trên `std::filesystem` |
-| Mạng TCP/UDP | ⬜ | Có TCP nội bộ cho HTTP server; chưa có API TCP/UDP tổng quát cho V++ |
-| HTTP client | ✅ | Có `mang_http_get/post/put/delete(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
-| Đa luồng/đồng thời | ⬜ | Chưa có thread API trong V++ |
-| Collections (list/map/set/tuple) | ✅ | Có literal/index, mutation và helper collection được regression test |
-| Xử lý chuỗi | 🚧 | Length/reverse theo code point UTF-8; upper/lower/title vẫn ASCII-only |
-| Toán học | ✅ | Có nhóm hàm stdlib tính toán |
-| Chuyển kiểu & random | ✅ | Có `thành chuỗi/số nguyên/số thực`, `loại của`, `ngẫu nhiên nguyên` |
-| Ngày giờ | 🚧 | Có thời gian hiện tại và sleep mili giây; chưa có duration/parse/format timezone |
-| Serialization JSON/XML/YAML | 🚧 | JSON đã parse/serialize nested map/list/scalar; XML/YAML chưa có |
-| Logging chuẩn | ✅ | Có module `gói/nhập xuất/nhật ký.vi` cơ bản |
-| Cấu hình (config) | ✅ | Có `doc_config(path)` |
-| Xử lý lỗi/ngoại lệ | ✅ | Có `thử` / `bắt lỗi` / `ném lỗi` |
-| Testing framework nội bộ ngôn ngữ | 🚧 | Có `run_tests.sh` và `kiểm thử` với assertion cơ bản; chưa có discovery/runner API trong V++ |
-| Reflection/Metadata | ⬜ | Chưa có introspection runtime |
-| FFI (gọi mã ngoài) | ⬜ | Chưa có cơ chế FFI chính thức |
-| Quản lý gói & phiên bản | 🚧 | Có CLI MVP; chưa có dependency/version resolver |
-| Bảo mật/Crypto | ⬜ | Chưa có module mã hóa/hash chuẩn |
-| Sandboxing/Permission | ⬜ | Chưa có hệ quyền/sandbox runtime |
-| i18n/l10n | ⬜ | Chưa có module locale/translation |
-| Diagnostics/Profiling | 🚧 | Có `vpp bác sĩ`, chưa có profiler chuyên sâu |
-| GUI/Đồ họa | ⬜ | Chưa có gói GUI chuẩn |
-| OS bindings nâng cao | 🚧 | Có env/platform/path/directory/sleep; chưa có process API và syscall nâng cao |
+| I/O tệp & luồng | | Có `io_doc_file`, `io_ghi_file`, đọc/ghi file cơ bản |
+| Hệ thống tệp (filesystem) | | Có API V++ nối/tách/kiểm tra path, tạo/liệt kê/xóa thư mục trên `std::filesystem` |
+| Mạng TCP/UDP | | Có TCP nội bộ cho HTTP server; chưa có API TCP/UDP tổng quát cho V++ |
+| HTTP client | | Có `mang_http_get/post/put/delete(...)` qua `curl` shell; test dùng fixture nội bộ viết bằng `.vi`; chưa link `libcurl` trực tiếp |
+| Đa luồng/đồng thời | | Chưa có thread API trong V++ |
+| Collections (list/map/set/tuple) | | Có literal/index, mutation và helper collection được regression test |
+| Xử lý chuỗi | | Length/reverse theo code point UTF-8; upper/lower/title vẫn ASCII-only |
+| Toán học | | Có nhóm hàm stdlib tính toán |
+| Chuyển kiểu & random | | Có `thành chuỗi/số nguyên/số thực`, `loại của`, `ngẫu nhiên nguyên` |
+| Ngày giờ | | Có thời gian hiện tại và sleep mili giây; chưa có duration/parse/format timezone |
+| Serialization JSON/XML/YAML | | JSON đã parse/serialize nested map/list/scalar; XML/YAML chưa có |
+| Logging chuẩn | | Có module `gói/nhập xuất/nhật ký.vi` cơ bản |
+| Cấu hình (config) | | Có `doc_config(path)` |
+| Xử lý lỗi/ngoại lệ | | Có `thử` / `bắt lỗi` / `ném lỗi` |
+| Testing framework nội bộ ngôn ngữ | | Có `run_tests.sh` và `kiểm thử` với assertion cơ bản; chưa có discovery/runner API trong V++ |
+| Reflection/Metadata | | Chưa có introspection runtime |
+| FFI (gọi mã ngoài) | | Chưa có cơ chế FFI chính thức |
+| Quản lý gói & phiên bản | | Có CLI MVP; chưa có dependency/version resolver |
+| Bảo mật/Crypto | | Chưa có module mã hóa/hash chuẩn |
+| Sandboxing/Permission | | Chưa có hệ quyền/sandbox runtime |
+| i18n/l10n | | Chưa có module locale/translation |
+| Diagnostics/Profiling | | Có `vpp bác sĩ`, chưa có profiler chuyên sâu |
+| GUI/Đồ họa | | Chưa có gói GUI chuẩn |
+| OS bindings nâng cao | | Có env/platform/path/directory/sleep; chưa có process API và syscall nâng cao |
 
 ---
 
-## 12. 📚 Tài Liệu (Documentation)
+## 12. Tài Liệu (Documentation)
 
 | Tài liệu | Trạng thái |
 |---------|-----------|
-| `README.md` — Giới thiệu & build guide | ✅ |
-| `README-updates.md` — Trạng thái repo & roadmap | ✅ |
-| `docs/architecture.md` — Kiến trúc | ✅ |
-| `docs/bytecode.md` — Mô tả bytecode | ✅ |
-| `docs/grammar.bnf` — Ngữ pháp BNF | ✅ |
-| `docs/language-comparison.md` — So sánh với ngôn ngữ khác | ✅ |
-| `CHECKLIST.md` — File này | ✅ |
-| `CONTRIBUTING.md` — Hướng dẫn đóng góp | ✅ |
-| Tutorial / ví dụ HTTP tối giản | ✅ — `examples/api_project` |
-| API reference cho embedding | ⬜ |
+| `README.md` — Giới thiệu & build guide | |
+| `README-updates.md` — Trạng thái repo & roadmap | |
+| `docs/architecture.md` — Kiến trúc | |
+| `docs/bytecode.md` — Mô tả bytecode | |
+| `docs/grammar.bnf` — Ngữ pháp BNF | |
+| `docs/language-comparison.md` — So sánh với ngôn ngữ khác | |
+| `CHECKLIST.md` — File này | |
+| `CONTRIBUTING.md` — Hướng dẫn đóng góp | |
+| Tutorial / ví dụ HTTP tối giản | — `examples/api_project` |
+| API reference cho embedding | |
 
 ---
 
-## 13. 🚀 Lộ Trình Phát Triển (Roadmap)
+## 13. Lộ Trình Phát Triển (Roadmap)
 
 ### Ngắn hạn (1–2 tuần) — **Đã hoàn thành phần lớn**
 - [x] Thêm `bỏ qua` (continue) trong vòng lặp
@@ -411,7 +411,7 @@
 
 ---
 
-## 14. 🧭 Đánh Giá Kiến Trúc & Hướng Phát Triển
+## 14. Đánh Giá Kiến Trúc & Hướng Phát Triển
 
 Phần này phân biệt rõ **mức hoàn thành checklist nội bộ** với mức trưởng thành
 của một platform như Java, C# hoặc Python. Nó được đối chiếu với source hiện
@@ -421,23 +421,23 @@ có; không tính các mục chỉ nằm trên roadmap.
 
 | Thành phần | V++ hiện tại | Java | C# | Python |
 |---|---|---|---|---|
-| Lexer / parser | ✅ Token mang span, parser cấu trúc | ✅ Trưởng thành | ✅ Trưởng thành | ✅ Trưởng thành |
-| AST chuẩn | ✅ Statement tree + expression arena mang span; lambda body cấu trúc | ✅ | ✅ | ✅ |
-| Name resolution / semantic analysis | 🚧 Scope tree/ExprId binding/class visibility đã có; module export/cross-module semantic còn mở | ✅ | ✅ | ✅ |
-| Static typing | ⬜ Chưa quyết định mô hình kiểu | ✅ Mạnh | ✅ Mạnh | 🟡 Dynamic + type hints |
-| Bytecode / VM | ✅ Stack bytecode và V++ VM | ✅ JVM | ✅ CLR | ✅ CPython VM |
-| GC / JIT | 🚧 MVP, chưa production-grade | ✅ Mature | ✅ Mature | ✅/🟡 Tuỳ runtime |
-| Exception / function / lambda-HOF | ✅ | ✅ | ✅ | ✅ |
-| Array / map | 🚧 Map scalar; chưa có array/index API ổn định | ✅ | ✅ | ✅ |
-| Module / import | ✅ | ✅ | ✅ | ✅ |
-| Class / object / inheritance | 🚧 Class-method và modifier; chưa có instance/inheritance | ✅ | ✅ | ✅ |
-| Generics / reflection | ⬜ (reflection hiện không là mục tiêu mặc định) | ✅ | ✅ | ✅ |
-| Concurrency / async / FFI | ⬜ | ✅ | ✅ | ✅ |
-| Standard library | 🚧 Nhỏ, theo module | ✅ Rất lớn | ✅ Rất lớn | ✅ Rất lớn |
-| HTTP / package / REPL | ✅ HTTP cơ bản, package MVP, REPL | ✅ | ✅ | ✅ |
-| LSP / debugger / profiler | 🚧 LSP MVP; chưa có debugger/profiler | ✅ | ✅ | ✅ |
-| Cross-platform | 🚧 Unix + Windows CI; còn phụ thuộc binary host | ✅ | ✅ | ✅ |
-| Production maturity | ⬜ Experimental | ✅✅✅ | ✅✅✅ | ✅✅✅ |
+| Lexer / parser | Token mang span, parser cấu trúc | Trưởng thành | Trưởng thành | Trưởng thành |
+| AST chuẩn | Statement tree + expression arena mang span; lambda body cấu trúc | | | |
+| Name resolution / semantic analysis | Scope tree/ExprId binding/class visibility đã có; module export/cross-module semantic còn mở | | | |
+| Static typing | Chưa quyết định mô hình kiểu | Mạnh | Mạnh | Một phần Dynamic + type hints |
+| Bytecode / VM | Stack bytecode và V++ VM | JVM | CLR | CPython VM |
+| GC / JIT | MVP, chưa production-grade | Mature | Mature | Hoàn thành/Một phần Tuỳ runtime |
+| Exception / function / lambda-HOF | | | | |
+| Array / map | Map scalar; chưa có array/index API ổn định | | | |
+| Module / import | | | | |
+| Class / object / inheritance | Class-method và modifier; chưa có instance/inheritance | | | |
+| Generics / reflection | (reflection hiện không là mục tiêu mặc định) | | | |
+| Concurrency / async / FFI | | | | |
+| Standard library | Nhỏ, theo module | Rất lớn | Rất lớn | Rất lớn |
+| HTTP / package / REPL | HTTP cơ bản, package MVP, REPL | | | |
+| LSP / debugger / profiler | LSP MVP; chưa có debugger/profiler | | | |
+| Cross-platform | Unix + Windows CI; còn phụ thuộc binary host | | | |
+| Production maturity | Experimental | Hoàn thànhHoàn thành| Hoàn thànhHoàn thành| Hoàn thànhHoàn thành|
 
 ### 14.2 Snapshot tiến độ hiện tại
 
@@ -553,7 +553,7 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 
 ---
 
-## 📊 Tổng Kết
+## Tổng Kết
 
 | Thước đo | Ý nghĩa |
 |---------|---------|
@@ -562,4 +562,4 @@ driver DB, crypto, logging, config, debugger, profiler, security và monitoring
 | Backlog thực thi | Các checkbox ở §13 và §14.6 là nguồn trạng thái hiện hành. |
 
 > Không diễn giải phần trăm roadmap nội bộ như mức tương đương với Java, C# hoặc
-> Python. Mỗi hạng mục `🚧`/`⬜` phía trên có phạm vi và điều kiện chấp nhận riêng.
+> Python. Mỗi hạng mục `Đang làm`/`Chưa làm` phía trên có phạm vi và điều kiện chấp nhận riêng.

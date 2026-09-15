@@ -333,6 +333,9 @@ PackageDependencySpec dependencyFromJson(const JsonValue &value) {
     dependency.sourceKind = parsePackageSourceKind(
         optionalString(value, "source", "registry"));
     dependency.location = optionalString(value, "location", "");
+    if (dependency.sourceKind == PackageSourceKind::Git) {
+        dependency.reference = optionalString(value, "ref", "HEAD");
+    }
     return dependency;
 }
 
@@ -347,6 +350,7 @@ PackageLockEntry lockEntryFromJson(const JsonValue &value) {
     entry.location = optionalString(value, "location", "");
     entry.resolvedPath = requireString(value, "resolved");
     entry.fingerprint = requireString(value, "fingerprint");
+    entry.revision = optionalString(value, "revision", "");
     if (!isValidPackageName(entry.name)) {
         throw std::runtime_error("vpp.lock: package name không hợp lệ: " + entry.name);
     }
@@ -360,6 +364,10 @@ PackageLockEntry lockEntryFromJson(const JsonValue &value) {
         throw std::runtime_error(
             "vpp.lock: package '" + entry.name +
             "' thiếu resolved/fingerprint");
+    }
+    if (entry.sourceKind == PackageSourceKind::Git && entry.revision.empty()) {
+        throw std::runtime_error(
+            "vpp.lock: Git package '" + entry.name + "' thiếu exact revision");
     }
     return entry;
 }
@@ -449,6 +457,12 @@ void validateProjectManifest(const ProjectManifest &manifest) {
                 "vpp.json: dependency '" + dependency.name +
                 "' cần location cho source " +
                 packageSourceKindName(dependency.sourceKind));
+        }
+        if (dependency.sourceKind == PackageSourceKind::Git &&
+            dependency.reference.empty()) {
+            throw std::runtime_error(
+                "vpp.json: Git dependency '" + dependency.name +
+                "' cần ref (dùng HEAD nếu muốn theo default branch)");
         }
         names.push_back(dependency.name);
     }
@@ -546,7 +560,12 @@ void writeProjectManifest(const std::filesystem::path &path,
                << "\", \"source\": \""
                << packageSourceKindName(dependency.sourceKind)
                << "\", \"location\": \"" << jsonEscape(dependency.location)
-               << "\"}";
+               << "\"";
+        if (dependency.sourceKind == PackageSourceKind::Git) {
+            output << ", \"ref\": \"" << jsonEscape(dependency.reference)
+                   << "\"";
+        }
+        output << "}";
         if (index + 1 != dependencies.size()) output << ',';
         output << '\n';
     }
@@ -634,6 +653,12 @@ void writePackageLockfile(const std::filesystem::path &path,
                 "vpp.lock: package '" + packages[index].name +
                 "' thiếu resolved/fingerprint");
         }
+        if (packages[index].sourceKind == PackageSourceKind::Git &&
+            packages[index].revision.empty()) {
+            throw std::runtime_error(
+                "vpp.lock: Git package '" + packages[index].name +
+                "' thiếu exact revision");
+        }
     }
 
     std::ofstream output(path);
@@ -648,7 +673,12 @@ void writePackageLockfile(const std::filesystem::path &path,
                << "\", \"version\": \"" << jsonEscape(entry.version)
                << "\", \"source\": \"" << packageSourceKindName(entry.sourceKind)
                << "\", \"location\": \"" << jsonEscape(entry.location)
-               << "\", \"resolved\": \"" << jsonEscape(entry.resolvedPath)
+               << "\"";
+        if (entry.sourceKind == PackageSourceKind::Git) {
+            output << ", \"revision\": \"" << jsonEscape(entry.revision)
+                   << "\"";
+        }
+        output << ", \"resolved\": \"" << jsonEscape(entry.resolvedPath)
                << "\", \"fingerprint\": \"" << jsonEscape(entry.fingerprint)
                << "\"}";
         if (index + 1 != packages.size()) output << ',';

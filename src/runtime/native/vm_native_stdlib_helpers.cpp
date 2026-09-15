@@ -2,7 +2,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <ctime>
 #include <filesystem>
+#include <limits>
 #include <random>
 #include <string>
 #include <system_error>
@@ -11,21 +15,43 @@
 
 #include "common/vm_native_constants.h"
 #include "common/vm_native_helpers.h"
+#include "vpp/core/message_constants.h"
+#include "vpp/core/text.h"
 
 namespace vietvm::helpers {
+
+// Chuyển chuỗi UTF-8 thành `std::filesystem::path` ngay tại native boundary.
+// Runtime chỉ nhận đường dẫn UTF-8 hợp lệ để Windows/Unix không diễn giải cùng
+// một chuỗi đầu vào theo hai cách khác nhau.
+bool nativeUtf8Path(const StackValue &value,
+                    const std::string &operation,
+                    std::filesystem::path &path,
+                    std::string &err) {
+    const std::string text = argToRawString(value);
+    if (!vietvm::core::isValidUtf8(text)) {
+        err = operation + ": đường dẫn UTF-8 không hợp lệ";
+        return false;
+    }
+    path = std::filesystem::u8path(text);
+    return true;
+}
 
 namespace {
 
 namespace fs = std::filesystem;
 
-// Chuyển chuỗi UTF-8 thành `std::filesystem::path` theo quy tắc của nền tảng để đường dẫn Unicode hoạt động nhất quán.
-fs::path utf8Path(const StackValue &value) {
-    return fs::u8path(argToRawString(value));
-}
-
-// Chuyển `std::filesystem::path` thành chuỗi UTF-8 để runtime/API trả đường dẫn nhất quán giữa Windows và Unix.
-std::string pathToUtf8(const fs::path &path) {
-    return path.generic_u8string();
+// Chuyển path hệ điều hành về UTF-8 với separator `/`. Trên POSIX tên file có
+// thể chứa byte không phải UTF-8; không để dữ liệu đó lọt ngược vào string V++.
+bool pathToUtf8(const fs::path &path,
+                const std::string &operation,
+                std::string &text,
+                std::string &err) {
+    text = path.generic_u8string();
+    if (!vietvm::core::isValidUtf8(text)) {
+        err = operation + ": hệ thống tệp trả về đường dẫn không phải UTF-8";
+        return false;
+    }
+    return true;
 }
 
 // Chuyển `std::error_code` filesystem thành lỗi runtime có ngữ cảnh; hàm ghép thao tác, đường dẫn và thông điệp hệ điều hành.
@@ -50,7 +76,13 @@ bool toStrictInt(const StackValue &value, int &out) {
         return true;
     }
     if (std::holds_alternative<double>(value)) {
-        out = static_cast<int>(std::get<double>(value));
+        const double number = std::get<double>(value);
+        if (!std::isfinite(number) || std::trunc(number) != number ||
+            number < static_cast<double>(std::numeric_limits<int>::min()) ||
+            number > static_cast<double>(std::numeric_limits<int>::max())) {
+            return false;
+        }
+        out = static_cast<int>(number);
         return true;
     }
     if (!std::holds_alternative<std::string>(value)) return false;
@@ -64,6 +96,24 @@ bool toStrictInt(const StackValue &value, int &out) {
     } catch (...) {
         return false;
     }
+}
+
+// Tên biến môi trường đi qua native boundary phải có cùng contract trên mọi nền tảng.
+// `getenv`/`_dupenv_s` không thống nhất cách xử lý tên rỗng, dấu `=` hoặc NUL nhúng,
+// vì vậy V++ từ chối các trường hợp đó trước khi gọi CRT/POSIX.
+bool validateEnvironmentVariableName(const std::string &name,
+                                     const std::string &operation,
+                                     std::string &err) {
+    if (name.empty() || name.find('=') != std::string::npos ||
+        name.find('\0') != std::string::npos) {
+        err = operation + ": tên biến môi trường không hợp lệ";
+        return false;
+    }
+    if (!vietvm::core::isValidUtf8(name)) {
+        err = operation + ": tên biến môi trường phải là UTF-8 hợp lệ";
+        return false;
+    }
+    return true;
 }
 
 // Chuyển nghiêm ngặt double; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
@@ -115,6 +165,87 @@ std::string platformName() {
 #else
     return "không rõ";
 #endif
+}
+
+bool localTime(std::time_t value, std::tm &out) {
+#if defined(_WIN32)
+    return localtime_s(&out, &value) == 0;
+#else
+    return localtime_r(&value, &out) != nullptr;
+#endif
+}
+
+bool utcTime(std::time_t value, std::tm &out) {
+#if defined(_WIN32)
+    return gmtime_s(&out, &value) == 0;
+#else
+    return gmtime_r(&value, &out) != nullptr;
+#endif
+}
+
+bool timezoneOffsetMinutes(std::time_t now,
+                           const std::tm &local,
+                           const std::tm &utc,
+                           int &minutes) {
+#if defined(_WIN32)
+    std::tm localCopy = local;
+    const __time64_t localAsUtc = _mkgmtime64(&localCopy);
+    if (localAsUtc == -1) return false;
+    minutes = static_cast<int>((localAsUtc - static_cast<__time64_t>(now)) / 60);
+    return true;
+#elif defined(__APPLE__) || defined(__linux__)
+    (void)now;
+    (void)utc;
+    minutes = static_cast<int>(local.tm_gmtoff / 60);
+    return true;
+#else
+    std::tm localCopy = local;
+    std::tm utcCopy = utc;
+    utcCopy.tm_isdst = -1;
+    const std::time_t localEpoch = std::mktime(&localCopy);
+    const std::time_t utcAsLocalEpoch = std::mktime(&utcCopy);
+    if (localEpoch == static_cast<std::time_t>(-1) ||
+        utcAsLocalEpoch == static_cast<std::time_t>(-1)) {
+        return false;
+    }
+    minutes = static_cast<int>(std::difftime(localEpoch, utcAsLocalEpoch) / 60.0);
+    return true;
+#endif
+}
+
+bool formatUtcIso8601(std::time_t now, std::string &out) {
+    std::tm utc{};
+    if (!utcTime(now, utc)) return false;
+    char buffer[32] = {0};
+    if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &utc) == 0) {
+        return false;
+    }
+    out = buffer;
+    return true;
+}
+
+bool formatLocalIso8601(std::time_t now, std::string &out, int &offsetMinutes) {
+    std::tm local{};
+    std::tm utc{};
+    if (!localTime(now, local) || !utcTime(now, utc) ||
+        !timezoneOffsetMinutes(now, local, utc, offsetMinutes)) {
+        return false;
+    }
+
+    char dateTime[32] = {0};
+    if (std::strftime(dateTime, sizeof(dateTime), "%Y-%m-%dT%H:%M:%S", &local) == 0) {
+        return false;
+    }
+
+    const char sign = offsetMinutes < 0 ? '-' : '+';
+    const int absoluteMinutes = offsetMinutes < 0 ? -offsetMinutes : offsetMinutes;
+    char offset[8] = {0};
+    if (std::snprintf(offset, sizeof(offset), "%c%02d:%02d", sign,
+                      absoluteMinutes / 60, absoluteMinutes % 60) <= 0) {
+        return false;
+    }
+    out = std::string(dateTime) + offset;
+    return true;
 }
 
 } // namespace
@@ -178,19 +309,33 @@ bool handleNativeFoundationFunction(const std::string &fn,
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathJoin)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        result = make_string_value(pathToUtf8(utf8Path(args[0]) / utf8Path(args[1])));
+        fs::path root;
+        fs::path child;
+        if (!nativeUtf8Path(args[0], fn, root, err) ||
+            !nativeUtf8Path(args[1], fn, child, err)) return true;
+        std::string joined;
+        if (!pathToUtf8(root / child, fn, joined, err)) return true;
+        result = make_string_value(joined);
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathName)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_string_value(pathToUtf8(utf8Path(args[0]).filename()));
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::string name;
+        if (!pathToUtf8(path.filename(), fn, name, err)) return true;
+        result = make_string_value(name);
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathParent)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_string_value(pathToUtf8(utf8Path(args[0]).parent_path()));
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::string parent;
+        if (!pathToUtf8(path.parent_path(), fn, parent, err)) return true;
+        result = make_string_value(parent);
         return true;
     }
 
@@ -200,7 +345,8 @@ bool handleNativeFoundationFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
         bool value = false;
-        const fs::path path = utf8Path(args[0]);
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
         if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathExists)) {
             value = fs::exists(path, ec);
         } else if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathIsFile)) {
@@ -224,7 +370,8 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnCreateDirectory)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
-        const fs::path path = utf8Path(args[0]);
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
         fs::create_directories(path, ec);
         if (filesystemError(ec, fn, err)) return true;
         result = make_int_value(fs::is_directory(path, ec) ? 1 : 0);
@@ -235,12 +382,15 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListDirectory)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
-        const fs::path path = utf8Path(args[0]);
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
         std::vector<std::string> names;
         fs::directory_iterator iterator(path, ec);
         if (filesystemError(ec, fn, err)) return true;
         for (const auto &entry : iterator) {
-            names.push_back(pathToUtf8(entry.path().filename()));
+            std::string name;
+            if (!pathToUtf8(entry.path().filename(), fn, name, err)) return true;
+            names.push_back(std::move(name));
         }
         std::sort(names.begin(), names.end());
         std::vector<StackValue> values;
@@ -253,7 +403,9 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnRemovePath)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
-        const auto removed = fs::remove_all(utf8Path(args[0]), ec);
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
+        const auto removed = fs::remove_all(path, ec);
         if (filesystemError(ec, fn, err)) return true;
         result = make_int_value(static_cast<int>(removed));
         return true;
@@ -262,6 +414,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnEnvGet)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         const std::string name = argToRawString(args[0]);
+        if (!validateEnvironmentVariableName(name, fn, err)) return true;
         const auto value = getEnvVar(name.c_str());
         result = make_string_value(value.has_value() ? *value : argToRawString(args[1]));
         return true;
@@ -270,6 +423,49 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPlatformName)) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
         result = make_string_value(platformName());
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNow)) {
+        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
+        const std::time_t now = std::time(nullptr);
+        int offsetMinutes = 0;
+        std::string formatted;
+        if (!formatLocalIso8601(now, formatted, offsetMinutes)) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeTimeFormatFailed, {fn});
+            return true;
+        }
+        result = make_string_value(formatted);
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNowUtc)) {
+        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
+        std::string formatted;
+        if (!formatUtcIso8601(std::time(nullptr), formatted)) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeTimeFormatFailed, {fn});
+            return true;
+        }
+        result = make_string_value(formatted);
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(
+            fn, vietvm::constants::kFnTimezoneOffsetMinutes)) {
+        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
+        const std::time_t now = std::time(nullptr);
+        std::tm local{};
+        std::tm utc{};
+        int offsetMinutes = 0;
+        if (!localTime(now, local) || !utcTime(now, utc) ||
+            !timezoneOffsetMinutes(now, local, utc, offsetMinutes)) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeTimeFormatFailed, {fn});
+            return true;
+        }
+        result = make_int_value(offsetMinutes);
         return true;
     }
 

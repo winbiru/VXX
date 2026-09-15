@@ -14,4 +14,8 @@ hàm main() {
     ghi thông tin("ok");
     ghi cảnh báo("warn");
     ghi lỗi("err");
+
+    in ghi thông tin("Tiếng Việt 𠀀") == 0;
+    in ghi cảnh báo(42) == 0;
+    in ghi lỗi(đúng) == 0;
 };

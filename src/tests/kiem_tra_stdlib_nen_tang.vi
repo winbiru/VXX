@@ -4,6 +4,19 @@ hàm main() {
     // Chuỗi UTF-8 phải tính/reverse theo code point, không theo byte.
     in độ dài("Việt Nam");
     in đảo ngược("Việt");
+    việt = "Việt";
+    unicode4 = "𠀀Việt";
+    in việt[2];
+    in unicode4[0];
+    in unicode4[3];
+    in độ dài("𠀀Việt");
+    in cắt chuỗi("𠀀Việt Nam", 1, 4);
+    in cắt chuỗi("𠀀Việt", 0, 2);
+    in cắt chuỗi("Việt", 2, 99);
+    in chuỗi thường("ĐẶNG THỊ HỒNG 𠀀中");
+    in chuỗi hoa("Việt Nam ươ 𠀀中");
+    in chuẩn hóa unicode("Việt Nam");
+    in chuẩn hóa unicode("Ắ Ớ");
 
     in thành số nguyên("42");
     in thành số thực("3.5");
@@ -12,7 +25,9 @@ hàm main() {
     in loại của(danh sách mẫu);
     in ngẫu nhiên nguyên(5, 5);
 
-    thư mục test = đường dẫn nối("src/tests/.tmp", "stdlib_nen_tang");
+    in đường dẫn nối("a", "b");
+    in đường dẫn cha("a/b/c.vi");
+    thư mục test = đường dẫn nối("src/tests/.tmp", "stdlib_nền_tảng_𠀀");
     xóa đường dẫn(thư mục test);
     in đường dẫn tên(thư mục test);
     in tạo thư mục(thư mục test);

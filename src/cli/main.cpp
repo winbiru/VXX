@@ -18,6 +18,7 @@
 #include "vpp/core/package_cache.h"
 #include "vpp/core/package_installer.h"
 #include "vpp/core/package_manifest.h"
+#include "vpp/core/package_source.h"
 #include "vpp/core/package_solver.h"
 #include "vpp/core/project_layout.h"
 #include "vpp/core/semver.h"
@@ -355,7 +356,16 @@ static std::string packageSourceVersion(const fs::path &sourcePath) {
 static vietvm::core::ResolvedPackageGraph resolveProjectPackages(
     const fs::path &root,
     const vietvm::core::ProjectManifest &manifest) {
-    return vietvm::core::resolvePackageDependencyGraph(manifest, root);
+    const fs::path sourceStateRoot =
+        root / vietvm::core::utf8Path(vietvm::core::kPackageStateDirectory) /
+        "sources";
+    return vietvm::core::resolvePackageDependencyGraph(
+        manifest, root,
+        [sourceStateRoot](const vietvm::core::PackageDependencySpec &dependency,
+                          const fs::path &declaringRoot) {
+            return vietvm::core::materializePackageSource(
+                dependency, declaringRoot, sourceStateRoot);
+        });
 }
 
 static void materializeResolvedPackages(
@@ -398,17 +408,46 @@ static int writeResolvedPackageLock(
             return EXIT_FAILURE;
         }
 
+        // A source can move without changing its package version (notably a Git
+        // branch/tag). Locking the newly resolved source identity together with
+        // stale vendored bytes would produce an impossible lock entry. Reuse the
+        // real installer staging/filtering path to verify that the installed
+        // artifact is exactly what the current resolved source materializes to.
+        const std::string installedFingerprint =
+            vietvm::core::fingerprintPackageTree(installed);
+        const fs::path verificationTarget =
+            root / vietvm::core::utf8Path(vietvm::core::kPackageStateDirectory) /
+            "lock-verify" / vietvm::core::utf8Path(dependency.name);
+        std::error_code cleanupError;
+        fs::remove_all(verificationTarget, cleanupError);
+        try {
+            (void)vietvm::core::materializePathPackage(
+                dependency.sourcePath, verificationTarget, installedFingerprint);
+        } catch (const std::exception &error) {
+            fs::remove_all(verificationTarget, cleanupError);
+            throw std::runtime_error(
+                "không thể khóa package '" + dependency.name +
+                "': bytes đã cài không khớp source vừa resolve; hãy chạy 'vpp cập nhật' "
+                "hoặc 'vpp đồng bộ' trước. Chi tiết: " + error.what());
+        }
+        fs::remove_all(verificationTarget, cleanupError);
+
         vietvm::core::PackageLockEntry entry;
         entry.name = dependency.name;
         entry.version = dependency.version;
         entry.sourceKind = dependency.sourceKind;
-        entry.location = relativePackageLocation(dependency.sourcePath, root);
+        entry.location =
+            (dependency.sourceKind == vietvm::core::PackageSourceKind::Git ||
+             dependency.sourceKind == vietvm::core::PackageSourceKind::Registry)
+                ? dependency.resolvedLocation
+                : relativePackageLocation(dependency.sourcePath, root);
         try {
             entry.resolvedPath = fs::relative(installed, root).generic_u8string();
         } catch (...) {
             entry.resolvedPath = installed.lexically_normal().generic_u8string();
         }
-        entry.fingerprint = vietvm::core::fingerprintPackageTree(installed);
+        entry.fingerprint = installedFingerprint;
+        entry.revision = dependency.sourceRevision;
         (void)vietvm::core::cachePackageTree(
             installed, cacheRoot, entry.fingerprint);
         lockfile.packages.push_back(std::move(entry));
@@ -502,15 +541,112 @@ static int backendInit(const std::string &name) {
 }
 
 // Thêm dependency/package vào manifest; hàm kiểm tra trùng, cập nhật metadata rồi ghi lại file cấu hình.
+struct ParsedPackageSourceArgument {
+    vietvm::core::PackageSourceKind kind = vietvm::core::PackageSourceKind::Path;
+    std::string location;
+    std::string reference;
+    std::string packageName;
+    std::string versionRange = "*";
+};
+
+static void parseRegistryPackageSelector(
+    const std::string &selector,
+    ParsedPackageSourceArgument &parsed) {
+    if (selector.empty()) {
+        throw std::runtime_error(
+            "nguồn registry phải chỉ rõ package theo dạng <tên>[@<range>]");
+    }
+    const std::size_t at = selector.rfind('@');
+    if (at == std::string::npos) {
+        parsed.packageName = selector;
+        parsed.versionRange = "*";
+    } else {
+        parsed.packageName = selector.substr(0, at);
+        parsed.versionRange = selector.substr(at + 1);
+    }
+    if (!vietvm::core::isValidPackageName(parsed.packageName) ||
+        parsed.versionRange.empty()) {
+        throw std::runtime_error("selector registry không hợp lệ: " + selector);
+    }
+}
+
+static ParsedPackageSourceArgument parsePackageSourceArgument(
+    const std::string &sourceArg) {
+    ParsedPackageSourceArgument parsed;
+    parsed.location = sourceArg;
+    if (sourceArg.rfind("registry:", 0) == 0) {
+        parsed.kind = vietvm::core::PackageSourceKind::Registry;
+        parsed.location.clear();
+        parseRegistryPackageSelector(sourceArg.substr(9), parsed);
+        return parsed;
+    }
+    if (sourceArg.rfind("registry+", 0) == 0) {
+        parsed.kind = vietvm::core::PackageSourceKind::Registry;
+        std::string body = sourceArg.substr(9);
+        const std::size_t fragment = body.rfind('#');
+        if (fragment == std::string::npos) {
+            throw std::runtime_error(
+                "nguồn registry phải có dạng registry+<root>#<tên>[@<range>]");
+        }
+        parsed.location = body.substr(0, fragment);
+        if (parsed.location.empty()) {
+            throw std::runtime_error("registry root không được rỗng");
+        }
+        parseRegistryPackageSelector(body.substr(fragment + 1), parsed);
+        return parsed;
+    }
+    if (sourceArg.rfind("git+", 0) != 0) return parsed;
+
+    parsed.kind = vietvm::core::PackageSourceKind::Git;
+    parsed.location = sourceArg.substr(4);
+    parsed.reference = "HEAD";
+    const std::size_t fragment = parsed.location.rfind('#');
+    if (fragment != std::string::npos) {
+        parsed.reference = parsed.location.substr(fragment + 1);
+        parsed.location.resize(fragment);
+    }
+    if (parsed.location.empty() || parsed.reference.empty()) {
+        throw std::runtime_error(
+            "nguồn Git phải có dạng git+<repository>[#<ref>]");
+    }
+    return parsed;
+}
+
+static std::string inferGitPackageName(const std::string &location) {
+    std::string normalized = location;
+    std::replace(normalized.begin(), normalized.end(), '\\', '/');
+    while (!normalized.empty() && normalized.back() == '/') normalized.pop_back();
+    const std::size_t slash = normalized.find_last_of('/');
+    const std::size_t colon = normalized.find_last_of(':');
+    const std::size_t separator =
+        slash == std::string::npos ? colon
+                                   : (colon == std::string::npos ? slash
+                                                                 : std::max(slash, colon));
+    std::string name = separator == std::string::npos
+                           ? normalized
+                           : normalized.substr(separator + 1);
+    if (name.size() > 4 && name.substr(name.size() - 4) == ".git") {
+        name.resize(name.size() - 4);
+    }
+    return name;
+}
+
 static int pkgAdd(const std::string &sourceArg, const std::string &packageNameArg) {
-    fs::path sourcePath = vietvm::core::utf8Path(sourceArg);
-    if (!fs::exists(sourcePath)) {
-        std::cerr << messages::formatMessage(messages::kPkgSourceNotFound, {sourceArg}) << std::endl;
-        return EXIT_FAILURE;
+    const ParsedPackageSourceArgument parsedSource =
+        parsePackageSourceArgument(sourceArg);
+    fs::path sourcePath;
+    if (parsedSource.kind == vietvm::core::PackageSourceKind::Path) {
+        sourcePath = vietvm::core::utf8Path(parsedSource.location);
+        if (!fs::exists(sourcePath)) {
+            std::cerr << messages::formatMessage(
+                messages::kPkgSourceNotFound, {parsedSource.location}) << std::endl;
+            return EXIT_FAILURE;
+        }
     }
 
     std::optional<vietvm::core::ProjectManifest> sourceProject;
-    if (fs::is_directory(sourcePath)) {
+    if (parsedSource.kind == vietvm::core::PackageSourceKind::Path &&
+        fs::is_directory(sourcePath)) {
         const fs::path sourceManifest = packageManifestPath(sourcePath);
         if (fs::exists(sourceManifest)) {
             sourceProject = vietvm::core::readProjectManifest(sourceManifest);
@@ -518,9 +654,19 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
     }
 
     std::string packageName = packageNameArg;
+    if (parsedSource.kind == vietvm::core::PackageSourceKind::Registry) {
+        if (!packageName.empty() && packageName != parsedSource.packageName) {
+            throw std::runtime_error(
+                "tên package registry trong source ('" + parsedSource.packageName +
+                "') khác tên được truyền ('" + packageName + "')");
+        }
+        packageName = parsedSource.packageName;
+    }
     if (packageName.empty()) {
         if (sourceProject.has_value() && !sourceProject->name.empty()) {
             packageName = sourceProject->name;
+        } else if (parsedSource.kind == vietvm::core::PackageSourceKind::Git) {
+            packageName = inferGitPackageName(parsedSource.location);
         } else {
             packageName = sourcePath.filename().u8string();
             if (sourcePath.has_extension()) {
@@ -538,9 +684,10 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
         });
     vietvm::core::PackageDependencySpec updated;
     updated.name = packageName;
-    updated.versionRange = "*";
-    updated.sourceKind = vietvm::core::PackageSourceKind::Path;
-    updated.location = sourceArg;
+    updated.versionRange = parsedSource.versionRange;
+    updated.sourceKind = parsedSource.kind;
+    updated.location = parsedSource.location;
+    updated.reference = parsedSource.reference;
     if (sourceProject.has_value()) {
         updated.versionRange = sourceProject->version;
     }
@@ -555,12 +702,44 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
     // dependency cycle hoặc source transport chưa hỗ trợ vì vậy thất bại trước
     // bước materialize thay vì để lại dependency graph nửa vời.
     const auto graph = resolveProjectPackages(projectRoot, manifest);
+    if (parsedSource.kind == vietvm::core::PackageSourceKind::Git) {
+        const auto selected = std::find_if(
+            graph.packages.begin(), graph.packages.end(),
+            [&](const vietvm::core::ResolvedPackageDependency &item) {
+                return item.name == packageName;
+            });
+        if (selected == graph.packages.end()) {
+            throw std::runtime_error(
+                "không tìm thấy Git dependency vừa resolve: " + packageName);
+        }
+        auto direct = std::find_if(
+            manifest.dependencies.begin(), manifest.dependencies.end(),
+            [&](const vietvm::core::PackageDependencySpec &item) {
+                return item.name == packageName;
+            });
+        if (direct != manifest.dependencies.end()) {
+            direct->versionRange = selected->version;
+        }
+    }
     materializeResolvedPackages(projectRoot, graph);
     vietvm::core::writeProjectManifest(packageManifestPath(projectRoot), manifest);
     if (writeResolvedPackageLock(projectRoot, graph, false) != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
     std::cout << messages::messageText(messages::kPkgInstalled, {packageName});
+    return EXIT_SUCCESS;
+}
+
+static int pkgPublish(const std::string &registryArg) {
+    if (registryArg.empty()) {
+        std::cerr << messages::formatMessage(messages::kPkgPublishRegistryMissing) << '\n';
+        return EXIT_FAILURE;
+    }
+    const auto published = vietvm::core::publishPackageToRegistry(
+        fs::current_path(), vietvm::core::utf8Path(registryArg));
+    std::cout << messages::messageText(
+        messages::kPkgPublished,
+        {published.name, published.version, published.path.u8string()});
     return EXIT_SUCCESS;
 }
 
@@ -770,24 +949,50 @@ static int pkgRestore(bool offlineOnly = false) {
             return EXIT_FAILURE;
         }
 
-        if (entry.sourceKind != vietvm::core::PackageSourceKind::Path) {
-            throw std::runtime_error(
-                "phục hồi: source '" +
-                vietvm::core::packageSourceKindName(entry.sourceKind) +
-                "' chưa được hỗ trợ cho package '" + entry.name + "'");
-        }
-
-        fs::path sourcePath = vietvm::core::utf8Path(entry.location);
-        if (!sourcePath.is_absolute()) sourcePath = root / sourcePath;
-        try {
-            sourcePath = fs::absolute(sourcePath).lexically_normal();
-        } catch (...) {
-            sourcePath = sourcePath.lexically_normal();
-        }
-        if (!fs::exists(sourcePath)) {
-            std::cerr << messages::formatMessage(
-                messages::kPkgSourceNotFound, {sourcePath.u8string()}) << '\n';
-            return EXIT_FAILURE;
+        fs::path sourcePath;
+        if (entry.sourceKind == vietvm::core::PackageSourceKind::Git) {
+            vietvm::core::PackageDependencySpec lockedSource;
+            lockedSource.name = entry.name;
+            lockedSource.versionRange = entry.version;
+            lockedSource.sourceKind = vietvm::core::PackageSourceKind::Git;
+            lockedSource.location = entry.location;
+            lockedSource.reference = entry.revision;
+            const fs::path sourceStateRoot =
+                root / vietvm::core::utf8Path(vietvm::core::kPackageStateDirectory) /
+                "sources";
+            const auto materialized = vietvm::core::materializePackageSource(
+                lockedSource, root, sourceStateRoot);
+            if (materialized.revision != entry.revision) {
+                throw std::runtime_error(
+                    "Git restore resolve sai revision cho package '" + entry.name +
+                    "': mong đợi " + entry.revision + ", thực tế " +
+                    materialized.revision);
+            }
+            sourcePath = materialized.path;
+        } else if (entry.sourceKind == vietvm::core::PackageSourceKind::Registry) {
+            vietvm::core::PackageDependencySpec lockedSource;
+            lockedSource.name = entry.name;
+            lockedSource.versionRange = entry.version;
+            lockedSource.sourceKind = vietvm::core::PackageSourceKind::Registry;
+            lockedSource.location = entry.location;
+            const fs::path sourceStateRoot =
+                root / vietvm::core::utf8Path(vietvm::core::kPackageStateDirectory) /
+                "sources";
+            sourcePath = vietvm::core::materializePackageSource(
+                lockedSource, root, sourceStateRoot).path;
+        } else {
+            sourcePath = vietvm::core::utf8Path(entry.location);
+            if (!sourcePath.is_absolute()) sourcePath = root / sourcePath;
+            try {
+                sourcePath = fs::absolute(sourcePath).lexically_normal();
+            } catch (...) {
+                sourcePath = sourcePath.lexically_normal();
+            }
+            if (!fs::exists(sourcePath)) {
+                std::cerr << messages::formatMessage(
+                    messages::kPkgSourceNotFound, {sourcePath.u8string()}) << '\n';
+                return EXIT_FAILURE;
+            }
         }
 
         const std::string sourceVersion = packageSourceVersion(sourcePath);
@@ -847,6 +1052,13 @@ static int runPackageCommand(int argc, char *argv[]) {
         if (isOfflineFlag(sourceArg)) return pkgRestore(true);
         std::string name = (argc >= (5 + subWordOffset)) ? argv[4 + subWordOffset] : "";
         return pkgAdd(sourceArg, name);
+    }
+    if (sub == "publish" || sub == "phát-hành") {
+        if (argc < (4 + subWordOffset)) {
+            std::cerr << messages::formatMessage(messages::kPkgPublishRegistryMissing) << '\n';
+            return EXIT_FAILURE;
+        }
+        return pkgPublish(argv[3 + subWordOffset]);
     }
     if (sub == "list" || sub == "danh sách") {
         return pkgList();
@@ -1183,6 +1395,13 @@ int main(int argc, char* argv[]) {
                 if (isOfflineFlag(sourceArg)) return pkgRestore(true);
                 std::string name = (argc >= (4 + commandWordOffset)) ? argv[3 + commandWordOffset] : "";
                 return pkgAdd(sourceArg, name);
+            }
+            if (command == "publish" || command == "phát-hành") {
+                if (argc < (3 + commandWordOffset)) {
+                    std::cerr << messages::formatMessage(messages::kPkgPublishRegistryMissing) << '\n';
+                    return EXIT_FAILURE;
+                }
+                return pkgPublish(argv[2 + commandWordOffset]);
             }
             if (command == "list" || command == "danh sách") {
                 return pkgList();

@@ -29,7 +29,7 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | --- | --- | --- |
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
 | 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
-| 0.9 | Chưa hoàn tất | Git/registry package, stdlib audit, test/tooling/LSP |
+| 0.9 | Chưa hoàn tất | Stdlib audit, test/tooling/LSP |
 | 1.0 RC | Chưa bắt đầu | Freeze contract, fuzz/stress/sanitizer, release smoke đa nền tảng |
 
 Ước lượng theo khối lượng kỹ thuật hiện tại: còn khoảng **25–30%** để đạt 1.0. Con số
@@ -58,8 +58,8 @@ hơn nhiều so với một checkbox tính năng thông thường.
 - [x] Có regression cho lỗi parser/compiler/semantic, không chỉ expected-output fixture.
 - [x] Test discovery đã phân biệt `test/` cho C++ unit và `src/tests/` cho regression
   V++; HTTP fixture được khởi động riêng trong integration runner.
-- [x] Parity gate hiện đối chiếu 116 chương trình `.vi`; direct IR backend bao phủ
-  116/116 chương trình.
+- [x] Parity gate hiện đối chiếu 117 chương trình `.vi`; direct IR backend bao phủ
+  117/117 chương trình.
 - [x] Parity gate chạy lại cùng corpus theo thứ tự đảo trong cùng process; regression
   compile A → B → A đã khóa lifecycle reset giữa nhiều lần biên dịch.
 - [x] VM opcode smoke đã có branch (`OP_JUMP`, `OP_JUMP_IF_FALSE`) và call/return
@@ -69,7 +69,7 @@ hơn nhiều so với một checkbox tính năng thông thường.
   trực tiếp cho `OP_DUNG_GIA_TRI` và `OP_SAI_GIA_TRI`.
 - [x] `VM::run()` đã được thu gọn thành lifecycle/GC + opcode routing; call, value,
   index, variable/call-frame, switch/block, loop-control, exception và branch có
-  handler riêng. Baseline regression hiện tại đạt 98/98.
+  handler riêng. Baseline regression hiện tại đạt 99/99.
 - [x] Stack trace runtime giữ frame có cấu trúc mà không đổi bytecode ABI: source file,
   line/column, function/method và module identity đi qua function/module child VM; CLI
   hiển thị trace từ điểm lỗi về caller và gộp các frame đệ quy liên tiếp. Regression khóa
@@ -204,14 +204,14 @@ hơn nhiều so với một checkbox tính năng thông thường.
 | Crypto | Chưa có package chuẩn | Secure random + hash/HMAC + primitive từ implementation kiểm chứng |
 | Sandbox / permission | Chưa có | Capability cho file/network/process/env/FFI, enforce tại runtime boundary |
 | Profiler | Benchmark có, profiler còn thiếu | CPU/timing/allocation sampling hoặc VM event hooks |
-| Package dependency solver | Transitive local-path solver + SemVer/range + conflict/cycle + deterministic lock + cache/offline restore + locked-run fingerprint enforcement đã có | Git/registry transport và remote metadata/version selection |
+| Package dependency solver | Transitive path/Git/registry solver + SemVer/range + conflict/cycle + exact Git revision/exact registry version lock + deterministic lock + cache/offline restore + locked-run fingerprint enforcement đã có | Hosted registry/auth/signing là hardening hậu 0.9 |
 | Typed IR | Hoãn sau 1.0 | Dynamic typing đã chốt; Typed IR/static/gradual checker là tính năng hậu 1.0 |
 | GC production | Tracing GC đã chạy mặc định, có cycle sweep + root graph | Tiếp tục đo allocation/latency cùng profiler trước tối ưu sâu |
 | Object model | Hoàn tất contract hiện tại: object/field động, bound-call, `mình`/`gốc`, đơn kế thừa class, nhiều interface compile-time, constructor có tham số, method visibility semantic + runtime | Trait/generic, runtime interface introspection và field declaration nếu bổ sung sẽ cần contract mới |
 
 ## Rủi ro cần xử lý sớm
 
-- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 116 chương trình
+- [x] Xác nhận tính độc lập của `vpp-pipeline-legacy-parity`: corpus 117 chương trình
   chạy thuận và đảo thứ tự trong cùng process đều khớp snapshot; chạy riêng parity
   và bộ CTest không gồm integration đều qua.
 - [x] Handler VM vẫn thao tác trên state của instance, nhưng `VMRuntimeFixture` đã tạo
@@ -225,15 +225,16 @@ hơn nhiều so với một checkbox tính năng thông thường.
 
 ```text
 VM opcode smoke (build trực tiếp bằng C++17): passed
-Integration regression: 98/98 passed
-CTest baseline gần nhất: 23/23 passed
+Integration regression: 99/99 passed
+CTest baseline gần nhất: 24/24 passed
+Package workflow: 6/6 passed, gồm Git install/update/exact-revision restore/offline + path -> Git graph + registry
 ASan+UBSan local CTest: 16/16 passed; LSan chờ Ubuntu CI `detect_leaks=1`
-Pipeline parity baseline gần nhất: 116 chương trình, direct IR 116 chương trình
+Pipeline parity baseline gần nhất: 117 chương trình, direct IR 117 chương trình
 Coverage cross-check: 75.77% line coverage (8,884/11,725), gate 45%
 Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
 Short-term: 14/15
 Medium-term: 18/18
-Long-term: 15/40
+Long-term: 17/40
 ```
 
 ## Ưu tiên tiếp theo
@@ -246,7 +247,7 @@ Long-term: 15/40
    xóa token bridge khỏi production compiler/source set.
 5. [x] Sau khi test architecture ổn định, thêm coverage + clang-tidy + benchmark baseline.
 6. [x] Tách nốt variable/index/switch/block/exception khỏi `VM::run()` và mở rộng
-   opcode matrix; full regression hiện tại đạt 98/98.
+   opcode matrix; full regression hiện tại đạt 99/99.
 7. [x] Tạo internal VM state fixture/API và output sink để test handler trực tiếp
    không phụ thuộc stdout; khóa bằng `vpp-vm-handler-unit`.
 8. [x] Dời `StringPool`, function registry, import set và class/access state vào
@@ -275,19 +276,67 @@ Long-term: 15/40
     Local ASan+UBSan full CTest hiện 16/16 sau khi sửa hai lỗi sanitizer; Ubuntu CI đã bật
     leak detection tường minh. Stack trace source span/function/method/module đã hoàn tất;
     còn CI Linux leak gate để đóng runtime hardening 0.8.
-16. [ ] **Package 0.9:** manifest `vpp.json` schema 1/project layout đã chốt; package/bare-module
+16. [x] **Package 0.9:** manifest `vpp.json` schema 1/project layout đã chốt; package/bare-module
     lookup đã tách sang `PackageResolver`; SemVer/range, transitive solver, conflict/cycle,
     staged installer và deterministic `vpp.lock` có content fingerprint đã chạy. Install/update
     giữ lock đồng bộ; project-local content-addressed cache cho phép `restore/install --offline`
     phục hồi exact bytes ngay cả khi local source đã mất; remove cũng ghi lại lock graph còn lại.
-    File `.vi` trong project có lock chỉ chạy khi installed package khớp fingerprint đã khóa.
-    Còn Git/registry source + registry metadata/version selection.
-17. [ ] **Stdlib 1.0:** audit UTF-8, filesystem/path, time/date và các package hiện có;
-    bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
+    Git source đã chạy end-to-end qua transport tách khỏi solver: manifest giữ symbolic `ref`,
+    lock pin exact commit `revision`, restore cache-miss checkout đúng commit, offline restore
+    dùng cache khi repository đã mất, graph hỗn hợp path -> Git chạy thật và `.git/` không bị
+    vendored. Regression `src/tests/kiem_tra_package_git.vi` chạy package Git thật sau
+    install/update/restore/offline. `vpp khóa` chặn trường hợp ref đã di chuyển nhưng installed
+    bytes còn cũ để không tạo revision/fingerprint bất nhất. File `.vi` trong project có lock
+    chỉ chạy khi installed package khớp fingerprint đã khóa. Filesystem registry v1 đã có
+    immutable publish, metadata từ `vpp.json`, chọn SemVer cao nhất theo range, `VPP_REGISTRY`,
+    exact-version restore và offline cache. Regression `kiem_tra_package_registry.vi` chạy
+    package registry thật sau install/update/restore/offline; package source unit khóa cả
+    transitive same-registry selection. Hosted registry/auth/signing chưa thuộc contract 0.9.
+17. [ ] **Stdlib 1.0:** phần UTF-8 nền tảng đã khóa `độ dài`, `đảo ngược` và truy cập
+    chỉ số chuỗi theo code point thay vì byte; `cắt chuỗi(s, bắt_đầu, số_lượng)` cũng dùng
+    code-point offset/count và clamp ở cuối chuỗi. Core text có validator UTF-8 chặt cho overlong,
+    surrogate và code point > U+10FFFF, còn malformed input giữ từng byte lỗi như một đơn vị
+    thô để không làm mất dữ liệu. `chuỗi thường`/`chuỗi hoa` đã chuyển theo code point và khóa
+    toàn bộ case pair dựng sẵn của bảng chữ cái tiếng Việt; `chuẩn hóa unicode` compose NFC
+    cho các tổ hợp nguyên âm + dấu tiếng Việt, kể cả input tách dấu. `viết hoa đầu từ`,
+    `là palindrome` và `là anagram` cũng dùng NFC + case tiếng Việt thay cho ASCII-only;
+    `đếm ký tự`/`chứa chuỗi`/`thay thế` chuẩn hóa NFC hai phía nên input dựng sẵn và tách dấu
+    có cùng kết quả. Unit corpus khóa toàn bộ 67 chữ thường tiếng Việt từ NFD -> NFC.
+    `vpp-runtime-value-unit`, `vpp-vm-handler-unit` và
+    `kiem_tra_stdlib_nen_tang.vi` khóa tiếng Việt + Unicode ngoài BMP end-to-end. Native filesystem/path
+    hiện kiểm tra UTF-8 ngay tại runtime boundary, không truyền malformed path xuống
+    `std::filesystem`; output path dùng separator `/` ổn định và regression khóa tên thư mục/tệp
+    tiếng Việt + Unicode ngoài BMP, parent/join và missing-path predicate. Time/date contract 1.0 đã có
+    local ISO-8601 kèm UTC offset, UTC ISO-8601 hậu tố `Z` và API độ lệch múi giờ theo phút;
+    native conversion dùng `localtime_r`/`gmtime_r` hoặc bản `_s` trên Windows thay cho state
+    tĩnh của `std::localtime`. Phạm vi 1.0 tập trung tiếng Việt, không đặt mục tiêu mở rộng
+    case/normalization sang Unicode tổng quát; corpus chữ cái + substring tiếng Việt đã được khóa,
+    Audit stdlib cục bộ đã đưa đọc/ghi/đếm tệp và đọc cấu hình về cùng UTF-8 path boundary,
+    khóa đường dẫn tiếng Việt + Unicode ngoài BMP end-to-end, thêm contract `đọc cấu hình khóa`/fallback
+    và chặn `ngẫu nhiên nguyên`/`ngủ mili giây` âm thầm cắt số thực có phần lẻ. Collection/JSON
+    đã khóa output xác định: `khóa map` và object từ `json tạo` sắp khóa theo thứ tự từ điển
+    thay vì phụ thuộc iteration của `unordered_map`. HTTP client đã chặn URL rỗng, UTF-8 lỗi,
+    scheme ngoài HTTP(S), thiếu host và whitespace/ký tự điều khiển ngay tại native boundary
+    thay vì phụ thuộc diagnostic của curl. Còn filesystem edge case đa nền tảng và
+    Math đã tách rõ `chia`/`chia dư` (giữ lỗi runtime khi chia 0) khỏi `chia an toàn`
+    (fallback tường minh), đồng thời `lũy thừa`/`giai thừa` chỉ nhận số nguyên không âm và có
+    regression lỗi tương ứng. Environment đã khóa tên biến tại native boundary: từ chối tên rỗng,
+    chứa `=`, NUL nhúng và UTF-8 lỗi trước khi gọi API hệ điều hành, còn biến hợp lệ bị thiếu vẫn
+    trả fallback. Logging đã có regression cho wrapper module, tiếng Việt/Unicode ngoài BMP, giá trị không phải
+    chuỗi và contract trả `0`. JSON đã khóa thêm UTF-8 boundary: parser từ chối input malformed,
+    serializer từ chối chuỗi/khóa object malformed và regression giữ tiếng Việt + Unicode ngoài BMP hợp lệ.
+    Collection đã chặn `tổng list` tràn số nguyên/số thực và khóa lỗi sort hỗn hợp/min rỗng.
+    HTTP đã validate authority/port rõ hơn, gồm host rỗng sau scheme/userinfo, port sai và IPv6
+    không có ngoặc vuông. Math không còn âm thầm cắt số thực có phần lẻ ở `%`/`chia dư`, còn
+    `giới hạn` từ chối cận nhỏ nhất lớn hơn cận lớn nhất. Integer parser dùng chung đã chặn
+    suffix/phần lẻ thay vì `stoi` cắt ngầm; `cắt chuỗi` và `mã hóa caesar` dùng cùng contract,
+    chấp nhận số thực tích phân và từ chối số thực có phần lẻ. Phần còn lại là xác nhận các contract
+    này trên release matrix; bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
-19. [ ] **Compiler hardening còn lại:** fuzz lexer/parser, malformed AST/IR, bytecode verification,
-    deterministic/reproducible compile và stress project lớn.
+19. [ ] **Compiler hardening còn lại:** deterministic/reproducible compile đã khóa bằng regression
+    so khớp toàn bộ bytecode + compiler/module metadata trên cùng dependency graph; phần còn lại là
+    fuzz lexer/parser, malformed AST/IR, bytecode verification và stress project lớn.
 20. [ ] **Toolchain 1.0:** đóng public CLI, formatter/linter/LSP/VS Code integration,
     project templates, docs và installer/update path Windows/macOS/Linux.
 21. [ ] **1.0 RC:** freeze syntax/semantics/bytecode/package/CLI; chạy fuzz + stress +

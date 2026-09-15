@@ -1,0 +1,4 @@
+Lỗi: giá trị không phải số nguyên
+Dấu vết lỗi:
+  ở chia dư (gói/lõi/toán học.vi:28:16) [mô đun=gói/lõi/toán học.vi]
+  ở main (src/tests/kiem_tra_loi_chia_du_so_thuc.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_du_so_thuc.vi]

@@ -60,8 +60,9 @@ SourceMetadata readSourceMetadata(const fs::path &sourcePath) {
 
 class Solver {
 public:
-    explicit Solver(fs::path projectRoot)
-        : projectRoot_(absoluteLexical(fs::current_path(), std::move(projectRoot))) {}
+    Solver(fs::path projectRoot, PackageSourceMaterializer materializer)
+        : projectRoot_(absoluteLexical(fs::current_path(), std::move(projectRoot))),
+          materializer_(std::move(materializer)) {}
 
     ResolvedPackageGraph solve(const ProjectManifest &manifest) {
         std::vector<PackageDependencySpec> roots = manifest.dependencies;
@@ -114,15 +115,22 @@ private:
     void resolveDependency(const PackageDependencySpec &dependency,
                            const fs::path &declaringRoot,
                            const std::string &requester) {
-        if (dependency.sourceKind != PackageSourceKind::Path) {
-            throw std::runtime_error(
-                "dependency '" + dependency.name + "' dùng source '" +
-                packageSourceKindName(dependency.sourceKind) +
-                "' nhưng transport này chưa được hỗ trợ trong Package 0.9");
+        MaterializedPackageSource materialized;
+        if (materializer_) {
+            materialized = materializer_(dependency, declaringRoot);
+        } else {
+            if (dependency.sourceKind != PackageSourceKind::Path) {
+                throw std::runtime_error(
+                    "dependency '" + dependency.name + "' dùng source '" +
+                    packageSourceKindName(dependency.sourceKind) +
+                    "' nhưng transport này chưa được hỗ trợ trong Package 0.9");
+            }
+            materialized.path = absoluteLexical(
+                declaringRoot, utf8Path(dependency.location));
+            materialized.resolvedLocation = materialized.path.generic_u8string();
         }
 
-        const fs::path sourcePath = absoluteLexical(
-            declaringRoot, utf8Path(dependency.location));
+        const fs::path sourcePath = materialized.path;
         if (!fs::exists(sourcePath)) {
             throw std::runtime_error(
                 "không tìm thấy source path của dependency '" + dependency.name +
@@ -141,12 +149,14 @@ private:
         const auto existing = indexByName_.find(dependency.name);
         if (existing != indexByName_.end()) {
             ResolvedPackageDependency &resolved = ordered_[existing->second];
-            if (resolved.sourcePath != sourcePath || resolved.version != metadata.version) {
+            if (resolved.resolvedLocation != materialized.resolvedLocation ||
+                resolved.sourceRevision != materialized.revision ||
+                resolved.version != metadata.version) {
                 throw std::runtime_error(
                     "xung đột dependency '" + dependency.name +
                     "': đã resolve " + resolved.version + " từ " +
-                    resolved.sourcePath.u8string() + ", nhưng '" + requester +
-                    "' yêu cầu source " + sourcePath.u8string() +
+                    resolved.resolvedLocation + ", nhưng '" + requester +
+                    "' yêu cầu source " + materialized.resolvedLocation +
                     " phiên bản " + metadata.version);
             }
             if (std::find(resolved.requestedRanges.begin(),
@@ -183,12 +193,15 @@ private:
         resolved.sourceKind = dependency.sourceKind;
         resolved.declaredLocation = dependency.location;
         resolved.sourcePath = sourcePath;
+        resolved.resolvedLocation = materialized.resolvedLocation;
+        resolved.sourceRevision = materialized.revision;
         resolved.requestedRanges.push_back(dependency.versionRange);
         indexByName_[resolved.name] = ordered_.size();
         ordered_.push_back(std::move(resolved));
     }
 
     fs::path projectRoot_;
+    PackageSourceMaterializer materializer_;
     std::vector<ResolvedPackageDependency> ordered_;
     std::unordered_map<std::string, std::size_t> indexByName_;
     std::unordered_set<std::string> visiting_;
@@ -199,9 +212,10 @@ private:
 
 ResolvedPackageGraph resolvePackageDependencyGraph(
     const ProjectManifest &manifest,
-    const std::filesystem::path &projectRoot) {
+    const std::filesystem::path &projectRoot,
+    PackageSourceMaterializer materializer) {
     validateProjectManifest(manifest);
-    return Solver(projectRoot).solve(manifest);
+    return Solver(projectRoot, std::move(materializer)).solve(manifest);
 }
 
 } // namespace vietvm::core

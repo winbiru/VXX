@@ -370,7 +370,7 @@ func fibonacci(n int) int {
 
 ## When to Use V++
 
-### ✅ Suitable for:
+### Có Suitable for:
 
 1. **Learning Programming Basics (Vietnamese speakers)**
    * Reduce English language barrier
@@ -393,7 +393,7 @@ func fibonacci(n int) int {
    * Test optimization strategies
    * Research project baseline
 
-### ❌ Not Suitable for:
+### Không Not Suitable for:
 
 1. **Production Applications**
    * Not stable, not mature
@@ -435,17 +435,17 @@ V++ is an **experimental, education-oriented language** with unique features of 
 
 ### V++'s Strengths:
 
-1. ✅ **Vietnamese-first**: Reduces learning barrier for Vietnamese speakers
-2. ✅ **Educational**: Simple, clear design, easy to learn VM internals
-3. ✅ **Explicit**: No magic, behavior is easy to predict and debug
-4. ✅ **Research-friendly**: Free to experiment, no legacy burden
+1. Có **Vietnamese-first**: Reduces learning barrier for Vietnamese speakers
+2. Có **Educational**: Simple, clear design, easy to learn VM internals
+3. Có **Explicit**: No magic, behavior is easy to predict and debug
+4. Có **Research-friendly**: Free to experiment, no legacy burden
 
 ### V++'s Weaknesses:
 
-1. ❌ **Experimental**: Not production-ready, subject to change
-2. ❌ **Minimal ecosystem**: Bundled libraries and tooling are MVPs; there is no broad third-party ecosystem
-3. ❌ **Limited features**: No object instances/inheritance, generics, concurrency, or type checker
-4. ❌ **Small community**: Limited documentation, limited support
+1. Không **Experimental**: Not production-ready, subject to change
+2. Không **Minimal ecosystem**: Bundled libraries and tooling are MVPs; there is no broad third-party ecosystem
+3. Không **Limited features**: No object instances/inheritance, generics, concurrency, or type checker
+4. Không **Small community**: Limited documentation, limited support
 
 ### Recommendations:
 

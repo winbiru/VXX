@@ -106,6 +106,14 @@ inline constexpr std::array<const char *, 3> kFnNow = {
     "lay_thoi_gian_hien_tai", "lấythờigianhiệntại", "lấy thời gian hiện tại"
 };
 
+inline constexpr std::array<const char *, 3> kFnNowUtc = {
+    "lay_thoi_gian_utc", "lấythờigianutc", "lấy thời gian utc"
+};
+
+inline constexpr std::array<const char *, 3> kFnTimezoneOffsetMinutes = {
+    "do_lech_mui_gio", "độlệchmúigiờ", "độ lệch múi giờ"
+};
+
 inline constexpr std::array<const char *, 3> kFnReadConfig = {
     "doc_config", "đọccấuhình", "đọc cấu hình"
 };
@@ -262,12 +270,20 @@ inline constexpr std::array<const char *, 2> kFnStringReplace = {
     "thay_the", "thay thế"
 };
 
+inline constexpr std::array<const char *, 2> kFnStringSlice = {
+    "cat_chuoi", "cắt chuỗi"
+};
+
 inline constexpr std::array<const char *, 2> kFnStringLower = {
     "chuoi_thuong", "chuỗi thường"
 };
 
 inline constexpr std::array<const char *, 2> kFnStringUpper = {
     "chuoi_hoa", "chuỗi hoa"
+};
+
+inline constexpr std::array<const char *, 2> kFnStringNormalizeUnicode = {
+    "chuan_hoa_unicode", "chuẩn hóa unicode"
 };
 
 inline constexpr std::array<const char *, 2> kFnStringTrimSpaces = {

@@ -1,5 +1,6 @@
 // Module: lõi.ngẫu nhiên
 // Sinh số nguyên giả ngẫu nhiên trong đoạn đóng [tối thiểu, tối đa].
+// Hai giới hạn phải là số nguyên; số thực có phần lẻ không bị âm thầm cắt cụt.
 
 hàm ngẫu nhiên nguyên(tối thiểu, tối đa) {
     ném "stdlib: ngẫu nhiên nguyên native hook không khả dụng";

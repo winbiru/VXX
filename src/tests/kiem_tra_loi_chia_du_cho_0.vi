@@ -1,4 +1,6 @@
-// Chia lấy dư cho 0: phép % không thể thực hiện khi số chia bằng 0.
+// Chia lấy dư cho 0 qua stdlib: chia dư() phải giữ lỗi runtime của toán tử %.
+nhập gói/chuẩn/main.vi;
+
 hàm main() {
-    in 10 % 0;
+    in chia dư(10, 0);
 };

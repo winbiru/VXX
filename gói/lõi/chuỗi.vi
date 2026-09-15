@@ -32,8 +32,8 @@ hàm là chuỗi rỗng(s) {
     trả về s == "";
 };
 
-// Các API dưới đây dùng byte UTF-8/ASCII cho MVP; runtime giữ nguyên byte
-// tiếng Việt thay vì chuyển hoa/thường Unicode toàn diện.
+// Chuỗi V++ dùng UTF-8. Các phép đếm/chứa/thay dưới đây chuẩn hóa NFC tiếng
+// Việt trước khi so khớp để chữ dựng sẵn và chữ tách dấu có cùng semantics.
 hàm đếm ký tự(s, ký tự) {
     ném "stdlib: đếm ký tự native hook không khả dụng";
 };
@@ -46,12 +46,25 @@ hàm thay thế(s, cũ, mới) {
     ném "stdlib: thay thế native hook không khả dụng";
 };
 
+// Ghi chú hàm: cắt `số_lượng` code point kể từ `bắt_đầu` (chỉ số bắt đầu từ 0).
+// Tham số nguyên chấp nhận cả dạng số thực tích phân như 1.0; giá trị có phần lẻ bị từ chối.
+// Nếu độ dài vượt phần còn lại, kết quả dừng ở cuối chuỗi.
+hàm cắt chuỗi(s, bắt_đầu, số_lượng) {
+    ném "stdlib: cắt chuỗi native hook không khả dụng";
+};
+
 hàm chuỗi thường(s) {
     ném "stdlib: chuỗi thường native hook không khả dụng";
 };
 
 hàm chuỗi hoa(s) {
     ném "stdlib: chuỗi hoa native hook không khả dụng";
+};
+
+// Chuẩn hóa NFC cho các tổ hợp chữ và dấu tiếng Việt trong contract V++ 1.0.
+// Code point thuộc script khác được giữ nguyên để có thể mở rộng Unicode sau này.
+hàm chuẩn hóa unicode(s) {
+    ném "stdlib: chuẩn hóa unicode native hook không khả dụng";
 };
 
 hàm chuẩn hóa khoảng trắng(s) {
@@ -70,14 +83,17 @@ hàm viết hoa đầu từ(s) {
     ném "stdlib: viết hoa đầu từ native hook không khả dụng";
 };
 
+// Không phân biệt hoa/thường tiếng Việt; giữ nguyên whitespace/dấu câu trong phép so sánh.
 hàm là palindrome(s) {
     ném "stdlib: là palindrome native hook không khả dụng";
 };
 
+// So sánh theo code point sau chuẩn hóa NFC + chữ thường tiếng Việt; bỏ whitespace.
 hàm là anagram(a, b) {
     ném "stdlib: là anagram native hook không khả dụng";
 };
 
+// Khóa phải biểu diễn số nguyên; số thực tích phân được chấp nhận, phần lẻ bị từ chối.
 hàm mã hóa caesar(s, khóa) {
     ném "stdlib: mã hóa caesar native hook không khả dụng";
 };

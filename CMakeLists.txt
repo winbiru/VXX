@@ -53,6 +53,7 @@ set(VPP_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/core/text.cpp
     ${CMAKE_SOURCE_DIR}/src/core/semver.cpp
     ${CMAKE_SOURCE_DIR}/src/core/package_manifest.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/package_source.cpp
     ${CMAKE_SOURCE_DIR}/src/core/package_solver.cpp
     ${CMAKE_SOURCE_DIR}/src/core/package_installer.cpp
     ${CMAKE_SOURCE_DIR}/src/core/package_cache.cpp)

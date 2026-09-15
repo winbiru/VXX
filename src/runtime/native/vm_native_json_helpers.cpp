@@ -1,5 +1,6 @@
 #include "common/vm_native_json_helpers.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -9,6 +10,8 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include "vpp/core/text.h"
 
 namespace vietvm::helpers {
 
@@ -317,8 +320,13 @@ bool encodeJson(const StackValue &value,
         return true;
     }
     if (std::holds_alternative<std::string>(value)) {
+        const std::string &text = std::get<std::string>(value);
+        if (!vietvm::core::isValidUtf8(text)) {
+            err = "json tạo: chuỗi phải là UTF-8 hợp lệ";
+            return false;
+        }
         out += '"';
-        out += escapeJsonString(std::get<std::string>(value));
+        out += escapeJsonString(text);
         out += '"';
         return true;
     }
@@ -363,13 +371,21 @@ bool encodeJson(const StackValue &value,
         out += '{';
         bool first = true;
         if (map) {
-            for (const auto &entry : map->entries) {
+            std::vector<std::string> keys;
+            keys.reserve(map->entries.size());
+            for (const auto &entry : map->entries) keys.push_back(entry.first);
+            std::sort(keys.begin(), keys.end());
+            for (const std::string &key : keys) {
+                if (!vietvm::core::isValidUtf8(key)) {
+                    err = "json tạo: khóa object phải là UTF-8 hợp lệ";
+                    return false;
+                }
                 if (!first) out += ',';
                 first = false;
                 out += '"';
-                out += escapeJsonString(entry.first);
+                out += escapeJsonString(key);
                 out += "\":";
-                if (!encodeJson(entry.second, out, active, err)) return false;
+                if (!encodeJson(map->entries.at(key), out, active, err)) return false;
             }
         }
         out += '}';
@@ -411,6 +427,10 @@ std::string escapeJsonString(const std::string &input) {
 
 // Phân tích JSON; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseJson(const std::string &input, StackValue &result, std::string &err) {
+    if (!vietvm::core::isValidUtf8(input)) {
+        err = "json phân tích: đầu vào phải là UTF-8 hợp lệ";
+        return false;
+    }
     return JsonParser(input).parse(result, err);
 }
 

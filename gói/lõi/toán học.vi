@@ -19,17 +19,12 @@ hàm nhân(a, b) {
 
 // Ghi chú hàm: chia.
 hàm chia(a, b) {
-    nếu (b == 0 || b == 0.0) {
-        trả về 0;
-    };
     trả về a / b;
 };
 
 // Ghi chú hàm: chia dư.
+// Hai toán hạng phải biểu diễn số nguyên; số thực có phần lẻ bị runtime từ chối.
 hàm chia dư(a, b) {
-    nếu (b == 0) {
-        trả về 0;
-    };
     trả về a % b;
 };
 
@@ -39,6 +34,7 @@ hàm chia lấy dư(a, b) {
 };
 
 // Ghi chú hàm: chia an toàn.
+// Khác với chia(), hàm này chủ động trả fallback khi số chia bằng 0.
 hàm chia an toàn(a, b, mặc định = 0) {
     nếu (b == 0 || b == 0.0) {
         trả về mặc định;
@@ -49,22 +45,37 @@ hàm chia an toàn(a, b, mặc định = 0) {
 // Ghi chú hàm: lũy thừa.
 hàm lũy thừa(cơ sở, số mũ) {
     nếu (số mũ < 0) {
-        trả về 0;
+        ném "lũy thừa: số mũ phải là số nguyên không âm";
     };
 
     kết quả = 1;
-    lặp (i = 0; i < số mũ; i = i + 1) {
+    còn lại = số mũ;
+    lặp (i = 0; còn lại > 0; i = i + 1) {
+        nếu (còn lại < 1) {
+            ném "lũy thừa: số mũ phải là số nguyên không âm";
+        };
         kết quả = kết quả * cơ sở;
+        còn lại = còn lại - 1;
     };
     trả về kết quả;
 };
 
 // Ghi chú hàm: giai thừa.
 hàm giai thừa(n) {
-    nếu (n <= 1) {
-        trả về 1;
+    nếu (n < 0) {
+        ném "giai thừa: đối số phải là số nguyên không âm";
     };
-    trả về n * giai thừa(n - 1);
+
+    kết quả = 1;
+    còn lại = n;
+    lặp (i = 0; còn lại > 0; i = i + 1) {
+        nếu (còn lại < 1) {
+            ném "giai thừa: đối số phải là số nguyên không âm";
+        };
+        kết quả = kết quả * còn lại;
+        còn lại = còn lại - 1;
+    };
+    trả về kết quả;
 };
 
 // Ghi chú hàm: trị tuyệt đối.
@@ -93,6 +104,9 @@ hàm nhỏ nhất hai(a, b) {
 
 // Ghi chú hàm: giới hạn.
 hàm giới hạn(x, nhỏ nhất, lớn nhất) {
+    nếu (nhỏ nhất > lớn nhất) {
+        ném "giới hạn: cận nhỏ nhất không được lớn hơn cận lớn nhất";
+    };
     nếu (x < nhỏ nhất) {
         trả về nhỏ nhất;
     };
