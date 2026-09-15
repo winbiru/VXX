@@ -1,0 +1,7 @@
+nhập parent;
+nhập shared;
+
+hàm main() {
+    in parent();
+    in shared();
+};

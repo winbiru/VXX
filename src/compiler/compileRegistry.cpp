@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -11,6 +12,7 @@
 #include <vector>
 
 #include "common/storeString.h"
+#include "vpp/compiler/package_resolver.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
@@ -203,27 +205,6 @@ namespace vietvm { namespace compiler {
         const std::string &moduleAlias = spec.alias;
         namespace fs = std::filesystem;
 
-        fs::path resolutionBase = state.importResolutionBase;
-        if (resolutionBase.empty()) {
-            resolutionBase = fs::current_path();
-        }
-        try {
-            resolutionBase = fs::absolute(resolutionBase).lexically_normal();
-        } catch (...) {
-            resolutionBase = resolutionBase.lexically_normal();
-        }
-
-        auto absoluteLexical = [&](const fs::path &candidate) {
-            fs::path resolved = candidate.is_absolute()
-                                    ? candidate
-                                    : resolutionBase / candidate;
-            try {
-                return fs::absolute(resolved).lexically_normal();
-            } catch (...) {
-                return resolved.lexically_normal();
-            }
-        };
-
         // Tạo tên nguồn dễ đọc cho debug metadata. Module vẫn dùng đường dẫn
         // tuyệt đối làm khóa runtime, còn stack trace ưu tiên đường dẫn tương đối
         // khi file nằm dưới thư mục làm việc hiện tại để kết quả ổn định giữa máy.
@@ -241,251 +222,14 @@ namespace vietvm { namespace compiler {
             return sourcePath.lexically_normal().u8string();
         };
 
-        // Determine path
-        std::string path = spec.target;
-
-        // Package shortcuts for the bundled standard packages.
-        if (path == "stdlib" || path == "chuẩn") {
-            path = vietvm::core::kStandardPackageMainFile;
+        std::optional<fs::path> installationHome;
+        if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
+            installationHome = vietvm::core::utf8Path(vppHome);
         }
-
-        // A package name may be quoted when it contains spaces, for example:
-        //
-        //     nhập "lõi";
-        //
-        // Quoting must not turn that into a file-only import.  Treat a target
-        // without a path component or extension as a package candidate whether
-        // it was quoted or not, while continuing to resolve an actual file
-        // before trying package directories.
-        // `std::filesystem::path(const char*)` uses the active Windows code
-        // page on MSVC. Import targets and bundled directory names are UTF-8,
-        // so construct every such path explicitly as UTF-8. Otherwise imports
-        // such as `nhập mạng;` fall back to `<project>/mạng.vi` on Windows.
-        const fs::path requestedPath = vietvm::core::utf8Path(path);
-        const bool bareModuleName = requestedPath.parent_path().empty() &&
-                                    requestedPath.extension().empty();
-        const std::string bareModule = path;
-
-        // Keep the previous bare `vpp_*` imports working. Standard packages
-        // live directly under `gói/<tên>`; `gói/chuẩn` is only the aggregate
-        // entrypoint. Local project packages with the same name still take
-        // precedence during lookup below.
-        static const std::unordered_map<std::string, std::string> packageAliases = {
-            {"vpp_core", "lõi"},
-            {"cốt lõi", "lõi"},
-            {"vpp_io", "nhập xuất"},
-            {"vào ra", "nhập xuất"},
-            {"vpp_http", "mạng"},
-            {"vpp_web", "mạng"},
-            {"mạng web", "mạng"},
-            {"vpp_system", "hệ thống"},
-            {"vpp_data", "dữ liệu"},
-            {"vpp_app", "ứng dụng"},
-            {"vpp_starters", "dựng"},
-            {"khởi động", "dựng"},
-        };
-        static const std::unordered_set<std::string> bundledPackageNames = {
-            "lõi",
-            "nhập xuất",
-            "mạng",
-            "hệ thống",
-            "dữ liệu",
-            "ứng dụng",
-            "dựng",
-            "kiểm thử",
-        };
-
-        std::vector<std::string> packageCandidates;
-        if (bareModuleName) {
-            packageCandidates.push_back(bareModule);
-            auto alias = packageAliases.find(bareModule);
-            if (alias != packageAliases.end()) {
-                packageCandidates.push_back(alias->second);
-            }
-        }
-
-        // For unquoted targets, append .vi only when there is no extension.
-        if (!spec.quoted) {
-            fs::path rawPath = vietvm::core::utf8Path(path);
-            if (rawPath.extension().empty()) {
-                path += ".vi";
-            }
-        }
-
-        fs::path p = vietvm::core::utf8Path(path);
-
-        // Compatibility fallbacks for the former flat package layout and the
-        // retired leaf shims. They are intentionally fallbacks so a project
-        // that owns a real file at an old path keeps working unchanged.
-        fs::path compatibilityPackageRedirect;
-        {
-            fs::path normalized = p.lexically_normal();
-            auto root = normalized.begin();
-            const std::string rootName = (root != normalized.end()) ? root->u8string() : "";
-            if (root != normalized.end() &&
-                vietvm::core::isPackageDirectoryName(rootName)) {
-                fs::path relativePath;
-                for (auto item = std::next(root); item != normalized.end(); ++item) {
-                    relativePath /= *item;
-                }
-
-                static const std::unordered_map<std::string, std::string> compatibilityModuleRedirects = {
-                    {"chuẩn/hỗ trợ/nhật ký.vi", "nhập xuất/nhật ký.vi"},
-                    {"chuẩn/hỗ trợ/xác thực.vi", "lõi/xác thực.vi"},
-                    {"ứng dụng/tương thích/api.vi", "ứng dụng/cầu nối/api.vi"},
-                    {"chuẩn/ứng dụng/tương thích/api.vi", "ứng dụng/cầu nối/api.vi"},
-                    {"khởi động/khởi động web.vi", "dựng/web.vi"},
-                    {"khởi động/khởi động dữ liệu.vi", "dựng/dữ liệu.vi"},
-                    {"khởi động/khởi động ứng dụng.vi", "dựng/ứng dụng.vi"},
-                    {"dựng/khởi động web.vi", "dựng/web.vi"},
-                    {"dựng/khởi động dữ liệu.vi", "dựng/dữ liệu.vi"},
-                    {"dựng/khởi động ứng dụng.vi", "dựng/ứng dụng.vi"},
-                    {"chuẩn/khởi động/khởi động web.vi", "dựng/web.vi"},
-                    {"chuẩn/khởi động/khởi động dữ liệu.vi", "dựng/dữ liệu.vi"},
-                    {"chuẩn/khởi động/khởi động ứng dụng.vi", "dựng/ứng dụng.vi"},
-                };
-
-                auto leafRedirect = compatibilityModuleRedirects.find(relativePath.generic_u8string());
-                if (leafRedirect != compatibilityModuleRedirects.end()) {
-                    compatibilityPackageRedirect = vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory) /
-                                            vietvm::core::utf8Path(leafRedirect->second);
-                } else {
-                    auto package = relativePath.begin();
-                    bool groupedStandardPackages = false;
-                    if (package != relativePath.end()) {
-                        const std::string groupName = package->u8string();
-                        if (groupName == vietvm::core::kStandardPackageDirectory) {
-                            groupedStandardPackages = true;
-                            ++package;
-                        }
-                    }
-
-                    if (groupedStandardPackages && package != relativePath.end() &&
-                        package->u8string() == vietvm::core::kPackageEntryFile) {
-                        compatibilityPackageRedirect =
-                            vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory) /
-                            vietvm::core::utf8Path(vietvm::core::kStandardPackageDirectory) /
-                            vietvm::core::utf8Path(vietvm::core::kPackageEntryFile);
-                        package = relativePath.end();
-                    }
-
-                    if (package != relativePath.end()) {
-                        std::string canonicalPackage;
-                        const std::string packageName = package->u8string();
-                        auto alias = packageAliases.find(packageName);
-                        if (alias != packageAliases.end()) {
-                            canonicalPackage = alias->second;
-                        } else if (bundledPackageNames.find(packageName) != bundledPackageNames.end()) {
-                            canonicalPackage = packageName;
-                        }
-
-                        if (!canonicalPackage.empty()) {
-                            compatibilityPackageRedirect = vietvm::core::utf8Path(vietvm::core::kPrimaryPackageDirectory) /
-                                                    vietvm::core::utf8Path(canonicalPackage);
-                            for (auto rest = std::next(package); rest != relativePath.end(); ++rest) {
-                                compatibilityPackageRedirect /= *rest;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // Resolve relative imports against the compilation context rather than
-        // the process working directory.
-        fs::path abs = absoluteLexical(p);
-
-        auto resolvePackageAtBase = [&](const fs::path &base, const std::string &packageName) {
-            const fs::path packagePath = vietvm::core::utf8Path(packageName);
-            fs::path packageMain = vietvm::core::packageEntryPath(base / packagePath);
-            fs::path packageRoot = base / packagePath;
-            fs::path packageSource = base / vietvm::core::utf8Path(packageName + ".vi");
-            if (fs::exists(packageMain)) {
-                abs = absoluteLexical(packageMain);
-                return true;
-            }
-            if (fs::exists(packageRoot) && fs::is_regular_file(packageRoot)) {
-                abs = absoluteLexical(packageRoot);
-                return true;
-            }
-            if (fs::exists(packageSource)) {
-                abs = absoluteLexical(packageSource);
-                return true;
-            }
-            return false;
-        };
-
-        // If resolved path does not exist, attempt to locate the file by searching
-        // upward from the compilation base and appending the requested path.
-        // This keeps imports like "src/tests/..." working when the entry file lives
-        // below the repository root without mutating or consulting process cwd.
-        if (!fs::exists(abs)) {
-            for (fs::path dir = resolutionBase; ; dir = dir.parent_path()) {
-                fs::path cand = dir / p;
-                if (fs::exists(cand)) {
-                    abs = absoluteLexical(cand);
-                    break;
-                }
-                if (!compatibilityPackageRedirect.empty()) {
-                    fs::path redirected = dir / compatibilityPackageRedirect;
-                    if (fs::exists(redirected)) {
-                        abs = absoluteLexical(redirected);
-                        break;
-                    }
-                }
-                if (bareModuleName) {
-                    for (const char *packageDirectory : vietvm::core::kPackageDirectoryNames) {
-                        const fs::path base = dir / vietvm::core::utf8Path(packageDirectory);
-                        for (const auto &packageName : packageCandidates) {
-                            if (resolvePackageAtBase(base, packageName)) {
-                                break;
-                            }
-                        }
-                        if (fs::exists(abs)) {
-                            break;
-                        }
-                    }
-                    if (fs::exists(abs)) {
-                        break;
-                    }
-                }
-                if (dir == dir.parent_path()) break; // reached filesystem root
-            }
-        }
-
-        // Installed releases keep the standard library beside the executable.
-        // The installer exposes that location through VPP_HOME, so a project
-        // outside the repository can import gói/chuẩn/... and bare bundled
-        // module names.
-        if (!fs::exists(abs)) {
-            if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
-                const fs::path vppHomePath =
-                    absoluteLexical(vietvm::core::utf8Path(vppHome));
-                fs::path bundled = vppHomePath / p;
-                if (fs::exists(bundled)) {
-                    abs = absoluteLexical(bundled);
-                }
-                if (!fs::exists(abs) && !compatibilityPackageRedirect.empty()) {
-                    fs::path redirected = vppHomePath / compatibilityPackageRedirect;
-                    if (fs::exists(redirected)) {
-                        abs = absoluteLexical(redirected);
-                    }
-                }
-                if (!fs::exists(abs) && bareModuleName) {
-                    for (const char *packageDir : vietvm::core::kPackageDirectoryNames) {
-                        for (const auto &packageName : packageCandidates) {
-                            if (resolvePackageAtBase(vppHomePath / vietvm::core::utf8Path(packageDir), packageName)) {
-                                break;
-                            }
-                        }
-                        if (fs::exists(abs)) {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        std::string canonical = abs.u8string();
+        const PackageResolver resolver(state.importResolutionBase, installationHome);
+        const PackageResolution resolved = resolver.resolve(spec.target, spec.quoted);
+        const fs::path abs = resolved.path;
+        const std::string canonical = abs.u8string();
 
         auto &importedFiles = state.importedFiles;
         if (importedFiles.find(canonical) != importedFiles.end()) {

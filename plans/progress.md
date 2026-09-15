@@ -275,8 +275,10 @@ Long-term: 15/40
     Local ASan+UBSan full CTest hiện 16/16 sau khi sửa hai lỗi sanitizer; Ubuntu CI đã bật
     leak detection tường minh. Stack trace source span/function/method/module đã hoàn tất;
     còn CI Linux leak gate để đóng runtime hardening 0.8.
-16. [ ] **Package 0.9:** chốt manifest/project layout; tách resolver; xây semver/range,
-    dependency conflict diagnostic, deterministic lockfile, cache/offline + local/Git/registry source.
+16. [ ] **Package 0.9:** manifest `vpp.json` schema 1/project layout đã chốt; package/bare-module
+    lookup đã tách sang `PackageResolver`; SemVer/range và conflict check khi khóa đã có.
+    `vpp.lock` schema 1 sinh deterministic và có content fingerprint. Còn dependency solver
+    transitive, restore/install bắt buộc theo lockfile, cache/offline và Git/registry source.
 17. [ ] **Stdlib 1.0:** audit UTF-8, filesystem/path, time/date và các package hiện có;
     bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;

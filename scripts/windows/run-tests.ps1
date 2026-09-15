@@ -379,6 +379,7 @@ try {
         "src/tests/kiem_tra_rong_va_map.vi",
         "src/tests/kiem_tra_namespace_module.vi",
         "src/tests/kiem_tra_package_modules.vi",
+        "src/tests/kiem_tra_package_09.vi",
         "src/tests/kiem_tra_package_tieng_viet.vi",
         "src/tests/kiem_tra_stdlib.vi",
         "src/tests/kiem_tra_stdlib_starter.vi",

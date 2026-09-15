@@ -62,11 +62,17 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 
 ## 3. Module và package system dùng được cho dự án thật
 
-- [ ] Chốt project manifest (`vpp.json` hoặc `vpp.toml`) và layout project chuẩn.
-- [ ] Tách hoàn toàn package/bare-module resolution khỏi compatibility path trong compiler;
-  resolver phải sở hữu identity, source và dependency policy.
-- [ ] Hỗ trợ semantic versioning + version range và diagnostic conflict rõ ràng.
+- [x] Chốt project manifest `vpp.json` schema 1 và layout project chuẩn; model/parser/writer
+  dùng chung nằm ở core, đọc tương thích manifest legacy `gói: [...]` và ghi canonical
+  deterministic. Contract được mô tả trong `docs/package-system.md`.
+- [x] Tách package/bare-module resolution khỏi `compileRegistry`: `PackageResolver` sở hữu
+  lookup file/project package, compatibility redirect, alias chuẩn và `VPP_HOME`; unit test
+  khóa thứ tự ưu tiên và UTF-8 package name.
+- [x] Hỗ trợ Semantic Versioning 2.0 + range `*`, exact, `^`, `~`, comparator AND; `vpp khóa`
+  kiểm tra exact version đã cài với range manifest và trả conflict rõ ràng.
 - [ ] Tạo deterministic lockfile và reproducible install/build.
+  `vpp.lock` schema 1 + deterministic writer/content fingerprint đã có; còn restore/install
+  từ lockfile và bắt buộc build dùng lock để đóng đầy đủ mục này.
 - [ ] Hỗ trợ package cache/offline, local path package và Git package.
 - [ ] Thiết kế registry package và metadata tối thiểu cho publish/install.
 - [ ] Hoàn thiện CLI dependency flow tương đương `vpp cài`, `vpp cập nhật`, `vpp xóa`,

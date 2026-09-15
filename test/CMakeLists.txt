@@ -46,6 +46,46 @@ target_link_libraries(vpp-message-constants-unit PRIVATE vpp-core)
 add_test(NAME vpp-message-constants-unit
          COMMAND vpp-message-constants-unit)
 
+add_executable(vpp-semver-unit
+    semver_tests.cpp)
+
+target_link_libraries(vpp-semver-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-semver-unit
+         COMMAND vpp-semver-unit)
+
+add_executable(vpp-package-manifest-unit
+    package_manifest_tests.cpp)
+
+target_link_libraries(vpp-package-manifest-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-package-manifest-unit
+         COMMAND vpp-package-manifest-unit)
+
+add_executable(vpp-package-solver-unit
+    package_solver_tests.cpp)
+
+target_link_libraries(vpp-package-solver-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-package-solver-unit
+         COMMAND vpp-package-solver-unit)
+
+add_executable(vpp-package-installer-unit
+    package_installer_tests.cpp)
+
+target_link_libraries(vpp-package-installer-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-package-installer-unit
+         COMMAND vpp-package-installer-unit)
+
+add_executable(vpp-package-cache-unit
+    package_cache_tests.cpp)
+
+target_link_libraries(vpp-package-cache-unit PRIVATE vpp-core)
+
+add_test(NAME vpp-package-cache-unit
+         COMMAND vpp-package-cache-unit)
+
 add_executable(vpp-pipeline-unit
     pipeline_tests.cpp)
 
@@ -61,6 +101,14 @@ target_link_libraries(vpp-module-graph-unit PRIVATE vpp-compiler)
 
 add_test(NAME vpp-module-graph-unit
          COMMAND vpp-module-graph-unit)
+
+add_executable(vpp-package-resolver-unit
+    package_resolver_tests.cpp)
+
+target_link_libraries(vpp-package-resolver-unit PRIVATE vpp-compiler)
+
+add_test(NAME vpp-package-resolver-unit
+         COMMAND vpp-package-resolver-unit)
 
 add_executable(vpp-recursive-ir-unit
     recursive_ir_tests.cpp)
@@ -120,6 +168,12 @@ add_test(NAME vpp-cli-dump-ir
 set_tests_properties(vpp-cli-dump-ir PROPERTIES
     PASS_REGULAR_EXPRESSION "định nghĩa hàm")
 
+add_test(NAME vpp-package-cli-unit
+         COMMAND ${CMAKE_COMMAND}
+                 -DVPP_EXEC=$<TARGET_FILE:vpp-cli>
+                 -DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/package-cli-case
+                 -P ${CMAKE_CURRENT_SOURCE_DIR}/package_cli_tests.cmake)
+
 foreach(vpp_test_target IN ITEMS
         vpp-compiler-support-unit
         vpp-vm-opcode-smoke-unit
@@ -127,8 +181,14 @@ foreach(vpp_test_target IN ITEMS
         vpp-runtime-value-unit
         vpp-opcode-and-native-constants-unit
         vpp-message-constants-unit
+        vpp-semver-unit
+        vpp-package-manifest-unit
+        vpp-package-solver-unit
+        vpp-package-installer-unit
+        vpp-package-cache-unit
         vpp-pipeline-unit
         vpp-module-graph-unit
+        vpp-package-resolver-unit
         vpp-recursive-ir-unit
         vpp-direct-codegen-unit
         vpp-object-model-integration-unit

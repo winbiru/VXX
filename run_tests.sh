@@ -218,6 +218,7 @@ TESTS=(
   src/tests/kiem_tra_module_alias_lifecycle.vi
   src/tests/kiem_tra_module_reexport.vi
   src/tests/kiem_tra_package_modules.vi
+  src/tests/kiem_tra_package_09.vi
   src/tests/kiem_tra_package_tieng_viet.vi
   src/tests/kiem_tra_stdlib.vi
   src/tests/kiem_tra_stdlib_starter.vi

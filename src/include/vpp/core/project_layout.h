@@ -11,6 +11,9 @@ namespace vietvm::core {
 // utf8Path() rather than fs::path(const char*).
 inline constexpr const char *kCliVersion = "0.1.0";
 inline constexpr const char *kProjectManifestFile = "vpp.json";
+inline constexpr const char *kPackageLockFile = "vpp.lock";
+inline constexpr const char *kPackageStateDirectory = ".vpp";
+inline constexpr const char *kPackageCacheDirectory = "cache";
 inline constexpr const char *kPackageEntryFile = "main.vi";
 inline constexpr const char *kPrimaryPackageDirectory = u8"gói";
 // `gói/chuẩn` là package tổng hợp. Các package chuẩn (`lõi`, `mạng`, ...)
