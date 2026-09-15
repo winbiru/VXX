@@ -88,10 +88,10 @@ enum Opcode {
     OP_THU_KET_THUC = 82,        // kết thúc try block, operand = past_catch_addr
     OP_BAT_LOI = 83,             // bắt lỗi (catch begin, operandIndex = err_var_id or -1)
     OP_RONG_GIA_TRI = 84,        // rỗng (null)
-    OP_MAP_LITERAL = 85,         // map literal (operandIndex = encoded map in string pool)
+    OP_MAP_LITERAL = 85,         // map literal; operandIndex>=0: encoded pool, -1: operand cặp key/value trên stack
     OP_GOI_GIAN_TIEP = 86,       // gọi hàm qua giá trị biến (function ref)
     OP_PARAM_MAC_DINH = 87,      // bind tham số với giá trị mặc định
-    OP_LIST_LITERAL = 88,        // list literal (operandIndex = encoded list in string pool)
+    OP_LIST_LITERAL = 88,        // list literal; operandIndex>=0: encoded pool, -1: operand phần tử trên stack
     OP_DOC_CHI_SO = 89,          // read list/string element by integer index
     OP_GAN_CHI_SO = 90,          // assign list element by integer index
     OP_TAO_LOP = 91,             // class name=operandIndex; operandValue=superclass string index+1, 0=none

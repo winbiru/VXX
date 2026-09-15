@@ -1,0 +1,121 @@
+nhập lõi;
+nhập "ma-don-hang";
+nhập "../domain/don_hang.vi";
+
+lớp công khai DịchVụĐơnHàng {
+    hàm khởi tạo(khoSảnPhẩm, khoĐơnHàng) {
+        mình.khoSảnPhẩm = khoSảnPhẩm;
+        mình.khoĐơnHàng = khoĐơnHàng;
+    }
+
+    hàm tấtCả() {
+        kho = mình.khoĐơnHàng;
+        danhSách = kho.tấtCả();
+        kếtQuả = [];
+        lặp(i = 0; i < độ dài(danhSách); i = i + 1) {
+            đơn = danhSách[i];
+            thêm(kếtQuả, đơn.thànhMap());
+        };
+        trả về kếtQuả;
+    }
+
+    hàm tìmTheoId(id) {
+        kho = mình.khoĐơnHàng;
+        đơn = kho.tìmTheoId(id);
+        nếu (đơn == rỗng) {
+            ném "Dịch vụ đơn hàng: không tìm thấy " + id;
+        };
+        trả về đơn;
+    }
+
+    hàm gomSốLượng(cácMục) {
+        nếu (độ dài(cácMục) == 0) {
+            ném "Dịch vụ đơn hàng: danh sách sản phẩm rỗng";
+        };
+        tổngTheoMã = {};
+        lặp(i = 0; i < độ dài(cácMục); i = i + 1) {
+            mục = cácMục[i];
+            mã = lấy map(mục, "maSanPham", "");
+            sốLượng = lấy map(mục, "soLuong", 0);
+            nếu (mã == "") {
+                ném "Dịch vụ đơn hàng: thiếu maSanPham";
+            };
+            nếu (sốLượng <= 0) {
+                ném "Dịch vụ đơn hàng: soLuong phải lớn hơn 0";
+            };
+            hiệnTại = lấy map(tổngTheoMã, mã, 0);
+            đặt map(tổngTheoMã, mã, hiệnTại + sốLượng);
+        };
+        trả về tổngTheoMã;
+    }
+
+    hàm đặtHàng(kháchHàng, cácMục) {
+        nếu (kháchHàng == "") {
+            ném "Dịch vụ đơn hàng: khách hàng không được rỗng";
+        };
+
+        tổngTheoMã = mình.gomSốLượng(cácMục);
+        cácMã = khóa map(tổngTheoMã);
+        khoSảnPhẩm = mình.khoSảnPhẩm;
+        cácSảnPhẩm = [];
+
+        // Pass 1: chỉ kiểm tra. Chưa thay đổi tồn kho nếu có mục nào sai.
+        lặp(i = 0; i < độ dài(cácMã); i = i + 1) {
+            mã = cácMã[i];
+            sốLượng = lấy map(tổngTheoMã, mã, 0);
+            sảnPhẩm = khoSảnPhẩm.tìmTheoId(mã);
+            nếu (sảnPhẩm == rỗng) {
+                ném "Dịch vụ đơn hàng: sản phẩm không tồn tại: " + mã;
+            };
+            nếu (!sảnPhẩm.cònHàng(sốLượng)) {
+                ném "Dịch vụ đơn hàng: không đủ tồn kho cho " + mã;
+            };
+            thêm(cácSảnPhẩm, sảnPhẩm);
+        };
+
+        // Pass 2: tạo snapshot dòng đơn và cập nhật tồn kho.
+        cácDòng = [];
+        lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
+            sảnPhẩm = cácSảnPhẩm[i];
+            sốLượng = lấy map(tổngTheoMã, sảnPhẩm.id, 0);
+            dòng = DòngĐơnHàng(sảnPhẩm.id, sảnPhẩm.tên, sảnPhẩm.giá, sốLượng);
+            dòng.kiểmTraHợpLệ();
+            thêm(cácDòng, dòng);
+            sảnPhẩm.xuấtKho(sốLượng);
+            khoSảnPhẩm.lưu(sảnPhẩm);
+        };
+
+        khoĐơnHàng = mình.khoĐơnHàng;
+        mãĐơn = tạo mã hóa đơn(khoĐơnHàng.sốLượng() + 1);
+        đơn = ĐơnHàng(mãĐơn, kháchHàng, cácDòng, "MOI");
+        đơn.kiểmTraHợpLệ();
+        đơn.xácNhận();
+        khoĐơnHàng.tạoMới(đơn);
+        trả về đơn;
+    }
+
+    hàm hủy(id) {
+        khoĐơnHàng = mình.khoĐơnHàng;
+        khoSảnPhẩm = mình.khoSảnPhẩm;
+        đơn = mình.tìmTheoId(id);
+        đơn.hủy();
+
+        cácDòng = đơn.cácDòng;
+        lặp(i = 0; i < độ dài(cácDòng); i = i + 1) {
+            dòng = cácDòng[i];
+            sảnPhẩm = khoSảnPhẩm.tìmTheoId(dòng.mãSảnPhẩm);
+            nếu (sảnPhẩm == rỗng) {
+                ném "Dịch vụ đơn hàng: không thể hoàn kho sản phẩm " + dòng.mãSảnPhẩm;
+            };
+            sảnPhẩm.hoànKho(dòng.sốLượng);
+            khoSảnPhẩm.lưu(sảnPhẩm);
+        };
+
+        khoĐơnHàng.lưu(đơn);
+        trả về đơn;
+    }
+};
+
+hàm công khai tạo dịch vụ đơn hàng(khoSảnPhẩm, khoĐơnHàng) {
+    trả về DịchVụĐơnHàng(khoSảnPhẩm, khoĐơnHàng);
+};

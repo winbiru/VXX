@@ -1,0 +1,40 @@
+nhập lõi;
+nhập mạng;
+
+lớp công khai RouterApi {
+    hàm khởi tạo(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
+        mình.healthController = healthController;
+        mình.sảnPhẩmController = sảnPhẩmController;
+        mình.đơnHàngController = đơnHàngController;
+        mình.báoCáoController = báoCáoController;
+        mình.notFoundController = notFoundController;
+    }
+
+    hàm xửLý(requestId) {
+        path = mạng path yêu cầu(requestId);
+
+        nếu (path == "/health") {
+            controller = mình.healthController;
+            trả về controller.xửLý(requestId);
+        };
+        nếu (path == "/san-pham" || path == "/san-pham/thong-ke" || path == "/san-pham/nhap-kho") {
+            controller = mình.sảnPhẩmController;
+            trả về controller.xửLý(requestId);
+        };
+        nếu (path == "/don-hang" || path == "/don-hang/huy") {
+            controller = mình.đơnHàngController;
+            trả về controller.xửLý(requestId);
+        };
+        nếu (path == "/bao-cao") {
+            controller = mình.báoCáoController;
+            trả về controller.xửLý(requestId);
+        };
+
+        controller = mình.notFoundController;
+        trả về controller.xửLý(requestId);
+    }
+};
+
+hàm công khai tạo router api(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController) {
+    trả về RouterApi(healthController, sảnPhẩmController, đơnHàngController, báoCáoController, notFoundController);
+};

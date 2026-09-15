@@ -79,8 +79,21 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
 
             case OP_CHUOI:
             case OP_BIEN_SO_FLOAT:
+                if (auto result = requirePoolIndex(instruction.operandIndex,
+                                                   "literal")) {
+                    return result;
+                }
+                break;
+
             case OP_MAP_LITERAL:
             case OP_LIST_LITERAL:
+                if (instruction.operandIndex == -1) {
+                    if (instruction.operand < 0) {
+                        return issue(index, rawOpcode,
+                                     "số phần tử collection động âm");
+                    }
+                    break;
+                }
                 if (auto result = requirePoolIndex(instruction.operandIndex,
                                                    "literal")) {
                     return result;

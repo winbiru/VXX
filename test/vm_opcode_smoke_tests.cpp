@@ -437,6 +437,26 @@ void testNestedMapListWireDecode() {
                 "nested map/list literal decode");
 }
 
+void testDynamicCollectionLiteralStackMode() {
+    const std::vector<Instruction> dynamicMap = {
+        {OP_CHUOI, 0, 0, 0}, integer(7),
+        {OP_MAP_LITERAL, 1, -1, 0}, opcode(OP_IN),
+        opcode(OP_DUNG_CHUONG_TRINH),
+    };
+    expectEqual(runAndCapture(dynamicMap, {"id"}),
+                "{\"id\": 7}\n",
+                "stack-backed map literal consumes key/value pairs");
+
+    const std::vector<Instruction> dynamicList = {
+        integer(7), integer(9),
+        {OP_LIST_LITERAL, 2, -1, 0}, opcode(OP_IN),
+        opcode(OP_DUNG_CHUONG_TRINH),
+    };
+    expectEqual(runAndCapture(dynamicList, {}),
+                "[7, 9]\n",
+                "stack-backed list literal preserves source order");
+}
+
 } // namespace
 
 int main() {
@@ -462,6 +482,7 @@ int main() {
         testListIndexAssignment();
         testNestedListWireDecodeAndChainedRead();
         testNestedMapListWireDecode();
+        testDynamicCollectionLiteralStackMode();
     } catch (const std::exception &error) {
         std::cerr << "FAIL: VM raised an exception: " << error.what() << '\n';
         return 1;

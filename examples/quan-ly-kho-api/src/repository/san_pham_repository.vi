@@ -1,0 +1,95 @@
+nhập lõi;
+nhập mạng;
+nhập "nhập xuất";
+nhập "hop_dong.vi";
+nhập "../domain/san_pham.vi";
+
+lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
+    hàm khởi tạo(đườngDẫn) {
+        mình.đườngDẫn = đườngDẫn;
+        mình.khởiTạoNếuThiếu();
+    }
+
+    hàm khởiTạoNếuThiếu() {
+        đườngDẫn = mình.đườngDẫn;
+        nếu (!đường dẫn tồn tại(đườngDẫn)) {
+            thưMục = đường dẫn cha(đườngDẫn);
+            nếu (thưMục != "" && !đường dẫn tồn tại(thưMục)) {
+                tạo thư mục(thưMục);
+            };
+            ghi tệp(đườngDẫn, "[]");
+        };
+        trả về đúng;
+    }
+
+    hàm đọcMap() {
+        nộiDung = đọc tệp(mình.đườngDẫn);
+        nếu (nộiDung == "") {
+            trả về [];
+        };
+        dữLiệu = json phân tích(nộiDung);
+        nếu (loại của(dữLiệu) != "danh sách") {
+            ném "Kho sản phẩm: tệp JSON gốc phải là mảng";
+        };
+        trả về dữLiệu;
+    }
+
+    hàm ghiMap(danhSách) {
+        nộiDung = json tạo(danhSách);
+        ghi tệp(mình.đườngDẫn, nộiDung);
+        trả về độ dài(danhSách);
+    }
+
+    hàm tấtCả() {
+        raw = mình.đọcMap();
+        kếtQuả = [];
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            thêm(kếtQuả, sản phẩm từ map(raw[i]));
+        };
+        trả về kếtQuả;
+    }
+
+    hàm tìmTheoId(id) {
+        danhSáchSảnPhẩm = mình.tấtCả();
+        lặp(i = 0; i < độ dài(danhSáchSảnPhẩm); i = i + 1) {
+            sảnPhẩm = danhSáchSảnPhẩm[i];
+            nếu (sảnPhẩm.id == id) {
+                trả về sảnPhẩm;
+            };
+        };
+        trả về rỗng;
+    }
+
+    hàm tạoMới(sảnPhẩm) {
+        sảnPhẩm.kiểmTraHợpLệ();
+        nếu (mình.tìmTheoId(sảnPhẩm.id) != rỗng) {
+            ném "Kho sản phẩm: id đã tồn tại: " + sảnPhẩm.id;
+        };
+        raw = mình.đọcMap();
+        thêm(raw, sảnPhẩm.thànhMap());
+        mình.ghiMap(raw);
+        trả về sảnPhẩm;
+    }
+
+    hàm lưu(sảnPhẩm) {
+        sảnPhẩm.kiểmTraHợpLệ();
+        raw = mình.đọcMap();
+        tìmThấy = sai;
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            item = raw[i];
+            nếu (lấy map(item, "id", "") == sảnPhẩm.id) {
+                raw[i] = sảnPhẩm.thànhMap();
+                tìmThấy = đúng;
+            };
+        };
+        nếu (!tìmThấy) {
+            ném "Kho sản phẩm: không tìm thấy " + sảnPhẩm.id;
+        };
+        mình.ghiMap(raw);
+        trả về sảnPhẩm;
+    }
+};
+
+hàm công khai tạo kho sản phẩm tệp(đườngDẫn) {
+    trả về KhoSảnPhẩmTệp(đườngDẫn);
+};

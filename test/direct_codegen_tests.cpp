@@ -1166,6 +1166,40 @@ void testCollectionLiteralsAreFirstClassIrValues() {
     vietvm::compiler::resetCompilationState();
 }
 
+void testDynamicCollectionLiteralsUseStackBackedEncoding() {
+    vietvm::compiler::resetCompilationState();
+    const auto artifacts = vietvm::compiler::compilePipeline(
+        "x = 7; m = {\"id\": x, \"next\": x + 1}; ds = [x, x + 2]; in m; in ds;",
+        keywordMap,
+        true);
+
+    expect(artifacts.unsupportedDirectIrRegions == 0,
+           "dynamic collection literals remain supported by direct IR");
+    expect(std::any_of(artifacts.bytecode.begin(), artifacts.bytecode.end(),
+                       [](const Instruction &instruction) {
+                           return instruction.op == OP_MAP_LITERAL &&
+                                  instruction.operandIndex == -1 &&
+                                  instruction.operand == 2;
+                       }),
+           "dynamic map literal emits stack-backed OP_MAP_LITERAL");
+    expect(std::any_of(artifacts.bytecode.begin(), artifacts.bytecode.end(),
+                       [](const Instruction &instruction) {
+                           return instruction.op == OP_LIST_LITERAL &&
+                                  instruction.operandIndex == -1 &&
+                                  instruction.operand == 2;
+                       }),
+           "dynamic list literal emits stack-backed OP_LIST_LITERAL");
+    vietvm::compiler::resetCompilationState();
+}
+
+void testIndexedAssignmentAcceptsCallRhs() {
+    expectDirectCompilationStable(
+        "lớp C { hàm f() { trả về {\"x\": 1}; } } "
+        "hàm main() { raw = [{\"x\": 0}]; c = C(); raw[0] = c.f(); in raw; }",
+        "indexed assignment can consume an instance-method call result",
+        true);
+}
+
 void testMapEscapesUseStableDirectEncoding() {
     const std::string source =
         R"VPP(m = {"line\nkey": "x\ny", "quote": "a\"b", "slash": "c\\d"}; in m;)VPP";
@@ -1259,6 +1293,8 @@ int main() {
     testPrimitiveListUsesDirectIrAndLegacyEncoding();
     testNestedListUsesSharedLiteralWireAndChainedIndexing();
     testCollectionLiteralsAreFirstClassIrValues();
+    testDynamicCollectionLiteralsUseStackBackedEncoding();
+    testIndexedAssignmentAcceptsCallRhs();
     testMapEscapesUseStableDirectEncoding();
     testMapGrammarAndContextReportDiagnostics();
     testGroupedStoresReportDiagnostics();

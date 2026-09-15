@@ -69,6 +69,23 @@ void testRejectsInvalidPoolReferences() {
            "verifier từ chối tên hàm mã hóa ngoài StringPool");
 }
 
+void testDynamicCollectionLiteralMetadata() {
+    const auto dynamicMap = vietvm::bytecode::verifyBytecode(
+        {{OP_MAP_LITERAL, 2, -1, 0}}, context(0));
+    expect(!dynamicMap.has_value(),
+           "verifier chấp nhận map động với số cặp key/value hợp lệ");
+
+    const auto dynamicList = vietvm::bytecode::verifyBytecode(
+        {{OP_LIST_LITERAL, 3, -1, 0}}, context(0));
+    expect(!dynamicList.has_value(),
+           "verifier chấp nhận list động với số phần tử hợp lệ");
+
+    const auto badDynamicMap = vietvm::bytecode::verifyBytecode(
+        {{OP_MAP_LITERAL, -1, -1, 0}}, context(0));
+    expect(badDynamicMap.has_value(),
+           "verifier từ chối collection động có số phần tử âm");
+}
+
 void testRejectsInvalidFunctionMetadata() {
     const auto badFunction = vietvm::bytecode::verifyBytecode(
         {{OP_HAM, 0, 9, 0}}, context(1, {7}));
@@ -88,6 +105,7 @@ int main() {
     testRejectsUnknownOpcode();
     testRejectsInvalidJumpAndTryTargets();
     testRejectsInvalidPoolReferences();
+    testDynamicCollectionLiteralMetadata();
     testRejectsInvalidFunctionMetadata();
 
     if (failures != 0) {

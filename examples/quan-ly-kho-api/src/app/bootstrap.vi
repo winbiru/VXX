@@ -1,0 +1,49 @@
+nhập "nhập xuất";
+nhập "../repository/san_pham_repository.vi";
+nhập "../repository/don_hang_repository.vi";
+nhập "../service/kho_service.vi";
+nhập "../service/don_hang_service.vi";
+nhập "../service/bao_cao_service.vi";
+nhập "../http/controller.vi";
+nhập "../http/router.vi";
+
+hàm công khai tạo ngữ cảnh ứng dụng(đườngDẫnSảnPhẩm, đườngDẫnĐơnHàng) {
+    khoSảnPhẩm = tạo kho sản phẩm tệp(đườngDẫnSảnPhẩm);
+    khoĐơnHàng = tạo kho đơn hàng tệp(đườngDẫnĐơnHàng);
+
+    dịchVụKho = tạo dịch vụ kho(khoSảnPhẩm);
+    dịchVụĐơnHàng = tạo dịch vụ đơn hàng(khoSảnPhẩm, khoĐơnHàng);
+    dịchVụBáoCáo = tạo dịch vụ báo cáo(khoSảnPhẩm, khoĐơnHàng);
+
+    healthController = HealthController();
+    sảnPhẩmController = SảnPhẩmController(dịchVụKho);
+    đơnHàngController = ĐơnHàngController(dịchVụĐơnHàng);
+    báoCáoController = BáoCáoController(dịchVụBáoCáo);
+    notFoundController = NotFoundController();
+
+    router = tạo router api(
+        healthController,
+        sảnPhẩmController,
+        đơnHàngController,
+        báoCáoController,
+        notFoundController
+    );
+
+    trả về {
+        "khoSanPham": khoSảnPhẩm,
+        "khoDonHang": khoĐơnHàng,
+        "dichVuKho": dịchVụKho,
+        "dichVuDonHang": dịchVụĐơnHàng,
+        "dichVuBaoCao": dịchVụBáoCáo,
+        "router": router
+    };
+};
+
+hàm công khai tạo ứng dụng(thưMụcDữLiệu) {
+    nếu (!đường dẫn tồn tại(thưMụcDữLiệu)) {
+        tạo thư mục(thưMụcDữLiệu);
+    };
+    đườngDẫnSảnPhẩm = đường dẫn nối(thưMụcDữLiệu, "san-pham.json");
+    đườngDẫnĐơnHàng = đường dẫn nối(thưMụcDữLiệu, "don-hang.json");
+    trả về tạo ngữ cảnh ứng dụng(đườngDẫnSảnPhẩm, đườngDẫnĐơnHàng);
+};

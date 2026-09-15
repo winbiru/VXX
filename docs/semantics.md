@@ -98,6 +98,13 @@ Regression end-to-end chính cho các quy tắc này nằm ở
 `src/tests/kiem_tra_semantics_gia_tri.vi`; helper-level regression nằm trong
 `test/runtime_value_tests.cpp`.
 
+## Chuỗi và file I/O
+
+Compiler giải mã escape trong literal chuỗi một lần, giống nhau cho chuỗi độc lập
+và chuỗi nằm trong list/map. `ghi tệp` ghi nguyên nội dung chuỗi runtime; nó không
+giải mã lại `\n`, `\"` hay `\\` trong dữ liệu JSON đã serialize. Vì vậy đọc lại tệp
+giữ nguyên nội dung truyền vào, kể cả dấu gạch chéo và dấu ngoặc kép.
+
 ## Module: export, re-export và chu trình import
 
 - Function/class/interface top-level không ghi visibility hoặc ghi `công khai` thuộc bề mặt

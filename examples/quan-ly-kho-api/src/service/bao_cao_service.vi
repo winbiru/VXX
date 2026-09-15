@@ -1,0 +1,55 @@
+nhập lõi;
+
+lớp công khai DịchVụBáoCáo {
+    hàm khởi tạo(khoSảnPhẩm, khoĐơnHàng) {
+        mình.khoSảnPhẩm = khoSảnPhẩm;
+        mình.khoĐơnHàng = khoĐơnHàng;
+    }
+
+    hàm tổngQuan() {
+        khoSảnPhẩm = mình.khoSảnPhẩm;
+        khoĐơnHàng = mình.khoĐơnHàng;
+        sảnPhẩm = khoSảnPhẩm.tấtCả();
+        đơnHàng = khoĐơnHàng.tấtCả();
+
+        giáTrịKho = 0;
+        sốLượngKho = 0;
+        mặtHàngSắpHết = 0;
+        lặp(i = 0; i < độ dài(sảnPhẩm); i = i + 1) {
+            sp = sảnPhẩm[i];
+            giáTrịKho = giáTrịKho + sp.giáTrịTồnKho();
+            sốLượngKho = sốLượngKho + sp.tồnKho;
+            nếu (sp.tồnKho <= 5) {
+                mặtHàngSắpHết = mặtHàngSắpHết + 1;
+            };
+        };
+
+        doanhThu = 0;
+        đơnĐãHủy = 0;
+        đơnHoạtĐộng = 0;
+        lặp(i = 0; i < độ dài(đơnHàng); i = i + 1) {
+            đơn = đơnHàng[i];
+            nếu (đơn.trạngThái == "DA_HUY") {
+                đơnĐãHủy = đơnĐãHủy + 1;
+            } nếu không {
+                đơnHoạtĐộng = đơnHoạtĐộng + 1;
+                doanhThu = doanhThu + đơn.tổngTiền();
+            };
+        };
+
+        trả về {
+            "soMatHang": độ dài(sảnPhẩm),
+            "soLuongTon": sốLượngKho,
+            "giaTriKho": giáTrịKho,
+            "matHangSapHet": mặtHàngSắpHết,
+            "soDonHang": độ dài(đơnHàng),
+            "donHoatDong": đơnHoạtĐộng,
+            "donDaHuy": đơnĐãHủy,
+            "doanhThu": doanhThu
+        };
+    }
+};
+
+hàm công khai tạo dịch vụ báo cáo(khoSảnPhẩm, khoĐơnHàng) {
+    trả về DịchVụBáoCáo(khoSảnPhẩm, khoĐơnHàng);
+};

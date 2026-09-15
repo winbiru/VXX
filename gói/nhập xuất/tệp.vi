@@ -8,7 +8,7 @@ hàm đọc tệp(đường dẫn) {
     ném "stdlib: đọc tệp native hook không khả dụng";
 };
 
-// Ghi chú hàm: ghi tệp.
+// Ghi nguyên nội dung chuỗi runtime, không giải mã lại escape (kể cả JSON).
 hàm ghi tệp(đường dẫn, nội dung) {
     ném "stdlib: ghi tệp native hook không khả dụng";
 };

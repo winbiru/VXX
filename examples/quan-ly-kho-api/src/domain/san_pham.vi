@@ -1,0 +1,100 @@
+nhập lõi;
+
+// Entity sản phẩm của miền nghiệp vụ.
+lớp công khai SảnPhẩm {
+    hàm khởi tạo(id, tên, giá, tồnKho, đãBán = 0, phiênBản = 1) {
+        mình.id = id;
+        mình.tên = tên;
+        mình.giá = giá;
+        mình.tồnKho = tồnKho;
+        mình.đãBán = đãBán;
+        mình.phiênBản = phiênBản;
+    }
+
+    hàm kiểmTraHợpLệ() {
+        nếu (mình.id == "") {
+            ném "Sản phẩm: id không được rỗng";
+        };
+        nếu (mình.tên == "") {
+            ném "Sản phẩm: tên không được rỗng";
+        };
+        nếu (mình.giá < 0) {
+            ném "Sản phẩm: giá không được âm";
+        };
+        nếu (mình.tồnKho < 0) {
+            ném "Sản phẩm: tồn kho không được âm";
+        };
+        trả về đúng;
+    }
+
+    hàm cònHàng(sốLượng) {
+        nếu (sốLượng <= 0) {
+            trả về sai;
+        };
+        trả về mình.tồnKho >= sốLượng;
+    }
+
+    hàm xuấtKho(sốLượng) {
+        mình.kiểmTraHợpLệ();
+        nếu (sốLượng <= 0) {
+            ném "Sản phẩm: số lượng xuất phải lớn hơn 0";
+        };
+        nếu (!mình.cònHàng(sốLượng)) {
+            ném "Sản phẩm " + mình.id + ": không đủ tồn kho";
+        };
+        mình.tồnKho = mình.tồnKho - sốLượng;
+        mình.đãBán = mình.đãBán + sốLượng;
+        mình.phiênBản = mình.phiênBản + 1;
+        trả về mình.tồnKho;
+    }
+
+    hàm nhậpKho(sốLượng) {
+        nếu (sốLượng <= 0) {
+            ném "Sản phẩm: số lượng nhập phải lớn hơn 0";
+        };
+        mình.tồnKho = mình.tồnKho + sốLượng;
+        mình.phiênBản = mình.phiênBản + 1;
+        trả về mình.tồnKho;
+    }
+
+    hàm hoànKho(sốLượng) {
+        nếu (sốLượng <= 0) {
+            ném "Sản phẩm: số lượng hoàn phải lớn hơn 0";
+        };
+        mình.tồnKho = mình.tồnKho + sốLượng;
+        mình.đãBán = mình.đãBán - sốLượng;
+        nếu (mình.đãBán < 0) {
+            mình.đãBán = 0;
+        };
+        mình.phiênBản = mình.phiênBản + 1;
+        trả về mình.tồnKho;
+    }
+
+    hàm giáTrịTồnKho() {
+        trả về mình.giá * mình.tồnKho;
+    }
+
+    hàm thànhMap() {
+        trả về {
+            "id": mình.id,
+            "ten": mình.tên,
+            "gia": mình.giá,
+            "tonKho": mình.tồnKho,
+            "daBan": mình.đãBán,
+            "phienBan": mình.phiênBản
+        };
+    }
+};
+
+hàm công khai sản phẩm từ map(dữLiệu) {
+    sảnPhẩm = SảnPhẩm(
+        lấy map(dữLiệu, "id", ""),
+        lấy map(dữLiệu, "ten", ""),
+        lấy map(dữLiệu, "gia", 0),
+        lấy map(dữLiệu, "tonKho", 0),
+        lấy map(dữLiệu, "daBan", 0),
+        lấy map(dữLiệu, "phienBan", 1)
+    );
+    sảnPhẩm.kiểmTraHợpLệ();
+    trả về sảnPhẩm;
+};

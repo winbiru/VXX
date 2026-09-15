@@ -1,0 +1,28 @@
+nhập lõi;
+nhập mạng;
+nhập "nhập xuất";
+
+hàm main() {
+    tên = "Cà phê \"Đậm\" ☕";
+    đườngDẫn = "C:\\new\\tea";
+    nộiDung = "dòng một\ndòng hai\tcuối";
+    tĩnh = ["Cà phê \"Đậm\" ☕", "C:\\new\\tea", "dòng một\ndòng hai\tcuối"];
+    động = [tên, đườngDẫn, nộiDung];
+    in tên == tĩnh[0];
+    in đườngDẫn == tĩnh[1];
+    in nộiDung == tĩnh[2];
+    in json tạo(động) == json tạo(tĩnh);
+
+    tệp = ".tmp_json_file_roundtrip.json";
+    dữLiệu = {"ten": tên, "duongDan": đườngDẫn, "noiDung": nộiDung};
+    encoded = json tạo(dữLiệu);
+    ghi tệp(tệp, encoded);
+    in đọc tệp(tệp) == encoded;
+    decoded = json phân tích(đọc tệp(tệp));
+    in lấy map(decoded, "ten", "") == tên;
+    in lấy map(decoded, "duongDan", "") == đườngDẫn;
+    in lấy map(decoded, "noiDung", "") == nộiDung;
+    ghi tệp(tệp, nộiDung);
+    in đọc tệp(tệp) == nộiDung;
+    xóa đường dẫn(tệp);
+};

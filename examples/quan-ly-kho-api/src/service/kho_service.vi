@@ -1,0 +1,81 @@
+nhập lõi;
+nhập "ma-don-hang";
+nhập "../domain/san_pham.vi";
+
+lớp công khai DịchVụKho {
+    hàm khởi tạo(khoSảnPhẩm) {
+        mình.khoSảnPhẩm = khoSảnPhẩm;
+    }
+
+    hàm tấtCả() {
+        kho = mình.khoSảnPhẩm;
+        danhSách = kho.tấtCả();
+        kếtQuả = [];
+        lặp(i = 0; i < độ dài(danhSách); i = i + 1) {
+            sảnPhẩm = danhSách[i];
+            thêm(kếtQuả, sảnPhẩm.thànhMap());
+        };
+        trả về kếtQuả;
+    }
+
+    hàm tìmTheoId(id) {
+        kho = mình.khoSảnPhẩm;
+        sảnPhẩm = kho.tìmTheoId(id);
+        nếu (sảnPhẩm == rỗng) {
+            ném "Dịch vụ kho: không tìm thấy sản phẩm " + id;
+        };
+        trả về sảnPhẩm;
+    }
+
+    hàm tạo(id, tên, giá, tồnKho) {
+        kho = mình.khoSảnPhẩm;
+        mã = id;
+        nếu (mã == "") {
+            mã = tạo mã sản phẩm(độ dài(kho.tấtCả()) + 1);
+        };
+        sảnPhẩm = SảnPhẩm(mã, tên, giá, tồnKho, 0, 1);
+        sảnPhẩm.kiểmTraHợpLệ();
+        kho.tạoMới(sảnPhẩm);
+        trả về sảnPhẩm;
+    }
+
+    hàm nhậpKho(id, sốLượng) {
+        sảnPhẩm = mình.tìmTheoId(id);
+        sảnPhẩm.nhậpKho(sốLượng);
+        kho = mình.khoSảnPhẩm;
+        kho.lưu(sảnPhẩm);
+        trả về sảnPhẩm;
+    }
+
+    hàm thốngKê() {
+        kho = mình.khoSảnPhẩm;
+        danhSách = kho.tấtCả();
+        tổngMặtHàng = độ dài(danhSách);
+        tổngSốLượng = 0;
+        tổngGiáTrị = 0;
+        tổngĐãBán = 0;
+        sắpHết = [];
+
+        lặp(i = 0; i < độ dài(danhSách); i = i + 1) {
+            sảnPhẩm = danhSách[i];
+            tổngSốLượng = tổngSốLượng + sảnPhẩm.tồnKho;
+            tổngGiáTrị = tổngGiáTrị + sảnPhẩm.giáTrịTồnKho();
+            tổngĐãBán = tổngĐãBán + sảnPhẩm.đãBán;
+            nếu (sảnPhẩm.tồnKho <= 5) {
+                thêm(sắpHết, sảnPhẩm.thànhMap());
+            };
+        };
+
+        trả về {
+            "tongMatHang": tổngMặtHàng,
+            "tongSoLuongTon": tổngSốLượng,
+            "tongGiaTriTon": tổngGiáTrị,
+            "tongDaBan": tổngĐãBán,
+            "sapHetHang": sắpHết
+        };
+    }
+};
+
+hàm công khai tạo dịch vụ kho(khoSảnPhẩm) {
+    trả về DịchVụKho(khoSảnPhẩm);
+};

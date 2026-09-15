@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "name": "quan-ly-kho-api",
+  "version": "1.0.0",
+  "dependencies": [
+    {"name": "ma-don-hang", "version": "1.0.0", "source": "path", "location": "../ma-don-hang"}
+  ]
+}

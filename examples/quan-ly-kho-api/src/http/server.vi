@@ -1,0 +1,26 @@
+nhập mạng;
+
+lớp công khai MáyChủKho {
+    hàm khởi tạo(cổng, router) {
+        mình.cổng = cổng;
+        mình.router = router;
+    }
+
+    hàm chạy() {
+        serverId = mạng mở máy chủ api(mình.cổng);
+        router = mình.router;
+        in "Quan ly kho API dang lang nghe tai http://127.0.0.1:" + mình.cổng;
+        lặp(i = 0; i < 2147483647; i = i + 1) {
+            requestId = mạng lấy yêu cầu kế tiếp(serverId);
+            nếu (requestId == "") {
+                bỏ qua;
+            };
+            router.xửLý(requestId);
+        };
+        mạng đóng máy chủ api(serverId);
+    }
+};
+
+hàm công khai tạo máy chủ kho(cổng, router) {
+    trả về MáyChủKho(cổng, router);
+};
