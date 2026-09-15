@@ -1,0 +1,8 @@
+nhập "../src/hoa_don.vi";
+
+hàm main() {
+    hóaĐơn = HóaĐơn(120000, 15000, 10000);
+    nếu (hóaĐơn.tổngThanhToán() != 125000) {
+        ném "tổng thanh toán không đúng";
+    };
+};

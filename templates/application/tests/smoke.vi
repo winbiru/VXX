@@ -1,0 +1,7 @@
+// Smoke test tối thiểu; `kiểm thử` xem file đạt khi chương trình chạy không lỗi.
+hàm main() {
+    kếtQuả = 2 + 3;
+    nếu (kếtQuả != 5) {
+        ném "phép cộng cơ bản trả kết quả sai";
+    };
+};

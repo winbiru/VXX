@@ -8,9 +8,12 @@
     { "include": "#strings" },
     { "include": "#imports" },
     { "include": "#classDefinitions" },
+    { "include": "#interfaceDefinitions" },
     { "include": "#functionDefinitions" },
     { "include": "#controlKeywords" },
+    { "include": "#typeRelationKeywords" },
     { "include": "#storageKeywords" },
+    { "include": "#receiverKeywords" },
     { "include": "#constants" },
     { "include": "#numbers" },
     { "include": "#builtins" },
@@ -111,6 +114,19 @@
         }
       ]
     },
+    "interfaceDefinitions": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(giao[ \\t]+diện)(?:[ \\t]+(công[ \\t]+khai|riêng[ \\t]+tư|bảo[ \\t]+vệ))?[ \\t]+([\\p{L}_][\\p{L}\\p{N}_]*)",
+          "name": "meta.interface.definition.vietvm",
+          "captures": {
+            "1": { "name": "storage.type.interface.vietvm" },
+            "2": { "name": "storage.modifier.access.vietvm" },
+            "3": { "name": "entity.name.type.class.vietvm" }
+          }
+        }
+      ]
+    },
     "functionDefinitions": {
       "patterns": [
         {
@@ -145,6 +161,14 @@
         }
       ]
     },
+    "typeRelationKeywords": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(kế[ \\t]+thừa|triển[ \\t]+khai)(?![\\p{L}\\p{N}_])",
+          "name": "keyword.other.inheritance.vietvm"
+        }
+      ]
+    },
     "storageKeywords": {
       "patterns": [
         {
@@ -154,6 +178,14 @@
         {
           "match": "(?<![\\p{L}\\p{N}_])(biến)(?![\\p{L}\\p{N}_])",
           "name": "storage.type.variable.vietvm"
+        }
+      ]
+    },
+    "receiverKeywords": {
+      "patterns": [
+        {
+          "match": "(?<![\\p{L}\\p{N}_])(mình|gốc)(?![\\p{L}\\p{N}_])",
+          "name": "variable.language.receiver.vietvm"
         }
       ]
     },

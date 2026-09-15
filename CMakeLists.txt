@@ -63,7 +63,8 @@ set(VPP_FRONTEND_SOURCES
     ${CMAKE_SOURCE_DIR}/src/frontend/ast.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/parser.cpp)
 set(VPP_BYTECODE_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/bytecode/opcode.cpp)
+    ${CMAKE_SOURCE_DIR}/src/bytecode/opcode.cpp
+    ${CMAKE_SOURCE_DIR}/src/bytecode/verifier.cpp)
 set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/support/expression.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/storeString.cpp

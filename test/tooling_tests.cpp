@@ -294,6 +294,62 @@ void testDisassemblerLabelsOnlyRealStringPoolOperands() {
            "default parameters label the pool entry stored in operand");
 }
 
+void testFormatterPreservesCommentsTokensAndIsIdempotent() {
+    const std::string source =
+        "// giữ bình luận đầu\n"
+        "hàm main(){x=1+2;/* giữ bình luận giữa */nếu(x>1){in \"Việt Nam\";}"
+        "lặp(i=0;i<2;i++){in i;}}\n";
+
+    const std::string formatted = vietvm::tooling::formatSource(source);
+    const std::string formattedAgain = vietvm::tooling::formatSource(formatted);
+
+    expect(formatted.find("// giữ bình luận đầu") != std::string::npos &&
+               formatted.find("/* giữ bình luận giữa */") != std::string::npos,
+           "formatter preserves line and block comments");
+    expect(formatted.find("nếu (x > 1)") != std::string::npos,
+           "formatter uses stable control-flow parenthesis spacing");
+    expect(formatted.find("lặp (i = 0; i < 2; i++)") != std::string::npos,
+           "formatter keeps for-loop header semicolons on one logical line");
+    expect(formatted.find("\"Việt Nam\"") != std::string::npos,
+           "formatter preserves UTF-8 string literal bytes");
+    expect(formatted == formattedAgain,
+           "formatter is idempotent");
+
+    const auto before = vietvm::compiler::postProcessTokens(
+        vietvm::compiler::tokenize(source));
+    const auto after = vietvm::compiler::postProcessTokens(
+        vietvm::compiler::tokenize(formatted));
+    expect(before == after,
+           "formatter preserves the compiler token stream");
+}
+
+void testLintDiagnosticsExposeSourceLocations() {
+    const auto valid = vietvm::tooling::lintDiagnostics(
+        "hàm main() { in \"đúng\"; }");
+    expect(valid.empty(), "linter accepts valid source without diagnostics");
+
+    const auto lexerError = vietvm::tooling::lintDiagnostics(
+        "hàm main() {\n  in \"chuỗi chưa đóng\n}");
+    expect(!lexerError.empty() &&
+               lexerError.front().severity == vietvm::tooling::DiagnosticSeverity::Error &&
+               lexerError.front().span.begin.line == 2 &&
+               lexerError.front().span.begin.column > 0,
+           "lexer diagnostic carries the actual source line and column");
+
+    const auto parseError = vietvm::tooling::lintDiagnostics(
+        "in 1;\n}\n");
+    expect(!parseError.empty() &&
+               parseError.front().severity == vietvm::tooling::DiagnosticSeverity::Error &&
+               parseError.front().span.begin.line == 2 &&
+               parseError.front().span.begin.column == 1,
+           "parser diagnostic carries its structural source span");
+
+    std::string compatibilityError;
+    expect(!vietvm::tooling::lintSource("in 1;\n}\n", compatibilityError) &&
+               !compatibilityError.empty(),
+           "legacy lintSource API remains compatible with structured diagnostics");
+}
+
 } // namespace
 
 int main() {
@@ -307,6 +363,8 @@ int main() {
     testStructuredLambdaPayloadsAreVisibleInAstAndIrDumps();
     testCallTargetKindsAreVisibleInIrDump();
     testDisassemblerLabelsOnlyRealStringPoolOperands();
+    testFormatterPreservesCommentsTokensAndIsIdempotent();
+    testLintDiagnosticsExposeSourceLocations();
 
     if (failures != 0) {
         std::cerr << failures << " tooling unit test(s) failed\n";

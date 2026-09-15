@@ -574,7 +574,7 @@ file(WRITE "${REGISTRY_SOURCE}/vpp.json"
 file(WRITE "${REGISTRY_SOURCE}/main.vi" "hàm registry_ping() { trả về 53; }\n")
 run_vpp("${REGISTRY_SOURCE}" publish "${REGISTRY_ROOT}")
 run_vpp_expect_failure("${REGISTRY_PROJECT}" lock)
-string(FIND "${LAST_STDERR}" "resolver yêu cầu 1.3.0" registry_stale_lock_diagnostic)
+string(FIND "${LAST_STDERR}" "bộ phân giải yêu cầu 1.3.0" registry_stale_lock_diagnostic)
 if(registry_stale_lock_diagnostic EQUAL -1)
     message(FATAL_ERROR "registry lock did not reject stale installed version:\n${LAST_STDERR}")
 endif()

@@ -132,25 +132,63 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   callable lookup và recursive import nhận registry tường minh; CLI/tooling/`compileSource`
   dùng `CompilationContext`. Facade thread-local chỉ còn cho compatibility test/caller cũ,
   và regression "poison legacy registry" khóa việc context-driven compile không phụ thuộc nó.
-- [ ] Thêm fuzzing cho lexer/parser và malformed-source corpus có seed cố định.
-- [ ] Thêm malformed AST/invalid IR tests và bytecode verifier trước khi VM thực thi input
-  không tin cậy.
+- [x] Thêm fuzzing cho lexer/parser và malformed-source corpus có seed cố định.
+  `vpp-frontend-fuzz-unit` chạy corpus malformed cố định cùng 512 input sinh xác định từ
+  seed `0x56505031`, yêu cầu mọi input hoặc parse thành công với ExprId/LambdaId arena liên
+  tục hoặc bị từ chối bằng lỗi có kiểm soát; chạy lặp cùng seed phải sinh đúng cùng corpus.
+- [x] Thêm malformed AST/invalid IR tests và bytecode verifier trước khi VM thực thi input
+  không tin cậy. AST có ExprId ngoài arena/chu trình được hạ thành unsupported IR thay vì
+  truy cập ngoài biên; direct codegen từ chối IR có operand/control-flow shape sai. Tầng
+  `vpp-bytecode` kiểm tra opcode, jump/try target, StringPool reference, argument/capture count
+  và function metadata cơ bản; `VM::run()` chạy verifier cho root + function bytecode trước
+  module initialization, JIT và interpreter dispatch.
 - [x] Khóa deterministic compilation/reproducible bytecode cho cùng source + dependency lock.
   `vpp-compiler-support-unit` biên dịch lặp lại cùng source + import graph và so khớp chính xác
   root/function bytecode, StringPool, function ID/name index, debug metadata, module initializer
   và module export. Package lock đã khóa exact dependency version/revision + fingerprint/bytes,
   nên cùng source + cùng lock dẫn tới cùng compiler input graph và bytecode tái lập.
-- [ ] Stress source/project lớn và theo dõi peak memory/compiler time để phát hiện regression.
+- [x] Stress source/project lớn và theo dõi peak memory/compiler time để phát hiện regression.
+  `vpp-compiler-stress-unit` khóa source 800 hàm, project 24 module × 24 hàm và 5 lần
+  compile lặp trên cùng `CompilationContext`; test in `compile_ms` + peak RSS (khi hệ điều hành
+  hỗ trợ), chặn runaway >30 giây/scenario và peak RSS >1 GiB, đồng thời xác nhận registry không
+  tích lũy function/StringPool state giữa các lượt compile.
 
 ## 6. Toolchain và trải nghiệm phát triển
 
-- [ ] Đóng public CLI contract cho `new`, `run`, `test`, `build` và package commands.
-- [ ] Hoàn thiện formatter và linter đủ ổn định để dùng trong CI/editor.
-- [ ] Nâng LSP: diagnostic, completion, go-to-definition, hover và rename dựa trên semantic model.
-- [ ] Đồng bộ VS Code extension với LSP/toolchain 1.0 và syntax mới.
-- [ ] Bổ sung project templates và ít nhất một sample project thực tế ngoài regression corpus.
-- [ ] Hoàn thiện installer/update path cho Windows, macOS và Linux; đánh giá Homebrew/winget
-  sau khi install contract ổn định.
+- [x] Đóng public CLI contract cho `new`, `run`, `test`, `build` và package commands.
+  Giao diện canonical 1.0 dùng tiếng Việt: `khởi tạo`, `chạy`, `kiểm thử`, `dựng` và
+  namespace `gói`; `new/run/test/build` cùng các tên package tiếng Anh chỉ là alias tương thích.
+  `kiểm thử` quét `.vi` theo thứ tự xác định và trả summary; `dựng` biên dịch đầy đủ nhưng chưa
+  ghi artifact `.vbc` trước khi format bytecode được freeze. `vpp-cli-contract-unit` khóa help,
+  alias compatibility, build-only, test discovery, package namespace và `chẩn đoán`.
+- [x] Hoàn thiện formatter và linter đủ ổn định để dùng trong CI/editor. Formatter giữ comment
+  + literal, bảo toàn compiler token stream, idempotent và có `--kiểm-tra`/`--ghi-tệp` cho
+  file hoặc thư mục. Linter trả diagnostic có cấu trúc gồm severity + source span, CLI
+  `--soát-lỗi` xuất `tệp:dòng:cột` và exit code phù hợp CI, còn LSP dùng cùng diagnostic range.
+  `vpp-tooling-unit` và `vpp-cli-contract-unit` khóa comment/UTF-8/spacing/idempotence,
+  lexer/parser location, import tương đối và directory workflow.
+- [x] Nâng LSP: diagnostic, completion, go-to-definition, hover và rename dựa trên semantic model.
+  Completion/definition/hover/rename dùng symbol/binding từ semantic model; rename chỉ sửa
+  declaration + reference cùng `SymbolId`, range LSP dùng UTF-16 và declaration được thu hẹp
+  đúng token tên thay vì toàn statement. `vpp-lsp-semantic-unit` khóa capability, diagnostic,
+  completion, definition, hover, rename, tên rename không hợp lệ và range identifier tiếng Việt.
+- [x] Đồng bộ VS Code extension với LSP/toolchain 1.0 và syntax mới.
+  Extension tự khởi động `vpp --lsp` khi mở tài liệu V++, đồng bộ full-document change và
+  nối diagnostic/completion/definition/hover/rename/format vào VS Code mà không cần dependency
+  npm ngoài. Có cấu hình bật/tắt + executable tùy chọn, command restart LSP, tự ưu tiên VM do
+  extension quản lý rồi PATH. TextMate grammar đã bổ sung `giao diện`, `kế thừa`, `triển khai`,
+  `mình` và `gốc`; manifest/JS/grammar đều qua kiểm tra cú pháp.
+- [x] Bổ sung project templates và ít nhất một sample project thực tế ngoài regression corpus.
+  `vpp khởi tạo ứng dụng <tên>` tạo project schema 1 với `src/`, `tests/`, `gói/`, README
+  và `.gitignore`, đồng thời giữ nguyên contract cũ của `khởi tạo <tên>`. Sample
+  `examples/hoa-don-cua-hang` dùng module, class/constructor, import tương đối và smoke test;
+  `vpp-sample-project-unit` khóa cả dựng, chạy và kiểm thử sample.
+- [x] Hoàn thiện installer/update path cho Windows, macOS và Linux; đánh giá Homebrew/winget
+  sau khi install contract ổn định. Installer Unix/Windows dùng staged update và thay toàn bộ
+  `gói/`, `templates/`, `examples` để không giữ file stale; có chế độ CI không sửa profile/PATH.
+  Release workflow chạy install smoke trên Ubuntu/macOS/Windows trước khi upload artifact,
+  gồm cài lại cùng prefix, tạo/dựng/chạy/test template và dựng/test sample thực tế. Smoke macOS
+  cục bộ đã xanh; release gate đa nền tảng vẫn chỉ đóng sau khi matrix CI thực tế xanh.
 - [ ] Hoàn thiện documentation 1.0: language reference, package guide, CLI guide, debugging,
   migration/changelog và examples.
 
@@ -176,8 +214,8 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [x] Package resolver + semver + lockfile + cache.
 - [ ] Standard library audit/completeness cho 1.0.
 - [ ] Test framework nâng cấp.
-- [ ] Formatter/linter/LSP/VS Code integration hoàn thiện.
-- [ ] Project templates + sample project thực tế.
+- [x] Formatter/linter/LSP/VS Code integration hoàn thiện.
+- [x] Project templates + sample project thực tế.
 
 ### V++ 1.0 RC
 

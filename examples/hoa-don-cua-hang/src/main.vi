@@ -1,0 +1,7 @@
+nhập "hoa_don.vi";
+
+hàm main() {
+    hóaĐơn = HóaĐơn(120000, 15000, 10000);
+    in "Tổng thanh toán:";
+    in hóaĐơn.tổngThanhToán();
+};
