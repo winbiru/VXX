@@ -20,11 +20,25 @@ hàm bat_va_nem_lai() {
     }
 }
 
+hàm bat_vao_closure() {
+    doc_loi = rỗng;
+    thử {
+        ném "loi-closure";
+    } bắt lỗi (e) {
+        doc_loi = hàm() {
+            trả về e;
+        };
+    }
+    trả về doc_loi;
+}
+
 hàm main() {
     thử {
         bat_va_nem_lai();
     } bắt lỗi (e) {
         in "bat-ngoai:" + e;
     }
+    doc_loi = bat_vao_closure();
+    in "bat-closure:" + doc_loi();
     in "sau-bat";
 }

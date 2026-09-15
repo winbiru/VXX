@@ -8,6 +8,8 @@ thực thi của VM. Hai nhóm có cơ chế xử lý khác nhau và không đư
 `ném biểu_thức;` có thể mang mọi `StackValue`. Giá trị này được chuyển tới `bắt lỗi` gần
 nhất theo luồng gọi động, kể cả khi phải đi qua nhiều hàm, method hoặc constructor. Biến
 catch nhận lại đúng giá trị đã ném; runtime không stringify giá trị trước khi bind.
+Nếu handler nằm trong một hàm, binding catch được ghi vào call frame hiện tại (hoặc shared
+capture cell khi biến được closure capture), không rò sang bảng biến global.
 
 Khi chuyển tới handler, VM unwind trạng thái tạm được tạo sau lúc vào `thử`:
 
@@ -87,7 +89,7 @@ qua, module đã ở trạng thái failed rồi bị chạy lại, và invariant
 
 - `src/tests/kiem_tra_ngoai_le.vi`: bắt lỗi cục bộ cơ bản.
 - `src/tests/kiem_tra_ngoai_le_xuyen_ham.vi`: exception xuyên function boundary, catch gần
-  nhất, rethrow và tiếp tục chạy sau catch.
+  nhất, rethrow, binding catch cục bộ được closure capture đúng và tiếp tục chạy sau catch.
 - `test/vm_handler_tests.cpp`: unwind data/control stack, typed fatal runtime error và cleanup
   call frame; đồng thời khóa khoảng 30 trường hợp suy luận từ dữ kiện thực thi và bảo đảm CLI
   không xuất `Mã lỗi:`.

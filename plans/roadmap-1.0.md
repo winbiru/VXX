@@ -49,6 +49,8 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [x] Bổ sung invariant/regression để runtime error không làm corrupt stack, call frame,
   module lifecycle hoặc heap roots cho lần chạy tiếp theo. Handler unit khóa cùng VM tiếp tục
   gọi function hợp lệ sau `VmFault`, caller stack/root vẫn nguyên và module failed-state ổn định.
+  Catch variable trong function bind vào local frame/captured cell, không ghi nhầm global;
+  regression `.vi` khóa cả closure capture biến catch.
 - [ ] Chạy ASan/UBSan/LSan hoặc công cụ tương đương cho stress suite; local AppleClang
   ASan+UBSan hiện xanh 16/16 sau khi sửa UB opcode và GC destructor-chain stack overflow.
   Ubuntu CI đã ép `detect_leaks=1`; cần một lượt CI Linux xanh để đóng leak gate.

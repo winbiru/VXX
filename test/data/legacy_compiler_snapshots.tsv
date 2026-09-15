@@ -79,7 +79,7 @@ src/tests/kiem_tra_module_lifecycle.vi	4485a641110972c8
 src/tests/kiem_tra_module_reexport.vi	06f67636093dfb05
 src/tests/kiem_tra_namespace_module.vi	0663e9803622ba6e
 src/tests/kiem_tra_ngoai_le.vi	4e19f9c2294a8c6b
-src/tests/kiem_tra_ngoai_le_xuyen_ham.vi	2cee09b8a5583ec3
+src/tests/kiem_tra_ngoai_le_xuyen_ham.vi	cc9b096474ac0e27
 src/tests/kiem_tra_noi_chuoi.vi	c4237d35e9f90100
 src/tests/kiem_tra_package_modules.vi	a7409c602df52c73
 src/tests/kiem_tra_package_tieng_viet.vi	392557b6771f7751

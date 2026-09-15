@@ -201,6 +201,22 @@ void testExceptionHandlerState() {
     expect(access.hasVariable(1), "exception handler", "catch must bind the error variable");
     expect(asString(access.variable(1), "exception handler") == "boom",
            "exception handler", "catch variable must contain thrown value");
+
+    VM localVm(std::vector<Instruction>(10, instruction(OP_DONG_LENH)), {});
+    VMRuntimeFixture localAccess(localVm);
+    CallFrame localFrame;
+    localFrame.localsIndexed = true;
+    localFrame.localsVec.resize(4, make_int_value(0));
+    localAccess.pushCallFrame(localFrame);
+    localAccess.executeException(instruction(OP_THU, 8, 1, 0));
+    localAccess.push(make_string_value("local-boom"));
+    expect(localAccess.executeException(instruction(OP_NEM)),
+           "exception handler", "throw inside a function must jump to its catch");
+    localAccess.executeException(instruction(OP_BAT_LOI, 0, 1, 0));
+    expect(!localAccess.hasVariable(1),
+           "exception handler", "function catch must not leak its error into global variables");
+    expect(asString(localAccess.currentCallFrame().localsVec[1], "exception handler") == "local-boom",
+           "exception handler", "function catch must bind the error into the current local slot");
 }
 
 void testFatalRuntimeErrorUnwindsCallFrame() {

@@ -2084,7 +2084,22 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
             const int errVarId = instr.operandIndex;
             if (errVarId >= 0 && !stack.empty()) {
                 StackValue errVal = stack.back(); stack.pop_back();
-                variables[errVarId] = errVal;
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    const auto captured = frame.capturedCells.find(errVarId);
+                    if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                        captured->second->value = std::move(errVal);
+                    } else if (frame.localsIndexed) {
+                        if (errVarId >= static_cast<int>(frame.localsVec.size())) {
+                            frame.localsVec.resize(errVarId + 1, make_int_value(0));
+                        }
+                        frame.localsVec[errVarId] = std::move(errVal);
+                    } else {
+                        frame.localsMap[errVarId] = std::move(errVal);
+                    }
+                } else {
+                    variables[errVarId] = std::move(errVal);
+                }
             } else if (!stack.empty()) {
                 stack.pop_back();
             }

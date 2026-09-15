@@ -138,7 +138,9 @@ concurrency/async phức tạp không phải release blocker mặc định của
      Phần call stack đã có regression recursion sâu + exception xuyên child VM và giới hạn
      256 tầng trả `CallBoundary` có kiểm soát. GC stress đã có graph 4.096 node, burst 1.024
      cycle và `.vi` interval 1. Handler invariant khóa stack/call frame/heap root sau `VmFault`,
-     cùng VM gọi tiếp được function hợp lệ; module failed-state vẫn giữ contract riêng.
+     cùng VM gọi tiếp được function hợp lệ; module failed-state vẫn giữ contract riêng. Catch
+     trong function bind biến lỗi vào local/captured cell và regression closure xác nhận giá trị
+     không rò sang global state.
    - [ ] **Leak/sanitizer gate** — chạy stress suite qua ASan/UBSan và leak checker phù hợp;
      mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC. Local
      AppleClang ASan+UBSan đã chạy full CTest 16/16; quá trình này phát hiện và đã sửa
