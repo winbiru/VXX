@@ -39,7 +39,7 @@ void testAcceptsValidProgram() {
 
 void testRejectsUnknownOpcode() {
     const std::vector<Instruction> code = {
-        {static_cast<Opcode>(999), 0, 0, 0},
+        {999, 0, 0, 0},
     };
     const auto result = vietvm::bytecode::verifyBytecode(code, context(0));
     expect(result.has_value() && result->instructionIndex == 0,

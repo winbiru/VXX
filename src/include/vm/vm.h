@@ -167,7 +167,7 @@ private:
     // Tạo call frame và thực thi bytecode của một function id với danh sách đối số/receiver đã chuẩn bị, sau đó trả kết quả về caller.
     void invokeFunction(int argc,
                         int hamIdOrName,
-                        Opcode op,
+                        int op,
                         int curPc,
                         InstanceHandle receiver = nullptr,
                         ClassHandle methodOwnerClass = nullptr,

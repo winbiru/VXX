@@ -115,7 +115,7 @@ enum CompareOp {
 
 // Cấu trúc của một câu lệnh bytecode
 struct Instruction {
-    Opcode op;
+    int op; // opcode thô; phải được xác thực trước khi ép sang Opcode
     int operand; // chỉ dùng cho OP_BIEN_SO (đẩy giá trị biến hoặc hằng số)
     int operandIndex; // Thêm dòng này để xác định chỉ số biến (ví dụ: i trong for)
     int operandValue;

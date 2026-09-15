@@ -31,10 +31,11 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
     const BytecodeVerificationContext &context) {
     for (std::size_t index = 0; index < code.size(); ++index) {
         const Instruction &instruction = code[index];
-        const int rawOpcode = static_cast<int>(instruction.op);
+        const int rawOpcode = instruction.op;
         if (!isKnownOpcode(rawOpcode)) {
             return issue(index, rawOpcode, "mã lệnh bytecode không xác định");
         }
+        const Opcode opcode = static_cast<Opcode>(rawOpcode);
 
         const auto requirePoolIndex = [&](int poolIndex,
                                           const char *label)
@@ -46,7 +47,7 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                          std::string(label) + " tham chiếu ngoài StringPool");
         };
 
-        switch (instruction.op) {
+        switch (opcode) {
             case OP_JUMP:
             case OP_JUMP_IF_FALSE:
                 if (instruction.operand < 0 ||
