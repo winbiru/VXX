@@ -1,7 +1,7 @@
 // Module: mạng.json
 // Mục đích: dựng, phân tích và tuần tự JSON an toàn, gồm object/array lồng nhau.
 
-// Ghi chú hàm: escape một chuỗi theo JSON (quote, backslash và ký tự điều khiển).
+// Ghi chú hàm: escape một chuỗi UTF-8 hợp lệ theo JSON (quote, backslash và ký tự điều khiển).
 hàm json thoát(giá trị) {
     ném "chuẩn: json thoát native hook không khả dụng";
 };
@@ -11,13 +11,14 @@ hàm json chuỗi(giá trị) {
     ném "chuẩn: json chuỗi native hook không khả dụng";
 };
 
-// Phân tích JSON thành map/list/scalar runtime. JSON true/false ánh xạ sang
+// Phân tích JSON UTF-8 hợp lệ thành map/list/scalar runtime. JSON true/false ánh xạ sang
 // đúng/sai (1/0), null ánh xạ sang rỗng.
 hàm json phân tích(nội dung) {
     ném "chuẩn: json phân tích native hook không khả dụng";
 };
 
-// Tuần tự map/list/tuple/scalar runtime thành JSON hợp lệ.
+// Tuần tự map/list/tuple/scalar runtime thành JSON UTF-8 hợp lệ.
+// Khóa object được ghi theo thứ tự từ điển để output xác định giữa các nền tảng.
 hàm json tạo(giá trị) {
     ném "chuẩn: json tạo native hook không khả dụng";
 };

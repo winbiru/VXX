@@ -1,6 +1,8 @@
 // Module: mạng
 // Mục đích: adapter mạng mức thấp (GET/POST/PUT/DELETE và HTTP server) qua native hook.
 // Ghi chú: nếu VM chưa bật native hook, các hàm sẽ ném lỗi.
+// HTTP client chỉ nhận URL UTF-8 hợp lệ dùng http:// hoặc https://, có host và
+// không chứa khoảng trắng/ký tự điều khiển chưa percent-encode.
 
 // Ghi chú hàm: mạng lấy.
 hàm mạng lấy(đường dẫn) {

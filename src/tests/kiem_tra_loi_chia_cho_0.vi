@@ -1,4 +1,6 @@
-// Chia cho 0: hệ thống phải nhận ra số chia bằng 0 từ hai toán hạng thực tế.
+// Chia cho 0 qua stdlib: chia() không được che lỗi bằng giá trị 0.
+nhập gói/chuẩn/main.vi;
+
 hàm main() {
-    in 10 / 0;
+    in chia(10, 0);
 };

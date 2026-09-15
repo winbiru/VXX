@@ -84,7 +84,7 @@ inline constexpr std::string_view kNativeInvalidArgument = "{0}: {1} không hợ
 inline constexpr std::string_view kNativeFileOpenForReadFailed = "{0}: không thể mở tệp để đọc";
 inline constexpr std::string_view kNativeFileOpenForWriteFailed = "{0}: không thể mở tệp để ghi";
 inline constexpr std::string_view kNativeFileWriteFailed = "{0}: ghi tệp thất bại";
-inline constexpr std::string_view kNativeTimeFormatFailed = "lay_thoi_gian_hien_tai: định dạng thời gian thất bại";
+inline constexpr std::string_view kNativeTimeFormatFailed = "{0}: định dạng thời gian thất bại";
 
 // Native HTTP client/server diagnostics.
 inline constexpr std::string_view kNativeHttpCurlProcessOpenFailed = "{0}: không mở được tiến trình curl";

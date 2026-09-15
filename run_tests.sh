@@ -329,6 +329,7 @@ fi
 for runtime_failure_test in \
   src/tests/kiem_tra_loi_chia_cho_0.vi \
   src/tests/kiem_tra_loi_chia_du_cho_0.vi \
+  src/tests/kiem_tra_loi_chia_du_so_thuc.vi \
   src/tests/kiem_tra_loi_can_so_nguyen.vi \
   src/tests/kiem_tra_loi_phep_tinh_can_so.vi \
   src/tests/kiem_tra_loi_so_sanh_khac_kieu.vi \

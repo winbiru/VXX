@@ -70,6 +70,13 @@ void testIndexHandlerState() {
     access.executeIndex(instruction(OP_GAN_CHI_SO));
     expect(asInt(list->elements[0], "index write handler") == 9,
            "index write handler", "list[0] must be mutated to 9");
+
+    access.push(make_string_value(u8"Việt𠀀"));
+    access.push(make_int_value(2));
+    access.executeIndex(instruction(OP_DOC_CHI_SO));
+    expect(std::holds_alternative<std::string>(access.top()) &&
+               std::get<std::string>(access.top()) == u8"ệ",
+           "index read handler", "UTF-8 string indexing must return a whole code point");
 }
 
 void testVariableAndCallFrameHandlerState() {
@@ -516,6 +523,169 @@ void testFilesystemPredicatesTreatMissingPathAsFalse() {
            "filesystem predicate", "là tệp(missing) must return 0");
 }
 
+void testFilesystemPathUtf8Boundary() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    const bool joined = vietvm::helpers::handleNativeFoundationFunction(
+        "đường dẫn nối",
+        {make_string_value(u8"thư mục"), make_string_value(u8"con𠀀/mẫu.txt")},
+        result,
+        error);
+    expect(joined, "filesystem UTF-8 path", "path join must be handled by foundation native layer");
+    expect(error.empty(), "filesystem UTF-8 path", "valid Unicode paths must not produce an error");
+    expect(asString(result, "filesystem UTF-8 path") == u8"thư mục/con𠀀/mẫu.txt",
+           "filesystem UTF-8 path",
+           "path join must preserve Unicode and expose generic separators");
+
+    result = make_null_value();
+    error.clear();
+    const std::string malformed =
+        std::string("bad/") + static_cast<char>(0xc0) + static_cast<char>(0xaf);
+    const bool rejected = vietvm::helpers::handleNativeFoundationFunction(
+        "đường dẫn tồn tại", {make_string_value(malformed)}, result, error);
+    expect(rejected, "filesystem UTF-8 path", "malformed path input must stay inside native dispatch");
+    expect(error.find("UTF-8") != std::string::npos,
+           "filesystem UTF-8 path",
+           "malformed path input must be rejected as an invalid UTF-8 path");
+}
+
+void testFoundationStrictIntegerContract() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    const bool randomRejected = vietvm::helpers::handleNativeFoundationFunction(
+        "ngẫu nhiên nguyên",
+        {make_float_value(1.5), make_int_value(2)},
+        result,
+        error);
+    expect(randomRejected,
+           "strict integer native contract",
+           "ngẫu nhiên nguyên must be handled by the foundation native layer");
+    expect(error.find("số nguyên") != std::string::npos,
+           "strict integer native contract",
+           "fractional random bounds must be rejected instead of truncated");
+
+    result = make_null_value();
+    error.clear();
+    const bool integralDoubleAccepted = vietvm::helpers::handleNativeFoundationFunction(
+        "ngẫu nhiên nguyên",
+        {make_float_value(5.0), make_float_value(5.0)},
+        result,
+        error);
+    expect(integralDoubleAccepted && error.empty(),
+           "strict integer native contract",
+           "integral floating-point bounds must remain valid integer inputs");
+    expect(asInt(result, "strict integer native contract") == 5,
+           "strict integer native contract",
+           "equal integral bounds must return that exact value");
+
+    result = make_null_value();
+    error.clear();
+    const bool sleepRejected = vietvm::helpers::handleNativeFoundationFunction(
+        "ngủ mili giây", {make_float_value(0.5)}, result, error);
+    expect(sleepRejected,
+           "strict integer native contract",
+           "ngủ mili giây must be handled by the foundation native layer");
+    expect(error.find("số nguyên không âm") != std::string::npos,
+           "strict integer native contract",
+           "fractional sleep duration must be rejected instead of truncated");
+}
+
+void testEnvironmentVariableContract() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    const bool fallbackHandled = vietvm::helpers::handleNativeFoundationFunction(
+        "đọc biến môi trường",
+        {make_string_value("__VPP_TEST_BIEN_KHONG_TON_TAI_7F0C4D0A__"),
+         make_string_value(u8"mặc định")},
+        result,
+        error);
+    expect(fallbackHandled,
+           "environment variable contract",
+           "đọc biến môi trường must be handled by the foundation native layer");
+    expect(error.empty(),
+           "environment variable contract",
+           "a valid missing variable name must use the supplied fallback without an error");
+    expect(asString(result, "environment variable contract") == u8"mặc định",
+           "environment variable contract",
+           "a valid missing variable must return the exact fallback value");
+
+    const std::vector<std::string> invalidNames = {
+        "",
+        "VPP=KHONG_HOP_LE",
+        std::string("VPP\0AN", 6),
+        std::string("VPP_") + static_cast<char>(0xc0) + static_cast<char>(0xaf)
+    };
+    for (const std::string &name : invalidNames) {
+        result = make_null_value();
+        error.clear();
+        const bool handled = vietvm::helpers::handleNativeFoundationFunction(
+            "đọc biến môi trường",
+            {make_string_value(name), make_string_value("fallback")},
+            result,
+            error);
+        expect(handled,
+               "environment variable contract",
+               "invalid environment names must stay inside native dispatch");
+        expect(!error.empty(),
+               "environment variable contract",
+               "invalid environment names must be rejected before calling the host API");
+    }
+}
+
+void testTimeContract() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    const bool localHandled = vietvm::helpers::handleNativeFoundationFunction(
+        "lấy thời gian hiện tại", {}, result, error);
+    expect(localHandled, "time contract", "local time must be handled by foundation native layer");
+    expect(error.empty(), "time contract", "local time must not produce an error");
+    const std::string local = asString(result, "time contract");
+    expect(local.size() == 25 && local[4] == '-' && local[7] == '-' &&
+               local[10] == 'T' && local[13] == ':' && local[16] == ':' &&
+               (local[19] == '+' || local[19] == '-') && local[22] == ':',
+           "time contract",
+           "local time must use ISO-8601 with an explicit UTC offset");
+
+    result = make_null_value();
+    error.clear();
+    const bool utcHandled = vietvm::helpers::handleNativeFoundationFunction(
+        "lấy thời gian utc", {}, result, error);
+    expect(utcHandled, "time contract", "UTC time must be handled by foundation native layer");
+    expect(error.empty(), "time contract", "UTC time must not produce an error");
+    const std::string utc = asString(result, "time contract");
+    expect(utc.size() == 20 && utc[4] == '-' && utc[7] == '-' && utc[10] == 'T' &&
+               utc[13] == ':' && utc[16] == ':' && utc[19] == 'Z',
+           "time contract", "UTC time must use ISO-8601 with a Z suffix");
+
+    result = make_null_value();
+    error.clear();
+    const bool offsetHandled = vietvm::helpers::handleNativeFoundationFunction(
+        "độ lệch múi giờ", {}, result, error);
+    expect(offsetHandled, "time contract", "timezone offset must be handled by foundation native layer");
+    expect(error.empty(), "time contract", "timezone offset must not produce an error");
+    const int offsetMinutes = asInt(result, "time contract");
+    expect(offsetMinutes >= -24 * 60 && offsetMinutes <= 24 * 60,
+           "time contract", "timezone offset must be represented in minutes");
+    if (local.size() == 25) {
+        const int sign = local[19] == '-' ? -1 : 1;
+        const int suffixMinutes = sign *
+            (std::stoi(local.substr(20, 2)) * 60 + std::stoi(local.substr(23, 2)));
+        expect(suffixMinutes == offsetMinutes,
+               "time contract", "local ISO-8601 suffix must match timezone offset API");
+    }
+
+    result = make_null_value();
+    error.clear();
+    const bool invalidArityHandled = vietvm::helpers::handleNativeFoundationFunction(
+        "lấy thời gian hiện tại", {make_int_value(1)}, result, error);
+    expect(invalidArityHandled, "time contract", "time function must stay inside native dispatch");
+    expect(!error.empty(), "time contract", "time function must reject unexpected arguments");
+}
+
 void testRuntimeModuleInitializationRunsOnce() {
     VM vm({
         instruction(OP_CHUOI, 0, 1, 0),
@@ -820,6 +990,10 @@ int main() {
     testLoopControlHandlerState();
     testOutputHandlerUsesSink();
     testFilesystemPredicatesTreatMissingPathAsFalse();
+    testFilesystemPathUtf8Boundary();
+    testFoundationStrictIntegerContract();
+    testEnvironmentVariableContract();
+    testTimeContract();
     testRuntimeModuleInitializationRunsOnce();
     testObjectHandlerState();
     testTracingGcKeepsRootsAndCollectsCycles();

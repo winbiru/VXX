@@ -28,6 +28,11 @@ concurrency/async phức tạp không phải release blocker mặc định của
 - [x] Parity gate compile toàn bộ `src/tests/**/*.vi` qua pipeline rồi đối chiếu
   fingerprint bytecode, StringPool và function registries với baseline legacy
   đóng băng dưới `test/data/`.
+- [x] Stdlib hardening đã khóa các lát cắt UTF-8 tiếng Việt, file/config/random,
+  collection/JSON deterministic + overflow/error boundary, JSON UTF-8 boundary, HTTP URL/authority,
+  math strict integer modulo + clamp bounds, shared strict-integer boundary cho text/HTTP native,
+  environment-name boundary và logging regression;
+  phần còn lại tiếp tục được kiểm tra trên release matrix trước 1.0 RC.
 
 ## Việc lớn còn lại
 
@@ -160,12 +165,14 @@ concurrency/async phức tạp không phải release blocker mặc định của
    - [x] Tách package/bare-module lookup khỏi `compileRegistry`: project package,
      bundled standard packages, compatibility redirect và `VPP_HOME` đi qua `PackageResolver`
      độc lập; unit test khóa precedence, alias, UTF-8 và installation-home fallback.
-   - [ ] **Dependency solver** — manifest schema 1, source kind `path/git/registry`, SemVer/range,
-     transitive local-path graph, conflict/cycle detection, staged installer, deterministic
-     `vpp.lock` và project-local content-addressed cache đã có. Restore/install cache-only offline
-     phục hồi exact lock bytes khi source mất; install/update/remove giữ lock đồng bộ và CLI
-     từ chối run nếu installed fingerprint lệch lock. Còn registry/Git fetch và remote
-     metadata/version selection.
+   - [x] **Dependency solver** — manifest schema 1, source kind `path/git/registry`, SemVer/range,
+     transitive path/Git/registry graph, conflict/cycle detection, staged installer, deterministic
+     `vpp.lock` và project-local content-addressed cache đã có. Git ref được resolve thành exact
+     commit trong lock; restore cache-miss checkout đúng revision, còn cache-only offline phục hồi
+     exact lock bytes khi source/repository mất. Filesystem registry v1 publish version bất biến,
+     dùng `vpp.json` làm metadata và chọn highest matching SemVer; lock/restore pin exact version.
+     Install/update/remove giữ lock đồng bộ và CLI từ chối run nếu installed fingerprint lệch lock.
+     Hosted registry/auth/signing được theo dõi như hardening/public-service layer riêng.
 
 5. An toàn và bảo mật runtime
 
@@ -202,11 +209,28 @@ concurrency/async phức tạp không phải release blocker mặc định của
 9. Standard library 1.0
 
    - [ ] Audit UTF-8 cho text/string API và malformed input; tiếng Việt phải giữ semantics
-     ổn định qua lexer, runtime text và package chuẩn.
-   - [ ] Hoàn thiện filesystem/path và time/date contract đa nền tảng.
+     ổn định qua lexer, runtime text và package chuẩn. Length/reverse/index đã dùng code point,
+     slice dùng `start + count` theo code point, validator chặn overlong/surrogate/>U+10FFFF
+     và malformed byte có policy lossless. Case conversion đã phủ toàn bộ chữ cái tiếng Việt
+     dựng sẵn; NFC composition đã phủ tổ hợp nguyên âm + dấu tiếng Việt; title/palindrome/anagram
+     dùng chung NFC + case tiếng Việt; đếm/chứa/thay substring cũng normalize NFC. Corpus NFD
+     -> NFC đã phủ toàn bộ 67 chữ thường tiếng Việt. Scope 1.0 chỉ cam kết tiếng Việt; phần
+     text/string tiếng Việt đã đủ contract 1.0.
+   - [ ] Hoàn thiện filesystem/path contract đa nền tảng. Path native boundary đã reject
+     malformed UTF-8 cho path API lẫn file/config, chuẩn hóa output separator `/` và có
+     regression Unicode directory/file + join/parent + file/config tiếng Việt/Unicode ngoài BMP; còn matrix
+     Windows/Linux và các edge case hệ điều hành.
+   - [x] Hoàn thiện time/date + timezone contract 1.0: local ISO-8601 luôn kèm UTC offset,
+     UTC dùng hậu tố `Z`, offset múi giờ có API phút riêng và native conversion dùng API
+     thread-safe trên POSIX/Windows. Regression native + `.vi` khóa format, offset và arity.
    - [ ] Bổ sung process API tối thiểu nếu permission model cho phép.
    - [ ] Nâng testing package và audit collection/file/JSON/HTTP/math/random/env/log/config
-     bằng regression đa nền tảng trước release candidate.
+     bằng regression đa nền tảng trước release candidate. Audit cục bộ file/config/random đã
+     khóa line/word count, config key/fallback, UTF-8 path và strict integer bounds;
+     collection/JSON đã khóa thứ tự key deterministic cho `khóa map` và `json tạo`; HTTP
+     client validate URL HTTP(S)/UTF-8/host và ký tự điều khiển trước native transport; math
+     giữ lỗi chia 0 ở API thường, fallback chỉ ở `chia an toàn`, và khóa domain số nguyên không
+     âm cho lũy thừa/giai thừa.
 
 10. Compiler hardening và release candidate
 
@@ -214,8 +238,10 @@ concurrency/async phức tạp không phải release blocker mặc định của
      lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
      Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
      context-driven compile không đọc/ghi một active registry khác.
-   - [ ] Fuzz lexer/parser, malformed AST/IR test, bytecode verification và deterministic
-     compilation/reproducible bytecode.
+   - [ ] Fuzz lexer/parser, malformed AST/IR test và bytecode verification. Deterministic
+     compilation/reproducible bytecode đã được khóa bằng regression so khớp toàn bộ root/function
+     bytecode, StringPool, function metadata, debug metadata và module metadata trên cùng import graph;
+     package lock đã pin exact dependency bytes/fingerprint.
    - [ ] Stress source/project lớn và theo dõi compiler memory/time regression.
    - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
      bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.

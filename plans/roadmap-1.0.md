@@ -75,26 +75,54 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   tự ghi lock, restore/install từ lock ưu tiên exact cache bytes và có cache-only offline.
   CLI run/compile path tìm lock gần nhất và từ chối package thiếu hoặc fingerprint lệch trước
   khi compiler chạy, nên project đã khóa luôn dùng đúng dependency bytes đã chấp nhận.
-- [ ] Hỗ trợ package cache/offline, local path package và Git package.
-  Local path package + project-local content-addressed cache đã chạy; `restore/install --offline`
-  phục hồi được khi source path không còn. Còn Git transport trước khi đóng mục tổng hợp này.
-- [ ] Thiết kế registry package và metadata tối thiểu cho publish/install.
-- [ ] Hoàn thiện CLI dependency flow tương đương `vpp cài`, `vpp cập nhật`, `vpp xóa`,
-  `vpp khóa` sau khi contract manifest/lockfile ổn định. Local path flow hiện đã có
-  install/update(sync)/remove/lock/restore và giữ lock đồng bộ; phần remote source còn thiếu.
+- [x] Hỗ trợ package cache/offline, local path package và Git package.
+  Git transport được tách khỏi solver, resolve branch/tag/commit thành exact revision trong
+  `vpp.lock`, loại `.git/` khỏi artifact và restore exact commit khi cache thiếu. Cache-only
+  `restore/install --offline` vẫn phục hồi được exact bytes khi source path/repository không còn.
+- [x] Thiết kế registry package và metadata tối thiểu cho publish/install.
+  Filesystem registry v1 dùng `<root>/<name>/<semver>/` + `vpp.json`, chọn version cao nhất
+  thỏa range, version publish bất biến và hỗ trợ root tường minh hoặc `VPP_REGISTRY`.
+- [x] Hoàn thiện CLI dependency flow tương đương `vpp cài`, `vpp cập nhật`, `vpp xóa`,
+  `vpp khóa`: path/Git/registry cùng đi qua graph + lock/cache/restore, registry update chọn
+  version mới trong range còn restore pin exact version/fingerprint đã khóa.
 
 ## 4. Standard library 1.0
 
 - [ ] Audit UTF-8 end-to-end cho string/index/slice/length/case/normalization vì tiếng Việt là
-  first-class syntax; bổ sung corpus Unicode và regression malformed input.
-- [ ] Chuẩn hóa filesystem/path API đa nền tảng và edge case separator/encoding.
-- [ ] Hoàn thiện time/date API và timezone contract ở mức đủ dùng cho ứng dụng thực tế.
+  first-class syntax. Đã hoàn tất code-point semantics cho length/reverse/index/slice,
+  validator malformed UTF-8, case conversion cho toàn bộ chữ cái tiếng Việt dựng sẵn và NFC
+  composition cho tổ hợp nguyên âm + dấu tiếng Việt. Title/palindrome/anagram cũng dùng NFC +
+  case tiếng Việt. Đếm/chứa/thay chuỗi cũng normalize NFC, và corpus NFD -> NFC đã phủ toàn bộ
+  67 chữ thường tiếng Việt. Scope 1.0 không mở rộng Unicode tổng quát; phần text/string tiếng
+  Việt của mục này đã đủ contract 1.0.
+- [ ] Chuẩn hóa filesystem/path API đa nền tảng và edge case separator/encoding. Native
+  boundary đã reject malformed UTF-8 cho cả path API, đọc/ghi/đếm tệp và đọc cấu hình, trả
+  path bằng generic `/`, và regression khóa Unicode directory/file + join/parent/missing-path
+  cùng file/config tiếng Việt + Unicode ngoài BMP; còn xác minh Windows/Linux và các edge case hệ điều hành
+  trước khi đóng mục.
+- [x] Hoàn thiện time/date API và timezone contract ở mức đủ dùng cho ứng dụng thực tế.
+  `lấy thời gian hiện tại()` trả local ISO-8601 có UTC offset, `lấy thời gian utc()` trả UTC
+  ISO-8601 hậu tố `Z`, còn `độ lệch múi giờ()` trả offset theo phút. Runtime dùng API chuyển
+  `tm` thread-safe theo nền tảng và regression khóa format/offset/arity qua native + `.vi`.
 - [ ] Bổ sung process API tối thiểu nếu permission model cho phép.
 - [ ] Bổ sung crypto cơ bản bằng implementation đã được kiểm chứng: secure random, hash/HMAC;
   không tự viết primitive mật mã trong VM.
 - [ ] Nâng package testing: assertion, expected error, setup/teardown và test discovery rõ ràng.
 - [ ] Audit các package đã có: collection, file, JSON, HTTP client/server, math, random,
-  environment, logging và config; đóng behavior + lỗi + cross-platform test cho 1.0.
+  environment, logging và config; đóng behavior + lỗi + cross-platform test cho 1.0. Slice
+  file/config/random đã khóa UTF-8 path, line/word count, config key/fallback và strict integer
+  bounds; collection/JSON đã khóa thứ tự key deterministic cho `khóa map` và `json tạo` để
+  output không phụ thuộc `unordered_map`; HTTP client đã validate URL HTTP(S), UTF-8, host và
+  ký tự điều khiển trước khi gọi curl. Math đã khóa chia/chia dư cho 0 theo runtime error,
+  giữ `chia an toàn` làm fallback riêng và từ chối số mũ/giai thừa không phải số nguyên không âm.
+  Environment đã validate tên biến nhất quán trước host API (rỗng/`=`/NUL/UTF-8 lỗi bị từ chối),
+  giữ fallback cho biến hợp lệ bị thiếu. Logging đã khóa wrapper, Unicode tiếng Việt, giá trị động
+  và giá trị trả `0` bằng regression. JSON parser/serializer đã chặn UTF-8 lỗi ở input, string value
+  và object key, đồng thời giữ tiếng Việt/Unicode ngoài BMP hợp lệ. Collection đã chặn overflow ở `tổng list`
+  và khóa diagnostic cho sort hỗn hợp/min rỗng; HTTP validate authority, port và IPv6 trước curl;
+  math từ chối modulo số thực có phần lẻ và cận `giới hạn` đảo ngược; text + helper integer
+  dùng chung chấp nhận số thực tích phân nhưng từ chối phần lẻ/suffix thay vì cắt ngầm. Phần còn lại là xác nhận
+  các contract này trên release-matrix trước RC.
 
 ## 5. Compiler hardening
 
@@ -107,7 +135,11 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [ ] Thêm fuzzing cho lexer/parser và malformed-source corpus có seed cố định.
 - [ ] Thêm malformed AST/invalid IR tests và bytecode verifier trước khi VM thực thi input
   không tin cậy.
-- [ ] Khóa deterministic compilation/reproducible bytecode cho cùng source + dependency lock.
+- [x] Khóa deterministic compilation/reproducible bytecode cho cùng source + dependency lock.
+  `vpp-compiler-support-unit` biên dịch lặp lại cùng source + import graph và so khớp chính xác
+  root/function bytecode, StringPool, function ID/name index, debug metadata, module initializer
+  và module export. Package lock đã khóa exact dependency version/revision + fingerprint/bytes,
+  nên cùng source + cùng lock dẫn tới cùng compiler input graph và bytecode tái lập.
 - [ ] Stress source/project lớn và theo dõi peak memory/compiler time để phát hiện regression.
 
 ## 6. Toolchain và trải nghiệm phát triển

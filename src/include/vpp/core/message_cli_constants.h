@@ -26,6 +26,9 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp khởi tạo [tên-dự-án]\n"
     "  vpp khởi tạo backend <tên-dự-án>\n"
     "  vpp cài đặt [<nguồn> [tên] | --offline]\n"
+    "  vpp cài đặt registry:<tên>[@<range>]\n"
+    "  vpp cài đặt registry+<root>#<tên>[@<range>]\n"
+    "  vpp publish <registry-root>\n"
     "  vpp đồng bộ\n"
     "  vpp cập nhật\n"
     "  vpp khóa\n"
@@ -36,6 +39,7 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp gói khởi tạo [tên]\n"
     "  vpp gói thêm <nguồn> [tên]\n"
     "  vpp gói cài đặt [<nguồn> [tên] | --offline]\n"
+    "  vpp gói publish <registry-root>\n"
     "  vpp gói đồng bộ\n"
     "  vpp gói cập nhật\n"
     "  vpp gói khóa\n"
@@ -46,7 +50,7 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "  vpp gói kiểm tra <tên>\n";
 
 inline constexpr std::string_view kCliVersion = "Phiên bản V++ CLI: {0}\n";
-inline constexpr std::string_view kCliTestRunning = "\n🔹 Đang chạy kiểm thử: {0}";
+inline constexpr std::string_view kCliTestRunning = "\nĐang chạy kiểm thử: {0}";
 inline constexpr std::string_view kCliDoctorHeading = "Chẩn đoán V++ CLI\n";
 inline constexpr std::string_view kCliDoctorVersion = "  phiên_bản: {0}\n";
 inline constexpr std::string_view kCliDoctorExecutable = "  tệp_thực_thi: {0}\n";
@@ -78,6 +82,7 @@ inline constexpr std::string_view kToolLintFailed = "{0}: {1}";
 inline constexpr std::string_view kPkgManifestCreated = "Đã tạo tệp khai báo tại {0}\n";
 inline constexpr std::string_view kPkgBackendCreated = "Đã tạo dự án backend tại {0}\n";
 inline constexpr std::string_view kPkgInstalled = "Đã cài gói: {0}\n";
+inline constexpr std::string_view kPkgPublished = "Đã publish gói {0}@{1} vào registry: {2}\n";
 inline constexpr std::string_view kPkgSynced = "Đã đồng bộ {0} gói từ manifest.\n";
 inline constexpr std::string_view kPkgListEmpty = "Chưa có gói nào được cài.\n";
 inline constexpr std::string_view kPkgRemoved = "Đã xóa gói: {0}\n";
@@ -107,6 +112,7 @@ inline constexpr std::string_view kPkgAddSourceMissing = "gói thêm: thiếu đ
 inline constexpr std::string_view kPkgHasNameMissing = "gói kiểm tra: thiếu tên gói";
 inline constexpr std::string_view kPkgInvalidSubcommand = "gói: lệnh con không hợp lệ: {0}";
 inline constexpr std::string_view kPkgInstallSourceMissing = "cài đặt: thiếu đường dẫn nguồn";
+inline constexpr std::string_view kPkgPublishRegistryMissing = "publish: thiếu registry root";
 inline constexpr std::string_view kPkgLockManifestMissing = "khóa: không tìm thấy vpp.json";
 inline constexpr std::string_view kPkgSyncManifestMissing = "đồng bộ: không tìm thấy vpp.json";
 inline constexpr std::string_view kPkgRestoreLockMissing = "phục hồi: không tìm thấy vpp.lock";

@@ -203,9 +203,16 @@ int main(int argc, char **argv) {
     }
 
     std::vector<fs::path> testFiles;
+    std::size_t packageEnvironmentFiles = 0;
     for (const fs::directory_entry &entry :
          fs::recursive_directory_iterator(sourceRoot)) {
         if (entry.is_regular_file() && entry.path().extension() == ".vi") {
+            const std::string source = readSource(entry.path());
+            if (source.find("// vpp-parity: requires-package-environment") !=
+                std::string::npos) {
+                ++packageEnvironmentFiles;
+                continue;
+            }
             testFiles.push_back(entry.path());
         }
     }
@@ -291,6 +298,11 @@ int main(int argc, char **argv) {
     }
 
     std::cout << "direct IR pipeline matches frozen compiler state for "
-              << testFiles.size() << " .vi files\n";
+              << testFiles.size() << " .vi files";
+    if (packageEnvironmentFiles != 0) {
+        std::cout << "; skipped " << packageEnvironmentFiles
+                  << " package-environment regression file(s)";
+    }
+    std::cout << '\n';
     return 0;
 }

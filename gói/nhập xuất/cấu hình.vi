@@ -1,6 +1,7 @@
 // Module: nhập xuất.cấu hình
 // Mục đích: cung cấp API đọc cấu hình ở tầng gói.
 // Ghi chú: hiện phụ thuộc native hook của VM.
+// Đường dẫn phải là UTF-8 hợp lệ tại native boundary.
 
 // Ghi chú hàm: đọc cấu hình.
 hàm đọc cấu hình(đường dẫn) {

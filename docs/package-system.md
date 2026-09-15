@@ -1,9 +1,9 @@
 # Package system V++ 0.9
 
 Tài liệu này mô tả contract package hiện được triển khai trong compiler và CLI.
-Local path package, dependency graph transitive, deterministic lockfile, cache theo
-fingerprint và restore/install offline từ lockfile đã chạy end-to-end. Git/registry
-transport và registry publish vẫn thuộc roadmap 0.9.
+Local path, Git và filesystem registry package, dependency graph transitive,
+deterministic lockfile, cache theo fingerprint và restore/install offline từ lockfile
+đã chạy end-to-end.
 
 ## Project layout
 
@@ -43,9 +43,61 @@ Manifest canonical:
 
 `name` bắt buộc khác rỗng. `version` phải là Semantic Versioning 2.0 đầy đủ
 `major.minor.patch`. Dependency name không được trùng. `source` hiện có ba giá trị
-được dành sẵn trong contract: `path`, `git`, `registry`. CLI 0.9 hiện resolve/cài trực
-tiếp được `path`; Git/registry đã có schema nhưng solver từ chối rõ ràng cho tới khi
-transport tương ứng được triển khai.
+trong contract: `path`, `git`, `registry`; cả ba đều đi qua source materializer riêng,
+không nằm trong solver graph. Git dependency có thêm `ref`; nếu manifest cũ bỏ trường này, reader dùng
+`HEAD`:
+
+```json
+{
+  "name": "thu-vien-git",
+  "version": "^1.2.0",
+  "source": "git",
+  "location": "https://example.org/thu-vien.git",
+  "ref": "stable"
+}
+```
+
+Registry dependency dùng `name + version range` để chọn bản SemVer cao nhất phù hợp.
+`location` là registry root; nếu để rỗng thì source nằm trong một registry artifact sẽ
+kế thừa registry root bao quanh, còn project gốc dùng biến `VPP_REGISTRY`:
+
+```json
+{
+  "name": "thu-vien-registry",
+  "version": "^1.2.0",
+  "source": "registry",
+  "location": "/srv/vpp-registry"
+}
+```
+
+## Registry v1
+
+Registry 0.9 là filesystem-backed store, phù hợp local, shared disk hoặc mounted volume:
+
+```text
+registry/
+├── vpp-registry.json
+└── thu-vien/
+    ├── 1.2.0/
+    │   ├── vpp.json
+    │   └── main.vi
+    └── 1.4.0/
+        ├── vpp.json
+        └── main.vi
+```
+
+`vpp publish <registry-root>` xuất artifact hiện tại vào
+`<registry>/<name>/<version>/`. Version đã publish là bất biến: publish lại cùng bytes
+là idempotent, nhưng cùng `name@version` với bytes khác bị từ chối. `vpp.json` nằm trong
+artifact là metadata tối thiểu cho name/version/dependencies; root có marker schema
+`vpp-registry.json`.
+
+Install hỗ trợ cả registry root tường minh và default root qua môi trường:
+
+```text
+vpp cài đặt registry+/srv/vpp-registry#thu-vien@^1.2.0
+VPP_REGISTRY=/srv/vpp-registry vpp cài đặt registry:thu-vien@^1.2.0
+```
 
 Reader vẫn nhận manifest cũ:
 
@@ -111,22 +163,28 @@ relative path + bytes của toàn bộ regular file trong package tree, dùng đ
 thay đổi và kiểm tra tính lặp lại. Đây là fingerprint reproducibility, không phải chữ ký
 mật mã hoặc security integrity hash.
 
+Git entry lưu thêm `revision` là exact commit đã resolve từ `ref`. `ref` có thể là
+branch/tag/commit trong `vpp.json`, nhưng `vpp.lock` luôn pin commit bất biến để restore
+không phụ thuộc branch/tag có di chuyển về sau hay không.
+
 Khi package có `vpp.json`, `vpp khóa` dùng exact version của package đã cài và kiểm tra
 nó có thỏa range trong manifest project hay không. Xung đột version làm lệnh thất bại.
 
 `vpp cài đặt <nguồn>`, `vpp cập nhật`/`vpp đồng bộ` và `vpp khóa` đều giữ lockfile
-đồng bộ với graph vừa materialize. Trước khi ghi lock, CLI đối chiếu version trong
-package đã cài với exact version solver đã chọn để tránh tạo lockfile mang version mới
-nhưng fingerprint của bytes cũ.
+đồng bộ với graph vừa materialize. Trước khi ghi lock, CLI đối chiếu version và artifact
+bytes đã cài với source vừa resolve. Vì vậy Git ref di chuyển nhưng package vendored còn
+cũ làm `vpp khóa` thất bại và yêu cầu `vpp cập nhật`/`vpp đồng bộ`, thay vì tạo lockfile
+ghép revision mới với fingerprint cũ.
 
 ## Dependency graph
 
-Solver duyệt toàn graph local path package theo thứ tự dependency-first. Cùng một
-dependency được deduplicate nếu các range tương thích. Range xung đột bị từ chối với
-tên dependency rõ ràng; cycle bị từ chối với đường đi xác định như `a -> b -> a`.
+Solver duyệt graph theo thứ tự dependency-first và nhận source materializer riêng, nên
+logic graph/version không tự gọi Git hay đọc registry. Path, Git và registry có thể xuất hiện trong cùng graph;
+cùng một dependency được deduplicate nếu các range tương thích. Range xung đột bị từ
+chối với tên dependency rõ ràng; cycle bị từ chối với đường đi xác định như `a -> b -> a`.
 
-Package được materialize qua staging directory. `vpp.lock`, `.vpp/` và cây `gói/`
-đã cài của source project không bị vendored vào artifact package con.
+Package được materialize qua staging directory. `.git/`, `vpp.lock`, `.vpp/` và cây
+`gói/` đã cài của source project không bị vendored vào artifact package con.
 
 ## Cache và offline
 
@@ -140,9 +198,10 @@ Sau install/sync hoặc khi khóa graph, bytes đã cài được snapshot vào 
 fingerprint ghi trong `vpp.lock`. Cache entry chỉ được dùng nếu fingerprint tính lại
 vẫn khớp; entry bị sửa ngoài ý muốn không được coi là hợp lệ.
 
-`vpp phục hồi` đọc `vpp.lock`, ưu tiên cache trước và chỉ quay về local path source khi
-cache chưa có. Vì vậy một source path có thể bị xóa mà project vẫn phục hồi được chính
-xác bytes đã khóa nếu snapshot còn trong `.vpp/cache`.
+`vpp phục hồi` đọc `vpp.lock` và ưu tiên cache trước. Khi cache chưa có, path package
+quay về source path; Git package clone source rồi checkout exact `revision`; registry package
+resolve exact version đã khóa từ registry root rồi kiểm fingerprint. Vì vậy branch/tag có
+thể đã di chuyển hoặc registry có thêm version mới mà restore vẫn lấy đúng dependency đã khóa.
 
 `vpp phục hồi --offline` (hoặc `--ngoại-tuyến`) là cache-only: thiếu bất kỳ fingerprint
 nào thì lệnh thất bại thay vì truy cập source. `vpp cài đặt --offline` dùng cùng đường
@@ -159,10 +218,14 @@ thầm chạy trên dependency bytes khác với lockfile.
 
 ## CLI dependency flow
 
-Các lệnh local path hiện có:
+Các lệnh path/Git/registry hiện có:
 
 ```text
 vpp cài đặt <nguồn> [tên]
+vpp cài đặt git+<repository>[#<ref>] [tên]
+vpp cài đặt registry:<tên>[@<range>]
+vpp cài đặt registry+<root>#<tên>[@<range>]
+vpp publish <registry-root>
 vpp cập nhật          # alias workflow của đồng bộ
 vpp đồng bộ
 vpp khóa
@@ -174,8 +237,8 @@ vpp danh sách
 
 Các dạng `vpp gói ...` tương ứng dùng cùng implementation.
 
-## Phần còn lại của Package 0.9
+## Giới hạn sau Package 0.9
 
-- Git source fetch và registry source fetch/publish;
-- registry metadata/version selection và update policy cho remote package;
-- cryptographic integrity khi registry contract được chốt.
+- Registry 0.9 là filesystem-backed; hosted HTTP registry/auth/API server chưa thuộc contract này.
+- `fingerprint` phục vụ reproducibility, chưa phải cryptographic signature/integrity proof.
+- Publish signing, trust policy và registry authentication cần được chốt trước public hosted registry.

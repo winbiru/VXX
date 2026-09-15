@@ -6,7 +6,6 @@
 #include <fstream>
 #include <filesystem>
 #include <sstream>
-#include <ctime>
 #include <cstdio>
 #include <stdio.h>
 #include <cstdlib>
@@ -122,16 +121,24 @@ static bool handleNativeJsonFunction(const std::string &fn,
     std::string &err) {
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonEscape)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_string_value(vietvm::helpers::escapeJsonString(
-            vietvm::helpers::argToRawString(args[0])));
+        const std::string text = vietvm::helpers::argToRawString(args[0]);
+        if (!vietvm::core::isValidUtf8(text)) {
+            err = fn + ": chuỗi phải là UTF-8 hợp lệ";
+            return true;
+        }
+        result = make_string_value(vietvm::helpers::escapeJsonString(text));
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonString)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        const std::string text = vietvm::helpers::argToRawString(args[0]);
+        if (!vietvm::core::isValidUtf8(text)) {
+            err = fn + ": chuỗi phải là UTF-8 hợp lệ";
+            return true;
+        }
         result = make_string_value(std::string("\"") +
-                                   vietvm::helpers::escapeJsonString(
-                                       vietvm::helpers::argToRawString(args[0])) +
+                                   vietvm::helpers::escapeJsonString(text) +
                                    "\"");
         return true;
     }
@@ -271,8 +278,9 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnFileLineCount) ||
         vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnFileWordCount)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::ifstream input(std::filesystem::u8path(
-            vietvm::helpers::argToRawString(args[0])));
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::ifstream input(path);
         if (!input.is_open()) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeFileOpenForReadFailed, {fn});
@@ -294,8 +302,9 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadFile)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::ifstream ifs(std::filesystem::u8path(
-            vietvm::helpers::argToRawString(args[0])));
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::ifstream ifs(path);
         if (!ifs.is_open()) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeFileOpenForReadFailed, {fn});
@@ -309,8 +318,9 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteFile)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::ofstream ofs(std::filesystem::u8path(
-            vietvm::helpers::argToRawString(args[0])));
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::ofstream ofs(path);
         if (!ofs.is_open()) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeFileOpenForWriteFailed, {fn});
@@ -327,28 +337,11 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNow)) {
-        std::time_t now = std::time(nullptr);
-    #if defined(_MSC_VER)
-        std::tm tmBuf{};
-        std::tm *tmNow = (localtime_s(&tmBuf, &now) == 0) ? &tmBuf : nullptr;
-    #else
-        std::tm *tmNow = std::localtime(&now);
-    #endif
-        char buf[32] = {0};
-        if (!tmNow || std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tmNow) == 0) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeTimeFormatFailed);
-            return true;
-        }
-        result = make_string_value(buf);
-        return true;
-    }
-
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfig)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::ifstream ifs(std::filesystem::u8path(
-            vietvm::helpers::argToRawString(args[0])));
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::ifstream ifs(path);
         if (!ifs.is_open()) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeFileOpenForReadFailed, {fn});
@@ -392,6 +385,9 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfigKey)) {
         if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
         std::string filePath = vietvm::helpers::argToRawString(args[0]);
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        filePath = path.u8string();
         std::string key = vietvm::helpers::argToRawString(args[1]);
         std::string fallback = vietvm::helpers::argToRawString(args[2]);
         result = make_string_value(vietvm::helpers::readPropertyByKey(filePath, key, fallback));
@@ -1392,13 +1388,21 @@ void VM::executeIndexOpcode(const Instruction& instr) {
         }
         if (std::holds_alternative<std::string>(container)) {
             const std::string &text = std::get<std::string>(container);
-            const long long size = static_cast<long long>(text.size());
+            const long long size = static_cast<long long>(
+                vietvm::core::utf8CodePointCount(text));
             if (index >= size) {
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmIndexOutOfRange), instr.op, pc,
                     vietvm::runtime::runtimeIndexFacts(index, true, size, true));
             }
-            stack.push_back(make_string_value(std::string(1, text[static_cast<std::size_t>(index)])));
+            const auto unit = vietvm::core::utf8CodePointAt(
+                text, static_cast<std::size_t>(index));
+            if (!unit.has_value()) {
+                throw runtime_error_op(vietvm::messages::formatMessage(
+                    vietvm::messages::kVmIndexOutOfRange), instr.op, pc,
+                    vietvm::runtime::runtimeIndexFacts(index, true, size, true));
+            }
+            stack.push_back(make_string_value(*unit));
             return;
         }
         throw runtime_error_op(vietvm::messages::formatMessage(

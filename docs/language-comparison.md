@@ -370,7 +370,7 @@ func fibonacci(n int) int {
 
 ## Khi nào nên sử dụng V++
 
-### ✅ Phù hợp cho:
+### Có Phù hợp cho:
 
 1. **Học lập trình cơ bản (người Việt)**
    * Giảm rào cản ngôn ngữ tiếng Anh
@@ -393,7 +393,7 @@ func fibonacci(n int) int {
    * Test optimization strategies
    * Research project baseline
 
-### ❌ Không phù hợp cho:
+### Không Không phù hợp cho:
 
 1. **Production applications**
    * Chưa stable, chưa mature
@@ -435,17 +435,17 @@ V++ là một **ngôn ngữ thử nghiệm, định hướng giáo dục** với
 
 ### Điểm mạnh của V++:
 
-1. ✅ **Vietnamese-first**: Giảm rào cản học lập trình cho người Việt
-2. ✅ **Educational**: Thiết kế đơn giản, rõ ràng, dễ học VM internals
-3. ✅ **Explicit**: Không có magic, behavior dễ predict và debug
-4. ✅ **Research-friendly**: Tự do thử nghiệm, không legacy burden
+1. Có **Vietnamese-first**: Giảm rào cản học lập trình cho người Việt
+2. Có **Educational**: Thiết kế đơn giản, rõ ràng, dễ học VM internals
+3. Có **Explicit**: Không có magic, behavior dễ predict và debug
+4. Có **Research-friendly**: Tự do thử nghiệm, không legacy burden
 
 ### Điểm yếu của V++:
 
-1. ❌ **Experimental**: Chưa production-ready, có thể thay đổi
-2. ❌ **Minimal ecosystem**: Thư viện và tooling bundled mới ở mức MVP, chưa có hệ sinh thái bên thứ ba rộng
-3. ❌ **Limited features**: Chưa có object instance/inheritance, generics, concurrency hoặc type checker
-4. ❌ **Small community**: Ít tài liệu, ít hỗ trợ
+1. Không **Experimental**: Chưa production-ready, có thể thay đổi
+2. Không **Minimal ecosystem**: Thư viện và tooling bundled mới ở mức MVP, chưa có hệ sinh thái bên thứ ba rộng
+3. Không **Limited features**: Chưa có object instance/inheritance, generics, concurrency hoặc type checker
+4. Không **Small community**: Ít tài liệu, ít hỗ trợ
 
 ### Lời khuyên:
 

@@ -15,12 +15,14 @@ inline constexpr const char *kPackageLockFile = "vpp.lock";
 inline constexpr const char *kPackageStateDirectory = ".vpp";
 inline constexpr const char *kPackageCacheDirectory = "cache";
 inline constexpr const char *kPackageEntryFile = "main.vi";
+inline constexpr const char *kRegistryMarkerFile = "vpp-registry.json";
 inline constexpr const char *kPrimaryPackageDirectory = u8"gói";
 // `gói/chuẩn` là package tổng hợp. Các package chuẩn (`lõi`, `mạng`, ...)
 // nằm trực tiếp dưới `gói/` để đúng layout `gói/<tên>/main.vi`.
 inline constexpr const char *kStandardPackageDirectory = u8"chuẩn";
 inline constexpr const char *kStandardPackageMainFile = u8"gói/chuẩn/main.vi";
 inline constexpr const char *kEnvVppHome = "VPP_HOME";
+inline constexpr const char *kEnvVppRegistry = "VPP_REGISTRY";
 
 inline constexpr std::array<const char *, 3> kPackageDirectoryNames = {
     kPrimaryPackageDirectory,

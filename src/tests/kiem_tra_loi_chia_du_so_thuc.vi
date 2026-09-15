@@ -1,0 +1,6 @@
+nhập gói/chuẩn/main.vi;
+
+// Chia dư không được âm thầm cắt phần lẻ của số thực.
+hàm main() {
+    in chia dư(7.5, 2);
+};

@@ -1,6 +1,7 @@
 // Module: nhập xuất.tệp
 // Mục đích: đọc/ghi tệp ở tầng gói.
 // Ghi chú: hiện phụ thuộc native hook của VM.
+// Đường dẫn phải là UTF-8 hợp lệ tại native boundary.
 
 // Ghi chú hàm: đọc tệp.
 hàm đọc tệp(đường dẫn) {

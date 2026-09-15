@@ -6,14 +6,43 @@ hàm main() {
     in nhân(6, 7);
     in chia(7.0, 2.0);
     in chia dư(17, 5);
+    in chia an toàn(10, 0, 99);
 
     in lũy thừa(2, 8);
+    in lũy thừa(5, 0);
     in giai thừa(5);
+    in giai thừa(0);
+
+    thử {
+        in lũy thừa(2, 2.5);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        in lũy thừa(2, -1);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        in giai thừa(3.5);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        in giai thừa(-1);
+    } bắt lỗi (e) {
+        in e;
+    };
 
     in trị tuyệt đối(-9);
     in lớn nhất hai(9, 4);
     in nhỏ nhất hai(9, 4);
     in giới hạn(15, 0, 10);
+    thử {
+        in giới hạn(5, 10, 0);
+    } bắt lỗi (e) {
+        in e;
+    };
 
     in trung bình(5, 7);
     in phần trăm(2, 8);

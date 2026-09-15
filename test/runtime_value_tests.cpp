@@ -1,10 +1,13 @@
 #include <exception>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
+#include "common/vm_native_collection_helpers.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_json_helpers.h"
+#include "common/vm_native_text_helpers.h"
 #include "common/vm_utils.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/text.h"
@@ -176,6 +179,178 @@ void testSharedNativeValidation() {
     expect(!vietvm::helpers::requireNativeArgumentCount(listArgs, "thử số đối số", 2, error) &&
                error == expectedArityError,
            "native argument count validator retains the standard diagnostic");
+
+    int parsedInteger = 0;
+    error.clear();
+    expect(vietvm::helpers::parseIntArgFromStack(
+               make_float_value(7.0), "thử số nguyên", "giá trị", parsedInteger, error) &&
+               parsedInteger == 7,
+           "native integer parser accepts integral floating-point values");
+    error.clear();
+    expect(vietvm::helpers::parseIntArgFromStack(
+               make_string_value("7"), "thử số nguyên", "giá trị", parsedInteger, error) &&
+               parsedInteger == 7,
+           "native integer parser accepts complete decimal integer strings");
+    error.clear();
+    expect(!vietvm::helpers::parseIntArgFromStack(
+               make_float_value(7.5), "thử số nguyên", "giá trị", parsedInteger, error) &&
+               !error.empty(),
+           "native integer parser rejects fractional floating-point values");
+    error.clear();
+    expect(!vietvm::helpers::parseIntArgFromStack(
+               make_string_value("7.5"), "thử số nguyên", "giá trị", parsedInteger, error) &&
+               !error.empty(),
+           "native integer parser rejects strings with a fractional suffix");
+}
+
+void testTextIntegerContract() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    expect(vietvm::helpers::handleNativeTextFunction(
+               "cắt chuỗi",
+               {make_string_value(u8"Việt"), make_float_value(1.0), make_float_value(2.0)},
+               result, error) &&
+               error.empty() && std::holds_alternative<std::string>(result) &&
+               std::get<std::string>(result) == u8"iệ",
+           "string slice accepts integral floating-point offsets and counts");
+
+    result = make_null_value();
+    error.clear();
+    expect(vietvm::helpers::handleNativeTextFunction(
+               "cắt chuỗi",
+               {make_string_value(u8"Việt"), make_float_value(1.5), make_int_value(2)},
+               result, error) &&
+               !error.empty(),
+           "string slice rejects fractional offsets instead of truncating them");
+
+    result = make_null_value();
+    error.clear();
+    expect(vietvm::helpers::handleNativeTextFunction(
+               "mã hóa caesar",
+               {make_string_value("Abc-Z"), make_float_value(2.0)},
+               result, error) &&
+               error.empty() && std::holds_alternative<std::string>(result) &&
+               std::get<std::string>(result) == "Cde-B",
+           "Caesar helper accepts an integral floating-point key");
+
+    result = make_null_value();
+    error.clear();
+    expect(vietvm::helpers::handleNativeTextFunction(
+               "mã hóa caesar",
+               {make_string_value("Abc-Z"), make_float_value(2.5)},
+               result, error) &&
+               !error.empty(),
+           "Caesar helper rejects a fractional key instead of truncating it");
+}
+
+void testHttpUrlValidationContract() {
+    struct InvalidUrlCase {
+        std::string url;
+        std::string expectedReason;
+    };
+
+    const std::string malformedUtf8 =
+        std::string("http://example.test/") + static_cast<char>(0xc0) +
+        static_cast<char>(0xaf);
+    const std::vector<InvalidUrlCase> cases = {
+        {"", "URL rỗng"},
+        {"ftp://example.test/file", "scheme http:// hoặc https://"},
+        {"http://", "thiếu host"},
+        {"https:///path", "thiếu host"},
+        {"http://?x=1", "thiếu host"},
+        {"http://#muc", "thiếu host"},
+        {"http://:8080/path", "thiếu host"},
+        {"http://example.test:/path", "port không hợp lệ"},
+        {"http://example.test:99999/path", "port không hợp lệ"},
+        {"http://2001:db8::1/path", "IPv6 phải đặt trong ngoặc vuông"},
+        {"http://example.test/a b", "khoảng trắng hoặc ký tự điều khiển"},
+        {malformedUtf8, "UTF-8 hợp lệ"},
+    };
+
+    for (const auto &testCase : cases) {
+        StackValue result = make_null_value();
+        std::string error;
+        const bool handled = vietvm::helpers::runCurlHttpRequest(
+            "GET", "mạng lấy", testCase.url, std::nullopt, result, error);
+        expect(handled &&
+                   error.find("mạng lấy: URL HTTP không hợp lệ") != std::string::npos &&
+                   error.find(testCase.expectedReason) != std::string::npos,
+               "HTTP client validates invalid URLs before invoking curl: " +
+                   testCase.expectedReason);
+    }
+}
+
+void testCollectionErrorContract() {
+    StackValue result = make_null_value();
+    std::string error;
+
+    const bool overflowHandled = vietvm::helpers::handleNativeCollectionFunction(
+        "tổng list",
+        {make_list_value({make_int_value(std::numeric_limits<int>::max()), make_int_value(1)})},
+        result,
+        error);
+    expect(overflowHandled && error.find("vượt phạm vi số nguyên") != std::string::npos,
+           "collection sum rejects integer overflow instead of narrowing silently");
+
+    result = make_null_value();
+    error.clear();
+    const bool mixedHandled = vietvm::helpers::handleNativeCollectionFunction(
+        "sắp xếp",
+        {make_list_value({make_int_value(1), make_string_value("hai")})},
+        result,
+        error);
+    expect(mixedHandled && error.find("toàn số hoặc toàn chuỗi") != std::string::npos,
+           "collection sort rejects mixed incomparable values deterministically");
+
+    result = make_null_value();
+    error.clear();
+    const bool emptyMinHandled = vietvm::helpers::handleNativeCollectionFunction(
+        "nhỏ nhất list", {make_list_value({})}, result, error);
+    expect(emptyMinHandled && error.find("không nhận danh sách rỗng") != std::string::npos,
+           "collection min rejects an empty list with a stable diagnostic");
+}
+
+void testJsonUtf8Contract() {
+    const std::string malformed =
+        std::string("bad-") + static_cast<char>(0xc0) + static_cast<char>(0xaf);
+
+    StackValue parsed = make_null_value();
+    std::string error;
+    expect(!vietvm::helpers::parseJson(
+               std::string("{\"tên\":\"") + malformed + "\"}", parsed, error) &&
+               error.find("UTF-8 hợp lệ") != std::string::npos,
+           "JSON parser rejects malformed UTF-8 before parsing string contents");
+
+    error.clear();
+    expect(vietvm::helpers::parseJson(u8"{\"tên\":\"Việt Nam 𠀀\"}", parsed, error) &&
+               error.empty(),
+           "JSON parser accepts valid Vietnamese UTF-8 and Unicode ngoài BMP");
+
+    std::string encoded;
+    error.clear();
+    expect(!vietvm::helpers::stringifyJson(
+               make_string_value(malformed), encoded, error) &&
+               error.find("chuỗi phải là UTF-8 hợp lệ") != std::string::npos,
+           "JSON serializer rejects malformed UTF-8 string values");
+
+    MapValue invalidKeyMap;
+    invalidKeyMap.entries[malformed] = make_int_value(1);
+    encoded.clear();
+    error.clear();
+    expect(!vietvm::helpers::stringifyJson(
+               make_map_value(std::move(invalidKeyMap)), encoded, error) &&
+               error.find("khóa object phải là UTF-8 hợp lệ") != std::string::npos,
+           "JSON serializer rejects malformed UTF-8 object keys");
+
+    MapValue validMap;
+    validMap.entries[u8"ngôn ngữ"] = make_string_value(u8"Tiếng Việt 𠀀");
+    encoded.clear();
+    error.clear();
+    expect(vietvm::helpers::stringifyJson(
+               make_map_value(std::move(validMap)), encoded, error) &&
+               encoded == u8"{\"ngôn ngữ\":\"Tiếng Việt 𠀀\"}" && error.empty(),
+           "JSON serializer preserves valid Vietnamese UTF-8 deterministically");
 }
 
 void testRuntimeObjectModel() {
@@ -241,18 +416,95 @@ void testSharedTextAndWireHelpers() {
     expect(vietvm::core::toLowerAscii("AbC Đ") == "abc Đ" &&
                vietvm::core::toUpperAscii("aBc đ") == "ABC đ",
            "ASCII case helpers preserve UTF-8 bytes");
+    expect(vietvm::core::toLowerUtf8Vietnamese(u8"ĐẶNG THỊ HỒNG 𠀀中") ==
+               u8"đặng thị hồng 𠀀中" &&
+               vietvm::core::toUpperUtf8Vietnamese(u8"Việt Nam ươ 𠀀中") ==
+               u8"VIỆT NAM ƯƠ 𠀀中",
+           "Vietnamese UTF-8 case conversion covers precomposed letters and preserves other scripts");
+    const std::string vietnameseLower =
+        u8"ăâêôơưđàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ";
+    const std::string vietnameseUpper =
+        u8"ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
+    expect(vietvm::core::toUpperUtf8Vietnamese(vietnameseLower) == vietnameseUpper &&
+               vietvm::core::toLowerUtf8Vietnamese(vietnameseUpper) == vietnameseLower,
+           "Vietnamese UTF-8 case conversion covers every precomposed Vietnamese case pair");
+    expect(vietvm::core::normalizeUtf8VietnameseNfc(u8"Vie\u0323\u0302t Nam") ==
+               u8"Việt Nam" &&
+               vietvm::core::normalizeUtf8VietnameseNfc(u8"A\u0306\u0301 O\u031B\u0301") ==
+               u8"Ắ Ớ" &&
+               vietvm::core::normalizeUtf8VietnameseNfc(u8"Việt 𠀀中") == u8"Việt 𠀀中",
+           "Vietnamese NFC normalization composes decomposed marks and preserves other scripts");
+    const std::string vietnameseLowerNfd =
+        u8"a\u0306a\u0302e\u0302o\u0302o\u031Bu\u031B\u0111a\u0300a\u0301a\u0309a\u0303a\u0323"
+        u8"a\u0306\u0300a\u0306\u0301a\u0306\u0309a\u0306\u0303a\u0323\u0306"
+        u8"a\u0302\u0300a\u0302\u0301a\u0302\u0309a\u0302\u0303a\u0323\u0302"
+        u8"e\u0300e\u0301e\u0309e\u0303e\u0323e\u0302\u0300e\u0302\u0301e\u0302\u0309e\u0302\u0303e\u0323\u0302"
+        u8"i\u0300i\u0301i\u0309i\u0303i\u0323"
+        u8"o\u0300o\u0301o\u0309o\u0303o\u0323o\u0302\u0300o\u0302\u0301o\u0302\u0309o\u0302\u0303o\u0323\u0302"
+        u8"o\u031B\u0300o\u031B\u0301o\u031B\u0309o\u031B\u0303o\u031B\u0323"
+        u8"u\u0300u\u0301u\u0309u\u0303u\u0323u\u031B\u0300u\u031B\u0301u\u031B\u0309u\u031B\u0303u\u031B\u0323"
+        u8"y\u0300y\u0301y\u0309y\u0303y\u0323";
+    expect(vietvm::core::normalizeUtf8VietnameseNfc(vietnameseLowerNfd) ==
+               vietnameseLower,
+           "Vietnamese NFC normalization covers the complete lowercase Vietnamese corpus");
+    expect(vietvm::core::countVietnameseNormalizedSubstring(
+               u8"Vie\u0323\u0302t Vie\u0323\u0302t", u8"ệ") == 2 &&
+               vietvm::core::containsVietnameseNormalizedSubstring(
+                   u8"Vie\u0323\u0302t Nam", u8"Việt") &&
+               vietvm::core::replaceVietnameseNormalizedAll(
+                   u8"Vie\u0323\u0302t Nam", u8"Việt", u8"Đại Việt") ==
+                   u8"Đại Việt Nam",
+           "Vietnamese substring helpers treat NFC and decomposed input equivalently");
+    const std::string mixedUtf8 = u8"Aệ中𠀀";
+    expect(vietvm::core::isValidUtf8(mixedUtf8) &&
+               vietvm::core::utf8CodePointCount(mixedUtf8) == 4,
+           "UTF-8 helpers validate and count Unicode code points");
+    expect(vietvm::core::utf8CodePointAt(mixedUtf8, 0) == std::optional<std::string>("A") &&
+               vietvm::core::utf8CodePointAt(mixedUtf8, 1) == std::optional<std::string>(u8"ệ") &&
+               vietvm::core::utf8CodePointAt(mixedUtf8, 2) == std::optional<std::string>(u8"中") &&
+               vietvm::core::utf8CodePointAt(mixedUtf8, 3) == std::optional<std::string>(u8"𠀀") &&
+               !vietvm::core::utf8CodePointAt(mixedUtf8, 4).has_value(),
+           "UTF-8 code-point indexing returns complete multibyte units");
+    expect(vietvm::core::utf8CodePointSlice(u8"𠀀Việt Nam", 1, 4) == u8"Việt" &&
+               vietvm::core::utf8CodePointSlice(u8"𠀀Việt", 0, 2) == u8"𠀀V" &&
+               vietvm::core::utf8CodePointSlice(u8"Việt", 2, 99) == u8"ệt" &&
+               vietvm::core::utf8CodePointSlice(u8"Việt", 4, 1).empty(),
+           "UTF-8 slicing uses code-point offsets and clamps at the end");
+    const std::string malformed = std::string("A") + static_cast<char>(0xc0) +
+                                  static_cast<char>(0xaf) + "B";
+    expect(!vietvm::core::isValidUtf8(malformed) &&
+               vietvm::core::utf8CodePointCount(malformed) == 4 &&
+               vietvm::core::utf8CodePointAt(malformed, 1) ==
+                   std::optional<std::string>(std::string(1, static_cast<char>(0xc0))),
+           "malformed UTF-8 is detectable while raw-byte fallback remains deterministic");
+    expect(vietvm::core::toUpperUtf8Vietnamese(malformed) ==
+               std::string("A") + static_cast<char>(0xc0) +
+                   static_cast<char>(0xaf) + "B",
+           "Vietnamese case conversion preserves malformed raw bytes");
+    expect(vietvm::core::normalizeUtf8VietnameseNfc(malformed) == malformed,
+           "Vietnamese NFC normalization preserves malformed raw bytes");
+    expect(vietvm::core::utf8CodePointSlice(malformed, 1, 2) ==
+               std::string(1, static_cast<char>(0xc0)) + static_cast<char>(0xaf),
+           "UTF-8 slicing preserves malformed raw-byte fallback units");
     expect(vietvm::core::countSubstring("aaaa", "aa") == 2,
            "substring counting keeps non-overlapping native semantics");
     expect(vietvm::core::replaceAll("a-b-a", "a", "x") == "x-b-x",
            "replace-all helper preserves native left-to-right replacement");
     expect(vietvm::core::longestAsciiWord("mot haiiii ba") == "haiiii",
            "longest-word helper shares ASCII whitespace tokenization");
-    expect(vietvm::core::titleAsciiWords("hELLo   wORLD") == "Hello World",
-           "title helper normalizes words through shared ASCII case functions");
-    expect(vietvm::core::isAsciiCaseInsensitivePalindrome("AbBa"),
-           "palindrome helper shares ASCII case normalization");
-    expect(vietvm::core::areAsciiAnagrams("Dormitory", "Dirty room"),
-           "anagram helper shares ASCII case and whitespace normalization");
+    expect(vietvm::core::titleVietnameseWords(u8"đẶNG   thỊ hỒNG") ==
+               u8"Đặng Thị Hồng" &&
+               vietvm::core::titleVietnameseWords(u8"đa\u0323\u0306ng thi\u0323") ==
+                   u8"Đặng Thị",
+           "title helper normalizes Vietnamese NFC and case per word");
+    expect(vietvm::core::isVietnameseCaseInsensitivePalindrome(u8"ĐỏRỏđ") &&
+               vietvm::core::isVietnameseCaseInsensitivePalindrome(
+                   u8"A\u0306\u0301bBắ"),
+           "palindrome helper shares Vietnamese NFC and case normalization");
+    expect(vietvm::core::areVietnameseAnagrams(
+               u8"Việt Nam", u8"Nam Vie\u0323\u0302t") &&
+               vietvm::core::areVietnameseAnagrams("Dormitory", "Dirty room"),
+           "anagram helper compares normalized Vietnamese code points and ignores whitespace");
     expect(vietvm::core::caesarAscii("Az-z", -1) == "Zy-y",
            "Caesar helper normalizes negative shifts");
 
@@ -309,6 +561,18 @@ void testSharedOperatorEvaluation() {
     expect(sv_to_string(evaluateModuloOperator(
                make_int_value(7), make_int_value(3), OP_MODULO, 0)) == "1",
            "shared modulo evaluator preserves integer modulo");
+    expect(sv_to_string(evaluateModuloOperator(
+               make_float_value(7.0), make_float_value(3.0), OP_MODULO, 0)) == "1",
+           "shared modulo evaluator accepts integral floating-point values");
+    bool rejectedFractionalModulo = false;
+    try {
+        (void)evaluateModuloOperator(
+            make_float_value(7.5), make_int_value(3), OP_MODULO, 0);
+    } catch (const std::runtime_error &error) {
+        rejectedFractionalModulo = std::string(error.what()).find("số nguyên") != std::string::npos;
+    }
+    expect(rejectedFractionalModulo,
+           "shared modulo evaluator rejects fractional values instead of truncating them");
 }
 
 } // namespace
@@ -318,6 +582,10 @@ int main() {
         testSharedStackValueSemantics();
         testClosureValueAndGcSemantics();
         testSharedNativeValidation();
+        testTextIntegerContract();
+        testHttpUrlValidationContract();
+        testCollectionErrorContract();
+        testJsonUtf8Contract();
         testRuntimeObjectModel();
         testSharedTextAndWireHelpers();
         testSharedOperatorEvaluation();

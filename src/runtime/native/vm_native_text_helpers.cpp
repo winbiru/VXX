@@ -21,14 +21,16 @@ bool handleNativeTextFunction(const std::string &fn,
             err = "đếm ký tự cần ký tự không rỗng";
             return true;
         }
-        result = make_int_value(static_cast<int>(vietvm::core::countSubstring(text, needle)));
+        result = make_int_value(static_cast<int>(
+            vietvm::core::countVietnameseNormalizedSubstring(text, needle)));
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringContains)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        result = make_int_value(argToRawString(args[0]).find(argToRawString(args[1])) !=
-                                        std::string::npos ? 1 : 0);
+        result = make_int_value(vietvm::core::containsVietnameseNormalizedSubstring(
+                                    argToRawString(args[0]),
+                                    argToRawString(args[1])) ? 1 : 0);
         return true;
     }
 
@@ -39,8 +41,26 @@ bool handleNativeTextFunction(const std::string &fn,
             err = "thay thế không nhận chuỗi cần thay rỗng";
             return true;
         }
-        result = make_string_value(vietvm::core::replaceAll(
+        result = make_string_value(vietvm::core::replaceVietnameseNormalizedAll(
             argToRawString(args[0]), from, argToRawString(args[2])));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringSlice)) {
+        if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
+        int start = 0;
+        int count = 0;
+        if (!parseIntArgFromStack(args[1], fn, "vị trí bắt đầu", start, err) ||
+            !parseIntArgFromStack(args[2], fn, "độ dài", count, err)) {
+            return true;
+        }
+        if (start < 0 || count < 0) {
+            err = "cắt chuỗi không nhận vị trí hoặc độ dài âm";
+            return true;
+        }
+        result = make_string_value(vietvm::core::utf8CodePointSlice(
+            argToRawString(args[0]), static_cast<std::size_t>(start),
+            static_cast<std::size_t>(count)));
         return true;
     }
 
@@ -49,8 +69,17 @@ bool handleNativeTextFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         const std::string text = argToRawString(args[0]);
         result = make_string_value(vietvm::constants::matchesAnyName(
-            fn, vietvm::constants::kFnStringLower) ? vietvm::core::toLowerAscii(text)
-                                                    : vietvm::core::toUpperAscii(text));
+            fn, vietvm::constants::kFnStringLower)
+            ? vietvm::core::toLowerUtf8Vietnamese(text)
+            : vietvm::core::toUpperUtf8Vietnamese(text));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(
+            fn, vietvm::constants::kFnStringNormalizeUnicode)) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        result = make_string_value(vietvm::core::normalizeUtf8VietnameseNfc(
+            argToRawString(args[0])));
         return true;
     }
 
@@ -76,32 +105,33 @@ bool handleNativeTextFunction(const std::string &fn,
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringTitle)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_string_value(vietvm::core::titleAsciiWords(argToRawString(args[0])));
+        result = make_string_value(
+            vietvm::core::titleVietnameseWords(argToRawString(args[0])));
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringPalindrome)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_int_value(vietvm::core::isAsciiCaseInsensitivePalindrome(
-                                    argToRawString(args[0])) ? 1 : 0);
+        result = make_int_value(
+            vietvm::core::isVietnameseCaseInsensitivePalindrome(
+                argToRawString(args[0])) ? 1 : 0);
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringAnagram)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        result = make_int_value(vietvm::core::areAsciiAnagrams(
-                                    argToRawString(args[0]), argToRawString(args[1])) ? 1 : 0);
+        result = make_int_value(vietvm::core::areVietnameseAnagrams(
+                                    argToRawString(args[0]),
+                                    argToRawString(args[1])) ? 1 : 0);
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnStringCaesar)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        if (!std::holds_alternative<int>(args[1])) {
-            err = "mã hóa caesar cần khóa số nguyên";
-            return true;
-        }
+        int key = 0;
+        if (!parseIntArgFromStack(args[1], fn, "khóa", key, err)) return true;
         result = make_string_value(vietvm::core::caesarAscii(
-            argToRawString(args[0]), std::get<int>(args[1])));
+            argToRawString(args[0]), key));
         return true;
     }
 
@@ -109,4 +139,3 @@ bool handleNativeTextFunction(const std::string &fn,
 }
 
 } // namespace vietvm::helpers
-

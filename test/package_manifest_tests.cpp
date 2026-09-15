@@ -67,9 +67,9 @@ void testRoundTripAndDeterministicDependencyOrder() {
     manifest.name = u8"ứng dụng thử";
     manifest.version = "1.2.3-beta.1";
     manifest.dependencies = {
-        PackageDependencySpec{"zeta", "^2.0.0", PackageSourceKind::Registry, ""},
+        PackageDependencySpec{"zeta", "^2.0.0", PackageSourceKind::Registry, "", ""},
         PackageDependencySpec{u8"mạng nội bộ", "~1.4.0", PackageSourceKind::Path,
-                              "../network"},
+                              "../network", ""},
     };
 
     vietvm::core::writeProjectManifest(path, manifest);
@@ -109,7 +109,7 @@ void testValidationRejectsBadVersionRangeAndDuplicateName() {
     ProjectManifest badRange;
     badRange.name = "bad-range";
     badRange.dependencies.push_back(
-        PackageDependencySpec{"dep", "^", PackageSourceKind::Registry, ""});
+        PackageDependencySpec{"dep", "^", PackageSourceKind::Registry, "", ""});
     bool rejectedRange = false;
     try {
         vietvm::core::validateProjectManifest(badRange);
@@ -121,8 +121,8 @@ void testValidationRejectsBadVersionRangeAndDuplicateName() {
     ProjectManifest duplicate;
     duplicate.name = "duplicate";
     duplicate.dependencies = {
-        PackageDependencySpec{"dep", "*", PackageSourceKind::Registry, ""},
-        PackageDependencySpec{"dep", "1.0.0", PackageSourceKind::Registry, ""},
+        PackageDependencySpec{"dep", "*", PackageSourceKind::Registry, "", ""},
+        PackageDependencySpec{"dep", "1.0.0", PackageSourceKind::Registry, "", ""},
     };
     bool rejectedDuplicate = false;
     try {
@@ -169,9 +169,9 @@ void testLockfileRoundTripAndTreeFingerprint() {
     PackageLockfile lockfile;
     lockfile.packages = {
         PackageLockEntry{"zeta", "2.0.0", PackageSourceKind::Registry, "", "gói/zeta",
-                         vietvm::core::fingerprintPackageTree(packageB)},
+                         vietvm::core::fingerprintPackageTree(packageB), ""},
         PackageLockEntry{"alpha", "1.2.3", PackageSourceKind::Path, "../alpha", "gói/alpha",
-                         changedFingerprint},
+                         changedFingerprint, ""},
     };
     const fs::path lockPath = tree.root() / "vpp.lock";
     vietvm::core::writePackageLockfile(lockPath, lockfile);
@@ -188,6 +188,61 @@ void testLockfileRoundTripAndTreeFingerprint() {
            "lockfile writer sorts packages by name");
 }
 
+void testGitReferenceAndExactRevisionRoundTrip() {
+    TemporaryTree tree;
+    const fs::path manifestPath = tree.root() / "vpp.json";
+
+    ProjectManifest manifest;
+    manifest.name = "git-app";
+    manifest.dependencies = {
+        PackageDependencySpec{"remote", "^1.2.0", PackageSourceKind::Git,
+                              "https://example.invalid/remote.git", "release-1"},
+    };
+    vietvm::core::writeProjectManifest(manifestPath, manifest);
+    const ProjectManifest parsedManifest =
+        vietvm::core::readProjectManifest(manifestPath);
+    expect(parsedManifest.dependencies.size() == 1 &&
+               parsedManifest.dependencies[0].reference == "release-1",
+           "Git manifest dependency preserves symbolic ref");
+    expect(readText(manifestPath).find("\"ref\": \"release-1\"") != std::string::npos,
+           "Git manifest writer persists ref explicitly");
+
+    PackageLockfile lockfile;
+    lockfile.packages = {
+        PackageLockEntry{"remote", "1.2.3", PackageSourceKind::Git,
+                         "https://example.invalid/remote.git", "gói/remote",
+                         "fnv1a64:0123456789abcdef",
+                         "0123456789abcdef0123456789abcdef01234567"},
+    };
+    const fs::path lockPath = tree.root() / "vpp.lock";
+    vietvm::core::writePackageLockfile(lockPath, lockfile);
+    const PackageLockfile parsedLock =
+        vietvm::core::readPackageLockfile(lockPath);
+    expect(parsedLock.packages.size() == 1 &&
+               parsedLock.packages[0].revision ==
+                   "0123456789abcdef0123456789abcdef01234567",
+           "Git lock entry preserves exact revision");
+    expect(readText(lockPath).find("\"revision\": \"0123456789abcdef") !=
+               std::string::npos,
+           "Git lock writer persists exact revision");
+
+    const fs::path legacyPathLock = tree.root() / "legacy-path.lock";
+    writeText(legacyPathLock,
+              "{\n"
+              "  \"schema\": 1,\n"
+              "  \"packages\": [\n"
+              "    {\"name\": \"local\", \"version\": \"1.0.0\", "
+              "\"source\": \"path\", \"location\": \"../local\", "
+              "\"resolved\": \"gói/local\", "
+              "\"fingerprint\": \"fnv1a64:0000000000000000\"}\n"
+              "  ]\n"
+              "}\n");
+    const PackageLockfile legacy =
+        vietvm::core::readPackageLockfile(legacyPathLock);
+    expect(legacy.packages.size() == 1 && legacy.packages[0].revision.empty(),
+           "schema-1 non-Git lock entry remains compatible without revision");
+}
+
 } // namespace
 
 int main() {
@@ -196,6 +251,7 @@ int main() {
     testValidationRejectsBadVersionRangeAndDuplicateName();
     testJsonUnicodeEscapeAndUnknownFields();
     testLockfileRoundTripAndTreeFingerprint();
+    testGitReferenceAndExactRevisionRoundTrip();
 
     if (failures != 0) {
         std::cerr << failures << " package manifest test(s) failed\n";

@@ -33,6 +33,96 @@ void expect(bool condition, const std::string &message) {
     }
 }
 
+bool sameInstruction(const Instruction &left, const Instruction &right) {
+    return left.op == right.op &&
+           left.operand == right.operand &&
+           left.operandIndex == right.operandIndex &&
+           left.operandValue == right.operandValue;
+}
+
+bool sameBytecode(const std::vector<Instruction> &left,
+                  const std::vector<Instruction> &right) {
+    return left.size() == right.size() &&
+           std::equal(left.begin(), left.end(), right.begin(), sameInstruction);
+}
+
+bool sameDebugLocation(const vietvm::runtime::RuntimeSourceLocation &left,
+                       const vietvm::runtime::RuntimeSourceLocation &right) {
+    return left.sourceFile == right.sourceFile &&
+           left.moduleIdentity == right.moduleIdentity &&
+           left.functionName == right.functionName &&
+           left.line == right.line &&
+           left.column == right.column;
+}
+
+bool sameDebugInfo(
+    const std::vector<vietvm::runtime::RuntimeSourceLocation> &left,
+    const std::vector<vietvm::runtime::RuntimeSourceLocation> &right) {
+    return left.size() == right.size() &&
+           std::equal(left.begin(), left.end(), right.begin(), sameDebugLocation);
+}
+
+bool sameFunctionBytecode(
+    const std::unordered_map<int, std::vector<Instruction>> &left,
+    const std::unordered_map<int, std::vector<Instruction>> &right) {
+    if (left.size() != right.size()) return false;
+    for (const auto &entry : left) {
+        const auto found = right.find(entry.first);
+        if (found == right.end() || !sameBytecode(entry.second, found->second)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool sameFunctionDebugInfo(
+    const std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>> &left,
+    const std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>> &right) {
+    if (left.size() != right.size()) return false;
+    for (const auto &entry : left) {
+        const auto found = right.find(entry.first);
+        if (found == right.end() || !sameDebugInfo(entry.second, found->second)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool sameModuleInitializers(
+    const std::vector<vietvm::compiler::CompiledModuleInitializer> &left,
+    const std::vector<vietvm::compiler::CompiledModuleInitializer> &right) {
+    if (left.size() != right.size()) return false;
+    for (std::size_t index = 0; index < left.size(); ++index) {
+        if (left[index].identity != right[index].identity ||
+            !sameBytecode(left[index].bytecode, right[index].bytecode) ||
+            !sameDebugInfo(left[index].debugInfo, right[index].debugInfo)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool sameModuleExports(
+    const std::unordered_map<std::string,
+                             std::vector<vietvm::compiler::CompiledModuleFunctionExport>> &left,
+    const std::unordered_map<std::string,
+                             std::vector<vietvm::compiler::CompiledModuleFunctionExport>> &right) {
+    if (left.size() != right.size()) return false;
+    for (const auto &entry : left) {
+        const auto found = right.find(entry.first);
+        if (found == right.end() || entry.second.size() != found->second.size()) {
+            return false;
+        }
+        for (std::size_t index = 0; index < entry.second.size(); ++index) {
+            if (entry.second[index].name != found->second[index].name ||
+                entry.second[index].functionId != found->second[index].functionId) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void testStringPool() {
     using vietvm::compiler::StringPool;
 
@@ -204,6 +294,67 @@ void testCompilationContextLifecycle() {
            "repeated context-driven compilation reproduces function count");
     expect(firstAgain.bytecode.size() == first.bytecode.size(),
            "repeated context-driven compilation preserves root bytecode shape");
+}
+
+void testDeterministicCompilationArtifacts() {
+    const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+    const fs::path tempRoot = fs::temp_directory_path() /
+                              ("vpp-compiler-reproducible-" + std::to_string(nonce));
+    fs::create_directories(tempRoot);
+
+    auto writeFile = [](const fs::path &path, const std::string &contents) {
+        std::ofstream output(path);
+        if (!output.is_open()) {
+            throw std::runtime_error("cannot create reproducibility fixture: " + path.u8string());
+        }
+        output << contents;
+    };
+
+    writeFile(tempRoot / "dependency.vi",
+              "hàm giá_trị_gốc() { trả về 7; };\n");
+    writeFile(tempRoot / "module.vi",
+              "nhập dependency.vi;\n"
+              "hàm tính_toán(x) { trả về x + giá_trị_gốc(); };\n");
+
+    const std::string source =
+        "nhập module.vi;\n"
+        "hàm main() { in tính_toán(5); };\n";
+
+    vietvm::compiler::CompilationContext firstContext;
+    firstContext.importResolutionBase = tempRoot;
+    const auto first = vietvm::compiler::compilePipeline(
+        firstContext, source, keywordMap, true);
+
+    vietvm::compiler::CompilationContext secondContext;
+    secondContext.importResolutionBase = tempRoot;
+    const auto second = vietvm::compiler::compilePipeline(
+        secondContext, source, keywordMap, true);
+
+    expect(sameBytecode(first.bytecode, second.bytecode),
+           "repeated compilation reproduces root bytecode exactly");
+    expect(firstContext.stringPool == secondContext.stringPool,
+           "repeated compilation reproduces StringPool ordering exactly");
+    expect(sameFunctionBytecode(firstContext.functionBytecode,
+                                secondContext.functionBytecode),
+           "repeated compilation reproduces function bytecode exactly");
+    expect(firstContext.functionNameIndices == secondContext.functionNameIndices,
+           "repeated compilation reproduces function IDs and name indices exactly");
+    expect(sameDebugInfo(firstContext.rootBytecodeDebugInfo,
+                         secondContext.rootBytecodeDebugInfo) &&
+               sameFunctionDebugInfo(firstContext.functionDebugInfo,
+                                     secondContext.functionDebugInfo),
+           "repeated compilation reproduces bytecode debug metadata exactly");
+    expect(firstContext.importedFiles == secondContext.importedFiles &&
+               sameModuleInitializers(firstContext.moduleInitializers,
+                                      secondContext.moduleInitializers) &&
+               sameModuleExports(firstContext.moduleFunctionExports,
+                                 secondContext.moduleFunctionExports),
+           "repeated compilation reproduces dependency and module metadata exactly");
+    expect(firstContext.nextFunctionId == secondContext.nextFunctionId,
+           "repeated compilation ends with the same function allocator state");
+
+    std::error_code ignored;
+    fs::remove_all(tempRoot, ignored);
 }
 
 void testContextCompilationIgnoresLegacyActiveRegistry() {
@@ -511,6 +662,7 @@ int main() {
     testCompilationStateReset();
     testRepeatedTopLevelCompilationLifecycle();
     testCompilationContextLifecycle();
+    testDeterministicCompilationArtifacts();
     testContextCompilationIgnoresLegacyActiveRegistry();
     testConcurrentCompilationContexts();
     testConcurrentCompilationContextsWithIndependentImportRoots();

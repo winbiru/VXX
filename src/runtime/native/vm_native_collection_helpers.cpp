@@ -1,7 +1,10 @@
 #include "common/vm_native_collection_helpers.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -115,7 +118,6 @@ bool handleNativeCollectionFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         ListHandle list;
         if (!getFirstListArgument(args, fn, list, err)) return true;
-        double total = 0.0;
         bool hasFloat = false;
         for (const StackValue &value : list->elements) {
             if (!isNumeric(value)) {
@@ -123,9 +125,31 @@ bool handleNativeCollectionFunction(const std::string &fn,
                 return true;
             }
             hasFloat = hasFloat || std::holds_alternative<double>(value);
-            total += toDouble(value);
         }
-        result = hasFloat ? make_float_value(total) : make_int_value(static_cast<int>(total));
+
+        if (hasFloat) {
+            double total = 0.0;
+            for (const StackValue &value : list->elements) {
+                total += toDouble(value);
+                if (!std::isfinite(total)) {
+                    err = "tổng danh sách vượt phạm vi số thực";
+                    return true;
+                }
+            }
+            result = make_float_value(total);
+            return true;
+        }
+
+        std::int64_t total = 0;
+        for (const StackValue &value : list->elements) {
+            total += static_cast<std::int64_t>(std::get<int>(value));
+            if (total < std::numeric_limits<int>::min() ||
+                total > std::numeric_limits<int>::max()) {
+                err = "tổng danh sách vượt phạm vi số nguyên";
+                return true;
+            }
+        }
+        result = make_int_value(static_cast<int>(total));
         return true;
     }
 
@@ -269,9 +293,14 @@ bool handleNativeCollectionFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         MapHandle map;
         if (!getFirstMapArgument(args, fn, map, err)) return true;
+        std::vector<std::string> sortedKeys;
+        sortedKeys.reserve(map->entries.size());
+        for (const auto &entry : map->entries) sortedKeys.push_back(entry.first);
+        std::sort(sortedKeys.begin(), sortedKeys.end());
+
         std::vector<StackValue> keys;
-        keys.reserve(map->entries.size());
-        for (const auto &entry : map->entries) keys.push_back(make_string_value(entry.first));
+        keys.reserve(sortedKeys.size());
+        for (const std::string &key : sortedKeys) keys.push_back(make_string_value(key));
         result = make_list_value(std::move(keys));
         return true;
     }

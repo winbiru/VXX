@@ -1,4 +1,4 @@
-// Regression cho API chuỗi MVP (ASCII/byte UTF-8).
+// Regression cho API chuỗi, ưu tiên semantics tiếng Việt UTF-8.
 in đảo ngược("abc");
 in đếm ký tự("banana", "a");
 in chứa chuỗi("xin chào", "chào");
@@ -11,4 +11,12 @@ in từ dài nhất("một hai baaaaaa");
 in viết hoa đầu từ("xIN chAO");
 in là palindrome("Level");
 in là anagram("listen", "silent");
+in viết hoa đầu từ("đẶNG   thỊ hỒNG");
+in là palindrome("ĐỏRỏđ");
+in là anagram("Việt Nam", "Nam Việt");
+in đếm ký tự("Việt Việt", "ệ");
+in chứa chuỗi("Việt Nam", "Việt");
+in thay thế("Việt Nam", "Việt", "Đại Việt");
 in mã hóa caesar("Abc-Z", 2);
+in cắt chuỗi("Việt", 1.0, 2.0);
+in mã hóa caesar("Abc-Z", 2.0);

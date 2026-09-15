@@ -28,4 +28,10 @@ hàm main() {
         json thuộc tính thô("b", đối tượng b) + "}";
     dữ liệu hai = json phân tích(nội dung hai);
     in json tạo(dữ liệu hai);
+
+    thứ tự json = {};
+    đặt map(thứ tự json, "z", 1);
+    đặt map(thứ tự json, "a", 2);
+    đặt map(thứ tự json, "m", 3);
+    in json tạo(thứ tự json);
 };

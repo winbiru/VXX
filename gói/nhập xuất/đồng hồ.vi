@@ -2,9 +2,19 @@
 // Mục đích: cung cấp API thời gian hiện tại cho ứng dụng.
 // Ghi chú: phụ thuộc native hook của VM.
 
-// Ghi chú hàm: lấy thời gian hiện tại.
+// Trả thời gian local dạng ISO-8601 có offset, ví dụ 2026-09-15T16:10:20+07:00.
 hàm lấy thời gian hiện tại() {
     ném "stdlib: lấy thời gian hiện tại native hook không khả dụng";
+};
+
+// Trả thời gian UTC dạng ISO-8601, ví dụ 2026-09-15T09:10:20Z.
+hàm lấy thời gian utc() {
+    ném "stdlib: lấy thời gian utc native hook không khả dụng";
+};
+
+// Trả độ lệch local so với UTC theo phút, ví dụ UTC+07:00 là 420.
+hàm độ lệch múi giờ() {
+    ném "stdlib: độ lệch múi giờ native hook không khả dụng";
 };
 
 // Ghi chú hàm: giờ hiện tại.
