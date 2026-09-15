@@ -1,0 +1,5 @@
+[
+  {"id":"SP-1","ten":"Ca phe hat","gia":180000,"tonKho":50,"daBan":0,"phienBan":1},
+  {"id":"SP-2","ten":"Tra o long","gia":120000,"tonKho":35,"daBan":0,"phienBan":1},
+  {"id":"SP-3","ten":"Banh quy bo","gia":65000,"tonKho":80,"daBan":0,"phienBan":1}
+]

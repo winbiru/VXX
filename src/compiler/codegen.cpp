@@ -300,6 +300,43 @@ bool isCollectionLiteralValue(const IrProgram &program,
     return false;
 }
 
+bool isStaticCollectionLiteralValue(const IrProgram &program,
+                                    const IrValue *value) noexcept {
+    if (value == nullptr) return false;
+    switch (value->opcode) {
+        case IrValueOpcode::ConstInt:
+        case IrValueOpcode::ConstFloat:
+        case IrValueOpcode::ConstString:
+        case IrValueOpcode::ConstBool:
+        case IrValueOpcode::ConstNull:
+            return value->operands.empty();
+        case IrValueOpcode::ListLiteral:
+            for (IrValueId element : value->operands) {
+                if (!isStaticCollectionLiteralValue(program, program.value(element))) {
+                    return false;
+                }
+            }
+            return true;
+        case IrValueOpcode::MapLiteral:
+            if (value->operands.size() % 2 != 0) return false;
+            for (std::size_t index = 0; index < value->operands.size(); index += 2) {
+                const IrValue *key = program.value(value->operands[index]);
+                if (key == nullptr || !key->operands.empty() ||
+                    (key->opcode != IrValueOpcode::ConstString &&
+                     key->opcode != IrValueOpcode::LoadName)) {
+                    return false;
+                }
+                if (!isStaticCollectionLiteralValue(
+                        program, program.value(value->operands[index + 1]))) {
+                    return false;
+                }
+            }
+            return true;
+        default:
+            return false;
+    }
+}
+
 // Kiểm tra điều kiện của `isDirectIndexBase`.
 bool isDirectIndexBase(const IrValue *value) noexcept {
     return value != nullptr &&
@@ -426,14 +463,49 @@ bool supportsValue(const IrProgram &program,
         }
 
         case IrValueOpcode::MapLiteral:
-            // Composite literals are first-class IR values.  The direct
-            // emitter can materialize them anywhere a value is accepted,
-            // including call arguments and nested list/map values.
-            supported = isCollectionLiteralValue(program, sourceOwner, value);
+            if (!hasDelimitedLiteralBounds(sourceOwner, *value, "{", "}") ||
+                value->operands.size() % 2 != 0) {
+                break;
+            }
+            if (isStaticCollectionLiteralValue(program, value)) {
+                supported = isCollectionLiteralValue(program, sourceOwner, value);
+                break;
+            }
+            supported = true;
+            for (std::size_t index = 0;
+                 supported && index < value->operands.size(); index += 2) {
+                if (!isMapKey(sourceOwner, program.value(value->operands[index]))) {
+                    supported = false;
+                    break;
+                }
+                const IrValue *entryValue = program.value(value->operands[index + 1]);
+                supported = isStaticCollectionLiteralValue(program, entryValue)
+                    ? isCollectionLiteralValue(program, sourceOwner, entryValue)
+                    : supportsValue(program, sourceOwner, context,
+                                    value->operands[index + 1],
+                                    ValueContext::Nested, visiting);
+            }
             break;
 
         case IrValueOpcode::ListLiteral:
-            supported = isCollectionLiteralValue(program, sourceOwner, value);
+            if (!hasDelimitedLiteralBounds(sourceOwner, *value, "[", "]")) break;
+            if (isStaticCollectionLiteralValue(program, value)) {
+                supported = isCollectionLiteralValue(program, sourceOwner, value);
+                break;
+            }
+            supported = true;
+            for (IrValueId element : value->operands) {
+                const IrValue *elementValue = program.value(element);
+                const bool elementSupported =
+                    isStaticCollectionLiteralValue(program, elementValue)
+                        ? isCollectionLiteralValue(program, sourceOwner, elementValue)
+                        : supportsValue(program, sourceOwner, context, element,
+                                        ValueContext::Nested, visiting);
+                if (!elementSupported) {
+                    supported = false;
+                    break;
+                }
+            }
             break;
 
         case IrValueOpcode::Index:
@@ -536,7 +608,7 @@ bool supportsValue(const IrProgram &program,
                         supportsValue(program, sourceOwner, context, target->operands[1],
                                       ValueContext::Nested, visiting) &&
                         supportsValue(program, sourceOwner, context, value->operands[1],
-                                      ValueContext::Nested, visiting);
+                                      ValueContext::SimpleAssignmentRhs, visiting);
             break;
         }
 
@@ -1013,7 +1085,9 @@ bool supportsInstruction(const IrProgram &program,
     }
     if (instruction.opcode == IrOpcode::Statement && !dedicatedCall) {
         if (rootIsCall) return false;
-        if (root->opcode != IrValueOpcode::StoreName) {
+        if (root->opcode != IrValueOpcode::StoreName &&
+            root->opcode != IrValueOpcode::StoreProperty &&
+            root->opcode != IrValueOpcode::StoreIndex) {
             std::unordered_set<IrValueId> callSearch;
             if (containsCall(program, root->id, callSearch)) return false;
         }
@@ -1063,14 +1137,9 @@ Opcode compoundOpcode(const std::string &op) {
     throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedCompoundAssignment));
 }
 
-// Bỏ dấu nháy của literal chuỗi IR và giải phần bao ngoài trước khi lưu nội dung thực vào `StringPool`.
+// Giải mã escape tại compiler để mọi chuỗi runtime chứa nội dung thực.
 std::string unquote(const std::string &text) {
-    if (text.size() >= 2 &&
-        ((text.front() == '"' && text.back() == '"') ||
-         (text.front() == '\'' && text.back() == '\''))) {
-        return text.substr(1, text.size() - 2);
-    }
-    return text;
+    return stripQuotes(text);
 }
 
 // Nối thêm tagged scalar giá trị trực tiếp; hàm đưa dữ liệu mới vào cuối cấu trúc đích theo đúng thứ tự hiện có.
@@ -1091,9 +1160,8 @@ bool appendTaggedScalarLiteral(std::ostringstream &encoded,
             encoded << 'd' << fieldSeparator << escapeLiteralWireField(value.text);
             return true;
         case IrValueOpcode::ConstString:
-            // Map/list literal payloads decode source escapes before applying
-            // the wire escaping. Ordinary string-expression emission keeps
-            // its different legacy contract in `unquote` above.
+            // Decode source escapes once, then encode the literal-wire payload.
+            // Ordinary string expressions use the same source decoder.
             encoded << 's' << fieldSeparator
                     << escapeLiteralWireField(stripQuotes(value.text));
             return true;
@@ -1382,13 +1450,45 @@ struct Emitter {
                 output.push_back({OP_RONG_GIA_TRI, 0, 0, 0});
                 return;
             case IrValueOpcode::MapLiteral: {
-                const int index = registry.storeString(encodeMapLiteral(program, *value));
-                output.push_back({OP_MAP_LITERAL, 0, index, 0});
+                if (isStaticCollectionLiteralValue(program, value)) {
+                    const int index = registry.storeString(encodeMapLiteral(program, *value));
+                    output.push_back({OP_MAP_LITERAL, 0, index, 0});
+                    return;
+                }
+                for (std::size_t index = 0; index < value->operands.size(); index += 2) {
+                    const IrValue *key = program.value(value->operands[index]);
+                    if (key == nullptr || !key->operands.empty() ||
+                        (key->opcode != IrValueOpcode::ConstString &&
+                         key->opcode != IrValueOpcode::LoadName)) {
+                        throw std::logic_error(std::string(
+                            messages::kInternalDirectIrUnsupportedValue));
+                    }
+                    const std::string keyText = key->opcode == IrValueOpcode::ConstString
+                        ? stripQuotes(key->text)
+                        : key->text;
+                    const int keyIndex = registry.storeString(keyText);
+                    output.push_back({OP_CHUOI, 0, keyIndex, 0});
+                    emitValue(value->operands[index + 1], output);
+                }
+                output.push_back({OP_MAP_LITERAL,
+                                  static_cast<int>(value->operands.size() / 2),
+                                  -1,
+                                  0});
                 return;
             }
             case IrValueOpcode::ListLiteral: {
-                const int index = registry.storeString(encodeListLiteral(program, *value));
-                output.push_back({OP_LIST_LITERAL, 0, index, 0});
+                if (isStaticCollectionLiteralValue(program, value)) {
+                    const int index = registry.storeString(encodeListLiteral(program, *value));
+                    output.push_back({OP_LIST_LITERAL, 0, index, 0});
+                    return;
+                }
+                for (IrValueId element : value->operands) {
+                    emitValue(element, output);
+                }
+                output.push_back({OP_LIST_LITERAL,
+                                  static_cast<int>(value->operands.size()),
+                                  -1,
+                                  0});
                 return;
             }
             case IrValueOpcode::Index:

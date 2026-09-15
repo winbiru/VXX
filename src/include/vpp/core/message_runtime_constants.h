@@ -64,7 +64,6 @@ inline constexpr std::string_view kVmClosureMissingCaptures = "closure: không �
 inline constexpr std::string_view kVmClosureInvalidCapture = "closure: mã slot capture phải là số nguyên";
 inline constexpr std::string_view kVmUnknownThrownValue = "lỗi không xác định";
 inline constexpr std::string_view kVmUncaughtException = "ngoại lệ không bắt được: {0}";
-inline constexpr std::string_view kVmOutputPrefix = "[IN] ";
 inline constexpr std::string_view kVmLogPrefix = "[VM] ";
 inline constexpr std::string_view kVmModuleInitializationInvalidState = "trạng thái khởi tạo mô-đun không hợp lệ: {0}";
 inline constexpr std::string_view kVmModuleInitializationFailed = "khởi tạo mô-đun thất bại: {0}";

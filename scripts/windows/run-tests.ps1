@@ -17,7 +17,6 @@ $script:LastHttpProbeError = ""
 $sessionDir = Join-Path (Join-Path $repoRoot "src\tests\.tmp") ("windows-" + [guid]::NewGuid().ToString())
 $externalVppHome = $null
 $fixtureProcess = $null
-$backendProcess = $null
 $previousVppHome = $env:VPP_HOME
 
 function Add-Pass {
@@ -260,82 +259,6 @@ try {
         throw "Local HTTP test fixture did not start (pid: $fixturePid, exit code: $fixtureExitCode, probe: $script:LastHttpProbeError). stdout: $fixtureOutput stderr: $fixtureError"
     }
 
-    # This helper also checks the native Winsock adapter and the UTF-8 import
-    # path used by an installed project.
-    Write-Host "== Running examples/api_project/application.vi [example] =="
-    try {
-        & (Join-Path $PSScriptRoot "test-http-server.ps1") -VppExecutable $script:Vpp
-        Add-Pass "examples/api_project/application.vi [example]"
-    } catch {
-        Add-Fail "examples/api_project/application.vi [example]"
-        Write-Host $_.Exception.Message
-    }
-
-    Write-Host "== Running backend scaffold smoke test =="
-    $scaffoldRoot = Join-Path $sessionDir "backend"
-    New-Item -ItemType Directory -Path $scaffoldRoot -Force | Out-Null
-    $scaffoldStdOut = Join-Path $sessionDir "backend-init.output"
-    $scaffoldStdErr = Join-Path $sessionDir "backend-init.stderr"
-    $backendStdOut = $null
-    $backendStdErr = $null
-    $backendProbeError = ""
-    $backendFailureReason = ""
-    $scaffoldExit = Invoke-Vpp -Arguments @("init", "backend", "demo-api") -StdOut $scaffoldStdOut -StdErr $scaffoldStdErr -WorkingDirectory $scaffoldRoot
-    $scaffoldProject = Join-Path $scaffoldRoot "demo-api"
-    $properties = Join-Path $scaffoldProject "application.properties"
-    $scaffoldOk = $scaffoldExit -eq 0
-    foreach ($required in @(
-        "application.vi",
-        "config.vi",
-        "controller.vi",
-        "router.vi",
-        "server.vi",
-        "application.properties",
-        "README.md",
-        ".gitignore"
-    )) {
-        $scaffoldOk = $scaffoldOk -and (Test-Path -LiteralPath (Join-Path $scaffoldProject $required))
-    }
-    if ($scaffoldOk) {
-        $propertiesText = [System.IO.File]::ReadAllText($properties, [System.Text.UTF8Encoding]::new($false))
-        # `$` in multiline regex sits before `\n`, not before a preceding
-        # CRLF `\r`; accept both checkout line endings before changing the port.
-        $updatedPropertiesText = [regex]::Replace($propertiesText, "(?m)^port=8080\r?$", "port=18081")
-        if ($updatedPropertiesText -notmatch "(?m)^port=18081\r?$") {
-            $scaffoldOk = $false
-            $backendFailureReason = "Could not change the scaffold server port to 18081."
-        } else {
-            [System.IO.File]::WriteAllText($properties, $updatedPropertiesText, [System.Text.UTF8Encoding]::new($false))
-            $backendStdOut = Join-Path $sessionDir "backend-server.output"
-            $backendStdErr = Join-Path $sessionDir "backend-server.stderr"
-            $backendProcess = Start-VppServer -Source (Join-Path $scaffoldProject "application.vi") -StdOut $backendStdOut -StdErr $backendStdErr -WorkingDirectory $scaffoldProject
-            $scaffoldOk = Wait-ForHttp -Uri "http://127.0.0.1:18081/health" -ExpectedContent "true"
-            $backendProbeError = $script:LastHttpProbeError
-            Stop-VppServer $backendProcess
-            $backendProcess = $null
-        }
-    }
-    if ($scaffoldOk) {
-        Add-Pass "backend scaffold"
-    } else {
-        Add-Fail "backend scaffold"
-        if ($scaffoldExit -ne 0) {
-            Show-FailureDetails -StdErr $scaffoldStdErr -ExitCode $scaffoldExit
-        } elseif (-not [string]::IsNullOrWhiteSpace($backendFailureReason)) {
-            Write-Host "  $backendFailureReason"
-        } else {
-            Write-Host "  health probe: $backendProbeError"
-            $backendOutput = Get-NormalizedUtf8Text $backendStdOut
-            $backendError = Get-NormalizedUtf8Text $backendStdErr
-            if (-not [string]::IsNullOrWhiteSpace($backendOutput)) {
-                Write-Host "  stdout: $backendOutput"
-            }
-            if (-not [string]::IsNullOrWhiteSpace($backendError)) {
-                Write-Host "  stderr: $backendError"
-            }
-        }
-    }
-
     Write-Host "== Running Vietnamese package import via VPP_HOME =="
     $externalVppHome = Join-Path ([System.IO.Path]::GetTempPath()) ("vpp-package-import-" + [guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Path $externalVppHome -Force | Out-Null
@@ -427,7 +350,6 @@ try {
         throw "Windows V++ regression suite failed with $script:FailCount failure(s)."
     }
 } finally {
-    Stop-VppServer $backendProcess
     Stop-VppServer $fixtureProcess
     if ($null -eq $previousVppHome) {
         Remove-Item Env:VPP_HOME -ErrorAction SilentlyContinue

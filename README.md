@@ -128,7 +128,7 @@ vpp kiểm thử tests
 ```
 
 Template backend vẫn có thể tạo bằng `vpp khởi tạo backend <tên>`. Project mẫu thực tế
-`examples/hoa-don-cua-hang` minh họa module, class/constructor, import tương đối và smoke test.
+`examples/hoa-don-cua-hang` minh họa module, class/constructor và import tương đối.
 
 Hướng dẫn cài/cập nhật release cho Linux, macOS, Windows và đánh giá Homebrew/winget nằm tại
 `docs/installation.md`.
@@ -231,7 +231,9 @@ nhập "kiểm thử";
 - `gói/dữ liệu`: phân trang và database adapter.
 - `gói/ứng dụng`: chỉ lifecycle ứng dụng chung; không tự kéo web, HTTP hay data.
 - `gói/dựng`: facade tiện dụng cho web, dữ liệu và ứng dụng full stack.
-- `gói/kiểm thử`: khẳng định cơ bản trong mã V++ (`khẳng định đúng`, `khẳng định sai`, `khẳng định bằng`, `khẳng định khác`).
+- `gói/kiểm thử`: assertion và lifecycle test trong mã V++ (`khẳng định đúng/sai/bằng/khác`,
+  `khẳng định rỗng/không rỗng`, `khẳng định ném lỗi`, `chạy ca kiểm thử`). Xem
+  `docs/testing.md` cho discovery, setup/teardown và expected-error contract.
 
 Một số API chuẩn hiện được nối trực tiếp vào native runtime:
 

@@ -1,0 +1,97 @@
+nhập lõi;
+nhập mạng;
+nhập "nhập xuất";
+nhập "hop_dong.vi";
+nhập "../domain/don_hang.vi";
+
+lớp công khai KhoĐơnHàngTệp triển khai KhoĐơnHàng {
+    hàm khởi tạo(đườngDẫn) {
+        mình.đườngDẫn = đườngDẫn;
+        mình.khởiTạoNếuThiếu();
+    }
+
+    hàm khởiTạoNếuThiếu() {
+        đườngDẫn = mình.đườngDẫn;
+        nếu (!đường dẫn tồn tại(đườngDẫn)) {
+            thưMục = đường dẫn cha(đườngDẫn);
+            nếu (thưMục != "" && !đường dẫn tồn tại(thưMục)) {
+                tạo thư mục(thưMục);
+            };
+            ghi tệp(đườngDẫn, "[]");
+        };
+        trả về đúng;
+    }
+
+    hàm đọcMap() {
+        nộiDung = đọc tệp(mình.đườngDẫn);
+        nếu (nộiDung == "") {
+            trả về [];
+        };
+        dữLiệu = json phân tích(nộiDung);
+        nếu (loại của(dữLiệu) != "danh sách") {
+            ném "Kho đơn hàng: tệp JSON gốc phải là mảng";
+        };
+        trả về dữLiệu;
+    }
+
+    hàm ghiMap(danhSách) {
+        ghi tệp(mình.đườngDẫn, json tạo(danhSách));
+        trả về độ dài(danhSách);
+    }
+
+    hàm tấtCả() {
+        raw = mình.đọcMap();
+        kếtQuả = [];
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            thêm(kếtQuả, đơn hàng từ map(raw[i]));
+        };
+        trả về kếtQuả;
+    }
+
+    hàm tìmTheoId(id) {
+        danhSáchĐơnHàng = mình.tấtCả();
+        lặp(i = 0; i < độ dài(danhSáchĐơnHàng); i = i + 1) {
+            đơn = danhSáchĐơnHàng[i];
+            nếu (đơn.id == id) {
+                trả về đơn;
+            };
+        };
+        trả về rỗng;
+    }
+
+    hàm tạoMới(đơnHàng) {
+        đơnHàng.kiểmTraHợpLệ();
+        nếu (mình.tìmTheoId(đơnHàng.id) != rỗng) {
+            ném "Kho đơn hàng: id đã tồn tại: " + đơnHàng.id;
+        };
+        raw = mình.đọcMap();
+        thêm(raw, đơnHàng.thànhMap());
+        mình.ghiMap(raw);
+        trả về đơnHàng;
+    }
+
+    hàm lưu(đơnHàng) {
+        raw = mình.đọcMap();
+        tìmThấy = sai;
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            item = raw[i];
+            nếu (lấy map(item, "id", "") == đơnHàng.id) {
+                raw[i] = đơnHàng.thànhMap();
+                tìmThấy = đúng;
+            };
+        };
+        nếu (!tìmThấy) {
+            ném "Kho đơn hàng: không tìm thấy " + đơnHàng.id;
+        };
+        mình.ghiMap(raw);
+        trả về đơnHàng;
+    }
+
+    hàm sốLượng() {
+        trả về độ dài(mình.đọcMap());
+    }
+};
+
+hàm công khai tạo kho đơn hàng tệp(đườngDẫn) {
+    trả về KhoĐơnHàngTệp(đườngDẫn);
+};

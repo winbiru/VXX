@@ -180,23 +180,7 @@ Nếu build bằng `scripts/build-vpp-cli.sh`:
 VPP_EXEC=./bin/vpp-cli ./run_tests.sh
 ```
 
-Chạy riêng VM opcode unit test qua CTest:
-
-```bash
-ctest --test-dir build -R vpp-vm-opcode-smoke-unit --output-on-failure
-```
-
-Chạy riêng unit test cho từng VM handler qua fixture nội bộ:
-
-```bash
-ctest --test-dir build -R vpp-vm-handler-unit --output-on-failure
-```
-
-Chạy riêng parity test compiler:
-
-```bash
-ctest --test-dir build -R vpp-pipeline-legacy-parity --output-on-failure
-```
+CTest hiện chỉ đăng ký bộ regression V++ chạy các file `.vi` qua `vpp-integration`.
 
 ## 6. Chạy chương trình V++
 

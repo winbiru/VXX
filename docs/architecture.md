@@ -214,22 +214,10 @@ Unsupported Direct IR = 0 trên regression corpus (đã đạt 94/94)
 IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận diện phần chưa
 được direct emitter hỗ trợ. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow,
 không parse token lần nữa; một IR opcode vẫn có thể phát nhiều VM instruction.
-Parity test khóa fingerprint của top-level bytecode, StringPool, function bytecode và
-function-name map theo baseline đã đóng băng trên toàn bộ corpus `.vi`.
 
-CTest `vpp-pipeline-legacy-parity` tự động quét `src/tests/**/*.vi` và thực hiện
-so sánh pipeline hiện tại với manifest `test/data/legacy_compiler_snapshots.tsv`.
-Production compiler không chứa API, mode hay nhánh code dành riêng cho test.
-Test là compile-only để không mở cổng HTTP hay gọi native/external service;
-regression runtime/output hiện hành vẫn do các runner `.vi` đảm nhiệm. Không
-được tạo lại hàng loạt manifest để làm test xanh: mỗi thay đổi fingerprint phải
-được review như một thay đổi bytecode/compiler-state có chủ ý.
-
-Gate hiện tự động quét **94/94** chương trình `.vi`, xác nhận compiler snapshots khớp
-và yêu cầu mọi program có `unsupportedDirectIrRegions == 0`. Source test dùng
-`CompilationContext` cho từng top-level compile, sau đó chạy lại corpus theo thứ tự
-ngược trong cùng process để khóa reset/import-base isolation. Toàn corpus chính là direct-IR
-contract; không còn backend selector hay token compiler để quay lại.
+Regression hiện được khóa bằng các chương trình `.vi` trong `src/tests/` cùng expected
+output tương ứng. CTest chỉ đăng ký runner `vpp-integration`; không còn bộ unit/smoke test
+C++ riêng. Toàn corpus `.vi` là contract runtime/behavior chính của compiler và VM.
 
 Debug source metadata được lưu **song song** với bytecode thay vì nhúng vào `Instruction`.
 Direct emitter ghi `RuntimeSourceLocation` cho root bytecode và từng function; recursive
@@ -329,4 +317,4 @@ sample trong `src/tests/`. Regression có vài fixture legacy được track
 1. Source mới phải có một CMake target owner; không thêm lại thư mục `helpers` chung.
 2. Không để frontend phụ thuộc runtime/native.
 3. Không đưa framework web/dữ liệu/ứng dụng vào `gói/lõi` hoặc import full-stack mặc định.
-4. Thay đổi public behavior cần test `.vi` và expected output; example/scaffold cần smoke test.
+4. Thay đổi public behavior cần test `.vi` và expected output.

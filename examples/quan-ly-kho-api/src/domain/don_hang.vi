@@ -1,0 +1,128 @@
+nhập lõi;
+
+lớp công khai DòngĐơnHàng {
+    hàm khởi tạo(mãSảnPhẩm, tênSảnPhẩm, đơnGiá, sốLượng) {
+        mình.mãSảnPhẩm = mãSảnPhẩm;
+        mình.tênSảnPhẩm = tênSảnPhẩm;
+        mình.đơnGiá = đơnGiá;
+        mình.sốLượng = sốLượng;
+    }
+
+    hàm kiểmTraHợpLệ() {
+        nếu (mình.mãSảnPhẩm == "") {
+            ném "Dòng đơn hàng: mã sản phẩm không được rỗng";
+        };
+        nếu (mình.sốLượng <= 0) {
+            ném "Dòng đơn hàng: số lượng phải lớn hơn 0";
+        };
+        nếu (mình.đơnGiá < 0) {
+            ném "Dòng đơn hàng: đơn giá không được âm";
+        };
+        trả về đúng;
+    }
+
+    hàm thànhTiền() {
+        trả về mình.đơnGiá * mình.sốLượng;
+    }
+
+    hàm thànhMap() {
+        trả về {
+            "maSanPham": mình.mãSảnPhẩm,
+            "tenSanPham": mình.tênSảnPhẩm,
+            "donGia": mình.đơnGiá,
+            "soLuong": mình.sốLượng,
+            "thanhTien": mình.thànhTiền()
+        };
+    }
+};
+
+hàm công khai dòng đơn hàng từ map(dữLiệu) {
+    dòng = DòngĐơnHàng(
+        lấy map(dữLiệu, "maSanPham", ""),
+        lấy map(dữLiệu, "tenSanPham", ""),
+        lấy map(dữLiệu, "donGia", 0),
+        lấy map(dữLiệu, "soLuong", 0)
+    );
+    dòng.kiểmTraHợpLệ();
+    trả về dòng;
+};
+
+lớp công khai ĐơnHàng {
+    hàm khởi tạo(id, kháchHàng, cácDòng, trạngThái = "MOI") {
+        mình.id = id;
+        mình.kháchHàng = kháchHàng;
+        mình.cácDòng = cácDòng;
+        mình.trạngThái = trạngThái;
+    }
+
+    hàm kiểmTraHợpLệ() {
+        nếu (mình.id == "") {
+            ném "Đơn hàng: id không được rỗng";
+        };
+        nếu (mình.kháchHàng == "") {
+            ném "Đơn hàng: khách hàng không được rỗng";
+        };
+        nếu (độ dài(mình.cácDòng) == 0) {
+            ném "Đơn hàng: phải có ít nhất một sản phẩm";
+        };
+        trả về đúng;
+    }
+
+    hàm tổngTiền() {
+        tổng = 0;
+        cácDòng = mình.cácDòng;
+        lặp(i = 0; i < độ dài(cácDòng); i = i + 1) {
+            dòng = cácDòng[i];
+            tổng = tổng + dòng.thànhTiền();
+        };
+        trả về tổng;
+    }
+
+    hàm hủy() {
+        nếu (mình.trạngThái == "DA_HUY") {
+            ném "Đơn hàng " + mình.id + ": đã hủy trước đó";
+        };
+        mình.trạngThái = "DA_HUY";
+        trả về mình.trạngThái;
+    }
+
+    hàm xácNhận() {
+        nếu (mình.trạngThái != "MOI") {
+            ném "Đơn hàng " + mình.id + ": trạng thái không cho phép xác nhận";
+        };
+        mình.trạngThái = "DA_XAC_NHAN";
+        trả về mình.trạngThái;
+    }
+
+    hàm thànhMap() {
+        cácDòngMap = [];
+        cácDòng = mình.cácDòng;
+        lặp(i = 0; i < độ dài(cácDòng); i = i + 1) {
+            dòng = cácDòng[i];
+            thêm(cácDòngMap, dòng.thànhMap());
+        };
+        trả về {
+            "id": mình.id,
+            "khachHang": mình.kháchHàng,
+            "trangThai": mình.trạngThái,
+            "tongTien": mình.tổngTiền(),
+            "cacDong": cácDòngMap
+        };
+    }
+};
+
+hàm công khai đơn hàng từ map(dữLiệu) {
+    cácDòngMap = lấy map(dữLiệu, "cacDong", []);
+    cácDòng = [];
+    lặp(i = 0; i < độ dài(cácDòngMap); i = i + 1) {
+        thêm(cácDòng, dòng đơn hàng từ map(cácDòngMap[i]));
+    };
+    đơn = ĐơnHàng(
+        lấy map(dữLiệu, "id", ""),
+        lấy map(dữLiệu, "khachHang", ""),
+        cácDòng,
+        lấy map(dữLiệu, "trangThai", "MOI")
+    );
+    đơn.kiểmTraHợpLệ();
+    trả về đơn;
+};

@@ -1,0 +1,67 @@
+nhập lõi;
+nhập mạng;
+nhập "nhập xuất";
+nhập "app/bootstrap.vi";
+
+hàm ghi dữ liệu demo() {
+    nếu (!đường dẫn tồn tại("data")) {
+        tạo thư mục("data");
+    };
+
+    sảnPhẩm = [
+        {"id": "SP-1", "ten": "Ca phe hat", "gia": 180000, "tonKho": 10, "daBan": 0, "phienBan": 1},
+        {"id": "SP-2", "ten": "Tra o long", "gia": 120000, "tonKho": 8, "daBan": 0, "phienBan": 1},
+        {"id": "SP-3", "ten": "Banh quy bo", "gia": 65000, "tonKho": 20, "daBan": 0, "phienBan": 1}
+    ];
+
+    ghi tệp("data/demo-san-pham.json", json tạo(sảnPhẩm));
+    ghi tệp("data/demo-don-hang.json", "[]");
+};
+
+hàm main() {
+    ghi dữ liệu demo();
+    ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
+    dịchVụKho = lấy map(ứngDụng, "dichVuKho", rỗng);
+    dịchVụĐơnHàng = lấy map(ứngDụng, "dichVuDonHang", rỗng);
+    dịchVụBáoCáo = lấy map(ứngDụng, "dichVuBaoCao", rỗng);
+
+    in "=== DANH SACH SAN PHAM BAN DAU ===";
+    in json tạo(dịchVụKho.tấtCả());
+
+    in "=== NHAP KHO SP-2 ===";
+    sp = dịchVụKho.nhậpKho("SP-2", 5);
+    in json tạo(sp.thànhMap());
+
+    in "=== TAO DON HANG ===";
+    mục = [
+        {"maSanPham": "SP-1", "soLuong": 2},
+        {"maSanPham": "SP-2", "soLuong": 3},
+        {"maSanPham": "SP-1", "soLuong": 1}
+    ];
+    đơn = dịchVụĐơnHàng.đặtHàng("Cong ty Minh Anh", mục);
+    in json tạo(đơn.thànhMap());
+
+    in "=== THU DAT QUA TON KHO, BAT EXCEPTION NGHIEP VU ===";
+    thử {
+        dịchVụĐơnHàng.đặtHàng("Khach loi", [
+            {"maSanPham": "SP-3", "soLuong": 9999}
+        ]);
+        in "LOI: nhanh nay khong duoc chay";
+    } bắt lỗi (e) {
+        in "Da bat loi: " + e;
+    }
+
+    in "=== BAO CAO SAU KHI BAN ===";
+    in json tạo(dịchVụBáoCáo.tổngQuan());
+
+    in "=== HUY DON VA HOAN KHO ===";
+    đãHủy = dịchVụĐơnHàng.hủy(đơn.id);
+    in json tạo(đãHủy.thànhMap());
+
+    in "=== BAO CAO CUOI ===";
+    in json tạo(dịchVụBáoCáo.tổngQuan());
+
+    in "=== FILE JSON DA GHI ===";
+    in đọc tệp("data/demo-san-pham.json");
+    in đọc tệp("data/demo-don-hang.json");
+};

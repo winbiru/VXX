@@ -8,6 +8,8 @@ thực thi của VM. Hai nhóm có cơ chế xử lý khác nhau và không đư
 `ném biểu_thức;` có thể mang mọi `StackValue`. Giá trị này được chuyển tới `bắt lỗi` gần
 nhất theo luồng gọi động, kể cả khi phải đi qua nhiều hàm, method hoặc constructor. Biến
 catch nhận lại đúng giá trị đã ném; runtime không stringify giá trị trước khi bind.
+Nếu handler nằm trong một hàm, binding catch được ghi vào call frame hiện tại (hoặc shared
+capture cell khi biến được closure capture), không rò sang bảng biến global.
 
 Khi chuyển tới handler, VM unwind trạng thái tạm được tạo sau lúc vào `thử`:
 
@@ -77,24 +79,17 @@ tại, gọi giá trị không phải hàm, sai số lượng đối số, đệ
 số thực thất bại và thao tác native thất bại.
 
 Một số diagnostic chỉ có thể xuất hiện khi bytecode hoặc trạng thái nội bộ VM bị hỏng, nên
-không thể tạo trung thực bằng một file `.vi` hợp lệ: thiếu toán hạng trên VM stack, tham chiếu
-bảng hằng hỏng, literal đã mã hóa hỏng, closure capture hỏng, jump target hỏng, trạng thái
-control-flow bất khả thi, lớp runtime bị mất sau compile, thiếu tham số sau khi arity check đã
-qua, module đã ở trạng thái failed rồi bị chạy lại, và invariant nội bộ VM. Các trường hợp này
-được khóa bằng `test/vm_handler_tests.cpp`, nơi tạo trực tiếp dữ kiện runtime tương ứng.
+không thể tạo trung thực bằng một file `.vi` hợp lệ. Bộ regression hiện chỉ khóa các lỗi có thể
+quan sát hoặc tạo ra từ chương trình V++ hợp lệ.
 
 ## Regression
 
 - `src/tests/kiem_tra_ngoai_le.vi`: bắt lỗi cục bộ cơ bản.
 - `src/tests/kiem_tra_ngoai_le_xuyen_ham.vi`: exception xuyên function boundary, catch gần
-  nhất, rethrow và tiếp tục chạy sau catch.
-- `test/vm_handler_tests.cpp`: unwind data/control stack, typed fatal runtime error và cleanup
-  call frame; đồng thời khóa khoảng 30 trường hợp suy luận từ dữ kiện thực thi và bảo đảm CLI
-  không xuất `Mã lỗi:`.
+  nhất, rethrow, binding catch cục bộ được closure capture đúng và tiếp tục chạy sau catch.
 - `src/tests/kiem_tra_loi_chi_so_vuot_pham_vi.vi`: tự phát hiện chỉ số vượt kích thước thật.
 - `src/tests/kiem_tra_loi_kieu_chi_so.vi`: tự phát hiện giá trị dùng làm chỉ số không phải số nguyên.
 - `src/tests/kiem_tra_loi_phuong_thuc_khong_ton_tai.vi`: tự phát hiện method lookup thất bại.
-- `test/vm_opcode_smoke_tests.cpp`: uncaught exception và các runtime fault opcode cơ bản.
 - `src/tests/kiem_tra_stack_trace.vi`: lỗi số học kèm giá trị thật và dấu vết file/dòng/cột.
 - `src/tests/kiem_tra_de_quy_vuot_gioi_han.vi`: lỗi đệ quy quá sâu với diễn giải nguyên nhân và
   hướng sửa cho người mới học.

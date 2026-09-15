@@ -1,5 +1,5 @@
-[IN] https://example.test/health
-[IN] {"dịch vụ":"V++","trạng thái":"sẵn sàng"}
-[IN] {"data":{"id":"req-42"},"success":true,"message":"ok"}
-[IN] GET|/users?page=2
-[IN] POST|/users|{}
+https://example.test/health
+{"dịch vụ":"V++","trạng thái":"sẵn sàng"}
+{"data":{"id":"req-42"},"success":true,"message":"ok"}
+GET|/users?page=2
+POST|/users|{}

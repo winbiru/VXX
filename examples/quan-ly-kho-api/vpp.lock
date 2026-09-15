@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "packages": [
+    {"name": "ma-don-hang", "version": "1.0.0", "source": "path", "location": "../ma-don-hang", "resolved": "gói/ma-don-hang", "fingerprint": "fnv1a64:ec8e933096a4d596"}
+  ]
+}

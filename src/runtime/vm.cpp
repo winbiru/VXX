@@ -328,7 +328,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
             return true;
         }
         std::string content = vietvm::helpers::argToRawString(args[1]);
-        ofs << vietvm::helpers::decodeSimpleEscapes(content);
+        ofs << content;
         if (!ofs.good()) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeFileWriteFailed, {fn});
@@ -627,8 +627,7 @@ void VM::initializeModules() {
 // Phát mã cho đầu ra; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
 void VM::emitOutput(const StackValue& value) {
     if (!outputSink) return;
-    outputSink(vietvm::messages::messageText(vietvm::messages::kVmOutputPrefix)
-               + sv_to_string(value) + "\n");
+    outputSink(sv_to_string(value) + "\n");
 }
 
 // Chuyển `StackValue` thành điều kiện luận lý theo quy tắc runtime của V++, dùng cho nhánh và vòng lặp.
@@ -1302,6 +1301,37 @@ void VM::executeValueOpcode(const Instruction& instr) {
             stack.push_back(make_int_value(0));
             return;
         case OP_MAP_LITERAL:
+            if (instr.operandIndex == -1) {
+                if (instr.operand < 0 ||
+                    stack.size() < static_cast<std::size_t>(instr.operand) * 2u) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmNotEnoughOperands), instr.op, pc,
+                        vietvm::runtime::runtimeStackFacts(
+                            static_cast<int>(stack.size()), instr.operand * 2));
+                }
+                std::vector<std::pair<std::string, StackValue>> entries;
+                entries.reserve(static_cast<std::size_t>(instr.operand));
+                for (int index = 0; index < instr.operand; ++index) {
+                    StackValue itemValue = stack.back();
+                    stack.pop_back();
+                    StackValue keyValue = stack.back();
+                    stack.pop_back();
+                    if (!std::holds_alternative<std::string>(keyValue)) {
+                        throw runtime_error_op(vietvm::messages::formatMessage(
+                            vietvm::messages::kVmParseMapLiteral,
+                            {"khóa động không phải chuỗi"}), instr.op, pc);
+                    }
+                    entries.emplace_back(
+                        std::get<std::string>(std::move(keyValue)),
+                        std::move(itemValue));
+                }
+                MapValue map;
+                for (auto entry = entries.rbegin(); entry != entries.rend(); ++entry) {
+                    map.entries[entry->first] = std::move(entry->second);
+                }
+                stack.push_back(make_map_value(std::move(map)));
+                return;
+            }
             if (instr.operandIndex < 0 || instr.operandIndex >= static_cast<int>(stringPool.size())) {
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmInvalidMapIndex), instr.op, pc,
@@ -1316,6 +1346,22 @@ void VM::executeValueOpcode(const Instruction& instr) {
             }
             return;
         case OP_LIST_LITERAL:
+            if (instr.operandIndex == -1) {
+                if (instr.operand < 0 ||
+                    stack.size() < static_cast<std::size_t>(instr.operand)) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmNotEnoughOperands), instr.op, pc,
+                        vietvm::runtime::runtimeStackFacts(
+                            static_cast<int>(stack.size()), instr.operand));
+                }
+                std::vector<StackValue> elements(static_cast<std::size_t>(instr.operand));
+                for (int index = instr.operand - 1; index >= 0; --index) {
+                    elements[static_cast<std::size_t>(index)] = std::move(stack.back());
+                    stack.pop_back();
+                }
+                stack.push_back(make_list_value(std::move(elements)));
+                return;
+            }
             if (instr.operandIndex < 0 || instr.operandIndex >= static_cast<int>(stringPool.size())) {
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmInvalidListIndex), instr.op, pc,
@@ -2085,7 +2131,22 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
             const int errVarId = instr.operandIndex;
             if (errVarId >= 0 && !stack.empty()) {
                 StackValue errVal = stack.back(); stack.pop_back();
-                variables[errVarId] = errVal;
+                if (!callStack.empty()) {
+                    CallFrame &frame = callStack.back();
+                    const auto captured = frame.capturedCells.find(errVarId);
+                    if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                        captured->second->value = std::move(errVal);
+                    } else if (frame.localsIndexed) {
+                        if (errVarId >= static_cast<int>(frame.localsVec.size())) {
+                            frame.localsVec.resize(errVarId + 1, make_int_value(0));
+                        }
+                        frame.localsVec[errVarId] = std::move(errVal);
+                    } else {
+                        frame.localsMap[errVarId] = std::move(errVal);
+                    }
+                } else {
+                    variables[errVarId] = std::move(errVal);
+                }
             } else if (!stack.empty()) {
                 stack.pop_back();
             }

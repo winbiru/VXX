@@ -1,0 +1,13 @@
+nhập lõi;
+nhập "app/bootstrap.vi";
+nhập "http/server.vi";
+
+hàm main() {
+    ứngDụng = tạo ứng dụng("data");
+    router = lấy map(ứngDụng, "router", rỗng);
+    nếu (router == rỗng) {
+        ném "Không khởi tạo được router";
+    };
+    máyChủ = tạo máy chủ kho(8088, router);
+    máyChủ.chạy();
+};

@@ -171,8 +171,10 @@ hơn nhiều so với một checkbox tính năng thông thường.
   VM/function boundary; handler unwind data/block/switch/control state về snapshot của `thử`,
   còn failed child call luôn pop call frame trước khi truyền lỗi. `RuntimeError` mang kind
   `VmFault`/`CallBoundary`/`ModuleInitialization`; lỗi module giữ trạng thái `failed` và không
-  chạy initializer lần hai. Regression `kiem_tra_ngoai_le_xuyen_ham.vi` khóa catch + rethrow
-  xuyên nhiều hàm, còn `vpp-vm-handler-unit` khóa control-stack/call-frame/module-state cleanup.
+  chạy initializer lần hai. `OP_BAT_LOI` bind biến lỗi vào local frame/capture cell hiện tại
+  thay vì ghi nhầm global khi catch nằm trong hàm. Regression `kiem_tra_ngoai_le_xuyen_ham.vi`
+  khóa catch + rethrow xuyên nhiều hàm và closure capture biến catch, còn
+  `vpp-vm-handler-unit` khóa control-stack/call-frame/module-state cleanup.
 - [x] **Type policy 1.0:** ADR `docs/adr/0001-type-policy.md` chốt V++ dùng dynamic typing.
   Binding/parameter/field/return không có kiểu tĩnh bắt buộc; semantic chỉ kiểm tra arity khi
   callable đích biết chắc. Function/method/constructor có biên đối số tối thiểu/tối đa theo
@@ -272,7 +274,8 @@ Long-term: 20/41
 15. [ ] **Runtime hardening:** call-stack stress đã khóa recursion sâu, nested exception và
     stack overflow bằng giới hạn 256 với `CallBoundary` có kiểm soát; GC stress đã khóa graph
     sâu/allocation burst/caller roots ở interval 1. VM-state invariant đã chứng minh cùng VM
-    dùng tiếp được sau `VmFault` mà không mất caller stack/heap root/call-frame balance.
+    dùng tiếp được sau `VmFault` mà không mất caller stack/heap root/call-frame balance; catch
+    trong function cũng bind đúng local/captured cell và không làm rò biến lỗi ra global state.
     Local ASan+UBSan full CTest hiện 16/16 sau khi sửa hai lỗi sanitizer; Ubuntu CI đã bật
     leak detection tường minh. Stack trace source span/function/method/module đã hoàn tất;
     còn CI Linux leak gate để đóng runtime hardening 0.8.
@@ -330,8 +333,11 @@ Long-term: 20/41
     không có ngoặc vuông. Math không còn âm thầm cắt số thực có phần lẻ ở `%`/`chia dư`, còn
     `giới hạn` từ chối cận nhỏ nhất lớn hơn cận lớn nhất. Integer parser dùng chung đã chặn
     suffix/phần lẻ thay vì `stoi` cắt ngầm; `cắt chuỗi` và `mã hóa caesar` dùng cùng contract,
-    chấp nhận số thực tích phân và từ chối số thực có phần lẻ. Phần còn lại là xác nhận các contract
-    này trên release matrix; bổ sung process, crypto cơ bản và nâng test framework nếu release gate yêu cầu.
+    chấp nhận số thực tích phân và từ chối số thực có phần lẻ. Package `kiểm thử` đã được nâng
+    với assertion rỗng/không rỗng, expected-error callback và wrapper setup/teardown; CLI discovery
+    đệ quy + thứ tự xác định được khóa bằng contract test và tài liệu `docs/testing.md`.
+    Phần còn lại là xác nhận các contract này trên release matrix; process/crypto chỉ mở khi
+    permission model tương ứng được chốt.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
 19. [x] **Compiler hardening:** deterministic/reproducible compile đã khóa bằng regression

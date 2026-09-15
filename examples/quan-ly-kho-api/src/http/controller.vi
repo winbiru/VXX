@@ -1,0 +1,163 @@
+nhập lõi;
+nhập mạng;
+
+giao diện công khai TrìnhXửLýHttp {
+    hàm xửLý(requestId);
+};
+
+hàm công khai phản hồi json(requestId, status, dữLiệu) {
+    mạng trả phản hồi(requestId, status, json tạo(dữLiệu));
+    trả về status;
+};
+
+hàm công khai phản hồi lỗi(requestId, status, thôngĐiệp) {
+    trả về phản hồi json(requestId, status, {
+        "thanhCong": sai,
+        "loi": thôngĐiệp
+    });
+};
+
+lớp công khai HealthController triển khai TrìnhXửLýHttp {
+    hàm xửLý(requestId) {
+        trả về phản hồi json(requestId, 200, {
+            "thanhCong": đúng,
+            "trangThai": "UP",
+            "ungDung": "quan-ly-kho-api"
+        });
+    }
+};
+
+lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
+    hàm khởi tạo(dịchVụKho) {
+        mình.dịchVụKho = dịchVụKho;
+    }
+
+    hàm xửLý(requestId) {
+        method = mạng method yêu cầu(requestId);
+        path = mạng path yêu cầu(requestId);
+        dịchVụ = mình.dịchVụKho;
+
+        nếu (method == "GET" && path == "/san-pham") {
+            trả về phản hồi json(requestId, 200, {
+                "thanhCong": đúng,
+                "duLieu": dịchVụ.tấtCả()
+            });
+        };
+
+        nếu (method == "GET" && path == "/san-pham/thong-ke") {
+            trả về phản hồi json(requestId, 200, {
+                "thanhCong": đúng,
+                "duLieu": dịchVụ.thốngKê()
+            });
+        };
+
+        nếu (method == "POST" && path == "/san-pham") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                tên = lấy map(body, "ten", "");
+                giá = lấy map(body, "gia", 0);
+                tồnKho = lấy map(body, "tonKho", 0);
+                sảnPhẩm = dịchVụ.tạo(id, tên, giá, tồnKho);
+                trả về phản hồi json(requestId, 201, {
+                    "thanhCong": đúng,
+                    "duLieu": sảnPhẩm.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        nếu (method == "POST" && path == "/san-pham/nhap-kho") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                sốLượng = lấy map(body, "soLuong", 0);
+                sảnPhẩm = dịchVụ.nhậpKho(id, sốLượng);
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": sảnPhẩm.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        trả về phản hồi lỗi(requestId, 404, "Endpoint sản phẩm không tồn tại");
+    }
+};
+
+lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
+    hàm khởi tạo(dịchVụĐơnHàng) {
+        mình.dịchVụĐơnHàng = dịchVụĐơnHàng;
+    }
+
+    hàm xửLý(requestId) {
+        method = mạng method yêu cầu(requestId);
+        path = mạng path yêu cầu(requestId);
+        dịchVụ = mình.dịchVụĐơnHàng;
+
+        nếu (method == "GET" && path == "/don-hang") {
+            trả về phản hồi json(requestId, 200, {
+                "thanhCong": đúng,
+                "duLieu": dịchVụ.tấtCả()
+            });
+        };
+
+        nếu (method == "POST" && path == "/don-hang") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                kháchHàng = lấy map(body, "khachHang", "");
+                cácMục = lấy map(body, "sanPham", []);
+                đơn = dịchVụ.đặtHàng(kháchHàng, cácMục);
+                trả về phản hồi json(requestId, 201, {
+                    "thanhCong": đúng,
+                    "duLieu": đơn.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        nếu (method == "POST" && path == "/don-hang/huy") {
+            thử {
+                body = json phân tích(mạng body yêu cầu(requestId));
+                id = lấy map(body, "id", "");
+                đơn = dịchVụ.hủy(id);
+                trả về phản hồi json(requestId, 200, {
+                    "thanhCong": đúng,
+                    "duLieu": đơn.thànhMap()
+                });
+            } bắt lỗi (e) {
+                trả về phản hồi lỗi(requestId, 400, e);
+            }
+        };
+
+        trả về phản hồi lỗi(requestId, 404, "Endpoint đơn hàng không tồn tại");
+    }
+};
+
+lớp công khai BáoCáoController triển khai TrìnhXửLýHttp {
+    hàm khởi tạo(dịchVụBáoCáo) {
+        mình.dịchVụBáoCáo = dịchVụBáoCáo;
+    }
+
+    hàm xửLý(requestId) {
+        method = mạng method yêu cầu(requestId);
+        path = mạng path yêu cầu(requestId);
+        nếu (method == "GET" && path == "/bao-cao") {
+            dịchVụ = mình.dịchVụBáoCáo;
+            trả về phản hồi json(requestId, 200, {
+                "thanhCong": đúng,
+                "duLieu": dịchVụ.tổngQuan()
+            });
+        };
+        trả về phản hồi lỗi(requestId, 404, "Endpoint báo cáo không tồn tại");
+    }
+};
+
+lớp công khai NotFoundController triển khai TrìnhXửLýHttp {
+    hàm xửLý(requestId) {
+        trả về phản hồi lỗi(requestId, 404, "Không tìm thấy endpoint");
+    }
+};

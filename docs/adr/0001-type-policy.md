@@ -40,5 +40,5 @@ Typed IR/static checker không thuộc contract bắt buộc của 1.0. Nếu sa
 typing, annotation phải là lớp contract mới và không được âm thầm thay đổi chương trình dynamic
 hợp lệ của 1.0. Reflection/generic cũng không được dùng để giả định type tĩnh chưa tồn tại.
 
-Regression chính: `src/tests/kiem_tra_kieu_dong_call_boundary.vi`, semantic arity cases trong
-`test/pipeline_tests.cpp` và runtime indirect boundary trong `test/vm_handler_tests.cpp`.
+Regression chính: `src/tests/kiem_tra_kieu_dong_call_boundary.vi` cùng các chương trình `.vi`
+kiểm tra arity và call boundary trong `src/tests/`.

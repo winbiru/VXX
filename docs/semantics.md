@@ -94,9 +94,14 @@ Các cặp kiểu còn lại không có ordering và tạo runtime error.
 - Equality không ép `rỗng`, chuỗi hay collection thành số hoặc boolean.
 - Ordering không tự chuyển chuỗi thành số và cũng không tự stringify object/collection.
 
-Regression end-to-end chính cho các quy tắc này nằm ở
-`src/tests/kiem_tra_semantics_gia_tri.vi`; helper-level regression nằm trong
-`test/runtime_value_tests.cpp`.
+Regression cho các quy tắc này nằm ở `src/tests/kiem_tra_semantics_gia_tri.vi`.
+
+## Chuỗi và file I/O
+
+Compiler giải mã escape trong literal chuỗi một lần, giống nhau cho chuỗi độc lập
+và chuỗi nằm trong list/map. `ghi tệp` ghi nguyên nội dung chuỗi runtime; nó không
+giải mã lại `\n`, `\"` hay `\\` trong dữ liệu JSON đã serialize. Vì vậy đọc lại tệp
+giữ nguyên nội dung truyền vào, kể cả dấu gạch chéo và dấu ngoặc kép.
 
 ## Module: export, re-export và chu trình import
 
@@ -115,8 +120,8 @@ Regression end-to-end chính cho các quy tắc này nằm ở
 - Import tương đối bên trong module được phân giải từ thư mục chứa module đó, không từ thư mục
   của entry source.
 
-Regression module chính nằm trong `test/module_graph_tests.cpp` và
-`src/tests/kiem_tra_module_reexport.vi`.
+Regression module chính nằm trong `src/tests/kiem_tra_module_reexport.vi` cùng các test
+module/import `.vi` khác trong `src/tests/`.
 
 ## Destructor/finalizer trong 1.0
 

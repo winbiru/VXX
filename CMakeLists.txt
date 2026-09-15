@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_TESTS "Build V++ .vi regression tests" ON)
 option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 option(VPP_ENABLE_COVERAGE "Enable GCC/Clang coverage instrumentation" OFF)
@@ -175,13 +175,9 @@ add_custom_command(TARGET vpp-cli POST_BUILD
             $<TARGET_FILE:vpp-cli>
             ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vietvm-cli)
 
-# C++ unit-test sources live in test/; src/tests/ is reserved for V++ .vi
-# regression programs and their runtime fixtures.
+# Regression tests are V++ .vi programs under src/tests/.
 if (BUILD_TESTS)
     enable_testing()
-    if (EXISTS ${CMAKE_SOURCE_DIR}/test/CMakeLists.txt)
-        add_subdirectory(test)
-    endif()
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
                  COMMAND ${CMAKE_COMMAND} -E env

@@ -1,8 +1,52 @@
 nhập kiểm thử;
 
+hàm thiết lập ca() {
+    in "SETUP";
+};
+
+hàm dọn dẹp ca() {
+    in "TEARDOWN";
+};
+
+hàm thân thành công() {
+    in "BODY-OK";
+    trả về 7;
+};
+
+hàm thân thất bại() {
+    in "BODY-FAIL";
+    ném "loi-ca";
+};
+
 hàm main() {
     in khẳng định đúng(2 > 1);
     in khẳng định sai(2 < 1);
     in khẳng định bằng("vpp", "vpp");
     in khẳng định khác("vpp", "vietvm");
+    in khẳng định rỗng(rỗng);
+    in khẳng định không rỗng("vpp");
+
+    hànhĐộngLỗi = hàm() { ném "boom"; };
+    in khẳng định ném lỗi(hànhĐộngLỗi, "boom");
+
+    thử {
+        khẳng định bằng(1, 2, "sai-bang");
+    } bắt lỗi (e) {
+        in "ASSERT:" + e;
+    }
+
+    hànhĐộngKhôngLỗi = hàm() { trả về 1; };
+    thử {
+        khẳng định ném lỗi(hànhĐộngKhôngLỗi, rỗng, "khong-nem");
+    } bắt lỗi (e) {
+        in "ASSERT-THROW:" + e;
+    }
+
+    in chạy ca kiểm thử(thân thành công, thiết lập ca, dọn dẹp ca);
+
+    thử {
+        chạy ca kiểm thử(thân thất bại, thiết lập ca, dọn dẹp ca);
+    } bắt lỗi (e) {
+        in "CAUGHT:" + e;
+    }
 };
