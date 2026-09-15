@@ -1,0 +1,12 @@
+// Mô hình hóa một hóa đơn cửa hàng với ba thành phần giá cơ bản.
+lớp công khai HóaĐơn {
+    hàm khởi tạo(tạmTính, phíVậnChuyển, giảmGiá) {
+        mình.tạmTính = tạmTính;
+        mình.phíVậnChuyển = phíVậnChuyển;
+        mình.giảmGiá = giảmGiá;
+    }
+
+    hàm tổngThanhToán() {
+        trả về mình.tạmTính + mình.phíVậnChuyển - mình.giảmGiá;
+    }
+}
