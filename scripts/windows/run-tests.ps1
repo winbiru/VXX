@@ -226,7 +226,7 @@ try {
     $probeFile = Join-Path $probeDir "import-utf8.vi"
     [System.IO.File]::WriteAllText(
         $probeFile,
-        "nhập mạng;`nnhập `"vào ra`";`n",
+        "nhập mạng;`nnhập vào ra;`n",
         [System.Text.UTF8Encoding]::new($false)
     )
     $probeStdOut = Join-Path $sessionDir "import-utf8.output"
