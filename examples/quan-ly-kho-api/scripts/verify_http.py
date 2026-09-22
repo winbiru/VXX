@@ -1,4 +1,4 @@
-import concurrent.futures, json, os, pathlib, subprocess, tempfile, time, urllib.request, urllib.error, shutil, socket
+import concurrent.futures, json, os, pathlib, subprocess, tempfile, time, urllib.request, urllib.error, shutil, socket, sys
 root=pathlib.Path(__file__).resolve().parents[3]
 
 def find_vpp():
@@ -10,6 +10,7 @@ def find_vpp():
         root/'build-sanitize-local/bin/vpp-cli',
         root/'build/bin/vpp-cli',
         root/'vpp',
+        root/'vpp.exe',
     ]
     for candidate in candidates:
         if candidate.is_file():
@@ -22,13 +23,28 @@ def find_vpp():
     raise SystemExit('Không tìm thấy V++ executable. Cài V++0.9 release hoặc đặt VPP_EXEC.')
 
 vpp=find_vpp()
-with socket.socket() as probe:
-    if probe.connect_ex(('127.0.0.1', 8088)) == 0:
-        raise SystemExit('Port 8088 is in use; stop the existing server before verification.')
+
+def choose_port():
+    configured=os.environ.get('VPP_WAREHOUSE_PORT')
+    if configured:
+        return int(configured)
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        return probe.getsockname()[1]
+
+try:
+    port=choose_port()
+except PermissionError as error:
+    print(
+        "SKIP: môi trường hiện tại không cho phép bind localhost socket; "
+        "HTTP verification cần quyền mở cổng TCP cục bộ.",
+        file=sys.stderr,
+    )
+    raise SystemExit(77) from error
 work=pathlib.Path(tempfile.mkdtemp(prefix='vpp-http-'))
 app=work/'app'
 shutil.copytree(root/'examples/quan-ly-kho-api', app, ignore=shutil.ignore_patterns('data', '.vpp'))
-env=dict(os.environ, VPP_HOME=str(root))
+env=dict(os.environ, VPP_HOME=str(root), VPP_WAREHOUSE_PORT=str(port))
 client=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 count=0
 p=None
@@ -37,7 +53,7 @@ log=None
 def request(path, body=None, expected=200, method=None):
     global count
     data=None if body is None else json.dumps(body,ensure_ascii=False).encode()
-    req=urllib.request.Request('http://127.0.0.1:8088'+path,data=data,headers={'Content-Type':'application/json'},method=method)
+    req=urllib.request.Request(f'http://127.0.0.1:{port}'+path,data=data,headers={'Content-Type':'application/json'},method=method)
     try: response=client.open(req,timeout=10)
     except urllib.error.HTTPError as error: response=error
     with response:
@@ -129,7 +145,7 @@ try:
     files={f.name:json.loads(f.read_text()) for f in (app/'src/data').glob('*.json')}
     assert len(files['don-hang.json'])==26
     print('PASS: 25 repeated order/cancel cycles; persisted state survives restart',flush=True)
-    print(json.dumps({'requests_checked':count,'report':before,'artifacts':str(work)},ensure_ascii=False),flush=True)
+    print(json.dumps({'requests_checked':count,'port':port,'report':before,'artifacts':str(work)},ensure_ascii=False),flush=True)
 finally:
     stop()
     print((work/'server.log').read_text()[-2500:])

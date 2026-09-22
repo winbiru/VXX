@@ -209,22 +209,23 @@ VPP.cmd gói cài đặt duong-dan\goi.vi ten-goi
 
 Thư viện chuẩn là tập các package tiếng Việt nằm trực tiếp dưới `gói/`.
 `gói/chuẩn/main.vi` chỉ là entrypoint tổng hợp để nhập toàn bộ gói chuẩn.
-Program mới nên import package nhỏ nhất cần dùng. Khi import theo tên package, tên có
-khoảng trắng có thể để trần hoặc đặt trong dấu nháy; đường dẫn file có khoảng
-trắng luôn phải đặt trong dấu nháy:
+Program mới nên import package nhỏ nhất cần dùng. Mỗi câu `nhập` chỉ nhận một
+file hoặc package/folder. Target luôn viết trực tiếp, không dùng dấu nháy; tên
+package hoặc đường dẫn có khoảng trắng vẫn được parser giữ như một target duy nhất:
 
 ```vi
 nhập lõi;
-nhập "nhập xuất";
+nhập nhập xuất;
 nhập mạng;
-nhập "hệ thống";
+nhập hệ thống;
 nhập dữ liệu;
-nhập "ứng dụng";
+nhập ứng dụng;
 nhập dựng;
-nhập "kiểm thử";
+nhập kiểm thử;
 ```
 
-- `gói/lõi`: toán học, chuỗi UTF-8 cơ bản, collections, chuyển kiểu, random, luận lý và validation.
+- `gói/lõi`: toán học, chuỗi UTF-8 cơ bản, collections, chuyển kiểu, random, crypto cơ bản,
+  luận lý và validation.
 - `gói/nhập xuất`: tệp, đường dẫn/thư mục, cấu hình, thời gian và logging.
 - `gói/hệ thống`: biến môi trường, nhận diện nền tảng và sleep mức mili giây.
 - `gói/mạng`: HTTP client/server, REST helpers và JSON parse/serialize map/list/scalar.
@@ -239,19 +240,24 @@ Một số API chuẩn hiện được nối trực tiếp vào native runtime:
 
 ```vi
 nhập lõi;
-nhập "nhập xuất";
-nhập "hệ thống";
+nhập nhập xuất;
+nhập hệ thống;
 
 in thành chuỗi(42);
 in loại của(42);
 in ngẫu nhiên nguyên(1, 10);
+in băm sha256("Việt Nam");
+in hmac sha256("khóa", "Việt Nam");
+in ngẫu nhiên bảo mật(16); // 32 ký tự hex = 16 byte ngẫu nhiên
 in đường dẫn nối("tmp", "data.txt");
 in đường dẫn tồn tại("tmp/data.txt");
 in đọc biến môi trường("HOME", "");
 in tên nền tảng();
 ```
 
-Nhóm `lõi` có chuyển kiểu/quan sát loại và random; `nhập xuất` có path, kiểm tra
+Nhóm `lõi` có chuyển kiểu/quan sát loại, random và crypto cơ bản. Crypto 1.0 dùng
+SHA-256, HMAC-SHA256 và random bảo mật từ primitive hệ điều hành/OpenSSL; digest/random
+được trả dưới dạng hex chữ thường. `nhập xuất` có path, kiểm tra
 tệp/thư mục, tạo/liệt kê/xóa thư mục; `hệ thống` có biến môi trường, nhận diện nền
 tảng và sleep mili giây. Các hàm `.vi` tương ứng là public surface của gói chuẩn,
 còn implementation native nằm trong `src/runtime/native/`.
@@ -259,7 +265,7 @@ còn implementation native nằm trong `src/runtime/native/`.
 `gói/chuẩn/main.vi` là entrypoint đầy đủ. Mỗi package chuẩn có `main.vi` tại
 `gói/<tên tiếng Việt>/main.vi`. Có thể import theo tên package như
 trên, hoặc dùng đường dẫn tường minh khi cần module con, ví dụ
-`nhập "gói/mạng/kiểm thử/api.vi";`. Các bản cài từ release đặt các gói chuẩn
+`nhập gói/mạng/kiểm thử/api;`. Các bản cài từ release đặt các gói chuẩn
 chuẩn cạnh binary và installer tự cấu hình `VPP_HOME`, vì vậy các import này
 vẫn hoạt động ngoài repository.
 
@@ -272,7 +278,8 @@ Các package trên được bundle cùng V++; package manager nhìn thấy trự
 HTTP server native hỗ trợ Linux, macOS và Windows.
 
 `độ dài("Việt Nam")` và `đảo ngược(...)` xử lý chuỗi theo biên code point UTF-8.
-Các API đổi hoa/thường vẫn mới hỗ trợ bảng chữ cái ASCII. JSON parser ánh xạ
+Các API đổi hoa/thường hỗ trợ bảng chữ cái tiếng Việt theo phạm vi 1.0 và các helper text
+liên quan dùng NFC để giữ hành vi nhất quán giữa chuỗi dựng sẵn và chuỗi tách dấu. JSON parser ánh xạ
 `true/false` sang `đúng/sai` (1/0), `null` sang `rỗng`, object sang map và array
 sang list.
 
@@ -292,9 +299,9 @@ Endpoint mẫu trả JSON boolean `true`.
 Các entrypoint dựng canonical có thể import bằng đường dẫn:
 
 ```vi
-nhập "gói/dựng/web.vi";
-nhập "gói/dựng/dữ liệu.vi";
-nhập "gói/dựng/ứng dụng.vi";
+nhập gói/dựng/web;
+nhập gói/dựng/dữ liệu;
+nhập gói/dựng/ứng dụng;
 ```
 
 - `web`: lõi + nhập xuất + mạng.
@@ -353,11 +360,9 @@ Bytecode
 V++ VM
 ```
 
-Runtime vẫn dùng giá trị động, nên IR hiện chủ ý **không mang kiểu**. Dự án
-chưa có chính sách typed IR; việc chọn dynamic, static hoặc gradual typing sẽ
-được quyết định riêng trước khi thêm một lớp IR có kiểu. Backend bytecode cũ
-được giữ sau một cầu nối tương thích, để pipeline mới không làm thay đổi hành
-vi bytecode/VM đang có.
+Runtime dùng dynamic typing theo ADR 1.0, nên IR hiện chủ ý **không mang kiểu**.
+Typed IR/static hoặc gradual checking được hoãn sau 1.0. Production compiler đi trực tiếp
+từ structured IR sang bytecode; token bridge cũ không còn nằm trên production compile path.
 
 Các header pipeline được quy hoạch dưới
 `src/include/vpp/frontend/{token,ast,parser}.h` và
@@ -366,6 +371,15 @@ Các header pipeline được quy hoạch dưới
 
 ## Tài Liệu
 
+- `docs/language-reference.md`
+- `docs/cli.md`
+- `docs/debugging.md`
+- `docs/migration-1.0.md`
+- `docs/package-system.md`
+- `docs/testing.md`
+- `docs/installation.md`
+- `docs/semantics.md`
+- `docs/runtime-errors.md`
 - `PROJECT_COMMANDS.md`
 - `README-updates.md`
 - `docs/architecture.md`
@@ -375,7 +389,6 @@ Các header pipeline được quy hoạch dưới
 - `docs/grammar.bnf`
 - `docs/language-comparison.md`
 - `docs/language-comparison-en.md`
+- `CHANGELOG.md`
 
-Trạng thái roadmap và baseline kiểm thử gần nhất nằm ở `plans/progress.md`. Baseline
-local ngày 13/09/2026: 15/15 CTest pass, regression runtime 61/61 và direct-IR parity
-70/70.
+Trạng thái roadmap và baseline kiểm thử gần nhất nằm ở `plans/progress.md`.

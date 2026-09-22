@@ -1,6 +1,6 @@
 nhập lõi;
-nhập "ma-don-hang";
-nhập "../domain/don_hang.vi";
+nhập ma-don-hang;
+nhập ../domain/don_hang;
 
 lớp công khai DịchVụĐơnHàng {
     hàm khởi tạo(khoSảnPhẩm, khoĐơnHàng) {

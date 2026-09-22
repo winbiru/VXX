@@ -38,6 +38,9 @@ if (VPP_ENABLE_CLANG_TIDY)
 endif()
 
 find_package(Threads REQUIRED)
+if (UNIX AND NOT APPLE)
+    find_package(OpenSSL REQUIRED)
+endif()
 
 # Public include dir for headers
 set(VPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/include)
@@ -139,7 +142,12 @@ target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 vpp_add_module(vpp-runtime ${VPP_RUNTIME_SOURCES})
 target_link_libraries(vpp-runtime PUBLIC vpp-bytecode vpp-core Threads::Threads)
 if (WIN32)
-    target_link_libraries(vpp-runtime PUBLIC ws2_32)
+    target_link_libraries(vpp-runtime PUBLIC ws2_32 bcrypt)
+elseif(APPLE)
+    find_library(VPP_SECURITY_FRAMEWORK Security REQUIRED)
+    target_link_libraries(vpp-runtime PUBLIC ${VPP_SECURITY_FRAMEWORK})
+elseif(UNIX)
+    target_link_libraries(vpp-runtime PUBLIC OpenSSL::Crypto)
 endif()
 
 vpp_add_module(vpp-tooling ${VPP_TOOLING_SOURCES})
@@ -178,6 +186,22 @@ add_custom_command(TARGET vpp-cli POST_BUILD
 # Regression tests are V++ .vi programs under src/tests/.
 if (BUILD_TESTS)
     enable_testing()
+
+    # Focused internal RC gate. The old broad C++ unit tree was removed on
+    # purpose; keep only invariants that cannot be exercised from public .vi
+    # source: malformed AST/IR rejection and bytecode verifier metadata checks.
+    add_executable(vpp-rc-internal-hardening
+        ${CMAKE_SOURCE_DIR}/scripts/quality/rc_internal_hardening.cpp)
+    target_link_libraries(vpp-rc-internal-hardening PRIVATE vpp-compiler)
+    target_include_directories(vpp-rc-internal-hardening PRIVATE ${VPP_INCLUDE_DIR})
+    target_compile_features(vpp-rc-internal-hardening PRIVATE cxx_std_17)
+    if (MSVC)
+        target_compile_options(vpp-rc-internal-hardening PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(vpp-rc-internal-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-rc-internal-hardening COMMAND vpp-rc-internal-hardening)
+
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
                  COMMAND ${CMAKE_COMMAND} -E env

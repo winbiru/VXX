@@ -31,7 +31,7 @@ public:
         return installationHome_;
     }
 
-    PackageResolution resolve(const std::string &target, bool quoted) const;
+    PackageResolution resolve(const std::string &target) const;
 
 private:
     std::filesystem::path absoluteLexical(

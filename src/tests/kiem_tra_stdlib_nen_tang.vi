@@ -1,4 +1,4 @@
-nhập "gói/chuẩn/main.vi";
+nhập gói/chuẩn/main;
 
 hàm main() {
     // Chuỗi UTF-8 phải tính/reverse theo code point, không theo byte.
@@ -27,6 +27,10 @@ hàm main() {
 
     in đường dẫn nối("a", "b");
     in đường dẫn cha("a/b/c.vi");
+    in đường dẫn tên("a/b/c.vi");
+    in đường dẫn tồn tại("src/tests/__vpp_stdlib_missing_path__");
+    in là tệp("src/tests/__vpp_stdlib_missing_path__");
+    in là thư mục("src/tests/__vpp_stdlib_missing_path__");
     thư mục test = đường dẫn nối("src/tests/.tmp", "stdlib_nền_tảng_𠀀");
     xóa đường dẫn(thư mục test);
     in đường dẫn tên(thư mục test);

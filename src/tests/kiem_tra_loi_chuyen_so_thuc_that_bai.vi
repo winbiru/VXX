@@ -1,5 +1,5 @@
 // Chuyển một chuỗi không phải số thành số thực phải được giải thích là lỗi chuyển kiểu.
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in thành số thực("abc");

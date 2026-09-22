@@ -1,4 +1,4 @@
-nhập "vào ra";
+nhập vào ra;
 
 // Bao đóng nguồn cấu hình của API để các lớp khác không phụ thuộc trực tiếp vào file.
 lớp CấuHìnhApi {

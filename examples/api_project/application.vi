@@ -1,7 +1,7 @@
-nhập "config.vi";
-nhập "controller.vi";
-nhập "router.vi";
-nhập "server.vi";
+nhập config;
+nhập controller;
+nhập router;
+nhập server;
 
 // Đại diện cho ứng dụng API đã được ghép đủ dependency. Lớp chỉ sở hữu vòng đời
 // ứng dụng và khởi động server đã được truyền vào qua constructor.

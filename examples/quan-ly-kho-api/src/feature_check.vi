@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main.vi;
-nhập "diagnostics/language_features.vi";
-nhập "app/bootstrap.vi";
+nhập gói/chuẩn/main;
+nhập diagnostics/language_features;
+nhập app/bootstrap;
 
 hàm main() {
     chạy kiểm tra tính năng();

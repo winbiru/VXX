@@ -34,3 +34,7 @@ src/tests/.tmp_*
 *.actual
 dist/
 *.vsix
+
+# Python tooling
+__pycache__/
+*.pyc

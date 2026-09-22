@@ -1034,7 +1034,7 @@ void Parser::attachDeclarationPayload(AstStatement &statement) {
     addParameter(parameterBegin, close);
 }
 
-// Phân tích chi tiết câu lệnh nhập và gắn `AstImportSpec`; hàm tách đích, dấu nháy, bí danh và dấu chấm phẩy cho semantic/module graph sử dụng.
+// Phân tích chi tiết câu lệnh nhập và gắn `AstImportSpec`; mỗi câu chỉ nhận một target không có dấu nháy.
 void Parser::attachImportForm(AstStatement &statement) {
     if (statement.kind != AstStatementKind::Import) return;
 
@@ -1057,46 +1057,50 @@ void Parser::attachImportForm(AstStatement &statement) {
     ++cursor;
     if (cursor >= end - 1) return;
     if (tokens_[cursor].kind == TokenKind::String) {
-        const std::string &spelling = tokens_[cursor].lexeme;
-        if (spelling.size() < 2 ||
-            !((spelling.front() == '"' && spelling.back() == '"') ||
-              (spelling.front() == '\'' && spelling.back() == '\''))) {
-            return;
-        }
-        spec.quoted = true;
-        spec.target = spelling.substr(1, spelling.size() - 2);
-        spec.targetSpan = tokens_[cursor].span;
-        ++cursor;
-    } else {
-        const std::size_t targetBegin = cursor;
-        std::size_t targetEnd = cursor;
-        while (cursor < end - 1 && tokens_[cursor].lexeme != "như") {
-            const std::string &piece = tokens_[cursor].lexeme;
-            const bool separator = piece == "/" || piece == "\\";
-            if (separator) {
-                spec.target += piece;
-            } else {
-                if (!spec.target.empty() && spec.target.back() != '/' &&
-                    spec.target.back() != '\\') {
-                    spec.target.push_back(' ');
-                }
-                spec.target += piece;
-            }
-            targetEnd = ++cursor;
-        }
-        if (targetBegin == targetEnd) return;
-        spec.targetSpan = tokenRangeSpan(tokens_, targetBegin, targetEnd);
+        throw ParseError(
+            vietvm::messages::formatMessage(
+                vietvm::messages::kImportQuotedTargetUnsupported),
+            tokens_[cursor].span);
     }
 
-    const bool hasSeparator = spec.target.find('/') != std::string::npos ||
-                              spec.target.find('\\') != std::string::npos;
+    const std::size_t targetBegin = cursor;
+    std::size_t targetEnd = cursor;
+    while (cursor < end - 1 && tokens_[cursor].lexeme != "như") {
+        const std::string &piece = tokens_[cursor].lexeme;
+        if (piece == ",") {
+            throw ParseError(
+                vietvm::messages::formatMessage(
+                    vietvm::messages::kImportMultipleTargetsUnsupported),
+                tokens_[cursor].span);
+        }
+        const bool separator = piece == "/" || piece == "\\" || piece == "-";
+        if (separator) {
+            spec.target += piece;
+        } else {
+            if (!spec.target.empty() && spec.target.back() != '/' &&
+                spec.target.back() != '\\' && spec.target.back() != '-') {
+                spec.target.push_back(' ');
+            }
+            spec.target += piece;
+        }
+        targetEnd = ++cursor;
+    }
+    if (targetBegin == targetEnd) return;
+    spec.targetSpan = tokenRangeSpan(tokens_, targetBegin, targetEnd);
+
+    if (hasViSuffix(spec.target)) {
+        throw ParseError(
+            vietvm::messages::formatMessage(
+                vietvm::messages::kImportFileExtensionUnsupported),
+            spec.targetSpan);
+    }
+
     const std::size_t lastSeparator = spec.target.find_last_of("/\\");
     const std::size_t lastDot = spec.target.find_last_of('.');
     const bool hasExtension = lastDot != std::string::npos &&
                               (lastSeparator == std::string::npos ||
                                lastDot > lastSeparator);
-    const bool barePackageTarget = !hasSeparator && !hasExtension;
-    if (!hasViSuffix(spec.target) && !barePackageTarget) return;
+    if (hasExtension) return;
 
     if (cursor < end - 1 && tokens_[cursor].lexeme == "như") {
         ++cursor;

@@ -1,6 +1,6 @@
 nhập lõi;
-nhập "ma-don-hang";
-nhập "../domain/san_pham.vi";
+nhập ma-don-hang;
+nhập ../domain/san_pham;
 
 lớp công khai DịchVụKho {
     // Warehouse Showcase 1.0 service surface.

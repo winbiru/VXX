@@ -1,8 +1,8 @@
 {
   "name": "vpp-language",
   "displayName": "V++ Language",
-  "description": "Vietnamese-first language support and syntax highlighting for V++ source files",
-  "version": "0.1.3",
+  "description": "IDE-grade Vietnamese-first language support for V++: diagnostics, completion, navigation, outline, references, signatures, rename and formatting",
+  "version": "0.2.0",
   "publisher": "vpp",
   "main": "./extension.js",
   "icon": "assets/icons/vpp-file.png",
@@ -15,7 +15,10 @@
     "viet",
     "vietnamese",
     "syntax",
-    "highlighting"
+    "highlighting",
+    "intellisense",
+    "lsp",
+    "navigation"
   ],
   "engines": {
     "vscode": "^1.80.0"

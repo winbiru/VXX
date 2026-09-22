@@ -1,15 +1,15 @@
 // Đường dẫn package tiếng Việt có khoảng trắng phải dùng chuỗi được trích dẫn.
 // Test này xác nhận các package chuẩn nằm trực tiếp dưới gói/.
-nhập "gói/lõi/main.vi";
-nhập "gói/nhập xuất/main.vi";
-nhập "gói/hệ thống/main.vi";
-nhập "gói/mạng/main.vi";
-nhập "gói/dữ liệu/main.vi";
-nhập "gói/ứng dụng/main.vi";
-nhập "gói/dựng/main.vi";
-nhập "gói/kiểm thử/main.vi";
-nhập "gói/ứng dụng/cầu nối/api.vi";
-nhập "gói/chuẩn/main.vi";
+nhập gói/lõi/main;
+nhập gói/nhập xuất/main;
+nhập gói/hệ thống/main;
+nhập gói/mạng/main;
+nhập gói/dữ liệu/main;
+nhập gói/ứng dụng/main;
+nhập gói/dựng/main;
+nhập gói/kiểm thử/main;
+nhập gói/ứng dụng/cầu nối/api;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in nối chuỗi("cốt", " lõi");

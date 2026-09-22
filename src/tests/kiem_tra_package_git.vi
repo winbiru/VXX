@@ -1,5 +1,5 @@
 // vpp-parity: requires-package-environment
-nhập "git-demo";
+nhập git-demo;
 
 hàm main() {
     in git_ping();

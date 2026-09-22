@@ -1,8 +1,8 @@
 nhập lõi;
 nhập mạng;
-nhập "nhập xuất";
-nhập "app/bootstrap.vi";
-nhập "diagnostics/language_features.vi";
+nhập nhập xuất;
+nhập app/bootstrap;
+nhập diagnostics/language_features;
 
 hàm ghi dữ liệu demo() {
     nếu (!đường dẫn tồn tại("data")) {

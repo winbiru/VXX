@@ -142,6 +142,18 @@ inline constexpr std::array<const char *, 2> kFnRandomInt = {
     "ngau_nhien_nguyen", "ngẫu nhiên nguyên"
 };
 
+inline constexpr std::array<const char *, 2> kFnSecureRandom = {
+    "ngau_nhien_bao_mat", "ngẫu nhiên bảo mật"
+};
+
+inline constexpr std::array<const char *, 2> kFnSha256 = {
+    "bam_sha256", "băm sha256"
+};
+
+inline constexpr std::array<const char *, 2> kFnHmacSha256 = {
+    "hmac_sha256", "hmac sha256"
+};
+
 inline constexpr std::array<const char *, 2> kFnPathJoin = {
     "duong_dan_noi", "đường dẫn nối"
 };

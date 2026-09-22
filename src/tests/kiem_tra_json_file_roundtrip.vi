@@ -1,6 +1,6 @@
 nhập lõi;
 nhập mạng;
-nhập "nhập xuất";
+nhập nhập xuất;
 
 hàm main() {
     tên = "Cà phê \"Đậm\" ☕";

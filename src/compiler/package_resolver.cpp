@@ -162,8 +162,7 @@ fs::path PackageResolver::absoluteLexical(const fs::path &candidate) const {
 }
 
 PackageResolution PackageResolver::resolve(
-    const std::string &target,
-    bool quoted) const {
+    const std::string &target) const {
     std::string path = target;
     if (path == "stdlib" || path == "chuẩn") {
         path = vietvm::core::kStandardPackageMainFile;
@@ -175,7 +174,7 @@ PackageResolution PackageResolver::resolve(
     const std::vector<std::string> packageCandidates =
         bareModuleName ? packageCandidatesFor(path) : std::vector<std::string>{};
 
-    if (!quoted && requestedPath.extension().empty()) {
+    if (requestedPath.extension().empty()) {
         path += ".vi";
     }
     const fs::path importPath = vietvm::core::utf8Path(path);

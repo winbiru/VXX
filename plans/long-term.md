@@ -142,10 +142,10 @@ concurrency/async phức tạp không phải release blocker mặc định của
      trong function bind biến lỗi vào local/captured cell và regression closure xác nhận giá trị
      không rò sang global state.
    - [ ] **Leak/sanitizer gate** — chạy stress suite qua ASan/UBSan và leak checker phù hợp;
-     mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC. Local
-     AppleClang ASan+UBSan đã chạy full CTest 16/16; quá trình này phát hiện và đã sửa
-     invalid-enum UB cùng destructor-chain stack overflow ở GC. Ubuntu CI hiện ép
-     `ASAN_OPTIONS=detect_leaks=1`; leak gate chờ CI Linux xác nhận.
+     mọi leak/use-after-free/crash tái hiện được phải được xử lý trước 1.0 RC. AppleClang
+     ASan+UBSan hiện xanh 2/2 CTest trên test tree hiện hành (focused internal hardening +
+     integration regression). Ubuntu CI vẫn ép `ASAN_OPTIONS=detect_leaks=1`; leak gate chờ
+     CI Linux xác nhận LSan trên cấu hình hiện hành.
    - [ ] Stack trace có source span/function/method/module identity đã hoàn tất bằng debug
      metadata song song bytecode, structured `RuntimeError` và CLI formatter có nén frame
      đệ quy. Phần còn lại của đầu việc là debugger hook cho breakpoint, step và
@@ -240,18 +240,13 @@ concurrency/async phức tạp không phải release blocker mặc định của
      lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
      Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
      context-driven compile không đọc/ghi một active registry khác.
-   - [x] Fuzz lexer/parser và malformed-source corpus có seed cố định. `vpp-frontend-fuzz-unit`
-     khóa corpus malformed cố định + 512 input sinh từ seed `0x56505031`, đồng thời kiểm tra
-     parser chỉ kết thúc bằng AST hợp lệ hoặc lỗi có kiểm soát. Malformed AST/invalid IR
-     regression + bytecode verifier cũng đã hoàn tất: VM kiểm tra opcode, jump/try target, StringPool,
-     argument/capture count và function metadata trước dispatch. Deterministic compilation/
-     reproducible bytecode cũng đã được khóa bằng regression so khớp toàn bộ root/function bytecode,
-     StringPool, function metadata, debug metadata và module metadata trên cùng import graph;
-     package lock đã pin exact dependency bytes/fingerprint.
+   - [x] Fuzz lexer/parser và malformed-source corpus có seed cố định. `scripts/quality/rc-hardening.py`
+     chạy 528 input ở public CLI boundary với seed `0x56505031`, đồng thời khóa deterministic
+     AST/IR/disassembly qua ba lượt. Focused `vpp-rc-internal-hardening` khóa direct malformed
+     AST/invalid IR và bytecode verifier trước dispatch.
    - [x] Stress source/project lớn và theo dõi compiler memory/time regression.
-     `vpp-compiler-stress-unit` tạo source 800 hàm và import graph 24 module × 24 hàm,
-     ghi `compile_ms` + peak RSS trên Unix/macOS, áp budget rộng 30 giây/scenario + 1 GiB
-     và khóa repeated compilation không tích lũy function/StringPool state.
+     `scripts/quality/rc-hardening.py` tạo source 800 hàm và import graph 24 module × 24 hàm,
+     compile lặp năm lượt, áp timeout 30 giây/lượt + peak RSS budget 1 GiB trên Unix/macOS.
    - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
      bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.
 

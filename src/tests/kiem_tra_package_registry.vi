@@ -1,5 +1,5 @@
 // vpp-parity: requires-package-environment
-nhập "registry-demo";
+nhập registry-demo;
 
 hàm main() {
     in registry_ping();

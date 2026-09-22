@@ -1,8 +1,8 @@
-nhập src/tests/fixtures/api_project/repository.vi;
-nhập src/tests/fixtures/api_project/entity.vi;
-nhập src/tests/fixtures/api_project/dto.vi;
-nhập src/tests/fixtures/api_project/mapper.vi;
-nhập src/tests/fixtures/api_project/giao_dien/service.vi;
+nhập src/tests/fixtures/api_project/repository;
+nhập src/tests/fixtures/api_project/entity;
+nhập src/tests/fixtures/api_project/dto;
+nhập src/tests/fixtures/api_project/mapper;
+nhập src/tests/fixtures/api_project/giao_dien/service;
 
 lớp công khai UserService triển khai UserServiceContract {
     // Nhận dependency từ composition root để service không tự tạo repository/mapper.

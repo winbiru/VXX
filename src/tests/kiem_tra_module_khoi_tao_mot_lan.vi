@@ -1,6 +1,6 @@
 // Import cùng module hai lần nhưng initializer phải chỉ chạy đúng một lần.
-nhập modules/lifecycle_leaf.vi;
-nhập modules/lifecycle_leaf.vi;
+nhập modules/lifecycle_leaf;
+nhập modules/lifecycle_leaf;
 
 hàm main() {
     in leaf value();

@@ -1,6 +1,6 @@
 // Full-stack convenience starter. Project-specific API server code is excluded.
-nhập "gói/lõi/main.vi";
-nhập "gói/nhập xuất/main.vi";
-nhập "gói/mạng/main.vi";
-nhập "gói/dữ liệu/main.vi";
-nhập "gói/ứng dụng/main.vi";
+nhập gói/lõi/main;
+nhập gói/nhập xuất/main;
+nhập gói/mạng/main;
+nhập gói/dữ liệu/main;
+nhập gói/ứng dụng/main;

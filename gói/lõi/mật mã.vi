@@ -1,0 +1,19 @@
+// Module: lõi.mật mã
+//
+// Contract 1.0:
+// - Chuỗi đầu vào được băm theo đúng byte UTF-8.
+// - Digest và random bảo mật trả hex chữ thường để không trộn dữ liệu nhị phân
+//   vào kiểu chuỗi UTF-8.
+// - Primitive mật mã do API hệ điều hành/OpenSSL cung cấp, VM không tự cài đặt.
+
+hàm ngẫu nhiên bảo mật(số byte) {
+    ném "stdlib: ngẫu nhiên bảo mật native hook không khả dụng";
+};
+
+hàm băm sha256(văn bản) {
+    ném "stdlib: băm sha256 native hook không khả dụng";
+};
+
+hàm hmac sha256(khóa, văn bản) {
+    ném "stdlib: hmac sha256 native hook không khả dụng";
+};

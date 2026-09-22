@@ -1,5 +1,5 @@
-nhập "gói/dựng/ứng dụng.vi";
-nhập "gói/mạng/kiểm thử/api.vi";
+nhập gói/dựng/ứng dụng;
+nhập gói/mạng/kiểm thử/api;
 
 // Java-style API implementation in test: Controller -> Service -> ResponseEntity
 lớp công khai UserService {

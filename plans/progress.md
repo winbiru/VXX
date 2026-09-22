@@ -1,6 +1,6 @@
 # Tiến độ phát triển V++
 
-> Cập nhật: 15/09/2026
+> Cập nhật: 18/09/2026
 >
 > Tỷ lệ dưới đây được tính theo số checkbox trong roadmap, chỉ dùng để theo dõi
 > tiến độ đầu việc; không đại diện cho phần trăm khối lượng kỹ thuật thực tế.
@@ -29,8 +29,8 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | --- | --- | --- |
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
 | 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
-| 0.9 | Chưa hoàn tất | Stdlib audit, test framework/templates |
-| 1.0 RC | Chưa bắt đầu | Freeze contract, fuzz/stress/sanitizer, release smoke đa nền tảng |
+| 0.9 | Gần hoàn tất | Stdlib audit + xác nhận release matrix |
+| 1.0 RC | Đang hoàn tất | Linux leak gate + release/install matrix đa nền tảng |
 
 Ước lượng theo khối lượng kỹ thuật hiện tại: còn khoảng **25–30%** để đạt 1.0. Con số
 này không thay thế tỷ lệ checkbox ở bảng trên vì hardening/stress/release có chi phí lớn
@@ -39,7 +39,8 @@ hơn nhiều so với một checkbox tính năng thông thường.
 ## Đã xác nhận hoàn thành
 
 - [x] CMake/CTest đã tách các target core, frontend, bytecode, compiler, runtime,
-  tooling, CLI và các C++ unit test.
+  tooling, CLI; test tree C++ rộng đã được loại bỏ, chỉ giữ focused RC internal-hardening
+  harness cho malformed AST/IR + bytecode verifier cùng regression `.vi` qua public CLI.
 - [x] Regression V++ được nối vào CTest trên Unix/Windows; CI Ubuntu có sanitizer.
 - [x] `examples/api_project` và `templates/backend` đã chuyển sang kiến trúc OOP theo
   instance: `CấuHìnhApi`, controller triển khai `TrìnhXửLýHttp`, `BộĐịnhTuyến`,
@@ -69,7 +70,7 @@ hơn nhiều so với một checkbox tính năng thông thường.
   trực tiếp cho `OP_DUNG_GIA_TRI` và `OP_SAI_GIA_TRI`.
 - [x] `VM::run()` đã được thu gọn thành lifecycle/GC + opcode routing; call, value,
   index, variable/call-frame, switch/block, loop-control, exception và branch có
-  handler riêng. Baseline regression hiện tại đạt 99/99.
+  handler riêng. Baseline regression hiện tại đạt 98/98.
 - [x] Stack trace runtime giữ frame có cấu trúc mà không đổi bytecode ABI: source file,
   line/column, function/method và module identity đi qua function/module child VM; CLI
   hiển thị trace từ điểm lỗi về caller và gộp các frame đệ quy liên tiếp. Regression khóa
@@ -79,12 +80,12 @@ hơn nhiều so với một checkbox tính năng thông thường.
 - [x] VM opcode matrix hiện khóa arithmetic, logic/comparison boundary, stack,
   branch, call/return, native call, default parameter, switch/default, throw/catch,
   uncaught error và các lỗi boundary chính.
-- [x] `VMRuntimeFixture` + `vpp-vm-handler-unit` đã tạo test boundary nội bộ cho
-  stack/PC/variables/call frame/control stacks và output sink, cho phép test handler
-  trực tiếp mà không phải chạy toàn bộ dispatch/stdout.
+- [x] `VMRuntimeFixture` đã tạo test boundary nội bộ cho stack/PC/variables/call frame/
+  control stacks và output sink. C++ unit target từng dùng fixture này đã bị xóa có chủ đích
+  ở commit `473a8e4`; regression hiện hành đi qua public CLI + corpus `.vi`.
 - [x] `CompilationContext` hiện sở hữu `StringPool`, function maps, import set và
-  class/access state. `vpp-compiler-support-unit` có regression compile song song bằng
-  hai context và xác nhận registry không rò chéo giữa hai thread.
+  class/access state. Regression same-process/concurrent trước đây đã chứng minh hai context
+  không rò state; target C++ tương ứng không còn trong test tree sau `473a8e4`.
 - [x] Import resolution dùng `CompilationContext.importResolutionBase`; regression
   song song biên dịch hai `module.vi` cùng tên từ hai thư mục độc lập mà không đổi
   process cwd. CLI chỉ giữ cwd compatibility trong lúc VM thực thi file/database tương đối.
@@ -164,8 +165,7 @@ hơn nhiều so với một checkbox tính năng thông thường.
   value/identity, ordering và implicit coercion. Runtime dùng chung `stackValueTruthy()` cho
   branch, `!`, `&&`, `||`; `==/!=` dùng chung `sameStackValue()` nên null/reference/mixed-type
   không còn lệch giữa collection helper và toán tử ngôn ngữ. Regression
-  `kiem_tra_semantics_gia_tri.vi` khóa các trường hợp biên end-to-end, còn
-  `vpp-runtime-value-unit` khóa helper và mixed ordering error.
+  `kiem_tra_semantics_gia_tri.vi` khóa các trường hợp biên end-to-end qua runtime hiện hành.
 - [x] **Runtime error contract 1.0:** `docs/runtime-errors.md` phân biệt exception do
   chương trình `ném` với lỗi VM fatal. `LanguageException` giữ nguyên `StackValue` qua child
   VM/function boundary; handler unwind data/block/switch/control state về snapshot của `thử`,
@@ -173,19 +173,19 @@ hơn nhiều so với một checkbox tính năng thông thường.
   `VmFault`/`CallBoundary`/`ModuleInitialization`; lỗi module giữ trạng thái `failed` và không
   chạy initializer lần hai. `OP_BAT_LOI` bind biến lỗi vào local frame/capture cell hiện tại
   thay vì ghi nhầm global khi catch nằm trong hàm. Regression `kiem_tra_ngoai_le_xuyen_ham.vi`
-  khóa catch + rethrow xuyên nhiều hàm và closure capture biến catch, còn
-  `vpp-vm-handler-unit` khóa control-stack/call-frame/module-state cleanup.
+  khóa catch + rethrow xuyên nhiều hàm và closure capture biến catch. Direct handler unit
+  từng khóa control-stack/call-frame/module-state cleanup đã bị xóa ở `473a8e4`.
 - [x] **Type policy 1.0:** ADR `docs/adr/0001-type-policy.md` chốt V++ dùng dynamic typing.
   Binding/parameter/field/return không có kiểu tĩnh bắt buộc; semantic chỉ kiểm tra arity khi
   callable đích biết chắc. Function/method/constructor có biên đối số tối thiểu/tối đa theo
   default parameter; dynamic/indirect/imported call được kiểm tra lại ở VM và không còn tự bù
   `0` cho đối số bắt buộc thiếu. Regression `kiem_tra_kieu_dong_call_boundary.vi` khóa đổi kiểu
-  binding + default parameter; pipeline/VM unit khóa direct và runtime arity error.
+  binding + default parameter; runtime arity error tiếp tục nằm trong corpus regression `.vi`.
 - [x] **Closure/finalizer semantics 1.0:** closure capture dùng shared cell theo tham chiếu;
   mutation nhìn thấy hai chiều, captured value sống sau khi outer function trả về và nested
   closure dùng chung cell. V++ 1.0 không có destructor/finalizer do người dùng định nghĩa;
   hành vi chương trình không được phụ thuộc thời điểm GC. Regression
-  `kiem_tra_closure_capture.vi` và runtime-value/GC unit khóa contract này.
+  `kiem_tra_closure_capture.vi` cùng GC regression `.vi` khóa contract quan sát được từ source.
 - [x] **Tracing GC:** `RuntimeHeap` theo từng VM đăng ký map/list/tuple/class/instance bằng
   weak registry, mark từ stack, biến global/local, call frame, receiver, class table và
   switch value rồi sweep bằng cách cắt cạnh của graph không reachable. Child VM dùng chung
@@ -226,14 +226,17 @@ hơn nhiều so với một checkbox tính năng thông thường.
 ## Kiểm tra tại thời điểm cập nhật
 
 ```text
-VM opcode smoke (build trực tiếp bằng C++17): passed
-Integration regression: 99/99 passed
-CTest baseline gần nhất: 30/30 passed
+Integration regression: 98/98 passed (18/09/2026)
+CTest hiện hành: 2/2 passed (`vpp-rc-internal-hardening` + `vpp-integration`, 54.80s)
 Package workflow: 6/6 passed, gồm Git install/update/exact-revision restore/offline + path -> Git graph + registry
-ASan+UBSan local CTest: 16/16 passed; LSan chờ Ubuntu CI `detect_leaks=1`
-Pipeline parity baseline gần nhất: 117 chương trình, direct IR 117 chương trình
-Coverage cross-check: 75.77% line coverage (8,884/11,725), gate 45%
-Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers; compiler stress theo dõi compile time/peak RSS
+RC compiler hardening: 528 malformed/fuzz cases, deterministic AST/IR/disassembly ×3,
+  stress 800 hàm + 24 module × 24 hàm ×5, peak RSS local 17.0 MiB; PASS
+macOS artifact/install smoke: tarball tạm cài 2 lần, stale managed file bị xóa; warehouse
+  build + feature gate + rollback + demo chạy từ prefix đã cài; PASS (HTTP bị sandbox local chặn bind)
+ASan/UBSan local hiện hành: 2/2 CTest PASS (147.09s); CI Linux vẫn chạy cùng suite với `detect_leaks=1`
+Pipeline parity snapshot/unit: đã bị xóa có chủ đích ở `473a8e4`; production regression hiện chỉ dùng `.vi` + CLI hardening
+Coverage gate: minimum 45% vẫn nằm trong CI; số 75.77% là baseline lịch sử trước khi xóa C++ test tree
+Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
 Short-term: 14/15
 Medium-term: 18/18
 Long-term: 20/41
@@ -249,9 +252,9 @@ Long-term: 20/41
    xóa token bridge khỏi production compiler/source set.
 5. [x] Sau khi test architecture ổn định, thêm coverage + clang-tidy + benchmark baseline.
 6. [x] Tách nốt variable/index/switch/block/exception khỏi `VM::run()` và mở rộng
-   opcode matrix; full regression hiện tại đạt 99/99.
+   opcode matrix; full regression hiện tại đạt 98/98.
 7. [x] Tạo internal VM state fixture/API và output sink để test handler trực tiếp
-   không phụ thuộc stdout; khóa bằng `vpp-vm-handler-unit`.
+   không phụ thuộc stdout; C++ unit consumer của fixture đã bị xóa có chủ đích ở `473a8e4`.
 8. [x] Dời `StringPool`, function registry, import set và class/access state vào
    `CompilationContext`; thêm concurrent-compilation regression và migrate toàn bộ CLI
    sang context snapshot.
@@ -276,9 +279,10 @@ Long-term: 20/41
     sâu/allocation burst/caller roots ở interval 1. VM-state invariant đã chứng minh cùng VM
     dùng tiếp được sau `VmFault` mà không mất caller stack/heap root/call-frame balance; catch
     trong function cũng bind đúng local/captured cell và không làm rò biến lỗi ra global state.
-    Local ASan+UBSan full CTest hiện 16/16 sau khi sửa hai lỗi sanitizer; Ubuntu CI đã bật
-    leak detection tường minh. Stack trace source span/function/method/module đã hoàn tất;
-    còn CI Linux leak gate để đóng runtime hardening 0.8.
+    ASan+UBSan local hiện xanh 2/2 CTest trên test tree hiện hành (focused internal hardening +
+    integration regression); CI Linux chạy cùng suite và bật leak detection tường minh. Stack
+    trace source span/function/method/module đã hoàn tất; còn một lượt Linux sanitizer/leak xanh
+    để đóng runtime hardening 0.8.
 16. [x] **Package 0.9:** manifest `vpp.json` schema 1/project layout đã chốt; package/bare-module
     lookup đã tách sang `PackageResolver`; SemVer/range, transitive solver, conflict/cycle,
     staged installer và deterministic `vpp.lock` có content fingerprint đã chạy. Install/update
@@ -305,8 +309,8 @@ Long-term: 20/41
     `là palindrome` và `là anagram` cũng dùng NFC + case tiếng Việt thay cho ASCII-only;
     `đếm ký tự`/`chứa chuỗi`/`thay thế` chuẩn hóa NFC hai phía nên input dựng sẵn và tách dấu
     có cùng kết quả. Unit corpus khóa toàn bộ 67 chữ thường tiếng Việt từ NFD -> NFC.
-    `vpp-runtime-value-unit`, `vpp-vm-handler-unit` và
-    `kiem_tra_stdlib_nen_tang.vi` khóa tiếng Việt + Unicode ngoài BMP end-to-end. Native filesystem/path
+    `kiem_tra_stdlib_nen_tang.vi` và regression corpus hiện hành khóa tiếng Việt + Unicode ngoài BMP
+    end-to-end. Native filesystem/path
     hiện kiểm tra UTF-8 ngay tại runtime boundary, không truyền malformed path xuống
     `std::filesystem`; output path dùng separator `/` ổn định và regression khóa tên thư mục/tệp
     tiếng Việt + Unicode ngoài BMP, parent/join và missing-path predicate. Time/date contract 1.0 đã có
@@ -340,15 +344,14 @@ Long-term: 20/41
     permission model tương ứng được chốt.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
-19. [x] **Compiler hardening:** deterministic/reproducible compile đã khóa bằng regression
-    so khớp toàn bộ bytecode + compiler/module metadata trên cùng dependency graph. Malformed AST
-    (ExprId ngoài arena/chu trình) và invalid IR đã có regression từ chối có kiểm soát; bytecode
-    verifier chạy trước VM dispatch cho root/function code và khóa opcode, jump/try target,
-    StringPool cùng metadata đối số/closure/function. Fuzz lexer/parser đã khóa corpus malformed
-    cố định + 512 input sinh xác định từ seed `0x56505031`. Stress compiler khóa source 800 hàm,
-    project 24 module × 24 hàm, repeated compile state và xuất compile time/peak RSS để theo dõi
-    regression trước RC.
-20. [ ] **Toolchain 1.0:** public CLI contract đã chốt theo tiếng Việt với
+19. [x] **Compiler hardening:** `scripts/quality/rc-hardening.py` chạy qua public CLI và đã PASS
+    local với 528 malformed/fuzz input seed `0x56505031`, deterministic AST/IR/disassembly qua
+    3 lượt, source 800 hàm và project 24 module × 24 hàm biên dịch lặp 5 lần; peak RSS local
+    17.0 MiB dưới budget 1 GiB. `vpp-rc-internal-hardening` bổ sung trực tiếp các invariant không
+    thể tạo từ source: ExprId ngoài arena/chu trình, IR operand/control-flow hỏng và bytecode
+    verifier metadata sai. Public hardening script đã nối CI Ubuntu/macOS/Windows, còn focused
+    internal harness chạy trong CTest trên cùng các matrix.
+20. [x] **Toolchain 1.0:** public CLI contract đã chốt theo tiếng Việt với
     `khởi tạo/chạy/kiểm thử/dựng/gói`; `new/run/test/build` giữ làm alias tương thích và có
     regression riêng. Formatter/linter cũng đã chốt contract CI/editor: formatter giữ comment,
     idempotent và có check/write mode cho cả thư mục; linter trả severity + source span và CLI
@@ -361,6 +364,14 @@ Long-term: 20/41
     CTest dựng + chạy + kiểm thử. Installer/update path đã dùng staged replace trên Unix/Windows,
     có release-install smoke cho Ubuntu/macOS/Windows và đánh giá Homebrew/winget trong
     `docs/installation.md`; smoke cục bộ trên macOS đã xác nhận cài lần hai xóa file stale.
-    Phần còn lại của Toolchain 1.0 là documentation 1.0.
-21. [ ] **1.0 RC:** freeze syntax/semantics/bytecode/package/CLI; chạy fuzz + stress +
-    sanitizer/leak + release-install smoke và sample project thực tế trên cả ba nền tảng.
+    Documentation 1.0 đã hoàn tất với language reference, CLI guide, debugging guide,
+    migration guide, changelog cùng package/testing/install/semantics/runtime-error docs hiện có;
+    README đã nối các entrypoint tài liệu chính.
+21. [ ] **1.0 RC:** syntax/semantics, package schema, public CLI và bytecode compatibility policy
+    đã freeze bằng docs + ADR 0002. `quan-ly-kho-api` ngày 18/09/2026 đã dựng thành công, feature
+    gate xanh, transaction rollback PASS và demo end-to-end chạy bằng build tree; HTTP smoke không
+    chạy được trong sandbox hiện tại vì hệ điều hành trả `EPERM` ngay khi bind localhost socket.
+    Tarball macOS tạm cũng đã cài/update hai lần, xóa stale file và chạy build/feature/rollback/demo
+    từ prefix cài đặt thành công. Release workflow hiện enforce regression + RC hardening + install/
+    update + warehouse HTTP verify trên Ubuntu/macOS/Windows trước upload. Còn Linux leak gate và
+    một matrix release thực tế xanh trên cả ba nền tảng trước khi đóng RC.

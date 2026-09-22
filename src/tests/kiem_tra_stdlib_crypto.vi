@@ -1,0 +1,9 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    in băm sha256("abc");
+    in hmac sha256("key", "The quick brown fox jumps over the lazy dog");
+    in băm sha256("Việt Nam");
+    in hmac sha256("khóa", "Việt Nam");
+    in độ dài(ngẫu nhiên bảo mật(16));
+};

@@ -1,11 +1,11 @@
-nhập "nhập xuất";
-nhập "../repository/san_pham_repository.vi";
-nhập "../repository/don_hang_repository.vi";
-nhập "../service/kho_service.vi";
-nhập "../service/don_hang_service.vi";
-nhập "../service/bao_cao_service.vi";
-nhập "../http/controller.vi";
-nhập "../http/router.vi";
+nhập nhập xuất;
+nhập ../repository/san_pham_repository;
+nhập ../repository/don_hang_repository;
+nhập ../service/kho_service;
+nhập ../service/don_hang_service;
+nhập ../service/bao_cao_service;
+nhập ../http/controller;
+nhập ../http/router;
 
 hàm công khai tạo ngữ cảnh ứng dụng(đườngDẫnSảnPhẩm, đườngDẫnĐơnHàng) {
     khoSảnPhẩm = tạo kho sản phẩm tệp(đườngDẫnSảnPhẩm);

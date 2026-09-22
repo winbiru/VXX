@@ -1,4 +1,4 @@
 // Dựng web trên package mạng thống nhất. Helper tạo yêu cầu kiểm thử được tách riêng.
-nhập "gói/lõi/main.vi";
-nhập "gói/nhập xuất/main.vi";
-nhập "gói/mạng/main.vi";
+nhập gói/lõi/main;
+nhập gói/nhập xuất/main;
+nhập gói/mạng/main;

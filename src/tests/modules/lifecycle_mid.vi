@@ -1,6 +1,6 @@
 // Import resolution hiện dùng base của compilation context (entry module),
 // nên fixture ghi đường dẫn từ src/tests/ để khóa đúng contract hiện tại.
-nhập modules/lifecycle_leaf.vi;
+nhập modules/lifecycle_leaf;
 
 in "mid-init";
 

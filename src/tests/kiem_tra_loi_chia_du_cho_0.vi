@@ -1,5 +1,5 @@
 // Chia lấy dư cho 0 qua stdlib: chia dư() phải giữ lỗi runtime của toán tử %.
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in chia dư(10, 0);

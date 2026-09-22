@@ -23,7 +23,8 @@
      exception và branch đã nằm trong các handler riêng.
    - [x] Đưa state cần thiết vào API nội bộ có thể dựng trong test. `VMRuntimeFixture`
      hiện cho phép dựng stack/PC/variables/call frame/control state, gọi handler trực
-     tiếp và cấu hình output sink; `vpp-vm-handler-unit` khóa các nhóm handler chính.
+     tiếp và cấu hình output sink. C++ unit consumer đã bị xóa có chủ đích ở `473a8e4`;
+     regression hiện hành đi qua corpus `.vi`/public CLI.
    - [x] Giữ test tích hợp trước/sau mỗi nhánh refactor. Baseline trước refactor và
      hiện tại đều giữ suite xanh; baseline hiện tại đạt 78/78 regression.
 

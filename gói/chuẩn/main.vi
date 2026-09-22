@@ -1,9 +1,9 @@
 // Điểm vào đầy đủ của gói chuẩn V++.
 // Chương trình mới nên nhập module hẹp nhất phù hợp với nhu cầu.
 
-nhập "gói/lõi/main.vi";
-nhập "gói/nhập xuất/main.vi";
-nhập "gói/hệ thống/main.vi";
-nhập "gói/mạng/main.vi";
-nhập "gói/dữ liệu/main.vi";
-nhập "gói/ứng dụng/main.vi";
+nhập gói/lõi/main;
+nhập gói/nhập xuất/main;
+nhập gói/hệ thống/main;
+nhập gói/mạng/main;
+nhập gói/dữ liệu/main;
+nhập gói/ứng dụng/main;

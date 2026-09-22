@@ -1,4 +1,4 @@
-nhập "gói/dựng/ứng dụng.vi";
+nhập gói/dựng/ứng dụng;
 
 hàm main() {
     ghi tệp(".tmp_starter_runtime.txt", "xin");

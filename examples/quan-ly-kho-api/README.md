@@ -109,7 +109,12 @@ Demo thực hiện tuần tự:
 vpp chạy src/main.vi
 ```
 
-Server lắng nghe `127.0.0.1:8088` qua native HTTP runtime.
+Server mặc định lắng nghe `127.0.0.1:8088` qua native HTTP runtime. Có thể đổi port mà không
+sửa source bằng biến môi trường:
+
+```bash
+VPP_WAREHOUSE_PORT=18088 vpp chạy src/main.vi
+```
 
 Các endpoint:
 
@@ -198,9 +203,13 @@ Sau khi cài V++0.9 và đứng tại thư mục `examples/quan-ly-kho-api`:
 python3 scripts/verify_http.py
 ```
 
-Script chạy bản sao ứng dụng trong thư mục tạm, kiểm tra transaction rollback, feature gate,
+Script chạy bản sao ứng dụng trong thư mục tạm, tự chọn một localhost port đang trống (hoặc dùng
+`VPP_WAREHOUSE_PORT` nếu được đặt), kiểm tra transaction rollback, feature gate,
 CRUD/search sản phẩm, request health đồng thời và toàn bộ endpoint qua TCP localhost. Sau đó script
-chạy 25 vòng đặt–hủy và xác minh dữ liệu vẫn đúng sau khi server khởi động lại. Cổng 8088 phải đang trống.
+chạy 25 vòng đặt–hủy và xác minh dữ liệu vẫn đúng sau khi server khởi động lại.
+
+Nếu môi trường sandbox cấm bind localhost socket, script kết thúc với mã `77` và thông báo `SKIP`
+để phân biệt giới hạn hạ tầng với lỗi của application/runtime.
 
 Script ưu tiên executable theo thứ tự `VPP_EXEC`, build local của repository, binary `vpp` nằm
 cạnh thư mục `examples` trong release, rồi mới tới `vpp` trong `PATH`. Vì vậy cùng một script

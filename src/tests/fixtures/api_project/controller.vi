@@ -1,7 +1,7 @@
-nhập "mạng";
-nhập "gói/mạng/kiểm thử/api.vi";
-nhập src/tests/fixtures/api_project/service.vi;
-nhập src/tests/fixtures/api_project/giao_dien/controller.vi;
+nhập mạng;
+nhập gói/mạng/kiểm thử/api;
+nhập src/tests/fixtures/api_project/service;
+nhập src/tests/fixtures/api_project/giao_dien/controller;
 
 // Ghi chú lớp: gom route chuẩn của API project theo kiểu cấu hình tập trung.
 lớp công khai ApiProjectRoutes {

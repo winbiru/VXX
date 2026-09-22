@@ -1,2 +1,2 @@
 // Gói dựng đầy đủ. Ưu tiên import gói hẹp hơn khi phù hợp.
-nhập "gói/dựng/ứng dụng.vi";
+nhập gói/dựng/ứng dụng;

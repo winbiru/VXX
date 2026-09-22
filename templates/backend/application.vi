@@ -1,7 +1,7 @@
-nhập "config.vi";
-nhập "controller.vi";
-nhập "router.vi";
-nhập "server.vi";
+nhập config;
+nhập controller;
+nhập router;
+nhập server;
 
 // Đại diện cho ứng dụng API đã được ghép đủ dependency và sở hữu vòng đời server.
 lớp ApiApplication {

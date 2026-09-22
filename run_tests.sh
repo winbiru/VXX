@@ -54,7 +54,7 @@ http_get() {
   local output="$2"
   if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
     cat >"$tmpdir/http_probe.vi" <<EOF
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in mạng lấy("$url");
@@ -171,6 +171,7 @@ TESTS=(
   src/tests/kiem_tra_rest_json_jwt.vi
   src/tests/kiem_tra_stdlib_tinh_toan.vi
   src/tests/kiem_tra_stdlib_mo_rong.vi
+  src/tests/kiem_tra_stdlib_crypto.vi
   src/tests/kiem_tra_goi_kiem_thu.vi
   src/tests/kiem_tra_goi_mang.vi
   src/tests/kiem_tra_stdlib_nen_tang.vi

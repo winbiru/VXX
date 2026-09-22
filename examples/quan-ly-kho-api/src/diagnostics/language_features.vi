@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main.vi;
-nhập feature_math.vi như toán;
-nhập "feature_model.vi";
+nhập gói/chuẩn/main;
+nhập feature_math như toán;
+nhập feature_model;
 
 hàm yêuCầu(điềuKiện, nhãn) {
     nếu (!điềuKiện) {

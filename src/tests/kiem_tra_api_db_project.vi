@@ -1,9 +1,9 @@
-nhập src/tests/fixtures/api_project/database.vi;
-nhập src/tests/fixtures/api_project/controller.vi;
-nhập src/tests/fixtures/api_project/repository.vi;
-nhập src/tests/fixtures/api_project/mapper.vi;
-nhập src/tests/fixtures/api_project/service.vi;
-nhập "gói/ứng dụng/cầu nối/api.vi";
+nhập src/tests/fixtures/api_project/database;
+nhập src/tests/fixtures/api_project/controller;
+nhập src/tests/fixtures/api_project/repository;
+nhập src/tests/fixtures/api_project/mapper;
+nhập src/tests/fixtures/api_project/service;
+nhập gói/ứng dụng/cầu nối/api;
 
 lớp công khai ApiDbProjectTest {
     // Nhận controller đã ghép đủ dependency để test không tự tạo tầng nghiệp vụ.

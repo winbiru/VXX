@@ -1,8 +1,8 @@
 nhập lõi;
-nhập "nhập xuất";
-nhập "repository/hop_dong.vi";
-nhập "repository/san_pham_repository.vi";
-nhập "service/don_hang_service.vi";
+nhập nhập xuất;
+nhập repository/hop_dong;
+nhập repository/san_pham_repository;
+nhập service/don_hang_service;
 
 lớp KhoĐơnHàngLỗi triển khai KhoĐơnHàng {
     hàm tấtCả() {

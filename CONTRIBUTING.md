@@ -35,7 +35,7 @@ Tạo một backend mẫu để thử nghiệm thủ công bằng `vpp khởi t�
 1. Giữ mã tương thích C++17 và không thêm warning mới với `-Wall -Wextra -Wpedantic`.
 2. Với thay đổi ngôn ngữ/VM/compiler, thêm hoặc cập nhật một entry `.vi` trong `src/tests/` cùng output tương ứng trong `src/tests/expected/`. Fixture tái sử dụng đặt trong `src/tests/fixtures/` không cần expected riêng.
 3. Với thay đổi HTTP, ưu tiên mở rộng fixture `.vi` thay vì gọi dịch vụ Internet.
-4. Mỗi module `.vi` phải import trực tiếp dependency của chính nó; không dựa vào thứ tự import của facade. Giữ `gói/ứng dụng` ở mức lifecycle chung, còn full stack nằm ở `gói/dựng/ứng dụng.vi`. Đường dẫn package có khoảng trắng phải được đặt trong dấu nháy, ví dụ `nhập "gói/mạng/main.vi";`.
+4. Mỗi module `.vi` phải import trực tiếp dependency của chính nó; không dựa vào thứ tự import của facade. Giữ `gói/ứng dụng` ở mức lifecycle chung, còn full stack nằm ở `gói/dựng/ứng dụng.vi`. Mỗi câu `nhập` chỉ nhận một file hoặc package/folder và target không dùng dấu nháy, ví dụ `nhập gói/mạng/main;`.
 5. Cập nhật `README.md`, `CHECKLIST.md` hoặc tài liệu trong `docs/` nếu hành vi công khai thay đổi.
 6. Chạy `./run_tests.sh` trước khi gửi pull request.
 7. Đặt application mẫu trong `examples/` và scaffold source trong `templates/`, không đặt chúng trong `src/tests/`.

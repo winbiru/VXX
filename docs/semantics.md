@@ -107,10 +107,10 @@ giữ nguyên nội dung truyền vào, kể cả dấu gạch chéo và dấu n
 
 - Function/class/interface top-level không ghi visibility hoặc ghi `công khai` thuộc bề mặt
   export để giữ tương thích source hiện có. Khai báo `riêng tư`/`bảo vệ` không được export.
-- `nhập đường/dẫn.vi;` chỉ đưa export của module đích vào module hiện tại; nó không tự chuyển
+- `nhập đường/dẫn;` chỉ đưa export của module đích vào module hiện tại; nó không tự chuyển
   tiếp các tên đó cho module nhập phía ngoài.
-- `công khai nhập đường/dẫn.vi;` re-export bề mặt công khai của module đích. Nếu có alias,
-  alias là một phần của tên được re-export, ví dụ `công khai nhập toan.vi như toán;` xuất
+- `công khai nhập đường/dẫn;` re-export bề mặt công khai của module đích. Nếu có alias,
+  alias là một phần của tên được re-export, ví dụ `công khai nhập toan như toán;` xuất
   `toán.nhân` chứ không làm phẳng thành `nhân`.
 - Re-export không bao giờ làm lộ symbol private/protected của dependency.
 - Truy cập một symbol biết chắc tồn tại nhưng không thuộc bề mặt export là semantic error thay

@@ -1,4 +1,4 @@
-nhập "gói/mạng/rest.vi";
+nhập gói/mạng/rest;
 
 hàm main() {
     token = "eyJhbGciOiJIUzUxMiJ9.demo-token";

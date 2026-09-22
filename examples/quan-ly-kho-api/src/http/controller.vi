@@ -1,6 +1,6 @@
 nhập lõi;
 nhập mạng;
-nhập "../diagnostics/language_features.vi";
+nhập ../diagnostics/language_features;
 
 giao diện công khai TrìnhXửLýHttp {
     hàm xửLý(requestId);

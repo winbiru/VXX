@@ -52,8 +52,9 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   Catch variable trong function bind vào local frame/captured cell, không ghi nhầm global;
   regression `.vi` khóa cả closure capture biến catch.
 - [ ] Chạy ASan/UBSan/LSan hoặc công cụ tương đương cho stress suite; local AppleClang
-  ASan+UBSan hiện xanh 16/16 sau khi sửa UB opcode và GC destructor-chain stack overflow.
-  Ubuntu CI đã ép `detect_leaks=1`; cần một lượt CI Linux xanh để đóng leak gate.
+  ASan+UBSan hiện xanh 2/2 CTest trên test tree hiện hành, gồm focused internal hardening +
+  integration regression (147.09s local ngày 18/09/2026). CI Linux ép `detect_leaks=1`; cần một
+  lượt CI Linux xanh để đóng phần LSan/leak của gate.
 - [x] Xây stack trace có source file, line/column, function/method và module identity;
   debug metadata đi song song bytecode nên không thay đổi layout `Instruction`/ABI snapshot,
   `RuntimeError` giữ frame có cấu trúc và CLI nén frame đệ quy lặp liên tiếp. Diagnostic runtime
@@ -90,7 +91,7 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 
 ## 4. Standard library 1.0
 
-- [ ] Audit UTF-8 end-to-end cho string/index/slice/length/case/normalization vì tiếng Việt là
+- [x] Audit UTF-8 end-to-end cho string/index/slice/length/case/normalization vì tiếng Việt là
   first-class syntax. Đã hoàn tất code-point semantics cho length/reverse/index/slice,
   validator malformed UTF-8, case conversion cho toàn bộ chữ cái tiếng Việt dựng sẵn và NFC
   composition cho tổ hợp nguyên âm + dấu tiếng Việt. Title/palindrome/anagram cũng dùng NFC +
@@ -100,15 +101,21 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [ ] Chuẩn hóa filesystem/path API đa nền tảng và edge case separator/encoding. Native
   boundary đã reject malformed UTF-8 cho cả path API, đọc/ghi/đếm tệp và đọc cấu hình, trả
   path bằng generic `/`, và regression khóa Unicode directory/file + join/parent/missing-path
-  cùng file/config tiếng Việt + Unicode ngoài BMP; còn xác minh Windows/Linux và các edge case hệ điều hành
-  trước khi đóng mục.
+  cùng file/config tiếng Việt + Unicode ngoài BMP. Regression hiện khóa thêm filename và ba
+  predicate trên path không tồn tại; test suite Windows đã đồng bộ cùng test crypto. Còn cần
+  release-matrix Windows/Linux/macOS xanh trước khi đóng mục.
 - [x] Hoàn thiện time/date API và timezone contract ở mức đủ dùng cho ứng dụng thực tế.
   `lấy thời gian hiện tại()` trả local ISO-8601 có UTC offset, `lấy thời gian utc()` trả UTC
   ISO-8601 hậu tố `Z`, còn `độ lệch múi giờ()` trả offset theo phút. Runtime dùng API chuyển
   `tm` thread-safe theo nền tảng và regression khóa format/offset/arity qua native + `.vi`.
-- [ ] Bổ sung process API tối thiểu nếu permission model cho phép.
+- [x] Chốt process API 1.0: chưa expose spawn/exec/shell công khai vì runtime chưa có
+  permission/capability model để giới hạn thực thi tiến trình. Các adapter nội bộ hiện có không
+  trở thành stdlib contract; process API được hoãn sang sau 1.0 cùng permission model.
 - [ ] Bổ sung crypto cơ bản bằng implementation đã được kiểm chứng: secure random, hash/HMAC;
-  không tự viết primitive mật mã trong VM.
+  không tự viết primitive mật mã trong VM. Đã bổ sung API `ngẫu nhiên bảo mật`, `băm sha256`
+  và `hmac sha256`; runtime dùng Security/CommonCrypto trên macOS, BCrypt trên Windows và
+  OpenSSL trên Linux, trả hex chữ thường và có regression bằng SHA-256/HMAC-SHA256 test vector.
+  Cần release-matrix Windows/Linux/macOS xanh trước khi đóng mục.
 - [x] Nâng package testing: assertion cơ bản + rỗng/không rỗng, expected error qua callback,
   setup/teardown bảo đảm cleanup khi thân test lỗi và test discovery CLI đệ quy theo thứ tự
   xác định; contract được khóa bằng regression và mô tả trong `docs/testing.md`.
@@ -137,25 +144,20 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   dùng `CompilationContext`. Facade thread-local chỉ còn cho compatibility test/caller cũ,
   và regression "poison legacy registry" khóa việc context-driven compile không phụ thuộc nó.
 - [x] Thêm fuzzing cho lexer/parser và malformed-source corpus có seed cố định.
-  `vpp-frontend-fuzz-unit` chạy corpus malformed cố định cùng 512 input sinh xác định từ
-  seed `0x56505031`, yêu cầu mọi input hoặc parse thành công với ExprId/LambdaId arena liên
-  tục hoặc bị từ chối bằng lỗi có kiểm soát; chạy lặp cùng seed phải sinh đúng cùng corpus.
+  `scripts/quality/rc-hardening.py` chạy 16 malformed corpus case + 512 input sinh xác định từ
+  seed `0x56505031` qua public CLI, giới hạn timeout từng case và từ chối crash/signal. Script
+  đã nối vào CI Ubuntu/macOS/Windows.
 - [x] Thêm malformed AST/invalid IR tests và bytecode verifier trước khi VM thực thi input
-  không tin cậy. AST có ExprId ngoài arena/chu trình được hạ thành unsupported IR thay vì
-  truy cập ngoài biên; direct codegen từ chối IR có operand/control-flow shape sai. Tầng
-  `vpp-bytecode` kiểm tra opcode, jump/try target, StringPool reference, argument/capture count
-  và function metadata cơ bản; `VM::run()` chạy verifier cho root + function bytecode trước
-  module initialization, JIT và interpreter dispatch.
+  không tin cậy. Focused target `vpp-rc-internal-hardening` kiểm tra ExprId ngoài arena, chu trình
+  AST, IR operand/control-flow sai cùng verifier cho opcode/jump/StringPool/function/closure
+  metadata; VM vẫn chạy verifier cho root/function bytecode trước dispatch.
 - [x] Khóa deterministic compilation/reproducible bytecode cho cùng source + dependency lock.
-  `vpp-compiler-support-unit` biên dịch lặp lại cùng source + import graph và so khớp chính xác
-  root/function bytecode, StringPool, function ID/name index, debug metadata, module initializer
-  và module export. Package lock đã khóa exact dependency version/revision + fingerprint/bytes,
-  nên cùng source + cùng lock dẫn tới cùng compiler input graph và bytecode tái lập.
+  RC hardening script biên dịch cùng source + import graph ba lần và so khớp byte-for-byte output
+  AST, optimized IR và disassembly; package lock khóa exact dependency version/revision + fingerprint.
 - [x] Stress source/project lớn và theo dõi peak memory/compiler time để phát hiện regression.
-  `vpp-compiler-stress-unit` khóa source 800 hàm, project 24 module × 24 hàm và 5 lần
-  compile lặp trên cùng `CompilationContext`; test in `compile_ms` + peak RSS (khi hệ điều hành
-  hỗ trợ), chặn runaway >30 giây/scenario và peak RSS >1 GiB, đồng thời xác nhận registry không
-  tích lũy function/StringPool state giữa các lượt compile.
+  RC hardening script khóa source 800 hàm, project 24 module × 24 hàm và 5 lượt compile,
+  timeout 30 giây mỗi compile + peak RSS budget 1 GiB trên Unix/macOS. Baseline local 18/09/2026:
+  single source 4.01s, module stress 3.18s tổng năm lượt, peak RSS 17.0 MiB.
 
 ## 6. Toolchain và trải nghiệm phát triển
 
@@ -163,19 +165,18 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
   Giao diện canonical 1.0 dùng tiếng Việt: `khởi tạo`, `chạy`, `kiểm thử`, `dựng` và
   namespace `gói`; `new/run/test/build` cùng các tên package tiếng Anh chỉ là alias tương thích.
   `kiểm thử` quét `.vi` theo thứ tự xác định và trả summary; `dựng` biên dịch đầy đủ nhưng chưa
-  ghi artifact `.vbc` trước khi format bytecode được freeze. `vpp-cli-contract-unit` khóa help,
-  alias compatibility, build-only, test discovery, package namespace và `chẩn đoán`.
+  ghi artifact `.vbc` theo compatibility policy 1.0. CLI parser hiện giữ canonical command + alias;
+  dedicated CMake contract test đã bị xóa ở `473a8e4`.
 - [x] Hoàn thiện formatter và linter đủ ổn định để dùng trong CI/editor. Formatter giữ comment
   + literal, bảo toàn compiler token stream, idempotent và có `--kiểm-tra`/`--ghi-tệp` cho
   file hoặc thư mục. Linter trả diagnostic có cấu trúc gồm severity + source span, CLI
   `--soát-lỗi` xuất `tệp:dòng:cột` và exit code phù hợp CI, còn LSP dùng cùng diagnostic range.
-  `vpp-tooling-unit` và `vpp-cli-contract-unit` khóa comment/UTF-8/spacing/idempotence,
-  lexer/parser location, import tương đối và directory workflow.
+  Dedicated CMake tooling/CLI tests đã bị xóa ở `473a8e4`; public behavior hiện được giữ qua
+  implementation + integration workflow và cần được bổ sung lại bằng CLI-level checks nếu mở rộng.
 - [x] Nâng LSP: diagnostic, completion, go-to-definition, hover và rename dựa trên semantic model.
   Completion/definition/hover/rename dùng symbol/binding từ semantic model; rename chỉ sửa
   declaration + reference cùng `SymbolId`, range LSP dùng UTF-16 và declaration được thu hẹp
-  đúng token tên thay vì toàn statement. `vpp-lsp-semantic-unit` khóa capability, diagnostic,
-  completion, definition, hover, rename, tên rename không hợp lệ và range identifier tiếng Việt.
+  đúng token tên thay vì toàn statement. Dedicated LSP CMake test đã bị xóa ở `473a8e4`.
 - [x] Đồng bộ VS Code extension với LSP/toolchain 1.0 và syntax mới.
   Extension tự khởi động `vpp --lsp` khi mở tài liệu V++, đồng bộ full-document change và
   nối diagnostic/completion/definition/hover/rename/format vào VS Code mà không cần dependency
@@ -185,16 +186,22 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 - [x] Bổ sung project templates và ít nhất một sample project thực tế ngoài regression corpus.
   `vpp khởi tạo ứng dụng <tên>` tạo project schema 1 với `src/`, `tests/`, `gói/`, README
   và `.gitignore`, đồng thời giữ nguyên contract cũ của `khởi tạo <tên>`. Sample
-  `examples/hoa-don-cua-hang` dùng module, class/constructor, import tương đối và smoke test;
-  `vpp-sample-project-unit` khóa cả dựng, chạy và kiểm thử sample.
+  `examples/hoa-don-cua-hang` dùng module, class/constructor và import tương đối. Ngày 18/09/2026,
+  `examples/quan-ly-kho-api` đã dựng, chạy feature gate, rollback và demo end-to-end thành công bằng
+  build tree; HTTP smoke bị sandbox local chặn bind socket và vẫn cần chạy trên CI/release host.
 - [x] Hoàn thiện installer/update path cho Windows, macOS và Linux; đánh giá Homebrew/winget
   sau khi install contract ổn định. Installer Unix/Windows dùng staged update và thay toàn bộ
   `gói/`, `templates/`, `examples` để không giữ file stale; có chế độ CI không sửa profile/PATH.
-  Release workflow chạy install smoke trên Ubuntu/macOS/Windows trước khi upload artifact,
-  gồm cài lại cùng prefix, tạo/dựng/chạy/test template và dựng/test sample thực tế. Smoke macOS
-  cục bộ đã xanh; release gate đa nền tảng vẫn chỉ đóng sau khi matrix CI thực tế xanh.
-- [ ] Hoàn thiện documentation 1.0: language reference, package guide, CLI guide, debugging,
-  migration/changelog và examples.
+  Release workflow hiện build + regression + RC hardening, sau đó giải nén chính artifact,
+  cài hai lần vào prefix tạm, xác nhận managed stale file bị xóa và chạy warehouse sample/HTTP
+  bằng bản đã cài trên Ubuntu/macOS/Windows trước khi upload artifact. Smoke macOS cục bộ đã
+  xác nhận tarball tạm cài/update + build/feature/rollback/demo; release gate đa nền tảng chỉ
+  đóng sau khi matrix CI thực tế xanh.
+- [x] Hoàn thiện documentation 1.0: `docs/language-reference.md` khóa bề mặt ngôn ngữ;
+  `docs/cli.md` khóa workflow CLI/tooling; `docs/debugging.md` mô tả diagnostic/AST/IR/stack trace;
+  `docs/migration-1.0.md` + `CHANGELOG.md` ghi migration/release notes. Package/testing/install
+  guide đã có tại `docs/package-system.md`, `docs/testing.md`, `docs/installation.md`; README liên
+  kết bộ tài liệu và các sample trong `examples/` tiếp tục là ví dụ chạy thật.
 
 ## Mốc phát hành
 
@@ -217,20 +224,27 @@ vào 1.0 nếu chúng cần thiết để đóng một contract nền tảng đ�
 
 - [x] Package resolver + semver + lockfile + cache.
 - [ ] Standard library audit/completeness cho 1.0.
-- [ ] Test framework nâng cấp.
+- [x] Test framework nâng cấp.
 - [x] Formatter/linter/LSP/VS Code integration hoàn thiện.
 - [x] Project templates + sample project thực tế.
 
 ### V++ 1.0 RC
 
-- [ ] Freeze syntax và semantics.
-- [ ] Freeze bytecode compatibility/versioning policy.
-- [ ] Freeze package manifest/lockfile format.
-- [ ] Freeze public CLI contract.
+- [x] Freeze syntax và semantics: language reference + semantics/type/runtime-error contract đã
+  được chốt; thay đổi breaking sau freeze phải có migration/version decision tường minh.
+- [x] Freeze bytecode compatibility/versioning policy: V++ 1.0 không công bố serialized `.vbc`
+  ABI; `Instruction`/`Opcode` trong bộ nhớ là implementation detail. Policy nằm tại ADR 0002.
+- [x] Freeze package manifest/lockfile format: `vpp.json` schema 1 và `vpp.lock` schema 1 là
+  public format 1.0; breaking format change phải dùng schema mới.
+- [x] Freeze public CLI contract: tên canonical tiếng Việt + alias tương thích được khóa trong
+  `docs/cli.md` và ADR 0002.
 - [ ] Fuzz + stress + sanitizer/leak suite xanh.
-- [ ] Release artifact và install smoke test xanh trên Windows/macOS/Linux.
+- [ ] Release artifact và install smoke test xanh trên Windows/macOS/Linux. Workflow đã enforce
+  install/update + stale-file check trên artifact trước upload; còn chờ matrix CI thực tế xanh.
 - [ ] Chạy thành công sample project thực tế bằng artifact release, không dùng build tree.
-- [ ] Documentation + migration notes + changelog hoàn chỉnh.
+  Local macOS tarball tạm đã dựng/chạy feature gate, rollback và demo từ prefix cài đặt; HTTP
+  localhost bị sandbox local chặn `EPERM`, còn workflow release sẽ chạy full HTTP verify trên runner.
+- [x] Documentation + migration notes + changelog hoàn chỉnh.
 
 ## Release gate 1.0
 
