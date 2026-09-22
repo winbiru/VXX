@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 // Chia dư không được âm thầm cắt phần lẻ của số thực.
 hàm main() {

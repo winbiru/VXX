@@ -1,9 +1,9 @@
 // Legacy API-project adapter. It is intentionally excluded from gói/ứng dụng/main.vi
 // because its routes, users schema, and JSON contracts are project-specific.
 
-nhập "gói/mạng/main.vi";
-nhập "gói/dữ liệu/main.vi";
-nhập "gói/nhập xuất/main.vi";
+nhập gói/mạng/main;
+nhập gói/dữ liệu/main;
+nhập gói/nhập xuất/main;
 
 // Ghi chú hàm: in log khởi động ứng dụng kiểu V++.
 hàm app in khởi động vpp(tên ứng dụng, cổng, datasource) {

@@ -1,8 +1,9 @@
 nhập lõi;
-nhập "ma-don-hang";
-nhập "../domain/san_pham.vi";
+nhập ma-don-hang;
+nhập ../domain/san_pham;
 
 lớp công khai DịchVụKho {
+    // Warehouse Showcase 1.0 service surface.
     hàm khởi tạo(khoSảnPhẩm) {
         mình.khoSảnPhẩm = khoSảnPhẩm;
     }
@@ -27,6 +28,11 @@ lớp công khai DịchVụKho {
         trả về sảnPhẩm;
     }
 
+    hàm chiTiết(id) {
+        sảnPhẩm = mình.tìmTheoId(id);
+        trả về sảnPhẩm.thànhMap();
+    }
+
     hàm tạo(id, tên, giá, tồnKho) {
         kho = mình.khoSảnPhẩm;
         mã = id;
@@ -45,6 +51,75 @@ lớp công khai DịchVụKho {
         kho = mình.khoSảnPhẩm;
         kho.lưu(sảnPhẩm);
         trả về sảnPhẩm;
+    }
+
+    hàm cậpNhật(id, tên, giá, tồnKho) {
+        sảnPhẩm = mình.tìmTheoId(id);
+        nếu (tên != "") {
+            sảnPhẩm.tên = tên;
+        };
+        nếu (giá >= 0) {
+            sảnPhẩm.giá = giá;
+        };
+        nếu (tồnKho >= 0) {
+            sảnPhẩm.tồnKho = tồnKho;
+        };
+        sảnPhẩm.phiênBản = sảnPhẩm.phiênBản + 1;
+        sảnPhẩm.kiểmTraHợpLệ();
+        kho = mình.khoSảnPhẩm;
+        kho.lưu(sảnPhẩm);
+        trả về sảnPhẩm;
+    }
+
+    hàm loạiBỏ(id) {
+        sảnPhẩm = mình.tìmTheoId(id);
+        kho = mình.khoSảnPhẩm;
+        kho.loạiBỏ(id);
+        trả về sảnPhẩm;
+    }
+
+    hàm tìmKiếm(từKhóa, trang, kíchThước) {
+        nếu (trang < 1) {
+            trang = 1;
+        };
+        nếu (kíchThước < 1) {
+            kíchThước = 10;
+        };
+        nếu (kíchThước > 100) {
+            kíchThước = 100;
+        };
+
+        kho = mình.khoSảnPhẩm;
+        danhSách = kho.tấtCả();
+        đãLọc = [];
+        từKhóaChuẩn = chuỗi thường(từKhóa);
+        lặp(i = 0; i < độ dài(danhSách); i = i + 1) {
+            sảnPhẩm = danhSách[i];
+            tênChuẩn = chuỗi thường(sảnPhẩm.tên);
+            idChuẩn = chuỗi thường(sảnPhẩm.id);
+            nếu (từKhóaChuẩn == "" || chứa chuỗi(tênChuẩn, từKhóaChuẩn) || chứa chuỗi(idChuẩn, từKhóaChuẩn)) {
+                thêm(đãLọc, sảnPhẩm.thànhMap());
+            };
+        };
+
+        bắtĐầu = (trang - 1) * kíchThước;
+        kếtThúc = bắtĐầu + kíchThước;
+        nếu (kếtThúc > độ dài(đãLọc)) {
+            kếtThúc = độ dài(đãLọc);
+        };
+        kếtQuả = [];
+        nếu (bắtĐầu < độ dài(đãLọc)) {
+            lặp(i = bắtĐầu; i < kếtThúc; i = i + 1) {
+                thêm(kếtQuả, đãLọc[i]);
+            };
+        };
+
+        trả về {
+            "duLieu": kếtQuả,
+            "tong": độ dài(đãLọc),
+            "trang": trang,
+            "kichThuoc": kíchThước
+        };
     }
 
     hàm thốngKê() {

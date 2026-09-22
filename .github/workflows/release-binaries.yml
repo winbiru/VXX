@@ -26,11 +26,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Linux crypto dependency
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build vpp-cli
-        run: cmake --build build --config Release --target vpp-cli
+      - name: Build V++ and RC test gate
+        run: cmake --build build --config Release
+
+      - name: Verify build (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eu
+          ctest --test-dir build --output-on-failure --no-tests=error
+          python3 scripts/quality/rc-hardening.py --vpp build/bin/vpp-cli
+
+      - name: Verify build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release --output-on-failure --no-tests=error
+          python scripts/quality/rc-hardening.py --vpp build/bin/Release/vpp-cli.exe
 
       - name: Package (Linux/macOS)
         if: runner.os != 'Windows'
@@ -88,6 +107,61 @@ jobs:
           Copy-Item scripts/windows/install-vpp.ps1 dist/install-vpp.ps1
           Copy-Item scripts/windows/install-vpp.cmd dist/install-vpp.cmd
           Compress-Archive -Path dist/* -DestinationPath "${{ matrix.asset_name }}" -Force
+
+      - name: Verify packaged artifact (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eu
+          VERIFY_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$VERIFY_ROOT"' EXIT
+          EXTRACT_DIR="$VERIFY_ROOT/archive"
+          INSTALL_DIR="$VERIFY_ROOT/install"
+          mkdir -p "$EXTRACT_DIR"
+          tar -xzf "${{ matrix.asset_name }}" -C "$EXTRACT_DIR"
+          VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
+          touch "$INSTALL_DIR/gói/.release-smoke-stale"
+          VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
+          test ! -e "$INSTALL_DIR/gói/.release-smoke-stale"
+          VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" dựng "$INSTALL_DIR/examples/quan-ly-kho-api/src/main.vi"
+          (
+            cd "$INSTALL_DIR/examples/quan-ly-kho-api"
+            VPP_EXEC="$INSTALL_DIR/vpp" python3 scripts/verify_http.py
+          )
+
+      - name: Verify packaged artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $verifyRoot = Join-Path $env:RUNNER_TEMP "vpp-release-verify"
+          $extractDir = Join-Path $verifyRoot "archive"
+          $installDir = Join-Path $verifyRoot "install"
+          Remove-Item $verifyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          Expand-Archive -Path "${{ matrix.asset_name }}" -DestinationPath $extractDir -Force
+          $installer = Join-Path $extractDir "install-vpp.ps1"
+          & $installer -InstallDir $installDir -NoPathUpdate
+          if ($LASTEXITCODE -ne 0) { throw "Artifact installation failed" }
+          New-Item -ItemType File -Force -Path (Join-Path $installDir "gói/.release-smoke-stale") | Out-Null
+          & $installer -InstallDir $installDir -NoPathUpdate
+          if ($LASTEXITCODE -ne 0) { throw "Artifact update installation failed" }
+          if (Test-Path (Join-Path $installDir "gói/.release-smoke-stale")) {
+            throw "Installer left stale managed files behind"
+          }
+          $vpp = Join-Path $installDir "vpp.exe"
+          $sample = Join-Path $installDir "examples/quan-ly-kho-api"
+          $env:VPP_HOME = $installDir
+          & $vpp "dựng" (Join-Path $sample "src/main.vi")
+          if ($LASTEXITCODE -ne 0) { throw "Artifact build verification failed" }
+          Push-Location $sample
+          try {
+            $env:VPP_EXEC = $vpp
+            python scripts/verify_http.py
+            if ($LASTEXITCODE -ne 0) { throw "Artifact HTTP verification failed" }
+          }
+          finally {
+            Pop-Location
+          }
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

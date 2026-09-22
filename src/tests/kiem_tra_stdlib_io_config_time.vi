@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     tệp_io = ".tmp_stdlib_io_𠀀.txt";

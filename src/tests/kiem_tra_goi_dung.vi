@@ -1,4 +1,4 @@
-nhập "gói/dựng/ứng dụng.vi";
+nhập gói/dựng/ứng dụng;
 
 hàm main() {
     in banner ứng dụng("VPP", "1.0");

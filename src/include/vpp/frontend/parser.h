@@ -41,7 +41,7 @@ private:
                                 AstStatementKind kind) const;
     // Gắn metadata khai báo vào `AstStatement`; hàm đọc tên, modifier và tham số từ token để các pha semantic không phải phân tích lại chuỗi nguồn.
     void attachDeclarationPayload(AstStatement &statement);
-    // Phân tích chi tiết câu lệnh nhập và gắn `AstImportSpec`; hàm tách đích, dấu nháy, bí danh và dấu chấm phẩy cho semantic/module graph sử dụng.
+    // Phân tích chi tiết câu lệnh nhập và gắn `AstImportSpec`; target import là đường dẫn/tên package không có dấu nháy.
     void attachImportForm(AstStatement &statement);
     // Tính `SourceSpan` của một dải token theo chỉ số đầu/cuối; hàm xử lý cả dải rỗng để diagnostic vẫn có vị trí hợp lệ.
     SourceSpan spanFor(std::size_t begin, std::size_t end) const noexcept;

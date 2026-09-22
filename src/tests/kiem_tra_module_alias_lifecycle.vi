@@ -1,6 +1,6 @@
 // Alias namespace vẫn resolve imported function trong semantic pass,
 // đồng thời runtime initializer của module chạy trước main.
-nhập modules/lifecycle_leaf.vi như leafmod;
+nhập modules/lifecycle_leaf như leafmod;
 
 hàm main() {
     in leafmod.leaf value();

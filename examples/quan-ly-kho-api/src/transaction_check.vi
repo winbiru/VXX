@@ -1,0 +1,64 @@
+nhập lõi;
+nhập nhập xuất;
+nhập repository/hop_dong;
+nhập repository/san_pham_repository;
+nhập service/don_hang_service;
+
+lớp KhoĐơnHàngLỗi triển khai KhoĐơnHàng {
+    hàm tấtCả() {
+        trả về [];
+    }
+
+    hàm tìmTheoId(id) {
+        trả về rỗng;
+    }
+
+    hàm lưu(đơnHàng) {
+        ném "transaction-check: lưu đơn thất bại";
+    }
+
+    hàm tạoMới(đơnHàng) {
+        ném "transaction-check: tạo đơn thất bại";
+    }
+
+    hàm sốLượng() {
+        trả về 0;
+    }
+};
+
+hàm yêuCầuTransaction(điềuKiện, nhãn) {
+    nếu (!điềuKiện) {
+        ném "transaction-check thất bại: " + nhãn;
+    };
+    trả về đúng;
+}
+
+hàm main() {
+    đườngDẫn = ".tmp-transaction-products.json";
+    dữLiệu = [
+        {"id": "SP-TX", "ten": "San pham transaction", "gia": 100, "tonKho": 5, "daBan": 0, "phienBan": 1}
+    ];
+    ghi tệp(đườngDẫn, json tạo(dữLiệu));
+
+    khoSảnPhẩm = tạo kho sản phẩm tệp(đườngDẫn);
+    khoĐơnHàng = KhoĐơnHàngLỗi();
+    dịchVụ = tạo dịch vụ đơn hàng(khoSảnPhẩm, khoĐơnHàng);
+
+    bắtĐược = sai;
+    thử {
+        dịchVụ.đặtHàng("Khach transaction", [
+            {"maSanPham": "SP-TX", "soLuong": 2}
+        ]);
+    } bắt lỗi (e) {
+        bắtĐược = đúng;
+    };
+
+    yêuCầuTransaction(bắtĐược, "order repository phải phát sinh lỗi");
+    sauLỗi = khoSảnPhẩm.tìmTheoId("SP-TX");
+    yêuCầuTransaction(sauLỗi.tồnKho == 5, "tồn kho phải rollback");
+    yêuCầuTransaction(sauLỗi.đãBán == 0, "đã bán phải rollback");
+    yêuCầuTransaction(sauLỗi.phiênBản == 1, "phiên bản phải rollback");
+
+    xóa đường dẫn(đườngDẫn);
+    in "transaction rollback: PASS";
+};

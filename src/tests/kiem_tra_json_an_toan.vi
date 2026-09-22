@@ -1,6 +1,6 @@
-nhập "gói/mạng/json.vi";
-nhập "gói/mạng/rest.vi";
-nhập "gói/nhập xuất/tệp.vi";
+nhập gói/mạng/json;
+nhập gói/mạng/rest;
+nhập gói/nhập xuất/tệp;
 
 hàm main() {
     in json chuỗi("xin");

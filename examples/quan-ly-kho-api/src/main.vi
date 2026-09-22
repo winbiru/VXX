@@ -1,13 +1,17 @@
 nhập lõi;
-nhập "app/bootstrap.vi";
-nhập "http/server.vi";
+nhập hệ thống;
+nhập app/bootstrap;
+nhập diagnostics/language_features;
+nhập http/server;
 
 hàm main() {
+    chạy kiểm tra tính năng();
     ứngDụng = tạo ứng dụng("data");
     router = lấy map(ứngDụng, "router", rỗng);
     nếu (router == rỗng) {
         ném "Không khởi tạo được router";
     };
-    máyChủ = tạo máy chủ kho(8088, router);
+    cổng = thành số nguyên(đọc biến môi trường("VPP_WAREHOUSE_PORT", "8088"));
+    máyChủ = tạo máy chủ kho(cổng, router);
     máyChủ.chạy();
 };

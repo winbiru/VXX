@@ -38,7 +38,9 @@ vietvm::frontend::AstProgram parseModuleSource(const std::string &source) {
         postProcessTokensWithSpans(tokenizeWithSpans(source)));
 }
 
-// Trích các import local đã được parser nhận diện từ AST; hàm chỉ lấy `LocalSourceFile` để module graph không phải parse token thô.
+// Trích các import đã được parser nhận diện từ AST. Resolver sẽ quyết định target
+// extensionless nào thực sự ánh xạ tới file local; package import không tồn tại như
+// file cạnh source sẽ được bỏ qua ở bước resolve/existence phía sau.
 std::vector<vietvm::frontend::AstImportSpec> structuredLocalImports(
     const vietvm::frontend::AstProgram &program) {
     std::vector<vietvm::frontend::AstImportSpec> imports;
@@ -48,12 +50,6 @@ std::vector<vietvm::frontend::AstImportSpec> structuredLocalImports(
                 vietvm::frontend::AstImportForm::LocalSourceFile ||
             statement.importSpec.target.empty() ||
             !statement.importSpec.hasSemicolon) {
-            continue;
-        }
-        const fs::path target = vietvm::core::utf8Path(statement.importSpec.target);
-        if (target.extension() != ".vi") {
-            // Bare/package imports are resolved by the package resolver. The
-            // local module graph deliberately indexes explicit source files.
             continue;
         }
         imports.push_back(statement.importSpec);
@@ -209,7 +205,10 @@ const fs::path &LocalModuleResolver::resolutionBase() const noexcept {
 // Phân giải phân giải; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
 LocalModuleLocation LocalModuleResolver::resolve(
     const vietvm::frontend::AstImportSpec &importSpec) const {
-    const fs::path requested = vietvm::core::utf8Path(importSpec.target);
+    fs::path requested = vietvm::core::utf8Path(importSpec.target);
+    if (requested.extension().empty()) {
+        requested += ".vi";
+    }
     // `resolutionBase_` defaults to the process cwd for legacy compatibility,
     // but an explicit base is authoritative (and makes graph construction
     // deterministic for embedders and tests whose process cwd is elsewhere).

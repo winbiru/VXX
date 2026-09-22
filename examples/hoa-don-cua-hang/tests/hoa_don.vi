@@ -1,4 +1,4 @@
-nhập "../src/hoa_don.vi";
+nhập ../src/hoa_don;
 
 hàm main() {
     hóaĐơn = HóaĐơn(120000, 15000, 10000);

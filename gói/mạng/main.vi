@@ -1,4 +1,4 @@
 // Gói mạng thống nhất: HTTP native, máy chủ mức thấp, JSON và REST.
-nhập "gói/mạng/mạng.vi";
-nhập "gói/mạng/json.vi";
-nhập "gói/mạng/rest.vi";
+nhập gói/mạng/mạng;
+nhập gói/mạng/json;
+nhập gói/mạng/rest;

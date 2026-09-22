@@ -95,6 +95,9 @@ inline constexpr std::string_view kSemanticModuleSymbolNotExported = "Ký hiệu
 // Module/package import diagnostics.
 inline constexpr std::string_view kImportMissingTarget = "nhập: thiếu đường dẫn hoặc tên mô-đun";
 inline constexpr std::string_view kImportMissingNamespaceAlias = "nhập: thiếu tên không gian tên sau 'như'";
+inline constexpr std::string_view kImportQuotedTargetUnsupported = "nhập: không dùng dấu nháy quanh file hoặc package";
+inline constexpr std::string_view kImportMultipleTargetsUnsupported = "nhập: mỗi câu chỉ được nhập một file hoặc package";
+inline constexpr std::string_view kImportFileExtensionUnsupported = "nhập: không ghi đuôi .vi; trình biên dịch tự phân giải file nguồn";
 inline constexpr std::string_view kImportCannotOpenFile = "nhập: không thể mở tệp '{0}'";
 inline constexpr std::string_view kImportModuleCycle = "nhập: phát hiện chu trình mô-đun: {0}";
 inline constexpr std::string_view kInternalImportHandlerMissing = "trình biên dịch nội bộ chưa đăng ký bộ xử lý câu lệnh nhập";

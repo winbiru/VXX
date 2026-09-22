@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in bình phương(6);

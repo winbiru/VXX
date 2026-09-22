@@ -1,11 +1,12 @@
 // Gói lõi: các tiện ích không phụ thuộc mạng, dữ liệu hoặc ứng dụng.
-nhập "gói/lõi/toán học.vi";
-nhập "gói/lõi/chuỗi.vi";
-nhập "gói/lõi/danh sách.vi";
-nhập "gói/lõi/từ điển.vi";
-nhập "gói/lõi/tập hợp.vi";
-nhập "gói/lõi/tuple.vi";
-nhập "gói/lõi/luận lý.vi";
-nhập "gói/lõi/xác thực.vi";
-nhập "gói/lõi/chuyển kiểu.vi";
-nhập "gói/lõi/ngẫu nhiên.vi";
+nhập gói/lõi/toán học;
+nhập gói/lõi/chuỗi;
+nhập gói/lõi/danh sách;
+nhập gói/lõi/từ điển;
+nhập gói/lõi/tập hợp;
+nhập gói/lõi/tuple;
+nhập gói/lõi/luận lý;
+nhập gói/lõi/xác thực;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/ngẫu nhiên;
+nhập gói/lõi/mật mã;

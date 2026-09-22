@@ -1,20 +1,20 @@
 // Import theo tên package thay vì đường dẫn. Dạng quoted-bare phải tìm được
 // main.vi dưới gói/ (hoặc $VPP_HOME/gói/) cho cả tên một từ và nhiều từ.
 // Dòng kế tiếp cũng giữ coverage cho dạng bare không trích dẫn nhiều từ.
-nhập "lõi";
 nhập lõi;
-nhập "nhập xuất";
-nhập "mạng";
-nhập "mạng";
-nhập "hệ thống";
-nhập "dữ liệu";
-nhập "ứng dụng";
+nhập lõi;
+nhập nhập xuất;
+nhập mạng;
+nhập mạng;
+nhập hệ thống;
+nhập dữ liệu;
+nhập ứng dụng;
 nhập dựng;
 nhập vpp_core;
 // Alias cũ vẫn được hỗ trợ để mã hiện có không bị vỡ.
-nhập "cốt lõi";
-nhập "vào ra";
-nhập "khởi động";
+nhập cốt lõi;
+nhập vào ra;
+nhập khởi động;
 
 hàm main() {
     in nối chuỗi("gói", " tiếng Việt");

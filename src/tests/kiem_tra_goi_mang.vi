@@ -1,6 +1,6 @@
 // Kiểm tra package mạng thống nhất: HTTP helpers, JSON, REST và helper request.
-nhập "mạng";
-nhập "gói/mạng/kiểm thử/api.vi";
+nhập mạng;
+nhập gói/mạng/kiểm thử/api;
 
 hàm main() {
     in nối đường dẫn url("https://example.test", "/health");

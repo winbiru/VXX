@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 // Giả lập dữ liệu theo chỉ số để tránh phụ thuộc API mảng chưa ổn định.
 hàm lay_gia_tri(i) {

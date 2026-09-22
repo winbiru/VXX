@@ -128,7 +128,7 @@
 
 | Tính năng | Trạng thái |
 |-----------|-----------|
-| `nhập file.vi` — import file khác | |
+| `nhập file` — import file khác | |
 | Phát hiện import vòng (circular import) | |
 | Phân giải đường dẫn tương đối | |
 | Namespace / tên module | |

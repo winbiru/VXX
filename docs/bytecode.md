@@ -1,15 +1,14 @@
-# Bytecode — V++: proposal cho định dạng `.vbc`
+# Bytecode — proposal cho định dạng `.vbc`
 
 Tài liệu này là **proposal thiết kế cho một định dạng `.vbc` được tuần tự hóa trong tương
-lai**. Nó không phải format runtime hiện hành và không phải compatibility contract.
+lai**. V++ 1.0 không công bố serialized bytecode ABI; compatibility policy được chốt tại
+`docs/adr/0002-compatibility-policy-1.0.md`.
 
-> **Trạng thái hiện tại:** compiler tokenize source rồi phát trực tiếp
-> `std::vector<Instruction>` trong [`src/compiler/compiler.cpp`](../src/compiler/compiler.cpp).
-> VM nhận cấu trúc đó trong [`src/include/vm/vm.h`](../src/include/vm/vm.h) và thực thi tại
-> [`src/runtime/vm.cpp`](../src/runtime/vm.cpp). `Instruction` và enum `Opcode` hiện có nằm ở
-> [`src/include/vm/instruction.h`](../src/include/vm/instruction.h). Repo chưa có serializer,
-> loader hay verifier `.vbc`; hàm disassemble hiện có chỉ in biểu diễn bytecode trong bộ nhớ
-> tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp).
+> **Trạng thái hiện tại:** production compiler đi từ structured IR sang
+> `std::vector<Instruction>` trong bộ nhớ. VM nhận cùng representation này và bytecode verifier
+> kiểm tra root/function code trước dispatch. Repo chưa có serializer/loader `.vbc`; lệnh
+> disassemble hiện có chỉ in bytecode của build đang chạy. `vpp dựng` vì vậy là compile/verify
+> workflow, chưa phải lệnh sinh artifact `.vbc`.
 
 Phần còn lại mô tả layout file/section, mã hóa instruction/operand và một opcode set có thể
 dùng khi dự án chọn hiện thực assembler, disassembler, loader và verifier cho `.vbc`.
@@ -200,7 +199,7 @@ Mã byte (hex, ULEB128 for indices small => single byte):
 ---
 
 ## 11. Next steps thực thi (gợi ý tasks)
-1. Chốt ABI/versioning của `.vbc`, opcode set và constant-pool trước khi thay đổi enum runtime.
+1. Thiết kế ABI/versioning của `.vbc`, opcode set và constant-pool độc lập với enum runtime.
 2. Thêm serializer/deserializer `.vbc` và một assembler; chọn vị trí module trong cây `src/` khi thiết kế được chấp thuận.
 3. Thêm disassembler `.vbc` riêng; giữ disassembler in-memory hiện có ở `src/tooling/` hoạt động độc lập.
 4. Thêm loader + verifier cho format đã chốt, thay vì giả định một path chưa tồn tại.
@@ -211,5 +210,5 @@ Mã byte (hex, ULEB128 for indices small => single byte):
 
 ## 12. Lời kết
 Tài liệu này là điểm xuất phát để thiết kế assembler/disassembler và loader/verifier `.vbc`.
-Cho đến khi các thành phần đó tồn tại, nguồn chuẩn cho runtime là `Instruction`/`Opcode` và
-VM hiện hành, không phải các mã byte minh họa ở đây.
+Cho đến khi các thành phần đó tồn tại, bytecode chỉ là representation nội bộ giữa compiler/VM
+trong cùng release; không phải artifact tương thích giữa các phiên bản.

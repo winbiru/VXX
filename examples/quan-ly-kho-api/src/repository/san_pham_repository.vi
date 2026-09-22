@@ -1,8 +1,8 @@
 nhập lõi;
 nhập mạng;
-nhập "nhập xuất";
-nhập "hop_dong.vi";
-nhập "../domain/san_pham.vi";
+nhập nhập xuất;
+nhập hop_dong;
+nhập ../domain/san_pham;
 
 lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
     hàm khởi tạo(đườngDẫn) {
@@ -87,6 +87,25 @@ lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
         };
         mình.ghiMap(raw);
         trả về sảnPhẩm;
+    }
+
+    hàm loạiBỏ(id) {
+        raw = mình.đọcMap();
+        kếtQuả = [];
+        đãBỏ = sai;
+        lặp(i = 0; i < độ dài(raw); i = i + 1) {
+            item = raw[i];
+            nếu (lấy map(item, "id", "") == id) {
+                đãBỏ = đúng;
+            } nếu không {
+                thêm(kếtQuả, item);
+            };
+        };
+        nếu (!đãBỏ) {
+            ném "Kho sản phẩm: không tìm thấy " + id;
+        };
+        mình.ghiMap(kếtQuả);
+        trả về đúng;
     }
 };
 

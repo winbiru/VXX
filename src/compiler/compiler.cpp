@@ -32,9 +32,6 @@ std::vector<vietvm::frontend::AstImportSpec> directLocalSourceImports(
             !statement.importSpec.hasSemicolon) {
             continue;
         }
-        if (vietvm::core::utf8Path(statement.importSpec.target).extension() != ".vi") {
-            continue;
-        }
         imports.push_back(statement.importSpec);
     }
     return imports;

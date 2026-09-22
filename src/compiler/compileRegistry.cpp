@@ -227,7 +227,7 @@ namespace vietvm { namespace compiler {
             installationHome = vietvm::core::utf8Path(vppHome);
         }
         const PackageResolver resolver(state.importResolutionBase, installationHome);
-        const PackageResolution resolved = resolver.resolve(spec.target, spec.quoted);
+        const PackageResolution resolved = resolver.resolve(spec.target);
         const fs::path abs = resolved.path;
         const std::string canonical = abs.u8string();
 

@@ -2,8 +2,8 @@
 // Mục đích: wrapper REST tiện dụng trên nền module mạng.
 // Nhóm hàm: nối URL, rest lấy, rest gửi, rest cập nhật.
 
-nhập "gói/mạng/mạng.vi";
-nhập "gói/mạng/json.vi";
+nhập gói/mạng/mạng;
+nhập gói/mạng/json;
 
 // Ghi chú hàm: nối đường dẫn url.
 hàm nối đường dẫn url(gốc, đường dẫn) {

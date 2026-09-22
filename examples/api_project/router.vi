@@ -1,5 +1,5 @@
 nhập mạng;
-nhập "controller.vi";
+nhập controller;
 
 // Router nhận controller qua constructor thay vì tự tạo dependency.
 lớp BộĐịnhTuyến {

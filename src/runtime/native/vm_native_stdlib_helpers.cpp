@@ -1,9 +1,11 @@
 #include "common/vm_native_stdlib_helpers.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <limits>
@@ -17,6 +19,19 @@
 #include "common/vm_native_helpers.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
+
+#if defined(_WIN32)
+#include <windows.h>
+#include <bcrypt.h>
+#elif defined(__APPLE__)
+#include <CommonCrypto/CommonDigest.h>
+#include <CommonCrypto/CommonHMAC.h>
+#include <Security/Security.h>
+#elif defined(__linux__)
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#endif
 
 namespace vietvm::helpers {
 
@@ -39,6 +54,244 @@ bool nativeUtf8Path(const StackValue &value,
 namespace {
 
 namespace fs = std::filesystem;
+constexpr std::size_t kSha256DigestSize = 32;
+constexpr int kMaxSecureRandomBytes = 4096;
+
+std::string bytesToLowerHex(const unsigned char *bytes, std::size_t size) {
+    static constexpr char kHex[] = "0123456789abcdef";
+    std::string result;
+    result.resize(size * 2);
+    for (std::size_t i = 0; i < size; ++i) {
+        result[i * 2] = kHex[(bytes[i] >> 4) & 0x0f];
+        result[i * 2 + 1] = kHex[bytes[i] & 0x0f];
+    }
+    return result;
+}
+
+bool requireUtf8CryptoString(const std::vector<StackValue> &args,
+                             std::size_t index,
+                             const std::string &fn,
+                             const char *label,
+                             std::string &value,
+                             std::string &err) {
+    if (index >= args.size() || !std::holds_alternative<std::string>(args[index])) {
+        err = fn + ": " + label + " phải là chuỗi";
+        return false;
+    }
+    value = std::get<std::string>(args[index]);
+    if (!vietvm::core::isValidUtf8(value)) {
+        err = fn + ": " + label + " phải là UTF-8 hợp lệ";
+        return false;
+    }
+    return true;
+}
+
+bool fillSecureRandom(std::vector<unsigned char> &bytes, std::string &err) {
+    if (bytes.empty()) return true;
+#if defined(_WIN32)
+    const NTSTATUS status = BCryptGenRandom(
+        nullptr, bytes.data(), static_cast<ULONG>(bytes.size()),
+        BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+    if (status < 0) {
+        err = "ngẫu nhiên bảo mật: BCryptGenRandom thất bại";
+        return false;
+    }
+    return true;
+#elif defined(__APPLE__)
+    if (SecRandomCopyBytes(kSecRandomDefault, bytes.size(), bytes.data()) != errSecSuccess) {
+        err = "ngẫu nhiên bảo mật: SecRandomCopyBytes thất bại";
+        return false;
+    }
+    return true;
+#elif defined(__linux__)
+    if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1) {
+        err = "ngẫu nhiên bảo mật: RAND_bytes thất bại";
+        return false;
+    }
+    return true;
+#else
+    err = "ngẫu nhiên bảo mật: nền tảng chưa được hỗ trợ";
+    return false;
+#endif
+}
+
+bool sha256Digest(const std::string &text,
+                  std::array<unsigned char, kSha256DigestSize> &digest,
+                  std::string &err) {
+#if defined(_WIN32)
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    DWORD objectLength = 0;
+    DWORD hashLength = 0;
+    DWORD copied = 0;
+    std::vector<unsigned char> object;
+
+    auto closeHandles = [&]() {
+        if (hash != nullptr) BCryptDestroyHash(hash);
+        if (algorithm != nullptr) BCryptCloseAlgorithmProvider(algorithm, 0);
+    };
+
+    NTSTATUS status = BCryptOpenAlgorithmProvider(
+        &algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
+    if (status >= 0) {
+        status = BCryptGetProperty(
+            algorithm, BCRYPT_OBJECT_LENGTH,
+            reinterpret_cast<PUCHAR>(&objectLength), sizeof(objectLength), &copied, 0);
+    }
+    if (status >= 0) {
+        status = BCryptGetProperty(
+            algorithm, BCRYPT_HASH_LENGTH,
+            reinterpret_cast<PUCHAR>(&hashLength), sizeof(hashLength), &copied, 0);
+    }
+    if (status >= 0 && hashLength != digest.size()) {
+        closeHandles();
+        err = "băm sha256: BCrypt trả kích thước digest không hợp lệ";
+        return false;
+    }
+    if (status >= 0) {
+        object.resize(objectLength);
+        status = BCryptCreateHash(
+            algorithm, &hash, object.data(), objectLength, nullptr, 0, 0);
+    }
+    if (status >= 0 && !text.empty()) {
+        if (text.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max())) {
+            closeHandles();
+            err = "băm sha256: dữ liệu quá lớn";
+            return false;
+        } else {
+            status = BCryptHashData(
+                hash,
+                reinterpret_cast<PUCHAR>(const_cast<char *>(text.data())),
+                static_cast<ULONG>(text.size()), 0);
+        }
+    }
+    if (status >= 0) {
+        status = BCryptFinishHash(
+            hash, digest.data(), static_cast<ULONG>(digest.size()), 0);
+    }
+    closeHandles();
+    if (status < 0) {
+        err = "băm sha256: BCrypt SHA-256 thất bại";
+        return false;
+    }
+    return true;
+#elif defined(__APPLE__)
+    if (text.size() > static_cast<std::size_t>(std::numeric_limits<CC_LONG>::max())) {
+        err = "băm sha256: dữ liệu quá lớn";
+        return false;
+    }
+    if (CC_SHA256(text.data(), static_cast<CC_LONG>(text.size()), digest.data()) == nullptr) {
+        err = "băm sha256: CommonCrypto SHA-256 thất bại";
+        return false;
+    }
+    return true;
+#elif defined(__linux__)
+    unsigned int digestSize = 0;
+    if (EVP_Digest(text.data(), text.size(), digest.data(), &digestSize,
+                   EVP_sha256(), nullptr) != 1 ||
+        digestSize != digest.size()) {
+        err = "băm sha256: OpenSSL SHA-256 thất bại";
+        return false;
+    }
+    return true;
+#else
+    (void)text;
+    (void)digest;
+    err = "băm sha256: nền tảng chưa được hỗ trợ";
+    return false;
+#endif
+}
+
+bool hmacSha256Digest(const std::string &key,
+                      const std::string &text,
+                      std::array<unsigned char, kSha256DigestSize> &digest,
+                      std::string &err) {
+#if defined(_WIN32)
+    BCRYPT_ALG_HANDLE algorithm = nullptr;
+    BCRYPT_HASH_HANDLE hash = nullptr;
+    DWORD objectLength = 0;
+    DWORD hashLength = 0;
+    DWORD copied = 0;
+    std::vector<unsigned char> object;
+
+    auto closeHandles = [&]() {
+        if (hash != nullptr) BCryptDestroyHash(hash);
+        if (algorithm != nullptr) BCryptCloseAlgorithmProvider(algorithm, 0);
+    };
+
+    if (key.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max()) ||
+        text.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max())) {
+        err = "hmac sha256: dữ liệu quá lớn";
+        return false;
+    }
+
+    NTSTATUS status = BCryptOpenAlgorithmProvider(
+        &algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
+    if (status >= 0) {
+        status = BCryptGetProperty(
+            algorithm, BCRYPT_OBJECT_LENGTH,
+            reinterpret_cast<PUCHAR>(&objectLength), sizeof(objectLength), &copied, 0);
+    }
+    if (status >= 0) {
+        status = BCryptGetProperty(
+            algorithm, BCRYPT_HASH_LENGTH,
+            reinterpret_cast<PUCHAR>(&hashLength), sizeof(hashLength), &copied, 0);
+    }
+    if (status >= 0 && hashLength != digest.size()) {
+        closeHandles();
+        err = "hmac sha256: BCrypt trả kích thước digest không hợp lệ";
+        return false;
+    }
+    if (status >= 0) {
+        object.resize(objectLength);
+        status = BCryptCreateHash(
+            algorithm, &hash, object.data(), objectLength,
+            reinterpret_cast<PUCHAR>(const_cast<char *>(key.data())),
+            static_cast<ULONG>(key.size()), 0);
+    }
+    if (status >= 0 && !text.empty()) {
+        status = BCryptHashData(
+            hash,
+            reinterpret_cast<PUCHAR>(const_cast<char *>(text.data())),
+            static_cast<ULONG>(text.size()), 0);
+    }
+    if (status >= 0) {
+        status = BCryptFinishHash(
+            hash, digest.data(), static_cast<ULONG>(digest.size()), 0);
+    }
+    closeHandles();
+    if (status < 0) {
+        err = "hmac sha256: BCrypt HMAC thất bại";
+        return false;
+    }
+    return true;
+#elif defined(__APPLE__)
+    (void)err;
+    CCHmac(kCCHmacAlgSHA256, key.data(), key.size(),
+           text.data(), text.size(), digest.data());
+    return true;
+#elif defined(__linux__)
+    if (key.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        err = "hmac sha256: khóa quá lớn";
+        return false;
+    }
+    unsigned int digestSize = 0;
+    if (HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+             reinterpret_cast<const unsigned char *>(text.data()), text.size(),
+             digest.data(), &digestSize) == nullptr ||
+        digestSize != digest.size()) {
+        err = "hmac sha256: OpenSSL HMAC thất bại";
+        return false;
+    }
+    return true;
+#else
+    (void)key;
+    (void)text;
+    (void)digest;
+    err = "hmac sha256: nền tảng chưa được hỗ trợ";
+    return false;
+#endif
+}
 
 // Chuyển path hệ điều hành về UTF-8 với separator `/`. Trên POSIX tên file có
 // thể chứa byte không phải UTF-8; không để dữ liệu đó lọt ngược vào string V++.
@@ -304,6 +557,44 @@ bool handleNativeFoundationFunction(const std::string &fn,
         static thread_local std::mt19937 generator(std::random_device{}());
         std::uniform_int_distribution<int> distribution(minimum, maximum);
         result = make_int_value(distribution(generator));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSecureRandom)) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        int byteCount = 0;
+        if (!toStrictInt(args[0], byteCount) ||
+            byteCount < 1 || byteCount > kMaxSecureRandomBytes) {
+            err = "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+            return true;
+        }
+        std::vector<unsigned char> bytes(static_cast<std::size_t>(byteCount));
+        if (!fillSecureRandom(bytes, err)) return true;
+        result = make_string_value(bytesToLowerHex(bytes.data(), bytes.size()));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSha256)) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        std::string text;
+        if (!requireUtf8CryptoString(args, 0, fn, "văn bản", text, err)) return true;
+        std::array<unsigned char, kSha256DigestSize> digest{};
+        if (!sha256Digest(text, digest, err)) return true;
+        result = make_string_value(bytesToLowerHex(digest.data(), digest.size()));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHmacSha256)) {
+        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+        std::string key;
+        std::string text;
+        if (!requireUtf8CryptoString(args, 0, fn, "khóa", key, err) ||
+            !requireUtf8CryptoString(args, 1, fn, "văn bản", text, err)) {
+            return true;
+        }
+        std::array<unsigned char, kSha256DigestSize> digest{};
+        if (!hmacSha256Digest(key, text, digest, err)) return true;
+        result = make_string_value(bytesToLowerHex(digest.data(), digest.size()));
         return true;
     }
 

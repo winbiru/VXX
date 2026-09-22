@@ -1,4 +1,4 @@
-nhập "vào ra";
+nhập vào ra;
 
 // Bao đóng việc đọc cấu hình để phần còn lại của ứng dụng không phụ thuộc trực tiếp
 // vào file application.properties.

@@ -1,5 +1,5 @@
 // Chia cho 0 qua stdlib: chia() không được che lỗi bằng giá trị 0.
-nhập gói/chuẩn/main.vi;
+nhập gói/chuẩn/main;
 
 hàm main() {
     in chia(10, 0);

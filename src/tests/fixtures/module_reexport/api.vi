@@ -1,4 +1,4 @@
-công khai nhập toan.vi như toán;
+công khai nhập toan như toán;
 
 hàm công khai cộng(a, b) {
     trả về a + b;

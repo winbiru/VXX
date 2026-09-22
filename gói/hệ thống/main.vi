@@ -1,3 +1,3 @@
 // Gói hệ thống: môi trường tiến trình và thông tin nền tảng cơ bản.
-nhập "gói/hệ thống/môi trường.vi";
-nhập "gói/hệ thống/nền tảng.vi";
+nhập gói/hệ thống/môi trường;
+nhập gói/hệ thống/nền tảng;

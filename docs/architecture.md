@@ -215,9 +215,10 @@ IR vẫn có metadata `UnsupportedDirectRegion` để analyzer/diagnostic nhận
 được direct emitter hỗ trợ. Emitter “trực tiếp” nghĩa là đọc IR operands/control-flow,
 không parse token lần nữa; một IR opcode vẫn có thể phát nhiều VM instruction.
 
-Regression hiện được khóa bằng các chương trình `.vi` trong `src/tests/` cùng expected
-output tương ứng. CTest chỉ đăng ký runner `vpp-integration`; không còn bộ unit/smoke test
-C++ riêng. Toàn corpus `.vi` là contract runtime/behavior chính của compiler và VM.
+Regression runtime/behavior chính được khóa bằng các chương trình `.vi` trong `src/tests/`
+cùng expected output tương ứng qua CTest `vpp-integration`. CTest còn giữ một target C++ nhỏ
+`vpp-rc-internal-hardening` cho invariant không thể dựng từ source hợp lệ: malformed AST/IR và
+bytecode verifier metadata. Bộ unit/smoke C++ rộng trước đây vẫn không được khôi phục.
 
 Debug source metadata được lưu **song song** với bytecode thay vì nhúng vào `Instruction`.
 Direct emitter ghi `RuntimeSourceLocation` cho root bytecode và từng function; recursive
@@ -267,17 +268,17 @@ gói/
 └── kiểm thử/               # assertion helpers, không import mặc định
 ```
 
-Program mới nên import package hẹp nhất. Tên package có khoảng trắng có thể
-để trần hoặc đặt trong dấu nháy; đường dẫn trực tiếp có khoảng trắng phải dùng
-dấu nháy:
+Program mới nên import package hẹp nhất. Mỗi câu `nhập` chỉ nhận một file hoặc
+package/folder và target luôn viết trực tiếp, không dùng dấu nháy. Tên package
+hoặc đường dẫn có khoảng trắng vẫn được giữ như một target duy nhất:
 
 ```vi
 nhập lõi;
-nhập "nhập xuất";
-nhập "hệ thống";
+nhập nhập xuất;
+nhập hệ thống;
 nhập mạng;
 nhập dựng;
-nhập "gói/mạng/kiểm thử/api.vi";
+nhập gói/mạng/kiểm thử/api;
 ```
 
 Bare import ưu tiên package cùng tên của project, rồi mới tìm package bundle

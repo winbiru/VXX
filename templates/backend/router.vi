@@ -1,5 +1,5 @@
 nhập mạng;
-nhập "controller.vi";
+nhập controller;
 
 // Chọn controller theo path; các controller được inject qua constructor.
 lớp BộĐịnhTuyến {

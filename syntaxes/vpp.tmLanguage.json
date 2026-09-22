@@ -94,9 +94,7 @@
           "end": "(?=;|$)",
           "name": "meta.import.vietvm",
           "patterns": [
-            { "include": "#strings" },
-            { "match": "[\\p{L}\\p{N}_./\\-]+\\.vi\\b", "name": "string.unquoted.import-path.vietvm" },
-            { "match": "[\\p{L}_][\\p{L}\\p{N}_./\\-]*", "name": "string.unquoted.import-path.vietvm" }
+            { "match": "[\\p{L}_./][\\p{L}\\p{N}_./\\-]*", "name": "string.unquoted.import-path.vietvm" }
           ]
         }
       ]

@@ -1,6 +1,6 @@
-nhập src/tests/fixtures/api_project/entity.vi;
-nhập src/tests/fixtures/api_project/dto.vi;
-nhập src/tests/fixtures/api_project/giao_dien/mapper.vi;
+nhập src/tests/fixtures/api_project/entity;
+nhập src/tests/fixtures/api_project/dto;
+nhập src/tests/fixtures/api_project/giao_dien/mapper;
 
 // Mapper cho luồng chuyển đổi DTO <-> Entity trong api_project.
 

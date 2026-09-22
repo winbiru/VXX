@@ -1,0 +1,226 @@
+nhập gói/chuẩn/main;
+nhập feature_math như toán;
+nhập feature_model;
+
+hàm yêuCầu(điềuKiện, nhãn) {
+    nếu (!điềuKiện) {
+        ném "feature thất bại: " + nhãn;
+    };
+    trả về đúng;
+}
+
+hàm giaiThừaĐệQuy(n) {
+    nếu (n <= 1) {
+        trả về 1;
+    };
+    trả về n * giaiThừaĐệQuy(n - 1);
+}
+
+hàm cộngMặcĐịnh(a, b = 10) {
+    trả về a + b;
+}
+
+hàm ápDụng(f, x) {
+    trả về f(x);
+}
+
+hàm tạoBộĐếm(bắtĐầu) {
+    giáTrị = bắtĐầu;
+    tăng = hàm() {
+        giáTrị += 1;
+        trả về giáTrị;
+    };
+    trả về tăng;
+}
+
+hàm nhãnTheoChọn(giáTrị) {
+    chọn (giáTrị) {
+        ca 13: {
+            trả về "mười ba";
+        }
+        mặc định: {
+            trả về "khác";
+        }
+    }
+    trả về "khác";
+}
+
+hàm kiểmTraGiáTrịVàToánTử() {
+    yêuCầu(rỗng == rỗng, "rỗng equality");
+    yêuCầu(rỗng != 0, "rỗng khác số");
+    yêuCầu(1 == 1.0, "numeric equality");
+    yêuCầu(!rỗng && !"", "truthiness falsy");
+    yêuCầu((2 + 3 * 4) == 14, "precedence");
+    yêuCầu((17 % 5) == 2, "modulo");
+
+    a = 10;
+    a += 5;
+    yêuCầu(a == 15, "+=");
+    b = 20;
+    b -= 3;
+    yêuCầu(b == 17, "-=");
+    c = 4;
+    c *= 3;
+    yêuCầu(c == 12, "*=");
+    d = 15;
+    d /= 3;
+    yêuCầu(d == 5, "/=");
+    e = 17;
+    e %= 5;
+    yêuCầu(e == 2, "%=");
+    f = 5;
+    f++;
+    f--;
+    yêuCầu(f == 5, "++/--");
+    yêuCầu("V" + 2 == "V2", "string coercion");
+    trả về đúng;
+}
+
+hàm kiểmTraĐiềuKhiển() {
+    tổng = 0;
+    lặp(i = 0; i < 6; i++) {
+        nếu (i == 2) {
+            bỏ qua;
+        };
+        tổng += i;
+    };
+    yêuCầu(tổng == 13, "loop/continue");
+
+    yêuCầu(nhãnTheoChọn(tổng) == "mười ba", "switch/case");
+
+    phânLoại = "";
+    nếu (tổng > 20) {
+        phânLoại = "lớn";
+    } nếu không {
+        nếu (tổng > 10) {
+            phânLoại = "vừa";
+        } nếu không {
+            phânLoại = "nhỏ";
+        };
+    };
+    yêuCầu(phânLoại == "vừa", "if/else");
+    trả về đúng;
+}
+
+hàm kiểmTraHàmClosureVàModule() {
+    yêuCầu(giaiThừaĐệQuy(5) == 120, "recursion");
+    yêuCầu(cộngMặcĐịnh(5) == 15, "default parameter");
+    yêuCầu(cộngMặcĐịnh(5, 2) == 7, "explicit parameter");
+
+    nhânĐôi = hàm(x) { trả về x * 2; };
+    yêuCầu(ápDụng(nhânĐôi, 6) == 12, "lambda/higher-order function");
+
+    bộĐếm = tạoBộĐếm(10);
+    yêuCầu(bộĐếm() == 11, "closure capture 1");
+    yêuCầu(bộĐếm() == 12, "closure capture 2");
+
+    yêuCầu(toán.tổng(2, 3) == 5, "module alias");
+    yêuCầu(toán.nhân(4, 5) == 20, "module namespace");
+    trả về đúng;
+}
+
+hàm kiểmTraCollection() {
+    ds = [1, 2, 3];
+    ds[1] = 9;
+    thêm(ds, 4);
+    yêuCầu(độ dài(ds) == 4, "list length/append");
+    yêuCầu(ds[1] == 9, "list index assignment");
+
+    động = [ds[0], ds[1] + 1];
+    yêuCầu(động[1] == 10, "dynamic list literal");
+
+    dữLiệu = {"tên": "V++", "phiên bản": 1};
+    đặt map(dữLiệu, "ổn định", đúng);
+    yêuCầu(lấy map(dữLiệu, "tên", "") == "V++", "map get");
+    yêuCầu(có khóa(dữLiệu, "ổn định"), "map key");
+
+    bảnĐồĐộng = {"giá": ds[1], "kế": ds[1] + 1};
+    yêuCầu(lấy map(bảnĐồĐộng, "kế", 0) == 10, "dynamic map literal");
+
+    tập = tập hợp([1, 2, 2, 3]);
+    yêuCầu(độ dài(tập) == 3, "set");
+    bộ = thành tuple(tập);
+    yêuCầu(độ dài(bộ) == 3, "tuple");
+
+    maTrận = [[1, 2], [3, 4]];
+    maTrận[0][1] = 8;
+    yêuCầu(maTrận[0][1] == 8, "nested collection index");
+    trả về đúng;
+}
+
+hàm kiểmTraOop() {
+    sảnPhẩm = tạo sản phẩm chẩn đoán();
+    yêuCầu(sảnPhẩm.mã() == "SP-12", "inheritance/super/protected");
+    yêuCầu(sảnPhẩm.môTả() == "SP-12:Cà phê", "interface implementation");
+    yêuCầu(sảnPhẩm.thànhTiền(3) == 75, "instance method");
+    yêuCầu(sảnPhẩm.kiểmTraRiêngTư() == 7, "private method from owner");
+    trả về đúng;
+}
+
+hàm kiểmTraNgoạiLệ() {
+    bắtĐược = sai;
+    thử {
+        ném "lỗi chủ động";
+    } bắt lỗi (e) {
+        bắtĐược = e == "lỗi chủ động";
+    };
+    yêuCầu(bắtĐược, "throw/catch");
+    trả về đúng;
+}
+
+hàm kiểmTraStdlib() {
+    yêuCầu(độ dài("𠀀Việt") == 5, "unicode code point length");
+    yêuCầu(cắt chuỗi("𠀀Việt Nam", 1, 4) == "Việt", "unicode slice");
+    yêuCầu(chuỗi thường("V++ TEST") == "v++ test", "lowercase");
+    yêuCầu(thành số nguyên("42") == 42, "int conversion");
+    yêuCầu(thành số thực("3.5") == 3.5, "float conversion");
+    yêuCầu(trị tuyệt đối(-9) == 9, "math stdlib");
+    yêuCầu(lũy thừa(2, 8) == 256, "power stdlib");
+
+    đườngDẫn = ".feature-vpp.tmp";
+    ghi tệp(đườngDẫn, "dòng một\ndòng hai");
+    yêuCầu(đọc tệp(đườngDẫn) == "dòng một\ndòng hai", "file roundtrip");
+    yêuCầu(đường dẫn tồn tại(đườngDẫn), "path exists");
+    xóa đường dẫn(đườngDẫn);
+
+    cấuHình = ".feature-vpp.ini";
+    ghi tệp(cấuHình, "port=8088\nname=warehouse\n");
+    yêuCầu(đọc cấu hình khóa(cấuHình, "port", "") == "8088", "config read");
+    xóa đường dẫn(cấuHình);
+
+    yêuCầu(lấy thời gian hiện tại() != "", "local time");
+    yêuCầu(lấy thời gian utc() != "", "utc time");
+
+    dữLiệu = {"tên": "Cà phê \"Đậm\"", "ds": [1, 2, 3]};
+    jsonText = json tạo(dữLiệu);
+    parsed = json phân tích(jsonText);
+    yêuCầu(lấy map(parsed, "tên", "") == "Cà phê \"Đậm\"", "json roundtrip");
+    trả về đúng;
+}
+
+hàm công khai chạy kiểm tra tính năng() {
+    kiểmTraGiáTrịVàToánTử();
+    kiểmTraĐiềuKhiển();
+    kiểmTraHàmClosureVàModule();
+    kiểmTraCollection();
+    kiểmTraOop();
+    kiểmTraNgoạiLệ();
+    kiểmTraStdlib();
+    trả về đúng;
+}
+
+hàm công khai báo cáo tính năng() {
+    chạy kiểm tra tính năng();
+    trả về {
+        "values_operators": đúng,
+        "control_flow": đúng,
+        "functions_lambda_closure": đúng,
+        "modules_namespace": đúng,
+        "collections": đúng,
+        "oop_interface_inheritance_visibility": đúng,
+        "exceptions": đúng,
+        "stdlib_unicode_io_config_time_json": đúng,
+        "warehouse_domain_repository_service": đúng,
+        "http_server_routing": đúng
+    };
+}

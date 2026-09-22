@@ -280,7 +280,6 @@ void writeAstStatement(std::ostringstream &out,
         if (statement.importForm ==
             vietvm::frontend::AstImportForm::LocalSourceFile) {
             out << " đích=" << std::quoted(statement.importSpec.target)
-                << " có dấu nháy=" << coKhong(statement.importSpec.quoted)
                 << " dấu chấm phẩy=" << coKhong(statement.importSpec.hasSemicolon);
             if (!statement.importSpec.alias.empty()) {
                 out << " bí danh=" << std::quoted(statement.importSpec.alias);

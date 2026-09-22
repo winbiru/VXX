@@ -1,4 +1,4 @@
 // Gói dữ liệu: phân trang và adapter cơ sở dữ liệu tùy chọn.
 // Database drivers may require mysql, psql, or sqlite3 installed on the host.
-nhập "gói/dữ liệu/phân trang.vi";
-nhập "gói/dữ liệu/kết nối cơ sở dữ liệu.vi";
+nhập gói/dữ liệu/phân trang;
+nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
