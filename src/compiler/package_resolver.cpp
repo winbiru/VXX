@@ -205,6 +205,9 @@ PackageResolution PackageResolver::resolve(
         return false;
     };
 
+    // Contract 1.0: project-local source always wins across the whole ancestor
+    // search before any compatibility/package fallback is considered. This is
+    // intentionally phased rather than interleaved per ancestor.
     if (!fs::exists(resolved)) {
         for (fs::path dir = resolutionBase_;; dir = dir.parent_path()) {
             const fs::path candidate = dir / importPath;
@@ -212,33 +215,37 @@ PackageResolution PackageResolver::resolve(
                 resolved = absoluteLexical(candidate);
                 break;
             }
+            if (dir == dir.parent_path()) break;
+        }
+    }
 
-            if (!compatibilityRedirect.empty()) {
-                const fs::path redirected = dir / compatibilityRedirect;
-                if (fs::exists(redirected)) {
-                    resolved = absoluteLexical(redirected);
-                    break;
-                }
+    if (!fs::exists(resolved) && !compatibilityRedirect.empty()) {
+        for (fs::path dir = resolutionBase_;; dir = dir.parent_path()) {
+            const fs::path redirected = dir / compatibilityRedirect;
+            if (fs::exists(redirected)) {
+                resolved = absoluteLexical(redirected);
+                break;
             }
+            if (dir == dir.parent_path()) break;
+        }
+    }
 
-            if (bareModuleName) {
-                bool foundPackage = false;
-                for (const char *packageDirectory :
-                     vietvm::core::kPackageDirectoryNames) {
-                    const fs::path base =
-                        dir / vietvm::core::utf8Path(packageDirectory);
-                    for (const auto &packageName : packageCandidates) {
-                        if (resolvePackageAtBase(base, packageName, resolved)) {
-                            foundPackage = true;
-                            break;
-                        }
+    if (!fs::exists(resolved) && bareModuleName) {
+        bool foundPackage = false;
+        for (fs::path dir = resolutionBase_;; dir = dir.parent_path()) {
+            for (const char *packageDirectory :
+                 vietvm::core::kPackageDirectoryNames) {
+                const fs::path base =
+                    dir / vietvm::core::utf8Path(packageDirectory);
+                for (const auto &packageName : packageCandidates) {
+                    if (resolvePackageAtBase(base, packageName, resolved)) {
+                        foundPackage = true;
+                        break;
                     }
-                    if (foundPackage) break;
                 }
                 if (foundPackage) break;
             }
-
-            if (dir == dir.parent_path()) break;
+            if (foundPackage || dir == dir.parent_path()) break;
         }
     }
 

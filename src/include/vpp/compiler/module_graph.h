@@ -34,18 +34,25 @@ class LocalModuleResolver {
 public:
     // Khởi tạo `LocalModuleResolver` từ các tham số đầu vào; constructor lưu trạng thái ban đầu cần thiết để các phương thức của đối tượng hoạt động nhất quán.
     explicit LocalModuleResolver(
-        std::filesystem::path resolutionBase = std::filesystem::current_path());
+        std::filesystem::path resolutionBase = std::filesystem::current_path(),
+        std::optional<std::filesystem::path> installationHome = std::nullopt);
 
     // Trả thư mục gốc dùng để phân giải import tương đối; resolver chuẩn hóa giá trị constructor thành path tuyệt đối/lexical ổn định.
     const std::filesystem::path &resolutionBase() const noexcept;
     // Phân giải phân giải; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
     LocalModuleLocation resolve(
         const vietvm::frontend::AstImportSpec &importSpec) const;
+    // Resolve cùng policy nhưng lấy base từ chính importer; dùng cho nested import
+    // để semantic graph và codegen chọn cùng một source path.
+    LocalModuleLocation resolveFrom(
+        const std::filesystem::path &resolutionBase,
+        const vietvm::frontend::AstImportSpec &importSpec) const;
     // Đọc read; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
     LocalModuleSource read(const LocalModuleLocation &location) const;
 
 private:
     std::filesystem::path resolutionBase_;
+    std::optional<std::filesystem::path> installationHome_;
 };
 
 enum class LocalModuleEdgeAction {

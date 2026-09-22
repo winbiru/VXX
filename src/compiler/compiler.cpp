@@ -1,6 +1,7 @@
 // Compiler.cpp
 
 #include "vm/instruction.h"
+#include <cstdlib>
 #include <filesystem>
 #include <unordered_map>
 #include <string>
@@ -73,8 +74,12 @@ CompilationArtifacts compilePipelineInRegistry(
         namespace fs = std::filesystem;
         fs::path resolutionBase = state.importResolutionBase;
         if (resolutionBase.empty()) resolutionBase = fs::current_path();
+        std::optional<fs::path> installationHome;
+        if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
+            installationHome = vietvm::core::utf8Path(vppHome);
+        }
         artifacts.moduleIndex = buildLocalModuleSemanticIndex(
-            LocalModuleResolver(resolutionBase),
+            LocalModuleResolver(resolutionBase, installationHome),
             std::string(kCurrentCompilationModuleIdentity),
             localImports,
             ModuleIndexMode::Recursive);

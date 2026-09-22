@@ -11,6 +11,7 @@
 #include "frontend/lexer.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
+#include "vpp/compiler/package_resolver.h"
 #include "vpp/frontend/parser.h"
 
 namespace vietvm::compiler {
@@ -143,8 +144,10 @@ struct BuildContext {
 
     // Duyệt một module khi xây dependency graph; hàm đánh dấu trạng thái DFS, đọc import con và phát hiện chu trình trước khi thêm cạnh.
     void visit(const std::string &importerIdentity,
-               const vietvm::frontend::AstImportSpec &importSpec) {
-        const LocalModuleLocation location = resolver.resolve(importSpec);
+               const vietvm::frontend::AstImportSpec &importSpec,
+               const fs::path &importerBase) {
+        const LocalModuleLocation location = resolver.resolveFrom(importerBase, importSpec);
+        if (!fs::exists(location.path)) return;
 
         LocalModuleEdge edge;
         edge.importerIdentity = importerIdentity;
@@ -177,7 +180,7 @@ struct BuildContext {
             graph.modules.push_back(std::move(module));
 
             for (const vietvm::frontend::AstImportSpec &nestedImport : imports) {
-                visit(location.identity, nestedImport);
+                visit(location.identity, nestedImport, location.path.parent_path());
             }
             states[location.identity] = VisitState::Loaded;
             activeStack.pop_back();
@@ -194,8 +197,15 @@ struct BuildContext {
 } // namespace
 
 // Khởi tạo `LocalModuleResolver` từ các tham số đầu vào; constructor lưu trạng thái ban đầu cần thiết để các phương thức của đối tượng hoạt động nhất quán.
-LocalModuleResolver::LocalModuleResolver(fs::path resolutionBase)
-    : resolutionBase_(absoluteLexical(std::move(resolutionBase))) {}
+LocalModuleResolver::LocalModuleResolver(
+    fs::path resolutionBase,
+    std::optional<fs::path> installationHome)
+    : resolutionBase_(absoluteLexical(std::move(resolutionBase))),
+      installationHome_(std::move(installationHome)) {
+    if (installationHome_.has_value()) {
+        installationHome_ = absoluteLexical(*installationHome_);
+    }
+}
 
 // Trả thư mục gốc dùng để phân giải import tương đối; resolver chuẩn hóa giá trị constructor thành path tuyệt đối/lexical ổn định.
 const fs::path &LocalModuleResolver::resolutionBase() const noexcept {
@@ -205,29 +215,15 @@ const fs::path &LocalModuleResolver::resolutionBase() const noexcept {
 // Phân giải phân giải; hàm lần theo metadata/phạm vi liên quan để biến tham chiếu đầu vào thành đích cụ thể.
 LocalModuleLocation LocalModuleResolver::resolve(
     const vietvm::frontend::AstImportSpec &importSpec) const {
-    fs::path requested = vietvm::core::utf8Path(importSpec.target);
-    if (requested.extension().empty()) {
-        requested += ".vi";
-    }
-    // `resolutionBase_` defaults to the process cwd for legacy compatibility,
-    // but an explicit base is authoritative (and makes graph construction
-    // deterministic for embedders and tests whose process cwd is elsewhere).
-    fs::path resolved = absoluteLexical(resolutionBase_ / requested);
+    return resolveFrom(resolutionBase_, importSpec);
+}
 
-    if (!fs::exists(resolved)) {
-        for (fs::path directory = resolutionBase_;;
-             directory = directory.parent_path()) {
-            const fs::path candidate = directory / requested;
-            if (fs::exists(candidate)) {
-                resolved = absoluteLexical(candidate);
-                break;
-            }
-            if (directory == directory.parent_path()) break;
-        }
-    }
-
-    resolved = resolved.lexically_normal();
-    return {resolved, resolved.u8string()};
+LocalModuleLocation LocalModuleResolver::resolveFrom(
+    const fs::path &resolutionBase,
+    const vietvm::frontend::AstImportSpec &importSpec) const {
+    const PackageResolution resolved =
+        PackageResolver(resolutionBase, installationHome_).resolve(importSpec.target);
+    return {resolved.path, resolved.path.u8string()};
 }
 
 // Đọc read; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
@@ -277,7 +273,8 @@ LocalModuleGraph LocalModuleGraphBuilder::build(
     BuildContext context{resolver_, importScanner_, {}, {}, {}};
     context.graph.entryIdentity = std::move(entryIdentity);
     for (const vietvm::frontend::AstImportSpec &rootImport : rootImports) {
-        context.visit(context.graph.entryIdentity, rootImport);
+        context.visit(context.graph.entryIdentity, rootImport,
+                      resolver_.resolutionBase());
     }
     return std::move(context.graph);
 }
@@ -402,24 +399,17 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
         return index;
     }
 
-    const LocalModuleResolver scanResolver = resolver;
+    const LocalModuleResolver rootResolver = resolver;
     LocalModuleGraphBuilder graphBuilder(
         std::move(resolver),
-        [scanResolver](const std::string &source, const fs::path &) {
-            std::vector<vietvm::frontend::AstImportSpec> resolved;
-            for (const auto &candidate :
-                 structuredLocalImports(parseModuleSource(source))) {
-                if (fs::exists(scanResolver.resolve(candidate).path)) {
-                    resolved.push_back(candidate);
-                }
-            }
-            return resolved;
+        [](const std::string &source, const fs::path &) {
+            return structuredLocalImports(parseModuleSource(source));
         });
 
     std::vector<vietvm::frontend::AstImportSpec> resolvedRoots;
     resolvedRoots.reserve(rootImports.size());
     for (const auto &candidate : rootImports) {
-        if (fs::exists(scanResolver.resolve(candidate).path)) {
+        if (fs::exists(rootResolver.resolve(candidate).path)) {
             resolvedRoots.push_back(candidate);
         }
     }

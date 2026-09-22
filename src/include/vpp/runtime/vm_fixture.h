@@ -53,7 +53,13 @@ public:
     // active RuntimeHeapScope, còn test có thể tạo handle trước khi gọi `run()`.
     void trackHeapValue(const StackValue &value) { vm_.runtimeHeap->trackValue(value); }
     // Chạy trực tiếp một chu kỳ tracing GC trên trạng thái fixture hiện tại.
-    void collectGarbage() { vm_.collectGarbage(); }
+    void collectGarbage() { vm_.collectGarbage(false); }
+    // Yêu cầu explicit capacity trim sau GC để test policy major collection.
+    void collectGarbageAndTrim() { vm_.collectGarbage(true); }
+    // Trả capacity của data stack để hardening test kiểm tra periodic GC không shrink.
+    std::size_t stackCapacity() const { return vm_.stack.capacity(); }
+    // Dự trữ stack capacity mà không tạo root sống giả.
+    void reserveStack(std::size_t capacity) { vm_.stack.reserve(capacity); }
     // Trả thống kê chu kỳ GC gần nhất để test xác nhận mark/sweep đã thật sự chạy.
     const vietvm::runtime::RuntimeHeapStats &gcStats() const { return vm_.lastGcStats; }
     // Trả số heap object còn sống trong registry sau khi loại weak entry hết hạn.
@@ -64,6 +70,27 @@ public:
 
     // Trả số call frame đang hoạt động để test xác nhận unwind sau lời gọi thành công hoặc lỗi.
     std::size_t callDepth() const { return vm_.callStack.size(); }
+
+    // Reset execution-only state giữa các lượt benchmark. Globals/module/class state
+    // được giữ nguyên; caller chỉ dùng khi không còn function context hoạt động.
+    void resetExecutionForBenchmark() {
+        if (!vm_.executionStack.empty() || !vm_.callStack.empty()) {
+            throw std::logic_error("VM benchmark reset requires an idle VM");
+        }
+        vm_.stack.clear();
+        vm_.loopStartStack.clear();
+        vm_.ifElseStack.clear();
+        vm_.blockStack.clear();
+        vm_.switchStack.clear();
+        vm_.tryStack.clear();
+        vm_.blockDepth = 0;
+        vm_.callDepthFromRoot = 0;
+        vm_.pc = 0;
+    }
+
+    // Chạy interpreter trực tiếp sau khi benchmark đã verify bytecode ngoài timer.
+    // Đường này cố ý bỏ qua VM::run() để timing không gồm construction/verification.
+    void runInterpreterPreverifiedForBenchmark() { vm_.runInterpreterLoop(); }
 
     // Hạ/nâng giới hạn độ sâu lời gọi trong test để kiểm tra guard đệ quy mà
     // không cần tạo hàng trăm native stack frame.

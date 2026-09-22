@@ -154,7 +154,7 @@ bool sha256Digest(const std::string &text,
             algorithm, &hash, object.data(), objectLength, nullptr, 0, 0);
     }
     if (status >= 0 && !text.empty()) {
-        if (text.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max())) {
+        if (text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
             closeHandles();
             err = "băm sha256: dữ liệu quá lớn";
             return false;
@@ -219,8 +219,8 @@ bool hmacSha256Digest(const std::string &key,
         if (algorithm != nullptr) BCryptCloseAlgorithmProvider(algorithm, 0);
     };
 
-    if (key.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max()) ||
-        text.size() > static_cast<std::size_t>(std::numeric_limits<ULONG>::max())) {
+    if (key.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)()) ||
+        text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
         err = "hmac sha256: dữ liệu quá lớn";
         return false;
     }
@@ -331,8 +331,8 @@ bool toStrictInt(const StackValue &value, int &out) {
     if (std::holds_alternative<double>(value)) {
         const double number = std::get<double>(value);
         if (!std::isfinite(number) || std::trunc(number) != number ||
-            number < static_cast<double>(std::numeric_limits<int>::min()) ||
-            number > static_cast<double>(std::numeric_limits<int>::max())) {
+            number < static_cast<double>((std::numeric_limits<int>::min)()) ||
+            number > static_cast<double>((std::numeric_limits<int>::max)())) {
             return false;
         }
         out = static_cast<int>(number);

@@ -144,12 +144,13 @@ static int runSnippet(const std::string &source,
 
     VM vm(artifacts.bytecode, stringPool);
     connectVmOutput(vm);
-    vm.hamBytecodeMap = compilationContext.functionBytecode;
+    std::unordered_map<int, int> functionNames;
+    for (const auto &entry : compilationContext.functionNameIndices) {
+        functionNames[entry.second] = entry.first;
+    }
+    vm.setFunctions(compilationContext.functionBytecode, std::move(functionNames));
     vm.setDebugInfo(artifacts.bytecodeDebugInfo,
                     compilationContext.functionDebugInfo);
-    for (const auto &entry : compilationContext.functionNameIndices) {
-        vm.functionTableByNameIndex[entry.second] = entry.first;
-    }
     for (const auto &module : compilationContext.moduleInitializers) {
         (void)vm.addModuleInitializer(module.identity, module.bytecode,
                                       module.debugInfo);
