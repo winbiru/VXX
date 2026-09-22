@@ -35,10 +35,17 @@ cmake --build build-tidy --parallel
 
 ## Benchmark
 
-The baseline executable covers VM opcode dispatch, lexer throughput, the full
-compiler pipeline and pure native HTTP parsing helpers. Results are timing
-observations, not pass/fail performance thresholds, so shared CI runners do not
-fail because of machine variance.
+The benchmark executable separates bytecode verification, preverified VM dispatch,
+end-to-end VM execution, compiler stages, package resolution, JSON extraction and GC cycle
+collection. Stage setup/reset is kept outside the measured interval where practical.
+
+For RC comparison, build baseline and candidate with the same harness, corpus, Release flags
+and GC/JIT policy on the same machine. `scripts/quality/benchmark-regression.py` alternates the
+two binaries, uses 3 warm-ups and 40 measured samples by default, reports median/p95/MAD and
+fails on a >10% median regression (15% for GC). Ten samples remain the minimum accepted for a
+quick median check, but the GC p95 gate requires at least 40 samples; with fewer samples, a p95
+threshold breach is `inconclusive` rather than a false regression. MAD/median above 5% is also
+inconclusive rather than a pass.
 
 The first recorded measurements live in `benchmark/BASELINE.md`.
 
@@ -48,3 +55,15 @@ cmake -S . -B build-benchmark -DCMAKE_BUILD_TYPE=Release \
 cmake --build build-benchmark --target vpp-benchmark-baseline --parallel
 ./build-benchmark/bin/vpp-benchmark-baseline
 ```
+
+Example same-machine comparison:
+
+```bash
+python3 scripts/quality/benchmark-regression.py \
+  --baseline /path/to/baseline/vpp-benchmark-baseline \
+  --candidate ./build-benchmark/bin/vpp-benchmark-baseline \
+  --output benchmark/p0-report.json
+```
+
+The comparator requires identical benchmark metadata/case sets. A single benchmark run remains
+useful for local profiling, but it is not enough evidence to close the RC performance gate.

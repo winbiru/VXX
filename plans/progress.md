@@ -1,6 +1,6 @@
 # Tiến độ phát triển V++
 
-> Cập nhật: 18/09/2026
+> Cập nhật: 22/09/2026
 >
 > Tỷ lệ dưới đây được tính theo số checkbox trong roadmap, chỉ dùng để theo dõi
 > tiến độ đầu việc; không đại diện cho phần trăm khối lượng kỹ thuật thực tế.
@@ -30,11 +30,24 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
 | 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
 | 0.9 | Gần hoàn tất | Stdlib audit + xác nhận release matrix |
-| 1.0 RC | Đang hoàn tất | Linux leak gate + release/install matrix đa nền tảng |
+| 1.0 RC | Còn evidence P0 chặn RC | P0.1/P0.2/P0.5 đã triển khai; GC capacity core + harness/comparator đã có. Còn same-machine before/after, GC allocation/RSS/p95, CI performance gate, Linux leak gate + release/install matrix |
 
-Ước lượng theo khối lượng kỹ thuật hiện tại: còn khoảng **25–30%** để đạt 1.0. Con số
-này không thay thế tỷ lệ checkbox ở bảng trên vì hardening/stress/release có chi phí lớn
-hơn nhiều so với một checkbox tính năng thông thường.
+Ước lượng **25–30%** trước đây chưa tính đợt P0 ngày 22/09/2026. Phần source/contract của
+P0 hiện đã tiến đáng kể, nhưng mức sẵn sàng RC vẫn phải chờ performance evidence cùng release
+gate còn mở. Bảng checkbox theo kế hoạch thời gian phía trên không tính thêm các gate RC,
+không thể dùng để suy ra mức sẵn sàng phát hành.
+
+P0 được theo dõi tại [mục 0 của roadmap 1.0](roadmap-1.0.md#0-p0--runtime-performance-và-import-contract-trước-rc).
+`VM::run()` hiện dùng generation cache cho verifier; function/module mutation invalidate cache.
+HTTP JSON extraction dùng parser JSON thật thay regex; periodic GC giữ capacity và explicit trim
+có threshold; local/package import precedence đã được freeze trong code + ADR + regression.
+Harness v2 đã tách VM/compiler/HTTP/GC cases và comparator đã có alternating run,
+median/p95/MAD + threshold/noise validation; 10 sample là minimum cho median, còn p95 GC gate
+yêu cầu 40 sample để tránh false regression do một tail outlier. Self-comparison 40 sample
+sau hardening PASS. Release local hiện 4/4 CTest PASS, gồm hai P0
+hardening target và integration. Phần còn thiếu để đóng P0 là same-machine before/after giữa
+hai revision độc lập, GC allocation/RSS/p95 evidence và nối comparator vào CI; self-comparison
+candidate-vs-candidate chỉ chứng minh runner hoạt động, không phải bằng chứng cải thiện.
 
 ## Đã xác nhận hoàn thành
 
@@ -97,7 +110,8 @@ hơn nhiều so với một checkbox tính năng thông thường.
   riêng nhưng vẫn giữ runtime-name linking, và lifecycle tracker khóa
   `uninitialized → initializing → initialized/failed`.
 - [x] Quality baseline đã có coverage gate 45%, `.clang-tidy` versioned và benchmark
-  lặp lại được cho VM dispatch, lexer/compiler và native HTTP helpers.
+  lặp lại được cho VM, lexer/compiler và native HTTP helpers. Harness này chưa tách dispatch
+  khỏi verification/setup và chưa có performance threshold; xem P0.4 trong roadmap 1.0.
 
 ## Đang thực hiện
 
@@ -368,10 +382,13 @@ Long-term: 20/41
     migration guide, changelog cùng package/testing/install/semantics/runtime-error docs hiện có;
     README đã nối các entrypoint tài liệu chính.
 21. [ ] **1.0 RC:** syntax/semantics, package schema, public CLI và bytecode compatibility policy
-    đã freeze bằng docs + ADR 0002. `quan-ly-kho-api` ngày 18/09/2026 đã dựng thành công, feature
+    đã có docs + ADR 0002; riêng local/package collision precedence còn phải freeze ở P0.5.
+    P0.1–P0.4 còn yêu cầu cache verifier, sửa HTTP JSON helper, tách GC trim và benchmark từng
+    stage có regression gate, chứng minh bằng same-machine Release report + targeted tests.
+    `quan-ly-kho-api` ngày 18/09/2026 đã dựng thành công, feature
     gate xanh, transaction rollback PASS và demo end-to-end chạy bằng build tree; HTTP smoke không
     chạy được trong sandbox hiện tại vì hệ điều hành trả `EPERM` ngay khi bind localhost socket.
     Tarball macOS tạm cũng đã cài/update hai lần, xóa stale file và chạy build/feature/rollback/demo
     từ prefix cài đặt thành công. Release workflow hiện enforce regression + RC hardening + install/
     update + warehouse HTTP verify trên Ubuntu/macOS/Windows trước upload. Còn Linux leak gate và
-    một matrix release thực tế xanh trên cả ba nền tảng trước khi đóng RC.
+    một matrix release thực tế xanh trên cả ba nền tảng, cùng toàn bộ bằng chứng P0 trước khi đóng RC.

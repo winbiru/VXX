@@ -32,6 +32,11 @@ nhập feature_math như toán;
 Mỗi câu `nhập` chỉ nhận một target. Module cần re-export dependency phải dùng `công khai nhập`.
 Import thường không tự chuyển tiếp symbol cho module phía ngoài.
 
+Precedence 1.0 cho bare/extensionless import là local file trước package trên toàn bộ chuỗi
+ancestor được phép tìm kiếm; vì vậy local file ở ancestor xa hơn vẫn thắng package trùng tên
+ở ancestor gần hơn. Resolution dùng thư mục của importer/context, không dùng process cwd.
+Compatibility redirect/alias chỉ chạy sau local lookup; `VPP_HOME` là fallback cuối.
+
 ## Object model
 
 Receiver 1.0 là `mình`; gọi superclass qua `gốc`:
@@ -87,6 +92,12 @@ theo phạm vi 1.0. Code cũ dựa vào byte offset cho chuỗi UTF-8 cần chuy
 `bắt lỗi` bắt giá trị do `ném`. VM fault là lỗi fatal của lần `run()` hiện tại và không bị
 `bắt lỗi` nuốt. Các native/runtime boundary đã chặt hơn, vì vậy input từng bị cắt/ngầm chấp nhận
 như số thực có phần lẻ ở API integer có thể bị từ chối rõ ràng trong 1.0.
+
+## HTTP JSON helper
+
+Các helper HTTP 1.0 đọc JSON theo parser JSON thật và chỉ lấy exact top-level key có giá trị
+chuỗi. Hành vi cũ dựa trên regex có thể từng match nhầm key lồng nhau hoặc đoạn văn bản giống
+JSON nằm trong string; các false match đó không còn được xem là compatibility behavior.
 
 ## Checklist migration
 

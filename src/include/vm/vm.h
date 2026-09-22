@@ -48,13 +48,23 @@ public:
         std::vector<vietvm::runtime::RuntimeSourceLocation> rootDebugInfo,
         std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
             functionDebugInfo);
+    // Nạp toàn bộ function bytecode và bảng tên → function id như một snapshot.
+    // Mọi thay đổi qua API này đều làm bẩn cache verifier trước lần chạy kế tiếp.
+    void setFunctions(
+        std::unordered_map<int, std::vector<Instruction>> functionBytecode,
+        std::unordered_map<int, int> functionTableByNameIndex = {});
+    // Bảo đảm snapshot bytecode hiện tại đã qua verifier. Nhiều lần gọi trên cùng
+    // generation là O(1); mutation bytecode/module/function sẽ tạo generation mới.
+    void ensureBytecodeVerified();
+    // Đặt lại execution state để chạy lại cùng snapshot mà không làm mất globals/module state.
+    // API này chủ yếu phục vụ host/test/benchmark lặp lại cùng chương trình.
+    void resetExecution();
+    // Số generation đã thực sự đi vào verifier (kể cả generation bị từ chối).
+    // Cache hit trên cùng generation không tăng counter này.
+    std::size_t verificationPassCount() const noexcept { return verificationPassCount_; }
     // Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
     std::optional<vietvm::runtime::ModuleState> moduleState(
         std::string_view identity) const noexcept;
-
-    std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
-    // nameIndex → hamId mapping for function name lookup across execution contexts.
-    std::unordered_map<int, int> functionTableByNameIndex;
 
 private:
     // Cung cấp bề mặt kiểm thử nội bộ cho VM; fixture cho test push stack, đặt frame/class và gọi trực tiếp từng opcode handler mà không chạy cả chương trình.
@@ -62,6 +72,12 @@ private:
 
     std::vector<Instruction> bytecode;              // Mã bytecode
     std::vector<std::string> stringPool;
+    std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
+    // nameIndex → hamId mapping for function name lookup across execution contexts.
+    std::unordered_map<int, int> functionTableByNameIndex;
+    std::size_t programGeneration_ = 1;
+    std::size_t verifiedGeneration_ = 0;
+    std::size_t verificationPassCount_ = 0;
     std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
         functionDebugInfo;
@@ -228,7 +244,11 @@ private:
     // hàm dừng ngay sau khi lời gọi trực tiếp của fixture đã quay về độ sâu đó.
     void runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth = std::nullopt);
     // Thực hiện chu kỳ thu gom bộ nhớ runtime theo cơ chế GC hiện tại, duyệt các root đang sống trước khi giải phóng đối tượng không còn tham chiếu.
-    void collectGarbage();
+    // Thu gom tracing roots. `trimCapacity=true` chỉ dùng cho explicit/major trim;
+    // periodic/final collection giữ capacity để tránh allocate/free thrashing.
+    void collectGarbage(bool trimCapacity = false);
+    void invalidateBytecodeVerification() noexcept;
+    void trimExecutionCapacity();
 };
 
 #endif // VM_H

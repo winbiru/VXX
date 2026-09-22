@@ -535,6 +535,9 @@ static StackValue decodeDefaultParamValue(const std::string &encoded) {
 }
 
 // Khởi tạo máy ảo với bytecode hoặc trạng thái runtime được cung cấp; constructor thiết lập stack, frame và các bảng cần cho vòng thực thi.
+VM::VM(const std::vector<Instruction>& code)
+    : VM(code, std::vector<std::string>{}) {}
+
 VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool)
     : bytecode(code), stringPool(pool), pc(0) {}
 
@@ -547,8 +550,10 @@ void VM::setOutputSink(OutputSink sink) {
 bool VM::addModuleInitializer(std::string identity,
                               std::vector<Instruction> initializer,
                               std::vector<vietvm::runtime::RuntimeSourceLocation> debugInfo) {
-    return moduleTable.add(std::move(identity), std::move(initializer),
-                           std::move(debugInfo));
+    const bool added = moduleTable.add(std::move(identity), std::move(initializer),
+                                       std::move(debugInfo));
+    if (added) invalidateBytecodeVerification();
+    return added;
 }
 
 // Gắn metadata vị trí nguồn cho bytecode gốc và từng hàm; VM giữ metadata tách khỏi
@@ -559,6 +564,76 @@ void VM::setDebugInfo(
         functionDebug) {
     bytecodeDebugInfo = std::move(rootDebugInfo);
     functionDebugInfo = std::move(functionDebug);
+}
+
+void VM::setFunctions(
+    std::unordered_map<int, std::vector<Instruction>> functionBytecode,
+    std::unordered_map<int, int> functionNames) {
+    hamBytecodeMap = std::move(functionBytecode);
+    functionTableByNameIndex = std::move(functionNames);
+    invalidateBytecodeVerification();
+}
+
+void VM::invalidateBytecodeVerification() noexcept {
+    ++programGeneration_;
+    if (programGeneration_ == 0) {
+        // Wraparound is practically unreachable, but keep 0 reserved for
+        // "never verified" so stale cache state can never become valid.
+        programGeneration_ = 1;
+        verifiedGeneration_ = 0;
+    }
+}
+
+void VM::ensureBytecodeVerified() {
+    if (verifiedGeneration_ == programGeneration_) return;
+
+    ++verificationPassCount_;
+
+    vietvm::bytecode::BytecodeVerificationContext verificationContext;
+    verificationContext.stringPoolSize = stringPool.size();
+    for (const auto &entry : hamBytecodeMap) {
+        verificationContext.functionIds.insert(entry.first);
+    }
+
+    const auto verifyOrThrow = [&](const std::vector<Instruction> &code,
+                                   const std::string &scope) {
+        const auto verification =
+            vietvm::bytecode::verifyBytecode(code, verificationContext);
+        if (!verification.has_value()) return;
+        throw vietvm::runtime::RuntimeError(
+            "bytecode không hợp lệ trong " + scope + " tại lệnh " +
+            std::to_string(verification->instructionIndex) + ": " +
+            verification->message,
+            vietvm::runtime::RuntimeErrorKind::VmFault);
+    };
+
+    verifyOrThrow(bytecode, "chương trình chính");
+    for (const auto &entry : hamBytecodeMap) {
+        verifyOrThrow(entry.second, "hàm " + std::to_string(entry.first));
+    }
+    for (const std::string &identity : moduleTable.order()) {
+        const vietvm::runtime::RuntimeModule *module = moduleTable.module(identity);
+        if (module != nullptr) {
+            verifyOrThrow(module->initializer, "module " + identity);
+        }
+    }
+
+    verifiedGeneration_ = programGeneration_;
+}
+
+void VM::resetExecution() {
+    if (!executionStack.empty() || !callStack.empty()) {
+        throw std::logic_error("không thể reset VM khi lời gọi vẫn đang hoạt động");
+    }
+    stack.clear();
+    loopStartStack.clear();
+    ifElseStack.clear();
+    blockStack.clear();
+    switchStack.clear();
+    tryStack.clear();
+    blockDepth = 0;
+    callDepthFromRoot = 0;
+    pc = 0;
 }
 
 // Tra vị trí nguồn ứng với program counter hiện tại; nếu instruction chưa có
@@ -606,8 +681,7 @@ void VM::initializeModules() {
             initializer.outputSink = outputSink;
             initializer.variables = variables;
             initializer.classTable = classTable;
-            initializer.hamBytecodeMap = hamBytecodeMap;
-            initializer.functionTableByNameIndex = functionTableByNameIndex;
+            initializer.setFunctions(hamBytecodeMap, functionTableByNameIndex);
             initializer.bytecodeDebugInfo =
                 module == nullptr
                     ? std::vector<vietvm::runtime::RuntimeSourceLocation>{}
@@ -635,28 +709,40 @@ bool toBool(const StackValue& value) {
     return stackValueTruthy(value);
 }
 
+void VM::trimExecutionCapacity() {
+    constexpr std::size_t kMinimumSpare = 256;
+    const auto shouldTrim = [](std::size_t size, std::size_t capacity) {
+        return capacity > size + kMinimumSpare && capacity > size * 2;
+    };
+    const auto trimVector = [&](auto &values) {
+        if (shouldTrim(values.size(), values.capacity())) values.shrink_to_fit();
+    };
+
+    trimVector(stack);
+    trimVector(callStack);
+    trimVector(loopStartStack);
+    trimVector(ifElseStack);
+    trimVector(blockStack);
+    trimVector(switchStack);
+    trimVector(tryStack);
+    for (auto &frame : callStack) {
+        trimVector(frame.args);
+        trimVector(frame.localsVec);
+    }
+
+    const std::size_t buckets = variables.bucket_count();
+    const std::size_t target = variables.empty() ? 0 : variables.size() * 2;
+    if (buckets > target + kMinimumSpare && buckets > variables.size() * 2) {
+        variables.rehash(target);
+    }
+}
+
 // Thực hiện chu kỳ thu gom bộ nhớ runtime theo cơ chế GC hiện tại, duyệt các root đang sống trước khi giải phóng đối tượng không còn tham chiếu.
-void VM::collectGarbage() {
+void VM::collectGarbage(bool trimCapacity) {
     if (runtimeHeap != nullptr) {
         lastGcStats = runtimeHeap->collect(gcRoots());
     }
-
-    // Sau mark/sweep, thu gọn sức chứa của các container điều khiển để trả phần
-    // bộ nhớ dự phòng không còn cần thiết về allocator.
-    stack.shrink_to_fit();
-    callStack.shrink_to_fit();
-    loopStartStack.shrink_to_fit();
-    ifElseStack.shrink_to_fit();
-    blockStack.shrink_to_fit();
-    switchStack.shrink_to_fit();
-    tryStack.shrink_to_fit();
-
-    for (auto &f : callStack) {
-        f.args.shrink_to_fit();
-        f.localsVec.shrink_to_fit();
-    }
-
-    variables.rehash(variables.size());
+    if (trimCapacity) trimExecutionCapacity();
 }
 
 // Chụp root của VM cho tracing GC; các execution context đang tạm dừng vẫn giữ
@@ -2243,29 +2329,7 @@ void VM::executeOutputOpcode(const Instruction& instr) {
 // Chạy vòng lặp VM từ bytecode hiện tại; mỗi bước đọc opcode tại program counter và chuyển tới handler tương ứng cho tới khi dừng.
 void VM::run() {
     vietvm::runtime::RuntimeHeapScope heapScope(*runtimeHeap);
-
-    vietvm::bytecode::BytecodeVerificationContext verificationContext;
-    verificationContext.stringPoolSize = stringPool.size();
-    for (const auto &entry : hamBytecodeMap) {
-        verificationContext.functionIds.insert(entry.first);
-    }
-
-    const auto verifyOrThrow = [&](const std::vector<Instruction> &code,
-                                   const std::string &scope) {
-        const auto verification =
-            vietvm::bytecode::verifyBytecode(code, verificationContext);
-        if (!verification.has_value()) return;
-        throw vietvm::runtime::RuntimeError(
-            "bytecode không hợp lệ trong " + scope + " tại lệnh " +
-            std::to_string(verification->instructionIndex) + ": " +
-            verification->message,
-            vietvm::runtime::RuntimeErrorKind::VmFault);
-    };
-
-    verifyOrThrow(bytecode, "chương trình chính");
-    for (const auto &entry : hamBytecodeMap) {
-        verifyOrThrow(entry.second, "hàm " + std::to_string(entry.first));
-    }
+    ensureBytecodeVerified();
 
     initializeModules();
 

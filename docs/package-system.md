@@ -130,13 +130,21 @@ registry chỉ nhận kết quả đã resolve và biên dịch source đó.
 
 Thứ tự chính:
 
-1. file/path thật trong project, tìm từ `CompilationContext.importResolutionBase` và đi lên;
-2. compatibility redirect của layout package cũ;
-3. bare package dưới `gói/`, `goi/`, `packages/`;
-4. alias chuẩn như `vpp_core` → `lõi`;
-5. package dưới `VPP_HOME` của bản cài đặt.
+1. file/path thật trong project, tìm từ thư mục của importer và đi lên hết các ancestor;
+2. compatibility redirect của layout package cũ, chỉ sau khi không có local file thật;
+3. bare package dưới `gói/`, `goi/`, `packages/`, ưu tiên ancestor gần importer;
+4. alias chuẩn như `vpp_core` → `lõi` trong cùng bước package;
+5. fallback dưới `VPP_HOME` của bản cài đặt.
 
-File project thật luôn được ưu tiên trước fallback package để không đổi nghĩa source cũ.
+Các phase trên không xen kẽ theo từng ancestor. Vì vậy một local file ở ancestor xa vẫn thắng
+package trùng tên nằm gần hơn. Nested import bắt đầu resolve từ thư mục chứa chính module
+importer; semantic module graph và codegen dùng cùng policy này. Khi base được truyền tường minh,
+process current working directory không thay đổi kết quả. Contract được freeze bởi ADR 0003 và
+collision matrix test `vpp-import-precedence-hardening`.
+
+Compatibility note cho 1.0 RC: nếu source trước đây vô tình dựa vào việc package gần hơn thắng
+local file ở ancestor xa, target sẽ đổi về local file theo contract đã chốt. Project muốn chọn
+package rõ ràng nên tránh collision tên hoặc dùng target package/path không mơ hồ.
 
 ## `vpp.lock`
 

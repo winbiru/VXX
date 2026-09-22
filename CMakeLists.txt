@@ -202,6 +202,30 @@ if (BUILD_TESTS)
     endif()
     add_test(NAME vpp-rc-internal-hardening COMMAND vpp-rc-internal-hardening)
 
+    add_executable(vpp-runtime-p0-hardening
+        ${CMAKE_SOURCE_DIR}/scripts/quality/runtime_p0_hardening.cpp)
+    target_link_libraries(vpp-runtime-p0-hardening PRIVATE vpp-runtime)
+    target_include_directories(vpp-runtime-p0-hardening PRIVATE ${VPP_INCLUDE_DIR})
+    target_compile_features(vpp-runtime-p0-hardening PRIVATE cxx_std_17)
+    if (MSVC)
+        target_compile_options(vpp-runtime-p0-hardening PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(vpp-runtime-p0-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-runtime-p0-hardening COMMAND vpp-runtime-p0-hardening)
+
+    add_executable(vpp-import-precedence-hardening
+        ${CMAKE_SOURCE_DIR}/scripts/quality/import_precedence_hardening.cpp)
+    target_link_libraries(vpp-import-precedence-hardening PRIVATE vpp-compiler)
+    target_include_directories(vpp-import-precedence-hardening PRIVATE ${VPP_INCLUDE_DIR})
+    target_compile_features(vpp-import-precedence-hardening PRIVATE cxx_std_17)
+    if (MSVC)
+        target_compile_options(vpp-import-precedence-hardening PRIVATE /W4 /permissive- /utf-8)
+    else()
+        target_compile_options(vpp-import-precedence-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-import-precedence-hardening COMMAND vpp-import-precedence-hardening)
+
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
                  COMMAND ${CMAKE_COMMAND} -E env

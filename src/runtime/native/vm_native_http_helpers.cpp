@@ -1,21 +1,25 @@
 #include "common/vm_native_http_helpers.h"
 
-#include <regex>
+#include "common/vm_native_json_helpers.h"
+#include "vpp/runtime/value.h"
 
 namespace vietvm::helpers {
 
 // Trích xuất đơn giản JSON chuỗi trường; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::string extractSimpleJsonStringField(const std::string &body, const std::string &key) {
-    try {
-        std::regex rgx("\\\"" + key + "\\\"\\s*:\\s*\\\"([^\\\"]*)\\\"");
-        std::smatch m;
-        if (std::regex_search(body, m, rgx) && m.size() >= 2) {
-            return m[1].str();
-        }
-    } catch (...) {
+    StackValue parsed;
+    std::string error;
+    if (!parseJson(body, parsed, error) || !std::holds_alternative<MapHandle>(parsed)) {
         return "";
     }
-    return "";
+    const MapHandle &map = std::get<MapHandle>(parsed);
+    if (map == nullptr) return "";
+    const auto found = map->entries.find(key);
+    if (found == map->entries.end() ||
+        !std::holds_alternative<std::string>(found->second)) {
+        return "";
+    }
+    return std::get<std::string>(found->second);
 }
 
 // Tách đường dẫn and query; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
