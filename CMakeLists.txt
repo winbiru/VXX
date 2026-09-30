@@ -8,6 +8,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(BUILD_TESTS "Build V++ .vi regression tests" ON)
 option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
+# Standalone Windows executables must also run on machines without VC Redist.
+# Apply to every target so libraries and the CLI use the same CRT allocator.
+if (MSVC AND NOT BUILD_SHARED_LIBS AND NOT DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 option(VPP_ENABLE_COVERAGE "Enable GCC/Clang coverage instrumentation" OFF)
 option(VPP_ENABLE_CLANG_TIDY "Run clang-tidy while compiling C++ targets" OFF)
 

@@ -9,12 +9,106 @@ const RELEASES_URL = 'https://github.com/winbiru/VXX/releases';
 const LATEST_DOWNLOAD_URL = `${RELEASES_URL}/latest/download`;
 const VPP_LANGUAGE_SELECTOR = { language: 'vpp' };
 const VPP_OPEN_DEFINITION_COMMAND = 'vpp.openFunctionDefinition';
+const VPP_LIBRARY_VIEW_ID = 'vpp.libraryRoots';
+const VPP_REFRESH_LIBRARIES_COMMAND = 'vpp.refreshLibraryRoots';
 
 let languageServer = null;
 let languageServerStarting = null;
 let languageServerOutput = null;
 let languageServerExecutableWatchPath = null;
 let languageServerRestartTimer = null;
+
+class VppLibraryTreeProvider {
+  constructor(context) {
+    this.context = context;
+    this.changeEmitter = new vscode.EventEmitter();
+    this.onDidChangeTreeData = this.changeEmitter.event;
+  }
+
+  refresh() {
+    this.changeEmitter.fire(undefined);
+  }
+
+  catalogCandidates() {
+    const candidates = [];
+    for (const folder of vscode.workspace.workspaceFolders || []) {
+      candidates.push(path.join(folder.uri.fsPath, 'vpp-libraries.json'));
+    }
+    const managedVmCatalog = path.join(vmDirectory(this.context), 'vpp-libraries.json');
+    candidates.push(managedVmCatalog);
+    return candidates;
+  }
+
+  readCatalog() {
+    for (const catalogPath of this.catalogCandidates()) {
+      if (!fs.existsSync(catalogPath)) continue;
+      try {
+        const parsed = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+        if (parsed?.schema !== 1 || !Array.isArray(parsed?.libraries)) continue;
+        return { catalogPath, catalog: parsed };
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  async getChildren(element) {
+    if (!element) {
+      const loaded = this.readCatalog();
+      if (!loaded) return [];
+      return [...loaded.catalog.libraries]
+        .sort((left, right) => left.id.localeCompare(right.id, 'en'))
+        .map((library) => ({ kind: 'library', library, catalogPath: loaded.catalogPath }));
+    }
+
+    if (element.kind !== 'library' && element.kind !== 'directory') return [];
+    const target = element.kind === 'library'
+      ? path.resolve(path.dirname(element.catalogPath), element.library.sourceRoot)
+      : element.fsPath;
+    if (!fs.existsSync(target)) return [];
+
+    const entries = await fs.promises.readdir(target, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory() || (entry.isFile() && entry.name.endsWith('.vi')))
+      .sort((left, right) => {
+        if (left.isDirectory() !== right.isDirectory()) return left.isDirectory() ? -1 : 1;
+        return left.name.localeCompare(right.name, 'vi');
+      })
+      .map((entry) => ({
+        kind: entry.isDirectory() ? 'directory' : 'file',
+        name: entry.name,
+        fsPath: path.join(target, entry.name),
+        catalogPath: element.catalogPath
+      }));
+  }
+
+  getTreeItem(element) {
+    if (element.kind === 'library') {
+      const item = new vscode.TreeItem(element.library.id, vscode.TreeItemCollapsibleState.Collapsed);
+      item.description = 'thư mục gốc thư viện';
+      item.tooltip = `${element.library.displayName || element.library.id}\n${element.library.version || ''}\n${element.library.sourceRoot}`;
+      item.iconPath = new vscode.ThemeIcon('library');
+      return item;
+    }
+
+    if (element.kind === 'directory') {
+      const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
+      item.iconPath = vscode.ThemeIcon.Folder;
+      return item;
+    }
+
+    const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
+    item.resourceUri = vscode.Uri.file(element.fsPath);
+    item.command = {
+      command: 'vscode.open',
+      title: 'Mở mã nguồn',
+      arguments: [item.resourceUri]
+    };
+    item.iconPath = vscode.ThemeIcon.File;
+    return item;
+  }
+}
 
 function lspPosition(position) {
   return { line: position.line, character: position.character };
@@ -209,6 +303,51 @@ function relativeDisplayPath(uri) {
   return path.relative(folder.uri.fsPath, uri.fsPath) || path.basename(uri.fsPath);
 }
 
+function moduleDisplayName(uri) {
+  const relative = relativeDisplayPath(uri).replace(/\\/gu, '/');
+  return relative.replace(/\.vi$/u, '').replace(/\//gu, '.');
+}
+
+function hoverResultText(result) {
+  if (!result?.contents) return '';
+  if (typeof result.contents === 'string') return result.contents.trim();
+  if (Array.isArray(result.contents)) {
+    return result.contents
+      .map((entry) => typeof entry === 'string' ? entry : (entry?.value || ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+  return (result.contents.value || '').trim();
+}
+
+function documentationBeforeLine(document, lineNumber) {
+  const lines = [];
+  for (let line = lineNumber - 1; line >= 0; --line) {
+    const text = document.lineAt(line).text.trim();
+    if (!text.startsWith('//')) break;
+    lines.unshift(text.replace(/^\/\/\/?\s?/u, '').trim());
+  }
+  return lines.filter(Boolean).join('\n');
+}
+
+async function hoverSourceInfo(definition) {
+  if (!definition?.uri || !definition?.range) return null;
+  try {
+    const document = await vscode.workspace.openTextDocument(definition.uri);
+    const lineNumber = definition.range.start.line;
+    const lineText = document.lineAt(lineNumber).text.trim();
+    const signature = definition.signature || lineText.replace(/\s*\{\s*$/u, '').trim();
+    return {
+      module: moduleDisplayName(definition.uri),
+      signature,
+      documentation: documentationBeforeLine(document, lineNumber)
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 function definitionCommandUri(definition) {
   const args = [{
     uri: definition.uri.toString(),
@@ -355,6 +494,7 @@ class VppLanguageServer {
       this.output.appendLine(`LSP đã dừng với mã ${code}.`);
       this.rejectPending(new Error(`Máy chủ ngôn ngữ V++ đã dừng với mã ${code}.`));
       this.child = null;
+      if (languageServer === this) languageServer = null;
     });
 
     await this.request('initialize', {
@@ -424,13 +564,13 @@ class VppLanguageServer {
     this.send({ jsonrpc: '2.0', method, params });
   }
 
-  request(method, params) {
+  request(method, params, timeoutMs = 2_000) {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`LSP hết thời gian chờ phản hồi cho ${method}.`));
-      }, 10_000);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       try {
         this.send({ jsonrpc: '2.0', id, method, params });
@@ -543,6 +683,11 @@ function documentParams(document) {
   return { uri: document.uri.toString() };
 }
 
+async function ensureLanguageServer(context) {
+  if (!languageServer) await startLanguageServer(context);
+  return languageServer;
+}
+
 async function startLanguageServer(context, showError = false) {
   if (!vscode.workspace.getConfiguration('vpp').get('lsp.enabled', true)) return;
   if (languageServer) return;
@@ -630,11 +775,13 @@ function registerLanguageFeatures(context) {
     }),
     vscode.languages.registerCompletionItemProvider(VPP_LANGUAGE_SELECTOR, {
       async provideCompletionItems(document, position) {
-        if (!languageServer) return [];
-        const result = await languageServer.request('textDocument/completion', {
+        const server = await ensureLanguageServer(context);
+        if (!server) return [];
+        const result = await server.request('textDocument/completion', {
           textDocument: documentParams(document),
           position: lspPosition(position)
-        });
+        }).catch(() => null);
+        if (!result) return [];
         const sourceItems = Array.isArray(result) ? result : (result?.items || []);
         const items = sourceItems.map((source) => {
           const item = new vscode.CompletionItem(source.label, completionKind(source.kind));
@@ -647,6 +794,7 @@ function registerLanguageFeatures(context) {
     }, '.'),
     vscode.languages.registerDefinitionProvider(VPP_LANGUAGE_SELECTOR, {
       async provideDefinition(document, position) {
+        await ensureLanguageServer(context);
         const definition = await resolveFunctionDefinition(document, position);
         if (!definition) return null;
         return new vscode.Location(definition.uri, definition.range);
@@ -677,8 +825,9 @@ function registerLanguageFeatures(context) {
     vscode.languages.registerHoverProvider(VPP_LANGUAGE_SELECTOR, {
       async provideHover(document, position) {
         let result = null;
-        if (languageServer) {
-          result = await languageServer.request('textDocument/hover', {
+        const server = await ensureLanguageServer(context);
+        if (server) {
+          result = await server.request('textDocument/hover', {
             textDocument: documentParams(document),
             position: lspPosition(position)
           }).catch(() => null);
@@ -687,36 +836,47 @@ function registerLanguageFeatures(context) {
         const definition = await resolveFunctionDefinition(document, position);
         if (!result && !definition) return null;
 
+        const sourceInfo = await hoverSourceInfo(definition);
+        const semanticText = hoverResultText(result);
+
         const markdown = new vscode.MarkdownString('', true);
         markdown.isTrusted = { enabledCommands: [VPP_OPEN_DEFINITION_COMMAND] };
 
-        if (definition?.signature) {
-          markdown.appendCodeblock(definition.signature, 'vpp');
-        } else if (result) {
-          const contents = typeof result.contents === 'string'
-            ? result.contents
-            : result.contents?.value || '';
-          if (contents) markdown.appendText(contents);
+        if (sourceInfo?.module) {
+          markdown.appendMarkdown(`$(symbol-namespace) \`${sourceInfo.module}\`\n\n`);
+        }
+
+        const signature = sourceInfo?.signature || definition?.signature || semanticText;
+        if (signature) {
+          markdown.appendCodeblock(signature, 'vpp');
+        }
+
+        if (sourceInfo?.documentation) {
+          markdown.appendMarkdown(`\n${sourceInfo.documentation.replace(/\n/gu, '  \n')}\n`);
+        } else if (semanticText && semanticText !== signature) {
+          markdown.appendMarkdown(`\n${semanticText}\n`);
         }
 
         if (definition) {
-          if (markdown.value) markdown.appendMarkdown('\n\n');
+          if (markdown.value) markdown.appendMarkdown('\n---\n\n');
           markdown.appendMarkdown(
-            `**Tệp:** \`${relativeDisplayPath(definition.uri)}:${definition.range.start.line + 1}\`  \n`
+            `$(file-code) \`${relativeDisplayPath(definition.uri)}:${definition.range.start.line + 1}\`  \n`
           );
-          markdown.appendMarkdown(`[Mở định nghĩa ↗](${definitionCommandUri(definition)})`);
+          markdown.appendMarkdown(`[$(go-to-file) Mở định nghĩa](${definitionCommandUri(definition)})`);
         }
 
-        const hoverRange = result?.range
-          ? vscodeRange(result.range)
+        const semanticHoverRange = result?.range ? vscodeRange(result.range) : null;
+        const hoverRange = semanticHoverRange?.contains(position)
+          ? semanticHoverRange
           : document.getWordRangeAtPosition(position);
         return new vscode.Hover(markdown, hoverRange);
       }
     }),
     vscode.languages.registerRenameProvider(VPP_LANGUAGE_SELECTOR, {
       async provideRenameEdits(document, position, newName) {
-        if (!languageServer) return null;
-        const result = await languageServer.request('textDocument/rename', {
+        const server = await ensureLanguageServer(context);
+        if (!server) return null;
+        const result = await server.request('textDocument/rename', {
           textDocument: documentParams(document),
           position: lspPosition(position),
           newName
@@ -734,8 +894,9 @@ function registerLanguageFeatures(context) {
     }),
     vscode.languages.registerDocumentFormattingEditProvider(VPP_LANGUAGE_SELECTOR, {
       async provideDocumentFormattingEdits(document, options) {
-        if (!languageServer) return [];
-        const result = await languageServer.request('textDocument/formatting', {
+        const server = await ensureLanguageServer(context);
+        if (!server) return [];
+        const result = await server.request('textDocument/formatting', {
           textDocument: documentParams(document),
           options: {
             tabSize: options.tabSize,
@@ -968,6 +1129,12 @@ function activate(context) {
   context.subscriptions.push(languageServerOutput);
   registerLanguageFeatures(context);
   watchLanguageServerExecutable(context);
+  const libraryTreeProvider = new VppLibraryTreeProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider(VPP_LIBRARY_VIEW_ID, libraryTreeProvider),
+    libraryTreeProvider.changeEmitter,
+    vscode.commands.registerCommand(VPP_REFRESH_LIBRARIES_COMMAND, () => libraryTreeProvider.refresh())
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(VPP_OPEN_DEFINITION_COMMAND, (target) => openFunctionDefinition(target)),

@@ -213,10 +213,14 @@ private:
     // Thêm bên ngoài symbols; hàm chèn dữ liệu mới vào cấu trúc trạng thái hiện tại và duy trì các chỉ mục liên quan.
     void addExternalSymbols() {
         for (const SemanticExternalSymbol &external : environment_.importedSymbols) {
-            (void)addSymbol(model_.globalScope, external.kind, external.name,
-                            external.name, external.declaration,
-                            SemanticVisibility::Public, kInvalidSymbolId,
-                            SymbolOrigin::Imported, false, nullptr);
+            const SymbolId symbol = addSymbol(
+                model_.globalScope, external.kind, external.name,
+                external.name, external.declaration,
+                SemanticVisibility::Public, kInvalidSymbolId,
+                SymbolOrigin::Imported, false, nullptr);
+            if (symbol != kInvalidSymbolId && symbol < model_.symbols.size()) {
+                model_.symbols[symbol].sourceIdentity = external.sourceIdentity;
+            }
         }
     }
 

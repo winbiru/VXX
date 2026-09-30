@@ -53,8 +53,20 @@
       {
         "command": "vpp.restartLanguageServer",
         "title": "V++: Khởi động lại máy chủ ngôn ngữ"
+      },
+      {
+        "command": "vpp.refreshLibraryRoots",
+        "title": "V++: Làm mới thư viện"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "vpp.libraryRoots",
+          "name": "Thư viện V++"
+        }
+      ]
+    },
     "configuration": {
       "title": "V++",
       "properties": {

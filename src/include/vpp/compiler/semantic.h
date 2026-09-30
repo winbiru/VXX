@@ -114,6 +114,7 @@ struct SemanticSymbol {
     // qualified name. `lookupName` is the spelling used in the declaring scope.
     std::string name;
     vietvm::frontend::SourceSpan declaration{};
+    std::string sourceIdentity;
     std::string lookupName;
     std::string qualifiedName;
     SymbolSpace space = SymbolSpace::Value;
@@ -188,6 +189,7 @@ struct SemanticExternalSymbol {
     std::string name;
     SemanticSymbolKind kind = SemanticSymbolKind::Function;
     vietvm::frontend::SourceSpan declaration{};
+    std::string sourceIdentity;
 };
 
 // Mô tả một tên có tồn tại trong module đã nhập nhưng không thuộc bề mặt export;

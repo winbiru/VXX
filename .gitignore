@@ -38,3 +38,4 @@ dist/
 # Python tooling
 __pycache__/
 *.pyc
+*.md

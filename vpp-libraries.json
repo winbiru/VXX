@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "sdkVersion": "0.2.0",
+  "libraries": [
+    {
+      "id": "vi.application",
+      "package": "ứng dụng",
+      "displayName": "Ứng dụng",
+      "version": "0.2.0",
+      "sourceRoot": "gói/ứng dụng",
+      "entry": "main.vi",
+      "requires": [],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.base",
+      "package": "lõi",
+      "displayName": "Lõi",
+      "version": "0.2.0",
+      "sourceRoot": "gói/lõi",
+      "entry": "main.vi",
+      "requires": [],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.io",
+      "package": "nhập xuất",
+      "displayName": "Nhập xuất",
+      "version": "0.2.0",
+      "sourceRoot": "gói/nhập xuất",
+      "entry": "main.vi",
+      "requires": ["vi.base"],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.net",
+      "package": "mạng",
+      "displayName": "Mạng",
+      "version": "0.2.0",
+      "sourceRoot": "gói/mạng",
+      "entry": "main.vi",
+      "requires": ["vi.base"],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.sql",
+      "package": "dữ liệu",
+      "displayName": "Dữ liệu",
+      "version": "0.2.0",
+      "sourceRoot": "gói/dữ liệu",
+      "entry": "main.vi",
+      "requires": ["vi.base"],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.standard",
+      "package": "chuẩn",
+      "displayName": "Chuẩn",
+      "version": "0.2.0",
+      "sourceRoot": "gói/chuẩn",
+      "entry": "main.vi",
+      "requires": ["vi.application", "vi.base", "vi.io", "vi.net", "vi.sql", "vi.system"],
+      "stability": "stable",
+      "kind": "aggregate",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.starters",
+      "package": "dựng",
+      "displayName": "Dựng",
+      "version": "0.2.0",
+      "sourceRoot": "gói/dựng",
+      "entry": "main.vi",
+      "requires": ["vi.application", "vi.base", "vi.io", "vi.net", "vi.sql"],
+      "stability": "stable",
+      "kind": "aggregate",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.system",
+      "package": "hệ thống",
+      "displayName": "Hệ thống",
+      "version": "0.2.0",
+      "sourceRoot": "gói/hệ thống",
+      "entry": "main.vi",
+      "requires": [],
+      "stability": "stable",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.test",
+      "package": "kiểm thử",
+      "displayName": "Kiểm thử",
+      "version": "0.2.0",
+      "sourceRoot": "gói/kiểm thử",
+      "entry": "main.vi",
+      "requires": ["vi.base"],
+      "stability": "stable",
+      "kind": "tooling",
+      "platforms": ["windows", "linux", "macos"]
+    }
+  ]
+}

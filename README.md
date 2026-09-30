@@ -64,18 +64,143 @@ vpp giúp đỡ
 
 ### Windows (PowerShell)
 
+Mở Windows PowerShell 5.1 hoặc PowerShell 7 và chạy từng lệnh dưới đây.
+Sao chép URL nguyên dạng trong khối lệnh, không dùng cú pháp Markdown `[URL](URL)`.
+
 ```powershell
 Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
 Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
-.\vpp-bin\install-vpp.ps1
+$previousPolicy = Get-ExecutionPolicy -Scope Process
+try {
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+    & .\vpp-bin\install-vpp.ps1
+} finally {
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy $previousPolicy -Force
+}
+vpp phiên bản
 vpp giúp đỡ
 ```
 
-Hoặc chạy file batch:
+Bộ cài tự lưu `PATH`/`VPP_HOME` cho người dùng và cập nhật ngay cửa sổ PowerShell
+đang gọi script: không cần gõ `$env:Path` thủ công. Đường dẫn mặc định là
+`%LOCALAPPDATA%\Programs\VPP`. Cài lại không thêm trùng đường dẫn, và bản vừa cài
+được ưu tiên trong PATH. Đoạn lệnh trên chỉ tạm đổi execution policy của tiến trình
+hiện tại và khôi phục sau khi cài; Group Policy của tổ chức vẫn có hiệu lực.
 
-```cmd
+Bộ cài cũng tự chuyển console sang UTF-8 (`chcp 65001`), cấu hình
+`[Console]::OutputEncoding` và `$OutputEncoding` trước khi chạy V++ để hiển thị
+đúng tiếng Việt. Khi gọi `.ps1` trực tiếp, cấu hình này tiếp tục có hiệu lực trong
+PowerShell hiện tại. Đây là thiết lập của phiên, không phải thiết lập toàn máy;
+CLI bản mới tự xử lý UTF-8 khi chạy trong các cửa sổ khác.
+
+Nếu muốn chạy bộ cài bằng file batch:
+
+```powershell
 .\vpp-bin\install-vpp.cmd
 ```
+
+File `.cmd` cũng tự lưu biến môi trường cho người dùng, nhưng tiến trình con không
+thể sửa môi trường của PowerShell cha. Sau cách cài này, đóng và mở lại **toàn bộ
+ứng dụng terminal hoặc VS Code** để nhận PATH mới (chỉ mở tab mới có thể vẫn kế
+thừa PATH cũ). Sau đó dùng `vpp phiên bản` để kiểm tra.
+
+Source hiện tại lưu bộ cài dưới dạng UTF-8 có BOM để Windows PowerShell 5.1 đọc
+đúng thư mục `gói`. Build MSVC tĩnh mặc định tích hợp C++ runtime, và CLI tự dùng
+UTF-8 khi hiển thị console rồi khôi phục code page khi thoát. Những sửa đổi này
+chỉ có trong release được build từ source mới; file ZIP đã phát hành không tự cập nhật.
+
+#### Gỡ cài đặt Windows
+
+Với bản release mới có bộ gỡ, chạy trong PowerShell hoặc CMD:
+
+```powershell
+vpp gỡ cài đặt
+```
+
+Nếu terminal chưa nhận PATH, dùng đường dẫn đầy đủ:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\VPP\vpp.exe" gỡ cài đặt
+```
+
+Bộ gỡ xóa executable, thư viện `gói`, `templates`, `examples` và các file bộ gỡ;
+CLI khởi động bộ gỡ riêng rồi thoát để Windows cho phép xóa `vpp.exe`.
+đồng thời bỏ đường dẫn cài khỏi PATH của người dùng. `VPP_HOME` chỉ bị xóa nếu
+đang trỏ tới bản cài này. Các file khác và dự án bên ngoài được giữ lại.
+Đóng và mở lại terminal/VS Code sau khi gỡ. Extension VS Code cần gỡ riêng.
+Bản cũ chưa có lệnh này cần cập nhật bộ cài trước.
+
+#### Khắc phục với bộ cài Windows cũ
+
+Nếu PowerShell báo `vpp is not recognized` hoặc `The term 'vpp' is not recognized`,
+chạy nguyên khối sau để lưu lại `PATH`/`VPP_HOME` cho tài khoản Windows và cập nhật
+ngay cửa sổ hiện tại. Nếu cài ở vị trí tùy chỉnh, sửa `$vppDir` cho đúng.
+
+```powershell
+$vppDir = Join-Path $env:LOCALAPPDATA "Programs\VPP"
+
+if (Test-Path "$vppDir\vpp.exe") {
+    $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $otherPaths = @($userPath -split ";" | Where-Object {
+        $_ -and $_.TrimEnd("\") -ine $vppDir
+    })
+
+    [Environment]::SetEnvironmentVariable(
+        "Path", ((@($vppDir) + $otherPaths) -join ";"), "User"
+    )
+    [Environment]::SetEnvironmentVariable("VPP_HOME", $vppDir, "User")
+
+    $env:Path = "$vppDir;$env:Path"
+    $env:VPP_HOME = $vppDir
+
+    vpp phiên bản
+    $testFile = Join-Path $env:USERPROFILE "kiem-tra-vpp.vi"
+    if (Test-Path -LiteralPath $testFile -PathType Leaf) {
+        vpp chạy $testFile
+    } else {
+        Write-Host "Môi trường đã được cấu hình. Chưa có file thử: $testFile"
+    }
+} else {
+    Write-Host "Chưa tìm thấy V++. Hãy chạy lại bộ cài install-vpp.cmd."
+}
+```
+
+Các cửa sổ terminal/VS Code khác đang mở cần khởi động lại để nhận môi trường mới.
+Khi chạy file, dùng `vpp chạy .\kiem-tra-vpp.vi`; không thêm `\` sau đuôi `.vi`.
+Sửa source không tự cập nhật bộ cài đã tải: cần cài release mới để nhận sửa đổi.
+
+Nếu script báo `running scripts is disabled`, dùng `install-vpp.cmd` như trên.
+Nếu đường dẫn `gói` bị đọc thành `gÃ³i`, sửa mã hóa script rồi cài lại:
+
+```powershell
+$scriptPath = (Resolve-Path ".\vpp-bin\install-vpp.ps1").Path
+$content = [System.IO.File]::ReadAllText($scriptPath, [System.Text.Encoding]::UTF8)
+$utf8Bom = New-Object System.Text.UTF8Encoding($true)
+[System.IO.File]::WriteAllText($scriptPath, $content, $utf8Bom)
+.\vpp-bin\install-vpp.cmd
+```
+
+Nếu `vpp` không in gì và `$LASTEXITCODE` là `-1073741515` (`0xC0000135`), Windows
+không tải được DLL cần thiết. Bản cũ có thể cần
+[Visual C++ Runtime x64 của Microsoft](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist):
+
+```powershell
+Invoke-WebRequest -Uri "https://aka.ms/vc14/vc_redist.x64.exe" -OutFile "$env:TEMP\vc_redist.x64.exe"
+Start-Process -FilePath "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install" -Wait
+vpp phiên bản
+```
+
+Chọn Install hoặc Repair và làm theo hướng dẫn. Nếu vẫn lỗi, mở `vpp.exe` từ
+Explorer để xem tên DLL bị thiếu. Nếu bản cũ chạy được nhưng tiếng Việt bị lỗi dấu:
+
+```powershell
+chcp 65001
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = [Console]::OutputEncoding
+vpp giúp đỡ
+```
+
+Thiết lập UTF-8 thủ công này chỉ áp dụng cho cửa sổ hiện tại.
 
 Luu y: release asset se duoc tao boi workflow `.github/workflows/release-binaries.yml` khi ban publish Release.
 
