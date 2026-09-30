@@ -13,6 +13,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $script:Vpp = (Resolve-Path -LiteralPath $VppExecutable).Path
 $script:PassCount = 0
 $script:FailCount = 0
+$script:FailedTests = @()
 $script:LastHttpProbeError = ""
 $sessionDir = Join-Path (Join-Path $repoRoot "src\tests\.tmp") ("windows-" + [guid]::NewGuid().ToString())
 $externalVppHome = $null
@@ -31,6 +32,7 @@ function Add-Fail {
 
     Write-Host "FAIL: $Name"
     $script:FailCount++
+    $script:FailedTests += $Name
 }
 
 function Get-NormalizedUtf8Text {
@@ -348,6 +350,7 @@ try {
     Write-Host ""
     Write-Host "=== PASS: $script:PassCount, FAIL: $script:FailCount ==="
     if ($script:FailCount -ne 0) {
+        Write-Host ("Failed tests: " + ($script:FailedTests -join ', '))
         throw "Windows V++ regression suite failed with $script:FailCount failure(s)."
     }
 } finally {
