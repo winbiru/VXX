@@ -53,6 +53,13 @@ if (-not (Test-Path $sourceExamples)) {
     throw "Không tìm thấy examples tại: $sourceExamples"
 }
 
+# Reject incomplete bundles before changing an existing installation.
+foreach ($name in @('uninstall-vpp.ps1', 'vpp-uninstall.cmd')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $scriptDir $name) -PathType Leaf)) {
+        throw "Gói cài thiếu $name. Hãy tải và giải nén lại bộ cài đầy đủ."
+    }
+}
+
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 $stagingDir = Join-Path $InstallDir ".vpp-install-$PID"
 $targetExe = Join-Path $InstallDir "vpp.exe"
@@ -90,6 +97,16 @@ if (-not $NoPathUpdate) {
 
 $env:Path = Add-VppToPath $env:Path $InstallDir
 $env:VPP_HOME = $InstallDir
+
+# Check the installed copy, not only the executable in the extracted archive.
+& $targetExe "phiên" "bản"
+if ($LASTEXITCODE -ne 0) { throw "Không chạy được V++ sau khi cài đặt: $targetExe" }
+& $targetExe "chẩn" "đoán"
+if ($LASTEXITCODE -ne 0) { throw "Chẩn đoán sau cài đặt thất bại: $targetExe" }
+$resolvedVpp = Get-Command vpp -ErrorAction SilentlyContinue
+if (-not $resolvedVpp -or $resolvedVpp.Source -ine $targetExe) {
+    Write-Warning "Lệnh vpp chưa trỏ tới bản vừa cài. Kiểm tra bằng: Get-Command vpp -All"
+}
 
 Write-Host "Đã cài đặt/cập nhật V++ tại: $targetExe"
 Write-Host "Đã cài thư viện chuẩn tại: $targetStdlib"

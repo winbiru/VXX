@@ -51,6 +51,36 @@ Mặc định V++ được cài tại `%LOCALAPPDATA%\Programs\VPP`. Có thể �
 `-InstallDir`. `-NoPathUpdate` dành cho CI hoặc môi trường tự quản lý `PATH`/`VPP_HOME`.
 Chạy lại installer trên cùng `InstallDir` để cập nhật.
 
+## Gỡ trên Windows
+
+Với bản mới có hỗ trợ lệnh gỡ:
+
+```powershell
+vpp gỡ cài đặt
+```
+
+Hoặc gọi trực tiếp bộ gỡ của bản cài mặc định:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\VPP\vpp-uninstall.cmd"
+```
+
+Nếu cài ở thư mục khác, chạy `vpp-uninstall.cmd` trong thư mục đó.
+Bộ gỡ xóa executable, `gói`, `templates`, `examples` và các script gỡ;
+đồng thời dọn PATH/VPP_HOME của bản cài. Sao lưu thay đổi trong các thư mục này trước khi gỡ.
+Đóng và mở lại toàn bộ terminal/VS Code sau khi gỡ.
+
+Bản cũ có thể chỉ in trợ giúp khi gọi `vpp gỡ cài đặt`. Nếu không có bộ gỡ
+trong thư mục cài, dùng `uninstall-vpp.ps1` từ một bundle mới đầy đủ để gỡ bản cũ:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\vpp-bin\uninstall-vpp.ps1 -InstallDir "$env:LOCALAPPDATA\Programs\VPP"
+```
+
+Chỉ chạy lệnh trên khi file script thực sự tồn tại. Giải nén bundle mới vào thư mục
+trống để tránh trộn file cũ/mới. Thay đổi source không tự cập nhật ZIP đã phát hành;
+cài lại cùng ZIP cũ không bổ sung lệnh gỡ hoặc bản sửa UTF-8.
+
 ## Đánh giá Homebrew và winget
 
 **Homebrew:** phù hợp sau khi contract 1.0 được freeze. Formula nên cài nội dung artifact macOS

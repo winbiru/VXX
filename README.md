@@ -64,6 +64,8 @@ vpp giúp đỡ
 
 ### Windows (PowerShell)
 
+Hướng dẫn [gỡ cài đặt Windows](docs/installation.md#gỡ-trên-windows) có cả cách xử lý bản cũ chưa nhận lệnh gỡ.
+
 Mở Windows PowerShell 5.1 hoặc PowerShell 7 và chạy từng lệnh dưới đây.
 Sao chép URL nguyên dạng trong khối lệnh, không dùng cú pháp Markdown `[URL](URL)`.
 
