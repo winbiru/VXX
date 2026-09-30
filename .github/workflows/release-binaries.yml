@@ -49,7 +49,9 @@ jobs:
         shell: pwsh
         run: |
           ctest --test-dir build -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Windows CTest failed; release packaging stopped" }
           python scripts/quality/rc-hardening.py --vpp build/bin/Release/vpp-cli.exe
+          if ($LASTEXITCODE -ne 0) { throw "Windows RC hardening failed" }
 
       - name: Package (Linux/macOS)
         if: runner.os != 'Windows'
