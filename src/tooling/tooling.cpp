@@ -1,6 +1,7 @@
 #include "vpp/tooling/tooling.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <iomanip>
 #include <sstream>
@@ -13,7 +14,9 @@
 #include "frontend/lexer.h"
 #include "vpp/bytecode/opcode.h"
 #include "vpp/compiler/pipeline.h"
+#include "vpp/compiler/module_graph.h"
 #include "vpp/compiler/semantic.h"
+#include "vpp/core/project_layout.h"
 #include "vpp/frontend/parser.h"
 
 namespace vietvm::tooling {
@@ -847,7 +850,31 @@ std::vector<LintDiagnostic> lintDiagnostics(
         const auto tokens = vietvm::compiler::postProcessTokensWithSpans(
             vietvm::compiler::tokenizeWithSpans(source));
         const auto program = vietvm::frontend::parseTokens(tokens);
-        const auto semantic = vietvm::compiler::analyzeSemantics(program);
+        vietvm::compiler::SemanticEnvironment semanticEnvironment;
+        std::vector<vietvm::frontend::AstImportSpec> localImports;
+        for (const auto &statement : program.statements) {
+            if (statement.kind == vietvm::frontend::AstStatementKind::Import &&
+                statement.importForm == vietvm::frontend::AstImportForm::LocalSourceFile &&
+                !statement.importSpec.target.empty() && statement.importSpec.hasSemicolon) {
+                localImports.push_back(statement.importSpec);
+            }
+        }
+        if (!localImports.empty()) {
+            std::optional<std::filesystem::path> installationHome;
+            if (const char *vppHome = std::getenv(vietvm::core::kEnvVppHome)) {
+                installationHome = vietvm::core::utf8Path(vppHome);
+            }
+            const auto moduleIndex = vietvm::compiler::buildLocalModuleSemanticIndex(
+                vietvm::compiler::LocalModuleResolver(resolutionBase, installationHome),
+                std::string(vietvm::compiler::kCurrentCompilationModuleIdentity),
+                localImports,
+                vietvm::compiler::ModuleIndexMode::Recursive);
+            semanticEnvironment = moduleIndex.semanticEnvironmentFor(
+                vietvm::compiler::kCurrentCompilationModuleIdentity);
+        }
+        const auto semantic = vietvm::compiler::analyzeSemantics(
+            program, semanticEnvironment,
+            vietvm::compiler::ResolutionPolicy::PreserveLegacy);
         diagnostics.reserve(semantic.diagnostics.size());
         for (const auto &diagnostic : semantic.diagnostics) {
             diagnostics.push_back({

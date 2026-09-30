@@ -1,4 +1,3 @@
-// vpp-parity: requires-package-environment
 nhập registry-demo;
 
 hàm main() {

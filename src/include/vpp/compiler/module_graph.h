@@ -108,6 +108,7 @@ struct ModuleExportSymbol {
     std::string name;
     SemanticSymbolKind kind = SemanticSymbolKind::Function;
     vietvm::frontend::SourceSpan declaration{};
+    std::filesystem::path sourcePath;
 };
 
 // Gom semantic model và danh sách export của một module local; index dùng record này để xây môi trường cho module phụ thuộc.

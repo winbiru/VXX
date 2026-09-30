@@ -66,7 +66,8 @@ bool isModuleExportVisibility(vietvm::frontend::AstVisibility visibility) noexce
 
 // Thu thập symbol được phép export của một module; hàm duyệt semantic model và giữ khai báo có visibility phù hợp cho module khác.
 std::vector<ModuleExportSymbol> moduleExports(
-    const vietvm::frontend::AstProgram &program) {
+    const vietvm::frontend::AstProgram &program,
+    const std::filesystem::path &sourcePath) {
     std::vector<ModuleExportSymbol> exports;
     for (const vietvm::frontend::AstStatement &statement : program.statements) {
         if (statement.declarationName.empty() ||
@@ -85,7 +86,7 @@ std::vector<ModuleExportSymbol> moduleExports(
             continue;
         }
         exports.push_back(
-            ModuleExportSymbol{statement.declarationName, kind, statement.span});
+            ModuleExportSymbol{statement.declarationName, kind, statement.span, sourcePath});
     }
     return exports;
 }
@@ -112,7 +113,7 @@ std::vector<ModuleExportSymbol> moduleHiddenSymbols(
             continue;
         }
         hidden.push_back(
-            ModuleExportSymbol{statement.declarationName, kind, statement.span});
+            ModuleExportSymbol{statement.declarationName, kind, statement.span, {}});
     }
     return hidden;
 }
@@ -319,7 +320,8 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
             environment.importedSymbols.push_back(
                 SemanticExternalSymbol{importedName,
                                        exported.kind,
-                                       exported.declaration});
+                                       exported.declaration,
+                                       exported.sourcePath.lexically_normal().u8string()});
         }
         for (const ModuleExportSymbol &hidden : record->hiddenSymbols) {
             const std::string importedName = edge.importSpec.alias.empty()
@@ -392,7 +394,7 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
             index.modules.push_back(
                 LocalModuleSemanticRecord{source.path,
                                           source.identity,
-                                          moduleExports(program),
+                                          moduleExports(program, source.path),
                                           moduleHiddenSymbols(program)});
             index.graph.modules.push_back(std::move(source));
         }
@@ -423,7 +425,7 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
         index.modules.push_back(
             LocalModuleSemanticRecord{source.path,
                                       source.identity,
-                                      moduleExports(program),
+                                      moduleExports(program, source.path),
                                       moduleHiddenSymbols(program)});
     }
     applyModuleReExports(index);

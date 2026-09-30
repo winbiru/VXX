@@ -106,6 +106,8 @@ jobs:
           Copy-Item examples dist/examples -Recurse
           Copy-Item scripts/windows/install-vpp.ps1 dist/install-vpp.ps1
           Copy-Item scripts/windows/install-vpp.cmd dist/install-vpp.cmd
+          Copy-Item scripts/windows/uninstall-vpp.ps1 dist/uninstall-vpp.ps1
+          Copy-Item scripts/windows/vpp-uninstall.cmd dist/vpp-uninstall.cmd
           Compress-Archive -Path dist/* -DestinationPath "${{ matrix.asset_name }}" -Force
 
       - name: Verify packaged artifact (Linux/macOS)
@@ -140,7 +142,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
           Expand-Archive -Path "${{ matrix.asset_name }}" -DestinationPath $extractDir -Force
           $installer = Join-Path $extractDir "install-vpp.ps1"
-          & $installer -InstallDir $installDir -NoPathUpdate
+          python scripts/quality/windows-install-smoke.py --archive $extractDir --install $installDir
           if ($LASTEXITCODE -ne 0) { throw "Artifact installation failed" }
           New-Item -ItemType File -Force -Path (Join-Path $installDir "gói/.release-smoke-stale") | Out-Null
           & $installer -InstallDir $installDir -NoPathUpdate

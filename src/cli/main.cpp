@@ -1608,6 +1608,36 @@ static fs::path filePathFromUri(const std::string &uri) {
     return vietvm::core::utf8Path(path);
 }
 
+static std::string fileUriFromPath(const fs::path &path) {
+    fs::path absolute = path;
+    try {
+        absolute = fs::absolute(path).lexically_normal();
+    } catch (...) {
+        absolute = path.lexically_normal();
+    }
+
+    const std::string raw = absolute.generic_u8string();
+    static constexpr char hex[] = "0123456789ABCDEF";
+    std::string encoded;
+    encoded.reserve(raw.size() + 16);
+    for (unsigned char value : raw) {
+        const bool safe = std::isalnum(value) || value == '/' || value == ':' ||
+                          value == '-' || value == '_' || value == '.' || value == '~';
+        if (safe) {
+            encoded.push_back(static_cast<char>(value));
+        } else {
+            encoded.push_back('%');
+            encoded.push_back(hex[(value >> 4) & 0x0F]);
+            encoded.push_back(hex[value & 0x0F]);
+        }
+    }
+#ifdef _WIN32
+    return "file:///" + encoded;
+#else
+    return "file://" + encoded;
+#endif
+}
+
 static bool analyzeLspDocument(const std::string &uri,
                                const std::string &text,
                                vietvm::compiler::CompilationContext &context,
@@ -1650,9 +1680,25 @@ static vietvm::frontend::SourceSpan lspDeclarationSpan(
         const auto *statement = findStatementByTokenBegin(artifacts.ast.statements, entry.first);
         if (statement == nullptr) continue;
         const std::size_t end = std::min(statement->tokenEnd, artifacts.ast.tokens.size());
+        std::size_t headerEnd = end;
         for (std::size_t index = statement->tokenBegin; index < end; ++index) {
-            if (artifacts.ast.tokens[index].lexeme == symbol.lookupName) {
-                return artifacts.ast.tokens[index].span;
+            const auto &lexeme = artifacts.ast.tokens[index].lexeme;
+            if (lexeme == "(" || lexeme == "{" || lexeme == ";") {
+                headerEnd = index;
+                break;
+            }
+        }
+        for (std::size_t begin = statement->tokenBegin; begin < headerEnd; ++begin) {
+            std::string candidate;
+            for (std::size_t finish = begin; finish < headerEnd; ++finish) {
+                if (!candidate.empty()) candidate.push_back(' ');
+                candidate += artifacts.ast.tokens[finish].lexeme;
+                if (candidate == symbol.lookupName) {
+                    auto span = artifacts.ast.tokens[begin].span;
+                    span.end = artifacts.ast.tokens[finish].span.end;
+                    return span;
+                }
+                if (candidate.size() >= symbol.lookupName.size()) break;
             }
         }
     }
@@ -1668,6 +1714,12 @@ static const vietvm::compiler::SemanticSymbol *symbolAtLspPosition(
             spanContainsOffset(lspDeclarationSpan(artifacts, symbol), offset)) {
             return &symbol;
         }
+    }
+
+    for (const auto &reference : model.references) {
+        if (!spanContainsOffset(reference.span, offset) || reference.resolvedSymbolId < 0) continue;
+        const std::size_t symbolId = static_cast<std::size_t>(reference.resolvedSymbolId);
+        if (symbolId < model.symbols.size()) return &model.symbols[symbolId];
     }
 
     const vietvm::frontend::AstExpression *bestExpression = nullptr;
@@ -1686,13 +1738,39 @@ static const vietvm::compiler::SemanticSymbol *symbolAtLspPosition(
             return &model.symbols[binding->symbol];
         }
     }
-
-    for (const auto &reference : model.references) {
-        if (!spanContainsOffset(reference.span, offset) || reference.resolvedSymbolId < 0) continue;
-        const std::size_t symbolId = static_cast<std::size_t>(reference.resolvedSymbolId);
-        if (symbolId < model.symbols.size()) return &model.symbols[symbolId];
-    }
     return nullptr;
+}
+
+static vietvm::frontend::SourceSpan lspSymbolSpanAtPosition(
+    const vietvm::compiler::CompilationArtifacts &artifacts,
+    const vietvm::compiler::SemanticSymbol &symbol,
+    std::size_t offset) {
+    const auto declaration = lspDeclarationSpan(artifacts, symbol);
+    if (spanContainsOffset(declaration, offset)) return declaration;
+
+    for (const auto &reference : artifacts.semantic.references) {
+        if (reference.resolvedSymbolId != static_cast<int>(symbol.id) ||
+            !spanContainsOffset(reference.span, offset)) {
+            continue;
+        }
+        return reference.span;
+    }
+
+    const vietvm::frontend::AstExpression *bestExpression = nullptr;
+    for (const auto &expression : artifacts.ast.expressions) {
+        if (!spanContainsOffset(expression.span, offset)) continue;
+        const auto *binding = artifacts.semantic.bindingForExpression(expression.id);
+        if (binding == nullptr || binding->kind != vietvm::compiler::BindingKind::Symbol ||
+            binding->symbol != symbol.id) {
+            continue;
+        }
+        if (bestExpression == nullptr ||
+            (expression.span.end.offset - expression.span.begin.offset) <
+                (bestExpression->span.end.offset - bestExpression->span.begin.offset)) {
+            bestExpression = &expression;
+        }
+    }
+    return bestExpression == nullptr ? declaration : bestExpression->span;
 }
 
 static const char *lspSymbolKindName(vietvm::compiler::SemanticSymbolKind kind) noexcept {
@@ -2002,8 +2080,21 @@ static int runLanguageServer() {
                 std::ostringstream response;
                 response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
                          << ",\"result\":";
-                if (symbol == nullptr || symbol->origin != vietvm::compiler::SymbolOrigin::Source) {
+                if (symbol == nullptr) {
                     response << "null";
+                } else if (symbol->origin == vietvm::compiler::SymbolOrigin::Imported &&
+                           !symbol->sourceIdentity.empty()) {
+                    try {
+                        const fs::path definitionPath =
+                            vietvm::core::utf8Path(symbol->sourceIdentity);
+                        const std::string definitionText = readFile(symbol->sourceIdentity);
+                        response << "{\"uri\":\""
+                                 << jsonEscape(fileUriFromPath(definitionPath))
+                                 << "\",\"range\":"
+                                 << lspRangeJson(definitionText, symbol->declaration) << '}';
+                    } catch (...) {
+                        response << "null";
+                    }
                 } else {
                     const auto declaration = lspDeclarationSpan(artifacts, *symbol);
                     response << "{\"uri\":\"" << jsonEscape(uri) << "\",\"range\":"
@@ -2021,10 +2112,10 @@ static int runLanguageServer() {
                 if (symbol == nullptr) {
                     response << "null";
                 } else {
-                    const auto declaration = lspDeclarationSpan(artifacts, *symbol);
+                    const auto hoverSpan = lspSymbolSpanAtPosition(artifacts, *symbol, offset);
                     response << "{\"contents\":{\"kind\":\"plaintext\",\"value\":\""
                              << jsonEscape(lspHoverText(*symbol)) << "\"},\"range\":"
-                             << lspRangeJson(text, declaration) << '}';
+                             << lspRangeJson(text, hoverSpan) << '}';
                 }
                 response << '}';
                 writeLspMessage(response.str());
@@ -2060,8 +2151,72 @@ static int runLanguageServer() {
 
 // Chạy CLI với argv đã chuẩn hóa UTF-8. Trên Windows, entry point `wmain`
 // chuyển command line UTF-16 sang UTF-8 trước khi đi vào parser này.
+static int uninstallVpp() {
+#if defined(_WIN32)
+    std::vector<wchar_t> executable(32768);
+    const DWORD length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
+    if (length == 0 || length >= executable.size()) {
+        throw std::runtime_error("Không thể xác định thư mục cài V++");
+    }
+    const fs::path installDir = fs::path(executable.data()).parent_path();
+    const fs::path script = installDir / L"uninstall-vpp.ps1";
+    if (!fs::exists(script)) {
+        throw std::runtime_error("Không tìm thấy bộ gỡ. Hãy cài lại bằng bộ cài Windows mới.");
+    }
+    wchar_t tempDirectory[MAX_PATH + 1]{};
+    wchar_t tempScript[MAX_PATH + 1]{};
+    const DWORD tempLength = GetTempPathW(MAX_PATH + 1, tempDirectory);
+    if (tempLength == 0 || tempLength > MAX_PATH ||
+        GetTempFileNameW(tempDirectory, L"vpp", 0, tempScript) == 0) {
+        throw std::runtime_error("Không thể tạo bộ gỡ tạm thời");
+    }
+    // The running executable is locked on Windows. A temporary child script
+    // waits for this process to exit before removing the installed files.
+    const fs::path temporaryScript = std::wstring(tempScript) + L".ps1";
+    try {
+        fs::rename(tempScript, temporaryScript);
+        fs::copy_file(script, temporaryScript, fs::copy_options::overwrite_existing);
+        wchar_t systemDirectory[MAX_PATH + 1]{};
+        const UINT systemLength = GetSystemDirectoryW(systemDirectory, MAX_PATH + 1);
+        if (systemLength == 0 || systemLength > MAX_PATH) {
+            throw std::runtime_error("Không thể tìm Windows PowerShell");
+        }
+        const fs::path powershell = fs::path(systemDirectory) / L"WindowsPowerShell/v1.0/powershell.exe";
+        std::wstring command = L"\"" + powershell.wstring() +
+            L"\" -NoProfile -ExecutionPolicy Bypass -File \"" + temporaryScript.wstring() +
+            L"\" -InstallDir \"" + installDir.wstring() +
+            L"\" -WaitForProcessId " + std::to_wstring(GetCurrentProcessId()) +
+            L" -RemoveSelf";
+        STARTUPINFOW startup{};
+        startup.cb = sizeof(startup);
+        PROCESS_INFORMATION process{};
+        if (!CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr,
+                            FALSE, 0, nullptr, nullptr, &startup, &process)) {
+            throw std::runtime_error("Không thể khởi động bộ gỡ V++");
+        }
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+    } catch (...) {
+        std::error_code ignored;
+        fs::remove(tempScript, ignored);
+        fs::remove(temporaryScript, ignored);
+        throw;
+    }
+    std::cout << "Đã khởi động bộ gỡ V++. Bộ gỡ sẽ tiếp tục sau khi lệnh này thoát.\n";
+    return EXIT_SUCCESS;
+#else
+    std::cerr << "Lệnh gỡ cài đặt hiện chỉ hỗ trợ Windows.\n";
+    return EXIT_FAILURE;
+#endif
+}
+
 static int runCli(int argc, char* argv[]) {
     try {
+        if ((argc == 4 && std::string(argv[1]) == "gỡ" &&
+             std::string(argv[2]) == "cài" && std::string(argv[3]) == "đặt") ||
+            (argc == 2 && std::string(argv[1]) == "gỡ cài đặt")) {
+            return uninstallVpp();
+        }
         if (argc >= 2) {
             std::string command = argv[1];
             int commandWordOffset = 0;
@@ -2301,7 +2456,7 @@ static int runCli(int argc, char* argv[]) {
                 }
             }
         } else {
-            std::cerr << messages::formatMessage(messages::kCliTestsDirectoryMissing) << '\n';
+            printUsage();
         }
 
     } catch (const vietvm::runtime::RuntimeError &error) {
@@ -2317,6 +2472,26 @@ static int runCli(int argc, char* argv[]) {
 }
 
 #if defined(_WIN32)
+// Console code pages belong to the shared console; restore them on exit.
+// Redirected output remains UTF-8 bytes, including the LSP transport.
+class WindowsUtf8ConsoleGuard {
+public:
+    WindowsUtf8ConsoleGuard()
+        : input_(GetConsoleCP()), output_(GetConsoleOutputCP()) {
+        if (input_ != 0) SetConsoleCP(CP_UTF8);
+        if (output_ != 0) SetConsoleOutputCP(CP_UTF8);
+    }
+    ~WindowsUtf8ConsoleGuard() {
+        std::cout.flush();
+        std::cerr.flush();
+        if (input_ != 0) SetConsoleCP(input_);
+        if (output_ != 0) SetConsoleOutputCP(output_);
+    }
+private:
+    UINT input_;
+    UINT output_;
+};
+
 // Chuyển một đối số UTF-16 do Windows CRT cung cấp thành UTF-8 để toàn bộ
 // parser CLI dùng cùng encoding với source code và thông báo tiếng Việt.
 static std::string wideArgumentToUtf8(const wchar_t *argument) {
@@ -2341,6 +2516,7 @@ static std::string wideArgumentToUtf8(const wchar_t *argument) {
 // Windows truyền command line Unicode qua `wmain`; chuẩn hóa một lần tại biên
 // hệ điều hành rồi giữ parser/command contract nội bộ hoàn toàn bằng UTF-8.
 int wmain(int argc, wchar_t *argv[]) {
+    WindowsUtf8ConsoleGuard consoleEncoding;
     try {
         std::vector<std::string> utf8Arguments;
         utf8Arguments.reserve(static_cast<std::size_t>(argc));
