@@ -176,6 +176,15 @@ TESTS=(
   src/tests/kiem_tra_goi_kiem_thu.vi
   src/tests/kiem_tra_goi_mang.vi
   src/tests/kiem_tra_stdlib_nen_tang.vi
+  src/tests/kiem_tra_goi_ham.vi
+  src/tests/kiem_tra_tuy_chon_thong_ke.vi
+  src/tests/kiem_tra_gia_tri.vi
+  src/tests/kiem_tra_dinh_dang.vi
+  src/tests/kiem_tra_bo_noi_chuoi.vi
+  src/tests/kiem_tra_luong_du_lieu.vi
+  src/tests/kiem_tra_codec_uuid_bitset.vi
+  src/tests/kiem_tra_quet_tach_chuoi.vi
+  src/tests/kiem_tra_su_kien.vi
   src/tests/kiem_tra_json_phan_tich.vi
   src/tests/kiem_tra_json_an_toan.vi
   src/tests/kiem_tra_json_file_roundtrip.vi

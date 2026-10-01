@@ -1,0 +1,171 @@
+// Module: lõi.sự kiện
+// Event emitter đồng bộ, bounded, snapshot-based.
+// Service/provider loading thuộc cùng spec nhưng cần module registry runtime và
+// chưa được giả lập ở đây.
+
+hàm sự kiện yêu cầu bộ phát(emitter) {
+    nếu (loại của(emitter) != "từ điển") {
+        ném "LISTENER_STATE";
+    };
+    nếu (lấy map(emitter, "__vpp_event_emitter__", 0) != 1) {
+        ném "LISTENER_STATE";
+    };
+    trả về đúng;
+};
+
+hàm sự kiện yêu cầu đăng ký(registration) {
+    nếu (loại của(registration) != "từ điển") {
+        ném "LISTENER_STATE";
+    };
+    nếu (lấy map(registration, "__vpp_event_registration__", 0) != 1) {
+        ném "LISTENER_STATE";
+    };
+    trả về đúng;
+};
+
+hàm bộ phát sự kiện(giới_hạn_listener = 1024, chính_sách_lỗi = "ném đầu") {
+    nếu (loại của(giới_hạn_listener) != "số nguyên") {
+        ném "LISTENER_STATE";
+    };
+    nếu (giới_hạn_listener <= 0) {
+        ném "LISTENER_STATE";
+    };
+    nếu (chính_sách_lỗi != "ném đầu" && chính_sách_lỗi != "thu thập") {
+        ném "LISTENER_STATE";
+    };
+
+    trả về {
+        "__vpp_event_emitter__": 1,
+        "giới hạn": giới_hạn_listener,
+        "chính sách lỗi": chính_sách_lỗi,
+        "đăng ký": [],
+        "id kế tiếp": 1
+    };
+};
+
+hàm tạo sự kiện(nguồn, payload, metadata = rỗng) {
+    meta = metadata;
+    nếu (meta == rỗng) {
+        meta = {};
+    } nếu không {
+        nếu (loại của(meta) != "từ điển") {
+            ném "LISTENER_STATE";
+        };
+    };
+    trả về {
+        "__vpp_event__": 1,
+        "nguồn": nguồn,
+        "payload": payload,
+        "metadata": meta
+    };
+};
+
+// Loại registration đã hủy/một-lần khỏi emitter. Registration object trả cho
+// caller vẫn tồn tại và giữ trạng thái inactive của chính nó.
+hàm sự kiện gom đăng ký(emitter) {
+    sự kiện yêu cầu bộ phát(emitter);
+    hiện_tại = lấy map(emitter, "đăng ký", []);
+    đang_hoạt_động = [];
+    lặp(i = 0; i < độ dài(hiện_tại); i++) {
+        reg = hiện_tại[i];
+        nếu (loại của(reg) == "từ điển") {
+            nếu (lấy map(reg, "__vpp_event_registration__", 0) == 1) {
+                nếu (lấy map(reg, "hoạt động", 0) == 1) {
+                    thêm(đang_hoạt_động, reg);
+                };
+            };
+        };
+    };
+    đặt map(emitter, "đăng ký", đang_hoạt_động);
+    trả về đang_hoạt_động;
+};
+
+hàm số listener(emitter) {
+    đang_hoạt_động = sự kiện gom đăng ký(emitter);
+    trả về độ dài(đang_hoạt_động);
+};
+
+hàm đăng ký sự kiện(emitter, listener, một_lần = sai) {
+    sự kiện yêu cầu bộ phát(emitter);
+    nếu (listener == rỗng) {
+        ném "LISTENER_STATE";
+    };
+
+    hiện_tại = sự kiện gom đăng ký(emitter);
+    giới_hạn = lấy map(emitter, "giới hạn", 1024);
+    nếu (độ dài(hiện_tại) >= giới_hạn) {
+        ném "LISTENER_LIMIT";
+    };
+
+    id = lấy map(emitter, "id kế tiếp", 1);
+    đặt map(emitter, "id kế tiếp", id + 1);
+    reg = {
+        "__vpp_event_registration__": 1,
+        "id": id,
+        "listener": listener,
+        "một lần": một_lần,
+        "hoạt động": 1
+    };
+    thêm(hiện_tại, reg);
+    trả về reg;
+};
+
+// Idempotent: trả đúng nếu lời gọi này chuyển active -> inactive, sai nếu đã hủy.
+hàm hủy đăng ký(registration) {
+    sự kiện yêu cầu đăng ký(registration);
+    nếu (lấy map(registration, "hoạt động", 0) != 1) {
+        trả về sai;
+    };
+    đặt map(registration, "hoạt động", 0);
+    trả về đúng;
+};
+
+// Snapshot copy chỉ giữ dữ liệu cần cho dispatch. Vì vậy callback đăng ký/hủy
+// listener chỉ ảnh hưởng lần phát kế tiếp; listener đã có trong snapshot vẫn
+// được gọi trong lần phát hiện tại.
+hàm sự kiện snapshot(emitter) {
+    hiện_tại = sự kiện gom đăng ký(emitter);
+    snapshot = [];
+    lặp(i = 0; i < độ dài(hiện_tại); i++) {
+        reg = hiện_tại[i];
+        thêm(snapshot, {
+            "listener": lấy map(reg, "listener", rỗng),
+            "một lần": lấy map(reg, "một lần", sai),
+            "registration": reg
+        });
+    };
+    trả về snapshot;
+};
+
+hàm phát sự kiện(emitter, event) {
+    sự kiện yêu cầu bộ phát(emitter);
+    snapshot = sự kiện snapshot(emitter);
+    chính_sách = lấy map(emitter, "chính sách lỗi", "ném đầu");
+    lỗi = [];
+    đã_gọi = 0;
+
+    lặp(i = 0; i < độ dài(snapshot); i++) {
+        mục = snapshot[i];
+        listener = lấy map(mục, "listener", rỗng);
+        reg = lấy map(mục, "registration", rỗng);
+
+        // Mark trước callback để reentrant emit vẫn đảm bảo at-most-once.
+        nếu (lấy map(mục, "một lần", sai)) {
+            đặt map(reg, "hoạt động", 0);
+        };
+
+        đã_gọi += 1;
+        nếu (chính_sách == "thu thập") {
+            thử {
+                listener(event);
+            } bắt lỗi (e) {
+                thêm(lỗi, e);
+            };
+        } nếu không {
+            listener(event);
+        };
+    };
+
+    sự kiện gom đăng ký(emitter);
+    trả về {"đã gọi": đã_gọi, "lỗi": lỗi};
+};

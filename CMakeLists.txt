@@ -95,6 +95,7 @@ set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/object.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_format_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_http_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_json_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_helpers.cpp

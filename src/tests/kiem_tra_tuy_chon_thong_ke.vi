@@ -1,0 +1,52 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    in có giá trị(7);
+    in có giá trị(rỗng);
+    in hoặc giá trị(7, 99);
+    in hoặc giá trị(rỗng, 99);
+
+    gọi_supplier = 0;
+    supplier = hàm() {
+        gọi_supplier += 1;
+        trả về 42;
+    };
+    in hoặc tạo(5, supplier);
+    in gọi_supplier;
+    in hoặc tạo(rỗng, supplier);
+    in gọi_supplier;
+
+    nhân_đôi = hàm(x) { trả về x * 2; };
+    lớn_hơn_5 = hàm(x) { trả về x > 5; };
+    in ánh xạ tùy chọn(3, nhân_đôi);
+    in ánh xạ tùy chọn(rỗng, nhân_đôi) == rỗng;
+    in lọc tùy chọn(8, lớn_hơn_5);
+    in lọc tùy chọn(2, lớn_hơn_5) == rỗng;
+
+    s = thống kê số nguyên([1, 2, 3, 4]);
+    in lấy map(s, "đếm", -1);
+    in lấy map(s, "tổng", -1);
+    in lấy map(s, "nhỏ nhất", -1);
+    in lấy map(s, "lớn nhất", -1);
+    in lấy map(s, "trung bình", -1);
+
+    r = thống kê số thực([1, 2.5, 4]);
+    in lấy map(r, "đếm", -1);
+    in lấy map(r, "tổng", -1);
+    in lấy map(r, "nhỏ nhất", -1);
+    in lấy map(r, "lớn nhất", -1);
+    in lấy map(r, "trung bình", -1);
+
+    trống = thống kê số nguyên([]);
+    in lấy map(trống, "đếm", -1);
+    in lấy map(trống, "nhỏ nhất", 123) == rỗng;
+
+    a = thống kê số nguyên([1, 2]);
+    b = thống kê số nguyên([3, 4]);
+    g = gộp thống kê(a, b);
+    in lấy map(g, "đếm", -1);
+    in lấy map(g, "tổng", -1);
+    in lấy map(g, "nhỏ nhất", -1);
+    in lấy map(g, "lớn nhất", -1);
+    in lấy map(g, "trung bình", -1);
+};

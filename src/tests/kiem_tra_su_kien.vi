@@ -1,0 +1,98 @@
+nhập gói/chuẩn/main;
+
+hàm ghi danh sách(ds) {
+    lặp(i = 0; i < độ dài(ds); i++) {
+        in ds[i];
+    };
+};
+
+hàm main() {
+    nhật_ký = [];
+    emitter = bộ phát sự kiện(8, "thu thập");
+
+    listener_a = hàm(e) {
+        thêm(nhật_ký, "a:" + lấy map(e, "payload", ""));
+    };
+    listener_b = hàm(e) {
+        thêm(nhật_ký, "b:" + lấy map(e, "payload", ""));
+    };
+    đăng ký sự kiện(emitter, listener_a);
+    đăng ký sự kiện(emitter, listener_b);
+    báo_cáo = phát sự kiện(emitter, tạo sự kiện("test", "x"));
+    ghi danh sách(nhật_ký);
+    in lấy map(báo_cáo, "đã gọi", -1);
+    in độ dài(lấy map(báo_cáo, "lỗi", []));
+
+    một_lần = 0;
+    listener_once = hàm(e) {
+        một_lần += 1;
+    };
+    đăng ký sự kiện(emitter, listener_once, đúng);
+    phát sự kiện(emitter, tạo sự kiện("test", "y"));
+    phát sự kiện(emitter, tạo sự kiện("test", "z"));
+    in một_lần;
+
+    mutation_log = [];
+    mutation_emitter = bộ phát sự kiện(8, "thu thập");
+    đã_thêm = 0;
+    listener_mới = hàm(inner) {
+        thêm(mutation_log, "mới");
+    };
+    listener_đầu = hàm(e) {
+        thêm(mutation_log, "đầu");
+        nếu (!đã_thêm) {
+            đã_thêm = 1;
+            đăng ký sự kiện(mutation_emitter, listener_mới);
+        };
+    };
+    listener_cuối = hàm(e) {
+        thêm(mutation_log, "cuối");
+    };
+    đăng ký sự kiện(mutation_emitter, listener_đầu);
+    đăng ký sự kiện(mutation_emitter, listener_cuối);
+    phát sự kiện(mutation_emitter, tạo sự kiện("test", 1));
+    ghi danh sách(mutation_log);
+    mutation_log = [];
+    phát sự kiện(mutation_emitter, tạo sự kiện("test", 2));
+    ghi danh sách(mutation_log);
+
+    cancel_emitter = bộ phát sự kiện(2);
+    listener_hủy = hàm(e) { in "không in"; };
+    bị_hủy = đăng ký sự kiện(cancel_emitter, listener_hủy);
+    in hủy đăng ký(bị_hủy);
+    in hủy đăng ký(bị_hủy);
+    in số listener(cancel_emitter);
+
+    limit_emitter = bộ phát sự kiện(1);
+    listener_limit_1 = hàm(e) { trả về rỗng; };
+    listener_limit_2 = hàm(e) { trả về rỗng; };
+    đăng ký sự kiện(limit_emitter, listener_limit_1);
+    thử {
+        đăng ký sự kiện(limit_emitter, listener_limit_2);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    error_emitter = bộ phát sự kiện(4, "thu thập");
+    listener_lỗi = hàm(e) { ném "boom"; };
+    listener_sau_lỗi = hàm(e) { thêm(nhật_ký, "sau lỗi"); };
+    đăng ký sự kiện(error_emitter, listener_lỗi);
+    đăng ký sự kiện(error_emitter, listener_sau_lỗi);
+    error_report = phát sự kiện(error_emitter, tạo sự kiện("test", 3));
+    in lấy map(error_report, "đã gọi", -1);
+    errors = lấy map(error_report, "lỗi", []);
+    in độ dài(errors);
+    in errors[0];
+    in nhật_ký[độ dài(nhật_ký) - 1];
+
+    throw_emitter = bộ phát sự kiện(2, "ném đầu");
+    listener_stop = hàm(e) { ném "stop"; };
+    listener_không_tới = hàm(e) { in "không tới"; };
+    đăng ký sự kiện(throw_emitter, listener_stop);
+    đăng ký sự kiện(throw_emitter, listener_không_tới);
+    thử {
+        phát sự kiện(throw_emitter, tạo sự kiện("test", 4));
+    } bắt lỗi (e) {
+        in e;
+    };
+};

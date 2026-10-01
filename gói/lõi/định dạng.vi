@@ -1,0 +1,17 @@
+// Module: lõi.định dạng
+// ABI V1 dùng một list đối số vì ngôn ngữ chưa có vararg public ổn định.
+// Backend native trả map {"giá trị", "lỗi"}; wrapper đổi FORMAT_* thành
+// language exception để caller có thể bắt bằng `thử`.
+
+hàm định dạng nội bộ(pattern, args, locale) {
+    ném "stdlib: định dạng native hook không khả dụng";
+};
+
+hàm định dạng(pattern, args, locale = rỗng) {
+    kết_quả = định dạng nội bộ(pattern, args, locale);
+    lỗi = lấy map(kết_quả, "lỗi", "FORMAT_INVALID");
+    nếu (lỗi != "") {
+        ném lỗi;
+    };
+    trả về lấy map(kết_quả, "giá trị", "");
+};

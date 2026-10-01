@@ -57,6 +57,64 @@ namespace fs = std::filesystem;
 constexpr std::size_t kSha256DigestSize = 32;
 constexpr int kMaxSecureRandomBytes = 4096;
 
+std::uint32_t fnv1a32(const unsigned char *bytes, std::size_t size) noexcept {
+    std::uint32_t hash = 2166136261u;
+    for (std::size_t index = 0; index < size; ++index) {
+        hash ^= static_cast<std::uint32_t>(bytes[index]);
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+std::uint32_t fnv1a32(const std::string &text) noexcept {
+    return fnv1a32(reinterpret_cast<const unsigned char *>(text.data()), text.size());
+}
+
+int foldPublicHash(std::uint32_t hash) noexcept {
+    return static_cast<int>(hash & 0x7fffffffu);
+}
+
+template <typename Handle>
+int identityHash(const Handle &handle) noexcept {
+    if (handle == nullptr) return 0;
+    const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(handle.get());
+    std::uint32_t folded = static_cast<std::uint32_t>(address);
+    if constexpr (sizeof(std::uintptr_t) > sizeof(std::uint32_t)) {
+        folded ^= static_cast<std::uint32_t>(address >> 32u);
+    }
+    folded ^= 0x9e3779b9u;
+    folded *= 16777619u;
+    return foldPublicHash(folded);
+}
+
+int valueHash(const StackValue &value) {
+    if (std::holds_alternative<std::monostate>(value)) return 0;
+    if (isNumeric(value)) {
+        double number = toDouble(value);
+        if (number == 0.0) number = 0.0; // +0.0 và -0.0 có equality giống nhau.
+        return foldPublicHash(fnv1a32(std::string("n:") + formatRuntimeFloat(number)));
+    }
+    if (std::holds_alternative<std::string>(value)) {
+        return foldPublicHash(fnv1a32(std::string("s:") + std::get<std::string>(value)));
+    }
+    if (std::holds_alternative<MapHandle>(value)) {
+        return identityHash(std::get<MapHandle>(value));
+    }
+    if (std::holds_alternative<ListHandle>(value)) {
+        return identityHash(std::get<ListHandle>(value));
+    }
+    if (std::holds_alternative<TupleHandle>(value)) {
+        return identityHash(std::get<TupleHandle>(value));
+    }
+    if (std::holds_alternative<ClassHandle>(value)) {
+        return identityHash(std::get<ClassHandle>(value));
+    }
+    if (std::holds_alternative<InstanceHandle>(value)) {
+        return identityHash(std::get<InstanceHandle>(value));
+    }
+    return identityHash(std::get<ClosureHandle>(value));
+}
+
 std::string bytesToLowerHex(const unsigned char *bytes, std::size_t size) {
     static constexpr char kHex[] = "0123456789abcdef";
     std::string result;
@@ -539,6 +597,12 @@ bool handleNativeFoundationFunction(const std::string &fn,
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnTypeOf)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         result = make_string_value(runtimeTypeName(args[0]));
+        return true;
+    }
+
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnValueHash)) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        result = make_int_value(valueHash(args[0]));
         return true;
     }
 

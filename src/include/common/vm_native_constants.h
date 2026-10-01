@@ -138,6 +138,14 @@ inline constexpr std::array<const char *, 2> kFnTypeOf = {
     "loai_cua", "loại của"
 };
 
+inline constexpr std::array<const char *, 2> kFnValueHash = {
+    "bam_gia_tri", "băm giá trị"
+};
+
+inline constexpr std::array<const char *, 2> kFnFormatInternal = {
+    "dinh_dang_noi_bo", "định dạng nội bộ"
+};
+
 inline constexpr std::array<const char *, 2> kFnRandomInt = {
     "ngau_nhien_nguyen", "ngẫu nhiên nguyên"
 };

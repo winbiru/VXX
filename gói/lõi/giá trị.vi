@@ -1,0 +1,61 @@
+// Module: lõi.giá trị
+// Các helper tương ứng nhóm java.util.Objects nhưng giữ semantics V++:
+// rỗng là null, collection/object mutable dùng equality/hash theo identity.
+
+hàm bằng giá trị(a, b) {
+    trả về a == b;
+};
+
+// Native hook: scalar hash ổn định theo value; reference value dùng identity
+// hash trong process để luôn giữ invariant a == b => hash(a) == hash(b).
+hàm băm giá trị(giá_trị) {
+    ném "stdlib: băm giá trị native hook không khả dụng";
+};
+
+hàm yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") {
+    nếu (giá_trị == rỗng) {
+        ném thông_điệp;
+    };
+    trả về giá_trị;
+};
+
+// Tương đương Objects.checkIndex: trả lại index hợp lệ để dùng trực tiếp.
+hàm index hợp lệ(chỉ_số, kích_thước) {
+    nếu (loại của(chỉ_số) != "số nguyên" ||
+        loại của(kích_thước) != "số nguyên") {
+        ném "VALUE_INDEX";
+    };
+    nếu (kích_thước < 0 || chỉ_số < 0 || chỉ_số >= kích_thước) {
+        ném "VALUE_INDEX";
+    };
+    trả về chỉ_số;
+};
+
+// Khoảng nửa kín [bắt_đầu, kết_thúc), tương đương checkFromToIndex.
+hàm khoảng index hợp lệ(bắt_đầu, kết_thúc, kích_thước) {
+    nếu (loại của(bắt_đầu) != "số nguyên" ||
+        loại của(kết_thúc) != "số nguyên" ||
+        loại của(kích_thước) != "số nguyên") {
+        ném "VALUE_INDEX";
+    };
+    nếu (kích_thước < 0 || bắt_đầu < 0 || kết_thúc < bắt_đầu ||
+        kết_thúc > kích_thước) {
+        ném "VALUE_INDEX";
+    };
+    trả về bắt_đầu;
+};
+
+// Vùng [bắt_đầu, bắt_đầu+số_lượng), tránh cộng trước kiểm tra để không làm
+// overflow phép cộng trên ABI i32 hiện tại.
+hàm vùng index hợp lệ(bắt_đầu, số_lượng, kích_thước) {
+    nếu (loại của(bắt_đầu) != "số nguyên" ||
+        loại của(số_lượng) != "số nguyên" ||
+        loại của(kích_thước) != "số nguyên") {
+        ném "VALUE_INDEX";
+    };
+    nếu (kích_thước < 0 || bắt_đầu < 0 || số_lượng < 0 ||
+        bắt_đầu > kích_thước || số_lượng > kích_thước - bắt_đầu) {
+        ném "VALUE_INDEX";
+    };
+    trả về bắt_đầu;
+};

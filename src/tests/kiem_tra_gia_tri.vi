@@ -1,0 +1,44 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    in bằng giá trị(1, 1.0);
+    in bằng giá trị("abc", "abc");
+    in bằng giá trị(rỗng, rỗng);
+    in bằng giá trị("1", 1);
+
+    in băm giá trị(1) == băm giá trị(1.0);
+    in băm giá trị(0.0) == băm giá trị(-0.0);
+    in băm giá trị("abc") == băm giá trị("abc");
+    in băm giá trị(rỗng);
+    ds = [1, 2];
+    alias = ds;
+    in băm giá trị(ds) == băm giá trị(alias);
+
+    in yêu cầu không null(7);
+    thử {
+        yêu cầu không null(rỗng);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    in index hợp lệ(2, 3);
+    thử {
+        index hợp lệ(3, 3);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    in khoảng index hợp lệ(1, 3, 3);
+    thử {
+        khoảng index hợp lệ(2, 1, 3);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    in vùng index hợp lệ(1, 2, 3);
+    thử {
+        vùng index hợp lệ(2, 2, 3);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

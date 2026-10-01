@@ -1,0 +1,56 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    in base64 mã([77, 97, 110]);
+    in base64 mã([77, 97]);
+    in base64 mã([77]);
+    in base64 mã([251, 255], "URL_AN_TOÀN");
+    in base64 giải("TWFu");
+    in base64 giải("TWE=");
+    in base64 giải("TQ==");
+    in base64 giải("-_8=", "URL_AN_TOÀN");
+    in base64 mã([77], "CHUẨN", sai);
+    in base64 giải("TQ");
+    thử {
+        base64 giải("TQ=");
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    in hex mã([0, 15, 16, 255]);
+    in hex mã([0, 15, 16, 255], đúng, ":");
+    in hex giải("000f10ff");
+    in hex giải("00:0F:10:FF", ":");
+
+    id = uuid ngẫu nhiên();
+    in độ dài(id) == 36;
+    in id[14] == "4";
+    in chứa chuỗi("89ab", id[19]);
+    in uuid text(uuid parse("550E8400-E29B-41D4-A716-446655440000"));
+
+    a = tập bit();
+    bit đặt(a, 1);
+    bit đặt(a, 5);
+    bit đặt(a, 9);
+    in bit có(a, 5);
+    in bit có(a, 6);
+    in bit tiếp đặt(a, 2);
+    in bit độ dài(a);
+    in bit số bit(a);
+    bit lật(a, 5);
+    in bit có(a, 5);
+
+    b = tập bit();
+    bit đặt(b, 1);
+    bit đặt(b, 2);
+    bit đặt(b, 9);
+    in bit số bit(bit và(a, b));
+    in bit số bit(bit hoặc(a, b));
+    in bit số bit(bit xor(a, b));
+
+    thử {
+        bit có(a, "1");
+    } bắt lỗi (e) {
+        in e;
+    };
+};
