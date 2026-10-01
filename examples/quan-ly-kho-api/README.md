@@ -200,18 +200,14 @@ và các đặc tính phi chức năng như hiệu năng JIT hay thời điểm 
 Sau khi cài V++0.9 và đứng tại thư mục `examples/quan-ly-kho-api`:
 
 ```bash
-python3 scripts/verify_http.py
+VPP_WAREHOUSE_PORT=18081 vpp chạy src/main.vi
+# Mở terminal khác:
+VPP_WAREHOUSE_PORT=18081 vpp chạy scripts/verify_http.vi
 ```
 
-Script chạy bản sao ứng dụng trong thư mục tạm, tự chọn một localhost port đang trống (hoặc dùng
-`VPP_WAREHOUSE_PORT` nếu được đặt), kiểm tra transaction rollback, feature gate,
-CRUD/search sản phẩm, request health đồng thời và toàn bộ endpoint qua TCP localhost. Sau đó script
-chạy 25 vòng đặt–hủy và xác minh dữ liệu vẫn đúng sau khi server khởi động lại.
-
-Nếu môi trường sandbox cấm bind localhost socket, script kết thúc với mã `77` và thông báo `SKIP`
-để phân biệt giới hạn hạ tầng với lỗi của application/runtime.
-
-Script ưu tiên executable theo thứ tự `VPP_EXEC`, build local của repository, binary `vpp` nằm
-cạnh thư mục `examples` trong release, rồi mới tới `vpp` trong `PATH`. Vì vậy cùng một script
+Chương trình `.vi` kiểm tra feature gate, CRUD/search sản phẩm, Unicode JSON,
+đặt/hủy đơn hàng và báo cáo qua HTTP localhost bằng chính HTTP client của V++.
+Workflow release tự khởi động server, đặt `VPP_WAREHOUSE_PORT=18081`, chạy
+`scripts/verify_http.vi`, rồi dừng server.
 có thể dùng cho cả release V++0.9 lẫn quá trình phát triển compiler tại local.
 Server được dừng khi hoàn tất; script in thư mục chứa dữ liệu kiểm chứng.

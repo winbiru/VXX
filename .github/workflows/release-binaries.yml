@@ -151,7 +151,15 @@ jobs:
           VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" dựng "$INSTALL_DIR/examples/quan-ly-kho-api/src/main.vi"
           (
             cd "$INSTALL_DIR/examples/quan-ly-kho-api"
-            VPP_EXEC="$INSTALL_DIR/vpp" python3 scripts/verify_http.py
+            export VPP_HOME="$INSTALL_DIR"
+            export VPP_WAREHOUSE_PORT=18081
+            "$INSTALL_DIR/vpp" chạy src/main.vi >"$VERIFY_ROOT/warehouse-server.log" 2>&1 &
+            SERVER_PID=$!
+            trap 'kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
+            "$INSTALL_DIR/vpp" chạy scripts/verify_http.vi
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+            trap - EXIT
           )
 
           PROFILE_HOME="$VERIFY_ROOT/home"
@@ -200,9 +208,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Artifact build verification failed" }
           Push-Location $sample
           try {
-            $env:VPP_EXEC = $vpp
-            python scripts/verify_http.py
-            if ($LASTEXITCODE -ne 0) { throw "Artifact HTTP verification failed" }
+            $env:VPP_WAREHOUSE_PORT = "18081"
+            $serverOut = Join-Path $verifyRoot "warehouse-server.out"
+            $serverErr = Join-Path $verifyRoot "warehouse-server.err"
+            $server = Start-Process -FilePath $vpp -ArgumentList @("chạy", "src/main.vi") -WorkingDirectory $sample -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru -NoNewWindow
+            try {
+              & $vpp "chạy" "scripts/verify_http.vi"
+              if ($LASTEXITCODE -ne 0) { throw "Artifact .vi HTTP verification failed" }
+            }
+            finally {
+              if (-not $server.HasExited) {
+                Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+              }
+              $server.WaitForExit()
+            }
           }
           finally {
             Pop-Location

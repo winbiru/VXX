@@ -1,0 +1,117 @@
+nhập gói/chuẩn/main;
+
+hàm yêuCầu(điềuKiện, nhãn) {
+    nếu (!điềuKiện) {
+        ném "verify-http thất bại: " + nhãn;
+    };
+    trả về đúng;
+};
+
+hàm url(gốc, đườngDẫn) {
+    trả về gốc + đườngDẫn;
+};
+
+hàm lấyJson(gốc, đườngDẫn) {
+    trả về json phân tích(mạng lấy(url(gốc, đườngDẫn)));
+};
+
+hàm gửiJson(gốc, đườngDẫn, dữLiệu) {
+    trả về json phân tích(mạng gửi(url(gốc, đườngDẫn), json tạo(dữLiệu)));
+};
+
+hàm cậpNhậtJson(gốc, đườngDẫn, dữLiệu) {
+    trả về json phân tích(mạng cập nhật(url(gốc, đườngDẫn), json tạo(dữLiệu)));
+};
+
+hàm chờMáyChủ(gốc) {
+    lặp(i = 0; i < 50; i++) {
+        thử {
+            health = lấyJson(gốc, "/health");
+            nếu (lấy map(health, "trangThai", "") == "UP") {
+                trả về đúng;
+            };
+        } bắt lỗi (e) {
+        };
+        ngủ mili giây(100);
+    };
+    ném "verify-http thất bại: máy chủ không sẵn sàng";
+};
+
+hàm main() {
+    cổng = đọc biến môi trường("VPP_WAREHOUSE_PORT", "18081");
+    gốc = "http://127.0.0.1:" + cổng;
+    chờMáyChủ(gốc);
+
+    features = lấy map(lấyJson(gốc, "/features"), "duLieu", {});
+    yêuCầu(lấy map(features, "http_server_routing", sai), "feature gate");
+
+    sảnPhẩm = lấy map(
+        gửiJson(gốc, "/san-pham", {
+            "id": "SP-VERIFY",
+            "ten": "Cà phê \"Đậm\" ☕",
+            "gia": 180000,
+            "tonKho": 10
+        }),
+        "duLieu",
+        {}
+    );
+    yêuCầu(lấy map(sảnPhẩm, "id", "") == "SP-VERIFY", "tạo sản phẩm");
+    yêuCầu(lấy map(sảnPhẩm, "ten", "") == "Cà phê \"Đậm\" ☕", "Unicode JSON");
+
+    chiTiết = lấy map(
+        gửiJson(gốc, "/san-pham/chi-tiet", {"id": "SP-VERIFY"}),
+        "duLieu",
+        {}
+    );
+    yêuCầu(lấy map(chiTiết, "ten", "") == "Cà phê \"Đậm\" ☕", "đọc chi tiết");
+
+    tìmKiếm = lấy map(
+        gửiJson(gốc, "/san-pham/tim-kiem", {
+            "tuKhoa": "Đậm",
+            "trang": 1,
+            "kichThuoc": 10
+        }),
+        "duLieu",
+        {}
+    );
+    yêuCầu(lấy map(tìmKiếm, "tong", 0) >= 1, "tìm kiếm");
+
+    cậpNhật = lấy map(
+        cậpNhậtJson(gốc, "/san-pham", {
+            "id": "SP-VERIFY",
+            "ten": "Cà phê kiểm thử",
+            "gia": 190000,
+            "tonKho": 12
+        }),
+        "duLieu",
+        {}
+    );
+    yêuCầu(lấy map(cậpNhật, "gia", 0) == 190000, "cập nhật sản phẩm");
+    yêuCầu(lấy map(cậpNhật, "tonKho", 0) == 12, "cập nhật tồn kho");
+
+    đơn = lấy map(
+        gửiJson(gốc, "/don-hang", {
+            "khachHang": "Kiểm thử V++",
+            "sanPham": [
+                {"maSanPham": "SP-VERIFY", "soLuong": 2}
+            ]
+        }),
+        "duLieu",
+        {}
+    );
+    mãĐơn = lấy map(đơn, "id", "");
+    yêuCầu(mãĐơn != "", "tạo đơn hàng");
+    yêuCầu(lấy map(đơn, "tongTien", 0) == 380000, "tính tổng tiền");
+
+    đãHủy = lấy map(
+        gửiJson(gốc, "/don-hang/huy", {"id": mãĐơn}),
+        "duLieu",
+        {}
+    );
+    yêuCầu(lấy map(đãHủy, "trangThai", "") == "DA_HUY", "hủy đơn hàng");
+
+    báoCáo = lấy map(lấyJson(gốc, "/bao-cao"), "duLieu", {});
+    yêuCầu(lấy map(báoCáo, "soDonHang", 0) >= 1, "báo cáo");
+
+    in "PASS: V++ .vi HTTP release verification";
+};
