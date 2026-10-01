@@ -42,12 +42,14 @@ tiếp bằng `VPP_EXEC=./bin/vpp-cli ./run_tests.sh`.
 
 ## Cài Nhanh Không Cần Clone
 
-Ban co the tai file da build san tu GitHub Release.
+Bạn có thể cài trực tiếp từ GitHub Release `0.9.3`:
+
+https://github.com/winbiru/VXX/releases/tag/0.9.3
 
 ### Linux
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
 ./install-vpp.sh
 source "$HOME/.bashrc" 2>/dev/null || source "$HOME/.bash_profile"
@@ -57,7 +59,7 @@ vpp phiên bản
 ### macOS
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
 ./install-vpp.sh
 source "$HOME/.zshrc"
@@ -81,7 +83,7 @@ Mở Windows PowerShell 5.1 hoặc PowerShell 7 và chạy từng lệnh dưới
 Sao chép URL nguyên dạng trong khối lệnh, không dùng cú pháp Markdown `[URL](URL)`.
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
+Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
 Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
 $previousPolicy = Get-ExecutionPolicy -Scope Process
 try {

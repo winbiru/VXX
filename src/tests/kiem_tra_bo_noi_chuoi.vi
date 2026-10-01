@@ -1,0 +1,17 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    a = bộ nối chuỗi(", ", "[", "]");
+    in bộ nối kết quả(a);
+    bộ nối thêm(a, "một");
+    in bộ nối kết quả(a);
+    bộ nối thêm(a, "hai");
+    bộ nối thêm(a, 3);
+    in bộ nối kết quả(a);
+    in bộ nối số phần(a);
+
+    b = bộ nối chuỗi("|", "<", ">", "(trống)");
+    in bộ nối kết quả(b);
+    bộ nối thêm(b, "x");
+    in bộ nối kết quả(b);
+};

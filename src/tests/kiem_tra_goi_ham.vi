@@ -1,0 +1,42 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    tăng = hàm(x) { trả về x + 1; };
+    gấp đôi = hàm(x) { trả về x * 2; };
+    cộng = hàm(a, b) { trả về a + b; };
+
+    in áp dụng(tăng, 3);
+    in áp dụng hai(cộng, 4, 5);
+    in áp dụng(trước rồi(tăng, gấp đôi), 3);
+    in áp dụng(nối hàm(tăng, gấp đôi), 3);
+    in áp dụng(hàm đồng nhất(), 17);
+
+    ds = [tăng];
+    từ_list = ds[0];
+    in từ_list(9);
+
+    đếm = 0;
+    nhánh_phải = hàm(x) {
+        đếm += 1;
+        trả về x > 0;
+    };
+    luôn_sai = hàm(x) { trả về sai; };
+    luôn_đúng = hàm(x) { trả về đúng; };
+
+    in kiểm tra(và điều kiện(luôn_sai, nhánh_phải), 1);
+    in đếm;
+    in kiểm tra(hoặc điều kiện(luôn_đúng, nhánh_phải), 1);
+    in đếm;
+    in kiểm tra(phủ định điều kiện(luôn_sai), 1);
+
+    giá_trị_nhận = 0;
+    consumer = hàm(x) {
+        giá_trị_nhận = x;
+        trả về 999;
+    };
+    in nhận(consumer, 23) == rỗng;
+    in giá_trị_nhận;
+
+    supplier = hàm() { trả về 77; };
+    in lấy(supplier);
+};

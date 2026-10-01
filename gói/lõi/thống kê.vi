@@ -1,0 +1,108 @@
+// Module: lõi.thống kê
+// Summary statistics cho list số.
+
+hàm thống kê số nguyên(ds) {
+    n = độ dài(ds);
+    nếu (n == 0) {
+        trả về {
+            "đếm": 0,
+            "tổng": 0,
+            "nhỏ nhất": rỗng,
+            "lớn nhất": rỗng,
+            "trung bình": rỗng
+        };
+    };
+
+    lặp(i = 0; i < n; i++) {
+        nếu (loại của(ds[i]) != "số nguyên") {
+            ném "VALUE_STATS_INTEGER_REQUIRED";
+        };
+    };
+
+    tổng = tổng list(ds);
+    nhỏ = nhỏ nhất list(ds);
+    lớn = lớn nhất list(ds);
+    trung_bình = tổng / (n + 0.0);
+    trả về {
+        "đếm": n,
+        "tổng": tổng,
+        "nhỏ nhất": nhỏ,
+        "lớn nhất": lớn,
+        "trung bình": trung_bình
+    };
+};
+
+hàm thống kê số thực(ds) {
+    n = độ dài(ds);
+    nếu (n == 0) {
+        trả về {
+            "đếm": 0,
+            "tổng": 0.0,
+            "nhỏ nhất": rỗng,
+            "lớn nhất": rỗng,
+            "trung bình": rỗng
+        };
+    };
+
+    tổng = 0.0;
+    nhỏ = ds[0] + 0.0;
+    lớn = ds[0] + 0.0;
+    lặp(i = 0; i < n; i++) {
+        kiểu = loại của(ds[i]);
+        nếu (kiểu != "số nguyên" && kiểu != "số thực") {
+            ném "VALUE_STATS_NUMBER_REQUIRED";
+        };
+        giá_trị = ds[i] + 0.0;
+        tổng = tổng + giá_trị;
+        nếu (giá_trị < nhỏ) {
+            nhỏ = giá_trị;
+        };
+        nếu (giá_trị > lớn) {
+            lớn = giá_trị;
+        };
+    };
+
+    trả về {
+        "đếm": n,
+        "tổng": tổng,
+        "nhỏ nhất": nhỏ,
+        "lớn nhất": lớn,
+        "trung bình": tổng / n
+    };
+};
+
+hàm gộp thống kê(a, b) {
+    đếm_a = lấy map(a, "đếm", 0);
+    đếm_b = lấy map(b, "đếm", 0);
+    nếu (đếm_a == 0) {
+        trả về b;
+    };
+    nếu (đếm_b == 0) {
+        trả về a;
+    };
+
+    tổng_a = lấy map(a, "tổng", 0);
+    tổng_b = lấy map(b, "tổng", 0);
+    nhỏ_a = lấy map(a, "nhỏ nhất", rỗng);
+    nhỏ_b = lấy map(b, "nhỏ nhất", rỗng);
+    lớn_a = lấy map(a, "lớn nhất", rỗng);
+    lớn_b = lấy map(b, "lớn nhất", rỗng);
+    đếm = đếm_a + đếm_b;
+    tổng = tổng_a + tổng_b;
+    nhỏ = nhỏ_a;
+    lớn = lớn_a;
+    nếu (nhỏ_b < nhỏ) {
+        nhỏ = nhỏ_b;
+    };
+    nếu (lớn_b > lớn) {
+        lớn = lớn_b;
+    };
+
+    trả về {
+        "đếm": đếm,
+        "tổng": tổng,
+        "nhỏ nhất": nhỏ,
+        "lớn nhất": lớn,
+        "trung bình": tổng / (đếm + 0.0)
+    };
+};

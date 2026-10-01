@@ -1,6 +1,6 @@
 # Roadmap V++ 1.0
 
-> Cập nhật: 22/09/2026
+> Cập nhật: 01/10/2026
 >
 > Mục tiêu 1.0 không còn là mở rộng cú pháp theo chiều rộng. Trọng tâm là đóng băng
 > semantics, làm cứng compiler/runtime, hoàn thiện package + stdlib + toolchain và chứng
@@ -88,7 +88,8 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   không shrink/rehash lặp và explicit trim tuân ngưỡng. Đo allocation count, GC pause p95 và
   peak RSS trên workload burst → collect → reuse để tránh đổi giảm thời gian lấy giữ bộ nhớ vô hạn.
   Capacity invariant + explicit trim hiện đã có focused hardening; phần còn thiếu của checkbox
-  này là allocation count, GC pause p95 và peak RSS before/after trên workload reuse thực.
+  này là allocation count, GC pause p95 và peak RSS before/after trên workload reuse thực. Raw
+  telemetry phải được lưu cùng report benchmark để có thể đối chiếu lại giữa baseline/candidate.
 
 ### P0.4 — benchmark tách stage và gate regression
 
@@ -109,12 +110,15 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   Harness v2 đã có `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, các compiler stage,
   package/module graph, JSON extraction, native HTTP và `gc_collect_cycles`; còn thiếu telemetry
   allocation/RSS của GC để hoàn tất toàn bộ biên đo trong bảng này.
-- [ ] Lưu baseline/candidate bằng cùng harness, corpus, iteration và chính sách GC/JIT trên
-  **cùng máy, cùng toolchain/flags, Release**, không bật sanitizer/coverage/profiler trong timing.
+- [ ] Chạy **same-machine baseline vs candidate** bằng cùng harness, corpus, iteration và chính
+  sách GC/JIT trên **cùng máy, cùng toolchain/flags, Release**, không bật
+  sanitizer/coverage/profiler trong timing.
   Build hai revision vào thư mục riêng; đưa harness tương đương vào baseline khi API thay đổi,
   chỉ preverify ngoài timer cho case dispatch, giữ verification thật trong case end-to-end.
   Ghi commit + dirty diff, harness/corpus version, CPU/OS/compiler, CMake flags và môi trường;
   công bố raw samples, median, p95 và độ phân tán cùng command tái lập trong `benchmark/BASELINE.md`.
+  Lưu raw performance report theo từng lần đo dưới `benchmark/reports/` với baseline SHA,
+  candidate SHA, metadata môi trường và kết quả comparator để có thể audit/replay.
 - [x] Thiết kế runner/comparator trong `scripts/quality/`: ít nhất 3 warm-up và 10 lượt đo
   độc lập mỗi case, chạy baseline/candidate xen kẽ trên máy nhàn rỗi; mặc định 40 sample để
   p95 GC có đủ tail observations, còn 10–39 sample chỉ được dùng cho median gate và làm p95
@@ -124,10 +128,11 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   tự cập nhật baseline hoặc nới ngưỡng để làm xanh gate. MAD/median >5% đánh dấu inconclusive,
   cần đo lại trước khi nghiệm thu; thiếu case/sample hoặc khác metadata đo phải báo lỗi.
 - [ ] Nối comparator vào CI với baseline/candidate cùng runner trong một job (hoặc host
-  benchmark cố định), lưu raw report thành artifact. Job timing hiện tại chỉ in quan sát;
-  chưa có regression threshold. Targeted correctness tests chạy trên Windows/macOS/Linux;
-  ASan/UBSan/leak chạy riêng timing. Chỉ đóng gate khi tests xanh, report hợp lệ và cải thiện
-  workload mục tiêu vượt độ nhiễu, đồng thời các case còn lại không vượt regression budget.
+  benchmark cố định), lưu raw report thành CI artifact và fail gate khi vượt regression budget.
+  CI phải đọc trực tiếp telemetry GC allocation/RSS/p95 cùng timing report thay vì chỉ in số đo
+  quan sát. Targeted correctness tests chạy trên Windows/macOS/Linux; ASan/UBSan/LSan chạy riêng
+  khỏi timing. Chỉ đóng gate khi tests xanh, report hợp lệ và workload mục tiêu vượt độ nhiễu,
+  đồng thời các case còn lại không vượt regression budget.
 
 ### P0.5 — freeze local-vs-package import precedence
 
@@ -155,10 +160,14 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   gate; targeted runtime/import tests tái hiện lỗi cũ và xanh sau sửa. Các invariant chỉ quan
   sát được nội bộ đi vào focused C++ harness/CTest (bổ sung runtime linkage khi cần); public
   behavior đi qua `.vi`/CLI/HTTP integration. Kiểm tra verifier cache bằng counter, GC bằng
-  capacity/allocation/roots, HTTP bằng JSON corpus và resolver bằng collision matrix.
-- [ ] Full regression + RC hardening + sanitizer/leak và release/install matrix hiện có tiếp
-  tục xanh. Đính kèm revision, môi trường, command, test summary và report trước khi tick hoàn
-  tất; không dùng build thành công hoặc một lượt timing làm bằng chứng đủ cho P0.
+  capacity/allocation/roots/RSS/p95, HTTP bằng JSON corpus và resolver bằng collision matrix.
+- [ ] Raw performance report của baseline/candidate được lưu lại cùng commit SHA, toolchain,
+  CMake flags, CPU/OS, raw samples, median/p95/MAD và kết quả comparator; report phải tái lập được
+  bằng command đã ghi trong tài liệu.
+- [ ] Full regression + RC hardening + **ASan/UBSan/LSan trên Linux** xanh; đính kèm revision,
+  môi trường, command và test summary trước khi tick hoàn tất.
+- [ ] Release/install matrix **Windows + macOS + Linux** xanh trên chính artifact dự kiến phát
+  hành; không dùng build thành công hoặc một lượt timing làm bằng chứng đủ cho P0.
 
 Trạng thái local Release ngày 22/09/2026: CTest 4/4 PASS (`vpp-rc-internal-hardening`,
 `vpp-runtime-p0-hardening`, `vpp-import-precedence-hardening`, `vpp-integration`). Một lượt
@@ -180,7 +189,7 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
   diagnostic cho override không hợp lệ.
 - [x] Chốt module semantics còn lại: explicit export/re-export, truy cập symbol không export,
   import cycle và diagnostic có đường dẫn module rõ ràng.
-  Import collision giữa local file và package còn phải freeze riêng theo P0.5.
+  Import collision giữa local file và package đã được freeze riêng theo P0.5 + ADR 0003.
 - [x] Chốt lambda/closure capture: capture theo value/reference, lifetime và mutation.
 - [x] Quyết định destructor/finalizer: không hỗ trợ trong 1.0 hoặc định nghĩa lifecycle rõ ràng;
   không để behavior ngầm phụ thuộc GC.
@@ -384,7 +393,7 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
 
 - [x] Freeze syntax và semantics: language reference + semantics/type/runtime-error contract đã
   được chốt; thay đổi breaking sau freeze phải có migration/version decision tường minh.
-  Precedence khi local/package trùng target là contract còn mở, cần đóng theo P0.5 trước RC.
+  Precedence khi local/package trùng target đã được freeze theo P0.5 + ADR 0003.
 - [x] Freeze bytecode compatibility/versioning policy: V++ 1.0 không công bố serialized `.vbc`
   ABI; `Instruction`/`Opcode` trong bộ nhớ là implementation detail. Policy nằm tại ADR 0002.
 - [x] Freeze package manifest/lockfile format: `vpp.json` schema 1 và `vpp.lock` schema 1 là
@@ -394,12 +403,19 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
 - [ ] Đóng toàn bộ P0.1–P0.5: verification cache an toàn, HTTP JSON extraction đúng contract,
   GC không trim định kỳ, benchmark tách stage + regression gate và import precedence đã freeze;
   có same-machine Release report và targeted runtime/import tests theo mục 0.
-- [ ] Fuzz + stress + sanitizer/leak suite xanh.
-- [ ] Release artifact và install smoke test xanh trên Windows/macOS/Linux. Workflow đã enforce
+- [ ] Chạy **same-machine baseline vs candidate** và lưu raw performance report có metadata,
+  raw samples, median/p95/MAD và kết quả comparator; report phải đủ để audit/replay.
+- [ ] Bổ sung **GC allocation/RSS/p95 telemetry** cho workload burst → collect → reuse và đưa
+  comparator thành **CI regression gate** với threshold cố định trước khi đo candidate.
+- [ ] Fuzz + stress + **ASan/UBSan/LSan trên Linux** xanh, có log/test summary làm evidence.
+- [ ] Release artifact và install smoke test xanh trên **Windows/macOS/Linux**. Workflow đã enforce
   install/update + stale-file check trên artifact trước upload; còn chờ matrix CI thực tế xanh.
-- [ ] Chạy thành công sample project thực tế bằng artifact release, không dùng build tree.
-  Local macOS tarball tạm đã dựng/chạy feature gate, rollback và demo từ prefix cài đặt; HTTP
-  localhost bị sandbox local chặn `EPERM`, còn workflow release sẽ chạy full HTTP verify trên runner.
+- [ ] Chạy thành công sample project thực tế **hoàn toàn từ artifact đã cài đặt**: executable,
+  stdlib/package, template và runtime đều lấy từ install prefix/PATH; không tham chiếu binary,
+  library, package hoặc resource trong build tree. Lưu command + output/log của sample làm
+  release evidence trên từng nền tảng mục tiêu. Local macOS tarball tạm đã dựng/chạy feature
+  gate, rollback và demo từ prefix cài đặt; HTTP localhost bị sandbox local chặn `EPERM`, còn
+  workflow release sẽ chạy full HTTP verify trên runner.
 - [x] Documentation + migration notes + changelog hoàn chỉnh.
 
 ## Release gate 1.0
@@ -410,9 +426,12 @@ ba hệ điều hành mục tiêu.
 
 RC cũng bị chặn nếu còn P0 mở: cache có thể stale/bypass verification, HTTP JSON extraction
 sai contract, periodic GC còn capacity-thrashing, local/package chọn module không nhất quán,
-hoặc thiếu bằng chứng benchmark Release cùng máy + targeted tests. Report vượt budget hoặc
-inconclusive chưa được xử lý không được tính là gate xanh.
+hoặc thiếu bằng chứng benchmark Release cùng máy + targeted tests. RC cũng chưa đạt nếu chưa có
+raw baseline/candidate report, GC allocation/RSS/p95 telemetry, CI comparator gate, Linux
+ASan/UBSan/LSan evidence, release matrix ba hệ điều hành và sample chạy từ installed artifact.
+Report vượt budget hoặc inconclusive chưa được xử lý không được tính là gate xanh.
 
-Ước lượng **25–30% khối lượng tới 1.0** trước đợt rà soát này chưa tính P0 vừa bổ sung;
-cần đánh giá lại sau baseline và collision matrix. Trạng thái RC được quyết định bằng các
-gate/bằng chứng ở trên, không suy từ tỷ lệ checkbox hoặc số tính năng đã có.
+Rà soát source ngày 01/10/2026 đặt mức hoàn thiện tổng thể cho mục tiêu 1.0 khoảng **90–91%**.
+Phần còn lại tập trung vào performance/memory evidence, CI regression gate, sanitizer/leak và
+release validation đa nền tảng. Trạng thái RC vẫn được quyết định bằng các gate/bằng chứng ở
+trên, không suy trực tiếp từ tỷ lệ phần trăm hoặc số tính năng đã có.

@@ -1,0 +1,64 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    s = scanner("  alpha 42 ff 3.5 nope");
+    in có token(s);
+    in có token(s);
+    in token(s);
+    in xem i32(s);
+    in i32(s);
+    in i32(s, 16);
+    in f64(s);
+
+    thử {
+        in i32(s);
+    } bắt lỗi (e) {
+        in e;
+    };
+    in token(s);
+    thử {
+        in token(s);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    custom = scanner("a,b;;c", ",;");
+    lặp(i = 0; có token(custom); i++) {
+        in token(custom);
+    };
+
+    phần = tách token("a,b;;c", ",;", đúng);
+    lặp(i = 0; i < độ dài(phần); i++) {
+        in phần[i];
+    };
+
+    số = scanner("-2147483648 7fffffff 2147483648");
+    in i32(số);
+    in i32(số, 16);
+    in xem i32(số);
+    thử {
+        in i32(số);
+    } bắt lỗi (e) {
+        in e;
+    };
+    in token(số);
+
+    skip_scan = scanner("prefix123", "");
+    scanner bỏ literal(skip_scan, "prefix");
+    in token(skip_scan);
+
+    giới_hạn = scanner("abcd", " ", 3);
+    thử {
+        in có token(giới_hạn);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    đóng = scanner("x");
+    đóng scanner(đóng);
+    thử {
+        in có token(đóng);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

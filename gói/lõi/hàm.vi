@@ -1,0 +1,81 @@
+// Module: lõi.hàm
+// Helper cho callable/closure bậc cao. Các hàm này viết thuần V++ để giữ
+// semantics lỗi/capture của VM thay vì bọc qua native bridge.
+
+// Gọi callable một đối số.
+hàm áp dụng(f, giá trị) {
+    trả về f(giá trị);
+};
+
+// Gọi callable hai đối số.
+hàm áp dụng hai(f, a, b) {
+    trả về f(a, b);
+};
+
+// Gọi predicate một đối số.
+hàm kiểm tra(predicate, giá trị) {
+    trả về predicate(giá trị);
+};
+
+// Gọi consumer; giá trị trả về của consumer bị bỏ qua.
+hàm nhận(consumer, giá trị) {
+    consumer(giá trị);
+    trả về rỗng;
+};
+
+// Gọi supplier không đối số.
+hàm lấy(supplier) {
+    trả về supplier();
+};
+
+// compose(f, g): x -> f(g(x)).
+hàm nối hàm(f, g) {
+    kết_quả = hàm(x) {
+        trả về f(g(x));
+    };
+    trả về kết_quả;
+};
+
+// andThen(f, g): x -> g(f(x)).
+hàm trước rồi(f, g) {
+    kết_quả = hàm(x) {
+        trả về g(f(x));
+    };
+    trả về kết_quả;
+};
+
+// Predicate AND có short-circuit: b không chạy khi a sai.
+hàm và điều kiện(a, b) {
+    kết_quả = hàm(x) {
+        nếu (!a(x)) {
+            trả về sai;
+        };
+        trả về b(x);
+    };
+    trả về kết_quả;
+};
+
+// Predicate OR có short-circuit: b không chạy khi a đúng.
+hàm hoặc điều kiện(a, b) {
+    kết_quả = hàm(x) {
+        nếu (a(x)) {
+            trả về đúng;
+        };
+        trả về b(x);
+    };
+    trả về kết_quả;
+};
+
+hàm phủ định điều kiện(predicate) {
+    kết_quả = hàm(x) {
+        trả về !predicate(x);
+    };
+    trả về kết_quả;
+};
+
+hàm hàm đồng nhất() {
+    kết_quả = hàm(x) {
+        trả về x;
+    };
+    trả về kết_quả;
+};

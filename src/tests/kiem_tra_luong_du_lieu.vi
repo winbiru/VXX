@@ -1,0 +1,51 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    gọi_map = 0;
+    nhân_mười = hàm(x) {
+        gọi_map += 1;
+        trả về x * 10;
+    };
+    chẵn = hàm(x) { trả về x % 2 == 0; };
+
+    s0 = luồng([1, 2, 3, 4]);
+    s1 = lọc(s0, chẵn);
+    s2 = ánh xạ(s1, nhân_mười);
+    in gọi_map;
+    in gom danh sách(s2);
+    in gọi_map;
+
+    s3 = giới hạn luồng(bỏ(luồng([1, 2, 3, 4, 5]), 1), 3);
+    in gom danh sách(s3);
+
+    in gom danh sách(phân biệt(luồng([3, 1, 3, 2, 1])));
+    in gom danh sách(sắp xếp luồng(luồng([3, 1, 2])));
+
+    đảo = hàm(a, b) { trả về b - a; };
+    in gom danh sách(sắp xếp luồng(luồng([1, 3, 2]), đảo));
+
+    nhân_bản = hàm(x) { trả về [x, x + 10]; };
+    in gom danh sách(ánh xạ phẳng(luồng([1, 2]), nhân_bản));
+
+    gọi_any = 0;
+    lớn_hơn_hai = hàm(x) {
+        gọi_any += 1;
+        trả về x > 2;
+    };
+    in bất kỳ(luồng([1, 2, 3, 4]), lớn_hơn_hai);
+    in gọi_any;
+
+    in tất cả luồng(luồng([2, 4, 6]), chẵn);
+    in đầu tiên(luồng([9, 8, 7]));
+    cộng = hàm(a, b) { trả về a + b; };
+    in rút gọn(luồng([1, 2, 3, 4]), 0, cộng);
+    in đếm luồng(luồng([5, 6, 7]));
+
+    dùng_một_lần = luồng([1]);
+    in gom danh sách(dùng_một_lần);
+    thử {
+        in gom danh sách(dùng_một_lần);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

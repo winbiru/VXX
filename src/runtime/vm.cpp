@@ -29,6 +29,7 @@
 #include "common/vm_native_collection_helpers.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
+#include "common/vm_native_format_helpers.h"
 #include "common/vm_native_http_helpers.h"
 #include "common/vm_native_json_helpers.h"
 #include "common/vm_low_level_http_server.h"
@@ -290,6 +291,8 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
     }
 
     if (fn.empty()) return false;
+
+    if (vietvm::helpers::handleNativeFormatFunction(fn, args, result, err)) return true;
 
     if (vietvm::helpers::handleNativeCollectionFunction(fn, args, result, err)) return true;
 

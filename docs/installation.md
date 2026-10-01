@@ -1,6 +1,10 @@
-# Cài đặt và cập nhật V++ 1.0
+# Cài đặt và cập nhật V++
 
 ## Release artifact
+
+Release được tài liệu này tham chiếu:
+
+https://github.com/winbiru/VXX/releases/tag/0.9.3
 
 Mỗi release tạo ba artifact:
 
@@ -15,7 +19,27 @@ file đã bị xóa khỏi release mới không còn sót lại sau update.
 
 ## Linux và macOS
 
-Giải nén artifact rồi chạy:
+### Linux x64
+
+```bash
+curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+tar -xzf vpp-linux-x64.tar.gz
+./install-vpp.sh
+source "$HOME/.bashrc" 2>/dev/null || source "$HOME/.bash_profile"
+vpp phiên bản
+```
+
+### macOS
+
+```bash
+curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-macos.tar.gz -o vpp-macos.tar.gz
+tar -xzf vpp-macos.tar.gz
+./install-vpp.sh
+source "$HOME/.zshrc"
+vpp phiên bản
+```
+
+Sau khi giải nén, installer Unix có thể chạy trực tiếp bằng:
 
 ```bash
 ./install-vpp.sh
@@ -46,16 +70,30 @@ trong thư mục cài đặt được giữ lại.
 
 ## Windows
 
-Giải nén artifact rồi chạy PowerShell:
+Tải và giải nén release `0.9.3`:
 
 ```powershell
-.\install-vpp.ps1
+Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
+Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
+```
+
+Sau đó chạy PowerShell installer:
+
+```powershell
+$previousPolicy = Get-ExecutionPolicy -Scope Process
+try {
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+    & .\vpp-bin\install-vpp.ps1
+} finally {
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy $previousPolicy -Force
+}
+vpp phiên bản
 ```
 
 Hoặc dùng wrapper:
 
 ```cmd
-install-vpp.cmd
+vpp-bin\install-vpp.cmd
 ```
 
 Mặc định V++ được cài tại `%LOCALAPPDATA%\Programs\VPP`. Có thể đổi prefix bằng

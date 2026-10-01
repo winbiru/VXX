@@ -1,0 +1,38 @@
+// Module: lõi.tùy chọn
+// V++ dùng rỗng làm nullable/optional representation ở runtime hiện tại.
+// Các helper giữ supplier/function lazy theo contract Optional.
+
+hàm có giá trị(giá_trị) {
+    trả về giá_trị != rỗng;
+};
+
+hàm hoặc giá trị(giá_trị, mặc_định) {
+    nếu (giá_trị == rỗng) {
+        trả về mặc_định;
+    };
+    trả về giá_trị;
+};
+
+hàm hoặc tạo(giá_trị, supplier) {
+    nếu (giá_trị == rỗng) {
+        trả về supplier();
+    };
+    trả về giá_trị;
+};
+
+hàm ánh xạ tùy chọn(giá_trị, fn) {
+    nếu (giá_trị == rỗng) {
+        trả về rỗng;
+    };
+    trả về fn(giá_trị);
+};
+
+hàm lọc tùy chọn(giá_trị, predicate) {
+    nếu (giá_trị == rỗng) {
+        trả về rỗng;
+    };
+    nếu (predicate(giá_trị)) {
+        trả về giá_trị;
+    };
+    trả về rỗng;
+};
