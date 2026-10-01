@@ -298,9 +298,21 @@ jobs:
             $dependencyOutput = & $dependencyTool -p $vpp
           }
           if ($LASTEXITCODE -ne 0) { throw "Dependency inspection failed with $dependencyTool" }
-          $dependencies = ($dependencyOutput | Out-String).ToLowerInvariant()
-          foreach ($forbidden in @("vcruntime", "msvcp", "ucrtbase", "api-ms-win-crt", "vpp-")) {
-            if ($dependencies.Contains($forbidden)) { throw "Release depends on unbundled runtime DLL: $forbidden" }
+          $dependencyText = $dependencyOutput | Out-String
+          $dllNames = @(
+            [regex]::Matches($dependencyText, '(?im)\b[A-Za-z0-9][A-Za-z0-9._+-]*\.dll\b') |
+              ForEach-Object { $_.Value.ToLowerInvariant() } |
+              Sort-Object -Unique
+          )
+          if ($dllNames.Count -eq 0) {
+            throw "Dependency inspection produced no DLL names with $dependencyTool"
+          }
+          foreach ($dllName in $dllNames) {
+            foreach ($forbiddenPrefix in @("vcruntime", "msvcp", "ucrtbase", "api-ms-win-crt", "vpp-")) {
+              if ($dllName.StartsWith($forbiddenPrefix)) {
+                throw "Release depends on unbundled runtime DLL: $dllName"
+              }
+            }
           }
           $env:VPP_HOME = $installDir
           & $vpp "chạy" "scripts/quality/windows-install-smoke.vi"
