@@ -30,6 +30,16 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
+      - name: Install Windows SQLite CLI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install sqlite --yes --no-progress
+          if ($LASTEXITCODE -notin @(0, 3010)) {
+            throw "SQLite installation failed with exit code $LASTEXITCODE"
+          }
+          Get-Command sqlite3.exe -ErrorAction Stop | Out-Null
+
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
