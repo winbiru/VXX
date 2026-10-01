@@ -251,7 +251,54 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Artifact installation failed" }
           if (-not (Test-Path (Join-Path $installDir "gói"))) { throw "Vietnamese stdlib directory missing" }
           $vpp = Join-Path $installDir "vpp.exe"
-          $dependencies = (& dumpbin /dependents $vpp | Out-String).ToLowerInvariant()
+          $dependencyTool = $null
+          $dependencyToolKind = $null
+          $dumpbinCommand = Get-Command dumpbin.exe -ErrorAction SilentlyContinue
+          if ($dumpbinCommand) {
+            $dependencyTool = $dumpbinCommand.Source
+            $dependencyToolKind = "dumpbin"
+          }
+          else {
+            $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+            if (Test-Path $vswhere) {
+              $vsInstall = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+              if ($vsInstall) {
+                $dumpbin = Get-ChildItem (Join-Path $vsInstall "VC/Tools/MSVC") -Filter dumpbin.exe -File -Recurse |
+                  Where-Object { $_.FullName -match '[\\/]Hostx64[\\/]x64[\\/]dumpbin\.exe$' } |
+                  Sort-Object FullName -Descending |
+                  Select-Object -First 1 -ExpandProperty FullName
+                if ($dumpbin) {
+                  $dependencyTool = $dumpbin
+                  $dependencyToolKind = "dumpbin"
+                }
+              }
+            }
+          }
+          if (-not $dependencyTool) {
+            $llvmObjdump = Get-Command llvm-objdump.exe -ErrorAction SilentlyContinue
+            if ($llvmObjdump) {
+              $dependencyTool = $llvmObjdump.Source
+              $dependencyToolKind = "objdump"
+            }
+          }
+          if (-not $dependencyTool) {
+            $objdump = Get-Command objdump.exe -ErrorAction SilentlyContinue
+            if ($objdump) {
+              $dependencyTool = $objdump.Source
+              $dependencyToolKind = "objdump"
+            }
+          }
+          if (-not $dependencyTool) {
+            throw "Cannot inspect vpp.exe dependencies: dumpbin.exe, llvm-objdump.exe, and objdump.exe are all unavailable"
+          }
+          if ($dependencyToolKind -eq "dumpbin") {
+            $dependencyOutput = & $dependencyTool /dependents $vpp
+          }
+          else {
+            $dependencyOutput = & $dependencyTool -p $vpp
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Dependency inspection failed with $dependencyTool" }
+          $dependencies = ($dependencyOutput | Out-String).ToLowerInvariant()
           foreach ($forbidden in @("vcruntime", "msvcp", "ucrtbase", "api-ms-win-crt", "vpp-")) {
             if ($dependencies.Contains($forbidden)) { throw "Release depends on unbundled runtime DLL: $forbidden" }
           }
