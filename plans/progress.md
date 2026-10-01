@@ -358,7 +358,7 @@ Long-term: 20/41
     permission model tương ứng được chốt.
 18. [x] **Compiler re-entrant:** production compiler không còn dựa vào active registry ẩn;
     state đi qua `CompilationContext`/`CompilationRegistryState` tường minh, kể cả recursive import.
-19. [x] **Compiler hardening:** `scripts/quality/rc-hardening.py` chạy qua public CLI và đã PASS
+19. [x] **Compiler hardening:** `scripts/quality/rc-hardening.vi` và `rc-malformed.vi` chạy qua public CLI và đã PASS
     local với 528 malformed/fuzz input seed `0x56505031`, deterministic AST/IR/disassembly qua
     3 lượt, source 800 hàm và project 24 module × 24 hàm biên dịch lặp 5 lần; peak RSS local
     17.0 MiB dưới budget 1 GiB. `vpp-rc-internal-hardening` bổ sung trực tiếp các invariant không

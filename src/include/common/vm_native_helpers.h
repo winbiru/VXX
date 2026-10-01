@@ -88,6 +88,7 @@ bool runCurlHttpRequest(const std::string &method,
                         const std::string &url,
                         const std::optional<std::string> &payload,
                         StackValue &result,
-                        std::string &err);
+                        std::string &err,
+                        bool &transportFailure);
 
 } // namespace vietvm::helpers

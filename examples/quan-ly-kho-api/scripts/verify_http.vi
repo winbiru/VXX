@@ -38,7 +38,7 @@ hàm chờMáyChủ(gốc) {
 };
 
 hàm main() {
-    cổng = đọc biến môi trường("VPP_WAREHOUSE_PORT", "18081");
+    cổng = đọc biến môi trường("VPP_WAREHOUSE_PORT", "18932");
     gốc = "http://127.0.0.1:" + cổng;
     chờMáyChủ(gốc);
 

@@ -52,6 +52,11 @@
 
 using vietvm::helpers::requireNativeArgumentCount;
 
+enum class NativeFailureDisposition {
+    RuntimeError,
+    CatchableLanguageError,
+};
+
 // Kiểm tra quyền gọi một method runtime dựa trên visibility, lớp đang thực thi
 // và lớp sở hữu method. Private chỉ cho chính lớp sở hữu; protected cho cả lớp con.
 static bool canAccessRuntimeMethod(
@@ -85,31 +90,44 @@ static std::string runtimeMethodAccessMessage(
 static bool handleNativeHttpClientFunction(const std::string &fn,
                                            const std::vector<StackValue> &args,
                                            StackValue &result,
-    std::string &err) {
+                                           std::string &err,
+                                           NativeFailureDisposition &failureDisposition) {
+    const auto runRequest = [&](const std::string &method,
+                                const std::string &url,
+                                const std::optional<std::string> &payload) {
+        bool transportFailure = false;
+        const bool handled = vietvm::helpers::runCurlHttpRequest(
+            method, fn, url, payload, result, err, transportFailure);
+        if (transportFailure) {
+            failureDisposition = NativeFailureDisposition::CatchableLanguageError;
+        }
+        return handled;
+    };
+
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpGet)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::string url = vietvm::helpers::argToRawString(args[0]);
-        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodGet, fn, url, std::nullopt, result, err);
+        return runRequest(vietvm::constants::kHttpMethodGet, url, std::nullopt);
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPost)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         std::string url = vietvm::helpers::argToRawString(args[0]);
         std::string payload = vietvm::helpers::argToRawString(args[1]);
-        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodPost, fn, url, payload, result, err);
+        return runRequest(vietvm::constants::kHttpMethodPost, url, payload);
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPut)) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         std::string url = vietvm::helpers::argToRawString(args[0]);
         std::string payload = vietvm::helpers::argToRawString(args[1]);
-        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodPut, fn, url, payload, result, err);
+        return runRequest(vietvm::constants::kHttpMethodPut, url, payload);
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpDelete)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::string url = vietvm::helpers::argToRawString(args[0]);
-        return vietvm::helpers::runCurlHttpRequest(vietvm::constants::kHttpMethodDelete, fn, url, std::nullopt, result, err);
+        return runRequest(vietvm::constants::kHttpMethodDelete, url, std::nullopt);
     }
 
     return false;
@@ -248,6 +266,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
                                         const std::unordered_map<int, std::vector<Instruction>> &functionBytecode,
                                         StackValue &result,
                                         std::string &err,
+                                        NativeFailureDisposition &failureDisposition,
                                         const VM::OutputSink &outputSink) {
     std::string fn;
     if (hamIdOrName < 0) {
@@ -418,7 +437,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
                           err);
     }
 
-    if (handleNativeHttpClientFunction(fn, args, result, err)) return true;
+    if (handleNativeHttpClientFunction(fn, args, result, err, failureDisposition)) return true;
     if (handleNativeJsonFunction(fn, args, result, err)) return true;
     if (handleNativeLowLevelHttpFunction(fn, args, result, err, outputSink)) return true;
 
@@ -1041,10 +1060,18 @@ void VM::invokeFunction(int argc,
 
     StackValue nativeResult = make_int_value(0);
     std::string nativeErr;
+    NativeFailureDisposition nativeFailureDisposition =
+        NativeFailureDisposition::RuntimeError;
     if (executeNativeStdlibFunction(hamIdOrName, args, stringPool,
                                     functionTableByNameIndex, hamBytecodeMap,
-                                    nativeResult, nativeErr, outputSink)) {
+                                    nativeResult, nativeErr,
+                                    nativeFailureDisposition, outputSink)) {
         if (!nativeErr.empty()) {
+            if (nativeFailureDisposition ==
+                NativeFailureDisposition::CatchableLanguageError) {
+                throw vietvm::runtime::LanguageException(
+                    make_string_value(nativeErr));
+            }
             const std::string nativeName = runtimeCallTargetName(
                 hamIdOrName, stringPool, functionTableByNameIndex);
             vietvm::runtime::RuntimeDiagnosticContext context;

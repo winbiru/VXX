@@ -310,6 +310,7 @@ try {
         "src/tests/kiem_tra_stdlib_starter.vi",
         "src/tests/kiem_tra_stdlib_http.vi",
         "src/tests/kiem_tra_stdlib_http_post_put.vi",
+        "src/tests/kiem_tra_http_transport_bat_loi.vi",
         "src/tests/kiem_tra_application_server.vi",
         "src/tests/kiem_tra_rest_json_jwt.vi",
         "src/tests/kiem_tra_stdlib_tinh_toan.vi",

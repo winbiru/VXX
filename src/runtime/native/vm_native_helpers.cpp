@@ -26,6 +26,8 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#else
+#include <sys/wait.h>
 #endif
 
 #include "vpp/runtime/value.h"
@@ -300,7 +302,8 @@ bool runCurlHttpRequestWindows(const std::string &method,
                                const std::string &url,
                                const std::optional<std::string> &payload,
                                StackValue &result,
-                               std::string &err) {
+                               std::string &err,
+                               bool &transportFailure) {
     std::vector<std::string> arguments = {
         "curl.exe", "-Ls", "--max-time", "20", "-X", method
     };
@@ -320,8 +323,10 @@ bool runCurlHttpRequestWindows(const std::string &method,
         return true;
     }
     if (exitCode != 0) {
+        transportFailure = true;
         err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpCurlFailed, {fnName});
+            vietvm::messages::kNativeHttpCurlFailed, {fnName}) +
+            " (curl exit=" + std::to_string(exitCode) + ")";
         return true;
     }
 
@@ -934,7 +939,9 @@ bool runCurlHttpRequest(const std::string &method,
                         const std::string &url,
                         const std::optional<std::string> &payload,
                         StackValue &result,
-                        std::string &err) {
+                        std::string &err,
+                        bool &transportFailure) {
+    transportFailure = false;
     std::string invalidUrlReason;
     if (!validateHttpUrl(url, invalidUrlReason)) {
         err = messages::formatMessage(messages::kNativeHttpUrlInvalid, {fnName, invalidUrlReason});
@@ -945,6 +952,9 @@ bool runCurlHttpRequest(const std::string &method,
     if (tryLowLevelHttpFileTransportRequest(
             method, url, payload, result, err, fileTransportHandled) &&
         fileTransportHandled) {
+        if (!err.empty()) {
+            transportFailure = true;
+        }
         return true;
     }
 
@@ -952,7 +962,8 @@ bool runCurlHttpRequest(const std::string &method,
     // _popen routes through cmd.exe, whose quoting rules are incompatible with
     // JSON and with the POSIX single-quote command used below. Execute curl
     // directly so each URL/header/payload remains one argument on Windows.
-    return runCurlHttpRequestWindows(method, fnName, url, payload, result, err);
+    return runCurlHttpRequestWindows(
+        method, fnName, url, payload, result, err, transportFailure);
 #else
     std::string cmd = "curl -Ls --max-time 20 -X " + method;
     if (payload.has_value()) {
@@ -975,6 +986,14 @@ bool runCurlHttpRequest(const std::string &method,
 
     int rc = closeCommandPipe(pipe);
     if (rc != 0) {
+        if (rc != -1 && WIFEXITED(rc) &&
+            WEXITSTATUS(rc) != 126 && WEXITSTATUS(rc) != 127) {
+            transportFailure = true;
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeHttpCurlFailed, {fnName}) +
+                " (curl exit=" + std::to_string(WEXITSTATUS(rc)) + ")";
+            return true;
+        }
         err = vietvm::messages::formatMessage(
             vietvm::messages::kNativeHttpCurlFailed, {fnName});
         return true;
