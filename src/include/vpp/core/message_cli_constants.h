@@ -12,7 +12,7 @@ inline constexpr std::string_view kCliUsage = "V++ CLI\n"
     "Cách dùng:\n"
     "  vpp giúp đỡ\n"
     "  vpp phiên bản\n"
-    "  vpp gỡ cài đặt (Windows)\n"
+    "  vpp gỡ cài đặt\n"
     "  vpp chẩn đoán\n"
     "  vpp nơi\n"
     "  vpp thống kê\n"
@@ -80,6 +80,26 @@ inline constexpr std::string_view kCliTestsDirectoryMissing = "Thư mục kiểm
 inline constexpr std::string_view kCliDumpAstMissingFile = "--dump-ast cần đường dẫn tệp";
 inline constexpr std::string_view kCliDumpIrMissingFile = "--dump-ir cần đường dẫn tệp";
 inline constexpr std::string_view kCliUnhandledException = "Lỗi: {0}";
+inline constexpr std::string_view kCliRegistrySelectorRequired = "nguồn registry phải chỉ rõ package theo dạng <tên>[@<range>]";
+inline constexpr std::string_view kCliRegistrySelectorInvalid = "selector registry không hợp lệ: {0}";
+inline constexpr std::string_view kCliRegistrySourceInvalid = "nguồn registry phải có dạng registry+<root>#<tên>[@<range>]";
+inline constexpr std::string_view kCliRegistryRootEmpty = "registry root không được rỗng";
+inline constexpr std::string_view kCliGitSourceInvalid = "nguồn Git phải có dạng git+<repository>[#<ref>]";
+inline constexpr std::string_view kCliRegistryPackageNameMismatch = "tên package registry trong source ('{0}') khác tên được truyền ('{1}')";
+inline constexpr std::string_view kCliGitResolvedDependencyMissing = "không tìm thấy Git dependency vừa resolve: {0}";
+inline constexpr std::string_view kCliGitRestoreRevisionMismatch = "Git restore resolve sai revision cho package '{0}': mong đợi {1}, thực tế {2}";
+inline constexpr std::string_view kCliPackageLockSourceMismatch = "không thể khóa package '{0}': bytes đã cài không khớp source vừa resolve; hãy chạy 'vpp cập nhật' hoặc 'vpp đồng bộ' trước. Chi tiết: {1}";
+inline constexpr std::string_view kCliWindowsInstallDirectoryUnknown = "Không thể xác định thư mục cài V++";
+inline constexpr std::string_view kCliWindowsUninstallerMissing = "Không tìm thấy bộ gỡ. Hãy cài lại bằng bộ cài Windows mới.";
+inline constexpr std::string_view kCliUninstallerMissing = "Không tìm thấy bộ gỡ. Hãy cài lại bằng bộ cài V++ mới.";
+inline constexpr std::string_view kCliTempUninstallerCreateFailed = "Không thể tạo bộ gỡ tạm thời";
+inline constexpr std::string_view kCliWindowsPowerShellMissing = "Không thể tìm Windows PowerShell";
+inline constexpr std::string_view kCliUninstallerStartFailed = "Không thể khởi động bộ gỡ V++";
+inline constexpr std::string_view kCliExecutablePathUnknown = "Không thể xác định đường dẫn V++ đang chạy";
+inline constexpr std::string_view kCliUninstallerFailed = "Bộ gỡ V++ kết thúc với lỗi";
+inline constexpr std::string_view kCliUninstallerStarted =
+    "Đã khởi động bộ gỡ V++. Bộ gỡ sẽ tiếp tục sau khi lệnh này thoát.\n";
+inline constexpr std::string_view kCliWindowsArgumentUtf8Failed = "không thể chuyển đối số dòng lệnh Windows sang UTF-8";
 
 // REPL output and diagnostics.
 inline constexpr std::string_view kReplWelcome = "V++ REPL. Nhập :thoát để thoát, :giúp để xem trợ giúp.\n";

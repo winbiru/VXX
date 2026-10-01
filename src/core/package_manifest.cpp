@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "vpp/core/project_layout.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/semver.h"
 
 namespace vietvm::core {
@@ -36,16 +37,16 @@ public:
         skipWhitespace();
         JsonValue value = parseValue();
         skipWhitespace();
-        if (cursor_ != input_.size()) fail("dữ liệu dư sau JSON");
+        if (cursor_ != input_.size()) fail(messages::messageText(messages::kPackageJsonTrailingData));
         return value;
     }
 
 private:
     [[noreturn]] void fail(const std::string &message) const {
-        throw std::runtime_error(
-            std::string(documentName_) + " không hợp lệ tại offset " +
-            std::to_string(cursor_) +
-            ": " + message);
+        const std::string offset = std::to_string(cursor_);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonInvalidAtOffset,
+            {documentName_, offset, message}));
     }
 
     void skipWhitespace() {
@@ -63,7 +64,7 @@ private:
     }
 
     char take() {
-        if (cursor_ >= input_.size()) fail("kết thúc JSON đột ngột");
+        if (cursor_ >= input_.size()) fail(messages::messageText(messages::kPackageJsonUnexpectedEnd));
         return input_[cursor_++];
     }
 
@@ -78,7 +79,7 @@ private:
         unsigned value = 0;
         for (int count = 0; count < 4; ++count) {
             const int digit = hexValue(take());
-            if (digit < 0) fail("escape Unicode không hợp lệ");
+            if (digit < 0) fail(messages::messageText(messages::kPackageJsonUnicodeEscapeInvalid));
             value = value * 16u + static_cast<unsigned>(digit);
         }
         return value;
@@ -104,13 +105,13 @@ private:
 
     std::string parseString() {
         skipWhitespace();
-        if (take() != '"') fail("chuỗi JSON phải bắt đầu bằng dấu nháy kép");
+        if (take() != '"') fail(messages::messageText(messages::kPackageJsonStringMustStartWithQuote));
         std::string output;
         while (cursor_ < input_.size()) {
             const char c = take();
             if (c == '"') return output;
             if (static_cast<unsigned char>(c) < 0x20) {
-                fail("chuỗi JSON chứa control character thô");
+                fail(messages::messageText(messages::kPackageJsonRawControlCharacter));
             }
             if (c != '\\') {
                 output.push_back(c);
@@ -130,25 +131,25 @@ private:
                     unsigned codePoint = parseHex4();
                     if (codePoint >= 0xd800 && codePoint <= 0xdbff) {
                         if (take() != '\\' || take() != 'u') {
-                            fail("high surrogate thiếu low surrogate");
+                            fail(messages::messageText(messages::kPackageJsonHighSurrogateMissingLow));
                         }
                         const unsigned low = parseHex4();
                         if (low < 0xdc00 || low > 0xdfff) {
-                            fail("low surrogate không hợp lệ");
+                            fail(messages::messageText(messages::kPackageJsonLowSurrogateInvalid));
                         }
                         codePoint = 0x10000u +
                                     ((codePoint - 0xd800u) << 10u) +
                                     (low - 0xdc00u);
                     } else if (codePoint >= 0xdc00 && codePoint <= 0xdfff) {
-                        fail("low surrogate không có high surrogate");
+                        fail(messages::messageText(messages::kPackageJsonLowSurrogateWithoutHigh));
                     }
                     appendUtf8(output, codePoint);
                     break;
                 }
-                default: fail("escape chuỗi JSON không hợp lệ");
+                default: fail(messages::messageText(messages::kPackageJsonStringEscapeInvalid));
             }
         }
-        fail("chuỗi JSON chưa đóng");
+        fail(messages::messageText(messages::kPackageJsonStringUnterminated));
     }
 
     JsonValue parseNumber() {
@@ -156,7 +157,7 @@ private:
         if (input_[cursor_] == '-') ++cursor_;
         if (cursor_ >= input_.size() ||
             !std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
-            fail("number JSON không hợp lệ");
+            fail(messages::messageText(messages::kPackageJsonNumberInvalid));
         }
         if (input_[cursor_] == '0') {
             ++cursor_;
@@ -170,7 +171,7 @@ private:
             ++cursor_;
             if (cursor_ >= input_.size() ||
                 !std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
-                fail("fraction JSON không hợp lệ");
+                fail(messages::messageText(messages::kPackageJsonFractionInvalid));
             }
             while (cursor_ < input_.size() &&
                    std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
@@ -186,7 +187,7 @@ private:
             }
             if (cursor_ >= input_.size() ||
                 !std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
-                fail("exponent JSON không hợp lệ");
+                fail(messages::messageText(messages::kPackageJsonExponentInvalid));
             }
             while (cursor_ < input_.size() &&
                    std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
@@ -202,31 +203,31 @@ private:
     JsonValue parseArray() {
         JsonValue value;
         value.kind = JsonValue::Kind::Array;
-        if (!consume('[')) fail("array JSON phải bắt đầu bằng '['");
+        if (!consume('[')) fail(messages::messageText(messages::kPackageJsonArrayMustStart));
         if (consume(']')) return value;
         while (true) {
             value.array.push_back(parseValue());
             if (consume(']')) return value;
-            if (!consume(',')) fail("array JSON thiếu ','");
+            if (!consume(',')) fail(messages::messageText(messages::kPackageJsonArrayCommaMissing));
         }
     }
 
     JsonValue parseObject() {
         JsonValue value;
         value.kind = JsonValue::Kind::Object;
-        if (!consume('{')) fail("object JSON phải bắt đầu bằng '{'");
+        if (!consume('{')) fail(messages::messageText(messages::kPackageJsonObjectMustStart));
         if (consume('}')) return value;
         while (true) {
             skipWhitespace();
             if (cursor_ >= input_.size() || input_[cursor_] != '"') {
-                fail("key object JSON phải là chuỗi");
+                fail(messages::messageText(messages::kPackageJsonObjectKeyMustBeString));
             }
             std::string key = parseString();
-            if (!consume(':')) fail("object JSON thiếu ':' sau key");
+            if (!consume(':')) fail(messages::messageText(messages::kPackageJsonObjectColonMissing));
             auto inserted = value.object.emplace(std::move(key), parseValue());
-            if (!inserted.second) fail("object JSON có key trùng");
+            if (!inserted.second) fail(messages::messageText(messages::kPackageJsonObjectDuplicateKey));
             if (consume('}')) return value;
-            if (!consume(',')) fail("object JSON thiếu ','");
+            if (!consume(',')) fail(messages::messageText(messages::kPackageJsonObjectCommaMissing));
         }
     }
 
@@ -234,7 +235,7 @@ private:
                            JsonValue::Kind kind,
                            bool boolean = false) {
         if (input_.substr(cursor_, literal.size()) != literal) {
-            fail("literal JSON không hợp lệ");
+            fail(messages::messageText(messages::kPackageJsonLiteralInvalid));
         }
         cursor_ += literal.size();
         JsonValue value;
@@ -245,7 +246,7 @@ private:
 
     JsonValue parseValue() {
         skipWhitespace();
-        if (cursor_ >= input_.size()) fail("thiếu JSON value");
+        if (cursor_ >= input_.size()) fail(messages::messageText(messages::kPackageJsonValueMissing));
         switch (input_[cursor_]) {
             case '{': return parseObject();
             case '[': return parseArray();
@@ -263,7 +264,7 @@ private:
                     std::isdigit(static_cast<unsigned char>(input_[cursor_]))) {
                     return parseNumber();
                 }
-                fail("JSON value không hợp lệ");
+                fail(messages::messageText(messages::kPackageJsonValueInvalid));
         }
     }
 
@@ -281,7 +282,8 @@ const JsonValue *member(const JsonValue &object, const std::string &name) {
 std::string requireString(const JsonValue &object, const std::string &name) {
     const JsonValue *value = member(object, name);
     if (value == nullptr || value->kind != JsonValue::Kind::String) {
-        throw std::runtime_error("vpp.json: trường '" + name + "' phải là chuỗi");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonStringFieldRequired, {name}));
     }
     return value->text;
 }
@@ -292,7 +294,8 @@ std::string optionalString(const JsonValue &object,
     const JsonValue *value = member(object, name);
     if (value == nullptr) return fallback;
     if (value->kind != JsonValue::Kind::String) {
-        throw std::runtime_error("vpp.json: trường '" + name + "' phải là chuỗi");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonStringFieldRequired, {name}));
     }
     return value->text;
 }
@@ -325,7 +328,7 @@ std::string jsonEscape(const std::string &input) {
 
 PackageDependencySpec dependencyFromJson(const JsonValue &value) {
     if (value.kind != JsonValue::Kind::Object) {
-        throw std::runtime_error("vpp.json: mỗi dependency phải là object");
+        throw std::runtime_error(std::string(messages::kPackageJsonDependencyMustBeObject));
     }
     PackageDependencySpec dependency;
     dependency.name = requireString(value, "name");
@@ -341,7 +344,7 @@ PackageDependencySpec dependencyFromJson(const JsonValue &value) {
 
 PackageLockEntry lockEntryFromJson(const JsonValue &value) {
     if (value.kind != JsonValue::Kind::Object) {
-        throw std::runtime_error("vpp.lock: mỗi package phải là object");
+        throw std::runtime_error(std::string(messages::kPackageLockEntryMustBeObject));
     }
     PackageLockEntry entry;
     entry.name = requireString(value, "name");
@@ -352,22 +355,21 @@ PackageLockEntry lockEntryFromJson(const JsonValue &value) {
     entry.fingerprint = requireString(value, "fingerprint");
     entry.revision = optionalString(value, "revision", "");
     if (!isValidPackageName(entry.name)) {
-        throw std::runtime_error("vpp.lock: package name không hợp lệ: " + entry.name);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockNameInvalid, {entry.name}));
     }
     std::string versionError;
     if (!SemanticVersion::parse(entry.version, &versionError).has_value()) {
-        throw std::runtime_error(
-            "vpp.lock: version của package '" + entry.name +
-            "' không hợp lệ: " + versionError);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockVersionInvalid, {entry.name, versionError}));
     }
     if (entry.resolvedPath.empty() || entry.fingerprint.empty()) {
-        throw std::runtime_error(
-            "vpp.lock: package '" + entry.name +
-            "' thiếu resolved/fingerprint");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockResolvedFingerprintMissing, {entry.name}));
     }
     if (entry.sourceKind == PackageSourceKind::Git && entry.revision.empty()) {
-        throw std::runtime_error(
-            "vpp.lock: Git package '" + entry.name + "' thiếu exact revision");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockGitRevisionMissing, {entry.name}));
     }
     return entry;
 }
@@ -383,6 +385,16 @@ void hashText(std::uint64_t &hash, const std::string &text) {
     hashByte(hash, 0);
 }
 
+bool normalizeLineEndingsForFingerprint(const std::filesystem::path &file) {
+    std::string extension = file.extension().u8string();
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return extension == ".vi" || extension == ".vvm" || extension == ".json" ||
+           extension == ".md" || extension == ".txt" || extension == ".toml" ||
+           extension == ".yaml" || extension == ".yml" || extension == ".xml" ||
+           extension == ".csv" || extension == ".tsv";
+}
+
 } // namespace
 
 std::string packageSourceKindName(PackageSourceKind kind) {
@@ -391,14 +403,15 @@ std::string packageSourceKindName(PackageSourceKind kind) {
         case PackageSourceKind::Git: return "git";
         case PackageSourceKind::Registry: return "registry";
     }
-    throw std::runtime_error("package source kind không hợp lệ");
+    throw std::runtime_error(std::string(messages::kPackageSourceKindInvalid));
 }
 
 PackageSourceKind parsePackageSourceKind(const std::string &text) {
     if (text == "path") return PackageSourceKind::Path;
     if (text == "git") return PackageSourceKind::Git;
     if (text == "registry") return PackageSourceKind::Registry;
-    throw std::runtime_error("vpp.json: source dependency không hợp lệ: " + text);
+    throw std::runtime_error(messages::formatMessage(
+        messages::kPackageJsonSourceInvalid, {text}));
 }
 
 bool isValidPackageName(std::string_view name) noexcept {
@@ -425,78 +438,83 @@ bool isValidPackageName(std::string_view name) noexcept {
 
 void validateProjectManifest(const ProjectManifest &manifest) {
     if (manifest.schema != kProjectManifestSchemaVersion) {
-        throw std::runtime_error(
-            "vpp.json: schema không được hỗ trợ: " + std::to_string(manifest.schema));
+        const std::string schema = std::to_string(manifest.schema);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonSchemaUnsupported, {schema}));
     }
     if (!isValidPackageName(manifest.name)) {
-        throw std::runtime_error("vpp.json: name không hợp lệ: " + manifest.name);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonNameInvalid, {manifest.name}));
     }
     std::string versionError;
     if (!SemanticVersion::parse(manifest.version, &versionError).has_value()) {
-        throw std::runtime_error(
-            "vpp.json: version không hợp lệ: " + versionError);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonVersionInvalid, {versionError}));
     }
 
     std::vector<std::string> names;
     names.reserve(manifest.dependencies.size());
     for (const PackageDependencySpec &dependency : manifest.dependencies) {
         if (!isValidPackageName(dependency.name)) {
-            throw std::runtime_error(
-                "vpp.json: dependency name không hợp lệ: " + dependency.name);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageJsonDependencyNameInvalid, {dependency.name}));
         }
         std::string rangeError;
         if (!VersionRange::parse(dependency.versionRange, &rangeError).has_value()) {
-            throw std::runtime_error(
-                "vpp.json: version range của dependency '" + dependency.name +
-                "' không hợp lệ: " + rangeError);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageJsonDependencyRangeInvalid,
+                {dependency.name, rangeError}));
         }
         if ((dependency.sourceKind == PackageSourceKind::Path ||
              dependency.sourceKind == PackageSourceKind::Git) &&
             dependency.location.empty()) {
-            throw std::runtime_error(
-                "vpp.json: dependency '" + dependency.name +
-                "' cần location cho source " +
-                packageSourceKindName(dependency.sourceKind));
+            const std::string sourceKind = packageSourceKindName(dependency.sourceKind);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageJsonDependencyLocationMissing,
+                {dependency.name, sourceKind}));
         }
         if (dependency.sourceKind == PackageSourceKind::Git &&
             dependency.reference.empty()) {
-            throw std::runtime_error(
-                "vpp.json: Git dependency '" + dependency.name +
-                "' cần ref (dùng HEAD nếu muốn theo default branch)");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageJsonGitRefMissing, {dependency.name}));
         }
         names.push_back(dependency.name);
     }
     std::sort(names.begin(), names.end());
     const auto duplicate = std::adjacent_find(names.begin(), names.end());
     if (duplicate != names.end()) {
-        throw std::runtime_error("vpp.json: dependency bị khai báo trùng: " + *duplicate);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonDependencyDuplicate, {*duplicate}));
     }
 }
 
 ProjectManifest readProjectManifest(const std::filesystem::path &path) {
     std::ifstream input(path);
     if (!input.is_open()) {
-        throw std::runtime_error("không thể mở vpp.json: " + path.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonOpenFailed, {path.u8string()}));
     }
     std::ostringstream buffer;
     buffer << input.rdbuf();
     const std::string json = buffer.str();
     const JsonValue root = JsonParser(json, "vpp.json").parse();
     if (root.kind != JsonValue::Kind::Object) {
-        throw std::runtime_error("vpp.json: root phải là object");
+        throw std::runtime_error(std::string(messages::kPackageJsonRootMustBeObject));
     }
 
     ProjectManifest manifest;
     if (const JsonValue *schema = member(root, "schema")) {
         if (schema->kind != JsonValue::Kind::Number) {
-            throw std::runtime_error("vpp.json: schema phải là số nguyên");
+            throw std::runtime_error(std::string(messages::kPackageJsonSchemaMustBeInteger));
         }
         try {
             std::size_t consumed = 0;
             manifest.schema = std::stoi(schema->text, &consumed);
-            if (consumed != schema->text.size()) throw std::invalid_argument("schema");
+            if (consumed != schema->text.size()) {
+                throw std::invalid_argument(std::string(messages::kPackageSchemaParseSentinel));
+            }
         } catch (...) {
-            throw std::runtime_error("vpp.json: schema phải là số nguyên");
+            throw std::runtime_error(std::string(messages::kPackageJsonSchemaMustBeInteger));
         }
     }
     manifest.name = requireString(root, "name");
@@ -504,19 +522,18 @@ ProjectManifest readProjectManifest(const std::filesystem::path &path) {
 
     if (const JsonValue *dependencies = member(root, "dependencies")) {
         if (dependencies->kind != JsonValue::Kind::Array) {
-            throw std::runtime_error("vpp.json: dependencies phải là array");
+            throw std::runtime_error(std::string(messages::kPackageJsonDependenciesMustBeArray));
         }
         for (const JsonValue &dependency : dependencies->array) {
             manifest.dependencies.push_back(dependencyFromJson(dependency));
         }
     } else if (const JsonValue *legacy = member(root, u8"gói")) {
         if (legacy->kind != JsonValue::Kind::Array) {
-            throw std::runtime_error("vpp.json: trường legacy 'gói' phải là array");
+            throw std::runtime_error(std::string(messages::kPackageJsonLegacyPackagesMustBeArray));
         }
         for (const JsonValue &package : legacy->array) {
             if (package.kind != JsonValue::Kind::String) {
-                throw std::runtime_error(
-                    "vpp.json: phần tử legacy 'gói' phải là chuỗi");
+                throw std::runtime_error(std::string(messages::kPackageJsonLegacyPackageMustBeString));
             }
             PackageDependencySpec dependency;
             dependency.name = package.text;
@@ -545,7 +562,8 @@ void writeProjectManifest(const std::filesystem::path &path,
 
     std::ofstream output(path);
     if (!output.is_open()) {
-        throw std::runtime_error("không thể ghi vpp.json: " + path.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageJsonWriteFailed, {path.u8string()}));
     }
     output << "{\n"
            << "  \"schema\": " << manifest.schema << ",\n"
@@ -579,37 +597,40 @@ void writeProjectManifest(const std::filesystem::path &path,
 PackageLockfile readPackageLockfile(const std::filesystem::path &path) {
     std::ifstream input(path);
     if (!input.is_open()) {
-        throw std::runtime_error("không thể mở vpp.lock: " + path.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockOpenFailed, {path.u8string()}));
     }
     std::ostringstream buffer;
     buffer << input.rdbuf();
     const std::string json = buffer.str();
     const JsonValue root = JsonParser(json, "vpp.lock").parse();
     if (root.kind != JsonValue::Kind::Object) {
-        throw std::runtime_error("vpp.lock: root phải là object");
+        throw std::runtime_error(std::string(messages::kPackageLockRootMustBeObject));
     }
 
     PackageLockfile lockfile;
     const JsonValue *schema = member(root, "schema");
     if (schema == nullptr || schema->kind != JsonValue::Kind::Number) {
-        throw std::runtime_error("vpp.lock: schema phải là số nguyên");
+        throw std::runtime_error(std::string(messages::kPackageLockSchemaMustBeInteger));
     }
     try {
         std::size_t consumed = 0;
         lockfile.schema = std::stoi(schema->text, &consumed);
-        if (consumed != schema->text.size()) throw std::invalid_argument("schema");
+        if (consumed != schema->text.size()) {
+            throw std::invalid_argument(std::string(messages::kPackageSchemaParseSentinel));
+        }
     } catch (...) {
-        throw std::runtime_error("vpp.lock: schema phải là số nguyên");
+        throw std::runtime_error(std::string(messages::kPackageLockSchemaMustBeInteger));
     }
     if (lockfile.schema != kPackageLockSchemaVersion) {
-        throw std::runtime_error(
-            "vpp.lock: schema không được hỗ trợ: " +
-            std::to_string(lockfile.schema));
+        const std::string schema = std::to_string(lockfile.schema);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockSchemaUnsupported, {schema}));
     }
 
     const JsonValue *packages = member(root, "packages");
     if (packages == nullptr || packages->kind != JsonValue::Kind::Array) {
-        throw std::runtime_error("vpp.lock: packages phải là array");
+        throw std::runtime_error(std::string(messages::kPackageLockPackagesMustBeArray));
     }
     for (const JsonValue &value : packages->array) {
         lockfile.packages.push_back(lockEntryFromJson(value));
@@ -618,7 +639,7 @@ PackageLockfile readPackageLockfile(const std::filesystem::path &path) {
     for (const PackageLockEntry &entry : lockfile.packages) names.push_back(entry.name);
     std::sort(names.begin(), names.end());
     if (std::adjacent_find(names.begin(), names.end()) != names.end()) {
-        throw std::runtime_error("vpp.lock: package bị lặp");
+        throw std::runtime_error(std::string(messages::kPackageLockPackageDuplicate));
     }
     return lockfile;
 }
@@ -626,7 +647,9 @@ PackageLockfile readPackageLockfile(const std::filesystem::path &path) {
 void writePackageLockfile(const std::filesystem::path &path,
                           const PackageLockfile &lockfile) {
     if (lockfile.schema != kPackageLockSchemaVersion) {
-        throw std::runtime_error("vpp.lock: schema không được hỗ trợ");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockSchemaUnsupported,
+            {std::to_string(lockfile.schema)}));
     }
     std::vector<PackageLockEntry> packages = lockfile.packages;
     std::sort(packages.begin(), packages.end(),
@@ -635,35 +658,35 @@ void writePackageLockfile(const std::filesystem::path &path,
               });
     for (std::size_t index = 0; index < packages.size(); ++index) {
         if (!isValidPackageName(packages[index].name)) {
-            throw std::runtime_error(
-                "vpp.lock: package name không hợp lệ: " + packages[index].name);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageLockNameInvalid, {packages[index].name}));
         }
         if (index > 0 && packages[index - 1].name == packages[index].name) {
-            throw std::runtime_error(
-                "vpp.lock: package bị lặp: " + packages[index].name);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageLockPackageDuplicateNamed, {packages[index].name}));
         }
         std::string versionError;
         if (!SemanticVersion::parse(packages[index].version, &versionError).has_value()) {
-            throw std::runtime_error(
-                "vpp.lock: version của package '" + packages[index].name +
-                "' không hợp lệ: " + versionError);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageLockVersionInvalid,
+                {packages[index].name, versionError}));
         }
         if (packages[index].resolvedPath.empty() || packages[index].fingerprint.empty()) {
-            throw std::runtime_error(
-                "vpp.lock: package '" + packages[index].name +
-                "' thiếu resolved/fingerprint");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageLockResolvedFingerprintMissing,
+                {packages[index].name}));
         }
         if (packages[index].sourceKind == PackageSourceKind::Git &&
             packages[index].revision.empty()) {
-            throw std::runtime_error(
-                "vpp.lock: Git package '" + packages[index].name +
-                "' thiếu exact revision");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageLockGitRevisionMissing, {packages[index].name}));
         }
     }
 
     std::ofstream output(path);
     if (!output.is_open()) {
-        throw std::runtime_error("không thể ghi vpp.lock: " + path.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageLockWriteFailed, {path.u8string()}));
     }
     output << "{\n  \"schema\": " << lockfile.schema << ",\n  \"packages\": [";
     if (!packages.empty()) output << '\n';
@@ -693,8 +716,8 @@ void writePackageLockfile(const std::filesystem::path &path,
 
 std::string fingerprintPackageTree(const std::filesystem::path &root) {
     if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        throw std::runtime_error(
-            "không thể fingerprint package directory: " + root.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageFingerprintDirectoryInvalid, {root.u8string()}));
     }
     std::vector<std::filesystem::path> files;
     for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
@@ -710,17 +733,34 @@ std::string fingerprintPackageTree(const std::filesystem::path &root) {
         hashText(hash, std::filesystem::relative(file, root).generic_u8string());
         std::ifstream input(file, std::ios::binary);
         if (!input.is_open()) {
-            throw std::runtime_error(
-                "không thể đọc package file để fingerprint: " + file.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageFingerprintFileReadFailed, {file.u8string()}));
         }
-        char buffer[8192];
-        while (input.good()) {
-            input.read(buffer, sizeof(buffer));
-            const std::streamsize count = input.gcount();
-            for (std::streamsize index = 0; index < count; ++index) {
-                hashByte(hash, static_cast<unsigned char>(buffer[index]));
+        const bool normalizeLineEndings = normalizeLineEndingsForFingerprint(file);
+        bool pendingCarriageReturn = false;
+        char byte = 0;
+        while (input.get(byte)) {
+            const unsigned char value = static_cast<unsigned char>(byte);
+            if (!normalizeLineEndings) {
+                hashByte(hash, value);
+                continue;
+            }
+            if (pendingCarriageReturn) {
+                if (value == static_cast<unsigned char>('\n')) {
+                    hashByte(hash, static_cast<unsigned char>('\n'));
+                    pendingCarriageReturn = false;
+                    continue;
+                }
+                hashByte(hash, static_cast<unsigned char>('\r'));
+                pendingCarriageReturn = false;
+            }
+            if (value == static_cast<unsigned char>('\r')) {
+                pendingCarriageReturn = true;
+            } else {
+                hashByte(hash, value);
             }
         }
+        if (pendingCarriageReturn) hashByte(hash, static_cast<unsigned char>('\r'));
         hashByte(hash, 0xff);
     }
 

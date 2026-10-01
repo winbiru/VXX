@@ -6,6 +6,7 @@
 #include <string>
 
 #include "vpp/core/package_manifest.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
 
 namespace vietvm::core {
@@ -54,18 +55,16 @@ void copyDirectoryTree(const fs::path &source, const fs::path &staging) {
         }
         const fs::path target = staging / relative;
         if (entry.is_symlink()) {
-            throw std::runtime_error(
-                "package path không hỗ trợ symlink trong 0.9: " +
-                entry.path().u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackagePathSymlinkUnsupported, {entry.path().u8string()}));
         }
         if (entry.is_directory()) {
             fs::create_directories(target);
             continue;
         }
         if (!entry.is_regular_file()) {
-            throw std::runtime_error(
-                "package path chứa entry không được hỗ trợ: " +
-                entry.path().u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackagePathEntryUnsupported, {entry.path().u8string()}));
         }
         fs::create_directories(target.parent_path());
         fs::copy_file(entry.path(), target, fs::copy_options::overwrite_existing);
@@ -81,27 +80,25 @@ std::string materializePathPackage(
     const fs::path sourcePath = absoluteLexical(source);
     const fs::path targetPath = absoluteLexical(targetDirectory);
     if (!fs::exists(sourcePath)) {
-        throw std::runtime_error(
-            "không tìm thấy package source: " + sourcePath.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageSourceNotFoundRuntime, {sourcePath.u8string()}));
     }
 
     if (sourcePath == targetPath) {
         if (!fs::is_directory(targetPath)) {
-            throw std::runtime_error("package source trùng target nhưng không phải directory");
+            throw std::runtime_error(std::string(messages::kPackageSourceTargetSameNotDirectory));
         }
         const std::string fingerprint = fingerprintPackageTree(targetPath);
         if (expectedFingerprint.has_value() && fingerprint != *expectedFingerprint) {
-            throw std::runtime_error(
-                "fingerprint package không khớp: mong đợi " + *expectedFingerprint +
-                ", thực tế " + fingerprint);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageFingerprintMismatch, {*expectedFingerprint, fingerprint}));
         }
         return fingerprint;
     }
 
     if (fs::is_directory(sourcePath) && isPathInside(targetPath, sourcePath)) {
-        throw std::runtime_error(
-            "không thể cài package vào bên trong chính source tree: " +
-            targetPath.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageInstallInsideSource, {targetPath.u8string()}));
     }
 
     fs::create_directories(targetPath.parent_path());
@@ -120,23 +117,21 @@ std::string materializePathPackage(
                           staging / utf8Path(kPackageEntryFile),
                           fs::copy_options::overwrite_existing);
         } else {
-            throw std::runtime_error(
-                "package source không phải file hoặc directory: " +
-                sourcePath.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageSourceUnsupportedEntry, {sourcePath.u8string()}));
         }
 
         const std::string fingerprint = fingerprintPackageTree(staging);
         if (expectedFingerprint.has_value() && fingerprint != *expectedFingerprint) {
-            throw std::runtime_error(
-                "fingerprint package không khớp: mong đợi " + *expectedFingerprint +
-                ", thực tế " + fingerprint);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageFingerprintMismatch, {*expectedFingerprint, fingerprint}));
         }
 
         fs::remove_all(targetPath, ignored);
         if (ignored) {
-            throw std::runtime_error(
-                "không thể thay package cũ: " + targetPath.u8string() +
-                " (" + ignored.message() + ")");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageReplaceFailed,
+                {targetPath.u8string(), ignored.message()}));
         }
         fs::rename(staging, targetPath);
         return fingerprint;

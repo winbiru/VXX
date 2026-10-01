@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "vpp/core/message_runtime_constants.h"
 #include "vpp/runtime/vm.h"
 
 // Cung cấp bề mặt kiểm thử nội bộ cho VM; fixture cho test push stack, đặt frame/class và gọi trực tiếp từng opcode handler mà không chạy cả chương trình.
@@ -22,7 +23,9 @@ public:
 
     // Chuyển top; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
     const StackValue &top() const {
-        if (vm_.stack.empty()) throw std::logic_error("VM fixture stack is empty");
+        if (vm_.stack.empty()) {
+            throw std::logic_error(std::string(vietvm::messages::kVmFixtureStackEmpty));
+        }
         return vm_.stack.back();
     }
 
@@ -37,7 +40,9 @@ public:
     // Trả giá trị của biến trong fixture theo slot/tên đã đăng ký; accessor dùng để test kiểm tra tác động của opcode biến.
     const StackValue &variable(int id) const {
         const auto it = vm_.variables.find(id);
-        if (it == vm_.variables.end()) throw std::logic_error("VM fixture variable is missing");
+        if (it == vm_.variables.end()) {
+            throw std::logic_error(std::string(vietvm::messages::kVmFixtureVariableMissing));
+        }
         return it->second;
     }
 
@@ -75,7 +80,8 @@ public:
     // được giữ nguyên; caller chỉ dùng khi không còn function context hoạt động.
     void resetExecutionForBenchmark() {
         if (!vm_.executionStack.empty() || !vm_.callStack.empty()) {
-            throw std::logic_error("VM benchmark reset requires an idle VM");
+            throw std::logic_error(std::string(
+                vietvm::messages::kVmBenchmarkResetRequiresIdle));
         }
         vm_.stack.clear();
         vm_.loopStartStack.clear();
@@ -98,7 +104,9 @@ public:
 
     // Trả call frame đang hoạt động; hàm đọc frame trên cùng để handler/test truy cập tham số, local, receiver và địa chỉ quay về.
     const CallFrame &currentCallFrame() const {
-        if (vm_.callStack.empty()) throw std::logic_error("VM fixture call stack is empty");
+        if (vm_.callStack.empty()) {
+            throw std::logic_error(std::string(vietvm::messages::kVmFixtureCallStackEmpty));
+        }
         return vm_.callStack.back();
     }
 
@@ -111,12 +119,16 @@ public:
     std::size_t switchDepth() const { return vm_.switchStack.size(); }
     // Cho biết nhánh `chọn` hiện tại đang bị bỏ qua hay không; hàm đọc cờ `skipping` của frame trên cùng.
     bool switchSkipping() const {
-        if (vm_.switchStack.empty()) throw std::logic_error("VM fixture switch stack is empty");
+        if (vm_.switchStack.empty()) {
+            throw std::logic_error(std::string(vietvm::messages::kVmFixtureSwitchStackEmpty));
+        }
         return vm_.switchStack.back().skippingCase;
     }
     // Cho biết một nhánh của `chọn` đã khớp; hàm đọc cờ `matched` để test xác nhận các nhánh sau bị xử lý đúng.
     bool switchMatched() const {
-        if (vm_.switchStack.empty()) throw std::logic_error("VM fixture switch stack is empty");
+        if (vm_.switchStack.empty()) {
+            throw std::logic_error(std::string(vietvm::messages::kVmFixtureSwitchStackEmpty));
+        }
         return vm_.switchStack.back().caseMatched;
     }
 

@@ -79,16 +79,16 @@ std::string shellQuoteSingle(const std::string &s) {
 // HTTP(S), có host và không chứa whitespace/ký tự điều khiển chưa percent-encode.
 bool validateHttpUrl(const std::string &url, std::string &reason) {
     if (url.empty()) {
-        reason = "URL rỗng";
+        reason = messages::messageText(messages::kNativeHttpUrlEmpty);
         return false;
     }
     if (!vietvm::core::isValidUtf8(url)) {
-        reason = "URL không phải UTF-8 hợp lệ";
+        reason = messages::messageText(messages::kNativeHttpUrlUtf8Invalid);
         return false;
     }
     for (unsigned char byte : url) {
         if (byte <= 0x20u || byte == 0x7fu) {
-            reason = "URL chứa khoảng trắng hoặc ký tự điều khiển; hãy percent-encode trước";
+            reason = messages::messageText(messages::kNativeHttpUrlWhitespaceInvalid);
             return false;
         }
     }
@@ -100,7 +100,7 @@ bool validateHttpUrl(const std::string &url, std::string &reason) {
     } else if (vietvm::helpers::startsWith(lowered, "https://")) {
         authorityStart = 8;
     } else {
-        reason = "URL phải dùng scheme http:// hoặc https://";
+        reason = messages::messageText(messages::kNativeHttpUrlSchemeInvalid);
         return false;
     }
     const std::size_t authorityEnd = url.find_first_of("/?#", authorityStart);
@@ -108,7 +108,7 @@ bool validateHttpUrl(const std::string &url, std::string &reason) {
         authorityStart,
         authorityEnd == std::string::npos ? std::string::npos : authorityEnd - authorityStart);
     if (authority.empty()) {
-        reason = "URL thiếu host";
+        reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
         return false;
     }
 
@@ -117,7 +117,7 @@ bool validateHttpUrl(const std::string &url, std::string &reason) {
         ? authority
         : authority.substr(userInfoEnd + 1);
     if (hostPort.empty()) {
-        reason = "URL thiếu host";
+        reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
         return false;
     }
 
@@ -135,28 +135,28 @@ bool validateHttpUrl(const std::string &url, std::string &reason) {
     if (hostPort.front() == '[') {
         const std::size_t close = hostPort.find(']');
         if (close == std::string::npos || close == 1) {
-            reason = "URL host IPv6 không hợp lệ";
+            reason = messages::messageText(messages::kNativeHttpUrlIpv6HostInvalid);
             return false;
         }
         const std::string suffix = hostPort.substr(close + 1);
         if (!suffix.empty() &&
             (suffix.front() != ':' || !validPort(suffix.substr(1)))) {
-            reason = "URL port không hợp lệ";
+            reason = messages::messageText(messages::kNativeHttpUrlPortInvalid);
             return false;
         }
     } else {
         const std::size_t firstColon = hostPort.find(':');
         if (firstColon == 0) {
-            reason = "URL thiếu host";
+            reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
             return false;
         }
         if (firstColon != std::string::npos) {
             if (hostPort.find(':', firstColon + 1) != std::string::npos) {
-                reason = "URL host IPv6 phải đặt trong ngoặc vuông";
+                reason = messages::messageText(messages::kNativeHttpUrlIpv6NeedsBrackets);
                 return false;
             }
             if (!validPort(hostPort.substr(firstColon + 1))) {
-                reason = "URL port không hợp lệ";
+                reason = messages::messageText(messages::kNativeHttpUrlPortInvalid);
                 return false;
             }
         }
@@ -785,13 +785,16 @@ bool getNativeHandleArgument(const std::vector<StackValue> &args,
                              Handle &out,
                              std::string &err) {
     if (index >= args.size() || !std::holds_alternative<Handle>(args[index])) {
-        err = fn + " chỉ nhận " + typeName;
-        if (firstArgumentDiagnostic) err += " ở đối số đầu tiên";
+        err = messages::formatMessage(
+            firstArgumentDiagnostic
+                ? messages::kNativeHandleTypeRequiredFirstArgument
+                : messages::kNativeHandleTypeRequired,
+            {fn, typeName});
         return false;
     }
     out = std::get<Handle>(args[index]);
     if (out == nullptr) {
-        err = fn + " không thể thao tác trên " + typeName + " rỗng nội bộ";
+        err = messages::formatMessage(messages::kNativeHandleEmptyInternal, {fn, typeName});
         return false;
     }
     return true;
@@ -827,12 +830,12 @@ bool getFirstMapArgument(const std::vector<StackValue> &args,
 // Lấy non negative danh sách chỉ số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &err) {
     if (!std::holds_alternative<int>(value)) {
-        err = "chỉ số danh sách phải là số nguyên";
+        err = messages::messageText(messages::kNativeListIndexMustBeInteger);
         return false;
     }
     index = std::get<int>(value);
     if (index < 0) {
-        err = "chỉ số danh sách vượt phạm vi";
+        err = messages::messageText(messages::kNativeListIndexOutOfRange);
         return false;
     }
     return true;
@@ -934,7 +937,7 @@ bool runCurlHttpRequest(const std::string &method,
                         std::string &err) {
     std::string invalidUrlReason;
     if (!validateHttpUrl(url, invalidUrlReason)) {
-        err = fnName + ": URL HTTP không hợp lệ: " + invalidUrlReason;
+        err = messages::formatMessage(messages::kNativeHttpUrlInvalid, {fnName, invalidUrlReason});
         return true;
     }
 

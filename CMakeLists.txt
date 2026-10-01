@@ -44,6 +44,9 @@ endif()
 
 find_package(Threads REQUIRED)
 if (UNIX AND NOT APPLE)
+    # Release Linux should not require libcrypto.so to already exist on the
+    # user's machine. Ubuntu's libssl-dev provides the static archive.
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
     find_package(OpenSSL REQUIRED)
 endif()
 

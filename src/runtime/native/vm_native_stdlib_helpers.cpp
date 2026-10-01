@@ -44,7 +44,7 @@ bool nativeUtf8Path(const StackValue &value,
                     std::string &err) {
     const std::string text = argToRawString(value);
     if (!vietvm::core::isValidUtf8(text)) {
-        err = operation + ": đường dẫn UTF-8 không hợp lệ";
+        err = messages::formatMessage(messages::kNativePathUtf8Invalid, {operation});
         return false;
     }
     path = std::filesystem::u8path(text);
@@ -75,12 +75,12 @@ bool requireUtf8CryptoString(const std::vector<StackValue> &args,
                              std::string &value,
                              std::string &err) {
     if (index >= args.size() || !std::holds_alternative<std::string>(args[index])) {
-        err = fn + ": " + label + " phải là chuỗi";
+        err = messages::formatMessage(messages::kNativeStringArgumentRequired, {fn, label});
         return false;
     }
     value = std::get<std::string>(args[index]);
     if (!vietvm::core::isValidUtf8(value)) {
-        err = fn + ": " + label + " phải là UTF-8 hợp lệ";
+        err = messages::formatMessage(messages::kNativeStringArgumentUtf8Invalid, {fn, label});
         return false;
     }
     return true;
@@ -93,24 +93,24 @@ bool fillSecureRandom(std::vector<unsigned char> &bytes, std::string &err) {
         nullptr, bytes.data(), static_cast<ULONG>(bytes.size()),
         BCRYPT_USE_SYSTEM_PREFERRED_RNG);
     if (status < 0) {
-        err = "ngẫu nhiên bảo mật: BCryptGenRandom thất bại";
+        err = messages::messageText(messages::kNativeSecureRandomWindowsFailed);
         return false;
     }
     return true;
 #elif defined(__APPLE__)
     if (SecRandomCopyBytes(kSecRandomDefault, bytes.size(), bytes.data()) != errSecSuccess) {
-        err = "ngẫu nhiên bảo mật: SecRandomCopyBytes thất bại";
+        err = messages::messageText(messages::kNativeSecureRandomAppleFailed);
         return false;
     }
     return true;
 #elif defined(__linux__)
     if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1) {
-        err = "ngẫu nhiên bảo mật: RAND_bytes thất bại";
+        err = messages::messageText(messages::kNativeSecureRandomLinuxFailed);
         return false;
     }
     return true;
 #else
-    err = "ngẫu nhiên bảo mật: nền tảng chưa được hỗ trợ";
+    err = messages::messageText(messages::kNativeSecureRandomPlatformUnsupported);
     return false;
 #endif
 }
@@ -145,7 +145,7 @@ bool sha256Digest(const std::string &text,
     }
     if (status >= 0 && hashLength != digest.size()) {
         closeHandles();
-        err = "băm sha256: BCrypt trả kích thước digest không hợp lệ";
+        err = messages::messageText(messages::kNativeSha256DigestSizeInvalid);
         return false;
     }
     if (status >= 0) {
@@ -156,7 +156,7 @@ bool sha256Digest(const std::string &text,
     if (status >= 0 && !text.empty()) {
         if (text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
             closeHandles();
-            err = "băm sha256: dữ liệu quá lớn";
+            err = messages::messageText(messages::kNativeSha256InputTooLarge);
             return false;
         } else {
             status = BCryptHashData(
@@ -171,17 +171,17 @@ bool sha256Digest(const std::string &text,
     }
     closeHandles();
     if (status < 0) {
-        err = "băm sha256: BCrypt SHA-256 thất bại";
+        err = messages::messageText(messages::kNativeSha256WindowsFailed);
         return false;
     }
     return true;
 #elif defined(__APPLE__)
     if (text.size() > static_cast<std::size_t>(std::numeric_limits<CC_LONG>::max())) {
-        err = "băm sha256: dữ liệu quá lớn";
+        err = messages::messageText(messages::kNativeSha256InputTooLarge);
         return false;
     }
     if (CC_SHA256(text.data(), static_cast<CC_LONG>(text.size()), digest.data()) == nullptr) {
-        err = "băm sha256: CommonCrypto SHA-256 thất bại";
+        err = messages::messageText(messages::kNativeSha256AppleFailed);
         return false;
     }
     return true;
@@ -190,14 +190,14 @@ bool sha256Digest(const std::string &text,
     if (EVP_Digest(text.data(), text.size(), digest.data(), &digestSize,
                    EVP_sha256(), nullptr) != 1 ||
         digestSize != digest.size()) {
-        err = "băm sha256: OpenSSL SHA-256 thất bại";
+        err = messages::messageText(messages::kNativeSha256LinuxFailed);
         return false;
     }
     return true;
 #else
     (void)text;
     (void)digest;
-    err = "băm sha256: nền tảng chưa được hỗ trợ";
+    err = messages::messageText(messages::kNativeSha256PlatformUnsupported);
     return false;
 #endif
 }
@@ -221,7 +221,7 @@ bool hmacSha256Digest(const std::string &key,
 
     if (key.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)()) ||
         text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
-        err = "hmac sha256: dữ liệu quá lớn";
+        err = messages::messageText(messages::kNativeHmacSha256InputTooLarge);
         return false;
     }
 
@@ -239,7 +239,7 @@ bool hmacSha256Digest(const std::string &key,
     }
     if (status >= 0 && hashLength != digest.size()) {
         closeHandles();
-        err = "hmac sha256: BCrypt trả kích thước digest không hợp lệ";
+        err = messages::messageText(messages::kNativeHmacSha256DigestSizeInvalid);
         return false;
     }
     if (status >= 0) {
@@ -261,7 +261,7 @@ bool hmacSha256Digest(const std::string &key,
     }
     closeHandles();
     if (status < 0) {
-        err = "hmac sha256: BCrypt HMAC thất bại";
+        err = messages::messageText(messages::kNativeHmacSha256WindowsFailed);
         return false;
     }
     return true;
@@ -272,7 +272,7 @@ bool hmacSha256Digest(const std::string &key,
     return true;
 #elif defined(__linux__)
     if (key.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        err = "hmac sha256: khóa quá lớn";
+        err = messages::messageText(messages::kNativeHmacSha256KeyTooLarge);
         return false;
     }
     unsigned int digestSize = 0;
@@ -280,7 +280,7 @@ bool hmacSha256Digest(const std::string &key,
              reinterpret_cast<const unsigned char *>(text.data()), text.size(),
              digest.data(), &digestSize) == nullptr ||
         digestSize != digest.size()) {
-        err = "hmac sha256: OpenSSL HMAC thất bại";
+        err = messages::messageText(messages::kNativeHmacSha256LinuxFailed);
         return false;
     }
     return true;
@@ -288,7 +288,7 @@ bool hmacSha256Digest(const std::string &key,
     (void)key;
     (void)text;
     (void)digest;
-    err = "hmac sha256: nền tảng chưa được hỗ trợ";
+    err = messages::messageText(messages::kNativeHmacSha256PlatformUnsupported);
     return false;
 #endif
 }
@@ -301,7 +301,7 @@ bool pathToUtf8(const fs::path &path,
                 std::string &err) {
     text = path.generic_u8string();
     if (!vietvm::core::isValidUtf8(text)) {
-        err = operation + ": hệ thống tệp trả về đường dẫn không phải UTF-8";
+        err = messages::formatMessage(messages::kNativeFilesystemPathUtf8Invalid, {operation});
         return false;
     }
     return true;
@@ -312,7 +312,7 @@ bool filesystemError(const std::error_code &ec,
                      const std::string &operation,
                      std::string &err) {
     if (!ec) return false;
-    err = operation + ": " + ec.message();
+    err = messages::formatMessage(messages::kNativeOperationSystemError, {operation, ec.message()});
     return true;
 }
 
@@ -359,11 +359,11 @@ bool validateEnvironmentVariableName(const std::string &name,
                                      std::string &err) {
     if (name.empty() || name.find('=') != std::string::npos ||
         name.find('\0') != std::string::npos) {
-        err = operation + ": tên biến môi trường không hợp lệ";
+        err = messages::formatMessage(messages::kNativeEnvironmentNameInvalid, {operation});
         return false;
     }
     if (!vietvm::core::isValidUtf8(name)) {
-        err = operation + ": tên biến môi trường phải là UTF-8 hợp lệ";
+        err = messages::formatMessage(messages::kNativeEnvironmentNameUtf8Invalid, {operation});
         return false;
     }
     return true;
@@ -518,7 +518,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         int parsed = 0;
         if (!toStrictInt(args[0], parsed)) {
-            err = "thành số nguyên: giá trị không thể chuyển đổi";
+            err = messages::messageText(messages::kNativeToIntegerConversionFailed);
             return true;
         }
         result = make_int_value(parsed);
@@ -529,7 +529,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         double parsed = 0.0;
         if (!toStrictDouble(args[0], parsed)) {
-            err = "thành số thực: giá trị không thể chuyển đổi";
+            err = messages::messageText(messages::kNativeToFloatConversionFailed);
             return true;
         }
         result = make_float_value(parsed);
@@ -547,11 +547,11 @@ bool handleNativeFoundationFunction(const std::string &fn,
         int minimum = 0;
         int maximum = 0;
         if (!toStrictInt(args[0], minimum) || !toStrictInt(args[1], maximum)) {
-            err = "ngẫu nhiên nguyên: giới hạn phải là số nguyên";
+            err = messages::messageText(messages::kNativeRandomIntBoundsMustBeInteger);
             return true;
         }
         if (minimum > maximum) {
-            err = "ngẫu nhiên nguyên: giới hạn dưới lớn hơn giới hạn trên";
+            err = messages::messageText(messages::kNativeRandomIntBoundsInvalid);
             return true;
         }
         static thread_local std::mt19937 generator(std::random_device{}());
@@ -565,7 +565,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         int byteCount = 0;
         if (!toStrictInt(args[0], byteCount) ||
             byteCount < 1 || byteCount > kMaxSecureRandomBytes) {
-            err = "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+            err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
             return true;
         }
         std::vector<unsigned char> bytes(static_cast<std::size_t>(byteCount));
@@ -764,7 +764,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         int milliseconds = 0;
         if (!toStrictInt(args[0], milliseconds) || milliseconds < 0) {
-            err = "ngủ mili giây: thời lượng phải là số nguyên không âm";
+            err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);
             return true;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));

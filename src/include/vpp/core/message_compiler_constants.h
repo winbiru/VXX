@@ -101,6 +101,7 @@ inline constexpr std::string_view kImportFileExtensionUnsupported = "nhập: kh�
 inline constexpr std::string_view kImportCannotOpenFile = "nhập: không thể mở tệp '{0}'";
 inline constexpr std::string_view kImportModuleCycle = "nhập: phát hiện chu trình mô-đun: {0}";
 inline constexpr std::string_view kInternalImportHandlerMissing = "trình biên dịch nội bộ chưa đăng ký bộ xử lý câu lệnh nhập";
+inline constexpr std::string_view kModuleGraphImportScannerMissing = "LocalModuleGraphBuilder requires an import scanner";
 
 // Compiler invariants. These indicate a compiler bug or malformed internal IR.
 inline constexpr std::string_view kInternalBlockHandlerDidNotAdvance = "compileBlock: bộ xử lý cho '{0}' không dịch chuyển vị trí (vị trí={1})\nNgữ cảnh: {2}";
@@ -132,5 +133,52 @@ inline constexpr std::string_view kInternalDirectIrSuperclassNotFound = "IR tr�
 inline constexpr std::string_view kInternalDirectIrInheritanceCycle = "IR trực tiếp phát hiện chu trình kế thừa tại lớp '{0}'";
 inline constexpr std::string_view kInternalDirectIrMissingParameterDefaultValue = "tham số của IR trực tiếp không có giá trị mặc định";
 inline constexpr std::string_view kInternalDirectIrProgramHasUnsupportedRegion = "chương trình chứa vùng IR chưa được bộ phát bytecode trực tiếp hỗ trợ";
+inline constexpr std::string_view kInternalDirectIrLambdaMissingStructuredPayload = "direct IR lambda has no structured payload";
+
+// Bytecode verifier diagnostics.
+inline constexpr std::string_view kBytecodeUnknownOpcode = "mã lệnh bytecode không xác định";
+inline constexpr std::string_view kBytecodePoolReferenceOutOfRange = "{0} tham chiếu ngoài StringPool";
+inline constexpr std::string_view kBytecodeJumpAddressOutOfRange = "địa chỉ nhảy ngoài phạm vi";
+inline constexpr std::string_view kBytecodeCatchAddressOutOfRange = "địa chỉ khối bắt lỗi ngoài phạm vi";
+inline constexpr std::string_view kBytecodeCatchAddressMustPointToCatch =
+    "địa chỉ khối bắt lỗi không trỏ tới OP_BAT_LOI";
+inline constexpr std::string_view kBytecodeTryEndAddressOutOfRange =
+    "địa chỉ kết thúc khối thử ngoài phạm vi";
+inline constexpr std::string_view kBytecodeDynamicCollectionCountNegative =
+    "số phần tử collection động âm";
+inline constexpr std::string_view kBytecodeFunctionIdNegative = "function id âm";
+inline constexpr std::string_view kBytecodeFunctionIdMissing =
+    "function id không có bytecode tương ứng";
+inline constexpr std::string_view kBytecodeCallArgumentCountNegative = "số đối số gọi hàm âm";
+inline constexpr std::string_view kBytecodeIndirectCallNameOutOfRange =
+    "tên hàm gọi gián tiếp ngoài StringPool";
+inline constexpr std::string_view kBytecodeIndirectCallArgumentCountNegative =
+    "số đối số gọi gián tiếp âm";
+inline constexpr std::string_view kBytecodeParameterMetadataInvalid = "metadata tham số không hợp lệ";
+inline constexpr std::string_view kBytecodeDefaultParameterMetadataInvalid =
+    "metadata tham số mặc định không hợp lệ";
+inline constexpr std::string_view kBytecodeCaseLabelKindInvalid = "kiểu nhãn ca không hợp lệ";
+inline constexpr std::string_view kBytecodeSuperclassMetadataInvalid = "metadata lớp cha không hợp lệ";
+inline constexpr std::string_view kBytecodeMethodClassNameOutOfRange =
+    "tên lớp của phương thức ngoài StringPool";
+inline constexpr std::string_view kBytecodeMethodFunctionIdMissing =
+    "phương thức tham chiếu function id không tồn tại";
+inline constexpr std::string_view kBytecodeConstructorArgumentCountNegative =
+    "số đối số constructor âm";
+inline constexpr std::string_view kBytecodeMethodArgumentCountNegative =
+    "số đối số phương thức âm";
+inline constexpr std::string_view kBytecodeMethodDispatchModeInvalid =
+    "chế độ dispatch phương thức không hợp lệ";
+inline constexpr std::string_view kBytecodeClosureMetadataInvalid = "metadata closure không hợp lệ";
+inline constexpr std::string_view kBytecodeClosureFunctionIdMissing =
+    "closure tham chiếu function id không tồn tại";
+inline constexpr std::string_view kBytecodePoolLabelLiteral = "literal";
+inline constexpr std::string_view kBytecodePoolLabelFunctionName = "tên hàm";
+inline constexpr std::string_view kBytecodePoolLabelDefaultValue = "giá trị mặc định";
+inline constexpr std::string_view kBytecodePoolLabelClassName = "tên lớp";
+inline constexpr std::string_view kBytecodePoolLabelSuperclassName = "tên lớp cha";
+inline constexpr std::string_view kBytecodePoolLabelMethodName = "tên phương thức";
+inline constexpr std::string_view kBytecodePoolLabelConstructorClassName = "tên lớp constructor";
+inline constexpr std::string_view kBytecodePoolLabelPropertyName = "tên thuộc tính";
 
 } // namespace vietvm::messages

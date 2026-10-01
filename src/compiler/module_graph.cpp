@@ -262,8 +262,8 @@ LocalModuleGraphBuilder::LocalModuleGraphBuilder(
     : resolver_(std::move(resolver)),
       importScanner_(std::move(importScanner)) {
     if (!importScanner_) {
-        throw std::invalid_argument(
-            "LocalModuleGraphBuilder requires an import scanner");
+        throw std::invalid_argument(std::string(
+            vietvm::messages::kModuleGraphImportScannerMissing));
     }
 }
 

@@ -18,6 +18,14 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#else
+#include <climits>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 #include "vm/vm.h"
 #include "frontend/keywords.h"
@@ -26,6 +34,7 @@
 #include "vpp/runtime/error.h"
 #include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
+#include "vpp/core/cli_constants.h"
 #include "vpp/core/package_cache.h"
 #include "vpp/core/package_installer.h"
 #include "vpp/core/package_manifest.h"
@@ -616,10 +625,9 @@ static int writeResolvedPackageLock(
                 dependency.sourcePath, verificationTarget, installedFingerprint);
         } catch (const std::exception &error) {
             fs::remove_all(verificationTarget, cleanupError);
-            throw std::runtime_error(
-                "không thể khóa package '" + dependency.name +
-                "': bytes đã cài không khớp source vừa resolve; hãy chạy 'vpp cập nhật' "
-                "hoặc 'vpp đồng bộ' trước. Chi tiết: " + error.what());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kCliPackageLockSourceMismatch,
+                {dependency.name, error.what()}));
         }
         fs::remove_all(verificationTarget, cleanupError);
 
@@ -817,8 +825,7 @@ static void parseRegistryPackageSelector(
     const std::string &selector,
     ParsedPackageSourceArgument &parsed) {
     if (selector.empty()) {
-        throw std::runtime_error(
-            "nguồn registry phải chỉ rõ package theo dạng <tên>[@<range>]");
+        throw std::runtime_error(std::string(messages::kCliRegistrySelectorRequired));
     }
     const std::size_t at = selector.rfind('@');
     if (at == std::string::npos) {
@@ -830,7 +837,8 @@ static void parseRegistryPackageSelector(
     }
     if (!vietvm::core::isValidPackageName(parsed.packageName) ||
         parsed.versionRange.empty()) {
-        throw std::runtime_error("selector registry không hợp lệ: " + selector);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kCliRegistrySelectorInvalid, {selector}));
     }
 }
 
@@ -849,12 +857,11 @@ static ParsedPackageSourceArgument parsePackageSourceArgument(
         std::string body = sourceArg.substr(9);
         const std::size_t fragment = body.rfind('#');
         if (fragment == std::string::npos) {
-            throw std::runtime_error(
-                "nguồn registry phải có dạng registry+<root>#<tên>[@<range>]");
+            throw std::runtime_error(std::string(messages::kCliRegistrySourceInvalid));
         }
         parsed.location = body.substr(0, fragment);
         if (parsed.location.empty()) {
-            throw std::runtime_error("registry root không được rỗng");
+            throw std::runtime_error(std::string(messages::kCliRegistryRootEmpty));
         }
         parseRegistryPackageSelector(body.substr(fragment + 1), parsed);
         return parsed;
@@ -870,8 +877,7 @@ static ParsedPackageSourceArgument parsePackageSourceArgument(
         parsed.location.resize(fragment);
     }
     if (parsed.location.empty() || parsed.reference.empty()) {
-        throw std::runtime_error(
-            "nguồn Git phải có dạng git+<repository>[#<ref>]");
+        throw std::runtime_error(std::string(messages::kCliGitSourceInvalid));
     }
     return parsed;
 }
@@ -920,9 +926,9 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
     std::string packageName = packageNameArg;
     if (parsedSource.kind == vietvm::core::PackageSourceKind::Registry) {
         if (!packageName.empty() && packageName != parsedSource.packageName) {
-            throw std::runtime_error(
-                "tên package registry trong source ('" + parsedSource.packageName +
-                "') khác tên được truyền ('" + packageName + "')");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kCliRegistryPackageNameMismatch,
+                {parsedSource.packageName, packageName}));
         }
         packageName = parsedSource.packageName;
     }
@@ -973,8 +979,8 @@ static int pkgAdd(const std::string &sourceArg, const std::string &packageNameAr
                 return item.name == packageName;
             });
         if (selected == graph.packages.end()) {
-            throw std::runtime_error(
-                "không tìm thấy Git dependency vừa resolve: " + packageName);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kCliGitResolvedDependencyMissing, {packageName}));
         }
         auto direct = std::find_if(
             manifest.dependencies.begin(), manifest.dependencies.end(),
@@ -1168,7 +1174,7 @@ static int pkgLock() {
 }
 
 static bool isOfflineFlag(const std::string &argument) {
-    return argument == "--offline" || argument == "--ngoại-tuyến";
+    return argument == vietvm::cli::kOfflineFlag || argument == vietvm::cli::kOfflineFlagVi;
 }
 
 static int pkgRestore(bool offlineOnly = false) {
@@ -1227,10 +1233,9 @@ static int pkgRestore(bool offlineOnly = false) {
             const auto materialized = vietvm::core::materializePackageSource(
                 lockedSource, root, sourceStateRoot);
             if (materialized.revision != entry.revision) {
-                throw std::runtime_error(
-                    "Git restore resolve sai revision cho package '" + entry.name +
-                    "': mong đợi " + entry.revision + ", thực tế " +
-                    materialized.revision);
+                throw std::runtime_error(messages::formatMessage(
+                    messages::kCliGitRestoreRevisionMismatch,
+                    {entry.name, entry.revision, materialized.revision}));
             }
             sourcePath = materialized.path;
         } else if (entry.sourceKind == vietvm::core::PackageSourceKind::Registry) {
@@ -1288,20 +1293,20 @@ static int runPackageCommand(int argc, char *argv[]) {
     int subWordOffset = 0;
     if (argc >= 4) {
         std::string twoWordSub = sub + " " + std::string(argv[3]);
-        if (twoWordSub == "khởi tạo" || twoWordSub == "danh sách" ||
-            twoWordSub == "thông tin" || twoWordSub == "kiểm tra" ||
-            twoWordSub == "cài đặt" || twoWordSub == "phát hành" ||
-            twoWordSub == "đồng bộ" || twoWordSub == "cập nhật" ||
-            twoWordSub == "phục hồi" || twoWordSub == "thống kê") {
+        if (twoWordSub == vietvm::cli::kPkgInitVi || twoWordSub == vietvm::cli::kPkgListVi ||
+            twoWordSub == vietvm::cli::kPkgInfoVi || twoWordSub == vietvm::cli::kPkgHasVi ||
+            twoWordSub == vietvm::cli::kPkgInstallVi || twoWordSub == vietvm::cli::kPkgPublishVi ||
+            twoWordSub == vietvm::cli::kPkgSyncVi || twoWordSub == vietvm::cli::kPkgUpdateVi ||
+            twoWordSub == vietvm::cli::kPkgRestoreVi || twoWordSub == vietvm::cli::kPkgStatsVi) {
             sub = twoWordSub;
             subWordOffset = 1;
         }
     }
-    if (sub == "init" || sub == "khởi tạo") {
+    if (sub == vietvm::cli::kPkgInit || sub == vietvm::cli::kPkgInitVi) {
         std::string name = (argc >= (4 + subWordOffset)) ? argv[3 + subWordOffset] : "";
         return pkgInit(name);
     }
-    if (sub == "add" || sub == "thêm") {
+    if (sub == vietvm::cli::kPkgAdd || sub == vietvm::cli::kPkgAddVi) {
         if (argc < (4 + subWordOffset)) {
             std::cerr << messages::formatMessage(messages::kPkgAddSourceMissing) << '\n';
             return EXIT_FAILURE;
@@ -1310,7 +1315,7 @@ static int runPackageCommand(int argc, char *argv[]) {
         std::string name = (argc >= (5 + subWordOffset)) ? argv[4 + subWordOffset] : "";
         return pkgAdd(sourceArg, name);
     }
-    if (sub == "install" || sub == "cài đặt") {
+    if (sub == vietvm::cli::kPkgInstall || sub == vietvm::cli::kPkgInstallVi) {
         if (argc < (4 + subWordOffset)) {
             return pkgRestore(false);
         }
@@ -1319,53 +1324,53 @@ static int runPackageCommand(int argc, char *argv[]) {
         std::string name = (argc >= (5 + subWordOffset)) ? argv[4 + subWordOffset] : "";
         return pkgAdd(sourceArg, name);
     }
-    if (sub == "publish" || sub == "phát-hành" || sub == "phát hành") {
+    if (sub == vietvm::cli::kPkgPublish || sub == vietvm::cli::kPkgPublishViHyphen || sub == vietvm::cli::kPkgPublishVi) {
         if (argc < (4 + subWordOffset)) {
             std::cerr << messages::formatMessage(messages::kPkgPublishRegistryMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgPublish(argv[3 + subWordOffset]);
     }
-    if (sub == "list" || sub == "danh sách") {
+    if (sub == vietvm::cli::kPkgList || sub == vietvm::cli::kPkgListVi) {
         return pkgList();
     }
-    if (sub == "sync" || sub == "đồng bộ") {
+    if (sub == vietvm::cli::kPkgSync || sub == vietvm::cli::kPkgSyncVi) {
         return pkgSync();
     }
-    if (sub == "update" || sub == "cập nhật") {
+    if (sub == vietvm::cli::kPkgUpdate || sub == vietvm::cli::kPkgUpdateVi) {
         return pkgSync();
     }
-    if (sub == "lock" || sub == "khóa") {
+    if (sub == vietvm::cli::kPkgLock || sub == vietvm::cli::kPkgLockVi) {
         return pkgLock();
     }
-    if (sub == "restore" || sub == "phục hồi") {
+    if (sub == vietvm::cli::kPkgRestore || sub == vietvm::cli::kPkgRestoreVi) {
         const bool offlineOnly =
             argc >= (4 + subWordOffset) &&
             isOfflineFlag(argv[3 + subWordOffset]);
         return pkgRestore(offlineOnly);
     }
-    if (sub == "remove" || sub == "xóa") {
+    if (sub == vietvm::cli::kPkgRemove || sub == vietvm::cli::kPkgRemoveVi) {
         if (argc < (4 + subWordOffset)) {
             std::cerr << messages::formatMessage(messages::kPkgRemoveNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgRemove(argv[3 + subWordOffset]);
     }
-    if (sub == "info" || sub == "thông tin") {
+    if (sub == vietvm::cli::kPkgInfo || sub == vietvm::cli::kPkgInfoVi) {
         if (argc < (4 + subWordOffset)) {
             std::cerr << messages::formatMessage(messages::kPkgInfoNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgInfo(argv[3 + subWordOffset]);
     }
-    if (sub == "has" || sub == "kiểm tra") {
+    if (sub == vietvm::cli::kPkgHas || sub == vietvm::cli::kPkgHasVi) {
         if (argc < (4 + subWordOffset)) {
             std::cerr << messages::formatMessage(messages::kPkgHasNameMissing) << '\n';
             return EXIT_FAILURE;
         }
         return pkgHas(argv[3 + subWordOffset]);
     }
-    if (sub == "stats" || sub == "thống kê") {
+    if (sub == vietvm::cli::kPkgStats || sub == vietvm::cli::kPkgStatsVi) {
         return pkgStats();
     }
     std::cerr << messages::formatMessage(messages::kPkgInvalidSubcommand, {sub}) << std::endl;
@@ -2151,24 +2156,27 @@ static int runLanguageServer() {
 
 // Chạy CLI với argv đã chuẩn hóa UTF-8. Trên Windows, entry point `wmain`
 // chuyển command line UTF-16 sang UTF-8 trước khi đi vào parser này.
-static int uninstallVpp() {
+static int uninstallVpp(const std::string &argv0) {
+#if defined(_WIN32) || defined(__APPLE__) || defined(__linux__)
+    (void)argv0;
+#endif
 #if defined(_WIN32)
     std::vector<wchar_t> executable(32768);
     const DWORD length = GetModuleFileNameW(nullptr, executable.data(), static_cast<DWORD>(executable.size()));
     if (length == 0 || length >= executable.size()) {
-        throw std::runtime_error("Không thể xác định thư mục cài V++");
+        throw std::runtime_error(std::string(messages::kCliWindowsInstallDirectoryUnknown));
     }
     const fs::path installDir = fs::path(executable.data()).parent_path();
-    const fs::path script = installDir / L"uninstall-vpp.ps1";
+    const fs::path script = installDir / vietvm::cli::kWindowsUninstallScript;
     if (!fs::exists(script)) {
-        throw std::runtime_error("Không tìm thấy bộ gỡ. Hãy cài lại bằng bộ cài Windows mới.");
+        throw std::runtime_error(std::string(messages::kCliWindowsUninstallerMissing));
     }
     wchar_t tempDirectory[MAX_PATH + 1]{};
     wchar_t tempScript[MAX_PATH + 1]{};
     const DWORD tempLength = GetTempPathW(MAX_PATH + 1, tempDirectory);
     if (tempLength == 0 || tempLength > MAX_PATH ||
         GetTempFileNameW(tempDirectory, L"vpp", 0, tempScript) == 0) {
-        throw std::runtime_error("Không thể tạo bộ gỡ tạm thời");
+        throw std::runtime_error(std::string(messages::kCliTempUninstallerCreateFailed));
     }
     // The running executable is locked on Windows. A temporary child script
     // waits for this process to exit before removing the installed files.
@@ -2179,9 +2187,9 @@ static int uninstallVpp() {
         wchar_t systemDirectory[MAX_PATH + 1]{};
         const UINT systemLength = GetSystemDirectoryW(systemDirectory, MAX_PATH + 1);
         if (systemLength == 0 || systemLength > MAX_PATH) {
-            throw std::runtime_error("Không thể tìm Windows PowerShell");
+            throw std::runtime_error(std::string(messages::kCliWindowsPowerShellMissing));
         }
-        const fs::path powershell = fs::path(systemDirectory) / L"WindowsPowerShell/v1.0/powershell.exe";
+        const fs::path powershell = fs::path(systemDirectory) / vietvm::cli::kPowerShellRelativePath;
         std::wstring command = L"\"" + powershell.wstring() +
             L"\" -NoProfile -ExecutionPolicy Bypass -File \"" + temporaryScript.wstring() +
             L"\" -InstallDir \"" + installDir.wstring() +
@@ -2192,7 +2200,7 @@ static int uninstallVpp() {
         PROCESS_INFORMATION process{};
         if (!CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr,
                             FALSE, 0, nullptr, nullptr, &startup, &process)) {
-            throw std::runtime_error("Không thể khởi động bộ gỡ V++");
+            throw std::runtime_error(std::string(messages::kCliUninstallerStartFailed));
         }
         CloseHandle(process.hThread);
         CloseHandle(process.hProcess);
@@ -2202,112 +2210,147 @@ static int uninstallVpp() {
         fs::remove(temporaryScript, ignored);
         throw;
     }
-    std::cout << "Đã khởi động bộ gỡ V++. Bộ gỡ sẽ tiếp tục sau khi lệnh này thoát.\n";
+    std::cout << messages::kCliUninstallerStarted;
     return EXIT_SUCCESS;
 #else
-    std::cerr << "Lệnh gỡ cài đặt hiện chỉ hỗ trợ Windows.\n";
-    return EXIT_FAILURE;
+    fs::path executable;
+#if defined(__APPLE__)
+    std::uint32_t size = 0;
+    (void)_NSGetExecutablePath(nullptr, &size);
+    std::vector<char> buffer(size + 1, '\0');
+    if (_NSGetExecutablePath(buffer.data(), &size) != 0) {
+        throw std::runtime_error(std::string(messages::kCliExecutablePathUnknown));
+    }
+    executable = fs::weakly_canonical(fs::path(buffer.data()));
+#elif defined(__linux__)
+    std::vector<char> buffer(PATH_MAX + 1, '\0');
+    const ssize_t length = readlink("/proc/self/exe", buffer.data(), PATH_MAX);
+    if (length <= 0) {
+        throw std::runtime_error(std::string(messages::kCliExecutablePathUnknown));
+    }
+    buffer[static_cast<std::size_t>(length)] = '\0';
+    executable = fs::path(buffer.data());
+#else
+    executable = fs::weakly_canonical(fs::absolute(vietvm::core::utf8Path(argv0)));
+#endif
+    const fs::path installDir = executable.parent_path();
+    const fs::path script = installDir / vietvm::cli::kUnixUninstallScript;
+    if (!fs::exists(script)) {
+        throw std::runtime_error(std::string(messages::kCliUninstallerMissing));
+    }
+
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error(std::string(messages::kCliUninstallerStartFailed));
+    if (child == 0) {
+        execl("/bin/sh", "sh", script.c_str(), installDir.c_str(), static_cast<char *>(nullptr));
+        _exit(127);
+    }
+    int status = 0;
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        throw std::runtime_error(std::string(messages::kCliUninstallerFailed));
+    }
+    return EXIT_SUCCESS;
 #endif
 }
 
 static int runCli(int argc, char* argv[]) {
     try {
-        if ((argc == 4 && std::string(argv[1]) == "gỡ" &&
-             std::string(argv[2]) == "cài" && std::string(argv[3]) == "đặt") ||
-            (argc == 2 && std::string(argv[1]) == "gỡ cài đặt")) {
-            return uninstallVpp();
+        if ((argc == 4 && std::string(argv[1]) == vietvm::cli::kUninstallWord1 &&
+             std::string(argv[2]) == vietvm::cli::kUninstallWord2 && std::string(argv[3]) == vietvm::cli::kUninstallWord3) ||
+            (argc == 2 && std::string(argv[1]) == vietvm::cli::kUninstallCommandVi)) {
+            return uninstallVpp(argv[0]);
         }
         if (argc >= 2) {
             std::string command = argv[1];
             int commandWordOffset = 0;
             if (argc >= 3) {
                 std::string twoWordCommand = command + " " + std::string(argv[2]);
-                if (twoWordCommand == "giúp đỡ" || twoWordCommand == "phiên bản" ||
-                    twoWordCommand == "bác sĩ" || twoWordCommand == "chẩn đoán" ||
-                    twoWordCommand == "danh sách" ||
-                    twoWordCommand == "khởi tạo" || twoWordCommand == "thông tin" ||
-                    twoWordCommand == "kiểm tra" || twoWordCommand == "thống kê" ||
-                    twoWordCommand == "cài đặt" || twoWordCommand == "kiểm thử" ||
-                    twoWordCommand == "phát hành" || twoWordCommand == "đồng bộ" ||
-                    twoWordCommand == "cập nhật" || twoWordCommand == "phục hồi" ||
-                    twoWordCommand == "--giải mã" ||
-                    twoWordCommand == "--định dạng" ||
-                    twoWordCommand == "--soát lỗi") {
+                if (twoWordCommand == vietvm::cli::kCmdHelpVi || twoWordCommand == vietvm::cli::kCmdVersionVi ||
+                    twoWordCommand == vietvm::cli::kCmdDoctorVi || twoWordCommand == vietvm::cli::kCmdDiagnoseVi ||
+                    twoWordCommand == vietvm::cli::kPkgListVi ||
+                    twoWordCommand == vietvm::cli::kCmdInitVi || twoWordCommand == vietvm::cli::kPkgInfoVi ||
+                    twoWordCommand == vietvm::cli::kPkgHasVi || twoWordCommand == vietvm::cli::kPkgStatsVi ||
+                    twoWordCommand == vietvm::cli::kPkgInstallVi || twoWordCommand == vietvm::cli::kCmdTestVi ||
+                    twoWordCommand == vietvm::cli::kPkgPublishVi || twoWordCommand == vietvm::cli::kPkgSyncVi ||
+                    twoWordCommand == vietvm::cli::kPkgUpdateVi || twoWordCommand == vietvm::cli::kPkgRestoreVi ||
+                    twoWordCommand == vietvm::cli::kCmdDisassembleVi ||
+                    twoWordCommand == vietvm::cli::kCmdFormatVi ||
+                    twoWordCommand == vietvm::cli::kCmdLintVi) {
                     command = twoWordCommand;
                     commandWordOffset = 1;
                 }
             }
-            if (command == "--help" || command == "-h" || command == "help" || command == "commands" || command == "giúp đỡ") {
+            if (command == vietvm::cli::kCmdHelpLong || command == vietvm::cli::kCmdHelpShort || command == vietvm::cli::kCmdHelp || command == vietvm::cli::kCmdCommands || command == vietvm::cli::kCmdHelpVi) {
                 printUsage();
                 return EXIT_SUCCESS;
             }
-            if (command == "--version" || command == "-v" || command == "version" || command == "phiên bản") {
+            if (command == vietvm::cli::kCmdVersionLong || command == vietvm::cli::kCmdVersionShort || command == vietvm::cli::kCmdVersion || command == vietvm::cli::kCmdVersionVi) {
                 printVersion();
                 return EXIT_SUCCESS;
             }
-            if (command == "doctor" || command == "bác sĩ" || command == "chẩn đoán") {
+            if (command == vietvm::cli::kCmdDoctor || command == vietvm::cli::kCmdDoctorVi || command == vietvm::cli::kCmdDiagnoseVi) {
                 return runDoctor(argv[0]);
             }
-            if (command == "where" || command == "nơi") {
+            if (command == vietvm::cli::kCmdWhere || command == vietvm::cli::kCmdWhereVi) {
                 std::cout << fs::current_path().u8string() << std::endl;
                 return EXIT_SUCCESS;
             }
-            if (command == "--lsp") {
+            if (command == vietvm::cli::kCmdLsp) {
                 return runLanguageServer();
             }
-            if (command == "--repl") {
+            if (command == vietvm::cli::kCmdRepl) {
                 return runRepl();
             }
-            if (command == "run" || command == "chạy") {
+            if (command == vietvm::cli::kCmdRun || command == vietvm::cli::kCmdRunVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliRunMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], SnippetMode::Execute);
             }
-            if (command == "test" || command == "kiểm thử" || command == "kiểm-thử") {
+            if (command == vietvm::cli::kCmdTest || command == vietvm::cli::kCmdTestVi || command == vietvm::cli::kCmdTestViHyphen) {
                 const fs::path path =
                     argc >= (3 + commandWordOffset)
                         ? vietvm::core::utf8Path(argv[2 + commandWordOffset])
                         : vietvm::core::utf8Path("tests");
                 return runTests(path);
             }
-            if (command == "build" || command == "dựng") {
+            if (command == vietvm::cli::kCmdBuild || command == vietvm::cli::kCmdBuildVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliBuildMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return buildFile(argv[2 + commandWordOffset]);
             }
-            if (command == "--disassemble" || command == "--giải mã" || command == "--giải-mã") {
+            if (command == vietvm::cli::kCmdDisassemble || command == vietvm::cli::kCmdDisassembleVi || command == vietvm::cli::kCmdDisassembleViHyphen) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliDisassembleMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], SnippetMode::Disassemble);
             }
-            if (command == "--dump-ast") {
+            if (command == vietvm::cli::kCmdDumpAst) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliDumpAstMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], SnippetMode::DumpAst);
             }
-            if (command == "--dump-ir") {
+            if (command == vietvm::cli::kCmdDumpIr) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliDumpIrMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runFile(argv[2 + commandWordOffset], SnippetMode::DumpIr);
             }
-            if (command == "--lint" || command == "--soát-lỗi" || command == "--soát lỗi") {
+            if (command == vietvm::cli::kCmdLint || command == vietvm::cli::kCmdLintViHyphen || command == vietvm::cli::kCmdLintVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliLintMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
                 return runLintPath(vietvm::core::utf8Path(argv[2 + commandWordOffset]));
             }
-            if (command == "--format" || command == "--định dạng" || command == "--định-dạng") {
+            if (command == vietvm::cli::kCmdFormat || command == vietvm::cli::kCmdFormatVi || command == vietvm::cli::kCmdFormatViHyphen) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kCliFormatMissingFile) << '\n';
                     return EXIT_FAILURE;
@@ -2317,15 +2360,15 @@ static int runCli(int argc, char* argv[]) {
                 bool checkOnly = false;
                 for (int i = 3 + commandWordOffset; i < argc; ++i) {
                     const std::string option = argv[i];
-                    if (option == "--in-place" || option == "--ghi-tệp") writeFiles = true;
-                    if (option == "--check" || option == "--kiểm-tra") checkOnly = true;
+                    if (option == vietvm::cli::kCmdFormatInPlace || option == vietvm::cli::kCmdFormatInPlaceVi) writeFiles = true;
+                    if (option == vietvm::cli::kCmdFormatCheck || option == vietvm::cli::kCmdFormatCheckVi) checkOnly = true;
                 }
                 return runFormatPath(path, writeFiles, checkOnly);
             }
-            if (command == "pkg" || command == "gói") {
+            if (command == vietvm::cli::kCmdPackage || command == vietvm::cli::kCmdPackageVi) {
                 return runPackageCommand(argc, argv);
             }
-            if (command == "init" || command == "new" || command == "khởi tạo") {
+            if (command == vietvm::cli::kCmdInit || command == vietvm::cli::kCmdNew || command == vietvm::cli::kCmdInitVi) {
                 std::string name = (argc >= (3 + commandWordOffset)) ? argv[2 + commandWordOffset] : "";
                 int initSubWordOffset = 0;
                 if (name == "ứng" && argc >= (4 + commandWordOffset) &&
@@ -2333,74 +2376,77 @@ static int runCli(int argc, char* argv[]) {
                     name = "ứng dụng";
                     initSubWordOffset = 1;
                 }
-                if (name == "ứng dụng" || name == "ứng-dụng" ||
-                    name == "app" || name == "application") {
+                if (name == vietvm::cli::kApplicationVi || name == vietvm::cli::kApplicationViHyphen ||
+                    name == vietvm::cli::kApplicationShort || name == vietvm::cli::kApplication) {
                     std::string applicationName =
                         (argc >= (4 + commandWordOffset + initSubWordOffset))
                             ? argv[3 + commandWordOffset + initSubWordOffset]
                             : "";
                     return applicationInit(applicationName);
                 }
-                if (name == "backend") {
+                if (name == vietvm::cli::kBackend) {
                     std::string backendName = (argc >= (4 + commandWordOffset)) ? argv[3 + commandWordOffset] : "";
                     return backendInit(backendName);
                 }
                 return pkgInit(name);
             }
-            if (command == "install" || command == "cai" || command == "caidat" || command == "cài đặt") {
+            if (command == vietvm::cli::kPkgInstall || command == vietvm::cli::kPkgInstallAscii ||
+                command == vietvm::cli::kPkgInstallAsciiCompact || command == vietvm::cli::kPkgInstallVi) {
                 if (argc < (3 + commandWordOffset)) return pkgRestore(false);
                 std::string sourceArg = argv[2 + commandWordOffset];
                 if (isOfflineFlag(sourceArg)) return pkgRestore(true);
                 std::string name = (argc >= (4 + commandWordOffset)) ? argv[3 + commandWordOffset] : "";
                 return pkgAdd(sourceArg, name);
             }
-            if (command == "publish" || command == "phát-hành" || command == "phát hành") {
+            if (command == vietvm::cli::kPkgPublish || command == vietvm::cli::kPkgPublishViHyphen ||
+                command == vietvm::cli::kPkgPublishVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kPkgPublishRegistryMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgPublish(argv[2 + commandWordOffset]);
             }
-            if (command == "list" || command == "danh sách") {
+            if (command == vietvm::cli::kPkgList || command == vietvm::cli::kPkgListVi) {
                 return pkgList();
             }
-            if (command == "sync" || command == "đồng bộ") {
+            if (command == vietvm::cli::kPkgSync || command == vietvm::cli::kPkgSyncVi) {
                 return pkgSync();
             }
-            if (command == "update" || command == "cập nhật") {
+            if (command == vietvm::cli::kPkgUpdate || command == vietvm::cli::kPkgUpdateVi) {
                 return pkgSync();
             }
-            if (command == "lock" || command == "khóa") {
+            if (command == vietvm::cli::kPkgLock || command == vietvm::cli::kPkgLockVi) {
                 return pkgLock();
             }
-            if (command == "restore" || command == "phục hồi") {
+            if (command == vietvm::cli::kPkgRestore || command == vietvm::cli::kPkgRestoreVi) {
                 const bool offlineOnly =
                     argc >= (3 + commandWordOffset) &&
                     isOfflineFlag(argv[2 + commandWordOffset]);
                 return pkgRestore(offlineOnly);
             }
-            if (command == "remove" || command == "xoa" || command == "xóa") {
+            if (command == vietvm::cli::kPkgRemove || command == vietvm::cli::kPkgRemoveAscii ||
+                command == vietvm::cli::kPkgRemoveVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kPkgTopLevelRemoveNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgRemove(argv[2 + commandWordOffset]);
             }
-            if (command == "info" || command == "thông tin") {
+            if (command == vietvm::cli::kPkgInfo || command == vietvm::cli::kPkgInfoVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kPkgTopLevelInfoNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgInfo(argv[2 + commandWordOffset]);
             }
-            if (command == "has" || command == "kiểm tra") {
+            if (command == vietvm::cli::kPkgHas || command == vietvm::cli::kPkgHasVi) {
                 if (argc < (3 + commandWordOffset)) {
                     std::cerr << messages::formatMessage(messages::kPkgTopLevelHasNameMissing) << '\n';
                     return EXIT_FAILURE;
                 }
                 return pkgHas(argv[2 + commandWordOffset]);
             }
-            if (command == "stats" || command == "thống kê") {
+            if (command == vietvm::cli::kPkgStats || command == vietvm::cli::kPkgStatsVi) {
                 return pkgStats();
             }
         }
@@ -2499,7 +2545,7 @@ static std::string wideArgumentToUtf8(const wchar_t *argument) {
     const int required = WideCharToMultiByte(
         CP_UTF8, WC_ERR_INVALID_CHARS, argument, -1, nullptr, 0, nullptr, nullptr);
     if (required <= 0) {
-        throw std::runtime_error("không thể chuyển đối số dòng lệnh Windows sang UTF-8");
+        throw std::runtime_error(std::string(messages::kCliWindowsArgumentUtf8Failed));
     }
 
     std::string utf8(static_cast<std::size_t>(required), '\0');
@@ -2507,7 +2553,7 @@ static std::string wideArgumentToUtf8(const wchar_t *argument) {
         CP_UTF8, WC_ERR_INVALID_CHARS, argument, -1,
         utf8.data(), required, nullptr, nullptr);
     if (written != required) {
-        throw std::runtime_error("không thể chuyển đối số dòng lệnh Windows sang UTF-8");
+        throw std::runtime_error(std::string(messages::kCliWindowsArgumentUtf8Failed));
     }
     utf8.pop_back();
     return utf8;

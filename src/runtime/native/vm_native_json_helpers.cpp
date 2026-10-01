@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 
 namespace vietvm::helpers {
@@ -59,7 +60,7 @@ public:
         }
         skipWhitespace();
         if (position_ != input_.size()) {
-            err = "json phân tích: còn dữ liệu sau giá trị JSON";
+            err = messages::messageText(messages::kNativeJsonParseTrailingData);
             return false;
         }
         return true;
@@ -82,7 +83,9 @@ private:
     // Đánh dấu thao tác/module thất bại; hàm lưu trạng thái lỗi để caller không xem thực thể là đã khởi tạo thành công.
     bool fail(const std::string &message) {
         if (error_.empty()) {
-            error_ = "json phân tích: " + message + " tại vị trí " + std::to_string(position_);
+            error_ = messages::formatMessage(
+                messages::kNativeJsonParseAtPosition,
+                {message, std::to_string(position_)});
         }
         return false;
     }
@@ -105,7 +108,7 @@ private:
     // Phân tích giá trị; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
     bool parseValue(StackValue &out) {
         skipWhitespace();
-        if (position_ >= input_.size()) return fail("thiếu giá trị");
+        if (position_ >= input_.size()) return fail(messages::messageText(messages::kNativeJsonValueMissing));
         const char c = input_[position_];
         if (c == '"') {
             std::string text;
@@ -128,16 +131,16 @@ private:
             return true;
         }
         if (c == '-' || (c >= '0' && c <= '9')) return parseNumber(out);
-        return fail("giá trị không hợp lệ");
+        return fail(messages::messageText(messages::kNativeJsonValueInvalid));
     }
 
     // Phân tích hex4; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
     bool parseHex4(std::uint32_t &value) {
-        if (position_ + 4 > input_.size()) return fail("escape unicode chưa đủ 4 chữ số");
+        if (position_ + 4 > input_.size()) return fail(messages::messageText(messages::kNativeJsonUnicodeEscapeTooShort));
         value = 0;
         for (int i = 0; i < 4; ++i) {
             const int digit = hexValue(input_[position_++]);
-            if (digit < 0) return fail("escape unicode không hợp lệ");
+            if (digit < 0) return fail(messages::messageText(messages::kNativeJsonUnicodeEscapeInvalid));
             value = (value << 4u) | static_cast<std::uint32_t>(digit);
         }
         return true;
@@ -145,17 +148,17 @@ private:
 
     // Phân tích chuỗi; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
     bool parseString(std::string &out) {
-        if (!consume('"')) return fail("chuỗi phải bắt đầu bằng dấu nháy");
+        if (!consume('"')) return fail(messages::messageText(messages::kNativeJsonStringMustStartWithQuote));
         out.clear();
         while (position_ < input_.size()) {
             const unsigned char byte = static_cast<unsigned char>(input_[position_++]);
             if (byte == '"') return true;
-            if (byte < 0x20u) return fail("chuỗi chứa ký tự điều khiển chưa escape");
+            if (byte < 0x20u) return fail(messages::messageText(messages::kNativeJsonStringRawControlCharacter));
             if (byte != '\\') {
                 out.push_back(static_cast<char>(byte));
                 continue;
             }
-            if (position_ >= input_.size()) return fail("escape chuỗi bị thiếu");
+            if (position_ >= input_.size()) return fail(messages::messageText(messages::kNativeJsonStringEscapeMissing));
             const char escaped = input_[position_++];
             switch (escaped) {
                 case '"': out.push_back('"'); break;
@@ -172,40 +175,40 @@ private:
                     if (first >= 0xd800u && first <= 0xdbffu) {
                         if (position_ + 2 > input_.size() || input_[position_] != '\\' ||
                             input_[position_ + 1] != 'u') {
-                            return fail("surrogate unicode cao thiếu cặp thấp");
+                            return fail(messages::messageText(messages::kNativeJsonHighSurrogateMissingLow));
                         }
                         position_ += 2;
                         std::uint32_t second = 0;
                         if (!parseHex4(second)) return false;
                         if (second < 0xdc00u || second > 0xdfffu) {
-                            return fail("surrogate unicode thấp không hợp lệ");
+                            return fail(messages::messageText(messages::kNativeJsonLowSurrogateInvalid));
                         }
                         const std::uint32_t codePoint = 0x10000u +
                             ((first - 0xd800u) << 10u) + (second - 0xdc00u);
                         appendUtf8(out, codePoint);
                     } else if (first >= 0xdc00u && first <= 0xdfffu) {
-                        return fail("surrogate unicode thấp không có cặp cao");
+                        return fail(messages::messageText(messages::kNativeJsonLowSurrogateWithoutHigh));
                     } else {
                         appendUtf8(out, first);
                     }
                     break;
                 }
                 default:
-                    return fail("escape chuỗi không hợp lệ");
+                    return fail(messages::messageText(messages::kNativeJsonStringEscapeInvalid));
             }
         }
-        return fail("chuỗi chưa đóng dấu nháy");
+        return fail(messages::messageText(messages::kNativeJsonStringUnterminated));
     }
 
     // Phân tích số; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
     bool parseNumber(StackValue &out) {
         const std::size_t start = position_;
         if (input_[position_] == '-') ++position_;
-        if (position_ >= input_.size()) return fail("số bị thiếu chữ số");
+        if (position_ >= input_.size()) return fail(messages::messageText(messages::kNativeJsonNumberDigitMissing));
         if (input_[position_] == '0') {
             ++position_;
         } else {
-            if (input_[position_] < '1' || input_[position_] > '9') return fail("số không hợp lệ");
+            if (input_[position_] < '1' || input_[position_] > '9') return fail(messages::messageText(messages::kNativeJsonNumberInvalid));
             while (position_ < input_.size() && input_[position_] >= '0' && input_[position_] <= '9') {
                 ++position_;
             }
@@ -218,7 +221,7 @@ private:
             while (position_ < input_.size() && input_[position_] >= '0' && input_[position_] <= '9') {
                 ++position_;
             }
-            if (fractionStart == position_) return fail("phần thập phân bị thiếu");
+            if (fractionStart == position_) return fail(messages::messageText(messages::kNativeJsonFractionMissing));
         }
         if (position_ < input_.size() && (input_[position_] == 'e' || input_[position_] == 'E')) {
             floating = true;
@@ -228,7 +231,7 @@ private:
             while (position_ < input_.size() && input_[position_] >= '0' && input_[position_] <= '9') {
                 ++position_;
             }
-            if (exponentStart == position_) return fail("số mũ bị thiếu");
+            if (exponentStart == position_) return fail(messages::messageText(messages::kNativeJsonExponentMissing));
         }
         const std::string text = input_.substr(start, position_ - start);
         try {
@@ -244,11 +247,11 @@ private:
             }
             std::size_t consumed = 0;
             const double number = std::stod(text, &consumed);
-            if (consumed != text.size() || !std::isfinite(number)) return fail("số vượt phạm vi");
+            if (consumed != text.size() || !std::isfinite(number)) return fail(messages::messageText(messages::kNativeJsonNumberOutOfRange));
             out = make_float_value(number);
             return true;
         } catch (...) {
-            return fail("số không thể chuyển đổi");
+            return fail(messages::messageText(messages::kNativeJsonNumberConversionFailed));
         }
     }
 
@@ -267,7 +270,7 @@ private:
             elements.push_back(std::move(value));
             skipWhitespace();
             if (consume(']')) break;
-            if (!consume(',')) return fail("mảng cần dấu phẩy hoặc dấu ]");
+            if (!consume(',')) return fail(messages::messageText(messages::kNativeJsonArraySeparatorMissing));
             skipWhitespace();
         }
         out = make_list_value(std::move(elements));
@@ -287,13 +290,13 @@ private:
             std::string key;
             if (!parseString(key)) return false;
             skipWhitespace();
-            if (!consume(':')) return fail("object cần dấu : sau khóa");
+            if (!consume(':')) return fail(messages::messageText(messages::kNativeJsonObjectColonMissing));
             StackValue value;
             if (!parseValue(value)) return false;
             map.entries[key] = std::move(value);
             skipWhitespace();
             if (consume('}')) break;
-            if (!consume(',')) return fail("object cần dấu phẩy hoặc dấu }");
+            if (!consume(',')) return fail(messages::messageText(messages::kNativeJsonObjectSeparatorMissing));
             skipWhitespace();
         }
         out = make_map_value(std::move(map));
@@ -313,7 +316,7 @@ bool encodeJson(const StackValue &value,
     if (std::holds_alternative<double>(value)) {
         const double number = std::get<double>(value);
         if (!std::isfinite(number)) {
-            err = "json tạo: JSON không hỗ trợ NaN hoặc vô cực";
+            err = messages::messageText(messages::kNativeJsonEncodeNonFinite);
             return false;
         }
         out += formatRuntimeFloat(number);
@@ -322,7 +325,7 @@ bool encodeJson(const StackValue &value,
     if (std::holds_alternative<std::string>(value)) {
         const std::string &text = std::get<std::string>(value);
         if (!vietvm::core::isValidUtf8(text)) {
-            err = "json tạo: chuỗi phải là UTF-8 hợp lệ";
+            err = messages::messageText(messages::kNativeJsonEncodeStringUtf8Invalid);
             return false;
         }
         out += '"';
@@ -336,7 +339,7 @@ bool encodeJson(const StackValue &value,
     }
     if (std::holds_alternative<ClassHandle>(value) ||
         std::holds_alternative<InstanceHandle>(value)) {
-        err = "json tạo: không hỗ trợ lớp hoặc đối tượng runtime";
+        err = messages::messageText(messages::kNativeJsonEncodeObjectUnsupported);
         return false;
     }
 
@@ -345,7 +348,7 @@ bool encodeJson(const StackValue &value,
     else if (std::holds_alternative<TupleHandle>(value)) identity = std::get<TupleHandle>(value).get();
     else identity = std::get<MapHandle>(value).get();
     if (identity != nullptr && !active.insert(identity).second) {
-        err = "json tạo: phát hiện collection tự tham chiếu";
+        err = messages::messageText(messages::kNativeJsonEncodeSelfReference);
         return false;
     }
 
@@ -377,7 +380,7 @@ bool encodeJson(const StackValue &value,
             std::sort(keys.begin(), keys.end());
             for (const std::string &key : keys) {
                 if (!vietvm::core::isValidUtf8(key)) {
-                    err = "json tạo: khóa object phải là UTF-8 hợp lệ";
+                    err = messages::messageText(messages::kNativeJsonEncodeObjectKeyUtf8Invalid);
                     return false;
                 }
                 if (!first) out += ',';
@@ -428,7 +431,7 @@ std::string escapeJsonString(const std::string &input) {
 // Phân tích JSON; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
 bool parseJson(const std::string &input, StackValue &result, std::string &err) {
     if (!vietvm::core::isValidUtf8(input)) {
-        err = "json phân tích: đầu vào phải là UTF-8 hợp lệ";
+        err = messages::messageText(messages::kNativeJsonParseInputUtf8Invalid);
         return false;
     }
     return JsonParser(input).parse(result, err);

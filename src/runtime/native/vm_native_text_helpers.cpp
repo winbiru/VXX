@@ -4,6 +4,7 @@
 
 #include "common/vm_native_constants.h"
 #include "common/vm_native_helpers.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 
 namespace vietvm::helpers {
@@ -18,7 +19,7 @@ bool handleNativeTextFunction(const std::string &fn,
         const std::string text = argToRawString(args[0]);
         const std::string needle = argToRawString(args[1]);
         if (needle.empty()) {
-            err = "đếm ký tự cần ký tự không rỗng";
+            err = messages::messageText(messages::kNativeStringCountNeedleEmpty);
             return true;
         }
         result = make_int_value(static_cast<int>(
@@ -38,7 +39,7 @@ bool handleNativeTextFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
         const std::string from = argToRawString(args[1]);
         if (from.empty()) {
-            err = "thay thế không nhận chuỗi cần thay rỗng";
+            err = messages::messageText(messages::kNativeStringReplaceNeedleEmpty);
             return true;
         }
         result = make_string_value(vietvm::core::replaceVietnameseNormalizedAll(
@@ -55,7 +56,7 @@ bool handleNativeTextFunction(const std::string &fn,
             return true;
         }
         if (start < 0 || count < 0) {
-            err = "cắt chuỗi không nhận vị trí hoặc độ dài âm";
+            err = messages::messageText(messages::kNativeStringSliceNegativeRange);
             return true;
         }
         result = make_string_value(vietvm::core::utf8CodePointSlice(

@@ -6,6 +6,20 @@
 )
 
 $ErrorActionPreference = "Stop"
+$VppExecutableName = 'vpp.exe'
+$StdlibDirectoryName = 'gói'
+$TemplatesDirectoryName = 'templates'
+$ExamplesDirectoryName = 'examples'
+$UninstallScriptName = 'uninstall-vpp.ps1'
+$UninstallLauncherName = 'vpp-uninstall.cmd'
+$ManagedEntries = @(
+    $VppExecutableName,
+    $StdlibDirectoryName,
+    $TemplatesDirectoryName,
+    $ExamplesDirectoryName,
+    $UninstallLauncherName,
+    $UninstallScriptName
+)
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $global:OutputEncoding = [Console]::OutputEncoding
 $InstallDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($InstallDir)
@@ -29,11 +43,11 @@ function Remove-VppFromPath([string]$Value) {
 # Only remove files/directories managed by the installer; keep user projects.
 # Refuse unrelated directories when an installation is not identifiable.
 if (Test-Path -LiteralPath $InstallDir) {
-    if (-not (Test-Path -LiteralPath (Join-Path $InstallDir 'vpp.exe')) -and
-        -not (Test-Path -LiteralPath (Join-Path $InstallDir 'uninstall-vpp.ps1'))) {
+    if (-not (Test-Path -LiteralPath (Join-Path $InstallDir $VppExecutableName)) -and
+        -not (Test-Path -LiteralPath (Join-Path $InstallDir $UninstallScriptName))) {
         throw "Không tìm thấy bản cài V++ tại: $InstallDir"
     }
-    foreach ($name in @('vpp.exe', 'gói', 'templates', 'examples', 'vpp-uninstall.cmd', 'uninstall-vpp.ps1')) {
+    foreach ($name in $ManagedEntries) {
         $target = Join-Path $InstallDir $name
         if (Test-Path -LiteralPath $target) {
             Remove-Item -LiteralPath $target -Recurse -Force

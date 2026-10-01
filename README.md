@@ -50,7 +50,8 @@ Ban co the tai file da build san tu GitHub Release.
 curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
 ./install-vpp.sh
-vpp giúp đỡ
+source "$HOME/.bashrc" 2>/dev/null || source "$HOME/.bash_profile"
+vpp phiên bản
 ```
 
 ### macOS
@@ -59,7 +60,17 @@ vpp giúp đỡ
 curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
 ./install-vpp.sh
-vpp giúp đỡ
+source "$HOME/.zshrc"
+vpp phiên bản
+```
+
+Hai bộ cài Unix tự kiểm tra executable trước và sau khi cài, cài thư viện chuẩn,
+templates, examples và bộ gỡ, đồng thời ghi một block `PATH`/`VPP_HOME` có marker
+vào profile shell để cài lại không tạo dòng trùng. Sau khi nạp lại profile, lệnh
+gỡ trên cả Linux và macOS là:
+
+```bash
+vpp gỡ cài đặt
 ```
 
 ### Windows (PowerShell)

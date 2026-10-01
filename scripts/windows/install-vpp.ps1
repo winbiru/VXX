@@ -5,6 +5,15 @@
 
 $ErrorActionPreference = "Stop"
 
+$VppExecutableName = "vpp.exe"
+$StdlibDirectoryName = "gói"
+$TemplatesDirectoryName = "templates"
+$ExamplesDirectoryName = "examples"
+$UninstallScriptName = "uninstall-vpp.ps1"
+$UninstallLauncherName = "vpp-uninstall.cmd"
+$ManagedDirectories = @($StdlibDirectoryName, $TemplatesDirectoryName, $ExamplesDirectoryName)
+$UninstallFiles = @($UninstallScriptName, $UninstallLauncherName)
+
 # Configure UTF-8 before invoking V++ or printing Vietnamese installer messages.
 # A headless host may have no console for chcp; redirected output still uses UTF-8.
 try {
@@ -29,7 +38,7 @@ function Add-VppToPath([string]$ExistingPath, [string]$Directory) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourceExe = Join-Path $scriptDir "vpp.exe"
+$sourceExe = Join-Path $scriptDir $VppExecutableName
 if (-not (Test-Path $sourceExe)) {
     throw "Không tìm thấy vpp.exe trong thư mục giải nén: $scriptDir"
 }
@@ -40,21 +49,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Không thể chạy vpp.exe (mã lỗi: $LASTEXITCODE). Hãy tải bản Windows mới nhất. Với bản cũ bị lỗi 0xC0000135, cài Visual C++ Runtime x64: https://aka.ms/vc14/vc_redist.x64.exe"
 }
 
-$sourceStdlib = Join-Path $scriptDir "gói"
+$sourceStdlib = Join-Path $scriptDir $StdlibDirectoryName
 if (-not (Test-Path $sourceStdlib)) {
     throw "Không tìm thấy thư viện chuẩn tại: $sourceStdlib"
 }
-$sourceTemplates = Join-Path $scriptDir "templates"
+$sourceTemplates = Join-Path $scriptDir $TemplatesDirectoryName
 if (-not (Test-Path $sourceTemplates)) {
     throw "Không tìm thấy templates tại: $sourceTemplates"
 }
-$sourceExamples = Join-Path $scriptDir "examples"
+$sourceExamples = Join-Path $scriptDir $ExamplesDirectoryName
 if (-not (Test-Path $sourceExamples)) {
     throw "Không tìm thấy examples tại: $sourceExamples"
 }
 
 # Reject incomplete bundles before changing an existing installation.
-foreach ($name in @('uninstall-vpp.ps1', 'vpp-uninstall.cmd')) {
+foreach ($name in $UninstallFiles) {
     if (-not (Test-Path -LiteralPath (Join-Path $scriptDir $name) -PathType Leaf)) {
         throw "Gói cài thiếu $name. Hãy tải và giải nén lại bộ cài đầy đủ."
     }
@@ -62,24 +71,27 @@ foreach ($name in @('uninstall-vpp.ps1', 'vpp-uninstall.cmd')) {
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 $stagingDir = Join-Path $InstallDir ".vpp-install-$PID"
-$targetExe = Join-Path $InstallDir "vpp.exe"
-$targetStdlib = Join-Path $InstallDir "gói"
-$targetTemplates = Join-Path $InstallDir "templates"
-$targetExamples = Join-Path $InstallDir "examples"
+$targetExe = Join-Path $InstallDir $VppExecutableName
+$targetStdlib = Join-Path $InstallDir $StdlibDirectoryName
+$targetTemplates = Join-Path $InstallDir $TemplatesDirectoryName
+$targetExamples = Join-Path $InstallDir $ExamplesDirectoryName
 
 try {
     Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
-    Copy-Item $sourceExe (Join-Path $stagingDir "vpp.exe") -Force
-    Copy-Item $sourceStdlib (Join-Path $stagingDir "gói") -Recurse
-    Copy-Item $sourceTemplates (Join-Path $stagingDir "templates") -Recurse
-    Copy-Item $sourceExamples (Join-Path $stagingDir "examples") -Recurse
-
-    Copy-Item (Join-Path $stagingDir "vpp.exe") $targetExe -Force
-    foreach ($name in @('uninstall-vpp.ps1', 'vpp-uninstall.cmd')) {
-        Copy-Item (Join-Path $scriptDir $name) (Join-Path $InstallDir $name) -Force
+    Copy-Item $sourceExe (Join-Path $stagingDir $VppExecutableName) -Force
+    foreach ($name in $UninstallFiles) {
+        Copy-Item (Join-Path $scriptDir $name) (Join-Path $stagingDir $name) -Force
     }
-    foreach ($managedDir in @("gói", "templates", "examples")) {
+    Copy-Item $sourceStdlib (Join-Path $stagingDir $StdlibDirectoryName) -Recurse
+    Copy-Item $sourceTemplates (Join-Path $stagingDir $TemplatesDirectoryName) -Recurse
+    Copy-Item $sourceExamples (Join-Path $stagingDir $ExamplesDirectoryName) -Recurse
+
+    Copy-Item (Join-Path $stagingDir $VppExecutableName) $targetExe -Force
+    foreach ($name in $UninstallFiles) {
+        Copy-Item (Join-Path $stagingDir $name) (Join-Path $InstallDir $name) -Force
+    }
+    foreach ($managedDir in $ManagedDirectories) {
         $target = Join-Path $InstallDir $managedDir
         Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
         Move-Item (Join-Path $stagingDir $managedDir) $target

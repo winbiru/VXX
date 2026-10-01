@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "vpp/bytecode/opcode.h"
+#include "vpp/core/message_constants.h"
 
 namespace vietvm::bytecode {
 
@@ -33,18 +34,21 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
         const Instruction &instruction = code[index];
         const int rawOpcode = instruction.op;
         if (!isKnownOpcode(rawOpcode)) {
-            return issue(index, rawOpcode, "mã lệnh bytecode không xác định");
+            return issue(index, rawOpcode,
+                         messages::messageText(messages::kBytecodeUnknownOpcode));
         }
         const Opcode opcode = static_cast<Opcode>(rawOpcode);
 
         const auto requirePoolIndex = [&](int poolIndex,
-                                          const char *label)
+                                          std::string_view label)
             -> std::optional<BytecodeVerificationIssue> {
             if (validPoolIndex(poolIndex, context.stringPoolSize)) {
                 return std::nullopt;
             }
             return issue(index, rawOpcode,
-                         std::string(label) + " tham chiếu ngoài StringPool");
+                         messages::formatMessage(
+                             messages::kBytecodePoolReferenceOutOfRange,
+                             {label}));
         };
 
         switch (opcode) {
@@ -52,7 +56,8 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
             case OP_JUMP_IF_FALSE:
                 if (instruction.operand < 0 ||
                     static_cast<std::size_t>(instruction.operand) >= code.size()) {
-                    return issue(index, rawOpcode, "địa chỉ nhảy ngoài phạm vi");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeJumpAddressOutOfRange));
                 }
                 break;
 
@@ -60,12 +65,12 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                 if (instruction.operand < 0 ||
                     static_cast<std::size_t>(instruction.operand) >= code.size()) {
                     return issue(index, rawOpcode,
-                                 "địa chỉ khối bắt lỗi ngoài phạm vi");
+                                 messages::messageText(messages::kBytecodeCatchAddressOutOfRange));
                 }
                 if (code[static_cast<std::size_t>(instruction.operand)].op !=
                     OP_BAT_LOI) {
                     return issue(index, rawOpcode,
-                                 "địa chỉ khối bắt lỗi không trỏ tới OP_BAT_LOI");
+                                 messages::messageText(messages::kBytecodeCatchAddressMustPointToCatch));
                 }
                 break;
 
@@ -73,14 +78,15 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                 if (instruction.operand < 0 ||
                     static_cast<std::size_t>(instruction.operand) > code.size()) {
                     return issue(index, rawOpcode,
-                                 "địa chỉ kết thúc khối thử ngoài phạm vi");
+                                 messages::messageText(messages::kBytecodeTryEndAddressOutOfRange));
                 }
                 break;
 
             case OP_CHUOI:
             case OP_BIEN_SO_FLOAT:
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "literal")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelLiteral)) {
                     return result;
                 }
                 break;
@@ -90,35 +96,39 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                 if (instruction.operandIndex == -1) {
                     if (instruction.operand < 0) {
                         return issue(index, rawOpcode,
-                                     "số phần tử collection động âm");
+                                     messages::messageText(messages::kBytecodeDynamicCollectionCountNegative));
                     }
                     break;
                 }
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "literal")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelLiteral)) {
                     return result;
                 }
                 break;
 
             case OP_HAM:
-                if (auto result = requirePoolIndex(instruction.operand,
-                                                   "tên hàm")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operand,
+                        messages::kBytecodePoolLabelFunctionName)) {
                     return result;
                 }
                 if (instruction.operandIndex < 0) {
-                    return issue(index, rawOpcode, "function id âm");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeFunctionIdNegative));
                 }
                 if (!context.functionIds.empty() &&
                     context.functionIds.find(instruction.operandIndex) ==
                         context.functionIds.end()) {
                     return issue(index, rawOpcode,
-                                 "function id không có bytecode tương ứng");
+                                 messages::messageText(messages::kBytecodeFunctionIdMissing));
                 }
                 break;
 
             case OP_GOI:
                 if (instruction.operand < 0) {
-                    return issue(index, rawOpcode, "số đối số gọi hàm âm");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeCallArgumentCountNegative));
                 }
                 if (instruction.operandIndex < 0) {
                     const std::int64_t nameIndex =
@@ -126,53 +136,58 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                     if (nameIndex < 0 ||
                         static_cast<std::size_t>(nameIndex) >= context.stringPoolSize) {
                         return issue(index, rawOpcode,
-                                     "tên hàm gọi gián tiếp ngoài StringPool");
+                                     messages::messageText(messages::kBytecodeIndirectCallNameOutOfRange));
                     }
                 }
                 break;
 
             case OP_GOI_GIAN_TIEP:
                 if (instruction.operand < 0) {
-                    return issue(index, rawOpcode, "số đối số gọi gián tiếp âm");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeIndirectCallArgumentCountNegative));
                 }
                 break;
 
             case OP_PARAM:
                 if (instruction.operandIndex < 0 || instruction.operandValue < -1) {
                     return issue(index, rawOpcode,
-                                 "metadata tham số không hợp lệ");
+                                 messages::messageText(messages::kBytecodeParameterMetadataInvalid));
                 }
                 break;
 
             case OP_PARAM_MAC_DINH:
                 if (instruction.operandIndex < 0 || instruction.operandValue < 0) {
                     return issue(index, rawOpcode,
-                                 "metadata tham số mặc định không hợp lệ");
+                                 messages::messageText(messages::kBytecodeDefaultParameterMetadataInvalid));
                 }
-                if (auto result = requirePoolIndex(instruction.operand,
-                                                   "giá trị mặc định")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operand,
+                        messages::kBytecodePoolLabelDefaultValue)) {
                     return result;
                 }
                 break;
 
             case OP_CA:
                 if (instruction.operandIndex < -2) {
-                    return issue(index, rawOpcode, "kiểu nhãn ca không hợp lệ");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeCaseLabelKindInvalid));
                 }
                 break;
 
             case OP_TAO_LOP:
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "tên lớp")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelClassName)) {
                     return result;
                 }
                 if (instruction.operandValue < 0) {
                     return issue(index, rawOpcode,
-                                 "metadata lớp cha không hợp lệ");
+                                 messages::messageText(messages::kBytecodeSuperclassMetadataInvalid));
                 }
                 if (instruction.operandValue > 0) {
-                    if (auto result = requirePoolIndex(instruction.operandValue - 1,
-                                                       "tên lớp cha")) {
+                    if (auto result = requirePoolIndex(
+                            instruction.operandValue - 1,
+                            messages::kBytecodePoolLabelSuperclassName)) {
                         return result;
                     }
                 }
@@ -183,10 +198,11 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                 if (classIndex < 0 ||
                     static_cast<std::size_t>(classIndex) >= context.stringPoolSize) {
                     return issue(index, rawOpcode,
-                                 "tên lớp của phương thức ngoài StringPool");
+                                 messages::messageText(messages::kBytecodeMethodClassNameOutOfRange));
                 }
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "tên phương thức")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelMethodName)) {
                     return result;
                 }
                 const std::int64_t functionId =
@@ -195,52 +211,58 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                     context.functionIds.find(static_cast<int>(functionId)) ==
                         context.functionIds.end()) {
                     return issue(index, rawOpcode,
-                                 "phương thức tham chiếu function id không tồn tại");
+                                 messages::messageText(messages::kBytecodeMethodFunctionIdMissing));
                 }
                 break;
             }
 
             case OP_TAO_DOI_TUONG:
                 if (instruction.operand < 0) {
-                    return issue(index, rawOpcode, "số đối số constructor âm");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeConstructorArgumentCountNegative));
                 }
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "tên lớp constructor")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelConstructorClassName)) {
                     return result;
                 }
                 break;
 
             case OP_DOC_THUOC_TINH:
             case OP_GAN_THUOC_TINH:
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "tên thuộc tính")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelPropertyName)) {
                     return result;
                 }
                 break;
 
             case OP_GOI_PHUONG_THUC:
                 if (instruction.operand < 0) {
-                    return issue(index, rawOpcode, "số đối số phương thức âm");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeMethodArgumentCountNegative));
                 }
                 if (instruction.operandValue != 0 && instruction.operandValue != 1) {
                     return issue(index, rawOpcode,
-                                 "chế độ dispatch phương thức không hợp lệ");
+                                 messages::messageText(messages::kBytecodeMethodDispatchModeInvalid));
                 }
-                if (auto result = requirePoolIndex(instruction.operandIndex,
-                                                   "tên phương thức")) {
+                if (auto result = requirePoolIndex(
+                        instruction.operandIndex,
+                        messages::kBytecodePoolLabelMethodName)) {
                     return result;
                 }
                 break;
 
             case OP_TAO_DONG_BAO:
                 if (instruction.operand < 0 || instruction.operandIndex < 0) {
-                    return issue(index, rawOpcode, "metadata closure không hợp lệ");
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeClosureMetadataInvalid));
                 }
                 if (!context.functionIds.empty() &&
                     context.functionIds.find(instruction.operand) ==
                         context.functionIds.end()) {
                     return issue(index, rawOpcode,
-                                 "closure tham chiếu function id không tồn tại");
+                                 messages::messageText(messages::kBytecodeClosureFunctionIdMissing));
                 }
                 break;
 

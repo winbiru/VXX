@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "vpp/core/package_installer.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
 #include "vpp/core/semver.h"
 #include "vpp/core/text.h"
@@ -65,13 +66,13 @@ std::wstring utf8ToWide(const std::string &text) {
         CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()),
         nullptr, 0);
     if (length <= 0) {
-        throw std::runtime_error("không thể chuyển đối số Git UTF-8 sang UTF-16");
+        throw std::runtime_error(std::string(messages::kPackageGitUtf8ToUtf16Failed));
     }
     std::wstring wide(static_cast<std::size_t>(length), L'\0');
     if (MultiByteToWideChar(
             CP_UTF8, MB_ERR_INVALID_CHARS, text.data(), static_cast<int>(text.size()),
             wide.data(), length) != length) {
-        throw std::runtime_error("không thể chuyển đối số Git UTF-8 sang UTF-16");
+        throw std::runtime_error(std::string(messages::kPackageGitUtf8ToUtf16Failed));
     }
     return wide;
 }
@@ -105,7 +106,7 @@ void appendWindowsArgument(std::wstring &command, const std::wstring &argument) 
 }
 
 ProcessResult runProcess(const std::vector<std::string> &arguments) {
-    if (arguments.empty()) throw std::runtime_error("process Git thiếu executable");
+    if (arguments.empty()) throw std::runtime_error(std::string(messages::kPackageGitExecutableMissing));
 
     std::wstring command;
     for (const auto &argument : arguments) {
@@ -121,7 +122,7 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
         !SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0)) {
         if (readPipe != nullptr) CloseHandle(readPipe);
         if (writePipe != nullptr) CloseHandle(writePipe);
-        throw std::runtime_error("không thể tạo pipe cho Git process");
+        throw std::runtime_error(std::string(messages::kPackageGitPipeFailed));
     }
 
     HANDLE nullInput = CreateFileW(
@@ -130,7 +131,7 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
     if (nullInput == INVALID_HANDLE_VALUE) {
         CloseHandle(readPipe);
         CloseHandle(writePipe);
-        throw std::runtime_error("không thể mở NUL cho Git process");
+        throw std::runtime_error(std::string(messages::kPackageGitNullInputFailed));
     }
 
     STARTUPINFOW startup{};
@@ -149,8 +150,7 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
     CloseHandle(writePipe);
     if (!started) {
         CloseHandle(readPipe);
-        throw std::runtime_error(
-            "không thể khởi động Git; hãy kiểm tra git có trong PATH");
+        throw std::runtime_error(std::string(messages::kPackageGitStartFailed));
     }
 
     ProcessResult result;
@@ -171,17 +171,17 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
 }
 #else
 ProcessResult runProcess(const std::vector<std::string> &arguments) {
-    if (arguments.empty()) throw std::runtime_error("process Git thiếu executable");
+    if (arguments.empty()) throw std::runtime_error(std::string(messages::kPackageGitExecutableMissing));
     int outputPipe[2];
     if (pipe(outputPipe) != 0) {
-        throw std::runtime_error("không thể tạo pipe cho Git process");
+        throw std::runtime_error(std::string(messages::kPackageGitPipeFailed));
     }
 
     const pid_t pid = fork();
     if (pid < 0) {
         close(outputPipe[0]);
         close(outputPipe[1]);
-        throw std::runtime_error("không thể fork Git process");
+        throw std::runtime_error(std::string(messages::kPackageGitForkFailed));
     }
     if (pid == 0) {
         (void)dup2(outputPipe[1], STDOUT_FILENO);
@@ -209,7 +209,7 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
 
     int status = 0;
     if (waitpid(pid, &status, 0) < 0) {
-        throw std::runtime_error("không thể chờ Git process");
+        throw std::runtime_error(std::string(messages::kPackageGitWaitFailed));
     }
     if (WIFEXITED(status)) {
         result.exitCode = WEXITSTATUS(status);
@@ -234,9 +234,10 @@ void requireGitSuccess(const ProcessResult &result, const std::string &operation
     if (result.exitCode == 127 && detail.empty()) {
         detail = "git không có trong PATH";
     }
-    throw std::runtime_error(
-        operation + " thất bại (exit " + std::to_string(result.exitCode) + ")" +
-        (detail.empty() ? "" : ": " + detail));
+    const std::string exitCode = std::to_string(result.exitCode);
+    const std::string suffix = detail.empty() ? "" : ": " + detail;
+    throw std::runtime_error(messages::formatMessage(
+        messages::kPackageGitOperationFailed, {operation, exitCode, suffix}));
 }
 
 std::string canonicalGitLocation(const std::string &location,
@@ -255,9 +256,8 @@ MaterializedPackageSource materializeGitSource(
     const std::string reference =
         dependency.reference.empty() ? "HEAD" : dependency.reference;
     if (!reference.empty() && reference.front() == '-') {
-        throw std::runtime_error(
-            "Git ref của dependency '" + dependency.name + "' không hợp lệ: " +
-            reference);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageGitRefInvalid, {dependency.name, reference}));
     }
 
     const fs::path checkoutRoot =
@@ -265,9 +265,9 @@ MaterializedPackageSource materializeGitSource(
     std::error_code ec;
     fs::remove_all(checkoutRoot, ec);
     if (ec) {
-        throw std::runtime_error(
-            "không thể dọn Git checkout cũ: " + checkoutRoot.u8string() +
-            " (" + ec.message() + ")");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageGitCheckoutCleanupFailed,
+            {checkoutRoot.u8string(), ec.message()}));
     }
     fs::create_directories(checkoutRoot.parent_path());
 
@@ -284,8 +284,8 @@ MaterializedPackageSource materializeGitSource(
                       dependency.name + "'");
     const std::string revision = trim(resolved.output);
     if (revision.empty()) {
-        throw std::runtime_error(
-            "Git không trả exact commit cho dependency '" + dependency.name + "'");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageGitExactCommitMissing, {dependency.name}));
     }
 
     requireGitSuccess(
@@ -325,14 +325,13 @@ fs::path resolveRegistryRoot(const PackageDependencySpec &dependency,
         }
     }
     if (registryRoot.empty()) {
-        throw std::runtime_error(
-            "registry dependency '" + dependency.name +
-            "' thiếu location và biến VPP_REGISTRY chưa được cấu hình");
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryLocationMissing, {dependency.name}));
     }
     if (!fs::exists(registryRoot) || !fs::is_directory(registryRoot)) {
-        throw std::runtime_error(
-            "không tìm thấy registry root cho dependency '" + dependency.name +
-            "': " + registryRoot.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryRootMissing,
+            {dependency.name, registryRoot.u8string()}));
     }
     return registryRoot;
 }
@@ -349,18 +348,17 @@ MaterializedPackageSource materializeRegistrySource(
     const fs::path registryRoot = resolveRegistryRoot(dependency, declaringRoot);
     const fs::path packageRoot = registryRoot / utf8Path(dependency.name);
     if (!fs::exists(packageRoot) || !fs::is_directory(packageRoot)) {
-        throw std::runtime_error(
-            "registry không có package '" + dependency.name + "' tại " +
-            registryRoot.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryPackageMissing,
+            {dependency.name, registryRoot.u8string()}));
     }
 
     std::string rangeError;
     const auto range = VersionRange::parse(dependency.versionRange, &rangeError);
     if (!range.has_value()) {
-        throw std::runtime_error(
-            "registry dependency '" + dependency.name +
-            "' có version range không hợp lệ '" + dependency.versionRange +
-            "': " + rangeError);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryRangeInvalid,
+            {dependency.name, dependency.versionRange, rangeError}));
     }
 
     std::optional<RegistryCandidate> selected;
@@ -373,15 +371,15 @@ MaterializedPackageSource materializeRegistrySource(
 
         const fs::path manifestPath = entry.path() / utf8Path(kProjectManifestFile);
         if (!fs::exists(manifestPath)) {
-            throw std::runtime_error(
-                "registry package '" + dependency.name + "@" + versionText +
-                "' thiếu vpp.json");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageRegistryManifestMissing,
+                {dependency.name, versionText}));
         }
         const ProjectManifest manifest = readProjectManifest(manifestPath);
         if (manifest.name != dependency.name || manifest.version != versionText) {
-            throw std::runtime_error(
-                "registry metadata không khớp layout cho package '" +
-                dependency.name + "@" + versionText + "'");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageRegistryMetadataMismatch,
+                {dependency.name, versionText}));
         }
 
         if (!selected.has_value() ||
@@ -391,9 +389,9 @@ MaterializedPackageSource materializeRegistrySource(
     }
 
     if (!selected.has_value()) {
-        throw std::runtime_error(
-            "registry không có version của package '" + dependency.name +
-            "' thỏa range " + dependency.versionRange);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryVersionMissing,
+            {dependency.name, dependency.versionRange}));
     }
     return MaterializedPackageSource{
         selected->path, "", registryRoot.generic_u8string()};
@@ -405,8 +403,8 @@ void ensureRegistryMarker(const fs::path &registryRoot) {
     if (fs::exists(marker)) return;
     std::ofstream output(marker, std::ios::binary);
     if (!output.is_open()) {
-        throw std::runtime_error(
-            "không thể tạo registry metadata: " + marker.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageRegistryMetadataCreateFailed, {marker.u8string()}));
     }
     output << "{\n  \"schema\": 1\n}\n";
 }
@@ -421,14 +419,14 @@ MaterializedPackageSource materializePackageSource(
         const fs::path sourcePath = absoluteLexical(
             declaringRoot, utf8Path(dependency.location));
         if (!fs::exists(sourcePath)) {
-            throw std::runtime_error(
-                "không tìm thấy source path của dependency '" + dependency.name +
-                "': " + sourcePath.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencySourceMissing,
+                {dependency.name, sourcePath.u8string()}));
         }
         if (!fs::is_directory(sourcePath) && !fs::is_regular_file(sourcePath)) {
-            throw std::runtime_error(
-                "source path của dependency '" + dependency.name +
-                "' không phải file hoặc directory: " + sourcePath.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencySourceInvalid,
+                {dependency.name, sourcePath.u8string()}));
         }
         return MaterializedPackageSource{
             sourcePath, "", sourcePath.generic_u8string()};
@@ -439,10 +437,9 @@ MaterializedPackageSource materializePackageSource(
     if (dependency.sourceKind == PackageSourceKind::Registry) {
         return materializeRegistrySource(dependency, declaringRoot);
     }
-    throw std::runtime_error(
-        "dependency '" + dependency.name + "' dùng source '" +
-        packageSourceKindName(dependency.sourceKind) +
-        "' nhưng transport này chưa được hỗ trợ trong Package 0.9");
+    const std::string sourceKind = packageSourceKindName(dependency.sourceKind);
+    throw std::runtime_error(messages::formatMessage(
+        messages::kPackageTransportUnsupported, {dependency.name, sourceKind}));
 }
 
 PublishedRegistryPackage publishPackageToRegistry(
@@ -454,8 +451,8 @@ PublishedRegistryPackage publishPackageToRegistry(
         absoluteLexical(fs::current_path(), registryRoot);
     const fs::path manifestPath = absoluteProject / utf8Path(kProjectManifestFile);
     if (!fs::exists(manifestPath)) {
-        throw std::runtime_error(
-            "publish: không tìm thấy vpp.json tại " + absoluteProject.u8string());
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackagePublishManifestMissing, {absoluteProject.u8string()}));
     }
     const ProjectManifest manifest = readProjectManifest(manifestPath);
     ensureRegistryMarker(absoluteRegistry);
@@ -475,14 +472,14 @@ PublishedRegistryPackage publishPackageToRegistry(
     try {
         if (fs::exists(target)) {
             if (!fs::is_directory(target)) {
-                throw std::runtime_error(
-                    "registry version path không phải directory: " + target.u8string());
+                throw std::runtime_error(messages::formatMessage(
+                    messages::kPackageRegistryVersionPathInvalid, {target.u8string()}));
             }
             const std::string existingFingerprint = fingerprintPackageTree(target);
             if (existingFingerprint != candidateFingerprint) {
-                throw std::runtime_error(
-                    "registry đã có '" + manifest.name + "@" + manifest.version +
-                    "' với nội dung khác; version đã publish là bất biến");
+                throw std::runtime_error(messages::formatMessage(
+                    messages::kPackageRegistryVersionImmutable,
+                    {manifest.name, manifest.version}));
             }
             fs::remove_all(staging, ec);
             return PublishedRegistryPackage{

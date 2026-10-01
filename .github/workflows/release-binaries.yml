@@ -78,8 +78,10 @@ jobs:
           cp -R templates dist/templates
           cp -R examples dist/examples
           cp scripts/unix/install-vpp.sh dist/install-vpp.sh
+          cp scripts/unix/uninstall-vpp.sh dist/uninstall-vpp.sh
           chmod +x dist/install-vpp.sh
-          tar -czf "${{ matrix.asset_name }}" -C dist vpp gói templates examples install-vpp.sh
+          chmod +x dist/uninstall-vpp.sh
+          tar -czf "${{ matrix.asset_name }}" -C dist vpp gói templates examples install-vpp.sh uninstall-vpp.sh
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -127,11 +129,40 @@ jobs:
           touch "$INSTALL_DIR/gói/.release-smoke-stale"
           VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
           test ! -e "$INSTALL_DIR/gói/.release-smoke-stale"
+          test -x "$INSTALL_DIR/uninstall-vpp.sh"
+          "$INSTALL_DIR/vpp" phiên bản
+          "$INSTALL_DIR/vpp" chẩn đoán
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            if ldd "$INSTALL_DIR/vpp" | grep -E 'lib(ssl|crypto)\.so' >/dev/null; then
+              echo "Linux release still depends on external OpenSSL shared libraries" >&2
+              exit 1
+            fi
+          fi
           VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" dựng "$INSTALL_DIR/examples/quan-ly-kho-api/src/main.vi"
           (
             cd "$INSTALL_DIR/examples/quan-ly-kho-api"
             VPP_EXEC="$INSTALL_DIR/vpp" python3 scripts/verify_http.py
           )
+
+          PROFILE_HOME="$VERIFY_ROOT/home"
+          PROFILE_INSTALL="$VERIFY_ROOT/profile-install"
+          mkdir -p "$PROFILE_HOME"
+          HOME="$PROFILE_HOME" SHELL=/bin/bash VPP_INSTALL_DIR="$PROFILE_INSTALL" "$EXTRACT_DIR/install-vpp.sh"
+          HOME="$PROFILE_HOME" PROFILE_INSTALL="$PROFILE_INSTALL" /bin/bash -c '
+            set -eu
+            . "$HOME/.bash_profile"
+            test "$VPP_HOME" = "$PROFILE_INSTALL"
+            test "$(command -v vpp)" = "$PROFILE_INSTALL/vpp"
+            vpp phiên bản >/dev/null
+          '
+          printf 'in 42;\n' > "$PROFILE_INSTALL/my-project.vi"
+          HOME="$PROFILE_HOME" SHELL=/bin/bash PATH="$PROFILE_INSTALL:$PATH" VPP_HOME="$PROFILE_INSTALL" \
+            "$PROFILE_INSTALL/vpp" gỡ cài đặt
+          test -f "$PROFILE_INSTALL/my-project.vi"
+          test ! -e "$PROFILE_INSTALL/vpp"
+          test ! -e "$PROFILE_INSTALL/gói"
+          test ! -e "$PROFILE_INSTALL/uninstall-vpp.sh"
+          test -z "$(grep -F 'VPP installer' "$PROFILE_HOME/.bash_profile" || true)"
 
       - name: Verify packaged artifact (Windows)
         if: runner.os == 'Windows'

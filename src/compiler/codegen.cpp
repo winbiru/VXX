@@ -1737,8 +1737,8 @@ struct Emitter {
             case IrValueOpcode::Lambda: {
                 const IrLambda *lambda = program.lambda(value->lambdaId);
                 if (lambda == nullptr || lambda->ownerValue != value->id) {
-                    throw std::logic_error(
-                        "direct IR lambda has no structured payload");
+                    throw std::logic_error(std::string(
+                        messages::kInternalDirectIrLambdaMissingStructuredPayload));
                 }
 
                 const auto existing = lambdaIds.find(value->lambdaId);
