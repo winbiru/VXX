@@ -97,7 +97,7 @@ jobs:
             & $vpp "dựng" $source.FullName
             $malformedExit = $LASTEXITCODE
             if ($malformedExit -eq 0) { throw "Malformed V++ source unexpectedly compiled: $($source.Name)" }
-            if ($malformedExit -ne 1) { throw "Malformed V++ source returned unexpected exit code $malformedExit: $($source.Name)" }
+            if ($malformedExit -ne 1) { throw "Malformed V++ source returned unexpected exit code ${malformedExit}: $($source.Name)" }
           }
           foreach ($mode in @("--dump-ast", "--dump-ir", "--giải-mã")) {
             $first = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".a")
