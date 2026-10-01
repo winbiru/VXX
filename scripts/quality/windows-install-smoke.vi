@@ -1,0 +1,11 @@
+nhập gói/chuẩn/main;
+
+hàm main() {
+    nếu (độ dài("V++") != 3) {
+        ném "stdlib UTF-8 không hoạt động trong artifact Windows";
+    };
+    nếu (thành số nguyên("42") != 42) {
+        ném "stdlib chuyển kiểu không hoạt động trong artifact Windows";
+    };
+    in "PASS: Windows artifact chạy được chương trình .vi và stdlib UTF-8";
+};

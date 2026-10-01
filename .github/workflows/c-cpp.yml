@@ -26,7 +26,37 @@ jobs:
         run: ctest --test-dir cmake-build-debug --output-on-failure --verbose --no-tests=error
 
       - name: Run RC compiler hardening checks
-        run: python3 scripts/quality/rc-hardening.py --vpp cmake-build-debug/bin/vpp-cli
+        shell: bash
+        run: |
+          set -eu
+          export VPP_HOME="$PWD"
+          VPP=cmake-build-debug/bin/vpp-cli
+          "$VPP" dựng scripts/quality/rc-hardening.vi
+          malformed_sources=(scripts/quality/rc-malformed*.vi)
+          if [ "${#malformed_sources[@]}" -lt 2 ]; then
+            echo "RC malformed corpus is missing" >&2
+            exit 1
+          fi
+          for source in "${malformed_sources[@]}"; do
+            if "$VPP" dựng "$source"; then
+              echo "Malformed V++ source unexpectedly compiled: $source" >&2
+              exit 1
+            else
+              malformed_exit=$?
+              if [ "$malformed_exit" -ne 1 ]; then
+                echo "Malformed V++ source returned unexpected exit code $malformed_exit: $source" >&2
+                exit 1
+              fi
+            fi
+          done
+          for mode in --dump-ast --dump-ir --giải-mã; do
+            first="$(mktemp)"
+            second="$(mktemp)"
+            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$first"
+            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$second"
+            cmp "$first" "$second"
+            rm -f "$first" "$second"
+          done
 
       - name: Run AddressSanitizer and UndefinedBehaviorSanitizer tests
         run: |
@@ -98,7 +128,31 @@ jobs:
 
       - name: Run Windows RC compiler hardening checks
         shell: pwsh
-        run: python scripts/quality/rc-hardening.py --vpp build/bin/Release/vpp-cli.exe
+        run: |
+          $env:VPP_HOME = (Get-Location).Path
+          $vpp = "build/bin/Release/vpp-cli.exe"
+          & $vpp "dựng" "scripts/quality/rc-hardening.vi"
+          if ($LASTEXITCODE -ne 0) { throw "RC hardening source failed to compile" }
+          $malformedSources = @(Get-ChildItem "scripts/quality/rc-malformed*.vi" | Sort-Object Name)
+          if ($malformedSources.Count -lt 2) { throw "RC malformed corpus is missing" }
+          foreach ($source in $malformedSources) {
+            & $vpp "dựng" $source.FullName
+            $malformedExit = $LASTEXITCODE
+            if ($malformedExit -eq 0) { throw "Malformed V++ source unexpectedly compiled: $($source.Name)" }
+            if ($malformedExit -ne 1) { throw "Malformed V++ source returned unexpected exit code $malformedExit: $($source.Name)" }
+          }
+          foreach ($mode in @("--dump-ast", "--dump-ir", "--giải-mã")) {
+            $first = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".a")
+            $second = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".b")
+            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $first
+            if ($LASTEXITCODE -ne 0) { throw "RC hardening failed for $mode" }
+            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $second
+            if ($LASTEXITCODE -ne 0) { throw "RC hardening failed for $mode" }
+            if ((Get-FileHash $first).Hash -ne (Get-FileHash $second).Hash) {
+              throw "Non-deterministic compiler output for $mode"
+            }
+            Remove-Item $first, $second -Force
+          }
 
   macos-build:
     runs-on: macos-latest
@@ -116,4 +170,34 @@ jobs:
         run: ctest --test-dir build --output-on-failure --verbose --no-tests=error
 
       - name: Run macOS RC compiler hardening checks
-        run: python3 scripts/quality/rc-hardening.py --vpp build/bin/vpp-cli
+        shell: bash
+        run: |
+          set -eu
+          export VPP_HOME="$PWD"
+          VPP=build/bin/vpp-cli
+          "$VPP" dựng scripts/quality/rc-hardening.vi
+          malformed_sources=(scripts/quality/rc-malformed*.vi)
+          if [ "${#malformed_sources[@]}" -lt 2 ]; then
+            echo "RC malformed corpus is missing" >&2
+            exit 1
+          fi
+          for source in "${malformed_sources[@]}"; do
+            if "$VPP" dựng "$source"; then
+              echo "Malformed V++ source unexpectedly compiled: $source" >&2
+              exit 1
+            else
+              malformed_exit=$?
+              if [ "$malformed_exit" -ne 1 ]; then
+                echo "Malformed V++ source returned unexpected exit code $malformed_exit: $source" >&2
+                exit 1
+              fi
+            fi
+          done
+          for mode in --dump-ast --dump-ir --giải-mã; do
+            first="$(mktemp)"
+            second="$(mktemp)"
+            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$first"
+            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$second"
+            cmp "$first" "$second"
+            rm -f "$first" "$second"
+          done

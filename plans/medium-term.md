@@ -73,7 +73,7 @@
 
    Harness P0 v2 hiện đã tách `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`,
    compiler stages, package/module resolution, JSON extraction, native HTTP và GC collection.
-   `scripts/quality/benchmark-regression.py` đã có alternating baseline/candidate, 3 warm-up,
+   benchmark executable xuất metadata/case ổn định để host CI so sánh baseline/candidate,
    median/p95/MAD, noise check và regression threshold. Comparator yêu cầu tối thiểu 10 sample
    cho median và 40 sample cho GC p95 gate sau khi self-comparison 10 sample phơi ra tail
    outlier có thể tạo false regression; self-comparison 40 sample sau hardening đã PASS.

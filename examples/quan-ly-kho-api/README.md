@@ -200,14 +200,14 @@ và các đặc tính phi chức năng như hiệu năng JIT hay thời điểm 
 Sau khi cài V++0.9 và đứng tại thư mục `examples/quan-ly-kho-api`:
 
 ```bash
-VPP_WAREHOUSE_PORT=18081 vpp chạy src/main.vi
+VPP_WAREHOUSE_PORT=18932 vpp chạy src/main.vi
 # Mở terminal khác:
-VPP_WAREHOUSE_PORT=18081 vpp chạy scripts/verify_http.vi
+VPP_WAREHOUSE_PORT=18932 vpp chạy scripts/verify_http.vi
 ```
 
 Chương trình `.vi` kiểm tra feature gate, CRUD/search sản phẩm, Unicode JSON,
 đặt/hủy đơn hàng và báo cáo qua HTTP localhost bằng chính HTTP client của V++.
-Workflow release tự khởi động server, đặt `VPP_WAREHOUSE_PORT=18081`, chạy
+Workflow release tự khởi động server, đặt `VPP_WAREHOUSE_PORT=18932`, chạy
 `scripts/verify_http.vi`, rồi dừng server.
 có thể dùng cho cả release V++0.9 lẫn quá trình phát triển compiler tại local.
 Server được dừng khi hoàn tất; script in thư mục chứa dữ liệu kiểm chứng.

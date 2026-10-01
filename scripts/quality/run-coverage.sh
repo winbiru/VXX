@@ -7,7 +7,6 @@ MINIMUM="${VPP_COVERAGE_MINIMUM:-45}"
 
 command -v cmake >/dev/null
 command -v lcov >/dev/null
-command -v python3 >/dev/null
 
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Debug \
@@ -35,5 +34,19 @@ lcov --remove "$BUILD_DIR/coverage.raw.info" \
   '*/build*/*' \
   --output-file "$BUILD_DIR/coverage.info"
 
-python3 "$ROOT_DIR/scripts/quality/check_coverage.py" \
-  "$BUILD_DIR/coverage.info" --minimum "$MINIMUM"
+read -r FOUND HIT <<EOF
+$(awk -F: '
+  /^LF:/ { found += $2 }
+  /^LH:/ { hit += $2 }
+  END { printf "%d %d\n", found, hit }
+' "$BUILD_DIR/coverage.info")
+EOF
+
+if [ "$FOUND" -eq 0 ]; then
+  echo "coverage: no instrumented lines were found" >&2
+  exit 2
+fi
+
+PERCENT=$(awk -v hit="$HIT" -v found="$FOUND" 'BEGIN { printf "%.2f", hit * 100.0 / found }')
+echo "coverage: $HIT/$FOUND lines = $PERCENT% (minimum $MINIMUM%)"
+awk -v actual="$PERCENT" -v minimum="$MINIMUM" 'BEGIN { exit !(actual + 0 >= minimum + 0) }'

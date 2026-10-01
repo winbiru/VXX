@@ -295,7 +295,7 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
   dùng `CompilationContext`. Facade thread-local chỉ còn cho compatibility test/caller cũ,
   và regression "poison legacy registry" khóa việc context-driven compile không phụ thuộc nó.
 - [x] Thêm fuzzing cho lexer/parser và malformed-source corpus có seed cố định.
-  `scripts/quality/rc-hardening.py` chạy 16 malformed corpus case + 512 input sinh xác định từ
+  `scripts/quality/rc-hardening.vi` và `scripts/quality/rc-malformed.vi` khóa stress + malformed source qua
   seed `0x56505031` qua public CLI, giới hạn timeout từng case và từ chối crash/signal. Script
   đã nối vào CI Ubuntu/macOS/Windows.
 - [x] Thêm malformed AST/invalid IR tests và bytecode verifier trước khi VM thực thi input

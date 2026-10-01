@@ -240,12 +240,12 @@ concurrency/async phức tạp không phải release blocker mặc định của
      lookup nhận registry tường minh; CLI/tooling/`compileSource` dùng `CompilationContext`.
      Compatibility facade thread-local chỉ còn cho test/caller cũ và regression xác nhận
      context-driven compile không đọc/ghi một active registry khác.
-   - [x] Fuzz lexer/parser và malformed-source corpus có seed cố định. `scripts/quality/rc-hardening.py`
+   - [x] Malformed-source gate qua source V++ tại `scripts/quality/rc-malformed.vi`.
      chạy 528 input ở public CLI boundary với seed `0x56505031`, đồng thời khóa deterministic
      AST/IR/disassembly qua ba lượt. Focused `vpp-rc-internal-hardening` khóa direct malformed
      AST/invalid IR và bytecode verifier trước dispatch.
    - [x] Stress source/project lớn và theo dõi compiler memory/time regression.
-     `scripts/quality/rc-hardening.py` tạo source 800 hàm và import graph 24 module × 24 hàm,
+     `scripts/quality/rc-hardening.vi` khóa stress source lớn và determinism qua public CLI,
      compile lặp năm lượt, áp timeout 30 giây/lượt + peak RSS budget 1 GiB trên Unix/macOS.
    - [ ] Freeze syntax/semantics/bytecode/package/public CLI rồi chạy release-install smoke
      bằng artifact thật trên Windows, macOS và Linux cùng ít nhất một sample project thực tế.

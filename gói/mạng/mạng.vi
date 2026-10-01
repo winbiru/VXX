@@ -3,6 +3,9 @@
 // Ghi chú: nếu VM chưa bật native hook, các hàm sẽ ném lỗi.
 // HTTP client chỉ nhận URL UTF-8 hợp lệ dùng http:// hoặc https://, có host và
 // không chứa khoảng trắng/ký tự điều khiển chưa percent-encode.
+// Lỗi truyền HTTP do curl trả về được ném để thử/bắt lỗi có thể xử lý hoặc
+// thử lại khi máy chủ chưa sẵn sàng. Không tự động gửi lại POST/PUT/DELETE.
+// URL sai và lỗi khởi chạy curl vẫn là lỗi runtime không thể bắt.
 
 // Ghi chú hàm: mạng lấy.
 hàm mạng lấy(đường dẫn) {
