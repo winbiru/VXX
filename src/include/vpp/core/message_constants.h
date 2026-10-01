@@ -6,6 +6,7 @@
 
 #include "vpp/core/message_cli_constants.h"
 #include "vpp/core/message_compiler_constants.h"
+#include "vpp/core/message_package_constants.h"
 #include "vpp/core/message_runtime_constants.h"
 
 namespace vietvm::messages {

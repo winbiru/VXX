@@ -124,7 +124,8 @@ static bool handleNativeJsonFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         const std::string text = vietvm::helpers::argToRawString(args[0]);
         if (!vietvm::core::isValidUtf8(text)) {
-            err = fn + ": chuỗi phải là UTF-8 hợp lệ";
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeStringUtf8Invalid, {fn});
             return true;
         }
         result = make_string_value(vietvm::helpers::escapeJsonString(text));
@@ -135,7 +136,8 @@ static bool handleNativeJsonFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         const std::string text = vietvm::helpers::argToRawString(args[0]);
         if (!vietvm::core::isValidUtf8(text)) {
-            err = fn + ": chuỗi phải là UTF-8 hợp lệ";
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeStringUtf8Invalid, {fn});
             return true;
         }
         result = make_string_value(std::string("\"") +
@@ -623,7 +625,7 @@ void VM::ensureBytecodeVerified() {
 
 void VM::resetExecution() {
     if (!executionStack.empty() || !callStack.empty()) {
-        throw std::logic_error("không thể reset VM khi lời gọi vẫn đang hoạt động");
+        throw std::logic_error(std::string(vietvm::messages::kVmResetWhileCallActive));
     }
     stack.clear();
     loopStartStack.clear();

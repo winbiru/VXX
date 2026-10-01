@@ -1,4 +1,5 @@
 #include "vpp/core/semver.h"
+#include "vpp/core/message_constants.h"
 
 #include <algorithm>
 #include <cctype>
@@ -31,11 +32,11 @@ bool parseNumber(std::string_view text,
     const std::size_t begin = cursor;
     while (cursor < text.size() && isAsciiDigit(text[cursor])) ++cursor;
     if (begin == cursor) {
-        if (error) *error = "thiếu thành phần số trong semantic version";
+        if (error) *error = messages::messageText(messages::kSemverNumberComponentMissing);
         return false;
     }
     if (cursor - begin > 1 && text[begin] == '0') {
-        if (error) *error = "thành phần số semantic version không được có số 0 ở đầu";
+        if (error) *error = messages::messageText(messages::kSemverNumberLeadingZero);
         return false;
     }
 
@@ -43,7 +44,7 @@ bool parseNumber(std::string_view text,
     for (std::size_t index = begin; index < cursor; ++index) {
         parsed = parsed * 10 + (text[index] - '0');
         if (parsed > std::numeric_limits<int>::max()) {
-            if (error) *error = "thành phần semantic version vượt phạm vi số nguyên";
+            if (error) *error = messages::messageText(messages::kSemverNumberOutOfRange);
             return false;
         }
     }
@@ -60,13 +61,13 @@ bool parseIdentifiers(std::string_view text,
         const std::size_t begin = cursor;
         while (cursor < text.size() && isIdentifierChar(text[cursor])) ++cursor;
         if (begin == cursor) {
-            if (error) *error = "identifier semantic version rỗng hoặc chứa ký tự không hợp lệ";
+            if (error) *error = messages::messageText(messages::kSemverIdentifierInvalid);
             return false;
         }
         std::string identifier(text.substr(begin, cursor - begin));
         if (rejectNumericLeadingZero && allDigits(identifier) &&
             identifier.size() > 1 && identifier.front() == '0') {
-            if (error) *error = "identifier prerelease dạng số không được có số 0 ở đầu";
+            if (error) *error = messages::messageText(messages::kSemverPrereleaseLeadingZero);
             return false;
         }
         out.push_back(std::move(identifier));
@@ -74,7 +75,7 @@ bool parseIdentifiers(std::string_view text,
         if (text[cursor] != '.') return true;
         ++cursor;
         if (cursor == text.size()) {
-            if (error) *error = "identifier semantic version không được kết thúc bằng dấu chấm";
+            if (error) *error = messages::messageText(messages::kSemverIdentifierTrailingDot);
             return false;
         }
     }
@@ -161,7 +162,7 @@ std::optional<SemanticVersion> SemanticVersion::parse(
     std::string *error) {
     if (error) error->clear();
     if (text.empty()) {
-        setError(error, "semantic version rỗng");
+        setError(error, messages::messageText(messages::kSemverEmpty));
         return std::nullopt;
     }
 
@@ -169,12 +170,12 @@ std::optional<SemanticVersion> SemanticVersion::parse(
     std::size_t cursor = 0;
     if (!parseNumber(text, cursor, version.major, error)) return std::nullopt;
     if (cursor >= text.size() || text[cursor++] != '.') {
-        setError(error, "semantic version phải có dạng major.minor.patch");
+        setError(error, messages::messageText(messages::kSemverExpectedCoreFormat));
         return std::nullopt;
     }
     if (!parseNumber(text, cursor, version.minor, error)) return std::nullopt;
     if (cursor >= text.size() || text[cursor++] != '.') {
-        setError(error, "semantic version phải có dạng major.minor.patch");
+        setError(error, messages::messageText(messages::kSemverExpectedCoreFormat));
         return std::nullopt;
     }
     if (!parseNumber(text, cursor, version.patch, error)) return std::nullopt;
@@ -192,7 +193,7 @@ std::optional<SemanticVersion> SemanticVersion::parse(
         }
     }
     if (cursor != text.size()) {
-        setError(error, "semantic version chứa phần dư không hợp lệ");
+        setError(error, messages::messageText(messages::kSemverTrailingDataInvalid));
         return std::nullopt;
     }
     return version;
@@ -248,11 +249,11 @@ std::optional<VersionRange> VersionRange::parse(
 
     for (const std::string &token : tokens) {
         if (token == "*") {
-            setError(error, "'*' chỉ hợp lệ khi đứng một mình trong version range");
+            setError(error, messages::messageText(messages::kSemverWildcardMustStandAlone));
             return std::nullopt;
         }
         if (token.find("||") != std::string::npos) {
-            setError(error, "OR version range chưa được hỗ trợ trong Package 0.9");
+            setError(error, messages::messageText(messages::kSemverOrRangeUnsupported));
             return std::nullopt;
         }
 
@@ -288,7 +289,7 @@ std::optional<VersionRange> VersionRange::parse(
         }
 
         if (versionOffset == token.size()) {
-            setError(error, "version comparator thiếu phiên bản");
+            setError(error, messages::messageText(messages::kSemverComparatorMissingVersion));
             return std::nullopt;
         }
         const auto parsed = SemanticVersion::parse(

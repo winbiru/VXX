@@ -70,8 +70,9 @@ PackageLockfile readPackageLockfile(const std::filesystem::path &path);
 void writePackageLockfile(const std::filesystem::path &path,
                           const PackageLockfile &lockfile);
 
-// Tạo fingerprint xác định theo relative path + bytes của toàn bộ regular file
-// trong package tree. Symlink và directory metadata không tham gia fingerprint.
+// Tạo fingerprint xác định theo relative path + nội dung của toàn bộ regular file.
+// File text chuẩn hóa CRLF thành LF để lockfile ổn định giữa Windows/POSIX;
+// binary vẫn được hash đúng từng byte. Symlink/directory metadata không tham gia.
 std::string fingerprintPackageTree(const std::filesystem::path &root);
 
 } // namespace vietvm::core

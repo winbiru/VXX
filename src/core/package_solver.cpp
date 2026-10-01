@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "vpp/core/project_layout.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/semver.h"
 
 namespace vietvm::core {
@@ -93,22 +94,21 @@ private:
         std::string rangeError;
         const auto range = VersionRange::parse(rangeText, &rangeError);
         if (!range.has_value()) {
-            throw std::runtime_error(
-                "dependency '" + name + "' từ '" + requester +
-                "' có version range không hợp lệ '" + rangeText +
-                "': " + rangeError);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencyRangeInvalid,
+                {name, requester, rangeText, rangeError}));
         }
         std::string versionError;
         const auto version = SemanticVersion::parse(versionText, &versionError);
         if (!version.has_value()) {
-            throw std::runtime_error(
-                "dependency '" + name + "' có source version không hợp lệ '" +
-                versionText + "': " + versionError);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencySourceVersionInvalid,
+                {name, versionText, versionError}));
         }
         if (!range->matches(*version)) {
-            throw std::runtime_error(
-                "xung đột dependency '" + name + "': phiên bản " + versionText +
-                " không thỏa range " + rangeText + " do '" + requester + "' yêu cầu");
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencyVersionConflict,
+                {name, versionText, rangeText, requester}));
         }
     }
 
@@ -120,10 +120,9 @@ private:
             materialized = materializer_(dependency, declaringRoot);
         } else {
             if (dependency.sourceKind != PackageSourceKind::Path) {
-                throw std::runtime_error(
-                    "dependency '" + dependency.name + "' dùng source '" +
-                    packageSourceKindName(dependency.sourceKind) +
-                    "' nhưng transport này chưa được hỗ trợ trong Package 0.9");
+                throw std::runtime_error(messages::formatMessage(
+                    messages::kPackageTransportUnsupported,
+                    {dependency.name, packageSourceKindName(dependency.sourceKind)}));
             }
             materialized.path = absoluteLexical(
                 declaringRoot, utf8Path(dependency.location));
@@ -132,14 +131,14 @@ private:
 
         const fs::path sourcePath = materialized.path;
         if (!fs::exists(sourcePath)) {
-            throw std::runtime_error(
-                "không tìm thấy source path của dependency '" + dependency.name +
-                "': " + sourcePath.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencySourceMissing,
+                {dependency.name, sourcePath.u8string()}));
         }
         if (!fs::is_directory(sourcePath) && !fs::is_regular_file(sourcePath)) {
-            throw std::runtime_error(
-                "source path của dependency '" + dependency.name +
-                "' không phải file hoặc directory: " + sourcePath.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencySourceInvalid,
+                {dependency.name, sourcePath.u8string()}));
         }
 
         const SourceMetadata metadata = readSourceMetadata(sourcePath);
@@ -152,12 +151,10 @@ private:
             if (resolved.resolvedLocation != materialized.resolvedLocation ||
                 resolved.sourceRevision != materialized.revision ||
                 resolved.version != metadata.version) {
-                throw std::runtime_error(
-                    "xung đột dependency '" + dependency.name +
-                    "': đã resolve " + resolved.version + " từ " +
-                    resolved.resolvedLocation + ", nhưng '" + requester +
-                    "' yêu cầu source " + materialized.resolvedLocation +
-                    " phiên bản " + metadata.version);
+                throw std::runtime_error(messages::formatMessage(
+                    messages::kPackageDependencyResolvedConflict,
+                    {dependency.name, resolved.version, resolved.resolvedLocation,
+                     requester, materialized.resolvedLocation, metadata.version}));
             }
             if (std::find(resolved.requestedRanges.begin(),
                           resolved.requestedRanges.end(),
@@ -169,8 +166,9 @@ private:
         }
 
         if (visiting_.count(dependency.name) != 0) {
-            throw std::runtime_error(
-                "phát hiện vòng lặp dependency: " + joinCycle(stack_, dependency.name));
+            const std::string cycle = joinCycle(stack_, dependency.name);
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageDependencyCycle, {cycle}));
         }
 
         visiting_.insert(dependency.name);

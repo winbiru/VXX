@@ -7,6 +7,7 @@
 #include <string>
 
 #include "vpp/core/package_manifest.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/project_layout.h"
 
 namespace vietvm::core {
@@ -16,8 +17,8 @@ std::string cacheKeyForFingerprint(const std::string &fingerprint) {
     const std::string prefix = "fnv1a64:";
     if (fingerprint.rfind(prefix, 0) != 0 ||
         fingerprint.size() != prefix.size() + 16) {
-        throw std::runtime_error(
-            "fingerprint package không hợp lệ cho cache: " + fingerprint);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageCacheFingerprintInvalid, {fingerprint}));
     }
     const std::string digest = fingerprint.substr(prefix.size());
     const bool valid = std::all_of(
@@ -25,8 +26,8 @@ std::string cacheKeyForFingerprint(const std::string &fingerprint) {
             return std::isdigit(c) != 0 || (c >= 'a' && c <= 'f');
         });
     if (!valid) {
-        throw std::runtime_error(
-            "fingerprint package không hợp lệ cho cache: " + fingerprint);
+        throw std::runtime_error(messages::formatMessage(
+            messages::kPackageCacheFingerprintInvalid, {fingerprint}));
     }
     return "fnv1a64-" + digest;
 }
@@ -39,8 +40,8 @@ void copyExactTree(const std::filesystem::path &source,
             std::filesystem::relative(entry.path(), source);
         const std::filesystem::path destination = target / relative;
         if (entry.is_symlink()) {
-            throw std::runtime_error(
-                "cache package không hỗ trợ symlink: " + entry.path().u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageCacheSymlinkUnsupported, {entry.path().u8string()}));
         }
         if (entry.is_directory()) {
             std::filesystem::create_directories(destination);
@@ -50,8 +51,8 @@ void copyExactTree(const std::filesystem::path &source,
                 entry.path(), destination,
                 std::filesystem::copy_options::overwrite_existing);
         } else {
-            throw std::runtime_error(
-                "cache package gặp entry không được hỗ trợ: " + entry.path().u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageCacheEntryUnsupported, {entry.path().u8string()}));
         }
     }
 }
@@ -78,8 +79,8 @@ std::filesystem::path cachePackageTree(
         packageCacheEntryPath(cacheRoot, fingerprint);
     if (std::filesystem::exists(entry)) {
         if (fingerprintPackageTree(entry) != fingerprint) {
-            throw std::runtime_error(
-                "cache package bị thay đổi ngoài ý muốn: " + entry.u8string());
+            throw std::runtime_error(messages::formatMessage(
+                messages::kPackageCacheChanged, {entry.u8string()}));
         }
         return entry;
     }
@@ -92,8 +93,7 @@ std::filesystem::path cachePackageTree(
         copyExactTree(installedPackage, staging);
         const std::string stagedFingerprint = fingerprintPackageTree(staging);
         if (stagedFingerprint != fingerprint) {
-            throw std::runtime_error(
-                "không thể cache package: fingerprint thay đổi trong khi snapshot");
+            throw std::runtime_error(std::string(messages::kPackageCacheFingerprintChanged));
         }
         std::filesystem::rename(staging, entry);
     } catch (...) {

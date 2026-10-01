@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "vm/instruction.h"
+#include "vpp/core/message_constants.h"
 
 namespace vietvm::runtime {
 
@@ -429,141 +430,169 @@ inline RuntimeDiagnosticInfo runtimeDiagnosticInfo(
     const RuntimeDiagnosticContext &context) {
     switch (kind) {
         case RuntimeDiagnosticKind::DivisionByZero:
-            return {"Số học",
-                    "Chương trình đang cố lấy " + runtimeDiagnosticOperand(context, 0, "một số") +
-                        " chia cho " + runtimeDiagnosticOperand(context, 1, "0") +
-                        ". Số chia bằng 0 nên phép chia không thể cho ra kết quả hợp lệ.",
-                    "Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryArithmetic),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagDivisionByZeroDescription,
+                        {runtimeDiagnosticOperand(
+                             context, 0, std::string(messages::kRuntimeDiagFallbackOperand)),
+                         runtimeDiagnosticOperand(
+                             context, 1, std::string(messages::kRuntimeDiagFallbackZero))}),
+                    messages::messageText(messages::kRuntimeDiagDivisionByZeroSuggestion)};
         case RuntimeDiagnosticKind::ModuloByZero:
-            return {"Số học",
-                    "Chương trình đang tìm phần dư của phép chia cho 0. Không thể tính phần dư khi số chia bằng 0.",
-                    "Hãy kiểm tra số chia trước khi dùng phép chia lấy dư và xử lý riêng trường hợp bằng 0."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryArithmetic),
+                    messages::messageText(messages::kRuntimeDiagModuloByZeroDescription),
+                    messages::messageText(messages::kRuntimeDiagModuloByZeroSuggestion)};
         case RuntimeDiagnosticKind::IntegerRequired:
-            return {"Kiểu dữ liệu",
-                    "Chỗ này cần một số nguyên, nhưng chương trình đang đưa vào giá trị thuộc loại '" +
-                        (context.actualType.empty() ? std::string("không phù hợp") : context.actualType) + "'.",
-                    "Hãy dùng một số nguyên như 0, 1, -2 hoặc chuyển giá trị hiện tại sang số trước khi dùng."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryType),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagIntegerRequiredDescription,
+                        {context.actualType.empty()
+                            ? messages::kRuntimeDiagFallbackType
+                            : std::string_view(context.actualType)}),
+                    messages::messageText(messages::kRuntimeDiagIntegerRequiredSuggestion)};
         case RuntimeDiagnosticKind::NumericOperandRequired:
-            return {"Kiểu dữ liệu",
-                    "Phép tính này cần số ở cả hai bên, nhưng ít nhất một giá trị hiện tại không phải là số.",
-                    "Hãy kiểm tra hai giá trị trong phép tính và đổi giá trị không phải số thành số trước khi tính."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryType),
+                    messages::messageText(messages::kRuntimeDiagNumericOperandRequiredDescription),
+                    messages::messageText(messages::kRuntimeDiagNumericOperandRequiredSuggestion)};
         case RuntimeDiagnosticKind::ComparisonTypeMismatch:
-            return {"Kiểu dữ liệu",
-                    "Hai giá trị đang được so sánh không cùng loại có thể xếp thứ tự với nhau.",
-                    "Hãy đưa hai giá trị về cùng loại, ví dụ cùng là số hoặc cùng là chuỗi, rồi mới so sánh."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryType),
+                    messages::messageText(messages::kRuntimeDiagComparisonTypeMismatchDescription),
+                    messages::messageText(messages::kRuntimeDiagComparisonTypeMismatchSuggestion)};
         case RuntimeDiagnosticKind::FloatConversionFailed:
-            return {"Chuyển kiểu",
-                    "Chương trình muốn đổi '" + context.conversionInput + "' thành " +
-                        (context.conversionTarget.empty() ? std::string("một con số") : context.conversionTarget) +
-                        ", nhưng nội dung đó không có dạng số mà V++ hiểu.",
-                    "Hãy kiểm tra dữ liệu đầu vào. Ví dụ 12, -3 và 4.5 là các cách viết số hợp lệ."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryConversion),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagFloatConversionFailedDescription,
+                        {context.conversionInput,
+                         context.conversionTarget.empty()
+                            ? messages::kRuntimeDiagFallbackNumberTarget
+                            : std::string_view(context.conversionTarget)}),
+                    messages::messageText(messages::kRuntimeDiagFloatConversionFailedSuggestion)};
         case RuntimeDiagnosticKind::IndexTypeInvalid:
-            return {"Truy cập phần tử",
-                    "Chương trình đang chọn một phần tử bằng vị trí không phải số nguyên nên V++ không biết phải lấy phần tử thứ mấy.",
-                    "Hãy dùng số nguyên làm vị trí, ví dụ 0 cho phần tử đầu tiên, 1 cho phần tử thứ hai."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryIndex),
+                    messages::messageText(messages::kRuntimeDiagIndexTypeInvalidDescription),
+                    messages::messageText(messages::kRuntimeDiagIndexTypeInvalidSuggestion)};
         case RuntimeDiagnosticKind::IndexOutOfRange:
-            return {"Truy cập phần tử",
-                    "Chương trình đang yêu cầu phần tử ở vị trí " + std::to_string(context.index) +
-                        (context.containerSize >= 0
-                            ? ", nhưng dữ liệu chỉ có " + std::to_string(context.containerSize) + " phần tử."
-                            : ", nhưng vị trí này không tồn tại trong dữ liệu hiện có."),
-                    "Hãy kiểm tra số lượng phần tử trước khi truy cập. Vị trí hợp lệ bắt đầu từ 0 và phải nhỏ hơn số lượng phần tử."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryIndex),
+                    context.containerSize >= 0
+                        ? messages::formatMessage(
+                            messages::kRuntimeDiagIndexOutOfRangeSizedDescription,
+                            {std::to_string(context.index), std::to_string(context.containerSize)})
+                        : messages::formatMessage(
+                            messages::kRuntimeDiagIndexOutOfRangeUnknownDescription,
+                            {std::to_string(context.index)}),
+                    messages::messageText(messages::kRuntimeDiagIndexOutOfRangeSuggestion)};
         case RuntimeDiagnosticKind::ContainerNotIndexable:
-            return {"Truy cập phần tử",
-                    "Bạn đang dùng dấu [] với một giá trị không có các phần tử được đánh số vị trí.",
-                    "Hãy dùng [] với danh sách, bộ hoặc chuỗi; với đối tượng hãy dùng thuộc tính hay phương thức phù hợp."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryIndex),
+                    messages::messageText(messages::kRuntimeDiagContainerNotIndexableDescription),
+                    messages::messageText(messages::kRuntimeDiagContainerNotIndexableSuggestion)};
         case RuntimeDiagnosticKind::FunctionNotFound:
-            return {"Gọi hàm",
-                    "Chương trình muốn gọi hàm '" + context.targetName + "', nhưng không tìm thấy hàm đó trong phạm vi hiện tại.",
-                    "Hãy kiểm tra tên hàm, phần khai báo hàm và mô đun chứa hàm đã được nhập hay chưa."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryCall),
+                    messages::formatMessage(messages::kRuntimeDiagFunctionNotFoundDescription, {context.targetName}),
+                    messages::messageText(messages::kRuntimeDiagFunctionNotFoundSuggestion)};
         case RuntimeDiagnosticKind::InvalidCallable:
-            return {"Gọi hàm",
-                    "Chương trình đang cố gọi một giá trị như hàm, nhưng giá trị đó không trỏ tới một hàm có thể chạy.",
-                    "Hãy kiểm tra biến đứng ở vị trí lời gọi và bảo đảm nó đang chứa tham chiếu hàm hoặc hàm đóng hợp lệ."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryCall),
+                    messages::messageText(messages::kRuntimeDiagInvalidCallableDescription),
+                    messages::messageText(messages::kRuntimeDiagInvalidCallableSuggestion)};
         case RuntimeDiagnosticKind::CallArityMismatch:
-            return {"Gọi hàm",
-                    "Hàm '" + context.targetName + "' được gọi với " + std::to_string(context.argumentCount) +
-                        " giá trị, trong khi hàm này nhận từ " + std::to_string(context.minimumArguments) +
-                        " đến " + std::to_string(context.maximumArguments) + " giá trị.",
-                    "Hãy thêm hoặc bớt giá trị khi gọi hàm để khớp với phần khai báo của hàm."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryCall),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagCallArityMismatchDescription,
+                        {context.targetName, std::to_string(context.argumentCount),
+                         std::to_string(context.minimumArguments), std::to_string(context.maximumArguments)}),
+                    messages::messageText(messages::kRuntimeDiagCallArityMismatchSuggestion)};
         case RuntimeDiagnosticKind::CallDepthExceeded:
-            return {"Gọi hàm",
-                    "Hàm '" + context.targetName + "' đã gọi lồng quá " +
-                        std::to_string(context.maximumCallDepth) +
-                        " lần. Thường là một hàm cứ gọi lại chính nó mà chưa đi tới điều kiện dừng.",
-                    "Hãy kiểm tra điều kiện dừng. Mỗi lần gọi lại phải làm dữ liệu tiến gần hơn tới trường hợp dừng."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryCall),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagCallDepthExceededDescription,
+                        {context.targetName, std::to_string(context.maximumCallDepth)}),
+                    messages::messageText(messages::kRuntimeDiagCallDepthExceededSuggestion)};
         case RuntimeDiagnosticKind::RequiredArgumentMissing:
-            return {"Gọi hàm",
-                    "Hàm cần một giá trị bắt buộc ở vị trí " + std::to_string(context.requiredArgumentIndex) +
-                        ", nhưng lời gọi không truyền giá trị đó vào.",
-                    "Hãy truyền thêm giá trị còn thiếu hoặc khai báo giá trị mặc định nếu tham số được phép bỏ qua."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryCall),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagRequiredArgumentMissingDescription,
+                        {std::to_string(context.requiredArgumentIndex)}),
+                    messages::messageText(messages::kRuntimeDiagRequiredArgumentMissingSuggestion)};
         case RuntimeDiagnosticKind::ModuleInitializationFailed:
-            return {"Mô đun",
-                    "Mô đun '" + context.moduleName + "' chưa khởi tạo xong nên chương trình chưa thể sử dụng nó.",
-                    "Hãy xem lỗi đầu tiên xảy ra trong phần khởi tạo của mô đun và các mô đun mà nó phụ thuộc."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryModule),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagModuleInitializationFailedDescription,
+                        {context.moduleName}),
+                    messages::messageText(messages::kRuntimeDiagModuleInitializationFailedSuggestion)};
         case RuntimeDiagnosticKind::ClassNotFound:
-            return {"Lớp và đối tượng",
-                    "Chương trình muốn dùng lớp '" + context.targetName + "', nhưng V++ không tìm thấy phần khai báo của lớp này.",
-                    "Hãy kiểm tra tên lớp, nơi khai báo lớp và mô đun chứa lớp đã được nhập hay chưa."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryObject),
+                    messages::formatMessage(messages::kRuntimeDiagClassNotFoundDescription, {context.targetName}),
+                    messages::messageText(messages::kRuntimeDiagClassNotFoundSuggestion)};
         case RuntimeDiagnosticKind::ObjectRequired:
-            return {"Lớp và đối tượng",
-                    "Chương trình đang cố dùng thuộc tính hoặc phương thức trên một giá trị không phải đối tượng.",
-                    "Hãy kiểm tra giá trị đứng trước dấu chấm và bảo đảm nó là một đối tượng được tạo từ lớp."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryObject),
+                    messages::messageText(messages::kRuntimeDiagObjectRequiredDescription),
+                    messages::messageText(messages::kRuntimeDiagObjectRequiredSuggestion)};
         case RuntimeDiagnosticKind::PropertyNotFound:
-            return {"Lớp và đối tượng",
-                    "Đối tượng hiện tại không có thuộc tính '" + context.memberName + "'.",
-                    "Hãy kiểm tra chính tả tên thuộc tính và phần khai báo của lớp."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryObject),
+                    messages::formatMessage(messages::kRuntimeDiagPropertyNotFoundDescription, {context.memberName}),
+                    messages::messageText(messages::kRuntimeDiagPropertyNotFoundSuggestion)};
         case RuntimeDiagnosticKind::MethodNotFound:
-            return {"Lớp và đối tượng",
-                    "Đối tượng hiện tại không có phương thức '" + context.memberName + "' phù hợp để gọi.",
-                    "Hãy kiểm tra tên phương thức, lớp của đối tượng và các lớp cha của nó."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryObject),
+                    messages::formatMessage(messages::kRuntimeDiagMethodNotFoundDescription, {context.memberName}),
+                    messages::messageText(messages::kRuntimeDiagMethodNotFoundSuggestion)};
         case RuntimeDiagnosticKind::MemberAccessDenied:
-            return {"Quyền truy cập",
-                    "Thành viên '" + context.memberName + "' có tồn tại nhưng đoạn mã hiện tại không được phép sử dụng nó.",
-                    "Hãy gọi thành viên từ phạm vi được phép hoặc đổi mức truy cập nếu thiết kế của lớp cho phép."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryAccess),
+                    messages::formatMessage(messages::kRuntimeDiagMemberAccessDeniedDescription, {context.memberName}),
+                    messages::messageText(messages::kRuntimeDiagMemberAccessDeniedSuggestion)};
         case RuntimeDiagnosticKind::MissingOperand:
-            return {"Biểu thức",
-                    "VM cần " + std::to_string(context.requiredOperands) + " giá trị để thực hiện thao tác này nhưng hiện chỉ có " +
-                        std::to_string(context.availableOperands) + ".",
-                    "Hãy kiểm tra biểu thức gần vị trí báo lỗi; có thể một giá trị đã bị thiếu hoặc bytecode được tạo không đúng."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryExpression),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagMissingOperandDescription,
+                        {std::to_string(context.requiredOperands), std::to_string(context.availableOperands)}),
+                    messages::messageText(messages::kRuntimeDiagMissingOperandSuggestion)};
         case RuntimeDiagnosticKind::IncrementTypeInvalid:
-            return {"Kiểu dữ liệu",
-                    "Chương trình đang tăng thêm 1 cho một giá trị thuộc loại '" + context.actualType + "', loại này không thể tăng như một con số.",
-                    "Hãy dùng ++ với giá trị số hoặc chuyển dữ liệu sang số trước khi tăng."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryType),
+                    messages::formatMessage(messages::kRuntimeDiagIncrementTypeInvalidDescription, {context.actualType}),
+                    messages::messageText(messages::kRuntimeDiagIncrementTypeInvalidSuggestion)};
         case RuntimeDiagnosticKind::DecrementTypeInvalid:
-            return {"Kiểu dữ liệu",
-                    "Chương trình đang giảm 1 trên một giá trị thuộc loại '" + context.actualType + "', loại này không thể giảm như một con số.",
-                    "Hãy dùng -- với giá trị số hoặc chuyển dữ liệu sang số trước khi giảm."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryType),
+                    messages::formatMessage(messages::kRuntimeDiagDecrementTypeInvalidDescription, {context.actualType}),
+                    messages::messageText(messages::kRuntimeDiagDecrementTypeInvalidSuggestion)};
         case RuntimeDiagnosticKind::ConstantReferenceInvalid:
-            return {"Dữ liệu chương trình",
-                    "Một câu lệnh đang trỏ tới dữ liệu hằng không tồn tại trong chương trình đã biên dịch.",
-                    "Nếu mã nguồn V++ hợp lệ, hãy biên dịch lại chương trình; nếu lỗi còn lặp lại thì đây có thể là lỗi của trình biên dịch."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryProgramData),
+                    messages::messageText(messages::kRuntimeDiagConstantReferenceInvalidDescription),
+                    messages::messageText(messages::kRuntimeDiagConstantReferenceInvalidSuggestion)};
         case RuntimeDiagnosticKind::LiteralDecodeFailed:
-            return {"Dữ liệu chương trình",
-                    "V++ đọc được câu lệnh tạo dữ liệu nhưng phần dữ liệu đi kèm bị hỏng hoặc không đúng định dạng.",
-                    "Hãy biên dịch lại từ mã nguồn. Nếu lỗi vẫn xuất hiện với cùng mã nguồn, hãy báo lỗi cho trình biên dịch V++."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryProgramData),
+                    messages::messageText(messages::kRuntimeDiagLiteralDecodeFailedDescription),
+                    messages::messageText(messages::kRuntimeDiagLiteralDecodeFailedSuggestion)};
         case RuntimeDiagnosticKind::ClosureCaptureInvalid:
-            return {"Hàm đóng",
-                    "Hàm đóng cần giữ lại một biến từ bên ngoài nhưng thông tin về biến đó không còn hợp lệ.",
-                    "Hãy biên dịch lại chương trình. Nếu lỗi vẫn xảy ra, đây có thể là lỗi trong quá trình tạo bytecode cho hàm đóng."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryClosure),
+                    messages::messageText(messages::kRuntimeDiagClosureCaptureInvalidDescription),
+                    messages::messageText(messages::kRuntimeDiagClosureCaptureInvalidSuggestion)};
         case RuntimeDiagnosticKind::JumpTargetInvalid:
-            return {"Luồng chương trình",
-                    "Chương trình định nhảy tới vị trí " + std::to_string(context.jumpTarget) + " nhưng vị trí đó nằm ngoài phần mã có thể chạy.",
-                    "Hãy biên dịch lại chương trình. Nếu mã nguồn hợp lệ mà lỗi vẫn xảy ra, hãy báo lỗi cho trình biên dịch V++."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryControlFlow),
+                    messages::formatMessage(
+                        messages::kRuntimeDiagJumpTargetInvalidDescription,
+                        {std::to_string(context.jumpTarget)}),
+                    messages::messageText(messages::kRuntimeDiagJumpTargetInvalidSuggestion)};
         case RuntimeDiagnosticKind::ControlFlowStateInvalid:
-            return {"Luồng chương trình",
-                    "Một câu lệnh điều khiển đang chạy ở nơi không có cấu trúc tương ứng để nó làm việc.",
-                    "Hãy kiểm tra các khối lặp, chọn, điều kiện và dấu ngoặc khối gần vị trí báo lỗi."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryControlFlow),
+                    messages::messageText(messages::kRuntimeDiagControlFlowStateInvalidDescription),
+                    messages::messageText(messages::kRuntimeDiagControlFlowStateInvalidSuggestion)};
         case RuntimeDiagnosticKind::NativeOperationFailed:
-            return {"Thư viện hệ thống",
-                    "Tác vụ '" + (context.nativeOperation.empty() ? std::string("hệ thống") : context.nativeOperation) +
-                        "' đã được gọi nhưng hệ điều hành hoặc thư viện bên dưới không thực hiện được." +
-                        (context.detail.empty() ? std::string() : " Chi tiết: " + context.detail),
-                    "Hãy kiểm tra dữ liệu truyền vào, tệp/đường dẫn, quyền truy cập hoặc kết nối mà tác vụ này cần."};
+            return {messages::messageText(messages::kRuntimeDiagCategorySystemLibrary),
+                    context.detail.empty()
+                        ? messages::formatMessage(
+                            messages::kRuntimeDiagNativeOperationFailedDescription,
+                            {context.nativeOperation.empty()
+                                ? messages::kRuntimeDiagFallbackSystemOperation
+                                : std::string_view(context.nativeOperation)})
+                        : messages::formatMessage(
+                            messages::kRuntimeDiagNativeOperationFailedWithDetailDescription,
+                            {context.nativeOperation.empty()
+                                ? messages::kRuntimeDiagFallbackSystemOperation
+                                : std::string_view(context.nativeOperation),
+                             context.detail}),
+                    messages::messageText(messages::kRuntimeDiagNativeOperationFailedSuggestion)};
         case RuntimeDiagnosticKind::InternalRuntimeState:
-            return {"Nội bộ V++",
-                    "Máy ảo gặp một trạng thái không thể xuất hiện khi bytecode và trạng thái chạy đều hợp lệ.",
-                    "Hãy biên dịch lại chương trình. Nếu lỗi lặp lại, hãy giữ đoạn mã ngắn nhất gây lỗi để báo cho V++."};
+            return {messages::messageText(messages::kRuntimeDiagCategoryInternal),
+                    messages::messageText(messages::kRuntimeDiagInternalStateDescription),
+                    messages::messageText(messages::kRuntimeDiagInternalStateSuggestion)};
         case RuntimeDiagnosticKind::None:
             return {};
     }

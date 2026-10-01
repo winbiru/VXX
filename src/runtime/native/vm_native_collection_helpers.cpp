@@ -10,6 +10,7 @@
 
 #include "common/vm_native_constants.h"
 #include "common/vm_native_helpers.h"
+#include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
 #include "vpp/runtime/collection.h"
 
@@ -37,7 +38,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             result = make_int_value(tuple == nullptr ? 0 : static_cast<int>(tuple->elements.size()));
             return true;
         }
-        err = "độ dài chỉ nhận chuỗi, danh sách hoặc bộ";
+        err = messages::messageText(messages::kNativeLengthTypeInvalid);
         return true;
     }
 
@@ -57,7 +58,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         if (!getFirstListArgument(args, fn, list, err) ||
             !getNonNegativeListIndex(args[1], index, err)) return true;
         if (static_cast<std::size_t>(index) >= list->elements.size()) {
-            err = "chỉ số danh sách vượt phạm vi";
+            err = messages::messageText(messages::kNativeListIndexOutOfRange);
             return true;
         }
         result = list->elements[static_cast<std::size_t>(index)];
@@ -102,7 +103,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         ListHandle list;
         if (!getFirstListArgument(args, fn, list, err)) return true;
         if (!vietvm::runtime::isUniformSortableStackValues(list->elements)) {
-            err = "sắp xếp chỉ hỗ trợ danh sách toàn số hoặc toàn chuỗi";
+            err = messages::messageText(messages::kNativeListSortTypeInvalid);
             return true;
         }
         std::stable_sort(list->elements.begin(), list->elements.end(),
@@ -121,7 +122,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         bool hasFloat = false;
         for (const StackValue &value : list->elements) {
             if (!isNumeric(value)) {
-                err = "tổng danh sách chỉ hỗ trợ phần tử số";
+                err = messages::messageText(messages::kNativeListSumTypeInvalid);
                 return true;
             }
             hasFloat = hasFloat || std::holds_alternative<double>(value);
@@ -132,7 +133,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             for (const StackValue &value : list->elements) {
                 total += toDouble(value);
                 if (!std::isfinite(total)) {
-                    err = "tổng danh sách vượt phạm vi số thực";
+                    err = messages::messageText(messages::kNativeListSumFloatOutOfRange);
                     return true;
                 }
             }
@@ -145,7 +146,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             total += static_cast<std::int64_t>(std::get<int>(value));
             if (total < std::numeric_limits<int>::min() ||
                 total > std::numeric_limits<int>::max()) {
-                err = "tổng danh sách vượt phạm vi số nguyên";
+                err = messages::messageText(messages::kNativeListSumIntegerOutOfRange);
                 return true;
             }
         }
@@ -159,11 +160,11 @@ bool handleNativeCollectionFunction(const std::string &fn,
         ListHandle list;
         if (!getFirstListArgument(args, fn, list, err)) return true;
         if (list->elements.empty()) {
-            err = fn + " không nhận danh sách rỗng";
+            err = messages::formatMessage(messages::kNativeListEmptyRejected, {fn});
             return true;
         }
         if (!vietvm::runtime::isUniformSortableStackValues(list->elements)) {
-            err = fn + " chỉ hỗ trợ danh sách toàn số hoặc toàn chuỗi";
+            err = messages::formatMessage(messages::kNativeListUniformSortableRequired, {fn});
             return true;
         }
         const bool wantMax = vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListMax);
@@ -172,7 +173,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             bool valid = false;
             const bool less = stackValueLess(list->elements[index], selected, valid);
             if (!valid) {
-                err = fn + " chỉ hỗ trợ danh sách toàn số hoặc toàn chuỗi";
+                err = messages::formatMessage(messages::kNativeListUniformSortableRequired, {fn});
                 return true;
             }
             if ((wantMax && !less && !sameStackValue(list->elements[index], selected)) ||
@@ -203,7 +204,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             result = args[0];
             return true;
         }
-        err = "thành bộ chỉ nhận danh sách hoặc bộ";
+        err = messages::messageText(messages::kNativeToTupleTypeInvalid);
         return true;
     }
 
@@ -219,7 +220,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
             result = make_list_value(list == nullptr ? std::vector<StackValue>{} : list->elements);
             return true;
         }
-        err = "thành danh sách chỉ nhận danh sách hoặc bộ";
+        err = messages::messageText(messages::kNativeToListTypeInvalid);
         return true;
     }
 

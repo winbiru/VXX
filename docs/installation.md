@@ -8,7 +8,7 @@ Mỗi release tạo ba artifact:
 - `vpp-macos.tar.gz`
 - `vpp-windows-x64.zip`
 
-Artifact chứa executable, `gói/`, `templates/`, `examples/` và installer của nền tảng.
+Artifact chứa executable, `gói/`, `templates/`, `examples`, installer và uninstaller của nền tảng.
 Installer có thể chạy lại trên cùng thư mục cài đặt để cập nhật. Các thư mục do V++ quản lý
 (`gói/`, `templates/`, `examples/`) được thay toàn bộ sau khi bundle mới đã được staging, vì vậy
 file đã bị xóa khỏi release mới không còn sót lại sau update.
@@ -29,9 +29,20 @@ VPP_INSTALL_DIR="$HOME/.local/share/vpp" ./install-vpp.sh
 
 Installer cấu hình `PATH` và `VPP_HOME` trong profile shell. CI hoặc hệ thống quản lý môi trường
 có thể đặt `VPP_SKIP_PROFILE=1` để chỉ cài file mà không sửa profile.
+Installer tự kiểm tra executable trước/sau khi cài và dùng block profile có marker để cài lại
+không nhân đôi `PATH` hoặc `VPP_HOME`.
 
 Để cập nhật, tải artifact release mới, giải nén và chạy lại cùng installer với cùng
 `VPP_INSTALL_DIR`.
+
+Gỡ trên Linux/macOS:
+
+```bash
+vpp gỡ cài đặt
+```
+
+Bộ gỡ chỉ xóa các thành phần do V++ quản lý và dọn block profile của V++; file/project khác
+trong thư mục cài đặt được giữ lại.
 
 ## Windows
 
