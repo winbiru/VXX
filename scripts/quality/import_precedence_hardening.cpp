@@ -69,7 +69,7 @@ void testResolverPrecedence() {
 
     const fs::path ancestorLocal = project / "collision.vi";
     const fs::path nearPackage =
-        base / utf8(vietvm::core::kPrimaryPackageDirectory) / "collision" / "main.vi";
+        base / utf8(vietvm::core::kPrimaryPackageDirectory) / "collision" / utf8(u8"chính.vi");
     writeFile(ancestorLocal, "hàm local() { trả về 1; }\n");
     writeFile(nearPackage, "hàm package() { trả về 2; }\n");
 
@@ -83,16 +83,16 @@ void testResolverPrecedence() {
            "semantic resolver và package/codegen resolver chọn cùng collision target");
 
     const fs::path nearestPackage =
-        base / utf8(vietvm::core::kPrimaryPackageDirectory) / "nearest" / "main.vi";
+        base / utf8(vietvm::core::kPrimaryPackageDirectory) / "nearest" / utf8(u8"chính.vi");
     const fs::path fartherPackage =
-        project / utf8(vietvm::core::kPrimaryPackageDirectory) / "nearest" / "main.vi";
+        project / utf8(vietvm::core::kPrimaryPackageDirectory) / "nearest" / utf8(u8"chính.vi");
     writeFile(nearestPackage, "hàm gần() { trả về 1; }\n");
     writeFile(fartherPackage, "hàm xa() { trả về 2; }\n");
     expect(packageResolver.resolve("nearest").path == absoluteNormalized(nearestPackage),
            "package gần nhất thắng package cùng tên ở ancestor xa");
 
     const fs::path aliasTarget =
-        base / utf8(vietvm::core::kPrimaryPackageDirectory) / utf8(u8"lõi") / "main.vi";
+        base / utf8(vietvm::core::kPrimaryPackageDirectory) / utf8(u8"lõi") / utf8(u8"chính.vi");
     writeFile(aliasTarget, "hàm lõi() { trả về 1; }\n");
     expect(packageResolver.resolve("vpp_core").path == absoluteNormalized(aliasTarget),
            "alias vpp_core resolve sang package lõi");
@@ -108,7 +108,7 @@ void testResolverPrecedence() {
     const fs::path installHome = tree.root / "vpp-home";
     const fs::path installedPackage =
         installHome / utf8(vietvm::core::kPrimaryPackageDirectory) /
-        utf8(u8"hệ thống") / "main.vi";
+        utf8(u8"hệ thống") / utf8(u8"chính.vi");
     writeFile(installedPackage, "hàm hệ_thống() { trả về 1; }\n");
     vietvm::compiler::PackageResolver installedResolver(base, installHome);
     expect(installedResolver.resolve("vpp_system").path == absoluteNormalized(installedPackage),
@@ -127,7 +127,7 @@ void testNestedImportUsesImporterDirectory() {
     const fs::path project = tree.root / "project";
     const fs::path base = project / "src";
     const fs::path packageMain =
-        project / utf8(vietvm::core::kPrimaryPackageDirectory) / "demo" / "main.vi";
+        project / utf8(vietvm::core::kPrimaryPackageDirectory) / "demo" / utf8(u8"chính.vi");
     const fs::path nested =
         project / utf8(vietvm::core::kPrimaryPackageDirectory) / "demo" /
         utf8(u8"phụ.vi");

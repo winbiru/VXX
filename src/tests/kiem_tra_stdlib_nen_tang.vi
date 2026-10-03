@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     // Chuỗi UTF-8 phải tính/reverse theo code point, không theo byte.
     in độ dài("Việt Nam");
     in đảo ngược("Việt");

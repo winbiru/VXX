@@ -1,7 +1,7 @@
 nhập kiểm thử;
 
 // Smoke test tối thiểu dùng package kiểm thử chuẩn.
-hàm main() {
+hàm chính() {
     kếtQuả = 2 + 3;
     khẳng định bằng(kếtQuả, 5, "phép cộng cơ bản trả kết quả sai");
 };

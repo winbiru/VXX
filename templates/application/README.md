@@ -5,13 +5,13 @@ Project được tạo bằng `vpp khởi tạo ứng dụng <tên>`.
 ## Chạy
 
 ```bash
-vpp chạy src/main.vi
+vpp chạy src/chính.vi
 ```
 
 ## Dựng và kiểm thử
 
 ```bash
-vpp dựng src/main.vi
+vpp dựng src/chính.vi
 vpp kiểm thử tests
 vpp --soát-lỗi src
 vpp --định-dạng src --kiểm-tra

@@ -28,7 +28,7 @@ lớp Mẫu kế thừa Nền triển khai CóTổng {
     }
 };
 
-hàm main() {
+hàm chính() {
     đốiTượng = Mẫu();
     in đốiTượng.giáTrị();
     in đốiTượng.nhãn();

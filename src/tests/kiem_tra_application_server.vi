@@ -1,6 +1,6 @@
 nhập gói/ứng dụng/cầu nối/api;
 
-hàm main() {
+hàm chính() {
     app in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");
     in app json health();
     in app json login thành công("eyJhbGciOiJIUzUxMiJ9.demo-token", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");

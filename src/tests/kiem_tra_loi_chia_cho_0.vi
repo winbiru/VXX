@@ -1,6 +1,6 @@
 // Chia cho 0 qua stdlib: chia() không được che lỗi bằng giá trị 0.
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in chia(10, 0);
 };

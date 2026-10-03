@@ -17,7 +17,7 @@ lớp Counter {
     }
 };
 
-hàm main() {
+hàm chính() {
     c = Counter();
     c.set(1);
     in c.addEvenUntil(6);

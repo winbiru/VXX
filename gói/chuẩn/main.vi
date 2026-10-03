@@ -1,9 +1,0 @@
-// Điểm vào đầy đủ của gói chuẩn V++.
-// Chương trình mới nên nhập module hẹp nhất phù hợp với nhu cầu.
-
-nhập gói/lõi/main;
-nhập gói/nhập xuất/main;
-nhập gói/hệ thống/main;
-nhập gói/mạng/main;
-nhập gói/dữ liệu/main;
-nhập gói/ứng dụng/main;

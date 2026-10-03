@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     tăng = hàm(x) { trả về x + 1; };
     gấp đôi = hàm(x) { trả về x * 2; };
     cộng = hàm(a, b) { trả về a + b; };

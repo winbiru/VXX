@@ -117,7 +117,7 @@ static int runSnippet(const std::string &source,
                       const fs::path &resolutionBase,
                       SnippetMode mode,
                       const fs::path &sourceIdentity = {}) {
-    const bool emitMainCall = mode == SnippetMode::Execute ||
+    const bool emitEntryPointCall = mode == SnippetMode::Execute ||
                               mode == SnippetMode::Disassemble;
     vietvm::compiler::CompilationContext compilationContext;
     compilationContext.importResolutionBase = resolutionBase;
@@ -129,7 +129,7 @@ static int runSnippet(const std::string &source,
     }
     vietvm::compiler::CompilationArtifacts artifacts =
         vietvm::compiler::compilePipeline(
-            compilationContext, source, keywordMap, emitMainCall);
+            compilationContext, source, keywordMap, emitEntryPointCall);
     const auto &stringPool = compilationContext.stringPool;
 
     switch (mode) {

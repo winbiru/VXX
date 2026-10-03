@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     s = scanner("  alpha 42 ff 3.5 nope");
     in có token(s);
     in có token(s);

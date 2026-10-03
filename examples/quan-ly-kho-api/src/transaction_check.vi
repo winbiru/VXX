@@ -33,7 +33,7 @@ hàm yêuCầuTransaction(điềuKiện, nhãn) {
     trả về đúng;
 }
 
-hàm main() {
+hàm chính() {
     đườngDẫn = ".tmp-transaction-products.json";
     dữLiệu = [
         {"id": "SP-TX", "ten": "San pham transaction", "gia": 100, "tonKho": 5, "daBan": 0, "phienBan": 1}

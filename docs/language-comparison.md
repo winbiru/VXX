@@ -207,7 +207,7 @@ function giaiThua(n) {
 
 **V++:**
 ```vietvm
-hàm main() {
+hàm chính() {
     khởi tạo tên = "Việt";
     in("Xin chào, " + tên);
 }

@@ -1,5 +1,5 @@
 // Import theo tên package thay vì đường dẫn. Dạng quoted-bare phải tìm được
-// main.vi dưới gói/ (hoặc $VPP_HOME/gói/) cho cả tên một từ và nhiều từ.
+// chính.vi dưới gói/ (hoặc $VPP_HOME/gói/) cho cả tên một từ và nhiều từ.
 // Dòng kế tiếp cũng giữ coverage cho dạng bare không trích dẫn nhiều từ.
 nhập lõi;
 nhập lõi;
@@ -16,7 +16,7 @@ nhập cốt lõi;
 nhập vào ra;
 nhập khởi động;
 
-hàm main() {
+hàm chính() {
     in nối chuỗi("gói", " tiếng Việt");
     in nối đường dẫn url("https://example.test", "/health");
     in banner ứng dụng("VPP", "1");

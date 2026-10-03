@@ -15,6 +15,6 @@ hàm trungGian() {
     trả về máy.tính();
 }
 
-hàm main() {
+hàm chính() {
     in trungGian();
 }

@@ -15,7 +15,7 @@ lớp Child kế thừa Base {
     }
 }
 
-hàm main() {
+hàm chính() {
     first = Child(10, 5);
     second = Child(20);
 

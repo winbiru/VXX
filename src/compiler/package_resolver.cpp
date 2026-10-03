@@ -165,7 +165,7 @@ PackageResolution PackageResolver::resolve(
     const std::string &target) const {
     std::string path = target;
     if (path == "stdlib" || path == "chuẩn") {
-        path = vietvm::core::kStandardPackageMainFile;
+        path = vietvm::core::kStandardPackageEntryFile;
     }
 
     const fs::path requestedPath = vietvm::core::utf8Path(path);

@@ -13,7 +13,7 @@ lớp Box {
     }
 };
 
-hàm main() {
+hàm chính() {
     a = Box();
     b = Box();
 

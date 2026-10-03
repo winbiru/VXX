@@ -1,6 +1,6 @@
 nhập src/tests/modules/math như toan;
 
-hàm main() {
+hàm chính() {
     in toan.tong(2, 3);
     in toan.mul(4, 5);
 };

@@ -2,7 +2,7 @@ nhập gói/mạng/json;
 nhập gói/mạng/rest;
 nhập gói/nhập xuất/tệp;
 
-hàm main() {
+hàm chính() {
     in json chuỗi("xin");
     in json đối tượng hai chuỗi("tên", "V++", "trạng thái", "sẵn sàng");
 

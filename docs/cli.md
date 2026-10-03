@@ -49,7 +49,7 @@ Chi tiết assertion/setup/teardown nằm trong `docs/testing.md`.
 
 ```text
 vpp --soát-lỗi src/
-vpp --định-dạng src/main.vi
+vpp --định-dạng src/chính.vi
 vpp --định-dạng src/ --kiểm-tra
 vpp --định-dạng src/ --ghi-tệp
 ```
@@ -104,7 +104,7 @@ Xem `docs/package-system.md` cho cú pháp source, SemVer/range, cache và offli
 ```text
 vpp --định-dạng src/ --kiểm-tra
 vpp --soát-lỗi src/
-vpp dựng src/main.vi
+vpp dựng src/chính.vi
 vpp kiểm thử tests
 ```
 

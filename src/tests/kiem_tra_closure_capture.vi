@@ -24,7 +24,7 @@ hàm tạolồng(bắtđầu) {
     trả về ngoài;
 }
 
-hàm main() {
+hàm chính() {
     bộđếm = tạo(3);
     in bộđếm();
     in bộđếm();

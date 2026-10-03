@@ -20,7 +20,7 @@ Server đọc cổng từ `application.properties`; mặc định là `8080`. Th
 
 ## Kiến trúc OOP
 
-`main` là composition root: chỉ tạo object và nối dependency. Request được xử lý bằng
+`chính` là composition root: chỉ tạo object và nối dependency. Request được xử lý bằng
 các instance chuyên trách, còn `ApiApplication` chỉ sở hữu vòng đời server:
 
 ```text

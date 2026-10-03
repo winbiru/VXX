@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     nếu (độ dài("V++") != 3) {
         ném "stdlib UTF-8 không hoạt động trong artifact Windows";
     };

@@ -2,6 +2,6 @@
 // đồng thời runtime initializer của module chạy trước main.
 nhập modules/lifecycle_leaf như leafmod;
 
-hàm main() {
+hàm chính() {
     in leafmod.leaf value();
 };

@@ -9,7 +9,7 @@ lớp Hop {
     }
 };
 
-hàm main() {
+hàm chính() {
     hop = giữ(Hop());
     in hop.bíMat();
 };

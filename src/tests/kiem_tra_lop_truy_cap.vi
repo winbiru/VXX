@@ -12,6 +12,6 @@ lớp công khai Toan {
     };
 };
 
-hàm main() {
+hàm chính() {
     in Toan.tinhTongHop(2, 3);
 };

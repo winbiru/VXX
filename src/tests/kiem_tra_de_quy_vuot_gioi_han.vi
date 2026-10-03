@@ -4,6 +4,6 @@ hàm điSâu(n) {
     trả về điSâu(n + 1);
 }
 
-hàm main() {
+hàm chính() {
     in điSâu(0);
 }

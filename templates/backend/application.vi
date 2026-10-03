@@ -18,7 +18,7 @@ lớp ApiApplication {
 };
 
 // Composition root của project sinh mới: dựng object graph và inject dependency.
-hàm main() {
+hàm chính() {
     config = tạo cấu hình api("application.properties");
     healthController = tạo health controller();
     notFoundController = tạo not found controller();

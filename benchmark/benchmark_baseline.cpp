@@ -82,7 +82,7 @@ std::string makeCompilerSource() {
         source += "hàm f" + std::to_string(i) + "(a, b) { trả về a + b + " +
                   std::to_string(i) + "; }\n";
     }
-    source += "hàm main() { x = f23(19, 0); nếu (x == 42) { in x; } }\n";
+    source += "hàm chính() { x = f23(19, 0); nếu (x == 42) { in x; } }\n";
     return source;
 }
 

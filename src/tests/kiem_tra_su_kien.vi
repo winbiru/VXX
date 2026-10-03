@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
 hàm ghi danh sách(ds) {
     lặp(i = 0; i < độ dài(ds); i++) {
@@ -6,7 +6,7 @@ hàm ghi danh sách(ds) {
     };
 };
 
-hàm main() {
+hàm chính() {
     nhật_ký = [];
     emitter = bộ phát sự kiện(8, "thu thập");
 

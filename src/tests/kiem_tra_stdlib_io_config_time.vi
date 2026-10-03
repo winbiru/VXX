@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     tệp_io = ".tmp_stdlib_io_𠀀.txt";
     ghi tệp(tệp_io, "xin chao io");
     in đọc tệp(tệp_io);

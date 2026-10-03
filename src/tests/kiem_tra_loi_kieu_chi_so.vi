@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     ds = [10, 20, 30];
     in ds["hai"];
 };

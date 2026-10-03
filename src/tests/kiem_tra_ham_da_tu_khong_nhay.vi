@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     in cộng hai số(2, 3);
     gọi in lời chào();
     in cộng ba số(1, 2, 3);

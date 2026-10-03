@@ -3,4 +3,4 @@ Lỗi: không thể chia 21 cho 0
 Cách sửa: Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước.
 Dấu vết lỗi:
   ở gâyLỗi (src/tests/fixtures/stack_trace/module_loi.vi:4:16) [mô đun=src/tests/fixtures/stack_trace/module_loi.vi]
-  ở main (src/tests/kiem_tra_stack_trace_module.vi:6:8) [mô đun=src/tests/kiem_tra_stack_trace_module.vi]
+  ở chính (src/tests/kiem_tra_stack_trace_module.vi:6:8) [mô đun=src/tests/kiem_tra_stack_trace_module.vi]

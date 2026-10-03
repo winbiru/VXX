@@ -25,6 +25,6 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program);
 std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
                                             const IrProgram &program,
                                             const std::unordered_map<std::string, Opcode> &keywordMap,
-                                            bool emitMainCall = true);
+                                            bool emitEntryPointCall = true);
 
 } // namespace vietvm::compiler

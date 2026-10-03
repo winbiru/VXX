@@ -14,7 +14,7 @@ lớp Child kế thừa Base {
     }
 };
 
-hàm main() {
+hàm chính() {
     c = Child();
     in c.value();
     in c.inherited();

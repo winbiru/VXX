@@ -2069,8 +2069,10 @@ struct Emitter {
         emittedClasses.insert(instruction.declarationName);
     }
 
-    // Phát toàn bộ chương trình IR theo thứ tự top-level rồi thêm lời gọi `main`/opcode kết thúc theo hợp đồng bytecode hiện tại.
-    void emitProgram(bool emitMainCall) {
+    // Phát toàn bộ chương trình IR theo thứ tự top-level rồi thêm lời gọi hàm
+    // entrypoint `chính`/opcode kết thúc. `main` được giữ làm alias tương thích
+    // ngược cho source V++ cũ trong giai đoạn chuyển đổi.
+    void emitProgram(bool emitEntryPointCall) {
         predeclareFunctions();
         for (const IrInstruction &instruction : program.instructions) {
             if (instruction.opcode == IrOpcode::DefineFunction) {
@@ -2081,14 +2083,15 @@ struct Emitter {
                 emitInstruction(instruction, bytecode);
             }
         }
-        if (!emitMainCall) return;
-        const auto main = slots.find("main");
-        if (main != slots.end()) {
+        if (!emitEntryPointCall) return;
+        auto entryPoint = slots.find(u8"chính");
+        if (entryPoint == slots.end()) entryPoint = slots.find("main");
+        if (entryPoint != slots.end()) {
             // The compatibility compiler performs this lookup in its shared
             // textual symbol table, not in the function registry. Preserve
             // that observable contract while VM slots and function IDs still
             // share one numeric namespace.
-            bytecode.push_back({OP_GOI, 0, main->second, 0});
+            bytecode.push_back({OP_GOI, 0, entryPoint->second, 0});
         }
         bytecode.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
         bytecodeDebugInfo.resize(bytecode.size());
@@ -2140,7 +2143,7 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
 std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
                                             const IrProgram &program,
                                             const std::unordered_map<std::string, Opcode> &keywordMap,
-                                            bool emitMainCall) {
+                                            bool emitEntryPointCall) {
     const DirectIrSupport support = analyzeDirectIrSupport(program);
     if (!support.supported) {
         throw std::logic_error(std::string(
@@ -2148,7 +2151,7 @@ std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
     }
 
     Emitter emitter{state, program, keywordMap};
-    emitter.emitProgram(emitMainCall);
+    emitter.emitProgram(emitEntryPointCall);
     // Root debug metadata được lấy qua state tạm bên dưới bởi compiler pipeline;
     // function metadata đã được ghi trực tiếp vào registry theo function id.
     state.rootBytecodeDebugInfo = emitter.bytecodeDebugInfo;

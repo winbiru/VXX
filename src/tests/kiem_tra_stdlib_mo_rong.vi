@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in nối chuỗi("xin", " chao");
     in nối ba("a", "b", "c");
 

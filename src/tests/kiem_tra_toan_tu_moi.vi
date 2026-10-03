@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     // Test -- (giảm 1)
     x = 5;
     x--;

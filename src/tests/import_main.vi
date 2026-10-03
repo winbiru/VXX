@@ -1,7 +1,7 @@
 // Test import
 nhập src/tests/modules/math;
 
-hàm main() {
+hàm chính() {
     in tong(2,3);
     in mul(4,5);
 };

@@ -1,5 +1,5 @@
 nhập git-demo;
 // vpp-parity: requires-package-environment
-hàm main() {
+hàm chính() {
     in git_ping();
 };

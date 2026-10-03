@@ -25,5 +25,5 @@ Endpoint `/health` trả JSON boolean `true`; các path khác trả `404` với 
 - `router.vi`: router nhận controller bằng constructor injection.
 - `server.vi`: HTTP server adapter nhận router bằng constructor injection.
 
-Luồng chính: `main -> MáyChủApi -> BộĐịnhTuyến -> Controller`; sau khi ghép xong,
+Luồng chính: `chính -> MáyChủApi -> BộĐịnhTuyến -> Controller`; sau khi ghép xong,
 `MáyChủApi` được inject vào `ApiApplication` để quản lý vòng đời.

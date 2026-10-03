@@ -155,7 +155,7 @@
 | `gói/dữ liệu` (phân trang/database adapter) | *(phụ thuộc driver CLI của host)* |
 | `gói/ứng dụng` (lifecycle chung, không tự import full stack) | |
 | `gói/dựng` (facade web/dữ liệu/ứng dụng; `ứng dụng` là full stack) | |
-| `gói/chuẩn/main.vi` (entrypoint đầy đủ) | |
+| `gói/chuẩn/chính.vi` (entrypoint đầy đủ) | |
 | Shim tên starter cũ trong cùng cây `gói/dựng` | |
 
 ---

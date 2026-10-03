@@ -19,7 +19,7 @@ hàm ghi dữ liệu demo() {
     ghi tệp("data/demo-don-hang.json", "[]");
 };
 
-hàm main() {
+hàm chính() {
     in "=== KIEM TRA TINH NANG NGON NGU ===";
     in json tạo(báo cáo tính năng());
 

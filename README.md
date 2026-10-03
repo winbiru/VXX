@@ -262,8 +262,8 @@ Template ứng dụng chuẩn tạo project schema 1 có `src/`, `tests/` và th
 ```bash
 vpp khởi tạo ứng dụng my-app
 cd my-app
-vpp dựng src/main.vi
-vpp chạy src/main.vi
+vpp dựng src/chính.vi
+vpp chạy src/chính.vi
 vpp kiểm thử tests
 ```
 
@@ -348,7 +348,7 @@ VPP.cmd gói cài đặt duong-dan\goi.vi ten-goi
 ```
 
 Thư viện chuẩn là tập các package tiếng Việt nằm trực tiếp dưới `gói/`.
-`gói/chuẩn/main.vi` chỉ là entrypoint tổng hợp để nhập toàn bộ gói chuẩn.
+`gói/chuẩn/chính.vi` chỉ là entrypoint tổng hợp để nhập toàn bộ gói chuẩn.
 Program mới nên import package nhỏ nhất cần dùng. Mỗi câu `nhập` chỉ nhận một
 file hoặc package/folder. Target luôn viết trực tiếp, không dùng dấu nháy; tên
 package hoặc đường dẫn có khoảng trắng vẫn được parser giữ như một target duy nhất:
@@ -402,15 +402,15 @@ tệp/thư mục, tạo/liệt kê/xóa thư mục; `hệ thống` có biến m�
 tảng và sleep mili giây. Các hàm `.vi` tương ứng là public surface của gói chuẩn,
 còn implementation native nằm trong `src/runtime/native/`.
 
-`gói/chuẩn/main.vi` là entrypoint đầy đủ. Mỗi package chuẩn có `main.vi` tại
-`gói/<tên tiếng Việt>/main.vi`. Có thể import theo tên package như
+`gói/chuẩn/chính.vi` là entrypoint đầy đủ. Mỗi package chuẩn có `chính.vi` tại
+`gói/<tên tiếng Việt>/chính.vi`. Có thể import theo tên package như
 trên, hoặc dùng đường dẫn tường minh khi cần module con, ví dụ
 `nhập gói/mạng/kiểm thử/api;`. Các bản cài từ release đặt các gói chuẩn
 chuẩn cạnh binary và installer tự cấu hình `VPP_HOME`, vì vậy các import này
 vẫn hoạt động ngoài repository.
 
 `kiểm thử` và `mạng/kiểm thử/api.vi` là module tùy chọn, không được import
-tự động bởi `main.vi`; mã production không bị kéo theo API kiểm thử.
+tự động bởi `chính.vi`; mã production không bị kéo theo API kiểm thử.
 
 Các package trên được bundle cùng V++; package manager nhìn thấy trực tiếp
 `lõi`, `mạng`, `dữ liệu`... và hiện chưa tự resolve dependency/version giữa chúng.

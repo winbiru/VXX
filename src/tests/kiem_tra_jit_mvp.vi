@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     in (2 + 3) * 4;
     in "jit" + "_ok";
     in 10 % 3;

@@ -1,6 +1,6 @@
 nhập gói/dựng/ứng dụng;
 
-hàm main() {
+hàm chính() {
     ghi tệp(".tmp_starter_runtime.txt", "xin");
     in đọc tệp(".tmp_starter_runtime.txt");
 

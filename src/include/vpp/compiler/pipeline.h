@@ -40,20 +40,20 @@ CompilationArtifacts compilePipelineInRegistry(
     CompilationRegistryState &state,
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall,
+    bool emitEntryPointCall,
     bool topLevel);
 
 // API compatibility dùng registry thread-local cũ; production caller nên dùng overload nhận `CompilationContext`.
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall = true);
+    bool emitEntryPointCall = true);
 
 // Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
 CompilationArtifacts compilePipeline(
     CompilationContext &context,
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall = true);
+    bool emitEntryPointCall = true);
 
 } // namespace vietvm::compiler

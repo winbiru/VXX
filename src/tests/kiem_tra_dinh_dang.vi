@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in định dạng("Xin %s: %d", ["V++", 42]);
     in định dạng("%2$s/%1$d", [7, "x"]);
     in định dạng("[%05d] [%-5s]", [12, "a"]);
