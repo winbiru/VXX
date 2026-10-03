@@ -7,10 +7,13 @@ Quy tắc chi tiết về scope, equality, truthiness, closure, module và lỗi
 ## Chương trình tối thiểu
 
 ```vi
-hàm main() {
+hàm chính() {
     in "Xin chào V++";
 };
 ```
+
+`chính` là hàm vào chương trình chuẩn của V++. Compiler tự gọi `chính()` khi chạy
+một chương trình. Tên cũ `main` chỉ còn là alias tương thích ngược cho mã nguồn cũ.
 
 V++ dùng dấu `;` để kết thúc phần lớn statement. Identifier hỗ trợ Unicode, vì vậy tên tiếng
 Việt có dấu có thể dùng trực tiếp.

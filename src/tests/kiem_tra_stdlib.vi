@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in bình phương(6);
     in là chẵn(8);
     in là chẵn(7);

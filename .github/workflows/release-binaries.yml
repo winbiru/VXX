@@ -197,12 +197,12 @@ jobs:
               exit 1
             fi
           fi
-          VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" dựng "$INSTALL_DIR/examples/quan-ly-kho-api/src/main.vi"
+          VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" dựng "$INSTALL_DIR/examples/quan-ly-kho-api/src/chính.vi"
           (
             cd "$INSTALL_DIR/examples/quan-ly-kho-api"
             export VPP_HOME="$INSTALL_DIR"
             export VPP_WAREHOUSE_PORT=18932
-            "$INSTALL_DIR/vpp" chạy src/main.vi >"$VERIFY_ROOT/warehouse-server.log" 2>&1 &
+            "$INSTALL_DIR/vpp" chạy src/chính.vi >"$VERIFY_ROOT/warehouse-server.log" 2>&1 &
             SERVER_PID=$!
             trap 'kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
 
@@ -326,14 +326,14 @@ jobs:
           $vpp = Join-Path $installDir "vpp.exe"
           $sample = Join-Path $installDir "examples/quan-ly-kho-api"
           $env:VPP_HOME = $installDir
-          & $vpp "dựng" (Join-Path $sample "src/main.vi")
+          & $vpp "dựng" (Join-Path $sample "src/chính.vi")
           if ($LASTEXITCODE -ne 0) { throw "Artifact build verification failed" }
           Push-Location $sample
           try {
             $env:VPP_WAREHOUSE_PORT = "18932"
             $serverOut = Join-Path $verifyRoot "warehouse-server.out"
             $serverErr = Join-Path $verifyRoot "warehouse-server.err"
-            $server = Start-Process -FilePath $vpp -ArgumentList @("chạy", "src/main.vi") -WorkingDirectory $sample -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru -NoNewWindow
+            $server = Start-Process -FilePath $vpp -ArgumentList @("chạy", "src/chính.vi") -WorkingDirectory $sample -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr -PassThru -NoNewWindow
             try {
               & $vpp "chạy" "scripts/verify_http.vi"
               if ($LASTEXITCODE -ne 0) { throw "Artifact .vi HTTP verification failed" }

@@ -20,8 +20,8 @@ thể làm các diagnostic phía sau chỉ là hệ quả.
 ## Xem AST và IR
 
 ```text
-vpp --dump-ast src/main.vi
-vpp --dump-ir src/main.vi
+vpp --dump-ast src/chính.vi
+vpp --dump-ir src/chính.vi
 ```
 
 `--dump-ast` giúp kiểm tra parser đã hiểu token/block/call theo cấu trúc nào. `--dump-ir` cho
@@ -31,7 +31,7 @@ khoanh vùng lỗi compiler mà không gây side effect của chương trình.
 Khi cần quan sát bytecode đã sinh:
 
 ```text
-vpp --giải-mã src/main.vi
+vpp --giải-mã src/chính.vi
 ```
 
 ## Stack trace runtime

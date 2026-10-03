@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     thử {
         ném 1;
     };

@@ -1,4 +1,4 @@
 // So sánh thứ tự giữa chuỗi và số là không tương thích.
-hàm main() {
+hàm chính() {
     in "abc" < 1;
 };

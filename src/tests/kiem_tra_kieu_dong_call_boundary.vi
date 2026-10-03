@@ -22,7 +22,7 @@ lớp Hộp {
     }
 };
 
-hàm main() {
+hàm chính() {
     giá_trị = 7;
     in giữ(giá_trị);
     giá_trị = "động";

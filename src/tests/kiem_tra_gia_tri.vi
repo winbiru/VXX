@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in bằng giá trị(1, 1.0);
     in bằng giá trị("abc", "abc");
     in bằng giá trị(rỗng, rỗng);

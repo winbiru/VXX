@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     // Manual test: phụ thuộc mạng/curl
     in mạng lấy("https://google.com") != "";
 };

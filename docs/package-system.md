@@ -15,11 +15,11 @@ project/
 ├── vpp.lock          # sinh bởi `vpp khóa`, có thể chưa tồn tại
 └── gói/
     └── ten-goi/
-        └── main.vi
+        └── chính.vi
 ```
 
 `gói/` là tên thư mục chuẩn. Resolver vẫn nhận `goi/` và `packages/` để tương thích
-project cũ. Package entry mặc định là `main.vi`.
+project cũ. Package entry mặc định là `chính.vi`.
 
 ## `vpp.json` schema 1
 
@@ -80,10 +80,10 @@ registry/
 └── thu-vien/
     ├── 1.2.0/
     │   ├── vpp.json
-    │   └── main.vi
+    │   └── chính.vi
     └── 1.4.0/
         ├── vpp.json
-        └── main.vi
+        └── chính.vi
 ```
 
 `vpp gói phát hành <registry-root>` xuất artifact hiện tại vào

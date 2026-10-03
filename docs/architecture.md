@@ -257,7 +257,7 @@ chỉ là entrypoint tổng hợp:
 ```text
 gói/
 ├── chuẩn/
-│   └── main.vi             # entrypoint tổng hợp
+│   └── chính.vi            # entrypoint tổng hợp
 ├── lõi/                    # toán, UTF-8 cơ bản, collections, chuyển kiểu, random
 ├── nhập xuất/              # tệp, path/thư mục, cấu hình, đồng hồ, nhật ký
 ├── hệ thống/               # env, nền tảng, sleep
@@ -284,7 +284,7 @@ nhập gói/mạng/kiểm thử/api;
 Bare import ưu tiên package cùng tên của project, rồi mới tìm package bundle
 dưới `$VPP_HOME/gói/`. Các alias package cũ được xử lý ở resolver khi cần,
 không xuất hiện trong layout canonical.
-`gói/ứng dụng/main.vi` không import `gói/ứng dụng/cầu nối/api.vi`;
+`gói/ứng dụng/chính.vi` không import `gói/ứng dụng/cầu nối/api.vi`;
 routes/schema/token của một project mẫu không phải standard library.
 
 Các package này được bundle cùng runtime nhưng chưa có dependency/version resolver. HTTP, REST và JSON hiện cùng nằm trong package `mạng` để dùng một entrypoint thống nhất. JSON object/array được ánh xạ trực tiếp sang map/list runtime. `lõi` nối native cho chuyển kiểu/type và random; `nhập xuất` nối path/filesystem; `hệ thống` nối env/platform/sleep. Các native helper này không phụ thuộc CLI/stdout.

@@ -3,4 +3,4 @@ Lỗi: không thể chia 10 cho 0
 Cách sửa: Hãy kiểm tra số chia trước khi chia. Nếu số chia bằng 0, hãy xử lý trường hợp đó trước.
 Dấu vết lỗi:
   ở chia (gói/lõi/toán học.vi:22:16) [mô đun=gói/lõi/toán học.vi]
-  ở main (src/tests/kiem_tra_loi_chia_cho_0.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_cho_0.vi]
+  ở chính (src/tests/kiem_tra_loi_chia_cho_0.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_cho_0.vi]

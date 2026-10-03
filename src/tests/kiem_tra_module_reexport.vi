@@ -1,7 +1,7 @@
 // Re-export module phải đi xuyên semantic index và runtime linker cùng một contract.
 nhập fixtures/module_reexport/api như api;
 
-hàm main() {
+hàm chính() {
     in api.cộng(1, 2);
     in api.toán.nhân(3, 4);
 }

@@ -185,6 +185,6 @@ lớp công khai AdminRestControllerCrudTest {
     };
 };
 
-hàm main() {
+hàm chính() {
     AdminRestControllerCrudTest.runAll();
 };

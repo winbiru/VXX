@@ -5,4 +5,4 @@ Dấu vết lỗi:
   ở MáyTính.chia (src/tests/kiem_tra_stack_trace.vi:5:20) [mô đun=src/tests/kiem_tra_stack_trace.vi]
   ở MáyTính.tính (src/tests/kiem_tra_stack_trace.vi:9:20) [mô đun=src/tests/kiem_tra_stack_trace.vi]
   ở trungGian (src/tests/kiem_tra_stack_trace.vi:15:16) [mô đun=src/tests/kiem_tra_stack_trace.vi]
-  ở main (src/tests/kiem_tra_stack_trace.vi:19:8) [mô đun=src/tests/kiem_tra_stack_trace.vi]
+  ở chính (src/tests/kiem_tra_stack_trace.vi:19:8) [mô đun=src/tests/kiem_tra_stack_trace.vi]

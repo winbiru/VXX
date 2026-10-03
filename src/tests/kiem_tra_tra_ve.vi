@@ -6,7 +6,7 @@ hàm khongGiaTri() {
     trả về;
 }
 
-hàm main() {
+hàm chính() {
     in congHai(2, 3);
     in khongGiaTri();
 }

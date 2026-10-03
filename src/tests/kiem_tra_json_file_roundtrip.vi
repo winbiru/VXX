@@ -2,7 +2,7 @@ nhập lõi;
 nhập mạng;
 nhập nhập xuất;
 
-hàm main() {
+hàm chính() {
     tên = "Cà phê \"Đậm\" ☕";
     đườngDẫn = "C:\\new\\tea";
     nộiDung = "dòng một\ndòng hai\tcuối";

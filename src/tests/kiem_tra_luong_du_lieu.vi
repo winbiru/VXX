@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     gọi_map = 0;
     nhân_mười = hàm(x) {
         gọi_map += 1;

@@ -10,7 +10,7 @@ hàm giaiThua(n) {
     }
     trả về n * giaiThua(n - 1);
 }
-hàm main() {
+hàm chính() {
     in fibonacci(0);
     in fibonacci(1);
     in fibonacci(5);

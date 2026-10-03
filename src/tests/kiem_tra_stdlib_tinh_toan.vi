@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in cộng(2, 3);
     in trừ(10, 4);
     in nhân(6, 7);

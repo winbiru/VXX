@@ -18,7 +18,7 @@ lớp Child kế thừa Base {
     }
 }
 
-hàm main() {
+hàm chính() {
     child = Child();
     in child.read(5);
     in child.viaPrivate(10);

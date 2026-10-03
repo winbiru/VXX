@@ -54,9 +54,9 @@ http_get() {
   local output="$2"
   if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
     cat >"$tmpdir/http_probe.vi" <<EOF
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in mạng lấy("$url");
 };
 EOF
@@ -114,7 +114,7 @@ if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http
 fi
 
 # Verify bare Vietnamese package imports from a directory outside the repository.
-# This exercises the installed-layout lookup: $VPP_HOME/gói/chuẩn/<tên package>/main.vi.
+# This exercises the installed-layout lookup: $VPP_HOME/gói/chuẩn/<tên package>/chính.vi.
 echo "== Running Vietnamese package import via VPP_HOME =="
 VPP_HOME_TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/vpp-package-import.XXXXXX")
 vpp_home_out="$tmpdir/kiem_tra_package_tieng_viet_vpp_home.output"
@@ -176,6 +176,7 @@ TESTS=(
   src/tests/kiem_tra_goi_kiem_thu.vi
   src/tests/kiem_tra_goi_mang.vi
   src/tests/kiem_tra_stdlib_nen_tang.vi
+  src/tests/kiem_tra_chuoi_nen_tang.vi
   src/tests/kiem_tra_goi_ham.vi
   src/tests/kiem_tra_tuy_chon_thong_ke.vi
   src/tests/kiem_tra_gia_tri.vi

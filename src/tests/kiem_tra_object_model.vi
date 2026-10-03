@@ -4,7 +4,7 @@ lớp công khai Counter {
     }
 };
 
-hàm main() {
+hàm chính() {
     c = Counter();
     c.value = 7;
     in c.value;

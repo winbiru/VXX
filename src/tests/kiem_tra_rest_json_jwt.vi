@@ -1,6 +1,6 @@
 nhập gói/mạng/rest;
 
-hàm main() {
+hàm chính() {
     token = "eyJhbGciOiJIUzUxMiJ9.demo-token";
     refresh = "eyJhbGciOiJIUzUxMiJ9.demo-refresh";
 

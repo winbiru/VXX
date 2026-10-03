@@ -1,4 +1,4 @@
-hàm main() {
+hàm chính() {
     xuLyDuLieuKhongGian(2, 8, 2, 8);
     in "Chương trình xử lý dữ liệu không gian hoàn thành";
     locGiaoDichDacBiet(1000, 5000, 10, 15);

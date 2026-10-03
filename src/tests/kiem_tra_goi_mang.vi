@@ -2,7 +2,7 @@
 nhập mạng;
 nhập gói/mạng/kiểm thử/api;
 
-hàm main() {
+hàm chính() {
     in nối đường dẫn url("https://example.test", "/health");
     in json đối tượng hai chuỗi("dịch vụ", "V++", "trạng thái", "sẵn sàng");
 

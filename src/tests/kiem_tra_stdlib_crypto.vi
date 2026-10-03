@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in băm sha256("abc");
     in hmac sha256("key", "The quick brown fox jumps over the lazy dog");
     in băm sha256("Việt Nam");

@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
 // Giả lập dữ liệu theo chỉ số để tránh phụ thuộc API mảng chưa ổn định.
 hàm lay_gia_tri(i) {
@@ -89,7 +89,7 @@ hàm xu_ly_du_lieu() {
 
 
 // ===== MAIN =====
-hàm main() {
+hàm chính() {
     in "BAT_DAU";
     che_do_hien_tai = 0;
     in xu_ly_du_lieu();

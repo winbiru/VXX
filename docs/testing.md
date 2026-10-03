@@ -70,10 +70,10 @@ hàm ca() {
     trả về đúng;
 };
 
-hàm main() {
+hàm chính() {
     chạy ca kiểm thử(ca, chuẩn bị, dọn);
 };
 ```
 
-Package `kiểm thử` không được import tự động bởi `gói/chuẩn/main.vi`; mã production chỉ
+Package `kiểm thử` không được import tự động bởi `gói/chuẩn/chính.vi`; mã production chỉ
 kéo test API khi import tường minh.

@@ -13,7 +13,7 @@ lớp Counter {
     }
 };
 
-hàm main() {
+hàm chính() {
     c = Counter();
     c.set(7);
     in c.get();

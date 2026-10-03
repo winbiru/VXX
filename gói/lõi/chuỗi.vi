@@ -97,3 +97,286 @@ hàm là anagram(a, b) {
 hàm mã hóa caesar(s, khóa) {
     ném "stdlib: mã hóa caesar native hook không khả dụng";
 };
+
+// --- Chuỗi nền tảng theo VPP-CORE-STRING-001 ---
+// Các API dưới đây giữ equality/lookup exact theo code point. Chúng không
+// chuẩn hóa NFC ngầm như nhóm helper tiếng Việt lịch sử ở phía trên.
+
+hàm chuỗi yêu cầu(văn_bản) {
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "STRING_TYPE";
+    };
+    trả về văn_bản;
+};
+
+hàm chuỗi yêu cầu index(chỉ_số, nhỏ_nhất, lớn_nhất) {
+    nếu (loại của(chỉ_số) != "số nguyên" ||
+        chỉ_số < nhỏ_nhất || chỉ_số > lớn_nhất) {
+        ném "STRING_INDEX";
+    };
+    trả về chỉ_số;
+};
+
+hàm ký tự tại(văn_bản, chỉ_số) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    chuỗi yêu cầu index(chỉ_số, 0, n - 1);
+    trả về văn_bản[chỉ_số];
+};
+
+// Khoảng nửa kín [bắt_đầu, kết_thúc), chỉ số theo Unicode code point.
+hàm con chuỗi(văn_bản, bắt_đầu, kết_thúc) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    trả về cắt chuỗi(văn_bản, bắt_đầu, kết_thúc - bắt_đầu);
+};
+
+// Tìm exact, trả về chỉ số code point đầu tiên hoặc rỗng.
+hàm tìm chuỗi chính xác(văn_bản, mẫu, từ = 0) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(mẫu);
+    n = độ dài(văn_bản);
+    m = độ dài(mẫu);
+    chuỗi yêu cầu index(từ, 0, n);
+
+    nếu (m == 0) {
+        trả về từ;
+    };
+    nếu (m > n - từ) {
+        trả về rỗng;
+    };
+
+    kết_quả = rỗng;
+    giới_hạn = n - m;
+    lặp(i = từ; i <= giới_hạn && kết_quả == rỗng; i++) {
+        nếu (con chuỗi(văn_bản, i, i + m) == mẫu) {
+            kết_quả = i;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm bắt đầu bằng(văn_bản, tiền_tố) {
+    vị_trí = tìm chuỗi chính xác(văn_bản, tiền_tố, 0);
+    trả về vị_trí == 0;
+};
+
+hàm kết thúc bằng(văn_bản, hậu_tố) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(hậu_tố);
+    n = độ dài(văn_bản);
+    m = độ dài(hậu_tố);
+    nếu (m > n) {
+        trả về sai;
+    };
+    trả về con chuỗi(văn_bản, n - m, n) == hậu_tố;
+};
+
+hàm chứa chính xác(văn_bản, mẫu) {
+    trả về tìm chuỗi chính xác(văn_bản, mẫu, 0) != rỗng;
+};
+
+// Thay tất cả match literal không chồng lấp. Mẫu rỗng chèn replacement tại
+// mọi biên code point, tương đương semantics String.replace CharSequence.
+hàm thay chính xác(văn_bản, cũ, mới) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(cũ);
+    chuỗi yêu cầu(mới);
+    n = độ dài(văn_bản);
+    m = độ dài(cũ);
+
+    nếu (m == 0) {
+        kết_quả = mới;
+        lặp(i = 0; i < n; i++) {
+            kết_quả = kết_quả + ký tự tại(văn_bản, i) + mới;
+        };
+        trả về kết_quả;
+    };
+
+    kết_quả = "";
+    con_trỏ = 0;
+    tiếp_tục = đúng;
+    lặp(vòng = 0; tiếp_tục; vòng++) {
+        vị_trí = tìm chuỗi chính xác(văn_bản, cũ, con_trỏ);
+        nếu (vị_trí == rỗng) {
+            kết_quả = kết_quả + con chuỗi(văn_bản, con_trỏ, n);
+            tiếp_tục = sai;
+        } nếu không {
+            kết_quả = kết_quả + con chuỗi(văn_bản, con_trỏ, vị_trí) + mới;
+            con_trỏ = vị_trí + m;
+            nếu (con_trỏ == n) {
+                tiếp_tục = sai;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// Split literal, không dùng regex. Separator rỗng tách theo code point.
+hàm tách literal(văn_bản, phân_cách) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(phân_cách);
+    kết_quả = [];
+    n = độ dài(văn_bản);
+    m = độ dài(phân_cách);
+
+    nếu (m == 0) {
+        lặp(i = 0; i < n; i++) {
+            thêm(kết_quả, ký tự tại(văn_bản, i));
+        };
+        trả về kết_quả;
+    };
+
+    con_trỏ = 0;
+    tiếp_tục = đúng;
+    lặp(vòng = 0; tiếp_tục; vòng++) {
+        vị_trí = tìm chuỗi chính xác(văn_bản, phân_cách, con_trỏ);
+        nếu (vị_trí == rỗng) {
+            thêm(kết_quả, con chuỗi(văn_bản, con_trỏ, n));
+            tiếp_tục = sai;
+        } nếu không {
+            thêm(kết_quả, con chuỗi(văn_bản, con_trỏ, vị_trí));
+            con_trỏ = vị_trí + m;
+            nếu (con_trỏ == n) {
+                thêm(kết_quả, "");
+                tiếp_tục = sai;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// --- BộDựngChuỗi ---
+// V1 dùng map nội bộ để tránh phụ thuộc class-lowering. Budget hiện tính theo
+// code point; byte-budget allocator vẫn là gap runtime được ghi trong spec.
+
+hàm bộ dựng chuỗi(giới_hạn = 1048576) {
+    nếu (loại của(giới_hạn) != "số nguyên" || giới_hạn < 0) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    trả về {
+        "loại": "BộDựngChuỗi",
+        "giá trị": "",
+        "giới hạn": giới_hạn
+    };
+};
+
+hàm bộ dựng yêu cầu(builder) {
+    nếu (loại của(builder) != "từ điển" ||
+        lấy map(builder, "loại", "") != "BộDựngChuỗi") {
+        ném "STRING_BUILDER_INVALID";
+    };
+    trả về builder;
+};
+
+hàm bộ dựng đặt(builder, văn_bản) {
+    bộ dựng yêu cầu(builder);
+    chuỗi yêu cầu(văn_bản);
+    giới_hạn = lấy map(builder, "giới hạn", 0);
+    nếu (độ dài(văn_bản) > giới_hạn) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    đặt map(builder, "giá trị", văn_bản);
+    trả về builder;
+};
+
+hàm bộ dựng thêm(builder, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    trả về bộ dựng đặt(builder, hiện_tại + thành chuỗi(giá_trị));
+};
+
+hàm bộ dựng chèn(builder, chỉ_số, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(chỉ_số, 0, n);
+    mới = con chuỗi(hiện_tại, 0, chỉ_số) + thành chuỗi(giá_trị) +
+          con chuỗi(hiện_tại, chỉ_số, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng xóa(builder, bắt_đầu, kết_thúc) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    mới = con chuỗi(hiện_tại, 0, bắt_đầu) + con chuỗi(hiện_tại, kết_thúc, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng thay(builder, bắt_đầu, kết_thúc, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    mới = con chuỗi(hiện_tại, 0, bắt_đầu) + thành chuỗi(giá_trị) +
+          con chuỗi(hiện_tại, kết_thúc, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng đảo(builder) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    trả về bộ dựng đặt(builder, đảo ngược(hiện_tại));
+};
+
+hàm bộ dựng kết quả(builder) {
+    bộ dựng yêu cầu(builder);
+    trả về lấy map(builder, "giá trị", "");
+};
+
+// --- MẫuChuỗi ---
+// Snapshot hai list cấu trúc lúc tạo để mutation danh sách của caller không
+// đổi topology template sau đó.
+
+hàm mẫu chuỗi(mảnh, giá_trị) {
+    nếu (loại của(mảnh) != "danh sách" || loại của(giá_trị) != "danh sách" ||
+        độ dài(mảnh) != độ dài(giá_trị) + 1) {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+
+    mảnh_copy = [];
+    giá_trị_copy = [];
+    lặp(i = 0; i < độ dài(mảnh); i++) {
+        chuỗi yêu cầu(mảnh[i]);
+        thêm(mảnh_copy, mảnh[i]);
+    };
+    lặp(i = 0; i < độ dài(giá_trị); i++) {
+        thêm(giá_trị_copy, giá_trị[i]);
+    };
+
+    trả về {
+        "loại": "MẫuChuỗi",
+        "mảnh": mảnh_copy,
+        "giá trị": giá_trị_copy
+    };
+};
+
+hàm mẫu chuỗi yêu cầu(template) {
+    nếu (loại của(template) != "từ điển" ||
+        lấy map(template, "loại", "") != "MẫuChuỗi") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    trả về template;
+};
+
+hàm nội suy mẫu(template) {
+    mẫu chuỗi yêu cầu(template);
+    mảnh = lấy map(template, "mảnh", []);
+    giá_trị = lấy map(template, "giá trị", []);
+    kết_quả = "";
+    lặp(i = 0; i < độ dài(giá_trị); i++) {
+        kết_quả = kết_quả + mảnh[i] + thành chuỗi(giá_trị[i]);
+    };
+    trả về kết_quả + mảnh[độ dài(mảnh) - 1];
+};
+
+hàm xử lý mẫu(template, processor) {
+    mẫu chuỗi yêu cầu(template);
+    trả về processor(template);
+};

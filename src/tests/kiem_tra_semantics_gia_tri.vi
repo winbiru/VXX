@@ -18,7 +18,7 @@ hàm kiem_tra_scope() {
     in gia_tri;
 }
 
-hàm main() {
+hàm chính() {
     // `rỗng` là một giá trị riêng, falsy và chỉ bằng chính `rỗng`.
     in rỗng == rỗng;
     in rỗng != 0;

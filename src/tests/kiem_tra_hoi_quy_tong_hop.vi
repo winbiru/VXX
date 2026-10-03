@@ -82,7 +82,7 @@ hàm némLỗiSâu(n) {
     trả về némLỗiSâu(n - 1);
 }
 
-hàm main() {
+hàm chính() {
     bộĐếm = BộĐếm(10, 2);
     mặcĐịnh = BộĐếm(20);
 

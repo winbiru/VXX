@@ -4,6 +4,6 @@ lớp Toan {
     };
 };
 
-hàm main() {
+hàm chính() {
     in Toan.tinh(2, 3);
 };

@@ -27,7 +27,7 @@ hàm kiemTraToaDo(){
         };
     };
 };
-hàm main() {
+hàm chính() {
     kiemTraToaDo();
     in "Chương trình hoàn thành";
 };

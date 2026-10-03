@@ -1,17 +1,17 @@
 // Đường dẫn package tiếng Việt có khoảng trắng phải dùng chuỗi được trích dẫn.
 // Test này xác nhận các package chuẩn nằm trực tiếp dưới gói/.
-nhập gói/lõi/main;
-nhập gói/nhập xuất/main;
-nhập gói/hệ thống/main;
-nhập gói/mạng/main;
-nhập gói/dữ liệu/main;
-nhập gói/ứng dụng/main;
-nhập gói/dựng/main;
-nhập gói/kiểm thử/main;
+nhập gói/lõi/chính;
+nhập gói/nhập xuất/chính;
+nhập gói/hệ thống/chính;
+nhập gói/mạng/chính;
+nhập gói/dữ liệu/chính;
+nhập gói/ứng dụng/chính;
+nhập gói/dựng/chính;
+nhập gói/kiểm thử/chính;
 nhập gói/ứng dụng/cầu nối/api;
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in nối chuỗi("cốt", " lõi");
     in nối đường dẫn url("https://example.test", "/health");
     in banner ứng dụng("VPP", "1");

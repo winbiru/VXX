@@ -3,4 +3,4 @@ Lỗi: chia dư cho 0
 Cách sửa: Hãy kiểm tra số chia trước khi dùng phép chia lấy dư và xử lý riêng trường hợp bằng 0.
 Dấu vết lỗi:
   ở chia dư (gói/lõi/toán học.vi:28:16) [mô đun=gói/lõi/toán học.vi]
-  ở main (src/tests/kiem_tra_loi_chia_du_cho_0.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_du_cho_0.vi]
+  ở chính (src/tests/kiem_tra_loi_chia_du_cho_0.vi:5:8) [mô đun=src/tests/kiem_tra_loi_chia_du_cho_0.vi]

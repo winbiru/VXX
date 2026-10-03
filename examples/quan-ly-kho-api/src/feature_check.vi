@@ -1,8 +1,8 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 nhập diagnostics/language_features;
 nhập app/bootstrap;
 
-hàm main() {
+hàm chính() {
     chạy kiểm tra tính năng();
 
     ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");

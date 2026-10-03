@@ -1,7 +1,7 @@
 nhập parent;
 nhập shared;
 
-hàm main() {
+hàm chính() {
     in parent();
     in shared();
 };

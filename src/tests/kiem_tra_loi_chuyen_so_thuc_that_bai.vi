@@ -1,6 +1,6 @@
 // Chuyển một chuỗi không phải số thành số thực phải được giải thích là lỗi chuyển kiểu.
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in thành số thực("abc");
 };

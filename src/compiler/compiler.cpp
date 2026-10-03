@@ -59,7 +59,7 @@ CompilationArtifacts compilePipelineInRegistry(
     CompilationRegistryState &state,
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall,
+    bool emitEntryPointCall,
     bool /*topLevel*/) {
     CompilationArtifacts artifacts;
 
@@ -101,7 +101,7 @@ CompilationArtifacts compilePipelineInRegistry(
     const DirectIrSupport directSupport = analyzeDirectIrSupport(artifacts.ir);
     artifacts.unsupportedDirectIrRegions = directSupport.unsupportedRegions;
     artifacts.bytecode = emitDirectBytecode(
-        state, artifacts.ir, keywordMap, emitMainCall);
+        state, artifacts.ir, keywordMap, emitEntryPointCall);
     artifacts.bytecodeDebugInfo = state.rootBytecodeDebugInfo;
     return artifacts;
 }
@@ -110,9 +110,9 @@ CompilationArtifacts compilePipelineInRegistry(
 CompilationArtifacts compilePipeline(
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall) {
+    bool emitEntryPointCall) {
     return compilePipelineInRegistry(
-        activeCompilationRegistryState(), source, keywordMap, emitMainCall, true);
+        activeCompilationRegistryState(), source, keywordMap, emitEntryPointCall, true);
 }
 
 // Chạy pipeline biên dịch từ source qua lexer, parser, semantic, IR, optimization và codegen; kết quả được gom vào `CompilationArtifacts`.
@@ -120,7 +120,7 @@ CompilationArtifacts compilePipeline(
     CompilationContext &context,
     const std::string &source,
     const std::unordered_map<std::string, Opcode> &keywordMap,
-    bool emitMainCall) {
+    bool emitEntryPointCall) {
     namespace fs = std::filesystem;
 
     if (context.importResolutionBase.empty()) {
@@ -138,7 +138,7 @@ CompilationArtifacts compilePipeline(
 
     try {
         CompilationArtifacts artifacts = compilePipelineInRegistry(
-            context, source, keywordMap, emitMainCall, true);
+            context, source, keywordMap, emitEntryPointCall, true);
 
         // Giữ StringPool/function/module initializer trong context cho CLI/runtime;
         // import/access stack chỉ cần trong lúc biên dịch nên xóa sau khi pipeline kết thúc.
@@ -155,9 +155,9 @@ CompilationArtifacts compilePipeline(
 // Biên dịch chuỗi nguồn thành bytecode bằng pipeline hiện hành và trả về artifact phục vụ CLI/runtime.
 std::vector<Instruction> compileSource(const std::string& source,
                                        const std::unordered_map<std::string,Opcode>& keywordMap,
-                                       bool emitMainCall)
+                                       bool emitEntryPointCall)
 {
     vietvm::compiler::CompilationContext context;
     return vietvm::compiler::compilePipeline(
-        context, source, keywordMap, emitMainCall).bytecode;
+        context, source, keywordMap, emitEntryPointCall).bytecode;
 }

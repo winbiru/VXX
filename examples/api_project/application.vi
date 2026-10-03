@@ -20,7 +20,7 @@ lớp ApiApplication {
 
 // Composition root: tạo object graph một lần, nối dependency từ ngoài vào trong
 // rồi trao server hoàn chỉnh cho ApiApplication quản lý vòng đời.
-hàm main() {
+hàm chính() {
     config = tạo cấu hình api("application.properties");
     healthController = tạo health controller();
     notFoundController = tạo not found controller();

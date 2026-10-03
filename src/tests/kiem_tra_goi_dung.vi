@@ -1,6 +1,6 @@
 nhập gói/dựng/ứng dụng;
 
-hàm main() {
+hàm chính() {
     in banner ứng dụng("VPP", "1.0");
     in độ dời dữ liệu(2, 10);
     in tổng số trang(95, 10);

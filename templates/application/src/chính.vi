@@ -1,5 +1,5 @@
 // Entry point của ứng dụng V++ mới.
-hàm main() {
+hàm chính() {
     lờiChào = "Xin chào từ V++";
     in lờiChào;
 };

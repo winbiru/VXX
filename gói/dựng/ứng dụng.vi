@@ -1,6 +1,6 @@
 // Full-stack convenience starter. Project-specific API server code is excluded.
-nhập gói/lõi/main;
-nhập gói/nhập xuất/main;
-nhập gói/mạng/main;
-nhập gói/dữ liệu/main;
-nhập gói/ứng dụng/main;
+nhập gói/lõi/chính;
+nhập gói/nhập xuất/chính;
+nhập gói/mạng/chính;
+nhập gói/dữ liệu/chính;
+nhập gói/ứng dụng/chính;

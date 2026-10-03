@@ -1,6 +1,6 @@
 nhập gói/dựng/ứng dụng;
 
-hàm main() {
+hàm chính() {
     NhậtKý.ghi thông tin("dịch vụ khởi động");
     NhậtKý.ghi cảnh báo("cấu hình mặc định");
     NhậtKý.ghi lỗi("mạng chậm");

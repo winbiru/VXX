@@ -1,5 +1,5 @@
 nhập registry-demo;
 
-hàm main() {
+hàm chính() {
     in registry_ping();
 };

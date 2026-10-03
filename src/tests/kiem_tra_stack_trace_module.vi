@@ -2,6 +2,6 @@
 // module nguồn, sau đó mới tới frame main của file entry.
 nhập fixtures/stack_trace/module_loi như môđun;
 
-hàm main() {
+hàm chính() {
     in môđun.gâyLỗi();
 }

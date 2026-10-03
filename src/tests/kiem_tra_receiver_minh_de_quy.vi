@@ -16,7 +16,7 @@ lớp Counter {
     }
 };
 
-hàm main() {
+hàm chính() {
     c = Counter();
     c.set(0);
     in c.sumDown(4);

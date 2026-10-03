@@ -2,7 +2,7 @@
 nhập modules/lifecycle_leaf;
 nhập modules/lifecycle_leaf;
 
-hàm main() {
+hàm chính() {
     in leaf value();
     in leaf value();
 };

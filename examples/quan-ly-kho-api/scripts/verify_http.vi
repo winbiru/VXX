@@ -1,4 +1,4 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
 hàm yêuCầu(điềuKiện, nhãn) {
     nếu (!điềuKiện) {
@@ -37,7 +37,7 @@ hàm chờMáyChủ(gốc) {
     ném "verify-http thất bại: máy chủ không sẵn sàng";
 };
 
-hàm main() {
+hàm chính() {
     cổng = đọc biến môi trường("VPP_WAREHOUSE_PORT", "18932");
     gốc = "http://127.0.0.1:" + cổng;
     chờMáyChủ(gốc);

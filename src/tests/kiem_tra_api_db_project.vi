@@ -39,7 +39,7 @@ lớp công khai ApiDbProjectTest {
     };
 };
 
-hàm main() {
+hàm chính() {
     // Composition root của fixture: tạo object graph một lần rồi inject từ ngoài vào.
     repository = UserRepository();
     mapper = UserMapper();

@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     in có giá trị(7);
     in có giá trị(rỗng);
     in hoặc giá trị(7, 99);

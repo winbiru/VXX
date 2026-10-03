@@ -44,7 +44,7 @@ quan-ly-kho-api/
 │   ├── san-pham.json
 │   └── don-hang.json
 └── src/
-    ├── main.vi                 # HTTP server thật, port 8088
+    ├── chính.vi                # HTTP server thật, port 8088
     ├── demo.vi                 # luồng end-to-end không block
     ├── feature_check.vi        # feature gate không mở HTTP server
     ├── transaction_check.vi    # kiểm tra rollback khi persist đơn thất bại
@@ -106,14 +106,14 @@ Demo thực hiện tuần tự:
 ## Chạy HTTP API
 
 ```bash
-vpp chạy src/main.vi
+vpp chạy src/chính.vi
 ```
 
 Server mặc định lắng nghe `127.0.0.1:8088` qua native HTTP runtime. Có thể đổi port mà không
 sửa source bằng biến môi trường:
 
 ```bash
-VPP_WAREHOUSE_PORT=18088 vpp chạy src/main.vi
+VPP_WAREHOUSE_PORT=18088 vpp chạy src/chính.vi
 ```
 
 Các endpoint:
@@ -172,7 +172,7 @@ vpp chạy src/feature_check.vi
 ```
 
 Khi tất cả contract đều còn hoạt động, lệnh in một JSON với toàn bộ nhóm feature bằng `1`.
-`src/main.vi` cũng chạy gate này trước khi mở port 8088, nên regression ngôn ngữ sẽ làm ứng
+`src/chính.vi` cũng chạy gate này trước khi mở port 8088, nên regression ngôn ngữ sẽ làm ứng
 dụng fail-fast thay vì khởi động với behavior sai.
 
 Có thể chạy cùng gate dưới các mode runtime:
@@ -200,7 +200,7 @@ và các đặc tính phi chức năng như hiệu năng JIT hay thời điểm 
 Sau khi cài V++0.9 và đứng tại thư mục `examples/quan-ly-kho-api`:
 
 ```bash
-VPP_WAREHOUSE_PORT=18932 vpp chạy src/main.vi
+VPP_WAREHOUSE_PORT=18932 vpp chạy src/chính.vi
 # Mở terminal khác:
 VPP_WAREHOUSE_PORT=18932 vpp chạy scripts/verify_http.vi
 ```

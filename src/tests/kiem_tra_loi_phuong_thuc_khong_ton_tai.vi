@@ -4,7 +4,7 @@ lớp HocSinh {
     }
 };
 
-hàm main() {
+hàm chính() {
     ban = HocSinh();
     in ban.khongCo();
 };

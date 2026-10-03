@@ -3,7 +3,7 @@
 nhập modules/lifecycle_mid;
 nhập modules/lifecycle_leaf;
 
-hàm main() {
+hàm chính() {
     in "entry";
     in mid value();
     in leaf value();

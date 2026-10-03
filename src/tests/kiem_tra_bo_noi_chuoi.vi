@@ -1,6 +1,6 @@
-nhập gói/chuẩn/main;
+nhập gói/chuẩn/chính;
 
-hàm main() {
+hàm chính() {
     a = bộ nối chuỗi(", ", "[", "]");
     in bộ nối kết quả(a);
     bộ nối thêm(a, "một");

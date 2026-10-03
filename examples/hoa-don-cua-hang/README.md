@@ -4,8 +4,8 @@ Sample project V++ nhỏ nhưng có cấu trúc dự án thật: manifest schema
 class có constructor, import tương đối và smoke test nghiệp vụ.
 
 ```bash
-vpp dựng src/main.vi
-vpp chạy src/main.vi
+vpp dựng src/chính.vi
+vpp chạy src/chính.vi
 vpp kiểm thử tests
 ```
 

@@ -1,0 +1,59 @@
+nhập gói/chuẩn/chính;
+
+hàm chính() {
+    văn_bản = "a😀Việt";
+    in ký tự tại(văn_bản, 1);
+    in con chuỗi(văn_bản, 1, 4);
+    in tìm chuỗi chính xác(văn_bản, "Việt");
+    in tìm chuỗi chính xác(văn_bản, "missing") == rỗng;
+    in bắt đầu bằng(văn_bản, "a😀");
+    in kết thúc bằng(văn_bản, "Việt");
+    in chứa chính xác(văn_bản, "😀V");
+    in thay chính xác("aba😀aba", "aba", "X");
+    in thay chính xác("ab", "", "-");
+
+    phần = tách literal("a::b::", "::");
+    in độ dài(phần);
+    lặp(i = 0; i < độ dài(phần); i++) {
+        in "[" + phần[i] + "]";
+    };
+
+    builder = bộ dựng chuỗi(16);
+    bộ dựng thêm(builder, "Việt");
+    bộ dựng thêm(builder, " Nam");
+    bộ dựng chèn(builder, 4, " đẹp");
+    in bộ dựng kết quả(builder);
+    bộ dựng xóa(builder, 4, 8);
+    in bộ dựng kết quả(builder);
+    bộ dựng thay(builder, 0, 4, "V++");
+    in bộ dựng kết quả(builder);
+    bộ dựng đảo(builder);
+    in bộ dựng kết quả(builder);
+
+    mảnh = ["Xin ", ", số ", "!"];
+    giá_trị = ["V++", 42];
+    template = mẫu chuỗi(mảnh, giá_trị);
+    mảnh[0] = "Đổi ";
+    in nội suy mẫu(template);
+
+    processor = hàm(t) {
+        parts = lấy map(t, "mảnh", []);
+        values = lấy map(t, "giá trị", []);
+        trả về parts[0] + "[" + thành chuỗi(values[0]) + "]" + parts[1] +
+               thành chuỗi(values[1]) + parts[2];
+    };
+    in xử lý mẫu(template, processor);
+
+    thử {
+        in ký tự tại("x", 1);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    nhỏ = bộ dựng chuỗi(2);
+    thử {
+        bộ dựng thêm(nhỏ, "abc");
+    } bắt lỗi (e) {
+        in e;
+    };
+};

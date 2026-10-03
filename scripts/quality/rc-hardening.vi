@@ -799,6 +799,6 @@ hàm f797(x) { trả về x + 797; };
 hàm f798(x) { trả về x + 798; };
 hàm f799(x) { trả về x + 799; };
 
-hàm main() {
+hàm chính() {
     in f799(1);
 };

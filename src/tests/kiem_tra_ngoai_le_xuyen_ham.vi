@@ -32,7 +32,7 @@ hàm bat_vao_closure() {
     trả về doc_loi;
 }
 
-hàm main() {
+hàm chính() {
     thử {
         bat_va_nem_lai();
     } bắt lỗi (e) {

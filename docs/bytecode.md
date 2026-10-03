@@ -156,7 +156,7 @@ Giả sử constant pool:
 0: INT 2
 1: INT 3
 
-Function main code (pseudo):
+Function `chính` code (pseudo):
 - PUSH_CONST 0
 - PUSH_CONST 1
 - OP_CONG
