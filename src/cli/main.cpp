@@ -123,7 +123,7 @@ static int runSnippet(const std::string &source,
     compilationContext.importResolutionBase = resolutionBase;
     if (!sourceIdentity.empty()) {
         compilationContext.currentSourceIdentity =
-            sourceIdentity.lexically_normal().u8string();
+            sourceIdentity.lexically_normal().generic_u8string();
     } else {
         compilationContext.currentSourceIdentity = "<memory>";
     }
@@ -253,7 +253,7 @@ static int buildFile(const std::string &filename) {
     vietvm::compiler::CompilationContext context;
     context.importResolutionBase =
         fileDir.empty() ? fs::current_path() : fileDir;
-    context.currentSourceIdentity = filePath.lexically_normal().u8string();
+    context.currentSourceIdentity = filePath.lexically_normal().generic_u8string();
     const auto artifacts = vietvm::compiler::compilePipeline(
         context, source, keywordMap, true);
 
@@ -1689,7 +1689,9 @@ static bool analyzeLspDocument(const std::string &uri,
     context.importResolutionBase = sourcePath.empty() || sourcePath.parent_path().empty()
         ? fs::current_path()
         : sourcePath.parent_path();
-    context.currentSourceIdentity = sourcePath.empty() ? uri : sourcePath.lexically_normal().u8string();
+    context.currentSourceIdentity = sourcePath.empty()
+                                        ? uri
+                                        : sourcePath.lexically_normal().generic_u8string();
     try {
         artifacts = vietvm::compiler::compilePipeline(context, text, keywordMap, false);
         return true;

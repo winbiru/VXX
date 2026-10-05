@@ -197,7 +197,7 @@ function Invoke-ExpectedTest {
     $expected = Join-Path $repoRoot ("src\tests\expected\$base.expected")
     $stdout = Join-Path $sessionDir ("$base.output")
     $stderr = Join-Path $sessionDir ("$base.stderr")
-    $displayName = $TestFile.Substring($repoRoot.Length).TrimStart('\', '/')
+    $displayName = $TestFile.Replace('\', '/')
 
     Write-Host "== Running $displayName =="
     if (-not (Test-Path -LiteralPath $expected)) {
@@ -222,7 +222,7 @@ function Invoke-ExpectedFailureTest {
     $expected = Join-Path $repoRoot ("src\tests\expected\$base.expected")
     $stdout = Join-Path $sessionDir ("$base.output")
     $stderr = Join-Path $sessionDir ("$base.stderr")
-    $displayName = $TestFile.Substring($repoRoot.Length).TrimStart('\', '/')
+    $displayName = $TestFile.Replace('\', '/')
 
     Write-Host "== Running $displayName [expected runtime failure] =="
     if (-not (Test-Path -LiteralPath $expected)) {
@@ -336,19 +336,19 @@ try {
 
     $tests = Get-BashTestArray -ArrayName "TESTS"
     foreach ($relativeTest in $tests) {
-        Invoke-ExpectedTest -TestFile (Join-Path $repoRoot $relativeTest)
+        Invoke-ExpectedTest -TestFile $relativeTest
     }
 
     $expectedFailureTests = Get-BashTestArray -ArrayName "EXPECTED_FAILURE_TESTS"
     foreach ($relativeTest in $expectedFailureTests) {
-        Invoke-ExpectedFailureTest -TestFile (Join-Path $repoRoot $relativeTest)
+        Invoke-ExpectedFailureTest -TestFile $relativeTest
     }
 
     Write-Host "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
-    Invoke-ExpectedTest -TestFile (Join-Path $repoRoot "src\tests\kiem_tra_jit_mvp.vi") -Environment @{ VPP_ENABLE_JIT = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_jit_mvp.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
 
     Write-Host "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
-    Invoke-ExpectedTest -TestFile (Join-Path $repoRoot "src\tests\kiem_tra_gc_mvp.vi") -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
 
     Write-Host ""
     Write-Host "=== PASS: $script:PassCount, FAIL: $script:FailCount ==="

@@ -219,7 +219,7 @@ namespace vietvm { namespace compiler {
                 }
             } catch (...) {
             }
-            return sourcePath.lexically_normal().u8string();
+            return sourcePath.lexically_normal().generic_u8string();
         };
 
         std::optional<fs::path> installationHome;
