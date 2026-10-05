@@ -27,16 +27,16 @@ hàm chính() {
     r = ngẫu nhiên nguyên(-5, 5);
     in r >= -5 && r <= 5;
 
-    in đường dẫn nối("a", "b");
+    in thay thế(đường dẫn nối("a", "b"), "\\", "/");
     in đường dẫn cha("a/b/c.vi");
     in đường dẫn tên("a/b/c.vi");
     in đường dẫn nối("a/", "b");
     in đường dẫn nối("", "b");
-    in đường dẫn nối("a", "");
+    in thay thế(đường dẫn nối("a", ""), "\\", "/");
     in đường dẫn nối("a", "/b");
     in đường dẫn tên("a/b/") == "";
     in đường dẫn cha("a/b/");
-    in đường dẫn cha("/");
+    in thay thế(đường dẫn cha("/"), "\\", "/");
     in đường dẫn cha("c.vi") == "";
     in đường dẫn tồn tại("src/tests/__vpp_stdlib_missing_path__");
     in là tệp("src/tests/__vpp_stdlib_missing_path__");

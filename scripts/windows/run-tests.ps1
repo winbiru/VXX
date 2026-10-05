@@ -253,7 +253,7 @@ function Get-BashTestArray {
     $tests = [System.Collections.Generic.List[string]]::new()
     foreach ($line in $lines) {
         if (-not $inside) {
-            if ($line.Trim() -eq "$ArrayName=(") {
+            if ($line.Trim().StartsWith("$ArrayName=(")) {
                 $inside = $true
             }
             continue
