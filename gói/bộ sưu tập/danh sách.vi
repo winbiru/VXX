@@ -1,0 +1,94 @@
+// Module: lõi.danh sách
+// List MVP: literal, length, read/write index và append/xóa vật lý là primitive runtime.
+// Các thuật toán collection còn lại được triển khai trực tiếp bằng V++.
+
+nhập gói/lõi/trình tự;
+
+// Thêm giá trị vào cuối list; trả về rỗng.
+hàm thêm(ds, giá trị) {
+    trả về them(ds, giá trị);
+};
+
+// Xóa phần tử tại chỉ số, trả về phần tử vừa xóa.
+hàm xóa tại(ds, chỉ số) {
+    trả về xoa_tai(ds, chỉ số);
+};
+
+// Tìm chỉ số đầu tiên của giá trị; trả về -1 nếu không có.
+hàm tìm chỉ số(ds, giá trị) {
+    vị_trí = -1;
+    lặp(i = 0; i < do_dai(ds) && vị_trí < 0; i++) {
+        nếu (ds[i] == giá trị) {
+            vị_trí = i;
+        };
+    };
+    trả về vị_trí;
+};
+
+// Loại bỏ phần tử trùng lặp, giữ thứ tự xuất hiện đầu tiên.
+hàm xóa trùng(ds) {
+    i = 0;
+    lặp(vòng = 0; i < do_dai(ds); vòng++) {
+        j = i + 1;
+        lặp(vòng_con = 0; j < do_dai(ds); vòng_con++) {
+            nếu (ds[j] == ds[i]) {
+                xoa_tai(ds, j);
+            } nếu không {
+                j = j + 1;
+            };
+        };
+        i = i + 1;
+    };
+    trả về rỗng;
+};
+
+// Sắp xếp list số hoặc list chuỗi tại chỗ.
+hàm sắp xếp(ds) {
+    n = do_dai(ds);
+    lặp(i = 0; i < n; i++) {
+        lặp(j = 0; j + 1 < n - i; j++) {
+            nếu (ds[j] > ds[j + 1]) {
+                tạm = ds[j];
+                ds[j] = ds[j + 1];
+                ds[j + 1] = tạm;
+            };
+        };
+    };
+    trả về rỗng;
+};
+
+// Tổng phần tử số trong list.
+hàm tổng list(ds) {
+    tổng = 0;
+    lặp(i = 0; i < do_dai(ds); i++) {
+        tổng = tổng + ds[i];
+    };
+    trả về tổng;
+};
+
+// Giá trị nhỏ nhất/lớn nhất trong list số hoặc list chuỗi.
+hàm nhỏ nhất list(ds) {
+    nếu (do_dai(ds) == 0) {
+        ném "nhỏ nhất list: danh sách rỗng";
+    };
+    kết_quả = ds[0];
+    lặp(i = 1; i < do_dai(ds); i++) {
+        nếu (ds[i] < kết_quả) {
+            kết_quả = ds[i];
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm lớn nhất list(ds) {
+    nếu (do_dai(ds) == 0) {
+        ném "lớn nhất list: danh sách rỗng";
+    };
+    kết_quả = ds[0];
+    lặp(i = 1; i < do_dai(ds); i++) {
+        nếu (ds[i] > kết_quả) {
+            kết_quả = ds[i];
+        };
+    };
+    trả về kết_quả;
+};

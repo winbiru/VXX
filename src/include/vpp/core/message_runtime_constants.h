@@ -278,23 +278,10 @@ inline constexpr std::string_view kNativeToTupleTypeInvalid = "thành bộ chỉ
 inline constexpr std::string_view kNativeToListTypeInvalid = "thành danh sách chỉ nhận danh sách hoặc bộ";
 inline constexpr std::string_view kNativeStringCountNeedleEmpty = "đếm ký tự cần ký tự không rỗng";
 inline constexpr std::string_view kNativeStringReplaceNeedleEmpty = "thay thế không nhận chuỗi cần thay rỗng";
-inline constexpr std::string_view kNativeStringSliceNegativeRange = "cắt chuỗi không nhận vị trí hoặc độ dài âm";
 inline constexpr std::string_view kNativeSecureRandomWindowsFailed = "ngẫu nhiên bảo mật: BCryptGenRandom thất bại";
 inline constexpr std::string_view kNativeSecureRandomAppleFailed = "ngẫu nhiên bảo mật: SecRandomCopyBytes thất bại";
 inline constexpr std::string_view kNativeSecureRandomLinuxFailed = "ngẫu nhiên bảo mật: RAND_bytes thất bại";
 inline constexpr std::string_view kNativeSecureRandomPlatformUnsupported = "ngẫu nhiên bảo mật: nền tảng chưa được hỗ trợ";
-inline constexpr std::string_view kNativeSha256DigestSizeInvalid = "băm sha256: BCrypt trả kích thước digest không hợp lệ";
-inline constexpr std::string_view kNativeSha256InputTooLarge = "băm sha256: dữ liệu quá lớn";
-inline constexpr std::string_view kNativeSha256WindowsFailed = "băm sha256: BCrypt SHA-256 thất bại";
-inline constexpr std::string_view kNativeSha256AppleFailed = "băm sha256: CommonCrypto SHA-256 thất bại";
-inline constexpr std::string_view kNativeSha256LinuxFailed = "băm sha256: OpenSSL SHA-256 thất bại";
-inline constexpr std::string_view kNativeSha256PlatformUnsupported = "băm sha256: nền tảng chưa được hỗ trợ";
-inline constexpr std::string_view kNativeHmacSha256InputTooLarge = "hmac sha256: dữ liệu quá lớn";
-inline constexpr std::string_view kNativeHmacSha256DigestSizeInvalid = "hmac sha256: BCrypt trả kích thước digest không hợp lệ";
-inline constexpr std::string_view kNativeHmacSha256WindowsFailed = "hmac sha256: BCrypt HMAC thất bại";
-inline constexpr std::string_view kNativeHmacSha256KeyTooLarge = "hmac sha256: khóa quá lớn";
-inline constexpr std::string_view kNativeHmacSha256LinuxFailed = "hmac sha256: OpenSSL HMAC thất bại";
-inline constexpr std::string_view kNativeHmacSha256PlatformUnsupported = "hmac sha256: nền tảng chưa được hỗ trợ";
 inline constexpr std::string_view kNativeToIntegerConversionFailed = "thành số nguyên: giá trị không thể chuyển đổi";
 inline constexpr std::string_view kNativeToFloatConversionFailed = "thành số thực: giá trị không thể chuyển đổi";
 inline constexpr std::string_view kNativeRandomIntBoundsMustBeInteger = "ngẫu nhiên nguyên: giới hạn phải là số nguyên";
@@ -304,7 +291,6 @@ inline constexpr std::string_view kNativeSleepMillisecondsInvalid = "ngủ mili 
 inline constexpr std::string_view kNativeHandleTypeRequired = "{0} chỉ nhận {1}";
 inline constexpr std::string_view kNativeHandleTypeRequiredFirstArgument = "{0} chỉ nhận {1} ở đối số đầu tiên";
 inline constexpr std::string_view kNativeHandleEmptyInternal = "{0} không thể thao tác trên {1} rỗng nội bộ";
-inline constexpr std::string_view kNativeHttpUrlInvalid = "{0}: URL HTTP không hợp lệ: {1}";
 inline constexpr std::string_view kNativePathUtf8Invalid = "{0}: đường dẫn UTF-8 không hợp lệ";
 inline constexpr std::string_view kNativeStringArgumentRequired = "{0}: {1} phải là chuỗi";
 inline constexpr std::string_view kNativeStringArgumentUtf8Invalid = "{0}: {1} phải là UTF-8 hợp lệ";
@@ -313,39 +299,4 @@ inline constexpr std::string_view kNativeOperationSystemError = "{0}: {1}";
 inline constexpr std::string_view kNativeEnvironmentNameInvalid = "{0}: tên biến môi trường không hợp lệ";
 inline constexpr std::string_view kNativeEnvironmentNameUtf8Invalid = "{0}: tên biến môi trường phải là UTF-8 hợp lệ";
 inline constexpr std::string_view kNativeStringUtf8Invalid = "{0}: chuỗi phải là UTF-8 hợp lệ";
-inline constexpr std::string_view kNativeHttpUrlEmpty = "URL rỗng";
-inline constexpr std::string_view kNativeHttpUrlUtf8Invalid = "URL không phải UTF-8 hợp lệ";
-inline constexpr std::string_view kNativeHttpUrlWhitespaceInvalid =
-    "URL chứa khoảng trắng hoặc ký tự điều khiển; hãy percent-encode trước";
-inline constexpr std::string_view kNativeHttpUrlSchemeInvalid =
-    "URL phải dùng scheme http:// hoặc https://";
-inline constexpr std::string_view kNativeHttpUrlHostMissing = "URL thiếu host";
-inline constexpr std::string_view kNativeHttpUrlIpv6HostInvalid = "URL host IPv6 không hợp lệ";
-inline constexpr std::string_view kNativeHttpUrlIpv6NeedsBrackets =
-    "URL host IPv6 phải đặt trong ngoặc vuông";
-inline constexpr std::string_view kNativeHttpUrlPortInvalid = "URL port không hợp lệ";
-
-// Native HTTP client/server diagnostics.
-inline constexpr std::string_view kNativeHttpCurlProcessOpenFailed = "{0}: không mở được tiến trình curl";
-inline constexpr std::string_view kNativeHttpCurlFailed = "{0}: curl trả về lỗi";
-inline constexpr std::string_view kNativeHttpServerWsaStartupFailed = "mang_http_server_open: WSAStartup thất bại";
-inline constexpr std::string_view kNativeHttpServerInvalidPort = "mang_http_server_open: cổng không hợp lệ";
-inline constexpr std::string_view kNativeHttpServerSocketCreateFailed = "mang_http_server_open: không tạo được ổ cắm mạng (socket)";
-inline constexpr std::string_view kNativeHttpServerExclusivePortFailed = "mang_http_server_open: không thể giữ riêng cổng (WSA={0})";
-inline constexpr std::string_view kNativeHttpServerBindFailed = "mang_http_server_open: gắn địa chỉ/cổng (bind) thất bại (mã={0})";
-inline constexpr std::string_view kNativeHttpServerListenFailed = "mang_http_server_open: lắng nghe kết nối (listen) thất bại";
-inline constexpr std::string_view kNativeHttpServerNotFound = "mang_http_server_next: máy chủ không tồn tại";
-inline constexpr std::string_view kNativeHttpRequestNotFound = "{0}: yêu cầu không tồn tại";
-inline constexpr std::string_view kNativeHttpRequestFieldInvalid = "mang_http_req_field: trường yêu cầu không hợp lệ";
-inline constexpr std::string_view kNativeHttpResponseSendFailed = "mang_http_server_send: gửi phản hồi thất bại";
-inline constexpr std::string_view kNativeHttpServerListening = "[HTTP] máy chủ mức thấp đang lắng nghe tại 0.0.0.0:{0}";
-
-// These are result payloads rather than thrown diagnostics.  Keep their text
-// byte-for-byte compatible with programs that inspect DB_OK| and DB_ERR|.
-inline constexpr std::string_view kNativeDbErrorResult = "DB_ERR|{0}";
-inline constexpr std::string_view kNativeDbConnectedResult = "DB_OK|connected";
-inline constexpr std::string_view kNativeDbAffectedOneResult = "DB_OK|affected=1";
-inline constexpr std::string_view kNativeDbQueryResult = "DB_OK|{0}";
-
-
 } // namespace vietvm::messages

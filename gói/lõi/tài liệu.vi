@@ -1,0 +1,97 @@
+// vpp.doc — sinh tài liệu Markdown từ AST V++.
+nhập nhập xuất;
+
+hàm tài liệu dựng tham số(tham số) {
+    nếu (độ dài(tham số) == 0) {
+        trả về "không có";
+    };
+    kết_quả = "";
+    lặp(i = 0; i < độ dài(tham số); i++) {
+        nếu (i > 0) {
+            kết_quả = kết_quả + ", ";
+        };
+        mục = tham số[i];
+        kết_quả = kết_quả + lấy map(mục, "tên", "");
+        nếu (lấy map(mục, "có mặc định", 0)) {
+            kết_quả = kết_quả + " (có mặc định)";
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm tài liệu dựng hàm(mục, tiền tố) {
+    trả về tiền tố + " Hàm " + lấy map(mục, "tên", "") + "\n\n" +
+        "- Phạm vi: " + lấy map(mục, "phạm vi", "mặc định") + "\n" +
+        "- Tham số: " + tài liệu dựng tham số(lấy map(mục, "tham số", [])) + "\n\n";
+};
+
+hàm tài liệu dựng kiểu(mục) {
+    loại = lấy map(mục, "loại", "");
+    nhãn = "Giao diện";
+    nếu (loại == "lớp") {
+        nhãn = "Lớp";
+    };
+    kết_quả = "## " + nhãn + " " + lấy map(mục, "tên", "") + "\n\n" +
+        "- Phạm vi: " + lấy map(mục, "phạm vi", "mặc định") + "\n\n";
+    thành_viên = lấy map(mục, "thành viên", []);
+    lặp(i = 0; i < độ dài(thành_viên); i++) {
+        kết_quả = kết_quả + tài liệu dựng hàm(thành_viên[i], "###");
+    };
+    trả về kết_quả;
+};
+
+hàm tài liệu dựng(mã nguồn, tiêu đề) {
+    phân_tích = bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+    cây = lấy map(phân_tích, "cây cú pháp", []);
+    nếu (tiêu đề == "") {
+        tiêu đề = "Tài liệu V++";
+    };
+    kết_quả = "# " + tiêu đề + "\n\n";
+
+    phụ_thuộc = [];
+    lặp(i = 0; i < độ dài(cây); i++) {
+        mục = cây[i];
+        nếu (lấy map(mục, "loại", "") == "nhập") {
+            đích = lấy map(mục, "đích", "");
+            nếu (đích != "") { thêm(phụ_thuộc, đích); };
+        };
+    };
+    nếu (độ dài(phụ_thuộc) > 0) {
+        kết_quả = kết_quả + "## Phụ thuộc\n\n";
+        lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
+            kết_quả = kết_quả + "- " + phụ_thuộc[i] + "\n";
+        };
+        kết_quả = kết_quả + "\n";
+    };
+
+    lặp(i = 0; i < độ dài(cây); i++) {
+        mục = cây[i];
+        phạm_vi = lấy map(mục, "phạm vi", "mặc định");
+        nếu (phạm_vi != "riêng tư" && phạm_vi != "bảo vệ") {
+            loại = lấy map(mục, "loại", "");
+            nếu (loại == "hàm") {
+                kết_quả = kết_quả + tài liệu dựng hàm(mục, "##");
+            } nếu không {
+                nếu (loại == "lớp" || loại == "giao diện") {
+                    kết_quả = kết_quả + tài liệu dựng kiểu(mục);
+                };
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm tài liệu tạo(mã nguồn) {
+    trả về tài liệu dựng(mã nguồn, "Tài liệu V++");
+};
+
+hàm tài liệu tạo từ tệp(đường dẫn) {
+    mã_nguồn = đọc tệp(đường dẫn);
+    trả về tài liệu dựng(mã_nguồn, đường dẫn tên(đường dẫn));
+};
+
+hàm tài liệu ghi tệp(mã nguồn, đường dẫn) {
+    nội_dung = tài liệu tạo(mã nguồn);
+    ghi tệp(đường dẫn, nội_dung);
+    trả về độ dài(nội_dung);
+};

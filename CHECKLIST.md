@@ -296,7 +296,7 @@
 | AddressSanitizer / UndefinedBehaviorSanitizer trên CI | |
 | `clang-tidy` quality gate | |
 | Coverage gate | — minimum hiện tại 45% |
-| Benchmark baseline | — VM dispatch, lexer, compiler pipeline, native HTTP helpers |
+| Benchmark baseline | — VM verification/dispatch/end-to-end, compiler stages, package/module graph, GC collection; comparator gate còn thiếu |
 | Disassembler (xem bytecode) | |
 | REPL (interactive shell) | |
 | Language Server Protocol (LSP) | — MVP |
@@ -342,7 +342,7 @@
 | Chuyển kiểu & random | | Có `thành chuỗi/số nguyên/số thực`, `loại của`, `ngẫu nhiên nguyên` |
 | Ngày giờ | | Có thời gian hiện tại và sleep mili giây; chưa có duration/parse/format timezone |
 | Serialization JSON/XML/YAML | | JSON đã parse/serialize nested map/list/scalar; XML/YAML chưa có |
-| Logging chuẩn | | Có module `gói/nhập xuất/nhật ký.vi` cơ bản |
+| Logging chuẩn | | Có module `gói/lõi/nhật ký.vi` cơ bản; `gói/nhập xuất/chính.vi` nhập trực tiếp owner này |
 | Cấu hình (config) | | Có `doc_config(path)` |
 | Xử lý lỗi/ngoại lệ | | Có `thử` / `bắt lỗi` / `ném lỗi` |
 | Testing framework nội bộ ngôn ngữ | | Có `run_tests.sh` và `kiểm thử` với assertion cơ bản; chưa có discovery/runner API trong V++ |
@@ -387,7 +387,7 @@
 - [x] Báo lỗi có số dòng và cột
 - [x] CI cơ bản với GitHub Actions
 - [x] CTest unit target cho StringPool, hamMap và symbolTable
-- [x] CTest unit target cho canonical opcode và native HTTP constants
+- [x] CTest focused hardening targets cho compiler/runtime/import precedence
 - [x] CTest smoke target cho opcode số học, so sánh và chuỗi của VM
 
 ### Trung hạn (1–3 tháng)

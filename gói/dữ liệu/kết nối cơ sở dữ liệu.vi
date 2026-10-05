@@ -2,25 +2,275 @@
 // Mục đích: cung cấp API cấu hình và thực thi truy vấn cho nhiều engine DB.
 // Hỗ trợ hiện tại: MySQL, PostgreSQL, SQLite qua JDBC URL + driver class.
 
-// Ghi chú hàm: mở kết nối DB thông qua native hook của VM.
-hàm db_ket_noi(driverClassName, jdbcUrl, username, password) {
-    trả về db_native_connect(
-        driverClassName,
-        jdbcUrl,
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/văn bản/chuỗi;
+
+hàm db lỗi cấu hình(lý_do) {
+    trả về {"ok": sai, "reason": lý_do};
+};
+
+hàm db đọc số nguyên thập phân(văn_bản) {
+    nếu (văn_bản == "") {
+        trả về {"ok": sai, "value": 0};
+    };
+    dấu = 1;
+    bắt_đầu = 0;
+    nếu (văn_bản[0] == "-") {
+        dấu = -1;
+        bắt_đầu = 1;
+    } nếu không {
+        nếu (văn_bản[0] == "+") {
+            bắt_đầu = 1;
+        };
+    };
+    nếu (bắt_đầu >= độ dài(văn_bản)) {
+        trả về {"ok": sai, "value": 0};
+    };
+    giá_trị = 0;
+    chữ_số = "0123456789";
+    lặp(i = bắt_đầu; i < độ dài(văn_bản); i++) {
+        số = tìm chuỗi chính xác(chữ_số, văn_bản[i], 0);
+        nếu (số == rỗng) {
+            trả về {"ok": sai, "value": 0};
+        };
+        giá_trị = giá_trị * 10 + số;
+    };
+    trả về {"ok": đúng, "value": giá_trị * dấu};
+};
+
+hàm db cấu hình tcp(jdbcUrl, tiền_tố, engine, cổng_mặc_định) {
+    nếu (!bắt đầu bằng(jdbcUrl, tiền_tố)) {
+        trả về db lỗi cấu hình("invalid-jdbc-prefix");
+    };
+    phần_còn_lại = con chuỗi(jdbcUrl, độ dài(tiền_tố), độ dài(jdbcUrl));
+    vị_trí_gạch = tìm chuỗi chính xác(phần_còn_lại, "/", 0);
+    nếu (vị_trí_gạch == rỗng || vị_trí_gạch == 0) {
+        trả về db lỗi cấu hình("invalid-host-or-database");
+    };
+
+    host_port = bỏ khoảng trắng(con chuỗi(phần_còn_lại, 0, vị_trí_gạch));
+    db_query = con chuỗi(phần_còn_lại, vị_trí_gạch + 1, độ dài(phần_còn_lại));
+    host = host_port;
+    cổng = cổng_mặc_định;
+    vị_trí_hai_chấm = tìm chuỗi chính xác(host_port, ":", 0);
+    nếu (vị_trí_hai_chấm != rỗng) {
+        host = bỏ khoảng trắng(con chuỗi(host_port, 0, vị_trí_hai_chấm));
+        chữ_cổng = bỏ khoảng trắng(con chuỗi(
+            host_port,
+            vị_trí_hai_chấm + 1,
+            độ dài(host_port)
+        ));
+        nếu (chữ_cổng == "") {
+            trả về db lỗi cấu hình("invalid-port");
+        };
+        cổng_đã_đọc = db đọc số nguyên thập phân(chữ_cổng);
+        nếu (!lấy map(cổng_đã_đọc, "ok", sai)) {
+            trả về db lỗi cấu hình("invalid-port");
+        };
+        cổng = lấy map(cổng_đã_đọc, "value", 0);
+    };
+    nếu (host == "") {
+        trả về db lỗi cấu hình("missing-host");
+    };
+
+    database = db_query;
+    query = "";
+    vị_trí_hỏi = tìm chuỗi chính xác(db_query, "?", 0);
+    nếu (vị_trí_hỏi != rỗng) {
+        database = con chuỗi(db_query, 0, vị_trí_hỏi);
+        query = con chuỗi(db_query, vị_trí_hỏi + 1, độ dài(db_query));
+    };
+    database = bỏ khoảng trắng(database);
+    nếu (database == "") {
+        trả về db lỗi cấu hình("missing-database");
+    };
+    trả về {
+        "ok": đúng,
+        "engine": engine,
+        "host": host,
+        "port": cổng,
+        "database": database,
+        "path": "",
+        "create": chứa chính xác(query, "createDatabaseIfNotExist=true")
+    };
+};
+
+hàm db phân tích cấu hình(driverClassName, jdbcUrl) {
+    nếu (bắt đầu bằng(jdbcUrl, "jdbc:mysql://") ||
+        chứa chính xác(driverClassName, "mysql")) {
+        trả về db cấu hình tcp(jdbcUrl, "jdbc:mysql://", "mysql", 3306);
+    };
+    nếu (bắt đầu bằng(jdbcUrl, "jdbc:postgresql://") ||
+        chứa chính xác(driverClassName, "postgresql")) {
+        trả về db cấu hình tcp(jdbcUrl, "jdbc:postgresql://", "postgresql", 5432);
+    };
+    nếu (bắt đầu bằng(jdbcUrl, "jdbc:sqlite:") ||
+        chứa chính xác(driverClassName, "sqlite")) {
+        tiền_tố = "jdbc:sqlite:";
+        nếu (!bắt đầu bằng(jdbcUrl, tiền_tố)) {
+            trả về db lỗi cấu hình("invalid-jdbc-prefix");
+        };
+        path = bỏ khoảng trắng(con chuỗi(jdbcUrl, độ dài(tiền_tố), độ dài(jdbcUrl)));
+        nếu (path == "") {
+            trả về db lỗi cấu hình("missing-sqlite-path");
+        };
+        trả về {
+            "ok": đúng,
+            "engine": "sqlite",
+            "host": "",
+            "port": 0,
+            "database": "",
+            "path": path,
+            "create": sai
+        };
+    };
+    trả về db lỗi cấu hình("unsupported-driver");
+};
+
+hàm db định danh an toàn(tên) {
+    nếu (tên == "") { trả về sai; };
+    lặp(i = 0; i < độ dài(tên); i++) {
+        c = tên[i];
+        hợp_lệ = (c >= "a" && c <= "z") ||
+            (c >= "A" && c <= "Z") ||
+            (c >= "0" && c <= "9") ||
+            c == "_";
+        nếu (!hợp_lệ) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm db chuẩn hóa token(raw, rỗng_là_lỗi = đúng) {
+    văn_bản = bỏ khoảng trắng(raw);
+    nếu (văn_bản == "" && rỗng_là_lỗi) {
+        trả về "db-command-failed";
+    };
+    kết_quả = "";
+    lặp(i = 0; i < độ dài(văn_bản); i++) {
+        c = văn_bản[i];
+        nếu (c == "\n" || c == "\r" || c == "\t") {
+            kết_quả = kết_quả + " ";
+        } nếu không {
+            nếu (c == "|") {
+                kết_quả = kết_quả + "/";
+            } nếu không {
+                kết_quả = kết_quả + c;
+            };
+        };
+    };
+    trả về bỏ khoảng trắng(kết_quả);
+};
+
+hàm db chạy native(cấu_hình, username, password, sql, dùng_database) {
+    engine = lấy map(cấu_hình, "engine", "");
+    đích = lấy map(cấu_hình, "database", "");
+    nếu (engine == "sqlite") {
+        đích = lấy map(cấu_hình, "path", "");
+    };
+    raw = db_native_exec(
+        engine,
+        lấy map(cấu_hình, "host", ""),
+        lấy map(cấu_hình, "port", 0),
+        đích,
         username,
-        password
+        password,
+        sql,
+        dùng_database
+    );
+    nếu (!lấy map(raw, "ok", sai)) {
+        trả về {
+            "ok": sai,
+            "reason": db chuẩn hóa token(lấy map(raw, "reason", "")),
+            "output": ""
+        };
+    };
+    trả về {
+        "ok": đúng,
+        "reason": "",
+        "output": db chuẩn hóa token(lấy map(raw, "output", ""), sai)
+    };
+};
+
+hàm db chuẩn bị database(cấu_hình, username, password) {
+    engine = lấy map(cấu_hình, "engine", "");
+    nếu (engine == "sqlite" || !lấy map(cấu_hình, "create", sai)) {
+        trả về {"ok": đúng, "reason": "", "output": ""};
+    };
+    database = lấy map(cấu_hình, "database", "");
+    nếu (!db định danh an toàn(database)) {
+        trả về {"ok": sai, "reason": "unsafe-database-name", "output": ""};
+    };
+    nếu (engine == "mysql") {
+        trả về db chạy native(
+            cấu_hình,
+            username,
+            password,
+            "CREATE DATABASE IF NOT EXISTS `" + database + "`;",
+            sai
+        );
+    };
+    kiểm_tra = db chạy native(
+        cấu_hình,
+        username,
+        password,
+        "SELECT 1 FROM pg_database WHERE datname='" + database + "';",
+        sai
+    );
+    nếu (!lấy map(kiểm_tra, "ok", sai)) { trả về kiểm_tra; };
+    nếu (lấy map(kiểm_tra, "output", "") == "1") { trả về kiểm_tra; };
+    trả về db chạy native(
+        cấu_hình,
+        username,
+        password,
+        "CREATE DATABASE \"" + database + "\";",
+        sai
     );
 };
 
-// Ghi chú hàm: thực thi câu lệnh SQL bất kỳ.
+hàm db lỗi kết quả(lý_do) {
+    trả về "DB_ERR|" + lý_do;
+};
+
+// Parse JDBC và policy kết nối nằm ở V++; native chỉ chạy client DB.
+hàm db_ket_noi(driverClassName, jdbcUrl, username, password) {
+    cấu_hình = db phân tích cấu hình(driverClassName, jdbcUrl);
+    nếu (!lấy map(cấu_hình, "ok", sai)) {
+        trả về db lỗi kết quả(lấy map(cấu_hình, "reason", "db-command-failed"));
+    };
+    engine = lấy map(cấu_hình, "engine", "");
+    nếu (engine != "sqlite" && username == "") {
+        trả về db lỗi kết quả("missing-username");
+    };
+    chuẩn_bị = db chuẩn bị database(cấu_hình, username, password);
+    nếu (!lấy map(chuẩn_bị, "ok", sai)) {
+        trả về db lỗi kết quả(lấy map(chuẩn_bị, "reason", "db-command-failed"));
+    };
+    kết_quả = db chạy native(cấu_hình, username, password, "SELECT 1;", đúng);
+    nếu (!lấy map(kết_quả, "ok", sai)) {
+        trả về db lỗi kết quả(lấy map(kết_quả, "reason", "db-command-failed"));
+    };
+    trả về "DB_OK|connected";
+};
+
+// SQL result contract cũng được dựng ở V++.
 hàm db_truy_van(driverClassName, jdbcUrl, username, password, sql) {
-    trả về db_native_query(
-        driverClassName,
-        jdbcUrl,
-        username,
-        password,
-        sql
-    );
+    cấu_hình = db phân tích cấu hình(driverClassName, jdbcUrl);
+    nếu (!lấy map(cấu_hình, "ok", sai)) {
+        trả về db lỗi kết quả(lấy map(cấu_hình, "reason", "db-command-failed"));
+    };
+    engine = lấy map(cấu_hình, "engine", "");
+    nếu (engine != "sqlite" && username == "") {
+        trả về db lỗi kết quả("missing-username");
+    };
+    kết_quả = db chạy native(cấu_hình, username, password, sql, đúng);
+    nếu (!lấy map(kết_quả, "ok", sai)) {
+        trả về db lỗi kết quả(lấy map(kết_quả, "reason", "db-command-failed"));
+    };
+    output = lấy map(kết_quả, "output", "");
+    nếu (output == "") {
+        trả về "DB_OK|affected=1";
+    };
+    trả về "DB_OK|" + output;
 };
 
 // Ghi chú hàm: ngắt kết nối logic ở tầng gói.

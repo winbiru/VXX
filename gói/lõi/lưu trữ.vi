@@ -1,0 +1,370 @@
+// vi.archive — ZIP32 STORE triển khai bằng V++.
+// Native chỉ còn primitive file I/O nhị phân; format ZIP, CRC32, kiểm tra tên
+// mục và giới hạn giải nén đều thuộc tầng thư viện V++.
+
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+nhập gói/nhập xuất/thư mục;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/toán học;
+
+hàm lưu trữ yêu cầu khoảng(bytes, vị_trí, số_lượng, thông_báo) {
+    nếu (vị_trí < 0 || số_lượng < 0 || vị_trí + số_lượng > do_dai(bytes)) {
+        ném thông_báo;
+    };
+    trả về đúng;
+};
+
+hàm lưu trữ thêm bytes(đích, nguồn) {
+    lặp(i = 0; i < do_dai(nguồn); i++) {
+        them(đích, nguồn[i]);
+    };
+    trả về đích;
+};
+
+hàm lưu trữ lấy bytes(bytes, vị_trí, số_lượng) {
+    lưu trữ yêu cầu khoảng(bytes, vị_trí, số_lượng, "lưu trữ: dữ liệu ZIP bị cắt ngắn");
+    kết_quả = [];
+    lặp(i = 0; i < số_lượng; i++) {
+        them(kết_quả, bytes[vị_trí + i]);
+    };
+    trả về kết_quả;
+};
+
+hàm lưu trữ thêm u16(đích, giá_trị) {
+    nếu (giá_trị < 0 || giá_trị > 65535) {
+        ném "lưu trữ: giá trị vượt giới hạn ZIP16";
+    };
+    thấp = giá_trị % 256;
+    cao = lam_tron_xuong(giá_trị / 256) % 256;
+    them(đích, thấp);
+    them(đích, cao);
+    trả về đích;
+};
+
+hàm lưu trữ thêm u32(đích, giá_trị) {
+    nếu (giá_trị < 0 || giá_trị > 2147483647) {
+        ném "lưu trữ: ZIP vượt giới hạn 2 GiB của runtime hiện tại";
+    };
+    còn_lại = giá_trị;
+    lặp(i = 0; i < 4; i++) {
+        them(đích, còn_lại % 256);
+        còn_lại = lam_tron_xuong(còn_lại / 256);
+    };
+    trả về đích;
+};
+
+hàm lưu trữ đọc u16(bytes, vị_trí) {
+    lưu trữ yêu cầu khoảng(bytes, vị_trí, 2, "lưu trữ: header ZIP bị cắt ngắn");
+    trả về bytes[vị_trí] + bytes[vị_trí + 1] * 256;
+};
+
+hàm lưu trữ đọc u32 giới hạn(bytes, vị_trí) {
+    lưu trữ yêu cầu khoảng(bytes, vị_trí, 4, "lưu trữ: header ZIP bị cắt ngắn");
+    nếu (bytes[vị_trí + 3] >= 128) {
+        ném "lưu trữ: ZIP vượt giới hạn 2 GiB của runtime hiện tại";
+    };
+    trả về bytes[vị_trí] +
+           bytes[vị_trí + 1] * 256 +
+           bytes[vị_trí + 2] * 65536 +
+           bytes[vị_trí + 3] * 16777216;
+};
+
+hàm lưu trữ xor byte(a, b) {
+    nếu (a < 0 || a > 255 || b < 0 || b > 255) {
+        ném "lưu trữ: CRC32 nhận byte ngoài 0..255";
+    };
+    x = a;
+    y = b;
+    trọng_số = 1;
+    kết_quả = 0;
+    lặp(i = 0; i < 8; i++) {
+        bit_x = x % 2;
+        bit_y = y % 2;
+        nếu (bit_x != bit_y) {
+            kết_quả = kết_quả + trọng_số;
+        };
+        x = lam_tron_xuong(x / 2);
+        y = lam_tron_xuong(y / 2);
+        trọng_số = trọng_số * 2;
+    };
+    trả về kết_quả;
+};
+
+// CRC32 IEEE ở dạng bốn byte little-endian để tránh phụ thuộc integer unsigned
+// 32-bit/bitwise native của VM.
+hàm lưu trữ crc32(bytes) {
+    crc = [255, 255, 255, 255];
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        byte = bytes[i];
+        nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            ném "lưu trữ: dữ liệu phải là danh sách byte 0..255";
+        };
+        crc[0] = lưu trữ xor byte(crc[0], byte);
+        lặp(bit = 0; bit < 8; bit++) {
+            thấp = crc[0] % 2;
+            b0 = lam_tron_xuong(crc[0] / 2) + (crc[1] % 2) * 128;
+            b1 = lam_tron_xuong(crc[1] / 2) + (crc[2] % 2) * 128;
+            b2 = lam_tron_xuong(crc[2] / 2) + (crc[3] % 2) * 128;
+            b3 = lam_tron_xuong(crc[3] / 2);
+            crc[0] = b0;
+            crc[1] = b1;
+            crc[2] = b2;
+            crc[3] = b3;
+            nếu (thấp == 1) {
+                crc[0] = lưu trữ xor byte(crc[0], 32);
+                crc[1] = lưu trữ xor byte(crc[1], 131);
+                crc[2] = lưu trữ xor byte(crc[2], 184);
+                crc[3] = lưu trữ xor byte(crc[3], 237);
+            };
+        };
+    };
+    lặp(i = 0; i < 4; i++) {
+        crc[i] = lưu trữ xor byte(crc[i], 255);
+    };
+    trả về crc;
+};
+
+hàm lưu trữ bytes bằng(a, b) {
+    nếu (do_dai(a) != do_dai(b)) {
+        trả về sai;
+    };
+    lặp(i = 0; i < do_dai(a); i++) {
+        nếu (a[i] != b[i]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm lưu trữ tên an toàn(tên) {
+    nếu (loai_cua(tên) != "chuỗi" || do_dai(tên) == 0) {
+        ném "lưu trữ: tên mục ZIP không an toàn";
+    };
+    nếu (tên[0] == "/" || tên[0] == "\\") {
+        ném "lưu trữ: tên mục ZIP không an toàn";
+    };
+
+    kết_quả = "";
+    đoạn = "";
+    lặp(i = 0; i <= do_dai(tên); i++) {
+        phân_cách = i == do_dai(tên);
+        nếu (!phân_cách) {
+            phân_cách = tên[i] == "/" || tên[i] == "\\";
+        };
+        nếu (phân_cách) {
+            nếu (đoạn == "..") {
+                ném "lưu trữ: tên mục ZIP không an toàn";
+            };
+            nếu (đoạn != "" && đoạn != ".") {
+                lặp(j = 0; j < do_dai(đoạn); j++) {
+                    nếu (đoạn[j] == ":") {
+                        ném "lưu trữ: tên mục ZIP không an toàn";
+                    };
+                };
+                kết_quả = đường dẫn nối(kết_quả, đoạn);
+            };
+            đoạn = "";
+        } nếu không {
+            đoạn = đoạn + tên[i];
+        };
+    };
+    nếu (kết_quả == "") {
+        ném "lưu trữ: tên mục ZIP không an toàn";
+    };
+    trả về kết_quả;
+};
+
+hàm lưu trữ đọc local entry(bytes, vị_trí) {
+    lưu trữ yêu cầu khoảng(bytes, vị_trí, 4, "lưu trữ: ZIP bị cắt ngắn");
+    chữ_ký = lưu trữ đọc u32 giới hạn(bytes, vị_trí);
+    nếu (chữ_ký == 33639248 || chữ_ký == 101010256) {
+        trả về {"xong": đúng, "vị trí": vị_trí};
+    };
+    nếu (chữ_ký != 67324752) {
+        ném "lưu trữ: chữ ký ZIP không hợp lệ";
+    };
+    lưu trữ yêu cầu khoảng(bytes, vị_trí, 30, "lưu trữ: header ZIP bị cắt ngắn");
+    cờ = lưu trữ đọc u16(bytes, vị_trí + 6);
+    nếu (lam_tron_xuong(cờ / 8) % 2 == 1) {
+        ném "lưu trữ: ZIP dùng data descriptor chưa được hỗ trợ";
+    };
+    phương_thức = lưu trữ đọc u16(bytes, vị_trí + 8);
+    crc = lưu trữ lấy bytes(bytes, vị_trí + 14, 4);
+    kích_thước_nén = lưu trữ đọc u32 giới hạn(bytes, vị_trí + 18);
+    kích_thước_gốc = lưu trữ đọc u32 giới hạn(bytes, vị_trí + 22);
+    dài_tên = lưu trữ đọc u16(bytes, vị_trí + 26);
+    dài_extra = lưu trữ đọc u16(bytes, vị_trí + 28);
+    đầu_tên = vị_trí + 30;
+    đầu_dữ_liệu = đầu_tên + dài_tên + dài_extra;
+    lưu trữ yêu cầu khoảng(bytes, đầu_tên, dài_tên + dài_extra + kích_thước_nén,
+                           "lưu trữ: dữ liệu mục ZIP bị cắt ngắn");
+    tên_bytes = lưu trữ lấy bytes(bytes, đầu_tên, dài_tên);
+    tên = giải mã bảng mã(tên_bytes, "UTF-8");
+    trả về {
+        "xong": sai,
+        "vị trí": vị_trí,
+        "vị trí dữ liệu": đầu_dữ_liệu,
+        "vị trí kế": đầu_dữ_liệu + kích_thước_nén,
+        "tên": tên,
+        "phương thức": phương_thức,
+        "crc": crc,
+        "kích thước nén": kích_thước_nén,
+        "kích thước gốc": kích_thước_gốc
+    };
+};
+
+hàm lưu trữ tạo zip(đường zip, danh sách tệp) {
+    nếu (loai_cua(danh sách tệp) != "danh sách") {
+        ném "lưu trữ tạo zip: danh sách tệp phải là danh sách";
+    };
+    zip = [];
+    mục = [];
+    đã_dùng = {};
+
+    lặp(i = 0; i < do_dai(danh sách tệp); i++) {
+        nguồn = danh sách tệp[i];
+        nếu (loai_cua(nguồn) != "chuỗi") {
+            ném "lưu trữ tạo zip: danh sách chỉ được chứa đường dẫn chuỗi";
+        };
+        nếu (!là tệp(nguồn)) {
+            ném "lưu trữ tạo zip: nguồn phải là tệp thường";
+        };
+        tên = đường dẫn tên(nguồn);
+        lưu trữ tên an toàn(tên);
+        nếu (co_khoa(đã_dùng, tên)) {
+            ném "lưu trữ tạo zip: tên mục không hợp lệ hoặc bị trùng";
+        };
+        dat_map(đã_dùng, tên, đúng);
+        tên_bytes = mã hóa bảng mã(tên, "UTF-8");
+        nếu (do_dai(tên_bytes) > 65535) {
+            ném "lưu trữ: tên mục ZIP quá dài";
+        };
+        dữ_liệu = đọc bytes tệp(nguồn);
+        kích_thước = do_dai(dữ_liệu);
+        vị_trí = do_dai(zip);
+        crc = lưu trữ crc32(dữ_liệu);
+
+        lưu trữ thêm u32(zip, 67324752);
+        lưu trữ thêm u16(zip, 20);
+        lưu trữ thêm u16(zip, 2048);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm bytes(zip, crc);
+        lưu trữ thêm u32(zip, kích_thước);
+        lưu trữ thêm u32(zip, kích_thước);
+        lưu trữ thêm u16(zip, do_dai(tên_bytes));
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm bytes(zip, tên_bytes);
+        lưu trữ thêm bytes(zip, dữ_liệu);
+
+        them(mục, {
+            "tên": tên,
+            "tên bytes": tên_bytes,
+            "crc": crc,
+            "kích thước": kích_thước,
+            "vị trí": vị_trí
+        });
+    };
+
+    vị_trí_trung_tâm = do_dai(zip);
+    lặp(i = 0; i < do_dai(mục); i++) {
+        entry = mục[i];
+        tên_bytes = lay_map(entry, "tên bytes", []);
+        crc = lay_map(entry, "crc", []);
+        kích_thước = lay_map(entry, "kích thước", 0);
+        vị_trí = lay_map(entry, "vị trí", 0);
+        lưu trữ thêm u32(zip, 33639248);
+        lưu trữ thêm u16(zip, 20);
+        lưu trữ thêm u16(zip, 20);
+        lưu trữ thêm u16(zip, 2048);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm bytes(zip, crc);
+        lưu trữ thêm u32(zip, kích_thước);
+        lưu trữ thêm u32(zip, kích_thước);
+        lưu trữ thêm u16(zip, do_dai(tên_bytes));
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u16(zip, 0);
+        lưu trữ thêm u32(zip, 0);
+        lưu trữ thêm u32(zip, vị_trí);
+        lưu trữ thêm bytes(zip, tên_bytes);
+    };
+    kích_thước_trung_tâm = do_dai(zip) - vị_trí_trung_tâm;
+    nếu (do_dai(mục) > 65535) {
+        ném "lưu trữ: ZIP vượt giới hạn ZIP32";
+    };
+    lưu trữ thêm u32(zip, 101010256);
+    lưu trữ thêm u16(zip, 0);
+    lưu trữ thêm u16(zip, 0);
+    lưu trữ thêm u16(zip, do_dai(mục));
+    lưu trữ thêm u16(zip, do_dai(mục));
+    lưu trữ thêm u32(zip, kích_thước_trung_tâm);
+    lưu trữ thêm u32(zip, vị_trí_trung_tâm);
+    lưu trữ thêm u16(zip, 0);
+    ghi bytes tệp(đường zip, zip);
+    trả về do_dai(mục);
+};
+
+hàm lưu trữ liệt kê zip(đường zip) {
+    bytes = đọc bytes tệp(đường zip);
+    kết_quả = [];
+    vị_trí = 0;
+    lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
+        entry = lưu trữ đọc local entry(bytes, vị_trí);
+        nếu (lay_map(entry, "xong", sai)) {
+            trả về kết_quả;
+        };
+        them(kết_quả, lay_map(entry, "tên", ""));
+        vị_trí = lay_map(entry, "vị trí kế", vị_trí);
+    };
+    ném "lưu trữ: ZIP bị cắt ngắn";
+};
+
+hàm lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn byte = 67108864) {
+    nếu (loai_cua(giới hạn byte) != "số nguyên" || giới hạn byte < 0) {
+        ném "lưu trữ giải nén zip: giới hạn byte phải không âm";
+    };
+    bytes = đọc bytes tệp(đường zip);
+    tạo thư mục(thư mục đích);
+    vị_trí = 0;
+    tổng = 0;
+    số_mục = 0;
+    lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
+        entry = lưu trữ đọc local entry(bytes, vị_trí);
+        nếu (lay_map(entry, "xong", sai)) {
+            trả về số_mục;
+        };
+        phương_thức = lay_map(entry, "phương thức", -1);
+        kích_thước_nén = lay_map(entry, "kích thước nén", -1);
+        kích_thước_gốc = lay_map(entry, "kích thước gốc", -1);
+        nếu (phương_thức != 0 || kích_thước_nén != kích_thước_gốc) {
+            ném "lưu trữ: chỉ giải nén ZIP phương thức STORE (không nén)";
+        };
+        tổng = tổng + kích_thước_gốc;
+        nếu (tổng > giới hạn byte) {
+            ném "lưu trữ: vượt giới hạn dung lượng giải nén";
+        };
+        tên = lay_map(entry, "tên", "");
+        tương_đối = lưu trữ tên an toàn(tên);
+        đầu = lay_map(entry, "vị trí dữ liệu", -1);
+        dữ_liệu = lưu trữ lấy bytes(bytes, đầu, kích_thước_gốc);
+        crc_mong_đợi = lay_map(entry, "crc", []);
+        nếu (!lưu trữ bytes bằng(lưu trữ crc32(dữ_liệu), crc_mong_đợi)) {
+            ném "lưu trữ: CRC32 không khớp";
+        };
+        đích = đường dẫn nối(thư mục đích, tương_đối);
+        cha = đường dẫn cha(đích);
+        nếu (cha != "") {
+            tạo thư mục(cha);
+        };
+        ghi bytes tệp(đích, dữ_liệu);
+        số_mục = số_mục + 1;
+        vị_trí = lay_map(entry, "vị trí kế", vị_trí);
+    };
+    ném "lưu trữ: ZIP bị cắt ngắn";
+};

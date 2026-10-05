@@ -1,0 +1,12 @@
+// vpp.scripting — chạy mã V++ nhúng bằng cùng compiler và VM của runtime.
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+
+hàm kịch bản chạy(mã nguồn) {
+    trả về kich_ban_chay_noi_bo(mã nguồn, ".");
+};
+
+hàm kịch bản chạy tệp(đường dẫn) {
+    mã_nguồn = đọc tệp(đường dẫn);
+    trả về kich_ban_chay_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+};

@@ -1,0 +1,43 @@
+// vi.net.http.server — bề mặt server V++ trên socket primitives của hệ điều hành.
+nhập gói/mạng/ổ cắm;
+nhập gói/mạng/http/máy khách;
+
+hàm máy chủ http mở(cổng) {
+    trả về mạng mở máy chủ api(cổng);
+};
+
+hàm máy chủ http yêu cầu kế tiếp(mã máy chủ) {
+    trả về mạng lấy yêu cầu kế tiếp(mã máy chủ);
+};
+
+hàm yêu cầu http phương thức(mã yêu cầu) {
+    trả về mạng method yêu cầu(mã yêu cầu);
+};
+
+hàm yêu cầu http đường dẫn(mã yêu cầu) {
+    trả về mạng path yêu cầu(mã yêu cầu);
+};
+
+hàm yêu cầu http truy vấn(mã yêu cầu) {
+    trả về mạng query yêu cầu(mã yêu cầu);
+};
+
+hàm yêu cầu http nội dung(mã yêu cầu) {
+    trả về mạng body yêu cầu(mã yêu cầu);
+};
+
+hàm yêu cầu http header(mã yêu cầu, khóa) {
+    trả về mạng header yêu cầu(mã yêu cầu, khóa);
+};
+
+hàm yêu cầu http tham số(mã yêu cầu, khóa) {
+    trả về mạng query param yêu cầu(mã yêu cầu, khóa);
+};
+
+hàm máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
+    trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung);
+};
+
+hàm máy chủ http đóng(mã máy chủ) {
+    trả về mạng đóng máy chủ api(mã máy chủ);
+};

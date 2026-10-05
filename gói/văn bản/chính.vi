@@ -1,0 +1,5 @@
+// vi.text — chuỗi Unicode, nối/tách và mã hóa văn bản.
+nhập gói/văn bản/chuỗi;
+nhập gói/văn bản/bộ nối chuỗi;
+nhập gói/văn bản/quét và tách chuỗi;
+nhập gói/văn bản/mã hóa tiện ích;

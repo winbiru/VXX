@@ -5,9 +5,9 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "common/vm_native_http_helpers.h"
 #include "frontend/keywords.h"
 #include "frontend/lexer.h"
 #include "vpp/bytecode/verifier.h"
@@ -76,6 +76,62 @@ std::vector<Instruction> makeVmDispatchProgram() {
     return code;
 }
 
+std::vector<Instruction> makeVmFunctionCallProgram(int calls, int functionId) {
+    std::vector<Instruction> code;
+    code.reserve(static_cast<std::size_t>(calls) + 1);
+    for (int i = 0; i < calls; ++i) {
+        code.push_back({OP_GOI, 0, functionId, 0});
+    }
+    code.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
+    return code;
+}
+
+std::vector<Instruction> makeVmConsumedFunctionCallProgram(int calls, int functionId) {
+    std::vector<Instruction> code;
+    code.reserve(static_cast<std::size_t>(calls) * 3 + 1);
+    for (int i = 0; i < calls; ++i) {
+        code.push_back({OP_GOI, 0, functionId, 0});
+        code.push_back({OP_TEN_BIEN_ID, 0, 0, 0});
+        code.push_back({OP_GAN, 0, 0, 0});
+    }
+    code.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
+    return code;
+}
+
+std::vector<Instruction> makeTinyVmFunction() {
+    return {
+        {OP_BIEN_SO, 1, 0, 0},
+        {OP_TRA_VE, 0, 0, 0},
+    };
+}
+
+std::unordered_map<int, std::vector<Instruction>> makeVmFunctionTable(int count) {
+    std::unordered_map<int, std::vector<Instruction>> functions;
+    functions.reserve(static_cast<std::size_t>(count));
+    for (int id = 1; id <= count; ++id) {
+        functions.emplace(id, makeTinyVmFunction());
+    }
+    return functions;
+}
+
+std::vector<std::string> makeVmFunctionNamePool(int count) {
+    std::vector<std::string> pool;
+    pool.reserve(static_cast<std::size_t>(count));
+    for (int id = 1; id <= count; ++id) {
+        pool.push_back("bench_fn_" + std::to_string(id));
+    }
+    return pool;
+}
+
+std::unordered_map<int, int> makeVmFunctionNameTable(int count) {
+    std::unordered_map<int, int> names;
+    names.reserve(static_cast<std::size_t>(count));
+    for (int id = 1; id <= count; ++id) {
+        names.emplace(id - 1, id);
+    }
+    return names;
+}
+
 std::string makeCompilerSource() {
     std::string source;
     for (int i = 0; i < 24; ++i) {
@@ -84,17 +140,6 @@ std::string makeCompilerSource() {
     }
     source += "hàm chính() { x = f23(19, 0); nếu (x == 42) { in x; } }\n";
     return source;
-}
-
-std::string makeLargeJsonBody() {
-    std::string body = "{";
-    for (int i = 0; i < 128; ++i) {
-        if (i != 0) body += ',';
-        body += "\"field" + std::to_string(i) + "\":\"giá trị-" +
-                std::to_string(i) + "\"";
-    }
-    body += ",\"target\":\"V++ 🚀\"}";
-    return body;
 }
 
 } // namespace
@@ -129,6 +174,60 @@ int main() {
         vm.run();
         return vmProgram.size();
     });
+
+    constexpr int kVmCallsPerIteration = 10000;
+    constexpr int kVmCallFunctionId = 1;
+    const auto vmCallProgram =
+        makeVmFunctionCallProgram(kVmCallsPerIteration, kVmCallFunctionId);
+    VM callVm(vmCallProgram, {});
+    callVm.setFunctions({{kVmCallFunctionId, makeTinyVmFunction()}}, {});
+    callVm.ensureBytecodeVerified();
+    VMRuntimeFixture callFixture(callVm);
+    runStageBenchmark(
+        "vm_direct_function_calls_10k", 40,
+        [&]() { callFixture.resetExecutionForBenchmark(); },
+        [&]() {
+            callFixture.runInterpreterPreverifiedForBenchmark();
+            return kVmCallsPerIteration;
+        });
+
+    const auto vmConsumedCallProgram =
+        makeVmConsumedFunctionCallProgram(kVmCallsPerIteration, kVmCallFunctionId);
+    VM consumedCallVm(vmConsumedCallProgram, {});
+    consumedCallVm.setFunctions({{kVmCallFunctionId, makeTinyVmFunction()}}, {});
+    consumedCallVm.ensureBytecodeVerified();
+    VMRuntimeFixture consumedCallFixture(consumedCallVm);
+    runStageBenchmark(
+        "vm_direct_function_calls_consumed_10k", 40,
+        [&]() { consumedCallFixture.resetExecutionForBenchmark(); },
+        [&]() {
+            consumedCallFixture.runInterpreterPreverifiedForBenchmark();
+            return kVmCallsPerIteration;
+        });
+
+    constexpr int kStdlibFunctionCount = 622;
+    constexpr int kModuleInitializerCount = 32;
+    const auto moduleFunctions = makeVmFunctionTable(kStdlibFunctionCount);
+    const auto moduleStringPool = makeVmFunctionNamePool(kStdlibFunctionCount);
+    const auto moduleFunctionNames = makeVmFunctionNameTable(kStdlibFunctionCount);
+    std::unique_ptr<VM> moduleVm;
+    runStageBenchmark(
+        "vm_module_init_32x622_functions", 5,
+        [&]() {
+            moduleVm = std::make_unique<VM>(
+                std::vector<Instruction>{{OP_DUNG_CHUONG_TRINH, 0, 0, 0}},
+                moduleStringPool);
+            moduleVm->setFunctions(moduleFunctions, moduleFunctionNames);
+            for (int index = 0; index < kModuleInitializerCount; ++index) {
+                moduleVm->addModuleInitializer(
+                    "bench://module/" + std::to_string(index),
+                    {{OP_DUNG_CHUONG_TRINH, 0, 0, 0}});
+            }
+        },
+        [&]() {
+            moduleVm->run();
+            return kModuleInitializerCount * kStdlibFunctionCount;
+        });
 
     const std::string source = makeCompilerSource();
     const auto rawTokens = vietvm::compiler::tokenizeWithSpans(source);
@@ -196,26 +295,6 @@ int main() {
             {moduleImport},
             vietvm::compiler::ModuleIndexMode::DirectOnly);
         return index.graph.modules.size() + index.graph.edges.size() + 1;
-    });
-
-    const std::string smallJson =
-        R"({"name":"vpp","status":"ổn","escaped":"a\"b"})";
-    const std::string largeJson = makeLargeJsonBody();
-    runBenchmark("http_json_extract_small", 30000, [&]() {
-        return vietvm::helpers::extractSimpleJsonStringField(smallJson, "status").size();
-    });
-    runBenchmark("http_json_extract_large", 3000, [&]() {
-        return vietvm::helpers::extractSimpleJsonStringField(largeJson, "target").size();
-    });
-    runBenchmark("native_http_helpers", 30000, [&]() {
-        std::string path;
-        std::string query;
-        vietvm::helpers::splitPathAndQuery(
-            "/api/items?id=42&name=vpp", path, query);
-        const std::string id = vietvm::helpers::queryParam(query, "id");
-        const std::string status =
-            vietvm::helpers::extractSimpleJsonStringField(smallJson, "status");
-        return path.size() + query.size() + id.size() + status.size();
     });
 
     VM gcVm({{OP_DUNG_CHUONG_TRINH, 0, 0, 0}}, {});

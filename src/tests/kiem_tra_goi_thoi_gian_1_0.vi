@@ -1,0 +1,12 @@
+nhập thời gian;
+nhập hệ thống;
+
+hàm chính() {
+    bắt đầu = bắt đầu đo thời gian();
+    ngủ mili giây(5);
+    kết thúc = thời gian đơn điệu mili giây();
+    đã qua = thời lượng mili giây(bắt đầu, kết thúc);
+    in đã qua >= 0;
+    in mili giây thành giây(1500) == 1.5;
+    in giây thành mili giây(2.5) == 2500.0;
+};

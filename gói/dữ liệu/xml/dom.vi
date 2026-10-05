@@ -1,0 +1,52 @@
+// vi.xml.dom — thao tác cây node do vi.xml tạo ra.
+nhập gói/dữ liệu/xml/xml;
+nhập gói/bộ sưu tập/chính;
+
+hàm dom phần tử(tên) {
+    trả về {"tên": tên, "thuộc tính": {}, "nội dung": "", "con": []};
+};
+
+hàm dom tên(node) {
+    trả về lấy map(node, "tên", "");
+};
+
+hàm dom nội dung(node) {
+    trả về lấy map(node, "nội dung", "");
+};
+
+hàm dom đặt nội dung(node, nội dung) {
+    đặt map(node, "nội dung", nội dung);
+    trả về node;
+};
+
+hàm dom thuộc tính(node, khóa, mặc định = rỗng) {
+    attrs = lấy map(node, "thuộc tính", rỗng);
+    nếu (attrs == rỗng) {
+        trả về mặc định;
+    };
+    trả về lấy map(attrs, khóa, mặc định);
+};
+
+hàm dom đặt thuộc tính(node, khóa, giá trị) {
+    attrs = lấy map(node, "thuộc tính", rỗng);
+    nếu (attrs == rỗng) {
+        attrs = {};
+        đặt map(node, "thuộc tính", attrs);
+    };
+    đặt map(attrs, khóa, giá trị);
+    trả về node;
+};
+
+hàm dom con(node) {
+    trả về lấy map(node, "con", []);
+};
+
+hàm dom thêm con(node, child) {
+    children = lấy map(node, "con", rỗng);
+    nếu (children == rỗng) {
+        children = [];
+        đặt map(node, "con", children);
+    };
+    thêm(children, child);
+    trả về node;
+};

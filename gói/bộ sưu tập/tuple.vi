@@ -1,0 +1,26 @@
+// Module: lõi.tuple
+// Tuple MVP là collection bất biến, tạo từ list và chuyển ngược về list.
+
+hàm thành tuple(ds) {
+    trả về thanh_tuple(ds);
+};
+
+hàm thành list nội bộ(giá trị, chỉ_số, kết_quả) {
+    nếu (chỉ_số >= do_dai(giá trị)) {
+        trả về kết_quả;
+    };
+    them(kết_quả, giá trị[chỉ_số]);
+    trả về thành list nội bộ(giá trị, chỉ_số + 1, kết_quả);
+};
+
+hàm thành list(giá trị) {
+    nếu (loai_cua(giá trị) != "danh sách" && loai_cua(giá trị) != "tuple") {
+        ném "thành danh sách chỉ nhận danh sách hoặc bộ";
+    };
+    // Sao chép nông: list mới độc lập, phần tử tham chiếu vẫn được chia sẻ.
+    trả về thành list nội bộ(giá trị, 0, []);
+};
+
+hàm thanh_list(giá trị) {
+    trả về thành list(giá trị);
+};

@@ -1,0 +1,26 @@
+nhập bảng mã;
+
+hàm chính() {
+    in bảng mã hỗ trợ("UTF-8");
+    in bảng mã hỗ trợ("ISO-8859-1");
+    in bảng mã hỗ trợ("UTF-16");
+    bytes = mã hóa bảng mã("Aé", "latin-1");
+    in bytes;
+    in giải mã bảng mã(bytes, "ISO-8859-1");
+    utf8 = mã hóa bảng mã("Việt", "UTF-8");
+    in giải mã bảng mã(utf8, "UTF-8");
+    in mã hóa bảng mã("ABC", "US-ASCII");
+    in giải mã bảng mã([65, 66, 67], "ASCII");
+    in mã hóa bảng mã("ÿ", "ISO_8859 1");
+    in giải mã bảng mã([255], "latin1");
+
+    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    thử {
+        in giải mã bảng mã([195, 40], "UTF-8");
+    } bắt lỗi (e) {
+        in e;
+    };
+    in giải mã bảng mã([195, 40], "UTF-8", "THAY_THẾ") == ký_tự_thay + "(";
+    in giải mã bảng mã([226, 130], "UTF-8", "replace") == ký_tự_thay;
+    in giải mã bảng mã([65, 255, 66], "ASCII", "thay thế") == "A" + ký_tự_thay + "B";
+};

@@ -1,4 +1,3 @@
-// Gói mạng thống nhất: HTTP native, máy chủ mức thấp, JSON và REST.
-nhập gói/mạng/mạng;
-nhập gói/mạng/json;
-nhập gói/mạng/rest;
+// Gói mạng thống nhất: HTTP/REST viết bằng V++ trên các primitive transport.
+nhập gói/mạng/http/chính;
+nhập gói/dữ liệu/json/chính;

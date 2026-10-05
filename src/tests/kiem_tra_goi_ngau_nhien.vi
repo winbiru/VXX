@@ -1,0 +1,48 @@
+nhập ngẫu nhiên;
+
+hàm chính() {
+    a = tạo bộ sinh ngẫu nhiên(2026);
+    b = tạo bộ sinh ngẫu nhiên(2026);
+    in ngẫu nhiên nguyên từ bộ(a, -100, 100) == ngẫu nhiên nguyên từ bộ(b, -100, 100);
+    in ngẫu nhiên nguyên từ bộ(a, 0, 1000000) == ngẫu nhiên nguyên từ bộ(b, 0, 1000000);
+    in ngẫu nhiên thực từ bộ(a) == ngẫu nhiên thực từ bộ(b);
+    c = tạo bộ sinh ngẫu nhiên(1);
+    x = ngẫu nhiên nguyên từ bộ(c, -5, 5);
+    in x >= -5 && x <= 5;
+    y = ngẫu nhiên thực từ bộ(c);
+    in y > 0.0 && y < 1.0;
+
+    d = prng(12345);
+    in lay_map(trạng thái bộ sinh ngẫu nhiên(d), "thuật toán", "");
+    in random i64(d, 0, 9);
+    snapshot = trạng thái bộ sinh ngẫu nhiên(d);
+    tiếp_1 = random i64(d, -1000, 1000);
+    phục_hồi = khôi phục bộ sinh ngẫu nhiên(snapshot);
+    tiếp_2 = random i64(phục_hồi, -1000, 1000);
+    in tiếp_1 == tiếp_2;
+    in loai_cua(random bool(d));
+    bytes = ngẫu nhiên bytes từ bộ(d, 8);
+    in do_dai(bytes);
+    hợp_lệ_bytes = đúng;
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] < 0 || bytes[i] > 255) {
+            hợp_lệ_bytes = sai;
+        };
+    };
+    in hợp_lệ_bytes;
+    thử {
+        random i64(d, 5, 4);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        khôi phục bộ sinh ngẫu nhiên({"thuật toán": "khác", "trạng thái": 1});
+    } bắt lỗi (e) {
+        in e;
+    };
+    in xóa bộ sinh ngẫu nhiên(c);
+    in xóa bộ sinh ngẫu nhiên(a);
+    in xóa bộ sinh ngẫu nhiên(b);
+    in xóa bộ sinh ngẫu nhiên(d);
+    in xóa bộ sinh ngẫu nhiên(phục_hồi);
+};

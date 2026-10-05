@@ -1,10 +1,561 @@
 // Module: lõi.định dạng
 // ABI V1 dùng một list đối số vì ngôn ngữ chưa có vararg public ổn định.
-// Backend native trả map {"giá trị", "lỗi"}; wrapper đổi FORMAT_* thành
-// language exception để caller có thể bắt bằng `thử`.
+// Parser, validation, grouping, padding và dispatch kiểu nằm ở V++.
+// Native chỉ giữ primitive dựng biểu diễn IEEE-754 cho f/e/g vì tầng ngôn ngữ
+// chưa có decimal formatter đủ chính xác để tự tái tạo iostream semantics.
+
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/danh sách;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/ký hiệu vùng;
+nhập gói/văn bản/chuỗi;
+
+hàm định dạng có ký tự(văn_bản, ký_tự) {
+    lặp(i = 0; i < độ dài(văn_bản); i++) {
+        nếu (văn_bản[i] == ký_tự) {
+            trả về đúng;
+        };
+    };
+    trả về sai;
+};
+
+hàm định dạng là chữ số(c) {
+    trả về c >= "0" && c <= "9";
+};
+
+hàm định dạng đọc số(pattern, bắt_đầu, kết_thúc, lỗi) {
+    nếu (bắt_đầu == kết_thúc) {
+        ném lỗi;
+    };
+    giá_trị = 0;
+    lặp(i = bắt_đầu; i < kết_thúc; i++) {
+        c = pattern[i];
+        nếu (!định dạng là chữ số(c)) {
+            ném lỗi;
+        };
+        chữ_số = thành số nguyên(c);
+        nếu (giá_trị > (1048576 - chữ_số) / 10) {
+            ném lỗi;
+        };
+        giá_trị = giá_trị * 10 + chữ_số;
+    };
+    trả về giá_trị;
+};
+
+hàm định dạng cờ ngoài(cờ, cho_phép) {
+    lặp(i = 0; i < độ dài(cờ); i++) {
+        nếu (!định dạng có ký tự(cho_phép, cờ[i])) {
+            trả về đúng;
+        };
+    };
+    trả về sai;
+};
+
+hàm định dạng chuyển đổi hợp lệ(c) {
+    trả về c == "s" || c == "b" || c == "c" || c == "d" ||
+        c == "o" || c == "x" || c == "X" || c == "f" ||
+        c == "e" || c == "E" || c == "g" || c == "G" ||
+        c == "%" || c == "n";
+};
+
+hàm định dạng xác thực spec(spec) {
+    cờ = lấy map(spec, "cờ", "");
+    chuyển = lấy map(spec, "chuyển", "");
+    có_rộng = lấy map(spec, "có rộng", sai);
+    có_chính_xác = lấy map(spec, "có chính xác", sai);
+
+    nếu (định dạng có ký tự(cờ, "-") && định dạng có ký tự(cờ, "0")) {
+        ném "FORMAT_FLAG_MISMATCH";
+    };
+    nếu (định dạng có ký tự(cờ, "+") && định dạng có ký tự(cờ, " ")) {
+        ném "FORMAT_FLAG_MISMATCH";
+    };
+    nếu (định dạng có ký tự(cờ, "(") &&
+        (định dạng có ký tự(cờ, "+") || định dạng có ký tự(cờ, " "))) {
+        ném "FORMAT_FLAG_MISMATCH";
+    };
+    nếu ((định dạng có ký tự(cờ, "-") || định dạng có ký tự(cờ, "0")) && !có_rộng) {
+        ném "FORMAT_MISSING_WIDTH";
+    };
+
+    nếu (chuyển == "s" || chuyển == "b") {
+        nếu (định dạng cờ ngoài(cờ, "-")) { ném "FORMAT_FLAG_MISMATCH"; };
+    } nếu không {
+        nếu (chuyển == "c") {
+            nếu (định dạng cờ ngoài(cờ, "-") || có_chính_xác) {
+                ném "FORMAT_FLAG_MISMATCH";
+            };
+        } nếu không {
+            nếu (chuyển == "d") {
+                nếu (định dạng cờ ngoài(cờ, "-+0 ,(") || có_chính_xác) {
+                    ném "FORMAT_FLAG_MISMATCH";
+                };
+            } nếu không {
+                nếu (chuyển == "o" || chuyển == "x" || chuyển == "X") {
+                    nếu (định dạng cờ ngoài(cờ, "-0") || có_chính_xác) {
+                        ném "FORMAT_FLAG_MISMATCH";
+                    };
+                } nếu không {
+                    nếu (chuyển == "f") {
+                        nếu (định dạng cờ ngoài(cờ, "-+0 ,(")) {
+                            ném "FORMAT_FLAG_MISMATCH";
+                        };
+                    } nếu không {
+                        nếu (chuyển == "e" || chuyển == "E") {
+                            nếu (định dạng cờ ngoài(cờ, "-+0 (")) {
+                                ném "FORMAT_FLAG_MISMATCH";
+                            };
+                        } nếu không {
+                            nếu (chuyển == "g" || chuyển == "G") {
+                                nếu (định dạng cờ ngoài(cờ, "-+0 ,(")) {
+                                    ném "FORMAT_FLAG_MISMATCH";
+                                };
+                            } nếu không {
+                                nếu (chuyển == "%") {
+                                    nếu (định dạng cờ ngoài(cờ, "-") || có_chính_xác) {
+                                        ném "FORMAT_FLAG_MISMATCH";
+                                    };
+                                } nếu không {
+                                    nếu (chuyển == "n") {
+                                        nếu (cờ != "" || có_rộng || có_chính_xác) {
+                                            ném "FORMAT_FLAG_MISMATCH";
+                                        };
+                                    };
+                                };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    trả về đúng;
+};
+
+hàm định dạng lặp(ký_tự, số_lượng) {
+    kết_quả = "";
+    lặp(i = 0; i < số_lượng; i++) {
+        kết_quả = kết_quả + ký_tự;
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng đệm(giá_trị, spec, số = sai, tiền_tố = 0, hậu_tố = 0) {
+    nếu (!lấy map(spec, "có rộng", sai)) {
+        trả về giá_trị;
+    };
+    rộng = lấy map(spec, "rộng", 0);
+    n = độ dài(giá_trị);
+    nếu (rộng <= n) {
+        trả về giá_trị;
+    };
+    thêm_vào = rộng - n;
+    cờ = lấy map(spec, "cờ", "");
+    nếu (định dạng có ký tự(cờ, "-")) {
+        trả về giá_trị + định dạng lặp(" ", thêm_vào);
+    };
+    nếu (số && định dạng có ký tự(cờ, "0")) {
+        giữa = n - tiền_tố - hậu_tố;
+        nếu (giữa < 0) { giữa = 0; };
+        đầu = cắt chuỗi(giá_trị, 0, tiền_tố);
+        thân = cắt chuỗi(giá_trị, tiền_tố, giữa);
+        đuôi = cắt chuỗi(giá_trị, tiền_tố + giữa, hậu_tố);
+        trả về đầu + định dạng lặp("0", thêm_vào) + thân + đuôi;
+    };
+    trả về định dạng lặp(" ", thêm_vào) + giá_trị;
+};
+
+hàm định dạng nhóm chữ số(chữ_số, phân_cách = ",") {
+    n = độ dài(chữ_số);
+    nếu (n == 0) { trả về chữ_số; };
+    đầu = n % 3;
+    nếu (đầu == 0) { đầu = 3; };
+    kết_quả = "";
+    lặp(i = 0; i < n; i++) {
+        nếu (i != 0 && (i == đầu || (i > đầu && (i - đầu) % 3 == 0))) {
+            kết_quả = kết_quả + phân_cách;
+        };
+        kết_quả = kết_quả + chữ_số[i];
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng nhóm số thực(thân, phân_cách = ",", thập_phân = ".") {
+    n = độ dài(thân);
+    mũ = n;
+    chấm = n;
+    lặp(i = 0; i < n; i++) {
+        nếu (mũ == n && (thân[i] == "e" || thân[i] == "E")) { mũ = i; };
+        nếu (chấm == n && thân[i] == thập_phân) { chấm = i; };
+    };
+    hết_nguyên = chấm;
+    nếu (mũ < hết_nguyên) { hết_nguyên = mũ; };
+    trả về định dạng nhóm chữ số(cắt chuỗi(thân, 0, hết_nguyên), phân_cách) +
+        cắt chuỗi(thân, hết_nguyên, n - hết_nguyên);
+};
+
+hàm định dạng áp ký hiệu thập phân(thân, ký_hiệu) {
+    thập_phân = lấy map(ký_hiệu, "thập phân", ".");
+    nếu (thập_phân == ".") {
+        trả về thân;
+    };
+    kết_quả = "";
+    đã_thay = sai;
+    lặp(i = 0; i < độ dài(thân); i++) {
+        c = thân[i];
+        nếu (!đã_thay && c == ".") {
+            kết_quả = kết_quả + thập_phân;
+            đã_thay = đúng;
+        } nếu không {
+            kết_quả = kết_quả + c;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng cơ số dương(giá_trị, cơ_số, hoa) {
+    chữ = "0123456789abcdef";
+    nếu (hoa) { chữ = "0123456789ABCDEF"; };
+    nếu (giá_trị == 0) { trả về "0"; };
+    kết_quả = "";
+    còn_lại = giá_trị;
+    lặp(vòng = 0; còn_lại > 0; vòng++) {
+        dư = còn_lại % cơ_số;
+        kết_quả = chữ[dư] + kết_quả;
+        còn_lại = lam_tron_xuong(còn_lại / cơ_số);
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng thân số nguyên(giá_trị, chuyển) {
+    âm = giá_trị < 0;
+    nếu (giá_trị == 0 - 2147483647 - 1) {
+        nếu (chuyển == "d") { trả về "2147483648"; };
+        nếu (chuyển == "o") { trả về "20000000000"; };
+        nếu (chuyển == "X") { trả về "80000000"; };
+        trả về "80000000";
+    };
+    độ_lớn = giá_trị;
+    nếu (âm) { độ_lớn = 0 - giá_trị; };
+    cơ_số = 10;
+    nếu (chuyển == "o") { cơ_số = 8; };
+    nếu (chuyển == "x" || chuyển == "X") { cơ_số = 16; };
+    trả về định dạng cơ số dương(độ_lớn, cơ_số, chuyển == "X");
+};
+
+hàm định dạng áp dấu(thân, âm, spec) {
+    cờ = lấy map(spec, "cờ", "");
+    tiền_tố = 0;
+    hậu_tố = 0;
+    nếu (âm && định dạng có ký tự(cờ, "(")) {
+        thân = "(" + thân + ")";
+        tiền_tố = 1;
+        hậu_tố = 1;
+    } nếu không {
+        nếu (âm) {
+            thân = "-" + thân;
+            tiền_tố = 1;
+        } nếu không {
+            nếu (định dạng có ký tự(cờ, "+")) {
+                thân = "+" + thân;
+                tiền_tố = 1;
+            } nếu không {
+                nếu (định dạng có ký tự(cờ, " ")) {
+                    thân = " " + thân;
+                    tiền_tố = 1;
+                };
+            };
+        };
+    };
+    trả về định dạng đệm(thân, spec, đúng, tiền_tố, hậu_tố);
+};
+
+hàm định dạng ký tự mã(mã) {
+    nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
+        ném "FORMAT_CODEPOINT";
+    };
+    bytes = [];
+    nếu (mã <= 127) {
+        thêm(bytes, mã);
+    } nếu không {
+        nếu (mã <= 2047) {
+            thêm(bytes, 192 + lam_tron_xuong(mã / 64));
+            thêm(bytes, 128 + mã % 64);
+        } nếu không {
+            nếu (mã <= 65535) {
+                thêm(bytes, 224 + lam_tron_xuong(mã / 4096));
+                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
+                thêm(bytes, 128 + mã % 64);
+            } nếu không {
+                thêm(bytes, 240 + lam_tron_xuong(mã / 262144));
+                thêm(bytes, 128 + (lam_tron_xuong(mã / 4096) % 64));
+                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
+                thêm(bytes, 128 + mã % 64);
+            };
+        };
+    };
+    trả về giải mã bảng mã(bytes, "UTF-8");
+};
+
+hàm định dạng truthy(giá_trị) {
+    kiểu = loại của(giá_trị);
+    nếu (kiểu == "rỗng") { trả về sai; };
+    nếu (kiểu == "số nguyên" || kiểu == "số thực") {
+        trả về giá_trị != 0;
+    };
+    nếu (kiểu == "chuỗi" || kiểu == "danh sách" || kiểu == "tuple" || kiểu == "từ điển") {
+        trả về độ dài(giá_trị) > 0;
+    };
+    trả về đúng;
+};
+
+hàm có thể định dạng(callback) {
+    trả về {
+        "loại": "CóThểĐịnhDạng",
+        "callback": callback
+    };
+};
+
+hàm định dạng custom(giá_trị, spec, ký_hiệu) {
+    nếu (loại của(giá_trị) != "từ điển") {
+        trả về rỗng;
+    };
+    nếu (lấy map(giá_trị, "loại", "") != "CóThểĐịnhDạng") {
+        trả về rỗng;
+    };
+    callback = lấy map(giá_trị, "callback", rỗng);
+    context = {
+        "cờ": lấy map(spec, "cờ", ""),
+        "rộng": lấy map(spec, "rộng", 0),
+        "có rộng": lấy map(spec, "có rộng", sai),
+        "chính xác": lấy map(spec, "chính xác", 0),
+        "có chính xác": lấy map(spec, "có chính xác", sai),
+        "locale": lấy map(ký_hiệu, "tên", "C")
+    };
+    văn_bản = callback(context);
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "FORMAT_FORMATTABLE";
+    };
+    trả về văn_bản;
+};
+
+hàm định dạng giá trị(giá_trị, spec, ký_hiệu) {
+    chuyển = lấy map(spec, "chuyển", "");
+    có_chính_xác = lấy map(spec, "có chính xác", sai);
+    chính_xác = lấy map(spec, "chính xác", 0);
+
+    nếu (chuyển == "s") {
+        văn_bản = định dạng custom(giá_trị, spec, ký_hiệu);
+        nếu (văn_bản == rỗng) {
+            văn_bản = thành chuỗi(giá_trị);
+        };
+        nếu (có_chính_xác && độ dài(văn_bản) > chính_xác) {
+            văn_bản = cắt chuỗi(văn_bản, 0, chính_xác);
+        };
+        trả về định dạng đệm(văn_bản, spec);
+    };
+    nếu (chuyển == "b") {
+        văn_bản = "false";
+        nếu (định dạng truthy(giá_trị)) { văn_bản = "true"; };
+        nếu (có_chính_xác && độ dài(văn_bản) > chính_xác) {
+            văn_bản = cắt chuỗi(văn_bản, 0, chính_xác);
+        };
+        trả về định dạng đệm(văn_bản, spec);
+    };
+    nếu (chuyển == "c") {
+        kiểu = loại của(giá_trị);
+        nếu (kiểu == "số nguyên") {
+            văn_bản = định dạng ký tự mã(giá_trị);
+        } nếu không {
+            nếu (kiểu == "chuỗi" && độ dài(giá_trị) == 1) {
+                văn_bản = giá_trị;
+            } nếu không {
+                ném "FORMAT_CONVERSION";
+            };
+        };
+        trả về định dạng đệm(văn_bản, spec);
+    };
+    nếu (chuyển == "d" || chuyển == "o" || chuyển == "x" || chuyển == "X") {
+        nếu (loại của(giá_trị) != "số nguyên") {
+            ném "FORMAT_CONVERSION";
+        };
+        thân = định dạng thân số nguyên(giá_trị, chuyển);
+        nếu (chuyển == "d" && định dạng có ký tự(lấy map(spec, "cờ", ""), ",")) {
+            thân = định dạng nhóm chữ số(thân, lấy map(ký_hiệu, "nhóm", ","));
+        };
+        trả về định dạng áp dấu(thân, giá_trị < 0, spec);
+    };
+    nếu (chuyển == "f" || chuyển == "e" || chuyển == "E" ||
+        chuyển == "g" || chuyển == "G") {
+        kiểu = loại của(giá_trị);
+        nếu (kiểu != "số nguyên" && kiểu != "số thực") {
+            ném "FORMAT_CONVERSION";
+        };
+        nếu (!có_chính_xác) { chính_xác = 6; };
+        native = dinh_dang_so_thuc_noi_bo(giá_trị, chuyển, chính_xác);
+        thân = lấy map(native, "thân", "");
+        âm = lấy map(native, "âm", sai);
+        thân = định dạng áp ký hiệu thập phân(thân, ký_hiệu);
+        nếu (định dạng có ký tự(lấy map(spec, "cờ", ""), ",") &&
+            (chuyển == "f" || chuyển == "g" || chuyển == "G")) {
+            thân = định dạng nhóm số thực(
+                thân,
+                lấy map(ký_hiệu, "nhóm", ","),
+                lấy map(ký_hiệu, "thập phân", ".")
+            );
+        };
+        trả về định dạng áp dấu(thân, âm, spec);
+    };
+    ném "FORMAT_UNKNOWN_CONVERSION";
+};
+
+hàm định dạng thực thi(pattern, args, locale) {
+    nếu (loại của(pattern) != "chuỗi" || loại của(args) != "danh sách") {
+        ném "FORMAT_INVALID";
+    };
+    thử {
+        ký_hiệu = ký hiệu vùng lấy(locale);
+    } bắt lỗi (e) {
+        ném "FORMAT_LOCALE";
+    };
+    nếu (độ dài(mã hóa bảng mã(pattern, "UTF-8")) > 1048576) {
+        ném "FORMAT_RESOURCE_LIMIT";
+    };
+
+    kết_quả = "";
+    n = độ dài(pattern);
+    con_trỏ = 0;
+    chỉ_số_ngầm = 0;
+    đã_tường_minh = sai;
+    đã_ngầm = sai;
+
+    lặp(vòng = 0; con_trỏ < n; vòng++) {
+        nếu (pattern[con_trỏ] != "%") {
+            kết_quả = kết_quả + pattern[con_trỏ];
+            con_trỏ = con_trỏ + 1;
+        } nếu không {
+            pos = con_trỏ + 1;
+            nếu (pos >= n) { ném "FORMAT_INVALID"; };
+
+            bắt_đầu_số = pos;
+            lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
+                pos = pos + 1;
+            };
+            có_chỉ_số = sai;
+            chỉ_số = 0;
+            nếu (pos > bắt_đầu_số && pos < n && pattern[pos] == "$") {
+                một_gốc = định dạng đọc số(pattern, bắt_đầu_số, pos, "FORMAT_INVALID");
+                nếu (một_gốc == 0) { ném "FORMAT_INVALID"; };
+                chỉ_số = một_gốc - 1;
+                có_chỉ_số = đúng;
+                pos = pos + 1;
+            } nếu không {
+                pos = bắt_đầu_số;
+            };
+
+            cờ = "";
+            đang_cờ = đúng;
+            lặp(k = 0; pos < n && đang_cờ; k++) {
+                c = pattern[pos];
+                nếu (c == "-" || c == "+" || c == "0" || c == " " || c == "," || c == "(") {
+                    nếu (định dạng có ký tự(cờ, c)) { ném "FORMAT_DUPLICATE_FLAG"; };
+                    cờ = cờ + c;
+                    pos = pos + 1;
+                } nếu không {
+                    nếu (c == "#" || c == "<") { ném "FORMAT_UNKNOWN_FLAG"; };
+                    đang_cờ = sai;
+                };
+            };
+
+            bắt_đầu_rộng = pos;
+            lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
+                pos = pos + 1;
+            };
+            có_rộng = pos > bắt_đầu_rộng;
+            rộng = 0;
+            nếu (có_rộng) {
+                rộng = định dạng đọc số(pattern, bắt_đầu_rộng, pos, "FORMAT_WIDTH");
+            };
+
+            có_chính_xác = sai;
+            chính_xác = 0;
+            nếu (pos < n && pattern[pos] == ".") {
+                có_chính_xác = đúng;
+                pos = pos + 1;
+                bắt_đầu_chính_xác = pos;
+                lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
+                    pos = pos + 1;
+                };
+                nếu (bắt_đầu_chính_xác == pos) { ném "FORMAT_PRECISION"; };
+                chính_xác = định dạng đọc số(pattern, bắt_đầu_chính_xác, pos, "FORMAT_PRECISION");
+            };
+
+            nếu (pos >= n) { ném "FORMAT_INVALID"; };
+            chuyển = pattern[pos];
+            pos = pos + 1;
+            nếu (!định dạng chuyển đổi hợp lệ(chuyển)) {
+                ném "FORMAT_UNKNOWN_CONVERSION";
+            };
+            nếu ((chuyển == "%" || chuyển == "n") && có_chỉ_số) {
+                ném "FORMAT_INVALID";
+            };
+
+            spec = {
+                "cờ": cờ,
+                "rộng": rộng,
+                "có rộng": có_rộng,
+                "chính xác": chính_xác,
+                "có chính xác": có_chính_xác,
+                "chuyển": chuyển
+            };
+            định dạng xác thực spec(spec);
+
+            nếu (chuyển == "%") {
+                kết_quả = kết_quả + định dạng đệm("%", spec);
+            } nếu không {
+                nếu (chuyển == "n") {
+                    kết_quả = kết_quả + "\n";
+                } nếu không {
+                    nếu (có_chỉ_số) {
+                        đã_tường_minh = đúng;
+                    } nếu không {
+                        đã_ngầm = đúng;
+                    };
+                    nếu (đã_tường_minh && đã_ngầm) { ném "FORMAT_INVALID"; };
+
+                    dùng = chỉ_số_ngầm;
+                    nếu (có_chỉ_số) {
+                        dùng = chỉ_số;
+                    } nếu không {
+                        chỉ_số_ngầm = chỉ_số_ngầm + 1;
+                    };
+                    nếu (dùng < 0 || dùng >= độ dài(args)) {
+                        ném "FORMAT_MISSING_ARGUMENT";
+                    };
+                    kết_quả = kết_quả + định dạng giá trị(args[dùng], spec, ký_hiệu);
+                };
+            };
+            nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+                ném "FORMAT_RESOURCE_LIMIT";
+            };
+            con_trỏ = pos;
+        };
+    };
+
+    nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+        ném "FORMAT_RESOURCE_LIMIT";
+    };
+    trả về kết_quả;
+};
 
 hàm định dạng nội bộ(pattern, args, locale) {
-    ném "stdlib: định dạng native hook không khả dụng";
+    thử {
+        trả về {"giá trị": định dạng thực thi(pattern, args, locale), "lỗi": ""};
+    } bắt lỗi (e) {
+        trả về {"giá trị": "", "lỗi": e};
+    };
 };
 
 hàm định dạng(pattern, args, locale = rỗng) {
@@ -14,4 +565,63 @@ hàm định dạng(pattern, args, locale = rỗng) {
         ném lỗi;
     };
     trả về lấy map(kết_quả, "giá trị", "");
+};
+
+// Appendable V++ đầu tiên là BộDựngChuỗi. Engine format dựng output atomically
+// rồi append một lần, vì vậy formatter không để lại prefix dở nếu parse/render lỗi.
+hàm định dạng vào(đích, pattern, args, locale = rỗng) {
+    thử {
+        bộ dựng yêu cầu(đích);
+    } bắt lỗi (e) {
+        ném "FORMAT_APPENDABLE";
+    };
+    văn_bản = định dạng(pattern, args, locale);
+    thử {
+        bộ dựng thêm(đích, văn_bản);
+    } bắt lỗi (e) {
+        nếu (e == "STRING_RESOURCE_LIMIT") {
+            ném "FORMAT_RESOURCE_LIMIT";
+        };
+        ném "FORMAT_APPENDABLE";
+    };
+    trả về đích;
+};
+
+// Processor cho MẫuChuỗi. Format spec nằm ở danh sách `specs`, tách khỏi
+// values của template; vì vậy dữ liệu không bao giờ được diễn giải như cú pháp.
+hàm bộ xử lý mẫu định dạng(specs = rỗng, locale = rỗng) {
+    processor = hàm(template) {
+        mẫu chuỗi yêu cầu(template);
+        mảnh = lấy map(template, "mảnh", []);
+        giá_trị = lấy map(template, "giá trị", []);
+        nếu (specs != rỗng) {
+            nếu (loại của(specs) != "danh sách") {
+                ném "FORMAT_PROCESSOR_INVALID";
+            };
+            nếu (độ dài(specs) != độ dài(giá_trị)) {
+                ném "FORMAT_PROCESSOR_INVALID";
+            };
+        };
+
+        kết_quả = "";
+        lặp(i = 0; i < độ dài(giá_trị); i++) {
+            spec = "%s";
+            nếu (specs != rỗng) {
+                spec = specs[i];
+                nếu (loại của(spec) != "chuỗi") {
+                    ném "FORMAT_PROCESSOR_INVALID";
+                };
+            };
+            kết_quả = kết_quả + mảnh[i] + định dạng(spec, [giá_trị[i]], locale);
+            nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+                ném "FORMAT_RESOURCE_LIMIT";
+            };
+        };
+        kết_quả = kết_quả + mảnh[độ dài(mảnh) - 1];
+        nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+            ném "FORMAT_RESOURCE_LIMIT";
+        };
+        trả về kết_quả;
+    };
+    trả về processor;
 };

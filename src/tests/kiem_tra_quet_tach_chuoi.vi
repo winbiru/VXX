@@ -61,4 +61,30 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
+
+    regex_scan = scanner regex("a   b\tc", "\\s+");
+    in token(regex_scan);
+    in token(regex_scan);
+    in token(regex_scan);
+
+    regex_parts = tách token regex("a--b---c", "-+");
+    lặp(i = 0; i < độ dài(regex_parts); i++) {
+        in regex_parts[i];
+    };
+
+    regex_keep = tách token regex("a--b---c", "-+", đúng);
+    lặp(i = 0; i < độ dài(regex_keep); i++) {
+        in regex_keep[i];
+    };
+
+    regex_skip = scanner("abc123", "");
+    scanner bỏ regex(regex_skip, "[a-z]+");
+    in token(regex_skip);
+
+    thử {
+        scanner regex("abc", "a*");
+    } bắt lỗi (e) {
+        in e;
+    };
+
 };

@@ -1,0 +1,37 @@
+nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
+
+hàm chính() {
+    mysql = db phân tích cấu hình(
+        "com.mysql.cj.jdbc.Driver",
+        "jdbc:mysql://db.local:3307/app_db?createDatabaseIfNotExist=true"
+    );
+    in lấy map(mysql, "ok", sai);
+    in lấy map(mysql, "engine", "");
+    in lấy map(mysql, "host", "");
+    in lấy map(mysql, "port", 0);
+    in lấy map(mysql, "database", "");
+    in lấy map(mysql, "create", sai);
+
+    pg = db phân tích cấu hình(
+        "org.postgresql.Driver",
+        "jdbc:postgresql://localhost/demo"
+    );
+    in lấy map(pg, "port", 0);
+    in lấy map(pg, "database", "");
+
+    sqlite = db phân tích cấu hình(
+        "org.sqlite.JDBC",
+        "jdbc:sqlite:src/tests/.tmp-db.sqlite"
+    );
+    in lấy map(sqlite, "engine", "");
+    in lấy map(sqlite, "path", "");
+
+    lỗi_cổng = db phân tích cấu hình(
+        "mysql",
+        "jdbc:mysql://localhost:x/demo"
+    );
+    in lấy map(lỗi_cổng, "reason", "");
+    in lấy map(db phân tích cấu hình("", "ftp://localhost/a"), "reason", "");
+    in db định danh an toàn("app_2026");
+    in db định danh an toàn("app-prod");
+};

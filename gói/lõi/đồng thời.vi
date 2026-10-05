@@ -1,0 +1,63 @@
+// vi.concurrent — tác vụ trễ với timeout/hủy.
+// Public API chọn thao tác ở V++; native chỉ giữ một primitive quản lý
+// worker thread/task registry. 0.2 chỉ truyền kết quả scalar.
+
+nhập gói/lõi/chuyển kiểu;
+
+hàm đồng thời yêu cầu số nguyên(giá_trị, tên_hàm, nhãn) {
+    thử {
+        trả về thành số nguyên(giá_trị);
+    } bắt lỗi (e) {
+        ném tên_hàm + ": " + nhãn + " không hợp lệ";
+    };
+};
+
+hàm đồng thời yêu cầu mã tác vụ(giá_trị, tên_hàm) {
+    mã = đồng thời yêu cầu số nguyên(giá_trị, tên_hàm, "mã tác vụ");
+    nếu (mã <= 0) {
+        ném tên_hàm + ": mã tác vụ phải dương";
+    };
+    trả về mã;
+};
+
+hàm tác vụ sau(độ trễ mili giây, kết quả) {
+    độ trễ mili giây = đồng thời yêu cầu số nguyên(
+        độ trễ mili giây,
+        "tac_vu_sau",
+        "độ trễ mili giây"
+    );
+    nếu (độ trễ mili giây < 0 || độ trễ mili giây > 86400000) {
+        ném "tác vụ sau: độ trễ phải trong 0..86400000 ms";
+    };
+    trả về task_native_exec("schedule", độ trễ mili giây, kết quả);
+};
+
+hàm chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
+    mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "cho_tac_vu");
+    thời gian chờ mili giây = đồng thời yêu cầu số nguyên(
+        thời gian chờ mili giây,
+        "cho_tac_vu",
+        "thời gian chờ mili giây"
+    );
+    nếu (thời gian chờ mili giây < 0) {
+        ném "chờ tác vụ: thời gian chờ phải không âm";
+    };
+    trả về task_native_exec("wait", mã tác vụ, thời gian chờ mili giây);
+};
+
+hàm hủy tác vụ(mã tác vụ) {
+    mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "huy_tac_vu");
+    trả về task_native_exec("cancel", mã tác vụ, 0);
+};
+
+hàm trạng thái tác vụ(mã tác vụ) {
+    mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "trang_thai_tac_vu");
+    trạng_thái = task_native_exec("status", mã tác vụ, 0);
+    nếu (trạng_thái == 0) {
+        trả về "đang chạy";
+    };
+    nếu (trạng_thái == 1) {
+        trả về "hoàn tất";
+    };
+    trả về "đã hủy";
+};

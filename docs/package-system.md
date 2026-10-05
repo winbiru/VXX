@@ -1,4 +1,4 @@
-# Package system V++ 0.9
+# Package system V++ 1.0
 
 Tài liệu này mô tả contract package hiện được triển khai trong compiler và CLI.
 Local path, Git và filesystem registry package, dependency graph transitive,
@@ -20,6 +20,11 @@ project/
 
 `gói/` là tên thư mục chuẩn. Resolver vẫn nhận `goi/` và `packages/` để tương thích
 project cũ. Package entry mặc định là `chính.vi`.
+
+Riêng thư viện chuẩn đi kèm V++, các module nền tảng dạng một file có thể đặt tại
+`gói/lõi/<tên-module>.vi`. Bare import sẽ thử layout package thông thường trước,
+sau đó mới fallback tới file trong `gói/lõi/`; vì vậy package project-local vẫn
+giữ precedence và không bị module chuẩn che khuất.
 
 ## `vpp.json` schema 1
 
@@ -72,7 +77,7 @@ kế thừa registry root bao quanh, còn project gốc dùng biến `VPP_REGIST
 
 ## Registry v1
 
-Registry 0.9 là filesystem-backed store, phù hợp local, shared disk hoặc mounted volume:
+Registry v1 là filesystem-backed store, phù hợp local, shared disk hoặc mounted volume:
 
 ```text
 registry/

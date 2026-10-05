@@ -1,0 +1,255 @@
+// vi.charsets — chuyển đổi chuỗi UTF-8 với các bảng mã nền tảng ổn định.
+// Logic bảng mã nằm ở V++; native chỉ giữ primitive chuyển chuỗi UTF-8 hợp lệ
+// sang byte UTF-8 và ngược lại.
+
+// Hạ chữ ngay trong V++ để module bảng mã không cần primitive đổi
+// hoa/thường của runtime. Chế độ lỗi có cả từ khóa tiếng Việt như BÁO_LỖI,
+// vì vậy bảng giữ cùng contract ASCII + chữ dựng sẵn tiếng Việt của vi.text.
+hàm bảng mã thường nội bộ(văn_bản) {
+    hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+          "ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
+    thường = "abcdefghijklmnopqrstuvwxyz" +
+             "ăâêôơưđàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ";
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(văn_bản); i++) {
+        c = văn_bản[i];
+        thay = c;
+        tìm_thấy = sai;
+        lặp(j = 0; j < do_dai(hoa) && !tìm_thấy; j++) {
+            nếu (hoa[j] == c) {
+                thay = thường[j];
+                tìm_thấy = đúng;
+            };
+        };
+        kết_quả = kết_quả + thay;
+    };
+    trả về kết_quả;
+};
+
+hàm bảng mã chuẩn hóa tên(tên bảng mã) {
+    nếu (loai_cua(tên bảng mã) != "chuỗi") {
+        ném "bảng mã: tên bảng mã phải là chuỗi";
+    };
+
+    tên = bảng mã thường nội bộ(tên bảng mã);
+    gọn = "";
+    lặp(i = 0; i < do_dai(tên); i++) {
+        c = tên[i];
+        nếu (c != "-" && c != "_" && c != " ") {
+            gọn = gọn + c;
+        };
+    };
+    nếu (gọn == "utf8") { trả về "utf8"; };
+    nếu (gọn == "ascii" || gọn == "usascii") { trả về "ascii"; };
+    nếu (gọn == "latin1" || gọn == "iso88591") { trả về "latin1"; };
+    trả về "";
+};
+
+hàm bảng mã kiểm tra bytes(bytes) {
+    nếu (loai_cua(bytes) != "danh sách") {
+        ném "bảng mã: dữ liệu byte phải là danh sách";
+    };
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (loai_cua(bytes[i]) != "số nguyên") {
+            ném "bảng mã: mỗi byte phải là số nguyên";
+        };
+        nếu (bytes[i] < 0 || bytes[i] > 255) {
+            ném "bảng mã: byte phải trong 0..255";
+        };
+    };
+    trả về đúng;
+};
+
+hàm bảng mã chuẩn hóa chế độ lỗi(chế độ) {
+    nếu (loai_cua(chế độ) != "chuỗi") {
+        ném "bảng mã: chế độ lỗi phải là chuỗi";
+    };
+    tên = bảng mã thường nội bộ(chế độ);
+    nếu (tên == "báo_lỗi" || tên == "báo lỗi" || tên == "nghiêm" || tên == "strict") {
+        trả về "nghiêm";
+    };
+    nếu (tên == "thay_thế" || tên == "thay thế" || tên == "replace") {
+        trả về "thay thế";
+    };
+    ném "bảng mã: chế độ lỗi không được hỗ trợ";
+};
+
+hàm bảng mã utf8 là byte tiếp(byte) {
+    trả về byte >= 128 && byte <= 191;
+};
+
+// Số dương: sequence hợp lệ. Số âm: số byte của maximal valid prefix cần
+// tiêu thụ khi thay malformed UTF-8 bằng U+FFFD.
+hàm bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
+    n = do_dai(bytes);
+    b0 = bytes[vị_trí];
+    nếu (b0 <= 127) {
+        trả về 1;
+    };
+
+    nếu (b0 >= 194 && b0 <= 223) {
+        nếu (vị_trí + 1 >= n) {
+            trả về -1;
+        };
+        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 1])) {
+            trả về 2;
+        };
+        trả về -1;
+    };
+
+    nếu (b0 >= 224 && b0 <= 239) {
+        nếu (vị_trí + 1 >= n) {
+            trả về -1;
+        };
+        b1 = bytes[vị_trí + 1];
+        hợp_lệ_b1 = bảng mã utf8 là byte tiếp(b1);
+        nếu (b0 == 224 && b1 < 160) {
+            hợp_lệ_b1 = sai;
+        };
+        nếu (b0 == 237 && b1 > 159) {
+            hợp_lệ_b1 = sai;
+        };
+        nếu (!hợp_lệ_b1) {
+            trả về -1;
+        };
+        nếu (vị_trí + 2 >= n) {
+            trả về -2;
+        };
+        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 2])) {
+            trả về 3;
+        };
+        trả về -2;
+    };
+
+    nếu (b0 >= 240 && b0 <= 244) {
+        nếu (vị_trí + 1 >= n) {
+            trả về -1;
+        };
+        b1 = bytes[vị_trí + 1];
+        hợp_lệ_b1 = bảng mã utf8 là byte tiếp(b1);
+        nếu (b0 == 240 && b1 < 144) {
+            hợp_lệ_b1 = sai;
+        };
+        nếu (b0 == 244 && b1 > 143) {
+            hợp_lệ_b1 = sai;
+        };
+        nếu (!hợp_lệ_b1) {
+            trả về -1;
+        };
+        nếu (vị_trí + 2 >= n) {
+            trả về -2;
+        };
+        nếu (!bảng mã utf8 là byte tiếp(bytes[vị_trí + 2])) {
+            trả về -2;
+        };
+        nếu (vị_trí + 3 >= n) {
+            trả về -3;
+        };
+        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 3])) {
+            trả về 4;
+        };
+        trả về -3;
+    };
+
+    trả về -1;
+};
+
+hàm bảng mã utf8 giải mã(bytes, chế độ) {
+    kết_quả = "";
+    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    vị_trí = 0;
+    n = do_dai(bytes);
+    lặp(vòng = 0; vị_trí < n; vòng++) {
+        độ_dài = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
+        nếu (độ_dài > 0) {
+            đoạn = [];
+            lặp(j = 0; j < độ_dài; j++) {
+                thêm(đoạn, bytes[vị_trí + j]);
+            };
+            kết_quả = kết_quả + utf8_native_exec("decode", đoạn);
+            vị_trí = vị_trí + độ_dài;
+        } nếu không {
+            nếu (chế độ == "nghiêm") {
+                ném "TEXT_DECODE_INVALID";
+            };
+            kết_quả = kết_quả + ký_tự_thay;
+            vị_trí = vị_trí - độ_dài;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm bảng mã hỗ trợ(tên bảng mã) {
+    trả về bảng mã chuẩn hóa tên(tên bảng mã) != "";
+};
+
+hàm mã hóa bảng mã(văn bản, tên bảng mã) {
+    nếu (loai_cua(văn bản) != "chuỗi") {
+        ném "mã hóa bảng mã: văn bản phải là chuỗi";
+    };
+    bảng = bảng mã chuẩn hóa tên(tên bảng mã);
+    nếu (bảng == "") {
+        ném "mã hóa bảng mã: bảng mã không được hỗ trợ";
+    };
+    nếu (bảng == "utf8") {
+        trả về utf8_native_exec("encode", văn bản);
+    };
+
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(văn bản); i++) {
+        // Index chuỗi V++ trả một code point. Primitive UTF-8 chỉ cho ta byte
+        // của code point đó; quyết định ASCII/Latin-1 vẫn hoàn toàn ở V++.
+        utf8 = utf8_native_exec("encode", văn bản[i]);
+        nếu (do_dai(utf8) == 1) {
+            thêm(kết_quả, utf8[0]);
+        } nếu không {
+            nếu (bảng == "ascii" || do_dai(utf8) != 2) {
+                ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
+            };
+            mã = (utf8[0] % 32) * 64 + (utf8[1] % 64);
+            nếu (mã > 255) {
+                ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
+            };
+            thêm(kết_quả, mã);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_LỖI") {
+    bảng mã kiểm tra bytes(bytes);
+    bảng = bảng mã chuẩn hóa tên(tên bảng mã);
+    nếu (bảng == "") {
+        ném "giải mã bảng mã: bảng mã không được hỗ trợ";
+    };
+    chế_độ = bảng mã chuẩn hóa chế độ lỗi(chế độ lỗi);
+    nếu (bảng == "utf8") {
+        trả về bảng mã utf8 giải mã(bytes, chế_độ);
+    };
+
+    utf8 = [];
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        byte = bytes[i];
+        nếu (bảng == "ascii") {
+            nếu (byte > 127) {
+                nếu (chế_độ == "nghiêm") {
+                    ném "TEXT_DECODE_INVALID";
+                };
+                thêm(utf8, 239);
+                thêm(utf8, 191);
+                thêm(utf8, 189);
+            } nếu không {
+                thêm(utf8, byte);
+            };
+        } nếu không {
+            nếu (byte <= 127) {
+                thêm(utf8, byte);
+            } nếu không {
+                thêm(utf8, 192 + thành số nguyên(byte / 64));
+                thêm(utf8, 128 + byte % 64);
+            };
+        };
+    };
+    trả về utf8_native_exec("decode", utf8);
+};
+nhập gói/lõi/chuyển kiểu;

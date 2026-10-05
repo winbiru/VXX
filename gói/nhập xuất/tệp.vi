@@ -1,24 +1,74 @@
 // Module: nhập xuất.tệp
 // Mục đích: đọc/ghi tệp ở tầng gói.
-// Ghi chú: hiện phụ thuộc native hook của VM.
+// Chỉ đọc/ghi tệp là primitive native. Các phép xử lý nội dung tệp được viết
+// bằng V++ để giữ logic thư viện ở tầng ngôn ngữ.
 // Đường dẫn phải là UTF-8 hợp lệ tại native boundary.
 
 // Ghi chú hàm: đọc tệp.
 hàm đọc tệp(đường dẫn) {
-    ném "stdlib: đọc tệp native hook không khả dụng";
+    trả về io_doc_file(đường dẫn);
 };
 
 // Ghi nguyên nội dung chuỗi runtime, không giải mã lại escape (kể cả JSON).
 hàm ghi tệp(đường dẫn, nội dung) {
-    ném "stdlib: ghi tệp native hook không khả dụng";
+    trả về io_ghi_file(đường dẫn, nội dung);
+};
+
+// Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
+// cấp cao như nhật ký chỉ chịu trách nhiệm dựng nội dung cần ghi.
+hàm ghi nối tệp(đường dẫn, nội dung) {
+    trả về io_ghi_tiep_file(đường dẫn, nội dung);
+};
+
+// Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là
+// primitive file I/O để các codec/archive triển khai format bằng V++ mà không
+// phải đẩy thuật toán định dạng xuống C++.
+hàm đọc bytes tệp(đường dẫn) {
+    trả về io_doc_bytes(đường dẫn);
+};
+
+hàm ghi bytes tệp(đường dẫn, bytes) {
+    trả về io_ghi_bytes(đường dẫn, bytes);
 };
 
 // Đếm dòng vật lý; tệp rỗng có 0 dòng.
 hàm đếm dòng tệp(đường dẫn) {
-    ném "stdlib: đếm dòng tệp native hook không khả dụng";
+    nội_dung = đọc tệp(đường dẫn);
+    n = do_dai(nội_dung);
+    nếu (n == 0) {
+        trả về 0;
+    };
+
+    số_dòng = 0;
+    lặp(i = 0; i < n; i++) {
+        nếu (nội_dung[i] == "\n") {
+            số_dòng = số_dòng + 1;
+        };
+    };
+
+    // std::getline không tạo thêm một dòng rỗng sau dấu xuống dòng cuối tệp.
+    nếu (nội_dung[n - 1] != "\n") {
+        số_dòng = số_dòng + 1;
+    };
+    trả về số_dòng;
 };
 
 // Đếm từ phân tách bởi ASCII whitespace.
 hàm đếm từ tệp(đường dẫn) {
-    ném "stdlib: đếm từ tệp native hook không khả dụng";
+    nội_dung = đọc tệp(đường dẫn);
+    số_từ = 0;
+    trong_từ = sai;
+    lặp(i = 0; i < do_dai(nội_dung); i++) {
+        c = nội_dung[i];
+        trắng = c == " " || c == "\t" || c == "\n" || c == "\r";
+        nếu (trắng) {
+            trong_từ = sai;
+        } nếu không {
+            nếu (!trong_từ) {
+                số_từ = số_từ + 1;
+                trong_từ = đúng;
+            };
+        };
+    };
+    trả về số_từ;
 };

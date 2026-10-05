@@ -1,0 +1,33 @@
+// vpp.dependencies — phân tích import và kiểm tra đồ thị phụ thuộc bằng compiler V++.
+
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+
+hàm phụ thuộc danh sách(mã nguồn) {
+    phân_tích = bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+    cây = lấy map(phân_tích, "cây cú pháp", []);
+    kết_quả = [];
+    lặp(i = 0; i < độ dài(cây); i++) {
+        mục = cây[i];
+        nếu (lấy map(mục, "loại", "") == "nhập") {
+            đích = lấy map(mục, "đích", "");
+            nếu (đích != "") {
+                thêm(kết_quả, {
+                    "tên": đích,
+                    "bí danh": lấy map(mục, "bí danh", ""),
+                    "công khai": lấy map(mục, "công khai", 0)
+                });
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm phụ thuộc tệp(đường dẫn) {
+    trả về phụ thuộc danh sách(đọc tệp(đường dẫn));
+};
+
+hàm phụ thuộc kiểm tra tệp(đường dẫn) {
+    mã_nguồn = đọc tệp(đường dẫn);
+    trả về phu_thuoc_kiem_tra_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+};

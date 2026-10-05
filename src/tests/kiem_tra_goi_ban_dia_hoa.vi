@@ -1,0 +1,18 @@
+nhập bản địa hóa;
+
+hàm chính() {
+    in định dạng số vùng(1234567.5, "vi-VN", 2);
+    in định dạng số vùng(1234567.5, "en-US", 2);
+    in định dạng tiền vùng(1234567.5, "VND", "vi-VN");
+    in định dạng tiền vùng(1234.5, "USD", "en-US");
+    in định dạng số vùng(-1234.5, "vi_VN", 1);
+    in định dạng tiền vùng(1234.5, "USD", "vi-VN");
+    in định dạng tiền vùng(1234.5, "EUR", "en-US");
+    in bản địa hóa chuẩn hóa vùng("EN_US.UTF-8");
+    in vùng mặc định() != "";
+    thử {
+        in định dạng số vùng(12.5, "fr-FR", 1);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

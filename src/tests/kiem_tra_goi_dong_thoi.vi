@@ -1,0 +1,12 @@
+nhập đồng thời;
+
+hàm chính() {
+    nhanh = tác vụ sau("10", "xong");
+    in chờ tác vụ(nhanh, 1000.0);
+    in trạng thái tác vụ(nhanh);
+
+    chậm = tác vụ sau("10000", "muộn");
+    in hủy tác vụ(chậm);
+    in trạng thái tác vụ(chậm);
+    in chờ tác vụ(chậm, "0");
+};

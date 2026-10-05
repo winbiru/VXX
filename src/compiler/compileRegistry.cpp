@@ -219,7 +219,7 @@ namespace vietvm { namespace compiler {
                 }
             } catch (...) {
             }
-            return sourcePath.lexically_normal().u8string();
+            return sourcePath.lexically_normal().generic_u8string();
         };
 
         std::optional<fs::path> installationHome;
@@ -239,33 +239,50 @@ namespace vietvm { namespace compiler {
         importedFiles.insert(canonical);
 
         try {
-            std::ifstream ifs(abs);
-            if (!ifs.is_open()) {
-                throw std::runtime_error(vietvm::messages::formatMessage(
-                    vietvm::messages::kImportCannotOpenFile, {canonical}));
+            const vietvm::frontend::AstProgram *cachedProgram =
+                state.activeModuleSemanticIndex == nullptr
+                    ? nullptr
+                    : state.activeModuleSemanticIndex->parsedProgram(canonical);
+            std::string src;
+            if (cachedProgram == nullptr) {
+                std::ifstream ifs(abs);
+                if (!ifs.is_open()) {
+                    throw std::runtime_error(vietvm::messages::formatMessage(
+                        vietvm::messages::kImportCannotOpenFile, {canonical}));
+                }
+                std::stringstream ss;
+                ss << ifs.rdbuf();
+                src = ss.str();
             }
-            std::stringstream ss;
-            ss << ifs.rdbuf();
-            std::string src = ss.str();
 
             // Import tương đối bên trong module phải resolve từ thư mục chứa chính
             // module đó. Khôi phục base của importer ngay sau recursive compile để
             // sibling import ở scope ngoài không bị đổi nghĩa.
             const fs::path previousResolutionBase = state.importResolutionBase;
             const std::string previousSourceIdentity = state.currentSourceIdentity;
+            const std::string previousSemanticModuleIdentity =
+                state.currentSemanticModuleIdentity;
             state.importResolutionBase = abs.parent_path();
             state.currentSourceIdentity = debugIdentityForPath(abs);
+            state.currentSemanticModuleIdentity = canonical;
             CompilationArtifacts moduleArtifacts;
             try {
-                moduleArtifacts = compilePipelineInRegistry(
-                    state, src, keywordMap, false, false);
+                if (cachedProgram != nullptr) {
+                    moduleArtifacts = compileParsedPipelineInRegistry(
+                        state, *cachedProgram, keywordMap, false, false);
+                } else {
+                    moduleArtifacts = compilePipelineInRegistry(
+                        state, src, keywordMap, false, false);
+                }
             } catch (...) {
                 state.importResolutionBase = previousResolutionBase;
                 state.currentSourceIdentity = previousSourceIdentity;
+                state.currentSemanticModuleIdentity = previousSemanticModuleIdentity;
                 throw;
             }
             state.importResolutionBase = previousResolutionBase;
             state.currentSourceIdentity = previousSourceIdentity;
+            state.currentSemanticModuleIdentity = previousSemanticModuleIdentity;
             auto moduleBytecode = moduleArtifacts.bytecode;
             state.moduleInitializers.push_back(
                 CompiledModuleInitializer{canonical, moduleBytecode,
@@ -294,14 +311,22 @@ namespace vietvm { namespace compiler {
                 }
             }
 
-            if (moduleArtifacts.moduleIndex.has_value()) {
-                for (const LocalModuleEdge &edge : moduleArtifacts.moduleIndex->graph.edges) {
-                    if (edge.importerIdentity != kCurrentCompilationModuleIdentity ||
+            const LocalModuleSemanticIndex *semanticIndex =
+                moduleArtifacts.moduleIndex.has_value()
+                    ? &*moduleArtifacts.moduleIndex
+                    : state.activeModuleSemanticIndex;
+            const std::string_view semanticImporterIdentity =
+                moduleArtifacts.moduleIndex.has_value()
+                    ? kCurrentCompilationModuleIdentity
+                    : std::string_view(canonical);
+            if (semanticIndex != nullptr) {
+                for (const LocalModuleEdge &edge : semanticIndex->graph.edges) {
+                    if (edge.importerIdentity != semanticImporterIdentity ||
                         !edge.importSpec.reExport) {
                         continue;
                     }
                     const LocalModuleSemanticRecord *dependency =
-                        moduleArtifacts.moduleIndex->module(edge.importedIdentity);
+                        semanticIndex->module(edge.importedIdentity);
                     if (dependency == nullptr) continue;
                     for (const ModuleExportSymbol &exported : dependency->exports) {
                         if (exported.kind != SemanticSymbolKind::Function) continue;

@@ -3,9 +3,9 @@ param(
     [string]$VppExecutable
 )
 
-# Full Windows counterpart to run_tests.sh.  Keep the explicit list below in
-# sync with that script: it deliberately excludes the fixture, a legacy test
-# without an expected output, and the manual test that calls the public web.
+# Full Windows counterpart to run_tests.sh.  The Unix runner is the canonical
+# manifest for golden and expected-runtime-failure tests; parse those arrays
+# directly so the Windows matrix cannot silently drift behind it.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -164,14 +164,17 @@ function Wait-ForHttp {
     param(
         [string]$Uri,
         [string]$ExpectedContent,
-        [int]$Attempts = 50
+        [int]$Attempts = 20
     )
 
     $script:LastHttpProbeError = ""
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         try {
             # Local fixture checks must not inherit a corporate/runner proxy.
-            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -NoProxy -TimeoutSec 1
+            # PowerShell/.NET can spend noticeable time initializing the first
+            # localhost request on a fresh Windows runner. Give each probe enough
+            # time to complete without turning normal startup into a client abort.
+            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -NoProxy -TimeoutSec 3
             if ($response.StatusCode -eq 200 -and $response.Content.Trim() -eq $ExpectedContent) {
                 return $true
             }
@@ -194,7 +197,7 @@ function Invoke-ExpectedTest {
     $expected = Join-Path $repoRoot ("src\tests\expected\$base.expected")
     $stdout = Join-Path $sessionDir ("$base.output")
     $stderr = Join-Path $sessionDir ("$base.stderr")
-    $displayName = $TestFile.Substring($repoRoot.Length).TrimStart('\', '/')
+    $displayName = $TestFile.Replace('\', '/')
 
     Write-Host "== Running $displayName =="
     if (-not (Test-Path -LiteralPath $expected)) {
@@ -210,6 +213,59 @@ function Invoke-ExpectedTest {
         Add-Fail $displayName
         Show-FailureDetails -StdErr $stderr -ExitCode $exitCode
     }
+}
+
+function Invoke-ExpectedFailureTest {
+    param([string]$TestFile)
+
+    $base = [System.IO.Path]::GetFileNameWithoutExtension($TestFile)
+    $expected = Join-Path $repoRoot ("src\tests\expected\$base.expected")
+    $stdout = Join-Path $sessionDir ("$base.output")
+    $stderr = Join-Path $sessionDir ("$base.stderr")
+    $displayName = $TestFile.Replace('\', '/')
+
+    Write-Host "== Running $displayName [expected runtime failure] =="
+    if (-not (Test-Path -LiteralPath $expected)) {
+        Add-Fail "$displayName (no expected output)"
+        return
+    }
+
+    $exitCode = Invoke-Vpp -Arguments @($TestFile) -StdOut $stdout -StdErr $stderr -WorkingDirectory $repoRoot
+    $matches = Test-ExpectedOutput -Expected $expected -Actual $stderr
+    if ($exitCode -ne 0 -and $matches) {
+        Add-Pass $displayName
+    } else {
+        if ($exitCode -eq 0) {
+            Add-Fail "$displayName (expected non-zero exit code)"
+        } else {
+            Add-Fail $displayName
+        }
+        Show-FailureDetails -StdErr $stderr -ExitCode $exitCode
+    }
+}
+
+function Get-BashTestArray {
+    param([string]$ArrayName)
+
+    $runner = Join-Path $repoRoot "run_tests.sh"
+    $lines = [System.IO.File]::ReadAllLines($runner, [System.Text.Encoding]::UTF8)
+    $inside = $false
+    $tests = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $lines) {
+        if (-not $inside) {
+            if ($line.Trim().StartsWith("$ArrayName=(")) {
+                $inside = $true
+            }
+            continue
+        }
+        if ($line.Trim() -eq ")") {
+            return $tests.ToArray()
+        }
+        if ($line -match '(src/tests/[^\s\\]+\.vi)') {
+            $tests.Add($Matches[1])
+        }
+    }
+    throw "Không tìm thấy mảng $ArrayName hoàn chỉnh trong run_tests.sh"
 }
 
 try {
@@ -278,75 +334,21 @@ try {
         Show-FailureDetails -StdErr $externalStdErr -ExitCode $externalExit
     }
 
-    $tests = @(
-        "src/tests/import_main.vi",
-        "src/tests/kiem_tra_boolean.vi",
-        "src/tests/kiem_tra_bo_qua.vi",
-        "src/tests/kiem_tra_chon_ca.vi",
-        "src/tests/kiem_tra_chuoi_co_ban.vi",
-        "src/tests/kiem_tra_de_quy.vi",
-        "src/tests/kiem_tra_file_dem.vi",
-        "src/tests/kiem_tra_ngoai_le.vi",
-        "src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi",
-        "src/tests/kiem_tra_dieu_kien_phu_dinh.vi",
-        "src/tests/kiem_tra_ham.vi",
-        "src/tests/kiem_tra_ham_4_tham_so.vi",
-        "src/tests/kiem_tra_ham_tham_so.vi",
-        "src/tests/kiem_tra_ham_da_tu_khong_nhay.vi",
-        "src/tests/kiem_tra_mang_3_chieu.vi",
-        "src/tests/kiem_tra_noi_chuoi.vi",
-        "src/tests/kiem_tra_so_chan_1-20.vi",
-        "src/tests/kiem_tra_so_chia_het_cho_3_va_4.vi",
-        "src/tests/kiem_tra_so_le_chia_het_cho_5.vi",
-        "src/tests/kiem_tra_so_nguyen.vi",
-        "src/tests/kiem_tra_so_thuc.vi",
-        "src/tests/kiem_tra_tong_hop_khong_xung_dot.vi",
-        "src/tests/kiem_tra_rong_va_map.vi",
-        "src/tests/kiem_tra_namespace_module.vi",
-        "src/tests/kiem_tra_package_modules.vi",
-        "src/tests/kiem_tra_package_09.vi",
-        "src/tests/kiem_tra_package_tieng_viet.vi",
-        "src/tests/kiem_tra_stdlib.vi",
-        "src/tests/kiem_tra_stdlib_starter.vi",
-        "src/tests/kiem_tra_stdlib_http.vi",
-        "src/tests/kiem_tra_stdlib_http_post_put.vi",
-        "src/tests/kiem_tra_http_transport_bat_loi.vi",
-        "src/tests/kiem_tra_application_server.vi",
-        "src/tests/kiem_tra_rest_json_jwt.vi",
-        "src/tests/kiem_tra_stdlib_tinh_toan.vi",
-        "src/tests/kiem_tra_stdlib_mo_rong.vi",
-        "src/tests/kiem_tra_stdlib_crypto.vi",
-        "src/tests/kiem_tra_goi_kiem_thu.vi",
-        "src/tests/kiem_tra_goi_mang.vi",
-        "src/tests/kiem_tra_stdlib_nen_tang.vi",
-        "src/tests/kiem_tra_json_phan_tich.vi",
-        "src/tests/kiem_tra_json_an_toan.vi",
-        "src/tests/kiem_tra_stdlib_io_config_time.vi",
-        "src/tests/kiem_tra_api_thuc_thu.vi",
-        "src/tests/kiem_tra_api_db_project.vi",
-        "src/tests/kiem_tra_goi_dung.vi",
-        "src/tests/kiem_tra_nhat_ky.vi",
-        "src/tests/kiem_tra_lambda_hof_mac_dinh.vi",
-        "src/tests/kiem_tra_list_literal.vi",
-        "src/tests/kiem_tra_toan_tu_moi.vi",
-        "src/tests/kiem_tra_lop_truy_cap.vi",
-        "src/tests/kiem_tra_constructor_tham_so.vi",
-        "src/tests/kiem_tra_visibility_instance.vi",
-        "src/tests/kiem_tra_giao_dien_trien_khai.vi",
-        "src/tests/kiem_tra_hoi_quy_tong_hop.vi",
-        "src/tests/kiem_tra_cu_phap_modifier_cu.vi",
-        "src/tests/kiem_tra_tra_ve.vi",
-        "src/tests/program.vi"
-    )
+    $tests = Get-BashTestArray -ArrayName "TESTS"
     foreach ($relativeTest in $tests) {
-        Invoke-ExpectedTest -TestFile (Join-Path $repoRoot $relativeTest)
+        Invoke-ExpectedTest -TestFile $relativeTest
+    }
+
+    $expectedFailureTests = Get-BashTestArray -ArrayName "EXPECTED_FAILURE_TESTS"
+    foreach ($relativeTest in $expectedFailureTests) {
+        Invoke-ExpectedFailureTest -TestFile $relativeTest
     }
 
     Write-Host "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
-    Invoke-ExpectedTest -TestFile (Join-Path $repoRoot "src\tests\kiem_tra_jit_mvp.vi") -Environment @{ VPP_ENABLE_JIT = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_jit_mvp.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
 
     Write-Host "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
-    Invoke-ExpectedTest -TestFile (Join-Path $repoRoot "src\tests\kiem_tra_gc_mvp.vi") -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }
 
     Write-Host ""
     Write-Host "=== PASS: $script:PassCount, FAIL: $script:FailCount ==="

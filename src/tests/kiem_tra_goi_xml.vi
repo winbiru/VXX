@@ -1,0 +1,29 @@
+nhập xml;
+nhập bộ sưu tập;
+
+hàm chính() {
+    in xml thoát("A & B < C > D");
+    node = xml phân tích("<gốc id=\"1\"><con>Việt &amp; V++</con></gốc>");
+    in lấy map(node, "tên", "");
+    thuộc tính = lấy map(node, "thuộc tính", rỗng);
+    in lấy map(thuộc tính, "id", "");
+    con = lấy map(node, "con", rỗng);
+    in lấy map(con[0], "nội dung", "");
+    in xml tạo(node);
+    in xml tạo({"tên": "x", "thuộc tính": {"a": "\"'&<>"}, "nội dung": "\"'&<>", "con": []});
+    in xml tạo({"tên": "trống", "thuộc tính": {}, "nội dung": "", "con": []});
+
+    nâng cao = xml phân tích(
+        "<?xml version=\"1.0\"?><g><!-- bỏ --><![CDATA[A < B]]><c>&#x1F680; &#38;</c></g>"
+    );
+    in lấy map(nâng cao, "nội dung", "") == "A < B";
+    con nâng cao = lấy map(nâng cao, "con", []);
+    in lấy map(con nâng cao[0], "nội dung", "") == "🚀 &";
+
+    thử {
+        xml phân tích("<!DOCTYPE g><g/>");
+        in 0;
+    } bắt lỗi (e) {
+        in e == "xml: DOCTYPE/thực thể ngoài bị vô hiệu hóa";
+    };
+};

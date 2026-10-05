@@ -1,7 +1,7 @@
 // Module: lõi.sự kiện
 // Event emitter đồng bộ, bounded, snapshot-based.
-// Service/provider loading thuộc cùng spec nhưng cần module registry runtime và
-// chưa được giả lập ở đây.
+// Service loader thủ công giữ registry/lazy/lifecycle ở V++; discovery từ
+// module manifest và capability isolation vẫn là boundary runtime sau này.
 
 hàm sự kiện yêu cầu bộ phát(emitter) {
     nếu (loại của(emitter) != "từ điển") {
@@ -169,3 +169,180 @@ hàm phát sự kiện(emitter, event) {
     sự kiện gom đăng ký(emitter);
     trả về {"đã gọi": đã_gọi, "lỗi": lỗi};
 };
+
+// --- Service/provider registry thuần V++ ---
+
+hàm dịch vụ yêu cầu loader(loader) {
+    nếu (loại của(loader) != "từ điển") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (lấy map(loader, "__vpp_service_loader__", 0) != 1) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    trả về loader;
+};
+
+hàm dịch vụ yêu cầu provider(provider) {
+    nếu (loại của(provider) != "từ điển") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (lấy map(provider, "__vpp_service_provider__", 0) != 1) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    trả về provider;
+};
+
+hàm bộ nạp dịch vụ(giới_hạn_provider = 1024) {
+    nếu (loại của(giới_hạn_provider) != "số nguyên") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (giới_hạn_provider <= 0) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    trả về {
+        "__vpp_service_loader__": 1,
+        "giới hạn": giới_hạn_provider,
+        "providers": []
+    };
+};
+
+hàm nhà cung cấp dịch vụ(
+    interface_id,
+    implementation_id,
+    factory,
+    version = "0",
+    module_id = "",
+    capabilities = rỗng,
+    lifecycle = "mỗi lần",
+    validator = rỗng
+) {
+    nếu (loại của(interface_id) != "chuỗi") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (độ dài(interface_id) == 0) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (loại của(implementation_id) != "chuỗi") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (độ dài(implementation_id) == 0) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (loại của(version) != "chuỗi" || loại của(module_id) != "chuỗi") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (factory == rỗng) {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (lifecycle != "mỗi lần" && lifecycle != "đơn thể") {
+        ném "SERVICE_CONFIGURATION";
+    };
+
+    quyền = [];
+    nếu (capabilities != rỗng) {
+        nếu (loại của(capabilities) != "danh sách") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        lặp(i = 0; i < độ dài(capabilities); i++) {
+            nếu (loại của(capabilities[i]) != "chuỗi") {
+                ném "SERVICE_CONFIGURATION";
+            };
+            thêm(quyền, capabilities[i]);
+        };
+    };
+
+    trả về {
+        "__vpp_service_provider__": 1,
+        "interface_id": interface_id,
+        "implementation_id": implementation_id,
+        "version": version,
+        "module_id": module_id,
+        "capabilities": quyền,
+        "factory": factory,
+        "validator": validator,
+        "lifecycle": lifecycle,
+        "đã tạo": 0,
+        "instance": rỗng
+    };
+};
+
+hàm đăng ký nhà cung cấp(loader, provider) {
+    dịch vụ yêu cầu loader(loader);
+    dịch vụ yêu cầu provider(provider);
+    danh_sách = lấy map(loader, "providers", []);
+    giới_hạn = lấy map(loader, "giới hạn", 1024);
+    nếu (độ dài(danh_sách) >= giới_hạn) {
+        ném "SERVICE_CONFIGURATION";
+    };
+
+    interface_id = lấy map(provider, "interface_id", "");
+    implementation_id = lấy map(provider, "implementation_id", "");
+    module_id = lấy map(provider, "module_id", "");
+    lặp(i = 0; i < độ dài(danh_sách); i++) {
+        hiện_tại = danh_sách[i];
+        nếu (lấy map(hiện_tại, "interface_id", "") == interface_id &&
+            lấy map(hiện_tại, "implementation_id", "") == implementation_id &&
+            lấy map(hiện_tại, "module_id", "") == module_id) {
+            ném "SERVICE_CONFIGURATION";
+        };
+    };
+    thêm(danh_sách, provider);
+    trả về provider;
+};
+
+hàm dịch vụ(interface_id, loader) {
+    dịch vụ yêu cầu loader(loader);
+    nếu (loại của(interface_id) != "chuỗi") {
+        ném "SERVICE_CONFIGURATION";
+    };
+    nếu (độ dài(interface_id) == 0) {
+        ném "SERVICE_CONFIGURATION";
+    };
+
+    kết_quả = [];
+    danh_sách = lấy map(loader, "providers", []);
+    lặp(i = 0; i < độ dài(danh_sách); i++) {
+        provider = danh_sách[i];
+        nếu (lấy map(provider, "interface_id", "") == interface_id) {
+            thêm(kết_quả, provider);
+        };
+    };
+    nếu (độ dài(kết_quả) == 0) {
+        ném "SERVICE_NOT_FOUND";
+    };
+    trả về kết_quả;
+};
+
+hàm tải dịch vụ(provider) {
+    dịch vụ yêu cầu provider(provider);
+    lifecycle = lấy map(provider, "lifecycle", "mỗi lần");
+    nếu (lifecycle == "đơn thể" && lấy map(provider, "đã tạo", 0) == 1) {
+        trả về lấy map(provider, "instance", rỗng);
+    };
+
+    factory = lấy map(provider, "factory", rỗng);
+    thử {
+        instance = factory();
+    } bắt lỗi (e) {
+        ném "SERVICE_CONFIGURATION";
+    };
+
+    validator = lấy map(provider, "validator", rỗng);
+    nếu (validator != rỗng) {
+        thử {
+            hợp_lệ = validator(instance);
+        } bắt lỗi (e) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (!hợp_lệ) {
+            ném "SERVICE_CONFIGURATION";
+        };
+    };
+
+    nếu (lifecycle == "đơn thể") {
+        đặt map(provider, "instance", instance);
+        đặt map(provider, "đã tạo", 1);
+    };
+    trả về instance;
+};
+nhập gói/lõi/chuyển kiểu;

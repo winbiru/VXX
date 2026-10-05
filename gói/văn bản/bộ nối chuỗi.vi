@@ -1,0 +1,103 @@
+// Module: lõi.bộ nối chuỗi
+// ABI hiện tại biểu diễn BộNốiChuỗi bằng map nội bộ để package chuẩn không
+// phụ thuộc class-lowering. Public semantics giữ encounter order.
+
+hàm bộ nối chuỗi(phân_cách, tiền_tố = "", hậu_tố = "", giá_trị_rỗng = rỗng) {
+    nếu (loại của(phân_cách) != "chuỗi") {
+        ném "JOIN_ARGUMENT";
+    };
+    nếu (loại của(tiền_tố) != "chuỗi") {
+        ném "JOIN_ARGUMENT";
+    };
+    nếu (loại của(hậu_tố) != "chuỗi") {
+        ném "JOIN_ARGUMENT";
+    };
+    nếu (giá_trị_rỗng != rỗng && loại của(giá_trị_rỗng) != "chuỗi") {
+        ném "JOIN_ARGUMENT";
+    };
+    trả về {
+        "__vpp_string_joiner__": 1,
+        "phân cách": phân_cách,
+        "tiền tố": tiền_tố,
+        "hậu tố": hậu_tố,
+        "giá trị rỗng": giá_trị_rỗng,
+        "các phần": []
+    };
+};
+
+hàm bộ nối yêu cầu(bộ) {
+    nếu (loại của(bộ) != "từ điển") {
+        ném "JOIN_ARGUMENT";
+    };
+    nếu (lấy map(bộ, "__vpp_string_joiner__", 0) != 1) {
+        ném "JOIN_ARGUMENT";
+    };
+    các_phần = lấy map(bộ, "các phần", rỗng);
+    nếu (loại của(các_phần) != "danh sách") {
+        ném "JOIN_ARGUMENT";
+    };
+    trả về các_phần;
+};
+
+hàm bộ nối thêm(bộ, giá_trị) {
+    các_phần = bộ nối yêu cầu(bộ);
+    thêm(các_phần, thành chuỗi(giá_trị));
+    trả về bộ;
+};
+
+hàm bộ nối số phần(bộ) {
+    các_phần = bộ nối yêu cầu(bộ);
+    trả về độ dài(các_phần);
+};
+
+hàm bộ nối kết quả(bộ) {
+    các_phần = bộ nối yêu cầu(bộ);
+
+    phân_cách = lấy map(bộ, "phân cách", "");
+    tiền_tố = lấy map(bộ, "tiền tố", "");
+    hậu_tố = lấy map(bộ, "hậu tố", "");
+    giá_trị_rỗng = lấy map(bộ, "giá trị rỗng", rỗng);
+    n = độ dài(các_phần);
+    nếu (n == 0) {
+        nếu (giá_trị_rỗng != rỗng) {
+            trả về giá_trị_rỗng;
+        };
+        trả về tiền_tố + hậu_tố;
+    };
+
+    kết_quả = tiền_tố;
+    lặp(i = 0; i < n; i++) {
+        nếu (i > 0) {
+            kết_quả = kết_quả + phân_cách;
+        };
+        kết_quả = kết_quả + các_phần[i];
+    };
+    trả về kết_quả + hậu_tố;
+};
+
+// Tương đương StringJoiner.merge: nội dung nguồn được nối thành đúng một phần
+// theo delimiter của nguồn, không mang prefix/suffix và không dùng emptyValue.
+hàm bộ nối gộp(đích, nguồn) {
+    đích_phần = bộ nối yêu cầu(đích);
+    nguồn_phần = bộ nối yêu cầu(nguồn);
+    nếu (độ dài(nguồn_phần) == 0) {
+        trả về đích;
+    };
+
+    phân_cách_nguồn = lấy map(nguồn, "phân cách", "");
+    nội_dung = "";
+    lặp(i = 0; i < độ dài(nguồn_phần); i++) {
+        nếu (i > 0) {
+            nội_dung = nội_dung + phân_cách_nguồn;
+        };
+        nội_dung = nội_dung + nguồn_phần[i];
+    };
+    thêm(đích_phần, nội_dung);
+    trả về đích;
+};
+
+// Độ dài observable của chuỗi kết quả theo Unicode code point.
+hàm bộ nối độ dài(bộ) {
+    trả về độ dài(bộ nối kết quả(bộ));
+};
+nhập gói/lõi/chuyển kiểu;

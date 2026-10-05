@@ -1,0 +1,132 @@
+// vi.locale — định dạng số/tiền tệ theo vùng theo contract xác định của V++.
+nhập gói/lõi/định dạng;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/ký hiệu vùng;
+nhập gói/văn bản/chuỗi;
+nhập gói/hệ thống/môi trường;
+
+hàm bản địa hóa chuẩn hóa vùng(vùng) {
+    thử {
+        trả về ký hiệu vùng chuẩn hóa(vùng);
+    } bắt lỗi (e) {
+        ném "bản địa hóa: vùng phải là chuỗi";
+    };
+};
+
+hàm vùng mặc định() {
+    vùng = đọc biến môi trường("LC_ALL", "");
+    nếu (vùng == "") {
+        vùng = đọc biến môi trường("LANG", "");
+    };
+    nếu (vùng == "") {
+        trả về "vi-VN";
+    };
+    trả về bản địa hóa chuẩn hóa vùng(vùng);
+};
+
+hàm bản địa hóa là vùng vi(vùng) {
+    thử {
+        ký_hiệu = ký hiệu vùng lấy(vùng);
+    } bắt lỗi (e) {
+        ném "bản địa hóa: vùng không được hỗ trợ";
+    };
+    trả về lấy map(ký_hiệu, "ngôn ngữ", "") == "vi";
+};
+
+hàm bản địa hóa nhóm số thập phân(raw, vùng_vi) {
+    dấu = "";
+    bắt_đầu = 0;
+    nếu (do_dai(raw) > 0 && raw[0] == "-") {
+        dấu = "-";
+        bắt_đầu = 1;
+    };
+
+    vị_trí_chấm = -1;
+    lặp(i = bắt_đầu; i < do_dai(raw) && vị_trí_chấm < 0; i++) {
+        nếu (raw[i] == ".") {
+            vị_trí_chấm = i;
+        };
+    };
+
+    cuối_nguyên = do_dai(raw);
+    nếu (vị_trí_chấm >= 0) {
+        cuối_nguyên = vị_trí_chấm;
+    };
+    số_chữ_số_nguyên = cuối_nguyên - bắt_đầu;
+    phân_cách_nghìn = ",";
+    phân_cách_thập_phân = ".";
+    nếu (vùng_vi) {
+        phân_cách_nghìn = ".";
+        phân_cách_thập_phân = ",";
+    };
+
+    kết_quả = dấu;
+    lặp(i = bắt_đầu; i < cuối_nguyên; i++) {
+        đã_ghi = i - bắt_đầu;
+        nếu (đã_ghi > 0 && (số_chữ_số_nguyên - đã_ghi) % 3 == 0) {
+            kết_quả = kết_quả + phân_cách_nghìn;
+        };
+        kết_quả = kết_quả + raw[i];
+    };
+
+    nếu (vị_trí_chấm >= 0 && vị_trí_chấm + 1 < do_dai(raw)) {
+        kết_quả = kết_quả + phân_cách_thập_phân +
+            cắt chuỗi(raw, vị_trí_chấm + 1, do_dai(raw) - vị_trí_chấm - 1);
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng số vùng(giá trị, vùng, số chữ số thập phân = 2) {
+    loại = loai_cua(giá trị);
+    nếu (loại != "số nguyên" && loại != "số thực") {
+        ném "bản địa hóa: giá trị phải là số hữu hạn";
+    };
+    nếu (loai_cua(vùng) != "chuỗi") {
+        ném "bản địa hóa: vùng phải là chuỗi";
+    };
+
+    thử {
+        chữ_số = thành số nguyên(số chữ số thập phân);
+    } bắt lỗi (e) {
+        ném "bản địa hóa: số chữ số thập phân phải là số nguyên";
+    };
+    nếu (chữ_số < 0 || chữ_số > 12) {
+        ném "bản địa hóa: số chữ số thập phân phải trong 0..12";
+    };
+
+    pattern = "%,." + thành chuỗi(chữ_số) + "f";
+    thử {
+        trả về định dạng(pattern, [giá trị], vùng);
+    } bắt lỗi (e) {
+        nếu (e == "FORMAT_LOCALE") {
+            ném "bản địa hóa: vùng không được hỗ trợ";
+        };
+        ném e;
+    };
+};
+
+hàm định dạng tiền vùng(giá trị, mã tiền tệ, vùng) {
+    nếu (loai_cua(mã tiền tệ) != "chuỗi") {
+        ném "bản địa hóa: mã tiền tệ phải là chuỗi";
+    };
+    nếu (loai_cua(vùng) != "chuỗi") {
+        ném "bản địa hóa: vùng phải là chuỗi";
+    };
+
+    mã = chuỗi thường(mã tiền tệ);
+    chữ_số = 2;
+    nếu (mã == "vnd") {
+        chữ_số = 0;
+    };
+    đã_định_dạng = định dạng số vùng(giá trị, vùng, chữ_số);
+    nếu (mã == "vnd") {
+        trả về đã_định_dạng + " ₫";
+    };
+    nếu (mã == "usd") {
+        nếu (bản địa hóa là vùng vi(vùng)) {
+            trả về đã_định_dạng + " US$";
+        };
+        trả về "$" + đã_định_dạng;
+    };
+    trả về đã_định_dạng + " " + mã;
+};

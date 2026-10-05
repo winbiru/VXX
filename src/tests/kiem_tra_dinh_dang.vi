@@ -10,6 +10,38 @@ hàm chính() {
     in định dạng("%b %b %c %c", [đúng, rỗng, 65, "Đ"]);
     in định dạng("%%:%n%s", ["x"]);
     in định dạng("%.3s", ["Việt Nam"]);
+    in định dạng("%,d %,.2f %.2e", [1234567, 1234.5, 12.5], "vi-VN");
+    in định dạng("%,.2f", [1234.5], "en_US.UTF-8");
+
+    callback_tùy_biến = hàm(context) {
+        trả về "V++/" + lấy map(context, "locale", "");
+    };
+    tùy_biến = có thể định dạng(callback_tùy_biến);
+    in định dạng("[%-12s]", [tùy_biến], "vi-VN");
+
+    template = mẫu chuỗi(["Tên=", ", số=", ""], ["V++", 1234.5]);
+    processor = bộ xử lý mẫu định dạng(["%s", "%,.2f"], "vi-VN");
+    in xử lý mẫu(template, processor);
+
+    đích = bộ dựng chuỗi(64, 128);
+    bộ dựng thêm(đích, "prefix:");
+    định dạng vào(đích, "%,d/%s", [12345, "ok"], "vi-VN");
+    in bộ dựng kết quả(đích);
+
+    trước_lỗi = bộ dựng kết quả(đích);
+    thử {
+        định dạng vào(đích, "%d", ["sai"]);
+    } bắt lỗi (e) {
+        in e;
+    };
+    in bộ dựng kết quả(đích) == trước_lỗi;
+
+    đích_hẹp = bộ dựng chuỗi(4, 4);
+    thử {
+        định dạng vào(đích_hẹp, "%s", ["Việt"]);
+    } bắt lỗi (e) {
+        in e;
+    };
 
     thử {
         in định dạng("%s %2$s", ["a", "b"]);
@@ -43,6 +75,22 @@ hàm chính() {
     };
     thử {
         in định dạng("%c", [1114112]);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        in định dạng("%d", [1], "fr-FR");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        lỗi_processor = bộ xử lý mẫu định dạng(["%s"]);
+        in xử lý mẫu(template, lỗi_processor);
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        định dạng vào({}, "%s", ["x"]);
     } bắt lỗi (e) {
         in e;
     };

@@ -1,0 +1,70 @@
+nhập gói/mạng/http/máy khách;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm chính() {
+    chunked =
+        "HTTP/1.1 200 OK\r\n" +
+        "Transfer-Encoding: chunked\r\n" +
+        "X-Test: yes\r\n\r\n" +
+        "5\r\nhello\r\n" +
+        "6;foo=bar\r\n world\r\n" +
+        "0\r\n\r\n";
+    parsed = mạng http phân tích response(chunked);
+    in lấy map(parsed, "status", 0) == 200;
+    in lấy map(lấy map(parsed, "headers", {}), "x-test", "") == "yes";
+    in lấy map(parsed, "body", "") == "hello world";
+
+    utf8_chunked =
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" +
+        "9\r\nxin chào\r\n0\r\n\r\n";
+    in mạng http tách body(utf8_chunked) == "xin chào";
+
+    chunked_trailer =
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" +
+        "5\r\nhello\r\n0\r\nX-Checksum: ok\r\n\r\n";
+    in mạng http tách body(chunked_trailer) == "hello";
+
+    trailer_lỗi = sai;
+    thử {
+        mạng http tách body(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" +
+            "1\r\na\r\n0\r\nBROKEN\r\n\r\n"
+        );
+    } bắt lỗi (e) {
+        trailer_lỗi = đúng;
+    };
+    in trailer_lỗi;
+
+    length_response =
+        "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhelloEXTRA";
+    in mạng http tách body(length_response) == "hello";
+
+    in mạng http url redirect(
+        "https://example.com/a/b?x=1", "/next"
+    ) == "https://example.com/next";
+    in mạng http url redirect(
+        "https://example.com/a/b?x=1", "next"
+    ) == "https://example.com/a/next";
+    in mạng http url redirect(
+        "https://example.com/a/b?x=1", "?q=2"
+    ) == "https://example.com/a/b?q=2";
+    in mạng http url redirect(
+        "https://example.com/a/b", "//other.test/x"
+    ) == "https://other.test/x";
+    in mạng http url redirect(
+        "https://example.com/a/b/c", "../d"
+    ) == "https://example.com/a/d";
+    in mạng http url redirect(
+        "https://example.com/a/b", "/x/./y/../z?q=1"
+    ) == "https://example.com/x/z?q=1";
+
+    length_quá_lớn = sai;
+    thử {
+        mạng http phân tích response(
+            "HTTP/1.1 200 OK\r\nContent-Length: 16777217\r\n\r\n"
+        );
+    } bắt lỗi (e) {
+        length_quá_lớn = đúng;
+    };
+    in length_quá_lớn;
+};

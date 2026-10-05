@@ -1,0 +1,14 @@
+nhập tùy chọn;
+
+hàm chính() {
+    không gian = "kiem-tra-vpp";
+    tùy chọn xóa không gian(không gian);
+    in tùy chọn đọc(không gian, "thiếu", "mặc định");
+    in tùy chọn lưu(không gian, "tên", "V++");
+    in tùy chọn lưu(không gian, "ngôn ngữ", "Tiếng Việt");
+    in tùy chọn đọc(không gian, "tên", "");
+    in tùy chọn khóa(không gian);
+    in tùy chọn xóa(không gian, "tên");
+    in tùy chọn đọc(không gian, "tên", "đã xóa");
+    in tùy chọn xóa không gian(không gian);
+};

@@ -1,0 +1,63 @@
+nhập gói/chuẩn/chính;
+
+hàm chính() {
+    loader = bộ nạp dịch vụ(4);
+    số_lần_tạo = 0;
+
+    factory_a = hàm() {
+        số_lần_tạo += 1;
+        trả về {"tên": "a", "lần": số_lần_tạo};
+    };
+    factory_b = hàm() {
+        số_lần_tạo += 1;
+        trả về {"tên": "b", "lần": số_lần_tạo};
+    };
+    validator = hàm(instance) {
+        trả về loại của(instance) == "từ điển";
+    };
+
+    a = nhà cung cấp dịch vụ("demo", "a", factory_a, "1.0", "core", ["read"], "đơn thể", validator);
+    b = nhà cung cấp dịch vụ("demo", "b", factory_b, "1.0", "plugin", [], "mỗi lần", validator);
+    đăng ký nhà cung cấp(loader, a);
+    đăng ký nhà cung cấp(loader, b);
+
+    in số_lần_tạo;
+    providers = dịch vụ("demo", loader);
+    in độ dài(providers);
+    in lấy map(providers[0], "implementation_id", "");
+    in lấy map(providers[1], "implementation_id", "");
+    in số_lần_tạo;
+
+    a1 = tải dịch vụ(providers[0]);
+    a2 = tải dịch vụ(providers[0]);
+    in lấy map(a1, "lần", -1);
+    in lấy map(a2, "lần", -1);
+    in số_lần_tạo;
+
+    b1 = tải dịch vụ(providers[1]);
+    b2 = tải dịch vụ(providers[1]);
+    in lấy map(b1, "lần", -1);
+    in lấy map(b2, "lần", -1);
+    in số_lần_tạo;
+
+    thử {
+        dịch vụ("không có", loader);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    thử {
+        đăng ký nhà cung cấp(loader, a);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    factory_sai = hàm() { trả về 7; };
+    provider_sai = nhà cung cấp dịch vụ("demo", "sai", factory_sai, "1.0", "plugin", [], "mỗi lần", validator);
+    đăng ký nhà cung cấp(loader, provider_sai);
+    thử {
+        tải dịch vụ(provider_sai);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

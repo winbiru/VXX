@@ -12,6 +12,35 @@ hàm chính() {
     in thay chính xác("aba😀aba", "aba", "X");
     in thay chính xác("ab", "", "-");
 
+    nbsp = utf8_native_exec("decode", [194, 160]);
+    em_space = utf8_native_exec("decode", [226, 128, 131]);
+    narrow_nbsp = utf8_native_exec("decode", [226, 128, 175]);
+    ideographic_space = utf8_native_exec("decode", [227, 128, 128]);
+    zero_width_space = utf8_native_exec("decode", [226, 128, 139]);
+    in là khoảng trắng unicode(nbsp);
+    in là khoảng trắng unicode(em_space);
+    in là khoảng trắng unicode(narrow_nbsp);
+    in là khoảng trắng unicode(ideographic_space);
+    in !là khoảng trắng unicode(zero_width_space);
+    in bỏ khoảng trắng(nbsp + em_space + "Việt" + narrow_nbsp + ideographic_space) == "Việt";
+    in bỏ khoảng trắng đầu(nbsp + "A" + em_space) == "A" + em_space;
+    in bỏ khoảng trắng cuối(nbsp + "A" + em_space) == nbsp + "A";
+    in bỏ khoảng trắng(nbsp + em_space) == "";
+    in chuẩn hóa khoảng trắng("a" + nbsp + em_space + "b") == "a b";
+    in đếm từ("a" + em_space + "b" + ideographic_space + "c") == 3;
+    in từ dài nhất("a" + em_space + "Việt" + nbsp + "b") == "Việt";
+    in là anagram("a" + narrow_nbsp + "b", "ba");
+
+    bytes_việt = chuỗi thành bytes("Việt");
+    in chuỗi từ bytes(bytes_việt) == "Việt";
+    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    in chuỗi từ bytes([226, 130], "UTF-8", "THAY_THẾ") == ký_tự_thay;
+    thử {
+        in chuỗi từ bytes([226, 130]);
+    } bắt lỗi (e) {
+        in e;
+    };
+
     phần = tách literal("a::b::", "::");
     in độ dài(phần);
     lặp(i = 0; i < độ dài(phần); i++) {
@@ -53,6 +82,26 @@ hàm chính() {
     nhỏ = bộ dựng chuỗi(2);
     thử {
         bộ dựng thêm(nhỏ, "abc");
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    byte_hẹp = bộ dựng chuỗi(10, 5);
+    thử {
+        bộ dựng thêm(byte_hẹp, "Việt");
+    } bắt lỗi (e) {
+        in e;
+    };
+    bộ dựng thêm(byte_hẹp, "abc");
+    in bộ dựng số byte(byte_hẹp);
+
+    thử {
+        bộ dựng thêm([], "x");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        mẫu chuỗi("x", []);
     } bắt lỗi (e) {
         in e;
     };

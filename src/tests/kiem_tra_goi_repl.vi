@@ -1,0 +1,11 @@
+nhập thực thi tương tác;
+
+hàm chính() {
+    phiên = repl tạo();
+    in repl chạy(phiên, "x = 4;") == "";
+    in repl chạy(phiên, "in x + 1;") == "5\n";
+    in độ dài(repl nguồn(phiên)) > 0;
+    in repl đặt lại(phiên);
+    in repl chạy(phiên, "in 9;") == "9\n";
+    in repl đóng(phiên);
+};

@@ -1,0 +1,43 @@
+nhập thời gian;
+
+hàm chính() {
+    in thời gian là năm nhuận(2024);
+    in thời gian là năm nhuận(1900);
+    in thời gian là năm nhuận(2000);
+
+    d = tạo ngày(2024, 2, 29);
+    in định dạng ngày(d);
+    in lấy map(d, "ngày", 0);
+
+    thử {
+        tạo ngày(2023, 2, 29);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    parsed = parse ngày("2026-10-04");
+    in định dạng ngày(parsed);
+    thử {
+        parse ngày("2026/10/04");
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    t = tạo giờ(23, 59, 58, 123000000);
+    in định dạng giờ(t);
+    thử {
+        tạo giờ(24, 0, 0);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    dt = parse ngày giờ("2026-10-04T09:08:07.123");
+    in định dạng ngày giờ(dt);
+    in lấy map(lấy map(dt, "giờ", {}), "nano", -1);
+
+    thử {
+        parse ngày giờ("2026-10-04T09:08:07Z");
+    } bắt lỗi (e) {
+        in e;
+    };
+};

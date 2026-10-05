@@ -1,0 +1,12 @@
+nhập soạn thảo tương tác;
+
+hàm chính() {
+    bộ = soạn thảo tạo();
+    in soạn thảo thêm(bộ, "x = 2;") == 1;
+    in soạn thảo thêm(bộ, "in x + 3;") == 2;
+    in soạn thảo chạy(bộ) == "5\n";
+    in soạn thảo thay(bộ, 1, "in x + 8;");
+    in soạn thảo chạy(bộ) == "10\n";
+    in soạn thảo xóa dòng(bộ, 0) == "x = 2;";
+    in độ dài(soạn thảo nội dung(bộ)) > 0;
+};

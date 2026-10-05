@@ -1,0 +1,33 @@
+// vi.sql.rowset — tập kết quả độc lập kết nối dùng list<map> của runtime.
+nhập gói/bộ sưu tập/chính;
+
+hàm tập bản ghi(danh sách hàng) {
+    trả về danh sách hàng;
+};
+
+hàm số hàng tập bản ghi(bản ghi) {
+    trả về độ dài(bản ghi);
+};
+
+hàm hàng tập bản ghi(bản ghi, chỉ số) {
+    trả về bản ghi[chỉ số];
+};
+
+hàm lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
+    kết quả = [];
+    lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
+        hàng = bản ghi[i];
+        nếu (lấy map(hàng, cột, rỗng) == giá trị) {
+            thêm(kết quả, hàng);
+        };
+    };
+    trả về kết quả;
+};
+
+hàm cột tập bản ghi(bản ghi, cột, mặc định = rỗng) {
+    kết quả = [];
+    lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
+        thêm(kết quả, lấy map(bản ghi[i], cột, mặc định));
+    };
+    trả về kết quả;
+};

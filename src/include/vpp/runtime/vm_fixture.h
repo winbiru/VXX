@@ -92,6 +92,8 @@ public:
         vm_.blockDepth = 0;
         vm_.callDepthFromRoot = 0;
         vm_.pc = 0;
+        vm_.activeBytecode_ = nullptr;
+        vm_.activeBytecodeDebugInfo_ = nullptr;
     }
 
     // Chạy interpreter trực tiếp sau khi benchmark đã verify bytecode ngoài timer.

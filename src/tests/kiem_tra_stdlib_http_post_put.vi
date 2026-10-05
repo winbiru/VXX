@@ -10,6 +10,11 @@ hàm chính() {
     payload = "{\"text\":\"xin chào \\\"V++\\\" \\\\ 100% &\"}";
     in mạng gửi("http://127.0.0.1:18080/post", payload) == "POST|" + payload;
 
+    in mạng gửi(
+        "http://127.0.0.1:18080/inspect/user-42?keyword=V%2B%2B",
+        "{\"name\":\"An\",\"count\":42}"
+    ) == "V%2B%2B|An|user-42";
+
     in mạng xóa("http://127.0.0.1:18080/delete") == "DELETE|";
     in rest xóa("http://127.0.0.1:18080", "/delete") == "DELETE|";
 };

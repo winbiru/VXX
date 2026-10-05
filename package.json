@@ -2,7 +2,7 @@
   "name": "vpp-language",
   "displayName": "V++ Language",
   "description": "IDE-grade Vietnamese-first language support for V++: diagnostics, completion, navigation, outline, references, signatures, rename and formatting",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "publisher": "vpp",
   "main": "./extension.js",
   "icon": "assets/icons/vpp-file.png",

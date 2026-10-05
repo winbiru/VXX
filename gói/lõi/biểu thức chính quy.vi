@@ -1,0 +1,133 @@
+// vi.regex — biểu thức chính quy ECMAScript.
+// Native chỉ còn engine primitive quét mẫu và trả capture. Match/search,
+// thay thế và tách chuỗi đều là logic V++.
+
+hàm regex quét engine(văn bản, mẫu) {
+    trả về regex_quet_noi_bo(văn bản, mẫu);
+};
+
+hàm regex khớp(văn bản, mẫu) {
+    // std::regex_match yêu cầu toàn bộ input khớp. Dùng lookahead âm thay cho
+    // '$' để không nhận vị trí ngay trước newline cuối như một số engine.
+    mẫu_toàn_bộ = "^(?:" + mẫu + ")(?![\\s\\S])";
+    kết_quả_quét = regex quét engine(văn bản, mẫu_toàn_bộ);
+    trả về do_dai(kết_quả_quét[0]) > 0;
+};
+
+hàm regex tìm(văn bản, mẫu) {
+    kết_quả_quét = regex quét engine(văn bản, mẫu);
+    các_khớp = kết_quả_quét[0];
+    nếu (do_dai(các_khớp) == 0) {
+        trả về "";
+    };
+    trả về các_khớp[0][1][0];
+};
+
+hàm regex chữ số nhóm(c) {
+    chữ_số = "0123456789";
+    lặp(i = 0; i < 10; i++) {
+        nếu (chữ_số[i] == c) { trả về i; };
+    };
+    trả về -1;
+};
+
+// scan trả [các khớp, đuôi]; mỗi khớp là [khoảng trước, các nhóm gồm nhóm 0].
+// Chỉ ghép các mảnh engine trả về, không đánh chỉ số Unicode vào byte offset.
+// Không lưu suffix đầy đủ cho từng khớp để tránh bộ nhớ O(n²) khi thay đơn giản.
+hàm regex phần sau(các_khớp, chỉ_số, đuôi) {
+    kết_quả = "";
+    lặp(i = chỉ_số + 1; i < do_dai(các_khớp); i++) {
+        khớp = các_khớp[i];
+        nhóm = khớp[1];
+        kết_quả = kết_quả + khớp[0] + nhóm[0];
+    };
+    trả về kết_quả + đuôi;
+};
+
+hàm regex mở rộng thay thế(mẫu_thay, các_khớp, chỉ_số, đuôi) {
+    khớp = các_khớp[chỉ_số];
+    nhóm = khớp[1];
+    kết_quả = "";
+    n = do_dai(mẫu_thay);
+    lặp(i = 0; i < n; i++) {
+        c = mẫu_thay[i];
+        nếu (c != "$" || i + 1 >= n) {
+            kết_quả = kết_quả + c;
+        } nếu không {
+            tiếp = mẫu_thay[i + 1];
+            đã_xử_lý = sai;
+            nếu (tiếp == "$") {
+                kết_quả = kết_quả + "$";
+                i++;
+                đã_xử_lý = đúng;
+            };
+            nếu (tiếp == "&") {
+                kết_quả = kết_quả + nhóm[0];
+                i++;
+                đã_xử_lý = đúng;
+            };
+            nếu (tiếp == "`") {
+                kết_quả = kết_quả + khớp[0];
+                i++;
+                đã_xử_lý = đúng;
+            };
+            nếu (tiếp == "'") {
+                kết_quả = kết_quả + regex phần sau(các_khớp, chỉ_số, đuôi);
+                i++;
+                đã_xử_lý = đúng;
+            };
+            nếu (!đã_xử_lý) {
+                số_nhóm = regex chữ số nhóm(tiếp);
+                nếu (số_nhóm < 0) {
+                    kết_quả = kết_quả + "$";
+                } nếu không {
+                    i++;
+                    nếu (i + 1 < n) {
+                        chữ_số_sau = regex chữ số nhóm(mẫu_thay[i + 1]);
+                        nếu (chữ_số_sau >= 0) {
+                            số_nhóm = số_nhóm * 10 + chữ_số_sau;
+                            i++;
+                        };
+                    };
+                    nếu (số_nhóm < do_dai(nhóm)) {
+                        kết_quả = kết_quả + nhóm[số_nhóm];
+                    };
+                };
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm regex thay(văn bản, mẫu, giá trị thay thế) {
+    nếu (loại của(giá trị thay thế) != "chuỗi") {
+        ném "regex thay: giá trị thay thế phải là chuỗi";
+    };
+    kết_quả_quét = regex quét engine(văn bản, mẫu);
+    các_khớp = kết_quả_quét[0];
+    đuôi = kết_quả_quét[1];
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(các_khớp); i++) {
+        khớp = các_khớp[i];
+        kết_quả = kết_quả + khớp[0] +
+            regex mở rộng thay thế(giá trị thay thế, các_khớp, i, đuôi);
+    };
+    trả về kết_quả + đuôi;
+};
+
+hàm regex tách(văn bản, mẫu) {
+    kết_quả_quét = regex quét engine(văn bản, mẫu);
+    các_khớp = kết_quả_quét[0];
+    đuôi = kết_quả_quét[1];
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(các_khớp); i++) {
+        khớp = các_khớp[i];
+        them(kết_quả, khớp[0]);
+    };
+    // Contract std::regex_token_iterator: giữ mảnh rỗng đầu/giữa nhưng không
+    // thêm đuôi rỗng sau delimiter cuối. Không khớp trả nguyên văn bản.
+    nếu (đuôi != "" || do_dai(các_khớp) == 0) {
+        them(kết_quả, đuôi);
+    };
+    trả về kết_quả;
+};

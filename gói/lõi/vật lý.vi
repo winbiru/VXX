@@ -1,0 +1,91 @@
+// Thư viện vi.physics — công thức vật lý nền tảng cho V++.
+// Đơn vị mặc định dùng hệ SI, trừ khi tên hàm ghi rõ khác.
+nhập gói/lõi/toán học;
+
+hàm vận tốc(s, t) {
+    nếu (t == 0 || t == 0.0) {
+        ném "vật lý: thời gian phải khác 0";
+    };
+    trả về s / t;
+};
+
+hàm gia tốc(delta_v, t) {
+    nếu (t == 0 || t == 0.0) {
+        ném "vật lý: thời gian phải khác 0";
+    };
+    trả về delta_v / t;
+};
+
+hàm lực(m, a) {
+    trả về m * a;
+};
+
+hàm động lượng(m, v) {
+    trả về m * v;
+};
+
+hàm động năng(m, v) {
+    trả về (m * v * v) / 2;
+};
+
+hàm thế năng trọng trường(m, h, g = 9.80665) {
+    trả về m * g * h;
+};
+
+hàm công cơ học(f, s) {
+    trả về f * s;
+};
+
+hàm công suất(w, t) {
+    nếu (t == 0 || t == 0.0) {
+        ném "vật lý: thời gian phải khác 0";
+    };
+    trả về w / t;
+};
+
+hàm áp suất(f, a) {
+    nếu (a == 0 || a == 0.0) {
+        ném "vật lý: diện tích phải khác 0";
+    };
+    trả về f / a;
+};
+
+hàm khối lượng riêng(m, v) {
+    nếu (v == 0 || v == 0.0) {
+        ném "vật lý: thể tích phải khác 0";
+    };
+    trả về m / v;
+};
+
+hàm cường độ dòng điện(u, r) {
+    nếu (r == 0 || r == 0.0) {
+        ném "vật lý: điện trở phải khác 0";
+    };
+    trả về u / r;
+};
+
+hàm điện áp(i, r) {
+    trả về i * r;
+};
+
+hàm điện trở(u, i) {
+    nếu (i == 0 || i == 0.0) {
+        ném "vật lý: cường độ dòng điện phải khác 0";
+    };
+    trả về u / i;
+};
+
+hàm tần số(t) {
+    nếu (t == 0 || t == 0.0) {
+        ném "vật lý: chu kỳ phải khác 0";
+    };
+    trả về 1 / t;
+};
+
+hàm gia tốc trọng trường chuẩn() {
+    trả về 9.80665;
+};
+
+hàm tốc độ ánh sáng() {
+    trả về 299792458;
+};

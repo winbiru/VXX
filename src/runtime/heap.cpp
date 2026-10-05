@@ -9,19 +9,20 @@ namespace {
 thread_local RuntimeHeap *activeHeap = nullptr;
 
 template <typename T>
-void trackWeak(std::vector<std::weak_ptr<T>> &registry,
+bool trackWeak(std::vector<std::weak_ptr<T>> &registry,
                const std::shared_ptr<T> &value) {
-    if (value == nullptr) return;
+    if (value == nullptr) return false;
     for (auto it = registry.begin(); it != registry.end();) {
         const std::shared_ptr<T> live = it->lock();
         if (live == nullptr) {
             it = registry.erase(it);
             continue;
         }
-        if (live.get() == value.get()) return;
+        if (live.get() == value.get()) return false;
         ++it;
     }
     registry.push_back(value);
+    return true;
 }
 
 template <typename T>
@@ -121,12 +122,24 @@ RuntimeHeap::~RuntimeHeap() {
     (void)collect({});
 }
 
-void RuntimeHeap::track(const MapHandle &value) { trackWeak(maps_, value); }
-void RuntimeHeap::track(const ListHandle &value) { trackWeak(lists_, value); }
-void RuntimeHeap::track(const TupleHandle &value) { trackWeak(tuples_, value); }
-void RuntimeHeap::track(const ClassHandle &value) { trackWeak(classes_, value); }
-void RuntimeHeap::track(const InstanceHandle &value) { trackWeak(instances_, value); }
-void RuntimeHeap::track(const ClosureHandle &value) { trackWeak(closures_, value); }
+void RuntimeHeap::track(const MapHandle &value) {
+    if (trackWeak(maps_, value)) ++allocationGeneration_;
+}
+void RuntimeHeap::track(const ListHandle &value) {
+    if (trackWeak(lists_, value)) ++allocationGeneration_;
+}
+void RuntimeHeap::track(const TupleHandle &value) {
+    if (trackWeak(tuples_, value)) ++allocationGeneration_;
+}
+void RuntimeHeap::track(const ClassHandle &value) {
+    if (trackWeak(classes_, value)) ++allocationGeneration_;
+}
+void RuntimeHeap::track(const InstanceHandle &value) {
+    if (trackWeak(instances_, value)) ++allocationGeneration_;
+}
+void RuntimeHeap::track(const ClosureHandle &value) {
+    if (trackWeak(closures_, value)) ++allocationGeneration_;
+}
 
 // Đăng ký toàn bộ object graph bên dưới một StackValue bằng worklist lặp để test,
 // embedding và giá trị tạo ngoài active heap scope không làm tràn native stack.
@@ -230,6 +243,7 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
     pruneExpired(closures_);
     stats.trackedAfter = maps_.size() + lists_.size() + tuples_.size() +
                          classes_.size() + instances_.size() + closures_.size();
+    collectedAllocationGeneration_ = allocationGeneration_;
     return stats;
 }
 

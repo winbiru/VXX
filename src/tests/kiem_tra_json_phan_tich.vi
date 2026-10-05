@@ -34,4 +34,26 @@ hàm chính() {
     đặt map(thứ tự json, "a", 2);
     đặt map(thứ tự json, "m", 3);
     in json tạo(thứ tự json);
+
+    escaped = json phân tích(
+        "{\"x\":\"a\\\"b\\\\c\",\"u\":\"Việt \\uD83D\\uDE80\"}"
+    );
+    in lấy map(escaped, "x", "") == "a\"b\\c";
+    in lấy map(escaped, "u", "") == "Việt 🚀";
+
+    trùng = json phân tích("{\"k\":\"đầu\",\"k\":\"cuối\"}");
+    in lấy map(trùng, "k", "") == "cuối";
+
+    số = json phân tích("[-12,3.5,1e3,2147483648]");
+    in số[0] == -12;
+    in số[1] == 3.5;
+    in số[2] == 1000.0;
+    in số[3] == 2147483648.0;
+
+    thử {
+        json phân tích("{\"x\":1} trailing");
+        in 0;
+    } bắt lỗi (e) {
+        in 1;
+    };
 };

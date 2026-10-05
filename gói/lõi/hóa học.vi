@@ -1,0 +1,61 @@
+// Thư viện vi.chemistry — công thức hóa học nền tảng cho V++.
+// Khối lượng mặc định tính bằng gram, thể tích dung dịch bằng lít.
+nhập gói/lõi/toán học;
+
+hàm số mol từ khối lượng(m, m_mol) {
+    nếu (m_mol == 0 || m_mol == 0.0) {
+        ném "hóa học: khối lượng mol phải khác 0";
+    };
+    trả về m / m_mol;
+};
+
+hàm khối lượng từ số mol(n, m_mol) {
+    trả về n * m_mol;
+};
+
+hàm nồng độ mol(n, v_lit) {
+    nếu (v_lit == 0 || v_lit == 0.0) {
+        ném "hóa học: thể tích dung dịch phải khác 0";
+    };
+    trả về n / v_lit;
+};
+
+hàm số mol từ nồng độ(c, v_lit) {
+    trả về c * v_lit;
+};
+
+hàm nồng độ phần trăm(m_chat_tan, m_dung_dich) {
+    nếu (m_dung_dich == 0 || m_dung_dich == 0.0) {
+        ném "hóa học: khối lượng dung dịch phải khác 0";
+    };
+    trả về (m_chat_tan * 100) / m_dung_dich;
+};
+
+hàm khối lượng chất tan(c_phan_tram, m_dung_dich) {
+    trả về (c_phan_tram * m_dung_dich) / 100;
+};
+
+// Thể tích mol khí lý tưởng tại 0 °C và 1 atm, đơn vị lít/mol.
+hàm thể tích khí ở đktc(n) {
+    trả về n * 22.414;
+};
+
+hàm số mol khí ở đktc(v_lit) {
+    trả về v_lit / 22.414;
+};
+
+// C2 = C1 * V1 / V2.
+hàm nồng độ sau pha loãng(c_ban_dau, v_ban_dau, v_sau) {
+    nếu (v_sau == 0 || v_sau == 0.0) {
+        ném "hóa học: thể tích sau pha loãng phải khác 0";
+    };
+    trả về (c_ban_dau * v_ban_dau) / (v_sau + 0.0);
+};
+
+hàm hằng số avogadro() {
+    trả về 602214076000000000000000.0;
+};
+
+hàm số hạt từ số mol(n) {
+    trả về n * hằng số avogadro();
+};

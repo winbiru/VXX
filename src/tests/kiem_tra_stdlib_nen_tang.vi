@@ -24,10 +24,20 @@ hàm chính() {
     danh sách mẫu = [1, 2];
     in loại của(danh sách mẫu);
     in ngẫu nhiên nguyên(5, 5);
+    r = ngẫu nhiên nguyên(-5, 5);
+    in r >= -5 && r <= 5;
 
-    in đường dẫn nối("a", "b");
+    in thay thế(đường dẫn nối("a", "b"), "\\", "/");
     in đường dẫn cha("a/b/c.vi");
     in đường dẫn tên("a/b/c.vi");
+    in đường dẫn nối("a/", "b");
+    in đường dẫn nối("", "b");
+    in thay thế(đường dẫn nối("a", ""), "\\", "/");
+    in đường dẫn nối("a", "/b");
+    in đường dẫn tên("a/b/") == "";
+    in đường dẫn cha("a/b/");
+    in thay thế(đường dẫn cha("/"), "\\", "/");
+    in đường dẫn cha("c.vi") == "";
     in đường dẫn tồn tại("src/tests/__vpp_stdlib_missing_path__");
     in là tệp("src/tests/__vpp_stdlib_missing_path__");
     in là thư mục("src/tests/__vpp_stdlib_missing_path__");
@@ -44,7 +54,7 @@ hàm chính() {
     in liệt kê thư mục(thư mục test);
 
     in đọc biến môi trường("__VPP_TEST_BIEN_KHONG_TON_TAI__", "mặc định");
-    ngủ mili giây(0);
+    ngủ mili giây("0");
     in "đã ngủ";
     in xóa đường dẫn(thư mục test) > 0;
 };

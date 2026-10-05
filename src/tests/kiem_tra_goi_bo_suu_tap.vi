@@ -1,0 +1,59 @@
+nhập bộ sưu tập;
+
+hàm chính() {
+    ds = [3, 1, 2];
+    in tìm chỉ số(ds, 1);
+    in tổng list(ds);
+    in nhỏ nhất list(ds);
+    in lớn nhất list(ds);
+    in có khóa({"tên": "V++"}, "tên");
+    in rời nhau([1, 2], [3, 4]);
+
+    s = tập hợp([3, 1, 3, 2, 1]);
+    in s;
+    in tập chứa(s, 2);
+    in hợp tập([1, 2], [2, 3]);
+    in giao tập([1, 2, 3], [2, 3, 4]);
+    in hiệu tập([1, 2, 3], [2, 4]);
+    in hiệu đối xứng tập([1, 2, 3], [2, 3, 4]);
+    in tập con([1, 1, 2], [2, 1, 3]);
+    in tập con thực sự([1, 2], [2, 1, 3]);
+    in tập cha([1, 2, 3], [1, 2]);
+    in tập bằng([1, 2, 2], [2, 1]);
+
+    mutable = tập hợp([1, 2]);
+    in tập thêm(mutable, 3);
+    in tập thêm(mutable, 3);
+    in tập xóa(mutable, 2);
+    in tập xóa(mutable, 9);
+    in mutable;
+
+    thử {
+        tập hợp({});
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    gốc = [1, [2]];
+    bản_sao = thành list(gốc);
+    bản_sao[0] = 9;
+    thêm(bản_sao, 3);
+    in gốc[0] == 1 && độ dài(gốc) == 2 && độ dài(bản_sao) == 3;
+    con = bản_sao[1];
+    con[0] = 7;
+    in gốc[1][0] == 7;
+
+    bộ = thành tuple(gốc);
+    từ_bộ = thành list(bộ);
+    từ_bộ[0] = 8;
+    in bộ[0] == 1;
+    con_bộ = từ_bộ[1];
+    con_bộ[0] = 6;
+    in bộ[1][0] == 6;
+    in thành list([]);
+    in thành list(thành tuple([]));
+    in thanh_list([4, 5]);
+    thử { thành list("abc"); } bắt lỗi (e) { in e; };
+    thử { thành list({}); } bắt lỗi (e) { in e; };
+    thử { thành list(rỗng); } bắt lỗi (e) { in e; };
+};

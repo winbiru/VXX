@@ -1,0 +1,10 @@
+nhập tập bản ghi;
+
+hàm chính() {
+    rows = tập bản ghi([{"id": 1, "nhóm": "a"}, {"id": 2, "nhóm": "b"}, {"id": 3, "nhóm": "a"}]);
+    in số hàng tập bản ghi(rows);
+    in cột tập bản ghi(rows, "id", 0);
+    lọc = lọc tập bản ghi bằng(rows, "nhóm", "a");
+    in số hàng tập bản ghi(lọc);
+    in cột tập bản ghi(lọc, "id", 0);
+};

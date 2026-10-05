@@ -1,0 +1,869 @@
+// Module: lõi.chuỗi
+// Mục đích: gom các phép xử lý chuỗi cơ bản.
+// Nhóm hàm: nối chuỗi, so sánh chuỗi, kiểm tra rỗng.
+
+nhập gói/lõi/trình tự;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/chuyển kiểu;
+
+// Ghi chú hàm: độ dài của chuỗi hoặc list. Native runtime cung cấp implementation.
+hàm độ dài(giá trị) {
+    trả về do_dai(giá trị);
+};
+
+// Ghi chú hàm: nối chuỗi.
+hàm nối chuỗi(a, b) {
+    trả về a + b;
+};
+
+// Ghi chú hàm: nối ba.
+hàm nối ba(a, b, c) {
+    trả về a + b + c;
+};
+
+// Ghi chú hàm: bằng nhau chuỗi.
+hàm bằng nhau chuỗi(a, b) {
+    trả về a == b;
+};
+
+// Ghi chú hàm: khác nhau chuỗi.
+hàm khác nhau chuỗi(a, b) {
+    trả về a != b;
+};
+
+// Ghi chú hàm: là chuỗi rỗng.
+hàm là chuỗi rỗng(s) {
+    trả về s == "";
+};
+
+// Chuỗi V++ dùng UTF-8. Các phép đếm/chứa/thay dưới đây chuẩn hóa NFC tiếng
+// Việt trước khi so khớp để chữ dựng sẵn và chữ tách dấu có cùng semantics.
+hàm đếm ký tự(s, ký tự) {
+    nguồn = chuẩn hóa unicode(s);
+    mẫu = chuẩn hóa unicode(ký tự);
+    m = do_dai(mẫu);
+    nếu (m == 0) {
+        ném "đếm ký tự: mẫu không được rỗng";
+    };
+    n = do_dai(nguồn);
+    kết_quả = 0;
+    vị_trí = 0;
+    lặp(vòng = 0; vị_trí + m <= n; vòng++) {
+        nếu (cắt chuỗi(nguồn, vị_trí, m) == mẫu) {
+            kết_quả = kết_quả + 1;
+            vị_trí = vị_trí + m;
+        } nếu không {
+            vị_trí = vị_trí + 1;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm chứa chuỗi(s, chuỗi con) {
+    nguồn = chuẩn hóa unicode(s);
+    mẫu = chuẩn hóa unicode(chuỗi con);
+    m = do_dai(mẫu);
+    nếu (m == 0) {
+        trả về đúng;
+    };
+    tìm_thấy = sai;
+    lặp(i = 0; i + m <= do_dai(nguồn) && !tìm_thấy; i++) {
+        nếu (cắt chuỗi(nguồn, i, m) == mẫu) {
+            tìm_thấy = đúng;
+        };
+    };
+    trả về tìm_thấy;
+};
+
+hàm thay thế(s, cũ, mới) {
+    nguồn = chuẩn hóa unicode(s);
+    mẫu = chuẩn hóa unicode(cũ);
+    thay = chuẩn hóa unicode(mới);
+    m = do_dai(mẫu);
+    nếu (m == 0) {
+        ném "thay thế: mẫu không được rỗng";
+    };
+
+    kết_quả = "";
+    vị_trí = 0;
+    n = do_dai(nguồn);
+    lặp(vòng = 0; vị_trí < n; vòng++) {
+        nếu (vị_trí + m <= n && cắt chuỗi(nguồn, vị_trí, m) == mẫu) {
+            kết_quả = kết_quả + thay;
+            vị_trí = vị_trí + m;
+        } nếu không {
+            kết_quả = kết_quả + nguồn[vị_trí];
+            vị_trí = vị_trí + 1;
+        };
+    };
+    trả về kết_quả;
+};
+
+// Ghi chú hàm: cắt `số_lượng` code point kể từ `bắt_đầu` (chỉ số bắt đầu từ 0).
+// Tham số nguyên chấp nhận cả dạng số thực tích phân như 1.0; giá trị có phần lẻ bị từ chối.
+// Nếu độ dài vượt phần còn lại, kết quả dừng ở cuối chuỗi.
+hàm cắt chuỗi(s, bắt_đầu, số_lượng) {
+    văn_bản = thành chuỗi(s);
+    thử {
+        bắt_đầu = thành số nguyên(bắt_đầu);
+        số_lượng = thành số nguyên(số_lượng);
+    } bắt lỗi (e) {
+        ném "cắt chuỗi: vị trí và độ dài phải là số nguyên";
+    };
+    nếu (bắt_đầu < 0 || số_lượng < 0) {
+        ném "cắt chuỗi không nhận vị trí hoặc độ dài âm";
+    };
+    n = độ dài(văn_bản);
+    nếu (bắt_đầu >= n || số_lượng == 0) {
+        trả về "";
+    };
+    kết_thúc = bắt_đầu + số_lượng;
+    nếu (kết_thúc > n) {
+        kết_thúc = n;
+    };
+    kết_quả = "";
+    lặp(i = bắt_đầu; i < kết_thúc; i++) {
+        kết_quả = kết_quả + văn_bản[i];
+    };
+    trả về kết_quả;
+};
+
+// Bảng chữ cái public hiện giữ đúng contract runtime 1.0: ASCII và các
+// chữ dựng sẵn tiếng Việt. Ký tự ngoài bảng được giữ nguyên. Đây là logic
+// thư viện nên được thực hiện bằng V++, không cần native hook riêng.
+hàm chuỗi đổi hoa thường(s, nguồn, đích) {
+    văn_bản = s;
+    nếu (loại của(văn_bản) != "chuỗi") {
+        văn_bản = thành chuỗi(văn_bản);
+    };
+
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(văn_bản); i++) {
+        c = văn_bản[i];
+        thay = c;
+        tìm_thấy = sai;
+        lặp(j = 0; j < do_dai(nguồn) && !tìm_thấy; j++) {
+            nếu (nguồn[j] == c) {
+                thay = đích[j];
+                tìm_thấy = đúng;
+            };
+        };
+        kết_quả = kết_quả + thay;
+    };
+    trả về kết_quả;
+};
+
+hàm chuỗi thường(s) {
+    nguồn = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+            "ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
+    đích = "abcdefghijklmnopqrstuvwxyz" +
+           "ăâêôơưđàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ";
+    trả về chuỗi đổi hoa thường(s, nguồn, đích);
+};
+
+hàm chuỗi hoa(s) {
+    nguồn = "abcdefghijklmnopqrstuvwxyz" +
+            "ăâêôơưđàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ";
+    đích = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+           "ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
+    trả về chuỗi đổi hoa thường(s, nguồn, đích);
+};
+
+// Canonical combining class tối thiểu mà contract NFC tiếng Việt 1.0 cần.
+hàm chuỗi nfc hạng dấu(c) {
+    nếu (c == "̛") { trả về 216; }; // horn
+    nếu (c == "̣") { trả về 220; }; // dot below
+    nếu (c == "̀" || c == "́" || c == "̂" || c == "̃" ||
+        c == "̆" || c == "̉") {
+        trả về 230;
+    };
+    trả về 0;
+};
+
+// Trả canonical decomposition của một nguyên âm dựng sẵn tiếng Việt.
+// `mục_tiêu` là chuỗi 144 code point; `phân_rã` là danh sách song song.
+hàm chuỗi nfc phân rã ký tự(c, mục_tiêu, phân_rã) {
+    vị_trí = -1;
+    lặp(i = 0; i < do_dai(mục_tiêu) && vị_trí < 0; i++) {
+        nếu (mục_tiêu[i] == c) {
+            vị_trí = i;
+        };
+    };
+    nếu (vị_trí < 0) {
+        trả về c;
+    };
+    trả về phân_rã[vị_trí];
+};
+
+// Sắp dấu theo canonical combining class rồi ghép lại nếu tổ hợp có dạng
+// dựng sẵn trong bảng tiếng Việt. Dấu cùng class giữ encounter order.
+hàm chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã) {
+    nếu (do_dai(đoạn) == 0) {
+        trả về "";
+    };
+
+    dấu = [];
+    lặp(i = 1; i < do_dai(đoạn); i++) {
+        them(dấu, đoạn[i]);
+    };
+    n = do_dai(dấu);
+    lặp(i = 0; i < n; i++) {
+        lặp(j = 0; j + 1 < n - i; j++) {
+            nếu (chuỗi nfc hạng dấu(dấu[j]) > chuỗi nfc hạng dấu(dấu[j + 1])) {
+                tạm = dấu[j];
+                dấu[j] = dấu[j + 1];
+                dấu[j + 1] = tạm;
+            };
+        };
+    };
+
+    khóa = đoạn[0];
+    lặp(i = 0; i < do_dai(dấu); i++) {
+        khóa = khóa + dấu[i];
+    };
+
+    vị_trí = -1;
+    lặp(i = 0; i < do_dai(phân_rã) && vị_trí < 0; i++) {
+        nếu (phân_rã[i] == khóa) {
+            vị_trí = i;
+        };
+    };
+    nếu (vị_trí >= 0) {
+        trả về mục_tiêu[vị_trí];
+    };
+    trả về khóa;
+};
+
+// Chuẩn hóa NFC cho các tổ hợp chữ và dấu tiếng Việt trong contract V++ 1.0.
+// Đây là thuật toán thư viện thuần V++; code point thuộc script khác được giữ
+// nguyên. Bảng và thứ tự dấu tương đương implementation C++ trước đây.
+hàm chuẩn hóa unicode(s) {
+    văn_bản = s;
+    nếu (loại của(văn_bản) != "chuỗi") {
+        văn_bản = thành chuỗi(văn_bản);
+    };
+
+    mục_tiêu = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩị" +
+               "oòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ" +
+               "AÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊ" +
+               "OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
+    phân_rã = [
+        "a", "à", "á", "ả", "ã", "ạ", "ă", "ằ", "ắ", "ẳ", "ẵ", "ặ",
+        "â", "ầ", "ấ", "ẩ", "ẫ", "ậ", "e", "è", "é", "ẻ", "ẽ", "ẹ",
+        "ê", "ề", "ế", "ể", "ễ", "ệ", "i", "ì", "í", "ỉ", "ĩ", "ị",
+        "o", "ò", "ó", "ỏ", "õ", "ọ", "ô", "ồ", "ố", "ổ", "ỗ", "ộ",
+        "ơ", "ờ", "ớ", "ở", "ỡ", "ợ", "u", "ù", "ú", "ủ", "ũ", "ụ",
+        "ư", "ừ", "ứ", "ử", "ữ", "ự", "y", "ỳ", "ý", "ỷ", "ỹ", "ỵ",
+        "A", "À", "Á", "Ả", "Ã", "Ạ", "Ă", "Ằ", "Ắ", "Ẳ", "Ẵ", "Ặ",
+        "Â", "Ầ", "Ấ", "Ẩ", "Ẫ", "Ậ", "E", "È", "É", "Ẻ", "Ẽ", "Ẹ",
+        "Ê", "Ề", "Ế", "Ể", "Ễ", "Ệ", "I", "Ì", "Í", "Ỉ", "Ĩ", "Ị",
+        "O", "Ò", "Ó", "Ỏ", "Õ", "Ọ", "Ô", "Ồ", "Ố", "Ổ", "Ỗ", "Ộ",
+        "Ơ", "Ờ", "Ớ", "Ở", "Ỡ", "Ợ", "U", "Ù", "Ú", "Ủ", "Ũ", "Ụ",
+        "Ư", "Ừ", "Ứ", "Ử", "Ữ", "Ự", "Y", "Ỳ", "Ý", "Ỷ", "Ỹ", "Ỵ"
+    ];
+
+    kết_quả = "";
+    đoạn = [];
+    lặp(i = 0; i < do_dai(văn_bản); i++) {
+        c = văn_bản[i];
+        hạng_dấu = chuỗi nfc hạng dấu(c);
+        nếu (hạng_dấu != 0) {
+            nếu (do_dai(đoạn) == 0) {
+                // Giữ đúng hành vi cũ: combining mark đứng độc lập được phát ra ngay.
+                kết_quả = kết_quả + c;
+            } nếu không {
+                them(đoạn, c);
+            };
+        } nếu không {
+            kết_quả = kết_quả + chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã);
+            đoạn = [];
+            phân_rã_c = chuỗi nfc phân rã ký tự(c, mục_tiêu, phân_rã);
+            lặp(j = 0; j < do_dai(phân_rã_c); j++) {
+                them(đoạn, phân_rã_c[j]);
+            };
+        };
+    };
+    trả về kết_quả + chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã);
+};
+
+// Phân loại theo Unicode White_Space. Native chỉ cung cấp primitive mã hóa
+// một code point sang UTF-8; việc khôi phục scalar và quyết định whitespace
+// được thực hiện hoàn toàn ở V++.
+hàm chuỗi mã điểm unicode(c) {
+    nếu (loại của(c) != "chuỗi" || do_dai(c) != 1) {
+        ném "STRING_TYPE";
+    };
+
+    bytes = utf8_native_exec("encode", c);
+    n = do_dai(bytes);
+    nếu (n == 1) {
+        trả về bytes[0];
+    };
+    nếu (n == 2) {
+        trả về (bytes[0] % 32) * 64 + (bytes[1] % 64);
+    };
+    nếu (n == 3) {
+        trả về (bytes[0] % 16) * 4096 +
+               (bytes[1] % 64) * 64 +
+               (bytes[2] % 64);
+    };
+    nếu (n == 4) {
+        trả về (bytes[0] % 8) * 262144 +
+               (bytes[1] % 64) * 4096 +
+               (bytes[2] % 64) * 64 +
+               (bytes[3] % 64);
+    };
+    ném "STRING_TYPE";
+};
+
+hàm là khoảng trắng unicode(c) {
+    mã = chuỗi mã điểm unicode(c);
+    trả về (mã >= 9 && mã <= 13) ||
+           mã == 32 || mã == 133 || mã == 160 || mã == 5760 ||
+           (mã >= 8192 && mã <= 8202) ||
+           mã == 8232 || mã == 8233 || mã == 8239 ||
+           mã == 8287 || mã == 12288;
+};
+
+hàm chuẩn hóa khoảng trắng(s) {
+    kết_quả = "";
+    đang_trong_từ = sai;
+    lặp(i = 0; i < do_dai(s); i++) {
+        c = s[i];
+        trắng = là khoảng trắng unicode(c);
+        nếu (trắng) {
+            nếu (đang_trong_từ) {
+                kết_quả = kết_quả + " ";
+                đang_trong_từ = sai;
+            };
+        } nếu không {
+            kết_quả = kết_quả + c;
+            đang_trong_từ = đúng;
+        };
+    };
+    nếu (do_dai(kết_quả) > 0 && kết_quả[do_dai(kết_quả) - 1] == " ") {
+        kết_quả = cắt chuỗi(kết_quả, 0, do_dai(kết_quả) - 1);
+    };
+    trả về kết_quả;
+};
+
+hàm đếm từ(s) {
+    đếm = 0;
+    trong_từ = sai;
+    lặp(i = 0; i < do_dai(s); i++) {
+        c = s[i];
+        trắng = là khoảng trắng unicode(c);
+        nếu (trắng) {
+            trong_từ = sai;
+        } nếu không {
+            nếu (!trong_từ) {
+                đếm = đếm + 1;
+                trong_từ = đúng;
+            };
+        };
+    };
+    trả về đếm;
+};
+
+hàm từ dài nhất(s) {
+    dài_nhất = "";
+    hiện_tại = "";
+    lặp(i = 0; i <= do_dai(s); i++) {
+        hết = i == do_dai(s);
+        c = " ";
+        nếu (!hết) {
+            c = s[i];
+        };
+        trắng = hết || là khoảng trắng unicode(c);
+        nếu (trắng) {
+            nếu (do_dai(hiện_tại) > do_dai(dài_nhất)) {
+                dài_nhất = hiện_tại;
+            };
+            hiện_tại = "";
+        } nếu không {
+            hiện_tại = hiện_tại + c;
+        };
+    };
+    trả về dài_nhất;
+};
+
+hàm viết hoa đầu từ(s) {
+    nguồn = chuẩn hóa khoảng trắng(s);
+    nếu (nguồn == "") {
+        trả về "";
+    };
+    nguồn = chuỗi thường(nguồn);
+    kết_quả = "";
+    đầu_từ = đúng;
+    lặp(i = 0; i < do_dai(nguồn); i++) {
+        c = nguồn[i];
+        nếu (c == " ") {
+            kết_quả = kết_quả + " ";
+            đầu_từ = đúng;
+        } nếu không {
+            nếu (đầu_từ) {
+                kết_quả = kết_quả + chuỗi hoa(c);
+                đầu_từ = sai;
+            } nếu không {
+                kết_quả = kết_quả + c;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// Không phân biệt hoa/thường tiếng Việt; giữ nguyên whitespace/dấu câu trong phép so sánh.
+hàm là palindrome(s) {
+    nguồn = chuỗi thường(chuẩn hóa unicode(s));
+    trái = 0;
+    phải = do_dai(nguồn) - 1;
+    kết_quả = đúng;
+    lặp(vòng = 0; trái < phải && kết_quả; vòng++) {
+        nếu (nguồn[trái] != nguồn[phải]) {
+            kết_quả = sai;
+        };
+        trái = trái + 1;
+        phải = phải - 1;
+    };
+    trả về kết_quả;
+};
+
+// So sánh theo code point sau chuẩn hóa NFC + chữ thường tiếng Việt; bỏ whitespace.
+hàm là anagram(a, b) {
+    trái = chuỗi thường(chuẩn hóa unicode(a));
+    phải = chuỗi thường(chuẩn hóa unicode(b));
+    a_list = [];
+    b_list = [];
+    lặp(i = 0; i < do_dai(trái); i++) {
+        c = trái[i];
+        nếu (!là khoảng trắng unicode(c)) {
+            them(a_list, c);
+        };
+    };
+    lặp(i = 0; i < do_dai(phải); i++) {
+        c = phải[i];
+        nếu (!là khoảng trắng unicode(c)) {
+            them(b_list, c);
+        };
+    };
+    nếu (do_dai(a_list) != do_dai(b_list)) {
+        trả về sai;
+    };
+    lặp(i = 0; i < do_dai(a_list); i++) {
+        vị_trí = -1;
+        lặp(j = 0; j < do_dai(b_list) && vị_trí < 0; j++) {
+            nếu (a_list[i] == b_list[j]) {
+                vị_trí = j;
+            };
+        };
+        nếu (vị_trí < 0) {
+            trả về sai;
+        };
+        xoa_tai(b_list, vị_trí);
+    };
+    trả về đúng;
+};
+
+// Khóa phải biểu diễn số nguyên; số thực tích phân được chấp nhận, phần lẻ bị từ chối.
+hàm mã hóa caesar(s, khóa) {
+    chữ_thường = "abcdefghijklmnopqrstuvwxyz";
+    chữ_hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    dịch = khóa % 26;
+    nếu (dịch < 0) {
+        dịch = dịch + 26;
+    };
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(s); i++) {
+        c = s[i];
+        vị_trí = -1;
+        hoa = sai;
+        lặp(j = 0; j < 26 && vị_trí < 0; j++) {
+            nếu (chữ_thường[j] == c) {
+                vị_trí = j;
+            };
+            nếu (chữ_hoa[j] == c) {
+                vị_trí = j;
+                hoa = đúng;
+            };
+        };
+        nếu (vị_trí < 0) {
+            kết_quả = kết_quả + c;
+        } nếu không {
+            mới = (vị_trí + dịch) % 26;
+            nếu (hoa) {
+                kết_quả = kết_quả + chữ_hoa[mới];
+            } nếu không {
+                kết_quả = kết_quả + chữ_thường[mới];
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// --- Chuỗi nền tảng theo VPP-CORE-STRING-001 ---
+// Các API dưới đây giữ equality/lookup exact theo code point. Chúng không
+// chuẩn hóa NFC ngầm như nhóm helper tiếng Việt lịch sử ở phía trên.
+
+hàm chuỗi yêu cầu(văn_bản) {
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "STRING_TYPE";
+    };
+    trả về văn_bản;
+};
+
+hàm chuỗi yêu cầu index(chỉ_số, nhỏ_nhất, lớn_nhất) {
+    nếu (loại của(chỉ_số) != "số nguyên" ||
+        chỉ_số < nhỏ_nhất || chỉ_số > lớn_nhất) {
+        ném "STRING_INDEX";
+    };
+    trả về chỉ_số;
+};
+
+hàm ký tự tại(văn_bản, chỉ_số) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    chuỗi yêu cầu index(chỉ_số, 0, n - 1);
+    trả về văn_bản[chỉ_số];
+};
+
+// Khoảng nửa kín [bắt_đầu, kết_thúc), chỉ số theo Unicode code point.
+hàm con chuỗi(văn_bản, bắt_đầu, kết_thúc) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    trả về cắt chuỗi(văn_bản, bắt_đầu, kết_thúc - bắt_đầu);
+};
+
+hàm bỏ khoảng trắng đầu(văn_bản) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    bắt_đầu = 0;
+    đang_bỏ = đúng;
+    lặp(vòng = 0; bắt_đầu < n && đang_bỏ; vòng++) {
+        nếu (là khoảng trắng unicode(văn_bản[bắt_đầu])) {
+            bắt_đầu = bắt_đầu + 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    trả về con chuỗi(văn_bản, bắt_đầu, n);
+};
+
+hàm bỏ khoảng trắng cuối(văn_bản) {
+    chuỗi yêu cầu(văn_bản);
+    kết_thúc = độ dài(văn_bản);
+    đang_bỏ = đúng;
+    lặp(vòng = 0; kết_thúc > 0 && đang_bỏ; vòng++) {
+        nếu (là khoảng trắng unicode(văn_bản[kết_thúc - 1])) {
+            kết_thúc = kết_thúc - 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    trả về con chuỗi(văn_bản, 0, kết_thúc);
+};
+
+hàm bỏ khoảng trắng(văn_bản) {
+    chuỗi yêu cầu(văn_bản);
+    n = độ dài(văn_bản);
+    bắt_đầu = 0;
+    kết_thúc = n;
+    đang_bỏ = đúng;
+    lặp(vòng = 0; bắt_đầu < kết_thúc && đang_bỏ; vòng++) {
+        nếu (là khoảng trắng unicode(văn_bản[bắt_đầu])) {
+            bắt_đầu = bắt_đầu + 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    đang_bỏ = đúng;
+    lặp(vòng = 0; kết_thúc > bắt_đầu && đang_bỏ; vòng++) {
+        nếu (là khoảng trắng unicode(văn_bản[kết_thúc - 1])) {
+            kết_thúc = kết_thúc - 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    trả về con chuỗi(văn_bản, bắt_đầu, kết_thúc);
+};
+
+hàm chuỗi thành bytes(văn_bản, bảng_mã = "UTF-8") {
+    chuỗi yêu cầu(văn_bản);
+    trả về mã hóa bảng mã(văn_bản, bảng_mã);
+};
+
+hàm chuỗi từ bytes(bytes, bảng_mã = "UTF-8", chế_độ_lỗi = "BÁO_LỖI") {
+    trả về giải mã bảng mã(bytes, bảng_mã, chế_độ_lỗi);
+};
+
+// Tìm exact, trả về chỉ số code point đầu tiên hoặc rỗng.
+hàm tìm chuỗi chính xác(văn_bản, mẫu, từ = 0) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(mẫu);
+    n = độ dài(văn_bản);
+    m = độ dài(mẫu);
+    chuỗi yêu cầu index(từ, 0, n);
+
+    nếu (m == 0) {
+        trả về từ;
+    };
+    nếu (m > n - từ) {
+        trả về rỗng;
+    };
+
+    kết_quả = rỗng;
+    giới_hạn = n - m;
+    lặp(i = từ; i <= giới_hạn && kết_quả == rỗng; i++) {
+        nếu (con chuỗi(văn_bản, i, i + m) == mẫu) {
+            kết_quả = i;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm bắt đầu bằng(văn_bản, tiền_tố) {
+    vị_trí = tìm chuỗi chính xác(văn_bản, tiền_tố, 0);
+    trả về vị_trí == 0;
+};
+
+hàm kết thúc bằng(văn_bản, hậu_tố) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(hậu_tố);
+    n = độ dài(văn_bản);
+    m = độ dài(hậu_tố);
+    nếu (m > n) {
+        trả về sai;
+    };
+    trả về con chuỗi(văn_bản, n - m, n) == hậu_tố;
+};
+
+hàm chứa chính xác(văn_bản, mẫu) {
+    trả về tìm chuỗi chính xác(văn_bản, mẫu, 0) != rỗng;
+};
+
+// Thay tất cả match literal không chồng lấp. Mẫu rỗng chèn replacement tại
+// mọi biên code point, tương đương semantics String.replace CharSequence.
+hàm thay chính xác(văn_bản, cũ, mới) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(cũ);
+    chuỗi yêu cầu(mới);
+    n = độ dài(văn_bản);
+    m = độ dài(cũ);
+
+    nếu (m == 0) {
+        kết_quả = mới;
+        lặp(i = 0; i < n; i++) {
+            kết_quả = kết_quả + ký tự tại(văn_bản, i) + mới;
+        };
+        trả về kết_quả;
+    };
+
+    kết_quả = "";
+    con_trỏ = 0;
+    tiếp_tục = đúng;
+    lặp(vòng = 0; tiếp_tục; vòng++) {
+        vị_trí = tìm chuỗi chính xác(văn_bản, cũ, con_trỏ);
+        nếu (vị_trí == rỗng) {
+            kết_quả = kết_quả + con chuỗi(văn_bản, con_trỏ, n);
+            tiếp_tục = sai;
+        } nếu không {
+            kết_quả = kết_quả + con chuỗi(văn_bản, con_trỏ, vị_trí) + mới;
+            con_trỏ = vị_trí + m;
+            nếu (con_trỏ == n) {
+                tiếp_tục = sai;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// Split literal, không dùng regex. Separator rỗng tách theo code point.
+hàm tách literal(văn_bản, phân_cách) {
+    chuỗi yêu cầu(văn_bản);
+    chuỗi yêu cầu(phân_cách);
+    kết_quả = [];
+    n = độ dài(văn_bản);
+    m = độ dài(phân_cách);
+
+    nếu (m == 0) {
+        lặp(i = 0; i < n; i++) {
+            thêm(kết_quả, ký tự tại(văn_bản, i));
+        };
+        trả về kết_quả;
+    };
+
+    con_trỏ = 0;
+    tiếp_tục = đúng;
+    lặp(vòng = 0; tiếp_tục; vòng++) {
+        vị_trí = tìm chuỗi chính xác(văn_bản, phân_cách, con_trỏ);
+        nếu (vị_trí == rỗng) {
+            thêm(kết_quả, con chuỗi(văn_bản, con_trỏ, n));
+            tiếp_tục = sai;
+        } nếu không {
+            thêm(kết_quả, con chuỗi(văn_bản, con_trỏ, vị_trí));
+            con_trỏ = vị_trí + m;
+            nếu (con_trỏ == n) {
+                thêm(kết_quả, "");
+                tiếp_tục = sai;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+// --- BộDựngChuỗi ---
+// V1 dùng map nội bộ để tránh phụ thuộc class-lowering. Builder giữ đồng thời
+// budget code point và budget byte UTF-8; không cần native allocator riêng.
+
+hàm bộ dựng chuỗi(giới_hạn = 1048576, giới_hạn_byte = 4194304) {
+    nếu (loại của(giới_hạn) != "số nguyên" || giới_hạn < 0) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    nếu (loại của(giới_hạn_byte) != "số nguyên" || giới_hạn_byte < 0) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    trả về {
+        "loại": "BộDựngChuỗi",
+        "giá trị": "",
+        "giới hạn": giới_hạn,
+        "giới hạn byte": giới_hạn_byte
+    };
+};
+
+hàm bộ dựng yêu cầu(builder) {
+    nếu (loại của(builder) != "từ điển") {
+        ném "STRING_BUILDER_INVALID";
+    };
+    nếu (lấy map(builder, "loại", "") != "BộDựngChuỗi") {
+        ném "STRING_BUILDER_INVALID";
+    };
+    trả về builder;
+};
+
+hàm bộ dựng đặt(builder, văn_bản) {
+    bộ dựng yêu cầu(builder);
+    chuỗi yêu cầu(văn_bản);
+    giới_hạn = lấy map(builder, "giới hạn", 0);
+    nếu (độ dài(văn_bản) > giới_hạn) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    giới_hạn_byte = lấy map(builder, "giới hạn byte", 4194304);
+    nếu (độ dài(chuỗi thành bytes(văn_bản, "UTF-8")) > giới_hạn_byte) {
+        ném "STRING_RESOURCE_LIMIT";
+    };
+    đặt map(builder, "giá trị", văn_bản);
+    trả về builder;
+};
+
+hàm bộ dựng thêm(builder, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    trả về bộ dựng đặt(builder, hiện_tại + thành chuỗi(giá_trị));
+};
+
+hàm bộ dựng chèn(builder, chỉ_số, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(chỉ_số, 0, n);
+    mới = con chuỗi(hiện_tại, 0, chỉ_số) + thành chuỗi(giá_trị) +
+          con chuỗi(hiện_tại, chỉ_số, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng xóa(builder, bắt_đầu, kết_thúc) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    mới = con chuỗi(hiện_tại, 0, bắt_đầu) + con chuỗi(hiện_tại, kết_thúc, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng thay(builder, bắt_đầu, kết_thúc, giá_trị) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    n = độ dài(hiện_tại);
+    chuỗi yêu cầu index(bắt_đầu, 0, n);
+    chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
+    mới = con chuỗi(hiện_tại, 0, bắt_đầu) + thành chuỗi(giá_trị) +
+          con chuỗi(hiện_tại, kết_thúc, n);
+    trả về bộ dựng đặt(builder, mới);
+};
+
+hàm bộ dựng đảo(builder) {
+    bộ dựng yêu cầu(builder);
+    hiện_tại = lấy map(builder, "giá trị", "");
+    trả về bộ dựng đặt(builder, đảo ngược(hiện_tại));
+};
+
+hàm bộ dựng kết quả(builder) {
+    bộ dựng yêu cầu(builder);
+    trả về lấy map(builder, "giá trị", "");
+};
+
+hàm bộ dựng số byte(builder) {
+    bộ dựng yêu cầu(builder);
+    văn_bản = lấy map(builder, "giá trị", "");
+    trả về độ dài(chuỗi thành bytes(văn_bản, "UTF-8"));
+};
+
+// --- MẫuChuỗi ---
+// Snapshot hai list cấu trúc lúc tạo để mutation danh sách của caller không
+// đổi topology template sau đó.
+
+hàm mẫu chuỗi(mảnh, giá_trị) {
+    nếu (loại của(mảnh) != "danh sách") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    nếu (loại của(giá_trị) != "danh sách") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    nếu (độ dài(mảnh) != độ dài(giá_trị) + 1) {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+
+    mảnh_copy = [];
+    giá_trị_copy = [];
+    lặp(i = 0; i < độ dài(mảnh); i++) {
+        chuỗi yêu cầu(mảnh[i]);
+        thêm(mảnh_copy, mảnh[i]);
+    };
+    lặp(i = 0; i < độ dài(giá_trị); i++) {
+        thêm(giá_trị_copy, giá_trị[i]);
+    };
+
+    trả về {
+        "loại": "MẫuChuỗi",
+        "mảnh": mảnh_copy,
+        "giá trị": giá_trị_copy
+    };
+};
+
+hàm mẫu chuỗi yêu cầu(template) {
+    nếu (loại của(template) != "từ điển") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    nếu (lấy map(template, "loại", "") != "MẫuChuỗi") {
+        ném "STRING_TEMPLATE_INVALID";
+    };
+    trả về template;
+};
+
+hàm nội suy mẫu(template) {
+    mẫu chuỗi yêu cầu(template);
+    mảnh = lấy map(template, "mảnh", []);
+    giá_trị = lấy map(template, "giá trị", []);
+    kết_quả = "";
+    lặp(i = 0; i < độ dài(giá_trị); i++) {
+        kết_quả = kết_quả + mảnh[i] + thành chuỗi(giá_trị[i]);
+    };
+    trả về kết_quả + mảnh[độ dài(mảnh) - 1];
+};
+
+hàm xử lý mẫu(template, processor) {
+    mẫu chuỗi yêu cầu(template);
+    trả về processor(template);
+};

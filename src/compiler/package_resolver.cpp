@@ -23,8 +23,16 @@ const std::unordered_map<std::string, std::string> &packageAliases() {
         {"vpp_http", "mạng"},
         {"vpp_web", "mạng"},
         {"mạng web", "mạng"},
+        {"http", "mạng/http"},
+        {"đầu nối mạng", "mạng/ổ cắm"},
+        {"phân giải dns", "mạng/dns"},
+        {"máy chủ http", "mạng/http/máy chủ"},
         {"vpp_system", "hệ thống"},
         {"vpp_data", "dữ liệu"},
+        {"json", "dữ liệu/json"},
+        {"xml", "dữ liệu/xml"},
+        {"cây tài liệu xml", "dữ liệu/xml/dom"},
+        {"mật mã", "bảo mật/mật mã"},
         {"vpp_app", "ứng dụng"},
         {"vpp_starters", "dựng"},
         {"khởi động", "dựng"},
@@ -50,6 +58,17 @@ const std::unordered_map<std::string, std::string> &compatibilityModuleRedirects
     static const std::unordered_map<std::string, std::string> redirects = {
         {"chuẩn/hỗ trợ/nhật ký.vi", "nhập xuất/nhật ký.vi"},
         {"chuẩn/hỗ trợ/xác thực.vi", "lõi/xác thực.vi"},
+        {"http/chính.vi", "mạng/http/chính.vi"},
+        {"http/mạng.vi", "mạng/http/máy khách.vi"},
+        {"http/rest.vi", "mạng/http/rest.vi"},
+        {"mạng/mạng.vi", "mạng/http/máy khách.vi"},
+        {"mạng/rest.vi", "mạng/http/rest.vi"},
+        {"lõi/đầu nối mạng.vi", "mạng/ổ cắm.vi"},
+        {"lõi/phân giải dns.vi", "mạng/dns.vi"},
+        {"lõi/máy chủ http.vi", "mạng/http/máy chủ.vi"},
+        {"lõi/xml.vi", "dữ liệu/xml/xml.vi"},
+        {"lõi/cây tài liệu xml.vi", "dữ liệu/xml/dom.vi"},
+        {"lõi/mật mã.vi", "bảo mật/mật mã.vi"},
         {"ứng dụng/tương thích/api.vi", "ứng dụng/cầu nối/api.vi"},
         {"chuẩn/ứng dụng/tương thích/api.vi", "ứng dụng/cầu nối/api.vi"},
         {"khởi động/khởi động web.vi", "dựng/web.vi"},
@@ -190,6 +209,11 @@ PackageResolution PackageResolver::resolve(
         const fs::path packageMain = vietvm::core::packageEntryPath(packageRoot);
         const fs::path packageSource =
             base / vietvm::core::utf8Path(packageName + ".vi");
+        const std::string coreModuleName =
+            packageName == "tùy chọn" ? "tùy chọn bền vững" : packageName;
+        const fs::path coreSource =
+            base / vietvm::core::utf8Path("lõi") /
+            vietvm::core::utf8Path(coreModuleName + ".vi");
         if (fs::exists(packageMain)) {
             result = absoluteLexical(packageMain);
             return true;
@@ -200,6 +224,10 @@ PackageResolution PackageResolver::resolve(
         }
         if (fs::exists(packageSource)) {
             result = absoluteLexical(packageSource);
+            return true;
+        }
+        if (fs::exists(coreSource) && fs::is_regular_file(coreSource)) {
+            result = absoluteLexical(coreSource);
             return true;
         }
         return false;

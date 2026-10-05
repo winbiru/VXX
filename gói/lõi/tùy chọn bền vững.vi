@@ -1,0 +1,185 @@
+// vi.preferences — thiết lập bền vững theo người dùng/ứng dụng.
+// Logic namespace/serialization/CRUD nằm ở V++. Native chỉ cung cấp các primitive
+// môi trường, đường dẫn, file I/O và codec UTF-8.
+
+nhập gói/hệ thống/môi trường;
+nhập gói/hệ thống/nền tảng;
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+nhập gói/nhập xuất/thư mục;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/văn bản/chuỗi;
+nhập gói/văn bản/mã hóa tiện ích;
+nhập gói/lõi/bảng mã;
+
+hàm tùy chọn yêu cầu chuỗi(giá trị, nhãn) {
+    nếu (loại của(giá trị) != "chuỗi") {
+        ném "tùy chọn: " + nhãn + " phải là chuỗi";
+    };
+    trả về giá trị;
+};
+
+hàm tùy chọn mã hex(văn bản) {
+    trả về hex mã(mã hóa bảng mã(văn bản, "UTF-8"));
+};
+
+hàm tùy chọn giải hex(văn bản) {
+    thử {
+        trả về giải mã bảng mã(hex giải(văn bản), "UTF-8");
+    } bắt lỗi (e) {
+        ném "tùy chọn: dữ liệu lưu không hợp lệ";
+    };
+};
+
+hàm tùy chọn thư mục gốc() {
+    chỉ_định = đọc biến môi trường("VPP_PREFERENCES_HOME", "");
+    nếu (chỉ_định != "") {
+        trả về chỉ_định;
+    };
+
+    nền_tảng = tên nền tảng();
+    nếu (nền_tảng == "windows") {
+        local = đọc biến môi trường("LOCALAPPDATA", "");
+        nếu (local != "") {
+            trả về đường dẫn nối(đường dẫn nối(local, "VPP"), "preferences");
+        };
+        home = đọc biến môi trường("USERPROFILE", "");
+        nếu (home != "") {
+            trả về đường dẫn nối(đường dẫn nối(home, ".vpp"), "preferences");
+        };
+    } nếu không {
+        xdg = đọc biến môi trường("XDG_CONFIG_HOME", "");
+        nếu (xdg != "") {
+            trả về đường dẫn nối(đường dẫn nối(xdg, "vpp"), "preferences");
+        };
+        home = đọc biến môi trường("HOME", "");
+        nếu (home != "") {
+            trả về đường dẫn nối(
+                đường dẫn nối(đường dẫn nối(home, ".config"), "vpp"),
+                "preferences"
+            );
+        };
+    };
+    ném "tùy chọn: không xác định được thư mục cấu hình người dùng";
+};
+
+hàm tùy chọn đường dẫn(không gian) {
+    tùy chọn yêu cầu chuỗi(không gian, "không gian");
+    nếu (không gian == "") {
+        ném "tùy chọn: không gian không được rỗng";
+    };
+    gốc = tùy chọn thư mục gốc();
+    tạo thư mục(gốc);
+    trả về đường dẫn nối(gốc, tùy chọn mã hex(không gian) + ".prefs");
+};
+
+hàm tùy chọn đọc dòng(dòng, kết_quả) {
+    nếu (dòng == "") {
+        trả về rỗng;
+    };
+    vị_trí = -1;
+    lặp(i = 0; i < độ dài(dòng) && vị_trí < 0; i++) {
+        nếu (dòng[i] == "=") {
+            vị_trí = i;
+        };
+    };
+    nếu (vị_trí < 0) {
+        ném "tùy chọn: dữ liệu lưu bị hỏng";
+    };
+
+    khóa_hex = cắt chuỗi(dòng, 0, vị_trí);
+    giá_trị_hex = cắt chuỗi(dòng, vị_trí + 1, độ dài(dòng) - vị_trí - 1);
+    khóa = tùy chọn giải hex(khóa_hex);
+    giá_trị = tùy chọn giải hex(giá_trị_hex);
+    đặt map(kết_quả, khóa, giá_trị);
+    trả về rỗng;
+};
+
+hàm tùy chọn đọc tất cả(đường dẫn) {
+    kết_quả = {};
+    nếu (!đường dẫn tồn tại(đường dẫn)) {
+        trả về kết_quả;
+    };
+
+    nội_dung = đọc tệp(đường dẫn);
+    dòng = "";
+    n = độ dài(nội_dung);
+    lặp(i = 0; i <= n; i++) {
+        hết = i == n;
+        c = "\n";
+        nếu (!hết) {
+            c = nội_dung[i];
+        };
+        nếu (c == "\n") {
+            tùy chọn đọc dòng(dòng, kết_quả);
+            dòng = "";
+        } nếu không {
+            dòng = dòng + c;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm tùy chọn ghi tất cả(đường dẫn, giá_trị) {
+    khóa = khóa map(giá_trị);
+    nội_dung = "";
+    lặp(i = 0; i < độ dài(khóa); i++) {
+        tên = khóa[i];
+        nội_dung = nội_dung + tùy chọn mã hex(tên) + "=" +
+            tùy chọn mã hex(lấy map(giá_trị, tên, "")) + "\n";
+    };
+    ghi tệp(đường dẫn, nội_dung);
+    trả về đúng;
+};
+
+hàm tùy chọn đọc(không gian, khóa, giá trị mặc định) {
+    tùy chọn yêu cầu chuỗi(khóa, "khóa");
+    nếu (khóa == "") {
+        ném "tùy chọn đọc: khóa không được rỗng";
+    };
+    dữ_liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
+    trả về lấy map(dữ_liệu, khóa, giá trị mặc định);
+};
+
+hàm tùy chọn lưu(không gian, khóa, giá trị) {
+    tùy chọn yêu cầu chuỗi(khóa, "khóa");
+    tùy chọn yêu cầu chuỗi(giá trị, "giá trị");
+    nếu (khóa == "") {
+        ném "tùy chọn lưu: khóa không được rỗng";
+    };
+    đường = tùy chọn đường dẫn(không gian);
+    dữ_liệu = tùy chọn đọc tất cả(đường);
+    đặt map(dữ_liệu, khóa, giá trị);
+    tùy chọn ghi tất cả(đường, dữ_liệu);
+    trả về đúng;
+};
+
+hàm tùy chọn xóa(không gian, khóa) {
+    tùy chọn yêu cầu chuỗi(khóa, "khóa");
+    nếu (khóa == "") {
+        ném "tùy chọn xóa: khóa không được rỗng";
+    };
+    đường = tùy chọn đường dẫn(không gian);
+    dữ_liệu = tùy chọn đọc tất cả(đường);
+    nếu (!có khóa(dữ_liệu, khóa)) {
+        trả về sai;
+    };
+    xóa khóa(dữ_liệu, khóa);
+    tùy chọn ghi tất cả(đường, dữ_liệu);
+    trả về đúng;
+};
+
+hàm tùy chọn khóa(không gian) {
+    dữ_liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
+    trả về khóa map(dữ_liệu);
+};
+
+hàm tùy chọn xóa không gian(không gian) {
+    đường = tùy chọn đường dẫn(không gian);
+    nếu (!đường dẫn tồn tại(đường)) {
+        trả về sai;
+    };
+    xóa đường dẫn(đường);
+    trả về đúng;
+};

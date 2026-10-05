@@ -1,0 +1,23 @@
+nhập tài liệu;
+nhập văn bản;
+nhập nhập xuất;
+
+hàm chính() {
+    nguồn = "nhập bộ sưu tập; hàm cộng(a, b = 1) { trả về a + b; };";
+    md = tài liệu tạo(nguồn);
+    in tìm chuỗi chính xác(md, "# Tài liệu V++") >= 0;
+    in tìm chuỗi chính xác(md, "## Phụ thuộc") >= 0;
+    in tìm chuỗi chính xác(md, "## Hàm cộng") >= 0;
+    in tìm chuỗi chính xác(md, "b (có mặc định)") >= 0;
+
+    nguồn_tệp = ".tmp_vpp_doc_source.vi";
+    ghi tệp(nguồn_tệp, nguồn);
+    md_tệp = tài liệu tạo từ tệp(nguồn_tệp);
+    in tìm chuỗi chính xác(md_tệp, "# .tmp_vpp_doc_source.vi") >= 0;
+    xóa đường dẫn(nguồn_tệp);
+
+    đường = ".tmp_vpp_doc.md";
+    in tài liệu ghi tệp(nguồn, đường) > 0;
+    in đường dẫn tồn tại(đường);
+    xóa đường dẫn(đường);
+};

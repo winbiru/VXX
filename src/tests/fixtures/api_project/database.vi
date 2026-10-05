@@ -8,7 +8,7 @@ hàm db đường dẫn cấu hình() {
 
 // Ghi chú hàm: JDBC URL mặc định theo cấu hình V++ datasource.
 hàm db mặc định url() {
-    trả về "jdbc:sqlite:.tmp/api_project.db";
+    trả về "jdbc:sqlite:.tmp_api_project.db";
 };
 
 // Ghi chú hàm: username mặc định cho datasource.

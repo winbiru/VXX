@@ -2,17 +2,36 @@
 // Pipeline lazy/single-use trên source list/tuple hiện có của V++.
 // Representation dùng map nội bộ cho tới khi generic public type được khóa.
 
-hàm luồng tạo nội bộ(nguồn, thao_tác) {
+hàm luồng tạo tài nguyên() {
+    trả về {
+        "dọn dẹp": [],
+        "đã dọn": sai
+    };
+};
+
+hàm luồng tạo nội bộ(nguồn, thao_tác, tài_nguyên = rỗng) {
     loại = loại của(nguồn);
-    nếu (loại != "danh sách" && loại != "tuple") {
+    là_bộ_sinh = sai;
+    nếu (loại == "từ điển") {
+        là_bộ_sinh = lấy map(nguồn, "__vpp_stream_generator__", 0) == 1;
+    };
+    nếu (loại != "danh sách" && loại != "tuple" && !là_bộ_sinh) {
         ném "STREAM_ARGUMENT";
+    };
+    nếu (tài_nguyên == rỗng) {
+        tài_nguyên = luồng tạo tài nguyên();
+    };
+    độ_dài_nguồn = -1;
+    nếu (loại == "danh sách" || loại == "tuple") {
+        độ_dài_nguồn = độ dài(nguồn);
     };
     trả về {
         "__vpp_stream__": 1,
         "nguồn": nguồn,
-        "độ dài nguồn": độ dài(nguồn),
+        "độ dài nguồn": độ_dài_nguồn,
         "thao tác": thao_tác,
-        "trạng thái": "mở"
+        "trạng thái": "mở",
+        "tài nguyên": tài_nguyên
     };
 };
 
@@ -22,6 +41,35 @@ hàm luồng(nguồn) {
 
 hàm luồng rỗng() {
     trả về luồng([]);
+};
+
+// Protocol pull-source thuần V++: callback tiếp() trả bước luồng(...) hoặc hết luồng().
+hàm bước luồng(giá_trị) {
+    trả về {
+        "__vpp_stream_step__": 1,
+        "có": đúng,
+        "giá trị": giá_trị
+    };
+};
+
+hàm hết luồng() {
+    trả về {
+        "__vpp_stream_step__": 1,
+        "có": sai
+    };
+};
+
+hàm luồng từ bộ sinh(tiếp, cleanup = rỗng) {
+    tài_nguyên = luồng tạo tài nguyên();
+    nếu (cleanup != rỗng) {
+        danh_sách = lấy map(tài_nguyên, "dọn dẹp", []);
+        thêm(danh_sách, cleanup);
+    };
+    nguồn = {
+        "__vpp_stream_generator__": 1,
+        "tiếp": tiếp
+    };
+    trả về luồng tạo nội bộ(nguồn, [], tài_nguyên);
 };
 
 hàm luồng yêu cầu mở(stream) {
@@ -34,7 +82,58 @@ hàm luồng yêu cầu mở(stream) {
     nếu (lấy map(stream, "trạng thái", "") != "mở") {
         ném "STREAM_ALREADY_USED";
     };
+    tài_nguyên = lấy map(stream, "tài nguyên", rỗng);
+    nếu (loại của(tài_nguyên) != "từ điển" ||
+        lấy map(tài_nguyên, "đã dọn", sai)) {
+        ném "STREAM_ALREADY_USED";
+    };
     trả về đúng;
+};
+
+hàm luồng yêu cầu số lượng(n) {
+    nếu (loại của(n) != "số nguyên" || n < 0) {
+        ném "STREAM_ARGUMENT";
+    };
+    trả về n;
+};
+
+// Đăng ký callback đóng trên cùng resource-state của toàn pipeline.
+// Callback được gọi tối đa một lần, kể cả terminal thất bại.
+hàm khi đóng luồng(stream, cleanup) {
+    luồng yêu cầu mở(stream);
+    tài_nguyên = lấy map(stream, "tài nguyên", rỗng);
+    danh_sách = lấy map(tài_nguyên, "dọn dẹp", []);
+    thêm(danh_sách, cleanup);
+    trả về stream;
+};
+
+hàm luồng dọn dẹp(stream) {
+    tài_nguyên = lấy map(stream, "tài nguyên", rỗng);
+    nếu (loại của(tài_nguyên) != "từ điển") {
+        ném "STREAM_ARGUMENT";
+    };
+    nếu (lấy map(tài_nguyên, "đã dọn", sai)) {
+        trả về rỗng;
+    };
+
+    // Đánh dấu trước callback để close đệ quy cũng không chạy lại cleanup.
+    đặt map(tài_nguyên, "đã dọn", đúng);
+    danh_sách = lấy map(tài_nguyên, "dọn dẹp", []);
+    lỗi_đầu = rỗng;
+    lặp(i = 0; i < độ dài(danh_sách); i++) {
+        cleanup = danh_sách[i];
+        thử {
+            cleanup();
+        } bắt lỗi (e) {
+            nếu (lỗi_đầu == rỗng) {
+                lỗi_đầu = e;
+            };
+        };
+    };
+    nếu (lỗi_đầu != rỗng) {
+        ném lỗi_đầu;
+    };
+    trả về rỗng;
 };
 
 hàm luồng thêm thao tác(stream, thao_tác) {
@@ -43,7 +142,11 @@ hàm luồng thêm thao tác(stream, thao_tác) {
     cũ = lấy map(stream, "thao tác", []);
     mới = thành list(cũ);
     thêm(mới, thao_tác);
-    trả về luồng tạo nội bộ(lấy map(stream, "nguồn", []), mới);
+    trả về luồng tạo nội bộ(
+        lấy map(stream, "nguồn", []),
+        mới,
+        lấy map(stream, "tài nguyên", rỗng)
+    );
 };
 
 hàm ánh xạ(stream, fn) {
@@ -60,16 +163,12 @@ hàm ánh xạ phẳng(stream, fn) {
 
 // Tên có hậu tố "luồng" để không xung đột hàm giới hạn(x,min,max) của toán học.
 hàm giới hạn luồng(stream, n) {
-    nếu (n < 0) {
-        ném "STREAM_ARGUMENT";
-    };
+    luồng yêu cầu số lượng(n);
     trả về luồng thêm thao tác(stream, {"loại": "limit", "n": n});
 };
 
 hàm bỏ(stream, n) {
-    nếu (n < 0) {
-        ném "STREAM_ARGUMENT";
-    };
+    luồng yêu cầu số lượng(n);
     trả về luồng thêm thao tác(stream, {"loại": "skip", "n": n});
 };
 
@@ -192,15 +291,16 @@ hàm luồng tìm sort(thao_tác, bắt_đầu) {
 };
 
 hàm luồng sắp xếp buffer(ds, comparator) {
-    nếu (comparator == rỗng) {
-        sắp xếp(ds);
-        trả về ds;
-    };
-
     n = độ dài(ds);
     lặp(i = 0; i < n; i++) {
         lặp(j = 0; j + 1 < n - i; j++) {
-            nếu (comparator(ds[j], ds[j + 1]) > 0) {
+            đổi = sai;
+            nếu (comparator == rỗng) {
+                đổi = ds[j] > ds[j + 1];
+            } nếu không {
+                đổi = comparator(ds[j], ds[j + 1]) > 0;
+            };
+            nếu (đổi) {
                 tạm = ds[j];
                 ds[j] = ds[j + 1];
                 ds[j + 1] = tạm;
@@ -208,6 +308,73 @@ hàm luồng sắp xếp buffer(ds, comparator) {
         };
     };
     trả về ds;
+};
+
+hàm luồng xác minh nguồn(stream, nguồn, bắt_đầu) {
+    loại = loại của(nguồn);
+    nếu (bắt_đầu == 0 &&
+        (loại == "danh sách" || loại == "tuple") &&
+        độ dài(nguồn) != lấy map(stream, "độ dài nguồn", -1)) {
+        ném "STREAM_SOURCE_MODIFIED";
+    };
+    trả về đúng;
+};
+
+hàm luồng đoạn dừng ngay(thao_tác, bắt_đầu, kết_thúc) {
+    lặp(i = bắt_đầu; i < kết_thúc; i++) {
+        nếu (lấy map(thao_tác[i], "loại", "") == "limit" &&
+            lấy map(thao_tác[i], "n", -1) == 0) {
+            trả về đúng;
+        };
+    };
+    trả về sai;
+};
+
+hàm luồng chạy đoạn nguồn(stream, nguồn, thao_tác, trạng_thái,
+                          bắt_đầu, kết_thúc, sink) {
+    nếu (luồng đoạn dừng ngay(thao_tác, bắt_đầu, kết_thúc)) {
+        trả về sai;
+    };
+
+    loại = loại của(nguồn);
+    tiếp_tục = đúng;
+    nếu (loại == "danh sách" || loại == "tuple") {
+        lặp(i = 0; i < độ dài(nguồn) && tiếp_tục; i++) {
+            luồng xác minh nguồn(stream, nguồn, bắt_đầu);
+            tiếp_tục = luồng đẩy(
+                thao_tác, trạng_thái, bắt_đầu, kết_thúc, nguồn[i], sink
+            );
+        };
+        luồng xác minh nguồn(stream, nguồn, bắt_đầu);
+        trả về tiếp_tục;
+    };
+
+    nếu (loại == "từ điển" &&
+        lấy map(nguồn, "__vpp_stream_generator__", 0) == 1) {
+        tiếp = lấy map(nguồn, "tiếp", rỗng);
+        còn = đúng;
+        lặp(vòng = 0; còn && tiếp_tục; vòng++) {
+            bước = tiếp();
+            nếu (loại của(bước) != "từ điển" ||
+                lấy map(bước, "__vpp_stream_step__", 0) != 1) {
+                ném "STREAM_ARGUMENT";
+            };
+            còn = lấy map(bước, "có", sai);
+            nếu (còn) {
+                tiếp_tục = luồng đẩy(
+                    thao_tác,
+                    trạng_thái,
+                    bắt_đầu,
+                    kết_thúc,
+                    lấy map(bước, "giá trị", rỗng),
+                    sink
+                );
+            };
+        };
+        trả về tiếp_tục;
+    };
+
+    ném "STREAM_ARGUMENT";
 };
 
 hàm luồng chạy từ(stream, nguồn, bắt_đầu, sink) {
@@ -220,12 +387,9 @@ hàm luồng chạy từ(stream, nguồn, bắt_đầu, sink) {
 
     trạng_thái = luồng tạo trạng thái(thao_tác);
     nếu (vị_trí_sort < 0) {
-        tiếp_tục = đúng;
-        lặp(i = 0; i < độ dài(nguồn) && tiếp_tục; i++) {
-            tiếp_tục = luồng đẩy(
-                thao_tác, trạng_thái, bắt_đầu, kết_thúc, nguồn[i], sink
-            );
-        };
+        luồng chạy đoạn nguồn(
+            stream, nguồn, thao_tác, trạng_thái, bắt_đầu, kết_thúc, sink
+        );
         trả về rỗng;
     };
 
@@ -234,12 +398,15 @@ hàm luồng chạy từ(stream, nguồn, bắt_đầu, sink) {
         thêm(buffer, x);
         trả về đúng;
     };
-    tiếp_tục = đúng;
-    lặp(i = 0; i < độ dài(nguồn) && tiếp_tục; i++) {
-        tiếp_tục = luồng đẩy(
-            thao_tác, trạng_thái, bắt_đầu, vị_trí_sort, nguồn[i], bộ_nhận_buffer
-        );
-    };
+    luồng chạy đoạn nguồn(
+        stream,
+        nguồn,
+        thao_tác,
+        trạng_thái,
+        bắt_đầu,
+        vị_trí_sort,
+        bộ_nhận_buffer
+    );
 
     sort_op = thao_tác[vị_trí_sort];
     comparator = lấy map(sort_op, "hàm", rỗng);
@@ -250,95 +417,130 @@ hàm luồng chạy từ(stream, nguồn, bắt_đầu, sink) {
 hàm luồng bắt đầu terminal(stream) {
     luồng yêu cầu mở(stream);
     nguồn = lấy map(stream, "nguồn", []);
-    nếu (độ dài(nguồn) != lấy map(stream, "độ dài nguồn", -1)) {
-        đặt map(stream, "trạng thái", "đã dùng");
-        ném "STREAM_SOURCE_MODIFIED";
+    loại = loại của(nguồn);
+    nếu (loại == "danh sách" || loại == "tuple") {
+        nếu (độ dài(nguồn) != lấy map(stream, "độ dài nguồn", -1)) {
+            đặt map(stream, "trạng thái", "đã dùng");
+            ném "STREAM_SOURCE_MODIFIED";
+        };
     };
     // Đánh dấu trước callback để reentrant terminal không thể dùng lại stream.
     đặt map(stream, "trạng thái", "đã dùng");
     trả về nguồn;
 };
 
-hàm duyệt(stream, consumer) {
+hàm luồng terminal(stream, xử_lý) {
     nguồn = luồng bắt đầu terminal(stream);
-    sink = hàm(x) {
-        consumer(x);
-        trả về đúng;
+    kết_quả = rỗng;
+    thử {
+        kết_quả = xử_lý(nguồn);
+    } bắt lỗi (e) {
+        // Callback/pipeline error là lỗi chính; cleanup vẫn chạy đúng một lần.
+        thử {
+            luồng dọn dẹp(stream);
+        } bắt lỗi (lỗi_dọn) {
+            // Giữ nguyên lỗi chính theo contract.
+        };
+        ném e;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về rỗng;
+    luồng dọn dẹp(stream);
+    trả về kết_quả;
+};
+
+hàm duyệt(stream, consumer) {
+    xử_lý = hàm(nguồn) {
+        sink = hàm(x) {
+            consumer(x);
+            trả về đúng;
+        };
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về rỗng;
+    };
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm gom danh sách(stream) {
-    nguồn = luồng bắt đầu terminal(stream);
-    kết_quả = [];
-    sink = hàm(x) {
-        thêm(kết_quả, x);
-        trả về đúng;
+    xử_lý = hàm(nguồn) {
+        kết_quả = [];
+        sink = hàm(x) {
+            thêm(kết_quả, x);
+            trả về đúng;
+        };
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về kết_quả;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về kết_quả;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm đếm luồng(stream) {
-    nguồn = luồng bắt đầu terminal(stream);
-    đếm = 0;
-    sink = hàm(x) {
-        đếm += 1;
-        trả về đúng;
+    xử_lý = hàm(nguồn) {
+        đếm = 0;
+        sink = hàm(x) {
+            đếm += 1;
+            trả về đúng;
+        };
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về đếm;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về đếm;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm bất kỳ(stream, predicate) {
-    nguồn = luồng bắt đầu terminal(stream);
-    kết_quả = sai;
-    sink = hàm(x) {
-        nếu (predicate(x)) {
-            kết_quả = đúng;
-            trả về sai;
+    xử_lý = hàm(nguồn) {
+        kết_quả = sai;
+        sink = hàm(x) {
+            nếu (predicate(x)) {
+                kết_quả = đúng;
+                trả về sai;
+            };
+            trả về đúng;
         };
-        trả về đúng;
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về kết_quả;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về kết_quả;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm tất cả luồng(stream, predicate) {
-    nguồn = luồng bắt đầu terminal(stream);
-    kết_quả = đúng;
-    sink = hàm(x) {
-        nếu (!predicate(x)) {
-            kết_quả = sai;
-            trả về sai;
+    xử_lý = hàm(nguồn) {
+        kết_quả = đúng;
+        sink = hàm(x) {
+            nếu (!predicate(x)) {
+                kết_quả = sai;
+                trả về sai;
+            };
+            trả về đúng;
         };
-        trả về đúng;
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về kết_quả;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về kết_quả;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm đầu tiên(stream) {
-    nguồn = luồng bắt đầu terminal(stream);
-    kết_quả = rỗng;
-    sink = hàm(x) {
-        kết_quả = x;
-        trả về sai;
+    xử_lý = hàm(nguồn) {
+        kết_quả = rỗng;
+        sink = hàm(x) {
+            kết_quả = x;
+            trả về sai;
+        };
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về kết_quả;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về kết_quả;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm rút gọn(stream, giá_trị_đầu, reducer) {
-    nguồn = luồng bắt đầu terminal(stream);
-    tích_lũy = giá_trị_đầu;
-    sink = hàm(x) {
-        tích_lũy = reducer(tích_lũy, x);
-        trả về đúng;
+    xử_lý = hàm(nguồn) {
+        tích_lũy = giá_trị_đầu;
+        sink = hàm(x) {
+            tích_lũy = reducer(tích_lũy, x);
+            trả về đúng;
+        };
+        luồng chạy từ(stream, nguồn, 0, sink);
+        trả về tích_lũy;
     };
-    luồng chạy từ(stream, nguồn, 0, sink);
-    trả về tích_lũy;
+    trả về luồng terminal(stream, xử_lý);
 };
 
 hàm đóng luồng(stream) {
@@ -348,6 +550,10 @@ hàm đóng luồng(stream) {
     nếu (lấy map(stream, "__vpp_stream__", 0) != 1) {
         ném "STREAM_ARGUMENT";
     };
+    nếu (lấy map(stream, "trạng thái", "") == "đóng") {
+        trả về rỗng;
+    };
     đặt map(stream, "trạng thái", "đóng");
-    trả về rỗng;
+    trả về luồng dọn dẹp(stream);
 };
+nhập gói/lõi/chuyển kiểu;

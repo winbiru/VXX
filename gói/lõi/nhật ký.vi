@@ -1,0 +1,72 @@
+// Module: nhập xuất.nhật ký
+// Mục đích: chuẩn hóa định dạng log theo mức thông tin/cảnh báo/lỗi.
+// Ghi chú: cung cấp cả class `NhậtKý` và wrapper hàm mức module.
+
+lớp công khai NhậtKý {
+    // Ghi chú hàm: công khai ghi thông tin.
+    hàm công khai ghi thông tin(msg) {
+        in "[THÔNG TIN] " + msg;
+        trả về 0;
+    };
+
+    // Ghi chú hàm: công khai ghi cảnh báo.
+    hàm công khai ghi cảnh báo(msg) {
+        in "[CẢNH BÁO] " + msg;
+        trả về 0;
+    };
+
+    // Ghi chú hàm: công khai ghi lỗi.
+    hàm công khai ghi lỗi(msg) {
+        in "[LỖI] " + msg;
+        trả về 0;
+    };
+};
+
+// Ghi chú hàm: ghi thông tin.
+hàm ghi thông tin(msg) {
+    trả về NhậtKý.ghi thông tin(msg);
+};
+
+// Ghi chú hàm: ghi cảnh báo.
+hàm ghi cảnh báo(msg) {
+    trả về NhậtKý.ghi cảnh báo(msg);
+};
+
+// Ghi chú hàm: ghi lỗi.
+hàm ghi lỗi(msg) {
+    trả về NhậtKý.ghi lỗi(msg);
+};
+
+// Logging chỉ dựng nội dung; append tệp là primitive I/O dùng chung.
+hàm nhật ký ghi tệp(đường dẫn, nội dung) {
+    trả về io_ghi_tiep_file(đường dẫn, nội dung);
+};
+
+hàm ghi thông tin tệp(đường dẫn, msg) {
+    trả về nhật ký ghi tệp(đường dẫn, "[THÔNG TIN] " + msg + "\n");
+};
+
+hàm ghi cảnh báo tệp(đường dẫn, msg) {
+    trả về nhật ký ghi tệp(đường dẫn, "[CẢNH BÁO] " + msg + "\n");
+};
+
+hàm ghi lỗi tệp(đường dẫn, msg) {
+    trả về nhật ký ghi tệp(đường dẫn, "[LỖI] " + msg + "\n");
+};
+
+hàm ghi theo cấu hình(đích, đường dẫn, mức, msg) {
+    nếu (đích == "bảng điều khiển") {
+        nếu (mức == "thông tin") { trả về ghi thông tin(msg); };
+        nếu (mức == "cảnh báo") { trả về ghi cảnh báo(msg); };
+        nếu (mức == "lỗi") { trả về ghi lỗi(msg); };
+        ném "nhật ký: mức không hợp lệ";
+    };
+    nếu (đích == "tệp") {
+        nếu (đường dẫn == "") { ném "nhật ký: đường dẫn tệp rỗng"; };
+        nếu (mức == "thông tin") { trả về ghi thông tin tệp(đường dẫn, msg); };
+        nếu (mức == "cảnh báo") { trả về ghi cảnh báo tệp(đường dẫn, msg); };
+        nếu (mức == "lỗi") { trả về ghi lỗi tệp(đường dẫn, msg); };
+        ném "nhật ký: mức không hợp lệ";
+    };
+    ném "nhật ký: đích ghi không hợp lệ";
+};

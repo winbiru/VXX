@@ -1,0 +1,7 @@
+nhập mật mã;
+
+hàm chính() {
+    in băm sha256("abc");
+    in hmac sha256("key", "The quick brown fox jumps over the lazy dog");
+    in độ dài(ngẫu nhiên bảo mật("8"));
+};

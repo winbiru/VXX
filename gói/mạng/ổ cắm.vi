@@ -1,0 +1,106 @@
+// vi.net.sockets — TCP/UDP cơ bản dựa trên socket của hệ điều hành.
+// Các thao tác socket là primitive OS; wrapper công khai nằm ở V++.
+// Handle socket là số nguyên do runtime quản lý; luôn đóng khi dùng xong.
+
+nhập gói/lõi/chuyển kiểu;
+
+hàm socket yêu cầu số nguyên(giá_trị, tên_hàm, nhãn) {
+    thử {
+        trả về thành số nguyên(giá_trị);
+    } bắt lỗi (e) {
+        ném tên_hàm + ": " + nhãn + " không hợp lệ";
+    };
+};
+
+hàm socket yêu cầu cổng(giá_trị, tên_hàm) {
+    cổng = socket yêu cầu số nguyên(giá_trị, tên_hàm, "cổng");
+    nếu (cổng <= 0 || cổng > 65535) {
+        ném tên_hàm + ": cổng phải trong 1..65535";
+    };
+    trả về cổng;
+};
+
+hàm socket yêu cầu timeout(giá_trị, tên_hàm) {
+    thời_gian_chờ = socket yêu cầu số nguyên(giá_trị, tên_hàm, "thời gian chờ");
+    nếu (thời_gian_chờ <= 0 || thời_gian_chờ > 300000) {
+        ném tên_hàm + ": thời gian chờ phải trong 1..300000 ms";
+    };
+    trả về thời_gian_chờ;
+};
+
+hàm socket yêu cầu mã(giá_trị, tên_hàm, nhãn) {
+    mã = socket yêu cầu số nguyên(giá_trị, tên_hàm, nhãn);
+    nếu (mã <= 0) {
+        ném tên_hàm + ": " + nhãn + " không hợp lệ";
+    };
+    trả về mã;
+};
+
+hàm socket tcp mở(tên máy, cổng, thời gian chờ = 5000) {
+    cổng = socket yêu cầu cổng(cổng, "socket_tcp_mo");
+    thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_tcp_mo");
+    trả về socket_tcp_mo(tên máy, cổng, thời gian chờ);
+};
+
+hàm socket udp mở(tên máy, cổng, thời gian chờ = 5000) {
+    cổng = socket yêu cầu cổng(cổng, "socket_udp_mo");
+    thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_udp_mo");
+    trả về socket_udp_mo(tên máy, cổng, thời gian chờ);
+};
+
+// TLS client primitive: hệ điều hành/thư viện TLS thực hiện handshake, xác minh
+// chứng chỉ và mã hóa; framing HTTP/ứng dụng vẫn nằm hoàn toàn ở V++.
+hàm socket tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
+    cổng = socket yêu cầu cổng(cổng, "socket_tls_mo");
+    thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_tls_mo");
+    trả về socket_tls_mo(tên máy, cổng, thời gian chờ);
+};
+
+// Primitive máy chủ: bind/listen và accept do hệ điều hành thực hiện. Mọi
+// protocol framing/parsing phía trên (HTTP, WebSocket...) thuộc thư viện V++.
+hàm socket tcp lắng nghe(cổng, backlog = 64) {
+    cổng = socket yêu cầu cổng(cổng, "socket_tcp_lang_nghe");
+    backlog = socket yêu cầu số nguyên(backlog, "socket_tcp_lang_nghe", "backlog");
+    nếu (backlog <= 0 || backlog > 1024) {
+        ném "socket_tcp_lang_nghe: backlog phải trong 1..1024";
+    };
+    trả về socket_tcp_lang_nghe(cổng, backlog);
+};
+
+hàm socket chấp nhận(mã socket lắng nghe) {
+    mã socket lắng nghe = socket yêu cầu mã(
+        mã socket lắng nghe,
+        "socket_chap_nhan",
+        "mã socket lắng nghe"
+    );
+    trả về socket_chap_nhan(mã socket lắng nghe);
+};
+
+hàm socket gửi(mã socket, dữ liệu) {
+    mã socket = socket yêu cầu mã(mã socket, "socket_gui", "mã socket");
+    trả về socket_gui(mã socket, dữ liệu);
+};
+
+hàm socket nhận(mã socket, số byte tối đa = 65536) {
+    mã socket = socket yêu cầu mã(mã socket, "socket_nhan", "mã socket");
+    số byte tối đa = socket yêu cầu số nguyên(
+        số byte tối đa,
+        "socket_nhan",
+        "số byte tối đa"
+    );
+    nếu (số byte tối đa <= 0 || số byte tối đa > 16777216) {
+        ném "socket_nhan: số byte tối đa phải trong 1..16777216";
+    };
+    trả về socket_nhan(mã socket, số byte tối đa);
+};
+
+hàm socket đặt timeout(mã socket, thời gian chờ) {
+    mã socket = socket yêu cầu mã(mã socket, "socket_dat_timeout", "mã socket");
+    thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_dat_timeout");
+    trả về socket_dat_timeout(mã socket, thời gian chờ);
+};
+
+hàm socket đóng(mã socket) {
+    mã socket = socket yêu cầu mã(mã socket, "socket_dong", "mã socket");
+    trả về socket_dong(mã socket);
+};

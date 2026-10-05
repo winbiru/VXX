@@ -1,4 +1,5 @@
 // Dựng web trên package mạng thống nhất. Helper tạo yêu cầu kiểm thử được tách riêng.
 nhập gói/lõi/chính;
+nhập gói/lõi/toán học;
 nhập gói/nhập xuất/chính;
 nhập gói/mạng/chính;

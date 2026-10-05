@@ -1,0 +1,53 @@
+nhập gói/chuẩn/chính;
+
+hàm chính() {
+    vi = locale("VI-vn");
+    zh = locale("ZH-hant-tw-x-PRIVATE");
+    in tag locale(vi);
+    in tag locale(zh);
+
+    nguồn = {
+        "zh-Hant-TW": {"xin chào": "繁體"},
+        "zh": {"xin chào": "中文"},
+        "": {"xin chào": "root"}
+    };
+    bundle = gói tài nguyên("messages", zh, nguồn);
+    in lấy map(bundle, "locale đã chọn", "?");
+    in lấy tài nguyên(bundle, "xin chào");
+    root_bundle = gói tài nguyên("messages", locale("fr-CA"), nguồn);
+    in lấy map(root_bundle, "locale đã chọn", "?") == "";
+    in lấy tài nguyên(root_bundle, "xin chào");
+
+    mặc_định = properties("host=localhost\nport=8080\n");
+    nội_dung = "# comment\n" +
+        "name=V++\n" +
+        "message=hello\\\n  world\n" +
+        "escaped\\ key:value\\:x\n" +
+        "unicode=Vi\\u1EC7t Nam\n" +
+        "dup=first\n" +
+        "dup=last\n";
+    p = properties(nội_dung, mặc_định);
+    in lấy property(p, "name");
+    in lấy property(p, "message");
+    in lấy property(p, "escaped key");
+    in lấy property(p, "unicode");
+    in lấy property(p, "dup");
+    in lấy property(p, "host");
+    in lấy property(p, "missing", "fallback");
+
+    thử {
+        locale("en--US");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        lấy tài nguyên(bundle, "missing");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        properties("a=1\nb=2\n", rỗng, 1, 100);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

@@ -1,0 +1,12 @@
+nhập nhật ký;
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/thư mục;
+
+hàm chính() {
+    đường = ".tmp_nhat_ky_1_0.log";
+    ghi thông tin tệp(đường, "một");
+    ghi cảnh báo tệp(đường, "hai");
+    ghi theo cấu hình("tệp", đường, "lỗi", "ba");
+    in đọc tệp(đường);
+    xóa đường dẫn(đường);
+};

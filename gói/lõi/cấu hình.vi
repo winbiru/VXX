@@ -1,0 +1,196 @@
+// Module: cấu hình
+// Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
+// File I/O vẫn là primitive native; toàn bộ parsing và chuyển kiểu nằm ở V++.
+
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/văn bản/chuỗi;
+
+hàm cấu hình là khoảng trắng(c) {
+    trả về c == " " || c == "\t" || c == "\r" || c == "\n";
+};
+
+hàm cấu hình cắt khoảng trắng(s) {
+    đầu = 0;
+    cuối = do_dai(s);
+    đang_cắt = đúng;
+    lặp(i = 0; i < cuối && đang_cắt; i++) {
+        nếu (cấu hình là khoảng trắng(s[đầu])) {
+            đầu = đầu + 1;
+            nếu (đầu == cuối) { đang_cắt = sai; };
+        } nếu không {
+            đang_cắt = sai;
+        };
+    };
+    đang_cắt = đúng;
+    lặp(i = 0; i < cuối - đầu && đang_cắt; i++) {
+        nếu (cấu hình là khoảng trắng(s[cuối - 1])) {
+            cuối = cuối - 1;
+        } nếu không {
+            đang_cắt = sai;
+        };
+    };
+    trả về cắt chuỗi(s, đầu, cuối - đầu);
+};
+
+// Trả {"khóa", "giá trị"} hoặc rỗng nếu dòng trống/comment/không có '='.
+hàm cấu hình phân tích dòng(dòng) {
+    dòng = cấu hình cắt khoảng trắng(dòng);
+    nếu (dòng == "") {
+        trả về rỗng;
+    };
+    nếu (dòng[0] == "#") {
+        trả về rỗng;
+    };
+
+    vị_trí = -1;
+    lặp(i = 0; i < do_dai(dòng) && vị_trí < 0; i++) {
+        nếu (dòng[i] == "=") {
+            vị_trí = i;
+        };
+    };
+    nếu (vị_trí < 0) {
+        trả về rỗng;
+    };
+
+    khóa = cấu hình cắt khoảng trắng(cắt chuỗi(dòng, 0, vị_trí));
+    nếu (khóa == "") {
+        trả về rỗng;
+    };
+    giá_trị = cấu hình cắt khoảng trắng(
+        cắt chuỗi(dòng, vị_trí + 1, do_dai(dòng) - vị_trí - 1)
+    );
+    trả về {"khóa": khóa, "giá trị": giá_trị};
+};
+
+hàm cấu hình là chữ số(c) {
+    trả về c >= "0" && c <= "9";
+};
+
+hàm cấu hình là số nguyên(s) {
+    n = do_dai(s);
+    nếu (n == 0) { trả về sai; };
+    i = 0;
+    nếu (s[0] == "+" || s[0] == "-") { i = 1; };
+    nếu (i >= n) { trả về sai; };
+    hợp_lệ = đúng;
+    lặp(vòng = 0; i < n && hợp_lệ; vòng++) {
+        nếu (!cấu hình là chữ số(s[i])) {
+            hợp_lệ = sai;
+        };
+        i = i + 1;
+    };
+    trả về hợp_lệ;
+};
+
+// Decimal/exponent parser đủ cho cú pháp mà native std::stod trước đây nhận
+// trong file cấu hình: 2.5, .5, 5., 1e3, -2.5E-4.
+hàm cấu hình là số thực(s) {
+    n = do_dai(s);
+    nếu (n == 0) { trả về sai; };
+    i = 0;
+    nếu (s[0] == "+" || s[0] == "-") { i = 1; };
+    nếu (i >= n) { trả về sai; };
+
+    có_chữ_số = sai;
+    có_chấm = sai;
+    có_mũ = sai;
+    chữ_số_sau_mũ = đúng;
+    hợp_lệ = đúng;
+
+    lặp(vòng = 0; i < n && hợp_lệ; vòng++) {
+        c = s[i];
+        nếu (cấu hình là chữ số(c)) {
+            có_chữ_số = đúng;
+            nếu (có_mũ) { chữ_số_sau_mũ = đúng; };
+        } nếu không {
+            nếu (c == "." && !có_chấm && !có_mũ) {
+                có_chấm = đúng;
+            } nếu không {
+                nếu ((c == "e" || c == "E") && !có_mũ && có_chữ_số) {
+                    có_mũ = đúng;
+                    chữ_số_sau_mũ = sai;
+                    nếu (i + 1 < n) {
+                        nếu (s[i + 1] == "+" || s[i + 1] == "-") {
+                            i = i + 1;
+                        };
+                    };
+                } nếu không {
+                    hợp_lệ = sai;
+                };
+            };
+        };
+        i = i + 1;
+    };
+    trả về hợp_lệ && có_chữ_số && (có_chấm || có_mũ) && chữ_số_sau_mũ;
+};
+
+hàm cấu hình chuyển giá trị(s) {
+    nếu (s == "đúng") { trả về đúng; };
+    nếu (s == "sai") { trả về sai; };
+    nếu (s == "rỗng") { trả về rỗng; };
+    nếu (cấu hình là số nguyên(s)) { trả về thành số nguyên(s); };
+    nếu (cấu hình là số thực(s)) { trả về thành số thực(s); };
+    trả về s;
+};
+
+hàm đọc cấu hình(đường dẫn) {
+    nội_dung = đọc tệp(đường dẫn);
+    kết_quả = {};
+    dòng = "";
+    n = do_dai(nội_dung);
+
+    lặp(i = 0; i <= n; i++) {
+        hết = i == n;
+        c = "\n";
+        nếu (!hết) { c = nội_dung[i]; };
+
+        nếu (c == "\n") {
+            mục = cấu hình phân tích dòng(dòng);
+            nếu (mục != rỗng) {
+                khóa = lấy map(mục, "khóa", "");
+                giá_trị = lấy map(mục, "giá trị", "");
+                đặt map(kết_quả, khóa, cấu hình chuyển giá trị(giá_trị));
+            };
+            dòng = "";
+        } nếu không {
+            dòng = dòng + c;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) {
+    // Giữ contract cũ: tệp không tồn tại trả fallback thay vì ném lỗi đọc tệp.
+    nếu (!đường dẫn tồn tại(đường dẫn)) {
+        trả về giá trị mặc định;
+    };
+
+    nội_dung = đọc tệp(đường dẫn);
+    dòng = "";
+    n = do_dai(nội_dung);
+    kết_quả = giá trị mặc định;
+    tìm_thấy = sai;
+
+    lặp(i = 0; i <= n && !tìm_thấy; i++) {
+        hết = i == n;
+        c = "\n";
+        nếu (!hết) { c = nội_dung[i]; };
+
+        nếu (c == "\n") {
+            mục = cấu hình phân tích dòng(dòng);
+            nếu (mục != rỗng) {
+                nếu (lấy map(mục, "khóa", "") == khóa) {
+                    kết_quả = lấy map(mục, "giá trị", "");
+                    tìm_thấy = đúng;
+                };
+            };
+            dòng = "";
+        } nếu không {
+            dòng = dòng + c;
+        };
+    };
+    trả về kết_quả;
+};

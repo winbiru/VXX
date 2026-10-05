@@ -1,0 +1,15 @@
+nhập đầu nối mạng;
+
+hàm chính() {
+    tcp = socket tcp mở("127.0.0.1", "18080", 1000.0);
+    yêu_cầu = "GET /health HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    in socket gửi(tcp, yêu_cầu) > 0;
+    phản_hồi = socket nhận(tcp, "4096");
+    in độ dài(phản_hồi) > 0;
+    in socket đặt timeout(tcp, "1000");
+    in socket đóng(tcp);
+
+    udp = socket udp mở("127.0.0.1", "9", 1000.0);
+    in socket gửi(udp, "ping") == 4;
+    in socket đóng(udp);
+};

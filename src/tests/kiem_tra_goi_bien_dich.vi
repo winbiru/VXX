@@ -1,0 +1,26 @@
+nhập biên dịch;
+nhập bộ sưu tập;
+nhập nhập xuất;
+
+hàm chính() {
+    nguồn = "hàm cộng(a, b) { trả về a + b; };";
+    kiểm = biên dịch kiểm tra(nguồn);
+    in lấy map(kiểm, "hợp lệ", 0);
+
+    kiểm_sai = biên dịch kiểm tra("hàm");
+    in lấy map(kiểm_sai, "hợp lệ", 1) == 0;
+    in lấy map(kiểm_sai, "lỗi", "") != "";
+
+    phân tích = biên dịch phân tích(nguồn);
+    in lấy map(phân tích, "token", 0) > 0;
+    in lấy map(phân tích, "lệnh", 0) > 0;
+
+    bytecode = biên dịch bytecode(nguồn);
+    in độ dài(bytecode) > 0;
+
+    tệp = ".tmp_compiler_api.vi";
+    ghi tệp(tệp, nguồn);
+    từ tệp = biên dịch tệp(tệp);
+    in lấy map(từ tệp, "lệnh", 0) > 0;
+    xóa đường dẫn(tệp);
+};

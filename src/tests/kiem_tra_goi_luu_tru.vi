@@ -1,0 +1,22 @@
+nhập lưu trữ;
+nhập nhập xuất;
+
+hàm chính() {
+    a = ".tmp_luu_tru_a.txt";
+    b = ".tmp_luu_tru_b.txt";
+    zip = ".tmp_luu_tru.zip";
+    đích = ".tmp_luu_tru_giai_nen";
+    ghi tệp(a, "A");
+    ghi tệp(b, "B");
+
+    in lưu trữ tạo zip(zip, [a, b]);
+    in lưu trữ liệt kê zip(zip);
+    in lưu trữ giải nén zip(zip, đích, 1024);
+    in đọc tệp(đường dẫn nối(đích, a));
+    in đọc tệp(đường dẫn nối(đích, b));
+
+    xóa đường dẫn(a);
+    xóa đường dẫn(b);
+    xóa đường dẫn(zip);
+    xóa đường dẫn(đích);
+};

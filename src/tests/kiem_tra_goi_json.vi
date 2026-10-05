@@ -1,0 +1,26 @@
+nhập json;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+
+hàm chính() {
+    dữ liệu = json phân tích("{\"tên\":\"V++\",\"số\":3}");
+    in json tạo(dữ liệu);
+    in json chuỗi("Việt");
+
+    vòng = {};
+    đặt map(vòng, "self", vòng);
+    thử {
+        json tạo(vòng);
+        in 0;
+    } bắt lỗi (e) {
+        in e == "json tạo: phát hiện collection tự tham chiếu";
+    };
+
+    nan = thành số thực("nan");
+    thử {
+        json tạo(nan);
+        in 0;
+    } bắt lỗi (e) {
+        in e == "json tạo: JSON không hỗ trợ NaN hoặc vô cực";
+    };
+};

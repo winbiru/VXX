@@ -1,5 +1,8 @@
 // Regression cho bài 96–97: ghi/đọc và đếm tệp text.
-ghi tệp(".tmp/file_count.txt", "mot hai\nba bon\n");
-in đọc tệp(".tmp/file_count.txt");
-in đếm dòng tệp(".tmp/file_count.txt");
-in đếm từ tệp(".tmp/file_count.txt");
+nhập gói/nhập xuất/chính;
+
+ghi tệp(".tmp_file_count.txt", "mot hai\nba bon\n");
+in đọc tệp(".tmp_file_count.txt");
+in đếm dòng tệp(".tmp_file_count.txt");
+in đếm từ tệp(".tmp_file_count.txt");
+xóa đường dẫn(".tmp_file_count.txt");
