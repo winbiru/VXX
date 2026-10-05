@@ -15,9 +15,6 @@ lớp MáyChủApi {
         serverId = mạng mở máy chủ api(cổng);
         lặp(i = 0; i < 2147483647; i = i + 1) {
             requestId = mạng lấy yêu cầu kế tiếp(serverId);
-            nếu (requestId == "") {
-                bỏ qua;
-            };
             router.xửLý(requestId);
         };
     }

@@ -5,9 +5,6 @@ hàm chính() {
     serverId = mạng mở máy chủ api(18080);
     lặp(i = 0; i < 2147483647; i = i + 1) {
         requestId = mạng lấy yêu cầu kế tiếp(serverId);
-        nếu (requestId == "") {
-            bỏ qua;
-        };
         path = mạng path yêu cầu(requestId);
         method = mạng method yêu cầu(requestId);
         body = mạng body yêu cầu(requestId);

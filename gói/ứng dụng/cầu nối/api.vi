@@ -161,10 +161,6 @@ hàm app chạy máy chủ api(cổng, driver, jdbcUrl, username, password, auth
     serverId = mạng mở máy chủ api(cổng);
     lặp(i = 0; i < 2147483647; i = i + 1) {
         requestId = mạng lấy yêu cầu kế tiếp(serverId);
-        nếu (requestId == "") {
-            bỏ qua;
-        };
-
         method = mạng method yêu cầu(requestId);
         path = mạng path yêu cầu(requestId);
         auth = mạng header yêu cầu(requestId, "authorization");

@@ -164,14 +164,17 @@ function Wait-ForHttp {
     param(
         [string]$Uri,
         [string]$ExpectedContent,
-        [int]$Attempts = 50
+        [int]$Attempts = 20
     )
 
     $script:LastHttpProbeError = ""
     for ($attempt = 0; $attempt -lt $Attempts; $attempt++) {
         try {
             # Local fixture checks must not inherit a corporate/runner proxy.
-            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -NoProxy -TimeoutSec 1
+            # PowerShell/.NET can spend noticeable time initializing the first
+            # localhost request on a fresh Windows runner. Give each probe enough
+            # time to complete without turning normal startup into a client abort.
+            $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -NoProxy -TimeoutSec 3
             if ($response.StatusCode -eq 200 -and $response.Content.Trim() -eq $ExpectedContent) {
                 return $true
             }

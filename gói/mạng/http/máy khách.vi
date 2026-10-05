@@ -613,6 +613,9 @@ hàm mạng http đọc request socket(mã_socket) {
     lặp(vòng = 0; vị_trí_ngăn == rỗng; vòng++) {
         phần = socket nhận(mã_socket, 65536);
         nếu (phần == "") {
+            nếu (dữ_liệu == "") {
+                trả về "";
+            };
             ném "mạng http server: kết nối đóng trước khi nhận đủ header";
         };
         dữ_liệu = dữ_liệu + phần;
@@ -645,15 +648,25 @@ hàm mạng http đọc request socket(mã_socket) {
     trả về request;
 };
 
-// Chấp nhận đúng một TCP connection và trả request map V++.
+// Chấp nhận connection cho tới khi nhận được một request thật.
+// Client kết nối rồi đóng ngay là nhiễu transport và không được lộ ra API
+// dưới dạng một kiểu giá trị khác với request map.
 hàm mạng lấy yêu cầu kế tiếp(serverId) {
-    client = socket chấp nhận(serverId);
-    thử {
-        trả về mạng http đọc request socket(client);
-    } bắt lỗi (e) {
-        thử { socket đóng(client); } bắt lỗi (bỏ_qua) {};
-        ném e;
+    lặp(vòng = 0; vòng < 2147483647; vòng++) {
+        client = socket chấp nhận(serverId);
+        thử {
+            request = mạng http đọc request socket(client);
+            nếu (loai_cua(request) == "chuỗi" && request == "") {
+                socket đóng(client);
+                bỏ qua;
+            };
+            trả về request;
+        } bắt lỗi (e) {
+            thử { socket đóng(client); } bắt lỗi (bỏ_qua) {};
+            ném e;
+        };
     };
+    ném "mạng http server: vòng lặp accept đã kết thúc ngoài dự kiến";
 };
 
 hàm mạng trường yêu cầu(requestId, trường, khóa = "") {
