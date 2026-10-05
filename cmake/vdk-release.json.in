@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "name": "VDK",
+  "version": "@PROJECT_VERSION@",
+  "platform": "@VDK_PLATFORM@",
+  "arch": "@VDK_ARCH@",
+  "components": {
+    "compiler": "@PROJECT_VERSION@",
+    "runtime": "@PROJECT_VERSION@",
+    "stdlib": "@PROJECT_VERSION@",
+    "tooling": "@PROJECT_VERSION@"
+  },
+  "executables": {
+    "vdk": "bin/vdk@CMAKE_EXECUTABLE_SUFFIX@",
+    "vpp": "bin/vpp@CMAKE_EXECUTABLE_SUFFIX@"
+  },
+  "libraryCatalog": "vpp-libraries.json",
+  "packageRoot": "gói"
+}

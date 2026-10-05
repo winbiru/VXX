@@ -4,7 +4,6 @@
 #include <utility>
 #include <vector>
 
-#include "common/vm_native_http_helpers.h"
 #include "vpp/runtime/error.h"
 #include "vpp/runtime/vm.h"
 #include "vpp/runtime/vm_fixture.h"
@@ -106,44 +105,12 @@ void testPeriodicGcKeepsCapacity() {
            "explicit trim không làm tăng stack capacity");
 }
 
-void testHttpJsonExtractionUsesJsonContract() {
-    using vietvm::helpers::extractSimpleJsonStringField;
-
-    expect(extractSimpleJsonStringField(
-               R"({"name":"V++","escaped":"a\"b\\c","unicode":"Việt \uD83D\uDE80"})",
-               "escaped") == "a\"b\\c",
-           "JSON helper giải escape quote/backslash");
-    expect(extractSimpleJsonStringField(
-               R"({"unicode":"Việt \uD83D\uDE80"})", "unicode") ==
-               std::string("Việt 🚀"),
-           "JSON helper giải Unicode/surrogate pair");
-    expect(extractSimpleJsonStringField(
-               R"({"nested":{"token":"wrong"},"token":"right"})", "token") ==
-               "right",
-           "JSON helper chỉ lấy exact top-level key");
-    expect(extractSimpleJsonStringField(
-               R"({"a.*":"literal"})", "a.*") == "literal",
-           "key có ký tự regex được xử lý như JSON key literal");
-    expect(extractSimpleJsonStringField(
-               R"({"dup":"first","dup":"last"})", "dup") == "last",
-           "duplicate key theo parser policy last-write-wins");
-    expect(extractSimpleJsonStringField(R"({"token":42})", "token").empty(),
-           "value không phải string trả fallback rỗng");
-    expect(extractSimpleJsonStringField(R"({"token":"inside"} trailing)", "token").empty(),
-           "malformed/trailing JSON bị từ chối");
-    expect(extractSimpleJsonStringField(
-               R"({"text":"\"token\":\"fake\""})", "token").empty(),
-           "không match JSON-looking text bên trong string");
-}
-
 } // namespace
 
 int main() {
     testVerificationCacheAndInvalidation();
     testModuleVerificationPrecedesSideEffects();
     testPeriodicGcKeepsCapacity();
-    testHttpJsonExtractionUsesJsonContract();
-
     if (failures != 0) {
         std::cerr << failures << " runtime P0 hardening check(s) failed\n";
         return 1;

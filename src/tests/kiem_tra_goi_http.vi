@@ -1,0 +1,5 @@
+nhập http;
+
+hàm chính() {
+    in mạng lấy("http://127.0.0.1:18080/health");
+};

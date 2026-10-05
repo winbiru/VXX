@@ -57,21 +57,22 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   module initializer chỉ đổi qua API có invalidation. Counter đếm verification attempt theo
   generation nên cache hit không bị lẫn với số vector bytecode được quét trong một attempt.
 
-### P0.2 — thay regex extraction trong HTTP helper
+### P0.2 — đưa HTTP/JSON policy ra khỏi native runtime
 
-- [x] Thay regex tạo mỗi request tại
-  `src/runtime/native/vm_native_http_helpers.cpp::extractSimpleJsonStringField()` bằng
-  `parseJson()` hiện có trong `vm_native_json_helpers.cpp` hoặc exact scanner tương đương
-  contract JSON. Caller chính nằm ở `vm_low_level_http_server.cpp`; không đổi query parsing
-  hay public API ngoài phạm vi cần thiết.
-- [x] Khóa exact top-level key và string value, escape quote/backslash, Unicode escape,
-  UTF-8 tiếng Việt/ngoài BMP, whitespace, nested object/key trùng tên, duplicate key theo
-  policy parser, key chứa ký tự regex, sai kiểu và malformed/trailing input. Thiếu key,
-  sai kiểu hoặc JSON lỗi giữ fallback chuỗi rỗng của helper; không match một đoạn văn bản
-  trong string hay lấy nhầm nested field. Ghi compatibility note cho các false match cũ bị loại bỏ.
-- [x] Chứng minh bằng targeted helper test, HTTP route regression và benchmark riêng cho
-  JSON extraction với body nhỏ/lớn, escaped/missing-key input; giữ case native HTTP tổng hợp
-  để đo tác động end-to-end, không chỉ báo microbenchmark thuận lợi.
+- [x] HTTP/1.x framing/parsing và JSON parser/serializer hiện nằm trong V++ tại
+  `gói/mạng/http/máy khách.vi`, `gói/mạng/http/máy chủ.vi` và
+  `gói/dữ liệu/json/json.vi`. Các helper C++ cũ
+  `vm_native_http_helpers.cpp`, `vm_native_json_helpers.cpp` và
+  `vm_low_level_http_server.cpp` đã bị xóa; native chỉ giữ socket/TLS/DNS/file/clock
+  và các primitive hệ thống tương ứng.
+- [x] Regression hiện hành khóa HTTP request/response thuần V++, server framing,
+  transport error và JSON malformed/Unicode/nested data qua
+  `kiem_tra_http_thuan_vpp.vi`, `kiem_tra_http_response_vpp.vi`,
+  `kiem_tra_http_may_chu_thuan_vpp.vi`, `kiem_tra_json_phan_tich.vi` và
+  `kiem_tra_json_an_toan.vi`.
+- [x] Không còn benchmark/helper contract nào phụ thuộc implementation HTTP/JSON native cũ.
+  Nếu bổ sung performance case mới, case phải đo module V++ hiện hành trên socket primitive,
+  thay vì phục hồi helper C++ đã bị loại bỏ.
 
 ### P0.3 — dừng capacity-thrashing trong GC
 
@@ -101,15 +102,15 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   | `vm_dispatch_preverified` | Thực thi bytecode đã verified, không construction/verification; reset state ngoài timer, xác nhận số opcode và kết quả mỗi lượt; ghi rõ GC policy |
   | `vm_end_to_end` | Dựng/nạp VM + metadata, verify, module initialization và execute đến cleanup; source compile đo riêng |
   | Compiler stages | Lexer + token normalization, parser, import/module resolution, semantic, IR lowering, optimizer, codegen và `compiler_pipeline` tổng |
-  | HTTP / GC | JSON extraction riêng, native HTTP tổng hợp và burst/collect/reuse với latency/allocation/RSS |
+  | HTTP / GC | HTTP/JSON V++ end-to-end nếu bổ sung case mới; GC burst/collect/reuse với latency/allocation/RSS |
 
   Case `vm_dispatch` hiện tại bao gồm dựng VM, verify và GC cuối run nên chưa cô lập dispatch.
   Stage benchmark phải dựng input/context ở ngoài timer; stage làm biến đổi AST/IR nhận fixture
   mới mỗi lượt. Không cộng các stage độc lập để giả định bằng pipeline tổng. Thêm corpus nhỏ,
   nhiều hàm và nhiều module, không chỉ source hai hàm; khóa checksum/output để tránh đo no-op.
-  Harness v2 đã có `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, các compiler stage,
-  package/module graph, JSON extraction, native HTTP và `gc_collect_cycles`; còn thiếu telemetry
-  allocation/RSS của GC để hoàn tất toàn bộ biên đo trong bảng này.
+  Harness hiện có `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, direct-call/module
+  cases, các compiler stage, package/module graph và `gc_collect_cycles`. HTTP/JSON performance
+  case theo implementation V++ hiện hành và telemetry allocation/RSS của GC vẫn chưa có.
 - [ ] Chạy **same-machine baseline vs candidate** bằng cùng harness, corpus, iteration và chính
   sách GC/JIT trên **cùng máy, cùng toolchain/flags, Release**, không bật
   sanitizer/coverage/profiler trong timing.
@@ -119,7 +120,7 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   công bố raw samples, median, p95 và độ phân tán cùng command tái lập trong `benchmark/BASELINE.md`.
   Lưu raw performance report theo từng lần đo dưới `benchmark/reports/` với baseline SHA,
   candidate SHA, metadata môi trường và kết quả comparator để có thể audit/replay.
-- [x] Thiết kế runner/comparator trong `scripts/quality/`: ít nhất 3 warm-up và 10 lượt đo
+- [ ] Thêm runner/comparator trong `scripts/quality/`: ít nhất 3 warm-up và 10 lượt đo
   độc lập mỗi case, chạy baseline/candidate xen kẽ trên máy nhàn rỗi; mặc định 40 sample để
   p95 GC có đủ tail observations, còn 10–39 sample chỉ được dùng cho median gate và làm p95
   breach thành `inconclusive`. Chọn iteration đủ dài
@@ -127,6 +128,8 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   GC pause p95 và peak RSS tăng >15%. Chốt threshold theo case trước khi so candidate, không
   tự cập nhật baseline hoặc nới ngưỡng để làm xanh gate. MAD/median >5% đánh dấu inconclusive,
   cần đo lại trước khi nghiệm thu; thiếu case/sample hoặc khác metadata đo phải báo lỗi.
+  Rà soát source hiện tại chưa có runner/comparator tương ứng trong `scripts/quality/`, nên
+  mục này không được tính hoàn tất chỉ dựa trên format output của benchmark executable.
 - [ ] Nối comparator vào CI với baseline/candidate cùng runner trong một job (hoặc host
   benchmark cố định), lưu raw report thành CI artifact và fail gate khi vượt regression budget.
   CI phải đọc trực tiếp telemetry GC allocation/RSS/p95 cùng timing report thay vì chỉ in số đo
@@ -170,11 +173,10 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   hành; không dùng build thành công hoặc một lượt timing làm bằng chứng đủ cho P0.
 
 Trạng thái local Release ngày 22/09/2026: CTest 4/4 PASS (`vpp-rc-internal-hardening`,
-`vpp-runtime-p0-hardening`, `vpp-import-precedence-hardening`, `vpp-integration`). Một lượt
-self-comparison 10 sample đã phơi ra false GC p95 regression do tail quá ít; comparator vì vậy
-được harden để yêu cầu 40 sample cho p95 gate; self-comparison 40 sample sau hardening PASS.
-Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/after report từ hai revision
-độc lập.
+`vpp-runtime-p0-hardening`, `vpp-import-precedence-hardening`, `vpp-integration`).
+Benchmark executable đã xuất metadata/case ổn định, nhưng source hiện tại chưa có
+runner/comparator lặp baseline/candidate; vì vậy chưa có self-comparison hợp lệ để dùng làm
+evidence và vẫn cần before/after report từ hai revision độc lập.
 
 ## 1. Đóng băng semantics ngôn ngữ
 
@@ -292,8 +294,8 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
   và khóa diagnostic cho sort hỗn hợp/min rỗng; HTTP validate authority, port và IPv6 trước curl;
   math từ chối modulo số thực có phần lẻ và cận `giới hạn` đảo ngược; text + helper integer
   dùng chung chấp nhận số thực tích phân nhưng từ chối phần lẻ/suffix thay vì cắt ngầm. Phần còn lại là xác nhận
-  các contract này trên release-matrix trước RC, cùng sửa HTTP JSON extraction và khóa behavior
-  bằng targeted test/benchmark ở P0.2.
+  các contract này trên release-matrix trước RC. P0.2 hiện đã chuyển HTTP/JSON policy sang V++
+  và khóa bằng regression; performance gate còn theo dõi riêng ở P0.4.
 
 ## 5. Compiler hardening
 
@@ -400,7 +402,7 @@ Self-comparison vẫn chỉ là kiểm tra runner, không thay thế before/afte
   public format 1.0; breaking format change phải dùng schema mới.
 - [x] Freeze public CLI contract: tên canonical tiếng Việt + alias tương thích được khóa trong
   `docs/cli.md` và ADR 0002.
-- [ ] Đóng toàn bộ P0.1–P0.5: verification cache an toàn, HTTP JSON extraction đúng contract,
+- [ ] Đóng toàn bộ P0.1–P0.5: verification cache an toàn, HTTP/JSON V++ đúng contract,
   GC không trim định kỳ, benchmark tách stage + regression gate và import precedence đã freeze;
   có same-machine Release report và targeted runtime/import tests theo mục 0.
 - [ ] Chạy **same-machine baseline vs candidate** và lưu raw performance report có metadata,
@@ -424,8 +426,8 @@ Không phát hành 1.0 nếu còn lỗi làm VM corrupt state, crash trên input
 không reproducible, semantics chưa có contract hoặc artifact release không qua smoke test trên
 ba hệ điều hành mục tiêu.
 
-RC cũng bị chặn nếu còn P0 mở: cache có thể stale/bypass verification, HTTP JSON extraction
-sai contract, periodic GC còn capacity-thrashing, local/package chọn module không nhất quán,
+RC cũng bị chặn nếu còn P0 mở: cache có thể stale/bypass verification, HTTP/JSON V++ sai
+contract, periodic GC còn capacity-thrashing, local/package chọn module không nhất quán,
 hoặc thiếu bằng chứng benchmark Release cùng máy + targeted tests. RC cũng chưa đạt nếu chưa có
 raw baseline/candidate report, GC allocation/RSS/p95 telemetry, CI comparator gate, Linux
 ASan/UBSan/LSan evidence, release matrix ba hệ điều hành và sample chạy từ installed artifact.

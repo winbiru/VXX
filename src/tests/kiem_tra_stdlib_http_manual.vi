@@ -1,6 +1,6 @@
 nhập gói/chuẩn/chính;
 
 hàm chính() {
-    // Manual test: phụ thuộc mạng/curl
+    // Manual test: phụ thuộc kết nối mạng và TLS hệ thống.
     in mạng lấy("https://google.com") != "";
 };

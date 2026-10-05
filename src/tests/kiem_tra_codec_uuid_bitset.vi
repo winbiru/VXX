@@ -16,11 +16,45 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
+    in base64 giải(" T W F u \n", "CHUẨN", đúng);
+    in base64 giải("T W@Fu\r\n", "MIME");
+
+    roundtrip = đúng;
+    lặp(i = 0; i < 256; i++) {
+        encoded = base64 mã([i]);
+        decoded = base64 giải(encoded);
+        nếu (độ dài(decoded) != 1) {
+            roundtrip = sai;
+        } nếu không {
+            nếu (decoded[0] != i) {
+                roundtrip = sai;
+            };
+        };
+    };
+    in roundtrip;
 
     in hex mã([0, 15, 16, 255]);
     in hex mã([0, 15, 16, 255], đúng, ":");
     in hex giải("000f10ff");
     in hex giải("00:0F:10:FF", ":");
+    hex_roundtrip = đúng;
+    lặp(i = 0; i < 256; i++) {
+        encoded = hex mã([i], i % 2 == 0);
+        decoded = hex giải(encoded);
+        nếu (độ dài(decoded) != 1) {
+            hex_roundtrip = sai;
+        } nếu không {
+            nếu (decoded[0] != i) {
+                hex_roundtrip = sai;
+            };
+        };
+    };
+    in hex_roundtrip;
+    thử {
+        hex giải("00-0f:10", ":");
+    } bắt lỗi (e) {
+        in e;
+    };
 
     id = uuid ngẫu nhiên();
     in độ dài(id) == 36;
@@ -47,6 +81,13 @@ hàm chính() {
     in bit số bit(bit và(a, b));
     in bit số bit(bit hoặc(a, b));
     in bit số bit(bit xor(a, b));
+
+    a_copy = bit sao chép(a);
+    in bit bằng(a, a_copy);
+    bit đặt(a_copy, 100);
+    in bit bằng(a, a_copy);
+    bit xóa(a_copy, 100);
+    in bit bằng(a, a_copy);
 
     thử {
         bit có(a, "1");

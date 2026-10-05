@@ -1,0 +1,29 @@
+// vi.archive.zipfs — facade đường dẫn ảo tối thiểu trên vi.archive.
+// Handle 0.2 là map chứa đường ZIP; mọi thao tác xác minh lại kho trước khi dùng.
+nhập gói/lõi/lưu trữ;
+nhập gói/bộ sưu tập/chính;
+
+hàm zipfs mở(đường zip) {
+    lưu trữ liệt kê zip(đường zip);
+    trả về {"đường": đường zip, "mở": 1};
+};
+
+hàm zipfs yêu cầu mở(kho) {
+    nếu (lấy map(kho, "mở", 0) != 1) {
+        ném "zipfs: kho đã đóng";
+    };
+    trả về lấy map(kho, "đường", "");
+};
+
+hàm zipfs liệt kê(kho) {
+    trả về lưu trữ liệt kê zip(zipfs yêu cầu mở(kho));
+};
+
+hàm zipfs giải nén(kho, thư mục đích, giới hạn byte = 67108864) {
+    trả về lưu trữ giải nén zip(zipfs yêu cầu mở(kho), thư mục đích, giới hạn byte);
+};
+
+hàm zipfs đóng(kho) {
+    đặt map(kho, "mở", 0);
+    trả về 1;
+};

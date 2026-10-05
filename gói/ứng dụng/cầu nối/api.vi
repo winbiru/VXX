@@ -151,7 +151,7 @@ hàm app chuẩn bị dữ liệu api(driver, jdbcUrl, username, password) {
     trả về "DB_OK|prepared";
 };
 
-// Ghi chú hàm: chạy server HTTP native cho API project.
+// Ghi chú hàm: chạy server HTTP V++ trên socket primitives cho API project.
 hàm app chạy máy chủ api(cổng, driver, jdbcUrl, username, password, authToken, refreshToken, healthPath, loginPath, adminUsersPath, adminUsersSearchPath) {
     prepRes = app chuẩn bị dữ liệu api(driver, jdbcUrl, username, password);
     nếu (prepRes == "DB_ERR|not-connected") {

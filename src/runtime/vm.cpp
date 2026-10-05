@@ -27,14 +27,13 @@
 #include <atomic>
 #include "common/vm_utils.h"
 #include "common/vm_native_collection_helpers.h"
+#include "common/vm_native_compiler_helpers.h"
+#include "common/vm_native_extended_helpers.h"
+#include "common/vm_native_m3_helpers.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
 #include "common/vm_native_format_helpers.h"
-#include "common/vm_native_http_helpers.h"
-#include "common/vm_native_json_helpers.h"
-#include "common/vm_low_level_http_server.h"
 #include "common/vm_native_stdlib_helpers.h"
-#include "common/vm_native_text_helpers.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/bytecode/verifier.h"
 #include "vpp/core/message_constants.h"
@@ -87,178 +86,6 @@ static std::string runtimeMethodAccessMessage(
     return vietvm::messages::formatMessage(message, {methodName});
 }
 
-// Xử lý `native http client function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
-static bool handleNativeHttpClientFunction(const std::string &fn,
-                                           const std::vector<StackValue> &args,
-                                           StackValue &result,
-                                           std::string &err,
-                                           NativeFailureDisposition &failureDisposition) {
-    const auto runRequest = [&](const std::string &method,
-                                const std::string &url,
-                                const std::optional<std::string> &payload) {
-        bool transportFailure = false;
-        const bool handled = vietvm::helpers::runCurlHttpRequest(
-            method, fn, url, payload, result, err, transportFailure);
-        if (transportFailure) {
-            failureDisposition = NativeFailureDisposition::CatchableLanguageError;
-        }
-        return handled;
-    };
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpGet)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string url = vietvm::helpers::argToRawString(args[0]);
-        return runRequest(vietvm::constants::kHttpMethodGet, url, std::nullopt);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPost)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string url = vietvm::helpers::argToRawString(args[0]);
-        std::string payload = vietvm::helpers::argToRawString(args[1]);
-        return runRequest(vietvm::constants::kHttpMethodPost, url, payload);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpPut)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string url = vietvm::helpers::argToRawString(args[0]);
-        std::string payload = vietvm::helpers::argToRawString(args[1]);
-        return runRequest(vietvm::constants::kHttpMethodPut, url, payload);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpDelete)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string url = vietvm::helpers::argToRawString(args[0]);
-        return runRequest(vietvm::constants::kHttpMethodDelete, url, std::nullopt);
-    }
-
-    return false;
-}
-
-// Xử lý `native json function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
-static bool handleNativeJsonFunction(const std::string &fn,
-                                     const std::vector<StackValue> &args,
-                                     StackValue &result,
-    std::string &err) {
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonEscape)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        const std::string text = vietvm::helpers::argToRawString(args[0]);
-        if (!vietvm::core::isValidUtf8(text)) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeStringUtf8Invalid, {fn});
-            return true;
-        }
-        result = make_string_value(vietvm::helpers::escapeJsonString(text));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonString)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        const std::string text = vietvm::helpers::argToRawString(args[0]);
-        if (!vietvm::core::isValidUtf8(text)) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeStringUtf8Invalid, {fn});
-            return true;
-        }
-        result = make_string_value(std::string("\"") +
-                                   vietvm::helpers::escapeJsonString(text) +
-                                   "\"");
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonParse)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        vietvm::helpers::parseJson(vietvm::helpers::argToRawString(args[0]), result, err);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnJsonEncode)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string encoded;
-        if (!vietvm::helpers::stringifyJson(args[0], encoded, err)) return true;
-        result = make_string_value(encoded);
-        return true;
-    }
-
-    return false;
-}
-
-// Xử lý `native low level http function`; hàm dispatch theo loại/tên yêu cầu, đọc đối số cần thiết và ghi kết quả trở lại runtime.
-static bool handleNativeLowLevelHttpFunction(const std::string &fn,
-                                             const std::vector<StackValue> &args,
-                                             StackValue &result,
-                                             std::string &err,
-                                             const VM::OutputSink &outputSink) {
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerOpen)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int port = 0;
-        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelPort, port, err)) return true;
-        return vietvm::helpers::runLowLevelHttpServerOpen(port, result, err, outputSink);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerNext)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int serverId = 0;
-        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelServerId, serverId, err)) return true;
-        return vietvm::helpers::runLowLevelHttpServerNext(serverId, result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqMethod)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldMethod, std::nullopt, result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqPath)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldPath, std::nullopt, result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqQuery)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldQuery, std::nullopt, result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqBody)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldBody, std::nullopt, result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqHeader)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldHeader, vietvm::helpers::argToRawString(args[1]), result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqQueryParam)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldQueryParam, vietvm::helpers::argToRawString(args[1]), result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqJsonField)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldJsonField, vietvm::helpers::argToRawString(args[1]), result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpReqPathSuffix)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        return vietvm::helpers::runLowLevelHttpReqField(vietvm::helpers::argToRawString(args[0]), vietvm::constants::kReqFieldPathSuffix, vietvm::helpers::argToRawString(args[1]), result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerSend)) {
-        if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-        int status = vietvm::constants::kHttpStatusOk;
-        if (!vietvm::helpers::parseIntArgFromStack(args[1], fn, vietvm::constants::kArgLabelStatus, status, err)) return true;
-        return vietvm::helpers::runLowLevelHttpServerSend(vietvm::helpers::argToRawString(args[0]), status, vietvm::helpers::argToRawString(args[2]), result, err);
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHttpServerClose)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int serverId = 0;
-        if (!vietvm::helpers::parseIntArgFromStack(args[0], fn, vietvm::constants::kArgLabelServerId, serverId, err)) return true;
-        return vietvm::helpers::runLowLevelHttpServerClose(serverId, result, err);
-    }
-
-    return false;
-}
-
 // Thực thi native thư viện chuẩn hàm; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
 static bool executeNativeStdlibFunction(int hamIdOrName,
                                         const std::vector<StackValue> &args,
@@ -269,6 +96,7 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
                                         std::string &err,
                                         NativeFailureDisposition &failureDisposition,
                                         const VM::OutputSink &outputSink) {
+    (void)outputSink;
     std::string fn;
     if (hamIdOrName < 0) {
         int nameIdx = -(hamIdOrName + 1);
@@ -296,43 +124,32 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
 
     if (vietvm::helpers::handleNativeCollectionFunction(fn, args, result, err)) return true;
 
-    if (vietvm::helpers::handleNativeTextFunction(fn, args, result, err)) return true;
+    if (vietvm::helpers::handleNativeCompilerLibraryFunction(fn, args, result, err)) return true;
 
-    if (vietvm::helpers::handleNativeFoundationFunction(fn, args, result, err)) return true;
+    if (vietvm::helpers::handleNativeExtendedLibraryFunction(fn, args, result, err)) return true;
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnFileLineCount) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnFileWordCount)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::ifstream input(path);
-        if (!input.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {fn});
-            return true;
+    if (vietvm::helpers::handleNativeM3LibraryFunction(fn, args, result, err)) {
+        // Socket/DNS là primitive I/O của thư viện chuẩn. Lỗi kết nối, timeout,
+        // resolver... phải đi qua cơ chế thử/bắt của V++ để wrapper giao thức
+        // (HTTP, REST, client ứng dụng) có thể tự xử lý và dọn tài nguyên.
+        if (!err.empty() &&
+            (fn.rfind("socket_", 0) == 0 || fn == "dns_phan_giai")) {
+            failureDisposition = NativeFailureDisposition::CatchableLanguageError;
         }
-        if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnFileLineCount)) {
-            int count = 0;
-            std::string line;
-            while (std::getline(input, line)) ++count;
-            result = make_int_value(count);
-            return true;
-        }
-        std::ostringstream content;
-        content << input.rdbuf();
-        result = make_int_value(static_cast<int>(
-            vietvm::core::splitAsciiWords(content.str()).size()));
         return true;
     }
 
+    if (vietvm::helpers::handleNativeFoundationFunction(fn, args, result, err)) return true;
+
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadFile)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        const std::string publicName = "đọc tệp";
+        if (!requireNativeArgumentCount(args, publicName, 1, err)) return true;
         std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
         std::ifstream ifs(path);
         if (!ifs.is_open()) {
             err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {fn});
+                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
             return true;
         }
         std::ostringstream ss;
@@ -342,107 +159,128 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteFile)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+        const std::string publicName = "ghi tệp";
+        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
         std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
         std::ofstream ofs(path);
         if (!ofs.is_open()) {
             err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForWriteFailed, {fn});
+                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
             return true;
         }
         std::string content = vietvm::helpers::argToRawString(args[1]);
         ofs << content;
         if (!ofs.good()) {
             err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileWriteFailed, {fn});
+                vietvm::messages::kNativeFileWriteFailed, {publicName});
             return true;
         }
         result = make_int_value(1);
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfig)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadBytes)) {
+        const std::string publicName = "đọc bytes tệp";
+        if (!requireNativeArgumentCount(args, publicName, 1, err)) return true;
         std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::ifstream ifs(path);
+        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
+        std::ifstream ifs(path, std::ios::binary);
         if (!ifs.is_open()) {
             err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {fn});
+                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
             return true;
         }
-
-        MapValue cfg;
-        std::string line;
-        while (std::getline(ifs, line)) {
-            const auto assignment = vietvm::helpers::parsePropertyAssignment(line);
-            if (!assignment.has_value()) continue;
-            const std::string &key = assignment->first;
-            const std::string &val = assignment->second;
-            if (key.empty()) continue;
-
-            if (val == "đúng") cfg.entries[key] = make_int_value(1);
-            else if (val == "sai") cfg.entries[key] = make_int_value(0);
-            else if (val == "rỗng") cfg.entries[key] = make_null_value();
-            else {
-                bool parsed = false;
-                try {
-                    size_t p = 0;
-                    int iv = std::stoi(val, &p);
-                    if (p == val.size()) { cfg.entries[key] = make_int_value(iv); parsed = true; }
-                } catch (...) {}
-                if (!parsed) {
-                    try {
-                        size_t p = 0;
-                        double dv = std::stod(val, &p);
-                        if (p == val.size()) { cfg.entries[key] = make_float_value(dv); parsed = true; }
-                    } catch (...) {}
-                }
-                if (!parsed) cfg.entries[key] = make_string_value(val);
-            }
+        std::vector<StackValue> bytes;
+        char byte = 0;
+        while (ifs.get(byte)) {
+            bytes.push_back(make_int_value(static_cast<unsigned char>(byte)));
         }
-
-        result = make_map_value(cfg);
+        if (!ifs.eof()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
+            return true;
+        }
+        result = make_list_value(std::move(bytes));
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnReadConfigKey)) {
-        if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-        std::string filePath = vietvm::helpers::argToRawString(args[0]);
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteBytes)) {
+        const std::string publicName = "ghi bytes tệp";
+        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
         std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], fn, path, err)) return true;
-        filePath = path.u8string();
-        std::string key = vietvm::helpers::argToRawString(args[1]);
-        std::string fallback = vietvm::helpers::argToRawString(args[2]);
-        result = make_string_value(vietvm::helpers::readPropertyByKey(filePath, key, fallback));
+        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
+        ListHandle list;
+        if (!vietvm::helpers::getListArgument(args, 1, publicName, list, err)) return true;
+        std::ofstream ofs(path, std::ios::binary | std::ios::trunc);
+        if (!ofs.is_open()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
+            return true;
+        }
+        for (const StackValue &item : list->elements) {
+            if (!std::holds_alternative<int>(item)) {
+                err = publicName + ": mỗi byte phải là số nguyên";
+                return true;
+            }
+            const int value = std::get<int>(item);
+            if (value < 0 || value > 255) {
+                err = publicName + ": byte phải trong 0..255";
+                return true;
+            }
+            ofs.put(static_cast<char>(static_cast<unsigned char>(value)));
+        }
+        if (!ofs.good()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileWriteFailed, {publicName});
+            return true;
+        }
+        result = make_int_value(1);
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbConnect)) {
-        if (!requireNativeArgumentCount(args, fn, 4, err)) return true;
-        return vietvm::helpers::runDbConnect(vietvm::helpers::argToRawString(args[0]),
-                    vietvm::helpers::argToRawString(args[1]),
-                    vietvm::helpers::argToRawString(args[2]),
-                    vietvm::helpers::argToRawString(args[3]),
-                            result,
-                            err);
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoAppendFile)) {
+        const std::string publicName = "ghi nối tệp";
+        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
+        std::filesystem::path path;
+        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
+        std::ofstream ofs(path, std::ios::out | std::ios::app);
+        if (!ofs.is_open()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
+            return true;
+        }
+        ofs << vietvm::helpers::argToRawString(args[1]);
+        if (!ofs.good()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileWriteFailed, {publicName});
+            return true;
+        }
+        result = make_int_value(1);
+        return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbQuery)) {
-        if (!requireNativeArgumentCount(args, fn, 5, err)) return true;
-        return vietvm::helpers::runDbQuery(vietvm::helpers::argToRawString(args[0]),
-                  vietvm::helpers::argToRawString(args[1]),
-                  vietvm::helpers::argToRawString(args[2]),
-                  vietvm::helpers::argToRawString(args[3]),
-                  vietvm::helpers::argToRawString(args[4]),
-                          result,
-                          err);
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbExec)) {
+        if (!requireNativeArgumentCount(args, fn, 8, err)) return true;
+        int port = 0;
+        int useDatabase = 0;
+        if (!vietvm::helpers::requireIntArgFromStack(args[2], fn, "cổng", port, err) ||
+            !vietvm::helpers::requireIntArgFromStack(
+                args[7], fn, "dùng database", useDatabase, err)) {
+            return true;
+        }
+        return vietvm::helpers::runDbExec(
+            vietvm::helpers::argToRawString(args[0]),
+            vietvm::helpers::argToRawString(args[1]),
+            port,
+            vietvm::helpers::argToRawString(args[3]),
+            vietvm::helpers::argToRawString(args[4]),
+            vietvm::helpers::argToRawString(args[5]),
+            vietvm::helpers::argToRawString(args[6]),
+            useDatabase != 0,
+            result,
+            err);
     }
-
-    if (handleNativeHttpClientFunction(fn, args, result, err, failureDisposition)) return true;
-    if (handleNativeJsonFunction(fn, args, result, err)) return true;
-    if (handleNativeLowLevelHttpFunction(fn, args, result, err, outputSink)) return true;
 
     return false;
 }
@@ -593,6 +431,12 @@ void VM::setDebugInfo(
 void VM::setFunctions(
     std::unordered_map<int, std::vector<Instruction>> functionBytecode,
     std::unordered_map<int, int> functionNames) {
+    functionNameIndexById_.clear();
+    functionNameIndexById_.reserve(functionNames.size());
+    for (const auto &[nameIndex, functionId] : functionNames) {
+        functionNameIndexById_.emplace(functionId, nameIndex);
+    }
+
     hamBytecodeMap = std::move(functionBytecode);
     functionTableByNameIndex = std::move(functionNames);
     invalidateBytecodeVerification();
@@ -658,14 +502,29 @@ void VM::resetExecution() {
     blockDepth = 0;
     callDepthFromRoot = 0;
     pc = 0;
+    activeBytecode_ = nullptr;
+    activeBytecodeDebugInfo_ = nullptr;
+}
+
+const std::vector<Instruction> &VM::currentBytecode() const noexcept {
+    return activeBytecode_ == nullptr ? bytecode : *activeBytecode_;
+}
+
+const std::vector<vietvm::runtime::RuntimeSourceLocation> &
+VM::currentBytecodeDebugInfo() const noexcept {
+    if (activeBytecode_ == nullptr) return bytecodeDebugInfo;
+    if (activeBytecodeDebugInfo_ != nullptr) return *activeBytecodeDebugInfo_;
+    static const std::vector<vietvm::runtime::RuntimeSourceLocation> empty;
+    return empty;
 }
 
 // Tra vị trí nguồn ứng với program counter hiện tại; nếu instruction chưa có
 // metadata thì trả frame rỗng để quá trình unwind bỏ qua vị trí không xác định.
 vietvm::runtime::RuntimeSourceLocation VM::sourceLocationForPc(
     std::size_t value) const {
-    if (value >= bytecodeDebugInfo.size()) return {};
-    return bytecodeDebugInfo[value];
+    const auto &debugInfo = currentBytecodeDebugInfo();
+    if (value >= debugInfo.size()) return {};
+    return debugInfo[value];
 }
 
 // Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
@@ -706,6 +565,15 @@ void VM::initializeModules() {
             initializer.variables = variables;
             initializer.classTable = classTable;
             initializer.setFunctions(hamBytecodeMap, functionTableByNameIndex);
+
+            // `VM::run()` của VM cha đã verify root, toàn bộ function bytecode
+            // và toàn bộ module initializer trước khi bất kỳ initializer nào
+            // được phép tạo side effect. VM con nhận đúng cùng string pool và
+            // function snapshot, còn root của nó chính là initializer vừa được
+            // verifier của cha kiểm tra. Đánh dấu generation này đã verified để
+            // không quét lại toàn bộ bảng hàm cho từng module.
+            initializer.verifiedGeneration_ = initializer.programGeneration_;
+
             initializer.bytecodeDebugInfo =
                 module == nullptr
                     ? std::vector<vietvm::runtime::RuntimeSourceLocation>{}
@@ -969,11 +837,21 @@ static RuntimeFunctionArity inferRuntimeFunctionArity(const std::vector<Instruct
 // StringPool/function table và chỉ dùng id số khi không còn metadata tên hợp lệ.
 static std::string runtimeCallTargetName(int hamIdOrName,
                                          const std::vector<std::string> &stringPool,
-                                         const std::unordered_map<int, int> &functionTableByNameIndex) {
+                                         const std::unordered_map<int, int> &functionTableByNameIndex,
+                                         const std::unordered_map<int, int> *functionNameIndexById = nullptr) {
     if (hamIdOrName < 0) {
         const int nameIndex = -(hamIdOrName + 1);
         if (nameIndex >= 0 && nameIndex < static_cast<int>(stringPool.size())) {
             return stringPool[static_cast<std::size_t>(nameIndex)];
+        }
+    }
+    if (functionNameIndexById != nullptr) {
+        const auto reverse = functionNameIndexById->find(hamIdOrName);
+        if (reverse != functionNameIndexById->end()) {
+            const int nameIndex = reverse->second;
+            if (nameIndex >= 0 && nameIndex < static_cast<int>(stringPool.size())) {
+                return stringPool[static_cast<std::size_t>(nameIndex)];
+            }
         }
     }
     for (const auto &[nameIndex, functionId] : functionTableByNameIndex) {
@@ -1061,45 +939,56 @@ void VM::invokeFunction(int argc,
     }
     std::reverse(args.begin(), args.end());
 
-    StackValue nativeResult = make_int_value(0);
-    std::string nativeErr;
-    NativeFailureDisposition nativeFailureDisposition =
-        NativeFailureDisposition::RuntimeError;
-    if (executeNativeStdlibFunction(hamIdOrName, args, stringPool,
-                                    functionTableByNameIndex, hamBytecodeMap,
-                                    nativeResult, nativeErr,
-                                    nativeFailureDisposition, outputSink)) {
-        if (!nativeErr.empty()) {
-            if (nativeFailureDisposition ==
-                NativeFailureDisposition::CatchableLanguageError) {
-                throw vietvm::runtime::LanguageException(
-                    make_string_value(nativeErr));
-            }
-            const std::string nativeName = runtimeCallTargetName(
-                hamIdOrName, stringPool, functionTableByNameIndex);
-            vietvm::runtime::RuntimeDiagnosticContext context;
-            if (vietvm::constants::matchesAnyName(
-                    nativeName, vietvm::constants::kFnToFloat) && !args.empty()) {
-                context = vietvm::runtime::runtimeConversionFacts(
-                    sv_to_string(args.front()), "số thực", false);
-            } else {
+    // Direct bytecode calls already carry a concrete VM function id. Do not
+    // resolve a name and walk every native handler first: stdlib-heavy programs
+    // can have hundreds of registered V++ functions, making that old path O(n)
+    // for every ordinary function call. Only unresolved/name-based calls need
+    // to probe the native boundary.
+    auto directVmFunction = hamBytecodeMap.find(hamIdOrName);
+    if (directVmFunction == hamBytecodeMap.end()) {
+        StackValue nativeResult = make_int_value(0);
+        std::string nativeErr;
+        NativeFailureDisposition nativeFailureDisposition =
+            NativeFailureDisposition::RuntimeError;
+        if (executeNativeStdlibFunction(hamIdOrName, args, stringPool,
+                                        functionTableByNameIndex, hamBytecodeMap,
+                                        nativeResult, nativeErr,
+                                        nativeFailureDisposition, outputSink)) {
+            if (!nativeErr.empty()) {
+                if (nativeFailureDisposition ==
+                    NativeFailureDisposition::CatchableLanguageError) {
+                    throw vietvm::runtime::LanguageException(
+                        make_string_value(nativeErr));
+                }
+                const std::string nativeName = runtimeCallTargetName(
+                    hamIdOrName, stringPool, functionTableByNameIndex);
+                vietvm::runtime::RuntimeDiagnosticContext context;
+                std::string diagnosticName = nativeName;
+                if (vietvm::constants::matchesAnyName(
+                        nativeName, vietvm::constants::kFnIoReadFile)) {
+                    diagnosticName = "đọc tệp";
+                } else if (vietvm::constants::matchesAnyName(
+                               nativeName, vietvm::constants::kFnIoWriteFile)) {
+                    diagnosticName = "ghi tệp";
+                }
                 context = vietvm::runtime::runtimeNativeFacts(
-                    nativeName, nativeErr, false);
+                    diagnosticName, nativeErr, false);
+                throw runtime_error_op(nativeErr, op, curPc, std::move(context));
             }
-            throw runtime_error_op(nativeErr, op, curPc, std::move(context));
+            if (returnMode == CallReturnMode::ConstructorInstance) {
+                stack.push_back(make_instance_value(std::move(constructorInstance)));
+            } else {
+                stack.push_back(nativeResult);
+            }
+            return;
         }
-        if (returnMode == CallReturnMode::ConstructorInstance) {
-            stack.push_back(make_instance_value(std::move(constructorInstance)));
-        } else {
-            stack.push_back(nativeResult);
-        }
-        return;
     }
 
     const std::size_t nextCallDepth = callDepthFromRoot + 1;
     if (nextCallDepth > maxCallDepth) {
         const std::string targetName = runtimeCallTargetName(
-            hamIdOrName, stringPool, functionTableByNameIndex);
+            hamIdOrName, stringPool, functionTableByNameIndex,
+            &functionNameIndexById_);
         throw vietvm::runtime::RuntimeError(
             vietvm::messages::formatMessage(
                 vietvm::messages::kVmCallDepthExceeded,
@@ -1109,14 +998,14 @@ void VM::invokeFunction(int argc,
                 targetName, static_cast<int>(nextCallDepth), static_cast<int>(maxCallDepth)));
     }
 
-    auto it = hamBytecodeMap.find(hamIdOrName);
+    auto it = directVmFunction;
     if (it == hamBytecodeMap.end()) {
         const int nameIndex = (hamIdOrName < 0) ? -(hamIdOrName + 1) : hamIdOrName;
         auto ftIt = functionTableByNameIndex.find(nameIndex);
         if (ftIt != functionTableByNameIndex.end()) {
             it = hamBytecodeMap.find(ftIt->second);
         } else {
-            for (const Instruction &hinst : bytecode) {
+            for (const Instruction &hinst : currentBytecode()) {
                 if (hinst.op == OP_HAM && hinst.operand == nameIndex) {
                     auto resolved = hamBytecodeMap.find(hinst.operandIndex);
                     if (resolved != hamBytecodeMap.end()) {
@@ -1146,7 +1035,8 @@ void VM::invokeFunction(int argc,
     const RuntimeFunctionArity arity = inferRuntimeFunctionArity(it->second);
     if (argc < arity.minimum || argc > arity.maximum) {
         const std::string targetName = runtimeCallTargetName(
-            hamIdOrName, stringPool, functionTableByNameIndex);
+            hamIdOrName, stringPool, functionTableByNameIndex,
+            &functionNameIndexById_);
         throw vietvm::runtime::RuntimeError(
             vietvm::messages::formatMessage(
                 vietvm::messages::kVmCallArityMismatch,
@@ -1159,6 +1049,9 @@ void VM::invokeFunction(int argc,
     }
 
     CallFrame frame;
+    frame.functionName = runtimeCallTargetName(
+        hamIdOrName, stringPool, functionTableByNameIndex,
+        &functionNameIndexById_);
     frame.args = std::move(args);
     frame.receiver = std::move(receiver);
     frame.methodOwnerClass = std::move(methodOwnerClass);
@@ -1166,18 +1059,14 @@ void VM::invokeFunction(int argc,
     frame.returnPc = curPc + 1;
     if (closure != nullptr) frame.capturedCells = closure->captures;
 
-    std::vector<vietvm::runtime::RuntimeSourceLocation> calleeDebugInfo;
     const auto debugEntry = functionDebugInfo.find(it->first);
-    if (debugEntry != functionDebugInfo.end()) {
-        calleeDebugInfo = debugEntry->second;
-    }
 
     // Chuyển interpreter sang callee bằng explicit execution context thay vì
     // gọi `funcVM.run()` lồng nhau. Nhờ đó recursion V++ không làm sâu native
     // C++ call stack và giới hạn `maxCallDepth` luôn là guard đầu tiên.
     ExecutionContext caller;
-    caller.bytecode = std::move(bytecode);
-    caller.bytecodeDebugInfo = std::move(bytecodeDebugInfo);
+    caller.bytecode = activeBytecode_;
+    caller.bytecodeDebugInfo = activeBytecodeDebugInfo_;
     caller.stack = std::move(stack);
     caller.loopStartStack = std::move(loopStartStack);
     caller.ifElseStack = std::move(ifElseStack);
@@ -1192,8 +1081,9 @@ void VM::invokeFunction(int argc,
 
     callStack.push_back(std::move(frame));
     callDepthFromRoot = nextCallDepth;
-    bytecode = it->second;
-    bytecodeDebugInfo = std::move(calleeDebugInfo);
+    activeBytecode_ = &it->second;
+    activeBytecodeDebugInfo_ =
+        debugEntry == functionDebugInfo.end() ? nullptr : &debugEntry->second;
     stack.clear();
     loopStartStack.clear();
     ifElseStack.clear();
@@ -1214,8 +1104,8 @@ void VM::restoreCallerExecutionContext() {
     if (!callStack.empty()) callStack.pop_back();
     if (callDepthFromRoot > 0) --callDepthFromRoot;
 
-    bytecode = std::move(caller.bytecode);
-    bytecodeDebugInfo = std::move(caller.bytecodeDebugInfo);
+    activeBytecode_ = caller.bytecode;
+    activeBytecodeDebugInfo_ = caller.bytecodeDebugInfo;
     stack = std::move(caller.stack);
     loopStartStack = std::move(caller.loopStartStack);
     ifElseStack = std::move(caller.ifElseStack);
@@ -2171,8 +2061,9 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
                 vietvm::messages::kVmBreakOutsideSwitch), instr.op, pc,
                 vietvm::runtime::runtimeControlFacts("thoát không có khối chọn đang hoạt động", false));
             switchStack.back().skippingCase = true;
-            while (pc < bytecode.size()) {
-                if (bytecode[pc].op == OP_DONG_KHOI) {
+            const auto &code = currentBytecode();
+            while (pc < code.size()) {
+                if (code[pc].op == OP_DONG_KHOI) {
                     ++pc;
                     break;
                 }
@@ -2193,8 +2084,9 @@ void VM::executeLoopControlOpcode(const Instruction& instr) {
             vietvm::messages::kVmUnknownOpcode), instr.op, pc);
     }
     size_t scanPc = pc + 1;
-    while (scanPc < bytecode.size()) {
-        if (bytecode[scanPc].op == OP_CAP_NHAT) {
+    const auto &code = currentBytecode();
+    while (scanPc < code.size()) {
+        if (code[scanPc].op == OP_CAP_NHAT) {
             pc = scanPc;
             return;
         }
@@ -2307,8 +2199,9 @@ bool VM::transferThrownValue(const StackValue &value) {
 // Xử lý opcode nhảy có điều kiện/không điều kiện bằng cách cập nhật program counter dựa trên giá trị trên stack.
 bool VM::executeBranchOpcode(const Instruction& instr) {
     const int jumpAddress = instr.operand;
+    const auto &code = currentBytecode();
     if (instr.op == OP_JUMP) {
-        if (jumpAddress < 0 || jumpAddress >= static_cast<int>(bytecode.size())) {
+        if (jumpAddress < 0 || jumpAddress >= static_cast<int>(code.size())) {
             throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmJumpAddressOutOfRange), instr.op, pc,
                 vietvm::runtime::runtimeJumpFacts(jumpAddress, false));
@@ -2331,7 +2224,7 @@ bool VM::executeBranchOpcode(const Instruction& instr) {
     if (as_int(condition, instr.op, pc) != 0) {
         return false;
     }
-    if (jumpAddress < 0 || jumpAddress >= static_cast<int>(bytecode.size())) {
+    if (jumpAddress < 0 || jumpAddress >= static_cast<int>(code.size())) {
         throw runtime_error_op(vietvm::messages::formatMessage(
             vietvm::messages::kVmJumpAddressOutOfRange), instr.op, pc);
     }
@@ -2376,6 +2269,7 @@ void VM::run() {
         for (const Instruction &candidate : bytecode) {
             if (candidate.op == OP_HAM && candidate.operand >= 0) {
                 functionTableByNameIndex[candidate.operand] = candidate.operandIndex;
+                functionNameIndexById_.emplace(candidate.operandIndex, candidate.operand);
             }
         }
     }
@@ -2404,7 +2298,8 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             executionStack.size() <= *stopExecutionDepth) {
             return;
         }
-        if (pc >= bytecode.size()) {
+        const auto &code = currentBytecode();
+        if (pc >= code.size()) {
             if (completeFunctionCall()) continue;
             collectGarbage();
             return;
@@ -2412,11 +2307,11 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
         ++executedSinceGc;
         if (executedSinceGc >= gcInterval) {
-            collectGarbage();
+            if (runtimeHeap->needsCollection()) collectGarbage();
             executedSinceGc = 0;
         }
 
-        const Instruction &instr = bytecode[pc];
+        const Instruction &instr = code[pc];
         try {
             switch (instr.op) {
             case OP_HAM:
@@ -2542,8 +2437,72 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                     vietvm::messages::kVmUnknownOpcode), instr.op, pc);
             }
         } catch (const vietvm::runtime::LanguageException &thrown) {
-            if (!unwindLanguageException(thrown.value())) throw;
-            continue;
+            const std::string thrownText = sv_to_string(thrown.value());
+            const bool conversionFailure =
+                thrownText == vietvm::messages::messageText(
+                    vietvm::messages::kNativeToFloatConversionFailed) ||
+                thrownText == vietvm::messages::messageText(
+                    vietvm::messages::kNativeToIntegerConversionFailed);
+            std::string conversionInput;
+            vietvm::runtime::RuntimeSourceLocation conversionCallerFrame;
+            if (conversionFailure) {
+                const std::string conversionFunction =
+                    thrownText == vietvm::messages::messageText(
+                        vietvm::messages::kNativeToIntegerConversionFailed)
+                        ? "thành số nguyên"
+                        : "thành số thực";
+                for (std::size_t index = 0; index < callStack.size(); ++index) {
+                    const CallFrame &frame = callStack[index];
+                    if (frame.functionName != conversionFunction) continue;
+                    if (!frame.args.empty()) {
+                        conversionInput = sv_to_string(frame.args.front());
+                    }
+                    if (index < executionStack.size()) {
+                        const ExecutionContext &caller = executionStack[index];
+                        const auto *callerDebugInfo =
+                            caller.bytecode == nullptr
+                                ? &bytecodeDebugInfo
+                                : caller.bytecodeDebugInfo;
+                        if (callerDebugInfo != nullptr &&
+                            caller.pc < callerDebugInfo->size()) {
+                            conversionCallerFrame = (*callerDebugInfo)[caller.pc];
+                        }
+                    }
+                    break;
+                }
+                if (conversionInput.empty()) {
+                    for (auto frame = callStack.rbegin(); frame != callStack.rend(); ++frame) {
+                        if (frame->args.empty()) continue;
+                        conversionInput = sv_to_string(frame->args.front());
+                        break;
+                    }
+                }
+                if (!conversionCallerFrame.valid()) {
+                    conversionCallerFrame = sourceLocationForPc(pc);
+                }
+            }
+
+            if (unwindLanguageException(thrown.value())) continue;
+
+            // Library conversion is implemented in V++ and therefore signals
+            // failure with `ném`.  Keep that value catchable while a handler
+            // exists, but recover the structured runtime diagnostic when it
+            // reaches the program boundary uncaught.
+            if (conversionFailure) {
+                const std::string target =
+                    thrownText == vietvm::messages::messageText(
+                        vietvm::messages::kNativeToIntegerConversionFailed)
+                        ? "số nguyên"
+                        : "số thực";
+                vietvm::runtime::RuntimeError error(
+                    thrownText,
+                    vietvm::runtime::RuntimeErrorKind::VmFault,
+                    vietvm::runtime::runtimeConversionFacts(
+                        conversionInput, target, false));
+                error.addFrame(std::move(conversionCallerFrame));
+                throw error;
+            }
+            throw;
         } catch (vietvm::runtime::RuntimeError &error) {
             unwindRuntimeError(error);
             throw;

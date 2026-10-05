@@ -2,15 +2,18 @@
 
 ## Release artifact
 
-Release được tài liệu này tham chiếu:
-
-https://github.com/winbiru/VXX/releases/tag/0.9.3
-
-Mỗi release tạo ba artifact:
+Source hiện tại mang phiên bản V++/VDK `1.0.0`. Release workflow tạo hai nhóm artifact.
+Ba runtime bundle giữ tên ổn định để installer và VS Code extension có thể dùng URL
+`releases/latest/download`:
 
 - `vpp-linux-x64.tar.gz`
 - `vpp-macos.tar.gz`
 - `vpp-windows-x64.zip`
+
+Ngoài ra CPack tạo VDK đầy đủ theo mẫu
+`vdk-1.0.0-<platform>-<arch>.tar.gz` trên Unix/macOS và
+`vdk-1.0.0-windows-<arch>.zip` trên Windows. VDK chứa `vdk`, compiler/VM,
+static libraries, public headers, `gói/`, catalog, tài liệu, templates và examples.
 
 Artifact chứa executable, `gói/`, `templates/`, `examples`, installer và uninstaller của nền tảng.
 Installer có thể chạy lại trên cùng thư mục cài đặt để cập nhật. Các thư mục do V++ quản lý
@@ -22,7 +25,7 @@ file đã bị xóa khỏi release mới không còn sót lại sau update.
 ### Linux x64
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
 ./install-vpp.sh
 source "$HOME/.bashrc" 2>/dev/null || source "$HOME/.bash_profile"
@@ -32,7 +35,7 @@ vpp phiên bản
 ### macOS
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-macos.tar.gz -o vpp-macos.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
 ./install-vpp.sh
 source "$HOME/.zshrc"
@@ -70,10 +73,10 @@ trong thư mục cài đặt được giữ lại.
 
 ## Windows
 
-Tải và giải nén release `0.9.3`:
+Tải và giải nén runtime bundle mới nhất:
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
+Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
 Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
 ```
 
@@ -132,9 +135,9 @@ cài lại cùng ZIP cũ không bổ sung lệnh gỡ hoặc bản sửa UTF-8.
 
 ## Đánh giá Homebrew và winget
 
-**Homebrew:** phù hợp sau khi contract 1.0 được freeze. Formula nên cài nội dung artifact macOS
-vào `libexec`, symlink `vpp` ra `bin`, và đặt `VPP_HOME`/wrapper theo layout của formula. Chưa
-nên publish formula trước 1.0 vì URL/version/checksum và public CLI vẫn đang ở giai đoạn RC.
+**Homebrew:** contract 1.0 trong source đã được freeze. Formula có thể cài runtime bundle hoặc
+VDK macOS vào `libexec`, symlink `vpp`/`vdk` ra `bin`, và đặt `VPP_HOME` theo layout của formula.
+Khi phát hành formula, khóa URL/version/checksum vào release asset cụ thể thay vì URL `latest`.
 
 **winget:** nên chờ Windows có artifact cài đặt ký số ổn định (ưu tiên MSI/MSIX hoặc portable
 package có metadata/version/hash cố định). ZIP + PowerShell installer hiện đủ cho release trực

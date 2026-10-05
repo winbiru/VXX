@@ -1,9 +1,19 @@
 // Module: hệ thống.nền tảng
 
+nhập gói/lõi/chuyển kiểu;
+
 hàm tên nền tảng() {
-    ném "stdlib: tên nền tảng native hook không khả dụng";
+    trả về ten_nen_tang();
 };
 
 hàm ngủ mili giây(thời lượng) {
-    ném "stdlib: ngủ mili giây native hook không khả dụng";
+    thử {
+        thời lượng = thành số nguyên(thời lượng);
+    } bắt lỗi (e) {
+        ném "ngủ mili giây: thời lượng phải là số nguyên không âm";
+    };
+    nếu (thời lượng < 0) {
+        ném "ngủ mili giây: thời lượng phải là số nguyên không âm";
+    };
+    trả về ngu_mili_giay(thời lượng);
 };

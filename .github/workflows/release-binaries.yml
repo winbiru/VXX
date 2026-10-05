@@ -46,6 +46,34 @@ jobs:
       - name: Build V++ and RC test gate
         run: cmake --build build --config Release
 
+      - name: Package VDK
+        run: cpack --config build/CPackConfig.cmake -C Release
+
+      - name: Verify VDK install (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -eu
+          VDK_VERIFY_ROOT="$(mktemp -d)"
+          trap 'rm -rf "$VDK_VERIFY_ROOT"' EXIT
+          cmake --install build --prefix "$VDK_VERIFY_ROOT"
+          "$VDK_VERIFY_ROOT/bin/vdk" phiên bản
+          "$VDK_VERIFY_ROOT/bin/vdk" chẩn đoán
+
+      - name: Verify VDK install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vdkVerifyRoot = Join-Path $env:RUNNER_TEMP "vdk-install-verify"
+          Remove-Item $vdkVerifyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          cmake --install build --config Release --prefix $vdkVerifyRoot
+          if ($LASTEXITCODE -ne 0) { throw "VDK install verification failed during install" }
+          $vdk = Join-Path $vdkVerifyRoot "bin/vdk.exe"
+          & $vdk "phiên" "bản"
+          if ($LASTEXITCODE -ne 0) { throw "VDK version verification failed" }
+          & $vdk "chẩn" "đoán"
+          if ($LASTEXITCODE -ne 0) { throw "VDK diagnostic verification failed" }
+
       - name: Verify build (Linux/macOS)
         if: runner.os != 'Windows'
         shell: bash
@@ -136,6 +164,7 @@ jobs:
           cp -R gói dist/gói
           cp -R templates dist/templates
           cp -R examples dist/examples
+          find dist/examples -type d -name .vpp -prune -exec rm -rf {} +
           cp scripts/unix/install-vpp.sh dist/install-vpp.sh
           cp scripts/unix/uninstall-vpp.sh dist/uninstall-vpp.sh
           chmod +x dist/install-vpp.sh
@@ -167,6 +196,7 @@ jobs:
           Copy-Item gói dist/gói -Recurse
           Copy-Item templates dist/templates -Recurse
           Copy-Item examples dist/examples -Recurse
+          Get-ChildItem dist/examples -Directory -Filter .vpp -Recurse -Force | Remove-Item -Recurse -Force
           Copy-Item scripts/windows/install-vpp.ps1 dist/install-vpp.ps1
           Copy-Item scripts/windows/install-vpp.cmd dist/install-vpp.cmd
           Copy-Item scripts/windows/uninstall-vpp.ps1 dist/uninstall-vpp.ps1
@@ -184,6 +214,10 @@ jobs:
           INSTALL_DIR="$VERIFY_ROOT/install"
           mkdir -p "$EXTRACT_DIR"
           tar -xzf "${{ matrix.asset_name }}" -C "$EXTRACT_DIR"
+          if find "$EXTRACT_DIR/examples" -type d -name .vpp -print -quit | grep -q .; then
+            echo "Release artifact unexpectedly contains .vpp cache" >&2
+            exit 1
+          fi
           VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
           touch "$INSTALL_DIR/gói/.release-smoke-stale"
           VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
@@ -245,6 +279,8 @@ jobs:
           Remove-Item $verifyRoot -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
           Expand-Archive -Path "${{ matrix.asset_name }}" -DestinationPath $extractDir -Force
+          $packagedCache = Get-ChildItem (Join-Path $extractDir "examples") -Directory -Filter .vpp -Recurse -Force | Select-Object -First 1
+          if ($packagedCache) { throw "Release artifact unexpectedly contains .vpp cache: $($packagedCache.FullName)" }
           $installer = Join-Path $extractDir "install-vpp.ps1"
           $launcher = Join-Path $extractDir "install-vpp.cmd"
           & powershell.exe -NoProfile -ExecutionPolicy Restricted -Command "& '$launcher' -InstallDir '$installDir' -NoPathUpdate; exit `$LASTEXITCODE"
@@ -367,8 +403,20 @@ jobs:
           name: ${{ matrix.asset_name }}
           path: ${{ matrix.asset_name }}
 
+      - name: Upload VDK workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vdk-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            vdk-*.tar.gz
+            vdk-*.zip
+          if-no-files-found: error
+
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.asset_name }}
+          files: |
+            ${{ matrix.asset_name }}
+            vdk-*.tar.gz
+            vdk-*.zip

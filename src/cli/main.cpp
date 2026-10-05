@@ -203,6 +203,44 @@ static int runFile(const std::string &filename,
                       filePath);
 }
 
+// Internal regression-test worker. Chạy nhiều source file tuần tự trong cùng
+// process để compiler có thể tái sử dụng cache AST giữa các lượt, nhưng vẫn ghi
+// output/status riêng cho từng file để run_tests.sh giữ nguyên golden semantics.
+static int runBatchTestFiles(const fs::path &outputDir,
+                             const std::vector<fs::path> &testFiles) {
+    fs::create_directories(outputDir);
+    for (const fs::path &testFile : testFiles) {
+        std::ostringstream captured;
+        std::streambuf *oldOut = std::cout.rdbuf(captured.rdbuf());
+        std::streambuf *oldErr = std::cerr.rdbuf(captured.rdbuf());
+        int status = EXIT_FAILURE;
+        try {
+            status = runFile(testFile.u8string(), SnippetMode::Execute);
+        } catch (const vietvm::runtime::RuntimeError &error) {
+            printErrorMessage(messages::kCliUnhandledException,
+                              vietvm::runtime::formatRuntimeError(error));
+            status = EXIT_FAILURE;
+        } catch (const std::exception &error) {
+            printErrorMessage(messages::kCliUnhandledException, error.what());
+            status = EXIT_FAILURE;
+        }
+        std::cout.flush();
+        std::cerr.flush();
+        std::cout.rdbuf(oldOut);
+        std::cerr.rdbuf(oldErr);
+
+        const std::string base = testFile.stem().u8string();
+        std::ofstream output(outputDir / vietvm::core::utf8Path(base + ".output"),
+                             std::ios::binary | std::ios::trunc);
+        output << captured.str();
+        std::ofstream statusFile(outputDir / vietvm::core::utf8Path(base + ".status"),
+                                 std::ios::trunc);
+        statusFile << status << '\n';
+        if (!output || !statusFile) return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 // Biên dịch một tệp V++ mà không chạy VM. Lệnh `dựng` dùng contract này trong
 // giai đoạn bytecode 1.0 chưa đóng format artifact trên đĩa: compile pipeline
 // phải thành công và metadata/function registry phải hoàn chỉnh trong bộ nhớ.
@@ -1921,6 +1959,108 @@ static void writeLspMessage(const std::string &payload) {
     std::cout << "Content-Length: " << payload.size() << "\r\n\r\n" << payload << std::flush;
 }
 
+static fs::path findLspLibraryCatalog(const fs::path &workspaceRoot) {
+    if (!workspaceRoot.empty()) {
+        const fs::path candidate = workspaceRoot / "vpp-libraries.json";
+        if (fs::is_regular_file(candidate)) return candidate;
+    }
+    if (const char *home = std::getenv(vietvm::core::kEnvVppHome)) {
+        const fs::path candidate = fs::u8path(home) / "vpp-libraries.json";
+        if (fs::is_regular_file(candidate)) return candidate;
+    }
+    for (fs::path dir = workspaceRoot.empty() ? fs::current_path() : workspaceRoot;
+         ; dir = dir.parent_path()) {
+        const fs::path candidate = dir / "vpp-libraries.json";
+        if (fs::is_regular_file(candidate)) return candidate;
+        if (dir == dir.parent_path()) break;
+    }
+    return {};
+}
+
+static std::string lspLibraryRootsResult(const fs::path &workspaceRoot) {
+    const fs::path catalogPath = findLspLibraryCatalog(workspaceRoot);
+    if (catalogPath.empty()) {
+        return "{\"revision\":\"\",\"catalogUri\":null,\"libraries\":[],"
+               "\"diagnostics\":[{\"severity\":\"error\",\"message\":"
+               "\"Không tìm thấy vpp-libraries.json từ VPP_HOME hoặc thư mục dự án.\"}]}";
+    }
+
+    std::string catalog;
+    try {
+        catalog = readFile(catalogPath.u8string());
+    } catch (const std::exception &error) {
+        return "{\"revision\":\"\",\"catalogUri\":\"" +
+               jsonEscape(fileUriFromPath(catalogPath)) +
+               "\",\"libraries\":[],\"diagnostics\":[{\"severity\":\"error\","
+               "\"message\":\"" + jsonEscape(error.what()) + "\"}]}";
+    }
+
+    const std::string sdkVersion = extractJsonStringField(catalog, "sdkVersion");
+    std::uint64_t revisionHash = 1469598103934665603ull;
+    for (unsigned char byte : catalog) {
+        revisionHash ^= static_cast<std::uint64_t>(byte);
+        revisionHash *= 1099511628211ull;
+    }
+    std::ostringstream revision;
+    revision << sdkVersion << ':' << std::hex << revisionHash;
+    std::ostringstream result;
+    result << "{\"revision\":\"" << jsonEscape(revision.str())
+           << "\",\"catalogUri\":\"" << jsonEscape(fileUriFromPath(catalogPath))
+           << "\",\"libraries\":[";
+
+    // `moduleGroups` cũng có trường `libraries`; mảng thư viện cấp top-level
+    // nằm sau cùng trong schema 1, nên lấy occurrence cuối để không nhầm với
+    // danh sách id của từng nhóm.
+    const std::size_t librariesKey = catalog.rfind("\"libraries\"");
+    const std::size_t arrayBegin = librariesKey == std::string::npos
+        ? std::string::npos
+        : catalog.find('[', librariesKey);
+    bool first = true;
+    if (arrayBegin != std::string::npos) {
+        std::size_t depth = 0;
+        std::size_t objectBegin = std::string::npos;
+        for (std::size_t index = arrayBegin + 1; index < catalog.size(); ++index) {
+            const char ch = catalog[index];
+            if (ch == '{') {
+                if (depth == 0) objectBegin = index;
+                ++depth;
+                continue;
+            }
+            if (ch == '}') {
+                if (depth == 0) continue;
+                --depth;
+                if (depth != 0 || objectBegin == std::string::npos) continue;
+                const std::string object = catalog.substr(objectBegin, index - objectBegin + 1);
+                const std::string id = extractJsonStringField(object, "id");
+                const std::string sourceRoot = extractJsonStringField(object, "sourceRoot");
+                const std::string entry = extractJsonStringField(object, "entry");
+                if (id.empty() || sourceRoot.empty() || entry.empty()) continue;
+                const fs::path root = catalogPath.parent_path() / fs::u8path(sourceRoot);
+                const fs::path entryPath = root / fs::u8path(entry);
+                if (!first) result << ',';
+                first = false;
+                result << "{\"id\":\"" << jsonEscape(id)
+                       << "\",\"displayName\":\""
+                       << jsonEscape(extractJsonStringField(object, "displayName"))
+                       << "\",\"version\":\""
+                       << jsonEscape(extractJsonStringField(object, "version"))
+                       << "\",\"stability\":\""
+                       << jsonEscape(extractJsonStringField(object, "stability"))
+                       << "\",\"kind\":\""
+                       << jsonEscape(extractJsonStringField(object, "kind"))
+                       << "\",\"sourceRoot\":\"" << jsonEscape(sourceRoot)
+                       << "\",\"entry\":\"" << jsonEscape(entry)
+                       << "\",\"rootUri\":\"" << jsonEscape(fileUriFromPath(root))
+                       << "\",\"entryUri\":\"" << jsonEscape(fileUriFromPath(entryPath))
+                       << "\"}";
+            }
+            if (depth == 0 && ch == ']') break;
+        }
+    }
+    result << "],\"diagnostics\":[]}";
+    return result.str();
+}
+
 // Gửi `textDocument/publishDiagnostics` qua LSP; hàm chuyển diagnostic compiler thành JSON-RPC notification kèm range/message.
 static void publishDiagnostics(const std::string &uri, const std::string &text) {
     const fs::path sourcePath = filePathFromUri(uri);
@@ -1955,6 +2095,7 @@ static void publishDiagnostics(const std::string &uri, const std::string &text) 
 static int runLanguageServer() {
     std::unordered_map<std::string, std::string> openDocuments;
     bool shutdownRequested = false;
+    fs::path workspaceRoot;
 
     while (true) {
         auto payload = readLspMessage();
@@ -1964,6 +2105,8 @@ static int runLanguageServer() {
         std::string id = extractJsonRawField(body, "id");
 
         if (method == "initialize") {
+            const std::string rootUri = extractJsonStringField(body, "rootUri");
+            if (!rootUri.empty()) workspaceRoot = filePathFromUri(rootUri);
             std::ostringstream response;
             response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
                      << ",\"result\":{\"capabilities\":{"
@@ -1984,6 +2127,23 @@ static int runLanguageServer() {
             response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
                      << ",\"result\":null}";
             writeLspMessage(response.str());
+            continue;
+        }
+
+        if (method == "vpp/libraryRoots") {
+            std::ostringstream response;
+            response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
+                     << ",\"result\":" << lspLibraryRootsResult(workspaceRoot) << '}';
+            writeLspMessage(response.str());
+            continue;
+        }
+
+        if (method == "workspace/didChangeWatchedFiles" &&
+            body.find("vpp-libraries.json") != std::string::npos) {
+            const std::string snapshot = lspLibraryRootsResult(workspaceRoot);
+            writeLspMessage(
+                "{\"jsonrpc\":\"2.0\",\"method\":\"vpp/libraryRootsChanged\","
+                "\"params\":" + snapshot + "}");
             continue;
         }
 
@@ -2262,6 +2422,15 @@ static int runCli(int argc, char* argv[]) {
         }
         if (argc >= 2) {
             std::string command = argv[1];
+            if (command == "--batch-run-tests") {
+                if (argc < 4) return EXIT_FAILURE;
+                std::vector<fs::path> testFiles;
+                testFiles.reserve(static_cast<std::size_t>(argc - 3));
+                for (int index = 3; index < argc; ++index) {
+                    testFiles.push_back(vietvm::core::utf8Path(argv[index]));
+                }
+                return runBatchTestFiles(vietvm::core::utf8Path(argv[2]), testFiles);
+            }
             int commandWordOffset = 0;
             if (argc >= 3) {
                 std::string twoWordCommand = command + " " + std::string(argv[2]);

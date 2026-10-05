@@ -1,0 +1,21 @@
+// vpp.compiler — API nhúng trực tiếp compiler pipeline V++.
+// Không spawn vpp-cli; mọi kết quả đến từ lexer/parser/semantic/IR/codegen.
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+
+hàm biên dịch kiểm tra(mã nguồn) {
+    trả về bien_dich_kiem_tra(mã nguồn);
+};
+
+hàm biên dịch phân tích(mã nguồn) {
+    trả về bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+};
+
+hàm biên dịch bytecode(mã nguồn) {
+    trả về bien_dich_bytecode(mã nguồn);
+};
+
+hàm biên dịch tệp(đường dẫn) {
+    mã_nguồn = đọc tệp(đường dẫn);
+    trả về bien_dich_phan_tich_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+};

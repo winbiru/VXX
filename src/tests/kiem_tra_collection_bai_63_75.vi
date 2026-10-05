@@ -1,5 +1,6 @@
 // Regression cho các bài collection 63-75 trong backlog giáo trình Python.
 // Mục tiêu: chứng minh các bài này ghép được từ primitive P1 hiện có.
+nhập bộ sưu tập;
 
 // 63 - Tổng hai ma trận.
 a = [[1, 2], [3, 4]];

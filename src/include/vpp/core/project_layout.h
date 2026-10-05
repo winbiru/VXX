@@ -9,7 +9,10 @@ namespace vietvm::core {
 // Shared project/package layout.  These strings are UTF-8 where Vietnamese
 // names are involved, so callers should construct filesystem paths with
 // utf8Path() rather than fs::path(const char*).
-inline constexpr const char *kCliVersion = "0.1.0";
+#ifndef VPP_VERSION_STRING
+#define VPP_VERSION_STRING "1.0.0"
+#endif
+inline constexpr const char *kCliVersion = VPP_VERSION_STRING;
 inline constexpr const char *kProjectManifestFile = "vpp.json";
 inline constexpr const char *kPackageLockFile = "vpp.lock";
 inline constexpr const char *kPackageStateDirectory = ".vpp";

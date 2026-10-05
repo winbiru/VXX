@@ -1,0 +1,10 @@
+// vi.naming.dns — phân giải tên bằng resolver của hệ điều hành.
+nhập gói/mạng/ổ cắm;
+nhập gói/bộ sưu tập/danh sách;
+
+hàm dns phân giải(tên máy) {
+    kết_quả = dns_phan_giai(tên máy);
+    xóa trùng(kết_quả);
+    sắp xếp(kết_quả);
+    trả về kết_quả;
+};

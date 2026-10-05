@@ -1,4 +1,6 @@
 // Regression P1: list literal scalar, in và native độ dài.
+nhập gói/bộ sưu tập/chính;
+
 ds = [1, "hai", rỗng];
 in ds;
 in ds[1];

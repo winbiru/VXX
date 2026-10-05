@@ -39,6 +39,35 @@ vietvm::frontend::AstProgram parseModuleSource(const std::string &source) {
         postProcessTokensWithSpans(tokenizeWithSpans(source)));
 }
 
+struct CachedParsedModule {
+    std::string source;
+    std::shared_ptr<const vietvm::frontend::AstProgram> program;
+};
+
+thread_local std::unordered_map<std::string, CachedParsedModule> parsedModuleCache;
+constexpr std::size_t kParsedModuleCacheLimit = 512;
+
+std::shared_ptr<const vietvm::frontend::AstProgram> parseModuleSourceCached(
+    const std::string &source,
+    const fs::path &sourcePath) {
+    const std::string identity = absoluteLexical(sourcePath).u8string();
+    const auto found = parsedModuleCache.find(identity);
+    if (found != parsedModuleCache.end() && found->second.source == source) {
+        return found->second.program;
+    }
+
+    // Process dài hạn như LSP/test worker không được giữ AST của mọi module đã
+    // từng thấy vô hạn. Các semantic index đang hoạt động giữ shared_ptr riêng,
+    // nên xóa cache ở ngưỡng này không làm invalid compilation hiện tại.
+    if (parsedModuleCache.size() >= kParsedModuleCacheLimit) {
+        parsedModuleCache.clear();
+    }
+    auto program = std::make_shared<const vietvm::frontend::AstProgram>(
+        parseModuleSource(source));
+    parsedModuleCache[identity] = CachedParsedModule{source, program};
+    return program;
+}
+
 // Trích các import đã được parser nhận diện từ AST. Resolver sẽ quyết định target
 // extensionless nào thực sự ánh xạ tới file local; package import không tồn tại như
 // file cạnh source sẽ được bỏ qua ở bước resolve/existence phía sau.
@@ -301,6 +330,20 @@ const ModuleExportSymbol *LocalModuleSemanticIndex::exportedSymbol(
     return nullptr;
 }
 
+const vietvm::frontend::AstProgram *LocalModuleSemanticIndex::parsedProgram(
+    std::string_view moduleIdentity) const noexcept {
+    const auto it = parsedPrograms.find(std::string(moduleIdentity));
+    return it == parsedPrograms.end() ? nullptr : it->second.get();
+}
+
+const std::string *LocalModuleSemanticIndex::moduleSource(
+    std::string_view moduleIdentity) const noexcept {
+    for (const LocalModuleSource &source : graph.modules) {
+        if (source.identity == moduleIdentity) return &source.source;
+    }
+    return nullptr;
+}
+
 // Tạo `SemanticEnvironment` cho một module; hàm gom các export từ dependency đã phân giải thành external symbol mà analyzer có thể nhìn thấy.
 SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
     std::string_view importerIdentity) const {
@@ -390,22 +433,30 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
             edge.action = LocalModuleEdgeAction::Load;
             index.graph.edges.push_back(std::move(edge));
             LocalModuleSource source = resolver.read(location);
-            const vietvm::frontend::AstProgram program = parseModuleSource(source.source);
+            const auto program = parseModuleSourceCached(source.source, source.path);
             index.modules.push_back(
                 LocalModuleSemanticRecord{source.path,
                                           source.identity,
-                                          moduleExports(program, source.path),
-                                          moduleHiddenSymbols(program)});
+                                          moduleExports(*program, source.path),
+                                          moduleHiddenSymbols(*program)});
+            index.parsedPrograms.emplace(source.identity, program);
             index.graph.modules.push_back(std::move(source));
         }
         return index;
     }
 
     const LocalModuleResolver rootResolver = resolver;
+    // Graph traversal cần parse source để tìm import; giữ AST theo identity để
+    // bước dựng semantic records ngay sau đó không tokenize/parse cùng file lần hai.
+    std::unordered_map<std::string,
+                       std::shared_ptr<const vietvm::frontend::AstProgram>> parsedPrograms;
     LocalModuleGraphBuilder graphBuilder(
         std::move(resolver),
-        [](const std::string &source, const fs::path &) {
-            return structuredLocalImports(parseModuleSource(source));
+        [&parsedPrograms](const std::string &source, const fs::path &sourcePath) {
+            const auto program = parseModuleSourceCached(source, sourcePath);
+            auto imports = structuredLocalImports(*program);
+            parsedPrograms.emplace(absoluteLexical(sourcePath).u8string(), program);
+            return imports;
         });
 
     std::vector<vietvm::frontend::AstImportSpec> resolvedRoots;
@@ -421,13 +472,19 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
     index.graph = graphBuilder.build(std::move(entryIdentity), resolvedRoots);
     index.modules.reserve(index.graph.modules.size());
     for (const LocalModuleSource &source : index.graph.modules) {
-        const vietvm::frontend::AstProgram program = parseModuleSource(source.source);
+        const auto parsed = parsedPrograms.find(source.identity);
+        const auto fallback = parsed == parsedPrograms.end()
+            ? parseModuleSourceCached(source.source, source.path)
+            : std::shared_ptr<const vietvm::frontend::AstProgram>{};
+        const vietvm::frontend::AstProgram &program =
+            parsed == parsedPrograms.end() ? *fallback : *parsed->second;
         index.modules.push_back(
             LocalModuleSemanticRecord{source.path,
                                       source.identity,
                                       moduleExports(program, source.path),
                                       moduleHiddenSymbols(program)});
     }
+    index.parsedPrograms = std::move(parsedPrograms);
     applyModuleReExports(index);
     return index;
 }

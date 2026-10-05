@@ -1,0 +1,15 @@
+// vi.time — đồng hồ đơn điệu để đo khoảng thời gian.
+// Giá trị là số mili giây dạng số thực kể từ một mốc không xác định.
+// Chỉ hiệu giữa hai lần đọc có ý nghĩa; không dùng làm thời gian lịch.
+
+hàm thời gian đơn điệu mili giây() {
+    trả về thoi_gian_don_dieu_mili_giay();
+};
+
+hàm bắt đầu đo thời gian() {
+    trả về thời gian đơn điệu mili giây();
+};
+
+hàm kết thúc đo thời gian(bắt đầu) {
+    trả về thời gian đơn điệu mili giây() - bắt đầu;
+};

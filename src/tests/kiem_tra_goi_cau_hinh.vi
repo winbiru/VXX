@@ -1,0 +1,11 @@
+nhập cấu hình;
+nhập nhập xuất;
+
+hàm chính() {
+    tệp = ".tmp_goi_cau_hinh.ini";
+    ghi tệp(tệp, "tên=V++\nsố=42\n");
+    in đọc cấu hình khóa(tệp, "tên", "");
+    in đọc cấu hình khóa(tệp, "số", 0);
+    in đọc cấu hình khóa(tệp, "thiếu", "mặc định");
+    xóa đường dẫn(tệp);
+};

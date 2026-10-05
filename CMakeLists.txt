@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(VPP LANGUAGES CXX)
+project(VPP VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -95,16 +95,42 @@ set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/object.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_compiler_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_extended_helpers.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_m3_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_format_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_http_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_json_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_stdlib_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_text_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_low_level_http_server.cpp)
+    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_stdlib_helpers.cpp)
 set(VPP_TOOLING_SOURCES
     ${CMAKE_SOURCE_DIR}/src/tooling/tooling.cpp)
 set(VPP_CLI_SOURCES ${CMAKE_SOURCE_DIR}/src/cli/main.cpp)
+set(VDK_SOURCES ${CMAKE_SOURCE_DIR}/src/vdk/main.cpp)
+
+if (WIN32)
+    set(VDK_PLATFORM "windows")
+elseif(APPLE)
+    set(VDK_PLATFORM "macos")
+elseif(UNIX)
+    set(VDK_PLATFORM "linux")
+else()
+    set(VDK_PLATFORM "unknown")
+endif()
+
+string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" VDK_PROCESSOR_LOWER)
+if (VDK_PROCESSOR_LOWER MATCHES "^(x86_64|amd64)$")
+    set(VDK_ARCH "x64")
+elseif(VDK_PROCESSOR_LOWER MATCHES "^(aarch64|arm64)$")
+    set(VDK_ARCH "arm64")
+elseif(VDK_PROCESSOR_LOWER MATCHES "^(i[3-6]86|x86)$")
+    set(VDK_ARCH "x86")
+else()
+    set(VDK_ARCH "${VDK_PROCESSOR_LOWER}")
+endif()
+
+configure_file(
+    ${CMAKE_SOURCE_DIR}/cmake/vdk-release.json.in
+    ${CMAKE_BINARY_DIR}/vdk-release.json
+    @ONLY)
 
 # Create library helper (accepts sources passed directly)
 function(vpp_add_module name)
@@ -149,14 +175,18 @@ vpp_add_module(vpp-compiler ${VPP_COMPILER_SOURCES})
 target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 
 vpp_add_module(vpp-runtime ${VPP_RUNTIME_SOURCES})
-target_link_libraries(vpp-runtime PUBLIC vpp-bytecode vpp-core Threads::Threads)
+target_link_libraries(vpp-runtime PUBLIC vpp-bytecode vpp-core vpp-compiler Threads::Threads)
 if (WIN32)
-    target_link_libraries(vpp-runtime PUBLIC ws2_32 bcrypt)
+    target_link_libraries(vpp-runtime PUBLIC ws2_32 bcrypt secur32 crypt32)
 elseif(APPLE)
     find_library(VPP_SECURITY_FRAMEWORK Security REQUIRED)
-    target_link_libraries(vpp-runtime PUBLIC ${VPP_SECURITY_FRAMEWORK})
+    find_library(VPP_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    target_link_libraries(
+        vpp-runtime PUBLIC
+        ${VPP_SECURITY_FRAMEWORK}
+        ${VPP_COREFOUNDATION_FRAMEWORK})
 elseif(UNIX)
-    target_link_libraries(vpp-runtime PUBLIC OpenSSL::Crypto)
+    target_link_libraries(vpp-runtime PUBLIC OpenSSL::SSL OpenSSL::Crypto)
 endif()
 
 vpp_add_module(vpp-tooling ${VPP_TOOLING_SOURCES})
@@ -173,6 +203,16 @@ add_library(vpp::tooling ALIAS vpp-tooling)
 add_executable(vpp-cli ${VPP_CLI_SOURCES})
 target_link_libraries(vpp-cli PRIVATE vpp-runtime vpp-tooling)
 target_include_directories(vpp-cli PRIVATE ${VPP_INCLUDE_DIR})
+target_compile_definitions(vpp-cli PRIVATE VPP_VERSION_STRING="${PROJECT_VERSION}")
+
+add_executable(vdk ${VDK_SOURCES})
+target_compile_features(vdk PRIVATE cxx_std_17)
+target_compile_definitions(vdk PRIVATE VDK_VERSION_STRING="${PROJECT_VERSION}")
+if (MSVC)
+    target_compile_options(vdk PRIVATE /W4 /permissive- /utf-8)
+else()
+    target_compile_options(vdk PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 
 if (MSVC)
     target_compile_definitions(vpp-cli PRIVATE
@@ -191,6 +231,10 @@ add_custom_command(TARGET vpp-cli POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:vpp-cli>
             ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vietvm-cli)
+add_custom_command(TARGET vpp-cli POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:vpp-cli>
+            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/vpp${CMAKE_EXECUTABLE_SUFFIX})
 
 # Regression tests are V++ .vi programs under src/tests/.
 if (BUILD_TESTS)
@@ -266,22 +310,45 @@ if (BUILD_BENCHMARKS)
 endif()
 
 # Install rules (optional)
-install(TARGETS vpp-cli vpp-core vpp-frontend vpp-bytecode vpp-compiler vpp-runtime vpp-tooling
+install(TARGETS vdk vpp-cli vpp-core vpp-frontend vpp-bytecode vpp-compiler vpp-runtime vpp-tooling
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
+install(PROGRAMS $<TARGET_FILE:vpp-cli>
+        DESTINATION bin
+        RENAME vpp${CMAKE_EXECUTABLE_SUFFIX})
+install(FILES
+        ${CMAKE_BINARY_DIR}/vdk-release.json
+        ${CMAKE_SOURCE_DIR}/vpp-libraries.json
+        DESTINATION .)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
         DESTINATION gói
+        PATTERN ".DS_Store" EXCLUDE)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/docs/
+        DESTINATION docs
         PATTERN ".DS_Store" EXCLUDE)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/templates/
         DESTINATION templates
         PATTERN ".DS_Store" EXCLUDE)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/examples/
         DESTINATION examples
-        PATTERN ".DS_Store" EXCLUDE)
+        PATTERN ".DS_Store" EXCLUDE
+        PATTERN ".vpp" EXCLUDE)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/include/
         DESTINATION include
         PATTERN ".DS_Store" EXCLUDE)
+install(FILES ${CMAKE_SOURCE_DIR}/LICENSE DESTINATION licenses)
+
+set(CPACK_PACKAGE_NAME "VDK")
+set(CPACK_PACKAGE_VENDOR "V++")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_PACKAGE_FILE_NAME "vdk-${PROJECT_VERSION}-${VDK_PLATFORM}-${VDK_ARCH}")
+if (WIN32)
+    set(CPACK_GENERATOR "ZIP")
+else()
+    set(CPACK_GENERATOR "TGZ")
+endif()
+include(CPack)
 
 # Developer notes:
 # - Keep source ownership explicit; do not add new files to a generic helpers target.

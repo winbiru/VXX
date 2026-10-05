@@ -1,26 +1,127 @@
 // Module: nhập xuất.đường dẫn
-// Tiện ích đường dẫn đa nền tảng dựa trên filesystem của runtime.
+// Phân tích/nối đường dẫn là logic thuần V++. Chỉ các phép hỏi trạng thái hệ tệp
+// ở cuối tệp này đi qua native boundary.
+
+nhập gói/hệ thống/nền tảng;
+nhập gói/văn bản/chuỗi;
+
+hàm đường dẫn dấu phân cách() {
+    nếu (tên nền tảng() == "windows") {
+        trả về "\\";
+    };
+    trả về "/";
+};
+
+hàm đường dẫn là phân cách(c) {
+    nếu (c == "/") {
+        trả về đúng;
+    };
+    nếu (tên nền tảng() == "windows" && c == "\\") {
+        trả về đúng;
+    };
+    trả về sai;
+};
+
+hàm đường dẫn là tuyệt đối(đường dẫn) {
+    nếu (do_dai(đường dẫn) == 0) {
+        trả về sai;
+    };
+    nếu (đường dẫn là phân cách(đường dẫn[0])) {
+        trả về đúng;
+    };
+    nếu (tên nền tảng() == "windows") {
+        nếu (do_dai(đường dẫn) >= 3) {
+            nếu (đường dẫn[1] == ":") {
+                nếu (đường dẫn là phân cách(đường dẫn[2])) {
+                    trả về đúng;
+                };
+            };
+        };
+    };
+    trả về sai;
+};
 
 hàm đường dẫn nối(gốc, phần con) {
-    ném "stdlib: đường dẫn nối native hook không khả dụng";
+    nếu (gốc == "") {
+        trả về phần con;
+    };
+    nếu (đường dẫn là tuyệt đối(phần con)) {
+        trả về phần con;
+    };
+
+    phân_cách = đường dẫn dấu phân cách();
+    nếu (phần con == "") {
+        nếu (đường dẫn là phân cách(gốc[do_dai(gốc) - 1])) {
+            trả về gốc;
+        };
+        trả về gốc + phân_cách;
+    };
+
+    nếu (đường dẫn là phân cách(gốc[do_dai(gốc) - 1])) {
+        trả về gốc + phần con;
+    };
+    trả về gốc + phân_cách + phần con;
 };
 
 hàm đường dẫn tên(đường dẫn) {
-    ném "stdlib: đường dẫn tên native hook không khả dụng";
+    n = do_dai(đường dẫn);
+    nếu (n == 0 || đường dẫn là phân cách(đường dẫn[n - 1])) {
+        trả về "";
+    };
+
+    bắt_đầu = 0;
+    lặp(i = n - 1; i >= 0; i--) {
+        nếu (đường dẫn là phân cách(đường dẫn[i])) {
+            bắt_đầu = i + 1;
+            i = -1;
+        };
+    };
+    trả về cắt chuỗi(đường dẫn, bắt_đầu, n - bắt_đầu);
 };
 
 hàm đường dẫn cha(đường dẫn) {
-    ném "stdlib: đường dẫn cha native hook không khả dụng";
+    n = do_dai(đường dẫn);
+    nếu (n == 0) {
+        trả về "";
+    };
+
+    kết_thúc = n;
+    lặp(vòng = 0; kết_thúc > 1 && đường dẫn là phân cách(đường dẫn[kết_thúc - 1]); vòng++) {
+        kết_thúc = kết_thúc - 1;
+    };
+
+    nếu (kết_thúc < n) {
+        nếu (kết_thúc == 1 && đường dẫn là phân cách(đường dẫn[0])) {
+            trả về đường dẫn dấu phân cách();
+        };
+        trả về cắt chuỗi(đường dẫn, 0, kết_thúc);
+    };
+
+    vị_trí = -1;
+    lặp(i = kết_thúc - 1; i >= 0; i--) {
+        nếu (đường dẫn là phân cách(đường dẫn[i])) {
+            vị_trí = i;
+            i = -1;
+        };
+    };
+
+    nếu (vị_trí < 0) {
+        trả về "";
+    };
+    nếu (vị_trí == 0) {
+        trả về đường dẫn dấu phân cách();
+    };
+    trả về cắt chuỗi(đường dẫn, 0, vị_trí);
 };
 
 hàm đường dẫn tồn tại(đường dẫn) {
-    ném "stdlib: đường dẫn tồn tại native hook không khả dụng";
+    trả về duong_dan_ton_tai(đường dẫn);
 };
 
 hàm là tệp(đường dẫn) {
-    ném "stdlib: là tệp native hook không khả dụng";
+    trả về la_tep(đường dẫn);
 };
 
 hàm là thư mục(đường dẫn) {
-    ném "stdlib: là thư mục native hook không khả dụng";
+    trả về la_thu_muc(đường dẫn);
 };

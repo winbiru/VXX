@@ -1,0 +1,7 @@
+nhập nhật ký;
+
+hàm chính() {
+    ghi thông tin("thử");
+    ghi cảnh báo("cảnh báo");
+    ghi lỗi("lỗi");
+};

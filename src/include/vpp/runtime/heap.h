@@ -50,6 +50,13 @@ public:
     // Trả số allocation còn sống trong weak registry sau khi loại entry hết hạn.
     std::size_t trackedObjectCount();
 
+    // Cho biết từ lần collect gần nhất có object heap mới được đăng ký hay chưa.
+    // VM dùng tín hiệu này để tránh chạy tracing GC theo chu kỳ opcode khi workload
+    // chỉ thao tác số/chuỗi và không tạo thêm graph tham chiếu.
+    bool needsCollection() const noexcept {
+        return allocationGeneration_ != collectedAllocationGeneration_;
+    }
+
 private:
     std::vector<std::weak_ptr<MapValue>> maps_;
     std::vector<std::weak_ptr<ListValue>> lists_;
@@ -57,6 +64,8 @@ private:
     std::vector<std::weak_ptr<RuntimeClass>> classes_;
     std::vector<std::weak_ptr<RuntimeInstance>> instances_;
     std::vector<std::weak_ptr<RuntimeClosure>> closures_;
+    std::size_t allocationGeneration_ = 0;
+    std::size_t collectedAllocationGeneration_ = 0;
 };
 
 // Gắn một heap làm đích đăng ký allocation trên thread hiện tại trong thời gian

@@ -66,21 +66,20 @@
 
 5. Benchmark và profiling
 
-   - [x] Tạo benchmark lặp lại được cho dispatch opcode, lexer/compiler và native
-     HTTP parsing path bằng target `vpp-benchmark-baseline`.
+   - [x] Tạo benchmark lặp lại được cho VM dispatch/verification, compiler stages,
+     package/module resolution và GC bằng target `vpp-benchmark-baseline`.
    - [x] Ghi baseline trước mọi tối ưu JIT/VM qua output timing của benchmark và chạy
      trong CI theo dạng quan sát không đặt performance threshold.
 
-   Harness P0 v2 hiện đã tách `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`,
-   compiler stages, package/module resolution, JSON extraction, native HTTP và GC collection.
-   benchmark executable xuất metadata/case ổn định để host CI so sánh baseline/candidate,
-   median/p95/MAD, noise check và regression threshold. Comparator yêu cầu tối thiểu 10 sample
-   cho median và 40 sample cho GC p95 gate sau khi self-comparison 10 sample phơi ra tail
-   outlier có thể tạo false regression; self-comparison 40 sample sau hardening đã PASS.
+   Harness P0 hiện đã tách `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`,
+   compiler stages, package/module resolution và GC collection. HTTP/JSON native benchmark cũ
+   không còn phù hợp sau khi logic giao thức/parser chuyển sang V++. Benchmark executable xuất
+   metadata/case ổn định, nhưng repo hiện chưa có runner/comparator baseline/candidate để tính
+   median/p95/MAD, noise check hay regression threshold.
    Công việc P0 trước RC vẫn được theo dõi riêng tại
    [mục 0 của roadmap 1.0](roadmap-1.0.md#0-p0--runtime-performance-và-import-contract-trước-rc):
-   còn phải đo baseline/candidate thực trên cùng máy, bổ sung GC allocation/RSS telemetry và
-   nối comparator vào CI. Checklist baseline trung hạn hoàn tất không đồng nghĩa các release
+   còn phải thêm runner/comparator, đo baseline/candidate thực trên cùng máy, bổ sung GC
+   allocation/RSS telemetry và nối gate vào CI. Checklist baseline trung hạn hoàn tất không đồng nghĩa các release
    blocker evidence này đã hoàn tất.
 
 ## Rủi ro và dependency

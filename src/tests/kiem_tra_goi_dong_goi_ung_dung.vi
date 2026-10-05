@@ -1,0 +1,25 @@
+nhập đóng gói ứng dụng;
+nhập nhập xuất;
+nhập bộ sưu tập;
+
+hàm chính() {
+    nguồn = ".tmp_pack_main.vi";
+    tài_nguyên = ".tmp_pack_data.txt";
+    đích = ".tmp_pack_dist";
+    ghi tệp(nguồn, "hàm chính() { in 42; };");
+    ghi tệp(tài_nguyên, "DATA");
+
+    kq = đóng gói ứng dụng(đích, "demo", nguồn, [tài_nguyên]);
+    in đường dẫn tồn tại(đường dẫn nối(đích, đường dẫn tên(nguồn)));
+    in đọc tệp(đường dẫn nối(đích, đường dẫn tên(tài_nguyên))) == "DATA";
+    in lấy map(kq, "tài nguyên", 0) == 1;
+    in đường dẫn tồn tại(lấy map(kq, "manifest", ""));
+    zip = ".tmp_pack_dist.zip";
+    in đóng gói ứng dụng zip(zip, đích, "demo", nguồn, [tài_nguyên]) == 3;
+    in đường dẫn tồn tại(zip);
+
+    xóa đường dẫn(nguồn);
+    xóa đường dẫn(tài_nguyên);
+    xóa đường dẫn(zip);
+    xóa đường dẫn(đích);
+};

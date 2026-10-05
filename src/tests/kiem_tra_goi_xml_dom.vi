@@ -1,0 +1,14 @@
+nhập cây tài liệu xml;
+nhập bộ sưu tập;
+
+hàm chính() {
+    root = dom phần tử("gốc");
+    dom đặt thuộc tính(root, "id", "1");
+    child = dom phần tử("con");
+    dom đặt nội dung(child, "V++ & Việt");
+    dom thêm con(root, child);
+    in dom tên(root);
+    in dom thuộc tính(root, "id", "");
+    in độ dài(dom con(root));
+    in xml tạo(root);
+};

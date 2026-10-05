@@ -1,0 +1,23 @@
+nhập thời gian;
+
+hàm chính() {
+    in lấy thời gian hiện tại() != "";
+    in lấy thời gian utc() != "";
+    lệch = độ lệch múi giờ();
+    in lệch >= -1440 && lệch <= 1440;
+
+    // Các snapshot cố định kiểm tra định dạng mà không phụ thuộc clock/TZ máy chạy.
+    in thời gian định dạng đồng hồ([7, 1, 2, 3, 4, 5, 0], đúng);
+    in thời gian định dạng đồng hồ([2024, 2, 29, 0, 0, 0, 0], sai);
+    in thời gian định dạng đồng hồ([2026, 10, 5, 16, 9, 8, 420], sai);
+    in thời gian định dạng đồng hồ([2026, 1, 1, 0, 0, 0, 345], sai);
+    in thời gian định dạng đồng hồ([2025, 12, 31, 23, 59, 59, -210], sai);
+    in thời gian định dạng đồng hồ([2016, 12, 31, 23, 59, 60, 0], đúng);
+
+    utc = dong_ho_lich_noi_bo(1);
+    in độ dài(utc) == 7 && utc[6] == 0;
+    in utc[1] >= 1 && utc[1] <= 12 && utc[2] >= 1 && utc[2] <= 31;
+    in độ dài(lay_thoi_gian_hien_tai()) == 25;
+    in độ dài(lay_thoi_gian_utc()) == 20;
+    in loại của(do_lech_mui_gio()) == "số nguyên";
+};

@@ -9,6 +9,8 @@
 #include "vpp/runtime/debug.h"
 
 namespace vietvm::compiler {
+    struct LocalModuleSemanticIndex;
+
     // Lưu metadata truy cập của một phương thức đã biên dịch như lớp sở hữu và visibility; registry dùng nó để kiểm tra lời gọi hợp lệ.
     struct MethodAccessInfo {
         std::string ownerClass;
@@ -50,6 +52,14 @@ namespace vietvm::compiler {
         // Identity của source đang được hạ IR. Recursive import tạm đổi trường
         // này sang module con rồi khôi phục module cha sau khi compile xong.
         std::string currentSourceIdentity;
+        // Semantic module graph của toàn bộ lượt biên dịch top-level. Recursive
+        // import tái sử dụng index này thay vì dựng lại cùng subtree nhiều lần.
+        // Pointer chỉ hợp lệ trong thời gian compilePipelineInRegistry top-level
+        // đang giữ CompilationArtifacts::moduleIndex sống trên stack.
+        const LocalModuleSemanticIndex *activeModuleSemanticIndex = nullptr;
+        // Identity canonical của module đang được compile; tách khỏi
+        // currentSourceIdentity vì trường kia ưu tiên đường dẫn dễ đọc cho debug.
+        std::string currentSemanticModuleIdentity;
         int nextFunctionId = 0;
 
         // Tìm chuỗi trong bể của chính compilation state này mà không phụ thuộc active context ẩn.
@@ -80,6 +90,8 @@ namespace vietvm::compiler {
             moduleFunctionExports.clear();
             methodAccess.clear();
             classContextStack.clear();
+            activeModuleSemanticIndex = nullptr;
+            currentSemanticModuleIdentity.clear();
             nextFunctionId = 0;
         }
     };

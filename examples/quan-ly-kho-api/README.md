@@ -6,15 +6,15 @@
 ép compiler/runtime đi qua một luồng ứng dụng dài: nhiều module, package dependency, object
 model, interface, JSON, HTTP server, file I/O và exception nghiệp vụ.
 
-## Yêu cầu — V++0.9
+## Yêu cầu — V++ 1.0
 
-Project này được cập nhật để chạy trực tiếp bằng bản release **V++0.9**. Release được phát hành
-ngày 15/09/2026 và hiện cung cấp binary dựng sẵn cho Linux x64 và macOS.
+Project này chạy trực tiếp bằng **V++ 1.0.0**. Runtime bundle của GitHub Release giữ tên asset
+ổn định để có thể tải bản phát hành mới nhất mà không hardcode tag.
 
 ### macOS
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/V%2B%2B0.9/vpp-macos.tar.gz -o vpp-macos.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
 ./install-vpp.sh
 source ~/.zshrc
@@ -24,14 +24,15 @@ vpp giúp đỡ
 ### Linux x64
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/V%2B%2B0.9/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
 ./install-vpp.sh
 vpp giúp đỡ
 ```
 
 Installer mặc định cài `vpp`, thư viện chuẩn `gói/`, `templates/` và toàn bộ `examples/` vào
-`~/.local/bin`, đồng thời thiết lập `VPP_HOME`. Release V++0.9 hiện chưa có asset Windows.
+`~/.local/bin`, đồng thời thiết lập `VPP_HOME`. Release workflow 1.0 dựng runtime bundle cho
+Linux, macOS và Windows, đồng thời phát hành thêm VDK đầy đủ theo nền tảng.
 
 ## Kiến trúc
 
@@ -197,7 +198,7 @@ và các đặc tính phi chức năng như hiệu năng JIT hay thời điểm 
 
 ## Xác minh HTTP thật
 
-Sau khi cài V++0.9 và đứng tại thư mục `examples/quan-ly-kho-api`:
+Sau khi cài V++ 1.0 và đứng tại thư mục `examples/quan-ly-kho-api`:
 
 ```bash
 VPP_WAREHOUSE_PORT=18932 vpp chạy src/chính.vi
@@ -209,5 +210,5 @@ Chương trình `.vi` kiểm tra feature gate, CRUD/search sản phẩm, Unicode
 đặt/hủy đơn hàng và báo cáo qua HTTP localhost bằng chính HTTP client của V++.
 Workflow release tự khởi động server, đặt `VPP_WAREHOUSE_PORT=18932`, chạy
 `scripts/verify_http.vi`, rồi dừng server.
-có thể dùng cho cả release V++0.9 lẫn quá trình phát triển compiler tại local.
+có thể dùng cho cả release V++ 1.0 lẫn quá trình phát triển compiler tại local.
 Server được dừng khi hoàn tất; script in thư mục chứa dữ liệu kiểm chứng.

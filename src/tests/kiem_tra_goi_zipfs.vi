@@ -1,0 +1,19 @@
+nhập hệ tệp zip;
+nhập lưu trữ;
+nhập nhập xuất;
+
+hàm chính() {
+    nguồn = ".tmp_zipfs.txt";
+    zip = ".tmp_zipfs.zip";
+    đích = ".tmp_zipfs_out";
+    ghi tệp(nguồn, "zipfs");
+    lưu trữ tạo zip(zip, [nguồn]);
+    kho = zipfs mở(zip);
+    in zipfs liệt kê(kho);
+    in zipfs giải nén(kho, đích, 1024);
+    in đọc tệp(đường dẫn nối(đích, nguồn));
+    in zipfs đóng(kho);
+    xóa đường dẫn(nguồn);
+    xóa đường dẫn(zip);
+    xóa đường dẫn(đích);
+};

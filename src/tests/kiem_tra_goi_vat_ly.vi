@@ -1,0 +1,20 @@
+nhập vật lý;
+
+hàm chính() {
+    in vận tốc(100, 20);
+    in gia tốc(30, 10);
+    in lực(10, 3);
+    in động lượng(4, 5);
+    in động năng(2, 3);
+    in thế năng trọng trường(2, 5, 10);
+    in công cơ học(10, 4);
+    in công suất(100, 20);
+    in áp suất(100, 20);
+    in khối lượng riêng(10, 2);
+    in cường độ dòng điện(12, 4);
+    in điện áp(2, 5);
+    in điện trở(12, 3);
+    in tần số(0.5);
+    in gia tốc trọng trường chuẩn() > 9;
+    in tốc độ ánh sáng();
+};

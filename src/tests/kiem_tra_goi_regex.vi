@@ -1,0 +1,46 @@
+nhập biểu thức chính quy;
+
+hàm chính() {
+    in regex khớp("abc123", "[a-z]+[0-9]+");
+    in regex tìm("xx-123-yy", "[0-9]+");
+    in regex thay("a1b2", "[0-9]", "#");
+    in regex tách("a,b;c", "[,;]");
+
+    // Capture, escape và số nhóm một/hai chữ số theo std::regex ECMAScript.
+    in regex thay("a1b22c", "([a-z])([0-9]+)", "$2:$1");
+    in regex thay("ab", "(a)(b)", "$$/$&/$0/$00/$1/$2/$3/$12/$01/$99");
+    in regex thay("abcdefghij", "(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)", "$10$09$1");
+    in regex thay("b", "(a)?b", "<$1>");
+    in regex thay("aba", "a", "[$`][$']");
+    in regex thay("a", "a", "$q/$");
+    in regex thay("abc", "z", "$&");
+
+    // Khớp rỗng vẫn tiến lên đúng theo engine, kể cả anchor và lookahead.
+    in regex thay("ab", "", "#");
+    in regex thay("aa", "a*?", "#");
+    in regex thay("aba", "(?=a)", "#");
+    in regex thay("ab", "^|$", "#");
+    in regex tách("a,,", ",");
+    in regex tách(",a", ",");
+    in regex tách("ab", "");
+    in regex tách("", "x");
+    in regex tách("", "");
+    in regex tách("abc", "x");
+
+    // Engine hiện khớp theo byte UTF-8; ghép capture không được mất byte.
+    in regex thay("é", ".", "#");
+    in regex thay("Tiếng Việt", "(.)", "$&") == "Tiếng Việt";
+    in regex thay("Việt", "Việt", "xin chào $&");
+    in regex tách("một,hai,ba", ",");
+    in do_dai(regex tách("", "x")) == 1;
+    in do_dai(regex tách("", "")) == 1;
+    in do_dai(regex tách("a,,", ",")) == 2;
+
+    // match/search là wrapper V++ trên primitive scan duy nhất.
+    in regex khớp("aa", "a|aa");
+    in regex khớp("aaa", "a*");
+    in regex khớp("", "");
+    in !regex khớp("a\n", "a$");
+    in regex khớp("ab", "a(?=b)b");
+    in regex tìm("xx-123-yy", "[0-9]+") == "123";
+};

@@ -1,6 +1,5 @@
 #include "common/vm_native_collection_helpers.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -66,133 +65,6 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListReverse)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (std::holds_alternative<std::string>(args[0])) {
-            result = make_string_value(vietvm::core::reverseUtf8CodePoints(
-                std::get<std::string>(args[0])));
-            return true;
-        }
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        std::reverse(list->elements.begin(), list->elements.end());
-        result = make_null_value();
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListFindIndex)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        const auto index = vietvm::runtime::findStackValueIndex(list->elements, args[1]);
-        result = make_int_value(index.has_value() ? static_cast<int>(*index) : -1);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListUnique)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        list->elements = vietvm::runtime::uniqueStackValues(list->elements);
-        result = make_null_value();
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListSort)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        if (!vietvm::runtime::isUniformSortableStackValues(list->elements)) {
-            err = messages::messageText(messages::kNativeListSortTypeInvalid);
-            return true;
-        }
-        std::stable_sort(list->elements.begin(), list->elements.end(),
-                         [](const StackValue &left, const StackValue &right) {
-                             bool valid = false;
-                             return stackValueLess(left, right, valid);
-                         });
-        result = make_null_value();
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListSum)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        bool hasFloat = false;
-        for (const StackValue &value : list->elements) {
-            if (!isNumeric(value)) {
-                err = messages::messageText(messages::kNativeListSumTypeInvalid);
-                return true;
-            }
-            hasFloat = hasFloat || std::holds_alternative<double>(value);
-        }
-
-        if (hasFloat) {
-            double total = 0.0;
-            for (const StackValue &value : list->elements) {
-                total += toDouble(value);
-                if (!std::isfinite(total)) {
-                    err = messages::messageText(messages::kNativeListSumFloatOutOfRange);
-                    return true;
-                }
-            }
-            result = make_float_value(total);
-            return true;
-        }
-
-        std::int64_t total = 0;
-        for (const StackValue &value : list->elements) {
-            total += static_cast<std::int64_t>(std::get<int>(value));
-            if (total < std::numeric_limits<int>::min() ||
-                total > std::numeric_limits<int>::max()) {
-                err = messages::messageText(messages::kNativeListSumIntegerOutOfRange);
-                return true;
-            }
-        }
-        result = make_int_value(static_cast<int>(total));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListMin) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListMax)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        ListHandle list;
-        if (!getFirstListArgument(args, fn, list, err)) return true;
-        if (list->elements.empty()) {
-            err = messages::formatMessage(messages::kNativeListEmptyRejected, {fn});
-            return true;
-        }
-        if (!vietvm::runtime::isUniformSortableStackValues(list->elements)) {
-            err = messages::formatMessage(messages::kNativeListUniformSortableRequired, {fn});
-            return true;
-        }
-        const bool wantMax = vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListMax);
-        StackValue selected = list->elements.front();
-        for (std::size_t index = 1; index < list->elements.size(); ++index) {
-            bool valid = false;
-            const bool less = stackValueLess(list->elements[index], selected, valid);
-            if (!valid) {
-                err = messages::formatMessage(messages::kNativeListUniformSortableRequired, {fn});
-                return true;
-            }
-            if ((wantMax && !less && !sameStackValue(list->elements[index], selected)) ||
-                (!wantMax && less)) {
-                selected = list->elements[index];
-            }
-        }
-        result = selected;
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetFromList)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        ListHandle source;
-        if (!getListArgument(args, 0, fn, source, err)) return true;
-        result = make_list_value(vietvm::runtime::uniqueStackValues(source->elements));
-        return true;
-    }
-
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToTuple)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         if (std::holds_alternative<ListHandle>(args[0])) {
@@ -205,46 +77,6 @@ bool handleNativeCollectionFunction(const std::string &fn,
             return true;
         }
         err = messages::messageText(messages::kNativeToTupleTypeInvalid);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToList)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (std::holds_alternative<TupleHandle>(args[0])) {
-            const TupleHandle &tuple = std::get<TupleHandle>(args[0]);
-            result = make_list_value(tuple == nullptr ? std::vector<StackValue>{} : tuple->elements);
-            return true;
-        }
-        if (std::holds_alternative<ListHandle>(args[0])) {
-            const ListHandle &list = std::get<ListHandle>(args[0]);
-            result = make_list_value(list == nullptr ? std::vector<StackValue>{} : list->elements);
-            return true;
-        }
-        err = messages::messageText(messages::kNativeToListTypeInvalid);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetUnion) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetIntersection) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetDisjoint)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        ListHandle left;
-        ListHandle right;
-        if (!getListArgument(args, 0, fn, left, err) ||
-            !getListArgument(args, 1, fn, right, err)) return true;
-
-        if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetDisjoint)) {
-            result = make_int_value(vietvm::runtime::areStackValueCollectionsDisjoint(
-                                        left->elements, right->elements) ? 1 : 0);
-            return true;
-        }
-        if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSetUnion)) {
-            result = make_list_value(vietvm::runtime::unionStackValues(
-                left->elements, right->elements));
-            return true;
-        }
-        result = make_list_value(vietvm::runtime::intersectStackValues(
-            left->elements, right->elements));
         return true;
     }
 
@@ -294,14 +126,11 @@ bool handleNativeCollectionFunction(const std::string &fn,
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         MapHandle map;
         if (!getFirstMapArgument(args, fn, map, err)) return true;
-        std::vector<std::string> sortedKeys;
-        sortedKeys.reserve(map->entries.size());
-        for (const auto &entry : map->entries) sortedKeys.push_back(entry.first);
-        std::sort(sortedKeys.begin(), sortedKeys.end());
-
         std::vector<StackValue> keys;
-        keys.reserve(sortedKeys.size());
-        for (const std::string &key : sortedKeys) keys.push_back(make_string_value(key));
+        keys.reserve(map->entries.size());
+        for (const auto &entry : map->entries) {
+            keys.push_back(make_string_value(entry.first));
+        }
         result = make_list_value(std::move(keys));
         return true;
     }

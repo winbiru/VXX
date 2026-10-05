@@ -1,0 +1,517 @@
+// Module: lõi.quốc tế hóa
+// Locale/resource/properties semantics thuần V++.
+// Không đọc process-global locale và không phụ thuộc native i18n APIs.
+
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/văn bản/chuỗi;
+
+hàm quốc tế là chữ ascii(c) {
+    thấp = chuỗi thường(c);
+    trả về thấp >= "a" && thấp <= "z";
+};
+
+hàm quốc tế là số ascii(c) {
+    trả về c >= "0" && c <= "9";
+};
+
+hàm quốc tế là chữ số ascii(c) {
+    trả về quốc tế là chữ ascii(c) || quốc tế là số ascii(c);
+};
+
+hàm quốc tế toàn bộ chữ(s) {
+    nếu (loại của(s) != "chuỗi") { trả về sai; };
+    nếu (độ dài(s) == 0) { trả về sai; };
+    hợp_lệ = đúng;
+    lặp(i = 0; i < độ dài(s) && hợp_lệ; i++) {
+        nếu (!quốc tế là chữ ascii(s[i])) { hợp_lệ = sai; };
+    };
+    trả về hợp_lệ;
+};
+
+hàm quốc tế toàn bộ số(s) {
+    nếu (loại của(s) != "chuỗi") { trả về sai; };
+    nếu (độ dài(s) == 0) { trả về sai; };
+    hợp_lệ = đúng;
+    lặp(i = 0; i < độ dài(s) && hợp_lệ; i++) {
+        nếu (!quốc tế là số ascii(s[i])) { hợp_lệ = sai; };
+    };
+    trả về hợp_lệ;
+};
+
+hàm quốc tế toàn bộ chữ số(s) {
+    nếu (loại của(s) != "chuỗi") { trả về sai; };
+    nếu (độ dài(s) == 0) { trả về sai; };
+    hợp_lệ = đúng;
+    lặp(i = 0; i < độ dài(s) && hợp_lệ; i++) {
+        nếu (!quốc tế là chữ số ascii(s[i])) { hợp_lệ = sai; };
+    };
+    trả về hợp_lệ;
+};
+
+hàm quốc tế title ascii(s) {
+    nếu (độ dài(s) == 0) { trả về s; };
+    trả về chuỗi hoa(cắt chuỗi(s, 0, 1)) +
+        chuỗi thường(cắt chuỗi(s, 1, độ dài(s) - 1));
+};
+
+hàm quốc tế tách tag(raw) {
+    nếu (loại của(raw) != "chuỗi" || raw == "") {
+        ném "LOCALE_INVALID";
+    };
+    phần = [];
+    hiện_tại = "";
+    lặp(i = 0; i <= độ dài(raw); i++) {
+        hết = i == độ dài(raw);
+        c = "-";
+        nếu (!hết) { c = raw[i]; };
+        nếu (c == "-") {
+            nếu (hiện_tại == "") { ném "LOCALE_INVALID"; };
+            thêm(phần, hiện_tại);
+            hiện_tại = "";
+        } nếu không {
+            nếu (!quốc tế là chữ số ascii(c)) { ném "LOCALE_INVALID"; };
+            hiện_tại = hiện_tại + c;
+        };
+    };
+    trả về phần;
+};
+
+// BCP47 structural profile cho thư viện 0.1:
+// language [script] [region] [variant/extension subtags...].
+hàm locale(raw) {
+    phần = quốc tế tách tag(raw);
+    ngôn_ngữ_raw = phần[0];
+    nếu (độ dài(ngôn_ngữ_raw) < 2 || độ dài(ngôn_ngữ_raw) > 8 ||
+        !quốc tế toàn bộ chữ(ngôn_ngữ_raw)) {
+        ném "LOCALE_INVALID";
+    };
+
+    ngôn_ngữ = chuỗi thường(ngôn_ngữ_raw);
+    chữ_viết = "";
+    vùng = "";
+    phụ = [];
+    i = 1;
+
+    nếu (i < độ dài(phần)) {
+        p = phần[i];
+        nếu (độ dài(p) == 4 && quốc tế toàn bộ chữ(p)) {
+            chữ_viết = quốc tế title ascii(p);
+            i += 1;
+        };
+    };
+
+    nếu (i < độ dài(phần)) {
+        p = phần[i];
+        nếu ((độ dài(p) == 2 && quốc tế toàn bộ chữ(p)) ||
+            (độ dài(p) == 3 && quốc tế toàn bộ số(p))) {
+            vùng = chuỗi hoa(p);
+            i += 1;
+        };
+    };
+
+    lặp(k = i; k < độ dài(phần); k++) {
+        p = phần[k];
+        nếu (độ dài(p) < 1 || độ dài(p) > 8 ||
+            !quốc tế toàn bộ chữ số(p)) {
+            ném "LOCALE_INVALID";
+        };
+        thêm(phụ, chuỗi thường(p));
+    };
+
+    chuẩn = ngôn_ngữ;
+    nếu (chữ_viết != "") { chuẩn = chuẩn + "-" + chữ_viết; };
+    nếu (vùng != "") { chuẩn = chuẩn + "-" + vùng; };
+    lặp(k = 0; k < độ dài(phụ); k++) {
+        chuẩn = chuẩn + "-" + phụ[k];
+    };
+
+    trả về {
+        "__vpp_locale__": 1,
+        "tag": chuẩn,
+        "ngôn ngữ": ngôn_ngữ,
+        "chữ viết": chữ_viết,
+        "vùng": vùng,
+        "phụ": phụ
+    };
+};
+
+hàm tag locale(vùng_locale) {
+    nếu (loại của(vùng_locale) != "từ điển") {
+        ném "LOCALE_INVALID";
+    };
+    nếu (lấy map(vùng_locale, "__vpp_locale__", 0) != 1) {
+        ném "LOCALE_INVALID";
+    };
+    trả về lấy map(vùng_locale, "tag", "");
+};
+
+hàm quốc tế thêm duy nhất(ds, giá_trị) {
+    nếu (tìm chỉ số(ds, giá_trị) < 0) {
+        thêm(ds, giá_trị);
+    };
+};
+
+// Fallback deterministic: exact -> bỏ variant/extensions ->
+// language-script-region -> language-region -> language-script -> language -> root.
+hàm fallback locale(vùng_locale) {
+    nếu (loại của(vùng_locale) == "chuỗi") {
+        vùng_locale = locale(vùng_locale);
+    };
+    tag_chuẩn = tag locale(vùng_locale);
+    ngôn_ngữ = lấy map(vùng_locale, "ngôn ngữ", "");
+    chữ_viết = lấy map(vùng_locale, "chữ viết", "");
+    vùng = lấy map(vùng_locale, "vùng", "");
+
+    kết_quả = [];
+    quốc tế thêm duy nhất(kết_quả, tag_chuẩn);
+
+    cơ_sở = ngôn_ngữ;
+    nếu (chữ_viết != "") { cơ_sở = cơ_sở + "-" + chữ_viết; };
+    nếu (vùng != "") { cơ_sở = cơ_sở + "-" + vùng; };
+    quốc tế thêm duy nhất(kết_quả, cơ_sở);
+
+    nếu (vùng != "") {
+        quốc tế thêm duy nhất(kết_quả, ngôn_ngữ + "-" + vùng);
+    };
+    nếu (chữ_viết != "") {
+        quốc tế thêm duy nhất(kết_quả, ngôn_ngữ + "-" + chữ_viết);
+    };
+    quốc tế thêm duy nhất(kết_quả, ngôn_ngữ);
+    quốc tế thêm duy nhất(kết_quả, "");
+    trả về kết_quả;
+};
+
+hàm gói tài nguyên(tên_cơ_sở, vùng_locale, nguồn) {
+    nếu (loại của(tên_cơ_sở) != "chuỗi" || tên_cơ_sở == "" ||
+        loại của(nguồn) != "từ điển") {
+        ném "RESOURCE_INVALID";
+    };
+    nếu (loại của(vùng_locale) == "chuỗi") {
+        vùng_locale = locale(vùng_locale);
+    };
+
+    ứng_viên = fallback locale(vùng_locale);
+    dữ_liệu = rỗng;
+    đã_chọn = "";
+    tìm_thấy = sai;
+    lặp(i = 0; i < độ dài(ứng_viên) && !tìm_thấy; i++) {
+        key = ứng_viên[i];
+        nếu (có khóa(nguồn, key)) {
+            dữ_liệu = lấy map(nguồn, key, rỗng);
+            nếu (loại của(dữ_liệu) != "từ điển") {
+                ném "RESOURCE_INVALID";
+            };
+            đã_chọn = key;
+            tìm_thấy = đúng;
+        };
+    };
+    nếu (!tìm_thấy) { ném "RESOURCE_MISSING"; };
+
+    trả về {
+        "__vpp_resource_bundle__": 1,
+        "tên": tên_cơ_sở,
+        "locale yêu cầu": tag locale(vùng_locale),
+        "locale đã chọn": đã_chọn,
+        "dữ liệu": dữ_liệu
+    };
+};
+
+hàm lấy tài nguyên(bundle, khóa) {
+    nếu (loại của(bundle) != "từ điển") {
+        ném "RESOURCE_INVALID";
+    };
+    nếu (lấy map(bundle, "__vpp_resource_bundle__", 0) != 1) {
+        ném "RESOURCE_INVALID";
+    };
+    nếu (loại của(khóa) != "chuỗi") {
+        ném "RESOURCE_INVALID";
+    };
+    dữ_liệu = lấy map(bundle, "dữ liệu", {});
+    nếu (!có khóa(dữ_liệu, khóa)) { ném "RESOURCE_MISSING"; };
+    trả về lấy map(dữ_liệu, khóa, rỗng);
+};
+
+hàm quốc tế là khoảng trắng properties(c) {
+    trả về c == " " || c == "\t" || c == "\f";
+};
+
+hàm quốc tế hex nibble(c) {
+    bảng = "0123456789abcdef";
+    chữ = chuỗi thường(c);
+    kết_quả = -1;
+    lặp(i = 0; i < 16 && kết_quả < 0; i++) {
+        nếu (bảng[i] == chữ) { kết_quả = i; };
+    };
+    trả về kết_quả;
+};
+
+hàm quốc tế ký tự mã(mã) {
+    nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
+        ném "PROPERTIES_INVALID";
+    };
+    bytes = [];
+    nếu (mã <= 127) {
+        thêm(bytes, mã);
+    } nếu không {
+        nếu (mã <= 2047) {
+            thêm(bytes, 192 + thành số nguyên(mã / 64));
+            thêm(bytes, 128 + mã % 64);
+        } nếu không {
+            nếu (mã <= 65535) {
+                thêm(bytes, 224 + thành số nguyên(mã / 4096));
+                thêm(bytes, 128 + (thành số nguyên(mã / 64) % 64));
+                thêm(bytes, 128 + mã % 64);
+            } nếu không {
+                thêm(bytes, 240 + thành số nguyên(mã / 262144));
+                thêm(bytes, 128 + (thành số nguyên(mã / 4096) % 64));
+                thêm(bytes, 128 + (thành số nguyên(mã / 64) % 64));
+                thêm(bytes, 128 + mã % 64);
+            };
+        };
+    };
+    trả về giải mã bảng mã(bytes, "UTF-8");
+};
+
+hàm quốc tế giải escape properties(s) {
+    kết_quả = "";
+    i = 0;
+    lặp(vòng = 0; i < độ dài(s); vòng++) {
+        c = s[i];
+        nếu (c != "\\") {
+            kết_quả = kết_quả + c;
+            i += 1;
+        } nếu không {
+            i += 1;
+            nếu (i >= độ dài(s)) { ném "PROPERTIES_INVALID"; };
+            e = s[i];
+            nếu (e == "t") { kết_quả = kết_quả + "\t"; i += 1; }
+            nếu không {
+                nếu (e == "n") { kết_quả = kết_quả + "\n"; i += 1; }
+                nếu không {
+                    nếu (e == "r") { kết_quả = kết_quả + "\r"; i += 1; }
+                    nếu không {
+                        nếu (e == "f") { kết_quả = kết_quả + "\f"; i += 1; }
+                        nếu không {
+                            nếu (e == "u") {
+                                nếu (i + 4 >= độ dài(s)) { ném "PROPERTIES_INVALID"; };
+                                mã = 0;
+                                lặp(k = 1; k <= 4; k++) {
+                                    nibble = quốc tế hex nibble(s[i + k]);
+                                    nếu (nibble < 0) { ném "PROPERTIES_INVALID"; };
+                                    mã = mã * 16 + nibble;
+                                };
+                                kết_quả = kết_quả + quốc tế ký tự mã(mã);
+                                i += 5;
+                            } nếu không {
+                                // Java Properties giữ ký tự sau backslash cho escape không đặc biệt.
+                                kết_quả = kết_quả + e;
+                                i += 1;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm quốc tế dòng tiếp diễn(s) {
+    đếm = 0;
+    i = độ dài(s) - 1;
+    đang_đếm = đúng;
+    lặp(vòng = 0; đang_đếm; vòng++) {
+        nếu (i < 0) {
+            đang_đếm = sai;
+        } nếu không {
+            nếu (s[i] == "\\") {
+                đếm += 1;
+                i -= 1;
+            } nếu không {
+                đang_đếm = sai;
+            };
+        };
+    };
+    trả về đếm % 2 == 1;
+};
+
+hàm quốc tế bỏ trắng đầu properties(s) {
+    i = 0;
+    đang_bỏ = đúng;
+    lặp(vòng = 0; đang_bỏ; vòng++) {
+        nếu (i >= độ dài(s)) {
+            đang_bỏ = sai;
+        } nếu không {
+            nếu (quốc tế là khoảng trắng properties(s[i])) {
+                i += 1;
+            } nếu không {
+                đang_bỏ = sai;
+            };
+        };
+    };
+    trả về cắt chuỗi(s, i, độ dài(s) - i);
+};
+
+hàm quốc tế phân tích dòng properties(dòng) {
+    s = quốc tế bỏ trắng đầu properties(dòng);
+    nếu (s == "") { trả về rỗng; };
+    nếu (s[0] == "#" || s[0] == "!") { trả về rỗng; };
+
+    vị_trí = -1;
+    kiểu = "";
+    escape = sai;
+    lặp(i = 0; i < độ dài(s) && vị_trí < 0; i++) {
+        c = s[i];
+        nếu (escape) {
+            escape = sai;
+        } nếu không {
+            nếu (c == "\\") {
+                escape = đúng;
+            } nếu không {
+                nếu (c == "=" || c == ":") {
+                    vị_trí = i;
+                    kiểu = "sep";
+                } nếu không {
+                    nếu (quốc tế là khoảng trắng properties(c)) {
+                        vị_trí = i;
+                        kiểu = "space";
+                    };
+                };
+            };
+        };
+    };
+
+    nếu (vị_trí < 0) {
+        trả về {"khóa": quốc tế giải escape properties(s), "giá trị": ""};
+    };
+
+    khóa_raw = cắt chuỗi(s, 0, vị_trí);
+    i = vị_trí;
+    nếu (kiểu == "space") {
+        đang_bỏ = đúng;
+        lặp(vòng = 0; đang_bỏ; vòng++) {
+            nếu (i >= độ dài(s)) {
+                đang_bỏ = sai;
+            } nếu không {
+                nếu (quốc tế là khoảng trắng properties(s[i])) {
+                    i += 1;
+                } nếu không {
+                    đang_bỏ = sai;
+                };
+            };
+        };
+        nếu (i < độ dài(s)) {
+            nếu (s[i] == "=" || s[i] == ":") { i += 1; };
+        };
+    } nếu không {
+        i += 1;
+    };
+    đang_bỏ = đúng;
+    lặp(vòng = 0; đang_bỏ; vòng++) {
+        nếu (i >= độ dài(s)) {
+            đang_bỏ = sai;
+        } nếu không {
+            nếu (quốc tế là khoảng trắng properties(s[i])) {
+                i += 1;
+            } nếu không {
+                đang_bỏ = sai;
+            };
+        };
+    };
+    giá_trị_raw = cắt chuỗi(s, i, độ dài(s) - i);
+    trả về {
+        "khóa": quốc tế giải escape properties(khóa_raw),
+        "giá trị": quốc tế giải escape properties(giá_trị_raw)
+    };
+};
+
+hàm properties(văn_bản, mặc_định = rỗng,
+               giới_hạn_mục = 4096, giới_hạn_ký_tự = 1048576) {
+    nếu (loại của(văn_bản) != "chuỗi" ||
+        loại của(giới_hạn_mục) != "số nguyên" || giới_hạn_mục <= 0 ||
+        loại của(giới_hạn_ký_tự) != "số nguyên" || giới_hạn_ký_tự <= 0) {
+        ném "PROPERTIES_INVALID";
+    };
+    nếu (độ dài(văn_bản) > giới_hạn_ký_tự) { ném "I18N_RESOURCE_LIMIT"; };
+    nếu (mặc_định != rỗng) {
+        nếu (loại của(mặc_định) != "từ điển") {
+            ném "PROPERTIES_INVALID";
+        };
+        nếu (lấy map(mặc_định, "__vpp_properties__", 0) != 1) {
+            ném "PROPERTIES_INVALID";
+        };
+    };
+
+    dữ_liệu = {};
+    dòng_vật_lý = "";
+    dòng_logic = "";
+    tiếp_diễn = sai;
+    số_mục = 0;
+    n = độ dài(văn_bản);
+
+    lặp(pos = 0; pos <= n; pos++) {
+        hết = pos == n;
+        c = "\n";
+        nếu (!hết) { c = văn_bản[pos]; };
+        nếu (c == "\r") {
+            // CRLF: CR được bỏ, LF kết thúc dòng; CR đơn cũng được chấp nhận ở cuối.
+        } nếu không {
+            nếu (c == "\n") {
+                phần = dòng_vật_lý;
+                nếu (tiếp_diễn) { phần = quốc tế bỏ trắng đầu properties(phần); };
+                nối_tiếp = quốc tế dòng tiếp diễn(phần);
+                nếu (nối_tiếp) {
+                    phần = cắt chuỗi(phần, 0, độ dài(phần) - 1);
+                };
+                dòng_logic = dòng_logic + phần;
+                dòng_vật_lý = "";
+                tiếp_diễn = nối_tiếp;
+
+                nếu (!nối_tiếp) {
+                    mục = quốc tế phân tích dòng properties(dòng_logic);
+                    nếu (mục != rỗng) {
+                        khóa = lấy map(mục, "khóa", "");
+                        nếu (!có khóa(dữ_liệu, khóa)) {
+                            số_mục += 1;
+                            nếu (số_mục > giới_hạn_mục) { ném "I18N_RESOURCE_LIMIT"; };
+                        };
+                        đặt map(dữ_liệu, khóa, lấy map(mục, "giá trị", ""));
+                    };
+                    dòng_logic = "";
+                };
+            } nếu không {
+                dòng_vật_lý = dòng_vật_lý + c;
+            };
+        };
+    };
+    nếu (tiếp_diễn) { ném "PROPERTIES_INVALID"; };
+
+    trả về {
+        "__vpp_properties__": 1,
+        "dữ liệu": dữ_liệu,
+        "mặc định": mặc_định
+    };
+};
+
+hàm lấy property(cấu_hình, khóa, fallback = rỗng) {
+    nếu (loại của(cấu_hình) != "từ điển") {
+        ném "PROPERTIES_INVALID";
+    };
+    nếu (lấy map(cấu_hình, "__vpp_properties__", 0) != 1) {
+        ném "PROPERTIES_INVALID";
+    };
+    nếu (loại của(khóa) != "chuỗi") {
+        ném "PROPERTIES_INVALID";
+    };
+    dữ_liệu = lấy map(cấu_hình, "dữ liệu", {});
+    nếu (có khóa(dữ_liệu, khóa)) {
+        trả về lấy map(dữ_liệu, khóa, rỗng);
+    };
+    mặc_định = lấy map(cấu_hình, "mặc định", rỗng);
+    nếu (mặc_định != rỗng) {
+        trả về lấy property(mặc_định, khóa, fallback);
+    };
+    trả về fallback;
+};

@@ -1,0 +1,20 @@
+nhập công cụ lưu trữ;
+nhập nhập xuất;
+
+hàm chính() {
+    a = ".tmp_archive_a.txt";
+    b = ".tmp_archive_b.txt";
+    z = ".tmp_archive_tool.zip";
+    đích = ".tmp_archive_tool_out";
+    ghi tệp(a, "A");
+    ghi tệp(b, "B");
+    in gói tài nguyên tạo(z, [a, b]) == 2;
+    ds = gói tài nguyên liệt kê(z);
+    in độ dài(ds) == 2;
+    in gói tài nguyên giải nén(z, đích) == 2;
+    in đọc tệp(đường dẫn nối(đích, đường dẫn tên(a))) == "A";
+    xóa đường dẫn(a);
+    xóa đường dẫn(b);
+    xóa đường dẫn(z);
+    xóa đường dẫn(đích);
+};

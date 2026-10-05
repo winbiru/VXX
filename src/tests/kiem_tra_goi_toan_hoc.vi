@@ -1,0 +1,18 @@
+nhập toán học;
+
+hàm chính() {
+    in làm tròn xuống(3.9);
+    in làm tròn xuống(-3.1);
+    in làm tròn lên(3.1);
+    in làm tròn lên(-3.9);
+    in làm tròn(2.4);
+    in làm tròn(2.5);
+    in làm tròn(-2.5);
+
+    in trị tuyệt đối(-12);
+    in nhỏ nhất danh sách([7, 2, 9]);
+    in lớn nhất danh sách([7, 2, 9]);
+    in tổng danh sách([1, 2, 3, 4]);
+    in trung bình danh sách([2, 4, 9]);
+    in thống kê số nguyên([2, 4, 6]) != rỗng;
+};

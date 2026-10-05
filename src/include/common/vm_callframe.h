@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <vector>
 #include <unordered_map>
 #include "vpp/runtime/value.h"
@@ -8,6 +9,7 @@ using Value = StackValue;
 
 // Lưu trạng thái một lời gọi hàm VM gồm biến cục bộ, tham số, receiver, defining class và địa chỉ quay về; stack frame được push/pop quanh mỗi call.
 struct CallFrame {
+    std::string functionName;                     // resolved function/method name for diagnostics
     std::vector<Value> args;                      // argument values, args[0] = first param
     InstanceHandle receiver;                      // bound instance for method calls
     ClassHandle methodOwnerClass;                 // class that supplied the active method

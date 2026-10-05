@@ -42,14 +42,13 @@ tiếp bằng `VPP_EXEC=./bin/vpp-cli ./run_tests.sh`.
 
 ## Cài Nhanh Không Cần Clone
 
-Bạn có thể cài trực tiếp từ GitHub Release `0.9.3`:
-
-https://github.com/winbiru/VXX/releases/tag/0.9.3
+Nhánh hiện tại mang phiên bản V++/VDK `1.0.0`. GitHub Release luôn giữ các runtime bundle
+`vpp-*` có tên ổn định để installer và VS Code extension có thể lấy bản mới nhất.
 
 ### Linux
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-linux-x64.tar.gz -o vpp-linux-x64.tar.gz
 tar -xzf vpp-linux-x64.tar.gz
 ./install-vpp.sh
 source "$HOME/.bashrc" 2>/dev/null || source "$HOME/.bash_profile"
@@ -59,7 +58,7 @@ vpp phiên bản
 ### macOS
 
 ```bash
-curl -L https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-macos.tar.gz -o vpp-macos.tar.gz
+curl -L https://github.com/winbiru/VXX/releases/latest/download/vpp-macos.tar.gz -o vpp-macos.tar.gz
 tar -xzf vpp-macos.tar.gz
 ./install-vpp.sh
 source "$HOME/.zshrc"
@@ -83,7 +82,7 @@ Mở Windows PowerShell 5.1 hoặc PowerShell 7 và chạy từng lệnh dưới
 Sao chép URL nguyên dạng trong khối lệnh, không dùng cú pháp Markdown `[URL](URL)`.
 
 ```powershell
-Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/download/0.9.3/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
+Invoke-WebRequest -Uri "https://github.com/winbiru/VXX/releases/latest/download/vpp-windows-x64.zip" -OutFile "vpp-windows-x64.zip"
 Expand-Archive -Path "vpp-windows-x64.zip" -DestinationPath ".\vpp-bin" -Force
 $previousPolicy = Get-ExecutionPolicy -Scope Process
 try {
@@ -402,8 +401,10 @@ tệp/thư mục, tạo/liệt kê/xóa thư mục; `hệ thống` có biến m�
 tảng và sleep mili giây. Các hàm `.vi` tương ứng là public surface của gói chuẩn,
 còn implementation native nằm trong `src/runtime/native/`.
 
-`gói/chuẩn/chính.vi` là entrypoint đầy đủ. Mỗi package chuẩn có `chính.vi` tại
-`gói/<tên tiếng Việt>/chính.vi`. Có thể import theo tên package như
+`gói/chuẩn/chính.vi` là entrypoint tổng hợp. Các module nền tảng có thể nằm trực
+tiếp trong `gói/lõi/<tên>.vi`; resolver vẫn cho phép import ngắn như
+`nhập bảng mã;` hoặc `nhập bản địa hóa;`. Các package có cây module riêng vẫn
+dùng entry `gói/<tên>/chính.vi`. Có thể import theo tên package như
 trên, hoặc dùng đường dẫn tường minh khi cần module con, ví dụ
 `nhập gói/mạng/kiểm thử/api;`. Các bản cài từ release đặt các gói chuẩn
 chuẩn cạnh binary và installer tự cấu hình `VPP_HOME`, vì vậy các import này

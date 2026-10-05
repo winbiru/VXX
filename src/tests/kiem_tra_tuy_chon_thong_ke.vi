@@ -49,4 +49,22 @@ hàm chính() {
     in lấy map(g, "nhỏ nhất", -1);
     in lấy map(g, "lớn nhất", -1);
     in lấy map(g, "trung bình", -1);
+
+    nan = thành số thực("nan");
+    n = thống kê số thực([1.0, nan, 3.0]);
+    in thống kê là nan(lấy map(n, "tổng", 0.0));
+    in thống kê là nan(lấy map(n, "nhỏ nhất", 0.0));
+    in thống kê là nan(lấy map(n, "lớn nhất", 0.0));
+    in thống kê là nan(lấy map(n, "trung bình", 0.0));
+
+    n2 = thống kê số thực([4.0, 5.0]);
+    gn = gộp thống kê(n, n2);
+    in lấy map(gn, "đếm", -1);
+    in thống kê là nan(lấy map(gn, "nhỏ nhất", 0.0));
+
+    thử {
+        gộp thống kê(a, n2);
+    } bắt lỗi (e) {
+        in e;
+    };
 };

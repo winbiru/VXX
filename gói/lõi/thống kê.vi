@@ -1,10 +1,33 @@
 // Module: lõi.thống kê
 // Summary statistics cho list số.
 
+hàm thống kê là nan(giá_trị) {
+    nếu (loại của(giá_trị) != "số thực") {
+        trả về sai;
+    };
+    trả về giá_trị != giá_trị;
+};
+
+hàm thống kê yêu cầu(bản) {
+    nếu (loại của(bản) != "từ điển") {
+        ném "VALUE_STATS_INVALID";
+    };
+    loại = lấy map(bản, "__vpp_stats__", "");
+    nếu (loại != "integer" && loại != "float") {
+        ném "VALUE_STATS_INVALID";
+    };
+    đếm = lấy map(bản, "đếm", -1);
+    nếu (loại của(đếm) != "số nguyên" || đếm < 0) {
+        ném "VALUE_STATS_INVALID";
+    };
+    trả về loại;
+};
+
 hàm thống kê số nguyên(ds) {
     n = độ dài(ds);
     nếu (n == 0) {
         trả về {
+            "__vpp_stats__": "integer",
             "đếm": 0,
             "tổng": 0,
             "nhỏ nhất": rỗng,
@@ -24,6 +47,7 @@ hàm thống kê số nguyên(ds) {
     lớn = lớn nhất list(ds);
     trung_bình = tổng / (n + 0.0);
     trả về {
+        "__vpp_stats__": "integer",
         "đếm": n,
         "tổng": tổng,
         "nhỏ nhất": nhỏ,
@@ -36,6 +60,7 @@ hàm thống kê số thực(ds) {
     n = độ dài(ds);
     nếu (n == 0) {
         trả về {
+            "__vpp_stats__": "float",
             "đếm": 0,
             "tổng": 0.0,
             "nhỏ nhất": rỗng,
@@ -44,25 +69,42 @@ hàm thống kê số thực(ds) {
         };
     };
 
-    tổng = 0.0;
-    nhỏ = ds[0] + 0.0;
-    lớn = ds[0] + 0.0;
     lặp(i = 0; i < n; i++) {
         kiểu = loại của(ds[i]);
         nếu (kiểu != "số nguyên" && kiểu != "số thực") {
             ném "VALUE_STATS_NUMBER_REQUIRED";
         };
+    };
+
+    tổng = 0.0;
+    nhỏ = ds[0] + 0.0;
+    lớn = ds[0] + 0.0;
+    có_nan = sai;
+    lặp(i = 0; i < n; i++) {
         giá_trị = ds[i] + 0.0;
         tổng = tổng + giá_trị;
-        nếu (giá_trị < nhỏ) {
-            nhỏ = giá_trị;
-        };
-        nếu (giá_trị > lớn) {
-            lớn = giá_trị;
+        nếu (thống kê là nan(giá_trị)) {
+            có_nan = đúng;
+        } nếu không {
+            nếu (!có_nan) {
+                nếu (giá_trị < nhỏ) {
+                    nhỏ = giá_trị;
+                };
+                nếu (giá_trị > lớn) {
+                    lớn = giá_trị;
+                };
+            };
         };
     };
 
+    nếu (có_nan) {
+        nan = thành số thực("nan");
+        nhỏ = nan;
+        lớn = nan;
+    };
+
     trả về {
+        "__vpp_stats__": "float",
         "đếm": n,
         "tổng": tổng,
         "nhỏ nhất": nhỏ,
@@ -72,6 +114,12 @@ hàm thống kê số thực(ds) {
 };
 
 hàm gộp thống kê(a, b) {
+    loại_a = thống kê yêu cầu(a);
+    loại_b = thống kê yêu cầu(b);
+    nếu (loại_a != loại_b) {
+        ném "VALUE_STATS_INVALID";
+    };
+
     đếm_a = lấy map(a, "đếm", 0);
     đếm_b = lấy map(b, "đếm", 0);
     nếu (đếm_a == 0) {
@@ -89,6 +137,23 @@ hàm gộp thống kê(a, b) {
     lớn_b = lấy map(b, "lớn nhất", rỗng);
     đếm = đếm_a + đếm_b;
     tổng = tổng_a + tổng_b;
+
+    nếu (loại_a == "float") {
+        nếu (thống kê là nan(tổng_a) || thống kê là nan(tổng_b) ||
+            thống kê là nan(nhỏ_a) || thống kê là nan(nhỏ_b) ||
+            thống kê là nan(lớn_a) || thống kê là nan(lớn_b)) {
+            nan = thành số thực("nan");
+            trả về {
+                "__vpp_stats__": "float",
+                "đếm": đếm,
+                "tổng": nan,
+                "nhỏ nhất": nan,
+                "lớn nhất": nan,
+                "trung bình": nan
+            };
+        };
+    };
+
     nhỏ = nhỏ_a;
     lớn = lớn_a;
     nếu (nhỏ_b < nhỏ) {
@@ -99,6 +164,7 @@ hàm gộp thống kê(a, b) {
     };
 
     trả về {
+        "__vpp_stats__": loại_a,
         "đếm": đếm,
         "tổng": tổng,
         "nhỏ nhất": nhỏ,
@@ -106,3 +172,4 @@ hàm gộp thống kê(a, b) {
         "trung bình": tổng / (đếm + 0.0)
     };
 };
+nhập gói/lõi/chuyển kiểu;

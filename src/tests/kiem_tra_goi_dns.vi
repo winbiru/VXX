@@ -1,0 +1,7 @@
+nhập phân giải dns;
+nhập bộ sưu tập;
+
+hàm chính() {
+    địa chỉ = dns phân giải("localhost");
+    in độ dài(địa chỉ) > 0;
+};

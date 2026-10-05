@@ -2,10 +2,7 @@
 
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
-#include "common/vm_low_level_http_server.h"
 
-#include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -74,96 +71,6 @@ std::string shellQuoteSingle(const std::string &s) {
     }
     out += "'";
     return out;
-}
-
-// Chuẩn hóa lỗi URL trước khi giao cho curl để hành vi không phụ thuộc phiên
-// bản curl hay hệ điều hành. URL HTTP client phải là UTF-8 hợp lệ, có scheme
-// HTTP(S), có host và không chứa whitespace/ký tự điều khiển chưa percent-encode.
-bool validateHttpUrl(const std::string &url, std::string &reason) {
-    if (url.empty()) {
-        reason = messages::messageText(messages::kNativeHttpUrlEmpty);
-        return false;
-    }
-    if (!vietvm::core::isValidUtf8(url)) {
-        reason = messages::messageText(messages::kNativeHttpUrlUtf8Invalid);
-        return false;
-    }
-    for (unsigned char byte : url) {
-        if (byte <= 0x20u || byte == 0x7fu) {
-            reason = messages::messageText(messages::kNativeHttpUrlWhitespaceInvalid);
-            return false;
-        }
-    }
-
-    const std::string lowered = vietvm::core::toLowerAscii(url);
-    std::size_t authorityStart = std::string::npos;
-    if (vietvm::helpers::startsWith(lowered, "http://")) {
-        authorityStart = 7;
-    } else if (vietvm::helpers::startsWith(lowered, "https://")) {
-        authorityStart = 8;
-    } else {
-        reason = messages::messageText(messages::kNativeHttpUrlSchemeInvalid);
-        return false;
-    }
-    const std::size_t authorityEnd = url.find_first_of("/?#", authorityStart);
-    const std::string authority = url.substr(
-        authorityStart,
-        authorityEnd == std::string::npos ? std::string::npos : authorityEnd - authorityStart);
-    if (authority.empty()) {
-        reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
-        return false;
-    }
-
-    const std::size_t userInfoEnd = authority.rfind('@');
-    const std::string hostPort = userInfoEnd == std::string::npos
-        ? authority
-        : authority.substr(userInfoEnd + 1);
-    if (hostPort.empty()) {
-        reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
-        return false;
-    }
-
-    auto validPort = [&](const std::string &port) {
-        if (port.empty()) return false;
-        unsigned long value = 0;
-        for (unsigned char c : port) {
-            if (c < '0' || c > '9') return false;
-            value = value * 10u + static_cast<unsigned long>(c - '0');
-            if (value > 65535u) return false;
-        }
-        return true;
-    };
-
-    if (hostPort.front() == '[') {
-        const std::size_t close = hostPort.find(']');
-        if (close == std::string::npos || close == 1) {
-            reason = messages::messageText(messages::kNativeHttpUrlIpv6HostInvalid);
-            return false;
-        }
-        const std::string suffix = hostPort.substr(close + 1);
-        if (!suffix.empty() &&
-            (suffix.front() != ':' || !validPort(suffix.substr(1)))) {
-            reason = messages::messageText(messages::kNativeHttpUrlPortInvalid);
-            return false;
-        }
-    } else {
-        const std::size_t firstColon = hostPort.find(':');
-        if (firstColon == 0) {
-            reason = messages::messageText(messages::kNativeHttpUrlHostMissing);
-            return false;
-        }
-        if (firstColon != std::string::npos) {
-            if (hostPort.find(':', firstColon + 1) != std::string::npos) {
-                reason = messages::messageText(messages::kNativeHttpUrlIpv6NeedsBrackets);
-                return false;
-            }
-            if (!validPort(hostPort.substr(firstColon + 1))) {
-                reason = messages::messageText(messages::kNativeHttpUrlPortInvalid);
-                return false;
-            }
-        }
-    }
-    return true;
 }
 
 #if defined(_WIN32)
@@ -296,174 +203,16 @@ bool runWindowsProcess(const std::vector<std::string> &arguments,
     return readOk && gotExitCode;
 }
 
-// Chạy curl HTTP yêu cầu windows; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runCurlHttpRequestWindows(const std::string &method,
-                               const std::string &fnName,
-                               const std::string &url,
-                               const std::optional<std::string> &payload,
-                               StackValue &result,
-                               std::string &err,
-                               bool &transportFailure) {
-    std::vector<std::string> arguments = {
-        "curl.exe", "-Ls", "--max-time", "20", "-X", method
-    };
-    if (payload.has_value()) {
-        arguments.push_back("-H");
-        arguments.push_back("Content-Type: application/json");
-        arguments.push_back("--data-raw");
-        arguments.push_back(*payload);
-    }
-    arguments.push_back(url);
-
-    std::string data;
-    DWORD exitCode = 0;
-    if (!runWindowsProcess(arguments, data, exitCode)) {
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpCurlProcessOpenFailed, {fnName});
-        return true;
-    }
-    if (exitCode != 0) {
-        transportFailure = true;
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpCurlFailed, {fnName}) +
-            " (curl exit=" + std::to_string(exitCode) + ")";
-        return true;
-    }
-
-    result = make_string_value(data);
-    return true;
-}
 #endif
 
-// Chuẩn hóa token dùng trong câu lệnh DB phụ trợ; hàm loại/escape ký tự ngoài tập an toàn trước khi ghép vào lệnh client.
-std::string sanitizeDbToken(const std::string &s) {
-    std::string out = trimCopy(s);
-    if (out.empty()) return vietvm::constants::kDbReasonCommandFailed;
-    for (char &c : out) {
-        if (c == '\n' || c == '\r' || c == '\t') c = ' ';
-        if (c == '|') c = '/';
-    }
-    return trimCopy(out);
-}
-
-// Kiểm tra điều kiện của `isSafeDbIdentifier`.
-bool isSafeDbIdentifier(const std::string &name) {
-    if (name.empty()) return false;
-    for (unsigned char c : name) {
-        if (!(std::isalnum(c) || c == '_')) return false;
-    }
-    return true;
-}
-
-// Lưu cấu hình kết nối DB đã parse từ JDBC URL như driver, host, port, database và credential để helper dựng lệnh client tương ứng.
+// Cấu hình đã được parser V++ chuẩn hóa trước khi đi qua native boundary.
 struct JdbcDbConfig {
     std::string engine;
     std::string host;
     int port = 0;
     std::string database;
     std::string sqlitePath;
-    bool createIfNotExist = false;
 };
-
-// Phân tích JDBC tcp url; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
-bool parseJdbcTcpUrl(const std::string &jdbcUrl,
-                     const std::string &prefix,
-                     int defaultPort,
-                     JdbcDbConfig &cfg,
-    std::string &reason) {
-    if (!startsWith(jdbcUrl, prefix)) {
-        reason = vietvm::constants::kDbReasonInvalidJdbcPrefix;
-        return false;
-    }
-
-    std::string rest = jdbcUrl.substr(prefix.size());
-    size_t slash = rest.find('/');
-    if (slash == std::string::npos || slash == 0) {
-        reason = vietvm::constants::kDbReasonInvalidHostOrDatabase;
-        return false;
-    }
-
-    std::string hostPort = trimCopy(rest.substr(0, slash));
-    std::string dbAndQuery = rest.substr(slash + 1);
-
-    cfg.host.clear();
-    cfg.port = defaultPort;
-
-    size_t colon = hostPort.find(':');
-    if (colon == std::string::npos) {
-        cfg.host = hostPort;
-    } else {
-        cfg.host = trimCopy(hostPort.substr(0, colon));
-        std::string portText = trimCopy(hostPort.substr(colon + 1));
-        if (portText.empty()) {
-            reason = vietvm::constants::kDbReasonInvalidPort;
-            return false;
-        }
-        try {
-            cfg.port = std::stoi(portText);
-        } catch (...) {
-            reason = vietvm::constants::kDbReasonInvalidPort;
-            return false;
-        }
-    }
-
-    if (cfg.host.empty()) {
-        reason = vietvm::constants::kDbReasonMissingHost;
-        return false;
-    }
-
-    cfg.createIfNotExist = false;
-    size_t q = dbAndQuery.find('?');
-    if (q == std::string::npos) {
-        cfg.database = trimCopy(dbAndQuery);
-    } else {
-        cfg.database = trimCopy(dbAndQuery.substr(0, q));
-        std::string query = dbAndQuery.substr(q + 1);
-        if (query.find("createDatabaseIfNotExist=true") != std::string::npos) {
-            cfg.createIfNotExist = true;
-        }
-    }
-
-    if (cfg.database.empty()) {
-        reason = vietvm::constants::kDbReasonMissingDatabase;
-        return false;
-    }
-
-    return true;
-}
-
-// Phân tích JDBC cơ sở dữ liệu cấu hình; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
-bool parseJdbcDbConfig(const std::string &driverClass,
-                       const std::string &jdbcUrl,
-                       JdbcDbConfig &cfg,
-                       std::string &reason) {
-    cfg = JdbcDbConfig{};
-
-    if (startsWith(jdbcUrl, "jdbc:mysql://") || driverClass.find("mysql") != std::string::npos) {
-        cfg.engine = "mysql";
-        if (!parseJdbcTcpUrl(jdbcUrl, "jdbc:mysql://", 3306, cfg, reason)) return false;
-        return true;
-    }
-
-    if (startsWith(jdbcUrl, "jdbc:postgresql://") || driverClass.find("postgresql") != std::string::npos) {
-        cfg.engine = "postgresql";
-        if (!parseJdbcTcpUrl(jdbcUrl, "jdbc:postgresql://", 5432, cfg, reason)) return false;
-        return true;
-    }
-
-    if (startsWith(jdbcUrl, "jdbc:sqlite:") || driverClass.find("sqlite") != std::string::npos) {
-        cfg.engine = "sqlite";
-        cfg.sqlitePath = trimCopy(jdbcUrl.substr(std::string("jdbc:sqlite:").size()));
-        if (cfg.sqlitePath.empty()) {
-            reason = vietvm::constants::kDbReasonMissingSqlitePath;
-            return false;
-        }
-        return true;
-    }
-
-    reason = vietvm::constants::kDbReasonUnsupportedDriver;
-    return false;
-}
 
 // Chạy lệnh biến bắt giữ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 bool runCommandCapture(const std::string &cmd, std::string &output, int &rc) {
@@ -507,11 +256,9 @@ bool runMySqlQuery(const JdbcDbConfig &cfg,
         return false;
     }
     if (rc != 0) {
-        reason = sanitizeDbToken(output);
+        reason = output;
         return false;
     }
-
-    output = trimCopy(output);
     return true;
 }
 
@@ -543,11 +290,9 @@ bool runPostgresQuery(const JdbcDbConfig &cfg,
         return false;
     }
     if (rc != 0) {
-        reason = sanitizeDbToken(output);
+        reason = output;
         return false;
     }
-
-    output = trimCopy(output);
     return true;
 }
 
@@ -566,7 +311,7 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
         return false;
     }
     if (exitCode != 0) {
-        reason = sanitizeDbToken(output);
+        reason = output;
         return false;
     }
 #else
@@ -580,40 +325,10 @@ bool runSqliteQuery(const JdbcDbConfig &cfg,
         return false;
     }
     if (rc != 0) {
-        reason = sanitizeDbToken(output);
+        reason = output;
         return false;
     }
 #endif
-
-    output = trimCopy(output);
-    return true;
-}
-
-// Tạo database khi cấu hình yêu cầu; hàm kiểm tra driver/config rồi phát câu lệnh tạo DB trước truy vấn chính nếu cần.
-bool ensureDatabaseIfRequested(const JdbcDbConfig &cfg,
-                               const std::string &user,
-                               const std::string &password,
-                               std::string &reason) {
-    if (!cfg.createIfNotExist) return true;
-    if (!isSafeDbIdentifier(cfg.database)) {
-        reason = vietvm::constants::kDbReasonUnsafeDatabaseName;
-        return false;
-    }
-
-    std::string output;
-    if (cfg.engine == "mysql") {
-        std::string sql = "CREATE DATABASE IF NOT EXISTS `" + cfg.database + "`;";
-        return runMySqlQuery(cfg, user, password, sql, false, output, reason);
-    }
-
-    if (cfg.engine == "postgresql") {
-        std::string checkSql = "SELECT 1 FROM pg_database WHERE datname='" + cfg.database + "';";
-        if (!runPostgresQuery(cfg, user, password, checkSql, false, output, reason)) return false;
-        if (trimCopy(output) == "1") return true;
-        std::string createSql = "CREATE DATABASE \"" + cfg.database + "\";";
-        return runPostgresQuery(cfg, user, password, createSql, false, output, reason);
-    }
-
     return true;
 }
 
@@ -692,69 +407,17 @@ std::string decodeSimpleEscapes(const std::string &s) {
     return out;
 }
 
-// Phân tích thuộc tính phép gán; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
-std::optional<std::pair<std::string, std::string>> parsePropertyAssignment(
-    const std::string &line) {
-    const std::string trimmed = trimCopy(line);
-    if (trimmed.empty() || trimmed.front() == '#') return std::nullopt;
-
-    const std::size_t equals = trimmed.find('=');
-    if (equals == std::string::npos) return std::nullopt;
-
-    return std::make_pair(trimCopy(trimmed.substr(0, equals)),
-                          trimCopy(trimmed.substr(equals + 1)));
-}
-
-// Đọc thuộc tính by khóa; hàm lấy nội dung từ nguồn tương ứng, kiểm tra lỗi cần thiết rồi trả dữ liệu đã đọc.
-std::string readPropertyByKey(const std::string &filePath,
-                              const std::string &key,
-                              const std::string &fallback) {
-    std::ifstream ifs(std::filesystem::u8path(filePath));
-    if (!ifs.is_open()) {
-        return fallback;
-    }
-
-    std::string line;
-    while (std::getline(ifs, line)) {
-        const auto assignment = parsePropertyAssignment(line);
-        if (!assignment.has_value() || assignment->first != key) continue;
-        return assignment->second;
-    }
-
-    return fallback;
-}
-
-// Phân tích số nguyên arg from stack; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.
-bool parseIntArgFromStack(const StackValue &arg,
-                          const std::string &fn,
-                          const std::string &label,
-                          int &out,
-                          std::string &err) {
+// Đọc số nguyên đã chuẩn hóa ở tầng V++. Primitive native chỉ chấp nhận đúng
+// kiểu int của VM và không còn parse chuỗi hay ép số thực tích phân.
+bool requireIntArgFromStack(const StackValue &arg,
+                            const std::string &fn,
+                            const std::string &label,
+                            int &out,
+                            std::string &err) {
     if (std::holds_alternative<int>(arg)) {
         out = std::get<int>(arg);
         return true;
     }
-    if (std::holds_alternative<double>(arg)) {
-        const double number = std::get<double>(arg);
-        if (std::isfinite(number) && std::trunc(number) == number &&
-            number >= static_cast<double>(std::numeric_limits<int>::min()) &&
-            number <= static_cast<double>(std::numeric_limits<int>::max())) {
-            out = static_cast<int>(number);
-            return true;
-        }
-    } else if (std::holds_alternative<std::string>(arg)) {
-        try {
-            const std::string &text = std::get<std::string>(arg);
-            std::size_t consumed = 0;
-            const int parsed = std::stoi(text, &consumed);
-            if (consumed == text.size()) {
-                out = parsed;
-                return true;
-            }
-        } catch (...) {
-        }
-    }
-
     err = vietvm::messages::formatMessage(
         vietvm::messages::kNativeInvalidArgument, {fn, label});
     return false;
@@ -846,162 +509,48 @@ bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &e
     return true;
 }
 
-// Chạy cơ sở dữ liệu connect; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runDbConnect(const std::string &driverClass,
-                  const std::string &jdbcUrl,
-                  const std::string &user,
-                  const std::string &password,
-                  StackValue &result,
-                  std::string &err) {
+// Primitive DB: V++ đã parse JDBC, validate policy và dựng contract kết quả.
+// Native chỉ gọi client hệ điều hành rồi trả trạng thái thô.
+bool runDbExec(const std::string &engine,
+               const std::string &host,
+               int port,
+               const std::string &target,
+               const std::string &user,
+               const std::string &password,
+               const std::string &sql,
+               bool useDatabase,
+               StackValue &result,
+               std::string &err) {
     (void)err;
-    JdbcDbConfig cfg;
+    JdbcDbConfig cfg{};
+    cfg.engine = engine;
+    cfg.host = host;
+    cfg.port = port;
+    if (engine == "sqlite") {
+        cfg.sqlitePath = target;
+    } else {
+        cfg.database = target;
+    }
+
     std::string reason;
-    if (!parseJdbcDbConfig(driverClass, jdbcUrl, cfg, reason)) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbErrorResult, {reason}));
-        return true;
-    }
-
-    if (!ensureDatabaseIfRequested(cfg, user, password, reason)) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbErrorResult, {reason}));
-        return true;
-    }
-
     std::string output;
     bool ok = false;
     if (cfg.engine == "mysql") {
-        ok = runMySqlQuery(cfg, user, password, "SELECT 1;", true, output, reason);
+        ok = runMySqlQuery(cfg, user, password, sql, useDatabase, output, reason);
     } else if (cfg.engine == "postgresql") {
-        ok = runPostgresQuery(cfg, user, password, "SELECT 1;", true, output, reason);
-    } else if (cfg.engine == "sqlite") {
-        ok = runSqliteQuery(cfg, "SELECT 1;", output, reason);
-    }
-
-    if (!ok) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbErrorResult, {reason}));
-        return true;
-    }
-
-    result = make_string_value(vietvm::messages::messageText(
-        vietvm::messages::kNativeDbConnectedResult));
-    return true;
-}
-
-// Chạy cơ sở dữ liệu query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runDbQuery(const std::string &driverClass,
-                const std::string &jdbcUrl,
-                const std::string &user,
-                const std::string &password,
-                const std::string &sql,
-                StackValue &result,
-                std::string &err) {
-    (void)err;
-    JdbcDbConfig cfg;
-    std::string reason;
-    if (!parseJdbcDbConfig(driverClass, jdbcUrl, cfg, reason)) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbErrorResult, {reason}));
-        return true;
-    }
-
-    std::string output;
-    bool ok = false;
-    if (cfg.engine == "mysql") {
-        ok = runMySqlQuery(cfg, user, password, sql, true, output, reason);
-    } else if (cfg.engine == "postgresql") {
-        ok = runPostgresQuery(cfg, user, password, sql, true, output, reason);
+        ok = runPostgresQuery(cfg, user, password, sql, useDatabase, output, reason);
     } else if (cfg.engine == "sqlite") {
         ok = runSqliteQuery(cfg, sql, output, reason);
+    } else {
+        reason = vietvm::constants::kDbReasonUnsupportedDriver;
     }
 
-    if (!ok) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbErrorResult, {reason}));
-        return true;
-    }
-
-    if (output.empty()) {
-        result = make_string_value(vietvm::messages::messageText(
-            vietvm::messages::kNativeDbAffectedOneResult));
-        return true;
-    }
-
-    result = make_string_value(vietvm::messages::messageText(
-        vietvm::messages::kNativeDbQueryResult, {sanitizeDbToken(output)}));
+    MapValue response;
+    response.entries["ok"] = make_int_value(ok ? 1 : 0);
+    response.entries["output"] = make_string_value(output);
+    response.entries["reason"] = make_string_value(reason);
+    result = make_map_value(std::move(response));
     return true;
-}
-
-// Chạy curl HTTP yêu cầu; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runCurlHttpRequest(const std::string &method,
-                        const std::string &fnName,
-                        const std::string &url,
-                        const std::optional<std::string> &payload,
-                        StackValue &result,
-                        std::string &err,
-                        bool &transportFailure) {
-    transportFailure = false;
-    std::string invalidUrlReason;
-    if (!validateHttpUrl(url, invalidUrlReason)) {
-        err = messages::formatMessage(messages::kNativeHttpUrlInvalid, {fnName, invalidUrlReason});
-        return true;
-    }
-
-    bool fileTransportHandled = false;
-    if (tryLowLevelHttpFileTransportRequest(
-            method, url, payload, result, err, fileTransportHandled) &&
-        fileTransportHandled) {
-        if (!err.empty()) {
-            transportFailure = true;
-        }
-        return true;
-    }
-
-#if defined(_WIN32)
-    // _popen routes through cmd.exe, whose quoting rules are incompatible with
-    // JSON and with the POSIX single-quote command used below. Execute curl
-    // directly so each URL/header/payload remains one argument on Windows.
-    return runCurlHttpRequestWindows(
-        method, fnName, url, payload, result, err, transportFailure);
-#else
-    std::string cmd = "curl -Ls --max-time 20 -X " + method;
-    if (payload.has_value()) {
-        cmd += " -H 'Content-Type: application/json' --data " + shellQuoteSingle(*payload);
-    }
-    cmd += " " + shellQuoteSingle(url);
-
-    FILE *pipe = openCommandPipe(cmd);
-    if (!pipe) {
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpCurlProcessOpenFailed, {fnName});
-        return true;
-    }
-
-    std::string data;
-    char chunk[512];
-    while (fgets(chunk, sizeof(chunk), pipe) != nullptr) {
-        data += chunk;
-    }
-
-    int rc = closeCommandPipe(pipe);
-    if (rc != 0) {
-        if (rc != -1 && WIFEXITED(rc) &&
-            WEXITSTATUS(rc) != 126 && WEXITSTATUS(rc) != 127) {
-            transportFailure = true;
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeHttpCurlFailed, {fnName}) +
-                " (curl exit=" + std::to_string(WEXITSTATUS(rc)) + ")";
-            return true;
-        }
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeHttpCurlFailed, {fnName});
-        return true;
-    }
-
-    result = make_string_value(data);
-    return true;
-#endif
 }
 
 } // namespace vietvm::helpers

@@ -1,0 +1,43 @@
+// vpp.packaging — đóng gói cơ bản thành thư mục phân phối.
+// M3 chỉ mang entry + tài nguyên + manifest; bundle runtime tùy biến thuộc M4.
+nhập nhập xuất;
+nhập bộ sưu tập;
+nhập công cụ lưu trữ;
+
+hàm đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên) {
+    tạo thư mục(thư mục đích);
+
+    tên_chính = đường dẫn tên(tệp chính);
+    đích_chính = đường dẫn nối(thư mục đích, tên_chính);
+    ghi tệp(đích_chính, đọc tệp(tệp chính));
+
+    lặp(i = 0; i < độ dài(tài nguyên); i++) {
+        nguồn = tài nguyên[i];
+        tên_tệp = đường dẫn tên(nguồn);
+        đích = đường dẫn nối(thư mục đích, tên_tệp);
+        ghi tệp(đích, đọc tệp(nguồn));
+    };
+
+    manifest = "name=" + tên + "\nentry=" + tên_chính +
+        "\nresources=" + độ dài(tài nguyên) + "\n";
+    đường_manifest = đường dẫn nối(thư mục đích, "vpp-package.txt");
+    ghi tệp(đường_manifest, manifest);
+
+    trả về {
+        "thư mục": thư mục đích,
+        "tệp chính": tên_chính,
+        "tài nguyên": độ dài(tài nguyên),
+        "manifest": đường_manifest
+    };
+};
+
+hàm đóng gói ứng dụng zip(đường zip, thư mục đích, tên, tệp chính, tài nguyên) {
+    kq = đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên);
+    các_tệp = [];
+    thêm(các_tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tệp chính)));
+    lặp(i = 0; i < độ dài(tài nguyên); i++) {
+        thêm(các_tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tài nguyên[i])));
+    };
+    thêm(các_tệp, lấy map(kq, "manifest", ""));
+    trả về gói tài nguyên tạo(đường zip, các_tệp);
+};

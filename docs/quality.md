@@ -36,13 +36,13 @@ cmake --build build-tidy --parallel
 ## Benchmark
 
 The benchmark executable separates bytecode verification, preverified VM dispatch,
-end-to-end VM execution, compiler stages, package resolution, JSON extraction and GC cycle
+end-to-end VM execution, compiler stages, package/module resolution and GC cycle
 collection. Stage setup/reset is kept outside the measured interval where practical.
 
 For RC comparison, build baseline and candidate with the same harness, corpus, Release flags
 and GC/JIT policy on the same machine. The benchmark executable prints stable machine-readable
-`benchmark_meta=` and `benchmark=` lines so the host CI can compare repeated runs without a
-Python test harness in `scripts/`.
+`benchmark_meta=` and `benchmark=` lines. A repeated baseline/candidate comparator is still
+missing from `scripts/quality/`, so those lines are currently raw input for a future gate.
 
 The first recorded measurements live in `benchmark/BASELINE.md`.
 

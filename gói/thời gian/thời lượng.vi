@@ -1,0 +1,16 @@
+// vi.time — phép toán thời lượng cơ bản, không phụ thuộc múi giờ.
+
+hàm thời lượng mili giây(bắt đầu, kết thúc) {
+    nếu (kết thúc < bắt đầu) {
+        ném "thời gian: mốc kết thúc nhỏ hơn mốc bắt đầu";
+    };
+    trả về kết thúc - bắt đầu;
+};
+
+hàm mili giây thành giây(mili giây) {
+    trả về mili giây / 1000.0;
+};
+
+hàm giây thành mili giây(giây) {
+    trả về giây * 1000.0;
+};

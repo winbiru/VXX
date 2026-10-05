@@ -1,0 +1,370 @@
+// Module: bảo mật.mật mã
+//
+// Contract 1.0:
+// - Chuỗi đầu vào được băm theo đúng byte UTF-8.
+// - SHA-256 và HMAC-SHA256 được triển khai bằng V++.
+// - Native chỉ giữ entropy bảo mật của hệ điều hành/OpenSSL.
+// - Digest và random bảo mật trả hex chữ thường.
+
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
+
+hàm mật mã lũy thừa hai(n) {
+    kết_quả = 1;
+    lặp(i = 0; i < n; i++) {
+        kết_quả = kết_quả * 2;
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã xor byte(a, b) {
+    x = a;
+    y = b;
+    trọng_số = 1;
+    kết_quả = 0;
+    lặp(i = 0; i < 8; i++) {
+        nếu ((x % 2) != (y % 2)) {
+            kết_quả = kết_quả + trọng_số;
+        };
+        x = lam_tron_xuong(x / 2);
+        y = lam_tron_xuong(y / 2);
+        trọng_số = trọng_số * 2;
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã và byte(a, b) {
+    x = a;
+    y = b;
+    trọng_số = 1;
+    kết_quả = 0;
+    lặp(i = 0; i < 8; i++) {
+        nếu ((x % 2) == 1 && (y % 2) == 1) {
+            kết_quả = kết_quả + trọng_số;
+        };
+        x = lam_tron_xuong(x / 2);
+        y = lam_tron_xuong(y / 2);
+        trọng_số = trọng_số * 2;
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã xor word(a, b) {
+    trả về [
+        mật mã xor byte(a[0], b[0]),
+        mật mã xor byte(a[1], b[1]),
+        mật mã xor byte(a[2], b[2]),
+        mật mã xor byte(a[3], b[3])
+    ];
+};
+
+hàm mật mã xor ba word(a, b, c) {
+    trả về mật mã xor word(mật mã xor word(a, b), c);
+};
+
+hàm mật mã và word(a, b) {
+    trả về [
+        mật mã và byte(a[0], b[0]),
+        mật mã và byte(a[1], b[1]),
+        mật mã và byte(a[2], b[2]),
+        mật mã và byte(a[3], b[3])
+    ];
+};
+
+hàm mật mã cộng word(a, b) {
+    kết_quả = [0, 0, 0, 0];
+    nhớ = 0;
+    lặp(i = 3; i >= 0; i--) {
+        tổng = a[i] + b[i] + nhớ;
+        kết_quả[i] = tổng % 256;
+        nhớ = lam_tron_xuong(tổng / 256);
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã quay phải(word, số_bit) {
+    dịch_byte = lam_tron_xuong(số_bit / 8);
+    dịch_bit = số_bit % 8;
+    kết_quả = [0, 0, 0, 0];
+    lặp(i = 0; i < 4; i++) {
+        nguồn = i - dịch_byte;
+        lặp(v = 0; nguồn < 0; v++) {
+            nguồn = nguồn + 4;
+        };
+        nguồn = nguồn % 4;
+        nếu (dịch_bit == 0) {
+            kết_quả[i] = word[nguồn];
+        } nếu không {
+            trước = nguồn - 1;
+            nếu (trước < 0) {
+                trước = trước + 4;
+            };
+            mẫu = mật mã lũy thừa hai(dịch_bit);
+            kết_quả[i] = lam_tron_xuong(word[nguồn] / mẫu) +
+                         (word[trước] % mẫu) * mật mã lũy thừa hai(8 - dịch_bit);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã dịch phải(word, số_bit) {
+    dịch_byte = lam_tron_xuong(số_bit / 8);
+    dịch_bit = số_bit % 8;
+    kết_quả = [0, 0, 0, 0];
+    lặp(i = 0; i < 4; i++) {
+        nguồn = i - dịch_byte;
+        nếu (nguồn >= 0) {
+            nếu (dịch_bit == 0) {
+                kết_quả[i] = word[nguồn];
+            } nếu không {
+                mẫu = mật mã lũy thừa hai(dịch_bit);
+                giá_trị = lam_tron_xuong(word[nguồn] / mẫu);
+                nếu (nguồn - 1 >= 0) {
+                    giá_trị = giá_trị +
+                              (word[nguồn - 1] % mẫu) * mật mã lũy thừa hai(8 - dịch_bit);
+                };
+                kết_quả[i] = giá_trị;
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã lựa chọn(e, f, g) {
+    // Ch(e,f,g) = g xor (e and (f xor g)).
+    trả về mật mã xor word(g, mật mã và word(e, mật mã xor word(f, g)));
+};
+
+hàm mật mã đa số(a, b, c) {
+    trả về mật mã xor ba word(
+        mật mã và word(a, b),
+        mật mã và word(a, c),
+        mật mã và word(b, c)
+    );
+};
+
+hàm mật mã sigma lớn không(a) {
+    trả về mật mã xor ba word(
+        mật mã quay phải(a, 2),
+        mật mã quay phải(a, 13),
+        mật mã quay phải(a, 22)
+    );
+};
+
+hàm mật mã sigma lớn một(e) {
+    trả về mật mã xor ba word(
+        mật mã quay phải(e, 6),
+        mật mã quay phải(e, 11),
+        mật mã quay phải(e, 25)
+    );
+};
+
+hàm mật mã sigma nhỏ không(x) {
+    trả về mật mã xor ba word(
+        mật mã quay phải(x, 7),
+        mật mã quay phải(x, 18),
+        mật mã dịch phải(x, 3)
+    );
+};
+
+hàm mật mã sigma nhỏ một(x) {
+    trả về mật mã xor ba word(
+        mật mã quay phải(x, 17),
+        mật mã quay phải(x, 19),
+        mật mã dịch phải(x, 10)
+    );
+};
+
+hàm mật mã hằng số sha256() {
+    trả về [
+        [66,138,47,152], [113,55,68,145], [181,192,251,207], [233,181,219,165],
+        [57,86,194,91], [89,241,17,241], [146,63,130,164], [171,28,94,213],
+        [216,7,170,152], [18,131,91,1], [36,49,133,190], [85,12,125,195],
+        [114,190,93,116], [128,222,177,254], [155,220,6,167], [193,155,241,116],
+        [228,155,105,193], [239,190,71,134], [15,193,157,198], [36,12,161,204],
+        [45,233,44,111], [74,116,132,170], [92,176,169,220], [118,249,136,218],
+        [152,62,81,82], [168,49,198,109], [176,3,39,200], [191,89,127,199],
+        [198,224,11,243], [213,167,145,71], [6,202,99,81], [20,41,41,103],
+        [39,183,10,133], [46,27,33,56], [77,44,109,252], [83,56,13,19],
+        [101,10,115,84], [118,106,10,187], [129,194,201,46], [146,114,44,133],
+        [162,191,232,161], [168,26,102,75], [194,75,139,112], [199,108,81,163],
+        [209,146,232,25], [214,153,6,36], [244,14,53,133], [16,106,160,112],
+        [25,164,193,22], [30,55,108,8], [39,72,119,76], [52,176,188,181],
+        [57,28,12,179], [78,216,170,74], [91,156,202,79], [104,46,111,243],
+        [116,143,130,238], [120,165,99,111], [132,200,120,20], [140,199,2,8],
+        [144,190,255,250], [164,80,108,235], [190,249,163,247], [198,113,120,242]
+    ];
+};
+
+hàm mật mã độ dài bit bytes(số_byte) {
+    kết_quả = [0, 0, 0, 0, 0, 0, 0, 0];
+    còn_lại = số_byte;
+    lặp(i = 7; i >= 0; i--) {
+        kết_quả[i] = còn_lại % 256;
+        còn_lại = lam_tron_xuong(còn_lại / 256);
+    };
+    nhớ = 0;
+    lặp(i = 7; i >= 0; i--) {
+        giá_trị = kết_quả[i] * 8 + nhớ;
+        kết_quả[i] = giá_trị % 256;
+        nhớ = lam_tron_xuong(giá_trị / 256);
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã sha256 bytes(bytes) {
+    thông_điệp = [];
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        byte = bytes[i];
+        nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            ném "băm sha256: dữ liệu byte không hợp lệ";
+        };
+        them(thông_điệp, byte);
+    };
+    độ_dài_gốc = do_dai(thông_điệp);
+    them(thông_điệp, 128);
+    lặp(vòng = 0; do_dai(thông_điệp) % 64 != 56; vòng++) {
+        them(thông_điệp, 0);
+    };
+    dài_bit = mật mã độ dài bit bytes(độ_dài_gốc);
+    lặp(i = 0; i < 8; i++) {
+        them(thông_điệp, dài_bit[i]);
+    };
+
+    h = [
+        [106,9,230,103], [187,103,174,133], [60,110,243,114], [165,79,245,58],
+        [81,14,82,127], [155,5,104,140], [31,131,217,171], [91,224,205,25]
+    ];
+    k = mật mã hằng số sha256();
+
+    lặp(bắt_đầu = 0; bắt_đầu < do_dai(thông_điệp); bắt_đầu += 64) {
+        w = [];
+        lặp(t = 0; t < 16; t++) {
+            p = bắt_đầu + t * 4;
+            them(w, [thông_điệp[p], thông_điệp[p + 1], thông_điệp[p + 2], thông_điệp[p + 3]]);
+        };
+        lặp(t_mở_rộng = 16; t_mở_rộng < 64; t_mở_rộng++) {
+            giá_trị = mật mã cộng word(
+                mật mã sigma nhỏ một(w[t_mở_rộng - 2]),
+                w[t_mở_rộng - 7]
+            );
+            giá_trị = mật mã cộng word(
+                giá_trị,
+                mật mã sigma nhỏ không(w[t_mở_rộng - 15])
+            );
+            giá_trị = mật mã cộng word(giá_trị, w[t_mở_rộng - 16]);
+            them(w, giá_trị);
+        };
+
+        a = h[0];
+        b = h[1];
+        c = h[2];
+        d = h[3];
+        e = h[4];
+        f = h[5];
+        g = h[6];
+        hh = h[7];
+
+        lặp(t_vòng = 0; t_vòng < 64; t_vòng++) {
+            t1 = mật mã cộng word(hh, mật mã sigma lớn một(e));
+            t1 = mật mã cộng word(t1, mật mã lựa chọn(e, f, g));
+            t1 = mật mã cộng word(t1, k[t_vòng]);
+            t1 = mật mã cộng word(t1, w[t_vòng]);
+            t2 = mật mã cộng word(mật mã sigma lớn không(a), mật mã đa số(a, b, c));
+
+            hh = g;
+            g = f;
+            f = e;
+            e = mật mã cộng word(d, t1);
+            d = c;
+            c = b;
+            b = a;
+            a = mật mã cộng word(t1, t2);
+        };
+
+        h[0] = mật mã cộng word(h[0], a);
+        h[1] = mật mã cộng word(h[1], b);
+        h[2] = mật mã cộng word(h[2], c);
+        h[3] = mật mã cộng word(h[3], d);
+        h[4] = mật mã cộng word(h[4], e);
+        h[5] = mật mã cộng word(h[5], f);
+        h[6] = mật mã cộng word(h[6], g);
+        h[7] = mật mã cộng word(h[7], hh);
+    };
+
+    kết_quả = [];
+    lặp(i = 0; i < 8; i++) {
+        lặp(j = 0; j < 4; j++) {
+            them(kết_quả, h[i][j]);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã hex(bytes) {
+    alphabet = "0123456789abcdef";
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        byte = bytes[i];
+        kết_quả = kết_quả + alphabet[lam_tron_xuong(byte / 16)] + alphabet[byte % 16];
+    };
+    trả về kết_quả;
+};
+
+hàm mật mã utf8 bytes(văn_bản, tên_hàm) {
+    nếu (loai_cua(văn_bản) != "chuỗi") {
+        ném tên_hàm + ": văn bản phải là chuỗi";
+    };
+    // Primitive charset nền tảng: chuyển representation UTF-8 runtime sang byte.
+    trả về utf8_native_exec("encode", văn_bản);
+};
+
+hàm ngẫu nhiên bảo mật(số byte) {
+    // Entropy hệ điều hành là native boundary thực sự và được giữ lại.
+    thử {
+        số byte = thành số nguyên(số byte);
+    } bắt lỗi (e) {
+        ném "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+    };
+    nếu (số byte < 1 || số byte > 4096) {
+        ném "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+    };
+    trả về mật mã hex(ngau_nhien_bao_mat_bytes(số byte));
+};
+
+hàm băm sha256(văn bản) {
+    bytes = mật mã utf8 bytes(văn bản, "băm sha256");
+    trả về mật mã hex(mật mã sha256 bytes(bytes));
+};
+
+hàm hmac sha256(khóa, văn bản) {
+    nếu (loai_cua(khóa) != "chuỗi") {
+        ném "hmac sha256: khóa phải là chuỗi";
+    };
+    nếu (loai_cua(văn bản) != "chuỗi") {
+        ném "hmac sha256: văn bản phải là chuỗi";
+    };
+    khóa_bytes = utf8_native_exec("encode", khóa);
+    nếu (do_dai(khóa_bytes) > 64) {
+        khóa_bytes = mật mã sha256 bytes(khóa_bytes);
+    };
+    lặp(i = do_dai(khóa_bytes); i < 64; i++) {
+        them(khóa_bytes, 0);
+    };
+
+    trong = [];
+    ngoài = [];
+    lặp(i = 0; i < 64; i++) {
+        them(trong, mật mã xor byte(khóa_bytes[i], 54));
+        them(ngoài, mật mã xor byte(khóa_bytes[i], 92));
+    };
+    dữ_liệu = utf8_native_exec("encode", văn bản);
+    lặp(i = 0; i < do_dai(dữ_liệu); i++) {
+        them(trong, dữ_liệu[i]);
+    };
+    băm_trong = mật mã sha256 bytes(trong);
+    lặp(i = 0; i < do_dai(băm_trong); i++) {
+        them(ngoài, băm_trong[i]);
+    };
+    trả về mật mã hex(mật mã sha256 bytes(ngoài));
+};

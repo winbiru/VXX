@@ -48,4 +48,111 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
+
+    // sort comparator bằng nhau phải giữ encounter order.
+    theo_khóa = hàm(a, b) { trả về a[0] - b[0]; };
+    in gom danh sách(sắp xếp luồng(
+        luồng([[1, "a"], [1, "b"], [0, "c"]]),
+        theo_khóa
+    ));
+
+    // Mutation cấu trúc của source trong traversal phải bị phát hiện.
+    nguồn_đổi = [1, 2, 3];
+    sửa_nguồn = hàm(x) {
+        nếu (x == 1) {
+            thêm(nguồn_đổi, 4);
+        };
+    };
+    thử {
+        duyệt(luồng(nguồn_đổi), sửa_nguồn);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    // Callback lỗi vẫn chạy cleanup đúng một lần và giữ nguyên lỗi chính.
+    số_lần_dọn = 0;
+    s_lỗi = luồng([1, 2, 3]);
+    cleanup_lỗi = hàm() {
+        số_lần_dọn += 1;
+        ném "CLEANUP_FAIL";
+    };
+    khi đóng luồng(s_lỗi, cleanup_lỗi);
+    consumer_lỗi = hàm(x) {
+        nếu (x == 2) {
+            ném "ITEM_FAIL";
+        };
+    };
+    thử {
+        duyệt(s_lỗi, consumer_lỗi);
+    } bắt lỗi (e) {
+        in e;
+    };
+    in số_lần_dọn;
+    đóng luồng(s_lỗi);
+    in số_lần_dọn;
+
+    // Explicit close idempotent và cleanup chỉ chạy một lần.
+    số_lần_đóng = 0;
+    s_đóng = luồng([9]);
+    cleanup_đóng = hàm() { số_lần_đóng += 1; };
+    khi đóng luồng(s_đóng, cleanup_đóng);
+    đóng luồng(s_đóng);
+    đóng luồng(s_đóng);
+    in số_lần_đóng;
+    thử {
+        gom danh sách(s_đóng);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    thử {
+        bỏ(luồng([1]), 1.5);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    // Generator source: find-first chỉ pull đúng một phần tử.
+    số_lần_pull = 0;
+    sinh_vô_hạn = hàm() {
+        số_lần_pull += 1;
+        trả về bước luồng(số_lần_pull);
+    };
+    in đầu tiên(luồng từ bộ sinh(sinh_vô_hạn));
+    in số_lần_pull;
+
+    // limit(0) không được pull generator.
+    số_lần_pull_0 = 0;
+    sinh_0 = hàm() {
+        số_lần_pull_0 += 1;
+        trả về bước luồng(số_lần_pull_0);
+    };
+    in gom danh sách(giới hạn luồng(luồng từ bộ sinh(sinh_0), 0));
+    in số_lần_pull_0;
+
+    // limit hữu hạn phải chặn được generator vô hạn.
+    số_lần_pull_3 = 0;
+    sinh_3 = hàm() {
+        số_lần_pull_3 += 1;
+        trả về bước luồng(số_lần_pull_3);
+    };
+    in gom danh sách(giới hạn luồng(luồng từ bộ sinh(sinh_3), 3));
+
+    // Generator hữu hạn kết thúc bằng sentinel hết luồng().
+    vị_trí_sinh = 0;
+    sinh_hữu_hạn = hàm() {
+        nếu (vị_trí_sinh >= 3) {
+            trả về hết luồng();
+        };
+        vị_trí_sinh += 1;
+        trả về bước luồng(vị_trí_sinh * 2);
+    };
+    in gom danh sách(luồng từ bộ sinh(sinh_hữu_hạn));
+
+    // Cleanup gắn trực tiếp với generator cũng chạy sau terminal short-circuit.
+    dọn_generator = 0;
+    sinh_một = hàm() { trả về bước luồng(7); };
+    cleanup_generator = hàm() { dọn_generator += 1; };
+    s_generator = luồng từ bộ sinh(sinh_một, cleanup_generator);
+    in đầu tiên(s_generator);
+    in dọn_generator;
 };

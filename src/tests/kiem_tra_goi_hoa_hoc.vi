@@ -1,0 +1,15 @@
+nhập hóa học;
+
+hàm chính() {
+    in số mol từ khối lượng(18, 18);
+    in khối lượng từ số mol(2, 18);
+    in nồng độ mol(2, 0.5);
+    in số mol từ nồng độ(0.5, 2);
+    in nồng độ phần trăm(10, 100);
+    in khối lượng chất tan(20, 200);
+    in thể tích khí ở đktc(2);
+    in số mol khí ở đktc(22.414);
+    in nồng độ sau pha loãng(2, 1, 4);
+    in hằng số avogadro() > 0;
+    in số hạt từ số mol(1) > 0;
+};

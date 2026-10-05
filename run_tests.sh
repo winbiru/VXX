@@ -24,14 +24,14 @@ if [ ! -x "$EXEC_PATH" ]; then
   echo "ERROR: VPP executable khong chay duoc: $EXEC_PATH" >&2
   exit 2
 fi
-tmpdir="src/tests/.tmp"
-mkdir -p "$tmpdir"
+tmpdir=$(mktemp -d "src/tests/.tmp.XXXXXX")
+export VPP_PREFERENCES_HOME="$ROOT_DIR/$tmpdir/preferences"
 PASS=0; FAIL=0
-HTTP_FILE_TRANSPORT_DIR=""
+HTTP_NETWORK_RESTRICTED=0
 
-# HTTP tests prefer real localhost TCP. If the execution environment denies
-# bind(2), the runtime can use a file-backed IPC transport while preserving the
-# same V++ HTTP client/server API across separate processes.
+# HTTP integration tests use the same TCP socket primitives as production. If
+# the execution environment denies bind(2), only tests that require localhost
+# sockets are skipped; protocol parsing/framing still runs as ordinary V++ tests.
 HTTP_FIXTURE_PID=""
 VPP_HOME_TEST_DIR=""
 cleanup() {
@@ -42,9 +42,8 @@ cleanup() {
   if [ -n "$VPP_HOME_TEST_DIR" ] && [ -d "$VPP_HOME_TEST_DIR" ]; then
     rm -rf "$VPP_HOME_TEST_DIR"
   fi
-  if [ -n "$HTTP_FILE_TRANSPORT_DIR" ] && [ -d "$HTTP_FILE_TRANSPORT_DIR" ]; then
-    rm -rf "$HTTP_FILE_TRANSPORT_DIR"
-  fi
+  rm -f src/tests/.tmp_api_project.db src/tests/.tmp_api_project.db-journal \
+        src/tests/.tmp_api_project.db-shm src/tests/.tmp_api_project.db-wal
   rm -rf "$tmpdir"
 }
 trap cleanup EXIT INT TERM
@@ -52,20 +51,6 @@ trap cleanup EXIT INT TERM
 http_get() {
   local url="$1"
   local output="$2"
-  if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
-    cat >"$tmpdir/http_probe.vi" <<EOF
-nhập gói/chuẩn/chính;
-
-hàm chính() {
-    in mạng lấy("$url");
-};
-EOF
-    if ! "$EXEC_PATH" "$tmpdir/http_probe.vi" >"$tmpdir/http_probe.raw" 2>&1; then
-      return 1
-    fi
-    cat "$tmpdir/http_probe.raw" >"$output"
-    return 0
-  fi
   curl -fsS --max-time 1 "$url" >"$output" 2>/dev/null
 }
 
@@ -73,13 +58,13 @@ wait_http_value() {
   local url="$1"
   local expected="$2"
   local output="$3"
-  local attempts=50
-  if [ -n "${VPP_HTTP_FILE_TRANSPORT_DIR:-}" ]; then
-    attempts=1
-  fi
+  local attempts=200
   for _ in $(seq 1 "$attempts"); do
     if http_get "$url" "$output" && [ "$(cat "$output")" = "$expected" ]; then
       return 0
+    fi
+    if [ -n "$HTTP_FIXTURE_PID" ] && ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
+      return 1
     fi
     sleep 0.1
   done
@@ -89,23 +74,15 @@ wait_http_value() {
 "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
 if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
-  if grep -Eq '\(mã=(1|13|10013)\)' "$tmpdir/http_fixture.log"; then
+  if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
+    wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
+  fi
+  if grep -Eq 'socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$' "$tmpdir/http_fixture.log"; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
     HTTP_FIXTURE_PID=""
-
-    HTTP_FILE_TRANSPORT_DIR=$(mktemp -d "$tmpdir/http-transport.XXXXXX")
-    export VPP_HTTP_FILE_TRANSPORT_DIR="$ROOT_DIR/$HTTP_FILE_TRANSPORT_DIR"
-    echo "INFO: localhost bind is restricted; using V++ HTTP file transport for integration tests"
-
-    "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
-    HTTP_FIXTURE_PID=$!
-    if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
-      echo "ERROR: HTTP fixture failed through the fallback transport" >&2
-      cat "$tmpdir/http_fixture.log" >&2
-      cat "$tmpdir/http_probe.raw" >&2 2>/dev/null || true
-      exit 2
-    fi
+    HTTP_NETWORK_RESTRICTED=1
+    echo "INFO: localhost bind is restricted; skipping socket integration tests"
   else
     echo "ERROR: local HTTP test fixture did not return the expected /health response" >&2
     cat "$tmpdir/http_fixture.log" >&2
@@ -167,6 +144,9 @@ TESTS=(
   src/tests/kiem_tra_stdlib_starter.vi
   src/tests/kiem_tra_stdlib_http.vi
   src/tests/kiem_tra_stdlib_http_post_put.vi
+  src/tests/kiem_tra_http_thuan_vpp.vi
+  src/tests/kiem_tra_http_response_vpp.vi
+  src/tests/kiem_tra_http_may_chu_thuan_vpp.vi
   src/tests/kiem_tra_http_transport_bat_loi.vi
   src/tests/kiem_tra_application_server.vi
   src/tests/kiem_tra_rest_json_jwt.vi
@@ -174,6 +154,41 @@ TESTS=(
   src/tests/kiem_tra_stdlib_mo_rong.vi
   src/tests/kiem_tra_stdlib_crypto.vi
   src/tests/kiem_tra_goi_kiem_thu.vi
+  src/tests/kiem_tra_goi_toan_hoc.vi
+  src/tests/kiem_tra_goi_vat_ly.vi
+  src/tests/kiem_tra_goi_hoa_hoc.vi
+  src/tests/kiem_tra_goi_bo_suu_tap.vi
+  src/tests/kiem_tra_goi_van_ban.vi
+  src/tests/kiem_tra_goi_thoi_gian.vi
+  src/tests/kiem_tra_goi_thoi_gian_1_0.vi
+  src/tests/kiem_tra_goi_json.vi
+  src/tests/kiem_tra_goi_nhat_ky_moi.vi
+  src/tests/kiem_tra_goi_nhat_ky_1_0.vi
+  src/tests/kiem_tra_goi_http.vi
+  src/tests/kiem_tra_goi_mat_ma.vi
+  src/tests/kiem_tra_goi_cau_hinh.vi
+  src/tests/kiem_tra_goi_regex.vi
+  src/tests/kiem_tra_goi_xml.vi
+  src/tests/kiem_tra_goi_luu_tru.vi
+  src/tests/kiem_tra_goi_dong_thoi.vi
+  src/tests/kiem_tra_goi_tuy_chon.vi
+  src/tests/kiem_tra_goi_bang_ma.vi
+  src/tests/kiem_tra_goi_ban_dia_hoa.vi
+  src/tests/kiem_tra_goi_ngau_nhien.vi
+  src/tests/kiem_tra_goi_dns.vi
+  src/tests/kiem_tra_goi_dau_noi_mang.vi
+  src/tests/kiem_tra_goi_tap_ban_ghi.vi
+  src/tests/kiem_tra_goi_xml_dom.vi
+  src/tests/kiem_tra_goi_zipfs.vi
+  src/tests/kiem_tra_goi_may_chu_http.vi
+  src/tests/kiem_tra_goi_bien_dich.vi
+  src/tests/kiem_tra_goi_phan_tich_phu_thuoc.vi
+  src/tests/kiem_tra_goi_tai_lieu.vi
+  src/tests/kiem_tra_goi_kich_ban.vi
+  src/tests/kiem_tra_goi_repl.vi
+  src/tests/kiem_tra_goi_soan_thao_tuong_tac.vi
+  src/tests/kiem_tra_goi_cong_cu_luu_tru.vi
+  src/tests/kiem_tra_goi_dong_goi_ung_dung.vi
   src/tests/kiem_tra_goi_mang.vi
   src/tests/kiem_tra_stdlib_nen_tang.vi
   src/tests/kiem_tra_chuoi_nen_tang.vi
@@ -217,13 +232,46 @@ TESTS=(
   src/tests/program.vi
 )
 
+RUNNABLE_TESTS=()
 for testfile in "${TESTS[@]}"; do
   base=$(basename "${testfile%.vi}")
+  if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
+    case "$base" in
+      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang)
+        continue
+        ;;
+    esac
+  fi
+  RUNNABLE_TESTS+=("$testfile")
+done
+
+# Chạy các golden test thường trong một tiến trình V++ duy nhất. Worker vẫn ghi
+# output/status riêng cho từng file nên phần so sánh expected bên dưới giữ nguyên
+# semantics, trong khi compiler có thể tái sử dụng AST module giữa các test.
+if ! "$EXEC_PATH" --batch-run-tests "$tmpdir" "${RUNNABLE_TESTS[@]}"; then
+  echo "ERROR: batch test worker failed" >&2
+  exit 2
+fi
+
+for testfile in "${TESTS[@]}"; do
+  base=$(basename "${testfile%.vi}")
+  if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
+    case "$base" in
+      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang)
+        echo "== Skipping $testfile: localhost socket syscalls are restricted =="
+        continue
+        ;;
+    esac
+  fi
   out="$tmpdir/$base.output"
   exp="src/tests/expected/$base.expected"
   echo "== Running $testfile =="
-  "$EXEC_PATH" "$testfile" > "$out" 2>&1
-  test_status=$?
+  if [ -f "$tmpdir/$base.status" ]; then
+    test_status=$(cat "$tmpdir/$base.status")
+  else
+    echo "FAIL: $testfile (batch worker did not produce status)"; FAIL=$((FAIL+1))
+    continue
+  fi
   if [ -f "$exp" ]; then
     if [ "$test_status" -ne 0 ]; then
       echo "FAIL: $testfile (exit code: $test_status)"; FAIL=$((FAIL+1))
@@ -238,51 +286,12 @@ for testfile in "${TESTS[@]}"; do
   fi
 done
 
-echo "== Running src/tests/kiem_tra_de_quy_vuot_gioi_han.vi [expected runtime failure] =="
-call_depth_test="src/tests/kiem_tra_de_quy_vuot_gioi_han.vi"
-call_depth_out="$tmpdir/kiem_tra_de_quy_vuot_gioi_han.output"
-call_depth_exp="src/tests/expected/kiem_tra_de_quy_vuot_gioi_han.expected"
-"$EXEC_PATH" "$call_depth_test" > "$call_depth_out" 2>&1
-call_depth_status=$?
-if [ "$call_depth_status" -eq 0 ]; then
-  echo "FAIL: $call_depth_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
-elif diff -u "$call_depth_exp" "$call_depth_out"; then
-  echo "PASS: $call_depth_test"; PASS=$((PASS+1))
-else
-  echo "FAIL: $call_depth_test"; FAIL=$((FAIL+1))
-fi
-
-echo "== Running src/tests/kiem_tra_stack_trace.vi [expected runtime failure] =="
-stack_trace_test="src/tests/kiem_tra_stack_trace.vi"
-stack_trace_out="$tmpdir/kiem_tra_stack_trace.output"
-stack_trace_exp="src/tests/expected/kiem_tra_stack_trace.expected"
-"$EXEC_PATH" "$stack_trace_test" > "$stack_trace_out" 2>&1
-stack_trace_status=$?
-if [ "$stack_trace_status" -eq 0 ]; then
-  echo "FAIL: $stack_trace_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
-elif diff -u "$stack_trace_exp" "$stack_trace_out"; then
-  echo "PASS: $stack_trace_test"; PASS=$((PASS+1))
-else
-  echo "FAIL: $stack_trace_test"; FAIL=$((FAIL+1))
-fi
-
-echo "== Running src/tests/kiem_tra_stack_trace_module.vi [expected runtime failure] =="
-stack_trace_module_test="src/tests/kiem_tra_stack_trace_module.vi"
-stack_trace_module_out="$tmpdir/kiem_tra_stack_trace_module.output"
-stack_trace_module_exp="src/tests/expected/kiem_tra_stack_trace_module.expected"
-"$EXEC_PATH" "$stack_trace_module_test" > "$stack_trace_module_out" 2>&1
-stack_trace_module_status=$?
-if [ "$stack_trace_module_status" -eq 0 ]; then
-  echo "FAIL: $stack_trace_module_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
-elif diff -u "$stack_trace_module_exp" "$stack_trace_module_out"; then
-  echo "PASS: $stack_trace_module_test"; PASS=$((PASS+1))
-else
-  echo "FAIL: $stack_trace_module_test"; FAIL=$((FAIL+1))
-fi
-
 # Các ca lỗi runtime dưới đây khóa cơ chế chẩn đoán từ trạng thái thực tế: VM phải
 # tự suy ra nguyên nhân và giải thích mà không cần nơi phát sinh gắn mã lỗi.
-for runtime_failure_test in \
+EXPECTED_FAILURE_TESTS=( \
+  src/tests/kiem_tra_de_quy_vuot_gioi_han.vi \
+  src/tests/kiem_tra_stack_trace.vi \
+  src/tests/kiem_tra_stack_trace_module.vi \
   src/tests/kiem_tra_loi_chia_cho_0.vi \
   src/tests/kiem_tra_loi_chia_du_cho_0.vi \
   src/tests/kiem_tra_loi_chia_du_so_thuc.vi \
@@ -302,13 +311,27 @@ for runtime_failure_test in \
   src/tests/kiem_tra_loi_tang_sai_kieu.vi \
   src/tests/kiem_tra_loi_giam_sai_kieu.vi \
   src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi \
-  src/tests/kiem_tra_loi_doc_tep_that_bai.vi; do
+  src/tests/kiem_tra_loi_doc_tep_that_bai.vi
+)
+
+# Các ca expected-failure cũng chạy trong một worker duy nhất để tái sử dụng
+# AST/mid-end cache. Mỗi test vẫn tạo CompilationContext và VM riêng.
+if ! "$EXEC_PATH" --batch-run-tests "$tmpdir" "${EXPECTED_FAILURE_TESTS[@]}"; then
+  echo "ERROR: expected-failure batch worker failed" >&2
+  exit 2
+fi
+
+for runtime_failure_test in "${EXPECTED_FAILURE_TESTS[@]}"; do
   runtime_failure_name="$(basename "$runtime_failure_test" .vi)"
   runtime_failure_out="$tmpdir/${runtime_failure_name}.output"
   runtime_failure_exp="src/tests/expected/${runtime_failure_name}.expected"
   echo "== Running $runtime_failure_test [expected runtime failure] =="
-  "$EXEC_PATH" "$runtime_failure_test" > "$runtime_failure_out" 2>&1
-  runtime_failure_status=$?
+  if [ -f "$tmpdir/${runtime_failure_name}.status" ]; then
+    runtime_failure_status=$(cat "$tmpdir/${runtime_failure_name}.status")
+  else
+    echo "FAIL: $runtime_failure_test (batch worker did not produce status)"; FAIL=$((FAIL+1))
+    continue
+  fi
   if [ "$runtime_failure_status" -eq 0 ]; then
     echo "FAIL: $runtime_failure_test (expected non-zero exit code)"; FAIL=$((FAIL+1))
   elif diff -u "$runtime_failure_exp" "$runtime_failure_out"; then

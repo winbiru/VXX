@@ -1,7 +1,261 @@
 // Module: lõi.ngẫu nhiên
-// Sinh số nguyên giả ngẫu nhiên trong đoạn đóng [tối thiểu, tối đa].
-// Hai giới hạn phải là số nguyên; số thực có phần lẻ không bị âm thầm cắt cụt.
+// Sinh số nguyên trong đoạn đóng [tối thiểu, tối đa]. Native chỉ cung cấp
+// entropy bảo mật dạng byte; việc ánh xạ vào khoảng số nguyên nằm hoàn toàn ở V++.
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
 
+hàm ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
+    kiểu = loai_cua(giá_trị);
+    nếu (kiểu == "số nguyên") {
+        trả về giá_trị;
+    };
+
+    nếu (kiểu == "số thực") {
+        thử {
+            n = thành số nguyên(giá_trị);
+            nếu (thành số thực(n) == giá_trị) {
+                trả về n;
+            };
+        } bắt lỗi (e) {
+        };
+    };
+
+    nếu (kiểu == "chuỗi") {
+        thử {
+            trả về thành số nguyên(giá_trị);
+        } bắt lỗi (e) {
+        };
+    };
+
+    ném "ngẫu nhiên nguyên: giới hạn phải là số nguyên";
+};
+
+hàm ngẫu nhiên entropy sáu byte() {
+    bytes = ngau_nhien_bao_mat_bytes(6);
+    nếu (do_dai(bytes) != 6) {
+        ném "ngẫu nhiên nguyên: entropy không hợp lệ";
+    };
+
+    giá_trị = 0.0;
+    lặp(i = 0; i < 6; i++) {
+        byte = bytes[i];
+        nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            ném "ngẫu nhiên nguyên: entropy không hợp lệ";
+        };
+        giá_trị = giá_trị * 256.0 + thành số thực(byte);
+    };
+    trả về giá_trị;
+};
+
+// Dùng không gian 2^48. Double biểu diễn chính xác mọi số nguyên trong miền này.
+// Rejection sampling loại phần dư trước khi modulo logic để không tạo modulo bias.
 hàm ngẫu nhiên nguyên(tối thiểu, tối đa) {
-    ném "stdlib: ngẫu nhiên nguyên native hook không khả dụng";
+    nhỏ = ngẫu nhiên nguyên yêu cầu giới hạn(tối thiểu);
+    lớn = ngẫu nhiên nguyên yêu cầu giới hạn(tối đa);
+    nếu (nhỏ > lớn) {
+        ném "ngẫu nhiên nguyên: giới hạn dưới lớn hơn giới hạn trên";
+    };
+    nếu (nhỏ == lớn) {
+        trả về nhỏ;
+    };
+
+    độ_rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
+    không_gian = 281474976710656.0;
+    số_khối = lam_tron_xuong(không_gian / độ_rộng);
+    giới_hạn = số_khối * độ_rộng;
+
+    mẫu = không_gian;
+    lặp(vòng = 0; mẫu >= giới_hạn; vòng++) {
+        mẫu = ngẫu nhiên entropy sáu byte();
+    };
+
+    thương = lam_tron_xuong(mẫu / độ_rộng);
+    phần_dư = mẫu - thương * độ_rộng;
+    trả về thành số nguyên(thành số thực(nhỏ) + phần_dư);
+};
+
+// vi.random — bộ sinh giả ngẫu nhiên có hạt giống, tách khỏi nguồn mật mã.
+//
+// PRNG là logic thư viện thuần V++. State được giữ ngay trong handle map thay vì
+// registry C++ toàn cục. Thuật toán Park-Miller dùng biến thể Schrage để mọi
+// phép nhân trung gian vẫn nằm trong miền số nguyên 32-bit của VM.
+
+hàm ngẫu nhiên yêu cầu số nguyên(giá trị, nhãn) {
+    kiểu = loai_cua(giá trị);
+    nếu (kiểu == "số nguyên") {
+        trả về giá trị;
+    };
+
+    nếu (kiểu == "số thực") {
+        thử {
+            n = thành số nguyên(giá trị);
+            nếu (thành số thực(n) == giá trị) {
+                trả về n;
+            };
+        } bắt lỗi (e) {
+        };
+    };
+
+    nếu (kiểu == "chuỗi") {
+        thử {
+            trả về thành số nguyên(giá trị);
+        } bắt lỗi (e) {
+        };
+    };
+
+    ném "ngẫu nhiên: " + nhãn + " phải là số nguyên";
+};
+
+hàm ngẫu nhiên yêu cầu bộ sinh(bộ sinh) {
+    nếu (loai_cua(bộ sinh) != "từ điển") {
+        ném "ngẫu nhiên: không tìm thấy bộ sinh";
+    };
+    nếu (lay_map(bộ sinh, "__vpp_random", 0) != 1) {
+        ném "ngẫu nhiên: không tìm thấy bộ sinh";
+    };
+    nếu (lay_map(bộ sinh, "mở", 0) != 1) {
+        ném "ngẫu nhiên: không tìm thấy bộ sinh";
+    };
+    nếu (lay_map(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
+        ném "RANDOM_STATE";
+    };
+    trả về bộ sinh;
+};
+
+hàm ngẫu nhiên bước(bộ sinh) {
+    ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
+    trạng_thái = lay_map(bộ sinh, "trạng thái", 1);
+
+    // m = 2147483647, a = 48271, q = m / a = 44488, r = m % a = 3399.
+    hi = thành số nguyên(trạng_thái / 44488);
+    lo = trạng_thái % 44488;
+    tiếp = 48271 * lo - 3399 * hi;
+    nếu (tiếp <= 0) {
+        tiếp = tiếp + 2147483647;
+    };
+
+    dat_map(bộ sinh, "trạng thái", tiếp);
+    trả về tiếp;
+};
+
+hàm tạo bộ sinh ngẫu nhiên(hạt giống) {
+    seed = ngẫu nhiên yêu cầu số nguyên(hạt giống, "hạt giống");
+    trạng_thái = seed % 2147483647;
+    nếu (trạng_thái <= 0) {
+        trạng_thái = trạng_thái + 2147483646;
+    };
+    trả về {
+        "__vpp_random": 1,
+        "mở": 1,
+        "thuật toán": "park-miller-48271-v1",
+        "trạng thái": trạng_thái
+    };
+};
+
+hàm ngẫu nhiên nguyên từ bộ(bộ sinh, tối thiểu, tối đa) {
+    ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
+    nhỏ = ngẫu nhiên yêu cầu số nguyên(tối thiểu, "tối thiểu");
+    lớn = ngẫu nhiên yêu cầu số nguyên(tối đa, "tối đa");
+    nếu (nhỏ > lớn) {
+        ném "RANDOM_RANGE";
+    };
+    nếu (nhỏ == lớn) {
+        trả về nhỏ;
+    };
+
+    // Park-Miller sinh đều 1..2147483646. Dịch xuống 0..2147483645 rồi
+    // rejection sampling để loại phần dư, tránh modulo/scale bias.
+    không_gian = 2147483646.0;
+    độ_rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
+    nếu (độ_rộng <= 0.0 || độ_rộng > không_gian) {
+        ném "RANDOM_RANGE";
+    };
+    số_khối = lam_tron_xuong(không_gian / độ_rộng);
+    giới_hạn = số_khối * độ_rộng;
+
+    mẫu = không_gian;
+    lặp(vòng = 0; mẫu >= giới_hạn; vòng++) {
+        mẫu = thành số thực(ngẫu nhiên bước(bộ sinh) - 1);
+    };
+    thương = lam_tron_xuong(mẫu / độ_rộng);
+    phần_dư = mẫu - thương * độ_rộng;
+    trả về thành số nguyên(thành số thực(nhỏ) + phần_dư);
+};
+
+hàm ngẫu nhiên thực từ bộ(bộ sinh) {
+    trạng_thái = ngẫu nhiên bước(bộ sinh);
+    trả về trạng_thái / 2147483647.0;
+};
+
+hàm ngẫu nhiên luận lý từ bộ(bộ sinh) {
+    trạng_thái = ngẫu nhiên bước(bộ sinh);
+    trả về trạng_thái % 2 == 0;
+};
+
+hàm ngẫu nhiên bytes từ bộ(bộ sinh, số_lượng) {
+    ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
+    n = ngẫu nhiên yêu cầu số nguyên(số_lượng, "số lượng byte");
+    nếu (n < 0 || n > 1048576) {
+        ném "RANDOM_RANGE";
+    };
+    kết_quả = [];
+    lặp(i = 0; i < n; i++) {
+        them(kết_quả, ngẫu nhiên nguyên từ bộ(bộ sinh, 0, 255));
+    };
+    trả về kết_quả;
+};
+
+hàm trạng thái bộ sinh ngẫu nhiên(bộ sinh) {
+    ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
+    trả về {
+        "thuật toán": lay_map(bộ sinh, "thuật toán", ""),
+        "trạng thái": lay_map(bộ sinh, "trạng thái", 0)
+    };
+};
+
+hàm khôi phục bộ sinh ngẫu nhiên(snapshot) {
+    nếu (loai_cua(snapshot) != "từ điển") {
+        ném "RANDOM_STATE";
+    };
+    thuật_toán = lay_map(snapshot, "thuật toán", "");
+    nếu (thuật_toán != "park-miller-48271-v1") {
+        ném "RANDOM_STATE";
+    };
+    trạng_thái = lay_map(snapshot, "trạng thái", 0);
+    nếu (loai_cua(trạng_thái) != "số nguyên") {
+        ném "RANDOM_STATE";
+    };
+    nếu (trạng_thái <= 0 || trạng_thái >= 2147483647) {
+        ném "RANDOM_STATE";
+    };
+    trả về {
+        "__vpp_random": 1,
+        "mở": 1,
+        "thuật toán": thuật_toán,
+        "trạng thái": trạng_thái
+    };
+};
+
+// Tên contract ngắn theo spec.
+hàm prng(hạt_giống) {
+    trả về tạo bộ sinh ngẫu nhiên(hạt_giống);
+};
+
+hàm random i64(bộ_sinh, tối_thiểu, tối_đa) {
+    trả về ngẫu nhiên nguyên từ bộ(bộ_sinh, tối_thiểu, tối_đa);
+};
+
+hàm random f64(bộ_sinh) {
+    trả về ngẫu nhiên thực từ bộ(bộ_sinh);
+};
+
+hàm random bool(bộ_sinh) {
+    trả về ngẫu nhiên luận lý từ bộ(bộ_sinh);
+};
+
+hàm xóa bộ sinh ngẫu nhiên(bộ sinh) {
+    ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
+    dat_map(bộ sinh, "mở", 0);
+    dat_map(bộ sinh, "trạng thái", 0);
+    trả về 1;
 };

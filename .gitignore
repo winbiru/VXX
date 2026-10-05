@@ -31,9 +31,20 @@ bin/
 # Test artifacts
 src/tests/.tmp/
 src/tests/.tmp_*
+src/tests/.tmp.*/
+src/tests/.perf_batch/
 *.actual
 dist/
 *.vsix
+
+# Local/generated packaging artifacts
+.tmp/
+_CPack_Packages/
+vdk-*.tar.gz
+vdk-*.zip
+
+# V++ workspace/package cache
+.vpp/
 
 # Python tooling
 __pycache__/

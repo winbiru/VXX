@@ -1,0 +1,11 @@
+nhập kịch bản;
+nhập nhập xuất;
+
+hàm chính() {
+    in kịch bản chạy("in 2 + 3;") == "5\n";
+
+    đường = ".tmp_script.vi";
+    ghi tệp(đường, "in 7;");
+    in kịch bản chạy tệp(đường) == "7\n";
+    xóa đường dẫn(đường);
+};

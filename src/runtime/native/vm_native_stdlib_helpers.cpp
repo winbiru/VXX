@@ -1,15 +1,10 @@
 #include "common/vm_native_stdlib_helpers.h"
 
-#include <algorithm>
-#include <array>
 #include <chrono>
-#include <cmath>
-#include <cstdio>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
 #include <limits>
-#include <random>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -24,12 +19,8 @@
 #include <windows.h>
 #include <bcrypt.h>
 #elif defined(__APPLE__)
-#include <CommonCrypto/CommonDigest.h>
-#include <CommonCrypto/CommonHMAC.h>
 #include <Security/Security.h>
 #elif defined(__linux__)
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
 #include <openssl/rand.h>
 #endif
 
@@ -54,21 +45,7 @@ bool nativeUtf8Path(const StackValue &value,
 namespace {
 
 namespace fs = std::filesystem;
-constexpr std::size_t kSha256DigestSize = 32;
 constexpr int kMaxSecureRandomBytes = 4096;
-
-std::uint32_t fnv1a32(const unsigned char *bytes, std::size_t size) noexcept {
-    std::uint32_t hash = 2166136261u;
-    for (std::size_t index = 0; index < size; ++index) {
-        hash ^= static_cast<std::uint32_t>(bytes[index]);
-        hash *= 16777619u;
-    }
-    return hash;
-}
-
-std::uint32_t fnv1a32(const std::string &text) noexcept {
-    return fnv1a32(reinterpret_cast<const unsigned char *>(text.data()), text.size());
-}
 
 int foldPublicHash(std::uint32_t hash) noexcept {
     return static_cast<int>(hash & 0x7fffffffu);
@@ -85,63 +62,6 @@ int identityHash(const Handle &handle) noexcept {
     folded ^= 0x9e3779b9u;
     folded *= 16777619u;
     return foldPublicHash(folded);
-}
-
-int valueHash(const StackValue &value) {
-    if (std::holds_alternative<std::monostate>(value)) return 0;
-    if (isNumeric(value)) {
-        double number = toDouble(value);
-        if (number == 0.0) number = 0.0; // +0.0 và -0.0 có equality giống nhau.
-        return foldPublicHash(fnv1a32(std::string("n:") + formatRuntimeFloat(number)));
-    }
-    if (std::holds_alternative<std::string>(value)) {
-        return foldPublicHash(fnv1a32(std::string("s:") + std::get<std::string>(value)));
-    }
-    if (std::holds_alternative<MapHandle>(value)) {
-        return identityHash(std::get<MapHandle>(value));
-    }
-    if (std::holds_alternative<ListHandle>(value)) {
-        return identityHash(std::get<ListHandle>(value));
-    }
-    if (std::holds_alternative<TupleHandle>(value)) {
-        return identityHash(std::get<TupleHandle>(value));
-    }
-    if (std::holds_alternative<ClassHandle>(value)) {
-        return identityHash(std::get<ClassHandle>(value));
-    }
-    if (std::holds_alternative<InstanceHandle>(value)) {
-        return identityHash(std::get<InstanceHandle>(value));
-    }
-    return identityHash(std::get<ClosureHandle>(value));
-}
-
-std::string bytesToLowerHex(const unsigned char *bytes, std::size_t size) {
-    static constexpr char kHex[] = "0123456789abcdef";
-    std::string result;
-    result.resize(size * 2);
-    for (std::size_t i = 0; i < size; ++i) {
-        result[i * 2] = kHex[(bytes[i] >> 4) & 0x0f];
-        result[i * 2 + 1] = kHex[bytes[i] & 0x0f];
-    }
-    return result;
-}
-
-bool requireUtf8CryptoString(const std::vector<StackValue> &args,
-                             std::size_t index,
-                             const std::string &fn,
-                             const char *label,
-                             std::string &value,
-                             std::string &err) {
-    if (index >= args.size() || !std::holds_alternative<std::string>(args[index])) {
-        err = messages::formatMessage(messages::kNativeStringArgumentRequired, {fn, label});
-        return false;
-    }
-    value = std::get<std::string>(args[index]);
-    if (!vietvm::core::isValidUtf8(value)) {
-        err = messages::formatMessage(messages::kNativeStringArgumentUtf8Invalid, {fn, label});
-        return false;
-    }
-    return true;
 }
 
 bool fillSecureRandom(std::vector<unsigned char> &bytes, std::string &err) {
@@ -169,184 +89,6 @@ bool fillSecureRandom(std::vector<unsigned char> &bytes, std::string &err) {
     return true;
 #else
     err = messages::messageText(messages::kNativeSecureRandomPlatformUnsupported);
-    return false;
-#endif
-}
-
-bool sha256Digest(const std::string &text,
-                  std::array<unsigned char, kSha256DigestSize> &digest,
-                  std::string &err) {
-#if defined(_WIN32)
-    BCRYPT_ALG_HANDLE algorithm = nullptr;
-    BCRYPT_HASH_HANDLE hash = nullptr;
-    DWORD objectLength = 0;
-    DWORD hashLength = 0;
-    DWORD copied = 0;
-    std::vector<unsigned char> object;
-
-    auto closeHandles = [&]() {
-        if (hash != nullptr) BCryptDestroyHash(hash);
-        if (algorithm != nullptr) BCryptCloseAlgorithmProvider(algorithm, 0);
-    };
-
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
-        &algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0);
-    if (status >= 0) {
-        status = BCryptGetProperty(
-            algorithm, BCRYPT_OBJECT_LENGTH,
-            reinterpret_cast<PUCHAR>(&objectLength), sizeof(objectLength), &copied, 0);
-    }
-    if (status >= 0) {
-        status = BCryptGetProperty(
-            algorithm, BCRYPT_HASH_LENGTH,
-            reinterpret_cast<PUCHAR>(&hashLength), sizeof(hashLength), &copied, 0);
-    }
-    if (status >= 0 && hashLength != digest.size()) {
-        closeHandles();
-        err = messages::messageText(messages::kNativeSha256DigestSizeInvalid);
-        return false;
-    }
-    if (status >= 0) {
-        object.resize(objectLength);
-        status = BCryptCreateHash(
-            algorithm, &hash, object.data(), objectLength, nullptr, 0, 0);
-    }
-    if (status >= 0 && !text.empty()) {
-        if (text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
-            closeHandles();
-            err = messages::messageText(messages::kNativeSha256InputTooLarge);
-            return false;
-        } else {
-            status = BCryptHashData(
-                hash,
-                reinterpret_cast<PUCHAR>(const_cast<char *>(text.data())),
-                static_cast<ULONG>(text.size()), 0);
-        }
-    }
-    if (status >= 0) {
-        status = BCryptFinishHash(
-            hash, digest.data(), static_cast<ULONG>(digest.size()), 0);
-    }
-    closeHandles();
-    if (status < 0) {
-        err = messages::messageText(messages::kNativeSha256WindowsFailed);
-        return false;
-    }
-    return true;
-#elif defined(__APPLE__)
-    if (text.size() > static_cast<std::size_t>(std::numeric_limits<CC_LONG>::max())) {
-        err = messages::messageText(messages::kNativeSha256InputTooLarge);
-        return false;
-    }
-    if (CC_SHA256(text.data(), static_cast<CC_LONG>(text.size()), digest.data()) == nullptr) {
-        err = messages::messageText(messages::kNativeSha256AppleFailed);
-        return false;
-    }
-    return true;
-#elif defined(__linux__)
-    unsigned int digestSize = 0;
-    if (EVP_Digest(text.data(), text.size(), digest.data(), &digestSize,
-                   EVP_sha256(), nullptr) != 1 ||
-        digestSize != digest.size()) {
-        err = messages::messageText(messages::kNativeSha256LinuxFailed);
-        return false;
-    }
-    return true;
-#else
-    (void)text;
-    (void)digest;
-    err = messages::messageText(messages::kNativeSha256PlatformUnsupported);
-    return false;
-#endif
-}
-
-bool hmacSha256Digest(const std::string &key,
-                      const std::string &text,
-                      std::array<unsigned char, kSha256DigestSize> &digest,
-                      std::string &err) {
-#if defined(_WIN32)
-    BCRYPT_ALG_HANDLE algorithm = nullptr;
-    BCRYPT_HASH_HANDLE hash = nullptr;
-    DWORD objectLength = 0;
-    DWORD hashLength = 0;
-    DWORD copied = 0;
-    std::vector<unsigned char> object;
-
-    auto closeHandles = [&]() {
-        if (hash != nullptr) BCryptDestroyHash(hash);
-        if (algorithm != nullptr) BCryptCloseAlgorithmProvider(algorithm, 0);
-    };
-
-    if (key.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)()) ||
-        text.size() > static_cast<std::size_t>((std::numeric_limits<ULONG>::max)())) {
-        err = messages::messageText(messages::kNativeHmacSha256InputTooLarge);
-        return false;
-    }
-
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
-        &algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, BCRYPT_ALG_HANDLE_HMAC_FLAG);
-    if (status >= 0) {
-        status = BCryptGetProperty(
-            algorithm, BCRYPT_OBJECT_LENGTH,
-            reinterpret_cast<PUCHAR>(&objectLength), sizeof(objectLength), &copied, 0);
-    }
-    if (status >= 0) {
-        status = BCryptGetProperty(
-            algorithm, BCRYPT_HASH_LENGTH,
-            reinterpret_cast<PUCHAR>(&hashLength), sizeof(hashLength), &copied, 0);
-    }
-    if (status >= 0 && hashLength != digest.size()) {
-        closeHandles();
-        err = messages::messageText(messages::kNativeHmacSha256DigestSizeInvalid);
-        return false;
-    }
-    if (status >= 0) {
-        object.resize(objectLength);
-        status = BCryptCreateHash(
-            algorithm, &hash, object.data(), objectLength,
-            reinterpret_cast<PUCHAR>(const_cast<char *>(key.data())),
-            static_cast<ULONG>(key.size()), 0);
-    }
-    if (status >= 0 && !text.empty()) {
-        status = BCryptHashData(
-            hash,
-            reinterpret_cast<PUCHAR>(const_cast<char *>(text.data())),
-            static_cast<ULONG>(text.size()), 0);
-    }
-    if (status >= 0) {
-        status = BCryptFinishHash(
-            hash, digest.data(), static_cast<ULONG>(digest.size()), 0);
-    }
-    closeHandles();
-    if (status < 0) {
-        err = messages::messageText(messages::kNativeHmacSha256WindowsFailed);
-        return false;
-    }
-    return true;
-#elif defined(__APPLE__)
-    (void)err;
-    CCHmac(kCCHmacAlgSHA256, key.data(), key.size(),
-           text.data(), text.size(), digest.data());
-    return true;
-#elif defined(__linux__)
-    if (key.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-        err = messages::messageText(messages::kNativeHmacSha256KeyTooLarge);
-        return false;
-    }
-    unsigned int digestSize = 0;
-    if (HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
-             reinterpret_cast<const unsigned char *>(text.data()), text.size(),
-             digest.data(), &digestSize) == nullptr ||
-        digestSize != digest.size()) {
-        err = messages::messageText(messages::kNativeHmacSha256LinuxFailed);
-        return false;
-    }
-    return true;
-#else
-    (void)key;
-    (void)text;
-    (void)digest;
-    err = messages::messageText(messages::kNativeHmacSha256PlatformUnsupported);
     return false;
 #endif
 }
@@ -380,35 +122,6 @@ bool isMissingPathError(const std::error_code &ec) noexcept {
            ec == std::errc::not_a_directory;
 }
 
-// Chuyển nghiêm ngặt số nguyên; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
-bool toStrictInt(const StackValue &value, int &out) {
-    if (std::holds_alternative<int>(value)) {
-        out = std::get<int>(value);
-        return true;
-    }
-    if (std::holds_alternative<double>(value)) {
-        const double number = std::get<double>(value);
-        if (!std::isfinite(number) || std::trunc(number) != number ||
-            number < static_cast<double>((std::numeric_limits<int>::min)()) ||
-            number > static_cast<double>((std::numeric_limits<int>::max)())) {
-            return false;
-        }
-        out = static_cast<int>(number);
-        return true;
-    }
-    if (!std::holds_alternative<std::string>(value)) return false;
-    try {
-        const std::string &text = std::get<std::string>(value);
-        std::size_t consumed = 0;
-        const int parsed = std::stoi(text, &consumed);
-        if (consumed != text.size()) return false;
-        out = parsed;
-        return true;
-    } catch (...) {
-        return false;
-    }
-}
-
 // Tên biến môi trường đi qua native boundary phải có cùng contract trên mọi nền tảng.
 // `getenv`/`_dupenv_s` không thống nhất cách xử lý tên rỗng, dấu `=` hoặc NUL nhúng,
 // vì vậy V++ từ chối các trường hợp đó trước khi gọi CRT/POSIX.
@@ -425,29 +138,6 @@ bool validateEnvironmentVariableName(const std::string &name,
         return false;
     }
     return true;
-}
-
-// Chuyển nghiêm ngặt double; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
-bool toStrictDouble(const StackValue &value, double &out) {
-    if (std::holds_alternative<int>(value)) {
-        out = static_cast<double>(std::get<int>(value));
-        return true;
-    }
-    if (std::holds_alternative<double>(value)) {
-        out = std::get<double>(value);
-        return true;
-    }
-    if (!std::holds_alternative<std::string>(value)) return false;
-    try {
-        const std::string &text = std::get<std::string>(value);
-        std::size_t consumed = 0;
-        const double parsed = std::stod(text, &consumed);
-        if (consumed != text.size()) return false;
-        out = parsed;
-        return true;
-    } catch (...) {
-        return false;
-    }
 }
 
 // Chạy kiểu tên; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
@@ -524,41 +214,6 @@ bool timezoneOffsetMinutes(std::time_t now,
 #endif
 }
 
-bool formatUtcIso8601(std::time_t now, std::string &out) {
-    std::tm utc{};
-    if (!utcTime(now, utc)) return false;
-    char buffer[32] = {0};
-    if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%SZ", &utc) == 0) {
-        return false;
-    }
-    out = buffer;
-    return true;
-}
-
-bool formatLocalIso8601(std::time_t now, std::string &out, int &offsetMinutes) {
-    std::tm local{};
-    std::tm utc{};
-    if (!localTime(now, local) || !utcTime(now, utc) ||
-        !timezoneOffsetMinutes(now, local, utc, offsetMinutes)) {
-        return false;
-    }
-
-    char dateTime[32] = {0};
-    if (std::strftime(dateTime, sizeof(dateTime), "%Y-%m-%dT%H:%M:%S", &local) == 0) {
-        return false;
-    }
-
-    const char sign = offsetMinutes < 0 ? '-' : '+';
-    const int absoluteMinutes = offsetMinutes < 0 ? -offsetMinutes : offsetMinutes;
-    char offset[8] = {0};
-    if (std::snprintf(offset, sizeof(offset), "%c%02d:%02d", sign,
-                      absoluteMinutes / 60, absoluteMinutes % 60) <= 0) {
-        return false;
-    }
-    out = std::string(dateTime) + offset;
-    return true;
-}
-
 } // namespace
 
 // Dispatch nhóm hàm native nền tảng/thư viện chuẩn; handler kiểm tra tên hàm và thực hiện filesystem, time, environment hoặc utility tương ứng.
@@ -566,31 +221,23 @@ bool handleNativeFoundationFunction(const std::string &fn,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,
                                     std::string &err) {
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToString)) {
+    if (vietvm::constants::matchesAnyName(
+            fn, vietvm::constants::kFnSpecialFloatInternal)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_string_value(sv_to_string(args[0]));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToInt)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int parsed = 0;
-        if (!toStrictInt(args[0], parsed)) {
-            err = messages::messageText(messages::kNativeToIntegerConversionFailed);
+        if (!std::holds_alternative<std::string>(args[0])) {
+            err = fn + ": yêu cầu tên giá trị IEEE dạng chuỗi";
             return true;
         }
-        result = make_int_value(parsed);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToFloat)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        double parsed = 0.0;
-        if (!toStrictDouble(args[0], parsed)) {
-            err = messages::messageText(messages::kNativeToFloatConversionFailed);
-            return true;
+        const std::string &kind = std::get<std::string>(args[0]);
+        if (kind == "nan") {
+            result = make_float_value(std::numeric_limits<double>::quiet_NaN());
+        } else if (kind == "inf") {
+            result = make_float_value(std::numeric_limits<double>::infinity());
+        } else if (kind == "-inf") {
+            result = make_float_value(-std::numeric_limits<double>::infinity());
+        } else {
+            err = fn + ": giá trị IEEE không được hỗ trợ";
         }
-        result = make_float_value(parsed);
         return true;
     }
 
@@ -600,97 +247,45 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnValueHash)) {
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIdentityHash)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        result = make_int_value(valueHash(args[0]));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnRandomInt)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        int minimum = 0;
-        int maximum = 0;
-        if (!toStrictInt(args[0], minimum) || !toStrictInt(args[1], maximum)) {
-            err = messages::messageText(messages::kNativeRandomIntBoundsMustBeInteger);
-            return true;
+        if (std::holds_alternative<MapHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<MapHandle>(args[0])));
+        } else if (std::holds_alternative<ListHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<ListHandle>(args[0])));
+        } else if (std::holds_alternative<TupleHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<TupleHandle>(args[0])));
+        } else if (std::holds_alternative<ClassHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<ClassHandle>(args[0])));
+        } else if (std::holds_alternative<InstanceHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<InstanceHandle>(args[0])));
+        } else if (std::holds_alternative<ClosureHandle>(args[0])) {
+            result = make_int_value(identityHash(std::get<ClosureHandle>(args[0])));
+        } else {
+            err = fn + ": chỉ nhận giá trị tham chiếu của VM";
         }
-        if (minimum > maximum) {
-            err = messages::messageText(messages::kNativeRandomIntBoundsInvalid);
-            return true;
-        }
-        static thread_local std::mt19937 generator(std::random_device{}());
-        std::uniform_int_distribution<int> distribution(minimum, maximum);
-        result = make_int_value(distribution(generator));
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSecureRandom)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int byteCount = 0;
-        if (!toStrictInt(args[0], byteCount) ||
-            byteCount < 1 || byteCount > kMaxSecureRandomBytes) {
+        if (!std::holds_alternative<int>(args[0])) {
+            err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
+            return true;
+        }
+        const int byteCount = std::get<int>(args[0]);
+        if (byteCount < 1 || byteCount > kMaxSecureRandomBytes) {
             err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
             return true;
         }
         std::vector<unsigned char> bytes(static_cast<std::size_t>(byteCount));
         if (!fillSecureRandom(bytes, err)) return true;
-        result = make_string_value(bytesToLowerHex(bytes.data(), bytes.size()));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSha256)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string text;
-        if (!requireUtf8CryptoString(args, 0, fn, "văn bản", text, err)) return true;
-        std::array<unsigned char, kSha256DigestSize> digest{};
-        if (!sha256Digest(text, digest, err)) return true;
-        result = make_string_value(bytesToLowerHex(digest.data(), digest.size()));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnHmacSha256)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string key;
-        std::string text;
-        if (!requireUtf8CryptoString(args, 0, fn, "khóa", key, err) ||
-            !requireUtf8CryptoString(args, 1, fn, "văn bản", text, err)) {
-            return true;
+        std::vector<StackValue> values;
+        values.reserve(bytes.size());
+        for (unsigned char byte : bytes) {
+            values.push_back(make_int_value(static_cast<int>(byte)));
         }
-        std::array<unsigned char, kSha256DigestSize> digest{};
-        if (!hmacSha256Digest(key, text, digest, err)) return true;
-        result = make_string_value(bytesToLowerHex(digest.data(), digest.size()));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathJoin)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        fs::path root;
-        fs::path child;
-        if (!nativeUtf8Path(args[0], fn, root, err) ||
-            !nativeUtf8Path(args[1], fn, child, err)) return true;
-        std::string joined;
-        if (!pathToUtf8(root / child, fn, joined, err)) return true;
-        result = make_string_value(joined);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathName)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::string name;
-        if (!pathToUtf8(path.filename(), fn, name, err)) return true;
-        result = make_string_value(name);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathParent)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::string parent;
-        if (!pathToUtf8(path.parent_path(), fn, parent, err)) return true;
-        result = make_string_value(parent);
+        result = make_list_value(std::move(values));
         return true;
     }
 
@@ -709,10 +304,6 @@ bool handleNativeFoundationFunction(const std::string &fn,
         } else {
             value = fs::is_directory(path, ec);
         }
-        // Query predicates have boolean semantics: a missing path is simply
-        // false. Windows reports ENOENT through error_code for some of these
-        // overloads while POSIX implementations commonly return false with a
-        // clear error_code, so normalize that platform difference here.
         if (isMissingPathError(ec)) {
             ec.clear();
             value = false;
@@ -747,7 +338,6 @@ bool handleNativeFoundationFunction(const std::string &fn,
             if (!pathToUtf8(entry.path().filename(), fn, name, err)) return true;
             names.push_back(std::move(name));
         }
-        std::sort(names.begin(), names.end());
         std::vector<StackValue> values;
         values.reserve(names.size());
         for (const std::string &name : names) values.push_back(make_string_value(name));
@@ -767,11 +357,11 @@ bool handleNativeFoundationFunction(const std::string &fn,
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnEnvGet)) {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         const std::string name = argToRawString(args[0]);
         if (!validateEnvironmentVariableName(name, fn, err)) return true;
         const auto value = getEnvVar(name.c_str());
-        result = make_string_value(value.has_value() ? *value : argToRawString(args[1]));
+        result = value.has_value() ? make_string_value(*value) : make_null_value();
         return true;
     }
 
@@ -781,53 +371,61 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNow)) {
-        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
+    // One clock read supplies both calendar fields and the local UTC offset.
+    // ISO-8601 formatting belongs to gói/thời gian, not the OS boundary.
+    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnWallClockParts)) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        int utcMode = 0;
+        if (!requireIntArgFromStack(args[0], fn, "chế độ UTC", utcMode, err)) return true;
+        if (utcMode != 0 && utcMode != 1) {
+            err = fn + ": chế độ UTC phải là 0 hoặc 1";
+            return true;
+        }
         const std::time_t now = std::time(nullptr);
+        std::tm calendar{};
+        std::tm utc{};
         int offsetMinutes = 0;
-        std::string formatted;
-        if (!formatLocalIso8601(now, formatted, offsetMinutes)) {
+        bool ok = false;
+        if (utcMode == 1) {
+            ok = utcTime(now, calendar);
+        } else {
+            ok = localTime(now, calendar) && utcTime(now, utc) &&
+                 timezoneOffsetMinutes(now, calendar, utc, offsetMinutes);
+        }
+        if (!ok) {
             err = vietvm::messages::formatMessage(
                 vietvm::messages::kNativeTimeFormatFailed, {fn});
             return true;
         }
-        result = make_string_value(formatted);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnNowUtc)) {
-        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
-        std::string formatted;
-        if (!formatUtcIso8601(std::time(nullptr), formatted)) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeTimeFormatFailed, {fn});
-            return true;
-        }
-        result = make_string_value(formatted);
+        result = make_list_value({
+            make_int_value(calendar.tm_year + 1900),
+            make_int_value(calendar.tm_mon + 1),
+            make_int_value(calendar.tm_mday),
+            make_int_value(calendar.tm_hour),
+            make_int_value(calendar.tm_min),
+            make_int_value(calendar.tm_sec),
+            make_int_value(offsetMinutes),
+        });
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(
-            fn, vietvm::constants::kFnTimezoneOffsetMinutes)) {
+            fn, vietvm::constants::kFnMonotonicMilliseconds)) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
-        const std::time_t now = std::time(nullptr);
-        std::tm local{};
-        std::tm utc{};
-        int offsetMinutes = 0;
-        if (!localTime(now, local) || !utcTime(now, utc) ||
-            !timezoneOffsetMinutes(now, local, utc, offsetMinutes)) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeTimeFormatFailed, {fn});
-            return true;
-        }
-        result = make_int_value(offsetMinutes);
+        const auto elapsed = std::chrono::steady_clock::now().time_since_epoch();
+        result = make_float_value(
+            std::chrono::duration<double, std::milli>(elapsed).count());
         return true;
     }
 
     if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSleepMs)) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int milliseconds = 0;
-        if (!toStrictInt(args[0], milliseconds) || milliseconds < 0) {
+        if (!std::holds_alternative<int>(args[0])) {
+            err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);
+            return true;
+        }
+        const int milliseconds = std::get<int>(args[0]);
+        if (milliseconds < 0) {
             err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);
             return true;
         }

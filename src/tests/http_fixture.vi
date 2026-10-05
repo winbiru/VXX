@@ -15,6 +15,12 @@ hàm chính() {
         nếu (path == "/health") {
             response = '{"ok":true}';
         };
+        nếu (mạng path suffix yêu cầu(requestId, "/inspect/") != "") {
+            keyword = mạng query param yêu cầu(requestId, "keyword");
+            name = mạng json field yêu cầu(requestId, "name");
+            suffix = mạng path suffix yêu cầu(requestId, "/inspect/");
+            response = keyword + "|" + name + "|" + suffix;
+        };
         mạng trả phản hồi(requestId, 200, response);
     };
 };

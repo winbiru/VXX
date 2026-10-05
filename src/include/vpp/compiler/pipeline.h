@@ -43,6 +43,13 @@ CompilationArtifacts compilePipelineInRegistry(
     bool emitEntryPointCall,
     bool topLevel);
 
+CompilationArtifacts compileParsedPipelineInRegistry(
+    CompilationRegistryState &state,
+    const vietvm::frontend::AstProgram &program,
+    const std::unordered_map<std::string, Opcode> &keywordMap,
+    bool emitEntryPointCall,
+    bool topLevel);
+
 // API compatibility dùng registry thread-local cũ; production caller nên dùng overload nhận `CompilationContext`.
 CompilationArtifacts compilePipeline(
     const std::string &source,

@@ -1,0 +1,66 @@
+// Module: thời gian
+// Mục đích: cung cấp API thời gian hiện tại cho ứng dụng.
+// Clock/zone là primitive OS; định dạng ISO-8601 nằm hoàn toàn ở V++.
+
+nhập gói/thời gian/lịch;
+
+// Snapshot native: [năm, tháng, ngày, giờ, phút, giây, offset phút].
+// Các trường và offset được lấy từ cùng một lần đọc clock, tránh lệch ngày/DST.
+// Đệm trực tiếp giây để giữ được giây nhuận 60 nếu OS trả về giá trị đó.
+hàm thời gian định dạng đồng hồ(các_phần, utc) {
+    kết_quả = thời gian đệm số(các_phần[0], 4) + "-" +
+        thời gian đệm số(các_phần[1], 2) + "-" +
+        thời gian đệm số(các_phần[2], 2) + "T" +
+        thời gian đệm số(các_phần[3], 2) + ":" +
+        thời gian đệm số(các_phần[4], 2) + ":" +
+        thời gian đệm số(các_phần[5], 2);
+    nếu (utc) {
+        trả về kết_quả + "Z";
+    };
+    lệch = các_phần[6];
+    dấu = "+";
+    nếu (lệch < 0) {
+        dấu = "-";
+        lệch = 0 - lệch;
+    };
+    giờ_lệch = thành số nguyên(lệch / 60);
+    trả về kết_quả + dấu + thời gian đệm số(giờ_lệch, 2) + ":" +
+        thời gian đệm số(lệch % 60, 2);
+};
+
+// Trả thời gian local dạng ISO-8601 có offset, ví dụ 2026-09-15T16:10:20+07:00.
+hàm lấy thời gian hiện tại() {
+    trả về thời gian định dạng đồng hồ(dong_ho_lich_noi_bo(0), sai);
+};
+
+// Trả thời gian UTC dạng ISO-8601, ví dụ 2026-09-15T09:10:20Z.
+hàm lấy thời gian utc() {
+    trả về thời gian định dạng đồng hồ(dong_ho_lich_noi_bo(1), đúng);
+};
+
+// Trả độ lệch local so với UTC theo phút, ví dụ UTC+07:00 là 420.
+hàm độ lệch múi giờ() {
+    các_phần = dong_ho_lich_noi_bo(0);
+    trả về các_phần[6];
+};
+
+// Alias tương thích cũng đi qua thân hàm V++.
+hàm lay_thoi_gian_hien_tai() {
+    trả về lấy thời gian hiện tại();
+};
+
+hàm lay_thoi_gian_utc() {
+    trả về lấy thời gian utc();
+};
+
+hàm do_lech_mui_gio() {
+    trả về độ lệch múi giờ();
+};
+
+// Ghi chú hàm: giờ hiện tại.
+hàm giờ hiện tại() {
+    trả về lấy thời gian hiện tại();
+};
+
+nhập gói/thời gian/đơn điệu;
+nhập gói/thời gian/thời lượng;

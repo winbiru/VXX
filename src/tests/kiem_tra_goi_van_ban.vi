@@ -1,0 +1,10 @@
+nhập văn bản;
+
+hàm chính() {
+    in độ dài("Việt");
+    in chuỗi hoa("xin chào");
+    in bắt đầu bằng("V++ Việt", "V++");
+    in kết thúc bằng("V++ Việt", "Việt");
+    in chứa chính xác("abc Việt xyz", "Việt");
+    in thay chính xác("a-b-a", "a", "x");
+};

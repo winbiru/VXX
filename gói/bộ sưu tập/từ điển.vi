@@ -1,0 +1,32 @@
+// Module: lõi.từ điển
+// Map MVP: literal scalar, lấy/đặt/xóa key và liệt kê key được thực thi native.
+// Thứ tự key là policy thư viện và được xử lý bằng V++.
+
+nhập gói/bộ sưu tập/danh sách;
+
+// Lấy value theo key; trả về mặc định khi key không tồn tại.
+hàm lấy map(bảng, khóa, mặc định) {
+    trả về lay_map(bảng, khóa, mặc định);
+};
+
+// Đặt value theo key; list/map cũng được giữ theo tham chiếu. Trả về rỗng.
+hàm đặt map(bảng, khóa, giá trị) {
+    trả về dat_map(bảng, khóa, giá trị);
+};
+
+// Kiểm tra key tồn tại, trả về đúng/sai theo quy ước số 1/0.
+hàm có khóa(bảng, khóa) {
+    trả về co_khoa(bảng, khóa);
+};
+
+// Xóa key, trả về value cũ hoặc rỗng.
+hàm xóa khóa(bảng, khóa) {
+    trả về xoa_khoa(bảng, khóa);
+};
+
+// Trả về list key đã sắp theo thứ tự từ điển.
+hàm khóa map(bảng) {
+    khóa = khoa_map(bảng);
+    sắp xếp(khóa);
+    trả về khóa;
+};

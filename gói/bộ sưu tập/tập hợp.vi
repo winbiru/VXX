@@ -1,0 +1,140 @@
+// Module: lõi.tập hợp
+// Set MVP được biểu diễn bởi list không trùng lặp, giữ thứ tự xuất hiện.
+
+hàm tập yêu cầu danh sách(ds) {
+    nếu (loại của(ds) != "danh sách") {
+        ném "COLLECTION_ARGUMENT";
+    };
+    trả về ds;
+};
+
+hàm tập chứa(ds, giá_trị) {
+    tập yêu cầu danh sách(ds);
+    lặp(i = 0; i < do_dai(ds); i++) {
+        nếu (ds[i] == giá_trị) {
+            trả về đúng;
+        };
+    };
+    trả về sai;
+};
+
+hàm tập hợp(ds) {
+    tập yêu cầu danh sách(ds);
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(ds); i++) {
+        nếu (!tập chứa(kết_quả, ds[i])) {
+            them(kết_quả, ds[i]);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm hợp tập(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    kết_quả = tập hợp(a);
+    lặp(i = 0; i < do_dai(b); i++) {
+        nếu (!tập chứa(kết_quả, b[i])) {
+            them(kết_quả, b[i]);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm giao tập(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    kết_quả = [];
+    duyệt = tập hợp(a);
+    lặp(i = 0; i < do_dai(duyệt); i++) {
+        nếu (tập chứa(b, duyệt[i])) {
+            them(kết_quả, duyệt[i]);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm rời nhau(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    lặp(i = 0; i < do_dai(a); i++) {
+        nếu (tập chứa(b, a[i])) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm hiệu tập(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    kết_quả = [];
+    duyệt = tập hợp(a);
+    lặp(i = 0; i < do_dai(duyệt); i++) {
+        nếu (!tập chứa(b, duyệt[i])) {
+            them(kết_quả, duyệt[i]);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm hiệu đối xứng tập(a, b) {
+    trái = hiệu tập(a, b);
+    phải = hiệu tập(b, a);
+    trả về hợp tập(trái, phải);
+};
+
+hàm tập con(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    duyệt = tập hợp(a);
+    lặp(i = 0; i < do_dai(duyệt); i++) {
+        nếu (!tập chứa(b, duyệt[i])) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm tập con thực sự(a, b) {
+    nếu (!tập con(a, b)) {
+        trả về sai;
+    };
+    trả về do_dai(tập hợp(a)) < do_dai(tập hợp(b));
+};
+
+hàm tập cha(a, b) {
+    trả về tập con(b, a);
+};
+
+hàm tập bằng(a, b) {
+    tập yêu cầu danh sách(a);
+    tập yêu cầu danh sách(b);
+    aa = tập hợp(a);
+    bb = tập hợp(b);
+    nếu (do_dai(aa) != do_dai(bb)) {
+        trả về sai;
+    };
+    trả về tập con(aa, bb);
+};
+
+hàm tập thêm(ds, giá_trị) {
+    tập yêu cầu danh sách(ds);
+    nếu (tập chứa(ds, giá_trị)) {
+        trả về sai;
+    };
+    them(ds, giá_trị);
+    trả về đúng;
+};
+
+hàm tập xóa(ds, giá_trị) {
+    tập yêu cầu danh sách(ds);
+    lặp(i = 0; i < do_dai(ds); i++) {
+        nếu (ds[i] == giá_trị) {
+            xoa_tai(ds, i);
+            trả về đúng;
+        };
+    };
+    trả về sai;
+};
+nhập gói/lõi/chuyển kiểu;

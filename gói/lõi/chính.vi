@@ -1,22 +1,16 @@
 // Gói lõi: các tiện ích không phụ thuộc mạng, dữ liệu hoặc ứng dụng.
-nhập gói/lõi/toán học;
-nhập gói/lõi/chuỗi;
-nhập gói/lõi/danh sách;
-nhập gói/lõi/từ điển;
-nhập gói/lõi/tập hợp;
-nhập gói/lõi/tuple;
 nhập gói/lõi/luận lý;
 nhập gói/lõi/xác thực;
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/ngẫu nhiên;
-nhập gói/lõi/mật mã;
+nhập gói/bảo mật/mật mã;
 nhập gói/lõi/hàm;
 nhập gói/lõi/tùy chọn;
 nhập gói/lõi/giá trị;
 nhập gói/lõi/định dạng;
 nhập gói/lõi/thống kê;
-nhập gói/lõi/bộ nối chuỗi;
 nhập gói/lõi/luồng dữ liệu;
-nhập gói/lõi/mã hóa tiện ích;
-nhập gói/lõi/quét và tách chuỗi;
 nhập gói/lõi/sự kiện;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/bản địa hóa;
+nhập gói/lõi/quốc tế hóa;

@@ -1,0 +1,829 @@
+// Module: mạng
+// HTTP method wrappers và HTTP/1.1 nằm ở V++; native chỉ giữ socket/TLS primitive I/O.
+// HTTP client chỉ nhận URL UTF-8 hợp lệ dùng http:// hoặc https://, có host và
+// không chứa khoảng trắng/ký tự điều khiển chưa percent-encode.
+// Lỗi socket/transport được ném qua thử/bắt để caller có thể xử lý hoặc thử
+// lại khi máy chủ chưa sẵn sàng. Không tự động gửi lại POST/PUT/DELETE.
+// Cả HTTP và HTTPS đều dùng cùng framing/parsing V++; HTTPS chỉ đổi transport sang TLS.
+
+nhập gói/dữ liệu/json/chính;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/mạng/ổ cắm;
+nhập gói/văn bản/chuỗi;
+
+// HTTP/1.x là logic thư viện và được viết bằng V++. Native chỉ giữ transport
+// socket/TLS, certificate verification và crypto primitive của hệ điều hành.
+hàm mạng http tìm ký tự đầu(giá_trị, ký_tự, từ = 0) {
+    trả về tìm chuỗi chính xác(giá_trị, ký_tự, từ);
+};
+
+hàm mạng http authority kết thúc(đường_dẫn, bắt_đầu) {
+    n = do_dai(đường_dẫn);
+    kết_thúc = n;
+    slash = mạng http tìm ký tự đầu(đường_dẫn, "/", bắt_đầu);
+    query = mạng http tìm ký tự đầu(đường_dẫn, "?", bắt_đầu);
+    fragment = mạng http tìm ký tự đầu(đường_dẫn, "#", bắt_đầu);
+    nếu (slash != rỗng) {
+        nếu (slash < kết_thúc) { kết_thúc = slash; };
+    };
+    nếu (query != rỗng) {
+        nếu (query < kết_thúc) { kết_thúc = query; };
+    };
+    nếu (fragment != rỗng) {
+        nếu (fragment < kết_thúc) { kết_thúc = fragment; };
+    };
+    trả về kết_thúc;
+};
+
+hàm mạng http phân tích url(đường_dẫn) {
+    nếu (đường_dẫn == "") {
+        ném "mạng http: URL không được rỗng";
+    };
+    lặp(i = 0; i < do_dai(đường_dẫn); i++) {
+        mã = chuỗi mã điểm unicode(đường_dẫn[i]);
+        nếu (mã <= 32 || mã == 127) {
+            ném "mạng http: URL chứa khoảng trắng hoặc ký tự điều khiển; hãy percent-encode trước";
+        };
+    };
+
+    dùng_tls = sai;
+    n = do_dai(đường_dẫn);
+    authority_bắt_đầu = 0;
+    cổng_mặc_định = 80;
+    nếu (bắt đầu bằng(đường_dẫn, "http://")) {
+        authority_bắt_đầu = 7;
+    } nếu không {
+        nếu (bắt đầu bằng(đường_dẫn, "https://")) {
+            authority_bắt_đầu = 8;
+            cổng_mặc_định = 443;
+            dùng_tls = đúng;
+        } nếu không {
+            ném "mạng http: chỉ hỗ trợ URL http:// hoặc https://";
+        };
+    };
+    authority_kết_thúc = mạng http authority kết thúc(đường_dẫn, authority_bắt_đầu);
+    nếu (authority_kết_thúc <= authority_bắt_đầu) {
+        ném "mạng http: URL thiếu tên máy";
+    };
+
+    authority = con chuỗi(đường_dẫn, authority_bắt_đầu, authority_kết_thúc);
+    nếu (chứa chính xác(authority, "@")) {
+        ném "mạng http: userinfo trong URL chưa được hỗ trợ";
+    };
+
+    tên_máy = "";
+    cổng = cổng_mặc_định;
+    nếu (bắt đầu bằng(authority, "[")) {
+        đóng = mạng http tìm ký tự đầu(authority, "]", 1);
+        nếu (đóng == rỗng) {
+            ném "mạng http: địa chỉ IPv6 không hợp lệ";
+        };
+        nếu (đóng <= 1) {
+            ném "mạng http: địa chỉ IPv6 không hợp lệ";
+        };
+        tên_máy = con chuỗi(authority, 1, đóng);
+        hậu = con chuỗi(authority, đóng + 1, do_dai(authority));
+        nếu (hậu != "") {
+            nếu (!bắt đầu bằng(hậu, ":") || do_dai(hậu) == 1) {
+                ném "mạng http: cổng không hợp lệ";
+            };
+            cổng = thành số nguyên(con chuỗi(hậu, 1, do_dai(hậu)));
+        };
+    } nếu không {
+        dấu_hai_chấm = mạng http tìm ký tự đầu(authority, ":", 0);
+        nếu (dấu_hai_chấm == rỗng) {
+            tên_máy = authority;
+        } nếu không {
+            nếu (mạng http tìm ký tự đầu(authority, ":", dấu_hai_chấm + 1) != rỗng) {
+                ném "mạng http: IPv6 phải đặt trong []";
+            };
+            tên_máy = con chuỗi(authority, 0, dấu_hai_chấm);
+            cổng_chữ = con chuỗi(authority, dấu_hai_chấm + 1, do_dai(authority));
+            nếu (cổng_chữ == "") {
+                ném "mạng http: cổng không hợp lệ";
+            };
+            thử {
+                cổng = thành số nguyên(cổng_chữ);
+            } bắt lỗi (e) {
+                ném "mạng http: cổng không hợp lệ";
+            };
+        };
+    };
+
+    nếu (tên_máy == "" || cổng <= 0 || cổng > 65535) {
+        ném "mạng http: tên máy hoặc cổng không hợp lệ";
+    };
+
+    đích = "/";
+    nếu (authority_kết_thúc < n) {
+        đích = con chuỗi(đường_dẫn, authority_kết_thúc, n);
+        nếu (bắt đầu bằng(đích, "?")) {
+            đích = "/" + đích;
+        };
+        fragment = mạng http tìm ký tự đầu(đích, "#", 0);
+        nếu (fragment != rỗng) {
+            đích = con chuỗi(đích, 0, fragment);
+        };
+        nếu (đích == "") { đích = "/"; };
+    };
+
+    trả về [tên_máy, cổng, đích, authority, dùng_tls];
+};
+
+hàm mạng http dựng request(method, đích, host_header, dữ_liệu, có_body) {
+    request = method + " " + đích + " HTTP/1.1\r\n" +
+              "Host: " + host_header + "\r\n" +
+              "Accept: */*\r\n" +
+              "Connection: close\r\n";
+    nếu (có_body) {
+        số_byte = do_dai(chuỗi thành bytes(dữ_liệu, "UTF-8"));
+        request = request +
+                  "Content-Type: application/json\r\n" +
+                  "Content-Length: " + thành chuỗi(số_byte) + "\r\n";
+    };
+    request = request + "\r\n";
+    nếu (có_body) { request = request + dữ_liệu; };
+    trả về request;
+};
+
+hàm mạng http lấy prefix byte(văn_bản, số_byte, nhãn = "dữ liệu") {
+    bytes = chuỗi thành bytes(văn_bản, "UTF-8");
+    nếu (số_byte < 0 || do_dai(bytes) < số_byte) {
+        ném "mạng http: " + nhãn + " ngắn hơn độ dài đã khai báo";
+    };
+    nếu (do_dai(bytes) == số_byte) { trả về văn_bản; };
+    kết_quả = [];
+    lặp(i = 0; i < số_byte; i++) {
+        them(kết_quả, bytes[i]);
+    };
+    trả về chuỗi từ bytes(kết_quả, "UTF-8", "BÁO_LỖI");
+};
+
+hàm mạng http hex byte(b) {
+    nếu (b >= 48 && b <= 57) { trả về b - 48; };
+    nếu (b >= 65 && b <= 70) { trả về b - 65 + 10; };
+    nếu (b >= 97 && b <= 102) { trả về b - 97 + 10; };
+    trả về -1;
+};
+
+// Giải Transfer-Encoding: chunked trực tiếp trên bytes để kích thước chunk
+// không bị nhầm giữa byte UTF-8 và code point V++.
+hàm mạng http giải chunked(body) {
+    nguồn = chuỗi thành bytes(body, "UTF-8");
+    kết_quả = [];
+    vị_trí = 0;
+    hoàn_tất = sai;
+
+    lặp(vòng = 0; !hoàn_tất; vòng++) {
+        nếu (vị_trí >= do_dai(nguồn)) {
+            ném "mạng http: chunked response thiếu kích thước chunk";
+        };
+        cuối_dòng = -1;
+        lặp(i = vị_trí; i + 1 < do_dai(nguồn) && cuối_dòng < 0; i++) {
+            nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
+                cuối_dòng = i;
+            };
+        };
+        nếu (cuối_dòng < 0) {
+            ném "mạng http: chunked response thiếu CRLF";
+        };
+
+        kích_thước = 0;
+        có_chữ_số = sai;
+        đang_hex = đúng;
+        lặp(i = vị_trí; i < cuối_dòng && đang_hex; i++) {
+            nếu (nguồn[i] == 59) {
+                đang_hex = sai; // ';' bắt đầu chunk extension.
+            } nếu không {
+                nibble = mạng http hex byte(nguồn[i]);
+                nếu (nibble < 0) {
+                    ném "mạng http: kích thước chunk không hợp lệ";
+                };
+                có_chữ_số = đúng;
+                kích_thước = kích_thước * 16 + nibble;
+                nếu (kích_thước > 16777216) {
+                    ném "mạng http: chunk vượt giới hạn 16 MiB";
+                };
+            };
+        };
+        nếu (!có_chữ_số) {
+            ném "mạng http: kích thước chunk rỗng";
+        };
+
+        vị_trí = cuối_dòng + 2;
+        nếu (kích_thước == 0) {
+            // Sau zero chunk là trailer section, kết thúc bởi một dòng rỗng.
+            // Trailer hiện chưa được nhập vào map headers nhưng vẫn phải được
+            // đọc và kiểm tra cấu trúc để không chấp nhận response bị cắt cụt.
+            trailer_xong = sai;
+            lặp(vòng_trailer = 0; !trailer_xong; vòng_trailer++) {
+                cuối_trailer = -1;
+                lặp(i = vị_trí; i + 1 < do_dai(nguồn) && cuối_trailer < 0; i++) {
+                    nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
+                        cuối_trailer = i;
+                    };
+                };
+                nếu (cuối_trailer < 0) {
+                    ném "mạng http: chunked response thiếu CRLF kết thúc trailer";
+                };
+                nếu (cuối_trailer == vị_trí) {
+                    vị_trí = cuối_trailer + 2;
+                    trailer_xong = đúng;
+                } nếu không {
+                    có_hai_chấm = sai;
+                    lặp(i = vị_trí; i < cuối_trailer && !có_hai_chấm; i++) {
+                        nếu (nguồn[i] == 58 && i > vị_trí) {
+                            có_hai_chấm = đúng;
+                        };
+                    };
+                    nếu (!có_hai_chấm) {
+                        ném "mạng http: trailer chunked không hợp lệ";
+                    };
+                    vị_trí = cuối_trailer + 2;
+                };
+            };
+            hoàn_tất = đúng;
+        } nếu không {
+            nếu (vị_trí + kích_thước + 2 > do_dai(nguồn)) {
+                ném "mạng http: chunk ngắn hơn kích thước đã khai báo";
+            };
+            nếu (do_dai(kết_quả) + kích_thước > 16777216) {
+                ném "mạng http: body chunked vượt giới hạn 16 MiB";
+            };
+            lặp(i = 0; i < kích_thước; i++) {
+                them(kết_quả, nguồn[vị_trí + i]);
+            };
+            vị_trí = vị_trí + kích_thước;
+            nếu (nguồn[vị_trí] != 13 || nguồn[vị_trí + 1] != 10) {
+                ném "mạng http: chunk thiếu CRLF kết thúc";
+            };
+            vị_trí = vị_trí + 2;
+        };
+    };
+    trả về chuỗi từ bytes(kết_quả, "UTF-8", "BÁO_LỖI");
+};
+
+hàm mạng http phân tích response(phản_hồi) {
+    ngăn = tìm chuỗi chính xác(phản_hồi, "\r\n\r\n", 0);
+    nếu (ngăn == rỗng) {
+        ném "mạng http: phản hồi không có phần đầu HTTP hợp lệ";
+    };
+    phần_đầu = con chuỗi(phản_hồi, 0, ngăn);
+    dòng = tách literal(phần_đầu, "\r\n");
+    nếu (do_dai(dòng) == 0) {
+        ném "mạng http: status line bị thiếu";
+    };
+    status_parts = tách literal(dòng[0], " ");
+    nếu (do_dai(status_parts) < 2) {
+        ném "mạng http: status line không hợp lệ";
+    };
+    nếu (!bắt đầu bằng(status_parts[0], "HTTP/")) {
+        ném "mạng http: status line không hợp lệ";
+    };
+    thử {
+        status = thành số nguyên(status_parts[1]);
+    } bắt lỗi (e) {
+        ném "mạng http: status code không hợp lệ";
+    };
+
+    headers = {};
+    lặp(i = 1; i < do_dai(dòng); i++) {
+        nếu (dòng[i] != "") {
+            dấu_hai_chấm = tìm chuỗi chính xác(dòng[i], ":", 0);
+            nếu (dấu_hai_chấm == rỗng || dấu_hai_chấm == 0) {
+                ném "mạng http: response header không hợp lệ";
+            };
+            khóa = chuỗi thường(bỏ khoảng trắng(
+                con chuỗi(dòng[i], 0, dấu_hai_chấm)
+            ));
+            giá_trị = bỏ khoảng trắng(
+                con chuỗi(dòng[i], dấu_hai_chấm + 1, do_dai(dòng[i]))
+            );
+            đặt map(headers, khóa, giá_trị);
+        };
+    };
+
+    body = con chuỗi(phản_hồi, ngăn + 4, do_dai(phản_hồi));
+    transfer = chuỗi thường(lấy map(headers, "transfer-encoding", ""));
+    nếu (chứa chính xác(transfer, "chunked")) {
+        body = mạng http giải chunked(body);
+    } nếu không {
+        content_length_text = lấy map(headers, "content-length", "");
+        nếu (content_length_text != "") {
+            thử {
+                content_length = thành số nguyên(content_length_text);
+            } bắt lỗi (e) {
+                ném "mạng http: Content-Length response không hợp lệ";
+            };
+            nếu (content_length < 0 || content_length > 16777216) {
+                ném "mạng http: Content-Length response vượt giới hạn 16 MiB";
+            };
+            body = mạng http lấy prefix byte(body, content_length, "response body");
+        };
+    };
+
+    trả về {"status": status, "headers": headers, "body": body};
+};
+
+hàm mạng http tách body(phản_hồi) {
+    response = mạng http phân tích response(phản_hồi);
+    trả về lấy map(response, "body", "");
+};
+
+hàm mạng http thực thi response qua socket(method, đường_dẫn, dữ_liệu, có_body) {
+    url = mạng http phân tích url(đường_dẫn);
+    tên_máy = url[0];
+    cổng = url[1];
+    đích = url[2];
+    host_header = url[3];
+    dùng_tls = url[4];
+    socket = 0;
+    nếu (dùng_tls) {
+        socket = socket tls mở(tên_máy, cổng, 20000);
+    } nếu không {
+        socket = socket tcp mở(tên_máy, cổng, 20000);
+    };
+    phản_hồi = "";
+    thử {
+        request = mạng http dựng request(method, đích, host_header, dữ_liệu, có_body);
+        socket gửi(socket, request);
+        đang_đọc = đúng;
+        lặp(vòng = 0; đang_đọc; vòng++) {
+            phần = socket nhận(socket, 65536);
+            nếu (phần == "") {
+                đang_đọc = sai;
+            } nếu không {
+                phản_hồi = phản_hồi + phần;
+                nếu (do_dai(chuỗi thành bytes(phản_hồi, "UTF-8")) > 16842752) {
+                    ném "mạng http: response vượt giới hạn 16 MiB + 64 KiB header";
+                };
+            };
+        };
+    } bắt lỗi (e) {
+        thử { socket đóng(socket); } bắt lỗi (bỏ_qua) {};
+        ném e;
+    };
+    socket đóng(socket);
+    trả về mạng http phân tích response(phản_hồi);
+};
+
+hàm mạng http thực thi qua socket(method, đường_dẫn, dữ_liệu, có_body) {
+    response = mạng http thực thi response qua socket(
+        method, đường_dẫn, dữ_liệu, có_body
+    );
+    trả về lấy map(response, "body", "");
+};
+
+hàm mạng http là redirect(status) {
+    trả về status == 301 || status == 302 || status == 303 ||
+            status == 307 || status == 308;
+};
+
+hàm mạng http chuẩn hóa path redirect(path_và_hậu_tố) {
+    path = path_và_hậu_tố;
+    hậu_tố = "";
+    vị_trí_hậu = rỗng;
+    vị_trí_query = tìm chuỗi chính xác(path, "?", 0);
+    vị_trí_fragment = tìm chuỗi chính xác(path, "#", 0);
+    nếu (vị_trí_query != rỗng) { vị_trí_hậu = vị_trí_query; };
+    nếu (vị_trí_fragment != rỗng) {
+        nếu (vị_trí_hậu == rỗng || vị_trí_fragment < vị_trí_hậu) {
+            vị_trí_hậu = vị_trí_fragment;
+        };
+    };
+    nếu (vị_trí_hậu != rỗng) {
+        hậu_tố = con chuỗi(path, vị_trí_hậu, do_dai(path));
+        path = con chuỗi(path, 0, vị_trí_hậu);
+    };
+
+    giữ_slash_cuối = kết thúc bằng(path, "/") ||
+                     kết thúc bằng(path, "/.") ||
+                     kết thúc bằng(path, "/..");
+    phần = tách literal(path, "/");
+    chuẩn = [];
+    lặp(i = 0; i < do_dai(phần); i++) {
+        đoạn = phần[i];
+        nếu (đoạn == "" || đoạn == ".") {
+            // Bỏ segment rỗng và '.'.
+        } nếu không {
+            nếu (đoạn == "..") {
+                nếu (do_dai(chuẩn) > 0) {
+                    xoa_tai(chuẩn, do_dai(chuẩn) - 1);
+                };
+            } nếu không {
+                them(chuẩn, đoạn);
+            };
+        };
+    };
+
+    kết_quả = "/";
+    lặp(i = 0; i < do_dai(chuẩn); i++) {
+        nếu (i > 0) { kết_quả = kết_quả + "/"; };
+        kết_quả = kết_quả + chuẩn[i];
+    };
+    nếu (giữ_slash_cuối && kết_quả != "/") {
+        kết_quả = kết_quả + "/";
+    };
+    trả về kết_quả + hậu_tố;
+};
+
+hàm mạng http url redirect(gốc, location) {
+    nếu (bắt đầu bằng(location, "http://") || bắt đầu bằng(location, "https://")) {
+        trả về location;
+    };
+    base = mạng http phân tích url(gốc);
+    scheme = "http://";
+    nếu (base[4]) { scheme = "https://"; };
+    origin = scheme + base[3];
+    nếu (bắt đầu bằng(location, "//")) {
+        trả về con chuỗi(scheme, 0, do_dai(scheme) - 2) + location;
+    };
+    nếu (bắt đầu bằng(location, "/")) {
+        trả về origin + mạng http chuẩn hóa path redirect(location);
+    };
+
+    path = base[2];
+    vị_trí_query = tìm chuỗi chính xác(path, "?", 0);
+    nếu (vị_trí_query != rỗng) {
+        path = con chuỗi(path, 0, vị_trí_query);
+    };
+    nếu (bắt đầu bằng(location, "?")) {
+        trả về origin + path + location;
+    };
+    slash_cuối = 0;
+    lặp(i = 0; i < do_dai(path); i++) {
+        nếu (path[i] == "/") { slash_cuối = i; };
+    };
+    thư_mục = con chuỗi(path, 0, slash_cuối + 1);
+    trả về origin + mạng http chuẩn hóa path redirect(thư_mục + location);
+};
+
+hàm mạng thực thi yêu cầu(method, đường_dẫn, dữ_liệu = "") {
+    nếu (method != "GET" && method != "POST" && method != "PUT" && method != "DELETE") {
+        ném "mạng http: phương thức HTTP không được hỗ trợ";
+    };
+    method_hiện_tại = method;
+    url_hiện_tại = đường_dẫn;
+    dữ_liệu_hiện_tại = dữ_liệu;
+    lặp(lần = 0; lần <= 8; lần++) {
+        có_body = method_hiện_tại == "POST" || method_hiện_tại == "PUT";
+        response = mạng http thực thi response qua socket(
+            method_hiện_tại, url_hiện_tại, dữ_liệu_hiện_tại, có_body
+        );
+        status = lấy map(response, "status", 0);
+        headers = lấy map(response, "headers", {});
+        location = lấy map(headers, "location", "");
+        nếu (!mạng http là redirect(status) || location == "") {
+            trả về lấy map(response, "body", "");
+        };
+        nếu (lần == 8) {
+            ném "mạng http: vượt quá 8 lần redirect";
+        };
+        url_hiện_tại = mạng http url redirect(url_hiện_tại, location);
+        nếu (status == 303 ||
+            ((status == 301 || status == 302) && method_hiện_tại == "POST")) {
+            method_hiện_tại = "GET";
+            dữ_liệu_hiện_tại = "";
+        };
+    };
+    ném "mạng http: redirect không kết thúc";
+};
+
+hàm mạng lấy(đường dẫn) {
+    trả về mạng thực thi yêu cầu("GET", đường dẫn, "");
+};
+
+hàm mạng gửi(đường dẫn, dữ liệu) {
+    trả về mạng thực thi yêu cầu("POST", đường dẫn, dữ liệu);
+};
+
+hàm mạng cập nhật(đường dẫn, dữ liệu) {
+    trả về mạng thực thi yêu cầu("PUT", đường dẫn, dữ liệu);
+};
+
+hàm mạng xóa(đường dẫn) {
+    trả về mạng thực thi yêu cầu("DELETE", đường dẫn, "");
+};
+
+// Tương thích API cũ. HTTP server được triển khai ở V++; native chỉ cung cấp
+// bind/listen/accept/send/recv/close trên socket.
+hàm mạng chạy máy chủ api(cổng, driver, jdbcUrl, username, password) {
+    trả về mạng mở máy chủ api(cổng);
+};
+
+hàm mạng mở máy chủ api(cổng) {
+    trả về socket tcp lắng nghe(cổng, 64);
+};
+
+// Parse request line + headers. Body được đọc riêng vì Content-Length tính byte,
+// còn chuỗi V++ lập chỉ mục theo code point.
+hàm mạng http phân tích phần đầu request(phần_đầu) {
+    dòng = tách literal(phần_đầu, "\r\n");
+    nếu (do_dai(dòng) == 0 || dòng[0] == "") {
+        ném "mạng http server: request line rỗng";
+    };
+
+    request_line = dòng[0];
+    khoảng_1 = tìm chuỗi chính xác(request_line, " ", 0);
+    nếu (khoảng_1 == rỗng) {
+        ném "mạng http server: request line không hợp lệ";
+    };
+    khoảng_2 = tìm chuỗi chính xác(request_line, " ", khoảng_1 + 1);
+    nếu (khoảng_2 == rỗng) {
+        ném "mạng http server: request line không hợp lệ";
+    };
+
+    method = con chuỗi(request_line, 0, khoảng_1);
+    target = con chuỗi(request_line, khoảng_1 + 1, khoảng_2);
+    phiên_bản = con chuỗi(request_line, khoảng_2 + 1, do_dai(request_line));
+    nếu (method == "" || target == "" ||
+        (phiên_bản != "HTTP/1.0" && phiên_bản != "HTTP/1.1")) {
+        ném "mạng http server: request line không hợp lệ";
+    };
+
+    path = target;
+    query = "";
+    vị_trí_query = tìm chuỗi chính xác(target, "?", 0);
+    nếu (vị_trí_query != rỗng) {
+        path = con chuỗi(target, 0, vị_trí_query);
+        query = con chuỗi(target, vị_trí_query + 1, do_dai(target));
+    };
+    nếu (path == "") { path = "/"; };
+
+    headers = {};
+    lặp(i = 1; i < do_dai(dòng); i++) {
+        nếu (dòng[i] != "") {
+            dấu_hai_chấm = tìm chuỗi chính xác(dòng[i], ":", 0);
+            nếu (dấu_hai_chấm == rỗng || dấu_hai_chấm == 0) {
+                ném "mạng http server: header không hợp lệ";
+            };
+            khóa = chuỗi thường(bỏ khoảng trắng(
+                con chuỗi(dòng[i], 0, dấu_hai_chấm)
+            ));
+            giá_trị = bỏ khoảng trắng(
+                con chuỗi(dòng[i], dấu_hai_chấm + 1, do_dai(dòng[i]))
+            );
+            đặt map(headers, khóa, giá_trị);
+        };
+    };
+
+    nếu (chuỗi thường(lấy map(headers, "transfer-encoding", "")) == "chunked") {
+        ném "mạng http server: Transfer-Encoding chunked chưa được hỗ trợ";
+    };
+
+    content_length = 0;
+    content_length_text = lấy map(headers, "content-length", "");
+    nếu (content_length_text != "") {
+        thử {
+            content_length = thành số nguyên(content_length_text);
+        } bắt lỗi (e) {
+            ném "mạng http server: Content-Length không hợp lệ";
+        };
+        nếu (content_length < 0 || content_length > 16777216) {
+            ném "mạng http server: Content-Length vượt giới hạn";
+        };
+    };
+
+    trả về {
+        "method": method,
+        "path": path,
+        "query": query,
+        "headers": headers,
+        "content length": content_length
+    };
+};
+
+hàm mạng http cắt body theo byte(body, số_byte) {
+    nếu (số_byte == 0) { trả về ""; };
+    bytes = chuỗi thành bytes(body, "UTF-8");
+    nếu (do_dai(bytes) < số_byte) {
+        ném "mạng http server: body ngắn hơn Content-Length";
+    };
+    nếu (do_dai(bytes) == số_byte) { trả về body; };
+    đủ = [];
+    lặp(i = 0; i < số_byte; i++) {
+        them(đủ, bytes[i]);
+    };
+    trả về chuỗi từ bytes(đủ, "UTF-8", "BÁO_LỖI");
+};
+
+hàm mạng http đọc request socket(mã_socket) {
+    dữ_liệu = "";
+    vị_trí_ngăn = rỗng;
+    lặp(vòng = 0; vị_trí_ngăn == rỗng; vòng++) {
+        phần = socket nhận(mã_socket, 65536);
+        nếu (phần == "") {
+            ném "mạng http server: kết nối đóng trước khi nhận đủ header";
+        };
+        dữ_liệu = dữ_liệu + phần;
+        nếu (do_dai(chuỗi thành bytes(dữ_liệu, "UTF-8")) > 16842752) {
+            ném "mạng http server: request vượt giới hạn";
+        };
+        vị_trí_ngăn = tìm chuỗi chính xác(dữ_liệu, "\r\n\r\n", 0);
+    };
+
+    phần_đầu = con chuỗi(dữ_liệu, 0, vị_trí_ngăn);
+    request = mạng http phân tích phần đầu request(phần_đầu);
+    content_length = lấy map(request, "content length", 0);
+    body = con chuỗi(dữ_liệu, vị_trí_ngăn + 4, do_dai(dữ_liệu));
+
+    lặp(vòng = 0;
+        do_dai(chuỗi thành bytes(body, "UTF-8")) < content_length;
+        vòng++) {
+        phần = socket nhận(mã_socket, 65536);
+        nếu (phần == "") {
+            ném "mạng http server: kết nối đóng trước khi nhận đủ body";
+        };
+        body = body + phần;
+        nếu (do_dai(chuỗi thành bytes(body, "UTF-8")) > 16777216) {
+            ném "mạng http server: body vượt giới hạn";
+        };
+    };
+
+    đặt map(request, "body", mạng http cắt body theo byte(body, content_length));
+    đặt map(request, "socket", mã_socket);
+    trả về request;
+};
+
+// Chấp nhận đúng một TCP connection và trả request map V++.
+hàm mạng lấy yêu cầu kế tiếp(serverId) {
+    client = socket chấp nhận(serverId);
+    thử {
+        trả về mạng http đọc request socket(client);
+    } bắt lỗi (e) {
+        thử { socket đóng(client); } bắt lỗi (bỏ_qua) {};
+        ném e;
+    };
+};
+
+hàm mạng trường yêu cầu(requestId, trường, khóa = "") {
+    nếu (loai_cua(requestId) != "từ điển") {
+        ném "mạng http server: request handle không hợp lệ";
+    };
+    nếu (trường == "header") {
+        headers = lấy map(requestId, "headers", {});
+        trả về lấy map(headers, chuỗi thường(khóa), "");
+    };
+    nếu (trường == "method" || trường == "path" ||
+        trường == "query" || trường == "body") {
+        trả về lấy map(requestId, trường, "");
+    };
+    ném "mạng http server: trường yêu cầu không hợp lệ";
+};
+
+hàm mạng method yêu cầu(requestId) {
+    trả về mạng trường yêu cầu(requestId, "method", "");
+};
+
+hàm mạng path yêu cầu(requestId) {
+    trả về mạng trường yêu cầu(requestId, "path", "");
+};
+
+hàm mạng query yêu cầu(requestId) {
+    trả về mạng trường yêu cầu(requestId, "query", "");
+};
+
+hàm mạng body yêu cầu(requestId) {
+    trả về mạng trường yêu cầu(requestId, "body", "");
+};
+
+hàm mạng header yêu cầu(requestId, key) {
+    trả về mạng trường yêu cầu(requestId, "header", key);
+};
+
+// Ghi chú hàm: lấy query param theo key.
+hàm mạng query param yêu cầu(requestId, key) {
+    query = mạng query yêu cầu(requestId);
+    n = do_dai(query);
+    bắt_đầu = 0;
+    kết_quả = "";
+    tìm_thấy = sai;
+
+    lặp(vòng = 0; bắt_đầu <= n && !tìm_thấy; vòng++) {
+        kết_thúc = bắt_đầu;
+        đang_quét = đúng;
+        lặp(i = bắt_đầu; i < n && đang_quét; i++) {
+            nếu (query[i] == "&") {
+                đang_quét = sai;
+            } nếu không {
+                kết_thúc = i + 1;
+            };
+        };
+
+        cặp = cắt chuỗi(query, bắt_đầu, kết_thúc - bắt_đầu);
+        vị_trí_bằng = -1;
+        lặp(i = 0; i < do_dai(cặp) && vị_trí_bằng < 0; i++) {
+            nếu (cặp[i] == "=") {
+                vị_trí_bằng = i;
+            };
+        };
+
+        nếu (vị_trí_bằng >= 0) {
+            khóa_cặp = cắt chuỗi(cặp, 0, vị_trí_bằng);
+            nếu (khóa_cặp == key) {
+                kết_quả = cắt chuỗi(
+                    cặp,
+                    vị_trí_bằng + 1,
+                    do_dai(cặp) - vị_trí_bằng - 1
+                );
+                tìm_thấy = đúng;
+            };
+        } nếu không {
+            nếu (cặp == key) {
+                tìm_thấy = đúng;
+            };
+        };
+
+        nếu (kết_thúc >= n) {
+            bắt_đầu = n + 1;
+        } nếu không {
+            bắt_đầu = kết_thúc + 1;
+        };
+    };
+    trả về kết_quả;
+};
+
+// Ghi chú hàm: lấy json field chuỗi từ request body.
+hàm mạng json field yêu cầu(requestId, key) {
+    body = mạng body yêu cầu(requestId);
+    kết_quả = "";
+    thử {
+        parsed = json phân tích(body);
+        nếu (loai_cua(parsed) == "từ điển") {
+            value = lấy map(parsed, key, rỗng);
+            nếu (loai_cua(value) == "chuỗi") {
+                kết_quả = value;
+            };
+        };
+    } bắt lỗi (e) {
+        // Giữ contract cũ: JSON lỗi hoặc field không phải chuỗi trả chuỗi rỗng.
+        kết_quả = "";
+    };
+    trả về kết_quả;
+};
+
+// Ghi chú hàm: lấy path suffix sau prefix.
+hàm mạng path suffix yêu cầu(requestId, prefix) {
+    path = mạng path yêu cầu(requestId);
+    n_prefix = do_dai(prefix);
+    nếu (n_prefix > do_dai(path)) {
+        trả về "";
+    };
+    nếu (cắt chuỗi(path, 0, n_prefix) != prefix) {
+        trả về "";
+    };
+    trả về cắt chuỗi(path, n_prefix, do_dai(path) - n_prefix);
+};
+
+hàm mạng http trạng thái chữ(status) {
+    nếu (status == 200) { trả về "OK"; };
+    nếu (status == 201) { trả về "Created"; };
+    nếu (status == 400) { trả về "Bad Request"; };
+    nếu (status == 401) { trả về "Unauthorized"; };
+    nếu (status == 403) { trả về "Forbidden"; };
+    nếu (status == 404) { trả về "Not Found"; };
+    nếu (status == 405) { trả về "Method Not Allowed"; };
+    nếu (status == 409) { trả về "Conflict"; };
+    nếu (status == 422) { trả về "Unprocessable Content"; };
+    nếu (status == 429) { trả về "Too Many Requests"; };
+    nếu (status == 500) { trả về "Internal Server Error"; };
+    nếu (status == 502) { trả về "Bad Gateway"; };
+    nếu (status == 503) { trả về "Service Unavailable"; };
+    trả về "OK";
+};
+
+hàm mạng http dựng response(status, body) {
+    số_byte = do_dai(chuỗi thành bytes(body, "UTF-8"));
+    trả về "HTTP/1.1 " + thành chuỗi(status) + " " +
+            mạng http trạng thái chữ(status) + "\r\n" +
+            "Content-Type: application/json; charset=utf-8\r\n" +
+            "Content-Length: " + thành chuỗi(số_byte) + "\r\n" +
+            "Connection: close\r\n\r\n" + body;
+};
+
+// Gửi response bằng socket primitive rồi đóng connection theo contract cũ.
+hàm mạng trả phản hồi(requestId, status, body) {
+    nếu (loai_cua(requestId) != "từ điển") {
+        ném "mạng http server: request handle không hợp lệ";
+    };
+    mã_socket = lấy map(requestId, "socket", 0);
+    nếu (mã_socket <= 0) {
+        ném "mạng http server: request socket đã đóng hoặc không hợp lệ";
+    };
+    thử {
+        phản_hồi = mạng http dựng response(status, body);
+        socket gửi(mã_socket, phản_hồi);
+        socket đóng(mã_socket);
+        đặt map(requestId, "socket", 0);
+        trả về 1;
+    } bắt lỗi (e) {
+        thử { socket đóng(mã_socket); } bắt lỗi (bỏ_qua) {};
+        đặt map(requestId, "socket", 0);
+        ném e;
+    };
+};
+
+hàm mạng đóng máy chủ api(serverId) {
+    trả về socket đóng(serverId);
+};
+nhập gói/lõi/chuyển kiểu;

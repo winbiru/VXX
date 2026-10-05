@@ -1,5 +1,6 @@
 "xin"
 {"tên":"V++","trạng thái":"sẵn sàng"}
 dòng \"một\" \\ đường\ndòng hai
+a\u0000b
 {"data":{"id":"req-1"},"success":true,"message":"hoàn tất"}
 {"data":{},"success":false,"message":"không tìm thấy"}

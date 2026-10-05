@@ -75,12 +75,22 @@ private:
     std::unordered_map<int, std::vector<Instruction>> hamBytecodeMap;
     // nameIndex → hamId mapping for function name lookup across execution contexts.
     std::unordered_map<int, int> functionTableByNameIndex;
+    // Reverse lookup derived once when function tables are installed.
+    std::unordered_map<int, int> functionNameIndexById_;
     std::size_t programGeneration_ = 1;
     std::size_t verifiedGeneration_ = 0;
     std::size_t verificationPassCount_ = 0;
     std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
         functionDebugInfo;
+
+    // Root bytecode/debug metadata are owned by the fields above. While a V++
+    // function is running these pointers select the immutable function vectors
+    // stored in the function tables, avoiding a full vector copy on every call.
+    // nullptr means the root program is active.
+    const std::vector<Instruction> *activeBytecode_ = nullptr;
+    const std::vector<vietvm::runtime::RuntimeSourceLocation>
+        *activeBytecodeDebugInfo_ = nullptr;
 
     std::vector<StackValue> stack;                  // data stack (values)
 
@@ -145,8 +155,9 @@ private:
     // callee. Đây là call stack ở cấp interpreter, thay cho việc gọi lồng
     // `VM::run()` bằng native C++ recursion.
     struct ExecutionContext {
-        std::vector<Instruction> bytecode;
-        std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
+        const std::vector<Instruction> *bytecode = nullptr;
+        const std::vector<vietvm::runtime::RuntimeSourceLocation>
+            *bytecodeDebugInfo = nullptr;
         std::vector<StackValue> stack;
         std::vector<size_t> loopStartStack;
         std::vector<size_t> ifElseStack;
@@ -249,6 +260,9 @@ private:
     void collectGarbage(bool trimCapacity = false);
     void invalidateBytecodeVerification() noexcept;
     void trimExecutionCapacity();
+    const std::vector<Instruction> &currentBytecode() const noexcept;
+    const std::vector<vietvm::runtime::RuntimeSourceLocation> &
+    currentBytecodeDebugInfo() const noexcept;
 };
 
 #endif // VM_H

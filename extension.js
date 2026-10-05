@@ -17,6 +17,7 @@ let languageServerStarting = null;
 let languageServerOutput = null;
 let languageServerExecutableWatchPath = null;
 let languageServerRestartTimer = null;
+let libraryTreeProvider = null;
 
 class VppLibraryTreeProvider {
   constructor(context) {
@@ -53,18 +54,46 @@ class VppLibraryTreeProvider {
     return null;
   }
 
+  async readRoots() {
+    try {
+      const server = await ensureLanguageServer(this.context);
+      if (server) {
+        const snapshot = await server.request('vpp/libraryRoots', null, 3_000);
+        if (snapshot && Array.isArray(snapshot.libraries)) return snapshot;
+      }
+    } catch (error) {
+      languageServerOutput?.appendLine(`Không đọc được library roots từ LSP: ${error.message}`);
+    }
+
+    const loaded = this.readCatalog();
+    if (!loaded) return null;
+    return {
+      revision: loaded.catalog.sdkVersion || '',
+      catalogUri: vscode.Uri.file(loaded.catalogPath).toString(),
+      diagnostics: [],
+      libraries: loaded.catalog.libraries.map((library) => {
+        const rootPath = path.resolve(path.dirname(loaded.catalogPath), library.sourceRoot);
+        return {
+          ...library,
+          rootUri: vscode.Uri.file(rootPath).toString(),
+          entryUri: vscode.Uri.file(path.join(rootPath, library.entry)).toString()
+        };
+      })
+    };
+  }
+
   async getChildren(element) {
     if (!element) {
-      const loaded = this.readCatalog();
-      if (!loaded) return [];
-      return [...loaded.catalog.libraries]
+      const snapshot = await this.readRoots();
+      if (!snapshot) return [];
+      return [...snapshot.libraries]
         .sort((left, right) => left.id.localeCompare(right.id, 'en'))
-        .map((library) => ({ kind: 'library', library, catalogPath: loaded.catalogPath }));
+        .map((library) => ({ kind: 'library', library }));
     }
 
     if (element.kind !== 'library' && element.kind !== 'directory') return [];
     const target = element.kind === 'library'
-      ? path.resolve(path.dirname(element.catalogPath), element.library.sourceRoot)
+      ? vscode.Uri.parse(element.library.rootUri).fsPath
       : element.fsPath;
     if (!fs.existsSync(target)) return [];
 
@@ -78,8 +107,7 @@ class VppLibraryTreeProvider {
       .map((entry) => ({
         kind: entry.isDirectory() ? 'directory' : 'file',
         name: entry.name,
-        fsPath: path.join(target, entry.name),
-        catalogPath: element.catalogPath
+        fsPath: path.join(target, entry.name)
       }));
   }
 
@@ -87,7 +115,7 @@ class VppLibraryTreeProvider {
     if (element.kind === 'library') {
       const item = new vscode.TreeItem(element.library.id, vscode.TreeItemCollapsibleState.Collapsed);
       item.description = 'thư mục gốc thư viện';
-      item.tooltip = `${element.library.displayName || element.library.id}\n${element.library.version || ''}\n${element.library.sourceRoot}`;
+      item.tooltip = `${element.library.displayName || element.library.id}\n${element.library.version || ''} · ${element.library.stability || ''}\n${element.library.sourceRoot}`;
       item.iconPath = new vscode.ThemeIcon('library');
       return item;
     }
@@ -471,7 +499,19 @@ class VppLanguageServer {
 
   async start() {
     this.output.appendLine(`Khởi động: ${this.executable} --lsp`);
-    this.child = spawn(this.executable, ['--lsp'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const executableDir = path.dirname(this.executable);
+    const candidateHomes = [executableDir, path.dirname(executableDir)];
+    const vppHome = candidateHomes.find((directory) =>
+      fs.existsSync(path.join(directory, 'vpp-libraries.json')) &&
+      fs.existsSync(path.join(directory, 'gói'))
+    );
+    const env = { ...process.env };
+    if (vppHome) env.VPP_HOME = vppHome;
+    this.child = spawn(this.executable, ['--lsp'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || undefined,
+      env
+    });
 
     await new Promise((resolve, reject) => {
       const onSpawn = () => {
@@ -637,6 +677,11 @@ class VppLanguageServer {
         return diagnostic;
       });
       this.diagnostics.set(uri, diagnostics);
+      return;
+    }
+
+    if (message.method === 'vpp/libraryRootsChanged') {
+      libraryTreeProvider?.refresh();
     }
   }
 }
@@ -1064,6 +1109,7 @@ async function installVm(context) {
     });
 
     configureTerminalEnvironment(context);
+    libraryTreeProvider?.refresh();
     const binary = vmBinary(context);
     vscode.window.showInformationMessage(`Đã cài V++ VM: ${binary}. Terminal mới trong VS Code có thể dùng lệnh vpp.`);
     await restartLanguageServer(context);
@@ -1129,11 +1175,22 @@ function activate(context) {
   context.subscriptions.push(languageServerOutput);
   registerLanguageFeatures(context);
   watchLanguageServerExecutable(context);
-  const libraryTreeProvider = new VppLibraryTreeProvider(context);
+  libraryTreeProvider = new VppLibraryTreeProvider(context);
+  const libraryCatalogWatcher = vscode.workspace.createFileSystemWatcher('**/vpp-libraries.json');
+  const relayLibraryCatalogChange = (uri, type) => {
+    libraryTreeProvider?.refresh();
+    languageServer?.notify('workspace/didChangeWatchedFiles', {
+      changes: [{ uri: uri.toString(), type }]
+    });
+  };
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(VPP_LIBRARY_VIEW_ID, libraryTreeProvider),
     libraryTreeProvider.changeEmitter,
-    vscode.commands.registerCommand(VPP_REFRESH_LIBRARIES_COMMAND, () => libraryTreeProvider.refresh())
+    vscode.commands.registerCommand(VPP_REFRESH_LIBRARIES_COMMAND, () => libraryTreeProvider?.refresh()),
+    libraryCatalogWatcher,
+    libraryCatalogWatcher.onDidCreate((uri) => relayLibraryCatalogChange(uri, 1)),
+    libraryCatalogWatcher.onDidChange((uri) => relayLibraryCatalogChange(uri, 2)),
+    libraryCatalogWatcher.onDidDelete((uri) => relayLibraryCatalogChange(uri, 3))
   );
 
   context.subscriptions.push(
@@ -1164,6 +1221,7 @@ async function deactivate() {
     await current.stop();
     current.dispose();
   }
+  libraryTreeProvider = null;
 }
 
 module.exports = { activate, deactivate };

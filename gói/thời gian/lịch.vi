@@ -1,0 +1,230 @@
+// vi.time — giá trị lịch ISO/Gregorian thuần V++.
+// Wall clock, epoch/tzdb và monotonic clock vẫn là primitive/runtime boundary.
+
+nhập gói/văn bản/chuỗi;
+
+hàm thời gian là năm nhuận(năm) {
+    nếu (loại của(năm) != "số nguyên") {
+        ném "TIME_RANGE";
+    };
+    nếu (năm % 400 == 0) {
+        trả về đúng;
+    };
+    nếu (năm % 100 == 0) {
+        trả về sai;
+    };
+    trả về năm % 4 == 0;
+};
+
+hàm thời gian số ngày trong tháng(năm, tháng) {
+    nếu (loại của(năm) != "số nguyên" || loại của(tháng) != "số nguyên") {
+        ném "TIME_RANGE";
+    };
+    nếu (năm < 0 || năm > 9999 || tháng < 1 || tháng > 12) {
+        ném "TIME_RANGE";
+    };
+    nếu (tháng == 2) {
+        nếu (thời gian là năm nhuận(năm)) {
+            trả về 29;
+        };
+        trả về 28;
+    };
+    nếu (tháng == 4 || tháng == 6 || tháng == 9 || tháng == 11) {
+        trả về 30;
+    };
+    trả về 31;
+};
+
+hàm tạo ngày(năm, tháng, ngày) {
+    nếu (loại của(năm) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (loại của(tháng) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (loại của(ngày) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (năm < 0 || năm > 9999 || tháng < 1 || tháng > 12) {
+        ném "TIME_RANGE";
+    };
+    tối_đa = thời gian số ngày trong tháng(năm, tháng);
+    nếu (ngày < 1 || ngày > tối_đa) {
+        ném "TIME_RANGE";
+    };
+    trả về {
+        "__vpp_date__": 1,
+        "năm": năm,
+        "tháng": tháng,
+        "ngày": ngày
+    };
+};
+
+hàm tạo giờ(giờ, phút, giây = 0, nano = 0) {
+    nếu (loại của(giờ) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (loại của(phút) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (loại của(giây) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (loại của(nano) != "số nguyên") { ném "TIME_RANGE"; };
+    nếu (giờ < 0 || giờ > 23 || phút < 0 || phút > 59 ||
+        giây < 0 || giây > 59 || nano < 0 || nano > 999999999) {
+        ném "TIME_RANGE";
+    };
+    trả về {
+        "__vpp_time__": 1,
+        "giờ": giờ,
+        "phút": phút,
+        "giây": giây,
+        "nano": nano
+    };
+};
+
+hàm thời gian yêu cầu ngày(giá_trị) {
+    nếu (loại của(giá_trị) != "từ điển") {
+        ném "TIME_RANGE";
+    };
+    nếu (lấy map(giá_trị, "__vpp_date__", 0) != 1) {
+        ném "TIME_RANGE";
+    };
+    trả về giá_trị;
+};
+
+hàm thời gian yêu cầu giờ(giá_trị) {
+    nếu (loại của(giá_trị) != "từ điển") {
+        ném "TIME_RANGE";
+    };
+    nếu (lấy map(giá_trị, "__vpp_time__", 0) != 1) {
+        ném "TIME_RANGE";
+    };
+    trả về giá_trị;
+};
+
+hàm tạo ngày giờ(ngày, giờ) {
+    thời gian yêu cầu ngày(ngày);
+    thời gian yêu cầu giờ(giờ);
+    trả về {
+        "__vpp_datetime__": 1,
+        "ngày": ngày,
+        "giờ": giờ
+    };
+};
+
+hàm thời gian yêu cầu ngày giờ(giá_trị) {
+    nếu (loại của(giá_trị) != "từ điển") {
+        ném "TIME_RANGE";
+    };
+    nếu (lấy map(giá_trị, "__vpp_datetime__", 0) != 1) {
+        ném "TIME_RANGE";
+    };
+    thời gian yêu cầu ngày(lấy map(giá_trị, "ngày", rỗng));
+    thời gian yêu cầu giờ(lấy map(giá_trị, "giờ", rỗng));
+    trả về giá_trị;
+};
+
+hàm thời gian là chữ số(c) {
+    trả về c >= "0" && c <= "9";
+};
+
+hàm thời gian đọc số cố định(văn_bản, bắt_đầu, số_lượng) {
+    giá_trị = 0;
+    lặp(i = 0; i < số_lượng; i++) {
+        c = văn_bản[bắt_đầu + i];
+        nếu (!thời gian là chữ số(c)) {
+            ném "TIME_PARSE";
+        };
+        giá_trị = giá_trị * 10 + thành số nguyên(c);
+    };
+    trả về giá_trị;
+};
+
+hàm parse ngày(văn_bản) {
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "TIME_PARSE";
+    };
+    nếu (do_dai(văn_bản) != 10) {
+        ném "TIME_PARSE";
+    };
+    nếu (văn_bản[4] != "-" || văn_bản[7] != "-") {
+        ném "TIME_PARSE";
+    };
+    năm = thời gian đọc số cố định(văn_bản, 0, 4);
+    tháng = thời gian đọc số cố định(văn_bản, 5, 2);
+    ngày = thời gian đọc số cố định(văn_bản, 8, 2);
+    trả về tạo ngày(năm, tháng, ngày);
+};
+
+hàm parse ngày giờ(văn_bản) {
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "TIME_PARSE";
+    };
+    n = do_dai(văn_bản);
+    nếu (n < 19 || n > 29) {
+        ném "TIME_PARSE";
+    };
+    nếu (văn_bản[4] != "-" || văn_bản[7] != "-" || văn_bản[10] != "T" ||
+        văn_bản[13] != ":" || văn_bản[16] != ":") {
+        ném "TIME_PARSE";
+    };
+
+    ngày = parse ngày(cắt chuỗi(văn_bản, 0, 10));
+    giờ_số = thời gian đọc số cố định(văn_bản, 11, 2);
+    phút = thời gian đọc số cố định(văn_bản, 14, 2);
+    giây = thời gian đọc số cố định(văn_bản, 17, 2);
+    nano = 0;
+
+    nếu (n > 19) {
+        nếu (văn_bản[19] != ".") {
+            ném "TIME_PARSE";
+        };
+        chữ_số = n - 20;
+        nếu (chữ_số < 1 || chữ_số > 9) {
+            ném "TIME_PARSE";
+        };
+        nano = thời gian đọc số cố định(văn_bản, 20, chữ_số);
+        lặp(i = chữ_số; i < 9; i++) {
+            nano = nano * 10;
+        };
+    };
+
+    giờ = tạo giờ(giờ_số, phút, giây, nano);
+    trả về tạo ngày giờ(ngày, giờ);
+};
+
+hàm thời gian đệm số(giá_trị, rộng) {
+    văn_bản = thành chuỗi(giá_trị);
+    kết_quả = "";
+    lặp(i = do_dai(văn_bản); i < rộng; i++) {
+        kết_quả = kết_quả + "0";
+    };
+    trả về kết_quả + văn_bản;
+};
+
+hàm định dạng ngày(ngày) {
+    thời gian yêu cầu ngày(ngày);
+    trả về thời gian đệm số(lấy map(ngày, "năm", 0), 4) + "-" +
+        thời gian đệm số(lấy map(ngày, "tháng", 0), 2) + "-" +
+        thời gian đệm số(lấy map(ngày, "ngày", 0), 2);
+};
+
+hàm định dạng giờ(giờ) {
+    thời gian yêu cầu giờ(giờ);
+    kết_quả = thời gian đệm số(lấy map(giờ, "giờ", 0), 2) + ":" +
+        thời gian đệm số(lấy map(giờ, "phút", 0), 2) + ":" +
+        thời gian đệm số(lấy map(giờ, "giây", 0), 2);
+    nano = lấy map(giờ, "nano", 0);
+    nếu (nano == 0) {
+        trả về kết_quả;
+    };
+
+    phần = thời gian đệm số(nano, 9);
+    cuối = do_dai(phần);
+    đang_bỏ = đúng;
+    lặp(vòng = 0; cuối > 1 && đang_bỏ; vòng++) {
+        nếu (phần[cuối - 1] == "0") {
+            cuối = cuối - 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    trả về kết_quả + "." + cắt chuỗi(phần, 0, cuối);
+};
+
+hàm định dạng ngày giờ(ngày_giờ) {
+    thời gian yêu cầu ngày giờ(ngày_giờ);
+    trả về định dạng ngày(lấy map(ngày_giờ, "ngày", rỗng)) + "T" +
+        định dạng giờ(lấy map(ngày_giờ, "giờ", rỗng));
+};
+nhập gói/lõi/chuyển kiểu;

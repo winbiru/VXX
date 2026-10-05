@@ -1,0 +1,7 @@
+nhập máy chủ http;
+
+hàm chính() {
+    // Backend server đã được kiểm thử tích hợp bởi http_fixture; ca này khóa
+    // riêng việc phân giải/tái xuất package mới mà không chiếm thêm cổng.
+    in "vi.net.http.server";
+};

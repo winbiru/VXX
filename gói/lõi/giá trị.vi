@@ -2,14 +2,83 @@
 // Các helper tương ứng nhóm java.util.Objects nhưng giữ semantics V++:
 // rỗng là null, collection/object mutable dùng equality/hash theo identity.
 
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/toán học;
+
 hàm bằng giá trị(a, b) {
     trả về a == b;
 };
 
-// Native hook: scalar hash ổn định theo value; reference value dùng identity
-// hash trong process để luôn giữ invariant a == b => hash(a) == hash(b).
+// XOR một byte không cần bitwise primitive của VM.
+hàm giá trị xor byte(a, b) {
+    x = a;
+    y = b;
+    trọng_số = 1;
+    kết_quả = 0;
+    lặp(i = 0; i < 8; i++) {
+        nếu ((x % 2) != (y % 2)) {
+            kết_quả = kết_quả + trọng_số;
+        };
+        x = lam_tron_xuong(x / 2);
+        y = lam_tron_xuong(y / 2);
+        trọng_số = trọng_số * 2;
+    };
+    trả về kết_quả;
+};
+
+// FNV-1a 32-bit biểu diễn bằng bốn byte để không phụ thuộc overflow i32.
+// Prime 0x01000193 được nhân modulo 2^32 theo từng byte.
+hàm giá trị fnv1a32(văn_bản) {
+    bytes = mã hóa bảng mã(văn_bản, "UTF-8");
+    h = [197, 157, 28, 129]; // 0x811c9dc5, little-endian
+    lặp(i = 0; i < độ dài(bytes); i++) {
+        h[0] = giá trị xor byte(h[0], bytes[i]);
+
+        h0 = h[0];
+        h1 = h[1];
+        h2 = h[2];
+        h3 = h[3];
+
+        t0 = h0 * 147;
+        r0 = t0 % 256;
+        nhớ = lam_tron_xuong(t0 / 256);
+
+        t1 = h1 * 147 + h0 + nhớ;
+        r1 = t1 % 256;
+        nhớ = lam_tron_xuong(t1 / 256);
+
+        t2 = h2 * 147 + h1 + nhớ;
+        r2 = t2 % 256;
+        nhớ = lam_tron_xuong(t2 / 256);
+
+        t3 = h3 * 147 + h2 + h0 + nhớ;
+        r3 = t3 % 256;
+        h = [r0, r1, r2, r3];
+    };
+
+    // Public hash trước đây luôn bỏ bit dấu: uint32 & 0x7fffffff.
+    trả về h[0] + h[1] * 256 + h[2] * 65536 + (h[3] % 128) * 16777216;
+};
+
+// Scalar hash nằm hoàn toàn ở V++. Native chỉ còn identity hash cho các handle
+// tham chiếu của VM, vì định danh object/collection không thể quan sát từ V++.
 hàm băm giá trị(giá_trị) {
-    ném "stdlib: băm giá trị native hook không khả dụng";
+    kiểu = loại của(giá_trị);
+    nếu (kiểu == "rỗng") {
+        trả về 0;
+    };
+    nếu (kiểu == "số nguyên" || kiểu == "số thực") {
+        số = giá_trị + 0.0;
+        nếu (số == 0.0) {
+            số = 0.0;
+        };
+        trả về giá trị fnv1a32("n:" + thành chuỗi(số));
+    };
+    nếu (kiểu == "chuỗi") {
+        trả về giá trị fnv1a32("s:" + giá_trị);
+    };
+    trả về bam_dinh_danh(giá_trị);
 };
 
 hàm yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") {

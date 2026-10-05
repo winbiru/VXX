@@ -1,0 +1,23 @@
+// Thuật toán chung cho các giá trị có thứ tự như chuỗi và danh sách.
+// Chỉ dùng primitive runtime tối thiểu: loại, độ dài và truy cập chỉ số.
+
+// Chuỗi: trả về chuỗi mới theo thứ tự ngược.
+// Danh sách: đảo tại chỗ và trả về rỗng để giữ API hiện có.
+hàm đảo ngược(giá_trị) {
+    nếu (loai_cua(giá_trị) == "chuỗi") {
+        kết_quả = "";
+        lặp(i = do_dai(giá_trị) - 1; i >= 0; i--) {
+            kết_quả = kết_quả + giá_trị[i];
+        };
+        trả về kết_quả;
+    };
+
+    n = do_dai(giá_trị);
+    lặp(i = 0; i < n - 1 - i; i++) {
+        j = n - 1 - i;
+        tạm = giá_trị[i];
+        giá_trị[i] = giá_trị[j];
+        giá_trị[j] = tạm;
+    };
+    trả về rỗng;
+};

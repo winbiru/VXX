@@ -1,0 +1,25 @@
+nhập gói/mạng/http/máy khách;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/văn bản/chuỗi;
+
+hàm chính() {
+    request = mạng http phân tích phần đầu request(
+        "POST /inspect/user-42?keyword=V%2B%2B HTTP/1.1\r\n" +
+        "Host: localhost:18080\r\n" +
+        "Content-Type: application/json\r\n" +
+        "Content-Length: 17"
+    );
+
+    in lấy map(request, "method", "") == "POST";
+    in lấy map(request, "path", "") == "/inspect/user-42";
+    in lấy map(request, "query", "") == "keyword=V%2B%2B";
+    headers = lấy map(request, "headers", {});
+    in lấy map(headers, "host", "") == "localhost:18080";
+    in lấy map(headers, "content-type", "") == "application/json";
+    in lấy map(request, "content length", 0) == 17;
+
+    in mạng http cắt body theo byte("xin chào", 9) == "xin chào";
+    response = mạng http dựng response(404, "không có");
+    in chứa chính xác(response, "HTTP/1.1 404 Not Found\r\n");
+    in chứa chính xác(response, "Content-Length: 10\r\n");
+};

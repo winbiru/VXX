@@ -14,208 +14,92 @@ inline bool matchesAnyName(const std::string &fn, const std::array<const char *,
     return false;
 }
 
-inline constexpr std::array<const char *, 3> kFnHttpGet = {
-    "mang_http_get", "mạnglấy", "mạng lấy"
+inline constexpr std::array<const char *, 1> kFnIoReadFile = {
+    "io_doc_file"
 };
 
-inline constexpr std::array<const char *, 3> kFnHttpPost = {
-    "mang_http_post", "mạnggửi", "mạng gửi"
+inline constexpr std::array<const char *, 1> kFnIoWriteFile = {
+    "io_ghi_file"
 };
 
-inline constexpr std::array<const char *, 3> kFnHttpPut = {
-    "mang_http_put", "mạngcậpnhật", "mạng cập nhật"
+inline constexpr std::array<const char *, 1> kFnIoAppendFile = {
+    "io_ghi_tiep_file"
 };
 
-inline constexpr std::array<const char *, 3> kFnHttpDelete = {
-    "mang_http_delete", "mạngxóa", "mạng xóa"
+inline constexpr std::array<const char *, 1> kFnIoReadBytes = {
+    "io_doc_bytes"
 };
 
-inline constexpr std::array<const char *, 3> kFnJsonEscape = {
-    "json_escape", "jsonthoát", "json thoát"
+inline constexpr std::array<const char *, 1> kFnIoWriteBytes = {
+    "io_ghi_bytes"
 };
 
-inline constexpr std::array<const char *, 3> kFnJsonString = {
-    "json_quote", "jsonchuỗi", "json chuỗi"
+inline constexpr std::array<const char *, 1> kFnWallClockParts = {
+    "dong_ho_lich_noi_bo"
 };
 
-inline constexpr std::array<const char *, 3> kFnJsonParse = {
-    "json_parse", "jsonphântích", "json phân tích"
+inline constexpr std::array<const char *, 1> kFnMonotonicMilliseconds = {
+    "thoi_gian_don_dieu_mili_giay"
 };
 
-inline constexpr std::array<const char *, 3> kFnJsonEncode = {
-    "json_encode", "jsontạo", "json tạo"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpServerOpen = {
-    "mang_http_server_open", "mạngmởmáychủapi", "mạng mở máy chủ api"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpServerNext = {
-    "mang_http_server_next", "mạnglấyyêucầukếtiếp", "mạng lấy yêu cầu kế tiếp"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqMethod = {
-    "mang_http_req_method", "mạngmethodyêucầu", "mạng method yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqPath = {
-    "mang_http_req_path", "mạngpathyêucầu", "mạng path yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqQuery = {
-    "mang_http_req_query", "mạngqueryyêucầu", "mạng query yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqBody = {
-    "mang_http_req_body", "mạngbodyyêucầu", "mạng body yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqHeader = {
-    "mang_http_req_header", "mạngheaderyêucầu", "mạng header yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqQueryParam = {
-    "mang_http_req_query_param", "mạngqueryparamyêucầu", "mạng query param yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqJsonField = {
-    "mang_http_req_json_field", "mạngjsonfieldyêucầu", "mạng json field yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpReqPathSuffix = {
-    "mang_http_req_path_suffix", "mạngpathsuffixyêucầu", "mạng path suffix yêu cầu"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpServerSend = {
-    "mang_http_server_send", "mạngtrảphảnhồi", "mạng trả phản hồi"
-};
-
-inline constexpr std::array<const char *, 3> kFnHttpServerClose = {
-    "mang_http_server_close", "mạngđóngmáychủapi", "mạng đóng máy chủ api"
-};
-
-inline constexpr std::array<const char *, 3> kFnIoReadFile = {
-    "io_doc_file", "đọctệp", "đọc tệp"
-};
-
-inline constexpr std::array<const char *, 3> kFnIoWriteFile = {
-    "io_ghi_file", "ghitọệp", "ghi tệp"
-};
-
-inline constexpr std::array<const char *, 3> kFnNow = {
-    "lay_thoi_gian_hien_tai", "lấythờigianhiệntại", "lấy thời gian hiện tại"
-};
-
-inline constexpr std::array<const char *, 3> kFnNowUtc = {
-    "lay_thoi_gian_utc", "lấythờigianutc", "lấy thời gian utc"
-};
-
-inline constexpr std::array<const char *, 3> kFnTimezoneOffsetMinutes = {
-    "do_lech_mui_gio", "độlệchmúigiờ", "độ lệch múi giờ"
-};
-
-inline constexpr std::array<const char *, 3> kFnReadConfig = {
-    "doc_config", "đọccấuhình", "đọc cấu hình"
-};
-
-inline constexpr std::array<const char *, 3> kFnReadConfigKey = {
-    "doc_config_key", "đọccấuhìnhkhóa", "đọc cấu hình khóa"
-};
-
-inline constexpr std::array<const char *, 2> kFnToString = {
-    "thanh_chuoi", "thành chuỗi"
-};
-
-inline constexpr std::array<const char *, 2> kFnToInt = {
-    "thanh_so_nguyen", "thành số nguyên"
-};
-
-inline constexpr std::array<const char *, 2> kFnToFloat = {
-    "thanh_so_thuc", "thành số thực"
+inline constexpr std::array<const char *, 1> kFnSpecialFloatInternal = {
+    "so_thuc_dac_biet_noi_bo"
 };
 
 inline constexpr std::array<const char *, 2> kFnTypeOf = {
     "loai_cua", "loại của"
 };
 
-inline constexpr std::array<const char *, 2> kFnValueHash = {
-    "bam_gia_tri", "băm giá trị"
+inline constexpr std::array<const char *, 1> kFnIdentityHash = {
+    "bam_dinh_danh"
 };
 
-inline constexpr std::array<const char *, 2> kFnFormatInternal = {
-    "dinh_dang_noi_bo", "định dạng nội bộ"
+inline constexpr std::array<const char *, 1> kFnFormatFloatInternal = {
+    "dinh_dang_so_thuc_noi_bo"
 };
 
-inline constexpr std::array<const char *, 2> kFnRandomInt = {
-    "ngau_nhien_nguyen", "ngẫu nhiên nguyên"
+inline constexpr std::array<const char *, 1> kFnSecureRandom = {
+    "ngau_nhien_bao_mat_bytes"
 };
 
-inline constexpr std::array<const char *, 2> kFnSecureRandom = {
-    "ngau_nhien_bao_mat", "ngẫu nhiên bảo mật"
+inline constexpr std::array<const char *, 1> kFnPathExists = {
+    "duong_dan_ton_tai"
 };
 
-inline constexpr std::array<const char *, 2> kFnSha256 = {
-    "bam_sha256", "băm sha256"
+inline constexpr std::array<const char *, 1> kFnPathIsFile = {
+    "la_tep"
 };
 
-inline constexpr std::array<const char *, 2> kFnHmacSha256 = {
-    "hmac_sha256", "hmac sha256"
+inline constexpr std::array<const char *, 1> kFnPathIsDirectory = {
+    "la_thu_muc"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathJoin = {
-    "duong_dan_noi", "đường dẫn nối"
+inline constexpr std::array<const char *, 1> kFnCreateDirectory = {
+    "tao_thu_muc"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathName = {
-    "duong_dan_ten", "đường dẫn tên"
+inline constexpr std::array<const char *, 1> kFnListDirectory = {
+    "liet_ke_thu_muc"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathParent = {
-    "duong_dan_cha", "đường dẫn cha"
+inline constexpr std::array<const char *, 1> kFnRemovePath = {
+    "xoa_duong_dan"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathExists = {
-    "duong_dan_ton_tai", "đường dẫn tồn tại"
+inline constexpr std::array<const char *, 1> kFnEnvGet = {
+    "doc_bien_moi_truong"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathIsFile = {
-    "la_tep", "là tệp"
+inline constexpr std::array<const char *, 1> kFnPlatformName = {
+    "ten_nen_tang"
 };
 
-inline constexpr std::array<const char *, 2> kFnPathIsDirectory = {
-    "la_thu_muc", "là thư mục"
+inline constexpr std::array<const char *, 1> kFnSleepMs = {
+    "ngu_mili_giay"
 };
 
-inline constexpr std::array<const char *, 2> kFnCreateDirectory = {
-    "tao_thu_muc", "tạo thư mục"
-};
-
-inline constexpr std::array<const char *, 2> kFnListDirectory = {
-    "liet_ke_thu_muc", "liệt kê thư mục"
-};
-
-inline constexpr std::array<const char *, 2> kFnRemovePath = {
-    "xoa_duong_dan", "xóa đường dẫn"
-};
-
-inline constexpr std::array<const char *, 2> kFnEnvGet = {
-    "doc_bien_moi_truong", "đọc biến môi trường"
-};
-
-inline constexpr std::array<const char *, 2> kFnPlatformName = {
-    "ten_nen_tang", "tên nền tảng"
-};
-
-inline constexpr std::array<const char *, 2> kFnSleepMs = {
-    "ngu_mili_giay", "ngủ mili giây"
-};
-
-inline constexpr std::array<const char *, 1> kFnDbConnect = {
-    "db_native_connect"
-};
-
-inline constexpr std::array<const char *, 1> kFnDbQuery = {
-    "db_native_query"
+inline constexpr std::array<const char *, 1> kFnDbExec = {
+    "db_native_exec"
 };
 
 inline constexpr std::array<const char *, 2> kFnLength = {
@@ -228,34 +112,6 @@ inline constexpr std::array<const char *, 2> kFnListAppend = {
 
 inline constexpr std::array<const char *, 2> kFnListRemoveAt = {
     "xoa_tai", "xóa tại"
-};
-
-inline constexpr std::array<const char *, 2> kFnListReverse = {
-    "dao_nguoc", "đảo ngược"
-};
-
-inline constexpr std::array<const char *, 2> kFnListFindIndex = {
-    "tim_chi_so", "tìm chỉ số"
-};
-
-inline constexpr std::array<const char *, 2> kFnListUnique = {
-    "xoa_trung", "xóa trùng"
-};
-
-inline constexpr std::array<const char *, 2> kFnListSort = {
-    "sap_xep", "sắp xếp"
-};
-
-inline constexpr std::array<const char *, 2> kFnListSum = {
-    "tong_list", "tổng list"
-};
-
-inline constexpr std::array<const char *, 2> kFnListMin = {
-    "nho_nhat_list", "nhỏ nhất list"
-};
-
-inline constexpr std::array<const char *, 2> kFnListMax = {
-    "lon_nhat_list", "lớn nhất list"
 };
 
 inline constexpr std::array<const char *, 2> kFnMapGet = {
@@ -278,98 +134,9 @@ inline constexpr std::array<const char *, 2> kFnMapKeys = {
     "khoa_map", "khóa map"
 };
 
-inline constexpr std::array<const char *, 2> kFnStringCountChar = {
-    "dem_ky_tu", "đếm ký tự"
+inline constexpr std::array<const char *, 1> kFnToTuple = {
+    "thanh_tuple"
 };
-
-inline constexpr std::array<const char *, 2> kFnStringContains = {
-    "chua_chuoi", "chứa chuỗi"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringReplace = {
-    "thay_the", "thay thế"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringSlice = {
-    "cat_chuoi", "cắt chuỗi"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringLower = {
-    "chuoi_thuong", "chuỗi thường"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringUpper = {
-    "chuoi_hoa", "chuỗi hoa"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringNormalizeUnicode = {
-    "chuan_hoa_unicode", "chuẩn hóa unicode"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringTrimSpaces = {
-    "chuan_hoa_khoang_trang", "chuẩn hóa khoảng trắng"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringWordCount = {
-    "dem_tu", "đếm từ"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringLongestWord = {
-    "tu_dai_nhat", "từ dài nhất"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringTitle = {
-    "viet_hoa_dau_tu", "viết hoa đầu từ"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringPalindrome = {
-    "la_palindrome", "là palindrome"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringAnagram = {
-    "la_anagram", "là anagram"
-};
-
-inline constexpr std::array<const char *, 2> kFnStringCaesar = {
-    "ma_hoa_caesar", "mã hóa caesar"
-};
-
-inline constexpr std::array<const char *, 2> kFnSetFromList = {
-    "tap_hop", "tập hợp"
-};
-
-inline constexpr std::array<const char *, 2> kFnSetUnion = {
-    "hop_tap", "hợp tập"
-};
-
-inline constexpr std::array<const char *, 2> kFnSetIntersection = {
-    "giao_tap", "giao tập"
-};
-
-inline constexpr std::array<const char *, 2> kFnSetDisjoint = {
-    "roi_nhau", "rời nhau"
-};
-
-inline constexpr std::array<const char *, 2> kFnFileLineCount = {
-    "dem_dong_tep", "đếm dòng tệp"
-};
-
-inline constexpr std::array<const char *, 2> kFnFileWordCount = {
-    "dem_tu_tep", "đếm từ tệp"
-};
-
-inline constexpr std::array<const char *, 2> kFnToTuple = {
-    "thanh_tuple", "thành tuple"
-};
-
-inline constexpr std::array<const char *, 2> kFnToList = {
-    "thanh_list", "thành list"
-};
-
-inline constexpr const char *kHttpMethodGet = "GET";
-inline constexpr const char *kHttpMethodPost = "POST";
-inline constexpr const char *kHttpMethodPut = "PUT";
-inline constexpr const char *kHttpMethodDelete = "DELETE";
 
 inline constexpr int kHttpStatusOk = 200;
 
@@ -382,10 +149,6 @@ inline constexpr const char *kReqFieldPath = "path";
 inline constexpr const char *kReqFieldQuery = "query";
 inline constexpr const char *kReqFieldBody = "body";
 inline constexpr const char *kReqFieldHeader = "header";
-inline constexpr const char *kReqFieldQueryParam = "query_param";
-inline constexpr const char *kReqFieldJsonField = "json_field";
-inline constexpr const char *kReqFieldPathSuffix = "path_suffix";
-
 inline constexpr const char *kEnvVppEnableGc = "VPP_ENABLE_GC";
 inline constexpr const char *kEnvVietvmEnableGc = "VIETVM_ENABLE_GC";
 inline constexpr const char *kEnvVppGcInterval = "VPP_GC_INTERVAL";
@@ -397,18 +160,10 @@ inline constexpr int kDefaultGcInterval = 2048;
 
 // DB result reasons are part of the native-function protocol.  Their text is
 // intentionally stable because V++ programs compare the `DB_ERR|...` value.
-inline constexpr const char *kDbReasonCommandFailed = "db-command-failed";
-inline constexpr const char *kDbReasonInvalidJdbcPrefix = "invalid-jdbc-prefix";
-inline constexpr const char *kDbReasonInvalidHostOrDatabase = "invalid-host-or-database";
-inline constexpr const char *kDbReasonInvalidPort = "invalid-port";
-inline constexpr const char *kDbReasonMissingHost = "missing-host";
-inline constexpr const char *kDbReasonMissingDatabase = "missing-database";
-inline constexpr const char *kDbReasonMissingSqlitePath = "missing-sqlite-path";
 inline constexpr const char *kDbReasonUnsupportedDriver = "unsupported-driver";
 inline constexpr const char *kDbReasonMissingUsername = "missing-username";
 inline constexpr const char *kDbReasonCannotOpenMysqlProcess = "cannot-open-mysql-process";
 inline constexpr const char *kDbReasonCannotOpenPsqlProcess = "cannot-open-psql-process";
 inline constexpr const char *kDbReasonCannotOpenSqliteProcess = "cannot-open-sqlite-process";
-inline constexpr const char *kDbReasonUnsafeDatabaseName = "unsafe-database-name";
 
 } // namespace vietvm::constants

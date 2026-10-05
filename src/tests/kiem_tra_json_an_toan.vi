@@ -1,4 +1,4 @@
-nhập gói/mạng/json;
+nhập gói/dữ liệu/json/chính;
 nhập gói/mạng/rest;
 nhập gói/nhập xuất/tệp;
 
@@ -8,6 +8,7 @@ hàm chính() {
 
     ghi tệp(".tmp_json_escape.txt", "dòng \"một\" \\ đường\ndòng hai");
     in json thoát(đọc tệp(".tmp_json_escape.txt"));
+    in json thoát("a\0b");
 
     dataJson = json đối tượng một chuỗi("id", "req-1");
     in rest json thành công an toàn("hoàn tất", dataJson);

@@ -1,0 +1,75 @@
+// Registry ký hiệu locale deterministic dùng chung cho formatter và vi.locale.
+// Không đọc process locale và không phụ thuộc native locale APIs.
+
+nhập gói/văn bản/chuỗi;
+
+hàm ký hiệu vùng chuẩn hóa(vùng) {
+    nếu (loai_cua(vùng) != "chuỗi") {
+        ném "LOCALE_INVALID";
+    };
+    nếu (vùng == "C" || vùng == "POSIX" || vùng == "c" || vùng == "posix") {
+        trả về "C";
+    };
+
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(vùng); i++) {
+        c = vùng[i];
+        nếu (c == ".") {
+            trả về kết_quả;
+        };
+        nếu (c == "_") {
+            c = "-";
+        };
+        nếu (i < 2) {
+            c = chuỗi thường(c);
+        };
+        kết_quả = kết_quả + c;
+    };
+    trả về kết_quả;
+};
+
+hàm ký hiệu vùng lấy(vùng = rỗng) {
+    nếu (vùng == rỗng) {
+        trả về {
+            "tên": "C",
+            "ngôn ngữ": "en",
+            "thập phân": ".",
+            "nhóm": ","
+        };
+    };
+    tên = ký hiệu vùng chuẩn hóa(vùng);
+    nếu (tên == "C") {
+        trả về {
+            "tên": "C",
+            "ngôn ngữ": "en",
+            "thập phân": ".",
+            "nhóm": ","
+        };
+    };
+    nếu (tên == "vi" || tên == "vi-VN" || tên == "vi-vn") {
+        trả về {
+            "tên": "vi-VN",
+            "ngôn ngữ": "vi",
+            "thập phân": ",",
+            "nhóm": "."
+        };
+    };
+    nếu (tên == "en" || tên == "en-US" || tên == "en-us") {
+        trả về {
+            "tên": "en-US",
+            "ngôn ngữ": "en",
+            "thập phân": ".",
+            "nhóm": ","
+        };
+    };
+    ném "LOCALE_UNSUPPORTED";
+};
+
+hàm ký hiệu vùng hỗ trợ(vùng) {
+    thử {
+        ký hiệu vùng lấy(vùng);
+        trả về đúng;
+    } bắt lỗi (e) {
+        trả về sai;
+    };
+};

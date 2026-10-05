@@ -1,18 +1,254 @@
 // Module: lõi.chuyển kiểu
-// Chuyển đổi các StackValue phổ biến và quan sát loại runtime.
+// Chuyển kiểu mức thư viện được viết bằng V++.
+//
+// Native chỉ còn hai primitive mà ngôn ngữ không thể tự suy ra:
+// - loai_cua(value): đọc tag kiểu runtime.
+// - so_thuc_dac_biet_noi_bo(kind): tạo NaN/+Inf/-Inf IEEE-754.
+
+hàm chuyển_kiểu_lỗi_số_nguyên() {
+    ném "thành số nguyên: giá trị không thể chuyển đổi";
+};
+
+hàm chuyển_kiểu_lỗi_số_thực() {
+    ném "thành số thực: giá trị không thể chuyển đổi";
+};
+
+hàm chuyển kiểu là khoảng trắng đầu(c) {
+    trả về c == " " || c == "\t" || c == "\n" || c == "\r";
+};
+
+hàm chuyển kiểu chữ số(c) {
+    nếu (c == "0") { trả về 0; };
+    nếu (c == "1") { trả về 1; };
+    nếu (c == "2") { trả về 2; };
+    nếu (c == "3") { trả về 3; };
+    nếu (c == "4") { trả về 4; };
+    nếu (c == "5") { trả về 5; };
+    nếu (c == "6") { trả về 6; };
+    nếu (c == "7") { trả về 7; };
+    nếu (c == "8") { trả về 8; };
+    nếu (c == "9") { trả về 9; };
+    trả về -1;
+};
+
+hàm chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
+    i = 0;
+    n = do_dai(văn_bản);
+    đang_bỏ = đúng;
+    lặp(vòng = 0; i < n && đang_bỏ; vòng++) {
+        nếu (chuyển kiểu là khoảng trắng đầu(văn_bản[i])) {
+            i = i + 1;
+        } nếu không {
+            đang_bỏ = sai;
+        };
+    };
+    trả về i;
+};
+
+// Parse số nguyên 32-bit theo contract cũ của std::stoi:
+// cho phép khoảng trắng ở đầu, dấu +/- và yêu cầu phần còn lại toàn chữ số.
+hàm chuyển kiểu phân tích số nguyên(văn_bản) {
+    n = do_dai(văn_bản);
+    i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
+    nếu (i >= n) { chuyển_kiểu_lỗi_số_nguyên(); };
+
+    âm = sai;
+    nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
+        âm = văn_bản[i] == "-";
+        i = i + 1;
+    };
+    nếu (i >= n) { chuyển_kiểu_lỗi_số_nguyên(); };
+
+    kết_quả = 0;
+    có_chữ_số = sai;
+    lặp(vòng = 0; i < n; vòng++) {
+        chữ_số = chuyển kiểu chữ số(văn_bản[i]);
+        nếu (chữ_số < 0) { chuyển_kiểu_lỗi_số_nguyên(); };
+        có_chữ_số = đúng;
+
+        nếu (âm) {
+            nếu (kết_quả < -214748364 ||
+                (kết_quả == -214748364 && chữ_số > 8)) {
+                chuyển_kiểu_lỗi_số_nguyên();
+            };
+            kết_quả = kết_quả * 10 - chữ_số;
+        } nếu không {
+            nếu (kết_quả > 214748364 ||
+                (kết_quả == 214748364 && chữ_số > 7)) {
+                chuyển_kiểu_lỗi_số_nguyên();
+            };
+            kết_quả = kết_quả * 10 + chữ_số;
+        };
+        i = i + 1;
+    };
+    nếu (!có_chữ_số) { chuyển_kiểu_lỗi_số_nguyên(); };
+    trả về kết_quả;
+};
 
 hàm thành chuỗi(giá trị) {
-    ném "stdlib: thành chuỗi native hook không khả dụng";
+    // OP_CONG là ngữ nghĩa lõi của V++. Nối với chuỗi rỗng giữ nguyên cách
+    // runtime hiển thị scalar, collection, object và closure.
+    trả về "" + giá trị;
 };
 
 hàm thành số nguyên(giá trị) {
-    ném "stdlib: thành số nguyên native hook không khả dụng";
+    kiểu = loai_cua(giá trị);
+    nếu (kiểu == "số nguyên") {
+        trả về giá trị;
+    };
+    nếu (kiểu == "chuỗi") {
+        trả về chuyển kiểu phân tích số nguyên(giá trị);
+    };
+    nếu (kiểu == "số thực") {
+        nếu (!(giá trị >= -2147483648.0 && giá trị <= 2147483647.0)) {
+            chuyển_kiểu_lỗi_số_nguyên();
+        };
+        văn_bản = thành chuỗi(giá trị);
+        n = do_dai(văn_bản);
+        nếu (n < 3 || văn_bản[n - 2] != "." || văn_bản[n - 1] != "0") {
+            chuyển_kiểu_lỗi_số_nguyên();
+        };
+        nguyên = "";
+        lặp(i = 0; i < n - 2; i++) {
+            nguyên = nguyên + văn_bản[i];
+        };
+        trả về chuyển kiểu phân tích số nguyên(nguyên);
+    };
+    chuyển_kiểu_lỗi_số_nguyên();
+};
+
+hàm chuyển kiểu lũy thừa mười(số_mũ) {
+    kết_quả = 1.0;
+    nếu (số_mũ >= 0) {
+        lặp(i = 0; i < số_mũ; i++) {
+            kết_quả = kết_quả * 10.0;
+        };
+    } nếu không {
+        lặp(i = 0; i > số_mũ; i--) {
+            kết_quả = kết_quả / 10.0;
+        };
+    };
+    trả về kết_quả;
+};
+
+// Parser thập phân/scientific notation thuần V++.
+// Native không còn dùng std::stod cho conversion thông thường.
+hàm chuyển kiểu phân tích số thực(văn_bản) {
+    n = do_dai(văn_bản);
+    i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
+    nếu (i >= n) { chuyển_kiểu_lỗi_số_thực(); };
+
+    âm = sai;
+    nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
+        âm = văn_bản[i] == "-";
+        i = i + 1;
+    };
+    nếu (i >= n) { chuyển_kiểu_lỗi_số_thực(); };
+
+    // NaN/Infinity không thể tự tạo bằng toán tử V++ vì phép chia cho 0
+    // chủ động ném lỗi, nên chỉ ba giá trị IEEE này đi qua primitive runtime.
+    còn_lại = "";
+    lặp(j = i; j < n; j++) {
+        còn_lại = còn_lại + văn_bản[j];
+    };
+    nếu (còn_lại == "nan" || còn_lại == "NaN" || còn_lại == "NAN") {
+        trả về so_thuc_dac_biet_noi_bo("nan");
+    };
+    nếu (còn_lại == "inf" || còn_lại == "Inf" || còn_lại == "INF" ||
+        còn_lại == "infinity" || còn_lại == "Infinity" || còn_lại == "INFINITY") {
+        nếu (âm) { trả về so_thuc_dac_biet_noi_bo("-inf"); };
+        trả về so_thuc_dac_biet_noi_bo("inf");
+    };
+
+    giá_trị = 0.0;
+    có_chữ_số = sai;
+    đang_đọc = đúng;
+    lặp(vòng = 0; i < n && đang_đọc; vòng++) {
+        chữ_số = chuyển kiểu chữ số(văn_bản[i]);
+        nếu (chữ_số < 0) {
+            đang_đọc = sai;
+        } nếu không {
+            có_chữ_số = đúng;
+            giá_trị = giá_trị * 10.0 + chữ_số;
+            i = i + 1;
+        };
+    };
+
+    nếu (i < n) {
+        nếu (văn_bản[i] == ".") {
+            i = i + 1;
+            hệ_số = 0.1;
+            đang_đọc = đúng;
+            lặp(vòng = 0; i < n && đang_đọc; vòng++) {
+                chữ_số = chuyển kiểu chữ số(văn_bản[i]);
+                nếu (chữ_số < 0) {
+                    đang_đọc = sai;
+                } nếu không {
+                    có_chữ_số = đúng;
+                    giá_trị = giá_trị + chữ_số * hệ_số;
+                    hệ_số = hệ_số / 10.0;
+                    i = i + 1;
+                };
+            };
+        };
+    };
+    nếu (!có_chữ_số) { chuyển_kiểu_lỗi_số_thực(); };
+
+    số_mũ = 0;
+    có_số_mũ = sai;
+    nếu (i < n) {
+        nếu (văn_bản[i] == "e" || văn_bản[i] == "E") {
+            i = i + 1;
+            âm_mũ = sai;
+            nếu (i < n) {
+                nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
+                    âm_mũ = văn_bản[i] == "-";
+                    i = i + 1;
+                };
+            };
+            đang_đọc = đúng;
+            lặp(vòng = 0; i < n && đang_đọc; vòng++) {
+                chữ_số = chuyển kiểu chữ số(văn_bản[i]);
+                nếu (chữ_số < 0) {
+                    đang_đọc = sai;
+                } nếu không {
+                    có_số_mũ = đúng;
+                    nếu (số_mũ > 10000) { chuyển_kiểu_lỗi_số_thực(); };
+                    số_mũ = số_mũ * 10 + chữ_số;
+                    i = i + 1;
+                };
+            };
+            nếu (!có_số_mũ) { chuyển_kiểu_lỗi_số_thực(); };
+            nếu (âm_mũ) { số_mũ = 0 - số_mũ; };
+        };
+    };
+
+    nếu (i != n) { chuyển_kiểu_lỗi_số_thực(); };
+    nếu (số_mũ > 400 || số_mũ < -400) {
+        chuyển_kiểu_lỗi_số_thực();
+    };
+    nếu (số_mũ != 0) {
+        giá_trị = giá_trị * chuyển kiểu lũy thừa mười(số_mũ);
+    };
+    nếu (âm) { giá_trị = 0.0 - giá_trị; };
+
+    vô_cực_dương = so_thuc_dac_biet_noi_bo("inf");
+    vô_cực_âm = so_thuc_dac_biet_noi_bo("-inf");
+    nếu (giá_trị == vô_cực_dương || giá_trị == vô_cực_âm) {
+        chuyển_kiểu_lỗi_số_thực();
+    };
+    trả về giá_trị;
 };
 
 hàm thành số thực(giá trị) {
-    ném "stdlib: thành số thực native hook không khả dụng";
+    kiểu = loai_cua(giá trị);
+    nếu (kiểu == "số thực") { trả về giá trị; };
+    nếu (kiểu == "số nguyên") { trả về giá trị * 1.0; };
+    nếu (kiểu == "chuỗi") { trả về chuyển kiểu phân tích số thực(giá trị); };
+    chuyển_kiểu_lỗi_số_thực();
 };
 
 hàm loại của(giá trị) {
-    ném "stdlib: loại của native hook không khả dụng";
+    // Type tag là metadata của VM nên primitive này vẫn thuộc runtime.
+    trả về loai_cua(giá trị);
 };

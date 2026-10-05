@@ -1,14 +1,18 @@
 // Module: nhập xuất.thư mục
 // Tạo, liệt kê và dọn cây thư mục.
 
+nhập gói/bộ sưu tập/danh sách;
+
 hàm tạo thư mục(đường dẫn) {
-    ném "stdlib: tạo thư mục native hook không khả dụng";
+    trả về tao_thu_muc(đường dẫn);
 };
 
 hàm liệt kê thư mục(đường dẫn) {
-    ném "stdlib: liệt kê thư mục native hook không khả dụng";
+    kết_quả = liet_ke_thu_muc(đường dẫn);
+    sắp xếp(kết_quả);
+    trả về kết_quả;
 };
 
 hàm xóa đường dẫn(đường dẫn) {
-    ném "stdlib: xóa đường dẫn native hook không khả dụng";
+    trả về xoa_duong_dan(đường dẫn);
 };

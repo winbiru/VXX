@@ -1,0 +1,68 @@
+// vpp.repl — phiên tương tác giữ nguồn qua nhiều lần nhập.
+// Quản lý phiên được triển khai bằng V++. Chỉ thao tác thực thi mã nguồn dùng
+// primitive `kịch bản chạy`, vì compiler/VM là năng lực thấp tầng của runtime.
+
+nhập bộ sưu tập;
+nhập văn bản;
+nhập kịch bản;
+
+hàm riêng tư repl yêu cầu phiên(phiên) {
+    nếu (có khóa(phiên, "__repl") == 0 ||
+        lấy map(phiên, "__repl", 0) != 1 ||
+        lấy map(phiên, "mở", 0) != 1) {
+        ném "repl: phiên không tồn tại";
+    };
+    trả về phiên;
+};
+
+hàm repl tạo() {
+    trả về {
+        "__repl": 1,
+        "mở": 1,
+        "nguồn": "",
+        "đầu ra": ""
+    };
+};
+
+hàm repl chạy(phiên, dòng) {
+    repl yêu cầu phiên(phiên);
+    nguồn_cũ = lấy map(phiên, "nguồn", "");
+    đầu_ra_cũ = lấy map(phiên, "đầu ra", "");
+
+    nguồn_mới = nguồn_cũ + dòng;
+    nếu (kết thúc bằng(nguồn_mới, "\n") == sai) {
+        nguồn_mới = nguồn_mới + "\n";
+    };
+
+    đầu_ra_mới = kịch bản chạy(nguồn_mới);
+    phần_mới = đầu_ra_mới;
+    nếu (bắt đầu bằng(đầu_ra_mới, đầu_ra_cũ)) {
+        phần_mới = con chuỗi(
+            đầu_ra_mới,
+            độ dài(đầu_ra_cũ),
+            độ dài(đầu_ra_mới)
+        );
+    };
+
+    đặt map(phiên, "nguồn", nguồn_mới);
+    đặt map(phiên, "đầu ra", đầu_ra_mới);
+    trả về phần_mới;
+};
+
+hàm repl nguồn(phiên) {
+    repl yêu cầu phiên(phiên);
+    trả về lấy map(phiên, "nguồn", "");
+};
+
+hàm repl đặt lại(phiên) {
+    repl yêu cầu phiên(phiên);
+    đặt map(phiên, "nguồn", "");
+    đặt map(phiên, "đầu ra", "");
+    trả về 1;
+};
+
+hàm repl đóng(phiên) {
+    repl yêu cầu phiên(phiên);
+    đặt map(phiên, "mở", 0);
+    trả về 1;
+};

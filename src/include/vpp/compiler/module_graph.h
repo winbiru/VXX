@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -126,12 +127,18 @@ struct LocalModuleSemanticIndex {
     std::string entryIdentity;
     LocalModuleGraph graph;
     std::vector<LocalModuleSemanticRecord> modules;
+    std::unordered_map<std::string,
+                       std::shared_ptr<const vietvm::frontend::AstProgram>> parsedPrograms;
 
     // Tra `RuntimeModule` theo tên hoặc chỉ mục; hàm trả con trỏ/tham chiếu tới record đang được `ModuleTable` quản lý.
     const LocalModuleSemanticRecord *module(std::string_view identity) const noexcept;
     // Tra symbol được export từ một module semantic record; hàm tìm theo tên public và trả metadata cần cho module khác import.
     const ModuleExportSymbol *exportedSymbol(std::string_view moduleIdentity,
                                              std::string_view name) const noexcept;
+    const vietvm::frontend::AstProgram *parsedProgram(
+        std::string_view moduleIdentity) const noexcept;
+    const std::string *moduleSource(
+        std::string_view moduleIdentity) const noexcept;
 
     // Produces only direct imports of `importerIdentity`. An import alias
     // qualifies the exported name (`alias.symbol`); an unaliased import keeps

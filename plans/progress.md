@@ -30,7 +30,7 @@ ngắn/trung/dài hạn vẫn theo dõi công việc kỹ thuật theo thời gi
 | 0.7 | Hoàn tất | Production compiler dùng registry/context tường minh; compatibility facade chỉ còn cho caller cũ |
 | 0.8 | Gần hoàn tất | Sanitizer/leak gate Linux |
 | 0.9 | Gần hoàn tất | Stdlib audit + xác nhận release matrix |
-| 1.0 RC | Còn evidence P0 chặn RC | P0.1/P0.2/P0.5 đã triển khai; GC capacity core + harness/comparator đã có. Còn same-machine before/after, GC allocation/RSS/p95, CI performance gate, Linux leak gate + release/install matrix |
+| 1.0 RC | Còn evidence P0 chặn RC | P0.1/P0.2/P0.5 đã triển khai; GC capacity core + benchmark stage harness đã có. Comparator/runner chưa có. Còn same-machine before/after, GC allocation/RSS/p95, CI performance gate, Linux leak gate + release/install matrix |
 
 Ước lượng **25–30%** trước đây chưa tính đợt P0 ngày 22/09/2026. Phần source/contract của
 P0 hiện đã tiến đáng kể, nhưng mức sẵn sàng RC vẫn phải chờ performance evidence cùng release
@@ -41,13 +41,12 @@ P0 được theo dõi tại [mục 0 của roadmap 1.0](roadmap-1.0.md#0-p0--run
 `VM::run()` hiện dùng generation cache cho verifier; function/module mutation invalidate cache.
 HTTP JSON extraction dùng parser JSON thật thay regex; periodic GC giữ capacity và explicit trim
 có threshold; local/package import precedence đã được freeze trong code + ADR + regression.
-Harness v2 đã tách VM/compiler/HTTP/GC cases và comparator đã có alternating run,
-median/p95/MAD + threshold/noise validation; 10 sample là minimum cho median, còn p95 GC gate
-yêu cầu 40 sample để tránh false regression do một tail outlier. Self-comparison 40 sample
-sau hardening PASS. Release local hiện 4/4 CTest PASS, gồm hai P0
+Benchmark harness hiện tách VM verification/dispatch/end-to-end, compiler stages,
+package/module graph và GC collection; HTTP/JSON native case cũ đã biến mất cùng helper C++.
+Runner/comparator alternating baseline/candidate, median/p95/MAD và threshold/noise validation
+chưa tồn tại trong `scripts/quality/`. Release local hiện 4/4 CTest PASS, gồm hai P0
 hardening target và integration. Phần còn thiếu để đóng P0 là same-machine before/after giữa
-hai revision độc lập, GC allocation/RSS/p95 evidence và nối comparator vào CI; self-comparison
-candidate-vs-candidate chỉ chứng minh runner hoạt động, không phải bằng chứng cải thiện.
+hai revision độc lập, GC allocation/RSS/p95 evidence, runner/comparator và nối gate vào CI.
 
 ## Đã xác nhận hoàn thành
 
@@ -110,8 +109,9 @@ candidate-vs-candidate chỉ chứng minh runner hoạt động, không phải b
   riêng nhưng vẫn giữ runtime-name linking, và lifecycle tracker khóa
   `uninitialized → initializing → initialized/failed`.
 - [x] Quality baseline đã có coverage gate 45%, `.clang-tidy` versioned và benchmark
-  lặp lại được cho VM, lexer/compiler và native HTTP helpers. Harness này chưa tách dispatch
-  khỏi verification/setup và chưa có performance threshold; xem P0.4 trong roadmap 1.0.
+  lặp lại được cho VM verification/dispatch/end-to-end, compiler stages, package/module graph
+  và GC collection. Runner/comparator cùng performance threshold vẫn còn mở; xem P0.4 trong
+  roadmap 1.0.
 
 ## Đang thực hiện
 
@@ -250,7 +250,7 @@ macOS artifact/install smoke: tarball tạm cài 2 lần, stale managed file b�
 ASan/UBSan local hiện hành: 2/2 CTest PASS (147.09s); CI Linux vẫn chạy cùng suite với `detect_leaks=1`
 Pipeline parity snapshot/unit: đã bị xóa có chủ đích ở `473a8e4`; production regression hiện chỉ dùng `.vi` + CLI hardening
 Coverage gate: minimum 45% vẫn nằm trong CI; số 75.77% là baseline lịch sử trước khi xóa C++ test tree
-Benchmark baseline: VM dispatch + lexer + compiler pipeline + native HTTP helpers
+Benchmark hiện hành: VM verification/dispatch/end-to-end + compiler stages + package/module graph + GC collection
 Short-term: 14/15
 Medium-term: 18/18
 Long-term: 20/41

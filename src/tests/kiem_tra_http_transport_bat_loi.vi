@@ -6,25 +6,31 @@ hàm chính() {
     thử {
         mạng lấy("http://127.0.0.2:1/health");
     } bắt lỗi (e) {
-        nếu (chứa chuỗi(e, "curl")) { bắtĐược = bắtĐược + 1; };
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
     };
 
     thử {
         mạng gửi("http://127.0.0.2:1/health", "{}");
     } bắt lỗi (e) {
-        nếu (chứa chuỗi(e, "curl")) { bắtĐược = bắtĐược + 1; };
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
     };
 
     thử {
         mạng cập nhật("http://127.0.0.2:1/health", "{}");
     } bắt lỗi (e) {
-        nếu (chứa chuỗi(e, "curl")) { bắtĐược = bắtĐược + 1; };
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
     };
 
     thử {
         mạng xóa("http://127.0.0.2:1/health");
     } bắt lỗi (e) {
-        nếu (chứa chuỗi(e, "curl")) { bắtĐược = bắtĐược + 1; };
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
+    };
+
+    thử {
+        mạng lấy("https://127.0.0.2:1/health");
+    } bắt lỗi (e) {
+        nếu (chứa chuỗi(e, "socket_tls_mo")) { bắtĐược = bắtĐược + 1; };
     };
 
     in bắtĐược;

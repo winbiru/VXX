@@ -1,0 +1,535 @@
+// Module: lõi.quét và tách chuỗi
+// Scanner/tokenizer thuần V++ trên nguồn chuỗi bất biến.
+// Regex chỉ dùng engine primitive; cursor, delimiter policy và tokenization
+// đều được điều phối ở lớp V++.
+
+nhập gói/lõi/biểu thức chính quy;
+
+hàm scanner yêu cầu hình dạng(s) {
+    nếu (loại của(s) != "từ điển") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (lấy map(s, "__vpp_scanner__", 0) != 1) {
+        ném "SCAN_ARGUMENT";
+    };
+    trả về đúng;
+};
+
+hàm scanner yêu cầu mở(s) {
+    scanner yêu cầu hình dạng(s);
+    nếu (lấy map(s, "trạng thái", "") == "đóng") {
+        ném "SCAN_CLOSED";
+    };
+    trả về đúng;
+};
+
+hàm scanner ký tự trắng(ký_tự) {
+    nếu (ký_tự == " ") { trả về đúng; };
+    nếu (ký_tự == "\t") { trả về đúng; };
+    nếu (ký_tự == "\n") { trả về đúng; };
+    nếu (ký_tự == "\r") { trả về đúng; };
+    trả về sai;
+};
+
+// `phân_cách = rỗng` nghĩa là bộ whitespace tương thích StringTokenizer.
+// Chuỗi phân cách khác được hiểu là tập ký tự, không phải regex.
+hàm scanner là phân cách(phân_cách, ký_tự) {
+    nếu (phân_cách == rỗng) {
+        trả về scanner ký tự trắng(ký_tự);
+    };
+    nếu (loại của(phân_cách) != "chuỗi") {
+        ném "SCAN_ARGUMENT";
+    };
+
+    tìm_thấy = sai;
+    lặp(i = 0; i < độ dài(phân_cách) && !tìm_thấy; i++) {
+        nếu (cắt chuỗi(phân_cách, i, 1) == ký_tự) {
+            tìm_thấy = đúng;
+        };
+    };
+    trả về tìm_thấy;
+};
+
+hàm scanner regex marker(văn_bản) {
+    marker = "__VPP_SCAN_REGEX_MARKER__";
+    lặp(vòng = 0; regex tìm(văn_bản, marker) != ""; vòng++) {
+        marker = marker + "_";
+    };
+    trả về marker;
+};
+
+hàm scanner regex tại(nguồn, vị_trí, mẫu) {
+    nếu (loại của(mẫu) != "chuỗi" || mẫu == "") {
+        ném "SCAN_ARGUMENT";
+    };
+    suffix = cắt chuỗi(nguồn, vị_trí, độ dài(nguồn) - vị_trí);
+    marker = scanner regex marker(suffix);
+    anchored = "^(?:" + mẫu + ")";
+    thay = regex thay(suffix, anchored, marker);
+    nếu (thay == suffix) {
+        trả về {"có": 0, "độ dài": 0};
+    };
+    matched = độ dài(suffix) + độ dài(marker) - độ dài(thay);
+    nếu (matched < 0) {
+        ném "SCAN_ARGUMENT";
+    };
+    trả về {"có": 1, "độ dài": matched};
+};
+
+hàm scanner phân cách tại(nguồn, vị_trí, phân_cách, kiểu) {
+    nếu (vị_trí >= độ dài(nguồn)) {
+        trả về {"có": 0, "độ dài": 0};
+    };
+    nếu (kiểu == "regex") {
+        trả về scanner regex tại(nguồn, vị_trí, phân_cách);
+    };
+    ký_tự = cắt chuỗi(nguồn, vị_trí, 1);
+    nếu (scanner là phân cách(phân_cách, ký_tự)) {
+        trả về {"có": 1, "độ dài": 1};
+    };
+    trả về {"có": 0, "độ dài": 0};
+};
+
+hàm scanner(nguồn, phân_cách = rỗng, giới_hạn_token = 1048576) {
+    nếu (loại của(nguồn) != "chuỗi") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (phân_cách != rỗng) {
+        nếu (loại của(phân_cách) != "chuỗi") {
+            ném "SCAN_ARGUMENT";
+        };
+    };
+    nếu (loại của(giới_hạn_token) != "số nguyên") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (giới_hạn_token <= 0) {
+        ném "SCAN_ARGUMENT";
+    };
+
+    trả về {
+        "__vpp_scanner__": 1,
+        "nguồn": nguồn,
+        "phân cách": phân_cách,
+        "kiểu phân cách": "ký tự",
+        "vị trí": 0,
+        "giới hạn token": giới_hạn_token,
+        "trạng thái": "mở"
+    };
+};
+
+hàm scanner regex(nguồn, mẫu_phân_cách, giới_hạn_token = 1048576) {
+    nếu (loại của(nguồn) != "chuỗi" || loại của(mẫu_phân_cách) != "chuỗi" ||
+        mẫu_phân_cách == "") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (loại của(giới_hạn_token) != "số nguyên" || giới_hạn_token <= 0) {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (regex khớp("", mẫu_phân_cách)) {
+        ném "SCAN_REGEX_ZERO_LENGTH";
+    };
+    regex tìm("", mẫu_phân_cách);
+    trả về {
+        "__vpp_scanner__": 1,
+        "nguồn": nguồn,
+        "phân cách": mẫu_phân_cách,
+        "kiểu phân cách": "regex",
+        "vị trí": 0,
+        "giới hạn token": giới_hạn_token,
+        "trạng thái": "mở"
+    };
+};
+
+// Trả snapshot token kế tiếp nhưng không thay đổi cursor.
+hàm scanner tìm token(s) {
+    scanner yêu cầu mở(s);
+    nguồn = lấy map(s, "nguồn", "");
+    phân_cách = lấy map(s, "phân cách", rỗng);
+    kiểu_phân_cách = lấy map(s, "kiểu phân cách", "ký tự");
+    vị_trí = lấy map(s, "vị trí", 0);
+    giới_hạn = lấy map(s, "giới hạn token", 1048576);
+    n = độ dài(nguồn);
+
+    // Không dùng điều kiện `i < n && cắt...`: runtime hiện chưa khóa
+    // short-circuit cho mọi backend, nên truy cập chuỗi phải được bảo vệ riêng.
+    đang_bỏ_phân_cách = đúng;
+    lặp(k = 0; đang_bỏ_phân_cách; k++) {
+        nếu (vị_trí >= n) {
+            đang_bỏ_phân_cách = sai;
+        } nếu không {
+            match = scanner phân cách tại(nguồn, vị_trí, phân_cách, kiểu_phân_cách);
+            nếu (lấy map(match, "có", 0) == 1) {
+                bước = lấy map(match, "độ dài", 0);
+                nếu (bước <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+                vị_trí += bước;
+            } nếu không {
+                đang_bỏ_phân_cách = sai;
+            };
+        };
+    };
+
+    nếu (vị_trí >= n) {
+        trả về {"có": 0, "bắt đầu": n, "kết thúc": n, "giá trị": ""};
+    };
+
+    bắt_đầu = vị_trí;
+    đang_đọc = đúng;
+    lặp(k = 0; đang_đọc; k++) {
+        nếu (vị_trí >= n) {
+            đang_đọc = sai;
+        } nếu không {
+            match = scanner phân cách tại(nguồn, vị_trí, phân_cách, kiểu_phân_cách);
+            nếu (lấy map(match, "có", 0) == 1) {
+                nếu (lấy map(match, "độ dài", 0) <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+                đang_đọc = sai;
+            } nếu không {
+                nếu (vị_trí - bắt_đầu >= giới_hạn) {
+                    ném "SCAN_TOKEN_LIMIT";
+                };
+                vị_trí += 1;
+            };
+        };
+    };
+
+    trả về {
+        "có": 1,
+        "bắt đầu": bắt_đầu,
+        "kết thúc": vị_trí,
+        "giá trị": cắt chuỗi(nguồn, bắt_đầu, vị_trí - bắt_đầu)
+    };
+};
+
+hàm có token(s) {
+    thông_tin = scanner tìm token(s);
+    trả về lấy map(thông_tin, "có", 0) == 1;
+};
+
+hàm token(s) {
+    thông_tin = scanner tìm token(s);
+    nếu (lấy map(thông_tin, "có", 0) != 1) {
+        ném "SCAN_END";
+    };
+    đặt map(s, "vị trí", lấy map(thông_tin, "kết thúc", 0));
+    trả về lấy map(thông_tin, "giá trị", "");
+};
+
+hàm scanner giá trị chữ số(ký_tự) {
+    chữ = chuỗi thường(ký_tự);
+    bảng = "0123456789abcdefghijklmnopqrstuvwxyz";
+    kết_quả = -1;
+    lặp(i = 0; i < 36 && kết_quả < 0; i++) {
+        nếu (cắt chuỗi(bảng, i, 1) == chữ) {
+            kết_quả = i;
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm scanner yêu cầu cơ số(cơ_số) {
+    nếu (loại của(cơ_số) != "số nguyên") {
+        ném "SCAN_RADIX";
+    };
+    nếu (cơ_số < 2 || cơ_số > 36) {
+        ném "SCAN_RADIX";
+    };
+    trả về cơ_số;
+};
+
+// Parser i32 dùng tích lũy âm để chấp nhận chính xác -2147483648 mà không
+// tạo giá trị dương 2147483648 trung gian. Đây là miền integer ABI hiện tại.
+hàm scanner phân tích i32(văn_bản, cơ_số) {
+    radix = scanner yêu cầu cơ số(cơ_số);
+    n = độ dài(văn_bản);
+    nếu (n == 0) {
+        trả về {"hợp lệ": 0};
+    };
+
+    i = 0;
+    âm = sai;
+    đầu = cắt chuỗi(văn_bản, 0, 1);
+    nếu (đầu == "-" || đầu == "+") {
+        nếu (đầu == "-") { âm = đúng; };
+        i = 1;
+    };
+    nếu (i >= n) {
+        trả về {"hợp lệ": 0};
+    };
+
+    giới_hạn = 0 - 2147483647;
+    nếu (âm) {
+        giới_hạn = 0 - 2147483647 - 1;
+    };
+    ngưỡng_nhân = giới_hạn / radix;
+    kết_quả = 0;
+
+    lặp(k = i; k < n; k++) {
+        chữ_số = scanner giá trị chữ số(cắt chuỗi(văn_bản, k, 1));
+        nếu (chữ_số < 0 || chữ_số >= radix) {
+            trả về {"hợp lệ": 0};
+        };
+        nếu (kết_quả < ngưỡng_nhân) {
+            trả về {"hợp lệ": 0};
+        };
+        kết_quả = kết_quả * radix;
+        nếu (kết_quả < giới_hạn + chữ_số) {
+            trả về {"hợp lệ": 0};
+        };
+        kết_quả = kết_quả - chữ_số;
+    };
+
+    nếu (âm) {
+        trả về {"hợp lệ": 1, "giá trị": kết_quả};
+    };
+    trả về {"hợp lệ": 1, "giá trị": 0 - kết_quả};
+};
+
+// Tương đương hasNextInt: không consume; mismatch/EOF trả rỗng.
+hàm xem i32(s, cơ_số = 10) {
+    scanner yêu cầu cơ số(cơ_số);
+    thông_tin = scanner tìm token(s);
+    nếu (lấy map(thông_tin, "có", 0) != 1) {
+        trả về rỗng;
+    };
+    phân_tích = scanner phân tích i32(lấy map(thông_tin, "giá trị", ""), cơ_số);
+    nếu (lấy map(phân_tích, "hợp lệ", 0) != 1) {
+        trả về rỗng;
+    };
+    trả về lấy map(phân_tích, "giá trị", rỗng);
+};
+
+hàm i32(s, cơ_số = 10) {
+    scanner yêu cầu cơ số(cơ_số);
+    thông_tin = scanner tìm token(s);
+    nếu (lấy map(thông_tin, "có", 0) != 1) {
+        ném "SCAN_END";
+    };
+    phân_tích = scanner phân tích i32(lấy map(thông_tin, "giá trị", ""), cơ_số);
+    nếu (lấy map(phân_tích, "hợp lệ", 0) != 1) {
+        ném "SCAN_MISMATCH";
+    };
+    đặt map(s, "vị trí", lấy map(thông_tin, "kết thúc", 0));
+    trả về lấy map(phân_tích, "giá trị", 0);
+};
+
+// V1 cố ý giới hạn float token ở 64 code point và |exponent| <= 240 trước
+// khi gọi native conversion. Miền này tránh lỗi range không bắt được ở ABI
+// conversion hiện tại nhưng vẫn bao phủ dữ liệu cấu hình/CLI thông dụng.
+hàm scanner f64 hợp lệ(văn_bản) {
+    n = độ dài(văn_bản);
+    nếu (n == 0 || n > 64) {
+        trả về sai;
+    };
+
+    i = 0;
+    đầu = cắt chuỗi(văn_bản, 0, 1);
+    nếu (đầu == "-" || đầu == "+") {
+        i = 1;
+    };
+    nếu (i >= n) {
+        trả về sai;
+    };
+
+    số_chữ_số = 0;
+    đã_chấm = sai;
+    hết_mantissa = sai;
+    lặp(k = 0; !hết_mantissa; k++) {
+        nếu (i >= n) {
+            hết_mantissa = đúng;
+        } nếu không {
+            c = cắt chuỗi(văn_bản, i, 1);
+            nếu (c == "e" || c == "E") {
+                hết_mantissa = đúng;
+            } nếu không {
+                chữ_số = scanner giá trị chữ số(c);
+                nếu (chữ_số >= 0 && chữ_số <= 9) {
+                    số_chữ_số += 1;
+                    i += 1;
+                } nếu không {
+                    nếu (c == "." && !đã_chấm) {
+                        đã_chấm = đúng;
+                        i += 1;
+                    } nếu không {
+                        trả về sai;
+                    };
+                };
+            };
+        };
+    };
+
+    nếu (số_chữ_số == 0) {
+        trả về sai;
+    };
+    nếu (i >= n) {
+        trả về đúng;
+    };
+
+    e = cắt chuỗi(văn_bản, i, 1);
+    nếu (e != "e" && e != "E") {
+        trả về sai;
+    };
+    i += 1;
+    nếu (i >= n) {
+        trả về sai;
+    };
+
+    dấu_mũ = cắt chuỗi(văn_bản, i, 1);
+    nếu (dấu_mũ == "+" || dấu_mũ == "-") {
+        i += 1;
+    };
+    nếu (i >= n) {
+        trả về sai;
+    };
+
+    mũ = 0;
+    số_chữ_số_mũ = 0;
+    lặp(k = i; k < n; k++) {
+        chữ_số = scanner giá trị chữ số(cắt chuỗi(văn_bản, k, 1));
+        nếu (chữ_số < 0 || chữ_số > 9) {
+            trả về sai;
+        };
+        số_chữ_số_mũ += 1;
+        mũ = mũ * 10 + chữ_số;
+        nếu (mũ > 240) {
+            trả về sai;
+        };
+    };
+    trả về số_chữ_số_mũ > 0;
+};
+
+hàm xem f64(s) {
+    thông_tin = scanner tìm token(s);
+    nếu (lấy map(thông_tin, "có", 0) != 1) {
+        trả về rỗng;
+    };
+    văn_bản = lấy map(thông_tin, "giá trị", "");
+    nếu (!scanner f64 hợp lệ(văn_bản)) {
+        trả về rỗng;
+    };
+    trả về thành số thực(văn_bản);
+};
+
+hàm f64(s) {
+    thông_tin = scanner tìm token(s);
+    nếu (lấy map(thông_tin, "có", 0) != 1) {
+        ném "SCAN_END";
+    };
+    văn_bản = lấy map(thông_tin, "giá trị", "");
+    nếu (!scanner f64 hợp lệ(văn_bản)) {
+        ném "SCAN_MISMATCH";
+    };
+    giá_trị = thành số thực(văn_bản);
+    đặt map(s, "vị trí", lấy map(thông_tin, "kết thúc", 0));
+    trả về giá_trị;
+};
+
+hàm scanner bỏ literal(s, mẫu) {
+    scanner yêu cầu mở(s);
+    nếu (loại của(mẫu) != "chuỗi") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (độ dài(mẫu) == 0) {
+        ném "SCAN_ARGUMENT";
+    };
+
+    nguồn = lấy map(s, "nguồn", "");
+    vị_trí = lấy map(s, "vị trí", 0);
+    n = độ dài(nguồn);
+    m = độ dài(mẫu);
+    nếu (vị_trí + m > n) {
+        ném "SCAN_MISMATCH";
+    };
+    nếu (cắt chuỗi(nguồn, vị_trí, m) != mẫu) {
+        ném "SCAN_MISMATCH";
+    };
+    đặt map(s, "vị trí", vị_trí + m);
+    trả về s;
+};
+
+hàm scanner bỏ regex(s, mẫu) {
+    scanner yêu cầu mở(s);
+    nếu (loại của(mẫu) != "chuỗi" || mẫu == "") {
+        ném "SCAN_ARGUMENT";
+    };
+    nguồn = lấy map(s, "nguồn", "");
+    vị_trí = lấy map(s, "vị trí", 0);
+    match = scanner regex tại(nguồn, vị_trí, mẫu);
+    nếu (lấy map(match, "có", 0) != 1) {
+        ném "SCAN_MISMATCH";
+    };
+    đặt map(s, "vị trí", vị_trí + lấy map(match, "độ dài", 0));
+    trả về s;
+};
+
+hàm đóng scanner(s) {
+    scanner yêu cầu hình dạng(s);
+    đặt map(s, "trạng thái", "đóng");
+    trả về rỗng;
+};
+
+// StringTokenizer compatibility: delimiter là tập ký tự. Empty token giữa
+// hai delimiter liên tiếp bị bỏ; khi giữ_phân_cách=true mỗi delimiter là một token.
+hàm tách token(văn_bản, phân_cách = rỗng, giữ_phân_cách = sai) {
+    nếu (loại của(văn_bản) != "chuỗi") {
+        ném "SCAN_ARGUMENT";
+    };
+    nếu (phân_cách != rỗng) {
+        nếu (loại của(phân_cách) != "chuỗi") {
+            ném "SCAN_ARGUMENT";
+        };
+    };
+
+    kết_quả = [];
+    n = độ dài(văn_bản);
+    bắt_đầu = 0;
+    lặp(i = 0; i < n; i++) {
+        c = cắt chuỗi(văn_bản, i, 1);
+        nếu (scanner là phân cách(phân_cách, c)) {
+            nếu (i > bắt_đầu) {
+                thêm(kết_quả, cắt chuỗi(văn_bản, bắt_đầu, i - bắt_đầu));
+            };
+            nếu (giữ_phân_cách) {
+                thêm(kết_quả, c);
+            };
+            bắt_đầu = i + 1;
+        };
+    };
+    nếu (bắt_đầu < n) {
+        thêm(kết_quả, cắt chuỗi(văn_bản, bắt_đầu, n - bắt_đầu));
+    };
+    trả về kết_quả;
+};
+
+hàm tách token regex(văn_bản, mẫu_phân_cách, giữ_phân_cách = sai) {
+    nếu (loại của(văn_bản) != "chuỗi" || loại của(mẫu_phân_cách) != "chuỗi" ||
+        mẫu_phân_cách == "") {
+        ném "SCAN_ARGUMENT";
+    };
+
+    kiểm_tra = scanner regex(văn_bản, mẫu_phân_cách);
+    kết_quả = [];
+    n = độ dài(văn_bản);
+    bắt_đầu = 0;
+    vị_trí = 0;
+    lặp(vòng = 0; vị_trí < n; vòng++) {
+        match = scanner regex tại(văn_bản, vị_trí, mẫu_phân_cách);
+        nếu (lấy map(match, "có", 0) == 1) {
+            bước = lấy map(match, "độ dài", 0);
+            nếu (bước <= 0) { ném "SCAN_REGEX_ZERO_LENGTH"; };
+            nếu (vị_trí > bắt_đầu) {
+                thêm(kết_quả, cắt chuỗi(văn_bản, bắt_đầu, vị_trí - bắt_đầu));
+            };
+            nếu (giữ_phân_cách) {
+                thêm(kết_quả, cắt chuỗi(văn_bản, vị_trí, bước));
+            };
+            vị_trí += bước;
+            bắt_đầu = vị_trí;
+        } nếu không {
+            vị_trí += 1;
+        };
+    };
+    nếu (bắt_đầu < n) {
+        thêm(kết_quả, cắt chuỗi(văn_bản, bắt_đầu, n - bắt_đầu));
+    };
+    trả về kết_quả;
+};
+nhập gói/lõi/chuyển kiểu;

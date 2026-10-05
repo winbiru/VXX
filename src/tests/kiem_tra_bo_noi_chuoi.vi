@@ -14,4 +14,26 @@ hàm chính() {
     in bộ nối kết quả(b);
     bộ nối thêm(b, "x");
     in bộ nối kết quả(b);
+
+    nguồn = bộ nối chuỗi("/", "(", ")", "rỗng nguồn");
+    bộ nối thêm(nguồn, "a");
+    bộ nối thêm(nguồn, "b");
+    bộ nối gộp(a, nguồn);
+    in bộ nối kết quả(a);
+    in bộ nối độ dài(a);
+
+    rỗng_nguồn = bộ nối chuỗi("/", "(", ")", "không được gộp");
+    bộ nối gộp(a, rỗng_nguồn);
+    in bộ nối kết quả(a);
+
+    thử {
+        bộ nối thêm({}, "x");
+    } bắt lỗi (e) {
+        in e;
+    };
+    thử {
+        bộ nối chuỗi(1);
+    } bắt lỗi (e) {
+        in e;
+    };
 };
