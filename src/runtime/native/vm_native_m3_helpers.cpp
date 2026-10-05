@@ -382,7 +382,8 @@ bool openConnectedNativeSocket(const std::string &fn,
             connected = candidate;
             break;
         }
-        if (!connectError.empty()) err = connectError;
+        // Preserve the public operation for timeout/non-blocking failures too.
+        if (!connectError.empty()) err = fn + ": " + connectError;
         closeNativeSocket(candidate);
     }
     freeaddrinfo(head);

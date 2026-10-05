@@ -1,4 +1,4 @@
-name: Release Binaries
+name: Release VDK and Runtime
 
 on:
   release:
@@ -45,34 +45,6 @@ jobs:
 
       - name: Build V++ and RC test gate
         run: cmake --build build --config Release
-
-      - name: Package VDK
-        run: cpack --config build/CPackConfig.cmake -C Release
-
-      - name: Verify VDK install (Linux/macOS)
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          set -eu
-          VDK_VERIFY_ROOT="$(mktemp -d)"
-          trap 'rm -rf "$VDK_VERIFY_ROOT"' EXIT
-          cmake --install build --prefix "$VDK_VERIFY_ROOT"
-          "$VDK_VERIFY_ROOT/bin/vdk" phiên bản
-          "$VDK_VERIFY_ROOT/bin/vdk" chẩn đoán
-
-      - name: Verify VDK install (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $vdkVerifyRoot = Join-Path $env:RUNNER_TEMP "vdk-install-verify"
-          Remove-Item $vdkVerifyRoot -Recurse -Force -ErrorAction SilentlyContinue
-          cmake --install build --config Release --prefix $vdkVerifyRoot
-          if ($LASTEXITCODE -ne 0) { throw "VDK install verification failed during install" }
-          $vdk = Join-Path $vdkVerifyRoot "bin/vdk.exe"
-          & $vdk "phiên" "bản"
-          if ($LASTEXITCODE -ne 0) { throw "VDK version verification failed" }
-          & $vdk "chẩn" "đoán"
-          if ($LASTEXITCODE -ne 0) { throw "VDK diagnostic verification failed" }
 
       - name: Verify build (Linux/macOS)
         if: runner.os != 'Windows'
@@ -139,6 +111,13 @@ jobs:
             }
             Remove-Item $first, $second -Force
           }
+
+      - name: Package VDK
+        run: cpack --config build/CPackConfig.cmake -C Release -B build/vdk-artifacts
+
+      - name: Verify VDK archive
+        id: vdk
+        run: python scripts/quality/verify-vdk.py --build-dir build
 
       - name: Package (Linux/macOS)
         if: runner.os != 'Windows'
@@ -406,17 +385,18 @@ jobs:
       - name: Upload VDK workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vdk-${{ runner.os }}-${{ runner.arch }}
+          name: ${{ steps.vdk.outputs.name }}
           path: |
-            vdk-*.tar.gz
-            vdk-*.zip
+            ${{ steps.vdk.outputs.archive }}
+            ${{ steps.vdk.outputs.checksum }}
           if-no-files-found: error
 
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: true
           files: |
             ${{ matrix.asset_name }}
-            vdk-*.tar.gz
-            vdk-*.zip
+            ${{ steps.vdk.outputs.archive }}
+            ${{ steps.vdk.outputs.checksum }}
