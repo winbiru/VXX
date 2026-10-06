@@ -237,6 +237,8 @@ jobs:
             . "$HOME/.bash_profile"
             test "$VPP_HOME" = "$PROFILE_INSTALL"
             test "$(command -v vpp)" = "$PROFILE_INSTALL/vpp"
+            case "${LANG:-}" in *UTF-8*|*utf8*) ;; *) echo "Installer did not persist a UTF-8 LANG" >&2; exit 1 ;; esac
+            case "${LC_CTYPE:-}" in *UTF-8*|*utf8*) ;; *) echo "Installer did not persist a UTF-8 LC_CTYPE" >&2; exit 1 ;; esac
             vpp phiên bản >/dev/null
           '
           printf 'in 42;\n' > "$PROFILE_INSTALL/my-project.vi"
@@ -375,6 +377,36 @@ jobs:
           }
           if (-not (Test-Path (Join-Path $uninstallDir "my-project.vi"))) { throw "Uninstall deleted user project" }
           if (Test-Path (Join-Path $uninstallDir "vpp.exe")) { throw "Uninstall left vpp.exe" }
+
+          # Verify the normal end-user path: installer persists UTF-8 configuration
+          # for both Windows PowerShell and PowerShell 7, and uninstall removes it.
+          $profileInstallDir = Join-Path $verifyRoot "profile-install"
+          & $installer -InstallDir $profileInstallDir
+          if ($LASTEXITCODE -ne 0) { throw "Profile installation smoke failed" }
+          $documents = [Environment]::GetFolderPath('MyDocuments')
+          $profilePaths = @(
+            $PROFILE.CurrentUserAllHosts,
+            (Join-Path $documents "WindowsPowerShell\profile.ps1"),
+            (Join-Path $documents "PowerShell\profile.ps1")
+          ) | Where-Object { $_ } | Select-Object -Unique
+          foreach ($profilePath in $profilePaths) {
+            if (-not (Test-Path -LiteralPath $profilePath)) { throw "PowerShell profile was not created: $profilePath" }
+            if (-not (Select-String -LiteralPath $profilePath -SimpleMatch '# >>> V++ UTF-8 >>>' -Quiet)) {
+              throw "V++ UTF-8 profile marker missing: $profilePath"
+            }
+          }
+          & (Join-Path $profileInstallDir "vpp.exe") "gỡ" "cài" "đặt"
+          if ($LASTEXITCODE -ne 0) { throw "Profile uninstall smoke failed" }
+          $deadline = [DateTime]::UtcNow.AddSeconds(30)
+          while ((Test-Path (Join-Path $profileInstallDir "vpp.exe")) -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 100
+          }
+          foreach ($profilePath in $profilePaths) {
+            if ((Test-Path -LiteralPath $profilePath) -and
+                (Select-String -LiteralPath $profilePath -SimpleMatch '# >>> V++ UTF-8 >>>' -Quiet)) {
+              throw "V++ UTF-8 profile marker was not removed: $profilePath"
+            }
+          }
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

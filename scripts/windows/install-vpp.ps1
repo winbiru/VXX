@@ -13,6 +13,58 @@ $UninstallScriptName = "uninstall-vpp.ps1"
 $UninstallLauncherName = "vpp-uninstall.cmd"
 $ManagedDirectories = @($StdlibDirectoryName, $TemplatesDirectoryName, $ExamplesDirectoryName)
 $UninstallFiles = @($UninstallScriptName, $UninstallLauncherName)
+$Utf8ProfileStart = '# >>> V++ UTF-8 >>>'
+$Utf8ProfileEnd = '# <<< V++ UTF-8 <<<'
+
+function Get-VppPowerShellProfiles {
+    $paths = New-Object System.Collections.Generic.List[string]
+    if ($PROFILE.CurrentUserAllHosts) {
+        $paths.Add($PROFILE.CurrentUserAllHosts)
+    }
+
+    $documents = [Environment]::GetFolderPath('MyDocuments')
+    if ($documents) {
+        $paths.Add((Join-Path $documents 'WindowsPowerShell\profile.ps1'))
+        $paths.Add((Join-Path $documents 'PowerShell\profile.ps1'))
+    }
+
+    return @($paths | Where-Object { $_ } | Select-Object -Unique)
+}
+
+function Set-VppUtf8Profiles {
+    $updatedProfiles = @()
+    foreach ($profilePath in (Get-VppPowerShellProfiles)) {
+        $profileDir = Split-Path -Parent $profilePath
+        if (-not (Test-Path -LiteralPath $profileDir)) {
+            New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+        }
+
+        $existing = ''
+        if (Test-Path -LiteralPath $profilePath -PathType Leaf) {
+            $existing = [System.IO.File]::ReadAllText($profilePath)
+        }
+
+        $pattern = '(?ms)^' + [regex]::Escape($Utf8ProfileStart) + '.*?^' + [regex]::Escape($Utf8ProfileEnd) + '\s*'
+        $existing = [regex]::Replace($existing, $pattern, '').TrimEnd()
+
+        $block = @"
+$Utf8ProfileStart
+try { & "$env:SystemRoot\System32\chcp.com" 65001 2>`$null | Out-Null } catch { }
+`$VppUtf8 = [System.Text.UTF8Encoding]::new(`$false)
+[Console]::InputEncoding = `$VppUtf8
+[Console]::OutputEncoding = `$VppUtf8
+`$global:OutputEncoding = `$VppUtf8
+`$env:LANG = 'vi_VN.UTF-8'
+$Utf8ProfileEnd
+"@
+
+        $content = if ($existing) { $existing + [Environment]::NewLine + [Environment]::NewLine + $block } else { $block }
+        $utf8Bom = New-Object System.Text.UTF8Encoding($true)
+        [System.IO.File]::WriteAllText($profilePath, $content.TrimEnd() + [Environment]::NewLine, $utf8Bom)
+        $updatedProfiles += $profilePath
+    }
+    return $updatedProfiles
+}
 
 # Configure UTF-8 before invoking V++ or printing Vietnamese installer messages.
 # A headless host may have no console for chcp; redirected output still uses UTF-8.
@@ -100,15 +152,19 @@ try {
     Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+$utf8ProfilePaths = @()
 if (-not $NoPathUpdate) {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $newPath = Add-VppToPath $userPath $InstallDir
     [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     [Environment]::SetEnvironmentVariable("VPP_HOME", $InstallDir, "User")
+    $utf8ProfilePaths = @(Set-VppUtf8Profiles)
 }
 
 $env:Path = Add-VppToPath $env:Path $InstallDir
 $env:VPP_HOME = $InstallDir
+$env:LANG = "vi_VN.UTF-8"
+[Console]::InputEncoding = [Console]::OutputEncoding
 
 # Check the installed copy, not only the executable in the extracted archive.
 & $targetExe "phiên" "bản"
@@ -125,9 +181,12 @@ Write-Host "Đã cài thư viện chuẩn tại: $targetStdlib"
 Write-Host "Đã cài templates tại: $targetTemplates"
 Write-Host "Đã cài examples tại: $targetExamples"
 if ($NoPathUpdate) {
-    Write-Host "Đã bỏ qua cập nhật PATH/VPP_HOME của User theo -NoPathUpdate."
+    Write-Host "Đã bỏ qua cập nhật PATH/VPP_HOME và PowerShell profile theo -NoPathUpdate."
 } else {
     Write-Host "Đã lưu PATH/VPP_HOME (User) và cập nhật môi trường của tiến trình PowerShell đang chạy bộ cài."
+    foreach ($profilePath in $utf8ProfilePaths) {
+        Write-Host "Đã cấu hình UTF-8 lâu dài cho PowerShell profile: $profilePath"
+    }
     Write-Host "Nếu gọi trực tiếp install-vpp.ps1 trong PowerShell, bạn có thể dùng ngay: vpp"
-    Write-Host "Nếu cài qua .cmd hoặc tiến trình con, hãy đóng và mở lại ứng dụng terminal/VS Code để nhận môi trường mới."
+    Write-Host "Các PowerShell mới sẽ tự dùng UTF-8; nếu cài qua .cmd hoặc tiến trình con, hãy mở terminal/VS Code mới."
 }

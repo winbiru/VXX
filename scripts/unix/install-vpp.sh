@@ -2,6 +2,28 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+
+# Chọn locale UTF-8 tốt nhất một lần trong installer. Ưu tiên tiếng Việt nếu hệ thống có,
+# sau đó fallback sang locale UTF-8 phổ biến để không tạo cảnh báo locale không tồn tại.
+choose_utf8_locale() {
+  locales=$(locale -a 2>/dev/null || true)
+  if printf '%s\n' "$locales" | grep -qiE '^vi_VN\.(UTF-8|utf8)$'; then
+    printf '%s\n' 'vi_VN.UTF-8'
+  elif printf '%s\n' "$locales" | grep -qiE '^C\.(UTF-8|utf8)$'; then
+    printf '%s\n' 'C.UTF-8'
+  elif printf '%s\n' "$locales" | grep -qiE '^en_US\.(UTF-8|utf8)$'; then
+    printf '%s\n' 'en_US.UTF-8'
+  else
+    printf '%s\n' 'C'
+  fi
+}
+
+VPP_UTF8_LOCALE=$(choose_utf8_locale)
+if [ "$VPP_UTF8_LOCALE" != "C" ]; then
+  export LANG="$VPP_UTF8_LOCALE"
+  export LC_CTYPE="$VPP_UTF8_LOCALE"
+fi
+
 SOURCE_BIN="$SCRIPT_DIR/vpp"
 SOURCE_UNINSTALLER="$SCRIPT_DIR/uninstall-vpp.sh"
 if [ ! -f "$SOURCE_BIN" ]; then
@@ -91,6 +113,10 @@ if [ "${VPP_SKIP_PROFILE:-0}" != "1" ]; then
     echo "# >>> VPP installer >>>"
     echo "export VPP_HOME=\"$INSTALL_DIR\""
     echo "case \":\$PATH:\" in *\":\$VPP_HOME:\"*) ;; *) export PATH=\"\$VPP_HOME:\$PATH\" ;; esac"
+    if [ "$VPP_UTF8_LOCALE" != "C" ]; then
+      echo "export LANG=\"$VPP_UTF8_LOCALE\""
+      echo "export LC_CTYPE=\"$VPP_UTF8_LOCALE\""
+    fi
     echo "# <<< VPP installer <<<"
   } >> "$PROFILE_FILE"
 fi
@@ -109,7 +135,7 @@ echo "Đã cài thư viện chuẩn tại: $TARGET_STDLIB"
 echo "Đã cài templates tại: $TARGET_TEMPLATES"
 echo "Đã cài examples tại: $TARGET_EXAMPLES"
 if [ -n "$PROFILE_FILE" ]; then
-  echo "Đã cập nhật PATH/VPP_HOME trong: $PROFILE_FILE"
+  echo "Đã cập nhật PATH/VPP_HOME và locale UTF-8 trong: $PROFILE_FILE"
   echo "Mở terminal mới, hoặc chạy: source $PROFILE_FILE"
 else
   echo "Đã bỏ qua cập nhật profile theo VPP_SKIP_PROFILE=1."
