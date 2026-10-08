@@ -243,6 +243,7 @@ const char *tenGiaTriIr(vietvm::compiler::IrValueOpcode opcode) noexcept {
         case IrValueOpcode::Binary: return "hai ngôi";
         case IrValueOpcode::Call: return "gọi";
         case IrValueOpcode::CallDynamic: return "gọi động";
+        case IrValueOpcode::Intrinsic: return "primitive VM";
         case IrValueOpcode::Lambda: return "hàm vô danh";
     }
     return "vùng chưa hỗ trợ trực tiếp";
@@ -520,8 +521,12 @@ std::string dumpIr(const vietvm::compiler::IrProgram &program) {
             << " văn bản=" << std::quoted(value.text)
             << " gọi tường minh=" << coKhong(value.explicitCall);
         if (value.opcode == vietvm::compiler::IrValueOpcode::Call ||
-            value.opcode == vietvm::compiler::IrValueOpcode::CallDynamic) {
+            value.opcode == vietvm::compiler::IrValueOpcode::CallDynamic ||
+            value.opcode == vietvm::compiler::IrValueOpcode::Intrinsic) {
             out << " đích gọi=" << tenDichGoi(value.callTarget);
+        }
+        if (value.opcode == vietvm::compiler::IrValueOpcode::Intrinsic) {
+            out << " opcode=" << vietvm::bytecode::opcodeName(value.intrinsicOpcode);
         }
         if (value.opcode == vietvm::compiler::IrValueOpcode::Lambda) {
             out << " hàm vô danh=#" << value.lambdaId;

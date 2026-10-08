@@ -63,6 +63,7 @@ enum class IrValueOpcode {
     Binary,
     Call,
     CallDynamic,
+    Intrinsic,
     Lambda,
 };
 
@@ -84,6 +85,8 @@ struct IrValue {
     // ordinary `tên(...)` form, so lowering preserves that source-level mode.
     bool explicitCall = false;
     CallTargetKind callTarget = CallTargetKind::Invalid;
+    // Resolved primitive identity; never recover the opcode from text in codegen.
+    int intrinsicOpcode = -1;
     IrLambdaId lambdaId = kInvalidIrLambdaId;
 
     // Evaluation order is source order.  Calls store the callee first and then

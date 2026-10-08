@@ -100,6 +100,13 @@ public:
     // Đường này cố ý bỏ qua VM::run() để timing không gồm construction/verification.
     void runInterpreterPreverifiedForBenchmark() { vm_.runInterpreterLoop(); }
 
+    // Kiểm thử cả dispatcher hỗn hợp và mã đã compile, không phụ thuộc biến
+    // môi trường của máy chạy CTest.
+    void runJitCompiledForTesting() {
+        vm_.ensureBytecodeVerified();
+        vm_.runJitCompiled();
+    }
+
     // Hạ/nâng giới hạn độ sâu lời gọi trong test để kiểm tra guard đệ quy mà
     // không cần tạo hàng trăm native stack frame.
     void setMaxCallDepth(std::size_t value) { vm_.maxCallDepth = value; }

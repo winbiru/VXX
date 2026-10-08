@@ -12,6 +12,7 @@
 #include "common/utility.h"
 #include "compiler/compileRegistry.h"
 #include "frontend/lexer.h"
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/message_constants.h"
 
@@ -181,7 +182,8 @@ bool containsCall(const IrProgram &program,
     const IrValue *value = program.value(id);
     if (value == nullptr || !visiting.insert(id).second) return false;
     if (value->opcode == IrValueOpcode::Call ||
-        value->opcode == IrValueOpcode::CallDynamic) {
+        value->opcode == IrValueOpcode::CallDynamic ||
+        value->opcode == IrValueOpcode::Intrinsic) {
         visiting.erase(id);
         return true;
     }
@@ -638,6 +640,24 @@ bool supportsValue(const IrProgram &program,
             break;
         }
 
+        case IrValueOpcode::Intrinsic: {
+            const auto *primitive = bytecode::intrinsicByOpcode(value->intrinsicOpcode);
+            if (primitive == nullptr || value->callTarget != CallTargetKind::Native ||
+                value->operands.size() != primitive->arity + 1 ||
+                (value->explicitCall &&
+                 valueContext != ValueContext::DedicatedCallStatementRoot)) break;
+            const IrValue *callee = program.value(value->operands.front());
+            supported = callee != nullptr && callee->opcode == IrValueOpcode::LoadName &&
+                        callee->text == value->text &&
+                        bytecode::intrinsicByName(callee->text) == primitive &&
+                        isExactSourceName(sourceOwner, *callee);
+            for (std::size_t index = 1; supported && index < value->operands.size(); ++index) {
+                supported = supportsValue(program, sourceOwner, context,
+                    value->operands[index], ValueContext::Nested, visiting);
+            }
+            break;
+        }
+
         case IrValueOpcode::CallDynamic: {
             if (value->explicitCall &&
                 valueContext != ValueContext::DedicatedCallStatementRoot) {
@@ -1068,7 +1088,8 @@ bool supportsInstruction(const IrProgram &program,
     const vietvm::frontend::Token *statementFirst =
         firstTokenFor(sourceOwner, instruction);
     const bool rootIsCall = root->opcode == IrValueOpcode::Call ||
-        root->opcode == IrValueOpcode::CallDynamic;
+        root->opcode == IrValueOpcode::CallDynamic ||
+        root->opcode == IrValueOpcode::Intrinsic;
     const bool explicitStatementCall = rootIsCall &&
         root->explicitCall && statementFirst != nullptr &&
         statementFirst->lexeme == "gọi";
@@ -1655,6 +1676,10 @@ struct Emitter {
                                   0});
                 return;
             }
+            case IrValueOpcode::Intrinsic:
+                emitCallArguments(*value, output);
+                output.push_back({value->intrinsicOpcode, 0, 0, 0});
+                return;
             case IrValueOpcode::CallDynamic: {
                 if (value->callTarget == CallTargetKind::ClassConstructor) {
                     if (value->operands.empty()) {

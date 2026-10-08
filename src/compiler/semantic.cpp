@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/core/message_constants.h"
 
 namespace vietvm::compiler {
@@ -1245,6 +1246,7 @@ private:
 
     // Kiểm tra điều kiện của `isKnownNative`.
     bool isKnownNative(const std::string &name) const {
+        if (vietvm::bytecode::intrinsicByName(name) != nullptr) return true;
         return std::find(environment_.nativeCallables.begin(),
                          environment_.nativeCallables.end(), name) !=
                environment_.nativeCallables.end();
@@ -1256,6 +1258,15 @@ private:
         binding.expression = expression.id;
         binding.lookupScope = scope;
         binding.runtimeName = expression.text;
+        // VM intrinsics là primitive của ngôn ngữ trong vị trí gọi. Chúng phải
+        // được bind trước symbol lexical để một biến trùng tên không biến lời
+        // gọi primitive thành OP_GOI_GIAN_TIEP trên chính giá trị biến đó.
+        const auto *primitive = vietvm::bytecode::intrinsicByName(expression.text);
+        if (callableUse && primitive != nullptr && primitive->reserved) {
+            binding.kind = BindingKind::NativeCallable;
+            model_.expressionBindings[expression.id] = binding;
+            return binding;
+        }
         LookupResult found = lookup(expression.text, scope);
         if (found.symbol == kInvalidSymbolId && callableUse) {
             const LookupResult type = lookupTypeLexical(expression.text, scope);
@@ -1363,6 +1374,24 @@ private:
                                 const CallBinding &binding) {
         const SemanticSymbol *callable = nullptr;
         std::string displayName = callee == nullptr ? binding.runtimeName : callee->text;
+
+        if (binding.kind == CallTargetKind::Native) {
+            if (const auto *intrinsic = vietvm::bytecode::intrinsicByName(displayName)) {
+                const std::size_t actual = call.arguments.size();
+                if (actual != intrinsic->arity) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticCallArityMismatch,
+                            {displayName, std::to_string(actual),
+                             std::to_string(intrinsic->arity),
+                             std::to_string(intrinsic->arity)}),
+                        call.span,
+                    });
+                }
+                return;
+            }
+        }
 
         if (binding.kind == CallTargetKind::DirectFunction &&
             binding.symbol != kInvalidSymbolId && binding.symbol < model_.symbols.size()) {

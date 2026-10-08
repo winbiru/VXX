@@ -346,6 +346,13 @@ try {
 
     Write-Host "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_jit_mvp.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    foreach ($jitCase in @(
+        "kiem_tra_goi_bo_suu_tap", "kiem_tra_goi_regex", "kiem_tra_goi_bang_ma",
+        "kiem_tra_goi_thoi_gian", "kiem_tra_goi_quan_ly_goi", "kiem_tra_vm_ieee754",
+        "kiem_tra_hoi_quy_tong_hop", "kiem_tra_closure_capture",
+        "kiem_tra_lambda_hof_mac_dinh", "kiem_tra_goi_dong_thoi")) {
+        Invoke-ExpectedTest -TestFile "src/tests/$jitCase.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    }
 
     Write-Host "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }

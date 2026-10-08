@@ -4,15 +4,15 @@
 #include "common/vm_native_constants.h"
 
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <map>
 #include <optional>
-#include <regex>
-#include <sstream>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 #if defined(_WIN32)
@@ -24,54 +24,18 @@
 #endif
 #include <windows.h>
 #else
+#include <spawn.h>
 #include <sys/wait.h>
+#include <unistd.h>
+extern char **environ;
 #endif
 
 #include "vpp/runtime/value.h"
 #include "vpp/core/message_constants.h"
-#include "vpp/core/text.h"
-
-#if defined(_WIN32) && defined(_MSC_VER)
-#ifndef popen
-#define popen _popen
-#endif
-#ifndef pclose
-#define pclose _pclose
-#endif
-#endif
 
 namespace vietvm::helpers {
 
 namespace {
-
-// Mở pipe để chạy lệnh hệ thống và đọc stdout; helper chọn API phù hợp nền tảng rồi trả handle dùng cho quá trình capture.
-FILE *openCommandPipe(const std::string &cmd) {
-#if defined(_WIN32) && defined(_MSC_VER)
-    return _popen(cmd.c_str(), "r");
-#else
-    return popen(cmd.c_str(), "r");
-#endif
-}
-
-// Đóng pipe tiến trình đã mở và trả exit status; helper dùng API nền tảng tương ứng để tránh rò handle.
-int closeCommandPipe(FILE *pipe) {
-#if defined(_WIN32) && defined(_MSC_VER)
-    return _pclose(pipe);
-#else
-    return pclose(pipe);
-#endif
-}
-
-// Quote một đối số shell bằng dấu nháy đơn; hàm escape dấu nháy đơn bên trong để chuỗi có thể ghép an toàn vào command line POSIX.
-std::string shellQuoteSingle(const std::string &s) {
-    std::string out = "'";
-    for (char c : s) {
-        if (c == '\'') out += "'\\''";
-        else out.push_back(c);
-    }
-    out += "'";
-    return out;
-}
 
 #if defined(_WIN32)
 // Chuyển chuỗi UTF-8 sang chuỗi wide trên Windows; hàm dùng API chuyển mã để truyền đường dẫn/command Unicode cho Win32.
@@ -124,213 +88,101 @@ void appendWindowsCommandArgument(std::wstring &command, const std::wstring &arg
     command.push_back(L'"');
 }
 
-// Chạy windows process; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runWindowsProcess(const std::vector<std::string> &arguments,
-                       std::string &output,
-                       DWORD &exitCode) {
-    std::wstring command;
-    for (const std::string &argument : arguments) {
-        auto wide = utf8ToWide(argument);
-        if (!wide.has_value()) return false;
-        appendWindowsCommandArgument(command, *wide);
-    }
-
-    SECURITY_ATTRIBUTES attributes{};
-    attributes.nLength = sizeof(attributes);
-    attributes.bInheritHandle = TRUE;
-
-    HANDLE readPipe = nullptr;
-    HANDLE writePipe = nullptr;
-    HANDLE nullInput = INVALID_HANDLE_VALUE;
-    PROCESS_INFORMATION processInfo{};
-    bool started = false;
-
-    if (!CreatePipe(&readPipe, &writePipe, &attributes, 0) ||
-        !SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0)) {
-        if (readPipe) CloseHandle(readPipe);
-        if (writePipe) CloseHandle(writePipe);
-        return false;
-    }
-
-    nullInput = CreateFileW(L"NUL", GENERIC_READ,
-                            FILE_SHARE_READ | FILE_SHARE_WRITE, &attributes,
-                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (nullInput == INVALID_HANDLE_VALUE) {
-        CloseHandle(readPipe);
-        CloseHandle(writePipe);
-        return false;
-    }
-
-    STARTUPINFOW startupInfo{};
-    startupInfo.cb = sizeof(startupInfo);
-    startupInfo.dwFlags = STARTF_USESTDHANDLES;
-    startupInfo.hStdInput = nullInput;
-    startupInfo.hStdOutput = writePipe;
-    startupInfo.hStdError = writePipe;
-
-    std::vector<wchar_t> mutableCommand(command.begin(), command.end());
-    mutableCommand.push_back(L'\0');
-    started = CreateProcessW(nullptr, mutableCommand.data(), nullptr, nullptr,
-                             TRUE, CREATE_NO_WINDOW, nullptr, nullptr,
-                             &startupInfo, &processInfo) != FALSE;
-    CloseHandle(nullInput);
-    CloseHandle(writePipe);
-    writePipe = nullptr;
-    if (!started) {
-        CloseHandle(readPipe);
-        return false;
-    }
-
-    output.clear();
-    char chunk[512];
-    DWORD bytesRead = 0;
-    bool readOk = true;
-    while (true) {
-        if (ReadFile(readPipe, chunk, sizeof(chunk), &bytesRead, nullptr)) {
-            if (bytesRead == 0) break;
-            output.append(chunk, bytesRead);
-            continue;
-        }
-        if (GetLastError() != ERROR_BROKEN_PIPE) readOk = false;
-        break;
-    }
-
-    CloseHandle(readPipe);
-    WaitForSingleObject(processInfo.hProcess, INFINITE);
-    const bool gotExitCode = GetExitCodeProcess(processInfo.hProcess, &exitCode) != FALSE;
-    CloseHandle(processInfo.hThread);
-    CloseHandle(processInfo.hProcess);
-    return readOk && gotExitCode;
-}
-
 #endif
 
-// Cấu hình đã được parser V++ chuẩn hóa trước khi đi qua native boundary.
-struct JdbcDbConfig {
-    std::string engine;
-    std::string host;
-    int port = 0;
-    std::string database;
-    std::string sqlitePath;
+StackValue processPrimitiveResult(bool launched,
+                                  int exitCode,
+                                  std::string output,
+                                  std::string error) {
+    // Primitive boundary chỉ trả dữ liệu thô theo vị trí. Tên trường và
+    // contract public thuộc gói/hệ thống/tiến trình.vi.
+    return make_list_value({
+        make_int_value(launched ? 1 : 0),
+        make_int_value(exitCode),
+        make_string_value(std::move(output)),
+        make_string_value(std::move(error)),
+    });
+}
+
+#if defined(_WIN32)
+struct WideCaseInsensitiveLess {
+    bool operator()(const std::wstring &left, const std::wstring &right) const {
+        return _wcsicmp(left.c_str(), right.c_str()) < 0;
+    }
 };
 
-// Chạy lệnh biến bắt giữ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runCommandCapture(const std::string &cmd, std::string &output, int &rc) {
-    output.clear();
-    FILE *pipe = openCommandPipe(cmd);
-    if (!pipe) return false;
-
-    char chunk[512];
-    while (fgets(chunk, sizeof(chunk), pipe) != nullptr) {
-        output += chunk;
+bool buildWindowsEnvironment(const MapHandle &overrides,
+                             std::vector<wchar_t> &block) {
+    std::map<std::wstring, std::wstring, WideCaseInsensitiveLess> env;
+    LPWCH raw = GetEnvironmentStringsW();
+    if (raw == nullptr) return false;
+    for (const wchar_t *entry = raw; *entry != L'\0'; entry += wcslen(entry) + 1) {
+        const std::wstring item(entry);
+        const std::size_t separator = item.find(L'=', item.empty() || item[0] != L'=' ? 0 : 1);
+        if (separator == std::wstring::npos) continue;
+        env[item.substr(0, separator)] = item.substr(separator + 1);
     }
-    rc = closeCommandPipe(pipe);
+    FreeEnvironmentStringsW(raw);
+
+    for (const auto &[key, value] : overrides->entries) {
+        if (!std::holds_alternative<std::string>(value)) return false;
+        auto wideKey = utf8ToWide(key);
+        auto wideValue = utf8ToWide(std::get<std::string>(value));
+        if (!wideKey.has_value() || !wideValue.has_value()) return false;
+        env[*wideKey] = *wideValue;
+    }
+
+    block.clear();
+    for (const auto &[key, value] : env) {
+        block.insert(block.end(), key.begin(), key.end());
+        block.push_back(L'=');
+        block.insert(block.end(), value.begin(), value.end());
+        block.push_back(L'\0');
+    }
+    block.push_back(L'\0');
     return true;
 }
 
-// Chạy my SQL query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runMySqlQuery(const JdbcDbConfig &cfg,
-                   const std::string &user,
-                   const std::string &password,
-                   const std::string &sql,
-                   bool useDatabase,
-                   std::string &output,
-    std::string &reason) {
-    if (user.empty()) {
-        reason = vietvm::constants::kDbReasonMissingUsername;
-        return false;
+void readWindowsPipe(HANDLE pipe, std::string &output) {
+    char chunk[4096];
+    DWORD read = 0;
+    while (ReadFile(pipe, chunk, sizeof(chunk), &read, nullptr) && read != 0) {
+        output.append(chunk, read);
     }
-
-    std::string mysqlBin = "$(command -v mysql || echo /opt/homebrew/opt/mysql-client/bin/mysql)";
-    std::string cmd = "MYSQL_PWD=" + shellQuoteSingle(password) + " " + mysqlBin +
-                      " --protocol=TCP --batch --skip-column-names -h " + shellQuoteSingle(cfg.host) +
-                      " -P " + std::to_string(cfg.port) + " -u " + shellQuoteSingle(user);
-    if (useDatabase) {
-        cmd += " -D " + shellQuoteSingle(cfg.database);
-    }
-    cmd += " -e " + shellQuoteSingle(sql) + " 2>&1";
-
-    int rc = 0;
-    if (!runCommandCapture(cmd, output, rc)) {
-        reason = vietvm::constants::kDbReasonCannotOpenMysqlProcess;
-        return false;
-    }
-    if (rc != 0) {
-        reason = output;
-        return false;
-    }
-    return true;
+    CloseHandle(pipe);
 }
-
-// Chạy PostgreSQL query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runPostgresQuery(const JdbcDbConfig &cfg,
-                      const std::string &user,
-                      const std::string &password,
-                      const std::string &sql,
-                      bool useDatabase,
-                      std::string &output,
-    std::string &reason) {
-    if (user.empty()) {
-        reason = vietvm::constants::kDbReasonMissingUsername;
-        return false;
-    }
-
-    std::string db = useDatabase ? cfg.database : "postgres";
-    std::string psqlBin = "$(command -v psql || echo /opt/homebrew/bin/psql)";
-    std::string cmd = "PGPASSWORD=" + shellQuoteSingle(password) + " " + psqlBin +
-                      " -h " + shellQuoteSingle(cfg.host) +
-                      " -p " + std::to_string(cfg.port) +
-                      " -U " + shellQuoteSingle(user) +
-                      " -d " + shellQuoteSingle(db) +
-                      " -At -c " + shellQuoteSingle(sql) + " 2>&1";
-
-    int rc = 0;
-    if (!runCommandCapture(cmd, output, rc)) {
-        reason = vietvm::constants::kDbReasonCannotOpenPsqlProcess;
-        return false;
-    }
-    if (rc != 0) {
-        reason = output;
-        return false;
-    }
-    return true;
-}
-
-// Chạy SQLite query; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool runSqliteQuery(const JdbcDbConfig &cfg,
-                    const std::string &sql,
-                    std::string &output,
-                    std::string &reason) {
-#if defined(_WIN32)
-    // _popen runs through cmd.exe on Windows, where neither POSIX command
-    // substitution nor single-quote escaping works. Invoke SQLite directly so
-    // the database path and SQL remain individual UTF-8 arguments.
-    DWORD exitCode = 0;
-    if (!runWindowsProcess({"sqlite3.exe", cfg.sqlitePath, sql}, output, exitCode)) {
-        reason = vietvm::constants::kDbReasonCannotOpenSqliteProcess;
-        return false;
-    }
-    if (exitCode != 0) {
-        reason = output;
-        return false;
-    }
 #else
-    std::string sqliteBin = "$(command -v sqlite3 || echo sqlite3)";
-    std::string cmd = sqliteBin + " " + shellQuoteSingle(cfg.sqlitePath) +
-                      " " + shellQuoteSingle(sql) + " 2>&1";
-
-    int rc = 0;
-    if (!runCommandCapture(cmd, output, rc)) {
-        reason = vietvm::constants::kDbReasonCannotOpenSqliteProcess;
-        return false;
+void readPosixPipe(int fd, std::string &output) {
+    char chunk[4096];
+    for (;;) {
+        const ssize_t count = ::read(fd, chunk, sizeof(chunk));
+        if (count > 0) {
+            output.append(chunk, static_cast<std::size_t>(count));
+            continue;
+        }
+        if (count < 0 && errno == EINTR) continue;
+        break;
     }
-    if (rc != 0) {
-        reason = output;
-        return false;
-    }
-#endif
-    return true;
+    ::close(fd);
 }
+
+std::vector<std::string> mergedPosixEnvironment(const MapHandle &overrides) {
+    std::unordered_map<std::string, std::string> env;
+    for (char **current = environ; current != nullptr && *current != nullptr; ++current) {
+        const std::string item(*current);
+        const std::size_t separator = item.find('=');
+        if (separator == std::string::npos) continue;
+        env[item.substr(0, separator)] = item.substr(separator + 1);
+    }
+    for (const auto &[key, value] : overrides->entries) {
+        env[key] = std::get<std::string>(value);
+    }
+    std::vector<std::string> result;
+    result.reserve(env.size());
+    for (const auto &[key, value] : env) result.push_back(key + "=" + value);
+    return result;
+}
+#endif
 
 } // namespace
 
@@ -371,40 +223,10 @@ std::optional<std::string> getEnvVar(const char *name) {
 #endif
 }
 
-// Kiểm tra điều kiện của `startsWith`.
-bool startsWith(const std::string &value, const std::string &prefix) {
-    return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
-}
-
-// Tạo bản sao chuỗi đã bỏ whitespace ở hai đầu; hàm không sửa dữ liệu gốc nên phù hợp cho parser helper/native argument.
-std::string trimCopy(const std::string &s) {
-    return vietvm::core::trim(s);
-}
-
 // Chuyển một `StackValue` đối số thành chuỗi thô mà native helper cần; hàm giữ nội dung chuỗi nguyên bản và định dạng scalar theo quy tắc runtime.
 std::string argToRawString(const StackValue &v) {
     if (std::holds_alternative<std::string>(v)) return std::get<std::string>(v);
     return sv_to_string(v);
-}
-
-// Giải mã đơn giản escapes; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
-std::string decodeSimpleEscapes(const std::string &s) {
-    std::string out;
-    out.reserve(s.size());
-    for (size_t i = 0; i < s.size(); ++i) {
-        if (s[i] == '\\' && i + 1 < s.size()) {
-            char n = s[i + 1];
-            if (n == 'n') out.push_back('\n');
-            else if (n == 'r') out.push_back('\r');
-            else if (n == 't') out.push_back('\t');
-            else if (n == '\\') out.push_back('\\');
-            else out.push_back(n);
-            ++i;
-            continue;
-        }
-        out.push_back(s[i]);
-    }
-    return out;
 }
 
 // Đọc số nguyên đã chuẩn hóa ở tầng V++. Primitive native chỉ chấp nhận đúng
@@ -509,47 +331,186 @@ bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &e
     return true;
 }
 
-// Primitive DB: V++ đã parse JDBC, validate policy và dựng contract kết quả.
-// Native chỉ gọi client hệ điều hành rồi trả trạng thái thô.
-bool runDbExec(const std::string &engine,
-               const std::string &host,
-               int port,
-               const std::string &target,
-               const std::string &user,
-               const std::string &password,
-               const std::string &sql,
-               bool useDatabase,
-               StackValue &result,
-               std::string &err) {
-    (void)err;
-    JdbcDbConfig cfg{};
-    cfg.engine = engine;
-    cfg.host = host;
-    cfg.port = port;
-    if (engine == "sqlite") {
-        cfg.sqlitePath = target;
-    } else {
-        cfg.database = target;
+bool handleNativeProcessPrimitive(const std::vector<StackValue> &args,
+                                  StackValue &result,
+                                  std::string &err) {
+    const std::string fn = "tien_trinh_chay_vm";
+    if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
+    if (!std::holds_alternative<std::string>(args[0])) {
+        err = fn + ": chương trình phải là chuỗi";
+        return true;
+    }
+    if (!std::holds_alternative<ListHandle>(args[1]) ||
+        std::get<ListHandle>(args[1]) == nullptr) {
+        err = fn + ": đối số phải là danh sách";
+        return true;
+    }
+    if (!std::holds_alternative<MapHandle>(args[2]) ||
+        std::get<MapHandle>(args[2]) == nullptr) {
+        err = fn + ": môi trường phải là từ điển";
+        return true;
     }
 
-    std::string reason;
+    const std::string program = std::get<std::string>(args[0]);
+    const ListHandle arguments = std::get<ListHandle>(args[1]);
+    const MapHandle environment = std::get<MapHandle>(args[2]);
+    std::vector<std::string> argvStorage;
+    argvStorage.reserve(arguments->elements.size() + 1);
+    argvStorage.push_back(program);
+    for (const StackValue &value : arguments->elements) {
+        if (!std::holds_alternative<std::string>(value)) {
+            err = fn + ": mỗi đối số phải là chuỗi";
+            return true;
+        }
+        argvStorage.push_back(std::get<std::string>(value));
+    }
+    for (const auto &[key, value] : environment->entries) {
+        (void)key;
+        if (!std::holds_alternative<std::string>(value)) {
+            err = fn + ": giá trị biến môi trường phải là chuỗi";
+            return true;
+        }
+    }
+
+#if defined(_WIN32)
+    std::wstring command;
+    for (const std::string &argument : argvStorage) {
+        auto wide = utf8ToWide(argument);
+        if (!wide.has_value()) {
+            err = fn + ": đối số không phải UTF-8 hợp lệ";
+            return true;
+        }
+        appendWindowsCommandArgument(command, *wide);
+    }
+    std::vector<wchar_t> environmentBlock;
+    if (!buildWindowsEnvironment(environment, environmentBlock)) {
+        err = fn + ": không dựng được môi trường tiến trình";
+        return true;
+    }
+
+    SECURITY_ATTRIBUTES attributes{};
+    attributes.nLength = sizeof(attributes);
+    attributes.bInheritHandle = TRUE;
+    HANDLE stdoutRead = nullptr;
+    HANDLE stdoutWrite = nullptr;
+    HANDLE stderrRead = nullptr;
+    HANDLE stderrWrite = nullptr;
+    HANDLE nullInput = INVALID_HANDLE_VALUE;
+    if (!CreatePipe(&stdoutRead, &stdoutWrite, &attributes, 0) ||
+        !SetHandleInformation(stdoutRead, HANDLE_FLAG_INHERIT, 0) ||
+        !CreatePipe(&stderrRead, &stderrWrite, &attributes, 0) ||
+        !SetHandleInformation(stderrRead, HANDLE_FLAG_INHERIT, 0)) {
+        if (stdoutRead) CloseHandle(stdoutRead);
+        if (stdoutWrite) CloseHandle(stdoutWrite);
+        if (stderrRead) CloseHandle(stderrRead);
+        if (stderrWrite) CloseHandle(stderrWrite);
+        result = processPrimitiveResult(false, -1, "", "không tạo được pipe tiến trình");
+        return true;
+    }
+    nullInput = CreateFileW(L"NUL", GENERIC_READ,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, &attributes,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (nullInput == INVALID_HANDLE_VALUE) {
+        CloseHandle(stdoutRead); CloseHandle(stdoutWrite);
+        CloseHandle(stderrRead); CloseHandle(stderrWrite);
+        result = processPrimitiveResult(false, -1, "", "không mở được stdin rỗng");
+        return true;
+    }
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = nullInput;
+    startup.hStdOutput = stdoutWrite;
+    startup.hStdError = stderrWrite;
+    PROCESS_INFORMATION process{};
+    std::vector<wchar_t> mutableCommand(command.begin(), command.end());
+    mutableCommand.push_back(L'\0');
+    const BOOL started = CreateProcessW(
+        nullptr, mutableCommand.data(), nullptr, nullptr, TRUE,
+        CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+        environmentBlock.data(), nullptr, &startup, &process);
+    const DWORD startError = started ? ERROR_SUCCESS : GetLastError();
+    CloseHandle(nullInput);
+    CloseHandle(stdoutWrite);
+    CloseHandle(stderrWrite);
+    if (!started) {
+        CloseHandle(stdoutRead);
+        CloseHandle(stderrRead);
+        result = processPrimitiveResult(false, -1, "",
+                                        "CreateProcessW thất bại, mã " + std::to_string(startError));
+        return true;
+    }
     std::string output;
-    bool ok = false;
-    if (cfg.engine == "mysql") {
-        ok = runMySqlQuery(cfg, user, password, sql, useDatabase, output, reason);
-    } else if (cfg.engine == "postgresql") {
-        ok = runPostgresQuery(cfg, user, password, sql, useDatabase, output, reason);
-    } else if (cfg.engine == "sqlite") {
-        ok = runSqliteQuery(cfg, sql, output, reason);
-    } else {
-        reason = vietvm::constants::kDbReasonUnsupportedDriver;
+    std::string errorOutput;
+    std::thread outReader(readWindowsPipe, stdoutRead, std::ref(output));
+    std::thread errReader(readWindowsPipe, stderrRead, std::ref(errorOutput));
+    WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD exitCode = 0;
+    const bool gotExit = GetExitCodeProcess(process.hProcess, &exitCode) != FALSE;
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    outReader.join();
+    errReader.join();
+    result = processPrimitiveResult(true, gotExit ? static_cast<int>(exitCode) : -1,
+                                    std::move(output), std::move(errorOutput));
+#else
+    int stdoutPipe[2] = {-1, -1};
+    int stderrPipe[2] = {-1, -1};
+    if (::pipe(stdoutPipe) != 0 || ::pipe(stderrPipe) != 0) {
+        const int saved = errno;
+        if (stdoutPipe[0] >= 0) ::close(stdoutPipe[0]);
+        if (stdoutPipe[1] >= 0) ::close(stdoutPipe[1]);
+        if (stderrPipe[0] >= 0) ::close(stderrPipe[0]);
+        if (stderrPipe[1] >= 0) ::close(stderrPipe[1]);
+        result = processPrimitiveResult(false, -1, "", std::strerror(saved));
+        return true;
     }
 
-    MapValue response;
-    response.entries["ok"] = make_int_value(ok ? 1 : 0);
-    response.entries["output"] = make_string_value(output);
-    response.entries["reason"] = make_string_value(reason);
-    result = make_map_value(std::move(response));
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_adddup2(&actions, stdoutPipe[1], STDOUT_FILENO);
+    posix_spawn_file_actions_adddup2(&actions, stderrPipe[1], STDERR_FILENO);
+    posix_spawn_file_actions_addclose(&actions, stdoutPipe[0]);
+    posix_spawn_file_actions_addclose(&actions, stderrPipe[0]);
+    posix_spawn_file_actions_addclose(&actions, stdoutPipe[1]);
+    posix_spawn_file_actions_addclose(&actions, stderrPipe[1]);
+
+    std::vector<char *> argv;
+    argv.reserve(argvStorage.size() + 1);
+    for (std::string &value : argvStorage) argv.push_back(value.data());
+    argv.push_back(nullptr);
+    std::vector<std::string> envStorage = mergedPosixEnvironment(environment);
+    std::vector<char *> envp;
+    envp.reserve(envStorage.size() + 1);
+    for (std::string &value : envStorage) envp.push_back(value.data());
+    envp.push_back(nullptr);
+
+    pid_t pid = -1;
+    const int spawnStatus = posix_spawnp(&pid, program.c_str(), &actions, nullptr,
+                                         argv.data(), envp.data());
+    posix_spawn_file_actions_destroy(&actions);
+    ::close(stdoutPipe[1]);
+    ::close(stderrPipe[1]);
+    if (spawnStatus != 0) {
+        ::close(stdoutPipe[0]);
+        ::close(stderrPipe[0]);
+        result = processPrimitiveResult(false, -1, "", std::strerror(spawnStatus));
+        return true;
+    }
+
+    std::string output;
+    std::string errorOutput;
+    std::thread outReader(readPosixPipe, stdoutPipe[0], std::ref(output));
+    std::thread errReader(readPosixPipe, stderrPipe[0], std::ref(errorOutput));
+    int waitStatus = 0;
+    while (::waitpid(pid, &waitStatus, 0) < 0 && errno == EINTR) {}
+    outReader.join();
+    errReader.join();
+    int exitCode = -1;
+    if (WIFEXITED(waitStatus)) exitCode = WEXITSTATUS(waitStatus);
+    else if (WIFSIGNALED(waitStatus)) exitCode = 128 + WTERMSIG(waitStatus);
+    result = processPrimitiveResult(true, exitCode, std::move(output), std::move(errorOutput));
+#endif
     return true;
 }
 

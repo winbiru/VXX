@@ -173,6 +173,7 @@ TESTS=(
   src/tests/kiem_tra_goi_dong_thoi.vi
   src/tests/kiem_tra_goi_tuy_chon.vi
   src/tests/kiem_tra_goi_bang_ma.vi
+  src/tests/kiem_tra_vm_ieee754.vi
   src/tests/kiem_tra_goi_ban_dia_hoa.vi
   src/tests/kiem_tra_goi_ngau_nhien.vi
   src/tests/kiem_tra_goi_dns.vi
@@ -354,6 +355,32 @@ elif diff -u "$jit_exp" "$jit_out"; then
 else
   echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT]"; FAIL=$((FAIL+1))
 fi
+
+# Chạy thư viện .vi thực với JIT: hàm, vòng lặp, collection, Unicode, regex,
+# intrinsic và xử lý lỗi phải tương đương đường interpreter mặc định.
+for jit_case in \
+  kiem_tra_goi_bo_suu_tap \
+  kiem_tra_goi_regex \
+  kiem_tra_goi_bang_ma \
+  kiem_tra_goi_thoi_gian \
+  kiem_tra_goi_quan_ly_goi \
+  kiem_tra_vm_ieee754 \
+  kiem_tra_hoi_quy_tong_hop \
+  kiem_tra_closure_capture \
+  kiem_tra_lambda_hof_mac_dinh \
+  kiem_tra_goi_dong_thoi; do
+  jit_test="src/tests/${jit_case}.vi"
+  jit_exp="src/tests/expected/${jit_case}.expected"
+  jit_out="$tmpdir/${jit_case}.jit.output"
+  VPP_ENABLE_JIT=1 "$EXEC_PATH" "$jit_test" >"$jit_out" 2>&1
+  jit_status=$?
+  if [ "$jit_status" -eq 0 ] && diff -u "$jit_exp" "$jit_out"; then
+    echo "PASS: $jit_test [JIT]"; PASS=$((PASS+1))
+  else
+    echo "FAIL: $jit_test [JIT] (exit code: $jit_status)"; FAIL=$((FAIL+1))
+    if [ "$jit_status" -ne 0 ]; then cat "$jit_out" >&2; fi
+  fi
+done
 
 echo "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
 gc_out="$tmpdir/kiem_tra_gc_mvp.output"

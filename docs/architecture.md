@@ -66,6 +66,15 @@ control stacks rồi gọi handler trực tiếp. Fixture cũng cấu hình `Out
 `OP_IN` không phụ thuộc stdout. Fixture này là internal test boundary, không phải API
 embedding ổn định.
 
+`VM::runJitCompiled()` biên dịch trước những opcode đơn giản (giá trị, số thực, biến,
+toán tử và xuất kết quả) thành closure theo từng vector bytecode của root và thân hàm V++.
+`runInterpreterLoop()` vẫn là vòng điều phối chung cho cả hai chế độ: lệnh chưa được
+biên dịch (gọi hàm, nhảy, intrinsic, exception, collection/object) chạy qua opcode handler
+cũ trong khi các phép toán bên trong hàm và vòng lặp dùng closure đã chuẩn bị.
+Cache closure chỉ tồn tại trong một lượt chạy JIT; GC, hủy worker và unwind vẫn dùng
+chung runtime. Đây là đường thực thi hỗn hợp ở mức bytecode, chưa tạo mã máy native;
+hiệu năng phải được đánh giá riêng bằng benchmark trước khi công bố tăng tốc.
+
 Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance/closure
 đăng ký weak handle vào heap đang active; collector mark từ stack, variables, call frame,
 capture cell, receiver, class table và switch value rồi cắt cạnh của object không reachable để phá

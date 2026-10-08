@@ -1,4 +1,5 @@
 #include "common/vm_native_stdlib_helpers.h"
+#include "vpp/bytecode/intrinsic.h"
 
 #include <chrono>
 #include <cstdint>
@@ -217,37 +218,21 @@ bool timezoneOffsetMinutes(std::time_t now,
 } // namespace
 
 // Dispatch nhóm hàm native nền tảng/thư viện chuẩn; handler kiểm tra tên hàm và thực hiện filesystem, time, environment hoặc utility tương ứng.
-bool handleNativeFoundationFunction(const std::string &fn,
+bool handleNativeFoundationFunction(Opcode opcode,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,
                                     std::string &err) {
-    if (vietvm::constants::matchesAnyName(
-            fn, vietvm::constants::kFnSpecialFloatInternal)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (!std::holds_alternative<std::string>(args[0])) {
-            err = fn + ": yêu cầu tên giá trị IEEE dạng chuỗi";
-            return true;
-        }
-        const std::string &kind = std::get<std::string>(args[0]);
-        if (kind == "nan") {
-            result = make_float_value(std::numeric_limits<double>::quiet_NaN());
-        } else if (kind == "inf") {
-            result = make_float_value(std::numeric_limits<double>::infinity());
-        } else if (kind == "-inf") {
-            result = make_float_value(-std::numeric_limits<double>::infinity());
-        } else {
-            err = fn + ": giá trị IEEE không được hỗ trợ";
-        }
-        return true;
-    }
+    const auto *primitive = vietvm::bytecode::intrinsicByOpcode(opcode);
+    if (primitive == nullptr) return false;
+    const std::string fn(primitive->name);
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnTypeOf)) {
+    if (opcode == OP_VM_TYPE_OF) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         result = make_string_value(runtimeTypeName(args[0]));
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIdentityHash)) {
+    if (opcode == OP_VM_IDENTITY_HASH) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         if (std::holds_alternative<MapHandle>(args[0])) {
             result = make_int_value(identityHash(std::get<MapHandle>(args[0])));
@@ -267,7 +252,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSecureRandom)) {
+    if (opcode == OP_VM_NGAU_NHIEN_BAO_MAT_BYTES) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         if (!std::holds_alternative<int>(args[0])) {
             err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
@@ -289,17 +274,16 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathExists) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathIsFile) ||
-        vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathIsDirectory)) {
+    if (opcode == OP_VM_DUONG_DAN_TON_TAI || opcode == OP_VM_LA_TEP ||
+        opcode == OP_VM_LA_THU_MUC) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
         bool value = false;
         fs::path path;
         if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathExists)) {
+        if (opcode == OP_VM_DUONG_DAN_TON_TAI) {
             value = fs::exists(path, ec);
-        } else if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPathIsFile)) {
+        } else if (opcode == OP_VM_LA_TEP) {
             value = fs::is_regular_file(path, ec);
         } else {
             value = fs::is_directory(path, ec);
@@ -313,19 +297,35 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnCreateDirectory)) {
+    if (opcode == OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET) {
+        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
+        fs::path path;
+        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
+        std::error_code ec;
+        const auto status = fs::symlink_status(path, ec);
+        if (isMissingPathError(ec)) {
+            result = make_int_value(-1);
+            return true;
+        }
+        if (filesystemError(ec, fn, err)) return true;
+        result = make_int_value(fs::is_directory(status) ? 1 : 0);
+        return true;
+    }
+
+    if (opcode == OP_VM_TAO_THU_MUC) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
         fs::path path;
         if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        fs::create_directories(path, ec);
+        // Primitive thấp: chỉ tạo đúng một directory entry. Việc tìm cha và
+        // tạo cả cây thuộc gói/nhập xuất/thư mục.vi.
+        const bool created = fs::create_directory(path, ec);
         if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(fs::is_directory(path, ec) ? 1 : 0);
-        if (filesystemError(ec, fn, err)) return true;
+        result = make_int_value(created ? 1 : 0);
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListDirectory)) {
+    if (opcode == OP_VM_LIET_KE_THU_MUC) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
         fs::path path;
@@ -345,18 +345,20 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnRemovePath)) {
+    if (opcode == OP_VM_XOA_DUONG_DAN) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         std::error_code ec;
         fs::path path;
         if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        const auto removed = fs::remove_all(path, ec);
+        // Primitive thấp: unlink/rmdir đúng một entry. Traversal và recursion
+        // nằm hoàn toàn ở thư viện V++.
+        const bool removed = fs::remove(path, ec);
         if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(static_cast<int>(removed));
+        result = make_int_value(removed ? 1 : 0);
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnEnvGet)) {
+    if (opcode == OP_VM_DOC_BIEN_MOI_TRUONG) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         const std::string name = argToRawString(args[0]);
         if (!validateEnvironmentVariableName(name, fn, err)) return true;
@@ -365,7 +367,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnPlatformName)) {
+    if (opcode == OP_VM_TEN_NEN_TANG) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
         result = make_string_value(platformName());
         return true;
@@ -373,20 +375,15 @@ bool handleNativeFoundationFunction(const std::string &fn,
 
     // One clock read supplies both calendar fields and the local UTC offset.
     // ISO-8601 formatting belongs to gói/thời gian, not the OS boundary.
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnWallClockParts)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        int utcMode = 0;
-        if (!requireIntArgFromStack(args[0], fn, "chế độ UTC", utcMode, err)) return true;
-        if (utcMode != 0 && utcMode != 1) {
-            err = fn + ": chế độ UTC phải là 0 hoặc 1";
-            return true;
-        }
+    if (opcode == OP_VM_DONG_HO_DIA_PHUONG || opcode == OP_VM_DONG_HO_UTC) {
+        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
+        const bool utcMode = opcode == OP_VM_DONG_HO_UTC;
         const std::time_t now = std::time(nullptr);
         std::tm calendar{};
         std::tm utc{};
         int offsetMinutes = 0;
         bool ok = false;
-        if (utcMode == 1) {
+        if (utcMode) {
             ok = utcTime(now, calendar);
         } else {
             ok = localTime(now, calendar) && utcTime(now, utc) &&
@@ -409,8 +406,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(
-            fn, vietvm::constants::kFnMonotonicMilliseconds)) {
+    if (opcode == OP_VM_THOI_GIAN_DON_DIEU_MS) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
         const auto elapsed = std::chrono::steady_clock::now().time_since_epoch();
         result = make_float_value(
@@ -418,7 +414,7 @@ bool handleNativeFoundationFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnSleepMs)) {
+    if (opcode == OP_VM_NGU_MILI_GIAY) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         if (!std::holds_alternative<int>(args[0])) {
             err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);

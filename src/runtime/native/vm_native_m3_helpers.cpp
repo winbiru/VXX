@@ -1,4 +1,5 @@
 #include "common/vm_native_m3_helpers.h"
+#include "vpp/bytecode/intrinsic.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -57,70 +58,6 @@ bool requireString(const StackValue &value,
         err = fn + ": " + label + " không phải UTF-8 hợp lệ";
         return false;
     }
-    return true;
-}
-
-bool listBytes(const StackValue &value, std::vector<unsigned char> &bytes, std::string &err) {
-    if (!std::holds_alternative<ListHandle>(value) || std::get<ListHandle>(value) == nullptr) {
-        err = "bảng mã: dữ liệu byte phải là danh sách";
-        return false;
-    }
-    bytes.clear();
-    for (const StackValue &item : std::get<ListHandle>(value)->elements) {
-        if (!std::holds_alternative<int>(item)) {
-            err = "bảng mã: mỗi byte phải là số nguyên";
-            return false;
-        }
-        const int byte = std::get<int>(item);
-        if (byte < 0 || byte > 255) {
-            err = "bảng mã: byte phải trong 0..255";
-            return false;
-        }
-        bytes.push_back(static_cast<unsigned char>(byte));
-    }
-    return true;
-}
-
-StackValue byteList(const std::vector<unsigned char> &bytes) {
-    std::vector<StackValue> values;
-    values.reserve(bytes.size());
-    for (unsigned char byte : bytes) values.push_back(make_int_value(byte));
-    return make_list_value(std::move(values));
-}
-
-bool handleCharsets(const std::string &fn,
-                    const std::vector<StackValue> &args,
-                    StackValue &result,
-                    std::string &err) {
-    if (fn != "utf8_native_exec") return false;
-    if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-
-    std::string operation;
-    if (!requireString(args[0], fn, "thao tác", operation, err)) return true;
-
-    if (operation == "encode") {
-        const std::string logicalFn = "ma_hoa_utf8_noi_bo";
-        std::string text;
-        if (!requireString(args[1], logicalFn, "văn bản", text, err)) return true;
-        const std::vector<unsigned char> bytes(text.begin(), text.end());
-        result = byteList(bytes);
-        return true;
-    }
-
-    if (operation != "decode") {
-        err = "utf8_native_exec: thao tác không được hỗ trợ";
-        return true;
-    }
-
-    const std::string logicalFn = "giai_ma_utf8_noi_bo";
-    std::vector<unsigned char> bytes;
-    if (!listBytes(args[1], bytes, err)) return true;
-    const std::string text(bytes.begin(), bytes.end());
-    if (!vietvm::core::isValidUtf8(text)) {
-        err = logicalFn + ": chuỗi byte UTF-8 không hợp lệ";
-        return true;
-    }
-    result = make_string_value(text);
     return true;
 }
 
@@ -607,51 +544,50 @@ bool initializeTlsClient(OpenTlsSocket &tls,
 
 bool tlsWrite(OpenTlsSocket &tls,
               const std::string &payload,
+              int &written,
               std::string &err) {
-    std::size_t offset = 0;
-    while (offset < payload.size()) {
-        const std::size_t remaining = payload.size() - offset;
-        const std::size_t chunkSize = std::min<std::size_t>(
-            remaining, static_cast<std::size_t>(tls.sizes.cbMaximumMessage));
-        std::vector<unsigned char> buffer(
-            static_cast<std::size_t>(tls.sizes.cbHeader) + chunkSize +
-            static_cast<std::size_t>(tls.sizes.cbTrailer));
-        std::memcpy(
-            buffer.data() + tls.sizes.cbHeader,
-            payload.data() + offset,
-            chunkSize);
+    written = 0;
+    if (payload.empty()) return true;
+    const std::size_t chunkSize = std::min<std::size_t>(
+        payload.size(), static_cast<std::size_t>(tls.sizes.cbMaximumMessage));
+    std::vector<unsigned char> buffer(
+        static_cast<std::size_t>(tls.sizes.cbHeader) + chunkSize +
+        static_cast<std::size_t>(tls.sizes.cbTrailer));
+    std::memcpy(
+        buffer.data() + tls.sizes.cbHeader,
+        payload.data(),
+        chunkSize);
 
-        SecBuffer buffers[4]{};
-        buffers[0].BufferType = SECBUFFER_STREAM_HEADER;
-        buffers[0].pvBuffer = buffer.data();
-        buffers[0].cbBuffer = tls.sizes.cbHeader;
-        buffers[1].BufferType = SECBUFFER_DATA;
-        buffers[1].pvBuffer = buffer.data() + tls.sizes.cbHeader;
-        buffers[1].cbBuffer = static_cast<unsigned long>(chunkSize);
-        buffers[2].BufferType = SECBUFFER_STREAM_TRAILER;
-        buffers[2].pvBuffer = buffer.data() + tls.sizes.cbHeader + chunkSize;
-        buffers[2].cbBuffer = tls.sizes.cbTrailer;
-        buffers[3].BufferType = SECBUFFER_EMPTY;
-        SecBufferDesc desc{};
-        desc.ulVersion = SECBUFFER_VERSION;
-        desc.cBuffers = 4;
-        desc.pBuffers = buffers;
-        const SECURITY_STATUS status = EncryptMessage(&tls.context, 0, &desc, 0);
-        if (status != SEC_E_OK) {
-            err = "socket_gui: SChannel EncryptMessage thất bại";
+    SecBuffer buffers[4]{};
+    buffers[0].BufferType = SECBUFFER_STREAM_HEADER;
+    buffers[0].pvBuffer = buffer.data();
+    buffers[0].cbBuffer = tls.sizes.cbHeader;
+    buffers[1].BufferType = SECBUFFER_DATA;
+    buffers[1].pvBuffer = buffer.data() + tls.sizes.cbHeader;
+    buffers[1].cbBuffer = static_cast<unsigned long>(chunkSize);
+    buffers[2].BufferType = SECBUFFER_STREAM_TRAILER;
+    buffers[2].pvBuffer = buffer.data() + tls.sizes.cbHeader + chunkSize;
+    buffers[2].cbBuffer = tls.sizes.cbTrailer;
+    buffers[3].BufferType = SECBUFFER_EMPTY;
+    SecBufferDesc desc{};
+    desc.ulVersion = SECBUFFER_VERSION;
+    desc.cBuffers = 4;
+    desc.pBuffers = buffers;
+    const SECURITY_STATUS status = EncryptMessage(&tls.context, 0, &desc, 0);
+    if (status != SEC_E_OK) {
+        err = "socket_gui: SChannel EncryptMessage thất bại";
+        return false;
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (buffers[i].cbBuffer > 0 && !sendNativeAll(
+                tls.handle,
+                static_cast<const unsigned char *>(buffers[i].pvBuffer),
+                buffers[i].cbBuffer)) {
+            err = "socket_gui: gửi TLS thất bại";
             return false;
         }
-        for (int i = 0; i < 3; ++i) {
-            if (buffers[i].cbBuffer > 0 && !sendNativeAll(
-                    tls.handle,
-                    static_cast<const unsigned char *>(buffers[i].pvBuffer),
-                    buffers[i].cbBuffer)) {
-                err = "socket_gui: gửi TLS thất bại";
-                return false;
-            }
-        }
-        offset += chunkSize;
     }
+    written = static_cast<int>(chunkSize);
     return true;
 }
 
@@ -872,22 +808,18 @@ bool initializeTlsClient(OpenTlsSocket &tls,
 
 bool tlsWrite(OpenTlsSocket &tls,
               const std::string &payload,
+              int &written,
               std::string &err) {
-    std::size_t offset = 0;
-    while (offset < payload.size()) {
-        std::size_t processed = 0;
-        OSStatus status = SSLWrite(
-            tls.context,
-            payload.data() + offset,
-            payload.size() - offset,
-            &processed);
-        offset += processed;
-        if (status == errSSLWouldBlock) continue;
-        if (status != noErr) {
-            err = "socket_gui: TLS gửi thất bại, mã " + std::to_string(status);
-            return false;
-        }
+    written = 0;
+    if (payload.empty()) return true;
+    std::size_t processed = 0;
+    const OSStatus status = SSLWrite(
+        tls.context, payload.data(), payload.size(), &processed);
+    if (status != noErr && status != errSSLWouldBlock) {
+        err = "socket_gui: TLS gửi thất bại, mã " + std::to_string(status);
+        return false;
     }
+    written = static_cast<int>(processed);
     return true;
 }
 
@@ -983,19 +915,18 @@ bool initializeTlsClient(OpenTlsSocket &tls,
 
 bool tlsWrite(OpenTlsSocket &tls,
               const std::string &payload,
+              int &written,
               std::string &err) {
-    std::size_t offset = 0;
-    while (offset < payload.size()) {
-        const std::size_t remaining = payload.size() - offset;
-        const int chunk = static_cast<int>(
-            remaining > static_cast<std::size_t>(INT_MAX) ? INT_MAX : remaining);
-        const int written = SSL_write(tls.session, payload.data() + offset, chunk);
-        if (written <= 0) {
-            err = "socket_gui: TLS gửi thất bại: " + opensslErrorText();
-            return false;
-        }
-        offset += static_cast<std::size_t>(written);
+    written = 0;
+    if (payload.empty()) return true;
+    const int chunk = static_cast<int>(
+        payload.size() > static_cast<std::size_t>(INT_MAX) ? INT_MAX : payload.size());
+    const int count = SSL_write(tls.session, payload.data(), chunk);
+    if (count <= 0) {
+        err = "socket_gui: TLS gửi thất bại: " + opensslErrorText();
+        return false;
     }
+    written = count;
     return true;
 }
 
@@ -1318,8 +1249,9 @@ bool handleSockets(const std::string &fn,
         if (fn == "socket_gui") {
             std::string payload;
             if (!requireString(args[1], fn, "dữ liệu", payload, err)) return true;
-            if (!tlsWrite(tls, payload, err)) return true;
-            result = make_int_value(static_cast<int>(payload.size()));
+            int written = 0;
+            if (!tlsWrite(tls, payload, written, err)) return true;
+            result = make_int_value(written);
             return true;
         }
 
@@ -1369,25 +1301,20 @@ bool handleSockets(const std::string &fn,
     if (fn == "socket_gui") {
         std::string payload;
         if (!requireString(args[1], fn, "dữ liệu", payload, err)) return true;
-        std::size_t sentTotal = 0;
-        while (sentTotal < payload.size()) {
 #if defined(MSG_NOSIGNAL)
-            constexpr int flags = MSG_NOSIGNAL;
+        constexpr int flags = MSG_NOSIGNAL;
 #else
-            constexpr int flags = 0;
+        constexpr int flags = 0;
 #endif
-            const int sent = ::send(socket, payload.data() + sentTotal,
-                                    static_cast<int>(payload.size() - sentTotal),
-                                    flags);
-            if (sent <= 0) {
-                err = fn + ": gửi thất bại, mã " +
-                      std::to_string(lastSocketError());
-                return true;
-            }
-            sentTotal += static_cast<std::size_t>(sent);
-            if (socketState.type == SOCK_DGRAM) break;
+        const std::size_t capped = std::min<std::size_t>(
+            payload.size(), static_cast<std::size_t>(INT_MAX));
+        const int sent = ::send(socket, payload.data(), static_cast<int>(capped), flags);
+        if (sent < 0) {
+            err = fn + ": gửi thất bại, mã " +
+                  std::to_string(lastSocketError());
+            return true;
         }
-        result = make_int_value(static_cast<int>(sentTotal));
+        result = make_int_value(sent);
         return true;
     }
 
@@ -1450,15 +1377,218 @@ bool handleDns(const std::string &fn,
     return true;
 }
 
+bool socketResolveVm(const std::vector<StackValue> &args,
+                     StackValue &result,
+                     std::string &err) {
+    const std::string fn = "socket_phan_giai_vm";
+    if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
+    std::string host;
+    int port = 0;
+    int datagram = 0;
+    if (!requireString(args[0], fn, "tên máy", host, err) ||
+        !requireIntArgFromStack(args[1], fn, "cổng", port, err) ||
+        !requireIntArgFromStack(args[2], fn, "datagram", datagram, err)) {
+        return true;
+    }
+    if (host.empty() || port <= 0 || port > 65535 ||
+        (datagram != 0 && datagram != 1)) {
+        err = fn + ": đối số không hợp lệ";
+        return true;
+    }
+    if (!initializeNetwork(err)) return true;
+
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = datagram ? SOCK_DGRAM : SOCK_STREAM;
+    hints.ai_protocol = datagram ? IPPROTO_UDP : IPPROTO_TCP;
+    addrinfo *head = nullptr;
+    const std::string service = std::to_string(port);
+    const int status = getaddrinfo(host.c_str(), service.c_str(), &hints, &head);
+    if (status != 0 || head == nullptr) {
+#if defined(_WIN32)
+        err = fn + ": không phân giải được địa chỉ, mã " + std::to_string(status);
+#else
+        err = fn + ": không phân giải được địa chỉ: " + std::string(gai_strerror(status));
+#endif
+        if (head != nullptr) freeaddrinfo(head);
+        return true;
+    }
+
+    std::vector<StackValue> resolved;
+    for (addrinfo *entry = head; entry != nullptr; entry = entry->ai_next) {
+        char numericHost[NI_MAXHOST]{};
+        char numericService[NI_MAXSERV]{};
+        if (getnameinfo(entry->ai_addr, static_cast<socklen_t>(entry->ai_addrlen),
+                        numericHost, sizeof(numericHost),
+                        numericService, sizeof(numericService),
+                        NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+            continue;
+        }
+        int resolvedPort = port;
+        try {
+            resolvedPort = std::stoi(numericService);
+        } catch (...) {}
+        resolved.push_back(make_list_value({
+            make_string_value(numericHost),
+            make_int_value(resolvedPort),
+        }));
+    }
+    freeaddrinfo(head);
+    result = make_list_value(std::move(resolved));
+    return true;
+}
+
+bool socketOpenResolvedVm(const std::string &fn,
+                          const std::vector<StackValue> &args,
+                          int socketType,
+                          StackValue &result,
+                          std::string &err) {
+    if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+    if (!std::holds_alternative<ListHandle>(args[0]) ||
+        std::get<ListHandle>(args[0]) == nullptr) {
+        err = fn + ": địa chỉ phân giải không hợp lệ";
+        return true;
+    }
+    const ListHandle address = std::get<ListHandle>(args[0]);
+    if (address->elements.size() != 2 ||
+        !std::holds_alternative<std::string>(address->elements[0]) ||
+        !std::holds_alternative<int>(address->elements[1])) {
+        err = fn + ": địa chỉ phân giải không hợp lệ";
+        return true;
+    }
+    std::vector<StackValue> legacyArgs{
+        address->elements[0], address->elements[1], args[1],
+    };
+    return socketOpen(fn, legacyArgs, socketType, result, err);
+}
+
+bool socketTlsUpgradeVm(const std::vector<StackValue> &args,
+                        StackValue &result,
+                        std::string &err) {
+    const std::string fn = "socket_tls_nang_cap_vm";
+    if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+    int id = 0;
+    std::string host;
+    if (!requireIntArgFromStack(args[0], fn, "mã socket", id, err) || id <= 0 ||
+        !requireString(args[1], fn, "tên máy", host, err) || host.empty()) {
+        if (err.empty()) err = fn + ": đối số không hợp lệ";
+        return true;
+    }
+
+    std::shared_ptr<OpenSocket> raw;
+    {
+        std::lock_guard<std::mutex> lock(socketMutex());
+        const auto found = openSockets().find(id);
+        if (found == openSockets().end() || found->second->listener ||
+            found->second->type != SOCK_STREAM) {
+            err = fn + ": socket TCP đã đóng hoặc không tồn tại";
+            return true;
+        }
+        raw = found->second;
+    }
+
+    std::lock_guard<std::mutex> ioLock(raw->ioMutex);
+    if (raw->handle == kInvalidNativeSocket) {
+        err = fn + ": socket TCP đã đóng hoặc không tồn tại";
+        return true;
+    }
+    auto tls = std::make_shared<OpenTlsSocket>();
+    tls->handle = raw->handle;
+    if (!initializeTlsClient(*tls, host, err)) {
+        closeTlsSocket(*tls);
+        raw->handle = kInvalidNativeSocket;
+        std::lock_guard<std::mutex> lock(socketMutex());
+        openSockets().erase(id);
+        return true;
+    }
+
+    raw->handle = kInvalidNativeSocket;
+    {
+        std::lock_guard<std::mutex> lock(socketMutex());
+        openSockets().erase(id);
+        openTlsSockets()[id] = std::move(tls);
+    }
+    result = make_int_value(id);
+    return true;
+}
+
+bool socketSendVm(const std::vector<StackValue> &args,
+                  StackValue &result,
+                  std::string &err) {
+    const std::string fn = "socket_gui_vm";
+    if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
+    int offset = 0;
+    if (!std::holds_alternative<std::string>(args[1]) ||
+        !requireIntArgFromStack(args[2], fn, "độ lệch byte", offset, err)) {
+        if (err.empty()) err = fn + ": dữ liệu phải là chuỗi";
+        return true;
+    }
+    const std::string &payload = std::get<std::string>(args[1]);
+    const int total = static_cast<int>(payload.size());
+    if (offset < 0 || offset > total) {
+        err = fn + ": độ lệch byte ngoài phạm vi";
+        return true;
+    }
+    if (offset == total) {
+        result = make_list_value({make_int_value(0), make_int_value(total), make_int_value(1)});
+        return true;
+    }
+    StackValue sentResult = make_int_value(0);
+    std::vector<StackValue> legacyArgs{
+        args[0], make_string_value(payload.substr(static_cast<std::size_t>(offset))),
+    };
+    if (!handleSockets("socket_gui", legacyArgs, sentResult, err)) return false;
+    if (!err.empty()) return true;
+    if (!std::holds_alternative<int>(sentResult)) {
+        err = fn + ": kết quả gửi nội bộ không hợp lệ";
+        return true;
+    }
+    const int sent = std::get<int>(sentResult);
+    result = make_list_value({
+        make_int_value(sent),
+        make_int_value(total),
+        make_int_value(offset + sent >= total ? 1 : 0),
+    });
+    return true;
+}
+
 } // namespace
 
-bool handleNativeM3LibraryFunction(const std::string &fn,
+bool handleNativeM3LibraryFunction(Opcode opcode,
                                    const std::vector<StackValue> &args,
                                    StackValue &result,
                                    std::string &err) {
-    if (handleCharsets(fn, args, result, err)) return true;
-    if (handleSockets(fn, args, result, err)) return true;
-    if (handleDns(fn, args, result, err)) return true;
+    const auto *primitive = vietvm::bytecode::intrinsicByOpcode(opcode);
+    if (primitive == nullptr) return false;
+    const std::string fn(primitive->name);
+
+    if (opcode == OP_VM_SOCKET_PHAN_GIAI) return socketResolveVm(args, result, err);
+    if (opcode == OP_VM_SOCKET_TCP_MO) {
+        return socketOpenResolvedVm(fn, args, SOCK_STREAM, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_UDP_MO) {
+        return socketOpenResolvedVm(fn, args, SOCK_DGRAM, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_TLS_NANG_CAP) return socketTlsUpgradeVm(args, result, err);
+    if (opcode == OP_VM_SOCKET_GUI) return socketSendVm(args, result, err);
+    if (opcode == OP_VM_SOCKET_TCP_LANG_NGHE) {
+        return socketListen("socket_tcp_lang_nghe", args, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_CHAP_NHAN) {
+        return socketAccept("socket_chap_nhan", args, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_DAT_TIMEOUT) {
+        return handleSockets("socket_dat_timeout", args, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_NHAN) {
+        return handleSockets("socket_nhan", args, result, err);
+    }
+    if (opcode == OP_VM_SOCKET_DONG) {
+        return handleSockets("socket_dong", args, result, err);
+    }
+    if (opcode == OP_VM_DNS_PHAN_GIAI) {
+        return handleDns("dns_phan_giai", args, result, err);
+    }
     return false;
 }
 

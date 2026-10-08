@@ -14,15 +14,8 @@ namespace vietvm::helpers {
 bool hasEnvVar(const char *name);
 // Lấy env var; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 std::optional<std::string> getEnvVar(const char *name);
-// Kiểm tra điều kiện của `startsWith`.
-bool startsWith(const std::string &value, const std::string &prefix);
-
-// Tạo bản sao chuỗi đã bỏ whitespace ở hai đầu; hàm không sửa dữ liệu gốc nên phù hợp cho parser helper/native argument.
-std::string trimCopy(const std::string &s);
 // Chuyển một `StackValue` đối số thành chuỗi thô mà native helper cần; hàm giữ nội dung chuỗi nguyên bản và định dạng scalar theo quy tắc runtime.
 std::string argToRawString(const StackValue &v);
-// Giải mã đơn giản escapes; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
-std::string decodeSimpleEscapes(const std::string &s);
 // Đọc đối số số nguyên đã được wrapper V++ chuẩn hóa. Native boundary không
 // thực hiện parsing/coercion từ chuỗi hoặc số thực.
 bool requireIntArgFromStack(const StackValue &arg,
@@ -58,17 +51,10 @@ bool getFirstMapArgument(const std::vector<StackValue> &args,
 // Lấy non negative danh sách chỉ số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &err);
 
-// Primitive DB: nhận cấu hình đã được V++ parse/validate và chỉ thực thi
-// client hệ điều hành tương ứng.
-bool runDbExec(const std::string &engine,
-                const std::string &host,
-                int port,
-                const std::string &target,
-                const std::string &user,
-                const std::string &password,
-                const std::string &sql,
-                bool useDatabase,
-                StackValue &result,
-                std::string &err);
+// Primitive tiến trình cho thư viện chuẩn. V++ chịu trách nhiệm validate argv
+// và environment; helper chỉ spawn, capture stdout/stderr và chờ exit status.
+bool handleNativeProcessPrimitive(const std::vector<StackValue> &args,
+                                  StackValue &result,
+                                  std::string &err);
 
 } // namespace vietvm::helpers

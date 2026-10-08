@@ -96,9 +96,7 @@ set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_compiler_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_extended_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_m3_helpers.cpp
-    ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_format_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_stdlib_helpers.cpp)
 set(VPP_TOOLING_SOURCES

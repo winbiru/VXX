@@ -12,8 +12,8 @@
 #include <cstring>
 #include <functional>
 #include <optional>
+#include <limits>
 #include <unordered_map>
-#include <regex>
 #include "vm/vm.h"
 
 #include <algorithm>
@@ -28,12 +28,11 @@
 #include "common/vm_utils.h"
 #include "common/vm_native_collection_helpers.h"
 #include "common/vm_native_compiler_helpers.h"
-#include "common/vm_native_extended_helpers.h"
 #include "common/vm_native_m3_helpers.h"
 #include "common/vm_native_helpers.h"
 #include "common/vm_native_constants.h"
-#include "common/vm_native_format_helpers.h"
 #include "common/vm_native_stdlib_helpers.h"
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/bytecode/verifier.h"
 #include "vpp/core/message_constants.h"
@@ -56,6 +55,145 @@ enum class NativeFailureDisposition {
     RuntimeError,
     CatchableLanguageError,
 };
+
+namespace {
+
+// Tín hiệu nội bộ dùng để dừng cooperative worker. Không dùng LanguageException
+// vì mã V++ có thể bắt LanguageException và vô tình nuốt yêu cầu hủy.
+struct VmWorkerCancelled final {};
+
+// Sao chép sâu graph StackValue qua biên OS thread. Các allocation được tạo trực
+// tiếp bằng shared_ptr (không gọi factory runtime) để snapshot không bị đăng ký
+// nhầm vào heap của thread nguồn. Worker/VM đích sẽ track graph sau khi nhận.
+class ThreadValueCloner {
+public:
+    StackValue clone(const StackValue &value) {
+        if (std::holds_alternative<int>(value) ||
+            std::holds_alternative<double>(value) ||
+            std::holds_alternative<std::string>(value) ||
+            std::holds_alternative<std::monostate>(value)) {
+            return value;
+        }
+        if (std::holds_alternative<MapHandle>(value)) {
+            return StackValue(cloneMap(std::get<MapHandle>(value)));
+        }
+        if (std::holds_alternative<ListHandle>(value)) {
+            return StackValue(cloneList(std::get<ListHandle>(value)));
+        }
+        if (std::holds_alternative<TupleHandle>(value)) {
+            return StackValue(cloneTuple(std::get<TupleHandle>(value)));
+        }
+        if (std::holds_alternative<ClassHandle>(value)) {
+            return StackValue(cloneClass(std::get<ClassHandle>(value)));
+        }
+        if (std::holds_alternative<InstanceHandle>(value)) {
+            return StackValue(cloneInstance(std::get<InstanceHandle>(value)));
+        }
+        return StackValue(cloneClosure(std::get<ClosureHandle>(value)));
+    }
+
+    ClassHandle cloneClassHandle(const ClassHandle &value) { return cloneClass(value); }
+
+private:
+    std::unordered_map<const MapValue *, MapHandle> maps_;
+    std::unordered_map<const vietvm::runtime::ListValue *, ListHandle> lists_;
+    std::unordered_map<const vietvm::runtime::TupleValue *, TupleHandle> tuples_;
+    std::unordered_map<const vietvm::runtime::RuntimeClass *, ClassHandle> classes_;
+    std::unordered_map<const vietvm::runtime::RuntimeInstance *, InstanceHandle> instances_;
+    std::unordered_map<const vietvm::runtime::RuntimeClosure *, ClosureHandle> closures_;
+    std::unordered_map<const vietvm::runtime::RuntimeCell *, CellHandle> cells_;
+
+    MapHandle cloneMap(const MapHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = maps_.find(value.get());
+        if (found != maps_.end()) return found->second;
+        auto copy = std::make_shared<MapValue>();
+        maps_.emplace(value.get(), copy);
+        for (const auto &[key, item] : value->entries) {
+            copy->entries.emplace(key, clone(item));
+        }
+        return copy;
+    }
+
+    ListHandle cloneList(const ListHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = lists_.find(value.get());
+        if (found != lists_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::ListValue>();
+        lists_.emplace(value.get(), copy);
+        copy->elements.reserve(value->elements.size());
+        for (const StackValue &item : value->elements) copy->elements.push_back(clone(item));
+        return copy;
+    }
+
+    TupleHandle cloneTuple(const TupleHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = tuples_.find(value.get());
+        if (found != tuples_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::TupleValue>();
+        tuples_.emplace(value.get(), copy);
+        copy->elements.reserve(value->elements.size());
+        for (const StackValue &item : value->elements) copy->elements.push_back(clone(item));
+        return copy;
+    }
+
+    ClassHandle cloneClass(const ClassHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = classes_.find(value.get());
+        if (found != classes_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::RuntimeClass>();
+        classes_.emplace(value.get(), copy);
+        copy->name = value->name;
+        copy->methods = value->methods;
+        copy->superclass = cloneClass(value->superclass);
+        return copy;
+    }
+
+    InstanceHandle cloneInstance(const InstanceHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = instances_.find(value.get());
+        if (found != instances_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::RuntimeInstance>();
+        instances_.emplace(value.get(), copy);
+        copy->klass = cloneClass(value->klass);
+        for (const auto &[key, item] : value->fields) {
+            copy->fields.emplace(key, clone(item));
+        }
+        return copy;
+    }
+
+    CellHandle cloneCell(const CellHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = cells_.find(value.get());
+        if (found != cells_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::RuntimeCell>();
+        cells_.emplace(value.get(), copy);
+        copy->value = clone(value->value);
+        return copy;
+    }
+
+    ClosureHandle cloneClosure(const ClosureHandle &value) {
+        if (value == nullptr) return nullptr;
+        const auto found = closures_.find(value.get());
+        if (found != closures_.end()) return found->second;
+        auto copy = std::make_shared<vietvm::runtime::RuntimeClosure>();
+        closures_.emplace(value.get(), copy);
+        copy->functionId = value->functionId;
+        for (const auto &[slot, cell] : value->captures) {
+            copy->captures.emplace(slot, cloneCell(cell));
+        }
+        return copy;
+    }
+};
+
+std::string languageExceptionText(const vietvm::runtime::LanguageException &error) {
+    if (std::holds_alternative<std::string>(error.value())) {
+        return std::get<std::string>(error.value());
+    }
+    return sv_to_string(error.value());
+}
+
+} // namespace
 
 // Kiểm tra quyền gọi một method runtime dựa trên visibility, lớp đang thực thi
 // và lớp sở hữu method. Private chỉ cho chính lớp sở hữu; protected cho cả lớp con.
@@ -86,17 +224,121 @@ static std::string runtimeMethodAccessMessage(
     return vietvm::messages::formatMessage(message, {methodName});
 }
 
-// Thực thi native thư viện chuẩn hàm; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
-static bool executeNativeStdlibFunction(int hamIdOrName,
-                                        const std::vector<StackValue> &args,
-                                        const std::vector<std::string> &stringPool,
-                                        const std::unordered_map<int, int> &functionTableByNameIndex,
-                                        const std::unordered_map<int, std::vector<Instruction>> &functionBytecode,
-                                        StackValue &result,
-                                        std::string &err,
-                                        NativeFailureDisposition &failureDisposition,
-                                        const VM::OutputSink &outputSink) {
-    (void)outputSink;
+// Primitive file I/O. C++ chỉ mở/đọc/ghi đúng tệp được yêu cầu; chuẩn hóa
+// đường dẫn, kiểm tra byte và các thuật toán xử lý nội dung thuộc thư viện V++.
+static bool executeNativeFilePrimitive(Opcode opcode,
+                                       const std::vector<StackValue> &args,
+                                       StackValue &result,
+                                       std::string &err) {
+    const bool readText = opcode == OP_VM_IO_DOC_FILE;
+    const bool writeText = opcode == OP_VM_IO_GHI_FILE;
+    const bool readBytes = opcode == OP_VM_IO_DOC_BYTES;
+    const bool writeBytes = opcode == OP_VM_IO_GHI_BYTES;
+    const bool appendText = opcode == OP_VM_IO_GHI_TIEP_FILE;
+    if (!readText && !writeText && !readBytes && !writeBytes && !appendText) {
+        return false;
+    }
+
+    const std::string operation = readText ? "đọc tệp"
+        : writeText ? "ghi tệp"
+        : readBytes ? "đọc bytes tệp"
+        : writeBytes ? "ghi bytes tệp"
+        : "ghi nối tệp";
+    const std::size_t arity = (readText || readBytes) ? 1u : 2u;
+    if (!requireNativeArgumentCount(args, operation, arity, err)) return true;
+    std::filesystem::path path;
+    if (!vietvm::helpers::nativeUtf8Path(args[0], operation, path, err)) return true;
+
+    if (readText) {
+        std::ifstream ifs(path);
+        if (!ifs.is_open()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
+            return true;
+        }
+        std::ostringstream ss;
+        ss << ifs.rdbuf();
+        result = make_string_value(ss.str());
+        return true;
+    }
+
+    if (readBytes) {
+        std::ifstream ifs(path, std::ios::binary);
+        if (!ifs.is_open()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
+            return true;
+        }
+        std::vector<StackValue> bytes;
+        char byte = 0;
+        while (ifs.get(byte)) {
+            bytes.push_back(make_int_value(static_cast<unsigned char>(byte)));
+        }
+        if (!ifs.eof()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
+            return true;
+        }
+        result = make_list_value(std::move(bytes));
+        return true;
+    }
+
+    if (writeBytes) {
+        ListHandle list;
+        if (!vietvm::helpers::getListArgument(args, 1, operation, list, err)) return true;
+        std::ofstream ofs(path, std::ios::binary | std::ios::trunc);
+        if (!ofs.is_open()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileOpenForWriteFailed, {operation});
+            return true;
+        }
+        for (const StackValue &item : list->elements) {
+            if (!std::holds_alternative<int>(item)) {
+                err = operation + ": mỗi byte phải là số nguyên";
+                return true;
+            }
+            const int value = std::get<int>(item);
+            if (value < 0 || value > 255) {
+                err = operation + ": byte phải trong 0..255";
+                return true;
+            }
+            ofs.put(static_cast<char>(static_cast<unsigned char>(value)));
+        }
+        if (!ofs.good()) {
+            err = vietvm::messages::formatMessage(
+                vietvm::messages::kNativeFileWriteFailed, {operation});
+            return true;
+        }
+        result = make_int_value(1);
+        return true;
+    }
+
+    const std::ios::openmode mode = appendText
+        ? (std::ios::out | std::ios::app)
+        : std::ios::out;
+    std::ofstream ofs(path, mode);
+    if (!ofs.is_open()) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeFileOpenForWriteFailed, {operation});
+        return true;
+    }
+    ofs << vietvm::helpers::argToRawString(args[1]);
+    if (!ofs.good()) {
+        err = vietvm::messages::formatMessage(
+            vietvm::messages::kNativeFileWriteFailed, {operation});
+        return true;
+    }
+    result = make_int_value(1);
+    return true;
+}
+
+// Bytecode cũ có thể gọi intrinsic theo tên thay vì opcode. Chỉ giải tên ở
+// đây; mọi thực thi (kể cả thread, process, bytes) dùng chung opcode dispatcher.
+static const vietvm::bytecode::IntrinsicDescriptor *resolveLegacyIntrinsic(
+    int hamIdOrName,
+    const std::vector<std::string> &stringPool,
+    const std::unordered_map<int, int> &functionTableByNameIndex,
+    const std::unordered_map<int, std::vector<Instruction>> &functionBytecode) {
     std::string fn;
     if (hamIdOrName < 0) {
         int nameIdx = -(hamIdOrName + 1);
@@ -118,171 +360,141 @@ static bool executeNativeStdlibFunction(int hamIdOrName,
         }
     }
 
-    if (fn.empty()) return false;
+    return fn.empty() ? nullptr : vietvm::bytecode::intrinsicByName(fn);
+}
 
-    if (vietvm::helpers::handleNativeFormatFunction(fn, args, result, err)) return true;
-
-    if (vietvm::helpers::handleNativeCollectionFunction(fn, args, result, err)) return true;
-
-    if (vietvm::helpers::handleNativeCompilerLibraryFunction(fn, args, result, err)) return true;
-
-    if (vietvm::helpers::handleNativeExtendedLibraryFunction(fn, args, result, err)) return true;
-
-    if (vietvm::helpers::handleNativeM3LibraryFunction(fn, args, result, err)) {
-        // Socket/DNS là primitive I/O của thư viện chuẩn. Lỗi kết nối, timeout,
-        // resolver... phải đi qua cơ chế thử/bắt của V++ để wrapper giao thức
-        // (HTTP, REST, client ứng dụng) có thể tự xử lý và dọn tài nguyên.
-        if (!err.empty() &&
-            (fn.rfind("socket_", 0) == 0 || fn == "dns_phan_giai")) {
-            failureDisposition = NativeFailureDisposition::CatchableLanguageError;
-        }
-        return true;
-    }
-
-    if (vietvm::helpers::handleNativeFoundationFunction(fn, args, result, err)) return true;
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadFile)) {
-        const std::string publicName = "đọc tệp";
-        if (!requireNativeArgumentCount(args, publicName, 1, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
-        std::ifstream ifs(path);
-        if (!ifs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
+// Only representation/OS primitives live here. Library algorithms run as V++ bytecode.
+static bool executeVmPrimitive(Opcode opcode,
+                               const std::vector<StackValue> &args,
+                               StackValue &result,
+                               std::string &err,
+                               NativeFailureDisposition &failureDisposition) {
+    const auto *primitive = vietvm::bytecode::intrinsicByOpcode(opcode);
+    if (primitive == nullptr) return false;
+    const std::string fn(primitive->name);
+    switch (opcode) {
+        case OP_VM_LENGTH:
+        case OP_VM_LIST_APPEND:
+        case OP_VM_LIST_REMOVE:
+        case OP_VM_MAP_HAS:
+        case OP_VM_MAP_REMOVE:
+        case OP_VM_MAP_KEYS:
+            return vietvm::helpers::handleNativeCollectionFunction(opcode, args, result, err);
+        case OP_VM_TYPE_OF:
+        case OP_VM_IDENTITY_HASH:
+        case OP_VM_DOC_BIEN_MOI_TRUONG:
+        case OP_VM_DONG_HO_DIA_PHUONG:
+        case OP_VM_DONG_HO_UTC:
+        case OP_VM_DUONG_DAN_TON_TAI:
+        case OP_VM_LA_TEP:
+        case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
+        case OP_VM_LA_THU_MUC:
+        case OP_VM_LIET_KE_THU_MUC:
+        case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
+        case OP_VM_NGU_MILI_GIAY:
+        case OP_VM_TAO_THU_MUC:
+        case OP_VM_TEN_NEN_TANG:
+        case OP_VM_THOI_GIAN_DON_DIEU_MS:
+        case OP_VM_XOA_DUONG_DAN:
+            return vietvm::helpers::handleNativeFoundationFunction(opcode, args, result, err);
+        case OP_VM_DNS_PHAN_GIAI:
+        case OP_VM_SOCKET_CHAP_NHAN:
+        case OP_VM_SOCKET_DAT_TIMEOUT:
+        case OP_VM_SOCKET_DONG:
+        case OP_VM_SOCKET_GUI:
+        case OP_VM_SOCKET_NHAN:
+        case OP_VM_SOCKET_PHAN_GIAI:
+        case OP_VM_SOCKET_TCP_LANG_NGHE:
+        case OP_VM_SOCKET_TCP_MO:
+        case OP_VM_SOCKET_TLS_NANG_CAP:
+        case OP_VM_SOCKET_UDP_MO:
+            return vietvm::helpers::handleNativeM3LibraryFunction(opcode, args, result, err);
+        case OP_VM_IO_DOC_BYTES:
+        case OP_VM_IO_DOC_FILE:
+        case OP_VM_IO_GHI_BYTES:
+        case OP_VM_IO_GHI_FILE:
+        case OP_VM_IO_GHI_TIEP_FILE:
+            failureDisposition = NativeFailureDisposition::RuntimeError;
+            return executeNativeFilePrimitive(opcode, args, result, err);
+        case OP_VM_TIEN_TRINH_CHAY:
+            return vietvm::helpers::handleNativeProcessPrimitive(args, result, err);
+        case OP_VM_BIEN_DICH_PHAN_TICH:
+            return vietvm::helpers::compilerAnalyzePrimitive(args, result, err);
+        case OP_VM_KICH_BAN_CHAY:
+            return vietvm::helpers::embeddedVmRunPrimitive(args, result, err);
+        case OP_VM_TUPLE_FROM_LIST:
+            if (std::holds_alternative<ListHandle>(args[0])) {
+                const ListHandle &list = std::get<ListHandle>(args[0]);
+                result = make_tuple_value(list == nullptr ? std::vector<StackValue>{} : list->elements);
+            } else {
+                err = "bộ: primitive cần danh sách";
+            }
             return true;
-        }
-        std::ostringstream ss;
-        ss << ifs.rdbuf();
-        result = make_string_value(ss.str());
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteFile)) {
-        const std::string publicName = "ghi tệp";
-        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
-        std::ofstream ofs(path);
-        if (!ofs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
-            return true;
-        }
-        std::string content = vietvm::helpers::argToRawString(args[1]);
-        ofs << content;
-        if (!ofs.good()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileWriteFailed, {publicName});
-            return true;
-        }
-        result = make_int_value(1);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoReadBytes)) {
-        const std::string publicName = "đọc bytes tệp";
-        if (!requireNativeArgumentCount(args, publicName, 1, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
-        std::ifstream ifs(path, std::ios::binary);
-        if (!ifs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
-            return true;
-        }
-        std::vector<StackValue> bytes;
-        char byte = 0;
-        while (ifs.get(byte)) {
-            bytes.push_back(make_int_value(static_cast<unsigned char>(byte)));
-        }
-        if (!ifs.eof()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {publicName});
-            return true;
-        }
-        result = make_list_value(std::move(bytes));
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoWriteBytes)) {
-        const std::string publicName = "ghi bytes tệp";
-        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
-        ListHandle list;
-        if (!vietvm::helpers::getListArgument(args, 1, publicName, list, err)) return true;
-        std::ofstream ofs(path, std::ios::binary | std::ios::trunc);
-        if (!ofs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
-            return true;
-        }
-        for (const StackValue &item : list->elements) {
-            if (!std::holds_alternative<int>(item)) {
-                err = publicName + ": mỗi byte phải là số nguyên";
+        case OP_VM_STRING_BYTES: {
+            if (!std::holds_alternative<std::string>(args[0])) {
+                err = fn + ": giá trị phải là chuỗi";
                 return true;
             }
-            const int value = std::get<int>(item);
-            if (value < 0 || value > 255) {
-                err = publicName + ": byte phải trong 0..255";
+            const auto &text = std::get<std::string>(args[0]);
+            std::vector<StackValue> bytes;
+            bytes.reserve(text.size());
+            for (unsigned char byte : text) bytes.push_back(make_int_value(byte));
+            result = make_list_value(std::move(bytes));
+            return true;
+        }
+        case OP_VM_STRING_FROM_BYTES:
+        case OP_VM_FLOAT_FROM_BITS: {
+            ListHandle list;
+            if (!vietvm::helpers::getFirstListArgument(args, fn, list, err)) return true;
+            if (opcode == OP_VM_FLOAT_FROM_BITS && list->elements.size() != 8) {
+                err = fn + ": cần đúng 8 byte IEEE-754";
                 return true;
             }
-            ofs.put(static_cast<char>(static_cast<unsigned char>(value)));
-        }
-        if (!ofs.good()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileWriteFailed, {publicName});
+            std::string bytes;
+            bytes.reserve(list->elements.size());
+            for (const auto &item : list->elements) {
+                if (!std::holds_alternative<int>(item) || std::get<int>(item) < 0 ||
+                    std::get<int>(item) > 255) {
+                    err = fn + ": mỗi byte phải là số nguyên trong 0..255";
+                    return true;
+                }
+                bytes.push_back(static_cast<char>(std::get<int>(item)));
+            }
+            if (opcode == OP_VM_STRING_FROM_BYTES) {
+                // Raw storage bridge, including NUL/malformed bytes. UTF-8 policy is in V++.
+                result = make_string_value(std::move(bytes));
+            } else {
+                std::uint64_t bits = 0;
+                for (unsigned i = 0; i < 8; ++i) {
+                    bits |= std::uint64_t(static_cast<unsigned char>(bytes[i])) << (i * 8);
+                }
+                double number;
+                static_assert(sizeof(number) == sizeof(bits) && std::numeric_limits<double>::is_iec559);
+                std::memcpy(&number, &bits, sizeof(number));
+                result = make_float_value(number);
+            }
             return true;
         }
-        result = make_int_value(1);
-        return true;
+        case OP_VM_SO_THUC_BITS: {
+            if (!isNumeric(args[0])) {
+                err = fn + ": giá trị phải là số";
+                return true;
+            }
+            const double number = toDouble(args[0]);
+            std::uint64_t bits = 0;
+            static_assert(sizeof(bits) == sizeof(number) && std::numeric_limits<double>::is_iec559);
+            std::memcpy(&bits, &number, sizeof(bits));
+            std::vector<StackValue> bytes;
+            bytes.reserve(8);
+            for (unsigned shift = 0; shift < 64; shift += 8) {
+                bytes.push_back(make_int_value(static_cast<int>((bits >> shift) & 0xffu)));
+            }
+            result = make_list_value(std::move(bytes));
+            return true;
+        }
+        default:
+            return false;
     }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnIoAppendFile)) {
-        const std::string publicName = "ghi nối tệp";
-        if (!requireNativeArgumentCount(args, publicName, 2, err)) return true;
-        std::filesystem::path path;
-        if (!vietvm::helpers::nativeUtf8Path(args[0], publicName, path, err)) return true;
-        std::ofstream ofs(path, std::ios::out | std::ios::app);
-        if (!ofs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForWriteFailed, {publicName});
-            return true;
-        }
-        ofs << vietvm::helpers::argToRawString(args[1]);
-        if (!ofs.good()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileWriteFailed, {publicName});
-            return true;
-        }
-        result = make_int_value(1);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnDbExec)) {
-        if (!requireNativeArgumentCount(args, fn, 8, err)) return true;
-        int port = 0;
-        int useDatabase = 0;
-        if (!vietvm::helpers::requireIntArgFromStack(args[2], fn, "cổng", port, err) ||
-            !vietvm::helpers::requireIntArgFromStack(
-                args[7], fn, "dùng database", useDatabase, err)) {
-            return true;
-        }
-        return vietvm::helpers::runDbExec(
-            vietvm::helpers::argToRawString(args[0]),
-            vietvm::helpers::argToRawString(args[1]),
-            port,
-            vietvm::helpers::argToRawString(args[3]),
-            vietvm::helpers::argToRawString(args[4]),
-            vietvm::helpers::argToRawString(args[5]),
-            vietvm::helpers::argToRawString(args[6]),
-            useDatabase != 0,
-            result,
-            err);
-    }
-
-    return false;
 }
 
 // Giải mã ánh xạ from chuỗi bể dữ liệu; hàm đọc biểu diễn đã mã hóa, kiểm tra định dạng và dựng lại giá trị runtime tương ứng.
@@ -402,6 +614,10 @@ VM::VM(const std::vector<Instruction>& code)
 
 VM::VM(const std::vector<Instruction>& code, const std::vector<std::string>& pool)
     : bytecode(code), stringPool(pool), pc(0) {}
+
+VM::~VM() {
+    if (threadRuntimeOwner_) shutdownThreadRuntime();
+}
 
 // Thiết lập đầu ra sink; hàm ghi giá trị đầu vào vào trạng thái đích và thay thế giá trị cũ nếu đã tồn tại.
 void VM::setOutputSink(OutputSink sink) {
@@ -562,6 +778,9 @@ void VM::initializeModules() {
             initializer.runtimeHeap = runtimeHeap;
             initializer.inheritedGcRoots = gcRoots();
             initializer.outputSink = outputSink;
+            initializer.threadRuntime_ = threadRuntime_;
+            initializer.threadRuntimeOwner_ = false;
+            initializer.cancellationRequested_ = cancellationRequested_;
             initializer.variables = variables;
             initializer.classTable = classTable;
             initializer.setFunctions(hamBytecodeMap, functionTableByNameIndex);
@@ -593,6 +812,11 @@ void VM::initializeModules() {
 // Phát mã cho đầu ra; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
 void VM::emitOutput(const StackValue& value) {
     if (!outputSink) return;
+    if (threadRuntime_ != nullptr && threadRuntime_->outputMutex != nullptr) {
+        std::lock_guard<std::mutex> lock(*threadRuntime_->outputMutex);
+        outputSink(sv_to_string(value) + "\n");
+        return;
+    }
     outputSink(sv_to_string(value) + "\n");
 }
 
@@ -672,144 +896,214 @@ std::vector<StackValue> VM::gcRoots() const {
     return roots;
 }
 
-// Chạy JIT đã biên dịch tuyến tính; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-bool VM::runJitCompiledLinear() {
-    // MVP JIT: compile linear, non-control-flow bytecode into executable lambdas.
-    // Unsupported opcodes fall back to the normal interpreter.
-    for (const auto &ins : bytecode) {
-        switch (ins.op) {
-            case OP_BIEN_SO:
-            case OP_BIEN_SO_FLOAT:
-            case OP_CHUOI:
-            case OP_RONG_GIA_TRI:
-            case OP_CONG:
-            case OP_TRU:
-            case OP_NHAN:
-            case OP_CHIA:
-            case OP_MODULO:
-            case OP_Logic_VA:
-            case OP_Logic_HOAC:
-            case OP_SO_SANH_BANG:
-            case OP_KHAC_BANG:
-            case OP_LON_HON:
-            case OP_NHO_HON:
-            case OP_LON_HON_HOAC_BANG:
-            case OP_NHO_HON_HOAC_BANG:
-            case OP_PHU_DINH:
-            case OP_IN:
-            case OP_DONG_LENH:
-            case OP_MO_NGOAC:
-            case OP_DONG_NGOAC:
-            case OP_DUNG_CHUONG_TRINH:
-                break;
-            default:
-                return false;
+// Biên dịch trước vi lệnh của root và từng thân hàm V++. Những opcode làm đổi
+// execution context (gọi hàm, nhảy, return, catch, intrinsic...) tiếp tục chạy
+// qua dispatcher chung. Nhờ đó phép toán trong thư viện .vi vẫn đi qua JIT,
+// nhưng source trace, GC, hủy worker và unwind không bị nhân đôi ở JIT.
+void VM::runJitCompiled() {
+    jitPrograms_.clear();
+    jitFastInstructionCount_ = 0;
+    jitInterpreterInstructionCount_ = 0;
+
+    auto compile = [this](const std::vector<Instruction> &code) {
+        auto &program = jitPrograms_[&code];
+        program.reserve(code.size());
+        for (const Instruction &instr : code) {
+            switch (instr.op) {
+                case OP_BIEN_SO: {
+                    const int value = instr.operand;
+                    program.emplace_back([this, value]() { stack.emplace_back(value); });
+                    break;
+                }
+                case OP_TEN_BIEN_ID: {
+                    const int id = instr.operandIndex;
+                    program.emplace_back([this, id]() { stack.emplace_back(id); });
+                    break;
+                }
+                case OP_CHUOI: {
+                    const int index = instr.operandIndex;
+                    program.emplace_back([this, index]() {
+                        if (index < 0 || index >= static_cast<int>(stringPool.size())) {
+                            throw runtime_error_op(vietvm::messages::formatMessage(
+                                vietvm::messages::kVmInvalidStringIndex), OP_CHUOI,
+                                static_cast<int>(pc),
+                                vietvm::runtime::runtimeConstantReferenceFacts(false));
+                        }
+                        stack.push_back(stringPool[index]);
+                    });
+                    break;
+                }
+                case OP_BIEN_SO_FLOAT: {
+                    const int index = instr.operandIndex;
+                    program.emplace_back([this, index]() {
+                        if (index < 0 || index >= static_cast<int>(stringPool.size())) {
+                            throw runtime_error_op(vietvm::messages::formatMessage(
+                                vietvm::messages::kVmInvalidFloatIndex), OP_BIEN_SO_FLOAT,
+                                static_cast<int>(pc),
+                                vietvm::runtime::runtimeConstantReferenceFacts(false));
+                        }
+                        try {
+                            stack.push_back(make_float_value(std::stod(stringPool[index])));
+                        } catch (...) {
+                            throw runtime_error_op(vietvm::messages::formatMessage(
+                                vietvm::messages::kVmCannotConvertToFloat,
+                                {stringPool[index]}), OP_BIEN_SO_FLOAT,
+                                static_cast<int>(pc),
+                                vietvm::runtime::runtimeConversionFacts(
+                                    stringPool[index], "số thực", false));
+                        }
+                    });
+                    break;
+                }
+                case OP_KHOI_TAO: {
+                    const int id = instr.operandIndex;
+                    program.emplace_back([this, id]() {
+                        if (!callStack.empty()) {
+                            CallFrame &frame = callStack.back();
+                            if (frame.localsIndexed) {
+                                if (id >= 0 && id >= static_cast<int>(frame.localsVec.size())) {
+                                    frame.localsVec.resize(id + 1, make_int_value(0));
+                                } else if (id >= 0) {
+                                    frame.localsVec[id] = make_int_value(0);
+                                }
+                            } else {
+                                frame.localsMap[id] = make_int_value(0);
+                            }
+                        } else if (variables.count(id) == 0) {
+                            variables[id] = make_int_value(0);
+                        }
+                    });
+                    break;
+                }
+                case OP_TEN_BIEN_GIA_TRI: {
+                    const int id = instr.operandIndex;
+                    program.emplace_back([this, id]() {
+                        if (!callStack.empty()) {
+                            CallFrame &frame = callStack.back();
+                            const auto captured = frame.capturedCells.find(id);
+                            if (captured != frame.capturedCells.end() && captured->second != nullptr) {
+                                stack.push_back(captured->second->value);
+                                return;
+                            }
+                            if (frame.localsIndexed) {
+                                if (id >= 0 && id < static_cast<int>(frame.localsVec.size())) {
+                                    stack.push_back(frame.localsVec[id]);
+                                    return;
+                                }
+                            } else {
+                                const auto found = frame.localsMap.find(id);
+                                if (found != frame.localsMap.end()) {
+                                    stack.push_back(found->second);
+                                    return;
+                                }
+                            }
+                        }
+                        const auto found = variables.find(id);
+                        if (found != variables.end()) {
+                            stack.push_back(found->second);
+                        } else {
+                            variables[id] = make_int_value(0);
+                            stack.push_back(variables[id]);
+                        }
+                    });
+                    break;
+                }
+                case OP_RONG_GIA_TRI:
+                    program.emplace_back([this]() { stack.push_back(make_null_value()); });
+                    break;
+                case OP_DUNG_GIA_TRI:
+                    program.emplace_back([this]() { stack.push_back(make_int_value(1)); });
+                    break;
+                case OP_SAI_GIA_TRI:
+                    program.emplace_back([this]() { stack.push_back(make_int_value(0)); });
+                    break;
+                case OP_CONG:
+                case OP_TRU:
+                case OP_NHAN:
+                case OP_CHIA:
+                case OP_Logic_VA:
+                case OP_Logic_HOAC:
+                case OP_SO_SANH_BANG:
+                case OP_KHAC_BANG:
+                case OP_LON_HON:
+                case OP_NHO_HON:
+                case OP_LON_HON_HOAC_BANG:
+                case OP_NHO_HON_HOAC_BANG: {
+                    const int op = instr.op;
+                    program.emplace_back([this, op]() {
+                        if (stack.size() < 2) throw runtime_error_op(
+                            vietvm::messages::formatMessage(vietvm::messages::kVmNotEnoughOperands),
+                            op, static_cast<int>(pc));
+                        StackValue b = std::move(stack.back()); stack.pop_back();
+                        StackValue a = std::move(stack.back()); stack.pop_back();
+                        stack.push_back(evaluateBinaryOperator(op, a, b, static_cast<int>(pc)));
+                    });
+                    break;
+                }
+                case OP_MODULO:
+                    program.emplace_back([this]() {
+                        if (stack.size() < 2) throw runtime_error_op(
+                            vietvm::messages::formatMessage(vietvm::messages::kVmMissingModuloOperands),
+                            OP_MODULO, static_cast<int>(pc));
+                        StackValue b = std::move(stack.back()); stack.pop_back();
+                        StackValue a = std::move(stack.back()); stack.pop_back();
+                        stack.push_back(evaluateModuloOperator(
+                            a, b, OP_MODULO, static_cast<int>(pc)));
+                    });
+                    break;
+                case OP_KHONG:
+                    program.emplace_back([this]() {
+                        if (stack.empty()) throw runtime_error_op(
+                            vietvm::messages::formatMessage(vietvm::messages::kVmMissingNotOperands),
+                            OP_KHONG, static_cast<int>(pc));
+                        StackValue value = std::move(stack.back()); stack.pop_back();
+                        stack.push_back(as_int(value, OP_KHONG, pc) == 0 ? 1 : 0);
+                    });
+                    break;
+                case OP_PHU_DINH:
+                    program.emplace_back([this]() {
+                        if (stack.empty()) throw runtime_error_op(
+                            vietvm::messages::formatMessage(vietvm::messages::kVmMissingNegationOperand),
+                            OP_PHU_DINH, static_cast<int>(pc));
+                        StackValue value = std::move(stack.back()); stack.pop_back();
+                        stack.push_back(toBool(value) ? 0 : 1);
+                    });
+                    break;
+                case OP_IN:
+                    program.emplace_back([this, instr]() { executeOutputOpcode(instr); });
+                    break;
+                case OP_HAM:
+                case OP_NEU:
+                case OP_DIEU_KIEN:
+                case OP_LAP:
+                case OP_CAP_NHAT:
+                case OP_DONG_LENH:
+                case OP_MO_NGOAC:
+                case OP_DONG_NGOAC:
+                    program.emplace_back([]() {});
+                    break;
+                default:
+                    // Dispatcher chịu trách nhiệm đầy đủ cho control flow,
+                    // collection, object model, intrinsic và lỗi ngôn ngữ.
+                    program.emplace_back();
+                    break;
+            }
         }
+    };
+
+    compile(bytecode);
+    for (const auto &entry : hamBytecodeMap) compile(entry.second);
+
+    jitActive_ = true;
+    try {
+        runInterpreterLoop();
+    } catch (...) {
+        jitActive_ = false;
+        jitPrograms_.clear();
+        throw;
     }
-
-    using JitFn = std::function<void()>;
-    std::vector<JitFn> program;
-    program.reserve(bytecode.size());
-
-    for (const auto &instr : bytecode) {
-        switch (instr.op) {
-            case OP_BIEN_SO: {
-                int v = instr.operand;
-                program.push_back([this, v]() { stack.emplace_back(v); });
-                break;
-            }
-            case OP_BIEN_SO_FLOAT: {
-                int idx = instr.operandIndex;
-                program.push_back([this, idx]() {
-                    if (idx < 0 || idx >= (int)stringPool.size())
-                        throw runtime_error_op(vietvm::messages::formatMessage(
-                            vietvm::messages::kVmInvalidFloatIndex), OP_BIEN_SO_FLOAT, (int)pc);
-                    stack.push_back(make_float_value(std::stod(stringPool[idx])));
-                });
-                break;
-            }
-            case OP_CHUOI: {
-                int idx = instr.operandIndex;
-                program.push_back([this, idx]() {
-                    if (idx < 0 || idx >= (int)stringPool.size())
-                        throw runtime_error_op(vietvm::messages::formatMessage(
-                            vietvm::messages::kVmInvalidStringIndex), OP_CHUOI, (int)pc);
-                    stack.push_back(stringPool[idx]);
-                });
-                break;
-            }
-            case OP_RONG_GIA_TRI:
-                program.push_back([this]() { stack.push_back(make_null_value()); });
-                break;
-
-            case OP_CONG:
-            case OP_TRU:
-            case OP_NHAN:
-            case OP_CHIA:
-            case OP_Logic_VA:
-            case OP_Logic_HOAC:
-            case OP_SO_SANH_BANG:
-            case OP_KHAC_BANG:
-            case OP_LON_HON:
-            case OP_NHO_HON:
-            case OP_LON_HON_HOAC_BANG:
-            case OP_NHO_HON_HOAC_BANG: {
-                const int op = instr.op;
-                program.push_back([this, op]() {
-                    if (stack.size() < 2) throw runtime_error_op(vietvm::messages::formatMessage(
-                        vietvm::messages::kVmNotEnoughOperands), op, (int)pc);
-                    StackValue b = stack.back(); stack.pop_back();
-                    StackValue a = stack.back(); stack.pop_back();
-                    stack.push_back(evaluateBinaryOperator(op, a, b, static_cast<int>(pc)));
-                });
-                break;
-            }
-
-            case OP_MODULO:
-                program.push_back([this]() {
-                    if (stack.size() < 2) throw runtime_error_op(vietvm::messages::formatMessage(
-                        vietvm::messages::kVmMissingModuloOperands), OP_MODULO, (int)pc);
-                    StackValue b = stack.back(); stack.pop_back();
-                    StackValue a = stack.back(); stack.pop_back();
-                    stack.push_back(evaluateModuloOperator(
-                        a, b, OP_MODULO, static_cast<int>(pc)));
-                });
-                break;
-
-            case OP_PHU_DINH:
-                program.push_back([this]() {
-                    if (stack.empty()) throw runtime_error_op(vietvm::messages::formatMessage(
-                        vietvm::messages::kVmMissingNegationOperand), OP_PHU_DINH, (int)pc);
-                    StackValue operand = stack.back(); stack.pop_back();
-                    stack.push_back(toBool(operand) ? 0 : 1);
-                });
-                break;
-
-            case OP_IN:
-                program.push_back([this, instr]() { executeOutputOpcode(instr); });
-                break;
-
-            case OP_DONG_LENH:
-            case OP_MO_NGOAC:
-            case OP_DONG_NGOAC:
-                program.push_back([]() {});
-                break;
-
-            case OP_DUNG_CHUONG_TRINH:
-                program.push_back([this]() { pc = bytecode.size(); });
-                break;
-
-            default:
-                return false;
-        }
-    }
-
-    pc = 0;
-    while (pc < program.size()) {
-        program[pc]();
-        ++pc;
-    }
-    return true;
+    jitActive_ = false;
+    jitPrograms_.clear();
 }
 
 // Suy ra biên arity từ bytecode parameter binding. `operandValue` của OP_PARAM/
@@ -948,15 +1242,23 @@ void VM::invokeFunction(int argc,
     if (directVmFunction == hamBytecodeMap.end()) {
         StackValue nativeResult = make_int_value(0);
         std::string nativeErr;
-        NativeFailureDisposition nativeFailureDisposition =
-            NativeFailureDisposition::RuntimeError;
-        if (executeNativeStdlibFunction(hamIdOrName, args, stringPool,
-                                        functionTableByNameIndex, hamBytecodeMap,
-                                        nativeResult, nativeErr,
-                                        nativeFailureDisposition, outputSink)) {
+        bool runtimeFailure = false;
+        const auto *legacy = resolveLegacyIntrinsic(
+            hamIdOrName, stringPool, functionTableByNameIndex, hamBytecodeMap);
+        if (legacy != nullptr) {
+            if (requireNativeArgumentCount(args, std::string(legacy->name),
+                                           static_cast<int>(legacy->arity), nativeErr)) {
+                // Old name-based calls now have exactly the same backend as
+                // the IR-generated OP_VM_* instructions.
+                if (!dispatchRegisteredIntrinsic(
+                        *legacy, args, nativeResult, nativeErr, runtimeFailure)) {
+                    throw runtime_error_op(
+                        vietvm::messages::formatMessage(
+                            vietvm::messages::kVmUnknownOpcode), op, curPc);
+                }
+            }
             if (!nativeErr.empty()) {
-                if (nativeFailureDisposition ==
-                    NativeFailureDisposition::CatchableLanguageError) {
+                if (!runtimeFailure) {
                     throw vietvm::runtime::LanguageException(
                         make_string_value(nativeErr));
                 }
@@ -964,13 +1266,6 @@ void VM::invokeFunction(int argc,
                     hamIdOrName, stringPool, functionTableByNameIndex);
                 vietvm::runtime::RuntimeDiagnosticContext context;
                 std::string diagnosticName = nativeName;
-                if (vietvm::constants::matchesAnyName(
-                        nativeName, vietvm::constants::kFnIoReadFile)) {
-                    diagnosticName = "đọc tệp";
-                } else if (vietvm::constants::matchesAnyName(
-                               nativeName, vietvm::constants::kFnIoWriteFile)) {
-                    diagnosticName = "ghi tệp";
-                }
                 context = vietvm::runtime::runtimeNativeFacts(
                     diagnosticName, nativeErr, false);
                 throw runtime_error_op(nativeErr, op, curPc, std::move(context));
@@ -1210,6 +1505,418 @@ void VM::executeCallOpcode(const Instruction& instr) {
     invokeFunction(instr.operand, hamIdOrName, instr.op, static_cast<int>(pc));
 }
 
+void VM::shutdownThreadRuntime() noexcept {
+    if (threadRuntime_ == nullptr) return;
+
+    std::vector<std::shared_ptr<WorkerTask>> tasks;
+    {
+        std::lock_guard<std::mutex> registryLock(threadRuntime_->registryMutex);
+        threadRuntime_->stopping.store(true, std::memory_order_release);
+        tasks.reserve(threadRuntime_->tasks.size());
+        for (const auto &entry : threadRuntime_->tasks) tasks.push_back(entry.second);
+    }
+
+    for (const auto &task : tasks) {
+        if (task == nullptr) continue;
+        task->cancelRequested.store(true, std::memory_order_release);
+        task->cv.notify_all();
+    }
+
+    for (const auto &task : tasks) {
+        if (task == nullptr) continue;
+        bool shouldJoin = false;
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            if (!task->joinClaimed && task->worker.joinable()) {
+                task->joinClaimed = true;
+                shouldJoin = true;
+            }
+        }
+        if (!shouldJoin) continue;
+        try {
+            if (task->worker.get_id() == std::this_thread::get_id()) {
+                task->worker.detach();
+            } else {
+                task->worker.join();
+            }
+        } catch (...) {
+            // Destructors must not throw. The task still owns its completion
+            // state, and process teardown will release the remaining handles.
+        }
+    }
+
+    std::lock_guard<std::mutex> registryLock(threadRuntime_->registryMutex);
+    threadRuntime_->tasks.clear();
+}
+
+StackValue VM::runWorkerCallable(const StackValue &callable,
+                                 const std::vector<StackValue> &args) {
+    vietvm::runtime::RuntimeHeapScope heapScope(*runtimeHeap);
+    ensureBytecodeVerified();
+
+    for (const auto &entry : variables) runtimeHeap->trackValue(entry.second);
+    for (const auto &entry : classTable) {
+        runtimeHeap->trackValue(make_class_value(entry.second));
+    }
+    runtimeHeap->trackValue(callable);
+    for (const StackValue &arg : args) runtimeHeap->trackValue(arg);
+
+    stack = args;
+    if (std::holds_alternative<ClosureHandle>(callable)) {
+        const ClosureHandle &closure = std::get<ClosureHandle>(callable);
+        if (closure == nullptr || closure->functionId < 0) {
+            throw std::runtime_error("thread_vm_spawn: closure không hợp lệ");
+        }
+        invokeFunction(static_cast<int>(args.size()), closure->functionId,
+                       OP_GOI_GIAN_TIEP, 0, nullptr, nullptr, closure);
+    } else {
+        int functionIdOrName = -1;
+        if (std::holds_alternative<int>(callable)) {
+            functionIdOrName = std::get<int>(callable);
+        } else if (std::holds_alternative<std::string>(callable)) {
+            const std::string &name = std::get<std::string>(callable);
+            const auto found = std::find(stringPool.begin(), stringPool.end(), name);
+            if (found == stringPool.end()) {
+                throw std::runtime_error("thread_vm_spawn: không tìm thấy hàm " + name);
+            }
+            functionIdOrName =
+                -static_cast<int>(std::distance(stringPool.begin(), found)) - 1;
+        } else {
+            throw std::runtime_error(
+                "thread_vm_spawn: công việc phải là hàm hoặc closure");
+        }
+        invokeFunction(static_cast<int>(args.size()), functionIdOrName,
+                       OP_GOI, 0);
+    }
+
+    if (!executionStack.empty()) {
+        if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit) ||
+            vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
+            runJitCompiled();
+        } else {
+            runInterpreterLoop();
+        }
+    }
+    if (stack.empty()) return make_null_value();
+    return stack.back();
+}
+
+bool VM::executeThreadIntrinsic(
+    const vietvm::bytecode::IntrinsicDescriptor &intrinsic,
+    const std::vector<StackValue> &args,
+    StackValue &result,
+    std::string &err) {
+    const std::string_view fn = intrinsic.name;
+    if (intrinsic.opcode != OP_VM_THREAD_SPAWN && intrinsic.opcode != OP_VM_THREAD_WAIT &&
+        intrinsic.opcode != OP_VM_THREAD_CANCEL && intrinsic.opcode != OP_VM_THREAD_STATUS &&
+        intrinsic.opcode != OP_VM_THREAD_PARK) {
+        return false;
+    }
+
+    if (threadRuntime_ == nullptr) {
+        err = std::string(fn) + ": runtime luồng chưa được khởi tạo";
+        return true;
+    }
+
+    if (intrinsic.opcode == OP_VM_THREAD_PARK) {
+        if (args.size() != 1 || !std::holds_alternative<int>(args[0])) {
+            err = std::string(fn) + ": thời gian chờ phải là số nguyên";
+            return true;
+        }
+        const int delayMs = std::get<int>(args[0]);
+        if (delayMs < 0 || delayMs > 86400000) {
+            err = std::string(fn) + ": thời gian chờ phải trong 0..86400000 ms";
+            return true;
+        }
+        if (currentWorkerTask_ == nullptr) {
+            err = std::string(fn) + ": chỉ được dùng bên trong worker V++";
+            return true;
+        }
+
+        std::unique_lock<std::mutex> lock(currentWorkerTask_->mutex);
+        if (currentWorkerTask_->cancelRequested.load(std::memory_order_acquire)) {
+            throw VmWorkerCancelled{};
+        }
+        const bool cancelled = currentWorkerTask_->cv.wait_for(
+            lock, std::chrono::milliseconds(delayMs), [&]() {
+                return currentWorkerTask_->cancelRequested.load(std::memory_order_acquire);
+            });
+        if (cancelled) throw VmWorkerCancelled{};
+        result = make_null_value();
+        return true;
+    }
+
+    if (intrinsic.opcode == OP_VM_THREAD_SPAWN) {
+        if (args.size() != 2) {
+            err = vietvm::helpers::nativeArgumentCountError(std::string(fn), 2);
+            return true;
+        }
+        if (!std::holds_alternative<ListHandle>(args[1]) ||
+            std::get<ListHandle>(args[1]) == nullptr) {
+            err = std::string(fn) + ": đối số phải là danh sách";
+            return true;
+        }
+
+        ThreadValueCloner snapshotCloner;
+        StackValue callableSnapshot = snapshotCloner.clone(args[0]);
+        std::vector<StackValue> argumentSnapshot;
+        const ListHandle &argumentList = std::get<ListHandle>(args[1]);
+        argumentSnapshot.reserve(argumentList->elements.size());
+        for (const StackValue &value : argumentList->elements) {
+            argumentSnapshot.push_back(snapshotCloner.clone(value));
+        }
+
+        std::unordered_map<int, StackValue> variableSnapshot;
+        variableSnapshot.reserve(variables.size());
+        for (const auto &[slot, value] : variables) {
+            variableSnapshot.emplace(slot, snapshotCloner.clone(value));
+        }
+        std::unordered_map<std::string, ClassHandle> classSnapshot;
+        classSnapshot.reserve(classTable.size());
+        for (const auto &[name, klass] : classTable) {
+            classSnapshot.emplace(name, snapshotCloner.cloneClassHandle(klass));
+        }
+
+        auto task = std::make_shared<WorkerTask>();
+        auto state = threadRuntime_;
+        auto poolSnapshot = stringPool;
+        auto functionSnapshot = hamBytecodeMap;
+        auto functionNamesSnapshot = functionTableByNameIndex;
+        auto functionDebugSnapshot = functionDebugInfo;
+        const std::size_t maxDepthSnapshot = maxCallDepth;
+        OutputSink sinkSnapshot = outputSink;
+
+        int id = 0;
+        {
+            std::lock_guard<std::mutex> registryLock(threadRuntime_->registryMutex);
+            if (threadRuntime_->stopping.load(std::memory_order_acquire)) {
+                err = std::string(fn) + ": runtime luồng đang dừng";
+                return true;
+            }
+            id = threadRuntime_->nextId.fetch_add(1, std::memory_order_relaxed);
+            if (id <= 0) {
+                err = std::string(fn) + ": đã hết mã luồng";
+                return true;
+            }
+            try {
+                task->worker = std::thread(
+                [task, state,
+                 callable = std::move(callableSnapshot),
+                 callArgs = std::move(argumentSnapshot),
+                 pool = std::move(poolSnapshot),
+                 functions = std::move(functionSnapshot),
+                 functionNames = std::move(functionNamesSnapshot),
+                 functionDebug = std::move(functionDebugSnapshot),
+                 workerVariables = std::move(variableSnapshot),
+                 workerClasses = std::move(classSnapshot),
+                 maxDepthSnapshot, sink = std::move(sinkSnapshot)]() mutable {
+                    try {
+                        VM worker({}, pool);
+                        worker.threadRuntime_ = state;
+                        worker.threadRuntimeOwner_ = false;
+                        worker.cancellationRequested_ = &task->cancelRequested;
+                        worker.currentWorkerTask_ = task.get();
+                        worker.outputSink = std::move(sink);
+                        worker.variables = std::move(workerVariables);
+                        worker.classTable = std::move(workerClasses);
+                        worker.functionDebugInfo = std::move(functionDebug);
+                        worker.maxCallDepth = maxDepthSnapshot;
+                        worker.setFunctions(std::move(functions), std::move(functionNames));
+
+                        StackValue workerResult = worker.runWorkerCallable(callable, callArgs);
+                        ThreadValueCloner resultCloner;
+                        StackValue transportResult = resultCloner.clone(workerResult);
+                        {
+                            std::lock_guard<std::mutex> lock(task->mutex);
+                            task->result = std::move(transportResult);
+                            task->status = WorkerStatus::Done;
+                        }
+                    } catch (const VmWorkerCancelled &) {
+                        std::lock_guard<std::mutex> lock(task->mutex);
+                        task->status = WorkerStatus::Cancelled;
+                    } catch (const vietvm::runtime::LanguageException &failure) {
+                        std::lock_guard<std::mutex> lock(task->mutex);
+                        task->error = languageExceptionText(failure);
+                        task->status = WorkerStatus::Failed;
+                    } catch (const std::exception &failure) {
+                        std::lock_guard<std::mutex> lock(task->mutex);
+                        task->error = failure.what();
+                        task->status = WorkerStatus::Failed;
+                    } catch (...) {
+                        std::lock_guard<std::mutex> lock(task->mutex);
+                        task->error = "lỗi worker không xác định";
+                        task->status = WorkerStatus::Failed;
+                    }
+                    task->cv.notify_all();
+                });
+            } catch (const std::system_error &failure) {
+                err = std::string(fn) + ": không tạo được OS thread: " + failure.what();
+                return true;
+            }
+            threadRuntime_->tasks.emplace(id, task);
+        }
+        result = make_int_value(id);
+        return true;
+    }
+
+    if (args.empty() || !std::holds_alternative<int>(args[0])) {
+        err = std::string(fn) + ": mã luồng phải là số nguyên";
+        return true;
+    }
+    const int id = std::get<int>(args[0]);
+    if (id <= 0) {
+        err = std::string(fn) + ": mã luồng phải dương";
+        return true;
+    }
+
+    std::shared_ptr<WorkerTask> task;
+    {
+        std::lock_guard<std::mutex> lock(threadRuntime_->registryMutex);
+        const auto found = threadRuntime_->tasks.find(id);
+        if (found == threadRuntime_->tasks.end()) {
+            err = std::string(fn) + ": không tìm thấy luồng";
+            return true;
+        }
+        task = found->second;
+    }
+
+    if (intrinsic.opcode == OP_VM_THREAD_CANCEL) {
+        if (args.size() != 1) {
+            err = vietvm::helpers::nativeArgumentCountError(std::string(fn), 1);
+            return true;
+        }
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            if (task->status != WorkerStatus::Running) {
+                result = make_int_value(0);
+                return true;
+            }
+            task->cancelRequested.store(true, std::memory_order_release);
+        }
+        task->cv.notify_all();
+        result = make_int_value(1);
+        return true;
+    }
+
+    if (intrinsic.opcode == OP_VM_THREAD_STATUS) {
+        if (args.size() != 1) {
+            err = vietvm::helpers::nativeArgumentCountError(std::string(fn), 1);
+            return true;
+        }
+        std::lock_guard<std::mutex> lock(task->mutex);
+        result = make_int_value(static_cast<int>(task->status));
+        return true;
+    }
+
+    if (args.size() != 2 || !std::holds_alternative<int>(args[1])) {
+        err = std::string(fn) + ": thời gian chờ phải là số nguyên";
+        return true;
+    }
+    const int timeoutMs = std::get<int>(args[1]);
+    if (timeoutMs < -1) {
+        err = std::string(fn) + ": thời gian chờ phải là -1 hoặc không âm";
+        return true;
+    }
+
+    WorkerStatus status = WorkerStatus::Running;
+    StackValue transportResult = make_null_value();
+    std::string workerError;
+    bool shouldJoin = false;
+    {
+        std::unique_lock<std::mutex> lock(task->mutex);
+        const auto completed = [&]() { return task->status != WorkerStatus::Running; };
+        if (timeoutMs < 0) {
+            task->cv.wait(lock, completed);
+        } else if (timeoutMs > 0) {
+            (void)task->cv.wait_for(lock, std::chrono::milliseconds(timeoutMs), completed);
+        }
+        status = task->status;
+        transportResult = task->result;
+        workerError = task->error;
+        if (status != WorkerStatus::Running && !task->joinClaimed &&
+            task->worker.joinable()) {
+            task->joinClaimed = true;
+            shouldJoin = true;
+        }
+    }
+
+    if (shouldJoin) task->worker.join();
+
+    StackValue copiedResult = make_null_value();
+    if (status == WorkerStatus::Done) {
+        ThreadValueCloner resultCloner;
+        copiedResult = resultCloner.clone(transportResult);
+        runtimeHeap->trackValue(copiedResult);
+    }
+    result = make_list_value({
+        make_int_value(static_cast<int>(status)),
+        std::move(copiedResult),
+        make_string_value(std::move(workerError)),
+    });
+    return true;
+}
+
+bool VM::dispatchRegisteredIntrinsic(
+    const vietvm::bytecode::IntrinsicDescriptor &intrinsic,
+    const std::vector<StackValue> &args,
+    StackValue &result,
+    std::string &err,
+    bool &runtimeFailure) {
+    NativeFailureDisposition failureDisposition =
+        NativeFailureDisposition::CatchableLanguageError;
+    const bool handledThread = executeThreadIntrinsic(intrinsic, args, result, err);
+    const bool handled = handledThread ||
+        executeVmPrimitive(intrinsic.opcode, args, result, err, failureDisposition);
+    runtimeFailure = failureDisposition == NativeFailureDisposition::RuntimeError;
+    return handled;
+}
+
+void VM::executeIntrinsicOpcode(const Instruction &instr) {
+    const auto *intrinsic = vietvm::bytecode::intrinsicByOpcode(instr.op);
+    if (intrinsic == nullptr) {
+        throw runtime_error_op(vietvm::messages::formatMessage(
+            vietvm::messages::kVmUnknownOpcode), instr.op, pc);
+    }
+    if (stack.size() < intrinsic->arity) {
+        throw runtime_error_op(
+            vietvm::messages::formatMessage(vietvm::messages::kVmNotEnoughOperands),
+            instr.op, pc,
+            vietvm::runtime::runtimeStackFacts(
+                static_cast<int>(stack.size()), static_cast<int>(intrinsic->arity)));
+    }
+
+    std::vector<StackValue> args;
+    args.reserve(intrinsic->arity);
+    for (std::size_t index = 0; index < intrinsic->arity; ++index) {
+        args.push_back(stack.back());
+        stack.pop_back();
+    }
+    std::reverse(args.begin(), args.end());
+
+    StackValue result = make_null_value();
+    std::string err;
+    bool runtimeFailure = false;
+    if (!dispatchRegisteredIntrinsic(*intrinsic, args, result, err, runtimeFailure)) {
+        throw runtime_error_op(vietvm::messages::formatMessage(
+            vietvm::messages::kVmUnknownOpcode), instr.op, pc);
+    }
+    if (!err.empty()) {
+        if (runtimeFailure) {
+            std::string diagnosticName(intrinsic->name);
+            if (intrinsic->name == "io_doc_file_vm") diagnosticName = "đọc tệp";
+            else if (intrinsic->name == "io_ghi_file_vm") diagnosticName = "ghi tệp";
+            else if (intrinsic->name == "io_doc_bytes_vm") diagnosticName = "đọc bytes tệp";
+            else if (intrinsic->name == "io_ghi_bytes_vm") diagnosticName = "ghi bytes tệp";
+            else if (intrinsic->name == "io_ghi_tiep_file_vm") diagnosticName = "ghi tiếp tệp";
+            throw runtime_error_op(
+                err, instr.op, pc,
+                vietvm::runtime::runtimeNativeFacts(diagnosticName, err, false));
+        }
+        throw vietvm::runtime::LanguageException(make_string_value(err));
+    }
+    stack.push_back(std::move(result));
+}
+
 // Xử lý opcode tạo hoặc biến đổi giá trị trên stack, bao gồm literal và các phép toán số/chuỗi.
 void VM::executeValueOpcode(const Instruction& instr) {
     switch (instr.op) {
@@ -1396,8 +2103,8 @@ void VM::executeValueOpcode(const Instruction& instr) {
     }
 }
 
-// Xử lý truy cập theo chỉ số cho list/tuple/string; hàm ghi lại chỉ số, kích
-// thước và kiểu dữ liệu thực tế để bộ chẩn đoán tự nhận diện nguyên nhân khi lỗi.
+// Xử lý truy cập theo chỉ số cho list/tuple/map/string; map dùng khóa chuỗi theo
+// cùng quy tắc chuyển khóa của các primitive collection hiện có.
 void VM::executeIndexOpcode(const Instruction& instr) {
     if (instr.op == OP_DOC_CHI_SO) {
         if (stack.size() < 2) {
@@ -1407,6 +2114,19 @@ void VM::executeIndexOpcode(const Instruction& instr) {
         }
         StackValue indexValue = stack.back(); stack.pop_back();
         StackValue container = stack.back(); stack.pop_back();
+        if (std::holds_alternative<MapHandle>(container)) {
+            const MapHandle &map = std::get<MapHandle>(container);
+            if (map == nullptr) {
+                stack.push_back(make_null_value());
+                return;
+            }
+            const std::string key = vietvm::helpers::argToRawString(indexValue);
+            const auto found = map->entries.find(key);
+            stack.push_back(found == map->entries.end()
+                                ? make_null_value()
+                                : found->second);
+            return;
+        }
         if (!std::holds_alternative<int>(indexValue)) {
             throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmIndexMustBeInteger), instr.op, pc,
@@ -1481,6 +2201,17 @@ void VM::executeIndexOpcode(const Instruction& instr) {
     StackValue value = stack.back(); stack.pop_back();
     StackValue indexValue = stack.back(); stack.pop_back();
     StackValue container = stack.back(); stack.pop_back();
+    if (std::holds_alternative<MapHandle>(container)) {
+        const MapHandle &map = std::get<MapHandle>(container);
+        if (map == nullptr) {
+            throw runtime_error_op(vietvm::messages::formatMessage(
+                vietvm::messages::kVmIndexNeedsListOrString), instr.op, pc,
+                vietvm::runtime::runtimeIndexFacts(
+                    0, false, -1, false, runtime_value_type_name(container)));
+        }
+        map->entries[vietvm::helpers::argToRawString(indexValue)] = std::move(value);
+        return;
+    }
     if (!std::holds_alternative<int>(indexValue)) {
         throw runtime_error_op(vietvm::messages::formatMessage(
             vietvm::messages::kVmIndexMustBeInteger), instr.op, pc,
@@ -2258,13 +2989,6 @@ void VM::run() {
 
     initializeModules();
 
-    if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit)
-     || vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
-        if (runJitCompiledLinear()) {
-            return;
-        }
-    }
-
     if (functionTableByNameIndex.empty()) {
         for (const Instruction &candidate : bytecode) {
             if (candidate.op == OP_HAM && candidate.operand >= 0) {
@@ -2274,6 +2998,13 @@ void VM::run() {
         }
     }
 
+    if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit) ||
+        vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
+        runJitCompiled();
+        return;
+    }
+    jitFastInstructionCount_ = 0;
+    jitInterpreterInstructionCount_ = 0;
     runInterpreterLoop();
 }
 
@@ -2294,6 +3025,10 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
     int executedSinceGc = 0;
     while (true) {
+        if (cancellationRequested_ != nullptr &&
+            cancellationRequested_->load(std::memory_order_acquire)) {
+            throw VmWorkerCancelled{};
+        }
         if (stopExecutionDepth.has_value() &&
             executionStack.size() <= *stopExecutionDepth) {
             return;
@@ -2313,6 +3048,20 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
         const Instruction &instr = code[pc];
         try {
+            bool compiled = false;
+            if (jitActive_) {
+                const auto program = jitPrograms_.find(&code);
+                if (program != jitPrograms_.end() && pc < program->second.size()) {
+                    const JitOperation &operation = program->second[pc];
+                    if (operation) {
+                        operation();
+                        ++jitFastInstructionCount_;
+                        compiled = true;
+                    }
+                }
+                if (!compiled) ++jitInterpreterInstructionCount_;
+            }
+            if (!compiled) {
             switch (instr.op) {
             case OP_HAM:
             case OP_NEU:
@@ -2331,6 +3080,62 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                 if (executionStack.size() > executionDepth) continue;
                 break;
             }
+
+            case OP_VM_BIEN_DICH_PHAN_TICH:
+            case OP_VM_DNS_PHAN_GIAI:
+            case OP_VM_DOC_BIEN_MOI_TRUONG:
+            case OP_VM_DONG_HO_DIA_PHUONG:
+            case OP_VM_DONG_HO_UTC:
+            case OP_VM_DUONG_DAN_TON_TAI:
+            case OP_VM_IO_DOC_BYTES:
+            case OP_VM_IO_DOC_FILE:
+            case OP_VM_IO_GHI_BYTES:
+            case OP_VM_IO_GHI_FILE:
+            case OP_VM_IO_GHI_TIEP_FILE:
+            case OP_VM_KICH_BAN_CHAY:
+            case OP_VM_LA_TEP:
+            case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
+            case OP_VM_LA_THU_MUC:
+            case OP_VM_LIET_KE_THU_MUC:
+            case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
+            case OP_VM_NGU_MILI_GIAY:
+            case OP_VM_SO_THUC_BITS:
+            case OP_VM_SOCKET_CHAP_NHAN:
+            case OP_VM_SOCKET_DAT_TIMEOUT:
+            case OP_VM_SOCKET_DONG:
+            case OP_VM_SOCKET_GUI:
+            case OP_VM_SOCKET_NHAN:
+            case OP_VM_SOCKET_PHAN_GIAI:
+            case OP_VM_SOCKET_TCP_LANG_NGHE:
+            case OP_VM_SOCKET_TCP_MO:
+            case OP_VM_SOCKET_TLS_NANG_CAP:
+            case OP_VM_SOCKET_UDP_MO:
+            case OP_VM_TAO_THU_MUC:
+            case OP_VM_TEN_NEN_TANG:
+            case OP_VM_THOI_GIAN_DON_DIEU_MS:
+            case OP_VM_TIEN_TRINH_CHAY:
+            case OP_VM_XOA_DUONG_DAN:
+            case OP_VM_THREAD_SPAWN:
+            case OP_VM_THREAD_WAIT:
+            case OP_VM_THREAD_CANCEL:
+            case OP_VM_THREAD_STATUS:
+            case OP_VM_THREAD_PARK:
+            case OP_VM_TUPLE_FROM_LIST:
+            case OP_VM_TYPE_OF:
+            case OP_VM_IDENTITY_HASH:
+            case OP_VM_LENGTH:
+            case OP_VM_LIST_APPEND:
+            case OP_VM_LIST_REMOVE:
+            case OP_VM_MAP_HAS:
+            case OP_VM_MAP_REMOVE:
+            case OP_VM_MAP_KEYS:
+            case OP_VM_STRING_BYTES:
+            case OP_VM_STRING_FROM_BYTES:
+            case OP_VM_FLOAT_FROM_BITS:
+                if (switchStack.empty() || !switchStack.back().skippingCase) {
+                    executeIntrinsicOpcode(instr);
+                }
+                break;
 
             case OP_BIEN_SO:
             case OP_TEN_BIEN_ID:
@@ -2435,6 +3240,7 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                 }
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmUnknownOpcode), instr.op, pc);
+            }
             }
         } catch (const vietvm::runtime::LanguageException &thrown) {
             const std::string thrownText = sv_to_string(thrown.value());

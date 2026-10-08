@@ -1,4 +1,5 @@
 #include "vpp/compiler/ir.h"
+#include "vpp/bytecode/intrinsic.h"
 
 #include <algorithm>
 #include <array>
@@ -342,6 +343,13 @@ private:
                 }
                 if (result.text.empty() && hasNameKind(program_, source.callee)) {
                     result.text = program_.expressions[source.callee].text;
+                }
+                if (result.callTarget == CallTargetKind::Native) {
+                    if (const auto *primitive = bytecode::intrinsicByName(result.text)) {
+                        result.opcode = IrValueOpcode::Intrinsic;
+                        result.intrinsicOpcode = primitive->opcode;
+                        supported = supported && source.arguments.size() == primitive->arity;
+                    }
                 }
                 break;
 
@@ -733,6 +741,7 @@ const char *irValueOpcodeName(IrValueOpcode opcode) noexcept {
         case IrValueOpcode::Binary: return "binary";
         case IrValueOpcode::Call: return "call";
         case IrValueOpcode::CallDynamic: return "call_dynamic";
+        case IrValueOpcode::Intrinsic: return "intrinsic";
         case IrValueOpcode::Lambda: return "lambda";
     }
     return "unsupported_direct_region";

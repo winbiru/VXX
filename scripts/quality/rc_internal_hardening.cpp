@@ -4,9 +4,13 @@
 #include <vector>
 
 #include "common/storeString.h"
+#include "frontend/keywords.h"
+#include "vpp/bytecode/intrinsic.h"
+#include "vpp/bytecode/opcode.h"
 #include "vpp/bytecode/verifier.h"
 #include "vpp/compiler/codegen.h"
 #include "vpp/compiler/ir.h"
+#include "vpp/compiler/pipeline.h"
 
 namespace {
 
@@ -148,12 +152,102 @@ void testBytecodeVerifierRejectsMalformedMetadata() {
            "verifier từ chối closure tham chiếu function id không tồn tại");
 }
 
+void testPrimitivePipeline() {
+    using namespace vietvm::compiler;
+    using namespace vietvm::bytecode;
+    const std::unordered_set<int> retiredOpCodes{
+        OP_VM_KY_TU_UNICODE,
+        OP_VM_MA_DIEM_UNICODE,
+        OP_VM_SO_THUC_DAC_BIET,
+        OP_VM_TASK_CANCEL,
+        OP_VM_TASK_SCHEDULE,
+        OP_VM_TASK_STATUS,
+        OP_VM_TASK_WAIT,
+    };
+    // Each serialized VM opcode must have a descriptor or be explicitly retired.
+    // An unregistered opcode would bypass intrinsic lowering and arity checking.
+    for (int raw = OP_VM_BIEN_DICH_PHAN_TICH; raw <= OP_VM_FLOAT_FROM_BITS; ++raw) {
+        if (retiredOpCodes.count(raw)) {
+            expect(intrinsicByOpcode(raw) == nullptr && !isKnownOpcode(raw) &&
+                       verifyBytecode({{raw, 0, 0, 0}}).has_value(),
+                   "retired opcode is rejected: " + std::to_string(raw));
+        } else {
+            expect(intrinsicByOpcode(raw) != nullptr && isKnownOpcode(raw),
+                   "VM opcode has intrinsic descriptor: " + std::to_string(raw));
+        }
+    }
+    for (const auto *retired : {"ky_tu_unicode_vm", "ma_diem_unicode_vm",
+                                "so_thuc_dac_biet_vm", "task_vm_schedule",
+                                "task_vm_wait", "task_vm_cancel", "task_vm_status"}) {
+        expect(intrinsicByName(retired) == nullptr,
+               std::string("retired native name not callable: ") + retired);
+    }
+    std::unordered_set<int> opcodes;
+    for (const auto &primitive : kVmIntrinsics) {
+        const std::string name(primitive.name);
+        expect(opcodes.insert(primitive.opcode).second, name + ": opcode duy nhất");
+        expect(isKnownOpcode(primitive.opcode) &&
+                   opcodeName(primitive.opcode).find("OP_VM_") == 0,
+               name + ": opcode được đăng ký");
+        expect(verifyBytecode({{primitive.opcode, 1, 0, 0}}).has_value(),
+               name + ": verifier từ chối immediate không hợp lệ");
+        std::string arguments;
+        for (std::size_t i = 0; i < primitive.arity; ++i) {
+            if (i != 0) arguments += ", ";
+            arguments += "rỗng";
+        }
+        for (const std::string prefix : {"in ", "gọi "}) {
+            CompilationContext context;
+            auto artifacts = compilePipeline(context, prefix + name + "(" + arguments + ");",
+                                             keywordMap, false);
+            bool found = false;
+            for (auto &value : artifacts.ir.values) {
+                if (value.opcode != IrValueOpcode::Intrinsic) continue;
+                found = value.intrinsicOpcode == primitive.opcode &&
+                        value.operands.size() == primitive.arity + 1;
+                // Mutating a validated IR must not silently emit a different primitive.
+                const int saved = value.intrinsicOpcode;
+                value.intrinsicOpcode = -1;
+                expect(!analyzeDirectIrSupport(artifacts.ir).supported,
+                       name + ": từ chối opcode IR hỏng");
+                value.intrinsicOpcode = saved;
+            }
+            expect(found, name + ": parser/semantic hạ thành IR intrinsic");
+            std::size_t emitted = 0;
+            for (const auto &instruction : artifacts.bytecode) {
+                emitted += instruction.op == primitive.opcode;
+                expect(instruction.op != OP_GOI && instruction.op != OP_GOI_GIAN_TIEP,
+                       name + ": không dispatch lời gọi theo tên");
+            }
+            expect(emitted == 1, name + ": phát đúng một primitive");
+        }
+        bool arityRejected = false;
+        try {
+            CompilationContext context;
+            (void)compilePipeline(context, "in " + name + "(" + arguments +
+                (arguments.empty() ? "rỗng" : ", rỗng") + ");", keywordMap, false);
+        } catch (const std::exception &) {
+            arityRejected = true;
+        }
+        expect(arityRejected, name + ": sai arity bị từ chối trước runtime");
+    }
+
+    CompilationContext context;
+    const auto shadowed = compilePipeline(context,
+        "hàm do_dai(x) { trả về 42; }; in do_dai([]);", keywordMap, false);
+    for (const auto &value : shadowed.ir.values) {
+        expect(value.opcode != IrValueOpcode::Intrinsic,
+               "hàm thư viện/người dùng được ưu tiên hơn alias primitive không reserved");
+    }
+}
+
 } // namespace
 
 int main() {
     testMalformedAstReferencesBecomeUnsupportedIr();
     testInvalidIrIsRejectedBeforeEmission();
     testBytecodeVerifierRejectsMalformedMetadata();
+    testPrimitivePipeline();
 
     if (failures != 0) {
         std::cerr << failures << " RC internal hardening check(s) failed\n";

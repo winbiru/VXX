@@ -1,4 +1,5 @@
 #include "common/vm_native_collection_helpers.h"
+#include "vpp/bytecode/intrinsic.h"
 
 #include <cmath>
 #include <cstddef>
@@ -15,12 +16,16 @@
 
 namespace vietvm::helpers {
 
-// Dispatch các hàm native thao tác list/map/tập hợp theo tên; handler kiểm tra đối số, thực hiện phép toán collection và đẩy kết quả trở lại stack.
-bool handleNativeCollectionFunction(const std::string &fn,
+// Dispatch các primitive list/map theo opcode đã đăng ký; handler kiểm tra đối số và cập nhật giá trị VM.
+bool handleNativeCollectionFunction(Opcode opcode,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,
                                     std::string &err) {
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnLength)) {
+    const auto *primitive = vietvm::bytecode::intrinsicByOpcode(opcode);
+    if (primitive == nullptr) return false;
+    const std::string fn(primitive->name);
+
+    if (opcode == OP_VM_LENGTH) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         if (std::holds_alternative<std::string>(args[0])) {
             result = make_int_value(static_cast<int>(vietvm::core::utf8CodePointCount(
@@ -41,7 +46,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListAppend)) {
+    if (opcode == OP_VM_LIST_APPEND) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         ListHandle list;
         if (!getFirstListArgument(args, fn, list, err)) return true;
@@ -50,7 +55,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnListRemoveAt)) {
+    if (opcode == OP_VM_LIST_REMOVE) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         ListHandle list;
         int index = 0;
@@ -65,41 +70,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnToTuple)) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (std::holds_alternative<ListHandle>(args[0])) {
-            const ListHandle &list = std::get<ListHandle>(args[0]);
-            result = make_tuple_value(list == nullptr ? std::vector<StackValue>{} : list->elements);
-            return true;
-        }
-        if (std::holds_alternative<TupleHandle>(args[0])) {
-            result = args[0];
-            return true;
-        }
-        err = messages::messageText(messages::kNativeToTupleTypeInvalid);
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnMapGet)) {
-        if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-        MapHandle map;
-        if (!getFirstMapArgument(args, fn, map, err)) return true;
-        const std::string key = argToRawString(args[1]);
-        const auto found = map->entries.find(key);
-        result = found == map->entries.end() ? args[2] : found->second;
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnMapSet)) {
-        if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-        MapHandle map;
-        if (!getFirstMapArgument(args, fn, map, err)) return true;
-        map->entries[argToRawString(args[1])] = args[2];
-        result = make_null_value();
-        return true;
-    }
-
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnMapHasKey)) {
+    if (opcode == OP_VM_MAP_HAS) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         MapHandle map;
         if (!getFirstMapArgument(args, fn, map, err)) return true;
@@ -107,7 +78,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnMapRemove)) {
+    if (opcode == OP_VM_MAP_REMOVE) {
         if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
         MapHandle map;
         if (!getFirstMapArgument(args, fn, map, err)) return true;
@@ -122,7 +93,7 @@ bool handleNativeCollectionFunction(const std::string &fn,
         return true;
     }
 
-    if (vietvm::constants::matchesAnyName(fn, vietvm::constants::kFnMapKeys)) {
+    if (opcode == OP_VM_MAP_KEYS) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
         MapHandle map;
         if (!getFirstMapArgument(args, fn, map, err)) return true;

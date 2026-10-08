@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "vpp/bytecode/opcode.h"
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/core/message_constants.h"
 
 namespace vietvm::bytecode {
@@ -38,6 +39,11 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                          messages::messageText(messages::kBytecodeUnknownOpcode));
         }
         const Opcode opcode = static_cast<Opcode>(rawOpcode);
+        if (intrinsicByOpcode(rawOpcode) != nullptr &&
+            (instruction.operand != 0 || instruction.operandIndex != 0 ||
+             instruction.operandValue != 0)) {
+            return issue(index, rawOpcode, "VM primitive không nhận immediate operand");
+        }
 
         const auto requirePoolIndex = [&](int poolIndex,
                                           std::string_view label)

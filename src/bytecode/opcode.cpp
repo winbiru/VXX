@@ -86,6 +86,57 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_GAN_THUOC_TINH:
         case OP_GOI_PHUONG_THUC:
         case OP_TAO_DONG_BAO:
+        case OP_VM_BIEN_DICH_PHAN_TICH:
+        case OP_VM_DNS_PHAN_GIAI:
+        case OP_VM_DOC_BIEN_MOI_TRUONG:
+        case OP_VM_DONG_HO_DIA_PHUONG:
+        case OP_VM_DONG_HO_UTC:
+        case OP_VM_DUONG_DAN_TON_TAI:
+        case OP_VM_IO_DOC_BYTES:
+        case OP_VM_IO_DOC_FILE:
+        case OP_VM_IO_GHI_BYTES:
+        case OP_VM_IO_GHI_FILE:
+        case OP_VM_IO_GHI_TIEP_FILE:
+        case OP_VM_KICH_BAN_CHAY:
+        case OP_VM_LA_TEP:
+        case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
+        case OP_VM_LA_THU_MUC:
+        case OP_VM_LIET_KE_THU_MUC:
+        case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
+        case OP_VM_NGU_MILI_GIAY:
+        case OP_VM_SO_THUC_BITS:
+        case OP_VM_SOCKET_CHAP_NHAN:
+        case OP_VM_SOCKET_DAT_TIMEOUT:
+        case OP_VM_SOCKET_DONG:
+        case OP_VM_SOCKET_GUI:
+        case OP_VM_SOCKET_NHAN:
+        case OP_VM_SOCKET_PHAN_GIAI:
+        case OP_VM_SOCKET_TCP_LANG_NGHE:
+        case OP_VM_SOCKET_TCP_MO:
+        case OP_VM_SOCKET_TLS_NANG_CAP:
+        case OP_VM_SOCKET_UDP_MO:
+        case OP_VM_TAO_THU_MUC:
+        case OP_VM_TEN_NEN_TANG:
+        case OP_VM_THOI_GIAN_DON_DIEU_MS:
+        case OP_VM_TIEN_TRINH_CHAY:
+        case OP_VM_XOA_DUONG_DAN:
+        case OP_VM_THREAD_SPAWN:
+        case OP_VM_THREAD_WAIT:
+        case OP_VM_THREAD_CANCEL:
+        case OP_VM_THREAD_STATUS:
+        case OP_VM_THREAD_PARK:
+        case OP_VM_TUPLE_FROM_LIST:
+        case OP_VM_TYPE_OF:
+        case OP_VM_IDENTITY_HASH:
+        case OP_VM_LENGTH:
+        case OP_VM_LIST_APPEND:
+        case OP_VM_LIST_REMOVE:
+        case OP_VM_MAP_HAS:
+        case OP_VM_MAP_REMOVE:
+        case OP_VM_MAP_KEYS:
+        case OP_VM_STRING_BYTES:
+        case OP_VM_STRING_FROM_BYTES:
+        case OP_VM_FLOAT_FROM_BITS:
             return true;
         default:
             return false;
@@ -183,6 +234,57 @@ std::string opcodeName(int rawOpcode) {
         case OP_GAN_THUOC_TINH: return "OP_GAN_THUOC_TINH";
         case OP_GOI_PHUONG_THUC: return "OP_GOI_PHUONG_THUC";
         case OP_TAO_DONG_BAO: return "OP_TAO_DONG_BAO";
+        case OP_VM_BIEN_DICH_PHAN_TICH: return "OP_VM_BIEN_DICH_PHAN_TICH";
+        case OP_VM_DNS_PHAN_GIAI: return "OP_VM_DNS_PHAN_GIAI";
+        case OP_VM_DOC_BIEN_MOI_TRUONG: return "OP_VM_DOC_BIEN_MOI_TRUONG";
+        case OP_VM_DONG_HO_DIA_PHUONG: return "OP_VM_DONG_HO_DIA_PHUONG";
+        case OP_VM_DONG_HO_UTC: return "OP_VM_DONG_HO_UTC";
+        case OP_VM_DUONG_DAN_TON_TAI: return "OP_VM_DUONG_DAN_TON_TAI";
+        case OP_VM_IO_DOC_BYTES: return "OP_VM_IO_DOC_BYTES";
+        case OP_VM_IO_DOC_FILE: return "OP_VM_IO_DOC_FILE";
+        case OP_VM_IO_GHI_BYTES: return "OP_VM_IO_GHI_BYTES";
+        case OP_VM_IO_GHI_FILE: return "OP_VM_IO_GHI_FILE";
+        case OP_VM_IO_GHI_TIEP_FILE: return "OP_VM_IO_GHI_TIEP_FILE";
+        case OP_VM_KICH_BAN_CHAY: return "OP_VM_KICH_BAN_CHAY";
+        case OP_VM_LA_TEP: return "OP_VM_LA_TEP";
+        case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET: return "OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET";
+        case OP_VM_LA_THU_MUC: return "OP_VM_LA_THU_MUC";
+        case OP_VM_LIET_KE_THU_MUC: return "OP_VM_LIET_KE_THU_MUC";
+        case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES: return "OP_VM_NGAU_NHIEN_BAO_MAT_BYTES";
+        case OP_VM_NGU_MILI_GIAY: return "OP_VM_NGU_MILI_GIAY";
+        case OP_VM_SO_THUC_BITS: return "OP_VM_SO_THUC_BITS";
+        case OP_VM_SOCKET_CHAP_NHAN: return "OP_VM_SOCKET_CHAP_NHAN";
+        case OP_VM_SOCKET_DAT_TIMEOUT: return "OP_VM_SOCKET_DAT_TIMEOUT";
+        case OP_VM_SOCKET_DONG: return "OP_VM_SOCKET_DONG";
+        case OP_VM_SOCKET_GUI: return "OP_VM_SOCKET_GUI";
+        case OP_VM_SOCKET_NHAN: return "OP_VM_SOCKET_NHAN";
+        case OP_VM_SOCKET_PHAN_GIAI: return "OP_VM_SOCKET_PHAN_GIAI";
+        case OP_VM_SOCKET_TCP_LANG_NGHE: return "OP_VM_SOCKET_TCP_LANG_NGHE";
+        case OP_VM_SOCKET_TCP_MO: return "OP_VM_SOCKET_TCP_MO";
+        case OP_VM_SOCKET_TLS_NANG_CAP: return "OP_VM_SOCKET_TLS_NANG_CAP";
+        case OP_VM_SOCKET_UDP_MO: return "OP_VM_SOCKET_UDP_MO";
+        case OP_VM_TAO_THU_MUC: return "OP_VM_TAO_THU_MUC";
+        case OP_VM_TEN_NEN_TANG: return "OP_VM_TEN_NEN_TANG";
+        case OP_VM_THOI_GIAN_DON_DIEU_MS: return "OP_VM_THOI_GIAN_DON_DIEU_MS";
+        case OP_VM_TIEN_TRINH_CHAY: return "OP_VM_TIEN_TRINH_CHAY";
+        case OP_VM_XOA_DUONG_DAN: return "OP_VM_XOA_DUONG_DAN";
+        case OP_VM_THREAD_SPAWN: return "OP_VM_THREAD_SPAWN";
+        case OP_VM_THREAD_WAIT: return "OP_VM_THREAD_WAIT";
+        case OP_VM_THREAD_CANCEL: return "OP_VM_THREAD_CANCEL";
+        case OP_VM_THREAD_STATUS: return "OP_VM_THREAD_STATUS";
+        case OP_VM_THREAD_PARK: return "OP_VM_THREAD_PARK";
+        case OP_VM_TUPLE_FROM_LIST: return "OP_VM_TUPLE_FROM_LIST";
+        case OP_VM_TYPE_OF: return "OP_VM_TYPE_OF";
+        case OP_VM_IDENTITY_HASH: return "OP_VM_IDENTITY_HASH";
+        case OP_VM_LENGTH: return "OP_VM_LENGTH";
+        case OP_VM_LIST_APPEND: return "OP_VM_LIST_APPEND";
+        case OP_VM_LIST_REMOVE: return "OP_VM_LIST_REMOVE";
+        case OP_VM_MAP_HAS: return "OP_VM_MAP_HAS";
+        case OP_VM_MAP_REMOVE: return "OP_VM_MAP_REMOVE";
+        case OP_VM_MAP_KEYS: return "OP_VM_MAP_KEYS";
+        case OP_VM_STRING_BYTES: return "OP_VM_STRING_BYTES";
+        case OP_VM_STRING_FROM_BYTES: return "OP_VM_STRING_FROM_BYTES";
+        case OP_VM_FLOAT_FROM_BITS: return "OP_VM_FLOAT_FROM_BITS";
         default: return "UNKNOWN_OPCODE";
     }
 }
