@@ -1,9 +1,11 @@
 // Module: lõi.chuyển kiểu
 // Chuyển kiểu mức thư viện được viết bằng V++.
 //
-// Native chỉ còn hai primitive mà ngôn ngữ không thể tự suy ra:
+// VM chỉ còn hai primitive mà ngôn ngữ không thể tự suy ra:
 // - loai_cua(value): đọc tag kiểu runtime.
-// - so_thuc_dac_biet_noi_bo(kind): tạo NaN/+Inf/-Inf IEEE-754.
+// - so_thuc_tu_bits_vm(bytes): diễn giải 8 byte IEEE-754 little-endian.
+// Thư viện tự dựng biểu diễn NaN/+Inf/-Inf.
+
 
 hàm chuyển_kiểu_lỗi_số_nguyên() {
     ném "thành số nguyên: giá trị không thể chuyển đổi";
@@ -11,6 +13,15 @@ hàm chuyển_kiểu_lỗi_số_nguyên() {
 
 hàm chuyển_kiểu_lỗi_số_thực() {
     ném "thành số thực: giá trị không thể chuyển đổi";
+};
+
+hàm chuyển kiểu số thực đặc biệt(mã) {
+    nếu (mã != -1 && mã != 0 && mã != 1) {
+        chuyển_kiểu_lỗi_số_thực();
+    };
+    nếu (mã == 0) { trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 248, 127]); };
+    nếu (mã == 1) { trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 240, 127]); };
+    trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 240, 255]);
 };
 
 hàm chuyển kiểu là khoảng trắng đầu(c) {
@@ -152,12 +163,12 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
         còn_lại = còn_lại + văn_bản[j];
     };
     nếu (còn_lại == "nan" || còn_lại == "NaN" || còn_lại == "NAN") {
-        trả về so_thuc_dac_biet_noi_bo("nan");
+        trả về chuyển kiểu số thực đặc biệt(0);
     };
     nếu (còn_lại == "inf" || còn_lại == "Inf" || còn_lại == "INF" ||
         còn_lại == "infinity" || còn_lại == "Infinity" || còn_lại == "INFINITY") {
-        nếu (âm) { trả về so_thuc_dac_biet_noi_bo("-inf"); };
-        trả về so_thuc_dac_biet_noi_bo("inf");
+        nếu (âm) { trả về chuyển kiểu số thực đặc biệt(-1); };
+        trả về chuyển kiểu số thực đặc biệt(1);
     };
 
     giá_trị = 0.0;
@@ -230,10 +241,18 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
     nếu (số_mũ != 0) {
         giá_trị = giá_trị * chuyển kiểu lũy thừa mười(số_mũ);
     };
-    nếu (âm) { giá_trị = 0.0 - giá_trị; };
+    nếu (âm) {
+        // 0.0 - 0.0 tạo +0 theo IEEE-754. Parse dấu âm của zero bằng
+        // primitive bit-pattern để không làm mất bit dấu.
+        nếu (giá_trị == 0.0) {
+            giá_trị = so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 0, 128]);
+        } nếu không {
+            giá_trị = 0.0 - giá_trị;
+        };
+    };
 
-    vô_cực_dương = so_thuc_dac_biet_noi_bo("inf");
-    vô_cực_âm = so_thuc_dac_biet_noi_bo("-inf");
+    vô_cực_dương = chuyển kiểu số thực đặc biệt(1);
+    vô_cực_âm = chuyển kiểu số thực đặc biệt(-1);
     nếu (giá_trị == vô_cực_dương || giá_trị == vô_cực_âm) {
         chuyển_kiểu_lỗi_số_thực();
     };

@@ -1,5 +1,5 @@
 // Module: mạng
-// HTTP method wrappers và HTTP/1.1 nằm ở V++; native chỉ giữ socket/TLS primitive I/O.
+// HTTP method wrappers và HTTP/1.1 nằm ở V++; VM chỉ giữ socket/TLS primitive I/O.
 // HTTP client chỉ nhận URL UTF-8 hợp lệ dùng http:// hoặc https://, có host và
 // không chứa khoảng trắng/ký tự điều khiển chưa percent-encode.
 // Lỗi socket/transport được ném qua thử/bắt để caller có thể xử lý hoặc thử
@@ -11,7 +11,7 @@ nhập gói/bộ sưu tập/từ điển;
 nhập gói/mạng/ổ cắm;
 nhập gói/văn bản/chuỗi;
 
-// HTTP/1.x là logic thư viện và được viết bằng V++. Native chỉ giữ transport
+// HTTP/1.x là logic thư viện và được viết bằng V++. VM chỉ giữ transport
 // socket/TLS, certificate verification và crypto primitive của hệ điều hành.
 hàm mạng http tìm ký tự đầu(giá_trị, ký_tự, từ = 0) {
     trả về tìm chuỗi chính xác(giá_trị, ký_tự, từ);
@@ -166,101 +166,149 @@ hàm mạng http hex byte(b) {
     trả về -1;
 };
 
-// Giải Transfer-Encoding: chunked trực tiếp trên bytes để kích thước chunk
-// không bị nhầm giữa byte UTF-8 và code point V++.
-hàm mạng http giải chunked(body) {
+// Khi đang đọc socket, một lần nhận có thể kết thúc giữa size line, dữ liệu
+// chunk hoặc trailer. Hàm này trả `hoàn tất = sai` cho đúng trường hợp thiếu
+// byte đó; lỗi cú pháp vẫn được ném ngay từ tầng HTTP V++.
+hàm mạng http chunked cần thêm(cho_phep_thieu, thông_báo) {
+    nếu (cho_phep_thieu) {
+        trả về đúng;
+    };
+    ném thông_báo;
+};
+
+// Quét Transfer-Encoding: chunked trực tiếp trên bytes để kích thước chunk
+// không bị nhầm giữa byte UTF-8 và code point V++. `loại` chỉ đi vào lỗi để
+// client và server giữ được ngữ cảnh riêng.
+hàm mạng http quét chunked(body, cho_phep_thieu = sai,
+                          tiền_tố = "mạng http", loại = "response") {
     nguồn = chuỗi thành bytes(body, "UTF-8");
     kết_quả = [];
     vị_trí = 0;
     hoàn_tất = sai;
+    cần_thêm = sai;
 
-    lặp(vòng = 0; !hoàn_tất; vòng++) {
+    lặp(vòng = 0; !hoàn_tất && !cần_thêm; vòng++) {
         nếu (vị_trí >= do_dai(nguồn)) {
-            ném "mạng http: chunked response thiếu kích thước chunk";
-        };
-        cuối_dòng = -1;
-        lặp(i = vị_trí; i + 1 < do_dai(nguồn) && cuối_dòng < 0; i++) {
-            nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
-                cuối_dòng = i;
+            cần_thêm = mạng http chunked cần thêm(
+                cho_phep_thieu,
+                tiền_tố + ": chunked " + loại + " thiếu kích thước chunk"
+            );
+        } nếu không {
+            cuối_dòng = -1;
+            lặp(i = vị_trí; i + 1 < do_dai(nguồn) && cuối_dòng < 0; i++) {
+                nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
+                    cuối_dòng = i;
+                };
             };
-        };
-        nếu (cuối_dòng < 0) {
-            ném "mạng http: chunked response thiếu CRLF";
-        };
-
-        kích_thước = 0;
-        có_chữ_số = sai;
-        đang_hex = đúng;
-        lặp(i = vị_trí; i < cuối_dòng && đang_hex; i++) {
-            nếu (nguồn[i] == 59) {
-                đang_hex = sai; // ';' bắt đầu chunk extension.
+            nếu (cuối_dòng < 0) {
+                cần_thêm = mạng http chunked cần thêm(
+                    cho_phep_thieu,
+                    tiền_tố + ": chunked " + loại + " thiếu CRLF"
+                );
             } nếu không {
-                nibble = mạng http hex byte(nguồn[i]);
-                nếu (nibble < 0) {
-                    ném "mạng http: kích thước chunk không hợp lệ";
-                };
-                có_chữ_số = đúng;
-                kích_thước = kích_thước * 16 + nibble;
-                nếu (kích_thước > 16777216) {
-                    ném "mạng http: chunk vượt giới hạn 16 MiB";
-                };
-            };
-        };
-        nếu (!có_chữ_số) {
-            ném "mạng http: kích thước chunk rỗng";
-        };
-
-        vị_trí = cuối_dòng + 2;
-        nếu (kích_thước == 0) {
-            // Sau zero chunk là trailer section, kết thúc bởi một dòng rỗng.
-            // Trailer hiện chưa được nhập vào map headers nhưng vẫn phải được
-            // đọc và kiểm tra cấu trúc để không chấp nhận response bị cắt cụt.
-            trailer_xong = sai;
-            lặp(vòng_trailer = 0; !trailer_xong; vòng_trailer++) {
-                cuối_trailer = -1;
-                lặp(i = vị_trí; i + 1 < do_dai(nguồn) && cuối_trailer < 0; i++) {
-                    nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
-                        cuối_trailer = i;
-                    };
-                };
-                nếu (cuối_trailer < 0) {
-                    ném "mạng http: chunked response thiếu CRLF kết thúc trailer";
-                };
-                nếu (cuối_trailer == vị_trí) {
-                    vị_trí = cuối_trailer + 2;
-                    trailer_xong = đúng;
-                } nếu không {
-                    có_hai_chấm = sai;
-                    lặp(i = vị_trí; i < cuối_trailer && !có_hai_chấm; i++) {
-                        nếu (nguồn[i] == 58 && i > vị_trí) {
-                            có_hai_chấm = đúng;
+                kích_thước = 0;
+                có_chữ_số = sai;
+                đang_hex = đúng;
+                lặp(i = vị_trí; i < cuối_dòng && đang_hex; i++) {
+                    nếu (nguồn[i] == 59) {
+                        đang_hex = sai; // ';' bắt đầu chunk extension.
+                    } nếu không {
+                        nibble = mạng http hex byte(nguồn[i]);
+                        nếu (nibble < 0) {
+                            ném tiền_tố + ": kích thước chunk không hợp lệ";
+                        };
+                        có_chữ_số = đúng;
+                        kích_thước = kích_thước * 16 + nibble;
+                        nếu (kích_thước > 16777216) {
+                            ném tiền_tố + ": chunk vượt giới hạn 16 MiB";
                         };
                     };
-                    nếu (!có_hai_chấm) {
-                        ném "mạng http: trailer chunked không hợp lệ";
+                };
+                nếu (!có_chữ_số) {
+                    ném tiền_tố + ": kích thước chunk rỗng";
+                };
+
+                vị_trí = cuối_dòng + 2;
+                nếu (kích_thước == 0) {
+                    // Sau zero chunk là trailer section, kết thúc bởi một dòng
+                    // rỗng. Trailer chưa được nhập vào headers nhưng phải được
+                    // xác thực để không chấp nhận message bị cắt cụt.
+                    trailer_xong = sai;
+                    lặp(vòng_trailer = 0;
+                         !trailer_xong && !cần_thêm;
+                         vòng_trailer++) {
+                        cuối_trailer = -1;
+                        lặp(i = vị_trí;
+                             i + 1 < do_dai(nguồn) && cuối_trailer < 0;
+                             i++) {
+                            nếu (nguồn[i] == 13 && nguồn[i + 1] == 10) {
+                                cuối_trailer = i;
+                            };
+                        };
+                        nếu (cuối_trailer < 0) {
+                            cần_thêm = mạng http chunked cần thêm(
+                                cho_phep_thieu,
+                                tiền_tố + ": chunked " + loại +
+                                    " thiếu CRLF kết thúc trailer"
+                            );
+                        } nếu không {
+                            nếu (cuối_trailer == vị_trí) {
+                                vị_trí = cuối_trailer + 2;
+                                trailer_xong = đúng;
+                                hoàn_tất = đúng;
+                            } nếu không {
+                                có_hai_chấm = sai;
+                                lặp(i = vị_trí;
+                                     i < cuối_trailer && !có_hai_chấm;
+                                     i++) {
+                                    nếu (nguồn[i] == 58 && i > vị_trí) {
+                                        có_hai_chấm = đúng;
+                                    };
+                                };
+                                nếu (!có_hai_chấm) {
+                                    ném tiền_tố + ": trailer chunked không hợp lệ";
+                                };
+                                vị_trí = cuối_trailer + 2;
+                            };
+                        };
                     };
-                    vị_trí = cuối_trailer + 2;
+                } nếu không {
+                    nếu (vị_trí + kích_thước + 2 > do_dai(nguồn)) {
+                        cần_thêm = mạng http chunked cần thêm(
+                            cho_phep_thieu,
+                            tiền_tố + ": chunk ngắn hơn kích thước đã khai báo"
+                        );
+                    } nếu không {
+                        nếu (do_dai(kết_quả) + kích_thước > 16777216) {
+                            ném tiền_tố + ": body chunked vượt giới hạn 16 MiB";
+                        };
+                        lặp(i = 0; i < kích_thước; i++) {
+                            them(kết_quả, nguồn[vị_trí + i]);
+                        };
+                        vị_trí = vị_trí + kích_thước;
+                        nếu (nguồn[vị_trí] != 13 || nguồn[vị_trí + 1] != 10) {
+                            ném tiền_tố + ": chunk thiếu CRLF kết thúc";
+                        };
+                        vị_trí = vị_trí + 2;
+                    };
                 };
             };
-            hoàn_tất = đúng;
-        } nếu không {
-            nếu (vị_trí + kích_thước + 2 > do_dai(nguồn)) {
-                ném "mạng http: chunk ngắn hơn kích thước đã khai báo";
-            };
-            nếu (do_dai(kết_quả) + kích_thước > 16777216) {
-                ném "mạng http: body chunked vượt giới hạn 16 MiB";
-            };
-            lặp(i = 0; i < kích_thước; i++) {
-                them(kết_quả, nguồn[vị_trí + i]);
-            };
-            vị_trí = vị_trí + kích_thước;
-            nếu (nguồn[vị_trí] != 13 || nguồn[vị_trí + 1] != 10) {
-                ném "mạng http: chunk thiếu CRLF kết thúc";
-            };
-            vị_trí = vị_trí + 2;
         };
     };
-    trả về chuỗi từ bytes(kết_quả, "UTF-8", "BÁO_LỖI");
+
+    nếu (cần_thêm) {
+        trả về {"hoàn tất": sai, "body": "", "đã dùng": vị_trí};
+    };
+    trả về {
+        "hoàn tất": đúng,
+        "body": chuỗi từ bytes(kết_quả, "UTF-8", "BÁO_LỖI"),
+        "đã dùng": vị_trí
+    };
+};
+
+hàm mạng http giải chunked(body) {
+    quét = mạng http quét chunked(body);
+    trả về lấy map(quét, "body", "");
 };
 
 hàm mạng http phân tích response(phản_hồi) {
@@ -331,12 +379,12 @@ hàm mạng http tách body(phản_hồi) {
 };
 
 hàm mạng http thực thi response qua socket(method, đường_dẫn, dữ_liệu, có_body) {
-    url = mạng http phân tích url(đường_dẫn);
-    tên_máy = url[0];
-    cổng = url[1];
-    đích = url[2];
-    host_header = url[3];
-    dùng_tls = url[4];
+    url_yêu_cầu = mạng http phân tích url(đường_dẫn);
+    tên_máy = url_yêu_cầu[0];
+    cổng = url_yêu_cầu[1];
+    đích = url_yêu_cầu[2];
+    host_header = url_yêu_cầu[3];
+    dùng_tls = url_yêu_cầu[4];
     socket = 0;
     nếu (dùng_tls) {
         socket = socket tls mở(tên_máy, cổng, 20000);
@@ -505,7 +553,7 @@ hàm mạng xóa(đường dẫn) {
     trả về mạng thực thi yêu cầu("DELETE", đường dẫn, "");
 };
 
-// Tương thích API cũ. HTTP server được triển khai ở V++; native chỉ cung cấp
+// Tương thích API cũ. HTTP server được triển khai ở V++; VM chỉ cung cấp
 // bind/listen/accept/send/recv/close trên socket.
 hàm mạng chạy máy chủ api(cổng, driver, jdbcUrl, username, password) {
     trả về mạng mở máy chủ api(cổng);
@@ -567,13 +615,16 @@ hàm mạng http phân tích phần đầu request(phần_đầu) {
         };
     };
 
-    nếu (chuỗi thường(lấy map(headers, "transfer-encoding", "")) == "chunked") {
-        ném "mạng http server: Transfer-Encoding chunked chưa được hỗ trợ";
-    };
-
+    transfer = chuỗi thường(lấy map(headers, "transfer-encoding", ""));
+    chunked = chứa chính xác(transfer, "chunked");
     content_length = 0;
     content_length_text = lấy map(headers, "content-length", "");
-    nếu (content_length_text != "") {
+    // Content-Length và chunked cùng xuất hiện tạo ambiguity framing. Server
+    // đóng connection sau response, nhưng vẫn từ chối message này ngay ở V++.
+    nếu (chunked && content_length_text != "") {
+        ném "mạng http server: không được gửi cả Transfer-Encoding chunked và Content-Length";
+    };
+    nếu (!chunked && content_length_text != "") {
         thử {
             content_length = thành số nguyên(content_length_text);
         } bắt lỗi (e) {
@@ -589,7 +640,8 @@ hàm mạng http phân tích phần đầu request(phần_đầu) {
         "path": path,
         "query": query,
         "headers": headers,
-        "content length": content_length
+        "content length": content_length,
+        "chunked": chunked
     };
 };
 
@@ -630,20 +682,45 @@ hàm mạng http đọc request socket(mã_socket) {
     content_length = lấy map(request, "content length", 0);
     body = con chuỗi(dữ_liệu, vị_trí_ngăn + 4, do_dai(dữ_liệu));
 
-    lặp(vòng = 0;
-        do_dai(chuỗi thành bytes(body, "UTF-8")) < content_length;
-        vòng++) {
-        phần = socket nhận(mã_socket, 65536);
-        nếu (phần == "") {
-            ném "mạng http server: kết nối đóng trước khi nhận đủ body";
+    nếu (lấy map(request, "chunked", sai)) {
+        quét = mạng http quét chunked(
+            body,
+            đúng,
+            "mạng http server",
+            "request"
+        );
+        lặp(vòng = 0; !lấy map(quét, "hoàn tất", sai); vòng++) {
+            phần = socket nhận(mã_socket, 65536);
+            nếu (phần == "") {
+                ném "mạng http server: kết nối đóng trước khi nhận đủ chunked body";
+            };
+            body = body + phần;
+            nếu (do_dai(chuỗi thành bytes(body, "UTF-8")) > 16842752) {
+                ném "mạng http server: body chunked vượt giới hạn 16 MiB + 64 KiB framing";
+            };
+            quét = mạng http quét chunked(
+                body,
+                đúng,
+                "mạng http server",
+                "request"
+            );
         };
-        body = body + phần;
-        nếu (do_dai(chuỗi thành bytes(body, "UTF-8")) > 16777216) {
-            ném "mạng http server: body vượt giới hạn";
+        đặt map(request, "body", lấy map(quét, "body", ""));
+    } nếu không {
+        lặp(vòng = 0;
+            do_dai(chuỗi thành bytes(body, "UTF-8")) < content_length;
+            vòng++) {
+            phần = socket nhận(mã_socket, 65536);
+            nếu (phần == "") {
+                ném "mạng http server: kết nối đóng trước khi nhận đủ body";
+            };
+            body = body + phần;
+            nếu (do_dai(chuỗi thành bytes(body, "UTF-8")) > 16777216) {
+                ném "mạng http server: body vượt giới hạn";
+            };
         };
+        đặt map(request, "body", mạng http cắt body theo byte(body, content_length));
     };
-
-    đặt map(request, "body", mạng http cắt body theo byte(body, content_length));
     đặt map(request, "socket", mã_socket);
     trả về request;
 };

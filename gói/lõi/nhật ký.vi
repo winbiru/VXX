@@ -2,6 +2,8 @@
 // Mục đích: chuẩn hóa định dạng log theo mức thông tin/cảnh báo/lỗi.
 // Ghi chú: cung cấp cả class `NhậtKý` và wrapper hàm mức module.
 
+nhập gói/nhập xuất/tệp;
+
 lớp công khai NhậtKý {
     // Ghi chú hàm: công khai ghi thông tin.
     hàm công khai ghi thông tin(msg) {
@@ -37,9 +39,9 @@ hàm ghi lỗi(msg) {
     trả về NhậtKý.ghi lỗi(msg);
 };
 
-// Logging chỉ dựng nội dung; append tệp là primitive I/O dùng chung.
+// Logging chỉ dựng nội dung và đi qua API file V++; append OS nằm sau wrapper.
 hàm nhật ký ghi tệp(đường dẫn, nội dung) {
-    trả về io_ghi_tiep_file(đường dẫn, nội dung);
+    trả về ghi nối tệp(đường dẫn, nội dung);
 };
 
 hàm ghi thông tin tệp(đường dẫn, msg) {

@@ -1,17 +1,500 @@
-// vi.regex — biểu thức chính quy ECMAScript.
-// Native chỉ còn engine primitive quét mẫu và trả capture. Match/search,
-// thay thế và tách chuỗi đều là logic V++.
+// vi.regex — engine regex và API biểu thức chính quy viết bằng V++.
+// Runtime chỉ cung cấp primitive chuỗi/list/map; parser, backtracking, capture,
+// search, replace và split đều nằm ở tầng ngôn ngữ.
+
+nhập gói/bộ sưu tập/danh sách;
+
+hàm regex lỗi mẫu() {
+    ném "regex: mẫu không hợp lệ";
+};
+
+hàm regex sao chép danh sách(ds) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(ds); i++) {
+        them(kết_quả, ds[i]);
+    };
+    trả về kết_quả;
+};
+
+hàm regex đoạn(văn_bản, bắt_đầu, kết_thúc) {
+    kết_quả = "";
+    lặp(i = bắt_đầu; i < kết_thúc; i++) {
+        kết_quả = kết_quả + văn_bản[i];
+    };
+    trả về kết_quả;
+};
+
+hàm regex parser tạo(mẫu) {
+    trả về {"mẫu": mẫu, "vị trí": 0, "nhóm": 0};
+};
+
+hàm regex parser biểu thức(p) {
+    nhánh = [];
+    them(nhánh, regex parser chuỗi(p));
+    mẫu = p["mẫu"];
+    tiếp = đúng;
+    lặp(vòng = 0; tiếp; vòng++) {
+        i = p["vị trí"];
+        nếu (i >= do_dai(mẫu)) {
+            tiếp = sai;
+        } nếu không {
+            nếu (mẫu[i] == "|") {
+                p["vị trí"] = i + 1;
+                them(nhánh, regex parser chuỗi(p));
+            } nếu không {
+                tiếp = sai;
+            };
+        };
+    };
+    nếu (do_dai(nhánh) == 1) {
+        trả về nhánh[0];
+    };
+    trả về {"loại": "hoặc", "con": nhánh};
+};
+
+hàm regex parser chuỗi(p) {
+    con = [];
+    mẫu = p["mẫu"];
+    tiếp = đúng;
+    lặp(vòng = 0; tiếp; vòng++) {
+        i = p["vị trí"];
+        nếu (i >= do_dai(mẫu)) {
+            tiếp = sai;
+        } nếu không {
+            c = mẫu[i];
+            nếu (c == ")" || c == "|") {
+                tiếp = sai;
+            } nếu không {
+                them(con, regex parser phần tử(p));
+            };
+        };
+    };
+    trả về {"loại": "chuỗi", "con": con};
+};
+
+hàm regex parser lớp(p) {
+    mẫu = p["mẫu"];
+    i = p["vị trí"] + 1;
+    phủ_định = sai;
+    nếu (i < do_dai(mẫu)) {
+        nếu (mẫu[i] == "^") {
+            phủ_định = đúng;
+            i++;
+        };
+    };
+    nội_dung = "";
+    đóng = sai;
+    lặp(vòng = 0; i < do_dai(mẫu) && !đóng; vòng++) {
+        c = mẫu[i];
+        nếu (c == "]") {
+            đóng = đúng;
+            i++;
+        } nếu không {
+            nếu (c == "\\") {
+                nội_dung = nội_dung + c;
+                i++;
+                nếu (i >= do_dai(mẫu)) { regex lỗi mẫu(); };
+                nội_dung = nội_dung + mẫu[i];
+                i++;
+            } nếu không {
+                nội_dung = nội_dung + c;
+                i++;
+            };
+        };
+    };
+    nếu (!đóng) { regex lỗi mẫu(); };
+    p["vị trí"] = i;
+    trả về {"loại": "lớp", "mẫu": nội_dung, "phủ định": phủ_định};
+};
+
+hàm regex parser atom(p) {
+    mẫu = p["mẫu"];
+    i = p["vị trí"];
+    nếu (i >= do_dai(mẫu)) { regex lỗi mẫu(); };
+    c = mẫu[i];
+
+    nếu (c == "(" ) {
+        p["vị trí"] = i + 1;
+        kiểu = "nhóm";
+        số_nhóm = 0;
+        j = p["vị trí"];
+        nếu (j < do_dai(mẫu)) {
+            nếu (mẫu[j] == "?") {
+                j++;
+                nếu (j >= do_dai(mẫu)) { regex lỗi mẫu(); };
+                dấu = mẫu[j];
+                nếu (dấu == ":") {
+                    kiểu = "không bắt";
+                } nếu không {
+                    nếu (dấu == "=") {
+                        kiểu = "nhìn trước";
+                    } nếu không {
+                        nếu (dấu == "!") {
+                            kiểu = "không nhìn trước";
+                        } nếu không {
+                            regex lỗi mẫu();
+                        };
+                    };
+                };
+                p["vị trí"] = j + 1;
+            };
+        };
+        nếu (kiểu == "nhóm") {
+            p["nhóm"] = p["nhóm"] + 1;
+            số_nhóm = p["nhóm"];
+        };
+        thân = regex parser biểu thức(p);
+        i = p["vị trí"];
+        nếu (i >= do_dai(mẫu)) { regex lỗi mẫu(); };
+        nếu (mẫu[i] != ")") { regex lỗi mẫu(); };
+        p["vị trí"] = i + 1;
+        nếu (kiểu == "không bắt") { trả về thân; };
+        nếu (kiểu == "nhìn trước") {
+            trả về {"loại": "nhìn trước", "con": thân};
+        };
+        nếu (kiểu == "không nhìn trước") {
+            trả về {"loại": "không nhìn trước", "con": thân};
+        };
+        trả về {"loại": "nhóm", "con": thân, "số": số_nhóm};
+    };
+
+    nếu (c == "[") {
+        trả về regex parser lớp(p);
+    };
+
+    nếu (c == "\\") {
+        i++;
+        nếu (i >= do_dai(mẫu)) { regex lỗi mẫu(); };
+        p["vị trí"] = i + 1;
+        e = mẫu[i];
+        nếu (e == "s" || e == "d" || e == "w") {
+            trả về {"loại": "lớp tắt", "mẫu": e};
+        };
+        nếu (e == "n") { trả về {"loại": "chữ", "giá trị": "\n"}; };
+        nếu (e == "r") { trả về {"loại": "chữ", "giá trị": "\r"}; };
+        nếu (e == "t") { trả về {"loại": "chữ", "giá trị": "\t"}; };
+        trả về {"loại": "chữ", "giá trị": e};
+    };
+
+    nếu (c == "*" || c == "+" || c == "?") { regex lỗi mẫu(); };
+    p["vị trí"] = i + 1;
+    nếu (c == ".") { trả về {"loại": "bất kỳ"}; };
+    nếu (c == "^") { trả về {"loại": "đầu"}; };
+    nếu (c == "$") { trả về {"loại": "cuối"}; };
+    trả về {"loại": "chữ", "giá trị": c};
+};
+
+hàm regex parser phần tử(p) {
+    atom = regex parser atom(p);
+    mẫu = p["mẫu"];
+    i = p["vị trí"];
+    nếu (i >= do_dai(mẫu)) { trả về atom; };
+    q = mẫu[i];
+    nếu (q != "*" && q != "+" && q != "?") { trả về atom; };
+    tối_thiểu = 0;
+    tối_đa = -1;
+    nếu (q == "+") { tối_thiểu = 1; };
+    nếu (q == "?") { tối_đa = 1; };
+    i++;
+    tham = đúng;
+    nếu (i < do_dai(mẫu)) {
+        nếu (mẫu[i] == "?") {
+            tham = sai;
+            i++;
+        };
+    };
+    p["vị trí"] = i;
+    trả về {
+        "loại": "lặp",
+        "con": atom,
+        "tối thiểu": tối_thiểu,
+        "tối đa": tối_đa,
+        "tham": tham
+    };
+};
+
+hàm regex phân tích(mẫu) {
+    nếu (loai_cua(mẫu) != "chuỗi") {
+        ném "regex: mẫu phải là chuỗi";
+    };
+    p = regex parser tạo(mẫu);
+    cây = regex parser biểu thức(p);
+    nếu (p["vị trí"] != do_dai(mẫu)) { regex lỗi mẫu(); };
+    trả về {"cây": cây, "nhóm": p["nhóm"]};
+};
+
+hàm regex là chữ số(c) {
+    trả về c >= "0" && c <= "9";
+};
+
+hàm regex là chữ(c) {
+    trả về (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") ||
+        regex là chữ số(c) || c == "_";
+};
+
+hàm regex là trắng(c) {
+    trả về c == " " || c == "\t" || c == "\n" || c == "\r";
+};
+
+hàm regex lớp tắt khớp(mẫu, c) {
+    nếu (mẫu == "s") { trả về regex là trắng(c); };
+    nếu (mẫu == "d") { trả về regex là chữ số(c); };
+    nếu (mẫu == "w") { trả về regex là chữ(c); };
+    trả về sai;
+};
+
+hàm regex lớp khớp(nút, c) {
+    mẫu = nút["mẫu"];
+    khớp = sai;
+    i = 0;
+    lặp(vòng = 0; i < do_dai(mẫu); vòng++) {
+        đầu = mẫu[i];
+        nếu (đầu == "\\") {
+            i++;
+            nếu (i >= do_dai(mẫu)) { regex lỗi mẫu(); };
+            e = mẫu[i];
+            nếu (e == "s" || e == "d" || e == "w") {
+                nếu (regex lớp tắt khớp(e, c)) { khớp = đúng; };
+            } nếu không {
+                nếu (e == c) { khớp = đúng; };
+            };
+            i++;
+        } nếu không {
+            có_range = sai;
+            nếu (i + 2 < do_dai(mẫu)) {
+                nếu (mẫu[i + 1] == "-") { có_range = đúng; };
+            };
+            nếu (có_range) {
+                cuối = mẫu[i + 2];
+                nếu (c >= đầu && c <= cuối) { khớp = đúng; };
+                i = i + 3;
+            } nếu không {
+                nếu (c == đầu) { khớp = đúng; };
+                i++;
+            };
+        };
+    };
+    nếu (nút["phủ định"]) { trả về !khớp; };
+    trả về khớp;
+};
+
+hàm regex trạng thái(vị_trí, nhóm) {
+    trả về {"vị trí": vị_trí, "nhóm": nhóm};
+};
+
+hàm regex ghép trạng thái(đích, nguồn) {
+    lặp(i = 0; i < do_dai(nguồn); i++) { them(đích, nguồn[i]); };
+    trả về đích;
+};
+
+hàm regex khớp lặp(nút, văn_bản, trạng_thái, số_lần, kết_quả) {
+    tối_thiểu = nút["tối thiểu"];
+    tối_đa = nút["tối đa"];
+    tham = nút["tham"];
+    nếu (!tham && số_lần >= tối_thiểu) {
+        them(kết_quả, trạng_thái);
+    };
+
+    được_lặp = tối_đa < 0 || số_lần < tối_đa;
+    nếu (được_lặp) {
+        tiếp = regex khớp nút(nút["con"], văn_bản, trạng_thái);
+        lặp(i = 0; i < do_dai(tiếp); i++) {
+            nếu (tiếp[i]["vị trí"] > trạng_thái["vị trí"]) {
+                regex khớp lặp(nút, văn_bản, tiếp[i], số_lần + 1, kết_quả);
+            };
+        };
+    };
+
+    nếu (tham && số_lần >= tối_thiểu) {
+        them(kết_quả, trạng_thái);
+    };
+    trả về kết_quả;
+};
+
+hàm regex khớp nút(nút, văn_bản, trạng_thái) {
+    loại = nút["loại"];
+    vị_trí = trạng_thái["vị trí"];
+    n = do_dai(văn_bản);
+
+    nếu (loại == "chữ") {
+        nếu (vị_trí < n) {
+            nếu (văn_bản[vị_trí] == nút["giá trị"]) {
+                trả về [regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+            };
+        };
+        trả về [];
+    };
+    nếu (loại == "bất kỳ") {
+        nếu (vị_trí < n) {
+            c = văn_bản[vị_trí];
+            nếu (c != "\n" && c != "\r") {
+                trả về [regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+            };
+        };
+        trả về [];
+    };
+    nếu (loại == "lớp") {
+        nếu (vị_trí < n) {
+            nếu (regex lớp khớp(nút, văn_bản[vị_trí])) {
+                trả về [regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+            };
+        };
+        trả về [];
+    };
+    nếu (loại == "lớp tắt") {
+        nếu (vị_trí < n) {
+            nếu (regex lớp tắt khớp(nút["mẫu"], văn_bản[vị_trí])) {
+                trả về [regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+            };
+        };
+        trả về [];
+    };
+    nếu (loại == "đầu") {
+        nếu (vị_trí == 0) { trả về [trạng_thái]; };
+        trả về [];
+    };
+    nếu (loại == "cuối") {
+        nếu (vị_trí == n) { trả về [trạng_thái]; };
+        trả về [];
+    };
+    nếu (loại == "chuỗi") {
+        hiện = [trạng_thái];
+        con = nút["con"];
+        lặp(i = 0; i < do_dai(con); i++) {
+            kế = [];
+            lặp(j = 0; j < do_dai(hiện); j++) {
+                regex ghép trạng thái(kế, regex khớp nút(con[i], văn_bản, hiện[j]));
+            };
+            hiện = kế;
+            nếu (do_dai(hiện) == 0) { trả về []; };
+        };
+        trả về hiện;
+    };
+    nếu (loại == "hoặc") {
+        kết_quả = [];
+        con = nút["con"];
+        lặp(i = 0; i < do_dai(con); i++) {
+            regex ghép trạng thái(kết_quả, regex khớp nút(con[i], văn_bản, trạng_thái));
+        };
+        trả về kết_quả;
+    };
+    nếu (loại == "nhóm") {
+        bắt_đầu = vị_trí;
+        kết_quả_con = regex khớp nút(nút["con"], văn_bản, trạng_thái);
+        kết_quả = [];
+        lặp(i = 0; i < do_dai(kết_quả_con); i++) {
+            nhóm = regex sao chép danh sách(kết_quả_con[i]["nhóm"]);
+            nhóm[nút["số"]] = regex đoạn(văn_bản, bắt_đầu, kết_quả_con[i]["vị trí"]);
+            them(kết_quả, regex trạng thái(kết_quả_con[i]["vị trí"], nhóm));
+        };
+        trả về kết_quả;
+    };
+    nếu (loại == "nhìn trước") {
+        thử_khớp = regex khớp nút(nút["con"], văn_bản, trạng_thái);
+        nếu (do_dai(thử_khớp) == 0) { trả về []; };
+        trả về [regex trạng thái(vị_trí, thử_khớp[0]["nhóm"])];
+    };
+    nếu (loại == "không nhìn trước") {
+        thử_khớp = regex khớp nút(nút["con"], văn_bản, trạng_thái);
+        nếu (do_dai(thử_khớp) == 0) { trả về [trạng_thái]; };
+        trả về [];
+    };
+    nếu (loại == "lặp") {
+        trả về regex khớp lặp(nút, văn_bản, trạng_thái, 0, []);
+    };
+    regex lỗi mẫu();
+};
+
+hàm regex nhóm rỗng(số_nhóm) {
+    nhóm = [];
+    lặp(i = 0; i <= số_nhóm; i++) { them(nhóm, ""); };
+    trả về nhóm;
+};
+
+hàm regex thử tại(cây, số_nhóm, văn_bản, vị_trí) {
+    trạng_thái = regex trạng thái(vị_trí, regex nhóm rỗng(số_nhóm));
+    trả về regex khớp nút(cây, văn_bản, trạng_thái);
+};
+
+hàm regex chọn(kết_quả, bắt_đầu, cần_dương) {
+    lặp(i = 0; i < do_dai(kết_quả); i++) {
+        nếu (!cần_dương || kết_quả[i]["vị trí"] > bắt_đầu) {
+            trả về kết_quả[i];
+        };
+    };
+    trả về rỗng;
+};
+
+hàm regex thêm match(các_khớp, văn_bản, bắt_đầu_trước, bắt_đầu, trạng_thái) {
+    nhóm = regex sao chép danh sách(trạng_thái["nhóm"]);
+    nhóm[0] = regex đoạn(văn_bản, bắt_đầu, trạng_thái["vị trí"]);
+    them(các_khớp, [regex đoạn(văn_bản, bắt_đầu_trước, bắt_đầu), nhóm]);
+    trả về trạng_thái["vị trí"];
+};
 
 hàm regex quét engine(văn bản, mẫu) {
-    trả về regex_quet_noi_bo(văn bản, mẫu);
+    nếu (loai_cua(văn bản) != "chuỗi") {
+        ném "regex: văn bản phải là chuỗi";
+    };
+    phân_tích = regex phân tích(mẫu);
+    cây = phân_tích["cây"];
+    số_nhóm = phân_tích["nhóm"];
+    n = do_dai(văn bản);
+    các_khớp = [];
+    tìm_từ = 0;
+    hết_trước = 0;
+    xong = sai;
+
+    lặp(vòng = 0; !xong; vòng++) {
+        tìm_thấy = rỗng;
+        bắt_đầu = -1;
+        p = tìm_từ;
+        lặp(tìm = 0; p <= n && tìm_thấy == rỗng; tìm++) {
+            thử_khớp = regex thử tại(cây, số_nhóm, văn bản, p);
+            tìm_thấy = regex chọn(thử_khớp, p, sai);
+            nếu (tìm_thấy == rỗng) { p++; };
+        };
+        nếu (tìm_thấy == rỗng) {
+            xong = đúng;
+        } nếu không {
+            bắt_đầu = p;
+            hết = regex thêm match(các_khớp, văn bản, hết_trước, bắt_đầu, tìm_thấy);
+            hết_trước = hết;
+            nếu (hết > bắt_đầu) {
+                tìm_từ = hết;
+            } nếu không {
+                // ECMAScript iterator: sau empty match, thử một non-empty match
+                // liên tục tại cùng vị trí trước khi tiến một code point.
+                thử_dương = regex thử tại(cây, số_nhóm, văn bản, bắt_đầu);
+                dương = regex chọn(thử_dương, bắt_đầu, đúng);
+                nếu (dương != rỗng) {
+                    hết = regex thêm match(các_khớp, văn bản, hết_trước, bắt_đầu, dương);
+                    hết_trước = hết;
+                    tìm_từ = hết;
+                } nếu không {
+                    nếu (bắt_đầu >= n) {
+                        xong = đúng;
+                    } nếu không {
+                        tìm_từ = bắt_đầu + 1;
+                    };
+                };
+            };
+        };
+    };
+    trả về [các_khớp, regex đoạn(văn bản, hết_trước, n)];
 };
 
 hàm regex khớp(văn bản, mẫu) {
-    // std::regex_match yêu cầu toàn bộ input khớp. Dùng lookahead âm thay cho
-    // '$' để không nhận vị trí ngay trước newline cuối như một số engine.
-    mẫu_toàn_bộ = "^(?:" + mẫu + ")(?![\\s\\S])";
-    kết_quả_quét = regex quét engine(văn bản, mẫu_toàn_bộ);
-    trả về do_dai(kết_quả_quét[0]) > 0;
+    nếu (loai_cua(văn bản) != "chuỗi") {
+        ném "regex: văn bản phải là chuỗi";
+    };
+    phân_tích = regex phân tích(mẫu);
+    kết_quả = regex thử tại(phân_tích["cây"], phân_tích["nhóm"], văn bản, 0);
+    n = do_dai(văn bản);
+    lặp(i = 0; i < do_dai(kết_quả); i++) {
+        nếu (kết_quả[i]["vị trí"] == n) { trả về đúng; };
+    };
+    trả về sai;
 };
 
 hàm regex tìm(văn bản, mẫu) {

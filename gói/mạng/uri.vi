@@ -1,0 +1,543 @@
+// vi.net.uri — URI parser, normalization, resolution và form encoding thuần V++.
+// URI là dữ liệu; không phát sinh DNS/network I/O khi parse/normalize/resolve.
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/nhập xuất/tệp;
+nhập gói/văn bản/chuỗi;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/mạng/http/máy khách;
+
+hàm uri hex(chữ_số) {
+    bảng = "0123456789ABCDEF";
+    c = chuỗi thường(chữ_số);
+    lặp(i = 0; i < 16; i++) {
+        nếu (chuỗi thường(bảng[i]) == c) {
+            trả về i;
+        };
+    };
+    trả về -1;
+};
+
+hàm uri hex ký tự(giá_trị) {
+    bảng = "0123456789ABCDEF";
+    trả về bảng[giá_trị];
+};
+
+hàm uri không dành riêng(c) {
+    return_value = sai;
+    alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+    lặp(i = 0; i < do_dai(alphabet) && !return_value; i++) {
+        nếu (c == alphabet[i]) {
+            return_value = đúng;
+        };
+    };
+    trả về return_value;
+};
+
+hàm uri ký tự hex(c) {
+    mã = mã điểm unicode(c);
+    nếu (mã >= 48 && mã <= 57) { trả về mã - 48; };
+    nếu (mã >= 65 && mã <= 70) { trả về mã - 65 + 10; };
+    nếu (mã >= 97 && mã <= 102) { trả về mã - 97 + 10; };
+    trả về -1;
+};
+
+hàm uri phần trăm giải mã(văn_bản, giữ_dấu = sai) {
+    bytes = [];
+    i = 0;
+    n = do_dai(văn_bản);
+    lặp(vòng = 0; i < n; vòng++) {
+        c = văn_bản[i];
+        nếu (c == "%") {
+            nếu (i + 2 >= n) {
+                ném "NET_URI_SYNTAX: percent escape bị thiếu";
+            };
+            hi = uri ký tự hex(văn_bản[i + 1]);
+            lo = uri ký tự hex(văn_bản[i + 2]);
+            nếu (hi < 0 || lo < 0) {
+                ném "NET_URI_SYNTAX: percent escape không hợp lệ";
+            };
+            byte = hi * 16 + lo;
+            nếu (byte == 0) {
+                ném "NET_URI_SYNTAX: NUL percent encoding không được phép";
+            };
+            nếu (giữ_dấu && ((byte == 37) || (byte == 47) || (byte == 63) || (byte == 35))) {
+                thêm(bytes, 37);
+                thêm(bytes, mã điểm unicode(uri hex ký tự(hi)));
+                thêm(bytes, mã điểm unicode(uri hex ký tự(lo)));
+            } nếu không {
+                thêm(bytes, byte);
+            };
+            i = i + 3;
+        } nếu không {
+            mã = mã điểm unicode(c);
+            nếu (mã < 128) {
+                thêm(bytes, mã);
+            } nếu không {
+                encoded = mã hóa bảng mã(c, "UTF-8");
+                lặp(j = 0; j < do_dai(encoded); j++) {
+                    thêm(bytes, encoded[j]);
+                };
+            };
+            i = i + 1;
+        };
+    };
+    trả về giải mã bảng mã(bytes, "UTF-8", "BÁO_LỖI");
+};
+
+hàm uri phần trăm mã hóa(văn_bản, giữ_dấu = sai) {
+    bytes = mã hóa bảng mã(văn_bản, "UTF-8");
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        byte = bytes[i];
+        được_phép = (byte >= 65 && byte <= 90) ||
+            (byte >= 97 && byte <= 122) ||
+            (byte >= 48 && byte <= 57) ||
+            byte == 45 || byte == 46 || byte == 95 || byte == 126;
+        nếu (giữ_dấu && (byte == 33 || byte == 36 || byte == 38 || byte == 39 ||
+            byte == 40 || byte == 41 || byte == 42 || byte == 43 || byte == 44 ||
+            byte == 47 || byte == 58 || byte == 59 || byte == 61 || byte == 63 ||
+            byte == 64)) {
+            được_phép = đúng;
+        };
+        nếu (được_phép) {
+            kết_quả = kết_quả + ký tự unicode(byte);
+        } nếu không {
+            kết_quả = kết_quả + "%" + uri hex ký tự(lam_tron_xuong(byte / 16)) +
+                uri hex ký tự(byte % 16);
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm uri scheme hợp lệ(s) {
+    nếu (s == "") { trả về sai; };
+    alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.";
+    first = s[0];
+    first_ok = (mã điểm unicode(first) >= 65 && mã điểm unicode(first) <= 90) ||
+        (mã điểm unicode(first) >= 97 && mã điểm unicode(first) <= 122);
+    nếu (!first_ok) { trả về sai; };
+    lặp(i = 1; i < do_dai(s); i++) {
+        ok = sai;
+        lặp(j = 0; j < do_dai(alphabet) && !ok; j++) {
+            nếu (s[i] == alphabet[j]) { ok = đúng; };
+        };
+        nếu (!ok) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm uri chỉ số cuối(văn_bản, ký_tự) {
+    vị_trí = rỗng;
+    lặp(i = 0; i < do_dai(văn_bản); i++) {
+        nếu (văn_bản[i] == ký_tự) { vị_trí = i; };
+    };
+    trả về vị_trí;
+};
+
+hàm uri phần(giá_trị, tên, mặc_định = "") {
+    nếu (loai_cua(giá_trị) != "từ điển") { ném "NET_URI_SYNTAX"; };
+    trả về lấy map(giá_trị, tên, mặc_định);
+};
+
+hàm uri ghép(uri_value) {
+    scheme = lấy map(uri_value, "scheme", "");
+    authority = lấy map(uri_value, "authority", "");
+    path = lấy map(uri_value, "đường_dẫn_thô", lấy map(uri_value, "đường_dẫn", ""));
+    query = lấy map(uri_value, "truy_vấn_thô", rỗng);
+    fragment = lấy map(uri_value, "mảnh_thô", rỗng);
+    kết_quả = "";
+    nếu (scheme != "") { kết_quả = kết_quả + scheme + ":"; };
+    nếu (authority != "") { kết_quả = kết_quả + "//" + authority; };
+    kết_quả = kết_quả + path;
+    nếu (query != rỗng) { kết_quả = kết_quả + "?" + query; };
+    nếu (fragment != rỗng) { kết_quả = kết_quả + "#" + fragment; };
+    trả về kết_quả;
+};
+
+hàm uri phân tích(text) {
+    nếu (loai_cua(text) != "chuỗi" || do_dai(text) > 1048576) {
+        ném "NET_URI_SYNTAX: URI phải là chuỗi tối đa 1 MiB";
+    };
+    colon = tìm chuỗi chính xác(text, ":", 0);
+    slash = tìm chuỗi chính xác(text, "/", 0);
+    hỏi = tìm chuỗi chính xác(text, "?", 0);
+    băm = tìm chuỗi chính xác(text, "#", 0);
+    có_scheme = sai;
+    // &&/|| hiện đánh giá cả hai vế. Kiểm tra sentinel trước khi xếp thứ tự.
+    nếu (colon != rỗng) {
+        có_scheme = đúng;
+        nếu (slash != rỗng) {
+            nếu (colon >= slash) { có_scheme = sai; };
+        };
+        nếu (hỏi != rỗng) {
+            nếu (colon >= hỏi) { có_scheme = sai; };
+        };
+        nếu (băm != rỗng) {
+            nếu (colon >= băm) { có_scheme = sai; };
+        };
+    };
+    scheme = "";
+    bắt_đầu = 0;
+    nếu (có_scheme) {
+        scheme = chuỗi thường(cắt chuỗi(text, 0, colon));
+        nếu (!uri scheme hợp lệ(scheme)) {
+            ném "NET_URI_SYNTAX: scheme không hợp lệ";
+        };
+        bắt_đầu = colon + 1;
+    };
+
+    fragment = rỗng;
+    fragment_raw = rỗng;
+    fragment_start = tìm chuỗi chính xác(text, "#", bắt_đầu);
+    thân_end = do_dai(text);
+    nếu (fragment_start != rỗng) {
+        fragment_raw = cắt chuỗi(text, fragment_start + 1, do_dai(text) - fragment_start - 1);
+        fragment = uri phần trăm giải mã(fragment_raw);
+        thân_end = fragment_start;
+    };
+
+    query = rỗng;
+    query_raw = rỗng;
+    query_start = tìm chuỗi chính xác(text, "?", bắt_đầu);
+    nếu (query_start != rỗng) {
+        nếu (query_start < thân_end) {
+            query_raw = cắt chuỗi(text, query_start + 1, thân_end - query_start - 1);
+            query = uri phần trăm giải mã(query_raw);
+            thân_end = query_start;
+        };
+    };
+
+    authority = "";
+    userinfo = "";
+    host = "";
+    port = rỗng;
+    path_raw = cắt chuỗi(text, bắt_đầu, thân_end - bắt_đầu);
+    có_authority = bắt_đầu + 1 < thân_end &&
+        cắt chuỗi(text, bắt_đầu, 2) == "//";
+    nếu (có_authority) {
+        auth_start = bắt_đầu + 2;
+        auth_end = tìm chuỗi chính xác(text, "/", auth_start);
+        nếu (auth_end == rỗng) {
+            auth_end = thân_end;
+        } nếu không {
+            nếu (auth_end > thân_end) { auth_end = thân_end; };
+        };
+        authority = cắt chuỗi(text, auth_start, auth_end - auth_start);
+        path_raw = cắt chuỗi(text, auth_end, thân_end - auth_end);
+        at = uri chỉ số cuối(authority, "@");
+        hostpart = authority;
+        nếu (at != rỗng) {
+            userinfo = uri phần trăm giải mã(cắt chuỗi(authority, 0, at));
+            hostpart = cắt chuỗi(authority, at + 1, do_dai(authority) - at - 1);
+        };
+        nếu (bắt đầu bằng(hostpart, "[")) {
+            close = tìm chuỗi chính xác(hostpart, "]", 1);
+            nếu (close == rỗng) { ném "NET_URI_SYNTAX: IPv6 host không hợp lệ"; };
+            host = chuỗi thường(cắt chuỗi(hostpart, 1, close - 1));
+            hậu = cắt chuỗi(hostpart, close + 1, do_dai(hostpart) - close - 1);
+            nếu (hậu != "") {
+                nếu (hậu[0] != ":") { ném "NET_URI_SYNTAX: authority không hợp lệ"; };
+                port_text = cắt chuỗi(hậu, 1, do_dai(hậu) - 1);
+                nếu (port_text == "") { ném "NET_URI_SYNTAX: port rỗng"; };
+                port = thành số nguyên(port_text);
+            };
+        } nếu không {
+            colon_port = uri chỉ số cuối(hostpart, ":");
+            host = chuỗi thường(hostpart);
+            nếu (colon_port != rỗng) {
+                host = chuỗi thường(cắt chuỗi(hostpart, 0, colon_port));
+                port_text = cắt chuỗi(hostpart, colon_port + 1, do_dai(hostpart) - colon_port - 1);
+                nếu (port_text == "") { ném "NET_URI_SYNTAX: port rỗng"; };
+                port = thành số nguyên(port_text);
+            };
+        };
+        nếu (host == "") { ném "NET_URI_SYNTAX: host rỗng"; };
+        nếu (port != rỗng) {
+            nếu (port < 0 || port > 65535) {
+                ném "NET_URI_SYNTAX: port ngoài 0..65535";
+            };
+        };
+    };
+
+    nếu (có_authority && path_raw != "") {
+        nếu (path_raw[0] != "/") {
+            ném "NET_URI_SYNTAX: path có authority phải bắt đầu bằng /";
+        };
+    };
+    nếu (!có_authority && bắt đầu bằng(path_raw, "//")) {
+        ném "NET_URI_SYNTAX: relative path không được bắt đầu bằng //";
+    };
+
+    path = uri phần trăm giải mã(path_raw);
+    canonical_authority = authority;
+    nếu (có_authority) {
+        canonical_authority = "";
+        nếu (userinfo != "") { canonical_authority = uri phần trăm mã hóa(userinfo, đúng) + "@"; };
+        nếu (bắt đầu bằng(host, ":") || chứa chính xác(host, ":")) {
+            canonical_authority = canonical_authority + "[" + host + "]";
+        } nếu không {
+            canonical_authority = canonical_authority + host;
+        };
+        nếu (port != rỗng) {
+            canonical_authority = canonical_authority + ":" + thành chuỗi(port);
+        };
+    };
+
+    canonical = {
+        "scheme": scheme,
+        "authority": canonical_authority,
+        "userinfo": userinfo,
+        "host": host,
+        "port": port,
+        "đường_dẫn": path,
+        "đường_dẫn_thô": path_raw,
+        "truy_vấn": query,
+        "truy_vấn_thô": query_raw,
+        "mảnh": fragment,
+        "mảnh_thô": fragment_raw,
+        "có_authority": có_authority,
+        "raw": text
+    };
+    đặt map(canonical, "canonical", uri ghép(canonical));
+    trả về canonical;
+};
+
+hàm uri bỏ chấm(path) {
+    absolute = bắt đầu bằng(path, "/");
+    trailing = kết thúc bằng(path, "/") || kết thúc bằng(path, "/.") || kết thúc bằng(path, "/..");
+    parts = tách literal(path, "/");
+    stack = [];
+    lặp(i = 0; i < do_dai(parts); i++) {
+        p = parts[i];
+        nếu (p == "" || p == ".") {
+            // Empty segment đầu/cuối được khôi phục theo slash layout.
+        } nếu không {
+            nếu (p == "..") {
+                có_cha = sai;
+                nếu (do_dai(stack) > 0) {
+                    có_cha = stack[do_dai(stack) - 1] != "..";
+                };
+                nếu (có_cha) {
+                    xoa_tai(stack, do_dai(stack) - 1);
+                } nếu không {
+                    nếu (!absolute) { thêm(stack, ".."); };
+                };
+            } nếu không {
+                thêm(stack, p);
+            };
+        };
+    };
+    kết_quả = "";
+    nếu (absolute) { kết_quả = "/"; };
+    lặp(i = 0; i < do_dai(stack); i++) {
+        nếu (i > 0) { kết_quả = kết_quả + "/"; };
+        kết_quả = kết_quả + stack[i];
+    };
+    nếu (trailing && kết_quả != "" && !kết thúc bằng(kết_quả, "/")) { kết_quả = kết_quả + "/"; };
+    nếu (absolute && kết_quả == "") { kết_quả = "/"; };
+    trả về kết_quả;
+};
+
+hàm uri chuẩn hóa(value) {
+    parsed = value;
+    nếu (loai_cua(value) == "chuỗi") {
+        parsed = uri phân tích(value);
+    } nếu không {
+        parsed = uri phân tích(uri ghép(value));
+    };
+    scheme = chuỗi thường(lấy map(parsed, "scheme", ""));
+    host = chuỗi thường(lấy map(parsed, "host", ""));
+    path_raw = lấy map(parsed, "đường_dẫn_thô", "");
+    path_raw = uri bỏ chấm(path_raw);
+    authority = lấy map(parsed, "authority", "");
+    port = lấy map(parsed, "port", rỗng);
+    nếu ((scheme == "http" && port == 80) || (scheme == "https" && port == 443)) { port = rỗng; };
+    nếu (host != "") {
+        authority = host;
+        nếu (chứa chính xác(host, ":")) { authority = "[" + host + "]"; };
+        userinfo = lấy map(parsed, "userinfo", "");
+        nếu (userinfo != "") { authority = uri phần trăm mã hóa(userinfo, đúng) + "@" + authority; };
+        nếu (port != rỗng) { authority = authority + ":" + thành chuỗi(port); };
+    };
+    result = {
+        "scheme": scheme,
+        "authority": authority,
+        "userinfo": lấy map(parsed, "userinfo", ""),
+        "host": host,
+        "port": port,
+        "đường_dẫn": uri phần trăm giải mã(path_raw),
+        "đường_dẫn_thô": path_raw,
+        "truy_vấn": lấy map(parsed, "truy_vấn", rỗng),
+        "truy_vấn_thô": lấy map(parsed, "truy_vấn_thô", rỗng),
+        "mảnh": lấy map(parsed, "mảnh", rỗng),
+        "mảnh_thô": lấy map(parsed, "mảnh_thô", rỗng),
+        "có_authority": lấy map(parsed, "có_authority", sai),
+        "raw": lấy map(parsed, "raw", "")
+    };
+    đặt map(result, "canonical", uri ghép(result));
+    trả về result;
+};
+
+hàm uri hợp nhất(base, relative) {
+    b = base;
+    r = relative;
+    nếu (loai_cua(base) == "chuỗi") { b = uri phân tích(base); };
+    nếu (loai_cua(relative) == "chuỗi") { r = uri phân tích(relative); };
+    rs = lấy map(r, "scheme", "");
+    ra = lấy map(r, "authority", "");
+    rp = lấy map(r, "đường_dẫn_thô", "");
+    rq = lấy map(r, "truy_vấn_thô", rỗng);
+    rf = lấy map(r, "mảnh_thô", rỗng);
+    bs = lấy map(b, "scheme", "");
+    ba = lấy map(b, "authority", "");
+    bp = lấy map(b, "đường_dẫn_thô", "");
+    bq = lấy map(b, "truy_vấn_thô", rỗng);
+    ta = ba;
+    tp = "";
+    tq = rq;
+    nếu (rs != "") {
+        bs = rs; ta = ra; tp = uri bỏ chấm(rp);
+    } nếu không {
+        nếu (ra != "") {
+            ta = ra; tp = uri bỏ chấm(rp);
+        } nếu không {
+            nếu (rp == "") {
+                tp = bp;
+                nếu (rq == rỗng) { tq = bq; };
+            } nếu không {
+                nếu (bắt đầu bằng(rp, "/")) {
+                    tp = uri bỏ chấm(rp);
+                } nếu không {
+                    prefix = "/";
+                    slash = uri chỉ số cuối(bp, "/");
+                    nếu (slash != rỗng) { prefix = cắt chuỗi(bp, 0, slash + 1); };
+                    nếu (ba != "" && bp == "") { prefix = "/"; };
+                    tp = uri bỏ chấm(prefix + rp);
+                };
+            };
+        };
+    };
+    result = {
+        "scheme": bs,
+        "authority": ta,
+        "userinfo": lấy map(r, "userinfo", lấy map(b, "userinfo", "")),
+        "host": lấy map(r, "host", lấy map(b, "host", "")),
+        "port": lấy map(r, "port", lấy map(b, "port", rỗng)),
+        "đường_dẫn": uri phần trăm giải mã(tp),
+        "đường_dẫn_thô": tp,
+        "truy_vấn": rỗng,
+        "truy_vấn_thô": tq,
+        "mảnh": rỗng,
+        "mảnh_thô": rf,
+        "có_authority": ta != "",
+        "raw": ""
+    };
+    nếu (tq != rỗng) { đặt map(result, "truy_vấn", uri phần trăm giải mã(tq)); };
+    nếu (rf != rỗng) { đặt map(result, "mảnh", uri phần trăm giải mã(rf)); };
+    đặt map(result, "canonical", uri ghép(result));
+    trả về result;
+};
+
+hàm encode form(text, charset = "UTF-8") {
+    nếu (chuỗi thường(charset) != "utf-8" && chuỗi thường(charset) != "utf8") {
+        ném "NET_ENCODING_INVALID: chỉ hỗ trợ UTF-8";
+    };
+    bytes = mã hóa bảng mã(text, "UTF-8");
+    kết_quả = "";
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        b = bytes[i];
+        nếu ((b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57) ||
+            b == 45 || b == 46 || b == 95 || b == 126) {
+            kết_quả = kết_quả + ký tự unicode(b);
+        } nếu không {
+            nếu (b == 32) {
+                kết_quả = kết_quả + "+";
+            } nếu không {
+                kết_quả = kết_quả + "%" + uri hex ký tự(lam_tron_xuong(b / 16)) + uri hex ký tự(b % 16);
+            };
+        };
+    };
+    trả về kết_quả;
+};
+
+hàm decode form(text, charset = "UTF-8") {
+    nếu (chuỗi thường(charset) != "utf-8" && chuỗi thường(charset) != "utf8") {
+        ném "NET_ENCODING_INVALID: chỉ hỗ trợ UTF-8";
+    };
+    bytes = [];
+    i = 0;
+    lặp(vòng = 0; i < do_dai(text); vòng++) {
+        c = text[i];
+        nếu (c == "+") {
+            thêm(bytes, 32);
+            i = i + 1;
+        } nếu không {
+            nếu (c == "%") {
+                nếu (i + 2 >= do_dai(text)) { ném "NET_URI_SYNTAX: percent escape bị thiếu"; };
+                hi = uri ký tự hex(text[i + 1]);
+                lo = uri ký tự hex(text[i + 2]);
+                nếu (hi < 0 || lo < 0) { ném "NET_URI_SYNTAX: percent escape không hợp lệ"; };
+                thêm(bytes, hi * 16 + lo);
+                i = i + 3;
+            } nếu không {
+                encoded = mã hóa bảng mã(c, "UTF-8");
+                lặp(j = 0; j < do_dai(encoded); j++) { thêm(bytes, encoded[j]); };
+                i = i + 1;
+            };
+        };
+    };
+    trả về giải mã bảng mã(bytes, "UTF-8", "BÁO_LỖI");
+};
+
+hàm url(value) {
+    parsed = value;
+    nếu (loai_cua(value) == "chuỗi") { parsed = uri phân tích(value); };
+    scheme = chuỗi thường(lấy map(parsed, "scheme", ""));
+    nếu (scheme == "") { ném "NET_URL_MALFORMED: URL cần scheme"; };
+    nếu (scheme != "file" && scheme != "http" && scheme != "https") {
+        ném "NET_SCHEME_UNKNOWN: scheme chưa có resource handler: " + scheme;
+    };
+    đặt map(parsed, "resource_type", "url");
+    trả về parsed;
+};
+
+hàm kiểu nội dung(tên_file) {
+    tên = chuỗi thường(thành chuỗi(tên_file));
+    dấu = uri chỉ số cuối(tên, ".");
+    nếu (dấu == rỗng || dấu == do_dai(tên) - 1) { trả về rỗng; };
+    ext = cắt chuỗi(tên, dấu + 1, do_dai(tên) - dấu - 1);
+    nếu (ext == "html" || ext == "htm") { trả về "text/html"; };
+    nếu (ext == "css") { trả về "text/css"; };
+    nếu (ext == "js" || ext == "mjs") { trả về "text/javascript"; };
+    nếu (ext == "json") { trả về "application/json"; };
+    nếu (ext == "xml") { trả về "application/xml"; };
+    nếu (ext == "txt" || ext == "log") { trả về "text/plain"; };
+    nếu (ext == "csv") { trả về "text/csv"; };
+    nếu (ext == "pdf") { trả về "application/pdf"; };
+    nếu (ext == "zip") { trả về "application/zip"; };
+    nếu (ext == "gz") { trả về "application/gzip"; };
+    nếu (ext == "png") { trả về "image/png"; };
+    nếu (ext == "jpg" || ext == "jpeg") { trả về "image/jpeg"; };
+    nếu (ext == "gif") { trả về "image/gif"; };
+    nếu (ext == "svg") { trả về "image/svg+xml"; };
+    nếu (ext == "wasm") { trả về "application/wasm"; };
+    trả về rỗng;
+};
+
+// Mở resource chỉ thực hiện I/O khi caller gọi hàm này. HTTP/HTTPS trả response
+// từ HTTP client; file trả nội dung tệp. Archive/unknown scheme không giả lập.
+hàm mở tài nguyên(value, tùy_chọn = rỗng) {
+    parsed = url(value);
+    scheme = lấy map(parsed, "scheme", "");
+    nếu (scheme == "file") {
+        path = lấy map(parsed, "đường_dẫn", "");
+        nếu (path == "") { ném "NET_RESOURCE_UNSUPPORTED: file URL thiếu path"; };
+        trả về {"scheme": "file", "url": lấy map(parsed, "canonical", ""), "nội_dung": đọc tệp(path), "kiểu": kiểu nội dung(path)};
+    };
+    nếu (scheme == "http" || scheme == "https") {
+        response = mạng lấy(lấy map(parsed, "canonical", ""));
+        trả về {"scheme": scheme, "url": lấy map(parsed, "canonical", ""), "nội_dung": response, "kiểu": kiểu nội dung(lấy map(parsed, "đường_dẫn", ""))};
+    };
+    ném "NET_RESOURCE_UNSUPPORTED: resource handler chưa có";
+};

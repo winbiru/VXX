@@ -1,9 +1,10 @@
 // Module: nhập xuất.đường dẫn
 // Phân tích/nối đường dẫn là logic thuần V++. Chỉ các phép hỏi trạng thái hệ tệp
-// ở cuối tệp này đi qua native boundary.
+// ở cuối tệp này đi qua VM primitive boundary.
 
 nhập gói/hệ thống/nền tảng;
 nhập gói/văn bản/chuỗi;
+nhập gói/lõi/chuyển kiểu;
 
 hàm đường dẫn dấu phân cách() {
     nếu (tên nền tảng() == "windows") {
@@ -115,13 +116,13 @@ hàm đường dẫn cha(đường dẫn) {
 };
 
 hàm đường dẫn tồn tại(đường dẫn) {
-    trả về duong_dan_ton_tai(đường dẫn);
+    trả về duong_dan_ton_tai_vm(thành chuỗi(đường dẫn));
 };
 
 hàm là tệp(đường dẫn) {
-    trả về la_tep(đường dẫn);
+    trả về la_tep_vm(thành chuỗi(đường dẫn));
 };
 
 hàm là thư mục(đường dẫn) {
-    trả về la_thu_muc(đường dẫn);
+    trả về la_thu_muc_vm(thành chuỗi(đường dẫn));
 };

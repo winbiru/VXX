@@ -3,7 +3,7 @@
 nhập gói/lõi/chuyển kiểu;
 
 hàm tên nền tảng() {
-    trả về ten_nen_tang();
+    trả về ten_nen_tang_vm();
 };
 
 hàm ngủ mili giây(thời lượng) {
@@ -15,5 +15,5 @@ hàm ngủ mili giây(thời lượng) {
     nếu (thời lượng < 0) {
         ném "ngủ mili giây: thời lượng phải là số nguyên không âm";
     };
-    trả về ngu_mili_giay(thời lượng);
+    trả về ngu_mili_giay_vm(thời lượng);
 };

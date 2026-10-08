@@ -3,7 +3,7 @@
 // Chỉ hiệu giữa hai lần đọc có ý nghĩa; không dùng làm thời gian lịch.
 
 hàm thời gian đơn điệu mili giây() {
-    trả về thoi_gian_don_dieu_mili_giay();
+    trả về thoi_gian_don_dieu_ms_vm();
 };
 
 hàm bắt đầu đo thời gian() {

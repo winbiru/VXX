@@ -2,11 +2,28 @@
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
 
+hàm kịch bản chạy nội bộ(mã nguồn, gốc) {
+    nếu (loai_cua(mã nguồn) != "chuỗi") {
+        ném "kịch bản chạy: mã nguồn phải là chuỗi";
+    };
+    nếu (loai_cua(gốc) != "chuỗi") {
+        ném "kịch bản chạy: gốc phải là chuỗi";
+    };
+    nếu (gốc == "") {
+        gốc = ".";
+    };
+    thử {
+        trả về kich_ban_chay_vm(mã nguồn, gốc);
+    } bắt lỗi (e) {
+        ném "kịch bản chạy: " + e;
+    };
+};
+
 hàm kịch bản chạy(mã nguồn) {
-    trả về kich_ban_chay_noi_bo(mã nguồn, ".");
+    trả về kịch bản chạy nội bộ(mã nguồn, ".");
 };
 
 hàm kịch bản chạy tệp(đường dẫn) {
     mã_nguồn = đọc tệp(đường dẫn);
-    trả về kich_ban_chay_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+    trả về kịch bản chạy nội bộ(mã_nguồn, đường dẫn cha(đường dẫn));
 };

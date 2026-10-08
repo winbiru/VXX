@@ -1,18 +1,92 @@
 // Module: nhập xuất.thư mục
-// Tạo, liệt kê và dọn cây thư mục.
+// Tạo, liệt kê và dọn cây thư mục bằng V++.
+// VM chỉ tạo/xóa một mục hoặc đọc trạng thái/danh sách mục của hệ tệp.
 
 nhập gói/bộ sưu tập/danh sách;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/nhập xuất/đường dẫn;
+
+hàm thư mục là thư mục không theo liên kết(đường) {
+    trạng_thái = la_thu_muc_khong_theo_lien_ket_vm(đường);
+    // Primitive chỉ trả mã trạng thái: -1 thiếu, 0 không phải thư mục, 1 thư mục.
+    // Chính sách coi đường dẫn thiếu là "không phải thư mục" thuộc V++.
+    nếu (trạng_thái < 0) { trả về sai; };
+    trả về trạng_thái == 1;
+};
+
+// Bỏ separator cuối trước lstat/unlink để symlink tới thư mục vẫn chỉ bị
+// xóa liên kết, kể cả khi caller truyền "link/". Giữ root POSIX/Windows.
+hàm thư mục bỏ dấu cuối(đường) {
+    n = do_dai(đường);
+    đang_bỏ = đúng;
+    lặp(vòng = 0; n > 1 && đang_bỏ; vòng++) {
+        nếu (!đường dẫn là phân cách(đường[n - 1])) {
+            đang_bỏ = sai;
+        } nếu không {
+            nếu (n == 3 && đường[1] == ":" && tên nền tảng() == "windows") {
+                đang_bỏ = sai;
+            } nếu không {
+                n = n - 1;
+            };
+        };
+    };
+    trả về cắt chuỗi(đường, 0, n);
+};
 
 hàm tạo thư mục(đường dẫn) {
-    trả về tao_thu_muc(đường dẫn);
+    đường = thư mục bỏ dấu cuối(thành chuỗi(đường dẫn));
+    cần_tạo = [];
+    hiện_tại = đường;
+    tìm_cha = đúng;
+    lặp(vòng = 0; tìm_cha; vòng++) {
+        nếu (la_thu_muc_vm(hiện_tại)) {
+            tìm_cha = sai;
+        } nếu không {
+            nếu (duong_dan_ton_tai_vm(hiện_tại)) {
+                ném "tạo thư mục: đường dẫn đã tồn tại và không phải thư mục";
+            };
+            them(cần_tạo, hiện_tại);
+            cha = đường dẫn cha(hiện_tại);
+            nếu (cha == "" || cha == hiện_tại) {
+                tìm_cha = sai;
+            } nếu không {
+                hiện_tại = cha;
+            };
+        };
+    };
+    lặp(i = do_dai(cần_tạo) - 1; i >= 0; i--) {
+        tao_thu_muc_vm(cần_tạo[i]);
+    };
+    trả về 1;
 };
 
 hàm liệt kê thư mục(đường dẫn) {
-    kết_quả = liet_ke_thu_muc(đường dẫn);
+    kết_quả = liet_ke_thu_muc_vm(thành chuỗi(đường dẫn));
     sắp xếp(kết_quả);
     trả về kết_quả;
 };
 
 hàm xóa đường dẫn(đường dẫn) {
-    trả về xoa_duong_dan(đường dẫn);
+    đường = thư mục bỏ dấu cuối(thành chuỗi(đường dẫn));
+    việc = [[đường, sai]];
+    đã_xóa = 0;
+    // Stack tường minh thay cho lời gọi đệ quy: cây sâu không dùng call stack VM.
+    lặp(vòng = 0; do_dai(việc) > 0; vòng++) {
+        mục = xoa_tai(việc, do_dai(việc) - 1);
+        đường_mục = mục[0];
+        nếu (mục[1]) {
+            đã_xóa = đã_xóa + xoa_duong_dan_vm(đường_mục);
+        } nếu không {
+            nếu (thư mục là thư mục không theo liên kết(đường_mục)) {
+                them(việc, [đường_mục, đúng]);
+                con = liet_ke_thu_muc_vm(đường_mục);
+                lặp(i = 0; i < do_dai(con); i++) {
+                    them(việc, [đường dẫn nối(đường_mục, con[i]), sai]);
+                };
+            } nếu không {
+                đã_xóa = đã_xóa + xoa_duong_dan_vm(đường_mục);
+            };
+        };
+    };
+    trả về đã_xóa;
 };

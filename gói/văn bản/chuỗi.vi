@@ -286,34 +286,13 @@ hàm chuẩn hóa unicode(s) {
     trả về kết_quả + chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã);
 };
 
-// Phân loại theo Unicode White_Space. Native chỉ cung cấp primitive mã hóa
-// một code point sang UTF-8; việc khôi phục scalar và quyết định whitespace
-// được thực hiện hoàn toàn ở V++.
+// Phân loại theo Unicode White_Space. Việc xác định code point dùng opcode chuỗi
+// cơ bản của VM; policy whitespace nằm hoàn toàn ở V++.
 hàm chuỗi mã điểm unicode(c) {
     nếu (loại của(c) != "chuỗi" || do_dai(c) != 1) {
         ném "STRING_TYPE";
     };
-
-    bytes = utf8_native_exec("encode", c);
-    n = do_dai(bytes);
-    nếu (n == 1) {
-        trả về bytes[0];
-    };
-    nếu (n == 2) {
-        trả về (bytes[0] % 32) * 64 + (bytes[1] % 64);
-    };
-    nếu (n == 3) {
-        trả về (bytes[0] % 16) * 4096 +
-               (bytes[1] % 64) * 64 +
-               (bytes[2] % 64);
-    };
-    nếu (n == 4) {
-        trả về (bytes[0] % 8) * 262144 +
-               (bytes[1] % 64) * 4096 +
-               (bytes[2] % 64) * 64 +
-               (bytes[3] % 64);
-    };
-    ném "STRING_TYPE";
+    trả về mã điểm unicode(c);
 };
 
 hàm là khoảng trắng unicode(c) {

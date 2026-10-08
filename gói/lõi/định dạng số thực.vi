@@ -1,0 +1,225 @@
+// Chuyển IEEE-754 binary64 thành thập phân chính xác bằng V++.
+// VM chỉ đọc 8 byte biểu diễn số. Số lớn, làm tròn ties-to-even và bố cục
+// fixed/scientific/general đều nằm ở thư viện.
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/văn bản/chuỗi;
+
+hàm định dạng số lặp(ký_tự, n) {
+    kết_quả = "";
+    khối = ký_tự;
+    lặp(vòng = 0; n > 0; vòng++) {
+        nếu (n % 2 == 1) { kết_quả = kết_quả + khối; };
+        n = lam_tron_xuong(n / 2);
+        nếu (n > 0) { khối = khối + khối; };
+    };
+    trả về kết_quả;
+};
+
+// Limb little-endian base 10^4. Factor <= 78125 giữ mọi trung gian trong i32.
+hàm định dạng số nhân lớn(limbs, factor, nhớ = 0) {
+    lặp(i = 0; i < do_dai(limbs); i++) {
+        tổng = limbs[i] * factor + nhớ;
+        limbs[i] = tổng % 10000;
+        nhớ = lam_tron_xuong(tổng / 10000);
+    };
+    lặp(vòng = 0; nhớ > 0; vòng++) {
+        thêm(limbs, nhớ % 10000);
+        nhớ = lam_tron_xuong(nhớ / 10000);
+    };
+    trả về limbs;
+};
+
+hàm định dạng số chữ số lớn(limbs) {
+    kết_quả = thành chuỗi(limbs[do_dai(limbs) - 1]);
+    lặp(i = do_dai(limbs) - 2; i >= 0; i--) {
+        nhóm = thành chuỗi(limbs[i]);
+        kết_quả = kết_quả + định dạng số lặp("0", 4 - do_dai(nhóm)) + nhóm;
+    };
+    trả về kết_quả;
+};
+
+hàm định dạng số thập phân chính xác(giá_trị) {
+    kiểu = loai_cua(giá_trị);
+    nếu (kiểu != "số nguyên" && kiểu != "số thực") {
+        ném "định dạng số thực: giá trị phải là số";
+    };
+    bytes = so_thuc_bits_vm(giá_trị);
+    âm = bytes[7] >= 128;
+    số_mũ = (bytes[7] % 128) * 16 + lam_tron_xuong(bytes[6] / 16);
+    mantissa = [0];
+    đầu = bytes[6] % 16;
+    nếu (số_mũ > 0 && số_mũ < 2047) { đầu = đầu + 16; };
+    định dạng số nhân lớn(mantissa, 256, đầu);
+    lặp(i = 5; i >= 0; i--) {
+        định dạng số nhân lớn(mantissa, 256, bytes[i]);
+    };
+    là_zero = do_dai(mantissa) == 1 && mantissa[0] == 0;
+    nếu (số_mũ == 2047) {
+        đặc_biệt = "NaN";
+        nếu (là_zero) { đặc_biệt = "Infinity"; };
+        trả về {"âm": âm, "đặc biệt": đặc_biệt};
+    };
+    nếu (là_zero) {
+        trả về {"âm": âm, "đặc biệt": "", "chữ số": "0", "scale": 0, "mũ": 0};
+    };
+    mũ_hai = số_mũ - 1075;
+    nếu (số_mũ == 0) { mũ_hai = -1074; };
+    scale = 0;
+    nếu (mũ_hai < 0) {
+        scale = 0 - mũ_hai;
+        còn_lại = scale;
+        lặp(vòng = 0; còn_lại > 0; vòng++) {
+            bước = 7;
+            nếu (còn_lại < bước) { bước = còn_lại; };
+            factor = 1;
+            lặp(j = 0; j < bước; j++) { factor = factor * 5; };
+            định dạng số nhân lớn(mantissa, factor);
+            còn_lại = còn_lại - bước;
+        };
+    } nếu không {
+        còn_lại = mũ_hai;
+        lặp(vòng = 0; còn_lại > 0; vòng++) {
+            bước = 16;
+            nếu (còn_lại < bước) { bước = còn_lại; };
+            factor = 1;
+            lặp(j = 0; j < bước; j++) { factor = factor * 2; };
+            định dạng số nhân lớn(mantissa, factor);
+            còn_lại = còn_lại - bước;
+        };
+    };
+    chữ_số = định dạng số chữ số lớn(mantissa);
+    trả về {"âm": âm, "đặc biệt": "", "chữ số": chữ_số, "scale": scale,
+        "mũ": do_dai(chữ_số) - scale - 1};
+};
+
+hàm định dạng số tăng một(chữ_số) {
+    ds = [];
+    lặp(i = 0; i < do_dai(chữ_số); i++) { thêm(ds, thành số nguyên(chữ_số[i])); };
+    nhớ = 1;
+    lặp(i = do_dai(ds) - 1; i >= 0 && nhớ > 0; i--) {
+        tổng = ds[i] + nhớ;
+        ds[i] = tổng % 10;
+        nhớ = lam_tron_xuong(tổng / 10);
+    };
+    kết_quả = "";
+    nếu (nhớ > 0) { kết_quả = "1"; };
+    lặp(i = 0; i < do_dai(ds); i++) { kết_quả = kết_quả + thành chuỗi(ds[i]); };
+    trả về kết_quả;
+};
+
+// Giữ số chữ số đầu và làm tròn theo biểu diễn thập phân chính xác.
+hàm định dạng số làm tròn chữ số(chữ_số, giữ) {
+    n = do_dai(chữ_số);
+    nếu (giữ >= n) { trả về chữ_số + định dạng số lặp("0", giữ - n); };
+    nếu (giữ < 0) { trả về "0"; };
+    đầu = "0";
+    nếu (giữ > 0) { đầu = cắt chuỗi(chữ_số, 0, giữ); };
+    chữ_bỏ = thành số nguyên(chữ_số[giữ]);
+    tăng = chữ_bỏ > 5;
+    nếu (chữ_bỏ == 5) {
+        còn_khác_zero = sai;
+        lặp(i = giữ + 1; i < n && !còn_khác_zero; i++) {
+            nếu (chữ_số[i] != "0") { còn_khác_zero = đúng; };
+        };
+        cuối = thành số nguyên(đầu[do_dai(đầu) - 1]);
+        tăng = còn_khác_zero || cuối % 2 == 1;
+    };
+    nếu (tăng) { trả về định dạng số tăng một(đầu); };
+    trả về đầu;
+};
+
+hàm định dạng số fixed(chữ_số, precision) {
+    n = do_dai(chữ_số);
+    nếu (n <= precision) {
+        chữ_số = định dạng số lặp("0", precision + 1 - n) + chữ_số;
+        n = do_dai(chữ_số);
+    };
+    nếu (precision == 0) { trả về chữ_số; };
+    trả về cắt chuỗi(chữ_số, 0, n - precision) + "." +
+        cắt chuỗi(chữ_số, n - precision, precision);
+};
+
+hàm định dạng số bỏ zero lẻ(thân) {
+    dấu_chấm = sai;
+    lặp(i = 0; i < do_dai(thân); i++) {
+        nếu (thân[i] == ".") { dấu_chấm = đúng; };
+    };
+    nếu (!dấu_chấm) { trả về thân; };
+    n = do_dai(thân);
+    đang_bỏ = đúng;
+    lặp(vòng = 0; n > 0 && đang_bỏ; vòng++) {
+        nếu (thân[n - 1] == "0") { n = n - 1; } nếu không { đang_bỏ = sai; };
+    };
+    nếu (n > 0) {
+        nếu (thân[n - 1] == ".") { n = n - 1; };
+    };
+    trả về cắt chuỗi(thân, 0, n);
+};
+
+hàm định dạng số scientific(chữ_số, mũ, hoa, bỏ_zero = sai) {
+    thân = chữ_số[0];
+    nếu (do_dai(chữ_số) > 1) {
+        thân = thân + "." + cắt chuỗi(chữ_số, 1, do_dai(chữ_số) - 1);
+    };
+    nếu (bỏ_zero) { thân = định dạng số bỏ zero lẻ(thân); };
+    dấu = "+";
+    nếu (mũ < 0) { dấu = "-"; mũ = 0 - mũ; };
+    số_mũ = thành chuỗi(mũ);
+    nếu (do_dai(số_mũ) < 2) { số_mũ = "0" + số_mũ; };
+    ký_hiệu = "e";
+    nếu (hoa) { ký_hiệu = "E"; };
+    trả về thân + ký_hiệu + dấu + số_mũ;
+};
+
+hàm định dạng số thực nội bộ(giá_trị, chuyển, precision) {
+    nếu (loai_cua(precision) != "số nguyên") { ném "FORMAT_PRECISION"; };
+    nếu (precision < 0 || precision > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
+    nếu (chuyển != "f" && chuyển != "e" && chuyển != "E" && chuyển != "g" && chuyển != "G") {
+        ném "FORMAT_UNKNOWN_CONVERSION";
+    };
+    exact = định dạng số thập phân chính xác(giá_trị);
+    đặc_biệt = lấy map(exact, "đặc biệt", "");
+    hoa = chuyển == "E" || chuyển == "G";
+    nếu (đặc_biệt != "") {
+        nếu (hoa) { đặc_biệt = chuỗi hoa(đặc_biệt); };
+        trả về {"âm": lấy map(exact, "âm", sai), "thân": đặc_biệt};
+    };
+    chữ_số = lấy map(exact, "chữ số", "0");
+    mũ = lấy map(exact, "mũ", 0);
+    thân = "";
+    nếu (chuyển == "f") {
+        giữ = do_dai(chữ_số) - lấy map(exact, "scale", 0) + precision;
+        thân = định dạng số fixed(định dạng số làm tròn chữ số(chữ_số, giữ), precision);
+    } nếu không {
+        giữ = precision;
+        nếu (chuyển == "e" || chuyển == "E") { giữ = precision + 1; };
+        nếu (giữ == 0) { giữ = 1; };
+        nếu (chuyển == "g" || chuyển == "G") {
+            nếu (giữ > do_dai(chữ_số)) { giữ = do_dai(chữ_số); };
+        };
+        rounded = định dạng số làm tròn chữ số(chữ_số, giữ);
+        nếu (do_dai(rounded) > giữ) {
+            mũ = mũ + 1;
+            rounded = cắt chuỗi(rounded, 0, giữ);
+        };
+        nếu (chuyển == "e" || chuyển == "E") {
+            thân = định dạng số scientific(rounded, mũ, hoa);
+        } nếu không {
+            p = precision;
+            nếu (p == 0) { p = 1; };
+            nếu (mũ < -4 || mũ >= p) {
+                thân = định dạng số scientific(rounded, mũ, hoa, đúng);
+            } nếu không {
+                lẻ = do_dai(rounded) - mũ - 1;
+                nếu (lẻ < 0) {
+                    rounded = rounded + định dạng số lặp("0", 0 - lẻ);
+                    lẻ = 0;
+                };
+                thân = định dạng số bỏ zero lẻ(định dạng số fixed(rounded, lẻ));
+            };
+        };
+    };
+    trả về {"âm": lấy map(exact, "âm", sai), "thân": thân};
+};

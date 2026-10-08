@@ -1,0 +1,50 @@
+// Chạy executable bằng argv riêng và môi trường riêng cho tiến trình con.
+// Validation/defaults thuộc V++; VM chỉ spawn, đọc pipe và chờ exit status.
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm tiến trình yêu cầu chuỗi(giá_trị, nhãn) {
+    nếu (loai_cua(giá_trị) != "chuỗi") {
+        ném "chạy tiến trình: " + nhãn + " phải là chuỗi";
+    };
+    nul = ký tự unicode(0);
+    lặp(i = 0; i < do_dai(giá_trị); i++) {
+        nếu (giá_trị[i] == nul) {
+            ném "chạy tiến trình: " + nhãn + " không được chứa NUL";
+        };
+    };
+    trả về giá_trị;
+};
+
+hàm chạy tiến trình(chương_trình, đối_số = rỗng, môi_trường = rỗng) {
+    chương_trình = tiến trình yêu cầu chuỗi(chương_trình, "chương trình");
+    nếu (chương_trình == "") { ném "chạy tiến trình: chương trình không được rỗng"; };
+    nếu (đối_số == rỗng) { đối_số = []; };
+    nếu (môi_trường == rỗng) { môi_trường = {}; };
+    nếu (loai_cua(đối_số) != "danh sách") {
+        ném "chạy tiến trình: đối số phải là danh sách";
+    };
+    nếu (loai_cua(môi_trường) != "từ điển") {
+        ném "chạy tiến trình: môi trường phải là từ điển";
+    };
+    lặp(i = 0; i < do_dai(đối_số); i++) {
+        tiến trình yêu cầu chuỗi(đối_số[i], "đối số");
+    };
+    tên = khóa map(môi_trường);
+    lặp(i = 0; i < do_dai(tên); i++) {
+        key = tiến trình yêu cầu chuỗi(tên[i], "tên biến môi trường");
+        nếu (key == "") { ném "chạy tiến trình: tên biến môi trường không được rỗng"; };
+        lặp(j = 0; j < do_dai(key); j++) {
+            nếu (key[j] == "=") { ném "chạy tiến trình: tên biến môi trường không được chứa ="; };
+        };
+        tiến trình yêu cầu chuỗi(môi_trường[key], "giá trị biến môi trường");
+    };
+    thô = tien_trinh_chay_vm(chương_trình, đối_số, môi_trường);
+    trả về {
+        "khởi chạy": thô[0],
+        "mã thoát": thô[1],
+        "đầu ra": thô[2],
+        "lỗi": thô[3]
+    };
+};

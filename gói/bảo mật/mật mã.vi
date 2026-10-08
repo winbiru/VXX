@@ -3,11 +3,12 @@
 // Contract 1.0:
 // - Chuỗi đầu vào được băm theo đúng byte UTF-8.
 // - SHA-256 và HMAC-SHA256 được triển khai bằng V++.
-// - Native chỉ giữ entropy bảo mật của hệ điều hành/OpenSSL.
+// - VM chỉ giữ entropy bảo mật của hệ điều hành/OpenSSL.
 // - Digest và random bảo mật trả hex chữ thường.
 
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
+nhập gói/lõi/bảng mã;
 
 hàm mật mã lũy thừa hai(n) {
     kết_quả = 1;
@@ -315,12 +316,11 @@ hàm mật mã utf8 bytes(văn_bản, tên_hàm) {
     nếu (loai_cua(văn_bản) != "chuỗi") {
         ném tên_hàm + ": văn bản phải là chuỗi";
     };
-    // Primitive charset nền tảng: chuyển representation UTF-8 runtime sang byte.
-    trả về utf8_native_exec("encode", văn_bản);
+    trả về mã hóa bảng mã(văn_bản, "UTF-8");
 };
 
 hàm ngẫu nhiên bảo mật(số byte) {
-    // Entropy hệ điều hành là native boundary thực sự và được giữ lại.
+    // Entropy hệ điều hành là VM primitive boundary thực sự và được giữ lại.
     thử {
         số byte = thành số nguyên(số byte);
     } bắt lỗi (e) {
@@ -329,7 +329,7 @@ hàm ngẫu nhiên bảo mật(số byte) {
     nếu (số byte < 1 || số byte > 4096) {
         ném "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
     };
-    trả về mật mã hex(ngau_nhien_bao_mat_bytes(số byte));
+    trả về mật mã hex(ngau_nhien_bao_mat_bytes_vm(số byte));
 };
 
 hàm băm sha256(văn bản) {
@@ -344,7 +344,7 @@ hàm hmac sha256(khóa, văn bản) {
     nếu (loai_cua(văn bản) != "chuỗi") {
         ném "hmac sha256: văn bản phải là chuỗi";
     };
-    khóa_bytes = utf8_native_exec("encode", khóa);
+    khóa_bytes = mã hóa bảng mã(khóa, "UTF-8");
     nếu (do_dai(khóa_bytes) > 64) {
         khóa_bytes = mật mã sha256 bytes(khóa_bytes);
     };
@@ -358,7 +358,7 @@ hàm hmac sha256(khóa, văn bản) {
         them(trong, mật mã xor byte(khóa_bytes[i], 54));
         them(ngoài, mật mã xor byte(khóa_bytes[i], 92));
     };
-    dữ_liệu = utf8_native_exec("encode", văn bản);
+    dữ_liệu = mã hóa bảng mã(văn bản, "UTF-8");
     lặp(i = 0; i < do_dai(dữ_liệu); i++) {
         them(trong, dữ_liệu[i]);
     };

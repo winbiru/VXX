@@ -61,7 +61,7 @@ hàm giá trị fnv1a32(văn_bản) {
     trả về h[0] + h[1] * 256 + h[2] * 65536 + (h[3] % 128) * 16777216;
 };
 
-// Scalar hash nằm hoàn toàn ở V++. Native chỉ còn identity hash cho các handle
+// Scalar hash nằm hoàn toàn ở V++. VM chỉ còn identity hash cho các handle
 // tham chiếu của VM, vì định danh object/collection không thể quan sát từ V++.
 hàm băm giá trị(giá_trị) {
     kiểu = loại của(giá_trị);

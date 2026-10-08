@@ -4,6 +4,16 @@
 
 nhập gói/lõi/chuyển kiểu;
 
+hàm socket yêu cầu tên máy(giá_trị, tên_hàm) {
+    nếu (loai_cua(giá_trị) != "chuỗi") {
+        ném tên_hàm + ": tên máy phải là chuỗi";
+    };
+    nếu (do_dai(giá_trị) == 0) {
+        ném tên_hàm + ": tên máy không được rỗng";
+    };
+    trả về giá_trị;
+};
+
 hàm socket yêu cầu số nguyên(giá_trị, tên_hàm, nhãn) {
     thử {
         trả về thành số nguyên(giá_trị);
@@ -36,24 +46,67 @@ hàm socket yêu cầu mã(giá_trị, tên_hàm, nhãn) {
     trả về mã;
 };
 
+hàm socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm) {
+    địa_chỉ = [];
+    thử {
+        // Giữ thứ tự resolver, không dùng danh sách DNS đã sort/deduplicate.
+        địa_chỉ = socket_phan_giai_vm(tên_máy, cổng, là_datagram);
+    } bắt lỗi (e) {
+        ném tên_hàm + ": " + e;
+    };
+    lỗi_cuối = "không có địa chỉ kết nối";
+    lặp(i = 0; i < do_dai(địa_chỉ); i++) {
+        thử {
+            mã = 0;
+            nếu (là_datagram) {
+                mã = socket_udp_mo_vm(địa_chỉ[i], thời_gian_chờ);
+            } nếu không {
+                mã = socket_tcp_mo_vm(địa_chỉ[i], thời_gian_chờ);
+            };
+            // Cấu hình timeout sau connect; lỗi phải đóng rồi thử địa chỉ kế.
+            thử {
+                socket_dat_timeout_vm(mã, thời_gian_chờ);
+            } bắt lỗi (e) {
+                thử { socket_dong_vm(mã); } bắt lỗi (bỏ_qua) {};
+                ném e;
+            };
+            trả về mã;
+        } bắt lỗi (e) {
+            lỗi_cuối = e;
+        };
+    };
+    ném tên_hàm + ": " + lỗi_cuối;
+};
+
 hàm socket tcp mở(tên máy, cổng, thời gian chờ = 5000) {
+    tên máy = socket yêu cầu tên máy(tên máy, "socket_tcp_mo");
     cổng = socket yêu cầu cổng(cổng, "socket_tcp_mo");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_tcp_mo");
-    trả về socket_tcp_mo(tên máy, cổng, thời gian chờ);
+    trả về socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tcp_mo");
 };
 
 hàm socket udp mở(tên máy, cổng, thời gian chờ = 5000) {
+    tên máy = socket yêu cầu tên máy(tên máy, "socket_udp_mo");
     cổng = socket yêu cầu cổng(cổng, "socket_udp_mo");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_udp_mo");
-    trả về socket_udp_mo(tên máy, cổng, thời gian chờ);
+    trả về socket mở kết nối(tên máy, cổng, thời gian chờ, đúng, "socket_udp_mo");
 };
 
 // TLS client primitive: hệ điều hành/thư viện TLS thực hiện handshake, xác minh
 // chứng chỉ và mã hóa; framing HTTP/ứng dụng vẫn nằm hoàn toàn ở V++.
 hàm socket tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
+    tên máy = socket yêu cầu tên máy(tên máy, "socket_tls_mo");
     cổng = socket yêu cầu cổng(cổng, "socket_tls_mo");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_tls_mo");
-    trả về socket_tls_mo(tên máy, cổng, thời gian chờ);
+    mã = socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo");
+    // TLS chỉ bắt đầu sau khi đã chọn kết nối. Lỗi chứng chỉ/handshake được
+    // trả ngay; V++ đóng socket TCP, không thử lại TLS trên địa chỉ khác.
+    thử {
+        trả về socket_tls_nang_cap_vm(mã, tên máy);
+    } bắt lỗi (e) {
+        thử { socket_dong_vm(mã); } bắt lỗi (bỏ_qua) {};
+        ném e;
+    };
 };
 
 // Primitive máy chủ: bind/listen và accept do hệ điều hành thực hiện. Mọi
@@ -64,21 +117,54 @@ hàm socket tcp lắng nghe(cổng, backlog = 64) {
     nếu (backlog <= 0 || backlog > 1024) {
         ném "socket_tcp_lang_nghe: backlog phải trong 1..1024";
     };
-    trả về socket_tcp_lang_nghe(cổng, backlog);
+    trả về socket_tcp_lang_nghe_vm(cổng, backlog);
 };
 
-hàm socket chấp nhận(mã socket lắng nghe) {
+hàm socket chấp nhận(mã socket lắng nghe, thời gian chờ = 300000) {
     mã socket lắng nghe = socket yêu cầu mã(
         mã socket lắng nghe,
         "socket_chap_nhan",
         "mã socket lắng nghe"
     );
-    trả về socket_chap_nhan(mã socket lắng nghe);
+    thời gian chờ = socket yêu cầu timeout(
+        thời gian chờ,
+        "socket_chap_nhan"
+    );
+
+    // `accept()` chỉ là primitive OS. Chính sách timeout của connection mới
+    // thuộc thư viện V++; nếu cấu hình thất bại phải đóng handle vừa nhận.
+    mã socket = socket_chap_nhan_vm(mã socket lắng nghe);
+    thử {
+        socket_dat_timeout_vm(mã socket, thời gian chờ);
+    } bắt lỗi (e) {
+        socket_dong_vm(mã socket);
+        ném e;
+    };
+    trả về mã socket;
 };
 
 hàm socket gửi(mã socket, dữ liệu) {
     mã socket = socket yêu cầu mã(mã socket, "socket_gui", "mã socket");
-    trả về socket_gui(mã socket, dữ liệu);
+    nếu (loai_cua(dữ liệu) != "chuỗi") { ném "socket_gui: dữ liệu phải là chuỗi"; };
+    đã_gửi = 0;
+    xong = sai;
+    // VM chỉ send/SSLWrite một lần (một record với SChannel). V++ sở hữu
+    // vòng gửi hết stream và quy tắc chỉ gửi một datagram cho UDP.
+    // Offset tính theo byte nên partial write giữa hai byte UTF-8 vẫn đúng.
+    lặp(vòng = 0; !xong; vòng++) {
+        lần_gửi = socket_gui_vm(mã socket, dữ liệu, đã_gửi);
+        byte = lần_gửi[0];
+        tổng_byte = lần_gửi[1];
+        nếu (byte < 0 || byte > tổng_byte - đã_gửi) {
+            ném "socket_gui: số byte gửi không hợp lệ";
+        };
+        nếu (byte == 0 && đã_gửi < tổng_byte) {
+            ném "socket_gui: gửi không tiến triển";
+        };
+        đã_gửi = đã_gửi + byte;
+        xong = lần_gửi[2] || đã_gửi == tổng_byte;
+    };
+    trả về đã_gửi;
 };
 
 hàm socket nhận(mã socket, số byte tối đa = 65536) {
@@ -91,16 +177,16 @@ hàm socket nhận(mã socket, số byte tối đa = 65536) {
     nếu (số byte tối đa <= 0 || số byte tối đa > 16777216) {
         ném "socket_nhan: số byte tối đa phải trong 1..16777216";
     };
-    trả về socket_nhan(mã socket, số byte tối đa);
+    trả về socket_nhan_vm(mã socket, số byte tối đa);
 };
 
 hàm socket đặt timeout(mã socket, thời gian chờ) {
     mã socket = socket yêu cầu mã(mã socket, "socket_dat_timeout", "mã socket");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_dat_timeout");
-    trả về socket_dat_timeout(mã socket, thời gian chờ);
+    trả về socket_dat_timeout_vm(mã socket, thời gian chờ);
 };
 
 hàm socket đóng(mã socket) {
     mã socket = socket yêu cầu mã(mã socket, "socket_dong", "mã socket");
-    trả về socket_dong(mã socket);
+    trả về socket_dong_vm(mã socket);
 };

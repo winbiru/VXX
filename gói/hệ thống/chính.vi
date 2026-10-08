@@ -1,3 +1,4 @@
 // Gói hệ thống: môi trường tiến trình và thông tin nền tảng cơ bản.
 nhập gói/hệ thống/môi trường;
 nhập gói/hệ thống/nền tảng;
+nhập gói/hệ thống/tiến trình;

@@ -1,34 +1,64 @@
 // Module: nhập xuất.tệp
 // Mục đích: đọc/ghi tệp ở tầng gói.
-// Chỉ đọc/ghi tệp là primitive native. Các phép xử lý nội dung tệp được viết
+// Chỉ đọc/ghi tệp là VM primitive. Các phép xử lý nội dung tệp được viết
 // bằng V++ để giữ logic thư viện ở tầng ngôn ngữ.
-// Đường dẫn phải là UTF-8 hợp lệ tại native boundary.
+// Đường dẫn phải là UTF-8 hợp lệ tại VM primitive boundary.
+
+nhập gói/lõi/chuyển kiểu;
+
+hàm tệp chuẩn hóa đường dẫn(đường dẫn) {
+    trả về thành chuỗi(đường dẫn);
+};
+
+hàm tệp yêu cầu bytes(bytes) {
+    nếu (loai_cua(bytes) != "danh sách") {
+        ném "ghi bytes tệp: cần danh sách bytes";
+    };
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (loai_cua(bytes[i]) != "số nguyên") {
+            ném "ghi bytes tệp: mỗi byte phải là số nguyên";
+        };
+        nếu (bytes[i] < 0 || bytes[i] > 255) {
+            ném "ghi bytes tệp: byte phải trong 0..255";
+        };
+    };
+    trả về bytes;
+};
 
 // Ghi chú hàm: đọc tệp.
 hàm đọc tệp(đường dẫn) {
-    trả về io_doc_file(đường dẫn);
+    trả về io_doc_file_vm(tệp chuẩn hóa đường dẫn(đường dẫn));
 };
 
 // Ghi nguyên nội dung chuỗi runtime, không giải mã lại escape (kể cả JSON).
 hàm ghi tệp(đường dẫn, nội dung) {
-    trả về io_ghi_file(đường dẫn, nội dung);
+    trả về io_ghi_file_vm(
+        tệp chuẩn hóa đường dẫn(đường dẫn),
+        thành chuỗi(nội dung)
+    );
 };
 
 // Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
 // cấp cao như nhật ký chỉ chịu trách nhiệm dựng nội dung cần ghi.
 hàm ghi nối tệp(đường dẫn, nội dung) {
-    trả về io_ghi_tiep_file(đường dẫn, nội dung);
+    trả về io_ghi_tiep_file_vm(
+        tệp chuẩn hóa đường dẫn(đường dẫn),
+        thành chuỗi(nội dung)
+    );
 };
 
 // Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là
 // primitive file I/O để các codec/archive triển khai format bằng V++ mà không
 // phải đẩy thuật toán định dạng xuống C++.
 hàm đọc bytes tệp(đường dẫn) {
-    trả về io_doc_bytes(đường dẫn);
+    trả về io_doc_bytes_vm(tệp chuẩn hóa đường dẫn(đường dẫn));
 };
 
 hàm ghi bytes tệp(đường dẫn, bytes) {
-    trả về io_ghi_bytes(đường dẫn, bytes);
+    trả về io_ghi_bytes_vm(
+        tệp chuẩn hóa đường dẫn(đường dẫn),
+        tệp yêu cầu bytes(bytes)
+    );
 };
 
 // Đếm dòng vật lý; tệp rỗng có 0 dòng.

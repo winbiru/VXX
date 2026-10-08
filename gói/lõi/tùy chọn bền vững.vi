@@ -1,5 +1,5 @@
 // vi.preferences — thiết lập bền vững theo người dùng/ứng dụng.
-// Logic namespace/serialization/CRUD nằm ở V++. Native chỉ cung cấp các primitive
+// Logic namespace/serialization/CRUD nằm ở V++. VM chỉ cung cấp các primitive
 // môi trường, đường dẫn, file I/O và codec UTF-8.
 
 nhập gói/hệ thống/môi trường;

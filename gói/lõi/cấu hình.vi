@@ -1,6 +1,6 @@
 // Module: cấu hình
 // Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
-// File I/O vẫn là primitive native; toàn bộ parsing và chuyển kiểu nằm ở V++.
+// File I/O vẫn là VM primitive; toàn bộ parsing và chuyển kiểu nằm ở V++.
 
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;

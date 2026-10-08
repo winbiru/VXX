@@ -1,0 +1,38 @@
+nhập gói/mạng/uri;
+
+hàm chính() {
+    u = uri phân tích("HTTP://Example.COM:80/a/../b?q=hello%20world#frag");
+    in lấy map(u, "scheme", "") == "http";
+    in lấy map(u, "host", "") == "example.com";
+    in lấy map(u, "port", 0) == 80;
+    in lấy map(u, "đường_dẫn", "") == "/a/../b";
+    n = uri chuẩn hóa(u);
+    in lấy map(n, "canonical", "") == "http://example.com/b?q=hello%20world#frag";
+
+    b = uri phân tích("http://a/b/c/d;p?q");
+    r = uri hợp nhất(b, "../g");
+    in lấy map(r, "canonical", "") == "http://a/b/g";
+    r2 = uri hợp nhất(b, "g?y#s");
+    in lấy map(r2, "canonical", "") == "http://a/b/c/g?y#s";
+    r3 = uri hợp nhất(b, "../../g");
+    in lấy map(r3, "canonical", "") == "http://a/g";
+
+    in encode form("xin chào + V++") == "xin+ch%C3%A0o+%2B+V%2B%2B";
+    in decode form("xin+ch%C3%A0o+%2B+V%2B%2B") == "xin chào + V++";
+    in kiểu nội dung("a.json") == "application/json";
+    in kiểu nội dung("a.unknown") == rỗng;
+
+    thử {
+        uri phân tích("http://a/%ZZ");
+        in sai;
+    } bắt lỗi (e) {
+        in đúng;
+    };
+
+    thử {
+        url("gopher://example.com/");
+        in sai;
+    } bắt lỗi (e) {
+        in đúng;
+    };
+};
