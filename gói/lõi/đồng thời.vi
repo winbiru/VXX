@@ -1,5 +1,5 @@
 // vi.concurrent — tác vụ trễ với timeout/hủy.
-// Public API chọn thao tác ở V++; native chỉ giữ một primitive quản lý
+// Public API chọn thao tác và diễn giải snapshot ở V++; VM chỉ quản lý
 // worker thread/task registry. 0.2 chỉ truyền kết quả scalar.
 
 nhập gói/lõi/chuyển kiểu;
@@ -20,6 +20,15 @@ hàm đồng thời yêu cầu mã tác vụ(giá_trị, tên_hàm) {
     trả về mã;
 };
 
+hàm đồng thời yêu cầu kết quả scalar(giá_trị) {
+    kiểu = loai_cua(giá_trị);
+    nếu (kiểu == "số nguyên" || kiểu == "số thực" ||
+        kiểu == "chuỗi" || kiểu == "rỗng") {
+        trả về giá_trị;
+    };
+    ném "tác vụ sau: kết quả phiên bản 0.2 chỉ hỗ trợ scalar";
+};
+
 hàm tác vụ sau(độ trễ mili giây, kết quả) {
     độ trễ mili giây = đồng thời yêu cầu số nguyên(
         độ trễ mili giây,
@@ -29,7 +38,14 @@ hàm tác vụ sau(độ trễ mili giây, kết quả) {
     nếu (độ trễ mili giây < 0 || độ trễ mili giây > 86400000) {
         ném "tác vụ sau: độ trễ phải trong 0..86400000 ms";
     };
-    trả về task_native_exec("schedule", độ trễ mili giây, kết quả);
+    kết quả = đồng thời yêu cầu kết quả scalar(kết quả);
+    công_việc = hàm() {
+        // Park là primitive VM có thể bị đánh thức bởi cooperative cancel.
+        // Registry, trạng thái và policy tác vụ đều nằm ở V++.
+        thread_vm_park(độ trễ mili giây);
+        trả về kết quả;
+    };
+    trả về thread_vm_spawn(công_việc, []);
 };
 
 hàm chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
@@ -42,22 +58,81 @@ hàm chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
     nếu (thời gian chờ mili giây < 0) {
         ném "chờ tác vụ: thời gian chờ phải không âm";
     };
-    trả về task_native_exec("wait", mã tác vụ, thời gian chờ mili giây);
+    // Snapshot được chụp dưới cùng một lock: không hỏi lại status sau wait.
+    snapshot = thread_vm_wait(mã tác vụ, thời gian chờ mili giây);
+    nếu (snapshot[0] == 1) { trả về snapshot[1]; };
+    nếu (snapshot[0] == 3 && snapshot[2] != "") { ném snapshot[2]; };
+    trả về rỗng;
 };
 
 hàm hủy tác vụ(mã tác vụ) {
     mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "huy_tac_vu");
-    trả về task_native_exec("cancel", mã tác vụ, 0);
+    kết_quả = thread_vm_cancel(mã tác vụ);
+    // Tác vụ trễ dùng park hủy được, nên đợi worker ghi trạng thái cuối cùng để
+    // `trạng thái tác vụ` ngay sau lời gọi này luôn quan sát "đã hủy".
+    nếu (kết_quả) { thread_vm_wait(mã tác vụ, -1); };
+    trả về kết_quả;
 };
 
 hàm trạng thái tác vụ(mã tác vụ) {
     mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "trang_thai_tac_vu");
-    trạng_thái = task_native_exec("status", mã tác vụ, 0);
+    trạng_thái = thread_vm_status(mã tác vụ);
     nếu (trạng_thái == 0) {
         trả về "đang chạy";
     };
     nếu (trạng_thái == 1) {
         trả về "hoàn tất";
     };
+    nếu (trạng_thái == 3) {
+        trả về "lỗi";
+    };
     trả về "đã hủy";
+};
+
+// Chạy một callback V++ trên OS thread riêng. VM chụp snapshot sâu của closure,
+// globals và đối_số trước khi worker bắt đầu, vì vậy mutable object không bị
+// chia sẻ ngầm giữa hai heap. Kết quả được sao chép ngược về VM gọi khi join.
+hàm chạy luồng(công_việc, đối_số = rỗng) {
+    nếu (đối_số == rỗng) { đối_số = []; };
+    nếu (loai_cua(đối_số) != "danh sách") {
+        ném "chạy luồng: đối số phải là danh sách";
+    };
+    trả về thread_vm_spawn(công_việc, đối_số);
+};
+
+// timeout = -1 nghĩa là chờ vô hạn; 0 chỉ chụp trạng thái hiện tại.
+hàm chờ luồng(mã luồng, thời gian chờ mili giây = rỗng) {
+    mã luồng = đồng thời yêu cầu số nguyên(mã luồng, "cho_luong", "mã luồng");
+    nếu (mã luồng <= 0) { ném "chờ luồng: mã luồng phải dương"; };
+    nếu (thời gian chờ mili giây == rỗng) { thời gian chờ mili giây = -1; };
+    thời gian chờ mili giây = đồng thời yêu cầu số nguyên(
+        thời gian chờ mili giây,
+        "cho_luong",
+        "thời gian chờ mili giây"
+    );
+    nếu (thời gian chờ mili giây < -1) {
+        ném "chờ luồng: thời gian chờ phải là -1 hoặc không âm";
+    };
+    snapshot = thread_vm_wait(mã luồng, thời gian chờ mili giây);
+    nếu (snapshot[0] == 0) { trả về rỗng; };
+    nếu (snapshot[0] == 1) { trả về snapshot[1]; };
+    nếu (snapshot[0] == 2) { ném "chờ luồng: luồng đã hủy"; };
+    nếu (snapshot[2] != "") { ném snapshot[2]; };
+    ném "chờ luồng: worker thất bại";
+};
+
+hàm hủy luồng(mã luồng) {
+    mã luồng = đồng thời yêu cầu số nguyên(mã luồng, "huy_luong", "mã luồng");
+    nếu (mã luồng <= 0) { ném "hủy luồng: mã luồng phải dương"; };
+    trả về thread_vm_cancel(mã luồng);
+};
+
+hàm trạng thái luồng(mã luồng) {
+    mã luồng = đồng thời yêu cầu số nguyên(mã luồng, "trang_thai_luong", "mã luồng");
+    nếu (mã luồng <= 0) { ném "trạng thái luồng: mã luồng phải dương"; };
+    trạng_thái = thread_vm_status(mã luồng);
+    nếu (trạng_thái == 0) { trả về "đang chạy"; };
+    nếu (trạng_thái == 1) { trả về "hoàn tất"; };
+    nếu (trạng_thái == 2) { trả về "đã hủy"; };
+    trả về "lỗi";
 };

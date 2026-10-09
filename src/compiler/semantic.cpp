@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/core/message_constants.h"
 
 namespace vietvm::compiler {
@@ -57,7 +58,31 @@ SemanticVisibility semanticVisibility(vietvm::frontend::AstVisibility visibility
 
 // Kiểm tra điều kiện của `isCallableKind`.
 bool isCallableKind(SemanticSymbolKind kind) noexcept {
-    return kind == SemanticSymbolKind::Function || kind == SemanticSymbolKind::Method;
+    return kind == SemanticSymbolKind::Function ||
+           kind == SemanticSymbolKind::ForeignFunction ||
+           kind == SemanticSymbolKind::Method;
+}
+
+bool parseForeignAbiType(const std::string &name,
+                         vietvm::bytecode::ForeignAbiType &out) noexcept {
+    using vietvm::bytecode::ForeignAbiType;
+    if (name == "void" || name == "rỗng") out = ForeignAbiType::Void;
+    else if (name == "i32") out = ForeignAbiType::I32;
+    else if (name == "u32") out = ForeignAbiType::U32;
+    else if (name == "i64") out = ForeignAbiType::I64;
+    else if (name == "u64") out = ForeignAbiType::U64;
+    else if (name == "f64") out = ForeignAbiType::F64;
+    else if (name == "c_chuỗi") out = ForeignAbiType::CString;
+    else if (name == "c_đệm_ra") out = ForeignAbiType::BufferOut;
+    else if (name == "c_đệm_vào") out = ForeignAbiType::BufferIn;
+    else if (name == "c_tệp") out = ForeignAbiType::FileHandle;
+    else if (name == "c_thư_mục") out = ForeignAbiType::DirectoryHandle;
+    else if (name == "c_mục_thư_mục") out = ForeignAbiType::DirectoryEntry;
+    else if (name == "c_cờ_con_trỏ") out = ForeignAbiType::PointerStatus;
+    else if (name == "c_dns") out = ForeignAbiType::DnsHandle;
+    else if (name == "c_socket") out = ForeignAbiType::SocketHandle;
+    else return false;
+    return true;
 }
 
 // Kiểm tra điều kiện của `isIndirectCallableKind`.
@@ -179,6 +204,7 @@ public:
     SemanticModel run() {
         model_.globalScope = addScope(ScopeKind::Global, kInvalidScopeId, program_.span);
         addExternalSymbols();
+        collectForeignLibraries();
         buildStatementList(program_.statements, model_.globalScope, kInvalidSymbolId);
         validateClassInheritance();
         validateMethodOverrides();
@@ -190,6 +216,28 @@ public:
     }
 
 private:
+    void collectForeignLibraries() {
+        for (const AstStatement &statement : program_.statements) {
+            if (statement.kind != AstStatementKind::ForeignLibrary) continue;
+            const auto &spec = statement.foreignLibrary;
+            if (spec.name.empty() || spec.target.empty()) {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    "khai báo ngoại thư viện không đầy đủ",
+                    statement.span,
+                });
+                continue;
+            }
+            if (!foreignLibraries_.emplace(spec.name, spec.target).second) {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    "ngoại thư viện bị khai báo trùng: " + spec.name,
+                    spec.nameSpan,
+                });
+            }
+        }
+    }
+
     // Thêm phạm vi; hàm chèn dữ liệu mới vào cấu trúc trạng thái hiện tại và duy trì các chỉ mục liên quan.
     ScopeId addScope(ScopeKind kind,
                      ScopeId parent,
@@ -291,14 +339,19 @@ private:
         const bool isClass = statement.kind == AstStatementKind::Class;
         const bool isInterface = statement.kind == AstStatementKind::Interface;
         const bool isFunction = statement.kind == AstStatementKind::Function;
-        if (!isClass && !isInterface && !isFunction) return kInvalidSymbolId;
+        const bool isForeignFunction =
+            statement.kind == AstStatementKind::ForeignFunction;
+        if (!isClass && !isInterface && !isFunction && !isForeignFunction) {
+            return kInvalidSymbolId;
+        }
 
         if (statement.declarationName.empty()) {
             model_.diagnostics.push_back({
                 SemanticDiagnosticSeverity::Error,
                 vietvm::messages::messageText(
                     vietvm::messages::kSemanticMissingDeclarationName,
-                    {isFunction ? "hàm" : (isInterface ? "giao diện" : "lớp")}),
+                    {isFunction || isForeignFunction ? "hàm" :
+                        (isInterface ? "giao diện" : "lớp")}),
                 statement.span,
             });
             return kInvalidSymbolId;
@@ -313,8 +366,11 @@ private:
             ? SemanticSymbolKind::Class
             : (isInterface
                    ? SemanticSymbolKind::Interface
-                   : (directOwnerClass == kInvalidSymbolId ? SemanticSymbolKind::Function
-                                                            : SemanticSymbolKind::Method));
+                   : (isForeignFunction
+                          ? SemanticSymbolKind::ForeignFunction
+                          : (directOwnerClass == kInvalidSymbolId
+                                 ? SemanticSymbolKind::Function
+                                 : SemanticSymbolKind::Method)));
         const std::string qualifiedName = directOwnerClass == kInvalidSymbolId
             ? statement.declarationName
             : model_.symbols[directOwnerClass].qualifiedName + "." + statement.declarationName;
@@ -332,6 +388,142 @@ private:
             scope, kind, statement.declarationName, qualifiedName, statement.span,
             visibility, directOwnerClass, SymbolOrigin::Source, true, &statement, &inserted);
         if (symbol == kInvalidSymbolId || !inserted) return kInvalidSymbolId;
+
+        if (isForeignFunction) {
+            SemanticSymbol &callable = model_.symbols[symbol];
+            callable.parameterCount = statement.foreignFunction.parameters.size();
+            callable.minimumArgumentCount = callable.parameterCount;
+            callable.foreignDescriptorId = nextForeignDescriptorId_++;
+            callable.foreignDescriptor.id = callable.foreignDescriptorId;
+            const auto library =
+                foreignLibraries_.find(statement.foreignFunction.libraryName);
+            if (library == foreignLibraries_.end()) {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    "ngoại hàm tham chiếu thư viện chưa khai báo: " +
+                        statement.foreignFunction.libraryName,
+                    statement.foreignFunction.librarySpan,
+                });
+            } else {
+                callable.foreignDescriptor.library = library->second;
+            }
+            callable.foreignDescriptor.symbol = statement.foreignFunction.symbol;
+            callable.foreignDescriptor.abi = statement.foreignFunction.abi;
+            callable.foreignDescriptor.capability =
+                statement.foreignFunction.capability;
+            if (callable.foreignDescriptor.abi != "c") {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    "FFI hiện chỉ hỗ trợ abi \"c\"",
+                    statement.span,
+                });
+            }
+            vietvm::bytecode::ForeignAbiType resultType;
+            if (!parseForeignAbiType(statement.foreignFunction.returnType, resultType) ||
+                resultType == vietvm::bytecode::ForeignAbiType::BufferOut ||
+                resultType == vietvm::bytecode::ForeignAbiType::BufferIn) {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    "kiểu ABI trả về chưa hỗ trợ: " +
+                        statement.foreignFunction.returnType,
+                    statement.span,
+                });
+            } else {
+                callable.foreignDescriptor.result = resultType;
+            }
+            for (const auto &parameter : statement.foreignFunction.parameters) {
+                vietvm::bytecode::ForeignAbiType parameterType;
+                if (!parseForeignAbiType(parameter.abiType, parameterType) ||
+                    parameterType == vietvm::bytecode::ForeignAbiType::Void) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        "kiểu ABI tham số chưa hỗ trợ: " + parameter.abiType,
+                        parameter.span,
+                    });
+                    continue;
+                }
+                callable.foreignDescriptor.parameters.push_back(parameterType);
+            }
+            // Buffer extents are part of the ABI contract, not a runtime
+            // convention inferred from the native symbol's name.
+            const auto &parameters = statement.foreignFunction.parameters;
+            for (std::size_t index = 0; index < parameters.size(); ++index) {
+                const auto &parameter = parameters[index];
+                const bool bufferType = parameter.abiType == "c_đệm_ra" ||
+                                        parameter.abiType == "c_đệm_vào";
+                if (!bufferType && !parameter.bufferExtent.empty()) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        "chỉ c_đệm_ra/c_đệm_vào được khai báo độ dài",
+                        parameter.span,
+                    });
+                    continue;
+                }
+                if (!bufferType) continue;
+                if (parameter.bufferExtent.empty()) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        "đệm FFI phải khai báo độ dài: [số_byte] hoặc [tham_số]",
+                        parameter.span,
+                    });
+                    continue;
+                }
+                vietvm::bytecode::ForeignBufferExtent extent;
+                extent.parameterIndex = index;
+                const std::string &declared = parameter.bufferExtent;
+                const bool decimal = declared[0] >= '0' && declared[0] <= '9';
+                if (decimal) {
+                    std::size_t number = 0;
+                    bool valid = true;
+                    for (const char digit : declared) {
+                        if (digit < '0' || digit > '9') {
+                            valid = false;
+                            break;
+                        }
+                        number = number * 10 + static_cast<std::size_t>(digit - '0');
+                        if (number > 65536) { valid = false; break; }
+                    }
+                    if (!valid || number == 0) {
+                        model_.diagnostics.push_back({
+                            SemanticDiagnosticSeverity::Error,
+                            "độ dài đệm FFI cố định phải từ 1 đến 65536 byte",
+                            parameter.span,
+                        });
+                        continue;
+                    }
+                    extent.fixedLength = number;
+                } else {
+                    int reference = -1;
+                    bool duplicate = false;
+                    for (std::size_t other = 0; other < parameters.size(); ++other) {
+                        if (parameters[other].name != declared) continue;
+                        if (reference >= 0) duplicate = true;
+                        reference = static_cast<int>(other);
+                    }
+                    if (duplicate || reference < 0 || reference == static_cast<int>(index)) {
+                        model_.diagnostics.push_back({
+                            SemanticDiagnosticSeverity::Error,
+                            "tham chiếu độ dài đệm FFI không hợp lệ: " + declared,
+                            parameter.span,
+                        });
+                        continue;
+                    }
+                    const std::string &lengthType = parameters[reference].abiType;
+                    if (lengthType != "i32" && lengthType != "u32" &&
+                        lengthType != "i64" && lengthType != "u64") {
+                        model_.diagnostics.push_back({
+                            SemanticDiagnosticSeverity::Error,
+                            "độ dài đệm FFI phải tham chiếu tham số ABI số nguyên",
+                            parameter.span,
+                        });
+                        continue;
+                    }
+                    extent.lengthParameterIndex = reference;
+                }
+                callable.foreignDescriptor.bufferExtents.push_back(extent);
+            }
+            return symbol;
+        }
 
         if (isFunction) {
             SemanticSymbol &callable = model_.symbols[symbol];
@@ -423,6 +615,11 @@ private:
     void buildStatement(const AstStatement &statement,
                         ScopeId containingScope,
                         SymbolId ownerClass) {
+        if (statement.kind == AstStatementKind::ForeignLibrary ||
+            statement.kind == AstStatementKind::ForeignFunction) {
+            model_.statementScopes[statement.tokenBegin] = containingScope;
+            return;
+        }
         if (statement.kind == AstStatementKind::Interface) {
             const auto found = declarationScopes_.find(statement.tokenBegin);
             if (found == declarationScopes_.end()) {
@@ -1245,6 +1442,7 @@ private:
 
     // Kiểm tra điều kiện của `isKnownNative`.
     bool isKnownNative(const std::string &name) const {
+        if (vietvm::bytecode::intrinsicByName(name) != nullptr) return true;
         return std::find(environment_.nativeCallables.begin(),
                          environment_.nativeCallables.end(), name) !=
                environment_.nativeCallables.end();
@@ -1256,6 +1454,15 @@ private:
         binding.expression = expression.id;
         binding.lookupScope = scope;
         binding.runtimeName = expression.text;
+        // VM intrinsics là primitive của ngôn ngữ trong vị trí gọi. Chúng phải
+        // được bind trước symbol lexical để một biến trùng tên không biến lời
+        // gọi primitive thành OP_GOI_GIAN_TIEP trên chính giá trị biến đó.
+        const auto *primitive = vietvm::bytecode::intrinsicByName(expression.text);
+        if (callableUse && primitive != nullptr && primitive->reserved) {
+            binding.kind = BindingKind::NativeCallable;
+            model_.expressionBindings[expression.id] = binding;
+            return binding;
+        }
         LookupResult found = lookup(expression.text, scope);
         if (found.symbol == kInvalidSymbolId && callableUse) {
             const LookupResult type = lookupTypeLexical(expression.text, scope);
@@ -1364,7 +1571,26 @@ private:
         const SemanticSymbol *callable = nullptr;
         std::string displayName = callee == nullptr ? binding.runtimeName : callee->text;
 
-        if (binding.kind == CallTargetKind::DirectFunction &&
+        if (binding.kind == CallTargetKind::Native) {
+            if (const auto *intrinsic = vietvm::bytecode::intrinsicByName(displayName)) {
+                const std::size_t actual = call.arguments.size();
+                if (actual != intrinsic->arity) {
+                    model_.diagnostics.push_back({
+                        SemanticDiagnosticSeverity::Error,
+                        vietvm::messages::messageText(
+                            vietvm::messages::kSemanticCallArityMismatch,
+                            {displayName, std::to_string(actual),
+                             std::to_string(intrinsic->arity),
+                             std::to_string(intrinsic->arity)}),
+                        call.span,
+                    });
+                }
+                return;
+            }
+        }
+
+        if ((binding.kind == CallTargetKind::DirectFunction ||
+             binding.kind == CallTargetKind::ForeignFunction) &&
             binding.symbol != kInvalidSymbolId && binding.symbol < model_.symbols.size()) {
             const SemanticSymbol &candidate = model_.symbols[binding.symbol];
             if (candidate.origin == SymbolOrigin::Source) callable = &candidate;
@@ -1440,6 +1666,8 @@ private:
             const SemanticSymbol &symbol = model_.symbols[calleeBinding.symbol];
             if (symbol.kind == SemanticSymbolKind::Class) {
                 result.kind = CallTargetKind::ClassConstructor;
+            } else if (symbol.kind == SemanticSymbolKind::ForeignFunction) {
+                result.kind = CallTargetKind::ForeignFunction;
             } else if (symbol.origin == SymbolOrigin::Imported && isCallableKind(symbol.kind)) {
                 // Imported functions have a known semantic identity but no VM
                 // function ID in this module's predeclaration table. Keep them
@@ -1611,6 +1839,8 @@ private:
     std::unordered_set<ExprId> resolvedLambdaBodies_;
     std::unordered_set<SymbolId> ambiguousInstanceClasses_;
     std::unordered_map<std::string, SymbolId> qualifiedValues_;
+    std::unordered_map<std::string, std::string> foreignLibraries_;
+    int nextForeignDescriptorId_ = 0;
 };
 
 } // namespace
@@ -1682,6 +1912,7 @@ const char *callTargetKindName(CallTargetKind kind) noexcept {
     switch (kind) {
         case CallTargetKind::Invalid: return "invalid";
         case CallTargetKind::DirectFunction: return "direct_function";
+        case CallTargetKind::ForeignFunction: return "foreign_function";
         case CallTargetKind::ImportedFunction: return "imported_function";
         case CallTargetKind::ClassConstructor: return "class_constructor";
         case CallTargetKind::InstanceMethod: return "instance_method";

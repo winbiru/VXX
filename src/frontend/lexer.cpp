@@ -160,7 +160,8 @@ namespace vietvm::compiler {
             "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
             "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",
             "bắt lỗi", "nhập", "lớp", "giao diện", "kế thừa", "triển khai",
-            "công khai", "riêng tư", "bảo vệ"
+            "công khai", "riêng tư", "bảo vệ", "ngoại thư viện", "ngoại hàm",
+            "ký hiệu", "khả năng"
         };
         return keywords.find(lexeme) != keywords.end() ? TokenKind::Keyword : TokenKind::Identifier;
     }
@@ -375,6 +376,10 @@ namespace vietvm::compiler {
             {"công", "khai"},
             {"riêng", "tư"},
             {"bảo", "vệ"}
+            ,{"ngoại", "thư", "viện"}
+            ,{"ngoại", "hàm"}
+            ,{"ký", "hiệu"}
+            ,{"khả", "năng"}
         };
 
         for (size_t i = 0; i < tokens.size(); ++i) {

@@ -53,6 +53,8 @@ const char *tenLoaiCauLenh(vietvm::frontend::AstStatementKind kind) noexcept {
         case AstStatementKind::Empty: return "rỗng";
         case AstStatementKind::Block: return "khối";
         case AstStatementKind::Import: return "nhập";
+        case AstStatementKind::ForeignLibrary: return "ngoại thư viện";
+        case AstStatementKind::ForeignFunction: return "ngoại hàm";
         case AstStatementKind::Function: return "hàm";
         case AstStatementKind::Class: return "lớp";
         case AstStatementKind::Interface: return "giao diện";
@@ -243,6 +245,8 @@ const char *tenGiaTriIr(vietvm::compiler::IrValueOpcode opcode) noexcept {
         case IrValueOpcode::Binary: return "hai ngôi";
         case IrValueOpcode::Call: return "gọi";
         case IrValueOpcode::CallDynamic: return "gọi động";
+        case IrValueOpcode::Intrinsic: return "primitive VM";
+        case IrValueOpcode::ForeignCall: return "gọi FFI";
         case IrValueOpcode::Lambda: return "hàm vô danh";
     }
     return "vùng chưa hỗ trợ trực tiếp";
@@ -254,6 +258,7 @@ const char *tenDichGoi(vietvm::compiler::CallTargetKind kind) noexcept {
     switch (kind) {
         case CallTargetKind::Invalid: return "không hợp lệ";
         case CallTargetKind::DirectFunction: return "hàm trực tiếp";
+        case CallTargetKind::ForeignFunction: return "ngoại hàm";
         case CallTargetKind::ImportedFunction: return "hàm được nhập";
         case CallTargetKind::ClassConstructor: return "hàm tạo lớp";
         case CallTargetKind::InstanceMethod: return "phương thức đối tượng";
@@ -288,6 +293,26 @@ void writeAstStatement(std::ostringstream &out,
                 out << " bí danh=" << std::quoted(statement.importSpec.alias);
             }
         }
+    } else if (statement.kind == vietvm::frontend::AstStatementKind::ForeignLibrary) {
+        out << " tên=" << std::quoted(statement.foreignLibrary.name)
+            << " đích=" << std::quoted(statement.foreignLibrary.target);
+    } else if (statement.kind == vietvm::frontend::AstStatementKind::ForeignFunction) {
+        out << " thư viện=" << std::quoted(statement.foreignFunction.libraryName)
+            << " ký hiệu=" << std::quoted(statement.foreignFunction.symbol)
+            << " abi=" << std::quoted(statement.foreignFunction.abi)
+            << " khả năng=" << std::quoted(statement.foreignFunction.capability)
+            << " trả về=" << std::quoted(statement.foreignFunction.returnType)
+            << " tham số ABI=[";
+        for (std::size_t index = 0;
+             index < statement.foreignFunction.parameters.size(); ++index) {
+            if (index != 0) out << ", ";
+            const auto &parameter = statement.foreignFunction.parameters[index];
+            out << std::quoted(parameter.name) << ':' << parameter.abiType;
+            if (!parameter.bufferExtent.empty()) {
+                out << '[' << parameter.bufferExtent << ']';
+            }
+        }
+        out << ']';
     } else if (statement.kind == vietvm::frontend::AstStatementKind::Class) {
         out << " dạng=" << tenDangLop(statement.classForm);
         if (!statement.superclassName.empty()) {
@@ -520,8 +545,16 @@ std::string dumpIr(const vietvm::compiler::IrProgram &program) {
             << " văn bản=" << std::quoted(value.text)
             << " gọi tường minh=" << coKhong(value.explicitCall);
         if (value.opcode == vietvm::compiler::IrValueOpcode::Call ||
-            value.opcode == vietvm::compiler::IrValueOpcode::CallDynamic) {
+            value.opcode == vietvm::compiler::IrValueOpcode::CallDynamic ||
+            value.opcode == vietvm::compiler::IrValueOpcode::Intrinsic ||
+            value.opcode == vietvm::compiler::IrValueOpcode::ForeignCall) {
             out << " đích gọi=" << tenDichGoi(value.callTarget);
+        }
+        if (value.opcode == vietvm::compiler::IrValueOpcode::Intrinsic) {
+            out << " opcode=" << vietvm::bytecode::opcodeName(value.intrinsicOpcode);
+        }
+        if (value.opcode == vietvm::compiler::IrValueOpcode::ForeignCall) {
+            out << " foreign-descriptor=" << value.foreignDescriptorId;
         }
         if (value.opcode == vietvm::compiler::IrValueOpcode::Lambda) {
             out << " hàm vô danh=#" << value.lambdaId;

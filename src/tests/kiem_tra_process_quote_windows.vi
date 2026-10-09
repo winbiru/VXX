@@ -1,0 +1,25 @@
+// Thuật toán quoting Win32 nằm trong V++, nên kiểm tra được trên mọi nền tảng.
+nhập gói/hệ thống/tiến trình;
+
+hàm chính() {
+    q = "\"";
+    b = "\\";
+    in tiến trình quote windows("simple") == "simple";
+    in tiến trình quote windows("") == q + q;
+    in tiến trình quote windows("hello world") == q + "hello world" + q;
+    in tiến trình quote windows("a\tb") == q + "a\tb" + q;
+    in tiến trình quote windows("a\nb") == q + "a\nb" + q;
+    in tiến trình quote windows("a" + ký tự unicode(11) + "b") ==
+        q + "a" + ký tự unicode(11) + "b" + q;
+    in tiến trình quote windows("a\"b") == q + "a" + b + q + "b" + q;
+    in tiến trình quote windows("a" + b + q + "b") ==
+        q + "a" + b + b + b + q + "b" + q;
+    in tiến trình quote windows("C:" + b + "tmp" + b) == "C:" + b + "tmp" + b;
+    in tiến trình quote windows("C:" + b + "Program Files" + b + "bin" + b) ==
+        q + "C:" + b + "Program Files" + b + "bin" + b + b + q;
+    in tiến trình quote windows("Việt Nam") == q + "Việt Nam" + q;
+    in tiến trình dựng lệnh windows("C:" + b + "Program Files" + b + "vpp.exe",
+        ["", "a\"b", "Việt Nam"]) ==
+        q + "C:" + b + "Program Files" + b + "vpp.exe" + q + " " + q + q +
+        " " + q + "a" + b + q + "b" + q + " " + q + "Việt Nam" + q;
+};

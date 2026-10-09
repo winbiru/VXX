@@ -7,11 +7,14 @@
 
 namespace vietvm::helpers {
 
-// Cầu nối runtime -> compiler pipeline cho vpp.compiler và tooling M3.
-// Không spawn process; mọi kết quả lấy trực tiếp từ frontend/compiler/VM SDK.
-bool handleNativeCompilerLibraryFunction(const std::string &fn,
-                                         const std::vector<StackValue> &args,
-                                         StackValue &result,
-                                         std::string &err);
+// Hai primitive compiler/runtime tối thiểu. Policy API, default path,
+// contract thành công/thất bại và diễn giải snapshot thuộc thư viện V++.
+bool compilerAnalyzePrimitive(const std::vector<StackValue> &args,
+                              StackValue &result,
+                              std::string &err);
+
+bool embeddedVmRunPrimitive(const std::vector<StackValue> &args,
+                            StackValue &result,
+                            std::string &err);
 
 } // namespace vietvm::helpers

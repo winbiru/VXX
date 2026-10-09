@@ -1,0 +1,4 @@
+// Phải bị strict POSIX chặn trước khi chạy TLS provider cũ.
+hàm chính() {
+    socket_tls_nang_cap_vm(0, "localhost");
+};

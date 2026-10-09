@@ -2,6 +2,14 @@
 
 V++ tách compiler, runtime, tooling và các gói ngôn ngữ thành các lớp có dependency một chiều. Mục tiêu là để CLI chỉ ghép các thành phần; parser không biết HTTP/DB, và runtime không đọc compiler global state.
 
+Lộ trình tiếp theo nằm trong [kế hoạch chuyển primitive OS sang V++](system-ffi-migration-plan.md):
+FFI/System ABI dùng chung, frontend → IR → bytecode → VM/JIT, ownership,
+migration từng nhóm thư viện và gate kiểm thử. System FFI hiện đã chạy trên
+production pipeline POSIX: env, clock, entropy, file/thư mục, DNS, TCP/UDP và
+quản lý tiến trình con dùng binding có capability riêng. Runtime vẫn giữ ABI
+bridge và tài nguyên VM; TLS, scheduler/worker và process Windows tiếp tục dùng
+backend native cho đến khi qua gate của từng nhóm.
+
 ## C++ modules
 
 ```text
@@ -65,6 +73,15 @@ handler theo nhóm. Unit test handler dùng `VMRuntimeFixture` ở
 control stacks rồi gọi handler trực tiếp. Fixture cũng cấu hình `OutputSink`, nên test
 `OP_IN` không phụ thuộc stdout. Fixture này là internal test boundary, không phải API
 embedding ổn định.
+
+`VM::runJitCompiled()` biên dịch trước những opcode đơn giản (giá trị, số thực, biến,
+toán tử và xuất kết quả) thành closure theo từng vector bytecode của root và thân hàm V++.
+`runInterpreterLoop()` vẫn là vòng điều phối chung cho cả hai chế độ: lệnh chưa được
+biên dịch (gọi hàm, nhảy, intrinsic, exception, collection/object) chạy qua opcode handler
+cũ trong khi các phép toán bên trong hàm và vòng lặp dùng closure đã chuẩn bị.
+Cache closure chỉ tồn tại trong một lượt chạy JIT; GC, hủy worker và unwind vẫn dùng
+chung runtime. Đây là đường thực thi hỗn hợp ở mức bytecode, chưa tạo mã máy native;
+hiệu năng phải được đánh giá riêng bằng benchmark trước khi công bố tăng tốc.
 
 Tracing GC dùng `RuntimeHeap` riêng theo VM. Factory của map/list/tuple/class/instance/closure
 đăng ký weak handle vào heap đang active; collector mark từ stack, variables, call frame,

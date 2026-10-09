@@ -17,6 +17,7 @@
 // thích giá trị thực tế mà không lộ tên kiểu C++ hay chi tiết variant nội bộ.
 inline std::string runtime_value_type_name(const StackValue &value) {
     if (std::holds_alternative<int>(value)) return "số nguyên";
+    if (std::holds_alternative<AbiInteger>(value)) return "số nguyên 64-bit";
     if (std::holds_alternative<double>(value)) return "số thực";
     if (std::holds_alternative<std::string>(value)) return "chuỗi";
     if (std::holds_alternative<std::monostate>(value)) return "rỗng";
@@ -140,15 +141,116 @@ inline StackValue numDiv(const StackValue &a, const StackValue &b, int op, std::
     return std::get<int>(a) / std::get<int>(b);
 }
 
+// Boxed ABI integers retain their signed/unsigned 64-bit domain. Do arithmetic
+// without converting through double or silently wrapping; a negative signed
+// operand mixed with u64 needs an explicit conversion by the V++ caller.
+inline StackValue evaluateAbiIntegerArithmetic(int op,
+                                               const StackValue &a,
+                                               const StackValue &b,
+                                               int pc) {
+    const AbiInteger lhs = asAbiInteger(a);
+    const AbiInteger rhs = asAbiInteger(b);
+    const auto fail = [&](const std::string &reason) -> StackValue {
+        throw runtime_error_op("số học ABI 64-bit: " + reason, op, pc,
+                               runtime_binary_facts(a, b));
+    };
+    const bool unsignedDomain = !lhs.isSigned || !rhs.isSigned;
+    if (unsignedDomain) {
+        if ((lhs.isSigned && lhs.signedValue < 0) ||
+            (rhs.isSigned && rhs.signedValue < 0)) {
+            return fail("không thể trộn số âm có dấu với số không dấu");
+        }
+        const std::uint64_t x = lhs.isSigned
+            ? static_cast<std::uint64_t>(lhs.signedValue) : lhs.unsignedValue;
+        const std::uint64_t y = rhs.isSigned
+            ? static_cast<std::uint64_t>(rhs.signedValue) : rhs.unsignedValue;
+        const std::uint64_t limit = std::numeric_limits<std::uint64_t>::max();
+        std::uint64_t value = 0;
+        switch (op) {
+            case OP_CONG:
+                if (x > limit - y) return fail("tràn u64 khi cộng");
+                value = x + y;
+                break;
+            case OP_TRU:
+                if (x < y) return fail("tràn u64 khi trừ");
+                value = x - y;
+                break;
+            case OP_NHAN:
+                if (y != 0 && x > limit / y) return fail("tràn u64 khi nhân");
+                value = x * y;
+                break;
+            case OP_CHIA:
+            case OP_MODULO:
+                if (y == 0) return fail("chia cho 0");
+                value = op == OP_CHIA ? x / y : x % y;
+                break;
+            default: return fail("toán tử không hợp lệ");
+        }
+        return make_abi_integer_value(AbiInteger::unsignedNumber(value));
+    }
+
+    const std::int64_t x = lhs.signedValue;
+    const std::int64_t y = rhs.signedValue;
+    const std::int64_t min = std::numeric_limits<std::int64_t>::min();
+    const std::int64_t max = std::numeric_limits<std::int64_t>::max();
+    std::int64_t value = 0;
+    switch (op) {
+        case OP_CONG:
+            if ((y > 0 && x > max - y) || (y < 0 && x < min - y)) {
+                return fail("tràn i64 khi cộng");
+            }
+            value = x + y;
+            break;
+        case OP_TRU:
+            if ((y < 0 && x > max + y) || (y > 0 && x < min + y)) {
+                return fail("tràn i64 khi trừ");
+            }
+            value = x - y;
+            break;
+        case OP_NHAN:
+            if (x != 0 && y != 0) {
+                if ((x == min && y == -1) || (y == min && x == -1) ||
+                    (x > 0 && y > 0 && x > max / y) ||
+                    (x > 0 && y < 0 && y < min / x) ||
+                    (x < 0 && y > 0 && x < min / y) ||
+                    (x < 0 && y < 0 && x < max / y)) {
+                    return fail("tràn i64 khi nhân");
+                }
+            }
+            value = x * y;
+            break;
+        case OP_CHIA:
+        case OP_MODULO:
+            if (y == 0) return fail("chia cho 0");
+            if (x == min && y == -1) return fail("tràn i64 khi chia");
+            value = op == OP_CHIA ? x / y : x % y;
+            break;
+        default: return fail("toán tử không hợp lệ");
+    }
+    return make_abi_integer_value(AbiInteger::signedNumber(value));
+}
+
 // Thực thi toán tử nhị phân của VM; khi kiểu dữ liệu không phù hợp, hàm gửi các
 // giá trị thực tế để bộ chẩn đoán tự phân biệt lỗi phép tính và lỗi so sánh.
 inline StackValue evaluateBinaryOperator(int op,
                                          const StackValue &a,
                                          const StackValue &b,
                                          int pc) {
+    const bool boxedInteger = std::holds_alternative<AbiInteger>(a) ||
+                              std::holds_alternative<AbiInteger>(b);
     switch (op) {
         case OP_CONG:
-            if (isNumeric(a) && isNumeric(b)) return numAdd(a, b);
+            if (isNumeric(a) && isNumeric(b)) {
+                if (boxedInteger) {
+                    if (!isExactInteger(a) || !isExactInteger(b)) {
+                        throw runtime_error_op(
+                            "số học ABI 64-bit với số thực cần chuyển đổi tường minh",
+                            op, pc, runtime_binary_facts(a, b));
+                    }
+                    return evaluateAbiIntegerArithmetic(op, a, b, pc);
+                }
+                return numAdd(a, b);
+            }
             return make_string_value(sv_to_string(a) + sv_to_string(b));
 
         case OP_TRU:
@@ -158,6 +260,14 @@ inline StackValue evaluateBinaryOperator(int op,
                 throw runtime_error_op(vietvm::messages::formatMessage(
                     vietvm::messages::kVmNumericOnlyOperator), op, pc,
                     runtime_binary_facts(a, b));
+            }
+            if (boxedInteger) {
+                if (!isExactInteger(a) || !isExactInteger(b)) {
+                    throw runtime_error_op(
+                        "số học ABI 64-bit với số thực cần chuyển đổi tường minh",
+                        op, pc, runtime_binary_facts(a, b));
+                }
+                return evaluateAbiIntegerArithmetic(op, a, b, pc);
             }
             if (op == OP_TRU) return numSub(a, b);
             if (op == OP_NHAN) return numMul(a, b);
@@ -183,6 +293,23 @@ inline StackValue evaluateBinaryOperator(int op,
         case OP_LON_HON_HOAC_BANG:
         case OP_NHO_HON_HOAC_BANG: {
             int result = 0;
+            if (boxedInteger) {
+                if (!isExactInteger(a) || !isExactInteger(b)) {
+                    throw runtime_error_op(
+                        "so sánh ABI 64-bit với số thực cần chuyển đổi tường minh",
+                        op, pc, runtime_binary_facts(a, b));
+                }
+                const int comparison = compareAbiIntegers(asAbiInteger(a),
+                                                          asAbiInteger(b));
+                switch (op) {
+                    case OP_LON_HON: result = comparison > 0; break;
+                    case OP_NHO_HON: result = comparison < 0; break;
+                    case OP_LON_HON_HOAC_BANG: result = comparison >= 0; break;
+                    case OP_NHO_HON_HOAC_BANG: result = comparison <= 0; break;
+                    default: break;
+                }
+                return make_int_value(result);
+            }
             if (isNumeric(a) && isNumeric(b)) {
                 const double left = toDouble(a);
                 const double right = toDouble(b);
@@ -229,6 +356,15 @@ inline StackValue evaluateModuloOperator(const StackValue &a,
                                          const StackValue &b,
                                          int op,
                                          int pc) {
+    if (std::holds_alternative<AbiInteger>(a) ||
+        std::holds_alternative<AbiInteger>(b)) {
+        if (!isExactInteger(a) || !isExactInteger(b)) {
+            throw runtime_error_op(
+                "số học ABI 64-bit với số thực cần chuyển đổi tường minh",
+                op, pc, runtime_binary_facts(a, b));
+        }
+        return evaluateAbiIntegerArithmetic(op, a, b, pc);
+    }
     auto strictInteger = [&](const StackValue &value) -> int {
         if (std::holds_alternative<int>(value)) return std::get<int>(value);
         if (std::holds_alternative<double>(value)) {

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "vpp/bytecode/instruction.h"
+#include "vpp/bytecode/foreign.h"
 
 namespace vietvm::bytecode {
 
@@ -14,6 +15,10 @@ namespace vietvm::bytecode {
 struct BytecodeVerificationContext {
     std::size_t stringPoolSize = 0;
     std::unordered_set<int> functionIds;
+    std::size_t foreignDescriptorCount = 0;
+    // VM supplies the actual table so the verifier can validate FFI arity
+    // and pointer extents before dispatch; count-only callers remain valid.
+    const std::vector<ForeignFunctionDescriptor> *foreignDescriptors = nullptr;
 };
 
 // Mô tả lỗi cấu trúc đầu tiên của bytecode để VM/tooling có thể từ chối dữ liệu

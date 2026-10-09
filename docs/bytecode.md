@@ -10,6 +10,26 @@ lai**. V++ 1.0 không công bố serialized bytecode ABI; compatibility policy �
 > disassemble hiện có chỉ in bytecode của build đang chạy. `vpp dựng` vì vậy là compile/verify
 > workflow, chưa phải lệnh sinh artifact `.vbc`.
 
+### Intrinsic VM hiện hành (trong bộ nhớ)
+
+Tính đến 2026-10-08, `src/include/vpp/bytecode/intrinsic.h` đăng ký 51 intrinsic
+với tên, opcode và arity. Lời gọi trực tiếp được kiểm tra ở semantic, biểu diễn
+thành `IrValueOpcode::Intrinsic` và phát một `OP_VM_*` tương ứng. VM thực hiện
+primitive trên biểu diễn dữ liệu/OS; UTF-8, Unicode scalar, IEEE-754 formatting,
+regex và các thuật toán thư viện nằm ở `gói/` bằng V++. Runtime còn đường tra
+tên intrinsic khi xử lý lời gọi tương thích cũ không tìm thấy ID hàm.
+
+Những opcode 110, 115, 119 và 131–134 đã nghỉ, chỉ giữ số hiệu để tránh tái sử
+dụng nhầm; bytecode verifier không chấp nhận chúng. Gate
+`vpp-rc-internal-hardening` kiểm tra registry bao phủ toàn bộ khoảng opcode VM
+đang dùng, mỗi opcode chỉ có một descriptor, các opcode đã nghỉ bị từ chối và
+đường parser → semantic → IR → codegen phát đúng instruction/arity.
+
+Đề xuất `ForeignCall`, descriptor ABI và `OP_FFI_CALL` cho migration thư viện OS
+được mô tả trong [kế hoạch FFI/System ABI](system-ffi-migration-plan.md).
+Những tên này chưa có trong enum/IR hiện hành; kế hoạch dùng metadata và bytecode
+trong bộ nhớ, độc lập với proposal serializer `.vbc` bên dưới.
+
 Phần còn lại mô tả layout file/section, mã hóa instruction/operand và một opcode set có thể
 dùng khi dự án chọn hiện thực assembler, disassembler, loader và verifier cho `.vbc`.
 

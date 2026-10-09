@@ -1,0 +1,103 @@
+// UTC POSIX/Windows: FFI cung cấp 16 byte [seconds, nanoseconds] little-endian;
+// đổi Unix epoch -> Gregorian và kiểm tra dữ liệu ở V++.
+// Giới hạn năm 0000..9999, phép toán giây có độ chính xác nguyên binary64.
+
+nhập gói/lõi/toán học;
+
+ngoại thư viện c_utc = "system.c";
+ngoại hàm đọc_đồng_hồ_utc_ffi(mã_đồng_hồ: i32, đệm: c_đệm_ra[16]): i32 từ c_utc
+    ký hiệu "clock_gettime" abi "c" khả năng "system.time.realtime";
+
+// Decode two's-complement signed 64-bit little-endian without ever turning
+// a negative tv_sec into an unsigned 2^64-sized value.
+hàm thời gian utc đọc i64(đệm, bắt_đầu) {
+    âm = đệm[bắt_đầu + 7] >= 128;
+    số = 0.0;
+    bội = 1.0;
+    nhớ = 1;
+    lặp(i = 0; i < 8; i++) {
+        byte = đệm[bắt_đầu + i];
+        nếu (âm) {
+            byte = 255 - byte + nhớ;
+            nếu (byte == 256) {
+                byte = 0;
+                nhớ = 1;
+            } nếu không {
+                nhớ = 0;
+            };
+        };
+        số = số + byte * bội;
+        bội = bội * 256.0;
+    };
+    nếu (âm) { trả về 0.0 - số; };
+    trả về số;
+};
+
+// Các thương ở đây luôn nằm trong miền int32 sau khi kiểm tra epoch.
+// Quy tắc floor quan trọng với giây trước 1970 và các chu kỳ 400 năm.
+hàm thời gian utc chia sàn(tử, mẫu) {
+    // Phép chia int/int của V++ làm tròn về 0 trước khi tới lam_tron_xuong.
+    trả về lam_tron_xuong(tử / (mẫu * 1.0));
+};
+
+// Đổi giây nguyên Unix thành [năm, tháng, ngày, giờ, phút, giây, 0].
+// Gregorian proleptic, gồm ngày âm trước epoch và ngày nhuận 2000/2400.
+hàm thời gian utc từ epoch giây(giây_epoch) {
+    nếu (giây_epoch < -62167219200.0 || giây_epoch >= 253402300800.0) {
+        ném "TIME_RANGE";
+    };
+    nếu (lam_tron_xuong(giây_epoch) != giây_epoch) { ném "TIME_RANGE"; };
+    ngày_epoch = thời gian utc chia sàn(giây_epoch, 86400);
+    giây_ngày = giây_epoch - ngày_epoch * 86400.0;
+    giờ = thời gian utc chia sàn(giây_ngày, 3600);
+    phút = thời gian utc chia sàn(giây_ngày - giờ * 3600, 60);
+    giây = thành số nguyên(giây_ngày - giờ * 3600 - phút * 60);
+
+    // Civil-from-days: kỷ nguyên 400 năm có 146097 ngày.
+    z = ngày_epoch + 719468;
+    kỷ = thời gian utc chia sàn(z, 146097);
+    ngày_kỷ = z - kỷ * 146097;
+    năm_kỷ = thời gian utc chia sàn(
+        ngày_kỷ - thời gian utc chia sàn(ngày_kỷ, 1460) +
+        thời gian utc chia sàn(ngày_kỷ, 36524) -
+        thời gian utc chia sàn(ngày_kỷ, 146096), 365);
+    năm = năm_kỷ + kỷ * 400;
+    ngày_năm = ngày_kỷ - (365 * năm_kỷ +
+        thời gian utc chia sàn(năm_kỷ, 4) - thời gian utc chia sàn(năm_kỷ, 100));
+    tháng_mốc = thời gian utc chia sàn(5 * ngày_năm + 2, 153);
+    ngày = ngày_năm - thời gian utc chia sàn(153 * tháng_mốc + 2, 5) + 1;
+    tháng = tháng_mốc + 3;
+    nếu (tháng_mốc >= 10) { tháng = tháng_mốc - 9; };
+    nếu (tháng <= 2) { năm = năm + 1; };
+    trả về [năm, tháng, ngày, giờ, phút, giây, 0];
+};
+
+hàm thời gian utc đọc epoch byte ffi() {
+    // CLOCK_REALTIME = 0 trên POSIX; Win32 FFI dùng cùng ID và wire format.
+    đệm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    trạng_thái = đọc_đồng_hồ_utc_ffi(0, đệm);
+    nếu (trạng_thái != 0) {
+        ném "UTC: clock_gettime thất bại";
+    };
+    nano = thời gian utc đọc i64(đệm, 8);
+    nếu (nano < 0 || nano >= 1000000000.0) {
+        ném "UTC: timespec không hợp lệ";
+    };
+    giây_byte = [];
+    lặp(i = 0; i < 8; i++) { them(giây_byte, đệm[i]); };
+    trả về giây_byte;
+};
+
+hàm thời gian đọc utc ffi() {
+    giây = thời gian utc đọc i64(thời gian utc đọc epoch byte ffi(), 0);
+    trả về thời gian utc từ epoch giây(giây);
+};
+
+// Tương thích các caller cũ dùng tên POSIX trước khi adapter Windows xuất hiện.
+hàm thời gian utc đọc epoch byte posix() {
+    trả về thời gian utc đọc epoch byte ffi();
+};
+
+hàm thời gian đọc utc posix() {
+    trả về thời gian đọc utc ffi();
+};

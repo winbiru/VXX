@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "vpp/runtime/value.h"
+#include "vpp/bytecode/instruction.h"
 
 namespace vietvm::helpers {
 
@@ -16,7 +17,7 @@ bool nativeUtf8Path(const StackValue &value,
                     std::string &err);
 
 // Dispatch nhóm hàm native nền tảng/thư viện chuẩn; handler kiểm tra tên hàm và thực hiện filesystem, time, environment hoặc utility tương ứng.
-bool handleNativeFoundationFunction(const std::string &fn,
+bool handleNativeFoundationFunction(Opcode opcode,
                                     const std::vector<StackValue> &args,
                                     StackValue &result,
                                     std::string &err);

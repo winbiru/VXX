@@ -1,0 +1,26 @@
+nhập gói/mạng/ổ cắm;
+
+hàm chính() {
+    tcp = socket tcp mở("127.0.0.1", "18080", "1000");
+    in tcp >= 536870912;
+    in socket đặt timeout(tcp, 1000);
+    yêu_cầu = "GET /health HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    in socket gửi(tcp, yêu_cầu) > 0;
+    phản_hồi = socket nhận(tcp, 4096);
+    in do_dai(phản_hồi) > 0;
+    in socket đóng(tcp);
+    bắt_được = sai;
+    thử { socket đóng(tcp); } bắt lỗi(e) { bắt_được = đúng; };
+    in bắt_được;
+
+    // Resolver có thể trả ::1 trước 127.0.0.1, trong khi fixture chỉ bind IPv4.
+    // V++ phải thử địa chỉ kế tiếp khi adapter native kết nối thất bại.
+    qua_dns = socket tcp mở("localhost", 18080, 1000);
+    in qua_dns >= 536870912;
+    in socket đóng(qua_dns);
+
+    udp = socket udp mở("127.0.0.1", 9, 1000);
+    in udp >= 536870912;
+    in socket gửi(udp, "ping") == 4;
+    in socket đóng(udp);
+};

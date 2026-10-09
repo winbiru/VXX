@@ -1,0 +1,37 @@
+nhập gói/hệ thống/nền tảng;
+nhập gói/thời gian/đơn điệu;
+
+// Foreign declarations belong to their declaring module. Bind test probes
+// locally rather than reaching the platform module's private FFI aliases.
+ngoại thư viện ffi_lỗi_kiểm_thử = "system.ffi";
+ngoại hàm đọc_errno_thử(): i32 từ ffi_lỗi_kiểm_thử
+    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
+ngoại hàm đọc_eintr_thử(): i32 từ ffi_lỗi_kiểm_thử
+    ký hiệu "eintr" abi "c" khả năng "system.ffi.error";
+
+hàm chính() {
+    // Kiểm tra ABI metadata thuần VM đi qua parser/codegen/FFI.
+    in đọc_errno_thử() == 0;
+    in đọc_eintr_thử() > 0;
+    in ngủ mili giây("0") == rỗng;
+    in ngủ mili giây(2) == rỗng;
+    // Hơn 999 ms để kiểm tra đường chia đợt tránh overflow của usleep(u32).
+    in ngủ mili giây(1001) == rỗng;
+    // Kiểm tra deadline tính bằng đồng hồ đơn điệu: không trở về sớm.
+    bắt_đầu = thời gian đơn điệu mili giây();
+    ngủ mili giây(30);
+    in thời gian đơn điệu mili giây() - bắt_đầu >= 25;
+    thử {
+        ngủ mili giây(-1);
+    } bắt lỗi (e) {
+        in "từ chối số âm";
+    };
+    thử {
+        ngủ mili giây("sai");
+    } bắt lỗi (e) {
+        in "từ chối kiểu sai";
+    };
+    mã_lỗi_trước = đọc_errno_thử();
+    in đọc_eintr_thử() > 0;
+    in đọc_errno_thử() == mã_lỗi_trước;
+};

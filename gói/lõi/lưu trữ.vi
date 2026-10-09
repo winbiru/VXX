@@ -1,5 +1,5 @@
 // vi.archive — ZIP32 STORE triển khai bằng V++.
-// Native chỉ còn primitive file I/O nhị phân; format ZIP, CRC32, kiểm tra tên
+// VM chỉ còn primitive file I/O nhị phân; format ZIP, CRC32, kiểm tra tên
 // mục và giới hạn giải nén đều thuộc tầng thư viện V++.
 
 nhập gói/nhập xuất/tệp;
@@ -7,6 +7,7 @@ nhập gói/nhập xuất/đường dẫn;
 nhập gói/nhập xuất/thư mục;
 nhập gói/lõi/bảng mã;
 nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/từ điển;
 
 hàm lưu trữ yêu cầu khoảng(bytes, vị_trí, số_lượng, thông_báo) {
     nếu (vị_trí < 0 || số_lượng < 0 || vị_trí + số_lượng > do_dai(bytes)) {
@@ -235,7 +236,7 @@ hàm lưu trữ tạo zip(đường zip, danh sách tệp) {
         nếu (co_khoa(đã_dùng, tên)) {
             ném "lưu trữ tạo zip: tên mục không hợp lệ hoặc bị trùng";
         };
-        dat_map(đã_dùng, tên, đúng);
+        đặt map(đã_dùng, tên, đúng);
         tên_bytes = mã hóa bảng mã(tên, "UTF-8");
         nếu (do_dai(tên_bytes) > 65535) {
             ném "lưu trữ: tên mục ZIP quá dài";
@@ -271,10 +272,10 @@ hàm lưu trữ tạo zip(đường zip, danh sách tệp) {
     vị_trí_trung_tâm = do_dai(zip);
     lặp(i = 0; i < do_dai(mục); i++) {
         entry = mục[i];
-        tên_bytes = lay_map(entry, "tên bytes", []);
-        crc = lay_map(entry, "crc", []);
-        kích_thước = lay_map(entry, "kích thước", 0);
-        vị_trí = lay_map(entry, "vị trí", 0);
+        tên_bytes = lấy map(entry, "tên bytes", []);
+        crc = lấy map(entry, "crc", []);
+        kích_thước = lấy map(entry, "kích thước", 0);
+        vị_trí = lấy map(entry, "vị trí", 0);
         lưu trữ thêm u32(zip, 33639248);
         lưu trữ thêm u16(zip, 20);
         lưu trữ thêm u16(zip, 20);
@@ -316,11 +317,11 @@ hàm lưu trữ liệt kê zip(đường zip) {
     vị_trí = 0;
     lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
         entry = lưu trữ đọc local entry(bytes, vị_trí);
-        nếu (lay_map(entry, "xong", sai)) {
+        nếu (lấy map(entry, "xong", sai)) {
             trả về kết_quả;
         };
-        them(kết_quả, lay_map(entry, "tên", ""));
-        vị_trí = lay_map(entry, "vị trí kế", vị_trí);
+        them(kết_quả, lấy map(entry, "tên", ""));
+        vị_trí = lấy map(entry, "vị trí kế", vị_trí);
     };
     ném "lưu trữ: ZIP bị cắt ngắn";
 };
@@ -336,12 +337,12 @@ hàm lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn b
     số_mục = 0;
     lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
         entry = lưu trữ đọc local entry(bytes, vị_trí);
-        nếu (lay_map(entry, "xong", sai)) {
+        nếu (lấy map(entry, "xong", sai)) {
             trả về số_mục;
         };
-        phương_thức = lay_map(entry, "phương thức", -1);
-        kích_thước_nén = lay_map(entry, "kích thước nén", -1);
-        kích_thước_gốc = lay_map(entry, "kích thước gốc", -1);
+        phương_thức = lấy map(entry, "phương thức", -1);
+        kích_thước_nén = lấy map(entry, "kích thước nén", -1);
+        kích_thước_gốc = lấy map(entry, "kích thước gốc", -1);
         nếu (phương_thức != 0 || kích_thước_nén != kích_thước_gốc) {
             ném "lưu trữ: chỉ giải nén ZIP phương thức STORE (không nén)";
         };
@@ -349,11 +350,11 @@ hàm lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn b
         nếu (tổng > giới hạn byte) {
             ném "lưu trữ: vượt giới hạn dung lượng giải nén";
         };
-        tên = lay_map(entry, "tên", "");
+        tên = lấy map(entry, "tên", "");
         tương_đối = lưu trữ tên an toàn(tên);
-        đầu = lay_map(entry, "vị trí dữ liệu", -1);
+        đầu = lấy map(entry, "vị trí dữ liệu", -1);
         dữ_liệu = lưu trữ lấy bytes(bytes, đầu, kích_thước_gốc);
-        crc_mong_đợi = lay_map(entry, "crc", []);
+        crc_mong_đợi = lấy map(entry, "crc", []);
         nếu (!lưu trữ bytes bằng(lưu trữ crc32(dữ_liệu), crc_mong_đợi)) {
             ném "lưu trữ: CRC32 không khớp";
         };
@@ -364,7 +365,7 @@ hàm lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn b
         };
         ghi bytes tệp(đích, dữ_liệu);
         số_mục = số_mục + 1;
-        vị_trí = lay_map(entry, "vị trí kế", vị_trí);
+        vị_trí = lấy map(entry, "vị trí kế", vị_trí);
     };
     ném "lưu trữ: ZIP bị cắt ngắn";
 };

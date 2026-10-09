@@ -9,12 +9,15 @@ hàm chính() {
     in giải mã bảng mã(bytes, "ISO-8859-1");
     utf8 = mã hóa bảng mã("Việt", "UTF-8");
     in giải mã bảng mã(utf8, "UTF-8");
+    emoji = mã hóa bảng mã("😀", "UTF-8");
+    in emoji;
+    in giải mã bảng mã(emoji, "UTF-8");
     in mã hóa bảng mã("ABC", "US-ASCII");
     in giải mã bảng mã([65, 66, 67], "ASCII");
     in mã hóa bảng mã("ÿ", "ISO_8859 1");
     in giải mã bảng mã([255], "latin1");
 
-    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    ký_tự_thay = ký tự unicode(65533);
     thử {
         in giải mã bảng mã([195, 40], "UTF-8");
     } bắt lỗi (e) {
@@ -23,4 +26,32 @@ hàm chính() {
     in giải mã bảng mã([195, 40], "UTF-8", "THAY_THẾ") == ký_tự_thay + "(";
     in giải mã bảng mã([226, 130], "UTF-8", "replace") == ký_tự_thay;
     in giải mã bảng mã([65, 255, 66], "ASCII", "thay thế") == "A" + ký_tự_thay + "B";
+
+    // Decoder phải tiêu thụ maximal valid prefix, kể cả chuỗi bị cắt giữa chừng.
+    in giải mã bảng mã([0, 65, 0], "UTF-8") == ký tự unicode(0) + "A" + ký tự unicode(0);
+    in giải mã bảng mã([192, 175], "UTF-8", "replace") == ký_tự_thay + ký_tự_thay;
+    in giải mã bảng mã([224, 128, 128], "UTF-8", "replace") == ký_tự_thay + ký_tự_thay + ký_tự_thay;
+    in giải mã bảng mã([237, 160, 128], "UTF-8", "replace") == ký_tự_thay + ký_tự_thay + ký_tự_thay;
+    in giải mã bảng mã([244, 144, 128, 128], "UTF-8", "replace") == ký_tự_thay + ký_tự_thay + ký_tự_thay + ký_tự_thay;
+    in giải mã bảng mã([226, 130, 65], "UTF-8", "replace") == ký_tự_thay + "A";
+    in giải mã bảng mã([240, 159, 152], "UTF-8", "replace") == ký_tự_thay;
+    in giải mã bảng mã([255], "UTF-8", "replace") == ký_tự_thay;
+    max_utf8 = mã hóa bảng mã(ký tự unicode(1114111), "UTF-8");
+    in do_dai(max_utf8) == 4 && max_utf8[0] == 244 && max_utf8[1] == 143 &&
+       max_utf8[2] == 191 && max_utf8[3] == 191;
+    in mã điểm unicode(ký tự unicode(1114111)) == 1114111;
+
+    // Raw VM bridge phải bảo toàn cả NUL và byte không hợp lệ UTF-8.
+    nguyên_bản = [0, 255, 128, 65, 0];
+    khôi_phục = chuoi_bytes_vm(chuoi_tu_bytes_vm(nguyên_bản));
+    đúng_bytes = do_dai(khôi_phục) == do_dai(nguyên_bản);
+    lặp(i = 0; i < do_dai(nguyên_bản); i++) {
+        đúng_bytes = đúng_bytes && khôi_phục[i] == nguyên_bản[i];
+    };
+    in đúng_bytes;
+
+    thử { ký tự unicode(55296); } bắt lỗi (e) { in e == "bảng mã: mã Unicode không hợp lệ"; };
+    thử { ký tự unicode(1114112); } bắt lỗi (e) { in e == "bảng mã: mã Unicode không hợp lệ"; };
+    thử { giải mã bảng mã([226, 130, 65], "UTF-8"); } bắt lỗi (e) { in e == "TEXT_DECODE_INVALID"; };
+    thử { chuoi_tu_bytes_vm([256]); } bắt lỗi (e) { in loai_cua(e) == "chuỗi"; };
 };

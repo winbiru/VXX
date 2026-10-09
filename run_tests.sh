@@ -26,6 +26,10 @@ if [ ! -x "$EXEC_PATH" ]; then
 fi
 tmpdir=$(mktemp -d "src/tests/.tmp.XXXXXX")
 export VPP_PREFERENCES_HOME="$ROOT_DIR/$tmpdir/preferences"
+# Deterministic environment values for public System/FFI API regression tests.
+export VPP_FFI_ENV_TEST="vpp-env-ffi-ok"
+export VPP_FFI_ENV_EMPTY_TEST=""
+unset VPP_FFI_ENV_MISSING_TEST
 PASS=0; FAIL=0
 HTTP_NETWORK_RESTRICTED=0
 
@@ -71,13 +75,15 @@ wait_http_value() {
   return 1
 }
 
-"$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
+# The HTTP fixture exercises TCP listen/accept/recv/send. Keep its server
+# side under the strict migration gate as well as the client-side FFI tests.
+VPP_STRICT_SYSTEM_FFI_POSIX=1 "$EXEC_PATH" src/tests/http_fixture.vi >"$tmpdir/http_fixture.log" 2>&1 &
 HTTP_FIXTURE_PID=$!
 if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http_fixture.output"; then
   if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
-  if grep -Eq 'socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$' "$tmpdir/http_fixture.log"; then
+  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013))' "$tmpdir/http_fixture.log"; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
     HTTP_FIXTURE_PID=""
@@ -111,6 +117,7 @@ TESTS=(
   src/tests/import_main.vi
   src/tests/kiem_tra_boolean.vi
   src/tests/kiem_tra_bo_qua.vi
+  src/tests/kiem_tra_thoat_vong_lap.vi
   src/tests/kiem_tra_chon_ca.vi
   src/tests/kiem_tra_chuoi_co_ban.vi
   src/tests/kiem_tra_de_quy.vi
@@ -148,6 +155,7 @@ TESTS=(
   src/tests/kiem_tra_http_response_vpp.vi
   src/tests/kiem_tra_http_may_chu_thuan_vpp.vi
   src/tests/kiem_tra_http_transport_bat_loi.vi
+  src/tests/kiem_tra_ffi_http_transport_bat_loi.vi
   src/tests/kiem_tra_application_server.vi
   src/tests/kiem_tra_rest_json_jwt.vi
   src/tests/kiem_tra_stdlib_tinh_toan.vi
@@ -173,6 +181,7 @@ TESTS=(
   src/tests/kiem_tra_goi_dong_thoi.vi
   src/tests/kiem_tra_goi_tuy_chon.vi
   src/tests/kiem_tra_goi_bang_ma.vi
+  src/tests/kiem_tra_vm_ieee754.vi
   src/tests/kiem_tra_goi_ban_dia_hoa.vi
   src/tests/kiem_tra_goi_ngau_nhien.vi
   src/tests/kiem_tra_goi_dns.vi
@@ -191,6 +200,19 @@ TESTS=(
   src/tests/kiem_tra_goi_dong_goi_ung_dung.vi
   src/tests/kiem_tra_goi_mang.vi
   src/tests/kiem_tra_stdlib_nen_tang.vi
+  src/tests/kiem_tra_ffi_moi_truong.vi
+  src/tests/kiem_tra_ffi_tien_trinh.vi
+  src/tests/kiem_tra_ffi_process_spawn.vi
+  src/tests/kiem_tra_process_quote_windows.vi
+  src/tests/kiem_tra_ffi_ngu.vi
+  src/tests/kiem_tra_ffi_don_dieu.vi
+  src/tests/kiem_tra_ffi_utc.vi
+  src/tests/kiem_tra_ffi_entropy.vi
+  src/tests/kiem_tra_ffi_thu_muc.vi
+  src/tests/kiem_tra_ffi_tep.vi
+  src/tests/kiem_tra_ffi_dns.vi
+  src/tests/kiem_tra_ffi_socket.vi
+  src/tests/kiem_tra_ffi_tls.vi
   src/tests/kiem_tra_chuoi_nen_tang.vi
   src/tests/kiem_tra_goi_ham.vi
   src/tests/kiem_tra_tuy_chon_thong_ke.vi
@@ -237,7 +259,7 @@ for testfile in "${TESTS[@]}"; do
   base=$(basename "${testfile%.vi}")
   if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
     case "$base" in
-      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang)
+      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang|kiem_tra_ffi_socket)
         continue
         ;;
     esac
@@ -257,7 +279,7 @@ for testfile in "${TESTS[@]}"; do
   base=$(basename "${testfile%.vi}")
   if [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
     case "$base" in
-      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang)
+      kiem_tra_stdlib_http|kiem_tra_stdlib_http_post_put|kiem_tra_goi_http|kiem_tra_goi_dau_noi_mang|kiem_tra_ffi_socket)
         echo "== Skipping $testfile: localhost socket syscalls are restricted =="
         continue
         ;;
@@ -285,6 +307,178 @@ for testfile in "${TESTS[@]}"; do
     echo "NO EXPECTED: $testfile"; FAIL=$((FAIL+1))
   fi
 done
+
+# POSIX migration gate: public System APIs use V++ FFI. All retired native OS
+# opcode groups must reject calls even when no strict testing flag is present.
+case "$(uname -s)" in
+  Darwin|Linux)
+    for legacy_mode in interpreter jit; do
+      legacy_jit=0
+      if [ "$legacy_mode" = jit ]; then legacy_jit=1; fi
+      for legacy_kind in tep moi_truong process nen_tang ngu socket tls utc local entropy; do
+        legacy_out="$tmpdir/removed_native_${legacy_mode}_${legacy_kind}.output"
+        case "$legacy_kind" in
+          tep)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_tep_cu.vi
+            legacy_diagnostic='System FFI strict file: legacy VM file opcode is disabled' ;;
+          moi_truong)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_moi_truong_cu.vi
+            legacy_diagnostic='System FFI: legacy environment opcode is disabled' ;;
+          process)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_process_cu.vi
+            legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
+          nen_tang)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi
+            legacy_diagnostic='System FFI: legacy monotonic clock opcode is disabled' ;;
+          ngu)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_ngu_cu.vi
+            legacy_diagnostic='System FFI: legacy sleep opcode is disabled' ;;
+          socket)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_socket_cu.vi
+            legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
+          tls)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_tls_cu.vi
+            legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
+          utc)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_utc_cu.vi
+            legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
+          local)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_local_cu.vi
+            legacy_diagnostic='System FFI: legacy POSIX System opcode is disabled' ;;
+          entropy)
+            legacy_fixture=src/tests/kiem_tra_ffi_opcode_entropy_cu.vi
+            legacy_diagnostic='System FFI: legacy secure entropy opcode is disabled' ;;
+        esac
+        if VPP_ENABLE_JIT="$legacy_jit" "$EXEC_PATH" "$legacy_fixture" >"$legacy_out" 2>&1; then
+          echo "FAIL: removed native $legacy_kind opcode allowed [$legacy_mode]"; FAIL=$((FAIL+1))
+        elif grep -q "$legacy_diagnostic" "$legacy_out"; then
+          echo "PASS: removed native $legacy_kind opcode [$legacy_mode]"; PASS=$((PASS+1))
+        else
+          echo "FAIL: removed native $legacy_kind opcode diagnostic [$legacy_mode]"; FAIL=$((FAIL+1))
+          cat "$legacy_out" >&2
+        fi
+      done
+    done
+
+    # Single-process batch tests share one TZ; run the DST fixture separately
+    # under a POSIX-defined zone so transitions stay deterministic.
+    for tz_mode in interpreter jit; do
+      local_clock_out="$tmpdir/ffi_local_clock_${tz_mode}.output"
+      if [ "$tz_mode" = jit ]; then
+        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT=1 "$EXEC_PATH" \
+          src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
+        local_clock_status=$?
+      else
+        TZ='EST5EDT,M3.2.0/2,M11.1.0/2' VPP_STRICT_SYSTEM_FFI_POSIX=1 "$EXEC_PATH" \
+          src/tests/kiem_tra_ffi_gio_dia_phuong.vi >"$local_clock_out" 2>&1
+        local_clock_status=$?
+      fi
+      if [ "$local_clock_status" -eq 0 ] && \
+          diff -u src/tests/expected/kiem_tra_ffi_gio_dia_phuong.expected "$local_clock_out"; then
+        echo "PASS: System FFI localtime/DST [$tz_mode]"; PASS=$((PASS+1))
+      else
+        echo "FAIL: System FFI localtime/DST [$tz_mode] (exit: $local_clock_status)"; FAIL=$((FAIL+1))
+        if [ "$local_clock_status" -ne 0 ]; then cat "$local_clock_out" >&2; fi
+      fi
+    done
+
+    strict_file_out="$tmpdir/strict_ffi_file.output"
+    if VPP_STRICT_SYSTEM_FFI_FILE=1 "$EXEC_PATH" src/tests/kiem_tra_ffi_tep.vi >"$strict_file_out" 2>&1 &&
+      diff -u src/tests/expected/kiem_tra_ffi_tep.expected "$strict_file_out"; then
+      echo "PASS: System FFI strict public file API"; PASS=$((PASS+1))
+    else
+      echo "FAIL: System FFI strict public file API"; FAIL=$((FAIL+1))
+      cat "$strict_file_out" >&2
+    fi
+    strict_legacy_out="$tmpdir/strict_ffi_legacy.output"
+    if VPP_STRICT_SYSTEM_FFI_FILE=1 "$EXEC_PATH" src/tests/kiem_tra_ffi_opcode_tep_cu.vi >"$strict_legacy_out" 2>&1; then
+      echo "FAIL: System FFI strict legacy opcode was allowed"; FAIL=$((FAIL+1))
+    elif grep -q 'System FFI strict file: legacy VM file opcode is disabled' "$strict_legacy_out"; then
+      echo "PASS: System FFI strict rejects legacy file opcode"; PASS=$((PASS+1))
+    else
+      echo "FAIL: System FFI strict legacy opcode failed for another reason"; FAIL=$((FAIL+1))
+      cat "$strict_legacy_out" >&2
+    fi
+
+    # The POSIX gate covers every migrated foundation group as well as file
+    # I/O. Verify public wrappers remain usable while legacy System opcodes
+    # are forbidden. Exercise the same dispatcher under JIT fallback.
+    strict_posix_tests=(
+      kiem_tra_ffi_moi_truong
+      kiem_tra_ffi_tien_trinh
+      kiem_tra_ffi_process_spawn
+      kiem_tra_ffi_ngu
+      kiem_tra_ffi_don_dieu
+      kiem_tra_ffi_utc
+      kiem_tra_ffi_entropy
+      kiem_tra_ffi_thu_muc
+      kiem_tra_ffi_tep
+      kiem_tra_ffi_dns
+      kiem_tra_ffi_socket
+      kiem_tra_ffi_tls
+      kiem_tra_ffi_http_transport_bat_loi
+    )
+    for strict_mode in interpreter jit; do
+      strict_jit=0
+      if [ "$strict_mode" = jit ]; then strict_jit=1; fi
+      for strict_name in "${strict_posix_tests[@]}"; do
+        if [ "$strict_name" = kiem_tra_ffi_socket ] && [ "$HTTP_NETWORK_RESTRICTED" -eq 1 ]; then
+          echo "SKIP: System FFI strict POSIX socket [$strict_mode] (localhost bind restricted)"
+          continue
+        fi
+        strict_out="$tmpdir/strict_posix_${strict_mode}_${strict_name}.output"
+        if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
+          "src/tests/${strict_name}.vi" >"$strict_out" 2>&1 &&
+          diff -u "src/tests/expected/${strict_name}.expected" "$strict_out"; then
+          echo "PASS: System FFI strict POSIX $strict_name [$strict_mode]"; PASS=$((PASS+1))
+        else
+          echo "FAIL: System FFI strict POSIX $strict_name [$strict_mode]"; FAIL=$((FAIL+1))
+          cat "$strict_out" >&2
+        fi
+      done
+      strict_old_out="$tmpdir/strict_posix_old_${strict_mode}.output"
+      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
+        src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi >"$strict_old_out" 2>&1; then
+        echo "FAIL: System FFI strict POSIX legacy opcode allowed [$strict_mode]"; FAIL=$((FAIL+1))
+      elif grep -q 'System FFI: legacy monotonic clock opcode is disabled' "$strict_old_out"; then
+        echo "PASS: System FFI strict POSIX rejects legacy monotonic opcode [$strict_mode]"; PASS=$((PASS+1))
+      else
+        echo "FAIL: System FFI strict POSIX legacy opcode failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
+        cat "$strict_old_out" >&2
+      fi
+      strict_socket_old_out="$tmpdir/strict_posix_socket_old_${strict_mode}.output"
+      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
+        src/tests/kiem_tra_ffi_opcode_socket_cu.vi >"$strict_socket_old_out" 2>&1; then
+        echo "FAIL: System FFI strict POSIX legacy socket allowed [$strict_mode]"; FAIL=$((FAIL+1))
+      elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_socket_old_out"; then
+        echo "PASS: System FFI strict POSIX rejects legacy socket [$strict_mode]"; PASS=$((PASS+1))
+      else
+        echo "FAIL: System FFI strict POSIX legacy socket failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
+        cat "$strict_socket_old_out" >&2
+      fi
+      strict_tls_old_out="$tmpdir/strict_posix_tls_old_${strict_mode}.output"
+      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
+        src/tests/kiem_tra_ffi_opcode_tls_cu.vi >"$strict_tls_old_out" 2>&1; then
+        echo "FAIL: System FFI strict POSIX legacy TLS opcode allowed [$strict_mode]"; FAIL=$((FAIL+1))
+      elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_tls_old_out"; then
+        echo "PASS: System FFI strict POSIX rejects legacy TLS [$strict_mode]"; PASS=$((PASS+1))
+      else
+        echo "FAIL: System FFI strict POSIX legacy TLS failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
+        cat "$strict_tls_old_out" >&2
+      fi
+      strict_process_old_out="$tmpdir/strict_posix_process_old_${strict_mode}.output"
+      if VPP_STRICT_SYSTEM_FFI_POSIX=1 VPP_ENABLE_JIT="$strict_jit" "$EXEC_PATH" \
+        src/tests/kiem_tra_ffi_opcode_process_cu.vi >"$strict_process_old_out" 2>&1; then
+        echo "FAIL: System FFI strict POSIX legacy process allowed [$strict_mode]"; FAIL=$((FAIL+1))
+      elif grep -q 'System FFI strict POSIX: legacy VM System opcode is disabled' "$strict_process_old_out"; then
+        echo "PASS: System FFI strict POSIX rejects legacy process [$strict_mode]"; PASS=$((PASS+1))
+      else
+        echo "FAIL: System FFI strict POSIX legacy process failed for another reason [$strict_mode]"; FAIL=$((FAIL+1))
+        cat "$strict_process_old_out" >&2
+      fi
+    done
+    ;;
+esac
 
 # Các ca lỗi runtime dưới đây khóa cơ chế chẩn đoán từ trạng thái thực tế: VM phải
 # tự suy ra nguyên nhân và giải thích mà không cần nơi phát sinh gắn mã lỗi.
@@ -354,6 +548,32 @@ elif diff -u "$jit_exp" "$jit_out"; then
 else
   echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT]"; FAIL=$((FAIL+1))
 fi
+
+# Chạy thư viện .vi thực với JIT: hàm, vòng lặp, collection, Unicode, regex,
+# intrinsic và xử lý lỗi phải tương đương đường interpreter mặc định.
+for jit_case in \
+  kiem_tra_goi_bo_suu_tap \
+  kiem_tra_goi_regex \
+  kiem_tra_goi_bang_ma \
+  kiem_tra_goi_thoi_gian \
+  kiem_tra_goi_quan_ly_goi \
+  kiem_tra_vm_ieee754 \
+  kiem_tra_hoi_quy_tong_hop \
+  kiem_tra_closure_capture \
+  kiem_tra_lambda_hof_mac_dinh \
+  kiem_tra_goi_dong_thoi; do
+  jit_test="src/tests/${jit_case}.vi"
+  jit_exp="src/tests/expected/${jit_case}.expected"
+  jit_out="$tmpdir/${jit_case}.jit.output"
+  VPP_ENABLE_JIT=1 "$EXEC_PATH" "$jit_test" >"$jit_out" 2>&1
+  jit_status=$?
+  if [ "$jit_status" -eq 0 ] && diff -u "$jit_exp" "$jit_out"; then
+    echo "PASS: $jit_test [JIT]"; PASS=$((PASS+1))
+  else
+    echo "FAIL: $jit_test [JIT] (exit code: $jit_status)"; FAIL=$((FAIL+1))
+    if [ "$jit_status" -ne 0 ]; then cat "$jit_out" >&2; fi
+  fi
+done
 
 echo "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
 gc_out="$tmpdir/kiem_tra_gc_mvp.output"

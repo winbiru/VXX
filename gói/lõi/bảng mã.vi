@@ -1,6 +1,63 @@
 // vi.charsets — chuyển đổi chuỗi UTF-8 với các bảng mã nền tảng ổn định.
-// Logic bảng mã nằm ở V++; native chỉ giữ primitive chuyển chuỗi UTF-8 hợp lệ
-// sang byte UTF-8 và ngược lại.
+// Toàn bộ thuật toán UTF-8/ASCII/Latin-1 nằm ở V++. VM chỉ có hai opcode
+// biểu diễn: sao chép byte chuỗi <-> danh sách, không giải mã Unicode.
+
+nhập gói/lõi/toán học;
+nhập gói/lõi/chuyển kiểu;
+
+hàm mã điểm unicode(c) {
+    nếu (loai_cua(c) != "chuỗi" || do_dai(c) != 1) {
+        ném "bảng mã: cần đúng một ký tự Unicode";
+    };
+    bytes = chuoi_bytes_vm(c);
+    n = do_dai(bytes);
+    nếu (bảng mã utf8 độ dài đoạn(bytes, 0) != n) {
+        ném "bảng mã: cần đúng một ký tự Unicode";
+    };
+    mã = bytes[0];
+    nếu (n == 2) { mã = mã % 32; };
+    nếu (n == 3) { mã = mã % 16; };
+    nếu (n == 4) { mã = mã % 8; };
+    lặp(i = 1; i < n; i++) {
+        mã = mã * 64 + bytes[i] % 64;
+    };
+    trả về mã;
+};
+
+hàm ký tự unicode(mã) {
+    nếu (loai_cua(mã) != "số nguyên" || mã < 0 || mã > 1114111 ||
+        (mã >= 55296 && mã <= 57343)) {
+        ném "bảng mã: mã Unicode không hợp lệ";
+    };
+    nếu (mã <= 127) { trả về chuoi_tu_bytes_vm([mã]); };
+    nếu (mã <= 2047) {
+        trả về chuoi_tu_bytes_vm([
+            192 + lam_tron_xuong(mã / 64), 128 + mã % 64
+        ]);
+    };
+    nếu (mã <= 65535) {
+        trả về chuoi_tu_bytes_vm([
+            224 + lam_tron_xuong(mã / 4096),
+            128 + lam_tron_xuong(mã / 64) % 64, 128 + mã % 64
+        ]);
+    };
+    trả về chuoi_tu_bytes_vm([
+        240 + lam_tron_xuong(mã / 262144),
+        128 + lam_tron_xuong(mã / 4096) % 64,
+        128 + lam_tron_xuong(mã / 64) % 64, 128 + mã % 64
+    ]);
+};
+
+hàm bảng mã utf8 mã hóa(văn_bản) {
+    bytes = chuoi_bytes_vm(văn_bản);
+    vị_trí = 0;
+    lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
+        n = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
+        nếu (n < 1) { ném "bảng mã: cần đúng một ký tự Unicode"; };
+        vị_trí = vị_trí + n;
+    };
+    trả về bytes;
+};
 
 // Hạ chữ ngay trong V++ để module bảng mã không cần primitive đổi
 // hoa/thường của runtime. Chế độ lỗi có cả từ khóa tiếng Việt như BÁO_LỖI,
@@ -156,17 +213,31 @@ hàm bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
 
 hàm bảng mã utf8 giải mã(bytes, chế độ) {
     kết_quả = "";
-    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    ký_tự_thay = ký tự unicode(65533);
     vị_trí = 0;
     n = do_dai(bytes);
     lặp(vòng = 0; vị_trí < n; vòng++) {
         độ_dài = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
         nếu (độ_dài > 0) {
-            đoạn = [];
-            lặp(j = 0; j < độ_dài; j++) {
-                thêm(đoạn, bytes[vị_trí + j]);
+            b0 = bytes[vị_trí];
+            mã = b0;
+            nếu (độ_dài == 2) {
+                mã = (b0 % 32) * 64 + (bytes[vị_trí + 1] % 64);
+            } nếu không {
+                nếu (độ_dài == 3) {
+                    mã = (b0 % 16) * 4096 +
+                        (bytes[vị_trí + 1] % 64) * 64 +
+                        (bytes[vị_trí + 2] % 64);
+                } nếu không {
+                    nếu (độ_dài == 4) {
+                        mã = (b0 % 8) * 262144 +
+                            (bytes[vị_trí + 1] % 64) * 4096 +
+                            (bytes[vị_trí + 2] % 64) * 64 +
+                            (bytes[vị_trí + 3] % 64);
+                    };
+                };
             };
-            kết_quả = kết_quả + utf8_native_exec("decode", đoạn);
+            kết_quả = kết_quả + ký tự unicode(mã);
             vị_trí = vị_trí + độ_dài;
         } nếu không {
             nếu (chế độ == "nghiêm") {
@@ -192,26 +263,19 @@ hàm mã hóa bảng mã(văn bản, tên bảng mã) {
         ném "mã hóa bảng mã: bảng mã không được hỗ trợ";
     };
     nếu (bảng == "utf8") {
-        trả về utf8_native_exec("encode", văn bản);
+        trả về bảng mã utf8 mã hóa(văn bản);
     };
 
     kết_quả = [];
     lặp(i = 0; i < do_dai(văn bản); i++) {
-        // Index chuỗi V++ trả một code point. Primitive UTF-8 chỉ cho ta byte
-        // của code point đó; quyết định ASCII/Latin-1 vẫn hoàn toàn ở V++.
-        utf8 = utf8_native_exec("encode", văn bản[i]);
-        nếu (do_dai(utf8) == 1) {
-            thêm(kết_quả, utf8[0]);
-        } nếu không {
-            nếu (bảng == "ascii" || do_dai(utf8) != 2) {
-                ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
-            };
-            mã = (utf8[0] % 32) * 64 + (utf8[1] % 64);
-            nếu (mã > 255) {
-                ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
-            };
-            thêm(kết_quả, mã);
+        mã = mã điểm unicode(văn bản[i]);
+        nếu (bảng == "ascii" && mã > 127) {
+            ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
         };
+        nếu (mã > 255) {
+            ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
+        };
+        thêm(kết_quả, mã);
     };
     trả về kết_quả;
 };
@@ -227,7 +291,7 @@ hàm giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_L�
         trả về bảng mã utf8 giải mã(bytes, chế_độ);
     };
 
-    utf8 = [];
+    kết_quả = "";
     lặp(i = 0; i < do_dai(bytes); i++) {
         byte = bytes[i];
         nếu (bảng == "ascii") {
@@ -235,21 +299,13 @@ hàm giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_L�
                 nếu (chế_độ == "nghiêm") {
                     ném "TEXT_DECODE_INVALID";
                 };
-                thêm(utf8, 239);
-                thêm(utf8, 191);
-                thêm(utf8, 189);
+                kết_quả = kết_quả + ký tự unicode(65533);
             } nếu không {
-                thêm(utf8, byte);
+                kết_quả = kết_quả + ký tự unicode(byte);
             };
         } nếu không {
-            nếu (byte <= 127) {
-                thêm(utf8, byte);
-            } nếu không {
-                thêm(utf8, 192 + thành số nguyên(byte / 64));
-                thêm(utf8, 128 + byte % 64);
-            };
+            kết_quả = kết_quả + ký tự unicode(byte);
         };
     };
-    trả về utf8_native_exec("decode", utf8);
+    trả về kết_quả;
 };
-nhập gói/lõi/chuyển kiểu;

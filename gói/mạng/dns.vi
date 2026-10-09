@@ -3,7 +3,8 @@ nhập gói/mạng/ổ cắm;
 nhập gói/bộ sưu tập/danh sách;
 
 hàm dns phân giải(tên máy) {
-    kết_quả = dns_phan_giai(tên máy);
+    tên máy = socket yêu cầu tên máy(tên máy, "dns_phan_giai");
+    kết_quả = socket resolver danh sách(tên máy, 0, sai);
     xóa trùng(kết_quả);
     sắp xếp(kết_quả);
     trả về kết_quả;

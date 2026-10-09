@@ -4,6 +4,8 @@
 
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/văn bản/chuỗi;
+nhập gói/hệ thống/tiến trình;
+nhập gói/hệ thống/nền tảng;
 
 hàm db lỗi cấu hình(lý_do) {
     trả về {"ok": sai, "reason": lý_do};
@@ -161,33 +163,78 @@ hàm db chuẩn hóa token(raw, rỗng_là_lỗi = đúng) {
     trả về bỏ khoảng trắng(kết_quả);
 };
 
-hàm db chạy native(cấu_hình, username, password, sql, dùng_database) {
+hàm db lệnh client(cấu_hình, username, password, sql, dùng_database) {
+    username = thành chuỗi(username);
+    password = thành chuỗi(password);
+    sql = thành chuỗi(sql);
     engine = lấy map(cấu_hình, "engine", "");
-    đích = lấy map(cấu_hình, "database", "");
-    nếu (engine == "sqlite") {
-        đích = lấy map(cấu_hình, "path", "");
+    nếu (engine != "sqlite" && username == "") {
+        trả về {"ok": sai, "reason": "missing-username"};
     };
-    raw = db_native_exec(
-        engine,
-        lấy map(cấu_hình, "host", ""),
-        lấy map(cấu_hình, "port", 0),
-        đích,
-        username,
-        password,
-        sql,
-        dùng_database
-    );
-    nếu (!lấy map(raw, "ok", sai)) {
+    host = lấy map(cấu_hình, "host", "");
+    port = thành chuỗi(lấy map(cấu_hình, "port", 0));
+    database = lấy map(cấu_hình, "database", "");
+    nếu (engine == "mysql") {
+        argv = ["--protocol=TCP", "--batch", "--skip-column-names",
+            "-h", host, "-P", port, "-u", username];
+        nếu (dùng_database) {
+            thêm(argv, "-D"); thêm(argv, database);
+        };
+        thêm(argv, "-e"); thêm(argv, sql);
+        trả về {"ok": đúng, "chương trình": "mysql", "đối số": argv,
+            "môi trường": {"MYSQL_PWD": password},
+            "dự phòng": "/opt/homebrew/opt/mysql-client/bin/mysql",
+            "lỗi mở": "cannot-open-mysql-process"};
+    };
+    nếu (engine == "postgresql") {
+        nếu (!dùng_database) { database = "postgres"; };
+        trả về {"ok": đúng, "chương trình": "psql",
+            "đối số": ["-h", host, "-p", port, "-U", username,
+                "-d", database, "-At", "-c", sql],
+            "môi trường": {"PGPASSWORD": password},
+            "dự phòng": "/opt/homebrew/bin/psql", "lỗi mở": "cannot-open-psql-process"};
+    };
+    nếu (engine == "sqlite") {
+        chương_trình = "sqlite3";
+        nếu (tên nền tảng() == "windows") { chương_trình = "sqlite3.exe"; };
+        trả về {"ok": đúng, "chương trình": chương_trình,
+            "đối số": [lấy map(cấu_hình, "path", ""), sql],
+            "môi trường": {}, "dự phòng": "", "lỗi mở": "cannot-open-sqlite-process"};
+    };
+    trả về {"ok": sai, "reason": "unsupported-driver"};
+};
+
+// Chọn client, dựng argv/environment, dự phòng và diễn giải exit status đều ở V++.
+hàm db chạy primitive(cấu_hình, username, password, sql, dùng_database) {
+    lệnh = db lệnh client(cấu_hình, username, password, sql, dùng_database);
+    nếu (!lấy map(lệnh, "ok", sai)) {
+        trả về {"ok": sai, "reason": lấy map(lệnh, "reason", "db-command-failed"), "output": ""};
+    };
+    argv = lấy map(lệnh, "đối số", []);
+    env = lấy map(lệnh, "môi trường", {});
+    raw = chạy tiến trình(lấy map(lệnh, "chương trình", ""), argv, env);
+    nếu (!lấy map(raw, "khởi chạy", sai)) {
+        dự_phòng = lấy map(lệnh, "dự phòng", "");
+        nếu (dự_phòng != "" && tên nền tảng() == "macos") {
+            raw = chạy tiến trình(dự_phòng, argv, env);
+        };
+    };
+    nếu (!lấy map(raw, "khởi chạy", sai)) {
+        trả về {"ok": sai, "reason": lấy map(lệnh, "lỗi mở", "db-command-failed"), "output": ""};
+    };
+    nếu (lấy map(raw, "mã thoát", -1) != 0 || lấy map(raw, "lỗi", "") != "") {
+        lý_do = lấy map(raw, "đầu ra", "");
+        nếu (lý_do == "") { lý_do = lấy map(raw, "lỗi", ""); };
         trả về {
             "ok": sai,
-            "reason": db chuẩn hóa token(lấy map(raw, "reason", "")),
+            "reason": db chuẩn hóa token(lý_do),
             "output": ""
         };
     };
     trả về {
         "ok": đúng,
         "reason": "",
-        "output": db chuẩn hóa token(lấy map(raw, "output", ""), sai)
+        "output": db chuẩn hóa token(lấy map(raw, "đầu ra", ""), sai)
     };
 };
 
@@ -201,7 +248,7 @@ hàm db chuẩn bị database(cấu_hình, username, password) {
         trả về {"ok": sai, "reason": "unsafe-database-name", "output": ""};
     };
     nếu (engine == "mysql") {
-        trả về db chạy native(
+        trả về db chạy primitive(
             cấu_hình,
             username,
             password,
@@ -209,7 +256,7 @@ hàm db chuẩn bị database(cấu_hình, username, password) {
             sai
         );
     };
-    kiểm_tra = db chạy native(
+    kiểm_tra = db chạy primitive(
         cấu_hình,
         username,
         password,
@@ -218,7 +265,7 @@ hàm db chuẩn bị database(cấu_hình, username, password) {
     );
     nếu (!lấy map(kiểm_tra, "ok", sai)) { trả về kiểm_tra; };
     nếu (lấy map(kiểm_tra, "output", "") == "1") { trả về kiểm_tra; };
-    trả về db chạy native(
+    trả về db chạy primitive(
         cấu_hình,
         username,
         password,
@@ -231,7 +278,7 @@ hàm db lỗi kết quả(lý_do) {
     trả về "DB_ERR|" + lý_do;
 };
 
-// Parse JDBC và policy kết nối nằm ở V++; native chỉ chạy client DB.
+// JDBC, lựa chọn client, argv và policy kết nối ở V++; VM chỉ spawn executable.
 hàm db_ket_noi(driverClassName, jdbcUrl, username, password) {
     cấu_hình = db phân tích cấu hình(driverClassName, jdbcUrl);
     nếu (!lấy map(cấu_hình, "ok", sai)) {
@@ -245,7 +292,7 @@ hàm db_ket_noi(driverClassName, jdbcUrl, username, password) {
     nếu (!lấy map(chuẩn_bị, "ok", sai)) {
         trả về db lỗi kết quả(lấy map(chuẩn_bị, "reason", "db-command-failed"));
     };
-    kết_quả = db chạy native(cấu_hình, username, password, "SELECT 1;", đúng);
+    kết_quả = db chạy primitive(cấu_hình, username, password, "SELECT 1;", đúng);
     nếu (!lấy map(kết_quả, "ok", sai)) {
         trả về db lỗi kết quả(lấy map(kết_quả, "reason", "db-command-failed"));
     };
@@ -262,7 +309,7 @@ hàm db_truy_van(driverClassName, jdbcUrl, username, password, sql) {
     nếu (engine != "sqlite" && username == "") {
         trả về db lỗi kết quả("missing-username");
     };
-    kết_quả = db chạy native(cấu_hình, username, password, sql, đúng);
+    kết_quả = db chạy primitive(cấu_hình, username, password, sql, đúng);
     nếu (!lấy map(kết_quả, "ok", sai)) {
         trả về db lỗi kết quả(lấy map(kết_quả, "reason", "db-command-failed"));
     };

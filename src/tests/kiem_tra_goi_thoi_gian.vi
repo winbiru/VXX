@@ -14,7 +14,8 @@ hàm chính() {
     in thời gian định dạng đồng hồ([2025, 12, 31, 23, 59, 59, -210], sai);
     in thời gian định dạng đồng hồ([2016, 12, 31, 23, 59, 60, 0], đúng);
 
-    utc = dong_ho_lich_noi_bo(1);
+    // Cả Windows và POSIX đều đọc UTC qua System FFI rồi đổi lịch tại V++.
+    utc = thời gian đọc utc ffi();
     in độ dài(utc) == 7 && utc[6] == 0;
     in utc[1] >= 1 && utc[1] <= 12 && utc[2] >= 1 && utc[2] <= 31;
     in độ dài(lay_thoi_gian_hien_tai()) == 25;

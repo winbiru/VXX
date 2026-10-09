@@ -3,19 +3,171 @@
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
 
+hàm biên dịch loại câu lệnh từ mã(mã) {
+    nếu (mã == 0) { trả về "nhập"; };
+    nếu (mã == 1) { trả về "hàm"; };
+    nếu (mã == 2) { trả về "lớp"; };
+    nếu (mã == 3) { trả về "giao diện"; };
+    trả về "khác";
+};
+
+hàm biên dịch phạm vi từ mã(mã) {
+    nếu (mã == 1) { trả về "công khai"; };
+    nếu (mã == 2) { trả về "riêng tư"; };
+    nếu (mã == 3) { trả về "bảo vệ"; };
+    trả về "mặc định";
+};
+
+hàm biên dịch tham số từ thô(các_tham_số) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(các_tham_số); i++) {
+        thô = các_tham_số[i];
+        thêm(kết_quả, {
+            "tên": thô[0],
+            "có mặc định": thô[1]
+        });
+    };
+    trả về kết_quả;
+};
+
+hàm biên dịch câu lệnh từ thô(thô) {
+    thành_viên = [];
+    con = thô[7];
+    lặp(i = 0; i < do_dai(con); i++) {
+        thêm(thành_viên, biên dịch câu lệnh từ thô(con[i]));
+    };
+    trả về {
+        "loại": biên dịch loại câu lệnh từ mã(thô[0]),
+        "tên": thô[1],
+        "phạm vi": biên dịch phạm vi từ mã(thô[2]),
+        "tham số": biên dịch tham số từ thô(thô[3]),
+        "đích": thô[4],
+        "bí danh": thô[5],
+        "công khai": thô[6],
+        "thành viên": thành_viên
+    };
+};
+
+hàm biên dịch cây từ thô(cây_thô) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(cây_thô); i++) {
+        thêm(kết_quả, biên dịch câu lệnh từ thô(cây_thô[i]));
+    };
+    trả về kết_quả;
+};
+
+hàm biên dịch bytecode từ thô(bytecode_thô) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(bytecode_thô); i++) {
+        lệnh = bytecode_thô[i];
+        thêm(kết_quả, {
+            "op": lệnh[0],
+            "toán hạng": lệnh[1],
+            "chỉ số": lệnh[2],
+            "giá trị": lệnh[3]
+        });
+    };
+    trả về kết_quả;
+};
+
+hàm biên dịch snapshot lỗi(lỗi) {
+    trả về {
+        "hợp lệ": 0,
+        "lỗi": lỗi,
+        "token": 0,
+        "ký hiệu": 0,
+        "phạm vi": 0,
+        "tham chiếu": 0,
+        "lệnh": 0,
+        "vùng ir chưa trực tiếp": 0,
+        "mô đun": 0,
+        "bytecode": [],
+        "cây cú pháp": []
+    };
+};
+
+hàm biên dịch chuẩn hóa gốc(gốc) {
+    nếu (loai_cua(gốc) != "chuỗi") {
+        ném "biên dịch: gốc phải là chuỗi";
+    };
+    nếu (gốc == "") {
+        trả về ".";
+    };
+    trả về gốc;
+};
+
+hàm biên dịch snapshot nội bộ(mã nguồn, gốc = ".") {
+    nếu (loai_cua(mã nguồn) != "chuỗi") {
+        ném "biên dịch: mã nguồn phải là chuỗi";
+    };
+    gốc = biên dịch chuẩn hóa gốc(gốc);
+    thô = rỗng;
+    thử {
+        thô = bien_dich_phan_tich_vm(mã nguồn, gốc);
+    } bắt lỗi (e) {
+        trả về biên dịch snapshot lỗi(e);
+    };
+    trả về {
+        "hợp lệ": 1,
+        "lỗi": "",
+        "token": thô[0],
+        "ký hiệu": thô[1],
+        "phạm vi": thô[2],
+        "tham chiếu": thô[3],
+        "lệnh": thô[4],
+        "vùng ir chưa trực tiếp": thô[5],
+        "mô đun": thô[6],
+        "bytecode": biên dịch bytecode từ thô(thô[7]),
+        "cây cú pháp": biên dịch cây từ thô(thô[8])
+    };
+};
+
 hàm biên dịch kiểm tra(mã nguồn) {
-    trả về bien_dich_kiem_tra(mã nguồn);
+    snapshot = biên dịch snapshot nội bộ(mã nguồn, ".");
+    trả về {
+        "hợp lệ": lấy map(snapshot, "hợp lệ", 0),
+        "lỗi": lấy map(snapshot, "lỗi", ""),
+        "lệnh": lấy map(snapshot, "lệnh", 0)
+    };
 };
 
 hàm biên dịch phân tích(mã nguồn) {
-    trả về bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+    snapshot = biên dịch snapshot nội bộ(mã nguồn, ".");
+    nếu (!lấy map(snapshot, "hợp lệ", 0)) {
+        ném lấy map(snapshot, "lỗi", "biên dịch thất bại");
+    };
+    trả về snapshot;
 };
 
 hàm biên dịch bytecode(mã nguồn) {
-    trả về bien_dich_bytecode(mã nguồn);
+    phân_tích = biên dịch phân tích(mã nguồn);
+    trả về lấy map(phân_tích, "bytecode", []);
+};
+
+// Các tiện ích dưới đây chỉ diễn giải snapshot compiler bằng V++; native không
+// có entry point riêng cho từng phép truy vấn.
+hàm biên dịch cây cú pháp(mã nguồn) {
+    phân_tích = biên dịch phân tích(mã nguồn);
+    trả về lấy map(phân_tích, "cây cú pháp", []);
+};
+
+hàm biên dịch thống kê(mã nguồn) {
+    phân_tích = biên dịch phân tích(mã nguồn);
+    trả về {
+        "token": lấy map(phân_tích, "token", 0),
+        "ký hiệu": lấy map(phân_tích, "ký hiệu", 0),
+        "phạm vi": lấy map(phân_tích, "phạm vi", 0),
+        "tham chiếu": lấy map(phân_tích, "tham chiếu", 0),
+        "lệnh": lấy map(phân_tích, "lệnh", 0),
+        "mô đun": lấy map(phân_tích, "mô đun", 0)
+    };
 };
 
 hàm biên dịch tệp(đường dẫn) {
     mã_nguồn = đọc tệp(đường dẫn);
-    trả về bien_dich_phan_tich_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+    snapshot = biên dịch snapshot nội bộ(mã_nguồn, đường dẫn cha(đường dẫn));
+    nếu (!lấy map(snapshot, "hợp lệ", 0)) {
+        ném lấy map(snapshot, "lỗi", "biên dịch thất bại");
+    };
+    trả về snapshot;
 };

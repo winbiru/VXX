@@ -4,6 +4,15 @@ hàm chính() {
     tệp_io = ".tmp_stdlib_io_𠀀.txt";
     ghi tệp(tệp_io, "xin chao io");
     in đọc tệp(tệp_io);
+    ghi tệp(tệp_io, 42);
+    in đọc tệp(tệp_io);
+    ghi nối tệp(tệp_io, đúng);
+    in đọc tệp(tệp_io);
+    thử {
+        ghi bytes tệp(tệp_io, [0, 256]);
+    } bắt lỗi (e) {
+        in e;
+    };
 
     tệp_đếm = ".tmp_stdlib_đếm_𠀀.txt";
     ghi tệp(tệp_đếm, "mot hai\nba bon\n");

@@ -17,6 +17,13 @@ hàm chính() {
 
     bytecode = biên dịch bytecode(nguồn);
     in độ dài(bytecode) > 0;
+    in lấy map(bytecode[0], "op", -1) >= 0;
+
+    cây = biên dịch cây cú pháp(nguồn);
+    in độ dài(cây) > 0;
+    thống_kê = biên dịch thống kê(nguồn);
+    in lấy map(thống_kê, "token", 0) > 0;
+    in lấy map(thống_kê, "lệnh", 0) > 0;
 
     tệp = ".tmp_compiler_api.vi";
     ghi tệp(tệp, nguồn);

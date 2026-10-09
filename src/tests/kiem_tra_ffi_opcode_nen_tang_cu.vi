@@ -1,0 +1,5 @@
+// Negative migration gate: intentionally bypass the public V++ System API.
+// POSIX rejects this legacy native clock opcode with or without the strict gate.
+hàm chính() {
+    in thoi_gian_don_dieu_ms_vm();
+};

@@ -1,4 +1,4 @@
-Lỗi: truy cập chỉ số chỉ áp dụng cho danh sách, bộ hoặc chuỗi
+Lỗi: truy cập chỉ số chỉ áp dụng cho danh sách, bộ, từ điển hoặc chuỗi
 Điều đã xảy ra: Bạn đang dùng dấu [] với một giá trị không có các phần tử được đánh số vị trí.
 Cách sửa: Hãy dùng [] với danh sách, bộ hoặc chuỗi; với đối tượng hãy dùng thuộc tính hay phương thức phù hợp.
 Dấu vết lỗi:

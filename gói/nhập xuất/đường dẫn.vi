@@ -1,9 +1,37 @@
 // Module: nhập xuất.đường dẫn
 // Phân tích/nối đường dẫn là logic thuần V++. Chỉ các phép hỏi trạng thái hệ tệp
-// ở cuối tệp này đi qua native boundary.
+// ở cuối tệp này đi qua VM primitive hoặc FFI boundary.
 
 nhập gói/hệ thống/nền tảng;
 nhập gói/văn bản/chuỗi;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+nhập gói/hệ thống/môi trường;
+
+ngoại thư viện c_đường_dẫn = "system.c";
+ngoại hàm đường_tồn_tại_ffi(đường: c_chuỗi, chế_độ: i32): i32 từ c_đường_dẫn
+    ký hiệu "access" abi "c" khả năng "system.fs.exists";
+ngoại hàm đường_stat_ffi(đường: c_chuỗi, kết_quả: c_đệm_ra[256]): i32 từ c_đường_dẫn
+    ký hiệu "stat" abi "c" khả năng "system.fs.stat";
+ngoại hàm đường_lstat_ffi(đường: c_chuỗi, kết_quả: c_đệm_ra[256]): i32 từ c_đường_dẫn
+    ký hiệu "lstat" abi "c" khả năng "system.fs.lstat";
+ngoại thư viện c_bố_cục_đường = "system.ffi";
+ngoại hàm đường_stat_mode_offset_ffi(): i32 từ c_bố_cục_đường
+    ký hiệu "stat_mode_offset" abi "c" khả năng "system.ffi.layout";
+// Adapter Win32 chỉ trả loại entry; V++ giữ chính sách theo/không theo link.
+ngoại thư viện c_trạng_thái_windows = "system.path";
+ngoại hàm đường_loại_windows_ffi(đường: c_chuỗi, theo_liên_kết: i32): i32 từ c_trạng_thái_windows
+    ký hiệu "kind" abi "c" khả năng "system.fs.path.kind";
+
+hàm đường dẫn dùng ffi windows() {
+    trả về đọc biến môi trường("VPP_WINDOWS_DIRECTORY_FFI", "") == "1" ||
+        đọc biến môi trường("VPP_WINDOWS_PATH_FFI", "") == "1";
+};
+
+hàm đường dẫn loại windows(đường, theo_liên_kết) {
+    nếu (theo_liên_kết) { trả về đường_loại_windows_ffi(đường, 1); };
+    trả về đường_loại_windows_ffi(đường, 0);
+};
 
 hàm đường dẫn dấu phân cách() {
     nếu (tên nền tảng() == "windows") {
@@ -115,13 +143,61 @@ hàm đường dẫn cha(đường dẫn) {
 };
 
 hàm đường dẫn tồn tại(đường dẫn) {
-    trả về duong_dan_ton_tai(đường dẫn);
+    đường = thành chuỗi(đường dẫn);
+    nếu (tên nền tảng() == "windows") {
+        nếu (đường dẫn dùng ffi windows()) {
+            trả về đường dẫn loại windows(đường, đúng) >= 0;
+        };
+        trả về duong_dan_ton_tai_vm(đường);
+    };
+    // Giữ xác thực UTF-8 của primitive cũ; libc nhận chuỗi kết thúc bởi NUL.
+    bytes = bảng mã utf8 mã hóa(đường);
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+    };
+    trả về đường_tồn_tại_ffi(đường, 0) == 0;
+};
+
+// POSIX stat/lstat trả struct phụ thuộc ABI. VM kiểm tra alignment/kích thước,
+// cung cấp offset st_mode từ SDK hiện hành; V++ giải mã field để phân loại.
+// Kết quả là mã loại POSIX 0..15 hoặc -1 nếu stat thất bại.
+hàm đường dẫn loại posix(đường, theo_liên_kết) {
+    bytes = bảng mã utf8 mã hóa(đường);
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+    };
+    đệm = [];
+    lặp(i = 0; i < 256; i++) { them(đệm, 0); };
+    trạng_thái = -1;
+    nếu (theo_liên_kết) {
+        trạng_thái = đường_stat_ffi(đường, đệm);
+    } nếu không {
+        trạng_thái = đường_lstat_ffi(đường, đệm);
+    };
+    nếu (trạng_thái != 0) { trả về -1; };
+    offset = đường_stat_mode_offset_ffi();
+    mode = đệm[offset] + đệm[offset + 1] * 256;
+    trả về mode / 4096;
 };
 
 hàm là tệp(đường dẫn) {
-    trả về la_tep(đường dẫn);
+    đường = thành chuỗi(đường dẫn);
+    nếu (tên nền tảng() == "windows") {
+        nếu (đường dẫn dùng ffi windows()) {
+            trả về đường dẫn loại windows(đường, đúng) == 1;
+        };
+        trả về la_tep_vm(đường);
+    };
+    trả về đường dẫn loại posix(đường, đúng) == 8;
 };
 
 hàm là thư mục(đường dẫn) {
-    trả về la_thu_muc(đường dẫn);
+    đường = thành chuỗi(đường dẫn);
+    nếu (tên nền tảng() == "windows") {
+        nếu (đường dẫn dùng ffi windows()) {
+            trả về đường dẫn loại windows(đường, đúng) == 2;
+        };
+        trả về la_thu_muc_vm(đường);
+    };
+    trả về đường dẫn loại posix(đường, đúng) == 4;
 };

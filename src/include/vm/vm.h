@@ -11,9 +11,16 @@
 #include <functional>
 #include <optional>
 #include <variant>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "instruction.h"
 #include "../common/vm_callframe.h"
+#include "vpp/bytecode/intrinsic.h"
+#include "vpp/bytecode/foreign.h"
+#include "vpp/runtime/foreign.h"
 #include "vpp/runtime/heap.h"
 #include "vpp/runtime/value.h"
 #include "vpp/runtime/module.h"
@@ -32,6 +39,9 @@ public:
     explicit VM(const std::vector<Instruction>& code);
     // Tạo VM rỗng để test/helper có thể nạp trực tiếp bytecode, StringPool hoặc bảng hàm trước khi thực thi.
     VM() = default;
+    ~VM();
+    VM(const VM &) = delete;
+    VM &operator=(const VM &) = delete;
     // Chạy vòng lặp VM từ bytecode hiện tại; mỗi bước đọc opcode tại program counter và chuyển tới handler tương ứng cho tới khi dừng.
     void run();
     // Tạo VM từ bytecode và `StringPool` đi kèm; constructor giữ cùng chỉ số chuỗi mà compiler đã mã hóa trong operand.
@@ -53,6 +63,9 @@ public:
     void setFunctions(
         std::unordered_map<int, std::vector<Instruction>> functionBytecode,
         std::unordered_map<int, int> functionTableByNameIndex = {});
+    void setForeignFunctions(
+        std::vector<vietvm::bytecode::ForeignFunctionDescriptor> descriptors);
+    void setForeignCapabilities(std::unordered_set<std::string> capabilities);
     // Bảo đảm snapshot bytecode hiện tại đã qua verifier. Nhiều lần gọi trên cùng
     // generation là O(1); mutation bytecode/module/function sẽ tạo generation mới.
     void ensureBytecodeVerified();
@@ -62,6 +75,10 @@ public:
     // Số generation đã thực sự đi vào verifier (kể cả generation bị từ chối).
     // Cache hit trên cùng generation không tăng counter này.
     std::size_t verificationPassCount() const noexcept { return verificationPassCount_; }
+    // Số opcode đã chạy qua fast path JIT ở lần chạy gần nhất (0 khi JIT tắt).
+    std::size_t jitFastInstructionCount() const noexcept { return jitFastInstructionCount_; }
+    // Số opcode cần dispatcher đầy đủ (call, branch, intrinsic, exception...).
+    std::size_t jitInterpreterInstructionCount() const noexcept { return jitInterpreterInstructionCount_; }
     // Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
     std::optional<vietvm::runtime::ModuleState> moduleState(
         std::string_view identity) const noexcept;
@@ -77,9 +94,20 @@ private:
     std::unordered_map<int, int> functionTableByNameIndex;
     // Reverse lookup derived once when function tables are installed.
     std::unordered_map<int, int> functionNameIndexById_;
+    std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions_;
+    std::unordered_set<std::string> foreignCapabilities_;
+    int lastForeignPosixError_ = 0;
+    vietvm::runtime::ForeignFileState foreignFileState_;
     std::size_t programGeneration_ = 1;
     std::size_t verifiedGeneration_ = 0;
     std::size_t verificationPassCount_ = 0;
+    // Cache vi lệnh đã biên dịch cho root và mọi function; chỉ sống trong một
+    // lượt chạy JIT và được truy cập bằng identity của bytecode vector.
+    using JitOperation = std::function<void()>;
+    std::unordered_map<const std::vector<Instruction> *, std::vector<JitOperation>> jitPrograms_;
+    bool jitActive_ = false;
+    std::size_t jitFastInstructionCount_ = 0;
+    std::size_t jitInterpreterInstructionCount_ = 0;
     std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
         functionDebugInfo;
@@ -127,6 +155,8 @@ private:
         bool skippingCase{};
         bool caseMatched{};
         size_t blockDepthAtStart{};
+        size_t tryDepthAtStart{};
+        size_t endPc{}; // points at OP_KET_THUC_CHUYEN for structured switch
     };
     std::vector<SwitchFrame> switchStack;
     int blockDepth = 0;
@@ -170,6 +200,38 @@ private:
         InstanceHandle constructorInstance;
     };
     std::vector<ExecutionContext> executionStack;
+
+    enum class WorkerStatus {
+        Running = 0,
+        Done = 1,
+        Cancelled = 2,
+        Failed = 3,
+    };
+
+    struct WorkerTask {
+        std::mutex mutex;
+        std::condition_variable cv;
+        std::atomic<bool> cancelRequested{false};
+        WorkerStatus status = WorkerStatus::Running;
+        StackValue result = make_null_value();
+        std::string error;
+        std::thread worker;
+        bool joinClaimed = false;
+    };
+
+    struct ThreadRuntimeState {
+        std::mutex registryMutex;
+        std::unordered_map<int, std::shared_ptr<WorkerTask>> tasks;
+        std::atomic<int> nextId{1};
+        std::atomic<bool> stopping{false};
+        std::shared_ptr<std::mutex> outputMutex = std::make_shared<std::mutex>();
+    };
+
+    std::shared_ptr<ThreadRuntimeState> threadRuntime_ =
+        std::make_shared<ThreadRuntimeState>();
+    bool threadRuntimeOwner_ = true;
+    std::atomic<bool> *cancellationRequested_ = nullptr;
+    WorkerTask *currentWorkerTask_ = nullptr;
 
     // Các hàm phụ trợ
     void execute(const Instruction& inst);
@@ -216,6 +278,24 @@ private:
     CellHandle captureCellForSlot(int varId);
     // Xử lý nhóm opcode gọi hàm/phương thức; hàm lấy đối số từ stack, xác định đích gọi và chuyển quyền điều khiển sang function tương ứng.
     void executeCallOpcode(const Instruction& instr);
+    // Thực thi intrinsic VM dành riêng cho thư viện chuẩn; opcode mang sẵn
+    // identity/arity nên không cần tra tên hàm động qua StringPool.
+    void executeIntrinsicOpcode(const Instruction& instr);
+    void executeForeignCallOpcode(const Instruction& instr);
+    // Cùng đường thực thi primitive cho opcode hiện hành và lời gọi legacy.
+    // runtimeFailure phân biệt lỗi VM/IO không bắt được với lỗi V++ có thể bắt.
+    bool dispatchRegisteredIntrinsic(const vietvm::bytecode::IntrinsicDescriptor &intrinsic,
+                                     const std::vector<StackValue> &args,
+                                     StackValue &result,
+                                     std::string &err,
+                                     bool &runtimeFailure);
+    bool executeThreadIntrinsic(const vietvm::bytecode::IntrinsicDescriptor &intrinsic,
+                                const std::vector<StackValue> &args,
+                                StackValue &result,
+                                std::string &err);
+    StackValue runWorkerCallable(const StackValue &callable,
+                                 const std::vector<StackValue> &args);
+    void shutdownThreadRuntime() noexcept;
     // Xử lý opcode tạo hoặc biến đổi giá trị trên stack, bao gồm literal và các phép toán số/chuỗi.
     void executeValueOpcode(const Instruction& instr);
     // Xử lý truy cập theo chỉ số cho list/map/string; hàm đọc toán hạng trên stack và áp dụng quy tắc kiểm tra biên/khóa runtime.
@@ -249,8 +329,9 @@ private:
     // call frame, class table, switch value và root kế thừa từ VM caller.
     std::vector<StackValue> gcRoots() const;
 
-    // Chạy JIT đã biên dịch tuyến tính; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-    bool runJitCompiledLinear();
+    // Biên dịch các vi lệnh thuần giá trị ở root và mọi function. Dispatcher VM
+    // xử lý call/branch/intrinsic/exception để giữ nguyên execution contexts.
+    void runJitCompiled();
     // Chạy interpreter trên context hiện tại. Khi `stopExecutionDepth` có giá trị,
     // hàm dừng ngay sau khi lời gọi trực tiếp của fixture đã quay về độ sâu đó.
     void runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth = std::nullopt);

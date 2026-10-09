@@ -12,6 +12,7 @@
 #include "common/utility.h"
 #include "compiler/compileRegistry.h"
 #include "frontend/lexer.h"
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/message_constants.h"
 
@@ -146,11 +147,13 @@ bool startsWithDedicatedCallSyntax(const IrInstruction &sourceOwner,
     const vietvm::frontend::Token *first = firstTokenFor(sourceOwner, instruction);
     if (first == nullptr) return false;
 
-    // A statement-leading keyword is dispatched before the generic callable
-    // parser by the compatibility compiler (`in`, `dừng`, ...). It cannot be
-    // treated as an ordinary direct call merely because semantic resolution
-    // found a same-spelled function.
-    if (first->kind == vietvm::frontend::TokenKind::Keyword ||
+    // Legacy statement keywords (`in`, `dừng`, ...) take precedence over a
+    // same-spelled function. `ký hiệu` is instead contextual FFI metadata:
+    // it was added to the lexer keyword table but remains a valid first word
+    // of an ordinary callable name (e.g. `ký hiệu vùng lấy(...)`). The parser
+    // accepts it there, so direct-IR analysis must preserve that grammar.
+    if ((first->kind == vietvm::frontend::TokenKind::Keyword &&
+         first->lexeme != "ký hiệu") ||
         !isCallableNamePiece(first->lexeme)) {
         return false;
     }
@@ -181,7 +184,9 @@ bool containsCall(const IrProgram &program,
     const IrValue *value = program.value(id);
     if (value == nullptr || !visiting.insert(id).second) return false;
     if (value->opcode == IrValueOpcode::Call ||
-        value->opcode == IrValueOpcode::CallDynamic) {
+        value->opcode == IrValueOpcode::CallDynamic ||
+        value->opcode == IrValueOpcode::Intrinsic ||
+        value->opcode == IrValueOpcode::ForeignCall) {
         visiting.erase(id);
         return true;
     }
@@ -638,6 +643,51 @@ bool supportsValue(const IrProgram &program,
             break;
         }
 
+        case IrValueOpcode::Intrinsic: {
+            const auto *primitive = bytecode::intrinsicByOpcode(value->intrinsicOpcode);
+            if (primitive == nullptr || value->callTarget != CallTargetKind::Native ||
+                value->operands.size() != primitive->arity + 1 ||
+                (value->explicitCall &&
+                 valueContext != ValueContext::DedicatedCallStatementRoot)) break;
+            const IrValue *callee = program.value(value->operands.front());
+            supported = callee != nullptr && callee->opcode == IrValueOpcode::LoadName &&
+                        callee->text == value->text &&
+                        bytecode::intrinsicByName(callee->text) == primitive &&
+                        isExactSourceName(sourceOwner, *callee);
+            for (std::size_t index = 1; supported && index < value->operands.size(); ++index) {
+                supported = supportsValue(program, sourceOwner, context,
+                    value->operands[index], ValueContext::Nested, visiting);
+            }
+            break;
+        }
+
+        case IrValueOpcode::ForeignCall: {
+            if (value->foreignDescriptorId < 0 ||
+                static_cast<std::size_t>(value->foreignDescriptorId) >=
+                    program.foreignFunctions.size() ||
+                value->callTarget != CallTargetKind::ForeignFunction ||
+                (value->explicitCall &&
+                 valueContext != ValueContext::DedicatedCallStatementRoot)) {
+                break;
+            }
+            const auto &descriptor =
+                program.foreignFunctions[static_cast<std::size_t>(
+                    value->foreignDescriptorId)];
+            if (value->operands.size() != descriptor.parameters.size() + 1) break;
+            const IrValue *callee = program.value(value->operands.front());
+            supported = callee != nullptr &&
+                        callee->opcode == IrValueOpcode::LoadName &&
+                        callee->text == value->text &&
+                        isExactSourceName(sourceOwner, *callee);
+            for (std::size_t index = 1;
+                 supported && index < value->operands.size(); ++index) {
+                supported = supportsValue(
+                    program, sourceOwner, context, value->operands[index],
+                    ValueContext::Nested, visiting);
+            }
+            break;
+        }
+
         case IrValueOpcode::CallDynamic: {
             if (value->explicitCall &&
                 valueContext != ValueContext::DedicatedCallStatementRoot) {
@@ -910,7 +960,7 @@ bool supportsInstruction(const IrProgram &program,
         }
         return supportsInstruction(
             program, instruction.children.front(), sourceOwner, context,
-            insideFunction, true, switchDepth, false);
+            insideFunction, true, switchDepth + 1, false);
     }
     if (instruction.opcode == IrOpcode::Switch) {
         if (instruction.switchForm !=
@@ -1068,7 +1118,9 @@ bool supportsInstruction(const IrProgram &program,
     const vietvm::frontend::Token *statementFirst =
         firstTokenFor(sourceOwner, instruction);
     const bool rootIsCall = root->opcode == IrValueOpcode::Call ||
-        root->opcode == IrValueOpcode::CallDynamic;
+        root->opcode == IrValueOpcode::CallDynamic ||
+        root->opcode == IrValueOpcode::Intrinsic ||
+        root->opcode == IrValueOpcode::ForeignCall;
     const bool explicitStatementCall = rootIsCall &&
         root->explicitCall && statementFirst != nullptr &&
         statementFirst->lexeme == "gọi";
@@ -1255,6 +1307,7 @@ struct Emitter {
     std::unordered_map<std::string, int> functionIdsByName;
     std::unordered_map<int, int> functionNameIndices;
     std::unordered_map<IrLambdaId, int> lambdaIds;
+    std::vector<int> foreignDescriptorIds;
     std::unordered_map<std::string, const IrInstruction *> classesByName;
     std::unordered_set<std::string> emittedClasses;
     std::unordered_set<std::string> emittingClasses;
@@ -1262,6 +1315,18 @@ struct Emitter {
     std::vector<vietvm::runtime::RuntimeSourceLocation> *activeDebugInfo =
         &bytecodeDebugInfo;
     std::string activeFunctionName;
+
+    // Track the nearest lexical break target. Loop breaks need their own jump
+    // and unwind metadata; switch breaks retain the existing OP_THOAT behavior.
+    struct BreakScope {
+        bool loop = false;
+        std::size_t blockDepth = 0;
+        std::size_t tryDepth = 0;
+        std::vector<std::size_t> pendingJumps;
+    };
+    std::vector<BreakScope> breakScopes;
+    std::size_t emittedBlockDepth = 0;
+    std::size_t emittedTryDepth = 0;
 
     // Chuyển source span của IR thành vị trí runtime hiện tại, giữ tên function
     // đang phát để VM có thể dựng frame mà không cần đọc lại AST/IR khi lỗi xảy ra.
@@ -1327,7 +1392,15 @@ struct Emitter {
     Emitter(CompilationRegistryState &state,
             const IrProgram &ir,
             const std::unordered_map<std::string, Opcode> &keywords)
-        : registry(state), program(ir), keywordMap(keywords) {}
+        : registry(state), program(ir), keywordMap(keywords) {
+        foreignDescriptorIds.reserve(program.foreignFunctions.size());
+        for (const auto &descriptor : program.foreignFunctions) {
+            auto registered = descriptor;
+            registered.id = static_cast<int>(registry.foreignFunctions.size());
+            foreignDescriptorIds.push_back(registered.id);
+            registry.foreignFunctions.push_back(std::move(registered));
+        }
+    }
 
     // Cấp phát hàm; hàm lấy mã định danh hoặc vùng lưu trữ mới và đăng ký nó vào trạng thái quản lý hiện tại.
     void allocateFunction(const IrInstruction &instruction) {
@@ -1655,6 +1728,26 @@ struct Emitter {
                                   0});
                 return;
             }
+            case IrValueOpcode::Intrinsic:
+                emitCallArguments(*value, output);
+                output.push_back({value->intrinsicOpcode, 0, 0, 0});
+                return;
+            case IrValueOpcode::ForeignCall: {
+                if (value->foreignDescriptorId < 0 ||
+                    static_cast<std::size_t>(value->foreignDescriptorId) >=
+                        foreignDescriptorIds.size()) {
+                    throw std::logic_error(
+                        "foreign descriptor IR không hợp lệ");
+                }
+                emitCallArguments(*value, output);
+                output.push_back({
+                    OP_FFI_CALL,
+                    static_cast<int>(value->operands.size() - 1),
+                    foreignDescriptorIds[static_cast<std::size_t>(
+                        value->foreignDescriptorId)],
+                    0});
+                return;
+            }
             case IrValueOpcode::CallDynamic: {
                 if (value->callTarget == CallTargetKind::ClassConstructor) {
                     if (value->operands.empty()) {
@@ -1761,6 +1854,12 @@ struct Emitter {
                 activeFunctionName = "<lambda@" +
                     std::to_string(lambda->span.begin.line) + ":" +
                     std::to_string(lambda->span.begin.column) + ">";
+                const auto outerBreakScopes = std::move(breakScopes);
+                const std::size_t outerBlockDepth = emittedBlockDepth;
+                const std::size_t outerTryDepth = emittedTryDepth;
+                breakScopes.clear();
+                emittedBlockDepth = 0;
+                emittedTryDepth = 0;
                 {
                     DebugRangeGuard functionGuard(*this, functionBytecode, lambda->span);
                     functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
@@ -1771,6 +1870,9 @@ struct Emitter {
                     emitBlock(lambda->body, functionBytecode, false);
                     functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
                 }
+                breakScopes = outerBreakScopes;
+                emittedBlockDepth = outerBlockDepth;
+                emittedTryDepth = outerTryDepth;
                 functionDebugInfo.resize(functionBytecode.size());
                 activeDebugInfo = previousDebugInfo;
                 activeFunctionName = previousFunctionName;
@@ -1790,11 +1892,17 @@ struct Emitter {
     void emitBlock(const IrInstruction &block,
                    std::vector<Instruction> &output,
                    bool blockMarkers = true) {
-        if (blockMarkers) output.push_back({OP_MO_KHOI, 0, 0, 0});
+        if (blockMarkers) {
+            output.push_back({OP_MO_KHOI, 0, 0, 0});
+            ++emittedBlockDepth;
+        }
         for (const IrInstruction &child : block.children) {
             emitInstruction(child, output);
         }
-        if (blockMarkers) output.push_back({OP_DONG_KHOI, 0, 0, 0});
+        if (blockMarkers) {
+            output.push_back({OP_DONG_KHOI, 0, 0, 0});
+            --emittedBlockDepth;
+        }
     }
 
     // Phát một `IrInstruction` sang bytecode hoặc chuyển tiếp đến bộ phát chuyên biệt cho khối, điều kiện, vòng lặp và câu lệnh phức hợp.
@@ -1857,17 +1965,34 @@ struct Emitter {
                 emitValue(instruction.expressionRoots[1], output);
                 const std::size_t exitJump = output.size();
                 output.push_back({OP_JUMP_IF_FALSE, 0, 0, 0});
+                breakScopes.push_back({true, emittedBlockDepth, emittedTryDepth, {}});
                 emitInstruction(instruction.children.front(), output);
+                BreakScope loopScope = std::move(breakScopes.back());
+                breakScopes.pop_back();
                 output.push_back({OP_CAP_NHAT, 0, 0, 0});
                 emitValue(instruction.expressionRoots[2], output);
                 output.push_back({OP_JUMP, conditionTarget, 0, 0});
                 output[exitJump].operand = static_cast<int>(output.size());
+                for (const std::size_t jump : loopScope.pendingJumps) {
+                    output[jump].operand = static_cast<int>(output.size());
+                }
                 return;
             }
-            case IrOpcode::Switch:
+            case IrOpcode::Switch: {
                 emitValue(instruction.expressionRoots.front(), output);
+                const std::size_t switchBegin = output.size();
                 output.push_back({OP_CHON, 0, 0, 0});
+                breakScopes.push_back({false, emittedBlockDepth, emittedTryDepth, {}});
+                std::size_t previousArmStart = 0;
                 for (const IrSwitchArm &arm : instruction.switchArms) {
+                    // A case that does not match must jump over its entire body.
+                    // Interpreting a skipped body can execute nested break/loop
+                    // instructions and corrupt the active switch frame.
+                    if (previousArmStart != 0) {
+                        output[previousArmStart].operandValue =
+                            static_cast<int>(output.size());
+                    }
+                    previousArmStart = output.size();
                     if (arm.kind ==
                         vietvm::frontend::AstSwitchArmKind::Default) {
                         output.push_back({OP_MAC_DINH, 0, 0, 0});
@@ -1903,14 +2028,38 @@ struct Emitter {
                     emitInstruction(
                         instruction.children[arm.bodyChildIndex], output);
                 }
+                breakScopes.pop_back();
+                if (previousArmStart != 0) {
+                    output[previousArmStart].operandValue =
+                        static_cast<int>(output.size());
+                }
+                output[switchBegin].operand = static_cast<int>(output.size());
+                output.push_back({OP_KET_THUC_CHUYEN, 0, 0, 0});
                 return;
-            case IrOpcode::Break:
-                output.push_back({OP_THOAT, 0, 0, 0});
+            }
+            case IrOpcode::Break: {
+                if (breakScopes.empty()) {
+                    throw std::logic_error("thoát phải nằm trong lặp hoặc chọn");
+                }
+                BreakScope &scope = breakScopes.back();
+                if (scope.loop) {
+                    const int blocks = static_cast<int>(emittedBlockDepth - scope.blockDepth);
+                    const int tries = static_cast<int>(emittedTryDepth - scope.tryDepth);
+                    scope.pendingJumps.push_back(output.size());
+                    // A negative operandIndex marks a loop break: -1-blocks.
+                    // operandValue holds the number of active try frames to pop.
+                    output.push_back({OP_THOAT, 0, -1 - blocks, tries});
+                } else {
+                    output.push_back({OP_THOAT, 0, 0, 0});
+                }
                 return;
+            }
             case IrOpcode::Try: {
                 const std::size_t tryBegin = output.size();
                 output.push_back({OP_THU, 0, -1, 0});
+                ++emittedTryDepth;
                 emitInstruction(instruction.children[0], output);
+                --emittedTryDepth;
                 const std::size_t tryEnd = output.size();
                 output.push_back({OP_THU_KET_THUC, 0, 0, 0});
                 output[tryBegin].operand = static_cast<int>(output.size());
@@ -1967,6 +2116,12 @@ struct Emitter {
         const std::string previousFunctionName = activeFunctionName;
         activeDebugInfo = &functionDebugInfo;
         activeFunctionName = instruction.declarationName;
+        const auto outerBreakScopes = std::move(breakScopes);
+        const std::size_t outerBlockDepth = emittedBlockDepth;
+        const std::size_t outerTryDepth = emittedTryDepth;
+        breakScopes.clear();
+        emittedBlockDepth = 0;
+        emittedTryDepth = 0;
         DebugRangeGuard functionGuard(*this, functionBytecode, instruction.span);
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
         for (const std::string &receiverName : instruction.implicitReceiverNames) {
@@ -1979,6 +2134,9 @@ struct Emitter {
             messages::kInternalDirectIrMissingParameterDefaultValue);
         emitBlock(instruction.children.front(), functionBytecode, false);
         functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        breakScopes = outerBreakScopes;
+        emittedBlockDepth = outerBlockDepth;
+        emittedTryDepth = outerTryDepth;
         functionDebugInfo.resize(functionBytecode.size());
         activeDebugInfo = previousDebugInfo;
         activeFunctionName = previousFunctionName;
@@ -2146,8 +2304,16 @@ std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
                                             bool emitEntryPointCall) {
     const DirectIrSupport support = analyzeDirectIrSupport(program);
     if (!support.supported) {
-        throw std::logic_error(std::string(
-            messages::kInternalDirectIrProgramHasUnsupportedRegion));
+        std::string message(
+            messages::kInternalDirectIrProgramHasUnsupportedRegion);
+        message += " [module=";
+        message += state.currentSemanticModuleIdentity.empty()
+            ? (state.currentSourceIdentity.empty()
+                   ? std::string("<memory>")
+                   : state.currentSourceIdentity)
+            : state.currentSemanticModuleIdentity;
+        message += ", regions=" + std::to_string(support.unsupportedRegions) + "]";
+        throw std::logic_error(std::move(message));
     }
 
     Emitter emitter{state, program, keywordMap};

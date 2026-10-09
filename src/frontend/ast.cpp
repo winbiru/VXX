@@ -8,6 +8,8 @@ const char *astStatementKindName(AstStatementKind kind) noexcept {
         case AstStatementKind::Empty: return "empty";
         case AstStatementKind::Block: return "block";
         case AstStatementKind::Import: return "import";
+        case AstStatementKind::ForeignLibrary: return "foreign_library";
+        case AstStatementKind::ForeignFunction: return "foreign_function";
         case AstStatementKind::Function: return "function";
         case AstStatementKind::Class: return "class";
         case AstStatementKind::Interface: return "interface";

@@ -170,6 +170,8 @@ enum class AstStatementKind {
     Empty,
     Block,
     Import,
+    ForeignLibrary,
+    ForeignFunction,
     Function,
     Class,
     Interface,
@@ -184,6 +186,33 @@ enum class AstStatementKind {
     Try,
     Expression,
     Unknown,
+};
+
+struct AstForeignParameter {
+    std::string name;
+    SourceSpan span{};
+    std::string abiType;
+    // An optional exact byte count or the name of an integer ABI argument.
+    // Written as c_đệm_ra[16] or c_đệm_vào[số_byte].
+    std::string bufferExtent;
+};
+
+struct AstForeignLibrarySpec {
+    std::string name;
+    SourceSpan nameSpan{};
+    std::string target;
+    SourceSpan targetSpan{};
+};
+
+struct AstForeignFunctionSpec {
+    std::string libraryName;
+    SourceSpan librarySpan{};
+    std::string symbol;
+    SourceSpan symbolSpan{};
+    std::string returnType;
+    std::vector<AstForeignParameter> parameters;
+    std::string abi = "c";
+    std::string capability;
 };
 
 // Biểu diễn một câu lệnh AST có cấu trúc, gồm loại, span, token range, khai báo, expression roots và các statement con.
@@ -201,6 +230,8 @@ struct AstStatement {
     AstVisibility visibility = AstVisibility::Unspecified;
     AstImportForm importForm = AstImportForm::Unstructured;
     AstImportSpec importSpec;
+    AstForeignLibrarySpec foreignLibrary;
+    AstForeignFunctionSpec foreignFunction;
     AstClassForm classForm = AstClassForm::Unstructured;
     std::string superclassName;
     SourceSpan superclassSpan{};

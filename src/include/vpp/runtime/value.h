@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -18,6 +20,32 @@ namespace vietvm::runtime {
 
 // Runtime values are deliberately independent from VM execution and bytecode.
 // Native adapters may include this header without pulling in VM internals.
+// Preserve the full C ABI integer domain without rounding through double.
+// These boxed values are produced by FFI; V++ int32 literals keep their type.
+struct AbiInteger {
+    bool isSigned = true;
+    std::int64_t signedValue = 0;
+    std::uint64_t unsignedValue = 0;
+
+    static AbiInteger signedNumber(std::int64_t value) {
+        return {true, value, 0};
+    }
+    static AbiInteger unsignedNumber(std::uint64_t value) {
+        return {false, 0, value};
+    }
+
+    bool operator==(const AbiInteger &other) const noexcept {
+        if (isSigned != other.isSigned) return false;
+        return isSigned ? signedValue == other.signedValue
+                        : unsignedValue == other.unsignedValue;
+    }
+};
+
+inline std::string abiIntegerText(const AbiInteger &value) {
+    return value.isSigned ? std::to_string(value.signedValue)
+                          : std::to_string(value.unsignedValue);
+}
+
 using ScalarValue = std::variant<int, double, std::string, std::monostate>;
 // Biểu diễn map runtime bằng container khóa–giá trị `StackValue`; giá trị được chia sẻ qua handle để mutation và identity hoạt động đúng.
 struct MapValue;
@@ -42,7 +70,39 @@ using CellHandle = std::shared_ptr<RuntimeCell>;
 using ClosureHandle = std::shared_ptr<RuntimeClosure>;
 using StackValue = std::variant<int, double, std::string, std::monostate,
                                 MapHandle, ListHandle, TupleHandle,
-                                ClassHandle, InstanceHandle, ClosureHandle>;
+                                ClassHandle, InstanceHandle, ClosureHandle,
+                                AbiInteger>;
+
+inline bool isExactInteger(const StackValue &value) {
+    return std::holds_alternative<int>(value) ||
+           std::holds_alternative<AbiInteger>(value);
+}
+
+inline AbiInteger asAbiInteger(const StackValue &value) {
+    if (std::holds_alternative<AbiInteger>(value)) {
+        return std::get<AbiInteger>(value);
+    }
+    return AbiInteger::signedNumber(std::get<int>(value));
+}
+
+// Return -1 / 0 / 1 with an exact signed/unsigned comparison (including UINT64_MAX).
+inline int compareAbiIntegers(const AbiInteger &left, const AbiInteger &right) {
+    if (left.isSigned && right.isSigned) {
+        return (left.signedValue > right.signedValue) -
+               (left.signedValue < right.signedValue);
+    }
+    if (!left.isSigned && !right.isSigned) {
+        return (left.unsignedValue > right.unsignedValue) -
+               (left.unsignedValue < right.unsignedValue);
+    }
+    if (left.isSigned) {
+        if (left.signedValue < 0) return -1;
+        const auto numericLeft = static_cast<std::uint64_t>(left.signedValue);
+        return (numericLeft > right.unsignedValue) -
+               (numericLeft < right.unsignedValue);
+    }
+    return -compareAbiIntegers(right, left);
+}
 
 // Đăng ký allocation vào heap của VM đang hoạt động; các overload được định
 // nghĩa trong runtime heap và là no-op khi value được tạo ngoài một VM run.
@@ -109,7 +169,7 @@ struct RuntimeClosure {
 
 // Kiểm tra điều kiện của `isNumeric`.
 inline bool isNumeric(const StackValue &value) {
-    return std::holds_alternative<int>(value) || std::holds_alternative<double>(value);
+    return isExactInteger(value) || std::holds_alternative<double>(value);
 }
 
 // Định dạng runtime số thực; hàm chuyển dữ liệu đầu vào thành biểu diễn chuỗi ổn định để hiển thị hoặc ghi log.
@@ -139,6 +199,21 @@ inline std::string scalar_to_string(const ScalarValue &value) {
 inline double toDouble(const StackValue &value) {
     if (std::holds_alternative<int>(value)) return static_cast<double>(std::get<int>(value));
     if (std::holds_alternative<double>(value)) return std::get<double>(value);
+    if (std::holds_alternative<AbiInteger>(value)) {
+        const AbiInteger &number = std::get<AbiInteger>(value);
+        constexpr std::uint64_t exactDoubleLimit = std::uint64_t{1} << 53;
+        if (number.isSigned) {
+            if (number.signedValue < -static_cast<std::int64_t>(exactDoubleLimit) ||
+                number.signedValue > static_cast<std::int64_t>(exactDoubleLimit)) {
+                throw std::runtime_error("số nguyên ABI 64-bit vượt độ chính xác f64");
+            }
+            return static_cast<double>(number.signedValue);
+        }
+        if (number.unsignedValue > exactDoubleLimit) {
+            throw std::runtime_error("số nguyên ABI 64-bit vượt độ chính xác f64");
+        }
+        return static_cast<double>(number.unsignedValue);
+    }
     throw std::runtime_error(std::string(vietvm::messages::kRuntimeValueNotNumeric));
 }
 
@@ -146,6 +221,10 @@ inline double toDouble(const StackValue &value) {
 // chuỗi rỗng, `rỗng`, collection rỗng và handle null là sai; các giá trị còn
 // lại là đúng. Helper này là nguồn contract chung cho nhánh, `!`, `&&` và `||`.
 inline bool stackValueTruthy(const StackValue &value) {
+    if (std::holds_alternative<AbiInteger>(value)) {
+        const AbiInteger &number = std::get<AbiInteger>(value);
+        return number.isSigned ? number.signedValue != 0 : number.unsignedValue != 0;
+    }
     if (std::holds_alternative<int>(value)) return std::get<int>(value) != 0;
     if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
     if (std::holds_alternative<std::string>(value)) {
@@ -175,6 +254,11 @@ inline bool stackValueTruthy(const StackValue &value) {
 
 // So sánh hai `StackValue` theo ngữ nghĩa equality của runtime; scalar so theo giá trị còn collection/object dùng identity hoặc quy tắc riêng.
 inline bool sameStackValue(const StackValue &left, const StackValue &right) {
+    if (std::holds_alternative<AbiInteger>(left) ||
+        std::holds_alternative<AbiInteger>(right)) {
+        return isExactInteger(left) && isExactInteger(right) &&
+               compareAbiIntegers(asAbiInteger(left), asAbiInteger(right)) == 0;
+    }
     if (isNumeric(left) && isNumeric(right)) return toDouble(left) == toDouble(right);
     if (left.index() != right.index()) return false;
     if (std::holds_alternative<std::string>(left)) {
@@ -207,6 +291,14 @@ inline bool stackValueLess(const StackValue &left,
                            const StackValue &right,
                            bool &comparable) {
     comparable = true;
+    if (std::holds_alternative<AbiInteger>(left) ||
+        std::holds_alternative<AbiInteger>(right)) {
+        if (isExactInteger(left) && isExactInteger(right)) {
+            return compareAbiIntegers(asAbiInteger(left), asAbiInteger(right)) < 0;
+        }
+        comparable = false;
+        return false;
+    }
     if (isNumeric(left) && isNumeric(right)) return toDouble(left) < toDouble(right);
     if (std::holds_alternative<std::string>(left) &&
         std::holds_alternative<std::string>(right)) {
@@ -223,6 +315,8 @@ inline std::string stackValueToString(
     const StackValue &value,
     std::unordered_set<const void *> &activeCollections) {
     if (std::holds_alternative<int>(value)) return std::to_string(std::get<int>(value));
+    if (std::holds_alternative<AbiInteger>(value))
+        return abiIntegerText(std::get<AbiInteger>(value));
     if (std::holds_alternative<double>(value)) return formatRuntimeFloat(std::get<double>(value));
     if (std::holds_alternative<std::string>(value)) return std::get<std::string>(value);
     if (std::holds_alternative<std::monostate>(value)) return "rỗng";
@@ -321,6 +415,7 @@ inline std::string sv_to_string(const StackValue &value) {
 
 // Tạo số nguyên giá trị; hàm dựng giá trị mới từ đầu vào theo định dạng runtime và trả kết quả cho caller.
 inline StackValue make_int_value(int value) { return StackValue(value); }
+inline StackValue make_abi_integer_value(AbiInteger value) { return StackValue(value); }
 // Tạo số thực giá trị; hàm dựng giá trị mới từ đầu vào theo định dạng runtime và trả kết quả cho caller.
 inline StackValue make_float_value(double value) { return StackValue(value); }
 // Tạo chuỗi giá trị; hàm dựng giá trị mới từ đầu vào theo định dạng runtime và trả kết quả cho caller.
@@ -364,6 +459,7 @@ inline StackValue make_closure_value(ClosureHandle value) {
 // Compatibility aliases keep the existing VM/native implementation source
 // stable while callers migrate to vietvm::runtime::*.
 using ScalarValue = vietvm::runtime::ScalarValue;
+using AbiInteger = vietvm::runtime::AbiInteger;
 using MapValue = vietvm::runtime::MapValue;
 using MapHandle = vietvm::runtime::MapHandle;
 using TupleHandle = vietvm::runtime::TupleHandle;

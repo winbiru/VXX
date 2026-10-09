@@ -1,9 +1,19 @@
 // Module: hệ thống.nền tảng
 
 nhập gói/lõi/chuyển kiểu;
+nhập gói/thời gian/đơn điệu;
+
+ngoại thư viện c_hệ_thống_nền_tảng = "system.c";
+ngoại hàm ngủ_vi_giây_ffi(thời_lượng: u32): i32 từ c_hệ_thống_nền_tảng
+    ký hiệu "usleep" abi "c" khả năng "system.time.sleep";
+ngoại thư viện c_lỗi_ffi_nền_tảng = "system.ffi";
+ngoại hàm mã_errno_ffi(): i32 từ c_lỗi_ffi_nền_tảng
+    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
+ngoại hàm mã_eintr_ffi(): i32 từ c_lỗi_ffi_nền_tảng
+    ký hiệu "eintr" abi "c" khả năng "system.ffi.error";
 
 hàm tên nền tảng() {
-    trả về ten_nen_tang();
+    trả về ten_nen_tang_vm();
 };
 
 hàm ngủ mili giây(thời lượng) {
@@ -15,5 +25,43 @@ hàm ngủ mili giây(thời lượng) {
     nếu (thời lượng < 0) {
         ném "ngủ mili giây: thời lượng phải là số nguyên không âm";
     };
-    trả về ngu_mili_giay(thời lượng);
+    // usleep có đối số micro giây u32; mỗi đợt < 1 giây để tương thích
+    // POSIX/macOS và tránh tràn số khi nhân 1000 trên số nguyên V++ 32 bit.
+    // POSIX có thể ngắt usleep bằng tín hiệu. Dùng deadline đơn điệu cho từng
+    // đợt để chỉ ngủ tiếp phần còn thiếu, không ngủ lại nguyên đợt.
+    còn_lại = thời lượng;
+    mã_ngắt = mã_eintr_ffi();
+    lặp (vòng = 0; còn_lại > 0; vòng++) {
+        đợt = còn_lại;
+        nếu (đợt > 999) { đợt = 999; };
+        hạn_đợt = thời gian đơn điệu mili giây() + đợt;
+        cần_ngủ = đợt;
+        lặp (lần_thử = 0; cần_ngủ > 0; lần_thử++) {
+            mã = ngủ_vi_giây_ffi(cần_ngủ * 1000);
+            nếu (mã == 0) {
+                cần_ngủ = 0;
+            } hoặc {
+                // Snapshot errno đã được lấy ngay tại ranh giới native call.
+                // Chỉ thử lại EINTR; lỗi khác không được âm thầm bỏ qua.
+                lỗi_hệ_thống = mã_errno_ffi();
+                nếu (mã != -1 || lỗi_hệ_thống != mã_ngắt) {
+                    ném "ngủ mili giây: usleep thất bại, errno=" + lỗi_hệ_thống;
+                };
+                // Chặn tình huống provider liên tục trả EINTR mà thời gian
+                // đơn điệu không tiến triển.
+                nếu (lần_thử >= 127) {
+                    ném "ngủ mili giây: usleep liên tục bị ngắt";
+                };
+                chênh_lệch = hạn_đợt - thời gian đơn điệu mili giây();
+                nếu (chênh_lệch <= 0) {
+                    cần_ngủ = 0;
+                } hoặc {
+                    cần_ngủ = thành số nguyên(chênh_lệch);
+                    nếu (cần_ngủ < 1) { cần_ngủ = 1; };
+                };
+            };
+        };
+        còn_lại = còn_lại - đợt;
+    };
+    trả về rỗng;
 };

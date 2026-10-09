@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
 
       - name: Configure CMake
         run: cmake -S . -B cmake-build-debug
@@ -76,7 +76,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install quality tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev libffi-dev pkg-config
 
       - name: Run clang-tidy baseline
         run: |
@@ -159,6 +159,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install POSIX FFI dependency
+        shell: bash
+        run: |
+          brew install libffi pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
 
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

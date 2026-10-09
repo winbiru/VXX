@@ -7,6 +7,10 @@ hàm chính() {
     in nhỏ nhất list(ds);
     in lớn nhất list(ds);
     in có khóa({"tên": "V++"}, "tên");
+    trực_tiếp = {"a": 1};
+    in trực_tiếp["a"];
+    trực_tiếp["b"] = 2;
+    in lấy map(trực_tiếp, "b", 0);
     in rời nhau([1, 2], [3, 4]);
 
     s = tập hợp([3, 1, 3, 2, 1]);
@@ -52,7 +56,9 @@ hàm chính() {
     in bộ[1][0] == 6;
     in thành list([]);
     in thành list(thành tuple([]));
+    in thành list(bộ([8, 9]));
     in thanh_list([4, 5]);
+    thử { thành tuple("abc"); } bắt lỗi (e) { in e; };
     thử { thành list("abc"); } bắt lỗi (e) { in e; };
     thử { thành list({}); } bắt lỗi (e) { in e; };
     thử { thành list(rỗng); } bắt lỗi (e) { in e; };

@@ -1,0 +1,9 @@
+// Timeout hủy cây tiến trình qua JobObject chỉ thuộc backend FFI Win32.
+nhập gói/hệ thống/tiến trình;
+
+hàm chính() {
+    giới = chạy tiến trình("cmd.exe", ["/d", "/c", "ping -n 6 127.0.0.1 >nul"], {}, 250);
+    in giới["khởi chạy"];
+    in giới["mã thoát"] == -1;
+    in giới["lỗi"] == "chạy tiến trình: quá thời hạn";
+};

@@ -1,0 +1,249 @@
+// Chạy executable bằng argv riêng và môi trường riêng cho tiến trình con.
+// Validation/defaults thuộc V++; VM chỉ spawn, đọc pipe và chờ exit status.
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/thời gian/đơn điệu;
+
+ngoại thư viện c_hệ_thống_tiến_trình = "system.c";
+ngoại hàm getpid_hệ_thống_ffi(): i32 từ c_hệ_thống_tiến_trình
+    ký hiệu "getpid" abi "c" khả năng "system.process.id";
+ngoại hàm getppid_hệ_thống_ffi(): i32 từ c_hệ_thống_tiến_trình
+    ký hiệu "getppid" abi "c" khả năng "system.process.parent_id";
+ngoại hàm getuid_hệ_thống_ffi(): u32 từ c_hệ_thống_tiến_trình
+    ký hiệu "getuid" abi "c" khả năng "system.user.id";
+ngoại hàm geteuid_hệ_thống_ffi(): u32 từ c_hệ_thống_tiến_trình
+    ký hiệu "geteuid" abi "c" khả năng "system.user.effective_id";
+ngoại hàm getgid_hệ_thống_ffi(): u32 từ c_hệ_thống_tiến_trình
+    ký hiệu "getgid" abi "c" khả năng "system.group.id";
+ngoại hàm getegid_hệ_thống_ffi(): u32 từ c_hệ_thống_tiến_trình
+    ký hiệu "getegid" abi "c" khả năng "system.group.effective_id";
+
+// Process handles thuộc VM trên POSIX và Windows; V++ tự điều phối argv,
+// môi trường, hai pipe, timeout và wait bằng cùng một thuật toán.
+ngoại thư viện c_tiến_trình = "system.process";
+ngoại hàm tiến_trình_tạo_ffi(chương_trình: c_chuỗi): i32 từ c_tiến_trình
+    ký hiệu "new" abi "c" khả năng "system.process.new";
+ngoại hàm tiến_trình_đối_số_ffi(mã: i32, đối_số: c_chuỗi): i32 từ c_tiến_trình
+    ký hiệu "arg" abi "c" khả năng "system.process.arg";
+// Dòng lệnh Windows được escape ở V++; adapter Win32 chỉ nhận UTF-8 và gọi OS.
+ngoại hàm tiến_trình_lệnh_windows_ffi(mã: i32, dòng_lệnh: c_chuỗi): i32 từ c_tiến_trình
+    ký hiệu "command_line" abi "c" khả năng "system.process.command_line";
+ngoại hàm tiến_trình_môi_trường_ffi(mã: i32, tên: c_chuỗi, giá_trị: c_chuỗi): i32 từ c_tiến_trình
+    ký hiệu "env" abi "c" khả năng "system.process.env";
+ngoại hàm tiến_trình_bắt_đầu_ffi(mã: i32): i32 từ c_tiến_trình
+    ký hiệu "start" abi "c" khả năng "system.process.start";
+ngoại hàm tiến_trình_thăm_dò_ffi(mã: i32, mili_giây: i32): i32 từ c_tiến_trình
+    ký hiệu "poll" abi "c" khả năng "system.process.poll";
+ngoại hàm tiến_trình_đọc_ffi(mã: i32, kênh: i32, đệm: c_đệm_ra[đếm], đếm: u64): i32 từ c_tiến_trình
+    ký hiệu "read" abi "c" khả năng "system.process.read";
+ngoại hàm tiến_trình_đợi_ffi(mã: i32): i32 từ c_tiến_trình
+    ký hiệu "wait" abi "c" khả năng "system.process.wait";
+ngoại hàm tiến_trình_lỗi_ffi(mã: i32): c_chuỗi từ c_tiến_trình
+    ký hiệu "error" abi "c" khả năng "system.process.error";
+ngoại hàm tiến_trình_đóng_ffi(mã: i32): i32 từ c_tiến_trình
+    ký hiệu "close" abi "c" khả năng "system.process.close";
+
+// PID của chính tiến trình đang chạy VM.
+hàm mã tiến trình() {
+    trả về getpid_hệ_thống_ffi();
+};
+
+// PID của tiến trình cha tại thời điểm gọi; có thể thay đổi nếu cha kết thúc.
+hàm mã tiến trình cha() {
+    trả về getppid_hệ_thống_ffi();
+};
+
+// POSIX real/effective IDs. UID/GID lớn hơn INT32_MAX chưa biểu diễn được
+// dưới dạng số nguyên V++ 1.0 nên FFI sẽ ném lỗi trong trường hợp đó.
+hàm mã người dùng() {
+    nếu (ten_nen_tang_vm() == "windows") {
+        ném "mã người dùng: FFI Windows chưa được hỗ trợ";
+    };
+    trả về getuid_hệ_thống_ffi();
+};
+
+hàm mã người dùng hiệu lực() {
+    nếu (ten_nen_tang_vm() == "windows") {
+        ném "mã người dùng hiệu lực: FFI Windows chưa được hỗ trợ";
+    };
+    trả về geteuid_hệ_thống_ffi();
+};
+
+hàm mã nhóm() {
+    nếu (ten_nen_tang_vm() == "windows") {
+        ném "mã nhóm: FFI Windows chưa được hỗ trợ";
+    };
+    trả về getgid_hệ_thống_ffi();
+};
+
+hàm mã nhóm hiệu lực() {
+    nếu (ten_nen_tang_vm() == "windows") {
+        ném "mã nhóm hiệu lực: FFI Windows chưa được hỗ trợ";
+    };
+    trả về getegid_hệ_thống_ffi();
+};
+
+hàm tiến trình yêu cầu chuỗi(giá_trị, nhãn) {
+    nếu (loai_cua(giá_trị) != "chuỗi") {
+        ném "chạy tiến trình: " + nhãn + " phải là chuỗi";
+    };
+    nul = ký tự unicode(0);
+    lặp(i = 0; i < do_dai(giá_trị); i++) {
+        nếu (giá_trị[i] == nul) {
+            ném "chạy tiến trình: " + nhãn + " không được chứa NUL";
+        };
+    };
+    trả về giá_trị;
+};
+
+// Quy tắc quote đối số CreateProcessW / argv của C runtime trên Windows:
+// backslash đứng trước quote phải gấp đôi và thêm một; cuối chuỗi có quote
+// thì các backslash cuối cũng phải gấp đôi. Unicode được giữ nguyên.
+hàm tiến trình quote windows(đối_số) {
+    cần_quote = đối_số == "";
+    lặp(i = 0; i < do_dai(đối_số); i++) {
+        c = đối_số[i];
+        nếu (c == " " || c == "\t" || c == "\n" ||
+            c == ký tự unicode(11) || c == "\"") { cần_quote = đúng; };
+    };
+    nếu (!cần_quote) { trả về đối_số; };
+    kết_quả = "\"";
+    dấu_gạch = 0;
+    lặp(i = 0; i < do_dai(đối_số); i++) {
+        c = đối_số[i];
+        nếu (c == "\\") {
+            dấu_gạch = dấu_gạch + 1;
+        } nếu không {
+            số_gạch = dấu_gạch;
+            nếu (c == "\"") { số_gạch = dấu_gạch * 2 + 1; };
+            lặp(j = 0; j < số_gạch; j++) { kết_quả = kết_quả + "\\"; };
+            kết_quả = kết_quả + c;
+            dấu_gạch = 0;
+        };
+    };
+    lặp(j = 0; j < dấu_gạch * 2; j++) { kết_quả = kết_quả + "\\"; };
+    trả về kết_quả + "\"";
+};
+
+hàm tiến trình dựng lệnh windows(chương_trình, đối_số) {
+    dòng_lệnh = tiến trình quote windows(chương_trình);
+    lặp(i = 0; i < do_dai(đối_số); i++) {
+        dòng_lệnh = dòng_lệnh + " " + tiến trình quote windows(đối_số[i]);
+    };
+    trả về dòng_lệnh;
+};
+
+// Kết quả công khai được V++ dựng thống nhất cho mọi backend.
+hàm tiến trình kết quả(khởi_chạy, mã_thoát, đầu_ra, lỗi) {
+    trả về {
+        "khởi chạy": khởi_chạy, "mã thoát": mã_thoát,
+        "đầu ra": đầu_ra, "lỗi": lỗi
+    };
+};
+
+// Đọc đúng một khối đã sẵn sàng. FFI chỉ sao chép byte vào đệm do V++ cấp;
+// việc dựng chuỗi, kể cả dữ liệu chứa NUL, do gói này thực hiện.
+hàm tiến trình đọc khối(mã, kênh, đệm) {
+    n = tiến_trình_đọc_ffi(mã, kênh, đệm, 4096);
+    byte_đọc = [];
+    lặp(i = 0; i < n; i++) { them(byte_đọc, đệm[i]); };
+    trả về chuoi_tu_bytes_vm(byte_đọc);
+};
+
+hàm chạy tiến trình(chương_trình, đối_số = rỗng, môi_trường = rỗng, giới_hạn_mili_giây = rỗng) {
+    chương_trình = tiến trình yêu cầu chuỗi(chương_trình, "chương trình");
+    nếu (chương_trình == "") { ném "chạy tiến trình: chương trình không được rỗng"; };
+    nếu (đối_số == rỗng) { đối_số = []; };
+    nếu (môi_trường == rỗng) { môi_trường = {}; };
+    nếu (loai_cua(đối_số) != "danh sách") {
+        ném "chạy tiến trình: đối số phải là danh sách";
+    };
+    nếu (loai_cua(môi_trường) != "từ điển") {
+        ném "chạy tiến trình: môi trường phải là từ điển";
+    };
+    nếu (giới_hạn_mili_giây != rỗng) {
+        nếu (loai_cua(giới_hạn_mili_giây) != "số nguyên" ||
+            giới_hạn_mili_giây < 1) {
+            ném "chạy tiến trình: giới hạn mili giây phải là số nguyên dương";
+        };
+    };
+    lặp(i = 0; i < do_dai(đối_số); i++) {
+        tiến trình yêu cầu chuỗi(đối_số[i], "đối số");
+    };
+    tên = khóa map(môi_trường);
+    lặp(i = 0; i < do_dai(tên); i++) {
+        key = tiến trình yêu cầu chuỗi(tên[i], "tên biến môi trường");
+        nếu (key == "") { ném "chạy tiến trình: tên biến môi trường không được rỗng"; };
+        lặp(j = 0; j < do_dai(key); j++) {
+            nếu (key[j] == "=") { ném "chạy tiến trình: tên biến môi trường không được chứa ="; };
+        };
+        tiến trình yêu cầu chuỗi(môi_trường[key], "giá trị biến môi trường");
+    };
+    // POSIX và Windows dùng cùng thuật toán V++ và FFI quản lý vòng đời child.
+    mã = tiến_trình_tạo_ffi(chương_trình);
+    thử {
+        nếu (ten_nen_tang_vm() == "windows") {
+            tiến_trình_lệnh_windows_ffi(mã, tiến trình dựng lệnh windows(chương_trình, đối_số));
+        } nếu không {
+            lặp(i = 0; i < do_dai(đối_số); i++) {
+                tiến_trình_đối_số_ffi(mã, đối_số[i]);
+            };
+        };
+        lặp(i = 0; i < do_dai(tên); i++) {
+            tiến_trình_môi_trường_ffi(mã, tên[i], môi_trường[tên[i]]);
+        };
+        nếu (tiến_trình_bắt_đầu_ffi(mã) == 0) {
+            lỗi = tiến_trình_lỗi_ffi(mã);
+            tiến_trình_đóng_ffi(mã);
+            trả về tiến trình kết quả(sai, -1, "", lỗi);
+        };
+        đầu_ra = "";
+        lỗi_ra = "";
+        hết_hạn = 0.0;
+        nếu (giới_hạn_mili_giây != rỗng) {
+            hết_hạn = thời gian đơn điệu mili giây() + giới_hạn_mili_giây;
+        };
+        // Cấp đệm một lần cho cả hai pipe; adapter chỉ ghi các byte đầu n.
+        đệm = [];
+        lặp(j = 0; j < 4096; j++) { them(đệm, 0); };
+        // poll đồng thời hai pipe để child không bị kẹt vì một pipe đầy.
+        lặp(vòng = 0; vòng < 2147483647; vòng++) {
+            chờ = 1000;
+            nếu (giới_hạn_mili_giây != rỗng) {
+                còn = hết_hạn - thời gian đơn điệu mili giây();
+                nếu (còn <= 0.0) {
+                    tiến_trình_đóng_ffi(mã);
+                    trả về tiến trình kết quả(đúng, -1, đầu_ra,
+                        lỗi_ra + "chạy tiến trình: quá thời hạn");
+                };
+                // Chỉ chờ phần thời gian còn lại; làm tròn lên để số thực
+                // có phần lẻ không bị chuyển sang số nguyên sai contract.
+                nếu (còn < 1000.0) { chờ = lam_tron_len(còn); };
+            };
+            sẵn_sàng = tiến_trình_thăm_dò_ffi(mã, chờ);
+            nếu (sẵn_sàng == 4) { thoát; };
+            lặp(kênh = 1; kênh <= 2; kênh++) {
+                đọc_kênh = sai;
+                nếu (kênh == 1 && (sẵn_sàng % 2) == 1) { đọc_kênh = đúng; };
+                nếu (kênh == 2 && sẵn_sàng >= 2) { đọc_kênh = đúng; };
+                nếu (đọc_kênh) {
+                    khối = tiến trình đọc khối(mã, kênh, đệm);
+                    nếu (kênh == 1) {
+                        đầu_ra = đầu_ra + khối;
+                    } hoặc {
+                        lỗi_ra = lỗi_ra + khối;
+                    };
+                };
+            };
+        };
+        nếu (vòng == 2147483647) { ném "chạy tiến trình: vượt giới hạn vòng đọc"; };
+        mã_thoát = tiến_trình_đợi_ffi(mã);
+        tiến_trình_đóng_ffi(mã);
+        trả về tiến trình kết quả(đúng, mã_thoát, đầu_ra, lỗi_ra);
+    } bắt lỗi(e) {
+        thử { tiến_trình_đóng_ffi(mã); } bắt lỗi(bỏ_qua) {};
+        ném e;
+    };
+};

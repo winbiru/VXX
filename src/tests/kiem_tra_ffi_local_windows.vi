@@ -1,0 +1,20 @@
+// No fixed TZ assumption: verify the Win32 CRT adapter and V++ civil clock
+// logic for known epochs independently of the host timezone.
+nhập thời gian;
+nhập gói/thời gian/địa phương;
+
+hàm chính() {
+    epoch = [0, 0, 0, 0, 0, 0, 0, 0];
+    lúc_đầu = thời gian địa phương từ epoch byte ffi(epoch);
+    lần_hai = thời gian địa phương từ epoch byte ffi(epoch);
+    in thời gian định dạng đồng hồ(lúc_đầu, sai) ==
+        thời gian định dạng đồng hồ(lần_hai, sai);
+    in lúc_đầu[0] >= 1969 && lúc_đầu[0] <= 1970;
+    in lúc_đầu[1] >= 1 && lúc_đầu[1] <= 12;
+    in lúc_đầu[2] >= 1 && lúc_đầu[2] <= 31;
+    in lúc_đầu[3] >= 0 && lúc_đầu[3] <= 23;
+    in lúc_đầu[4] >= 0 && lúc_đầu[4] <= 59;
+    in lúc_đầu[5] >= 0 && lúc_đầu[5] <= 60;
+    in lúc_đầu[6] >= -1440 && lúc_đầu[6] <= 1440;
+    in độ dài(thời gian định dạng đồng hồ(lúc_đầu, sai)) == 25;
+};

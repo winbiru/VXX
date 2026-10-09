@@ -1,0 +1,66 @@
+nhập gói/hệ thống/tiến trình;
+
+hàm chính() {
+    k = chạy tiến trình("/bin/sh", ["-c", "printf out; printf err 1>&2; exit 7"]);
+    in k["khởi chạy"];
+    in k["mã thoát"] == 7;
+    in k["đầu ra"] == "out";
+    in k["lỗi"] == "err";
+
+    argv = chạy tiến trình("/bin/sh", ["-c", "printf '%s/%s' \"$1\" \"$VPP_CHILD_TEST\"", "child", "literal & space"], {"VPP_CHILD_TEST": "riêng"});
+    in argv["khởi chạy"];
+    in argv["mã thoát"] == 0;
+    in argv["đầu ra"] == "literal & space/riêng";
+    in argv["lỗi"] == "";
+
+    hỏng = chạy tiến trình("/vpp/không-tồn-tại", []);
+    in !hỏng["khởi chạy"];
+    in hỏng["mã thoát"] == -1;
+    in hỏng["đầu ra"] == "";
+    in do_dai(hỏng["lỗi"]) > 0;
+
+    nhị_phân = chạy tiến trình("/bin/sh", ["-c", "printf '\\000\\303\\251'"]);
+    in nhị_phân["khởi chạy"];
+    bytes = chuoi_bytes_vm(nhị_phân["đầu ra"]);
+    in do_dai(bytes) == 3 && bytes[0] == 0 && bytes[1] == 195 && bytes[2] == 169;
+
+    // Pipe của cả hai hướng vượt dung lượng pipe thông thường; phải drain xen kẽ.
+    lớn = chạy tiến trình("/bin/sh", ["-c", "head -c 73728 /dev/zero; head -c 73728 /dev/zero 1>&2"]);
+    in lớn["khởi chạy"];
+    in lớn["mã thoát"] == 0;
+    in do_dai(lớn["đầu ra"]) == 73728;
+    in do_dai(lớn["lỗi"]) == 73728;
+
+    // Giới hạn thời gian dùng clock đơn điệu FFI; child bị reap khi hết hạn.
+    giới = chạy tiến trình("/bin/sh", ["-c", "printf partial; exec sleep 3"], {}, 40);
+    in giới["khởi chạy"];
+    in giới["mã thoát"] == -1;
+    // Shell có thể chưa chạy printf khi 40 ms hết hạn dưới tải lớn.
+    // Nếu đã nhận marker, phải giữ nguyên; không có marker cũng hợp lệ.
+    in giới["đầu ra"] == "" || giới["đầu ra"] == "partial";
+    in giới["lỗi"] == "chạy tiến trình: quá thời hạn";
+
+    // Deadline rất ngắn và rất dài: không chuyển số thực có phần lẻ
+    // thành số nguyên sai và không hủy child đã hoàn tất.
+    ngắn = chạy tiến trình("/bin/sh", ["-c", "exec sleep 3"], {}, 1);
+    in ngắn["khởi chạy"] && ngắn["mã thoát"] == -1;
+    in ngắn["lỗi"] == "chạy tiến trình: quá thời hạn";
+    đủ = chạy tiến trình("/bin/sh", ["-c", "printf done"], {}, 10000);
+    in đủ["khởi chạy"] && đủ["mã thoát"] == 0;
+    in đủ["đầu ra"] == "done" && đủ["lỗi"] == "";
+
+    // Shell sinh thêm tiến trình nền cùng nhóm; timeout phải trả kết quả
+    // đồng thời runtime gửi SIGKILL cho toàn bộ nhóm trước khi reap shell.
+    nhóm = chạy tiến trình("/bin/sh", ["-c", "printf group; sleep 3 & wait"], {}, 150);
+    in nhóm["khởi chạy"];
+    in nhóm["mã thoát"] == -1;
+    in nhóm["đầu ra"] == "" || nhóm["đầu ra"] == "group";
+    in nhóm["lỗi"] == "chạy tiến trình: quá thời hạn";
+
+    // POSIX waitpid mã hóa tiến trình bị SIGTERM là 128 + 15.
+    tín_hiệu = chạy tiến trình("/bin/sh", ["-c", "kill -TERM $$"]);
+    in tín_hiệu["khởi chạy"];
+    in tín_hiệu["mã thoát"] == 143;
+    in tín_hiệu["đầu ra"] == "";
+    in tín_hiệu["lỗi"] == "";
+};

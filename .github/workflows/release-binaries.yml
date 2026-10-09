@@ -28,7 +28,14 @@ jobs:
 
       - name: Install Linux crypto dependency
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev libffi-dev pkg-config
+
+      - name: Install macOS POSIX FFI dependency
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install libffi pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
 
       - name: Install Windows SQLite CLI
         if: runner.os == 'Windows'
@@ -41,7 +48,7 @@ jobs:
           Get-Command sqlite3.exe -ErrorAction Stop | Out-Null
 
       - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVPP_STATIC_LIBFFI=ON
 
       - name: Build V++ and RC test gate
         run: cmake --build build --config Release
@@ -207,6 +214,15 @@ jobs:
           if [ "${{ runner.os }}" = "Linux" ]; then
             if ldd "$INSTALL_DIR/vpp" | grep -E 'lib(ssl|crypto)\.so' >/dev/null; then
               echo "Linux release still depends on external OpenSSL shared libraries" >&2
+              exit 1
+            fi
+            if ldd "$INSTALL_DIR/vpp" | grep -E 'libffi\.so' >/dev/null; then
+              echo "Linux release still depends on external libffi shared libraries" >&2
+              exit 1
+            fi
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            if otool -L "$INSTALL_DIR/vpp" | grep -E 'libffi[^/]*\.dylib' >/dev/null; then
+              echo "macOS release still depends on an external libffi dylib" >&2
               exit 1
             fi
           fi

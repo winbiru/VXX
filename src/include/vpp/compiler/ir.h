@@ -63,6 +63,8 @@ enum class IrValueOpcode {
     Binary,
     Call,
     CallDynamic,
+    Intrinsic,
+    ForeignCall,
     Lambda,
 };
 
@@ -84,6 +86,9 @@ struct IrValue {
     // ordinary `tên(...)` form, so lowering preserves that source-level mode.
     bool explicitCall = false;
     CallTargetKind callTarget = CallTargetKind::Invalid;
+    // Resolved primitive identity; never recover the opcode from text in codegen.
+    int intrinsicOpcode = -1;
+    int foreignDescriptorId = -1;
     IrLambdaId lambdaId = kInvalidIrLambdaId;
 
     // Evaluation order is source order.  Calls store the callee first and then
@@ -177,6 +182,7 @@ struct IrLambda {
 struct IrProgram {
     std::vector<IrValue> values;
     std::vector<IrLambda> lambdas;
+    std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions;
     std::vector<IrInstruction> instructions;
     std::size_t unsupportedDirectRegionCount = 0;
 

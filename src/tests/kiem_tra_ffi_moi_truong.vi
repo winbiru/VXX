@@ -1,0 +1,12 @@
+nhập gói/hệ thống/môi trường;
+
+hàm chính() {
+    in đọc biến môi trường("VPP_FFI_ENV_TEST", "không có");
+    in đọc biến môi trường("VPP_FFI_ENV_EMPTY_TEST", "không có") == "";
+    in đọc biến môi trường("VPP_FFI_ENV_MISSING_TEST", "mặc định");
+    thử {
+        đọc biến môi trường("TÊN=SAI", "bỏ qua");
+    } bắt lỗi(e) {
+        in "tên không hợp lệ";
+    };
+};

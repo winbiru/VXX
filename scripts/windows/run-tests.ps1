@@ -336,7 +336,101 @@ try {
 
     $tests = Get-BashTestArray -ArrayName "TESTS"
     foreach ($relativeTest in $tests) {
+        # POSIX shell/signal fixture has a Windows-specific counterpart below.
+        if ($relativeTest -eq "src/tests/kiem_tra_ffi_process_spawn.vi") {
+            continue
+        }
         Invoke-ExpectedTest -TestFile $relativeTest
+    }
+
+    # Windows file I/O now shares the managed stdio FFI path with POSIX.
+    # The fixture covers chunk boundaries, binary NUL, UTF-8 paths, append,
+    # missing files, invalid bytes and zero-length writes under both engines.
+    foreach ($fileMode in @("0", "1")) {
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_tep.vi" -Environment @{ VPP_ENABLE_JIT = $fileMode; VPP_STRICT_SYSTEM_FFI_FILE = "1" }
+        $fileStdout = Join-Path $sessionDir "legacy-file-$fileMode.output"
+        $fileStderr = Join-Path $sessionDir "legacy-file-$fileMode.stderr"
+        $fileExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_tep_cu.vi") -StdOut $fileStdout -StdErr $fileStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $fileMode }
+        $fileError = Get-NormalizedUtf8Text $fileStderr
+        if ($fileExit -ne 0 -and $null -ne $fileError -and
+            $fileError.Contains("System FFI strict file: legacy VM file opcode is disabled")) {
+            Add-Pass "legacy file opcode disabled [JIT=$fileMode]"
+        } else {
+            Add-Fail "legacy file opcode gate [JIT=$fileMode]"
+            Show-FailureDetails -StdErr $fileStderr -ExitCode $fileExit
+        }
+    }
+
+    # The default path exercises existing Windows behavior, then opt into the
+    # V++ orchestrators backed by audited Win32 adapters. Both must pass.
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc_windows.vi"
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc.vi" -Environment @{ VPP_WINDOWS_DIRECTORY_FFI = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc_windows.vi" -Environment @{ VPP_WINDOWS_DIRECTORY_FFI = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc_windows.vi" -Environment @{ VPP_WINDOWS_PATH_FFI = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc.vi" -Environment @{ VPP_WINDOWS_DIRECTORY_FFI = "1"; VPP_ENABLE_JIT = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_thu_muc_windows.vi" -Environment @{ VPP_WINDOWS_DIRECTORY_FFI = "1"; VPP_ENABLE_JIT = "1" }
+    # All public Windows process calls now use the same V++ FFI implementation.
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_spawn_windows.vi"
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_spawn_windows.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_timeout_windows.vi"
+    Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_timeout_windows.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    Invoke-ExpectedFailureTest -TestFile "src/tests/kiem_tra_ffi_opcode_process_cu.vi"
+
+    # UTC chạy cùng V++ FFI trên Windows interpreter/JIT; chặn opcode cũ.
+    foreach ($utcMode in @("0", "1")) {
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_utc.vi" -Environment @{ VPP_ENABLE_JIT = $utcMode }
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_local_windows.vi" -Environment @{ VPP_ENABLE_JIT = $utcMode }
+        $utcStdout = Join-Path $sessionDir "legacy-utc-$utcMode.output"
+        $utcStderr = Join-Path $sessionDir "legacy-utc-$utcMode.stderr"
+        $utcExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_utc_cu.vi") -StdOut $utcStdout -StdErr $utcStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $utcMode }
+        $utcError = Get-NormalizedUtf8Text $utcStderr
+        if ($utcExit -ne 0 -and $null -ne $utcError -and
+            $utcError.Contains("System FFI: legacy UTC clock opcode is disabled")) {
+            Add-Pass "legacy UTC opcode disabled [JIT=$utcMode]"
+        } else {
+            Add-Fail "legacy UTC opcode gate [JIT=$utcMode]"
+            Show-FailureDetails -StdErr $utcStderr -ExitCode $utcExit
+        }
+    }
+
+    # BCryptGenRandom stays in the Windows FFI adapter; V++ performs chunking
+    # and exposes the same entropy API in interpreter and JIT modes.
+    foreach ($entropyMode in @("0", "1")) {
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_entropy.vi" -Environment @{ VPP_ENABLE_JIT = $entropyMode }
+        $entropyStdout = Join-Path $sessionDir "legacy-entropy-$entropyMode.output"
+        $entropyStderr = Join-Path $sessionDir "legacy-entropy-$entropyMode.stderr"
+        $entropyExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_entropy_cu.vi") -StdOut $entropyStdout -StdErr $entropyStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $entropyMode }
+        $entropyError = Get-NormalizedUtf8Text $entropyStderr
+        if ($entropyExit -ne 0 -and $null -ne $entropyError -and
+            $entropyError.Contains("System FFI: legacy secure entropy opcode is disabled")) {
+            Add-Pass "legacy entropy opcode disabled [JIT=$entropyMode]"
+        } else {
+            Add-Fail "legacy entropy opcode gate [JIT=$entropyMode]"
+            Show-FailureDetails -StdErr $entropyStderr -ExitCode $entropyExit
+        }
+    }
+
+    # Windows time/sleep behavior is orchestrated in V++ with Win32 FFI.
+    foreach ($timeMode in @("0", "1")) {
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_don_dieu.vi" -Environment @{ VPP_ENABLE_JIT = $timeMode }
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_ngu.vi" -Environment @{ VPP_ENABLE_JIT = $timeMode }
+        foreach ($oldClockTest in @(
+            @{ File = "src/tests/kiem_tra_ffi_opcode_local_cu.vi"; Diagnostic = "System FFI: legacy local clock opcode is disabled"; Name = "local" },
+            @{ File = "src/tests/kiem_tra_ffi_opcode_nen_tang_cu.vi"; Diagnostic = "System FFI: legacy monotonic clock opcode is disabled"; Name = "monotonic" },
+            @{ File = "src/tests/kiem_tra_ffi_opcode_ngu_cu.vi"; Diagnostic = "System FFI: legacy sleep opcode is disabled"; Name = "sleep" }
+        )) {
+            $clockStdout = Join-Path $sessionDir "legacy-$($oldClockTest.Name)-$timeMode.output"
+            $clockStderr = Join-Path $sessionDir "legacy-$($oldClockTest.Name)-$timeMode.stderr"
+            $clockExit = Invoke-Vpp -Arguments @($oldClockTest.File) -StdOut $clockStdout -StdErr $clockStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $timeMode }
+            $clockError = Get-NormalizedUtf8Text $clockStderr
+            if ($clockExit -ne 0 -and $null -ne $clockError -and
+                $clockError.Contains($oldClockTest.Diagnostic)) {
+                Add-Pass "legacy $($oldClockTest.Name) opcode disabled [JIT=$timeMode]"
+            } else {
+                Add-Fail "legacy $($oldClockTest.Name) opcode gate [JIT=$timeMode]"
+                Show-FailureDetails -StdErr $clockStderr -ExitCode $clockExit
+            }
+        }
     }
 
     $expectedFailureTests = Get-BashTestArray -ArrayName "EXPECTED_FAILURE_TESTS"
@@ -346,6 +440,13 @@ try {
 
     Write-Host "== Running src/tests/kiem_tra_jit_mvp.vi [JIT] =="
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_jit_mvp.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    foreach ($jitCase in @(
+        "kiem_tra_goi_bo_suu_tap", "kiem_tra_goi_regex", "kiem_tra_goi_bang_ma",
+        "kiem_tra_goi_thoi_gian", "kiem_tra_goi_quan_ly_goi", "kiem_tra_vm_ieee754",
+        "kiem_tra_hoi_quy_tong_hop", "kiem_tra_closure_capture",
+        "kiem_tra_lambda_hof_mac_dinh", "kiem_tra_goi_dong_thoi")) {
+        Invoke-ExpectedTest -TestFile "src/tests/$jitCase.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
+    }
 
     Write-Host "== Running src/tests/kiem_tra_gc_mvp.vi [GC] =="
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_gc_mvp.vi" -Environment @{ VPP_ENABLE_GC = "1"; VPP_GC_INTERVAL = "1" }

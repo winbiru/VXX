@@ -45,7 +45,7 @@
     {
       "name": "vpp.tooling",
       "displayName": "Công cụ V++",
-      "libraries": ["vpp.compiler", "vpp.dependencies", "vpp.doc", "vpp.editpad", "vpp.packaging", "vpp.repl", "vpp.scripting", "vpp.archive"]
+      "libraries": ["vpp.compiler", "vpp.dependencies", "vpp.doc", "vpp.editpad", "vpp.packages", "vpp.packaging", "vpp.repl", "vpp.scripting", "vpp.archive"]
     },
     {
       "name": "vi.standard",
@@ -397,7 +397,7 @@
       "version": "1.0.0",
       "sourceRoot": "gói/dữ liệu",
       "entry": "chính.vi",
-      "requires": ["vi.base"],
+      "requires": ["vi.base", "vi.system"],
       "stability": "stable",
       "kind": "runtime",
       "platforms": ["windows", "linux", "macos"]
@@ -482,6 +482,18 @@
       "sourceRoot": "gói/lõi",
       "entry": "đóng gói ứng dụng.vi",
       "requires": ["vi.collections", "vi.io", "vpp.archive"],
+      "stability": "experimental",
+      "kind": "tooling",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vpp.packages",
+      "package": "quản lý gói",
+      "displayName": "Quản lý gói V++",
+      "version": "1.0.0",
+      "sourceRoot": "gói/lõi",
+      "entry": "quản lý gói.vi",
+      "requires": ["vi.collections", "vi.io", "vi.json", "vi.text"],
       "stability": "experimental",
       "kind": "tooling",
       "platforms": ["windows", "linux", "macos"]

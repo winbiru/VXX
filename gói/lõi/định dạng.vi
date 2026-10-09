@@ -1,8 +1,8 @@
 // Module: lõi.định dạng
 // ABI V1 dùng một list đối số vì ngôn ngữ chưa có vararg public ổn định.
 // Parser, validation, grouping, padding và dispatch kiểu nằm ở V++.
-// Native chỉ giữ primitive dựng biểu diễn IEEE-754 cho f/e/g vì tầng ngôn ngữ
-// chưa có decimal formatter đủ chính xác để tự tái tạo iostream semantics.
+// V++ sở hữu cả chuyển đổi IEEE-754 thành thập phân và làm tròn.
+// VM chỉ đọc byte biểu diễn số, không dựng thân thập phân hay chạy formatter.
 
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
@@ -11,6 +11,7 @@ nhập gói/bộ sưu tập/từ điển;
 nhập gói/lõi/bảng mã;
 nhập gói/lõi/ký hiệu vùng;
 nhập gói/văn bản/chuỗi;
+nhập gói/lõi/định dạng số thực;
 
 hàm định dạng có ký tự(văn_bản, ký_tự) {
     lặp(i = 0; i < độ dài(văn_bản); i++) {
@@ -394,9 +395,9 @@ hàm định dạng giá trị(giá_trị, spec, ký_hiệu) {
             ném "FORMAT_CONVERSION";
         };
         nếu (!có_chính_xác) { chính_xác = 6; };
-        native = dinh_dang_so_thuc_noi_bo(giá_trị, chuyển, chính_xác);
-        thân = lấy map(native, "thân", "");
-        âm = lấy map(native, "âm", sai);
+        số_đã_định_dạng = định dạng số thực nội bộ(giá_trị, chuyển, chính_xác);
+        thân = lấy map(số_đã_định_dạng, "thân", "");
+        âm = lấy map(số_đã_định_dạng, "âm", sai);
         thân = định dạng áp ký hiệu thập phân(thân, ký_hiệu);
         nếu (định dạng có ký tự(lấy map(spec, "cờ", ""), ",") &&
             (chuyển == "f" || chuyển == "g" || chuyển == "G")) {

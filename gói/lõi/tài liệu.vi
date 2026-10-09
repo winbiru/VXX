@@ -1,5 +1,6 @@
 // vpp.doc — sinh tài liệu Markdown từ AST V++.
 nhập nhập xuất;
+nhập biên dịch;
 
 hàm tài liệu dựng tham số(tham số) {
     nếu (độ dài(tham số) == 0) {
@@ -41,7 +42,7 @@ hàm tài liệu dựng kiểu(mục) {
 };
 
 hàm tài liệu dựng(mã nguồn, tiêu đề) {
-    phân_tích = bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+    phân_tích = biên dịch phân tích(mã nguồn);
     cây = lấy map(phân_tích, "cây cú pháp", []);
     nếu (tiêu đề == "") {
         tiêu đề = "Tài liệu V++";

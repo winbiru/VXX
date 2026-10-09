@@ -2,9 +2,10 @@
 
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
+nhập gói/lõi/biên dịch;
 
 hàm phụ thuộc danh sách(mã nguồn) {
-    phân_tích = bien_dich_phan_tich_noi_bo(mã nguồn, ".");
+    phân_tích = biên dịch phân tích(mã nguồn);
     cây = lấy map(phân_tích, "cây cú pháp", []);
     kết_quả = [];
     lặp(i = 0; i < độ dài(cây); i++) {
@@ -29,5 +30,12 @@ hàm phụ thuộc tệp(đường dẫn) {
 
 hàm phụ thuộc kiểm tra tệp(đường dẫn) {
     mã_nguồn = đọc tệp(đường dẫn);
-    trả về phu_thuoc_kiem_tra_noi_bo(mã_nguồn, đường dẫn cha(đường dẫn));
+    // Compiler/VM chỉ tạo snapshot phân tích. Hình dạng kết quả của API kiểm
+    // tra phụ thuộc là policy thư viện nên được dựng tại đây, giống
+    // `biên dịch kiểm tra`.
+    snapshot = biên dịch snapshot nội bộ(mã_nguồn, đường dẫn cha(đường dẫn));
+    trả về {
+        "hợp lệ": lấy map(snapshot, "hợp lệ", 0),
+        "lỗi": lấy map(snapshot, "lỗi", "")
+    };
 };

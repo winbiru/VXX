@@ -1,34 +1,136 @@
 // Module: nhập xuất.tệp
 // Mục đích: đọc/ghi tệp ở tầng gói.
-// Chỉ đọc/ghi tệp là primitive native. Các phép xử lý nội dung tệp được viết
-// bằng V++ để giữ logic thư viện ở tầng ngôn ngữ.
-// Đường dẫn phải là UTF-8 hợp lệ tại native boundary.
+// Đa nền tảng dùng FFI stdio: V++ quản lý chunk, EOF, partial write và cleanup.
+// Đường dẫn phải là UTF-8 hợp lệ tại VM primitive boundary.
+
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+
+ngoại thư viện c_tệp = "system.c";
+ngoại hàm tệp_mở_ffi(đường: c_chuỗi, chế_độ: c_chuỗi): c_tệp từ c_tệp
+    ký hiệu "fopen" abi "c" khả năng "system.file.open";
+ngoại hàm tệp_đọc_ffi(đệm: c_đệm_ra[đếm], kích_thước: u64, đếm: u64, tệp: c_tệp): u64 từ c_tệp
+    ký hiệu "fread" abi "c" khả năng "system.file.read";
+ngoại hàm tệp_ghi_ffi(đệm: c_đệm_vào[đếm], kích_thước: u64, đếm: u64, tệp: c_tệp): u64 từ c_tệp
+    ký hiệu "fwrite" abi "c" khả năng "system.file.write";
+ngoại hàm tệp_đóng_ffi(tệp: c_tệp): i32 từ c_tệp
+    ký hiệu "fclose" abi "c" khả năng "system.file.close";
+ngoại hàm tệp_lỗi_ffi(tệp: c_tệp): i32 từ c_tệp
+    ký hiệu "ferror" abi "c" khả năng "system.file.error";
+
+hàm tệp chuẩn hóa đường dẫn(đường dẫn) {
+    đường = thành chuỗi(đường dẫn);
+    bytes = bảng mã utf8 mã hóa(đường);
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+    };
+    trả về đường;
+};
+
+// Mỗi thao tác giữ FILE* trong registry riêng của VM, V++ chỉ nhận một token.
+// Cleanup ở đây bao phủ cả lỗi I/O; VM còn đóng tài nguyên tồn tại khi hủy/reset.
+hàm tệp đọc bytes posix(đường, thao_tác) {
+    tệp = tệp_mở_ffi(đường, "rb");
+    nếu (tệp == rỗng) { ném thao_tác + ": không thể mở tệp để đọc"; };
+    kết_quả = [];
+    thử {
+        // Dùng lại một đệm cho toàn bộ vòng đọc, tránh tạo 4096 phần tử
+        // V++ cho mỗi khối khi xử lý tệp lớn.
+        đệm = [];
+        lặp(i = 0; i < 4096; i++) { them(đệm, 0); };
+        đang_đọc = đúng;
+        lặp(vòng = 0; đang_đọc; vòng++) {
+            // fread returns exact size_t (boxed u64); count is bounded to 4096.
+            n = thành số nguyên(thành chuỗi(tệp_đọc_ffi(đệm, 1, 4096, tệp)));
+            nếu (n == 0) {
+                nếu (tệp_lỗi_ffi(tệp) != 0) { ném thao_tác + ": không thể đọc tệp"; };
+                đang_đọc = sai;
+            } nếu không {
+                lặp(i = 0; i < n; i++) { them(kết_quả, đệm[i]); };
+            };
+        };
+    } bắt lỗi(e) {
+        tệp_đóng_ffi(tệp);
+        ném e;
+    };
+    nếu (tệp_đóng_ffi(tệp) != 0) { ném thao_tác + ": không thể đóng tệp"; };
+    trả về kết_quả;
+};
+
+hàm tệp ghi bytes posix(đường, bytes, nối, thao_tác) {
+    chế_độ = "wb";
+    nếu (nối) { chế_độ = "ab"; };
+    tệp = tệp_mở_ffi(đường, chế_độ);
+    nếu (tệp == rỗng) { ném thao_tác + ": không thể mở tệp để ghi"; };
+    thử {
+        vị_trí = 0;
+        lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
+            đệm = [];
+            hết = vị_trí + 4096;
+            nếu (hết > do_dai(bytes)) { hết = do_dai(bytes); };
+            lặp(i = vị_trí; i < hết; i++) { them(đệm, bytes[i]); };
+            n = thành số nguyên(thành chuỗi(tệp_ghi_ffi(đệm, 1, do_dai(đệm), tệp)));
+            nếu (n <= 0 || n > do_dai(đệm)) {
+                ném thao_tác + ": không thể ghi tệp";
+            };
+            vị_trí = vị_trí + n;
+        };
+    } bắt lỗi(e) {
+        tệp_đóng_ffi(tệp);
+        ném e;
+    };
+    nếu (tệp_đóng_ffi(tệp) != 0) { ném thao_tác + ": không thể ghi tệp"; };
+    trả về 1;
+};
+
+hàm tệp yêu cầu bytes(bytes) {
+    nếu (loai_cua(bytes) != "danh sách") {
+        ném "ghi bytes tệp: cần danh sách bytes";
+    };
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (loai_cua(bytes[i]) != "số nguyên") {
+            ném "ghi bytes tệp: mỗi byte phải là số nguyên";
+        };
+        nếu (bytes[i] < 0 || bytes[i] > 255) {
+            ném "ghi bytes tệp: byte phải trong 0..255";
+        };
+    };
+    trả về bytes;
+};
 
 // Ghi chú hàm: đọc tệp.
 hàm đọc tệp(đường dẫn) {
-    trả về io_doc_file(đường dẫn);
+    đường = tệp chuẩn hóa đường dẫn(đường dẫn);
+    trả về chuoi_tu_bytes_vm(tệp đọc bytes posix(đường, "đọc tệp"));
 };
 
 // Ghi nguyên nội dung chuỗi runtime, không giải mã lại escape (kể cả JSON).
 hàm ghi tệp(đường dẫn, nội dung) {
-    trả về io_ghi_file(đường dẫn, nội dung);
+    đường = tệp chuẩn hóa đường dẫn(đường dẫn);
+    văn_bản = thành chuỗi(nội dung);
+    trả về tệp ghi bytes posix(đường, chuoi_bytes_vm(văn_bản), sai, "ghi tệp");
 };
 
 // Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
 // cấp cao như nhật ký chỉ chịu trách nhiệm dựng nội dung cần ghi.
 hàm ghi nối tệp(đường dẫn, nội dung) {
-    trả về io_ghi_tiep_file(đường dẫn, nội dung);
+    đường = tệp chuẩn hóa đường dẫn(đường dẫn);
+    văn_bản = thành chuỗi(nội dung);
+    trả về tệp ghi bytes posix(đường, chuoi_bytes_vm(văn_bản), đúng, "ghi nối tệp");
 };
 
 // Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là
 // primitive file I/O để các codec/archive triển khai format bằng V++ mà không
 // phải đẩy thuật toán định dạng xuống C++.
 hàm đọc bytes tệp(đường dẫn) {
-    trả về io_doc_bytes(đường dẫn);
+    đường = tệp chuẩn hóa đường dẫn(đường dẫn);
+    trả về tệp đọc bytes posix(đường, "đọc bytes tệp");
 };
 
 hàm ghi bytes tệp(đường dẫn, bytes) {
-    trả về io_ghi_bytes(đường dẫn, bytes);
+    đường = tệp chuẩn hóa đường dẫn(đường dẫn);
+    dữ_liệu = tệp yêu cầu bytes(bytes);
+    trả về tệp ghi bytes posix(đường, dữ_liệu, sai, "ghi bytes tệp");
 };
 
 // Đếm dòng vật lý; tệp rỗng có 0 dòng.

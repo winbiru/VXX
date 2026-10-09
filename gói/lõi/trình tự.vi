@@ -3,6 +3,7 @@
 
 // Chuỗi: trả về chuỗi mới theo thứ tự ngược.
 // Danh sách: đảo tại chỗ và trả về rỗng để giữ API hiện có.
+
 hàm đảo ngược(giá_trị) {
     nếu (loai_cua(giá_trị) == "chuỗi") {
         kết_quả = "";

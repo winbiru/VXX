@@ -1,7 +1,29 @@
 // Module: hệ thống.môi trường
+// Chính sách tên và giá trị mặc định thuộc V++; VM chỉ đọc môi trường OS.
+
+nhập gói/lõi/chuyển kiểu;
+
+ngoại thư viện c_hệ_thống = "system.c";
+ngoại hàm getenv_hệ_thống_ffi(tên: c_chuỗi): c_chuỗi từ c_hệ_thống
+    ký hiệu "getenv" abi "c" khả năng "system.env.read";
+
+hàm môi trường chuẩn hóa tên(tên) {
+    tên = thành chuỗi(tên);
+    nếu (tên == "") {
+        ném "doc_bien_moi_truong_vm: tên biến môi trường không hợp lệ";
+    };
+    nul = chuoi_tu_bytes_vm([0]);
+    lặp(i = 0; i < do_dai(tên); i++) {
+        nếu (tên[i] == "=" || tên[i] == nul) {
+            ném "doc_bien_moi_truong_vm: tên biến môi trường không hợp lệ";
+        };
+    };
+    trả về tên;
+};
 
 hàm đọc biến môi trường(tên, giá trị mặc định) {
-    giá_trị = doc_bien_moi_truong(tên);
+    tên = môi trường chuẩn hóa tên(tên);
+    giá_trị = getenv_hệ_thống_ffi(tên);
     nếu (giá_trị == rỗng) {
         trả về giá trị mặc định;
     };

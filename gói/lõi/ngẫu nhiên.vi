@@ -1,8 +1,10 @@
 // Module: lõi.ngẫu nhiên
-// Sinh số nguyên trong đoạn đóng [tối thiểu, tối đa]. Native chỉ cung cấp
+// Sinh số nguyên trong đoạn đóng [tối thiểu, tối đa]. VM chỉ cung cấp
 // entropy bảo mật dạng byte; việc ánh xạ vào khoảng số nguyên nằm hoàn toàn ở V++.
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/entropy;
 
 hàm ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
     kiểu = loai_cua(giá_trị);
@@ -31,7 +33,7 @@ hàm ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
 };
 
 hàm ngẫu nhiên entropy sáu byte() {
-    bytes = ngau_nhien_bao_mat_bytes(6);
+    bytes = entropy bảo mật bytes(6);
     nếu (do_dai(bytes) != 6) {
         ném "ngẫu nhiên nguyên: entropy không hợp lệ";
     };
@@ -110,13 +112,13 @@ hàm ngẫu nhiên yêu cầu bộ sinh(bộ sinh) {
     nếu (loai_cua(bộ sinh) != "từ điển") {
         ném "ngẫu nhiên: không tìm thấy bộ sinh";
     };
-    nếu (lay_map(bộ sinh, "__vpp_random", 0) != 1) {
+    nếu (lấy map(bộ sinh, "__vpp_random", 0) != 1) {
         ném "ngẫu nhiên: không tìm thấy bộ sinh";
     };
-    nếu (lay_map(bộ sinh, "mở", 0) != 1) {
+    nếu (lấy map(bộ sinh, "mở", 0) != 1) {
         ném "ngẫu nhiên: không tìm thấy bộ sinh";
     };
-    nếu (lay_map(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
+    nếu (lấy map(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
         ném "RANDOM_STATE";
     };
     trả về bộ sinh;
@@ -124,7 +126,7 @@ hàm ngẫu nhiên yêu cầu bộ sinh(bộ sinh) {
 
 hàm ngẫu nhiên bước(bộ sinh) {
     ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
-    trạng_thái = lay_map(bộ sinh, "trạng thái", 1);
+    trạng_thái = lấy map(bộ sinh, "trạng thái", 1);
 
     // m = 2147483647, a = 48271, q = m / a = 44488, r = m % a = 3399.
     hi = thành số nguyên(trạng_thái / 44488);
@@ -134,7 +136,7 @@ hàm ngẫu nhiên bước(bộ sinh) {
         tiếp = tiếp + 2147483647;
     };
 
-    dat_map(bộ sinh, "trạng thái", tiếp);
+    đặt map(bộ sinh, "trạng thái", tiếp);
     trả về tiếp;
 };
 
@@ -208,8 +210,8 @@ hàm ngẫu nhiên bytes từ bộ(bộ sinh, số_lượng) {
 hàm trạng thái bộ sinh ngẫu nhiên(bộ sinh) {
     ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
     trả về {
-        "thuật toán": lay_map(bộ sinh, "thuật toán", ""),
-        "trạng thái": lay_map(bộ sinh, "trạng thái", 0)
+        "thuật toán": lấy map(bộ sinh, "thuật toán", ""),
+        "trạng thái": lấy map(bộ sinh, "trạng thái", 0)
     };
 };
 
@@ -217,11 +219,11 @@ hàm khôi phục bộ sinh ngẫu nhiên(snapshot) {
     nếu (loai_cua(snapshot) != "từ điển") {
         ném "RANDOM_STATE";
     };
-    thuật_toán = lay_map(snapshot, "thuật toán", "");
+    thuật_toán = lấy map(snapshot, "thuật toán", "");
     nếu (thuật_toán != "park-miller-48271-v1") {
         ném "RANDOM_STATE";
     };
-    trạng_thái = lay_map(snapshot, "trạng thái", 0);
+    trạng_thái = lấy map(snapshot, "trạng thái", 0);
     nếu (loai_cua(trạng_thái) != "số nguyên") {
         ném "RANDOM_STATE";
     };
@@ -255,7 +257,7 @@ hàm random bool(bộ_sinh) {
 
 hàm xóa bộ sinh ngẫu nhiên(bộ sinh) {
     ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
-    dat_map(bộ sinh, "mở", 0);
-    dat_map(bộ sinh, "trạng thái", 0);
+    đặt map(bộ sinh, "mở", 0);
+    đặt map(bộ sinh, "trạng thái", 0);
     trả về 1;
 };
