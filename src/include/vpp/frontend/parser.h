@@ -43,6 +43,7 @@ private:
     void attachDeclarationPayload(AstStatement &statement);
     // Phân tích chi tiết câu lệnh nhập và gắn `AstImportSpec`; target import là đường dẫn/tên package không có dấu nháy.
     void attachImportForm(AstStatement &statement);
+    void attachForeignForm(AstStatement &statement);
     // Tính `SourceSpan` của một dải token theo chỉ số đầu/cuối; hàm xử lý cả dải rỗng để diagnostic vẫn có vị trí hợp lệ.
     SourceSpan spanFor(std::size_t begin, std::size_t end) const noexcept;
     // Thử dựng expression root từ dải token của câu lệnh; khi parse thành công hàm lưu ExprId, còn lỗi dạng legacy được giữ cho đường tương thích.

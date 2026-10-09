@@ -4,6 +4,7 @@
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
 nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/entropy;
 
 hàm ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
     kiểu = loai_cua(giá_trị);
@@ -32,7 +33,7 @@ hàm ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
 };
 
 hàm ngẫu nhiên entropy sáu byte() {
-    bytes = ngau_nhien_bao_mat_bytes_vm(6);
+    bytes = entropy bảo mật bytes(6);
     nếu (do_dai(bytes) != 6) {
         ném "ngẫu nhiên nguyên: entropy không hợp lệ";
     };

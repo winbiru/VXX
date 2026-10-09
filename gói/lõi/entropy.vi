@@ -1,0 +1,27 @@
+// Entropy bí mật cấp OS. POSIX getentropy() bảo đảm mỗi lần <= 256 byte;
+// chính V++ điều phối các khối, kiểm tra lỗi và ghép danh sách byte.
+// Windows dùng cùng binding đã kiểm chứng qua provider BCryptGenRandom.
+
+ngoại thư viện c_entropy = "system.c";
+ngoại hàm lấy_entropy_ffi(đệm: c_đệm_ra[độ_dài], độ_dài: u64): i32 từ c_entropy
+    ký hiệu "getentropy" abi "c" khả năng "system.entropy.read";
+
+hàm entropy bảo mật bytes(số_byte) {
+    nếu (loai_cua(số_byte) != "số nguyên" || số_byte < 1 || số_byte > 4096) {
+        ném "entropy bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+    };
+    kết_quả = [];
+    còn_lại = số_byte;
+    lặp(vòng = 0; còn_lại > 0; vòng++) {
+        số_đọc = còn_lại;
+        nếu (số_đọc > 256) { số_đọc = 256; };
+        đệm = [];
+        lặp(i = 0; i < số_đọc; i++) { them(đệm, 0); };
+        nếu (lấy_entropy_ffi(đệm, số_đọc) != 0) {
+            ném "entropy bảo mật: getentropy thất bại";
+        };
+        lặp(i = 0; i < số_đọc; i++) { them(kết_quả, đệm[i]); };
+        còn_lại = còn_lại - số_đọc;
+    };
+    trả về kết_quả;
+};

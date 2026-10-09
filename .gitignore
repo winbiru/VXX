@@ -50,3 +50,5 @@ vdk-*.zip
 __pycache__/
 *.pyc
 *.md
+!docs/system-ffi-migration-plan.md
+!docs/native-boundary-audit.md

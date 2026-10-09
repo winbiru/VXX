@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inventory V++ bodies and their direct VM primitive calls, ignoring comments."""
+"""Inventory V++ bodies, VM primitive calls and declared foreign ABI bindings."""
 
 import argparse
 import json
@@ -14,11 +14,82 @@ DECLARATION = re.compile(r'\bhàm\s+([\w ]+?)\s*\(')
 INTERFACE = re.compile(r'\bgiao\s+diện\b[^{}]*\{')
 CONSTANT_RETURN = re.compile(
     r'\s*trả\s+về\s+(?:rỗng|đúng|sai|-?\d+(?:\.\d+)?|"(?:\\.|[^"\\])*")\s*;\s*')
+FOREIGN_LIBRARY = re.compile(
+    r'\bngoại\s+thư\s+viện\s+(\w+)\s*=\s*"([^"\n]+)"\s*;')
+FOREIGN_FUNCTION = re.compile(
+    r'\bngoại\s+hàm\s+(\w+)\s*\(([^()]*)\)\s*:\s*(\w+)'
+    r'\s+từ\s+(\w+)\s+ký\s+hiệu\s+"([^"\n]+)"'
+    r'\s+abi\s+"([^"\n]+)"\s+khả\s+năng\s+"([^"\n]+)"\s*;')
 
 
 def mask(source):
     return LEXEMES.sub(
         lambda match: ''.join('\n' if c == '\n' else ' ' for c in match[0]), source)
+
+
+def mask_comments(source):
+    """Keep quoted FFI metadata while discarding comments with matching offsets."""
+    return LEXEMES.sub(
+        lambda match: (''.join('\n' if c == '\n' else ' ' for c in match[0])
+                       if match[0].startswith(('//', '/*')) else match[0]),
+        source)
+
+
+def foreign_declarations(source, filename):
+    clean = mask_comments(source)
+    libraries = {}
+    bindings = []
+    errors = []
+    names = set()
+    for declaration in FOREIGN_LIBRARY.finditer(clean):
+        alias, library = declaration.groups()
+        if alias in libraries:
+            errors.append(f'{filename}:{clean.count(chr(10), 0, declaration.start()) + 1}: '
+                          f'duplicate FFI library alias {alias}')
+        libraries[alias] = library
+    for declaration in FOREIGN_FUNCTION.finditer(clean):
+        name, params, result, alias, symbol, abi, capability = declaration.groups()
+        line = clean.count('\n', 0, declaration.start()) + 1
+        if name in names:
+            errors.append(f'{filename}:{line}: duplicate FFI function {name}')
+        names.add(name)
+        if alias not in libraries:
+            errors.append(f'{filename}:{line}: unknown FFI library alias {alias}')
+        types = []
+        parsed_params = []
+        for parameter in params.split(','):
+            if not parameter.strip():
+                continue
+            match = re.fullmatch(r'\s*(\w+)\s*:\s*(\w+)(?:\s*\[\s*(\w+)\s*\])?\s*', parameter)
+            if match is None:
+                errors.append(f'{filename}:{line}: invalid FFI parameter {parameter.strip()}')
+                continue
+            param_name, param_type, extent = match.groups()
+            types.append(param_type)
+            parsed_params.append((param_name, param_type, extent))
+        names_by_index = {name: (index, param_type)
+                          for index, (name, param_type, _) in enumerate(parsed_params)}
+        for param_name, param_type, extent in parsed_params:
+            is_buffer = param_type in {'c_đệm_vào', 'c_đệm_ra'}
+            if is_buffer and extent is None:
+                errors.append(f'{filename}:{line}: FFI buffer {param_name} missing extent')
+            elif not is_buffer and extent is not None:
+                errors.append(f'{filename}:{line}: FFI extent on non-buffer {param_name}')
+            elif extent is not None:
+                if extent.isdecimal():
+                    if not 1 <= int(extent) <= 65536:
+                        errors.append(f'{filename}:{line}: FFI buffer {param_name} invalid fixed length')
+                elif extent not in names_by_index or names_by_index[extent][1] not in {
+                        'i32', 'u32', 'i64', 'u64'}:
+                    errors.append(f'{filename}:{line}: FFI buffer {param_name} invalid length reference {extent}')
+        bindings.append({'file': filename, 'line': line, 'function': name,
+                         'library_alias': alias, 'library': libraries.get(alias),
+                         'symbol': symbol, 'abi': abi, 'capability': capability,
+                         'parameters': types, 'result': result})
+    # Distinguish an invalid/incomplete declaration from a declaration-free module.
+    if len(re.findall(r'\bngoại\s+hàm\s+', mask(clean))) != len(bindings):
+        errors.append(f'{filename}: foreign declaration cannot be parsed')
+    return libraries, bindings, errors
 
 
 def close_pair(source, start, opening, closing):
@@ -41,7 +112,12 @@ def interface_ranges(masked):
 def declarations(source):
     masked = mask(source)
     interfaces = interface_ranges(masked)
+    foreign_ranges = [(match.start(), match.end())
+                      for match in FOREIGN_FUNCTION.finditer(mask_comments(source))]
     for declaration in DECLARATION.finditer(masked):
+        # `ngoại hàm` is a declaration without a V++ body by design.
+        if any(start <= declaration.start() < end for start, end in foreign_ranges):
+            continue
         end_parameters = close_pair(masked, declaration.end() - 1, '(', ')')
         body_start = end_parameters + 1
         while body_start < len(masked) and masked[body_start].isspace():
@@ -107,6 +183,7 @@ def audit(root):
     calls = {name: re.compile(r'(?<!\w)' + re.escape(name) + r'\s*\(')
              for name in intrinsics}
     modules, implementations, native_callers = [], [], []
+    foreign_bindings, foreign_callers = [], []
     placeholders, empty_bodies = [], []
     missing_bodies, interface_signatures, constant_bodies, errors = [], [], [], []
     counts = {'library_bodies': 0, 'direct_native_wrappers': 0,
@@ -115,6 +192,14 @@ def audit(root):
               'unavailable_native_hooks': 0}
     for path, source in sources.items():
         module_calls = set()
+        filename = path.relative_to(root).as_posix()
+        _, bindings, binding_errors = foreign_declarations(source, filename)
+        foreign_bindings.extend(bindings)
+        errors.extend(binding_errors)
+        foreign_patterns = {binding['function']: re.compile(
+            r'(?<!\w)' + re.escape(binding['function']) + r'\s*\(')
+            for binding in bindings}
+        module_foreign_calls = set()
         function_count = 0
         for name, line, body, _, kind in declarations(source):
             item = {'file': path.relative_to(root).as_posix(),
@@ -126,7 +211,13 @@ def audit(root):
         for name, line, body, masked_body in functions(source):
             function_count += 1
             native = sorted(n for n, pattern in calls.items() if pattern.search(masked_body))
+            ffi_calls = sorted(n for n, pattern in foreign_patterns.items()
+                               if pattern.search(masked_body))
             module_calls.update(native)
+            module_foreign_calls.update(ffi_calls)
+            if ffi_calls:
+                foreign_callers.append({'file': filename, 'line': line,
+                                        'function': name, 'calls': ffi_calls})
             kind = 'library_bodies'
             if not masked_body.strip():
                 empty_bodies.append({'file': path.relative_to(root).as_posix(),
@@ -165,12 +256,15 @@ def audit(root):
                 'function': name,
                 'kind': kind,
                 'calls': native,
+                'foreign_calls': ffi_calls,
             })
             for called in re.findall(r'\b(vm_\w+|\w+_vm(?:_\w+)?)\s*\(', masked_body):
                 if called not in calls:
                     errors.append(f'{path.relative_to(root)}:{line}: unknown VM call {called}')
-        modules.append({'file': path.relative_to(root).as_posix(), 'functions': function_count,
-                        'direct_primitive_calls': sorted(module_calls)})
+        modules.append({'file': filename, 'functions': function_count,
+                        'direct_primitive_calls': sorted(module_calls),
+                        'foreign_bindings': [b['function'] for b in bindings],
+                        'direct_foreign_calls': sorted(module_foreign_calls)})
     boundaries = {}
     for intrinsic in intrinsics:
         boundary = category(intrinsic)
@@ -200,7 +294,7 @@ def audit(root):
             errors.append(f'{name}: missing VM dispatch {opcode}')
 
     incomplete = missing_bodies + empty_bodies + placeholders
-    return {'schema': 2, 'files': len(modules), 'functions': sum(counts.values()),
+    return {'schema': 3, 'files': len(modules), 'functions': sum(counts.values()),
             'classification': counts, 'unavailable_native_hooks': placeholders,
             'missing_bodies': missing_bodies, 'empty_bodies': empty_bodies,
             'interface_signatures': interface_signatures,
@@ -209,7 +303,14 @@ def audit(root):
             'boundary_summary': boundaries,
             'intrinsics': [{'name': n, 'boundary': category(n)} for n in intrinsics],
             'implementations': implementations,
-            'native_callers': native_callers, 'modules': modules, 'errors': errors}
+            'native_callers': native_callers, 'modules': modules,
+            'foreign_bindings': foreign_bindings,
+            'foreign_callers': foreign_callers,
+            'foreign_summary': {'bindings': len(foreign_bindings),
+                                'callers': len(foreign_callers),
+                                'capabilities': sorted({b['capability']
+                                                        for b in foreign_bindings})},
+            'errors': errors}
 
 
 def main():
@@ -223,6 +324,7 @@ def main():
           f"{len(report['incomplete_implementations'])} incomplete implementations")
     print(json.dumps(report['classification'], ensure_ascii=False, sort_keys=True))
     print(json.dumps(report['boundary_summary'], ensure_ascii=False, sort_keys=True))
+    print(json.dumps(report['foreign_summary'], ensure_ascii=False, sort_keys=True))
     for error in report['errors']:
         print(error)
     return bool(report['incomplete_implementations'] or report['errors'])

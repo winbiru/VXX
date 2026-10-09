@@ -2,6 +2,14 @@
 
 V++ tách compiler, runtime, tooling và các gói ngôn ngữ thành các lớp có dependency một chiều. Mục tiêu là để CLI chỉ ghép các thành phần; parser không biết HTTP/DB, và runtime không đọc compiler global state.
 
+Lộ trình tiếp theo nằm trong [kế hoạch chuyển primitive OS sang V++](system-ffi-migration-plan.md):
+FFI/System ABI dùng chung, frontend → IR → bytecode → VM/JIT, ownership,
+migration từng nhóm thư viện và gate kiểm thử. System FFI hiện đã chạy trên
+production pipeline POSIX: env, clock, entropy, file/thư mục, DNS, TCP/UDP và
+quản lý tiến trình con dùng binding có capability riêng. Runtime vẫn giữ ABI
+bridge và tài nguyên VM; TLS, scheduler/worker và process Windows tiếp tục dùng
+backend native cho đến khi qua gate của từng nhóm.
+
 ## C++ modules
 
 ```text

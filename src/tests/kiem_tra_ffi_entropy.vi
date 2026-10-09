@@ -1,0 +1,21 @@
+nhập gói/lõi/entropy;
+nhập mật mã;
+nhập ngẫu nhiên;
+
+hàm chính() {
+    một = entropy bảo mật bytes(1);
+    in do_dai(một) == 1;
+    in loai_cua(một[0]) == "số nguyên" && một[0] >= 0 && một[0] <= 255;
+    // Một lệnh getentropy nhận tối đa 256 byte; 257 và 4096 cần nhiều đợt.
+    in do_dai(entropy bảo mật bytes(256)) == 256;
+    in do_dai(entropy bảo mật bytes(257)) == 257;
+    in do_dai(entropy bảo mật bytes(4096)) == 4096;
+    in do_dai(ngẫu nhiên bảo mật(257)) == 514;
+    in do_dai(ngẫu nhiên bảo mật(4096)) == 8192;
+    x = ngẫu nhiên nguyên(0, 100);
+    in x >= 0 && x <= 100;
+
+    thử { entropy bảo mật bytes(0); } bắt lỗi(e) { in "chặn 0"; };
+    thử { entropy bảo mật bytes(4097); } bắt lỗi(e) { in "chặn 4097"; };
+    thử { entropy bảo mật bytes(2.5); } bắt lỗi(e) { in "chặn phân số"; };
+};

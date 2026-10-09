@@ -3,6 +3,10 @@
 
 nhập gói/lõi/chuyển kiểu;
 
+ngoại thư viện c_hệ_thống = "system.c";
+ngoại hàm getenv_hệ_thống_ffi(tên: c_chuỗi): c_chuỗi từ c_hệ_thống
+    ký hiệu "getenv" abi "c" khả năng "system.env.read";
+
 hàm môi trường chuẩn hóa tên(tên) {
     tên = thành chuỗi(tên);
     nếu (tên == "") {
@@ -19,7 +23,7 @@ hàm môi trường chuẩn hóa tên(tên) {
 
 hàm đọc biến môi trường(tên, giá trị mặc định) {
     tên = môi trường chuẩn hóa tên(tên);
-    giá_trị = doc_bien_moi_truong_vm(tên);
+    giá_trị = getenv_hệ_thống_ffi(tên);
     nếu (giá_trị == rỗng) {
         trả về giá trị mặc định;
     };

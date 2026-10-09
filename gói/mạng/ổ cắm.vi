@@ -4,6 +4,80 @@
 
 nhập gói/lõi/chuyển kiểu;
 
+// Adapter resolver POSIX có token sở hữu VM; getaddrinfo/addrinfo không
+// bao giờ đi qua V++ dưới dạng pointer hoặc sockaddr thô.
+ngoại thư viện c_mạng = "system.net";
+ngoại hàm resolver_mở_ffi(tên: c_chuỗi, dịch_vụ: c_chuỗi, udp: i32): c_dns từ c_mạng
+    ký hiệu "resolve_open" abi "c" khả năng "system.net.resolve.open";
+ngoại hàm resolver_tiếp_ffi(mã: c_dns): c_chuỗi từ c_mạng
+    ký hiệu "resolve_next" abi "c" khả năng "system.net.resolve.next";
+ngoại hàm resolver_đóng_ffi(mã: c_dns): i32 từ c_mạng
+    ký hiệu "resolve_close" abi "c" khả năng "system.net.resolve.close";
+
+// POSIX socket và TLS thuộc từng VM; Windows giữ backend cũ.
+ngoại hàm socket_kết_nối_ffi(ip: c_chuỗi, cổng: i32, udp: i32, chờ: i32): c_socket từ c_mạng
+    ký hiệu "socket_connect" abi "c" khả năng "system.net.socket.connect";
+ngoại hàm socket_lắng_nghe_ffi(cổng: i32, backlog: i32): c_socket từ c_mạng
+    ký hiệu "socket_listen" abi "c" khả năng "system.net.socket.listen";
+ngoại hàm socket_chấp_nhận_ffi(mã: c_socket): c_socket từ c_mạng
+    ký hiệu "socket_accept" abi "c" khả năng "system.net.socket.accept";
+ngoại hàm socket_timeout_ffi(mã: c_socket, mili_giây: i32): i32 từ c_mạng
+    ký hiệu "socket_timeout" abi "c" khả năng "system.net.socket.timeout";
+ngoại hàm socket_loại_ffi(mã: c_socket): i32 từ c_mạng
+    ký hiệu "socket_kind" abi "c" khả năng "system.net.socket.kind";
+
+ngoại thư viện c_socket_posix = "system.c";
+ngoại hàm socket_gửi_ffi(mã: c_socket, đệm: c_đệm_vào[đếm], đếm: u64, cờ: i32): i64 từ c_socket_posix
+    ký hiệu "send" abi "c" khả năng "system.net.socket.send";
+ngoại hàm socket_nhận_ffi(mã: c_socket, đệm: c_đệm_ra[đếm], đếm: u64, cờ: i32): i64 từ c_socket_posix
+    ký hiệu "recv" abi "c" khả năng "system.net.socket.recv";
+ngoại hàm socket_đóng_ffi(mã: c_socket): i32 từ c_socket_posix
+    ký hiệu "close" abi "c" khả năng "system.net.socket.close";
+ngoại hàm socket_tls_nâng_cấp_ffi(mã: c_socket, tên_máy: c_chuỗi): c_socket từ c_mạng
+    ký hiệu "tls_upgrade" abi "c" khả năng "system.net.tls.upgrade";
+ngoại hàm socket_tls_gửi_ffi(mã: c_socket, đệm: c_đệm_vào[đếm], đếm: u64): i64 từ c_mạng
+    ký hiệu "tls_send" abi "c" khả năng "system.net.tls.send";
+ngoại hàm socket_tls_nhận_ffi(mã: c_socket, đệm: c_đệm_ra[đếm], đếm: u64): i64 từ c_mạng
+    ký hiệu "tls_recv" abi "c" khả năng "system.net.tls.recv";
+
+// Token POSIX nằm trong miền dành riêng, bao gồm phiên TLS.
+// Runtime xác nhận sở hữu token thật sự trước mọi lời gọi.
+hàm socket dùng ffi(mã) {
+    trả về ten_nen_tang_vm() != "windows" && mã >= 536870912;
+};
+
+// Giữ thứ tự trả về của resolver; DNS public tự sort/deduplicate còn kết nối
+// TCP/UDP dùng thứ tự này để thử từng địa chỉ. Mọi nhánh đều đóng token.
+hàm socket resolver danh sách(tên_máy, cổng, datagram) {
+    nếu (ten_nen_tang_vm() == "windows") {
+        nếu (cổng == 0) { trả về dns_phan_giai_vm(tên_máy); };
+        trả về socket_phan_giai_vm(tên_máy, cổng, datagram);
+    };
+    dịch_vụ = "";
+    nếu (cổng != 0) { dịch_vụ = thành chuỗi(cổng); };
+    udp = 0;
+    nếu (datagram) { udp = 1; };
+    mã_resolver = resolver_mở_ffi(tên_máy, dịch_vụ, udp);
+    kết_quả = [];
+    thử {
+        lặp(i = 0; i < 16384; i++) {
+            địa_chỉ = resolver_tiếp_ffi(mã_resolver);
+            nếu (địa_chỉ == rỗng) { thoát; };
+            nếu (cổng == 0) {
+                them(kết_quả, địa_chỉ);
+            } nếu không {
+                them(kết_quả, [địa_chỉ, cổng]);
+            };
+        };
+        nếu (i == 16384) { ném "resolver: quá nhiều địa chỉ"; };
+        resolver_đóng_ffi(mã_resolver);
+    } bắt lỗi(e) {
+        thử { resolver_đóng_ffi(mã_resolver); } bắt lỗi(bỏ_qua) {};
+        ném e;
+    };
+    trả về kết_quả;
+};
+
 hàm socket yêu cầu tên máy(giá_trị, tên_hàm) {
     nếu (loai_cua(giá_trị) != "chuỗi") {
         ném tên_hàm + ": tên máy phải là chuỗi";
@@ -46,11 +120,11 @@ hàm socket yêu cầu mã(giá_trị, tên_hàm, nhãn) {
     trả về mã;
 };
 
-hàm socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm) {
+hàm socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm, dùng_tls_cũ = sai) {
     địa_chỉ = [];
     thử {
         // Giữ thứ tự resolver, không dùng danh sách DNS đã sort/deduplicate.
-        địa_chỉ = socket_phan_giai_vm(tên_máy, cổng, là_datagram);
+        địa_chỉ = socket resolver danh sách(tên_máy, cổng, là_datagram);
     } bắt lỗi (e) {
         ném tên_hàm + ": " + e;
     };
@@ -58,16 +132,24 @@ hàm socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram,
     lặp(i = 0; i < do_dai(địa_chỉ); i++) {
         thử {
             mã = 0;
-            nếu (là_datagram) {
+            nếu (!dùng_tls_cũ && ten_nen_tang_vm() != "windows") {
+                udp = 0;
+                nếu (là_datagram) { udp = 1; };
+                mã = socket_kết_nối_ffi(địa_chỉ[i][0], cổng, udp, thời_gian_chờ);
+            } nếu (là_datagram) {
                 mã = socket_udp_mo_vm(địa_chỉ[i], thời_gian_chờ);
             } nếu không {
                 mã = socket_tcp_mo_vm(địa_chỉ[i], thời_gian_chờ);
             };
             // Cấu hình timeout sau connect; lỗi phải đóng rồi thử địa chỉ kế.
             thử {
-                socket_dat_timeout_vm(mã, thời_gian_chờ);
+                nếu (socket dùng ffi(mã)) {
+                    socket_timeout_ffi(mã, thời_gian_chờ);
+                } nếu không {
+                    socket_dat_timeout_vm(mã, thời_gian_chờ);
+                };
             } bắt lỗi (e) {
-                thử { socket_dong_vm(mã); } bắt lỗi (bỏ_qua) {};
+                thử { socket đóng(mã); } bắt lỗi (bỏ_qua) {};
                 ném e;
             };
             trả về mã;
@@ -98,13 +180,15 @@ hàm socket tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
     tên máy = socket yêu cầu tên máy(tên máy, "socket_tls_mo");
     cổng = socket yêu cầu cổng(cổng, "socket_tls_mo");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_tls_mo");
-    mã = socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo");
+    cũ = ten_nen_tang_vm() == "windows";
+    mã = socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo", cũ);
     // TLS chỉ bắt đầu sau khi đã chọn kết nối. Lỗi chứng chỉ/handshake được
     // trả ngay; V++ đóng socket TCP, không thử lại TLS trên địa chỉ khác.
     thử {
+        nếu (!cũ) { trả về socket_tls_nâng_cấp_ffi(mã, tên máy); };
         trả về socket_tls_nang_cap_vm(mã, tên máy);
     } bắt lỗi (e) {
-        thử { socket_dong_vm(mã); } bắt lỗi (bỏ_qua) {};
+        thử { socket đóng(mã); } bắt lỗi (bỏ_qua) {};
         ném e;
     };
 };
@@ -116,6 +200,9 @@ hàm socket tcp lắng nghe(cổng, backlog = 64) {
     backlog = socket yêu cầu số nguyên(backlog, "socket_tcp_lang_nghe", "backlog");
     nếu (backlog <= 0 || backlog > 1024) {
         ném "socket_tcp_lang_nghe: backlog phải trong 1..1024";
+    };
+    nếu (ten_nen_tang_vm() != "windows") {
+        trả về socket_lắng_nghe_ffi(cổng, backlog);
     };
     trả về socket_tcp_lang_nghe_vm(cổng, backlog);
 };
@@ -133,11 +220,16 @@ hàm socket chấp nhận(mã socket lắng nghe, thời gian chờ = 300000) {
 
     // `accept()` chỉ là primitive OS. Chính sách timeout của connection mới
     // thuộc thư viện V++; nếu cấu hình thất bại phải đóng handle vừa nhận.
-    mã socket = socket_chap_nhan_vm(mã socket lắng nghe);
+    mã socket = rỗng;
+    nếu (socket dùng ffi(mã socket lắng nghe)) {
+        mã socket = socket_chấp_nhận_ffi(mã socket lắng nghe);
+    } nếu không {
+        mã socket = socket_chap_nhan_vm(mã socket lắng nghe);
+    };
     thử {
-        socket_dat_timeout_vm(mã socket, thời gian chờ);
+        socket đặt timeout(mã socket, thời gian chờ);
     } bắt lỗi (e) {
-        socket_dong_vm(mã socket);
+        socket đóng(mã socket);
         ném e;
     };
     trả về mã socket;
@@ -146,6 +238,37 @@ hàm socket chấp nhận(mã socket lắng nghe, thời gian chờ = 300000) {
 hàm socket gửi(mã socket, dữ liệu) {
     mã socket = socket yêu cầu mã(mã socket, "socket_gui", "mã socket");
     nếu (loai_cua(dữ liệu) != "chuỗi") { ném "socket_gui: dữ liệu phải là chuỗi"; };
+    nếu (socket dùng ffi(mã socket)) {
+        bytes = chuoi_bytes_vm(dữ liệu);
+        tổng = do_dai(bytes);
+        loại = socket_loại_ffi(mã socket);
+        datagram = loại == 1;
+        tls = loại == 2;
+        nếu (datagram && tổng > 65507) {
+            ném "socket_gui: datagram vượt quá 65507 byte";
+        };
+        đã_gửi = 0;
+        lặp(vòng = 0; đã_gửi < tổng; vòng++) {
+            đệm = [];
+            hết = đã_gửi + 65536;
+            nếu (hết > tổng) { hết = tổng; };
+            lặp(i = đã_gửi; i < hết; i++) { them(đệm, bytes[i]); };
+            n = 0;
+            nếu (tls) {
+                n = thành số nguyên(thành chuỗi(socket_tls_gửi_ffi(mã socket, đệm, do_dai(đệm))));
+            } nếu không {
+                n = thành số nguyên(thành chuỗi(socket_gửi_ffi(mã socket, đệm, do_dai(đệm), 0)));
+            };
+            nếu (n <= 0 || n > do_dai(đệm)) { ném "socket_gui: gửi thất bại hoặc không tiến triển"; };
+            đã_gửi = đã_gửi + n;
+            // UDP phải là một datagram; không gửi tiếp phần còn thiếu.
+            nếu (datagram) {
+                nếu (đã_gửi != tổng) { ném "socket_gui: gửi datagram không đủ"; };
+                trả về đã_gửi;
+            };
+        };
+        trả về đã_gửi;
+    };
     đã_gửi = 0;
     xong = sai;
     // VM chỉ send/SSLWrite một lần (một record với SChannel). V++ sở hữu
@@ -177,16 +300,36 @@ hàm socket nhận(mã socket, số byte tối đa = 65536) {
     nếu (số byte tối đa <= 0 || số byte tối đa > 16777216) {
         ném "socket_nhan: số byte tối đa phải trong 1..16777216";
     };
+    nếu (socket dùng ffi(mã socket)) {
+        giới_hạn = số byte tối đa;
+        nếu (giới_hạn > 65536) { giới_hạn = 65536; };
+        đệm = [];
+        lặp(i = 0; i < giới_hạn; i++) { them(đệm, 0); };
+        n = 0;
+        nếu (socket_loại_ffi(mã socket) == 2) {
+            n = thành số nguyên(thành chuỗi(socket_tls_nhận_ffi(mã socket, đệm, giới_hạn)));
+        } nếu không {
+            n = thành số nguyên(thành chuỗi(socket_nhận_ffi(mã socket, đệm, giới_hạn, 0)));
+        };
+        nếu (n < 0 || n > giới_hạn) { ném "socket_nhan: nhận thất bại"; };
+        bytes = [];
+        lặp(i = 0; i < n; i++) { them(bytes, đệm[i]); };
+        trả về chuoi_tu_bytes_vm(bytes);
+    };
     trả về socket_nhan_vm(mã socket, số byte tối đa);
 };
 
 hàm socket đặt timeout(mã socket, thời gian chờ) {
     mã socket = socket yêu cầu mã(mã socket, "socket_dat_timeout", "mã socket");
     thời gian chờ = socket yêu cầu timeout(thời gian chờ, "socket_dat_timeout");
+    nếu (socket dùng ffi(mã socket)) {
+        trả về socket_timeout_ffi(mã socket, thời gian chờ);
+    };
     trả về socket_dat_timeout_vm(mã socket, thời gian chờ);
 };
 
 hàm socket đóng(mã socket) {
     mã socket = socket yêu cầu mã(mã socket, "socket_dong", "mã socket");
+    nếu (socket dùng ffi(mã socket)) { trả về socket_đóng_ffi(mã socket); };
     trả về socket_dong_vm(mã socket);
 };

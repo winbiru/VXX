@@ -3,6 +3,8 @@
 // Clock/zone là primitive OS; định dạng ISO-8601 nằm hoàn toàn ở V++.
 
 nhập gói/thời gian/lịch;
+nhập gói/thời gian/utc;
+nhập gói/thời gian/địa phương;
 
 // Snapshot native: [năm, tháng, ngày, giờ, phút, giây, offset phút].
 // Các trường và offset được lấy từ cùng một lần đọc clock, tránh lệch ngày/DST.
@@ -30,17 +32,17 @@ hàm thời gian định dạng đồng hồ(các_phần, utc) {
 
 // Trả thời gian local dạng ISO-8601 có offset, ví dụ 2026-09-15T16:10:20+07:00.
 hàm lấy thời gian hiện tại() {
-    trả về thời gian định dạng đồng hồ(dong_ho_dia_phuong_vm(), sai);
+    trả về thời gian định dạng đồng hồ(thời gian đọc địa phương posix(), sai);
 };
 
 // Trả thời gian UTC dạng ISO-8601, ví dụ 2026-09-15T09:10:20Z.
 hàm lấy thời gian utc() {
-    trả về thời gian định dạng đồng hồ(dong_ho_utc_vm(), đúng);
+    trả về thời gian định dạng đồng hồ(thời gian đọc utc ffi(), đúng);
 };
 
 // Trả độ lệch local so với UTC theo phút, ví dụ UTC+07:00 là 420.
 hàm độ lệch múi giờ() {
-    các_phần = dong_ho_dia_phuong_vm();
+    các_phần = thời gian đọc địa phương posix();
     trả về các_phần[6];
 };
 

@@ -1,0 +1,27 @@
+// Chạy trên Windows với cả primitive tương thích và FFI Win32.
+// Kiểm chứng public API: V++ duyệt cây, không làm mất chức năng thư mục rỗng.
+nhập nhập xuất;
+
+hàm chính() {
+    gốc = ".tmp_ffi_win_thu_muc";
+    con = gốc + "/tiếng Việt/rỗng";
+    in tạo thư mục(con) == 1;
+    in là thư mục(con);
+    in !là tệp(con);
+    in do_dai(liệt kê thư mục(con)) == 0;
+    in tạo thư mục(con) == 1;
+    ghi tệp(gốc + "/tiếng Việt/ghi.txt", "dữ liệu");
+    danh_sách = liệt kê thư mục(gốc + "/tiếng Việt");
+    in do_dai(danh_sách) == 2;
+    in danh_sách[0] == "ghi.txt";
+    in danh_sách[1] == "rỗng";
+    in đọc tệp(gốc + "/tiếng Việt/ghi.txt") == "dữ liệu";
+    in là tệp(gốc + "/tiếng Việt/ghi.txt");
+    in !là thư mục(gốc + "/tiếng Việt/ghi.txt");
+    in !đường dẫn tồn tại(gốc + "/thiếu");
+    in !là tệp(gốc + "/thiếu");
+    in !là thư mục(gốc + "/thiếu");
+    in xóa đường dẫn(gốc) == 4;
+    in !đường dẫn tồn tại(gốc);
+    in xóa đường dẫn(gốc) == 0;
+};

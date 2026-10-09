@@ -3,9 +3,6 @@
 #include <stack>
 #include <variant>
 #include <string>
-#include <fstream>
-#include <filesystem>
-#include <sstream>
 #include <cstdio>
 #include <stdio.h>
 #include <cstdlib>
@@ -33,6 +30,7 @@
 #include "common/vm_native_constants.h"
 #include "common/vm_native_stdlib_helpers.h"
 #include "vpp/bytecode/intrinsic.h"
+#include "vpp/runtime/foreign.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/bytecode/verifier.h"
 #include "vpp/core/message_constants.h"
@@ -69,6 +67,7 @@ class ThreadValueCloner {
 public:
     StackValue clone(const StackValue &value) {
         if (std::holds_alternative<int>(value) ||
+            std::holds_alternative<AbiInteger>(value) ||
             std::holds_alternative<double>(value) ||
             std::holds_alternative<std::string>(value) ||
             std::holds_alternative<std::monostate>(value)) {
@@ -224,114 +223,6 @@ static std::string runtimeMethodAccessMessage(
     return vietvm::messages::formatMessage(message, {methodName});
 }
 
-// Primitive file I/O. C++ chỉ mở/đọc/ghi đúng tệp được yêu cầu; chuẩn hóa
-// đường dẫn, kiểm tra byte và các thuật toán xử lý nội dung thuộc thư viện V++.
-static bool executeNativeFilePrimitive(Opcode opcode,
-                                       const std::vector<StackValue> &args,
-                                       StackValue &result,
-                                       std::string &err) {
-    const bool readText = opcode == OP_VM_IO_DOC_FILE;
-    const bool writeText = opcode == OP_VM_IO_GHI_FILE;
-    const bool readBytes = opcode == OP_VM_IO_DOC_BYTES;
-    const bool writeBytes = opcode == OP_VM_IO_GHI_BYTES;
-    const bool appendText = opcode == OP_VM_IO_GHI_TIEP_FILE;
-    if (!readText && !writeText && !readBytes && !writeBytes && !appendText) {
-        return false;
-    }
-
-    const std::string operation = readText ? "đọc tệp"
-        : writeText ? "ghi tệp"
-        : readBytes ? "đọc bytes tệp"
-        : writeBytes ? "ghi bytes tệp"
-        : "ghi nối tệp";
-    const std::size_t arity = (readText || readBytes) ? 1u : 2u;
-    if (!requireNativeArgumentCount(args, operation, arity, err)) return true;
-    std::filesystem::path path;
-    if (!vietvm::helpers::nativeUtf8Path(args[0], operation, path, err)) return true;
-
-    if (readText) {
-        std::ifstream ifs(path);
-        if (!ifs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
-            return true;
-        }
-        std::ostringstream ss;
-        ss << ifs.rdbuf();
-        result = make_string_value(ss.str());
-        return true;
-    }
-
-    if (readBytes) {
-        std::ifstream ifs(path, std::ios::binary);
-        if (!ifs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
-            return true;
-        }
-        std::vector<StackValue> bytes;
-        char byte = 0;
-        while (ifs.get(byte)) {
-            bytes.push_back(make_int_value(static_cast<unsigned char>(byte)));
-        }
-        if (!ifs.eof()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForReadFailed, {operation});
-            return true;
-        }
-        result = make_list_value(std::move(bytes));
-        return true;
-    }
-
-    if (writeBytes) {
-        ListHandle list;
-        if (!vietvm::helpers::getListArgument(args, 1, operation, list, err)) return true;
-        std::ofstream ofs(path, std::ios::binary | std::ios::trunc);
-        if (!ofs.is_open()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileOpenForWriteFailed, {operation});
-            return true;
-        }
-        for (const StackValue &item : list->elements) {
-            if (!std::holds_alternative<int>(item)) {
-                err = operation + ": mỗi byte phải là số nguyên";
-                return true;
-            }
-            const int value = std::get<int>(item);
-            if (value < 0 || value > 255) {
-                err = operation + ": byte phải trong 0..255";
-                return true;
-            }
-            ofs.put(static_cast<char>(static_cast<unsigned char>(value)));
-        }
-        if (!ofs.good()) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeFileWriteFailed, {operation});
-            return true;
-        }
-        result = make_int_value(1);
-        return true;
-    }
-
-    const std::ios::openmode mode = appendText
-        ? (std::ios::out | std::ios::app)
-        : std::ios::out;
-    std::ofstream ofs(path, mode);
-    if (!ofs.is_open()) {
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeFileOpenForWriteFailed, {operation});
-        return true;
-    }
-    ofs << vietvm::helpers::argToRawString(args[1]);
-    if (!ofs.good()) {
-        err = vietvm::messages::formatMessage(
-            vietvm::messages::kNativeFileWriteFailed, {operation});
-        return true;
-    }
-    result = make_int_value(1);
-    return true;
-}
-
 // Bytecode cũ có thể gọi intrinsic theo tên thay vì opcode. Chỉ giải tên ở
 // đây; mọi thực thi (kể cả thread, process, bytes) dùng chung opcode dispatcher.
 static const vietvm::bytecode::IntrinsicDescriptor *resolveLegacyIntrinsic(
@@ -382,19 +273,13 @@ static bool executeVmPrimitive(Opcode opcode,
             return vietvm::helpers::handleNativeCollectionFunction(opcode, args, result, err);
         case OP_VM_TYPE_OF:
         case OP_VM_IDENTITY_HASH:
-        case OP_VM_DOC_BIEN_MOI_TRUONG:
-        case OP_VM_DONG_HO_DIA_PHUONG:
-        case OP_VM_DONG_HO_UTC:
         case OP_VM_DUONG_DAN_TON_TAI:
         case OP_VM_LA_TEP:
         case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
         case OP_VM_LA_THU_MUC:
         case OP_VM_LIET_KE_THU_MUC:
-        case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
-        case OP_VM_NGU_MILI_GIAY:
         case OP_VM_TAO_THU_MUC:
         case OP_VM_TEN_NEN_TANG:
-        case OP_VM_THOI_GIAN_DON_DIEU_MS:
         case OP_VM_XOA_DUONG_DAN:
             return vietvm::helpers::handleNativeFoundationFunction(opcode, args, result, err);
         case OP_VM_DNS_PHAN_GIAI:
@@ -415,9 +300,37 @@ static bool executeVmPrimitive(Opcode opcode,
         case OP_VM_IO_GHI_FILE:
         case OP_VM_IO_GHI_TIEP_FILE:
             failureDisposition = NativeFailureDisposition::RuntimeError;
-            return executeNativeFilePrimitive(opcode, args, result, err);
+            throw vietvm::runtime::RuntimeError(
+                "System FFI strict file: legacy VM file opcode is disabled",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_DOC_BIEN_MOI_TRUONG:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy environment opcode is disabled; use gói/hệ thống/môi trường.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_TIEN_TRINH_CHAY:
-            return vietvm::helpers::handleNativeProcessPrimitive(args, result, err);
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy process opcode is disabled; use gói/hệ thống/tiến trình.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_DONG_HO_UTC:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy UTC clock opcode is disabled; use gói/thời gian/utc.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_DONG_HO_DIA_PHUONG:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy local clock opcode is disabled; use gói/thời gian/địa phương.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy secure entropy opcode is disabled; use gói/lõi/entropy.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_THOI_GIAN_DON_DIEU_MS:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy monotonic clock opcode is disabled; use gói/thời gian/đơn điệu.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_NGU_MILI_GIAY:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy sleep opcode is disabled; use gói/hệ thống/nền tảng.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_BIEN_DICH_PHAN_TICH:
             return vietvm::helpers::compilerAnalyzePrimitive(args, result, err);
         case OP_VM_KICH_BAN_CHAY:
@@ -658,6 +571,17 @@ void VM::setFunctions(
     invalidateBytecodeVerification();
 }
 
+void VM::setForeignFunctions(
+    std::vector<vietvm::bytecode::ForeignFunctionDescriptor> descriptors) {
+    foreignFunctions_ = std::move(descriptors);
+    invalidateBytecodeVerification();
+}
+
+void VM::setForeignCapabilities(
+    std::unordered_set<std::string> capabilities) {
+    foreignCapabilities_ = std::move(capabilities);
+}
+
 void VM::invalidateBytecodeVerification() noexcept {
     ++programGeneration_;
     if (programGeneration_ == 0) {
@@ -675,6 +599,8 @@ void VM::ensureBytecodeVerified() {
 
     vietvm::bytecode::BytecodeVerificationContext verificationContext;
     verificationContext.stringPoolSize = stringPool.size();
+    verificationContext.foreignDescriptorCount = foreignFunctions_.size();
+    verificationContext.foreignDescriptors = &foreignFunctions_;
     for (const auto &entry : hamBytecodeMap) {
         verificationContext.functionIds.insert(entry.first);
     }
@@ -720,6 +646,8 @@ void VM::resetExecution() {
     pc = 0;
     activeBytecode_ = nullptr;
     activeBytecodeDebugInfo_ = nullptr;
+    lastForeignPosixError_ = 0;
+    foreignFileState_.closeAll();
 }
 
 const std::vector<Instruction> &VM::currentBytecode() const noexcept {
@@ -784,6 +712,8 @@ void VM::initializeModules() {
             initializer.variables = variables;
             initializer.classTable = classTable;
             initializer.setFunctions(hamBytecodeMap, functionTableByNameIndex);
+            initializer.setForeignFunctions(foreignFunctions_);
+            initializer.setForeignCapabilities(foreignCapabilities_);
 
             // `VM::run()` của VM cha đã verify root, toàn bộ function bytecode
             // và toàn bộ module initializer trước khi bất kỳ initializer nào
@@ -1683,6 +1613,8 @@ bool VM::executeThreadIntrinsic(
         auto functionSnapshot = hamBytecodeMap;
         auto functionNamesSnapshot = functionTableByNameIndex;
         auto functionDebugSnapshot = functionDebugInfo;
+        auto foreignFunctionsSnapshot = foreignFunctions_;
+        auto foreignCapabilitiesSnapshot = foreignCapabilities_;
         const std::size_t maxDepthSnapshot = maxCallDepth;
         OutputSink sinkSnapshot = outputSink;
 
@@ -1707,6 +1639,8 @@ bool VM::executeThreadIntrinsic(
                  functions = std::move(functionSnapshot),
                  functionNames = std::move(functionNamesSnapshot),
                  functionDebug = std::move(functionDebugSnapshot),
+                 foreignFunctions = std::move(foreignFunctionsSnapshot),
+                 foreignCapabilities = std::move(foreignCapabilitiesSnapshot),
                  workerVariables = std::move(variableSnapshot),
                  workerClasses = std::move(classSnapshot),
                  maxDepthSnapshot, sink = std::move(sinkSnapshot)]() mutable {
@@ -1722,6 +1656,8 @@ bool VM::executeThreadIntrinsic(
                         worker.functionDebugInfo = std::move(functionDebug);
                         worker.maxCallDepth = maxDepthSnapshot;
                         worker.setFunctions(std::move(functions), std::move(functionNames));
+                        worker.setForeignFunctions(std::move(foreignFunctions));
+                        worker.setForeignCapabilities(std::move(foreignCapabilities));
 
                         StackValue workerResult = worker.runWorkerCallable(callable, callArgs);
                         ThreadValueCloner resultCloner;
@@ -1862,6 +1798,45 @@ bool VM::dispatchRegisteredIntrinsic(
     StackValue &result,
     std::string &err,
     bool &runtimeFailure) {
+#if !defined(_WIN32)
+    // POSIX System algorithms now live in the V++ stdlib and use typed FFI.
+    // Reject old OS opcodes even without strict testing enabled, since their
+    // C++ implementations no longer ship on POSIX. Both legacy calls by name
+    // and direct bytecode opcodes reach this dispatcher in interpreter/JIT.
+    // Keep platform identity and VM representation primitives available.
+    const char *strictPosixFfi = std::getenv("VPP_STRICT_SYSTEM_FFI_POSIX");
+    const bool strictPosixMode = strictPosixFfi != nullptr &&
+                                 std::strcmp(strictPosixFfi, "1") == 0;
+    switch (intrinsic.opcode) {
+            case OP_VM_DONG_HO_DIA_PHUONG:
+            case OP_VM_DONG_HO_UTC:
+            case OP_VM_DUONG_DAN_TON_TAI:
+            case OP_VM_LA_TEP:
+            case OP_VM_LA_THU_MUC:
+            case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
+            case OP_VM_LIET_KE_THU_MUC:
+            case OP_VM_TAO_THU_MUC:
+            case OP_VM_XOA_DUONG_DAN:
+            case OP_VM_DNS_PHAN_GIAI:
+            case OP_VM_SOCKET_PHAN_GIAI:
+            case OP_VM_SOCKET_CHAP_NHAN:
+            case OP_VM_SOCKET_DAT_TIMEOUT:
+            case OP_VM_SOCKET_DONG:
+            case OP_VM_SOCKET_GUI:
+            case OP_VM_SOCKET_NHAN:
+            case OP_VM_SOCKET_TCP_LANG_NGHE:
+            case OP_VM_SOCKET_TCP_MO:
+            case OP_VM_SOCKET_UDP_MO:
+            case OP_VM_SOCKET_TLS_NANG_CAP:
+            case OP_VM_TIEN_TRINH_CHAY:
+                throw vietvm::runtime::RuntimeError(
+                    strictPosixMode
+                        ? "System FFI strict POSIX: legacy VM System opcode is disabled"
+                        : "System FFI: legacy POSIX System opcode is disabled; use V++ System FFI packages",
+                    vietvm::runtime::RuntimeErrorKind::CallBoundary);
+            default: break;
+    }
+#endif
     NativeFailureDisposition failureDisposition =
         NativeFailureDisposition::CatchableLanguageError;
     const bool handledThread = executeThreadIntrinsic(intrinsic, args, result, err);
@@ -1915,6 +1890,39 @@ void VM::executeIntrinsicOpcode(const Instruction &instr) {
         throw vietvm::runtime::LanguageException(make_string_value(err));
     }
     stack.push_back(std::move(result));
+}
+
+void VM::executeForeignCallOpcode(const Instruction &instr) {
+    if (instr.operandIndex < 0 ||
+        static_cast<std::size_t>(instr.operandIndex) >= foreignFunctions_.size()) {
+        throw vietvm::runtime::RuntimeError(
+            "FFI: foreign descriptor vượt phạm vi",
+            vietvm::runtime::RuntimeErrorKind::VmFault);
+    }
+    const auto &descriptor =
+        foreignFunctions_[static_cast<std::size_t>(instr.operandIndex)];
+    if (instr.operand < 0 ||
+        static_cast<std::size_t>(instr.operand) != descriptor.parameters.size()) {
+        throw vietvm::runtime::RuntimeError(
+            "FFI: arity bytecode không khớp descriptor",
+            vietvm::runtime::RuntimeErrorKind::VmFault);
+    }
+    if (stack.size() < static_cast<std::size_t>(instr.operand)) {
+        throw vietvm::runtime::RuntimeError(
+            "FFI: không đủ đối số trên stack",
+            vietvm::runtime::RuntimeErrorKind::VmFault);
+    }
+
+    std::vector<StackValue> arguments(static_cast<std::size_t>(instr.operand));
+    for (std::size_t index = arguments.size(); index > 0; --index) {
+        arguments[index - 1] = stack.back();
+        stack.pop_back();
+    }
+    auto result = vietvm::runtime::executeForeignCall(
+        descriptor, arguments, foreignCapabilities_, lastForeignPosixError_,
+        &foreignFileState_);
+    lastForeignPosixError_ = result.posixError;
+    stack.push_back(std::move(result.value));
 }
 
 // Xử lý opcode tạo hoặc biến đổi giá trị trên stack, bao gồm literal và các phép toán số/chuỗi.
@@ -2719,6 +2727,17 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
             frame.skippingCase = true;
             frame.caseMatched = false;
             frame.blockDepthAtStart = blockStack.size();
+            frame.tryDepthAtStart = tryStack.size();
+            if (instr.operand != 0) {
+                const auto &code = currentBytecode();
+                if (instr.operand <= 0 ||
+                    static_cast<std::size_t>(instr.operand) >= code.size() ||
+                    code[static_cast<std::size_t>(instr.operand)].op != OP_KET_THUC_CHUYEN) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmJumpAddressOutOfRange), instr.op, pc);
+                }
+                frame.endPc = static_cast<std::size_t>(instr.operand);
+            }
             switchStack.push_back(frame);
             return false;
         }
@@ -2772,6 +2791,10 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
             } else {
                 ctx.skippingCase = true;
             }
+            if (ctx.skippingCase && instr.operandValue != 0) {
+                pc = static_cast<std::size_t>(instr.operandValue);
+                return true;
+            }
             return false;
         }
         case OP_MAC_DINH: {
@@ -2785,12 +2808,63 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
             } else {
                 ctx.skippingCase = true;
             }
+            if (ctx.skippingCase && instr.operandValue != 0) {
+                pc = static_cast<std::size_t>(instr.operandValue);
+                return true;
+            }
             return false;
         }
         case OP_THOAT: {
+            // In older bytecode a nonmatching case is scanned opcode by opcode.
+            // Its break belongs to the skipped case and must not run.
+            if (!switchStack.empty() && switchStack.back().skippingCase) {
+                return false;
+            }
+            if (instr.operandIndex < 0) {
+                // The direct emitter encodes loop breaks as a forward target,
+                // together with the number of lexical blocks/try scopes exited.
+                // Plain OP_THOAT (zero operands) continues to break a switch.
+                const auto &code = currentBytecode();
+                if (instr.operand < 0 ||
+                    static_cast<std::size_t>(instr.operand) >= code.size()) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmJumpAddressOutOfRange), instr.op, pc);
+                }
+                const std::size_t blocksToExit =
+                    static_cast<std::size_t>(-static_cast<std::int64_t>(instr.operandIndex) - 1);
+                const std::size_t triesToExit = static_cast<std::size_t>(instr.operandValue);
+                if (instr.operandValue < 0 || blocksToExit > blockStack.size() ||
+                    triesToExit > tryStack.size()) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmNoOpenBlock), instr.op, pc);
+                }
+                blockStack.resize(blockStack.size() - blocksToExit);
+                blockDepth -= static_cast<int>(blocksToExit);
+                while (!switchStack.empty() &&
+                       blockStack.size() < switchStack.back().blockDepthAtStart) {
+                    switchStack.pop_back();
+                }
+                tryStack.resize(tryStack.size() - triesToExit);
+                pc = static_cast<std::size_t>(instr.operand);
+                return true;
+            }
             if (switchStack.empty()) throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmBreakOutsideSwitch), instr.op, pc,
                 vietvm::runtime::runtimeControlFacts("thoát không có khối chọn đang hoạt động", false));
+            const SwitchFrame &activeSwitch = switchStack.back();
+            if (activeSwitch.endPc != 0) {
+                if (blockStack.size() < activeSwitch.blockDepthAtStart ||
+                    tryStack.size() < activeSwitch.tryDepthAtStart) {
+                    throw runtime_error_op(vietvm::messages::formatMessage(
+                        vietvm::messages::kVmNoOpenBlock), instr.op, pc);
+                }
+                const std::size_t blocksToExit = blockStack.size() - activeSwitch.blockDepthAtStart;
+                blockStack.resize(activeSwitch.blockDepthAtStart);
+                blockDepth -= static_cast<int>(blocksToExit);
+                tryStack.resize(activeSwitch.tryDepthAtStart);
+                pc = activeSwitch.endPc;
+                return true;
+            }
             switchStack.back().skippingCase = true;
             const auto &code = currentBytecode();
             while (pc < code.size()) {
@@ -2802,6 +2876,13 @@ bool VM::executeSwitchOpcode(const Instruction& instr) {
             }
             return true;
         }
+        case OP_KET_THUC_CHUYEN:
+            if (switchStack.empty()) {
+                throw runtime_error_op(vietvm::messages::formatMessage(
+                    vietvm::messages::kVmCaseOutsideSwitch), instr.op, pc);
+            }
+            switchStack.pop_back();
+            return false;
         default:
             throw runtime_error_op(vietvm::messages::formatMessage(
                 vietvm::messages::kVmUnknownOpcode), instr.op, pc);
@@ -3137,6 +3218,12 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                 }
                 break;
 
+            case OP_FFI_CALL:
+                if (switchStack.empty() || !switchStack.back().skippingCase) {
+                    executeForeignCallOpcode(instr);
+                }
+                break;
+
             case OP_BIEN_SO:
             case OP_TEN_BIEN_ID:
             case OP_MODULO:
@@ -3209,6 +3296,7 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_CA:
             case OP_MAC_DINH:
             case OP_THOAT:
+            case OP_KET_THUC_CHUYEN:
                 if (runtime.executeSwitch(instr)) continue;
                 break;
 
@@ -3249,6 +3337,49 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                     vietvm::messages::kNativeToFloatConversionFailed) ||
                 thrownText == vietvm::messages::messageText(
                     vietvm::messages::kNativeToIntegerConversionFailed);
+            // POSIX stdio wrappers intentionally raise catchable V++ exceptions.
+            // At the uncaught program boundary restore the historical structured
+            // I/O diagnostic. Only recognize failures originating in the stdlib
+            // file helper; a user throwing identical text elsewhere is not an OS
+            // error. Capture frames before unwindLanguageException drops them.
+            std::string fileOperation;
+            std::vector<vietvm::runtime::RuntimeSourceLocation> fileFrames;
+            if (!callStack.empty() &&
+                (callStack.back().functionName == "tệp đọc bytes posix" ||
+                 callStack.back().functionName == "tệp ghi bytes posix") &&
+                sourceLocationForPc(pc).moduleIdentity == "gói/nhập xuất/tệp.vi") {
+                constexpr std::string_view operations[] = {
+                    "đọc tệp", "đọc bytes tệp", "ghi tệp",
+                    "ghi bytes tệp", "ghi nối tệp"};
+                for (std::string_view operation : operations) {
+                    if (thrownText.compare(0, operation.size(), operation) == 0 &&
+                        thrownText.compare(operation.size(),
+                                           std::string_view(": không thể ").size(),
+                                           ": không thể ") == 0) {
+                        fileOperation = operation;
+                        break;
+                    }
+                }
+                if (!fileOperation.empty()) {
+                    // executionStack[n] is the saved caller of callStack[n].
+                    // Skip the private helper's own frame, but keep the public
+                    // wrapper and each source-level caller in traceback order.
+                    for (std::size_t index = executionStack.size(); index > 0; --index) {
+                        const std::size_t savedIndex = index - 1;
+                        const ExecutionContext &caller = executionStack[savedIndex];
+                        const auto *debugInfo = caller.bytecode == nullptr
+                            ? &bytecodeDebugInfo : caller.bytecodeDebugInfo;
+                        if (debugInfo != nullptr && caller.pc < debugInfo->size()) {
+                            auto frame = (*debugInfo)[caller.pc];
+                            if (frame.valid() &&
+                                (savedIndex + 1 < executionStack.size() ||
+                                 frame.functionName == fileOperation)) {
+                                fileFrames.push_back(std::move(frame));
+                            }
+                        }
+                    }
+                }
+            }
             std::string conversionInput;
             vietvm::runtime::RuntimeSourceLocation conversionCallerFrame;
             if (conversionFailure) {
@@ -3306,6 +3437,15 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                     vietvm::runtime::runtimeConversionFacts(
                         conversionInput, target, false));
                 error.addFrame(std::move(conversionCallerFrame));
+                throw error;
+            }
+            if (!fileOperation.empty()) {
+                vietvm::runtime::RuntimeError error(
+                    thrownText,
+                    vietvm::runtime::RuntimeErrorKind::VmFault,
+                    vietvm::runtime::runtimeNativeFacts(
+                        fileOperation, thrownText, false));
+                for (auto &frame : fileFrames) error.addFrame(std::move(frame));
                 throw error;
             }
             throw;

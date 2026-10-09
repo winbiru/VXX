@@ -1,0 +1,94 @@
+hàm chính() {
+    lặp(i = 0; i < 5; i = i + 1) {
+        nếu (i == 2) {
+            thoát;
+        }
+        in "đơn:" + i;
+    }
+    in "sau đơn";
+
+    lặp(i = 1; i <= 2; i = i + 1) {
+        lặp(j = 1; j <= 4; j = j + 1) {
+            nếu (j == 3) {
+                thoát;
+            }
+            in "lồng:" + i + ":" + j;
+        }
+        in "ngoài:" + i;
+    }
+
+    chọn (1) {
+        ca 1: {
+            lặp(k = 0; k < 4; k = k + 1) {
+                nếu (k == 2) {
+                    thoát;
+                }
+                in "trong chọn:" + k;
+            }
+            in "sau lặp trong chọn";
+            thoát;
+        }
+        mặc định: {
+            in "không được in";
+        }
+    }
+
+    lặp(m = 0; m < 2; m = m + 1) {
+        chọn (m) {
+            ca 0: {
+                in "chọn trong lặp:" + m;
+                thoát;
+            }
+            mặc định: {
+                in "mặc định trong lặp:" + m;
+            }
+        }
+        in "sau chọn:" + m;
+    }
+
+    chọn (9) {
+        ca 0: {
+            lặp(p = 0; p < 2; p = p + 1) {
+                chọn (p) {
+                    ca 0: { in "không chạy vòng lồng"; thoát; }
+                    mặc định: { in "không chạy chọn lồng"; }
+                }
+            }
+            ném "không được ném";
+            thoát;
+        }
+        ca 1: { in "không chạy ca 1"; }
+        mặc định: { in "bỏ qua nhánh lồng"; }
+    }
+
+    chọn (2) {
+        ca 2: {
+            thử {
+                in "thoát từ thử trong chọn";
+                thoát;
+            } bắt lỗi (e) {
+                in "không được bắt";
+            }
+            in "không được tiếp tục trong ca";
+        }
+        mặc định: { in "không được chạy mặc định"; }
+    }
+    in "sau thoát chọn từ thử";
+
+    lặp(t = 1; t < 4; t = t + 1) {
+        thử {
+            nếu (t == 2) {
+                thoát;
+            }
+            in "thử:" + t;
+        } bắt lỗi (e) {
+            in "không bắt:" + e;
+        }
+    }
+    thử {
+        ném "lỗi cuối";
+    } bắt lỗi (e) {
+        in e;
+    }
+    in "kết thúc";
+}

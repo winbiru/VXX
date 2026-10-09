@@ -2,8 +2,38 @@
 // Giá trị là số mili giây dạng số thực kể từ một mốc không xác định.
 // Chỉ hiệu giữa hai lần đọc có ý nghĩa; không dùng làm thời gian lịch.
 
+ngoại thư viện c_đơn_điệu = "system.c";
+ngoại hàm đọc_đồng_hồ_đơn_điệu_ffi(mã_đồng_hồ: i32, đệm: c_đệm_ra[16]): i32 từ c_đơn_điệu
+    ký hiệu "clock_gettime" abi "c" khả năng "system.time.monotonic";
+
+// Đệm 16 byte, giây/nanosecond little-endian. Runtime kiểm chứng ABI POSIX
+// hoặc điền dữ liệu từ QueryPerformanceCounter trên Windows.
+hàm đơn điệu đọc u64(đệm, bắt_đầu) {
+    số = 0.0;
+    bội = 1.0;
+    lặp(i = 0; i < 8; i++) {
+        số = số + đệm[bắt_đầu + i] * bội;
+        bội = bội * 256.0;
+    };
+    trả về số;
+};
+
 hàm thời gian đơn điệu mili giây() {
-    trả về thoi_gian_don_dieu_ms_vm();
+    nền_tảng = ten_nen_tang_vm();
+    // CLOCK_MONOTONIC = 6 trên macOS, = 1 trên Linux.
+    mã_đồng_hồ = 1;
+    nếu (nền_tảng == "macos") { mã_đồng_hồ = 6; };
+    đệm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    trạng_thái = đọc_đồng_hồ_đơn_điệu_ffi(mã_đồng_hồ, đệm);
+    nếu (trạng_thái != 0) {
+        ném "thời gian đơn điệu: clock_gettime thất bại";
+    };
+    giây = đơn điệu đọc u64(đệm, 0);
+    nano = đơn điệu đọc u64(đệm, 8);
+    nếu (giây > 9007199254.0 || nano >= 1000000000.0) {
+        ném "thời gian đơn điệu: timespec không hợp lệ";
+    };
+    trả về giây * 1000.0 + nano / 1000000.0;
 };
 
 hàm bắt đầu đo thời gian() {

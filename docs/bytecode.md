@@ -25,6 +25,11 @@ dụng nhầm; bytecode verifier không chấp nhận chúng. Gate
 đang dùng, mỗi opcode chỉ có một descriptor, các opcode đã nghỉ bị từ chối và
 đường parser → semantic → IR → codegen phát đúng instruction/arity.
 
+Đề xuất `ForeignCall`, descriptor ABI và `OP_FFI_CALL` cho migration thư viện OS
+được mô tả trong [kế hoạch FFI/System ABI](system-ffi-migration-plan.md).
+Những tên này chưa có trong enum/IR hiện hành; kế hoạch dùng metadata và bytecode
+trong bộ nhớ, độc lập với proposal serializer `.vbc` bên dưới.
+
 Phần còn lại mô tả layout file/section, mã hóa instruction/operand và một opcode set có thể
 dùng khi dự án chọn hiện thực assembler, disassembler, loader và verifier cho `.vbc`.
 

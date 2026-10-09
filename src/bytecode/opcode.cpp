@@ -137,6 +137,7 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_VM_STRING_BYTES:
         case OP_VM_STRING_FROM_BYTES:
         case OP_VM_FLOAT_FROM_BITS:
+        case OP_FFI_CALL:
             return true;
         default:
             return false;
@@ -285,6 +286,7 @@ std::string opcodeName(int rawOpcode) {
         case OP_VM_STRING_BYTES: return "OP_VM_STRING_BYTES";
         case OP_VM_STRING_FROM_BYTES: return "OP_VM_STRING_FROM_BYTES";
         case OP_VM_FLOAT_FROM_BITS: return "OP_VM_FLOAT_FROM_BITS";
+        case OP_FFI_CALL: return "OP_FFI_CALL";
         default: return "UNKNOWN_OPCODE";
     }
 }

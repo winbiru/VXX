@@ -51,10 +51,4 @@ bool getFirstMapArgument(const std::vector<StackValue> &args,
 // Lấy non negative danh sách chỉ số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getNonNegativeListIndex(const StackValue &value, int &index, std::string &err);
 
-// Primitive tiến trình cho thư viện chuẩn. V++ chịu trách nhiệm validate argv
-// và environment; helper chỉ spawn, capture stdout/stderr và chờ exit status.
-bool handleNativeProcessPrimitive(const std::vector<StackValue> &args,
-                                  StackValue &result,
-                                  std::string &err);
-
 } // namespace vietvm::helpers

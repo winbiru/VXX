@@ -19,6 +19,8 @@
 #include "instruction.h"
 #include "../common/vm_callframe.h"
 #include "vpp/bytecode/intrinsic.h"
+#include "vpp/bytecode/foreign.h"
+#include "vpp/runtime/foreign.h"
 #include "vpp/runtime/heap.h"
 #include "vpp/runtime/value.h"
 #include "vpp/runtime/module.h"
@@ -61,6 +63,9 @@ public:
     void setFunctions(
         std::unordered_map<int, std::vector<Instruction>> functionBytecode,
         std::unordered_map<int, int> functionTableByNameIndex = {});
+    void setForeignFunctions(
+        std::vector<vietvm::bytecode::ForeignFunctionDescriptor> descriptors);
+    void setForeignCapabilities(std::unordered_set<std::string> capabilities);
     // Bảo đảm snapshot bytecode hiện tại đã qua verifier. Nhiều lần gọi trên cùng
     // generation là O(1); mutation bytecode/module/function sẽ tạo generation mới.
     void ensureBytecodeVerified();
@@ -89,6 +94,10 @@ private:
     std::unordered_map<int, int> functionTableByNameIndex;
     // Reverse lookup derived once when function tables are installed.
     std::unordered_map<int, int> functionNameIndexById_;
+    std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions_;
+    std::unordered_set<std::string> foreignCapabilities_;
+    int lastForeignPosixError_ = 0;
+    vietvm::runtime::ForeignFileState foreignFileState_;
     std::size_t programGeneration_ = 1;
     std::size_t verifiedGeneration_ = 0;
     std::size_t verificationPassCount_ = 0;
@@ -146,6 +155,8 @@ private:
         bool skippingCase{};
         bool caseMatched{};
         size_t blockDepthAtStart{};
+        size_t tryDepthAtStart{};
+        size_t endPc{}; // points at OP_KET_THUC_CHUYEN for structured switch
     };
     std::vector<SwitchFrame> switchStack;
     int blockDepth = 0;
@@ -270,6 +281,7 @@ private:
     // Thực thi intrinsic VM dành riêng cho thư viện chuẩn; opcode mang sẵn
     // identity/arity nên không cần tra tên hàm động qua StringPool.
     void executeIntrinsicOpcode(const Instruction& instr);
+    void executeForeignCallOpcode(const Instruction& instr);
     // Cùng đường thực thi primitive cho opcode hiện hành và lời gọi legacy.
     // runtimeFailure phân biệt lỗi VM/IO không bắt được với lỗi V++ có thể bắt.
     bool dispatchRegisteredIntrinsic(const vietvm::bytecode::IntrinsicDescriptor &intrinsic,

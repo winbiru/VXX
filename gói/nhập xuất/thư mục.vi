@@ -4,9 +4,77 @@
 
 nhập gói/bộ sưu tập/danh sách;
 nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
 nhập gói/nhập xuất/đường dẫn;
+nhập gói/hệ thống/môi trường;
+
+ngoại thư viện c_thư_mục = "system.c";
+ngoại hàm tạo_mục_ffi(đường: c_chuỗi, quyền: u32): i32 từ c_thư_mục
+    ký hiệu "mkdir" abi "c" khả năng "system.fs.mkdir";
+ngoại hàm xóa_mục_ffi(đường: c_chuỗi): i32 từ c_thư_mục
+    ký hiệu "remove" abi "c" khả năng "system.fs.remove";
+ngoại hàm mở_thư_mục_ffi(đường: c_chuỗi): c_thư_mục từ c_thư_mục
+    ký hiệu "opendir" abi "c" khả năng "system.fs.dir.open";
+ngoại hàm đọc_mục_ffi(thư_mục: c_thư_mục): c_mục_thư_mục từ c_thư_mục
+    ký hiệu "readdir" abi "c" khả năng "system.fs.dir.read";
+ngoại hàm đóng_thư_mục_ffi(thư_mục: c_thư_mục): i32 từ c_thư_mục
+    ký hiệu "closedir" abi "c" khả năng "system.fs.dir.close";
+ngoại thư viện c_lỗi_thư_mục = "system.ffi";
+ngoại hàm errno_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
+    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
+ngoại hàm eexist_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
+    ký hiệu "eexist" abi "c" khả năng "system.ffi.error";
+ngoại hàm enoent_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
+    ký hiệu "enoent" abi "c" khả năng "system.ffi.error";
+
+// Bảo toàn ranh giới UTF-8 của primitive cũ ngay cả với chuỗi byte được
+// tạo trực tiếp bằng chuoi_tu_bytes_vm(). FFI c_chuỗi tự từ chối NUL nhúng.
+hàm thư mục kiểm tra đường posix(đường) {
+    bytes = bảng mã utf8 mã hóa(đường);
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] == 0) {
+            ném "đường dẫn không được chứa byte NUL";
+        };
+    };
+    trả về đường;
+};
+
+// Khi chưa kiểm chứng Win32 qua CI, dùng primitive tương thích. Bật cờ để
+// chạy cùng thuật toán V++ với FFI mkdir/remove/FindFirstFileW trên Windows.
+hàm thư mục dùng ffi() {
+    trả về ten_nen_tang_vm() != "windows" ||
+        đọc biến môi trường("VPP_WINDOWS_DIRECTORY_FFI", "") == "1";
+};
+
+hàm thư mục tạo một mục(đường) {
+    nếu (!thư mục dùng ffi()) { trả về tao_thu_muc_vm(đường); };
+    // V++ tự tạo các mục cha; FFI chỉ tạo một mục trên hệ điều hành.
+    mã = tạo_mục_ffi(thư mục kiểm tra đường posix(đường), 511);
+    nếu (mã == 0) { trả về 1; };
+    lỗi = errno_thư_mục_ffi();
+    nếu (mã == -1 && lỗi == eexist_thư_mục_ffi()) {
+        nếu (là thư mục(đường)) { trả về 0; };
+    };
+    ném "tạo thư mục: mkdir thất bại, errno=" + lỗi;
+};
+
+hàm thư mục xóa một mục(đường) {
+    nếu (!thư mục dùng ffi()) { trả về xoa_duong_dan_vm(đường); };
+    // V++ quyết định thứ tự duyệt và xóa cây.
+    mã = xóa_mục_ffi(thư mục kiểm tra đường posix(đường));
+    nếu (mã == 0) { trả về 1; };
+    lỗi = errno_thư_mục_ffi();
+    nếu (mã == -1 && lỗi == enoent_thư_mục_ffi()) { trả về 0; };
+    ném "xóa đường dẫn: remove thất bại, errno=" + lỗi;
+};
 
 hàm thư mục là thư mục không theo liên kết(đường) {
+    nếu (ten_nen_tang_vm() != "windows") {
+        trả về đường dẫn loại posix(đường, sai) == 4;
+    };
+    nếu (đường dẫn dùng ffi windows()) {
+        trả về đường dẫn loại windows(đường, sai) == 2;
+    };
     trạng_thái = la_thu_muc_khong_theo_lien_ket_vm(đường);
     // Primitive chỉ trả mã trạng thái: -1 thiếu, 0 không phải thư mục, 1 thư mục.
     // Chính sách coi đường dẫn thiếu là "không phải thư mục" thuộc V++.
@@ -34,15 +102,19 @@ hàm thư mục bỏ dấu cuối(đường) {
 };
 
 hàm tạo thư mục(đường dẫn) {
-    đường = thư mục bỏ dấu cuối(thành chuỗi(đường dẫn));
+    đầu_vào = thành chuỗi(đường dẫn);
+    nếu (ten_nen_tang_vm() != "windows") {
+        thư mục kiểm tra đường posix(đầu_vào);
+    };
+    đường = thư mục bỏ dấu cuối(đầu_vào);
     cần_tạo = [];
     hiện_tại = đường;
     tìm_cha = đúng;
     lặp(vòng = 0; tìm_cha; vòng++) {
-        nếu (la_thu_muc_vm(hiện_tại)) {
+        nếu (là thư mục(hiện_tại)) {
             tìm_cha = sai;
         } nếu không {
-            nếu (duong_dan_ton_tai_vm(hiện_tại)) {
+            nếu (đường dẫn tồn tại(hiện_tại)) {
                 ném "tạo thư mục: đường dẫn đã tồn tại và không phải thư mục";
             };
             them(cần_tạo, hiện_tại);
@@ -55,19 +127,51 @@ hàm tạo thư mục(đường dẫn) {
         };
     };
     lặp(i = do_dai(cần_tạo) - 1; i >= 0; i--) {
-        tao_thu_muc_vm(cần_tạo[i]);
+        thư mục tạo một mục(cần_tạo[i]);
     };
     trả về 1;
 };
 
 hàm liệt kê thư mục(đường dẫn) {
-    kết_quả = liet_ke_thu_muc_vm(thành chuỗi(đường dẫn));
+    đường = thành chuỗi(đường dẫn);
+    nếu (!thư mục dùng ffi()) {
+        kết_quả = liet_ke_thu_muc_vm(đường);
+        sắp xếp(kết_quả);
+        trả về kết_quả;
+    };
+    thư_mục = mở_thư_mục_ffi(thư mục kiểm tra đường posix(đường));
+    nếu (thư_mục == rỗng) { ném "liệt kê thư mục: không thể mở thư mục"; };
+    kết_quả = [];
+    thử {
+        đang_đọc = đúng;
+        lặp(vòng = 0; đang_đọc; vòng++) {
+            tên = đọc_mục_ffi(thư_mục);
+            nếu (tên == rỗng) {
+                nếu (errno_thư_mục_ffi() != 0) {
+                    ném "liệt kê thư mục: không thể đọc thư mục";
+                };
+                đang_đọc = sai;
+            } nếu không {
+                nếu (tên != "." && tên != "..") { them(kết_quả, tên); };
+            };
+        };
+    } bắt lỗi(e) {
+        đóng_thư_mục_ffi(thư_mục);
+        ném e;
+    };
+    nếu (đóng_thư_mục_ffi(thư_mục) != 0) {
+        ném "liệt kê thư mục: không thể đóng thư mục";
+    };
     sắp xếp(kết_quả);
     trả về kết_quả;
 };
 
 hàm xóa đường dẫn(đường dẫn) {
-    đường = thư mục bỏ dấu cuối(thành chuỗi(đường dẫn));
+    đầu_vào = thành chuỗi(đường dẫn);
+    nếu (ten_nen_tang_vm() != "windows") {
+        thư mục kiểm tra đường posix(đầu_vào);
+    };
+    đường = thư mục bỏ dấu cuối(đầu_vào);
     việc = [[đường, sai]];
     đã_xóa = 0;
     // Stack tường minh thay cho lời gọi đệ quy: cây sâu không dùng call stack VM.
@@ -75,16 +179,16 @@ hàm xóa đường dẫn(đường dẫn) {
         mục = xoa_tai(việc, do_dai(việc) - 1);
         đường_mục = mục[0];
         nếu (mục[1]) {
-            đã_xóa = đã_xóa + xoa_duong_dan_vm(đường_mục);
+            đã_xóa = đã_xóa + thư mục xóa một mục(đường_mục);
         } nếu không {
             nếu (thư mục là thư mục không theo liên kết(đường_mục)) {
                 them(việc, [đường_mục, đúng]);
-                con = liet_ke_thu_muc_vm(đường_mục);
+                con = liệt kê thư mục(đường_mục);
                 lặp(i = 0; i < do_dai(con); i++) {
                     them(việc, [đường dẫn nối(đường_mục, con[i]), sai]);
                 };
             } nếu không {
-                đã_xóa = đã_xóa + xoa_duong_dan_vm(đường_mục);
+                đã_xóa = đã_xóa + thư mục xóa một mục(đường_mục);
             };
         };
     };

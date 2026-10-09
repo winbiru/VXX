@@ -1,0 +1,77 @@
+// Đồng hồ địa phương POSIX/Windows. Trình tự epoch -> lịch do V++ điều phối;
+// runtime ánh xạ localtime_r sang CRT localtime_s trên Windows.
+nhập gói/thời gian/utc;
+
+ngoại thư viện c_địa_phương = "system.c";
+ngoại hàm đổi_giờ_địa_phương_ffi(giây: c_đệm_vào[8], kết_quả: c_đệm_ra[64]): c_cờ_con_trỏ từ c_địa_phương
+    ký hiệu "localtime_r" abi "c" khả năng "system.time.local";
+
+// int32 có dấu từ bốn byte little-endian, kể cả tm_year âm.
+hàm thời gian địa phương đọc i32(đệm, đầu) {
+    số = 0.0;
+    bội = 1.0;
+    lặp(i = 0; i < 4; i++) {
+        số = số + đệm[đầu + i] * bội;
+        bội = bội * 256.0;
+    };
+    nếu (số >= 2147483648.0) { số = số - 4294967296.0; };
+    trả về thành số nguyên(số);
+};
+
+// Gregorian proleptic: số ngày từ 1970-01-01. Dùng để tính offset Windows
+// từ snapshot local và UTC của đúng cùng một epoch, kể cả tại biên DST.
+hàm thời gian địa phương ngày từ lịch(năm, tháng, ngày) {
+    nếu (tháng <= 2) { năm = năm - 1; };
+    kỷ = thời gian utc chia sàn(năm, 400);
+    năm_kỷ = năm - kỷ * 400;
+    tháng_lịch = tháng - 3;
+    nếu (tháng <= 2) { tháng_lịch = tháng + 9; };
+    ngày_năm = thời gian utc chia sàn(153 * tháng_lịch + 2, 5) + ngày - 1;
+    ngày_kỷ = năm_kỷ * 365 + thời gian utc chia sàn(năm_kỷ, 4) -
+        thời gian utc chia sàn(năm_kỷ, 100) + ngày_năm;
+    trả về kỷ * 146097 + ngày_kỷ - 719468;
+};
+
+// Nhận time_t 8 byte từ clock_gettime; hàm này cũng cho phép test mốc DST
+// mà không thay đổi đồng hồ hệ thống.
+hàm thời gian địa phương từ epoch byte ffi(giây_byte) {
+    kết_quả = [];
+    lặp(i = 0; i < 64; i++) { them(kết_quả, 0); };
+    nếu (đổi_giờ_địa_phương_ffi(giây_byte, kết_quả) != 1) {
+        ném "giờ địa phương: localtime_r thất bại";
+    };
+    giây = thời gian địa phương đọc i32(kết_quả, 0);
+    phút = thời gian địa phương đọc i32(kết_quả, 4);
+    giờ = thời gian địa phương đọc i32(kết_quả, 8);
+    ngày = thời gian địa phương đọc i32(kết_quả, 12);
+    tháng = thời gian địa phương đọc i32(kết_quả, 16) + 1;
+    năm = thời gian địa phương đọc i32(kết_quả, 20) + 1900;
+    lệch_giây = 0.0;
+    nếu (ten_nen_tang_vm() == "windows") {
+        // CRT không có tm_gmtoff. Lấy epoch của lịch local giả định là UTC,
+        // rồi trừ epoch ban đầu; không đo offset bằng hai lần đọc clock.
+        giây_epoch = thời gian utc đọc i64(giây_byte, 0);
+        lệch_giây = thời gian địa phương ngày từ lịch(năm, tháng, ngày) * 86400.0 +
+            giờ * 3600 + phút * 60 + giây - giây_epoch;
+    } nếu không {
+        lệch_giây = thời gian utc đọc i64(kết_quả, 40);
+    };
+    nếu (năm < 0 || năm > 9999 || tháng < 1 || tháng > 12 ||
+        ngày < 1 || ngày > 31 || giờ < 0 || giờ > 23 ||
+        phút < 0 || phút > 59 || giây < 0 || giây > 60 ||
+        lệch_giây < -86400 || lệch_giây > 86400) {
+        ném "giờ địa phương: struct tm không hợp lệ";
+    };
+    // Giữ contract hiện hành: phút offset làm tròn về 0, kể cả offset âm.
+    lệch_phút = thành số nguyên(lệch_giây / 60.0);
+    trả về [năm, tháng, ngày, giờ, phút, giây, lệch_phút];
+};
+
+hàm thời gian đọc địa phương posix() {
+    trả về thời gian địa phương từ epoch byte ffi(thời gian utc đọc epoch byte ffi());
+};
+
+// Alias cho fixture lịch sử; cùng một implementation thực thi trên POSIX.
+hàm thời gian địa phương từ epoch byte posix(giây_byte) {
+    trả về thời gian địa phương từ epoch byte ffi(giây_byte);
+};

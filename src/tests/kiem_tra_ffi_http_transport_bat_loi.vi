@@ -1,0 +1,33 @@
+nhập gói/chuẩn/chính;
+
+// A failed POSIX FFI connect must be catchable by the HTTP client's public
+// V++ wrappers even when legacy socket opcodes are forbidden.
+hàm chính() {
+    bắtĐược = 0;
+
+    thử {
+        mạng lấy("http://127.0.0.1:1/health");
+    } bắt lỗi (e) {
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
+    };
+
+    thử {
+        mạng gửi("http://127.0.0.1:1/health", "{}");
+    } bắt lỗi (e) {
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
+    };
+
+    thử {
+        mạng cập nhật("http://127.0.0.1:1/health", "{}");
+    } bắt lỗi (e) {
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
+    };
+
+    thử {
+        mạng xóa("http://127.0.0.1:1/health");
+    } bắt lỗi (e) {
+        nếu (chứa chuỗi(e, "socket_tcp_mo")) { bắtĐược = bắtĐược + 1; };
+    };
+
+    in bắtĐược;
+};

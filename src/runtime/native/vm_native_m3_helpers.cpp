@@ -44,6 +44,9 @@
 namespace vietvm::helpers {
 namespace {
 
+#if defined(_WIN32)
+// Legacy socket/DNS orchestration is retained only for Windows. POSIX calls
+// now originate in the V++ network modules through typed System FFI handles.
 bool requireString(const StackValue &value,
                    const std::string &fn,
                    const char *label,
@@ -78,6 +81,7 @@ bool initializeNetwork(std::string &err) {
 #endif
     return true;
 }
+#endif
 
 #if defined(_WIN32)
 using NativeSocket = SOCKET;
@@ -87,12 +91,14 @@ using NativeSocket = int;
 constexpr NativeSocket kInvalidNativeSocket = -1;
 #endif
 
+#if defined(_WIN32)
 struct OpenSocket {
     NativeSocket handle = kInvalidNativeSocket;
     int type = SOCK_STREAM;
     bool listener = false;
     std::mutex ioMutex;
 };
+#endif
 
 struct OpenTlsSocket {
     NativeSocket handle = kInvalidNativeSocket;
@@ -113,6 +119,7 @@ struct OpenTlsSocket {
 #endif
 };
 
+#if defined(_WIN32)
 std::mutex &socketMutex() {
     static std::mutex mutex;
     return mutex;
@@ -132,6 +139,7 @@ int &nextSocketId() {
     static int id = 1;
     return id;
 }
+#endif
 
 void closeNativeSocket(NativeSocket socket);
 
@@ -183,6 +191,7 @@ int lastSocketError() {
 #endif
 }
 
+#if defined(_WIN32)
 bool socketWouldBlock(int code) {
 #if defined(_WIN32)
     return code == WSAEWOULDBLOCK || code == WSAEINPROGRESS ||
@@ -334,6 +343,7 @@ bool openConnectedNativeSocket(const std::string &fn,
     }
     return true;
 }
+#endif
 
 bool sendNativeAll(NativeSocket socket,
                    const unsigned char *data,
@@ -952,6 +962,7 @@ bool tlsRead(OpenTlsSocket &tls,
 
 #endif
 
+#if defined(_WIN32)
 bool socketTlsOpen(const std::string &fn,
                    const std::vector<StackValue> &args,
                    StackValue &result,
@@ -1551,13 +1562,60 @@ bool socketSendVm(const std::vector<StackValue> &args,
     });
     return true;
 }
+#endif
 
 } // namespace
+
+#if !defined(_WIN32)
+void *createForeignTlsClient(int fd, const std::string &hostname,
+                             std::string &error) {
+    std::unique_ptr<OpenTlsSocket> session;
+    try {
+        session = std::make_unique<OpenTlsSocket>();
+    } catch (...) {
+        closeNativeSocket(fd);
+        throw;
+    }
+    session->handle = fd;
+    try {
+        if (!initializeTlsClient(*session, hostname, error)) {
+            closeTlsSocket(*session);
+            return nullptr;
+        }
+    } catch (...) {
+        closeTlsSocket(*session);
+        throw;
+    }
+    return session.release();
+}
+
+bool writeForeignTlsClient(void *session, const std::string &payload,
+                           int &written, std::string &error) {
+    auto &tls = *static_cast<OpenTlsSocket *>(session);
+    std::lock_guard<std::mutex> lock(tls.ioMutex);
+    return tlsWrite(tls, payload, written, error);
+}
+
+bool readForeignTlsClient(void *session, int maximum,
+                          std::string &payload, std::string &error) {
+    auto &tls = *static_cast<OpenTlsSocket *>(session);
+    std::lock_guard<std::mutex> lock(tls.ioMutex);
+    return tlsRead(tls, maximum, payload, error);
+}
+
+void closeForeignTlsClient(void *session) noexcept {
+    if (session == nullptr) return;
+    auto *tls = static_cast<OpenTlsSocket *>(session);
+    closeTlsSocket(*tls);
+    delete tls;
+}
+#endif
 
 bool handleNativeM3LibraryFunction(Opcode opcode,
                                    const std::vector<StackValue> &args,
                                    StackValue &result,
                                    std::string &err) {
+#if defined(_WIN32)
     const auto *primitive = vietvm::bytecode::intrinsicByOpcode(opcode);
     if (primitive == nullptr) return false;
     const std::string fn(primitive->name);
@@ -1589,6 +1647,12 @@ bool handleNativeM3LibraryFunction(Opcode opcode,
     if (opcode == OP_VM_DNS_PHAN_GIAI) {
         return handleDns("dns_phan_giai", args, result, err);
     }
+#else
+    (void)opcode;
+    (void)args;
+    (void)result;
+    (void)err;
+#endif
     return false;
 }
 

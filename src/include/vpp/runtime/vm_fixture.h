@@ -94,6 +94,7 @@ public:
         vm_.pc = 0;
         vm_.activeBytecode_ = nullptr;
         vm_.activeBytecodeDebugInfo_ = nullptr;
+        vm_.lastForeignPosixError_ = 0;
     }
 
     // Chạy interpreter trực tiếp sau khi benchmark đã verify bytecode ngoài timer.
@@ -155,6 +156,10 @@ public:
         if (vm_.executionStack.size() > executionDepth) {
             vm_.runInterpreterLoop(executionDepth);
         }
+    }
+    // Invoke the FFI dispatcher in isolation to inspect per-VM error state.
+    void executeForeignCall(const Instruction &instruction) {
+        vm_.executeForeignCallOpcode(instruction);
     }
     // Thực thi giá trị; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
     void executeValue(const Instruction &instruction) { vm_.executeValueOpcode(instruction); }

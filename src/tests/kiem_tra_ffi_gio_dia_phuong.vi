@@ -1,0 +1,23 @@
+// Chạy riêng với TZ=EST5EDT,M3.2.0/2,M11.1.0/2 để kiểm tra DST độc lập OS clock.
+nhập thời gian;
+nhập gói/thời gian/địa phương;
+
+hàm chính() {
+    // 2024-03-10: mùa hè bắt đầu tại 02:00; đồng hồ nhảy sang 03:00.
+    trước_xuân = thời gian địa phương từ epoch byte posix([111, 90, 237, 101, 0, 0, 0, 0]);
+    sau_xuân = thời gian địa phương từ epoch byte posix([112, 90, 237, 101, 0, 0, 0, 0]);
+    in thời gian định dạng đồng hồ(trước_xuân, sai) == "2024-03-10T01:59:59-05:00";
+    in thời gian định dạng đồng hồ(sau_xuân, sai) == "2024-03-10T03:00:00-04:00";
+
+    // 2024-11-03: 01:59:59 DST lặp lại thành 01:00:00 standard time.
+    trước_thu = thời gian địa phương từ epoch byte posix([95, 17, 39, 103, 0, 0, 0, 0]);
+    sau_thu = thời gian địa phương từ epoch byte posix([96, 17, 39, 103, 0, 0, 0, 0]);
+    in thời gian định dạng đồng hồ(trước_thu, sai) == "2024-11-03T01:59:59-04:00";
+    in thời gian định dạng đồng hồ(sau_thu, sai) == "2024-11-03T01:00:00-05:00";
+
+    in thời gian định dạng đồng hồ(thời gian địa phương từ epoch byte posix(
+        [0, 0, 0, 0, 0, 0, 0, 0]), sai) == "1969-12-31T19:00:00-05:00";
+    in thời gian định dạng đồng hồ(thời gian địa phương từ epoch byte posix(
+        [255, 255, 255, 255, 255, 255, 255, 255]), sai) == "1969-12-31T18:59:59-05:00";
+
+};

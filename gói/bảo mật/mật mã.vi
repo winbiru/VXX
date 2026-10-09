@@ -9,6 +9,7 @@
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
 nhập gói/lõi/bảng mã;
+nhập gói/lõi/entropy;
 
 hàm mật mã lũy thừa hai(n) {
     kết_quả = 1;
@@ -320,7 +321,7 @@ hàm mật mã utf8 bytes(văn_bản, tên_hàm) {
 };
 
 hàm ngẫu nhiên bảo mật(số byte) {
-    // Entropy hệ điều hành là VM primitive boundary thực sự và được giữ lại.
+    // POSIX lấy entropy bằng getentropy qua FFI, chia khối tại thư viện V++.
     thử {
         số byte = thành số nguyên(số byte);
     } bắt lỗi (e) {
@@ -329,7 +330,7 @@ hàm ngẫu nhiên bảo mật(số byte) {
     nếu (số byte < 1 || số byte > 4096) {
         ném "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
     };
-    trả về mật mã hex(ngau_nhien_bao_mat_bytes_vm(số byte));
+    trả về mật mã hex(entropy bảo mật bytes(số byte));
 };
 
 hàm băm sha256(văn bản) {

@@ -162,6 +162,7 @@ enum Opcode {
     OP_VM_STRING_BYTES = 153,
     OP_VM_STRING_FROM_BYTES = 154,
     OP_VM_FLOAT_FROM_BITS = 155,
+    OP_FFI_CALL = 156,          // operand=argc, operandIndex=foreign descriptor id
 
 };
 

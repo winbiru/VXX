@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "vpp/frontend/ast.h"
+#include "vpp/bytecode/foreign.h"
 
 namespace vietvm::compiler {
 
@@ -30,6 +31,7 @@ enum class ScopeKind {
 
 enum class SymbolKind {
     Function,
+    ForeignFunction,
     Method,
     Class,
     Interface,
@@ -75,6 +77,7 @@ enum class BindingKind {
 enum class CallTargetKind {
     Invalid,
     DirectFunction,
+    ForeignFunction,
     ImportedFunction,
     ClassConstructor,
     InstanceMethod,
@@ -132,6 +135,8 @@ struct SemanticSymbol {
     // hoặc một symbol đã mang cùng lớp. Dữ liệu này chỉ phục vụ semantic member
     // access; runtime vẫn giữ mô hình động và không phụ thuộc vào type tĩnh.
     SymbolId inferredClass = kInvalidSymbolId;
+    int foreignDescriptorId = -1;
+    vietvm::bytecode::ForeignFunctionDescriptor foreignDescriptor;
 };
 
 // Ghi cách một expression name/member được phân giải, gồm symbol, lookup depth, receiver/member và cờ capture để lowering không phải lookup lại.

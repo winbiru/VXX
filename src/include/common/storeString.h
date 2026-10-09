@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../vm/instruction.h"
+#include "vpp/bytecode/foreign.h"
 #include "vpp/runtime/debug.h"
 
 namespace vietvm::compiler {
@@ -39,6 +40,7 @@ namespace vietvm::compiler {
         std::unordered_map<int, int> functionNameIndices;
         std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
             functionDebugInfo;
+        std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions;
         std::vector<vietvm::runtime::RuntimeSourceLocation> rootBytecodeDebugInfo;
         std::unordered_set<std::string> importedFiles;
         std::vector<CompiledModuleInitializer> moduleInitializers;
@@ -84,6 +86,7 @@ namespace vietvm::compiler {
             functionBytecode.clear();
             functionNameIndices.clear();
             functionDebugInfo.clear();
+            foreignFunctions.clear();
             rootBytecodeDebugInfo.clear();
             importedFiles.clear();
             moduleInitializers.clear();

@@ -158,6 +158,39 @@ static int runSnippet(const std::string &source,
         functionNames[entry.second] = entry.first;
     }
     vm.setFunctions(compilationContext.functionBytecode, std::move(functionNames));
+    vm.setForeignFunctions(compilationContext.foreignFunctions);
+    // Grant the exact OS contracts used by the bundled System library.
+    vm.setForeignCapabilities({"system.env.read", "system.process.id",
+                               "system.process.parent_id", "system.time.sleep",
+                               "system.process.new", "system.process.arg",
+                               "system.process.command_line",
+                               "system.process.env", "system.process.start",
+                               "system.process.poll", "system.process.read",
+                               "system.process.wait", "system.process.error",
+                               "system.process.close",
+                               "system.time.monotonic",
+                               "system.time.realtime",
+                               "system.time.local",
+                               "system.entropy.read",
+                               "system.fs.mkdir", "system.fs.remove",
+                               "system.fs.exists",
+                               "system.fs.stat", "system.fs.lstat",
+                               "system.fs.path.kind",
+                               "system.fs.dir.open", "system.fs.dir.read",
+                               "system.fs.dir.close",
+                               "system.net.resolve.open", "system.net.resolve.next",
+                               "system.net.resolve.close",
+                               "system.net.socket.connect", "system.net.socket.listen",
+                               "system.net.socket.accept", "system.net.socket.timeout",
+                               "system.net.socket.kind", "system.net.socket.send",
+                               "system.net.socket.recv", "system.net.socket.close",
+                               "system.file.open", "system.file.read",
+                               "system.file.write", "system.file.close",
+                               "system.file.error",
+                               "system.ffi.error",
+                               "system.ffi.layout",
+                               "system.user.id", "system.user.effective_id",
+                               "system.group.id", "system.group.effective_id"});
     vm.setDebugInfo(artifacts.bytecodeDebugInfo,
                     compilationContext.functionDebugInfo);
     for (const auto &module : compilationContext.moduleInitializers) {
@@ -1822,6 +1855,7 @@ static const char *lspSymbolKindName(vietvm::compiler::SemanticSymbolKind kind) 
     using vietvm::compiler::SemanticSymbolKind;
     switch (kind) {
         case SemanticSymbolKind::Function: return "hàm";
+        case SemanticSymbolKind::ForeignFunction: return "ngoại hàm";
         case SemanticSymbolKind::Method: return "phương thức";
         case SemanticSymbolKind::Class: return "lớp";
         case SemanticSymbolKind::Interface: return "giao diện";
@@ -1839,6 +1873,7 @@ static int lspCompletionKind(vietvm::compiler::SemanticSymbolKind kind) noexcept
     switch (kind) {
         case SemanticSymbolKind::Method: return 2;
         case SemanticSymbolKind::Function: return 3;
+        case SemanticSymbolKind::ForeignFunction: return 3;
         case SemanticSymbolKind::Class: return 7;
         case SemanticSymbolKind::Interface: return 8;
         case SemanticSymbolKind::ImportAlias: return 9;
@@ -1895,6 +1930,7 @@ static std::string lspCompletionResult(
                << "\",\"kind\":" << lspCompletionKind(symbol.kind)
                << ",\"detail\":\"" << jsonEscape(lspSymbolKindName(symbol.kind));
         if ((symbol.kind == vietvm::compiler::SemanticSymbolKind::Function ||
+             symbol.kind == vietvm::compiler::SemanticSymbolKind::ForeignFunction ||
              symbol.kind == vietvm::compiler::SemanticSymbolKind::Method) &&
             symbol.parameterCount > 0) {
             result << " · " << symbol.minimumArgumentCount << ".." << symbol.parameterCount
@@ -1910,6 +1946,7 @@ static std::string lspHoverText(const vietvm::compiler::SemanticSymbol &symbol) 
     std::ostringstream text;
     text << lspSymbolKindName(symbol.kind) << ' ' << symbol.lookupName;
     if (symbol.kind == vietvm::compiler::SemanticSymbolKind::Function ||
+        symbol.kind == vietvm::compiler::SemanticSymbolKind::ForeignFunction ||
         symbol.kind == vietvm::compiler::SemanticSymbolKind::Method) {
         text << " — " << symbol.minimumArgumentCount << ".." << symbol.parameterCount
              << " tham số";

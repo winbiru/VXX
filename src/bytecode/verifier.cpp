@@ -20,6 +20,88 @@ bool validPoolIndex(int index, std::size_t size) noexcept {
     return index >= 0 && static_cast<std::size_t>(index) < size;
 }
 
+bool validForeignAbiType(ForeignAbiType type) noexcept {
+    switch (type) {
+        case ForeignAbiType::Void:
+        case ForeignAbiType::I32:
+        case ForeignAbiType::U32:
+        case ForeignAbiType::I64:
+        case ForeignAbiType::U64:
+        case ForeignAbiType::F64:
+        case ForeignAbiType::CString:
+        case ForeignAbiType::BufferOut:
+        case ForeignAbiType::BufferIn:
+        case ForeignAbiType::FileHandle:
+        case ForeignAbiType::DirectoryHandle:
+        case ForeignAbiType::DirectoryEntry:
+        case ForeignAbiType::PointerStatus:
+        case ForeignAbiType::DnsHandle:
+        case ForeignAbiType::SocketHandle:
+            return true;
+    }
+    return false;
+}
+
+bool foreignLengthAbiType(ForeignAbiType type) noexcept {
+    return type == ForeignAbiType::I32 || type == ForeignAbiType::U32 ||
+           type == ForeignAbiType::I64 || type == ForeignAbiType::U64;
+}
+
+std::optional<std::string> verifyForeignDescriptor(
+    const ForeignFunctionDescriptor &descriptor,
+    std::size_t descriptorIndex) {
+    if (descriptor.id != static_cast<int>(descriptorIndex) ||
+        descriptor.library.empty() || descriptor.symbol.empty() ||
+        descriptor.capability.empty() || descriptor.abi != "c") {
+        return "định danh, tên hoặc ABI foreign descriptor không hợp lệ";
+    }
+    if (!validForeignAbiType(descriptor.result) ||
+        descriptor.result == ForeignAbiType::BufferIn ||
+        descriptor.result == ForeignAbiType::BufferOut) {
+        return "kiểu trả về foreign descriptor không hợp lệ";
+    }
+    for (const auto type : descriptor.parameters) {
+        if (!validForeignAbiType(type) || type == ForeignAbiType::Void) {
+            return "kiểu tham số foreign descriptor không hợp lệ";
+        }
+    }
+    // The existing C++ ABI fixtures can omit extents. Source declarations
+    // must supply them (enforced by semantic); runtime capability guards
+    // still constrain the narrow legacy fixtures independently.
+    if (descriptor.bufferExtents.empty()) return std::nullopt;
+
+    std::vector<bool> seen(descriptor.parameters.size(), false);
+    for (const auto &extent : descriptor.bufferExtents) {
+        if (extent.parameterIndex >= descriptor.parameters.size() ||
+            seen[extent.parameterIndex]) {
+            return "chỉ số đệm FFI trùng hoặc vượt phạm vi";
+        }
+        const auto type = descriptor.parameters[extent.parameterIndex];
+        if (type != ForeignAbiType::BufferIn && type != ForeignAbiType::BufferOut) {
+            return "extent FFI tham chiếu tham số không phải đệm";
+        }
+        seen[extent.parameterIndex] = true;
+        if (extent.lengthParameterIndex < 0) {
+            if (extent.fixedLength == 0 || extent.fixedLength > 65536) {
+                return "độ dài cố định của đệm FFI ngoài miền 1..65536";
+            }
+        } else if (extent.fixedLength != 0 ||
+                   static_cast<std::size_t>(extent.lengthParameterIndex) >=
+                       descriptor.parameters.size() ||
+                   !foreignLengthAbiType(
+                       descriptor.parameters[extent.lengthParameterIndex])) {
+            return "tham chiếu độ dài đệm FFI không hợp lệ";
+        }
+    }
+    for (std::size_t i = 0; i < descriptor.parameters.size(); ++i) {
+        if ((descriptor.parameters[i] == ForeignAbiType::BufferIn ||
+             descriptor.parameters[i] == ForeignAbiType::BufferOut) && !seen[i]) {
+            return "descriptor FFI thiếu extent cho tham số đệm";
+        }
+    }
+    return std::nullopt;
+}
+
 std::int64_t decodeSignedIndex(int encoded) noexcept {
     return encoded >= 0
         ? static_cast<std::int64_t>(encoded)
@@ -58,6 +140,40 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
         };
 
         switch (opcode) {
+            case OP_CHON:
+                if (instruction.operand != 0 &&
+                    (instruction.operand < 0 ||
+                     static_cast<std::size_t>(instruction.operand) >= code.size() ||
+                     code[static_cast<std::size_t>(instruction.operand)].op != OP_KET_THUC_CHUYEN)) {
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeJumpAddressOutOfRange));
+                }
+                break;
+            case OP_MAC_DINH:
+                if (instruction.operandValue != 0 &&
+                    (instruction.operandValue <= static_cast<int>(index) ||
+                     static_cast<std::size_t>(instruction.operandValue) >= code.size() ||
+                     (code[static_cast<std::size_t>(instruction.operandValue)].op != OP_CA &&
+                      code[static_cast<std::size_t>(instruction.operandValue)].op != OP_MAC_DINH &&
+                      code[static_cast<std::size_t>(instruction.operandValue)].op != OP_KET_THUC_CHUYEN))) {
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeJumpAddressOutOfRange));
+                }
+                break;
+            case OP_THOAT:
+                if (instruction.operandIndex < 0) {
+                    if (instruction.operand < 0 ||
+                        static_cast<std::size_t>(instruction.operand) >= code.size() ||
+                        instruction.operandValue < 0) {
+                        return issue(index, rawOpcode,
+                                     messages::messageText(messages::kBytecodeJumpAddressOutOfRange));
+                    }
+                } else if (instruction.operand != 0 ||
+                           instruction.operandIndex != 0 ||
+                           instruction.operandValue != 0) {
+                    return issue(index, rawOpcode, "OP_THOAT trong chọn không nhận immediate operand");
+                }
+                break;
             case OP_JUMP:
             case OP_JUMP_IF_FALSE:
                 if (instruction.operand < 0 ||
@@ -178,6 +294,15 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                     return issue(index, rawOpcode,
                                  messages::messageText(messages::kBytecodeCaseLabelKindInvalid));
                 }
+                if (instruction.operandValue != 0 &&
+                    (instruction.operandValue <= static_cast<int>(index) ||
+                     static_cast<std::size_t>(instruction.operandValue) >= code.size() ||
+                     (code[static_cast<std::size_t>(instruction.operandValue)].op != OP_CA &&
+                      code[static_cast<std::size_t>(instruction.operandValue)].op != OP_MAC_DINH &&
+                      code[static_cast<std::size_t>(instruction.operandValue)].op != OP_KET_THUC_CHUYEN))) {
+                    return issue(index, rawOpcode,
+                                 messages::messageText(messages::kBytecodeJumpAddressOutOfRange));
+                }
                 break;
 
             case OP_TAO_LOP:
@@ -269,6 +394,42 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                         context.functionIds.end()) {
                     return issue(index, rawOpcode,
                                  messages::messageText(messages::kBytecodeClosureFunctionIdMissing));
+                }
+                break;
+
+            case OP_FFI_CALL:
+                if (instruction.operand < 0) {
+                    return issue(index, rawOpcode,
+                                 "số đối số FFI không được âm");
+                }
+                if (instruction.operandIndex < 0 ||
+                    static_cast<std::size_t>(instruction.operandIndex) >=
+                        context.foreignDescriptorCount) {
+                    return issue(index, rawOpcode,
+                                 "foreign descriptor vượt phạm vi");
+                }
+                if (instruction.operandValue != 0) {
+                    return issue(index, rawOpcode,
+                                 "operandValue của OP_FFI_CALL phải bằng 0");
+                }
+                if (context.foreignDescriptors != nullptr) {
+                    const auto &descriptors = *context.foreignDescriptors;
+                    if (static_cast<std::size_t>(instruction.operandIndex) >=
+                        descriptors.size()) {
+                        return issue(index, rawOpcode,
+                                     "foreign descriptor không tồn tại trong bảng");
+                    }
+                    const auto &descriptor = descriptors[instruction.operandIndex];
+                    if (static_cast<std::size_t>(instruction.operand) !=
+                        descriptor.parameters.size()) {
+                        return issue(index, rawOpcode,
+                                     "số đối số OP_FFI_CALL khác chữ ký foreign descriptor");
+                    }
+                    if (const auto error = verifyForeignDescriptor(
+                            descriptor,
+                            static_cast<std::size_t>(instruction.operandIndex))) {
+                        return issue(index, rawOpcode, *error);
+                    }
                 }
                 break;
 

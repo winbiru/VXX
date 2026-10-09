@@ -1,0 +1,37 @@
+nhập nhập xuất;
+
+hàm chính() {
+    gốc = ".tmp_ffi_thu_muc_cay";
+    con = gốc + "/nhánh/cà phê";
+    in tạo thư mục(con) == 1;
+    in tạo thư mục(con) == 1;
+    in là thư mục(con);
+    in !là tệp(con);
+    in đường dẫn tồn tại(con);
+    ghi tệp(con + "/nội dung.txt", "đúng");
+    mục_gốc = liệt kê thư mục(gốc);
+    mục_con = liệt kê thư mục(con);
+    in do_dai(mục_gốc) == 1;
+    in mục_gốc[0] == "nhánh";
+    in mục_con[0] == "nội dung.txt";
+    in là tệp(con + "/nội dung.txt");
+    in !là thư mục(con + "/nội dung.txt");
+    in đọc tệp(con + "/nội dung.txt") == "đúng";
+    in xóa đường dẫn(gốc) == 4;
+    in !là tệp(con + "/nội dung.txt");
+    in !đường dẫn tồn tại(gốc);
+    in xóa đường dẫn(gốc) == 0;
+
+    ghi tệp(".tmp_ffi_thu_muc_file", "a");
+    thử { tạo thư mục(".tmp_ffi_thu_muc_file"); }
+    bắt lỗi(e) { in "chặn file trùng tên"; };
+    in xóa đường dẫn(".tmp_ffi_thu_muc_file") == 1;
+
+    // POSIX c_chuỗi không thể đi qua ABI nếu chứa NUL.
+    thử { tạo thư mục(".tmp_ffi_thu_muc_nul" + chuoi_tu_bytes_vm([0])); }
+    bắt lỗi(e) { in "chặn NUL"; };
+    thử { xóa đường dẫn(".tmp_ffi_thu_muc_nul" + chuoi_tu_bytes_vm([0])); }
+    bắt lỗi(e) { in "chặn NUL xóa"; };
+    thử { tạo thư mục(".tmp_ffi_thu_muc_bad" + chuoi_tu_bytes_vm([255])); }
+    bắt lỗi(e) { in "chặn UTF-8"; };
+};

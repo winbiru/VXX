@@ -43,6 +43,7 @@ if (VPP_ENABLE_CLANG_TIDY)
 endif()
 
 find_package(Threads REQUIRED)
+find_package(PkgConfig QUIET)
 if (UNIX AND NOT APPLE)
     # Release Linux should not require libcrypto.so to already exist on the
     # user's machine. Ubuntu's libssl-dev provides the static archive.
@@ -91,6 +92,7 @@ set(VPP_COMPILER_SOURCES
     ${CMAKE_SOURCE_DIR}/src/compiler/compiler.cpp)
 set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/heap.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/foreign.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/module.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/object.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
@@ -174,6 +176,35 @@ target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 
 vpp_add_module(vpp-runtime ${VPP_RUNTIME_SOURCES})
 target_link_libraries(vpp-runtime PUBLIC vpp-bytecode vpp-core vpp-compiler Threads::Threads)
+option(VPP_STATIC_LIBFFI "Link libffi statically for standalone release archives" OFF)
+if (PkgConfig_FOUND)
+    pkg_check_modules(VPP_LIBFFI QUIET IMPORTED_TARGET libffi)
+endif()
+if (VPP_LIBFFI_FOUND)
+    if (VPP_STATIC_LIBFFI AND UNIX)
+        # pkg-config's imported target normally selects libffi.so/.dylib.
+        # A copied release binary cannot rely on a Homebrew/Linux runtime
+        # installation, so require the distribution's actual static archive.
+        find_file(VPP_LIBFFI_STATIC_ARCHIVE NAMES libffi.a
+            PATHS ${VPP_LIBFFI_LIBRARY_DIRS} NO_DEFAULT_PATH)
+        if (NOT VPP_LIBFFI_STATIC_ARCHIVE)
+            message(FATAL_ERROR
+                "Standalone V++ release requires libffi.a in ${VPP_LIBFFI_LIBRARY_DIRS}")
+        endif()
+        target_include_directories(vpp-runtime PRIVATE ${VPP_LIBFFI_INCLUDE_DIRS})
+        target_link_libraries(vpp-runtime PUBLIC
+            "${VPP_LIBFFI_STATIC_ARCHIVE}" ${CMAKE_DL_LIBS})
+    else()
+        target_link_libraries(vpp-runtime PUBLIC PkgConfig::VPP_LIBFFI ${CMAKE_DL_LIBS})
+    endif()
+    target_compile_definitions(vpp-runtime PRIVATE VPP_HAS_LIBFFI=1)
+elseif(UNIX)
+    # The POSIX standard library now requires FFI at runtime. A successful
+    # build without libffi would ship broken public System/file/socket APIs.
+    message(FATAL_ERROR "V++ POSIX System FFI requires libffi and pkg-config (install libffi-dev on Linux or libffi via Homebrew on macOS)")
+else()
+    message(STATUS "libffi unavailable; Windows System APIs use native backend")
+endif()
 if (WIN32)
     target_link_libraries(vpp-runtime PUBLIC ws2_32 bcrypt secur32 crypt32)
 elseif(APPLE)
@@ -258,6 +289,12 @@ if (BUILD_TESTS)
     target_link_libraries(vpp-runtime-p0-hardening PRIVATE vpp-runtime)
     target_include_directories(vpp-runtime-p0-hardening PRIVATE ${VPP_INCLUDE_DIR})
     target_compile_features(vpp-runtime-p0-hardening PRIVATE cxx_std_17)
+    if (VPP_LIBFFI_FOUND AND NOT WIN32)
+        target_compile_definitions(
+            vpp-runtime-p0-hardening PRIVATE VPP_TEST_POSIX_LIBFFI=1)
+        # Let dlsym(RTLD_DEFAULT, ...) resolve the C ABI roundtrip fixtures.
+        set_target_properties(vpp-runtime-p0-hardening PROPERTIES ENABLE_EXPORTS ON)
+    endif()
     if (MSVC)
         target_compile_options(vpp-runtime-p0-hardening PRIVATE /W4 /permissive- /utf-8)
     else()

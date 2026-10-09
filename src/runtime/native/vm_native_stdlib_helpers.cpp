@@ -1,29 +1,17 @@
 #include "common/vm_native_stdlib_helpers.h"
 #include "vpp/bytecode/intrinsic.h"
 
-#include <chrono>
 #include <cstdint>
-#include <ctime>
 #include <filesystem>
 #include <limits>
 #include <string>
 #include <system_error>
-#include <thread>
 #include <vector>
 
 #include "common/vm_native_constants.h"
 #include "common/vm_native_helpers.h"
 #include "vpp/core/message_constants.h"
 #include "vpp/core/text.h"
-
-#if defined(_WIN32)
-#include <windows.h>
-#include <bcrypt.h>
-#elif defined(__APPLE__)
-#include <Security/Security.h>
-#elif defined(__linux__)
-#include <openssl/rand.h>
-#endif
 
 namespace vietvm::helpers {
 
@@ -46,7 +34,6 @@ bool nativeUtf8Path(const StackValue &value,
 namespace {
 
 namespace fs = std::filesystem;
-constexpr int kMaxSecureRandomBytes = 4096;
 
 int foldPublicHash(std::uint32_t hash) noexcept {
     return static_cast<int>(hash & 0x7fffffffu);
@@ -65,35 +52,7 @@ int identityHash(const Handle &handle) noexcept {
     return foldPublicHash(folded);
 }
 
-bool fillSecureRandom(std::vector<unsigned char> &bytes, std::string &err) {
-    if (bytes.empty()) return true;
 #if defined(_WIN32)
-    const NTSTATUS status = BCryptGenRandom(
-        nullptr, bytes.data(), static_cast<ULONG>(bytes.size()),
-        BCRYPT_USE_SYSTEM_PREFERRED_RNG);
-    if (status < 0) {
-        err = messages::messageText(messages::kNativeSecureRandomWindowsFailed);
-        return false;
-    }
-    return true;
-#elif defined(__APPLE__)
-    if (SecRandomCopyBytes(kSecRandomDefault, bytes.size(), bytes.data()) != errSecSuccess) {
-        err = messages::messageText(messages::kNativeSecureRandomAppleFailed);
-        return false;
-    }
-    return true;
-#elif defined(__linux__)
-    if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1) {
-        err = messages::messageText(messages::kNativeSecureRandomLinuxFailed);
-        return false;
-    }
-    return true;
-#else
-    err = messages::messageText(messages::kNativeSecureRandomPlatformUnsupported);
-    return false;
-#endif
-}
-
 // Chuyển path hệ điều hành về UTF-8 với separator `/`. Trên POSIX tên file có
 // thể chứa byte không phải UTF-8; không để dữ liệu đó lọt ngược vào string V++.
 bool pathToUtf8(const fs::path &path,
@@ -123,27 +82,12 @@ bool isMissingPathError(const std::error_code &ec) noexcept {
            ec == std::errc::not_a_directory;
 }
 
-// Tên biến môi trường đi qua native boundary phải có cùng contract trên mọi nền tảng.
-// `getenv`/`_dupenv_s` không thống nhất cách xử lý tên rỗng, dấu `=` hoặc NUL nhúng,
-// vì vậy V++ từ chối các trường hợp đó trước khi gọi CRT/POSIX.
-bool validateEnvironmentVariableName(const std::string &name,
-                                     const std::string &operation,
-                                     std::string &err) {
-    if (name.empty() || name.find('=') != std::string::npos ||
-        name.find('\0') != std::string::npos) {
-        err = messages::formatMessage(messages::kNativeEnvironmentNameInvalid, {operation});
-        return false;
-    }
-    if (!vietvm::core::isValidUtf8(name)) {
-        err = messages::formatMessage(messages::kNativeEnvironmentNameUtf8Invalid, {operation});
-        return false;
-    }
-    return true;
-}
+#endif
 
 // Chạy kiểu tên; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 std::string runtimeTypeName(const StackValue &value) {
     if (std::holds_alternative<int>(value)) return "số nguyên";
+    if (std::holds_alternative<AbiInteger>(value)) return "số nguyên 64-bit";
     if (std::holds_alternative<double>(value)) return "số thực";
     if (std::holds_alternative<std::string>(value)) return "chuỗi";
     if (std::holds_alternative<std::monostate>(value)) return "rỗng";
@@ -166,52 +110,6 @@ std::string platformName() {
     return "linux";
 #else
     return "không rõ";
-#endif
-}
-
-bool localTime(std::time_t value, std::tm &out) {
-#if defined(_WIN32)
-    return localtime_s(&out, &value) == 0;
-#else
-    return localtime_r(&value, &out) != nullptr;
-#endif
-}
-
-bool utcTime(std::time_t value, std::tm &out) {
-#if defined(_WIN32)
-    return gmtime_s(&out, &value) == 0;
-#else
-    return gmtime_r(&value, &out) != nullptr;
-#endif
-}
-
-bool timezoneOffsetMinutes(std::time_t now,
-                           const std::tm &local,
-                           const std::tm &utc,
-                           int &minutes) {
-#if defined(_WIN32)
-    std::tm localCopy = local;
-    const __time64_t localAsUtc = _mkgmtime64(&localCopy);
-    if (localAsUtc == -1) return false;
-    minutes = static_cast<int>((localAsUtc - static_cast<__time64_t>(now)) / 60);
-    return true;
-#elif defined(__APPLE__) || defined(__linux__)
-    (void)now;
-    (void)utc;
-    minutes = static_cast<int>(local.tm_gmtoff / 60);
-    return true;
-#else
-    std::tm localCopy = local;
-    std::tm utcCopy = utc;
-    utcCopy.tm_isdst = -1;
-    const std::time_t localEpoch = std::mktime(&localCopy);
-    const std::time_t utcAsLocalEpoch = std::mktime(&utcCopy);
-    if (localEpoch == static_cast<std::time_t>(-1) ||
-        utcAsLocalEpoch == static_cast<std::time_t>(-1)) {
-        return false;
-    }
-    minutes = static_cast<int>(std::difftime(localEpoch, utcAsLocalEpoch) / 60.0);
-    return true;
 #endif
 }
 
@@ -252,28 +150,7 @@ bool handleNativeFoundationFunction(Opcode opcode,
         return true;
     }
 
-    if (opcode == OP_VM_NGAU_NHIEN_BAO_MAT_BYTES) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (!std::holds_alternative<int>(args[0])) {
-            err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
-            return true;
-        }
-        const int byteCount = std::get<int>(args[0]);
-        if (byteCount < 1 || byteCount > kMaxSecureRandomBytes) {
-            err = messages::messageText(messages::kNativeSecureRandomByteCountInvalid);
-            return true;
-        }
-        std::vector<unsigned char> bytes(static_cast<std::size_t>(byteCount));
-        if (!fillSecureRandom(bytes, err)) return true;
-        std::vector<StackValue> values;
-        values.reserve(bytes.size());
-        for (unsigned char byte : bytes) {
-            values.push_back(make_int_value(static_cast<int>(byte)));
-        }
-        result = make_list_value(std::move(values));
-        return true;
-    }
-
+#if defined(_WIN32)
     if (opcode == OP_VM_DUONG_DAN_TON_TAI || opcode == OP_VM_LA_TEP ||
         opcode == OP_VM_LA_THU_MUC) {
         if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
@@ -358,75 +235,11 @@ bool handleNativeFoundationFunction(Opcode opcode,
         return true;
     }
 
-    if (opcode == OP_VM_DOC_BIEN_MOI_TRUONG) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        const std::string name = argToRawString(args[0]);
-        if (!validateEnvironmentVariableName(name, fn, err)) return true;
-        const auto value = getEnvVar(name.c_str());
-        result = value.has_value() ? make_string_value(*value) : make_null_value();
-        return true;
-    }
+#endif
 
     if (opcode == OP_VM_TEN_NEN_TANG) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
         result = make_string_value(platformName());
-        return true;
-    }
-
-    // One clock read supplies both calendar fields and the local UTC offset.
-    // ISO-8601 formatting belongs to gói/thời gian, not the OS boundary.
-    if (opcode == OP_VM_DONG_HO_DIA_PHUONG || opcode == OP_VM_DONG_HO_UTC) {
-        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
-        const bool utcMode = opcode == OP_VM_DONG_HO_UTC;
-        const std::time_t now = std::time(nullptr);
-        std::tm calendar{};
-        std::tm utc{};
-        int offsetMinutes = 0;
-        bool ok = false;
-        if (utcMode) {
-            ok = utcTime(now, calendar);
-        } else {
-            ok = localTime(now, calendar) && utcTime(now, utc) &&
-                 timezoneOffsetMinutes(now, calendar, utc, offsetMinutes);
-        }
-        if (!ok) {
-            err = vietvm::messages::formatMessage(
-                vietvm::messages::kNativeTimeFormatFailed, {fn});
-            return true;
-        }
-        result = make_list_value({
-            make_int_value(calendar.tm_year + 1900),
-            make_int_value(calendar.tm_mon + 1),
-            make_int_value(calendar.tm_mday),
-            make_int_value(calendar.tm_hour),
-            make_int_value(calendar.tm_min),
-            make_int_value(calendar.tm_sec),
-            make_int_value(offsetMinutes),
-        });
-        return true;
-    }
-
-    if (opcode == OP_VM_THOI_GIAN_DON_DIEU_MS) {
-        if (!requireNativeArgumentCount(args, fn, 0, err)) return true;
-        const auto elapsed = std::chrono::steady_clock::now().time_since_epoch();
-        result = make_float_value(
-            std::chrono::duration<double, std::milli>(elapsed).count());
-        return true;
-    }
-
-    if (opcode == OP_VM_NGU_MILI_GIAY) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        if (!std::holds_alternative<int>(args[0])) {
-            err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);
-            return true;
-        }
-        const int milliseconds = std::get<int>(args[0]);
-        if (milliseconds < 0) {
-            err = messages::messageText(messages::kNativeSleepMillisecondsInvalid);
-            return true;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
-        result = make_null_value();
         return true;
     }
 
