@@ -200,6 +200,7 @@ int main(int argc, char **argv) {
     t.compare("x86_64-linux-gnu", {0xc3}, "valid", {{0, "call"}}, false);
 
     t.integrated("aarch64-apple-darwin", "kiem_tra_native_leaf.vi", "tra42", true);
+    t.integrated("powerpc64-linux-gnu", "kiem_tra_native_leaf.vi", "tra42", true);
     t.integrated("riscv64-linux-gnu", "kiem_tra_native_leaf.vi", "tra42", true);
     t.integrated("i386-windows-msvc", "kiem_tra_native_leaf.vi", "tra42", true);
     t.integrated("aarch64-apple-darwin", "kiem_tra_native_calls.vi", "goi_bon", false);

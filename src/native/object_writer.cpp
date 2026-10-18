@@ -158,11 +158,16 @@ RawObjectResult elfObject(const Target &target,
     if (ppc64ElfV1) {
         opdOff = w.pos();
         w.u64(0); // function entry: R_PPC64_ADDR64 against .text
-        w.u64(0); // TOC: unused by these self-contained integer leaves
+        w.u64(0); // TOC: populated by R_PPC64_TOC during linking
         w.u64(0); // environment pointer
         relaOff = w.pos();
         w.u64(0); // r_offset in .opd
         w.u64((std::uint64_t{1} << 32) | 38); // local .text section, R_PPC64_ADDR64
+        w.u64(0); // r_addend
+        // ELFv1 .opd descriptors require a second relocation for their TOC.
+        // GNU ld expects the ADDR64/TOC pair at consecutive 8-byte offsets.
+        w.u64(8); // TOC word in .opd
+        w.u64(51); // R_PPC64_TOC (STN_UNDEF symbol index 0)
         w.u64(0); // r_addend
     }
     std::size_t textRelaOff = 0;
@@ -237,7 +242,7 @@ RawObjectResult elfObject(const Target &target,
             alignment(target.arch), 0);
     if (ppc64ElfV1) {
         section(opdName, 1, 3, opdOff, 24, 0, 0, 8, 0);
-        section(relaName, 4, 0, relaOff, 24, 4, 2, 8, 24);
+        section(relaName, 4, 0, relaOff, 48, 4, 2, 8, 24);
     }
     if (textRelocs)
         section(textRelaName, 4, 0, textRelaOff, relocs.size() * 24,

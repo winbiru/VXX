@@ -110,7 +110,7 @@ void checkElf(Tester &test, const Bytes &obj, const Bytes &code,
         test.check(field(obj, sec(3) + 4, 4, false) == 4 &&
                    field(obj, sec(3) + 40, 4, false) == 4 &&
                    field(obj, sec(3) + 44, 4, false) == 2 &&
-                   sectionLength(3) == 24,
+                   sectionLength(3) == 48,
                    "PowerPC64 .rela.opd metadata");
         test.check(field(obj, sectionOffset(3), 8, false) == 0 &&
                    field(obj, sectionOffset(3) + 8, 8, false) ==
@@ -118,6 +118,10 @@ void checkElf(Tester &test, const Bytes &obj, const Bytes &code,
                    field(obj, sectionOffset(3) + 16, 8, false) == 0 &&
                    obj.at(sectionOffset(symSection) + symSize + 4) == 3,
                    "PowerPC64 descriptor relocates to local .text section");
+        test.check(field(obj, sectionOffset(3) + 24, 8, false) == 8 &&
+                   field(obj, sectionOffset(3) + 32, 8, false) == 51 &&
+                   field(obj, sectionOffset(3) + 40, 8, false) == 0,
+                   "PowerPC64 descriptor has R_PPC64_TOC at offset 8");
     }
 }
 
