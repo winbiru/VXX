@@ -1,7 +1,10 @@
 #include "vpp/native/vpp_machine_bridge.h"
 
 #include <charconv>
+#include <chrono>
+#include <cstdlib>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 #include <ostream>
 #include <sstream>
@@ -452,10 +455,18 @@ std::string makeVppTargetSource(std::string_view triple) {
 std::string executeVppSource(const std::string &source,
                              const std::filesystem::path &sourceBase,
                              std::string *partialOutput = nullptr) {
+    const bool profile = std::getenv("VPP_NATIVE_STAGE0_PROFILE") != nullptr;
+    const auto start = std::chrono::steady_clock::now();
     compiler::CompilationContext context;
     context.importResolutionBase = sourceBase.empty() ? std::filesystem::current_path() : sourceBase;
     context.currentSourceIdentity = "<native-machine-bridge>";
     const auto artifacts = compiler::compilePipeline(context, source, keywordMap, true);
+    const auto afterFrontend = std::chrono::steady_clock::now();
+    if (profile) {
+        std::cerr << "native Stage 0 frontend: "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(afterFrontend - start).count()
+                  << " ms, source=" << source.size() << " bytes\n";
+    }
     VM vm(artifacts.bytecode, context.stringPool);
     std::string output;
     vm.setOutputSink([&output, partialOutput](const std::string &text) {
@@ -470,6 +481,12 @@ std::string executeVppSource(const std::string &source,
     for (const auto &module : context.moduleInitializers)
         (void)vm.addModuleInitializer(module.identity, module.bytecode, module.debugInfo);
     vm.run();
+    if (profile) {
+        std::cerr << "native Stage 0 VM execution: "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - afterFrontend).count()
+                  << " ms\n";
+    }
     return output;
 }
 

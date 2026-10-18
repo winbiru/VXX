@@ -463,11 +463,18 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
         return EXIT_FAILURE;
     }
     verifyLockedProjectForSource(input);
-    // The macOS ARM64 runtime is compiled from V++ with the target program.
-    // Its small assembly boundary owns only full-width memory/OS operations.
+    // Compile the V++ runtime and link its OS/machine assembly boundary.
     fs::path nativeRuntimeRoot;
     std::string nativeSource = readFile(filename);
+    std::string primitiveRelative;
 #if defined(__APPLE__) && defined(__aarch64__)
+    primitiveRelative = "scripts/ASM/vpp_aot_primitives_aarch64.S";
+#elif defined(__linux__) && defined(__x86_64__)
+    primitiveRelative = "scripts/ASM/vpp_aot_primitives_linux_x86_64.S";
+#else
+    std::cerr << "Native self-host chưa có runtime V++/assembly cho host này\n";
+    return EXIT_FAILURE;
+#endif
     {
         std::vector<fs::path> roots;
         if (const char *home = std::getenv("VPP_HOME"); home && *home)
@@ -478,18 +485,17 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
             if (p == p.root_path()) break;
         }
         for (const auto &root : roots) {
-            if (fs::is_regular_file(root / "scripts/ASM/vpp_aot_primitives_aarch64.S") &&
+            if (fs::is_regular_file(root / primitiveRelative) &&
                 fs::is_regular_file(root / vietvm::core::utf8Path("gói/biên dịch/native/runtime.vi"))) {
                 nativeRuntimeRoot = fs::absolute(root);
                 break;
             }
         }
         if (nativeRuntimeRoot.empty())
-            throw std::runtime_error("thiếu runtime V++/primitive AArch64; đặt VPP_HOME tới bộ cài V++");
+            throw std::runtime_error("thiếu runtime V++/primitive assembly; đặt VPP_HOME tới bộ cài V++");
         nativeSource = readFile((nativeRuntimeRoot /
             vietvm::core::utf8Path("gói/biên dịch/native/runtime.vi")).string()) + "\n" + nativeSource;
     }
-#endif
     const auto compiled = vietvm::native::compileSourceProgramVpp(
         target, nativeSource, input.parent_path());
     if (!compiled) {
@@ -542,48 +548,11 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
         out.close();
         arguments.push_back(object.string());
     }
-    // macOS ARM64 links V++ runtime.vi through its assembly/OS boundary.
-    // Older targets retain the C fallback until they have native primitives.
-#if !defined(__APPLE__) || !defined(__aarch64__)
-    // Legacy C fallback for hosts without the macOS ARM64 V++ runtime.
-    // The macOS ARM64 path above requires runtime.vi and its assembly bridge.
-    bool needsNativeRuntime = false;
-    for (const auto &entry : compiled.functions) {
-        for (const auto &relocation : entry.second.emission.relocations) {
-            if (relocation.symbol.rfind("vpp_native_", 0) == 0) needsNativeRuntime = true;
-        }
-    }
-#endif
-    if (!nativeRuntimeRoot.empty()) {
-        arguments.push_back("-DVPP_NATIVE_VPP_RUNTIME=1");
-        arguments.push_back((nativeRuntimeRoot /
-            "scripts/ASM/vpp_aot_primitives_aarch64.S").string());
-    }
-#if !defined(__APPLE__) || !defined(__aarch64__)
-    else if (needsNativeRuntime) {
-        const fs::path runtimeRelative = "src/runtime/native/vpp_aot_runtime.c";
-        fs::path runtimeSource;
-        std::vector<fs::path> roots;
-        if (const char *home = std::getenv("VPP_HOME")) roots.emplace_back(home);
-        roots.push_back(fs::current_path());
-        for (auto p = input.parent_path(); !p.empty(); p = p.parent_path()) {
-            roots.push_back(p);
-            if (p == p.root_path()) break;
-        }
-        for (const auto &root : roots) {
-            const auto candidate = root / runtimeRelative;
-            if (fs::is_regular_file(candidate)) {
-                runtimeSource = candidate;
-                break;
-            }
-        }
-        if (runtimeSource.empty()) {
-            std::cerr << "Native runtime thiếu " << runtimeRelative.string()
-                      << "; đặt VPP_HOME tới thư mục cài V++\n";
-            return EXIT_FAILURE;
-        }
-        arguments.push_back(runtimeSource.string());
-    }
+    arguments.push_back("-DVPP_NATIVE_VPP_RUNTIME=1");
+    arguments.push_back((nativeRuntimeRoot / primitiveRelative).string());
+#if defined(__linux__)
+    // Assembly calls libcrypto for the SHA-256 primitive.
+    arguments.push_back("-lcrypto");
 #endif
     const auto temporaryExecutable = temporaryDirectory / "program";
     arguments.push_back("-o");

@@ -1,0 +1,211 @@
+// Linux ELF64 relocatable object, System V AMD64 ABI. The section layout is
+// null, .text, .rela.text, .symtab, .strtab, .shstrtab. Every external CALL
+// has a R_X86_64_PLT32 RELA entry with addend -4.
+
+// Mach-O uses leading underscores in names; ELF uses the same V++ registry
+// and native ABI names without that decoration.
+hàm elf_symbol(symbols, strings, decorated, defined, value) {
+    nếu (decorated <= 0) { trả về -1; };
+    biến length = byte_dài(decorated);
+    nếu (length < 2) { byte_hủy(decorated); trả về -1; };
+    biến offset = byte_dài(strings);
+    biến status = 0;
+    lặp (i = 1; i < length; i++) {
+        nếu (byte_thêm(strings, byte_lấy(decorated, i)) != 0) { status = -1; thoát; };
+    };
+    nếu (status == 0) { status = byte_thêm(strings, 0); };
+    nếu (status == 0) { status = obj_i32(symbols, offset); };
+    nếu (status == 0) { status = byte_thêm(symbols, 18); }; // STB_GLOBAL | STT_FUNC
+    nếu (status == 0) { status = byte_thêm(symbols, 0); };  // st_other
+    biến section = 0;
+    nếu (defined == 1) { section = 1; };
+    nếu (status == 0) { status = byte_thêm(symbols, section); };
+    nếu (status == 0) { status = byte_thêm(symbols, 0); };
+    nếu (status == 0) { status = obj_u64(symbols, value); };
+    nếu (status == 0) { status = obj_u64(symbols, 0); }; // st_size
+    byte_hủy(decorated);
+    trả về status;
+};
+
+hàm elf_rela(relocs, offset, symbol_index) {
+    nếu (obj_u64(relocs, offset) != 0) { trả về -1; };
+    nếu (obj_i32(relocs, 4) != 0) { trả về -1; }; // R_X86_64_PLT32
+    nếu (obj_i32(relocs, symbol_index) != 0) { trả về -1; };
+    nếu (obj_i32(relocs, -4) != 0) { trả về -1; };
+    trả về obj_i32(relocs, -1); // sign extension of RELA addend
+};
+
+hàm elf_shdr(out, name, kind, flags, offset, size, link, info, align, entsize) {
+    nếu (obj_i32(out, name) != 0) { trả về -1; };
+    nếu (obj_i32(out, kind) != 0) { trả về -1; };
+    nếu (obj_u64(out, flags) != 0) { trả về -1; };
+    nếu (obj_u64(out, 0) != 0) { trả về -1; }; // address in ET_REL
+    nếu (obj_u64(out, offset) != 0) { trả về -1; };
+    nếu (obj_u64(out, size) != 0) { trả về -1; };
+    nếu (obj_i32(out, link) != 0) { trả về -1; };
+    nếu (obj_i32(out, info) != 0) { trả về -1; };
+    nếu (obj_u64(out, align) != 0) { trả về -1; };
+    trả về obj_u64(out, entsize);
+};
+
+hàm elf_name(out, name) {
+    biến status = byte_nối(out, name);
+    byte_hủy(name);
+    nếu (status != 0) { trả về -1; };
+    trả về byte_thêm(out, 0);
+};
+
+hàm elf_module(code, object, starts, registry, first, last, entry_id, imports, native_calls) {
+    nếu (code == object) { trả về -1; };
+    nếu (first < 0) { trả về -1; };
+    nếu (last <= first) { trả về -1; };
+    biến n = byte_dài(code);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 900000) { trả về -1; };
+    nếu (byte_dài(starts) != (last - first) * 4) { trả về -1; };
+    nếu (byte_làm_rỗng(object) != 0) { trả về -1; };
+    biến symbols = byte_mới();
+    biến strings = byte_mới();
+    biến relocs = byte_mới();
+    biến section_names = byte_mới();
+    biến status = 0;
+    nếu (symbols <= 0) { status = -1; };
+    nếu (strings <= 0) { status = -1; };
+    nếu (relocs <= 0) { status = -1; };
+    nếu (section_names <= 0) { status = -1; };
+    // ELF index 0 is mandatory STN_UNDEF. All other symbols are global.
+    nếu (status == 0) { status = obj_pad(symbols, 24); };
+    nếu (status == 0) { status = byte_thêm(strings, 0); };
+    nếu (status == 0) {
+        lặp (fn = first; fn < last; fn++) {
+            biến start = byte_đọc_i32(starts, (fn - first) * 4);
+            nếu (start < 0) { status = -1; thoát; };
+            nếu (start >= n) { status = -1; thoát; };
+            nếu (elf_symbol(symbols, strings, om_function_name(registry, fn, entry_id), 1, start) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+    };
+    biến global_id = 0;
+    nếu (status == 0) {
+        lặp (offset = 0; offset < byte_dài(registry); offset = offset) {
+            nếu (offset + 8 > byte_dài(registry)) { status = -1; thoát; };
+            biến size = byte_đọc_i32(registry, offset);
+            nếu (size <= 0) { status = -1; thoát; };
+            nếu (size > byte_dài(registry) - offset - 8) { status = -1; thoát; };
+            nếu (om_used(imports, global_id) == 1) {
+                nếu (global_id >= first) { nếu (global_id < last) { status = -1; thoát; }; };
+                nếu (elf_symbol(symbols, strings, om_function_name(registry, global_id, entry_id), 0, 0) != 0) {
+                    status = -1;
+                    thoát;
+                };
+            };
+            offset = offset + 8 + size;
+            global_id = global_id + 1;
+        };
+    };
+    nếu (status == 0) {
+        lặp (off = 0; off < byte_dài(imports); off = off + 8) {
+            nếu (off + 8 > byte_dài(imports)) { status = -1; thoát; };
+            biến imported_id = byte_đọc_i32(imports, off + 4);
+            nếu (imported_id < 0) { status = -1; thoát; };
+            nếu (imported_id >= global_id) { status = -1; thoát; };
+        };
+    };
+    nếu (status == 0) {
+        lặp (native_id = 0; native_id < 62; native_id++) {
+            nếu (om_used(native_calls, native_id) == 1) {
+                nếu (elf_symbol(symbols, strings, obj_native_name(native_id), 0, 0) != 0) {
+                    status = -1;
+                    thoát;
+                };
+            };
+        };
+    };
+    nếu (status == 0) {
+        lặp (off = 0; off < byte_dài(imports); off = off + 8) {
+            biến at = byte_đọc_i32(imports, off);
+            biến id = byte_đọc_i32(imports, off + 4);
+            nếu (at < 0) { status = -1; thoát; };
+            nếu (at + 4 > n) { status = -1; thoát; };
+            nếu (elf_rela(relocs, at, 1 + om_import_index(imports, first, last, id)) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+        lặp (off = 0; off < byte_dài(native_calls); off = off + 8) {
+            biến native_at = byte_đọc_i32(native_calls, off);
+            biến native_symbol_id = byte_đọc_i32(native_calls, off + 4);
+            nếu (native_at < 0) { status = -1; thoát; };
+            nếu (native_at + 4 > n) { status = -1; thoát; };
+            nếu (native_symbol_id < 0) { status = -1; thoát; };
+            nếu (native_symbol_id >= 62) { status = -1; thoát; };
+            nếu (elf_rela(relocs, native_at, 1 + om_native_index(imports, native_calls, first, last, global_id, native_symbol_id)) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+    };
+    // Section-name indexes: 1 .text, 7 .rela.text, 18 .symtab,
+    // 26 .strtab, 34 .shstrtab.
+    nếu (status == 0) { status = byte_thêm(section_names, 0); };
+    nếu (status == 0) { status = elf_name(section_names, ".text"); };
+    nếu (status == 0) { status = elf_name(section_names, ".rela.text"); };
+    nếu (status == 0) { status = elf_name(section_names, ".symtab"); };
+    nếu (status == 0) { status = elf_name(section_names, ".strtab"); };
+    nếu (status == 0) { status = elf_name(section_names, ".shstrtab"); };
+    nếu (status == 0) {
+        biến reloc_offset = 64;
+        lặp (i = 0; i < n; i = i + 8) { reloc_offset = reloc_offset + 8; };
+        biến symbol_offset = reloc_offset + byte_dài(relocs);
+        biến string_offset = symbol_offset + byte_dài(symbols);
+        biến names_offset = string_offset + byte_dài(strings);
+        biến headers_offset = 0;
+        biến names_end = names_offset + byte_dài(section_names);
+        lặp (i = 0; i < names_end; i = i + 8) { headers_offset = headers_offset + 8; };
+        nếu (headers_offset + 384 > 1048576) { status = -1; };
+        nếu (status == 0) {
+            obj_i32(object, 1179403647); // ELF magic, little endian
+            byte_thêm(object, 2); // 64-bit
+            byte_thêm(object, 1); // little-endian
+            byte_thêm(object, 1); // current ELF version
+            byte_thêm(object, 0); // SYSV
+            obj_u64(object, 0); // remaining e_ident bytes
+            byte_thêm(object, 1); byte_thêm(object, 0); // ET_REL
+            byte_thêm(object, 62); byte_thêm(object, 0); // EM_X86_64
+            obj_i32(object, 1); // EV_CURRENT
+            obj_u64(object, 0); // entry
+            obj_u64(object, 0); // program headers
+            obj_u64(object, headers_offset);
+            obj_i32(object, 0); // flags
+            byte_thêm(object, 64); byte_thêm(object, 0); // header size
+            byte_thêm(object, 0); byte_thêm(object, 0); // phentsize
+            byte_thêm(object, 0); byte_thêm(object, 0); // phnum
+            byte_thêm(object, 64); byte_thêm(object, 0); // shentsize
+            byte_thêm(object, 6); byte_thêm(object, 0); // shnum
+            byte_thêm(object, 5); byte_thêm(object, 0); // shstrndx
+            nếu (byte_dài(object) != 64) { status = -1; };
+            nếu (byte_nối(object, code) != 0) { status = -1; };
+            nếu (obj_pad(object, reloc_offset) != 0) { status = -1; };
+            nếu (byte_nối(object, relocs) != 0) { status = -1; };
+            nếu (byte_nối(object, symbols) != 0) { status = -1; };
+            nếu (byte_nối(object, strings) != 0) { status = -1; };
+            nếu (byte_nối(object, section_names) != 0) { status = -1; };
+            nếu (obj_pad(object, headers_offset) != 0) { status = -1; };
+            nếu (obj_pad(object, headers_offset + 64) != 0) { status = -1; };
+            nếu (elf_shdr(object, 1, 1, 6, 64, n, 0, 0, 16, 0) != 0) { status = -1; };
+            nếu (elf_shdr(object, 7, 4, 0, reloc_offset, byte_dài(relocs), 3, 1, 8, 24) != 0) { status = -1; };
+            nếu (elf_shdr(object, 18, 2, 0, symbol_offset, byte_dài(symbols), 4, 1, 8, 24) != 0) { status = -1; };
+            nếu (elf_shdr(object, 26, 3, 0, string_offset, byte_dài(strings), 0, 0, 1, 0) != 0) { status = -1; };
+            nếu (elf_shdr(object, 34, 3, 0, names_offset, byte_dài(section_names), 0, 0, 1, 0) != 0) { status = -1; };
+            nếu (byte_dài(object) != headers_offset + 384) { status = -1; };
+        };
+    };
+    nếu (symbols > 0) { byte_hủy(symbols); };
+    nếu (strings > 0) { byte_hủy(strings); };
+    nếu (relocs > 0) { byte_hủy(relocs); };
+    nếu (section_names > 0) { byte_hủy(section_names); };
+    nếu (status != 0) { byte_làm_rỗng(object); trả về -1; };
+    trả về byte_dài(object);
+};

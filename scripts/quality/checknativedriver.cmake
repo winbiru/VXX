@@ -8,6 +8,10 @@ file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/vpp-native-source.vi")
 set(module_entry "${VPP_ROOT}/gói/biên dịch/native/compiler.vi")
 set(compiler "${VPP_OUTPUT_DIR}/vpp-native")
+set(stage0_linux FALSE)
+if (VPP_TARGET MATCHES "^x86_64-.*linux")
+    set(stage0_linux TRUE)
+endif()
 file(WRITE "${source}" "")
 foreach(part IN ITEMS
     "gói/biên dịch/native/lexer.vi"
@@ -15,19 +19,69 @@ foreach(part IN ITEMS
     "gói/biên dịch/native/parser.vi"
     "gói/biên dịch/native/program.vi"
     "gói/biên dịch/native/codegen.vi"
+    "gói/biên dịch/native/x86_64.vi"
     "gói/biên dịch/native/program_codegen.vi"
     "gói/biên dịch/native/object.vi"
     "gói/biên dịch/native/module_object.vi"
+    "gói/biên dịch/native/elf64.vi"
     "gói/biên dịch/native/module_loader.vi"
     "gói/biên dịch/native/module_compile.vi"
     "gói/biên dịch/native/cache.vi"
     "gói/biên dịch/native/driver.vi")
+    # Stage 0 only needs code for the host ISA. Once bootstrapped, Stage 1
+    # resolves the complete, unchanged native/*.vi library for Stage 2.
+    if (NOT stage0_linux AND (part MATCHES "/x86_64.vi$" OR
+                              part MATCHES "/elf64.vi$"))
+        continue()
+    endif()
     file(READ "${VPP_ROOT}/${part}" contents)
+    if (stage0_linux)
+        if (part MATCHES "/codegen.vi$")
+            string(FIND "${contents}" "// MOVZ/MOVK W9" cut)
+            if (cut LESS 0)
+                message(FATAL_ERROR "cannot trim ARM64 codegen for Linux Stage 0")
+            endif()
+            string(SUBSTRING "${contents}" 0 ${cut} contents)
+        elseif (part MATCHES "/program_codegen.vi$")
+            string(FIND "${contents}" "// Linux AMD64 uses rel32" cut)
+            if (cut LESS 0)
+                message(FATAL_ERROR "cannot extract Linux program codegen")
+            endif()
+            string(SUBSTRING "${contents}" ${cut} -1 contents)
+        elseif (part MATCHES "/object.vi$")
+            string(FIND "${contents}" "// Returns byte length" cut)
+            if (cut LESS 0)
+                message(FATAL_ERROR "cannot trim Mach-O object writer")
+            endif()
+            string(SUBSTRING "${contents}" 0 ${cut} contents)
+        elseif (part MATCHES "/module_object.vi$")
+            string(FIND "${contents}" "// Objects for empty function modules" cut)
+            if (cut LESS 0)
+                message(FATAL_ERROR "cannot trim Mach-O module writer")
+            endif()
+            string(SUBSTRING "${contents}" 0 ${cut} contents)
+        endif()
+    elseif (part MATCHES "/program_codegen.vi$")
+        string(FIND "${contents}" "// Linux AMD64 uses rel32" cut)
+        if (cut LESS 0)
+            message(FATAL_ERROR "cannot trim Linux program codegen for Darwin Stage 0")
+        endif()
+        string(SUBSTRING "${contents}" 0 ${cut} contents)
+    endif()
     file(APPEND "${source}" "${contents}\n")
 endforeach()
+if (stage0_linux)
+    file(APPEND "${source}" "\nhàm cgp_emit_module(a,b,c,d,e,f,g,h) { trả về -1; };\n")
+    file(APPEND "${source}" "hàm om_macho_module(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
+else()
+    file(APPEND "${source}" "\nhàm xgp_emit_module(a,b,c,d,e,f,g,h) { trả về -1; };\n")
+    file(APPEND "${source}" "hàm elf_module(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
+endif()
 file(REMOVE "${compiler}")
 message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    "VPP_ENABLE_MACHINE_JIT=1"
+    "VPP_NATIVE_STAGE0_PROFILE=1"
     "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
     "${source}" "${compiler}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
@@ -265,7 +319,7 @@ if (NOT status EQUAL 52)
     message(FATAL_ERROR "native nested/repeated module imports expected 52, got ${status}")
 endif()
 
-# Cross-module ARM64 relocations must resolve in both directions, including
+# Cross-module native relocations must resolve in both directions, including
 # calls to a declaration in the importer that appears after the import.
 file(WRITE "${module_dir}/sub/forward.vi"
     "hàm từ_phụ() { biến x = \"Tiếng Việt\"; biến n = byte_dài(x); byte_hủy(x); trả về từ_chính() + n - 14; };\n")
@@ -283,7 +337,7 @@ if (NOT status EQUAL 52)
     message(FATAL_ERROR "native reverse cross-module relocation expected 52, got ${status}")
 endif()
 
-# The linker must accept more than 32 independent Mach-O objects. Each
+# The linker must accept more than 32 independent native objects. Each
 # dependency contributes one function and the entrypoint calls all of them.
 set(many_imports "")
 set(many_sum "18")
@@ -383,7 +437,7 @@ if (NOT parity_status EQUAL 0)
 endif()
 message(STATUS "${parity_output}")
 
-# Probe all self-hosted generations; the high-word immediate catches ARM64 MOVK
+# Probe all self-hosted generations; the high-word immediate catches instruction
 # encoding regressions, alongside UTF-8 bytes, calls and loop updates.
 set(bootstrap_probe "${VPP_OUTPUT_DIR}/native-bootstrap-probe.vi")
 file(WRITE "${bootstrap_probe}" "hàm chính() { biến x = 16777228; biến y = 256 * 256 * 256 + 12; nếu (x != y) { trả về 1; }; biến s = \"Tiếng Việt\"; biến total = byte_dài(s) + 38; byte_hủy(s); lặp (i = 0; i < 3; i++) { total = total + 1; }; trả về total - 3; };\n")
@@ -402,4 +456,4 @@ foreach(generation IN ITEMS 2 3 4)
         message(FATAL_ERROR "native Stage ${generation} bootstrap probe expected 52, got ${status}")
     endif()
 endforeach()
-message(STATUS "V++ native ARM64 compiler Stage 1 -> Stage 2 -> Stage 3 -> Stage 4, code parity and runtime probes: PASS")
+message(STATUS "V++ native compiler Stage 1 -> Stage 2 -> Stage 3 -> Stage 4, code parity and runtime probes: PASS")

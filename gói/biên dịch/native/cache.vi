@@ -2,7 +2,9 @@
 // Include the full ordered signature registry: changing arity or function
 // IDs must invalidate callers, even when their own source is unchanged.
 hàm nc_key(kind, src, registry, first, last, entry) {
-    biến key = "vpp-native-aarch64-macho-cache-v1";
+    // One wire format for Mach-O/AArch64 and ELF64/x86-64; `kind` keeps
+    // their emitted-object namespaces distinct.
+    biến key = "vpp-native-object-cache-v2";
     nếu (key <= 0) { trả về -1; };
     biến status = byte_đẩy_i32(key, kind);
     nếu (byte_đẩy_i32(key, first) != 0) { status = -1; };

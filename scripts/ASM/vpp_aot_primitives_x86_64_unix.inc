@@ -206,11 +206,20 @@ PUBLIC(vpp_native_os_spawn_clang):
     movq (%rax), %r9
 #endif
     leaq -40(%rbp), %rdi       // pid_t *
+#ifdef __APPLE__
     leaq Lclang_path(%rip), %rsi
+#else
+    movq -32(%rbp), %rsi
+    movq (%rsi), %rsi          // V++ argv[0] is the linker executable
+#endif
     xorl %edx, %edx           // file actions
     xorl %ecx, %ecx           // attributes
     movq -32(%rbp), %r8       // argv
+#ifdef __APPLE__
     call LIB(posix_spawn)
+#else
+    call LIB(posix_spawnp)     // Locate cc in PATH; Ubuntu need not ship clang
+#endif
     testl %eax, %eax
     jne Lspawn_fail
     movl -40(%rbp), %eax

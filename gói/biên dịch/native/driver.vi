@@ -12,7 +12,19 @@ hàm native_read_source(path, source) {
     trả về byte_dài(source);
 };
 
+// The self-host executable discovers Linux from procfs. This works for the
+// Stage 0 bootstrap and every later generation without a VM/platform API.
+hàm native_is_linux() {
+    biến path = "/proc/self/exe";
+    biến handle = tệp_mở_đọc(path);
+    byte_hủy(path);
+    nếu (handle <= 0) { trả về 0; };
+    tệp_đóng(handle);
+    trả về 1;
+};
+
 hàm native_build(source_path, executable_path) {
+    biến linux = native_is_linux();
     biến source = byte_mới();
     biến ir = byte_mới();
     biến functions = byte_mới();
@@ -54,15 +66,29 @@ hàm native_build(source_path, executable_path) {
             source_offset = mc_read_unit(source, source_offset, unit_source);
             nếu (source_offset < 0) { status = 14; thoát; };
             nếu (last > first) {
-                biến key = nc_key(2, unit_source, registry, first, last, entry_id);
+                biến format = 2;
+                nếu (linux == 1) { format = 3; };
+                biến key = nc_key(format, unit_source, registry, first, last, entry_id);
                 biến cached = 0;
                 nếu (key > 0) { cached = cache_đọc(key, object); };
                 nếu (cached != 1) {
-                    nếu (cgp_emit_module(ir, functions, code, first, last, starts, imports, external_calls) <= 0) {
+                    biến generated = -1;
+                    nếu (linux == 1) {
+                        generated = xgp_emit_module(ir, functions, code, first, last, starts, imports, external_calls);
+                    } hoặc {
+                        generated = cgp_emit_module(ir, functions, code, first, last, starts, imports, external_calls);
+                    };
+                    nếu (generated <= 0) {
                         status = 15;
                     }
                     hoặc {
-                        nếu (om_macho_module(code, object, starts, registry, first, last, entry_id, imports, external_calls) <= 0) {
+                        biến emitted = -1;
+                        nếu (linux == 1) {
+                            emitted = elf_module(code, object, starts, registry, first, last, entry_id, imports, external_calls);
+                        } hoặc {
+                            emitted = om_macho_module(code, object, starts, registry, first, last, entry_id, imports, external_calls);
+                        };
+                        nếu (emitted <= 0) {
                             status = 16;
                         };
                     };

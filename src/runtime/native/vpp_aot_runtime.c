@@ -13,15 +13,24 @@
 #include <ctype.h>
 #include <string.h>
 #include <stddef.h>
-#ifdef __APPLE__
-#include <CommonCrypto/CommonDigest.h>
-#include <crt_externs.h>
-#include <mach-o/dyld.h>
 #include <fcntl.h>
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <CommonCrypto/CommonDigest.h>
+#include <crt_externs.h>
+#include <mach-o/dyld.h>
+#elif defined(__linux__)
+#include <openssl/sha.h>
+// Use the same SHA-256 cache format on both POSIX native hosts.
+#define CC_SHA256_CTX SHA256_CTX
+#define CC_SHA256_DIGEST_LENGTH SHA256_DIGEST_LENGTH
+#define CC_SHA256_Init SHA256_Init
+#define CC_SHA256_Update SHA256_Update
+#define CC_SHA256_Final SHA256_Final
+#define CC_LONG size_t
 #endif
 
 #ifndef VPP_NATIVE_VPP_RUNTIME
@@ -447,6 +456,19 @@ int32_t vpp_native_file_close(int32_t handle) {
 int32_t vpp_native_argc(void) {
 #ifdef __APPLE__
     return *_NSGetArgc();
+#elif defined(__linux__)
+    FILE *file = fopen("/proc/self/cmdline", "rb");
+    if (!file) return -1;
+    int32_t count = 0;
+    int ch, last = 0;
+    while ((ch = fgetc(file)) != EOF) {
+        if (ch == 0) ++count;
+        last = ch;
+    }
+    if (ferror(file)) count = -1;
+    if (count >= 0 && last != 0) ++count;
+    if (fclose(file) != 0) return -1;
+    return count;
 #else
     return -1;
 #endif
@@ -470,6 +492,37 @@ int32_t vpp_native_argv(int32_t index) {
     memcpy(slot->data, value, length + 1);
     slot->length = length;
     return handle;
+#elif defined(__linux__)
+    if (index < 0) return -1;
+    FILE *file = fopen("/proc/self/cmdline", "rb");
+    if (!file) return -1;
+    int32_t handle = -1;
+    int32_t current = 0;
+    int ch;
+    while ((ch = fgetc(file)) != EOF) {
+        if (current == index) {
+            if (handle < 0) {
+                handle = vpp_native_bytes_new();
+                if (handle < 0) break;
+            }
+            if (ch == 0) break;
+            if (vpp_native_bytes_append(handle, ch) != 0) {
+                vpp_native_bytes_free(handle);
+                handle = -1;
+                break;
+            }
+        }
+        if (ch == 0) ++current;
+    }
+    if (ferror(file)) {
+        if (handle >= 0) vpp_native_bytes_free(handle);
+        handle = -1;
+    }
+    if (fclose(file) != 0) {
+        if (handle >= 0) vpp_native_bytes_free(handle);
+        return -1;
+    }
+    return handle;
 #else
     (void)index;
     return -1;
@@ -481,7 +534,7 @@ int32_t vpp_native_argv(int32_t index) {
 // in V++; this boundary only hashes, validates and atomically publishes bytes.
 // Compiler content is part of the namespace, so replacing a compiler never
 // reuses artifacts produced by its previous implementation.
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 static unsigned long vpp_cache_hits, vpp_cache_misses, vpp_cache_writes;
 static int vpp_cache_initialized;
 static unsigned char vpp_cache_compiler[CC_SHA256_DIGEST_LENGTH];
@@ -500,8 +553,14 @@ static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
     if (!vpp_cache_initialized) {
         // Resolve the running image instead of trusting argv[0] or PATH.
         char executable[VPP_NATIVE_PATH_MAX + 1];
+#ifdef __APPLE__
         uint32_t size = sizeof executable;
         if (_NSGetExecutablePath(executable, &size) != 0) return -1;
+#else
+        ssize_t size = readlink("/proc/self/exe", executable, sizeof executable - 1);
+        if (size <= 0 || (size_t)size >= sizeof executable) return -1;
+        executable[size] = '\0';
+#endif
         FILE *file = fopen(executable, "rb");
         if (!file) return -1;
         CC_SHA256_CTX digest;
@@ -555,7 +614,7 @@ int32_t vpp_native_cache_read(int32_t key_handle, int32_t data_handle) {
     vpp_native_bytes_slot *data = vpp_native_find_bytes(data_handle);
     if (!key || !data || key == data || key->length == 0) return -1;
     vpp_native_bytes_clear(data_handle);
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
     char path[VPP_NATIVE_PATH_MAX + 1];
     if (vpp_native_cache_path(key, path, sizeof path) != 0) return 0;
     ++vpp_cache_misses;
@@ -627,7 +686,7 @@ int32_t vpp_native_cache_write(int32_t key_handle, int32_t data_handle) {
     vpp_native_bytes_slot *key = vpp_native_find_bytes(key_handle);
     vpp_native_bytes_slot *data = vpp_native_find_bytes(data_handle);
     if (!key || !data || key == data || key->length == 0) return -1;
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
     unsigned char header[48] = "VPPCACH1";
 #ifdef VPP_NATIVE_VPP_RUNTIME
     if (vpp_native_cache_header_write(key_handle, data_handle) != 0) return -1;
@@ -672,7 +731,7 @@ int32_t vpp_native_cache_write(int32_t key_handle, int32_t data_handle) {
 // Locate the native runtime from VPP_HOME or a workspace ancestor. Never
 // invoke the compiler through a shell or accept an arbitrary relative path.
 static int vpp_native_runtime_file(const char *relative, char *target, size_t capacity) {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
 #ifdef VPP_NATIVE_VPP_RUNTIME
     // V++ resolves only the trusted runtime paths. C retains the final OS
     // regular-file check before passing a discovered path to clang.
@@ -734,7 +793,11 @@ static int vpp_native_runtime_source(char *target, size_t capacity) {
 #ifndef VPP_NATIVE_VPP_RUNTIME
 int32_t vpp_native_runtime_module_path(void) {
     char path[VPP_NATIVE_PATH_MAX + 1];
-    if (vpp_native_runtime_file("gói/biên dịch/native/runtime.vi", path, sizeof path) != 0)
+    // The C/POSIX runtime supplies every native ABI symbol on both Linux and
+    // bootstrap macOS. Loading runtime.vi here would duplicate the runtime
+    // and introduce unresolved máy_* assembly primitive references.
+    const char *module = "gói/biên dịch/native/runtime_c.vi";
+    if (vpp_native_runtime_file(module, path, sizeof path) != 0)
         return -1;
     const size_t length = strlen(path);
     int32_t handle = vpp_native_bytes_new();
@@ -850,7 +913,7 @@ cleanup:
 int32_t vpp_native_link_macho_modules(int32_t archive_handle,
                                       int32_t output_handle,
                                       int32_t source_handle) {
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__linux__)
     vpp_native_bytes_slot *archive = vpp_native_find_bytes(archive_handle);
     vpp_native_bytes_slot *output = vpp_native_find_bytes(output_handle);
     vpp_native_bytes_slot *source = vpp_native_find_bytes(source_handle);
@@ -895,8 +958,16 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
         for (unsigned i = 0; i < 4; ++i)
             length |= (uint32_t)archive->data[position + i] << (8u * i);
         position += 4;
-        if (length < 232 || length > archive->length - position) return -1;
+        if (length < 64 || length > archive->length - position) return -1;
         const unsigned char *data = archive->data + position;
+#ifdef __linux__
+        // ELF64 little-endian ET_REL for EM_X86_64.
+        if (data[0] != 0x7f || data[1] != 'E' ||
+            data[2] != 'L' || data[3] != 'F' ||
+            data[4] != 2 || data[5] != 1 || data[6] != 1 ||
+            data[16] != 1 || data[17] != 0 ||
+            data[18] != 62 || data[19] != 0) return -1;
+#else
         // MH_MAGIC_64, CPU_TYPE_ARM64 and MH_OBJECT, all little-endian.
         if (data[0] != 0xcf || data[1] != 0xfa ||
             data[2] != 0xed || data[3] != 0xfe ||
@@ -904,6 +975,7 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
             data[6] != 0x00 || data[7] != 0x01 ||
             data[12] != 0x01 || data[13] != 0x00 ||
             data[14] != 0x00 || data[15] != 0x00) return -1;
+#endif
         ++module_count;
         position += length;
     }
@@ -933,9 +1005,14 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
     temporary_handle = vpp_native_bytes_new();
     if (temporary_handle <= 0) goto cleanup_modules;
 #endif
+#ifdef __linux__
+    const char *configured_cc = getenv("VPP_NATIVE_CC");
+    argv[argc++] = (char *)(configured_cc && *configured_cc ? configured_cc : "cc");
+#else
     argv[argc++] = "/usr/bin/clang";
     argv[argc++] = "-arch";
     argv[argc++] = "arm64";
+#endif
     position = 0;
     while (position < archive->length) {
 #ifdef VPP_NATIVE_VPP_RUNTIME
@@ -1042,6 +1119,9 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
     if (needs_services) argv[argc++] = runtime_path;
 #else
     argv[argc++] = runtime_path;
+#ifdef __linux__
+    argv[argc++] = "-lcrypto";
+#endif
 #endif
     argv[argc++] = "-o";
     argv[argc++] = executable_path;
@@ -1058,7 +1138,7 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
     if (vpp_native_link_spawn_wait() != 0) goto cleanup_modules;
 #else
     pid_t child;
-    if (posix_spawn(&child, argv[0], NULL, NULL, argv, environ) != 0)
+    if (posix_spawnp(&child, argv[0], NULL, NULL, argv, environ) != 0)
         goto cleanup_modules;
     int child_status = 0;
     pid_t waited;

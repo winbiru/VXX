@@ -1,5 +1,17 @@
 // Link CALL instructions inside one Mach-O __text section. The only public
 // symbol is _main, which may occur at any declaration-order function ID.
+// Each ARM64 BL displacement counts four-byte instructions. Skip 64 words
+// per iteration on long calls; this native subset does not yet expose i32 /.
+hàm cgp_word_delta(from, to) {
+    biến pos = from;
+    biến words = 0;
+    lặp (i = 0; pos + 256 <= to; i++) { pos = pos + 256; words = words + 64; };
+    lặp (i = 0; pos < to; i++) { pos = pos + 4; words = words + 1; };
+    lặp (i = 0; pos - 256 >= to; i++) { pos = pos - 256; words = words - 64; };
+    lặp (i = 0; pos > to; i++) { pos = pos - 4; words = words - 1; };
+    trả về words;
+};
+
 hàm cgp_patch_calls(code, starts, relocations, external_calls) {
     biến count = byte_dài(starts);
     lặp (i = 0; i < byte_dài(relocations); i = i + 8) {
@@ -15,9 +27,7 @@ hàm cgp_patch_calls(code, starts, relocations, external_calls) {
         };
         nếu (fn * 4 >= count) { trả về -1; };
         biến to = byte_đọc_i32(starts, fn * 4);
-        biến delta = 0;
-        lặp (pos = from; pos < to; pos = pos + 4) { delta = delta + 1; };
-        lặp (pos = from; pos > to; pos = pos - 4) { delta = delta - 1; };
+        biến delta = cgp_word_delta(from, to);
         nếu (delta < -33554432) { trả về -1; };
         nếu (delta > 33554431) { trả về -1; };
         nếu (delta < 0) { delta = delta + 67108864; };
@@ -112,9 +122,7 @@ hàm cgp_patch_module_calls(code, starts, calls, first, last, imports, native_ca
             nếu (byte_đẩy_i32(imports, target) != 0) { trả về -1; };
         } hoặc {
             biến to = byte_đọc_i32(starts, (target - first) * 4);
-            biến delta = 0;
-            lặp (pos = from; pos < to; pos = pos + 4) { delta = delta + 1; };
-            lặp (pos = from; pos > to; pos = pos - 4) { delta = delta - 1; };
+            biến delta = cgp_word_delta(from, to);
             nếu (delta < -33554432) { trả về -1; };
             nếu (delta > 33554431) { trả về -1; };
             nếu (delta < 0) { delta = delta + 67108864; };
@@ -173,6 +181,86 @@ hàm cgp_emit_module(ir, functions, code, first, last, starts, imports, native_c
             nếu (byte_nối(code, machine) != 0) { status = -1; thoát; };
         };
         nếu (status == 0) { status = cgp_patch_module_calls(code, starts, relocations, first, last, imports, native_calls); };
+    };
+    nếu (unit > 0) { byte_hủy(unit); };
+    nếu (machine > 0) { byte_hủy(machine); };
+    nếu (calls > 0) { byte_hủy(calls); };
+    nếu (relocations > 0) { byte_hủy(relocations); };
+    nếu (status != 0) { byte_làm_rỗng(code); trả về -1; };
+    trả về 1;
+};
+
+// Linux AMD64 uses rel32 call displacements. Internal calls are resolved
+// directly; external module/runtime calls become ELF64 .rela.text entries.
+hàm xgp_patch_module_calls(code, starts, calls, first, last, imports, native_calls) {
+    lặp (i = 0; i < byte_dài(calls); i = i + 8) {
+        biến from = byte_đọc_i32(calls, i);
+        biến target = byte_đọc_i32(calls, i + 4);
+        nếu (from < 0) { trả về -1; };
+        nếu (from + 4 > byte_dài(code)) { trả về -1; };
+        nếu (target < 0) {
+            nếu (target < -62) { trả về -1; };
+            nếu (byte_đẩy_i32(native_calls, from) != 0) { trả về -1; };
+            nếu (byte_đẩy_i32(native_calls, -target - 1) != 0) { trả về -1; };
+        } hoặc nếu (target < first) {
+            nếu (byte_đẩy_i32(imports, from) != 0) { trả về -1; };
+            nếu (byte_đẩy_i32(imports, target) != 0) { trả về -1; };
+        } hoặc nếu (target >= last) {
+            nếu (byte_đẩy_i32(imports, from) != 0) { trả về -1; };
+            nếu (byte_đẩy_i32(imports, target) != 0) { trả về -1; };
+        } hoặc {
+            biến to = byte_đọc_i32(starts, (target - first) * 4);
+            nếu (byte_ghi_i32(code, from, to - from - 4) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+hàm xgp_emit_module(ir, functions, code, first, last, starts, imports, native_calls) {
+    nếu (code == ir) { trả về -1; };
+    nếu (first < 0) { trả về -1; };
+    nếu (last <= first) { trả về -1; };
+    biến rounded_functions = 0;
+    lặp (i = 0; i < byte_dài(functions); i = i + 24) { rounded_functions = rounded_functions + 24; };
+    nếu (rounded_functions != byte_dài(functions)) { trả về -1; };
+    nếu (last * 24 > byte_dài(functions)) { trả về -1; };
+    nếu (byte_làm_rỗng(code) != 0) { trả về -1; };
+    nếu (byte_làm_rỗng(starts) != 0) { trả về -1; };
+    nếu (byte_làm_rỗng(imports) != 0) { trả về -1; };
+    nếu (byte_làm_rỗng(native_calls) != 0) { trả về -1; };
+    biến unit = byte_mới();
+    biến machine = byte_mới();
+    biến calls = byte_mới();
+    biến relocations = byte_mới();
+    biến status = 0;
+    nếu (unit <= 0) { status = -1; };
+    nếu (machine <= 0) { status = -1; };
+    nếu (calls <= 0) { status = -1; };
+    nếu (relocations <= 0) { status = -1; };
+    nếu (status == 0) {
+        lặp (fn = first; fn < last; fn++) {
+            biến ir_start = byte_đọc_i32(functions, fn * 24 + 12);
+            biến ir_size = byte_đọc_i32(functions, fn * 24 + 16);
+            nếu (ir_size < 8) { status = -1; thoát; };
+            nếu (ir_start < 0) { status = -1; thoát; };
+            nếu (ir_start + ir_size > byte_dài(ir)) { status = -1; thoát; };
+            nếu (byte_làm_rỗng(unit) != 0) { status = -1; thoát; };
+            nếu (byte_làm_rỗng(calls) != 0) { status = -1; thoát; };
+            lặp (off = ir_start; off < ir_start + ir_size; off++) {
+                nếu (byte_thêm(unit, byte_lấy(ir, off)) != 0) { status = -1; thoát; };
+            };
+            nếu (status < 0) { thoát; };
+            biến start = byte_dài(code);
+            nếu (byte_đẩy_i32(starts, start) != 0) { status = -1; thoát; };
+            nếu (xg_emit_internal(unit, machine, calls) <= 0) { status = -1; thoát; };
+            lặp (offset = 0; offset < byte_dài(calls); offset = offset + 8) {
+                nếu (byte_đẩy_i32(relocations, start + byte_đọc_i32(calls, offset)) != 0) { status = -1; thoát; };
+                nếu (byte_đẩy_i32(relocations, byte_đọc_i32(calls, offset + 4)) != 0) { status = -1; thoát; };
+            };
+            nếu (status < 0) { thoát; };
+            nếu (byte_nối(code, machine) != 0) { status = -1; thoát; };
+        };
+        nếu (status == 0) { status = xgp_patch_module_calls(code, starts, relocations, first, last, imports, native_calls); };
     };
     nếu (unit > 0) { byte_hủy(unit); };
     nếu (machine > 0) { byte_hủy(machine); };

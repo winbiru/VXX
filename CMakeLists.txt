@@ -558,6 +558,23 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativeparser"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativeparser.cmake)
+        if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$") OR
+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
+            add_test(NAME vpp-native-elf-x86-writer
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-elf-x86"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_elf_x86.cmake)
+            add_test(NAME vpp-native-compiler-driver
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativedriver"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativedriver.cmake)
+        endif()
         if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
             add_test(NAME vpp-native-ir-object
                 COMMAND ${CMAKE_COMMAND}
@@ -566,13 +583,6 @@ if (BUILD_TESTS)
                     "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativecodegen"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativecodegen.cmake)
-            add_test(NAME vpp-native-compiler-driver
-                COMMAND ${CMAKE_COMMAND}
-                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
-                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativedriver"
-                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativedriver.cmake)
             add_test(NAME vpp-native-vpp-runtime
                 COMMAND ${CMAKE_COMMAND}
                     "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"

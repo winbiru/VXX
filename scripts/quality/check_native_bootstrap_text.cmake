@@ -1,8 +1,21 @@
-# Compare ARM64 Mach-O __TEXT,__text across native compiler generations.
+# Compare the native executable .text sections across bootstrap generations.
 if (NOT DEFINED VPP_STAGE2 OR NOT DEFINED VPP_STAGE3 OR NOT DEFINED VPP_STAGE4)
     message(FATAL_ERROR "Native bootstrap: missing compiler stages")
 endif()
 function(vpp_native_text path out)
+    if (CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        find_program(VPP_BOOTSTRAP_OBJCOPY NAMES objcopy llvm-objcopy REQUIRED)
+        set(text_file "${path}.bootstrap-text")
+        execute_process(COMMAND "${VPP_BOOTSTRAP_OBJCOPY}" --only-section=.text -O binary
+            "${path}" "${text_file}" RESULT_VARIABLE result)
+        if (NOT result EQUAL 0)
+            message(FATAL_ERROR "Cannot extract ELF64 .text: ${path}")
+        endif()
+        file(READ "${text_file}" bytes HEX)
+        file(REMOVE "${text_file}")
+        set(${out} "${bytes}" PARENT_SCOPE)
+        return()
+    endif()
     file(READ "${path}" data HEX)
     # First load-command section descriptor: sectname[16] + segname[16].
     string(FIND "${data}" "5f5f74657874000000000000000000005f5f5445585400000000000000000000" section)
@@ -38,4 +51,4 @@ foreach(path IN ITEMS "${VPP_STAGE3}" "${VPP_STAGE4}")
         message(FATAL_ERROR "Native self-host machine code differs: ${path}")
     endif()
 endforeach()
-message(STATUS "V++ native self-host __TEXT,__text parity: PASS")
+message(STATUS "V++ native self-host .text parity: PASS")
