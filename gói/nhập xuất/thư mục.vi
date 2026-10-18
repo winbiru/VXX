@@ -30,9 +30,9 @@ ngoại hàm enoent_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
 lớp công khai Thư Mục {
     hàm công khai khởi tạo() {};
 
-    // Bảo toàn ranh giới UTF-8 của primitive cũ ngay cả với chuỗi byte được
-    // tạo trực tiếp bằng chuoi_tu_bytes_vm(). FFI c_chuỗi tự từ chối NUL nhúng.
-    hàm riêng tư thư mục kiểm tra đường posix(đường) {
+    // Kiểm tra trước khi tra cứu thư mục trên cả POSIX và Windows. Lỗi V++
+    // cần bắt được bằng thử/bắt lỗi trước khi đi vào FFI c_chuỗi.
+    hàm riêng tư thư mục kiểm tra đường(đường) {
         bytes = bảng mã utf8 mã hóa(đường);
         lặp(i = 0; i < do_dai(bytes); i++) {
             nếu (bytes[i] == 0) {
@@ -44,7 +44,7 @@ lớp công khai Thư Mục {
 
     hàm riêng tư thư mục tạo một mục(đường) {
         // V++ tự tạo các mục cha; FFI chỉ tạo một mục trên hệ điều hành.
-        mã = tạo_mục_ffi(mình.thư mục kiểm tra đường posix(đường), 511);
+        mã = tạo_mục_ffi(mình.thư mục kiểm tra đường(đường), 511);
         nếu (mã == 0) { trả về 1; };
         lỗi = errno_thư_mục_ffi();
         nếu (mã == -1 && lỗi == eexist_thư_mục_ffi()) {
@@ -55,7 +55,7 @@ lớp công khai Thư Mục {
 
     hàm riêng tư thư mục xóa một mục(đường) {
         // V++ quyết định thứ tự duyệt và xóa cây.
-        mã = xóa_mục_ffi(mình.thư mục kiểm tra đường posix(đường));
+        mã = xóa_mục_ffi(mình.thư mục kiểm tra đường(đường));
         nếu (mã == 0) { trả về 1; };
         lỗi = errno_thư_mục_ffi();
         nếu (mã == -1 && lỗi == enoent_thư_mục_ffi()) { trả về 0; };
@@ -91,9 +91,7 @@ lớp công khai Thư Mục {
 
     hàm công khai tạo thư mục(đường dẫn) {
         đầu_vào = thành chuỗi(đường dẫn);
-        nếu (ten_nen_tang_vm() != "windows") {
-            mình.thư mục kiểm tra đường posix(đầu_vào);
-        };
+        mình.thư mục kiểm tra đường(đầu_vào);
         đường = mình.thư mục bỏ dấu cuối(đầu_vào);
         cần_tạo = [];
         hiện_tại = đường;
@@ -122,7 +120,7 @@ lớp công khai Thư Mục {
 
     hàm công khai liệt kê thư mục(đường dẫn) {
         đường = thành chuỗi(đường dẫn);
-        thư_mục = mở_thư_mục_ffi(mình.thư mục kiểm tra đường posix(đường));
+        thư_mục = mở_thư_mục_ffi(mình.thư mục kiểm tra đường(đường));
         nếu (thư_mục == rỗng) { ném "liệt kê thư mục: không thể mở thư mục"; };
         kết_quả = [];
         thử {
@@ -151,9 +149,7 @@ lớp công khai Thư Mục {
 
     hàm công khai xóa đường dẫn(đường dẫn) {
         đầu_vào = thành chuỗi(đường dẫn);
-        nếu (ten_nen_tang_vm() != "windows") {
-            mình.thư mục kiểm tra đường posix(đầu_vào);
-        };
+        mình.thư mục kiểm tra đường(đầu_vào);
         đường = mình.thư mục bỏ dấu cuối(đầu_vào);
         việc = [[đường, sai]];
         đã_xóa = 0;

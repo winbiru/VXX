@@ -110,11 +110,10 @@ function Invoke-Vpp {
             $key,
             [EnvironmentVariableTarget]::Process
         )
-        [Environment]::SetEnvironmentVariable(
-            $key,
-            [string]$Environment[$key],
-            [EnvironmentVariableTarget]::Process
-        )
+        # Null removes a variable; an empty string is the explicit empty-value
+        # fixture. Preserve both cases for getenv() regression coverage.
+        $value = if ($null -eq $Environment[$key]) { $null } else { [string]$Environment[$key] }
+        [Environment]::SetEnvironmentVariable($key, $value, [EnvironmentVariableTarget]::Process)
     }
 
     try {
@@ -340,7 +339,16 @@ try {
         if ($relativeTest -eq "src/tests/kiem_tra_ffi_process_spawn.vi") {
             continue
         }
-        Invoke-ExpectedTest -TestFile $relativeTest
+        if ($relativeTest -eq "src/tests/kiem_tra_ffi_moi_truong.vi") {
+            # Match the deterministic environment fixtures in run_tests.sh.
+            Invoke-ExpectedTest -TestFile $relativeTest -Environment @{
+                VPP_FFI_ENV_TEST = "vpp-env-ffi-ok"
+                VPP_FFI_ENV_EMPTY_TEST = ""
+                VPP_FFI_ENV_MISSING_TEST = $null
+            }
+        } else {
+            Invoke-ExpectedTest -TestFile $relativeTest
+        }
     }
 
     # Windows file I/O now shares the managed stdio FFI path with POSIX.
@@ -410,7 +418,22 @@ try {
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_spawn_windows.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_timeout_windows.vi"
     Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_process_timeout_windows.vi" -Environment @{ VPP_ENABLE_JIT = "1" }
-    Invoke-ExpectedFailureTest -TestFile "src/tests/kiem_tra_ffi_opcode_process_cu.vi"
+    # The legacy process opcode must fail on Windows, as on POSIX. Its error
+    # includes a platform-dependent stack trace; check the actual runtime
+    # diagnostic instead of comparing an unrelated golden stderr file.
+    foreach ($processMode in @("0", "1")) {
+        $processStdout = Join-Path $sessionDir "legacy-process-$processMode.output"
+        $processStderr = Join-Path $sessionDir "legacy-process-$processMode.stderr"
+        $processExit = Invoke-Vpp -Arguments @("src/tests/kiem_tra_ffi_opcode_process_cu.vi") -StdOut $processStdout -StdErr $processStderr -WorkingDirectory $repoRoot -Environment @{ VPP_ENABLE_JIT = $processMode }
+        $processError = Get-NormalizedUtf8Text $processStderr
+        if ($processExit -ne 0 -and $null -ne $processError -and
+            $processError.Contains("System FFI: legacy process opcode is disabled")) {
+            Add-Pass "legacy process opcode disabled [JIT=$processMode]"
+        } else {
+            Add-Fail "legacy process opcode gate [JIT=$processMode]"
+            Show-FailureDetails -StdErr $processStderr -ExitCode $processExit
+        }
+    }
 
     # UTC chạy cùng V++ FFI trên Windows interpreter/JIT; chặn opcode cũ.
     foreach ($utcMode in @("0", "1")) {

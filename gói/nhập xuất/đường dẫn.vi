@@ -26,7 +26,16 @@ ngoại hàm đường_loại_windows_ffi(đường: c_chuỗi, theo_liên_kết
 lớp công khai Tiện Ích Đường Dẫn {
     hàm công khai khởi tạo() {};
 
+    hàm riêng tư đường dẫn kiểm tra byte(đường) {
+        bytes = bảng mã utf8 mã hóa(đường);
+        lặp(i = 0; i < do_dai(bytes); i++) {
+            nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+        };
+        trả về đường;
+    };
+
     hàm công khai đường dẫn loại windows(đường, theo_liên_kết) {
+        mình.đường dẫn kiểm tra byte(đường);
         nếu (theo_liên_kết) { trả về đường_loại_windows_ffi(đường, 1); };
         trả về đường_loại_windows_ffi(đường, 0);
     };
@@ -137,6 +146,16 @@ lớp công khai Tiện Ích Đường Dẫn {
         };
 
         phân_cách = mình.đường dẫn dấu phân cách();
+        // Trên Windows cả '/' và '\\' đều hợp lệ. Nối thêm vào đường dẫn
+        // đã có dấu phân cách thì giữ nguyên kiểu dấu của phần cha.
+        nếu (tên nền tảng() == "windows") {
+            lặp(i = do_dai(gốc_dữ_liệu) - 1; i >= 0; i--) {
+                nếu (mình.đường dẫn là phân cách(gốc_dữ_liệu[i])) {
+                    phân_cách = gốc_dữ_liệu[i];
+                    i = -1;
+                };
+            };
+        };
         nếu (phần con == "") {
             nếu (mình.đường dẫn là phân cách(gốc_dữ_liệu[do_dai(gốc_dữ_liệu) - 1])) {
                 trả về gốc_dữ_liệu;
@@ -246,10 +265,7 @@ lớp công khai Tiện Ích Đường Dẫn {
             trả về mình.đường dẫn loại windows(đường, đúng) >= 0;
         };
         // Giữ xác thực UTF-8 của primitive cũ; libc nhận chuỗi kết thúc bởi NUL.
-        bytes = bảng mã utf8 mã hóa(đường);
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
-        };
+        mình.đường dẫn kiểm tra byte(đường);
         trả về đường_tồn_tại_ffi(đường, 0) == 0;
     };
 
@@ -257,10 +273,7 @@ lớp công khai Tiện Ích Đường Dẫn {
     // cung cấp offset st_mode từ SDK hiện hành; V++ giải mã field để phân loại.
     // Kết quả là mã loại POSIX 0..15 hoặc -1 nếu stat thất bại.
     hàm công khai đường dẫn loại posix(đường, theo_liên_kết) {
-        bytes = bảng mã utf8 mã hóa(đường);
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
-        };
+        mình.đường dẫn kiểm tra byte(đường);
         đệm = [];
         lặp(i = 0; i < 256; i++) { them(đệm, 0); };
         trạng_thái = -1;
