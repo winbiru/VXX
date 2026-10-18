@@ -1,0 +1,33 @@
+// s390x: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phát S390X {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+        ra = [];
+        nếu (loại == "hằng") {
+                        nếu (hằng < -32768 || hằng > 32767) {
+                            // LGFI r2, signed imm32: C0 21 XX XX XX XX.
+                            ra = [192, 33];
+                            biên dịch mã máy thêm word(ra, hằng, sai);
+                        } hoặc {
+                            ra = [167, 41, (thấp - thấp % 256) / 256, thấp % 256];
+                        };
+                    } hoặc {
+                        nếu (loại == "cộng") { ra = [26, 35]; }
+                        hoặc { ra = [27, 35]; };
+                    };
+                    thêm(ra, 7);
+                    thêm(ra, 254);
+        trả về ra;
+    };
+};
+
+
+hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    __vpp_adapter = Bộ Phát S390X();
+    trả về __vpp_adapter.biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+};

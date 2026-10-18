@@ -1,0 +1,653 @@
+// Hạ compiler::IrProgram (đã được semantic binding) sang MachineFunction i32.
+// Hợp đồng serialization ở src/cli/native_vpp_codegen.cpp; C++ lowerer là oracle.
+nhập gói/biên dịch/mã máy nền;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Hạ Mã Máy {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư biên dịch máy hạ lỗi(thông_báo) { ném "Native Machine IR V++: " + thông_báo; };
+
+    // Giữ ABI dưới dạng danh sách đóng; không cho IR giả mạo gọi symbol C tùy ý.
+    hàm riêng tư biên dịch máy hạ runtime arity(symbol) {
+        nếu (symbol == "vpp_native_read_i32" || symbol == "vpp_native_read_status" ||
+            symbol == "vpp_native_bytes_new" || symbol == "vpp_native_argc") { trả về 0; };
+        nếu (symbol == "vpp_native_print_i32" ||
+            symbol == "vpp_native_bytes_length" || symbol == "vpp_native_bytes_free" ||
+            symbol == "vpp_native_bytes_print" || symbol == "vpp_native_bytes_clear" ||
+            symbol == "vpp_native_file_open_read" || symbol == "vpp_native_file_open_write" ||
+            symbol == "vpp_native_file_read_byte" || symbol == "vpp_native_file_close" ||
+            symbol == "vpp_native_argv") {
+            trả về 1;
+        };
+        nếu (symbol == "vpp_native_bytes_append" || symbol == "vpp_native_bytes_get" ||
+            symbol == "vpp_native_bytes_push_i32" || symbol == "vpp_native_bytes_load_i32" ||
+            symbol == "vpp_native_bytes_concat" || symbol == "vpp_native_bytes_equal" ||
+            symbol == "vpp_native_bytes_find" ||
+            symbol == "vpp_native_cache_read" || symbol == "vpp_native_cache_write" ||
+            symbol == "vpp_native_file_read_block" || symbol == "vpp_native_file_write_block" ||
+            symbol == "vpp_native_file_write_byte") { trả về 2; };
+        nếu (symbol == "vpp_native_bytes_slice" ||
+            symbol == "vpp_native_bytes_store_i32" || symbol == "vpp_native_link_macho" ||
+            symbol == "vpp_native_link_macho_modules") { trả về 3; };
+        nếu (symbol == "vpp_native_memory_read_byte") { trả về 1; };
+        nếu (symbol == "vpp_native_memory_write_byte") { trả về 2; };
+        nếu (symbol == "vpp_native_memory_read_i32") { trả về 1; };
+        nếu (symbol == "vpp_native_memory_write_i32") { trả về 2; };
+        nếu (symbol == "vpp_native_memory_bind") { trả về 2; };
+        nếu (symbol == "vpp_native_os_open") { trả về 2; };
+        nếu (symbol == "vpp_native_os_read") { trả về 3; };
+        nếu (symbol == "vpp_native_os_write") { trả về 3; };
+        nếu (symbol == "vpp_native_os_close") { trả về 1; };
+        nếu (symbol == "vpp_native_os_errno") { trả về 0; };
+        nếu (symbol == "vpp_native_os_mkstemp") { trả về 1; };
+        nếu (symbol == "vpp_native_os_rename") { trả về 2; };
+        nếu (symbol == "vpp_native_os_spawn_clang") { trả về 1; };
+        nếu (symbol == "vpp_native_os_waitpid") { trả về 2; };
+        nếu (symbol == "vpp_native_os_stat") { trả về 2; };
+        nếu (symbol == "vpp_native_os_lstat") { trả về 2; };
+        nếu (symbol == "vpp_native_os_access_exec") { trả về 1; };
+        nếu (symbol == "vpp_native_os_unlink") { trả về 1; };
+        nếu (symbol == "vpp_native_os_env_copy") { trả về 2; };
+        nếu (symbol == "vpp_native_os_executable_path") { trả về 1; };
+        nếu (symbol == "vpp_native_os_mkdir") { trả về 1; };
+        nếu (symbol == "vpp_native_os_fstat") { trả về 2; };
+        nếu (symbol == "vpp_native_sha_begin") { trả về 0; };
+        nếu (symbol == "vpp_native_sha_update") { trả về 2; };
+        nếu (symbol == "vpp_native_sha_end") { trả về 1; };
+        nếu (symbol == "vpp_native_os_register_cache_report") { trả về 0; };
+        nếu (symbol == "vpp_native_os_argument_length") { trả về 1; };
+        nếu (symbol == "vpp_native_os_home" || symbol == "vpp_native_os_cwd") { trả về 1; };
+        nếu (symbol == "vpp_native_os_argument_byte") { trả về 2; };
+        nếu (symbol == "vpp_native_i32_div") { trả về 2; };
+        nếu (symbol == "vpp_native_runtime_module_path") { trả về 0; };
+        trả về -1;
+    };
+
+    // Cùng quy tắc stripQuotes của frontend: token bao gồm dấu nháy.
+    hàm riêng tư biên dịch máy hạ tách chuỗi(token) {
+        n = độ dài(token);
+        nếu (n < 2 || !((token[0] == "\"" && token[n - 1] == "\"") ||
+                        (token[0] == "'" && token[n - 1] == "'"))) {
+            mình.biên dịch máy hạ lỗi("native string literal thiếu dấu nháy");
+        };
+        văn_bản = "";
+        i = 1;
+        lặp (vòng = 0; i < n - 1; vòng++) {
+            c = token[i];
+            nếu (c == "\\" && i + 1 < n - 1) {
+                i += 1;
+                esc = token[i];
+                nếu (esc == "n") { văn_bản += "\n"; }
+                hoặc {
+                    nếu (esc == "r") { văn_bản += "\r"; }
+                    hoặc {
+                        nếu (esc == "t") { văn_bản += "\t"; }
+                        hoặc {
+                            nếu (esc == "0") { văn_bản += chuoi_tu_bytes_vm([0]); }
+                            hoặc { văn_bản += esc; };
+                        };
+                    };
+                };
+            } hoặc { văn_bản += c; };
+            i += 1;
+        };
+        trả về văn_bản;
+    };
+
+    hàm riêng tư biên dịch máy hạ slot(trạng_thái, id) {
+        các_slot = trạng_thái["slots"];
+        lặp (i = 0; i < độ dài(các_slot); i++) {
+            nếu (các_slot[i] == id) { trả về i; };
+        };
+        trả về -1;
+    };
+
+    hàm riêng tư biên dịch máy hạ bind(trạng_thái, id) {
+        nếu (id < 0 || mình.biên dịch máy hạ slot(trạng_thái, id) != -1) {
+            trả về sai;
+        };
+        thêm(trạng_thái["slots"], id);
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch máy hạ lệnh(trạng_thái, opcode, immediate = 0, operand = 0, symbol = "") {
+        lệnh = trạng_thái["instructions"];
+        thêm(lệnh, biên dịch mã máy lệnh(opcode, immediate, operand,
+                                       trạng_thái["depth"], symbol));
+        trả về độ dài(lệnh) - 1;
+    };
+
+    hàm riêng tư biên dịch máy hạ push(trạng_thái) {
+        trạng_thái["depth"] = trạng_thái["depth"] + 1;
+        nếu (trạng_thái["depth"] > trạng_thái["maxDepth"]) {
+            trạng_thái["maxDepth"] = trạng_thái["depth"];
+        };
+    };
+
+    hàm riêng tư biên dịch máy hạ drop(trạng_thái) {
+        mình.biên dịch máy hạ lệnh(trạng_thái, "Drop");
+        trạng_thái["depth"] = trạng_thái["depth"] - 1;
+    };
+
+    hàm riêng tư biên dịch máy hạ giá trị(IR, id) {
+        giá_trị = IR["values"];
+        nếu (id < 0 || id >= độ dài(giá_trị)) {
+            mình.biên dịch máy hạ lỗi("IR chứa giá trị không tồn tại");
+        };
+        trả về giá_trị[id];
+    };
+
+    // from_chars C++ chỉ nhận số thập phân có dấu '-' tùy chọn.
+    // Dùng float64 kiểm tra biên i32 trước khi chuyển thành số nguyên VM.
+    hàm riêng tư biên dịch máy hạ số i32(text, cho_phép_2147483648 = sai) {
+        nếu (độ dài(text) == 0) { trả về {"ok": sai}; };
+        dấu = 0;
+        nếu (text[0] == "-") { dấu = 1; };
+        nếu (dấu == độ dài(text)) { trả về {"ok": sai}; };
+        bảng = "0123456789";
+        lặp (i = dấu; i < độ dài(text); i++) {
+            hợp_lệ = sai;
+            lặp (j = 0; j < 10; j++) {
+                nếu (text[i] == bảng[j]) { hợp_lệ = đúng; thoát; };
+            };
+            nếu (!hợp_lệ) { trả về {"ok": sai}; };
+        };
+        số = thành số thực(text);
+        nếu (số < -2147483648.0 || số > 2147483647.0) {
+            nếu (cho_phép_2147483648 && text == "2147483648") {
+                trả về {"ok": đúng, "value": -2147483647 - 1};
+            };
+            trả về {"ok": sai};
+        };
+        trả về {"ok": đúng, "value": thành số nguyên(text)};
+    };
+
+    // Chỉ constant-fold biểu thức nguyên thuần, kiểm tra overflow ở từng bước.
+    hàm riêng tư biên dịch máy hạ hằng(IR, id, sâu = 0) {
+        nếu (sâu >= 64) { trả về {"ok": sai}; };
+        v = mình.biên dịch máy hạ giá trị(IR, id);
+        mã = v["opcode"];
+        ops = v["operands"];
+        nếu (mã == "ConstInt") {
+            nếu (độ dài(ops) != 0) { trả về {"ok": sai}; };
+            trả về mình.biên dịch máy hạ số i32(v["text"]);
+        };
+        nếu (mã == "Unary" && độ dài(ops) == 1) {
+            nếu (v["text"] == "+") {
+                trả về mình.biên dịch máy hạ hằng(IR, ops[0], sâu + 1);
+            };
+            nếu (v["text"] == "-") {
+                trong = mình.biên dịch máy hạ giá trị(IR, ops[0]);
+                nếu (trong["opcode"] == "ConstInt" &&
+                    độ dài(trong["operands"]) == 0 &&
+                    trong["text"] == "2147483648") {
+                    trả về {"ok": đúng, "value": -2147483647 - 1};
+                };
+                x = mình.biên dịch máy hạ hằng(IR, ops[0], sâu + 1);
+                nếu (!x["ok"] || x["value"] == -2147483647 - 1) {
+                    trả về {"ok": sai};
+                };
+                trả về {"ok": đúng, "value": -x["value"]};
+            };
+        };
+        nếu (mã == "Binary" && độ dài(ops) == 2 &&
+            (v["text"] == "+" || v["text"] == "-" || v["text"] == "*")) {
+            a = mình.biên dịch máy hạ hằng(IR, ops[0], sâu + 1);
+            b = mình.biên dịch máy hạ hằng(IR, ops[1], sâu + 1);
+            nếu (!a["ok"] || !b["ok"]) { trả về {"ok": sai}; };
+            trái = thành số thực(a["value"]);
+            phải = thành số thực(b["value"]);
+            kết_quả = 0.0;
+            chọn (v["text"]) {
+                ca "+": { kết_quả = trái + phải; }
+                ca "-": { kết_quả = trái - phải; }
+                ca "*": { kết_quả = trái * phải; }
+                mặc định: { mình.biên dịch máy hạ lỗi("phép toán hằng C++ chưa định nghĩa"); }
+            };
+            nếu (kết_quả < -2147483648.0 || kết_quả > 2147483647.0) {
+                trả về {"ok": sai};
+            };
+            trả về {"ok": đúng, "value": thành số nguyên(kết_quả)};
+        };
+        trả về {"ok": sai};
+    };
+
+    hàm riêng tư biên dịch máy hạ hằng thuần(IR, id, sâu = 0) {
+        nếu (sâu >= 64) { trả về sai; };
+        v = mình.biên dịch máy hạ giá trị(IR, id);
+        ops = v["operands"];
+        nếu (v["opcode"] == "ConstInt") { trả về độ dài(ops) == 0; };
+        nếu (v["opcode"] == "Unary" && độ dài(ops) == 1 &&
+            (v["text"] == "+" || v["text"] == "-")) {
+            trả về mình.biên dịch máy hạ hằng thuần(IR, ops[0], sâu + 1);
+        };
+        nếu (v["opcode"] == "Binary" && độ dài(ops) == 2 &&
+            (v["text"] == "+" || v["text"] == "-" || v["text"] == "*")) {
+            trả về mình.biên dịch máy hạ hằng thuần(IR, ops[0], sâu + 1) &&
+                   mình.biên dịch máy hạ hằng thuần(IR, ops[1], sâu + 1);
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư biên dịch máy hạ khai báo(IR, trạng_thái, stmt) {
+        nếu (stmt["opcode"] == "DeclareVariable" &&
+            !mình.biên dịch máy hạ bind(trạng_thái, stmt["symbolId"])) {
+            mình.biên dịch máy hạ lỗi("khai báo native thiếu symbol ID hoặc trùng symbol");
+        };
+        nếu (stmt["opcode"] == "Loop" && độ dài(stmt["roots"]) != 0) {
+            init = mình.biên dịch máy hạ giá trị(IR, stmt["roots"][0]);
+            nếu (độ dài(init["operands"]) != 0) {
+                lhs = mình.biên dịch máy hạ giá trị(IR, init["operands"][0]);
+                nếu (lhs["opcode"] == "LoadName" && lhs["symbolId"] >= 0 &&
+                    mình.biên dịch máy hạ slot(trạng_thái, lhs["symbolId"]) == -1) {
+                    nếu (!mình.biên dịch máy hạ bind(trạng_thái, lhs["symbolId"])) {
+                        mình.biên dịch máy hạ lỗi("biến đếm vòng lặp không hợp lệ");
+                    };
+                };
+            };
+        };
+        con = stmt["children"];
+        lặp (i = 0; i < độ dài(con); i++) {
+            mình.biên dịch máy hạ khai báo(IR, trạng_thái, con[i]);
+        };
+    };
+
+    hàm riêng tư biên dịch máy hạ biểu thức(IR, trạng_thái, id, sâu = 0) {
+        nếu (sâu >= 64) { mình.biên dịch máy hạ lỗi("biểu thức native quá sâu hoặc có chu trình"); };
+        v = mình.biên dịch máy hạ giá trị(IR, id);
+        ops = v["operands"];
+        hằng = mình.biên dịch máy hạ hằng(IR, id);
+        nếu (hằng["ok"]) {
+            mình.biên dịch máy hạ lệnh(trạng_thái, "PushConstant", hằng["value"]);
+            mình.biên dịch máy hạ push(trạng_thái);
+            trả về đúng;
+        };
+        nếu (mình.biên dịch máy hạ hằng thuần(IR, id)) {
+            mình.biên dịch máy hạ lỗi("biểu thức hằng native vượt phạm vi i32 hoặc tràn trung gian");
+        };
+        chọn (v["opcode"]) {
+            ca "ConstString": {
+                nếu (độ dài(ops) != 0) { mình.biên dịch máy hạ lỗi("native string literal có toán hạng"); };
+                bytes = chuoi_bytes_vm(mình.biên dịch máy hạ tách chuỗi(v["text"]));
+                // Guard code size before emitting a sequence of native calls.
+                nếu (độ dài(bytes) > 4096) { mình.biên dịch máy hạ lỗi("native string literal vượt 4096 byte"); };
+                slot = trạng_thái["literalSlot"];
+                nếu (slot == -1) {
+                    slot = độ dài(trạng_thái["slots"]);
+                    thêm(trạng_thái["slots"], -10000);
+                    trạng_thái["literalSlot"] = slot;
+                };
+                mình.biên dịch máy hạ lệnh(trạng_thái, "Call", 0, 0, "vpp_native_bytes_new");
+                mình.biên dịch máy hạ push(trạng_thái);
+                mình.biên dịch máy hạ lệnh(trạng_thái, "StoreSlot", 0, slot);
+                mình.biên dịch máy hạ drop(trạng_thái);
+                lặp (i = 0; i < độ dài(bytes); i++) {
+                    mình.biên dịch máy hạ lệnh(trạng_thái, "LoadSlot", 0, slot);
+                    mình.biên dịch máy hạ push(trạng_thái);
+                    mình.biên dịch máy hạ lệnh(trạng_thái, "PushConstant", bytes[i]);
+                    mình.biên dịch máy hạ push(trạng_thái);
+                    mình.biên dịch máy hạ lệnh(trạng_thái, "Call", 0, 2, "vpp_native_bytes_append");
+                    trạng_thái["depth"] = trạng_thái["depth"] - 2;
+                    mình.biên dịch máy hạ push(trạng_thái);
+                    mình.biên dịch máy hạ drop(trạng_thái);
+                };
+                mình.biên dịch máy hạ lệnh(trạng_thái, "LoadSlot", 0, slot);
+                mình.biên dịch máy hạ push(trạng_thái);
+            }
+            ca "ConstBool": {
+                text = v["text"];
+                nếu (text != "đúng" && text != "sai" && text != "true" && text != "false") {
+                    mình.biên dịch máy hạ lỗi("hằng bool native không hợp lệ");
+                };
+                bit = 0;
+                nếu (text == "đúng" || text == "true") { bit = 1; };
+                mình.biên dịch máy hạ lệnh(trạng_thái, "PushConstant", bit);
+                mình.biên dịch máy hạ push(trạng_thái);
+            }
+            ca "LoadName": {
+                slot = mình.biên dịch máy hạ slot(trạng_thái, v["symbolId"]);
+                nếu (slot == -1) { mình.biên dịch máy hạ lỗi("biến native chưa có slot hoặc binding"); };
+                mình.biên dịch máy hạ lệnh(trạng_thái, "LoadSlot", 0, slot);
+                mình.biên dịch máy hạ push(trạng_thái);
+            }
+            ca "StoreName": {
+                nếu (v["text"] != "=" || độ dài(ops) != 2) {
+                    mình.biên dịch máy hạ lỗi("native chưa hỗ trợ phép gán mở rộng");
+                };
+                lhs = mình.biên dịch máy hạ giá trị(IR, ops[0]);
+                nếu (lhs["opcode"] != "LoadName") { mình.biên dịch máy hạ lỗi("đích gán native không phải biến"); };
+                slot = mình.biên dịch máy hạ slot(trạng_thái, lhs["symbolId"]);
+                nếu (slot == -1) { mình.biên dịch máy hạ lỗi("biến được gán chưa có slot"); };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[1], sâu + 1);
+                mình.biên dịch máy hạ lệnh(trạng_thái, "StoreSlot", 0, slot);
+            }
+            ca "Unary": {
+                nếu (độ dài(ops) != 1) { mình.biên dịch máy hạ lỗi("unary IR sai số toán hạng"); };
+                chọn (v["text"]) {
+                    ca "+": { mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[0], sâu + 1); }
+                    ca "-": {
+                        mình.biên dịch máy hạ lệnh(trạng_thái, "PushConstant", 0);
+                        mình.biên dịch máy hạ push(trạng_thái);
+                        mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[0], sâu + 1);
+                        mình.biên dịch máy hạ lệnh(trạng_thái, "Sub");
+                        trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                    }
+                    ca "!": {
+                        mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[0], sâu + 1);
+                        mình.biên dịch máy hạ lệnh(trạng_thái, "PushConstant", 0);
+                        mình.biên dịch máy hạ push(trạng_thái);
+                        mình.biên dịch máy hạ lệnh(trạng_thái, "Equal");
+                        trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                    }
+                    mặc định: { mình.biên dịch máy hạ lỗi("toán tử unary native chưa hỗ trợ: " + v["text"]); }
+                };
+            }
+            ca "Binary": {
+                nếu (độ dài(ops) != 2) { mình.biên dịch máy hạ lỗi("binary IR sai số toán hạng"); };
+                mã = "";
+                chọn (v["text"]) {
+                    ca "+": { mã = "Add"; }
+                    ca "-": { mã = "Sub"; }
+                    ca "*": { mã = "Mul"; }
+                    ca "==": { mã = "Equal"; }
+                    ca "!=": { mã = "NotEqual"; }
+                    ca "<": { mã = "Less"; }
+                    ca "<=": { mã = "LessEqual"; }
+                    ca ">": { mã = "Greater"; }
+                    ca ">=": { mã = "GreaterEqual"; }
+                    mặc định: { mình.biên dịch máy hạ lỗi("toán tử binary native chưa hỗ trợ: " + v["text"]); }
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[0], sâu + 1);
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[1], sâu + 1);
+                mình.biên dịch máy hạ lệnh(trạng_thái, mã);
+                trạng_thái["depth"] = trạng_thái["depth"] - 1;
+            }
+            ca "Call": {
+                nếu (v["callTarget"] == "NativeRuntime") {
+                    argc = mình.biên dịch máy hạ runtime arity(v["text"]);
+                    nếu (argc == -1 || v["symbolId"] != -1 || độ dài(ops) != argc) {
+                        mình.biên dịch máy hạ lỗi("runtime native i32/byte có ABI không hợp lệ");
+                    };
+                    lặp (i = 0; i < argc; i++) {
+                        mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[i], sâu + 1);
+                    };
+                    mình.biên dịch máy hạ lệnh(trạng_thái, "Call", 0, argc, v["text"]);
+                    trạng_thái["depth"] = trạng_thái["depth"] - argc;
+                    mình.biên dịch máy hạ push(trạng_thái);
+                    trả về đúng;
+                };
+                nếu (v["callTarget"] != "DirectFunction" || v["symbolId"] < 0 ||
+                    độ dài(ops) == 0) {
+                    mình.biên dịch máy hạ lỗi("native chỉ hỗ trợ lời gọi hàm direct đã binding");
+                };
+                callee = mình.biên dịch máy hạ giá trị(IR, ops[0]);
+                nếu (callee["opcode"] != "LoadName" ||
+                    callee["symbolId"] != v["symbolId"]) {
+                    mình.biên dịch máy hạ lỗi("callee native không khớp semantic binding");
+                };
+                argc = độ dài(ops) - 1;
+                đích = rỗng;
+                danh_sách_hàm = IR["functions"];
+                lặp (i = 0; i < độ dài(danh_sách_hàm); i++) {
+                    nếu (danh_sách_hàm[i]["symbolId"] == v["symbolId"]) {
+                        nếu (đích != rỗng) { mình.biên dịch máy hạ lỗi("native call có nhiều định nghĩa cùng symbol"); };
+                        đích = danh_sách_hàm[i];
+                    };
+                };
+                nếu (đích == rỗng ||
+                    !biên dịch mã máy ký hiệu hợp lệ(đích["name"]) ||
+                    độ dài(đích["parameters"]) != argc) {
+                    mình.biên dịch máy hạ lỗi("native call thiếu định nghĩa hàm/không đúng arity hoặc tên symbol");
+                };
+                params = đích["parameters"];
+                lặp (i = 0; i < độ dài(params); i++) {
+                    nếu (params[i]["hasDefault"]) { mình.biên dịch máy hạ lỗi("native call không hỗ trợ tham số mặc định"); };
+                };
+                lặp (i = 1; i < độ dài(ops); i++) {
+                    mình.biên dịch máy hạ biểu thức(IR, trạng_thái, ops[i], sâu + 1);
+                };
+                mình.biên dịch máy hạ lệnh(trạng_thái, "Call", 0, argc, đích["name"]);
+                trạng_thái["depth"] = trạng_thái["depth"] - argc;
+                mình.biên dịch máy hạ push(trạng_thái);
+            }
+            mặc định: { mình.biên dịch máy hạ lỗi("IR native không hỗ trợ giá trị " + v["opcode"]); }
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch máy hạ câu(IR, trạng_thái, stmt) {
+        nếu (stmt["unsupported"]) { mình.biên dịch máy hạ lỗi("unsupported direct IR region"); };
+        roots = stmt["roots"];
+        con = stmt["children"];
+        chọn (stmt["opcode"]) {
+            ca "NoOp": {
+                nếu (độ dài(roots) != 0 || độ dài(con) != 0) {
+                    mình.biên dịch máy hạ lỗi("NoOp IR chứa tác dụng phụ");
+                };
+            }
+            ca "Block": {
+                nếu (độ dài(roots) != 0) { mình.biên dịch máy hạ lỗi("Block IR không hợp lệ"); };
+                lặp (i = 0; i < độ dài(con); i++) {
+                    mình.biên dịch máy hạ câu(IR, trạng_thái, con[i]);
+                };
+            }
+            ca "DeclareVariable": {
+                nếu (độ dài(con) != 0 || độ dài(roots) > 1) {
+                    mình.biên dịch máy hạ lỗi("khai báo native không hợp lệ");
+                };
+                nếu (độ dài(roots) == 0) { mình.biên dịch máy hạ lỗi("native cần khởi tạo biến cục bộ"); };
+                slot = mình.biên dịch máy hạ slot(trạng_thái, stmt["symbolId"]);
+                nếu (slot == -1) { mình.biên dịch máy hạ lỗi("thiếu frame slot cho khai báo"); };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                mình.biên dịch máy hạ lệnh(trạng_thái, "StoreSlot", 0, slot);
+                mình.biên dịch máy hạ drop(trạng_thái);
+            }
+            ca "Statement": {
+                nếu (độ dài(roots) != 1 || độ dài(con) != 0) {
+                    mình.biên dịch máy hạ lỗi("câu lệnh biểu thức native không hợp lệ");
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                mình.biên dịch máy hạ drop(trạng_thái);
+            }
+            ca "Print": {
+                nếu (độ dài(roots) != 1 || độ dài(con) != 0) {
+                    mình.biên dịch máy hạ lỗi("in native cần đúng một biểu thức i32");
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                // Signed i32 native ABI. Runtime returns i32 (ignored); stack
+                // discipline is identical to a one-argument direct CALL.
+                mình.biên dịch máy hạ lệnh(trạng_thái, "Call", 0, 1,
+                                          "vpp_native_print_i32");
+                trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                mình.biên dịch máy hạ push(trạng_thái);
+                mình.biên dịch máy hạ drop(trạng_thái);
+            }
+            ca "Return": {
+                nếu (độ dài(roots) != 1 || độ dài(con) != 0) {
+                    mình.biên dịch máy hạ lỗi("native cần trả về đúng một giá trị i32");
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                mình.biên dịch máy hạ lệnh(trạng_thái, "Return");
+                trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                trạng_thái["hasReturn"] = đúng;
+            }
+            ca "Conditional": {
+                có_hoặc = stmt["conditionalForm"] == "IfElseBlocks";
+                nếu (độ dài(roots) != 1 ||
+                    (có_hoặc && độ dài(con) != 2) ||
+                    (!có_hoặc && độ dài(con) != 1) ||
+                    (stmt["conditionalForm"] != "IfBlock" && !có_hoặc)) {
+                    mình.biên dịch máy hạ lỗi("dạng điều kiện native chưa được hỗ trợ");
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                tới_hoặc = mình.biên dịch máy hạ lệnh(trạng_thái, "BranchZero");
+                trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                mình.biên dịch máy hạ câu(IR, trạng_thái, con[0]);
+                nếu (có_hoặc) {
+                    tới_cuối = mình.biên dịch máy hạ lệnh(trạng_thái, "Jump");
+                    trạng_thái["instructions"][tới_hoặc]["operand"] = độ dài(trạng_thái["instructions"]);
+                    mình.biên dịch máy hạ câu(IR, trạng_thái, con[1]);
+                    trạng_thái["instructions"][tới_cuối]["operand"] = độ dài(trạng_thái["instructions"]);
+                } hoặc {
+                    trạng_thái["instructions"][tới_hoặc]["operand"] = độ dài(trạng_thái["instructions"]);
+                };
+            }
+            ca "Loop": {
+                nếu (stmt["loopForm"] != "ForBlock" || độ dài(roots) != 3 || độ dài(con) != 1) {
+                    mình.biên dịch máy hạ lỗi("native chỉ hỗ trợ lặp(init; condition; update) { ... }");
+                };
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[0]);
+                mình.biên dịch máy hạ drop(trạng_thái);
+                bắt_đầu = độ dài(trạng_thái["instructions"]);
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[1]);
+                thoát_lặp = mình.biên dịch máy hạ lệnh(trạng_thái, "BranchZero");
+                trạng_thái["depth"] = trạng_thái["depth"] - 1;
+                khung = {"breaks": [], "continues": []};
+                thêm(trạng_thái["loops"], khung);
+                mình.biên dịch máy hạ câu(IR, trạng_thái, con[0]);
+                cập_nhật = độ dài(trạng_thái["instructions"]);
+                mình.biên dịch máy hạ biểu thức(IR, trạng_thái, roots[2]);
+                mình.biên dịch máy hạ drop(trạng_thái);
+                mình.biên dịch máy hạ lệnh(trạng_thái, "Jump", 0, bắt_đầu);
+                kết_thúc = độ dài(trạng_thái["instructions"]);
+                trạng_thái["instructions"][thoát_lặp]["operand"] = kết_thúc;
+                lặp (i = 0; i < độ dài(khung["breaks"]); i++) {
+                    trạng_thái["instructions"][khung["breaks"][i]]["operand"] = kết_thúc;
+                };
+                lặp (i = 0; i < độ dài(khung["continues"]); i++) {
+                    trạng_thái["instructions"][khung["continues"][i]]["operand"] = cập_nhật;
+                };
+                xóa tại(trạng_thái["loops"], độ dài(trạng_thái["loops"]) - 1);
+            }
+            ca "Break": {
+                loops = trạng_thái["loops"];
+                nếu (độ dài(loops) == 0) { mình.biên dịch máy hạ lỗi("thoát/bỏ qua ngoài vòng lặp native"); };
+                thêm(loops[độ dài(loops) - 1]["breaks"], mình.biên dịch máy hạ lệnh(trạng_thái, "Jump"));
+            }
+            ca "Continue": {
+                loops = trạng_thái["loops"];
+                nếu (độ dài(loops) == 0) { mình.biên dịch máy hạ lỗi("thoát/bỏ qua ngoài vòng lặp native"); };
+                thêm(loops[độ dài(loops) - 1]["continues"], mình.biên dịch máy hạ lệnh(trạng_thái, "Jump"));
+            }
+            mặc định: { mình.biên dịch máy hạ lỗi("IR native chưa hỗ trợ câu lệnh " + stmt["opcode"]); }
+        };
+        trả về đúng;
+    };
+
+    hàm công khai biên dịch máy hạ IR(IR, tên_hàm) {
+        danh_sách_hàm = IR["functions"];
+        định_nghĩa = rỗng;
+        lặp (i = 0; i < độ dài(danh_sách_hàm); i++) {
+            nếu (danh_sách_hàm[i]["name"] == tên_hàm) {
+                nếu (định_nghĩa != rỗng) { mình.biên dịch máy hạ lỗi("có nhiều hàm cùng tên"); };
+                định_nghĩa = danh_sách_hàm[i];
+            };
+        };
+        nếu (định_nghĩa == rỗng) { mình.biên dịch máy hạ lỗi("không tìm thấy hàm: " + tên_hàm); };
+        con = định_nghĩa["children"];
+        nếu (định_nghĩa["unsupported"] || độ dài(định_nghĩa["roots"]) != 0 ||
+            độ dài(con) != 1 || con[0]["opcode"] != "Block") {
+            mình.biên dịch máy hạ lỗi("hàm native phải có thân IR trực tiếp");
+        };
+        params = định_nghĩa["parameters"];
+        trạng_thái = {"slots": [], "instructions": [], "depth": 0,
+                      "maxDepth": 0, "hasReturn": sai, "loops": [], "literalSlot": -1};
+        lặp (i = 0; i < độ dài(params); i++) {
+            nếu (params[i]["hasDefault"] || !mình.biên dịch máy hạ bind(trạng_thái, params[i]["symbolId"])) {
+                mình.biên dịch máy hạ lỗi("tham số native cần symbol ID riêng và không có mặc định");
+            };
+        };
+        mình.biên dịch máy hạ khai báo(IR, trạng_thái, con[0]);
+        mình.biên dịch máy hạ câu(IR, trạng_thái, con[0]);
+        slots = độ dài(trạng_thái["slots"]);
+        nếu (!trạng_thái["hasReturn"]) { mình.biên dịch máy hạ lỗi("hàm native cần trả về i32"); };
+        mình.biên dịch máy hạ lệnh(trạng_thái, "Trap");
+        kết_quả = {"parameterCount": độ dài(params), "slotCount": slots,
+                   "maxStackDepth": trạng_thái["maxDepth"],
+                   "instructions": trạng_thái["instructions"]};
+        biên dịch mã máy kiểm tra CFG(kết_quả);
+        trả về kết_quả;
+    };
+
+    // Nhận diện ABI leaf i32 trên tất cả kiến trúc. Trả về loại/hằng đúng hợp
+    // đồng RawLeaf C++ để encoder ISA V++ hiện có xử lý, không sinh byte C++.
+    hàm công khai biên dịch máy hạ lá(IR, tên_hàm) {
+        danh_sách_hàm = IR["functions"];
+        định_nghĩa = rỗng;
+        lặp (i = 0; i < độ dài(danh_sách_hàm); i++) {
+            nếu (danh_sách_hàm[i]["name"] == tên_hàm) {
+                nếu (định_nghĩa != rỗng) { mình.biên dịch máy hạ lỗi("có nhiều hàm cùng tên"); };
+                định_nghĩa = danh_sách_hàm[i];
+            };
+        };
+        nếu (định_nghĩa == rỗng) { mình.biên dịch máy hạ lỗi("không tìm thấy hàm: " + tên_hàm); };
+        con = định_nghĩa["children"];
+        nếu (định_nghĩa["unsupported"] || độ dài(định_nghĩa["roots"]) != 0 ||
+            độ dài(con) != 1 || con[0]["opcode"] != "Block") {
+            mình.biên dịch máy hạ lỗi("cấu trúc hàm chưa được hỗ trợ");
+        };
+        thân = con[0];
+        lệnh = thân["children"];
+        nếu (thân["unsupported"] || độ dài(thân["roots"]) != 0 ||
+            độ dài(lệnh) != 1 || lệnh[0]["opcode"] != "Return") {
+            mình.biên dịch máy hạ lỗi("hàm lá cần duy nhất một lệnh trả về");
+        };
+        trả_về = lệnh[0];
+        nếu (trả_về["unsupported"] || độ dài(trả_về["children"]) != 0 ||
+            độ dài(trả_về["roots"]) != 1) {
+            mình.biên dịch máy hạ lỗi("giá trị trả về chưa được hỗ trợ");
+        };
+        gốc_dữ_liệu = trả_về["roots"][0];
+        params = định_nghĩa["parameters"];
+        nếu (độ dài(params) == 0) {
+            folded = mình.biên dịch máy hạ hằng(IR, gốc_dữ_liệu);
+            nếu (folded["ok"]) {
+                trả về {"kind": "hằng", "constant": folded["value"]};
+            };
+        };
+        nếu (độ dài(params) == 2) {
+            p0 = params[0];
+            p1 = params[1];
+            nếu (p0["hasDefault"] || p1["hasDefault"] ||
+                p0["symbolId"] < 0 || p1["symbolId"] < 0 ||
+                p0["symbolId"] == p1["symbolId"]) {
+                mình.biên dịch máy hạ lỗi("ABI i32 không hỗ trợ tham số mặc định hoặc trùng tên");
+            };
+            expr = mình.biên dịch máy hạ giá trị(IR, gốc_dữ_liệu);
+            ops = expr["operands"];
+            nếu (expr["opcode"] == "Binary" &&
+                (expr["text"] == "+" || expr["text"] == "-") &&
+                độ dài(ops) == 2) {
+                trái = mình.biên dịch máy hạ giá trị(IR, ops[0]);
+                phải = mình.biên dịch máy hạ giá trị(IR, ops[1]);
+                nếu (trái["opcode"] == "LoadName" && phải["opcode"] == "LoadName" &&
+                    độ dài(trái["operands"]) == 0 && độ dài(phải["operands"]) == 0) {
+                    nếu (trái["symbolId"] == p0["symbolId"] &&
+                        phải["symbolId"] == p1["symbolId"]) {
+                        nếu (expr["text"] == "+") { trả về {"kind": "cộng", "constant": 0}; };
+                        trả về {"kind": "trừ", "constant": 0};
+                    };
+                    nếu (expr["text"] == "+" && trái["symbolId"] == p1["symbolId"] &&
+                        phải["symbolId"] == p0["symbolId"]) {
+                        trả về {"kind": "cộng", "constant": 0};
+                    };
+                };
+            };
+        };
+        mình.biên dịch máy hạ lỗi("chỉ hỗ trợ biểu thức hằng i32 (+,-,*), a + b, b + a hoặc a - b với hai tham số i32");
+    };
+};
+
+
+hàm công khai biên dịch máy hạ IR(IR, tên_hàm) {
+    __vpp_adapter = Bộ Hạ Mã Máy();
+    trả về __vpp_adapter.biên dịch máy hạ IR(IR, tên_hàm);
+};
+
+hàm công khai biên dịch máy hạ lá(IR, tên_hàm) {
+    __vpp_adapter = Bộ Hạ Mã Máy();
+    trả về __vpp_adapter.biên dịch máy hạ lá(IR, tên_hàm);
+};

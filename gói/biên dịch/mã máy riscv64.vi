@@ -1,0 +1,35 @@
+// riscv64: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phát RISCV64 {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+        ra = [];
+        nếu (loại == "hằng") {
+                        // Chia trước khi chuẩn hóa phần dư: (INT_MAX - (-1))
+                        // vượt int32, dù kết quả hi20/lo12 vẫn biểu diễn được.
+                        phần_cao = hằng / 4096;
+                        dư = hằng % 4096;
+                        nếu (dư > 2047) { dư -= 4096; phần_cao += 1; };
+                        nếu (dư < -2048) { dư += 4096; phần_cao -= 1; };
+                        nếu (phần_cao >= 524288) { phần_cao -= 1048576; };
+                        nếu (phần_cao < -524288) { phần_cao += 1048576; };
+                        biên dịch mã máy thêm word(ra, phần_cao * 4096 + 1335, ít);
+                        biên dịch mã máy thêm word(ra, dư * 1048576 + 328987, ít);
+                    } hoặc {
+                        nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "00b5053b", ít); }
+                        hoặc { biên dịch mã máy thêm hex(ra, "40b5053b", ít); };
+                    };
+                    biên dịch mã máy thêm hex(ra, "00008067", ít);
+        trả về ra;
+    };
+};
+
+
+hàm công khai biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    __vpp_adapter = Bộ Phát RISCV64();
+    trả về __vpp_adapter.biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+};

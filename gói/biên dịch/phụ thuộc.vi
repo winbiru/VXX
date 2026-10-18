@@ -1,0 +1,58 @@
+// Phân tích đồ thị phụ thuộc dùng snapshot compiler V++ chung.
+nhập gói/bộ sưu tập/từ điển;
+// vpp.dependencies — phân tích import và kiểm tra đồ thị phụ thuộc bằng compiler V++.
+
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+nhập gói/biên dịch/chính;
+
+// Một phiên compiler được dùng chung cho việc kiểm tra và liệt kê import.
+lớp công khai Bộ Phân Tích Phụ Thuộc {
+    hàm công khai khởi tạo(mã_nguồn, thư_mục) {
+        mình.phiên = Bộ Biên Dịch(mã_nguồn, thư_mục);
+    };
+
+    hàm công khai danh sách() {
+        phiên = mình.phiên;
+        cây = phiên.cây cú pháp();
+        kết_quả = [];
+        lặp(i = 0; i < độ dài(cây); i++) {
+            mục = cây[i];
+            nếu (lấy map(mục, "loại", "") == "nhập") {
+                đích = lấy map(mục, "đích", "");
+                nếu (đích != "") {
+                    thêm(kết_quả, {
+                        "tên": đích,
+                        "bí danh": lấy map(mục, "bí danh", ""),
+                        "công khai": lấy map(mục, "công khai", 0)
+                    });
+                };
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai kiểm tra() {
+        phiên = mình.phiên;
+        kết_quả = phiên.kiểm tra();
+        trả về {
+            "hợp lệ": lấy map(kết_quả, "hợp lệ", 0),
+            "lỗi": lấy map(kết_quả, "lỗi", "")
+        };
+    };
+};
+
+hàm công khai phụ thuộc danh sách(mã nguồn) {
+    phân_tích = Bộ Phân Tích Phụ Thuộc(mã nguồn, ".");
+    trả về phân_tích.danh sách();
+};
+
+hàm công khai phụ thuộc tệp(đường dẫn) {
+    phân_tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), ".");
+    trả về phân_tích.danh sách();
+};
+
+hàm công khai phụ thuộc kiểm tra tệp(đường dẫn) {
+    phân_tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), đường dẫn cha(đường dẫn));
+    trả về phân_tích.kiểm tra();
+};

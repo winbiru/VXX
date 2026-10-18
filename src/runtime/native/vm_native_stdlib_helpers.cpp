@@ -3,9 +3,7 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <limits>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include "common/vm_native_constants.h"
@@ -33,8 +31,6 @@ bool nativeUtf8Path(const StackValue &value,
 
 namespace {
 
-namespace fs = std::filesystem;
-
 int foldPublicHash(std::uint32_t hash) noexcept {
     return static_cast<int>(hash & 0x7fffffffu);
 }
@@ -51,38 +47,6 @@ int identityHash(const Handle &handle) noexcept {
     folded *= 16777619u;
     return foldPublicHash(folded);
 }
-
-#if defined(_WIN32)
-// Chuyển path hệ điều hành về UTF-8 với separator `/`. Trên POSIX tên file có
-// thể chứa byte không phải UTF-8; không để dữ liệu đó lọt ngược vào string V++.
-bool pathToUtf8(const fs::path &path,
-                const std::string &operation,
-                std::string &text,
-                std::string &err) {
-    text = path.generic_u8string();
-    if (!vietvm::core::isValidUtf8(text)) {
-        err = messages::formatMessage(messages::kNativeFilesystemPathUtf8Invalid, {operation});
-        return false;
-    }
-    return true;
-}
-
-// Chuyển `std::error_code` filesystem thành lỗi runtime có ngữ cảnh; hàm ghép thao tác, đường dẫn và thông điệp hệ điều hành.
-bool filesystemError(const std::error_code &ec,
-                     const std::string &operation,
-                     std::string &err) {
-    if (!ec) return false;
-    err = messages::formatMessage(messages::kNativeOperationSystemError, {operation, ec.message()});
-    return true;
-}
-
-// Kiểm tra điều kiện của `isMissingPathError`.
-bool isMissingPathError(const std::error_code &ec) noexcept {
-    return ec == std::errc::no_such_file_or_directory ||
-           ec == std::errc::not_a_directory;
-}
-
-#endif
 
 // Chạy kiểu tên; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 std::string runtimeTypeName(const StackValue &value) {
@@ -149,93 +113,6 @@ bool handleNativeFoundationFunction(Opcode opcode,
         }
         return true;
     }
-
-#if defined(_WIN32)
-    if (opcode == OP_VM_DUONG_DAN_TON_TAI || opcode == OP_VM_LA_TEP ||
-        opcode == OP_VM_LA_THU_MUC) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::error_code ec;
-        bool value = false;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        if (opcode == OP_VM_DUONG_DAN_TON_TAI) {
-            value = fs::exists(path, ec);
-        } else if (opcode == OP_VM_LA_TEP) {
-            value = fs::is_regular_file(path, ec);
-        } else {
-            value = fs::is_directory(path, ec);
-        }
-        if (isMissingPathError(ec)) {
-            ec.clear();
-            value = false;
-        }
-        if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(value ? 1 : 0);
-        return true;
-    }
-
-    if (opcode == OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::error_code ec;
-        const auto status = fs::symlink_status(path, ec);
-        if (isMissingPathError(ec)) {
-            result = make_int_value(-1);
-            return true;
-        }
-        if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(fs::is_directory(status) ? 1 : 0);
-        return true;
-    }
-
-    if (opcode == OP_VM_TAO_THU_MUC) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::error_code ec;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        // Primitive thấp: chỉ tạo đúng một directory entry. Việc tìm cha và
-        // tạo cả cây thuộc gói/nhập xuất/thư mục.vi.
-        const bool created = fs::create_directory(path, ec);
-        if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(created ? 1 : 0);
-        return true;
-    }
-
-    if (opcode == OP_VM_LIET_KE_THU_MUC) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::error_code ec;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        std::vector<std::string> names;
-        fs::directory_iterator iterator(path, ec);
-        if (filesystemError(ec, fn, err)) return true;
-        for (const auto &entry : iterator) {
-            std::string name;
-            if (!pathToUtf8(entry.path().filename(), fn, name, err)) return true;
-            names.push_back(std::move(name));
-        }
-        std::vector<StackValue> values;
-        values.reserve(names.size());
-        for (const std::string &name : names) values.push_back(make_string_value(name));
-        result = make_list_value(std::move(values));
-        return true;
-    }
-
-    if (opcode == OP_VM_XOA_DUONG_DAN) {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::error_code ec;
-        fs::path path;
-        if (!nativeUtf8Path(args[0], fn, path, err)) return true;
-        // Primitive thấp: unlink/rmdir đúng một entry. Traversal và recursion
-        // nằm hoàn toàn ở thư viện V++.
-        const bool removed = fs::remove(path, ec);
-        if (filesystemError(ec, fn, err)) return true;
-        result = make_int_value(removed ? 1 : 0);
-        return true;
-    }
-
-#endif
 
     if (opcode == OP_VM_TEN_NEN_TANG) {
         if (!requireNativeArgumentCount(args, fn, 0, err)) return true;

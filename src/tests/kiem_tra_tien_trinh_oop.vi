@@ -1,0 +1,34 @@
+nhập gói/hệ thống/chính;
+
+hàm chính() {
+    lệnh = Lệnh Tiến Trình("/bin/echo");
+    in lệnh.kết quả gần nhất() == rỗng;
+    in lệnh.thêm đối số("oop") == lệnh;
+    in lệnh.đặt biến("VPP_OOP", "1") == lệnh;
+    in lệnh.đặt thời hạn(2000) == lệnh;
+    nếu (ten_nen_tang_vm() != "windows") {
+        kết_quả = lệnh.chạy();
+        in kết_quả["khởi chạy"];
+        in kết_quả["mã thoát"] == 0;
+        in kết_quả["đầu ra"] == "oop\n";
+        in lệnh.kết quả gần nhất() == kết_quả;
+    } hoặc {
+        // `/bin/echo` là trường hợp Unix; Windows có bộ kiểm thử spawn riêng.
+        in lệnh.kết quả gần nhất() == rỗng;
+        in đúng;
+        in đúng;
+        in đúng;
+    };
+    sai_thời_hạn = sai;
+    thử { lệnh.đặt thời hạn(0); } bắt lỗi(e) { sai_thời_hạn = đúng; };
+    in sai_thời_hạn;
+    sai_đối_số = sai;
+    thử { lệnh.thêm đối số(1); } bắt lỗi(e) { sai_đối_số = đúng; };
+    in sai_đối_số;
+    sai_biến = sai;
+    thử { lệnh.đặt biến("BAD=NAME", "x"); } bắt lỗi(e) { sai_biến = đúng; };
+    in sai_biến;
+    sai_chương_trình = sai;
+    thử { Lệnh Tiến Trình(""); } bắt lỗi(e) { sai_chương_trình = đúng; };
+    in sai_chương_trình;
+};

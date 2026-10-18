@@ -4,91 +4,137 @@
 
 nhập gói/lõi/trình tự;
 
-// Thêm giá trị vào cuối list; trả về rỗng.
-hàm thêm(ds, giá trị) {
-    trả về them(ds, giá trị);
-};
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Danh Sách {
+    hàm công khai khởi tạo() {};
 
-// Xóa phần tử tại chỉ số, trả về phần tử vừa xóa.
-hàm xóa tại(ds, chỉ số) {
-    trả về xoa_tai(ds, chỉ số);
-};
-
-// Tìm chỉ số đầu tiên của giá trị; trả về -1 nếu không có.
-hàm tìm chỉ số(ds, giá trị) {
-    vị_trí = -1;
-    lặp(i = 0; i < do_dai(ds) && vị_trí < 0; i++) {
-        nếu (ds[i] == giá trị) {
-            vị_trí = i;
-        };
+    // Thêm giá trị vào cuối list; trả về rỗng.
+    hàm công khai thêm(ds, giá trị) {
+        trả về them(ds, giá trị);
     };
-    trả về vị_trí;
-};
 
-// Loại bỏ phần tử trùng lặp, giữ thứ tự xuất hiện đầu tiên.
-hàm xóa trùng(ds) {
-    i = 0;
-    lặp(vòng = 0; i < do_dai(ds); vòng++) {
-        j = i + 1;
-        lặp(vòng_con = 0; j < do_dai(ds); vòng_con++) {
-            nếu (ds[j] == ds[i]) {
-                xoa_tai(ds, j);
-            } nếu không {
-                j = j + 1;
+    // Xóa phần tử tại chỉ số, trả về phần tử vừa xóa.
+    hàm công khai xóa tại(ds, chỉ số) {
+        trả về xoa_tai(ds, chỉ số);
+    };
+
+    // Tìm chỉ số đầu tiên của giá trị; trả về -1 nếu không có.
+    hàm công khai tìm chỉ số(ds, giá trị) {
+        vị_trí = -1;
+        lặp(i = 0; i < do_dai(ds) && vị_trí < 0; i++) {
+            nếu (ds[i] == giá trị) {
+                vị_trí = i;
             };
         };
-        i = i + 1;
+        trả về vị_trí;
     };
-    trả về rỗng;
-};
 
-// Sắp xếp list số hoặc list chuỗi tại chỗ.
-hàm sắp xếp(ds) {
-    n = do_dai(ds);
-    lặp(i = 0; i < n; i++) {
-        lặp(j = 0; j + 1 < n - i; j++) {
-            nếu (ds[j] > ds[j + 1]) {
-                tạm = ds[j];
-                ds[j] = ds[j + 1];
-                ds[j + 1] = tạm;
+    // Loại bỏ phần tử trùng lặp, giữ thứ tự xuất hiện đầu tiên.
+    hàm công khai xóa trùng(ds) {
+        i = 0;
+        lặp(vòng = 0; i < do_dai(ds); vòng++) {
+            j = i + 1;
+            lặp(vòng_con = 0; j < do_dai(ds); vòng_con++) {
+                nếu (ds[j] == ds[i]) {
+                    xoa_tai(ds, j);
+                } hoặc {
+                    j = j + 1;
+                };
+            };
+            i = i + 1;
+        };
+        trả về rỗng;
+    };
+
+    // Sắp xếp list số hoặc list chuỗi tại chỗ.
+    hàm công khai sắp xếp(ds) {
+        n = do_dai(ds);
+        lặp(i = 0; i < n; i++) {
+            lặp(j = 0; j + 1 < n - i; j++) {
+                nếu (ds[j] > ds[j + 1]) {
+                    tạm = ds[j];
+                    ds[j] = ds[j + 1];
+                    ds[j + 1] = tạm;
+                };
             };
         };
+        trả về rỗng;
     };
-    trả về rỗng;
-};
 
-// Tổng phần tử số trong list.
-hàm tổng list(ds) {
-    tổng = 0;
-    lặp(i = 0; i < do_dai(ds); i++) {
-        tổng = tổng + ds[i];
-    };
-    trả về tổng;
-};
-
-// Giá trị nhỏ nhất/lớn nhất trong list số hoặc list chuỗi.
-hàm nhỏ nhất list(ds) {
-    nếu (do_dai(ds) == 0) {
-        ném "nhỏ nhất list: danh sách rỗng";
-    };
-    kết_quả = ds[0];
-    lặp(i = 1; i < do_dai(ds); i++) {
-        nếu (ds[i] < kết_quả) {
-            kết_quả = ds[i];
+    // Tổng phần tử số trong list.
+    hàm công khai tổng list(ds) {
+        tổng = 0;
+        lặp(i = 0; i < do_dai(ds); i++) {
+            tổng = tổng + ds[i];
         };
+        trả về tổng;
     };
-    trả về kết_quả;
+
+    // Giá trị nhỏ nhất/lớn nhất trong list số hoặc list chuỗi.
+    hàm công khai nhỏ nhất list(ds) {
+        nếu (do_dai(ds) == 0) {
+            ném "nhỏ nhất list: danh sách rỗng";
+        };
+        kết_quả = ds[0];
+        lặp(i = 1; i < do_dai(ds); i++) {
+            nếu (ds[i] < kết_quả) {
+                kết_quả = ds[i];
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai lớn nhất list(ds) {
+        nếu (do_dai(ds) == 0) {
+            ném "lớn nhất list: danh sách rỗng";
+        };
+        kết_quả = ds[0];
+        lặp(i = 1; i < do_dai(ds); i++) {
+            nếu (ds[i] > kết_quả) {
+                kết_quả = ds[i];
+            };
+        };
+        trả về kết_quả;
+    };
 };
 
-hàm lớn nhất list(ds) {
-    nếu (do_dai(ds) == 0) {
-        ném "lớn nhất list: danh sách rỗng";
-    };
-    kết_quả = ds[0];
-    lặp(i = 1; i < do_dai(ds); i++) {
-        nếu (ds[i] > kết_quả) {
-            kết_quả = ds[i];
-        };
-    };
-    trả về kết_quả;
+
+hàm công khai thêm(ds, giá trị) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.thêm(ds, giá trị);
+};
+
+hàm công khai xóa tại(ds, chỉ số) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.xóa tại(ds, chỉ số);
+};
+
+hàm công khai tìm chỉ số(ds, giá trị) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.tìm chỉ số(ds, giá trị);
+};
+
+hàm công khai xóa trùng(ds) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.xóa trùng(ds);
+};
+
+hàm công khai sắp xếp(ds) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.sắp xếp(ds);
+};
+
+hàm công khai tổng list(ds) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.tổng list(ds);
+};
+
+hàm công khai nhỏ nhất list(ds) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.nhỏ nhất list(ds);
+};
+
+hàm công khai lớn nhất list(ds) {
+    __vpp_adapter = Tiện Ích Danh Sách();
+    trả về __vpp_adapter.lớn nhất list(ds);
 };

@@ -1,0 +1,809 @@
+// Kiểm tra ngữ nghĩa trên AST thuần V++ của parser chương trình.
+// Chưa suy luận kiểu hoặc phân giải tên ngoài phạm vi khai báo cục bộ.
+nhập gói/biên dịch/chương trình;
+nhập gói/biên dịch/biểu thức;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/bảng mã;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư biên dịch ngữ nghĩa chứa(tập, tên) {
+        lặp(i = 0; i < độ dài(tập); i++) {
+            nếu (tập[i] == tên) { trả về đúng; };
+        };
+        trả về sai;
+    };
+
+    // Bảng kiểu của một đơn vị biên dịch. Việc phân giải kiểu từ module nhập
+    // sẽ được thực hiện ở bước linker khi compiler tự chủ hỗ trợ OOP đa module.
+    hàm riêng tư biên dịch ngữ nghĩa tìm kiểu(các_lệnh, tên) {
+        lặp(i = 0; i < độ dài(các_lệnh); i++) {
+            mục = các_lệnh[i];
+            loại = lấy map(mục, "loại", "");
+            nếu ((loại == "lớp" || loại == "giao diện") && mục["tên"] == tên) {
+                trả về mục;
+            };
+        };
+        trả về rỗng;
+    };
+
+    // Duyệt đường kế thừa chỉ qua các kiểu khai báo trong cùng AST. Dùng đường
+    // đi riêng cho mỗi nhánh để phát hiện vòng A->B->A mà vẫn cho phép hình thoi
+    // hợp lệ ở cây kế thừa giao diện.
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra chu trình kiểu(các_lệnh, tên, đường_đi) {
+        nếu (mình.biên dịch ngữ nghĩa chứa(đường_đi, tên)) {
+            ném "biên dịch ngữ nghĩa: chu trình kế thừa tại '" + tên + "'";
+        };
+        mục = mình.biên dịch ngữ nghĩa tìm kiểu(các_lệnh, tên);
+        nếu (mục == rỗng) { trả về đúng; };
+        đường_mới = [];
+        lặp(i = 0; i < độ dài(đường_đi); i++) {
+            thêm(đường_mới, đường_đi[i]);
+        };
+        thêm(đường_mới, tên);
+        nếu (mục["loại"] == "lớp") {
+            cha = lấy map(mục, "lớp cha", "");
+            nếu (cha != "") {
+                mình.biên dịch ngữ nghĩa kiểm tra chu trình kiểu(các_lệnh, cha, đường_mới);
+            };
+        } hoặc {
+            cha = lấy map(mục, "giao diện cha", []);
+            lặp(i = 0; i < độ dài(cha); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra chu trình kiểu(các_lệnh, cha[i], đường_mới);
+            };
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra quan hệ kiểu(các_lệnh) {
+        lặp(i = 0; i < độ dài(các_lệnh); i++) {
+            mục = các_lệnh[i];
+            loại = lấy map(mục, "loại", "");
+            nếu (loại == "lớp") {
+                cha = lấy map(mục, "lớp cha", "");
+                nếu (cha != "") {
+                    khai_báo_cha = mình.biên dịch ngữ nghĩa tìm kiểu(các_lệnh, cha);
+                    nếu (khai_báo_cha == rỗng) {
+                        ném "biên dịch ngữ nghĩa: lớp cha chưa khai báo '" + cha + "'";
+                    };
+                    nếu (khai_báo_cha["loại"] != "lớp") {
+                        ném "biên dịch ngữ nghĩa: lớp cha chưa khai báo '" + cha + "'";
+                    };
+                };
+            };
+            nếu (loại == "lớp" || loại == "giao diện") {
+                giao_diện = [];
+                nếu (loại == "lớp") {
+                    giao_diện = lấy map(mục, "triển khai", []);
+                } hoặc {
+                    giao_diện = lấy map(mục, "giao diện cha", []);
+                };
+                lặp(j = 0; j < độ dài(giao_diện); j++) {
+                    tên_giao_diện = giao_diện[j];
+                    khai_báo_giao_diện = mình.biên dịch ngữ nghĩa tìm kiểu(các_lệnh, tên_giao_diện);
+                    nếu (khai_báo_giao_diện == rỗng) {
+                        ném "biên dịch ngữ nghĩa: giao diện chưa khai báo '" + tên_giao_diện + "'";
+                    };
+                    nếu (khai_báo_giao_diện["loại"] != "giao diện") {
+                        ném "biên dịch ngữ nghĩa: giao diện chưa khai báo '" + tên_giao_diện + "'";
+                    };
+                };
+            };
+        };
+        lặp(i = 0; i < độ dài(các_lệnh); i++) {
+            mục = các_lệnh[i];
+            loại = lấy map(mục, "loại", "");
+            nếu (loại == "lớp" || loại == "giao diện") {
+                mình.biên dịch ngữ nghĩa kiểm tra chu trình kiểu(các_lệnh, mục["tên"], []);
+            };
+        };
+        trả về đúng;
+    };
+
+    // Kiểm tra hợp đồng và ghi đè trước khi hạ OOP xuống IR.
+    hàm riêng tư biên dịch ngữ nghĩa tìm phương thức(các_lệnh, tên_kiểu, tên) {
+        kiểu = mình.biên dịch ngữ nghĩa tìm kiểu(các_lệnh, tên_kiểu);
+        nếu (kiểu == rỗng) { trả về rỗng; };
+        các_hàm = lấy map(kiểu, "phương thức", []);
+        lặp(i = 0; i < độ dài(các_hàm); i++) {
+            nếu (các_hàm[i]["tên"] == tên) { trả về các_hàm[i]; };
+        };
+        cha = lấy map(kiểu, "lớp cha", "");
+        nếu (cha == "") { trả về rỗng; };
+        trả về mình.biên dịch ngữ nghĩa tìm phương thức(các_lệnh, cha, tên);
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra hợp đồng(các_lệnh, tên_lớp, giao_diện) {
+        kiểu = mình.biên dịch ngữ nghĩa tìm kiểu(các_lệnh, giao_diện);
+        nếu (kiểu == rỗng) { trả về đúng; };
+        cha = lấy map(kiểu, "giao diện cha", []);
+        lặp(i = 0; i < độ dài(cha); i++) {
+            mình.biên dịch ngữ nghĩa kiểm tra hợp đồng(các_lệnh, tên_lớp, cha[i]);
+        };
+        cần = lấy map(kiểu, "phương thức", []);
+        lặp(i = 0; i < độ dài(cần); i++) {
+            thực_hiện = mình.biên dịch ngữ nghĩa tìm phương thức(các_lệnh, tên_lớp, cần[i]["tên"]);
+            nếu (thực_hiện == rỗng) {
+                ném "biên dịch ngữ nghĩa: lớp '" + tên_lớp + "' thiếu phương thức '" + cần[i]["tên"] + "'";
+            };
+            nếu (độ dài(thực_hiện["tham số"]) != độ dài(cần[i]["tham số"])) {
+                ném "biên dịch ngữ nghĩa: số tham số triển khai không khớp '" + cần[i]["tên"] + "'";
+            };
+            phạm_vi = lấy map(thực_hiện, "phạm vi", "");
+            nếu (phạm_vi == "riêng tư" || phạm_vi == "bảo vệ") {
+                ném "biên dịch ngữ nghĩa: phương thức triển khai phải công khai '" + cần[i]["tên"] + "'";
+            };
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa hạng truy cập(phạm_vi) {
+        nếu (phạm_vi == "riêng tư") { trả về 0; };
+        nếu (phạm_vi == "bảo vệ") { trả về 1; };
+        trả về 2;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra OOP(các_lệnh) {
+        lặp(i = 0; i < độ dài(các_lệnh); i++) {
+            mục_lớp = các_lệnh[i];
+            nếu (lấy map(mục_lớp, "loại", "") != "lớp") { bỏ qua; };
+            các_giao_diện = lấy map(mục_lớp, "triển khai", []);
+            lặp(j = 0; j < độ dài(các_giao_diện); j++) {
+                mình.biên dịch ngữ nghĩa kiểm tra hợp đồng(các_lệnh, mục_lớp["tên"], các_giao_diện[j]);
+            };
+            cha = lấy map(mục_lớp, "lớp cha", "");
+            nếu (cha == "") { bỏ qua; };
+            phương_thức = lấy map(mục_lớp, "phương thức", []);
+            lặp(j = 0; j < độ dài(phương_thức); j++) {
+                con = phương_thức[j];
+                nếu (con["tên"] == "khởi tạo") { bỏ qua; };
+                gốc_dữ_liệu = mình.biên dịch ngữ nghĩa tìm phương thức(các_lệnh, cha, con["tên"]);
+                nếu (gốc_dữ_liệu == rỗng) { bỏ qua; };
+                nếu (lấy map(gốc_dữ_liệu, "phạm vi", "") == "riêng tư") { bỏ qua; };
+                nếu (độ dài(con["tham số"]) != độ dài(gốc_dữ_liệu["tham số"]) ||
+                    mình.biên dịch ngữ nghĩa hạng truy cập(lấy map(con, "phạm vi", "")) <
+                    mình.biên dịch ngữ nghĩa hạng truy cập(lấy map(gốc_dữ_liệu, "phạm vi", ""))) {
+                    ném "biên dịch ngữ nghĩa: ghi đè không tương thích '" + con["tên"] + "'";
+                };
+            };
+        };
+        trả về đúng;
+    };
+
+    // Phép kiểm tra hợp đồng FFI phía frontend V++ tương ứng với
+    // parseForeignAbiType và bufferExtents trong semantic.cpp. Backend FFI
+    // bytecode vẫn chưa được hạ ở đường self-host.
+    hàm riêng tư biên dịch ngữ nghĩa kiểu ABI(kiểu) {
+        hợp_lệ = ["rỗng", "void", "i32", "u32", "i64", "u64", "f64",
+            "c_chuỗi", "c_đệm_ra", "c_đệm_vào", "c_tệp", "c_thư_mục",
+            "c_mục_thư_mục", "c_cờ_con_trỏ", "c_dns", "c_socket"];
+        trả về mình.biên dịch ngữ nghĩa chứa(hợp_lệ, kiểu);
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra FFI(mục) {
+        nếu (lấy map(mục, "abi", "c") != "c") {
+            ném "biên dịch ngữ nghĩa: FFI hiện chỉ hỗ trợ abi 'c'";
+        };
+        kiểu_trả_về = lấy map(mục, "kiểu trả về", "");
+        nếu (!mình.biên dịch ngữ nghĩa kiểu ABI(kiểu_trả_về) ||
+            kiểu_trả_về == "c_đệm_ra" || kiểu_trả_về == "c_đệm_vào") {
+            ném "biên dịch ngữ nghĩa: kiểu ABI trả về chưa hỗ trợ '" + kiểu_trả_về + "'";
+        };
+        tham_số = lấy map(mục, "tham số", []);
+        tên_đã_có = [];
+        lặp(i = 0; i < độ dài(tham_số); i++) {
+            p = tham_số[i];
+            tên = p["tên"];
+            kiểu = p["kiểu"];
+            chiều_dài = lấy map(p, "độ dài", "");
+            nếu (mình.biên dịch ngữ nghĩa chứa(tên_đã_có, tên)) {
+                ném "biên dịch ngữ nghĩa: trùng tham số FFI '" + tên + "'";
+            };
+            thêm(tên_đã_có, tên);
+            nếu (!mình.biên dịch ngữ nghĩa kiểu ABI(kiểu) || kiểu == "rỗng" || kiểu == "void") {
+                ném "biên dịch ngữ nghĩa: kiểu ABI tham số chưa hỗ trợ '" + kiểu + "'";
+            };
+            là_đệm = kiểu == "c_đệm_ra" || kiểu == "c_đệm_vào";
+            nếu (!là_đệm && chiều_dài != "") {
+                ném "biên dịch ngữ nghĩa: chỉ tham số đệm FFI được khai báo độ dài";
+            };
+            nếu (là_đệm) {
+                nếu (chiều_dài == "") {
+                    ném "biên dịch ngữ nghĩa: đệm FFI phải khai báo độ dài";
+                };
+                mã_đầu = mã điểm unicode(chiều_dài[0]);
+                nếu (mã_đầu >= 48 && mã_đầu <= 57) {
+                    độ_dài = 0;
+                    lặp(j = 0; j < độ dài(chiều_dài); j++) {
+                        mã = mã điểm unicode(chiều_dài[j]);
+                        nếu (mã < 48 || mã > 57) {
+                            ném "biên dịch ngữ nghĩa: độ dài đệm FFI cố định không hợp lệ";
+                        };
+                        độ_dài = độ_dài * 10 + mã - 48;
+                        nếu (độ_dài > 65536) {
+                            ném "biên dịch ngữ nghĩa: độ dài đệm FFI tối đa 65536";
+                        };
+                    };
+                    nếu (độ_dài == 0) {
+                        ném "biên dịch ngữ nghĩa: độ dài đệm FFI phải dương";
+                    };
+                } hoặc {
+                    tham_chiếu = -1;
+                    lặp(j = 0; j < độ dài(tham_số); j++) {
+                        nếu (tham_số[j]["tên"] == chiều_dài) {
+                            nếu (tham_chiếu >= 0) {
+                                ném "biên dịch ngữ nghĩa: tham chiếu độ dài đệm FFI trùng";
+                            };
+                            tham_chiếu = j;
+                        };
+                    };
+                    nếu (tham_chiếu < 0 || tham_chiếu == i) {
+                        ném "biên dịch ngữ nghĩa: tham chiếu độ dài đệm FFI không hợp lệ";
+                    };
+                    kiểu_dài = tham_số[tham_chiếu]["kiểu"];
+                    nếu (kiểu_dài != "i32" && kiểu_dài != "u32" &&
+                        kiểu_dài != "i64" && kiểu_dài != "u64") {
+                        ném "biên dịch ngữ nghĩa: độ dài đệm FFI phải tham chiếu kiểu số nguyên";
+                    };
+                };
+            };
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa biểu thức(cây) {
+        nếu (cây == rỗng) { trả về đúng; };
+        loại = lấy map(cây, "loại", "");
+        nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "danh sách") {
+            phần_tử = lấy map(cây, "phần tử", []);
+            lặp(i = 0; i < độ dài(phần_tử); i++) {
+                mình.biên dịch ngữ nghĩa biểu thức(phần_tử[i]);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "từ điển") {
+            mục = lấy map(cây, "mục", []);
+            lặp(i = 0; i < độ dài(mục); i++) {
+                khóa = mục[i]["khóa"];
+                nếu (lấy map(khóa, "loại", "") != "tên" &&
+                    !(lấy map(khóa, "loại", "") == "hằng" &&
+                      lấy map(khóa, "kiểu", "") == "chuỗi")) {
+                    ném "biên dịch ngữ nghĩa: khóa từ điển phải là chuỗi hoặc tên";
+                };
+                mình.biên dịch ngữ nghĩa biểu thức(mục[i]["giá trị"]);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "một ngôi") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "toán hạng", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "hai ngôi") {
+            trái = lấy map(cây, "trái", rỗng);
+            toán_tử = lấy map(cây, "toán tử", "");
+            nếu (biên dịch biểu thức là phép gán(toán_tử) &&
+                lấy map(trái, "loại", "") != "tên" &&
+                lấy map(trái, "loại", "") != "chỉ số" &&
+                lấy map(trái, "loại", "") != "thành viên") {
+                ném "biên dịch ngữ nghĩa: vế trái phép gán phải là tên, chỉ số hoặc thành viên";
+            };
+            mình.biên dịch ngữ nghĩa biểu thức(trái);
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "phải", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "gọi") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "hàm", rỗng));
+            đối_số = lấy map(cây, "đối số", []);
+            lặp(i = 0; i < độ dài(đối_số); i++) {
+                mình.biên dịch ngữ nghĩa biểu thức(đối_số[i]);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "chỉ số") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "đối tượng", rỗng));
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "chỉ số", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "thành viên") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(cây, "đối tượng", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "cập nhật") {
+            đích = lấy map(cây, "đối tượng", rỗng);
+            nếu (lấy map(đích, "loại", "") != "tên" &&
+                lấy map(đích, "loại", "") != "chỉ số" &&
+                lấy map(đích, "loại", "") != "thành viên") {
+                ném "biên dịch ngữ nghĩa: ++/-- cần tên, chỉ số hoặc thành viên";
+            };
+            mình.biên dịch ngữ nghĩa biểu thức(đích);
+            trả về đúng;
+        };
+        ném "biên dịch ngữ nghĩa: biểu thức chưa hỗ trợ '" + loại + "'";
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa câu lệnh(nút, trong_hàm, trong_lặp, trong_chọn) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "trống" || loại == "nhập") { trả về đúng; };
+        nếu (loại == "ngoại hàm" || loại == "ngoại thư viện") {
+            nếu (trong_hàm) { ném "biên dịch ngữ nghĩa: khai báo FFI trong hàm"; };
+            trả về đúng;
+        };
+        nếu (loại == "lớp" || loại == "giao diện") {
+            nếu (trong_hàm) { ném "biên dịch ngữ nghĩa: khai báo lớp/giao diện trong hàm"; };
+            nếu (loại == "lớp" && lấy map(nút, "lớp cha", "") == nút["tên"]) {
+                ném "biên dịch ngữ nghĩa: lớp không được kế thừa chính nó";
+            };
+            tham_chiếu = [];
+            nếu (loại == "giao diện") {
+                tham_chiếu = lấy map(nút, "giao diện cha", []);
+            } hoặc {
+                tham_chiếu = lấy map(nút, "triển khai", []);
+            };
+            đã_tham_chiếu = [];
+            lặp(i = 0; i < độ dài(tham_chiếu); i++) {
+                nếu (loại == "giao diện" && tham_chiếu[i] == nút["tên"]) {
+                    ném "biên dịch ngữ nghĩa: giao diện không được kế thừa chính nó";
+                };
+                nếu (mình.biên dịch ngữ nghĩa chứa(đã_tham_chiếu, tham_chiếu[i])) {
+                    ném "biên dịch ngữ nghĩa: trùng giao diện '" + tham_chiếu[i] + "'";
+                };
+                thêm(đã_tham_chiếu, tham_chiếu[i]);
+            };
+            phương_thức = lấy map(nút, "phương thức", []);
+            đã_khai_báo = [];
+            lặp(i = 0; i < độ dài(phương_thức); i++) {
+                tên = phương_thức[i]["tên"];
+                nếu (mình.biên dịch ngữ nghĩa chứa(đã_khai_báo, tên)) {
+                    ném "biên dịch ngữ nghĩa: trùng phương thức '" + tên + "'";
+                };
+                thêm(đã_khai_báo, tên);
+                nếu (loại == "lớp") {
+                    mình.biên dịch ngữ nghĩa câu lệnh(phương_thức[i], sai, sai, sai);
+                } hoặc {
+                    phạm_vi = lấy map(phương_thức[i], "phạm vi", "");
+                    nếu (phạm_vi == "bảo vệ" || phạm_vi == "riêng tư") {
+                        ném "biên dịch ngữ nghĩa: phương thức giao diện phải công khai";
+                    };
+                    tham_số = lấy map(phương_thức[i], "tham số", []);
+                    tên_tham_số = [];
+                    lặp(j = 0; j < độ dài(tham_số); j++) {
+                        nếu (mình.biên dịch ngữ nghĩa chứa(tên_tham_số, tham_số[j])) {
+                            ném "biên dịch ngữ nghĩa: trùng tham số '" + tham_số[j] + "'";
+                        };
+                        thêm(tên_tham_số, tham_số[j]);
+                    };
+                };
+            };
+            trả về đúng;
+        };
+        nếu (loại == "hàm") {
+            nếu (trong_hàm) { ném "biên dịch ngữ nghĩa: không hỗ trợ khai báo hàm lồng nhau"; };
+            tham_số = lấy map(nút, "tham số", []);
+            mặc_định = lấy map(nút, "mặc định tham số", []);
+            đã_khai_báo = [];
+            lặp(i = 0; i < độ dài(tham_số); i++) {
+                nếu (mình.biên dịch ngữ nghĩa chứa(đã_khai_báo, tham_số[i])) {
+                    ném "biên dịch ngữ nghĩa: trùng tham số '" + tham_số[i] + "'";
+                };
+                thêm(đã_khai_báo, tham_số[i]);
+                nếu (i < độ dài(mặc_định)) {
+                    nếu (mặc_định[i] != rỗng) { mình.biên dịch ngữ nghĩa biểu thức(mặc_định[i]); };
+                };
+            };
+            mình.biên dịch ngữ nghĩa câu lệnh(lấy map(nút, "thân", {}), đúng, sai, sai);
+            trả về đúng;
+        };
+        nếu (loại == "khối") {
+            câu_lệnh = lấy map(nút, "câu lệnh", []);
+            lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+                mình.biên dịch ngữ nghĩa câu lệnh(câu_lệnh[i], trong_hàm, trong_lặp, trong_chọn);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "trả về") {
+            nếu (!trong_hàm) { ném "biên dịch ngữ nghĩa: trả về ngoài hàm"; };
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "biểu thức", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "in" || loại == "biểu thức") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "biểu thức", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "biến") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "giá trị", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "nếu") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "điều kiện", rỗng));
+            mình.biên dịch ngữ nghĩa câu lệnh(lấy map(nút, "thân", {}), trong_hàm, trong_lặp, trong_chọn);
+            nhánh_khác = lấy map(nút, "nhánh khác", rỗng);
+            nếu (nhánh_khác != rỗng) {
+                mình.biên dịch ngữ nghĩa câu lệnh(nhánh_khác, trong_hàm, trong_lặp, trong_chọn);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "lặp") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "khởi tạo", rỗng));
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "điều kiện", rỗng));
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "cập nhật", rỗng));
+            mình.biên dịch ngữ nghĩa câu lệnh(lấy map(nút, "thân", {}), trong_hàm, đúng, trong_chọn);
+            trả về đúng;
+        };
+        nếu (loại == "chọn") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "biểu thức", rỗng));
+            các_nhánh = lấy map(nút, "nhánh", []);
+            đã_mặc_định = sai;
+            lặp(i = 0; i < độ dài(các_nhánh); i++) {
+                nhánh = các_nhánh[i];
+                nếu (nhánh["loại"] == "mặc định") {
+                    nếu (đã_mặc_định) { ném "biên dịch ngữ nghĩa: trùng mặc định trong chọn"; };
+                    đã_mặc_định = đúng;
+                } hoặc {
+                    nhãn = lấy map(nhánh, "nhãn", rỗng);
+                    kiểu = lấy map(nhãn, "loại", "");
+                    nếu (kiểu == "hằng") {
+                        loại_hằng = lấy map(nhãn, "kiểu", "");
+                        nếu (loại_hằng != "số nguyên" && loại_hằng != "chuỗi") {
+                            ném "biên dịch ngữ nghĩa: nhãn ca chỉ nhận số nguyên, chuỗi hoặc tên";
+                        };
+                    } hoặc {
+                        nếu (kiểu != "tên") {
+                            ném "biên dịch ngữ nghĩa: nhãn ca không hợp lệ";
+                        };
+                    };
+                    mình.biên dịch ngữ nghĩa biểu thức(nhãn);
+                };
+                mình.biên dịch ngữ nghĩa câu lệnh(nhánh["thân"], trong_hàm, trong_lặp, đúng);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "thử") {
+            mình.biên dịch ngữ nghĩa câu lệnh(nút["thân"], trong_hàm, trong_lặp, trong_chọn);
+            mình.biên dịch ngữ nghĩa câu lệnh(nút["bắt"], trong_hàm, trong_lặp, trong_chọn);
+            trả về đúng;
+        };
+        nếu (loại == "ném") {
+            mình.biên dịch ngữ nghĩa biểu thức(lấy map(nút, "biểu thức", rỗng));
+            trả về đúng;
+        };
+        nếu (loại == "thoát" || loại == "bỏ qua") {
+            nếu (!trong_lặp && !(loại == "thoát" && trong_chọn)) {
+                ném "biên dịch ngữ nghĩa: '" + loại + "' ở ngoài vòng lặp";
+            };
+            trả về đúng;
+        };
+        ném "biên dịch ngữ nghĩa: câu lệnh chưa hỗ trợ '" + loại + "'";
+    };
+
+    // C++ SemanticBuilder::buildStatement/addSymbol dùng một bảng khai báo biến
+    // cho toàn bộ thân hàm (kể cả các khối nếu/lặp), và một bảng riêng ở global.
+    // Tham số cùng chia sẻ bảng tên của hàm; mỗi hàm có bảng riêng.
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra khai báo biến(nút, tên_đã_khai_báo, các_hàm) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "hàm") {
+            tên_trong_hàm = [];
+            tham_số = lấy map(nút, "tham số", []);
+            lặp(i = 0; i < độ dài(tham_số); i++) {
+                thêm(tên_trong_hàm, tham_số[i]);
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(
+                lấy map(nút, "thân", {}), tên_trong_hàm, các_hàm);
+            // C++ đăng ký các khai báo biến trước khi duyệt phép gán. Vì vậy
+            // biến cục bộ có thể che tên hàm dù được khai báo ở cuối thân hàm.
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                lấy map(nút, "thân", {}), các_hàm, tên_trong_hàm);
+            trả về đúng;
+        };
+        nếu (loại == "biến") {
+            tên = lấy map(nút, "tên", "");
+            nếu (mình.biên dịch ngữ nghĩa chứa(tên_đã_khai_báo, tên)) {
+                ném "biên dịch ngữ nghĩa: trùng khai báo '" + tên + "'";
+            };
+            thêm(tên_đã_khai_báo, tên);
+            trả về đúng;
+        };
+        nếu (loại == "khối") {
+            các_lệnh = lấy map(nút, "câu lệnh", []);
+            lặp(i = 0; i < độ dài(các_lệnh); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(các_lệnh[i], tên_đã_khai_báo, các_hàm);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "nếu") {
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(
+                lấy map(nút, "thân", {}), tên_đã_khai_báo, các_hàm);
+            nhánh_khác = lấy map(nút, "nhánh khác", rỗng);
+            nếu (nhánh_khác != rỗng) {
+                mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(nhánh_khác, tên_đã_khai_báo, các_hàm);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "lặp") {
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(
+                lấy map(nút, "thân", {}), tên_đã_khai_báo, các_hàm);
+        };
+        nếu (loại == "chọn") {
+            nhánh = lấy map(nút, "nhánh", []);
+            lặp(i = 0; i < độ dài(nhánh); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(nhánh[i]["thân"], tên_đã_khai_báo, các_hàm);
+            };
+        };
+        nếu (loại == "thử") {
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(nút["thân"], tên_đã_khai_báo, các_hàm);
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(nút["bắt"], tên_đã_khai_báo, các_hàm);
+        };
+        trả về đúng;
+    };
+
+    // Semantic C++ cấm ghi vào tên hàm (Assignment/CompoundAssignment/Postfix)
+    // vì tên hàm được resolve thành function ID, không phải slot biến VM.
+    // Hai bảng tên riêng thể hiện lexical lookup: parameter/local che hàm global.
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra đích gán hàm(đích, các_hàm, tên_cục_bộ) {
+        nếu (lấy map(đích, "loại", "") != "tên") { trả về đúng; };
+        tên = lấy map(đích, "giá trị", "");
+        nếu (mình.biên dịch ngữ nghĩa chứa(các_hàm, tên) &&
+            !mình.biên dịch ngữ nghĩa chứa(tên_cục_bộ, tên)) {
+            ném "biên dịch ngữ nghĩa: không thể gán vào tên hàm '" + tên + "'";
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(cây, các_hàm, tên_cục_bộ) {
+        nếu (cây == rỗng) { trả về đúng; };
+        loại = lấy map(cây, "loại", "");
+        nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "hai ngôi") {
+            trái = lấy map(cây, "trái", rỗng);
+            nếu (biên dịch biểu thức là phép gán(lấy map(cây, "toán tử", ""))) {
+                mình.biên dịch ngữ nghĩa kiểm tra đích gán hàm(trái, các_hàm, tên_cục_bộ);
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(trái, các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "phải", rỗng), các_hàm, tên_cục_bộ);
+            trả về đúng;
+        };
+        nếu (loại == "cập nhật") {
+            đích = lấy map(cây, "đối tượng", rỗng);
+            mình.biên dịch ngữ nghĩa kiểm tra đích gán hàm(đích, các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(đích, các_hàm, tên_cục_bộ);
+            trả về đúng;
+        };
+        nếu (loại == "một ngôi") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "toán hạng", rỗng), các_hàm, tên_cục_bộ);
+            trả về đúng;
+        };
+        nếu (loại == "gọi") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "hàm", rỗng), các_hàm, tên_cục_bộ);
+            đối_số = lấy map(cây, "đối số", []);
+            lặp(i = 0; i < độ dài(đối_số); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(đối_số[i], các_hàm, tên_cục_bộ);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "chỉ số") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "đối tượng", rỗng), các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "chỉ số", rỗng), các_hàm, tên_cục_bộ);
+            trả về đúng;
+        };
+        nếu (loại == "thành viên") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(cây, "đối tượng", rỗng), các_hàm, tên_cục_bộ);
+            trả về đúng;
+        };
+        nếu (loại == "danh sách") {
+            phần_tử = lấy map(cây, "phần tử", []);
+            lặp(i = 0; i < độ dài(phần_tử); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(phần_tử[i], các_hàm, tên_cục_bộ);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "từ điển") {
+            các_mục = lấy map(cây, "mục", []);
+            lặp(i = 0; i < độ dài(các_mục); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                    các_mục[i]["giá trị"], các_hàm, tên_cục_bộ);
+            };
+            trả về đúng;
+        };
+        ném "biên dịch ngữ nghĩa: biểu thức chưa hỗ trợ '" + loại + "'";
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(nút, các_hàm, tên_cục_bộ) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "hàm") { trả về đúng; };
+        nếu (loại == "khối") {
+            các_lệnh = lấy map(nút, "câu lệnh", []);
+            lặp(i = 0; i < độ dài(các_lệnh); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                    các_lệnh[i], các_hàm, tên_cục_bộ);
+            };
+        };
+        nếu (loại == "biến") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "giá trị", rỗng), các_hàm, tên_cục_bộ);
+        };
+        nếu (loại == "biểu thức" || loại == "in" || loại == "ném" || loại == "trả về") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "biểu thức", rỗng), các_hàm, tên_cục_bộ);
+        };
+        nếu (loại == "nếu") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "điều kiện", rỗng), các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                lấy map(nút, "thân", {}), các_hàm, tên_cục_bộ);
+            nhánh_khác = lấy map(nút, "nhánh khác", rỗng);
+            nếu (nhánh_khác != rỗng) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                    nhánh_khác, các_hàm, tên_cục_bộ);
+            };
+        };
+        nếu (loại == "lặp") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "khởi tạo", rỗng), các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "điều kiện", rỗng), các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "cập nhật", rỗng), các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                lấy map(nút, "thân", {}), các_hàm, tên_cục_bộ);
+        };
+        nếu (loại == "chọn") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm biểu thức(
+                lấy map(nút, "biểu thức", rỗng), các_hàm, tên_cục_bộ);
+            nhánh = lấy map(nút, "nhánh", []);
+            lặp(i = 0; i < độ dài(nhánh); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                    nhánh[i]["thân"], các_hàm, tên_cục_bộ);
+            };
+        };
+        nếu (loại == "thử") {
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(nút["thân"], các_hàm, tên_cục_bộ);
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(nút["bắt"], các_hàm, tên_cục_bộ);
+        };
+        trả về đúng;
+    };
+
+    // C++ đăng ký bí danh nhập trong SymbolSpace::Module của từng lexical scope.
+    // Mỗi khối có một bảng bí danh riêng, độc lập với bảng tên hàm/biến.
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(nút) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "khối") {
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh danh sách(lấy map(nút, "câu lệnh", []));
+        };
+        nếu (loại == "hàm" || loại == "lặp") {
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(lấy map(nút, "thân", {}));
+        };
+        nếu (loại == "nếu") {
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(lấy map(nút, "thân", {}));
+            nhánh_khác = lấy map(nút, "nhánh khác", rỗng);
+            nếu (nhánh_khác != rỗng) {
+                mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(nhánh_khác);
+            };
+        };
+        nếu (loại == "chọn") {
+            các_nhánh = lấy map(nút, "nhánh", []);
+            lặp(i = 0; i < độ dài(các_nhánh); i++) {
+                mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(các_nhánh[i]["thân"]);
+            };
+        };
+        nếu (loại == "thử") {
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(nút["thân"]);
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(nút["bắt"]);
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư biên dịch ngữ nghĩa kiểm tra bí danh danh sách(các_lệnh) {
+        đã_khai_báo = [];
+        lặp(i = 0; i < độ dài(các_lệnh); i++) {
+            mục = các_lệnh[i];
+            nếu (lấy map(mục, "loại", "") == "nhập") {
+                bí_danh = lấy map(mục, "bí danh", "");
+                nếu (bí_danh != "") {
+                    nếu (mình.biên dịch ngữ nghĩa chứa(đã_khai_báo, bí_danh)) {
+                        ném "biên dịch ngữ nghĩa: trùng bí danh nhập '" + bí_danh + "'";
+                    };
+                    thêm(đã_khai_báo, bí_danh);
+                };
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra bí danh câu lệnh(mục);
+        };
+        trả về đúng;
+    };
+
+    hàm công khai biên dịch kiểm tra ngữ nghĩa thuần(cây) {
+        nếu (lấy map(cây, "loại", "") != "chương trình") {
+            ném "biên dịch ngữ nghĩa: cần AST chương trình";
+        };
+        câu_lệnh = lấy map(cây, "câu lệnh", []);
+        hàm_đã_khai_báo = [];
+        kiểu_đã_khai_báo = [];
+        thư_viện_đã_khai_báo = [];
+        ngoại_đã_khai_báo = [];
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mục = câu_lệnh[i];
+            loại = lấy map(mục, "loại", "");
+            nếu (loại == "lớp" || loại == "giao diện") {
+                tên_kiểu = mục["tên"];
+                nếu (mình.biên dịch ngữ nghĩa chứa(kiểu_đã_khai_báo, tên_kiểu)) {
+                    ném "biên dịch ngữ nghĩa: trùng khai báo kiểu '" + tên_kiểu + "'";
+                };
+                thêm(kiểu_đã_khai_báo, tên_kiểu);
+            };
+            nếu (loại == "ngoại thư viện") {
+                nếu (mình.biên dịch ngữ nghĩa chứa(thư_viện_đã_khai_báo, mục["tên"])) {
+                    ném "biên dịch ngữ nghĩa: trùng thư viện FFI '" + mục["tên"] + "'";
+                };
+                thêm(thư_viện_đã_khai_báo, mục["tên"]);
+            };
+            nếu (loại == "ngoại hàm") {
+                nếu (mình.biên dịch ngữ nghĩa chứa(ngoại_đã_khai_báo, mục["tên"])) {
+                    ném "biên dịch ngữ nghĩa: trùng ngoại hàm '" + mục["tên"] + "'";
+                };
+                thêm(ngoại_đã_khai_báo, mục["tên"]);
+                mình.biên dịch ngữ nghĩa kiểm tra FFI(mục);
+            };
+            nếu (lấy map(mục, "loại", "") == "hàm") {
+                tên = lấy map(mục, "tên", "");
+                nếu (mình.biên dịch ngữ nghĩa chứa(hàm_đã_khai_báo, tên)) {
+                    ném "biên dịch ngữ nghĩa: trùng khai báo hàm '" + tên + "'";
+                };
+                thêm(hàm_đã_khai_báo, tên);
+            };
+            mình.biên dịch ngữ nghĩa câu lệnh(mục, sai, sai, sai);
+        };
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mục = câu_lệnh[i];
+            nếu (lấy map(mục, "loại", "") == "ngoại hàm" &&
+                !mình.biên dịch ngữ nghĩa chứa(thư_viện_đã_khai_báo, mục["thư viện"])) {
+                ném "biên dịch ngữ nghĩa: thư viện FFI chưa khai báo '" + mục["thư viện"] + "'";
+            };
+        };
+        môi_trường_kiểu = [];
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) { thêm(môi_trường_kiểu, câu_lệnh[i]); };
+        ngoài = lấy map(cây, "kiểu ngoài", []);
+        lặp(i = 0; i < độ dài(ngoài); i++) { thêm(môi_trường_kiểu, ngoài[i]); };
+        mình.biên dịch ngữ nghĩa kiểm tra quan hệ kiểu(môi_trường_kiểu);
+        mình.biên dịch ngữ nghĩa kiểm tra OOP(môi_trường_kiểu);
+        tên_toàn_cục = [];
+        lặp(i = 0; i < độ dài(hàm_đã_khai_báo); i++) {
+            thêm(tên_toàn_cục, hàm_đã_khai_báo[i]);
+        };
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(
+                câu_lệnh[i], tên_toàn_cục, hàm_đã_khai_báo);
+            // Thân hàm dùng bảng tên local đã thu thập ở nhánh "hàm" bên trên.
+            nếu (lấy map(câu_lệnh[i], "loại", "") != "hàm") {
+                mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(
+                    câu_lệnh[i], hàm_đã_khai_báo, []);
+            };
+        };
+        mình.biên dịch ngữ nghĩa kiểm tra bí danh danh sách(câu_lệnh);
+        trả về đúng;
+    };
+
+    // Điểm vào bootstrap cho parser + semantic V++, chưa sinh IR/bytecode.
+    hàm công khai biên dịch phân tích ngữ nghĩa thuần(mã_nguồn) {
+        cây = biên dịch phân tích chương trình thuần(mã_nguồn);
+        mình.biên dịch kiểm tra ngữ nghĩa thuần(cây);
+        trả về cây;
+    };
+};
+
+
+hàm công khai biên dịch kiểm tra ngữ nghĩa thuần(cây) {
+    __vpp_adapter = Bộ Kiểm Tra Ngữ Nghĩa();
+    trả về __vpp_adapter.biên dịch kiểm tra ngữ nghĩa thuần(cây);
+};
+
+hàm công khai biên dịch phân tích ngữ nghĩa thuần(mã_nguồn) {
+    __vpp_adapter = Bộ Kiểm Tra Ngữ Nghĩa();
+    trả về __vpp_adapter.biên dịch phân tích ngữ nghĩa thuần(mã_nguồn);
+};

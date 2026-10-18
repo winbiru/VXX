@@ -5,6 +5,7 @@
 nhập bộ sưu tập;
 nhập văn bản;
 nhập kịch bản;
+nhập gói/lõi/giao diện tài nguyên;
 
 hàm riêng tư repl yêu cầu phiên(phiên) {
     nếu (có khóa(phiên, "__repl") == 0 ||
@@ -15,7 +16,7 @@ hàm riêng tư repl yêu cầu phiên(phiên) {
     trả về phiên;
 };
 
-hàm repl tạo() {
+hàm công khai repl tạo() {
     trả về {
         "__repl": 1,
         "mở": 1,
@@ -24,7 +25,7 @@ hàm repl tạo() {
     };
 };
 
-hàm repl chạy(phiên, dòng) {
+hàm công khai repl chạy(phiên, dòng) {
     repl yêu cầu phiên(phiên);
     nguồn_cũ = lấy map(phiên, "nguồn", "");
     đầu_ra_cũ = lấy map(phiên, "đầu ra", "");
@@ -49,20 +50,32 @@ hàm repl chạy(phiên, dòng) {
     trả về phần_mới;
 };
 
-hàm repl nguồn(phiên) {
+hàm công khai repl nguồn(phiên) {
     repl yêu cầu phiên(phiên);
     trả về lấy map(phiên, "nguồn", "");
 };
 
-hàm repl đặt lại(phiên) {
+hàm công khai repl đặt lại(phiên) {
     repl yêu cầu phiên(phiên);
     đặt map(phiên, "nguồn", "");
     đặt map(phiên, "đầu ra", "");
     trả về 1;
 };
 
-hàm repl đóng(phiên) {
+hàm công khai repl đóng(phiên) {
     repl yêu cầu phiên(phiên);
     đặt map(phiên, "mở", 0);
     trả về 1;
+};
+
+lớp công khai Phiên Tương Tác triển khai Đóng Được {
+    hàm công khai khởi tạo() { mình.phiên = repl tạo(); };
+    hàm công khai chạy(dòng) { trả về repl chạy(mình.phiên, dòng); };
+    hàm công khai nguồn() { trả về repl nguồn(mình.phiên); };
+    hàm công khai đặt lại() { repl đặt lại(mình.phiên); trả về mình; };
+    hàm công khai đóng() {
+        nếu (lấy map(mình.phiên, "mở", 0) == 0) { trả về sai; };
+        repl đóng(mình.phiên);
+        trả về đúng;
+    };
 };

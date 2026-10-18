@@ -2,7 +2,7 @@
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
 
-hàm kịch bản chạy nội bộ(mã nguồn, gốc) {
+hàm công khai kịch bản chạy nội bộ(mã nguồn, gốc) {
     nếu (loai_cua(mã nguồn) != "chuỗi") {
         ném "kịch bản chạy: mã nguồn phải là chuỗi";
     };
@@ -19,11 +19,11 @@ hàm kịch bản chạy nội bộ(mã nguồn, gốc) {
     };
 };
 
-hàm kịch bản chạy(mã nguồn) {
+hàm công khai kịch bản chạy(mã nguồn) {
     trả về kịch bản chạy nội bộ(mã nguồn, ".");
 };
 
-hàm kịch bản chạy tệp(đường dẫn) {
+hàm công khai kịch bản chạy tệp(đường dẫn) {
     mã_nguồn = đọc tệp(đường dẫn);
     trả về kịch bản chạy nội bộ(mã_nguồn, đường dẫn cha(đường dẫn));
 };

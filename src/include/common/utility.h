@@ -19,17 +19,11 @@ namespace vietvm::compiler {
     std::vector<std::string> splitTopLevelFields(const std::string &text,
                                                  char delimiter);
 
-    // Tách top level đối số; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
-    std::vector<std::string> splitTopLevelArguments(const std::string &text);
-
     // Trích xuất parens; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
     std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start);
 
     // Trích xuất khối; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
     std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& tokens, size_t start);
-
-    // Trích xuất biểu thức until semicolon; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
-    std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start);
 
     // Trích xuất assigned var; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
     std::string extractAssignedVar(const std::string& expr);

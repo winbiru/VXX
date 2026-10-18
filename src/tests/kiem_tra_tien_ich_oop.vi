@@ -1,0 +1,39 @@
+nhập gói/văn bản/chính;
+nhập gói/dữ liệu/chính;
+nhập gói/nhập xuất/chính;
+nhập gói/thời gian/chính;
+
+hàm chính() {
+    bộ = Bộ Nối Văn Bản(",", "[", "]");
+    in bộ.số phần() == 0;
+    in bộ.thêm("a") == bộ;
+    bộ.thêm(2);
+    in bộ.kết quả() == "[a,2]";
+    in bộ.độ dài() == 5;
+    khác = Bộ Nối Văn Bản("-");
+    khác.thêm("x");
+    khác.thêm("y");
+    bộ.gộp(khác);
+    in bộ.kết quả() == "[a,2,x-y]";
+
+    trang = Bộ Phân Trang(2, 10);
+    in trang.độ dời() == 20;
+    in trang.tổng trang(25) == 3;
+    trang.đặt trang(-2).đặt kích thước(0);
+    in trang.số trang hiện tại() == 0 && trang.số phần tử mỗi trang() == 1;
+
+    đường = Đường Dẫn("gói/lõi/chính.vi");
+    in đường.tên() == "chính.vi";
+    // Tra cứu đường dẫn không tồn tại là ổn định ngay cả khi FFI stat bị hạn chế.
+    không_có = Đường Dẫn("__vpp_oop_path_missing_test__");
+    in !không_có.tồn tại() && !không_có.là tệp();
+    in đường.cha().nối("chính.vi").giá trị() == đường.giá trị();
+
+    giờ = Bộ Bấm Giờ();
+    in !giờ.đang chạy() && giờ.bắt đầu();
+    in giờ.đang chạy() && giờ.dừng();
+    in giờ.đọc mili giây() >= 0.0;
+    giờ.đặt lại();
+    in giờ.đọc mili giây() == 0.0;
+    in !giờ.dừng();
+};

@@ -1,0 +1,334 @@
+// Lexer viết bằng V++: bước đầu của compiler tự lưu trữ.
+// Vị trí/cột dùng byte UTF-8 như SourceSpan của compiler bootstrap.
+// Cả vị trí theo Unicode code point được giữ trong các trường "... ký tự".
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/bộ sưu tập/từ điển;
+
+// Mỗi phiên giữ nguồn và cache token thô/token đã hợp nhất riêng.
+// Các phương thức nhận nguồn trực tiếp bên dưới vẫn giữ API cũ.
+lớp công khai Bộ Tách Từ Vựng {
+    hàm công khai khởi tạo(mã_nguồn = "") {
+        mình.làm mới(mã_nguồn);
+    };
+
+    hàm công khai làm mới(mã_nguồn) {
+        nếu (loai_cua(mã_nguồn) != "chuỗi") {
+            ném "biên dịch từ vựng: mã nguồn phải là chuỗi";
+        };
+        mình.nguồn = mã_nguồn;
+        mình.token_thô = rỗng;
+        mình.token_đã_ghép = rỗng;
+        trả về mình;
+    };
+
+    hàm công khai token thô() {
+        nếu (mình.token_thô == rỗng) {
+            mình.token_thô = mình.biên dịch token hóa thô(mình.nguồn);
+        };
+        trả về mình.token_thô;
+    };
+
+    hàm công khai token() {
+        nếu (mình.token_đã_ghép == rỗng) {
+            mình.token_đã_ghép = mình.hợp nhất token(mình.token thô());
+        };
+        trả về mình.token_đã_ghép;
+    };
+
+    hàm riêng tư biên dịch từ vựng ký tự(các_ký_tự, vị_trí) {
+        nếu (vị_trí < 0 || vị_trí >= độ dài(các_ký_tự)) { trả về ""; };
+        trả về các_ký_tự[vị_trí];
+    };
+
+    hàm riêng tư biên dịch từ vựng trắng(c) {
+        // Chuỗi escape \v / \f không được V++ diễn giải thành ký tự điều khiển:
+        // dùng code point để tránh nuốt nhầm chữ 'v' và 'f' của định danh.
+        nếu (c == " " || c == "\n" || c == "\r" || c == "\t") { trả về đúng; };
+        mã = mã điểm unicode(c);
+        trả về mã == 11 || mã == 12;
+    };
+
+    hàm riêng tư biên dịch từ vựng ngăn cách(c) {
+        trả về c == "\"" || c == "'" || c == "+" || c == "-" ||
+            c == "*" || c == "/" || c == "(" || c == ")" ||
+            c == "{" || c == "}" || c == "[" || c == "]" ||
+            c == ";" || c == "," || c == "<" || c == ">" ||
+            c == "=" || c == "!" || c == ":";
+    };
+
+    hàm riêng tư biên dịch từ vựng hai toán tử(s) {
+        trả về s == "==" || s == "!=" || s == "<=" || s == ">=" ||
+            s == "&&" || s == "||" || s == "++" || s == "--" ||
+            s == "+=" || s == "-=" || s == "*=" || s == "/=" || s == "%=";
+    };
+
+    hàm riêng tư biên dịch từ vựng chữ số(c) {
+        nếu (c == "") { trả về sai; };
+        mã = mã điểm unicode(c);
+        trả về mã >= 48 && mã <= 57;
+    };
+
+    hàm riêng tư biên dịch từ vựng số(s) {
+        nếu (s == "") { trả về ""; };
+        dấu_chấm = 0;
+        lặp(i = 0; i < độ dài(s); i++) {
+            c = s[i];
+            nếu (c == ".") {
+                dấu_chấm += 1;
+            } hoặc {
+                nếu (!mình.biên dịch từ vựng chữ số(c)) { trả về ""; };
+            };
+        };
+        nếu (dấu_chấm == 0) { trả về "số nguyên"; };
+        nếu (dấu_chấm == 1) { trả về "số thực"; };
+        trả về "";
+    };
+
+    hàm riêng tư biên dịch từ vựng phân loại(s) {
+        n = độ dài(s);
+        nếu (n >= 2) {
+            nếu ((s[0] == "\"" && s[n - 1] == "\"") ||
+                (s[0] == "'" && s[n - 1] == "'")) { trả về "chuỗi"; };
+        };
+        số = mình.biên dịch từ vựng số(s);
+        nếu (số != "") { trả về số; };
+        nếu (mình.biên dịch từ vựng hai toán tử(s) || s == "+" || s == "-" ||
+            s == "*" || s == "/" || s == "%" || s == "=" ||
+            s == "!" || s == "<" || s == ">") { trả về "toán tử"; };
+        nếu (s == "(" || s == ")" || s == "{" || s == "}" ||
+            s == "[" || s == "]" || s == ";" || s == "," || s == ":") {
+            trả về "dấu câu";
+        };
+        nếu (s == "nếu" || s == "hoặc" || s == "lặp" || s == "hàm" ||
+            s == "gọi" || s == "biến" || s == "in" || s == "dừng" ||
+            s == "thoát" || s == "chọn" || s == "ca" || s == "đúng" ||
+            s == "sai" || s == "rỗng" || s == "ném" || s == "thử" ||
+            s == "nhập" || s == "lớp" || s == "chuyển" || s == "mặc định" ||
+            s == "trả về" || s == "bỏ qua" ||
+            s == "khởi tạo" || s == "điều kiện" || s == "cập nhật" ||
+            s == "kiểm tra sau" || s == "bắt lỗi" || s == "trường hợp" ||
+            s == "giao diện" || s == "kế thừa" || s == "triển khai" ||
+            s == "công khai" || s == "riêng tư" || s == "bảo vệ" ||
+            s == "ngoại thư viện" || s == "ngoại hàm" || s == "ký hiệu" ||
+            s == "khả năng") { trả về "từ khóa"; };
+        trả về "định danh";
+    };
+
+    hàm riêng tư biên dịch từ vựng token(giá_trị, dòng, cột, bắt_đầu, kết_thúc,
+                               cột_ký_tự, bắt_đầu_ký_tự, kết_thúc_ký_tự) {
+        trả về {
+            "loại": mình.biên dịch từ vựng phân loại(giá_trị),
+            "giá trị": giá_trị,
+            "dòng": dòng,
+            "cột": cột,
+            "vị trí": bắt_đầu,
+            "kết thúc": kết_thúc,
+            "cột ký tự": cột_ký_tự,
+            "vị trí ký tự": bắt_đầu_ký_tự,
+            "kết thúc ký tự": kết_thúc_ký_tự
+        };
+    };
+
+    hàm riêng tư biên dịch từ vựng lỗi(loại_lỗi, dòng, cột) {
+        ném "biên dịch từ vựng: " + loại_lỗi + " tại dòng " +
+            thành chuỗi(dòng) + ", cột " + thành chuỗi(cột);
+    };
+
+    // Lex UTF-8 bằng các code point: không tách đôi ký tự tiếng Việt.
+    // Chưa dùng trong bootstrap C++; API này là pass độc lập có thể kiểm thử.
+    hàm công khai biên dịch token hóa thô(mã_nguồn) {
+        nếu (loai_cua(mã_nguồn) != "chuỗi") {
+            ném "biên dịch từ vựng: mã nguồn phải là chuỗi";
+        };
+        // Không lấy chỉ số Unicode từ đầu chuỗi cho từng ký tự: cách đó phải
+        // quét lại toàn bộ prefix và làm thời gian lexer tăng theo bình phương.
+        // Duyệt UTF-8 đúng một lượt rồi giữ bảng code point cho các pass sau.
+        bytes = chuoi_bytes_vm(mã_nguồn);
+        ký_tự = [];
+        ascii = [];
+        lặp(i = 0; i < 128; i++) { thêm(ascii, chuoi_tu_bytes_vm([i])); };
+        vị_trí_byte = [0];
+        cột_byte = [1];
+        cột_hiện_tại = 1;
+        vị_trí = 0;
+        lặp(vòng = 0; vị_trí < độ dài(bytes); vòng++) {
+            bước = 1;
+            c = "";
+            nếu (bytes[vị_trí] < 128) {
+                c = ascii[bytes[vị_trí]];
+            } hoặc {
+                bước = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
+                nếu (bước < 1) { ném "biên dịch từ vựng: mã nguồn UTF-8 không hợp lệ"; };
+                đoạn = [];
+                lặp(j = 0; j < bước; j++) { thêm(đoạn, bytes[vị_trí + j]); };
+                c = chuoi_tu_bytes_vm(đoạn);
+            };
+            thêm(ký_tự, c);
+            vị_trí += bước;
+            nếu (c == "\n") { cột_hiện_tại = 1; }
+            hoặc { cột_hiện_tại += bước; };
+            thêm(vị_trí_byte, vị_trí);
+            thêm(cột_byte, cột_hiện_tại);
+        };
+        n = độ dài(ký_tự);
+        kq = [];
+        i = 0;
+        dòng = 1;
+        cột = 1;
+        lặp(vòng = 0; i < n; vòng++) {
+            c = mình.biên dịch từ vựng ký tự(ký_tự, i);
+            tiếp = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+            nếu (mình.biên dịch từ vựng trắng(c)) {
+                nếu (c == "\n") { dòng += 1; cột = 1; }
+                hoặc { cột += 1; };
+                i += 1;
+            } hoặc {
+                nếu (c == "/" && tiếp == "/") {
+                    i += 2;
+                    cột += 2;
+                    lặp(j = 0; i < n && mình.biên dịch từ vựng ký tự(ký_tự, i) != "\n"; j++) {
+                        i += 1;
+                        cột += 1;
+                    };
+                } hoặc {
+                    nếu (c == "/" && tiếp == "*") {
+                        đầu_dòng = dòng;
+                        đầu_cột = cột;
+                        i += 2;
+                        cột += 2;
+                        đóng = sai;
+                        lặp(j = 0; i < n && !đóng; j++) {
+                            a = mình.biên dịch từ vựng ký tự(ký_tự, i);
+                            b = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+                            nếu (a == "*" && b == "/") {
+                                i += 2;
+                                cột += 2;
+                                đóng = đúng;
+                            } hoặc {
+                                nếu (a == "\n") { dòng += 1; cột = 1; }
+                                hoặc { cột += 1; };
+                                i += 1;
+                            };
+                        };
+                        nếu (!đóng) { mình.biên dịch từ vựng lỗi("chú thích khối chưa đóng", đầu_dòng, đầu_cột); };
+                    } hoặc {
+                        đầu = i;
+                        đầu_dòng = dòng;
+                        đầu_cột = cột;
+                        giá_trị = "";
+                        nếu (c == "\"" || c == "'") {
+                            nháy = c;
+                            giá_trị = c;
+                            i += 1;
+                            cột += 1;
+                            đóng = sai;
+                            lặp(j = 0; i < n && !đóng; j++) {
+                                a = mình.biên dịch từ vựng ký tự(ký_tự, i);
+                                b = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+                                nếu (a == "\n") {
+                                    mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu_dòng, đầu_cột);
+                                };
+                                nếu (a == "\\" && i + 1 < n) {
+                                    giá_trị = giá_trị + a + b;
+                                    i += 2;
+                                    cột += 2;
+                                } hoặc {
+                                    giá_trị = giá_trị + a;
+                                    i += 1;
+                                    cột += 1;
+                                    nếu (a == nháy) { đóng = đúng; };
+                                };
+                            };
+                            nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu_dòng, đầu_cột); };
+                        } hoặc {
+                            ghép = c + tiếp;
+                            nếu (mình.biên dịch từ vựng hai toán tử(ghép)) {
+                                giá_trị = ghép;
+                                i += 2;
+                                cột += 2;
+                            } hoặc {
+                                nếu (mình.biên dịch từ vựng ngăn cách(c)) {
+                                    giá_trị = c;
+                                    i += 1;
+                                    cột += 1;
+                                } hoặc {
+                                    lặp(j = 0; i < n; j++) {
+                                        a = mình.biên dịch từ vựng ký tự(ký_tự, i);
+                                        nếu (mình.biên dịch từ vựng trắng(a) || mình.biên dịch từ vựng ngăn cách(a)) {
+                                            thoát;
+                                        };
+                                        giá_trị = giá_trị + a;
+                                        i += 1;
+                                        cột += 1;
+                                    };
+                                };
+                            };
+                        };
+                        thêm(kq, mình.biên dịch từ vựng token(
+                            giá_trị, đầu_dòng, cột_byte[đầu],
+                            vị_trí_byte[đầu], vị_trí_byte[i], đầu_cột, đầu, i
+                        ));
+                    };
+                };
+            };
+        };
+        trả về kq;
+    };
+
+    // Hợp nhất từ khóa nhiều âm tiết theo cùng thứ tự lexer C++.
+    hàm công khai biên dịch token hóa(mã_nguồn) {
+        thô = mình.biên dịch token hóa thô(mã_nguồn);
+        trả về mình.hợp nhất token(thô);
+    };
+
+    hàm riêng tư hợp nhất token(thô) {
+        kq = [];
+        cụm_ba = ["kiểm tra sau", "ngoại thư viện"];
+        cụm_hai = ["mặc định", "trường hợp", "trả về", "bỏ qua",
+            "khởi tạo", "điều kiện", "cập nhật", "bắt lỗi", "giao diện",
+            "kế thừa", "triển khai", "công khai", "riêng tư", "bảo vệ",
+            "ngoại hàm", "ký hiệu", "khả năng"];
+        i = 0;
+        lặp(vòng = 0; i < độ dài(thô); vòng++) {
+            đầu = thô[i];
+            chuỗi_ghép = lấy map(đầu, "giá trị", "");
+            bước = 1;
+            nếu (i + 2 < độ dài(thô)) {
+                thử_ba = chuỗi_ghép + " " + lấy map(thô[i + 1], "giá trị", "") +
+                    " " + lấy map(thô[i + 2], "giá trị", "");
+                lặp(j = 0; j < độ dài(cụm_ba); j++) {
+                    nếu (thử_ba == cụm_ba[j]) { chuỗi_ghép = thử_ba; bước = 3; thoát; };
+                };
+            };
+            nếu (bước == 1 && i + 1 < độ dài(thô)) {
+                thử_hai = chuỗi_ghép + " " + lấy map(thô[i + 1], "giá trị", "");
+                lặp(j = 0; j < độ dài(cụm_hai); j++) {
+                    nếu (thử_hai == cụm_hai[j]) { chuỗi_ghép = thử_hai; bước = 2; thoát; };
+                };
+            };
+            cuối = thô[i + bước - 1];
+            thêm(kq, mình.biên dịch từ vựng token(
+                chuỗi_ghép,
+                lấy map(đầu, "dòng", 1), lấy map(đầu, "cột", 1),
+                lấy map(đầu, "vị trí", 0), lấy map(cuối, "kết thúc", 0),
+                lấy map(đầu, "cột ký tự", 1),
+                lấy map(đầu, "vị trí ký tự", 0),
+                lấy map(cuối, "kết thúc ký tự", 0)
+            ));
+            i += bước;
+        };
+        trả về kq;
+    };
+};
+
+
+hàm công khai biên dịch token hóa thô(mã_nguồn) {
+    bộ_tách = Bộ Tách Từ Vựng(mã_nguồn);
+    trả về bộ_tách.token thô();
+};
+
+hàm công khai biên dịch token hóa(mã_nguồn) {
+    bộ_tách = Bộ Tách Từ Vựng(mã_nguồn);
+    trả về bộ_tách.token();
+};

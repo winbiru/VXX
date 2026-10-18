@@ -1,0 +1,70 @@
+// So sánh ABI bytecode OOP compiler tự chủ với C++ (từng toán hạng).
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/chính;
+
+hàm so_lệnh(c, v, nhãn) {
+    nếu (độ dài(c) != độ dài(v)) {
+        in nhãn + " độ dài: " + thành chuỗi(độ dài(c)) + "/" + thành chuỗi(độ dài(v));
+        trả về sai;
+    };
+    lặp(i = 0; i < độ dài(c); i++) {
+        nếu (c[i]["op"] != v[i]["op"] ||
+            c[i]["toán hạng"] != v[i]["toán hạng"] ||
+            c[i]["chỉ số"] != v[i]["chỉ số"] ||
+            c[i]["giá trị"] != v[i]["giá trị"]) {
+            in nhãn + " khác tại " + thành chuỗi(i);
+            in c[i];
+            in v[i];
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm so_oop(nguồn) {
+    tự_chủ = biên dịch phát bytecode thuần(nguồn);
+    chuẩn = biên dịch bytecode(nguồn);
+    khớp = so_lệnh(chuẩn, tự_chủ["bytecode"], "top");
+    hàm_cpp = biên dịch bytecode hàm(nguồn);
+    hàm_vi = tự_chủ["hàm"];
+    nếu (độ dài(hàm_cpp) != độ dài(hàm_vi)) {
+        in "số hàm: " + thành chuỗi(độ dài(hàm_cpp)) + "/" + thành chuỗi(độ dài(hàm_vi));
+        trả về sai;
+    };
+    lặp(i = 0; i < độ dài(hàm_cpp); i++) {
+        nếu (hàm_cpp[i]["tên"] != hàm_vi[i]["tên"] ||
+            hàm_cpp[i]["id"] != hàm_vi[i]["id"]) {
+            in "metadata hàm khác tại " + thành chuỗi(i);
+            in hàm_cpp[i]["tên"];
+            in hàm_vi[i]["tên"];
+            khớp = sai;
+        };
+        nếu (!so_lệnh(hàm_cpp[i]["bytecode"], hàm_vi[i]["bytecode"],
+            "hàm " + thành chuỗi(i))) { khớp = sai; };
+    };
+    trả về khớp;
+};
+
+hàm chính() {
+    in so_oop("lớp A {};");
+    in so_oop("lớp A { hàm công khai f() { trả về 1; }; };");
+    in so_oop("lớp A { hàm khởi tạo(x) { mình.x = x; }; " +
+              "hàm công khai f() { trả về mình.x; }; };");
+    in so_oop("lớp A { hàm khởi tạo(x) { mình.x = x; }; " +
+              "hàm công khai f() { trả về mình.x; }; }; " +
+              "a = A(5); in a.f();");
+    in so_oop("lớp Cha { hàm công khai f() { trả về 2; }; }; " +
+              "lớp Con kế thừa Cha { hàm công khai f() { trả về gốc.f() + 1; }; }; " +
+              "c = Con(); in c.f();");
+    in so_oop("hàm trước() { trả về 1; }; lớp A { hàm công khai f() { trả về 2; }; }; " +
+              "in trước();");
+    in so_oop("lớp công khai A { hàm riêng tư ẩn() { trả về 1; }; " +
+              "hàm bảo vệ giữ() { trả về 2; }; hàm công khai mở() { trả về 3; }; };");
+    in so_oop("lớp Ngăn Xếp { hàm công khai đẩy(x) { " +
+              "mình.đỉnh = x; trả về mình.đỉnh; }; }; " +
+              "ngăn = Ngăn Xếp(); in ngăn.đẩy(8);");
+    in so_oop("lớp A { hàm set(x) { mình.x = x; }; " +
+              "hàm get() { trả về mình.x; }; " +
+              "hàm bump() { mình.set(mình.get() + 1); trả về mình.get(); }; }; " +
+              "a = A(); in a.bump();");
+};

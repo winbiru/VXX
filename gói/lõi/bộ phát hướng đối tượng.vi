@@ -1,0 +1,134 @@
+// Hai đối tượng có trạng thái cho event emitter và service registry.
+// Dùng lại implementation hàm để giữ tương thích với chương trình cũ.
+nhập gói/lõi/giao diện tài nguyên;
+nhập gói/lõi/sự kiện;
+
+lớp công khai Bộ Phát Sự Kiện triển khai Đóng Được {
+    hàm công khai khởi tạo(giới_hạn = 1024, chính_sách_lỗi = "ném đầu") {
+        mình.bộ = bộ phát sự kiện(giới_hạn, chính_sách_lỗi);
+        mình.đã_đóng = sai;
+    };
+
+    hàm riêng tư yêu cầu mở() {
+        nếu (mình.đã_đóng) { ném "LISTENER_STATE"; };
+    };
+
+    hàm công khai đăng ký(listener, một_lần = sai) {
+        mình.yêu cầu mở();
+        trả về đăng ký sự kiện(mình.bộ, listener, một_lần);
+    };
+
+    hàm công khai hủy(registration) {
+        mình.yêu cầu mở();
+        // Chỉ cho phép hủy đăng ký thuộc bộ phát hiện tại.
+        danh_sách = lấy map(mình.bộ, "đăng ký", []);
+        tìm_thấy = sai;
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            nếu (danh_sách[i] == registration) { tìm_thấy = đúng; };
+        };
+        nếu (!tìm_thấy) { ném "LISTENER_STATE"; };
+        trả về hủy đăng ký(registration);
+    };
+
+    hàm công khai phát(event) {
+        mình.yêu cầu mở();
+        trả về phát sự kiện(mình.bộ, event);
+    };
+
+    hàm công khai số người nghe() {
+        nếu (mình.đã_đóng) { trả về 0; };
+        trả về số listener(mình.bộ);
+    };
+
+    hàm công khai đang mở() { trả về !mình.đã_đóng; };
+
+    hàm công khai đóng() {
+        nếu (mình.đã_đóng) { trả về sai; };
+        mình.đã_đóng = đúng;
+        danh_sách = lấy map(mình.bộ, "đăng ký", []);
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            hủy đăng ký(danh_sách[i]);
+        };
+        trả về đúng;
+    };
+};
+
+lớp công khai Bộ Nạp Dịch Vụ {
+    hàm công khai khởi tạo(giới_hạn = 1024) {
+        nếu (loại của(giới_hạn) != "số nguyên" || giới_hạn <= 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        mình.giới_hạn = giới_hạn;
+        mình.nhà_cung_cấp = [];
+    };
+
+    hàm công khai đăng ký(provider) {
+        mình.kiểm tra nhà cung cấp(provider);
+        nếu (độ dài(mình.nhà_cung_cấp) >= mình.giới_hạn) { ném "SERVICE_CONFIGURATION"; };
+        danh_sách = mình.nhà_cung_cấp;
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            hiện_tại = danh_sách[i];
+            nếu (lấy map(hiện_tại, "interface_id", "") == lấy map(provider, "interface_id", "") &&
+                lấy map(hiện_tại, "implementation_id", "") == lấy map(provider, "implementation_id", "") &&
+                lấy map(hiện_tại, "module_id", "") == lấy map(provider, "module_id", "")) {
+                ném "SERVICE_CONFIGURATION";
+            };
+        };
+        thêm(danh_sách, provider);
+        trả về mình;
+    };
+
+    hàm công khai tìm(interface_id) {
+        nếu (loại của(interface_id) != "chuỗi" || độ dài(interface_id) == 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        kết_quả = [];
+        danh_sách = mình.nhà_cung_cấp;
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            provider = danh_sách[i];
+            nếu (lấy map(provider, "interface_id", "") == interface_id) { thêm(kết_quả, provider); };
+        };
+        nếu (độ dài(kết_quả) == 0) { ném "SERVICE_NOT_FOUND"; };
+        trả về kết_quả;
+    };
+
+    hàm công khai tải(provider) {
+        mình.yêu cầu đã đăng ký(provider);
+        nếu (lấy map(provider, "lifecycle", "mỗi lần") == "đơn thể" &&
+            lấy map(provider, "đã tạo", 0) == 1) {
+            trả về lấy map(provider, "instance", rỗng);
+        };
+        instance = mình.tạo instance(provider);
+        nếu (lấy map(provider, "lifecycle", "mỗi lần") == "đơn thể") {
+            đặt map(provider, "instance", instance);
+            đặt map(provider, "đã tạo", 1);
+        };
+        trả về instance;
+    };
+
+    hàm riêng tư kiểm tra nhà cung cấp(provider) {
+        nếu (loại của(provider) != "từ điển" || lấy map(provider, "__vpp_service_provider__", 0) != 1) {
+            ném "SERVICE_CONFIGURATION";
+        };
+    };
+
+    hàm riêng tư yêu cầu đã đăng ký(provider) {
+        mình.kiểm tra nhà cung cấp(provider);
+        danh_sách = mình.nhà_cung_cấp;
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            nếu (danh_sách[i] == provider) { trả về đúng; };
+        };
+        ném "SERVICE_NOT_FOUND";
+    };
+
+    hàm riêng tư tạo instance(provider) {
+        factory = lấy map(provider, "factory", rỗng);
+        thử { instance = factory(); } bắt lỗi(e) { ném "SERVICE_CONFIGURATION"; };
+        validator = lấy map(provider, "validator", rỗng);
+        nếu (validator != rỗng) {
+            thử { hợp_lệ = validator(instance); } bắt lỗi(e) { ném "SERVICE_CONFIGURATION"; };
+            nếu (!hợp_lệ) { ném "SERVICE_CONFIGURATION"; };
+        };
+        trả về instance;
+    };
+};

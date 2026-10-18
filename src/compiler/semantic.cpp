@@ -268,6 +268,41 @@ private:
                 SymbolOrigin::Imported, false, nullptr);
             if (symbol != kInvalidSymbolId && symbol < model_.symbols.size()) {
                 model_.symbols[symbol].sourceIdentity = external.sourceIdentity;
+                if (!external.runtimeName.empty()) {
+                    model_.symbols[symbol].qualifiedName = external.runtimeName;
+                }
+            }
+        }
+        for (const auto &external : environment_.importedSymbols) {
+            if (external.kind != SemanticSymbolKind::Class &&
+                external.kind != SemanticSymbolKind::Interface) continue;
+            const SymbolId owner = lookupTypeLexical(external.name, model_.globalScope).symbol;
+            if (owner == kInvalidSymbolId) continue;
+            const ScopeId members = addScope(
+                external.kind == SemanticSymbolKind::Class ? ScopeKind::Class : ScopeKind::Interface,
+                model_.globalScope, external.declaration, owner);
+            model_.symbols[owner].memberScope = members;
+            if (!external.superclassName.empty()) {
+                model_.symbols[owner].superclass = lookupTypeLexical(
+                    external.superclassName, model_.globalScope).symbol;
+            }
+            for (const auto &name : external.implementedInterfaces) {
+                model_.symbols[owner].implementedInterfaces.push_back(
+                    lookupTypeLexical(name, model_.globalScope).symbol);
+            }
+            for (const auto &name : external.extendedInterfaces) {
+                model_.symbols[owner].extendedInterfaces.push_back(
+                    lookupTypeLexical(name, model_.globalScope).symbol);
+            }
+            for (const auto &method : external.methods) {
+                const SymbolId id = addSymbol(members, SemanticSymbolKind::Method,
+                    method.name, external.runtimeName + "." + method.name, external.declaration,
+                    method.visibility, owner, SymbolOrigin::Imported, false, nullptr);
+                if (id != kInvalidSymbolId) {
+                    model_.symbols[id].parameterCount = method.parameterCount;
+                    model_.symbols[id].minimumArgumentCount = method.minimumArgumentCount;
+                    model_.symbols[id].sourceIdentity = external.sourceIdentity;
+                }
             }
         }
     }
@@ -808,6 +843,20 @@ private:
         }
 
         model_.statementScopes[statement.tokenBegin] = containingScope;
+        if (statement.kind == AstStatementKind::VariableDeclaration) {
+            // VM slots remain textual and function-wide. Match the scope used
+            // for implicit assignment bindings until symbol-keyed slots exist.
+            const ScopeId declarationScope = implicitVariableScope(containingScope);
+            const SemanticSymbolKind variableKind = declarationScope == model_.globalScope
+                ? SemanticSymbolKind::GlobalVariable
+                : SemanticSymbolKind::LocalVariable;
+            (void)addSymbol(declarationScope, variableKind,
+                            statement.declarationName, statement.declarationName,
+                            statement.span, SemanticVisibility::Unspecified,
+                            kInvalidSymbolId, SymbolOrigin::Source,
+                            true, &statement);
+            return;
+        }
         if (statement.kind == AstStatementKind::Try && statement.children.size() > 1) {
             buildOrdinaryBlock(statement.children.front(), containingScope, ownerClass);
             for (std::size_t index = 1; index < statement.children.size(); ++index) {
@@ -1128,7 +1177,21 @@ private:
             }
         }
 
-        if (lookupLexical(left->text, scope).symbol != kInvalidSymbolId) {
+        const LookupResult existing = lookupLexical(left->text, scope);
+        if (existing.symbol != kInvalidSymbolId) {
+            // A function name resolves to its VM function ID on reads. Writing
+            // a value into its name slot would silently discard that value on
+            // subsequent reads, so reject the assignment at the binding site.
+            // Proper callable shadowing requires symbol-scoped VM slots.
+            if (isCallableKind(model_.symbols[existing.symbol].kind)) {
+                model_.diagnostics.push_back({
+                    SemanticDiagnosticSeverity::Error,
+                    vietvm::messages::messageText(
+                        vietvm::messages::kSemanticAssignmentToCallable,
+                        {left->text}),
+                    left->span,
+                });
+            }
             return;
         }
         const ScopeId declarationScope = implicitVariableScope(scope);
@@ -1242,6 +1305,9 @@ private:
             case AstExpressionKind::Index:
                 declareExpression(expression->left, scope);
                 declareExpression(expression->right, scope);
+                break;
+            case AstExpressionKind::Member:
+                declareExpression(expression->left, scope);
                 break;
             case AstExpressionKind::Literal:
             case AstExpressionKind::Name:
@@ -1495,6 +1561,11 @@ private:
                     binding.lexicalDepth = receiver.depth;
                     binding.receiverName = member.first;
                     binding.memberName = member.second;
+                    binding.captured = crossesCallableBoundary(
+                        scope, model_.symbols[receiver.symbol].declaringScope);
+                    if (binding.captured) {
+                        recordLambdaCaptures(scope, model_.symbols[receiver.symbol]);
+                    }
                     SymbolId receiverClass = model_.symbols[receiver.symbol].inferredClass;
                     if (member.first == "gốc" && receiverClass != kInvalidSymbolId &&
                         receiverClass < model_.symbols.size()) {
@@ -1599,7 +1670,7 @@ private:
             const SemanticSymbol &klass = model_.symbols[binding.symbol];
             // Imported class symbols hiện chưa mang member/constructor metadata qua
             // SemanticEnvironment; runtime linker sẽ kiểm tra arity sau khi resolve class.
-            if (klass.origin != SymbolOrigin::Source) return;
+            if (klass.origin != SymbolOrigin::Source && klass.memberScope == kInvalidScopeId) return;
             displayName = klass.lookupName;
             const SymbolId constructor = klass.memberScope == kInvalidScopeId
                 ? kInvalidSymbolId
@@ -1666,6 +1737,9 @@ private:
             const SemanticSymbol &symbol = model_.symbols[calleeBinding.symbol];
             if (symbol.kind == SemanticSymbolKind::Class) {
                 result.kind = CallTargetKind::ClassConstructor;
+                if (symbol.origin == SymbolOrigin::Imported && !symbol.qualifiedName.empty()) {
+                    result.runtimeName = symbol.qualifiedName;
+                }
             } else if (symbol.kind == SemanticSymbolKind::ForeignFunction) {
                 result.kind = CallTargetKind::ForeignFunction;
             } else if (symbol.origin == SymbolOrigin::Imported && isCallableKind(symbol.kind)) {
@@ -1762,6 +1836,15 @@ private:
                 resolveExpression(expression->left, scope);
                 resolveExpression(expression->right, scope);
                 break;
+            case AstExpressionKind::Member: {
+                resolveExpression(expression->left, scope);
+                BindingResult member;
+                member.kind = BindingKind::InstanceMember;
+                member.expression = id;
+                member.memberName = expression->text;
+                model_.expressionBindings[id] = std::move(member);
+                break;
+            }
         }
     }
 

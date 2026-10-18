@@ -1,0 +1,75 @@
+// Kiểm thử parser biểu thức self-host: không gọi compilerAnalyzePrimitive.
+nhập gói/biên dịch/biểu thức;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm chính() {
+    cây = biên dịch phân tích biểu thức("1 + 2 * 3");
+    in lấy map(cây, "loại", "") == "hai ngôi";
+    in lấy map(cây, "toán tử", "") == "+";
+    in lấy map(lấy map(cây, "trái", {}), "giá trị", "") == "1";
+    nhánh_nhân = lấy map(cây, "phải", {});
+    in lấy map(nhánh_nhân, "toán tử", "") == "*";
+    in lấy map(lấy map(nhánh_nhân, "phải", {}), "giá trị", "") == "3";
+
+    ngoặc = biên dịch phân tích biểu thức("(1 + 2) * 3");
+    in lấy map(ngoặc, "toán tử", "") == "*";
+    in lấy map(lấy map(ngoặc, "trái", {}), "toán tử", "") == "+";
+
+    gán = biên dịch phân tích biểu thức("a = b = c");
+    in lấy map(gán, "toán tử", "") == "=";
+    in lấy map(lấy map(gán, "trái", {}), "giá trị", "") == "a";
+    in lấy map(lấy map(gán, "phải", {}), "toán tử", "") == "=";
+    in lấy map(lấy map(lấy map(gán, "phải", {}), "phải", {}), "giá trị", "") == "c";
+
+    phép = biên dịch phân tích biểu thức("a || b && c == d");
+    in lấy map(phép, "toán tử", "") == "||";
+    in lấy map(lấy map(phép, "phải", {}), "toán tử", "") == "&&";
+    in lấy map(lấy map(lấy map(phép, "phải", {}), "phải", {}), "toán tử", "") == "==";
+
+    dấu = biên dịch phân tích biểu thức("-a * !b");
+    in lấy map(dấu, "toán tử", "") == "*";
+    in lấy map(lấy map(dấu, "trái", {}), "toán tử", "") == "-";
+    in lấy map(lấy map(dấu, "phải", {}), "toán tử", "") == "!";
+
+    kết_quả_gọi = biên dịch phân tích biểu thức("cộng(1, nhân(2, 3))");
+    in lấy map(kết_quả_gọi, "loại", "") == "gọi";
+    in lấy map(lấy map(kết_quả_gọi, "hàm", {}), "giá trị", "") == "cộng";
+    in độ dài(lấy map(kết_quả_gọi, "đối số", [])) == 2;
+    đối_số_gọi = lấy map(kết_quả_gọi, "đối số", []);
+    in lấy map(đối_số_gọi[1], "loại", "") == "gọi";
+
+    gọi_rỗng = biên dịch phân tích biểu thức("f()");
+    in độ dài(lấy map(gọi_rỗng, "đối số", [1])) == 0;
+    mảng = biên dịch phân tích biểu thức("mảng[1 + 2] * 4");
+    in lấy map(lấy map(mảng, "trái", {}), "loại", "") == "chỉ số";
+    in lấy map(lấy map(lấy map(mảng, "trái", {}), "chỉ số", {}), "toán tử", "") == "+";
+
+    tiếng_việt = biên dịch phân tích biểu thức("đếm + 1");
+    in lấy map(lấy map(tiếng_việt, "trái", {}), "giá trị", "") == "đếm";
+    in lấy map(lấy map(tiếng_việt, "trái", {}), "vị trí", -1) == 0;
+    chuỗi = biên dịch phân tích biểu thức("\"Việt Nam\"");
+    in lấy map(chuỗi, "kiểu", "") == "chuỗi";
+    in lấy map(chuỗi, "giá trị", "") == "\"Việt Nam\"";
+
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("1 +"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("(1 + 2"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("a b"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("f(1,)"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("a[1 + ]"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức("hàm x"); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích biểu thức(""); } bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+};

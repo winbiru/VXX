@@ -9,35 +9,34 @@ namespace {
 thread_local RuntimeHeap *activeHeap = nullptr;
 
 template <typename T>
-bool trackWeak(std::vector<std::weak_ptr<T>> &registry,
+bool trackWeak(std::unordered_map<const T *, std::weak_ptr<T>> &registry,
                const std::shared_ptr<T> &value) {
     if (value == nullptr) return false;
-    for (auto it = registry.begin(); it != registry.end();) {
-        const std::shared_ptr<T> live = it->lock();
-        if (live == nullptr) {
-            it = registry.erase(it);
-            continue;
-        }
-        if (live.get() == value.get()) return false;
-        ++it;
+    const auto found = registry.find(value.get());
+    if (found != registry.end()) {
+        if (!found->second.expired()) return false;
+        // The allocator may reuse the address of an expired object before a
+        // sweep. Replace its weak control block rather than losing tracking.
+        found->second = value;
+        return true;
     }
-    registry.push_back(value);
+    registry.emplace(value.get(), value);
     return true;
 }
 
 template <typename T>
-void pruneExpired(std::vector<std::weak_ptr<T>> &registry) {
-    registry.erase(
-        std::remove_if(registry.begin(), registry.end(),
-                       [](const std::weak_ptr<T> &entry) { return entry.expired(); }),
-        registry.end());
+void pruneExpired(std::unordered_map<const T *, std::weak_ptr<T>> &registry) {
+    for (auto it = registry.begin(); it != registry.end();) {
+        if (it->second.expired()) it = registry.erase(it);
+        else ++it;
+    }
 }
 
 template <typename T>
-std::size_t liveCount(const std::vector<std::weak_ptr<T>> &registry) {
+std::size_t liveCount(const std::unordered_map<const T *, std::weak_ptr<T>> &registry) {
     return static_cast<std::size_t>(std::count_if(
         registry.begin(), registry.end(),
-        [](const std::weak_ptr<T> &entry) { return !entry.expired(); }));
+        [](const auto &entry) { return !entry.second.expired(); }));
 }
 
 // Đánh dấu toàn bộ object graph reachable từ một StackValue bằng worklist lặp;
@@ -87,6 +86,8 @@ void markValue(const StackValue &value,
 
         const ClosureHandle &closure = std::get<ClosureHandle>(current);
         if (closure == nullptr || !marked.insert(closure.get()).second) continue;
+        if (closure->methodOwnerClass != nullptr)
+            pending.emplace_back(closure->methodOwnerClass);
         for (const auto &capture : closure->captures) {
             if (capture.second != nullptr) pending.push_back(capture.second->value);
         }
@@ -94,7 +95,7 @@ void markValue(const StackValue &value,
 }
 
 template <typename T, typename Clear>
-std::size_t sweepRegistry(std::vector<std::weak_ptr<T>> &registry,
+std::size_t sweepRegistry(std::unordered_map<const T *, std::weak_ptr<T>> &registry,
                           const std::unordered_set<const void *> &marked,
                           Clear clearEdges) {
     // Giữ strong handle cho toàn bộ object sắp sweep trước khi cắt cạnh. Nếu chỉ
@@ -102,8 +103,8 @@ std::size_t sweepRegistry(std::vector<std::weak_ptr<T>> &registry,
     // hủy dây chuyền qua shared_ptr destructor và làm tràn native stack.
     std::vector<std::shared_ptr<T>> garbage;
     garbage.reserve(registry.size());
-    for (const std::weak_ptr<T> &entry : registry) {
-        const std::shared_ptr<T> value = entry.lock();
+    for (const auto &entry : registry) {
+        const std::shared_ptr<T> value = entry.second.lock();
         if (value == nullptr || marked.count(value.get()) != 0) continue;
         garbage.push_back(value);
     }
@@ -194,6 +195,8 @@ void RuntimeHeap::trackValue(const StackValue &value) {
         const ClosureHandle &closure = std::get<ClosureHandle>(current);
         if (closure == nullptr || !visited.insert(closure.get()).second) continue;
         track(closure);
+        if (closure->methodOwnerClass != nullptr)
+            pending.emplace_back(closure->methodOwnerClass);
         for (const auto &capture : closure->captures) {
             if (capture.second != nullptr) pending.push_back(capture.second->value);
         }
@@ -233,7 +236,9 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
             value.methods.clear();
         });
     stats.swept += sweepRegistry(
-        closures_, marked, [](RuntimeClosure &value) { value.captures.clear(); });
+        closures_, marked, [](RuntimeClosure &value) {
+            value.captures.clear(); value.methodOwnerClass.reset();
+        });
 
     pruneExpired(maps_);
     pruneExpired(lists_);
@@ -244,6 +249,7 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
     stats.trackedAfter = maps_.size() + lists_.size() + tuples_.size() +
                          classes_.size() + instances_.size() + closures_.size();
     collectedAllocationGeneration_ = allocationGeneration_;
+    collectionBudget_ = std::max<std::size_t>(256, stats.trackedAfter / 2);
     return stats;
 }
 

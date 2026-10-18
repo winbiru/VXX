@@ -1,0 +1,59 @@
+// CLI compiler V++: C++ bootstrap VM; mọi pass của nguồn đích và artifact
+// thực thi ở thư viện này. Không gọi snapshot hay kịch bản compiler C++.
+nhập gói/biên dịch/nguồn tệp;
+nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/liên kết;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/nhập xuất/tệp;
+nhập gói/lõi/chuyển kiểu;
+
+// Điều khiển một phiên CLI. Trạng thái đường dẫn và cấu hình được giữ trong lớp.
+lớp công khai Trình Điều Khiển Biên Dịch {
+    hàm công khai khởi tạo(đường, thư_viện, đầu_ra) {
+        mình.đường = đường;
+        mình.thư_viện = thư_viện;
+        mình.đầu_ra = đầu_ra;
+    };
+
+    hàm riêng tư kiểm tra đầu ra(đồ_thị) {
+        nếu (mình.đầu_ra == "") { trả về; };
+        đích = biên dịch nguồn chuẩn đường(mình.đầu_ra);
+        nếu (đích == đồ_thị["điểm vào"]) { ném "biên dịch cli: đầu ra trùng nguồn"; };
+        mô_đun = đồ_thị["mô đun"];
+        lặp(i = 0; i < độ dài(mô_đun); i++) {
+            nếu (đích == mô_đun[i]["định danh"]) {
+                ném "biên dịch cli: đầu ra trùng nguồn phụ thuộc";
+            };
+        };
+    };
+
+    hàm công khai dựng() {
+        đồ_thị = biên dịch nguồn đồ thị(mình.đường, mình.thư_viện);
+        mình.kiểm tra đầu ra(đồ_thị);
+        artifact = biên dịch liên kết đồ thị thuần(đồ_thị);
+        nếu (mình.đầu_ra != "") {
+            ghi tệp(mình.đầu_ra, biên dịch artifact tuần tự(artifact));
+        };
+        trả về "Compiler V++: " + mình.đường + ": " +
+            thành chuỗi(độ dài(artifact["bytecode"])) + " lệnh bytecode, " +
+            thành chuỗi(độ dài(artifact["hàm"])) + " hàm.\n";
+    };
+
+    hàm công khai chạy(chế_độ) {
+        chọn (chế_độ) {
+            ca "artifact": {
+                trả về biên dịch chạy artifact(biên dịch artifact giải mã(đọc tệp(mình.đường)));
+            }
+            ca "run": {
+                trả về biên dịch chạy artifact(biên dịch nguồn tệp tự chủ(mình.đường, mình.thư_viện));
+            }
+            ca "build": { trả về mình.dựng(); }
+            mặc định: { ném "biên dịch cli: chế độ chưa hỗ trợ '" + chế_độ + "'"; }
+        }
+    };
+};
+
+hàm công khai biên dịch cli(đường, thư_viện, chế_độ, đầu_ra) {
+    điều_khiển = Trình Điều Khiển Biên Dịch(đường, thư_viện, đầu_ra);
+    trả về điều_khiển.chạy(chế_độ);
+};

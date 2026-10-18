@@ -46,6 +46,9 @@ namespace vietvm::compiler {
         std::vector<CompiledModuleInitializer> moduleInitializers;
         std::unordered_map<std::string, std::vector<CompiledModuleFunctionExport>>
             moduleFunctionExports;
+        // Một function ID có thể được nhập dưới nhiều bí danh; metadata tên
+        // runtime giữ một tên duy nhất, còn lookup biên dịch giữ đủ alias.
+        std::unordered_map<std::string, int> importedFunctionAliases;
         std::unordered_map<std::string, MethodAccessInfo> methodAccess;
         std::vector<std::string> classContextStack;
         // Base directory used to resolve relative imports for this compilation.
@@ -91,6 +94,7 @@ namespace vietvm::compiler {
             importedFiles.clear();
             moduleInitializers.clear();
             moduleFunctionExports.clear();
+            importedFunctionAliases.clear();
             methodAccess.clear();
             classContextStack.clear();
             activeModuleSemanticIndex = nullptr;

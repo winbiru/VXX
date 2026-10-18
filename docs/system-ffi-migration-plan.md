@@ -1,5 +1,36 @@
 # Kế hoạch chuyển primitive hệ điều hành sang thư viện V++
 
+**Cập nhật 2026-10-10 (socket TCP/UDP Windows):** public API trên Windows
+mặc định sử dụng các hàm V++ tại `gói/mạng/ổ cắm.vi`, gọi adapter WinSock
+`system.net.socket.connect/listen/accept/timeout/kind/send/recv/close` với
+token socket theo VM; `SOCKET` được giữ nguyên độ rộng pointer trên Win64.
+`VPP_WINDOWS_SOCKET_FFI=0` chọn backend TCP/UDP C++ legacy để đối chiếu.
+Runner Windows kiểm tra hai backend ở interpreter/JIT, bao gồm TCP/UDP loopback,
+nhưng **chưa có kết quả chạy Windows**; không xóa legacy trước khi xác nhận
+parity, lỗi/timeout, cleanup và IPv4/IPv6 trên Windows thật. TLS Windows
+vẫn dùng Schannel/đường TCP legacy; không thử TLS qua WinSock FFI đang thiếu
+provider TLS Windows. Backend socket POSIX và Windows vẫn cần OS/ABI adapter
+native để quản lý descriptor/handle an toàn.
+
+**Cập nhật 2026-10-10 (DNS Windows):** `gói/mạng/ổ cắm.vi` đã bỏ nhánh
+`dns_phan_giai_vm`/`socket_phan_giai_vm` riêng trên Windows. Tất cả nền tảng
+dùng V++ duyệt kết quả `resolve_open/next/close`, kiểm tra và đóng token cả khi
+gặp lỗi. Adapter Windows trong `foreign.cpp` gọi Winsock `getaddrinfo`/
+`getnameinfo` và lưu `addrinfo*` ở trạng thái VM, không lộ pointer qua FFI.
+Đã đạt fixture DNS interpreter/JIT trên macOS; chạy thật trên Windows còn là
+gate mở (Unicode, IPv4/IPv6, lỗi và cleanup). Đã xóa hai handler DNS C++ cũ
+trên Windows và chặn opcode DNS legacy trên mọi nền tảng, trong cả interpreter
+và JIT. Chỉ giữ descriptor opcode để trả diagnostic di chuyển; Windows runner
+có negative fixture cho cả hai opcode. TLS Windows chưa chuyển sang FFI.
+
+**Cập nhật 2026-10-10 (Windows filesystem):** bảy phép công khai liên quan
+thư mục và đường dẫn nay luôn chạy logic `.vi` qua Win32 FFI. Đã xóa handler
+filesystem C++ cuối cùng, chặn cả bảy opcode cũ trên Windows/POSIX. Hai cờ
+`VPP_WINDOWS_DIRECTORY_FFI` và `VPP_WINDOWS_PATH_FFI` không còn tác dụng;
+runner xác nhận cờ cũ không khôi phục nhánh native. **Chưa kiểm chứng chạy
+trên Windows**; cần CI interpreter/JIT, Unicode, NUL, symlink/reparse point,
+handle cleanup và quy ước lỗi. Đây là thay đổi hành vi đối với source gọi opcode cũ.
+
 **Cập nhật 2026-10-09 (Windows process):** API `chạy tiến trình` mặc định
 dùng FFI trên POSIX lẫn Windows, dựng argv/quote, môi trường, multiplex,
 deadline và kết quả tại `gói/hệ thống/tiến trình.vi`. Đã gỡ implementation
@@ -22,23 +53,22 @@ interpreter/JIT và Windows/POSIX phù hợp, (4) chuyển mặc định, rồi 
 helper C++ không còn caller. Native provider/handle/ABI vẫn là phần bắt buộc
 của VM; không xóa tính năng chỉ vì còn dùng C++.
 
-**Windows directory FFI thử nghiệm:** `gói/nhập xuất/thư mục.vi` đã điều phối
+**Windows directory FFI:** `gói/nhập xuất/thư mục.vi` đã điều phối
 tạo nhiều cấp, liệt kê, xóa cây bằng V++. Các binding `system.fs.mkdir/remove`
 dùng Win32 `CreateDirectoryW`/`RemoveDirectoryW`/`DeleteFileW` và
 `system.fs.dir.open/read/close` dùng `FindFirstFileW`/`FindNextFileW`/`FindClose`
-với token VM được giải phóng khi đóng hoặc reset. Mặc định Windows vẫn giữ
-primitive tạo/xóa/liệt kê cũ; `VPP_WINDOWS_DIRECTORY_FFI=1` chuyển ba thao tác
-sang FFI mà không đổi API V++. `scripts/windows/run-tests.ps1` chạy fixture
-thư mục cả đường cũ và opt-in, interpreter/JIT. Đã thêm adapter chỉ đọc
+với token VM được giải phóng khi đóng hoặc reset. Mặc định Windows sử dụng FFI;
+không còn nhánh primitive filesystem C++ khi thay đổi biến môi trường.
+`scripts/windows/run-tests.ps1` chạy fixture thư mục qua FFI ở interpreter/JIT,
+kiểm tra cờ cũ không bật lại native và từ chối opcode cũ. Đã thêm adapter chỉ đọc
 `system.fs.path.kind` gọi `CreateFileW`/`GetFileInformationByHandle`: trả
 `-1` nếu đường thiếu, `0` loại khác/reparse point không theo liên kết,
 `1` tệp, `2` thư mục. V++ quyết định phép `tồn tại`, `là tệp`, `là thư mục`
-và nhận biết thư mục không theo liên kết khi bật `VPP_WINDOWS_DIRECTORY_FFI=1`
-hoặc `VPP_WINDOWS_PATH_FFI=1`. Adapter kiểm tra chặt ký hiệu, capability,
-ABI và cờ follow (0/1); chưa gỡ opcode cũ trước khi Windows parity đạt.
-**Chưa chạy Windows CI với
-thay đổi này**; không được gỡ helper cũ hay bật FFI mặc định trước khi parity
-trên Windows đã đạt. Riêng process Windows đã chuyển sang FFI mặc định,
+và nhận biết thư mục không theo liên kết qua Win32 FFI mặc định.
+Adapter kiểm tra chặt ký hiệu, capability, ABI và cờ follow (0/1);
+descriptor opcode cũ được giữ để báo lỗi di chuyển.
+**Chưa chạy Windows CI với thay đổi này**; cần xác minh thực thi Windows
+trước khi loại bỏ helper dự phòng. Riêng process Windows đã chuyển sang FFI mặc định,
 không còn cần cờ `VPP_WINDOWS_PROCESS_FFI`; fixture dùng `cmd.exe` thay `/bin/sh`.
 
 ### Tiến độ thực tế (2026-10-09)
@@ -47,8 +77,8 @@ không còn cần cờ `VPP_WINDOWS_PROCESS_FFI`; fixture dùng `cmd.exe` thay `
 | --- | --- | --- |
 | Frontend/compiler | `ngoại thư viện`, `ngoại hàm`, `ForeignCall` IR, phát `OP_FFI_CALL = 156`; kiểm tra alias, kiểu, arity, ABI và capability; khai báo `c_đệm_ra[16]`/`c_đệm_vào[số_byte]` và giữ metadata extent đến descriptor | Ownership/layout và target profile đầy đủ; quan hệ pointer tổng quát |
 | Runtime POSIX | `libffi` + `dlsym`/`dlopen`, scalar `i32/u32/i64/u64/f64`, `c_chuỗi` và `void`, capability + verifier đối chiếu argc, descriptor, extent; số ABI boxed và số học nguyên chính xác; `errno` riêng từng VM; `c_đệm_ra`/`c_đệm_vào` theo contract từng API; token `FILE*`/`DIR*`/resolver riêng VM; binding cho env/process identity, clock/getentropy, stdio, `mkdir`/`remove`/`access`, `stat`/`lstat`, `opendir`/`readdir`/`closedir`, `localtime_r`; adapter `getaddrinfo`/`getnameinfo` và cleanup resolver; layout guard theo SDK | Constructor/literal `AbiInteger`, pointer/handle/buffer relation tổng quát, error domain khác POSIX, caching và ABI Windows |
-| System public | POSIX dùng FFI cho env, PID/PPID, UID/GID, sleep/EINTR, monotonic/realtime/local clock và DST, entropy, tồn tại/phân loại tệp/thư mục, liệt kê, tạo/xóa đường dẫn, DNS và phân giải địa chỉ kết nối; năm API đọc/ghi/ghi nối tệp điều phối chunk/EOF/partial write/close từ V++ qua stdio; TCP/UDP và TLS client qua binding theo capability/token VM, trong đó TLS handshake và mật mã chạy qua adapter provider đã kiểm chứng; `chạy tiến trình` dựng argv/env, multiplex hai pipe và dọn dẹp trong V++ qua FFI cả POSIX/Windows | Provider TLS POSIX vẫn là native (SecureTransport/OpenSSL), chưa có integration xác minh server/chứng chỉ với fixture TLS độc lập; worker/scheduler và Windows process FFI còn cần xác nhận trên Windows, Windows TLS vẫn native; spawn POSIX và Win32 vẫn cần adapter C++ cho ABI/OS; chưa có CI đa nền tảng |
-| Đa nền tảng | macOS POSIX chạy thực tế; Windows đã có FFI adapter cho env, sleep, file, clock, entropy, process và thư mục (opt-in nơi chưa chứng minh parity); CMake yêu cầu `libffi`/pkg-config trên POSIX | Windows FFI chưa được kiểm chứng đầy đủ bằng CI; DNS/socket/TLS và một số metadata vẫn dùng fallback; Linux và toàn bộ matrix ABI chưa được chứng minh cho tới khi runner thực thi thành công |
+| System public | POSIX dùng FFI cho env, PID/PPID, UID/GID, sleep/EINTR, monotonic/realtime/local clock và DST, entropy, tồn tại/phân loại tệp/thư mục, liệt kê, tạo/xóa đường dẫn, DNS và phân giải địa chỉ kết nối; năm API đọc/ghi/ghi nối tệp điều phối chunk/EOF/partial write/close từ V++ qua stdio; TCP/UDP dùng V++/FFI mặc định trên POSIX và Windows; TLS client POSIX qua binding theo capability/token VM, trong đó TLS handshake và mật mã chạy qua adapter provider đã kiểm chứng; `chạy tiến trình` dựng argv/env, multiplex hai pipe và dọn dẹp trong V++ qua FFI cả POSIX/Windows | Provider TLS POSIX vẫn là native (SecureTransport/OpenSSL), chưa có integration xác minh server/chứng chỉ với fixture TLS độc lập; worker/scheduler, socket/process FFI cần xác nhận trên Windows, Windows TLS vẫn native; spawn POSIX và Win32 vẫn cần adapter C++ cho ABI/OS; chưa có CI đa nền tảng |
+| Đa nền tảng | macOS POSIX chạy thực tế; Windows đã có FFI adapter cho env, sleep, file, clock, entropy, process, thư mục, metadata, DNS resolver và socket TCP/UDP (public `.vi` mặc định); CMake yêu cầu `libffi`/pkg-config trên POSIX; hai handler DNS C++ đã gỡ và opcode DNS cũ bị chặn trên cả hai OS | Windows FFI chưa được kiểm chứng đầy đủ bằng CI; rollback TCP/UDP và Schannel Windows còn native; Linux và toàn bộ matrix ABI chưa được chứng minh cho tới khi runner thực thi thành công |
 
 Kiểm thử: `src/tests/kiem_tra_ffi_moi_truong.vi` (fixture biến môi trường
 deterministic qua `run_tests.sh`), `src/tests/kiem_tra_ffi_tien_trinh.vi`
@@ -113,17 +143,22 @@ danh sách byte. Linux vẫn chờ kiểm thử libc/ABI trên runner thật.
 `mkdir(c_chuỗi,u32)` quyền `system.fs.mkdir`, mode duy nhất 0777 chịu `umask`,
 và `remove(c_chuỗi)` quyền `system.fs.remove`; hai quyền khóa symbol và chữ ký.
 V++ giữ traversal không đệ quy, xử lý EEXIST/ENOENT, UTF-8 và NUL của đường dẫn;
-Windows mặc định còn `tao_thu_muc_vm`/`xoa_duong_dan_vm`, nhưng có adapter
-Win32 FFI để kiểm thử và chuyển hẳn sau khi đạt parity trên CI. Truy vấn tồn tại dùng
+Windows luôn dùng V++ qua Win32 FFI; opcode `tao_thu_muc_vm`/
+`xoa_duong_dan_vm` cũ bị chặn trên mọi hệ điều hành. Truy vấn tồn tại dùng
 `access(c_chuỗi, F_OK=0)` trên POSIX (`system.fs.exists`), **theo** symlink;
 symlink đứt có kết quả không tồn tại. Phân loại `stat`/`lstat` dùng đệm 256 byte
 và `stat_mode_offset()` xác nhận theo SDK host, với capability độc lập.
 Liệt kê qua `opendir/readdir/closedir`, token `DIR*` được VM sở hữu/cleanup;
 V++ lọc `.`/`..`, sắp xếp, duyệt và xóa cây không theo symlink. Test ABI,
-symlink đứt, handle sai VM/đã đóng và cleanup đã có trên macOS. Windows vẫn
-dùng primitive cũ nên chưa thể gỡ helper filesystem.
+symlink đứt, handle sai VM/đã đóng và cleanup đã có trên macOS. Windows đã
+chuyển hẳn sang FFI và xóa helper dự phòng; vẫn phải xác minh trên CI Windows.
 
 File POSIX/Windows dùng năm binding stdio (`system.file.open/read/write/close/error`),
+và ba adapter `system.file.seek/tell/flush` trong thư viện FFI `system.file`
+với chữ ký `seek(c_tệp,i64,i32):i32`, `tell(c_tệp):i64`, `flush(c_tệp):i32`.
+Các adapter dùng cùng registry handle thuộc VM, từ chối handle đã đóng hoặc
+của VM khác; seek/tell dùng cursor 64-bit trên POSIX và Windows. `Luồng Tệp`
+giữ handle này từ constructor tới `đóng()`. Các buffer qua
 `c_đệm_vào`/`c_đệm_ra` kiểm tra từng byte và giới hạn độ dài, `c_tệp` không
 lộ `FILE*` mà dùng token VM cấp và xác nhận sở hữu; ID tăng toàn cục để token
 đã đóng không thể hợp lệ lại ở VM khác. VM đóng các file còn mở khi hủy/reset.
@@ -133,7 +168,7 @@ write, append và dọn dẹp trên nhánh lỗi. Gate strict POSIX
 file legacy bị từ chối ở cả POSIX và Windows; Windows dùng `_wfopen`/`fread`/
 `fwrite`/`fclose`/`ferror` qua System FFI, giữ chu trình chunk và cleanup ở V++.
 
-Resolver POSIX `system.net` dùng `resolve_open(c_chuỗi,c_chuỗi,i32):c_dns`,
+Resolver POSIX/Windows `system.net` dùng `resolve_open(c_chuỗi,c_chuỗi,i32):c_dns`,
 `resolve_next(c_dns):c_chuỗi` và `resolve_close(c_dns):i32`. Runtime giữ
 `addrinfo*` trong token riêng VM, chỉ trả địa chỉ số IPv4/IPv6, bảo toàn thứ tự
 để V++ thử lần lượt khi kết nối. Đường DNS công khai vẫn sort/dedup trong V++;
@@ -141,14 +176,22 @@ token được đóng cả khi hết kết quả hoặc có lỗi. Adapter này 
 `addrinfo**`/`sockaddr` chưa được biểu diễn tổng quát; không tuyên bố là
 `libffi` hỗ trợ cấu trúc đó. Runtime hardening kiểm tra quyền, chữ ký, input
 lỗi, token giả/đã đóng/khác VM, IPv4/IPv6, EOF và cleanup. Test
-`kiem_tra_ffi_dns.vi` chạy trong gate `VPP_STRICT_SYSTEM_FFI_POSIX=1`.
+`kiem_tra_ffi_dns.vi` chạy trong gate `VPP_STRICT_SYSTEM_FFI_POSIX=1` trên
+POSIX và được thêm vào suite Windows interpreter/JIT (chưa xác nhận kết quả).
 
-Socket TCP/UDP POSIX đã có adapter `socket_connect/listen/accept/timeout/kind`
+Socket TCP/UDP POSIX và Windows đã có adapter `socket_connect/listen/accept/timeout/kind`
 và `send/recv/close` qua FFI. Mỗi socket nhận token không trùng giữa các VM;
 backend kiểm tra token, chiều/extent đệm, cờ send/recv và giới hạn datagram;
 V++ giữ vòng partial-send, timeout sau connect/accept và quy tắc một datagram.
+Token socket không tồn tại/đã đóng thuộc lỗi thao tác công khai và ném
+`LanguageException` bắt được trong V++; kiểm tra capability, chữ ký ABI và
+buffer extent không hợp lệ tiếp tục bị từ chối ở tầng VM.
+`kiem_tra_ffi_socket_loi.vi` kiểm tra 10 trường hợp lỗi không yêu cầu
+quyền tạo/bind socket trên cả interpreter/JIT; Windows runner cũng chạy fixture.
 Strict POSIX chặn opcode socket cũ, kiểm thử negative cho cả interpreter/JIT;
-`kiem_tra_ffi_socket.vi` chạy TCP/UDP qua localhost khi runner cho phép bind.
+`kiem_tra_ffi_socket.vi` chạy TCP/UDP qua localhost khi runner cho phép bind;
+Windows runner ép `VPP_WINDOWS_SOCKET_FFI=1` và chạy đối chiếu legacy với
+`VPP_WINDOWS_SOCKET_FFI=0`, cả interpreter/JIT, nhưng chưa xác minh trên máy Windows.
 HTTP fixture chạy với strict gate để kiểm tra cả `listen/accept/recv/send` của
 server, độc lập với fixture socket client; nơi cấm bind được ghi rõ là skip.
 TLS client công khai trên POSIX mở TCP bằng cùng FFI, sau đó gọi
@@ -262,7 +305,7 @@ Các điểm C++ phải rà khi chuyển nhóm:
 | Tệp hiện có | Phần cần chuyển hoặc giữ |
 | --- | --- |
 | `src/runtime/vm.cpp` | Đã gỡ `executeNativeFilePrimitive` trên cả hai hệ điều hành; năm API file đọc/ghi điều phối hoàn toàn trong `.vi` qua stdio FFI, các opcode file cũ bị từ chối cả POSIX và Windows. `executeVmPrimitive` và dispatch vẫn giữ các nhóm chưa chuyển; worker lifecycle giữ trong VM. |
-| `src/runtime/native/vm_native_stdlib_helpers.cpp` | Filesystem, clock, env, entropy legacy đã gỡ khỏi build POSIX; giữ đường Windows dự phòng và tag/identity của VM. |
+| `src/runtime/native/vm_native_stdlib_helpers.cpp` | Filesystem legacy đã gỡ trên cả Windows/POSIX; giữ tag/identity/platform của VM. Clock, env, entropy legacy cũng đã gỡ. |
 | `src/runtime/native/vm_native_m3_helpers.cpp` | Resolver và TCP/UDP/TLS orchestration legacy đã gỡ khỏi build POSIX; giữ đường Windows dự phòng và provider TLS native cần cho FFI. |
 | `src/runtime/native/vm_native_helpers.cpp` | Đã gỡ `handleNativeProcessPrimitive` cùng spawn/pipe/wait cũ trên mọi OS. V++ `chạy tiến trình` dùng adapter `system.process.*` trong `foreign.cpp` cho POSIX/Windows; Windows chưa được xác nhận bằng CI. |
 | `src/runtime/native/vm_native_collection_helpers.cpp` | Giữ thao tác representation; rà để thuật toán collection mới không được thêm vào native. |
@@ -736,7 +779,7 @@ Mỗi giai đoạn kết thúc bằng mã review được, test và audit. Gate 
 | M3: VM và JIT | Một phần: interpreter | M2 | Shared backend, GC roots/unwind/child-module/cache | Interpreter và JIT cùng kết quả, GC interval 1, repeated VM run |
 | M4: env/file | Phần public: POSIX/Windows `getenv`/Win32 env adapter và 5 API file qua FFI stdio; vòng chunk và cleanup ở V++; helper C++ file/env cũ đã gỡ trên cả hai OS | M3 + diagnostic IO | So sánh lỗi/trace và CI Windows/Linux thực tế | Old contract parity, CI đa nền tảng |
 | M5: filesystem/clock/entropy | Một phần: POSIX `access`/`mkdir`/`remove`, `stat`/`lstat`, `opendir`/`readdir`/`closedir`, monotonic/realtime `clock_gettime`, localtime/DST và `getentropy`; ABI/layout/ownership guard, test macOS | M4 + layout profile | File descriptors, struct/handle tổng quát, ABI Windows/provider và fail/retry test | Symlink/encoding/time/RNG failure tests; CI đa nền tảng |
-| M6: socket/DNS | Một phần: resolver POSIX VM-owned, binding `c_dns`; TCP/UDP connect/listen/accept/send/recv/close/timeout qua FFI với token VM, `.vi` điều phối partial-send và retry địa chỉ; strict chặn DNS/socket legacy, fixture compiler/runtime và TCP/UDP localhost | M5 + readiness | `.vi` network state machine, xác minh readiness/error/cleanup trên đa nền tảng | TCP/UDP/IPv4/6/timeout/partial-send, resolver cleanup và fixture accept/listen under strict trên runner được phép bind |
+| M6: socket/DNS | Một phần: resolver POSIX/Windows VM-owned, binding `c_dns`; TCP/UDP POSIX/Windows connect/listen/accept/send/recv/close/timeout qua FFI với token VM, `.vi` điều phối partial-send và retry địa chỉ; strict chặn DNS/socket legacy POSIX, Windows có cờ rollback, fixture compiler/runtime và TCP/UDP localhost | M5 + readiness | `.vi` network state machine, xác minh readiness/error/cleanup trên đa nền tảng | Windows CI, TCP/UDP/IPv4/6/timeout/partial-send, resolver cleanup và fixture accept/listen under strict trên runner được phép bind |
 | M7: TLS/process | Một phần: POSIX process dùng 9 FFI adapter, `posix_spawnp`/hai pipe, poll/read/wait/close do V++ điều phối; timeout POSIX dựa trên monotonic và close/kill/reap theo process group; TLS client POSIX dùng 3 adapter `system.net.tls.*` và provider native xác minh chứng chỉ/hostname, không cho raw I/O trên token TLS; strict chặn opcode TLS/process cũ, runtime hardening đã thử handshake lỗi và resource cleanup trên macOS; Windows, worker và integration TLS xác minh cert còn thiếu | M6 + provider/scheduler | TLS fixture tin cậy/không tin cậy, process Windows, scheduler | Cert/hostname/failure; hai pipe lớn; cancel/resource leak; CI đa nền tảng |
 | M8: gỡ helper và phát hành | Một phần: gỡ C++ stream/file, process orchestration và Foundation/Network legacy khỏi build POSIX; Windows, VM representation và TLS provider còn native | Từng nhóm đã qua gate | Xóa thêm helper không còn caller, Windows FFI, package dependency | Audit, regression đa nền tảng, clean install, migration note |
 
@@ -771,6 +814,12 @@ không đợi mọi nhóm xong và cũng không xóa trước khi có parity.
   yêu cầu cùng chẩn đoán bị từ chối và không thực thi helper legacy.
   POSIX network public tiếp tục đi qua `.vi` và FFI; các khai báo `ngoại hàm`
   là chi tiết của thư viện chuẩn.
+- Đợt Windows filesystem đã xóa nhánh C++ còn lại trong
+  `vm_native_stdlib_helpers.cpp`; bảy opcode filesystem đều bị chặn trên
+  Windows và POSIX, kể cả khi gọi bằng tên cũ. Duyệt/tạo/xóa cây và phân
+  loại đường dẫn được điều phối qua `.vi`; `foreign.cpp` chỉ giữ adapter ABI.
+  Windows CI vẫn chưa được chạy, vì vậy cần xác nhận Unicode, reparse point,
+  lỗi Win32 và cleanup trước khi coi migration đạt gate đa nền tảng.
 - Gate còn thiếu: Windows FFI/provider và CI, kiểm tra đa nền tảng, clean install,
   TLS trust/hostname integration và các primitive compiler/worker nội bộ.
 
@@ -792,7 +841,7 @@ không đồng nghĩa API public đã chuyển; từng API phải có đường 
 Lệnh chạy từ root repository, sử dụng đúng binary vừa build:
 
 ```sh
-python3 scripts/quality/audit-stdlib-native.py --output /tmp/vpp-native-before.json
+# Trình audit Python đã được gỡ bỏ; dùng các kiểm thử CTest và fixture V++ bên dưới.
 cmake -S . -B build -DBUILD_TESTS=ON
 cmake --build build -j 4 --target vpp-cli vpp-rc-internal-hardening vpp-runtime-p0-hardening vpp-import-precedence-hardening
 ctest --test-dir build --output-on-failure
@@ -841,9 +890,9 @@ Mỗi profile kiểm tra sizeof pointer/long/size_t/time_t, alignment, endian v�
 
 ### 10.3. Nâng audit để chứng minh migration
 
-`scripts/quality/audit-stdlib-native.py` đã dùng schema 3, nhận foreign declarations,
+Trình audit Python trước đây dùng schema 3, nhận foreign declarations,
 generic FFI call và platform binding cùng registry `OP_VM_*` và thân `.vi`.
-Báo cáo 2026-10-09 ghi nhận **95 tệp, 935 thân hàm, 0 unfinished,
+Báo cáo 2026-10-10 ghi nhận **95 tệp, 936 thân hàm, 0 unfinished,
 56 foreign bindings, 31 foreign callers và 50 capabilities**. Audit tĩnh không chứng minh helper cũ
 không chạy. Gate `VPP_STRICT_SYSTEM_FFI_FILE=1` chỉ chặn opcode file cũ;
 `VPP_STRICT_SYSTEM_FFI_POSIX=1` chặn cả opcode file và các opcode System cũ

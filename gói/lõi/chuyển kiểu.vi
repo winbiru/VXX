@@ -5,17 +5,15 @@
 // - loai_cua(value): đọc tag kiểu runtime.
 // - so_thuc_tu_bits_vm(bytes): diễn giải 8 byte IEEE-754 little-endian.
 // Thư viện tự dựng biểu diễn NaN/+Inf/-Inf.
-
-
-hàm chuyển_kiểu_lỗi_số_nguyên() {
+hàm riêng tư chuyển_kiểu_lỗi_số_nguyên() {
     ném "thành số nguyên: giá trị không thể chuyển đổi";
 };
 
-hàm chuyển_kiểu_lỗi_số_thực() {
+hàm riêng tư chuyển_kiểu_lỗi_số_thực() {
     ném "thành số thực: giá trị không thể chuyển đổi";
 };
 
-hàm chuyển kiểu số thực đặc biệt(mã) {
+hàm riêng tư chuyển kiểu số thực đặc biệt(mã) {
     nếu (mã != -1 && mã != 0 && mã != 1) {
         chuyển_kiểu_lỗi_số_thực();
     };
@@ -24,11 +22,11 @@ hàm chuyển kiểu số thực đặc biệt(mã) {
     trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 240, 255]);
 };
 
-hàm chuyển kiểu là khoảng trắng đầu(c) {
+hàm riêng tư chuyển kiểu là khoảng trắng đầu(c) {
     trả về c == " " || c == "\t" || c == "\n" || c == "\r";
 };
 
-hàm chuyển kiểu chữ số(c) {
+hàm riêng tư chuyển kiểu chữ số(c) {
     nếu (c == "0") { trả về 0; };
     nếu (c == "1") { trả về 1; };
     nếu (c == "2") { trả về 2; };
@@ -42,14 +40,14 @@ hàm chuyển kiểu chữ số(c) {
     trả về -1;
 };
 
-hàm chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
+hàm riêng tư chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
     i = 0;
     n = do_dai(văn_bản);
     đang_bỏ = đúng;
     lặp(vòng = 0; i < n && đang_bỏ; vòng++) {
         nếu (chuyển kiểu là khoảng trắng đầu(văn_bản[i])) {
             i = i + 1;
-        } nếu không {
+        } hoặc {
             đang_bỏ = sai;
         };
     };
@@ -58,7 +56,7 @@ hàm chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
 
 // Parse số nguyên 32-bit theo contract cũ của std::stoi:
 // cho phép khoảng trắng ở đầu, dấu +/- và yêu cầu phần còn lại toàn chữ số.
-hàm chuyển kiểu phân tích số nguyên(văn_bản) {
+hàm riêng tư chuyển kiểu phân tích số nguyên(văn_bản) {
     n = do_dai(văn_bản);
     i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
     nếu (i >= n) { chuyển_kiểu_lỗi_số_nguyên(); };
@@ -83,7 +81,7 @@ hàm chuyển kiểu phân tích số nguyên(văn_bản) {
                 chuyển_kiểu_lỗi_số_nguyên();
             };
             kết_quả = kết_quả * 10 - chữ_số;
-        } nếu không {
+        } hoặc {
             nếu (kết_quả > 214748364 ||
                 (kết_quả == 214748364 && chữ_số > 7)) {
                 chuyển_kiểu_lỗi_số_nguyên();
@@ -96,13 +94,13 @@ hàm chuyển kiểu phân tích số nguyên(văn_bản) {
     trả về kết_quả;
 };
 
-hàm thành chuỗi(giá trị) {
+hàm công khai thành chuỗi(giá trị) {
     // OP_CONG là ngữ nghĩa lõi của V++. Nối với chuỗi rỗng giữ nguyên cách
     // runtime hiển thị scalar, collection, object và closure.
     trả về "" + giá trị;
 };
 
-hàm thành số nguyên(giá trị) {
+hàm công khai thành số nguyên(giá trị) {
     kiểu = loai_cua(giá trị);
     nếu (kiểu == "số nguyên") {
         trả về giá trị;
@@ -128,13 +126,13 @@ hàm thành số nguyên(giá trị) {
     chuyển_kiểu_lỗi_số_nguyên();
 };
 
-hàm chuyển kiểu lũy thừa mười(số_mũ) {
+hàm riêng tư chuyển kiểu lũy thừa mười(số_mũ) {
     kết_quả = 1.0;
     nếu (số_mũ >= 0) {
         lặp(i = 0; i < số_mũ; i++) {
             kết_quả = kết_quả * 10.0;
         };
-    } nếu không {
+    } hoặc {
         lặp(i = 0; i > số_mũ; i--) {
             kết_quả = kết_quả / 10.0;
         };
@@ -144,7 +142,7 @@ hàm chuyển kiểu lũy thừa mười(số_mũ) {
 
 // Parser thập phân/scientific notation thuần V++.
 // Native không còn dùng std::stod cho conversion thông thường.
-hàm chuyển kiểu phân tích số thực(văn_bản) {
+hàm riêng tư chuyển kiểu phân tích số thực(văn_bản) {
     n = do_dai(văn_bản);
     i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
     nếu (i >= n) { chuyển_kiểu_lỗi_số_thực(); };
@@ -178,7 +176,7 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
         chữ_số = chuyển kiểu chữ số(văn_bản[i]);
         nếu (chữ_số < 0) {
             đang_đọc = sai;
-        } nếu không {
+        } hoặc {
             có_chữ_số = đúng;
             giá_trị = giá_trị * 10.0 + chữ_số;
             i = i + 1;
@@ -194,7 +192,7 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
                 chữ_số = chuyển kiểu chữ số(văn_bản[i]);
                 nếu (chữ_số < 0) {
                     đang_đọc = sai;
-                } nếu không {
+                } hoặc {
                     có_chữ_số = đúng;
                     giá_trị = giá_trị + chữ_số * hệ_số;
                     hệ_số = hệ_số / 10.0;
@@ -222,7 +220,7 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
                 chữ_số = chuyển kiểu chữ số(văn_bản[i]);
                 nếu (chữ_số < 0) {
                     đang_đọc = sai;
-                } nếu không {
+                } hoặc {
                     có_số_mũ = đúng;
                     nếu (số_mũ > 10000) { chuyển_kiểu_lỗi_số_thực(); };
                     số_mũ = số_mũ * 10 + chữ_số;
@@ -246,7 +244,7 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
         // primitive bit-pattern để không làm mất bit dấu.
         nếu (giá_trị == 0.0) {
             giá_trị = so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 0, 128]);
-        } nếu không {
+        } hoặc {
             giá_trị = 0.0 - giá_trị;
         };
     };
@@ -259,7 +257,7 @@ hàm chuyển kiểu phân tích số thực(văn_bản) {
     trả về giá_trị;
 };
 
-hàm thành số thực(giá trị) {
+hàm công khai thành số thực(giá trị) {
     kiểu = loai_cua(giá trị);
     nếu (kiểu == "số thực") { trả về giá trị; };
     nếu (kiểu == "số nguyên") { trả về giá trị * 1.0; };
@@ -267,7 +265,7 @@ hàm thành số thực(giá trị) {
     chuyển_kiểu_lỗi_số_thực();
 };
 
-hàm loại của(giá trị) {
+hàm công khai loại của(giá trị) {
     // Type tag là metadata của VM nên primitive này vẫn thuộc runtime.
     trả về loai_cua(giá trị);
 };

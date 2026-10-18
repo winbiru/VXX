@@ -6,12 +6,12 @@ nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/bảng mã;
 nhập gói/lõi/toán học;
 
-hàm bằng giá trị(a, b) {
+hàm công khai bằng giá trị(a, b) {
     trả về a == b;
 };
 
 // XOR một byte không cần bitwise primitive của VM.
-hàm giá trị xor byte(a, b) {
+hàm riêng tư giá trị xor byte(a, b) {
     x = a;
     y = b;
     trọng_số = 1;
@@ -29,7 +29,7 @@ hàm giá trị xor byte(a, b) {
 
 // FNV-1a 32-bit biểu diễn bằng bốn byte để không phụ thuộc overflow i32.
 // Prime 0x01000193 được nhân modulo 2^32 theo từng byte.
-hàm giá trị fnv1a32(văn_bản) {
+hàm riêng tư giá trị fnv1a32(văn_bản) {
     bytes = mã hóa bảng mã(văn_bản, "UTF-8");
     h = [197, 157, 28, 129]; // 0x811c9dc5, little-endian
     lặp(i = 0; i < độ dài(bytes); i++) {
@@ -63,7 +63,7 @@ hàm giá trị fnv1a32(văn_bản) {
 
 // Scalar hash nằm hoàn toàn ở V++. VM chỉ còn identity hash cho các handle
 // tham chiếu của VM, vì định danh object/collection không thể quan sát từ V++.
-hàm băm giá trị(giá_trị) {
+hàm công khai băm giá trị(giá_trị) {
     kiểu = loại của(giá_trị);
     nếu (kiểu == "rỗng") {
         trả về 0;
@@ -81,7 +81,7 @@ hàm băm giá trị(giá_trị) {
     trả về bam_dinh_danh(giá_trị);
 };
 
-hàm yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") {
+hàm công khai yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") {
     nếu (giá_trị == rỗng) {
         ném thông_điệp;
     };
@@ -89,7 +89,7 @@ hàm yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") 
 };
 
 // Tương đương Objects.checkIndex: trả lại index hợp lệ để dùng trực tiếp.
-hàm index hợp lệ(chỉ_số, kích_thước) {
+hàm công khai index hợp lệ(chỉ_số, kích_thước) {
     nếu (loại của(chỉ_số) != "số nguyên" ||
         loại của(kích_thước) != "số nguyên") {
         ném "VALUE_INDEX";
@@ -101,7 +101,7 @@ hàm index hợp lệ(chỉ_số, kích_thước) {
 };
 
 // Khoảng nửa kín [bắt_đầu, kết_thúc), tương đương checkFromToIndex.
-hàm khoảng index hợp lệ(bắt_đầu, kết_thúc, kích_thước) {
+hàm công khai khoảng index hợp lệ(bắt_đầu, kết_thúc, kích_thước) {
     nếu (loại của(bắt_đầu) != "số nguyên" ||
         loại của(kết_thúc) != "số nguyên" ||
         loại của(kích_thước) != "số nguyên") {
@@ -116,7 +116,7 @@ hàm khoảng index hợp lệ(bắt_đầu, kết_thúc, kích_thước) {
 
 // Vùng [bắt_đầu, bắt_đầu+số_lượng), tránh cộng trước kiểm tra để không làm
 // overflow phép cộng trên ABI i32 hiện tại.
-hàm vùng index hợp lệ(bắt_đầu, số_lượng, kích_thước) {
+hàm công khai vùng index hợp lệ(bắt_đầu, số_lượng, kích_thước) {
     nếu (loại của(bắt_đầu) != "số nguyên" ||
         loại của(số_lượng) != "số nguyên" ||
         loại của(kích_thước) != "số nguyên") {

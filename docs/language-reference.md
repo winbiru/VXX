@@ -15,6 +15,28 @@ hàm chính() {
 `chính` là hàm vào chương trình chuẩn của V++. Compiler tự gọi `chính()` khi chạy
 một chương trình. Tên cũ `main` chỉ còn là alias tương thích ngược cho mã nguồn cũ.
 
+Ứng dụng theo hướng đối tượng có thể đặt lớp `Chính` ngay trong tệp nguồn khởi chạy,
+không cần khai báo `hàm chính()` riêng:
+
+```vi
+lớp Chính {
+    hàm công khai chạy() {
+        in "Xin chào từ ứng dụng V++";
+    };
+};
+```
+
+Khi thực thi, compiler ưu tiên `hàm chính()`, tiếp đến alias cũ `main()`. Nếu
+không có hai hàm đó nhưng có lớp `Chính`, runtime tự tạo `Chính()` rồi gọi
+`chạy()` trên đối tượng. `chạy()` phải công khai và không yêu cầu tham số;
+`khởi tạo()` cũng không được yêu cầu tham số. Phương thức `chạy()` có thể được
+kế thừa từ lớp cha. Lớp `Chính` khai báo mà không có phương thức `chạy()` hợp lệ
+sẽ gây lỗi. Những script chỉ chạy câu lệnh top-level vẫn hoạt động như trước.
+
+Tệp `chính.vi` của **gói thư viện** chỉ tập hợp/export API, không bắt buộc có
+lớp `Chính` hay hàm khởi chạy. `chính.vi` của **ứng dụng** có thể chọn một trong
+hai kiểu điểm vào ở trên.
+
 V++ dùng dấu `;` để kết thúc phần lớn statement. Identifier hỗ trợ Unicode, vì vậy tên tiếng
 Việt có dấu có thể dùng trực tiếp.
 
@@ -44,8 +66,10 @@ Chi tiết promotion, equality, ordering và truthiness được khóa trong `do
 ```vi
 nếu (điểm >= 8) {
     in "giỏi";
-} nếu không {
-    in "chưa đạt mức giỏi";
+} hoặc nếu (điểm >= 5) {
+    in "đạt";
+} hoặc {
+    in "chưa đạt";
 };
 
 tổng = 0;
@@ -107,11 +131,19 @@ Mỗi câu `nhập` nhận một target module/package. Import tương đối đ
 module đang import. Alias tạo namespace, ví dụ `toán.tổng(2, 3)`.
 
 Khai báo top-level mặc định/công khai nằm trong bề mặt export; `riêng tư` và `bảo vệ` không
-được export. Dùng `công khai nhập ...` để re-export:
+được export. File điểm vào gói `chính.vi` tự chuyển tiếp các thành phần công khai
+từ các module được nhập trực tiếp (không có alias):
 
 ```vi
-công khai nhập toan như toán;
+// gói/hệ thống/chính.vi
+nhập gói/hệ thống/môi trường;
+nhập gói/hệ thống/lệnh tiến trình;
 ```
+
+Người dùng chỉ cần `nhập gói/hệ thống/chính;` để sử dụng lớp `Lệnh Tiến Trình`.
+Import bên trong file thông thường vẫn chỉ dùng nội bộ; cú pháp `công khai nhập`
+cũ tiếp tục được hỗ trợ cho mã hiện có. Import với alias không tự chuyển tiếp,
+để tránh vô tình mở rộng API của gói. Tên lớp và tên file có thể có khoảng trắng.
 
 Import cycle local bị từ chối ở compile time và diagnostic chứa chuỗi module gây chu trình.
 
@@ -252,6 +284,11 @@ trong 1.0.
 
 Method hỗ trợ `công khai`, `bảo vệ`, `riêng tư`. Field hiện là thuộc tính động trên instance.
 Constructor dùng tên `khởi tạo` và có thể có tham số mặc định.
+Lớp con khai báo constructor riêng và gọi `gốc.khởi tạo(...)` khi cần khởi tạo
+lớp cha. Lời gọi nối tiếp và truy cập trên giá trị tạm được hỗ trợ, ví dụ
+`nút.các con()[0].tên()` hoặc `danh_sách[0].trường = giá_trị`.
+Closure được tạo trong phương thức giữ receiver và quyền truy cập của lớp
+khai báo, kể cả khi được gọi sau khi phương thức đã trả về.
 
 ## Exception của ngôn ngữ
 
@@ -271,6 +308,88 @@ lỗi VM fatal như chia cho 0 hoặc bytecode/state không hợp lệ tuân the
 
 List/map hỗ trợ literal, index và mutation. Stdlib cung cấp helper cho set/tuple, map, text,
 JSON, file, path, config, time, HTTP và các nhóm tiện ích khác.
+
+Thư viện chuẩn chọn API theo bản chất thành phần: chuỗi, toán học và mã hóa
+tiếp tục dùng hàm/module; các tài nguyên và trạng thái được bọc bằng lớp V++.
+Các điểm vào `chính.vi` tự xuất lại các lớp công khai của module đã nhập,
+trong khi API hàm trước đây vẫn dùng được qua đường dẫn module hiện có.
+
+| Thành phần | Import điểm vào | Lớp / API |
+| --- | --- | --- |
+| HTTP Client | `gói/mạng/http/chính` | `Khách HTTP(url_gốc)`: `tạo URL`, `yêu cầu`, `lấy`, `gửi`, `cập nhật`, `xóa`, `đóng` |
+| Database Connection | `gói/dữ liệu/cơ sở dữ liệu/chính` | `Kết Nối Cơ Sở Dữ Liệu(driver, url, tài_khoản, mật_khẩu)`: `thông tin`, `đang kết nối`, `kết nối`, `truy vấn`, `ping`, `đóng` |
+| File Stream | `gói/nhập xuất/chính` | `Luồng Tệp(đường, chế_độ)`: `đang mở`, `đọc bytes`, `đọc hết`, `ghi bytes`, `ghi`, `vị trí`, `dịch`, `đẩy đệm`, `đóng` |
+| Logger | `gói/lõi/chính` | `Bộ Ghi Nhật Ký(đích, đường, mức_tối_thiểu)`: `đổi mức`, `ghi`, `thông tin`, `cảnh báo`, `lỗi`, `đóng` |
+| Collections | `gói/bộ sưu tập/chính` | `Ngăn Xếp`, `Hàng Đợi`, `Tập Hợp`, `Từ Điển` triển khai `Bộ Chứa` (`số lượng`, `trống`) |
+| Compiler AST | `gói/biên dịch/chính` | `Nút Cú Pháp`, `Nút Lớp`, `Nút Hàm`, `Truy Cập Cú Pháp`, `Khách Duyệt Cú Pháp`; factory `tạo nút cú pháp` |
+| Application | `gói/ứng dụng/chính` | `Bộ Điều Khiển Ứng Dụng(tên, phiên_bản)` triển khai `Vòng Đời Ứng Dụng`: `banner`, `chạy`, `dừng`, `đang chạy` |
+| Process | `gói/hệ thống/chính` | `Lệnh Tiến Trình(chương_trình)`: `thêm đối số`, `đặt biến`, `đặt thời hạn`, `chạy`, `kết quả gần nhất` |
+| TCP Socket | `gói/mạng/chính` | `Ổ Cắm TCP(tên_máy, cổng, thời_gian_chờ = 5000)`: `kết nối`, `gửi`, `nhận`, `đặt thời gian chờ`, `đang mở`, `đóng` |
+| Văn bản | `gói/văn bản/chính` | `Bộ Nối Văn Bản(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng)`: `thêm`, `gộp`, `kết quả`, `số phần`, `độ dài` |
+| Phân trang | `gói/dữ liệu/chính` | `Bộ Phân Trang(trang, kích_thước)`: `đặt trang`, `đặt kích thước`, `độ dời`, `tổng trang` |
+| Đường dẫn | `gói/nhập xuất/chính` | `Đường Dẫn(đường)`: `giá trị`, `tên`, `cha`, `nối`, `tồn tại`, `là tệp`, `là thư mục` |
+| Đo thời gian | `gói/thời gian/chính` | `Bộ Bấm Giờ` triển khai `Đo Thời Gian`: `bắt đầu`, `dừng`, `đọc mili giây`, `đặt lại` |
+| Sự kiện | `gói/lõi/chính` | `Bộ Phát Sự Kiện` triển khai `Đóng Được`: `đăng ký`, `hủy`, `phát`, `số người nghe`, `đóng` |
+| Service Registry | `gói/lõi/chính` | `Bộ Nạp Dịch Vụ`: `đăng ký`, `tìm`, `tải` |
+| Luồng dữ liệu | `gói/lõi/chính` | `Luồng Truy Vấn(nguồn)` triển khai `Đóng Được`: `ánh xạ`, `lọc`, `bỏ`, `giới hạn`, `phân biệt`, `gom danh sách`, `đếm`, `đóng` |
+| Cấu hình | `gói/lõi/chính` | `Cấu Hình Tệp(đường_dẫn)`: `tải lại`, `lấy`, `có` |
+| Kiểm thử | `gói/kiểm thử/chính` | `Ca Kiểm Thử(thân, thiết_lập, dọn_dẹp)`: `chạy`, `số lần chạy` |
+
+Hai giao diện AST được khai báo tại `gói/biên dịch/giao diện cú pháp.vi`;
+`gói/biên dịch/nút cú pháp.vi` chỉ chứa các lớp và hàm triển khai. Điểm vào
+`gói/biên dịch/chính` tái xuất cả hai phần để giữ API import hiện có.
+
+`Đóng Được` là giao diện tài nguyên ở `gói/lõi/giao diện tài nguyên.vi`,
+được `Luồng Tệp`, `Bộ Ghi Nhật Ký`, `Khách HTTP`, `Kết Nối Cơ Sở Dữ Liệu`
+và `Ổ Cắm TCP`, `Bộ Phát Sự Kiện`, `Luồng Truy Vấn` triển khai.
+`đóng()` gọi nhiều lần an toàn, nhưng mỗi lớp
+giữ kiểu kết quả cũ để tương thích. Người dùng cần chủ động gọi `đóng()`;
+hiện chưa có destructor/finalizer theo vòng đời instance V++.
+
+`Vòng Đời Ứng Dụng` được khai báo trong `gói/ứng dụng/giao diện.vi`,
+phần hiện thực ở `gói/ứng dụng/bộ điều khiển.vi`. Lớp bảo vệ trạng thái
+chạy/dừng và sử dụng các helper `chạy ứng dụng`, `dừng ứng dụng` cũ.
+`Lệnh Tiến Trình` tạo cấu hình argv/env/timeout riêng cho từng instance;
+`chạy()` đồng bộ và trả map kết quả của `chạy tiến trình`. `Ổ Cắm TCP`
+chỉ kết nối khi gọi `kết nối()` và sở hữu một handle TCP; không hỗ trợ
+TLS, UDP hoặc tái kết nối sau khi `đóng()`. Những trường hợp này tiếp tục
+dùng API socket/module chuyên biệt.
+
+Ví dụ import và tạo đối tượng:
+
+```vi
+nhập gói/mạng/http/chính;
+nhập gói/bộ sưu tập/chính;
+
+hàm chính() {
+    khách = Khách HTTP("https://example.com/api");
+    in khách.tạo URL("/items");
+    ngăn = Ngăn Xếp();
+    ngăn.đẩy(42);
+    in ngăn.rút();
+};
+```
+
+`Khách HTTP` sử dụng HTTP transport hiện hành cho mỗi request (không duy trì
+socket qua các request). `Kết Nối Cơ Sở Dữ Liệu` giữ trạng thái logic: backend
+vẫn gọi chương trình DB bên ngoài cho từng truy vấn, không hỗ trợ transaction
+hay connection pooling. Mật khẩu lưu trong instance, không được ghi vào log.
+`Luồng Tệp` mở handle trong constructor và giữ cursor đến khi `đóng()`.
+`dịch(lệch, mốc = 0)` dùng độ lệch byte, mốc 0 = đầu, 1 = hiện tại, 2 = cuối;
+`vị trí()` trả số nguyên ABI 64-bit. `đọc bytes(đếm)` nhận 0..65536 byte,
+`đọc hết()` đọc từ cursor hiện tại tới EOF. `đẩy đệm()` flush tệp đang ghi;
+chế độ `ghi` truncate ngay khi mở, chế độ `nối` luôn ghi ở cuối. Đóng lặp
+được chấp nhận; thao tác I/O sau khi đóng ném lỗi. VM thu hồi handle còn mở
+khi reset/hủy, không có finalizer theo thời điểm GC cho từng instance.
+`Bộ Ghi Nhật Ký` dùng đích `tệp` hoặc `bảng điều khiển`, lọc mức
+`thông tin` < `cảnh báo` < `lỗi`. `Nút Cú Pháp` là adapter OOP cho AST dạng
+map, nhận cả cây snapshot (`thành viên`) và cây compiler V++ (`phương thức`,
+`câu lệnh`, `thân`). `các con()` bao gồm cả khối thân hàm, biểu thức,
+điều kiện, hai nhánh `nếu`, các nhánh `chọn`, `thử`/`bắt lỗi`, lời gọi,
+chỉ số, collection và giá trị mặc định của tham số. Với từ điển, khóa và
+giá trị đều là nút con. `duyệt(khách)` gọi `khách.thăm(nút)` theo thứ tự
+cha trước con, kể cả các biểu thức nằm sâu trong phương thức. Parser/IR
+vẫn sử dụng map nội bộ; dữ liệu con sai kiểu sẽ báo lỗi tường minh.
 
 Chuỗi nền tảng xử lý length/reverse/index/slice theo code point UTF-8. Các API text 1.0 có
 case/normalization dành cho tiếng Việt và NFC theo phạm vi được mô tả trong roadmap; malformed

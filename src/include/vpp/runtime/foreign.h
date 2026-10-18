@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -29,7 +30,8 @@ struct ForeignFileState {
     std::unordered_map<int, void *> directories;
     std::unordered_map<int, Resolver> resolvers;
     struct Socket {
-        int descriptor = -1;
+        // SOCKET is pointer-sized on Win64; a POSIX file descriptor is int.
+        std::intptr_t descriptor = -1;
         bool datagram = false;
         bool listener = false;
         void *tlsSession = nullptr; // POSIX provider-owned; close via TLS facade.

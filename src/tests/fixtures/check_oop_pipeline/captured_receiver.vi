@@ -1,0 +1,1 @@
+lớp Nền { hàm bảo vệ đọc() { trả về 7; }; }; lớp Con kế thừa Nền { hàm khởi tạo(x) { mình.x = x; }; hàm riêng tư bí mật() { trả về mình.x; }; hàm công khai tạo() { f = hàm() { trả về mình.bí mật() + gốc.đọc(); }; trả về f; }; }; hàm chính() { a = Con(5); f = a.tạo(); a = rỗng; in f(); };

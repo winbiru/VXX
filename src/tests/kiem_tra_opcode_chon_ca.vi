@@ -1,0 +1,41 @@
+// Kiem tra chọn/ca tu bang opcode C++ va nhanh mac dinh bao loi.
+nhập gói/biên dịch/opcode;
+
+hàm opcode không tồn tại phải báo lỗi(tên) {
+    thử {
+        biên dịch mã opcode(tên);
+        trả về sai;
+    } bắt lỗi (lỗi) {
+        trả về lỗi == "opcode C++ chưa định nghĩa: " + tên;
+    };
+};
+
+hàm chính() {
+    // Các ca hợp lệ nằm ở đầu, giữa, cuối enum; giữ nguyên cả khoảng trống ID.
+    in biên dịch mã opcode("OP_CONG") == 0;
+    in biên dịch mã opcode("OP_CHIA") == 3;
+    in biên dịch mã opcode("OP_Logic_VA") == 4;
+    in biên dịch mã opcode("OP_GAN") == 13;
+    in biên dịch mã opcode("OP_NEU") == 22;
+    in biên dịch mã opcode("OP_BIEN_SO") == 41;
+    in biên dịch mã opcode("OP_IN") == 43;
+    in biên dịch mã opcode("OP_DUNG_CHUONG_TRINH") == 44;
+    in biên dịch mã opcode("OP_TEN_BIEN_ID") == 60;
+    in biên dịch mã opcode("OP_CHON") == 67;
+    in biên dịch mã opcode("OP_CA") == 68;
+    in biên dịch mã opcode("OP_NEM") == 80;
+    in biên dịch mã opcode("OP_THU") == 81;
+    in biên dịch mã opcode("OP_BAT_LOI") == 83;
+    in biên dịch mã opcode("OP_VM_BIEN_DICH_PHAN_TICH") == 98;
+    in biên dịch mã opcode("OP_VM_KY_TU_UNICODE") == 110;
+    in biên dịch mã opcode("OP_VM_SOCKET_CHAP_NHAN") == 120;
+    in biên dịch mã opcode("OP_VM_THREAD_WAIT") == 140;
+    in biên dịch mã opcode("OP_FFI_CALL") == 156;
+
+    // Ca khong trung phai di vao mac dinh va nem dung thong bao loi.
+    in opcode không tồn tại phải báo lỗi("OP_TEN_BIEN"); // ID 42 da bo.
+    in opcode không tồn tại phải báo lỗi("OP_KHONG_TON_TAI");
+    in opcode không tồn tại phải báo lỗi("OP_CONG_2");
+    in opcode không tồn tại phải báo lỗi("op_cong");
+    in opcode không tồn tại phải báo lỗi("");
+};

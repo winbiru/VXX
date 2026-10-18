@@ -1,0 +1,60 @@
+// Pipeline hướng đối tượng trên implementation luồng lazy, single-use.
+nhập gói/lõi/giao diện tài nguyên;
+nhập gói/lõi/luồng dữ liệu như luồng_api;
+
+lớp công khai Luồng Truy Vấn triển khai Đóng Được {
+    hàm công khai khởi tạo(nguồn) {
+        mình.ống = luồng_api.luồng(nguồn);
+    };
+
+    hàm công khai ánh xạ(fn) {
+        mình.ống = luồng_api.ánh xạ(mình.ống, fn);
+        trả về mình;
+    };
+
+    hàm công khai lọc(predicate) {
+        mình.ống = luồng_api.lọc(mình.ống, predicate);
+        trả về mình;
+    };
+
+    hàm công khai ánh xạ phẳng(fn) {
+        mình.ống = luồng_api.ánh xạ phẳng(mình.ống, fn);
+        trả về mình;
+    };
+
+    hàm công khai bỏ(n) {
+        mình.ống = luồng_api.bỏ(mình.ống, n);
+        trả về mình;
+    };
+
+    hàm công khai giới hạn(n) {
+        mình.ống = luồng_api.giới hạn luồng(mình.ống, n);
+        trả về mình;
+    };
+
+    hàm công khai phân biệt() {
+        mình.ống = luồng_api.phân biệt(mình.ống);
+        trả về mình;
+    };
+
+    hàm công khai sắp xếp(so_sánh = rỗng) {
+        mình.ống = luồng_api.sắp xếp luồng(mình.ống, so_sánh);
+        trả về mình;
+    };
+
+    hàm công khai khi đóng(cleanup) {
+        luồng_api.khi đóng luồng(mình.ống, cleanup);
+        trả về mình;
+    };
+
+    hàm công khai gom danh sách() { trả về luồng_api.gom danh sách(mình.ống); };
+    hàm công khai duyệt(consumer) { trả về luồng_api.duyệt(mình.ống, consumer); };
+    hàm công khai đếm() { trả về luồng_api.đếm luồng(mình.ống); };
+    hàm công khai bất kỳ(predicate) { trả về luồng_api.bất kỳ(mình.ống, predicate); };
+    hàm công khai tất cả(predicate) { trả về luồng_api.tất cả luồng(mình.ống, predicate); };
+    hàm công khai đầu tiên() { trả về luồng_api.đầu tiên(mình.ống); };
+    hàm công khai rút gọn(giá_trị_đầu, reducer) {
+        trả về luồng_api.rút gọn(mình.ống, giá_trị_đầu, reducer);
+    };
+    hàm công khai đóng() { trả về luồng_api.đóng luồng(mình.ống); };
+};

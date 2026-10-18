@@ -26,6 +26,7 @@
 #include "vpp/runtime/module.h"
 #include "vpp/runtime/debug.h"
 #include "vpp/runtime/error.h"
+#include "vpp/native/aarch64_jit.h"
 
 // Cung cấp bề mặt kiểm thử nội bộ cho VM; fixture cho test push stack, đặt frame/class và gọi trực tiếp từng opcode handler mà không chạy cả chương trình.
 class VMRuntimeFixture;
@@ -79,6 +80,8 @@ public:
     std::size_t jitFastInstructionCount() const noexcept { return jitFastInstructionCount_; }
     // Số opcode cần dispatcher đầy đủ (call, branch, intrinsic, exception...).
     std::size_t jitInterpreterInstructionCount() const noexcept { return jitInterpreterInstructionCount_; }
+    std::size_t machineJitInstructionCount() const noexcept { return machineJitInstructionCount_; }
+    std::size_t machineJitRegionCount() const noexcept { return machineJitRegionCount_; }
     // Trả trạng thái khởi tạo của module được yêu cầu; hàm tra `ModuleTable`/tracker hiện tại và không tự chạy initializer.
     std::optional<vietvm::runtime::ModuleState> moduleState(
         std::string_view identity) const noexcept;
@@ -108,6 +111,16 @@ private:
     bool jitActive_ = false;
     std::size_t jitFastInstructionCount_ = 0;
     std::size_t jitInterpreterInstructionCount_ = 0;
+    using MachineRegions = std::unordered_map<std::size_t,
+        std::unique_ptr<vietvm::native::MachineExpression>>;
+    std::unordered_map<const std::vector<Instruction> *, MachineRegions> machinePrograms_;
+    std::unordered_map<int, std::unique_ptr<vietvm::native::MachineExpression>> machineBinaryOps_;
+    std::unordered_map<int, std::unique_ptr<vietvm::native::MachineExpression>> machineLeafFunctions_;
+    std::unique_ptr<vietvm::native::MachineExpression> machineCallBundle_;
+    std::unique_ptr<vietvm::native::MachineExpression> machineConditionalBranch_;
+    bool machineJitActive_ = false;
+    std::size_t machineJitInstructionCount_ = 0;
+    std::size_t machineJitRegionCount_ = 0;
     std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
         functionDebugInfo;
@@ -332,6 +345,7 @@ private:
     // Biên dịch các vi lệnh thuần giá trị ở root và mọi function. Dispatcher VM
     // xử lý call/branch/intrinsic/exception để giữ nguyên execution contexts.
     void runJitCompiled();
+    void runMachineCompiled();
     // Chạy interpreter trên context hiện tại. Khi `stopExecutionDepth` có giá trị,
     // hàm dừng ngay sau khi lời gọi trực tiếp của fixture đã quay về độ sâu đó.
     void runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth = std::nullopt);

@@ -1,0 +1,4 @@
+giao diện công khai Bộ Chứa {
+    hàm công khai số lượng();
+    hàm công khai trống();
+};

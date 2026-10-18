@@ -1,0 +1,7 @@
+lớp Cha {
+    hàm công khai chạy() {
+        in 303;
+    };
+};
+
+lớp Chính kế thừa Cha {};

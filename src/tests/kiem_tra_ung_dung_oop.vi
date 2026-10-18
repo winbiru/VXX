@@ -1,0 +1,20 @@
+nhập gói/ứng dụng/chính;
+
+hàm chính() {
+    app = Bộ Điều Khiển Ứng Dụng("Thử", "1.0");
+    in app.banner() == "[ỨNG DỤNG] Thử v1.0";
+    in !app.đang chạy();
+    in !app.dừng();
+    in app.chạy();
+    in app.đang chạy();
+    in !app.chạy();
+    in app.dừng();
+    in !app.đang chạy();
+    in !app.dừng();
+    sai_tên = sai;
+    thử { Bộ Điều Khiển Ứng Dụng("", "1.0"); } bắt lỗi(e) { sai_tên = đúng; };
+    in sai_tên;
+    sai_phiên_bản = sai;
+    thử { Bộ Điều Khiển Ứng Dụng("Thử", 1); } bắt lỗi(e) { sai_phiên_bản = đúng; };
+    in sai_phiên_bản;
+};

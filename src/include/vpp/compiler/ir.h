@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "vpp/compiler/semantic.h"
@@ -26,6 +27,7 @@ enum class IrOpcode {
     Continue,
     Throw,
     Try,
+    DeclareVariable,
     Statement,
 };
 
@@ -136,6 +138,7 @@ struct IrInstruction {
         vietvm::frontend::AstClassForm::Unstructured;
     std::string superclassName;
     int superclassSymbolId = -1;
+    bool importedSuperclass = false;
     vietvm::frontend::AstConditionalForm conditionalForm =
         vietvm::frontend::AstConditionalForm::Unstructured;
     vietvm::frontend::AstLoopForm loopForm =
@@ -151,6 +154,7 @@ struct IrInstruction {
     // is the current instance; `gốc` carries the same instance but method
     // calls dispatch from the defining class's superclass.
     std::vector<std::string> implicitReceiverNames;
+    std::vector<int> implicitReceiverSymbolIds;
     std::vector<IrParameter> parameters;
     std::vector<IrSwitchArm> switchArms;
     std::vector<IrValueId> expressionRoots;
@@ -182,6 +186,9 @@ struct IrLambda {
 struct IrProgram {
     std::vector<IrValue> values;
     std::vector<IrLambda> lambdas;
+    // Variables scoped to a callable must use their semantic identity, not
+    // the legacy global name table (which also contains function IDs).
+    std::unordered_set<int> lexicalSlotSymbols;
     std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions;
     std::vector<IrInstruction> instructions;
     std::size_t unsupportedDirectRegionCount = 0;

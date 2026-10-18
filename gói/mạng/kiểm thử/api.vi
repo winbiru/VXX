@@ -1,70 +1,113 @@
-// Module: mạng.kiểm thử.api
-// Mục đích: helper tạo request theo HTTP verb để test/mô phỏng controller.
-// Nhóm hàm: api get, api post, api put, api delete và biến thể json/query.
 
-// Ghi chú hàm: api url hợp lệ.
-hàm api url hợp lệ(đường_dẫn_yêu_cầu) {
-    nếu (đường_dẫn_yêu_cầu == "") {
-        trả về sai;
-    };
-    trả về đúng;
-};
 
-// Ghi chú hàm: api payload mặc định.
-hàm api payload mặc định(payload) {
-    nếu (payload == "") {
-        trả về "{}";
-    };
-    trả về payload;
-};
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Kiểm Thử API {
+    hàm công khai khởi tạo() {};
 
-// Ghi chú hàm: api tạo yêu cầu.
-hàm api tạo yêu cầu(method, đường_dẫn_yêu_cầu, payload) {
-    nếu (!api url hợp lệ(đường_dẫn_yêu_cầu)) {
-        trả về "ERR|missing-url";
+    // Module: mạng.kiểm thử.api
+    // Mục đích: helper tạo request theo HTTP verb để test/mô phỏng controller.
+    // Nhóm hàm: api get, api post, api put, api delete và biến thể json/query.
+
+    // Ghi chú hàm: api url hợp lệ.
+    hàm riêng tư api url hợp lệ(đường_dẫn_yêu_cầu) {
+        nếu (đường_dẫn_yêu_cầu == "") {
+            trả về sai;
+        };
+        trả về đúng;
     };
 
-    nếu (method == "GET" || method == "DELETE") {
-        trả về method + "|" + đường_dẫn_yêu_cầu;
+    // Ghi chú hàm: api payload mặc định.
+    hàm riêng tư api payload mặc định(payload) {
+        nếu (payload == "") {
+            trả về "{}";
+        };
+        trả về payload;
     };
 
-    trả về method + "|" + đường_dẫn_yêu_cầu + "|" + payload;
-};
+    // Ghi chú hàm: api tạo yêu cầu.
+    hàm riêng tư api tạo yêu cầu(method, đường_dẫn_yêu_cầu, payload) {
+        nếu (!mình.api url hợp lệ(đường_dẫn_yêu_cầu)) {
+            trả về "ERR|missing-url";
+        };
 
-// Ghi chú hàm: api get.
-hàm api get(đường_dẫn_yêu_cầu) {
-    trả về api tạo yêu cầu("GET", đường_dẫn_yêu_cầu, "");
-};
+        nếu (method == "GET" || method == "DELETE") {
+            trả về method + "|" + đường_dẫn_yêu_cầu;
+        };
 
-// Ghi chú hàm: api post.
-hàm api post(đường_dẫn_yêu_cầu, payload) {
-    trả về api tạo yêu cầu("POST", đường_dẫn_yêu_cầu, payload);
-};
-
-// Ghi chú hàm: api put.
-hàm api put(đường_dẫn_yêu_cầu, payload) {
-    trả về api tạo yêu cầu("PUT", đường_dẫn_yêu_cầu, payload);
-};
-
-// Ghi chú hàm: api delete.
-hàm api delete(đường_dẫn_yêu_cầu) {
-    trả về api tạo yêu cầu("DELETE", đường_dẫn_yêu_cầu, "");
-};
-
-// Ghi chú hàm: api post json.
-hàm api post json(đường_dẫn_yêu_cầu, payload) {
-    trả về api post(đường_dẫn_yêu_cầu, api payload mặc định(payload));
-};
-
-// Ghi chú hàm: api put json.
-hàm api put json(đường_dẫn_yêu_cầu, payload) {
-    trả về api put(đường_dẫn_yêu_cầu, api payload mặc định(payload));
-};
-
-// Ghi chú hàm: api get có query.
-hàm api get có query(đường_dẫn_yêu_cầu, query) {
-    nếu (query == "") {
-        trả về api get(đường_dẫn_yêu_cầu);
+        trả về method + "|" + đường_dẫn_yêu_cầu + "|" + payload;
     };
-    trả về api get(đường_dẫn_yêu_cầu + "?" + query);
+
+    // Ghi chú hàm: api get.
+    hàm công khai api get(đường_dẫn_yêu_cầu) {
+        trả về mình.api tạo yêu cầu("GET", đường_dẫn_yêu_cầu, "");
+    };
+
+    // Ghi chú hàm: api post.
+    hàm công khai api post(đường_dẫn_yêu_cầu, payload) {
+        trả về mình.api tạo yêu cầu("POST", đường_dẫn_yêu_cầu, payload);
+    };
+
+    // Ghi chú hàm: api put.
+    hàm công khai api put(đường_dẫn_yêu_cầu, payload) {
+        trả về mình.api tạo yêu cầu("PUT", đường_dẫn_yêu_cầu, payload);
+    };
+
+    // Ghi chú hàm: api delete.
+    hàm công khai api delete(đường_dẫn_yêu_cầu) {
+        trả về mình.api tạo yêu cầu("DELETE", đường_dẫn_yêu_cầu, "");
+    };
+
+    // Ghi chú hàm: api post json.
+    hàm công khai api post json(đường_dẫn_yêu_cầu, payload) {
+        trả về mình.api post(đường_dẫn_yêu_cầu, mình.api payload mặc định(payload));
+    };
+
+    // Ghi chú hàm: api put json.
+    hàm công khai api put json(đường_dẫn_yêu_cầu, payload) {
+        trả về mình.api put(đường_dẫn_yêu_cầu, mình.api payload mặc định(payload));
+    };
+
+    // Ghi chú hàm: api get có query.
+    hàm công khai api get có query(đường_dẫn_yêu_cầu, query) {
+        nếu (query == "") {
+            trả về mình.api get(đường_dẫn_yêu_cầu);
+        };
+        trả về mình.api get(đường_dẫn_yêu_cầu + "?" + query);
+    };
+};
+
+
+hàm công khai api get(đường_dẫn_yêu_cầu) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api get(đường_dẫn_yêu_cầu);
+};
+
+hàm công khai api post(đường_dẫn_yêu_cầu, payload) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api post(đường_dẫn_yêu_cầu, payload);
+};
+
+hàm công khai api put(đường_dẫn_yêu_cầu, payload) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api put(đường_dẫn_yêu_cầu, payload);
+};
+
+hàm công khai api delete(đường_dẫn_yêu_cầu) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api delete(đường_dẫn_yêu_cầu);
+};
+
+hàm công khai api post json(đường_dẫn_yêu_cầu, payload) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api post json(đường_dẫn_yêu_cầu, payload);
+};
+
+hàm công khai api put json(đường_dẫn_yêu_cầu, payload) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api put json(đường_dẫn_yêu_cầu, payload);
+};
+
+hàm công khai api get có query(đường_dẫn_yêu_cầu, query) {
+    __vpp_adapter = Bộ Kiểm Thử API();
+    trả về __vpp_adapter.api get có query(đường_dẫn_yêu_cầu, query);
 };

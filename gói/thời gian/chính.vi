@@ -6,63 +6,111 @@ nhập gói/thời gian/lịch;
 nhập gói/thời gian/utc;
 nhập gói/thời gian/địa phương;
 
-// Snapshot native: [năm, tháng, ngày, giờ, phút, giây, offset phút].
-// Các trường và offset được lấy từ cùng một lần đọc clock, tránh lệch ngày/DST.
-// Đệm trực tiếp giây để giữ được giây nhuận 60 nếu OS trả về giá trị đó.
-hàm thời gian định dạng đồng hồ(các_phần, utc) {
-    kết_quả = thời gian đệm số(các_phần[0], 4) + "-" +
-        thời gian đệm số(các_phần[1], 2) + "-" +
-        thời gian đệm số(các_phần[2], 2) + "T" +
-        thời gian đệm số(các_phần[3], 2) + ":" +
-        thời gian đệm số(các_phần[4], 2) + ":" +
-        thời gian đệm số(các_phần[5], 2);
-    nếu (utc) {
-        trả về kết_quả + "Z";
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Đồng Hồ {
+    hàm công khai khởi tạo() {};
+
+    // Snapshot native: [năm, tháng, ngày, giờ, phút, giây, offset phút].
+    // Các trường và offset được lấy từ cùng một lần đọc clock, tránh lệch ngày/DST.
+    // Đệm trực tiếp giây để giữ được giây nhuận 60 nếu OS trả về giá trị đó.
+    hàm công khai thời gian định dạng đồng hồ(các_phần, utc) {
+        kết_quả = thời gian đệm số(các_phần[0], 4) + "-" +
+            thời gian đệm số(các_phần[1], 2) + "-" +
+            thời gian đệm số(các_phần[2], 2) + "T" +
+            thời gian đệm số(các_phần[3], 2) + ":" +
+            thời gian đệm số(các_phần[4], 2) + ":" +
+            thời gian đệm số(các_phần[5], 2);
+        nếu (utc) {
+            trả về kết_quả + "Z";
+        };
+        lệch = các_phần[6];
+        dấu = "+";
+        nếu (lệch < 0) {
+            dấu = "-";
+            lệch = 0 - lệch;
+        };
+        giờ_lệch = thành số nguyên(lệch / 60);
+        trả về kết_quả + dấu + thời gian đệm số(giờ_lệch, 2) + ":" +
+            thời gian đệm số(lệch % 60, 2);
     };
-    lệch = các_phần[6];
-    dấu = "+";
-    nếu (lệch < 0) {
-        dấu = "-";
-        lệch = 0 - lệch;
+
+    // Trả thời gian local dạng ISO-8601 có offset, ví dụ 2026-09-15T16:10:20+07:00.
+    hàm công khai lấy thời gian hiện tại() {
+        trả về mình.thời gian định dạng đồng hồ(thời gian đọc địa phương posix(), sai);
     };
-    giờ_lệch = thành số nguyên(lệch / 60);
-    trả về kết_quả + dấu + thời gian đệm số(giờ_lệch, 2) + ":" +
-        thời gian đệm số(lệch % 60, 2);
+
+    // Trả thời gian UTC dạng ISO-8601, ví dụ 2026-09-15T09:10:20Z.
+    hàm công khai lấy thời gian utc() {
+        trả về mình.thời gian định dạng đồng hồ(thời gian đọc utc ffi(), đúng);
+    };
+
+    // Trả độ lệch local so với UTC theo phút, ví dụ UTC+07:00 là 420.
+    hàm công khai độ lệch múi giờ() {
+        các_phần = thời gian đọc địa phương posix();
+        trả về các_phần[6];
+    };
+
+    // Alias tương thích cũng đi qua thân hàm V++.
+    hàm công khai lay_thoi_gian_hien_tai() {
+        trả về mình.lấy thời gian hiện tại();
+    };
+
+    hàm công khai lay_thoi_gian_utc() {
+        trả về mình.lấy thời gian utc();
+    };
+
+    hàm công khai do_lech_mui_gio() {
+        trả về mình.độ lệch múi giờ();
+    };
+
+    // Ghi chú hàm: giờ hiện tại.
+    hàm công khai giờ hiện tại() {
+        trả về mình.lấy thời gian hiện tại();
+    };
 };
 
-// Trả thời gian local dạng ISO-8601 có offset, ví dụ 2026-09-15T16:10:20+07:00.
-hàm lấy thời gian hiện tại() {
-    trả về thời gian định dạng đồng hồ(thời gian đọc địa phương posix(), sai);
+
+hàm công khai thời gian định dạng đồng hồ(các_phần, utc) {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.thời gian định dạng đồng hồ(các_phần, utc);
 };
 
-// Trả thời gian UTC dạng ISO-8601, ví dụ 2026-09-15T09:10:20Z.
-hàm lấy thời gian utc() {
-    trả về thời gian định dạng đồng hồ(thời gian đọc utc ffi(), đúng);
+hàm công khai lấy thời gian hiện tại() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.lấy thời gian hiện tại();
 };
 
-// Trả độ lệch local so với UTC theo phút, ví dụ UTC+07:00 là 420.
-hàm độ lệch múi giờ() {
-    các_phần = thời gian đọc địa phương posix();
-    trả về các_phần[6];
+hàm công khai lấy thời gian utc() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.lấy thời gian utc();
 };
 
-// Alias tương thích cũng đi qua thân hàm V++.
-hàm lay_thoi_gian_hien_tai() {
-    trả về lấy thời gian hiện tại();
+hàm công khai độ lệch múi giờ() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.độ lệch múi giờ();
 };
 
-hàm lay_thoi_gian_utc() {
-    trả về lấy thời gian utc();
+hàm công khai lay_thoi_gian_hien_tai() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.lay_thoi_gian_hien_tai();
 };
 
-hàm do_lech_mui_gio() {
-    trả về độ lệch múi giờ();
+hàm công khai lay_thoi_gian_utc() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.lay_thoi_gian_utc();
 };
 
-// Ghi chú hàm: giờ hiện tại.
-hàm giờ hiện tại() {
-    trả về lấy thời gian hiện tại();
+hàm công khai do_lech_mui_gio() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.do_lech_mui_gio();
+};
+
+hàm công khai giờ hiện tại() {
+    __vpp_adapter = Đồng Hồ();
+    trả về __vpp_adapter.giờ hiện tại();
 };
 
 nhập gói/thời gian/đơn điệu;
 nhập gói/thời gian/thời lượng;
+nhập gói/thời gian/giao diện đo;
+nhập gói/thời gian/bộ bấm giờ;

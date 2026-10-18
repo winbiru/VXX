@@ -1,0 +1,67 @@
+// Một phiên phân tích giữ snapshot dùng chung cho mọi phép truy vấn.
+// Mỗi phiên phân tích một lần; API hàm tự do ở chính.vi vẫn tương thích.
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/cây cú pháp;
+nhập gói/biên dịch/nút cú pháp;
+
+lớp công khai Bộ Biên Dịch {
+    hàm công khai khởi tạo(mã_nguồn, thư_mục) {
+        mình.snapshot = biên dịch snapshot nội bộ(mã_nguồn, thư_mục);
+        mình.chỉ_mục_khai_báo = rỗng;
+    };
+
+    hàm công khai kiểm tra() {
+        kết_quả = mình.snapshot;
+        trả về {
+            "hợp lệ": lấy map(kết_quả, "hợp lệ", 0),
+            "lỗi": lấy map(kết_quả, "lỗi", ""),
+            "lệnh": lấy map(kết_quả, "lệnh", 0)
+        };
+    };
+
+    hàm công khai phân tích() {
+        kết_quả = mình.snapshot;
+        nếu (!lấy map(kết_quả, "hợp lệ", 0)) {
+            ném lấy map(kết_quả, "lỗi", "biên dịch thất bại");
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai bytecode() {
+        trả về lấy map(mình.phân tích(), "bytecode", []);
+    };
+
+    hàm công khai bytecode hàm() {
+        trả về lấy map(mình.phân tích(), "hàm", []);
+    };
+
+    hàm công khai cây cú pháp() {
+        trả về lấy map(mình.phân tích(), "cây cú pháp", []);
+    };
+
+    hàm công khai thống kê() {
+        kết_quả = mình.phân tích();
+        trả về {
+            "token": lấy map(kết_quả, "token", 0),
+            "ký hiệu": lấy map(kết_quả, "ký hiệu", 0),
+            "phạm vi": lấy map(kết_quả, "phạm vi", 0),
+            "tham chiếu": lấy map(kết_quả, "tham chiếu", 0),
+            "lệnh": lấy map(kết_quả, "lệnh", 0),
+            "mô đun": lấy map(kết_quả, "mô đun", 0)
+        };
+    };
+
+    hàm công khai tìm khai báo(tên) {
+        nếu (loai_cua(tên) != "chuỗi") { ném "biên dịch: tên phải là chuỗi"; };
+        nếu (mình.chỉ_mục_khai_báo == rỗng) {
+            mình.chỉ_mục_khai_báo = Bộ Chỉ Mục Khai Báo(mình.cây cú pháp());
+        };
+        chỉ_mục = mình.chỉ_mục_khai_báo;
+        trả về chỉ_mục.tìm(tên);
+    };
+
+    hàm công khai thống kê opcode() {
+        trả về biên dịch thống kê opcode từ bytecode(mình.bytecode());
+    };
+};

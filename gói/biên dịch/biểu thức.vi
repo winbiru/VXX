@@ -1,0 +1,319 @@
+// Parser biểu thức độc lập viết bằng V++ để tiến tới compiler self-host.
+// Trả AST dưới dạng map/list; không gọi bien_dich_phan_tich_vm.
+// Đây là pass biểu thức, chưa thay parser statement/semantic C++.
+nhập gói/biên dịch/từ vựng;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phân Tích Biểu Thức {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch biểu thức tạo parser(các_token) {
+        trả về {"token": các_token, "vị trí": 0};
+    };
+
+    hàm công khai biên dịch biểu thức nhìn(p) {
+        i = p["vị trí"];
+        tokens = p["token"];
+        nếu (i >= độ dài(tokens)) {
+            trả về {"giá trị": "", "loại": "hết", "dòng": 0, "cột": 0};
+        };
+        trả về tokens[i];
+    };
+
+    hàm công khai biên dịch biểu thức lỗi(p, thông_báo) {
+        token = mình.biên dịch biểu thức nhìn(p);
+        nếu (lấy map(token, "loại", "") == "hết") {
+            ném "biên dịch biểu thức: " + thông_báo + " tại cuối biểu thức";
+        };
+        ném "biên dịch biểu thức: " + thông_báo + " tại dòng " +
+            thành chuỗi(lấy map(token, "dòng", 0)) + ", cột " +
+            thành chuỗi(lấy map(token, "cột", 0));
+    };
+
+    hàm công khai biên dịch biểu thức lấy(p) {
+        token = mình.biên dịch biểu thức nhìn(p);
+        nếu (lấy map(token, "loại", "") != "hết") {
+            p["vị trí"] = p["vị trí"] + 1;
+        };
+        trả về token;
+    };
+
+    hàm công khai biên dịch biểu thức chờ(p, cần) {
+        nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != cần) {
+            mình.biên dịch biểu thức lỗi(p, "cần '" + cần + "'");
+        };
+        mình.biên dịch biểu thức lấy(p);
+        trả về đúng;
+    };
+
+    // Mức ưu tiên tương ứng operatorPrecedenceMap trong src/frontend/lexer.cpp.
+    // Phép gán kết hợp phải; các toán tử nhị phân còn lại kết hợp trái.
+    hàm công khai biên dịch biểu thức ưu tiên(op) {
+        nếu (op == "=" || op == "+=" || op == "-=" || op == "*=" ||
+            op == "/=" || op == "%=") { trả về 1; };
+        nếu (op == "||") { trả về 2; };
+        nếu (op == "&&") { trả về 3; };
+        nếu (op == "==" || op == "!=" || op == "<" || op == ">" ||
+            op == "<=" || op == ">=") { trả về 4; };
+        nếu (op == "+" || op == "-") { trả về 5; };
+        nếu (op == "*" || op == "/" || op == "%") { trả về 6; };
+        trả về 0;
+    };
+
+    hàm công khai biên dịch biểu thức là phép gán(op) {
+        trả về op == "=" || op == "+=" || op == "-=" || op == "*=" ||
+            op == "/=" || op == "%=";
+    };
+
+    // Lexer C++ giữ dấu '.' trong định danh (cả m.cộng của module import).
+    // Chỉ tách receiver đặc biệt của phương thức để không làm sai binding
+    // bí danh module trước khi có pass phân giải tên/kiểu hoàn chỉnh.
+    hàm công khai biên dịch biểu thức receiver(giá_trị, vị_trí) {
+        gốc_dữ_liệu = "";
+        điểm = -1;
+        lặp(i = 0; i < độ dài(giá_trị); i++) {
+            nếu (giá_trị[i] == ".") { điểm = i; thoát; };
+            gốc_dữ_liệu += giá_trị[i];
+        };
+        nếu (điểm < 0 || (gốc_dữ_liệu != "mình" && gốc_dữ_liệu != "gốc")) {
+            trả về {"loại": "tên", "giá trị": giá_trị, "vị trí": vị_trí};
+        };
+        trái = {"loại": "tên", "giá trị": gốc_dữ_liệu, "vị trí": vị_trí};
+        tên = "";
+        lặp(i = điểm + 1; i <= độ dài(giá_trị); i++) {
+            // VM hiện đánh giá cả hai vế ||, nên không đọc [i] ở vị trí cuối.
+            tách = i == độ dài(giá_trị);
+            nếu (!tách) { tách = giá_trị[i] == "."; };
+            nếu (tách) {
+                nếu (tên == "") { ném "biên dịch biểu thức: tên thành viên rỗng"; };
+                trái = {"loại": "thành viên", "đối tượng": trái, "tên": tên};
+                tên = "";
+            } hoặc {
+                tên += giá_trị[i];
+            };
+        };
+        trả về trái;
+    };
+
+    hàm công khai biên dịch biểu thức sơ cấp(p) {
+        token = mình.biên dịch biểu thức nhìn(p);
+        s = lấy map(token, "giá trị", "");
+        loại = lấy map(token, "loại", "hết");
+        nếu (s == "(" ) {
+            mình.biên dịch biểu thức lấy(p);
+            trong = mình.biên dịch biểu thức đọc(p, 1);
+            mình.biên dịch biểu thức chờ(p, ")");
+            trả về trong;
+        };
+        nếu (s == "[") {
+            mình.biên dịch biểu thức lấy(p);
+            phần_tử = [];
+            lặp(i = 0; lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]"; i++) {
+                nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+                    mình.biên dịch biểu thức lỗi(p, "thiếu ']' đóng danh sách");
+                };
+                thêm(phần_tử, mình.biên dịch biểu thức đọc(p, 1));
+                nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]") {
+                    mình.biên dịch biểu thức chờ(p, ",");
+                    nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") == "]") {
+                        mình.biên dịch biểu thức lỗi(p, "dấu phẩy cuối danh sách không hợp lệ");
+                    };
+                };
+            };
+            mình.biên dịch biểu thức chờ(p, "]");
+            trả về {"loại": "danh sách", "phần tử": phần_tử};
+        };
+        nếu (s == "{") {
+            mình.biên dịch biểu thức lấy(p);
+            mục = [];
+            lặp(i = 0; lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}"; i++) {
+                nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+                    mình.biên dịch biểu thức lỗi(p, "thiếu '}' đóng từ điển");
+                };
+                khóa = mình.biên dịch biểu thức đọc(p, 1);
+                mình.biên dịch biểu thức chờ(p, ":");
+                giá_trị = mình.biên dịch biểu thức đọc(p, 1);
+                thêm(mục, {"khóa": khóa, "giá trị": giá_trị});
+                nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}") {
+                    mình.biên dịch biểu thức chờ(p, ",");
+                };
+            };
+            mình.biên dịch biểu thức chờ(p, "}");
+            trả về {"loại": "từ điển", "mục": mục};
+        };
+        nếu (s == "!" || s == "-" || s == "+") {
+            mình.biên dịch biểu thức lấy(p);
+            trả về {"loại": "một ngôi", "toán tử": s,
+                     "toán hạng": mình.biên dịch biểu thức đọc(p, 7)};
+        };
+        nếu (loại == "số nguyên" || loại == "số thực" || loại == "chuỗi" ||
+            s == "đúng" || s == "sai" || s == "rỗng") {
+            mình.biên dịch biểu thức lấy(p);
+            trả về {"loại": "hằng", "kiểu": loại, "giá trị": s,
+                     "vị trí": lấy map(token, "vị trí", 0)};
+        };
+        nếu (loại == "định danh" || s == "mặc định" || s == "ca" ||
+            (loại == "từ khóa" && lấy map(p, "tên nhiều từ", sai))) {
+            mình.biên dịch biểu thức lấy(p);
+            nếu (lấy map(p, "tên nhiều từ", sai)) {
+                lặp(i = 0; đúng; i++) {
+                    loại_tiếp = lấy map(mình.biên dịch biểu thức nhìn(p), "loại", "");
+                    nếu (loại_tiếp != "định danh" && loại_tiếp != "từ khóa") { thoát; };
+                    s += " " + mình.biên dịch biểu thức lấy(p)["giá trị"];
+                };
+            };
+            trả về mình.biên dịch biểu thức receiver(s, lấy map(token, "vị trí", 0));
+        };
+        mình.biên dịch biểu thức lỗi(p, "thiếu toán hạng hoặc token không hợp lệ '" + s + "'");
+        trả về rỗng;
+    };
+
+    hàm công khai biên dịch biểu thức là chấm(s) {
+        nếu (s == "") { trả về sai; };
+        trả về s[0] == ".";
+    };
+
+    hàm công khai biên dịch biểu thức đọc(p, tối_thiểu) {
+        trái = mình.biên dịch biểu thức sơ cấp(p);
+        // Gọi hàm và truy cập chỉ số có độ ưu tiên cao hơn toán tử một ngôi.
+        tiếp_tục = đúng;
+        lặp(vòng = 0; tiếp_tục; vòng++) {
+            s = lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "");
+            nếu (s == "++" || s == "--") {
+                mình.biên dịch biểu thức lấy(p);
+                trái = {"loại": "cập nhật", "toán tử": s, "đối tượng": trái};
+            } hoặc {
+              nếu (s == "(" ) {
+                mình.biên dịch biểu thức lấy(p);
+                đối_số = [];
+                nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != ")") {
+                    thêm(đối_số, mình.biên dịch biểu thức đọc(p, 1));
+                    còn = đúng;
+                    lặp(i = 0; còn; i++) {
+                        nếu (lấy map(mình.biên dịch biểu thức nhìn(p), "giá trị", "") == ",") {
+                            mình.biên dịch biểu thức lấy(p);
+                            thêm(đối_số, mình.biên dịch biểu thức đọc(p, 1));
+                        } hoặc { còn = sai; };
+                    };
+                };
+                mình.biên dịch biểu thức chờ(p, ")");
+                trái = {"loại": "gọi", "hàm": trái, "đối số": đối_số};
+              } hoặc {
+                nếu (s == "[") {
+                    mình.biên dịch biểu thức lấy(p);
+                    chỉ_số = mình.biên dịch biểu thức đọc(p, 1);
+                    mình.biên dịch biểu thức chờ(p, "]");
+                    trái = {"loại": "chỉ số", "đối tượng": trái, "chỉ số": chỉ_số};
+                } hoặc {
+                  nếu (mình.biên dịch biểu thức là chấm(s)) {
+                    mình.biên dịch biểu thức lấy(p);
+                    tên = "";
+                    lặp(i = 1; i < độ dài(s); i++) { tên += s[i]; };
+                    nếu (s == ".") {
+                        tên = mình.biên dịch biểu thức lấy(p)["giá trị"];
+                    };
+                    nếu (lấy map(p, "tên nhiều từ", sai)) {
+                        lặp(i = 0; đúng; i++) {
+                            tiếp = mình.biên dịch biểu thức nhìn(p);
+                            kiểu = lấy map(tiếp, "loại", "");
+                            nếu (kiểu != "định danh" && kiểu != "từ khóa") { thoát; };
+                            tên += " " + mình.biên dịch biểu thức lấy(p)["giá trị"];
+                        };
+                    };
+                    nếu (tên == "") { mình.biên dịch biểu thức lỗi(p, "cần tên thành viên sau '.'"); };
+                    trái = {"loại": "thành viên", "đối tượng": trái,
+                             "tên": tên};
+                  } hoặc {
+                    mức = mình.biên dịch biểu thức ưu tiên(s);
+                    nếu (mức == 0 || mức < tối_thiểu) {
+                        tiếp_tục = sai;
+                    } hoặc {
+                        mình.biên dịch biểu thức lấy(p);
+                        mức_phải = mức + 1;
+                        nếu (mình.biên dịch biểu thức là phép gán(s)) { mức_phải = mức; };
+                        phải = mình.biên dịch biểu thức đọc(p, mức_phải);
+                        trái = {"loại": "hai ngôi", "toán tử": s,
+                                "trái": trái, "phải": phải};
+                    };
+                  };
+                };
+              };
+            };
+        };
+        trả về trái;
+    };
+
+    // API chưa đụng compiler bootstrap: parse một biểu thức hoàn chỉnh thành AST.
+    // Không chấp nhận token sót (vd "a b"), toán hạng thiếu, ngoặc chưa đóng.
+    hàm công khai biên dịch phân tích biểu thức(mã_nguồn) {
+        p = mình.biên dịch biểu thức tạo parser(biên dịch token hóa(mã_nguồn));
+        cây = mình.biên dịch biểu thức đọc(p, 1);
+        nếu (p["vị trí"] != độ dài(p["token"])) {
+            mình.biên dịch biểu thức lỗi(p, "còn token sau biểu thức");
+        };
+        trả về cây;
+    };
+};
+
+
+hàm công khai biên dịch biểu thức tạo parser(các_token) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức tạo parser(các_token);
+};
+
+hàm công khai biên dịch biểu thức nhìn(p) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức nhìn(p);
+};
+
+hàm công khai biên dịch biểu thức lỗi(p, thông_báo) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức lỗi(p, thông_báo);
+};
+
+hàm công khai biên dịch biểu thức lấy(p) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức lấy(p);
+};
+
+hàm công khai biên dịch biểu thức chờ(p, cần) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức chờ(p, cần);
+};
+
+hàm công khai biên dịch biểu thức ưu tiên(op) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức ưu tiên(op);
+};
+
+hàm công khai biên dịch biểu thức là phép gán(op) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức là phép gán(op);
+};
+
+hàm công khai biên dịch biểu thức receiver(giá_trị, vị_trí) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức receiver(giá_trị, vị_trí);
+};
+
+hàm công khai biên dịch biểu thức sơ cấp(p) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức sơ cấp(p);
+};
+
+hàm công khai biên dịch biểu thức là chấm(s) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức là chấm(s);
+};
+
+hàm công khai biên dịch biểu thức đọc(p, tối_thiểu) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch biểu thức đọc(p, tối_thiểu);
+};
+
+hàm công khai biên dịch phân tích biểu thức(mã_nguồn) {
+    __vpp_adapter = Bộ Phân Tích Biểu Thức();
+    trả về __vpp_adapter.biên dịch phân tích biểu thức(mã_nguồn);
+};

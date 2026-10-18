@@ -1,0 +1,68 @@
+// Xác minh registry kiến trúc self-host và cách từ chối target chưa biết.
+nhập gói/biên dịch/đích;
+
+hàm chính() {
+    danh_sách = biên dịch danh sách kiến trúc();
+    nếu (độ dài(danh_sách) != 16) { ném "thiếu kiến trúc trong V++ registry"; };
+    lặp (i = 0; i < độ dài(danh_sách); i++) {
+        mục = biên dịch thông tin kiến trúc(danh_sách[i]);
+        nếu (mục["tên"] != danh_sách[i]) { ném "tên target không nhất quán"; };
+        nếu (mục["bit"] != 32 && mục["bit"] != 64) { ném "bit target không hợp lệ"; };
+    };
+    nếu (biên dịch thông tin kiến trúc("ppc64le")["little endian"] != đúng) {
+        ném "POWER little endian sai";
+    };
+    nếu (biên dịch thông tin kiến trúc("mips64")["little endian"] != sai) {
+        ném "MIPS big endian sai";
+    };
+    nếu (biên dịch thông tin kiến trúc("amd64")["tên"] != "x86_64") {
+        ném "alias AMD64 sai";
+    };
+    nếu (!biên dịch jit máy thử nghiệm("arm64", "macos")) { ném "AArch64 JIT mất"; };
+    nếu (biên dịch jit máy thử nghiệm("riscv64", "linux")) { ném "JIT RISC-V chưa có"; };
+    có_lỗi = sai;
+    thử { biên dịch thông tin kiến trúc("riscv128"); } bắt lỗi (e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "không chặn kiến trúc lạ"; };
+    // Cùng bộ triple/alias với oracle C++ target_registry_hardening.cpp.
+    lặp (i = 0; i < độ dài(danh_sách); i++) {
+        tên = danh_sách[i];
+        đích = biên dịch phân tích đích(tên + "-unknown-linux-gnu");
+        nếu (đích["kiến trúc"] != tên || đích["định dạng"] != "ELF" ||
+            biên dịch triple chuẩn(đích) != tên + "-unknown-linux-gnu") {
+            ném "triple Linux sai: " + tên;
+        };
+    };
+    bí_danh = [
+        ["AMD64-linux", "x86_64-unknown-linux-gnu"],
+        ["arm64-apple-darwin", "aarch64-apple-darwin"],
+        ["rv64-linux-musl", "riscv64-unknown-linux-musl"],
+        ["i686-linux-gnu", "i386-unknown-linux-gnu"],
+        ["armv7l-linux-gnueabihf", "armv7-unknown-linux-gnueabihf"],
+        ["ppc64le-linux-gnu", "powerpc64le-unknown-linux-gnu"],
+        ["mips64el-linux-gnu", "mips64el-unknown-linux-gnu"],
+        ["x64-pc-windows-msvc", "x86_64-pc-windows-msvc"],
+        ["x86_64-w64-mingw32", "x86_64-w64-windows-gnu"]
+    ];
+    lặp (i = 0; i < độ dài(bí_danh); i++) {
+        đích = biên dịch phân tích đích(bí_danh[i][0]);
+        chuẩn = biên dịch triple chuẩn(đích);
+        nếu (chuẩn != bí_danh[i][1] ||
+            biên dịch triple chuẩn(biên dịch phân tích đích(chuẩn)) != chuẩn) {
+            ném "alias triple sai: " + bí_danh[i][0];
+        };
+    };
+    sai_triple = ["riscv128-linux-gnu", "aarch64", "aarch64-plan9",
+        "riscv64-linux-msvc", "x86_64-windows-musl",
+        "aarch64-apple-darwin-gnu", "mips64-windows-msvc",
+        "x86_64-linux-unknown", "-linux-gnu"];
+    lặp (i = 0; i < độ dài(sai_triple); i++) {
+        có_lỗi = sai;
+        thử { biên dịch phân tích đích(sai_triple[i]); }
+        bắt lỗi (e) { có_lỗi = đúng; };
+        nếu (!có_lỗi) { ném "triple không bị từ chối: " + sai_triple[i]; };
+    };
+    nếu (biên dịch phân tích đích("aarch64-pc-windows-msvc")["định dạng"] != "COFF") {
+        ném "Windows ARM64 phải được nhận diện dù chưa phát mã native";
+    };
+    in "target_registry_vi_ok";
+};

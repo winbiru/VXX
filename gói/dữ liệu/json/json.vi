@@ -8,623 +8,742 @@ nhập gói/bộ sưu tập/từ điển;
 nhập gói/lõi/bảng mã;
 nhập gói/văn bản/chuỗi;
 
-// Ghi chú hàm: escape một chuỗi UTF-8 hợp lệ theo JSON (quote, backslash và ký tự điều khiển).
-hàm json thoát(giá trị) {
-    văn_bản = thành chuỗi(giá trị);
-    kết_quả = "";
-    hex = "0123456789abcdef";
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp riêng tư Xử Lý Nội Bộ Json {
+    hàm công khai khởi tạo() {};
 
-    lặp(i = 0; i < do_dai(văn_bản); i++) {
-        c = văn_bản[i];
-        nếu (c == "\"") {
-            kết_quả = kết_quả + "\\\"";
-        } nếu không {
-            nếu (c == "\\") {
-                kết_quả = kết_quả + "\\\\";
-            } nếu không {
-                // C0 control characters đều là một byte trong UTF-8. Dùng primitive
-                // bảng mã chỉ để lấy byte; quy tắc escape vẫn nằm hoàn toàn ở V++.
-                bytes = mã hóa bảng mã(c, "UTF-8");
-                nếu (do_dai(bytes) == 1 && bytes[0] < 32) {
-                    mã = bytes[0];
-                    nếu (mã == 8) {
-                        kết_quả = kết_quả + "\\b";
-                    } nếu không {
-                        nếu (mã == 9) {
-                            kết_quả = kết_quả + "\\t";
-                        } nếu không {
-                            nếu (mã == 10) {
-                                kết_quả = kết_quả + "\\n";
-                            } nếu không {
-                                nếu (mã == 12) {
-                                    kết_quả = kết_quả + "\\f";
-                                } nếu không {
-                                    nếu (mã == 13) {
-                                        kết_quả = kết_quả + "\\r";
-                                    } nếu không {
-                                        cao = 0;
-                                        thấp = mã;
-                                        nếu (thấp >= 16) {
-                                            cao = 1;
-                                            thấp = thấp - 16;
+    // Ghi chú hàm: escape một chuỗi UTF-8 hợp lệ theo JSON (quote, backslash và ký tự điều khiển).
+    hàm công khai json thoát(giá trị) {
+        văn_bản = thành chuỗi(giá trị);
+        kết_quả = "";
+        hex = "0123456789abcdef";
+
+        lặp(i = 0; i < do_dai(văn_bản); i++) {
+            c = văn_bản[i];
+            nếu (c == "\"") {
+                kết_quả = kết_quả + "\\\"";
+            } hoặc {
+                nếu (c == "\\") {
+                    kết_quả = kết_quả + "\\\\";
+                } hoặc {
+                    // C0 control characters đều là một byte trong UTF-8. Dùng primitive
+                    // bảng mã chỉ để lấy byte; quy tắc escape vẫn nằm hoàn toàn ở V++.
+                    bytes = mã hóa bảng mã(c, "UTF-8");
+                    nếu (do_dai(bytes) == 1 && bytes[0] < 32) {
+                        mã = bytes[0];
+                        nếu (mã == 8) {
+                            kết_quả = kết_quả + "\\b";
+                        } hoặc {
+                            nếu (mã == 9) {
+                                kết_quả = kết_quả + "\\t";
+                            } hoặc {
+                                nếu (mã == 10) {
+                                    kết_quả = kết_quả + "\\n";
+                                } hoặc {
+                                    nếu (mã == 12) {
+                                        kết_quả = kết_quả + "\\f";
+                                    } hoặc {
+                                        nếu (mã == 13) {
+                                            kết_quả = kết_quả + "\\r";
+                                        } hoặc {
+                                            cao = 0;
+                                            thấp = mã;
+                                            nếu (thấp >= 16) {
+                                                cao = 1;
+                                                thấp = thấp - 16;
+                                            };
+                                            kết_quả = kết_quả + "\\u00" + hex[cao] + hex[thấp];
                                         };
-                                        kết_quả = kết_quả + "\\u00" + hex[cao] + hex[thấp];
+                                    };
+                                };
+                            };
+                        };
+                    } hoặc {
+                        kết_quả = kết_quả + c;
+                    };
+                };
+            };
+        };
+        trả về kết_quả;
+    };
+
+    // Ghi chú hàm: tạo literal JSON string, gồm cả dấu quote bao ngoài.
+    hàm công khai json chuỗi(giá trị) {
+        trả về "\"" + mình.json thoát(giá trị) + "\"";
+    };
+
+    hàm công khai json phân tích(nội dung) {
+        bộ_nội_bộ = Bộ Xử Lý JSON();
+        trả về bộ_nội_bộ.json phân tích(nội dung);
+    };
+
+    hàm công khai json tạo(giá trị) {
+        bộ_nội_bộ = Bộ Xử Lý JSON();
+        trả về bộ_nội_bộ.json tạo(giá trị);
+    };
+
+    // Ghi chú hàm: tạo một property JSON có giá trị chuỗi.
+    hàm công khai json thuộc tính chuỗi(khóa, giá trị) {
+        trả về mình.json chuỗi(khóa) + ":" + mình.json chuỗi(giá trị);
+    };
+
+    // Ghi chú hàm: tạo một property JSON với giá trị raw đã hợp lệ.
+    hàm công khai json thuộc tính thô(khóa, giá trịRaw) {
+        trả về mình.json chuỗi(khóa) + ":" + giá trịRaw;
+    };
+
+    // Ghi chú hàm: tạo object JSON rỗng.
+    hàm công khai json đối tượng rỗng() {
+        trả về "{}";
+    };
+
+    // Ghi chú hàm: tạo object JSON một property chuỗi.
+    hàm công khai json đối tượng một chuỗi(khóa, giá trị) {
+        trả về "{" + mình.json thuộc tính chuỗi(khóa, giá trị) + "}";
+    };
+
+    // Ghi chú hàm: tạo object JSON hai property chuỗi.
+    hàm công khai json đối tượng hai chuỗi(khóa một, giá trị một, khóa hai, giá trị hai) {
+        trả về "{" + mình.json thuộc tính chuỗi(khóa một, giá trị một) + "," + mình.json thuộc tính chuỗi(khóa hai, giá trị hai) + "}";
+    };
+};
+
+
+hàm công khai json thoát(giá trị) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json thoát(giá trị);
+};
+
+hàm công khai json chuỗi(giá trị) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json chuỗi(giá trị);
+};
+
+// Các thuật toán và trợ giúp nằm trong lớp nội bộ, không được xuất qua import.
+lớp riêng tư Bộ Xử Lý JSON {
+    hàm công khai khởi tạo() {};
+
+    // Các helper parser bên dưới chỉ giữ con trỏ trong map V++; native không chứa
+    // ngữ pháp JSON.
+    hàm riêng tư json là khoảng trắng(c) {
+        trả về c == " " || c == "\t" || c == "\r" || c == "\n";
+    };
+
+    hàm riêng tư json là chữ số(c) {
+        trả về c >= "0" && c <= "9";
+    };
+
+    hàm riêng tư json lỗi(trạng_thái, thông_báo) {
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        ném "json phân tích: " + thông_báo + " tại vị trí " + thành chuỗi(vị_trí);
+    };
+
+    hàm riêng tư json bỏ khoảng trắng(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        đang_bỏ = đúng;
+        lặp(vòng = 0; vị_trí < n && đang_bỏ; vòng++) {
+            nếu (mình.json là khoảng trắng(nội_dung[vị_trí])) {
+                vị_trí = vị_trí + 1;
+            } hoặc {
+                đang_bỏ = sai;
+            };
+        };
+        đặt map(trạng_thái, "vị trí", vị_trí);
+    };
+
+    hàm riêng tư json hex nibble(c) {
+        alphabet = "0123456789abcdef";
+        chữ = chuỗi thường(c);
+        kết_quả = -1;
+        lặp(i = 0; i < 16 && kết_quả < 0; i++) {
+            nếu (alphabet[i] == chữ) {
+                kết_quả = i;
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư json đọc hex4(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        nếu (vị_trí + 4 > n) {
+            mình.json lỗi(trạng_thái, "escape Unicode thiếu chữ số");
+        };
+        giá_trị = 0;
+        hợp_lệ = đúng;
+        lặp(i = 0; i < 4 && hợp_lệ; i++) {
+            nibble = mình.json hex nibble(nội_dung[vị_trí + i]);
+            nếu (nibble < 0) {
+                hợp_lệ = sai;
+            } hoặc {
+                giá_trị = giá_trị * 16 + nibble;
+            };
+        };
+        nếu (!hợp_lệ) {
+            mình.json lỗi(trạng_thái, "escape Unicode không hợp lệ");
+        };
+        đặt map(trạng_thái, "vị trí", vị_trí + 4);
+        trả về giá_trị;
+    };
+
+    hàm riêng tư json ký tự mã(mã) {
+        nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
+            ném "json phân tích: code point Unicode không hợp lệ";
+        };
+        bytes = [];
+        nếu (mã <= 127) {
+            thêm(bytes, mã);
+        } hoặc {
+            nếu (mã <= 2047) {
+                thêm(bytes, 192 + lam_tron_xuong(mã / 64));
+                thêm(bytes, 128 + mã % 64);
+            } hoặc {
+                nếu (mã <= 65535) {
+                    thêm(bytes, 224 + lam_tron_xuong(mã / 4096));
+                    thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
+                    thêm(bytes, 128 + mã % 64);
+                } hoặc {
+                    thêm(bytes, 240 + lam_tron_xuong(mã / 262144));
+                    thêm(bytes, 128 + (lam_tron_xuong(mã / 4096) % 64));
+                    thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
+                    thêm(bytes, 128 + mã % 64);
+                };
+            };
+        };
+        trả về giải mã bảng mã(bytes, "UTF-8");
+    };
+
+    hàm riêng tư json đọc chuỗi(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        nếu (vị_trí >= n) {
+            mình.json lỗi(trạng_thái, "thiếu chuỗi");
+        };
+        nếu (nội_dung[vị_trí] != "\"") {
+            mình.json lỗi(trạng_thái, "chuỗi phải bắt đầu bằng dấu nháy kép");
+        };
+        vị_trí = vị_trí + 1;
+        đặt map(trạng_thái, "vị trí", vị_trí);
+
+        kết_quả = "";
+        hoàn_tất = sai;
+        lặp(vòng = 0; vị_trí < n && !hoàn_tất; vòng++) {
+            c = nội_dung[vị_trí];
+            vị_trí = vị_trí + 1;
+            đặt map(trạng_thái, "vị trí", vị_trí);
+
+            nếu (c == "\"") {
+                hoàn_tất = đúng;
+            } hoặc {
+                nếu (c == "\\") {
+                    nếu (vị_trí >= n) {
+                        mình.json lỗi(trạng_thái, "escape chuỗi bị thiếu");
+                    };
+                    escape = nội_dung[vị_trí];
+                    vị_trí = vị_trí + 1;
+                    đặt map(trạng_thái, "vị trí", vị_trí);
+                    nếu (escape == "\"" || escape == "\\" || escape == "/") {
+                        kết_quả = kết_quả + escape;
+                    } hoặc {
+                        nếu (escape == "b") {
+                            kết_quả = kết_quả + "\b";
+                        } hoặc {
+                            nếu (escape == "f") {
+                                kết_quả = kết_quả + "\f";
+                            } hoặc {
+                                nếu (escape == "n") {
+                                    kết_quả = kết_quả + "\n";
+                                } hoặc {
+                                    nếu (escape == "r") {
+                                        kết_quả = kết_quả + "\r";
+                                    } hoặc {
+                                        nếu (escape == "t") {
+                                            kết_quả = kết_quả + "\t";
+                                        } hoặc {
+                                            nếu (escape == "u") {
+                                                đầu = mình.json đọc hex4(trạng_thái);
+                                                vị_trí = lấy map(trạng_thái, "vị trí", 0);
+                                                nếu (đầu >= 55296 && đầu <= 56319) {
+                                                    nếu (vị_trí + 2 > n) {
+                                                        mình.json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
+                                                    };
+                                                    nếu (nội_dung[vị_trí] != "\\") {
+                                                        mình.json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
+                                                    };
+                                                    nếu (nội_dung[vị_trí + 1] != "u") {
+                                                        mình.json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
+                                                    };
+                                                    đặt map(trạng_thái, "vị trí", vị_trí + 2);
+                                                    thấp = mình.json đọc hex4(trạng_thái);
+                                                    nếu (thấp < 56320 || thấp > 57343) {
+                                                        mình.json lỗi(trạng_thái, "surrogate thấp không hợp lệ");
+                                                    };
+                                                    mã = 65536 + (đầu - 55296) * 1024 + (thấp - 56320);
+                                                    kết_quả = kết_quả + mình.json ký tự mã(mã);
+                                                } hoặc {
+                                                    nếu (đầu >= 56320 && đầu <= 57343) {
+                                                        mình.json lỗi(trạng_thái, "surrogate thấp đứng một mình");
+                                                    };
+                                                    kết_quả = kết_quả + mình.json ký tự mã(đầu);
+                                                };
+                                                vị_trí = lấy map(trạng_thái, "vị trí", 0);
+                                            } hoặc {
+                                                mình.json lỗi(trạng_thái, "escape chuỗi không hợp lệ");
+                                            };
+                                        };
                                     };
                                 };
                             };
                         };
                     };
-                } nếu không {
+                } hoặc {
+                    bytes = mã hóa bảng mã(c, "UTF-8");
+                    nếu (độ dài(bytes) == 1) {
+                        nếu (bytes[0] < 32) {
+                            mình.json lỗi(trạng_thái, "chuỗi chứa ký tự điều khiển chưa escape");
+                        };
+                    };
                     kết_quả = kết_quả + c;
                 };
             };
         };
-    };
-    trả về kết_quả;
-};
-
-// Ghi chú hàm: tạo literal JSON string, gồm cả dấu quote bao ngoài.
-hàm json chuỗi(giá trị) {
-    trả về "\"" + json thoát(giá trị) + "\"";
-};
-
-// Các helper parser bên dưới chỉ giữ con trỏ trong map V++; native không chứa
-// ngữ pháp JSON.
-hàm json là khoảng trắng(c) {
-    trả về c == " " || c == "\t" || c == "\r" || c == "\n";
-};
-
-hàm json là chữ số(c) {
-    trả về c >= "0" && c <= "9";
-};
-
-hàm json lỗi(trạng_thái, thông_báo) {
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    ném "json phân tích: " + thông_báo + " tại vị trí " + thành chuỗi(vị_trí);
-};
-
-hàm json bỏ khoảng trắng(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    đang_bỏ = đúng;
-    lặp(vòng = 0; vị_trí < n && đang_bỏ; vòng++) {
-        nếu (json là khoảng trắng(nội_dung[vị_trí])) {
-            vị_trí = vị_trí + 1;
-        } nếu không {
-            đang_bỏ = sai;
+        nếu (!hoàn_tất) {
+            mình.json lỗi(trạng_thái, "chuỗi chưa đóng");
         };
-    };
-    đặt map(trạng_thái, "vị trí", vị_trí);
-};
-
-hàm json hex nibble(c) {
-    alphabet = "0123456789abcdef";
-    chữ = chuỗi thường(c);
-    kết_quả = -1;
-    lặp(i = 0; i < 16 && kết_quả < 0; i++) {
-        nếu (alphabet[i] == chữ) {
-            kết_quả = i;
-        };
-    };
-    trả về kết_quả;
-};
-
-hàm json đọc hex4(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    nếu (vị_trí + 4 > n) {
-        json lỗi(trạng_thái, "escape Unicode thiếu chữ số");
-    };
-    giá_trị = 0;
-    hợp_lệ = đúng;
-    lặp(i = 0; i < 4 && hợp_lệ; i++) {
-        nibble = json hex nibble(nội_dung[vị_trí + i]);
-        nếu (nibble < 0) {
-            hợp_lệ = sai;
-        } nếu không {
-            giá_trị = giá_trị * 16 + nibble;
-        };
-    };
-    nếu (!hợp_lệ) {
-        json lỗi(trạng_thái, "escape Unicode không hợp lệ");
-    };
-    đặt map(trạng_thái, "vị trí", vị_trí + 4);
-    trả về giá_trị;
-};
-
-hàm json ký tự mã(mã) {
-    nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
-        ném "json phân tích: code point Unicode không hợp lệ";
-    };
-    bytes = [];
-    nếu (mã <= 127) {
-        thêm(bytes, mã);
-    } nếu không {
-        nếu (mã <= 2047) {
-            thêm(bytes, 192 + lam_tron_xuong(mã / 64));
-            thêm(bytes, 128 + mã % 64);
-        } nếu không {
-            nếu (mã <= 65535) {
-                thêm(bytes, 224 + lam_tron_xuong(mã / 4096));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
-                thêm(bytes, 128 + mã % 64);
-            } nếu không {
-                thêm(bytes, 240 + lam_tron_xuong(mã / 262144));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 4096) % 64));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
-                thêm(bytes, 128 + mã % 64);
-            };
-        };
-    };
-    trả về giải mã bảng mã(bytes, "UTF-8");
-};
-
-hàm json đọc chuỗi(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    nếu (vị_trí >= n) {
-        json lỗi(trạng_thái, "thiếu chuỗi");
-    };
-    nếu (nội_dung[vị_trí] != "\"") {
-        json lỗi(trạng_thái, "chuỗi phải bắt đầu bằng dấu nháy kép");
-    };
-    vị_trí = vị_trí + 1;
-    đặt map(trạng_thái, "vị trí", vị_trí);
-
-    kết_quả = "";
-    hoàn_tất = sai;
-    lặp(vòng = 0; vị_trí < n && !hoàn_tất; vòng++) {
-        c = nội_dung[vị_trí];
-        vị_trí = vị_trí + 1;
-        đặt map(trạng_thái, "vị trí", vị_trí);
-
-        nếu (c == "\"") {
-            hoàn_tất = đúng;
-        } nếu không {
-            nếu (c == "\\") {
-                nếu (vị_trí >= n) {
-                    json lỗi(trạng_thái, "escape chuỗi bị thiếu");
-                };
-                escape = nội_dung[vị_trí];
-                vị_trí = vị_trí + 1;
-                đặt map(trạng_thái, "vị trí", vị_trí);
-                nếu (escape == "\"" || escape == "\\" || escape == "/") {
-                    kết_quả = kết_quả + escape;
-                } nếu không {
-                    nếu (escape == "b") {
-                        kết_quả = kết_quả + "\b";
-                    } nếu không {
-                        nếu (escape == "f") {
-                            kết_quả = kết_quả + "\f";
-                        } nếu không {
-                            nếu (escape == "n") {
-                                kết_quả = kết_quả + "\n";
-                            } nếu không {
-                                nếu (escape == "r") {
-                                    kết_quả = kết_quả + "\r";
-                                } nếu không {
-                                    nếu (escape == "t") {
-                                        kết_quả = kết_quả + "\t";
-                                    } nếu không {
-                                        nếu (escape == "u") {
-                                            đầu = json đọc hex4(trạng_thái);
-                                            vị_trí = lấy map(trạng_thái, "vị trí", 0);
-                                            nếu (đầu >= 55296 && đầu <= 56319) {
-                                                nếu (vị_trí + 2 > n) {
-                                                    json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
-                                                };
-                                                nếu (nội_dung[vị_trí] != "\\") {
-                                                    json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
-                                                };
-                                                nếu (nội_dung[vị_trí + 1] != "u") {
-                                                    json lỗi(trạng_thái, "surrogate cao thiếu surrogate thấp");
-                                                };
-                                                đặt map(trạng_thái, "vị trí", vị_trí + 2);
-                                                thấp = json đọc hex4(trạng_thái);
-                                                nếu (thấp < 56320 || thấp > 57343) {
-                                                    json lỗi(trạng_thái, "surrogate thấp không hợp lệ");
-                                                };
-                                                mã = 65536 + (đầu - 55296) * 1024 + (thấp - 56320);
-                                                kết_quả = kết_quả + json ký tự mã(mã);
-                                            } nếu không {
-                                                nếu (đầu >= 56320 && đầu <= 57343) {
-                                                    json lỗi(trạng_thái, "surrogate thấp đứng một mình");
-                                                };
-                                                kết_quả = kết_quả + json ký tự mã(đầu);
-                                            };
-                                            vị_trí = lấy map(trạng_thái, "vị trí", 0);
-                                        } nếu không {
-                                            json lỗi(trạng_thái, "escape chuỗi không hợp lệ");
-                                        };
-                                    };
-                                };
-                            };
-                        };
-                    };
-                };
-            } nếu không {
-                bytes = mã hóa bảng mã(c, "UTF-8");
-                nếu (độ dài(bytes) == 1) {
-                    nếu (bytes[0] < 32) {
-                        json lỗi(trạng_thái, "chuỗi chứa ký tự điều khiển chưa escape");
-                    };
-                };
-                kết_quả = kết_quả + c;
-            };
-        };
-    };
-    nếu (!hoàn_tất) {
-        json lỗi(trạng_thái, "chuỗi chưa đóng");
-    };
-    trả về kết_quả;
-};
-
-hàm json khớp literal(trạng_thái, literal) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    m = độ dài(literal);
-    nếu (vị_trí + m > n) {
-        trả về sai;
-    };
-    nếu (cắt chuỗi(nội_dung, vị_trí, m) != literal) {
-        trả về sai;
-    };
-    đặt map(trạng_thái, "vị trí", vị_trí + m);
-    trả về đúng;
-};
-
-hàm json đọc số(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    bắt_đầu = vị_trí;
-    số_thực = sai;
-
-    nếu (nội_dung[vị_trí] == "-") {
-        vị_trí = vị_trí + 1;
-    };
-    nếu (vị_trí >= n) {
-        đặt map(trạng_thái, "vị trí", vị_trí);
-        json lỗi(trạng_thái, "số thiếu chữ số");
+        trả về kết_quả;
     };
 
-    nếu (nội_dung[vị_trí] == "0") {
-        vị_trí = vị_trí + 1;
-    } nếu không {
-        nếu (nội_dung[vị_trí] < "1" || nội_dung[vị_trí] > "9") {
-            đặt map(trạng_thái, "vị trí", vị_trí);
-            json lỗi(trạng_thái, "số không hợp lệ");
-        };
-        đang_đọc = đúng;
-        lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
-            nếu (json là chữ số(nội_dung[vị_trí])) {
-                vị_trí = vị_trí + 1;
-            } nếu không {
-                đang_đọc = sai;
-            };
-        };
-    };
-
-    nếu (vị_trí < n) {
-        nếu (nội_dung[vị_trí] == ".") {
-            số_thực = đúng;
-            vị_trí = vị_trí + 1;
-            nếu (vị_trí >= n) {
-                đặt map(trạng_thái, "vị trí", vị_trí);
-                json lỗi(trạng_thái, "phần thập phân thiếu chữ số");
-            };
-            nếu (!json là chữ số(nội_dung[vị_trí])) {
-                đặt map(trạng_thái, "vị trí", vị_trí);
-                json lỗi(trạng_thái, "phần thập phân thiếu chữ số");
-            };
-            đang_đọc = đúng;
-            lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
-                nếu (json là chữ số(nội_dung[vị_trí])) {
-                    vị_trí = vị_trí + 1;
-                } nếu không {
-                    đang_đọc = sai;
-                };
-            };
-        };
-    };
-
-    nếu (vị_trí < n) {
-        nếu (nội_dung[vị_trí] == "e" || nội_dung[vị_trí] == "E") {
-            số_thực = đúng;
-            vị_trí = vị_trí + 1;
-            nếu (vị_trí < n) {
-                nếu (nội_dung[vị_trí] == "+" || nội_dung[vị_trí] == "-") {
-                    vị_trí = vị_trí + 1;
-                };
-            };
-            nếu (vị_trí >= n) {
-                đặt map(trạng_thái, "vị trí", vị_trí);
-                json lỗi(trạng_thái, "số mũ thiếu chữ số");
-            };
-            nếu (!json là chữ số(nội_dung[vị_trí])) {
-                đặt map(trạng_thái, "vị trí", vị_trí);
-                json lỗi(trạng_thái, "số mũ thiếu chữ số");
-            };
-            đang_đọc = đúng;
-            lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
-                nếu (json là chữ số(nội_dung[vị_trí])) {
-                    vị_trí = vị_trí + 1;
-                } nếu không {
-                    đang_đọc = sai;
-                };
-            };
-        };
-    };
-
-    đặt map(trạng_thái, "vị trí", vị_trí);
-    văn_bản = cắt chuỗi(nội_dung, bắt_đầu, vị_trí - bắt_đầu);
-    nếu (số_thực) {
-        trả về thành số thực(văn_bản);
-    };
-    kết_quả_số = thành số thực(văn_bản);
-    nếu (kết_quả_số >= -2147483648.0 && kết_quả_số <= 2147483647.0) {
-        trả về thành số nguyên(kết_quả_số);
-    };
-    trả về kết_quả_số;
-};
-
-hàm json đọc mảng(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    đặt map(trạng_thái, "vị trí", vị_trí + 1);
-    json bỏ khoảng trắng(trạng_thái);
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    kết_quả = [];
-
-    nếu (vị_trí < n) {
-        nếu (nội_dung[vị_trí] == "]") {
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            trả về kết_quả;
-        };
-    };
-
-    hoàn_tất = sai;
-    lặp(vòng = 0; !hoàn_tất; vòng++) {
-        thêm(kết_quả, json đọc giá trị(trạng_thái));
-        json bỏ khoảng trắng(trạng_thái);
+    hàm riêng tư json khớp literal(trạng_thái, literal) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
         vị_trí = lấy map(trạng_thái, "vị trí", 0);
-        nếu (vị_trí >= n) {
-            json lỗi(trạng_thái, "mảng thiếu dấu ]");
-        };
-        c = nội_dung[vị_trí];
-        nếu (c == "]") {
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            hoàn_tất = đúng;
-        } nếu không {
-            nếu (c != ",") {
-                json lỗi(trạng_thái, "mảng thiếu dấu phẩy");
-            };
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            json bỏ khoảng trắng(trạng_thái);
-        };
-    };
-    trả về kết_quả;
-};
-
-hàm json đọc đối tượng(trạng_thái) {
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    đặt map(trạng_thái, "vị trí", vị_trí + 1);
-    json bỏ khoảng trắng(trạng_thái);
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    kết_quả = {};
-
-    nếu (vị_trí < n) {
-        nếu (nội_dung[vị_trí] == "}") {
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            trả về kết_quả;
-        };
-    };
-
-    hoàn_tất = sai;
-    lặp(vòng = 0; !hoàn_tất; vòng++) {
-        vị_trí = lấy map(trạng_thái, "vị trí", 0);
-        nếu (vị_trí >= n) {
-            json lỗi(trạng_thái, "đối tượng thiếu khóa");
-        };
-        nếu (nội_dung[vị_trí] != "\"") {
-            json lỗi(trạng_thái, "khóa đối tượng phải là chuỗi");
-        };
-        khóa = json đọc chuỗi(trạng_thái);
-        json bỏ khoảng trắng(trạng_thái);
-
-        vị_trí = lấy map(trạng_thái, "vị trí", 0);
-        nếu (vị_trí >= n) {
-            json lỗi(trạng_thái, "đối tượng thiếu dấu hai chấm");
-        };
-        nếu (nội_dung[vị_trí] != ":") {
-            json lỗi(trạng_thái, "đối tượng thiếu dấu hai chấm");
-        };
-        đặt map(trạng_thái, "vị trí", vị_trí + 1);
-        json bỏ khoảng trắng(trạng_thái);
-        đặt map(kết_quả, khóa, json đọc giá trị(trạng_thái));
-        json bỏ khoảng trắng(trạng_thái);
-
-        vị_trí = lấy map(trạng_thái, "vị trí", 0);
-        nếu (vị_trí >= n) {
-            json lỗi(trạng_thái, "đối tượng thiếu dấu }");
-        };
-        c = nội_dung[vị_trí];
-        nếu (c == "}") {
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            hoàn_tất = đúng;
-        } nếu không {
-            nếu (c != ",") {
-                json lỗi(trạng_thái, "đối tượng thiếu dấu phẩy");
-            };
-            đặt map(trạng_thái, "vị trí", vị_trí + 1);
-            json bỏ khoảng trắng(trạng_thái);
-        };
-    };
-    trả về kết_quả;
-};
-
-hàm json đọc giá trị(trạng_thái) {
-    json bỏ khoảng trắng(trạng_thái);
-    nội_dung = lấy map(trạng_thái, "nội dung", "");
-    vị_trí = lấy map(trạng_thái, "vị trí", 0);
-    n = độ dài(nội_dung);
-    nếu (vị_trí >= n) {
-        json lỗi(trạng_thái, "thiếu giá trị");
-    };
-
-    c = nội_dung[vị_trí];
-    nếu (c == "\"") {
-        trả về json đọc chuỗi(trạng_thái);
-    };
-    nếu (c == "{") {
-        trả về json đọc đối tượng(trạng_thái);
-    };
-    nếu (c == "[") {
-        trả về json đọc mảng(trạng_thái);
-    };
-    nếu (c == "t") {
-        nếu (json khớp literal(trạng_thái, "true")) {
-            trả về đúng;
-        };
-        json lỗi(trạng_thái, "literal không hợp lệ");
-    };
-    nếu (c == "f") {
-        nếu (json khớp literal(trạng_thái, "false")) {
+        n = độ dài(nội_dung);
+        m = độ dài(literal);
+        nếu (vị_trí + m > n) {
             trả về sai;
         };
-        json lỗi(trạng_thái, "literal không hợp lệ");
-    };
-    nếu (c == "n") {
-        nếu (json khớp literal(trạng_thái, "null")) {
-            trả về rỗng;
+        nếu (mình.json đoạn nguồn(nội_dung, vị_trí, m) != literal) {
+            trả về sai;
         };
-        json lỗi(trạng_thái, "literal không hợp lệ");
+        đặt map(trạng_thái, "vị trí", vị_trí + m);
+        trả về đúng;
     };
-    nếu (c == "-" || json là chữ số(c)) {
-        trả về json đọc số(trạng_thái);
-    };
-    json lỗi(trạng_thái, "giá trị không hợp lệ");
-};
 
-// Phân tích JSON UTF-8 hợp lệ thành map/list/scalar runtime. JSON true/false ánh xạ sang
-// đúng/sai (1/0), null ánh xạ sang rỗng.
-hàm json phân tích(nội dung) {
-    nếu (loại của(nội dung) != "chuỗi") {
-        ném "json phân tích: nội dung phải là chuỗi";
-    };
-    trạng_thái = {"nội dung": nội dung, "vị trí": 0};
-    kết_quả = json đọc giá trị(trạng_thái);
-    json bỏ khoảng trắng(trạng_thái);
-    nếu (lấy map(trạng_thái, "vị trí", 0) != độ dài(nội dung)) {
-        json lỗi(trạng_thái, "còn dữ liệu sau giá trị JSON");
-    };
-    trả về kết_quả;
-};
+    hàm riêng tư json đọc số(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        bắt_đầu = vị_trí;
+        số_thực = sai;
 
-// Tuần tự map/list/tuple/scalar runtime thành JSON UTF-8 hợp lệ.
-// Khóa object được ghi theo thứ tự từ điển để output xác định giữa các nền tảng.
-hàm json đang hoạt động(đang_xử_lý, giá trị) {
-    lặp(i = 0; i < độ dài(đang_xử_lý); i++) {
-        nếu (đang_xử_lý[i] == giá trị) {
-            trả về đúng;
+        nếu (nội_dung[vị_trí] == "-") {
+            vị_trí = vị_trí + 1;
         };
-    };
-    trả về sai;
-};
-
-hàm json tạo nội bộ(giá trị, đang_xử_lý) {
-    kiểu = loại của(giá trị);
-
-    nếu (kiểu == "số nguyên") {
-        trả về thành chuỗi(giá trị);
-    };
-    nếu (kiểu == "số thực") {
-        raw = thành chuỗi(giá trị);
-        kiểm_tra = chuỗi thường(raw);
-        nếu (kiểm_tra == "nan" || kiểm_tra == "inf" || kiểm_tra == "-inf" ||
-            kiểm_tra == "infinity" || kiểm_tra == "-infinity") {
-            ném "json tạo: JSON không hỗ trợ NaN hoặc vô cực";
+        nếu (vị_trí >= n) {
+            đặt map(trạng_thái, "vị trí", vị_trí);
+            mình.json lỗi(trạng_thái, "số thiếu chữ số");
         };
-        trả về raw;
-    };
-    nếu (kiểu == "chuỗi") {
-        trả về json chuỗi(giá trị);
-    };
-    nếu (kiểu == "rỗng") {
-        trả về "null";
-    };
-    nếu (kiểu == "lớp" || kiểu == "đối tượng" || kiểu == "hàm") {
-        ném "json tạo: không hỗ trợ lớp hoặc đối tượng runtime";
-    };
 
-    nếu (kiểu != "danh sách" && kiểu != "tuple" && kiểu != "từ điển") {
-        ném "json tạo: không hỗ trợ lớp hoặc đối tượng runtime";
-    };
-    nếu (json đang hoạt động(đang_xử_lý, giá trị)) {
-        ném "json tạo: phát hiện collection tự tham chiếu";
-    };
-    thêm(đang_xử_lý, giá trị);
-
-    kết_quả = "";
-    nếu (kiểu == "danh sách" || kiểu == "tuple") {
-        kết_quả = "[";
-        lặp(i = 0; i < độ dài(giá trị); i++) {
-            nếu (i > 0) {
-                kết_quả = kết_quả + ",";
+        nếu (nội_dung[vị_trí] == "0") {
+            vị_trí = vị_trí + 1;
+        } hoặc {
+            nếu (nội_dung[vị_trí] < "1" || nội_dung[vị_trí] > "9") {
+                đặt map(trạng_thái, "vị trí", vị_trí);
+                mình.json lỗi(trạng_thái, "số không hợp lệ");
             };
-            kết_quả = kết_quả + json tạo nội bộ(giá trị[i], đang_xử_lý);
-        };
-        kết_quả = kết_quả + "]";
-    } nếu không {
-        khóa = khóa map(giá trị);
-        kết_quả = "{";
-        lặp(i = 0; i < độ dài(khóa); i++) {
-            nếu (i > 0) {
-                kết_quả = kết_quả + ",";
+            đang_đọc = đúng;
+            lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
+                nếu (mình.json là chữ số(nội_dung[vị_trí])) {
+                    vị_trí = vị_trí + 1;
+                } hoặc {
+                    đang_đọc = sai;
+                };
             };
-            tên = khóa[i];
-            kết_quả = kết_quả + json chuỗi(tên) + ":" +
-                json tạo nội bộ(lấy map(giá trị, tên, rỗng), đang_xử_lý);
         };
-        kết_quả = kết_quả + "}";
+
+        nếu (vị_trí < n) {
+            nếu (nội_dung[vị_trí] == ".") {
+                số_thực = đúng;
+                vị_trí = vị_trí + 1;
+                nếu (vị_trí >= n) {
+                    đặt map(trạng_thái, "vị trí", vị_trí);
+                    mình.json lỗi(trạng_thái, "phần thập phân thiếu chữ số");
+                };
+                nếu (!mình.json là chữ số(nội_dung[vị_trí])) {
+                    đặt map(trạng_thái, "vị trí", vị_trí);
+                    mình.json lỗi(trạng_thái, "phần thập phân thiếu chữ số");
+                };
+                đang_đọc = đúng;
+                lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
+                    nếu (mình.json là chữ số(nội_dung[vị_trí])) {
+                        vị_trí = vị_trí + 1;
+                    } hoặc {
+                        đang_đọc = sai;
+                    };
+                };
+            };
+        };
+
+        nếu (vị_trí < n) {
+            nếu (nội_dung[vị_trí] == "e" || nội_dung[vị_trí] == "E") {
+                số_thực = đúng;
+                vị_trí = vị_trí + 1;
+                nếu (vị_trí < n) {
+                    nếu (nội_dung[vị_trí] == "+" || nội_dung[vị_trí] == "-") {
+                        vị_trí = vị_trí + 1;
+                    };
+                };
+                nếu (vị_trí >= n) {
+                    đặt map(trạng_thái, "vị trí", vị_trí);
+                    mình.json lỗi(trạng_thái, "số mũ thiếu chữ số");
+                };
+                nếu (!mình.json là chữ số(nội_dung[vị_trí])) {
+                    đặt map(trạng_thái, "vị trí", vị_trí);
+                    mình.json lỗi(trạng_thái, "số mũ thiếu chữ số");
+                };
+                đang_đọc = đúng;
+                lặp(vòng = 0; vị_trí < n && đang_đọc; vòng++) {
+                    nếu (mình.json là chữ số(nội_dung[vị_trí])) {
+                        vị_trí = vị_trí + 1;
+                    } hoặc {
+                        đang_đọc = sai;
+                    };
+                };
+            };
+        };
+
+        đặt map(trạng_thái, "vị trí", vị_trí);
+        văn_bản = mình.json đoạn nguồn(nội_dung, bắt_đầu, vị_trí - bắt_đầu);
+        nếu (số_thực) {
+            trả về thành số thực(văn_bản);
+        };
+        // Opcode/slot/count của artifact đều là i32. Parse trực tiếp để không
+        // chuyển hàng chục nghìn số nguyên qua binary64 rồi lại đổi về i32.
+        // JSON integer ngoài biên i32 giữ cách biểu diễn số thực hiện hành.
+        thử { trả về thành số nguyên(văn_bản); }
+        bắt lỗi(e) { };
+        kết_quả_số = thành số thực(văn_bản);
+        nếu (kết_quả_số >= -2147483648.0 && kết_quả_số <= 2147483647.0) {
+            trả về thành số nguyên(kết_quả_số);
+        };
+        trả về kết_quả_số;
     };
 
-    xóa tại(đang_xử_lý, độ dài(đang_xử_lý) - 1);
-    trả về kết_quả;
+    hàm riêng tư json đọc mảng(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        đặt map(trạng_thái, "vị trí", vị_trí + 1);
+        mình.json bỏ khoảng trắng(trạng_thái);
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        kết_quả = [];
+
+        nếu (vị_trí < n) {
+            nếu (nội_dung[vị_trí] == "]") {
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                trả về kết_quả;
+            };
+        };
+
+        hoàn_tất = sai;
+        lặp(vòng = 0; !hoàn_tất; vòng++) {
+            thêm(kết_quả, mình.json đọc giá trị(trạng_thái));
+            mình.json bỏ khoảng trắng(trạng_thái);
+            vị_trí = lấy map(trạng_thái, "vị trí", 0);
+            nếu (vị_trí >= n) {
+                mình.json lỗi(trạng_thái, "mảng thiếu dấu ]");
+            };
+            c = nội_dung[vị_trí];
+            nếu (c == "]") {
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                hoàn_tất = đúng;
+            } hoặc {
+                nếu (c != ",") {
+                    mình.json lỗi(trạng_thái, "mảng thiếu dấu phẩy");
+                };
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                mình.json bỏ khoảng trắng(trạng_thái);
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư json đọc đối tượng(trạng_thái) {
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        đặt map(trạng_thái, "vị trí", vị_trí + 1);
+        mình.json bỏ khoảng trắng(trạng_thái);
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        kết_quả = {};
+
+        nếu (vị_trí < n) {
+            nếu (nội_dung[vị_trí] == "}") {
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                trả về kết_quả;
+            };
+        };
+
+        hoàn_tất = sai;
+        lặp(vòng = 0; !hoàn_tất; vòng++) {
+            vị_trí = lấy map(trạng_thái, "vị trí", 0);
+            nếu (vị_trí >= n) {
+                mình.json lỗi(trạng_thái, "đối tượng thiếu khóa");
+            };
+            nếu (nội_dung[vị_trí] != "\"") {
+                mình.json lỗi(trạng_thái, "khóa đối tượng phải là chuỗi");
+            };
+            khóa = mình.json đọc chuỗi(trạng_thái);
+            mình.json bỏ khoảng trắng(trạng_thái);
+
+            vị_trí = lấy map(trạng_thái, "vị trí", 0);
+            nếu (vị_trí >= n) {
+                mình.json lỗi(trạng_thái, "đối tượng thiếu dấu hai chấm");
+            };
+            nếu (nội_dung[vị_trí] != ":") {
+                mình.json lỗi(trạng_thái, "đối tượng thiếu dấu hai chấm");
+            };
+            đặt map(trạng_thái, "vị trí", vị_trí + 1);
+            mình.json bỏ khoảng trắng(trạng_thái);
+            đặt map(kết_quả, khóa, mình.json đọc giá trị(trạng_thái));
+            mình.json bỏ khoảng trắng(trạng_thái);
+
+            vị_trí = lấy map(trạng_thái, "vị trí", 0);
+            nếu (vị_trí >= n) {
+                mình.json lỗi(trạng_thái, "đối tượng thiếu dấu }");
+            };
+            c = nội_dung[vị_trí];
+            nếu (c == "}") {
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                hoàn_tất = đúng;
+            } hoặc {
+                nếu (c != ",") {
+                    mình.json lỗi(trạng_thái, "đối tượng thiếu dấu phẩy");
+                };
+                đặt map(trạng_thái, "vị trí", vị_trí + 1);
+                mình.json bỏ khoảng trắng(trạng_thái);
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư json đọc giá trị(trạng_thái) {
+        mình.json bỏ khoảng trắng(trạng_thái);
+        nội_dung = lấy map(trạng_thái, "nội dung", "");
+        vị_trí = lấy map(trạng_thái, "vị trí", 0);
+        n = độ dài(nội_dung);
+        nếu (vị_trí >= n) {
+            mình.json lỗi(trạng_thái, "thiếu giá trị");
+        };
+
+        c = nội_dung[vị_trí];
+        nếu (c == "\"") {
+            trả về mình.json đọc chuỗi(trạng_thái);
+        };
+        nếu (c == "{") {
+            trả về mình.json đọc đối tượng(trạng_thái);
+        };
+        nếu (c == "[") {
+            trả về mình.json đọc mảng(trạng_thái);
+        };
+        nếu (c == "t") {
+            nếu (mình.json khớp literal(trạng_thái, "true")) {
+                trả về đúng;
+            };
+            mình.json lỗi(trạng_thái, "literal không hợp lệ");
+        };
+        nếu (c == "f") {
+            nếu (mình.json khớp literal(trạng_thái, "false")) {
+                trả về sai;
+            };
+            mình.json lỗi(trạng_thái, "literal không hợp lệ");
+        };
+        nếu (c == "n") {
+            nếu (mình.json khớp literal(trạng_thái, "null")) {
+                trả về rỗng;
+            };
+            mình.json lỗi(trạng_thái, "literal không hợp lệ");
+        };
+        nếu (c == "-" || mình.json là chữ số(c)) {
+            trả về mình.json đọc số(trạng_thái);
+        };
+        mình.json lỗi(trạng_thái, "giá trị không hợp lệ");
+    };
+
+    // Phân tích JSON UTF-8 hợp lệ thành map/list/scalar runtime. JSON true/false ánh xạ sang
+    // đúng/sai (1/0), null ánh xạ sang rỗng.
+    hàm riêng tư json ký tự nguồn(văn_bản) {
+        // Các reader dùng vị trí Unicode. Lập bảng một lần để mỗi lần đọc c[i]
+        // không quét lại prefix UTF-8 của toàn bộ artifact/compiler lớn.
+        bytes = chuoi_bytes_vm(văn_bản);
+        ascii = [];
+        lặp(i = 0; i < 128; i++) { thêm(ascii, chuoi_tu_bytes_vm([i])); };
+        ký_tự = [];
+        vị_trí = 0;
+        lặp(vòng = 0; vị_trí < độ dài(bytes); vòng++) {
+            bước = 1;
+            c = "";
+            nếu (bytes[vị_trí] < 128) {
+                c = ascii[bytes[vị_trí]];
+            } hoặc {
+                bước = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
+                nếu (bước < 1) { ném "json phân tích: UTF-8 không hợp lệ"; };
+                đoạn = [];
+                lặp(j = 0; j < bước; j++) { thêm(đoạn, bytes[vị_trí + j]); };
+                c = chuoi_tu_bytes_vm(đoạn);
+            };
+            thêm(ký_tự, c);
+            vị_trí += bước;
+        };
+        trả về ký_tự;
+    };
+
+    hàm riêng tư json đoạn nguồn(ký_tự, vị_trí, n) {
+        kết_quả = "";
+        lặp(i = 0; i < n; i++) { kết_quả += ký_tự[vị_trí + i]; };
+        trả về kết_quả;
+    };
+
+    hàm công khai json phân tích(nội dung) {
+        nếu (loại của(nội dung) != "chuỗi") {
+            ném "json phân tích: nội dung phải là chuỗi";
+        };
+        trạng_thái = {"nội dung": mình.json ký tự nguồn(nội dung), "vị trí": 0};
+        kết_quả = mình.json đọc giá trị(trạng_thái);
+        mình.json bỏ khoảng trắng(trạng_thái);
+        nếu (lấy map(trạng_thái, "vị trí", 0) != độ dài(nội dung)) {
+            mình.json lỗi(trạng_thái, "còn dữ liệu sau giá trị JSON");
+        };
+        trả về kết_quả;
+    };
+
+    // Tuần tự map/list/tuple/scalar runtime thành JSON UTF-8 hợp lệ.
+    // Khóa object được ghi theo thứ tự từ điển để output xác định giữa các nền tảng.
+    hàm riêng tư json đang hoạt động(đang_xử_lý, giá trị) {
+        lặp(i = 0; i < độ dài(đang_xử_lý); i++) {
+            nếu (đang_xử_lý[i] == giá trị) {
+                trả về đúng;
+            };
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư json tạo nội bộ(giá trị, đang_xử_lý) {
+        kiểu = loại của(giá trị);
+
+        nếu (kiểu == "số nguyên") {
+            trả về thành chuỗi(giá trị);
+        };
+        nếu (kiểu == "số thực") {
+            raw = thành chuỗi(giá trị);
+            kiểm_tra = chuỗi thường(raw);
+            nếu (kiểm_tra == "nan" || kiểm_tra == "inf" || kiểm_tra == "-inf" ||
+                kiểm_tra == "infinity" || kiểm_tra == "-infinity") {
+                ném "json tạo: JSON không hỗ trợ NaN hoặc vô cực";
+            };
+            trả về raw;
+        };
+        nếu (kiểu == "chuỗi") {
+            trả về json chuỗi(giá trị);
+        };
+        nếu (kiểu == "rỗng") {
+            trả về "null";
+        };
+        nếu (kiểu == "lớp" || kiểu == "đối tượng" || kiểu == "hàm") {
+            ném "json tạo: không hỗ trợ lớp hoặc đối tượng runtime";
+        };
+
+        nếu (kiểu != "danh sách" && kiểu != "tuple" && kiểu != "từ điển") {
+            ném "json tạo: không hỗ trợ lớp hoặc đối tượng runtime";
+        };
+        nếu (mình.json đang hoạt động(đang_xử_lý, giá trị)) {
+            ném "json tạo: phát hiện collection tự tham chiếu";
+        };
+        thêm(đang_xử_lý, giá trị);
+
+        kết_quả = "";
+        nếu (kiểu == "danh sách" || kiểu == "tuple") {
+            kết_quả = "[";
+            lặp(i = 0; i < độ dài(giá trị); i++) {
+                nếu (i > 0) {
+                    kết_quả = kết_quả + ",";
+                };
+                kết_quả = kết_quả + mình.json tạo nội bộ(giá trị[i], đang_xử_lý);
+            };
+            kết_quả = kết_quả + "]";
+        } hoặc {
+            khóa = khóa map(giá trị);
+            kết_quả = "{";
+            lặp(i = 0; i < độ dài(khóa); i++) {
+                nếu (i > 0) {
+                    kết_quả = kết_quả + ",";
+                };
+                tên = khóa[i];
+                kết_quả = kết_quả + json chuỗi(tên) + ":" +
+                    mình.json tạo nội bộ(lấy map(giá trị, tên, rỗng), đang_xử_lý);
+            };
+            kết_quả = kết_quả + "}";
+        };
+
+        xóa tại(đang_xử_lý, độ dài(đang_xử_lý) - 1);
+        trả về kết_quả;
+    };
+
+    hàm công khai json tạo(giá trị) {
+        trả về mình.json tạo nội bộ(giá trị, []);
+    };
 };
 
-hàm json tạo(giá trị) {
-    trả về json tạo nội bộ(giá trị, []);
+hàm công khai json phân tích(nội dung) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json phân tích(nội dung);
 };
 
-// Ghi chú hàm: tạo một property JSON có giá trị chuỗi.
-hàm json thuộc tính chuỗi(khóa, giá trị) {
-    trả về json chuỗi(khóa) + ":" + json chuỗi(giá trị);
+// Tài liệu giữ kết quả đã parse, nạp lỗi không làm mất tài liệu trước đó.
+lớp công khai Tài Liệu JSON {
+    hàm công khai khởi tạo(văn_bản) { mình.nạp(văn_bản); };
+    hàm công khai nạp(văn_bản) {
+        mới = json phân tích(văn_bản);
+        mình.dữ_liệu = mới;
+        trả về mình;
+    };
+    hàm công khai giá trị() { trả về mình.dữ_liệu; };
+    hàm công khai văn bản() { trả về json tạo(mình.dữ_liệu); };
+    hàm công khai lấy(khóa, mặc_định = rỗng) {
+        nếu (loai_cua(mình.dữ_liệu) != "từ điển") { ném "json: tài liệu không phải đối tượng"; };
+        trả về lấy map(mình.dữ_liệu, khóa, mặc_định);
+    };
 };
 
-// Ghi chú hàm: tạo một property JSON với giá trị raw đã hợp lệ.
-hàm json thuộc tính thô(khóa, giá trịRaw) {
-    trả về json chuỗi(khóa) + ":" + giá trịRaw;
+hàm công khai json tạo(giá trị) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json tạo(giá trị);
 };
 
-// Ghi chú hàm: tạo object JSON rỗng.
-hàm json đối tượng rỗng() {
-    trả về "{}";
+hàm công khai json thuộc tính chuỗi(khóa, giá trị) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json thuộc tính chuỗi(khóa, giá trị);
 };
 
-// Ghi chú hàm: tạo object JSON một property chuỗi.
-hàm json đối tượng một chuỗi(khóa, giá trị) {
-    trả về "{" + json thuộc tính chuỗi(khóa, giá trị) + "}";
+hàm công khai json thuộc tính thô(khóa, giá trịRaw) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json thuộc tính thô(khóa, giá trịRaw);
 };
 
-// Ghi chú hàm: tạo object JSON hai property chuỗi.
-hàm json đối tượng hai chuỗi(khóa một, giá trị một, khóa hai, giá trị hai) {
-    trả về "{" + json thuộc tính chuỗi(khóa một, giá trị một) + "," + json thuộc tính chuỗi(khóa hai, giá trị hai) + "}";
+hàm công khai json đối tượng rỗng() {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json đối tượng rỗng();
+};
+
+hàm công khai json đối tượng một chuỗi(khóa, giá trị) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json đối tượng một chuỗi(khóa, giá trị);
+};
+
+hàm công khai json đối tượng hai chuỗi(khóa một, giá trị một, khóa hai, giá trị hai) {
+    __vpp_adapter = Xử Lý Nội Bộ Json();
+    trả về __vpp_adapter.json đối tượng hai chuỗi(khóa một, giá trị một, khóa hai, giá trị hai);
 };

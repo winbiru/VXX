@@ -273,22 +273,13 @@ static bool executeVmPrimitive(Opcode opcode,
             return vietvm::helpers::handleNativeCollectionFunction(opcode, args, result, err);
         case OP_VM_TYPE_OF:
         case OP_VM_IDENTITY_HASH:
-        case OP_VM_DUONG_DAN_TON_TAI:
-        case OP_VM_LA_TEP:
-        case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
-        case OP_VM_LA_THU_MUC:
-        case OP_VM_LIET_KE_THU_MUC:
-        case OP_VM_TAO_THU_MUC:
         case OP_VM_TEN_NEN_TANG:
-        case OP_VM_XOA_DUONG_DAN:
             return vietvm::helpers::handleNativeFoundationFunction(opcode, args, result, err);
-        case OP_VM_DNS_PHAN_GIAI:
         case OP_VM_SOCKET_CHAP_NHAN:
         case OP_VM_SOCKET_DAT_TIMEOUT:
         case OP_VM_SOCKET_DONG:
         case OP_VM_SOCKET_GUI:
         case OP_VM_SOCKET_NHAN:
-        case OP_VM_SOCKET_PHAN_GIAI:
         case OP_VM_SOCKET_TCP_LANG_NGHE:
         case OP_VM_SOCKET_TCP_MO:
         case OP_VM_SOCKET_TLS_NANG_CAP:
@@ -333,6 +324,8 @@ static bool executeVmPrimitive(Opcode opcode,
                 vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_BIEN_DICH_PHAN_TICH:
             return vietvm::helpers::compilerAnalyzePrimitive(args, result, err);
+        case OP_VM_BYTECODE_CHAY:
+            return vietvm::helpers::linkedBytecodeRunPrimitive(args, result, err);
         case OP_VM_KICH_BAN_CHAY:
             return vietvm::helpers::embeddedVmRunPrimitive(args, result, err);
         case OP_VM_TUPLE_FROM_LIST:
@@ -774,6 +767,7 @@ void VM::trimExecutionCapacity() {
     for (auto &frame : callStack) {
         trimVector(frame.args);
         trimVector(frame.localsVec);
+        trimVector(frame.localsPresent);
     }
 
     const std::size_t buckets = variables.bucket_count();
@@ -891,11 +885,7 @@ void VM::runJitCompiled() {
                         if (!callStack.empty()) {
                             CallFrame &frame = callStack.back();
                             if (frame.localsIndexed) {
-                                if (id >= 0 && id >= static_cast<int>(frame.localsVec.size())) {
-                                    frame.localsVec.resize(id + 1, make_int_value(0));
-                                } else if (id >= 0) {
-                                    frame.localsVec[id] = make_int_value(0);
-                                }
+                                frame.setIndexedLocal(id, make_int_value(0));
                             } else {
                                 frame.localsMap[id] = make_int_value(0);
                             }
@@ -916,7 +906,7 @@ void VM::runJitCompiled() {
                                 return;
                             }
                             if (frame.localsIndexed) {
-                                if (id >= 0 && id < static_cast<int>(frame.localsVec.size())) {
+                                if (frame.hasIndexedLocal(id)) {
                                     stack.push_back(frame.localsVec[id]);
                                     return;
                                 }
@@ -1036,6 +1026,131 @@ void VM::runJitCompiled() {
     jitPrograms_.clear();
 }
 
+// Execute pure integer-expression regions as AArch64 instructions. The runtime
+// still owns call frames, GC, exceptions, and all remaining bytecode.
+void VM::runMachineCompiled() {
+    if (!vietvm::native::MachineExpression::supported()) {
+        throw std::runtime_error("VPP_ENABLE_MACHINE_JIT requires macOS/Linux arm64 or Linux/Windows x86-64");
+    }
+    machinePrograms_.clear();
+    machineBinaryOps_.clear();
+    machineLeafFunctions_.clear();
+    machineCallBundle_.reset();
+    machineConditionalBranch_.reset();
+    machineJitInstructionCount_ = 0;
+    machineJitRegionCount_ = 0;
+
+    auto compile = [this](const std::vector<Instruction> &code) {
+        auto &regions = machinePrograms_[&code];
+        std::vector<bool> entryPoints(code.size(), false);
+        const auto markEntry = [&](int target) {
+            if (target >= 0 && static_cast<std::size_t>(target) < code.size()) {
+                entryPoints[static_cast<std::size_t>(target)] = true;
+            }
+        };
+        for (std::size_t i = 0; i < code.size(); ++i) {
+            const Instruction &inst = code[i];
+            switch (inst.op) {
+                case OP_JUMP:
+                case OP_JUMP_IF_FALSE:
+                case OP_THU:
+                case OP_THU_KET_THUC:
+                    markEntry(inst.operand);
+                    break;
+                case OP_THOAT:
+                    if (inst.operandIndex < 0) markEntry(inst.operand);
+                    break;
+                case OP_CHON:
+                    if (inst.operand != 0) markEntry(inst.operand);
+                    break;
+                case OP_CA:
+                case OP_MAC_DINH:
+                    if (inst.operandValue != 0) markEntry(inst.operandValue);
+                    break;
+                case OP_BO_QUA:
+                    // Match the enclosing loop's update, skipping future nested loops.
+                    {
+                    int nested = 0;
+                    for (std::size_t next = i + 1; next < code.size(); ++next) {
+                        if (code[next].op == OP_LAP) ++nested;
+                        if (code[next].op == OP_CAP_NHAT) {
+                            if (nested == 0) { entryPoints[next] = true; break; }
+                            --nested;
+                        }
+                    }
+                    }
+                    break;
+                default: break;
+            }
+        }
+        for (std::size_t index = 0; index < code.size();) {
+            auto region = vietvm::native::MachineExpression::tryCompile(
+                code, index, entryPoints);
+            if (!region) {
+                ++index;
+                continue;
+            }
+            const std::size_t length = region->instructionCount();
+            regions.emplace(index, std::move(region));
+            index += length;
+        }
+    };
+    try {
+        for (int op : {OP_CONG, OP_TRU, OP_NHAN, OP_Logic_VA, OP_Logic_HOAC,
+                       OP_SO_SANH_BANG,
+                       OP_KHAC_BANG, OP_LON_HON, OP_NHO_HON,
+                       OP_LON_HON_HOAC_BANG, OP_NHO_HON_HOAC_BANG}) {
+            machineBinaryOps_.emplace(op,
+                vietvm::native::MachineExpression::tryCompileBinary(op));
+        }
+        machineConditionalBranch_ =
+            vietvm::native::MachineExpression::tryCompileConditionalBranch();
+        compile(bytecode);
+        machineCallBundle_ =
+            vietvm::native::MachineExpression::tryCompileCallBundle(hamBytecodeMap);
+        for (const auto &entry : hamBytecodeMap) {
+            compile(entry.second);
+            for (int argc = 0; argc <= 2; ++argc) {
+                auto leaf = vietvm::native::MachineExpression::tryCompileLeaf(
+                    entry.second, argc);
+                if (leaf) {
+                    machineLeafFunctions_.emplace(entry.first, std::move(leaf));
+                    break;
+                }
+            }
+        }
+        machineJitActive_ = true;
+        runInterpreterLoop();
+    } catch (...) {
+        machineJitActive_ = false;
+        machinePrograms_.clear();
+        machineBinaryOps_.clear();
+        machineLeafFunctions_.clear();
+        machineCallBundle_.reset();
+        machineConditionalBranch_.reset();
+        throw;
+    }
+    machineJitActive_ = false;
+    machinePrograms_.clear();
+    machineBinaryOps_.clear();
+    machineLeafFunctions_.clear();
+    machineCallBundle_.reset();
+    machineConditionalBranch_.reset();
+    if (vietvm::helpers::hasEnvVar("VPP_MACHINE_JIT_STATS")) {
+        std::cerr << "machine-jit: executed " << machineJitRegionCount_
+                  << " regions / " << machineJitInstructionCount_
+                  << " bytecode instructions as "
+#if defined(__aarch64__)
+                  << "AArch64"
+#elif defined(__x86_64__) || defined(_M_X64)
+                  << "x86-64"
+#else
+                  << "unsupported-architecture"
+#endif
+                  << " machine code\n";
+    }
+}
+
 // Suy ra biên arity từ bytecode parameter binding. `operandValue` của OP_PARAM/
 // OP_PARAM_MAC_DINH là chỉ số đối số nguồn; receiver ngầm dùng -1 nên không tính.
 struct RuntimeFunctionArity {
@@ -1101,7 +1216,7 @@ CellHandle VM::captureCellForSlot(int varId) {
         StackValue current = make_int_value(0);
         bool found = false;
         if (frame.localsIndexed) {
-            if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
+            if (frame.hasIndexedLocal(varId)) {
                 current = frame.localsVec[varId];
                 found = true;
             }
@@ -1273,6 +1388,43 @@ void VM::invokeFunction(int argc,
                 targetName, argc, arity.minimum, arity.maximum));
     }
 
+    // Invoke verified, side-effect-free integer functions as AArch64 code.
+    // Nested static calls use real BL instructions in a single code bundle.
+    // Acyclic graph depth must fit the VM's remaining call-depth budget;
+    // otherwise interpreter frames produce the original boundary diagnostic.
+    // Overflow has no observable side effects and replays original bytecode.
+    if (machineJitActive_ && op == OP_GOI && receiver == nullptr &&
+        methodOwnerClass == nullptr && closure == nullptr &&
+        returnMode == CallReturnMode::Value) {
+        if ((argc == 0 || std::holds_alternative<int>(args[0])) &&
+            (argc < 2 || std::holds_alternative<int>(args[1]))) {
+            const int arg0 = argc > 0 ? std::get<int>(args[0]) : 0;
+            const int arg1 = argc > 1 ? std::get<int>(args[1]) : 0;
+            if (machineCallBundle_ &&
+                machineCallBundle_->hasNativeCalls(it->first) &&
+                machineCallBundle_->nativeCallDepth(it->first) <=
+                    maxCallDepth - callDepthFromRoot) {
+                if (const auto result = machineCallBundle_->executeNativeCall(
+                        it->first, arg0, arg1)) {
+                    stack.push_back(make_int_value(*result));
+                    machineJitInstructionCount_ +=
+                        machineCallBundle_->nativeCallInstructionCount(it->first);
+                    ++machineJitRegionCount_;
+                    return;
+                }
+            }
+            const auto leaf = machineLeafFunctions_.find(it->first);
+            if (leaf != machineLeafFunctions_.end()) {
+                if (const auto result = leaf->second->executeLeaf(arg0, arg1)) {
+                    stack.push_back(make_int_value(*result));
+                    machineJitInstructionCount_ += leaf->second->instructionCount();
+                    ++machineJitRegionCount_;
+                    return;
+                }
+            }
+        }
+    }
+
     CallFrame frame;
     frame.functionName = runtimeCallTargetName(
         hamIdOrName, stringPool, functionTableByNameIndex,
@@ -1280,6 +1432,8 @@ void VM::invokeFunction(int argc,
     frame.args = std::move(args);
     frame.receiver = std::move(receiver);
     frame.methodOwnerClass = std::move(methodOwnerClass);
+    if (closure != nullptr && closure->methodOwnerClass != nullptr)
+        frame.methodOwnerClass = closure->methodOwnerClass;
     frame.localsIndexed = true;
     frame.returnPc = curPc + 1;
     if (closure != nullptr) frame.capturedCells = closure->captures;
@@ -1520,7 +1674,9 @@ StackValue VM::runWorkerCallable(const StackValue &callable,
     }
 
     if (!executionStack.empty()) {
-        if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit) ||
+        if (vietvm::helpers::hasEnvVar("VPP_ENABLE_MACHINE_JIT")) {
+            runMachineCompiled();
+        } else if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit) ||
             vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
             runJitCompiled();
         } else {
@@ -1798,7 +1954,28 @@ bool VM::dispatchRegisteredIntrinsic(
     StackValue &result,
     std::string &err,
     bool &runtimeFailure) {
-#if !defined(_WIN32)
+#if defined(_WIN32)
+    // Windows filesystem and DNS policy now live in the V++ stdlib. Keep
+    // bytecode descriptors for a stable migration diagnostic only.
+    switch (intrinsic.opcode) {
+        case OP_VM_DNS_PHAN_GIAI:
+        case OP_VM_SOCKET_PHAN_GIAI:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy DNS opcode is disabled; use gói/mạng/*.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        case OP_VM_DUONG_DAN_TON_TAI:
+        case OP_VM_LA_TEP:
+        case OP_VM_LA_THU_MUC:
+        case OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET:
+        case OP_VM_LIET_KE_THU_MUC:
+        case OP_VM_TAO_THU_MUC:
+        case OP_VM_XOA_DUONG_DAN:
+            throw vietvm::runtime::RuntimeError(
+                "System FFI: legacy filesystem opcode is disabled; use gói/nhập xuất/*.vi",
+                vietvm::runtime::RuntimeErrorKind::CallBoundary);
+        default: break;
+    }
+#else
     // POSIX System algorithms now live in the V++ stdlib and use typed FFI.
     // Reject old OS opcodes even without strict testing enabled, since their
     // C++ implementations no longer ship on POSIX. Both legacy calls by name
@@ -1957,6 +2134,7 @@ void VM::executeValueOpcode(const Instruction& instr) {
 
             ClosureHandle closure = std::make_shared<vietvm::runtime::RuntimeClosure>();
             closure->functionId = instr.operand;
+            if (!callStack.empty()) closure->methodOwnerClass = callStack.back().methodOwnerClass;
             for (int slot : captureSlots) {
                 closure->captures[slot] = captureCellForSlot(slot);
             }
@@ -2449,8 +2627,18 @@ void VM::executeObjectOpcode(const Instruction& instr) {
             const ClassHandle callerClass = callStack.empty()
                 ? nullptr
                 : callStack.back().methodOwnerClass;
-            if (!canAccessRuntimeMethod(
-                    method->visibility, callerClass, method->owner)) {
+            bool accessible = canAccessRuntimeMethod(method->visibility, callerClass, method->owner);
+            // A base method may dispatch its protected virtual hook to an override.
+            // A new protected member introduced only by the subclass stays hidden.
+            if (!accessible && callerClass != nullptr && instance != nullptr &&
+                method->visibility == vietvm::runtime::RuntimeMemberVisibility::Protected &&
+                vietvm::runtime::isSubclassOf(instance->klass, callerClass) &&
+                vietvm::runtime::isSubclassOf(method->owner, callerClass)) {
+                const auto declared = vietvm::runtime::resolveMethod(callerClass, methodName);
+                accessible = declared.has_value() && canAccessRuntimeMethod(
+                    declared->visibility, callerClass, declared->owner);
+            }
+            if (!accessible) {
                 throw runtime_error_op(
                     runtimeMethodAccessMessage(method->visibility, methodName),
                     instr.op, pc,
@@ -2476,11 +2664,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             if (!callStack.empty()) {
                 CallFrame &frame = callStack.back();
                 if (frame.localsIndexed) {
-                    if (varId >= 0 && varId >= static_cast<int>(frame.localsVec.size())) {
-                        frame.localsVec.resize(varId + 1, make_int_value(0));
-                    } else if (varId >= 0) {
-                        frame.localsVec[varId] = make_int_value(0);
-                    }
+                    frame.setIndexedLocal(varId, make_int_value(0));
                 } else {
                     frame.localsMap[varId] = make_int_value(0);
                 }
@@ -2499,7 +2683,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                     return;
                 }
                 if (frame.localsIndexed) {
-                    if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
+                    if (frame.hasIndexedLocal(varId)) {
                         stack.push_back(frame.localsVec[varId]);
                         return;
                     }
@@ -2551,7 +2735,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                     return;
                 }
                 if (frame.localsIndexed) {
-                    if (varId >= 0 && varId < static_cast<int>(frame.localsVec.size())) {
+                    if (frame.hasIndexedLocal(varId)) {
                         frame.localsVec[varId] = valueVal;
                         return;
                     }
@@ -2560,8 +2744,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                         return;
                     }
                     if (varId >= 0) {
-                        frame.localsVec.resize(varId + 1, make_int_value(0));
-                        frame.localsVec[varId] = valueVal;
+                        frame.setIndexedLocal(varId, valueVal);
                         return;
                     }
                 } else {
@@ -2607,10 +2790,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                     vietvm::runtime::runtimeRequiredArgumentFacts(argIndex));
             }
             if (frame.localsIndexed) {
-                if (localId >= static_cast<int>(frame.localsVec.size())) {
-                    frame.localsVec.resize(localId + 1, make_int_value(0));
-                }
-                frame.localsVec[localId] = value;
+                frame.setIndexedLocal(localId, value);
             } else {
                 frame.localsMap[localId] = value;
             }
@@ -2636,10 +2816,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             }
             CallFrame &frame = callStack.back();
             if (frame.localsIndexed) {
-                if (localId >= static_cast<int>(frame.localsVec.size())) {
-                    frame.localsVec.resize(localId + 1, make_int_value(0));
-                }
-                frame.localsVec[localId] = value;
+                frame.setIndexedLocal(localId, value);
             } else {
                 frame.localsMap[localId] = value;
             }
@@ -2669,7 +2846,7 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                         updated = true;
                     }
                     if (!updated && frame.localsIndexed) {
-                        if (idOrVal >= 0 && idOrVal < static_cast<int>(frame.localsVec.size())) {
+                        if (frame.hasIndexedLocal(idOrVal)) {
                             const int current = as_int(frame.localsVec[idOrVal], instr.op, pc);
                             frame.localsVec[idOrVal] = make_int_value(current + delta);
                             pushResult(current + delta);
@@ -2897,10 +3074,26 @@ void VM::executeLoopControlOpcode(const Instruction& instr) {
     }
     size_t scanPc = pc + 1;
     const auto &code = currentBytecode();
+    int nestedLoops = 0;
+    int skippedBlocks = 0;
+    int closeBlocks = 0;
     while (scanPc < code.size()) {
+        if (code[scanPc].op == OP_LAP) ++nestedLoops;
+        if (code[scanPc].op == OP_MO_KHOI) ++skippedBlocks;
+        if (code[scanPc].op == OP_DONG_KHOI) {
+            if (skippedBlocks > 0) --skippedBlocks;
+            else ++closeBlocks;
+        }
         if (code[scanPc].op == OP_CAP_NHAT) {
-            pc = scanPc;
-            return;
+            if (nestedLoops == 0) {
+                while (closeBlocks-- > 0 && !blockStack.empty()) {
+                    blockStack.pop_back();
+                    if (blockDepth > 0) --blockDepth;
+                }
+                pc = scanPc;
+                return;
+            }
+            --nestedLoops;
         }
         ++scanPc;
     }
@@ -2959,10 +3152,7 @@ bool VM::executeExceptionOpcode(const Instruction& instr) {
                     if (captured != frame.capturedCells.end() && captured->second != nullptr) {
                         captured->second->value = std::move(errVal);
                     } else if (frame.localsIndexed) {
-                        if (errVarId >= static_cast<int>(frame.localsVec.size())) {
-                            frame.localsVec.resize(errVarId + 1, make_int_value(0));
-                        }
-                        frame.localsVec[errVarId] = std::move(errVal);
+                        frame.setIndexedLocal(errVarId, std::move(errVal));
                     } else {
                         frame.localsMap[errVarId] = std::move(errVal);
                     }
@@ -3079,6 +3269,10 @@ void VM::run() {
         }
     }
 
+    if (vietvm::helpers::hasEnvVar("VPP_ENABLE_MACHINE_JIT")) {
+        runMachineCompiled();
+        return;
+    }
     if (vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVppEnableJit) ||
         vietvm::helpers::hasEnvVar(vietvm::constants::kEnvVietvmEnableJit)) {
         runJitCompiled();
@@ -3129,6 +3323,67 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
         const Instruction &instr = code[pc];
         try {
+            if (machineJitActive_) {
+                if (instr.op == OP_JUMP_IF_FALSE && machineConditionalBranch_ &&
+                    !stack.empty() && std::holds_alternative<int>(stack.back())) {
+                    const int condition = std::get<int>(stack.back());
+                    // Only taken branches need a valid target in the VM.
+                    // An invalid taken target must reach executeBranchOpcode
+                    // to report the same runtime diagnostic as the interpreter.
+                    if (condition != 0 ||
+                        (instr.operand >= 0 &&
+                         static_cast<std::size_t>(instr.operand) < code.size())) {
+                        const std::size_t nextPc = machineConditionalBranch_->executeBranch(
+                            condition, static_cast<std::size_t>(instr.operand), pc + 1);
+                        stack.pop_back();
+                        pc = nextPc;
+                        ++machineJitInstructionCount_;
+                        ++machineJitRegionCount_;
+                        continue;
+                    }
+                }
+                const auto program = machinePrograms_.find(&code);
+                if (switchStack.empty() && program != machinePrograms_.end()) {
+                    const auto region = program->second.find(pc);
+                    if (region != program->second.end()) {
+                        const auto &compiled = *region->second;
+                        stack.emplace_back(compiled.execute());
+                        machineJitInstructionCount_ += compiled.instructionCount();
+                        ++machineJitRegionCount_;
+                        executedSinceGc += static_cast<int>(compiled.instructionCount()) - 1;
+                        pc += compiled.instructionCount();
+                        continue;
+                    }
+                }
+                // Dynamic integer operands remain in VM-owned StackValue slots.
+                // Only the checked arithmetic itself runs in generated code.
+                if (stack.size() >= 2 &&
+                    std::holds_alternative<int>(stack.back()) &&
+                    std::holds_alternative<int>(stack[stack.size() - 2])) {
+                    const auto operation = machineBinaryOps_.find(instr.op);
+                    if (operation != machineBinaryOps_.end() && operation->second) {
+                        const std::int64_t left = std::get<int>(stack[stack.size() - 2]);
+                        const std::int64_t right = std::get<int>(stack.back());
+                        const bool arithmetic = instr.op == OP_CONG ||
+                            instr.op == OP_TRU || instr.op == OP_NHAN;
+                        const std::int64_t value = !arithmetic ? 0 :
+                            instr.op == OP_CONG ? left + right :
+                            instr.op == OP_TRU ? left - right : left * right;
+                        if (!arithmetic ||
+                            (value >= std::numeric_limits<int>::min() &&
+                             value <= std::numeric_limits<int>::max())) {
+                            const int nativeResult = operation->second->execute(
+                                static_cast<int>(left), static_cast<int>(right));
+                            stack.pop_back();
+                            stack.back() = make_int_value(nativeResult);
+                            ++machineJitInstructionCount_;
+                            ++machineJitRegionCount_;
+                            ++pc;
+                            continue;
+                        }
+                    }
+                }
+            }
             bool compiled = false;
             if (jitActive_) {
                 const auto program = jitPrograms_.find(&code);
@@ -3163,6 +3418,7 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             }
 
             case OP_VM_BIEN_DICH_PHAN_TICH:
+            case OP_VM_BYTECODE_CHAY:
             case OP_VM_DNS_PHAN_GIAI:
             case OP_VM_DOC_BIEN_MOI_TRUONG:
             case OP_VM_DONG_HO_DIA_PHUONG:

@@ -1,0 +1,24 @@
+nhập gói/bộ sưu tập/chính;
+
+hàm chính() {
+    a = Ngăn Xếp();
+    b = Ngăn Xếp();
+
+    in a.trống();
+    in b.trống();
+    in a.đẩy(10) == 1;
+    in a.đẩy(20) == 2;
+    in a.đỉnh() == 20;
+    in b.đẩy("riêng") == 1;
+    in a.rút() == 20;
+    in a.rút() == 10;
+    in a.số lượng() == 0;
+    in b.đỉnh() == "riêng";
+    có_lỗi_rút = sai;
+    thử { a.rút(); } bắt lỗi (e) { có_lỗi_rút = đúng; };
+    in có_lỗi_rút;
+    có_lỗi_đỉnh = sai;
+    thử { a.đỉnh(); } bắt lỗi (e) { có_lỗi_đỉnh = đúng; };
+    in có_lỗi_đỉnh;
+    in b.số lượng() == 1;
+};

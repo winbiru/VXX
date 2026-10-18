@@ -1,0 +1,66 @@
+// Kiểm chứng chỉ mục AST theo DFS và bộ chạy ca kiểm thử có thống kê.
+nhập gói/biên dịch/cây cú pháp;
+nhập gói/biên dịch/chính;
+nhập gói/kiểm thử/chính;
+
+hàm thân đạt() { trả về 7; };
+hàm thân lỗi() { ném "loi-thu"; };
+
+hàm chính() {
+    cây = [
+        {"loại": "hàm", "tên": "chung", "thành viên": []},
+        {"loại": "lớp", "tên": "A", "thành viên": [
+            {"loại": "hàm", "tên": "chung", "thành viên": []},
+            {"loại": "lớp", "tên": "B", "thành viên": [
+                {"loại": "hàm", "tên": "chung", "thành viên": []}
+            ]}
+        ]}
+    ];
+    chỉ_mục = Bộ Chỉ Mục Khai Báo(cây);
+    tìm = chỉ_mục.tìm("chung");
+    in độ dài(tìm) == 3;
+    in tìm[0]["loại"] == "hàm" && tìm[1]["loại"] == "hàm";
+    in độ dài(chỉ_mục.tìm("không có")) == 0;
+    in độ dài(chỉ_mục.tìm("A")) == 1;
+    thêm(tìm, {"tên": "giả"});
+    in độ dài(chỉ_mục.tìm("chung")) == 3;
+    thêm(cây, {"loại": "hàm", "tên": "chung", "thành viên": []});
+    in độ dài(chỉ_mục.tìm("chung")) == 3;
+    chỉ_mục.làm mới();
+    in độ dài(chỉ_mục.tìm("chung")) == 4;
+    in độ dài(biên dịch tìm khai báo trong cây(cây, "chung")) == 4;
+    lỗi = sai;
+    thử { Bộ Chỉ Mục Khai Báo(2); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    phiên = Bộ Biên Dịch("hàm tính(x) { trả về x; }; hàm chính() {};", ".");
+    in độ dài(phiên.tìm khai báo("tính")) == 1;
+    in độ dài(phiên.tìm khai báo("không có")) == 0;
+    in độ dài(phiên.tìm khai báo("tính")) == 1;
+
+    thành_công = Ca Kiểm Thử(thân đạt);
+    thất_bại = Ca Kiểm Thử(thân lỗi);
+    tiếp = Ca Kiểm Thử(thân đạt);
+    bộ = Bộ Kiểm Thử();
+    bộ.đăng ký("đạt", thành_công);
+    bộ.đăng ký("lỗi", thất_bại);
+    bộ.đăng ký("tiếp", tiếp);
+    báo_cáo = bộ.chạy();
+    in báo_cáo["tổng"] == 3 && báo_cáo["đạt"] == 2 && báo_cáo["lỗi"] == 1;
+    in báo_cáo["kết quả"][0]["giá trị"] == 7;
+    in báo_cáo["kết quả"][1]["lỗi"] == "loi-thu";
+    in báo_cáo["kết quả"][2]["đạt"] == đúng;
+    in thành_công.số lần chạy() == 1 && thất_bại.số lần chạy() == 1;
+    báo_cáo = bộ.chạy();
+    in báo_cáo["tổng"] == 3 && thành_công.số lần chạy() == 2;
+
+    bộ_dừng = Bộ Kiểm Thử(đúng);
+    bộ_dừng.đăng ký("lỗi", thất_bại);
+    bộ_dừng.đăng ký("không chạy", tiếp);
+    báo_cáo = bộ_dừng.chạy();
+    in báo_cáo["tổng"] == 1 && báo_cáo["lỗi"] == 1;
+    in tiếp.số lần chạy() == 2;
+    lỗi = sai;
+    thử { bộ_dừng.đăng ký("", thành_công); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

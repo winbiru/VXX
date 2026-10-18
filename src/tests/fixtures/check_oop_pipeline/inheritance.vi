@@ -1,0 +1,1 @@
+nhập api như a; nhập api như b; lớp Con kế thừa a.Cha triển khai a.Có Giá Trị { hàm khởi tạo(x) { gốc.khởi tạo(x); }; hàm công khai đọc() { trả về gốc.đọc() + 1; }; }; hàm tạo() { trả về [Con(20)]; }; hàm chính() { x = a.Cha(10); y = b.Cha(11); in x.đọc(); in y.đọc(); in tạo()[0].đọc(); };

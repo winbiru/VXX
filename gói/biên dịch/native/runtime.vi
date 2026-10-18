@@ -1,0 +1,1413 @@
+// Native runtime algorithms. Only máy_* operations cross the machine/OS ABI.
+// Arena: counter at 0, input status at 8, 64 byte records at 16 (32 bytes
+// each), 64 file records at 2064 (16 bytes each), scratch at 3104, cache
+// record header at 3200 (16 bytes), digest at 3216 (32 bytes), cache hex
+// at 3248 (65 bytes), linker argv table in dedicated high arena region, wait status
+// at 3360 (4 bytes), Darwin stat scratch at 3376 and 3584 (208 bytes
+// each), payloads at 4096. Pointers in byte
+// records are bound as full-width 64-bit addresses.
+// Handles encode a monotonically increasing generation and a 7-bit slot tag.
+hàm rt_handle(tag) {
+    biến generation = máy_đọc_i32(0);
+    nếu (generation == 0) { generation = 1; };
+    nếu (generation < 1) { trả về -1; };
+    nếu (generation >= 16777215) { trả về -1; };
+    nếu (máy_ghi_i32(0, generation + 1) != 0) { trả về -1; };
+    trả về generation * 128 + tag;
+};
+
+hàm rt_bytes_slot(handle) {
+    nếu (handle <= 0) { trả về -1; };
+    biến slot = handle - máy_chia_i32(handle, 128) * 128;
+    nếu (slot >= 64) { trả về -1; };
+    nếu (máy_đọc_i32(16 + slot * 32) != handle) { trả về -1; };
+    trả về slot;
+};
+
+hàm rt_payload(slot) { trả về 4096 + slot * 1048592; };
+
+hàm rt_bytes_reserve(handle, extra) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    nếu (extra < 0) { trả về -1; };
+    biến record = 16 + slot * 32;
+    biến length = máy_đọc_i32(record + 16);
+    nếu (extra > 1048576 - length) { trả về -1; };
+    biến required = length + extra + 1;
+    biến capacity = máy_đọc_i32(record + 24);
+    lặp (i = 0; capacity < required; i++) {
+        nếu (capacity > 524288) { capacity = 1048577; }
+        hoặc { capacity = capacity * 2; };
+    };
+    trả về máy_ghi_i32(record + 24, capacity);
+};
+
+hàm rt_bytes_new() {
+    lặp (slot = 0; slot < 64; slot++) {
+        biến record = 16 + slot * 32;
+        nếu (máy_đọc_i32(record) == 0) {
+            nếu (máy_gắn_địa_chỉ(record + 8, rt_payload(slot)) != 0) { trả về -1; };
+            biến handle = rt_handle(slot);
+            nếu (handle <= 0) { trả về -1; };
+            máy_ghi_i32(record + 16, 0);
+            máy_ghi_i32(record + 20, 0);
+            máy_ghi_i32(record + 24, 1);
+            máy_ghi_i32(record + 28, 0);
+            máy_ghi_byte(rt_payload(slot), 0);
+            máy_ghi_i32(record, handle);
+            trả về handle;
+        };
+    };
+    trả về -1;
+};
+
+hàm rt_bytes_length(handle) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    trả về máy_đọc_i32(16 + slot * 32 + 16);
+};
+
+hàm rt_bytes_get(handle, index) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    nếu (index < 0) { trả về -1; };
+    nếu (index >= máy_đọc_i32(32 + slot * 32)) { trả về -1; };
+    trả về máy_đọc_byte(rt_payload(slot) + index);
+};
+
+hàm rt_bytes_append(handle, value) {
+    nếu (value < 0) { trả về -1; };
+    nếu (value > 255) { trả về -1; };
+    nếu (rt_bytes_reserve(handle, 1) != 0) { trả về -1; };
+    biến slot = rt_bytes_slot(handle);
+    biến record = 32 + slot * 32;
+    biến length = máy_đọc_i32(record);
+    máy_ghi_byte(rt_payload(slot) + length, value);
+    máy_ghi_byte(rt_payload(slot) + length + 1, 0);
+    trả về máy_ghi_i32(record, length + 1);
+};
+
+hàm rt_bytes_concat(destination, source) {
+    biến src = rt_bytes_slot(source);
+    nếu (src < 0) { trả về -1; };
+    biến count = máy_đọc_i32(32 + src * 32);
+    nếu (rt_bytes_reserve(destination, count) != 0) { trả về -1; };
+    biến dst = rt_bytes_slot(destination);
+    biến length = máy_đọc_i32(32 + dst * 32);
+    lặp (i = 0; i < count; i++) {
+        máy_ghi_byte(rt_payload(dst) + length + i, máy_đọc_byte(rt_payload(src) + i));
+    };
+    máy_ghi_byte(rt_payload(dst) + length + count, 0);
+    trả về máy_ghi_i32(32 + dst * 32, length + count);
+};
+
+hàm rt_bytes_equal(left, right) {
+    biến a = rt_bytes_slot(left);
+    biến b = rt_bytes_slot(right);
+    nếu (a < 0) { trả về -1; };
+    nếu (b < 0) { trả về -1; };
+    biến length = máy_đọc_i32(32 + a * 32);
+    nếu (length != máy_đọc_i32(32 + b * 32)) { trả về 0; };
+    lặp (i = 0; i < length; i++) {
+        nếu (máy_đọc_byte(rt_payload(a) + i) != máy_đọc_byte(rt_payload(b) + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+
+hàm rt_bytes_slice(handle, start, count) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    nếu (start < 0) { trả về -1; };
+    nếu (count < 0) { trả về -1; };
+    biến length = máy_đọc_i32(32 + slot * 32);
+    nếu (start > length) { trả về -1; };
+    nếu (count > length - start) { trả về -1; };
+    biến result = rt_bytes_new();
+    nếu (result <= 0) { trả về -1; };
+    biến dst = rt_bytes_slot(result);
+    nếu (rt_bytes_reserve(result, count) != 0) { rt_bytes_free(result); trả về -1; };
+    lặp (i = 0; i < count; i++) {
+        máy_ghi_byte(rt_payload(dst) + i, máy_đọc_byte(rt_payload(slot) + start + i));
+    };
+    máy_ghi_byte(rt_payload(dst) + count, 0);
+    máy_ghi_i32(32 + dst * 32, count);
+    trả về result;
+};
+
+hàm rt_bytes_find(handle, needle) {
+    biến src = rt_bytes_slot(handle);
+    biến pattern = rt_bytes_slot(needle);
+    nếu (src < 0) { trả về -2; };
+    nếu (pattern < 0) { trả về -2; };
+    biến count = máy_đọc_i32(32 + pattern * 32);
+    biến length = máy_đọc_i32(32 + src * 32);
+    nếu (count == 0) { trả về 0; };
+    lặp (i = 0; i <= length - count; i++) {
+        biến equal = 1;
+        lặp (j = 0; j < count; j++) {
+            nếu (máy_đọc_byte(rt_payload(src) + i + j) != máy_đọc_byte(rt_payload(pattern) + j)) {
+                equal = 0; thoát;
+            };
+        };
+        nếu (equal == 1) { trả về i; };
+    };
+    trả về -1;
+};
+
+hàm rt_bytes_clear(handle) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    máy_ghi_byte(rt_payload(slot), 0);
+    trả về máy_ghi_i32(32 + slot * 32, 0);
+};
+
+hàm rt_bytes_push_i32(handle, value) {
+    nếu (rt_bytes_reserve(handle, 4) != 0) { trả về -1; };
+    biến slot = rt_bytes_slot(handle);
+    biến length = máy_đọc_i32(32 + slot * 32);
+    máy_ghi_i32(rt_payload(slot) + length, value);
+    máy_ghi_byte(rt_payload(slot) + length + 4, 0);
+    trả về máy_ghi_i32(32 + slot * 32, length + 4);
+};
+
+hàm rt_bytes_load_i32(handle, offset) {
+    biến length = rt_bytes_length(handle);
+    nếu (offset < 0) { trả về -1; };
+    nếu (offset > length - 4) { trả về -1; };
+    trả về máy_đọc_i32(rt_payload(rt_bytes_slot(handle)) + offset);
+};
+
+hàm rt_bytes_store_i32(handle, offset, value) {
+    biến length = rt_bytes_length(handle);
+    nếu (offset < 0) { trả về -1; };
+    nếu (offset > length - 4) { trả về -1; };
+    trả về máy_ghi_i32(rt_payload(rt_bytes_slot(handle)) + offset, value);
+};
+
+hàm rt_bytes_free(handle) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    lặp (i = 0; i < 32; i = i + 4) { máy_ghi_i32(16 + slot * 32 + i, 0); };
+    trả về 0;
+};
+
+hàm rt_write_all(fd, offset, length) {
+    biến done = 0;
+    lặp (i = 0; done < length; i++) {
+        biến count = máy_ghi(fd, offset + done, length - done);
+        nếu (count < 0) {
+            nếu (máy_lỗi() == 4) { bỏ qua; };
+            trả về -1;
+        };
+        nếu (count == 0) { trả về -1; };
+        done = done + count;
+    };
+    trả về done;
+};
+
+hàm rt_bytes_print(handle) {
+    biến slot = rt_bytes_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    trả về rt_write_all(1, rt_payload(slot), máy_đọc_i32(32 + slot * 32));
+};
+
+hàm rt_argv(index) {
+    biến length = máy_đối_số_dài(index);
+    nếu (length < 0) { trả về -1; };
+    biến result = rt_bytes_new();
+    nếu (result <= 0) { trả về -1; };
+    nếu (rt_bytes_reserve(result, length) != 0) { rt_bytes_free(result); trả về -1; };
+    biến slot = rt_bytes_slot(result);
+    lặp (i = 0; i < length; i++) { máy_ghi_byte(rt_payload(slot) + i, máy_đối_số_byte(index, i)); };
+    máy_ghi_byte(rt_payload(slot) + length, 0);
+    máy_ghi_i32(32 + slot * 32, length);
+    trả về result;
+};
+
+// Resolve the native library in V++ itself. The machine boundary only copies
+// VPP_HOME / getcwd bytes into an arena buffer; it never returns a pointer as
+// i32. Use the normal V++ file API to check candidate source paths.
+hàm rt_os_path(kind) {
+    biến result = rt_bytes_new();
+    nếu (result <= 0) { trả về -1; };
+    biến slot = rt_bytes_slot(result);
+    biến count = -1;
+    nếu (kind == 0) { count = máy_home(rt_payload(slot)); }
+    hoặc { count = máy_cwd(rt_payload(slot)); };
+    nếu (count <= 0) { rt_bytes_free(result); trả về -1; };
+    nếu (count >= 4096) { rt_bytes_free(result); trả về -1; };
+    nếu (rt_bytes_reserve(result, count) != 0) { rt_bytes_free(result); trả về -1; };
+    máy_ghi_i32(32 + slot * 32, count);
+    trả về result;
+};
+
+hàm rt_runtime_candidate(root, suffix) {
+    biến candidate = rt_bytes_new();
+    nếu (candidate <= 0) { trả về -1; };
+    biến ok = rt_bytes_concat(candidate, root);
+    biến length = rt_bytes_length(root);
+    nếu (length <= 0) { ok = -1; };
+    nếu (ok == 0) {
+        nếu (rt_bytes_get(root, length - 1) != 47) {
+            nếu (rt_bytes_append(candidate, 47) != 0) { ok = -1; };
+        };
+    };
+    nếu (ok == 0) {
+        nếu (rt_bytes_concat(candidate, suffix) != 0) { ok = -1; };
+    };
+    nếu (rt_bytes_length(candidate) >= 4096) { ok = -1; };
+    nếu (ok == 0) {
+        // O_NONBLOCK (Darwin = 4) prevents a malicious FIFO in VPP_HOME
+        // from hanging runtime discovery. Regular files read as usual.
+        biến file = rt_file_open(candidate, 4);
+        nếu (file > 0) {
+            // A directory is not a valid runtime module. Read one byte to
+            // reject non-files before passing the candidate to the loader.
+            biến ch = rt_file_read_byte(file);
+            biến closed = rt_file_close(file);
+            nếu (ch >= 0) {
+                nếu (closed == 0) { trả về candidate; };
+            };
+        };
+    };
+    rt_bytes_free(candidate);
+    trả về -1;
+};
+
+// The caller chooses one of two trusted in-tree runtime files. Keep the
+// same VPP_HOME/ancestor search for the runtime module and linker resources.
+// Return an owned path handle (or -1), never a truncated machine pointer.
+hàm rt_runtime_file_path(kind) {
+    biến suffix = -1;
+    nếu (kind == 0) { suffix = "gói/biên dịch/native/runtime.vi"; }
+    hoặc nếu (kind == 1) { suffix = "scripts/ASM/vpp_aot_primitives_aarch64.S"; }
+    ; // The C implementation is only a legacy Stage 0 fallback.
+    nếu (suffix <= 0) { trả về -1; };
+    biến home = rt_os_path(0);
+    nếu (home > 0) {
+        nếu (rt_bytes_get(home, 0) == 47) {
+            biến result = rt_runtime_candidate(home, suffix);
+            rt_bytes_free(home);
+            nếu (result > 0) { rt_bytes_free(suffix); trả về result; };
+        } hoặc { rt_bytes_free(home); };
+    };
+    biến directory = rt_os_path(1);
+    nếu (directory <= 0) { rt_bytes_free(suffix); trả về -1; };
+    lặp (depth = 0; depth < 128; depth++) {
+        biến candidate = rt_runtime_candidate(directory, suffix);
+        nếu (candidate > 0) {
+            rt_bytes_free(directory);
+            rt_bytes_free(suffix);
+            trả về candidate;
+        };
+        biến last_slash = -1;
+        lặp (i = 0; i < rt_bytes_length(directory); i++) {
+            nếu (rt_bytes_get(directory, i) == 47) { last_slash = i; };
+        };
+        nếu (last_slash <= 0) {
+            nếu (rt_bytes_length(directory) == 1) { thoát; };
+            nếu (rt_bytes_clear(directory) != 0) { thoát; };
+            nếu (rt_bytes_append(directory, 47) != 0) { thoát; };
+        } hoặc {
+            biến parent = rt_bytes_slice(directory, 0, last_slash);
+            nếu (parent <= 0) { thoát; };
+            rt_bytes_free(directory);
+            directory = parent;
+        };
+    };
+    rt_bytes_free(directory);
+    rt_bytes_free(suffix);
+    trả về -1;
+};
+
+hàm rt_runtime_module_path() { trả về rt_runtime_file_path(0); };
+
+// Read the Mach-O symtab within one object of a packed object archive.
+// Values on disk are u32; negative i32 values can never represent a valid
+// offset/length in the bounded (1 MiB) V++ byte arena.
+hàm rt_object_name_matches(archive, offset, available, expected) {
+    biến count = rt_bytes_length(expected);
+    nếu (count < 0) { trả về 0; };
+    nếu (count >= available) { trả về 0; };
+    lặp (i = 0; i < count; i++) {
+        nếu (rt_bytes_get(archive, offset + i) != rt_bytes_get(expected, i)) { trả về 0; };
+    };
+    nếu (rt_bytes_get(archive, offset + count) != 0) { trả về 0; };
+    trả về 1;
+};
+
+hàm rt_object_service_name(archive, offset, available) {
+    biến name = "_vpp_native_cache_read";
+    nếu (name <= 0) { trả về -1; };
+    nếu (rt_object_name_matches(archive, offset, available, name) == 1) {
+        rt_bytes_free(name); trả về 1;
+    };
+    rt_bytes_free(name);
+    name = "_vpp_native_cache_write";
+    nếu (name <= 0) { trả về -1; };
+    nếu (rt_object_name_matches(archive, offset, available, name) == 1) {
+        rt_bytes_free(name); trả về 1;
+    };
+    rt_bytes_free(name);
+    name = "_vpp_native_link_macho";
+    nếu (name <= 0) { trả về -1; };
+    nếu (rt_object_name_matches(archive, offset, available, name) == 1) {
+        rt_bytes_free(name); trả về 1;
+    };
+    rt_bytes_free(name);
+    name = "_vpp_native_link_macho_modules";
+    nếu (name <= 0) { trả về -1; };
+    biến result = rt_object_name_matches(archive, offset, available, name);
+    rt_bytes_free(name);
+    trả về result;
+};
+
+// 1: references compiler services, 0: assembly/OS only, -1: corrupt Mach-O.
+// C supplies the archive handle and the object's byte range. All reads are
+// bounded by the object itself, even when the archive contains later modules.
+hàm rt_object_services(archive, start, length) {
+    biến total = rt_bytes_length(archive);
+    nếu (start < 0) { trả về -1; };
+    nếu (length < 32) { trả về -1; };
+    nếu (total < 0) { trả về -1; };
+    nếu (start > total - length) { trả về -1; };
+    biến commands = rt_bytes_load_i32(archive, start + 16);
+    nếu (commands < 0) { trả về -1; };
+    nếu (commands > máy_chia_i32(length - 32, 8)) { trả về -1; };
+    biến offset = 32;
+    biến needs_services = 0;
+    lặp (command = 0; command < commands; command++) {
+        nếu (offset > length - 8) { trả về -1; };
+        biến kind = rt_bytes_load_i32(archive, start + offset);
+        biến size = rt_bytes_load_i32(archive, start + offset + 4);
+        nếu (size < 8) { trả về -1; };
+        nếu (size > length - offset) { trả về -1; };
+        nếu (kind == 2) {
+            nếu (size < 24) { trả về -1; };
+            biến symbols = rt_bytes_load_i32(archive, start + offset + 8);
+            biến count = rt_bytes_load_i32(archive, start + offset + 12);
+            biến strings = rt_bytes_load_i32(archive, start + offset + 16);
+            biến string_size = rt_bytes_load_i32(archive, start + offset + 20);
+            nếu (symbols < 0) { trả về -1; };
+            nếu (count < 0) { trả về -1; };
+            nếu (strings < 0) { trả về -1; };
+            nếu (string_size < 0) { trả về -1; };
+            nếu (symbols > length) { trả về -1; };
+            nếu (count > máy_chia_i32(length - symbols, 16)) { trả về -1; };
+            nếu (strings > length) { trả về -1; };
+            nếu (string_size > length - strings) { trả về -1; };
+            lặp (i = 0; i < count; i++) {
+                biến symbol = symbols + i * 16;
+                biến type = rt_bytes_get(archive, start + symbol + 4);
+                biến bits = type - máy_chia_i32(type, 16) * 16;
+                nếu (bits >= 2) { bỏ qua; };
+                biến name_offset = rt_bytes_load_i32(archive, start + symbol);
+                nếu (name_offset < 0) { trả về -1; };
+                nếu (name_offset >= string_size) { trả về -1; };
+                biến name_start = start + strings + name_offset;
+                biến available = string_size - name_offset;
+                biến terminated = 0;
+                lặp (j = 0; j < available; j++) {
+                    nếu (rt_bytes_get(archive, name_start + j) == 0) {
+                        terminated = 1; thoát;
+                    };
+                };
+                nếu (terminated == 0) { trả về -1; };
+                biến service = rt_object_service_name(archive, name_start, available);
+                nếu (service < 0) { trả về -1; };
+                nếu (service > 0) { needs_services = 1; };
+            };
+        };
+        offset = offset + size;
+    };
+    trả về needs_services;
+};
+
+// A packed linker archive stores [u32 object length][MH_OBJECT bytes]...
+// Return the validated object length at the prefix, or -1. This function
+// bounds every read by the actual archive and rejects non-ARM64 Mach-O files.
+hàm rt_object_archive_entry(archive, offset) {
+    biến total = rt_bytes_length(archive);
+    nếu (total < 0) { trả về -1; };
+    nếu (offset < 0) { trả về -1; };
+    nếu (offset > total - 4) { trả về -1; };
+    biến length = rt_bytes_load_i32(archive, offset);
+    nếu (length < 232) { trả về -1; };
+    nếu (length > total - offset - 4) { trả về -1; };
+    biến start = offset + 4;
+    // MH_MAGIC_64 (little-endian), CPU_TYPE_ARM64 and MH_OBJECT.
+    nếu (rt_bytes_get(archive, start) != 207) { trả về -1; };
+    nếu (rt_bytes_get(archive, start + 1) != 250) { trả về -1; };
+    nếu (rt_bytes_get(archive, start + 2) != 237) { trả về -1; };
+    nếu (rt_bytes_get(archive, start + 3) != 254) { trả về -1; };
+    nếu (rt_bytes_load_i32(archive, start + 4) != 16777228) { trả về -1; };
+    nếu (rt_bytes_load_i32(archive, start + 12) != 1) { trả về -1; };
+    trả về length;
+};
+
+// Validates the entire archive, including each Mach-O symbol table. The
+// packed result is (count * 2 + needs_compiler_services), or -1 on error.
+// With <= 1 MiB archives and 232-byte minimum objects, this fits in i32.
+hàm rt_object_archive_summary(archive) {
+    biến total = rt_bytes_length(archive);
+    nếu (total < 5) { trả về -1; };
+    biến offset = 0;
+    biến count = 0;
+    biến needs_services = 0;
+    lặp (i = 0; offset < total; i++) {
+        biến length = rt_object_archive_entry(archive, offset);
+        nếu (length < 0) { trả về -1; };
+        biến services = rt_object_services(archive, offset + 4, length);
+        nếu (services < 0) { trả về -1; };
+        nếu (services > 0) { needs_services = 1; };
+        count = count + 1;
+        offset = offset + length + 4;
+    };
+    nếu (count == 0) { trả về -1; };
+    nếu (offset != total) { trả về -1; };
+    trả về count * 2 + needs_services;
+};
+
+// Wrap a single Mach-O object using the same [u32 length][body] wire format
+// as the multi-module linker. Return an owned archive handle or -1. The
+// downstream archive validator checks its Mach-O framing and symbols.
+hàm rt_link_archive_single(object) {
+    biến length = rt_bytes_length(object);
+    nếu (length < 232) { trả về -1; };
+    nếu (length > 1048572) { trả về -1; };
+    biến archive = rt_bytes_new();
+    nếu (archive <= 0) { trả về -1; };
+    nếu (rt_bytes_push_i32(archive, length) != 0) {
+        rt_bytes_free(archive);
+        trả về -1;
+    };
+    nếu (rt_bytes_concat(archive, object) != 0) {
+        rt_bytes_free(archive);
+        trả về -1;
+    };
+    trả về archive;
+};
+
+// Build the mkstemp pathname in V++. index == -1 selects the executable;
+// nonnegative indexes select object files.
+// The destination is a separate reusable bytes handle, with a trailing NUL.
+hàm rt_link_valid_path(handle, maximum) {
+    biến length = rt_bytes_length(handle);
+    nếu (length <= 0) { trả về -1; };
+    nếu (length > maximum) { trả về -1; };
+    lặp (i = 0; i < length; i++) {
+        nếu (rt_bytes_get(handle, i) == 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// Validate the path bytes before the OS borrows their NUL-terminated data.
+// The source is bounded by PATH_MAX; output leaves room for temp suffixes.
+// Filesystem policy (regular-file and same-inode checks) stays at the OS edge.
+hàm rt_link_validate_paths(output, source) {
+    nếu (rt_link_valid_path(output, 4048) != 0) { trả về -1; };
+    nếu (rt_link_valid_path(source, 4096) != 0) { trả về -1; };
+    trả về 0;
+};
+
+// Darwin arm64 stat layout: dev_t at +0 (4 bytes), mode_t at +4
+// (2 bytes), ino_t at +8 (8 bytes). Both stat scratch areas are private
+// to this synchronous linker operation and never carry truncated pointers.
+hàm rt_link_stat_regular(offset) {
+    biến mode = máy_đọc_byte(offset + 4) + máy_đọc_byte(offset + 5) * 256;
+    trả về máy_chia_i32(mode, 4096) == 8;
+};
+
+hàm rt_link_same_identity(first, second) {
+    lặp (i = 0; i < 4; i++) {
+        nếu (máy_đọc_byte(first + i) != máy_đọc_byte(second + i)) { trả về 0; };
+    };
+    lặp (i = 8; i < 16; i++) {
+        nếu (máy_đọc_byte(first + i) != máy_đọc_byte(second + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+
+// Reject a non-regular source, symlink/directory destination and an output
+// that aliases the source inode (including hard links). A missing destination
+// is permitted; any other lstat error fails closed.
+hàm rt_link_validate_files(output, source) {
+    nếu (rt_link_validate_paths(output, source) != 0) { trả về -1; };
+    biến source_slot = rt_bytes_slot(source);
+    biến output_slot = rt_bytes_slot(output);
+    nếu (source_slot < 0) { trả về -1; };
+    nếu (output_slot < 0) { trả về -1; };
+    nếu (máy_stat(rt_payload(source_slot), 3376) != 0) { trả về -1; };
+    nếu (rt_link_stat_regular(3376) != 1) { trả về -1; };
+    nếu (máy_lstat(rt_payload(output_slot), 3584) == 0) {
+        nếu (rt_link_stat_regular(3584) != 1) { trả về -1; };
+        nếu (rt_link_same_identity(3376, 3584) == 1) { trả về -1; };
+    } hoặc {
+        nếu (máy_lỗi() != 2) { trả về -1; }; // ENOENT
+    };
+    trả về 0;
+};
+
+// Only a real, executable regular file is eligible for atomic publication.
+hàm rt_link_executable_ready(temporary) {
+    nếu (rt_link_valid_path(temporary, 4095) != 0) { trả về -1; };
+    biến slot = rt_bytes_slot(temporary);
+    nếu (slot < 0) { trả về -1; };
+    biến path = rt_payload(slot);
+    nếu (máy_stat(path, 3584) != 0) { trả về -1; };
+    nếu (rt_link_stat_regular(3584) != 1) { trả về -1; };
+    nếu (máy_quyền_chạy(path) != 0) { trả về -1; };
+    trả về 0;
+};
+
+hàm rt_link_append_text(destination, text) {
+    nếu (text <= 0) { trả về -1; };
+    biến status = rt_bytes_concat(destination, text);
+    rt_bytes_free(text);
+    trả về status;
+};
+
+hàm rt_link_temporary_path(output, destination, index) {
+    nếu (rt_link_valid_path(output, 4048) != 0) { trả về -1; };
+    nếu (index < -1) { trả về -1; };
+    nếu (index > 1048576) { trả về -1; };
+    nếu (rt_bytes_slot(destination) < 0) { trả về -1; };
+    nếu (output == destination) { trả về -1; };
+    nếu (rt_bytes_clear(destination) != 0) { trả về -1; };
+    nếu (rt_bytes_get(output, 0) == 45) {
+        nếu (rt_link_append_text(destination, "./") != 0) { trả về -1; };
+    };
+    nếu (rt_bytes_concat(destination, output) != 0) { trả về -1; };
+    nếu (index == -1) {
+        nếu (rt_link_append_text(destination, ".vpp-exe-XXXXXX") != 0) { trả về -1; };
+    } hoặc {
+        nếu (rt_link_append_text(destination, ".vpp-module-") != 0) { trả về -1; };
+        biến divisor = 1;
+        lặp (i = 0; máy_chia_i32(index, divisor) >= 10; i++) {
+            divisor = divisor * 10;
+        };
+        biến rest = index;
+        lặp (j = 0; divisor > 0; j++) {
+            biến digit = máy_chia_i32(rest, divisor);
+            nếu (rt_bytes_append(destination, digit + 48) != 0) { trả về -1; };
+            rest = rest - digit * divisor;
+            divisor = máy_chia_i32(divisor, 10);
+        };
+        nếu (rt_link_append_text(destination, "-XXXXXX") != 0) { trả về -1; };
+    };
+    nếu (rt_bytes_length(destination) >= 4096) { trả về -1; };
+    trả về 0;
+};
+
+// The OS fills XXXXXX in-place and returns a descriptor with mode 0600.
+// Validate the full path and suffix before crossing the raw pointer boundary.
+hàm rt_link_temp_open(template) {
+    nếu (rt_link_valid_path(template, 4095) != 0) { trả về -1; };
+    biến length = rt_bytes_length(template);
+    nếu (length < 6) { trả về -1; };
+    lặp (i = length - 6; i < length; i++) {
+        nếu (rt_bytes_get(template, i) != 88) { trả về -1; };
+    };
+    biến slot = rt_bytes_slot(template);
+    nếu (slot < 0) { trả về -1; };
+    trả về máy_tạm_mở(rt_payload(slot));
+};
+
+// Publish only a validated path pair. The caller verifies the executable and
+// retains control of the failure path and temporary-file cleanup.
+hàm rt_link_publish(temporary, output) {
+    nếu (temporary == output) { trả về -1; };
+    nếu (rt_link_valid_path(temporary, 4095) != 0) { trả về -1; };
+    nếu (rt_link_valid_path(output, 4048) != 0) { trả về -1; };
+    biến temp_slot = rt_bytes_slot(temporary);
+    biến out_slot = rt_bytes_slot(output);
+    nếu (temp_slot < 0) { trả về -1; };
+    nếu (out_slot < 0) { trả về -1; };
+    trả về máy_đổi_tên(rt_payload(temp_slot), rt_payload(out_slot));
+};
+
+// V++ builds the full-width argv table in the private linker arena.
+// The machine primitive obtains environ and invokes clang directly;
+// V++ owns the waitpid EINTR retry and successful-exit decision.
+hàm rt_link_spawn_wait() {
+    biến child = máy_khởi_chạy_clang(67113984);
+    nếu (child <= 0) { trả về -1; };
+    lặp (retry = 0; retry < 1000000; retry++) {
+        biến waited = máy_đợi(child, 3360);
+        nếu (waited == child) {
+            nếu (máy_đọc_i32(3360) == 0) { trả về 0; };
+            trả về -1;
+        };
+        nếu (waited != -1) { trả về -1; };
+        nếu (máy_lỗi() != 4) { trả về -1; };
+    };
+    trả về -1;
+};
+
+// The OS boundary creates the temporary descriptor. V++ validates the
+// archive entry and writes all its bytes through the existing EINTR-safe
+// write primitive. Return bytes written or -1 on failure.
+hàm rt_link_write_object(fd, archive, prefix) {
+    nếu (fd < 0) { trả về -1; };
+    biến length = rt_object_archive_entry(archive, prefix);
+    nếu (length < 0) { trả về -1; };
+    biến slot = rt_bytes_slot(archive);
+    nếu (slot < 0) { trả về -1; };
+    trả về rt_write_all(fd, rt_payload(slot) + prefix + 4, length);
+};
+
+// Cache record framing is owned by V++. The OS boundary owns SHA-256, file
+// descriptors and atomic rename. C reads/writes the first 16 header bytes
+// through the dedicated arena scratch range [3200, 3216); the remaining 32
+// bytes hold the SHA-256 digest of header[0:16], key and payload.
+// This fixed scratch slot is used synchronously by the native compiler.
+hàm rt_cache_header_magic(write) {
+    biến magic = "VPPCACH1";
+    nếu (magic <= 0) { trả về -1; };
+    biến valid = 1;
+    lặp (i = 0; i < 8; i++) {
+        biến expected = rt_bytes_get(magic, i);
+        nếu (write == 1) {
+            nếu (máy_ghi_byte(3200 + i, expected) != 0) { valid = 0; };
+        } hoặc {
+            nếu (máy_đọc_byte(3200 + i) != expected) { valid = 0; };
+        };
+    };
+    rt_bytes_free(magic);
+    nếu (valid != 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm rt_cache_header_write(key, payload) {
+    biến key_size = rt_bytes_length(key);
+    biến data_size = rt_bytes_length(payload);
+    nếu (key_size <= 0) { trả về -1; };
+    nếu (data_size < 0) { trả về -1; };
+    nếu (rt_cache_header_magic(1) != 0) { trả về -1; };
+    nếu (máy_ghi_i32(3208, key_size) != 0) { trả về -1; };
+    nếu (máy_ghi_i32(3212, data_size) != 0) { trả về -1; };
+    trả về 0;
+};
+
+// Return the validated payload size, or -1 on an invalid magic, key size,
+// payload size or total record length. The caller checks the digest/key bytes.
+hàm rt_cache_header_check(key, file_size) {
+    biến key_size = rt_bytes_length(key);
+    nếu (key_size <= 0) { trả về -1; };
+    nếu (file_size < 48) { trả về -1; };
+    nếu (rt_cache_header_magic(0) != 0) { trả về -1; };
+    biến saved_key_size = máy_đọc_i32(3208);
+    biến data_size = máy_đọc_i32(3212);
+    nếu (saved_key_size != key_size) { trả về -1; };
+    nếu (data_size < 0) { trả về -1; };
+    nếu (data_size > 1048576) { trả về -1; };
+    nếu (file_size != 48 + saved_key_size + data_size) { trả về -1; };
+    trả về data_size;
+};
+
+// The SHA machine primitive hashes the compiler image and key into
+// arena[3216:3248]. V++ encodes its lowercase filename component at
+// arena[3248:3313] (including NUL), without allocating a temporary handle.
+hàm rt_cache_hex_digit(value) {
+    nếu (value < 10) { trả về value + 48; };
+    trả về value + 87;
+};
+
+hàm rt_cache_digest_hex() {
+    lặp (i = 0; i < 32; i++) {
+        biến octet = máy_đọc_byte(3216 + i);
+        nếu (octet < 0) { trả về -1; };
+        biến upper = máy_chia_i32(octet, 16);
+        biến lower = octet - upper * 16;
+        nếu (máy_ghi_byte(3248 + i * 2, rt_cache_hex_digit(upper)) != 0) { trả về -1; };
+        nếu (máy_ghi_byte(3249 + i * 2, rt_cache_hex_digit(lower)) != 0) { trả về -1; };
+    };
+    trả về máy_ghi_byte(3312, 0);
+};
+
+hàm rt_file_slot(handle) {
+    nếu (handle <= 0) { trả về -1; };
+    biến tag = handle - máy_chia_i32(handle, 128) * 128;
+    nếu (tag < 64) { trả về -1; };
+    biến slot = tag - 64;
+    nếu (máy_đọc_i32(2064 + slot * 16) != handle) { trả về -1; };
+    trả về slot;
+};
+
+hàm rt_file_open(path, mode) {
+    biến slot = rt_bytes_slot(path);
+    nếu (slot < 0) { trả về -1; };
+    biến length = rt_bytes_length(path);
+    nếu (length < 1) { trả về -1; };
+    nếu (length > 4096) { trả về -1; };
+    lặp (i = 0; i < length; i++) {
+        nếu (máy_đọc_byte(rt_payload(slot) + i) == 0) { trả về -1; };
+    };
+    lặp (file_slot = 0; file_slot < 64; file_slot++) {
+        biến record = 2064 + file_slot * 16;
+        nếu (máy_đọc_i32(record) == 0) {
+            // Allocate before opening: exhausted handles cannot truncate a file.
+            biến handle = rt_handle(file_slot + 64);
+            nếu (handle <= 0) { trả về -1; };
+            biến fd = máy_mở(rt_payload(slot), mode);
+            nếu (fd < 0) { trả về -1; };
+            máy_ghi_i32(record + 4, fd);
+            máy_ghi_i32(record + 8, mode);
+            máy_ghi_i32(record, handle);
+            trả về handle;
+        };
+    };
+    trả về -1;
+};
+
+hàm rt_file_open_read(path) { trả về rt_file_open(path, 0); };
+hàm rt_file_open_write(path) { trả về rt_file_open(path, 1537); };
+
+hàm rt_file_close(handle) {
+    biến slot = rt_file_slot(handle);
+    nếu (slot < 0) { trả về -1; };
+    biến record = 2064 + slot * 16;
+    biến status = máy_đóng(máy_đọc_i32(record + 4));
+    máy_ghi_i32(record, 0);
+    trả về status;
+};
+
+hàm rt_read_retry(fd, offset, length) {
+    biến result = -1;
+    lặp (i = 0; i < 1; i = i) {
+        result = máy_đọc(fd, offset, length);
+        nếu (result >= 0) { thoát; };
+        nếu (máy_lỗi() != 4) { thoát; };
+    };
+    trả về result;
+};
+
+hàm rt_file_read_block(handle, bytes) {
+    biến file = rt_file_slot(handle);
+    biến slot = rt_bytes_slot(bytes);
+    nếu (file < 0) { trả về -1; };
+    nếu (slot < 0) { trả về -1; };
+    biến length = máy_đọc_i32(32 + slot * 32);
+    biến count = 1048576 - length;
+    nếu (count > 4096) { count = 4096; };
+    nếu (count <= 0) { trả về -1; };
+    nếu (rt_bytes_reserve(bytes, count) != 0) { trả về -1; };
+    biến read = rt_read_retry(máy_đọc_i32(2068 + file * 16), rt_payload(slot) + length, count);
+    nếu (read < 0) { trả về -1; };
+    máy_ghi_i32(32 + slot * 32, length + read);
+    máy_ghi_byte(rt_payload(slot) + length + read, 0);
+    trả về read;
+};
+
+hàm rt_file_write_block(handle, bytes) {
+    biến file = rt_file_slot(handle);
+    biến slot = rt_bytes_slot(bytes);
+    nếu (file < 0) { trả về -1; };
+    nếu (slot < 0) { trả về -1; };
+    trả về rt_write_all(máy_đọc_i32(2068 + file * 16), rt_payload(slot), máy_đọc_i32(32 + slot * 32));
+};
+
+hàm rt_file_read_byte(handle) {
+    biến file = rt_file_slot(handle);
+    nếu (file < 0) { trả về -2; };
+    biến count = rt_read_retry(máy_đọc_i32(2068 + file * 16), 3104, 1);
+    nếu (count < 0) { trả về -2; };
+    nếu (count == 0) { trả về -1; };
+    trả về máy_đọc_byte(3104);
+};
+
+hàm rt_file_write_byte(handle, value) {
+    biến file = rt_file_slot(handle);
+    nếu (file < 0) { trả về -1; };
+    nếu (value < 0) { trả về -1; };
+    nếu (value > 255) { trả về -1; };
+    máy_ghi_byte(3104, value);
+    nếu (rt_write_all(máy_đọc_i32(2068 + file * 16), 3104, 1) != 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm rt_print_i32(value) {
+    biến negative = 0;
+    biến remaining = value;
+    nếu (value < 0) { negative = 1; } hoặc { remaining = -value; };
+    biến length = 0;
+    lặp (i = 0; i < 11; i++) {
+        biến quotient = máy_chia_i32(remaining, 10);
+        máy_ghi_byte(3104 + length, 48 + quotient * 10 - remaining);
+        length = length + 1;
+        remaining = quotient;
+        nếu (remaining == 0) { thoát; };
+    };
+    nếu (negative == 1) { máy_ghi_byte(3104 + length, 45); length = length + 1; };
+    lặp (j = 0; j < máy_chia_i32(length, 2); j++) {
+        biến first = máy_đọc_byte(3104 + j);
+        máy_ghi_byte(3104 + j, máy_đọc_byte(3104 + length - 1 - j));
+        máy_ghi_byte(3104 + length - 1 - j, first);
+    };
+    máy_ghi_byte(3104 + length, 10);
+    nếu (rt_write_all(1, 3104, length + 1) != length + 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm rt_space(ch) {
+    nếu (ch == 32) { trả về 1; };
+    nếu (ch >= 9) { nếu (ch <= 13) { trả về 1; }; };
+    trả về 0;
+};
+
+hàm rt_read_status() { trả về máy_đọc_i32(8); };
+
+hàm rt_read_i32() {
+    máy_ghi_i32(8, 0);
+    biến length = 0;
+    biến overflow_line = 0;
+    lặp (i = 0; i < 1; i = i) {
+        biến count = rt_read_retry(0, 3184, 1);
+        nếu (count < 0) { máy_ghi_i32(8, 2); trả về 0; };
+        nếu (count == 0) {
+            nếu (length == 0) { máy_ghi_i32(8, 1); trả về 0; };
+            thoát;
+        };
+        biến ch = máy_đọc_byte(3184);
+        nếu (ch == 10) { thoát; };
+        nếu (length < 63) {
+            máy_ghi_byte(3104 + length, ch);
+            length = length + 1;
+        } hoặc { overflow_line = 1; };
+    };
+    nếu (overflow_line == 1) { máy_ghi_i32(8, 2); trả về 0; };
+    biến cursor = 0;
+    lặp (j = 0; cursor < length; j++) {
+        nếu (rt_space(máy_đọc_byte(3104 + cursor)) != 1) { thoát; };
+        cursor = cursor + 1;
+    };
+    biến sign = 1;
+    nếu (cursor < length) {
+        biến prefix = máy_đọc_byte(3104 + cursor);
+        nếu (prefix == 45) { sign = -1; cursor = cursor + 1; }
+        hoặc nếu (prefix == 43) { cursor = cursor + 1; };
+    };
+    biến digits = 0;
+    biến value = 0;
+    biến out_of_range = 0;
+    lặp (k = 0; cursor < length; k++) {
+        biến digit = máy_đọc_byte(3104 + cursor) - 48;
+        nếu (digit < 0) { thoát; };
+        nếu (digit > 9) { thoát; };
+        nếu (value < -214748364) { out_of_range = 1; };
+        nếu (value == -214748364) {
+            biến limit = 7;
+            nếu (sign == -1) { limit = 8; };
+            nếu (digit > limit) { out_of_range = 1; };
+        };
+        nếu (out_of_range == 0) { value = value * 10 - digit; };
+        digits = digits + 1;
+        cursor = cursor + 1;
+    };
+    nếu (digits == 0) { máy_ghi_i32(8, 2); trả về 0; };
+    lặp (tail = cursor; tail < length; tail++) {
+        nếu (rt_space(máy_đọc_byte(3104 + tail)) != 1) { máy_ghi_i32(8, 2); trả về 0; };
+    };
+    nếu (out_of_range == 1) { máy_ghi_i32(8, 3); trả về 0; };
+    nếu (sign == 1) { trả về -value; };
+    trả về value;
+};
+
+
+// Cache/link state is in the metadata scratch page. OS pointers stay 64 bit:
+// linker argv at 67113984, 4096 pointers; offset table at 67146752;
+// copied NUL-terminated arguments begin at 67163136. The extra 1 MiB region
+// is mapped by the machine primitive and is never issued as a byte handle.
+hàm rt_link_args_reset() {
+    máy_ghi_i32(3800, 0);
+    máy_ghi_i32(3804, 67163136);
+    trả về 0;
+};
+
+hàm rt_link_args_push(text) {
+    biến slot = rt_bytes_slot(text);
+    biến length = rt_bytes_length(text);
+    nếu (slot < 0) { trả về -1; };
+    nếu (length <= 0) { trả về -1; };
+    biến index = máy_đọc_i32(3800);
+    biến cursor = máy_đọc_i32(3804);
+    nếu (index < 0) { trả về -1; };
+    nếu (index >= 4095) { trả về -1; };
+    nếu (cursor < 67163136) { trả về -1; };
+    nếu (length >= 68162560 - cursor) { trả về -1; };
+    nếu (máy_gắn_địa_chỉ(67113984 + index * 8, cursor) != 0) { trả về -1; };
+    máy_ghi_i32(67146752 + index * 4, cursor);
+    lặp (i = 0; i < length; i++) {
+        máy_ghi_byte(cursor + i, rt_bytes_get(text, i));
+    };
+    máy_ghi_byte(cursor + length, 0);
+    máy_ghi_i32(3804, cursor + length + 1);
+    máy_ghi_i32(3800, index + 1);
+    trả về index;
+};
+
+hàm rt_link_args_sync(index, text) {
+    nếu (index < 0) { trả về -1; };
+    nếu (index >= máy_đọc_i32(3800)) { trả về -1; };
+    biến cursor = máy_đọc_i32(67146752 + index * 4);
+    biến length = rt_bytes_length(text);
+    nếu (length <= 0) { trả về -1; };
+    biến end = máy_đọc_i32(3804);
+    nếu (cursor < 67163136) { trả về -1; };
+    nếu (length >= end - cursor) { trả về -1; };
+    lặp (i = 0; i < length; i++) {
+        máy_ghi_byte(cursor + i, rt_bytes_get(text, i));
+    };
+    máy_ghi_byte(cursor + length, 0);
+    trả về 0;
+};
+
+hàm rt_link_args_literal(text) {
+    nếu (text <= 0) { trả về -1; };
+    biến result = rt_link_args_push(text);
+    rt_bytes_free(text);
+    trả về result;
+};
+
+hàm rt_link_args_unlink(index) {
+    nếu (index < 0) { trả về -1; };
+    nếu (index >= máy_đọc_i32(3800)) { trả về -1; };
+    trả về máy_xóa(máy_đọc_i32(67146752 + index * 4));
+};
+
+hàm rt_link_macho(object, output, source) {
+    biến archive = rt_link_archive_single(object);
+    nếu (archive <= 0) { trả về -1; };
+    biến result = rt_link_macho_modules(archive, output, source);
+    rt_bytes_free(archive);
+    trả về result;
+};
+
+// V++ owns every module, path, argv entry, descriptor and cleanup decision.
+// The fixed-size address array holds full-width 64-bit pointers; no i32
+// handle or offset is reinterpreted as a process pointer.
+hàm rt_link_macho_modules(archive, output, source) {
+    nếu (archive == output) { trả về -1; };
+    nếu (archive == source) { trả về -1; };
+    nếu (output == source) { trả về -1; };
+    nếu (rt_link_validate_files(output, source) != 0) { trả về -1; };
+    biến summary = rt_object_archive_summary(archive);
+    nếu (summary < 2) { trả về -1; };
+    biến total = rt_bytes_length(archive);
+    biến modules = máy_chia_i32(summary, 2);
+    nếu (modules < 1) { trả về -1; };
+    nếu (modules > 4086) { trả về -1; };
+    rt_link_args_reset();
+    biến temp = rt_bytes_new();
+    nếu (temp <= 0) { trả về -1; };
+    biến status = -1;
+    biến created = 0;
+    biến exe_index = -1;
+    biến fd = -1;
+    biến position = 0;
+    nếu (rt_link_args_literal("/usr/bin/clang") < 0) { status = -2; };
+    nếu (status == -1) {
+        nếu (rt_link_args_literal("-arch") < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_args_literal("arm64") < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        lặp (i = 0; i < modules; i++) {
+            biến length = rt_object_archive_entry(archive, position);
+            nếu (length < 0) { status = -2; thoát; };
+            nếu (rt_link_temporary_path(output, temp, i) != 0) { status = -2; thoát; };
+            biến arg = rt_link_args_push(temp);
+            nếu (arg < 0) { status = -2; thoát; };
+            fd = rt_link_temp_open(temp);
+            nếu (fd < 0) { status = -2; thoát; };
+            created = created + 1;
+            nếu (rt_link_args_sync(arg, temp) != 0) {
+                máy_xóa(rt_payload(rt_bytes_slot(temp)));
+                status = -2;
+                thoát;
+            };
+            nếu (rt_link_write_object(fd, archive, position) != length) {
+                status = -2; thoát;
+            };
+            nếu (máy_đóng(fd) != 0) {
+                fd = -1; status = -2; thoát;
+            };
+            fd = -1;
+            position = position + length + 4;
+        };
+    };
+    nếu (status == -1) {
+        nếu (position != total) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_args_literal("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_args_literal("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        biến primitive = rt_runtime_file_path(1);
+        nếu (primitive <= 0) { status = -2; }
+        hoặc {
+            nếu (rt_link_args_push(primitive) < 0) { status = -2; };
+            rt_bytes_free(primitive);
+        };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_temporary_path(output, temp, -1) != 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_args_literal("-o") < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        exe_index = rt_link_args_push(temp);
+        nếu (exe_index < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        fd = rt_link_temp_open(temp);
+        nếu (fd < 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_args_sync(exe_index, temp) != 0) {
+            máy_xóa(rt_payload(rt_bytes_slot(temp)));
+            status = -2;
+        };
+    };
+    nếu (fd >= 0) {
+        nếu (máy_đóng(fd) != 0) { status = -2; };
+        fd = -1;
+    };
+    nếu (status == -1) {
+        biến argc = máy_đọc_i32(3800);
+        máy_ghi_i32(67113984 + argc * 8, 0);
+        máy_ghi_i32(67113984 + argc * 8 + 4, 0);
+        nếu (rt_link_spawn_wait() != 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_executable_ready(temp) != 0) { status = -2; };
+    };
+    nếu (status == -1) {
+        nếu (rt_link_publish(temp, output) != 0) { status = -2; };
+    };
+    nếu (status == -1) { status = 0; };
+    nếu (fd >= 0) { máy_đóng(fd); };
+    nếu (exe_index >= 0) { rt_link_args_unlink(exe_index); };
+    lặp (i = 0; i < created; i++) {
+        rt_link_args_unlink(3 + i);
+    };
+    rt_bytes_free(temp);
+    nếu (status == 0) { trả về 0; };
+    trả về -1;
+};
+
+// No C file streams or allocation are used by the content-addressed cache.
+hàm rt_cache_env(key) {
+    nếu (key <= 0) { trả về -1; };
+    biến result = rt_bytes_new();
+    nếu (result <= 0) { rt_bytes_free(key); trả về -1; };
+    biến name_slot = rt_bytes_slot(key);
+    biến data_slot = rt_bytes_slot(result);
+    biến length = máy_env_lấy(rt_payload(name_slot), rt_payload(data_slot));
+    rt_bytes_free(key);
+    nếu (length < 0) { rt_bytes_free(result); trả về -1; };
+    nếu (length >= 4096) { rt_bytes_free(result); trả về -1; };
+    máy_ghi_i32(32 + data_slot * 32, length);
+    trả về result;
+};
+
+hàm rt_cache_init() {
+    nếu (máy_đọc_i32(3812) == 1) { trả về 0; };
+    biến exe = rt_bytes_new();
+    nếu (exe <= 0) { trả về -1; };
+    biến slot = rt_bytes_slot(exe);
+    biến length = máy_exe_lấy(rt_payload(slot));
+    nếu (length <= 0) { rt_bytes_free(exe); trả về -1; };
+    máy_ghi_i32(32 + slot * 32, length);
+    biến fd = máy_mở(rt_payload(slot), 4);
+    rt_bytes_free(exe);
+    nếu (fd < 0) { trả về -1; };
+    biến buffer = rt_bytes_new();
+    nếu (buffer <= 0) { máy_đóng(fd); trả về -1; };
+    biến data = rt_payload(rt_bytes_slot(buffer));
+    biến okay = máy_sha_bắt_đầu();
+    nếu (okay == 0) {
+        lặp (i = 0; i < 1000000; i++) {
+            biến count = rt_read_retry(fd, data, 4096);
+            nếu (count < 0) { okay = -1; thoát; };
+            nếu (count == 0) { thoát; };
+            nếu (máy_sha_nạp(data, count) != 0) { okay = -1; thoát; };
+        };
+    };
+    nếu (máy_đóng(fd) != 0) { okay = -1; };
+    rt_bytes_free(buffer);
+    nếu (okay != 0) { trả về -1; };
+    nếu (máy_sha_kết(3856) != 0) { trả về -1; };
+    máy_ghi_i32(3812, 1);
+    nếu (máy_báo_cáo_cache() != 0) { trả về -1; };
+    trả về 0;
+};
+
+hàm rt_cache_path(key) {
+    biến disabled = rt_cache_env("VPP_NATIVE_NO_CACHE");
+    nếu (disabled > 0) {
+        biến one = "1";
+        biến is_off = rt_bytes_equal(disabled, one);
+        rt_bytes_free(one);
+        rt_bytes_free(disabled);
+        nếu (is_off == 1) { trả về -1; };
+    };
+    nếu (rt_cache_init() != 0) { trả về -1; };
+    biến directory = rt_cache_env("VPP_NATIVE_CACHE_DIR");
+    nếu (directory <= 0) { directory = ".vpp-native-cache"; };
+    nếu (rt_bytes_length(directory) == 0) {
+        rt_bytes_free(directory);
+        directory = ".vpp-native-cache";
+    };
+    nếu (rt_link_valid_path(directory, 4010) != 0) {
+        rt_bytes_free(directory); trả về -1;
+    };
+    biến slot = rt_bytes_slot(directory);
+    biến mode = máy_mkdir(rt_payload(slot));
+    nếu (mode != 0) {
+        nếu (máy_lỗi() != 17) { rt_bytes_free(directory); trả về -1; };
+    };
+    nếu (máy_lstat(rt_payload(slot), 3584) != 0) {
+        rt_bytes_free(directory); trả về -1;
+    };
+    biến permissions = máy_đọc_byte(3588) + 256 * máy_đọc_byte(3589);
+    nếu (máy_chia_i32(permissions, 4096) != 4) {
+        rt_bytes_free(directory); trả về -1;
+    };
+    biến key_length = rt_bytes_length(key);
+    biến key_slot = rt_bytes_slot(key);
+    nếu (key_slot < 0) { rt_bytes_free(directory); trả về -1; };
+    nếu (máy_sha_bắt_đầu() != 0) { rt_bytes_free(directory); trả về -1; };
+    nếu (máy_sha_nạp(3856, 32) != 0) { rt_bytes_free(directory); trả về -1; };
+    nếu (máy_sha_nạp(rt_payload(key_slot), key_length) != 0) {
+        rt_bytes_free(directory); trả về -1;
+    };
+    nếu (máy_sha_kết(3216) != 0) { rt_bytes_free(directory); trả về -1; };
+    nếu (rt_cache_digest_hex() != 0) { rt_bytes_free(directory); trả về -1; };
+    biến path = rt_bytes_new();
+    nếu (path <= 0) { rt_bytes_free(directory); trả về -1; };
+    biến result = rt_bytes_concat(path, directory);
+    nếu (result == 0) {
+        nếu (rt_bytes_append(path, 47) != 0) { result = -1; };
+    };
+    nếu (result == 0) {
+        lặp (i = 0; i < 64; i++) {
+            nếu (rt_bytes_append(path, máy_đọc_byte(3248 + i)) != 0) {
+                result = -1; thoát;
+            };
+        };
+    };
+    nếu (result == 0) {
+        nếu (rt_link_append_text(path, ".cache") != 0) { result = -1; };
+    };
+    rt_bytes_free(directory);
+    nếu (result != 0) { rt_bytes_free(path); trả về -1; };
+    nếu (rt_link_valid_path(path, 4088) != 0) {
+        rt_bytes_free(path); trả về -1;
+    };
+    trả về path;
+};
+
+hàm rt_cache_read_exact(fd, offset, length) {
+    biến done = 0;
+    lặp (i = 0; done < length; i++) {
+        biến count = rt_read_retry(fd, offset + done, length - done);
+        nếu (count <= 0) { trả về -1; };
+        done = done + count;
+    };
+    trả về 0;
+};
+
+hàm rt_cache_record_read(fd, key, data, file_size) {
+    nếu (file_size < 48) { trả về 0; };
+    nếu (file_size > 2097200) { trả về 0; };
+    nếu (rt_cache_read_exact(fd, 3200, 48) != 0) { trả về 0; };
+    biến payload_size = rt_cache_header_check(key, file_size);
+    nếu (payload_size < 0) { trả về 0; };
+    biến key_copy = rt_bytes_new();
+    nếu (key_copy <= 0) { trả về 0; };
+    biến key_size = rt_bytes_length(key);
+    biến valid = rt_bytes_reserve(key_copy, key_size);
+    biến key_slot = rt_bytes_slot(key_copy);
+    nếu (valid == 0) {
+        valid = rt_cache_read_exact(fd, rt_payload(key_slot), key_size);
+    };
+    nếu (valid == 0) {
+        máy_ghi_i32(32 + key_slot * 32, key_size);
+        máy_ghi_byte(rt_payload(key_slot) + key_size, 0);
+        nếu (rt_bytes_equal(key_copy, key) != 1) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        nếu (rt_bytes_reserve(data, payload_size) != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        biến data_slot = rt_bytes_slot(data);
+        nếu (rt_cache_read_exact(fd, rt_payload(data_slot), payload_size) != 0) {
+            valid = -1;
+        } hoặc {
+            máy_ghi_byte(rt_payload(data_slot) + payload_size, 0);
+            máy_ghi_i32(32 + data_slot * 32, payload_size);
+        };
+    };
+    nếu (valid == 0) {
+        nếu (rt_read_retry(fd, 3104, 1) != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        nếu (máy_sha_bắt_đầu() != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        nếu (máy_sha_nạp(3200, 16) != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        nếu (máy_sha_nạp(rt_payload(key_slot), key_size) != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        nếu (máy_sha_nạp(rt_payload(rt_bytes_slot(data)), payload_size) != 0) {
+            valid = -1;
+        };
+    };
+    nếu (valid == 0) {
+        nếu (máy_sha_kết(3376) != 0) { valid = -1; };
+    };
+    nếu (valid == 0) {
+        lặp (i = 0; i < 32; i++) {
+            nếu (máy_đọc_byte(3376 + i) != máy_đọc_byte(3216 + i)) {
+                valid = -1; thoát;
+            };
+        };
+    };
+    rt_bytes_free(key_copy);
+    nếu (valid == 0) { trả về 1; };
+    trả về 0;
+};
+
+hàm rt_cache_counter(offset) {
+    biến old = máy_đọc_i32(offset);
+    nếu (old >= 2147483647) { trả về 0; };
+    trả về máy_ghi_i32(offset, old + 1);
+};
+
+hàm rt_cache_read(key, data) {
+    nếu (key == data) { trả về -1; };
+    nếu (rt_bytes_slot(key) < 0) { trả về -1; };
+    nếu (rt_bytes_slot(data) < 0) { trả về -1; };
+    nếu (rt_bytes_length(key) <= 0) { trả về -1; };
+    rt_bytes_clear(data);
+    biến path = rt_cache_path(key);
+    nếu (path <= 0) { trả về 0; };
+    rt_cache_counter(3820);
+    biến fd = máy_mở(rt_payload(rt_bytes_slot(path)), 260);
+    rt_bytes_free(path);
+    nếu (fd < 0) { trả về 0; };
+    biến hit = 0;
+    nếu (máy_fstat(fd, 3376) == 0) {
+        nếu (rt_link_stat_regular(3376) == 1) {
+            biến size = máy_đọc_i32(3472);
+            biến high = máy_đọc_i32(3476);
+            nếu (high == 0) {
+                nếu (size >= 48) {
+                    hit = rt_cache_record_read(fd, key, data, size);
+                };
+            };
+        };
+    };
+    nếu (máy_đóng(fd) != 0) { hit = 0; };
+    nếu (hit == 1) {
+        rt_cache_counter(3816);
+        máy_ghi_i32(3820, máy_đọc_i32(3820) - 1);
+        trả về 1;
+    };
+    rt_bytes_clear(data);
+    trả về 0;
+};
+
+hàm rt_cache_write(key, data) {
+    nếu (key == data) { trả về -1; };
+    nếu (rt_bytes_slot(key) < 0) { trả về -1; };
+    nếu (rt_bytes_slot(data) < 0) { trả về -1; };
+    nếu (rt_bytes_length(key) <= 0) { trả về -1; };
+    biến path = rt_cache_path(key);
+    nếu (path <= 0) { trả về -1; };
+    nếu (rt_cache_header_write(key, data) != 0) {
+        rt_bytes_free(path); trả về -1;
+    };
+    biến good = máy_sha_bắt_đầu();
+    nếu (good == 0) { good = máy_sha_nạp(3200, 16); };
+    nếu (good == 0) { good = máy_sha_nạp(rt_payload(rt_bytes_slot(key)), rt_bytes_length(key)); };
+    nếu (good == 0) { good = máy_sha_nạp(rt_payload(rt_bytes_slot(data)), rt_bytes_length(data)); };
+    nếu (good == 0) { good = máy_sha_kết(3216); };
+    nếu (good != 0) { rt_bytes_free(path); trả về -1; };
+    biến temporary = rt_bytes_new();
+    nếu (temporary <= 0) { rt_bytes_free(path); trả về -1; };
+    good = rt_bytes_concat(temporary, path);
+    nếu (good == 0) { good = rt_link_append_text(temporary, ".XXXXXX"); };
+    biến fd = -1;
+    nếu (good == 0) { fd = rt_link_temp_open(temporary); };
+    nếu (fd < 0) { good = -1; };
+    nếu (good == 0) {
+        nếu (rt_write_all(fd, 3200, 48) != 48) { good = -1; };
+    };
+    nếu (good == 0) {
+        nếu (rt_write_all(fd, rt_payload(rt_bytes_slot(key)), rt_bytes_length(key)) != rt_bytes_length(key)) {
+            good = -1;
+        };
+    };
+    nếu (good == 0) {
+        nếu (rt_write_all(fd, rt_payload(rt_bytes_slot(data)), rt_bytes_length(data)) != rt_bytes_length(data)) {
+            good = -1;
+        };
+    };
+    nếu (fd >= 0) {
+        nếu (máy_đóng(fd) != 0) { good = -1; };
+    };
+    nếu (good == 0) { good = rt_link_publish(temporary, path); };
+    nếu (good == 0) { rt_cache_counter(3824); };
+    nếu (good != 0) { máy_xóa(rt_payload(rt_bytes_slot(temporary))); };
+    rt_bytes_free(temporary);
+    rt_bytes_free(path);
+    nếu (good == 0) { trả về 0; };
+    trả về -1;
+};
+
+hàm rt_cache_append_number(text, value) {
+    biến divisor = 1;
+    lặp (i = 0; i < 10; i++) {
+        nếu (divisor > 214748364) { thoát; };
+        nếu (máy_chia_i32(value, divisor) < 10) { thoát; };
+        divisor = divisor * 10;
+    };
+    biến rest = value;
+    lặp (i = 0; divisor > 0; i++) {
+        biến digit = máy_chia_i32(rest, divisor);
+        nếu (rt_bytes_append(text, digit + 48) != 0) { trả về -1; };
+        rest = rest - digit * divisor;
+        divisor = máy_chia_i32(divisor, 10);
+    };
+    trả về 0;
+};
+
+hàm rt_cache_report() {
+    biến flag = rt_cache_env("VPP_NATIVE_CACHE_STATS");
+    nếu (flag <= 0) { trả về 0; };
+    biến one = "1";
+    biến enabled = rt_bytes_equal(flag, one);
+    rt_bytes_free(one);
+    rt_bytes_free(flag);
+    nếu (enabled != 1) { trả về 0; };
+    biến output = "native cache: hits=";
+    nếu (output <= 0) { trả về -1; };
+    rt_cache_append_number(output, máy_đọc_i32(3816));
+    rt_link_append_text(output, " misses=");
+    rt_cache_append_number(output, máy_đọc_i32(3820));
+    rt_link_append_text(output, " writes=");
+    rt_cache_append_number(output, máy_đọc_i32(3824));
+    rt_bytes_append(output, 10);
+    rt_write_all(2, rt_payload(rt_bytes_slot(output)), rt_bytes_length(output));
+    rt_bytes_free(output);
+    trả về 0;
+};

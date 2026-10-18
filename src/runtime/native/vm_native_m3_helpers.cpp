@@ -26,9 +26,6 @@
 #include <schannel.h>
 #else
 #include <arpa/inet.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #if defined(__APPLE__)
@@ -45,8 +42,8 @@ namespace vietvm::helpers {
 namespace {
 
 #if defined(_WIN32)
-// Legacy socket/DNS orchestration is retained only for Windows. POSIX calls
-// now originate in the V++ network modules through typed System FFI handles.
+// Only the Windows TCP/UDP rollback path and Schannel TLS still need these
+// socket helpers. Public DNS resolution uses VM-owned typed FFI on every OS.
 bool requireString(const StackValue &value,
                    const std::string &fn,
                    const char *label,
@@ -65,7 +62,6 @@ bool requireString(const StackValue &value,
 }
 
 bool initializeNetwork(std::string &err) {
-#if defined(_WIN32)
     static std::once_flag once;
     static int status = 0;
     std::call_once(once, []() {
@@ -73,12 +69,9 @@ bool initializeNetwork(std::string &err) {
         status = WSAStartup(MAKEWORD(2, 2), &data);
     });
     if (status != 0) {
-        err = "dns: không khởi tạo được Winsock";
+        err = "socket: không khởi tạo được Winsock";
         return false;
     }
-#else
-    (void)err;
-#endif
     return true;
 }
 #endif
@@ -193,28 +186,16 @@ int lastSocketError() {
 
 #if defined(_WIN32)
 bool socketWouldBlock(int code) {
-#if defined(_WIN32)
     return code == WSAEWOULDBLOCK || code == WSAEINPROGRESS ||
            code == WSAEINVAL;
-#else
-    return code == EINPROGRESS || code == EWOULDBLOCK || code == EAGAIN;
-#endif
 }
 
 bool setSocketBlocking(NativeSocket socket, bool blocking) {
-#if defined(_WIN32)
     u_long mode = blocking ? 0UL : 1UL;
     return ioctlsocket(socket, FIONBIO, &mode) == 0;
-#else
-    const int flags = fcntl(socket, F_GETFL, 0);
-    if (flags < 0) return false;
-    const int desired = blocking ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-    return fcntl(socket, F_SETFL, desired) == 0;
-#endif
 }
 
 bool setSocketTimeout(NativeSocket socket, int timeoutMs) {
-#if defined(_WIN32)
     const DWORD timeout = static_cast<DWORD>(timeoutMs);
     return setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
                       reinterpret_cast<const char *>(&timeout),
@@ -222,15 +203,6 @@ bool setSocketTimeout(NativeSocket socket, int timeoutMs) {
            setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO,
                       reinterpret_cast<const char *>(&timeout),
                       sizeof(timeout)) == 0;
-#else
-    timeval timeout{};
-    timeout.tv_sec = timeoutMs / 1000;
-    timeout.tv_usec = (timeoutMs % 1000) * 1000;
-    return setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout,
-                      sizeof(timeout)) == 0 &&
-           setsockopt(socket, SOL_SOCKET, SO_SNDTIMEO, &timeout,
-                      sizeof(timeout)) == 0;
-#endif
 }
 
 bool connectWithTimeout(NativeSocket socket,
@@ -258,11 +230,7 @@ bool connectWithTimeout(NativeSocket socket,
     timeval timeout{};
     timeout.tv_sec = timeoutMs / 1000;
     timeout.tv_usec = (timeoutMs % 1000) * 1000;
-#if defined(_WIN32)
     const int selected = select(0, nullptr, &writeSet, nullptr, &timeout);
-#else
-    const int selected = select(socket + 1, nullptr, &writeSet, nullptr, &timeout);
-#endif
     if (selected <= 0) {
         (void)setSocketBlocking(socket, true);
         if (selected == 0) err = "socket: hết thời gian chờ kết nối";
@@ -271,12 +239,8 @@ bool connectWithTimeout(NativeSocket socket,
 
     int socketError = 0;
     socklen_t errorLength = static_cast<socklen_t>(sizeof(socketError));
-#if defined(_WIN32)
     if (getsockopt(socket, SOL_SOCKET, SO_ERROR,
                    reinterpret_cast<char *>(&socketError), &errorLength) != 0) {
-#else
-    if (getsockopt(socket, SOL_SOCKET, SO_ERROR, &socketError, &errorLength) != 0) {
-#endif
         (void)setSocketBlocking(socket, true);
         return false;
     }
@@ -301,11 +265,7 @@ bool openConnectedNativeSocket(const std::string &fn,
     const std::string service = std::to_string(port);
     const int status = getaddrinfo(host.c_str(), service.c_str(), &hints, &head);
     if (status != 0 || head == nullptr) {
-#if defined(_WIN32)
         err = fn + ": không phân giải được địa chỉ, mã " + std::to_string(status);
-#else
-        err = fn + ": không phân giải được địa chỉ: " + std::string(gai_strerror(status));
-#endif
         if (head != nullptr) freeaddrinfo(head);
         return false;
     }
@@ -963,47 +923,6 @@ bool tlsRead(OpenTlsSocket &tls,
 #endif
 
 #if defined(_WIN32)
-bool socketTlsOpen(const std::string &fn,
-                   const std::vector<StackValue> &args,
-                   StackValue &result,
-                   std::string &err) {
-    if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-    std::string host;
-    int port = 0;
-    int timeoutMs = 0;
-    if (!requireString(args[0], fn, "tên máy", host, err) ||
-        !requireIntArgFromStack(args[1], fn, "cổng", port, err) ||
-        !requireIntArgFromStack(args[2], fn, "thời gian chờ", timeoutMs, err)) {
-        return true;
-    }
-    if (host.empty()) {
-        err = fn + ": tên máy không được rỗng";
-        return true;
-    }
-    if (port <= 0 || port > 65535) {
-        err = fn + ": cổng phải trong 1..65535";
-        return true;
-    }
-    if (timeoutMs <= 0 || timeoutMs > 300000) {
-        err = fn + ": thời gian chờ phải trong 1..300000 ms";
-        return true;
-    }
-
-    auto tls = std::make_shared<OpenTlsSocket>();
-    if (!openConnectedNativeSocket(
-            fn, host, port, timeoutMs, SOCK_STREAM, tls->handle, err)) return true;
-    if (!initializeTlsClient(*tls, host, err)) {
-        closeTlsSocket(*tls);
-        return true;
-    }
-
-    std::lock_guard<std::mutex> lock(socketMutex());
-    const int id = nextSocketId()++;
-    openTlsSockets().emplace(id, std::move(tls));
-    result = make_int_value(id);
-    return true;
-}
-
 bool socketOpen(const std::string &fn,
                 const std::vector<StackValue> &args,
                 int socketType,
@@ -1180,21 +1099,6 @@ bool handleSockets(const std::string &fn,
                    const std::vector<StackValue> &args,
                    StackValue &result,
                    std::string &err) {
-    if (fn == "socket_tcp_mo") {
-        return socketOpen(fn, args, SOCK_STREAM, result, err);
-    }
-    if (fn == "socket_udp_mo") {
-        return socketOpen(fn, args, SOCK_DGRAM, result, err);
-    }
-    if (fn == "socket_tls_mo") {
-        return socketTlsOpen(fn, args, result, err);
-    }
-    if (fn == "socket_tcp_lang_nghe") {
-        return socketListen(fn, args, result, err);
-    }
-    if (fn == "socket_chap_nhan") {
-        return socketAccept(fn, args, result, err);
-    }
     if (fn != "socket_gui" && fn != "socket_nhan" &&
         fn != "socket_dat_timeout" && fn != "socket_dong") {
         return false;
@@ -1345,107 +1249,6 @@ bool handleSockets(const std::string &fn,
     }
     buffer.resize(static_cast<std::size_t>(received));
     result = make_string_value(buffer);
-    return true;
-}
-
-bool handleDns(const std::string &fn,
-               const std::vector<StackValue> &args,
-               StackValue &result,
-               std::string &err) {
-    if (fn != "dns_phan_giai") return false;
-    if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-    std::string host;
-    if (!requireString(args[0], fn, "tên máy", host, err) || host.empty()) {
-        if (err.empty()) err = fn + ": tên máy không được rỗng";
-        return true;
-    }
-    if (!initializeNetwork(err)) return true;
-
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    addrinfo *head = nullptr;
-    const int status = getaddrinfo(host.c_str(), nullptr, &hints, &head);
-    if (status != 0 || head == nullptr) {
-#if defined(_WIN32)
-        err = fn + ": không phân giải được tên máy, mã " + std::to_string(status);
-#else
-        err = fn + ": không phân giải được tên máy: " + std::string(gai_strerror(status));
-#endif
-        if (head != nullptr) freeaddrinfo(head);
-        return true;
-    }
-    std::vector<StackValue> addresses;
-    for (addrinfo *entry = head; entry != nullptr; entry = entry->ai_next) {
-        char buffer[NI_MAXHOST]{};
-        if (getnameinfo(entry->ai_addr, static_cast<socklen_t>(entry->ai_addrlen),
-                        buffer, sizeof(buffer), nullptr, 0, NI_NUMERICHOST) == 0) {
-            addresses.push_back(make_string_value(buffer));
-        }
-    }
-    freeaddrinfo(head);
-    result = make_list_value(std::move(addresses));
-    return true;
-}
-
-bool socketResolveVm(const std::vector<StackValue> &args,
-                     StackValue &result,
-                     std::string &err) {
-    const std::string fn = "socket_phan_giai_vm";
-    if (!requireNativeArgumentCount(args, fn, 3, err)) return true;
-    std::string host;
-    int port = 0;
-    int datagram = 0;
-    if (!requireString(args[0], fn, "tên máy", host, err) ||
-        !requireIntArgFromStack(args[1], fn, "cổng", port, err) ||
-        !requireIntArgFromStack(args[2], fn, "datagram", datagram, err)) {
-        return true;
-    }
-    if (host.empty() || port <= 0 || port > 65535 ||
-        (datagram != 0 && datagram != 1)) {
-        err = fn + ": đối số không hợp lệ";
-        return true;
-    }
-    if (!initializeNetwork(err)) return true;
-
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = datagram ? SOCK_DGRAM : SOCK_STREAM;
-    hints.ai_protocol = datagram ? IPPROTO_UDP : IPPROTO_TCP;
-    addrinfo *head = nullptr;
-    const std::string service = std::to_string(port);
-    const int status = getaddrinfo(host.c_str(), service.c_str(), &hints, &head);
-    if (status != 0 || head == nullptr) {
-#if defined(_WIN32)
-        err = fn + ": không phân giải được địa chỉ, mã " + std::to_string(status);
-#else
-        err = fn + ": không phân giải được địa chỉ: " + std::string(gai_strerror(status));
-#endif
-        if (head != nullptr) freeaddrinfo(head);
-        return true;
-    }
-
-    std::vector<StackValue> resolved;
-    for (addrinfo *entry = head; entry != nullptr; entry = entry->ai_next) {
-        char numericHost[NI_MAXHOST]{};
-        char numericService[NI_MAXSERV]{};
-        if (getnameinfo(entry->ai_addr, static_cast<socklen_t>(entry->ai_addrlen),
-                        numericHost, sizeof(numericHost),
-                        numericService, sizeof(numericService),
-                        NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
-            continue;
-        }
-        int resolvedPort = port;
-        try {
-            resolvedPort = std::stoi(numericService);
-        } catch (...) {}
-        resolved.push_back(make_list_value({
-            make_string_value(numericHost),
-            make_int_value(resolvedPort),
-        }));
-    }
-    freeaddrinfo(head);
-    result = make_list_value(std::move(resolved));
     return true;
 }
 
@@ -1620,7 +1423,6 @@ bool handleNativeM3LibraryFunction(Opcode opcode,
     if (primitive == nullptr) return false;
     const std::string fn(primitive->name);
 
-    if (opcode == OP_VM_SOCKET_PHAN_GIAI) return socketResolveVm(args, result, err);
     if (opcode == OP_VM_SOCKET_TCP_MO) {
         return socketOpenResolvedVm(fn, args, SOCK_STREAM, result, err);
     }
@@ -1643,9 +1445,6 @@ bool handleNativeM3LibraryFunction(Opcode opcode,
     }
     if (opcode == OP_VM_SOCKET_DONG) {
         return handleSockets("socket_dong", args, result, err);
-    }
-    if (opcode == OP_VM_DNS_PHAN_GIAI) {
-        return handleDns("dns_phan_giai", args, result, err);
     }
 #else
     (void)opcode;

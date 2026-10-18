@@ -1,0 +1,2 @@
+hàm cộng() { in "thân"; trả về 42; };
+in "phụ";

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,18 +35,10 @@ bool requireSource(const StackValue &value,
     return true;
 }
 
-vietvm::compiler::CompilationArtifacts compileText(
-    const std::string &source,
-    const std::filesystem::path &base) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = base;
-    return vietvm::compiler::compilePipeline(context, source, keywordMap, false);
-}
-
-StackValue bytecodePrimitiveList(const vietvm::compiler::CompilationArtifacts &artifacts) {
+StackValue bytecodePrimitiveList(const std::vector<Instruction> &bytecode) {
     std::vector<StackValue> instructions;
-    instructions.reserve(artifacts.bytecode.size());
-    for (const Instruction &instruction : artifacts.bytecode) {
+    instructions.reserve(bytecode.size());
+    for (const Instruction &instruction : bytecode) {
         instructions.push_back(make_list_value({
             make_int_value(instruction.op),
             make_int_value(instruction.operand),
@@ -54,6 +47,33 @@ StackValue bytecodePrimitiveList(const vietvm::compiler::CompilationArtifacts &a
         }));
     }
     return make_list_value(std::move(instructions));
+}
+
+// Read-only oracle for checking self-hosted function emitters. Preserve the
+// C++ registry's function IDs and four-field instruction ABI verbatim.
+StackValue namedFunctionBytecodePrimitiveList(
+    const vietvm::compiler::CompilationContext &context) {
+    std::vector<int> ids;
+    ids.reserve(context.functionNameIndices.size());
+    for (const auto &[id, nameIndex] : context.functionNameIndices) {
+        if (nameIndex >= 0 &&
+            static_cast<std::size_t>(nameIndex) < context.stringPool.size() &&
+            context.functionBytecode.count(id) != 0) {
+            ids.push_back(id);
+        }
+    }
+    std::sort(ids.begin(), ids.end());
+    std::vector<StackValue> functions;
+    functions.reserve(ids.size());
+    for (int id : ids) {
+        const int nameIndex = context.functionNameIndices.at(id);
+        functions.push_back(make_list_value({
+            make_string_value(context.stringPool[static_cast<std::size_t>(nameIndex)]),
+            make_int_value(id),
+            bytecodePrimitiveList(context.functionBytecode.at(id)),
+        }));
+    }
+    return make_list_value(std::move(functions));
 }
 
 vietvm::frontend::AstProgram parseSourceAst(const std::string &source) {
@@ -121,7 +141,8 @@ StackValue astStatementsPrimitive(const vietvm::frontend::AstProgram &program) {
 
 StackValue compilationAnalysisPrimitive(
     const vietvm::compiler::CompilationArtifacts &artifacts,
-    const vietvm::frontend::AstProgram &program) {
+    const vietvm::frontend::AstProgram &program,
+    const vietvm::compiler::CompilationContext &context) {
     // Native compiler chỉ phơi payload thô. Trạng thái thành công/thất bại,
     // tên trường, chuỗi loại AST và contract public do V++ dựng.
     return make_list_value({
@@ -134,8 +155,9 @@ StackValue compilationAnalysisPrimitive(
         make_int_value(artifacts.moduleIndex.has_value()
             ? static_cast<int>(artifacts.moduleIndex->graph.modules.size())
             : 0),
-        bytecodePrimitiveList(artifacts),
+        bytecodePrimitiveList(artifacts.bytecode),
         astStatementsPrimitive(program),
+        namedFunctionBytecodePrimitiveList(context),
     });
 }
 
@@ -165,7 +187,119 @@ std::string executeEmbeddedSource(const std::string &source,
     return output;
 }
 
+const std::vector<StackValue> &requireWireList(const StackValue &value,
+                                               const std::string &where) {
+    if (!std::holds_alternative<ListHandle>(value) ||
+        std::get<ListHandle>(value) == nullptr) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là danh sách");
+    }
+    return std::get<ListHandle>(value)->elements;
+}
+
+int requireWireInt(const StackValue &value, const std::string &where) {
+    if (!std::holds_alternative<int>(value)) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là số nguyên i32");
+    }
+    return std::get<int>(value);
+}
+
+const std::string &requireWireString(const StackValue &value,
+                                     const std::string &where) {
+    if (!std::holds_alternative<std::string>(value)) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là chuỗi");
+    }
+    return std::get<std::string>(value);
+}
+
+std::vector<Instruction> loadWireInstructions(const StackValue &value,
+                                               const std::string &where) {
+    const auto &records = requireWireList(value, where);
+    std::vector<Instruction> code;
+    code.reserve(records.size());
+    for (std::size_t i = 0; i < records.size(); ++i) {
+        const auto &record = requireWireList(records[i], where + "[" + std::to_string(i) + "]");
+        if (record.size() != 4) {
+            throw std::runtime_error("bytecode_chay_vm: lệnh phải có đúng 4 trường ABI tại " + where);
+        }
+        const std::string prefix = where + "[" + std::to_string(i) + "]";
+        code.push_back(Instruction{
+            requireWireInt(record[0], prefix + ".op"),
+            requireWireInt(record[1], prefix + ".toán hạng"),
+            requireWireInt(record[2], prefix + ".chỉ số"),
+            requireWireInt(record[3], prefix + ".giá trị"),
+        });
+    }
+    return code;
+}
+
+std::string executeLinkedBytecode(const std::vector<StackValue> &args) {
+    const auto root = loadWireInstructions(args[0], "bytecode gốc");
+
+    std::vector<std::string> pool;
+    const auto &strings = requireWireList(args[1], "StringPool");
+    pool.reserve(strings.size());
+    for (std::size_t i = 0; i < strings.size(); ++i) {
+        pool.push_back(requireWireString(strings[i], "StringPool[" + std::to_string(i) + "]"));
+    }
+
+    std::unordered_map<int, std::vector<Instruction>> functionBytecode;
+    std::unordered_map<int, int> functionNames;
+    const auto &functions = requireWireList(args[2], "bảng hàm");
+    for (std::size_t i = 0; i < functions.size(); ++i) {
+        const auto &row = requireWireList(functions[i], "bảng hàm[" + std::to_string(i) + "]");
+        if (row.size() != 3) {
+            throw std::runtime_error("bytecode_chay_vm: bản ghi hàm phải có 3 trường");
+        }
+        const int id = requireWireInt(row[0], "function ID");
+        const int nameIndex = requireWireInt(row[1], "function runtime name index");
+        if (id != static_cast<int>(i)) {
+            throw std::runtime_error("bytecode_chay_vm: function ID phải liên tiếp từ 0");
+        }
+        if (nameIndex < 0 || static_cast<std::size_t>(nameIndex) >= pool.size()) {
+            throw std::runtime_error("bytecode_chay_vm: function name index ngoài StringPool");
+        }
+        if (!functionNames.emplace(nameIndex, id).second) {
+            throw std::runtime_error("bytecode_chay_vm: trùng function runtime name index");
+        }
+        functionBytecode.emplace(id, loadWireInstructions(row[2], "thân hàm " + std::to_string(id)));
+    }
+
+    VM vm(root, pool);
+    vm.setFunctions(std::move(functionBytecode), std::move(functionNames));
+    const auto &initializers = requireWireList(args[3], "initializer");
+    for (std::size_t i = 0; i < initializers.size(); ++i) {
+        const auto &row = requireWireList(initializers[i], "initializer[" + std::to_string(i) + "]");
+        if (row.size() != 2) {
+            throw std::runtime_error("bytecode_chay_vm: initializer phải có 2 trường");
+        }
+        const std::string &identity = requireWireString(row[0], "định danh initializer");
+        if (identity.empty()) {
+            throw std::runtime_error("bytecode_chay_vm: định danh initializer rỗng");
+        }
+        if (!vm.addModuleInitializer(identity, loadWireInstructions(row[1], "initializer " + identity))) {
+            throw std::runtime_error("bytecode_chay_vm: trùng định danh initializer '" + identity + "'");
+        }
+    }
+    std::string output;
+    vm.setOutputSink([&output](const std::string &text) { output += text; });
+    vm.run();
+    return output;
+}
+
 } // namespace
+
+bool linkedBytecodeRunPrimitive(const std::vector<StackValue> &args,
+                                StackValue &result,
+                                std::string &err) {
+    constexpr const char *fn = "bytecode_chay_vm";
+    if (!requireNativeArgumentCount(args, fn, 4, err)) return true;
+    try {
+        result = make_string_value(executeLinkedBytecode(args));
+    } catch (const std::exception &e) {
+        err = e.what();
+    }
+    return true;
+}
 
 bool embeddedVmRunPrimitive(const std::vector<StackValue> &args,
                             StackValue &result,
@@ -194,8 +328,12 @@ bool compilerAnalyzePrimitive(const std::vector<StackValue> &args,
     if (!requireSource(args[0], fn, source, err)) return true;
     if (!nativeUtf8Path(args[1], fn, base, err)) return true;
     try {
+        vietvm::compiler::CompilationContext context;
+        context.importResolutionBase = base;
+        auto artifacts = vietvm::compiler::compilePipeline(
+            context, source, keywordMap, false);
         result = compilationAnalysisPrimitive(
-            compileText(source, base), parseSourceAst(source));
+            artifacts, parseSourceAst(source), context);
     } catch (const std::exception &e) {
         // Compiler primitive chỉ báo lỗi thô. V++ quyết định lỗi này được
         // chuyển thành snapshot hay được ném ra ngoài.

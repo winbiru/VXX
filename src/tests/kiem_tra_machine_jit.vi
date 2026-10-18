@@ -1,0 +1,73 @@
+// Parity test: literal regions, dynamic arithmetic, calls, loops, branching,
+// switch, and try/catch must behave identically in all three execution modes.
+hàm tinh(a, b) {
+    trả về a * b + (a - b);
+}
+
+hàm nhan_thuan(a, b) {
+    trả về a * b;
+}
+
+hàm tang_thuan(n) {
+    trả về n + 1;
+}
+
+hàm ket_hop_thuan(a, b) {
+    trả về tang_thuan(nhan_thuan(a, b)) + 5;
+}
+
+hàm giai_thua(n) {
+    nếu (n <= 1) { trả về 1; }
+    trả về n * giai_thua(n - 1);
+}
+
+hàm chính() {
+    in (2 + 3) * 4;
+    in (40 - 5) * (7 - 2);
+    in (0 - 7) * 3;
+    in (70000 + 12345) - 5;
+    in (2147483647 - 2147483646) * 9;
+    in 7 == 7;
+    in 7 != 7;
+    in 7 > 5;
+    in 7 < 5;
+    in 7 >= 7;
+    in 7 <= 6;
+    in (0 - 6) < (0 - 2);
+    in 2147483647 > (0 - 1);
+    biến x = 6;
+    biến y = 7;
+    in x * y + (x - y);
+    in x < y;
+    in x > y;
+    in x != y;
+    in x == y;
+    in x <= y;
+    in x >= y;
+    nếu (x < y) { in 101; } hoặc { in 900; };
+    nếu (x > y) { in 900; } hoặc { in 102; };
+    biến gan_bien = 2147483647;
+    in gan_bien + 0;
+    in tinh(8, 3);
+    in ket_hop_thuan(8, 3);
+    in giai_thua(5);
+    lặp (i = 1; i <= 3; i = i + 1) {
+        in i * 3;
+    };
+    nếu (đúng) {
+        in (10 - 3) * 2;
+    } hoặc {
+        in 99;
+    };
+    chọn (2) {
+        ca 1: { in 99; thoát; };
+        ca 2: { in 13 + 2; thoát; };
+        mặc định: { in 99; };
+    };
+    thử {
+        ném "kiem_tra_jit";
+    } bắt lỗi (e) {
+        in e;
+    }
+    in "jit" + "_ok";
+}

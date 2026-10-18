@@ -5,7 +5,7 @@
 nhập gói/lõi/toán học;
 nhập gói/lõi/chuyển kiểu;
 
-hàm mã điểm unicode(c) {
+hàm công khai mã điểm unicode(c) {
     nếu (loai_cua(c) != "chuỗi" || do_dai(c) != 1) {
         ném "bảng mã: cần đúng một ký tự Unicode";
     };
@@ -24,7 +24,7 @@ hàm mã điểm unicode(c) {
     trả về mã;
 };
 
-hàm ký tự unicode(mã) {
+hàm công khai ký tự unicode(mã) {
     nếu (loai_cua(mã) != "số nguyên" || mã < 0 || mã > 1114111 ||
         (mã >= 55296 && mã <= 57343)) {
         ném "bảng mã: mã Unicode không hợp lệ";
@@ -48,7 +48,7 @@ hàm ký tự unicode(mã) {
     ]);
 };
 
-hàm bảng mã utf8 mã hóa(văn_bản) {
+hàm công khai bảng mã utf8 mã hóa(văn_bản) {
     bytes = chuoi_bytes_vm(văn_bản);
     vị_trí = 0;
     lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
@@ -62,7 +62,7 @@ hàm bảng mã utf8 mã hóa(văn_bản) {
 // Hạ chữ ngay trong V++ để module bảng mã không cần primitive đổi
 // hoa/thường của runtime. Chế độ lỗi có cả từ khóa tiếng Việt như BÁO_LỖI,
 // vì vậy bảng giữ cùng contract ASCII + chữ dựng sẵn tiếng Việt của vi.text.
-hàm bảng mã thường nội bộ(văn_bản) {
+hàm riêng tư bảng mã thường nội bộ(văn_bản) {
     hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
           "ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
     thường = "abcdefghijklmnopqrstuvwxyz" +
@@ -83,7 +83,7 @@ hàm bảng mã thường nội bộ(văn_bản) {
     trả về kết_quả;
 };
 
-hàm bảng mã chuẩn hóa tên(tên bảng mã) {
+hàm riêng tư bảng mã chuẩn hóa tên(tên bảng mã) {
     nếu (loai_cua(tên bảng mã) != "chuỗi") {
         ném "bảng mã: tên bảng mã phải là chuỗi";
     };
@@ -102,7 +102,7 @@ hàm bảng mã chuẩn hóa tên(tên bảng mã) {
     trả về "";
 };
 
-hàm bảng mã kiểm tra bytes(bytes) {
+hàm riêng tư bảng mã kiểm tra bytes(bytes) {
     nếu (loai_cua(bytes) != "danh sách") {
         ném "bảng mã: dữ liệu byte phải là danh sách";
     };
@@ -117,7 +117,7 @@ hàm bảng mã kiểm tra bytes(bytes) {
     trả về đúng;
 };
 
-hàm bảng mã chuẩn hóa chế độ lỗi(chế độ) {
+hàm riêng tư bảng mã chuẩn hóa chế độ lỗi(chế độ) {
     nếu (loai_cua(chế độ) != "chuỗi") {
         ném "bảng mã: chế độ lỗi phải là chuỗi";
     };
@@ -131,13 +131,13 @@ hàm bảng mã chuẩn hóa chế độ lỗi(chế độ) {
     ném "bảng mã: chế độ lỗi không được hỗ trợ";
 };
 
-hàm bảng mã utf8 là byte tiếp(byte) {
+hàm riêng tư bảng mã utf8 là byte tiếp(byte) {
     trả về byte >= 128 && byte <= 191;
 };
 
 // Số dương: sequence hợp lệ. Số âm: số byte của maximal valid prefix cần
 // tiêu thụ khi thay malformed UTF-8 bằng U+FFFD.
-hàm bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
+hàm công khai bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
     n = do_dai(bytes);
     b0 = bytes[vị_trí];
     nếu (b0 <= 127) {
@@ -211,7 +211,7 @@ hàm bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
     trả về -1;
 };
 
-hàm bảng mã utf8 giải mã(bytes, chế độ) {
+hàm riêng tư bảng mã utf8 giải mã(bytes, chế độ) {
     kết_quả = "";
     ký_tự_thay = ký tự unicode(65533);
     vị_trí = 0;
@@ -223,12 +223,12 @@ hàm bảng mã utf8 giải mã(bytes, chế độ) {
             mã = b0;
             nếu (độ_dài == 2) {
                 mã = (b0 % 32) * 64 + (bytes[vị_trí + 1] % 64);
-            } nếu không {
+            } hoặc {
                 nếu (độ_dài == 3) {
                     mã = (b0 % 16) * 4096 +
                         (bytes[vị_trí + 1] % 64) * 64 +
                         (bytes[vị_trí + 2] % 64);
-                } nếu không {
+                } hoặc {
                     nếu (độ_dài == 4) {
                         mã = (b0 % 8) * 262144 +
                             (bytes[vị_trí + 1] % 64) * 4096 +
@@ -239,7 +239,7 @@ hàm bảng mã utf8 giải mã(bytes, chế độ) {
             };
             kết_quả = kết_quả + ký tự unicode(mã);
             vị_trí = vị_trí + độ_dài;
-        } nếu không {
+        } hoặc {
             nếu (chế độ == "nghiêm") {
                 ném "TEXT_DECODE_INVALID";
             };
@@ -250,11 +250,11 @@ hàm bảng mã utf8 giải mã(bytes, chế độ) {
     trả về kết_quả;
 };
 
-hàm bảng mã hỗ trợ(tên bảng mã) {
+hàm công khai bảng mã hỗ trợ(tên bảng mã) {
     trả về bảng mã chuẩn hóa tên(tên bảng mã) != "";
 };
 
-hàm mã hóa bảng mã(văn bản, tên bảng mã) {
+hàm công khai mã hóa bảng mã(văn bản, tên bảng mã) {
     nếu (loai_cua(văn bản) != "chuỗi") {
         ném "mã hóa bảng mã: văn bản phải là chuỗi";
     };
@@ -280,7 +280,7 @@ hàm mã hóa bảng mã(văn bản, tên bảng mã) {
     trả về kết_quả;
 };
 
-hàm giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_LỖI") {
+hàm công khai giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_LỖI") {
     bảng mã kiểm tra bytes(bytes);
     bảng = bảng mã chuẩn hóa tên(tên bảng mã);
     nếu (bảng == "") {
@@ -300,10 +300,10 @@ hàm giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_L�
                     ném "TEXT_DECODE_INVALID";
                 };
                 kết_quả = kết_quả + ký tự unicode(65533);
-            } nếu không {
+            } hoặc {
                 kết_quả = kết_quả + ký tự unicode(byte);
             };
-        } nếu không {
+        } hoặc {
             kết_quả = kết_quả + ký tự unicode(byte);
         };
     };

@@ -1,0 +1,13 @@
+nhập gói/bộ sưu tập/giao diện;
+nhập gói/bộ sưu tập/từ điển;
+
+lớp công khai Từ Điển triển khai Bộ Chứa {
+    hàm công khai khởi tạo() { mình.bảng = {}; };
+    hàm công khai số lượng() { trả về do_dai(khoa_map(mình.bảng)); };
+    hàm công khai trống() { trả về mình.số lượng() == 0; };
+    hàm công khai đặt(khóa, giá_trị) { đặt map(mình.bảng, khóa, giá_trị); };
+    hàm công khai lấy(khóa, mặc_định = rỗng) { trả về lấy map(mình.bảng, khóa, mặc_định); };
+    hàm công khai chứa(khóa) { trả về có khóa(mình.bảng, khóa); };
+    hàm công khai xóa(khóa) { trả về xóa khóa(mình.bảng, khóa); };
+    hàm công khai các khóa() { trả về khóa map(mình.bảng); };
+};

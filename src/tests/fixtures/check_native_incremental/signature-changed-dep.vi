@@ -1,0 +1,1 @@
+hàm helper(a) { trả về a + 50; };

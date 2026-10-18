@@ -109,7 +109,7 @@ hàm chính() {
 
     nếu (bộĐếm.giáTrị() == 15 && tổng == 6) {
         in "nhánh đúng";
-    } nếu không {
+    } hoặc {
         in "nhánh sai";
     };
 

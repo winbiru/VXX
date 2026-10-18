@@ -5,7 +5,7 @@ nhập gói/lõi/ký hiệu vùng;
 nhập gói/văn bản/chuỗi;
 nhập gói/hệ thống/môi trường;
 
-hàm bản địa hóa chuẩn hóa vùng(vùng) {
+hàm công khai bản địa hóa chuẩn hóa vùng(vùng) {
     thử {
         trả về ký hiệu vùng chuẩn hóa(vùng);
     } bắt lỗi (e) {
@@ -13,7 +13,7 @@ hàm bản địa hóa chuẩn hóa vùng(vùng) {
     };
 };
 
-hàm vùng mặc định() {
+hàm công khai vùng mặc định() {
     vùng = đọc biến môi trường("LC_ALL", "");
     nếu (vùng == "") {
         vùng = đọc biến môi trường("LANG", "");
@@ -24,7 +24,7 @@ hàm vùng mặc định() {
     trả về bản địa hóa chuẩn hóa vùng(vùng);
 };
 
-hàm bản địa hóa là vùng vi(vùng) {
+hàm riêng tư bản địa hóa là vùng vi(vùng) {
     thử {
         ký_hiệu = ký hiệu vùng lấy(vùng);
     } bắt lỗi (e) {
@@ -33,7 +33,7 @@ hàm bản địa hóa là vùng vi(vùng) {
     trả về lấy map(ký_hiệu, "ngôn ngữ", "") == "vi";
 };
 
-hàm bản địa hóa nhóm số thập phân(raw, vùng_vi) {
+hàm riêng tư bản địa hóa nhóm số thập phân(raw, vùng_vi) {
     dấu = "";
     bắt_đầu = 0;
     nếu (do_dai(raw) > 0 && raw[0] == "-") {
@@ -76,7 +76,7 @@ hàm bản địa hóa nhóm số thập phân(raw, vùng_vi) {
     trả về kết_quả;
 };
 
-hàm định dạng số vùng(giá trị, vùng, số chữ số thập phân = 2) {
+hàm công khai định dạng số vùng(giá trị, vùng, số chữ số thập phân = 2) {
     loại = loai_cua(giá trị);
     nếu (loại != "số nguyên" && loại != "số thực") {
         ném "bản địa hóa: giá trị phải là số hữu hạn";
@@ -105,7 +105,7 @@ hàm định dạng số vùng(giá trị, vùng, số chữ số thập phân =
     };
 };
 
-hàm định dạng tiền vùng(giá trị, mã tiền tệ, vùng) {
+hàm công khai định dạng tiền vùng(giá trị, mã tiền tệ, vùng) {
     nếu (loai_cua(mã tiền tệ) != "chuỗi") {
         ném "bản địa hóa: mã tiền tệ phải là chuỗi";
     };

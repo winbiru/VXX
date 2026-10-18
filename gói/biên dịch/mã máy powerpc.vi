@@ -1,0 +1,27 @@
+// powerpc: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phát POWERPC {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+        ra = [];
+        nếu (loại == "hằng") {
+                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("3c600000") + cao, ít);
+                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("60630000") + thấp, ít);
+            } hoặc {
+                nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "7c632214", ít); }
+                hoặc { biên dịch mã máy thêm hex(ra, "7c641850", ít); };
+            };
+            biên dịch mã máy thêm hex(ra, "4e800020", ít);
+        trả về ra;
+    };
+};
+
+
+hàm công khai biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    __vpp_adapter = Bộ Phát POWERPC();
+    trả về __vpp_adapter.biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+};

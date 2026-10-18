@@ -1,0 +1,15 @@
+// Nguồn native self-host dùng để kiểm tra object đã liên kết/chạy trên CPU thật.
+hàm twice(a) { trả về a + a; };
+
+hàm sum(n) {
+    biến total = 0;
+    lặp (i = 0; i < n; i++) {
+        nếu (i == 2) { bỏ qua; };
+        nếu (i == 7) { thoát; };
+        total += twice(i);
+    };
+    trả về total;
+};
+
+// Tham số che tên hàm, nhưng phải được ánh xạ theo symbol ID của biến.
+hàm other(twice) { trả về twice * 2; };

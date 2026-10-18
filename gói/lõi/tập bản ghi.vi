@@ -1,19 +1,19 @@
 // vi.sql.rowset — tập kết quả độc lập kết nối dùng list<map> của runtime.
 nhập gói/bộ sưu tập/chính;
 
-hàm tập bản ghi(danh sách hàng) {
+hàm công khai tập bản ghi(danh sách hàng) {
     trả về danh sách hàng;
 };
 
-hàm số hàng tập bản ghi(bản ghi) {
+hàm công khai số hàng tập bản ghi(bản ghi) {
     trả về độ dài(bản ghi);
 };
 
-hàm hàng tập bản ghi(bản ghi, chỉ số) {
+hàm công khai hàng tập bản ghi(bản ghi, chỉ số) {
     trả về bản ghi[chỉ số];
 };
 
-hàm lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
+hàm công khai lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
     kết quả = [];
     lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
         hàng = bản ghi[i];
@@ -24,10 +24,41 @@ hàm lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
     trả về kết quả;
 };
 
-hàm cột tập bản ghi(bản ghi, cột, mặc định = rỗng) {
+hàm công khai cột tập bản ghi(bản ghi, cột, mặc định = rỗng) {
     kết quả = [];
     lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
         thêm(kết quả, lấy map(bản ghi[i], cột, mặc định));
     };
     trả về kết quả;
+};
+
+// Sao chép danh sách ngoài để cursor/kích thước không phụ thuộc nguồn gọi.
+// Map của mỗi hàng vẫn được chia sẻ như API tập bản ghi hiện có.
+lớp công khai Tập Bản Ghi triển khai Bộ Chứa {
+    hàm công khai khởi tạo(các_hàng) {
+        nếu (loai_cua(các_hàng) != "danh sách") { ném "tập bản ghi: cần danh sách hàng"; };
+        mình.hàng = [];
+        lặp(i = 0; i < do_dai(các_hàng); i++) {
+            nếu (loai_cua(các_hàng[i]) != "từ điển") { ném "tập bản ghi: hàng phải là từ điển"; };
+            them(mình.hàng, các_hàng[i]);
+        };
+    };
+    hàm công khai số lượng() { trả về do_dai(mình.hàng); };
+    hàm công khai trống() { trả về mình.số lượng() == 0; };
+    hàm công khai tại(chỉ_số) {
+        nếu (loai_cua(chỉ_số) != "số nguyên" || chỉ_số < 0 || chỉ_số >= mình.số lượng()) {
+            ném "tập bản ghi: chỉ số ngoài phạm vi";
+        };
+        hàng = mình.hàng;
+        trả về hàng[chỉ_số];
+    };
+    hàm công khai lọc bằng(cột, giá_trị) {
+        trả về Tập Bản Ghi(lọc tập bản ghi bằng(mình.hàng, cột, giá_trị));
+    };
+    hàm công khai cột(tên, mặc_định = rỗng) { trả về cột tập bản ghi(mình.hàng, tên, mặc_định); };
+    hàm công khai danh sách() {
+        kết_quả = [];
+        lặp(i = 0; i < mình.số lượng(); i++) { them(kết_quả, mình.tại(i)); };
+        trả về kết_quả;
+    };
 };

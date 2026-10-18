@@ -45,10 +45,16 @@ vdk-*.zip
 
 # V++ workspace/package cache
 .vpp/
+.vpp-native-cache/
 
 # Python tooling
 __pycache__/
 *.pyc
 *.md
+!benchmark/NATIVE.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
+!docs/native-code-generator-implementation.md
+!docs/compiler-self-hosting-status.md
+!docs/native-freestanding-macos.md
+!docs/kien-truc-oop-thu-vien-va-bien-dich.md

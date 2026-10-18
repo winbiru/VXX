@@ -91,10 +91,10 @@ hàm kiểmTraĐiềuKhiển() {
     phânLoại = "";
     nếu (tổng > 20) {
         phânLoại = "lớn";
-    } nếu không {
+    } hoặc {
         nếu (tổng > 10) {
             phânLoại = "vừa";
-        } nếu không {
+        } hoặc {
             phânLoại = "nhỏ";
         };
     };

@@ -1,0 +1,6 @@
+// Hợp đồng cho vòng đời ứng dụng có trạng thái.
+giao diện công khai Vòng Đời Ứng Dụng {
+    hàm công khai chạy();
+    hàm công khai dừng();
+    hàm công khai đang chạy();
+};

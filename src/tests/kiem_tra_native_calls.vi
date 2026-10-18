@@ -1,0 +1,40 @@
+// Native object linkage: direct calls, nested calls, recursion, loops and ABI arguments.
+hàm co_so() { trả về 7; }
+
+hàm them(a, b) { trả về a + b; }
+hàm ten_ham_dai(x) { trả về x; }
+
+hàm nhan_sau(n) {
+    nếu (n <= 1) { trả về 1; };
+    trả về n * nhan_sau(n - 1);
+}
+
+hàm ket_hop(a, b, c, d) {
+    trả về them(them(a, b), them(c, d)) + ten_ham_dai(co_so());
+}
+
+hàm tinh_vong(n) {
+    biến kq = 0;
+    lặp (i = 0; i < n; i = i + 1) {
+        kq = kq + them(i, co_so());
+    };
+    trả về kq;
+}
+
+hàm bon(a, b, c, d) { trả về a + b + c + d; }
+hàm goi_bon(a, b, c, d) { trả về bon(a, b, c, d); }
+
+// Vượt số thanh ghi đối số: 8 ARM64, 6 SysV x86_64, 4 Win64.
+hàm tong_muoi(a, b, c, d, e, f, g, h, i, j) {
+    trả về a + b + c + d + e + f + g + h + i + j;
+}
+hàm goi_muoi(a, b, c, d, e, f, g, h, i, j) {
+    trả về tong_muoi(a, b, c, d, e, f, g, h, i, j);
+}
+
+hàm chính() {
+    in ket_hop(1, 2, 3, 4);
+    in nhan_sau(5);
+    in tinh_vong(4);
+    in goi_bon(4, 5, 6, 7);
+}

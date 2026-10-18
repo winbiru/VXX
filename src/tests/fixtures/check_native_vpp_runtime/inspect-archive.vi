@@ -1,0 +1,21 @@
+hàm chính() {
+    nếu (đối_số_đếm() != 2) { trả về 70; };
+    biến path = đối_số_lấy(1);
+    biến data = byte_mới();
+    biến file = tệp_mở_đọc(path);
+    nếu (file <= 0) { trả về 71; };
+    biến read = tệp_đọc_khối(file, data);
+    nếu (tệp_đóng(file) != 0) { trả về 72; };
+    nếu (read < 0) { trả về 73; };
+    biến summary = rt_object_archive_summary(data);
+    nếu (summary < 0) { trả về 60; };
+    biến position = 0;
+    biến count = máy_chia_i32(summary, 2);
+    lặp (i = 0; i < count; i++) {
+        biến length = rt_object_archive_entry(data, position);
+        nếu (length < 232) { trả về 80; };
+        position = position + 4 + length;
+    };
+    nếu (position != byte_dài(data)) { trả về 81; };
+    trả về 60 + summary;
+};

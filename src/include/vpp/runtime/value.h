@@ -165,6 +165,7 @@ struct RuntimeCell {
 struct RuntimeClosure {
     int functionId = -1;
     std::unordered_map<int, CellHandle> captures;
+    ClassHandle methodOwnerClass;
 };
 
 // Kiểm tra điều kiện của `isNumeric`.

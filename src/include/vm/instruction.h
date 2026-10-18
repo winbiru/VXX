@@ -163,6 +163,7 @@ enum Opcode {
     OP_VM_STRING_FROM_BYTES = 154,
     OP_VM_FLOAT_FROM_BITS = 155,
     OP_FFI_CALL = 156,          // operand=argc, operandIndex=foreign descriptor id
+    OP_VM_BYTECODE_CHAY = 157, // host VM nhận artifact bytecode đã được V++ liên kết
 
 };
 

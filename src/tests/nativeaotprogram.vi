@@ -1,0 +1,21 @@
+// Chương trình native tự chủ: nhiều hàm, vòng lặp và CALL relocation.
+hàm twice(a) { trả về a + a; };
+
+hàm sum(n) {
+    biến total = 0;
+    lặp (i = 0; i < n; i++) {
+        nếu (i == 2) { bỏ qua; };
+        nếu (i == 7) { thoát; };
+        total += twice(i);
+    };
+    trả về total;
+};
+
+hàm other(value) { trả về value * 2; };
+
+// Native symbol main được xuất từ entrypoint tiếng Việt chính.
+// Exit status: 38 + 4 = 42.
+hàm chính() { trả về sum(11) + other(twice(1)); };
+
+// Exercise relocation of a direct call to the Vietnamese entrypoint.
+hàm entry_alias() { trả về chính(); };

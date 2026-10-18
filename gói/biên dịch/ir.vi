@@ -1,0 +1,674 @@
+// Hạ AST parser/semantic V++ thành IR stack-based độc lập với C++.
+// Mỗi lệnh dùng {"mã": ..., "giá trị": ...}; lệnh có thứ tự thực thi.
+// Những cú pháp chưa lower được phải thất bại ngay tại pass này.
+nhập gói/biên dịch/ngữ nghĩa;
+nhập gói/biên dịch/chương trình;
+nhập gói/biên dịch/biểu thức;
+nhập gói/bộ sưu tập/từ điển;
+
+// Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
+lớp công khai Bộ Hạ IR {
+    hàm công khai khởi tạo(mã_nguồn = "") {
+        mình.làm mới(mã_nguồn);
+    };
+
+    hàm công khai làm mới(mã_nguồn) {
+        nếu (loai_cua(mã_nguồn) != "chuỗi") {
+            ném "Bộ Hạ IR: mã nguồn phải là chuỗi";
+        };
+        mình.nguồn = mã_nguồn;
+        mình.kết_quả = rỗng;
+        trả về mình;
+    };
+
+    hàm công khai hạ() {
+        nếu (mình.kết_quả == rỗng) {
+            mình.kết_quả = mình.biên dịch hạ IR thuần(mình.nguồn);
+        };
+        trả về mình.kết_quả;
+    };
+
+    hàm riêng tư biên dịch IR thêm(lệnh, mã, giá_trị) {
+        thêm(lệnh, {"mã": mã, "giá trị": giá_trị});
+    };
+
+    // Lexer có thể giữ `đối_tượng.thành_viên` trong một token tên.
+    // Trả về cặp receiver/member; việc phân biệt alias module xử lý ở emitter.
+    hàm công khai biên dịch IR tách thành viên(tên) {
+        nhận = "";
+        lặp(i = 0; i < độ dài(tên); i++) {
+            nếu (tên[i] == ".") {
+                nếu (nhận == "" || i + 1 >= độ dài(tên)) { trả về rỗng; };
+                phần = "";
+                lặp(j = i + 1; j < độ dài(tên); j++) { phần += tên[j]; };
+                trả về {"nhận": nhận, "tên": phần};
+            };
+            nhận += tên[i];
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư biên dịch IR lấy thành viên(nút) {
+        nếu (lấy map(nút, "loại", "") == "thành viên") {
+            gốc_dữ_liệu = lấy map(nút, "đối tượng", rỗng);
+            nếu (lấy map(gốc_dữ_liệu, "loại", "") != "tên") {
+                trả về {"nhận": "", "tên": nút["tên"], "tạm": đúng,
+                         "biểu thức nhận": gốc_dữ_liệu};
+            };
+            trả về {"nhận": gốc_dữ_liệu["giá trị"], "tên": nút["tên"]};
+        };
+        nếu (lấy map(nút, "loại", "") == "tên") {
+            trả về mình.biên dịch IR tách thành viên(nút["giá trị"]);
+        };
+        trả về rỗng;
+    };
+
+    // Binding ID thuộc semantic IR, độc lập với tên và function ID của VM.
+    // Các biến thông thường dùng scope hàm/global (như C++ SemanticBuilder);
+    // mỗi catch có scope từ vựng riêng, kể cả hai catch trùng tên.
+    hàm riêng tư biên dịch IR tìm ràng buộc(bảng, tên) {
+        lặp(i = 0; i < độ dài(bảng); i++) {
+            nếu (bảng[i]["tên"] == tên) { trả về bảng[i]["id"]; };
+        };
+        trả về -1;
+    };
+
+    hàm riêng tư biên dịch IR khai ràng buộc(bảng, tên, bộ_đếm) {
+        id = mình.biên dịch IR tìm ràng buộc(bảng, tên);
+        nếu (id >= 0) { trả về id; };
+        id = bộ_đếm["tiếp"];
+        bộ_đếm["tiếp"] = id + 1;
+        thêm(bảng, {"tên": tên, "id": id});
+        trả về id;
+    };
+
+    hàm riêng tư biên dịch IR tên mục(mục) {
+        mã = mục["mã"];
+        nếu (mã == "ca") {
+            nếu (lấy map(mục["giá trị"], "loại", "") == "tên") {
+                trả về mục["giá trị"]["giá trị"];
+            };
+        };
+        nếu (mã == "gọi tên" || mã == "gọi tường minh") {
+            trả về mục["giá trị"]["tên"];
+        };
+        nếu (mã == "đọc tên" || mã == "khai báo" ||
+            mã == "chuẩn bị gán" || mã == "gán tên" ||
+            mã == "++" || mã == "--" || mã == "bắt đầu lặp") {
+            trả về mục["giá trị"];
+        };
+        nếu (mã == "đọc thành viên" || mã == "chuẩn bị gán thành viên" ||
+            mã == "bắt đầu gọi thành viên") {
+            trả về mục["giá trị"]["nhận"];
+        };
+        trả về "";
+    };
+
+    // Pass 1: dựng symbol cho mọi khai báo và phép gán implicit của cùng hàm.
+    // Bỏ qua biến catch: scope này chỉ tồn tại trong phần `bắt lỗi`.
+    hàm riêng tư biên dịch IR tập hợp ràng buộc(lệnh, bảng, toàn_cục, bộ_đếm) {
+        các_catch = [];
+        lặp(i = 0; i < độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            mã = mục["mã"];
+            nếu (mã == "bắt đầu thử") { thêm(các_catch, ""); };
+            nếu (mã == "bắt lỗi") {
+                các_catch[độ dài(các_catch) - 1] = mục["giá trị"];
+            };
+            nếu (mã == "kết thúc thử") { xóa tại(các_catch, độ dài(các_catch) - 1); };
+            nếu (mã == "khai báo" || mã == "chuẩn bị gán" ||
+                mã == "gán tên" || mã == "++" || mã == "--" ||
+                mã == "bắt đầu lặp") {
+                tên = mục["giá trị"];
+                bị_che = sai;
+                nếu (mã != "khai báo") {
+                    lặp(j = 0; j < độ dài(các_catch); j++) {
+                        nếu (các_catch[j] == tên) { bị_che = đúng; };
+                    };
+                };
+                nếu (!bị_che && tên != "") {
+                    nếu (mã == "khai báo" ||
+                        mình.biên dịch IR tìm ràng buộc(toàn_cục, tên) < 0) {
+                        mình.biên dịch IR khai ràng buộc(bảng, tên, bộ_đếm);
+                    };
+                };
+            };
+        };
+    };
+
+    // Pass 2: phân giải mọi thao tác đọc/ghi/gọi tới cùng SymbolId.
+    // Stack catch bảo đảm tên chỉ che binding ngoài khi vào nhánh catch.
+    hàm riêng tư biên dịch IR gắn ràng buộc(lệnh, bảng, toàn_cục, bộ_đếm) {
+        các_catch = [];
+        lặp(i = 0; i < độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            mã = mục["mã"];
+            nếu (mã == "bắt đầu thử") {
+                thêm(các_catch, {"tên": "", "id": -1});
+            };
+            nếu (mã == "bắt lỗi") {
+                tên_lỗi = mục["giá trị"];
+                id_lỗi = -1;
+                nếu (tên_lỗi != "") {
+                    id_lỗi = bộ_đếm["tiếp"];
+                    bộ_đếm["tiếp"] = id_lỗi + 1;
+                };
+                các_catch[độ dài(các_catch) - 1] = {"tên": tên_lỗi, "id": id_lỗi};
+                mục["symbol"] = id_lỗi;
+            };
+            nếu (mã == "kết thúc thử") {
+                xóa tại(các_catch, độ dài(các_catch) - 1);
+            };
+            tên = mình.biên dịch IR tên mục(mục);
+            nếu (tên != "" && mã != "gọi tường minh") {
+                id = -1;
+                nếu (mã != "khai báo") {
+                    lặp(j = độ dài(các_catch); j > 0; j--) {
+                        nếu (các_catch[j - 1]["tên"] == tên) {
+                            id = các_catch[j - 1]["id"];
+                            thoát;
+                        };
+                    };
+                };
+                nếu (id < 0) { id = mình.biên dịch IR tìm ràng buộc(bảng, tên); };
+                nếu (id < 0) { id = mình.biên dịch IR tìm ràng buộc(toàn_cục, tên); };
+                nếu (id >= 0) { mục["symbol"] = id; };
+            };
+            lệnh[i] = mục;
+        };
+    };
+
+    hàm riêng tư biên dịch IR phân giải ràng buộc(top, các_hàm) {
+        bộ_đếm = {"tiếp": 0};
+        toàn_cục = [];
+        mình.biên dịch IR tập hợp ràng buộc(top, toàn_cục, [], bộ_đếm);
+        lặp(i = 0; i < độ dài(các_hàm); i++) {
+            mục = các_hàm[i];
+            cục_bộ = [];
+            ids = [];
+            nhận_ngầm = [];
+            nhận_ids = [];
+            nếu (lấy map(mục, "phương thức", sai)) {
+                lệnh_nhận = mục["lệnh"];
+                lặp(k = 0; k < 2; k++) {
+                    tên_nhận = "mình";
+                    nếu (k == 1) { tên_nhận = "gốc"; };
+                    dùng = sai;
+                    lặp(t = 0; t < độ dài(lệnh_nhận); t++) {
+                        chỉ_dẫn = lệnh_nhận[t];
+                        mã_nhận = chỉ_dẫn["mã"];
+                        nếu (mã_nhận == "đọc tên" && chỉ_dẫn["giá trị"] == tên_nhận) {
+                            dùng = đúng;
+                        };
+                        nếu (mã_nhận == "đọc thành viên" ||
+                            mã_nhận == "chuẩn bị gán thành viên" ||
+                            mã_nhận == "bắt đầu gọi thành viên") {
+                            nếu (chỉ_dẫn["giá trị"]["nhận"] == tên_nhận) {
+                                dùng = đúng;
+                            };
+                        };
+                    };
+                    nếu (dùng) {
+                        thêm(nhận_ngầm, tên_nhận);
+                        thêm(nhận_ids, mình.biên dịch IR khai ràng buộc(cục_bộ, tên_nhận, bộ_đếm));
+                    };
+                };
+            };
+            tham_số = mục["tham số"];
+            lặp(j = 0; j < độ dài(tham_số); j++) {
+                thêm(ids, mình.biên dịch IR khai ràng buộc(cục_bộ, tham_số[j], bộ_đếm));
+            };
+            lệnh = mục["lệnh"];
+            mình.biên dịch IR tập hợp ràng buộc(lệnh, cục_bộ, toàn_cục, bộ_đếm);
+            mình.biên dịch IR gắn ràng buộc(lệnh, cục_bộ, toàn_cục, bộ_đếm);
+            mục["tham số symbol"] = ids;
+            mục["nhận ngầm"] = nhận_ngầm;
+            mục["nhận symbol"] = nhận_ids;
+            các_hàm[i] = mục;
+        };
+        mình.biên dịch IR gắn ràng buộc(top, toàn_cục, [], bộ_đếm);
+    };
+
+    // C++ codegen.cpp::isStaticCollectionLiteralValue chỉ nhận hằng và
+    // collection tĩnh lồng nhau; tên và phép tính luôn là biểu thức động.
+    hàm riêng tư biên dịch IR tập hợp tĩnh(nút) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "hằng") { trả về đúng; };
+        nếu (loại == "danh sách") {
+            phần_tử = lấy map(nút, "phần tử", []);
+            lặp(i = 0; i < độ dài(phần_tử); i++) {
+                nếu (!mình.biên dịch IR tập hợp tĩnh(phần_tử[i])) { trả về sai; };
+            };
+            trả về đúng;
+        };
+        nếu (loại == "từ điển") {
+            mục = lấy map(nút, "mục", []);
+            lặp(i = 0; i < độ dài(mục); i++) {
+                nếu (!mình.biên dịch IR tập hợp tĩnh(mục[i]["giá trị"])) { trả về sai; };
+            };
+            trả về đúng;
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư biên dịch IR biểu thức(nút, lệnh) {
+        nếu (nút == rỗng) { ném "biên dịch IR: thiếu biểu thức"; };
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "hằng") {
+            kiểu = lấy map(nút, "kiểu", "");
+            giá_trị = lấy map(nút, "giá trị", "");
+            nếu (kiểu == "số nguyên") {
+                mình.biên dịch IR thêm(lệnh, "số nguyên", giá_trị);
+            } hoặc {
+                nếu (kiểu == "số thực") {
+                    mình.biên dịch IR thêm(lệnh, "số thực", giá_trị);
+                } hoặc {
+                    nếu (kiểu == "chuỗi") {
+                        mình.biên dịch IR thêm(lệnh, "chuỗi", giá_trị);
+                    } hoặc {
+                        nếu (giá_trị == "đúng" || giá_trị == "sai" ||
+                            giá_trị == "rỗng") {
+                            mình.biên dịch IR thêm(lệnh, giá_trị, "");
+                        } hoặc {
+                            ném "biên dịch IR: hằng chưa hỗ trợ '" + giá_trị + "'";
+                        };
+                    };
+                };
+            };
+            trả về đúng;
+        };
+        nếu (loại == "tên") {
+            mình.biên dịch IR thêm(lệnh, "đọc tên", lấy map(nút, "giá trị", ""));
+            trả về đúng;
+        };
+        nếu (loại == "thành viên") {
+            thành_viên = mình.biên dịch IR lấy thành viên(nút);
+            nếu (lấy map(thành_viên, "tạm", sai)) {
+                mình.biên dịch IR biểu thức(thành_viên["biểu thức nhận"], lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "đọc thành viên", thành_viên);
+            trả về đúng;
+        };
+        nếu (loại == "danh sách") {
+            nếu (mình.biên dịch IR tập hợp tĩnh(nút)) {
+                mình.biên dịch IR thêm(lệnh, "danh sách tĩnh", nút);
+                trả về đúng;
+            };
+            phần_tử = lấy map(nút, "phần tử", []);
+            lặp(i = 0; i < độ dài(phần_tử); i++) {
+                mình.biên dịch IR biểu thức(phần_tử[i], lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "danh sách động", độ dài(phần_tử));
+            trả về đúng;
+        };
+        nếu (loại == "từ điển") {
+            nếu (mình.biên dịch IR tập hợp tĩnh(nút)) {
+                mình.biên dịch IR thêm(lệnh, "từ điển tĩnh", nút);
+                trả về đúng;
+            };
+            mục = lấy map(nút, "mục", []);
+            lặp(i = 0; i < độ dài(mục); i++) {
+                // C++ nạp key của map như chuỗi hằng, không đọc biến tên key.
+                khóa = mục[i]["khóa"];
+                mình.biên dịch IR thêm(lệnh, "khóa từ điển", khóa);
+                mình.biên dịch IR biểu thức(mục[i]["giá trị"], lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "từ điển động", độ dài(mục));
+            trả về đúng;
+        };
+        nếu (loại == "gọi") {
+            đích = lấy map(nút, "hàm", rỗng);
+            kiểu_đích = lấy map(đích, "loại", "");
+            nếu (kiểu_đích != "tên" && kiểu_đích != "thành viên") {
+                ném "biên dịch IR: lời gọi chỉ hỗ trợ tên hàm";
+            };
+            thành_viên = mình.biên dịch IR lấy thành viên(đích);
+            nếu (thành_viên != rỗng) {
+                nếu (lấy map(thành_viên, "tạm", sai)) {
+                    mình.biên dịch IR biểu thức(thành_viên["biểu thức nhận"], lệnh);
+                };
+                mình.biên dịch IR thêm(lệnh, "bắt đầu gọi thành viên", thành_viên);
+            };
+            đối_số = lấy map(nút, "đối số", []);
+            lặp(i = 0; i < độ dài(đối_số); i++) {
+                mình.biên dịch IR biểu thức(đối_số[i], lệnh);
+            };
+            nếu (thành_viên != rỗng) {
+                thành_viên["số đối số"] = độ dài(đối_số);
+                mình.biên dịch IR thêm(lệnh, "gọi thành viên", thành_viên);
+                trả về đúng;
+            };
+            mã_gọi = "gọi tên";
+            nếu (lấy map(nút, "tường minh", sai)) { mã_gọi = "gọi tường minh"; };
+            mình.biên dịch IR thêm(lệnh, mã_gọi, {"tên": đích["giá trị"],
+                                             "số đối số": độ dài(đối_số)});
+            trả về đúng;
+        };
+        nếu (loại == "một ngôi") {
+            toán_tử = lấy map(nút, "toán tử", "");
+            toán_hạng = lấy map(nút, "toán hạng", rỗng);
+            nếu (toán_tử == "-" && lấy map(toán_hạng, "loại", "") == "hằng" &&
+                lấy map(toán_hạng, "kiểu", "") == "số nguyên") {
+                mình.biên dịch IR thêm(lệnh, "số nguyên", "-" + lấy map(toán_hạng, "giá trị", "0"));
+                trả về đúng;
+            };
+            nếu (toán_tử == "-") {
+                nếu (lấy map(toán_hạng, "loại", "") == "hằng" &&
+                    lấy map(toán_hạng, "kiểu", "") == "số thực") {
+                    mình.biên dịch IR thêm(lệnh, "số thực", "-" + toán_hạng["giá trị"]);
+                } hoặc {
+                    mình.biên dịch IR thêm(lệnh, "số nguyên", "0");
+                    mình.biên dịch IR biểu thức(toán_hạng, lệnh);
+                    mình.biên dịch IR thêm(lệnh, "toán tử", "-");
+                };
+                trả về đúng;
+            };
+            nếu (toán_tử == "+") {
+                mình.biên dịch IR biểu thức(toán_hạng, lệnh);
+                trả về đúng;
+            };
+            nếu (toán_tử != "!") {
+                ném "biên dịch IR: toán tử một ngôi chưa hỗ trợ '" + toán_tử + "'";
+            };
+            mình.biên dịch IR biểu thức(toán_hạng, lệnh);
+            mình.biên dịch IR thêm(lệnh, "phủ định", "");
+            trả về đúng;
+        };
+        nếu (loại == "hai ngôi") {
+            toán_tử = lấy map(nút, "toán tử", "");
+            trái = lấy map(nút, "trái", rỗng);
+            phải = lấy map(nút, "phải", rỗng);
+            nếu (biên dịch biểu thức là phép gán(toán_tử)) {
+                đích_thành_viên = mình.biên dịch IR lấy thành viên(trái);
+                nếu (đích_thành_viên != rỗng) {
+                    nếu (toán_tử != "=") {
+                        ném "biên dịch IR: gán kết hợp vào thuộc tính chưa hỗ trợ";
+                    };
+                    nếu (lấy map(đích_thành_viên, "tạm", sai)) {
+                        mình.biên dịch IR biểu thức(đích_thành_viên["biểu thức nhận"], lệnh);
+                    };
+                    mình.biên dịch IR thêm(lệnh, "chuẩn bị gán thành viên", đích_thành_viên);
+                    mình.biên dịch IR biểu thức(phải, lệnh);
+                    mình.biên dịch IR thêm(lệnh, "gán thành viên", đích_thành_viên);
+                    trả về đúng;
+                };
+                nếu (lấy map(trái, "loại", "") == "chỉ số") {
+                    nếu (toán_tử != "=") {
+                        ném "biên dịch IR: gán kết hợp vào chỉ số chưa hỗ trợ";
+                    };
+                    mình.biên dịch IR biểu thức(trái["đối tượng"], lệnh);
+                    mình.biên dịch IR biểu thức(trái["chỉ số"], lệnh);
+                    mình.biên dịch IR biểu thức(phải, lệnh);
+                    mình.biên dịch IR thêm(lệnh, "gán chỉ số", "");
+                    trả về đúng;
+                };
+                nếu (lấy map(trái, "loại", "") != "tên") {
+                    ném "biên dịch IR: chỉ hỗ trợ gán vào tên";
+                };
+                tên = lấy map(trái, "giá trị", "");
+                // Backend C++ đăng ký slot của đích trước khi đi qua vế phải.
+                // IR cần giữ thứ tự này dù việc đẩy ID biến diễn ra sau RHS.
+                mình.biên dịch IR thêm(lệnh, "chuẩn bị gán", tên);
+                nếu (toán_tử != "=") {
+                    mình.biên dịch IR thêm(lệnh, "đọc tên", tên);
+                };
+                mình.biên dịch IR biểu thức(phải, lệnh);
+                nếu (toán_tử != "=") {
+                    // Theo direct IR C++, compound gán = đọc đích, tính nhị phân,
+                    // rồi phát OP_TEN_BIEN_ID + OP_GAN. Opcode 72..76 dành cho
+                    // ký hiệu toán tử, không dùng ở chuỗi bytecode này.
+                    mình.biên dịch IR thêm(lệnh, "toán tử gán", toán_tử);
+                };
+                mình.biên dịch IR thêm(lệnh, "gán tên", tên);
+                trả về đúng;
+            };
+            nếu (biên dịch biểu thức ưu tiên(toán_tử) == 0) {
+                ném "biên dịch IR: phép hai ngôi chưa hỗ trợ '" + toán_tử + "'";
+            };
+            mình.biên dịch IR biểu thức(trái, lệnh);
+            mình.biên dịch IR biểu thức(phải, lệnh);
+            mình.biên dịch IR thêm(lệnh, "toán tử", toán_tử);
+            trả về đúng;
+        };
+        nếu (loại == "chỉ số") {
+            mình.biên dịch IR biểu thức(lấy map(nút, "đối tượng", rỗng), lệnh);
+            mình.biên dịch IR biểu thức(lấy map(nút, "chỉ số", rỗng), lệnh);
+            mình.biên dịch IR thêm(lệnh, "đọc chỉ số", "");
+            trả về đúng;
+        };
+        nếu (loại == "cập nhật") {
+            đích = lấy map(nút, "đối tượng", rỗng);
+            nếu (lấy map(đích, "loại", "") != "tên") {
+                ném "biên dịch IR: chỉ hỗ trợ ++/-- trên tên";
+            };
+            toán_tử = lấy map(nút, "toán tử", "");
+            nếu (toán_tử != "++" && toán_tử != "--") {
+                ném "biên dịch IR: toán tử cập nhật chưa hỗ trợ";
+            };
+            mình.biên dịch IR thêm(lệnh, toán_tử, lấy map(đích, "giá trị", ""));
+            trả về đúng;
+        };
+        ném "biên dịch IR: biểu thức chưa hỗ trợ '" + loại + "'";
+    };
+
+    hàm riêng tư biên dịch IR câu lệnh(nút, lệnh) {
+        loại = lấy map(nút, "loại", "");
+        nếu (loại == "trống") { trả về đúng; };
+        nếu (loại == "khối") {
+            mình.biên dịch IR thêm(lệnh, "mở khối", "");
+            con = lấy map(nút, "câu lệnh", []);
+            lặp(i = 0; i < độ dài(con); i++) {
+                mình.biên dịch IR câu lệnh(con[i], lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "đóng khối", "");
+            trả về đúng;
+        };
+        nếu (loại == "biến") {
+            tên = lấy map(nút, "tên", "");
+            mình.biên dịch IR thêm(lệnh, "khai báo", tên);
+            giá_trị = lấy map(nút, "giá trị", rỗng);
+            nếu (giá_trị != rỗng) {
+                mình.biên dịch IR biểu thức(giá_trị, lệnh);
+                mình.biên dịch IR thêm(lệnh, "gán tên", tên);
+            };
+            trả về đúng;
+        };
+        nếu (loại == "nếu") {
+            mình.biên dịch IR thêm(lệnh, "bắt đầu nếu", "");
+            mình.biên dịch IR biểu thức(lấy map(nút, "điều kiện", rỗng), lệnh);
+            mình.biên dịch IR thêm(lệnh, "nhảy nếu sai", "");
+            mình.biên dịch IR câu lệnh(lấy map(nút, "thân", {}), lệnh);
+            nhánh_khác = lấy map(nút, "nhánh khác", rỗng);
+            nếu (nhánh_khác != rỗng) {
+                mình.biên dịch IR thêm(lệnh, "bắt đầu nhánh khác", "");
+                mình.biên dịch IR câu lệnh(nhánh_khác, lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "kết thúc nếu", "");
+            trả về đúng;
+        };
+        nếu (loại == "lặp") {
+            khởi_tạo = lấy map(nút, "khởi tạo", rỗng);
+            đích = lấy map(khởi_tạo, "trái", rỗng);
+            nếu (lấy map(khởi_tạo, "loại", "") != "hai ngôi" ||
+                lấy map(khởi_tạo, "toán tử", "") != "=" ||
+                lấy map(đích, "loại", "") != "tên") {
+                ném "biên dịch IR: lặp yêu cầu khởi tạo dạng tên = giá trị";
+            };
+            nếu (lấy map(nút, "điều kiện", rỗng) == rỗng ||
+                lấy map(nút, "cập nhật", rỗng) == rỗng) {
+                ném "biên dịch IR: lặp yêu cầu điều kiện và cập nhật";
+            };
+            mình.biên dịch IR thêm(lệnh, "bắt đầu lặp", đích["giá trị"]);
+            mình.biên dịch IR biểu thức(khởi_tạo, lệnh);
+            mình.biên dịch IR thêm(lệnh, "vào lặp", "");
+            mình.biên dịch IR thêm(lệnh, "điều kiện lặp", "");
+            mình.biên dịch IR biểu thức(nút["điều kiện"], lệnh);
+            mình.biên dịch IR thêm(lệnh, "nhảy nếu sai lặp", "");
+            mình.biên dịch IR câu lệnh(nút["thân"], lệnh);
+            mình.biên dịch IR thêm(lệnh, "cập nhật lặp", "");
+            mình.biên dịch IR biểu thức(nút["cập nhật"], lệnh);
+            mình.biên dịch IR thêm(lệnh, "kết thúc lặp", "");
+            trả về đúng;
+        };
+        nếu (loại == "chọn") {
+            mình.biên dịch IR biểu thức(lấy map(nút, "biểu thức", rỗng), lệnh);
+            mình.biên dịch IR thêm(lệnh, "bắt đầu chọn", "");
+            nhánh = lấy map(nút, "nhánh", []);
+            lặp(i = 0; i < độ dài(nhánh); i++) {
+                mục = nhánh[i];
+                nếu (mục["loại"] == "ca") {
+                    mình.biên dịch IR thêm(lệnh, "ca", mục["nhãn"]);
+                } hoặc {
+                    mình.biên dịch IR thêm(lệnh, "mặc định", "");
+                };
+                mình.biên dịch IR câu lệnh(mục["thân"], lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "kết thúc chọn", "");
+            trả về đúng;
+        };
+        nếu (loại == "thoát") {
+            mình.biên dịch IR thêm(lệnh, "thoát", "");
+            trả về đúng;
+        };
+        nếu (loại == "bỏ qua") {
+            mình.biên dịch IR thêm(lệnh, "bỏ qua", "");
+            trả về đúng;
+        };
+        nếu (loại == "thử") {
+            mình.biên dịch IR thêm(lệnh, "bắt đầu thử", "");
+            mình.biên dịch IR câu lệnh(nút["thân"], lệnh);
+            mình.biên dịch IR thêm(lệnh, "bắt lỗi", lấy map(nút, "biến lỗi", ""));
+            mình.biên dịch IR câu lệnh(nút["bắt"], lệnh);
+            mình.biên dịch IR thêm(lệnh, "kết thúc thử", "");
+            trả về đúng;
+        };
+        nếu (loại == "ném") {
+            giá_trị = lấy map(nút, "biểu thức", rỗng);
+            nếu (giá_trị == rỗng) {
+                mình.biên dịch IR thêm(lệnh, "chuỗi", "\"lỗi không xác định\"");
+            } hoặc {
+                mình.biên dịch IR biểu thức(giá_trị, lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "ném", "");
+            trả về đúng;
+        };
+        nếu (loại == "in") {
+            mình.biên dịch IR biểu thức(lấy map(nút, "biểu thức", rỗng), lệnh);
+            mình.biên dịch IR thêm(lệnh, "in", "");
+            trả về đúng;
+        };
+        nếu (loại == "biểu thức") {
+            mình.biên dịch IR biểu thức(lấy map(nút, "biểu thức", rỗng), lệnh);
+            trả về đúng;
+        };
+        nếu (loại == "trả về") {
+            giá_trị = lấy map(nút, "biểu thức", rỗng);
+            nếu (giá_trị == rỗng) {
+                mình.biên dịch IR thêm(lệnh, "số nguyên", "0");
+            } hoặc {
+                mình.biên dịch IR biểu thức(giá_trị, lệnh);
+            };
+            mình.biên dịch IR thêm(lệnh, "trả về", "");
+            trả về đúng;
+        };
+        ném "biên dịch IR: câu lệnh chưa hỗ trợ '" + loại + "'";
+    };
+
+    // Hạ AST đã được semantic kiểm tra. Module imports chỉ được bỏ qua ở
+    // nhánh emitter đa mô-đun sau khi graph đã giải tất cả dependencies.
+    hàm công khai biên dịch hạ IR từ cây thuần(cây, bỏ_qua_nhập) {
+        biên dịch kiểm tra ngữ nghĩa thuần(cây);
+        câu_lệnh = lấy map(cây, "câu lệnh", []);
+        top = [];
+        các_hàm = [];
+        các_lớp = [];
+        thứ_tự = [];
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mục = câu_lệnh[i];
+            nếu (lấy map(mục, "loại", "") == "hàm") {
+                nội_dung = [];
+                thân = lấy map(mục, "thân", {});
+                phần_thân = lấy map(thân, "câu lệnh", []);
+                lặp(j = 0; j < độ dài(phần_thân); j++) {
+                    mình.biên dịch IR câu lệnh(phần_thân[j], nội_dung);
+                };
+                thêm(các_hàm, {"tên": lấy map(mục, "tên", ""),
+                               "tham số": lấy map(mục, "tham số", []),
+                               "mặc định tham số": lấy map(mục, "mặc định tham số", []),
+                               "lệnh": nội_dung});
+                thêm(thứ_tự, {"loại": "hàm", "chỉ số": độ dài(các_hàm) - 1});
+            } hoặc {
+                nếu (lấy map(mục, "loại", "") == "lớp") {
+                    thêm(các_lớp, {"tên": mục["tên"],
+                                    "lớp cha": lấy map(mục, "lớp cha", ""),
+                                    "phương thức": [],
+                                    "cây phương thức": lấy map(mục, "phương thức", [])});
+                    thêm(thứ_tự, {"loại": "lớp", "chỉ số": độ dài(các_lớp) - 1});
+                    bỏ qua;
+                };
+                nếu (lấy map(mục, "loại", "") == "giao diện") { bỏ qua; };
+                nếu (lấy map(mục, "loại", "") == "nhập" && bỏ_qua_nhập) {
+                    // Bước phát mã cần biết đúng vị trí import trong nguồn.
+                    thêm(thứ_tự, {"loại": "nhập", "đích": mục["đích"],
+                        "bí danh": lấy map(mục, "bí danh", ""),
+                        "tái xuất": lấy map(mục, "tái xuất", sai)});
+                    bỏ qua;
+                };
+                bắt_đầu = độ dài(top);
+                mình.biên dịch IR câu lệnh(mục, top);
+                thêm(thứ_tự, {"loại": "lệnh", "bắt đầu": bắt_đầu,
+                              "kết thúc": độ dài(top)});
+            };
+        };
+        // Các phương thức được hạ sau mọi hàm global, vì C++ predeclare
+        // function ID cho hàm global trước rồi mới cấp ID khi phát lớp.
+        lặp(i = 0; i < độ dài(các_lớp); i++) {
+            lớp_ir = các_lớp[i];
+            phương_thức = lớp_ir["cây phương thức"];
+            lặp(j = 0; j < độ dài(phương_thức); j++) {
+                khai = phương_thức[j];
+                thân = [];
+                câu = lấy map(lấy map(khai, "thân", {}), "câu lệnh", []);
+                lặp(k = 0; k < độ dài(câu); k++) {
+                    mình.biên dịch IR câu lệnh(câu[k], thân);
+                };
+                thêm(các_hàm, {"tên": lớp_ir["tên"] + "." + khai["tên"],
+                               "tên ngắn": khai["tên"],
+                               "phương thức": đúng,
+                               "phạm vi": lấy map(khai, "phạm vi", ""),
+                               "tham số": lấy map(khai, "tham số", []),
+                               "mặc định tham số": lấy map(khai, "mặc định tham số", []),
+                               "lệnh": thân});
+                thêm(lớp_ir["phương thức"], độ dài(các_hàm) - 1);
+            };
+            lớp_ir["cây phương thức"] = [];
+            các_lớp[i] = lớp_ir;
+        };
+        mình.biên dịch IR phân giải ràng buộc(top, các_hàm);
+        trả về {"loại": "chương trình IR", "lệnh": top, "hàm": các_hàm,
+                "lớp": các_lớp,
+                "thứ tự": thứ_tự};
+    };
+
+    // Đường đơn vị giữ nguyên hành vi: import chưa giải phải báo lỗi ở IR.
+    hàm công khai biên dịch hạ IR thuần(mã_nguồn) {
+        trả về mình.biên dịch hạ IR từ cây thuần(
+            biên dịch phân tích chương trình thuần(mã_nguồn), sai);
+    };
+};
+
+
+hàm công khai biên dịch IR tách thành viên(tên) {
+    __vpp_adapter = Bộ Hạ IR();
+    trả về __vpp_adapter.biên dịch IR tách thành viên(tên);
+};
+
+hàm công khai biên dịch hạ IR từ cây thuần(cây, bỏ_qua_nhập) {
+    __vpp_adapter = Bộ Hạ IR();
+    trả về __vpp_adapter.biên dịch hạ IR từ cây thuần(cây, bỏ_qua_nhập);
+};
+
+hàm công khai biên dịch hạ IR thuần(mã_nguồn) {
+    __vpp_adapter = Bộ Hạ IR();
+    trả về __vpp_adapter.biên dịch hạ IR thuần(mã_nguồn);
+};

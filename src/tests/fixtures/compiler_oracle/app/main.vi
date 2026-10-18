@@ -1,0 +1,2 @@
+nhập ../lib/feature như api;
+hàm chính() { in api.tính(); in api.số.cộng(); };

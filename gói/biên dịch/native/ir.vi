@@ -1,0 +1,107 @@
+// Máy thực thi tham chiếu cho IR i32 sinh ra bởi parser.vi.
+// Đây là logic V++ chạy trong native executable, không gọi VM C++.
+hàm ir_push(stack, top, value) {
+    nếu (top < 0) { trả về -1; };
+    nếu (top >= 1000) { trả về -1; };
+    nếu (byte_dài(stack) >= (top + 1) * 4) {
+        trả về byte_ghi_i32(stack, top * 4, value);
+    };
+    trả về byte_đẩy_i32(stack, value);
+};
+
+hàm ir_branch_target(ir, target) {
+    nếu (target < 0) { trả về 0; };
+    lặp (offset = 0; offset < byte_dài(ir); offset = offset + 8) {
+        nếu (offset == target) { trả về 1; };
+    };
+    trả về 0;
+};
+
+// Kết quả hợp lệ có thể âm; lỗi trả -2147483647 (không dùng trong fixture).
+hàm ir_run(ir) {
+    biến length = byte_dài(ir);
+    nếu (length < 8) { trả về -2147483647; };
+    biến locals = byte_mới();
+    biến stack = byte_mới();
+    nếu (locals <= 0) { trả về -2147483647; };
+    nếu (stack <= 0) { byte_hủy(locals); trả về -2147483647; };
+    lặp (i = 0; i < 1000; i++) { byte_đẩy_i32(locals, 0); };
+    biến top = 0;
+    biến result = -2147483647;
+    biến steps = 0;
+    lặp (pc = 0; pc < length; pc = pc + 8) {
+        steps = steps + 1;
+        nếu (steps > 200000) { thoát; };
+        nếu (pc + 8 > length) { thoát; };
+        biến op = byte_đọc_i32(ir, pc);
+        biến arg = byte_đọc_i32(ir, pc + 4);
+        nếu (op == 1) {
+            nếu (ir_push(stack, top, arg) != 0) { thoát; };
+            top = top + 1;
+        } hoặc {
+            nếu (op == 2) {
+                nếu (arg < 0) { thoát; };
+                nếu (arg >= 1000) { thoát; };
+                nếu (ir_push(stack, top, byte_đọc_i32(locals, arg * 4)) != 0) { thoát; };
+                top = top + 1;
+            } hoặc {
+                nếu (op == 3) {
+                    nếu (top < 1) { thoát; };
+                    nếu (arg < 0) { thoát; };
+                    nếu (arg >= 1000) { thoát; };
+                    top = top - 1;
+                    nếu (byte_ghi_i32(locals, arg * 4, byte_đọc_i32(stack, top * 4)) != 0) { thoát; };
+                } hoặc {
+                    nếu (op == 7) {
+                        nếu (top != 1) { thoát; };
+                        // A return inside a conditional can precede other IR
+                        // branches. The native codegen accepts these early
+                        // returns; the reference evaluator must do so too.
+                        result = byte_đọc_i32(stack, 0);
+                        thoát;
+                    } hoặc {
+                        nếu (op == 8) {
+                            nếu (top < 1) { thoát; };
+                            biến unary_value = byte_đọc_i32(stack, (top - 1) * 4);
+                            byte_ghi_i32(stack, (top - 1) * 4, 0 - unary_value);
+                        } hoặc {
+                            nếu (op == 9) {
+                                nếu (top < 1) { thoát; };
+                                nếu (ir_branch_target(ir, arg) != 1) { thoát; };
+                                top = top - 1;
+                                nếu (byte_đọc_i32(stack, top * 4) == 0) { pc = arg - 8; };
+                            } hoặc nếu (op == 10) {
+                                nếu (ir_branch_target(ir, arg) != 1) { thoát; };
+                                pc = arg - 8;
+                            } hoặc {
+                            nếu (top < 2) { thoát; };
+                            biến b = byte_đọc_i32(stack, (top - 1) * 4);
+                            biến a = byte_đọc_i32(stack, (top - 2) * 4);
+                            biến value = 0;
+                            nếu (op == 4) { value = a + b; }
+                            hoặc {
+                                nếu (op == 5) { value = a - b; }
+                                hoặc {
+                                    nếu (op == 6) { value = a * b; }
+                                    hoặc nếu (op == 11) { nếu (a == b) { value = 1; }; }
+                                    hoặc nếu (op == 12) { nếu (a != b) { value = 1; }; }
+                                    hoặc nếu (op == 13) { nếu (a < b) { value = 1; }; }
+                                    hoặc nếu (op == 14) { nếu (a <= b) { value = 1; }; }
+                                    hoặc nếu (op == 15) { nếu (a > b) { value = 1; }; }
+                                    hoặc nếu (op == 16) { nếu (a >= b) { value = 1; }; }
+                                    hoặc { thoát; };
+                                };
+                            };
+                            top = top - 1;
+                            nếu (byte_ghi_i32(stack, (top - 1) * 4, value) != 0) { thoát; };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    byte_hủy(locals);
+    byte_hủy(stack);
+    trả về result;
+};

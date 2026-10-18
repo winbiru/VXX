@@ -35,15 +35,15 @@ lặp(k = 0; k < độ dài(trai) + độ dài(phai); k++) {
     nếu (j >= độ dài(phai)) {
         thêm(tron, trai[i]);
         i++;
-    } nếu không {
+    } hoặc {
         nếu (i >= độ dài(trai)) {
             thêm(tron, phai[j]);
             j++;
-        } nếu không {
+        } hoặc {
             nếu (trai[i] <= phai[j]) {
                 thêm(tron, trai[i]);
                 i++;
-            } nếu không {
+            } hoặc {
                 thêm(tron, phai[j]);
                 j++;
             };

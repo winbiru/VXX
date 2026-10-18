@@ -1,0 +1,24 @@
+// Raw native codegen chỉ hạ một hàm leaf thuần i32 theo tên.
+hàm tra42() { trả về 42; }
+
+hàm tra_am() { trả về -7; }
+hàm tra_i32() { trả về 2147483647; }
+hàm tra_i32_am() { trả về -2147483648; }
+hàm tra_i32_am_ngoac() { trả về -(2147483648); }
+hàm tinh_hang() { trả về (9 + 3) * (8 - 4); }
+hàm tinh_am() { trả về -(2 + 5); }
+hàm tinh_sau() { trả về 100 - 2 * (4 + 3); }
+
+hàm cong(a, b) { trả về a + b; }
+hàm cong_dao(a, b) { trả về b + a; }
+hàm tru(a, b) { trả về a - b; }
+// Thứ tự đối số đảo ngược chưa nằm trong tập leaf AOT được hỗ trợ.
+hàm tru_dao(a, b) { trả về b - a; }
+hàm hang_tran() { trả về 2147483647 + 1; }
+hàm hang_tran_trung_gian() { trả về (2147483647 + 1) - 1; }
+hàm hang_chia() { trả về 20 / 4; }
+
+hàm chua_ho_tro(a) {
+    in a;
+    trả về a;
+}

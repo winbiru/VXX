@@ -3,28 +3,28 @@ nhập bộ sưu tập;
 nhập văn bản;
 nhập kịch bản;
 
-hàm soạn thảo tạo() {
+hàm công khai soạn thảo tạo() {
     trả về {"dòng": []};
 };
 
-hàm soạn thảo thêm(bộ, dòng) {
+hàm công khai soạn thảo thêm(bộ, dòng) {
     ds = lấy map(bộ, "dòng", []);
     thêm(ds, dòng);
     trả về độ dài(ds);
 };
 
-hàm soạn thảo thay(bộ, chỉ số, dòng) {
+hàm công khai soạn thảo thay(bộ, chỉ số, dòng) {
     ds = lấy map(bộ, "dòng", []);
     ds[chỉ số] = dòng;
     trả về 1;
 };
 
-hàm soạn thảo xóa dòng(bộ, chỉ số) {
+hàm công khai soạn thảo xóa dòng(bộ, chỉ số) {
     ds = lấy map(bộ, "dòng", []);
     trả về xóa tại(ds, chỉ số);
 };
 
-hàm soạn thảo nội dung(bộ) {
+hàm công khai soạn thảo nội dung(bộ) {
     ds = lấy map(bộ, "dòng", []);
     nối = bộ nối chuỗi("\n");
     lặp(i = 0; i < độ dài(ds); i++) {
@@ -33,6 +33,6 @@ hàm soạn thảo nội dung(bộ) {
     trả về bộ nối kết quả(nối);
 };
 
-hàm soạn thảo chạy(bộ) {
+hàm công khai soạn thảo chạy(bộ) {
     trả về kịch bản chạy(soạn thảo nội dung(bộ));
 };

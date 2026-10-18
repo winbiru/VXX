@@ -1,0 +1,37 @@
+nhập gói/bộ sưu tập/bộ đệm danh sách;
+
+lớp công khai Danh Sách kế thừa Bộ Đệm Danh Sách {
+    hàm công khai khởi tạo(nguồn = rỗng) {
+        gốc.khởi tạo();
+        nếu (nguồn != rỗng) {
+            nếu (loai_cua(nguồn) != "danh sách") { ném "danh sách: nguồn phải là danh sách"; };
+            lặp(i = 0; i < do_dai(nguồn); i++) { them(mình.phần_tử, nguồn[i]); };
+        };
+    };
+    hàm riêng tư yêu cầu chỉ số(chỉ_số) {
+        nếu (loai_cua(chỉ_số) != "số nguyên" || chỉ_số < 0 || chỉ_số >= mình.số lượng()) {
+            ném "danh sách: chỉ số ngoài phạm vi";
+        };
+    };
+    hàm công khai thêm(giá_trị) { them(mình.phần_tử, giá_trị); trả về mình; };
+    hàm công khai tại(chỉ_số) {
+        mình.yêu cầu chỉ số(chỉ_số);
+        các_mục = mình.phần_tử;
+        trả về các_mục[chỉ_số];
+    };
+    hàm công khai đặt(chỉ_số, giá_trị) {
+        mình.yêu cầu chỉ số(chỉ_số);
+        các_mục = mình.phần_tử;
+        các_mục[chỉ_số] = giá_trị;
+        trả về mình;
+    };
+    hàm công khai xóa(chỉ_số) {
+        mình.yêu cầu chỉ số(chỉ_số);
+        trả về xoa_tai(mình.phần_tử, chỉ_số);
+    };
+    hàm công khai danh sách() {
+        kết_quả = [];
+        lặp(i = 0; i < mình.số lượng(); i++) { them(kết_quả, mình.tại(i)); };
+        trả về kết_quả;
+    };
+};

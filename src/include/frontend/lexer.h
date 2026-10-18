@@ -166,7 +166,7 @@ namespace vietvm::compiler {
     // Tách token cho with spans; hàm quét chuỗi nguồn từ trái sang phải và tạo dãy token, đồng thời bảo toàn thông tin vị trí khi cần.
     std::vector<vietvm::frontend::Token> tokenizeWithSpans(const std::string &src);
 
-    // Xử lý hậu token: gộp các từ khóa nhiều từ (ví dụ "mặc định", "nếu không"),
+    // Xử lý hậu token: gộp các từ khóa nhiều từ (ví dụ "mặc định", "trả về"),
     // loại bỏ các dấu câu đuôi khi so sánh, v.v.
     std::vector<std::string> postProcessTokens(const std::vector<std::string>& tokens);
 

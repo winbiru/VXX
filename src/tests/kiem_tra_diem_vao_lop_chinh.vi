@@ -1,0 +1,10 @@
+// Không có hàm chính(): compiler phải tạo lớp Chính và gọi chạy().
+lớp Chính {
+    hàm khởi tạo() {
+        mình.giá_trị = 101;
+    };
+
+    hàm công khai chạy() {
+        in mình.giá_trị;
+    };
+};

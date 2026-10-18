@@ -1,0 +1,8 @@
+// Kiểm tra hạ Machine IR: biên signed i32 và overflow trung gian.
+hàm min_i32() { trả về -2147483648; }
+hàm max_i32_const() { trả về 2147483647; }
+hàm add_limit() { trả về 2147483646 + 1; }
+hàm neg_limit() { trả về -(2147483648); }
+
+// Trường hợp lỗi có literal vượt i32 được test bằng IR dựng trực tiếp
+// trong native_machine_cpp_oracle.cpp (frontend sẽ chặn trước khi hạ IR).

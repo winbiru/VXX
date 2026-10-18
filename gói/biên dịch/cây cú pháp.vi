@@ -1,0 +1,111 @@
+// Chuyển đổi AST thô thành mô hình cú pháp V++ công khai.
+nhập gói/bộ sưu tập/từ điển;
+
+// Các phép chuyển đổi AST thuần là hàm cấp mô-đun.
+hàm công khai biên dịch loại câu lệnh từ mã(mã) {
+    nếu (mã == 0) { trả về "nhập"; };
+    nếu (mã == 1) { trả về "hàm"; };
+    nếu (mã == 2) { trả về "lớp"; };
+    nếu (mã == 3) { trả về "giao diện"; };
+    trả về "khác";
+};
+
+hàm công khai biên dịch phạm vi từ mã(mã) {
+    nếu (mã == 1) { trả về "công khai"; };
+    nếu (mã == 2) { trả về "riêng tư"; };
+    nếu (mã == 3) { trả về "bảo vệ"; };
+    trả về "mặc định";
+};
+
+hàm công khai biên dịch tham số từ thô(các_tham_số) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(các_tham_số); i++) {
+        thô = các_tham_số[i];
+        thêm(kết_quả, {
+            "tên": thô[0],
+            "có mặc định": thô[1]
+        });
+    };
+    trả về kết_quả;
+};
+
+hàm công khai biên dịch câu lệnh từ thô(thô) {
+    thành_viên = [];
+    con = thô[7];
+    lặp(i = 0; i < do_dai(con); i++) {
+        thêm(thành_viên, biên dịch câu lệnh từ thô(con[i]));
+    };
+    trả về {
+        "loại": biên dịch loại câu lệnh từ mã(thô[0]),
+        "tên": thô[1],
+        "phạm vi": biên dịch phạm vi từ mã(thô[2]),
+        "tham số": biên dịch tham số từ thô(thô[3]),
+        "đích": thô[4],
+        "bí danh": thô[5],
+        "công khai": thô[6],
+        "thành viên": thành_viên
+    };
+};
+
+hàm công khai biên dịch cây từ thô(cây_thô) {
+    kết_quả = [];
+    lặp(i = 0; i < do_dai(cây_thô); i++) {
+        thêm(kết_quả, biên dịch câu lệnh từ thô(cây_thô[i]));
+    };
+    trả về kết_quả;
+};
+
+// Một snapshot AST có thể được truy vấn nhiều lần (IDE, linter, compiler).
+// Lập chỉ mục tên một lần theo DFS pre-order, kể cả thành viên lớp/giao diện.
+lớp công khai Bộ Chỉ Mục Khai Báo {
+    hàm công khai khởi tạo(cây) {
+        nếu (loai_cua(cây) != "danh sách") {
+            ném "biên dịch: cây khai báo phải là danh sách";
+        };
+        mình.cây = cây;
+        mình.chỉ_mục = {};
+        mình.đã_lập = sai;
+    };
+
+    hàm riêng tư ghi danh sách(cây) {
+        bảng = mình.chỉ_mục;
+        lặp(i = 0; i < độ dài(cây); i++) {
+            mục = cây[i];
+            tên = lấy map(mục, "tên", "");
+            nếu (loai_cua(tên) == "chuỗi") {
+                kết_quả = lấy map(bảng, tên, rỗng);
+                nếu (kết_quả == rỗng) {
+                    kết_quả = [];
+                    đặt map(bảng, tên, kết_quả);
+                };
+                thêm(kết_quả, mục);
+            };
+            mình.ghi danh sách(lấy map(mục, "thành viên", []));
+        };
+    };
+
+    hàm công khai tìm(tên) {
+        nếu (!mình.đã_lập) {
+            mình.chỉ_mục = {};
+            mình.ghi danh sách(mình.cây);
+            mình.đã_lập = đúng;
+        };
+        // Trả bản danh sách riêng để người gọi không sửa trực tiếp chỉ mục.
+        kết_quả = lấy map(mình.chỉ_mục, tên, []);
+        bản_sao = [];
+        lặp(i = 0; i < độ dài(kết_quả); i++) { thêm(bản_sao, kết_quả[i]); };
+        trả về bản_sao;
+    };
+
+    hàm công khai làm mới() {
+        mình.chỉ_mục = {};
+        mình.đã_lập = sai;
+    };
+};
+
+// API cũ: mỗi lần nhận một cây độc lập, giữ nguyên thứ tự kết quả DFS.
+hàm công khai biên dịch tìm khai báo trong cây(cây, tên) {
+    chỉ_mục = Bộ Chỉ Mục Khai Báo(cây);
+    trả về chỉ_mục.tìm(tên);
+};
+

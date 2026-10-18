@@ -1,0 +1,6 @@
+// Giao diện đồng hồ đo khoảng thời gian, không phải đồng hồ lịch.
+giao diện công khai Đo Thời Gian {
+    hàm công khai bắt đầu();
+    hàm công khai dừng();
+    hàm công khai đọc mili giây();
+};

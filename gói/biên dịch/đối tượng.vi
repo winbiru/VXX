@@ -1,0 +1,452 @@
+// Bộ ghi object tự chủ bằng V++: ELF32/64, Mach-O64, COFF.
+// Hợp đồng byte/section/symbol/relocation tương ứng src/native/object_writer.cpp.
+// Dùng các word signed i32 để tránh tràn số khi ghi header unsigned 32-bit.
+nhập gói/biên dịch/mã máy nền;
+nhập gói/lõi/bảng mã;
+
+hàm công khai biên dịch đối tượng số(ra, số, rộng, ít) {
+    nếu (rộng != 1 && rộng != 2 && rộng != 4) { ném "object: độ rộng số chưa hỗ trợ"; };
+    tạm = [];
+    lặp (i = 0; i < rộng; i++) {
+        byte = số % 256;
+        nếu (byte < 0) { byte += 256; };
+        thêm(tạm, byte);
+        số = (số - byte) / 256;
+    };
+    lặp (i = 0; i < rộng; i++) {
+        nếu (ít) { thêm(ra, tạm[i]); }
+        hoặc { thêm(ra, tạm[rộng - i - 1]); };
+    };
+};
+
+hàm công khai biên dịch đối tượng u64(ra, thấp, cao, ít) {
+    nếu (ít) {
+        biên dịch đối tượng số(ra, thấp, 4, đúng);
+        biên dịch đối tượng số(ra, cao, 4, đúng);
+    } hoặc {
+        biên dịch đối tượng số(ra, cao, 4, sai);
+        biên dịch đối tượng số(ra, thấp, 4, sai);
+    };
+};
+
+hàm công khai biên dịch đối tượng word(ra, số, rộng, ít) {
+    nếu (rộng == 4) { biên dịch đối tượng số(ra, số, 4, ít); }
+    hoặc nếu (rộng == 8) { biên dịch đối tượng u64(ra, số, 0, ít); }
+    hoặc { ném "object: word size không hợp lệ"; };
+};
+
+hàm công khai biên dịch đối tượng nối(ra, dữ_liệu) {
+    lặp (i = 0; i < độ dài(dữ_liệu); i++) { thêm(ra, dữ_liệu[i]); };
+};
+
+hàm công khai biên dịch đối tượng tên(ra, tên) {
+    vị_trí = độ dài(ra);
+    lặp (i = 0; i < độ dài(tên); i++) {
+        mã = mã điểm unicode(tên[i]);
+        nếu (mã < 1 || mã > 127) { ném "object: tên symbol/section phải là ASCII"; };
+        thêm(ra, mã);
+    };
+    thêm(ra, 0);
+    trả về vị_trí;
+};
+
+hàm công khai biên dịch đối tượng cố định(ra, tên, rộng) {
+    nếu (độ dài(tên) > rộng) { ném "object: chuỗi cố định quá dài"; };
+    lặp (i = 0; i < rộng; i++) {
+        nếu (i < độ dài(tên)) { thêm(ra, mã điểm unicode(tên[i])); }
+        hoặc { thêm(ra, 0); };
+    };
+};
+
+hàm công khai biên dịch đối tượng canh(ra, số) {
+    nếu (số <= 0) { ném "object: alignment không hợp lệ"; };
+    lặp (i = 0; i < số; i++) {
+        nếu (độ dài(ra) % số == 0) { thoát; };
+        thêm(ra, 0);
+    };
+};
+
+hàm công khai biên dịch đối tượng vá(ra, vị_trí, số, rộng, ít) {
+    tạm = [];
+    biên dịch đối tượng word(tạm, số, rộng, ít);
+    nếu (vị_trí < 0 || vị_trí + rộng > độ dài(ra)) { ném "object: patch ngoài buffer"; };
+    lặp (i = 0; i < rộng; i++) { ra[vị_trí + i] = tạm[i]; };
+};
+
+hàm công khai biên dịch đối tượng ký hiệu(tên) {
+    nếu (!biên dịch mã máy ký hiệu hợp lệ(tên)) {
+        ném "tên symbol native không hợp lệ: " + tên;
+    };
+};
+
+hàm công khai biên dịch đối tượng kiểm tra(mã, tên, tái_định_vị) {
+    biên dịch đối tượng ký hiệu(tên);
+    nếu (độ dài(mã) == 0) { ném "không có mã máy để xuất object"; };
+    lặp (i = 0; i < độ dài(mã); i++) {
+        nếu (mã[i] < 0 || mã[i] > 255) { ném "object: byte ngoài u8"; };
+    };
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        r = tái_định_vị[i];
+        biên dịch đối tượng ký hiệu(r["symbol"]);
+        nếu (r["offset"] < 0 || r["offset"] + 4 > độ dài(mã)) {
+            ném "native object relocation offset không hợp lệ";
+        };
+    };
+};
+
+hàm công khai biên dịch đối tượng elf thông tin(kiến_trúc) {
+    chọn (kiến_trúc) {
+        ca "x86_64": { trả về {"machine": 62, "small": sai, "little": đúng, "align": 1}; }
+        ca "aarch64": { trả về {"machine": 183, "small": sai, "little": đúng, "align": 4}; }
+        ca "riscv64": { trả về {"machine": 243, "small": sai, "little": đúng, "align": 4}; }
+        ca "armv7": { trả về {"machine": 40, "small": đúng, "little": đúng, "align": 4}; }
+        ca "i386": { trả về {"machine": 3, "small": đúng, "little": đúng, "align": 1}; }
+        ca "powerpc": { trả về {"machine": 20, "small": đúng, "little": sai, "align": 4}; }
+        ca "powerpc64": { trả về {"machine": 21, "small": sai, "little": sai, "align": 4}; }
+        ca "powerpc64le": { trả về {"machine": 21, "small": sai, "little": đúng, "align": 4}; }
+        ca "mips": { trả về {"machine": 8, "small": đúng, "little": sai, "align": 4}; }
+        ca "mipsel": { trả về {"machine": 8, "small": đúng, "little": đúng, "align": 4}; }
+        ca "mips64": { trả về {"machine": 8, "small": sai, "little": sai, "align": 4}; }
+        ca "mips64el": { trả về {"machine": 8, "small": sai, "little": đúng, "align": 4}; }
+        ca "loongarch64": { trả về {"machine": 258, "small": sai, "little": đúng, "align": 4}; }
+        ca "s390x": { trả về {"machine": 22, "small": sai, "little": sai, "align": 4}; }
+        ca "sparc": { trả về {"machine": 2, "small": đúng, "little": sai, "align": 4}; }
+        ca "sparc64": { trả về {"machine": 43, "small": sai, "little": sai, "align": 4}; }
+        mặc định: { ném "ELF machine chưa được đăng ký: " + kiến_trúc; }
+    };
+};
+
+hàm công khai biên dịch đối tượng elf mục(ra, tên, loại, cờ, offset, dài, link, info, căn, entsize, rộng, ít) {
+    biên dịch đối tượng số(ra, tên, 4, ít);
+    biên dịch đối tượng số(ra, loại, 4, ít);
+    biên dịch đối tượng word(ra, cờ, rộng, ít);
+    biên dịch đối tượng word(ra, 0, rộng, ít);
+    biên dịch đối tượng word(ra, offset, rộng, ít);
+    biên dịch đối tượng word(ra, dài, rộng, ít);
+    biên dịch đối tượng số(ra, link, 4, ít);
+    biên dịch đối tượng số(ra, info, 4, ít);
+    biên dịch đối tượng word(ra, căn, rộng, ít);
+    biên dịch đối tượng word(ra, entsize, rộng, ít);
+};
+
+hàm công khai biên dịch đối tượng elf(kiến_trúc, abi, mã, tên, tái_định_vị) {
+    k = biên dịch đối tượng elf thông tin(kiến_trúc);
+    bé = k["small"];
+    ít = k["little"];
+    rộng = 8;
+    header = 64;
+    mục_size = 64;
+    symbol_size = 24;
+    nếu (bé) { rộng = 4; header = 52; mục_size = 40; symbol_size = 16; };
+    ppc_v1 = kiến_trúc == "powerpc64";
+    có_reloc = độ dài(tái_định_vị) > 0;
+    nếu (có_reloc && kiến_trúc != "x86_64" && kiến_trúc != "aarch64") {
+        ném "ELF external CALL chỉ hỗ trợ x86_64/AArch64";
+    };
+    ra = [127, 69, 76, 70];
+    nếu (bé) { thêm(ra, 1); } hoặc { thêm(ra, 2); };
+    nếu (ít) { thêm(ra, 1); } hoặc { thêm(ra, 2); };
+    thêm(ra, 1); thêm(ra, 0); thêm(ra, 0);
+    lặp (i = 0; i < 7; i++) { thêm(ra, 0); };
+    biên dịch đối tượng số(ra, 1, 2, ít);
+    biên dịch đối tượng số(ra, k["machine"], 2, ít);
+    biên dịch đối tượng số(ra, 1, 4, ít);
+    biên dịch đối tượng word(ra, 0, rộng, ít);
+    biên dịch đối tượng word(ra, 0, rộng, ít);
+    sh_patch = độ dài(ra);
+    biên dịch đối tượng word(ra, 0, rộng, ít);
+    cờ = 0;
+    nếu (kiến_trúc == "armv7") {
+        cờ = 83886080;
+        nếu (abi == "gnueabihf" || abi == "musleabihf") { cờ += 1024; };
+    };
+    nếu (kiến_trúc == "riscv64") { cờ = 4; };
+    nếu (kiến_trúc == "loongarch64") { cờ = 3; };
+    nếu (ppc_v1) { cờ = 1; };
+    nếu (kiến_trúc == "powerpc64le") { cờ = 2; };
+    biên dịch đối tượng số(ra, cờ, 4, ít);
+    biên dịch đối tượng số(ra, header, 2, ít);
+    biên dịch đối tượng số(ra, 0, 2, ít);
+    biên dịch đối tượng số(ra, 0, 2, ít);
+    biên dịch đối tượng số(ra, mục_size, 2, ít);
+    n = 5;
+    shstr_index = 4;
+    nếu (có_reloc) { n = 6; shstr_index = 5; };
+    nếu (ppc_v1) { n = 7; shstr_index = 6; };
+    biên dịch đối tượng số(ra, n, 2, ít);
+    biên dịch đối tượng số(ra, shstr_index, 2, ít);
+    nếu (độ dài(ra) != header) { ném "ELF header size không khớp"; };
+
+    biên dịch đối tượng canh(ra, k["align"]);
+    text_off = độ dài(ra);
+    biên dịch đối tượng nối(ra, mã);
+    biên dịch đối tượng canh(ra, rộng);
+    opd_off = 0;
+    rela_off = 0;
+    nếu (ppc_v1) {
+        opd_off = độ dài(ra);
+        lặp (i = 0; i < 3; i++) { biên dịch đối tượng u64(ra, 0, 0, ít); };
+        rela_off = độ dài(ra);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+        biên dịch đối tượng u64(ra, 38, 1, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+    };
+    text_rela_off = 0;
+    nếu (có_reloc) {
+        text_rela_off = độ dài(ra);
+        lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+            r = tái_định_vị[i];
+            biên dịch đối tượng u64(ra, r["offset"], 0, ít);
+            loại = 4;
+            nếu (kiến_trúc == "aarch64") { loại = 283; };
+            biên dịch đối tượng u64(ra, loại, 2 + i, ít);
+            addend = 0;
+            nếu (kiến_trúc == "x86_64") { addend = -4; };
+            cao = 0;
+            nếu (addend < 0) { cao = -1; };
+            biên dịch đối tượng u64(ra, addend, cao, ít);
+        };
+    };
+    sym_off = độ dài(ra);
+    lặp (i = 0; i < symbol_size; i++) { thêm(ra, 0); };
+    nếu (ppc_v1) {
+        biên dịch đối tượng số(ra, 0, 4, ít);
+        thêm(ra, 3); thêm(ra, 0);
+        biên dịch đối tượng số(ra, 1, 2, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+    };
+    nếu (bé) {
+        biên dịch đối tượng số(ra, 1, 4, ít);
+        biên dịch đối tượng số(ra, 0, 4, ít);
+        biên dịch đối tượng số(ra, độ dài(mã), 4, ít);
+        thêm(ra, 18); thêm(ra, 0);
+        biên dịch đối tượng số(ra, 1, 2, ít);
+    } hoặc {
+        biên dịch đối tượng số(ra, 1, 4, ít);
+        thêm(ra, 18); thêm(ra, 0);
+        nơi = 1;
+        nếu (ppc_v1) { nơi = 2; };
+        biên dịch đối tượng số(ra, nơi, 2, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+        dài = độ dài(mã);
+        nếu (ppc_v1) { dài = 24; };
+        biên dịch đối tượng u64(ra, dài, 0, ít);
+    };
+    strings = [0];
+    biên dịch đối tượng tên(strings, tên);
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        tên_offset = biên dịch đối tượng tên(strings, tái_định_vị[i]["symbol"]);
+        biên dịch đối tượng số(ra, tên_offset, 4, ít);
+        thêm(ra, 18); thêm(ra, 0);
+        biên dịch đối tượng số(ra, 0, 2, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+        biên dịch đối tượng u64(ra, 0, 0, ít);
+    };
+    str_off = độ dài(ra);
+    biên dịch đối tượng nối(ra, strings);
+    tên_mục = [0];
+    text_name = biên dịch đối tượng tên(tên_mục, ".text");
+    opd_name = 0;
+    rela_name = 0;
+    nếu (ppc_v1) {
+        opd_name = biên dịch đối tượng tên(tên_mục, ".opd");
+        rela_name = biên dịch đối tượng tên(tên_mục, ".rela.opd");
+    };
+    text_rela_name = 0;
+    nếu (có_reloc) { text_rela_name = biên dịch đối tượng tên(tên_mục, ".rela.text"); };
+    sym_name = biên dịch đối tượng tên(tên_mục, ".symtab");
+    str_name = biên dịch đối tượng tên(tên_mục, ".strtab");
+    shstr_name = biên dịch đối tượng tên(tên_mục, ".shstrtab");
+    shstr_off = độ dài(ra);
+    biên dịch đối tượng nối(ra, tên_mục);
+    biên dịch đối tượng canh(ra, rộng);
+    shoff = độ dài(ra);
+    biên dịch đối tượng vá(ra, sh_patch, shoff, rộng, ít);
+    biên dịch đối tượng elf mục(ra, 0, 0, 0, 0, 0, 0, 0, 0, 0, rộng, ít);
+    biên dịch đối tượng elf mục(ra, text_name, 1, 6, text_off, độ dài(mã), 0, 0, k["align"], 0, rộng, ít);
+    nếu (ppc_v1) {
+        biên dịch đối tượng elf mục(ra, opd_name, 1, 3, opd_off, 24, 0, 0, 8, 0, rộng, ít);
+        biên dịch đối tượng elf mục(ra, rela_name, 4, 0, rela_off, 24, 4, 2, 8, 24, rộng, ít);
+    };
+    nếu (có_reloc) {
+        biên dịch đối tượng elf mục(ra, text_rela_name, 4, 0, text_rela_off,
+            độ dài(tái_định_vị) * 24, 3, 1, 8, 24, rộng, ít);
+    };
+    n_symbols = 2 + độ dài(tái_định_vị);
+    str_index = 3;
+    info = 1;
+    nếu (có_reloc) { str_index = 4; };
+    nếu (ppc_v1) { str_index = 5; n_symbols = 3; info = 2; };
+    biên dịch đối tượng elf mục(ra, sym_name, 2, 0, sym_off,
+        n_symbols * symbol_size, str_index, info, rộng, symbol_size, rộng, ít);
+    biên dịch đối tượng elf mục(ra, str_name, 3, 0, str_off, độ dài(strings), 0, 0, 1, 0, rộng, ít);
+    biên dịch đối tượng elf mục(ra, shstr_name, 3, 0, shstr_off, độ dài(tên_mục), 0, 0, 1, 0, rộng, ít);
+    nếu (độ dài(ra) != shoff + n * mục_size) { ném "ELF section table size không khớp"; };
+    trả về ra;
+};
+
+hàm công khai biên dịch đối tượng macho(kiến_trúc, mã, tên, tái_định_vị) {
+    cpu = 0;
+    subtype = 0;
+    nếu (kiến_trúc == "aarch64") { cpu = 16777228; }
+    hoặc nếu (kiến_trúc == "x86_64") { cpu = 16777223; subtype = 3; }
+    hoặc { ném "Mach-O chỉ hỗ trợ arm64 và x86_64"; };
+    text_off = 232;
+    reloc_off = ((text_off + độ dài(mã) + 3) / 4) * 4;
+    sym_off = ((reloc_off + độ dài(tái_định_vị) * 8 + 7) / 8) * 8;
+    names = [0];
+    biên dịch đối tượng tên(names, "_" + tên);
+    tên_offsets = [];
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        thêm(tên_offsets, biên dịch đối tượng tên(names, "_" + tái_định_vị[i]["symbol"]));
+    };
+    str_off = sym_off + 16 * (1 + độ dài(tái_định_vị));
+    ra = [];
+    biên dịch đối tượng số(ra, biên dịch mã máy word hex("feedfacf"), 4, đúng);
+    biên dịch đối tượng số(ra, cpu, 4, đúng);
+    biên dịch đối tượng số(ra, subtype, 4, đúng);
+    biên dịch đối tượng số(ra, 1, 4, đúng);
+    biên dịch đối tượng số(ra, 3, 4, đúng);
+    biên dịch đối tượng số(ra, 200, 4, đúng);
+    biên dịch đối tượng số(ra, 8192, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, 25, 4, đúng);
+    biên dịch đối tượng số(ra, 152, 4, đúng);
+    biên dịch đối tượng cố định(ra, "__TEXT", 16);
+    biên dịch đối tượng u64(ra, 0, 0, đúng);
+    biên dịch đối tượng u64(ra, độ dài(mã), 0, đúng);
+    biên dịch đối tượng u64(ra, text_off, 0, đúng);
+    biên dịch đối tượng u64(ra, độ dài(mã), 0, đúng);
+    biên dịch đối tượng số(ra, 7, 4, đúng);
+    biên dịch đối tượng số(ra, 5, 4, đúng);
+    biên dịch đối tượng số(ra, 1, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng cố định(ra, "__text", 16);
+    biên dịch đối tượng cố định(ra, "__TEXT", 16);
+    biên dịch đối tượng u64(ra, 0, 0, đúng);
+    biên dịch đối tượng u64(ra, độ dài(mã), 0, đúng);
+    biên dịch đối tượng số(ra, text_off, 4, đúng);
+    căn = 0;
+    nếu (kiến_trúc == "aarch64") { căn = 2; };
+    biên dịch đối tượng số(ra, căn, 4, đúng);
+    r_off = 0;
+    nếu (độ dài(tái_định_vị) > 0) { r_off = reloc_off; };
+    biên dịch đối tượng số(ra, r_off, 4, đúng);
+    biên dịch đối tượng số(ra, độ dài(tái_định_vị), 4, đúng);
+    biên dịch đối tượng số(ra, biên dịch mã máy word hex("80000400"), 4, đúng);
+    lặp (i = 0; i < 3; i++) { biên dịch đối tượng số(ra, 0, 4, đúng); };
+    biên dịch đối tượng số(ra, 2, 4, đúng);
+    biên dịch đối tượng số(ra, 24, 4, đúng);
+    biên dịch đối tượng số(ra, sym_off, 4, đúng);
+    biên dịch đối tượng số(ra, 1 + độ dài(tái_định_vị), 4, đúng);
+    biên dịch đối tượng số(ra, str_off, 4, đúng);
+    biên dịch đối tượng số(ra, độ dài(names), 4, đúng);
+    biên dịch đối tượng số(ra, 50, 4, đúng);
+    biên dịch đối tượng số(ra, 24, 4, đúng);
+    biên dịch đối tượng số(ra, 1, 4, đúng);
+    version = 659200;
+    nếu (kiến_trúc == "aarch64") { version = 720896; };
+    biên dịch đối tượng số(ra, version, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    nếu (độ dài(ra) != text_off) { ném "Mach-O header size không khớp"; };
+    biên dịch đối tượng nối(ra, mã);
+    biên dịch đối tượng canh(ra, 4);
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        biên dịch đối tượng số(ra, tái_định_vị[i]["offset"], 4, đúng);
+        biên dịch đối tượng số(ra, (i + 1) + 16777216 + 67108864 + 134217728 + 536870912, 4, đúng);
+    };
+    biên dịch đối tượng canh(ra, 8);
+    nếu (độ dài(ra) != sym_off) { ném "Mach-O symbol alignment không khớp"; };
+    biên dịch đối tượng số(ra, 1, 4, đúng);
+    thêm(ra, 15); thêm(ra, 1);
+    biên dịch đối tượng số(ra, 0, 2, đúng);
+    biên dịch đối tượng u64(ra, 0, 0, đúng);
+    lặp (i = 0; i < độ dài(tên_offsets); i++) {
+        biên dịch đối tượng số(ra, tên_offsets[i], 4, đúng);
+        thêm(ra, 1); thêm(ra, 0);
+        biên dịch đối tượng số(ra, 0, 2, đúng);
+        biên dịch đối tượng u64(ra, 0, 0, đúng);
+    };
+    biên dịch đối tượng nối(ra, names);
+    trả về ra;
+};
+
+hàm công khai biên dịch đối tượng coff tên(ra, strings, tên) {
+    nếu (độ dài(tên) <= 8) { biên dịch đối tượng cố định(ra, tên, 8); }
+    hoặc {
+        biên dịch đối tượng số(ra, 0, 4, đúng);
+        biên dịch đối tượng số(ra, 4 + độ dài(strings), 4, đúng);
+        biên dịch đối tượng tên(strings, tên);
+    };
+};
+
+hàm công khai biên dịch đối tượng coff(kiến_trúc, mã, tên, tái_định_vị) {
+    machine = 0;
+    exported = tên;
+    nếu (kiến_trúc == "x86_64") { machine = 34404; }
+    hoặc nếu (kiến_trúc == "i386") { machine = 332; exported = "_" + tên; }
+    hoặc { ném "COFF chỉ hỗ trợ i386 và x86_64"; };
+    nếu (độ dài(tái_định_vị) > 0 && kiến_trúc != "x86_64") {
+        ném "COFF external CALL chỉ hỗ trợ x86_64";
+    };
+    text_off = 60;
+    reloc_off = text_off + độ dài(mã);
+    sym_off = ((reloc_off + độ dài(tái_định_vị) * 10 + 3) / 4) * 4;
+    ra = [];
+    biên dịch đối tượng số(ra, machine, 2, đúng);
+    biên dịch đối tượng số(ra, 1, 2, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, sym_off, 4, đúng);
+    biên dịch đối tượng số(ra, 1 + độ dài(tái_định_vị), 4, đúng);
+    biên dịch đối tượng số(ra, 0, 2, đúng);
+    biên dịch đối tượng số(ra, 0, 2, đúng);
+    biên dịch đối tượng cố định(ra, ".text", 8);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, độ dài(mã), 4, đúng);
+    biên dịch đối tượng số(ra, text_off, 4, đúng);
+    r_off = 0;
+    nếu (độ dài(tái_định_vị) > 0) { r_off = reloc_off; };
+    biên dịch đối tượng số(ra, r_off, 4, đúng);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, độ dài(tái_định_vị), 2, đúng);
+    biên dịch đối tượng số(ra, 0, 2, đúng);
+    biên dịch đối tượng số(ra, 1610612768, 4, đúng);
+    biên dịch đối tượng nối(ra, mã);
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        biên dịch đối tượng số(ra, tái_định_vị[i]["offset"], 4, đúng);
+        biên dịch đối tượng số(ra, i + 1, 4, đúng);
+        biên dịch đối tượng số(ra, 4, 2, đúng);
+    };
+    biên dịch đối tượng canh(ra, 4);
+    nếu (độ dài(ra) != sym_off) { ném "COFF symbol alignment không khớp"; };
+    strings = [];
+    biên dịch đối tượng coff tên(ra, strings, exported);
+    biên dịch đối tượng số(ra, 0, 4, đúng);
+    biên dịch đối tượng số(ra, 1, 2, đúng);
+    biên dịch đối tượng số(ra, 32, 2, đúng);
+    thêm(ra, 2); thêm(ra, 0);
+    lặp (i = 0; i < độ dài(tái_định_vị); i++) {
+        biên dịch đối tượng coff tên(ra, strings, tái_định_vị[i]["symbol"]);
+        biên dịch đối tượng số(ra, 0, 4, đúng);
+        biên dịch đối tượng số(ra, 0, 2, đúng);
+        biên dịch đối tượng số(ra, 32, 2, đúng);
+        thêm(ra, 2); thêm(ra, 0);
+    };
+    biên dịch đối tượng số(ra, 4 + độ dài(strings), 4, đúng);
+    biên dịch đối tượng nối(ra, strings);
+    trả về ra;
+};
+
+// Public API. Không thay đổi format trên mỗi kiến trúc; lỗi chưa hỗ trợ ném ra.
+hàm công khai biên dịch object(kiến_trúc, hệ_điều_hành, abi, mã, tên, tái_định_vị) {
+    biên dịch đối tượng kiểm tra(mã, tên, tái_định_vị);
+    chọn (hệ_điều_hành) {
+        ca "linux": { trả về biên dịch đối tượng elf(kiến_trúc, abi, mã, tên, tái_định_vị); }
+        ca "macos": { trả về biên dịch đối tượng macho(kiến_trúc, mã, tên, tái_định_vị); }
+        ca "windows": { trả về biên dịch đối tượng coff(kiến_trúc, mã, tên, tái_định_vị); }
+        mặc định: { ném "hệ điều hành không có object writer V++: " + hệ_điều_hành; }
+    };
+};

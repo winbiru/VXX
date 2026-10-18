@@ -40,6 +40,7 @@ IrOpcode lowerOpcode(AstStatementKind kind) noexcept {
         case AstStatementKind::Continue: return IrOpcode::Continue;
         case AstStatementKind::Throw: return IrOpcode::Throw;
         case AstStatementKind::Try: return IrOpcode::Try;
+        case AstStatementKind::VariableDeclaration: return IrOpcode::DeclareVariable;
         case AstStatementKind::Expression:
         case AstStatementKind::Unknown:
             return IrOpcode::Statement;
@@ -100,6 +101,10 @@ bool statementNeedsUnsupportedDirectRegion(const AstStatement &statement) noexce
         case AstStatementKind::Print:
         case AstStatementKind::Expression:
             return expressionCount != 1;
+
+        case AstStatementKind::VariableDeclaration:
+            return statement.declarationName.empty() || expressionCount > 1 ||
+                   !statement.children.empty();
 
         case AstStatementKind::Function:
             if (expressionCount != 0 || statement.declarationName.empty() ||
@@ -177,6 +182,12 @@ public:
     // Hạ lower; hàm chuyển biểu diễn cấp cao sang IR thấp hơn đồng thời giữ metadata semantic cần cho codegen.
     IrProgram lower() {
         for (const SemanticSymbol &symbol : semantic_.symbols) {
+            if (symbol.kind == SemanticSymbolKind::Parameter ||
+                symbol.kind == SemanticSymbolKind::LocalVariable ||
+                symbol.kind == SemanticSymbolKind::CatchVariable) {
+                const int symbolId = compatibleSymbolId(symbol.id);
+                if (symbolId >= 0) ir_.lexicalSlotSymbols.insert(symbolId);
+            }
             if (symbol.kind != SemanticSymbolKind::ForeignFunction ||
                 symbol.foreignDescriptorId < 0) {
                 continue;
@@ -290,6 +301,12 @@ private:
                 supported = !source.text.empty();
                 break;
 
+            case AstExpressionKind::Member:
+                result.opcode = IrValueOpcode::LoadProperty;
+                supported = !source.text.empty();
+                addOperand(source.left);
+                break;
+
             case AstExpressionKind::Unary:
                 result.opcode = IrValueOpcode::Unary;
                 supported = !source.text.empty();
@@ -304,7 +321,10 @@ private:
                 break;
 
             case AstExpressionKind::Assignment:
-                result.opcode = hasNameKind(program_, source.left)
+                result.opcode = program_.expression(source.left) != nullptr &&
+                                program_.expression(source.left)->kind == AstExpressionKind::Member
+                    ? IrValueOpcode::StoreProperty
+                    : hasNameKind(program_, source.left)
                     ? (source.left < expressionBindings_.size() &&
                        expressionBindings_[source.left] != nullptr &&
                        expressionBindings_[source.left]->kind == BindingKind::InstanceMember
@@ -314,7 +334,8 @@ private:
                 if (result.text.empty()) result.text = "=";
                 supported = hasNameKind(program_, source.left) ||
                             (program_.expression(source.left) != nullptr &&
-                             program_.expression(source.left)->kind == AstExpressionKind::Index);
+                             (program_.expression(source.left)->kind == AstExpressionKind::Index ||
+                              program_.expression(source.left)->kind == AstExpressionKind::Member));
                 addOperand(source.left);
                 addOperand(source.right);
                 break;
@@ -500,6 +521,14 @@ private:
                 static_cast<std::size_t>(instruction.symbolId)];
             instruction.effectiveVisibility = symbol.visibility;
             instruction.superclassSymbolId = compatibleSymbolId(symbol.superclass);
+            if (symbol.superclass != kInvalidSymbolId &&
+                symbol.superclass < semantic_.symbols.size()) {
+                const auto &parent = semantic_.symbols[symbol.superclass];
+                instruction.importedSuperclass = parent.origin == SymbolOrigin::Imported;
+                if (instruction.importedSuperclass && !parent.qualifiedName.empty()) {
+                    instruction.superclassName = parent.qualifiedName;
+                }
+            }
             if (statement.kind == AstStatementKind::Function &&
                 symbol.kind == SemanticSymbolKind::Method &&
                 !symbol.qualifiedName.empty()) {
@@ -537,6 +566,8 @@ private:
                     });
                 if (used) {
                     instruction.implicitReceiverNames.emplace_back(receiverName);
+                    instruction.implicitReceiverSymbolIds.push_back(
+                        compatibleSymbolId(receiverSymbol));
                 }
             }
         }
@@ -739,6 +770,7 @@ const char *irOpcodeName(IrOpcode opcode) noexcept {
         case IrOpcode::Continue: return "continue";
         case IrOpcode::Throw: return "throw";
         case IrOpcode::Try: return "try";
+        case IrOpcode::DeclareVariable: return "declare_variable";
         case IrOpcode::Statement: return "statement";
     }
     return "statement";

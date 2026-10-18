@@ -1,0 +1,5 @@
+giao diện công khai Có Giá Trị { hàm đọc(); };
+lớp công khai Cha triển khai Có Giá Trị {
+    hàm khởi tạo(x) { mình.x = x; };
+    hàm công khai đọc() { trả về mình.x; };
+};

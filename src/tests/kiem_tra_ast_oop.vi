@@ -1,0 +1,114 @@
+nhập gói/biên dịch/chính;
+
+lớp Đếm Nút triển khai Khách Duyệt Cú Pháp {
+    hàm khởi tạo() { mình.tổng = 0; };
+    hàm công khai thăm(nút) { mình.tổng = mình.tổng + 1; };
+};
+
+hàm chính() {
+    thô = {"loại": "lớp", "tên": "VíDụ", "thành viên": [
+        {"loại": "hàm", "tên": "chạy", "thành viên": []}
+    ]};
+    nút = Nút Cú Pháp(thô);
+    in nút.loại() == "lớp";
+    in nút.tên() == "VíDụ";
+    dữ_liệu = nút.dữ liệu();
+    in dữ_liệu["tên"] == "VíDụ";
+    con = nút.các con();
+    in độ dài(con) == 1;
+    con_đầu = con[0];
+    in con_đầu.loại() == "hàm";
+    in con_đầu.tên() == "chạy";
+    cháu = con_đầu.các con();
+    in độ dài(cháu) == 0;
+    bản_trống = {};
+    trống = Nút Cú Pháp(bản_trống);
+    in trống.loại() == "khác";
+    in trống.tên() == "";
+    in nút.các con()[0].tên() == "chạy";
+    khách = Đếm Nút(); nút.duyệt(khách);
+    in khách.tổng == 2;
+    cây = biên dịch phân tích chương trình tự chủ("lớp Ví Dụ { hàm chạy() { trả về 1; }; };");
+    nút_thật = tạo nút cú pháp(cây);
+    in nút_thật.các con()[0].loại() == "lớp";
+    in nút_thật.các con()[0].các con()[0].tên() == "chạy";
+    chặn_sai = sai;
+    thử { Nút Cú Pháp(1); } bắt lỗi(e) { chặn_sai = đúng; };
+    in chặn_sai;
+
+    // AST thực: interface, lớp, default, khối, nhánh, biểu thức, collection.
+    mã = "giao diện I { hàm f(x); }; " +
+        "lớp A triển khai I { hàm công khai f(x = 2) { " +
+        "nếu (x > 0) { in [1, 2][0]; } hoặc { in {\"a\": x}; }; " +
+        "trả về x; }; };";
+    sâu = tạo nút cú pháp(biên dịch phân tích chương trình tự chủ(mã));
+    danh_kiểu = sâu.các con();
+    in độ dài(danh_kiểu) == 2;
+    in danh_kiểu[0].loại() == "giao diện" && danh_kiểu[1].loại() == "lớp";
+    hợp_đồng = danh_kiểu[0].các con();
+    chữ_ký = hợp_đồng[0];
+    in độ dài(hợp_đồng) == 1 && độ dài(chữ_ký.các con()) == 0;
+    phương_thức = danh_kiểu[1].các con();
+    con_hàm = phương_thức[0].các con();
+    in độ dài(con_hàm) == 2 && con_hàm[0].loại() == "hằng" &&
+       con_hàm[1].loại() == "khối";
+    câu_lệnh = con_hàm[1].các con();
+    in độ dài(câu_lệnh) == 2 && câu_lệnh[0].loại() == "nếu" &&
+       câu_lệnh[1].loại() == "trả về";
+    nhánh = câu_lệnh[0].các con();
+    in độ dài(nhánh) == 3 && nhánh[0].loại() == "hai ngôi" &&
+       nhánh[1].loại() == "khối" && nhánh[2].loại() == "khối";
+    in độ dài(nhánh[0].các con()) == 2;
+    nhánh_đúng = nhánh[1];
+    khối_đúng = nhánh_đúng.các con();
+    lệnh_in = khối_đúng[0];
+    biểu_thức_in = lệnh_in.các con();
+    gọi_chỉ_số = biểu_thức_in[0];
+    in gọi_chỉ_số.loại() == "chỉ số" && độ dài(gọi_chỉ_số.các con()) == 2;
+    con_chỉ_số = gọi_chỉ_số.các con();
+    danh_sách = con_chỉ_số[0];
+    in danh_sách.loại() == "danh sách" && độ dài(danh_sách.các con()) == 2;
+    nhánh_sai = nhánh[2];
+    khối_sai = nhánh_sai.các con();
+    lệnh_sai = khối_sai[0];
+    con_sai = lệnh_sai.các con();
+    từ_điển = con_sai[0];
+    in từ_điển.loại() == "từ điển" && độ dài(từ_điển.các con()) == 2;
+    khách_đầy = Đếm Nút();
+    sâu.duyệt(khách_đầy);
+    in khách_đầy.tổng == 25;
+
+    // Lời gọi/cập nhật, try/catch, switch và thứ tự duyệt từ trái sang phải.
+    nút_gọi = tạo nút cú pháp(biên dịch phân tích biểu thức("tính(1, 2 + 3)"));
+    gọi_con = nút_gọi.các con();
+    in độ dài(gọi_con) == 3 && gọi_con[0].loại() == "tên" &&
+       gọi_con[2].loại() == "hai ngôi";
+    số_cộng = gọi_con[2];
+    in độ dài(số_cộng.các con()) == 2;
+    nút_chọn = tạo nút cú pháp(biên dịch phân tích chương trình tự chủ(
+        "chọn (x) { ca 1: { in 1; } mặc định: { in 0; } };"));
+    các_chọn = nút_chọn.các con();
+    chọn_đầu = các_chọn[0];
+    nhánh_chọn = chọn_đầu.các con();
+    in độ dài(nhánh_chọn) == 3 && nhánh_chọn[1].loại() == "ca" &&
+       nhánh_chọn[2].loại() == "mặc định";
+    ca_đầu = nhánh_chọn[1];
+    ca_mặc_định = nhánh_chọn[2];
+    in độ dài(ca_đầu.các con()) == 2 &&
+       độ dài(ca_mặc_định.các con()) == 1;
+    nút_bắt = tạo nút cú pháp(biên dịch phân tích chương trình tự chủ(
+        "thử { ném 1; } bắt lỗi(e) { in e; };"));
+    thử_con = nút_bắt.các con();
+    thử_đầu = thử_con[0];
+    in độ dài(thử_đầu.các con()) == 2;
+    lỗi_con = sai;
+    thử {
+        sai_nút = Nút Cú Pháp({"loại": "khối", "câu lệnh": 3});
+        sai_nút.các con();
+    } bắt lỗi(e) { lỗi_con = đúng; };
+    in lỗi_con;
+    nút_ngoài = Nút Cú Pháp({"loại": "tùy biến", "thành viên": [
+        {"loại": "hằng", "giá trị": "1"}
+    ]});
+    in độ dài(nút_ngoài.các con()) == 1;
+};

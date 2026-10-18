@@ -1,0 +1,15 @@
+hàm chính() {
+    nếu (đối_số_đếm() != 2) { trả về 70; };
+    biến path = đối_số_lấy(1);
+    biến data = byte_mới();
+    biến file = tệp_mở_đọc(path);
+    nếu (file <= 0) { trả về 71; };
+    biến length = tệp_đọc_khối(file, data);
+    nếu (tệp_đóng(file) != 0) { trả về 72; };
+    nếu (length < 5) { trả về 73; };
+    biến services = rt_object_services(data, 4, length - 36);
+    nếu (services == -1) { trả về 60; };
+    nếu (services == 0) { trả về 61; };
+    nếu (services == 1) { trả về 62; };
+    trả về 74;
+};

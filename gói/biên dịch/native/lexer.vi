@@ -1,0 +1,237 @@
+// Lõi lexer native viết bằng V++; mọi vị trí là byte offset UTF-8.
+// Tương thích ABI i32/byte-handle hiện tại, không dùng VM hoặc import.
+// Kết quả âm: đầu vào/vị trí/UTF-8/chú thích/chuỗi không hợp lệ.
+
+hàm lex_space(c) {
+    nếu (c == 32) { trả về 1; };
+    nếu (c == 9) { trả về 1; };
+    nếu (c == 10) { trả về 1; };
+    nếu (c == 13) { trả về 1; };
+    nếu (c == 11) { trả về 1; };
+    nếu (c == 12) { trả về 1; };
+    trả về 0;
+};
+
+hàm lex_delim(c) {
+    nếu (c == 34) { trả về 1; };
+    nếu (c == 39) { trả về 1; };
+    nếu (c == 43) { trả về 1; };
+    nếu (c == 45) { trả về 1; };
+    nếu (c == 42) { trả về 1; };
+    nếu (c == 47) { trả về 1; };
+    nếu (c == 40) { trả về 1; };
+    nếu (c == 41) { trả về 1; };
+    nếu (c == 123) { trả về 1; };
+    nếu (c == 125) { trả về 1; };
+    nếu (c == 91) { trả về 1; };
+    nếu (c == 93) { trả về 1; };
+    nếu (c == 59) { trả về 1; };
+    nếu (c == 44) { trả về 1; };
+    nếu (c == 60) { trả về 1; };
+    nếu (c == 62) { trả về 1; };
+    nếu (c == 61) { trả về 1; };
+    nếu (c == 33) { trả về 1; };
+    nếu (c == 58) { trả về 1; };
+    nếu (c == 37) { trả về 1; };
+    nếu (c == 38) { trả về 1; };
+    nếu (c == 124) { trả về 1; };
+    trả về 0;
+};
+
+// Số byte của một Unicode scalar tại pos; từ chối NUL, overlong,
+// surrogate, code point > U+10FFFF và continuation rời rạc.
+hàm lex_utf8_step(src, pos) {
+    biến n = byte_dài(src);
+    nếu (n < 0) { trả về -1; };
+    nếu (pos < 0) { trả về -1; };
+    nếu (pos >= n) { trả về -1; };
+    biến a = byte_lấy(src, pos);
+    nếu (a <= 0) { trả về -1; };
+    nếu (a < 128) { trả về 1; };
+    nếu (a < 194) { trả về -1; };
+    nếu (a > 244) { trả về -1; };
+    biến len = 2;
+    nếu (a >= 224) { len = 3; };
+    nếu (a >= 240) { len = 4; };
+    nếu (pos + len > n) { trả về -1; };
+    biến b = byte_lấy(src, pos + 1);
+    nếu (b < 128) { trả về -1; };
+    nếu (b > 191) { trả về -1; };
+    nếu (a == 224) { nếu (b < 160) { trả về -1; }; };
+    nếu (a == 237) { nếu (b > 159) { trả về -1; }; };
+    nếu (a == 240) { nếu (b < 144) { trả về -1; }; };
+    nếu (a == 244) { nếu (b > 143) { trả về -1; }; };
+    nếu (len >= 3) {
+        biến c = byte_lấy(src, pos + 2);
+        nếu (c < 128) { trả về -1; };
+        nếu (c > 191) { trả về -1; };
+    };
+    nếu (len == 4) {
+        biến d = byte_lấy(src, pos + 3);
+        nếu (d < 128) { trả về -1; };
+        nếu (d > 191) { trả về -1; };
+    };
+    trả về len;
+};
+
+// 1 nếu cặp byte là toán tử đôi mà lexer hiện hành hiểu.
+hàm lex_two(a, b) {
+    nếu (b == 61) {
+        nếu (a == 61) { trả về 1; };
+        nếu (a == 33) { trả về 1; };
+        nếu (a == 60) { trả về 1; };
+        nếu (a == 62) { trả về 1; };
+        nếu (a == 43) { trả về 1; };
+        nếu (a == 45) { trả về 1; };
+        nếu (a == 42) { trả về 1; };
+        nếu (a == 47) { trả về 1; };
+        nếu (a == 37) { trả về 1; };
+    };
+    nếu (a == 38) { nếu (b == 38) { trả về 1; }; };
+    nếu (a == 124) { nếu (b == 124) { trả về 1; }; };
+    nếu (a == 43) { nếu (b == 43) { trả về 1; }; };
+    nếu (a == 45) { nếu (b == 45) { trả về 1; }; };
+    trả về 0;
+};
+
+// Bỏ khoảng trắng và //, /* */; trả về offset token tiếp theo hoặc -1.
+hàm lex_skip(src, offset) {
+    biến n = byte_dài(src);
+    nếu (n < 0) { trả về -1; };
+    nếu (offset < 0) { trả về -1; };
+    nếu (offset > n) { trả về -1; };
+    biến i = offset;
+    lặp (i = offset; i < n; i = i) {
+        biến step = lex_utf8_step(src, i);
+        nếu (step < 0) { trả về -1; };
+        biến c = byte_lấy(src, i);
+        nếu (lex_space(c) == 1) {
+            i = i + 1;
+        } hoặc {
+            biến next = -1;
+            nếu (i + 1 < n) { next = byte_lấy(src, i + 1); };
+            nếu (c == 47) {
+                nếu (next == 47) {
+                    i = i + 2;
+                    lặp (j = i; j < n; j = j) {
+                        nếu (byte_lấy(src, j) == 10) { thoát; };
+                        biến width_line = lex_utf8_step(src, j);
+                        nếu (width_line < 0) { trả về -1; };
+                        j = j + width_line;
+                        i = j;
+                    };
+                } hoặc {
+                    nếu (next == 42) {
+                        i = i + 2;
+                        biến closed = 0;
+                        lặp (k = i; k < n; k = k) {
+                            biến width_block = lex_utf8_step(src, k);
+                            nếu (width_block < 0) { trả về -1; };
+                            nếu (byte_lấy(src, k) == 42) {
+                                nếu (k + 1 < n) {
+                                    nếu (byte_lấy(src, k + 1) == 47) {
+                                        i = k + 2;
+                                        closed = 1;
+                                        thoát;
+                                    };
+                                };
+                            };
+                            k = k + width_block;
+                        };
+                        nếu (closed == 0) { trả về -1; };
+                    } hoặc { thoát; };
+                };
+            } hoặc { thoát; };
+        };
+    };
+    trả về i;
+};
+
+// Kết thúc exclusive của token bắt đầu tại start (đã lex_skip).
+hàm lex_end(src, start) {
+    biến n = byte_dài(src);
+    nếu (n < 0) { trả về -1; };
+    nếu (start < 0) { trả về -1; };
+    nếu (start >= n) { trả về -1; };
+    biến step = lex_utf8_step(src, start);
+    nếu (step < 0) { trả về -1; };
+    biến c = byte_lấy(src, start);
+    nếu (lex_space(c) == 1) { trả về -1; };
+    nếu (c == 34) {
+        trả về lex_quote_end(src, start, c);
+    };
+    nếu (c == 39) {
+        trả về lex_quote_end(src, start, c);
+    };
+    nếu (start + 1 < n) {
+        nếu (lex_two(c, byte_lấy(src, start + 1)) == 1) { trả về start + 2; };
+    };
+    nếu (lex_delim(c) == 1) { trả về start + 1; };
+    biến i = start;
+    lặp (i = start; i < n; i = i) {
+        biến width = lex_utf8_step(src, i);
+        nếu (width < 0) { trả về -1; };
+        biến current = byte_lấy(src, i);
+        nếu (lex_space(current) == 1) { thoát; };
+        nếu (lex_delim(current) == 1) { thoát; };
+        i = i + width;
+    };
+    trả về i;
+};
+
+hàm lex_quote_end(src, start, quote) {
+    biến n = byte_dài(src);
+    lặp (i = start + 1; i < n; i = i) {
+        biến width = lex_utf8_step(src, i);
+        nếu (width < 0) { trả về -1; };
+        biến c = byte_lấy(src, i);
+        nếu (c == 10) { trả về -1; };
+        nếu (c == 13) { trả về -1; };
+        nếu (c == quote) { trả về i + 1; };
+        nếu (c == 92) {
+            i = i + 1;
+            nếu (i >= n) { trả về -1; };
+            width = lex_utf8_step(src, i);
+            nếu (width < 0) { trả về -1; };
+            nếu (byte_lấy(src, i) == 10) { trả về -1; };
+            nếu (byte_lấy(src, i) == 13) { trả về -1; };
+        };
+        i = i + width;
+    };
+    trả về -1;
+};
+
+// 1: định danh, 2: số nguyên, 3: số thực, 4: chuỗi,
+// 5: toán tử, 6: dấu câu. -1: span/token không hợp lệ.
+hàm lex_kind(src, start, end) {
+    nếu (end <= start) { trả về -1; };
+    nếu (lex_end(src, start) != end) { trả về -1; };
+    biến a = byte_lấy(src, start);
+    nếu (a == 34) { trả về 4; };
+    nếu (a == 39) { trả về 4; };
+    nếu (lex_delim(a) == 1) {
+        nếu (a == 40) { trả về 6; };
+        nếu (a == 41) { trả về 6; };
+        nếu (a == 123) { trả về 6; };
+        nếu (a == 125) { trả về 6; };
+        nếu (a == 91) { trả về 6; };
+        nếu (a == 93) { trả về 6; };
+        nếu (a == 59) { trả về 6; };
+        nếu (a == 44) { trả về 6; };
+        nếu (a == 58) { trả về 6; };
+        trả về 5;
+    };
+    biến dots = 0;
+    lặp (i = start; i < end; i++) {
+        biến c = byte_lấy(src, i);
+        nếu (c == 46) {
+            dots = dots + 1;
+        } hoặc {
+            nếu (c < 48) { trả về 1; };
+            nếu (c > 57) { trả về 1; };
+        };
+    };
+    nếu (dots == 0) { trả về 2; };
+    nếu (dots == 1) { trả về 3; };
+    trả về 1;
+};

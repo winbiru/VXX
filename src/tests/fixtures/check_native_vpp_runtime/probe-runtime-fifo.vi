@@ -1,0 +1,5 @@
+hàm chính() {
+    biến path = rt_runtime_file_path(1);
+    nếu (path > 0) { byte_hủy(path); trả về 1; };
+    trả về 52;
+};

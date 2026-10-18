@@ -87,6 +87,22 @@ void testMalformedAstReferencesBecomeUnsupportedIr() {
            "chu trình ExprId bị chặn trước codegen");
 }
 
+void testCannotAssignToFunctionBinding() {
+    using namespace vietvm::compiler;
+    CompilationContext context;
+    bool rejected = false;
+    try {
+        (void)compilePipeline(context,
+            "hàm nhân(a, b) { trả về a * b; }; "
+            "hàm chính() { nhân = {\"số\": 42}; in nhân; };",
+            keywordMap, false);
+    } catch (const std::exception &error) {
+        rejected = std::string(error.what()).find(
+            "Không thể gán vào tên hàm 'nhân'") != std::string::npos;
+    }
+    expect(rejected, "phép gán vào tên hàm bị từ chối ở semantic trước codegen");
+}
+
 void testInvalidIrIsRejectedBeforeEmission() {
     using namespace vietvm::compiler;
 
@@ -656,6 +672,7 @@ void testPrimitivePipeline() {
 
 int main() {
     testMalformedAstReferencesBecomeUnsupportedIr();
+    testCannotAssignToFunctionBinding();
     testInvalidIrIsRejectedBeforeEmission();
     testBytecodeVerifierRejectsMalformedMetadata();
     testForeignFfiPipeline();

@@ -6,7 +6,7 @@ nhập gói/lõi/toán học;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/văn bản/chuỗi;
 
-hàm định dạng số lặp(ký_tự, n) {
+hàm riêng tư định dạng số lặp(ký_tự, n) {
     kết_quả = "";
     khối = ký_tự;
     lặp(vòng = 0; n > 0; vòng++) {
@@ -18,7 +18,7 @@ hàm định dạng số lặp(ký_tự, n) {
 };
 
 // Limb little-endian base 10^4. Factor <= 78125 giữ mọi trung gian trong i32.
-hàm định dạng số nhân lớn(limbs, factor, nhớ = 0) {
+hàm riêng tư định dạng số nhân lớn(limbs, factor, nhớ = 0) {
     lặp(i = 0; i < do_dai(limbs); i++) {
         tổng = limbs[i] * factor + nhớ;
         limbs[i] = tổng % 10000;
@@ -31,7 +31,7 @@ hàm định dạng số nhân lớn(limbs, factor, nhớ = 0) {
     trả về limbs;
 };
 
-hàm định dạng số chữ số lớn(limbs) {
+hàm riêng tư định dạng số chữ số lớn(limbs) {
     kết_quả = thành chuỗi(limbs[do_dai(limbs) - 1]);
     lặp(i = do_dai(limbs) - 2; i >= 0; i--) {
         nhóm = thành chuỗi(limbs[i]);
@@ -40,7 +40,7 @@ hàm định dạng số chữ số lớn(limbs) {
     trả về kết_quả;
 };
 
-hàm định dạng số thập phân chính xác(giá_trị) {
+hàm riêng tư định dạng số thập phân chính xác(giá_trị) {
     kiểu = loai_cua(giá_trị);
     nếu (kiểu != "số nguyên" && kiểu != "số thực") {
         ném "định dạng số thực: giá trị phải là số";
@@ -78,7 +78,7 @@ hàm định dạng số thập phân chính xác(giá_trị) {
             định dạng số nhân lớn(mantissa, factor);
             còn_lại = còn_lại - bước;
         };
-    } nếu không {
+    } hoặc {
         còn_lại = mũ_hai;
         lặp(vòng = 0; còn_lại > 0; vòng++) {
             bước = 16;
@@ -94,7 +94,7 @@ hàm định dạng số thập phân chính xác(giá_trị) {
         "mũ": do_dai(chữ_số) - scale - 1};
 };
 
-hàm định dạng số tăng một(chữ_số) {
+hàm riêng tư định dạng số tăng một(chữ_số) {
     ds = [];
     lặp(i = 0; i < do_dai(chữ_số); i++) { thêm(ds, thành số nguyên(chữ_số[i])); };
     nhớ = 1;
@@ -110,7 +110,7 @@ hàm định dạng số tăng một(chữ_số) {
 };
 
 // Giữ số chữ số đầu và làm tròn theo biểu diễn thập phân chính xác.
-hàm định dạng số làm tròn chữ số(chữ_số, giữ) {
+hàm riêng tư định dạng số làm tròn chữ số(chữ_số, giữ) {
     n = do_dai(chữ_số);
     nếu (giữ >= n) { trả về chữ_số + định dạng số lặp("0", giữ - n); };
     nếu (giữ < 0) { trả về "0"; };
@@ -130,7 +130,7 @@ hàm định dạng số làm tròn chữ số(chữ_số, giữ) {
     trả về đầu;
 };
 
-hàm định dạng số fixed(chữ_số, precision) {
+hàm riêng tư định dạng số fixed(chữ_số, precision) {
     n = do_dai(chữ_số);
     nếu (n <= precision) {
         chữ_số = định dạng số lặp("0", precision + 1 - n) + chữ_số;
@@ -141,7 +141,7 @@ hàm định dạng số fixed(chữ_số, precision) {
         cắt chuỗi(chữ_số, n - precision, precision);
 };
 
-hàm định dạng số bỏ zero lẻ(thân) {
+hàm riêng tư định dạng số bỏ zero lẻ(thân) {
     dấu_chấm = sai;
     lặp(i = 0; i < do_dai(thân); i++) {
         nếu (thân[i] == ".") { dấu_chấm = đúng; };
@@ -150,7 +150,7 @@ hàm định dạng số bỏ zero lẻ(thân) {
     n = do_dai(thân);
     đang_bỏ = đúng;
     lặp(vòng = 0; n > 0 && đang_bỏ; vòng++) {
-        nếu (thân[n - 1] == "0") { n = n - 1; } nếu không { đang_bỏ = sai; };
+        nếu (thân[n - 1] == "0") { n = n - 1; } hoặc { đang_bỏ = sai; };
     };
     nếu (n > 0) {
         nếu (thân[n - 1] == ".") { n = n - 1; };
@@ -158,7 +158,7 @@ hàm định dạng số bỏ zero lẻ(thân) {
     trả về cắt chuỗi(thân, 0, n);
 };
 
-hàm định dạng số scientific(chữ_số, mũ, hoa, bỏ_zero = sai) {
+hàm riêng tư định dạng số scientific(chữ_số, mũ, hoa, bỏ_zero = sai) {
     thân = chữ_số[0];
     nếu (do_dai(chữ_số) > 1) {
         thân = thân + "." + cắt chuỗi(chữ_số, 1, do_dai(chữ_số) - 1);
@@ -173,7 +173,7 @@ hàm định dạng số scientific(chữ_số, mũ, hoa, bỏ_zero = sai) {
     trả về thân + ký_hiệu + dấu + số_mũ;
 };
 
-hàm định dạng số thực nội bộ(giá_trị, chuyển, precision) {
+hàm công khai định dạng số thực nội bộ(giá_trị, chuyển, precision) {
     nếu (loai_cua(precision) != "số nguyên") { ném "FORMAT_PRECISION"; };
     nếu (precision < 0 || precision > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
     nếu (chuyển != "f" && chuyển != "e" && chuyển != "E" && chuyển != "g" && chuyển != "G") {
@@ -192,7 +192,7 @@ hàm định dạng số thực nội bộ(giá_trị, chuyển, precision) {
     nếu (chuyển == "f") {
         giữ = do_dai(chữ_số) - lấy map(exact, "scale", 0) + precision;
         thân = định dạng số fixed(định dạng số làm tròn chữ số(chữ_số, giữ), precision);
-    } nếu không {
+    } hoặc {
         giữ = precision;
         nếu (chuyển == "e" || chuyển == "E") { giữ = precision + 1; };
         nếu (giữ == 0) { giữ = 1; };
@@ -206,12 +206,12 @@ hàm định dạng số thực nội bộ(giá_trị, chuyển, precision) {
         };
         nếu (chuyển == "e" || chuyển == "E") {
             thân = định dạng số scientific(rounded, mũ, hoa);
-        } nếu không {
+        } hoặc {
             p = precision;
             nếu (p == 0) { p = 1; };
             nếu (mũ < -4 || mũ >= p) {
                 thân = định dạng số scientific(rounded, mũ, hoa, đúng);
-            } nếu không {
+            } hoặc {
                 lẻ = do_dai(rounded) - mũ - 1;
                 nếu (lẻ < 0) {
                     rounded = rounded + định dạng số lặp("0", 0 - lẻ);

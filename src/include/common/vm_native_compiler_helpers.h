@@ -17,4 +17,10 @@ bool embeddedVmRunPrimitive(const std::vector<StackValue> &args,
                             StackValue &result,
                             std::string &err);
 
+// VM host adapter: nhận bytecode/thông tin hàm đã biên dịch và liên kết trong V++.
+// Không gọi compiler C++ hay tái tạo AST từ mã nguồn.
+bool linkedBytecodeRunPrimitive(const std::vector<StackValue> &args,
+                                StackValue &result,
+                                std::string &err);
+
 } // namespace vietvm::helpers

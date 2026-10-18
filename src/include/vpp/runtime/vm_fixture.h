@@ -108,6 +108,12 @@ public:
         vm_.runJitCompiled();
     }
 
+    // Run actual AArch64 code in tests, independent of ambient environment.
+    void runMachineCompiledForTesting() {
+        vm_.ensureBytecodeVerified();
+        vm_.runMachineCompiled();
+    }
+
     // Hạ/nâng giới hạn độ sâu lời gọi trong test để kiểm tra guard đệ quy mà
     // không cần tạo hàng trăm native stack frame.
     void setMaxCallDepth(std::size_t value) { vm_.maxCallDepth = value; }

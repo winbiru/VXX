@@ -1,0 +1,154 @@
+// Compiler frontend thuần V++ phải giữ AST lớp/giao diện/FFI và từ chối
+// cú pháp sai. Bytecode AOT cho các khai báo này vẫn cần backend tương ứng.
+nhập gói/biên dịch/chính;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm chính() {
+    nguồn = "giao diện Gốc {}; giao diện Phụ {}; lớp Nền {}; giao diện Khác {}; " +
+        "giao diện công khai CóTên kế thừa Gốc, Phụ { " +
+        "hàm công khai tên(); hàm tên_phụ(); }; " +
+        "lớp công khai MặtHàng kế thừa Nền triển khai CóTên, Khác { " +
+        "hàm khởi tạo(tên) { mình.tên = tên; }; " +
+        "hàm công khai tên() { trả về mình.tên; }; " +
+        "hàm bảo vệ mã() { trả về gốc.mã(); }; hàm công khai tên_phụ() { trả về 0; }; };";
+    cây = biên dịch phân tích chương trình tự chủ(nguồn);
+    khai_báo = cây["câu lệnh"];
+    in độ dài(khai_báo) == 6;
+    giao_diện = khai_báo[4];
+    in giao_diện["loại"] == "giao diện";
+    in giao_diện["tên"] == "CóTên";
+    in giao_diện["phạm vi"] == "công khai";
+    in độ dài(giao_diện["giao diện cha"]) == 2;
+    in giao_diện["giao diện cha"][1] == "Phụ";
+    in độ dài(giao_diện["phương thức"]) == 2;
+    in giao_diện["phương thức"][0]["chữ ký"];
+    mục_lớp = khai_báo[5];
+    in mục_lớp["loại"] == "lớp";
+    in mục_lớp["lớp cha"] == "Nền";
+    in độ dài(mục_lớp["triển khai"]) == 2;
+    in mục_lớp["phương thức"][1]["phạm vi"] == "công khai";
+    in mục_lớp["phương thức"][2]["phạm vi"] == "bảo vệ";
+    thân = mục_lớp["phương thức"][0]["thân"]["câu lệnh"];
+    biểu_thức = thân[0]["biểu thức"];
+    in biểu_thức["toán tử"] == "=";
+    // Receiver mình/gốc được chuẩn hóa thành AST member; linker và dynamic
+    // dispatch vẫn thuộc bước lowering chưa triển khai.
+    in biểu_thức["trái"]["loại"] == "thành viên";
+    in biểu_thức["trái"]["đối tượng"]["giá trị"] == "mình" &&
+       biểu_thức["trái"]["tên"] == "tên";
+    gọi_cha = mục_lớp["phương thức"][2]["thân"]["câu lệnh"][0]["biểu thức"];
+    in gọi_cha["loại"] == "gọi";
+    in gọi_cha["hàm"]["loại"] == "thành viên" &&
+       gọi_cha["hàm"]["đối tượng"]["giá trị"] == "gốc" &&
+       gọi_cha["hàm"]["tên"] == "mã";
+
+    ffi = "ngoại thư viện hệ_thống = \"system.ffi\"; " +
+        "ngoại hàm đọc_errno(): i32 từ hệ_thống ký hiệu \"last_errno\" " +
+        "abi \"c\" khả năng \"system.ffi.error\";";
+    ast = biên dịch phân tích chương trình tự chủ(ffi)["câu lệnh"];
+    in ast[0]["loại"] == "ngoại thư viện";
+    in ast[0]["đích"] == "system.ffi";
+    in ast[1]["loại"] == "ngoại hàm";
+    in ast[1]["thư viện"] == "hệ_thống";
+    in ast[1]["ký hiệu"] == "last_errno";
+    in ast[1]["abi"] == "c";
+    in ast[1]["khả năng"] == "system.ffi.error";
+
+    // FFI with typed buffer extent and parameters.
+    ngoại = "ngoại thư viện sys = \"system.ffi\"; " +
+        "ngoại hàm đọc(p: c_đệm_ra[128], n: i32): i32 từ sys " +
+        "ký hiệu \"read\" khả năng \"filesystem\";";
+    khai_báo_ffi = biên dịch phân tích chương trình tự chủ(ngoại)["câu lệnh"][1];
+    in độ dài(khai_báo_ffi["tham số"]) == 2 && khai_báo_ffi["abi"] == "c";
+    in khai_báo_ffi["tham số"][0]["độ dài"] == "128";
+
+    // Hợp đồng ABI và độ dài buffer phải được kiểm tra trước lowering.
+    mở_đầu = "ngoại thư viện sys = \"system.ffi\"; ";
+    hợp_lệ = [
+        "ngoại hàm f(p: c_đệm_vào[n], n: u32): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(n: i64, p: c_đệm_ra[n]): void từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_chuỗi, q: c_socket): rỗng từ sys ký hiệu \"f\" abi \"c\" khả năng \"cap\";"
+    ];
+    mọi_ABI_hợp_lệ = đúng;
+    lặp(i = 0; i < độ dài(hợp_lệ); i++) {
+        đúng_kiểu = sai;
+        thử { biên dịch phân tích chương trình tự chủ(mở_đầu + hợp_lệ[i]); đúng_kiểu = đúng; }
+        bắt lỗi (e) { đúng_kiểu = sai; };
+        nếu (!đúng_kiểu) { mọi_ABI_hợp_lệ = sai; };
+    };
+    sai_ABI = [
+        "ngoại hàm f(p: con_trỏ[128]): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: void): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(): c_đệm_vào từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(): unknown từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(): i32 từ sys ký hiệu \"f\" abi \"stdcall\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_ra): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_ra[0]): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_vào[65537]): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: i32[4]): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_ra[missing], n: i32): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_ra[p], n: i32): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(p: c_đệm_ra[n], n: f64): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại hàm f(n: i32, n: u32): i32 từ sys ký hiệu \"f\" khả năng \"cap\";"
+    ];
+    mọi_ABI_sai_bị_từ_chối = đúng;
+    lặp(i = 0; i < độ dài(sai_ABI); i++) {
+        bị_từ_chối = sai;
+        thử { biên dịch phân tích chương trình tự chủ(mở_đầu + sai_ABI[i]); }
+        bắt lỗi (e) { bị_từ_chối = đúng; };
+        nếu (!bị_từ_chối) { mọi_ABI_sai_bị_từ_chối = sai; };
+    };
+
+    sai_phạm = [
+        "lớp A { biến x = 1; };",
+        "giao diện A { hàm f() { trả về 1; }; };",
+        "lớp A kế thừa { };",
+        "lớp A { hàm f() {}; hàm f() {}; };",
+        "lớp A {}; giao diện A {};",
+        "lớp A kế thừa A {};",
+        "giao diện A kế thừa A {};",
+        "giao diện A kế thừa X, X {};",
+        "lớp A triển khai X, X {};",
+        "giao diện A { hàm riêng tư f(); };",
+        "giao diện A { hàm bảo vệ f(); };",
+        "ngoại hàm f(): i32 từ sys ký hiệu \"f\";",
+        "ngoại hàm f(): i32 từ sys ký hiệu \"f\" khả năng \"cap\";",
+        "ngoại thư viện a = \"x\"; ngoại thư viện a = \"y\";",
+        "lớp A kế thừa B {};",
+        "giao diện A kế thừa B {};",
+        "lớp A triển khai B {};",
+        "lớp B {}; lớp A triển khai B {};",
+        "giao diện I {}; lớp A kế thừa I {};",
+        "lớp A kế thừa B {}; lớp B kế thừa A {};",
+        "giao diện A kế thừa B {}; giao diện B kế thừa A {};"
+    ];
+    kết_quả_lỗi = [];
+    lặp(i = 0; i < độ dài(sai_phạm); i++) {
+        lỗi = sai;
+        thử { biên dịch phân tích chương trình tự chủ(sai_phạm[i]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        thêm(kết_quả_lỗi, lỗi);
+    };
+    tất_cả_kiểu_sai_bị_từ_chối = đúng;
+    lặp(i = 8; i < độ dài(kết_quả_lỗi); i++) {
+        nếu (!kết_quả_lỗi[i]) { tất_cả_kiểu_sai_bị_từ_chối = sai; };
+    };
+    // Tám dòng golden cũ tiếp tục bao phủ toàn bộ danh sách lỗi mở rộng.
+    lặp(i = 0; i < 8; i++) {
+        in kết_quả_lỗi[i] && tất_cả_kiểu_sai_bị_từ_chối &&
+           mọi_ABI_hợp_lệ && mọi_ABI_sai_bị_từ_chối;
+    };
+
+    // Tên lớp/giao diện và tham chiếu kiểu có thể gồm nhiều từ.
+    tên_nhiều_từ = "giao diện Có Chứa { hàm công khai nhận(); }; " +
+        "giao diện Có Chứa Mở Rộng kế thừa Có Chứa {}; " +
+        "lớp Ngăn Xếp {}; " +
+        "lớp Ngăn Xếp Cao kế thừa Ngăn Xếp triển khai Có Chứa Mở Rộng { " +
+        "hàm công khai nhận() { trả về đúng; }; };";
+    cây_nhiều_từ = biên dịch phân tích chương trình tự chủ(tên_nhiều_từ)["câu lệnh"];
+    in cây_nhiều_từ[0]["tên"] == "Có Chứa";
+    in cây_nhiều_từ[1]["tên"] == "Có Chứa Mở Rộng";
+    in cây_nhiều_từ[1]["giao diện cha"][0] == "Có Chứa";
+    in cây_nhiều_từ[3]["lớp cha"] == "Ngăn Xếp";
+    in cây_nhiều_từ[3]["triển khai"][0] == "Có Chứa Mở Rộng";
+};

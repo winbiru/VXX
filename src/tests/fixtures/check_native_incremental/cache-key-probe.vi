@@ -1,0 +1,16 @@
+hàm chính() {
+            biến key = "runtime-test-key"; biến data = byte_mới();
+            byte_thêm(data, 0); byte_thêm(data, 255); byte_thêm(data, 52);
+            nếu (cache_ghi(key, data) != 0) { trả về 1; };
+            biến loaded = byte_mới(); byte_thêm(loaded, 99);
+            nếu (cache_đọc(key, loaded) != 1) { trả về 2; };
+            nếu (byte_bằng(data, loaded) != 1) { trả về 3; };
+            nếu (cache_đọc(key, key) != -1) { trả về 4; };
+            biến missing = "missing-cache-key";
+            nếu (cache_đọc(missing, loaded) != 0) { trả về 5; };
+            nếu (byte_dài(loaded) != 0) { trả về 6; };
+            byte_hủy(key);
+            nếu (cache_đọc(key, loaded) != -1) { trả về 7; };
+            byte_hủy(data); byte_hủy(loaded); byte_hủy(missing);
+            trả về 52;
+        };

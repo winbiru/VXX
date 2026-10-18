@@ -1,0 +1,4 @@
+in "trước";
+nhập ../lib/math như toán;
+in "sau";
+hàm chính() { in "gốc"; in toán.cộng(); };

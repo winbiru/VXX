@@ -1,72 +1,109 @@
-// Module: kiểm thử.khẳng định
-// Mục đích: assertion cơ bản có thể dùng trực tiếp trong chương trình V++.
 
-// Ghi chú hàm: khẳng định điều kiện đúng.
-hàm khẳng định đúng(điều kiện, thông điệp = "khẳng định đúng thất bại") {
-    nếu (!điều kiện) {
-        ném thông điệp;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Khẳng Định {
+    hàm công khai khởi tạo() {};
+
+    // Module: kiểm thử.khẳng định
+    // Mục đích: assertion cơ bản có thể dùng trực tiếp trong chương trình V++.
+
+    // Ghi chú hàm: khẳng định điều kiện đúng.
+    hàm công khai khẳng định đúng(điều kiện, thông điệp = "khẳng định đúng thất bại") {
+        nếu (!điều kiện) {
+            ném thông điệp;
+        };
+        trả về đúng;
     };
-    trả về đúng;
+
+    // Ghi chú hàm: khẳng định điều kiện sai.
+    hàm công khai khẳng định sai(điều kiện, thông điệp = "khẳng định sai thất bại") {
+        nếu (điều kiện) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: khẳng định hai giá trị bằng nhau.
+    hàm công khai khẳng định bằng(thực tế, kỳ vọng, thông điệp = "khẳng định bằng thất bại") {
+        nếu (thực tế != kỳ vọng) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: khẳng định hai giá trị khác nhau.
+    hàm công khai khẳng định khác(thực tế, giá trị khác, thông điệp = "khẳng định khác thất bại") {
+        nếu (thực tế == giá trị khác) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: khẳng định giá trị là rỗng.
+    hàm công khai khẳng định rỗng(thực tế, thông điệp = "khẳng định rỗng thất bại") {
+        nếu (thực tế != rỗng) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: khẳng định giá trị không phải rỗng.
+    hàm công khai khẳng định không rỗng(thực tế, thông điệp = "khẳng định không rỗng thất bại") {
+        nếu (thực tế == rỗng) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: chạy callback và yêu cầu callback phải ném lỗi. Nếu `lỗi kỳ vọng`
+    // khác rỗng thì giá trị lỗi bắt được phải bằng chính xác giá trị đó.
+    hàm công khai khẳng định ném lỗi(hành động, lỗi kỳ vọng = rỗng, thông điệp = "khẳng định ném lỗi thất bại") {
+        đãNém = sai;
+        lỗiBắtĐược = rỗng;
+
+        thử {
+            hành động();
+        } bắt lỗi (e) {
+            đãNém = đúng;
+            lỗiBắtĐược = e;
+        }
+
+        nếu (!đãNém) {
+            ném thông điệp;
+        };
+        nếu (lỗi kỳ vọng != rỗng && lỗiBắtĐược != lỗi kỳ vọng) {
+            ném thông điệp;
+        };
+        trả về đúng;
+    };
 };
 
-// Ghi chú hàm: khẳng định điều kiện sai.
-hàm khẳng định sai(điều kiện, thông điệp = "khẳng định sai thất bại") {
-    nếu (điều kiện) {
-        ném thông điệp;
-    };
-    trả về đúng;
+// Mỗi lần gọi tạo bộ kiểm tra không trạng thái, tránh phụ thuộc thứ tự khởi tạo
+// biến module khi một gói được import qua nhiều tầng facade.
+hàm công khai khẳng định đúng(điều kiện, thông điệp = "khẳng định đúng thất bại") {
+    trả về Khẳng Định().khẳng định đúng(điều kiện, thông điệp);
 };
 
-// Ghi chú hàm: khẳng định hai giá trị bằng nhau.
-hàm khẳng định bằng(thực tế, kỳ vọng, thông điệp = "khẳng định bằng thất bại") {
-    nếu (thực tế != kỳ vọng) {
-        ném thông điệp;
-    };
-    trả về đúng;
+hàm công khai khẳng định sai(điều kiện, thông điệp = "khẳng định sai thất bại") {
+    trả về Khẳng Định().khẳng định sai(điều kiện, thông điệp);
 };
 
-// Ghi chú hàm: khẳng định hai giá trị khác nhau.
-hàm khẳng định khác(thực tế, giá trị khác, thông điệp = "khẳng định khác thất bại") {
-    nếu (thực tế == giá trị khác) {
-        ném thông điệp;
-    };
-    trả về đúng;
+hàm công khai khẳng định bằng(thực tế, kỳ vọng, thông điệp = "khẳng định bằng thất bại") {
+    trả về Khẳng Định().khẳng định bằng(thực tế, kỳ vọng, thông điệp);
 };
 
-// Ghi chú hàm: khẳng định giá trị là rỗng.
-hàm khẳng định rỗng(thực tế, thông điệp = "khẳng định rỗng thất bại") {
-    nếu (thực tế != rỗng) {
-        ném thông điệp;
-    };
-    trả về đúng;
+hàm công khai khẳng định khác(thực tế, giá trị khác, thông điệp = "khẳng định khác thất bại") {
+    trả về Khẳng Định().khẳng định khác(thực tế, giá trị khác, thông điệp);
 };
 
-// Ghi chú hàm: khẳng định giá trị không phải rỗng.
-hàm khẳng định không rỗng(thực tế, thông điệp = "khẳng định không rỗng thất bại") {
-    nếu (thực tế == rỗng) {
-        ném thông điệp;
-    };
-    trả về đúng;
+hàm công khai khẳng định rỗng(thực tế, thông điệp = "khẳng định rỗng thất bại") {
+    trả về Khẳng Định().khẳng định rỗng(thực tế, thông điệp);
 };
 
-// Ghi chú hàm: chạy callback và yêu cầu callback phải ném lỗi. Nếu `lỗi kỳ vọng`
-// khác rỗng thì giá trị lỗi bắt được phải bằng chính xác giá trị đó.
-hàm khẳng định ném lỗi(hành động, lỗi kỳ vọng = rỗng, thông điệp = "khẳng định ném lỗi thất bại") {
-    đãNém = sai;
-    lỗiBắtĐược = rỗng;
+hàm công khai khẳng định không rỗng(thực tế, thông điệp = "khẳng định không rỗng thất bại") {
+    trả về Khẳng Định().khẳng định không rỗng(thực tế, thông điệp);
+};
 
-    thử {
-        hành động();
-    } bắt lỗi (e) {
-        đãNém = đúng;
-        lỗiBắtĐược = e;
-    }
-
-    nếu (!đãNém) {
-        ném thông điệp;
-    };
-    nếu (lỗi kỳ vọng != rỗng && lỗiBắtĐược != lỗi kỳ vọng) {
-        ném thông điệp;
-    };
-    trả về đúng;
+hàm công khai khẳng định ném lỗi(hành động, lỗi kỳ vọng = rỗng, thông điệp = "khẳng định ném lỗi thất bại") {
+    trả về Khẳng Định().khẳng định ném lỗi(hành động, lỗi kỳ vọng, thông điệp);
 };

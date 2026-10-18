@@ -1,0 +1,21 @@
+// Value-object đường dẫn, không giữ handle hệ tệp.
+nhập gói/nhập xuất/đường dẫn như đường_api;
+
+lớp công khai Đường Dẫn {
+    hàm công khai khởi tạo(đường) {
+        nếu (loai_cua(đường) != "chuỗi") { ném "đường dẫn: cần chuỗi"; };
+        mình.đường = đường;
+    };
+
+    hàm công khai giá trị() { trả về mình.đường; };
+    hàm công khai tên() { trả về đường_api.đường dẫn tên(mình.đường); };
+    hàm công khai cha() { trả về Đường Dẫn(đường_api.đường dẫn cha(mình.đường)); };
+    hàm công khai nối(phần_con) {
+        nếu (loai_cua(phần_con) != "chuỗi") { ném "đường dẫn: phần con phải là chuỗi"; };
+        trả về Đường Dẫn(đường_api.đường dẫn nối(mình.đường, phần_con));
+    };
+    hàm công khai tuyệt đối() { trả về đường_api.đường dẫn là tuyệt đối(mình.đường); };
+    hàm công khai tồn tại() { trả về đường_api.đường dẫn tồn tại(mình.đường); };
+    hàm công khai là tệp() { trả về đường_api.là tệp(mình.đường); };
+    hàm công khai là thư mục() { trả về đường_api.là thư mục(mình.đường); };
+};

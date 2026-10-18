@@ -6,40 +6,61 @@ ngoại thư viện c_đơn_điệu = "system.c";
 ngoại hàm đọc_đồng_hồ_đơn_điệu_ffi(mã_đồng_hồ: i32, đệm: c_đệm_ra[16]): i32 từ c_đơn_điệu
     ký hiệu "clock_gettime" abi "c" khả năng "system.time.monotonic";
 
-// Đệm 16 byte, giây/nanosecond little-endian. Runtime kiểm chứng ABI POSIX
-// hoặc điền dữ liệu từ QueryPerformanceCounter trên Windows.
-hàm đơn điệu đọc u64(đệm, bắt_đầu) {
-    số = 0.0;
-    bội = 1.0;
-    lặp(i = 0; i < 8; i++) {
-        số = số + đệm[bắt_đầu + i] * bội;
-        bội = bội * 256.0;
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Đồng Hồ Đơn Điệu {
+    hàm công khai khởi tạo() {};
+
+    // Đệm 16 byte, giây/nanosecond little-endian. Runtime kiểm chứng ABI POSIX
+    // hoặc điền dữ liệu từ QueryPerformanceCounter trên Windows.
+    hàm riêng tư đơn điệu đọc u64(đệm, bắt_đầu) {
+        số = 0.0;
+        bội = 1.0;
+        lặp(i = 0; i < 8; i++) {
+            số = số + đệm[bắt_đầu + i] * bội;
+            bội = bội * 256.0;
+        };
+        trả về số;
     };
-    trả về số;
+
+    hàm công khai thời gian đơn điệu mili giây() {
+        nền_tảng = ten_nen_tang_vm();
+        // CLOCK_MONOTONIC = 6 trên macOS, = 1 trên Linux.
+        mã_đồng_hồ = 1;
+        nếu (nền_tảng == "macos") { mã_đồng_hồ = 6; };
+        đệm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        trạng_thái = đọc_đồng_hồ_đơn_điệu_ffi(mã_đồng_hồ, đệm);
+        nếu (trạng_thái != 0) {
+            ném "thời gian đơn điệu: clock_gettime thất bại";
+        };
+        giây = mình.đơn điệu đọc u64(đệm, 0);
+        nano = mình.đơn điệu đọc u64(đệm, 8);
+        nếu (giây > 9007199254.0 || nano >= 1000000000.0) {
+            ném "thời gian đơn điệu: timespec không hợp lệ";
+        };
+        trả về giây * 1000.0 + nano / 1000000.0;
+    };
+
+    hàm công khai bắt đầu đo thời gian() {
+        trả về mình.thời gian đơn điệu mili giây();
+    };
+
+    hàm công khai kết thúc đo thời gian(bắt đầu) {
+        trả về mình.thời gian đơn điệu mili giây() - bắt đầu;
+    };
 };
 
-hàm thời gian đơn điệu mili giây() {
-    nền_tảng = ten_nen_tang_vm();
-    // CLOCK_MONOTONIC = 6 trên macOS, = 1 trên Linux.
-    mã_đồng_hồ = 1;
-    nếu (nền_tảng == "macos") { mã_đồng_hồ = 6; };
-    đệm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    trạng_thái = đọc_đồng_hồ_đơn_điệu_ffi(mã_đồng_hồ, đệm);
-    nếu (trạng_thái != 0) {
-        ném "thời gian đơn điệu: clock_gettime thất bại";
-    };
-    giây = đơn điệu đọc u64(đệm, 0);
-    nano = đơn điệu đọc u64(đệm, 8);
-    nếu (giây > 9007199254.0 || nano >= 1000000000.0) {
-        ném "thời gian đơn điệu: timespec không hợp lệ";
-    };
-    trả về giây * 1000.0 + nano / 1000000.0;
+
+hàm công khai thời gian đơn điệu mili giây() {
+    __vpp_adapter = Đồng Hồ Đơn Điệu();
+    trả về __vpp_adapter.thời gian đơn điệu mili giây();
 };
 
-hàm bắt đầu đo thời gian() {
-    trả về thời gian đơn điệu mili giây();
+hàm công khai bắt đầu đo thời gian() {
+    __vpp_adapter = Đồng Hồ Đơn Điệu();
+    trả về __vpp_adapter.bắt đầu đo thời gian();
 };
 
-hàm kết thúc đo thời gian(bắt đầu) {
-    trả về thời gian đơn điệu mili giây() - bắt đầu;
+hàm công khai kết thúc đo thời gian(bắt đầu) {
+    __vpp_adapter = Đồng Hồ Đơn Điệu();
+    trả về __vpp_adapter.kết thúc đo thời gian(bắt đầu);
 };

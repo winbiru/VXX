@@ -1,0 +1,3 @@
+nhập extra;
+nhập dep;
+hàm chính() { trả về helper(2) + extra() + 1; };

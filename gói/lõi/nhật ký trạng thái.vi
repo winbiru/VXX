@@ -1,0 +1,45 @@
+// Logger cấp instance: đích và ngưỡng mức được lưu trong mỗi đối tượng.
+nhập gói/lõi/nhật ký;
+nhập gói/lõi/tài nguyên có trạng thái;
+
+hàm công khai nhật ký thứ tự mức(mức) {
+    nếu (mức == "thông tin") { trả về 0; };
+    nếu (mức == "cảnh báo") { trả về 1; };
+    nếu (mức == "lỗi") { trả về 2; };
+    ném "nhật ký: mức không hợp lệ";
+};
+
+lớp công khai Bộ Ghi Nhật Ký kế thừa Tài Nguyên Có Trạng Thái {
+    hàm công khai khởi tạo(đích, đường, mức_tối_thiểu) {
+        nếu (đích != "tệp" && đích != "bảng điều khiển") {
+            ném "nhật ký: đích ghi không hợp lệ";
+        };
+        nếu (đích == "tệp" && đường == "") {
+            ném "nhật ký: đường dẫn tệp rỗng";
+        };
+        nhật ký thứ tự mức(mức_tối_thiểu);
+        gốc.khởi tạo();
+        mình.đích = đích;
+        mình.đường = đường;
+        mình.mức_tối_thiểu = mức_tối_thiểu;
+    };
+
+    hàm công khai đổi mức(mức) {
+        mình.yêu cầu mở("nhật ký");
+        nhật ký thứ tự mức(mức);
+        mình.mức_tối_thiểu = mức;
+    };
+
+    hàm công khai ghi(mức, nội_dung) {
+        mình.yêu cầu mở("nhật ký");
+        thứ_tự = nhật ký thứ tự mức(mức);
+        nếu (thứ_tự < nhật ký thứ tự mức(mình.mức_tối_thiểu)) {
+            trả về 0;
+        };
+        trả về ghi theo cấu hình(mình.đích, mình.đường, mức, thành chuỗi(nội_dung));
+    };
+
+    hàm công khai thông tin(nội_dung) { trả về mình.ghi("thông tin", nội_dung); };
+    hàm công khai cảnh báo(nội_dung) { trả về mình.ghi("cảnh báo", nội_dung); };
+    hàm công khai lỗi(nội_dung) { trả về mình.ghi("lỗi", nội_dung); };
+};

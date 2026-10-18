@@ -1,0 +1,47 @@
+nhập gói/mạng/ổ cắm;
+
+// Các đường lỗi này không bind/kết nối localhost: chạy được cả khi sandbox
+// cấm tạo socket. Chúng xác nhận policy V++ và kiểm tra token tại FFI.
+hàm chính() {
+    lỗi = sai;
+    thử { socket tcp mở("", 80); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket tcp mở("127.0.0.1", 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket udp mở("", 9); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket tcp lắng nghe(0, 64); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Token thuộc miền FFI nhưng chưa được cấp phát trong VM này.
+    mã_giả = 536870912;
+    lỗi = sai;
+    thử { socket tcp lắng nghe(8080, 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket chấp nhận(mã_giả); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket gửi(mã_giả, "x"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket nhận(mã_giả, 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket đặt timeout(mã_giả, 1000); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { socket đóng(mã_giả); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

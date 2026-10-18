@@ -7,20 +7,21 @@ nhập gói/lõi/chuyển kiểu;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/văn bản/chuỗi;
 
-hàm quốc tế là chữ ascii(c) {
+// Các thuật toán không giữ trạng thái là hàm cấp mô-đun; lớp tài nguyên quản lý trạng thái.
+hàm riêng tư quốc tế là chữ ascii(c) {
     thấp = chuỗi thường(c);
     trả về thấp >= "a" && thấp <= "z";
 };
 
-hàm quốc tế là số ascii(c) {
+hàm riêng tư quốc tế là số ascii(c) {
     trả về c >= "0" && c <= "9";
 };
 
-hàm quốc tế là chữ số ascii(c) {
+hàm riêng tư quốc tế là chữ số ascii(c) {
     trả về quốc tế là chữ ascii(c) || quốc tế là số ascii(c);
 };
 
-hàm quốc tế toàn bộ chữ(s) {
+hàm riêng tư quốc tế toàn bộ chữ(s) {
     nếu (loại của(s) != "chuỗi") { trả về sai; };
     nếu (độ dài(s) == 0) { trả về sai; };
     hợp_lệ = đúng;
@@ -30,7 +31,7 @@ hàm quốc tế toàn bộ chữ(s) {
     trả về hợp_lệ;
 };
 
-hàm quốc tế toàn bộ số(s) {
+hàm riêng tư quốc tế toàn bộ số(s) {
     nếu (loại của(s) != "chuỗi") { trả về sai; };
     nếu (độ dài(s) == 0) { trả về sai; };
     hợp_lệ = đúng;
@@ -40,7 +41,7 @@ hàm quốc tế toàn bộ số(s) {
     trả về hợp_lệ;
 };
 
-hàm quốc tế toàn bộ chữ số(s) {
+hàm riêng tư quốc tế toàn bộ chữ số(s) {
     nếu (loại của(s) != "chuỗi") { trả về sai; };
     nếu (độ dài(s) == 0) { trả về sai; };
     hợp_lệ = đúng;
@@ -50,13 +51,13 @@ hàm quốc tế toàn bộ chữ số(s) {
     trả về hợp_lệ;
 };
 
-hàm quốc tế title ascii(s) {
+hàm riêng tư quốc tế title ascii(s) {
     nếu (độ dài(s) == 0) { trả về s; };
     trả về chuỗi hoa(cắt chuỗi(s, 0, 1)) +
         chuỗi thường(cắt chuỗi(s, 1, độ dài(s) - 1));
 };
 
-hàm quốc tế tách tag(raw) {
+hàm riêng tư quốc tế tách tag(raw) {
     nếu (loại của(raw) != "chuỗi" || raw == "") {
         ném "LOCALE_INVALID";
     };
@@ -70,7 +71,7 @@ hàm quốc tế tách tag(raw) {
             nếu (hiện_tại == "") { ném "LOCALE_INVALID"; };
             thêm(phần, hiện_tại);
             hiện_tại = "";
-        } nếu không {
+        } hoặc {
             nếu (!quốc tế là chữ số ascii(c)) { ném "LOCALE_INVALID"; };
             hiện_tại = hiện_tại + c;
         };
@@ -80,7 +81,7 @@ hàm quốc tế tách tag(raw) {
 
 // BCP47 structural profile cho thư viện 0.1:
 // language [script] [region] [variant/extension subtags...].
-hàm locale(raw) {
+hàm công khai locale(raw) {
     phần = quốc tế tách tag(raw);
     ngôn_ngữ_raw = phần[0];
     nếu (độ dài(ngôn_ngữ_raw) < 2 || độ dài(ngôn_ngữ_raw) > 8 ||
@@ -137,7 +138,7 @@ hàm locale(raw) {
     };
 };
 
-hàm tag locale(vùng_locale) {
+hàm công khai tag locale(vùng_locale) {
     nếu (loại của(vùng_locale) != "từ điển") {
         ném "LOCALE_INVALID";
     };
@@ -147,7 +148,7 @@ hàm tag locale(vùng_locale) {
     trả về lấy map(vùng_locale, "tag", "");
 };
 
-hàm quốc tế thêm duy nhất(ds, giá_trị) {
+hàm riêng tư quốc tế thêm duy nhất(ds, giá_trị) {
     nếu (tìm chỉ số(ds, giá_trị) < 0) {
         thêm(ds, giá_trị);
     };
@@ -155,7 +156,7 @@ hàm quốc tế thêm duy nhất(ds, giá_trị) {
 
 // Fallback deterministic: exact -> bỏ variant/extensions ->
 // language-script-region -> language-region -> language-script -> language -> root.
-hàm fallback locale(vùng_locale) {
+hàm công khai fallback locale(vùng_locale) {
     nếu (loại của(vùng_locale) == "chuỗi") {
         vùng_locale = locale(vùng_locale);
     };
@@ -183,7 +184,7 @@ hàm fallback locale(vùng_locale) {
     trả về kết_quả;
 };
 
-hàm gói tài nguyên(tên_cơ_sở, vùng_locale, nguồn) {
+hàm công khai gói tài nguyên(tên_cơ_sở, vùng_locale, nguồn) {
     nếu (loại của(tên_cơ_sở) != "chuỗi" || tên_cơ_sở == "" ||
         loại của(nguồn) != "từ điển") {
         ném "RESOURCE_INVALID";
@@ -218,7 +219,7 @@ hàm gói tài nguyên(tên_cơ_sở, vùng_locale, nguồn) {
     };
 };
 
-hàm lấy tài nguyên(bundle, khóa) {
+hàm công khai lấy tài nguyên(bundle, khóa) {
     nếu (loại của(bundle) != "từ điển") {
         ném "RESOURCE_INVALID";
     };
@@ -233,11 +234,11 @@ hàm lấy tài nguyên(bundle, khóa) {
     trả về lấy map(dữ_liệu, khóa, rỗng);
 };
 
-hàm quốc tế là khoảng trắng properties(c) {
+hàm riêng tư quốc tế là khoảng trắng properties(c) {
     trả về c == " " || c == "\t" || c == "\f";
 };
 
-hàm quốc tế hex nibble(c) {
+hàm riêng tư quốc tế hex nibble(c) {
     bảng = "0123456789abcdef";
     chữ = chuỗi thường(c);
     kết_quả = -1;
@@ -247,23 +248,23 @@ hàm quốc tế hex nibble(c) {
     trả về kết_quả;
 };
 
-hàm quốc tế ký tự mã(mã) {
+hàm riêng tư quốc tế ký tự mã(mã) {
     nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
         ném "PROPERTIES_INVALID";
     };
     bytes = [];
     nếu (mã <= 127) {
         thêm(bytes, mã);
-    } nếu không {
+    } hoặc {
         nếu (mã <= 2047) {
             thêm(bytes, 192 + thành số nguyên(mã / 64));
             thêm(bytes, 128 + mã % 64);
-        } nếu không {
+        } hoặc {
             nếu (mã <= 65535) {
                 thêm(bytes, 224 + thành số nguyên(mã / 4096));
                 thêm(bytes, 128 + (thành số nguyên(mã / 64) % 64));
                 thêm(bytes, 128 + mã % 64);
-            } nếu không {
+            } hoặc {
                 thêm(bytes, 240 + thành số nguyên(mã / 262144));
                 thêm(bytes, 128 + (thành số nguyên(mã / 4096) % 64));
                 thêm(bytes, 128 + (thành số nguyên(mã / 64) % 64));
@@ -274,7 +275,7 @@ hàm quốc tế ký tự mã(mã) {
     trả về giải mã bảng mã(bytes, "UTF-8");
 };
 
-hàm quốc tế giải escape properties(s) {
+hàm riêng tư quốc tế giải escape properties(s) {
     kết_quả = "";
     i = 0;
     lặp(vòng = 0; i < độ dài(s); vòng++) {
@@ -282,18 +283,18 @@ hàm quốc tế giải escape properties(s) {
         nếu (c != "\\") {
             kết_quả = kết_quả + c;
             i += 1;
-        } nếu không {
+        } hoặc {
             i += 1;
             nếu (i >= độ dài(s)) { ném "PROPERTIES_INVALID"; };
             e = s[i];
             nếu (e == "t") { kết_quả = kết_quả + "\t"; i += 1; }
-            nếu không {
+            hoặc {
                 nếu (e == "n") { kết_quả = kết_quả + "\n"; i += 1; }
-                nếu không {
+                hoặc {
                     nếu (e == "r") { kết_quả = kết_quả + "\r"; i += 1; }
-                    nếu không {
+                    hoặc {
                         nếu (e == "f") { kết_quả = kết_quả + "\f"; i += 1; }
-                        nếu không {
+                        hoặc {
                             nếu (e == "u") {
                                 nếu (i + 4 >= độ dài(s)) { ném "PROPERTIES_INVALID"; };
                                 mã = 0;
@@ -304,7 +305,7 @@ hàm quốc tế giải escape properties(s) {
                                 };
                                 kết_quả = kết_quả + quốc tế ký tự mã(mã);
                                 i += 5;
-                            } nếu không {
+                            } hoặc {
                                 // Java Properties giữ ký tự sau backslash cho escape không đặc biệt.
                                 kết_quả = kết_quả + e;
                                 i += 1;
@@ -318,18 +319,18 @@ hàm quốc tế giải escape properties(s) {
     trả về kết_quả;
 };
 
-hàm quốc tế dòng tiếp diễn(s) {
+hàm riêng tư quốc tế dòng tiếp diễn(s) {
     đếm = 0;
     i = độ dài(s) - 1;
     đang_đếm = đúng;
     lặp(vòng = 0; đang_đếm; vòng++) {
         nếu (i < 0) {
             đang_đếm = sai;
-        } nếu không {
+        } hoặc {
             nếu (s[i] == "\\") {
                 đếm += 1;
                 i -= 1;
-            } nếu không {
+            } hoặc {
                 đang_đếm = sai;
             };
         };
@@ -337,16 +338,16 @@ hàm quốc tế dòng tiếp diễn(s) {
     trả về đếm % 2 == 1;
 };
 
-hàm quốc tế bỏ trắng đầu properties(s) {
+hàm riêng tư quốc tế bỏ trắng đầu properties(s) {
     i = 0;
     đang_bỏ = đúng;
     lặp(vòng = 0; đang_bỏ; vòng++) {
         nếu (i >= độ dài(s)) {
             đang_bỏ = sai;
-        } nếu không {
+        } hoặc {
             nếu (quốc tế là khoảng trắng properties(s[i])) {
                 i += 1;
-            } nếu không {
+            } hoặc {
                 đang_bỏ = sai;
             };
         };
@@ -354,7 +355,7 @@ hàm quốc tế bỏ trắng đầu properties(s) {
     trả về cắt chuỗi(s, i, độ dài(s) - i);
 };
 
-hàm quốc tế phân tích dòng properties(dòng) {
+hàm riêng tư quốc tế phân tích dòng properties(dòng) {
     s = quốc tế bỏ trắng đầu properties(dòng);
     nếu (s == "") { trả về rỗng; };
     nếu (s[0] == "#" || s[0] == "!") { trả về rỗng; };
@@ -366,14 +367,14 @@ hàm quốc tế phân tích dòng properties(dòng) {
         c = s[i];
         nếu (escape) {
             escape = sai;
-        } nếu không {
+        } hoặc {
             nếu (c == "\\") {
                 escape = đúng;
-            } nếu không {
+            } hoặc {
                 nếu (c == "=" || c == ":") {
                     vị_trí = i;
                     kiểu = "sep";
-                } nếu không {
+                } hoặc {
                     nếu (quốc tế là khoảng trắng properties(c)) {
                         vị_trí = i;
                         kiểu = "space";
@@ -394,10 +395,10 @@ hàm quốc tế phân tích dòng properties(dòng) {
         lặp(vòng = 0; đang_bỏ; vòng++) {
             nếu (i >= độ dài(s)) {
                 đang_bỏ = sai;
-            } nếu không {
+            } hoặc {
                 nếu (quốc tế là khoảng trắng properties(s[i])) {
                     i += 1;
-                } nếu không {
+                } hoặc {
                     đang_bỏ = sai;
                 };
             };
@@ -405,17 +406,17 @@ hàm quốc tế phân tích dòng properties(dòng) {
         nếu (i < độ dài(s)) {
             nếu (s[i] == "=" || s[i] == ":") { i += 1; };
         };
-    } nếu không {
+    } hoặc {
         i += 1;
     };
     đang_bỏ = đúng;
     lặp(vòng = 0; đang_bỏ; vòng++) {
         nếu (i >= độ dài(s)) {
             đang_bỏ = sai;
-        } nếu không {
+        } hoặc {
             nếu (quốc tế là khoảng trắng properties(s[i])) {
                 i += 1;
-            } nếu không {
+            } hoặc {
                 đang_bỏ = sai;
             };
         };
@@ -427,7 +428,7 @@ hàm quốc tế phân tích dòng properties(dòng) {
     };
 };
 
-hàm properties(văn_bản, mặc_định = rỗng,
+hàm công khai properties(văn_bản, mặc_định = rỗng,
                giới_hạn_mục = 4096, giới_hạn_ký_tự = 1048576) {
     nếu (loại của(văn_bản) != "chuỗi" ||
         loại của(giới_hạn_mục) != "số nguyên" || giới_hạn_mục <= 0 ||
@@ -457,7 +458,7 @@ hàm properties(văn_bản, mặc_định = rỗng,
         nếu (!hết) { c = văn_bản[pos]; };
         nếu (c == "\r") {
             // CRLF: CR được bỏ, LF kết thúc dòng; CR đơn cũng được chấp nhận ở cuối.
-        } nếu không {
+        } hoặc {
             nếu (c == "\n") {
                 phần = dòng_vật_lý;
                 nếu (tiếp_diễn) { phần = quốc tế bỏ trắng đầu properties(phần); };
@@ -481,7 +482,7 @@ hàm properties(văn_bản, mặc_định = rỗng,
                     };
                     dòng_logic = "";
                 };
-            } nếu không {
+            } hoặc {
                 dòng_vật_lý = dòng_vật_lý + c;
             };
         };
@@ -495,7 +496,7 @@ hàm properties(văn_bản, mặc_định = rỗng,
     };
 };
 
-hàm lấy property(cấu_hình, khóa, fallback = rỗng) {
+hàm công khai lấy property(cấu_hình, khóa, fallback = rỗng) {
     nếu (loại của(cấu_hình) != "từ điển") {
         ném "PROPERTIES_INVALID";
     };
@@ -514,4 +515,20 @@ hàm lấy property(cấu_hình, khóa, fallback = rỗng) {
         trả về lấy property(mặc_định, khóa, fallback);
     };
     trả về fallback;
+};
+
+// Lựa chọn locale được giữ lại; chọn lại chỉ thay trạng thái sau khi thành công.
+lớp công khai Gói Tài Nguyên {
+    hàm công khai khởi tạo(tên, vùng, nguồn) {
+        mình.bundle = gói tài nguyên(tên, vùng, nguồn);
+        mình.nguồn = nguồn;
+        mình.tên = tên;
+    };
+    hàm công khai lấy(khóa) { trả về lấy tài nguyên(mình.bundle, khóa); };
+    hàm công khai vùng đã chọn() { trả về lấy map(mình.bundle, "locale đã chọn", ""); };
+    hàm công khai chọn vùng(vùng) {
+        mới = gói tài nguyên(mình.tên, vùng, mình.nguồn);
+        mình.bundle = mới;
+        trả về mình;
+    };
 };

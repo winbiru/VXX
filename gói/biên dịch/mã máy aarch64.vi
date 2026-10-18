@@ -1,0 +1,313 @@
+// aarch64: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phát AARCH64 {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+        ra = [];
+        nếu (loại == "hằng") {
+                        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("52800000") + thấp * 32, ít);
+                        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("72a00000") + cao * 32, ít);
+                    } hoặc {
+                        nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "0b010000", ít); }
+                        hoặc { biên dịch mã máy thêm hex(ra, "4b010000", ít); };
+                    };
+                    biên dịch mã máy thêm hex(ra, "d65f03c0", ít);
+        trả về ra;
+    };
+
+    // Machine IR i32: byte emitter thuần V++ tương ứng chính xác với
+    // emitAArch64Function trong src/native/aarch64_codegen.cpp.
+    // Input gồm {"parameterCount", "slotCount", "maxStackDepth", "instructions"};
+    // mỗi lệnh gồm {"opcode", "immediate", "operand", "depthBefore", "symbol"}.
+    // Không nhận IR động/không có kiểu; relocation CALL để object writer xử lý.
+    hàm riêng tư biên dịch mã máy aarch64 word(ra, word) {
+        biên dịch mã máy thêm word(ra, word, đúng);
+    };
+
+    // Ánh xạ cố định qua mọi nhánh/vòng lặp; bỏ qua scratch W9/W10.
+    // Chỉ dùng W0..W17, không chạm W18 của nền tảng hoặc callee-saved W19+.
+    hàm riêng tư biên dịch mã máy aarch64 thanh ghi(slot) {
+        nếu (slot < 9) { trả về slot; };
+        trả về slot + 2;
+    };
+
+    hàm riêng tư biên dịch mã máy aarch64 chuyển(ra, đích, nguồn) {
+        nếu (đích != nguồn) {
+            mình.biên dịch mã máy aarch64 word(ra,
+                biên dịch mã máy word hex("2a0003e0") + nguồn * 65536 + đích);
+        };
+    };
+
+    hàm riêng tư biên dịch mã máy aarch64 điều chỉnh sp(ra, bytes, trừ) {
+        còn = bytes;
+        lặp (i = 0; i < bytes; i += 4095) {
+            bước = còn;
+            nếu (bước > 4095) { bước = 4095; };
+            nền = biên dịch mã máy word hex("910003ff");
+            nếu (trừ) { nền = biên dịch mã máy word hex("d10003ff"); };
+            mình.biên dịch mã máy aarch64 word(ra, nền + bước * 1024);
+            còn -= bước;
+        };
+    };
+
+    hàm riêng tư biên dịch mã máy aarch64 truy cập byte(ra, tải, thanh_ghi, offset) {
+        nếu (offset < 0 || offset > 2147483647 || offset % 4 != 0) {
+            ném "AArch64: offset stack không hợp lệ";
+        };
+        cơ_sở = biên dịch mã máy word hex("b9000000");
+        nếu (tải) { cơ_sở = biên dịch mã máy word hex("b9400000"); };
+        nếu (offset <= 16380) {
+            mình.biên dịch mã máy aarch64 word(ra, cơ_sở + offset * 256 + 992 + thanh_ghi);
+            trả về;
+        };
+        mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("910003eb"));
+        còn = offset;
+        lặp (i = 0; i < offset; i += 4095) {
+            bước = còn;
+            nếu (bước > 4095) { bước = 4095; };
+            mình.biên dịch mã máy aarch64 word(ra,
+                biên dịch mã máy word hex("9100016b") + bước * 1024);
+            còn -= bước;
+        };
+        mình.biên dịch mã máy aarch64 word(ra, cơ_sở + 352 + thanh_ghi);
+    };
+
+    // LDR/STR cho fallback; MOV cho hàm lá vừa đủ thanh ghi.
+    hàm riêng tư biên dịch mã máy aarch64 truy cập(ra, tải, thanh_ghi, slot, dùng_thanh_ghi) {
+        nếu (slot < 0 || thanh_ghi < 0 || thanh_ghi > 31) {
+            ném "AArch64: slot hoặc thanh ghi ngoài frame";
+        };
+        nếu (dùng_thanh_ghi) {
+            vị_trí = mình.biên dịch mã máy aarch64 thanh ghi(slot);
+            nếu (tải) { mình.biên dịch mã máy aarch64 chuyển(ra, thanh_ghi, vị_trí); }
+            hoặc { mình.biên dịch mã máy aarch64 chuyển(ra, vị_trí, thanh_ghi); };
+            trả về;
+        };
+        mình.biên dịch mã máy aarch64 truy cập byte(ra, tải, thanh_ghi, slot * 4);
+    };
+
+    // Nhận IR đã được CFG validator kiểm tra depth tại các điểm nối.
+    // Branch target là chỉ số lệnh; kết quả offset và relocation là byte offset.
+    hàm công khai biên dịch mã máy phát aarch64 hàm(hàm_ir, hệ_điều_hành = "linux") {
+        tham_số = hàm_ir["parameterCount"];
+        slot = hàm_ir["slotCount"];
+        sâu_nhất = hàm_ir["maxStackDepth"];
+        lệnh = hàm_ir["instructions"];
+        nếu (tham_số < 0 || slot < tham_số || slot < 0 ||
+            sâu_nhất < 0 || slot + sâu_nhất > 134217724 || độ dài(lệnh) == 0) {
+            ném "AArch64 machine IR/frame không hợp lệ";
+        };
+        frame = ((4 * (slot + sâu_nhất) + 15) / 16) * 16;
+        bước_tham_số = 8;
+        nếu (hệ_điều_hành == "macos") { bước_tham_số = 4; };
+        dùng_thanh_ghi = tham_số <= 8 && slot + sâu_nhất <= 16;
+        lặp (i = 0; i < độ dài(lệnh); i++) {
+            nếu (lệnh[i]["opcode"] == "Call") { dùng_thanh_ghi = sai; };
+        };
+        nếu (dùng_thanh_ghi) { frame = 0; };
+        ra = [];
+        tái_định_vị = [];
+        vá_nhánh = [];
+        vị_trí_lệnh = [];
+
+        nếu (!dùng_thanh_ghi) {
+            biên dịch mã máy thêm hex(ra, "a9bf7bfd", đúng);
+            biên dịch mã máy thêm hex(ra, "910003fd", đúng);
+        };
+        nếu (frame > 0) {
+            mình.biên dịch mã máy aarch64 điều chỉnh sp(ra, frame, đúng);
+        };
+        lặp (i = 0; i < tham_số; i++) {
+            nếu (i < 8) {
+                mình.biên dịch mã máy aarch64 truy cập(ra, sai, i, i, dùng_thanh_ghi);
+            } hoặc {
+                mình.biên dịch mã máy aarch64 truy cập byte(ra, đúng, 9, frame + 16 + (i - 8) * bước_tham_số);
+                mình.biên dịch mã máy aarch64 truy cập(ra, sai, 9, i, sai);
+            };
+        };
+
+        lặp (i = 0; i < độ dài(lệnh); i++) {
+            thêm(vị_trí_lệnh, độ dài(ra));
+            op = lệnh[i];
+            mã = op["opcode"];
+            d = op["depthBefore"];
+            số = op["operand"];
+            nếu (d < 0 || d > sâu_nhất) { ném "AArch64: độ sâu stack không hợp lệ"; };
+            chọn (mã) {
+                ca "PushConstant": {
+                    nếu (d >= sâu_nhất) { ném "ARM64 eval stack overflow"; };
+                    nửa = biên dịch mã máy trả về(op["immediate"]);
+                    đích = 9;
+                    nếu (dùng_thanh_ghi) { đích = mình.biên dịch mã máy aarch64 thanh ghi(slot + d); };
+                    mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("52800000") + nửa["lo"] * 32 + đích);
+                    nếu (!dùng_thanh_ghi || nửa["hi"] != 0) {
+                        mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("72a00000") + nửa["hi"] * 32 + đích);
+                    };
+                    mình.biên dịch mã máy aarch64 truy cập(ra, sai, đích, slot + d, dùng_thanh_ghi);
+                }
+                ca "LoadSlot": {
+                    nếu (số < 0 || số >= slot || d >= sâu_nhất) { ném "ARM64 load slot ngoài frame"; };
+                    nếu (dùng_thanh_ghi) {
+                        mình.biên dịch mã máy aarch64 chuyển(ra,
+                            mình.biên dịch mã máy aarch64 thanh ghi(slot + d),
+                            mình.biên dịch mã máy aarch64 thanh ghi(số));
+                    } hoặc {
+                        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, 9, số, sai);
+                        mình.biên dịch mã máy aarch64 truy cập(ra, sai, 9, slot + d, sai);
+                    };
+                }
+                ca "StoreSlot": {
+                    nếu (số < 0 || số >= slot || d == 0) { ném "ARM64 store slot ngoài frame"; };
+                    nếu (dùng_thanh_ghi) {
+                        mình.biên dịch mã máy aarch64 chuyển(ra,
+                            mình.biên dịch mã máy aarch64 thanh ghi(số),
+                            mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 1));
+                    } hoặc {
+                        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, 9, slot + d - 1, sai);
+                        mình.biên dịch mã máy aarch64 truy cập(ra, sai, 9, số, sai);
+                    };
+                }
+                ca "Drop": {
+                    nếu (d == 0) { ném "ARM64 eval stack underflow"; };
+                }
+                ca "Add": {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, slot, "0b000000", dùng_thanh_ghi);
+                }
+                ca "Sub": {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, slot, "4b000000", dùng_thanh_ghi);
+                }
+                ca "Mul": {
+                    mình.biên dịch mã máy aarch64 phép tính(ra, d, slot, "1b007c00", dùng_thanh_ghi);
+                }
+                ca "Equal": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 1, dùng_thanh_ghi); }
+                ca "NotEqual": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 0, dùng_thanh_ghi); }
+                ca "Less": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 10, dùng_thanh_ghi); }
+                ca "LessEqual": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 12, dùng_thanh_ghi); }
+                ca "Greater": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 13, dùng_thanh_ghi); }
+                ca "GreaterEqual": { mình.biên dịch mã máy aarch64 so sánh(ra, d, slot, 11, dùng_thanh_ghi); }
+                ca "BranchZero": {
+                    nếu (d == 0 || số < 0 || số >= độ dài(lệnh)) { ném "ARM64 branch không hợp lệ"; };
+                    nguồn = 9;
+                    nếu (dùng_thanh_ghi) { nguồn = mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 1); };
+                    mình.biên dịch mã máy aarch64 truy cập(ra, đúng, nguồn, slot + d - 1, dùng_thanh_ghi);
+                    thêm(vá_nhánh, {"vị trí": độ dài(ra), "đích": số, "điều kiện": đúng, "thanh ghi": nguồn});
+                    mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("34000000") + nguồn);
+                }
+                ca "Jump": {
+                    nếu (số < 0 || số >= độ dài(lệnh)) { ném "ARM64 jump không hợp lệ"; };
+                    thêm(vá_nhánh, {"vị trí": độ dài(ra), "đích": số, "điều kiện": sai});
+                    biên dịch mã máy thêm hex(ra, "14000000", đúng);
+                }
+                ca "Call": {
+                    nếu (số < 0 || d < số || op["symbol"] == "") {
+                        ném "ARM64 call thiếu arguments/symbol";
+                    };
+                    trực_tiếp = số;
+                    nếu (trực_tiếp > 8) { trực_tiếp = 8; };
+                    lặp (n = 0; n < trực_tiếp; n++) {
+                        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, n, slot + d - số + n, sai);
+                    };
+                    vượt = số - trực_tiếp;
+                    nếu (vượt > (2147483647 - 16) / bước_tham_số) {
+                        ném "ARM64 call stack quá lớn";
+                    };
+                    kích_cỡ = ((vượt * bước_tham_số + 15) / 16) * 16;
+                    mình.biên dịch mã máy aarch64 điều chỉnh sp(ra, kích_cỡ, đúng);
+                    lặp (n = 8; n < số; n++) {
+                        mình.biên dịch mã máy aarch64 truy cập byte(ra, đúng, 9,
+                            kích_cỡ + (slot + d - số + n) * 4);
+                        mình.biên dịch mã máy aarch64 truy cập byte(ra, sai, 9, (n - 8) * bước_tham_số);
+                    };
+                    thêm(tái_định_vị, {"offset": độ dài(ra), "symbol": op["symbol"]});
+                    biên dịch mã máy thêm hex(ra, "94000000", đúng);
+                    mình.biên dịch mã máy aarch64 điều chỉnh sp(ra, kích_cỡ, sai);
+                    mình.biên dịch mã máy aarch64 truy cập(ra, sai, 0, slot + d - số, sai);
+                }
+                ca "Return": {
+                    nếu (d == 0) { ném "ARM64 return không có giá trị"; };
+                    mình.biên dịch mã máy aarch64 truy cập(ra, đúng, 0, slot + d - 1, dùng_thanh_ghi);
+                    nếu (frame > 0) {
+                        mình.biên dịch mã máy aarch64 điều chỉnh sp(ra, frame, sai);
+                    };
+                    nếu (!dùng_thanh_ghi) { biên dịch mã máy thêm hex(ra, "a8c17bfd", đúng); };
+                    biên dịch mã máy thêm hex(ra, "d65f03c0", đúng);
+                }
+                ca "Trap": { biên dịch mã máy thêm hex(ra, "d4200000", đúng); }
+                mặc định: { ném "AArch64 MachineOpcode C++ chưa định nghĩa: " + mã; }
+            };
+        };
+        lặp (i = 0; i < độ dài(vá_nhánh); i++) {
+            f = vá_nhánh[i];
+            byte_đích = vị_trí_lệnh[f["đích"]];
+            chênh = byte_đích - f["vị trí"];
+            nếu (chênh % 4 != 0) { ném "ARM64 branch không căn theo word"; };
+            word_chênh = chênh / 4;
+            điều_kiện = f["điều kiện"];
+            phạm_vi = 33554432;
+            mô_đun = 67108864;
+            cơ_sở = biên dịch mã máy word hex("14000000");
+            hệ_số = 1;
+            nếu (điều_kiện) {
+                phạm_vi = 262144;
+                mô_đun = 524288;
+                cơ_sở = biên dịch mã máy word hex("34000000") + f["thanh ghi"];
+                hệ_số = 32;
+            };
+            nếu (word_chênh < -phạm_vi || word_chênh >= phạm_vi) {
+                ném "ARM64 branch vượt giới hạn ISA";
+            };
+            giá_trị = word_chênh % mô_đun;
+            nếu (giá_trị < 0) { giá_trị += mô_đun; };
+            byte_vá = [];
+            mình.biên dịch mã máy aarch64 word(byte_vá, cơ_sở + giá_trị * hệ_số);
+            lặp (n = 0; n < 4; n++) { ra[f["vị trí"] + n] = byte_vá[n]; };
+        };
+        trả về {"bytes": ra, "relocations": tái_định_vị};
+    };
+
+    hàm riêng tư biên dịch mã máy aarch64 phép tính(ra, d, slot, cơ_sở, dùng_thanh_ghi) {
+        nếu (d < 2) { ném "ARM64 binary stack underflow"; };
+        trái = 9;
+        phải = 10;
+        nếu (dùng_thanh_ghi) {
+            trái = mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 2);
+            phải = mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 1);
+        };
+        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, trái, slot + d - 2, dùng_thanh_ghi);
+        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, phải, slot + d - 1, dùng_thanh_ghi);
+        mình.biên dịch mã máy aarch64 word(ra,
+            biên dịch mã máy word hex(cơ_sở) + phải * 65536 + trái * 32 + trái);
+        mình.biên dịch mã máy aarch64 truy cập(ra, sai, trái, slot + d - 2, dùng_thanh_ghi);
+    };
+
+    hàm riêng tư biên dịch mã máy aarch64 so sánh(ra, d, slot, điều_kiện_ngược, dùng_thanh_ghi) {
+        nếu (d < 2) { ném "ARM64 binary stack underflow"; };
+        trái = 9;
+        phải = 10;
+        nếu (dùng_thanh_ghi) {
+            trái = mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 2);
+            phải = mình.biên dịch mã máy aarch64 thanh ghi(slot + d - 1);
+        };
+        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, trái, slot + d - 2, dùng_thanh_ghi);
+        mình.biên dịch mã máy aarch64 truy cập(ra, đúng, phải, slot + d - 1, dùng_thanh_ghi);
+        mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("6b00001f") + phải * 65536 + trái * 32);
+        mình.biên dịch mã máy aarch64 word(ra, biên dịch mã máy word hex("1a9f07e0") + điều_kiện_ngược * 4096 + trái);
+        mình.biên dịch mã máy aarch64 truy cập(ra, sai, trái, slot + d - 2, dùng_thanh_ghi);
+    };
+};
+
+
+hàm công khai biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    __vpp_adapter = Bộ Phát AARCH64();
+    trả về __vpp_adapter.biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+};
+
+hàm công khai biên dịch mã máy phát aarch64 hàm(hàm_ir, hệ_điều_hành = "linux") {
+    __vpp_adapter = Bộ Phát AARCH64();
+    trả về __vpp_adapter.biên dịch mã máy phát aarch64 hàm(hàm_ir, hệ_điều_hành);
+};
+

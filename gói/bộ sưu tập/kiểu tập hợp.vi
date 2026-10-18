@@ -1,0 +1,12 @@
+nhập gói/bộ sưu tập/giao diện;
+nhập gói/bộ sưu tập/tập hợp;
+
+lớp công khai Tập Hợp triển khai Bộ Chứa {
+    hàm công khai khởi tạo() { mình.phần_tử = []; };
+    hàm công khai số lượng() { trả về do_dai(mình.phần_tử); };
+    hàm công khai trống() { trả về mình.số lượng() == 0; };
+    hàm công khai chứa(giá_trị) { trả về tập chứa(mình.phần_tử, giá_trị); };
+    hàm công khai thêm(giá_trị) { trả về tập thêm(mình.phần_tử, giá_trị); };
+    hàm công khai xóa(giá_trị) { trả về tập xóa(mình.phần_tử, giá_trị); };
+    hàm công khai danh sách() { trả về tập hợp(mình.phần_tử); };
+};

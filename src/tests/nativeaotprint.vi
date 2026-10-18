@@ -1,0 +1,9 @@
+// Native runtime smoke: i32 output, CALL relocation, signed boundaries.
+hàm sum(a, b) { trả về a + b; };
+
+hàm chính() {
+    in -2147483648;
+    in sum(40, 2);
+    in 0;
+    trả về 7;
+};

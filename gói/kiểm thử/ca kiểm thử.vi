@@ -1,0 +1,19 @@
+// Một ca kiểm thử có thể chạy lại, mỗi lần vẫn có setup/cleanup riêng.
+nhập gói/kiểm thử/vòng đời;
+
+lớp công khai Ca Kiểm Thử {
+    hàm công khai khởi tạo(thân, thiết_lập = rỗng, dọn_dẹp = rỗng) {
+        nếu (thân == rỗng) { ném "TEST_ARGUMENT"; };
+        mình.thân = thân;
+        mình.thiết_lập = thiết_lập;
+        mình.dọn_dẹp = dọn_dẹp;
+        mình.số_lần = 0;
+    };
+
+    hàm công khai chạy() {
+        mình.số_lần = mình.số_lần + 1;
+        trả về chạy ca kiểm thử(mình.thân, mình.thiết_lập, mình.dọn_dẹp);
+    };
+
+    hàm công khai số lần chạy() { trả về mình.số_lần; };
+};

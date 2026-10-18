@@ -1,0 +1,29 @@
+nhập gói/bộ sưu tập/chính;
+
+hàm chính() {
+    a = Hàng Đợi(); b = Hàng Đợi();
+    in a.trống() && b.trống();
+    lặp(i = 0; i < 80; i++) { a.thêm(i); };
+    in a.số lượng() == 80;
+    đúng_fifo = đúng;
+    lặp(i = 0; i < 80; i++) { nếu (a.lấy() != i) { đúng_fifo = sai; }; };
+    in đúng_fifo && a.trống() && b.trống();
+    lỗi_rỗng = sai;
+    thử { a.lấy(); } bắt lỗi(e) { lỗi_rỗng = đúng; };
+    in lỗi_rỗng;
+    a.thêm("mới"); in a.đầu() == "mới";
+    tập = Tập Hợp(); tập_khác = Tập Hợp();
+    in tập.thêm("a") && !tập.thêm("a");
+    in tập.thêm("b") && tập.số lượng() == 2;
+    in tập.chứa("a") && tập_khác.trống();
+    bản_sao = tập.danh sách(); them(bản_sao, "c");
+    in tập.số lượng() == 2;
+    in tập.xóa("a") && !tập.xóa("a");
+    bảng = Từ Điển(); khác = Từ Điển();
+    bảng.đặt("a", rỗng); bảng.đặt("b", 4);
+    in bảng.chứa("a") && bảng.lấy("a", 9) == rỗng;
+    in bảng.lấy("thiếu", 9) == 9;
+    in bảng.số lượng() == 2 && khác.trống();
+    in bảng.các khóa()[1] == "b";
+    in bảng.xóa("b") == 4 && bảng.số lượng() == 1;
+};

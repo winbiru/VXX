@@ -6,7 +6,8 @@ ngoại thư viện c_entropy = "system.c";
 ngoại hàm lấy_entropy_ffi(đệm: c_đệm_ra[độ_dài], độ_dài: u64): i32 từ c_entropy
     ký hiệu "getentropy" abi "c" khả năng "system.entropy.read";
 
-hàm entropy bảo mật bytes(số_byte) {
+// Hàm thuần theo lời gọi: dữ liệu entropy không lưu trên một đối tượng.
+hàm công khai entropy bảo mật bytes(số_byte) {
     nếu (loai_cua(số_byte) != "số nguyên" || số_byte < 1 || số_byte > 4096) {
         ném "entropy bảo mật: số byte phải là số nguyên từ 1 đến 4096";
     };

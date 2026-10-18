@@ -3,7 +3,7 @@
 
 nhập gói/văn bản/chuỗi;
 
-hàm ký hiệu vùng chuẩn hóa(vùng) {
+hàm công khai ký hiệu vùng chuẩn hóa(vùng) {
     nếu (loai_cua(vùng) != "chuỗi") {
         ném "LOCALE_INVALID";
     };
@@ -28,7 +28,7 @@ hàm ký hiệu vùng chuẩn hóa(vùng) {
     trả về kết_quả;
 };
 
-hàm ký hiệu vùng lấy(vùng = rỗng) {
+hàm công khai ký hiệu vùng lấy(vùng = rỗng) {
     nếu (vùng == rỗng) {
         trả về {
             "tên": "C",
@@ -65,7 +65,7 @@ hàm ký hiệu vùng lấy(vùng = rỗng) {
     ném "LOCALE_UNSUPPORTED";
 };
 
-hàm ký hiệu vùng hỗ trợ(vùng) {
+hàm công khai ký hiệu vùng hỗ trợ(vùng) {
     thử {
         ký hiệu vùng lấy(vùng);
         trả về đúng;

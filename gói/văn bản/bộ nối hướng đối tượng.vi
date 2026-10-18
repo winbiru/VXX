@@ -1,0 +1,33 @@
+// Đối tượng nối chuỗi có trạng thái; dùng lại cùng logic với API hàm.
+nhập gói/văn bản/bộ nối chuỗi;
+
+lớp công khai Bộ Nối Văn Bản {
+    hàm công khai khởi tạo(phân_cách, tiền_tố = "", hậu_tố = "", giá_trị_rỗng = rỗng) {
+        mình.bộ = bộ nối chuỗi(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng);
+    };
+
+    hàm công khai thêm(giá_trị) {
+        bộ nối thêm(mình.bộ, giá_trị);
+        trả về mình;
+    };
+
+    hàm công khai số phần() { trả về bộ nối số phần(mình.bộ); };
+    hàm công khai kết quả() { trả về bộ nối kết quả(mình.bộ); };
+    hàm công khai độ dài() { trả về bộ nối độ dài(mình.bộ); };
+
+    hàm công khai gộp(nguồn) {
+        bộ nối gộp(mình.bộ, nguồn.bộ gốc());
+        trả về mình;
+    };
+
+    // Bản sao dữ liệu; không để caller sửa trạng thái nội bộ.
+    hàm công khai bộ gốc() {
+        gốc_dữ_liệu = mình.bộ;
+        bản_sao = bộ nối chuỗi(lấy map(gốc_dữ_liệu, "phân cách", ""),
+            lấy map(gốc_dữ_liệu, "tiền tố", ""), lấy map(gốc_dữ_liệu, "hậu tố", ""),
+            lấy map(gốc_dữ_liệu, "giá trị rỗng", rỗng));
+        các_phần = bộ nối yêu cầu(gốc_dữ_liệu);
+        lặp(i = 0; i < bộ nối số phần(gốc_dữ_liệu); i++) { bộ nối thêm(bản_sao, các_phần[i]); };
+        trả về bản_sao;
+    };
+};

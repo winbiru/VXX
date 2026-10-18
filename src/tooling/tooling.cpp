@@ -62,6 +62,7 @@ const char *tenLoaiCauLenh(vietvm::frontend::AstStatementKind kind) noexcept {
         case AstStatementKind::Loop: return "lặp";
         case AstStatementKind::Switch: return "chọn";
         case AstStatementKind::Return: return "trả về";
+        case AstStatementKind::VariableDeclaration: return "khai báo biến";
         case AstStatementKind::Print: return "in";
         case AstStatementKind::Break: return "thoát";
         case AstStatementKind::Continue: return "bỏ qua";
@@ -213,6 +214,7 @@ const char *tenLenhIr(vietvm::compiler::IrOpcode opcode) noexcept {
         case IrOpcode::Loop: return "lặp";
         case IrOpcode::Switch: return "chọn";
         case IrOpcode::Return: return "trả về";
+        case IrOpcode::DeclareVariable: return "khai báo biến";
         case IrOpcode::Print: return "in";
         case IrOpcode::Break: return "thoát";
         case IrOpcode::Continue: return "bỏ qua";

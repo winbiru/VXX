@@ -1,0 +1,77 @@
+// Đối chiếu bộ giải mã chuỗi V++ với stripQuotes và codegen C++.
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/chính;
+nhập gói/lõi/kịch bản;
+
+hàm escape cùng bytecode(nguồn) {
+    cpp = biên dịch bytecode(nguồn);
+    vi = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+    nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cpp); i++) {
+        nếu (cpp[i]["op"] != vi[i]["op"] ||
+            cpp[i]["toán hạng"] != vi[i]["toán hạng"] ||
+            cpp[i]["chỉ số"] != vi[i]["chỉ số"] ||
+            cpp[i]["giá trị"] != vi[i]["giá trị"]) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm escape cùng kết quả(nguồn) {
+    trả về biên dịch chạy chương trình tự chủ(nguồn) == kịch bản chạy(nguồn);
+};
+
+hàm chính() {
+    gạch = "\\";
+    nháy = "\"";
+    đơn = "'";
+
+    in biên dịch phát mã tách chuỗi(nháy + "A" + gạch + "nB" + nháy) == "A\nB";
+    in biên dịch phát mã tách chuỗi(nháy + "A" + gạch + "rB" + nháy) == "A\rB";
+    in biên dịch phát mã tách chuỗi(nháy + "A" + gạch + "tB" + nháy) == "A\tB";
+    in biên dịch phát mã tách chuỗi(nháy + "A" + gạch + gạch + "B" + nháy) == "A\\B";
+    in biên dịch phát mã tách chuỗi(nháy + gạch + nháy + nháy) == nháy;
+    in biên dịch phát mã tách chuỗi(đơn + gạch + đơn + đơn) == đơn;
+    in biên dịch phát mã tách chuỗi(nháy + gạch + "0" + nháy) == ký tự unicode(0);
+    in biên dịch phát mã tách chuỗi(nháy + gạch + "x" + nháy) == "x";
+    in biên dịch phát mã tách chuỗi(đơn + "Việt Nam" + đơn) == "Việt Nam";
+
+    a = "in " + nháy + "Một" + gạch + "nHai" + nháy + ";";
+    in escape cùng bytecode(a);
+    in escape cùng kết quả(a);
+    b = "in " + nháy + "Một" + gạch + "tHai" + nháy + ";";
+    in escape cùng bytecode(b);
+    in escape cùng kết quả(b);
+    c = "in " + nháy + "Một" + gạch + "rHai" + nháy + ";";
+    in escape cùng bytecode(c);
+    in escape cùng kết quả(c);
+    d = "in " + nháy + "a" + gạch + gạch + "b" + nháy + ";";
+    in escape cùng bytecode(d);
+    in escape cùng kết quả(d);
+    e = "in " + nháy + "a" + gạch + nháy + "b" + nháy + ";";
+    in escape cùng bytecode(e);
+    in escape cùng kết quả(e);
+    f = "in " + đơn + "A" + gạch + đơn + "B" + đơn + ";";
+    in escape cùng bytecode(f);
+    in escape cùng kết quả(f);
+    g = "in " + nháy + "A" + gạch + "xB" + nháy + ";";
+    in escape cùng bytecode(g);
+    in escape cùng kết quả(g);
+
+    // Static list/map wire phải escape lại ký tự đã decode, đúng một lần.
+    h = "biến a = [" + nháy + "A" + gạch + "nB" + nháy +
+        ", {" + nháy + "k" + gạch + "t1" + nháy + ": " +
+        đơn + "X" + gạch + gạch + "Y" + đơn + "}]; in a[0];";
+    in escape cùng bytecode(h);
+    in escape cùng kết quả(h);
+    // Dynamic collection và map key đi qua nhánh StringPool riêng.
+    k = "biến x = 1; biến m = {" + nháy + "k" + gạch + "n" + nháy +
+        ": x + 2}; in m[" + nháy + "k" + gạch + "n" + nháy + "];";
+    in escape cùng bytecode(k);
+    in escape cùng kết quả(k);
+
+    nul = "in " + nháy + "A" + gạch + "0B" + nháy + ";";
+    in escape cùng bytecode(nul);
+    v = biên dịch phát bytecode thuần(nul);
+    in v["chuỗi"][0] == "A" + ký tự unicode(0) + "B";
+};

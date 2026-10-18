@@ -37,8 +37,8 @@ hàm chính() {
 
     in tất cả luồng(luồng([2, 4, 6]), chẵn);
     in đầu tiên(luồng([9, 8, 7]));
-    cộng = hàm(a, b) { trả về a + b; };
-    in rút gọn(luồng([1, 2, 3, 4]), 0, cộng);
+    hàm_cộng = hàm(a, b) { trả về a + b; };
+    in rút gọn(luồng([1, 2, 3, 4]), 0, hàm_cộng);
     in đếm luồng(luồng([5, 6, 7]));
 
     dùng_một_lần = luồng([1]);

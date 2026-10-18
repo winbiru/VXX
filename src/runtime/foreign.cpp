@@ -12,6 +12,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include <signal.h>
 #include <string_view>
@@ -46,6 +47,8 @@ extern char **environ;
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <bcrypt.h>
@@ -57,8 +60,8 @@ namespace {
 // Tokens are unique across VM instances and resets. A token issued to VM A
 // must never accidentally match an unrelated open stream in VM B.
 std::atomic<std::uint64_t> nextForeignResourceToken{1};
-// Windows legacy native socket IDs use a separate range. POSIX sockets and
-// their TLS sessions share one VM-owned token registry.
+// Windows legacy native socket IDs use a separate range. FFI sockets and
+// their POSIX TLS sessions share one VM-owned token registry.
 constexpr int foreignSocketBase = 1 << 29;
 std::atomic<std::uint64_t> nextForeignSocketToken{foreignSocketBase};
 
@@ -67,6 +70,17 @@ RuntimeError ffiError(const std::string &message) {
 }
 
 #if defined(_WIN32)
+void ensureForeignWinsock() {
+    static std::once_flag once;
+    static int status = 0;
+    std::call_once(once, [] {
+        WSADATA data{};
+        status = WSAStartup(MAKEWORD(2, 2), &data);
+    });
+    if (status != 0)
+        throw ffiError("resolve_open: WSAStartup thất bại, mã " + std::to_string(status));
+}
+
 std::wstring foreignWide(const std::string &utf8) {
     if (utf8.find('\0') != std::string::npos)
         throw ffiError("chuỗi FFI chứa NUL");
@@ -164,14 +178,134 @@ void foreignTimespecBytes(std::vector<unsigned char> &buffer,
 #endif
 
 // Socket I/O can fail because the network is unavailable, the peer refuses a
-// connection, or an OS policy denies bind/connect. These are application-level
-// failures and must reach a V++ `bắt lỗi` handler. Descriptor/capability/ABI
-// violations continue to use RuntimeError and remain VM faults.
+// connection, or an OS policy denies bind/connect. Closed/foreign socket tokens
+// are also ordinary public API errors. These failures must reach a V++
+// `bắt lỗi` handler. Descriptor/capability/ABI violations remain VM faults.
 [[noreturn]] void throwForeignSocketIoError(const std::string &message) {
     throw LanguageException(make_string_value("FFI: " + message));
 }
 
-#if !defined(_WIN32)
+#if defined(_WIN32)
+// WinSock SOCKET is pointer-sized, so it must never be truncated to an int
+// when stored in the VM's token table. A token is the only value V++ sees.
+void closeForeignSocketDescriptor(std::intptr_t descriptor) noexcept {
+    if (descriptor != -1) (void)::closesocket(static_cast<SOCKET>(descriptor));
+}
+
+bool setForeignSocketTimeout(std::intptr_t descriptor, int milliseconds) {
+    const DWORD timeout = static_cast<DWORD>(milliseconds);
+    const auto fd = static_cast<SOCKET>(descriptor);
+    return ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,
+               reinterpret_cast<const char *>(&timeout), sizeof(timeout)) == 0 &&
+           ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO,
+               reinterpret_cast<const char *>(&timeout), sizeof(timeout)) == 0;
+}
+
+int registerForeignSocket(ForeignFileState &state, SOCKET fd, bool datagram,
+                          bool listener) {
+    const auto candidate = nextForeignSocketToken.fetch_add(1);
+    if (candidate > INT32_MAX) {
+        (void)::closesocket(fd);
+        throw ffiError("hết định danh socket WinSock");
+    }
+    try {
+        state.sockets.emplace(static_cast<int>(candidate), ForeignFileState::Socket{
+            static_cast<std::intptr_t>(fd), datagram, listener});
+    } catch (...) {
+        (void)::closesocket(fd);
+        throw;
+    }
+    return static_cast<int>(candidate);
+}
+
+SOCKET connectForeignSocket(const std::string &host, int port, bool datagram,
+                            int timeoutMs) {
+    ensureForeignWinsock();
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = datagram ? SOCK_DGRAM : SOCK_STREAM;
+    hints.ai_protocol = datagram ? IPPROTO_UDP : IPPROTO_TCP;
+    hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
+    addrinfo *head = nullptr;
+    const std::string service = std::to_string(port);
+    if (::getaddrinfo(host.c_str(), service.c_str(), &hints, &head) != 0 ||
+        head == nullptr) {
+        if (head != nullptr) ::freeaddrinfo(head);
+        throw ffiError("socket_connect: địa chỉ IP không hợp lệ");
+    }
+    const SOCKET fd = ::socket(head->ai_family, head->ai_socktype, head->ai_protocol);
+    if (fd == INVALID_SOCKET) {
+        const int error = WSAGetLastError();
+        ::freeaddrinfo(head);
+        throwForeignSocketIoError("socket_connect: WinSock=" + std::to_string(error));
+    }
+    u_long nonblocking = 1;
+    int rc = ::ioctlsocket(fd, FIONBIO, &nonblocking);
+    if (rc == 0)
+        rc = ::connect(fd, head->ai_addr, static_cast<int>(head->ai_addrlen));
+    int error = rc == 0 ? 0 : WSAGetLastError();
+    if (rc != 0 && (error == WSAEWOULDBLOCK || error == WSAEINPROGRESS)) {
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(timeoutMs);
+        while (true) {
+            const auto remaining = std::chrono::duration_cast<
+                std::chrono::milliseconds>(deadline -
+                    std::chrono::steady_clock::now()).count();
+            if (remaining <= 0) { error = WSAETIMEDOUT; rc = SOCKET_ERROR; break; }
+            fd_set writable{};
+            FD_SET(fd, &writable);
+            timeval wait{};
+            wait.tv_sec = static_cast<long>(remaining / 1000);
+            wait.tv_usec = static_cast<long>((remaining % 1000) * 1000);
+            rc = ::select(0, nullptr, &writable, nullptr, &wait);
+            if (rc > 0) {
+                int socketError = 0;
+                int size = sizeof(socketError);
+                if (::getsockopt(fd, SOL_SOCKET, SO_ERROR,
+                        reinterpret_cast<char *>(&socketError), &size) == 0) {
+                    rc = socketError == 0 ? 0 : SOCKET_ERROR;
+                    error = socketError;
+                } else { rc = SOCKET_ERROR; error = WSAGetLastError(); }
+            } else if (rc == SOCKET_ERROR && WSAGetLastError() == WSAEINTR) {
+                // Preserve the original deadline when select is interrupted.
+                continue;
+            } else { error = rc == 0 ? WSAETIMEDOUT : WSAGetLastError(); rc = SOCKET_ERROR; }
+            break;
+        }
+    }
+    nonblocking = 0;
+    const bool connected = rc == 0 &&
+        ::ioctlsocket(fd, FIONBIO, &nonblocking) == 0 &&
+        setForeignSocketTimeout(static_cast<std::intptr_t>(fd), timeoutMs);
+    if (!connected && error == 0) error = WSAGetLastError();
+    ::freeaddrinfo(head);
+    if (!connected) {
+        (void)::closesocket(fd);
+        throwForeignSocketIoError("socket_connect: WinSock=" + std::to_string(error));
+    }
+    return fd;
+}
+
+SOCKET listenForeignSocket(int port, int backlog) {
+    ensureForeignWinsock();
+    const SOCKET fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd == INVALID_SOCKET) {
+        throwForeignSocketIoError("socket_listen: WinSock=" +
+                                  std::to_string(WSAGetLastError()));
+    }
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(static_cast<u_short>(port));
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0 ||
+        ::listen(fd, backlog) != 0) {
+        const int error = WSAGetLastError();
+        (void)::closesocket(fd);
+        throwForeignSocketIoError("socket_listen: WinSock=" + std::to_string(error));
+    }
+    return fd;
+}
+#else
 // The dynamic library must close even when argument validation or marshaling
 // throws before ffi_call. Keep one owner for the entire call boundary.
 struct ForeignLibraryGuard {
@@ -750,21 +884,21 @@ void ForeignFileState::closeAll() noexcept {
     }
 #endif
     directories.clear();
-#if !defined(_WIN32)
     for (const auto &[id, resolver] : resolvers) {
         (void)id;
         if (resolver.head != nullptr) ::freeaddrinfo(static_cast<addrinfo *>(resolver.head));
     }
-#endif
     resolvers.clear();
-#if !defined(_WIN32)
     for (const auto &[id, socket] : sockets) {
         (void)id;
+#if defined(_WIN32)
+        closeForeignSocketDescriptor(socket.descriptor);
+#else
         if (socket.tlsSession != nullptr)
             helpers::closeForeignTlsClient(socket.tlsSession);
         else if (socket.descriptor >= 0) (void)::close(socket.descriptor);
-    }
 #endif
+    }
     sockets.clear();
     for (auto &[id, process] : processes) {
         (void)id;
@@ -933,6 +1067,57 @@ ForeignCallResult executeForeignCall(
     const bool fileWrite = descriptor.capability == "system.file.write";
     const bool fileClose = descriptor.capability == "system.file.close";
     const bool fileError = descriptor.capability == "system.file.error";
+    const bool fileSeek = descriptor.capability == "system.file.seek";
+    const bool fileTell = descriptor.capability == "system.file.tell";
+    const bool fileFlush = descriptor.capability == "system.file.flush";
+    if (fileSeek || fileTell || fileFlush) {
+        const auto expected = fileSeek
+            ? std::vector<ForeignAbiType>{ForeignAbiType::FileHandle,
+                ForeignAbiType::I64, ForeignAbiType::I32}
+            : std::vector<ForeignAbiType>{ForeignAbiType::FileHandle};
+        if (descriptor.library != "system.file" || descriptor.abi != "c" ||
+            descriptor.symbol != (fileSeek ? "seek" : fileTell ? "tell" : "flush") ||
+            descriptor.parameters != expected ||
+            descriptor.result != (fileTell ? ForeignAbiType::I64 : ForeignAbiType::I32) ||
+            !descriptor.bufferExtents.empty() ||
+            fileState == nullptr || arguments.size() != expected.size()) {
+            throw ffiError("system.file seek/tell/flush yêu cầu chữ ký và handle được quản lý");
+        }
+        if (!std::holds_alternative<int>(arguments[0]))
+            throw ffiError("c_tệp yêu cầu handle do VM sở hữu");
+        const auto entry = fileState->files.find(std::get<int>(arguments[0]));
+        if (entry == fileState->files.end())
+            throw ffiError("c_tệp đã đóng hoặc không thuộc VM");
+        std::FILE *file = entry->second;
+        errno = 0;
+        if (fileFlush) {
+            const int result = std::fflush(file);
+            return {make_int_value(result), errno};
+        }
+        if (fileTell) {
+#if defined(_WIN32)
+            const auto result = _ftelli64(file);
+#else
+            const auto result = ::ftello(file);
+#endif
+            return {make_abi_integer_value(AbiInteger::signedNumber(result)), errno};
+        }
+        if (!std::holds_alternative<int>(arguments[2]))
+            throw ffiError("seek yêu cầu gốc i32");
+        const int origin = std::get<int>(arguments[2]);
+        if (origin < 0 || origin > 2) throw ffiError("seek: gốc phải là 0, 1 hoặc 2");
+        const int whence = origin == 0 ? SEEK_SET : origin == 1 ? SEEK_CUR : SEEK_END;
+        const auto offset = ffiSigned64(arguments[1]);
+#if defined(_WIN32)
+        const int result = _fseeki64(file, offset, whence);
+#else
+        if (offset < std::numeric_limits<off_t>::min() ||
+            offset > std::numeric_limits<off_t>::max())
+            throw ffiError("seek: độ lệch ngoài miền off_t");
+        const int result = ::fseeko(file, static_cast<off_t>(offset), whence);
+#endif
+        return {make_int_value(result), errno};
+    }
     const bool fileBinding = fileOpen || fileRead || fileWrite || fileClose || fileError;
     if (fileBinding) {
         const std::vector<ForeignAbiType> expected = fileOpen
@@ -1796,7 +1981,7 @@ ForeignCallResult executeForeignCall(
     }
 
     if (dnsOpen || dnsNext || dnsClose) {
-#if defined(VPP_HAS_LIBFFI) && !defined(_WIN32)
+#if defined(VPP_HAS_LIBFFI) || defined(_WIN32)
         if (dnsOpen) {
             if (!std::holds_alternative<std::string>(arguments[0]) ||
                 !std::holds_alternative<std::string>(arguments[1]) ||
@@ -1827,12 +2012,20 @@ ForeignCallResult executeForeignCall(
             hints.ai_protocol = service.empty() ? 0 :
                 (datagram ? IPPROTO_UDP : IPPROTO_TCP);
             addrinfo *head = nullptr;
+#if defined(_WIN32)
+            ensureForeignWinsock();
+#endif
             const int status = ::getaddrinfo(host.c_str(),
                 service.empty() ? nullptr : service.c_str(), &hints, &head);
             if (status != 0 || head == nullptr) {
                 if (head != nullptr) ::freeaddrinfo(head);
+#if defined(_WIN32)
+                throw ffiError("resolve_open: không phân giải được tên máy, mã " +
+                    std::to_string(status));
+#else
                 throw ffiError("resolve_open: không phân giải được tên máy: " +
                     std::string(::gai_strerror(status)));
+#endif
             }
             const auto candidate = nextForeignResourceToken.fetch_add(1);
             if (candidate > static_cast<std::uint64_t>(INT32_MAX)) {
@@ -1865,16 +2058,158 @@ ForeignCallResult executeForeignCall(
             auto *current = static_cast<addrinfo *>(entry->second.cursor);
             entry->second.cursor = current->ai_next;
             char host[NI_MAXHOST]{};
-            if (::getnameinfo(current->ai_addr, current->ai_addrlen,
+            if (::getnameinfo(current->ai_addr,
+                    static_cast<int>(current->ai_addrlen),
                     host, sizeof(host), nullptr, 0, NI_NUMERICHOST) == 0) {
                 return {make_string_value(host), previousPosixError};
             }
         }
         return {make_null_value(), previousPosixError};
 #else
-        throw ffiError("resolver FFI chỉ được hỗ trợ trên POSIX có libffi");
+        throw ffiError("resolver FFI yêu cầu POSIX/libffi hoặc Windows Winsock");
 #endif
     }
+
+#if defined(_WIN32)
+    // WinSock cannot use the POSIX libffi fd marshaller: SOCKET is UINT_PTR
+    // (64-bit on Win64). Keep its native handle inside this VM-owned adapter;
+    // V++ owns DNS retries, byte chunking, timeouts and protocol behavior.
+    if (sockBinding) {
+        const auto number = [&](std::size_t index) -> int {
+            if (!std::holds_alternative<int>(arguments.at(index))) {
+                throw ffiError("socket FFI yêu cầu số nguyên i32");
+            }
+            return std::get<int>(arguments[index]);
+        };
+        if (sockConnect) {
+            if (!std::holds_alternative<std::string>(arguments[0])) {
+                throw ffiError("socket_connect yêu cầu địa chỉ IP chuỗi");
+            }
+            const auto &host = std::get<std::string>(arguments[0]);
+            const int port = number(1);
+            const int datagram = number(2);
+            const int timeout = number(3);
+            if (host.empty() || host.size() > 1024 ||
+                host.find('\0') != std::string::npos ||
+                port <= 0 || port > 65535 ||
+                (datagram != 0 && datagram != 1) ||
+                timeout <= 0 || timeout > 300000) {
+                throw ffiError("socket_connect: địa chỉ/cổng/timeout không hợp lệ");
+            }
+            const SOCKET fd = connectForeignSocket(host, port, datagram != 0, timeout);
+            return {make_int_value(registerForeignSocket(*fileState, fd,
+                       datagram != 0, false)), previousPosixError};
+        }
+        if (sockListen) {
+            const int port = number(0);
+            const int backlog = number(1);
+            if (port <= 0 || port > 65535 || backlog <= 0 || backlog > 1024) {
+                throw ffiError("socket_listen: cổng/backlog không hợp lệ");
+            }
+            const SOCKET fd = listenForeignSocket(port, backlog);
+            return {make_int_value(registerForeignSocket(*fileState, fd, false, true)),
+                    previousPosixError};
+        }
+        const int token = number(0);
+        const auto found = fileState->sockets.find(token);
+        if (found == fileState->sockets.end()) {
+            throwForeignSocketIoError("c_socket đã đóng hoặc không thuộc VM");
+        }
+        auto &socket = found->second;
+        const SOCKET fd = static_cast<SOCKET>(socket.descriptor);
+        if (sockClose) {
+            const int status = ::closesocket(fd);
+            const int error = status == SOCKET_ERROR ? WSAGetLastError() : 0;
+            if (status == SOCKET_ERROR) {
+                // A failed closesocket may leave the handle live. Keep its
+                // token so the caller can retry and VM cleanup can close it.
+                throwForeignSocketIoError("socket_close: WinSock=" +
+                                          std::to_string(error));
+            }
+            fileState->sockets.erase(found);
+            return {make_int_value(0), previousPosixError};
+        }
+        if (sockKind) {
+            return {make_int_value(socket.datagram ? 1 : 0), previousPosixError};
+        }
+        if (sockTimeout) {
+            const int timeout = number(1);
+            if (timeout <= 0 || timeout > 300000) {
+                throw ffiError("socket_timeout: timeout không hợp lệ");
+            }
+            if (!setForeignSocketTimeout(socket.descriptor, timeout)) {
+                throwForeignSocketIoError("socket_timeout: WinSock=" +
+                                          std::to_string(WSAGetLastError()));
+            }
+            return {make_int_value(1), previousPosixError};
+        }
+        if (sockAccept) {
+            if (!socket.listener) {
+                throw ffiError("socket_accept yêu cầu socket lắng nghe");
+            }
+            sockaddr_storage peer{};
+            int peerSize = sizeof(peer);
+            const SOCKET accepted = ::accept(fd,
+                reinterpret_cast<sockaddr *>(&peer), &peerSize);
+            if (accepted == INVALID_SOCKET) {
+                throwForeignSocketIoError("socket_accept: WinSock=" +
+                                          std::to_string(WSAGetLastError()));
+            }
+            if (!setForeignSocketTimeout(static_cast<std::intptr_t>(accepted), 300000)) {
+                const int error = WSAGetLastError();
+                (void)::closesocket(accepted);
+                throwForeignSocketIoError("socket_accept timeout: WinSock=" +
+                                          std::to_string(error));
+            }
+            return {make_int_value(registerForeignSocket(*fileState, accepted,
+                       false, false)), previousPosixError};
+        }
+        if (socket.listener || socket.tlsSession != nullptr) {
+            throw ffiError("raw send/recv không được dùng với listener hoặc TLS");
+        }
+        if (!std::holds_alternative<ListHandle>(arguments[1]) ||
+            !std::get<ListHandle>(arguments[1])) {
+            throw ffiError("socket send/recv yêu cầu danh sách byte");
+        }
+        auto &bytes = std::get<ListHandle>(arguments[1])->elements;
+        const auto count = ffiUnsigned64(arguments[2]);
+        if (count == 0 || count > 65536 || bytes.size() != count || number(3) != 0) {
+            throw ffiError("send/recv yêu cầu đệm 1..65536 byte, độ dài khớp, flags=0");
+        }
+        if (sockSend && socket.datagram && count > 65507) {
+            throw ffiError("datagram vượt giới hạn UDP an toàn 65507 byte");
+        }
+        std::vector<char> buffer(static_cast<std::size_t>(count));
+        if (sockSend) {
+            for (std::size_t i = 0; i < buffer.size(); ++i) {
+                if (!std::holds_alternative<int>(bytes[i]) ||
+                    std::get<int>(bytes[i]) < 0 || std::get<int>(bytes[i]) > 255) {
+                    throw ffiError("socket_send chứa byte ngoài miền 0..255");
+                }
+                buffer[i] = static_cast<char>(std::get<int>(bytes[i]));
+            }
+        }
+        const int transferred = sockSend
+            ? ::send(fd, buffer.data(), static_cast<int>(count), 0)
+            : ::recv(fd, buffer.data(), static_cast<int>(count), 0);
+        if (transferred == SOCKET_ERROR) {
+            throwForeignSocketIoError(std::string(sockSend ? "socket_send" : "socket_recv") +
+                                      ": WinSock=" + std::to_string(WSAGetLastError()));
+        }
+        if (sockRecv) {
+            for (int i = 0; i < transferred; ++i) {
+                bytes[static_cast<std::size_t>(i)] = make_int_value(
+                    static_cast<unsigned char>(buffer[static_cast<std::size_t>(i)]));
+            }
+        }
+        return {make_abi_integer_value(AbiInteger::signedNumber(transferred)),
+                previousPosixError};
+    }
+    if (tlsBinding) {
+        // Schannel TLS still uses the audited legacy provider on Windows.
+        throw ffiError("TLS FFI chưa được bật trên Windows; dùng Schannel VM");
+    }
+#endif
 
     if (sockBinding && !sockSend && !sockRecv && !sockClose) {
 #if defined(VPP_HAS_LIBFFI) && !defined(_WIN32)
@@ -1916,7 +2251,7 @@ ForeignCallResult executeForeignCall(
         const int id = number(0);
         const auto found = fileState->sockets.find(id);
         if (found == fileState->sockets.end()) {
-            throw ffiError("c_socket đã đóng hoặc không thuộc VM");
+            throwForeignSocketIoError("c_socket đã đóng hoặc không thuộc VM");
         }
         auto &socket = found->second;
         if (sockKind) {
@@ -1968,7 +2303,7 @@ ForeignCallResult executeForeignCall(
         const int token = std::get<int>(arguments[0]);
         auto found = fileState->sockets.find(token);
         if (found == fileState->sockets.end()) {
-            throw ffiError("c_socket đã đóng hoặc không thuộc VM");
+            throwForeignSocketIoError("c_socket đã đóng hoặc không thuộc VM");
         }
         auto &socket = found->second;
         if (sockClose && socket.tlsSession != nullptr) {
@@ -2232,7 +2567,7 @@ ForeignCallResult executeForeignCall(
                 const int id = std::get<int>(arguments[index]);
                 const auto found = fileState->sockets.find(id);
                 if (found == fileState->sockets.end()) {
-                    throw ffiError("c_socket đã đóng hoặc không thuộc VM");
+                    throwForeignSocketIoError("c_socket đã đóng hoặc không thuộc VM");
                 }
                 if ((sockSend || sockRecv) &&
                     (found->second.listener || found->second.tlsSession != nullptr)) {

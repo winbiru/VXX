@@ -1,27 +1,22 @@
 // Module: lõi.luận lý
-// Mục đích: cung cấp các toán tử logic mức hàm để tái sử dụng.
-// Nhóm hàm: bằng nhau, khác nhau, tất cả, một trong hai.
+// Các phép toán logic thuần túy được cung cấp trực tiếp tại cấp mô-đun.
 
-// Ghi chú hàm: bằng nhau.
-hàm bằng nhau(a, b) {
+hàm công khai bằng nhau(a, b) {
     trả về a == b;
 };
 
-// Ghi chú hàm: khác nhau.
-hàm khác nhau(a, b) {
+hàm công khai khác nhau(a, b) {
     trả về a != b;
 };
 
-// Ghi chú hàm: tất cả.
-hàm tất cả(a, b) {
+hàm công khai tất cả(a, b) {
     nếu (a && b) {
         trả về đúng;
     };
     trả về sai;
 };
 
-// Ghi chú hàm: một trong hai.
-hàm một trong hai(a, b) {
+hàm công khai một trong hai(a, b) {
     nếu (a || b) {
         trả về đúng;
     };

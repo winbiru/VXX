@@ -1,0 +1,1 @@
+hàm cộng(a, b = 2) { trả về a + b; }; in "init";

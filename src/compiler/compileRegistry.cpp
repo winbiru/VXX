@@ -29,7 +29,10 @@ namespace vietvm { namespace compiler {
     }
 
     // Xóa import state của registry cụ thể.
-    void clearImportedFiles(CompilationRegistryState &state) { state.importedFiles.clear(); }
+    void clearImportedFiles(CompilationRegistryState &state) {
+        state.importedFiles.clear();
+        state.importedFunctionAliases.clear();
+    }
 
     // Xóa imported files; hàm đưa cấu trúc trạng thái về rỗng để lần sử dụng tiếp theo không mang dữ liệu cũ.
     void clearImportedFiles() { clearImportedFiles(activeCompilationRegistryState()); }
@@ -175,6 +178,14 @@ namespace vietvm { namespace compiler {
 
         if (!includeGlobalFallback) return -1;
 
+        // Import trùng chỉ được khởi tạo một lần nhưng mỗi bí danh vẫn phải
+        // giải được về cùng function ID. functionNameIndices là 1:1 (id -> tên
+        // runtime) nên không thể dùng nó để biểu diễn nhiều alias của một hàm.
+        const auto importedAlias = state.importedFunctionAliases.find(resolvedName);
+        if (importedAlias != state.importedFunctionAliases.end()) {
+            return importedAlias->second;
+        }
+
         const int nameIndex = state.findString(resolvedName);
         if (nameIndex >= 0) {
             for (const auto &entry : state.functionNameIndices) {
@@ -231,8 +242,24 @@ namespace vietvm { namespace compiler {
         const fs::path abs = resolved.path;
         const std::string canonical = abs.u8string();
 
+        auto registerImportedAliases = [&]() {
+            const auto surface = state.moduleFunctionExports.find(canonical);
+            if (surface == state.moduleFunctionExports.end()) return;
+            for (const auto &exported : surface->second) {
+                const std::string visibleName = moduleAlias.empty()
+                    ? exported.name : moduleAlias + "." + exported.name;
+                const auto [existing, inserted] =
+                    state.importedFunctionAliases.emplace(visibleName, exported.functionId);
+                if (!inserted && existing->second != exported.functionId) {
+                    throw std::runtime_error(
+                        "import: xung đột bí danh hàm '" + visibleName + "'");
+                }
+            }
+        };
+
         auto &importedFiles = state.importedFiles;
         if (importedFiles.find(canonical) != importedFiles.end()) {
+            registerImportedAliases();
             return;
         }
 
@@ -385,6 +412,8 @@ namespace vietvm { namespace compiler {
                     }
                 }
             }
+
+            registerImportedAliases();
 
             int maxHamId = -1;
             for (const auto &entry : state.functionBytecode) {

@@ -23,6 +23,7 @@ const char *astStatementKindName(AstStatementKind kind) noexcept {
         case AstStatementKind::Throw: return "throw";
         case AstStatementKind::Try: return "try";
         case AstStatementKind::Expression: return "expression";
+        case AstStatementKind::VariableDeclaration: return "variable_declaration";
         case AstStatementKind::Unknown: return "unknown";
     }
     return "unknown";
@@ -43,6 +44,7 @@ const char *astExpressionKindName(AstExpressionKind kind) noexcept {
         case AstExpressionKind::MapLiteral: return "map_literal";
         case AstExpressionKind::ListLiteral: return "list_literal";
         case AstExpressionKind::Index: return "index";
+        case AstExpressionKind::Member: return "member";
     }
     return "unknown";
 }

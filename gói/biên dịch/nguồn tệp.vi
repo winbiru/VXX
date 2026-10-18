@@ -1,0 +1,127 @@
+// Nạp nguồn và dựng đồ thị import tại tầng V++. CLI chỉ cung cấp đường
+// tuyệt đối của entrypoint và thư mục cài đặt; không phân tích nguồn đích.
+nhập gói/biên dịch/liên kết;
+nhập gói/biên dịch/chương trình;
+nhập gói/biên dịch/đồ thị mô đun;
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+
+// Các phép biến đổi không lưu trạng thái dùng hàm cấp mô-đun.
+hàm công khai biên dịch nguồn chuẩn đường(đường) {
+    văn_bản = "";
+    lặp(i = 0; i < độ dài(đường); i++) {
+        c = đường[i];
+        nếu (c == "\\" && tên nền tảng() == "windows") { c = "/"; };
+        văn_bản += c;
+    };
+    gốc_dữ_liệu = "";
+    bắt_đầu = 0;
+    nếu (độ dài(văn_bản) == 0) { ném "biên dịch nguồn: cần đường dẫn tuyệt đối"; };
+    nếu (văn_bản[0] == "/") {
+        gốc_dữ_liệu = "/";
+        bắt_đầu = 1;
+        nếu (độ dài(văn_bản) > 1) {
+            nếu (văn_bản[1] == "/") { gốc_dữ_liệu = "//"; bắt_đầu = 2; };
+        };
+    } hoặc {
+        nếu (độ dài(văn_bản) < 3) { ném "biên dịch nguồn: cần đường dẫn tuyệt đối"; };
+        nếu (văn_bản[1] != ":" || văn_bản[2] != "/") {
+            ném "biên dịch nguồn: cần đường dẫn tuyệt đối";
+        };
+        gốc_dữ_liệu = văn_bản[0] + ":/";
+        bắt_đầu = 3;
+    };
+    đuôi = "";
+    lặp(i = bắt_đầu; i < độ dài(văn_bản); i++) { đuôi += văn_bản[i]; };
+    nếu (đuôi == "") { trả về gốc_dữ_liệu; };
+    trả về gốc_dữ_liệu + biên dịch đồ thị chuẩn đường(đuôi);
+};
+
+hàm riêng tư biên dịch nguồn đích(importer, đích, thư_viện) {
+    // Tìm nguồn cục bộ từ thư mục importer lên tổ tiên trước thư viện cài.
+    // Các dạng package/compatibility chưa có phải được báo rõ, không fallback.
+    thư_mục = đường dẫn cha(importer);
+    lặp(vòng = 0; đúng; vòng++) {
+        tệp = biên dịch nguồn chuẩn đường(thư_mục + "/" + đích + ".vi");
+        nếu (là tệp(tệp)) { trả về tệp; };
+        cha = đường dẫn cha(thư_mục);
+        nếu (cha == thư_mục || cha == "") { thoát; };
+        thư_mục = cha;
+    };
+    nếu (thư_viện != "") {
+        tệp = biên dịch nguồn chuẩn đường(thư_viện + "/" + đích + ".vi");
+        nếu (là tệp(tệp)) { trả về tệp; };
+    };
+    ném "biên dịch nguồn: không tìm thấy import '" + đích + "' từ '" + importer + "'";
+};
+
+// Mỗi lần dựng đồ thị sở hữu bảng đã thăm, ngăn đệ quy và thứ tự khởi tạo.
+// Lớp gom trạng thái giúp thuật toán duyệt chỉ truyền thông tin về cạnh.
+lớp công khai Bộ Nạp Nguồn {
+    hàm công khai khởi tạo(thư_viện) {
+        mình.thư_viện = thư_viện;
+        mình.trạng_thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
+            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": thư_viện};
+    };
+
+    hàm công khai duyệt(importer, spec) {
+        trạng_thái = mình.trạng_thái;
+        đích = biên dịch nguồn đích(importer, spec["đích"], trạng_thái["thư viện"]);
+        mức = lấy map(trạng_thái["đã thăm"], đích, 0);
+        nếu (mức == 1) {
+            ném "biên dịch nguồn: import vòng " +
+                biên dịch đồ thị chu trình(trạng_thái["ngăn"], đích);
+        };
+        hành_động = "load";
+        nếu (mức == 2) { hành_động = "duplicate_no_op"; };
+        thêm(trạng_thái["cạnh"], {"nguồn": importer, "đích": đích,
+             "yêu cầu": spec["đích"], "bí danh": spec["bí danh"],
+             "tái xuất": spec["tái xuất"], "hành động": hành_động});
+        nếu (mức == 2) { trả về đúng; };
+        trạng_thái["đã thăm"][đích] = 1;
+        thêm(trạng_thái["ngăn"], đích);
+        cây = biên dịch nguồn cây(đích);
+        thêm(trạng_thái["mô đun"], {"định danh": đích, "cây": cây});
+        imports = biên dịch đồ thị quét nhập(cây);
+        lặp(i = 0; i < độ dài(imports); i++) {
+            mình.duyệt(đích, imports[i]);
+        };
+        xóa tại(trạng_thái["ngăn"], độ dài(trạng_thái["ngăn"]) - 1);
+        trạng_thái["đã thăm"][đích] = 2;
+        thêm(trạng_thái["thứ tự khởi tạo"], đích);
+        trả về đúng;
+    };
+
+    hàm công khai đồ thị(điểm_vào) {
+        // Mỗi lần dựng bắt đầu bằng trạng thái riêng, kể cả khi tái dùng instance.
+        mình.trạng_thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
+            "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư_viện};
+        gốc_dữ_liệu = biên dịch nguồn chuẩn đường(điểm_vào);
+        cây = biên dịch nguồn cây(gốc_dữ_liệu);
+        trạng_thái = mình.trạng_thái;
+        thêm(trạng_thái["ngăn"], gốc_dữ_liệu);
+        trạng_thái["đã thăm"][gốc_dữ_liệu] = 1;
+        imports = biên dịch đồ thị quét nhập(cây);
+        lặp(i = 0; i < độ dài(imports); i++) {
+            mình.duyệt(gốc_dữ_liệu, imports[i]);
+        };
+        trả về {"loại": "đồ thị mô đun V++", "nguồn tệp": đúng,
+            "điểm vào": gốc_dữ_liệu, "cây điểm vào": cây,
+            "mô đun": trạng_thái["mô đun"], "cạnh": trạng_thái["cạnh"],
+            "thứ tự khởi tạo": trạng_thái["thứ tự khởi tạo"]};
+    };
+};
+
+hàm riêng tư biên dịch nguồn cây(tệp) {
+    thử { trả về biên dịch phân tích chương trình thuần(đọc tệp(tệp)); }
+    bắt lỗi(e) { ném "biên dịch nguồn '" + tệp + "': " + thành chuỗi(e); };
+};
+
+hàm công khai biên dịch nguồn đồ thị(điểm_vào, thư_viện) {
+    bộ_nạp = Bộ Nạp Nguồn(thư_viện);
+    trả về bộ_nạp.đồ thị(điểm_vào);
+};
+
+hàm công khai biên dịch nguồn tệp tự chủ(điểm_vào, thư_viện) {
+    trả về biên dịch liên kết đồ thị thuần(biên dịch nguồn đồ thị(điểm_vào, thư_viện));
+};

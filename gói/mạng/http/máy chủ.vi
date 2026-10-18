@@ -2,42 +2,98 @@
 nhập gói/mạng/ổ cắm;
 nhập gói/mạng/http/máy khách;
 
-hàm máy chủ http mở(cổng) {
-    trả về mạng mở máy chủ api(cổng);
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Máy Chủ HTTP {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai máy chủ http mở(cổng) {
+        trả về mạng mở máy chủ api(cổng);
+    };
+
+    hàm công khai máy chủ http yêu cầu kế tiếp(mã máy chủ) {
+        trả về mạng lấy yêu cầu kế tiếp(mã máy chủ);
+    };
+
+    hàm công khai yêu cầu http phương thức(mã yêu cầu) {
+        trả về mạng method yêu cầu(mã yêu cầu);
+    };
+
+    hàm công khai yêu cầu http đường dẫn(mã yêu cầu) {
+        trả về mạng path yêu cầu(mã yêu cầu);
+    };
+
+    hàm công khai yêu cầu http truy vấn(mã yêu cầu) {
+        trả về mạng query yêu cầu(mã yêu cầu);
+    };
+
+    hàm công khai yêu cầu http nội dung(mã yêu cầu) {
+        trả về mạng body yêu cầu(mã yêu cầu);
+    };
+
+    hàm công khai yêu cầu http header(mã yêu cầu, khóa) {
+        trả về mạng header yêu cầu(mã yêu cầu, khóa);
+    };
+
+    hàm công khai yêu cầu http tham số(mã yêu cầu, khóa) {
+        trả về mạng query param yêu cầu(mã yêu cầu, khóa);
+    };
+
+    hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
+        trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung);
+    };
+
+    hàm công khai máy chủ http đóng(mã máy chủ) {
+        trả về mạng đóng máy chủ api(mã máy chủ);
+    };
 };
 
-hàm máy chủ http yêu cầu kế tiếp(mã máy chủ) {
-    trả về mạng lấy yêu cầu kế tiếp(mã máy chủ);
+
+hàm công khai máy chủ http mở(cổng) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.máy chủ http mở(cổng);
 };
 
-hàm yêu cầu http phương thức(mã yêu cầu) {
-    trả về mạng method yêu cầu(mã yêu cầu);
+hàm công khai máy chủ http yêu cầu kế tiếp(mã máy chủ) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.máy chủ http yêu cầu kế tiếp(mã máy chủ);
 };
 
-hàm yêu cầu http đường dẫn(mã yêu cầu) {
-    trả về mạng path yêu cầu(mã yêu cầu);
+hàm công khai yêu cầu http phương thức(mã yêu cầu) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http phương thức(mã yêu cầu);
 };
 
-hàm yêu cầu http truy vấn(mã yêu cầu) {
-    trả về mạng query yêu cầu(mã yêu cầu);
+hàm công khai yêu cầu http đường dẫn(mã yêu cầu) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http đường dẫn(mã yêu cầu);
 };
 
-hàm yêu cầu http nội dung(mã yêu cầu) {
-    trả về mạng body yêu cầu(mã yêu cầu);
+hàm công khai yêu cầu http truy vấn(mã yêu cầu) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http truy vấn(mã yêu cầu);
 };
 
-hàm yêu cầu http header(mã yêu cầu, khóa) {
-    trả về mạng header yêu cầu(mã yêu cầu, khóa);
+hàm công khai yêu cầu http nội dung(mã yêu cầu) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http nội dung(mã yêu cầu);
 };
 
-hàm yêu cầu http tham số(mã yêu cầu, khóa) {
-    trả về mạng query param yêu cầu(mã yêu cầu, khóa);
+hàm công khai yêu cầu http header(mã yêu cầu, khóa) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http header(mã yêu cầu, khóa);
 };
 
-hàm máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
-    trả về mạng trả phản hồi(mã yêu cầu, trạng thái, nội dung);
+hàm công khai yêu cầu http tham số(mã yêu cầu, khóa) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.yêu cầu http tham số(mã yêu cầu, khóa);
 };
 
-hàm máy chủ http đóng(mã máy chủ) {
-    trả về mạng đóng máy chủ api(mã máy chủ);
+hàm công khai máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.máy chủ http trả lời(mã yêu cầu, trạng thái, nội dung);
+};
+
+hàm công khai máy chủ http đóng(mã máy chủ) {
+    __vpp_adapter = Máy Chủ HTTP();
+    trả về __vpp_adapter.máy chủ http đóng(mã máy chủ);
 };

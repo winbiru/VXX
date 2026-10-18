@@ -1,0 +1,52 @@
+// Bộ dựng tiến trình có trạng thái; việc spawn và thu stdout/stderr do
+// `chạy tiến trình` thực hiện đồng bộ, giữ nguyên hành vi của API hàm cũ.
+nhập gói/hệ thống/tiến trình;
+
+lớp công khai Lệnh Tiến Trình {
+    hàm công khai khởi tạo(chương_trình) {
+        chương_trình = tiến trình yêu cầu chuỗi(chương_trình, "chương trình");
+        nếu (chương_trình == "") { ném "lệnh tiến trình: chương trình rỗng"; };
+        mình.chương_trình = chương_trình;
+        mình.đối_số = [];
+        mình.môi_trường = {};
+        mình.thời_hạn = rỗng;
+        mình.kết_quả_cuối = rỗng;
+    };
+
+    hàm công khai thêm đối số(giá_trị) {
+        tiến trình yêu cầu chuỗi(giá_trị, "đối số");
+        danh_sách = mình.đối_số;
+        thêm(danh_sách, giá_trị);
+        trả về mình;
+    };
+
+    hàm công khai đặt biến(tên, giá_trị) {
+        tiến trình yêu cầu chuỗi(tên, "tên biến môi trường");
+        tiến trình yêu cầu chuỗi(giá_trị, "giá trị biến môi trường");
+        nếu (tên == "") { ném "lệnh tiến trình: tên biến rỗng"; };
+        lặp(i = 0; i < do_dai(tên); i++) {
+            nếu (tên[i] == "=") { ném "lệnh tiến trình: tên biến chứa ="; };
+        };
+        cấu_hình_môi_trường = mình.môi_trường;
+        cấu_hình_môi_trường[tên] = giá_trị;
+        trả về mình;
+    };
+
+    hàm công khai đặt thời hạn(mili_giây) {
+        nếu (mili_giây != rỗng &&
+            (loai_cua(mili_giây) != "số nguyên" || mili_giây < 1)) {
+            ném "lệnh tiến trình: thời hạn phải là số nguyên dương hoặc rỗng";
+        };
+        mình.thời_hạn = mili_giây;
+        trả về mình;
+    };
+
+    hàm công khai chạy() {
+        kết_quả = chạy tiến trình(mình.chương_trình, mình.đối_số,
+                                  mình.môi_trường, mình.thời_hạn);
+        mình.kết_quả_cuối = kết_quả;
+        trả về kết_quả;
+    };
+
+    hàm công khai kết quả gần nhất() { trả về mình.kết_quả_cuối; };
+};

@@ -26,6 +26,7 @@ enum class AstExpressionKind {
     MapLiteral,
     ListLiteral,
     Index,
+    Member,
 };
 
 enum class AstLiteralKind {
@@ -184,6 +185,7 @@ enum class AstStatementKind {
     Continue,
     Throw,
     Try,
+    VariableDeclaration,
     Expression,
     Unknown,
 };

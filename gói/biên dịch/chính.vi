@@ -1,0 +1,69 @@
+// Điểm vào vpp.compiler.
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/giao diện cú pháp;
+nhập gói/biên dịch/nút cú pháp;
+nhập gói/biên dịch/từ vựng;
+nhập gói/biên dịch/ngữ nghĩa;
+nhập gói/biên dịch/mã máy từ cây;
+nhập gói/biên dịch/bộ biên dịch;
+nhập gói/biên dịch/phiên tự chủ;
+nhập gói/biên dịch/bộ sinh mã bản địa;
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/đường dẫn;
+
+hàm công khai biên dịch kiểm tra(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.kiểm tra();
+};
+
+hàm công khai biên dịch phân tích(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.phân tích();
+};
+
+hàm công khai biên dịch bytecode(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.bytecode();
+};
+
+// Oracle tạm thời để kiểm chứng bytecode thân hàm từ compiler C++.
+hàm công khai biên dịch bytecode hàm(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.bytecode hàm();
+};
+
+// Các tiện ích dưới đây chỉ diễn giải snapshot compiler bằng V++; native không
+// có entry point riêng cho từng phép truy vấn.
+hàm công khai biên dịch cây cú pháp(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.cây cú pháp();
+};
+
+hàm công khai biên dịch thống kê(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.thống kê();
+};
+
+hàm công khai biên dịch tệp(đường dẫn) {
+    mã_nguồn = đọc tệp(đường dẫn);
+    phiên = Bộ Biên Dịch(mã_nguồn, đường dẫn cha(đường dẫn));
+    trả về phiên.phân tích();
+};
+
+// Các truy vấn compiler bổ sung được triển khai bằng các pass V++.
+hàm công khai biên dịch tìm khai báo(mã nguồn, tên) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.tìm khai báo(tên);
+};
+
+hàm công khai biên dịch thống kê opcode(mã nguồn) {
+    phiên = Bộ Biên Dịch(mã nguồn, ".");
+    trả về phiên.thống kê opcode();
+};
+
+// Compiler bootstrap: phân tích câu lệnh và kiểm tra ngữ nghĩa thuần V++.
+// Trả về AST; chưa tạo bytecode và chưa thay compilePipeline của CLI.
+hàm công khai biên dịch phân tích chương trình tự chủ(mã_nguồn) {
+    trả về biên dịch phân tích ngữ nghĩa thuần(mã_nguồn);
+};

@@ -155,7 +155,7 @@ namespace vietvm::compiler {
         }
 
         static const std::unordered_set<std::string> keywords = {
-            "nếu", "hoặc", "nếu không", "lặp", "khởi tạo", "điều kiện",
+            "nếu", "hoặc", "lặp", "khởi tạo", "điều kiện",
             "cập nhật", "kiểm tra sau", "chuyển", "trường hợp", "mặc định",
             "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
             "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",
@@ -349,18 +349,13 @@ namespace vietvm::compiler {
         std::vector<std::string> result;
         result.reserve(tokens.size());
 
-        auto throwMissingAccent = [](const std::string& kw) {
-            throw std::runtime_error(
-                vietvm::messages::formatMessage(vietvm::messages::kLexerMissingVietnameseAccent, {kw}));
-        };
-
         // Danh sách các multi-word keywords (bằng token gốc, lower-case ASCII)
-        // Nếu muốn mở rộng, thêm vào cả dạng có dấu và không dấu khi cần.
+        // Chỉ ghép dạng chính xác có dấu. Các token không dấu có thể là
+        // định danh hợp lệ (ví dụ tên phương thức "thu thập"), nên không
+        // được suy đoán chúng là từ khóa viết sai tại bước lexer.
         const std::vector<std::vector<std::string>> multiKeywords = {
             {"mặc", "định"},
             {"mặc", "định:"},
-            {"nếu", "không"},
-            {"nếu", "không:"},
             {"trường", "hợp"},
             {"trường", "hợp:"},
             {"trả", "về"},
@@ -385,43 +380,6 @@ namespace vietvm::compiler {
         for (size_t i = 0; i < tokens.size(); ++i) {
             // Chuẩn bị phiên bản để so sánh (normalize) cho token hiện tại
             std::string a_norm = normalizeTokenForCompare(tokens[i]);
-
-            // Enforce Vietnamese diacritics for multi-word keywords
-            if (i + 1 < tokens.size()) {
-                std::string b_norm = normalizeTokenForCompare(tokens[i + 1]);
-                if ((a_norm == "neu" && b_norm == "khong") ||
-                    (a_norm == "tra" && b_norm == "ve") ||
-                    (a_norm == "khoi" && b_norm == "tao") ||
-                    (a_norm == "dieu" && b_norm == "kien") ||
-                    (a_norm == "cap" && b_norm == "nhat") ||
-                    (a_norm == "kiem" && b_norm == "tra") ||
-                    (a_norm == "truong" && b_norm == "hop") ||
-                    (a_norm == "mac" && b_norm == "dinh") ||
-                    (a_norm == "bo" && b_norm == "qua") ||
-                    (a_norm == "giao" && b_norm == "dien") ||
-                    (a_norm == "ke" && b_norm == "thua") ||
-                    (a_norm == "trien" && b_norm == "khai") ||
-                    (a_norm == "cong" && b_norm == "khai") ||
-                    (a_norm == "rieng" && b_norm == "tu")) {
-                    throwMissingAccent(a_norm + " " + b_norm);
-                }
-
-                if (i + 2 < tokens.size()) {
-                    std::string c_norm = normalizeTokenForCompare(tokens[i + 2]);
-                    if (a_norm == "duoc" && b_norm == "bao" && c_norm == "ve") {
-                        throwMissingAccent(a_norm + " " + b_norm + " " + c_norm);
-                    }
-                }
-            }
-
-            // Enforce Vietnamese diacritics for single-word keywords
-            if (a_norm == "neu" || a_norm == "hoac" || a_norm == "lap" ||
-                a_norm == "ham" || a_norm == "goi" || a_norm == "bien" ||
-                a_norm == "thoat" || a_norm == "chon" ||
-                a_norm == "chuyen" || a_norm == "nem" || a_norm == "thu" ||
-                a_norm == "lop") {
-                throwMissingAccent(a_norm);
-            }
 
             bool matchedMulti = false;
 

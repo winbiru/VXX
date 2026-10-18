@@ -1,0 +1,74 @@
+// `gọi name(...)` dành riêng cho statement, giữ ABI/dispatch C++.
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/chính;
+nhập gói/lõi/kịch bản;
+
+hàm gọi khớp bytecode(nguồn) {
+    cpp = biên dịch bytecode(nguồn);
+    vi = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+    nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cpp); i++) {
+        nếu (cpp[i]["op"] != vi[i]["op"] ||
+            cpp[i]["toán hạng"] != vi[i]["toán hạng"] ||
+            cpp[i]["chỉ số"] != vi[i]["chỉ số"] ||
+            cpp[i]["giá trị"] != vi[i]["giá trị"]) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm gọi khớp thân hàm(nguồn) {
+    cpp = biên dịch bytecode hàm(nguồn);
+    vi = biên dịch phát bytecode thuần(nguồn)["hàm"];
+    nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cpp); i++) {
+        nếu (cpp[i]["id"] != vi[i]["id"] || cpp[i]["tên"] != vi[i]["tên"]) {
+            trả về sai;
+        };
+        c = cpp[i]["bytecode"];
+        v = vi[i]["bytecode"];
+        nếu (độ dài(c) != độ dài(v)) { trả về sai; };
+        lặp(j = 0; j < độ dài(c); j++) {
+            nếu (c[j]["op"] != v[j]["op"] ||
+                c[j]["toán hạng"] != v[j]["toán hạng"] ||
+                c[j]["chỉ số"] != v[j]["chỉ số"] ||
+                c[j]["giá trị"] != v[j]["giá trị"]) { trả về sai; };
+        };
+    };
+    trả về đúng;
+};
+
+hàm gọi khớp chạy(nguồn) {
+    trả về biên dịch chạy chương trình tự chủ(nguồn) == kịch bản chạy(nguồn);
+};
+
+hàm chính() {
+    trực_tiếp = "hàm f(x) { in x + 1; }; gọi f(2);";
+    in gọi khớp bytecode(trực_tiếp);
+    in gọi khớp chạy(trực_tiếp);
+    trong_hàm = "hàm f(x) { in x; }; hàm chính() { gọi f(2 + 3); };";
+    in gọi khớp thân hàm(trong_hàm);
+    in gọi khớp chạy(trong_hàm);
+    tên_dài = "hàm tính tổng(x, y) { in x + y; }; gọi tính tổng(20, 22);";
+    in gọi khớp bytecode(tên_dài);
+    in gọi khớp chạy(tên_dài);
+
+    // C++ dedicated call dùng OP_GOI tên, ngay cả khi có slot cùng tên.
+    // Không thực thi một callable chưa được định nghĩa.
+    tên_động = "biến fn = 2; gọi fn(1);";
+    in gọi khớp bytecode(tên_động);
+    v = biên dịch phát bytecode thuần(tên_động)["bytecode"];
+    // Phần tử sau đối số phải là OP_GOI (23), không OP_GOI_GIAN_TIEP.
+    in v[độ dài(v) - 1]["op"] == biên dịch mã opcode("OP_GOI");
+
+    chưa_có = "gọi chưa_có(4);";
+    in gọi khớp bytecode(chưa_có);
+    lỗi = sai;
+    thử { biên dịch phát bytecode thuần("gọi f(1,);"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phát bytecode thuần("gọi f(1) + 2;"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

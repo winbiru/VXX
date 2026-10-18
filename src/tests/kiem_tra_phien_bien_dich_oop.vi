@@ -1,0 +1,73 @@
+nhập gói/biên dịch/phiên tự chủ;
+nhập gói/biên dịch/chương trình;
+nhập gói/biên dịch/ir;
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/liên kết;
+nhập gói/kiểm thử/chính;
+
+hàm kiểm cache pass compiler(bộ, truy_vấn, loại) {
+    đầu = truy_vấn();
+    khẳng định bằng(đầu["loại"], loại);
+    khẳng định bằng(bam_dinh_danh(truy_vấn()), bam_dinh_danh(đầu));
+    sai_kiểu = hàm() { bộ.làm mới(42); };
+    khẳng định ném lỗi(sai_kiểu);
+    khẳng định bằng(bam_dinh_danh(truy_vấn()), bam_dinh_danh(đầu));
+    khẳng định bằng(bộ.làm mới("in 9;"), bộ);
+    sau = truy_vấn();
+    khẳng định khác(bam_dinh_danh(sau), bam_dinh_danh(đầu));
+    khẳng định bằng(sau["loại"], loại);
+    bộ.làm mới("in ;");
+    khẳng định ném lỗi(truy_vấn);
+    bộ.làm mới("in 10;");
+    khẳng định bằng(truy_vấn()["loại"], loại);
+};
+
+hàm chính() {
+    nguồn = "hàm chính() { in 42; };";
+    parser = Bộ Phân Tích Cú Pháp(nguồn);
+    cây = parser.phân tích();
+    vị_trí = parser.vị trí();
+    khẳng định đúng(vị_trí > 0);
+    cây_lại = parser.phân tích();
+    khẳng định bằng(parser.vị trí(), vị_trí);
+    khẳng định bằng(do_dai(cây["câu lệnh"]), do_dai(cây_lại["câu lệnh"]));
+
+    phiên = Bộ Biên Dịch Tự Chủ(nguồn);
+    khẳng định đúng(phiên.kiểm tra());
+    khẳng định bằng(do_dai(phiên.token()), vị_trí);
+    khẳng định bằng(phiên.cây cú pháp(), phiên.cây cú pháp());
+    khẳng định bằng(phiên.hạ IR(), phiên.hạ IR());
+    mã = phiên.bytecode();
+    khẳng định bằng(mã, phiên.bytecode());
+    cũ = biên dịch phát bytecode thuần(nguồn);
+    khẳng định bằng(do_dai(mã["bytecode"]), do_dai(cũ["bytecode"]));
+    khẳng định bằng(do_dai(mã["hàm"]), do_dai(cũ["hàm"]));
+
+    khác = Bộ Biên Dịch Tự Chủ("in 7;");
+    khẳng định bằng(do_dai(khác.hạ IR()["hàm"]), 0);
+    khẳng định bằng(do_dai(phiên.hạ IR()["hàm"]), 1);
+    khẳng định bằng(phiên.làm mới("in 9;"), phiên);
+    khẳng định bằng(do_dai(phiên.hạ IR()["hàm"]), 0);
+    hành_động_1 = hàm() { phiên.làm mới(42); };
+    khẳng định ném lỗi(hành_động_1);
+    khẳng định đúng(phiên.kiểm tra());
+    phiên.làm mới("in ;");
+    hành_động_2 = hàm() { phiên.bytecode(); };
+    khẳng định ném lỗi(hành_động_2);
+    phiên.làm mới(nguồn);
+    khẳng định đúng(phiên.kiểm tra());
+    khẳng định bằng(do_dai(phiên.bytecode()["hàm"]), 1);
+
+    hạ = Bộ Hạ IR("in 1;");
+    phát = Bộ Phát Bytecode("in 2;");
+    liên_kết = Bộ Liên Kết Bytecode("in 3;");
+    đọc_ir = hàm() { trả về hạ.hạ(); };
+    đọc_bytecode = hàm() { trả về phát.phát(); };
+    đọc_artifact = hàm() { trả về liên_kết.liên kết(); };
+    kiểm cache pass compiler(hạ, đọc_ir, "chương trình IR");
+    kiểm cache pass compiler(phát, đọc_bytecode, "bytecode V++ chưa liên kết");
+    kiểm cache pass compiler(liên_kết, đọc_artifact, "bytecode V++ đã liên kết");
+    hạ_khác = Bộ Hạ IR("in 11;");
+    khẳng định khác(bam_dinh_danh(hạ.hạ()), bam_dinh_danh(hạ_khác.hạ()));
+    in "phiên compiler OOP: đạt";
+};

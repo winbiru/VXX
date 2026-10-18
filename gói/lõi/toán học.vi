@@ -5,39 +5,39 @@ nhập gói/bộ sưu tập/danh sách;
 nhập gói/lõi/chuyển kiểu;
 
 // Số học cơ bản.
-hàm cộng(a, b) {
+hàm công khai cộng(a, b) {
     trả về a + b;
 };
 
-hàm trừ(a, b) {
+hàm công khai trừ(a, b) {
     trả về a - b;
 };
 
-hàm nhân(a, b) {
+hàm công khai nhân(a, b) {
     trả về a * b;
 };
 
-hàm chia(a, b) {
+hàm công khai chia(a, b) {
     trả về a / b;
 };
 
 // Hai toán hạng phải biểu diễn số nguyên; số thực có phần lẻ bị runtime từ chối.
-hàm chia dư(a, b) {
+hàm công khai chia dư(a, b) {
     trả về a % b;
 };
 
-hàm chia lấy dư(a, b) {
+hàm công khai chia lấy dư(a, b) {
     trả về chia dư(a, b);
 };
 
-hàm chia an toàn(a, b, mặc định = 0) {
+hàm công khai chia an toàn(a, b, mặc định = 0) {
     nếu (b == 0 || b == 0.0) {
         trả về mặc định;
     };
     trả về a / b;
 };
 
-hàm lũy thừa(cơ sở, số mũ) {
+hàm công khai lũy thừa(cơ sở, số mũ) {
     nếu (số mũ < 0) {
         ném "lũy thừa: số mũ phải là số nguyên không âm";
     };
@@ -54,7 +54,7 @@ hàm lũy thừa(cơ sở, số mũ) {
     trả về kết quả;
 };
 
-hàm giai thừa(n) {
+hàm công khai giai thừa(n) {
     nếu (n < 0) {
         ném "giai thừa: đối số phải là số nguyên không âm";
     };
@@ -71,28 +71,28 @@ hàm giai thừa(n) {
     trả về kết quả;
 };
 
-hàm trị tuyệt đối(x) {
+hàm công khai trị tuyệt đối(x) {
     nếu (x < 0) {
         trả về 0 - x;
     };
     trả về x;
 };
 
-hàm lớn nhất hai(a, b) {
+hàm công khai lớn nhất hai(a, b) {
     nếu (a > b) {
         trả về a;
     };
     trả về b;
 };
 
-hàm nhỏ nhất hai(a, b) {
+hàm công khai nhỏ nhất hai(a, b) {
     nếu (a < b) {
         trả về a;
     };
     trả về b;
 };
 
-hàm giới hạn(x, nhỏ nhất, lớn nhất) {
+hàm công khai giới hạn(x, nhỏ nhất, lớn nhất) {
     nếu (nhỏ nhất > lớn nhất) {
         ném "giới hạn: cận nhỏ nhất không được lớn hơn cận lớn nhất";
     };
@@ -105,36 +105,36 @@ hàm giới hạn(x, nhỏ nhất, lớn nhất) {
     trả về x;
 };
 
-hàm trung bình(a, b) {
+hàm công khai trung bình(a, b) {
     trả về (a + b) / 2;
 };
 
-hàm phần trăm(giá trị, tổng) {
+hàm công khai phần trăm(giá trị, tổng) {
     nếu (tổng == 0 || tổng == 0.0) {
         trả về 0;
     };
     trả về (giá trị * 100) / tổng;
 };
 
-hàm là chẵn(n) {
+hàm công khai là chẵn(n) {
     trả về n % 2 == 0;
 };
 
-hàm là lẻ(n) {
+hàm công khai là lẻ(n) {
     trả về n % 2 != 0;
 };
 
-hàm bình phương(x) {
+hàm công khai bình phương(x) {
     trả về nhân(x, x);
 };
 
-hàm tổng hai(a, b) {
+hàm công khai tổng hai(a, b) {
     trả về cộng(a, b);
 };
 
 // Làm tròn số hữu hạn bằng phép toán IEEE-754 của VM.
 // Từ 2^52 trở lên mọi double hữu hạn đều đã là số nguyên.
-hàm số học làm tròn nội bộ(x, lên, tên) {
+hàm riêng tư số học làm tròn nội bộ(x, lên, tên) {
     kiểu = loai_cua(x);
     nếu (kiểu == "số nguyên") { trả về x; };
     nếu (kiểu != "số thực") {
@@ -165,16 +165,16 @@ hàm số học làm tròn nội bộ(x, lên, tên) {
     trả về nguyên;
 };
 
-hàm lam_tron_xuong(x) {
+hàm công khai lam_tron_xuong(x) {
     trả về số học làm tròn nội bộ(x, sai, "lam_tron_xuong");
 };
 
-hàm lam_tron_len(x) {
+hàm công khai lam_tron_len(x) {
     trả về số học làm tròn nội bộ(x, đúng, "lam_tron_len");
 };
 
 // Làm tròn về số nguyên gần nhất theo quy tắc nửa đơn vị ra xa 0.
-hàm làm tròn(x) {
+hàm công khai làm tròn(x) {
     nếu (x >= 0) {
         trả về lam_tron_xuong(x + 0.5);
     };
@@ -182,32 +182,32 @@ hàm làm tròn(x) {
 };
 
 // Làm tròn về phía âm vô cùng.
-hàm làm tròn xuống(x) {
+hàm công khai làm tròn xuống(x) {
     trả về lam_tron_xuong(x);
 };
 
 // Làm tròn về phía dương vô cùng.
-hàm làm tròn lên(x) {
+hàm công khai làm tròn lên(x) {
     trả về lam_tron_len(x);
 };
 
 // Giá trị nhỏ nhất trong danh sách số. Danh sách rỗng giữ lỗi chuẩn của lõi.
-hàm nhỏ nhất danh sách(ds) {
+hàm công khai nhỏ nhất danh sách(ds) {
     trả về nhỏ nhất list(ds);
 };
 
 // Giá trị lớn nhất trong danh sách số. Danh sách rỗng giữ lỗi chuẩn của lõi.
-hàm lớn nhất danh sách(ds) {
+hàm công khai lớn nhất danh sách(ds) {
     trả về lớn nhất list(ds);
 };
 
 // Tổng các phần tử số trong danh sách.
-hàm tổng danh sách(ds) {
+hàm công khai tổng danh sách(ds) {
     trả về tổng list(ds);
 };
 
 // Trung bình cộng của danh sách số; từ chối danh sách rỗng để tránh kết quả không xác định.
-hàm trung bình danh sách(ds) {
+hàm công khai trung bình danh sách(ds) {
     n = độ dài(ds);
     nếu (n == 0) {
         ném "toán học: không thể tính trung bình danh sách rỗng";

@@ -131,15 +131,6 @@ bool getFirstListArgument(const std::vector<StackValue> &args,
     return getNativeHandleArgument(args, 0, fn, "danh sách", true, out, err);
 }
 
-// Lấy danh sách đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
-bool getListArgument(const std::vector<StackValue> &args,
-                     std::size_t index,
-                     const std::string &fn,
-                     ListHandle &out,
-                     std::string &err) {
-    return getNativeHandleArgument(args, index, fn, "danh sách", false, out, err);
-}
-
 // Lấy first ánh xạ đối số; hàm đọc dữ liệu từ trạng thái hiện tại và trả về cho caller mà không chủ động thay đổi dữ liệu.
 bool getFirstMapArgument(const std::vector<StackValue> &args,
                          const std::string &fn,

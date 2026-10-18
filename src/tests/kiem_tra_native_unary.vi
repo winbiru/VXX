@@ -1,0 +1,17 @@
+// Regression: prefix operators must compile through direct IR, including
+// grouped arithmetic and nested expressions used by raw native leaf codegen.
+hàm tinh(n) { trả về -(n + 5); }
+
+hàm chính() {
+    in -(2 + 5);
+    in -(-(2 + 5));
+    in -(2);
+    in +(2 + 5);
+    in tinh(2);
+    in -7;
+    in !sai;
+    in -2147483648;
+    in -(2147483648);
+    in -(0 - 7);
+    in -(2.5 + 0.5);
+}

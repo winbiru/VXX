@@ -1,0 +1,114 @@
+// Hàm i32 tổng quát dùng để so sánh VM với mã máy native x86_64/AArch64.
+hàm tinh(a, b) {
+    biến result = a * b;
+    nếu (a < b) { result = result + b; }
+    hoặc { result = result - b; };
+    trả về result;
+}
+
+hàm tong(n) {
+    biến total = 0;
+    lặp (i = 0; i < n; i = i + 1) {
+        total = total + i;
+    };
+    trả về total;
+}
+
+hàm max_i32(a, b) {
+    nếu (a >= b) { trả về a; }
+    hoặc { trả về b; };
+}
+
+hàm tong_bon(a, b, c, d) {
+    trả về (a + b) - c * d;
+}
+
+hàm tru_dao(a, b) {
+    trả về b - a;
+}
+
+hàm phu_dinh(n) {
+    nếu (!(n == 0)) { trả về 1; }
+    hoặc { trả về 0; };
+}
+
+hàm phan_loai(a, b) {
+    nếu (a < 0) {
+        nếu (b < 0) { trả về -2; }
+        hoặc { trả về -1; };
+    }
+    hoặc {
+        nếu (b == 0) { trả về 0; }
+        hoặc { trả về a + b; };
+    };
+}
+
+hàm tim_dau(n) {
+    biến total = 0;
+    lặp (i = 0; i < n; i = i + 1) {
+        nếu (i == 4) { trả về total + 100; };
+        total = total + i;
+    };
+    trả về total;
+}
+
+hàm dieu_kien(n) {
+    nếu (n != 0) { trả về 12; };
+    trả về -12;
+}
+
+hàm bo_qua(n) {
+    biến total = 0;
+    lặp (i = 0; i < n; i = i + 1) {
+        nếu (i == 2) { bỏ qua; };
+        nếu (i == 6) { thoát; };
+        total = total + i;
+    };
+    trả về total;
+}
+
+// 14 local/parameter slots + 2 evaluation slots: last register is W17.
+hàm register_limit(a, b, c, d) {
+    biến v0 = a + b;
+    biến v1 = c - d;
+    biến v2 = v0 + v1;
+    biến v3 = v2 + 3;
+    biến v4 = v3 - 4;
+    biến v5 = v4 + 5;
+    biến v6 = v5 - 6;
+    biến v7 = v6 + 7;
+    biến v8 = v7 - 8;
+    biến v9 = v8 + 9;
+    trả về v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8 + v9;
+}
+
+// One slot beyond the register budget must retain the stack-based path.
+hàm register_overflow(a, b, c, d) {
+    biến v0 = a + b;
+    biến v1 = c - d;
+    biến v2 = v0 + v1;
+    biến v3 = v2 + 3;
+    biến v4 = v3 - 4;
+    biến v5 = v4 + 5;
+    biến v6 = v5 - 6;
+    biến v7 = v6 + 7;
+    biến v8 = v7 - 8;
+    biến v9 = v8 + 9;
+    biến v10 = v9 + 10;
+    trả về v0 + v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8 + v9 + v10;
+}
+
+hàm chính() {
+    in tinh(2, 5);
+    in tinh(5, 2);
+    in tong(8);
+    in max_i32(-7, -3);
+    in tong_bon(3, 5, 2, 4);
+    in tru_dao(2, 5);
+    in phu_dinh(0);
+    in phu_dinh(-1);
+    in phan_loai(-1, -2);
+    in tim_dau(5);
+    in dieu_kien(0);
+    in bo_qua(9);
+}

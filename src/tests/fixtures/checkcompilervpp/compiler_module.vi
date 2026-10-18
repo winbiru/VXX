@@ -1,0 +1,1 @@
+nhập gói/biên dịch/opcode; hàm chính() { in biên dịch mã opcode("OP_GOI"); in biên dịch có opcode(42); };

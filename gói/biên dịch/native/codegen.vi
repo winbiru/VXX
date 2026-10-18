@@ -1,0 +1,408 @@
+hàm cg_binary(op) {
+    nếu (op == 4) { trả về 1; };
+    nếu (op == 5) { trả về 1; };
+    nếu (op == 6) { trả về 1; };
+    nếu (op >= 11) { nếu (op <= 16) { trả về 1; }; };
+    trả về 0;
+};
+
+hàm cg_branch_target(ir, target) {
+    nếu (target < 0) { trả về 0; };
+    lặp (pc = 0; pc < byte_dài(ir); pc = pc + 8) {
+        nếu (target == pc) { trả về 1; };
+    };
+    trả về 0;
+};
+
+hàm cg_frame(ir) {
+    biến length = byte_dài(ir);
+    nếu (length < 8) { trả về -1; };
+    biến depth = 0;
+    biến highest = 0;
+    biến locals = 0;
+    biến returned = 0;
+    biến calls = 0;
+    biến pending = -1;
+    lặp (pc = 0; pc < length; pc = pc + 8) {
+        nếu (pc + 8 > length) { trả về -1; };
+        biến op = byte_đọc_i32(ir, pc);
+        biến arg = byte_đọc_i32(ir, pc + 4);
+        nếu (pending >= 0) { nếu (op != 17) { trả về -1; }; };
+        nếu (op == 1) { depth = depth + 1; }
+        hoặc nếu (op == 2) {
+            nếu (arg < 0) { trả về -1; };
+            nếu (arg >= locals) { trả về -1; };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 3) {
+            nếu (depth < 1) { trả về -1; };
+            nếu (arg < 0) { trả về -1; };
+            nếu (arg > locals) { trả về -1; };
+            nếu (arg >= 130000) { trả về -1; };
+            nếu (arg == locals) { locals = locals + 1; };
+            depth = depth - 1;
+        }
+        hoặc nếu (cg_binary(op) == 1) {
+            nếu (arg != 0) { trả về -1; };
+            nếu (depth < 2) { trả về -1; };
+            depth = depth - 1;
+        }
+        hoặc nếu (op == 8) {
+            nếu (arg != 0) { trả về -1; };
+            nếu (depth < 1) { trả về -1; };
+        }
+        hoặc nếu (op == 17) {
+            nếu (arg < -62) { trả về -1; };
+            // The program codegen resolves and bounds-checks function IDs
+            // against the complete function table when patching CALLs.
+            nếu (pending < 0) { trả về -1; };
+            nếu (depth < pending) { trả về -1; };
+            calls = 1;
+            depth = depth - pending + 1;
+            pending = -1;
+        }
+        hoặc nếu (op == 19) {
+            nếu (arg < 0) { trả về -1; };
+            nếu (arg > 130000) { trả về -1; };
+            pending = arg;
+        }
+        hoặc nếu (op == 22) {
+            nếu (arg != 0) { trả về -1; };
+            calls = 1;
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 23) {
+            nếu (arg < 0) { trả về -1; };
+            nếu (arg > 255) { trả về -1; };
+            nếu (depth < 1) { trả về -1; };
+            calls = 1;
+        }
+        hoặc nếu (op == 24) {
+            nếu (arg != 0) { trả về -1; };
+            nếu (depth < 1) { trả về -1; };
+            depth = depth - 1;
+        }
+        hoặc nếu (op == 18) {
+            nếu (arg < 0) { trả về -1; };
+            nếu (arg >= 130000) { trả về -1; };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 9) {
+            nếu (depth < 1) { trả về -1; };
+            nếu (cg_branch_target(ir, arg) != 1) { trả về -1; };
+            depth = depth - 1;
+        }
+        hoặc nếu (op == 10) {
+            nếu (depth != 0) { trả về -1; };
+            nếu (cg_branch_target(ir, arg) != 1) { trả về -1; };
+        }
+        hoặc nếu (op == 7) {
+            nếu (arg != 0) { trả về -1; };
+            nếu (depth != 1) { trả về -1; };
+            // Return trong nhánh có thể đứng trước JZ/JMP hoặc mã nhánh khác.
+            // Sau return, luồng tuyến tính dùng lại độ sâu stack bằng 0.
+            depth = 0;
+            returned = 1;
+        }
+        hoặc { trả về -1; };
+        nếu (depth > highest) { highest = depth; };
+        nếu (depth > 130000) { trả về -1; };
+    };
+    nếu (returned != 1) { trả về -1; };
+    nếu (byte_đọc_i32(ir, length - 8) != 7) { trả về -1; };
+    nếu (pending >= 0) { trả về -1; };
+    // Outgoing arguments are allocated below SP for each individual call.
+    // This prevents callee frames from overwriting the caller's saved LR.
+    nếu (locals + highest > 260000) { trả về -1; };
+    biến frame = 0;
+    lặp (i = 0; i < locals + highest; i = i + 4) { frame = frame + 16; };
+    nếu (calls == 1) { frame = frame + 16; }; // LR at SP + 0
+    trả về frame;
+};
+
+// Recompute the slot count before emitting. The validation pass ensures
+// all references fit and prevents writing any code for a malformed IR.
+hàm cg_slots(ir) {
+    biến slots = 0;
+    lặp (pc = 0; pc < byte_dài(ir); pc = pc + 8) {
+        nếu (byte_đọc_i32(ir, pc) == 3) {
+            biến index = byte_đọc_i32(ir, pc + 4);
+            nếu (index == slots) { slots = slots + 1; };
+        };
+    };
+    trả về slots;
+};
+
+hàm cg_word(out, word) {
+    trả về byte_đẩy_i32(out, word);
+};
+
+// MOVZ/MOVK W9, signed i32 (16-bit chunks are unsigned).
+hàm cg_constant(out, ir, immediate_offset) {
+    biến lo = byte_lấy(ir, immediate_offset) + byte_lấy(ir, immediate_offset + 1) * 256;
+    biến hi = byte_lấy(ir, immediate_offset + 2) + byte_lấy(ir, immediate_offset + 3) * 256;
+    nếu (cg_word(out, 1384120329 + lo * 32) != 0) { trả về -1; };
+    // MOVK W9, #hi, LSL #16: 0x72a00009 | (hi << 5).
+    // The immediate field starts at zero; carrying out of a pre-filled
+    // field would corrupt high 32-bit literals and Mach-O header constants.
+    nếu (hi != 0) { trả về cg_word(out, 1923088393 + hi * 32); };
+    trả về 0;
+};
+
+// LDR/STR Wn from SP + slot*4. Large offsets use X11 as a scratch address.
+hàm cg_access(out, reg, slot, load) {
+    nếu (slot < 0) { trả về -1; };
+    nếu (slot < 4096) {
+        nếu (load == 1) { trả về cg_word(out, -1186987031 + slot * 1024 + reg - 9); };
+        trả về cg_word(out, -1191181335 + slot * 1024 + reg - 9);
+    };
+    nếu (cg_word(out, -1862269973) != 0) { trả về -1; }; // ADD X11,SP,#0
+    biến offset = slot * 4;
+    lặp (i = 0; i < offset; i = i + 4095) {
+        biến step = offset - i;
+        nếu (step > 4095) { step = 4095; };
+        nếu (cg_word(out, -1862270613 + step * 1024) != 0) { trả về -1; };
+    };
+    nếu (load == 1) { trả về cg_word(out, -1186987671 + reg - 9); };
+    trả về cg_word(out, -1191181975 + reg - 9);
+};
+
+hàm cg_load(out, reg, slot) {
+    trả về cg_access(out, reg, slot, 1);
+};
+
+hàm cg_store(out, reg, slot) {
+    trả về cg_access(out, reg, slot, 0);
+};
+
+// Preserve the 16-byte AArch64 stack alignment at every BL.
+hàm cg_adjust_sp(out, bytes, subtract) {
+    biến left = bytes;
+    lặp (i = 0; i < bytes; i = i + 4095) {
+        biến step = left;
+        nếu (step > 4095) { step = 4095; };
+        biến base = -1862269953;
+        nếu (subtract == 1) { base = -788528129; };
+        nếu (cg_word(out, base + step * 1024) != 0) { trả về -1; };
+        left = left - step;
+    };
+    trả về 0;
+};
+
+// Patch relative branch displacements only after all instructions have been
+// emitted. offsets holds the machine-code starting offset of each IR op.
+hàm cg_patch_branches(ir, code, offsets) {
+    biến source_slot = 0;
+    lặp (pc = 0; pc < byte_dài(ir); pc = pc + 8) {
+        biến op = byte_đọc_i32(ir, pc);
+        biến branch = 0;
+        nếu (op == 9) { branch = 1; };
+        nếu (op == 10) { branch = 1; };
+        nếu (branch == 1) {
+            biến target = byte_đọc_i32(ir, pc + 4);
+            biến target_slot = 0;
+            lặp (i = 0; i < target; i = i + 8) { target_slot = target_slot + 4; };
+            biến from = byte_đọc_i32(offsets, source_slot);
+            biến to = byte_đọc_i32(offsets, target_slot);
+            nếu (op == 9) { from = from + 4; }; // after the condition LDR
+            biến delta = 0;
+            lặp (step = from; step < to; step = step + 4) { delta = delta + 1; };
+            lặp (step = from; step > to; step = step - 4) { delta = delta - 1; };
+            biến word = 0;
+            nếu (op == 9) {
+                nếu (delta < -262144) { trả về -1; };
+                nếu (delta > 262143) { trả về -1; };
+                nếu (delta < 0) { delta = delta + 524288; };
+                word = 872415241 + delta * 32; // CBZ W9, imm19
+            } hoặc {
+                nếu (delta < -33554432) { trả về -1; };
+                nếu (delta > 33554431) { trả về -1; };
+                nếu (delta < 0) { delta = delta + 67108864; };
+                word = 335544320 + delta; // B imm26
+            };
+            nếu (byte_ghi_i32(code, from, word) != 0) { trả về -1; };
+        };
+        source_slot = source_slot + 4;
+    };
+    trả về 0;
+};
+
+// CALL relocations are pairs (machine offset, callee index). The caller
+// must resolve all BL placeholders before making the object executable.
+hàm cg_emit_internal(ir, code, calls) {
+    nếu (ir == code) { trả về -1; };
+    nếu (byte_dài(code) < 0) { trả về -1; };
+    nếu (byte_làm_rỗng(code) != 0) { trả về -1; };
+    biến frame = cg_frame(ir);
+    nếu (frame < 0) { trả về -1; };
+    biến offsets = byte_mới();
+    nếu (offsets <= 0) { trả về -1; };
+    biến slots = cg_slots(ir);
+    biến depth = 0;
+    biến status = cg_adjust_sp(code, frame, 1);
+    biến has_calls = 0;
+    lặp (pc = 0; pc < byte_dài(ir); pc = pc + 8) {
+        biến call_op = byte_đọc_i32(ir, pc);
+        nếu (call_op == 17) { has_calls = 1; };
+        nếu (call_op == 22) { has_calls = 1; };
+        nếu (call_op == 23) { has_calls = 1; };
+    };
+    nếu (has_calls == 1) {
+        nếu (calls <= 0) { byte_hủy(offsets); byte_làm_rỗng(code); trả về -1; };
+        nếu (status == 0) { status = cg_word(code, -117439490); }; // STR X30,[SP]
+    };
+    nếu (status != 0) { byte_hủy(offsets); byte_làm_rỗng(code); trả về -1; };
+    biến base = 0;
+    nếu (has_calls == 1) { base = 4; }; // LR occupies first aligned 16 bytes
+    biến frame_slots = 0;
+    lặp (i = 0; i < frame; i = i + 4) { frame_slots = frame_slots + 1; };
+    biến pending = -1;
+    lặp (pc = 0; pc < byte_dài(ir); pc = pc + 8) {
+        nếu (byte_đẩy_i32(offsets, byte_dài(code)) != 0) {
+            byte_hủy(offsets); byte_làm_rỗng(code); trả về -1;
+        };
+        biến op = byte_đọc_i32(ir, pc);
+        biến arg = byte_đọc_i32(ir, pc + 4);
+        biến offset = base + slots + depth;
+        nếu (op == 1) {
+            status = cg_constant(code, ir, pc + 4);
+            nếu (status == 0) { status = cg_store(code, 9, offset); };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 2) {
+            status = cg_load(code, 9, base + arg);
+            nếu (status == 0) { status = cg_store(code, 9, offset); };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 3) {
+            depth = depth - 1;
+            status = cg_load(code, 9, base + slots + depth);
+            nếu (status == 0) { status = cg_store(code, 9, base + arg); };
+        }
+        hoặc nếu (cg_binary(op) == 1) {
+            depth = depth - 1;
+            status = cg_load(code, 9, base + slots + depth - 1);
+            nếu (status == 0) { status = cg_load(code, 10, base + slots + depth); };
+            nếu (status == 0) {
+                nếu (op == 4) { status = cg_word(code, 185205033); };
+                nếu (op == 5) { status = cg_word(code, 1258946857); };
+                nếu (op == 6) { status = cg_word(code, 453672233); };
+                nếu (op >= 11) {
+                    status = cg_word(code, 1795817791); // CMP W9, W10
+                    nếu (status == 0) {
+                        biến condition = 0;
+                        nếu (op == 11) { condition = 446633961; }; // EQ
+                        nếu (op == 12) { condition = 446629865; }; // NE
+                        nếu (op == 13) { condition = 446670825; }; // LT
+                        nếu (op == 14) { condition = 446679017; }; // LE
+                        nếu (op == 15) { condition = 446683113; }; // GT
+                        nếu (op == 16) { condition = 446674921; }; // GE
+                        status = cg_word(code, condition);
+                    };
+                };
+            };
+            nếu (status == 0) { status = cg_store(code, 9, base + slots + depth - 1); };
+        }
+        hoặc nếu (op == 8) {
+            status = cg_load(code, 9, base + slots + depth - 1);
+            nếu (status == 0) { status = cg_word(code, 1258882025); };
+            nếu (status == 0) { status = cg_store(code, 9, base + slots + depth - 1); };
+        }
+        hoặc nếu (op == 7) {
+            status = cg_load(code, 0, base + slots);
+            nếu (has_calls == 1) {
+                nếu (status == 0) { status = cg_word(code, -113245186); }; // LDR X30,[SP]
+            };
+            nếu (status == 0) { status = cg_adjust_sp(code, frame, 0); };
+            nếu (status == 0) { status = cg_word(code, -698416192); }; // RET
+            depth = 0;
+        }
+        hoặc nếu (op == 18) {
+            // On entry, incoming arguments begin at the previous SP.
+            // Our prologue lowered SP by frame bytes.
+            status = cg_load(code, 9, frame_slots + arg);
+            nếu (status == 0) { status = cg_store(code, 9, offset); };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 19) {
+            pending = arg;
+        }
+        hoặc nếu (op == 22) {
+            // C ABI: bytes_new() returns an i32 handle in W0.
+            status = byte_đẩy_i32(calls, byte_dài(code));
+            nếu (status == 0) { status = byte_đẩy_i32(calls, -1); };
+            nếu (status == 0) { status = cg_word(code, -1811939328); };
+            nếu (status == 0) { status = cg_store(code, 0, offset); };
+            depth = depth + 1;
+        }
+        hoặc nếu (op == 23) {
+            // C ABI: bytes_append(handle, byte); W0 and W1.
+            status = cg_load(code, 0, base + slots + depth - 1);
+            nếu (status == 0) { status = cg_word(code, 1384120321 + arg * 32); };
+            nếu (status == 0) { status = byte_đẩy_i32(calls, byte_dài(code)); };
+            nếu (status == 0) { status = byte_đẩy_i32(calls, -4); };
+            nếu (status == 0) { status = cg_word(code, -1811939328); };
+        }
+        hoặc nếu (op == 24) {
+            depth = depth - 1;
+        }
+        hoặc nếu (op == 17) {
+            nếu (arg < 0) {
+                // AAPCS64: native C intrinsics accept i32 parameters in W0-W7.
+                nếu (pending > 8) { status = -1; };
+                lặp (i = 0; i < pending; i++) {
+                    nếu (status == 0) {
+                        status = cg_load(code, i, offset - pending + i);
+                    };
+                };
+            } hoặc {
+                // Internal V++ calls retain the unbounded stack ABI.
+                biến arg_slots = 0;
+                lặp (i = 0; i < pending; i = i + 4) { arg_slots = arg_slots + 4; };
+                nếu (status == 0) { status = cg_adjust_sp(code, arg_slots * 4, 1); };
+                lặp (i = 0; i < pending; i++) {
+                    nếu (cg_load(code, 9, arg_slots + offset - pending + i) != 0) { status = -1; thoát; };
+                    nếu (cg_store(code, 9, i) != 0) { status = -1; thoát; };
+                };
+            };
+            nếu (status == 0) { status = byte_đẩy_i32(calls, byte_dài(code)); };
+            nếu (status == 0) { status = byte_đẩy_i32(calls, arg); };
+            nếu (status == 0) { status = cg_word(code, -1811939328); }; // BL imm26 placeholder
+            nếu (arg >= 0) {
+                biến outgoing_slots = 0;
+                lặp (i = 0; i < pending; i = i + 4) { outgoing_slots = outgoing_slots + 4; };
+                nếu (status == 0) { status = cg_adjust_sp(code, outgoing_slots * 4, 0); };
+            };
+            depth = depth - pending + 1;
+            nếu (status == 0) { status = cg_store(code, 0, base + slots + depth - 1); };
+            pending = -1;
+        }
+        hoặc nếu (op == 9) {
+            depth = depth - 1;
+            status = cg_load(code, 9, base + slots + depth);
+            nếu (status == 0) { status = cg_word(code, 872415241); }; // CBZ placeholder
+        }
+        hoặc nếu (op == 10) {
+            status = cg_word(code, 335544320); // B placeholder
+        };
+        nếu (status != 0) {
+            byte_hủy(offsets);
+            byte_làm_rỗng(code);
+            trả về -1;
+        };
+    };
+    biến patched = cg_patch_branches(ir, code, offsets);
+    byte_hủy(offsets);
+    nếu (patched != 0) { byte_làm_rỗng(code); trả về -1; };
+    trả về byte_dài(code);
+};
+
+// Leaf-only callers of the original API must reject unresolved CALLs.
+hàm cg_emit(ir, code) {
+    trả về cg_emit_internal(ir, code, 0);
+};
+
+// Emit IR to ARM64 machine code. External runtime CALL sites are retained
+// for Mach-O BRANCH26 relocations in object.vi.
+// Dedicated to the validated, leaf-only i32 native IR subset.
+

@@ -1,0 +1,1 @@
+nhập lib/math như m; nhập lib/../lib/math như n; hàm chính() { d = [1, 2]; d[1] = 7; in m.cộng(40); in n.cộng(3, 4); in d[1]; in do_dai(d); in "tiếng Việt\nđúng"; };

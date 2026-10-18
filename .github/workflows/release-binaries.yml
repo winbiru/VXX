@@ -61,8 +61,8 @@ jobs:
           ctest --test-dir build --output-on-failure --no-tests=error
           export VPP_HOME="$PWD"
           VPP=build/bin/vpp-cli
-          "$VPP" dựng scripts/quality/rc-hardening.vi
-          malformed_sources=(scripts/quality/rc-malformed*.vi)
+          "$VPP" dựng src/tests/kiem_tra_rc_hardening.vi
+          malformed_sources=(src/tests/fixtures/rc_malformed/rc-malformed*.vi)
           if [ "${#malformed_sources[@]}" -lt 2 ]; then
             echo "RC malformed corpus is missing" >&2
             exit 1
@@ -82,8 +82,8 @@ jobs:
           for mode in --dump-ast --dump-ir --giải-mã; do
             first="$(mktemp)"
             second="$(mktemp)"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$first"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$second"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$first"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$second"
             cmp "$first" "$second"
             rm -f "$first" "$second"
           done
@@ -96,9 +96,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows CTest failed; release packaging stopped" }
           $env:VPP_HOME = (Get-Location).Path
           $vpp = "build/bin/Release/vpp-cli.exe"
-          & $vpp "dựng" "scripts/quality/rc-hardening.vi"
+          & $vpp "dựng" "src/tests/kiem_tra_rc_hardening.vi"
           if ($LASTEXITCODE -ne 0) { throw "Windows RC hardening source failed to compile" }
-          $malformedSources = @(Get-ChildItem "scripts/quality/rc-malformed*.vi" | Sort-Object Name)
+          $malformedSources = @(Get-ChildItem "src/tests/fixtures/rc_malformed/rc-malformed*.vi" | Sort-Object Name)
           if ($malformedSources.Count -lt 2) { throw "RC malformed corpus is missing" }
           foreach ($source in $malformedSources) {
             & $vpp "dựng" $source.FullName
@@ -109,9 +109,9 @@ jobs:
           foreach ($mode in @("--dump-ast", "--dump-ir", "--giải-mã")) {
             $first = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".a")
             $second = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".b")
-            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $first
+            & $vpp $mode "src/tests/kiem_tra_rc_hardening.vi" | Set-Content -Encoding utf8 $first
             if ($LASTEXITCODE -ne 0) { throw "Windows RC hardening failed for $mode" }
-            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $second
+            & $vpp $mode "src/tests/kiem_tra_rc_hardening.vi" | Set-Content -Encoding utf8 $second
             if ($LASTEXITCODE -ne 0) { throw "Windows RC hardening failed for $mode" }
             if ((Get-FileHash $first).Hash -ne (Get-FileHash $second).Hash) {
               throw "Non-deterministic compiler output for $mode"
@@ -124,7 +124,7 @@ jobs:
 
       - name: Verify VDK archive
         id: vdk
-        run: python scripts/quality/verify-vdk.py --build-dir build
+        run: cmake -DVPP_BUILD_DIR=build -P scripts/quality/verify_vdk.cmake
 
       - name: Package (Linux/macOS)
         if: runner.os != 'Windows'
@@ -209,6 +209,24 @@ jobs:
           VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
           test ! -e "$INSTALL_DIR/gói/.release-smoke-stale"
           test -x "$INSTALL_DIR/uninstall-vpp.sh"
+          # Compile native .o files with the actual release installer output,
+          # link them using the runner toolchain, then execute the binary.
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            case "$(uname -m)" in
+              arm64) native_target=aarch64-apple-darwin ;;
+              x86_64) native_target=x86_64-apple-darwin ;;
+              *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+            esac
+          else
+            native_target=x86_64-linux-gnu
+          fi
+          cmake -S scripts/quality/installed_native_smoke \
+            -B "$VERIFY_ROOT/native-smoke" -DCMAKE_BUILD_TYPE=Release \
+            "-DVPP_INSTALL_ROOT=$INSTALL_DIR" "-DVPP_SOURCE_ROOT=$PWD" \
+            "-DVPP_EXEC=$INSTALL_DIR/vpp" "-DVPP_CLI=$INSTALL_DIR/vpp" \
+            "-DVPP_TARGET=$native_target"
+          cmake --build "$VERIFY_ROOT/native-smoke" --parallel 2
+          ctest --test-dir "$VERIFY_ROOT/native-smoke" --output-on-failure --no-tests=error
           "$INSTALL_DIR/vpp" phiên bản
           "$INSTALL_DIR/vpp" chẩn đoán
           if [ "${{ runner.os }}" = "Linux" ]; then
@@ -348,7 +366,7 @@ jobs:
             }
           }
           $env:VPP_HOME = $installDir
-          & $vpp "chạy" "scripts/quality/windows-install-smoke.vi"
+          & $vpp "chạy" "src/tests/kiem_tra_windows_install.vi"
           if ($LASTEXITCODE -ne 0) { throw "Windows .vi artifact smoke failed" }
           New-Item -ItemType File -Force -Path (Join-Path $installDir "gói/.release-smoke-stale") | Out-Null
           & $installer -InstallDir $installDir -NoPathUpdate
@@ -359,6 +377,16 @@ jobs:
           $vpp = Join-Path $installDir "vpp.exe"
           $sample = Join-Path $installDir "examples/quan-ly-kho-api"
           $env:VPP_HOME = $installDir
+          # Validate the installed release executable as a native code generator.
+          $smoke = Join-Path $verifyRoot "native-smoke"
+          cmake -S scripts/quality/installed_native_smoke -B $smoke `
+            "-DVPP_INSTALL_ROOT=$installDir" "-DVPP_SOURCE_ROOT=$((Get-Location).Path)" `
+            "-DVPP_EXEC=$vpp" "-DVPP_CLI=$vpp" -DVPP_TARGET=x86_64-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw "Installed release native smoke configure failed" }
+          cmake --build $smoke --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "Installed release native source compilation/link failed" }
+          ctest --test-dir $smoke -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Installed release native executable failed" }
           & $vpp "dựng" (Join-Path $sample "src/chính.vi")
           if ($LASTEXITCODE -ne 0) { throw "Artifact build verification failed" }
           Push-Location $sample

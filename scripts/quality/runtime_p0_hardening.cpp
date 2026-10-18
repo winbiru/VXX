@@ -10,8 +10,10 @@
 
 #include "vpp/bytecode/foreign.h"
 #include "vpp/bytecode/intrinsic.h"
+#include "vpp/native/aarch64_jit.h"
 #include "vpp/runtime/error.h"
 #include "vpp/runtime/foreign.h"
+#include "vpp/runtime/heap.h"
 #include "vpp/runtime/vm.h"
 #include "vpp/runtime/vm_fixture.h"
 #include "common/vm_utils.h"
@@ -53,6 +55,52 @@ void expect(bool condition, const std::string &message) {
         std::cerr << "FAIL: " << message << '\n';
         ++failures;
     }
+}
+
+void testCompilerHeapRegistryAndCycles() {
+    using vietvm::runtime::ListValue;
+    vietvm::runtime::RuntimeHeap heap;
+    auto root = std::make_shared<ListValue>();
+    heap.track(root);
+    heap.track(root);
+    expect(heap.trackedObjectCount() == 1, "heap deduplicates the same handle");
+    for (int i = 0; i < 4096; ++i) {
+        auto child = std::make_shared<ListValue>();
+        child->elements.emplace_back(child);
+        root->elements.emplace_back(child);
+        heap.track(child);
+    }
+    expect(heap.needsCollection(), "large compiler allocation graph triggers collection");
+    const auto live = heap.collect({StackValue{root}});
+    expect(live.marked == 4097 && live.swept == 0 && live.trackedAfter == 4097,
+           "compiler graph and reachable cycles survive tracing");
+    expect(!heap.needsCollection(), "collection resets allocation budget");
+    heap.track(root);
+    expect(!heap.needsCollection(), "duplicate tracking does not consume allocation budget");
+    for (int i = 0; i < 16; ++i) {
+        auto child = std::make_shared<ListValue>();
+        root->elements.emplace_back(child);
+        heap.track(child);
+    }
+    expect(!heap.needsCollection(), "small allocations do not rescan a large compiler graph");
+    root->elements.resize(2048);
+    const auto reduced = heap.collect({StackValue{root}});
+    expect(reduced.swept == 2048 && reduced.trackedAfter == 2049,
+           "unreachable cycles are reclaimed while reachable compiler graph stays live");
+    root->elements.clear();
+    const auto cleared = heap.collect({StackValue{root}});
+    expect(cleared.swept == 2048 && heap.trackedObjectCount() == 1,
+           "explicit collection reclaims remaining detached cycles");
+    // Frequent short-lived allocations exercise allocator address reuse before
+    // pruning. The last live object must remain correctly registered.
+    ListHandle last;
+    for (int i = 0; i < 1024; ++i) {
+        last = std::make_shared<ListValue>();
+        heap.track(last);
+    }
+    const auto reused = heap.collect({StackValue{root}, StackValue{last}});
+    expect(reused.marked == 2 && reused.trackedAfter == 2,
+           "expired registry entries do not hide reused allocation addresses");
 }
 
 void testVerificationCacheAndInvalidation() {
@@ -176,8 +224,10 @@ void testLegacyIntrinsicUsesOpcodeDispatcher() {
     try {
         fixture.executeCall({OP_GOI, 1, -4, 0});
 #if defined(_WIN32)
-    } catch (const vietvm::runtime::LanguageException &) {
-        dnsRejectedAsExpected = true;
+    } catch (const vietvm::runtime::RuntimeError &error) {
+        dnsRejectedAsExpected =
+            std::string(error.what()).find("legacy DNS opcode is disabled") !=
+            std::string::npos;
 #else
     } catch (const vietvm::runtime::RuntimeError &error) {
         dnsRejectedAsExpected =
@@ -188,7 +238,7 @@ void testLegacyIntrinsicUsesOpcodeDispatcher() {
 #endif
     }
     expect(dnsRejectedAsExpected,
-           "OP_GOI DNS cũ tuân theo chính sách System của từng nền tảng");
+           "OP_GOI DNS cũ bị chặn sau khi thay thế bằng V++ FFI");
 
     fixture.clearStack();
     fixture.push(make_string_value("__vpp_nonexistent_legacy_intrinsic_test__/missing"));
@@ -235,12 +285,13 @@ void testLegacyNetworkErrorCatchMatchesDirectOpcode() {
     const auto directJit = runCatch(false, true);
     const auto legacyJit = runCatch(true, true);
 #if defined(_WIN32)
-    expect(!direct.first.empty() && direct.first == legacy.first &&
-               direct.first == directJit.first && direct.first == legacyJit.first &&
-               direct.first.find('1') != std::string::npos &&
-               direct.second.empty() && legacy.second.empty() &&
-               directJit.second.empty() && legacyJit.second.empty(),
-           "Windows DNS lỗi bắt được nhất quán qua opcode/tên và interpreter/JIT");
+    expect(direct.first.empty() && legacy.first.empty() &&
+               directJit.first.empty() && legacyJit.first.empty() &&
+               !direct.second.empty() && direct.second == legacy.second &&
+               direct.second == directJit.second && direct.second == legacyJit.second &&
+               direct.second.find("legacy DNS opcode is disabled") !=
+                   std::string::npos,
+           "Windows DNS opcode cũ bị chặn đồng nhất qua tên/opcode và interpreter/JIT");
 #else
     expect(direct.first.empty() && legacy.first.empty() &&
                directJit.first.empty() && legacyJit.first.empty() &&
@@ -250,6 +301,51 @@ void testLegacyNetworkErrorCatchMatchesDirectOpcode() {
                    std::string::npos,
            "POSIX DNS opcode cũ bị chặn đồng nhất qua tên/opcode và interpreter/JIT");
 #endif
+}
+
+void testRemovedDnsOpcodesRejectInterpreterAndJit() {
+    // DNS resolution is performed by V++ through the VM-owned System FFI
+    // resolver on every OS. Both compatibility opcodes must be inert.
+    for (const Opcode opcode : {OP_VM_DNS_PHAN_GIAI, OP_VM_SOCKET_PHAN_GIAI}) {
+        const auto *descriptor = vietvm::bytecode::intrinsicByOpcode(opcode);
+        expect(descriptor != nullptr, "legacy DNS opcode retains ABI descriptor");
+        if (descriptor == nullptr) continue;
+
+        for (const bool oldName : {false, true}) {
+            std::vector<Instruction> code;
+            for (std::size_t n = 0; n < descriptor->arity; ++n) {
+                code.push_back({OP_BIEN_SO, 0, 0, 0});
+            }
+            code.push_back({oldName ? OP_GOI : opcode,
+                            oldName ? static_cast<int>(descriptor->arity) : 0,
+                            oldName ? -1 : 0, 0});
+            code.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
+
+            for (const bool jit : {false, true}) {
+                VM vm(code, {std::string(descriptor->name)});
+                bool rejected = false;
+                try {
+                    if (jit) {
+                        VMRuntimeFixture fixture(vm);
+                        fixture.runJitCompiledForTesting();
+                    } else {
+                        vm.run();
+                    }
+                } catch (const vietvm::runtime::RuntimeError &error) {
+#if defined(_WIN32)
+                    const std::string diagnostic = "legacy DNS opcode is disabled";
+#else
+                    const std::string diagnostic = "legacy POSIX System opcode is disabled";
+#endif
+                    rejected = error.kind() ==
+                        vietvm::runtime::RuntimeErrorKind::CallBoundary &&
+                        std::string(error.what()).find(diagnostic) != std::string::npos;
+                }
+                expect(rejected, "legacy DNS opcode does not execute native resolver: " +
+                           std::string(descriptor->name));
+            }
+        }
+    }
 }
 
 void testRemovedEnvironmentOpcodeRejectInterpreterAndJit() {
@@ -281,6 +377,59 @@ void testRemovedEnvironmentOpcodeRejectInterpreterAndJit() {
                     "legacy environment opcode is disabled") != std::string::npos;
         }
         expect(rejected, "opcode môi trường cũ bị chặn trên mọi OS/JIT");
+    }
+}
+
+void testRemovedFilesystemOpcodesRejectInterpreterAndJit() {
+    constexpr std::array<Opcode, 7> removed = {{
+        OP_VM_DUONG_DAN_TON_TAI,
+        OP_VM_LA_TEP,
+        OP_VM_LA_THU_MUC,
+        OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET,
+        OP_VM_LIET_KE_THU_MUC,
+        OP_VM_TAO_THU_MUC,
+        OP_VM_XOA_DUONG_DAN,
+    }};
+
+    for (const Opcode opcode : removed) {
+        const auto *descriptor = vietvm::bytecode::intrinsicByOpcode(opcode);
+        expect(descriptor != nullptr && descriptor->arity == 1,
+               "filesystem opcode cũ giữ descriptor ABI để chẩn đoán");
+        if (descriptor == nullptr || descriptor->arity != 1) continue;
+
+        for (const bool legacyName : {false, true}) {
+            const std::vector<Instruction> code = {
+                {OP_BIEN_SO, 0, 0, 0},
+                {legacyName ? OP_GOI : opcode, legacyName ? 1 : 0,
+                 legacyName ? -1 : 0, 0},
+                {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+            };
+            for (const bool jit : {false, true}) {
+                VM vm(code, {std::string(descriptor->name)});
+                bool rejected = false;
+                try {
+                    if (jit) {
+                        VMRuntimeFixture fixture(vm);
+                        fixture.runJitCompiledForTesting();
+                    } else {
+                        vm.run();
+                    }
+                } catch (const vietvm::runtime::RuntimeError &error) {
+#if defined(_WIN32)
+                    const std::string diagnostic =
+                        "legacy filesystem opcode is disabled";
+#else
+                    const std::string diagnostic =
+                        "legacy POSIX System opcode is disabled";
+#endif
+                    rejected = error.kind() ==
+                        vietvm::runtime::RuntimeErrorKind::CallBoundary &&
+                        std::string(error.what()).find(diagnostic) !=
+                            std::string::npos;
+                }
+                expect(rejected, "filesystem opcode cũ bị chặn trên mọi OS/JIT và tên cũ");
+            }
+        }
     }
 }
 
@@ -496,6 +645,414 @@ void testJitVariablesFloatAndRepeat() {
     const std::string error = invalidFloat(false);
     expect(!error.empty() && error == invalidFloat(true),
            "JIT giữ nguyên runtime diagnostic khi literal số thực không hợp lệ");
+}
+
+void testMachineAarch64ComparisonsAndBranches() {
+#if (((defined(__APPLE__) || defined(__linux__)) && defined(__aarch64__)) || \
+     ((defined(__linux__) || defined(_WIN32)) && (defined(__x86_64__) || defined(_M_X64))))
+    using vietvm::native::MachineExpression;
+    expect(MachineExpression::supported(), "host bật native machine emitter");
+
+    const int min = std::numeric_limits<int>::min();
+    const int max = std::numeric_limits<int>::max();
+    const std::array<std::pair<int, int>, 9> operands = {{
+        {0, 0}, {1, 0}, {0, 1}, {-1, 0}, {0, -1},
+        {min, max}, {max, min}, {min, min}, {max, max}
+    }};
+    const std::array<int, 6> comparisons = {{
+        OP_SO_SANH_BANG, OP_KHAC_BANG, OP_LON_HON, OP_NHO_HON,
+        OP_LON_HON_HOAC_BANG, OP_NHO_HON_HOAC_BANG
+    }};
+    const auto compareInCpp = [](int op, int left, int right) {
+        switch (op) {
+            case OP_SO_SANH_BANG: return left == right;
+            case OP_KHAC_BANG: return left != right;
+            case OP_LON_HON: return left > right;
+            case OP_NHO_HON: return left < right;
+            case OP_LON_HON_HOAC_BANG: return left >= right;
+            case OP_NHO_HON_HOAC_BANG: return left <= right;
+            default: return false;
+        }
+    };
+
+    for (const int op : comparisons) {
+        auto binary = MachineExpression::tryCompileBinary(op);
+        expect(binary != nullptr, "emitter biên dịch opcode so sánh " + std::to_string(op));
+        if (!binary) continue;
+        for (const auto &pair : operands) {
+            const int wanted = compareInCpp(op, pair.first, pair.second) ? 1 : 0;
+            expect(binary->execute(pair.first, pair.second) == wanted,
+                   "mã máy so sánh signed int32, opcode " + std::to_string(op) +
+                       ", lhs=" + std::to_string(pair.first) +
+                       ", rhs=" + std::to_string(pair.second));
+
+            const std::vector<Instruction> literals = {
+                {OP_BIEN_SO, pair.first, 0, 0},
+                {OP_BIEN_SO, pair.second, 0, 0},
+                {op, 0, 0, 0},
+            };
+            auto region = MachineExpression::tryCompile(
+                literals, 0, std::vector<bool>(literals.size(), false));
+            expect(region != nullptr && region->instructionCount() == 3,
+                   "region hằng biên dịch đủ ba opcode so sánh");
+            if (region) {
+                expect(region->execute() == wanted,
+                       "region AArch64 so sánh hằng int32, opcode " +
+                           std::to_string(op));
+            }
+        }
+    }
+
+    for (const int op : {OP_Logic_VA, OP_Logic_HOAC}) {
+        auto binary = MachineExpression::tryCompileBinary(op);
+        expect(binary != nullptr, "emitter biên dịch opcode logic " + std::to_string(op));
+        if (!binary) continue;
+        for (const auto &pair : operands) {
+            const bool lhs = pair.first != 0;
+            const bool rhs = pair.second != 0;
+            const int wanted = op == OP_Logic_VA ? (lhs && rhs) : (lhs || rhs);
+            expect(binary->execute(pair.first, pair.second) == wanted,
+                   "mã máy logic động chuẩn hóa bool trên int32");
+            const std::vector<Instruction> literals = {
+                {OP_BIEN_SO, pair.first, 0, 0},
+                {OP_BIEN_SO, pair.second, 0, 0}, {op, 0, 0, 0},
+            };
+            auto region = MachineExpression::tryCompile(
+                literals, 0, std::vector<bool>(literals.size(), false));
+            expect(region && region->instructionCount() == 3 &&
+                       region->execute() == wanted,
+                   "region hằng logic giữ đúng semantic interpreter");
+        }
+    }
+
+    auto branch = MachineExpression::tryCompileConditionalBranch();
+    expect(branch != nullptr, "emitter biên dịch conditional branch AArch64");
+    if (branch) {
+        const std::size_t falsePc = std::numeric_limits<std::size_t>::max() - 17;
+        const std::size_t truePc = (static_cast<std::size_t>(1) << 34) + 31;
+        for (const int condition : {0, 1, -1, min, max}) {
+            expect(branch->executeBranch(condition, falsePc, truePc) ==
+                       (condition == 0 ? falsePc : truePc),
+                   "mã máy giữ đúng điều kiện int32 và địa chỉ nhảy 64-bit: " +
+                       std::to_string(condition));
+        }
+    }
+#endif
+}
+
+void testMachineAarch64LeafFunctions() {
+#if (((defined(__APPLE__) || defined(__linux__)) && defined(__aarch64__)) || \
+     ((defined(__linux__) || defined(_WIN32)) && (defined(__x86_64__) || defined(_M_X64))))
+    using vietvm::native::MachineExpression;
+    const int min = std::numeric_limits<int>::min();
+    const int max = std::numeric_limits<int>::max();
+    const std::vector<Instruction> constant = {
+        {OP_MO_KHOI, 0, 0, 0}, {OP_BIEN_SO, -9, 0, 0},
+        {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0},
+    };
+    auto zero = MachineExpression::tryCompileLeaf(constant, 0);
+    expect(zero && zero->executeLeaf() == -9,
+           "native leaf không tham số trả về signed int32");
+
+    const std::vector<Instruction> unary = {
+        {OP_MO_KHOI, 0, 0, 0}, {OP_KHOI_TAO, 0, 11, 0},
+        {OP_PARAM, 0, 11, 0}, {OP_TEN_BIEN_GIA_TRI, 0, 11, 0},
+        {OP_BIEN_SO, 3, 0, 0}, {OP_TRU, 0, 0, 0},
+        {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0},
+    };
+    auto one = MachineExpression::tryCompileLeaf(unary, 1);
+    expect(one && one->executeLeaf(-7) == -10 &&
+               one->executeLeaf(max) == max - 3 &&
+               !one->executeLeaf(min).has_value(),
+           "native leaf một tham số và kiểm tra tràn phép trừ");
+
+    const std::vector<Instruction> binary = {
+        {OP_MO_KHOI, 0, 0, 0},
+        {OP_KHOI_TAO, 0, 21, 0}, {OP_PARAM, 0, 21, 0},
+        {OP_KHOI_TAO, 0, 22, 0}, {OP_PARAM, 0, 22, 1},
+        {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+        {OP_TEN_BIEN_GIA_TRI, 0, 22, 0},
+        {OP_NHAN, 0, 0, 0},
+        {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+        {OP_TEN_BIEN_GIA_TRI, 0, 22, 0},
+        {OP_TRU, 0, 0, 0},
+        {OP_CONG, 0, 0, 0},
+        {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0},
+    };
+    auto two = MachineExpression::tryCompileLeaf(binary, 2);
+    expect(two && two->executeLeaf(8, 3) == 29 &&
+               two->executeLeaf(-3, 6) == -27 &&
+               !two->executeLeaf(max, max).has_value() &&
+               !two->executeLeaf(min, 1).has_value(),
+           "native leaf hai tham số, mixed arithmetic và tràn phép nhân");
+
+    const std::vector<Instruction> compare = {
+        {OP_PARAM, 0, 21, 0}, {OP_PARAM, 0, 22, 1},
+        {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+        {OP_TEN_BIEN_GIA_TRI, 0, 22, 0},
+        {OP_NHO_HON, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+    };
+    auto less = MachineExpression::tryCompileLeaf(compare, 2);
+    expect(less && less->executeLeaf(min, max) == 1 &&
+               less->executeLeaf(max, min) == 0,
+           "native leaf so sánh signed int32 ở hai biên");
+
+    for (int logicalOp : {OP_Logic_VA, OP_Logic_HOAC}) {
+        const std::vector<Instruction> logical = {
+            {OP_PARAM, 0, 21, 0}, {OP_PARAM, 0, 22, 1},
+            {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+            {OP_TEN_BIEN_GIA_TRI, 0, 22, 0},
+            {logicalOp, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+        };
+        auto leaf = MachineExpression::tryCompileLeaf(logical, 2);
+        expect(leaf && leaf->executeLeaf(0, 0) == 0 &&
+                   leaf->executeLeaf(-7, 1) == 1 &&
+                   leaf->executeLeaf(min, max) == 1 &&
+                   leaf->executeLeaf(0, -1) ==
+                       (logicalOp == OP_Logic_VA ? 0 : 1),
+               "native leaf xử lý logic && và || trên int32");
+    }
+
+    const std::vector<Instruction> logicalNegation = {
+        {OP_PARAM, 0, 21, 0}, {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+        {OP_PHU_DINH, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+    };
+    for (int negation : {OP_KHONG, OP_PHU_DINH}) {
+        const std::vector<Instruction> negated = {
+            {OP_PARAM, 0, 21, 0}, {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+            {negation, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+        };
+        auto logicalNot = MachineExpression::tryCompileLeaf(negated, 1);
+        expect(logicalNot && logicalNot->executeLeaf(0) == 1 &&
+                   logicalNot->executeLeaf(1) == 0 &&
+                   logicalNot->executeLeaf(-7) == 0 &&
+                   logicalNot->executeLeaf(min) == 0,
+               "native leaf phủ định logic cho số nguyên âm/dương/zero");
+    }
+
+    const std::vector<Instruction> globalRead = {
+        {OP_TEN_BIEN_GIA_TRI, 0, 30, 0}, {OP_TRA_VE, 0, 0, 0},
+    };
+    const std::vector<Instruction> unsafe = {
+        {OP_PARAM, 0, 21, 0}, {OP_BIEN_SO, 1, 0, 0},
+        {OP_NEM, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+    };
+    expect(!MachineExpression::tryCompileLeaf(globalRead, 0) &&
+               !MachineExpression::tryCompileLeaf(unsafe, 1) &&
+               !MachineExpression::tryCompileLeaf(binary, 1),
+           "native leaf từ chối global, exception và arity không đúng");
+
+    const std::vector<Instruction> root = {
+        {OP_GOI, 0, 7, 0}, {OP_IN, 0, 0, 0},
+        {OP_BIEN_SO, -7, 0, 0}, {OP_GOI, 1, 8, 0}, {OP_IN, 0, 0, 0},
+        {OP_BIEN_SO, 8, 0, 0}, {OP_BIEN_SO, 3, 0, 0},
+        {OP_GOI, 2, 9, 0}, {OP_IN, 0, 0, 0},
+        {OP_BIEN_SO, max, 0, 0}, {OP_BIEN_SO, max, 0, 0},
+        {OP_GOI, 2, 9, 0}, {OP_IN, 0, 0, 0},
+        {OP_BIEN_SO, 0, 0, 0}, {OP_GOI, 1, 10, 0}, {OP_IN, 0, 0, 0},
+        {OP_BIEN_SO, -7, 0, 0}, {OP_GOI, 1, 10, 0}, {OP_IN, 0, 0, 0},
+        {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    const auto run = [&](int mode, std::size_t &nativeCount) {
+        VM vm(root);
+        vm.setFunctions({{7, constant}, {8, unary},
+                         {9, binary}, {10, logicalNegation}});
+        std::string output;
+        vm.setOutputSink([&](const std::string &s) { output += s; });
+        if (mode == 0) vm.run();
+        else if (mode == 1) VMRuntimeFixture(vm).runJitCompiledForTesting();
+        else VMRuntimeFixture(vm).runMachineCompiledForTesting();
+        nativeCount = vm.machineJitRegionCount();
+        return output;
+    };
+    std::size_t interpretedCount = 0, jitCount = 0, nativeCount = 0;
+    const std::string interpreted = run(0, interpretedCount);
+    const std::string closure = run(1, jitCount);
+    const std::string machine = run(2, nativeCount);
+    expect(machine == closure && machine == interpreted,
+           "VM gọi native leaf có cùng output với interpreter/closure JIT");
+    expect(nativeCount >= 3 && interpretedCount == 0 && jitCount == 0,
+           "VM thực sự gọi ít nhất ba native leaf AArch64");
+
+    const auto callFailure = [&](const std::vector<Instruction> &calls,
+                                 std::vector<std::string> pool, bool machineMode) {
+        VM vm(calls, pool);
+        vm.setFunctions({{8, unary}});
+        try {
+            if (machineMode) VMRuntimeFixture(vm).runMachineCompiledForTesting();
+            else vm.run();
+        } catch (const std::exception &error) {
+            return std::string(error.what());
+        }
+        return std::string();
+    };
+    const std::vector<Instruction> wrongType = {
+        {OP_CHUOI, 0, 0, 0}, {OP_GOI, 1, 8, 0},
+        {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    const std::vector<Instruction> wrongArity = {
+        {OP_BIEN_SO, 1, 0, 0}, {OP_BIEN_SO, 2, 0, 0},
+        {OP_GOI, 2, 8, 0}, {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    for (const auto &calls : {wrongType, wrongArity}) {
+        const std::string expected = callFailure(calls, {"not-an-int"}, false);
+        const std::string actual = callFailure(calls, {"not-an-int"}, true);
+        expect(!expected.empty() && expected == actual,
+               "native leaf giữ nguyên runtime diagnostic cho kiểu/arity sai");
+    }
+
+    // The bytecode verifier rejects invalid jump targets before execution,
+    // including untaken branches. Both modes must report the same error.
+    for (const int target : {-1, 1000}) {
+        const auto runBranch = [&](int condition, bool machineMode) {
+            VM vm({{OP_BIEN_SO, condition, 0, 0},
+                   {OP_JUMP_IF_FALSE, target, 0, 0},
+                   {OP_BIEN_SO, 11, 0, 0}, {OP_IN, 0, 0, 0},
+                   {OP_DUNG_CHUONG_TRINH, 0, 0, 0}});
+            std::string output;
+            vm.setOutputSink([&](const std::string &part) { output += part; });
+            try {
+                if (machineMode) VMRuntimeFixture(vm).runMachineCompiledForTesting();
+                else vm.run();
+            } catch (const std::exception &error) {
+                return std::make_pair(output, std::string(error.what()));
+            }
+            return std::make_pair(output, std::string());
+        };
+        for (int condition : {0, 1}) {
+            const auto interpreterError = runBranch(condition, false);
+            const auto machineError = runBranch(condition, true);
+            expect(!interpreterError.second.empty() &&
+                       machineError == interpreterError,
+                   "machine branch giữ nguyên lỗi verifier target ngoài phạm vi");
+        }
+    }
+    for (int condition : {0, 1}) {
+        const int target = 4;
+        VM vm({{OP_BIEN_SO, condition, 0, 0},
+               {OP_JUMP_IF_FALSE, target, 0, 0},
+               {OP_BIEN_SO, 11, 0, 0}, {OP_IN, 0, 0, 0},
+               {OP_DUNG_CHUONG_TRINH, 0, 0, 0}});
+        std::string output;
+        vm.setOutputSink([&](const std::string &part) { output += part; });
+        VMRuntimeFixture(vm).runMachineCompiledForTesting();
+        expect(output == (condition == 0 ? "" : "11\n") &&
+                   vm.machineJitRegionCount() > 0,
+               "machine branch chọn đúng PC với target hợp lệ");
+    }
+#endif
+}
+
+void testMachineAarch64NativeToNativeCalls() {
+#if (((defined(__APPLE__) || defined(__linux__)) && defined(__aarch64__)) || \
+     ((defined(__linux__) || defined(_WIN32)) && (defined(__x86_64__) || defined(_M_X64))))
+    using vietvm::native::MachineExpression;
+    const std::unordered_map<int, std::vector<Instruction>> functions = {
+        {7, {{OP_MO_KHOI, 0, 0, 0}, {OP_BIEN_SO, 5, 0, 0},
+             {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0}}},
+        {8, {{OP_MO_KHOI, 0, 0, 0}, {OP_KHOI_TAO, 0, 11, 0},
+             {OP_PARAM, 0, 11, 0}, {OP_TEN_BIEN_GIA_TRI, 0, 11, 0},
+             {OP_BIEN_SO, 1, 0, 0}, {OP_CONG, 0, 0, 0},
+             {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0}}},
+        {9, {{OP_MO_KHOI, 0, 0, 0}, {OP_KHOI_TAO, 0, 11, 0},
+             {OP_PARAM, 0, 11, 0}, {OP_KHOI_TAO, 0, 12, 0},
+             {OP_PARAM, 0, 12, 1}, {OP_TEN_BIEN_GIA_TRI, 0, 11, 0},
+             {OP_TEN_BIEN_GIA_TRI, 0, 12, 0}, {OP_NHAN, 0, 0, 0},
+             {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0}}},
+        {10, {{OP_MO_KHOI, 0, 0, 0}, {OP_KHOI_TAO, 0, 21, 0},
+              {OP_PARAM, 0, 21, 0}, {OP_KHOI_TAO, 0, 22, 0},
+              {OP_PARAM, 0, 22, 1}, {OP_TEN_BIEN_GIA_TRI, 0, 21, 0},
+              {OP_TEN_BIEN_GIA_TRI, 0, 22, 0}, {OP_GOI, 2, 9, 0},
+              {OP_GOI, 1, 8, 0}, {OP_GOI, 0, 7, 0},
+              {OP_CONG, 0, 0, 0}, {OP_TRA_VE, 0, 0, 0},
+              {OP_DONG_KHOI, 0, 0, 0}}},
+        {11, {{OP_MO_KHOI, 0, 0, 0}, {OP_KHOI_TAO, 0, 31, 0},
+              {OP_PARAM, 0, 31, 0}, {OP_KHOI_TAO, 0, 32, 0},
+              {OP_PARAM, 0, 32, 1}, {OP_TEN_BIEN_GIA_TRI, 0, 31, 0},
+              {OP_TEN_BIEN_GIA_TRI, 0, 32, 0}, {OP_GOI, 2, 10, 0},
+              {OP_BIEN_SO, 2, 0, 0}, {OP_CONG, 0, 0, 0},
+              {OP_TRA_VE, 0, 0, 0}, {OP_DONG_KHOI, 0, 0, 0}}},
+        {12, {{OP_GOI, 0, 12, 0}, {OP_TRA_VE, 0, 0, 0}}},
+        {13, {{OP_GOI, 0, 8, 0}, {OP_TRA_VE, 0, 0, 0}}},
+        {14, {{OP_BIEN_SO, 3, 0, 0}, {OP_NEM, 0, 0, 0},
+              {OP_TRA_VE, 0, 0, 0}}},
+        {15, {{OP_GOI, 0, 14, 0}, {OP_TRA_VE, 0, 0, 0}}},
+    };
+    auto bundle = MachineExpression::tryCompileCallBundle(functions);
+    expect(bundle && bundle->hasNativeCalls(10) &&
+               bundle->hasNativeCalls(11) &&
+               bundle->nativeCallDepth(10) == 2 &&
+               bundle->nativeCallDepth(11) == 3,
+           "BL native-to-native nhận đúng DAG và call depth tĩnh");
+    if (!bundle) return;
+    expect(bundle->executeNativeCall(10, 8, 3) == 30 &&
+               bundle->executeNativeCall(11, 8, 3) == 32 &&
+               bundle->executeNativeCall(10, -3, 6) == -12,
+           "BL nested 0/1/2 arguments bảo toàn stack và LR");
+    const int max = std::numeric_limits<int>::max();
+    expect(!bundle->executeNativeCall(11, max, 2).has_value() &&
+               !bundle->executeNativeCall(10, max, 1).has_value(),
+           "BL truyền tràn int32 qua callee và outer expression");
+    expect(!bundle->hasNativeCalls(12) && !bundle->hasNativeCalls(13) &&
+               !bundle->hasNativeCalls(15),
+           "BL từ chối recursion, arity sai và callee có side effect");
+
+    const auto run = [&](const std::vector<Instruction> &root,
+                         std::size_t depthLimit, int mode) {
+        VM vm(root, {"wrong type"});
+        vm.setFunctions(functions);
+        VMRuntimeFixture fixture(vm);
+        fixture.setMaxCallDepth(depthLimit);
+        std::string output;
+        vm.setOutputSink([&](const std::string &text) { output += text; });
+        std::string failure;
+        try {
+            if (mode == 0) vm.run();
+            else if (mode == 1) fixture.runJitCompiledForTesting();
+            else fixture.runMachineCompiledForTesting();
+        } catch (const std::exception &error) {
+            failure = error.what();
+        }
+        return std::make_pair(std::make_pair(output, failure), vm.machineJitRegionCount());
+    };
+    const std::vector<Instruction> normal = {
+        {OP_BIEN_SO, 8, 0, 0}, {OP_BIEN_SO, 3, 0, 0},
+        {OP_GOI, 2, 11, 0}, {OP_IN, 0, 0, 0},
+        {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    const auto interpreted = run(normal, 256, 0);
+    const auto closure = run(normal, 256, 1);
+    const auto native = run(normal, 256, 2);
+    expect(interpreted.first.first == "32\n" &&
+               native.first == interpreted.first &&
+               closure.first == interpreted.first && native.second > 0,
+           "VM thực thi BL đa tầng và giữ parity interpreter/closure");
+
+    const std::vector<Instruction> overflow = {
+        {OP_BIEN_SO, max, 0, 0}, {OP_BIEN_SO, 2, 0, 0},
+        {OP_GOI, 2, 11, 0}, {OP_IN, 0, 0, 0},
+        {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    const std::vector<Instruction> wrongType = {
+        {OP_CHUOI, 0, 0, 0}, {OP_BIEN_SO, 3, 0, 0},
+        {OP_GOI, 2, 11, 0}, {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    const std::vector<Instruction> wrongArity = {
+        {OP_BIEN_SO, 8, 0, 0}, {OP_GOI, 1, 11, 0},
+        {OP_DUNG_CHUONG_TRINH, 0, 0, 0},
+    };
+    for (const auto &code : {overflow, wrongType, wrongArity}) {
+        const auto expected = run(code, 256, 0);
+        const auto actual = run(code, 256, 2);
+        expect(actual.first == expected.first,
+               "BL fallback giữ nguyên kết quả hoặc diagnostic cho overflow/type/arity");
+    }
+    const auto depthError = run(normal, 2, 0);
+    const auto nativeDepthError = run(normal, 2, 2);
+    expect(!depthError.first.second.empty() &&
+               nativeDepthError.first == depthError.first,
+           "BL guard trả lỗi call depth qua VM ở giới hạn thấp");
+#endif
 }
 
 vietvm::bytecode::ForeignFunctionDescriptor getenvDescriptor() {
@@ -2026,9 +2583,15 @@ void testForeignFileBindings() {
                                {ForeignAbiType::FileHandle}, ForeignAbiType::I32);
     const auto error = binding("ferror", "system.file.error",
                                {ForeignAbiType::FileHandle}, ForeignAbiType::I32);
+    auto seek = binding("seek", "system.file.seek",
+        {ForeignAbiType::FileHandle, ForeignAbiType::I64, ForeignAbiType::I32}, ForeignAbiType::I32);
+    auto tell = binding("tell", "system.file.tell", {ForeignAbiType::FileHandle}, ForeignAbiType::I64);
+    auto flush = binding("flush", "system.file.flush", {ForeignAbiType::FileHandle}, ForeignAbiType::I32);
+    seek.library = tell.library = flush.library = "system.file";
     const std::unordered_set<std::string> allGrants = {
         "system.file.open", "system.file.read", "system.file.write",
-        "system.file.close", "system.file.error"};
+        "system.file.close", "system.file.error", "system.file.seek",
+        "system.file.tell", "system.file.flush"};
     const std::unordered_set<std::string> openGrant = {"system.file.open"};
     ForeignFileState stateA;
     ForeignFileState stateB;
@@ -2115,6 +2678,20 @@ void testForeignFileBindings() {
         return;
     }
     const auto token = created.value;
+    expect(rejects(seek, {token, make_int_value(0), make_int_value(0)}, openGrant),
+           "seek yêu cầu quyền riêng");
+    expect(rejects(tell, {token}, allGrants, &stateB), "tell chặn handle khác VM");
+    expect(rejects(flush, {make_int_value(-1)}, allGrants), "flush chặn handle giả");
+    auto forgedSeek = seek;
+    forgedSeek.symbol = "fclose";
+    expect(rejects(forgedSeek, {token, make_int_value(0), make_int_value(0)}, allGrants),
+           "quyền seek không được dùng để đóng tệp");
+    forgedSeek = seek;
+    forgedSeek.parameters[1] = ForeignAbiType::F64;
+    expect(rejects(forgedSeek, {token, make_int_value(0), make_int_value(0)}, allGrants),
+           "seek kiểm tra ABI của độ lệch");
+    expect(rejects(seek, {token, make_int_value(0), make_int_value(3)}, allGrants),
+           "seek chặn gốc ngoài 0..2");
     const auto size = make_int_value(1);
     const auto count = make_int_value(4);
     const auto bytes = make_list_value({make_int_value(0), make_int_value(255),
@@ -2145,6 +2722,11 @@ void testForeignFileBindings() {
            "fread khóa chiều dài đệm");
 
     const auto written = invoke(write, {bytes, size, count, token});
+    expect(std::get<vietvm::runtime::AbiInteger>(invoke(tell, {token}).value).signedValue == 4,
+           "tell trả vị trí 64-bit sau ghi");
+    expect(invoke(flush, {token}).value == make_int_value(0), "flush giữ stream mở");
+    expect(invoke(seek, {token, make_int_value(0), make_int_value(0)}).value == make_int_value(0),
+           "seek thay đổi cursor của handle đang mở");
     expect(std::holds_alternative<vietvm::runtime::AbiInteger>(written.value) &&
                std::get<vietvm::runtime::AbiInteger>(written.value).unsignedValue == 4,
            "fwrite bảo toàn size_t u64 chính xác");
@@ -2152,6 +2734,7 @@ void testForeignFileBindings() {
            "fclose giải phóng token sau ghi");
     expect(rejects(close, {token}, allGrants), "fclose hai lần bị chặn");
     expect(rejects(error, {token}, allGrants), "ferror token đã đóng bị chặn");
+    expect(rejects(tell, {token}, allGrants), "tell chặn token đã đóng");
 
     const auto reopened = invoke(open, {path, rb});
     expect(std::holds_alternative<int>(reopened.value), "fopen mở lại file để đọc");
@@ -2437,6 +3020,8 @@ void testForeignSocketBindings() {
             return false;
         } catch (const vietvm::runtime::RuntimeError &) {
             return true;
+        } catch (const vietvm::runtime::LanguageException &) {
+            return true;
         }
     };
     const auto connectArgs = std::vector<StackValue>{
@@ -2513,10 +3098,16 @@ void testForeignSocketBindings() {
            "socket listener kiểm tra cổng và backlog trước bind");
 
     const auto unknown = make_int_value(536870912);
-    expect(rejects(kind, {unknown}, grants, &vmA) &&
+    bool unknownIsCatchable = false;
+    try {
+        (void)invoke(kind, {unknown}, grants, &vmA);
+    } catch (const vietvm::runtime::LanguageException &) {
+        unknownIsCatchable = true;
+    }
+    expect(unknownIsCatchable && rejects(kind, {unknown}, grants, &vmA) &&
                rejects(accept, {unknown}, grants, &vmA) &&
                rejects(close, {unknown}, grants, &vmA),
-           "socket token giả không được chấp nhận");
+           "socket token giả bị từ chối bằng lỗi V++ bắt được");
 
     int pair[2] = {-1, -1};
     if (::socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0) {
@@ -2873,17 +3464,23 @@ void testForeignProcessBindings() {
 } // namespace
 
 int main() {
+    testCompilerHeapRegistryAndCycles();
     testVerificationCacheAndInvalidation();
     testModuleVerificationPrecedesSideEffects();
     testPeriodicGcKeepsCapacity();
     testLegacyIntrinsicUsesOpcodeDispatcher();
     testLegacyNetworkErrorCatchMatchesDirectOpcode();
+    testRemovedDnsOpcodesRejectInterpreterAndJit();
     testRemovedEnvironmentOpcodeRejectInterpreterAndJit();
+    testRemovedFilesystemOpcodesRejectInterpreterAndJit();
 #if !defined(_WIN32)
     testRemovedPosixSystemOpcodesRejectInterpreterAndJit();
 #endif
     testJitFunctionsBranchesAndIntrinsics();
     testJitVariablesFloatAndRepeat();
+    testMachineAarch64ComparisonsAndBranches();
+    testMachineAarch64LeafFunctions();
+    testMachineAarch64NativeToNativeCalls();
     testForeignVerificationPrecedesSideEffects();
     testForeignFfiCapabilityAndRuntime();
     testForeignProcessIdFfi();

@@ -4,6 +4,9 @@ set -u
 ROOT_DIR="$(pwd)"
 if [ -n "${VPP_EXEC:-}" ]; then
   EXEC="$VPP_EXEC"
+elif [ -x "build/bin/vpp-cli" ]; then
+  # Prefer the current CMake build over an older installed/staged binary.
+  EXEC="build/bin/vpp-cli"
 elif [ -x "bin/vpp-cli" ]; then
   EXEC="bin/vpp-cli"
 elif [ -x "cmake-build-debug/bin/vpp-cli" ]; then
@@ -48,6 +51,9 @@ cleanup() {
   fi
   rm -f src/tests/.tmp_api_project.db src/tests/.tmp_api_project.db-journal \
         src/tests/.tmp_api_project.db-shm src/tests/.tmp_api_project.db-wal
+  rm -f src/tests/.tmp_oop_file_stream.txt src/tests/.tmp_oop_logger.txt
+  rm -f .tmp_oop_cau_hinh.ini
+  rm -f src/tests/.tmp_oop_zip.txt src/tests/.tmp_oop_zip.zip src/tests/.tmp_oop_manifest.json
   rm -rf "$tmpdir"
 }
 trap cleanup EXIT INT TERM
@@ -138,12 +144,14 @@ TESTS=(
   src/tests/kiem_tra_so_nguyen.vi
   src/tests/kiem_tra_so_thuc.vi
   src/tests/kiem_tra_tong_hop_khong_xung_dot.vi
+  src/tests/kiem_tra_machine_jit.vi
   src/tests/kiem_tra_rong_va_map.vi
   src/tests/kiem_tra_namespace_module.vi
   src/tests/kiem_tra_module_lifecycle.vi
   src/tests/kiem_tra_module_khoi_tao_mot_lan.vi
   src/tests/kiem_tra_module_alias_lifecycle.vi
   src/tests/kiem_tra_module_reexport.vi
+  src/tests/kiem_tra_module_alias_trung.vi
   src/tests/kiem_tra_package_modules.vi
   src/tests/kiem_tra_package_09.vi
   src/tests/kiem_tra_package_tieng_viet.vi
@@ -191,6 +199,36 @@ TESTS=(
   src/tests/kiem_tra_goi_zipfs.vi
   src/tests/kiem_tra_goi_may_chu_http.vi
   src/tests/kiem_tra_goi_bien_dich.vi
+  src/tests/kiem_tra_goi_bien_dich_moi.vi
+  src/tests/kiem_tra_kien_truc_oop_compiler.vi
+  src/tests/kiem_tra_lop_mo_rong_compiler.vi
+  src/tests/kiem_tra_chi_muc_ast_bo_kiem_thu.vi
+  src/tests/kiem_tra_bo_dang_ky_ham.vi
+  src/tests/kiem_tra_bien_dich_tu_vung_vi.vi
+  src/tests/kiem_tra_bien_dich_bieu_thuc_vi.vi
+  src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi
+  src/tests/kiem_tra_khai_bao_kieu_ffi_tu_chu.vi
+  src/tests/kiemtrathamsotrung.vi
+  src/tests/kiemtramacdinh.vi
+  src/tests/kiemtranativetuchu.vi
+  src/tests/kiemtracompilervpp.vi
+  src/tests/kiemtrabootstrapvpp.vi
+  src/tests/kiem_tra_nhanh_dieu_kien_moi.vi
+  src/tests/kiem_tra_doc_chi_so_ket_qua_goi.vi
+  src/tests/kiem_tra_ir_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oop_module_tu_chu.vi
+  src/tests/kiem_tra_tap_hop_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_escape_bien_dich_tu_chu.vi
+  src/tests/kiem_tra_lien_ket_tu_chu.vi
+  src/tests/kiem_tra_do_thi_module_tu_chu.vi
+  src/tests/kiem_tra_so_ham_module_tu_chu.vi
+  src/tests/kiem_tra_lien_ket_module_tu_chu.vi
+  src/tests/kiem_tra_chay_bytecode_tu_chu.vi
+  src/tests/kiem_tra_oracle_module_tu_chu.vi
+  src/tests/kiem_tra_oracle_chuoi_module.vi
+  src/tests/kiem_tra_opcode_chon_ca.vi
+  src/tests/kiem_tra_khai_bao_bien_runtime.vi
   src/tests/kiem_tra_goi_phan_tich_phu_thuoc.vi
   src/tests/kiem_tra_goi_tai_lieu.vi
   src/tests/kiem_tra_goi_kich_ban.vi
@@ -204,6 +242,7 @@ TESTS=(
   src/tests/kiem_tra_ffi_tien_trinh.vi
   src/tests/kiem_tra_ffi_process_spawn.vi
   src/tests/kiem_tra_process_quote_windows.vi
+  src/tests/kiem_tra_duong_dan_windows.vi
   src/tests/kiem_tra_ffi_ngu.vi
   src/tests/kiem_tra_ffi_don_dieu.vi
   src/tests/kiem_tra_ffi_utc.vi
@@ -212,6 +251,7 @@ TESTS=(
   src/tests/kiem_tra_ffi_tep.vi
   src/tests/kiem_tra_ffi_dns.vi
   src/tests/kiem_tra_ffi_socket.vi
+  src/tests/kiem_tra_ffi_socket_loi.vi
   src/tests/kiem_tra_ffi_tls.vi
   src/tests/kiem_tra_chuoi_nen_tang.vi
   src/tests/kiem_tra_goi_ham.vi
@@ -231,6 +271,28 @@ TESTS=(
   src/tests/kiem_tra_api_db_project.vi
   src/tests/kiem_tra_goi_dung.vi
   src/tests/kiem_tra_nhat_ky.vi
+  src/tests/kiem_tra_ngan_xep_oop.vi
+  src/tests/kiem_tra_http_client_oop.vi
+  src/tests/kiem_tra_database_oop.vi
+  src/tests/kiem_tra_file_stream_oop.vi
+  src/tests/kiem_tra_logger_oop.vi
+  src/tests/kiem_tra_ast_oop.vi
+  src/tests/kiem_tra_collections_oop.vi
+  src/tests/kiem_tra_quy_trinh_oop.vi
+  src/tests/kiem_tra_ung_dung_oop.vi
+  src/tests/kiem_tra_tien_trinh_oop.vi
+  src/tests/kiem_tra_o_cam_tcp_oop.vi
+  src/tests/kiem_tra_tien_ich_oop.vi
+  src/tests/kiem_tra_ha_tang_oop.vi
+  src/tests/kiem_tra_van_ban_oop.vi
+  src/tests/kiem_tra_trang_thai_oop.vi
+  src/tests/kiem_tra_du_lieu_oop.vi
+  src/tests/kiem_tra_tai_nguyen_luu_tru_oop.vi
+  src/tests/kiem_tra_phien_bien_dich_oop.vi
+  src/tests/kiem_tra_tu_vung_oop.vi
+  src/tests/kiem_tra_tuong_thich_oop_toan_thu_vien.vi
+  src/tests/kiem_tra_native_oop.vi
+  src/tests/kiem_tra_ten_kieu_nhieu_tu.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
   src/tests/kiem_tra_closure_capture.vi
   src/tests/kiem_tra_list_literal.vi
@@ -549,9 +611,86 @@ else
   echo "FAIL: src/tests/kiem_tra_jit_mvp.vi [JIT]"; FAIL=$((FAIL+1))
 fi
 
+# The machine backend is an opt-in native executable-memory path. Compare
+# its output with both bytecode interpretation and the legacy closure JIT.
+if { [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ]; } || \
+   { [ "$(uname -s)" = Linux ] && \
+     { [ "$(uname -m)" = x86_64 ] || [ "$(uname -m)" = aarch64 ]; }; }; then
+  machine_fixture=src/tests/kiem_tra_machine_jit.vi
+  machine_expected=src/tests/expected/kiem_tra_machine_jit.expected
+  for machine_mode in legacy-jit machine-jit; do
+    machine_output="$tmpdir/kiem_tra_machine_jit_${machine_mode}.output"
+    machine_stats="$tmpdir/kiem_tra_machine_jit_${machine_mode}.stderr"
+    if [ "$machine_mode" = machine-jit ]; then
+      VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 "$EXEC_PATH" \
+        "$machine_fixture" >"$machine_output" 2>"$machine_stats"
+      machine_status=$?
+    else
+      VPP_ENABLE_JIT=1 "$EXEC_PATH" \
+        "$machine_fixture" >"$machine_output" 2>"$machine_stats"
+      machine_status=$?
+    fi
+    if [ "$machine_status" -eq 0 ] && diff -u "$machine_expected" "$machine_output" && \
+       { [ "$machine_mode" != machine-jit ] || \
+         grep -Eq 'machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as (AArch64|x86-64) machine code' "$machine_stats"; }; then
+      echo "PASS: $machine_fixture [$machine_mode]"; PASS=$((PASS+1))
+    else
+      echo "FAIL: $machine_fixture [$machine_mode] (exit code: $machine_status)"; FAIL=$((FAIL+1))
+      cat "$machine_stats" >&2
+    fi
+  done
+fi
+
 # Chạy thư viện .vi thực với JIT: hàm, vòng lặp, collection, Unicode, regex,
 # intrinsic và xử lý lỗi phải tương đương đường interpreter mặc định.
 for jit_case in \
+  kiem_tra_goi_bien_dich_moi \
+  kiem_tra_kien_truc_oop_compiler \
+  kiem_tra_lop_mo_rong_compiler \
+  kiem_tra_chi_muc_ast_bo_kiem_thu \
+  kiem_tra_bo_dang_ky_ham \
+  kiem_tra_bien_dich_tu_vung_vi \
+  kiem_tra_bien_dich_bieu_thuc_vi \
+  kiem_tra_bien_dich_chuong_trinh_vi \
+  kiem_tra_khai_bao_kieu_ffi_tu_chu \
+  kiem_tra_ngan_xep_oop \
+  kiem_tra_http_client_oop \
+  kiem_tra_database_oop \
+  kiem_tra_file_stream_oop \
+  kiem_tra_logger_oop \
+  kiem_tra_ast_oop \
+  kiem_tra_collections_oop \
+  kiem_tra_quy_trinh_oop \
+  kiem_tra_tien_ich_oop \
+  kiem_tra_ha_tang_oop \
+  kiem_tra_van_ban_oop \
+  kiem_tra_trang_thai_oop \
+  kiem_tra_du_lieu_oop \
+  kiem_tra_tai_nguyen_luu_tru_oop \
+  kiem_tra_phien_bien_dich_oop \
+  kiem_tra_tu_vung_oop \
+  kiem_tra_tuong_thich_oop_toan_thu_vien \
+  kiem_tra_native_oop \
+  kiem_tra_ten_kieu_nhieu_tu \
+  kiemtramacdinh \
+  kiemtranativetuchu \
+  kiemtracompilervpp \
+  kiem_tra_nhanh_dieu_kien_moi \
+  kiem_tra_doc_chi_so_ket_qua_goi \
+  kiem_tra_ir_bytecode_tu_chu \
+  kiem_tra_oop_bytecode_tu_chu \
+  kiem_tra_oop_module_tu_chu \
+  kiem_tra_tap_hop_bien_dich_tu_chu \
+  kiem_tra_escape_bien_dich_tu_chu \
+  kiem_tra_lien_ket_tu_chu \
+  kiem_tra_do_thi_module_tu_chu \
+  kiem_tra_so_ham_module_tu_chu \
+  kiem_tra_lien_ket_module_tu_chu \
+  kiem_tra_chay_bytecode_tu_chu \
+  kiem_tra_oracle_module_tu_chu \
+  kiem_tra_oracle_chuoi_module \
+  kiem_tra_opcode_chon_ca \
+  kiem_tra_khai_bao_bien_runtime \
   kiem_tra_goi_bo_suu_tap \
   kiem_tra_goi_regex \
   kiem_tra_goi_bang_ma \

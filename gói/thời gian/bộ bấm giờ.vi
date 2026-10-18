@@ -1,0 +1,39 @@
+nhập gói/thời gian/giao diện đo;
+nhập gói/thời gian/đơn điệu;
+
+lớp công khai Bộ Bấm Giờ triển khai Đo Thời Gian {
+    hàm công khai khởi tạo() {
+        mình.đang_chạy = sai;
+        mình.đã_đo = 0.0;
+        mình.mốc = 0.0;
+    };
+
+    hàm công khai bắt đầu() {
+        nếu (mình.đang_chạy) { trả về sai; };
+        mình.mốc = thời gian đơn điệu mili giây();
+        mình.đang_chạy = đúng;
+        trả về đúng;
+    };
+
+    hàm công khai dừng() {
+        nếu (!mình.đang_chạy) { trả về sai; };
+        mình.đã_đo = mình.đã_đo + thời gian đơn điệu mili giây() - mình.mốc;
+        mình.đang_chạy = sai;
+        trả về đúng;
+    };
+
+    hàm công khai đọc mili giây() {
+        nếu (mình.đang_chạy) {
+            trả về mình.đã_đo + thời gian đơn điệu mili giây() - mình.mốc;
+        };
+        trả về mình.đã_đo;
+    };
+
+    hàm công khai đang chạy() { trả về mình.đang_chạy; };
+
+    hàm công khai đặt lại() {
+        mình.đã_đo = 0.0;
+        nếu (mình.đang_chạy) { mình.mốc = thời gian đơn điệu mili giây(); };
+        trả về đúng;
+    };
+};
