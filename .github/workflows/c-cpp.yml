@@ -156,8 +156,11 @@ jobs:
       - name: Install native cross toolchains and emulators
         run: |
           sudo apt-get update
+          # Ubuntu 26.04's static libcrypto.a depends on libjitterentropy.a,
+          # which is provided by libjitterentropy3-dev (not always pulled in
+          # by libssl-dev). Without it, linking the host vpp-cli fails.
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake libssl-dev libffi-dev pkg-config \
+            build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config \
             gcc-powerpc64-linux-gnu gcc-riscv64-linux-gnu \
             gcc-loongarch64-linux-gnu libc6-dev-ppc64-cross \
             libc6-dev-riscv64-cross libc6-dev-loong64-cross \
