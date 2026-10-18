@@ -5,6 +5,7 @@ nhập gói/biên dịch/mã lệnh;
 nhập gói/biên dịch/opcode;
 nhập gói/dữ liệu/json/json;
 nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
 
 // Codec giữ artifact đang xử lý; các bước kiểm tra, tuần tự hóa và giải mã
 // sử dụng chung logic ABI và cùng quy tắc kiểm tra dữ liệu.
@@ -13,81 +14,124 @@ lớp công khai Bộ Mã Hóa Artifact {
         mình.artifact = artifact;
     };
 
-    hàm công khai kiểm tra() {
-    artifact = mình.artifact;
-    dây = biên dịch nạp artifact(artifact);
+    hàm công khai kiểm tra vùng(vùng) {
+    biên dịch nạp danh sách(vùng, "bytecode ABI");
+    lặp(i = 0; i < độ dài(vùng); i++) {
+        lệnh = biên dịch nạp danh sách(vùng[i], "lệnh ABI");
+        nếu (độ dài(lệnh) != 4) { ném "biên dịch artifact: lệnh ABI phải có 4 trường"; };
+        lặp(k = 0; k < 4; k++) {
+            nếu (loai_cua(lệnh[k]) != "số nguyên") {
+                ném "biên dịch artifact: trường ABI phải là số nguyên i32";
+            };
+        };
+        nếu (!biên dịch có opcode(lệnh[0])) {
+            ném "biên dịch artifact: opcode C++ chưa định nghĩa";
+        };
+    };
+    trả về vùng;
+    };
+
+    // Giữ wire arrays xuyên suốt bước nạp; không tạo một map cho mỗi opcode
+    // rồi chuyển ngược thành arrays chỉ để gọi VM.
+    hàm công khai kiểm tra dây(dây, loại) {
+    biên dịch nạp danh sách(dây, "artifact ABI");
+    nếu (độ dài(dây) != 4) { ném "biên dịch artifact: cần 4 vùng ABI"; };
+    nếu (loại != "bytecode V++ đã liên kết" && loại != "bytecode V++ đồ thị đã liên kết") {
+        ném "biên dịch nạp: cần artifact bytecode V++ đã liên kết";
+    };
+    biên dịch nạp danh sách(dây[1], "StringPool");
     lặp(i = 0; i < độ dài(dây[1]); i++) {
         nếu (loai_cua(dây[1][i]) != "chuỗi") {
             ném "biên dịch artifact: StringPool phải chứa chuỗi";
         };
     };
-    vùng = [dây[0]];
-    lặp(i = 0; i < độ dài(dây[2]); i++) { thêm(vùng, dây[2][i][2]); };
-    lặp(i = 0; i < độ dài(dây[3]); i++) { thêm(vùng, dây[3][i][1]); };
-    lặp(i = 0; i < độ dài(vùng); i++) {
-        lặp(j = 0; j < độ dài(vùng[i]); j++) {
-            lệnh = vùng[i][j];
-            nếu (!biên dịch có opcode(lệnh[0])) {
-                ném "biên dịch artifact: opcode C++ chưa định nghĩa";
-            };
-            lặp(k = 0; k < 4; k++) {
-                nếu (loai_cua(lệnh[k]) != "số nguyên") {
-                    ném "biên dịch artifact: trường ABI phải là số nguyên i32";
-                };
-            };
+    mình.kiểm tra vùng(dây[0]);
+    biên dịch nạp danh sách(dây[2], "hàm ABI");
+    tên_đã_khai = {};
+    lặp(i = 0; i < độ dài(dây[2]); i++) {
+        h = biên dịch nạp danh sách(dây[2][i], "hàm ABI");
+        nếu (độ dài(h) != 3) { ném "biên dịch artifact: hàm ABI cần 3 trường"; };
+        nếu (loai_cua(h[0]) != "số nguyên" || h[0] != i) {
+            ném "biên dịch nạp: function ID không liên tiếp";
         };
+        index = h[1];
+        nếu (loai_cua(index) != "số nguyên") {
+            ném "biên dịch artifact: function name index ngoài StringPool";
+        };
+        nếu (index < 0 || index >= độ dài(dây[1])) {
+            ném "biên dịch artifact: function name index ngoài StringPool";
+        };
+        khóa = thành chuỗi(index);
+        nếu (co_khoa(tên_đã_khai, khóa)) { ném "biên dịch nạp: trùng function runtime name index"; };
+        tên_đã_khai[khóa] = đúng;
+        mình.kiểm tra vùng(h[2]);
     };
-    trả về artifact;
+    biên dịch nạp danh sách(dây[3], "initializer ABI");
+    nếu (loại == "bytecode V++ đã liên kết" && độ dài(dây[3]) != 0) {
+        ném "biên dịch nạp: artifact một mô-đun không có initializer";
+    };
+    mô_đun_đã_khai = {};
+    lặp(i = 0; i < độ dài(dây[3]); i++) {
+        mục = biên dịch nạp danh sách(dây[3][i], "initializer ABI");
+        nếu (độ dài(mục) != 2) { ném "biên dịch artifact: initializer ABI cần 2 trường"; };
+        tên = mục[0];
+        nếu (loai_cua(tên) != "chuỗi" || tên == "") {
+            ném "biên dịch nạp: định danh initializer không hợp lệ";
+        };
+        nếu (co_khoa(mô_đun_đã_khai, tên)) { ném "biên dịch nạp: trùng định danh initializer"; };
+        mô_đun_đã_khai[tên] = đúng;
+        mình.kiểm tra vùng(mục[1]);
+    };
+    trả về dây;
+    };
+
+    hàm riêng tư chuẩn bị dây() {
+        trả về mình.kiểm tra dây(biên dịch nạp artifact(mình.artifact), mình.artifact["loại"]);
+    };
+
+    hàm công khai kiểm tra() {
+        mình.chuẩn bị dây();
+        trả về mình.artifact;
     };
 
     hàm công khai tuần tự() {
-    artifact = mình.kiểm tra();
+    dây = mình.chuẩn bị dây();
     // Lưu Instruction dưới dạng bốn i32 thay vì lặp bốn tên trường cho mỗi
     // opcode. Compiler lớn có hàng chục nghìn lệnh; metadata tên trường chỉ
     // thuộc biểu diễn trong bộ nhớ, không cần nhân lên trong artifact trên đĩa.
     trả về json tạo({"định dạng": "VPP bytecode", "phiên bản": 1,
-                    "ABI": "Instruction 4*i32", "loại": artifact["loại"],
-                    "dây": biên dịch nạp artifact(artifact)});
+                    "ABI": "Instruction 4*i32", "loại": mình.artifact["loại"],
+                    "dây": dây});
     };
 
     hàm công khai đọc lệnh(dây) {
-    biên dịch nạp danh sách(dây, "bytecode ABI");
-    lặp(i = 0; i < độ dài(dây); i++) {
-        biên dịch nạp danh sách(dây[i], "lệnh ABI");
-        nếu (độ dài(dây[i]) != 4) { ném "biên dịch artifact: lệnh ABI phải có 4 trường"; };
-    };
+    mình.kiểm tra vùng(dây);
     trả về biên dịch bytecode từ thô(dây);
     };
 
     hàm công khai từ dây(gói) {
-    dây = biên dịch nạp danh sách(lấy map(gói, "dây", rỗng), "artifact ABI");
-    nếu (độ dài(dây) != 4) { ném "biên dịch artifact: cần 4 vùng ABI"; };
-    chuỗi = biên dịch nạp danh sách(dây[1], "StringPool");
-    khai = biên dịch nạp danh sách(dây[2], "hàm ABI");
+    dây = mình.kiểm tra dây(lấy map(gói, "dây", rỗng), lấy map(gói, "loại", ""));
+    chuỗi = dây[1];
+    khai = dây[2];
     hàm_đã_khai = [];
     lặp(i = 0; i < độ dài(khai); i++) {
-        h = biên dịch nạp danh sách(khai[i], "hàm ABI");
-        nếu (độ dài(h) != 3) { ném "biên dịch artifact: hàm ABI cần 3 trường"; };
+        h = khai[i];
         index = h[1];
-        nếu (loai_cua(index) != "số nguyên" || index < 0 || index >= độ dài(chuỗi)) {
-            ném "biên dịch artifact: function name index ngoài StringPool";
-        };
         thêm(hàm_đã_khai, {"id": h[0], "tên": chuỗi[index], "tên index": index,
-            "tên index runtime": index, "bytecode": mình.đọc lệnh(h[2])});
+            "tên index runtime": index, "bytecode": biên dịch bytecode từ thô(h[2])});
     };
-    initializer = biên dịch nạp danh sách(dây[3], "initializer ABI");
+    initializer = dây[3];
     mô_đun = [];
     lặp(i = 0; i < độ dài(initializer); i++) {
-        mục = biên dịch nạp danh sách(initializer[i], "initializer ABI");
-        nếu (độ dài(mục) != 2) { ném "biên dịch artifact: initializer ABI cần 2 trường"; };
-        thêm(mô_đun, {"định danh": mục[0], "bytecode": mình.đọc lệnh(mục[1])});
+        mục = initializer[i];
+        thêm(mô_đun, {"định danh": mục[0], "bytecode": biên dịch bytecode từ thô(mục[1])});
     };
     trả về {"loại": lấy map(gói, "loại", ""), "chuỗi": chuỗi,
-        "bytecode": mình.đọc lệnh(dây[0]),
+        "bytecode": biên dịch bytecode từ thô(dây[0]),
         "hàm": hàm_đã_khai, "mô đun khởi tạo": mô_đun};
     };
 
-    hàm công khai giải mã(văn_bản) {
+    hàm riêng tư đọc gói(văn_bản) {
     gói = json phân tích(văn_bản);
     nếu (loai_cua(gói) != "từ điển") {
         ném "biên dịch artifact: cần tài liệu từ điển";
@@ -98,14 +142,33 @@ lớp công khai Bộ Mã Hóa Artifact {
         lấy map(gói, "ABI", "") != "Instruction 4*i32") {
         ném "biên dịch artifact: định dạng, phiên bản hoặc ABI không hỗ trợ";
     };
+    trả về gói;
+    };
+
+    hàm công khai giải mã(văn_bản) {
+    gói = mình.đọc gói(văn_bản);
     nếu (co_khoa(gói, "dây")) {
         mình.artifact = mình.từ dây(gói);
-        trả về mình.kiểm tra();
+        trả về mình.artifact;
     };
     // Đọc được biểu diễn map của bootstrap version 1 trước khi chuyển sang
     // wire arrays; không gọi lại compiler hoặc sửa opcode của dữ liệu cũ.
     mình.artifact = lấy map(gói, "artifact", rỗng);
     trả về mình.kiểm tra();
+    };
+
+    hàm công khai giải mã dây(văn_bản) {
+        gói = mình.đọc gói(văn_bản);
+        nếu (co_khoa(gói, "dây")) {
+            trả về mình.kiểm tra dây(gói["dây"], lấy map(gói, "loại", ""));
+        };
+        mình.artifact = lấy map(gói, "artifact", rỗng);
+        trả về mình.chuẩn bị dây();
+    };
+
+    hàm công khai chạy văn bản(văn_bản) {
+        dây = mình.giải mã dây(văn_bản);
+        trả về bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]);
     };
 };
 
@@ -133,4 +196,14 @@ hàm công khai biên dịch artifact từ dây(gói) {
 hàm công khai biên dịch artifact giải mã(văn_bản) {
     codec = Bộ Mã Hóa Artifact(rỗng);
     trả về codec.giải mã(văn_bản);
+};
+
+hàm công khai biên dịch artifact giải mã dây(văn_bản) {
+    codec = Bộ Mã Hóa Artifact(rỗng);
+    trả về codec.giải mã dây(văn_bản);
+};
+
+hàm công khai biên dịch chạy artifact văn bản(văn_bản) {
+    codec = Bộ Mã Hóa Artifact(rỗng);
+    trả về codec.chạy văn bản(văn_bản);
 };

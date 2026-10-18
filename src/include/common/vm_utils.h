@@ -1,6 +1,7 @@
 #pragma once
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -92,25 +93,34 @@ inline int as_int(const StackValue &v, int op, std::size_t pc) {
         vietvm::messages::kVmInvalidIntegerValue), op, pc, std::move(context));
 }
 
+// Preserve the VM's two's-complement i32 result without C++ signed overflow.
+// In particular, machine-JIT overflow falls back to these same operations.
+inline int wrapRuntimeInt32(std::int64_t value) {
+    const std::uint32_t bits = static_cast<std::uint32_t>(value);
+    return bits <= static_cast<std::uint32_t>(std::numeric_limits<int>::max())
+        ? static_cast<int>(bits)
+        : static_cast<int>(static_cast<std::int64_t>(bits) - (std::int64_t{1} << 32));
+}
+
 // Cộng hai giá trị số runtime; hàm giữ kiểu số nguyên khi có thể và nâng lên số thực khi một toán hạng là `double`.
 inline StackValue numAdd(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) + toDouble(b);
-    return std::get<int>(a) + std::get<int>(b);
+    return wrapRuntimeInt32(static_cast<std::int64_t>(std::get<int>(a)) + std::get<int>(b));
 }
 
 // Trừ hai giá trị số runtime; hàm áp dụng quy tắc nâng kiểu int/double giống các phép toán số khác của VM.
 inline StackValue numSub(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) - toDouble(b);
-    return std::get<int>(a) - std::get<int>(b);
+    return wrapRuntimeInt32(static_cast<std::int64_t>(std::get<int>(a)) - std::get<int>(b));
 }
 
 // Nhân hai giá trị số runtime; hàm bảo toàn số nguyên nếu cả hai toán hạng là int, ngược lại tính bằng double.
 inline StackValue numMul(const StackValue &a, const StackValue &b) {
     if (std::holds_alternative<double>(a) || std::holds_alternative<double>(b))
         return toDouble(a) * toDouble(b);
-    return std::get<int>(a) * std::get<int>(b);
+    return wrapRuntimeInt32(static_cast<std::int64_t>(std::get<int>(a)) * std::get<int>(b));
 }
 
 // Chia hai giá trị số runtime; khi số chia bằng 0, hàm gửi hai giá trị thật cho

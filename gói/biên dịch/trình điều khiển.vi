@@ -42,7 +42,7 @@ lớp công khai Trình Điều Khiển Biên Dịch {
     hàm công khai chạy(chế_độ) {
         chọn (chế_độ) {
             ca "artifact": {
-                trả về biên dịch chạy artifact(biên dịch artifact giải mã(đọc tệp(mình.đường)));
+                trả về biên dịch chạy artifact văn bản(đọc tệp(mình.đường));
             }
             ca "run": {
                 trả về biên dịch chạy artifact(biên dịch nguồn tệp tự chủ(mình.đường, mình.thư_viện));

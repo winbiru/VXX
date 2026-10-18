@@ -3,6 +3,7 @@
 // bytecode_chay_vm chỉ chuyển ABI và thực thi trên máy ảo hiện có.
 nhập gói/biên dịch/liên kết;
 nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
 
 // Kiểm tra dữ liệu dùng chung không cần một đối tượng trung gian.
 hàm công khai biên dịch nạp danh sách(giá_trị, vị_trí) {
@@ -53,6 +54,7 @@ lớp công khai Bộ Nạp Artifact {
         nguồn = mình.bytecode(lấy map(artifact, "bytecode", rỗng));
         các_hàm = biên dịch nạp danh sách(lấy map(artifact, "hàm", rỗng), "hàm");
         bảng_hàm = [];
+        tên_đã_khai = {};
         lặp(i = 0; i < độ dài(các_hàm); i++) {
             h = các_hàm[i];
             nếu (loai_cua(h) != "từ điển" ||
@@ -63,14 +65,17 @@ lớp công khai Bộ Nạp Artifact {
             nếu (loại == "bytecode V++ đồ thị đã liên kết") {
                 tên_index = lấy map(h, "tên index runtime", -1);
             };
-            nếu (loai_cua(tên_index) != "số nguyên" || tên_index < 0 || tên_index >= độ dài(chuỗi)) {
+            nếu (loai_cua(tên_index) != "số nguyên") {
                 ném "biên dịch nạp: function name index ngoài StringPool";
             };
-            lặp(j = 0; j < độ dài(bảng_hàm); j++) {
-                nếu (bảng_hàm[j][1] == tên_index) {
-                    ném "biên dịch nạp: trùng function runtime name index";
-                };
+            nếu (tên_index < 0 || tên_index >= độ dài(chuỗi)) {
+                ném "biên dịch nạp: function name index ngoài StringPool";
             };
+            khóa = thành chuỗi(tên_index);
+            nếu (co_khoa(tên_đã_khai, khóa)) {
+                ném "biên dịch nạp: trùng function runtime name index";
+            };
+            tên_đã_khai[khóa] = đúng;
             thêm(bảng_hàm, [i, tên_index,
                             mình.bytecode(lấy map(h, "bytecode", rỗng))]);
         };
@@ -81,6 +86,7 @@ lớp công khai Bộ Nạp Artifact {
             ném "biên dịch nạp: artifact một mô-đun không có initializer";
         };
         khởi_tạo = [];
+        mô_đun_đã_khai = {};
         lặp(i = 0; i < độ dài(các_mô_đun); i++) {
             mô_đun = các_mô_đun[i];
             nếu (loai_cua(mô_đun) != "từ điển") {
@@ -90,11 +96,10 @@ lớp công khai Bộ Nạp Artifact {
             nếu (loai_cua(định_danh) != "chuỗi" || định_danh == "") {
                 ném "biên dịch nạp: định danh initializer không hợp lệ";
             };
-            lặp(j = 0; j < độ dài(khởi_tạo); j++) {
-                nếu (khởi_tạo[j][0] == định_danh) {
-                    ném "biên dịch nạp: trùng định danh initializer";
-                };
+            nếu (co_khoa(mô_đun_đã_khai, định_danh)) {
+                ném "biên dịch nạp: trùng định danh initializer";
             };
+            mô_đun_đã_khai[định_danh] = đúng;
             thêm(khởi_tạo, [định_danh,
                             mình.bytecode(lấy map(mô_đun, "bytecode", rỗng))]);
         };

@@ -103,6 +103,77 @@ void testCompilerHeapRegistryAndCycles() {
            "expired registry entries do not hide reused allocation addresses");
 }
 
+void testFlatBufferCollectionBudget() {
+    using vietvm::runtime::ListValue;
+    vietvm::runtime::RuntimeHeap heap;
+    auto buffer = std::make_shared<ListValue>();
+    buffer->elements.resize(65536, StackValue{42});
+    heap.track(buffer);
+    const auto live = heap.collect({StackValue{buffer}});
+    expect(live.marked == 1 && live.swept == 0,
+           "flat scalar buffer stays reachable during tracing");
+
+    // Reproduce stdlib adapters created while iterating a large byte buffer.
+    // Their allocation must not repeatedly trigger a full scan of the buffer.
+    std::weak_ptr<ListValue> detachedCycle;
+    for (int i = 0; i < 1024; ++i) {
+        auto temporary = std::make_shared<ListValue>();
+        temporary->elements.emplace_back(temporary);
+        heap.track(temporary);
+        detachedCycle = temporary;
+    }
+    expect(!heap.needsCollection(),
+           "transient adapters do not rescan a large flat buffer every 256 allocations");
+    const auto swept = heap.collect({StackValue{buffer}});
+    expect(swept.swept == 1024 && detachedCycle.expired(),
+           "explicit collection still reclaims cycles with a large scalar buffer");
+    expect(buffer->elements.size() == 65536 &&
+           std::get<int>(buffer->elements.back()) == 42,
+           "collection preserves scalar buffer contents");
+
+    buffer->elements.clear();
+    heap.collect({StackValue{buffer}});
+    for (int i = 0; i < 1024; ++i) {
+        auto temporary = std::make_shared<ListValue>();
+        temporary->elements.emplace_back(temporary);
+        heap.track(temporary);
+    }
+    expect(heap.needsCollection(),
+           "collection budget decreases again after the large buffer is cleared");
+    expect(heap.collect({StackValue{buffer}}).swept == 1024,
+           "scheduled collection reclaims cycles after the buffer shrinks");
+}
+
+void testInt32OverflowFallback() {
+    const int min = std::numeric_limits<int>::min();
+    const int max = std::numeric_limits<int>::max();
+    // Explicit results keep the interpreter from being its own JIT oracle.
+    for (const auto &[op, left, right, expected] :
+         std::array<std::array<int, 4>, 6>{{
+             {{OP_CONG, max, 1, min}}, {{OP_CONG, min, -1, max}},
+             {{OP_TRU, min, 1, max}}, {{OP_TRU, max, -1, min}},
+             {{OP_NHAN, max, max, 1}}, {{OP_NHAN, min, -1, min}}
+         }}) {
+        const std::vector<Instruction> code = {
+            {OP_BIEN_SO, left, 0, 0}, {OP_BIEN_SO, right, 0, 0},
+            {op, 0, 0, 0}, {OP_IN, 0, 0, 0}, {OP_DUNG_CHUONG_TRINH, 0, 0, 0}
+        };
+        for (const bool jit : {false, true}) {
+            VM vm(code, {});
+            std::string output;
+            vm.setOutputSink([&](const std::string &text) { output += text; });
+            if (jit) {
+                VMRuntimeFixture fixture(vm);
+                fixture.runJitCompiledForTesting();
+            } else {
+                vm.run();
+            }
+            expect(output == std::to_string(expected) + "\n",
+                   "i32 overflow has defined results in interpreter and JIT");
+        }
+    }
+}
+
 void testVerificationCacheAndInvalidation() {
     const std::vector<Instruction> root = {
         {OP_BIEN_SO, 42, 0, 0},
@@ -3465,6 +3536,8 @@ void testForeignProcessBindings() {
 
 int main() {
     testCompilerHeapRegistryAndCycles();
+    testFlatBufferCollectionBudget();
+    testInt32OverflowFallback();
     testVerificationCacheAndInvalidation();
     testModuleVerificationPrecedesSideEffects();
     testPeriodicGcKeepsCapacity();

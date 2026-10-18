@@ -17,10 +17,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
 
       - name: Configure CMake
-        run: cmake -S . -B cmake-build-debug
+        run: cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Release
 
       - name: Build V++
-        run: cmake --build cmake-build-debug
+        run: cmake --build cmake-build-debug --parallel 2
 
       - name: Install V++ and execute native code compiled from .vi (Linux x64)
         shell: bash
@@ -89,10 +89,10 @@ jobs:
       - name: Run AddressSanitizer and UndefinedBehaviorSanitizer tests
         run: |
           cmake -S . -B cmake-build-sanitized \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-          cmake --build cmake-build-sanitized
+          cmake --build cmake-build-sanitized --parallel 2
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --output-on-failure --verbose --no-tests=error

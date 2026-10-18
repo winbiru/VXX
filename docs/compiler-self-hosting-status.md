@@ -1,5 +1,36 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Nạp artifact và kiểm thử i32 bằng compiler V++ (18/10/2026)
+
+`Bộ Mã Hóa Artifact` có API `biên dịch artifact giải mã dây` và
+`biên dịch chạy artifact văn bản`. CLI `run --artifact` dùng đường này để
+giữ bốn vùng ABI dưới dạng arrays qua bước kiểm tra và thực thi. Việc kiểm
+tra định dạng/version, loại artifact, StringPool, function ID/name index,
+initializer và bốn trường i32/opcode thực hiện bằng V++. Biểu diễn map
+version 1 vẫn được đọc qua cùng bộ kiểm tra; API giải mã trả artifact map
+tiếp tục phục vụ các công cụ cần chỉnh sửa bytecode.
+
+Serializer chỉ chuyển artifact map sang ABI một lần mỗi lần gọi. Bộ nạp
+dùng bảng khóa cho kiểm tra trùng function name index/initializer thay vì
+quét toàn bộ danh sách đã nạp. Mỗi lần tuần tự hóa đọc lại dữ liệu hiện tại,
+kể cả khi caller vừa sửa artifact. Đường VM chung cung cấp GC theo chi phí
+duyệt graph và phép cộng/trừ/nhân i32 có kết quả two's-complement xác định.
+
+CTest `vpp-selfhost-i32-artifact` chạy bộ kiểm thử V++ bằng bootstrap, biên
+dịch chính bộ kiểm thử và các module compiler bằng `--compiler=vpp`, rồi
+chạy artifact đó. Compiler trong artifact tiếp tục biên dịch nguồn mới có
+biên i32, phép toán tràn, tham số mặc định và gán kết hợp; bộ kiểm thử còn
+đối chiếu API map/wire và từ chối artifact sai ABI. Test CLI kiểm tra thêm
+C++/V++ parity và chạy artifact i32 sau khi xóa nguồn đầu vào.
+
+Kiểm chứng trên macOS ARM64 Release ngày 18/10/2026: chín CTest liên quan
+đến bootstrap, self-host i32/artifact, runtime GC/JIT, CLI, OOP, source corpus,
+import và tích hợp đều đạt. Bootstrap mở rộng chạy trực tiếp bằng
+`scripts/quality/checkbootstrapstage3.cmake` cũng đạt Stage 1 → Stage 2 →
+Stage 3; compiler Stage 3 sinh artifact cho chương trình kiểm tra chạy ra
+`52`. Test ba thế hệ vẫn là lựa chọn bật riêng trong CMake do thời gian
+biên dịch đầy đủ dài hơn kiểm thử thường quy.
+
 ## Khảo sát bỏ toàn bộ C/C++ và libSystem (17/10/2026)
 
 Đích nghiên cứu được chọn là macOS ARM64 thử nghiệm, bỏ cả `libSystem`.

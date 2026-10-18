@@ -40,6 +40,13 @@ HTTP_NETWORK_RESTRICTED=0
 # the execution environment denies bind(2), only tests that require localhost
 # sockets are skipped; protocol parsing/framing still runs as ordinary V++ tests.
 HTTP_FIXTURE_PID=""
+HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-120}"
+if [[ ! "$HTTP_FIXTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] ||
+   [ "${#HTTP_FIXTURE_TIMEOUT}" -gt 4 ] || [ "$HTTP_FIXTURE_TIMEOUT" -gt 3600 ]; then
+  echo "ERROR: VPP_HTTP_FIXTURE_TIMEOUT must be an integer from 1 to 3600 seconds" >&2
+  rm -rf "$tmpdir"
+  exit 2
+fi
 VPP_HOME_TEST_DIR=""
 cleanup() {
   if [ -n "$HTTP_FIXTURE_PID" ]; then
@@ -61,15 +68,16 @@ trap cleanup EXIT INT TERM
 http_get() {
   local url="$1"
   local output="$2"
-  curl -fsS --max-time 1 "$url" >"$output" 2>/dev/null
+  curl -fsS --noproxy 127.0.0.1,localhost --max-time 5 "$url" \
+    >"$output" 2>"$output.curl.log"
 }
 
 wait_http_value() {
   local url="$1"
   local expected="$2"
   local output="$3"
-  local attempts=200
-  for _ in $(seq 1 "$attempts"); do
+  local deadline=$((SECONDS + HTTP_FIXTURE_TIMEOUT))
+  while [ "$SECONDS" -lt "$deadline" ]; do
     if http_get "$url" "$output" && [ "$(cat "$output")" = "$expected" ]; then
       return 0
     fi
@@ -96,8 +104,11 @@ if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http
     HTTP_NETWORK_RESTRICTED=1
     echo "INFO: localhost bind is restricted; skipping socket integration tests"
   else
-    echo "ERROR: local HTTP test fixture did not return the expected /health response" >&2
+    echo "ERROR: local HTTP test fixture did not return the expected /health response within ${HTTP_FIXTURE_TIMEOUT}s (pid $HTTP_FIXTURE_PID)" >&2
     cat "$tmpdir/http_fixture.log" >&2
+    cat "$tmpdir/http_fixture.output.curl.log" >&2
+    echo "Last /health response:" >&2
+    cat "$tmpdir/http_fixture.output" >&2
     exit 2
   fi
 fi
@@ -212,6 +223,7 @@ TESTS=(
   src/tests/kiemtramacdinh.vi
   src/tests/kiemtranativetuchu.vi
   src/tests/kiemtracompilervpp.vi
+  src/tests/kiem_tra_selfhost_i32_artifact.vi
   src/tests/kiemtrabootstrapvpp.vi
   src/tests/kiem_tra_nhanh_dieu_kien_moi.vi
   src/tests/kiem_tra_doc_chi_so_ket_qua_goi.vi

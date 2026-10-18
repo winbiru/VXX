@@ -23,7 +23,10 @@ if (VPP_ENABLE_COVERAGE)
     if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "Unsupported compiler for coverage: ${CMAKE_CXX_COMPILER_ID}")
     endif()
-    add_compile_options(-O0 -g --coverage)
+    # The full suite bootstraps the compiler inside the VM. Keep counters and
+    # debug info, but optimize dispatcher/container overhead so instrumented
+    # self-hosting stays within the same execution deadlines as regular CI.
+    add_compile_options(-O1 -g --coverage)
     # GCC's gcov counters may be updated by multiple processes during the
     # integration suite. Atomic profile updates prevent corrupted/negative
     # execution counts when those processes write the same .gcda files.
@@ -311,6 +314,15 @@ if (BUILD_TESTS)
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-bootstrap-stages"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/checkbootstrapstages.cmake)
     set_tests_properties(vpp-compiler-stage1-stage2 PROPERTIES TIMEOUT 3600)
+    add_test(NAME vpp-selfhost-i32-artifact
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_CASE=selfhost"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/selfhost-i32-artifact"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_cli.cmake)
+    set_tests_properties(vpp-selfhost-i32-artifact PROPERTIES
+        TIMEOUT 1800)
 
     # The full three-generation bootstrap is intentionally opt-in: it compiles
     # the complete compiler twice in V++ bytecode and takes several minutes.

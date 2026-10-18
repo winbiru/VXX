@@ -51,8 +51,8 @@ public:
     // Trả số allocation còn sống trong weak registry sau khi loại entry hết hạn.
     std::size_t trackedObjectCount();
 
-    // Đủ allocation mới để thu gom theo kích thước graph sống. Tracing toàn
-    // bộ AST sau mỗi vài allocation làm compiler có chi phí bậc hai.
+    // Budget scales with live objects and traced value slots, including large
+    // flat byte/character buffers used by the compiler and JSON parser.
     bool needsCollection() const noexcept {
         return allocationGeneration_ - collectedAllocationGeneration_ >= collectionBudget_;
     }
