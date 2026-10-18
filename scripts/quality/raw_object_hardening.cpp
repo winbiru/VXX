@@ -242,10 +242,10 @@ int main() {
                    !emitRawObject(*winArm.target,
                                   {RawLeafKind::AddI32Arguments, 0}, "cong"),
                "unsupported Windows AArch64 must fail explicitly");
-    const auto linux = parseTarget("x86_64-linux-gnu");
-    if (linux.target) {
+    const auto linuxTarget = parseTarget("x86_64-linux-gnu");
+    if (linuxTarget.target) {
         for (std::string_view bad : {"", "9bad", "bad;drop", "bad.name", "chữ"})
-            test.check(!emitRawObject(*linux.target,
+            test.check(!emitRawObject(*linuxTarget.target,
                                       {RawLeafKind::AddI32Arguments, 0}, bad),
                        "invalid exported symbol rejected");
     }

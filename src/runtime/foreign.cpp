@@ -69,6 +69,20 @@ RuntimeError ffiError(const std::string &message) {
     return RuntimeError("FFI: " + message, RuntimeErrorKind::CallBoundary);
 }
 
+// All C ABI string arguments must have the same checked representation on
+// every host. In particular, c_str() and Win32 APIs would silently truncate
+// an embedded NUL if it reached their native call boundary.
+const std::string &checkedForeignCString(const StackValue &argument) {
+    if (!std::holds_alternative<std::string>(argument)) {
+        throw ffiError("c_chuỗi yêu cầu chuỗi V++");
+    }
+    const auto &value = std::get<std::string>(argument);
+    if (value.find('\0') != std::string::npos) {
+        throw ffiError("c_chuỗi không chấp nhận byte NUL bên trong");
+    }
+    return value;
+}
+
 #if defined(_WIN32)
 void ensureForeignWinsock() {
     static std::once_flag once;
@@ -1307,6 +1321,13 @@ ForeignCallResult executeForeignCall(
     if (arguments.size() != descriptor.parameters.size()) {
         throw ffiError("số đối số không khớp descriptor");
     }
+    // Validate every CString before entering the platform-specific adapter
+    // or performing side effects, including C strings in later arguments.
+    for (std::size_t index = 0; index < arguments.size(); ++index) {
+        if (descriptor.parameters[index] == ForeignAbiType::CString) {
+            (void)checkedForeignCString(arguments[index]);
+        }
+    }
     // Source descriptors cover every buffer. Legacy C++ fixture descriptors
     // without metadata still use the narrow per-capability checks below.
     if (!descriptor.bufferExtents.empty()) {
@@ -1435,12 +1456,7 @@ ForeignCallResult executeForeignCall(
     // Windows adapters keep the exact audited FFI descriptors but use Win32
     // wide APIs rather than resolving incompatible POSIX symbols from a DLL.
     const auto windowsString = [&](std::size_t index) -> const std::string & {
-        if (!std::holds_alternative<std::string>(arguments.at(index)))
-            throw ffiError("Windows FFI yêu cầu c_chuỗi");
-        const auto &value = std::get<std::string>(arguments[index]);
-        if (value.find('\0') != std::string::npos)
-            throw ffiError("Windows FFI c_chuỗi chứa NUL");
-        return value;
+        return checkedForeignCString(arguments.at(index));
     };
     const auto windowsI32 = [&](std::size_t index) -> int {
         if (!std::holds_alternative<int>(arguments.at(index)))
@@ -2474,15 +2490,8 @@ ForeignCallResult executeForeignCall(
                 argumentPointers[index] = &storage[index].f64;
                 break;
             case vietvm::bytecode::ForeignAbiType::CString:
-                if (!std::holds_alternative<std::string>(arguments[index])) {
-                    throw ffiError("c_chuỗi yêu cầu chuỗi V++");
-                }
-                if (std::get<std::string>(arguments[index]).find('\0') !=
-                    std::string::npos) {
-                    throw ffiError("c_chuỗi không chấp nhận byte NUL bên trong");
-                }
                 storage[index].pointer =
-                    std::get<std::string>(arguments[index]).c_str();
+                    checkedForeignCString(arguments[index]).c_str();
                 argumentPointers[index] = &storage[index].pointer;
                 break;
             case vietvm::bytecode::ForeignAbiType::BufferOut: {
