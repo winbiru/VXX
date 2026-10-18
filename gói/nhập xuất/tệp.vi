@@ -17,10 +17,27 @@ ngoại hàm tệp_đóng_ffi(tệp: c_tệp): i32 từ c_tệp
     ký hiệu "fclose" abi "c" khả năng "system.file.close";
 ngoại hàm tệp_lỗi_ffi(tệp: c_tệp): i32 từ c_tệp
     ký hiệu "ferror" abi "c" khả năng "system.file.error";
+ngoại thư viện c_lỗi_tệp = "system.ffi";
+ngoại hàm mã_lỗi_tệp_ffi(): i32 từ c_lỗi_tệp
+    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Hệ Tệp {
     hàm công khai khởi tạo() {};
+
+    // Giá trị lỗi có cấu trúc: bắt lỗi(e) có thể đọc mã, đường dẫn, errno.
+    // VM nhận diện theo giao thức dữ liệu, không đoán từ thông báo hay tên hàm.
+    hàm tệp lỗi hệ thống(đường, thao_tác, mã, giai_đoạn, thông_báo, errno) {
+        trả về {
+            "loại": "lỗi hệ thống tệp",
+            "mã": mã,
+            "thao tác": thao_tác,
+            "giai đoạn": giai_đoạn,
+            "đường dẫn": đường,
+            "errno": errno,
+            "thông báo": thông_báo
+        };
+    };
 
     hàm công khai tệp chuẩn hóa đường dẫn(đường dẫn) {
         đường = thành chuỗi(đường dẫn);
@@ -35,7 +52,11 @@ lớp công khai Hệ Tệp {
     // Cleanup ở đây bao phủ cả lỗi I/O; VM còn đóng tài nguyên tồn tại khi hủy/reset.
     hàm công khai tệp đọc bytes posix(đường, thao_tác) {
         tệp = tệp_mở_ffi(đường, "rb");
-        nếu (tệp == rỗng) { ném thao_tác + ": không thể mở tệp để đọc"; };
+        nếu (tệp == rỗng) {
+            mã_lỗi = mã_lỗi_tệp_ffi();
+            ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_OPEN_FAILED", "mở",
+                thao_tác + ": không thể mở tệp để đọc", mã_lỗi);
+        };
         kết_quả = [];
         thử {
             // Dùng lại một đệm cho toàn bộ vòng đọc, tránh tạo 4096 phần tử
@@ -47,7 +68,11 @@ lớp công khai Hệ Tệp {
                 // fread returns exact size_t (boxed u64); count is bounded to 4096.
                 n = thành số nguyên(thành chuỗi(tệp_đọc_ffi(đệm, 1, 4096, tệp)));
                 nếu (n == 0) {
-                    nếu (tệp_lỗi_ffi(tệp) != 0) { ném thao_tác + ": không thể đọc tệp"; };
+                    mã_lỗi = mã_lỗi_tệp_ffi();
+                    nếu (tệp_lỗi_ffi(tệp) != 0) {
+                        ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_READ_FAILED", "đọc",
+                            thao_tác + ": không thể đọc tệp", mã_lỗi);
+                    };
                     đang_đọc = sai;
                 } hoặc {
                     lặp(i = 0; i < n; i++) { them(kết_quả, đệm[i]); };
@@ -57,7 +82,11 @@ lớp công khai Hệ Tệp {
             tệp_đóng_ffi(tệp);
             ném e;
         };
-        nếu (tệp_đóng_ffi(tệp) != 0) { ném thao_tác + ": không thể đóng tệp"; };
+        nếu (tệp_đóng_ffi(tệp) != 0) {
+            mã_lỗi = mã_lỗi_tệp_ffi();
+            ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_CLOSE_FAILED", "đóng",
+                thao_tác + ": không thể đóng tệp", mã_lỗi);
+        };
         trả về kết_quả;
     };
 
@@ -65,7 +94,11 @@ lớp công khai Hệ Tệp {
         chế_độ = "wb";
         nếu (nối) { chế_độ = "ab"; };
         tệp = tệp_mở_ffi(đường, chế_độ);
-        nếu (tệp == rỗng) { ném thao_tác + ": không thể mở tệp để ghi"; };
+        nếu (tệp == rỗng) {
+            mã_lỗi = mã_lỗi_tệp_ffi();
+            ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_OPEN_FAILED", "mở",
+                thao_tác + ": không thể mở tệp để ghi", mã_lỗi);
+        };
         thử {
             vị_trí = 0;
             lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
@@ -74,8 +107,10 @@ lớp công khai Hệ Tệp {
                 nếu (hết > do_dai(bytes)) { hết = do_dai(bytes); };
                 lặp(i = vị_trí; i < hết; i++) { them(đệm, bytes[i]); };
                 n = thành số nguyên(thành chuỗi(tệp_ghi_ffi(đệm, 1, do_dai(đệm), tệp)));
+                mã_lỗi = mã_lỗi_tệp_ffi();
                 nếu (n <= 0 || n > do_dai(đệm)) {
-                    ném thao_tác + ": không thể ghi tệp";
+                    ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_WRITE_FAILED", "ghi",
+                        thao_tác + ": không thể ghi tệp", mã_lỗi);
                 };
                 vị_trí = vị_trí + n;
             };
@@ -83,7 +118,11 @@ lớp công khai Hệ Tệp {
             tệp_đóng_ffi(tệp);
             ném e;
         };
-        nếu (tệp_đóng_ffi(tệp) != 0) { ném thao_tác + ": không thể ghi tệp"; };
+        nếu (tệp_đóng_ffi(tệp) != 0) {
+            mã_lỗi = mã_lỗi_tệp_ffi();
+            ném mình.tệp lỗi hệ thống(đường, thao_tác, "FILE_CLOSE_FAILED", "đóng",
+                thao_tác + ": không thể ghi tệp", mã_lỗi);
+        };
         trả về 1;
     };
 

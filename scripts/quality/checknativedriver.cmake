@@ -26,6 +26,7 @@ foreach(part IN ITEMS
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 file(REMOVE "${compiler}")
+message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
     "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
     "${source}" "${compiler}"
@@ -349,24 +350,28 @@ set(stage2 "${VPP_OUTPUT_DIR}/vpp-native-stage2")
 set(stage3 "${VPP_OUTPUT_DIR}/vpp-native-stage3")
 set(stage4 "${VPP_OUTPUT_DIR}/vpp-native-stage4")
 file(REMOVE "${stage2}" "${stage3}" "${stage4}")
+message(STATUS "Stage 1 -> Stage 2: compile original multi-module compiler")
 execute_process(COMMAND "${compiler}" build "${module_entry}" -o "${stage2}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${stage2}")
     message(FATAL_ERROR "native self-host Stage 1 -> Stage 2 failed: ${status}\n${output}\n${errors}")
 endif()
+message(STATUS "Stage 2 -> Stage 3: self-compile native compiler")
 execute_process(COMMAND "${stage2}" build "${module_entry}" -o "${stage3}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${stage3}")
     message(FATAL_ERROR "native self-host Stage 2 -> Stage 3 failed: ${status}\n${output}\n${errors}")
 endif()
+message(STATUS "Stage 3 -> Stage 4: self-compile native compiler")
 execute_process(COMMAND "${stage3}" build "${module_entry}" -o "${stage4}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${stage4}")
     message(FATAL_ERROR "native self-host Stage 3 -> Stage 4 failed: ${status}\n${output}\n${errors}")
 endif()
+message(STATUS "Stage 2/3/4: verify machine-code parity and execute generation probes")
 
 # Compare machine sections; UUIDs and signatures can differ between builds.
 execute_process(COMMAND "${CMAKE_COMMAND}"

@@ -249,6 +249,7 @@ TESTS=(
   src/tests/kiem_tra_ffi_entropy.vi
   src/tests/kiem_tra_ffi_thu_muc.vi
   src/tests/kiem_tra_ffi_tep.vi
+  src/tests/kiem_tra_loi_tep_co_cau_truc.vi
   src/tests/kiem_tra_ffi_dns.vi
   src/tests/kiem_tra_ffi_socket.vi
   src/tests/kiem_tra_ffi_socket_loi.vi
@@ -567,6 +568,7 @@ EXPECTED_FAILURE_TESTS=( \
   src/tests/kiem_tra_loi_tang_sai_kieu.vi \
   src/tests/kiem_tra_loi_giam_sai_kieu.vi \
   src/tests/kiem_tra_loi_chuyen_so_thuc_that_bai.vi \
+  src/tests/kiem_tra_loi_tep_gia_thong_bao.vi \
   src/tests/kiem_tra_loi_doc_tep_that_bai.vi
 )
 

@@ -161,11 +161,16 @@ endforeach()
 file(REMOVE "${raw_file}")
 file(REMOVE "${asm_file}")
 foreach(unsupported IN ITEMS hang_tran hang_tran_trung_gian hang_chia)
+    if (unsupported STREQUAL "hang_chia")
+        set(expected_diagnostic "toán tử binary native chưa hỗ trợ")
+    else()
+        set(expected_diagnostic "biểu thức hằng native vượt phạm vi i32 hoặc tràn trung gian")
+    endif()
     execute_process(
         COMMAND "${VPP_EXEC}" build --target aarch64-apple-darwin --emit-raw
             "${unsupported}" "${VPP_SOURCE}" "${raw_file}"
         RESULT_VARIABLE result ERROR_VARIABLE error)
-    if (result EQUAL 0 OR NOT error MATCHES "Native IR chưa hỗ trợ")
+    if (result EQUAL 0 OR NOT error MATCHES "${expected_diagnostic}")
         message(FATAL_ERROR "unsafe arithmetic must fail lowering (${unsupported}): ${error}")
     endif()
     if (EXISTS "${raw_file}")
@@ -187,7 +192,7 @@ execute_process(
     COMMAND "${VPP_EXEC}" build --target aarch64-apple-darwin --emit-raw
         chua_ho_tro "${VPP_SOURCE}" "${raw_file}"
     RESULT_VARIABLE result ERROR_VARIABLE error)
-if (result EQUAL 0 OR NOT error MATCHES "Native IR chưa hỗ trợ")
+if (result EQUAL 0 OR NOT error MATCHES "Raw machine code không thể chứa CALL chưa liên kết")
     message(FATAL_ERROR "must reject effects outside leaf subset: ${error}")
 endif()
 if (EXISTS "${raw_file}")

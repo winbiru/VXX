@@ -368,8 +368,11 @@ jobs:
               -P scripts/quality/checknativeprint.cmake
           fi
 
+      - name: Verify native compiler self-hosting Stage 0 -> Stage 4 (macOS ARM64)
+        run: ctest --test-dir build -R '^vpp-native-compiler-driver$' --output-on-failure --verbose --no-tests=error
+
       - name: Run macOS full V++ regression suite
-        run: ctest --test-dir build --output-on-failure --verbose --no-tests=error
+        run: ctest --test-dir build --output-on-failure --verbose --no-tests=error -E '^vpp-native-compiler-driver$'
 
       - name: Run macOS RC compiler hardening checks
         shell: bash

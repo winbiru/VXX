@@ -9,7 +9,7 @@ hàm từ chối(nguồn, tên_hàm) {
     lỗi = sai;
     thử { biên dịch native tự chủ(nguồn, tên_hàm, "aarch64", "macos"); }
     bắt lỗi(e) { lỗi = đúng; };
-    xác nhận(lỗi, "phải chặn nguồn không hỗ trợ");
+    xác nhận(lỗi, "phải chặn nguồn không hỗ trợ: " + nguồn);
 }
 
 hàm chính() {
@@ -43,7 +43,8 @@ hàm chính() {
     từ chối("hàm f(a) { trả về unknown + a; };", "f");
     từ chối("hàm f(a) { trả về a(1); };", "f");
     từ chối("hàm f(a = 7) { trả về a; };", "f");
-    từ chối("hàm f() { in 3; trả về 1; };", "f");
+    // In i32 đã được native hỗ trợ; in literal chuỗi vẫn phải bị từ chối.
+    từ chối("hàm f() { in \"chuỗi\"; trả về 1; };", "f");
     từ chối("hàm f() { trả về 2147483648; };", "f");
     in "native-selfhost-ok";
 }

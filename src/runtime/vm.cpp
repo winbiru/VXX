@@ -3593,48 +3593,68 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                     vietvm::messages::kNativeToFloatConversionFailed) ||
                 thrownText == vietvm::messages::messageText(
                     vietvm::messages::kNativeToIntegerConversionFailed);
-            // POSIX stdio wrappers intentionally raise catchable V++ exceptions.
-            // At the uncaught program boundary restore the historical structured
-            // I/O diagnostic. Only recognize failures originating in the stdlib
-            // file helper; a user throwing identical text elsewhere is not an OS
-            // error. Capture frames before unwindLanguageException drops them.
-            std::string fileOperation;
+            // Stdlib I/O throws a typed data record: preserve it through V++
+            // catch/rethrow and classify uncaught errors by fields, never by
+            // message prefixes, internal function names or module path strings.
+            struct FileErrorRecord {
+                std::string code, operation, phase, path, message;
+                int posixError;
+            };
+            const auto fileError = [&]() -> std::optional<FileErrorRecord> {
+                if (!std::holds_alternative<MapHandle>(thrown.value())) return std::nullopt;
+                const auto &map = std::get<MapHandle>(thrown.value());
+                if (map == nullptr) return std::nullopt;
+                const auto getString = [&](const char *key) -> const std::string * {
+                    const auto found = map->entries.find(key);
+                    return found != map->entries.end() &&
+                           std::holds_alternative<std::string>(found->second)
+                        ? &std::get<std::string>(found->second) : nullptr;
+                };
+                const auto *kind = getString("loại");
+                if (kind == nullptr || *kind != "lỗi hệ thống tệp") return std::nullopt;
+                const auto *code = getString("mã");
+                const auto *operation = getString("thao tác");
+                const auto *phase = getString("giai đoạn");
+                const auto *path = getString("đường dẫn");
+                const auto *message = getString("thông báo");
+                const auto foundErrno = map->entries.find("errno");
+                if (code == nullptr || operation == nullptr || phase == nullptr ||
+                    path == nullptr || message == nullptr ||
+                    foundErrno == map->entries.end() ||
+                    !std::holds_alternative<int>(foundErrno->second)) return std::nullopt;
+                return FileErrorRecord{*code, *operation, *phase, *path,
+                                       *message, std::get<int>(foundErrno->second)};
+            }();
             std::vector<vietvm::runtime::RuntimeSourceLocation> fileFrames;
-            if (!callStack.empty() &&
-                (callStack.back().functionName == "tệp đọc bytes posix" ||
-                 callStack.back().functionName == "tệp ghi bytes posix") &&
-                sourceLocationForPc(pc).moduleIdentity == "gói/nhập xuất/tệp.vi") {
-                constexpr std::string_view operations[] = {
-                    "đọc tệp", "đọc bytes tệp", "ghi tệp",
-                    "ghi bytes tệp", "ghi nối tệp"};
-                for (std::string_view operation : operations) {
-                    if (thrownText.compare(0, operation.size(), operation) == 0 &&
-                        thrownText.compare(operation.size(),
-                                           std::string_view(": không thể ").size(),
-                                           ": không thể ") == 0) {
-                        fileOperation = operation;
-                        break;
-                    }
-                }
-                if (!fileOperation.empty()) {
-                    // executionStack[n] is the saved caller of callStack[n].
-                    // Skip the private helper's own frame, but keep the public
-                    // wrapper and each source-level caller in traceback order.
-                    for (std::size_t index = executionStack.size(); index > 0; --index) {
-                        const std::size_t savedIndex = index - 1;
-                        const ExecutionContext &caller = executionStack[savedIndex];
-                        const auto *debugInfo = caller.bytecode == nullptr
-                            ? &bytecodeDebugInfo : caller.bytecodeDebugInfo;
-                        if (debugInfo != nullptr && caller.pc < debugInfo->size()) {
-                            auto frame = (*debugInfo)[caller.pc];
-                            if (frame.valid() &&
-                                (savedIndex + 1 < executionStack.size() ||
-                                 frame.functionName == fileOperation)) {
-                                fileFrames.push_back(std::move(frame));
-                            }
+            if (fileError) {
+                const std::string originModule = sourceLocationForPc(pc).moduleIdentity;
+                const std::string &operation = fileError->operation;
+                bool haveApiFrame = false;
+                // Resolve the public call frame from the recorded operation and
+                // actual debug metadata; library location is never hardcoded.
+                for (std::size_t index = executionStack.size(); index > 0; --index) {
+                    const ExecutionContext &caller = executionStack[index - 1];
+                    const auto *debugInfo = caller.bytecode == nullptr
+                        ? &bytecodeDebugInfo : caller.bytecodeDebugInfo;
+                    if (debugInfo == nullptr || caller.pc >= debugInfo->size()) continue;
+                    auto frame = (*debugInfo)[caller.pc];
+                    if (!frame.valid()) continue;
+                    if (frame.moduleIdentity == originModule) {
+                        const std::string &name = frame.functionName;
+                        const bool matchesOperation = name == operation ||
+                            (name.size() > operation.size() &&
+                             name[name.size() - operation.size() - 1] == '.' &&
+                             name.compare(name.size() - operation.size(),
+                                          operation.size(), operation) == 0);
+                        if (!haveApiFrame && matchesOperation) {
+                            fileFrames.push_back(std::move(frame));
+                            haveApiFrame = true;
                         }
+                    } else {
+                        fileFrames.push_back(std::move(frame));
                     }
                 }
+                if (!haveApiFrame) fileFrames.insert(fileFrames.begin(), sourceLocationForPc(pc));
             }
             std::string conversionInput;
             vietvm::runtime::RuntimeSourceLocation conversionCallerFrame;
@@ -3695,12 +3715,14 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
                 error.addFrame(std::move(conversionCallerFrame));
                 throw error;
             }
-            if (!fileOperation.empty()) {
+            if (fileError) {
                 vietvm::runtime::RuntimeError error(
-                    thrownText,
+                    fileError->message,
                     vietvm::runtime::RuntimeErrorKind::VmFault,
-                    vietvm::runtime::runtimeNativeFacts(
-                        fileOperation, thrownText, false));
+                    vietvm::runtime::runtimeFileFacts(
+                        fileError->operation, fileError->message,
+                        fileError->code, fileError->phase,
+                        fileError->path, fileError->posixError));
                 for (auto &frame : fileFrames) error.addFrame(std::move(frame));
                 throw error;
             }

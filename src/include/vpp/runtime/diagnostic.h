@@ -107,6 +107,11 @@ struct RuntimeDiagnosticContext {
     bool nativeOperationSucceeded = true;
     std::string nativeOperation;
     std::string detail;
+    // OS error metadata is kept separately from the human-readable message.
+    std::string nativeErrorCode;
+    std::string nativePath;
+    std::string nativePhase;
+    int nativePosixError = 0;
 
     bool internalInvariantChecked = false;
     bool internalInvariantValid = true;
@@ -254,6 +259,20 @@ inline RuntimeDiagnosticContext runtimeNativeFacts(std::string operation,
     context.nativeOperationSucceeded = succeeded;
     context.nativeOperation = std::move(operation);
     context.detail = std::move(detail);
+    return context;
+}
+
+inline RuntimeDiagnosticContext runtimeFileFacts(std::string operation,
+                                                std::string message,
+                                                std::string code,
+                                                std::string phase,
+                                                std::string path,
+                                                int posixError) {
+    auto context = runtimeNativeFacts(std::move(operation), std::move(message), false);
+    context.nativeErrorCode = std::move(code);
+    context.nativePhase = std::move(phase);
+    context.nativePath = std::move(path);
+    context.nativePosixError = posixError;
     return context;
 }
 
