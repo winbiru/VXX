@@ -104,30 +104,13 @@ function Invoke-Vpp {
     )
 
     Remove-Item -LiteralPath $StdOut, $StdErr -Force -ErrorAction SilentlyContinue
-    $previousEnvironment = @{}
-    foreach ($key in $Environment.Keys) {
-        $previousEnvironment[$key] = [Environment]::GetEnvironmentVariable(
-            $key,
-            [EnvironmentVariableTarget]::Process
-        )
-        # Null removes a variable; an empty string is the explicit empty-value
-        # fixture. Preserve both cases for getenv() regression coverage.
-        $value = if ($null -eq $Environment[$key]) { $null } else { [string]$Environment[$key] }
-        [Environment]::SetEnvironmentVariable($key, $value, [EnvironmentVariableTarget]::Process)
-    }
-
-    try {
-        $process = Start-Process -FilePath $script:Vpp -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -PassThru -Wait -NoNewWindow
-        return $process.ExitCode
-    } finally {
-        foreach ($key in $Environment.Keys) {
-            [Environment]::SetEnvironmentVariable(
-                $key,
-                $previousEnvironment[$key],
-                [EnvironmentVariableTarget]::Process
-            )
-        }
-    }
+    # Set the child environment through ProcessStartInfo (Start-Process
+    # -Environment), not by mutating PowerShell's own environment. On Windows,
+    # SetEnvironmentVariable(name, "") can remove the entry; that makes an
+    # explicitly empty getenv() value indistinguishable from a missing key.
+    # Start-Process -Environment keeps "" and $null distinct in the child.
+    $process = Start-Process -FilePath $script:Vpp -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
+    return $process.ExitCode
 }
 
 function Start-VppServer {
@@ -275,6 +258,21 @@ try {
     New-Item -ItemType Directory -Path $sessionDir -Force | Out-Null
     $env:VPP_HOME = $repoRoot
 
+    # Fail early if Windows process creation loses the distinction between an
+    # empty environment value and a missing variable. This fixture also runs
+    # in the interpreter and JIT before the slower integration suite.
+    foreach ($envMode in @("0", "1")) {
+        Invoke-ExpectedTest -TestFile "src/tests/kiem_tra_ffi_moi_truong.vi" -Environment @{
+            VPP_FFI_ENV_TEST = "vpp-env-ffi-ok"
+            VPP_FFI_ENV_EMPTY_TEST = ""
+            VPP_FFI_ENV_MISSING_TEST = $null
+            VPP_ENABLE_JIT = $envMode
+        }
+    }
+    if ($script:FailCount -ne 0) {
+        throw "Windows environment FFI preflight failed"
+    }
+
     # Keep the Windows UTF-8 filesystem regression independent from the HTTP
     # assertion. The source is outside the repository, so imports must use
     # VPP_HOME/gói/chuẩn.
@@ -340,15 +338,9 @@ try {
             continue
         }
         if ($relativeTest -eq "src/tests/kiem_tra_ffi_moi_truong.vi") {
-            # Match the deterministic environment fixtures in run_tests.sh.
-            Invoke-ExpectedTest -TestFile $relativeTest -Environment @{
-                VPP_FFI_ENV_TEST = "vpp-env-ffi-ok"
-                VPP_FFI_ENV_EMPTY_TEST = ""
-                VPP_FFI_ENV_MISSING_TEST = $null
-            }
-        } else {
-            Invoke-ExpectedTest -TestFile $relativeTest
+            continue # Already verified in both modes by the early preflight.
         }
+        Invoke-ExpectedTest -TestFile $relativeTest
     }
 
     # Windows file I/O now shares the managed stdio FFI path with POSIX.
