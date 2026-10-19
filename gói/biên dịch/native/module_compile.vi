@@ -31,7 +31,11 @@ hàm mc_collect_unit(src, tokens, registry, functions, entry) {
             biến length = end - start;
             nếu (length <= 0) { trả về -1; };
             nếu (byte_dài(functions) > 1048576 - 24) { trả về -1; };
-            nếu (tok_equals(src, tokens, i + 1, "chính") == 1) {
+            // Both Vietnamese `chính` and ABI-compatible `main` are valid
+            // entry aliases, but a program can declare only one of them.
+            biến is_entry = tok_equals(src, tokens, i + 1, "chính");
+            nếu (tok_equals(src, tokens, i + 1, "main") == 1) { is_entry = 1; };
+            nếu (is_entry == 1) {
                 nếu (arity != 0) { trả về -1; };
                 nếu (byte_đọc_i32(entry, 0) >= 0) { trả về -1; };
                 biến id = 0;

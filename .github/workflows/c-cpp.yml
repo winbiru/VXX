@@ -97,12 +97,13 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized --parallel 2
-          # Native compiler self-hosting is verified in installed Release smoke.
-          # Keep the sanitizer suite focused on frontend/runtime and integration.
+          # Release regression and installed smoke cover native self-hosting,
+          # linker and machine-code checks without sanitizer instrumentation.
+          # Exercise frontend, runtime and integration with ASan/UBSan here.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm

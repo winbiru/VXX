@@ -4,12 +4,15 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     message(FATAL_ERROR "Native runtime: missing test inputs")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
+include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
 set(source "${VPP_ROOT}/src/tests/fixtures/native_runtime.vi")
 set(executable "${VPP_OUTPUT_DIR}/native-runtime-check")
+file(REMOVE "${executable}" "${VPP_OUTPUT_DIR}/runtime-owned.bin")
+set(VPP_HOME "${VPP_ROOT}")
+vpp_native_compile_command("${source}" "${executable}" compile_command)
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-        "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-            "${source}" "${executable}"
+        ${compile_command}
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")
     message(FATAL_ERROR "V++ native runtime compilation failed: ${status}\n${errors}\n${output}")

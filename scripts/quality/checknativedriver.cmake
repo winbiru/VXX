@@ -116,6 +116,7 @@ function(run_native_case name code expected)
 endfunction()
 
 run_native_case(program "hàm chính() { trả về 52; };" 52)
+run_native_case(entry-main-alias "hàm main() { trả về 52; };" 52)
 run_native_case(runtime-bytes "hàm chính() { biến b = byte_mới(); byte_thêm(b, 52); biến value = byte_lấy(b, 0); byte_hủy(b); trả về value; };" 52)
 run_native_case(runtime-string "hàm chính() { biến b = \"Hello\"; trả về byte_dài(b) + 47; };" 52)
 run_native_case(runtime-utf8 "hàm chính() { biến b = \"Tiếng Việt\"; trả về byte_dài(b) + 38; };" 52)
@@ -240,6 +241,17 @@ file(READ "${sentinel}" content)
 if (status EQUAL 0 OR NOT content STREQUAL "preserve-me")
     message(FATAL_ERROR "native compiler accepted arity mismatch: ${status}")
 endif()
+foreach(entry IN ITEMS "hàm chính() { trả về 1; }; hàm main() { trả về 52; };"
+                       "hàm main() { trả về 1; }; hàm chính() { trả về 52; };")
+    file(WRITE "${VPP_OUTPUT_DIR}/duplicate-entry-alias.vi" "${entry}\n")
+    execute_process(COMMAND "${compiler}" build
+        "${VPP_OUTPUT_DIR}/duplicate-entry-alias.vi" -o "${sentinel}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}" RESULT_VARIABLE status TIMEOUT 30)
+    file(READ "${sentinel}" content)
+    if (status EQUAL 0 OR NOT content STREQUAL "preserve-me")
+        message(FATAL_ERROR "native compiler accepted conflicting entrypoint aliases: ${status}")
+    endif()
+endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi"
     "hàm chính() { trả về byte_lấy(1); };\n")
 execute_process(COMMAND "${compiler}" build "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi" -o "${sentinel}"

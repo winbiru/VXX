@@ -177,8 +177,9 @@ lớp công khai Bộ Tách Từ Vựng {
         dòng = 1;
         cột = 1;
         lặp(vòng = 0; i < n; vòng++) {
-            c = mình.biên dịch từ vựng ký tự(ký_tự, i);
-            tiếp = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+            c = ký_tự[i];
+            tiếp = "";
+            nếu (i + 1 < n) { tiếp = ký_tự[i + 1]; };
             nếu (mình.biên dịch từ vựng trắng(c)) {
                 nếu (c == "\n") { dòng += 1; cột = 1; }
                 hoặc { cột += 1; };
@@ -187,7 +188,8 @@ lớp công khai Bộ Tách Từ Vựng {
                 nếu (c == "/" && tiếp == "/") {
                     i += 2;
                     cột += 2;
-                    lặp(j = 0; i < n && mình.biên dịch từ vựng ký tự(ký_tự, i) != "\n"; j++) {
+                    lặp(j = 0; i < n; j++) {
+                        nếu (ký_tự[i] == "\n") { thoát; };
                         i += 1;
                         cột += 1;
                     };
@@ -199,8 +201,9 @@ lớp công khai Bộ Tách Từ Vựng {
                         cột += 2;
                         đóng = sai;
                         lặp(j = 0; i < n && !đóng; j++) {
-                            a = mình.biên dịch từ vựng ký tự(ký_tự, i);
-                            b = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+                            a = ký_tự[i];
+                            b = "";
+                            nếu (i + 1 < n) { b = ký_tự[i + 1]; };
                             nếu (a == "*" && b == "/") {
                                 i += 2;
                                 cột += 2;
@@ -224,8 +227,9 @@ lớp công khai Bộ Tách Từ Vựng {
                             cột += 1;
                             đóng = sai;
                             lặp(j = 0; i < n && !đóng; j++) {
-                                a = mình.biên dịch từ vựng ký tự(ký_tự, i);
-                                b = mình.biên dịch từ vựng ký tự(ký_tự, i + 1);
+                                a = ký_tự[i];
+                                b = "";
+                                nếu (i + 1 < n) { b = ký_tự[i + 1]; };
                                 nếu (a == "\n") {
                                     mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu_dòng, đầu_cột);
                                 };
@@ -254,7 +258,7 @@ lớp công khai Bộ Tách Từ Vựng {
                                     cột += 1;
                                 } hoặc {
                                     lặp(j = 0; i < n; j++) {
-                                        a = mình.biên dịch từ vựng ký tự(ký_tự, i);
+                                        a = ký_tự[i];
                                         nếu (mình.biên dịch từ vựng trắng(a) || mình.biên dịch từ vựng ngăn cách(a)) {
                                             thoát;
                                         };
@@ -289,33 +293,44 @@ lớp công khai Bộ Tách Từ Vựng {
             "khởi tạo", "điều kiện", "cập nhật", "bắt lỗi", "giao diện",
             "kế thừa", "triển khai", "công khai", "riêng tư", "bảo vệ",
             "ngoại hàm", "ký hiệu", "khả năng"];
+        tiền_tố = {"kiểm": đúng, "ngoại": đúng, "mặc": đúng,
+            "trường": đúng, "trả": đúng, "bỏ": đúng, "khởi": đúng,
+            "điều": đúng, "cập": đúng, "bắt": đúng, "giao": đúng,
+            "kế": đúng, "triển": đúng, "công": đúng, "riêng": đúng,
+            "bảo": đúng, "ký": đúng, "khả": đúng};
         i = 0;
         lặp(vòng = 0; i < độ dài(thô); vòng++) {
             đầu = thô[i];
             chuỗi_ghép = lấy map(đầu, "giá trị", "");
             bước = 1;
-            nếu (i + 2 < độ dài(thô)) {
+            nếu (co_khoa(tiền_tố, chuỗi_ghép) && i + 2 < độ dài(thô)) {
                 thử_ba = chuỗi_ghép + " " + lấy map(thô[i + 1], "giá trị", "") +
                     " " + lấy map(thô[i + 2], "giá trị", "");
                 lặp(j = 0; j < độ dài(cụm_ba); j++) {
                     nếu (thử_ba == cụm_ba[j]) { chuỗi_ghép = thử_ba; bước = 3; thoát; };
                 };
             };
-            nếu (bước == 1 && i + 1 < độ dài(thô)) {
+            nếu (bước == 1 && co_khoa(tiền_tố, chuỗi_ghép) && i + 1 < độ dài(thô)) {
                 thử_hai = chuỗi_ghép + " " + lấy map(thô[i + 1], "giá trị", "");
                 lặp(j = 0; j < độ dài(cụm_hai); j++) {
                     nếu (thử_hai == cụm_hai[j]) { chuỗi_ghép = thử_hai; bước = 2; thoát; };
                 };
             };
-            cuối = thô[i + bước - 1];
-            thêm(kq, mình.biên dịch từ vựng token(
-                chuỗi_ghép,
-                lấy map(đầu, "dòng", 1), lấy map(đầu, "cột", 1),
-                lấy map(đầu, "vị trí", 0), lấy map(cuối, "kết thúc", 0),
-                lấy map(đầu, "cột ký tự", 1),
-                lấy map(đầu, "vị trí ký tự", 0),
-                lấy map(cuối, "kết thúc ký tự", 0)
-            ));
+            nếu (bước == 1) {
+                // Token thô đã có phân loại và span chính xác. Giữ nguyên
+                // bản ghi để khỏi tạo map và phân loại lại mỗi token.
+                thêm(kq, đầu);
+            } hoặc {
+                cuối = thô[i + bước - 1];
+                thêm(kq, mình.biên dịch từ vựng token(
+                    chuỗi_ghép,
+                    lấy map(đầu, "dòng", 1), lấy map(đầu, "cột", 1),
+                    lấy map(đầu, "vị trí", 0), lấy map(cuối, "kết thúc", 0),
+                    lấy map(đầu, "cột ký tự", 1),
+                    lấy map(đầu, "vị trí ký tự", 0),
+                    lấy map(cuối, "kết thúc ký tự", 0)
+                ));
+            };
             i += bước;
         };
         trả về kq;

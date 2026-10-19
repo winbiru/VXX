@@ -28,7 +28,8 @@ if (NOT DEFINED VPP_AOT_LIB_ROOT)
 endif()
 foreach(module IN ITEMS native-aot runtime-native compiler frontend bytecode core)
     find_library(vpp_${module} NAMES vpp-${module}
-        PATHS "${VPP_AOT_LIB_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+        PATHS "${VPP_AOT_LIB_ROOT}/lib" "${VPP_AOT_LIB_ROOT}/lib64"
+        NO_DEFAULT_PATH REQUIRED)
     target_link_libraries(vpp-aot-program PRIVATE "${vpp_${module}}")
 endforeach()
 find_package(Threads REQUIRED)

@@ -1,7 +1,9 @@
 // Sổ hàm của compiler V++: global ID/StringPool; export và alias theo module.
 nhập gói/biên dịch/sổ đăng ký;
+nhập gói/biên dịch/đồ thị mô đun;
 nhập gói/biên dịch/ir;
 nhập gói/biên dịch/phát mã;
+nhập gói/lõi/chuyển kiểu;
 nhập gói/văn bản/chuỗi;
 
 hàm chính() {
@@ -55,6 +57,16 @@ hàm chính() {
     in độ dài(sổ2["chuỗi"]) == 4;
     in sổ2["hàm"][1]["tên index"] == sổ2["hàm"][2]["tên index"];
     in sổ2["hàm"][1]["id"] != sổ2["hàm"][2]["id"];
+    in biên dịch sổ tìm hàm trực tiếp(sổ2, "a", "chung") == 1;
+    in biên dịch sổ tìm hàm trực tiếp(sổ2, "b", "chung") == 2;
+    // Tra cứu xen kẽ registry/emitter phải giữ nguyên chỉ số, kể cả trùng tên.
+    trước = độ dài(sổ2["chuỗi"]);
+    in biên dịch sổ lưu chuỗi(sổ2, "chung") == sổ2["hàm"][1]["tên index"];
+    in độ dài(sổ2["chuỗi"]) == trước;
+    mới = biên dịch sổ lưu chuỗi(sổ2, "chuỗi mới");
+    in mới == trước;
+    in biên dịch sổ lưu chuỗi(sổ2, "chuỗi mới") == mới;
+    in độ dài(sổ2["chuỗi"]) == trước + 1;
 
     // Emitter đơn vị dùng cùng bộ cấp phát và giữ ABI C++.
     ir = biên dịch hạ IR thuần("hàm f() {}; hàm chính() { in f(); };");

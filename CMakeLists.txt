@@ -445,6 +445,15 @@ if (BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_machine_vpp_parity.cmake)
     find_program(VPP_NATIVE_SMOKE_CC NAMES clang cc gcc)
     if (VPP_NATIVE_SMOKE_TARGET AND VPP_NATIVE_SMOKE_CC)
+        # Runtime regressions share the native Stage 1 fixture with the
+        # parser/codegen tests, avoiding repeated C++ Stage 0 compilation.
+        set(VPP_NATIVE_HARNESS_STAGE1_ARG "")
+        if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$") OR
+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+             CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
+            set(VPP_NATIVE_HARNESS_STAGE1 "${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native")
+            set(VPP_NATIVE_HARNESS_STAGE1_ARG "-DVPP_STAGE1=${VPP_NATIVE_HARNESS_STAGE1}")
+        endif()
         add_test(NAME vpp-native-control-flow-host-link
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -480,6 +489,7 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativeprogram"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativeprogram.cmake)
         add_test(NAME vpp-native-i32-runtime
             COMMAND ${CMAKE_COMMAND}
@@ -488,6 +498,7 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativeprint"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativeprint.cmake)
         add_test(NAME vpp-native-i32-input
             COMMAND ${CMAKE_COMMAND}
@@ -496,6 +507,7 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativeread"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativeread.cmake)
         add_test(NAME vpp-native-byte-file-io
             COMMAND ${CMAKE_COMMAND}
@@ -504,6 +516,7 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativebytefile"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativebytefile.cmake)
         add_test(NAME vpp-native-block-file-io
             COMMAND ${CMAKE_COMMAND}
@@ -512,6 +525,7 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativebulk"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativebulk.cmake)
         add_test(NAME vpp-native-byte-ranges
             COMMAND ${CMAKE_COMMAND}
@@ -520,16 +534,10 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativebyteranges"
+                ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativebytesops.cmake)
         # The lexer is already written in V++; exercise it with the prepared
         # native compiler instead of starting another expensive Stage 0 build.
-        set(VPP_NATIVE_HARNESS_STAGE1_ARG "")
-        if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$") OR
-            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
-             CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
-            set(VPP_NATIVE_HARNESS_STAGE1 "${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native")
-            set(VPP_NATIVE_HARNESS_STAGE1_ARG "-DVPP_STAGE1=${VPP_NATIVE_HARNESS_STAGE1}")
-        endif()
         add_test(NAME vpp-native-lexer-kernel
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -556,6 +564,14 @@ if (BUILD_TESTS)
                 FIXTURES_SETUP native-stage1 TIMEOUT 540 RUN_SERIAL TRUE)
             set_tests_properties(vpp-native-lexer-kernel PROPERTIES
                 FIXTURES_REQUIRED native-stage1)
+            set_tests_properties(
+                vpp-native-i32-runtime
+                vpp-native-selfhost-executable
+                vpp-native-i32-input
+                vpp-native-byte-file-io
+                vpp-native-block-file-io
+                vpp-native-byte-ranges
+                PROPERTIES FIXTURES_REQUIRED native-stage1)
         endif()
         add_test(NAME vpp-native-parser-ir
             COMMAND ${CMAKE_COMMAND}
@@ -608,7 +624,10 @@ if (BUILD_TESTS)
                     "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                     "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-runtime-check"
+                    ${VPP_NATIVE_HARNESS_STAGE1_ARG}
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_runtime.cmake)
+            set_tests_properties(vpp-native-vpp-runtime PROPERTIES
+                FIXTURES_REQUIRED native-stage1)
         endif()
     endif()
     # MSVC needs the Visual Studio build environment to link the generated

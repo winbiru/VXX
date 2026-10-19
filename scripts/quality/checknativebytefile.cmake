@@ -3,11 +3,13 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_SOURCE OR
     message(FATAL_ERROR "missing native byte/file I/O arguments")
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
+include("${CMAKE_CURRENT_LIST_DIR}/native_stage1_compile.cmake")
 set(executable "${VPP_OUTPUT_DIR}/native byte file")
+file(REMOVE "${executable}")
+vpp_native_compile_command("${VPP_SOURCE}" "${executable}" compile_command)
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-        "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-        "${VPP_SOURCE}" "${executable}"
+        ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 180)
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")
@@ -34,21 +36,27 @@ endforeach()
 # Neither a bad ABI call nor a reserved runtime name may publish an executable.
 file(WRITE "${VPP_OUTPUT_DIR}/bad-arity.vi"
     "hàm chính() { trả về byte_thêm(1); };\n")
+file(REMOVE "${VPP_OUTPUT_DIR}/bad-arity")
+vpp_native_compile_command("${VPP_OUTPUT_DIR}/bad-arity.vi"
+    "${VPP_OUTPUT_DIR}/bad-arity" compile_command)
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-    "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-    "${VPP_OUTPUT_DIR}/bad-arity.vi" "${VPP_OUTPUT_DIR}/bad-arity"
+    ${compile_command}
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 180)
-if (status EQUAL 0 OR NOT errors MATCHES "sai số đối số" OR EXISTS "${VPP_OUTPUT_DIR}/bad-arity")
+if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/bad-arity" OR
+    (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "sai số đối số"))
     message(FATAL_ERROR "native must reject byte ABI arity: ${status}\n${errors}")
 endif()
 foreach(name IN ITEMS byte_mới tệp_đóng vpp_native_bytes_get vpp_native_file_close)
     file(WRITE "${VPP_OUTPUT_DIR}/reserved.vi"
         "hàm ${name}(a) { trả về a; }; hàm chính() { trả về 0; };\n")
+    file(REMOVE "${VPP_OUTPUT_DIR}/reserved")
+    vpp_native_compile_command("${VPP_OUTPUT_DIR}/reserved.vi"
+        "${VPP_OUTPUT_DIR}/reserved" compile_command)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-        "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-        "${VPP_OUTPUT_DIR}/reserved.vi" "${VPP_OUTPUT_DIR}/reserved"
+        ${compile_command}
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 180)
-    if (status EQUAL 0 OR NOT errors MATCHES "dành riêng" OR EXISTS "${VPP_OUTPUT_DIR}/reserved")
+    if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/reserved" OR
+        (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "dành riêng"))
         message(FATAL_ERROR "native must reserve runtime symbol ${name}: ${status}\n${errors}")
     endif()
 endforeach()

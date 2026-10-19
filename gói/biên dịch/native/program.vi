@@ -18,7 +18,9 @@ hàm pg_collect(src, tokens, functions) {
             // Function count is bounded by the byte-buffer capacity, not
             // an arbitrary small limit. The table uses 24 bytes per entry.
             nếu (byte_dài(functions) > 1048576 - 24) { trả về -1; };
-            nếu (tok_equals(src, tokens, i + 1, "chính") == 1) {
+            biến is_entry = tok_equals(src, tokens, i + 1, "chính");
+            nếu (tok_equals(src, tokens, i + 1, "main") == 1) { is_entry = 1; };
+            nếu (is_entry == 1) {
                 nếu (arity != 0) { trả về -1; };
                 entry_count = entry_count + 1;
                 nếu (entry_count > 1) { trả về -1; };
@@ -43,6 +45,7 @@ hàm pg_entry(src, tokens, functions) {
     lặp (record = 0; record < byte_dài(functions); record = record + 24) {
         biến declaration = byte_đọc_i32(functions, record);
         nếu (tok_equals(src, tokens, declaration + 1, "chính") == 1) { trả về id; };
+        nếu (tok_equals(src, tokens, declaration + 1, "main") == 1) { trả về id; };
         id = id + 1;
     };
     trả về -1;

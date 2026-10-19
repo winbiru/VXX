@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -12,6 +13,9 @@
 #else
 #include <sys/wait.h>
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 #include "vpp/core/project_layout.h"
 #include "vpp/core/text.h"
@@ -20,6 +24,25 @@
 namespace vietvm::native::aot {
 namespace {
 namespace fs=std::filesystem;
+class PhaseTimer {
+    using Clock=std::chrono::steady_clock;
+    Clock::time_point previous=Clock::now();
+    bool enabled=false;
+public:
+    PhaseTimer() {
+        const auto *value=std::getenv("VPP_NATIVE_PROFILE");
+        enabled=value&&std::string(value)=="1";
+    }
+    bool active() const { return enabled; }
+    void mark(const char *phase) {
+        if(!enabled)return;
+        const auto now=Clock::now();
+        std::cerr<<"VPP_NATIVE_PROFILE "<<phase<<" "
+                 <<std::chrono::duration_cast<std::chrono::milliseconds>(now-previous).count()
+                 <<" ms\n";
+        previous=now;
+    }
+};
 ProcessResult process(const std::vector<std::string> &arguments) {
     ProcessResult result;
 #if defined(_WIN32)
@@ -86,6 +109,27 @@ fs::path installation() {
     for(const char *name:{"VPP_AOT_ROOT","VPP_HOME"})if(const char *root=std::getenv(name);root&&*root)return fs::absolute(core::utf8Path(root));
     throw std::runtime_error("Native AOT: set VPP_HOME to the installed toolchain");
 }
+fs::path executableDirectory() {
+#if defined(_WIN32)
+    std::wstring buffer(32768, L'\0');
+    const auto length=GetModuleFileNameW(nullptr,buffer.data(),static_cast<DWORD>(buffer.size()));
+    if(!length||length>=buffer.size())return {};
+    buffer.resize(length);
+    return fs::path(buffer).parent_path();
+#elif defined(__APPLE__)
+    std::uint32_t length=0;
+    _NSGetExecutablePath(nullptr,&length);
+    if(!length)return {};
+    std::vector<char> buffer(length);
+    if(_NSGetExecutablePath(buffer.data(),&length)!=0)return {};
+    return fs::weakly_canonical(fs::path(buffer.data())).parent_path();
+#else
+    std::vector<char> buffer(4096);
+    const auto length=readlink("/proc/self/exe",buffer.data(),buffer.size());
+    if(length<=0||static_cast<std::size_t>(length)==buffer.size())return {};
+    return fs::path(std::string(buffer.data(),static_cast<std::size_t>(length))).parent_path();
+#endif
+}
 std::string read(const fs::path &path) {
     std::ifstream input(path,std::ios::binary);if(!input)throw std::runtime_error("Native AOT: cannot read "+path.u8string());
     return {std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
@@ -95,6 +139,7 @@ const std::vector<Value> &values(const Value &value) {
     if(!list||!*list)throw std::runtime_error("Native AOT: expected wire arrays");return (*list)->elements;
 }
 int compilerMain(Program &program,int argc,char **argv) {
+    PhaseTimer profiler;
     if(argc<3)throw std::runtime_error("Usage: vpp-native build|run|artifact|embed <source.vi|artifact.vbc> [-o output] [--bytecode] [--compiler] [--base directory]");
     const std::string command=argv[1];const auto source=fs::weakly_canonical(fs::absolute(core::utf8Path(argv[2])));
     fs::path output,embedBase;bool bytecode=false,compiler=false;
@@ -143,12 +188,25 @@ int compilerMain(Program &program,int argc,char **argv) {
         const auto result=program.invokeName("aot_bytecode_cli",{source.u8string(),root.u8string(),output.u8string()});
         program.output(sv_to_string(result));return 0;
     }
-    const auto artifact=program.invokeName("aot_compile_source",{source.u8string(),root.u8string()});
+    Value artifact;
+    if(profiler.active()) {
+        // The regular V++ entrypoint performs these exact two operations.
+        // Separate them only when profiling to locate expensive compiler passes.
+        const auto graph=program.invokeName("biên dịch nguồn đồ thị",{source.u8string(),root.u8string()});
+        profiler.mark("resolve-imports-lex-parse");
+        artifact=program.invokeName("biên dịch liên kết đồ thị thuần",{graph});
+        profiler.mark("semantic-ir-codegen-link");
+    } else {
+        artifact=program.invokeName("aot_compile_source",{source.u8string(),root.u8string()});
+    }
     const auto wire=program.invokeName("aot_artifact_wire",{artifact});
+    profiler.mark("artifact-wire");
     const auto snapshot=snapshotFromWire(values(wire));
+    profiler.mark("snapshot");
     if(command=="build") {
         if(output.empty())throw std::runtime_error("Native AOT: executable output required");
-        compileExecutable(snapshot,output,root,compiler);return 0;
+        compileExecutable(snapshot,output,root,compiler);
+        profiler.mark("native-asm-and-link");return 0;
     }
     TemporaryDirectory temporary(fs::temp_directory_path());const auto executable=temporary.path/"program";
     compileExecutable(snapshot,executable,root);const auto result=process({executable.u8string()});
@@ -162,23 +220,37 @@ ProcessResult runProcess(const std::vector<std::string> &arguments) {
 }
 
 void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs::path &root,bool compiler) {
+    PhaseTimer profiler;
     const auto absolute=fs::absolute(output);if(!fs::is_directory(absolute.parent_path()))throw std::runtime_error("Native AOT: output directory missing");
     TemporaryDirectory temporary(absolute.parent_path());const auto source=temporary.path/"program.S";
     {std::ofstream assembly(source,std::ios::binary);assembly<<emitAssembly(snapshot,compiler);if(!assembly)throw std::runtime_error("Native AOT: assembly write failed");}
+    profiler.mark("emit-native-assembly");
     const auto executable=temporary.path/"program";
     // Installed toolchains keep libraries under <root>/lib. A developer's
     // Stage 0 checkout can instead use the existing CMake build libraries.
     fs::path libraries=root;
-    if(!fs::exists(root/"lib")) {
-        for(const char *candidate:{"build","cmake-build-debug","cmake-build-release","cmake-build-sanitized"}) {
-            if(fs::exists(root/candidate/"lib")) {libraries=root/candidate;break;}
+    if(const char *configured=std::getenv("VPP_AOT_LIB_ROOT");configured&&*configured) {
+        libraries=fs::absolute(core::utf8Path(configured));
+    } else if(!fs::exists(root/"lib") && !fs::exists(root/"lib64")) {
+        // CI builds use arbitrary names (build-native-cross, build-coverage,
+        // cmake-build-debug). Link against the libraries of the running
+        // compiler so an instrumented build never picks a release library.
+        const auto executable=executableDirectory();
+        if(!executable.empty()&&fs::exists(executable.parent_path()/"lib")) {
+            libraries=executable.parent_path();
+        } else {
+            for(const char *candidate:{"build","cmake-build-debug","cmake-build-release","cmake-build-sanitized"}) {
+                if(fs::exists(root/candidate/"lib")) {libraries=root/candidate;break;}
+            }
         }
     }
     auto configured=process({"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string(),
         "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
+    profiler.mark("configure-native-linker");
     auto linked=process({"cmake","--build",(temporary.path/"build").u8string(),"--config","Release","--parallel","2"});
     if(linked.status||!fs::is_regular_file(executable))throw std::runtime_error("Native AOT: assembly/link failed\n"+linked.output);
+    profiler.mark("assemble-and-link");
     if(std::getenv("VPP_AOT_KEEP_ASM"))fs::copy_file(source,fs::path(absolute.u8string()+".S"),fs::copy_options::overwrite_existing);
     fs::rename(executable,absolute);
 }

@@ -20,14 +20,15 @@ cmake --build "$BUILD_DIR" --parallel
 # files also makes repeated local runs deterministic after source/flag changes.
 find "$BUILD_DIR" -type f -name '*.gcda' -delete
 
-# Native self-hosting runs against the release compiler in installed smoke.
-# Keep coverage focused on frontend, bytecode, runtime and integration tests;
-# native compiler/parser stress tests are already gated in CI release builds.
+# Native compiler, machine-code, and self-hosting checks run against the
+# uninstrumented Release toolchain in the mandatory build/ARM64 jobs. Running
+# them against an instrumented Stage 0 triggers repeated native linking and
+# bootstrap while providing little usable C++ coverage.
 # The instrumented HTTP fixture compiles its network modules before listening.
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
   ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
     --output-on-failure --no-tests=error \
-    -E '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+    -E '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$)'
 
 lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \
