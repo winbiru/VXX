@@ -1,6 +1,5 @@
-// Bộ nạp artifact sau linker V++: ABI VM cũ 4 vùng; native FFI thêm vùng 5.
-// Toàn bộ việc phân tích/phát bytecode/liên kết thực hiện trong gói V++;
-// bytecode_chay_vm chỉ chuyển ABI và thực thi trên máy ảo hiện có.
+// Bộ nạp artifact: tương thích ABI bốn vùng cũ, native FFI dùng năm vùng.
+// Backend AOT chuyển cả hai giao thức thành mã máy; VM legacy nhận bốn vùng.
 nhập gói/biên dịch/liên kết;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/lõi/chuyển kiểu;
@@ -126,7 +125,7 @@ lớp công khai Bộ Nạp Artifact {
     hàm công khai chạy() {
         dây = mình.nạp();
         nếu (độ dài(dây) == 5) {
-            ném "biên dịch nạp: chạy artifact có FFI cần native AOT";
+            trả về bytecode_chay_native(dây[0], dây[1], dây[2], dây[3], dây[4]);
         };
         trả về bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]);
     };

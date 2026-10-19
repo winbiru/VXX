@@ -163,15 +163,15 @@ hàm test_lex_file() {
 
 hàm chính() {
     biến a = test_lex_tokens();
-    nếu (a != 0) { in a; trả về a; };
+    nếu (a != 0) { in_số(a); trả về a; };
     a = test_lex_strings();
-    nếu (a != 0) { in a; trả về a; };
+    nếu (a != 0) { in_số(a); trả về a; };
     a = test_lex_invalid_bytes();
-    nếu (a != 0) { in a; trả về a; };
+    nếu (a != 0) { in_số(a); trả về a; };
     a = test_lex_operators();
-    nếu (a != 0) { in a; trả về a; };
+    nếu (a != 0) { in_số(a); trả về a; };
     a = test_lex_file();
-    nếu (a != 0) { in a; trả về a; };
-    in 20261017;
+    nếu (a != 0) { in_số(a); trả về a; };
+    in_số(20261017);
     trả về 0;
 };

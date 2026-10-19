@@ -21,12 +21,20 @@ foreach(part IN ITEMS
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 file(REMOVE "${harness}" "${object}" "${relocation_object}")
+if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
+    if (NOT EXISTS "${VPP_STAGE1}")
+        message(FATAL_ERROR "native Stage 1 compiler missing: ${VPP_STAGE1}")
+    endif()
+    set(compile_command "${VPP_STAGE1}" build "${source}" -o "${harness}")
+else()
+    set(compile_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
+        --emit-exe-selfhost "${source}" "${harness}")
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env
     "VPP_HOME=${VPP_ROOT}"
-    "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-    "${source}" "${harness}"
+    ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 240)
+    RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
 if (NOT result EQUAL 0 OR NOT EXISTS "${harness}")
     message(FATAL_ERROR "cross-host V++ ELF harness build: ${result}\n${output}\n${errors}")
 endif()

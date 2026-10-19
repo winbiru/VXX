@@ -14,12 +14,12 @@
 #include <unistd.h>
 #endif
 #include "vpp/core/project_layout.h"
+#include "vpp/core/text.h"
 #include "vpp/runtime/error.h"
 
 namespace vietvm::native::aot {
 namespace {
 namespace fs=std::filesystem;
-struct ProcessResult { int status=1; std::string output; };
 ProcessResult process(const std::vector<std::string> &arguments) {
     ProcessResult result;
 #if defined(_WIN32)
@@ -95,20 +95,49 @@ const std::vector<Value> &values(const Value &value) {
     if(!list||!*list)throw std::runtime_error("Native AOT: expected wire arrays");return (*list)->elements;
 }
 int compilerMain(Program &program,int argc,char **argv) {
-    if(argc<3)throw std::runtime_error("Usage: vpp-native build|run <source.vi> [-o output] [--bytecode] [--compiler]");
+    if(argc<3)throw std::runtime_error("Usage: vpp-native build|run|artifact|embed <source.vi|artifact.vbc> [-o output] [--bytecode] [--compiler] [--base directory]");
     const std::string command=argv[1];const auto source=fs::weakly_canonical(fs::absolute(core::utf8Path(argv[2])));
-    fs::path output;bool bytecode=false,compiler=false;
+    fs::path output,embedBase;bool bytecode=false,compiler=false;
     for(int i=3;i<argc;++i) {
         const std::string argument=argv[i];
         if(argument=="-o"&&i+1<argc)output=fs::absolute(core::utf8Path(argv[++i]));
         else if(argument=="--bytecode")bytecode=true;
         else if(argument=="--compiler")compiler=true;
+        else if(argument=="--base"&&i+1<argc)embedBase=fs::absolute(core::utf8Path(argv[++i]));
         else throw std::runtime_error("Native AOT: unknown option "+argument);
     }
-    if(command!="build"&&command!="run")throw std::runtime_error("Native AOT: unknown command");
+    if(command!="build"&&command!="run"&&command!="artifact"&&command!="embed")throw std::runtime_error("Native AOT: unknown command");
+    if(command!="embed"&&!embedBase.empty())throw std::runtime_error("Native AOT: --base requires embed");
     if(!output.empty()&&(fs::weakly_canonical(output)==source||(fs::exists(output)&&fs::equivalent(output,source))))
         throw std::runtime_error("Native AOT: output must not overwrite source");
     const auto root=installation();
+    if(command=="artifact") {
+        if(!output.empty()||bytecode||compiler)
+            throw std::runtime_error("Native AOT: artifact command does not accept build options");
+        const auto wire=program.invokeName("aot_artifact_text_wire",{read(source)});
+        const auto snapshot=snapshotFromWire(values(wire));
+        TemporaryDirectory temporary(fs::temp_directory_path());
+        const auto executable=temporary.path/"artifact";
+        compileExecutable(snapshot,executable,root);
+        const auto result=process({executable.u8string()});
+        program.output(result.output);
+        return result.status;
+    }
+    if(command=="embed") {
+        if(!output.empty()||bytecode||compiler||embedBase.empty()||!fs::is_directory(embedBase))
+            throw std::runtime_error("Native AOT: embed requires --base directory and no build options");
+        const auto text=read(source);
+        if(!core::isValidUtf8(text))throw std::runtime_error("Native AOT: embedded script is not valid UTF-8");
+        const auto artifact=program.invokeName("aot_compile_embedded_source",
+            {text,fs::weakly_canonical(embedBase).u8string(),root.u8string()});
+        const auto wire=program.invokeName("aot_artifact_wire",{artifact});
+        TemporaryDirectory temporary(fs::temp_directory_path());
+        const auto executable=temporary.path/"embedded";
+        compileExecutable(snapshotFromWire(values(wire)),executable,root);
+        const auto result=process({executable.u8string()});
+        program.output(result.output);
+        return result.status;
+    }
     if(bytecode) {
         if(output.empty())throw std::runtime_error("Native AOT: bytecode output required");
         const auto result=program.invokeName("aot_bytecode_cli",{source.u8string(),root.u8string(),output.u8string()});
@@ -127,13 +156,26 @@ int compilerMain(Program &program,int argc,char **argv) {
 }
 } // namespace
 
+ProcessResult runProcess(const std::vector<std::string> &arguments) {
+    if (arguments.empty()) throw std::invalid_argument("Native AOT: empty process arguments");
+    return process(arguments);
+}
+
 void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs::path &root,bool compiler) {
     const auto absolute=fs::absolute(output);if(!fs::is_directory(absolute.parent_path()))throw std::runtime_error("Native AOT: output directory missing");
     TemporaryDirectory temporary(absolute.parent_path());const auto source=temporary.path/"program.S";
     {std::ofstream assembly(source,std::ios::binary);assembly<<emitAssembly(snapshot,compiler);if(!assembly)throw std::runtime_error("Native AOT: assembly write failed");}
     const auto executable=temporary.path/"program";
+    // Installed toolchains keep libraries under <root>/lib. A developer's
+    // Stage 0 checkout can instead use the existing CMake build libraries.
+    fs::path libraries=root;
+    if(!fs::exists(root/"lib")) {
+        for(const char *candidate:{"build","cmake-build-debug","cmake-build-release","cmake-build-sanitized"}) {
+            if(fs::exists(root/candidate/"lib")) {libraries=root/candidate;break;}
+        }
+    }
     auto configured=process({"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string(),
-        "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
+        "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
     auto linked=process({"cmake","--build",(temporary.path/"build").u8string(),"--config","Release","--parallel","2"});
     if(linked.status||!fs::is_regular_file(executable))throw std::runtime_error("Native AOT: assembly/link failed\n"+linked.output);
@@ -161,6 +203,39 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             TemporaryDirectory temporary(fs::temp_directory_path());const auto executable=temporary.path/"artifact";
             compileExecutable(snapshotFromWire(wire),executable,installation());const auto result=process({executable.u8string()});
             if(result.status)throw std::runtime_error("Native AOT: generated artifact failed: "+std::to_string(result.status));
+            return result.output;
+        };
+        program.executeSource=[](const std::vector<Value> &args)->Value {
+            if(args.size()!=2||!std::holds_alternative<std::string>(args[0])||
+                !std::holds_alternative<std::string>(args[1]))
+                throw std::runtime_error("Native AOT: embedded script requires source and base directory strings");
+            const auto &source=std::get<std::string>(args[0]);
+            const auto &base=std::get<std::string>(args[1]);
+            if(!core::isValidUtf8(source))
+                throw std::runtime_error("Native AOT: embedded script is not valid UTF-8");
+            const auto directory=fs::absolute(core::utf8Path(base.empty()?".":base));
+            if(!fs::is_directory(directory))
+                throw std::runtime_error("Native AOT: embedded base is not a directory: "+directory.u8string());
+            const char *configured=std::getenv("VPP_NATIVE_COMPILER");
+            fs::path executable;
+            if(configured&&*configured)executable=fs::absolute(core::utf8Path(configured));
+            else executable=installation()/"bin"/
+#if defined(_WIN32)
+                "vpp-native.exe";
+#else
+                "vpp-native";
+#endif
+            if(!fs::is_regular_file(executable))
+                throw std::runtime_error("Native AOT: missing native V++ compiler: "+executable.u8string());
+            // The V++ loader receives the original import base explicitly;
+            // no write access to that directory is necessary.
+            TemporaryDirectory temporary(fs::temp_directory_path());
+            const auto file=temporary.path/"embedded.vi";
+            {std::ofstream output(file,std::ios::binary|std::ios::trunc);
+             if(!output||!(output<<source))throw std::runtime_error("Native AOT: cannot write embedded source");}
+            const auto result=process({executable.u8string(),"embed",file.u8string(),"--base",directory.u8string()});
+            if(result.status)
+                throw std::runtime_error("Native AOT: embedded script failed: "+std::to_string(result.status));
             return result.output;
         };
         program.run();

@@ -132,12 +132,42 @@ hàm xg_emit_internal(ir, code, calls) {
                     status = xg_byte(code, 15);
                     nếu (status == 0) { status = xg_byte(code, 175); };
                 };
+                nếu (op == 26) {
+                    // Signed 64-bit IDIV keeps INT32_MIN / -1 defined as
+                    // wrapped i32, matching AArch64 SDIV. Zero traps in IDIV.
+                    status = xg_byte(code, 72); // movsxd rax,eax
+                    nếu (status == 0) { status = xg_byte(code, 99); };
+                    nếu (status == 0) { status = xg_byte(code, 192); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // cqo
+                    nếu (status == 0) { status = xg_byte(code, 153); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // movsxd rcx,ecx
+                    nếu (status == 0) { status = xg_byte(code, 99); };
+                    nếu (status == 0) { status = xg_byte(code, 201); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // idiv rcx
+                    nếu (status == 0) { status = xg_byte(code, 247); };
+                    nếu (status == 0) { status = xg_byte(code, 249); };
+                };
+                nếu (op == 27) {
+                    status = xg_byte(code, 72); // movsxd rax,eax
+                    nếu (status == 0) { status = xg_byte(code, 99); };
+                    nếu (status == 0) { status = xg_byte(code, 192); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // cqo
+                    nếu (status == 0) { status = xg_byte(code, 153); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // movsxd rcx,ecx
+                    nếu (status == 0) { status = xg_byte(code, 99); };
+                    nếu (status == 0) { status = xg_byte(code, 201); };
+                    nếu (status == 0) { status = xg_byte(code, 72); }; // idiv rcx
+                    nếu (status == 0) { status = xg_byte(code, 247); };
+                    nếu (status == 0) { status = xg_byte(code, 249); };
+                    nếu (status == 0) { status = xg_byte(code, 137); }; // mov eax,edx
+                    nếu (status == 0) { status = xg_byte(code, 208); };
+                };
                 nếu (op <= 6) {
                     biến modrm = 200; // add/sub eax,ecx
                     nếu (op == 6) { modrm = 193; }; // imul eax,ecx
                     nếu (status == 0) { status = xg_byte(code, modrm); };
                 };
-                nếu (op >= 11) {
+                nếu (op >= 11) { nếu (op <= 16) {
                     status = xg_byte(code, 57); // cmp eax,ecx
                     nếu (status == 0) { status = xg_byte(code, 200); };
                     nếu (status == 0) { status = xg_byte(code, 15); };
@@ -152,7 +182,7 @@ hàm xg_emit_internal(ir, code, calls) {
                     nếu (status == 0) { status = xg_byte(code, 15); };
                     nếu (status == 0) { status = xg_byte(code, 182); };
                     nếu (status == 0) { status = xg_byte(code, 192); };
-                };
+                }; };
             };
             nếu (status == 0) { status = xg_store(code, 0, slots + depth - 1); };
         }
@@ -160,6 +190,19 @@ hàm xg_emit_internal(ir, code, calls) {
             status = xg_load(code, 0, slots + depth - 1);
             nếu (status == 0) { status = xg_byte(code, 247); };
             nếu (status == 0) { status = xg_byte(code, 216); };
+            nếu (status == 0) { status = xg_store(code, 0, slots + depth - 1); };
+        }
+        hoặc nếu (op == 25) {
+            // test eax,eax; sete al; movzx eax,al
+            status = xg_load(code, 0, slots + depth - 1);
+            nếu (status == 0) { status = xg_byte(code, 133); };
+            nếu (status == 0) { status = xg_byte(code, 192); };
+            nếu (status == 0) { status = xg_byte(code, 15); };
+            nếu (status == 0) { status = xg_byte(code, 148); };
+            nếu (status == 0) { status = xg_byte(code, 192); };
+            nếu (status == 0) { status = xg_byte(code, 15); };
+            nếu (status == 0) { status = xg_byte(code, 182); };
+            nếu (status == 0) { status = xg_byte(code, 192); };
             nếu (status == 0) { status = xg_store(code, 0, slots + depth - 1); };
         }
         hoặc nếu (op == 7) {

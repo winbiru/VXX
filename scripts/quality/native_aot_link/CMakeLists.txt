@@ -23,9 +23,12 @@ set_source_files_properties("${object}" PROPERTIES GENERATED TRUE EXTERNAL_OBJEC
 add_executable(vpp-aot-program "${object}")
 set_target_properties(vpp-aot-program PROPERTIES LINKER_LANGUAGE CXX
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
-foreach(module IN ITEMS native-aot runtime compiler frontend bytecode core)
+if (NOT DEFINED VPP_AOT_LIB_ROOT)
+    set(VPP_AOT_LIB_ROOT "${VPP_AOT_ROOT}")
+endif()
+foreach(module IN ITEMS native-aot runtime-native compiler frontend bytecode core)
     find_library(vpp_${module} NAMES vpp-${module}
-        PATHS "${VPP_AOT_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+        PATHS "${VPP_AOT_LIB_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
     target_link_libraries(vpp-aot-program PRIVATE "${vpp_${module}}")
 endforeach()
 find_package(Threads REQUIRED)

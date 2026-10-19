@@ -164,6 +164,7 @@ enum Opcode {
     OP_VM_FLOAT_FROM_BITS = 155,
     OP_FFI_CALL = 156,          // operand=argc, operandIndex=foreign descriptor id
     OP_VM_BYTECODE_CHAY = 157, // host VM nhận artifact bytecode đã được V++ liên kết
+    OP_NATIVE_ARTIFACT_CHAY = 158, // native-only 5-region ABI with FFI descriptors
 
 };
 

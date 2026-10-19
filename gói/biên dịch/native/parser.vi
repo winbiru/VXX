@@ -1,9 +1,12 @@
 // Parser/semantic và IR tuyến tính native cho tập con hàm chính() i32.
 // Ngữ pháp: hàm chính() { (biến tên = expr; | tên = expr; | nếu ...)* trả về expr; };
-// expr: số nguyên, tên đã khai báo, dấu ngoặc, unary -, +, -, *, so sánh.
+// expr: i32, đúng/sai, tên đã khai báo, dấu ngoặc, unary -/+/!, +, -, *, /, %, so sánh.
+// Câu lệnh và bước cập nhật vòng lặp hỗ trợ =, +=, -=, *=, /=, %=; biến cục bộ
+// cũng có thể dùng ++/--. Các phép tính dùng opcode IR i32 hiện có.
 // IR là dãy (i32 opcode, i32 operand) dùng stack, có thể tự chạy bằng V++.
 // op: 1 PUSH, 2 LOAD, 3 STORE, 4 ADD, 5 SUB, 6 MUL, 7 RET, 8 NEG,
-// 9 JZ (pop), 10 JMP; 11 EQ, 12 NE, 13 LT, 14 LE, 15 GT, 16 GE.
+// 9 JZ (pop), 10 JMP; 11 EQ, 12 NE, 13 LT, 14 LE, 15 GT, 16 GE;
+// 25 NOT, 26 DIV (signed i32), 27 MOD (signed i32). Chia cho 0 là lỗi.
 // Đích JZ/JMP là byte offset (bội của 8) trong buffer IR.
 // parser state: cursor, số biến, return-flag, loop-depth,
 //               (start,end) * số biến.
@@ -112,11 +115,32 @@ hàm p_same_token(src, tokens, a_index, b_index) {
     trả về 1;
 };
 
+// The machine runtime owns the entire vpp_native_* symbol namespace.
+// Reject declarations at the V++ frontend so user objects cannot shadow
+// ASM primitives when the native linker resolves external symbols.
+hàm p_reserved_abi_name(src, tokens, index) {
+    biến start = tok_field(tokens, index, 0);
+    biến end = tok_field(tokens, index, 1);
+    nếu (start < 0) { trả về 0; };
+    nếu (end - start < 11) { trả về 0; };
+    biến prefix = "vpp_native_";
+    biến matched = 1;
+    lặp (i = 0; i < 11; i++) {
+        nếu (byte_lấy(src, start + i) != byte_lấy(prefix, i)) {
+            matched = 0;
+            thoát;
+        };
+    };
+    byte_hủy(prefix);
+    trả về matched;
+};
+
 // Return the number of i32 parameters in a function header.
 // The first parameter starts at declaration token + 3.
 hàm p_header_arity(src, tokens, fn_token) {
     nếu (p_identifier(src, tokens, fn_token + 1) != 1) { trả về -1; };
     nếu (p_native_id(src, tokens, fn_token + 1) >= 0) { trả về -1; };
+    nếu (p_reserved_abi_name(src, tokens, fn_token + 1) == 1) { trả về -1; };
     nếu (tok_equals(src, tokens, fn_token + 2, "(") != 1) { trả về -1; };
     biến cursor = fn_token + 3;
     biến n = 0;
@@ -353,6 +377,14 @@ hàm p_native_arity(id) {
 hàm p_primary(src, tokens, state, ir) {
     biến cursor = byte_đọc_i32(state, 0);
     biến kind = tok_field(tokens, cursor, 2);
+    nếu (tok_equals(src, tokens, cursor, "đúng") == 1) {
+        byte_ghi_i32(state, 0, cursor + 1);
+        trả về p_emit(ir, 1, 1);
+    };
+    nếu (tok_equals(src, tokens, cursor, "sai") == 1) {
+        byte_ghi_i32(state, 0, cursor + 1);
+        trả về p_emit(ir, 1, 0);
+    };
     nếu (kind == 2) {
         biến value = p_number(src, tok_field(tokens, cursor, 0), tok_field(tokens, cursor, 1));
         nếu (value < 0) { trả về -1; };
@@ -437,15 +469,26 @@ hàm p_primary(src, tokens, state, ir) {
         nếu (p_primary(src, tokens, state, ir) != 0) { trả về -1; };
         trả về p_emit(ir, 8, 0);
     };
+    nếu (p_take(src, tokens, state, "!") == 1) {
+        nếu (p_primary(src, tokens, state, ir) != 0) { trả về -1; };
+        trả về p_emit(ir, 25, 0);
+    };
+    nếu (p_take(src, tokens, state, "+") == 1) {
+        trả về p_primary(src, tokens, state, ir);
+    };
     trả về -1;
 };
 
 hàm p_term(src, tokens, state, ir) {
     nếu (p_primary(src, tokens, state, ir) != 0) { trả về -1; };
     lặp (n = 0; n < tok_count(tokens); n++) {
-        nếu (p_take(src, tokens, state, "*") != 1) { thoát; };
+        biến op = 0;
+        nếu (p_take(src, tokens, state, "*") == 1) { op = 6; }
+        hoặc nếu (p_take(src, tokens, state, "/") == 1) { op = 26; }
+        hoặc nếu (p_take(src, tokens, state, "%") == 1) { op = 27; };
+        nếu (op == 0) { thoát; };
         nếu (p_primary(src, tokens, state, ir) != 0) { trả về -1; };
-        nếu (p_emit(ir, 6, 0) != 0) { trả về -1; };
+        nếu (p_emit(ir, op, 0) != 0) { trả về -1; };
     };
     trả về 0;
 };
@@ -536,8 +579,21 @@ hàm p_loop_update(src, tokens, state, update) {
         nếu (p_take(src, tokens, state, ")") != 1) { trả về -1; };
         trả về 0;
     };
-    nếu (p_take(src, tokens, state, "=") != 1) { trả về -1; };
+    biến compound = 0;
+    nếu (p_take(src, tokens, state, "=") == 1) { compound = 0; }
+    hoặc nếu (p_take(src, tokens, state, "+=") == 1) { compound = 4; }
+    hoặc nếu (p_take(src, tokens, state, "-=") == 1) { compound = 5; }
+    hoặc nếu (p_take(src, tokens, state, "*=") == 1) { compound = 6; }
+    hoặc nếu (p_take(src, tokens, state, "/=") == 1) { compound = 26; }
+    hoặc nếu (p_take(src, tokens, state, "%=") == 1) { compound = 27; }
+    hoặc { trả về -1; };
+    nếu (compound != 0) {
+        nếu (p_emit(update, 2, update_slot) != 0) { trả về -1; };
+    };
     nếu (p_expression(src, tokens, state, update) != 0) { trả về -1; };
+    nếu (compound != 0) {
+        nếu (p_emit(update, compound, 0) != 0) { trả về -1; };
+    };
     nếu (p_emit(update, 3, update_slot) != 0) { trả về -1; };
     nếu (p_take(src, tokens, state, ")") != 1) { trả về -1; };
     trả về 0;
@@ -715,8 +771,34 @@ hàm p_statement(src, tokens, state, ir) {
     biến assign_slot = p_symbol(src, tokens, state, assign_cursor);
     nếu (assign_slot < 0) { trả về -1; };
     byte_ghi_i32(state, 0, assign_cursor + 1);
-    nếu (p_take(src, tokens, state, "=") != 1) { trả về -1; };
-    nếu (p_expression(src, tokens, state, ir) != 0) { trả về -1; };
+    biến compound = 0;
+    biến postfix = 0;
+    nếu (p_take(src, tokens, state, "=") == 1) { compound = 0; }
+    hoặc nếu (p_take(src, tokens, state, "+=") == 1) { compound = 4; }
+    hoặc nếu (p_take(src, tokens, state, "-=") == 1) { compound = 5; }
+    hoặc nếu (p_take(src, tokens, state, "*=") == 1) { compound = 6; }
+    hoặc nếu (p_take(src, tokens, state, "/=") == 1) { compound = 26; }
+    hoặc nếu (p_take(src, tokens, state, "%=") == 1) { compound = 27; }
+    hoặc nếu (p_take(src, tokens, state, "++") == 1) {
+        compound = 4;
+        postfix = 1;
+    }
+    hoặc nếu (p_take(src, tokens, state, "--") == 1) {
+        compound = 5;
+        postfix = 1;
+    }
+    hoặc { trả về -1; };
+    nếu (compound != 0) {
+        nếu (p_emit(ir, 2, assign_slot) != 0) { trả về -1; };
+    };
+    nếu (postfix == 1) {
+        nếu (p_emit(ir, 1, 1) != 0) { trả về -1; };
+    } hoặc {
+        nếu (p_expression(src, tokens, state, ir) != 0) { trả về -1; };
+    };
+    nếu (compound != 0) {
+        nếu (p_emit(ir, compound, 0) != 0) { trả về -1; };
+    };
     nếu (p_take(src, tokens, state, ";") != 1) { trả về -1; };
     trả về p_emit(ir, 3, assign_slot);
 };

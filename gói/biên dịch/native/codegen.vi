@@ -2,6 +2,8 @@ hàm cg_binary(op) {
     nếu (op == 4) { trả về 1; };
     nếu (op == 5) { trả về 1; };
     nếu (op == 6) { trả về 1; };
+    nếu (op == 26) { trả về 1; };
+    nếu (op == 27) { trả về 1; };
     nếu (op >= 11) { nếu (op <= 16) { trả về 1; }; };
     trả về 0;
 };
@@ -48,6 +50,10 @@ hàm cg_frame(ir) {
             depth = depth - 1;
         }
         hoặc nếu (op == 8) {
+            nếu (arg != 0) { trả về -1; };
+            nếu (depth < 1) { trả về -1; };
+        }
+        hoặc nếu (op == 25) {
             nếu (arg != 0) { trả về -1; };
             nếu (depth < 1) { trả về -1; };
         }
@@ -287,7 +293,20 @@ hàm cg_emit_internal(ir, code, calls) {
                 nếu (op == 4) { status = cg_word(code, 185205033); };
                 nếu (op == 5) { status = cg_word(code, 1258946857); };
                 nếu (op == 6) { status = cg_word(code, 453672233); };
-                nếu (op >= 11) {
+                nếu (op == 26) {
+                    // CBNZ W10,+8; BRK on divide by zero; SDIV W9,W9,W10.
+                    status = cg_word(code, 889192522);
+                    nếu (status == 0) { status = cg_word(code, -736100352); };
+                    nếu (status == 0) { status = cg_word(code, 449449257); };
+                };
+                nếu (op == 27) {
+                    // W11 = a / b; W9 = a - W11*b. Remainder follows dividend sign.
+                    status = cg_word(code, 889192522);
+                    nếu (status == 0) { status = cg_word(code, -736100352); };
+                    nếu (status == 0) { status = cg_word(code, 449449259); };
+                    nếu (status == 0) { status = cg_word(code, 453682537); };
+                };
+                nếu (op >= 11) { nếu (op <= 16) {
                     status = cg_word(code, 1795817791); // CMP W9, W10
                     nếu (status == 0) {
                         biến condition = 0;
@@ -299,13 +318,21 @@ hàm cg_emit_internal(ir, code, calls) {
                         nếu (op == 16) { condition = 446674921; }; // GE
                         status = cg_word(code, condition);
                     };
-                };
+                }; };
             };
             nếu (status == 0) { status = cg_store(code, 9, base + slots + depth - 1); };
         }
         hoặc nếu (op == 8) {
             status = cg_load(code, 9, base + slots + depth - 1);
             nếu (status == 0) { status = cg_word(code, 1258882025); };
+            nếu (status == 0) { status = cg_store(code, 9, base + slots + depth - 1); };
+        }
+        hoặc nếu (op == 25) {
+            // !x: compare against zero and materialize a normalized i32 bool.
+            status = cg_load(code, 9, base + slots + depth - 1);
+            nếu (status == 0) { status = cg_word(code, 1384120330); }; // MOVZ W10,#0
+            nếu (status == 0) { status = cg_word(code, 1795817791); }; // CMP W9,W10
+            nếu (status == 0) { status = cg_word(code, 446633961); }; // CSET W9,EQ
             nếu (status == 0) { status = cg_store(code, 9, base + slots + depth - 1); };
         }
         hoặc nếu (op == 7) {

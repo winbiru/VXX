@@ -53,6 +53,36 @@ hàm test_bad_ir() {
     byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
     nếu (cg_emit(ir, code) != -1) { trả về 21; };
     nếu (byte_dài(code) != 0) { trả về 21; };
+    // NOT needs one operand and an unused immediate field.
+    byte_làm_rỗng(ir);
+    byte_đẩy_i32(ir, 25); byte_đẩy_i32(ir, 0);
+    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+    nếu (cg_emit(ir, code) != -1) { trả về 22; };
+    byte_làm_rỗng(ir);
+    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 0);
+    byte_đẩy_i32(ir, 25); byte_đẩy_i32(ir, 1);
+    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+    nếu (cg_emit(ir, code) != -1) { trả về 23; };
+    // DIV and MOD need two operands and a zero immediate in the IR wire format.
+    lặp (op = 26; op <= 27; op++) {
+        byte_làm_rỗng(ir);
+        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
+        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+        nếu (cg_emit(ir, code) != -1) { trả về 30; };
+        nếu (byte_dài(code) != 0) { trả về 31; };
+        byte_làm_rỗng(ir);
+        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
+        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
+        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+        nếu (cg_emit(ir, code) != -1) { trả về 32; };
+        byte_làm_rỗng(ir);
+        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
+        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 2);
+        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 1);
+        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+        nếu (cg_emit(ir, code) != -1) { trả về 33; };
+        nếu (byte_dài(code) != 0) { trả về 34; };
+    };
     nếu (byte_hủy(ir) != 0) { trả về 18; };
     nếu (byte_hủy(code) != 0) { trả về 18; };
     trả về 0;
@@ -60,7 +90,7 @@ hàm test_bad_ir() {
 
 hàm chính() {
     biến check = test_bad_ir();
-    nếu (check != 0) { in check; trả về check; };
+    nếu (check != 0) { in_số(check); trả về check; };
     biến source_path = "native-codegen-input.vi";
     biến source = byte_mới();
     biến input = tệp_mở_đọc(source_path);
@@ -93,7 +123,7 @@ hàm chính() {
     byte_hủy(ir);
     byte_hủy(code);
     byte_hủy(object);
-    in 20261017;
+    in_số(20261017);
     trả về 0;
 };
 

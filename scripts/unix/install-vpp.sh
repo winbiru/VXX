@@ -45,6 +45,10 @@ SOURCE_TEMPLATES="$SCRIPT_DIR/templates"
 TARGET_TEMPLATES="$INSTALL_DIR/templates"
 SOURCE_EXAMPLES="$SCRIPT_DIR/examples"
 TARGET_EXAMPLES="$INSTALL_DIR/examples"
+SOURCE_NATIVE="$SCRIPT_DIR/bin/vpp-native"
+SOURCE_LIB="$SCRIPT_DIR/lib"
+SOURCE_ASM="$SCRIPT_DIR/scripts/ASM"
+SOURCE_LINK="$SCRIPT_DIR/scripts/quality/native_aot_link"
 STAGING_DIR="$INSTALL_DIR/.vpp-install-$$"
 
 cleanup() {
@@ -59,9 +63,36 @@ for required_dir in "$SOURCE_STDLIB" "$SOURCE_TEMPLATES" "$SOURCE_EXAMPLES"; do
   fi
 done
 
+for required_dir in "$SOURCE_LIB" "$SOURCE_ASM" "$SOURCE_LINK"; do
+  if [ ! -d "$required_dir" ]; then
+    echo "Gói native V++ thiếu: $required_dir" >&2
+    exit 1
+  fi
+done
+for required_file in "$SOURCE_NATIVE" "$SCRIPT_DIR/vpp-libraries.json" "$SCRIPT_DIR/src/runtime/native/vpp_aot_runtime.c"; do
+  if [ ! -f "$required_file" ]; then
+    echo "Gói native V++ thiếu: $required_file" >&2
+    exit 1
+  fi
+done
+for module in native-aot runtime-native compiler frontend bytecode core; do
+  if [ ! -f "$SOURCE_LIB/libvpp-$module.a" ]; then
+    echo "Gói native V++ thiếu libvpp-$module.a" >&2
+    exit 1
+  fi
+done
+# The default prefix may be ~/.local/bin: never replace unrelated folders.
+for managed_dir in bin lib scripts src; do
+  if [ -d "$INSTALL_DIR/$managed_dir" ] && [ ! -f "$INSTALL_DIR/$managed_dir/.vpp-managed" ]; then
+    echo "Không ghi đè thư mục chưa do V++ quản lý: $INSTALL_DIR/$managed_dir" >&2
+    exit 1
+  fi
+done
+
 mkdir -p "$INSTALL_DIR"
 rm -rf "$STAGING_DIR"
-mkdir -p "$STAGING_DIR/gói" "$STAGING_DIR/templates" "$STAGING_DIR/examples"
+mkdir -p "$STAGING_DIR/gói" "$STAGING_DIR/templates" "$STAGING_DIR/examples" \
+  "$STAGING_DIR/bin" "$STAGING_DIR/lib" "$STAGING_DIR/scripts/quality" "$STAGING_DIR/src/runtime/native"
 cp "$SOURCE_BIN" "$STAGING_DIR/vpp"
 chmod +x "$STAGING_DIR/vpp"
 cp "$SOURCE_UNINSTALLER" "$STAGING_DIR/uninstall-vpp.sh"
@@ -69,6 +100,18 @@ chmod +x "$STAGING_DIR/uninstall-vpp.sh"
 cp -R "$SOURCE_STDLIB"/. "$STAGING_DIR/gói"/
 cp -R "$SOURCE_TEMPLATES"/. "$STAGING_DIR/templates"/
 cp -R "$SOURCE_EXAMPLES"/. "$STAGING_DIR/examples"/
+cp "$SOURCE_NATIVE" "$STAGING_DIR/bin/vpp-native"
+chmod +x "$STAGING_DIR/bin/vpp-native"
+for module in native-aot runtime-native compiler frontend bytecode core; do
+  cp "$SOURCE_LIB/libvpp-$module.a" "$STAGING_DIR/lib/"
+done
+cp -R "$SOURCE_ASM" "$STAGING_DIR/scripts/ASM"
+cp -R "$SOURCE_LINK" "$STAGING_DIR/scripts/quality/native_aot_link"
+cp "$SCRIPT_DIR/src/runtime/native/vpp_aot_runtime.c" "$STAGING_DIR/src/runtime/native/"
+cp "$SCRIPT_DIR/vpp-libraries.json" "$STAGING_DIR/vpp-libraries.json"
+for managed_dir in bin lib scripts src; do
+  : > "$STAGING_DIR/$managed_dir/.vpp-managed"
+done
 
 # Cài mới và cập nhật dùng cùng contract. Mỗi thư mục managed được thay toàn bộ
 # để file đã bị xóa khỏi release không còn sót lại sau update.
@@ -76,7 +119,8 @@ mv "$STAGING_DIR/vpp" "$TARGET_BIN"
 mv "$STAGING_DIR/uninstall-vpp.sh" "$INSTALL_DIR/uninstall-vpp.sh"
 cp "$SCRIPT_DIR/install-vpp.sh" "$INSTALL_DIR/install-vpp.sh"
 chmod +x "$INSTALL_DIR/install-vpp.sh"
-for managed_dir in gói templates examples; do
+mv "$STAGING_DIR/vpp-libraries.json" "$INSTALL_DIR/vpp-libraries.json"
+for managed_dir in gói templates examples bin lib scripts src; do
   rm -rf "$INSTALL_DIR/$managed_dir"
   mv "$STAGING_DIR/$managed_dir" "$INSTALL_DIR/$managed_dir"
 done
@@ -134,6 +178,7 @@ echo "Đã cài đặt/cập nhật V++ tại: $TARGET_BIN"
 echo "Đã cài thư viện chuẩn tại: $TARGET_STDLIB"
 echo "Đã cài templates tại: $TARGET_TEMPLATES"
 echo "Đã cài examples tại: $TARGET_EXAMPLES"
+echo "Đã cài trình biên dịch native tại: $INSTALL_DIR/bin/vpp-native"
 if [ -n "$PROFILE_FILE" ]; then
   echo "Đã cập nhật PATH/VPP_HOME và locale UTF-8 trong: $PROFILE_FILE"
   echo "Mở terminal mới, hoặc chạy: source $PROFILE_FILE"

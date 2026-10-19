@@ -19,13 +19,21 @@ foreach(part IN ITEMS
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/native-codegen-input.vi"
-    "hàm chính() { biến x = 3; biến y = (x + 4) * 8; y = y - 2; trả về -(-y) - 2; };\n")
+    "hàm chính() { biến x = -159; x /= -3; x %= 52; x += 51; nếu (!sai) { trả về x; }; trả về 1; };\n")
 file(REMOVE "${harness}")
+if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
+    if (NOT EXISTS "${VPP_STAGE1}")
+        message(FATAL_ERROR "native Stage 1 compiler missing: ${VPP_STAGE1}")
+    endif()
+    set(compile_command "${VPP_STAGE1}" build "${source}" -o "${harness}")
+else()
+    set(compile_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
+        --emit-exe-selfhost "${source}" "${harness}")
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-    "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-    "${source}" "${harness}"
+    ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
 if (NOT status EQUAL 0 OR NOT EXISTS "${harness}")
     message(FATAL_ERROR "native codegen test build failed: ${status}\n${output}\n${errors}")
 endif()

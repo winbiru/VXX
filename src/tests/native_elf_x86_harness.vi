@@ -23,16 +23,30 @@ hàm chính() {
     nếu (native_calls <= 0) { trả về 2; };
     nếu (object <= 0) { trả về 2; };
 
-    // (-2147483648 + -2147483648) wraps to i32 zero, taking the JZ branch.
-    // This checks i32 immediates, arithmetic, and rel32 branch fixups.
+    // Signed divide/remainder and NOT must execute in the generated ELF.
+    // -159 / -3 = 53; 53 % 52 = 1; 1 + 51 = 52.
     nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, -2147483648) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, -159) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, -2147483648) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, -3) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 26) != 0) { trả về 3; }; // DIV
+    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 52) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 27) != 0) { trả về 3; }; // MOD
+    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 51) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 4) != 0) { trả về 3; }; // ADD
     nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 52) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 11) != 0) { trả về 3; }; // EQ
+    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 25) != 0) { trả về 3; }; // NOT
+    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 9) != 0) { trả về 3; }; // JZ
-    nếu (byte_đẩy_i32(ir, 48) != 0) { trả về 3; };
+    nếu (byte_đẩy_i32(ir, 104) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 13) != 0) { trả về 3; };
     nếu (byte_đẩy_i32(ir, 7) != 0) { trả về 3; };
@@ -47,6 +61,22 @@ hàm chính() {
     nếu (byte_lấy(code, 1) != 72) { trả về 6; };
     nếu (byte_lấy(code, 2) != 137) { trả về 6; };
     nếu (byte_lấy(code, 3) != 229) { trả về 6; };
+    // Cross-host verification also checks that x86-64 IDIV and remainder
+    // extraction are actually present before the ELF object is written.
+    biến idiv_count = 0;
+    biến modulo_count = 0;
+    lặp (i = 0; i + 2 < byte_dài(code); i++) {
+        nếu (byte_lấy(code, i) == 72) {
+            nếu (byte_lấy(code, i + 1) == 247) {
+                nếu (byte_lấy(code, i + 2) == 249) { idiv_count = idiv_count + 1; };
+            };
+        };
+        nếu (byte_lấy(code, i) == 137) {
+            nếu (byte_lấy(code, i + 1) == 208) { modulo_count = modulo_count + 1; };
+        };
+    };
+    nếu (idiv_count != 2) { trả về 21; };
+    nếu (modulo_count < 1) { trả về 22; };
 
     nếu (byte_đẩy_i32(starts, 0) != 0) { trả về 7; };
     nếu (elf_module(code, object, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 8; };

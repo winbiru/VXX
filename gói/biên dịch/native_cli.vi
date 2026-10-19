@@ -8,8 +8,14 @@ nhập gói/biên dịch/artifact;
 hàm aot_compile_source(đường, thư_viện) {
     trả về biên dịch nguồn tệp tự chủ(đường, thư_viện);
 };
+hàm aot_compile_embedded_source(mã_nguồn, gốc, thư_viện) {
+    trả về biên dịch nguồn nhúng tự chủ(mã_nguồn, gốc, thư_viện);
+};
 hàm aot_artifact_wire(artifact) {
     trả về biên dịch nạp artifact(artifact);
+};
+hàm aot_artifact_text_wire(văn_bản) {
+    trả về biên dịch artifact giải mã dây(văn_bản);
 };
 hàm aot_bytecode_cli(đường, thư_viện, đầu_ra) {
     trả về biên dịch cli(đường, thư_viện, "build", đầu_ra);

@@ -2,8 +2,10 @@
 
 #include <charconv>
 #include <chrono>
+#include <atomic>
 #include <cstdlib>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <ostream>
@@ -15,7 +17,7 @@
 
 #include "frontend/keywords.h"
 #include "vpp/compiler/pipeline.h"
-#include "vm/vm.h"
+#include "vpp/native/aot.h"
 
 namespace vietvm::native {
 namespace {
@@ -467,27 +469,73 @@ std::string executeVppSource(const std::string &source,
                   << std::chrono::duration_cast<std::chrono::milliseconds>(afterFrontend - start).count()
                   << " ms, source=" << source.size() << " bytes\n";
     }
-    VM vm(artifacts.bytecode, context.stringPool);
-    std::string output;
-    vm.setOutputSink([&output, partialOutput](const std::string &text) {
-        output += text;
-        if (partialOutput) *partialOutput += text;
-    });
-    std::unordered_map<int, int> functionNames;
-    for (const auto &entry : context.functionNameIndices)
-        functionNames[entry.second] = entry.first;
-    vm.setFunctions(context.functionBytecode, std::move(functionNames));
-    vm.setDebugInfo(artifacts.bytecodeDebugInfo, context.functionDebugInfo);
+    // Stage 0 lowers the wrapper to host assembly. Machine lowering, encoding,
+    // and object writing still execute the V++ implementations in gói/biên dịch.
+    // Stage 1+ never calls VM::run through this bridge.
+    aot::Snapshot snapshot;
+    snapshot.strings = context.stringPool;
+    snapshot.entry = artifacts.bytecode;
+    snapshot.foreignFunctions = context.foreignFunctions;
+    for (const auto &[id, code] : context.functionBytecode) {
+        const auto name = context.functionNameIndices.find(id);
+        snapshot.functions.emplace(id, aot::FunctionCode{
+            name == context.functionNameIndices.end() ? -1 : name->second, code});
+    }
     for (const auto &module : context.moduleInitializers)
-        (void)vm.addModuleInitializer(module.identity, module.bytecode, module.debugInfo);
-    vm.run();
+        snapshot.initializers.push_back(module.bytecode);
+
+    std::filesystem::path root;
+    for (const char *name : {"VPP_AOT_ROOT", "VPP_HOME"}) {
+        if (const char *value = std::getenv(name); value && *value) {
+            root = std::filesystem::absolute(value);
+            break;
+        }
+    }
+    if (root.empty()) {
+        for (auto candidate = std::filesystem::absolute(context.importResolutionBase);;
+             candidate = candidate.parent_path()) {
+            if (std::filesystem::is_regular_file(candidate /
+                    "scripts/quality/native_aot_link/CMakeLists.txt")) {
+                root = candidate;
+                break;
+            }
+            if (candidate == candidate.parent_path()) break;
+        }
+    }
+    if (root.empty()) throw std::runtime_error("V++ native bridge cần VPP_HOME");
+
+    struct TemporaryNativeOutput {
+        std::filesystem::path directory;
+        TemporaryNativeOutput() {
+            static std::atomic<unsigned long> counter{0};
+            for (int i = 0; i < 100; ++i) {
+                directory = std::filesystem::temp_directory_path() /
+                    ("vpp-machine-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                     "-" + std::to_string(++counter));
+                std::error_code error;
+                if (std::filesystem::create_directory(directory, error)) return;
+            }
+            throw std::runtime_error("V++ native bridge: không tạo được thư mục tạm");
+        }
+        ~TemporaryNativeOutput() {
+            std::error_code ignored;
+            std::filesystem::remove_all(directory, ignored);
+        }
+    } temporary;
+    const auto executable = temporary.directory / "machine-bridge";
+    aot::compileExecutable(snapshot, executable, root);
+    const auto result = aot::runProcess({executable.u8string()});
+    if (partialOutput) *partialOutput += result.output;
+    if (result.status != 0)
+        throw std::runtime_error("V++ native bridge: executable thất bại (" +
+            std::to_string(result.status) + ")");
     if (profile) {
-        std::cerr << "native Stage 0 VM execution: "
+        std::cerr << "native Stage 0 ASM/link/execute: "
                   << std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::steady_clock::now() - afterFrontend).count()
                   << " ms\n";
     }
-    return output;
+    return result.output;
 }
 
 std::size_t parseOffset(const std::string &s) {

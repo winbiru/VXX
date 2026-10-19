@@ -327,6 +327,9 @@ static bool executeVmPrimitive(Opcode opcode,
             return vietvm::helpers::compilerAnalyzePrimitive(args, result, err);
         case OP_VM_BYTECODE_CHAY:
             return vietvm::helpers::linkedBytecodeRunPrimitive(args, result, err);
+        case OP_NATIVE_ARTIFACT_CHAY:
+            err = "artifact với FFI yêu cầu backend native; dùng --compiler=vpp";
+            return true;
         case OP_VM_KICH_BAN_CHAY:
             return vietvm::helpers::embeddedVmRunPrimitive(args, result, err);
         case OP_VM_TUPLE_FROM_LIST:
@@ -3330,6 +3333,7 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
             case OP_VM_BIEN_DICH_PHAN_TICH:
             case OP_VM_BYTECODE_CHAY:
+            case OP_NATIVE_ARTIFACT_CHAY:
             case OP_VM_DNS_PHAN_GIAI:
             case OP_VM_DOC_BIEN_MOI_TRUONG:
             case OP_VM_DONG_HO_DIA_PHUONG:

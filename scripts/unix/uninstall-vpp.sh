@@ -29,7 +29,12 @@ for profile in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.prof
   clean_profile "$profile"
 done
 
-for managed in vpp gói templates examples install-vpp.sh uninstall-vpp.sh; do
+for managed in bin lib scripts src; do
+  if [ -f "$INSTALL_DIR/$managed/.vpp-managed" ]; then
+    rm -rf "$INSTALL_DIR/$managed"
+  fi
+done
+for managed in vpp gói templates examples vpp-libraries.json install-vpp.sh uninstall-vpp.sh; do
   rm -rf "$INSTALL_DIR/$managed"
 done
 

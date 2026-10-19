@@ -88,6 +88,7 @@ bool isKnownOpcode(int rawOpcode) noexcept {
         case OP_TAO_DONG_BAO:
         case OP_VM_BIEN_DICH_PHAN_TICH:
         case OP_VM_BYTECODE_CHAY:
+        case OP_NATIVE_ARTIFACT_CHAY:
         case OP_VM_DNS_PHAN_GIAI:
         case OP_VM_DOC_BIEN_MOI_TRUONG:
         case OP_VM_DONG_HO_DIA_PHUONG:
@@ -238,6 +239,7 @@ std::string opcodeName(int rawOpcode) {
         case OP_TAO_DONG_BAO: return "OP_TAO_DONG_BAO";
         case OP_VM_BIEN_DICH_PHAN_TICH: return "OP_VM_BIEN_DICH_PHAN_TICH";
         case OP_VM_BYTECODE_CHAY: return "OP_VM_BYTECODE_CHAY";
+        case OP_NATIVE_ARTIFACT_CHAY: return "OP_NATIVE_ARTIFACT_CHAY";
         case OP_VM_DNS_PHAN_GIAI: return "OP_VM_DNS_PHAN_GIAI";
         case OP_VM_DOC_BIEN_MOI_TRUONG: return "OP_VM_DOC_BIEN_MOI_TRUONG";
         case OP_VM_DONG_HO_DIA_PHUONG: return "OP_VM_DONG_HO_DIA_PHUONG";

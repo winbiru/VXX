@@ -148,6 +148,24 @@ jobs:
           mkdir -p dist
           cp "$BIN_PATH" dist/vpp
           chmod +x dist/vpp
+          NATIVE_BIN=""
+          for p in build/native-compiler/vpp-native build/bin/vpp-native; do
+            if [ -x "$p" ]; then NATIVE_BIN="$p"; break; fi
+          done
+          if [ -z "$NATIVE_BIN" ]; then
+            echo "Native V++ bootstrap compiler is missing from the release build" >&2
+            exit 1
+          fi
+          mkdir -p dist/bin dist/lib dist/scripts/quality dist/src/runtime/native
+          cp "$NATIVE_BIN" dist/bin/vpp-native
+          chmod +x dist/bin/vpp-native
+          for module in native-aot runtime-native compiler frontend bytecode core; do
+            cp "build/lib/libvpp-${module}.a" dist/lib/
+          done
+          cp -R scripts/ASM dist/scripts/ASM
+          cp -R scripts/quality/native_aot_link dist/scripts/quality/native_aot_link
+          cp src/runtime/native/vpp_aot_runtime.c dist/src/runtime/native/
+          cp vpp-libraries.json dist/vpp-libraries.json
           cp -R gói dist/gói
           cp -R templates dist/templates
           cp -R examples dist/examples
@@ -156,7 +174,7 @@ jobs:
           cp scripts/unix/uninstall-vpp.sh dist/uninstall-vpp.sh
           chmod +x dist/install-vpp.sh
           chmod +x dist/uninstall-vpp.sh
-          tar -czf "${{ matrix.asset_name }}" -C dist vpp gói templates examples install-vpp.sh uninstall-vpp.sh
+          tar -czf "${{ matrix.asset_name }}" -C dist vpp bin lib scripts src vpp-libraries.json gói templates examples install-vpp.sh uninstall-vpp.sh
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -180,6 +198,24 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item $bin dist/vpp.exe
+          $env:VPP_HOME = (Get-Location).Path
+          New-Item -ItemType Directory -Force -Path dist/bin, dist/lib, dist/scripts/quality, dist/src/runtime/native | Out-Null
+          $nativeCompiler = Join-Path (Get-Location).Path "dist/bin/vpp-native.exe"
+          & $bin --bootstrap-native "gói/biên dịch/native_cli.vi" $nativeCompiler
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $nativeCompiler)) {
+            throw "Windows release requires a working native V++ bootstrap compiler"
+          }
+          foreach ($module in @("native-aot", "runtime-native", "compiler", "frontend", "bytecode", "core")) {
+            $archive = @("build/lib/Release/vpp-$module.lib", "build/lib/vpp-$module.lib",
+                         "build/lib/Release/libvpp-$module.a", "build/lib/libvpp-$module.a") |
+              Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $archive) { throw "Missing Windows native library: vpp-$module" }
+            Copy-Item $archive dist/lib/
+          }
+          Copy-Item scripts/ASM dist/scripts/ASM -Recurse
+          Copy-Item scripts/quality/native_aot_link dist/scripts/quality/native_aot_link -Recurse
+          Copy-Item src/runtime/native/vpp_aot_runtime.c dist/src/runtime/native/
+          Copy-Item vpp-libraries.json dist/vpp-libraries.json
           Copy-Item gói dist/gói -Recurse
           Copy-Item templates dist/templates -Recurse
           Copy-Item examples dist/examples -Recurse
@@ -210,6 +246,15 @@ jobs:
           VPP_INSTALL_DIR="$INSTALL_DIR" VPP_SKIP_PROFILE=1 "$EXTRACT_DIR/install-vpp.sh"
           test ! -e "$INSTALL_DIR/gói/.release-smoke-stale"
           test -x "$INSTALL_DIR/uninstall-vpp.sh"
+          test -x "$INSTALL_DIR/bin/vpp-native"
+          cp src/tests/nativeaotprint.vi "$VERIFY_ROOT/native.vi"
+          VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" build --compiler=vpp \
+            "$VERIFY_ROOT/native.vi" -o "$VERIFY_ROOT/native.vbc"
+          rm "$VERIFY_ROOT/native.vi"
+          VPP_HOME="$INSTALL_DIR" "$INSTALL_DIR/vpp" run --artifact \
+            "$VERIFY_ROOT/native.vbc" > "$VERIFY_ROOT/native.stdout"
+          printf '%s\n' '-2147483648' '42' '0' > "$VERIFY_ROOT/native.expected"
+          cmp "$VERIFY_ROOT/native.stdout" "$VERIFY_ROOT/native.expected"
           # Compile native .o files with the actual release installer output,
           # link them using the runner toolchain, then execute the binary.
           if [ "${{ runner.os }}" = "macOS" ]; then
@@ -282,6 +327,7 @@ jobs:
           test -f "$PROFILE_INSTALL/my-project.vi"
           test ! -e "$PROFILE_INSTALL/vpp"
           test ! -e "$PROFILE_INSTALL/gói"
+          test ! -e "$PROFILE_INSTALL/bin/vpp-native"
           test ! -e "$PROFILE_INSTALL/uninstall-vpp.sh"
           test -z "$(grep -F 'VPP installer' "$PROFILE_HOME/.bash_profile" || true)"
 
