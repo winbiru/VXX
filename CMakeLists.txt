@@ -119,6 +119,7 @@ set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/runtime/foreign.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/module.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/object.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/literal.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/vm.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_collection_helpers.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/native/vm_native_compiler_helpers.cpp
@@ -247,6 +248,12 @@ endif()
 vpp_add_module(vpp-tooling ${VPP_TOOLING_SOURCES})
 target_link_libraries(vpp-tooling PUBLIC vpp-compiler vpp-bytecode)
 
+vpp_add_module(vpp-native-aot
+    ${CMAKE_SOURCE_DIR}/src/native/aot_runtime.cpp
+    ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
+    ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp)
+target_link_libraries(vpp-native-aot PUBLIC vpp-runtime)
+
 add_library(vpp::core ALIAS vpp-core)
 add_library(vpp::bytecode ALIAS vpp-bytecode)
 add_library(vpp::frontend ALIAS vpp-frontend)
@@ -256,7 +263,7 @@ add_library(vpp::tooling ALIAS vpp-tooling)
 
 # CLI executable composes runtime and developer tooling.
 add_executable(vpp-cli ${VPP_CLI_SOURCES})
-target_link_libraries(vpp-cli PRIVATE vpp-runtime vpp-tooling)
+target_link_libraries(vpp-cli PRIVATE vpp-runtime vpp-tooling vpp-native-aot)
 target_include_directories(vpp-cli PRIVATE ${VPP_INCLUDE_DIR})
 target_compile_definitions(vpp-cli PRIVATE VPP_VERSION_STRING="${PROJECT_VERSION}")
 
@@ -323,6 +330,14 @@ if (BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_cli.cmake)
     set_tests_properties(vpp-selfhost-i32-artifact PROPERTIES
         TIMEOUT 1800)
+    # These tests repeatedly run a compiler written in V++ inside Stage 0.
+    # Release CI covers the complete bootstrap; sanitizer CI selects the
+    # remaining tests by label to avoid repeating this instrumented VM work.
+    set_tests_properties(
+        vpp-compiler-bytecode-bootstrap
+        vpp-compiler-stage1-stage2
+        vpp-selfhost-i32-artifact
+        PROPERTIES LABELS bootstrap)
 
     # The full three-generation bootstrap is intentionally opt-in: it compiles
     # the complete compiler twice in V++ bytecode and takes several minutes.
@@ -334,7 +349,8 @@ if (BUILD_TESTS)
                 "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-bootstrap-three-stage"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/checkbootstrapstage3.cmake)
-        set_tests_properties(vpp-compiler-stage1-stage2-stage3 PROPERTIES TIMEOUT 3900)
+        set_tests_properties(vpp-compiler-stage1-stage2-stage3 PROPERTIES
+            TIMEOUT 3900 LABELS bootstrap)
     endif()
 
     # Focused internal RC gate. The old broad C++ unit tree was removed on
@@ -704,7 +720,7 @@ if (BUILD_BENCHMARKS)
 endif()
 
 # Install rules (optional)
-install(TARGETS vdk vpp-cli vpp-core vpp-frontend vpp-bytecode vpp-compiler vpp-runtime vpp-tooling
+install(TARGETS vdk vpp-cli vpp-core vpp-frontend vpp-bytecode vpp-compiler vpp-runtime vpp-tooling vpp-native-aot
         RUNTIME DESTINATION bin
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
@@ -729,6 +745,8 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/ASM/
         PATTERN "*.S"
         PATTERN "*.inc"
         PATTERN "README.md")
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/quality/native_aot_link/
+        DESTINATION scripts/quality/native_aot_link)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/docs/
         DESTINATION docs
         PATTERN ".DS_Store" EXCLUDE)

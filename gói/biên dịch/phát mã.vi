@@ -510,6 +510,19 @@ lớp công khai Bộ Phát Bytecode {
                     };
                 };
             };
+            // Binding lexical có thể chưa có symbol ID ở đường tương thích.
+            // Chỉ phát foreign call sau khi đã thử các slot cục bộ.
+            các_ngoại = trạng_thái["ngoại"];
+            lặp(i = 0; i < độ dài(các_ngoại); i++) {
+                nếu (các_ngoại[i]["tên"] == tên) {
+                    nếu (số_đối_số != độ dài(các_ngoại[i]["tham số"])) {
+                        ném "biên dịch phát mã: sai số đối số ngoại hàm '" + tên + "'";
+                    };
+                    mình.biên dịch phát mã lệnh(thô, biên dịch mã opcode("OP_FFI_CALL"),
+                        số_đối_số, các_ngoại[i]["id"], 0);
+                    trả về đúng;
+                };
+            };
             nếu (nội_tại != rỗng) {
                 nếu (số_đối_số != nội_tại[1]) { ném "biên dịch phát mã: sai số đối số nội tại '" + tên + "'"; };
                 mình.biên dịch phát mã lệnh(thô, nội_tại[0], 0, 0, 0);
@@ -1042,6 +1055,18 @@ lớp công khai Bộ Phát Bytecode {
         nếu (độ dài(trực_tiếp) != số_global) {
             ném "biên dịch phát mã: sổ hàm khác IR trong '" + tên_module + "'";
         };
+        // Cấp descriptor ID cho toàn phiên trước khi phát thân hàm. Khi
+        // import lồng nhau, cùng một registry được truyền qua mọi module.
+        nếu (!co_khoa(phiên, "ngoại")) { phiên["ngoại"] = []; };
+        toàn_phiên = phiên["ngoại"];
+        ngoại_cục_bộ = [];
+        khai_ngoại = lấy map(ir, "ngoại", []);
+        lặp(i = 0; i < độ dài(khai_ngoại); i++) {
+            bản_ghi = khai_ngoại[i];
+            bản_ghi["id"] = độ dài(toàn_phiên);
+            thêm(toàn_phiên, bản_ghi);
+            thêm(ngoại_cục_bộ, bản_ghi);
+        };
         slots = [];
         hàm_đã_khai = [];
         hàm_ids = [];
@@ -1087,6 +1112,7 @@ lớp công khai Bộ Phát Bytecode {
         };
         trạng_thái = {"slots": slots, "khóa slots": [], "chuỗi": sổ["chuỗi"],
                       "mô đun": tên_module,
+                      "ngoại": ngoại_cục_bộ,
                       "nhánh nếu": [], "chọn": [], "thử": [],
                       "gọi thành viên": [], "gán thành viên": [],
                       "lớp đã khai": lớp_đã_khai, "lớp đã phát": [],
@@ -1169,6 +1195,7 @@ lớp công khai Bộ Phát Bytecode {
         trả về {"loại": "bytecode V++ chưa liên kết",
                 "bytecode": biên dịch bytecode từ thô(top),
                 "hàm": các_hàm,
+                "ngoại": ngoại_cục_bộ,
                 "slots": trạng_thái["slots"],
                 "chuỗi": trạng_thái["chuỗi"]};
     };

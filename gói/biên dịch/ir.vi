@@ -5,6 +5,8 @@ nhập gói/biên dịch/ngữ nghĩa;
 nhập gói/biên dịch/chương trình;
 nhập gói/biên dịch/biểu thức;
 nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Hạ IR {
@@ -30,6 +32,54 @@ lớp công khai Bộ Hạ IR {
 
     hàm riêng tư biên dịch IR thêm(lệnh, mã, giá_trị) {
         thêm(lệnh, {"mã": mã, "giá trị": giá_trị});
+    };
+
+    // Thứ tự mã ABI phải khớp bytecode::ForeignAbiType trong foreign.h.
+    hàm riêng tư biên dịch IR kiểu ngoại(kiểu) {
+        loại = ["void", "i32", "u32", "i64", "u64", "f64", "c_chuỗi",
+                "c_đệm_ra", "c_đệm_vào", "c_tệp", "c_thư_mục",
+                "c_mục_thư_mục", "c_cờ_con_trỏ", "c_dns", "c_socket"];
+        nếu (kiểu == "rỗng") { trả về 0; };
+        lặp(i = 0; i < độ dài(loại); i++) {
+            nếu (loại[i] == kiểu) { trả về i; };
+        };
+        ném "biên dịch IR: kiểu ABI FFI không hợp lệ '" + kiểu + "'";
+    };
+
+    hàm riêng tư biên dịch IR khai ngoại(mục, thư_viện, các_ngoại) {
+        đích = lấy map(thư_viện, mục["thư viện"], "");
+        nếu (đích == "") {
+            ném "biên dịch IR: thư viện FFI chưa khai báo '" + mục["thư viện"] + "'";
+        };
+        tham_số = mục["tham số"];
+        kiểu = [];
+        đệm = [];
+        lặp(i = 0; i < độ dài(tham_số); i++) {
+            p = tham_số[i];
+            loại = mình.biên dịch IR kiểu ngoại(p["kiểu"]);
+            thêm(kiểu, loại);
+            nếu (loại == 7 || loại == 8) {
+                chiều_dài = p["độ dài"];
+                đầu = mã điểm unicode(chiều_dài[0]);
+                tham_chiếu = -1;
+                cố_định = 0;
+                nếu (đầu >= 48 && đầu <= 57) {
+                    // Semantic đã xác nhận số nguyên dương không vượt 65536.
+                    cố_định = thành số nguyên(chiều_dài);
+                } hoặc {
+                    lặp(j = 0; j < độ dài(tham_số); j++) {
+                        nếu (tham_số[j]["tên"] == chiều_dài) { tham_chiếu = j; };
+                    };
+                    nếu (tham_chiếu < 0) { ném "biên dịch IR: thiếu tham số độ dài FFI"; };
+                };
+                thêm(đệm, [i, tham_chiếu, cố_định]);
+            };
+        };
+        thêm(các_ngoại, {"id": độ dài(các_ngoại), "tên": mục["tên"],
+            "thư viện": đích, "ký hiệu": mục["ký hiệu"],
+            "tham số": kiểu, "đệm": đệm,
+            "kết quả": mình.biên dịch IR kiểu ngoại(mục["kiểu trả về"]),
+            "abi": mục["abi"], "khả năng": mục["khả năng"]});
     };
 
     // Lexer có thể giữ `đối_tượng.thành_viên` trong một token tên.
@@ -582,6 +632,21 @@ lớp công khai Bộ Hạ IR {
         top = [];
         các_hàm = [];
         các_lớp = [];
+        thư_viện = {};
+        các_ngoại = [];
+        // Predeclare mọi thư viện trước: semantic cho phép thứ tự nguồn bất kỳ.
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mục = câu_lệnh[i];
+            nếu (lấy map(mục, "loại", "") == "ngoại thư viện") {
+                thư_viện[mục["tên"]] = mục["đích"];
+            };
+        };
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            mục = câu_lệnh[i];
+            nếu (lấy map(mục, "loại", "") == "ngoại hàm") {
+                mình.biên dịch IR khai ngoại(mục, thư_viện, các_ngoại);
+            };
+        };
         thứ_tự = [];
         lặp(i = 0; i < độ dài(câu_lệnh); i++) {
             mục = câu_lệnh[i];
@@ -607,6 +672,8 @@ lớp công khai Bộ Hạ IR {
                     bỏ qua;
                 };
                 nếu (lấy map(mục, "loại", "") == "giao diện") { bỏ qua; };
+                nếu (lấy map(mục, "loại", "") == "ngoại thư viện" ||
+                    lấy map(mục, "loại", "") == "ngoại hàm") { bỏ qua; };
                 nếu (lấy map(mục, "loại", "") == "nhập" && bỏ_qua_nhập) {
                     // Bước phát mã cần biết đúng vị trí import trong nguồn.
                     thêm(thứ_tự, {"loại": "nhập", "đích": mục["đích"],
@@ -647,6 +714,7 @@ lớp công khai Bộ Hạ IR {
         mình.biên dịch IR phân giải ràng buộc(top, các_hàm);
         trả về {"loại": "chương trình IR", "lệnh": top, "hàm": các_hàm,
                 "lớp": các_lớp,
+                "ngoại": các_ngoại,
                 "thứ tự": thứ_tự};
     };
 

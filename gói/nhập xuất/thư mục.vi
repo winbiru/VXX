@@ -6,6 +6,8 @@ nhập gói/bộ sưu tập/danh sách;
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/bảng mã;
 nhập gói/nhập xuất/đường dẫn;
+nhập gói/hệ thống/nền tảng;
+nhập gói/văn bản/chuỗi;
 
 ngoại thư viện c_thư_mục = "system.c";
 ngoại hàm tạo_mục_ffi(đường: c_chuỗi, quyền: u32): i32 từ c_thư_mục

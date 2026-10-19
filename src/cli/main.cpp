@@ -34,6 +34,7 @@
 #include "vpp/native/target.h"
 #include "vpp/native/raw_codegen.h"
 #include "vpp/native/vpp_machine_bridge.h"
+#include "vpp/native/aot.h"
 #include "vpp/runtime/error.h"
 #include "vpp/tooling/tooling.h"
 #include "vpp/core/message_constants.h"
@@ -337,6 +338,36 @@ static int buildFile(const std::string &filename) {
 
 // Quote only bootstrap arguments. The target source is read and compiled by
 // trình điều khiển.vi, never inserted as executable code in this wrapper.
+static int buildFullNative(const std::string &filename, const std::string &outputName,
+                           bool compiler) {
+    const auto input = fs::weakly_canonical(fs::absolute(vietvm::core::utf8Path(filename)));
+    const auto output = fs::absolute(vietvm::core::utf8Path(outputName));
+    if (input == fs::weakly_canonical(output) ||
+        (fs::exists(output) && fs::equivalent(input, output)))
+        throw std::runtime_error("Native AOT không được ghi đè mã nguồn");
+    verifyLockedProjectForSource(input);
+    vietvm::compiler::CompilationContext context;
+    context.importResolutionBase = input.parent_path();
+    context.currentSourceIdentity = input.generic_u8string();
+    const auto artifacts = vietvm::compiler::compilePipeline(context, readFile(input.u8string()), keywordMap, true);
+    vietvm::native::aot::Snapshot snapshot;
+    snapshot.strings = context.stringPool;
+    snapshot.entry = artifacts.bytecode;
+    snapshot.foreignFunctions = context.foreignFunctions;
+    for (const auto &[id, code] : context.functionBytecode) {
+        // Lambdas have an ID and executable body, but no StringPool name.
+        const auto name = context.functionNameIndices.find(id);
+        snapshot.functions.emplace(id, vietvm::native::aot::FunctionCode{
+            name == context.functionNameIndices.end() ? -1 : name->second, code});
+    }
+    for (const auto &module : context.moduleInitializers) snapshot.initializers.push_back(module.bytecode);
+    const char *root = std::getenv("VPP_AOT_ROOT");
+    if (!root || !*root) root = std::getenv("VPP_HOME");
+    if (!root || !*root) throw std::runtime_error("Native AOT cần VPP_HOME trỏ tới bộ cài toolchain");
+    vietvm::native::aot::compileExecutable(snapshot, output, fs::absolute(vietvm::core::utf8Path(root)), compiler);
+    return EXIT_SUCCESS;
+}
+
 static std::string vppStringLiteral(const std::string &value) {
     std::string result = "\"";
     for (const unsigned char c : value) {
@@ -471,6 +502,8 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
     primitiveRelative = "scripts/ASM/vpp_aot_primitives_aarch64.S";
 #elif defined(__linux__) && defined(__x86_64__)
     primitiveRelative = "scripts/ASM/vpp_aot_primitives_linux_x86_64.S";
+#elif defined(__linux__) && defined(__aarch64__)
+    primitiveRelative = "scripts/ASM/vpp_aot_primitives_linux_aarch64.S";
 #else
     std::cerr << "Native self-host chưa có runtime V++/assembly cho host này\n";
     return EXIT_FAILURE;
@@ -2855,6 +2888,10 @@ static int runCli(int argc, char* argv[]) {
         }
         if (argc >= 2) {
             std::string command = argv[1];
+            if (command == "--bootstrap-native" || command == "--emit-native") {
+                if (argc != 4) throw std::runtime_error("Cú pháp: vpp --bootstrap-native|--emit-native <source.vi> <output>");
+                return buildFullNative(argv[2], argv[3], command == "--bootstrap-native");
+            }
             if (command == "--batch-run-tests") {
                 if (argc < 4) return EXIT_FAILURE;
                 std::vector<fs::path> testFiles;

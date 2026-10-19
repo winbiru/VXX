@@ -1,4 +1,4 @@
-// Bộ nạp artifact sau linker V++: đóng gói ABI VM bốn trường, rồi chạy.
+// Bộ nạp artifact sau linker V++: ABI VM cũ 4 vùng; native FFI thêm vùng 5.
 // Toàn bộ việc phân tích/phát bytecode/liên kết thực hiện trong gói V++;
 // bytecode_chay_vm chỉ chuyển ABI và thực thi trên máy ảo hiện có.
 nhập gói/biên dịch/liên kết;
@@ -68,14 +68,16 @@ lớp công khai Bộ Nạp Artifact {
             nếu (loai_cua(tên_index) != "số nguyên") {
                 ném "biên dịch nạp: function name index ngoài StringPool";
             };
-            nếu (tên_index < 0 || tên_index >= độ dài(chuỗi)) {
+            nếu (tên_index < -1 || tên_index >= độ dài(chuỗi)) {
                 ném "biên dịch nạp: function name index ngoài StringPool";
             };
-            khóa = thành chuỗi(tên_index);
-            nếu (co_khoa(tên_đã_khai, khóa)) {
-                ném "biên dịch nạp: trùng function runtime name index";
+            nếu (tên_index >= 0) {
+                khóa = thành chuỗi(tên_index);
+                nếu (co_khoa(tên_đã_khai, khóa)) {
+                    ném "biên dịch nạp: trùng function runtime name index";
+                };
+                tên_đã_khai[khóa] = đúng;
             };
-            tên_đã_khai[khóa] = đúng;
             thêm(bảng_hàm, [i, tên_index,
                             mình.bytecode(lấy map(h, "bytecode", rỗng))]);
         };
@@ -104,11 +106,28 @@ lớp công khai Bộ Nạp Artifact {
                             mình.bytecode(lấy map(mô_đun, "bytecode", rỗng))]);
         };
         mình.abi = [nguồn, chuỗi, bảng_hàm, khởi_tạo];
+        ngoại = biên dịch nạp danh sách(lấy map(artifact, "ngoại", []), "ngoại hàm");
+        nếu (độ dài(ngoại) > 0) {
+            dây_ngoại = [];
+            lặp(i = 0; i < độ dài(ngoại); i++) {
+                d = ngoại[i];
+                nếu (loai_cua(d) != "từ điển" || d["id"] != i) {
+                    ném "biên dịch nạp: foreign descriptor ID không liên tiếp";
+                };
+                thêm(dây_ngoại, [d["id"], d["thư viện"], d["ký hiệu"],
+                    d["tham số"], d["đệm"], d["kết quả"],
+                    d["abi"], d["khả năng"]]);
+            };
+            thêm(mình.abi, dây_ngoại);
+        };
         trả về mình.abi;
     };
 
     hàm công khai chạy() {
         dây = mình.nạp();
+        nếu (độ dài(dây) == 5) {
+            ném "biên dịch nạp: chạy artifact có FFI cần native AOT";
+        };
         trả về bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]);
     };
 };

@@ -118,7 +118,10 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             };
             tên_tham_số = mình.biên dịch chương trình giá trị(p);
             biên dịch biểu thức lấy(p);
-            lặp(j = 0; lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "định danh"; j++) {
+            // Trong tên tham số nhiều từ, "mặc định" có thể là một phần
+            // định danh (ví dụ: giá trị mặc định), dù lexer gắn loại từ khóa.
+            lặp(j = 0; lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "định danh" ||
+                mình.biên dịch chương trình giá trị(p) == "mặc định"; j++) {
                 tên_tham_số += " " + biên dịch biểu thức lấy(p)["giá trị"];
             };
             thêm(tham_số, tên_tham_số);

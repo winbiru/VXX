@@ -36,6 +36,56 @@ add_test(NAME installed-stdlib-vi
 set_tests_properties(installed-stdlib-vi PROPERTIES
     PASS_REGULAR_EXPRESSION "vpp_installed_stdlib_ok" TIMEOUT 90)
 
+# Run host machine-code executables built by the full-language AOT compiler.
+# These fixtures cover anonymous closure metadata, captured exceptions, class
+# dispatch, and branch/loop lowering on both Linux runner architectures.
+if (UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$")
+    add_test(NAME installed-native-aot-bootstrap-three-stage
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE_ROOT=${VPP_SOURCE_ROOT}"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-bootstrap"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_bootstrap.cmake")
+    set_tests_properties(installed-native-aot-bootstrap-three-stage PROPERTIES
+        TIMEOUT 900 LABELS bootstrap-native)
+
+    foreach(case IN ITEMS
+            kiem_tra_closure_capture
+            kiem_tra_ngoai_le_xuyen_ham
+            kiem_tra_ke_thua
+            kiem_tra_native_control_flow)
+        set(fixture "${CMAKE_CURRENT_BINARY_DIR}/${case}.vi")
+        configure_file("${VPP_SOURCE_ROOT}/src/tests/${case}.vi"
+            "${fixture}" COPYONLY)
+        add_test(NAME "installed-native-aot-${case}"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DVPP_CLI=${VPP_CLI}"
+                "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+                "-DVPP_SOURCE=${fixture}"
+                "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/${case}.expected"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-${case}"
+                -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+        set_tests_properties("installed-native-aot-${case}" PROPERTIES TIMEOUT 180)
+    endforeach()
+endif()
+
+if (VPP_TARGET STREQUAL "aarch64-linux-gnu")
+    # Keep the source outside the checkout so runtime discovery must use the
+    # installed runtime.vi and Linux ARM64 assembly, without a source fallback.
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/nativeaotprint.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-native-print.vi" COPYONLY)
+    add_test(NAME installed-native-selfhost-runtime
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_EXEC=${VPP_EXEC}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-native-print.vi"
+            "-DVPP_TARGET=${VPP_TARGET}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/aot-runtime"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/checknativeprint.cmake")
+    set_tests_properties(installed-native-selfhost-runtime PROPERTIES TIMEOUT 600)
+endif()
+
 set(source "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_calls.vi")
 set(object_dir "${CMAKE_CURRENT_BINARY_DIR}/native-objects")
 file(MAKE_DIRECTORY "${object_dir}")

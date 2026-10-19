@@ -1,6 +1,7 @@
 // Đồng hồ địa phương POSIX/Windows. Trình tự epoch -> lịch do V++ điều phối;
 // runtime ánh xạ localtime_r sang CRT localtime_s trên Windows.
 nhập gói/thời gian/utc;
+nhập gói/lõi/chuyển kiểu;
 
 ngoại thư viện c_địa_phương = "system.c";
 ngoại hàm đổi_giờ_địa_phương_ffi(giây: c_đệm_vào[8], kết_quả: c_đệm_ra[64]): c_cờ_con_trỏ từ c_địa_phương

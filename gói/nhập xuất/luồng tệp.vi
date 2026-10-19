@@ -1,6 +1,7 @@
 // Luồng giữ handle stdio do VM quản lý; vị trí tính theo byte.
 nhập gói/nhập xuất/tệp;
 nhập gói/lõi/giao diện tài nguyên;
+nhập gói/lõi/chuyển kiểu;
 
 ngoại thư viện c_luồng = "system.c";
 ngoại hàm luồng_mở_ffi(đường: c_chuỗi, chế_độ: c_chuỗi): c_tệp từ c_luồng

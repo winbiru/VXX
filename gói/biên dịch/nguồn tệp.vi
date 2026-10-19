@@ -5,6 +5,9 @@ nhập gói/biên dịch/chương trình;
 nhập gói/biên dịch/đồ thị mô đun;
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
+nhập gói/hệ thống/nền tảng;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
 
 // Các phép biến đổi không lưu trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch nguồn chuẩn đường(đường) {
@@ -37,9 +40,41 @@ hàm công khai biên dịch nguồn chuẩn đường(đường) {
     trả về gốc_dữ_liệu + biên dịch đồ thị chuẩn đường(đuôi);
 };
 
+// Những tên gói tương thích mà Stage 0 cũng hỗ trợ. Phân giải ngay trong
+// V++ để Stage 1/2/3 không cần gọi ngược C++ package resolver.
+hàm riêng tư biên dịch nguồn tên gói(đích) {
+    bí_danh = {
+        "vpp_core": "lõi", "cốt lõi": "lõi",
+        "vpp_io": "nhập xuất", "vào ra": "nhập xuất",
+        "vpp_http": "mạng", "vpp_web": "mạng", "mạng web": "mạng",
+        "http": "mạng/http", "đầu nối mạng": "mạng/ổ cắm",
+        "phân giải dns": "mạng/dns", "máy chủ http": "mạng/http/máy chủ",
+        "vpp_system": "hệ thống", "vpp_data": "dữ liệu",
+        "json": "dữ liệu/json", "xml": "dữ liệu/xml",
+        "cây tài liệu xml": "dữ liệu/xml/dom",
+        "mật mã": "bảo mật/mật mã",
+        "vpp_app": "ứng dụng", "vpp_starters": "dựng",
+        "khởi động": "dựng"
+    };
+    trả về lấy map(bí_danh, đích, đích);
+};
+
+hàm riêng tư biên dịch nguồn tìm gói(gốc, đích) {
+    tên = biên dịch nguồn tên gói(đích);
+    nền = gốc + "/gói/" + tên;
+    // Package chính.vi được ưu tiên trước module cùng tên, như Stage 0.
+    tệp = biên dịch nguồn chuẩn đường(nền + "/chính.vi");
+    nếu (là tệp(tệp)) { trả về tệp; };
+    tệp = biên dịch nguồn chuẩn đường(nền + ".vi");
+    nếu (là tệp(tệp)) { trả về tệp; };
+    tệp = biên dịch nguồn chuẩn đường(gốc + "/gói/lõi/" + tên + ".vi");
+    nếu (là tệp(tệp)) { trả về tệp; };
+    trả về "";
+};
+
 hàm riêng tư biên dịch nguồn đích(importer, đích, thư_viện) {
-    // Tìm nguồn cục bộ từ thư mục importer lên tổ tiên trước thư viện cài.
-    // Các dạng package/compatibility chưa có phải được báo rõ, không fallback.
+    // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
+    // khi áp dụng bí danh và gói của toolchain.
     thư_mục = đường dẫn cha(importer);
     lặp(vòng = 0; đúng; vòng++) {
         tệp = biên dịch nguồn chuẩn đường(thư_mục + "/" + đích + ".vi");
@@ -48,9 +83,19 @@ hàm riêng tư biên dịch nguồn đích(importer, đích, thư_viện) {
         nếu (cha == thư_mục || cha == "") { thoát; };
         thư_mục = cha;
     };
+    thư_mục = đường dẫn cha(importer);
+    lặp(vòng = 0; đúng; vòng++) {
+        tệp = biên dịch nguồn tìm gói(thư_mục, đích);
+        nếu (tệp != "") { trả về tệp; };
+        cha = đường dẫn cha(thư_mục);
+        nếu (cha == thư_mục || cha == "") { thoát; };
+        thư_mục = cha;
+    };
     nếu (thư_viện != "") {
         tệp = biên dịch nguồn chuẩn đường(thư_viện + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
+        tệp = biên dịch nguồn tìm gói(thư_viện, đích);
+        nếu (tệp != "") { trả về tệp; };
     };
     ném "biên dịch nguồn: không tìm thấy import '" + đích + "' từ '" + importer + "'";
 };
@@ -113,7 +158,25 @@ lớp công khai Bộ Nạp Nguồn {
 };
 
 hàm riêng tư biên dịch nguồn cây(tệp) {
-    thử { trả về biên dịch phân tích chương trình thuần(đọc tệp(tệp)); }
+    thử {
+        cây = biên dịch phân tích chương trình thuần(đọc tệp(tệp));
+        // Đồng bộ với Stage 0: một package entrypoint `chính.vi` tự
+        // tái xuất các import không có bí danh. Biến đổi AST trước khi
+        // dựng cạnh để registry và emitter dùng cùng một thuộc tính.
+        nếu (đường dẫn tên(tệp) == "chính.vi") {
+            câu_lệnh = cây["câu lệnh"];
+            lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+                mục = câu_lệnh[i];
+                nếu (lấy map(mục, "loại", "") == "nhập" &&
+                    lấy map(mục, "bí danh", "") == "") {
+                    mục["tái xuất"] = đúng;
+                    câu_lệnh[i] = mục;
+                };
+            };
+            cây["câu lệnh"] = câu_lệnh;
+        };
+        trả về cây;
+    }
     bắt lỗi(e) { ném "biên dịch nguồn '" + tệp + "': " + thành chuỗi(e); };
 };
 

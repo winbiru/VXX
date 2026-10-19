@@ -151,4 +151,8 @@ hàm chính() {
     in cây_nhiều_từ[1]["giao diện cha"][0] == "Có Chứa";
     in cây_nhiều_từ[3]["lớp cha"] == "Ngăn Xếp";
     in cây_nhiều_từ[3]["triển khai"][0] == "Có Chứa Mở Rộng";
+    // Từ khóa "mặc định" cũng được phép ở giữa tên tham số nhiều từ.
+    chữ_ký_tên_tham_số = biên dịch phân tích chương trình tự chủ(
+        "hàm đọc(giá trị mặc định) { trả về giá trị mặc định; };")["câu lệnh"][0];
+    in chữ_ký_tên_tham_số["tham số"][0] == "giá trị mặc định";
 };

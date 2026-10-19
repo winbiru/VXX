@@ -5,6 +5,7 @@
 nhập gói/thời gian/lịch;
 nhập gói/thời gian/utc;
 nhập gói/thời gian/địa phương;
+nhập gói/lõi/chuyển kiểu;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Đồng Hồ {

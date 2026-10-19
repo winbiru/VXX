@@ -2,6 +2,7 @@
 // Wall clock, epoch/tzdb và monotonic clock vẫn là primitive/runtime boundary.
 
 nhập gói/văn bản/chuỗi;
+nhập gói/bộ sưu tập/từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Lịch {

@@ -3,6 +3,7 @@
 // Giới hạn năm 0000..9999, phép toán giây có độ chính xác nguyên binary64.
 
 nhập gói/lõi/toán học;
+nhập gói/lõi/chuyển kiểu;
 
 ngoại thư viện c_utc = "system.c";
 ngoại hàm đọc_đồng_hồ_utc_ffi(mã_đồng_hồ: i32, đệm: c_đệm_ra[16]): i32 từ c_utc

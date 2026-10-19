@@ -1,0 +1,17 @@
+// Native compiler must resolve lexical bindings before foreign declarations.
+ngoại thư viện hệ_thống = "system.ffi";
+ngoại hàm đọc_eintr(): i32 từ hệ_thống
+    ký hiệu "eintr" abi "c" khả năng "system.ffi.error";
+
+hàm trả_42() { trả về 42; };
+hàm qua_tham_số(đọc_eintr) { trả về đọc_eintr(); };
+
+hàm chính() {
+    // A direct foreign call remains available before the lexical shadow.
+    in đọc_eintr() > 0;
+    // A function parameter with the same name must be invoked indirectly.
+    in qua_tham_số(trả_42) == 42;
+    // Local shadowing must not turn this call into OP_FFI_CALL.
+    đọc_eintr = trả_42;
+    in đọc_eintr() == 42;
+};

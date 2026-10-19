@@ -1,0 +1,6 @@
+nhập demo;
+
+hàm chính() {
+    in gấp đôi(21);
+    in cộng(20, 22);
+};

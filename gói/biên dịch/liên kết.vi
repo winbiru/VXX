@@ -130,6 +130,7 @@ lớp công khai Bộ Liên Kết Bytecode {
                         "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         trả về {"loại": "bytecode V++ đã liên kết", "bytecode": bytecode,
                 "hàm": bảng_hàm, "điểm vào": điểm_vào,
+                "ngoại": lấy map(artifact, "ngoại", []),
                 "slots": slots, "chuỗi": chuỗi};
     };
 
@@ -148,7 +149,7 @@ lớp công khai Bộ Liên Kết Bytecode {
         bộ_kiểu = Bộ Đăng Ký Kiểu(sổ, đồ_thị);
         bộ_kiểu.đăng ký();
         phiên = {"đa mô đun": đúng, "cạnh dùng": [],
-                 "đã phát": [], "id tối đa": -1};
+                 "đã phát": [], "id tối đa": -1, "ngoại": []};
         tên_gốc = đồ_thị["điểm vào"];
         cây_gốc = bộ_kiểu.cây(tên_gốc);
         ir_gốc = biên dịch hạ IR từ cây thuần(cây_gốc, đúng);
@@ -266,7 +267,8 @@ lớp công khai Bộ Liên Kết Bytecode {
         trả về {"loại": "bytecode V++ đồ thị đã liên kết",
             "bytecode": bytecode, "hàm": bảng_hàm,
             "điểm vào": điểm_vào, "slots": gốc_dữ_liệu["slots"],
-            "chuỗi": sổ["chuỗi"], "mô đun khởi tạo": initializer};
+            "chuỗi": sổ["chuỗi"], "mô đun khởi tạo": initializer,
+            "ngoại": phiên["ngoại"]};
     };
 
     hàm công khai biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn) {
