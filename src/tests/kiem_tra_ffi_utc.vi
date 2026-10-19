@@ -1,0 +1,35 @@
+nhập thời gian;
+
+hàm chính() {
+    // Những ngày cố định tránh phụ thuộc múi giờ và đồng hồ máy thử.
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(0), đúng) ==
+        "1970-01-01T00:00:00Z";
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(-1), đúng) ==
+        "1969-12-31T23:59:59Z";
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(951782400), đúng) ==
+        "2000-02-29T00:00:00Z";
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(2147483648.0), đúng) ==
+        "2038-01-19T03:14:08Z";
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(253402300799.0), đúng) ==
+        "9999-12-31T23:59:59Z";
+    in thời gian định dạng đồng hồ(thời gian utc từ epoch giây(-62167219200.0), đúng) ==
+        "0000-01-01T00:00:00Z";
+
+    // tv_sec âm phải được giải mã dưới dạng int64 có dấu.
+    tất_cả_ff = [255, 255, 255, 255, 255, 255, 255, 255];
+    in thời gian utc đọc i64(tất_cả_ff, 0) == -1;
+    in thời gian utc đọc i64([0, 0, 0, 128, 0, 0, 0, 0], 0) == 2147483648.0;
+
+    thử {
+        thời gian utc từ epoch giây(253402300800.0);
+    } bắt lỗi(e) { in "chặn năm > 9999"; };
+    thử {
+        thời gian utc từ epoch giây(-62167219201.0);
+    } bắt lỗi(e) { in "chặn năm < 0000"; };
+    thử {
+        thời gian utc từ epoch giây(0.5);
+    } bắt lỗi(e) { in "chặn giây lẻ"; };
+
+    // Windows/Unix cùng chạy FFI realtime; luôn là YYYY-MM-DDTHH:MM:SSZ.
+    in độ dài(lấy thời gian utc()) == 20;
+};

@@ -96,11 +96,6 @@ std::vector<std::string> splitTopLevelFields(const std::string &text,
     return fields;
 }
 
-// Tách top level đối số; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
-std::vector<std::string> splitTopLevelArguments(const std::string &text) {
-    return splitTopLevelFields(text, ',');
-}
-
 // Trích xuất parens; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
 std::pair<std::string, size_t> extractParens(const std::vector<std::string>& tokens, size_t start) {
     if (start >= tokens.size() || tokens[start] != "(")
@@ -140,35 +135,6 @@ std::pair<std::string, size_t> extractBlock(const std::vector<std::string>& toke
     }
     if (depth != 0) throw std::runtime_error(vietvm::messages::formatMessage(
         vietvm::messages::kSyntaxUnbalancedBraces));
-    return {trim(oss.str()), i};
-}
-
-// Trích xuất biểu thức until semicolon; hàm tìm phần dữ liệu cần thiết trong đầu vào và trả về lát cắt đã được chuẩn hóa.
-std::pair<std::string, size_t> extractExpressionUntilSemicolon(const std::vector<std::string>& tokens, size_t start) {
-    std::ostringstream oss;
-    size_t i = start;
-    int parenDepth = 0;
-    int braceDepth = 0;
-    int bracketDepth = 0;
-
-    while (i < tokens.size()) {
-        const std::string &tk = tokens[i];
-
-        if (tk == "(") ++parenDepth;
-        else if (tk == ")" && parenDepth > 0) --parenDepth;
-        else if (tk == "{") ++braceDepth;
-        else if (tk == "}" && braceDepth > 0) --braceDepth;
-        else if (tk == "[") ++bracketDepth;
-        else if (tk == "]" && bracketDepth > 0) --bracketDepth;
-
-        if (tk == ";" && parenDepth == 0 && braceDepth == 0 && bracketDepth == 0) {
-            break;
-        }
-
-        oss << tokens[i] << ' ';
-        ++i;
-    }
-    if (i < tokens.size() && tokens[i] == ";") ++i;
     return {trim(oss.str()), i};
 }
 

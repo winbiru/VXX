@@ -1,0 +1,32 @@
+// sparc: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phát SPARC {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+        ra = [];
+        nếu (loại == "hằng") {
+                thấp = hằng % 1024;
+                nếu (thấp < 0) { thấp += 1024; };
+                cao = (hằng - thấp) / 1024;
+                nếu (cao < 0) { cao += 4194304; };
+                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("11000000") + cao, ít);
+                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("90122000") + thấp, ít);
+            } hoặc {
+                nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "90020009", ít); }
+                hoặc { biên dịch mã máy thêm hex(ra, "90220009", ít); };
+            };
+            biên dịch mã máy thêm hex(ra, "81c3e008", ít);
+            biên dịch mã máy thêm hex(ra, "01000000", ít);
+        trả về ra;
+    };
+};
+
+
+hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    __vpp_adapter = Bộ Phát SPARC();
+    trả về __vpp_adapter.biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+};

@@ -1,0 +1,26 @@
+nhập gói/lõi/chính;
+nhập gói/nhập xuất/tệp;
+
+hàm chính() {
+    đường = ".tmp_oop_logger.txt";
+    ghi tệp(đường, "");
+    logger = Bộ Ghi Nhật Ký("tệp", đường, "cảnh báo");
+    in logger.ghi("thông tin", "ẩn") == 0;
+    in logger.ghi("cảnh báo", "kiểm tra") == 1;
+    logger.đổi mức("lỗi");
+    in logger.ghi("cảnh báo", "ẩn tiếp") == 0;
+    in logger.ghi("lỗi", "có lỗi") == 1;
+    in đọc tệp(đường) == "[CẢNH BÁO] kiểm tra\n[LỖI] có lỗi\n";
+    sai_mức = sai;
+    thử { logger.đổi mức("khác"); } bắt lỗi(e) { sai_mức = đúng; };
+    in sai_mức;
+    in logger.ghi("cảnh báo", "ẩn lần nữa") == 0;
+    khác = Bộ Ghi Nhật Ký("tệp", đường, "thông tin");
+    in khác.thông tin(42) == 1;
+    in logger.cảnh báo("vẫn ẩn") == 0;
+    in đọc tệp(đường) == "[CẢNH BÁO] kiểm tra\n[LỖI] có lỗi\n[THÔNG TIN] 42\n";
+    in logger.đóng() && logger.đóng();
+    chặn_đóng = sai;
+    thử { logger.lỗi("ẩn"); } bắt lỗi(e) { chặn_đóng = đúng; };
+    in chặn_đóng;
+};

@@ -5,127 +5,272 @@
 nhập gói/mạng/http/máy khách;
 nhập gói/dữ liệu/json/chính;
 
-// Ghi chú hàm: nối đường dẫn url.
-hàm nối đường dẫn url(gốc, đường dẫn) {
-    nếu (đường dẫn == "") {
-        trả về gốc;
+// Lưu ngữ cảnh của một phản hồi, gom quy tắc thành công/lỗi và tạo JSON.
+// Hai phương thức giữ nguyên định dạng cũ: an toàn escape message, còn
+// object chèn message trực tiếp để tương thích với những API đang sử dụng.
+lớp công khai Bộ Dựng Phản Hồi REST {
+    hàm công khai khởi tạo(thành_công, thông_báo) {
+        mình.thành_công = thành_công;
+        mình.thông_báo = thông_báo;
     };
-    nếu (gốc == "") {
-        trả về đường dẫn;
+
+    hàm công khai an toàn(dataJson) {
+        trạng_thái = "false";
+        nếu (mình.thành_công) { trạng_thái = "true"; };
+        trả về "{" + json thuộc tính thô("data", dataJson) + "," +
+            json thuộc tính thô("success", trạng_thái) + "," +
+            json thuộc tính chuỗi("message", mình.thông_báo) + "}";
     };
-    trả về gốc + đường dẫn;
+
+    hàm công khai object(dataJson) {
+        trạng_thái = "false";
+        nếu (mình.thành_công) { trạng_thái = "true"; };
+        trả về "{\"data\":" + dataJson + ",\"success\":" + trạng_thái +
+            ",\"message\":\"" + mình.thông_báo + "\"}";
+    };
+
+    hàm công khai dữ liệu(requestId, dataKey, dataValue) {
+        dataJson = "{\"requestId\":\"" + requestId + "\",\"" + dataKey +
+            "\":\"" + dataValue + "\"}";
+        trả về mình.object(dataJson);
+    };
+
+    hàm công khai jwt(token, refreshToken) {
+        dataJson = "{\"token\":\"" + token + "\",\"refreshToken\":\"" +
+            refreshToken + "\"}";
+        trả về mình.object(dataJson);
+    };
 };
 
-// Ghi chú hàm: rest lấy.
-hàm rest lấy(gốc, đường dẫn) {
-    trả về mạng lấy(nối đường dẫn url(gốc, đường dẫn));
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp riêng tư Xử Lý Nội Bộ Rest {
+    hàm công khai khởi tạo() {};
+
+    // Ghi chú hàm: nối đường dẫn url.
+    hàm công khai nối đường dẫn url(gốc_dữ_liệu, đường dẫn) {
+        nếu (đường dẫn == "") {
+            trả về gốc_dữ_liệu;
+        };
+        nếu (gốc_dữ_liệu == "") {
+            trả về đường dẫn;
+        };
+        trả về gốc_dữ_liệu + đường dẫn;
+    };
+
+    // Ghi chú hàm: rest lấy.
+    hàm công khai rest lấy(gốc_dữ_liệu, đường dẫn) {
+        trả về mạng lấy(mình.nối đường dẫn url(gốc_dữ_liệu, đường dẫn));
+    };
+
+    // Ghi chú hàm: rest gửi.
+    hàm công khai rest gửi(gốc_dữ_liệu, đường dẫn, dữ liệu) {
+        trả về mạng gửi(mình.nối đường dẫn url(gốc_dữ_liệu, đường dẫn), dữ liệu);
+    };
+
+    // Ghi chú hàm: rest cập nhật.
+    hàm công khai rest cập nhật(gốc_dữ_liệu, đường dẫn, dữ liệu) {
+        trả về mạng cập nhật(mình.nối đường dẫn url(gốc_dữ_liệu, đường dẫn), dữ liệu);
+    };
+
+    // Ghi chú hàm: rest xóa.
+    hàm công khai rest xóa(gốc_dữ_liệu, đường dẫn) {
+        trả về mạng xóa(mình.nối đường dẫn url(gốc_dữ_liệu, đường dẫn));
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công không escape dữ liệu raw.
+    // Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
+    hàm công khai rest json thành công an toàn(message, dataJson) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, message).an toàn(dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi không escape dữ liệu raw.
+    // Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
+    hàm công khai rest json lỗi an toàn(message, dataJson) {
+        trả về Bộ Dựng Phản Hồi REST(sai, message).an toàn(dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công chuẩn API.
+    hàm công khai rest json thành công object(message, dataJson) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, message).object(dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi chuẩn API với data object tùy biến.
+    hàm công khai rest json lỗi object(message, dataJson) {
+        trả về Bộ Dựng Phản Hồi REST(sai, message).object(dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công chuẩn API.
+    hàm công khai rest json thành công(message, dataValue, requestId) {
+        dataJson = "{\"requestId\":\"" + requestId + "\",\"value\":\"" + dataValue + "\"}";
+        trả về mình.rest json thành công object(message, dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi chuẩn API.
+    hàm công khai rest json lỗi(message, requestId) {
+        dataJson = "{\"requestId\":\"" + requestId + "\"}";
+        trả về mình.rest json lỗi object(message, dataJson);
+    };
+
+    // Ghi chú hàm: dựng JSON thành công với data object gồm requestId và một key bất kỳ.
+    hàm công khai rest json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, message).dữ liệu(requestId, dataKey, dataValue);
+    };
+
+    // Ghi chú hàm: dựng JSON lỗi với data object gồm requestId và một key bất kỳ.
+    hàm công khai rest json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+        trả về Bộ Dựng Phản Hồi REST(sai, message).dữ liệu(requestId, dataKey, dataValue);
+    };
+
+    // Ghi chú hàm: in JSON response thành công với data object tùy biến.
+    hàm công khai rest in json thành công object(message, dataJson) {
+        in mình.rest json thành công object(message, dataJson);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response lỗi với data object tùy biến.
+    hàm công khai rest in json lỗi object(message, dataJson) {
+        in mình.rest json lỗi object(message, dataJson);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON thành công với data object requestId + key/value.
+    hàm công khai rest in json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+        in mình.rest json thành công dữ liệu(message, requestId, dataKey, dataValue);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON lỗi với data object requestId + key/value.
+    hàm công khai rest in json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+        in mình.rest json lỗi dữ liệu(message, requestId, dataKey, dataValue);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: dựng JSON thành công cho luồng đăng nhập JWT.
+    hàm công khai rest json thành công jwt(message, token, refreshToken) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, message).jwt(token, refreshToken);
+    };
+
+    // Ghi chú hàm: in JSON thành công cho luồng đăng nhập JWT.
+    hàm công khai rest in json thành công jwt(message, token, refreshToken) {
+        in mình.rest json thành công jwt(message, token, refreshToken);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response thành công.
+    hàm công khai rest in json thành công(message, dataValue, requestId) {
+        in mình.rest json thành công(message, dataValue, requestId);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response lỗi.
+    hàm công khai rest in json lỗi(message, requestId) {
+        in mình.rest json lỗi(message, requestId);
+        trả về 0;
+    };
 };
 
-// Ghi chú hàm: rest gửi.
-hàm rest gửi(gốc, đường dẫn, dữ liệu) {
-    trả về mạng gửi(nối đường dẫn url(gốc, đường dẫn), dữ liệu);
+
+hàm công khai nối đường dẫn url(gốc, đường dẫn) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.nối đường dẫn url(gốc, đường dẫn);
 };
 
-// Ghi chú hàm: rest cập nhật.
-hàm rest cập nhật(gốc, đường dẫn, dữ liệu) {
-    trả về mạng cập nhật(nối đường dẫn url(gốc, đường dẫn), dữ liệu);
+hàm công khai rest lấy(gốc, đường dẫn) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest lấy(gốc, đường dẫn);
 };
 
-// Ghi chú hàm: rest xóa.
-hàm rest xóa(gốc, đường dẫn) {
-    trả về mạng xóa(nối đường dẫn url(gốc, đường dẫn));
+hàm công khai rest gửi(gốc, đường dẫn, dữ liệu) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest gửi(gốc, đường dẫn, dữ liệu);
 };
 
-// Ghi chú hàm: dựng JSON response thành công không escape dữ liệu raw.
-// Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
-hàm rest json thành công an toàn(message, dataJson) {
-    trả về "{" + json thuộc tính thô("data", dataJson) + "," + json thuộc tính thô("success", "true") + "," + json thuộc tính chuỗi("message", message) + "}";
+hàm công khai rest cập nhật(gốc, đường dẫn, dữ liệu) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest cập nhật(gốc, đường dẫn, dữ liệu);
 };
 
-// Ghi chú hàm: dựng JSON response lỗi không escape dữ liệu raw.
-// Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
-hàm rest json lỗi an toàn(message, dataJson) {
-    trả về "{" + json thuộc tính thô("data", dataJson) + "," + json thuộc tính thô("success", "false") + "," + json thuộc tính chuỗi("message", message) + "}";
+hàm công khai rest xóa(gốc, đường dẫn) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest xóa(gốc, đường dẫn);
 };
 
-// Ghi chú hàm: dựng JSON response thành công chuẩn API.
-hàm rest json thành công object(message, dataJson) {
-    trả về "{\"data\":" + dataJson + ",\"success\":true,\"message\":\"" + message + "\"}";
+hàm công khai rest json thành công an toàn(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json thành công an toàn(message, dataJson);
 };
 
-// Ghi chú hàm: dựng JSON response lỗi chuẩn API với data object tùy biến.
-hàm rest json lỗi object(message, dataJson) {
-    trả về "{\"data\":" + dataJson + ",\"success\":false,\"message\":\"" + message + "\"}";
+hàm công khai rest json lỗi an toàn(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json lỗi an toàn(message, dataJson);
 };
 
-// Ghi chú hàm: dựng JSON response thành công chuẩn API.
-hàm rest json thành công(message, dataValue, requestId) {
-    dataJson = "{\"requestId\":\"" + requestId + "\",\"value\":\"" + dataValue + "\"}";
-    trả về rest json thành công object(message, dataJson);
+hàm công khai rest json thành công object(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json thành công object(message, dataJson);
 };
 
-// Ghi chú hàm: dựng JSON response lỗi chuẩn API.
-hàm rest json lỗi(message, requestId) {
-    dataJson = "{\"requestId\":\"" + requestId + "\"}";
-    trả về rest json lỗi object(message, dataJson);
+hàm công khai rest json lỗi object(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json lỗi object(message, dataJson);
 };
 
-// Ghi chú hàm: dựng JSON thành công với data object gồm requestId và một key bất kỳ.
-hàm rest json thành công dữ liệu(message, requestId, dataKey, dataValue) {
-    dataJson = "{\"requestId\":\"" + requestId + "\",\"" + dataKey + "\":\"" + dataValue + "\"}";
-    trả về rest json thành công object(message, dataJson);
+hàm công khai rest json thành công(message, dataValue, requestId) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json thành công(message, dataValue, requestId);
 };
 
-// Ghi chú hàm: dựng JSON lỗi với data object gồm requestId và một key bất kỳ.
-hàm rest json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
-    dataJson = "{\"requestId\":\"" + requestId + "\",\"" + dataKey + "\":\"" + dataValue + "\"}";
-    trả về rest json lỗi object(message, dataJson);
+hàm công khai rest json lỗi(message, requestId) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json lỗi(message, requestId);
 };
 
-// Ghi chú hàm: in JSON response thành công với data object tùy biến.
-hàm rest in json thành công object(message, dataJson) {
-    in rest json thành công object(message, dataJson);
-    trả về 0;
+hàm công khai rest json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json thành công dữ liệu(message, requestId, dataKey, dataValue);
 };
 
-// Ghi chú hàm: in JSON response lỗi với data object tùy biến.
-hàm rest in json lỗi object(message, dataJson) {
-    in rest json lỗi object(message, dataJson);
-    trả về 0;
+hàm công khai rest json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json lỗi dữ liệu(message, requestId, dataKey, dataValue);
 };
 
-// Ghi chú hàm: in JSON thành công với data object requestId + key/value.
-hàm rest in json thành công dữ liệu(message, requestId, dataKey, dataValue) {
-    in rest json thành công dữ liệu(message, requestId, dataKey, dataValue);
-    trả về 0;
+hàm công khai rest in json thành công object(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json thành công object(message, dataJson);
 };
 
-// Ghi chú hàm: in JSON lỗi với data object requestId + key/value.
-hàm rest in json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
-    in rest json lỗi dữ liệu(message, requestId, dataKey, dataValue);
-    trả về 0;
+hàm công khai rest in json lỗi object(message, dataJson) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json lỗi object(message, dataJson);
 };
 
-// Ghi chú hàm: dựng JSON thành công cho luồng đăng nhập JWT.
-hàm rest json thành công jwt(message, token, refreshToken) {
-    dataJson = "{\"token\":\"" + token + "\",\"refreshToken\":\"" + refreshToken + "\"}";
-    trả về rest json thành công object(message, dataJson);
+hàm công khai rest in json thành công dữ liệu(message, requestId, dataKey, dataValue) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json thành công dữ liệu(message, requestId, dataKey, dataValue);
 };
 
-// Ghi chú hàm: in JSON thành công cho luồng đăng nhập JWT.
-hàm rest in json thành công jwt(message, token, refreshToken) {
-    in rest json thành công jwt(message, token, refreshToken);
-    trả về 0;
+hàm công khai rest in json lỗi dữ liệu(message, requestId, dataKey, dataValue) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json lỗi dữ liệu(message, requestId, dataKey, dataValue);
 };
 
-// Ghi chú hàm: in JSON response thành công.
-hàm rest in json thành công(message, dataValue, requestId) {
-    in rest json thành công(message, dataValue, requestId);
-    trả về 0;
+hàm công khai rest json thành công jwt(message, token, refreshToken) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest json thành công jwt(message, token, refreshToken);
 };
 
-// Ghi chú hàm: in JSON response lỗi.
-hàm rest in json lỗi(message, requestId) {
-    in rest json lỗi(message, requestId);
-    trả về 0;
+hàm công khai rest in json thành công jwt(message, token, refreshToken) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json thành công jwt(message, token, refreshToken);
+};
+
+hàm công khai rest in json thành công(message, dataValue, requestId) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json thành công(message, dataValue, requestId);
+};
+
+hàm công khai rest in json lỗi(message, requestId) {
+    __vpp_adapter = Xử Lý Nội Bộ Rest();
+    trả về __vpp_adapter.rest in json lỗi(message, requestId);
 };

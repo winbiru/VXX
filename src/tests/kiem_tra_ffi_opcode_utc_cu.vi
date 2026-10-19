@@ -1,0 +1,4 @@
+// Opcode UTC cũ phải bị từ chối cả trên Windows lẫn POSIX.
+hàm chính() {
+    in dong_ho_utc_vm();
+};

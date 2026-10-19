@@ -1,0 +1,5 @@
+// Negative gate: the migrated TCP/UDP API must not call a legacy VM socket.
+// No network permission is needed: strict gate runs before validating a handle.
+hàm chính() {
+    in socket_dat_timeout_vm(1, 1000);
+};

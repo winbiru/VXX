@@ -1,0 +1,100 @@
+// Sổ hàm của compiler V++: global ID/StringPool; export và alias theo module.
+nhập gói/biên dịch/sổ đăng ký;
+nhập gói/biên dịch/ir;
+nhập gói/biên dịch/phát mã;
+nhập gói/văn bản/chuỗi;
+
+hàm chính() {
+    nguồn = {
+        "app/main": "nhập ../lib/math như toán; nhập ../lib/service như api; " +
+                    "nhập ../lib/math như lặp_lại; hàm chính() { in 1; };",
+        "lib/math": "hàm cộng() { trả về 1; }; hàm nhân() { trả về 2; };",
+        "lib/service": "công khai nhập math như phép; hàm báo() { trả về 3; };"
+    };
+    đồ_thị = biên dịch dựng đồ thị nguồn thuần("app/main", nguồn);
+    sổ = biên dịch đăng ký hàm đồ thị thuần(đồ_thị);
+    in sổ["loại"] == "sổ hàm V++";
+    in độ dài(sổ["hàm"]) == 4;
+    in độ dài(sổ["chuỗi"]) > 4;
+    in sổ["hàm"][0]["mô đun"] == "app/main";
+    in sổ["hàm"][0]["id"] == 0;
+    in sổ["hàm"][0]["tên"] == "chính";
+    in sổ["hàm"][0]["tên index"] == 0;
+    in sổ["hàm"][1]["tên index"] == 1;
+    in sổ["hàm"][2]["mô đun"] == "lib/math";
+    in sổ["hàm"][2]["tên index"] == 2;
+    in sổ["hàm"][3]["mô đun"] == "lib/service";
+    in sổ["hàm"][3]["tên index"] == 3;
+    in sổ["chuỗi"][0] == "chính";
+
+    toán = biên dịch sổ tìm mô đun(sổ["mô đun"], "lib/math");
+    service = biên dịch sổ tìm mô đun(sổ["mô đun"], "lib/service");
+    main = biên dịch sổ tìm mô đun(sổ["mô đun"], "app/main");
+    in độ dài(toán["xuất"]) == 2;
+    in độ dài(service["xuất"]) == 3;
+    in service["xuất"][0]["tên"] == "báo";
+    in service["xuất"][1]["tên"] == "phép.cộng";
+    in service["xuất"][1]["id"] == 1;
+    in service["xuất"][2]["tên"] == "phép.nhân";
+    in độ dài(main["xuất"]) == 1;
+    in main["xuất"][0]["tên"] == "chính";
+    in độ dài(main["nhìn thấy"]) == 8;
+    in main["nhìn thấy"][1]["tên"] == "toán.cộng";
+    in main["nhìn thấy"][2]["id"] == 2;
+    in main["nhìn thấy"][3]["tên"] == "api.báo";
+    in main["nhìn thấy"][4]["tên"] == "api.phép.cộng";
+    in main["nhìn thấy"][4]["id"] == 1;
+    in main["nhìn thấy"][6]["tên"] == "lặp_lại.cộng";
+
+    // Tên khai báo trùng trên hai module được cấp ID khác nhau,
+    // nhưng StringPool chỉ giữ một bản tên gốc.
+    sổ2 = biên dịch đăng ký hàm đồ thị thuần(biên dịch dựng đồ thị nguồn thuần(
+        "main", {"main": "nhập a như x; nhập b như y; hàm chính() {};",
+                 "a": "hàm chung() {};", "b": "hàm chung() {};"}));
+    in độ dài(sổ2["hàm"]) == 3;
+    in độ dài(sổ2["chuỗi"]) == 4;
+    in sổ2["hàm"][1]["tên index"] == sổ2["hàm"][2]["tên index"];
+    in sổ2["hàm"][1]["id"] != sổ2["hàm"][2]["id"];
+
+    // Emitter đơn vị dùng cùng bộ cấp phát và giữ ABI C++.
+    ir = biên dịch hạ IR thuần("hàm f() {}; hàm chính() { in f(); };");
+    một = biên dịch đăng ký hàm IR thuần(ir);
+    bytecode = biên dịch phát bytecode thuần("hàm f() {}; hàm chính() { in f(); };");
+    in độ dài(một["hàm"]) == 2;
+    in một["hàm"][0]["id"] == 0;
+    in một["slots"][1] == "chính";
+    in một["chuỗi"][1] == "chính";
+    in bytecode["hàm"][1]["id"] == một["hàm"][1]["id"];
+    in bytecode["slots"][1] == một["slots"][1];
+
+    // Các xung đột phải báo lỗi ngay, không được lặng lẽ chọn một ID.
+    lỗi = sai;
+    thử {
+        biên dịch đăng ký hàm đồ thị thuần(biên dịch dựng đồ thị nguồn thuần(
+            "main", {"main": "nhập a; nhập b;", "a": "hàm chung() {};",
+                     "b": "hàm chung() {};"}));
+    } bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "xung đột tên 'chung'"); };
+    in lỗi;
+    lỗi = sai;
+    thử {
+        biên dịch đăng ký hàm đồ thị thuần(biên dịch dựng đồ thị nguồn thuần(
+            "main", {"main": "hàm a() {}; hàm a() {};"}));
+    } bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "trùng hàm 'a'"); };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch đăng ký hàm đồ thị thuần({"loại": "khác"}); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch đăng ký hàm IR thuần({"loại": "khác"}); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử {
+        sai_thứ_tự = biên dịch dựng đồ thị nguồn thuần("app/main", nguồn);
+        thứ_tự = sai_thứ_tự["thứ tự khởi tạo"];
+        thứ_tự[1] = thứ_tự[0];
+        biên dịch đăng ký hàm đồ thị thuần(sai_thứ_tự);
+    } bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "đăng ký mô-đun lặp"); };
+    in lỗi;
+};

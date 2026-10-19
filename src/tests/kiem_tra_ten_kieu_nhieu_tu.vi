@@ -1,0 +1,13 @@
+// Tên lớp/giao diện nhiều từ phải khớp khi kế thừa, triển khai và khởi tạo.
+giao diện Có Chứa { hàm công khai chào(); };
+giao diện Có Chứa Cao kế thừa Có Chứa {};
+
+lớp Gốc Lớn {};
+lớp Con Cao kế thừa Gốc Lớn triển khai Có Chứa Cao {
+    hàm công khai chào() { trả về 42; };
+};
+
+hàm chính() {
+    đối_tượng = Con Cao();
+    in đối_tượng.chào();
+};

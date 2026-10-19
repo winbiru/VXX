@@ -1,16 +1,38 @@
-// vi.time — phép toán thời lượng cơ bản, không phụ thuộc múi giờ.
 
-hàm thời lượng mili giây(bắt đầu, kết thúc) {
-    nếu (kết thúc < bắt đầu) {
-        ném "thời gian: mốc kết thúc nhỏ hơn mốc bắt đầu";
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Thời Lượng {
+    hàm công khai khởi tạo() {};
+
+    // vi.time — phép toán thời lượng cơ bản, không phụ thuộc múi giờ.
+    hàm công khai thời lượng mili giây(bắt đầu, kết thúc) {
+        nếu (kết thúc < bắt đầu) {
+            ném "thời gian: mốc kết thúc nhỏ hơn mốc bắt đầu";
+        };
+        trả về kết thúc - bắt đầu;
     };
-    trả về kết thúc - bắt đầu;
+
+    hàm công khai mili giây thành giây(mili giây) {
+        trả về mili giây / 1000.0;
+    };
+
+    hàm công khai giây thành mili giây(giây) {
+        trả về giây * 1000.0;
+    };
 };
 
-hàm mili giây thành giây(mili giây) {
-    trả về mili giây / 1000.0;
+
+hàm công khai thời lượng mili giây(bắt đầu, kết thúc) {
+    __vpp_adapter = Thời Lượng();
+    trả về __vpp_adapter.thời lượng mili giây(bắt đầu, kết thúc);
 };
 
-hàm giây thành mili giây(giây) {
-    trả về giây * 1000.0;
+hàm công khai mili giây thành giây(mili giây) {
+    __vpp_adapter = Thời Lượng();
+    trả về __vpp_adapter.mili giây thành giây(mili giây);
+};
+
+hàm công khai giây thành mili giây(giây) {
+    __vpp_adapter = Thời Lượng();
+    trả về __vpp_adapter.giây thành mili giây(giây);
 };

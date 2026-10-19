@@ -1,0 +1,25 @@
+// Source compiler, bytecode artifact and VM must agree at the i32 boundaries.
+hàm tính(a, b) {
+    in a + b;
+    in a - b;
+    in a * b;
+};
+
+hàm mặc định i32(a = -2147483648) { trả về a; };
+
+hàm chính() {
+    in 2147483647 + 1;
+    in -2147483648 - 1;
+    in 2147483647 * 2147483647;
+    tính(2147483647, 1);
+    tính(-2147483648, -1);
+    a = 2147483647;
+    a += 1;
+    in a;
+    a -= 1;
+    in a;
+    a *= 2147483647;
+    in a;
+    in -(-2147483648);
+    in mặc định i32();
+};

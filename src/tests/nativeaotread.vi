@@ -1,0 +1,11 @@
+// Native console I/O: every signed i32 value is representable, including MIN.
+hàm chính() {
+    biến first = đọc_số();
+    biến first_status = trạng_thái_đọc();
+    in first;
+    in first_status;
+    biến second = đọc_số();
+    in second;
+    in trạng_thái_đọc();
+    trả về 0;
+};

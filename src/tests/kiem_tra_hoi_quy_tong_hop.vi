@@ -101,15 +101,15 @@ hàm chính() {
     in tổng;
 
     kếtQuả = {"tổng": 0};
-    đặt map(kếtQuả, "tổng", tổng);
-    in lấy map(kếtQuả, "tổng", -1);
+    kếtQuả["tổng"] = tổng;
+    in kếtQuả["tổng"];
 
     nhânĐôi = hàm(x) { trả về x * 2; };
     in ápDụng(nhânĐôi, 6);
 
     nếu (bộĐếm.giáTrị() == 15 && tổng == 6) {
         in "nhánh đúng";
-    } nếu không {
+    } hoặc {
         in "nhánh sai";
     };
 

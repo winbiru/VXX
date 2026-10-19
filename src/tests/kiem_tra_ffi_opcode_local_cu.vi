@@ -1,0 +1,4 @@
+// Legacy local clock opcode must be disabled on both POSIX and Windows.
+hàm chính() {
+    in dong_ho_dia_phuong_vm();
+};

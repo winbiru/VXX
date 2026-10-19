@@ -14,16 +14,49 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
 
       - name: Configure CMake
-        run: cmake -S . -B cmake-build-debug
+        run: cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Release
 
       - name: Build V++
-        run: cmake --build cmake-build-debug
+        run: cmake --build cmake-build-debug --parallel 2
+
+      - name: Install V++ and execute native code compiled from .vi (Linux x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="$RUNNER_TEMP/vpp-installed"
+          smoke="$RUNNER_TEMP/vpp-native-smoke"
+          cmake --install cmake-build-debug --prefix "$prefix"
+          cmake -S scripts/quality/installed_native_smoke -B "$smoke" \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DVPP_INSTALL_ROOT=$prefix" "-DVPP_SOURCE_ROOT=$PWD" \
+            -DVPP_TARGET=x86_64-linux-gnu
+          cmake --build "$smoke" --parallel 2
+          ctest --test-dir "$smoke" --output-on-failure --no-tests=error
+
+      - name: Verify Linux x86-64 native JIT and interpreter parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir cmake-build-debug -R '^vpp-runtime-p0-hardening$' --output-on-failure
+          output="$(mktemp)"
+          diagnostics="$(mktemp)"
+          trap 'rm -f "$output" "$diagnostics"' EXIT
+          VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
+            cmake-build-debug/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            >"$output" 2>"$diagnostics"
+          diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
+          grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as x86-64 machine code$' "$diagnostics"
+
+      - name: Verify Linux x86-64 V++ machine emitter and ELF64 object linker
+        run: ctest --test-dir cmake-build-debug -R '^vpp-native-elf-x86-writer$' --output-on-failure --no-tests=error
 
       - name: Run full V++ regression suite
-        run: ctest --test-dir cmake-build-debug --output-on-failure --verbose --no-tests=error
+        # Installed native smoke now verifies Stage 1 -> Stage 2 -> Stage 3.
+        # Avoid repeating legacy bytecode bootstrap through the VM.
+        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
       - name: Run RC compiler hardening checks
         shell: bash
@@ -31,8 +64,8 @@ jobs:
           set -eu
           export VPP_HOME="$PWD"
           VPP=cmake-build-debug/bin/vpp-cli
-          "$VPP" dựng scripts/quality/rc-hardening.vi
-          malformed_sources=(scripts/quality/rc-malformed*.vi)
+          "$VPP" dựng src/tests/kiem_tra_rc_hardening.vi
+          malformed_sources=(src/tests/fixtures/rc_malformed/rc-malformed*.vi)
           if [ "${#malformed_sources[@]}" -lt 2 ]; then
             echo "RC malformed corpus is missing" >&2
             exit 1
@@ -52,8 +85,8 @@ jobs:
           for mode in --dump-ast --dump-ir --giải-mã; do
             first="$(mktemp)"
             second="$(mktemp)"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$first"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$second"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$first"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$second"
             cmp "$first" "$second"
             rm -f "$first" "$second"
           done
@@ -61,13 +94,115 @@ jobs:
       - name: Run AddressSanitizer and UndefinedBehaviorSanitizer tests
         run: |
           cmake -S . -B cmake-build-sanitized \
-            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-          cmake --build cmake-build-sanitized
+          cmake --build cmake-build-sanitized --parallel 2
+          # Native parser, ELF writer and self-host bootstrap are verified in Release above.
+          # Instrumented Stage 0 VM compilation can exceed 1200 seconds on CI;
+          # exclude bytecode bootstrap tests by label as well as native compiler
+          # stress tests, keeping frontend/runtime and integration under ASan/UBSan.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
-            ctest --test-dir cmake-build-sanitized --output-on-failure --verbose --no-tests=error
+            ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
+              --label-exclude '^bootstrap$' \
+              --exclude-regex '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux ARM64 build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
+
+      - name: Build V++ on Linux ARM64
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+
+      - name: Install V++ and execute native code compiled from .vi (Linux ARM64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="$RUNNER_TEMP/vpp-installed"
+          smoke="$RUNNER_TEMP/vpp-native-smoke"
+          cmake --install build --prefix "$prefix"
+          cmake -S scripts/quality/installed_native_smoke -B "$smoke" \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DVPP_INSTALL_ROOT=$prefix" "-DVPP_SOURCE_ROOT=$PWD" \
+            -DVPP_TARGET=aarch64-linux-gnu
+          cmake --build "$smoke" --parallel 2
+          ctest --test-dir "$smoke" --output-on-failure --no-tests=error
+
+      - name: Verify Linux ARM64 machine JIT and interpreter parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build -R '^vpp-runtime-p0-hardening$' --output-on-failure
+          output="$(mktemp)"
+          diagnostics="$(mktemp)"
+          trap 'rm -f "$output" "$diagnostics"' EXIT
+          VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
+            build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            >"$output" 2>"$diagnostics"
+          diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
+          grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as AArch64 machine code$' "$diagnostics"
+
+      - name: Run Linux ARM64 regression suite
+        # Native AOT bootstrap is covered by installed smoke above.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+
+      - name: Link and run Linux ARM64 native calls
+        run: ctest --test-dir build -R '^vpp-native-calls-host-link$' --output-on-failure --no-tests=error
+
+  native-cross-smoke:
+    # Cross-compile ELF leaf objects with the host V++ CLI, then verify real
+    # target linkage and integer ABI behavior under Linux user-mode QEMU.
+    runs-on: ubuntu-26.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native cross toolchains and emulators
+        run: |
+          sudo apt-get update
+          # Ubuntu 26.04's static libcrypto.a depends on libjitterentropy.a,
+          # which is provided by libjitterentropy3-dev (not always pulled in
+          # by libssl-dev). Without it, linking the host vpp-cli fails.
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config \
+            gcc-powerpc64-linux-gnu gcc-riscv64-linux-gnu \
+            gcc-loongarch64-linux-gnu libc6-dev-ppc64-cross \
+            libc6-dev-riscv64-cross libc6-dev-loong64-cross \
+            qemu-user
+
+      - name: Build V++ code generator
+        run: |
+          cmake -S . -B build-native-cross -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+          cmake --build build-native-cross --target vpp-cli --parallel 2
+
+      - name: Execute PowerPC64 ELFv1 native object smoke
+        run: |
+          bash scripts/quality/run_cross_native_smoke.sh \
+            "$PWD/build-native-cross/bin/vpp-cli" \
+            powerpc64-linux-gnu powerpc64-linux-gnu-gcc qemu-ppc64 \
+            build-native-cross/smoke-powerpc64
+
+      - name: Execute RISC-V 64 LP64D native object smoke
+        run: |
+          bash scripts/quality/run_cross_native_smoke.sh \
+            "$PWD/build-native-cross/bin/vpp-cli" \
+            riscv64-linux-gnu riscv64-linux-gnu-gcc qemu-riscv64 \
+            build-native-cross/smoke-riscv64
+
+      - name: Execute LoongArch64 LP64D native object smoke
+        run: |
+          bash scripts/quality/run_cross_native_smoke.sh \
+            "$PWD/build-native-cross/bin/vpp-cli" \
+            loongarch64-linux-gnu loongarch64-linux-gnu-gcc qemu-loongarch64 \
+            build-native-cross/smoke-loongarch64
 
   quality:
     runs-on: ubuntu-latest
@@ -76,7 +211,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install quality tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev libffi-dev pkg-config
 
       - name: Run clang-tidy baseline
         run: |
@@ -121,19 +256,71 @@ jobs:
       - name: Build Windows HTTP server support
         run: cmake --build build --config Release
 
+      - name: Install V++ and execute native code compiled from .vi (Windows x64)
+        shell: pwsh
+        run: |
+          $prefix = Join-Path $env:RUNNER_TEMP "vpp-installed"
+          $smoke = Join-Path $env:RUNNER_TEMP "vpp-native-smoke"
+          cmake --install build --config Release --prefix $prefix
+          if ($LASTEXITCODE -ne 0) { throw "V++ CMake installation failed" }
+          cmake -S scripts/quality/installed_native_smoke -B $smoke `
+            "-DVPP_INSTALL_ROOT=$prefix" "-DVPP_SOURCE_ROOT=$((Get-Location).Path)" `
+            -DVPP_TARGET=x86_64-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw "Installed V++ native smoke configure failed" }
+          cmake --build $smoke --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "Installed V++ native object build/link failed" }
+          ctest --test-dir $smoke -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Installed V++ native executable failed" }
+
+      - name: Verify Windows x86-64 native JIT and interpreter parity
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release -R '^vpp-runtime-p0-hardening$' --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Windows native JIT hardening failed" }
+          $env:VPP_HOME = (Get-Location).Path
+          $env:VPP_ENABLE_MACHINE_JIT = "1"
+          $env:VPP_MACHINE_JIT_STATS = "1"
+          $output = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stdout"
+          $diagnostics = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stderr"
+          $process = Start-Process -FilePath (Resolve-Path "build/bin/Release/vpp-cli.exe").Path `
+            -ArgumentList @("src/tests/kiem_tra_machine_jit.vi") `
+            -WorkingDirectory (Get-Location).Path `
+            -RedirectStandardOutput $output -RedirectStandardError $diagnostics `
+            -NoNewWindow -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Windows machine JIT exited with $($process.ExitCode): $([IO.File]::ReadAllText($diagnostics))"
+          }
+          $expected = [IO.File]::ReadAllText((Resolve-Path "src/tests/expected/kiem_tra_machine_jit.expected").Path)
+          $actual = [IO.File]::ReadAllText($output)
+          if ($expected.Replace("`r`n", "`n") -cne $actual.Replace("`r`n", "`n")) {
+            throw "Windows machine JIT output differs from interpreter golden fixture"
+          }
+          $stats = [IO.File]::ReadAllText($diagnostics)
+          if ($stats -notmatch 'machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as x86-64 machine code') {
+            throw "Windows x86-64 native JIT did not execute machine code: $stats"
+          }
+
       - name: Run Windows full V++ regression suite
         shell: pwsh
         run: |
-          ctest --test-dir build -C Release --output-on-failure --verbose --no-tests=error
+          # Avoid running the legacy VM-based compiler bootstrap in routine CI.
+          ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$'
+          if ($LASTEXITCODE -ne 0) { throw "Windows V++ regression suite failed" }
+
+      - name: Link and run Windows x86-64 native COFF calls
+        shell: pwsh
+        run: |
+          ctest --test-dir build -C Release -R '^vpp-native-calls-host-link$' --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Windows native COFF calls failed to link or execute" }
 
       - name: Run Windows RC compiler hardening checks
         shell: pwsh
         run: |
           $env:VPP_HOME = (Get-Location).Path
           $vpp = "build/bin/Release/vpp-cli.exe"
-          & $vpp "dựng" "scripts/quality/rc-hardening.vi"
+          & $vpp "dựng" "src/tests/kiem_tra_rc_hardening.vi"
           if ($LASTEXITCODE -ne 0) { throw "RC hardening source failed to compile" }
-          $malformedSources = @(Get-ChildItem "scripts/quality/rc-malformed*.vi" | Sort-Object Name)
+          $malformedSources = @(Get-ChildItem "src/tests/fixtures/rc_malformed/rc-malformed*.vi" | Sort-Object Name)
           if ($malformedSources.Count -lt 2) { throw "RC malformed corpus is missing" }
           foreach ($source in $malformedSources) {
             & $vpp "dựng" $source.FullName
@@ -144,9 +331,9 @@ jobs:
           foreach ($mode in @("--dump-ast", "--dump-ir", "--giải-mã")) {
             $first = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".a")
             $second = Join-Path $env:RUNNER_TEMP ("vpp-rc-" + [guid]::NewGuid() + ".b")
-            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $first
+            & $vpp $mode "src/tests/kiem_tra_rc_hardening.vi" | Set-Content -Encoding utf8 $first
             if ($LASTEXITCODE -ne 0) { throw "RC hardening failed for $mode" }
-            & $vpp $mode "scripts/quality/rc-hardening.vi" | Set-Content -Encoding utf8 $second
+            & $vpp $mode "src/tests/kiem_tra_rc_hardening.vi" | Set-Content -Encoding utf8 $second
             if ($LASTEXITCODE -ne 0) { throw "RC hardening failed for $mode" }
             if ((Get-FileHash $first).Hash -ne (Get-FileHash $second).Hash) {
               throw "Non-deterministic compiler output for $mode"
@@ -160,14 +347,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install POSIX FFI dependency
+        shell: bash
+        run: |
+          brew install libffi pkg-config
+          echo "PKG_CONFIG_PATH=$(brew --prefix libffi)/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" >> "$GITHUB_ENV"
+
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
       - name: Build V++
         run: cmake --build build --parallel 2
 
+      - name: Install V++ and execute native code compiled from .vi (macOS)
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="$RUNNER_TEMP/vpp-installed"
+          smoke="$RUNNER_TEMP/vpp-native-smoke"
+          case "$(uname -m)" in
+            arm64) native_target=aarch64-apple-darwin ;;
+            x86_64) native_target=x86_64-apple-darwin ;;
+            *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          cmake --install build --prefix "$prefix"
+          cmake -S scripts/quality/installed_native_smoke -B "$smoke" \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DVPP_INSTALL_ROOT=$prefix" "-DVPP_SOURCE_ROOT=$PWD" \
+            "-DVPP_TARGET=$native_target"
+          cmake --build "$smoke" --parallel 2
+          ctest --test-dir "$smoke" --output-on-failure --no-tests=error
+          if [ "$native_target" = aarch64-apple-darwin ]; then
+            cmake "-DVPP_EXEC=$prefix/bin/vpp" \
+              "-DVPP_SOURCE=$PWD/src/tests/nativeaotprint.vi" \
+              "-DVPP_TARGET=$native_target" \
+              "-DVPP_HOME=$prefix" "-DVPP_OUTPUT_DIR=$smoke/aot-runtime" \
+              -P scripts/quality/checknativeprint.cmake
+          fi
+
+      - name: Verify native compiler self-hosting Stage 0 -> Stage 4 (macOS ARM64)
+        run: ctest --test-dir build -R '^vpp-native-compiler-driver$' --output-on-failure --verbose --no-tests=error
+
       - name: Run macOS full V++ regression suite
-        run: ctest --test-dir build --output-on-failure --verbose --no-tests=error
+        # Native Stage 0 -> Stage 4 is checked above; skip the legacy VM bootstrap.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^vpp-native-compiler-driver$'
 
       - name: Run macOS RC compiler hardening checks
         shell: bash
@@ -175,8 +398,8 @@ jobs:
           set -eu
           export VPP_HOME="$PWD"
           VPP=build/bin/vpp-cli
-          "$VPP" dựng scripts/quality/rc-hardening.vi
-          malformed_sources=(scripts/quality/rc-malformed*.vi)
+          "$VPP" dựng src/tests/kiem_tra_rc_hardening.vi
+          malformed_sources=(src/tests/fixtures/rc_malformed/rc-malformed*.vi)
           if [ "${#malformed_sources[@]}" -lt 2 ]; then
             echo "RC malformed corpus is missing" >&2
             exit 1
@@ -196,8 +419,8 @@ jobs:
           for mode in --dump-ast --dump-ir --giải-mã; do
             first="$(mktemp)"
             second="$(mktemp)"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$first"
-            "$VPP" "$mode" scripts/quality/rc-hardening.vi >"$second"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$first"
+            "$VPP" "$mode" src/tests/kiem_tra_rc_hardening.vi >"$second"
             cmp "$first" "$second"
             rm -f "$first" "$second"
           done

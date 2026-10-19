@@ -1,0 +1,134 @@
+nhập quản lý gói;
+nhập nhập xuất;
+
+hàm chính() {
+    manifest = {
+        "schema": 1,
+        "name": "ung-dung",
+        "version": "1.2.3",
+        "dependencies": []
+    };
+
+    kiểm = quản lý gói kiểm tra manifest(manifest);
+    in lấy map(kiểm, "hợp lệ", 0);
+    in quản lý gói semver hợp lệ("1.2.3");
+    in !quản lý gói semver hợp lệ("01.2.3");
+    in quản lý gói semver hợp lệ("1.2.3-alpha.1+build.005");
+    in !quản lý gói semver hợp lệ("1.2.3-alpha.01");
+    in !quản lý gói semver hợp lệ("2147483648.0.0");
+    in quản lý gói semver hợp lệ("1.2.3+build-x");
+    in quản lý gói so sánh semver("1.0.0-alpha", "1.0.0") == -1;
+    in quản lý gói so sánh semver("1.0.0-alpha.2", "1.0.0-alpha.10") == -1;
+    in quản lý gói so sánh semver("1.0.0+abc", "1.0.0+xyz") == 0;
+    in quản lý gói khớp range("1.5.0", "^1.2.3");
+    in !quản lý gói khớp range("2.0.0", "^1.2.3");
+    in quản lý gói khớp range("0.2.5", "^0.2.3");
+    in !quản lý gói khớp range("0.3.0", "^0.2.3");
+    in quản lý gói khớp range("1.2.9", "~1.2.3");
+    in !quản lý gói khớp range("1.3.0", "~1.2.3");
+    in quản lý gói khớp range("1.5.0", ">=1.2.0 <2.0.0");
+    in !quản lý gói range hợp lệ(">=1.0.0 || <2.0.0");
+    in !quản lý gói range hợp lệ("* >=1.0.0");
+
+    quản lý gói thêm phụ thuộc(
+        manifest, "thu-vien", "^1.2.0", "path", "../thu-vien"
+    );
+    in quản lý gói có phụ thuộc(manifest, "thu-vien");
+    tên = quản lý gói danh sách phụ thuộc(manifest);
+    in độ dài(tên) == 1 && tên[0] == "thu-vien";
+
+    tệp = ".tmp_package_manager_vpp.json";
+    quản lý gói ghi manifest(tệp, manifest);
+    đọc_lại = quản lý gói đọc manifest(tệp);
+    in lấy map(đọc_lại, "name", "") == "ung-dung";
+    in lấy map(
+        quản lý gói phụ thuộc(đọc_lại, "thu-vien"),
+        "location",
+        ""
+    ) == "../thu-vien";
+
+    đã_xóa = quản lý gói xóa phụ thuộc tệp(tệp, "thu-vien");
+    in đã_xóa != rỗng;
+    sau_xóa = quản lý gói đọc manifest(tệp);
+    in độ dài(quản lý gói danh sách phụ thuộc(sau_xóa)) == 0;
+    xóa đường dẫn(tệp);
+
+    graph_manifest = {
+        "schema": 1,
+        "name": "graph-root",
+        "version": "1.0.0",
+        "dependencies": [
+            {"name": "b", "version": "^1.0.0", "source": "path", "location": "../b"},
+            {"name": "a", "version": "^1.0.0", "source": "path", "location": "../a"}
+        ]
+    };
+    metadata = {
+        "a": {
+            "version": "1.1.0",
+            "dependencies": [
+                {"name": "c", "version": ">=1.0.0 <2.0.0", "source": "path", "location": "../c"}
+            ]
+        },
+        "b": {
+            "version": "1.2.0",
+            "dependencies": [
+                {"name": "c", "version": "^1.2.0", "source": "path", "location": "../c"}
+            ]
+        },
+        "c": {"version": "1.5.0", "dependencies": []}
+    };
+    graph = quản lý gói giải đồ thị(graph_manifest, metadata);
+    in độ dài(graph) == 3;
+    in lấy map(graph[0], "name", "") == "c";
+    in lấy map(graph[1], "name", "") == "a";
+    in lấy map(graph[2], "name", "") == "b";
+    range_c = lấy map(graph[0], "requestedRanges", []);
+    in độ dài(range_c) == 2;
+    in range_c[0] == ">=1.0.0 <2.0.0" && range_c[1] == "^1.2.0";
+
+    cycle_manifest = {
+        "schema": 1,
+        "name": "cycle-root",
+        "version": "1.0.0",
+        "dependencies": [
+            {"name": "x", "version": "*", "source": "path", "location": "../x"}
+        ]
+    };
+    cycle_metadata = {
+        "x": {
+            "version": "1.0.0",
+            "dependencies": [
+                {"name": "y", "version": "*", "source": "path", "location": "../y"}
+            ]
+        },
+        "y": {
+            "version": "1.0.0",
+            "dependencies": [
+                {"name": "x", "version": "*", "source": "path", "location": "../x"}
+            ]
+        }
+    };
+    bắt_được_vòng = sai;
+    thử {
+        quản lý gói giải đồ thị(cycle_manifest, cycle_metadata);
+    } bắt lỗi (e) {
+        bắt_được_vòng = chứa chính xác(thành chuỗi(e), "x -> y -> x");
+    };
+    in bắt_được_vòng;
+
+    conflict_manifest = {
+        "schema": 1,
+        "name": "conflict-root",
+        "version": "1.0.0",
+        "dependencies": [
+            {"name": "c", "version": "<1.5.0", "source": "path", "location": "../c"}
+        ]
+    };
+    bắt_được_xung_đột = sai;
+    thử {
+        quản lý gói giải đồ thị(conflict_manifest, metadata);
+    } bắt lỗi (e) {
+        bắt_được_xung_đột = chứa chính xác(thành chuỗi(e), "xung đột version dependency: c");
+    };
+    in bắt_được_xung_đột;
+};

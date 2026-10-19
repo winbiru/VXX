@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "vpp/runtime/value.h"
@@ -50,22 +51,24 @@ public:
     // Trả số allocation còn sống trong weak registry sau khi loại entry hết hạn.
     std::size_t trackedObjectCount();
 
-    // Cho biết từ lần collect gần nhất có object heap mới được đăng ký hay chưa.
-    // VM dùng tín hiệu này để tránh chạy tracing GC theo chu kỳ opcode khi workload
-    // chỉ thao tác số/chuỗi và không tạo thêm graph tham chiếu.
+    // Budget scales with live objects and traced value slots, including large
+    // flat byte/character buffers used by the compiler and JSON parser.
     bool needsCollection() const noexcept {
-        return allocationGeneration_ != collectedAllocationGeneration_;
+        return allocationGeneration_ - collectedAllocationGeneration_ >= collectionBudget_;
     }
 
 private:
-    std::vector<std::weak_ptr<MapValue>> maps_;
-    std::vector<std::weak_ptr<ListValue>> lists_;
-    std::vector<std::weak_ptr<TupleValue>> tuples_;
-    std::vector<std::weak_ptr<RuntimeClass>> classes_;
-    std::vector<std::weak_ptr<RuntimeInstance>> instances_;
-    std::vector<std::weak_ptr<RuntimeClosure>> closures_;
+    // Weak ownership is unchanged; keyed lookup deduplicates allocations in
+    // average O(1) instead of scanning every live AST object on every factory.
+    std::unordered_map<const MapValue *, std::weak_ptr<MapValue>> maps_;
+    std::unordered_map<const ListValue *, std::weak_ptr<ListValue>> lists_;
+    std::unordered_map<const TupleValue *, std::weak_ptr<TupleValue>> tuples_;
+    std::unordered_map<const RuntimeClass *, std::weak_ptr<RuntimeClass>> classes_;
+    std::unordered_map<const RuntimeInstance *, std::weak_ptr<RuntimeInstance>> instances_;
+    std::unordered_map<const RuntimeClosure *, std::weak_ptr<RuntimeClosure>> closures_;
     std::size_t allocationGeneration_ = 0;
     std::size_t collectedAllocationGeneration_ = 0;
+    std::size_t collectionBudget_ = 256;
 };
 
 // Gắn một heap làm đích đăng ký allocation trên thread hiện tại trong thời gian

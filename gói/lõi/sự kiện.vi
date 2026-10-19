@@ -1,212 +1,393 @@
-// Module: lõi.sự kiện
-// Event emitter đồng bộ, bounded, snapshot-based.
-// Service loader thủ công giữ registry/lazy/lifecycle ở V++; discovery từ
-// module manifest và capability isolation vẫn là boundary runtime sau này.
 
-hàm sự kiện yêu cầu bộ phát(emitter) {
-    nếu (loại của(emitter) != "từ điển") {
-        ném "LISTENER_STATE";
-    };
-    nếu (lấy map(emitter, "__vpp_event_emitter__", 0) != 1) {
-        ném "LISTENER_STATE";
-    };
-    trả về đúng;
-};
 
-hàm sự kiện yêu cầu đăng ký(registration) {
-    nếu (loại của(registration) != "từ điển") {
-        ném "LISTENER_STATE";
-    };
-    nếu (lấy map(registration, "__vpp_event_registration__", 0) != 1) {
-        ném "LISTENER_STATE";
-    };
-    trả về đúng;
-};
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Hạ Tầng Sự Kiện {
+    hàm công khai khởi tạo() {};
 
-hàm bộ phát sự kiện(giới_hạn_listener = 1024, chính_sách_lỗi = "ném đầu") {
-    nếu (loại của(giới_hạn_listener) != "số nguyên") {
-        ném "LISTENER_STATE";
-    };
-    nếu (giới_hạn_listener <= 0) {
-        ném "LISTENER_STATE";
-    };
-    nếu (chính_sách_lỗi != "ném đầu" && chính_sách_lỗi != "thu thập") {
-        ném "LISTENER_STATE";
-    };
-
-    trả về {
-        "__vpp_event_emitter__": 1,
-        "giới hạn": giới_hạn_listener,
-        "chính sách lỗi": chính_sách_lỗi,
-        "đăng ký": [],
-        "id kế tiếp": 1
-    };
-};
-
-hàm tạo sự kiện(nguồn, payload, metadata = rỗng) {
-    meta = metadata;
-    nếu (meta == rỗng) {
-        meta = {};
-    } nếu không {
-        nếu (loại của(meta) != "từ điển") {
+    // Module: lõi.sự kiện
+    // Event emitter đồng bộ, bounded, snapshot-based.
+    // Service loader thủ công giữ registry/lazy/lifecycle ở V++; discovery từ
+    // module manifest và capability isolation vẫn là boundary runtime sau này.
+    hàm riêng tư sự kiện yêu cầu bộ phát(emitter) {
+        nếu (loại của(emitter) != "từ điển") {
             ném "LISTENER_STATE";
         };
+        nếu (lấy map(emitter, "__vpp_event_emitter__", 0) != 1) {
+            ném "LISTENER_STATE";
+        };
+        trả về đúng;
     };
-    trả về {
-        "__vpp_event__": 1,
-        "nguồn": nguồn,
-        "payload": payload,
-        "metadata": meta
-    };
-};
 
-// Loại registration đã hủy/một-lần khỏi emitter. Registration object trả cho
-// caller vẫn tồn tại và giữ trạng thái inactive của chính nó.
-hàm sự kiện gom đăng ký(emitter) {
-    sự kiện yêu cầu bộ phát(emitter);
-    hiện_tại = lấy map(emitter, "đăng ký", []);
-    đang_hoạt_động = [];
-    lặp(i = 0; i < độ dài(hiện_tại); i++) {
-        reg = hiện_tại[i];
-        nếu (loại của(reg) == "từ điển") {
-            nếu (lấy map(reg, "__vpp_event_registration__", 0) == 1) {
-                nếu (lấy map(reg, "hoạt động", 0) == 1) {
-                    thêm(đang_hoạt_động, reg);
+    hàm riêng tư sự kiện yêu cầu đăng ký(registration) {
+        nếu (loại của(registration) != "từ điển") {
+            ném "LISTENER_STATE";
+        };
+        nếu (lấy map(registration, "__vpp_event_registration__", 0) != 1) {
+            ném "LISTENER_STATE";
+        };
+        trả về đúng;
+    };
+
+    hàm công khai bộ phát sự kiện(giới_hạn_listener = 1024, chính_sách_lỗi = "ném đầu") {
+        nếu (loại của(giới_hạn_listener) != "số nguyên") {
+            ném "LISTENER_STATE";
+        };
+        nếu (giới_hạn_listener <= 0) {
+            ném "LISTENER_STATE";
+        };
+        nếu (chính_sách_lỗi != "ném đầu" && chính_sách_lỗi != "thu thập") {
+            ném "LISTENER_STATE";
+        };
+
+        trả về {
+            "__vpp_event_emitter__": 1,
+            "giới hạn": giới_hạn_listener,
+            "chính sách lỗi": chính_sách_lỗi,
+            "đăng ký": [],
+            "id kế tiếp": 1
+        };
+    };
+
+    hàm công khai tạo sự kiện(nguồn, payload, metadata = rỗng) {
+        meta = metadata;
+        nếu (meta == rỗng) {
+            meta = {};
+        } hoặc {
+            nếu (loại của(meta) != "từ điển") {
+                ném "LISTENER_STATE";
+            };
+        };
+        trả về {
+            "__vpp_event__": 1,
+            "nguồn": nguồn,
+            "payload": payload,
+            "metadata": meta
+        };
+    };
+
+    // Loại registration đã hủy/một-lần khỏi emitter. Registration object trả cho
+    // caller vẫn tồn tại và giữ trạng thái inactive của chính nó.
+    hàm riêng tư sự kiện gom đăng ký(emitter) {
+        mình.sự kiện yêu cầu bộ phát(emitter);
+        hiện_tại = lấy map(emitter, "đăng ký", []);
+        đang_hoạt_động = [];
+        lặp(i = 0; i < độ dài(hiện_tại); i++) {
+            reg = hiện_tại[i];
+            nếu (loại của(reg) == "từ điển") {
+                nếu (lấy map(reg, "__vpp_event_registration__", 0) == 1) {
+                    nếu (lấy map(reg, "hoạt động", 0) == 1) {
+                        thêm(đang_hoạt_động, reg);
+                    };
                 };
             };
         };
-    };
-    đặt map(emitter, "đăng ký", đang_hoạt_động);
-    trả về đang_hoạt_động;
-};
-
-hàm số listener(emitter) {
-    đang_hoạt_động = sự kiện gom đăng ký(emitter);
-    trả về độ dài(đang_hoạt_động);
-};
-
-hàm đăng ký sự kiện(emitter, listener, một_lần = sai) {
-    sự kiện yêu cầu bộ phát(emitter);
-    nếu (listener == rỗng) {
-        ném "LISTENER_STATE";
+        đặt map(emitter, "đăng ký", đang_hoạt_động);
+        trả về đang_hoạt_động;
     };
 
-    hiện_tại = sự kiện gom đăng ký(emitter);
-    giới_hạn = lấy map(emitter, "giới hạn", 1024);
-    nếu (độ dài(hiện_tại) >= giới_hạn) {
-        ném "LISTENER_LIMIT";
+    hàm công khai số listener(emitter) {
+        đang_hoạt_động = mình.sự kiện gom đăng ký(emitter);
+        trả về độ dài(đang_hoạt_động);
     };
 
-    id = lấy map(emitter, "id kế tiếp", 1);
-    đặt map(emitter, "id kế tiếp", id + 1);
-    reg = {
-        "__vpp_event_registration__": 1,
-        "id": id,
-        "listener": listener,
-        "một lần": một_lần,
-        "hoạt động": 1
-    };
-    thêm(hiện_tại, reg);
-    trả về reg;
-};
-
-// Idempotent: trả đúng nếu lời gọi này chuyển active -> inactive, sai nếu đã hủy.
-hàm hủy đăng ký(registration) {
-    sự kiện yêu cầu đăng ký(registration);
-    nếu (lấy map(registration, "hoạt động", 0) != 1) {
-        trả về sai;
-    };
-    đặt map(registration, "hoạt động", 0);
-    trả về đúng;
-};
-
-// Snapshot copy chỉ giữ dữ liệu cần cho dispatch. Vì vậy callback đăng ký/hủy
-// listener chỉ ảnh hưởng lần phát kế tiếp; listener đã có trong snapshot vẫn
-// được gọi trong lần phát hiện tại.
-hàm sự kiện snapshot(emitter) {
-    hiện_tại = sự kiện gom đăng ký(emitter);
-    snapshot = [];
-    lặp(i = 0; i < độ dài(hiện_tại); i++) {
-        reg = hiện_tại[i];
-        thêm(snapshot, {
-            "listener": lấy map(reg, "listener", rỗng),
-            "một lần": lấy map(reg, "một lần", sai),
-            "registration": reg
-        });
-    };
-    trả về snapshot;
-};
-
-hàm phát sự kiện(emitter, event) {
-    sự kiện yêu cầu bộ phát(emitter);
-    snapshot = sự kiện snapshot(emitter);
-    chính_sách = lấy map(emitter, "chính sách lỗi", "ném đầu");
-    lỗi = [];
-    đã_gọi = 0;
-
-    lặp(i = 0; i < độ dài(snapshot); i++) {
-        mục = snapshot[i];
-        listener = lấy map(mục, "listener", rỗng);
-        reg = lấy map(mục, "registration", rỗng);
-
-        // Mark trước callback để reentrant emit vẫn đảm bảo at-most-once.
-        nếu (lấy map(mục, "một lần", sai)) {
-            đặt map(reg, "hoạt động", 0);
+    hàm công khai đăng ký sự kiện(emitter, listener, một_lần = sai) {
+        mình.sự kiện yêu cầu bộ phát(emitter);
+        nếu (listener == rỗng) {
+            ném "LISTENER_STATE";
         };
 
-        đã_gọi += 1;
-        nếu (chính_sách == "thu thập") {
-            thử {
-                listener(event);
-            } bắt lỗi (e) {
-                thêm(lỗi, e);
+        hiện_tại = mình.sự kiện gom đăng ký(emitter);
+        giới_hạn = lấy map(emitter, "giới hạn", 1024);
+        nếu (độ dài(hiện_tại) >= giới_hạn) {
+            ném "LISTENER_LIMIT";
+        };
+
+        id = lấy map(emitter, "id kế tiếp", 1);
+        đặt map(emitter, "id kế tiếp", id + 1);
+        reg = {
+            "__vpp_event_registration__": 1,
+            "id": id,
+            "listener": listener,
+            "một lần": một_lần,
+            "hoạt động": 1
+        };
+        thêm(hiện_tại, reg);
+        trả về reg;
+    };
+
+    // Idempotent: trả đúng nếu lời gọi này chuyển active -> inactive, sai nếu đã hủy.
+    hàm công khai hủy đăng ký(registration) {
+        mình.sự kiện yêu cầu đăng ký(registration);
+        nếu (lấy map(registration, "hoạt động", 0) != 1) {
+            trả về sai;
+        };
+        đặt map(registration, "hoạt động", 0);
+        trả về đúng;
+    };
+
+    // Snapshot copy chỉ giữ dữ liệu cần cho dispatch. Vì vậy callback đăng ký/hủy
+    // listener chỉ ảnh hưởng lần phát kế tiếp; listener đã có trong snapshot vẫn
+    // được gọi trong lần phát hiện tại.
+    hàm riêng tư sự kiện snapshot(emitter) {
+        hiện_tại = mình.sự kiện gom đăng ký(emitter);
+        snapshot = [];
+        lặp(i = 0; i < độ dài(hiện_tại); i++) {
+            reg = hiện_tại[i];
+            thêm(snapshot, {
+                "listener": lấy map(reg, "listener", rỗng),
+                "một lần": lấy map(reg, "một lần", sai),
+                "registration": reg
+            });
+        };
+        trả về snapshot;
+    };
+
+    hàm công khai phát sự kiện(emitter, event) {
+        mình.sự kiện yêu cầu bộ phát(emitter);
+        snapshot = mình.sự kiện snapshot(emitter);
+        chính_sách = lấy map(emitter, "chính sách lỗi", "ném đầu");
+        lỗi = [];
+        đã_gọi = 0;
+
+        lặp(i = 0; i < độ dài(snapshot); i++) {
+            mục = snapshot[i];
+            listener = lấy map(mục, "listener", rỗng);
+            reg = lấy map(mục, "registration", rỗng);
+
+            // Mark trước callback để reentrant emit vẫn đảm bảo at-most-once.
+            nếu (lấy map(mục, "một lần", sai)) {
+                đặt map(reg, "hoạt động", 0);
             };
-        } nếu không {
-            listener(event);
+
+            đã_gọi += 1;
+            nếu (chính_sách == "thu thập") {
+                thử {
+                    listener(event);
+                } bắt lỗi (e) {
+                    thêm(lỗi, e);
+                };
+            } hoặc {
+                listener(event);
+            };
+        };
+
+        mình.sự kiện gom đăng ký(emitter);
+        trả về {"đã gọi": đã_gọi, "lỗi": lỗi};
+    };
+
+    // --- Service/provider registry thuần V++ ---
+    hàm riêng tư dịch vụ yêu cầu loader(loader) {
+        nếu (loại của(loader) != "từ điển") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (lấy map(loader, "__vpp_service_loader__", 0) != 1) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        trả về loader;
+    };
+
+    hàm riêng tư dịch vụ yêu cầu provider(provider) {
+        nếu (loại của(provider) != "từ điển") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (lấy map(provider, "__vpp_service_provider__", 0) != 1) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        trả về provider;
+    };
+
+    hàm công khai bộ nạp dịch vụ(giới_hạn_provider = 1024) {
+        nếu (loại của(giới_hạn_provider) != "số nguyên") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (giới_hạn_provider <= 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        trả về {
+            "__vpp_service_loader__": 1,
+            "giới hạn": giới_hạn_provider,
+            "providers": []
         };
     };
 
-    sự kiện gom đăng ký(emitter);
-    trả về {"đã gọi": đã_gọi, "lỗi": lỗi};
+    hàm công khai nhà cung cấp dịch vụ(
+        interface_id,
+        implementation_id,
+        factory,
+        version = "0",
+        module_id = "",
+        capabilities = rỗng,
+        lifecycle = "mỗi lần",
+        validator = rỗng
+    ) {
+        nếu (loại của(interface_id) != "chuỗi") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (độ dài(interface_id) == 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (loại của(implementation_id) != "chuỗi") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (độ dài(implementation_id) == 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (loại của(version) != "chuỗi" || loại của(module_id) != "chuỗi") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (factory == rỗng) {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (lifecycle != "mỗi lần" && lifecycle != "đơn thể") {
+            ném "SERVICE_CONFIGURATION";
+        };
+
+        quyền = [];
+        nếu (capabilities != rỗng) {
+            nếu (loại của(capabilities) != "danh sách") {
+                ném "SERVICE_CONFIGURATION";
+            };
+            lặp(i = 0; i < độ dài(capabilities); i++) {
+                nếu (loại của(capabilities[i]) != "chuỗi") {
+                    ném "SERVICE_CONFIGURATION";
+                };
+                thêm(quyền, capabilities[i]);
+            };
+        };
+
+        trả về {
+            "__vpp_service_provider__": 1,
+            "interface_id": interface_id,
+            "implementation_id": implementation_id,
+            "version": version,
+            "module_id": module_id,
+            "capabilities": quyền,
+            "factory": factory,
+            "validator": validator,
+            "lifecycle": lifecycle,
+            "đã tạo": 0,
+            "instance": rỗng
+        };
+    };
+
+    hàm công khai đăng ký nhà cung cấp(loader, provider) {
+        mình.dịch vụ yêu cầu loader(loader);
+        mình.dịch vụ yêu cầu provider(provider);
+        danh_sách = lấy map(loader, "providers", []);
+        giới_hạn = lấy map(loader, "giới hạn", 1024);
+        nếu (độ dài(danh_sách) >= giới_hạn) {
+            ném "SERVICE_CONFIGURATION";
+        };
+
+        interface_id = lấy map(provider, "interface_id", "");
+        implementation_id = lấy map(provider, "implementation_id", "");
+        module_id = lấy map(provider, "module_id", "");
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            hiện_tại = danh_sách[i];
+            nếu (lấy map(hiện_tại, "interface_id", "") == interface_id &&
+                lấy map(hiện_tại, "implementation_id", "") == implementation_id &&
+                lấy map(hiện_tại, "module_id", "") == module_id) {
+                ném "SERVICE_CONFIGURATION";
+            };
+        };
+        thêm(danh_sách, provider);
+        trả về provider;
+    };
+
+    hàm công khai dịch vụ(interface_id, loader) {
+        mình.dịch vụ yêu cầu loader(loader);
+        nếu (loại của(interface_id) != "chuỗi") {
+            ném "SERVICE_CONFIGURATION";
+        };
+        nếu (độ dài(interface_id) == 0) {
+            ném "SERVICE_CONFIGURATION";
+        };
+
+        kết_quả = [];
+        danh_sách = lấy map(loader, "providers", []);
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            provider = danh_sách[i];
+            nếu (lấy map(provider, "interface_id", "") == interface_id) {
+                thêm(kết_quả, provider);
+            };
+        };
+        nếu (độ dài(kết_quả) == 0) {
+            ném "SERVICE_NOT_FOUND";
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai tải dịch vụ(provider) {
+        mình.dịch vụ yêu cầu provider(provider);
+        lifecycle = lấy map(provider, "lifecycle", "mỗi lần");
+        nếu (lifecycle == "đơn thể" && lấy map(provider, "đã tạo", 0) == 1) {
+            trả về lấy map(provider, "instance", rỗng);
+        };
+
+        factory = lấy map(provider, "factory", rỗng);
+        thử {
+            instance = factory();
+        } bắt lỗi (e) {
+            ném "SERVICE_CONFIGURATION";
+        };
+
+        validator = lấy map(provider, "validator", rỗng);
+        nếu (validator != rỗng) {
+            thử {
+                hợp_lệ = validator(instance);
+            } bắt lỗi (e) {
+                ném "SERVICE_CONFIGURATION";
+            };
+            nếu (!hợp_lệ) {
+                ném "SERVICE_CONFIGURATION";
+            };
+        };
+
+        nếu (lifecycle == "đơn thể") {
+            đặt map(provider, "instance", instance);
+            đặt map(provider, "đã tạo", 1);
+        };
+        trả về instance;
+    };
 };
 
-// --- Service/provider registry thuần V++ ---
 
-hàm dịch vụ yêu cầu loader(loader) {
-    nếu (loại của(loader) != "từ điển") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (lấy map(loader, "__vpp_service_loader__", 0) != 1) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    trả về loader;
+hàm công khai bộ phát sự kiện(giới_hạn_listener = 1024, chính_sách_lỗi = "ném đầu") {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.bộ phát sự kiện(giới_hạn_listener, chính_sách_lỗi);
 };
 
-hàm dịch vụ yêu cầu provider(provider) {
-    nếu (loại của(provider) != "từ điển") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (lấy map(provider, "__vpp_service_provider__", 0) != 1) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    trả về provider;
+hàm công khai tạo sự kiện(nguồn, payload, metadata = rỗng) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.tạo sự kiện(nguồn, payload, metadata);
 };
 
-hàm bộ nạp dịch vụ(giới_hạn_provider = 1024) {
-    nếu (loại của(giới_hạn_provider) != "số nguyên") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (giới_hạn_provider <= 0) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    trả về {
-        "__vpp_service_loader__": 1,
-        "giới hạn": giới_hạn_provider,
-        "providers": []
-    };
+hàm công khai số listener(emitter) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.số listener(emitter);
 };
 
-hàm nhà cung cấp dịch vụ(
+hàm công khai đăng ký sự kiện(emitter, listener, một_lần = sai) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.đăng ký sự kiện(emitter, listener, một_lần);
+};
+
+hàm công khai hủy đăng ký(registration) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.hủy đăng ký(registration);
+};
+
+hàm công khai phát sự kiện(emitter, event) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.phát sự kiện(emitter, event);
+};
+
+hàm công khai bộ nạp dịch vụ(giới_hạn_provider = 1024) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.bộ nạp dịch vụ(giới_hạn_provider);
+};
+
+hàm công khai nhà cung cấp dịch vụ(
     interface_id,
     implementation_id,
     factory,
@@ -216,133 +397,22 @@ hàm nhà cung cấp dịch vụ(
     lifecycle = "mỗi lần",
     validator = rỗng
 ) {
-    nếu (loại của(interface_id) != "chuỗi") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (độ dài(interface_id) == 0) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (loại của(implementation_id) != "chuỗi") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (độ dài(implementation_id) == 0) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (loại của(version) != "chuỗi" || loại của(module_id) != "chuỗi") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (factory == rỗng) {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (lifecycle != "mỗi lần" && lifecycle != "đơn thể") {
-        ném "SERVICE_CONFIGURATION";
-    };
-
-    quyền = [];
-    nếu (capabilities != rỗng) {
-        nếu (loại của(capabilities) != "danh sách") {
-            ném "SERVICE_CONFIGURATION";
-        };
-        lặp(i = 0; i < độ dài(capabilities); i++) {
-            nếu (loại của(capabilities[i]) != "chuỗi") {
-                ném "SERVICE_CONFIGURATION";
-            };
-            thêm(quyền, capabilities[i]);
-        };
-    };
-
-    trả về {
-        "__vpp_service_provider__": 1,
-        "interface_id": interface_id,
-        "implementation_id": implementation_id,
-        "version": version,
-        "module_id": module_id,
-        "capabilities": quyền,
-        "factory": factory,
-        "validator": validator,
-        "lifecycle": lifecycle,
-        "đã tạo": 0,
-        "instance": rỗng
-    };
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.nhà cung cấp dịch vụ(interface_id, implementation_id, factory, version, module_id, capabilities, lifecycle, validator);
 };
 
-hàm đăng ký nhà cung cấp(loader, provider) {
-    dịch vụ yêu cầu loader(loader);
-    dịch vụ yêu cầu provider(provider);
-    danh_sách = lấy map(loader, "providers", []);
-    giới_hạn = lấy map(loader, "giới hạn", 1024);
-    nếu (độ dài(danh_sách) >= giới_hạn) {
-        ném "SERVICE_CONFIGURATION";
-    };
-
-    interface_id = lấy map(provider, "interface_id", "");
-    implementation_id = lấy map(provider, "implementation_id", "");
-    module_id = lấy map(provider, "module_id", "");
-    lặp(i = 0; i < độ dài(danh_sách); i++) {
-        hiện_tại = danh_sách[i];
-        nếu (lấy map(hiện_tại, "interface_id", "") == interface_id &&
-            lấy map(hiện_tại, "implementation_id", "") == implementation_id &&
-            lấy map(hiện_tại, "module_id", "") == module_id) {
-            ném "SERVICE_CONFIGURATION";
-        };
-    };
-    thêm(danh_sách, provider);
-    trả về provider;
+hàm công khai đăng ký nhà cung cấp(loader, provider) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.đăng ký nhà cung cấp(loader, provider);
 };
 
-hàm dịch vụ(interface_id, loader) {
-    dịch vụ yêu cầu loader(loader);
-    nếu (loại của(interface_id) != "chuỗi") {
-        ném "SERVICE_CONFIGURATION";
-    };
-    nếu (độ dài(interface_id) == 0) {
-        ném "SERVICE_CONFIGURATION";
-    };
-
-    kết_quả = [];
-    danh_sách = lấy map(loader, "providers", []);
-    lặp(i = 0; i < độ dài(danh_sách); i++) {
-        provider = danh_sách[i];
-        nếu (lấy map(provider, "interface_id", "") == interface_id) {
-            thêm(kết_quả, provider);
-        };
-    };
-    nếu (độ dài(kết_quả) == 0) {
-        ném "SERVICE_NOT_FOUND";
-    };
-    trả về kết_quả;
+hàm công khai dịch vụ(interface_id, loader) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.dịch vụ(interface_id, loader);
 };
 
-hàm tải dịch vụ(provider) {
-    dịch vụ yêu cầu provider(provider);
-    lifecycle = lấy map(provider, "lifecycle", "mỗi lần");
-    nếu (lifecycle == "đơn thể" && lấy map(provider, "đã tạo", 0) == 1) {
-        trả về lấy map(provider, "instance", rỗng);
-    };
-
-    factory = lấy map(provider, "factory", rỗng);
-    thử {
-        instance = factory();
-    } bắt lỗi (e) {
-        ném "SERVICE_CONFIGURATION";
-    };
-
-    validator = lấy map(provider, "validator", rỗng);
-    nếu (validator != rỗng) {
-        thử {
-            hợp_lệ = validator(instance);
-        } bắt lỗi (e) {
-            ném "SERVICE_CONFIGURATION";
-        };
-        nếu (!hợp_lệ) {
-            ném "SERVICE_CONFIGURATION";
-        };
-    };
-
-    nếu (lifecycle == "đơn thể") {
-        đặt map(provider, "instance", instance);
-        đặt map(provider, "đã tạo", 1);
-    };
-    trả về instance;
+hàm công khai tải dịch vụ(provider) {
+    __vpp_adapter = Hạ Tầng Sự Kiện();
+    trả về __vpp_adapter.tải dịch vụ(provider);
 };
 nhập gói/lõi/chuyển kiểu;

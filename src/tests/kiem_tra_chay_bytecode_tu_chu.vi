@@ -1,0 +1,106 @@
+// Thực thi bytecode do V++ tự phân tích, phát mã và liên kết.
+// So sánh kết quả VM với compiler C++ cho subset đã hỗ trợ.
+nhập gói/biên dịch/bộ nạp;
+nhập gói/lõi/kịch bản;
+nhập gói/văn bản/chuỗi;
+
+hàm chính() {
+    nguồn = "hàm cộng(a, b) { trả về a + b; }; hàm chính() { in cộng(20, 22); };";
+    in biên dịch chạy chương trình tự chủ(nguồn) == "42\n";
+    in biên dịch chạy chương trình tự chủ(nguồn) == kịch bản chạy(nguồn);
+
+    // Literal/biến/khối và thứ tự các initializer dependency.
+    mã = "nhập ../lib/feature như api; nhập ../lib/math như toán; " +
+         "hàm chính() { in api.tính(); in toán.cộng(); in api.số.cộng(); };";
+    mô_đun = {
+        "app/main": mã,
+        "lib/feature": "công khai nhập math như số; hàm tính() { trả về số.cộng(); };",
+        "lib/math": "hàm cộng() { trả về 41 + 1; }; in 99;"
+    };
+    kết_quả = biên dịch chạy chương trình mô đun tự chủ("app/main", mô_đun);
+    in kết_quả == "99\n42\n42\n42\n";
+    in kết_quả == kịch bản chạy nội bộ(mã, "fixtures/compiler_oracle/app");
+
+    // Nạp artifact đã liên kết nhiều lần cho ra kết quả như nhau.
+    artifact = biên dịch chương trình mô đun tự chủ("app/main", mô_đun);
+    in biên dịch chạy artifact(artifact) == kết_quả;
+
+    lặp_lại = biên dịch chạy chương trình mô đun tự chủ("main", {
+        "main": "nhập dep như x; nhập dep như y; hàm chính() { in x.f(); in y.f(); };",
+        "dep": "hàm f() { trả về 7; }; in 5;"
+    });
+    in lặp_lại == "5\n7\n7\n";
+
+    cùng_tên = biên dịch chạy chương trình mô đun tự chủ("main", {
+        "main": "nhập a như x; nhập b như y; hàm chính() { in x.f(); in y.f(); };",
+        "a": "hàm f() { trả về 1; };",
+        "b": "hàm f() { trả về 2; };"
+    });
+    in cùng_tên == "1\n2\n";
+
+    in biên dịch chạy chương trình tự chủ("in \"xin chào\";") == "xin chào\n";
+
+    // StringPool khi literal xen giữa import phải giữ nguyên index C++.
+    xen_chuỗi = "in \"trước\"; nhập ../lib/math như toán; in \"sau\"; " +
+                "hàm chính() { in \"gốc\"; in toán.cộng(); };";
+    chuỗi_đồ_thị = biên dịch chạy chương trình mô đun tự chủ("app/main", {
+        "app/main": xen_chuỗi,
+        "lib/math": "hàm cộng() { in \"thân\"; trả về 42; }; in \"phụ\";"
+    });
+    in chuỗi_đồ_thị == "phụ\ntrước\nsau\ngốc\nthân\n42\n";
+
+    // Hàm chính trong dependency không trở thành entrypoint của root.
+    in biên dịch chạy chương trình mô đun tự chủ("main", {
+        "main": "nhập dep như x; in 1;",
+        "dep": "hàm chính() { in 2; };"
+    }) == "1\n";
+
+    // Phép chọn/ca trong subset emitter được nạp theo cùng bốn trường.
+    in biên dịch chạy chương trình tự chủ(
+        "hàm chính() { a = 20; chọn (a) { ca 20: { in 2; } mặc định: { in 3; } }; };"
+    ) == "2\n";
+
+    // Bộ nạp phải báo lỗi cho dữ liệu bị hỏng, không chạy bytecode đó.
+    lỗi = sai;
+    thử { biên dịch chạy artifact({"loại": "chưa liên kết"}); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "đã liên kết"); };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bytecode_chay_vm([[2147483647, 0, 0, 0]], [], [], []); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bytecode_chay_vm([[1, 0, 0]], [], [], []); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "4 trường"); };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bytecode_chay_vm([], [], [[1, 0, []]], []); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "function ID"); };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bytecode_chay_vm([], [], [], [["m", []], ["m", []]]); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "trùng định danh"); };
+    in lỗi;
+
+    // Lỗi phải lan qua API artifact công khai sau chuyển đổi map -> ABI.
+    hỏng = biên dịch chương trình tự chủ("in 1;");
+    các_lệnh = hỏng["bytecode"];
+    lệnh = các_lệnh[0];
+    lệnh["op"] = 2147483647;
+    lỗi = sai;
+    thử { biên dịch chạy artifact(hỏng); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
+    in lỗi;
+
+    hỏng_hàm = biên dịch chương trình tự chủ("hàm chính() { in 1; };");
+    hàm_đã_khai = hỏng_hàm["hàm"][0];
+    hàm_đã_khai["id"] = 3;
+    lỗi = sai;
+    thử { biên dịch chạy artifact(hỏng_hàm); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "function ID"); };
+    in lỗi;
+};

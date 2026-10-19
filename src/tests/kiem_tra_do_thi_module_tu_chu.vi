@@ -1,0 +1,87 @@
+// Mọi phép dựng graph dưới đây đều dùng parser + DFS thuần V++.
+nhập gói/biên dịch/đồ thị mô đun;
+nhập gói/văn bản/chuỗi;
+
+hàm chính() {
+    nguồn = {
+        "app/main": "nhập ../lib/util như công_cụ; nhập ../lib/feature; " +
+                    "nhập ../lib/util; hàm chính() { in 1; };",
+        "lib/util": "nhập common; hàm tiện() { trả về 1; };",
+        "lib/feature": "công khai nhập common như chung; hàm f() {};",
+        "lib/common": "hàm cơ_sở() { trả về 2; };"
+    };
+    đồ_thị = biên dịch dựng đồ thị nguồn thuần("app/main", nguồn);
+    in đồ_thị["loại"] == "đồ thị mô đun V++";
+    in đồ_thị["điểm vào"] == "app/main";
+    in độ dài(đồ_thị["cạnh"]) == 5;
+    in độ dài(đồ_thị["mô đun"]) == 3;
+    in đồ_thị["mô đun"][0]["định danh"] == "lib/util";
+    in đồ_thị["mô đun"][1]["định danh"] == "lib/common";
+    in đồ_thị["mô đun"][2]["định danh"] == "lib/feature";
+    in đồ_thị["cạnh"][0]["đích"] == "lib/util";
+    in đồ_thị["cạnh"][0]["bí danh"] == "công_cụ";
+    in đồ_thị["cạnh"][0]["tái xuất"] == sai;
+    in đồ_thị["cạnh"][0]["hành động"] == "load";
+    in đồ_thị["cạnh"][1]["đích"] == "lib/common";
+    in đồ_thị["cạnh"][2]["đích"] == "lib/feature";
+    in đồ_thị["cạnh"][3]["bí danh"] == "chung";
+    in đồ_thị["cạnh"][3]["tái xuất"] == đúng;
+    in đồ_thị["cạnh"][3]["hành động"] == "duplicate_no_op";
+    in đồ_thị["cạnh"][4]["hành động"] == "duplicate_no_op";
+    in đồ_thị["thứ tự khởi tạo"][0] == "lib/common";
+    in đồ_thị["thứ tự khởi tạo"][1] == "lib/util";
+    in đồ_thị["thứ tự khởi tạo"][2] == "lib/feature";
+
+    // Không bỏ qua lỗi import vòng, bao gồm vòng trở lại root.
+    lỗi = sai;
+    thử {
+        biên dịch dựng đồ thị nguồn thuần("app/main", {
+            "app/main": "nhập ../lib/a;",
+            "lib/a": "nhập b;", "lib/b": "nhập a;"
+        });
+    } bắt lỗi(e) {
+        lỗi = chứa chuỗi(thành chuỗi(e), "lib/a -> lib/b -> lib/a");
+    };
+    in lỗi;
+
+    lỗi = sai;
+    thử {
+        biên dịch dựng đồ thị nguồn thuần("main", {
+            "main": "nhập dep;", "dep": "nhập main;"
+        });
+    } bắt lỗi(e) {
+        lỗi = chứa chuỗi(thành chuỗi(e), "main -> dep -> main");
+    };
+    in lỗi;
+
+    lỗi = sai;
+    thử { biên dịch dựng đồ thị nguồn thuần("main", {"main": "nhập missing;"}); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "missing"); };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch dựng đồ thị nguồn thuần("main", {"other": ""}); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "main"); };
+    in lỗi;
+    lỗi = sai;
+    thử {
+        biên dịch dựng đồ thị nguồn thuần("a/main", {"a/main": "nhập ../../ngoài;"});
+    } bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "thoát khỏi gốc"); };
+    in lỗi;
+
+    // Đường dẫn lexical ổn định, import không có hậu tố .vi.
+    in biên dịch đồ thị chuẩn đường("a/./b/../c") == "a/c";
+    in biên dịch đồ thị đích nhập("app/main", "../lib/common") == "lib/common";
+    cây = biên dịch phân tích chương trình thuần(
+        "công khai nhập lib/util như công_cụ; nhập lib/feature;");
+    in cây["câu lệnh"][0]["tái xuất"] == đúng;
+    in cây["câu lệnh"][0]["bí danh"] == "công_cụ";
+    in cây["câu lệnh"][1]["tái xuất"] == sai;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("nhập lib/util như;"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("nhập lib/util.vi;"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

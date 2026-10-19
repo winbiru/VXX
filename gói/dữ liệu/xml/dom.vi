@@ -2,51 +2,122 @@
 nhập gói/dữ liệu/xml/xml;
 nhập gói/bộ sưu tập/chính;
 
-hàm dom phần tử(tên) {
-    trả về {"tên": tên, "thuộc tính": {}, "nội dung": "", "con": []};
-};
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp riêng tư Xử Lý Nội Bộ Dom {
+    hàm công khai khởi tạo() {};
 
-hàm dom tên(node) {
-    trả về lấy map(node, "tên", "");
-};
-
-hàm dom nội dung(node) {
-    trả về lấy map(node, "nội dung", "");
-};
-
-hàm dom đặt nội dung(node, nội dung) {
-    đặt map(node, "nội dung", nội dung);
-    trả về node;
-};
-
-hàm dom thuộc tính(node, khóa, mặc định = rỗng) {
-    attrs = lấy map(node, "thuộc tính", rỗng);
-    nếu (attrs == rỗng) {
-        trả về mặc định;
+    hàm công khai dom phần tử(tên) {
+        trả về {"tên": tên, "thuộc tính": {}, "nội dung": "", "con": []};
     };
-    trả về lấy map(attrs, khóa, mặc định);
-};
 
-hàm dom đặt thuộc tính(node, khóa, giá trị) {
-    attrs = lấy map(node, "thuộc tính", rỗng);
-    nếu (attrs == rỗng) {
-        attrs = {};
-        đặt map(node, "thuộc tính", attrs);
+    hàm công khai dom tên(node) {
+        trả về lấy map(node, "tên", "");
     };
-    đặt map(attrs, khóa, giá trị);
-    trả về node;
-};
 
-hàm dom con(node) {
-    trả về lấy map(node, "con", []);
-};
-
-hàm dom thêm con(node, child) {
-    children = lấy map(node, "con", rỗng);
-    nếu (children == rỗng) {
-        children = [];
-        đặt map(node, "con", children);
+    hàm công khai dom nội dung(node) {
+        trả về lấy map(node, "nội dung", "");
     };
-    thêm(children, child);
-    trả về node;
+
+    hàm công khai dom đặt nội dung(node, nội dung) {
+        đặt map(node, "nội dung", nội dung);
+        trả về node;
+    };
+
+    hàm công khai dom thuộc tính(node, khóa, mặc định = rỗng) {
+        attrs = lấy map(node, "thuộc tính", rỗng);
+        nếu (attrs == rỗng) {
+            trả về mặc định;
+        };
+        trả về lấy map(attrs, khóa, mặc định);
+    };
+
+    hàm công khai dom đặt thuộc tính(node, khóa, giá trị) {
+        attrs = lấy map(node, "thuộc tính", rỗng);
+        nếu (attrs == rỗng) {
+            attrs = {};
+            đặt map(node, "thuộc tính", attrs);
+        };
+        đặt map(attrs, khóa, giá trị);
+        trả về node;
+    };
+
+    hàm công khai dom con(node) {
+        trả về lấy map(node, "con", []);
+    };
+
+    hàm công khai dom thêm con(node, child) {
+        children = lấy map(node, "con", rỗng);
+        nếu (children == rỗng) {
+            children = [];
+            đặt map(node, "con", children);
+        };
+        thêm(children, child);
+        trả về node;
+    };
+};
+
+hàm công khai dom phần tử(tên) {
+    trả về Xử Lý Nội Bộ Dom().dom phần tử(tên);
+};
+
+hàm công khai dom tên(node) {
+    trả về Xử Lý Nội Bộ Dom().dom tên(node);
+};
+
+hàm công khai dom nội dung(node) {
+    trả về Xử Lý Nội Bộ Dom().dom nội dung(node);
+};
+
+hàm công khai dom đặt nội dung(node, nội dung) {
+    trả về Xử Lý Nội Bộ Dom().dom đặt nội dung(node, nội dung);
+};
+
+hàm công khai dom thuộc tính(node, khóa, mặc định = rỗng) {
+    trả về Xử Lý Nội Bộ Dom().dom thuộc tính(node, khóa, mặc định);
+};
+
+hàm công khai dom đặt thuộc tính(node, khóa, giá trị) {
+    trả về Xử Lý Nội Bộ Dom().dom đặt thuộc tính(node, khóa, giá trị);
+};
+
+hàm công khai dom con(node) {
+    trả về Xử Lý Nội Bộ Dom().dom con(node);
+};
+
+hàm công khai dom thêm con(node, child) {
+    trả về Xử Lý Nội Bộ Dom().dom thêm con(node, child);
+};
+
+// Adapter giữ cùng cây map với XML/DOM thủ tục để hai API dùng chung dữ liệu.
+lớp công khai Phần Tử DOM {
+    hàm công khai khởi tạo(tên) { mình.nút = dom phần tử(tên); };
+    hàm công khai nạp(cây) {
+        nếu (loai_cua(cây) != "từ điển" || !có khóa(cây, "tên")) {
+            ném "dom: cây không hợp lệ";
+        };
+        mình.nút = cây;
+        trả về mình;
+    };
+    hàm công khai cây() { trả về mình.nút; };
+    hàm công khai phân tích(văn_bản) {
+        mới = xml phân tích(văn_bản);
+        mình.nút = mới;
+        trả về mình;
+    };
+    hàm công khai tên() { trả về dom tên(mình.nút); };
+    hàm công khai nội dung() { trả về dom nội dung(mình.nút); };
+    hàm công khai đặt nội dung(văn_bản) { dom đặt nội dung(mình.nút, văn_bản); trả về mình; };
+    hàm công khai thuộc tính(khóa, mặc_định = rỗng) { trả về dom thuộc tính(mình.nút, khóa, mặc_định); };
+    hàm công khai đặt thuộc tính(khóa, giá_trị) { dom đặt thuộc tính(mình.nút, khóa, giá_trị); trả về mình; };
+    hàm công khai thêm con(phần_tử) { dom thêm con(mình.nút, phần_tử.cây()); trả về mình; };
+    hàm công khai số con() { trả về do_dai(dom con(mình.nút)); };
+    hàm công khai con(chỉ_số) {
+        nếu (loai_cua(chỉ_số) != "số nguyên" || chỉ_số < 0 || chỉ_số >= mình.số con()) {
+            ném "dom: chỉ số ngoài phạm vi";
+        };
+        các_con = dom con(mình.nút);
+        phần_tử = Phần Tử DOM("");
+        trả về phần_tử.nạp(các_con[chỉ_số]);
+    };
+    hàm công khai văn bản() { trả về xml tạo(mình.nút); };
 };

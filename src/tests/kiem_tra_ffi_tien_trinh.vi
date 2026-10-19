@@ -1,0 +1,31 @@
+nhập gói/hệ thống/tiến trình;
+
+hàm chính() {
+    nếu (ten_nen_tang_vm() == "windows") {
+        pid = mã tiến trình();
+        in pid > 0;
+        in mã tiến trình() == pid;
+        in loai_cua(pid) == "số nguyên";
+        ppid = mã tiến trình cha();
+        in ppid > 0;
+        in ppid != pid;
+        in loai_cua(ppid) == "số nguyên";
+        thử { mã người dùng(); } bắt lỗi (e) { in 1; };
+        thử { mã người dùng hiệu lực(); } bắt lỗi (e) { in 1; };
+        thử { mã nhóm(); } bắt lỗi (e) { in 1; };
+        thử { mã nhóm hiệu lực(); } bắt lỗi (e) { in 1; };
+    } hoặc {
+        pid = mã tiến trình();
+        in pid > 0;
+        in mã tiến trình() == pid;
+        in loai_cua(pid) == "số nguyên";
+        ppid = mã tiến trình cha();
+        in ppid > 0;
+        in ppid != pid;
+        in loai_cua(ppid) == "số nguyên";
+        in mã người dùng() >= 0;
+        in loai_cua(mã người dùng hiệu lực()) == "số nguyên";
+        in mã nhóm() >= 0;
+        in loai_cua(mã nhóm hiệu lực()) == "số nguyên";
+    };
+};

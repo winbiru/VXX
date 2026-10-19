@@ -1,0 +1,2 @@
+nhập dep;
+hàm chính() { trả về helper(2) + 2; };

@@ -7,7 +7,9 @@ regressions without adding third-party C++ benchmark dependencies.
 ## Coverage
 
 Coverage instrumentation is enabled with `-DVPP_ENABLE_COVERAGE=ON` on GCC or
-Clang toolchains compatible with gcov/LCOV. CI runs this gate on Ubuntu, executes
+Clang toolchains compatible with gcov/LCOV, using `-O1 -g --coverage` so the
+instrumented VM can complete the compiler bootstrap within its timeouts.
+CI runs this gate on Ubuntu, executes
 the full CTest suite, captures LCOV data, removes system headers,
 C++ test code, V++ regression fixtures, examples, templates and generated build
 files, then enforces a **45% line coverage** baseline.
@@ -18,6 +20,11 @@ files, then enforces a **45% line coverage** baseline.
 
 Set `VPP_COVERAGE_MINIMUM` to try a stricter threshold locally. Raise the
 repository baseline only after the current CI report is comfortably above it.
+The HTTP fixture compiles its V++ modules before listening. Its readiness check
+uses a wall-clock deadline (`VPP_HTTP_FIXTURE_TIMEOUT`, seconds), defaults to
+120 seconds for ordinary integration runs and 300 seconds under coverage, and
+requires the exact `/health` response. Local requests bypass HTTP proxies;
+startup failures include the server log, last curl error and last response.
 The 12/09/2026 local source-based coverage cross-check measured 75.77%
 (8,884/11,725 lines) with the same source/test/fixture exclusions; the CI gate
 remains deliberately lower because GCC/LCOV and Apple LLVM coverage accounting

@@ -1,0 +1,157 @@
+// Bộ nạp artifact sau linker V++: ABI VM cũ 4 vùng; native FFI thêm vùng 5.
+// Toàn bộ việc phân tích/phát bytecode/liên kết thực hiện trong gói V++;
+// bytecode_chay_vm chỉ chuyển ABI và thực thi trên máy ảo hiện có.
+nhập gói/biên dịch/liên kết;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/chuyển kiểu;
+
+// Kiểm tra dữ liệu dùng chung không cần một đối tượng trung gian.
+hàm công khai biên dịch nạp danh sách(giá_trị, vị_trí) {
+    nếu (loai_cua(giá_trị) != "danh sách") {
+        ném "biên dịch nạp: " + vị_trí + " phải là danh sách";
+    };
+    trả về giá_trị;
+};
+
+// Một bộ nạp giữ artifact và cache ABI; bộ chuyển mã dùng chung cho mọi module.
+lớp công khai Bộ Nạp Artifact {
+    hàm công khai khởi tạo(artifact) {
+        mình.artifact = artifact;
+        mình.abi = rỗng;
+    };
+
+    hàm công khai bytecode(danh_sách) {
+        biên dịch nạp danh sách(danh_sách, "bytecode");
+        dây = [];
+        lặp(i = 0; i < độ dài(danh_sách); i++) {
+            lệnh = danh_sách[i];
+            nếu (loai_cua(lệnh) != "từ điển") {
+                ném "biên dịch nạp: bản ghi bytecode phải là từ điển";
+            };
+            nếu (!co_khoa(lệnh, "op") || !co_khoa(lệnh, "toán hạng") ||
+                !co_khoa(lệnh, "chỉ số") || !co_khoa(lệnh, "giá trị")) {
+                ném "biên dịch nạp: bytecode thiếu trường ABI";
+            };
+            thêm(dây, [lệnh["op"], lệnh["toán hạng"],
+                       lệnh["chỉ số"], lệnh["giá trị"]]);
+        };
+        trả về dây;
+    };
+
+    // Hỗ trợ artifact một mô-đun và đồ thị đa mô-đun.
+    hàm công khai nạp() {
+        nếu (mình.abi != rỗng) { trả về mình.abi; };
+        artifact = mình.artifact;
+        nếu (loai_cua(artifact) != "từ điển") {
+            ném "biên dịch nạp: artifact phải là từ điển";
+        };
+        loại = lấy map(artifact, "loại", "");
+        nếu (loại != "bytecode V++ đã liên kết" &&
+            loại != "bytecode V++ đồ thị đã liên kết") {
+            ném "biên dịch nạp: cần artifact bytecode V++ đã liên kết";
+        };
+        chuỗi = biên dịch nạp danh sách(lấy map(artifact, "chuỗi", rỗng), "chuỗi");
+        nguồn = mình.bytecode(lấy map(artifact, "bytecode", rỗng));
+        các_hàm = biên dịch nạp danh sách(lấy map(artifact, "hàm", rỗng), "hàm");
+        bảng_hàm = [];
+        tên_đã_khai = {};
+        lặp(i = 0; i < độ dài(các_hàm); i++) {
+            h = các_hàm[i];
+            nếu (loai_cua(h) != "từ điển" ||
+                loai_cua(lấy map(h, "id", rỗng)) != "số nguyên" || lấy map(h, "id", -1) != i) {
+                ném "biên dịch nạp: function ID không liên tiếp";
+            };
+            tên_index = lấy map(h, "tên index", -1);
+            nếu (loại == "bytecode V++ đồ thị đã liên kết") {
+                tên_index = lấy map(h, "tên index runtime", -1);
+            };
+            nếu (loai_cua(tên_index) != "số nguyên") {
+                ném "biên dịch nạp: function name index ngoài StringPool";
+            };
+            nếu (tên_index < -1 || tên_index >= độ dài(chuỗi)) {
+                ném "biên dịch nạp: function name index ngoài StringPool";
+            };
+            nếu (tên_index >= 0) {
+                khóa = thành chuỗi(tên_index);
+                nếu (co_khoa(tên_đã_khai, khóa)) {
+                    ném "biên dịch nạp: trùng function runtime name index";
+                };
+                tên_đã_khai[khóa] = đúng;
+            };
+            thêm(bảng_hàm, [i, tên_index,
+                            mình.bytecode(lấy map(h, "bytecode", rỗng))]);
+        };
+
+        các_mô_đun = lấy map(artifact, "mô đun khởi tạo", []);
+        biên dịch nạp danh sách(các_mô_đun, "mô đun khởi tạo");
+        nếu (loại == "bytecode V++ đã liên kết" && độ dài(các_mô_đun) != 0) {
+            ném "biên dịch nạp: artifact một mô-đun không có initializer";
+        };
+        khởi_tạo = [];
+        mô_đun_đã_khai = {};
+        lặp(i = 0; i < độ dài(các_mô_đun); i++) {
+            mô_đun = các_mô_đun[i];
+            nếu (loai_cua(mô_đun) != "từ điển") {
+                ném "biên dịch nạp: initializer phải là từ điển";
+            };
+            định_danh = lấy map(mô_đun, "định danh", "");
+            nếu (loai_cua(định_danh) != "chuỗi" || định_danh == "") {
+                ném "biên dịch nạp: định danh initializer không hợp lệ";
+            };
+            nếu (co_khoa(mô_đun_đã_khai, định_danh)) {
+                ném "biên dịch nạp: trùng định danh initializer";
+            };
+            mô_đun_đã_khai[định_danh] = đúng;
+            thêm(khởi_tạo, [định_danh,
+                            mình.bytecode(lấy map(mô_đun, "bytecode", rỗng))]);
+        };
+        mình.abi = [nguồn, chuỗi, bảng_hàm, khởi_tạo];
+        ngoại = biên dịch nạp danh sách(lấy map(artifact, "ngoại", []), "ngoại hàm");
+        nếu (độ dài(ngoại) > 0) {
+            dây_ngoại = [];
+            lặp(i = 0; i < độ dài(ngoại); i++) {
+                d = ngoại[i];
+                nếu (loai_cua(d) != "từ điển" || d["id"] != i) {
+                    ném "biên dịch nạp: foreign descriptor ID không liên tiếp";
+                };
+                thêm(dây_ngoại, [d["id"], d["thư viện"], d["ký hiệu"],
+                    d["tham số"], d["đệm"], d["kết quả"],
+                    d["abi"], d["khả năng"]]);
+            };
+            thêm(mình.abi, dây_ngoại);
+        };
+        trả về mình.abi;
+    };
+
+    hàm công khai chạy() {
+        dây = mình.nạp();
+        nếu (độ dài(dây) == 5) {
+            ném "biên dịch nạp: chạy artifact có FFI cần native AOT";
+        };
+        trả về bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]);
+    };
+};
+
+hàm công khai biên dịch nạp bytecode(danh_sách) {
+    bộ_nạp = Bộ Nạp Artifact(rỗng);
+    trả về bộ_nạp.bytecode(danh_sách);
+};
+
+hàm công khai biên dịch nạp artifact(artifact) {
+    bộ_nạp = Bộ Nạp Artifact(artifact);
+    trả về bộ_nạp.nạp();
+};
+
+hàm công khai biên dịch chạy artifact(artifact) {
+    bộ_nạp = Bộ Nạp Artifact(artifact);
+    trả về bộ_nạp.chạy();
+};
+
+hàm công khai biên dịch chạy chương trình tự chủ(mã_nguồn) {
+    trả về biên dịch chạy artifact(biên dịch chương trình tự chủ(mã_nguồn));
+};
+
+hàm công khai biên dịch chạy chương trình mô đun tự chủ(điểm_vào, nguồn) {
+    trả về biên dịch chạy artifact(
+        biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn));
+};

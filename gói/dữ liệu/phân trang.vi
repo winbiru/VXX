@@ -1,41 +1,69 @@
-// Module: dữ liệu.phân trang
-// Mục đích: hỗ trợ tính toán phân trang cho API/list data.
-// Nhóm hàm: chuẩn hóa trang/kích thước, tính offset và tổng số trang.
 
-// Ghi chú hàm: trang hợp lệ.
-hàm trang hợp lệ(trang) {
-    nếu (trang < 0) {
-        trả về 0;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Phân Trang {
+    hàm công khai khởi tạo() {};
+
+    // Module: dữ liệu.phân trang
+    // Mục đích: hỗ trợ tính toán phân trang cho API/list data.
+    // Nhóm hàm: chuẩn hóa trang/kích thước, tính offset và tổng số trang.
+
+    // Ghi chú hàm: trang hợp lệ.
+    hàm công khai trang hợp lệ(trang) {
+        nếu (trang < 0) {
+            trả về 0;
+        };
+        trả về trang;
     };
-    trả về trang;
+
+    // Ghi chú hàm: kích thước hợp lệ.
+    hàm công khai kích thước hợp lệ(kích thước) {
+        nếu (kích thước <= 0) {
+            trả về 1;
+        };
+        trả về kích thước;
+    };
+
+    // Ghi chú hàm: độ dời dữ liệu.
+    hàm công khai độ dời dữ liệu(trang, kích thước) {
+        trang hợp = mình.trang hợp lệ(trang);
+        kích thước hợp = mình.kích thước hợp lệ(kích thước);
+        trả về trang hợp * kích thước hợp;
+    };
+
+    // Ghi chú hàm: tổng số trang.
+    hàm công khai tổng số trang(tổng bản ghi, kích thước) {
+        nếu (tổng bản ghi <= 0) {
+            trả về 0;
+        };
+
+        kích thước hợp = mình.kích thước hợp lệ(kích thước);
+        tổng trang = 0;
+        lặp (còn lại = tổng bản ghi; còn lại > 0; còn lại = còn lại - kích thước hợp) {
+            tổng trang = tổng trang + 1;
+        };
+
+        trả về tổng trang;
+    };
 };
 
-// Ghi chú hàm: kích thước hợp lệ.
-hàm kích thước hợp lệ(kích thước) {
-    nếu (kích thước <= 0) {
-        trả về 1;
-    };
-    trả về kích thước;
+
+hàm công khai trang hợp lệ(trang) {
+    __vpp_adapter = Tiện Ích Phân Trang();
+    trả về __vpp_adapter.trang hợp lệ(trang);
 };
 
-// Ghi chú hàm: độ dời dữ liệu.
-hàm độ dời dữ liệu(trang, kích thước) {
-    trang hợp = trang hợp lệ(trang);
-    kích thước hợp = kích thước hợp lệ(kích thước);
-    trả về trang hợp * kích thước hợp;
+hàm công khai kích thước hợp lệ(kích thước) {
+    __vpp_adapter = Tiện Ích Phân Trang();
+    trả về __vpp_adapter.kích thước hợp lệ(kích thước);
 };
 
-// Ghi chú hàm: tổng số trang.
-hàm tổng số trang(tổng bản ghi, kích thước) {
-    nếu (tổng bản ghi <= 0) {
-        trả về 0;
-    };
+hàm công khai độ dời dữ liệu(trang, kích thước) {
+    __vpp_adapter = Tiện Ích Phân Trang();
+    trả về __vpp_adapter.độ dời dữ liệu(trang, kích thước);
+};
 
-    kích thước hợp = kích thước hợp lệ(kích thước);
-    tổng trang = 0;
-    lặp (còn lại = tổng bản ghi; còn lại > 0; còn lại = còn lại - kích thước hợp) {
-        tổng trang = tổng trang + 1;
-    };
-
-    trả về tổng trang;
+hàm công khai tổng số trang(tổng bản ghi, kích thước) {
+    __vpp_adapter = Tiện Ích Phân Trang();
+    trả về __vpp_adapter.tổng số trang(tổng bản ghi, kích thước);
 };

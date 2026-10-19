@@ -2,9 +2,21 @@
 nhập gói/mạng/ổ cắm;
 nhập gói/bộ sưu tập/danh sách;
 
-hàm dns phân giải(tên máy) {
-    kết_quả = dns_phan_giai(tên máy);
-    xóa trùng(kết_quả);
-    sắp xếp(kết_quả);
-    trả về kết_quả;
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phân Giải DNS {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai dns phân giải(tên máy) {
+        tên máy = socket yêu cầu tên máy(tên máy, "dns_phan_giai");
+        kết_quả = socket resolver danh sách(tên máy, 0, sai);
+        xóa trùng(kết_quả);
+        sắp xếp(kết_quả);
+        trả về kết_quả;
+    };
+};
+
+
+hàm công khai dns phân giải(tên máy) {
+    __vpp_adapter = Bộ Phân Giải DNS();
+    trả về __vpp_adapter.dns phân giải(tên máy);
 };

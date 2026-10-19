@@ -1,0 +1,37 @@
+nhập nhập xuất;
+
+hàm chính() {
+    đường = ".tmp_ffi_file_chunk.bin";
+    bytes = [];
+    lặp(i = 0; i < 8201; i++) { them(bytes, i % 256); };
+    in ghi bytes tệp(đường, bytes) == 1;
+    nhận = đọc bytes tệp(đường);
+    in do_dai(nhận) == 8201;
+    in nhận[0] == 0 && nhận[255] == 255 && nhận[4096] == 0 && nhận[8200] == 8;
+
+    nội_dung = "cà phê" + chuoi_tu_bytes_vm([0, 255, 10]);
+    in ghi tệp(đường, nội_dung) == 1;
+    in đọc tệp(đường) == nội_dung;
+    in ghi nối tệp(đường, "-đuôi") == 1;
+    in đọc tệp(đường) == nội_dung + "-đuôi";
+    in ghi bytes tệp(đường, []) == 1;
+    in do_dai(đọc bytes tệp(đường)) == 0;
+    in ghi nối tệp(đường, "A") == 1;
+    in đọc tệp(đường) == "A";
+    in xóa đường dẫn(đường) == 1;
+
+    // Windows must open the UTF-8 public path through the wide CRT adapter.
+    đường_unicode = ".tmp_ffi_tệp_cà_phê.bin";
+    in ghi bytes tệp(đường_unicode, [0, 10, 127, 255]) == 1;
+    bytes_unicode = đọc bytes tệp(đường_unicode);
+    in do_dai(bytes_unicode) == 4 && bytes_unicode[0] == 0 &&
+        bytes_unicode[1] == 10 && bytes_unicode[2] == 127 && bytes_unicode[3] == 255;
+    in xóa đường dẫn(đường_unicode) == 1;
+
+    thử { đọc tệp(".tmp_ffi_file_does_not_exist"); }
+    bắt lỗi(e) { in "chặn tệp thiếu"; };
+    thử { ghi tệp(".tmp_ffi_file_bad" + chuoi_tu_bytes_vm([0]), "X"); }
+    bắt lỗi(e) { in "chặn NUL"; };
+    thử { ghi bytes tệp(".tmp_ffi_file_invalid", [256]); }
+    bắt lỗi(e) { in "chặn byte sai"; };
+};

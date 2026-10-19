@@ -1,0 +1,1 @@
+hàm helper() { biến value = 51; trả về value; };

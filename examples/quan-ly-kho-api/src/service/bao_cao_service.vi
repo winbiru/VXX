@@ -31,7 +31,7 @@ lớp công khai DịchVụBáoCáo {
             đơn = đơnHàng[i];
             nếu (đơn.trạngThái == "DA_HUY") {
                 đơnĐãHủy = đơnĐãHủy + 1;
-            } nếu không {
+            } hoặc {
                 đơnHoạtĐộng = đơnHoạtĐộng + 1;
                 doanhThu = doanhThu + đơn.tổngTiền();
             };

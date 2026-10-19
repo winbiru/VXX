@@ -1,0 +1,220 @@
+// Đối chiếu byte mã máy AArch64 của hàm Machine IR do V++ phát với C++ CLI.
+// Đầu vào phản ánh MachineOpcode trong src/include/vpp/native/raw_codegen.h.
+nhập gói/biên dịch/mã máy;
+nhập gói/biên dịch/mã máy nền;
+
+hàm native thêm lệnh(ra, mã, immediate = 0, operand = 0, depthBefore = 0, symbol = "") {
+    thêm(ra, biên dịch mã máy lệnh(mã, immediate, operand, depthBefore, symbol));
+}
+
+hàm native in byte(kiến_trúc, hệ_điều_hành, tên, tham_số, slot, sâu_nhất, lệnh) {
+    kết_quả = biên dịch mã máy hàm(kiến_trúc, {
+        "parameterCount": tham_số, "slotCount": slot,
+        "maxStackDepth": sâu_nhất, "instructions": lệnh
+    }, hệ_điều_hành);
+    byte = kết_quả["bytes"];
+    bảng = "0123456789abcdef";
+    hex = "";
+    lặp (i = 0; i < độ dài(byte); i++) {
+        b = byte[i];
+        hex += bảng[(b - b % 16) / 16] + bảng[b % 16];
+    };
+    in tên + "#" + kiến_trúc + "#" + hệ_điều_hành + ":" + hex;
+}
+
+hàm native kiểm tra byte(tên, tham_số, slot, sâu_nhất, lệnh) {
+    native in byte("aarch64", "macos", tên, tham_số, slot, sâu_nhất, lệnh);
+    native in byte("aarch64", "linux", tên, tham_số, slot, sâu_nhất, lệnh);
+    native in byte("x86_64", "linux", tên, tham_số, slot, sâu_nhất, lệnh);
+    native in byte("x86_64", "windows", tên, tham_số, slot, sâu_nhất, lệnh);
+}
+
+hàm chính() {
+    // Hàm tru_dao(a,b) { trả về b-a; } (cần Machine IR).
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 1);
+    native thêm lệnh(lệnh, "Sub", 0, 0, 2);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("tru_dao", 2, 2, 2, lệnh);
+
+    // Hàm tong_bon(a,b,c,d) { trả về (a+b)-c*d; }.
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "Add", 0, 0, 2);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 3, 2);
+    native thêm lệnh(lệnh, "Mul", 0, 0, 3);
+    native thêm lệnh(lệnh, "Sub", 0, 0, 2);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("tong_bon", 4, 4, 3, lệnh);
+
+    // Hàm dieu_kien(n): n != 0 ? 12 : -12, nhảy qua 2 return.
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "PushConstant", 0, 0, 1);
+    native thêm lệnh(lệnh, "NotEqual", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 6, 1);
+    native thêm lệnh(lệnh, "PushConstant", 12, 0, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "PushConstant", -12, 0, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("dieu_kien", 1, 1, 2, lệnh);
+
+    // Hàm max_i32(a,b): nhánh có else, Jump nhảy tới Trap ở cuối.
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "GreaterEqual", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 7, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Jump", 0, 9, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("max_i32", 2, 2, 2, lệnh);
+
+    // Hàm tong(n): biến total, biến đếm i, BranchZero tiến và Jump lùi.
+    lệnh = [];
+    native thêm lệnh(lệnh, "PushConstant", 0, 0, 0);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "PushConstant", 0, 0, 0);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 1);
+    native thêm lệnh(lệnh, "Less", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 21, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Add", 0, 0, 2);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "PushConstant", 1, 0, 1);
+    native thêm lệnh(lệnh, "Add", 0, 0, 2);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "Jump", 0, 6, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("tong", 1, 3, 2, lệnh);
+
+    // Lời gọi trực tiếp 4 đối số: vị trí relocation chỉ tới BL imm26.
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 2);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 3, 3);
+    native thêm lệnh(lệnh, "Call", 0, 4, 4, "bon");
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    kết_quả = biên dịch mã máy hàm("aarch64", {
+        "parameterCount": 4, "slotCount": 4,
+        "maxStackDepth": 4, "instructions": lệnh
+    });
+    tái_định_vị = kết_quả["relocations"];
+    nếu (độ dài(tái_định_vị) != 1 || tái_định_vị[0]["symbol"] != "bon") {
+        ném "AArch64 CALL: sai relocation của hàm bon";
+    };
+    offset = tái_định_vị[0]["offset"];
+    byte = kết_quả["bytes"];
+    nếu (offset < 0 || offset + 4 > độ dài(byte) ||
+        byte[offset] != 0 || byte[offset + 1] != 0 ||
+        byte[offset + 2] != 0 || byte[offset + 3] != 148) {
+        ném "AArch64 CALL: BL relocation offset không trỏ đúng lệnh";
+    };
+    native kiểm tra byte("goi_bon", 4, 4, 4, lệnh);
+
+    // Đối chiếu độc lập mã máy khi caller chuyển 10 tham số, gồm phần trên stack.
+    lệnh = [];
+    lặp (i = 0; i < 10; i++) {
+        native thêm lệnh(lệnh, "LoadSlot", 0, i, i);
+    };
+    native thêm lệnh(lệnh, "Call", 0, 10, 10, "tong_muoi");
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("goi_muoi", 10, 10, 10, lệnh);
+
+    // Callee lấy đủ 10 tham số, bao gồm giá trị được truyền qua stack.
+    lệnh = [];
+    lặp (i = 0; i < 10; i++) {
+        sâu = 1;
+        nếu (i == 0) { sâu = 0; };
+        native thêm lệnh(lệnh, "LoadSlot", 0, i, sâu);
+        nếu (i > 0) { native thêm lệnh(lệnh, "Add", 0, 0, 2); };
+    };
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("tong_muoi", 10, 10, 2, lệnh);
+
+    // Từ chối opcode lạ, invalid branch, stack underflow và CALL thiếu symbol.
+    lệnh = [biên dịch mã máy lệnh("Unset")];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("aarch64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "AArch64 MachineOpcode không chặn opcode lạ"; };
+
+    lệnh = [biên dịch mã máy lệnh("BranchZero", 0, 40, 1)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("aarch64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 2, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "AArch64 Machine IR không chặn branch ngoài frame"; };
+
+    lệnh = [biên dịch mã máy lệnh("Add", 0, 0, 1)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("aarch64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 2, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "AArch64 Machine IR không chặn underflow"; };
+
+    lệnh = [biên dịch mã máy lệnh("Call", 0, 0, 0)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("aarch64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "AArch64 Machine IR không chặn CALL thiếu symbol"; };
+
+    // CFG phải kiểm tra đúng stack depth tại đích của Jump, kể cả Trap.
+    lệnh = [biên dịch mã máy lệnh("PushConstant", 5),
+            biên dịch mã máy lệnh("Jump", 0, 3, 1),
+            biên dịch mã máy lệnh("Trap"),
+            biên dịch mã máy lệnh("Trap")];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("x86_64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "Machine IR CFG không chặn nhảy vào sai stack depth"; };
+
+    lệnh = [biên dịch mã máy lệnh("PushConstant", 2)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("x86_64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "Machine IR CFG không chặn fallthrough"; };
+
+    lệnh = [biên dịch mã máy lệnh("Call", 0, 0, 0, "bad-symbol"),
+            biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("x86_64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}, "windows"); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "Machine IR không chặn ký hiệu CALL không an toàn"; };
+
+    lệnh = [biên dịch mã máy lệnh("PushConstant", 1),
+            biên dịch mã máy lệnh("Return", 0, 0, 1)];
+    có_lỗi = sai;
+    thử { biên dịch mã máy hàm("riscv64", {"parameterCount": 0, "slotCount": 0,
+        "maxStackDepth": 1, "instructions": lệnh}); }
+    bắt lỗi(e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "Machine IR không chặn backend chưa hoàn thiện"; };
+}

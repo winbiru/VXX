@@ -1,0 +1,63 @@
+// Phát hiện StringPool sai thứ tự khi literal nằm xen giữa các import.
+nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/liên kết;
+
+hàm khớp lệnh(cũ, mới) {
+    nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cũ); i++) {
+        nếu (cũ[i]["op"] != mới[i]["op"] ||
+            cũ[i]["toán hạng"] != mới[i]["toán hạng"] ||
+            cũ[i]["chỉ số"] != mới[i]["chỉ số"] ||
+            cũ[i]["giá trị"] != mới[i]["giá trị"]) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm oracle kiểm thử chuỗi(root) {
+    lib = "hàm cộng() { in \"thân\"; trả về 42; }; in \"phụ\";";
+    oracle = biên dịch snapshot nội bộ(root, "fixtures/compiler_oracle/string_order/app");
+    mới = biên dịch chương trình mô đun tự chủ("app/main", {
+        "app/main": root, "lib/math": lib
+    });
+    in oracle["hợp lệ"] == 1;
+    nếu (oracle["hợp lệ"] == 1) {
+        cũ = oracle["bytecode"];
+        mới_root = mới["bytecode"];
+        đầu = [];
+        nếu (độ dài(mới_root) >= độ dài(cũ)) {
+            lặp(i = 0; i < độ dài(cũ); i++) { thêm(đầu, mới_root[i]); };
+        };
+        in độ dài(mới_root) == độ dài(cũ) + 2 && khớp lệnh(cũ, đầu);
+        hàm_cũ = oracle["hàm"];
+        hàm_mới = mới["hàm"];
+        đúng_hàm = độ dài(hàm_cũ) == độ dài(hàm_mới);
+        nếu (đúng_hàm) {
+            lặp(i = 0; i < độ dài(hàm_cũ); i++) {
+                nếu (hàm_cũ[i]["id"] != hàm_mới[i]["id"] ||
+                    hàm_cũ[i]["tên"] != hàm_mới[i]["tên chạy"] ||
+                    !khớp lệnh(hàm_cũ[i]["bytecode"], hàm_mới[i]["bytecode"])) {
+                    đúng_hàm = sai;
+                };
+            };
+        };
+        in đúng_hàm;
+    } hoặc { in sai; in sai; };
+};
+
+hàm chính() {
+    // Literal bao quanh import, C++ phân bổ StringPool khi gặp từng lệnh.
+    oracle kiểm thử chuỗi("in \"trước\"; nhập ../lib/math như toán; in \"sau\"; " +
+                          "hàm chính() { in \"gốc\"; in toán.cộng(); };");
+    // Các biến cũng sinh bytecode nạp chuỗi trước và sau import.
+    oracle kiểm thử chuỗi("biến x = \"trước\"; nhập ../lib/math như toán; " +
+                          "biến y = \"sau\"; " +
+                          "hàm chính() { in x; in toán.cộng(); in y; };");
+    // Import lặp dưới hai alias phải chia sẻ function ID.
+    oracle kiểm thử chuỗi("nhập ../lib/math như toán; in \"giữa\"; " +
+                          "nhập ../lib/math như khác; in \"sau\"; " +
+                          "hàm chính() { in khác.cộng(); in toán.cộng(); };");
+    // Khai báo hàm và chuỗi xuất hiện cả trước và sau dependency.
+    oracle kiểm thử chuỗi("hàm f() { in \"đầu\"; }; in \"trước\"; " +
+                          "nhập ../lib/math như toán; " +
+                          "hàm chính() { in f(); in toán.cộng(); in \"cuối\"; };");
+};

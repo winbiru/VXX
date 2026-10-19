@@ -1,0 +1,89 @@
+hàm chính() {
+    nếu (máy_đọc_byte(-1) != -1) { trả về 1; };
+    nếu (máy_đọc_byte(68162560) != -1) { trả về 2; };
+    nếu (máy_đọc_i32(68162557) != -1) { trả về 3; };
+    nếu (máy_ghi_i32(68162556, -2147483648) != 0) { trả về 4; };
+    nếu (máy_đọc_i32(68162556) != -2147483648) { trả về 5; };
+    nếu (máy_gắn_địa_chỉ(3, 4096) != -1) { trả về 6; };
+    nếu (máy_gắn_địa_chỉ(4000, -1) != -1) { trả về 7; };
+    nếu (máy_gắn_địa_chỉ(4000, 4096) != 0) { trả về 8; };
+    nếu (máy_đọc_i32(4004) == 0) { trả về 9; }; // Actual pointer is above 4 GiB on this host.
+
+    biến bytes = byte_mới();
+    nếu (bytes <= 0) { trả về 10; };
+    nếu (byte_thêm(bytes, 255) != 0) { trả về 11; };
+    nếu (byte_đẩy_i32(bytes, -2147483648) != 0) { trả về 12; };
+    nếu (byte_đọc_i32(bytes, 1) != -2147483648) { trả về 13; };
+    nếu (byte_lấy(bytes, 4) != 128) { trả về 14; };
+    biến part = byte_cắt(bytes, 1, 4);
+    nếu (part <= 0) { trả về 15; };
+    nếu (byte_tìm(bytes, part) != 1) { trả về 16; };
+    byte_làm_rỗng(bytes);
+    nếu (byte_đọc_i32(part, 0) != -2147483648) { trả về 17; };
+    byte_thêm(bytes, 90);
+    lặp (i = 0; i < 20; i++) {
+        nếu (byte_nối(bytes, bytes) != 0) { trả về 18; };
+    };
+    nếu (byte_dài(bytes) != 1048576) { trả về 19; };
+    nếu (byte_thêm(bytes, 1) != -1) { trả về 20; };
+    nếu (byte_đẩy_i32(bytes, 0) != -1) { trả về 21; };
+    nếu (byte_lấy(bytes, 1048575) != 90) { trả về 22; };
+
+    biến handles = byte_mới();
+    biến count = 0;
+    lặp (j = 0; j < 64; j++) {
+        biến h = byte_mới();
+        nếu (h < 0) { thoát; };
+        byte_đẩy_i32(handles, h);
+        count = count + 1;
+    };
+    nếu (count != 61) { trả về 23; };
+    lặp (k = 0; k < count; k++) {
+        nếu (byte_hủy(byte_đọc_i32(handles, k * 4)) != 0) { trả về 24; };
+    };
+    byte_hủy(part);
+    biến replacement = byte_mới();
+    nếu (replacement <= part) { trả về 25; };
+    nếu (byte_dài(part) != -1) { trả về 26; };
+    byte_hủy(replacement);
+
+    byte_làm_rỗng(bytes);
+    byte_thêm(bytes, 0); byte_thêm(bytes, 255); byte_thêm(bytes, 10); byte_thêm(bytes, 52);
+    biến path = "runtime-owned.bin";
+    biến file = tệp_mở_ghi(path);
+    nếu (file <= 0) { trả về 27; };
+    nếu (tệp_ghi_khối(file, bytes) != 4) { trả về 28; };
+    nếu (tệp_đóng(file) != 0) { trả về 29; };
+    nếu (tệp_đóng(file) != -1) { trả về 30; };
+    nếu (byte_dài(file) != -1) { trả về 31; };
+    byte_làm_rỗng(handles);
+    lặp (f = 0; f < 64; f++) {
+        biến opened = tệp_mở_đọc(path);
+        nếu (opened <= 0) { trả về 32; };
+        byte_đẩy_i32(handles, opened);
+    };
+    nếu (tệp_mở_ghi(path) != -1) { trả về 33; }; // Full table must not truncate.
+    lặp (close_index = 0; close_index < 64; close_index++) {
+        nếu (tệp_đóng(byte_đọc_i32(handles, close_index * 4)) != 0) { trả về 34; };
+    };
+    biến loaded = byte_mới();
+    file = tệp_mở_đọc(path);
+    nếu (tệp_đọc_khối(file, loaded) != 4) { trả về 35; };
+    nếu (byte_bằng(bytes, loaded) != 1) { trả về 36; };
+    nếu (tệp_đọc_byte(file) != -1) { trả về 37; };
+    nếu (tệp_ghi_byte(file, 52) != -1) { trả về 38; };
+    nếu (tệp_đóng(file) != 0) { trả về 39; };
+    byte_hủy(path); byte_hủy(loaded); byte_hủy(handles); byte_hủy(bytes);
+
+    nếu (đối_số_đếm() != 3) { trả về 40; };
+    biến empty = đối_số_lấy(1);
+    biến utf8 = đối_số_lấy(2);
+    nếu (byte_dài(empty) != 0) { trả về 41; };
+    nếu (byte_dài(utf8) != 14) { trả về 42; };
+    nếu (đối_số_lấy(3) != -1) { trả về 43; };
+    nếu (máy_đối_số_byte(1, 0) != -1) { trả về 44; };
+    nếu (máy_đối_số_byte(2, 14) != -1) { trả về 45; };
+    byte_hủy(empty); byte_hủy(utf8);
+    in_số(-2147483648); in_số(2147483647); in_số(0);
+    trả về 52;
+};

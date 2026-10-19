@@ -1,0 +1,72 @@
+// Kết nối logic theo instance; backend hiện thực thi từng truy vấn qua DB client.
+// Không cam kết transaction, pooling hay giữ một socket DB giữa các lần gọi.
+nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
+nhập gói/lõi/tài nguyên có trạng thái;
+
+lớp công khai Kết Nối Cơ Sở Dữ Liệu kế thừa Tài Nguyên Có Trạng Thái {
+    hàm công khai khởi tạo(driver, url, tài_khoản, mật_khẩu) {
+        cấu_hình = db phân tích cấu hình(driver, url);
+        nếu (!lấy map(cấu_hình, "ok", sai)) {
+            ném "kết nối cơ sở dữ liệu: " + lấy map(cấu_hình, "reason", "invalid-config");
+        };
+        gốc.khởi tạo();
+        mình.driver = driver;
+        mình.url = url;
+        mình.tài_khoản = tài_khoản;
+        mình.mật_khẩu = mật_khẩu;
+        mình.cấu_hình = cấu_hình;
+        mình.đã_kết_nối = sai;
+    };
+
+    hàm công khai thông tin() {
+        // Trả snapshot mới để caller không sửa trạng thái cấu hình của instance.
+        trả về db phân tích cấu hình(mình.driver, mình.url);
+    };
+
+    hàm công khai đang kết nối() {
+        trả về mình.đã_kết_nối && !mình.đã_đóng;
+    };
+
+    hàm công khai kết nối() {
+        mình.yêu cầu mở("kết nối cơ sở dữ liệu");
+        nếu (mình.đã_kết_nối) { trả về "DB_OK|connected"; };
+        kết_quả = mình.mở kết nối();
+        mình.đã_kết_nối = kết_quả == "DB_OK|connected";
+        trả về kết_quả;
+    };
+
+    hàm công khai truy vấn(sql) {
+        nếu (!mình.đang kết nối()) {
+            ném "kết nối cơ sở dữ liệu: chưa kết nối hoặc đã đóng";
+        };
+        trả về mình.thực thi(sql);
+    };
+
+    hàm công khai ping() {
+        trả về mình.truy vấn("SELECT 1;");
+    };
+
+    hàm công khai đóng() {
+        nếu (mình.đã_đóng) { trả về "DB_OK|disconnected"; };
+        mình.đã_đóng = đúng;
+        mình.đã_kết_nối = sai;
+        thử {
+            kết_quả = mình.ngắt kết nối();
+        } bắt lỗi(e) {
+            mình.mật_khẩu = "";
+            ném e;
+        };
+        mình.mật_khẩu = "";
+        trả về kết_quả;
+    };
+
+    hàm bảo vệ mở kết nối() {
+        trả về db_ket_noi(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu);
+    };
+    hàm bảo vệ thực thi(sql) {
+        trả về db_truy_van(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu, sql);
+    };
+    hàm bảo vệ ngắt kết nối() {
+        trả về db_ngat_ket_noi(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu);
+    };
+};

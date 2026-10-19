@@ -1,0 +1,87 @@
+// So byte mã V++ tự phát với các vector chuẩn của backend C++.
+nhập gói/biên dịch/mã máy;
+
+hàm kiểm tra mã lá(kiến_trúc, loại, hex, hằng = 42, hệ_điều_hành = "linux") {
+    byte = biên dịch mã máy lá(kiến_trúc, loại, hằng, hệ_điều_hành);
+    nếu (độ dài(byte) * 2 != độ dài(hex)) {
+        ném "độ dài mã máy sai: " + kiến_trúc + " " + loại;
+    };
+    lặp (i = 0; i < độ dài(byte); i++) {
+        mong_đợi = biên dịch mã máy chữ hex(hex[i * 2]) * 16 +
+            biên dịch mã máy chữ hex(hex[i * 2 + 1]);
+        nếu (byte[i] != mong_đợi) {
+            ném "mã máy sai: " + kiến_trúc + " " + loại + " offset " + i;
+        };
+    };
+}
+
+hàm chính() {
+    kiểm tra mã lá("x86_64", "hằng", "b82a000000c3");
+    kiểm tra mã lá("aarch64", "hằng", "400580520000a072c0035fd6");
+    kiểm tra mã lá("riscv64", "hằng", "370500001b05a50267800000");
+    kiểm tra mã lá("armv7", "hằng", "2a0000e3000040e31eff2fe1");
+    kiểm tra mã lá("i386", "hằng", "b82a000000c3");
+    kiểm tra mã lá("powerpc", "hằng", "3c6000006063002a4e800020");
+    kiểm tra mã lá("powerpc64", "hằng", "3c6000006063002a4e800020");
+    kiểm tra mã lá("powerpc64le", "hằng", "0000603c2a0063602000804e");
+    kiểm tra mã lá("mips", "hằng", "3c0200003442002a03e0000800000000");
+    kiểm tra mã lá("mipsel", "hằng", "0000023c2a0042340800e00300000000");
+    kiểm tra mã lá("mips64", "hằng", "3c0200003442002a03e0000800000000");
+    kiểm tra mã lá("mips64el", "hằng", "0000023c2a0042340800e00300000000");
+    kiểm tra mã lá("loongarch64", "hằng", "0400001484a880032000004c");
+    kiểm tra mã lá("s390x", "hằng", "a729002a07fe");
+    kiểm tra mã lá("sparc", "hằng", "110000009012202a81c3e00801000000");
+    kiểm tra mã lá("sparc64", "hằng", "110000009012202a81c3e00801000000");
+
+    kiểm tra mã lá("x86_64", "cộng", "89f801f0c3");
+    kiểm tra mã lá("aarch64", "cộng", "0000010bc0035fd6");
+    kiểm tra mã lá("riscv64", "cộng", "3b05b50067800000");
+    kiểm tra mã lá("armv7", "cộng", "010080e01eff2fe1");
+    kiểm tra mã lá("i386", "cộng", "8b44240403442408c3");
+    kiểm tra mã lá("powerpc", "cộng", "7c6322144e800020");
+    kiểm tra mã lá("powerpc64", "cộng", "7c6322144e800020");
+    kiểm tra mã lá("powerpc64le", "cộng", "1422637c2000804e");
+    kiểm tra mã lá("mips", "cộng", "0085102103e0000800000000");
+    kiểm tra mã lá("mipsel", "cộng", "211085000800e00300000000");
+    kiểm tra mã lá("mips64", "cộng", "0085102103e0000800000000");
+    kiểm tra mã lá("mips64el", "cộng", "211085000800e00300000000");
+    kiểm tra mã lá("loongarch64", "cộng", "841410002000004c");
+    kiểm tra mã lá("s390x", "cộng", "1a2307fe");
+    kiểm tra mã lá("sparc", "cộng", "9002000981c3e00801000000");
+    kiểm tra mã lá("sparc64", "cộng", "9002000981c3e00801000000");
+
+    kiểm tra mã lá("x86_64", "trừ", "89f829f0c3");
+    kiểm tra mã lá("aarch64", "trừ", "0000014bc0035fd6");
+    kiểm tra mã lá("riscv64", "trừ", "3b05b54067800000");
+    kiểm tra mã lá("armv7", "trừ", "010040e01eff2fe1");
+    kiểm tra mã lá("i386", "trừ", "8b4424042b442408c3");
+    kiểm tra mã lá("powerpc", "trừ", "7c6418504e800020");
+    kiểm tra mã lá("powerpc64", "trừ", "7c6418504e800020");
+    kiểm tra mã lá("powerpc64le", "trừ", "5018647c2000804e");
+    kiểm tra mã lá("mips", "trừ", "0085102303e0000800000000");
+    kiểm tra mã lá("mipsel", "trừ", "231085000800e00300000000");
+    kiểm tra mã lá("mips64", "trừ", "0085102303e0000800000000");
+    kiểm tra mã lá("mips64el", "trừ", "231085000800e00300000000");
+    kiểm tra mã lá("loongarch64", "trừ", "841411002000004c");
+    kiểm tra mã lá("s390x", "trừ", "1b2307fe");
+    kiểm tra mã lá("sparc", "trừ", "9022000981c3e00801000000");
+    kiểm tra mã lá("sparc64", "trừ", "9022000981c3e00801000000");
+    kiểm tra mã lá("x86_64", "trừ", "89c829d0c3", 0, "windows");
+
+    // RISC-V phải xử lý đúng hai biên signed i32 mà không tràn ở
+    // phép tính (hằng - dư), và chuẩn hóa đúng LUI/ADDIW 20+12 bit.
+    kiểm tra mã lá("riscv64", "hằng", "370500801b05050067800000", -2147483647 - 1);
+    kiểm tra mã lá("riscv64", "hằng", "370500801b05f5ff67800000", 2147483647);
+    kiểm tra mã lá("riscv64", "hằng", "371500001b05058067800000", 2048);
+    kiểm tra mã lá("riscv64", "hằng", "370500001b05058067800000", -2048);
+    kiểm tra mã lá("s390x", "hằng", "c0210000800007fe", 32768);
+    kiểm tra mã lá("s390x", "hằng", "c0217fffffff07fe", 2147483647);
+    kiểm tra mã lá("s390x", "hằng", "c0218000000007fe", -2147483647 - 1);
+    kiểm tra mã lá("s390x", "hằng", "a729800007fe", -32768);
+
+    có_lỗi = sai;
+    thử { biên dịch mã máy lá("riscv64", "không hỗ trợ"); }
+    bắt lỗi (e) { có_lỗi = đúng; };
+    nếu (!có_lỗi) { ném "native V++ không chặn opcode lạ"; };
+    in "native_leaf_vi_ok";
+}

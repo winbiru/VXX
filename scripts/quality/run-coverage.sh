@@ -19,7 +19,10 @@ cmake --build "$BUILD_DIR" --parallel
 # files also makes repeated local runs deterministic after source/flag changes.
 find "$BUILD_DIR" -type f -name '*.gcda' -delete
 
-ctest --test-dir "$BUILD_DIR" --output-on-failure --no-tests=error
+# The instrumented fixture compiles its V++ network modules before listening.
+# Allow that startup work without weakening any HTTP response assertions.
+VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
+  ctest --test-dir "$BUILD_DIR" --output-on-failure --no-tests=error
 
 lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \

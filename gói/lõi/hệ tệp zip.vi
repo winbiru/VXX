@@ -2,28 +2,43 @@
 // Handle 0.2 là map chứa đường ZIP; mọi thao tác xác minh lại kho trước khi dùng.
 nhập gói/lõi/lưu trữ;
 nhập gói/bộ sưu tập/chính;
+nhập gói/lõi/giao diện tài nguyên;
 
-hàm zipfs mở(đường zip) {
+// Thao tác ZIP dùng hàm cấp mô-đun; lớp Hệ Tệp ZIP giữ trạng thái đóng/mở.
+hàm công khai zipfs mở(đường zip) {
     lưu trữ liệt kê zip(đường zip);
     trả về {"đường": đường zip, "mở": 1};
 };
 
-hàm zipfs yêu cầu mở(kho) {
+hàm riêng tư zipfs yêu cầu mở(kho) {
     nếu (lấy map(kho, "mở", 0) != 1) {
         ném "zipfs: kho đã đóng";
     };
     trả về lấy map(kho, "đường", "");
 };
 
-hàm zipfs liệt kê(kho) {
+hàm công khai zipfs liệt kê(kho) {
     trả về lưu trữ liệt kê zip(zipfs yêu cầu mở(kho));
 };
 
-hàm zipfs giải nén(kho, thư mục đích, giới hạn byte = 67108864) {
+hàm công khai zipfs giải nén(kho, thư mục đích, giới hạn byte = 67108864) {
     trả về lưu trữ giải nén zip(zipfs yêu cầu mở(kho), thư mục đích, giới hạn byte);
 };
 
-hàm zipfs đóng(kho) {
+hàm công khai zipfs đóng(kho) {
     đặt map(kho, "mở", 0);
     trả về 1;
+};
+
+lớp công khai Hệ Tệp ZIP triển khai Đóng Được {
+    hàm công khai khởi tạo(đường_zip) { mình.kho = zipfs mở(đường_zip); };
+    hàm công khai liệt kê() { trả về zipfs liệt kê(mình.kho); };
+    hàm công khai giải nén(đích, giới_hạn_byte = 67108864) {
+        trả về zipfs giải nén(mình.kho, đích, giới_hạn_byte);
+    };
+    hàm công khai đóng() {
+        nếu (lấy map(mình.kho, "mở", 0) == 0) { trả về sai; };
+        zipfs đóng(mình.kho);
+        trả về đúng;
+    };
 };

@@ -1,0 +1,4 @@
+// Legacy process opcode must fail on every platform: use the V++ public API.
+hàm chính() {
+    in tien_trinh_chay_vm("/bin/sh", [], {});
+};

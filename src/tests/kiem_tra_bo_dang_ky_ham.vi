@@ -1,0 +1,61 @@
+// Phiên đăng ký giữ trạng thái riêng, bảo toàn Function ID và StringPool.
+nhập gói/biên dịch/sổ đăng ký;
+nhập gói/biên dịch/đồ thị mô đun;
+nhập gói/văn bản/chuỗi;
+
+hàm chính() {
+    nguồn = {"main": "nhập dep như d; hàm chính() {};",
+             "dep": "hàm f() {};"};
+    đồ_thị = biên dịch dựng đồ thị nguồn thuần("main", nguồn);
+    bộ = Bộ Đăng Ký Hàm();
+    sổ = bộ.đăng ký đồ thị(đồ_thị);
+    in độ dài(sổ["hàm"]) == 2;
+    in sổ["hàm"][0]["tên"] == "chính" && sổ["hàm"][0]["id"] == 0;
+    in sổ["hàm"][1]["tên"] == "f" && sổ["hàm"][1]["id"] == 1;
+    in bộ.tìm hàm("dep", "f") == 1;
+    in bộ.tìm mô đun("main")["nhìn thấy"][1]["tên"] == "d.f";
+    in bộ.kết quả()["chuỗi"][0] == "chính";
+    in độ dài(sổ["chuỗi"]) == 3;
+
+    // Gọi lại trên cùng đối tượng bắt đầu phiên mới, không rò ID/tên.
+    ngắn = biên dịch dựng đồ thị nguồn thuần("main", {"main": "hàm khác() {};"});
+    sổ = bộ.đăng ký đồ thị(ngắn);
+    in độ dài(sổ["hàm"]) == 1 && sổ["hàm"][0]["id"] == 0;
+    in sổ["chuỗi"][0] == "khác" && độ dài(sổ["mô đun"]) == 1;
+    sổ = bộ.đăng ký đồ thị(đồ_thị);
+    in bộ.tìm hàm("dep", "f") == 1 && độ dài(sổ["hàm"]) == 2;
+
+    // Hoãn StringPool khi linker cấp tên theo thứ tự emit C++.
+    hoãn = Bộ Đăng Ký Hàm(đúng);
+    sổ_hoãn = hoãn.đăng ký đồ thị(đồ_thị);
+    in độ dài(sổ_hoãn["chuỗi"]) == 0;
+    in sổ_hoãn["hàm"][0]["tên index"] == -1;
+    in sổ_hoãn["hàm"][1]["tên index"] == -1;
+    in độ dài(biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ_thị)["chuỗi"]) == 0;
+
+    // IR và graph dùng chung vòng đời lớp, vẫn phân cách dữ liệu.
+    ir = {"loại": "chương trình IR", "hàm": [
+        {"tên": "f"}, {"tên": "A.m", "phương thức": đúng},
+        {"tên": "chính"}
+    ]};
+    sổ_ir = bộ.đăng ký IR(ir);
+    in độ dài(sổ_ir["hàm"]) == 2 && độ dài(sổ_ir["slots"]) == 2;
+    in sổ_ir["slots"][0] == "f" && sổ_ir["slots"][1] == "chính";
+    in sổ_ir["hàm"][1]["id"] == 1 && sổ_ir["chuỗi"][1] == "chính";
+    in độ dài(bộ.kết quả()["hàm đã khai"]) == 2;
+    sổ_ir = bộ.đăng ký IR({"loại": "chương trình IR", "hàm": [{"tên": "mới"}]});
+    in độ dài(sổ_ir["hàm"]) == 1 && sổ_ir["hàm"][0]["id"] == 0;
+    in sổ_ir["slots"][0] == "mới" && độ dài(sổ_ir["chuỗi"]) == 1;
+    in độ dài(bộ.đăng ký đồ thị(đồ_thị)["hàm"]) == 2;
+
+    lỗi = sai;
+    thử { bộ.đăng ký IR({"loại": "chương trình IR", "hàm": [{"tên": "x"}, {"tên": "x"}]}); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "trùng khai báo hàm 'x'"); };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.đăng ký đồ thị({"loại": "sai"}); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.đăng ký IR({"loại": "sai"}); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

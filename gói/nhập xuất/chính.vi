@@ -1,5 +1,7 @@
 // Gói nhập xuất: tệp, cấu hình, thời gian và nhật ký.
 nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/luồng tệp;
+nhập gói/nhập xuất/đối tượng đường dẫn;
 nhập gói/lõi/cấu hình;
 nhập gói/nhập xuất/đồng hồ;
 nhập gói/lõi/nhật ký;

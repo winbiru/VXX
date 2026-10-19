@@ -12,11 +12,11 @@ hàm chính() {
     in thay chính xác("aba😀aba", "aba", "X");
     in thay chính xác("ab", "", "-");
 
-    nbsp = utf8_native_exec("decode", [194, 160]);
-    em_space = utf8_native_exec("decode", [226, 128, 131]);
-    narrow_nbsp = utf8_native_exec("decode", [226, 128, 175]);
-    ideographic_space = utf8_native_exec("decode", [227, 128, 128]);
-    zero_width_space = utf8_native_exec("decode", [226, 128, 139]);
+    nbsp = ký tự unicode(160);
+    em_space = ký tự unicode(8195);
+    narrow_nbsp = ký tự unicode(8239);
+    ideographic_space = ký tự unicode(12288);
+    zero_width_space = ký tự unicode(8203);
     in là khoảng trắng unicode(nbsp);
     in là khoảng trắng unicode(em_space);
     in là khoảng trắng unicode(narrow_nbsp);
@@ -33,7 +33,7 @@ hàm chính() {
 
     bytes_việt = chuỗi thành bytes("Việt");
     in chuỗi từ bytes(bytes_việt) == "Việt";
-    ký_tự_thay = utf8_native_exec("decode", [239, 191, 189]);
+    ký_tự_thay = ký tự unicode(65533);
     in chuỗi từ bytes([226, 130], "UTF-8", "THAY_THẾ") == ký_tự_thay;
     thử {
         in chuỗi từ bytes([226, 130]);

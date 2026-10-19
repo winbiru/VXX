@@ -1,0 +1,8 @@
+// Regression: giá trị mặc định âm phải được codegen trực tiếp, kể cả INT32_MIN.
+hàm lấy(a = -1) { trả về a; };
+hàm biên(a = -2147483648) { trả về a; };
+hàm chính() {
+    in lấy();
+    in lấy(5);
+    in biên();
+}

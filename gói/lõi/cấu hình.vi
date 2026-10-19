@@ -1,6 +1,6 @@
 // Module: cấu hình
 // Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
-// File I/O vẫn là primitive native; toàn bộ parsing và chuyển kiểu nằm ở V++.
+// File I/O vẫn là VM primitive; toàn bộ parsing và chuyển kiểu nằm ở V++.
 
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/đường dẫn;
@@ -8,11 +8,11 @@ nhập gói/bộ sưu tập/từ điển;
 nhập gói/lõi/chuyển kiểu;
 nhập gói/văn bản/chuỗi;
 
-hàm cấu hình là khoảng trắng(c) {
+hàm riêng tư cấu hình là khoảng trắng(c) {
     trả về c == " " || c == "\t" || c == "\r" || c == "\n";
 };
 
-hàm cấu hình cắt khoảng trắng(s) {
+hàm riêng tư cấu hình cắt khoảng trắng(s) {
     đầu = 0;
     cuối = do_dai(s);
     đang_cắt = đúng;
@@ -20,7 +20,7 @@ hàm cấu hình cắt khoảng trắng(s) {
         nếu (cấu hình là khoảng trắng(s[đầu])) {
             đầu = đầu + 1;
             nếu (đầu == cuối) { đang_cắt = sai; };
-        } nếu không {
+        } hoặc {
             đang_cắt = sai;
         };
     };
@@ -28,7 +28,7 @@ hàm cấu hình cắt khoảng trắng(s) {
     lặp(i = 0; i < cuối - đầu && đang_cắt; i++) {
         nếu (cấu hình là khoảng trắng(s[cuối - 1])) {
             cuối = cuối - 1;
-        } nếu không {
+        } hoặc {
             đang_cắt = sai;
         };
     };
@@ -36,7 +36,7 @@ hàm cấu hình cắt khoảng trắng(s) {
 };
 
 // Trả {"khóa", "giá trị"} hoặc rỗng nếu dòng trống/comment/không có '='.
-hàm cấu hình phân tích dòng(dòng) {
+hàm riêng tư cấu hình phân tích dòng(dòng) {
     dòng = cấu hình cắt khoảng trắng(dòng);
     nếu (dòng == "") {
         trả về rỗng;
@@ -65,11 +65,11 @@ hàm cấu hình phân tích dòng(dòng) {
     trả về {"khóa": khóa, "giá trị": giá_trị};
 };
 
-hàm cấu hình là chữ số(c) {
+hàm riêng tư cấu hình là chữ số(c) {
     trả về c >= "0" && c <= "9";
 };
 
-hàm cấu hình là số nguyên(s) {
+hàm riêng tư cấu hình là số nguyên(s) {
     n = do_dai(s);
     nếu (n == 0) { trả về sai; };
     i = 0;
@@ -87,7 +87,7 @@ hàm cấu hình là số nguyên(s) {
 
 // Decimal/exponent parser đủ cho cú pháp mà native std::stod trước đây nhận
 // trong file cấu hình: 2.5, .5, 5., 1e3, -2.5E-4.
-hàm cấu hình là số thực(s) {
+hàm riêng tư cấu hình là số thực(s) {
     n = do_dai(s);
     nếu (n == 0) { trả về sai; };
     i = 0;
@@ -105,10 +105,10 @@ hàm cấu hình là số thực(s) {
         nếu (cấu hình là chữ số(c)) {
             có_chữ_số = đúng;
             nếu (có_mũ) { chữ_số_sau_mũ = đúng; };
-        } nếu không {
+        } hoặc {
             nếu (c == "." && !có_chấm && !có_mũ) {
                 có_chấm = đúng;
-            } nếu không {
+            } hoặc {
                 nếu ((c == "e" || c == "E") && !có_mũ && có_chữ_số) {
                     có_mũ = đúng;
                     chữ_số_sau_mũ = sai;
@@ -117,7 +117,7 @@ hàm cấu hình là số thực(s) {
                             i = i + 1;
                         };
                     };
-                } nếu không {
+                } hoặc {
                     hợp_lệ = sai;
                 };
             };
@@ -127,7 +127,7 @@ hàm cấu hình là số thực(s) {
     trả về hợp_lệ && có_chữ_số && (có_chấm || có_mũ) && chữ_số_sau_mũ;
 };
 
-hàm cấu hình chuyển giá trị(s) {
+hàm riêng tư cấu hình chuyển giá trị(s) {
     nếu (s == "đúng") { trả về đúng; };
     nếu (s == "sai") { trả về sai; };
     nếu (s == "rỗng") { trả về rỗng; };
@@ -136,7 +136,7 @@ hàm cấu hình chuyển giá trị(s) {
     trả về s;
 };
 
-hàm đọc cấu hình(đường dẫn) {
+hàm công khai đọc cấu hình(đường dẫn) {
     nội_dung = đọc tệp(đường dẫn);
     kết_quả = {};
     dòng = "";
@@ -155,14 +155,14 @@ hàm đọc cấu hình(đường dẫn) {
                 đặt map(kết_quả, khóa, cấu hình chuyển giá trị(giá_trị));
             };
             dòng = "";
-        } nếu không {
+        } hoặc {
             dòng = dòng + c;
         };
     };
     trả về kết_quả;
 };
 
-hàm đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) {
+hàm công khai đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) {
     // Giữ contract cũ: tệp không tồn tại trả fallback thay vì ném lỗi đọc tệp.
     nếu (!đường dẫn tồn tại(đường dẫn)) {
         trả về giá trị mặc định;
@@ -188,7 +188,7 @@ hàm đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) 
                 };
             };
             dòng = "";
-        } nếu không {
+        } hoặc {
             dòng = dòng + c;
         };
     };

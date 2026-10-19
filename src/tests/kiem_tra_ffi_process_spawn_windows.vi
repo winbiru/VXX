@@ -1,0 +1,21 @@
+// Windows process FFI: thao tác thông qua API V++ có cùng kết quả public.
+nhập gói/hệ thống/tiến trình;
+
+hàm chính() {
+    k = chạy tiến trình("cmd.exe", ["/d", "/c", "echo out & echo err 1>&2 & exit /b 7"]);
+    in k["khởi chạy"];
+    in k["mã thoát"] == 7;
+    in do_dai(k["đầu ra"]) >= 3 && k["đầu ra"][0] == "o";
+    in do_dai(k["lỗi"]) >= 3 && k["lỗi"][0] == "e";
+
+    môi_trường = chạy tiến trình("cmd.exe", ["/d", "/c", "echo %VPP_CHILD_TEST%"],
+                                {"VPP_CHILD_TEST": "probe"});
+    in môi_trường["khởi chạy"];
+    in môi_trường["mã thoát"] == 0;
+    in do_dai(môi_trường["đầu ra"]) >= 5 && môi_trường["đầu ra"][0] == "p";
+
+    hỏng = chạy tiến trình("vpp-nonexistent-child-4b8c2e7.exe", []);
+    in !hỏng["khởi chạy"];
+    in hỏng["mã thoát"] == -1;
+    in do_dai(hỏng["lỗi"]) > 0;
+};

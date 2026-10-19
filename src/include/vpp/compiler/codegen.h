@@ -16,6 +16,7 @@ struct CompilationRegistryState;
 struct DirectIrSupport {
     bool supported = false;
     std::size_t unsupportedRegions = 0;
+    std::vector<std::string> unsupportedNames;
 };
 
 // Duyệt IR để xác định phần nào backend direct IR có thể phát bytecode mà không cần rơi về đường biên dịch cũ.

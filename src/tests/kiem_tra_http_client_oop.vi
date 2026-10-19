@@ -1,0 +1,41 @@
+nhập gói/mạng/http/chính;
+
+lớp HTTP Kiểm Thử kế thừa Khách HTTP {
+    hàm khởi tạo() { gốc.khởi tạo("https://example.com/api"); };
+    hàm bảo vệ thực thi(phương_thức, url, dữ_liệu) {
+        trả về phương_thức + "|" + url + "|" + dữ_liệu;
+    };
+};
+
+hàm chính() {
+    khách = Khách HTTP("https://example.com/api/");
+    in khách.tạo URL("") == "https://example.com/api/";
+    in khách.tạo URL("/users") == "https://example.com/api/users";
+    in khách.tạo URL("users?id=1") == "https://example.com/api/users?id=1";
+    khách_khác = Khách HTTP("http://localhost:8080/v1");
+    in khách_khác.tạo URL("items") == "http://localhost:8080/v1/items";
+    in khách_khác.tạo URL("/items") == "http://localhost:8080/v1/items";
+    chặn_tuyệt_đối = sai;
+    thử { khách.tạo URL("https://evil.example/"); } bắt lỗi(e) { chặn_tuyệt_đối = đúng; };
+    in chặn_tuyệt_đối;
+    chặn_url_gốc = sai;
+    thử { Khách HTTP("url-không-hợp-lệ"); } bắt lỗi(e) { chặn_url_gốc = đúng; };
+    in chặn_url_gốc;
+    chặn_query = sai;
+    thử { Khách HTTP("https://example.com/base?x=1"); } bắt lỗi(e) { chặn_query = đúng; };
+    in chặn_query;
+    in khách_khác.tạo URL("?id=1") == "http://localhost:8080/v1?id=1";
+    in khách_khác.tạo URL("#mục") == "http://localhost:8080/v1#mục";
+    a = HTTP Kiểm Thử();
+    in a.lấy("x") == "GET|https://example.com/api/x|";
+    in a.gửi("x", "dữ liệu") == "POST|https://example.com/api/x|dữ liệu";
+    in a.cập nhật("x", "mới") == "PUT|https://example.com/api/x|mới";
+    in a.xóa("x") == "DELETE|https://example.com/api/x|";
+    chặn_đường = sai;
+    thử { a.lấy("x y"); } bắt lỗi(e) { chặn_đường = đúng; };
+    in chặn_đường;
+    a.đóng();
+    chặn_đóng = sai;
+    thử { a.lấy("x"); } bắt lỗi(e) { chặn_đóng = đúng; };
+    in chặn_đóng;
+};

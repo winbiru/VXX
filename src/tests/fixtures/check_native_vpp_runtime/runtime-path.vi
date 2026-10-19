@@ -1,0 +1,27 @@
+hàm chính() {
+    biến path = runtime_nguồn();
+    nếu (path <= 0) { trả về 1; };
+    biến file = tệp_mở_đọc(path);
+    nếu (file <= 0) { byte_hủy(path); trả về 2; };
+    biến first = tệp_đọc_byte(file);
+    biến closed = tệp_đóng(file);
+    byte_hủy(path);
+    nếu (first < 0) { trả về 3; };
+    nếu (closed != 0) { trả về 3; };
+    nếu (rt_runtime_file_path(-1) != -1) { trả về 4; };
+    nếu (rt_runtime_file_path(3) != -1) { trả về 5; };
+    biến assembly = rt_runtime_file_path(1);
+    nếu (assembly <= 0) { trả về 6; };
+    biến assembly_name = "vpp_aot_primitives_aarch64.S";
+    nếu (byte_tìm(assembly, assembly_name) < 0) { trả về 7; };
+    byte_hủy(assembly_name);
+    file = tệp_mở_đọc(assembly);
+    nếu (file <= 0) { trả về 8; };
+    first = tệp_đọc_byte(file);
+    closed = tệp_đóng(file);
+    byte_hủy(assembly);
+    nếu (first < 0) { trả về 9; };
+    nếu (closed != 0) { trả về 10; };
+    nếu (rt_runtime_file_path(2) != -1) { trả về 11; };
+    trả về 52;
+};

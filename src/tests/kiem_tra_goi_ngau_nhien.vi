@@ -13,7 +13,7 @@ hàm chính() {
     in y > 0.0 && y < 1.0;
 
     d = prng(12345);
-    in lay_map(trạng thái bộ sinh ngẫu nhiên(d), "thuật toán", "");
+    in lấy map(trạng thái bộ sinh ngẫu nhiên(d), "thuật toán", "");
     in random i64(d, 0, 9);
     snapshot = trạng thái bộ sinh ngẫu nhiên(d);
     tiếp_1 = random i64(d, -1000, 1000);

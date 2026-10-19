@@ -1,0 +1,257 @@
+
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Mã Máy {
+    hàm công khai khởi tạo() {};
+
+    // Bootstrap raw machine-code leaf emitter THUẦN V++.
+    // Trả về DANH SÁCH BYTE, không phải ELF/COFF/Mach-O hay executable.
+    // Các word/opcode phải khớp src/native/raw_codegen.cpp (parity tests).
+    // Tiện ích ghép byte được dùng chung bởi các backend ISA.
+    hàm công khai biên dịch mã máy chữ hex(chữ) {
+        bảng = "0123456789abcdef";
+        lặp (i = 0; i < 16; i++) {
+            nếu (bảng[i] == chữ) { trả về i; };
+        };
+        ném "mã máy: chữ số hex không hợp lệ";
+    };
+
+    // V++ hiện dùng int32 cho nhiều phép tính. Ghép hai halfword ở dạng signed
+    // để không tạo intermediate unsigned 0xffffffff vượt miền số nguyên.
+    hàm công khai biên dịch mã máy word hex(chuỗi) {
+        nếu (độ dài(chuỗi) != 8) { ném "mã máy: word hex cần 8 chữ số"; };
+        cao = 0;
+        thấp = 0;
+        lặp (i = 0; i < 4; i++) {
+            cao = cao * 16 + mình.biên dịch mã máy chữ hex(chuỗi[i]);
+            thấp = thấp * 16 + mình.biên dịch mã máy chữ hex(chuỗi[i + 4]);
+        };
+        trả về mình.biên dịch mã máy ghép(cao, thấp);
+    };
+
+    hàm công khai biên dịch mã máy ghép(cao, thấp) {
+        nếu (cao < 0 || cao > 65535 || thấp < 0 || thấp > 65535) {
+            ném "mã máy: halfword nằm ngoài u16";
+        };
+        nếu (cao >= 32768) { cao -= 65536; };
+        trả về cao * 65536 + thấp;
+    };
+
+    // Chia nguyên signed sau khi trừ remainder chính xác; hỗ trợ word âm.
+    hàm công khai biên dịch mã máy thêm word(ra, word, ít_trước) {
+        các_byte = [];
+        số = word;
+        lặp (i = 0; i < 4; i++) {
+            byte = số % 256;
+            nếu (byte < 0) { byte += 256; };
+            thêm(các_byte, byte);
+            số = (số - byte) / 256;
+        };
+        lặp (i = 0; i < 4; i++) {
+            nếu (ít_trước) { thêm(ra, các_byte[i]); }
+            hoặc { thêm(ra, các_byte[3 - i]); };
+        };
+        trả về ra;
+    };
+
+    hàm công khai biên dịch mã máy thêm hex(ra, word_hex, ít_trước) {
+        trả về mình.biên dịch mã máy thêm word(ra,
+            mình.biên dịch mã máy word hex(word_hex), ít_trước);
+    };
+
+    hàm công khai biên dịch mã máy trả về(hằng) {
+        nếu (hằng < -2147483647 - 1 || hằng > 2147483647) {
+            ném "mã máy V++: hằng nằm ngoài i32";
+        };
+        lo = hằng % 65536;
+        nếu (lo < 0) { lo += 65536; };
+        hi = (hằng - lo) / 65536;
+        nếu (hi < 0) { hi += 65536; };
+        trả về {"lo": lo, "hi": hi};
+    };
+
+    // Machine IR dùng cùng tên opcode và các trường với C++ MachineInstruction.
+    hàm công khai biên dịch mã máy lệnh(opcode, immediate = 0, operand = 0,
+                               depthBefore = 0, symbol = "") {
+        trả về {"opcode": opcode, "immediate": immediate, "operand": operand,
+                "depthBefore": depthBefore, "symbol": symbol};
+    };
+
+    // C++ symbolNameSafe: chỉ chấp nhận ASCII [A-Za-z_][A-Za-z0-9_]*.
+    hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
+        nếu (độ dài(tên) == 0) { trả về sai; };
+        chữ_cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+        chữ_số = chữ_cái + "0123456789";
+        lặp (i = 0; i < độ dài(tên); i++) {
+            bảng = chữ_số;
+            nếu (i == 0) { bảng = chữ_cái; };
+            có = sai;
+            lặp (j = 0; j < độ dài(bảng); j++) {
+                nếu (tên[i] == bảng[j]) { có = đúng; thoát; };
+            };
+            nếu (!có) { trả về sai; };
+        };
+        trả về đúng;
+    };
+
+    // Validate stack transfer từng opcode, kể cả lệnh không thể tới được.
+    hàm riêng tư biên dịch mã máy stack sau(op, slot, sâu_nhất, tổng_lệnh) {
+        mã = op["opcode"];
+        trước = op["depthBefore"];
+        toán_hạng = op["operand"];
+        nếu (trước < 0 || trước > sâu_nhất) { ném "machine IR stack vượt frame"; };
+        nếu (mã == "Jump" || mã == "BranchZero") {
+            nếu (toán_hạng < 0 || toán_hạng >= tổng_lệnh) {
+                ném "machine IR branch ngoài phạm vi";
+            };
+        };
+        chọn (mã) {
+            ca "PushConstant": {
+                nếu (trước >= sâu_nhất) { ném "machine IR stack overflow"; };
+                trả về trước + 1;
+            }
+            ca "LoadSlot": {
+                nếu (toán_hạng < 0 || toán_hạng >= slot || trước >= sâu_nhất) {
+                    ném "machine IR load slot ngoài frame";
+                };
+                trả về trước + 1;
+            }
+            ca "StoreSlot": {
+                nếu (toán_hạng < 0 || toán_hạng >= slot || trước == 0) {
+                    ném "machine IR store slot ngoài frame";
+                };
+                trả về trước;
+            }
+            ca "Drop": {
+                nếu (trước == 0) { ném "machine IR stack underflow"; };
+                trả về trước - 1;
+            }
+            ca "BranchZero": {
+                nếu (trước == 0) { ném "machine IR stack underflow"; };
+                trả về trước - 1;
+            }
+            ca "Return": {
+                nếu (trước != 1) { ném "machine IR return phải tiêu thụ đúng một giá trị"; };
+                trả về 0;
+            }
+            ca "Add": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Sub": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Mul": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Equal": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "NotEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Less": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "LessEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Greater": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "GreaterEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Call": {
+                nếu (toán_hạng < 0 || trước < toán_hạng ||
+                    trước - toán_hạng >= sâu_nhất ||
+                    !mình.biên dịch mã máy ký hiệu hợp lệ(op["symbol"])) {
+                    ném "machine IR call/stack/symbol không hợp lệ";
+                };
+                trả về trước - toán_hạng + 1;
+            }
+            ca "Jump": { trả về trước; }
+            ca "Trap": { trả về trước; }
+            mặc định: { ném "MachineOpcode C++ chưa định nghĩa: " + mã; }
+        };
+    };
+
+    hàm riêng tư biên dịch mã máy stack nhị phân(trước) {
+        nếu (trước < 2) { ném "machine IR binary stack underflow"; };
+        trả về trước - 1;
+    };
+
+    // Bản V++ của validateMachineStack C++: kiểm tra các đường CFG, nhảy lùi,
+    // độ sâu tại điểm hợp nhánh, return và fallthrough.
+    hàm riêng tư biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, đích, sâu) {
+        nếu (độ_sâu_đến[đích] == -1) {
+            độ_sâu_đến[đích] = sâu;
+            thêm(hàng_đợi, đích);
+        };
+        nếu (độ_sâu_đến[đích] != sâu) {
+            ném "machine IR stack không khớp tại CFG join/branch";
+        };
+    };
+
+    hàm công khai biên dịch mã máy kiểm tra CFG(hàm_ir) {
+        lệnh = hàm_ir["instructions"];
+        n = độ dài(lệnh);
+        nếu (n == 0) { ném "machine IR không có lệnh"; };
+        slot = hàm_ir["slotCount"];
+        sâu_nhất = hàm_ir["maxStackDepth"];
+        sau = [];
+        độ_sâu_đến = [];
+        lặp (i = 0; i < n; i++) {
+            thêm(sau, mình.biên dịch mã máy stack sau(lệnh[i], slot, sâu_nhất, n));
+            thêm(độ_sâu_đến, -1);
+        };
+        độ_sâu_đến[0] = 0;
+        hàng_đợi = [0];
+        lặp (head = 0; head < độ dài(hàng_đợi); head++) {
+            i = hàng_đợi[head];
+            op = lệnh[i];
+            nếu (độ_sâu_đến[i] != op["depthBefore"]) {
+                ném "machine IR stack depth sai tại CFG join/branch";
+            };
+            mã = op["opcode"];
+            nếu (mã == "Return" || mã == "Trap") { bỏ qua; };
+            nếu (mã == "Jump" || mã == "BranchZero") {
+                mình.biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, op["operand"], sau[i]);
+            };
+            nếu (mã != "Jump") {
+                nếu (i + 1 >= n) { ném "machine IR fallthrough vượt cuối hàm"; };
+                mình.biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, i + 1, sau[i]);
+            };
+        };
+        trả về đúng;
+    };
+};
+
+
+hàm công khai biên dịch mã máy chữ hex(chữ) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy chữ hex(chữ);
+};
+
+hàm công khai biên dịch mã máy word hex(chuỗi) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy word hex(chuỗi);
+};
+
+hàm công khai biên dịch mã máy ghép(cao, thấp) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy ghép(cao, thấp);
+};
+
+hàm công khai biên dịch mã máy thêm word(ra, word, ít_trước) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy thêm word(ra, word, ít_trước);
+};
+
+hàm công khai biên dịch mã máy thêm hex(ra, word_hex, ít_trước) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy thêm hex(ra, word_hex, ít_trước);
+};
+
+hàm công khai biên dịch mã máy trả về(hằng) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy trả về(hằng);
+};
+
+hàm công khai biên dịch mã máy lệnh(opcode, immediate = 0, operand = 0,
+                           depthBefore = 0, symbol = "") {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy lệnh(opcode, immediate, operand, depthBefore, symbol);
+};
+
+hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy ký hiệu hợp lệ(tên);
+};
+
+hàm công khai biên dịch mã máy kiểm tra CFG(hàm_ir) {
+    __vpp_adapter = Tiện Ích Mã Máy();
+    trả về __vpp_adapter.biên dịch mã máy kiểm tra CFG(hàm_ir);
+};
+

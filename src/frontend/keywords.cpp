@@ -10,7 +10,7 @@
 const std::unordered_map<std::string, Opcode> keywordMap = {
     {"nếu", OP_NEU},
     {"hoặc", OP_HOAC},
-    {"nếu không", OP_NEU_KHONG},
+    {"hoặc nếu", OP_NEU_KHONG},
     {"lặp", OP_LAP},
     {"khởi tạo", OP_KHOI_TAO},
     {"điều kiện", OP_DIEU_KIEN},

@@ -25,7 +25,7 @@ hàm chính() {
         decoded = base64 giải(encoded);
         nếu (độ dài(decoded) != 1) {
             roundtrip = sai;
-        } nếu không {
+        } hoặc {
             nếu (decoded[0] != i) {
                 roundtrip = sai;
             };
@@ -43,7 +43,7 @@ hàm chính() {
         decoded = hex giải(encoded);
         nếu (độ dài(decoded) != 1) {
             hex_roundtrip = sai;
-        } nếu không {
+        } hoặc {
             nếu (decoded[0] != i) {
                 hex_roundtrip = sai;
             };

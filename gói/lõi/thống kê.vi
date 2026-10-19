@@ -1,14 +1,19 @@
 // Module: lõi.thống kê
 // Summary statistics cho list số.
 
-hàm thống kê là nan(giá_trị) {
+// Khai báo dependency tại module sở hữu; không dựa vào thư viện mà importer
+// tình cờ nạp sau đó vào namespace chung của bootstrap C++.
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/bộ sưu tập/danh sách;
+
+hàm công khai thống kê là nan(giá_trị) {
     nếu (loại của(giá_trị) != "số thực") {
         trả về sai;
     };
     trả về giá_trị != giá_trị;
 };
 
-hàm thống kê yêu cầu(bản) {
+hàm công khai thống kê yêu cầu(bản) {
     nếu (loại của(bản) != "từ điển") {
         ném "VALUE_STATS_INVALID";
     };
@@ -23,7 +28,7 @@ hàm thống kê yêu cầu(bản) {
     trả về loại;
 };
 
-hàm thống kê số nguyên(ds) {
+hàm công khai thống kê số nguyên(ds) {
     n = độ dài(ds);
     nếu (n == 0) {
         trả về {
@@ -56,7 +61,7 @@ hàm thống kê số nguyên(ds) {
     };
 };
 
-hàm thống kê số thực(ds) {
+hàm công khai thống kê số thực(ds) {
     n = độ dài(ds);
     nếu (n == 0) {
         trả về {
@@ -85,7 +90,7 @@ hàm thống kê số thực(ds) {
         tổng = tổng + giá_trị;
         nếu (thống kê là nan(giá_trị)) {
             có_nan = đúng;
-        } nếu không {
+        } hoặc {
             nếu (!có_nan) {
                 nếu (giá_trị < nhỏ) {
                     nhỏ = giá_trị;
@@ -113,7 +118,7 @@ hàm thống kê số thực(ds) {
     };
 };
 
-hàm gộp thống kê(a, b) {
+hàm công khai gộp thống kê(a, b) {
     loại_a = thống kê yêu cầu(a);
     loại_b = thống kê yêu cầu(b);
     nếu (loại_a != loại_b) {

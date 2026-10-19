@@ -1,0 +1,161 @@
+// Registry target thuần V++ dùng trong compiler self-host.
+// Các tên canonical, độ rộng và thứ tự byte phải tương ứng với
+// src/native/target.cpp. Các ISA chưa có backend phát mã máy đầy đủ.
+hàm công khai biên dịch danh sách kiến trúc() {
+    trả về ["x86_64", "aarch64", "riscv64", "armv7", "i386",
+            "powerpc", "powerpc64", "powerpc64le", "mips", "mipsel",
+            "mips64", "mips64el", "loongarch64", "s390x", "sparc", "sparc64"];
+};
+
+hàm công khai biên dịch chuẩn hóa kiến trúc(tên) {
+    chọn (tên) {
+        ca "amd64": { trả về "x86_64"; }
+        ca "x64": { trả về "x86_64"; }
+        ca "arm64": { trả về "aarch64"; }
+        ca "arm64e": { trả về "aarch64"; }
+        ca "rv64": { trả về "riscv64"; }
+        ca "arm": { trả về "armv7"; }
+        ca "armhf": { trả về "armv7"; }
+        ca "armv7l": { trả về "armv7"; }
+        ca "x86": { trả về "i386"; }
+        ca "i486": { trả về "i386"; }
+        ca "i586": { trả về "i386"; }
+        ca "i686": { trả về "i386"; }
+        ca "ppc": { trả về "powerpc"; }
+        ca "ppc64": { trả về "powerpc64"; }
+        ca "ppc64le": { trả về "powerpc64le"; }
+        ca "mips32": { trả về "mips"; }
+        ca "mips32el": { trả về "mipsel"; }
+        ca "sparcv9": { trả về "sparc64"; }
+        mặc định: { trả về tên; }
+    };
+};
+
+hàm công khai biên dịch thông tin kiến trúc(tên) {
+    tên = biên dịch chuẩn hóa kiến trúc(tên);
+    chọn (tên) {
+        ca "x86_64": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "aarch64": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "riscv64": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "armv7": { trả về {"tên": tên, "bit": 32, "little endian": đúng}; }
+        ca "i386": { trả về {"tên": tên, "bit": 32, "little endian": đúng}; }
+        ca "powerpc": { trả về {"tên": tên, "bit": 32, "little endian": sai}; }
+        ca "powerpc64": { trả về {"tên": tên, "bit": 64, "little endian": sai}; }
+        ca "powerpc64le": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "mips": { trả về {"tên": tên, "bit": 32, "little endian": sai}; }
+        ca "mipsel": { trả về {"tên": tên, "bit": 32, "little endian": đúng}; }
+        ca "mips64": { trả về {"tên": tên, "bit": 64, "little endian": sai}; }
+        ca "mips64el": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "loongarch64": { trả về {"tên": tên, "bit": 64, "little endian": đúng}; }
+        ca "s390x": { trả về {"tên": tên, "bit": 64, "little endian": sai}; }
+        ca "sparc": { trả về {"tên": tên, "bit": 32, "little endian": sai}; }
+        ca "sparc64": { trả về {"tên": tên, "bit": 64, "little endian": sai}; }
+        mặc định: { ném "biên dịch: kiến trúc chưa đăng ký: " + tên; }
+    };
+};
+
+// Không quảng cáo backend chỉ vì kiến trúc đã có trong registry.
+hàm công khai biên dịch jit máy thử nghiệm(tên, hệ_điều_hành) {
+    tên = biên dịch thông tin kiến trúc(tên)["tên"];
+    chọn (hệ_điều_hành) {
+        ca "linux": { trả về tên == "x86_64" || tên == "aarch64"; }
+        ca "windows": { trả về tên == "x86_64"; }
+        ca "macos": { trả về tên == "aarch64"; }
+        mặc định: { ném "biên dịch: hệ điều hành target chưa đăng ký: " + hệ_điều_hành; }
+    };
+};
+
+// Phân tích target triple trực tiếp trong V++. Quy tắc khớp với
+// src/native/target.cpp; trường không rõ phải ném lỗi tường minh.
+hàm công khai biên dịch đích chữ thường ASCII(chuỗi) {
+    hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    thường = "abcdefghijklmnopqrstuvwxyz";
+    kết_quả = "";
+    lặp (i = 0; i < độ dài(chuỗi); i++) {
+        ký_tự = chuỗi[i];
+        lặp (j = 0; j < 26; j++) {
+            nếu (ký_tự == hoa[j]) { ký_tự = thường[j]; thoát; };
+        };
+        kết_quả += ký_tự;
+    };
+    trả về kết_quả;
+};
+
+hàm công khai biên dịch đích cắt(chuỗi, bắt_đầu) {
+    kết_quả = "";
+    lặp (i = bắt_đầu; i < độ dài(chuỗi); i++) { kết_quả += chuỗi[i]; };
+    trả về kết_quả;
+};
+
+hàm công khai biên dịch đích bắt đầu(chuỗi, tiền_tố) {
+    nếu (độ dài(chuỗi) < độ dài(tiền_tố)) { trả về sai; };
+    lặp (i = 0; i < độ dài(tiền_tố); i++) {
+        nếu (chuỗi[i] != tiền_tố[i]) { trả về sai; };
+    };
+    trả về đúng;
+};
+
+hàm công khai biên dịch phân tích đích(triple) {
+    nếu (loai_cua(triple) != "chuỗi") { ném "target phải là chuỗi"; };
+    đầu_vào = biên dịch đích chữ thường ASCII(triple);
+    vị_trí = -1;
+    lặp (i = 0; i < độ dài(đầu_vào); i++) {
+        nếu (đầu_vào[i] == "-") { vị_trí = i; thoát; };
+    };
+    nếu (vị_trí <= 0) { ném "target cần kiến trúc, hệ điều hành và ABI"; };
+    tên_cpu = "";
+    lặp (i = 0; i < vị_trí; i++) { tên_cpu += đầu_vào[i]; };
+    tên_cpu = biên dịch chuẩn hóa kiến trúc(tên_cpu);
+    cpu = rỗng;
+    thử { cpu = biên dịch thông tin kiến trúc(tên_cpu); }
+    bắt lỗi (e) { ném "kiến trúc CPU chưa được đăng ký: " + tên_cpu; };
+
+    phần_sau = biên dịch đích cắt(đầu_vào, vị_trí + 1);
+    tiền_tố = ["unknown-", "pc-", "w64-", "apple-"];
+    lặp (i = 0; i < độ dài(tiền_tố); i++) {
+        nếu (biên dịch đích bắt đầu(phần_sau, tiền_tố[i])) {
+            phần_sau = biên dịch đích cắt(phần_sau, độ dài(tiền_tố[i]));
+            thoát;
+        };
+    };
+
+    hệ = "";
+    abi = "";
+    định_dạng = "";
+    chọn (phần_sau) {
+        ca "linux": { hệ = "linux"; abi = "gnu"; định_dạng = "ELF"; }
+        ca "linux-gnu": { hệ = "linux"; abi = "gnu"; định_dạng = "ELF"; }
+        ca "linux-gnueabihf": { hệ = "linux"; abi = "gnueabihf"; định_dạng = "ELF"; }
+        ca "linux-musl": { hệ = "linux"; abi = "musl"; định_dạng = "ELF"; }
+        ca "linux-musleabihf": { hệ = "linux"; abi = "musleabihf"; định_dạng = "ELF"; }
+        ca "windows-msvc": { hệ = "windows"; abi = "msvc"; định_dạng = "COFF"; }
+        ca "windows-gnu": { hệ = "windows"; abi = "gnu"; định_dạng = "COFF"; }
+        ca "mingw32": { hệ = "windows"; abi = "gnu"; định_dạng = "COFF"; }
+        ca "darwin": { hệ = "macos"; abi = "darwin"; định_dạng = "Mach-O"; }
+        ca "macos": { hệ = "macos"; abi = "darwin"; định_dạng = "Mach-O"; }
+        mặc định: { ném "hệ điều hành hoặc ABI chưa hỗ trợ: " + phần_sau; }
+    };
+    nếu (hệ == "macos" && tên_cpu != "aarch64" && tên_cpu != "x86_64") {
+        ném "kiến trúc này không có target macOS";
+    };
+    nếu (hệ == "windows" && tên_cpu != "x86_64" && tên_cpu != "i386" && tên_cpu != "aarch64") {
+        ném "kiến trúc này không có target Windows";
+    };
+    trả về {"kiến trúc": tên_cpu, "hệ điều hành": hệ, "ABI": abi,
+            "định dạng": định_dạng, "bit": cpu["bit"], "little endian": cpu["little endian"]};
+};
+
+hàm công khai biên dịch triple chuẩn(đích) {
+    tên = đích["kiến trúc"];
+    hệ = đích["hệ điều hành"];
+    abi = đích["ABI"];
+    chọn (hệ) {
+        ca "macos": { trả về tên + "-apple-darwin"; }
+        ca "windows": {
+            nếu (abi == "msvc") { trả về tên + "-pc-windows-msvc"; };
+            trả về tên + "-w64-windows-" + abi;
+        }
+        ca "linux": { trả về tên + "-unknown-linux-" + abi; }
+        mặc định: { ném "hệ điều hành chưa hỗ trợ trong canonical triple: " + hệ; }
+    };
+};

@@ -35,7 +35,10 @@ Lambda capture-free đã có AST/scope/IR và direct codegen. Closure capture,
 module graph/import exports, type policy, Typed IR và static type checker vẫn chưa hoàn thiện.
 
 GC và JIT hiện là MVP: GC chỉ compact các container runtime theo biến môi trường, còn
-JIT chỉ tạo chuỗi lambda cho bytecode tuyến tính được hỗ trợ rồi fallback về interpreter.
+JIT biên dịch trước các opcode đơn giản thành closure cho chương trình chính và thân hàm V++.
+Các thao tác trong vòng lặp, điều kiện và hàm thư viện có thể đi qua đường này; opcode
+điều khiển luồng, gọi hàm, intrinsic và exception dùng chung dispatcher với interpreter.
+JIT hiện chưa sinh mã máy và chưa có số đo chứng minh tăng tốc.
 `lớp` hiện chỉ gom method và metadata quyền truy cập, chưa có instance hay inheritance.
 CLI đã có package commands, formatter/linter và LSP ở mức MVP; chưa có resolver phụ thuộc,
 versioning hay debugger/IDE đầy đủ.
@@ -402,7 +405,7 @@ func fibonacci(n int) int {
 
 2. **Performance-critical applications**
    * VM overhead, không native
-   * JIT chỉ là đường chạy tuyến tính MVP, không sinh native machine code
+   * JIT thực thi hỗn hợp closure/dispatcher ở mức bytecode, không sinh native machine code
    * Không phù hợp cho systems programming
 
 3. **Team collaboration (international)**

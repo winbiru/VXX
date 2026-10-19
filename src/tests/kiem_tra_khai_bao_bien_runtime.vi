@@ -1,0 +1,33 @@
+// Chạy bytecode C++ theo đúng ABI của khai báo biến dùng trong compiler V++.
+biến cơ_sở = 5;
+biến chưa_gán;
+chưa_gán = 7;
+biến tổng_lượt = 10;
+
+hàm cộng_thêm(a) {
+    biến b = a + 2;
+    biến c;
+    c = b + cơ_sở;
+    trả về c;
+};
+
+hàm cập_nhật() {
+    tổng_lượt = tổng_lượt + 5;
+    tổng_lượt++;
+    trả về tổng_lượt;
+};
+
+hàm chính() {
+    in chưa_gán;
+    in cộng_thêm(3);
+    biến x = 2;
+    x += 4;
+    in x;
+    nếu (x > 2) { biến y = x * 2; in y; } hoặc { in 0; };
+    biến chữ = "Việt Nam";
+    in chữ;
+    biến cờ = đúng;
+    in cờ;
+    in cập_nhật();
+    in tổng_lượt;
+};

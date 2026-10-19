@@ -1,0 +1,56 @@
+// Một nguồn, nhiều truy vấn; mỗi pass chỉ chạy khi cần kết quả của nó.
+// Không gọi compiler snapshot C++; lexer/parser/IR/emitter đều là V++.
+nhập gói/biên dịch/từ vựng;
+nhập gói/biên dịch/chương trình;
+nhập gói/biên dịch/ngữ nghĩa;
+nhập gói/biên dịch/ir;
+nhập gói/biên dịch/phát mã;
+
+lớp công khai Bộ Biên Dịch Tự Chủ {
+    hàm công khai khởi tạo(mã_nguồn) { mình.làm mới(mã_nguồn); };
+
+    hàm công khai làm mới(mã_nguồn) {
+        nếu (loai_cua(mã_nguồn) != "chuỗi") { ném "biên dịch từ vựng: mã nguồn phải là chuỗi"; };
+        mình.nguồn = mã_nguồn;
+        mình.các_token = rỗng;
+        mình.cây = rỗng;
+        mình.đã_kiểm_tra = sai;
+        mình.ir = rỗng;
+        mình.mã = rỗng;
+        trả về mình;
+    };
+
+    hàm công khai token() {
+        nếu (mình.các_token == rỗng) { mình.các_token = biên dịch token hóa(mình.nguồn); };
+        trả về mình.các_token;
+    };
+
+    hàm công khai cây cú pháp() {
+        nếu (mình.cây == rỗng) {
+            bộ = Bộ Phân Tích Cú Pháp(mình.nguồn, mình.token());
+            mình.cây = bộ.phân tích();
+        };
+        trả về mình.cây;
+    };
+
+    hàm công khai kiểm tra() {
+        nếu (!mình.đã_kiểm_tra) {
+            biên dịch kiểm tra ngữ nghĩa thuần(mình.cây cú pháp());
+            mình.đã_kiểm_tra = đúng;
+        };
+        trả về đúng;
+    };
+
+    hàm công khai hạ IR() {
+        nếu (mình.ir == rỗng) {
+            mình.ir = biên dịch hạ IR từ cây thuần(mình.cây cú pháp(), sai);
+            mình.đã_kiểm_tra = đúng;
+        };
+        trả về mình.ir;
+    };
+
+    hàm công khai bytecode() {
+        nếu (mình.mã == rỗng) { mình.mã = biên dịch phát bytecode từ IR thuần(mình.hạ IR()); };
+        trả về mình.mã;
+    };
+};

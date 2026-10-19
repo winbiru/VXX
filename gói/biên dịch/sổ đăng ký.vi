@@ -1,0 +1,336 @@
+// Sổ hàm tự chủ. Function ID và StringPool dùng chung trên toàn phiên;
+// bảng slot là trạng thái riêng của từng emitter, không được nối giữa module.
+// API đồ thị lập symbol/exports cho emitter + linker V++; loader tại bộ nạp.vi.
+nhập gói/biên dịch/đồ thị mô đun;
+nhập gói/bộ sưu tập/từ điển;
+
+// Thuật toán không giữ trạng thái dùng hàm cấp mô-đun.
+hàm công khai biên dịch sổ lưu chuỗi(sổ, tên) {
+    pool = sổ["chuỗi"];
+    lặp(i = 0; i < độ dài(pool); i++) {
+        nếu (pool[i] == tên) { trả về i; };
+    };
+    id = độ dài(pool);
+    thêm(pool, tên);
+    trả về id;
+};
+
+// Một tên chỉ được ánh xạ tới một function ID trong cùng một phạm vi.
+// Nhập lại cùng một hàm qua hai đường dẫn tương đương là thao tác idempotent.
+hàm công khai biên dịch sổ thêm tên(bảng, tên, id, phạm_vi) {
+    nếu (tên == "") { ném "biên dịch sổ: tên hàm rỗng trong '" + phạm_vi + "'"; };
+    lặp(i = 0; i < độ dài(bảng); i++) {
+        nếu (bảng[i]["tên"] == tên) {
+            nếu (bảng[i]["id"] == id) { trả về sai; };
+            ném "biên dịch sổ: xung đột tên '" + tên + "' trong '" + phạm_vi + "'";
+        };
+    };
+    thêm(bảng, {"tên": tên, "id": id});
+    trả về đúng;
+};
+
+hàm công khai biên dịch sổ cấp hàm(sổ, mô_đun, tên) {
+    id = độ dài(sổ["hàm"]);
+    // Function ID đã xác định khi dựng đồ thị. Với emitter đa mô-đun,
+    // StringPool được cấp khi gặp predeclare thực tế của từng module.
+    tên_index = -1;
+    nếu (!lấy map(sổ, "hoãn chuỗi", sai)) {
+        tên_index = biên dịch sổ lưu chuỗi(sổ, tên);
+    };
+    thêm(sổ["hàm"], {"id": id, "tên": tên, "tên index": tên_index,
+                      "tên chạy": tên, "tên index runtime": tên_index,
+                      "mô đun": mô_đun});
+    trả về id;
+};
+
+hàm công khai biên dịch sổ tìm mô đun(các_mô_đun, định_danh) {
+    lặp(i = 0; i < độ dài(các_mô_đun); i++) {
+        nếu (các_mô_đun[i]["định danh"] == định_danh) {
+            trả về các_mô_đun[i];
+        };
+    };
+    ném "biên dịch sổ: chưa đăng ký mô-đun phụ thuộc '" + định_danh + "'";
+};
+
+hàm công khai biên dịch sổ cây mô đun(đồ_thị, định_danh) {
+    nếu (định_danh == đồ_thị["điểm vào"]) {
+        trả về đồ_thị["cây điểm vào"];
+    };
+    các_mô_đun = đồ_thị["mô đun"];
+    lặp(i = 0; i < độ dài(các_mô_đun); i++) {
+        nếu (các_mô_đun[i]["định danh"] == định_danh) {
+            trả về các_mô_đun[i]["cây"];
+        };
+    };
+    ném "biên dịch sổ: thiếu AST cho '" + định_danh + "'";
+};
+
+// C++ emitClassWithSuperclass cấp ID từng method khi gặp lớp (cha trước con).
+// Khai trước mọi hàm global, nhưng không khai trước method của lớp đứng sau import.
+hàm riêng tư biên dịch sổ cấp lớp duyệt(sổ, định_danh, câu_lệnh, tên_lớp, đã_lớp, đang_lớp) {
+    lặp(i = 0; i < độ dài(đã_lớp); i++) {
+        nếu (đã_lớp[i] == tên_lớp) { trả về đúng; };
+    };
+    lặp(i = 0; i < độ dài(đang_lớp); i++) {
+        nếu (đang_lớp[i] == tên_lớp) {
+            ném "biên dịch sổ: chu trình kế thừa lớp '" + tên_lớp + "'";
+        };
+    };
+    khai = rỗng;
+    lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+        nếu (lấy map(câu_lệnh[i], "loại", "") == "lớp" &&
+            câu_lệnh[i]["tên"] == tên_lớp) {
+            khai = câu_lệnh[i];
+            thoát;
+        };
+    };
+    nếu (khai == rỗng) {
+        ném "biên dịch sổ: không tìm thấy lớp '" + tên_lớp + "'";
+    };
+    thêm(đang_lớp, tên_lớp);
+    lớp_cha = lấy map(khai, "lớp cha", "");
+    nếu (lớp_cha != "") {
+        lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+            nếu (lấy map(câu_lệnh[i], "loại", "") == "lớp" && câu_lệnh[i]["tên"] == lớp_cha) {
+                biên dịch sổ cấp lớp duyệt(sổ, định_danh, câu_lệnh, lớp_cha, đã_lớp, đang_lớp);
+                thoát;
+            };
+        };
+    };
+    phương_thức = lấy map(khai, "phương thức", []);
+    lặp(i = 0; i < độ dài(phương_thức); i++) {
+        biên dịch sổ cấp hàm(sổ, định_danh, tên_lớp + "." + phương_thức[i]["tên"]);
+    };
+    xóa tại(đang_lớp, độ dài(đang_lớp) - 1);
+    thêm(đã_lớp, tên_lớp);
+    trả về đúng;
+};
+
+// C++ predeclare hàm toàn cục trước. Sau đó xử lý các lớp/import theo đúng
+// thứ tự câu lệnh để method trước import được cấp ID trước hàm dependency.
+hàm công khai biên dịch sổ cấp hàm duyệt(sổ, đồ_thị, định_danh) {
+    đã_cấp = sổ["đã cấp"];
+    lặp(i = 0; i < độ dài(đã_cấp); i++) {
+        nếu (đã_cấp[i] == định_danh) { trả về đúng; };
+    };
+    thêm(đã_cấp, định_danh);
+    cây = biên dịch sổ cây mô đun(đồ_thị, định_danh);
+    câu_lệnh = lấy map(cây, "câu lệnh", []);
+    lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+        nếu (lấy map(câu_lệnh[i], "loại", "") == "hàm") {
+            biên dịch sổ cấp hàm(sổ, định_danh, câu_lệnh[i]["tên"]);
+        };
+    };
+    đã_lớp = [];
+    đang_lớp = [];
+    cạnh = đồ_thị["cạnh"];
+    lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+        mục = câu_lệnh[i];
+        loại = lấy map(mục, "loại", "");
+        nếu (loại == "lớp") {
+            biên dịch sổ cấp lớp duyệt(sổ, định_danh, câu_lệnh,
+                mục["tên"], đã_lớp, đang_lớp);
+        };
+        nếu (loại == "nhập") {
+            đích = biên dịch đồ thị tìm đích(đồ_thị, định_danh, mục["đích"]);
+            lặp(j = 0; j < độ dài(cạnh); j++) {
+                nếu (cạnh[j]["nguồn"] == định_danh &&
+                    cạnh[j]["đích"] == đích &&
+                    cạnh[j]["hành động"] == "load") {
+                    biên dịch sổ cấp hàm duyệt(sổ, đồ_thị, đích);
+                    thoát;
+                };
+            };
+        };
+    };
+    trả về đúng;
+};
+
+hàm công khai biên dịch sổ tìm hàm trực tiếp(sổ, mô_đun, tên) {
+    các_hàm = sổ["hàm"];
+    lặp(i = 0; i < độ dài(các_hàm); i++) {
+        nếu (các_hàm[i]["mô đun"] == mô_đun &&
+            các_hàm[i]["tên"] == tên) {
+            trả về các_hàm[i]["id"];
+        };
+    };
+    ném "biên dịch sổ: thiếu function ID của '" + mô_đun + "." + tên + "'";
+};
+
+hàm công khai biên dịch sổ đổi tên chạy(sổ, id, tên) {
+    nếu (id < 0 || id >= độ dài(sổ["hàm"])) {
+        ném "biên dịch sổ: function ID bí danh không hợp lệ";
+    };
+    chỉ_số = biên dịch sổ lưu chuỗi(sổ, tên);
+    khai = sổ["hàm"][id];
+    khai["tên chạy"] = tên;
+    khai["tên index runtime"] = chỉ_số;
+    sổ["hàm"][id] = khai;
+};
+
+hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ_thị, định_danh) {
+    lặp(i = 0; i < độ dài(sổ["mô đun"]); i++) {
+        nếu (sổ["mô đun"][i]["định danh"] == định_danh) {
+            ném "biên dịch sổ: đăng ký mô-đun lặp '" + định_danh + "'";
+        };
+    };
+    cây = biên dịch sổ cây mô đun(đồ_thị, định_danh);
+    câu_lệnh = lấy map(cây, "câu lệnh", []);
+    trực_tiếp = [];
+    xuất = [];
+    nhìn_thấy = [];
+
+    // Mỗi module giữ tập tên riêng; hai module có thể khai cùng tên,
+    // nhưng ID luôn duy nhất trong registry dùng chung.
+    lặp(i = 0; i < độ dài(câu_lệnh); i++) {
+        nếu (lấy map(câu_lệnh[i], "loại", "") == "hàm") {
+            tên = lấy map(câu_lệnh[i], "tên", "");
+            lặp(j = 0; j < độ dài(trực_tiếp); j++) {
+                nếu (trực_tiếp[j]["tên"] == tên) {
+                    ném "biên dịch sổ: trùng hàm '" + tên + "' trong '" + định_danh + "'";
+                };
+            };
+            id = biên dịch sổ tìm hàm trực tiếp(sổ, định_danh, tên);
+            biên dịch sổ thêm tên(trực_tiếp, tên, id, định_danh);
+            biên dịch sổ thêm tên(nhìn_thấy, tên, id, định_danh);
+            // Parser bootstrap hiện chỉ nhận hàm mặc định (public).
+            biên dịch sổ thêm tên(xuất, tên, id, định_danh);
+        };
+    };
+
+    cạnh = đồ_thị["cạnh"];
+    lặp(i = 0; i < độ dài(cạnh); i++) {
+        e = cạnh[i];
+        nếu (e["nguồn"] == định_danh) {
+            phụ_thuộc = biên dịch sổ tìm mô đun(sổ["mô đun"], e["đích"]);
+            tên_prefix = lấy map(e, "bí danh", "");
+            exports = phụ_thuộc["xuất"];
+            lặp(j = 0; j < độ dài(exports); j++) {
+                tên = exports[j]["tên"];
+                nếu (tên_prefix != "") { tên = tên_prefix + "." + tên; };
+                id = exports[j]["id"];
+                biên dịch sổ thêm tên(nhìn_thấy, tên, id, định_danh);
+                nếu (lấy map(e, "tái xuất", sai)) {
+                    biên dịch sổ thêm tên(xuất, tên, id, định_danh);
+                };
+            };
+            // Compiler C++ áp bí danh sau khi phát xong module phụ thuộc.
+            // Metadata tên chạy tách khỏi tên khai báo/OP_HAM nguyên gốc.
+            nếu (tên_prefix != "" && e["hành động"] == "load" &&
+                !lấy map(sổ, "hoãn chuỗi", sai)) {
+                trực_phụ = phụ_thuộc["trực tiếp"];
+                lặp(j = 0; j < độ dài(trực_phụ); j++) {
+                    biên dịch sổ đổi tên chạy(sổ, trực_phụ[j]["id"],
+                        tên_prefix + "." + trực_phụ[j]["tên"]);
+                };
+                lặp(j = 0; j < độ dài(exports); j++) {
+                    biên dịch sổ đổi tên chạy(sổ, exports[j]["id"],
+                        tên_prefix + "." + exports[j]["tên"]);
+                };
+            };
+        };
+    };
+    thêm(sổ["mô đun"], {"định danh": định_danh, "trực tiếp": trực_tiếp,
+                           "nhìn thấy": nhìn_thấy, "xuất": xuất});
+};
+
+// Giữ hợp đồng hàm tự do để emitter/linker hiện có không phải thay đổi.
+hàm công khai biên dịch đăng ký hàm IR thuần(ir) {
+    bộ = Bộ Đăng Ký Hàm();
+    trả về bộ.đăng ký IR(ir);
+};
+
+hàm công khai biên dịch đăng ký hàm đồ thị nền(đồ_thị, hoãn_chuỗi) {
+    bộ = Bộ Đăng Ký Hàm(hoãn_chuỗi);
+    trả về bộ.đăng ký đồ thị(đồ_thị);
+};
+
+// Khi liên kết đồ thị, hoãn StringPool để cấp theo thứ tự import của C++.
+hàm công khai biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ_thị) {
+    trả về biên dịch đăng ký hàm đồ thị nền(đồ_thị, đúng);
+};
+
+// Bài kiểm thử registry riêng tiếp tục có chỉ số StringPool sẵn.
+hàm công khai biên dịch đăng ký hàm đồ thị thuần(đồ_thị) {
+    trả về biên dịch đăng ký hàm đồ thị nền(đồ_thị, sai);
+};
+
+// Mỗi phiên sở hữu Function ID, StringPool, slots và bảng ký hiệu riêng.
+// Các helper cấp phát giữ thứ tự predeclare của emitter C++ và dữ liệu ABI cũ.
+lớp công khai Bộ Đăng Ký Hàm {
+    hàm công khai khởi tạo(hoãn_chuỗi = sai) {
+        mình.hoãn_chuỗi = hoãn_chuỗi;
+        mình.sổ = {};
+        mình.slots = [];
+        mình.tên_đã_khai = [];
+    };
+
+    hàm riêng tư chuẩn bị IR() {
+        mình.sổ = {"hàm": [], "chuỗi": []};
+        mình.slots = [];
+        mình.tên_đã_khai = [];
+    };
+
+    hàm riêng tư khai hàm IR(tên) {
+        nếu (tên == "") { ném "biên dịch sổ: tên hàm rỗng"; };
+        lặp(j = 0; j < độ dài(mình.tên_đã_khai); j++) {
+            nếu (mình.tên_đã_khai[j] == tên) {
+                ném "biên dịch sổ: trùng khai báo hàm '" + tên + "'";
+            };
+        };
+        id = biên dịch sổ cấp hàm(mình.sổ, "", tên);
+        nếu (id != độ dài(mình.slots)) { ném "biên dịch sổ: function ID không liên tiếp"; };
+        thêm(mình.slots, tên);
+        thêm(mình.tên_đã_khai, tên);
+    };
+
+    // ID liên tiếp 0..N-1 theo Emitter::predeclareFunctions.
+    hàm công khai đăng ký IR(ir) {
+        nếu (lấy map(ir, "loại", "") != "chương trình IR") {
+            ném "biên dịch sổ: cần chương trình IR";
+        };
+        mình.chuẩn bị IR();
+        hàm_ir = lấy map(ir, "hàm", []);
+        lặp(i = 0; i < độ dài(hàm_ir); i++) {
+            // Method được cấp ID khi lớp thực sự được phát, giống C++.
+            nếu (!lấy map(hàm_ir[i], "phương thức", sai)) {
+                mình.khai hàm IR(lấy map(hàm_ir[i], "tên", ""));
+            };
+        };
+        mình.sổ["slots"] = mình.slots;
+        mình.sổ["hàm đã khai"] = mình.tên_đã_khai;
+        trả về mình.sổ;
+    };
+
+    // Graph đã giải chu trình, sử dụng postorder và khai trước global.
+    hàm công khai đăng ký đồ thị(đồ_thị) {
+        nếu (lấy map(đồ_thị, "loại", "") != "đồ thị mô đun V++") {
+            ném "biên dịch sổ: cần đồ thị mô đun V++";
+        };
+        mình.sổ = {"loại": "sổ hàm V++", "hàm": [], "chuỗi": [],
+                    "mô đun": [], "đã cấp": [], "hoãn chuỗi": mình.hoãn_chuỗi};
+        mình.slots = [];
+        mình.tên_đã_khai = [];
+        thứ_tự = đồ_thị["thứ tự khởi tạo"];
+        nếu (độ dài(thứ_tự) != độ dài(đồ_thị["mô đun"])) {
+            ném "biên dịch sổ: số mô-đun khác thứ tự khởi tạo";
+        };
+        biên dịch sổ cấp hàm duyệt(mình.sổ, đồ_thị, đồ_thị["điểm vào"]);
+        lặp(i = 0; i < độ dài(thứ_tự); i++) {
+            biên dịch sổ đăng ký mô đun(mình.sổ, đồ_thị, thứ_tự[i]);
+        };
+        biên dịch sổ đăng ký mô đun(mình.sổ, đồ_thị, đồ_thị["điểm vào"]);
+        trả về mình.sổ;
+    };
+
+    hàm công khai kết quả() { trả về mình.sổ; };
+
+    hàm công khai tìm hàm(mô_đun, tên) {
+        trả về biên dịch sổ tìm hàm trực tiếp(mình.sổ, mô_đun, tên);
+    };
+
+    hàm công khai tìm mô đun(định_danh) {
+        trả về biên dịch sổ tìm mô đun(mình.sổ["mô đun"], định_danh);
+    };
+};
+

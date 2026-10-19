@@ -1,0 +1,11 @@
+// Dùng chung quản lý bộ đệm và hợp đồng Bộ Chứa cho cấu trúc tuyến tính.
+// Lớp con chỉ cần ghi đè số lượng() nếu dùng một cửa sổ trong bộ đệm.
+nhập gói/bộ sưu tập/giao diện;
+
+lớp công khai Bộ Đệm Danh Sách triển khai Bộ Chứa {
+    hàm công khai khởi tạo() { mình.phần_tử = []; };
+
+    hàm công khai số lượng() { trả về do_dai(mình.phần_tử); };
+
+    hàm công khai trống() { trả về mình.số lượng() == 0; };
+};

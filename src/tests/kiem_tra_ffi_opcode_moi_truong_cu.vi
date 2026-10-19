@@ -1,0 +1,5 @@
+// Negative migration gate: legacy VM environmental lookup has been retired
+// on POSIX and Windows. Public code uses gói/hệ thống/môi trường.vi via FFI.
+hàm chính() {
+    in doc_bien_moi_truong_vm("VPP_FFI_ENV_TEST");
+};

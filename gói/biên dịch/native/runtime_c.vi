@@ -1,0 +1,2 @@
+// C/POSIX runtime for Linux x86-64 and macOS bootstrap Stage 1.
+// This import-only module intentionally defines no V++ runtime functions.

@@ -1,0 +1,51 @@
+nhập đồng thời;
+nhập gói/hệ thống/nền tảng;
+
+hàm chính() {
+    chậm = hàm() {
+        ngủ mili giây(200);
+        trả về 11;
+    };
+    nhanh = hàm() { trả về 22; };
+
+    mã_chậm = chạy luồng(chậm);
+    mã_nhanh = chạy luồng(nhanh);
+    in chờ luồng(mã_nhanh, 100);
+    in trạng thái luồng(mã_chậm);
+    in chờ luồng(mã_chậm, 1000);
+
+    gốc = 40;
+    closure = hàm(x) { trả về gốc + x; };
+    mã_closure = chạy luồng(closure, [2]);
+    in chờ luồng(mã_closure, 1000);
+
+    dữ_liệu = [5, 6];
+    xử_lý = hàm(x) {
+        x[0] = x[0] + 10;
+        trả về x;
+    };
+    mã_dữ_liệu = chạy luồng(xử_lý, [dữ_liệu]);
+    kết_quả = chờ luồng(mã_dữ_liệu, 1000);
+    in kết_quả[0];
+    in dữ_liệu[0];
+
+    có_thể_hủy = hàm() {
+        ngủ mili giây(200);
+        trả về 99;
+    };
+    mã_hủy = chạy luồng(có_thể_hủy);
+    in hủy luồng(mã_hủy);
+    thử {
+        chờ luồng(mã_hủy, 1000);
+    } bắt lỗi (e) {
+        in e;
+    };
+
+    bị_lỗi = hàm() { ném "worker-boom"; };
+    mã_lỗi = chạy luồng(bị_lỗi);
+    thử {
+        chờ luồng(mã_lỗi, 1000);
+    } bắt lỗi (e) {
+        in e;
+    };
+};

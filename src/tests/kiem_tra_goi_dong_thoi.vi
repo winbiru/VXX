@@ -9,4 +9,9 @@ hàm chính() {
     in hủy tác vụ(chậm);
     in trạng thái tác vụ(chậm);
     in chờ tác vụ(chậm, "0");
+    thử {
+        tác vụ sau(0, [1, 2]);
+    } bắt lỗi (e) {
+        in e;
+    };
 };

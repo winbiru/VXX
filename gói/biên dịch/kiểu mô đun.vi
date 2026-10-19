@@ -1,0 +1,164 @@
+// Bảng kiểu của đồ thị: định danh khai báo tách khỏi tên nhìn thấy qua import.
+nhập gói/biên dịch/sổ đăng ký;
+nhập gói/bộ sưu tập/từ điển;
+
+// Các hàm phụ trợ không giữ trạng thái; Bộ Đăng Ký Kiểu sở hữu sổ và đồ thị.
+hàm riêng tư biên dịch kiểu tìm(bảng, tên) {
+    lặp(i = 0; i < độ dài(bảng); i++) {
+        nếu (bảng[i]["tên"] == tên) { trả về bảng[i]["id"]; };
+    };
+    trả về -1;
+};
+
+hàm riêng tư biên dịch kiểu sao(khai, tên) {
+    kết_quả = {};
+    khóa = khoa_map(khai);
+    lặp(i = 0; i < độ dài(khóa); i++) { kết_quả[khóa[i]] = khai[khóa[i]]; };
+    kết_quả["tên"] = tên;
+    trả về kết_quả;
+};
+
+// API cũ vẫn nhận sổ và đồ thị, áp dụng kết quả vào sổ đang được linker dùng.
+hàm riêng tư biên dịch kiểu đăng ký(sổ, đồ_thị) {
+    bộ = Bộ Đăng Ký Kiểu(sổ, đồ_thị);
+    bộ.đăng ký();
+};
+
+hàm công khai biên dịch kiểu cây(sổ, đồ_thị, tên_module) {
+    bộ = Bộ Đăng Ký Kiểu(sổ, đồ_thị);
+    trả về bộ.cây(tên_module);
+};
+
+hàm công khai biên dịch kiểu lớp chạy(sổ, mô_đun) {
+    bộ = Bộ Đăng Ký Kiểu(sổ, rỗng);
+    trả về bộ.lớp chạy(mô_đun);
+};
+
+// Một sổ kiểu sống cùng phiên linker: ID và tên chuẩn thuộc môi trường
+// khai báo, còn tên nhìn thấy / tái xuất thuộc từng mô-đun nhập.
+lớp công khai Bộ Đăng Ký Kiểu {
+    hàm công khai khởi tạo(sổ, đồ_thị) {
+        mình.sổ = sổ;
+        mình.đồ_thị = đồ_thị;
+    };
+
+    hàm riêng tư gom kiểu() {
+        sổ = mình.sổ;
+        đồ_thị = mình.đồ_thị;
+        các_kiểu = [];
+        mô_đun = sổ["mô đun"];
+        cạnh = đồ_thị["cạnh"];
+        lặp(i = 0; i < độ dài(mô_đun); i++) {
+            mục = mô_đun[i];
+            tên_module = mục["định danh"];
+            cây_mô_đun = biên dịch sổ cây mô đun(đồ_thị, tên_module);
+            lệnh = cây_mô_đun["câu lệnh"];
+            trực = []; thấy = []; xuất = [];
+            lặp(j = 0; j < độ dài(lệnh); j++) {
+                khai = lệnh[j];
+                loại = lấy map(khai, "loại", "");
+                nếu (loại == "lớp" || loại == "giao diện") {
+                    id = độ dài(các_kiểu);
+                    thêm(các_kiểu, {"khai": khai, "mô đun": tên_module,
+                        "chuẩn": tên_module + "::" + khai["tên"], "runtime": khai["tên"]});
+                    biên dịch sổ thêm tên(trực, khai["tên"], id, tên_module);
+                    biên dịch sổ thêm tên(thấy, khai["tên"], id, tên_module);
+                    phạm_vi = lấy map(khai, "phạm vi", "");
+                    nếu (phạm_vi != "riêng tư" && phạm_vi != "bảo vệ") {
+                        biên dịch sổ thêm tên(xuất, khai["tên"], id, tên_module);
+                    };
+                };
+            };
+            lặp(j = 0; j < độ dài(cạnh); j++) {
+                e = cạnh[j];
+                nếu (e["nguồn"] != tên_module) { bỏ qua; };
+                phụ = biên dịch sổ tìm mô đun(mô_đun, e["đích"]);
+                bề_mặt = lấy map(phụ, "kiểu xuất", []);
+                lặp(k = 0; k < độ dài(bề_mặt); k++) {
+                    tên = bề_mặt[k]["tên"];
+                    nếu (e["bí danh"] != "") { tên = e["bí danh"] + "." + tên; };
+                    biên dịch sổ thêm tên(thấy, tên, bề_mặt[k]["id"], tên_module);
+                    nếu (e["tái xuất"]) {
+                        biên dịch sổ thêm tên(xuất, tên, bề_mặt[k]["id"], tên_module);
+                    };
+                };
+            };
+            mục["kiểu trực tiếp"] = trực;
+            mục["kiểu nhìn thấy"] = thấy;
+            mục["kiểu xuất"] = xuất;
+        };
+        sổ["kiểu"] = các_kiểu;
+    };
+
+    hàm riêng tư chuẩn hóa() {
+        sổ = mình.sổ;
+        các_kiểu = sổ["kiểu"];
+        mô_đun = sổ["mô đun"];
+        // Quan hệ kế thừa được phân giải trong module khai báo kiểu.
+        lặp(i = 0; i < độ dài(các_kiểu); i++) {
+            bản = các_kiểu[i];
+            mục = biên dịch sổ tìm mô đun(mô_đun, bản["mô đun"]);
+            khai = biên dịch kiểu sao(bản["khai"], bản["chuẩn"]);
+            cha = lấy map(khai, "lớp cha", "");
+            nếu (cha != "") {
+                id = biên dịch kiểu tìm(mục["kiểu nhìn thấy"], cha);
+                nếu (id < 0) { ném "biên dịch kiểu: thiếu lớp cha '" + cha + "'"; };
+                khai["lớp cha"] = các_kiểu[id]["chuẩn"];
+            };
+            quan_hệ = "triển khai";
+            nếu (khai["loại"] == "giao diện") { quan_hệ = "giao diện cha"; };
+            giao_diện = lấy map(khai, quan_hệ, []);
+            mới = [];
+            lặp(j = 0; j < độ dài(giao_diện); j++) {
+                id = biên dịch kiểu tìm(mục["kiểu nhìn thấy"], giao_diện[j]);
+                nếu (id < 0) { ném "biên dịch kiểu: thiếu giao diện '" + giao_diện[j] + "'"; };
+                thêm(mới, các_kiểu[id]["chuẩn"]);
+            };
+            khai[quan_hệ] = mới;
+            bản["chuẩn hóa"] = khai;
+        };
+    };
+
+    hàm công khai đăng ký() {
+        mình.gom kiểu();
+        mình.chuẩn hóa();
+    };
+
+    hàm công khai tất cả() {
+        trả về lấy map(mình.sổ, "kiểu", []);
+    };
+
+    hàm công khai cây(tên_module) {
+        sổ = mình.sổ;
+        cây_mô_đun = biên dịch sổ cây mô đun(mình.đồ_thị, tên_module);
+        kết_quả = biên dịch kiểu sao(cây_mô_đun, "");
+        ngoài = [];
+        các_kiểu = mình.tất cả();
+        lặp(i = 0; i < độ dài(các_kiểu); i++) {
+            thêm(ngoài, các_kiểu[i]["chuẩn hóa"]);
+        };
+        mục = biên dịch sổ tìm mô đun(sổ["mô đun"], tên_module);
+        thấy = lấy map(mục, "kiểu nhìn thấy", []);
+        lặp(i = 0; i < độ dài(thấy); i++) {
+            bản = các_kiểu[thấy[i]["id"]];
+            nếu (bản["mô đun"] != tên_module) {
+                thêm(ngoài, biên dịch kiểu sao(bản["chuẩn hóa"], thấy[i]["tên"]));
+            };
+        };
+        kết_quả["kiểu ngoài"] = ngoài;
+        trả về kết_quả;
+    };
+
+    hàm công khai lớp chạy(mô_đun) {
+        kết_quả = [];
+        thấy = lấy map(mô_đun, "kiểu nhìn thấy", []);
+        các_kiểu = mình.tất cả();
+        lặp(i = 0; i < độ dài(thấy); i++) {
+            bản = các_kiểu[thấy[i]["id"]];
+            nếu (bản["khai"]["loại"] == "lớp") {
+                thêm(kết_quả, {"tên": thấy[i]["tên"], "runtime": bản["runtime"]});
+            };
+        };
+        trả về kết_quả;
+    };
+};

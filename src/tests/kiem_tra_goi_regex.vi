@@ -27,7 +27,7 @@ hàm chính() {
     in regex tách("", "");
     in regex tách("abc", "x");
 
-    // Engine hiện khớp theo byte UTF-8; ghép capture không được mất byte.
+    // Engine V++ khớp theo Unicode code point, đồng nhất với indexing chuỗi.
     in regex thay("é", ".", "#");
     in regex thay("Tiếng Việt", "(.)", "$&") == "Tiếng Việt";
     in regex thay("Việt", "Việt", "xin chào $&");

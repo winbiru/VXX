@@ -1,0 +1,38 @@
+nhập nhập xuất;
+
+hàm chính() {
+    đường_đọc = ".vpp_khong_ton_tai_test_loi_tep";
+    thử {
+        đọc tệp(đường_đọc);
+        in sai;
+    } bắt lỗi(e) {
+        in loai_cua(e) == "từ điển";
+        in e["loại"] == "lỗi hệ thống tệp";
+        in e["mã"] == "FILE_OPEN_FAILED";
+        in e["giai đoạn"] == "mở";
+        in e["thao tác"] == "đọc tệp";
+        in e["đường dẫn"] == đường_đọc;
+        in e["errno"] == 2;
+        in e["thông báo"] == "đọc tệp: không thể mở tệp để đọc";
+    };
+
+    đường_ghi = ".vpp_thu_muc_khong_ton_tai_test_loi_tep/file";
+    thử {
+        ghi tệp(đường_ghi, "nội dung");
+        in sai;
+    } bắt lỗi(e) {
+        in e["mã"] == "FILE_OPEN_FAILED";
+        in e["thao tác"] == "ghi tệp";
+        in e["đường dẫn"] == đường_ghi;
+        in e["errno"] == 2;
+    };
+
+    thử {
+        ghi nối tệp(đường_ghi, "nối");
+        in sai;
+    } bắt lỗi(e) {
+        in e["mã"] == "FILE_OPEN_FAILED";
+        in e["thao tác"] == "ghi nối tệp";
+        in e["errno"] == 2;
+    };
+};

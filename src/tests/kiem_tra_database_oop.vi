@@ -1,0 +1,44 @@
+nhập gói/dữ liệu/cơ sở dữ liệu/chính;
+
+lớp DB Kiểm Thử kế thừa Kết Nối Cơ Sở Dữ Liệu {
+    hàm khởi tạo() {
+        gốc.khởi tạo("org.sqlite.JDBC", "jdbc:sqlite:test", "", "bí mật");
+        mình.lần_mở = 0;
+    };
+    hàm bảo vệ mở kết nối() { mình.lần_mở = mình.lần_mở + 1; trả về "DB_OK|connected"; };
+    hàm bảo vệ thực thi(sql) { trả về "DB_OK|" + sql; };
+    hàm bảo vệ ngắt kết nối() { trả về "DB_OK|disconnected"; };
+};
+
+hàm chính() {
+    db = Kết Nối Cơ Sở Dữ Liệu("org.sqlite.JDBC", "jdbc:sqlite:src/tests/.tmp_oop_db.sqlite", "", "");
+    in db.thông tin()["engine"] == "sqlite";
+    in db.thông tin()["path"] == "src/tests/.tmp_oop_db.sqlite";
+    in !db.đang kết nối();
+    chưa_kết_nối = sai;
+    thử { db.truy vấn("SELECT 1"); } bắt lỗi(e) { chưa_kết_nối = đúng; };
+    in chưa_kết_nối;
+    in db.đóng() == "DB_OK|disconnected";
+    in !db.đang kết nối();
+    đóng_lại = db.đóng();
+    in đóng_lại == "DB_OK|disconnected";
+    sau_đóng = sai;
+    thử { db.kết nối(); } bắt lỗi(e) { sau_đóng = đúng; };
+    in sau_đóng;
+    sai_driver = sai;
+    thử { Kết Nối Cơ Sở Dữ Liệu("khác", "jdbc:khác", "", ""); } bắt lỗi(e) { sai_driver = đúng; };
+    in sai_driver;
+    a = DB Kiểm Thử(); b = DB Kiểm Thử();
+    in a.kết nối() == "DB_OK|connected" && a.đang kết nối();
+    in a.kết nối() == "DB_OK|connected" && a.lần_mở == 1;
+    in !b.đang kết nối();
+    in a.truy vấn("SELECT 42;") == "DB_OK|SELECT 42;";
+    in a.ping() == "DB_OK|SELECT 1;";
+    thông_tin = a.thông tin(); thông_tin["path"] = "đã sửa";
+    in a.thông tin()["path"] == "test";
+    a.đóng();
+    in !a.đang kết nối() && a.mật_khẩu == "";
+    chặn_ping = sai;
+    thử { a.ping(); } bắt lỗi(e) { chặn_ping = đúng; };
+    in chặn_ping;
+};

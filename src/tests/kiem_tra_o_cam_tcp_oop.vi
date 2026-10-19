@@ -1,0 +1,25 @@
+nhập gói/mạng/chính;
+
+hàm chính() {
+    socket = Ổ Cắm TCP("127.0.0.1", 45678);
+    in !socket.đang mở();
+    in socket.đặt thời gian chờ(1000);
+    chưa_kết_nối = sai;
+    thử { socket.gửi("x"); } bắt lỗi(e) { chưa_kết_nối = đúng; };
+    in chưa_kết_nối;
+    in socket.đóng();
+    in socket.đóng();
+    in !socket.đang mở();
+    đã_đóng = sai;
+    thử { socket.kết nối(); } bắt lỗi(e) { đã_đóng = đúng; };
+    in đã_đóng;
+    sai_cổng = sai;
+    thử { Ổ Cắm TCP("localhost", 0); } bắt lỗi(e) { sai_cổng = đúng; };
+    in sai_cổng;
+    sai_host = sai;
+    thử { Ổ Cắm TCP("", 80); } bắt lỗi(e) { sai_host = đúng; };
+    in sai_host;
+    sai_timeout = sai;
+    thử { Ổ Cắm TCP("localhost", 80, 0); } bắt lỗi(e) { sai_timeout = đúng; };
+    in sai_timeout;
+};

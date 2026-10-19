@@ -1,0 +1,16 @@
+// Điều kiện V++: nếu / hoặc nếu / hoặc.
+hàm chính() {
+    nếu (sai) { in 99; } hoặc nếu (đúng) { in 10; } hoặc { in 99; };
+    nếu (sai) { in 99; } hoặc nếu (sai) { in 99; } hoặc { in 20; };
+    nếu (đúng || sai) { in 30; } hoặc { in 99; };
+    nếu (sai) { in 99; } hoặc nếu (sai) { in 99; } hoặc nếu (đúng) { in 40; };
+    biến x = 0;
+    nếu (sai) { x = 99; } hoặc nếu (sai) { x = 98; } hoặc nếu (đúng) { x = 1; } hoặc { x = 97; };
+    in x;
+    nếu (x == 1) {
+        nếu (sai) { in 99; } hoặc nếu (x == 1) { in 2; } hoặc { in 98; };
+    } hoặc { in 97; };
+    nếu (sai) { in 99; } hoặc { in 3; };
+    nếu (đúng && (x == 1 || sai)) { in 4; };
+    nếu (sai) { in 99; } hoặc nếu (đúng) { in 5; };
+};

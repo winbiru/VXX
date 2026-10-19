@@ -1,0 +1,4 @@
+// Opcode sleep cũ phải bị từ chối trên POSIX và Windows.
+hàm chính() {
+    ngu_mili_giay_vm(1);
+};

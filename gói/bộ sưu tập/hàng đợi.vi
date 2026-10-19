@@ -1,0 +1,28 @@
+nhập gói/bộ sưu tập/bộ đệm danh sách;
+
+// FIFO: đầu đọc độc lập cho từng instance; nén sau khi dùng nửa bộ đệm.
+lớp công khai Hàng Đợi kế thừa Bộ Đệm Danh Sách {
+    hàm công khai khởi tạo() { gốc.khởi tạo(); mình.đầu = 0; };
+    hàm công khai số lượng() { trả về do_dai(mình.phần_tử) - mình.đầu; };
+    hàm công khai thêm(giá_trị) {
+        them(mình.phần_tử, giá_trị);
+        trả về mình.số lượng();
+    };
+    hàm công khai đầu() {
+        nếu (mình.trống()) { ném "hàng đợi: không có phần tử"; };
+        ds = mình.phần_tử;
+        trả về ds[mình.đầu];
+    };
+    hàm công khai lấy() {
+        kết_quả = mình.đầu();
+        mình.đầu = mình.đầu + 1;
+        nếu (mình.đầu * 2 >= do_dai(mình.phần_tử)) {
+            mới = [];
+            ds = mình.phần_tử;
+            lặp(i = mình.đầu; i < do_dai(ds); i++) { them(mới, ds[i]); };
+            mình.phần_tử = mới;
+            mình.đầu = 0;
+        };
+        trả về kết_quả;
+    };
+};

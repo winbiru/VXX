@@ -1,0 +1,58 @@
+// Chuẩn hóa bytecode và các pass phân tích bytecode thuần V++.
+nhập gói/bộ sưu tập/từ điển;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Đọc Mã Lệnh {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai biên dịch bytecode từ thô(bytecode_thô) {
+        kết_quả = [];
+        lặp(i = 0; i < do_dai(bytecode_thô); i++) {
+            lệnh = bytecode_thô[i];
+            thêm(kết_quả, {
+                "op": lệnh[0],
+                "toán hạng": lệnh[1],
+                "chỉ số": lệnh[2],
+                "giá trị": lệnh[3]
+            });
+        };
+        trả về kết_quả;
+    };
+
+    // Pass đếm tần suất opcode thực hiện trong V++ (không cần native riêng).
+    // Giữ thứ tự opcode xuất hiện đầu tiên để kết quả có tính quyết định.
+    hàm công khai biên dịch thống kê opcode từ bytecode(bytecode) {
+        kết_quả = [];
+        lặp(i = 0; i < độ dài(bytecode); i++) {
+            op = lấy map(bytecode[i], "op", -1);
+            đã_có = sai;
+            lặp(j = 0; j < độ dài(kết_quả); j++) {
+                mục = kết_quả[j];
+                nếu (lấy map(mục, "op", -1) == op) {
+                    kết_quả[j] = {
+                        "op": op,
+                        "số lượng": lấy map(mục, "số lượng", 0) + 1
+                    };
+                    đã_có = đúng;
+                    thoát;
+                };
+            };
+            nếu (!đã_có) {
+                thêm(kết_quả, {"op": op, "số lượng": 1});
+            };
+        };
+        trả về kết_quả;
+    };
+};
+
+
+hàm công khai biên dịch bytecode từ thô(bytecode_thô) {
+    __vpp_adapter = Bộ Đọc Mã Lệnh();
+    trả về __vpp_adapter.biên dịch bytecode từ thô(bytecode_thô);
+};
+
+hàm công khai biên dịch thống kê opcode từ bytecode(bytecode) {
+    __vpp_adapter = Bộ Đọc Mã Lệnh();
+    trả về __vpp_adapter.biên dịch thống kê opcode từ bytecode(bytecode);
+};
+

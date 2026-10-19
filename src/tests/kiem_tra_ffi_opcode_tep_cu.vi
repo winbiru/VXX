@@ -1,0 +1,5 @@
+// Test gate: intentionally call an old file opcode instead of public V++ API.
+// Legacy opcode is disabled on all platforms; public file API lives in .vi.
+hàm chính() {
+    in io_doc_bytes_vm(".tmp_ffi_opcode_tep_cu_missing");
+};

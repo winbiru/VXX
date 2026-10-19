@@ -1,0 +1,94 @@
+// Incremental policy stays in V++. The runtime stores opaque byte records.
+// Include the full ordered signature registry: changing arity or function
+// IDs must invalidate callers, even when their own source is unchanged.
+hàm nc_key(kind, src, registry, first, last, entry) {
+    // One wire format for Mach-O/AArch64 and ELF64/x86-64; `kind` keeps
+    // their emitted-object namespaces distinct.
+    biến key = "vpp-native-object-cache-v2";
+    nếu (key <= 0) { trả về -1; };
+    biến status = byte_đẩy_i32(key, kind);
+    nếu (byte_đẩy_i32(key, first) != 0) { status = -1; };
+    nếu (byte_đẩy_i32(key, last) != 0) { status = -1; };
+    nếu (byte_đẩy_i32(key, entry) != 0) { status = -1; };
+    nếu (byte_đẩy_i32(key, byte_dài(src)) != 0) { status = -1; };
+    nếu (byte_nối(key, src) != 0) { status = -1; };
+    nếu (byte_nối(key, registry) != 0) { status = -1; };
+    nếu (status != 0) { byte_hủy(key); trả về -1; };
+    trả về key;
+};
+
+// IR records contain [i32 length, function-local IR bytes] for each function.
+// Global IR offsets are reconstructed, so unrelated body-size changes do not
+// prevent reuse. Validate the complete record before changing function data.
+hàm nc_restore(data, ir, functions, first, last) {
+    biến cursor = 0;
+    biến total = 0;
+    lặp (id = first; id < last; id++) {
+        nếu (cursor + 4 > byte_dài(data)) { trả về -1; };
+        biến length = byte_đọc_i32(data, cursor);
+        nếu (length <= 0) { trả về -1; };
+        nếu (length > byte_dài(data) - cursor - 4) { trả về -1; };
+        total = total + length;
+        cursor = cursor + 4 + length;
+    };
+    nếu (cursor != byte_dài(data)) { trả về -1; };
+    nếu (total > 1048576 - byte_dài(ir)) { trả về -1; };
+    cursor = 0;
+    lặp (id = first; id < last; id++) {
+        biến restored_length = byte_đọc_i32(data, cursor);
+        biến part = byte_cắt(data, cursor + 4, restored_length);
+        nếu (part <= 0) { trả về -1; };
+        biến begin = byte_dài(ir);
+        biến copied = byte_nối(ir, part);
+        byte_hủy(part);
+        nếu (copied != 0) { trả về -1; };
+        nếu (byte_ghi_i32(functions, id * 24 + 12, begin) != 0) { trả về -1; };
+        nếu (byte_ghi_i32(functions, id * 24 + 16, restored_length) != 0) { trả về -1; };
+        cursor = cursor + 4 + restored_length;
+    };
+    trả về last;
+};
+
+hàm nc_save(key, data, ir, functions, first, last) {
+    nếu (byte_làm_rỗng(data) != 0) { trả về -1; };
+    lặp (id = first; id < last; id++) {
+        biến begin = byte_đọc_i32(functions, id * 24 + 12);
+        biến length = byte_đọc_i32(functions, id * 24 + 16);
+        biến part = byte_cắt(ir, begin, length);
+        nếu (part <= 0) { trả về -1; };
+        biến copied = byte_đẩy_i32(data, length);
+        nếu (byte_nối(data, part) != 0) { copied = -1; };
+        byte_hủy(part);
+        nếu (copied != 0) { trả về -1; };
+    };
+    trả về cache_ghi(key, data);
+};
+
+hàm nc_compile_unit(src, tokens, registry, ir, functions, first, last, entry) {
+    biến key = nc_key(1, src, registry, first, last, entry);
+    biến data = byte_mới();
+    biến result = -1;
+    nếu (key > 0) {
+        nếu (data > 0) {
+            nếu (cache_đọc(key, data) == 1) {
+                result = nc_restore(data, ir, functions, first, last);
+                // Allocation failures after restore begins are fatal; never
+                // parse over partially restored function metadata.
+                byte_hủy(key);
+                byte_hủy(data);
+                trả về result;
+            };
+        };
+    };
+    nếu (lex_tokenize(src, tokens) > 0) {
+        result = mc_compile_unit(src, tokens, registry, ir, functions, first);
+    };
+    nếu (result == last) {
+        nếu (key > 0) {
+            nếu (data > 0) { nc_save(key, data, ir, functions, first, last); };
+        };
+    };
+    nếu (key > 0) { byte_hủy(key); };
+    nếu (data > 0) { byte_hủy(data); };
+    trả về result;
+};

@@ -1,0 +1,101 @@
+// Bài kiểm tra lexer V++ độc lập, đối chiếu kết quả với compiler bootstrap.
+nhập gói/biên dịch/chính;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/bảng mã;
+
+lớp Hộp Thu {
+    hàm công khai thu thập(x) { trả về x + 1; };
+};
+
+hàm ham(x) { trả về x + 2; };
+hàm tra ve(x) { trả về x + 3; };
+
+hàm chính() {
+    hộp = Hộp Thu();
+    in hộp.thu thập(6) == 7;
+    in ham(8) == 10;
+    in tra ve(4) == 7;
+
+    nguồn = "hàm chính() { /* lời chào\nViệt */ in \"Việt\"; trả về 1 + 2; };";
+    tokens = biên dịch token hóa(nguồn);
+    snapshot = biên dịch phân tích(nguồn);
+    in độ dài(tokens) == lấy map(snapshot, "token", -1);
+    in lấy map(tokens[0], "giá trị", "") == "hàm";
+    in lấy map(tokens[0], "loại", "") == "từ khóa";
+    in lấy map(tokens[0], "dòng", 0) == 1;
+    in lấy map(tokens[0], "cột", 0) == 1;
+    in lấy map(tokens[8], "giá trị", "") == "trả về";
+    in lấy map(tokens[8], "loại", "") == "từ khóa";
+    in lấy map(tokens[8], "kết thúc", 0) > lấy map(tokens[8], "vị trí", 0);
+
+    chuỗi = biên dịch token hóa("in \"a\\\"b\"; // comment");
+    in độ dài(chuỗi) == 3;
+    in lấy map(chuỗi[1], "giá trị", "") == "\"a\\\"b\"";
+    in lấy map(chuỗi[1], "loại", "") == "chuỗi";
+
+    dấu = biên dịch token hóa("a==b && c!=d || e<=f ++ -- += %= 1.2");
+    in độ dài(dấu) == 16;
+    in lấy map(dấu[1], "giá trị", "") == "==";
+    in lấy map(dấu[3], "giá trị", "") == "&&";
+    in lấy map(dấu[5], "giá trị", "") == "!=";
+    in lấy map(dấu[7], "giá trị", "") == "||";
+    in lấy map(dấu[9], "giá trị", "") == "<=";
+    in lấy map(dấu[10], "giá trị", "") == "f";
+    in lấy map(dấu[14], "giá trị", "") == "%=";
+    in lấy map(dấu[15], "loại", "") == "số thực";
+
+    từ_ghép = biên dịch token hóa("hoặc { trả về 0; } bắt lỗi (e) {};");
+    in lấy map(từ_ghép[0], "giá trị", "") == "hoặc";
+    in lấy map(từ_ghép[2], "giá trị", "") == "trả về";
+    in lấy map(từ_ghép[6], "giá trị", "") == "bắt lỗi";
+    nhánh_nhiều = biên dịch token hóa("nếu (a) {} hoặc nếu (b) {} hoặc {};");
+    in lấy map(nhánh_nhiều[6], "giá trị", "") == "hoặc";
+    in lấy map(nhánh_nhiều[7], "giá trị", "") == "nếu";
+    in lấy map(nhánh_nhiều[7], "loại", "") == "từ khóa";
+
+    // Chữ v/f từng bị nhận nhầm là escape \v/\f của khoảng trắng.
+    chữ = biên dịch token hóa("v f vf five vpp");
+    in độ dài(chữ) == 5;
+    in lấy map(chữ[0], "giá trị", "") == "v";
+    in lấy map(chữ[1], "giá trị", "") == "f";
+    in lấy map(chữ[3], "giá trị", "") == "five";
+    trắng = biên dịch token hóa("a" + ký tự unicode(11) + "b" + ký tự unicode(12) + "c");
+    in độ dài(trắng) == 3;
+    in lấy map(trắng[2], "giá trị", "") == "c";
+
+    // Không suy diễn thiếu dấu trong lexer: chúng là các định danh hợp lệ.
+    không_dấu = biên dịch token hóa("HAM ham thu thập lop tra ve duoc bao ve");
+    in độ dài(không_dấu) == 10;
+    in lấy map(không_dấu[0], "giá trị", "") == "HAM";
+    in lấy map(không_dấu[0], "loại", "") == "định danh";
+    in lấy map(không_dấu[2], "giá trị", "") == "thu";
+    in lấy map(không_dấu[2], "loại", "") == "định danh";
+    in lấy map(không_dấu[3], "giá trị", "") == "thập";
+    in lấy map(không_dấu[4], "giá trị", "") == "lop";
+    in lấy map(không_dấu[5], "giá trị", "") == "tra";
+    in lấy map(không_dấu[6], "giá trị", "") == "ve";
+    in lấy map(không_dấu[9], "giá trị", "") == "ve";
+
+    lỗi_chuỗi = sai;
+    thử { biên dịch token hóa("in \"chưa đóng"); }
+    bắt lỗi (e) { lỗi_chuỗi = đúng; };
+    in lỗi_chuỗi;
+    lỗi_khối = sai;
+    thử { biên dịch token hóa("/* chưa đóng"); }
+    bắt lỗi (e) { lỗi_khối = đúng; };
+    in lỗi_khối;
+
+    // SourceSpan của compiler C++ đo byte UTF-8; API bổ sung chỉ số ký tự.
+    việt = biên dịch token hóa("\n  hoặc { in \"đúng\"; }");
+    in lấy map(việt[0], "dòng", 0) == 2;
+    in lấy map(việt[0], "cột", 0) == 3;
+    in lấy map(việt[0], "vị trí", -1) == 3;
+    in lấy map(việt[0], "kết thúc", 0) == 9;
+    in lấy map(việt[0], "kết thúc ký tự", 0) == 7;
+    unicode = biên dịch token hóa("à x");
+    in lấy map(unicode[0], "kết thúc", 0) == 2;
+    in lấy map(unicode[1], "vị trí", 0) == 3;
+    in lấy map(unicode[1], "cột", 0) == 4;
+    in lấy map(unicode[1], "vị trí ký tự", 0) == 2;
+    in lấy map(unicode[1], "cột ký tự", 0) == 3;
+};

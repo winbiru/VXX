@@ -1,0 +1,263 @@
+// IR và emitter opcode chạy hoàn toàn qua các mô-đun V++, không gọi native.
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/chính;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm khớp opcode(nguồn) {
+    cpp = biên dịch bytecode(nguồn);
+    vpp = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+    nếu (độ dài(cpp) != độ dài(vpp)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cpp); i++) {
+        nếu (cpp[i]["op"] != vpp[i]["op"] ||
+            cpp[i]["toán hạng"] != vpp[i]["toán hạng"] ||
+            cpp[i]["chỉ số"] != vpp[i]["chỉ số"] ||
+            cpp[i]["giá trị"] != vpp[i]["giá trị"]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+// Kiểm chứng đúng opcode ID và cả ba toán hạng cho từng thân hàm.
+// Oracle C++ xuất bytecode hàm từ cùng registry mà CLI đang dùng.
+hàm khớp opcode hàm(nguồn) {
+    cpp = biên dịch bytecode hàm(nguồn);
+    vpp = biên dịch phát bytecode thuần(nguồn)["hàm"];
+    nếu (độ dài(cpp) != độ dài(vpp)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cpp); i++) {
+        nếu (cpp[i]["tên"] != vpp[i]["tên"] || cpp[i]["id"] != vpp[i]["id"]) {
+            trả về sai;
+        };
+        c = cpp[i]["bytecode"];
+        v = vpp[i]["bytecode"];
+        nếu (độ dài(c) != độ dài(v)) { trả về sai; };
+        lặp(j = 0; j < độ dài(c); j++) {
+            nếu (c[j]["op"] != v[j]["op"] ||
+                c[j]["toán hạng"] != v[j]["toán hạng"] ||
+                c[j]["chỉ số"] != v[j]["chỉ số"] ||
+                c[j]["giá trị"] != v[j]["giá trị"]) {
+                trả về sai;
+            };
+        };
+    };
+    trả về đúng;
+};
+
+// Cả parser/semantic C++ lẫn compiler thuần V++ phải từ chối đầu vào sai.
+hàm khớp lỗi khai báo(nguồn) {
+    cpp_lỗi = sai;
+    vpp_lỗi = sai;
+    thử { biên dịch bytecode(nguồn); }
+    bắt lỗi (e) { cpp_lỗi = đúng; };
+    thử { biên dịch phát bytecode thuần(nguồn); }
+    bắt lỗi (e) { vpp_lỗi = đúng; };
+    trả về cpp_lỗi && vpp_lỗi;
+};
+
+hàm chính() {
+    ir = biên dịch hạ IR thuần("in 2 + 3 * 4;");
+    lệnh = lấy map(ir, "lệnh", []);
+    in độ dài(lệnh) == 6;
+    in lấy map(lệnh[0], "mã", "") == "số nguyên";
+    in lấy map(lệnh[3], "giá trị", "") == "*";
+    in lấy map(lệnh[4], "giá trị", "") == "+";
+
+    mã = biên dịch phát bytecode thuần("in 2 + 3 * 4;");
+    mã_lệnh = lấy map(mã, "bytecode", []);
+    in độ dài(mã_lệnh) == 6;
+    in mã_lệnh[0]["op"] == 41 && mã_lệnh[0]["toán hạng"] == 2;
+    in mã_lệnh[3]["op"] == 2;
+    in mã_lệnh[4]["op"] == 0;
+    in mã_lệnh[5]["op"] == 43;
+    in mã_lệnh[5]["op"] == 43;
+
+    // Oracle kiểm thử độc lập: các opcode thực tế do compiler C++ phát.
+    chuẩn = biên dịch bytecode("in 2 + 3 * 4;");
+    in độ dài(chuẩn) == độ dài(mã_lệnh);
+    khớp = độ dài(chuẩn) == độ dài(mã_lệnh);
+    lặp(i = 0; i < độ dài(chuẩn) && i < độ dài(mã_lệnh); i++) {
+        nếu (chuẩn[i]["op"] != mã_lệnh[i]["op"] ||
+            chuẩn[i]["toán hạng"] != mã_lệnh[i]["toán hạng"]) {
+            khớp = sai;
+        };
+    };
+    in khớp;
+    in khớp opcode("in 10 - 3 * 2;");
+    in khớp opcode("in 4 >= 3;");
+    in khớp opcode("in đúng && sai;");
+    in khớp opcode("in \"abc\";");
+    in khớp opcode("in danh_sách[0];");
+    // Compound gán được hạ về thao tác số học và OP_GAN giống direct IR C++.
+    gán = biên dịch phát bytecode thuần("n = 2; n += 3; in n;");
+    in gán["bytecode"][5]["op"] == 0;
+
+    chương_trình = biên dịch phát bytecode thuần(
+        "hàm tính(a) { biến b = a + 2; in b; trả về b; };");
+    hàm_lệnh = lấy map(chương_trình, "hàm", []);
+    in độ dài(hàm_lệnh) == 1;
+    in lấy map(hàm_lệnh[0], "tên", "") == "tính";
+    thân = lấy map(hàm_lệnh[0], "bytecode", []);
+    in độ dài(thân) == 14;
+    in thân[0]["op"] == 14 && thân[1]["op"] == 27 && thân[2]["op"] == 69;
+    in thân[7]["op"] == 60 && thân[8]["op"] == 13;
+    in thân[12]["op"] == 40 && thân[13]["op"] == 15;
+    // C++ dành slot 0 cho tên hàm trước khi cấp slot cho tham số.
+    in độ dài(lấy map(chương_trình, "slots", [])) == 3;
+    in khớp opcode hàm("hàm tính(a) { biến b = a + 2; in b; trả về b; };");
+    in khớp opcode hàm("hàm f() { biến x; x = 2; trả về x; };");
+    in khớp opcode hàm("hàm f(a, b) { trả về a + b; };");
+    in khớp opcode hàm("hàm f(a) { nếu (a > 1) { trả về 2; } hoặc { trả về 3; }; };");
+    in khớp opcode hàm("hàm f() { biến x = 5; x += 3; x++; trả về x; };");
+    in khớp opcode hàm("hàm f() { biến x = 1; }; hàm g() { biến x = 2; };");
+    // Mỗi tham số/biến cục bộ có slot riêng ngay cả khi trùng tên hàm
+    // hoặc trùng tên biến trong một hàm khác.
+    in khớp opcode hàm("hàm đích() { trả về 7; }; hàm f(đích) { trả về đích; };");
+    in khớp opcode hàm("hàm đích() { trả về 7; }; hàm f() { biến đích = 2; trả về đích; };");
+    in khớp opcode hàm("hàm f(a) { biến x = a; }; hàm g(a) { biến x = a + 1; };");
+    // SymbolId của catch độc lập với tên hàm, tham số, global và catch khác.
+    in khớp opcode hàm("hàm f(e) { thử { ném 5; } bắt lỗi (e) { in e; }; " +
+                      "trả về e; };");
+    in khớp opcode hàm("hàm f() { thử { ném 5; } bắt lỗi (e) { in e; }; " +
+                      "thử { ném 8; } bắt lỗi (e) { in e; }; };");
+    in khớp opcode hàm("hàm đích() { trả về 9; }; hàm f() { " +
+                      "thử { ném 3; } bắt lỗi (đích) { in đích; }; " +
+                      "trả về đích(); };");
+    in khớp opcode hàm("hàm f() { thử { ném 1; } bắt lỗi (e) { " +
+                      "thử { ném 2; } bắt lỗi (e) { in e; }; in e; }; };");
+    in khớp opcode("biến e = 1; thử { ném 2; } bắt lỗi (e) { in e; }; in e;");
+    in khớp opcode hàm("hàm f() { biến e = 2; thử { ném 3; } " +
+                      "bắt lỗi (e) { in e; }; trả về e; };");
+    in khớp opcode hàm("hàm f(e) { thử { ném 2; } bắt lỗi (e) { " +
+                      "chọn (e) { ca e: { in e; thoát; } }; }; " +
+                      "trả về e; };");
+    in khớp opcode("biến e = 2; thử { ném 3; } bắt lỗi (e) { " +
+                  "chọn (e) { ca e: { in e; thoát; } }; }; in e;");
+    // C++ predeclare mọi function ID, nhưng cấp slot biến trong thứ tự
+    // các statement top-level (kể cả xen kẽ hàm và biến toàn cục).
+    xen_kẽ = "biến g = 5; hàm f(a) { biến b = a + g; trả về b; }; " +
+            "biến h = 7; hàm z() { trả về g + h; }; in g;";
+    in khớp opcode(xen_kẽ);
+    in khớp opcode hàm(xen_kẽ);
+    hàm_trước = "hàm f(a) { biến b = a + g; trả về b; }; biến g = 5;";
+    in khớp opcode(hàm_trước);
+    in khớp opcode hàm(hàm_trước);
+    in khớp opcode("hàm f() { trả về 1; }; hàm g() { trả về 2; };");
+    in khớp opcode hàm("hàm f() { trả về 1; }; hàm g() { trả về 2; };");
+
+    số_âm = biên dịch phát bytecode thuần("in -7;");
+    in số_âm["bytecode"][0]["toán hạng"] == -7;
+    chuỗi = biên dịch phát bytecode thuần("in \"Việt Nam\";");
+    in chuỗi["bytecode"][0]["op"] == 65;
+    in chuỗi["chuỗi"][0] == "Việt Nam";
+
+    in khớp opcode("in chưa_hỗ_trợ(1);");
+    in khớp opcode("lặp(i = 0; i < 2; i++) { in i; };");
+
+    // Giữ thứ tự cấp slot: C++ đăng ký đích x trước biến y trong RHS.
+    thứ_tự = biên dịch phát bytecode thuần("x = y + 3; in x;");
+    in thứ_tự["slots"][0] == "x" && thứ_tự["slots"][1] == "y";
+    in thứ_tự["bytecode"][0]["chỉ số"] == 1;
+    in thứ_tự["bytecode"][3]["chỉ số"] == 0;
+
+    // Offset nhảy là vị trí tuyệt đối trong bytecode đang được sinh.
+    nhánh = biên dịch phát bytecode thuần("nếu (đúng) { in 2; };");
+    in nhánh["bytecode"][0]["op"] == 22;
+    in nhánh["bytecode"][2]["op"] == 62 && nhánh["bytecode"][2]["toán hạng"] == 7;
+    in khớp opcode("nếu (đúng) { in 2; };");
+
+    hai_nhánh = biên dịch phát bytecode thuần("nếu (sai) { in 1; } hoặc { in 2; };");
+    in hai_nhánh["bytecode"][2]["toán hạng"] == 8;
+    in hai_nhánh["bytecode"][7]["op"] == 63 && hai_nhánh["bytecode"][7]["toán hạng"] == 12;
+    in khớp opcode("nếu (sai) { in 1; } hoặc { in 2; };");
+    in khớp opcode("nếu (đúng) { nếu (sai) { in 1; }; in 2; };");
+    in khớp opcode("n = 2;");
+    in khớp opcode("n = 2; n += 3; in n;");
+    in khớp opcode("n = 10; n -= 3; in n;");
+    in khớp opcode("n = 10; n *= 3; in n;");
+    in khớp opcode("n = 10; n /= 2; in n;");
+    in khớp opcode("n = 10; n %= 3; in n;");
+    in khớp opcode("biến n = 2; n += 3; in n;");
+    // So khớp đầy đủ (op, operand, operandIndex, operandValue), gồm slot và initializer.
+    in khớp opcode("biến n;");
+    in khớp opcode("biến n; n = 2; in n;");
+    in khớp opcode("biến n = đúng; in n;");
+    in khớp opcode("biến n = sai; in n;");
+    in khớp opcode("biến n = rỗng; in n;");
+    in khớp opcode("biến n = \"chào\"; in n;");
+    in khớp opcode("biến n = -7; in n;");
+    in khớp opcode("biến n = 5.5; in n;");
+    in khớp opcode("biến n = 2 + 3 * 4; in n;");
+    in khớp opcode("biến n = m + 3; in n;");
+    in khớp opcode("n = 2; biến m = n * 3; in m;");
+    in khớp opcode("biến n = (2 + 3); in n;");
+    in khớp lỗi khai báo("biến;");
+    in khớp lỗi khai báo("biến n = ;");
+    in khớp lỗi khai báo("biến n 3;");
+    in khớp lỗi khai báo("biến 42 = 2;");
+    in khớp lỗi khai báo("biến n = 1; biến n = 2;");
+    in khớp lỗi khai báo("hàm f(x) { biến x = 2; };");
+    in khớp lỗi khai báo("hàm f() { biến x = 1; nếu (đúng) { biến x = 2; }; };");
+    in khớp lỗi khai báo("hàm f() { nếu (đúng) { biến x = 1; } hoặc { biến x = 2; }; };");
+    in khớp lỗi khai báo("hàm f() {}; biến f = 2;");
+    // Hai hàm được phép khai báo cùng tên biến cục bộ, giống bảng symbol C++.
+    vpp_cục_bộ = biên dịch phát bytecode thuần(
+        "hàm f() { biến x = 1; }; hàm g() { biến x = 2; };");
+    in độ dài(vpp_cục_bộ["hàm"]) == 2;
+    // Switch: mã opcode và ba toán hạng (gồm vị trí nhảy bỏ qua từng ca).
+    in khớp opcode("chọn (2) { ca 1: { in 1; thoát; } ca 2: { in 2; thoát; } " +
+                  "mặc định: { in 3; } };");
+    in khớp opcode("chọn (\"b\") { ca \"a\": { in 1; } " +
+                  "ca \"b\": { in 2; thoát; } mặc định: { in 0; } };");
+    in khớp opcode("biến x = 3; biến y = 3; chọn (x) { " +
+                  "ca y: { in x; thoát; } mặc định: { in 0; } };");
+    in khớp opcode("chọn (1) { ca 1: { chọn (2) { ca 2: { in 3; thoát; } " +
+                  "mặc định: { in 4; } }; thoát; } mặc định: { in 5; } };");
+    in khớp opcode("chọn (0) { };");
+    in khớp opcode("chọn (0) { mặc định: { in 1; } };");
+    in khớp opcode hàm("hàm f(x) { chọn (x) { ca 1: { trả về 1; } " +
+                       "mặc định: { trả về 2; } }; };");
+    // Try/catch: OP_THU trỏ vào OP_BAT_LOI và OP_THU_KET_THUC
+    // trỏ sau khối catch, kể cả trong hàm và khi lồng nhau.
+    in khớp opcode("thử { ném \"sai\"; } bắt lỗi (e) { in e; };");
+    in khớp opcode("thử { in 1; } bắt lỗi { in 2; };");
+    in khớp opcode("thử { thử { ném 5; } bắt lỗi (e) { in e; }; } " +
+                  "bắt lỗi (x) { in x; };");
+    in khớp opcode("thử { ném; } bắt lỗi { in 1; };");
+    in khớp opcode hàm("hàm f() { thử { ném \"x\"; } " +
+                       "bắt lỗi (e) { trả về e; }; };");
+    in khớp opcode("chọn (2) { ca 2: { thử { ném 1; } " +
+                  "bắt lỗi (e) { in e; }; thoát; } };");
+    // Cú pháp và ngữ nghĩa không hợp lệ phải có lỗi tường minh.
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình tự chủ("chọn (2) { ca 1 { in 1; }"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình tự chủ("thử { in 1; } bắt lỗi () { in 2; }"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình tự chủ("chọn (1) { ca 2: { bỏ qua; } }"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    // Gọi hàm: tham số được phát trước OP_GOI; function ID đã đăng ký trước.
+    in khớp opcode("hàm f(a) { trả về a + 1; }; in f(2);");
+    in khớp opcode hàm("hàm f(a) { trả về a + 1; }; in f(2);");
+    in khớp opcode("in g(3); hàm g(x) { trả về x; };");
+    in khớp opcode hàm("in g(3); hàm g(x) { trả về x; };");
+    in khớp opcode("hàm f(x) { trả về x; }; in f(1 + 2 * 3);");
+    in khớp opcode("hàm f(x) { trả về x; }; in f(f(2));");
+    in khớp opcode hàm("hàm f(x) { trả về f(x - 1); };");
+    in khớp opcode("hàm f() { trả về 1; }; in f;");
+    // Loop: kiểm tra đầy đủ target, độ sâu block và số khung try cần thoát.
+    in khớp opcode("lặp(i = 0; i < 3; i++) { in i; };");
+    in khớp opcode("lặp(i = 0; i < 3; i++) { nếu (i == 1) { thoát; }; };");
+    in khớp opcode("lặp(i = 0; i < 3; i++) { nếu (i == 1) { bỏ qua; }; in i; };");
+    in khớp opcode("lặp(i = 0; i < 2; i++) { lặp(j = 0; j < 2; j++) { thoát; }; };");
+    in khớp opcode("lặp(i = 0; i < 2; i++) { chọn (i) { ca 0: { thoát; } " +
+                  "mặc định: { in i; } }; };");
+    in khớp opcode("lặp(i = 0; i < 2; i++) { thử { nếu (i == 1) { thoát; }; } " +
+                  "bắt lỗi { in i; }; };");
+    in khớp opcode hàm("hàm f(n) { lặp(i = 0; i < n; i++) { nếu (i == 1) { thoát; }; }; trả về n; };");
+    in khớp opcode hàm("hàm f(n) { lặp(i = 0; i < n; i++) { in f(i); }; };");
+};

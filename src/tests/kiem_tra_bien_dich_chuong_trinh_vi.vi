@@ -1,0 +1,221 @@
+// Parser câu lệnh và semantic pass chạy hoàn toàn trong thư viện V++.
+nhập gói/biên dịch/chính;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm chính() {
+    nguồn = "nhập gói/bộ sưu tập/từ điển; " +
+        "hàm tính tổng(a, b) { biến kết_quả = a + b * 2; " +
+        "nếu (kết_quả > 0) { in kết_quả; } hoặc { in 0; }; " +
+        "trả về kết_quả; }; " +
+        "hàm chính() { tính_tổng(1, 2); };";
+    cây = biên dịch phân tích chương trình tự chủ(nguồn);
+    in lấy map(cây, "loại", "") == "chương trình";
+    câu_lệnh = lấy map(cây, "câu lệnh", []);
+    in độ dài(câu_lệnh) == 3;
+    in lấy map(câu_lệnh[0], "loại", "") == "nhập";
+    in lấy map(câu_lệnh[0], "đích", "") == "gói/bộ sưu tập/từ điển";
+    khai_báo = câu_lệnh[1];
+    in lấy map(khai_báo, "tên", "") == "tính tổng";
+    in độ dài(lấy map(khai_báo, "tham số", [])) == 2;
+    thân = lấy map(khai_báo, "thân", {});
+    các_lệnh = lấy map(thân, "câu lệnh", []);
+    in độ dài(các_lệnh) == 3;
+    in lấy map(các_lệnh[0], "loại", "") == "biến";
+    biểu_thức = lấy map(các_lệnh[0], "giá trị", {});
+    in lấy map(biểu_thức, "toán tử", "") == "+";
+    in lấy map(lấy map(biểu_thức, "phải", {}), "toán tử", "") == "*";
+    nhánh = các_lệnh[1];
+    in lấy map(nhánh, "loại", "") == "nếu";
+    in lấy map(lấy map(nhánh, "điều kiện", {}), "toán tử", "") == ">";
+    in lấy map(lấy map(nhánh, "nhánh khác", {}), "loại", "") == "khối";
+    in lấy map(các_lệnh[2], "loại", "") == "trả về";
+    in lấy map(lấy map(các_lệnh[2], "biểu thức", {}), "giá trị", "") == "kết_quả";
+
+    // Không bắt buộc khai báo trước khi gọi; biểu thức được phân tích độc lập.
+    in độ dài(lấy map(lấy map(câu_lệnh[2], "thân", {}), "câu lệnh", [])) == 1;
+    in lấy map(biên dịch phân tích chương trình thuần(""), "loại", "") == "chương trình";
+    in độ dài(lấy map(biên dịch phân tích chương trình thuần(";;"), "câu lệnh", [])) == 2;
+
+    cây_nếu = biên dịch phân tích ngữ nghĩa thuần(
+        "hàm f(x) { nếu (x) { trả về 1; } hoặc nếu (x == 0) { trả về 0; }; };" );
+    in độ dài(lấy map(cây_nếu, "câu lệnh", [])) == 1;
+    chuỗi_nhánh = biên dịch phân tích chương trình thuần(
+        "nếu (sai) { in 1; } hoặc nếu (đúng) { in 2; } hoặc { in 3; };"
+    );
+    nhánh_đầu = lấy map(chuỗi_nhánh, "câu lệnh", [])[0];
+    in lấy map(nhánh_đầu, "loại", "") == "nếu";
+    nhánh_giữa = lấy map(nhánh_đầu, "nhánh khác", {});
+    in lấy map(nhánh_giữa, "loại", "") == "nếu";
+    in lấy map(lấy map(nhánh_giữa, "nhánh khác", {}), "loại", "") == "khối";
+    lỗi_cũ = sai;
+    thử { biên dịch phân tích chương trình thuần("nếu (đúng) {} nếu không {};"); }
+    bắt lỗi (e) { lỗi_cũ = đúng; };
+    in lỗi_cũ;
+    lỗi_cũ = sai;
+    thử { biên dịch phân tích("hàm chính() { nếu (đúng) {} nếu không {}; };"); }
+    bắt lỗi (e) { lỗi_cũ = đúng; };
+    in lỗi_cũ;
+
+    // Parser C++ và parser self-host cùng loại bỏ các chuỗi nhánh sai ngữ pháp.
+    mã_sai = [
+        "hàm chính() { nếu (đúng) {} hoặc {} hoặc {}; };",
+        "hàm chính() { hoặc {}; };",
+        "hàm chính() { nếu (đúng) {} hoặc nếu {}; };",
+        "hàm chính() { nếu (đúng) {} hoặc nếu (sai) in 1; };",
+        "hàm chính() { nếu (đúng) {} hoặc sai {}; };"
+    ];
+    lặp(i = 0; i < độ dài(mã_sai); i++) {
+        lỗi_vpp = sai;
+        thử { biên dịch phân tích chương trình thuần(mã_sai[i]); }
+        bắt lỗi (e) { lỗi_vpp = đúng; };
+        in lỗi_vpp;
+        lỗi_cpp = sai;
+        thử { biên dịch phân tích(mã_sai[i]); }
+        bắt lỗi (e) { lỗi_cpp = đúng; };
+        in lỗi_cpp;
+    };
+
+    vòng = biên dịch phân tích ngữ nghĩa thuần(
+        "hàm f() { lặp(i = 0; i < 3; i++) { " +
+        "nếu (i == 2) { thoát; }; bỏ qua; }; };" );
+    khai_báo_vòng = lấy map(vòng, "câu lệnh", []);
+    hàm_vòng = khai_báo_vòng[0];
+    thân_vòng = lấy map(hàm_vòng, "thân", {});
+    vòng_lặp = lấy map(thân_vòng, "câu lệnh", [])[0];
+    in lấy map(vòng_lặp, "loại", "") == "lặp";
+    in lấy map(lấy map(vòng_lặp, "khởi tạo", {}), "toán tử", "") == "=";
+    in lấy map(lấy map(vòng_lặp, "điều kiện", {}), "toán tử", "") == "<";
+    in lấy map(lấy map(vòng_lặp, "cập nhật", {}), "loại", "") == "cập nhật";
+    in lấy map(lấy map(vòng_lặp, "cập nhật", {}), "toán tử", "") == "++";
+    in độ dài(lấy map(lấy map(vòng_lặp, "thân", {}), "câu lệnh", [])) == 2;
+
+    trống = biên dịch phân tích ngữ nghĩa thuần("lặp(;;) { thoát; };");
+    danh_sách_trống = lấy map(trống, "câu lệnh", []);
+    in lấy map(danh_sách_trống[0], "điều kiện", 1) == rỗng;
+
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("hàm f(a) { trả về a;"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("hàm f(,) {}"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("hàm f() { in 1 }"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích chương trình thuần("lặp(i = 0; i < 3; i++ {}"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("trả về 2;"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("hàm f() {}; hàm f() {};"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("hàm f(a, a) {};"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("hàm f() { 1 = 2; };"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("hàm f() { hàm g() {}; };"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("thoát;"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("bỏ qua;"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("hàm f() { (1)++; };"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+
+    // Bí danh `như` được khai báo theo lexical scope và namespace module C++.
+    // So hai trường hợp top-level với oracle C++.
+    mã_trùng_bí_danh = "nhập gói/bộ sưu tập/từ điển như trợ_lý; " +
+        "nhập gói/biên dịch/chính như trợ_lý;";
+    lỗi_vpp = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(mã_trùng_bí_danh); }
+    bắt lỗi (e) { lỗi_vpp = đúng; };
+    in lỗi_vpp;
+    lỗi_cpp = sai;
+    thử { biên dịch phân tích(mã_trùng_bí_danh); }
+    bắt lỗi (e) { lỗi_cpp = đúng; };
+    in lỗi_cpp;
+
+    mã_bí_danh_riêng = "nhập gói/bộ sưu tập/từ điển như trợ_lý; " +
+        "nhập gói/biên dịch/chính như trình_dịch;";
+    lỗi_vpp = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(mã_bí_danh_riêng); }
+    bắt lỗi (e) { lỗi_vpp = đúng; };
+    in !lỗi_vpp;
+    lỗi_cpp = sai;
+    thử { biên dịch phân tích(mã_bí_danh_riêng); }
+    bắt lỗi (e) { lỗi_cpp = đúng; };
+    in !lỗi_cpp;
+
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(
+        "hàm f() { nhập a như x; nhập b như x; };" ); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(
+        "hàm f() { nếu (đúng) { nhập a như x; } hoặc { nhập b như x; }; };" ); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in !lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(
+        "hàm f() { nhập a như x; }; hàm g() { nhập b như x; };" ); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in !lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần(
+        "hàm x() {}; biến y = 1; nhập a như x; nhập b như y;" ); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in !lỗi;
+    lỗi = sai;
+    thử { biên dịch phân tích ngữ nghĩa thuần("nhập a; nhập a;"); }
+    bắt lỗi (e) { lỗi = đúng; };
+    in !lỗi;
+
+    // C++ Semantic::declareAssignmentTarget cấm ghi vào function ID.
+    // Tham số/biến cục bộ có thể che tên hàm, kể cả khai báo biến ở sau.
+    các_ca_gán_hàm = [
+        {"nguồn": "đích = 2; hàm đích() {}; hàm chính() {};", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích = 3; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích += 1; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích++; };", "hợp lệ": sai},
+        {"nguồn": "hàm đích() {}; hàm chính() { biến đích = 0; đích = 1; };",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() {}; hàm chính() { đích = 1; biến đích = 0; };",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() {}; hàm phụ(đích) { đích++; }; hàm chính() {};",
+         "hợp lệ": đúng},
+        {"nguồn": "hàm đích() { trả về 2; }; hàm chính() { in đích(); };",
+         "hợp lệ": đúng}
+    ];
+    lặp(i = 0; i < độ dài(các_ca_gán_hàm); i++) {
+        ca = các_ca_gán_hàm[i];
+        lỗi_vpp = sai;
+        thử { biên dịch phân tích ngữ nghĩa thuần(ca["nguồn"]); }
+        bắt lỗi (e) { lỗi_vpp = đúng; };
+        lỗi_cpp = sai;
+        thử { biên dịch phân tích(ca["nguồn"]); }
+        bắt lỗi (e) { lỗi_cpp = đúng; };
+        in lỗi_vpp == !ca["hợp lệ"];
+        in lỗi_vpp == lỗi_cpp;
+    };
+};

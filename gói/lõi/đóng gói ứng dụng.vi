@@ -4,7 +4,7 @@ nhập nhập xuất;
 nhập bộ sưu tập;
 nhập công cụ lưu trữ;
 
-hàm đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên) {
+hàm công khai đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên) {
     tạo thư mục(thư mục đích);
 
     tên_chính = đường dẫn tên(tệp chính);
@@ -31,7 +31,7 @@ hàm đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyê
     };
 };
 
-hàm đóng gói ứng dụng zip(đường zip, thư mục đích, tên, tệp chính, tài nguyên) {
+hàm công khai đóng gói ứng dụng zip(đường zip, thư mục đích, tên, tệp chính, tài nguyên) {
     kq = đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên);
     các_tệp = [];
     thêm(các_tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tệp chính)));

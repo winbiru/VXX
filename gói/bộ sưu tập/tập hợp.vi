@@ -1,140 +1,217 @@
-// Module: lõi.tập hợp
-// Set MVP được biểu diễn bởi list không trùng lặp, giữ thứ tự xuất hiện.
 
-hàm tập yêu cầu danh sách(ds) {
-    nếu (loại của(ds) != "danh sách") {
-        ném "COLLECTION_ARGUMENT";
-    };
-    trả về ds;
-};
 
-hàm tập chứa(ds, giá_trị) {
-    tập yêu cầu danh sách(ds);
-    lặp(i = 0; i < do_dai(ds); i++) {
-        nếu (ds[i] == giá_trị) {
-            trả về đúng;
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Tập Hợp {
+    hàm công khai khởi tạo() {};
+
+    // Module: lõi.tập hợp
+    // Set MVP được biểu diễn bởi list không trùng lặp, giữ thứ tự xuất hiện.
+    hàm công khai tập yêu cầu danh sách(ds) {
+        nếu (loại của(ds) != "danh sách") {
+            ném "COLLECTION_ARGUMENT";
         };
+        trả về ds;
     };
-    trả về sai;
-};
 
-hàm tập hợp(ds) {
-    tập yêu cầu danh sách(ds);
-    kết_quả = [];
-    lặp(i = 0; i < do_dai(ds); i++) {
-        nếu (!tập chứa(kết_quả, ds[i])) {
-            them(kết_quả, ds[i]);
+    hàm công khai tập chứa(ds, giá_trị) {
+        mình.tập yêu cầu danh sách(ds);
+        lặp(i = 0; i < do_dai(ds); i++) {
+            nếu (ds[i] == giá_trị) {
+                trả về đúng;
+            };
         };
+        trả về sai;
     };
-    trả về kết_quả;
-};
 
-hàm hợp tập(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    kết_quả = tập hợp(a);
-    lặp(i = 0; i < do_dai(b); i++) {
-        nếu (!tập chứa(kết_quả, b[i])) {
-            them(kết_quả, b[i]);
+    hàm công khai tập hợp(ds) {
+        mình.tập yêu cầu danh sách(ds);
+        kết_quả = [];
+        lặp(i = 0; i < do_dai(ds); i++) {
+            nếu (!mình.tập chứa(kết_quả, ds[i])) {
+                them(kết_quả, ds[i]);
+            };
         };
+        trả về kết_quả;
     };
-    trả về kết_quả;
-};
 
-hàm giao tập(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    kết_quả = [];
-    duyệt = tập hợp(a);
-    lặp(i = 0; i < do_dai(duyệt); i++) {
-        nếu (tập chứa(b, duyệt[i])) {
-            them(kết_quả, duyệt[i]);
+    hàm công khai hợp tập(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        kết_quả = mình.tập hợp(a);
+        lặp(i = 0; i < do_dai(b); i++) {
+            nếu (!mình.tập chứa(kết_quả, b[i])) {
+                them(kết_quả, b[i]);
+            };
         };
+        trả về kết_quả;
     };
-    trả về kết_quả;
-};
 
-hàm rời nhau(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    lặp(i = 0; i < do_dai(a); i++) {
-        nếu (tập chứa(b, a[i])) {
+    hàm công khai giao tập(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        kết_quả = [];
+        duyệt = mình.tập hợp(a);
+        lặp(i = 0; i < do_dai(duyệt); i++) {
+            nếu (mình.tập chứa(b, duyệt[i])) {
+                them(kết_quả, duyệt[i]);
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai rời nhau(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        lặp(i = 0; i < do_dai(a); i++) {
+            nếu (mình.tập chứa(b, a[i])) {
+                trả về sai;
+            };
+        };
+        trả về đúng;
+    };
+
+    hàm công khai hiệu tập(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        kết_quả = [];
+        duyệt = mình.tập hợp(a);
+        lặp(i = 0; i < do_dai(duyệt); i++) {
+            nếu (!mình.tập chứa(b, duyệt[i])) {
+                them(kết_quả, duyệt[i]);
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai hiệu đối xứng tập(a, b) {
+        trái = mình.hiệu tập(a, b);
+        phải = mình.hiệu tập(b, a);
+        trả về mình.hợp tập(trái, phải);
+    };
+
+    hàm công khai tập con(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        duyệt = mình.tập hợp(a);
+        lặp(i = 0; i < do_dai(duyệt); i++) {
+            nếu (!mình.tập chứa(b, duyệt[i])) {
+                trả về sai;
+            };
+        };
+        trả về đúng;
+    };
+
+    hàm công khai tập con thực sự(a, b) {
+        nếu (!mình.tập con(a, b)) {
             trả về sai;
         };
+        trả về do_dai(mình.tập hợp(a)) < do_dai(mình.tập hợp(b));
     };
-    trả về đúng;
-};
 
-hàm hiệu tập(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    kết_quả = [];
-    duyệt = tập hợp(a);
-    lặp(i = 0; i < do_dai(duyệt); i++) {
-        nếu (!tập chứa(b, duyệt[i])) {
-            them(kết_quả, duyệt[i]);
-        };
+    hàm công khai tập cha(a, b) {
+        trả về mình.tập con(b, a);
     };
-    trả về kết_quả;
-};
 
-hàm hiệu đối xứng tập(a, b) {
-    trái = hiệu tập(a, b);
-    phải = hiệu tập(b, a);
-    trả về hợp tập(trái, phải);
-};
-
-hàm tập con(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    duyệt = tập hợp(a);
-    lặp(i = 0; i < do_dai(duyệt); i++) {
-        nếu (!tập chứa(b, duyệt[i])) {
+    hàm công khai tập bằng(a, b) {
+        mình.tập yêu cầu danh sách(a);
+        mình.tập yêu cầu danh sách(b);
+        aa = mình.tập hợp(a);
+        bb = mình.tập hợp(b);
+        nếu (do_dai(aa) != do_dai(bb)) {
             trả về sai;
         };
+        trả về mình.tập con(aa, bb);
     };
-    trả về đúng;
-};
 
-hàm tập con thực sự(a, b) {
-    nếu (!tập con(a, b)) {
-        trả về sai;
-    };
-    trả về do_dai(tập hợp(a)) < do_dai(tập hợp(b));
-};
-
-hàm tập cha(a, b) {
-    trả về tập con(b, a);
-};
-
-hàm tập bằng(a, b) {
-    tập yêu cầu danh sách(a);
-    tập yêu cầu danh sách(b);
-    aa = tập hợp(a);
-    bb = tập hợp(b);
-    nếu (do_dai(aa) != do_dai(bb)) {
-        trả về sai;
-    };
-    trả về tập con(aa, bb);
-};
-
-hàm tập thêm(ds, giá_trị) {
-    tập yêu cầu danh sách(ds);
-    nếu (tập chứa(ds, giá_trị)) {
-        trả về sai;
-    };
-    them(ds, giá_trị);
-    trả về đúng;
-};
-
-hàm tập xóa(ds, giá_trị) {
-    tập yêu cầu danh sách(ds);
-    lặp(i = 0; i < do_dai(ds); i++) {
-        nếu (ds[i] == giá_trị) {
-            xoa_tai(ds, i);
-            trả về đúng;
+    hàm công khai tập thêm(ds, giá_trị) {
+        mình.tập yêu cầu danh sách(ds);
+        nếu (mình.tập chứa(ds, giá_trị)) {
+            trả về sai;
         };
+        them(ds, giá_trị);
+        trả về đúng;
     };
-    trả về sai;
+
+    hàm công khai tập xóa(ds, giá_trị) {
+        mình.tập yêu cầu danh sách(ds);
+        lặp(i = 0; i < do_dai(ds); i++) {
+            nếu (ds[i] == giá_trị) {
+                xoa_tai(ds, i);
+                trả về đúng;
+            };
+        };
+        trả về sai;
+    };
+};
+
+
+hàm công khai tập yêu cầu danh sách(ds) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập yêu cầu danh sách(ds);
+};
+
+hàm công khai tập chứa(ds, giá_trị) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập chứa(ds, giá_trị);
+};
+
+hàm công khai tập hợp(ds) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập hợp(ds);
+};
+
+hàm công khai hợp tập(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.hợp tập(a, b);
+};
+
+hàm công khai giao tập(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.giao tập(a, b);
+};
+
+hàm công khai rời nhau(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.rời nhau(a, b);
+};
+
+hàm công khai hiệu tập(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.hiệu tập(a, b);
+};
+
+hàm công khai hiệu đối xứng tập(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.hiệu đối xứng tập(a, b);
+};
+
+hàm công khai tập con(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập con(a, b);
+};
+
+hàm công khai tập con thực sự(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập con thực sự(a, b);
+};
+
+hàm công khai tập cha(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập cha(a, b);
+};
+
+hàm công khai tập bằng(a, b) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập bằng(a, b);
+};
+
+hàm công khai tập thêm(ds, giá_trị) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập thêm(ds, giá_trị);
+};
+
+hàm công khai tập xóa(ds, giá_trị) {
+    __vpp_adapter = Tiện Ích Tập Hợp();
+    trả về __vpp_adapter.tập xóa(ds, giá_trị);
 };
 nhập gói/lõi/chuyển kiểu;

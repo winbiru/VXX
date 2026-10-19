@@ -1,5 +1,5 @@
 // vi.preferences — thiết lập bền vững theo người dùng/ứng dụng.
-// Logic namespace/serialization/CRUD nằm ở V++. Native chỉ cung cấp các primitive
+// Logic namespace/serialization/CRUD nằm ở V++. VM chỉ cung cấp các primitive
 // môi trường, đường dẫn, file I/O và codec UTF-8.
 
 nhập gói/hệ thống/môi trường;
@@ -13,18 +13,19 @@ nhập gói/văn bản/chuỗi;
 nhập gói/văn bản/mã hóa tiện ích;
 nhập gói/lõi/bảng mã;
 
-hàm tùy chọn yêu cầu chuỗi(giá trị, nhãn) {
+// Hàm bền vững quản lý tệp; lớp Kho Tùy Chọn giữ namespace theo instance.
+hàm riêng tư tùy chọn yêu cầu chuỗi(giá trị, nhãn) {
     nếu (loại của(giá trị) != "chuỗi") {
         ném "tùy chọn: " + nhãn + " phải là chuỗi";
     };
     trả về giá trị;
 };
 
-hàm tùy chọn mã hex(văn bản) {
+hàm riêng tư tùy chọn mã hex(văn bản) {
     trả về hex mã(mã hóa bảng mã(văn bản, "UTF-8"));
 };
 
-hàm tùy chọn giải hex(văn bản) {
+hàm riêng tư tùy chọn giải hex(văn bản) {
     thử {
         trả về giải mã bảng mã(hex giải(văn bản), "UTF-8");
     } bắt lỗi (e) {
@@ -32,7 +33,7 @@ hàm tùy chọn giải hex(văn bản) {
     };
 };
 
-hàm tùy chọn thư mục gốc() {
+hàm riêng tư tùy chọn thư mục gốc() {
     chỉ_định = đọc biến môi trường("VPP_PREFERENCES_HOME", "");
     nếu (chỉ_định != "") {
         trả về chỉ_định;
@@ -48,7 +49,7 @@ hàm tùy chọn thư mục gốc() {
         nếu (home != "") {
             trả về đường dẫn nối(đường dẫn nối(home, ".vpp"), "preferences");
         };
-    } nếu không {
+    } hoặc {
         xdg = đọc biến môi trường("XDG_CONFIG_HOME", "");
         nếu (xdg != "") {
             trả về đường dẫn nối(đường dẫn nối(xdg, "vpp"), "preferences");
@@ -64,17 +65,17 @@ hàm tùy chọn thư mục gốc() {
     ném "tùy chọn: không xác định được thư mục cấu hình người dùng";
 };
 
-hàm tùy chọn đường dẫn(không gian) {
+hàm riêng tư tùy chọn đường dẫn(không gian) {
     tùy chọn yêu cầu chuỗi(không gian, "không gian");
     nếu (không gian == "") {
         ném "tùy chọn: không gian không được rỗng";
     };
-    gốc = tùy chọn thư mục gốc();
-    tạo thư mục(gốc);
-    trả về đường dẫn nối(gốc, tùy chọn mã hex(không gian) + ".prefs");
+    gốc_dữ_liệu = tùy chọn thư mục gốc();
+    tạo thư mục(gốc_dữ_liệu);
+    trả về đường dẫn nối(gốc_dữ_liệu, tùy chọn mã hex(không gian) + ".prefs");
 };
 
-hàm tùy chọn đọc dòng(dòng, kết_quả) {
+hàm riêng tư tùy chọn đọc dòng(dòng, kết_quả) {
     nếu (dòng == "") {
         trả về rỗng;
     };
@@ -96,7 +97,7 @@ hàm tùy chọn đọc dòng(dòng, kết_quả) {
     trả về rỗng;
 };
 
-hàm tùy chọn đọc tất cả(đường dẫn) {
+hàm riêng tư tùy chọn đọc tất cả(đường dẫn) {
     kết_quả = {};
     nếu (!đường dẫn tồn tại(đường dẫn)) {
         trả về kết_quả;
@@ -114,14 +115,14 @@ hàm tùy chọn đọc tất cả(đường dẫn) {
         nếu (c == "\n") {
             tùy chọn đọc dòng(dòng, kết_quả);
             dòng = "";
-        } nếu không {
+        } hoặc {
             dòng = dòng + c;
         };
     };
     trả về kết_quả;
 };
 
-hàm tùy chọn ghi tất cả(đường dẫn, giá_trị) {
+hàm riêng tư tùy chọn ghi tất cả(đường dẫn, giá_trị) {
     khóa = khóa map(giá_trị);
     nội_dung = "";
     lặp(i = 0; i < độ dài(khóa); i++) {
@@ -133,7 +134,7 @@ hàm tùy chọn ghi tất cả(đường dẫn, giá_trị) {
     trả về đúng;
 };
 
-hàm tùy chọn đọc(không gian, khóa, giá trị mặc định) {
+hàm công khai tùy chọn đọc(không gian, khóa, giá trị mặc định) {
     tùy chọn yêu cầu chuỗi(khóa, "khóa");
     nếu (khóa == "") {
         ném "tùy chọn đọc: khóa không được rỗng";
@@ -142,7 +143,7 @@ hàm tùy chọn đọc(không gian, khóa, giá trị mặc định) {
     trả về lấy map(dữ_liệu, khóa, giá trị mặc định);
 };
 
-hàm tùy chọn lưu(không gian, khóa, giá trị) {
+hàm công khai tùy chọn lưu(không gian, khóa, giá trị) {
     tùy chọn yêu cầu chuỗi(khóa, "khóa");
     tùy chọn yêu cầu chuỗi(giá trị, "giá trị");
     nếu (khóa == "") {
@@ -155,7 +156,7 @@ hàm tùy chọn lưu(không gian, khóa, giá trị) {
     trả về đúng;
 };
 
-hàm tùy chọn xóa(không gian, khóa) {
+hàm công khai tùy chọn xóa(không gian, khóa) {
     tùy chọn yêu cầu chuỗi(khóa, "khóa");
     nếu (khóa == "") {
         ném "tùy chọn xóa: khóa không được rỗng";
@@ -170,16 +171,31 @@ hàm tùy chọn xóa(không gian, khóa) {
     trả về đúng;
 };
 
-hàm tùy chọn khóa(không gian) {
+hàm công khai tùy chọn khóa(không gian) {
     dữ_liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
     trả về khóa map(dữ_liệu);
 };
 
-hàm tùy chọn xóa không gian(không gian) {
+hàm công khai tùy chọn xóa không gian(không gian) {
     đường = tùy chọn đường dẫn(không gian);
     nếu (!đường dẫn tồn tại(đường)) {
         trả về sai;
     };
     xóa đường dẫn(đường);
     trả về đúng;
+};
+
+// Giữ namespace theo instance, đọc lại tệp ở mỗi thao tác để không ghi đè
+// thay đổi từ một instance khác cùng namespace bằng cache cũ.
+lớp công khai Kho Tùy Chọn {
+    hàm công khai khởi tạo(không_gian) {
+        tùy chọn yêu cầu chuỗi(không_gian, "không gian");
+        nếu (không_gian == "") { ném "tùy chọn: không gian không được rỗng"; };
+        mình.không_gian = không_gian;
+    };
+    hàm công khai đọc(khóa, mặc_định = rỗng) { trả về tùy chọn đọc(mình.không_gian, khóa, mặc_định); };
+    hàm công khai lưu(khóa, giá_trị) { trả về tùy chọn lưu(mình.không_gian, khóa, giá_trị); };
+    hàm công khai xóa(khóa) { trả về tùy chọn xóa(mình.không_gian, khóa); };
+    hàm công khai các khóa() { trả về tùy chọn khóa(mình.không_gian); };
+    hàm công khai xóa tất cả() { trả về tùy chọn xóa không gian(mình.không_gian); };
 };

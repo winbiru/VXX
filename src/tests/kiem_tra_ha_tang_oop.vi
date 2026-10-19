@@ -1,0 +1,66 @@
+nhập gói/lõi/chính;
+nhập gói/kiểm thử/chính;
+nhập gói/nhập xuất/tệp;
+
+hàm chính() {
+    đếm = 0;
+    phát = Bộ Phát Sự Kiện();
+    listener = hàm(e) { đếm += 1; };
+    reg = phát.đăng ký(listener);
+    in phát.đang mở() && phát.số người nghe() == 1;
+    đã_phát = phát.phát(tạo sự kiện("thử", 1));
+    in đã_phát["đã gọi"] == 1;
+    in đếm == 1 && phát.hủy(reg);
+    in phát.số người nghe() == 0;
+    in phát.đóng() && !phát.đóng();
+    chặn = sai;
+    thử { phát.đăng ký(listener); } bắt lỗi(e) { chặn = đúng; };
+    in chặn;
+
+    nạp = Bộ Nạp Dịch Vụ();
+    số_lần = 0;
+    factory = hàm() {
+        số_lần += 1;
+        trả về {"ok": số_lần};
+    };
+    provider = nhà cung cấp dịch vụ("I", "Implementation", factory, "1", "", rỗng, "đơn thể");
+    in nạp.đăng ký(provider) == nạp;
+    in độ dài(nạp.tìm("I")) == 1;
+    đối_tượng = nạp.tải(provider);
+    in đối_tượng["ok"] == 1;
+    đối_tượng = nạp.tải(provider);
+    in đối_tượng["ok"] == 1 && số_lần == 1;
+
+    được = Luồng Truy Vấn([1, 2, 2, 3]);
+    gấp_đôi = hàm(x) { trả về x * 2; };
+    lớn_hơn_hai = hàm(x) { trả về x > 2; };
+    in được.ánh xạ(gấp_đôi) == được;
+    được.lọc(lớn_hơn_hai);
+    được.phân biệt();
+    ds = được.gom danh sách();
+    in độ dài(ds) == 2 && ds[0] == 4 && ds[1] == 6;
+    đếm_luồng = Luồng Truy Vấn([7, 8, 9]);
+    đếm_luồng.bỏ(1);
+    đếm_luồng.giới hạn(1);
+    in đếm_luồng.đếm() == 1;
+    đã_dùng = sai;
+    thử { đếm_luồng.đếm(); } bắt lỗi(e) { đã_dùng = đúng; };
+    in đã_dùng;
+
+    lần = 0;
+    thân = hàm() { lần += 1; trả về lần; };
+    ca = Ca Kiểm Thử(thân);
+    in ca.chạy() == 1;
+    in ca.chạy() == 2 && ca.số lần chạy() == 2;
+
+    đường = ".tmp_oop_cau_hinh.ini";
+    ghi tệp(đường, "tên=V++\nsố=42\n");
+    cấu_hình = Cấu Hình Tệp(đường);
+    in cấu_hình.đường dẫn() == đường;
+    in cấu_hình.có("tên") && cấu_hình.lấy("tên") == "V++";
+    in cấu_hình.lấy("số") == 42 && cấu_hình.lấy("không có", 7) == 7;
+    ghi tệp(đường, "số=13\n");
+    in cấu_hình.lấy("số") == 42;
+    cấu_hình.tải lại();
+    in cấu_hình.lấy("số") == 13 && !cấu_hình.có("tên");
+};

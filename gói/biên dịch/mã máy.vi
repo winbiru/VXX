@@ -1,0 +1,76 @@
+// Bộ chọn ISA: 10 backend V++ ở cùng cấp với mã máy.vi.
+// 16 biến thể target chia sẻ các mã lệnh theo họ CPU.
+nhập gói/biên dịch/đích;
+nhập gói/biên dịch/mã máy nền;
+nhập gói/biên dịch/mã máy x86 64;
+nhập gói/biên dịch/mã máy aarch64;
+nhập gói/biên dịch/mã máy riscv64;
+nhập gói/biên dịch/mã máy armv7;
+nhập gói/biên dịch/mã máy i386;
+nhập gói/biên dịch/mã máy powerpc;
+nhập gói/biên dịch/mã máy mips;
+nhập gói/biên dịch/mã máy loongarch64;
+nhập gói/biên dịch/mã máy s390x;
+nhập gói/biên dịch/mã máy sparc;
+
+// Hợp đồng ABI leaf i32: hằng số, cộng hoặc trừ hai tham số (chưa xử lý tràn VM).
+hàm công khai biên dịch mã máy lá(kiến_trúc, loại, hằng = 0, hệ_điều_hành = "linux") {
+    đích = biên dịch thông tin kiến trúc(kiến_trúc);
+    tên = đích["tên"];
+    ít = đích["little endian"];
+    nếu (tên == "aarch64" && hệ_điều_hành == "windows") {
+        ném "Windows ARM64 native ABI chưa được triển khai";
+    };
+    nếu (loại != "hằng" && loại != "cộng" && loại != "trừ") {
+        ném "mã máy: chỉ hỗ trợ hằng i32, cộng và trừ hai tham số i32";
+    };
+    thấp = 0;
+    cao = 0;
+    nếu (loại == "hằng") {
+        phần = biên dịch mã máy trả về(hằng);
+        thấp = phần["lo"];
+        cao = phần["hi"];
+    };
+    chọn (tên) {
+        ca "x86_64": { trả về biên dịch mã máy phát x86_64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "aarch64": { trả về biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "riscv64": { trả về biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "armv7": { trả về biên dịch mã máy phát armv7(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "i386": { trả về biên dịch mã máy phát i386(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "powerpc": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "powerpc64": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "powerpc64le": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "mips": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "mipsel": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "mips64": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "mips64el": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "loongarch64": { trả về biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "s390x": { trả về biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "sparc": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "sparc64": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        mặc định: { ném "mã máy: kiến trúc chưa hỗ trợ"; }
+    };
+};
+
+// Phát hàm MachineOpcode i32 qua thư viện V++; kết quả gồm bytes và relocations.
+// Chỉ công bố target đã có encoder tổng quát thuần V++ và kiểm tra parity.
+hàm công khai biên dịch mã máy hàm(kiến_trúc, hàm_ir, hệ_điều_hành = "linux") {
+    tên = biên dịch thông tin kiến trúc(kiến_trúc)["tên"];
+    biên dịch mã máy kiểm tra CFG(hàm_ir);
+    chọn (tên) {
+        ca "x86_64": {
+            nếu (hệ_điều_hành != "linux" && hệ_điều_hành != "macos" &&
+                hệ_điều_hành != "windows") {
+                ném "x86_64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ_điều_hành;
+            };
+            trả về biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành);
+        }
+        ca "aarch64": {
+            nếu (hệ_điều_hành != "linux" && hệ_điều_hành != "macos") {
+                ném "AArch64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ_điều_hành;
+            };
+            trả về biên dịch mã máy phát aarch64 hàm(hàm_ir, hệ_điều_hành);
+        }
+        mặc định: { ném "Machine IR V++ chưa có backend tổng quát: " + tên; }
+    };
+};

@@ -1,0 +1,14 @@
+nhập phân giải dns;
+nhập gói/mạng/ổ cắm;
+
+hàm chính() {
+    kết_quả = dns phân giải("localhost");
+    in do_dai(kết_quả) > 0;
+    in do_dai(kết_quả) == do_dai(dns phân giải("localhost"));
+    địa_chỉ = socket resolver danh sách("127.0.0.1", 8080, sai);
+    in do_dai(địa_chỉ) > 0;
+    in địa_chỉ[0][0] == "127.0.0.1";
+    in địa_chỉ[0][1] == 8080;
+    in do_dai(socket resolver danh sách("::1", 8080, đúng)) > 0;
+    in do_dai(socket resolver danh sách("127.0.0.1", 0, sai)) > 0;
+};

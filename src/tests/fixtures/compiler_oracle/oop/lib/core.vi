@@ -1,0 +1,8 @@
+lớp Lõi {
+    hàm công khai giá_trị() { trả về 7; };
+};
+
+hàm tính() {
+    c = Lõi();
+    trả về c.giá_trị();
+};

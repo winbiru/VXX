@@ -1,0 +1,136 @@
+// Adapter hướng đối tượng cho AST dạng map của compiler hiện hành.
+// Giữ cấu trúc map tại parser/IR để không phá vỡ đường bootstrap.
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/biên dịch/giao diện cú pháp;
+
+// Chỉ các map AST mới là nút. Metadata như tên tham số, operator và
+// phần tử rỗng không được bọc thành những nút giả.
+hàm riêng tư nút cú pháp thêm(đích, nút) {
+    nếu (nút == rỗng) { trả về; };
+    nếu (loai_cua(nút) != "từ điển") {
+        ném "nút cú pháp: con phải là dữ liệu map";
+    };
+    thêm(đích, tạo nút cú pháp(nút));
+};
+
+hàm riêng tư nút cú pháp thêm danh sách(đích, nút, khóa) {
+    danh_sách = lấy map(nút, khóa, []);
+    nếu (danh_sách == rỗng) { trả về; };
+    nếu (loai_cua(danh_sách) != "danh sách") {
+        ném "nút cú pháp: các con phải là danh sách";
+    };
+    lặp(i = 0; i < độ dài(danh_sách); i++) {
+        nút cú pháp thêm(đích, danh_sách[i]);
+    };
+};
+
+lớp công khai Nút Cú Pháp triển khai Truy Cập Cú Pháp {
+    hàm công khai khởi tạo(nút) {
+        nếu (loai_cua(nút) != "từ điển") { ném "nút cú pháp: cần dữ liệu map"; };
+        mình.nút = nút;
+    };
+
+    hàm công khai loại() {
+        trả về lấy map(mình.nút, "loại", "khác");
+    };
+
+    hàm công khai tên() {
+        trả về lấy map(mình.nút, "tên", "");
+    };
+
+    hàm công khai các con() {
+        kết_quả = [];
+        nút = mình.nút;
+        loại_nút = mình.loại();
+        nếu (loại_nút == "lớp" || loại_nút == "giao diện") {
+            nút cú pháp thêm danh sách(kết_quả, nút, "thành viên");
+            nút cú pháp thêm danh sách(kết_quả, nút, "phương thức");
+        } hoặc nếu (loại_nút == "chương trình" || loại_nút == "khối") {
+            nút cú pháp thêm danh sách(kết_quả, nút, "câu lệnh");
+        } hoặc nếu (loại_nút == "hàm") {
+            nút cú pháp thêm danh sách(kết_quả, nút, "mặc định tham số");
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+        } hoặc nếu (loại_nút == "nếu") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "điều kiện", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "nhánh khác", rỗng));
+        } hoặc nếu (loại_nút == "lặp") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "khởi tạo", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "điều kiện", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "cập nhật", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+        } hoặc nếu (loại_nút == "chọn") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "biểu thức", rỗng));
+            nút cú pháp thêm danh sách(kết_quả, nút, "nhánh");
+        } hoặc nếu (loại_nút == "ca" || loại_nút == "mặc định") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "nhãn", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+        } hoặc nếu (loại_nút == "thử") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "bắt", rỗng));
+        } hoặc nếu (loại_nút == "trả về" || loại_nút == "in" || loại_nút == "ném" ||
+                   loại_nút == "biểu thức") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "biểu thức", rỗng));
+        } hoặc nếu (loại_nút == "biến") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "giá trị", rỗng));
+        } hoặc nếu (loại_nút == "gọi") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "hàm", rỗng));
+            nút cú pháp thêm danh sách(kết_quả, nút, "đối số");
+        } hoặc nếu (loại_nút == "chỉ số") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "đối tượng", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "chỉ số", rỗng));
+        } hoặc nếu (loại_nút == "thành viên" || loại_nút == "cập nhật") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "đối tượng", rỗng));
+        } hoặc nếu (loại_nút == "hai ngôi") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "trái", rỗng));
+            nút cú pháp thêm(kết_quả, lấy map(nút, "phải", rỗng));
+        } hoặc nếu (loại_nút == "một ngôi") {
+            nút cú pháp thêm(kết_quả, lấy map(nút, "toán hạng", rỗng));
+        } hoặc nếu (loại_nút == "danh sách") {
+            nút cú pháp thêm danh sách(kết_quả, nút, "phần tử");
+        } hoặc nếu (loại_nút == "từ điển") {
+            mục = lấy map(nút, "mục", []);
+            nếu (loai_cua(mục) != "danh sách") {
+                ném "nút cú pháp: mục từ điển phải là danh sách";
+            };
+            lặp(i = 0; i < độ dài(mục); i++) {
+                nếu (loai_cua(mục[i]) != "từ điển") {
+                    ném "nút cú pháp: mục từ điển không hợp lệ";
+                };
+                nút cú pháp thêm(kết_quả, lấy map(mục[i], "khóa", rỗng));
+                nút cú pháp thêm(kết_quả, lấy map(mục[i], "giá trị", rỗng));
+            };
+        } hoặc {
+            // Snapshot AST ngoài parser có thể dùng tên loại riêng.
+            nút cú pháp thêm danh sách(kết_quả, nút, "thành viên");
+            nút cú pháp thêm danh sách(kết_quả, nút, "phương thức");
+            nút cú pháp thêm danh sách(kết_quả, nút, "câu lệnh");
+            nút cú pháp thêm(kết_quả, lấy map(nút, "thân", rỗng));
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai dữ liệu() { trả về mình.nút; };
+
+    // Visitor duyệt trước cha, rồi lần lượt các con theo thứ tự nguồn.
+    hàm công khai duyệt(khách) {
+        khách.thăm(mình);
+        con = mình.các con();
+        lặp(i = 0; i < do_dai(con); i++) { con[i].duyệt(khách); };
+    };
+};
+
+lớp công khai Nút Lớp kế thừa Nút Cú Pháp {
+    hàm công khai khởi tạo(nút) { gốc.khởi tạo(nút); };
+};
+lớp công khai Nút Hàm kế thừa Nút Cú Pháp {
+    hàm công khai khởi tạo(nút) { gốc.khởi tạo(nút); };
+};
+
+hàm công khai tạo nút cú pháp(nút) {
+    nếu (loai_cua(nút) != "từ điển") { ném "nút cú pháp: cần dữ liệu map"; };
+    loại = lấy map(nút, "loại", "khác");
+    nếu (loại == "lớp") { trả về Nút Lớp(nút); };
+    nếu (loại == "hàm") { trả về Nút Hàm(nút); };
+    trả về Nút Cú Pháp(nút);
+};

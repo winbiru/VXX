@@ -1,0 +1,22 @@
+đơn:0
+đơn:1
+sau đơn
+lồng:1:1
+lồng:1:2
+ngoài:1
+lồng:2:1
+lồng:2:2
+ngoài:2
+trong chọn:0
+trong chọn:1
+sau lặp trong chọn
+chọn trong lặp:0
+sau chọn:0
+mặc định trong lặp:1
+sau chọn:1
+bỏ qua nhánh lồng
+thoát từ thử trong chọn
+sau thoát chọn từ thử
+thử:1
+lỗi cuối
+kết thúc

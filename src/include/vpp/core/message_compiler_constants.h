@@ -24,6 +24,7 @@ inline constexpr std::string_view kLexerMissingVietnameseAccent = "Từ khóa ph
 inline constexpr std::string_view kCompilerVariableIdOutOfRange = "getVarValueInt: mã biến ngoài phạm vi (id={0}, kích thước={1})";
 inline constexpr std::string_view kCompilerVariableNotInteger = "getVarValueInt: giá trị biến không phải số hợp lệ: '{0}'";
 inline constexpr std::string_view kCompilerVariableIntegerOverflow = "getVarValueInt: giá trị số quá lớn: '{0}'";
+inline constexpr std::string_view kCompilerIntegerLiteralOutOfRange = "Số nguyên vượt phạm vi i32: '{0}'";
 inline constexpr std::string_view kCompilerUnsupportedVariableValue = "getVarValueInt: kiểu giá trị không hỗ trợ";
 
 // Source syntax diagnostics.
@@ -72,6 +73,7 @@ inline constexpr std::string_view kSemanticPrivateMethodAccess = "Không thể g
 inline constexpr std::string_view kSemanticProtectedMethodAccess = "Không thể gọi phương thức bảo vệ '{0}' từ phạm vi hiện tại";
 inline constexpr std::string_view kSemanticUnsupportedDefaultParameter = "{0}: tham số mặc định chỉ hỗ trợ giá trị trực tiếp (số nguyên, số thực, chuỗi, đúng, sai hoặc rỗng)";
 inline constexpr std::string_view kSemanticDuplicateDeclaration = "Khai báo '{0}' bị trùng trong cùng một đơn vị biên dịch";
+inline constexpr std::string_view kSemanticAssignmentToCallable = "Không thể gán vào tên hàm '{0}'; hãy dùng tên biến khác";
 inline constexpr std::string_view kSemanticMissingDeclarationName = "Không thể xác định tên của khai báo {0}";
 inline constexpr std::string_view kSemanticUnresolvedName = "Không thể phân giải tên '{0}' trong phạm vi hiện tại";
 inline constexpr std::string_view kSemanticUnresolvedCall = "Không thể phân giải hàm được gọi '{0}'";

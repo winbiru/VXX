@@ -35,8 +35,11 @@ Capture-free lambdas now have AST/scope/IR and direct codegen. Closure capture,
 the module/import export graph, type policy, typed IR, and a static type checker remain incomplete.
 
 GC and JIT are MVPs: GC only compacts runtime containers when enabled by environment
-variables, while JIT builds lambdas for supported linear bytecode and otherwise falls back to
-the interpreter. `lớp` groups methods and visibility metadata only; there are no instances or
+variables. JIT precompiles simple bytecode operations into closures for both root code
+and V++ function bodies, including operations inside branches and loops. Function calls,
+control flow, intrinsics and exception handling use the same interpreter dispatcher.
+This is not machine-code generation, and no speedup has been established by benchmarks.
+`lớp` groups methods and visibility metadata only; there are no instances or
 inheritance. The CLI has MVP package commands, formatter/linter, and LSP support, but no
 dependency/version resolver or complete debugger/IDE integration.
 
@@ -402,7 +405,7 @@ func fibonacci(n int) int {
 
 2. **Performance-critical Applications**
    * VM overhead, not native
-   * JIT is a linear MVP path and does not generate native machine code
+   * JIT uses hybrid closure/dispatcher execution and does not generate native machine code
    * Not suitable for systems programming
 
 3. **Team Collaboration (International)**

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../vm/instruction.h"
+#include "vpp/bytecode/foreign.h"
 #include "vpp/runtime/debug.h"
 
 namespace vietvm::compiler {
@@ -39,11 +40,15 @@ namespace vietvm::compiler {
         std::unordered_map<int, int> functionNameIndices;
         std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
             functionDebugInfo;
+        std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions;
         std::vector<vietvm::runtime::RuntimeSourceLocation> rootBytecodeDebugInfo;
         std::unordered_set<std::string> importedFiles;
         std::vector<CompiledModuleInitializer> moduleInitializers;
         std::unordered_map<std::string, std::vector<CompiledModuleFunctionExport>>
             moduleFunctionExports;
+        // Một function ID có thể được nhập dưới nhiều bí danh; metadata tên
+        // runtime giữ một tên duy nhất, còn lookup biên dịch giữ đủ alias.
+        std::unordered_map<std::string, int> importedFunctionAliases;
         std::unordered_map<std::string, MethodAccessInfo> methodAccess;
         std::vector<std::string> classContextStack;
         // Base directory used to resolve relative imports for this compilation.
@@ -84,10 +89,12 @@ namespace vietvm::compiler {
             functionBytecode.clear();
             functionNameIndices.clear();
             functionDebugInfo.clear();
+            foreignFunctions.clear();
             rootBytecodeDebugInfo.clear();
             importedFiles.clear();
             moduleInitializers.clear();
             moduleFunctionExports.clear();
+            importedFunctionAliases.clear();
             methodAccess.clear();
             classContextStack.clear();
             activeModuleSemanticIndex = nullptr;

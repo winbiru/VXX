@@ -1,0 +1,2 @@
+công khai nhập math như số;
+hàm tính() { trả về số.cộng(); };

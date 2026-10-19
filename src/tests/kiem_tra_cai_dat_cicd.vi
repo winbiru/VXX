@@ -1,0 +1,12 @@
+// Chạy bằng compiler đã cài đặt để kiểm tra tìm kiếm thư viện chuẩn qua VPP_HOME.
+nhập gói/chuẩn/chính;
+
+hàm chính() {
+    nếu (độ dài("V++") != 3) {
+        ném "Lỗi thư viện chuẩn: độ dài chuỗi";
+    };
+    nếu (thành số nguyên("42") != 42) {
+        ném "Lỗi thư viện chuẩn: chuyển số nguyên";
+    };
+    in "vpp_installed_stdlib_ok";
+};

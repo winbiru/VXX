@@ -1,0 +1,24 @@
+nhập gói/mạng/ổ cắm;
+
+// Không cần mạng: các lỗi đầu vào phải bị V++ từ chối trước connect/handshake.
+hàm chính() {
+    lỗi_tên = sai;
+    thử { socket tls mở("", 443, 1000); } bắt lỗi(e) { lỗi_tên = đúng; };
+    in lỗi_tên;
+
+    lỗi_kiểu = sai;
+    thử { socket tls mở(42, 443, 1000); } bắt lỗi(e) { lỗi_kiểu = đúng; };
+    in lỗi_kiểu;
+
+    lỗi_cổng = sai;
+    thử { socket tls mở("localhost", 0, 1000); } bắt lỗi(e) { lỗi_cổng = đúng; };
+    in lỗi_cổng;
+
+    lỗi_timeout = sai;
+    thử { socket tls mở("localhost", 443, 0); } bắt lỗi(e) { lỗi_timeout = đúng; };
+    in lỗi_timeout;
+
+    lỗi_timeout_lớn = sai;
+    thử { socket tls mở("localhost", 443, 300001); } bắt lỗi(e) { lỗi_timeout_lớn = đúng; };
+    in lỗi_timeout_lớn;
+};

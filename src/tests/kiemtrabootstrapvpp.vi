@@ -1,0 +1,10 @@
+// Khi tệp này được biên dịch bằng --compiler=vpp, lexer/parser/semantic/
+// IR/emitter/linker/bộ nạp đều nằm trong artifact do V++ tự phát bytecode.
+// Compiler đã sinh ra tiếp tục biên dịch một chương trình mới tại runtime.
+nhập gói/biên dịch/bộ nạp;
+
+hàm chính() {
+    nguồn = "hàm tổng(n, b = 7) { s = b; lặp(i = 0; i < n; i++) { s += i; }; trả về s; }; " +
+            "hàm chính() { in tổng(10); };";
+    in biên dịch chạy chương trình tự chủ(nguồn);
+};

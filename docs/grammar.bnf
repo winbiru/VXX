@@ -3,8 +3,8 @@
 //# Terminals shown in quotes; some Vietnamese keywords provided as both accented and ASCII alternatives.
 //# Map common opcodes from src/include/frontend/keywords.h:
 //#  - OP_NEU -> "nếu" / "neu"        (if)
-//#  - OP_NEU_KHONG -> "nếu không"/"neu khong" (else if / elif)  *adjust as needed
-//#  - OP_HOAC -> logical OR ("hoặc"/"hoac")
+//#  - OP_NEU_KHONG -> "hoặc nếu" (else if / elif; hai token cú pháp)
+//#  - OP_HOAC -> "hoặc" (else); logical OR dùng "||"
 //#  - OP_KHONG -> logical NOT ("không"/"khong")
 //#  - OP_LAP -> loop ("lặp"/"lap") (for/while style)
 //#  - OP_HAM -> "hàm"/"ham" (function)
@@ -66,8 +66,8 @@
 <elif>                  ::= <ELIF_KW> "(" <expression> ")" <block>
 <else_opt>              ::= <ELSE_KW> <block> | ""
 <IF_KW>                 ::= "nếu" | "neu"
-<ELIF_KW>               ::= "nếu không" | "neu khong"  //# OP_NEU_KHONG, adapt if different
-<ELSE_KW>               ::= "hoặc" | "hoac" | "không thì" | "khong thi" // # OP_HOAC or alternative, adjust as needed
+<ELIF_KW>               ::= "hoặc" "nếu"  //# OP_NEU_KHONG (giữ mã opcode)
+<ELSE_KW>               ::= "hoặc"           //# OP_HOAC
 
 //# While
 <while_stmt>            ::= <WHILE_KW> "(" <expression> ")" <block>
@@ -130,7 +130,7 @@
 <NEQ_OP>                ::= "!=" | "khác" | "khac"        // OP_KHAC_BANG
 <REL_OP>                ::= "<" | ">" | "<=" | ">=" | ">" | "nhỏ hơn" | "lon hon" | "nho hon"
 <AND_OP>                ::= "&&" | "và" | "va" | "va"     //# OP_Logic_VA
-<OR_OP>                 ::= "||" | "hoặc" | "hoac"        ///# OP_Logic_HOAC
+<OR_OP>                 ::= "||"                       ///# OP_Logic_HOAC
 <UNARY_OP>              ::= "!" | "không" | "khong"       //# OP_KHONG
                          | "-"  //# OP_PHU_DINH (unary minus)
 

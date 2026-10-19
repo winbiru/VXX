@@ -1,0 +1,109 @@
+// Compiler V++, artifact và ABI được đối chiếu với bootstrap C++.
+nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/nội tại;
+
+hàm compiler bytecode bằng(a, b) {
+    nếu (độ dài(a) != độ dài(b)) { trả về sai; };
+    lặp(i = 0; i < độ dài(a); i++) {
+        nếu (a[i]["op"] != b[i]["op"] || a[i]["toán hạng"] != b[i]["toán hạng"] ||
+            a[i]["chỉ số"] != b[i]["chỉ số"] || a[i]["giá trị"] != b[i]["giá trị"]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm chính() {
+    mã = "hàm tính tổng(a = -2147483648, b = 1.25, c = \"x\\ny\", d = đúng, e = rỗng) " +
+         "{ in a; in b; in c; in d; in e; }; hàm chính() { tính tổng(); };";
+    artifact = biên dịch chương trình tự chủ(mã);
+    in biên dịch chạy artifact(artifact) == "-2147483648\n1.25\nx\ny\n1\nrỗng\n";
+    oracle = biên dịch snapshot nội bộ(mã, ".");
+    in oracle["hợp lệ"] == 1;
+    in compiler bytecode bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
+
+    in biên dịch chạy chương trình tự chủ(
+        "hàm đọc mặc định(x) { trả về x; }; hàm chính() { in đọc mặc định(7); };") == "7\n";
+    cây = biên dịch phân tích chương trình thuần("nhập gói/lõi/chuyển kiểu; nhập gói/biên dịch/chương trình;");
+    in cây["câu lệnh"][0]["đích"] == "gói/lõi/chuyển kiểu";
+    in compiler bytecode bằng(oracle["hàm"][1]["bytecode"], artifact["hàm"][1]["bytecode"]);
+
+    văn_bản = biên dịch artifact tuần tự(artifact);
+    in biên dịch artifact tuần tự(biên dịch artifact giải mã(văn_bản)) == văn_bản;
+    đóng_gói = json phân tích(văn_bản);
+    in độ dài(đóng_gói["dây"]) == 4;
+    in độ dài(đóng_gói["dây"][0][0]) == 4;
+    in biên dịch chạy artifact(biên dịch artifact giải mã(văn_bản)) == biên dịch chạy artifact(artifact);
+    cũ = json tạo({"định dạng": "VPP bytecode", "phiên bản": 1,
+                   "ABI": "Instruction 4*i32", "artifact": artifact});
+    in biên dịch chạy artifact(biên dịch artifact giải mã(cũ)) == biên dịch chạy artifact(artifact);
+    in biên dịch chạy chương trình tự chủ(
+        "hàm tính(giá trị = 7, mặc định = 9) { trả về giá trị + mặc định; }; hàm chính() { in tính(); in tính(1, 2); };") == "16\n3\n";
+    mã = "hàm f(a = 0, b = -0, c = -0001, d = -1) { trả về a + b + c + d; };";
+    artifact = biên dịch chương trình tự chủ(mã);
+    oracle = biên dịch snapshot nội bộ(mã, ".");
+    in compiler bytecode bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
+
+    mã = "hàm chính() { a = [1, 2]; a[1] = 7; b = {\"x\": a}; b[\"x\"][0] = 8; in a[0]; in a[1]; };";
+    artifact = biên dịch chương trình tự chủ(mã);
+    in biên dịch chạy artifact(artifact) == "8\n7\n";
+    oracle = biên dịch snapshot nội bộ(mã, ".");
+    in compiler bytecode bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
+
+    mã = "hàm chính() { d = [1, 2]; them(d, 3); in do_dai(d); in loai_cua(d); in chuoi_tu_bytes_vm([65, 66]); };";
+    artifact = biên dịch chương trình tự chủ(mã);
+    in biên dịch chạy artifact(artifact) == "3\ndanh sách\nAB\n";
+    oracle = biên dịch snapshot nội bộ(mã, ".");
+    in compiler bytecode bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
+    in biên dịch chạy chương trình tự chủ("hàm do_dai(x) { trả về 9; }; hàm chính() { in do_dai([]); };") == "9\n";
+    in biên dịch chạy chương trình tự chủ("hàm chính() { chuoi_tu_bytes_vm = 3; in chuoi_tu_bytes_vm([65]); };") == "A\n";
+    in biên dịch nội tại("độ dài")[0] == biên dịch mã opcode("OP_VM_LENGTH");
+    in biên dịch nội tại("chưa định nghĩa") == rỗng;
+    in biên dịch có opcode(42) == sai && biên dịch có opcode(157) == đúng;
+    mã = "hàm tính(x) { in -x; in +x; in -1.25; }; hàm chính() { tính(3); };";
+    artifact = biên dịch chương trình tự chủ(mã);
+    oracle = biên dịch snapshot nội bộ(mã, ".");
+    in biên dịch chạy artifact(artifact) == "-3\n3\n-1.25\n";
+    in compiler bytecode bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
+
+    lỗi = sai;
+    thử { biên dịch artifact giải mã("{\"định dạng\":\"VPP bytecode\",\"phiên bản\":2,\"ABI\":\"Instruction 4*i32\"}"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    đóng_gói["dây"][0][0] = [1, 2, 3];
+    lỗi = sai;
+    thử { biên dịch artifact giải mã(json tạo(đóng_gói)); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch artifact giải mã("{\"định dạng\":\"VPP bytecode\",\"phiên bản\":1.0,\"ABI\":\"Instruction 4*i32\"}"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch artifact giải mã("{\"định dạng\":"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch artifact giải mã(văn_bản + "x"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    hỏng = biên dịch chương trình tự chủ("in 1;");
+    hỏng["bytecode"][0]["op"] = 42;
+    lỗi = sai;
+    thử { biên dịch artifact tuần tự(hỏng); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    hỏng = biên dịch chương trình tự chủ("hàm chính() { in 1; };");
+    hỏng["hàm"][0]["id"] = 0.0;
+    lỗi = sai;
+    thử { biên dịch artifact tuần tự(hỏng); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch chương trình tự chủ("hàm f(a = 1 + 2) { trả về a; };"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { biên dịch chương trình tự chủ("in do_dai();"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

@@ -55,6 +55,11 @@ bool sameSemanticEnvironment(const SemanticEnvironment &lhs,
         if (left.name != right.name ||
             left.kind != right.kind ||
             left.sourceIdentity != right.sourceIdentity ||
+            left.runtimeName != right.runtimeName ||
+            left.superclassName != right.superclassName ||
+            left.implementedInterfaces != right.implementedInterfaces ||
+            left.extendedInterfaces != right.extendedInterfaces ||
+            left.methods != right.methods ||
             !sameSpan(left.declaration, right.declaration)) {
             return false;
         }

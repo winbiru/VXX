@@ -1,0 +1,19 @@
+// armv7: phát byte mã máy kiến trúc riêng.
+// Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
+nhập gói/biên dịch/mã máy nền;
+
+// Bộ phát không giữ trạng thái, nên cung cấp trực tiếp hàm cấp mô-đun.
+hàm công khai biên dịch mã máy phát armv7(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    ra = [];
+    nếu (loại == "hằng") {
+        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("e3000000") +
+            (thấp % 4096) + ((thấp - thấp % 4096) / 4096) * 65536, ít);
+        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("e3400000") +
+            (cao % 4096) + ((cao - cao % 4096) / 4096) * 65536, ít);
+    } hoặc {
+        nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "e0800001", ít); }
+        hoặc { biên dịch mã máy thêm hex(ra, "e0400001", ít); };
+    };
+    biên dịch mã máy thêm hex(ra, "e12fff1e", ít);
+    trả về ra;
+};

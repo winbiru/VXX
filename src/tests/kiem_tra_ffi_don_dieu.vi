@@ -1,0 +1,11 @@
+nhập thời gian;
+nhập hệ thống;
+
+hàm chính() {
+    trước = thời gian đơn điệu mili giây();
+    ngủ mili giây(2);
+    sau = thời gian đơn điệu mili giây();
+    in trước > 0;
+    in sau >= trước;
+    in kết thúc đo thời gian(trước) >= 0;
+};

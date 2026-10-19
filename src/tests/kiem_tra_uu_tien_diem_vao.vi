@@ -1,0 +1,9 @@
+lớp Chính {
+    hàm công khai chạy() {
+        in "không được gọi";
+    };
+};
+
+hàm chính() {
+    in "hàm chính";
+};

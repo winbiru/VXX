@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -34,42 +35,45 @@ bool requireSource(const StackValue &value,
     return true;
 }
 
-vietvm::compiler::CompilationArtifacts compileText(
-    const std::string &source,
-    const std::filesystem::path &base) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = base;
-    return vietvm::compiler::compilePipeline(context, source, keywordMap, false);
-}
-
-StackValue compilationSummary(const vietvm::compiler::CompilationArtifacts &artifacts) {
-    MapValue summary;
-    summary.entries["token"] = make_int_value(static_cast<int>(artifacts.tokens.size()));
-    summary.entries["ký hiệu"] = make_int_value(static_cast<int>(artifacts.semantic.symbols.size()));
-    summary.entries["phạm vi"] = make_int_value(static_cast<int>(artifacts.semantic.scopes.size()));
-    summary.entries["tham chiếu"] = make_int_value(static_cast<int>(artifacts.semantic.references.size()));
-    summary.entries["lệnh"] = make_int_value(static_cast<int>(artifacts.bytecode.size()));
-    summary.entries["vùng ir chưa trực tiếp"] =
-        make_int_value(static_cast<int>(artifacts.unsupportedDirectIrRegions));
-    summary.entries["mô đun"] = make_int_value(
-        artifacts.moduleIndex.has_value()
-            ? static_cast<int>(artifacts.moduleIndex->graph.modules.size())
-            : 0);
-    return make_map_value(std::move(summary));
-}
-
-StackValue bytecodeList(const vietvm::compiler::CompilationArtifacts &artifacts) {
+StackValue bytecodePrimitiveList(const std::vector<Instruction> &bytecode) {
     std::vector<StackValue> instructions;
-    instructions.reserve(artifacts.bytecode.size());
-    for (const Instruction &instruction : artifacts.bytecode) {
-        MapValue row;
-        row.entries["op"] = make_int_value(instruction.op);
-        row.entries["toán hạng"] = make_int_value(instruction.operand);
-        row.entries["chỉ số"] = make_int_value(instruction.operandIndex);
-        row.entries["giá trị"] = make_int_value(instruction.operandValue);
-        instructions.push_back(make_map_value(std::move(row)));
+    instructions.reserve(bytecode.size());
+    for (const Instruction &instruction : bytecode) {
+        instructions.push_back(make_list_value({
+            make_int_value(instruction.op),
+            make_int_value(instruction.operand),
+            make_int_value(instruction.operandIndex),
+            make_int_value(instruction.operandValue),
+        }));
     }
     return make_list_value(std::move(instructions));
+}
+
+// Read-only oracle for checking self-hosted function emitters. Preserve the
+// C++ registry's function IDs and four-field instruction ABI verbatim.
+StackValue namedFunctionBytecodePrimitiveList(
+    const vietvm::compiler::CompilationContext &context) {
+    std::vector<int> ids;
+    ids.reserve(context.functionNameIndices.size());
+    for (const auto &[id, nameIndex] : context.functionNameIndices) {
+        if (nameIndex >= 0 &&
+            static_cast<std::size_t>(nameIndex) < context.stringPool.size() &&
+            context.functionBytecode.count(id) != 0) {
+            ids.push_back(id);
+        }
+    }
+    std::sort(ids.begin(), ids.end());
+    std::vector<StackValue> functions;
+    functions.reserve(ids.size());
+    for (int id : ids) {
+        const int nameIndex = context.functionNameIndices.at(id);
+        functions.push_back(make_list_value({
+            make_string_value(context.stringPool[static_cast<std::size_t>(nameIndex)]),
+            make_int_value(id),
+            bytecodePrimitiveList(context.functionBytecode.at(id)),
+        }));
+    }
+    return make_list_value(std::move(functions));
 }
 
 vietvm::frontend::AstProgram parseSourceAst(const std::string &source) {
@@ -78,77 +82,89 @@ vietvm::frontend::AstProgram parseSourceAst(const std::string &source) {
             vietvm::compiler::tokenizeWithSpans(source)));
 }
 
-const char *visibilityText(vietvm::frontend::AstVisibility visibility) {
+int visibilityCode(vietvm::frontend::AstVisibility visibility) {
     using vietvm::frontend::AstVisibility;
     switch (visibility) {
-        case AstVisibility::Public: return "công khai";
-        case AstVisibility::Private: return "riêng tư";
-        case AstVisibility::Protected: return "bảo vệ";
-        case AstVisibility::Unspecified: return "mặc định";
+        case AstVisibility::Unspecified: return 0;
+        case AstVisibility::Public: return 1;
+        case AstVisibility::Private: return 2;
+        case AstVisibility::Protected: return 3;
     }
-    return "mặc định";
+    return 0;
 }
 
-StackValue astParameters(const vietvm::frontend::AstStatement &statement) {
+StackValue astParametersPrimitive(const vietvm::frontend::AstStatement &statement) {
     std::vector<StackValue> parameters;
     parameters.reserve(statement.parameters.size());
     for (const auto &parameter : statement.parameters) {
-        MapValue row;
-        row.entries["tên"] = make_string_value(parameter.name);
-        row.entries["có mặc định"] = make_int_value(parameter.hasDefault ? 1 : 0);
-        parameters.push_back(make_map_value(std::move(row)));
+        parameters.push_back(make_list_value({
+            make_string_value(parameter.name),
+            make_int_value(parameter.hasDefault ? 1 : 0),
+        }));
     }
     return make_list_value(std::move(parameters));
 }
 
-StackValue astStatementValue(const vietvm::frontend::AstStatement &statement) {
+StackValue astStatementPrimitive(const vietvm::frontend::AstStatement &statement) {
     using vietvm::frontend::AstStatementKind;
-    MapValue row;
-    const char *kind = "khác";
-    if (statement.kind == AstStatementKind::Import) kind = "nhập";
-    else if (statement.kind == AstStatementKind::Function) kind = "hàm";
-    else if (statement.kind == AstStatementKind::Class) kind = "lớp";
-    else if (statement.kind == AstStatementKind::Interface) kind = "giao diện";
-    row.entries["loại"] = make_string_value(kind);
-    row.entries["tên"] = make_string_value(statement.declarationName);
-    row.entries["phạm vi"] = make_string_value(visibilityText(statement.visibility));
-    row.entries["tham số"] = astParameters(statement);
-    row.entries["đích"] = make_string_value(statement.importSpec.target);
-    row.entries["bí danh"] = make_string_value(statement.importSpec.alias);
-    row.entries["công khai"] = make_int_value(statement.importSpec.reExport ? 1 : 0);
+    int kindCode = 4;
+    if (statement.kind == AstStatementKind::Import) kindCode = 0;
+    else if (statement.kind == AstStatementKind::Function) kindCode = 1;
+    else if (statement.kind == AstStatementKind::Class) kindCode = 2;
+    else if (statement.kind == AstStatementKind::Interface) kindCode = 3;
 
     std::vector<StackValue> children;
     children.reserve(statement.children.size());
     for (const auto &child : statement.children) {
-        children.push_back(astStatementValue(child));
+        children.push_back(astStatementPrimitive(child));
     }
-    row.entries["thành viên"] = make_list_value(std::move(children));
-    return make_map_value(std::move(row));
+    return make_list_value({
+        make_int_value(kindCode),
+        make_string_value(statement.declarationName),
+        make_int_value(visibilityCode(statement.visibility)),
+        astParametersPrimitive(statement),
+        make_string_value(statement.importSpec.target),
+        make_string_value(statement.importSpec.alias),
+        make_int_value(statement.importSpec.reExport ? 1 : 0),
+        make_list_value(std::move(children)),
+    });
 }
 
-StackValue astStatements(const vietvm::frontend::AstProgram &program) {
+StackValue astStatementsPrimitive(const vietvm::frontend::AstProgram &program) {
     std::vector<StackValue> statements;
     statements.reserve(program.statements.size());
     for (const auto &statement : program.statements) {
-        statements.push_back(astStatementValue(statement));
+        statements.push_back(astStatementPrimitive(statement));
     }
     return make_list_value(std::move(statements));
 }
 
-StackValue compilationAnalysis(const vietvm::compiler::CompilationArtifacts &artifacts,
-                               const vietvm::frontend::AstProgram &program) {
-    StackValue summary = compilationSummary(artifacts);
-    MapHandle map = std::get<MapHandle>(summary);
-    map->entries["cây cú pháp"] = astStatements(program);
-    return summary;
+StackValue compilationAnalysisPrimitive(
+    const vietvm::compiler::CompilationArtifacts &artifacts,
+    const vietvm::frontend::AstProgram &program,
+    const vietvm::compiler::CompilationContext &context) {
+    // Native compiler chỉ phơi payload thô. Trạng thái thành công/thất bại,
+    // tên trường, chuỗi loại AST và contract public do V++ dựng.
+    return make_list_value({
+        make_int_value(static_cast<int>(artifacts.tokens.size())),
+        make_int_value(static_cast<int>(artifacts.semantic.symbols.size())),
+        make_int_value(static_cast<int>(artifacts.semantic.scopes.size())),
+        make_int_value(static_cast<int>(artifacts.semantic.references.size())),
+        make_int_value(static_cast<int>(artifacts.bytecode.size())),
+        make_int_value(static_cast<int>(artifacts.unsupportedDirectIrRegions)),
+        make_int_value(artifacts.moduleIndex.has_value()
+            ? static_cast<int>(artifacts.moduleIndex->graph.modules.size())
+            : 0),
+        bytecodePrimitiveList(artifacts.bytecode),
+        astStatementsPrimitive(program),
+        namedFunctionBytecodePrimitiveList(context),
+    });
 }
 
 std::string executeEmbeddedSource(const std::string &source,
                                   const std::filesystem::path &base) {
     vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = base.empty()
-        ? std::filesystem::current_path()
-        : base;
+    context.importResolutionBase = base;
     context.currentSourceIdentity = "<embedded>";
     const auto artifacts = vietvm::compiler::compilePipeline(
         context, source, keywordMap, true);
@@ -171,95 +187,159 @@ std::string executeEmbeddedSource(const std::string &source,
     return output;
 }
 
+const std::vector<StackValue> &requireWireList(const StackValue &value,
+                                               const std::string &where) {
+    if (!std::holds_alternative<ListHandle>(value) ||
+        std::get<ListHandle>(value) == nullptr) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là danh sách");
+    }
+    return std::get<ListHandle>(value)->elements;
+}
+
+int requireWireInt(const StackValue &value, const std::string &where) {
+    if (!std::holds_alternative<int>(value)) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là số nguyên i32");
+    }
+    return std::get<int>(value);
+}
+
+const std::string &requireWireString(const StackValue &value,
+                                     const std::string &where) {
+    if (!std::holds_alternative<std::string>(value)) {
+        throw std::runtime_error("bytecode_chay_vm: " + where + " phải là chuỗi");
+    }
+    return std::get<std::string>(value);
+}
+
+std::vector<Instruction> loadWireInstructions(const StackValue &value,
+                                               const std::string &where) {
+    const auto &records = requireWireList(value, where);
+    std::vector<Instruction> code;
+    code.reserve(records.size());
+    for (std::size_t i = 0; i < records.size(); ++i) {
+        const auto &record = requireWireList(records[i], where + "[" + std::to_string(i) + "]");
+        if (record.size() != 4) {
+            throw std::runtime_error("bytecode_chay_vm: lệnh phải có đúng 4 trường ABI tại " + where);
+        }
+        const std::string prefix = where + "[" + std::to_string(i) + "]";
+        code.push_back(Instruction{
+            requireWireInt(record[0], prefix + ".op"),
+            requireWireInt(record[1], prefix + ".toán hạng"),
+            requireWireInt(record[2], prefix + ".chỉ số"),
+            requireWireInt(record[3], prefix + ".giá trị"),
+        });
+    }
+    return code;
+}
+
+std::string executeLinkedBytecode(const std::vector<StackValue> &args) {
+    const auto root = loadWireInstructions(args[0], "bytecode gốc");
+
+    std::vector<std::string> pool;
+    const auto &strings = requireWireList(args[1], "StringPool");
+    pool.reserve(strings.size());
+    for (std::size_t i = 0; i < strings.size(); ++i) {
+        pool.push_back(requireWireString(strings[i], "StringPool[" + std::to_string(i) + "]"));
+    }
+
+    std::unordered_map<int, std::vector<Instruction>> functionBytecode;
+    std::unordered_map<int, int> functionNames;
+    const auto &functions = requireWireList(args[2], "bảng hàm");
+    for (std::size_t i = 0; i < functions.size(); ++i) {
+        const auto &row = requireWireList(functions[i], "bảng hàm[" + std::to_string(i) + "]");
+        if (row.size() != 3) {
+            throw std::runtime_error("bytecode_chay_vm: bản ghi hàm phải có 3 trường");
+        }
+        const int id = requireWireInt(row[0], "function ID");
+        const int nameIndex = requireWireInt(row[1], "function runtime name index");
+        if (id != static_cast<int>(i)) {
+            throw std::runtime_error("bytecode_chay_vm: function ID phải liên tiếp từ 0");
+        }
+        if (nameIndex < 0 || static_cast<std::size_t>(nameIndex) >= pool.size()) {
+            throw std::runtime_error("bytecode_chay_vm: function name index ngoài StringPool");
+        }
+        if (!functionNames.emplace(nameIndex, id).second) {
+            throw std::runtime_error("bytecode_chay_vm: trùng function runtime name index");
+        }
+        functionBytecode.emplace(id, loadWireInstructions(row[2], "thân hàm " + std::to_string(id)));
+    }
+
+    VM vm(root, pool);
+    vm.setFunctions(std::move(functionBytecode), std::move(functionNames));
+    const auto &initializers = requireWireList(args[3], "initializer");
+    for (std::size_t i = 0; i < initializers.size(); ++i) {
+        const auto &row = requireWireList(initializers[i], "initializer[" + std::to_string(i) + "]");
+        if (row.size() != 2) {
+            throw std::runtime_error("bytecode_chay_vm: initializer phải có 2 trường");
+        }
+        const std::string &identity = requireWireString(row[0], "định danh initializer");
+        if (identity.empty()) {
+            throw std::runtime_error("bytecode_chay_vm: định danh initializer rỗng");
+        }
+        if (!vm.addModuleInitializer(identity, loadWireInstructions(row[1], "initializer " + identity))) {
+            throw std::runtime_error("bytecode_chay_vm: trùng định danh initializer '" + identity + "'");
+        }
+    }
+    std::string output;
+    vm.setOutputSink([&output](const std::string &text) { output += text; });
+    vm.run();
+    return output;
+}
+
 } // namespace
 
-bool handleNativeCompilerLibraryFunction(const std::string &fn,
-                                         const std::vector<StackValue> &args,
-                                         StackValue &result,
-                                         std::string &err) {
-    if (fn == "phu_thuoc_kiem_tra_noi_bo") {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string source;
-        std::filesystem::path base;
-        if (!requireSource(args[0], fn, source, err)) return true;
-        if (!nativeUtf8Path(args[1], fn, base, err)) return true;
-        if (base.empty()) base = std::filesystem::current_path();
-        MapValue check;
-        try {
-            (void)compileText(source, base);
-            check.entries["hợp lệ"] = make_int_value(1);
-            check.entries["lỗi"] = make_string_value("");
-        } catch (const std::exception &e) {
-            check.entries["hợp lệ"] = make_int_value(0);
-            check.entries["lỗi"] = make_string_value(e.what());
-        }
-        result = make_map_value(std::move(check));
-        return true;
+bool linkedBytecodeRunPrimitive(const std::vector<StackValue> &args,
+                                StackValue &result,
+                                std::string &err) {
+    constexpr const char *fn = "bytecode_chay_vm";
+    if (!requireNativeArgumentCount(args, fn, 4, err)) return true;
+    try {
+        result = make_string_value(executeLinkedBytecode(args));
+    } catch (const std::exception &e) {
+        err = e.what();
     }
+    return true;
+}
 
-    if (fn == "kich_ban_chay_noi_bo") {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string source;
-        std::filesystem::path base;
-        if (!requireSource(args[0], fn, source, err)) return true;
-        if (!nativeUtf8Path(args[1], fn, base, err)) return true;
-        if (base.empty()) base = std::filesystem::current_path();
-        try {
-            result = make_string_value(executeEmbeddedSource(source, base));
-        } catch (const std::exception &e) {
-            err = fn + ": " + e.what();
-        }
-        return true;
+bool embeddedVmRunPrimitive(const std::vector<StackValue> &args,
+                            StackValue &result,
+                            std::string &err) {
+    constexpr const char *fn = "kich_ban_chay_vm";
+    if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+    std::string source;
+    std::filesystem::path base;
+    if (!requireSource(args[0], fn, source, err)) return true;
+    if (!nativeUtf8Path(args[1], fn, base, err)) return true;
+    try {
+        result = make_string_value(executeEmbeddedSource(source, base));
+    } catch (const std::exception &e) {
+        err = e.what();
     }
+    return true;
+}
 
-    if (fn == "bien_dich_kiem_tra") {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string source;
-        if (!requireSource(args[0], fn, source, err)) return true;
-        MapValue check;
-        try {
-            const auto artifacts = compileText(source, std::filesystem::current_path());
-            check.entries["hợp lệ"] = make_int_value(1);
-            check.entries["lỗi"] = make_string_value("");
-            check.entries["lệnh"] = make_int_value(static_cast<int>(artifacts.bytecode.size()));
-        } catch (const std::exception &e) {
-            check.entries["hợp lệ"] = make_int_value(0);
-            check.entries["lỗi"] = make_string_value(e.what());
-            check.entries["lệnh"] = make_int_value(0);
-        }
-        result = make_map_value(std::move(check));
-        return true;
+bool compilerAnalyzePrimitive(const std::vector<StackValue> &args,
+                              StackValue &result,
+                              std::string &err) {
+    constexpr const char *fn = "bien_dich_phan_tich_vm";
+    if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
+    std::string source;
+    std::filesystem::path base;
+    if (!requireSource(args[0], fn, source, err)) return true;
+    if (!nativeUtf8Path(args[1], fn, base, err)) return true;
+    try {
+        vietvm::compiler::CompilationContext context;
+        context.importResolutionBase = base;
+        auto artifacts = vietvm::compiler::compilePipeline(
+            context, source, keywordMap, false);
+        result = compilationAnalysisPrimitive(
+            artifacts, parseSourceAst(source), context);
+    } catch (const std::exception &e) {
+        // Compiler primitive chỉ báo lỗi thô. V++ quyết định lỗi này được
+        // chuyển thành snapshot hay được ném ra ngoài.
+        err = e.what();
     }
-
-    if (fn == "bien_dich_bytecode") {
-        if (!requireNativeArgumentCount(args, fn, 1, err)) return true;
-        std::string source;
-        if (!requireSource(args[0], fn, source, err)) return true;
-        try {
-            const auto artifacts = compileText(source, std::filesystem::current_path());
-            result = bytecodeList(artifacts);
-        } catch (const std::exception &e) {
-            err = fn + ": " + e.what();
-        }
-        return true;
-    }
-
-    if (fn == "bien_dich_phan_tich_noi_bo") {
-        if (!requireNativeArgumentCount(args, fn, 2, err)) return true;
-        std::string source;
-        std::filesystem::path base;
-        if (!requireSource(args[0], fn, source, err)) return true;
-        if (!nativeUtf8Path(args[1], fn, base, err)) return true;
-        if (base.empty()) base = std::filesystem::current_path();
-        try {
-            result = compilationAnalysis(compileText(source, base), parseSourceAst(source));
-        } catch (const std::exception &e) {
-            err = fn + ": " + e.what();
-        }
-        return true;
-    }
-
-    return false;
+    return true;
 }
 
 } // namespace vietvm::helpers

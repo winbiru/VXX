@@ -1,6 +1,9 @@
 #include "vpp/compiler/codegen.h"
 
+#include <charconv>
+#include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -12,6 +15,7 @@
 #include "common/utility.h"
 #include "compiler/compileRegistry.h"
 #include "frontend/lexer.h"
+#include "vpp/bytecode/intrinsic.h"
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/message_constants.h"
 
@@ -19,6 +23,37 @@ namespace vietvm::compiler {
 namespace {
 
 using vietvm::bytecode::escapeLiteralWireField;
+
+// Parse the magnitude in i64 before applying unary minus: 2147483648 is
+// legal only as the operand of a negative i32 literal. std::stoi would
+// reject that magnitude before its sign can be applied.
+int parseI32Literal(std::string_view token, bool negated = false) {
+    const std::string spelling = (negated ? "-" : "") + std::string(token);
+    std::int64_t magnitude = 0;
+    const auto [end, error] = std::from_chars(
+        token.data(), token.data() + token.size(), magnitude, 10);
+    if (error == std::errc::result_out_of_range) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kCompilerIntegerLiteralOutOfRange, {spelling}));
+    }
+    if (error != std::errc{} || end != token.data() + token.size()) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kInternalNumberParseMismatch, {spelling}));
+    }
+    if (negated) {
+        if (magnitude == std::numeric_limits<std::int64_t>::min()) {
+            throw std::runtime_error(vietvm::messages::formatMessage(
+                vietvm::messages::kCompilerIntegerLiteralOutOfRange, {spelling}));
+        }
+        magnitude = -magnitude;
+    }
+    if (magnitude < std::numeric_limits<std::int32_t>::min() ||
+        magnitude > std::numeric_limits<std::int32_t>::max()) {
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            vietvm::messages::kCompilerIntegerLiteralOutOfRange, {spelling}));
+    }
+    return static_cast<int>(magnitude);
+}
 
 // Kiểm tra điều kiện của `isBinaryOperator`.
 bool isBinaryOperator(const std::string &op) noexcept {
@@ -146,11 +181,13 @@ bool startsWithDedicatedCallSyntax(const IrInstruction &sourceOwner,
     const vietvm::frontend::Token *first = firstTokenFor(sourceOwner, instruction);
     if (first == nullptr) return false;
 
-    // A statement-leading keyword is dispatched before the generic callable
-    // parser by the compatibility compiler (`in`, `dừng`, ...). It cannot be
-    // treated as an ordinary direct call merely because semantic resolution
-    // found a same-spelled function.
-    if (first->kind == vietvm::frontend::TokenKind::Keyword ||
+    // Legacy statement keywords (`in`, `dừng`, ...) take precedence over a
+    // same-spelled function. `ký hiệu` is instead contextual FFI metadata:
+    // it was added to the lexer keyword table but remains a valid first word
+    // of an ordinary callable name (e.g. `ký hiệu vùng lấy(...)`). The parser
+    // accepts it there, so direct-IR analysis must preserve that grammar.
+    if ((first->kind == vietvm::frontend::TokenKind::Keyword &&
+         first->lexeme != "ký hiệu") ||
         !isCallableNamePiece(first->lexeme)) {
         return false;
     }
@@ -181,7 +218,9 @@ bool containsCall(const IrProgram &program,
     const IrValue *value = program.value(id);
     if (value == nullptr || !visiting.insert(id).second) return false;
     if (value->opcode == IrValueOpcode::Call ||
-        value->opcode == IrValueOpcode::CallDynamic) {
+        value->opcode == IrValueOpcode::CallDynamic ||
+        value->opcode == IrValueOpcode::Intrinsic ||
+        value->opcode == IrValueOpcode::ForeignCall) {
         visiting.erase(id);
         return true;
     }
@@ -264,6 +303,41 @@ bool isLegacyScalarLiteral(const IrInstruction &instruction,
     }
 }
 
+// A negative integer default is represented by unary-minus over a source
+// integer token. Keep the exact token check to avoid accepting arbitrary
+// expressions as parameter defaults.
+bool isNegativeIntegerDefault(const IrProgram &program,
+                              const IrInstruction &owner,
+                              const IrValue *value) noexcept {
+    if (value == nullptr || value->opcode != IrValueOpcode::Unary ||
+        value->text != "-" || value->operands.size() != 1) return false;
+    const IrValue *literal = program.value(value->operands.front());
+    if (literal == nullptr || literal->opcode != IrValueOpcode::ConstInt ||
+        !literal->operands.empty() || !isExactSourceToken(owner, *literal) ||
+        !isNumber(literal->text)) return false;
+    bool minusToken = false;
+    for (const auto &token : owner.tokens) {
+        if (token.span.begin.offset == value->span.begin.offset &&
+            token.lexeme == "-" && token.span.end.offset <= literal->span.begin.offset) {
+            minusToken = true;
+            break;
+        }
+    }
+    if (!minusToken) return false;
+    std::int64_t magnitude = 0;
+    const auto &s = literal->text;
+    const auto [end, err] = std::from_chars(s.data(), s.data() + s.size(), magnitude, 10);
+    return err == std::errc{} && end == s.data() + s.size() &&
+           magnitude <= static_cast<std::int64_t>(std::numeric_limits<std::int32_t>::max()) + 1;
+}
+
+bool supportsParameterDefault(const IrProgram &program,
+                              const IrInstruction &owner,
+                              const IrValue *value) noexcept {
+    return isLegacyScalarLiteral(owner, value) ||
+           isNegativeIntegerDefault(program, owner, value);
+}
+
 // Kiểm tra điều kiện của `isCollectionLiteralValue`.
 bool isCollectionLiteralValue(const IrProgram &program,
                               const IrInstruction &instruction,
@@ -337,11 +411,30 @@ bool isStaticCollectionLiteralValue(const IrProgram &program,
     }
 }
 
-// Kiểm tra điều kiện của `isDirectIndexBase`.
+// Only addressable collection values may be used as indexed assignment bases.
 bool isDirectIndexBase(const IrValue *value) noexcept {
     return value != nullptr &&
            (value->opcode == IrValueOpcode::LoadName ||
+            value->opcode == IrValueOpcode::LoadProperty ||
             value->opcode == IrValueOpcode::Index);
+}
+
+// Reading an index also accepts a temporary collection returned by a call.
+// emitValue leaves each call result on the VM stack, immediately followed by
+// the index operand, as required by OP_DOC_CHI_SO. The nested supportsValue
+// check still validates the callee, arguments and call target independently.
+bool isDirectIndexReadBase(const IrValue *value) noexcept {
+    if (isDirectIndexBase(value)) return true;
+    if (value == nullptr) return false;
+    switch (value->opcode) {
+        case IrValueOpcode::Call:
+        case IrValueOpcode::Intrinsic:
+        case IrValueOpcode::ForeignCall:
+        case IrValueOpcode::CallDynamic:
+            return true;
+        default:
+            return false;
+    }
 }
 
 enum class ValueContext {
@@ -355,7 +448,6 @@ enum class ValueContext {
 // Giữ ngữ cảnh khi kiểm tra direct-IR support, gồm tập hàm/phương thức đã thấy và thông tin cần để quyết định một lệnh có thể codegen trực tiếp hay không.
 struct SupportContext {
     std::unordered_set<int> functionSymbols;
-    std::unordered_set<std::string> functionNames;
     std::unordered_set<int> methodSymbols;
     std::unordered_map<int, std::size_t> methodDeclarationOffsets;
     std::unordered_map<std::string, std::size_t> methodNameDeclarationOffsets;
@@ -456,6 +548,12 @@ bool supportsValue(const IrProgram &program,
             break;
 
         case IrValueOpcode::LoadProperty: {
+            if (value->operands.size() == 1) {
+                supported = !value->text.empty() && supportsValue(
+                    program, sourceOwner, context, value->operands[0],
+                    ValueContext::Nested, visiting);
+                break;
+            }
             const auto member = splitRuntimeMemberName(value->text);
             supported = value->operands.empty() && !member.first.empty() &&
                         isExactSourceName(sourceOwner, *value);
@@ -509,10 +607,10 @@ bool supportsValue(const IrProgram &program,
             break;
 
         case IrValueOpcode::Index:
-            // Indexing is direct-only for now. A chained index remains safe
-            // because its innermost base is still a named runtime value.
+            // Index reads can consume a named collection, a previous indexed
+            // value, or a collection returned directly by a function call.
             supported = value->operands.size() == 2 &&
-                        isDirectIndexBase(program.value(value->operands[0])) &&
+                        isDirectIndexReadBase(program.value(value->operands[0])) &&
                         supportsValue(program, sourceOwner, context, value->operands[0],
                                       ValueContext::Nested, visiting) &&
                         supportsValue(program, sourceOwner, context, value->operands[1],
@@ -521,18 +619,10 @@ bool supportsValue(const IrProgram &program,
 
         case IrValueOpcode::Unary:
             if (value->operands.size() != 1) break;
-            if (value->text == "!") {
+            if (value->text == "!" || value->text == "+" || value->text == "-") {
                 supported = supportsValue(program, sourceOwner, context,
                                           value->operands.front(),
                                           ValueContext::Nested, visiting);
-                break;
-            }
-            if (value->text == "-") {
-                const IrValue *operand = program.value(value->operands.front());
-                supported = operand != nullptr && operand->operands.empty() &&
-                            (operand->opcode == IrValueOpcode::ConstInt ||
-                             operand->opcode == IrValueOpcode::ConstFloat) &&
-                            isExactSourceToken(sourceOwner, *operand);
             }
             break;
 
@@ -580,11 +670,14 @@ bool supportsValue(const IrProgram &program,
             }
             const IrValue *target = program.value(value->operands.front());
             if (target == nullptr || target->opcode != IrValueOpcode::LoadProperty ||
-                target->text.empty() || !isExactSourceName(sourceOwner, *target) ||
+                target->text.empty() ||
+                (target->operands.empty() && !isExactSourceName(sourceOwner, *target)) ||
                 value->span.begin.offset != target->span.begin.offset) {
                 break;
             }
-            supported = supportsValue(program, sourceOwner, context,
+            supported = supportsValue(program, sourceOwner, context, value->operands[0],
+                                      ValueContext::Nested, visiting) &&
+                        supportsValue(program, sourceOwner, context,
                                       value->operands[1],
                                       ValueContext::SimpleAssignmentRhs,
                                       visiting);
@@ -638,6 +731,51 @@ bool supportsValue(const IrProgram &program,
             break;
         }
 
+        case IrValueOpcode::Intrinsic: {
+            const auto *primitive = bytecode::intrinsicByOpcode(value->intrinsicOpcode);
+            if (primitive == nullptr || value->callTarget != CallTargetKind::Native ||
+                value->operands.size() != primitive->arity + 1 ||
+                (value->explicitCall &&
+                 valueContext != ValueContext::DedicatedCallStatementRoot)) break;
+            const IrValue *callee = program.value(value->operands.front());
+            supported = callee != nullptr && callee->opcode == IrValueOpcode::LoadName &&
+                        callee->text == value->text &&
+                        bytecode::intrinsicByName(callee->text) == primitive &&
+                        isExactSourceName(sourceOwner, *callee);
+            for (std::size_t index = 1; supported && index < value->operands.size(); ++index) {
+                supported = supportsValue(program, sourceOwner, context,
+                    value->operands[index], ValueContext::Nested, visiting);
+            }
+            break;
+        }
+
+        case IrValueOpcode::ForeignCall: {
+            if (value->foreignDescriptorId < 0 ||
+                static_cast<std::size_t>(value->foreignDescriptorId) >=
+                    program.foreignFunctions.size() ||
+                value->callTarget != CallTargetKind::ForeignFunction ||
+                (value->explicitCall &&
+                 valueContext != ValueContext::DedicatedCallStatementRoot)) {
+                break;
+            }
+            const auto &descriptor =
+                program.foreignFunctions[static_cast<std::size_t>(
+                    value->foreignDescriptorId)];
+            if (value->operands.size() != descriptor.parameters.size() + 1) break;
+            const IrValue *callee = program.value(value->operands.front());
+            supported = callee != nullptr &&
+                        callee->opcode == IrValueOpcode::LoadName &&
+                        callee->text == value->text &&
+                        isExactSourceName(sourceOwner, *callee);
+            for (std::size_t index = 1;
+                 supported && index < value->operands.size(); ++index) {
+                supported = supportsValue(
+                    program, sourceOwner, context, value->operands[index],
+                    ValueContext::Nested, visiting);
+            }
+            break;
+        }
+
         case IrValueOpcode::CallDynamic: {
             if (value->explicitCall &&
                 valueContext != ValueContext::DedicatedCallStatementRoot) {
@@ -656,13 +794,13 @@ bool supportsValue(const IrProgram &program,
             if (value->callTarget == CallTargetKind::ClassConstructor) {
                 supported = !value->operands.empty() && callee != nullptr &&
                             callee->opcode == IrValueOpcode::LoadName &&
-                            callee->text == value->text &&
                             isExactSourceName(sourceOwner, *callee);
             } else if (value->callTarget == CallTargetKind::InstanceMethod) {
                 supported = callee != nullptr &&
                             callee->opcode == IrValueOpcode::LoadProperty &&
                             callee->text == value->text &&
-                            isExactSourceName(sourceOwner, *callee);
+                            supportsValue(program, sourceOwner, context,
+                                          value->operands[0], ValueContext::Nested, visiting);
             } else {
                 supported = callee != nullptr &&
                             callee->opcode == IrValueOpcode::LoadName &&
@@ -702,9 +840,7 @@ bool supportsValue(const IrProgram &program,
 
             supported = true;
             for (const IrParameter &parameter : lambda->parameters) {
-                if (parameter.name.empty() ||
-                    context.functionNames.find(parameter.name) !=
-                        context.functionNames.end()) {
+                if (parameter.name.empty()) {
                     supported = false;
                     break;
                 }
@@ -716,7 +852,7 @@ bool supportsValue(const IrProgram &program,
                 }
                 const IrValue *defaultValue =
                     program.value(parameter.defaultValue);
-                if (!isLegacyScalarLiteral(sourceOwner, defaultValue)) {
+                if (!supportsParameterDefault(program, sourceOwner, defaultValue)) {
                     supported = false;
                     break;
                 }
@@ -763,18 +899,13 @@ bool supportsFunction(const IrProgram &program,
     }
 
     for (const IrParameter &parameter : instruction.parameters) {
-        if (parameter.name.empty() ||
-            context.functionNames.find(parameter.name) != context.functionNames.end()) {
-            // Keep this historical name-precedence edge unsupported until
-            // symbol-based codegen becomes authoritative.
-            return false;
-        }
+        if (parameter.name.empty()) return false;
         if (!parameter.hasDefault) {
             if (parameter.defaultValue != kInvalidIrValueId) return false;
             continue;
         }
         const IrValue *defaultValue = program.value(parameter.defaultValue);
-        if (!isLegacyScalarLiteral(sourceOwner, defaultValue)) return false;
+        if (!supportsParameterDefault(program, sourceOwner, defaultValue)) return false;
     }
 
     return supportsInstruction(program, instruction.children.front(), sourceOwner,
@@ -794,6 +925,18 @@ bool supportsInstruction(const IrProgram &program,
 
     if (instruction.opcode == IrOpcode::NoOp) {
         return instruction.expressionRoots.empty() && instruction.children.empty();
+    }
+    if (instruction.opcode == IrOpcode::DeclareVariable) {
+        if (instruction.declarationName.empty() || instruction.symbolId < 0 ||
+            !instruction.children.empty() || instruction.expressionRoots.size() > 1) {
+            return false;
+        }
+        if (instruction.expressionRoots.empty()) return true;
+        const IrValue *value = program.value(instruction.expressionRoots.front());
+        if (value == nullptr || value->opcode == IrValueOpcode::StoreName) return false;
+        std::unordered_set<IrValueId> visiting;
+        return supportsValue(program, sourceOwner, context, value->id,
+                             ValueContext::Nested, visiting);
     }
     if (instruction.opcode == IrOpcode::Import) {
         return topLevel &&
@@ -910,13 +1053,14 @@ bool supportsInstruction(const IrProgram &program,
         }
         return supportsInstruction(
             program, instruction.children.front(), sourceOwner, context,
-            insideFunction, true, switchDepth, false);
+            insideFunction, true, switchDepth + 1, false);
     }
     if (instruction.opcode == IrOpcode::Switch) {
+        // An empty structured switch is valid: emission still creates
+        // OP_CHON followed by OP_KET_THUC_CHUYEN with a patched end offset.
         if (instruction.switchForm !=
                 vietvm::frontend::AstSwitchForm::Structured ||
             instruction.expressionRoots.empty() ||
-            instruction.switchArms.empty() ||
             instruction.switchArms.size() != instruction.children.size()) {
             return false;
         }
@@ -1003,9 +1147,7 @@ bool supportsInstruction(const IrProgram &program,
             return false;
         }
         if (!instruction.catchVariable.empty() &&
-            (instruction.catchSymbolId < 0 ||
-             context.functionNames.find(instruction.catchVariable) !=
-                 context.functionNames.end())) {
+            instruction.catchSymbolId < 0) {
             return false;
         }
         return supportsInstruction(program, instruction.children[0], sourceOwner,
@@ -1068,13 +1210,17 @@ bool supportsInstruction(const IrProgram &program,
     const vietvm::frontend::Token *statementFirst =
         firstTokenFor(sourceOwner, instruction);
     const bool rootIsCall = root->opcode == IrValueOpcode::Call ||
-        root->opcode == IrValueOpcode::CallDynamic;
+        root->opcode == IrValueOpcode::CallDynamic ||
+        root->opcode == IrValueOpcode::Intrinsic ||
+        root->opcode == IrValueOpcode::ForeignCall;
     const bool explicitStatementCall = rootIsCall &&
         root->explicitCall && statementFirst != nullptr &&
         statementFirst->lexeme == "gọi";
     const bool dedicatedCall = instruction.opcode == IrOpcode::Statement &&
-        (explicitStatementCall ||
-         startsWithDedicatedCallSyntax(sourceOwner, instruction));
+        (rootIsCall || explicitStatementCall ||
+         (root->opcode != IrValueOpcode::StoreProperty &&
+          root->opcode != IrValueOpcode::StoreIndex &&
+          startsWithDedicatedCallSyntax(sourceOwner, instruction)));
     if (dedicatedCall &&
          (!rootIsCall ||
          !expressionConsumesStatement(sourceOwner, instruction, *root))) {
@@ -1230,7 +1376,7 @@ std::string encodeListLiteral(const IrProgram &program, const IrValue &list) {
 }
 
 // Mã hóa mặc định giá trị; hàm chuyển cấu trúc dữ liệu sang dạng chuỗi/wire ổn định để lưu trong bytecode hoặc truyền qua ranh giới module.
-std::string encodeDefaultValue(const IrValue &value) {
+std::string encodeDefaultValue(const IrProgram &program, const IrValue &value) {
     switch (value.opcode) {
         case IrValueOpcode::ConstInt: return "i:" + value.text;
         case IrValueOpcode::ConstFloat: return "d:" + value.text;
@@ -1238,9 +1384,19 @@ std::string encodeDefaultValue(const IrValue &value) {
         case IrValueOpcode::ConstBool:
             return value.text == "đúng" ? "i:1" : "i:0";
         case IrValueOpcode::ConstNull: return "n:";
+        case IrValueOpcode::Unary: {
+            if (value.text == "-" && value.operands.size() == 1) {
+                const IrValue *literal = program.value(value.operands.front());
+                if (literal != nullptr && literal->opcode == IrValueOpcode::ConstInt) {
+                    return "i:" + std::to_string(parseI32Literal(literal->text, true));
+                }
+            }
+            break;
+        }
         default:
-            throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedDefaultValue));
+            break;
     }
+    throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedDefaultValue));
 }
 
 // Giữ trạng thái của direct-IR codegen trong một lượt phát mã; struct quản lý bytecode, slot, function id, lambda và thứ tự phát lớp cha/con.
@@ -1251,10 +1407,14 @@ struct Emitter {
     std::vector<Instruction> bytecode;
     std::vector<vietvm::runtime::RuntimeSourceLocation> bytecodeDebugInfo;
     std::unordered_map<std::string, int> slots;
+    // Stable per-declaration VM cells for parameters, locals, and captures.
+    // These IDs are distinct from the legacy textual function-name slots.
+    std::unordered_map<int, int> lexicalSymbolSlots;
     std::unordered_map<int, int> functionIdsBySymbol;
     std::unordered_map<std::string, int> functionIdsByName;
     std::unordered_map<int, int> functionNameIndices;
     std::unordered_map<IrLambdaId, int> lambdaIds;
+    std::vector<int> foreignDescriptorIds;
     std::unordered_map<std::string, const IrInstruction *> classesByName;
     std::unordered_set<std::string> emittedClasses;
     std::unordered_set<std::string> emittingClasses;
@@ -1262,6 +1422,18 @@ struct Emitter {
     std::vector<vietvm::runtime::RuntimeSourceLocation> *activeDebugInfo =
         &bytecodeDebugInfo;
     std::string activeFunctionName;
+
+    // Track the nearest lexical break target. Loop breaks need their own jump
+    // and unwind metadata; switch breaks retain the existing OP_THOAT behavior.
+    struct BreakScope {
+        bool loop = false;
+        std::size_t blockDepth = 0;
+        std::size_t tryDepth = 0;
+        std::vector<std::size_t> pendingJumps;
+    };
+    std::vector<BreakScope> breakScopes;
+    std::size_t emittedBlockDepth = 0;
+    std::size_t emittedTryDepth = 0;
 
     // Chuyển source span của IR thành vị trí runtime hiện tại, giữ tên function
     // đang phát để VM có thể dựng frame mà không cần đọc lại AST/IR khi lỗi xảy ra.
@@ -1327,7 +1499,15 @@ struct Emitter {
     Emitter(CompilationRegistryState &state,
             const IrProgram &ir,
             const std::unordered_map<std::string, Opcode> &keywords)
-        : registry(state), program(ir), keywordMap(keywords) {}
+        : registry(state), program(ir), keywordMap(keywords) {
+        foreignDescriptorIds.reserve(program.foreignFunctions.size());
+        for (const auto &descriptor : program.foreignFunctions) {
+            auto registered = descriptor;
+            registered.id = static_cast<int>(registry.foreignFunctions.size());
+            foreignDescriptorIds.push_back(registered.id);
+            registry.foreignFunctions.push_back(std::move(registered));
+        }
+    }
 
     // Cấp phát hàm; hàm lấy mã định danh hoặc vùng lưu trữ mới và đăng ký nó vào trạng thái quản lý hiện tại.
     void allocateFunction(const IrInstruction &instruction) {
@@ -1366,6 +1546,21 @@ struct Emitter {
         return slot;
     }
 
+    bool isLexicalSlotSymbol(int symbolId) const {
+        return symbolId >= 0 &&
+            program.lexicalSlotSymbols.find(symbolId) !=
+                program.lexicalSlotSymbols.end();
+    }
+
+    int slotForSymbol(int symbolId, const std::string &fallbackName) {
+        if (!isLexicalSlotSymbol(symbolId)) return slotFor(fallbackName);
+        const auto found = lexicalSymbolSlots.find(symbolId);
+        if (found != lexicalSymbolSlots.end()) return found->second;
+        const int slot = nextSlot++;
+        lexicalSymbolSlots.emplace(symbolId, slot);
+        return slot;
+    }
+
     // Phát mã cho lời gọi đối số; hàm duyệt biểu diễn đầu vào và sinh opcode/metadata tương ứng vào buffer bytecode đích.
     void emitCallArguments(const IrValue &call,
                            std::vector<Instruction> &output) {
@@ -1380,7 +1575,7 @@ struct Emitter {
                                std::string_view missingDefaultMessage) {
         for (std::size_t index = 0; index < parameters.size(); ++index) {
             const IrParameter &parameter = parameters[index];
-            const int slot = slotFor(parameter.name);
+            const int slot = slotForSymbol(parameter.symbolId, parameter.name);
             output.push_back({OP_KHOI_TAO, 0, slot, 0});
             if (!parameter.hasDefault) {
                 output.push_back({OP_PARAM, 0, slot, static_cast<int>(index)});
@@ -1392,7 +1587,7 @@ struct Emitter {
                 throw std::logic_error(std::string(missingDefaultMessage));
             }
             const int defaultIndex = registry.storeString(
-                encodeDefaultValue(*defaultValue));
+                encodeDefaultValue(program, *defaultValue));
             output.push_back(
                 {OP_PARAM_MAC_DINH, defaultIndex, slot, static_cast<int>(index)});
         }
@@ -1407,8 +1602,10 @@ struct Emitter {
             output.push_back({OP_BIEN_SO, functionId, 0, 0});
             return;
         }
-        for (const std::string &captureName : lambda.captureNames) {
-            output.push_back({OP_TEN_BIEN_ID, 0, slotFor(captureName), 0});
+        for (std::size_t index = 0; index < lambda.captureNames.size(); ++index) {
+            output.push_back({OP_TEN_BIEN_ID, 0,
+                              slotForSymbol(lambda.captures[index],
+                                            lambda.captureNames[index]), 0});
         }
         output.push_back({OP_TAO_DONG_BAO,
                           functionId,
@@ -1426,12 +1623,7 @@ struct Emitter {
 
         switch (value->opcode) {
             case IrValueOpcode::ConstInt:
-                try {
-                    output.push_back({OP_BIEN_SO, std::stoi(value->text), 0, 0});
-                } catch (...) {
-                    throw std::runtime_error(vietvm::messages::formatMessage(
-                        vietvm::messages::kInternalNumberParseMismatch, {value->text}));
-                }
+                output.push_back({OP_BIEN_SO, parseI32Literal(value->text), 0, 0});
                 return;
             case IrValueOpcode::ConstFloat: {
                 const int index = registry.storeString(value->text);
@@ -1497,6 +1689,11 @@ struct Emitter {
                 output.push_back({OP_DOC_CHI_SO, 0, 0, 0});
                 return;
             case IrValueOpcode::LoadName: {
+                if (isLexicalSlotSymbol(value->symbolId)) {
+                    output.push_back({OP_TEN_BIEN_GIA_TRI, 0,
+                                      slotForSymbol(value->symbolId, value->text), 0});
+                    return;
+                }
                 const auto function = functionIdsBySymbol.find(value->symbolId);
                 if (function != functionIdsBySymbol.end()) {
                     output.push_back({OP_BIEN_SO, function->second, 0, 0});
@@ -1513,12 +1710,18 @@ struct Emitter {
                 return;
             }
             case IrValueOpcode::LoadProperty: {
+                if (value->operands.size() == 1) {
+                    emitValue(value->operands[0], output);
+                    const int memberIndex = registry.storeString(value->text);
+                    output.push_back({OP_DOC_THUOC_TINH, 0, memberIndex, 0});
+                    return;
+                }
                 const auto member = splitRuntimeMemberName(value->text);
                 if (member.first.empty()) {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrUnsupportedValue));
                 }
-                const int receiverSlot = slotFor(member.first);
+                const int receiverSlot = slotForSymbol(value->symbolId, member.first);
                 const int memberIndex = registry.storeString(member.second);
                 output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                 output.push_back({OP_DOC_THUOC_TINH, 0, memberIndex, 0});
@@ -1532,14 +1735,8 @@ struct Emitter {
                             messages::kInternalDirectIrInvalidValueId));
                     }
                     if (operand->opcode == IrValueOpcode::ConstInt) {
-                        try {
-                            output.push_back(
-                                {OP_BIEN_SO, -std::stoi(operand->text), 0, 0});
-                        } catch (...) {
-                            throw std::runtime_error(vietvm::messages::formatMessage(
-                                vietvm::messages::kInternalNumberParseMismatch,
-                                {"-" + operand->text}));
-                        }
+                        output.push_back({OP_BIEN_SO,
+                                          parseI32Literal(operand->text, true), 0, 0});
                         return;
                     }
                     if (operand->opcode == IrValueOpcode::ConstFloat) {
@@ -1547,11 +1744,20 @@ struct Emitter {
                         output.push_back({OP_BIEN_SO_FLOAT, 0, index, 0});
                         return;
                     }
+                    // For a non-literal expression, preserve evaluation order
+                    // by lowering unary minus as 0 - expression.
+                    output.push_back({OP_BIEN_SO, 0, 0, 0});
+                    emitValue(value->operands.front(), output);
+                    output.push_back({OP_TRU, 0, 0, 0});
+                    return;
+                }
+                emitValue(value->operands.front(), output);
+                if (value->text == "!") {
+                    output.push_back({OP_PHU_DINH, 0, 0, 0});
+                } else if (value->text != "+") {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrUnsupportedValue));
                 }
-                emitValue(value->operands.front(), output);
-                output.push_back({OP_PHU_DINH, 0, 0, 0});
                 return;
             }
             case IrValueOpcode::Binary:
@@ -1568,7 +1774,7 @@ struct Emitter {
                 // The legacy compiler assigns the target slot before compiling
                 // the RHS.  Preserve that ordering even though the target ID is
                 // pushed after the value.
-                const int slot = slotFor(target->text);
+                const int slot = slotForSymbol(target->symbolId, target->text);
                 if (value->text == "++" || value->text == "--") {
                     output.push_back({OP_TEN_BIEN_ID, 0, slot, 0});
                     output.push_back({value->text == "++" ? OP_CONG_MOT : OP_TRU_MOT,
@@ -1593,12 +1799,19 @@ struct Emitter {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrInvalidStoreTarget));
                 }
+                if (target->operands.size() == 1) {
+                    emitValue(target->operands[0], output);
+                    const int memberIndex = registry.storeString(target->text);
+                    emitValue(value->operands[1], output);
+                    output.push_back({OP_GAN_THUOC_TINH, 0, memberIndex, 0});
+                    return;
+                }
                 const auto member = splitRuntimeMemberName(target->text);
                 if (member.first.empty()) {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrInvalidStoreTarget));
                 }
-                const int receiverSlot = slotFor(member.first);
+                const int receiverSlot = slotForSymbol(target->symbolId, member.first);
                 const int memberIndex = registry.storeString(member.second);
                 output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                 emitValue(value->operands[1], output);
@@ -1655,6 +1868,26 @@ struct Emitter {
                                   0});
                 return;
             }
+            case IrValueOpcode::Intrinsic:
+                emitCallArguments(*value, output);
+                output.push_back({value->intrinsicOpcode, 0, 0, 0});
+                return;
+            case IrValueOpcode::ForeignCall: {
+                if (value->foreignDescriptorId < 0 ||
+                    static_cast<std::size_t>(value->foreignDescriptorId) >=
+                        foreignDescriptorIds.size()) {
+                    throw std::logic_error(
+                        "foreign descriptor IR không hợp lệ");
+                }
+                emitCallArguments(*value, output);
+                output.push_back({
+                    OP_FFI_CALL,
+                    static_cast<int>(value->operands.size() - 1),
+                    foreignDescriptorIds[static_cast<std::size_t>(
+                        value->foreignDescriptorId)],
+                    0});
+                return;
+            }
             case IrValueOpcode::CallDynamic: {
                 if (value->callTarget == CallTargetKind::ClassConstructor) {
                     if (value->operands.empty()) {
@@ -1671,12 +1904,25 @@ struct Emitter {
                 }
 
                 if (value->callTarget == CallTargetKind::InstanceMethod) {
+                    const IrValue *property = value->operands.empty()
+                        ? nullptr : program.value(value->operands[0]);
+                    if (property != nullptr && property->operands.size() == 1) {
+                        emitValue(property->operands[0], output);
+                        const int methodNameIndex = registry.storeString(property->text);
+                        emitCallArguments(*value, output);
+                        output.push_back({OP_GOI_PHUONG_THUC,
+                            static_cast<int>(value->operands.size() - 1), methodNameIndex, 0});
+                        return;
+                    }
                     const auto member = splitRuntimeMemberName(value->text);
                     if (member.first.empty()) {
                         throw std::logic_error(std::string(
                             messages::kInternalDirectIrUnsupportedValue));
                     }
-                    const int receiverSlot = slotFor(member.first);
+                    const IrValue *callee = value->operands.empty()
+                        ? nullptr : program.value(value->operands.front());
+                    const int receiverSlot = slotForSymbol(
+                        callee == nullptr ? -1 : callee->symbolId, member.first);
                     const int methodNameIndex = registry.storeString(member.second);
                     output.push_back({OP_TEN_BIEN_GIA_TRI, 0, receiverSlot, 0});
                     emitCallArguments(*value, output);
@@ -1698,6 +1944,18 @@ struct Emitter {
                 emitCallArguments(*value, output);
                 const int argumentCount =
                     static_cast<int>(value->operands.size() - 1);
+
+                // Indirect calls bind to the exact parameter/local symbol,
+                // even when a global function has the same spelling.
+                const IrValue *callee = value->operands.empty()
+                    ? nullptr : program.value(value->operands.front());
+                if (value->callTarget == CallTargetKind::IndirectValue &&
+                    callee != nullptr && isLexicalSlotSymbol(callee->symbolId)) {
+                    output.push_back({OP_TEN_BIEN_GIA_TRI, 0,
+                                      slotForSymbol(callee->symbolId, callee->text), 0});
+                    output.push_back({OP_GOI_GIAN_TIEP, argumentCount, 0, 0});
+                    return;
+                }
 
                 if (!value->explicitCall) {
                     // Ordinary expression calls resolve after argument
@@ -1761,6 +2019,12 @@ struct Emitter {
                 activeFunctionName = "<lambda@" +
                     std::to_string(lambda->span.begin.line) + ":" +
                     std::to_string(lambda->span.begin.column) + ">";
+                const auto outerBreakScopes = std::move(breakScopes);
+                const std::size_t outerBlockDepth = emittedBlockDepth;
+                const std::size_t outerTryDepth = emittedTryDepth;
+                breakScopes.clear();
+                emittedBlockDepth = 0;
+                emittedTryDepth = 0;
                 {
                     DebugRangeGuard functionGuard(*this, functionBytecode, lambda->span);
                     functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
@@ -1771,6 +2035,9 @@ struct Emitter {
                     emitBlock(lambda->body, functionBytecode, false);
                     functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
                 }
+                breakScopes = outerBreakScopes;
+                emittedBlockDepth = outerBlockDepth;
+                emittedTryDepth = outerTryDepth;
                 functionDebugInfo.resize(functionBytecode.size());
                 activeDebugInfo = previousDebugInfo;
                 activeFunctionName = previousFunctionName;
@@ -1790,11 +2057,17 @@ struct Emitter {
     void emitBlock(const IrInstruction &block,
                    std::vector<Instruction> &output,
                    bool blockMarkers = true) {
-        if (blockMarkers) output.push_back({OP_MO_KHOI, 0, 0, 0});
+        if (blockMarkers) {
+            output.push_back({OP_MO_KHOI, 0, 0, 0});
+            ++emittedBlockDepth;
+        }
         for (const IrInstruction &child : block.children) {
             emitInstruction(child, output);
         }
-        if (blockMarkers) output.push_back({OP_DONG_KHOI, 0, 0, 0});
+        if (blockMarkers) {
+            output.push_back({OP_DONG_KHOI, 0, 0, 0});
+            --emittedBlockDepth;
+        }
     }
 
     // Phát một `IrInstruction` sang bytecode hoặc chuyển tiếp đến bộ phát chuyên biệt cho khối, điều kiện, vòng lặp và câu lệnh phức hợp.
@@ -1814,6 +2087,17 @@ struct Emitter {
         switch (instruction.opcode) {
             case IrOpcode::NoOp:
                 return;
+            case IrOpcode::DeclareVariable: {
+                const int slot = slotForSymbol(
+                    instruction.symbolId, instruction.declarationName);
+                output.push_back({OP_KHOI_TAO, 0, slot, 0});
+                if (!instruction.expressionRoots.empty()) {
+                    emitValue(instruction.expressionRoots.front(), output);
+                    output.push_back({OP_TEN_BIEN_ID, 0, slot, 0});
+                    output.push_back({OP_GAN, 0, 0, 0});
+                }
+                return;
+            }
             case IrOpcode::Import:
                 compileImportSpec(registry, instruction.importSpec, nextSlot, keywordMap);
                 return;
@@ -1846,7 +2130,7 @@ struct Emitter {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrLoopMissingInitializerTarget));
                 }
-                const int initSlot = slotFor(target->text);
+                const int initSlot = slotForSymbol(target->symbolId, target->text);
                 // The legacy loop wrapper emits KHỞI_TẠO on every loop,
                 // including when the textual slot already exists.
                 output.push_back({OP_KHOI_TAO, 0, initSlot, 0});
@@ -1857,17 +2141,34 @@ struct Emitter {
                 emitValue(instruction.expressionRoots[1], output);
                 const std::size_t exitJump = output.size();
                 output.push_back({OP_JUMP_IF_FALSE, 0, 0, 0});
+                breakScopes.push_back({true, emittedBlockDepth, emittedTryDepth, {}});
                 emitInstruction(instruction.children.front(), output);
+                BreakScope loopScope = std::move(breakScopes.back());
+                breakScopes.pop_back();
                 output.push_back({OP_CAP_NHAT, 0, 0, 0});
                 emitValue(instruction.expressionRoots[2], output);
                 output.push_back({OP_JUMP, conditionTarget, 0, 0});
                 output[exitJump].operand = static_cast<int>(output.size());
+                for (const std::size_t jump : loopScope.pendingJumps) {
+                    output[jump].operand = static_cast<int>(output.size());
+                }
                 return;
             }
-            case IrOpcode::Switch:
+            case IrOpcode::Switch: {
                 emitValue(instruction.expressionRoots.front(), output);
+                const std::size_t switchBegin = output.size();
                 output.push_back({OP_CHON, 0, 0, 0});
+                breakScopes.push_back({false, emittedBlockDepth, emittedTryDepth, {}});
+                std::size_t previousArmStart = 0;
                 for (const IrSwitchArm &arm : instruction.switchArms) {
+                    // A case that does not match must jump over its entire body.
+                    // Interpreting a skipped body can execute nested break/loop
+                    // instructions and corrupt the active switch frame.
+                    if (previousArmStart != 0) {
+                        output[previousArmStart].operandValue =
+                            static_cast<int>(output.size());
+                    }
+                    previousArmStart = output.size();
                     if (arm.kind ==
                         vietvm::frontend::AstSwitchArmKind::Default) {
                         output.push_back({OP_MAC_DINH, 0, 0, 0});
@@ -1894,7 +2195,7 @@ struct Emitter {
                                     messages::kInternalDirectIrSwitchEmptyNormalizedLabel));
                             }
                             output.push_back(
-                                {OP_CA, slotFor(legacyName), -2, 0});
+                                {OP_CA, slotForSymbol(label->symbolId, legacyName), -2, 0});
                         } else {
                             throw std::logic_error(std::string(
                                 messages::kInternalDirectIrUnsupportedSwitchLabel));
@@ -1903,21 +2204,46 @@ struct Emitter {
                     emitInstruction(
                         instruction.children[arm.bodyChildIndex], output);
                 }
+                breakScopes.pop_back();
+                if (previousArmStart != 0) {
+                    output[previousArmStart].operandValue =
+                        static_cast<int>(output.size());
+                }
+                output[switchBegin].operand = static_cast<int>(output.size());
+                output.push_back({OP_KET_THUC_CHUYEN, 0, 0, 0});
                 return;
-            case IrOpcode::Break:
-                output.push_back({OP_THOAT, 0, 0, 0});
+            }
+            case IrOpcode::Break: {
+                if (breakScopes.empty()) {
+                    throw std::logic_error("thoát phải nằm trong lặp hoặc chọn");
+                }
+                BreakScope &scope = breakScopes.back();
+                if (scope.loop) {
+                    const int blocks = static_cast<int>(emittedBlockDepth - scope.blockDepth);
+                    const int tries = static_cast<int>(emittedTryDepth - scope.tryDepth);
+                    scope.pendingJumps.push_back(output.size());
+                    // A negative operandIndex marks a loop break: -1-blocks.
+                    // operandValue holds the number of active try frames to pop.
+                    output.push_back({OP_THOAT, 0, -1 - blocks, tries});
+                } else {
+                    output.push_back({OP_THOAT, 0, 0, 0});
+                }
                 return;
+            }
             case IrOpcode::Try: {
                 const std::size_t tryBegin = output.size();
                 output.push_back({OP_THU, 0, -1, 0});
+                ++emittedTryDepth;
                 emitInstruction(instruction.children[0], output);
+                --emittedTryDepth;
                 const std::size_t tryEnd = output.size();
                 output.push_back({OP_THU_KET_THUC, 0, 0, 0});
                 output[tryBegin].operand = static_cast<int>(output.size());
 
                 const int catchSlot = instruction.catchVariable.empty()
                     ? -1
-                    : slotFor(instruction.catchVariable);
+                    : slotForSymbol(instruction.catchSymbolId,
+                                    instruction.catchVariable);
                 output.push_back({OP_BAT_LOI, 0, catchSlot, 0});
                 emitInstruction(instruction.children[1], output);
                 output[tryEnd].operand = static_cast<int>(output.size());
@@ -1967,10 +2293,19 @@ struct Emitter {
         const std::string previousFunctionName = activeFunctionName;
         activeDebugInfo = &functionDebugInfo;
         activeFunctionName = instruction.declarationName;
+        const auto outerBreakScopes = std::move(breakScopes);
+        const std::size_t outerBlockDepth = emittedBlockDepth;
+        const std::size_t outerTryDepth = emittedTryDepth;
+        breakScopes.clear();
+        emittedBlockDepth = 0;
+        emittedTryDepth = 0;
         DebugRangeGuard functionGuard(*this, functionBytecode, instruction.span);
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
-        for (const std::string &receiverName : instruction.implicitReceiverNames) {
-            const int receiverSlot = slotFor(receiverName);
+        for (std::size_t index = 0;
+             index < instruction.implicitReceiverNames.size(); ++index) {
+            const int receiverSlot = slotForSymbol(
+                instruction.implicitReceiverSymbolIds[index],
+                instruction.implicitReceiverNames[index]);
             functionBytecode.push_back({OP_KHOI_TAO, 0, receiverSlot, 0});
             functionBytecode.push_back({OP_PARAM, 0, receiverSlot, -1});
         }
@@ -1979,6 +2314,9 @@ struct Emitter {
             messages::kInternalDirectIrMissingParameterDefaultValue);
         emitBlock(instruction.children.front(), functionBytecode, false);
         functionBytecode.push_back({OP_DONG_KHOI, 0, 0, 0});
+        breakScopes = outerBreakScopes;
+        emittedBlockDepth = outerBlockDepth;
+        emittedTryDepth = outerTryDepth;
         functionDebugInfo.resize(functionBytecode.size());
         activeDebugInfo = previousDebugInfo;
         activeFunctionName = previousFunctionName;
@@ -2055,7 +2393,7 @@ struct Emitter {
                 messages::kInternalDirectIrInheritanceCycle,
                 {instruction.declarationName}));
         }
-        if (!instruction.superclassName.empty()) {
+        if (!instruction.superclassName.empty() && !instruction.importedSuperclass) {
             const auto parent = classesByName.find(instruction.superclassName);
             if (parent == classesByName.end()) {
                 throw std::logic_error(vietvm::messages::messageText(
@@ -2069,9 +2407,9 @@ struct Emitter {
         emittedClasses.insert(instruction.declarationName);
     }
 
-    // Phát toàn bộ chương trình IR theo thứ tự top-level rồi thêm lời gọi hàm
-    // entrypoint `chính`/opcode kết thúc. `main` được giữ làm alias tương thích
-    // ngược cho source V++ cũ trong giai đoạn chuyển đổi.
+    // Chạy hàm `chính()` trước nếu có. Với chương trình OOP không khai báo
+    // hàm này, tạo `Chính()` rồi gọi `chạy()` trên instance. `main()` được
+    // giữ làm alias tương thích với nguồn cũ.
     void emitProgram(bool emitEntryPointCall) {
         predeclareFunctions();
         for (const IrInstruction &instruction : program.instructions) {
@@ -2092,6 +2430,60 @@ struct Emitter {
             // that observable contract while VM slots and function IDs still
             // share one numeric namespace.
             bytecode.push_back({OP_GOI, 0, entryPoint->second, 0});
+        } else if (const auto entryClass = classesByName.find(u8"Chính");
+                   entryClass != classesByName.end()) {
+            // Xác thực chữ ký qua IR, kể cả phương thức được kế thừa trong
+            // cùng module. Lớp cha nhập từ module khác sẽ được VM kiểm tra.
+            const IrInstruction *currentClass = entryClass->second;
+            std::unordered_set<std::string> inspected;
+            const IrInstruction *runMethod = nullptr;
+            while (currentClass != nullptr &&
+                   inspected.insert(currentClass->declarationName).second) {
+                for (const IrInstruction &member : currentClass->children.front().children) {
+                    if (member.opcode == IrOpcode::DefineFunction &&
+                        member.declarationName ==
+                            currentClass->declarationName + u8".chạy") {
+                        runMethod = &member;
+                        break;
+                    }
+                }
+                if (runMethod != nullptr) break;
+                const auto parent = classesByName.find(currentClass->superclassName);
+                currentClass = parent == classesByName.end() ? nullptr : parent->second;
+            }
+            if (runMethod == nullptr &&
+                entryClass->second->superclassName.empty()) {
+                throw std::runtime_error(
+                    "Lớp Chính cần phương thức công khai chạy() để khởi chạy chương trình");
+            }
+            if (runMethod != nullptr) {
+                if (runMethod->effectiveVisibility == SemanticVisibility::Private ||
+                    runMethod->effectiveVisibility == SemanticVisibility::Protected) {
+                    throw std::runtime_error(
+                        "Phương thức điểm vào Chính.chạy() phải là công khai");
+                }
+                for (const IrParameter &parameter : runMethod->parameters) {
+                    if (!parameter.hasDefault) {
+                        throw std::runtime_error(
+                            "Phương thức điểm vào Chính.chạy() không được yêu cầu tham số");
+                    }
+                }
+            }
+            for (const IrInstruction &member :
+                 entryClass->second->children.front().children) {
+                if (member.opcode != IrOpcode::DefineFunction ||
+                    member.declarationName != u8"Chính.khởi tạo") continue;
+                for (const IrParameter &parameter : member.parameters) {
+                    if (!parameter.hasDefault) {
+                        throw std::runtime_error(
+                            "Hàm khởi tạo của lớp Chính không được yêu cầu tham số");
+                    }
+                }
+            }
+            const int className = registry.storeString(u8"Chính");
+            const int methodName = registry.storeString(u8"chạy");
+            bytecode.push_back({OP_TAO_DOI_TUONG, 0, className, 0});
+            bytecode.push_back({OP_GOI_PHUONG_THUC, 0, methodName, 0});
         }
         bytecode.push_back({OP_DUNG_CHUONG_TRINH, 0, 0, 0});
         bytecodeDebugInfo.resize(bytecode.size());
@@ -2102,7 +2494,7 @@ struct Emitter {
 
 // Duyệt IR để xác định phần nào backend direct IR có thể phát bytecode mà không cần rơi về đường biên dịch cũ.
 DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
-    DirectIrSupport support{true, 0};
+    DirectIrSupport support{true, 0, {}};
     SupportContext context;
     const auto collectFunctions = [&](const auto &self,
                                       const IrInstruction &instruction,
@@ -2110,7 +2502,6 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
         if (instruction.opcode == IrOpcode::DefineFunction &&
             instruction.symbolId >= 0) {
             context.functionSymbols.insert(instruction.symbolId);
-            context.functionNames.insert(instruction.declarationName);
             if (insideClass) {
                 context.methodSymbols.insert(instruction.symbolId);
                 context.methodDeclarationOffsets.emplace(
@@ -2134,6 +2525,8 @@ DirectIrSupport analyzeDirectIrSupport(const IrProgram &program) {
                                  false, false, 0, true)) {
             support.supported = false;
             ++support.unsupportedRegions;
+            if (!instruction.declarationName.empty())
+                support.unsupportedNames.push_back(instruction.declarationName);
         }
     }
     return support;
@@ -2146,8 +2539,24 @@ std::vector<Instruction> emitDirectBytecode(CompilationRegistryState &state,
                                             bool emitEntryPointCall) {
     const DirectIrSupport support = analyzeDirectIrSupport(program);
     if (!support.supported) {
-        throw std::logic_error(std::string(
-            messages::kInternalDirectIrProgramHasUnsupportedRegion));
+        std::string message(
+            messages::kInternalDirectIrProgramHasUnsupportedRegion);
+        message += " [module=";
+        message += state.currentSemanticModuleIdentity.empty()
+            ? (state.currentSourceIdentity.empty()
+                   ? std::string("<memory>")
+                   : state.currentSourceIdentity)
+            : state.currentSemanticModuleIdentity;
+        message += ", regions=" + std::to_string(support.unsupportedRegions) + "]";
+        if (!support.unsupportedNames.empty()) {
+            message += " [declarations=";
+            for (std::size_t i = 0; i < support.unsupportedNames.size(); ++i) {
+                if (i) message += ", ";
+                message += support.unsupportedNames[i];
+            }
+            message += "]";
+        }
+        throw std::logic_error(std::move(message));
     }
 
     Emitter emitter{state, program, keywordMap};

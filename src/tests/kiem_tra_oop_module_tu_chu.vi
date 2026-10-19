@@ -1,0 +1,130 @@
+// Kiểm thử linker đồ thị cấp function ID cho phương thức trong từng mô-đun.
+nhập gói/biên dịch/liên kết;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/kết quả;
+
+hàm oop_lệnh_khớp(c, v) {
+    nếu (độ dài(c) != độ dài(v)) { trả về sai; };
+    lặp(i = 0; i < độ dài(c); i++) {
+        nếu (c[i]["op"] != v[i]["op"] ||
+            c[i]["toán hạng"] != v[i]["toán hạng"] ||
+            c[i]["chỉ số"] != v[i]["chỉ số"] ||
+            c[i]["giá trị"] != v[i]["giá trị"]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm chính() {
+    nguồn = {
+        "app/main": "nhập ../lib/core như công_cụ; " +
+                    "lớp Vỏ { hàm công khai giá_trị() { trả về 5; }; }; " +
+                    "hàm chính() { v = Vỏ(); in công_cụ.tính(); in v.giá_trị(); };",
+        "lib/core": "lớp Lõi { hàm công khai giá_trị() { trả về 7; }; }; " +
+                    "hàm tính() { c = Lõi(); trả về c.giá_trị(); };"
+    };
+    artifact = biên dịch chương trình mô đun tự chủ("app/main", nguồn);
+    in artifact["loại"] == "bytecode V++ đồ thị đã liên kết";
+    in độ dài(artifact["hàm"]) == 4;
+    in artifact["hàm"][0]["tên"] == "chính";
+    in artifact["hàm"][1]["tên"] == "tính";
+    in artifact["hàm"][2]["tên"] == "Lõi.giá_trị";
+    in artifact["hàm"][3]["tên"] == "Vỏ.giá_trị";
+    in biên dịch chạy artifact(artifact) == "7\n5\n";
+    oracle = biên dịch snapshot nội bộ(nguồn["app/main"],
+                                     "fixtures/compiler_oracle/oop/app");
+    in oracle["hợp lệ"] == 1;
+    nếu (oracle["hợp lệ"] == 1) {
+        c = oracle["bytecode"];
+        v = [];
+        nếu (độ dài(artifact["bytecode"]) >= độ dài(c)) {
+            lặp(i = 0; i < độ dài(c); i++) { thêm(v, artifact["bytecode"][i]); };
+        };
+        in oop_lệnh_khớp(c, v);
+        cùng_hàm = độ dài(oracle["hàm"]) == độ dài(artifact["hàm"]);
+        nếu (cùng_hàm) {
+            lặp(i = 0; i < độ dài(oracle["hàm"]); i++) {
+                a = oracle["hàm"][i];
+                b = artifact["hàm"][i];
+                nếu (a["tên"] != b["tên chạy"] || a["id"] != b["id"] ||
+                    !oop_lệnh_khớp(a["bytecode"], b["bytecode"])) {
+                    cùng_hàm = sai;
+                };
+            };
+        };
+        in cùng_hàm;
+    };
+
+    // Method trong root được cấp ID tại lớp, trước lần import kế tiếp.
+    đảo = "lớp Trước { hàm công khai nhận() { trả về 9; }; }; " +
+          "nhập ../lib/core như công_cụ; " +
+          "hàm chính() { a = Trước(); in a.nhận(); in công_cụ.tính(); };";
+    đảo_artifact = biên dịch chương trình mô đun tự chủ("app/main", {
+        "app/main": đảo, "lib/core": nguồn["lib/core"]
+    });
+    đảo_oracle = biên dịch snapshot nội bộ(đảo, "fixtures/compiler_oracle/oop/app");
+    in đảo_oracle["hợp lệ"] == 1;
+    nếu (đảo_oracle["hợp lệ"] == 1) {
+        in đảo_artifact["hàm"][1]["tên"] == "Trước.nhận";
+        in biên dịch chạy artifact(đảo_artifact) == "9\n7\n";
+        trước_link = [];
+        oracle_top = đảo_oracle["bytecode"];
+        nếu (độ dài(đảo_artifact["bytecode"]) >= độ dài(oracle_top)) {
+            lặp(i = 0; i < độ dài(oracle_top); i++) {
+                thêm(trước_link, đảo_artifact["bytecode"][i]);
+            };
+        };
+        in oop_lệnh_khớp(oracle_top, trước_link);
+        khớp_hàm = độ dài(đảo_oracle["hàm"]) == độ dài(đảo_artifact["hàm"]);
+        nếu (khớp_hàm) {
+            lặp(i = 0; i < độ dài(đảo_oracle["hàm"]); i++) {
+                a = đảo_oracle["hàm"][i];
+                b = đảo_artifact["hàm"][i];
+                nếu (a["tên"] != b["tên chạy"] || a["id"] != b["id"] ||
+                    !oop_lệnh_khớp(a["bytecode"], b["bytecode"])) {
+                    khớp_hàm = sai;
+                };
+            };
+        };
+        in khớp_hàm;
+    };
+
+    // C++ phát lớp cha trước lớp con dù khai báo sau, rồi mới đi qua import.
+    kế_thừa_ngược = "lớp Con kế thừa Cha { " +
+                     "hàm công khai đọc() { trả về gốc.đọc() + 1; }; }; " +
+                     "lớp Cha { hàm công khai đọc() { trả về 30; }; }; " +
+                     "nhập ../lib/core như công_cụ; " +
+                     "hàm chính() { c = Con(); in c.đọc(); in công_cụ.tính(); };";
+    kế_thừa_artifact = biên dịch chương trình mô đun tự chủ("app/main", {
+        "app/main": kế_thừa_ngược, "lib/core": nguồn["lib/core"]
+    });
+    kế_thừa_oracle = biên dịch snapshot nội bộ(kế_thừa_ngược,
+                                              "fixtures/compiler_oracle/oop/app");
+    in kế_thừa_oracle["hợp lệ"] == 1;
+    nếu (kế_thừa_oracle["hợp lệ"] == 1) {
+        in kế_thừa_artifact["hàm"][1]["tên"] == "Cha.đọc";
+        in kế_thừa_artifact["hàm"][2]["tên"] == "Con.đọc";
+        in biên dịch chạy artifact(kế_thừa_artifact) == "31\n7\n";
+        so_top = [];
+        chuẩn_top = kế_thừa_oracle["bytecode"];
+        nếu (độ dài(kế_thừa_artifact["bytecode"]) >= độ dài(chuẩn_top)) {
+            lặp(i = 0; i < độ dài(chuẩn_top); i++) {
+                thêm(so_top, kế_thừa_artifact["bytecode"][i]);
+            };
+        };
+        in oop_lệnh_khớp(chuẩn_top, so_top);
+        khớp_hàm = độ dài(kế_thừa_oracle["hàm"]) == độ dài(kế_thừa_artifact["hàm"]);
+        nếu (khớp_hàm) {
+            lặp(i = 0; i < độ dài(kế_thừa_oracle["hàm"]); i++) {
+                a = kế_thừa_oracle["hàm"][i];
+                b = kế_thừa_artifact["hàm"][i];
+                nếu (a["tên"] != b["tên chạy"] || a["id"] != b["id"] ||
+                    !oop_lệnh_khớp(a["bytecode"], b["bytecode"])) {
+                    khớp_hàm = sai;
+                };
+            };
+        };
+        in khớp_hàm;
+    };
+};

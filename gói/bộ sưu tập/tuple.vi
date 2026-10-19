@@ -1,26 +1,55 @@
-// Module: lõi.tuple
-// Tuple MVP là collection bất biến, tạo từ list và chuyển ngược về list.
 
-hàm thành tuple(ds) {
-    trả về thanh_tuple(ds);
-};
 
-hàm thành list nội bộ(giá trị, chỉ_số, kết_quả) {
-    nếu (chỉ_số >= do_dai(giá trị)) {
-        trả về kết_quả;
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Tuple {
+    hàm công khai khởi tạo() {};
+
+    // Module: lõi.tuple
+    // Tuple MVP là collection bất biến, tạo từ list và chuyển ngược về list.
+    hàm riêng tư thành list nội bộ(giá trị, chỉ_số, kết_quả) {
+        nếu (chỉ_số >= do_dai(giá trị)) {
+            trả về kết_quả;
+        };
+        them(kết_quả, giá trị[chỉ_số]);
+        trả về mình.thành list nội bộ(giá trị, chỉ_số + 1, kết_quả);
     };
-    them(kết_quả, giá trị[chỉ_số]);
-    trả về thành list nội bộ(giá trị, chỉ_số + 1, kết_quả);
-};
 
-hàm thành list(giá trị) {
-    nếu (loai_cua(giá trị) != "danh sách" && loai_cua(giá trị) != "tuple") {
-        ném "thành danh sách chỉ nhận danh sách hoặc bộ";
+    hàm công khai thành list(giá trị) {
+        nếu (loai_cua(giá trị) != "danh sách" && loai_cua(giá trị) != "tuple") {
+            ném "thành danh sách chỉ nhận danh sách hoặc bộ";
+        };
+        // Sao chép nông: list mới độc lập, phần tử tham chiếu vẫn được chia sẻ.
+        trả về mình.thành list nội bộ(giá trị, 0, []);
     };
-    // Sao chép nông: list mới độc lập, phần tử tham chiếu vẫn được chia sẻ.
-    trả về thành list nội bộ(giá trị, 0, []);
+
+    hàm công khai thành tuple(ds) {
+        nếu (loai_cua(ds) == "tuple") {
+            trả về ds;
+        };
+        nếu (loai_cua(ds) != "danh sách") {
+            ném "thành bộ chỉ nhận danh sách hoặc bộ";
+        };
+        // Policy và sao chép nông nằm ở V++; VM chỉ vật chất hóa tuple bất biến.
+        trả về bộ(mình.thành list(ds));
+    };
+
+    hàm công khai thanh_list(giá trị) {
+        trả về mình.thành list(giá trị);
+    };
 };
 
-hàm thanh_list(giá trị) {
-    trả về thành list(giá trị);
+
+hàm công khai thành list(giá trị) {
+    __vpp_adapter = Tiện Ích Tuple();
+    trả về __vpp_adapter.thành list(giá trị);
+};
+
+hàm công khai thành tuple(ds) {
+    __vpp_adapter = Tiện Ích Tuple();
+    trả về __vpp_adapter.thành tuple(ds);
+};
+
+hàm công khai thanh_list(giá trị) {
+    __vpp_adapter = Tiện Ích Tuple();
+    trả về __vpp_adapter.thanh_list(giá trị);
 };

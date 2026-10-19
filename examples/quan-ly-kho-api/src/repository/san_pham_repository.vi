@@ -97,7 +97,7 @@ lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
             item = raw[i];
             nếu (lấy map(item, "id", "") == id) {
                 đãBỏ = đúng;
-            } nếu không {
+            } hoặc {
                 thêm(kếtQuả, item);
             };
         };

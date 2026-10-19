@@ -1,0 +1,74 @@
+// Đối chiếu compiler C++ với linker V++: function ID, tên runtime và đủ
+// bốn trường của từng opcode. Oracle không xuất initializer của dependency.
+nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/liên kết;
+
+hàm oracle bytecode khớp(cũ, mới) {
+    nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cũ); i++) {
+        nếu (cũ[i]["op"] != mới[i]["op"] ||
+            cũ[i]["toán hạng"] != mới[i]["toán hạng"] ||
+            cũ[i]["chỉ số"] != mới[i]["chỉ số"] ||
+            cũ[i]["giá trị"] != mới[i]["giá trị"]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm oracle root khớp(cũ, mới) {
+    nếu (độ dài(mới) != độ dài(cũ) + 2) { trả về sai; };
+    lặp(i = 0; i < độ dài(cũ); i++) {
+        nếu (cũ[i]["op"] != mới[i]["op"] ||
+            cũ[i]["toán hạng"] != mới[i]["toán hạng"] ||
+            cũ[i]["chỉ số"] != mới[i]["chỉ số"] ||
+            cũ[i]["giá trị"] != mới[i]["giá trị"]) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm oracle hàm khớp(cũ, mới) {
+    nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
+    lặp(i = 0; i < độ dài(cũ); i++) {
+        nếu (cũ[i]["id"] != mới[i]["id"] ||
+            cũ[i]["tên"] != mới[i]["tên chạy"] ||
+            !oracle bytecode khớp(cũ[i]["bytecode"], mới[i]["bytecode"])) {
+            trả về sai;
+        };
+    };
+    trả về đúng;
+};
+
+hàm oracle chạy ca(nguồn_gốc) {
+    oracle = biên dịch snapshot nội bộ(
+        nguồn_gốc, "fixtures/compiler_oracle/app");
+    vpp = biên dịch chương trình mô đun tự chủ("app/main", {
+        "app/main": nguồn_gốc,
+        "lib/feature": "công khai nhập math như số; " +
+                       "hàm tính() { trả về số.cộng(); };",
+        "lib/math": "hàm cộng() { trả về 41 + 1; }; in 99;"
+    });
+    in oracle["hợp lệ"] == 1;
+    nếu (oracle["hợp lệ"] == 1) {
+        in oracle root khớp(oracle["bytecode"], vpp["bytecode"]);
+        in oracle hàm khớp(oracle["hàm"], vpp["hàm"]);
+    } hoặc {
+        in sai;
+        in sai;
+    };
+};
+
+hàm chính() {
+    // Import một cấp có re-export xuyên qua bí danh.
+    oracle chạy ca("nhập ../lib/feature như api; " +
+                  "hàm chính() { in api.tính(); in api.số.cộng(); };");
+    // Cùng một module xuất hiện qua hai đường, chỉ khởi tạo một lần nhưng
+    // mỗi bí danh phải trỏ về cùng function ID và không rơi vào late-binding.
+    oracle chạy ca("nhập ../lib/feature như api; nhập ../lib/math như toán; " +
+                  "hàm chính() { in api.tính(); in toán.cộng(); in api.số.cộng(); };");
+    // Import lại module cấp trên dưới bí danh khác, giữ cả re-export.
+    oracle chạy ca("nhập ../lib/feature như api; nhập ../lib/feature như alt; " +
+                  "hàm chính() { in alt.tính(); in alt.số.cộng(); in api.tính(); };");
+};

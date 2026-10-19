@@ -1,0 +1,50 @@
+// Kiểm tra pipeline native nguồn -> AST/IR V++ -> ISA -> object.
+nhập gói/biên dịch/chính;
+
+hàm xác nhận(điều_kiện, thông_báo) {
+    nếu (!điều_kiện) { ném "native self-host: " + thông_báo; };
+}
+
+hàm từ chối(nguồn, tên_hàm) {
+    lỗi = sai;
+    thử { biên dịch native tự chủ(nguồn, tên_hàm, "aarch64", "macos"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    xác nhận(lỗi, "phải chặn nguồn không hỗ trợ: " + nguồn);
+}
+
+hàm chính() {
+    nguồn = "hàm twice(a) { trả về a + a; }; " +
+        "hàm sum(n) { biến total = 0; " +
+        "lặp (i = 0; i < n; i++) { " +
+        "nếu (i == 2) { bỏ qua; }; " +
+        "nếu (i == 7) { thoát; }; " +
+        "total += twice(i); }; trả về total; };";
+    ir = biên dịch native tạo IR(nguồn);
+    xác nhận(độ dài(ir["functions"]) == 2, "tạo IR cho hai hàm");
+    xác nhận(độ dài(ir["values"]) > 10, "phân tích biểu thức native");
+    mac = biên dịch native object tự chủ(nguồn, "sum", "aarch64", "macos", "darwin");
+    xác nhận(độ dài(mac["bytes"]) > 20, "phát mã AArch64");
+    xác nhận(độ dài(mac["relocations"]) == 1, "relocation AArch64");
+    xác nhận(mac["relocations"][0]["symbol"] == "twice", "đích gọi AArch64");
+    xác nhận(độ dài(mac["object"]) > độ dài(mac["bytes"]), "Mach-O object");
+    linux = biên dịch native object tự chủ(nguồn, "sum", "x86_64", "linux", "gnu");
+    xác nhận(độ dài(linux["bytes"]) > 20, "phát mã x86_64");
+    xác nhận(độ dài(linux["relocations"]) == 1, "relocation x86_64");
+    xác nhận(độ dài(linux["object"]) > độ dài(linux["bytes"]), "ELF object");
+    win = biên dịch native object tự chủ(nguồn, "sum", "x86_64", "windows", "msvc");
+    xác nhận(độ dài(win["object"]) > độ dài(win["bytes"]), "COFF object");
+
+    // Parameter/local có tên trùng function ID phải có namespace riêng.
+    che = "hàm item(x) { trả về x + 1; }; " +
+          "hàm other(item) { trả về item * 2; };";
+    máy = biên dịch native tự chủ(che, "other", "aarch64", "macos");
+    xác nhận(máy["machine"]["slotCount"] == 1, "tham số che tên hàm");
+    từ chối("hàm f(a) { trả về a / 2; };", "f");
+    từ chối("hàm f(a) { trả về unknown + a; };", "f");
+    từ chối("hàm f(a) { trả về a(1); };", "f");
+    từ chối("hàm f(a = 7) { trả về a; };", "f");
+    // In i32 đã được native hỗ trợ; in literal chuỗi vẫn phải bị từ chối.
+    từ chối("hàm f() { in \"chuỗi\"; trả về 1; };", "f");
+    từ chối("hàm f() { trả về 2147483648; };", "f");
+    in "native-selfhost-ok";
+}

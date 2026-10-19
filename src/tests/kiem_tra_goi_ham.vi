@@ -3,10 +3,10 @@ nhập gói/chuẩn/chính;
 hàm chính() {
     tăng = hàm(x) { trả về x + 1; };
     gấp đôi = hàm(x) { trả về x * 2; };
-    cộng = hàm(a, b) { trả về a + b; };
+    hàm_cộng = hàm(a, b) { trả về a + b; };
 
     in áp dụng(tăng, 3);
-    in áp dụng hai(cộng, 4, 5);
+    in áp dụng hai(hàm_cộng, 4, 5);
     in áp dụng(trước rồi(tăng, gấp đôi), 3);
     in áp dụng(nối hàm(tăng, gấp đôi), 3);
     in áp dụng(hàm đồng nhất(), 17);

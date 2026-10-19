@@ -9,64 +9,67 @@ namespace {
 thread_local RuntimeHeap *activeHeap = nullptr;
 
 template <typename T>
-bool trackWeak(std::vector<std::weak_ptr<T>> &registry,
+bool trackWeak(std::unordered_map<const T *, std::weak_ptr<T>> &registry,
                const std::shared_ptr<T> &value) {
     if (value == nullptr) return false;
-    for (auto it = registry.begin(); it != registry.end();) {
-        const std::shared_ptr<T> live = it->lock();
-        if (live == nullptr) {
-            it = registry.erase(it);
-            continue;
-        }
-        if (live.get() == value.get()) return false;
-        ++it;
+    const auto found = registry.find(value.get());
+    if (found != registry.end()) {
+        if (!found->second.expired()) return false;
+        // The allocator may reuse the address of an expired object before a
+        // sweep. Replace its weak control block rather than losing tracking.
+        found->second = value;
+        return true;
     }
-    registry.push_back(value);
+    registry.emplace(value.get(), value);
     return true;
 }
 
 template <typename T>
-void pruneExpired(std::vector<std::weak_ptr<T>> &registry) {
-    registry.erase(
-        std::remove_if(registry.begin(), registry.end(),
-                       [](const std::weak_ptr<T> &entry) { return entry.expired(); }),
-        registry.end());
+void pruneExpired(std::unordered_map<const T *, std::weak_ptr<T>> &registry) {
+    for (auto it = registry.begin(); it != registry.end();) {
+        if (it->second.expired()) it = registry.erase(it);
+        else ++it;
+    }
 }
 
 template <typename T>
-std::size_t liveCount(const std::vector<std::weak_ptr<T>> &registry) {
+std::size_t liveCount(const std::unordered_map<const T *, std::weak_ptr<T>> &registry) {
     return static_cast<std::size_t>(std::count_if(
         registry.begin(), registry.end(),
-        [](const std::weak_ptr<T> &entry) { return !entry.expired(); }));
+        [](const auto &entry) { return !entry.second.expired(); }));
 }
 
 // Đánh dấu toàn bộ object graph reachable từ một StackValue bằng worklist lặp;
 // cách này tránh dùng native C++ recursion khi list/map/instance graph rất sâu.
-void markValue(const StackValue &value,
-               std::unordered_set<const void *> &marked) {
-    std::vector<StackValue> pending;
-    pending.push_back(value);
+std::size_t markValue(const StackValue &value,
+                      std::unordered_set<const void *> &marked) {
+    // Marking never mutates the graph. Borrow slots instead of copying their
+    // strings and shared handles into the worklist on every collection.
+    std::vector<const StackValue *> pending;
+    pending.push_back(&value);
+    std::size_t tracedSlots = 0;
 
     while (!pending.empty()) {
-        StackValue current = std::move(pending.back());
+        const StackValue &current = *pending.back();
         pending.pop_back();
+        ++tracedSlots;
 
         if (std::holds_alternative<MapHandle>(current)) {
             const MapHandle &map = std::get<MapHandle>(current);
             if (map == nullptr || !marked.insert(map.get()).second) continue;
-            for (const auto &entry : map->entries) pending.push_back(entry.second);
+            for (const auto &entry : map->entries) pending.push_back(&entry.second);
             continue;
         }
         if (std::holds_alternative<ListHandle>(current)) {
             const ListHandle &list = std::get<ListHandle>(current);
             if (list == nullptr || !marked.insert(list.get()).second) continue;
-            for (const StackValue &element : list->elements) pending.push_back(element);
+            for (const StackValue &element : list->elements) pending.push_back(&element);
             continue;
         }
         if (std::holds_alternative<TupleHandle>(current)) {
             const TupleHandle &tuple = std::get<TupleHandle>(current);
             if (tuple == nullptr || !marked.insert(tuple.get()).second) continue;
-            for (const StackValue &element : tuple->elements) pending.push_back(element);
+            for (const StackValue &element : tuple->elements) pending.push_back(&element);
             continue;
         }
         if (std::holds_alternative<ClassHandle>(current)) {
@@ -79,22 +82,30 @@ void markValue(const StackValue &value,
         if (std::holds_alternative<InstanceHandle>(current)) {
             const InstanceHandle &instance = std::get<InstanceHandle>(current);
             if (instance == nullptr || !marked.insert(instance.get()).second) continue;
-            if (instance->klass != nullptr) pending.emplace_back(instance->klass);
-            for (const auto &field : instance->fields) pending.push_back(field.second);
+            ClassHandle klass = instance->klass;
+            while (klass != nullptr && marked.insert(klass.get()).second) {
+                klass = klass->superclass;
+            }
+            for (const auto &field : instance->fields) pending.push_back(&field.second);
             continue;
         }
         if (!std::holds_alternative<ClosureHandle>(current)) continue;
 
         const ClosureHandle &closure = std::get<ClosureHandle>(current);
         if (closure == nullptr || !marked.insert(closure.get()).second) continue;
+        ClassHandle klass = closure->methodOwnerClass;
+        while (klass != nullptr && marked.insert(klass.get()).second) {
+            klass = klass->superclass;
+        }
         for (const auto &capture : closure->captures) {
-            if (capture.second != nullptr) pending.push_back(capture.second->value);
+            if (capture.second != nullptr) pending.push_back(&capture.second->value);
         }
     }
+    return tracedSlots;
 }
 
 template <typename T, typename Clear>
-std::size_t sweepRegistry(std::vector<std::weak_ptr<T>> &registry,
+std::size_t sweepRegistry(std::unordered_map<const T *, std::weak_ptr<T>> &registry,
                           const std::unordered_set<const void *> &marked,
                           Clear clearEdges) {
     // Giữ strong handle cho toàn bộ object sắp sweep trước khi cắt cạnh. Nếu chỉ
@@ -102,8 +113,8 @@ std::size_t sweepRegistry(std::vector<std::weak_ptr<T>> &registry,
     // hủy dây chuyền qua shared_ptr destructor và làm tràn native stack.
     std::vector<std::shared_ptr<T>> garbage;
     garbage.reserve(registry.size());
-    for (const std::weak_ptr<T> &entry : registry) {
-        const std::shared_ptr<T> value = entry.lock();
+    for (const auto &entry : registry) {
+        const std::shared_ptr<T> value = entry.second.lock();
         if (value == nullptr || marked.count(value.get()) != 0) continue;
         garbage.push_back(value);
     }
@@ -194,6 +205,8 @@ void RuntimeHeap::trackValue(const StackValue &value) {
         const ClosureHandle &closure = std::get<ClosureHandle>(current);
         if (closure == nullptr || !visited.insert(closure.get()).second) continue;
         track(closure);
+        if (closure->methodOwnerClass != nullptr)
+            pending.emplace_back(closure->methodOwnerClass);
         for (const auto &capture : closure->captures) {
             if (capture.second != nullptr) pending.push_back(capture.second->value);
         }
@@ -213,7 +226,8 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
                           classes_.size() + instances_.size() + closures_.size();
 
     std::unordered_set<const void *> marked;
-    for (const StackValue &root : roots) markValue(root, marked);
+    std::size_t tracedSlots = 0;
+    for (const StackValue &root : roots) tracedSlots += markValue(root, marked);
     stats.marked = marked.size();
 
     stats.swept += sweepRegistry(
@@ -233,7 +247,9 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
             value.methods.clear();
         });
     stats.swept += sweepRegistry(
-        closures_, marked, [](RuntimeClosure &value) { value.captures.clear(); });
+        closures_, marked, [](RuntimeClosure &value) {
+            value.captures.clear(); value.methodOwnerClass.reset();
+        });
 
     pruneExpired(maps_);
     pruneExpired(lists_);
@@ -244,6 +260,11 @@ RuntimeHeapStats RuntimeHeap::collect(const std::vector<StackValue> &roots) {
     stats.trackedAfter = maps_.size() + lists_.size() + tuples_.size() +
                          classes_.size() + instances_.size() + closures_.size();
     collectedAllocationGeneration_ = allocationGeneration_;
+    // A byte/character buffer can contain hundreds of thousands of slots but
+    // count as just one tracked object. Budget against tracing work as well as
+    // object count, or transient stdlib adapters repeatedly rescan that buffer.
+    collectionBudget_ = std::max<std::size_t>(
+        256, std::max(stats.trackedAfter, tracedSlots) / 2);
     return stats;
 }
 

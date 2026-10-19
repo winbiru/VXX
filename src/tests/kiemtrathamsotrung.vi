@@ -1,0 +1,103 @@
+// Tham số trùng tên hàm toàn cục phải dùng slot cục bộ riêng.
+hàm đích() { trả về 7; };
+
+hàm tăng(đích) {
+    đích++;
+    trả về đích;
+};
+
+hàm cộng hai(đích) {
+    đích += 2;
+    trả về đích;
+};
+
+hàm áp dụng(đích) {
+    trả về đích();
+};
+
+hàm nguồn khác() { trả về 11; };
+
+// Local declarations must not alias a function ID or another function's local.
+hàm sửa cục bộ() {
+    biến đích = 20;
+    đích++;
+    đích += 2;
+    trả về đích;
+};
+
+hàm thực thi cục bộ() {
+    biến đích = nguồn khác;
+    trả về đích();
+};
+
+hàm kiểm tra cách ly() {
+    trả về đích();
+};
+
+hàm đọc trước khai báo() {
+    biến trước = đích;
+    biến đích = 9;
+    trả về trước == 0 && đích == 9;
+};
+
+hàm giữ tham số(đích) {
+    đọc = hàm(x) { trả về đích + x; };
+    trả về đọc(3);
+};
+
+hàm giữ cục bộ() {
+    biến đích = 30;
+    đọc = hàm() { đích += 1; trả về đích; };
+    trả về đọc() == 31 && đích == 31;
+};
+
+// Mỗi ràng buộc bắt lỗi cũng có SymbolId riêng, kể cả khi che tên hàm.
+hàm kiểm tra ngoại lệ() {
+    biến tổng = 0;
+    thử { ném 5; } bắt lỗi (đích) { tổng += đích; };
+    thử { ném 8; } bắt lỗi (đích) { tổng += đích; };
+    trả về tổng;
+};
+
+// Catch chỉ che tên trong thân bắt lỗi; tham số và biến ngoài vẫn giữ giá trị.
+hàm giữ tham số sau bắt lỗi(e) {
+    biến đã_bắt = 0;
+    thử { ném 5; } bắt lỗi (e) { đã_bắt = e; };
+    trả về đã_bắt == 5 && e == 13;
+};
+
+hàm giữ cục bộ sau bắt lỗi() {
+    biến e = 7;
+    biến đã_bắt = 0;
+    thử { ném 9; } bắt lỗi (e) { đã_bắt = e; };
+    trả về đã_bắt == 9 && e == 7;
+};
+
+hàm bắt lỗi lồng nhau() {
+    biến tổng = 0;
+    thử { ném 1; } bắt lỗi (e) {
+        tổng += e;
+        thử { ném 2; } bắt lỗi (e) { tổng += e; };
+        tổng += e;
+    };
+    trả về tổng == 4;
+};
+
+hàm chính() {
+    in tăng(5) == 6;
+    in cộng hai(5) == 7;
+    in áp dụng(đích) == 7;
+    in đích() == 7;
+    in sửa cục bộ() == 23;
+    in thực thi cục bộ() == 11;
+    in kiểm tra cách ly() == 7;
+    in đọc trước khai báo();
+    in giữ tham số(4) == 7;
+    in giữ cục bộ();
+    in đích() == 7;
+    in kiểm tra ngoại lệ() == 13;
+    in đích() == 7;
+    in giữ tham số sau bắt lỗi(13);
+    in giữ cục bộ sau bắt lỗi();
+    in bắt lỗi lồng nhau();
+};

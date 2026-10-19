@@ -123,12 +123,38 @@ std::string joinTokenText(const std::vector<Token> &tokens,
     return result;
 }
 
+std::string unquoteToken(const std::string &value) {
+    if (value.size() >= 2 &&
+        ((value.front() == '"' && value.back() == '"') ||
+         (value.front() == '\'' && value.back() == '\''))) {
+        return value.substr(1, value.size() - 2);
+    }
+    return value;
+}
+
 // Chuyển range vị trí nguồn; hàm chuyển giá trị đầu vào sang kiểu/biểu diễn đích và trả kết quả đã chuẩn hóa.
 SourceSpan tokenRangeSpan(const std::vector<Token> &tokens,
                           std::size_t begin,
                           std::size_t end) {
     if (begin >= end || end > tokens.size()) return {};
     return {tokens[begin].span.begin, tokens[end - 1].span.end};
+}
+
+// Names of classes and interfaces may contain multiple identifier tokens.
+// Keywords such as `kế thừa` and `triển khai` terminate the name.
+std::string readTypeName(const std::vector<Token> &tokens,
+                         std::size_t &cursor,
+                         std::size_t end,
+                         SourceSpan *span = nullptr) {
+    const std::size_t begin = cursor;
+    while (cursor < end && tokens[cursor].kind == TokenKind::Identifier &&
+           !tokens[cursor].lexeme.empty()) {
+        ++cursor;
+    }
+    if (span != nullptr && cursor > begin) {
+        *span = tokenRangeSpan(tokens, begin, cursor);
+    }
+    return joinTokenText(tokens, begin, cursor);
 }
 
 // Chuyển token modifier truy cập thành `AstVisibility`; hàm nhận các từ khóa công khai/riêng tư/bảo vệ và trả enum tương ứng.
@@ -175,6 +201,28 @@ private:
         if (left == kInvalidExprId) return kInvalidExprId;
 
         while (pos_ < end_) {
+            if (!tokens_[pos_].lexeme.empty() && tokens_[pos_].lexeme.front() == '.') {
+                const std::size_t begin = expressions_[left].tokenBegin;
+                const bool separateDot = tokens_[pos_].lexeme == ".";
+                if (separateDot) ++pos_;
+                const std::size_t nameBegin = pos_;
+                while (pos_ < end_ && isCallableNamePiece(tokens_[pos_]) &&
+                       leftBindingPower(tokens_[pos_].lexeme) < 0 &&
+                       tokens_[pos_].lexeme != "++" && tokens_[pos_].lexeme != "--") {
+                    ++pos_;
+                }
+                if (nameBegin == pos_) return kInvalidExprId;
+                AstExpression member;
+                member.kind = AstExpressionKind::Member;
+                member.tokenBegin = begin;
+                member.tokenEnd = pos_;
+                member.left = left;
+                member.text = joinTokenText(tokens_, nameBegin, pos_);
+                if (!separateDot) member.text.erase(0, 1);
+                if (member.text.empty()) return kInvalidExprId;
+                left = append(std::move(member));
+                continue;
+            }
             if (tokens_[pos_].lexeme == "(") {
                 left = parseCall(left);
                 if (left == kInvalidExprId) return kInvalidExprId;
@@ -766,6 +814,10 @@ AstStatement Parser::parseStatement(bool insideBlock) {
 
     const std::size_t begin = pos_;
     AstStatementKind kind = classify(begin);
+    if (tokens_[begin].lexeme == "hoặc") {
+        throw ParseError("'hoặc' phải đứng sau nhánh 'nếu' và chỉ được xuất hiện một lần ở cuối chuỗi điều kiện",
+                         tokens_[begin].span);
+    }
     if (kind == AstStatementKind::Empty) {
         ++pos_;
         AstStatement empty;
@@ -843,7 +895,40 @@ AstStatement Parser::parseStatement(bool insideBlock) {
 
             if (kind == AstStatementKind::Conditional &&
                 pos_ < tokens_.size() && isContinuation(pos_)) {
+                if (parsedBlocks > 1) {
+                    throw ParseError("nhánh 'hoặc' cuối cùng không được theo sau bởi 'hoặc' khác",
+                                     tokens_[pos_].span);
+                }
+                // `hoặc nếu` là nhánh else-if: dựng conditional lồng trong
+                // nhánh else để giữ cấu trúc IR hai nhánh và thứ tự đánh giá.
+                if (pos_ + 1 < tokens_.size() &&
+                    tokens_[pos_ + 1].lexeme == "nếu") {
+                    ++pos_; // tiêu thụ `hoặc`, parse nhánh `nếu` kế tiếp
+                    const std::size_t nestedBegin = pos_;
+                    AstStatement nested = parseStatement(insideBlock);
+                    AstStatement elseBranch;
+                    elseBranch.kind = AstStatementKind::Block;
+                    elseBranch.tokenBegin = nestedBegin;
+                    elseBranch.tokenEnd = pos_;
+                    elseBranch.span = spanFor(nestedBegin, pos_);
+                    elseBranch.children.push_back(std::move(nested));
+                    statement.children.push_back(std::move(elseBranch));
+                    ++parsedBlocks;
+                    break;
+                }
+                if (pos_ + 1 >= tokens_.size() ||
+                    tokens_[pos_ + 1].lexeme != "{") {
+                    throw ParseError("sau 'hoặc' cần '{' hoặc 'nếu (điều kiện)'",
+                                     tokens_[pos_].span);
+                }
                 continue;
+            }
+            if (kind == AstStatementKind::Conditional &&
+                pos_ + 1 < tokens_.size() &&
+                tokens_[pos_].lexeme == "nếu" &&
+                tokens_[pos_ + 1].lexeme == "không") {
+                throw ParseError("đã bỏ 'nếu không'; dùng 'hoặc' hoặc 'hoặc nếu'",
+                                 tokens_[pos_].span);
             }
             if (kind == AstStatementKind::Try && parsedBlocks == 1 &&
                 pos_ < tokens_.size() && tokens_[pos_].lexeme == "bắt lỗi") {
@@ -895,12 +980,35 @@ AstStatement Parser::parseStatement(bool insideBlock) {
     statement.tokenEnd = pos_;
     statement.span = spanFor(begin, pos_);
     statement.declarationName = declarationName(begin, pos_, kind);
+    if (kind == AstStatementKind::VariableDeclaration) {
+        // Align the grammar with gói/biên dịch/chương trình.vi: `biến name [= expr];`.
+        // Reject malformed declarations at the parser boundary, not during IR emission.
+        const std::size_t cursor = begin + 2;
+        if (statement.declarationName.empty() || pos_ <= cursor ||
+            tokens_[pos_ - 1].lexeme != ";" ||
+            (cursor != pos_ - 1 && tokens_[cursor].lexeme != "=")) {
+            throw ParseError("khai báo biến không hợp lệ: cần 'biến tên [= biểu thức];'",
+                             statement.span);
+        }
+    }
     attachDeclarationPayload(statement);
     attachImportForm(statement);
+    attachForeignForm(statement);
     attachExpressionRoots(statement);
+    if (kind == AstStatementKind::VariableDeclaration &&
+        statement.tokenBegin + 2 < statement.tokenEnd - 1 &&
+        (statement.expressionRoots.size() != 1 ||
+         tokens_[statement.tokenBegin + 2].lexeme != "=")) {
+        throw ParseError("biểu thức khởi tạo biến không hợp lệ", statement.span);
+    }
     attachClassForm(statement);
     attachInterfaceForm(statement);
     attachConditionalForm(statement);
+    if (kind == AstStatementKind::Conditional &&
+        statement.conditionalForm == AstConditionalForm::Unstructured) {
+        throw ParseError("cú pháp 'nếu' không hợp lệ: cần 'nếu (điều kiện) { ... }' và nhánh 'hoặc' hợp lệ",
+                         statement.span);
+    }
     attachLoopForm(statement);
     attachTryForm(statement);
     return statement;
@@ -917,6 +1025,8 @@ AstStatementKind Parser::classify(std::size_t begin) const noexcept {
     if (lexeme == ";") return AstStatementKind::Empty;
     if (lexeme == "{") return AstStatementKind::Block;
     if (lexeme == "nhập") return AstStatementKind::Import;
+    if (lexeme == "ngoại thư viện") return AstStatementKind::ForeignLibrary;
+    if (lexeme == "ngoại hàm") return AstStatementKind::ForeignFunction;
     if (lexeme == "hàm") return AstStatementKind::Function;
     if (lexeme == "lớp") return AstStatementKind::Class;
     if (lexeme == "giao diện") return AstStatementKind::Interface;
@@ -929,6 +1039,7 @@ AstStatementKind Parser::classify(std::size_t begin) const noexcept {
     if (lexeme == "bỏ qua") return AstStatementKind::Continue;
     if (lexeme == "ném") return AstStatementKind::Throw;
     if (lexeme == "thử") return AstStatementKind::Try;
+    if (lexeme == "biến") return AstStatementKind::VariableDeclaration;
     return AstStatementKind::Expression;
 }
 
@@ -938,12 +1049,26 @@ std::string Parser::declarationName(std::size_t begin,
                                     AstStatementKind kind) const {
     if (begin >= end || end > tokens_.size()) return {};
 
+    if (kind == AstStatementKind::VariableDeclaration) {
+        // `biến` introduces one identifier, as in the V++ bootstrap parser.
+        const std::size_t index = begin + 1;
+        if (index >= end || tokens_[index].kind != TokenKind::Identifier) return {};
+        return tokens_[index].lexeme;
+    }
+
     if (kind == AstStatementKind::Class || kind == AstStatementKind::Interface) {
         std::size_t index = begin + 1;
         if (index < end && isVisibility(tokens_[index].lexeme)) ++index;
-        return index < end && isNamePiece(tokens_[index].lexeme) ? tokens_[index].lexeme : std::string{};
+        return readTypeName(tokens_, index, end);
     }
 
+    if (kind == AstStatementKind::ForeignLibrary ||
+        kind == AstStatementKind::ForeignFunction) {
+        const std::size_t index = begin + 1;
+        return index < end && isNamePiece(tokens_[index].lexeme)
+            ? tokens_[index].lexeme
+            : std::string{};
+    }
     if (kind != AstStatementKind::Function) return {};
     std::size_t index = begin + 1;
     if (index < end && isVisibility(tokens_[index].lexeme)) ++index;
@@ -1117,6 +1242,99 @@ void Parser::attachImportForm(AstStatement &statement) {
     statement.importSpec = std::move(spec);
 }
 
+void Parser::attachForeignForm(AstStatement &statement) {
+    if (statement.kind != AstStatementKind::ForeignLibrary &&
+        statement.kind != AstStatementKind::ForeignFunction) return;
+    const std::size_t begin = statement.tokenBegin;
+    const std::size_t end = statement.tokenEnd;
+    auto fail = [&](const std::string &message, std::size_t at) {
+        throw ParseError(message, at < tokens_.size() ? tokens_[at].span : statement.span);
+    };
+    if (end <= begin + 1 || end > tokens_.size() || tokens_[end - 1].lexeme != ";") {
+        fail("khai báo ngoại phải kết thúc bằng ';'", begin);
+    }
+    if (statement.kind == AstStatementKind::ForeignLibrary) {
+        if (end - begin != 5 || tokens_[begin + 2].lexeme != "=" ||
+            tokens_[begin + 3].kind != TokenKind::String) {
+            fail("cú pháp ngoại thư viện: ngoại thư viện tên = \"logical.id\";", begin);
+        }
+        statement.foreignLibrary.name = tokens_[begin + 1].lexeme;
+        statement.foreignLibrary.nameSpan = tokens_[begin + 1].span;
+        statement.foreignLibrary.target = unquoteToken(tokens_[begin + 3].lexeme);
+        statement.foreignLibrary.targetSpan = tokens_[begin + 3].span;
+        return;
+    }
+
+    std::size_t cursor = begin + 1;
+    if (cursor >= end - 1 || !isNamePiece(tokens_[cursor].lexeme)) {
+        fail("ngoại hàm thiếu tên", cursor);
+    }
+    statement.declarationName = tokens_[cursor++].lexeme;
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != "(") fail("ngoại hàm thiếu '('", cursor);
+    ++cursor;
+    while (cursor < end - 1 && tokens_[cursor].lexeme != ")") {
+        if (!isNamePiece(tokens_[cursor].lexeme)) fail("tham số ngoại không hợp lệ", cursor);
+        AstForeignParameter parameter;
+        parameter.name = tokens_[cursor].lexeme;
+        parameter.span = tokens_[cursor].span;
+        ++cursor;
+        if (cursor >= end - 1 || tokens_[cursor].lexeme != ":") fail("tham số ngoại thiếu ':'", cursor);
+        ++cursor;
+        if (cursor >= end - 1 || !isNamePiece(tokens_[cursor].lexeme)) fail("tham số ngoại thiếu kiểu ABI", cursor);
+        parameter.abiType = tokens_[cursor++].lexeme;
+        if (cursor < end - 1 && tokens_[cursor].lexeme == "[") {
+            ++cursor;
+            if (cursor >= end - 1 ||
+                (!isNamePiece(tokens_[cursor].lexeme) &&
+                 tokens_[cursor].kind != TokenKind::Integer)) {
+                fail("độ dài đệm FFI phải là số byte hoặc tên tham số", cursor);
+            }
+            parameter.bufferExtent = tokens_[cursor++].lexeme;
+            if (cursor >= end - 1 || tokens_[cursor].lexeme != "]") {
+                fail("độ dài đệm FFI thiếu ']'", cursor);
+            }
+            ++cursor;
+        }
+        statement.foreignFunction.parameters.push_back(std::move(parameter));
+        if (tokens_[cursor].lexeme == ",") { ++cursor; continue; }
+        if (tokens_[cursor].lexeme != ")") fail("danh sách tham số ngoại không hợp lệ", cursor);
+    }
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != ")") fail("ngoại hàm thiếu ')'", cursor);
+    ++cursor;
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != ":") fail("ngoại hàm thiếu kiểu trả về", cursor);
+    ++cursor;
+    if (cursor >= end - 1 || !isNamePiece(tokens_[cursor].lexeme)) fail("ngoại hàm thiếu kiểu trả về", cursor);
+    statement.foreignFunction.returnType = tokens_[cursor++].lexeme;
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != "từ") fail("ngoại hàm thiếu 'từ'", cursor);
+    ++cursor;
+    if (cursor >= end - 1 || !isNamePiece(tokens_[cursor].lexeme)) fail("ngoại hàm thiếu thư viện", cursor);
+    statement.foreignFunction.libraryName = tokens_[cursor].lexeme;
+    statement.foreignFunction.librarySpan = tokens_[cursor++].span;
+    if (cursor >= end - 1 || tokens_[cursor].lexeme != "ký hiệu") fail("ngoại hàm thiếu 'ký hiệu'", cursor);
+    ++cursor;
+    if (cursor >= end - 1 || tokens_[cursor].kind != TokenKind::String) fail("ngoại hàm thiếu symbol literal", cursor);
+    statement.foreignFunction.symbol = unquoteToken(tokens_[cursor].lexeme);
+    statement.foreignFunction.symbolSpan = tokens_[cursor++].span;
+    while (cursor < end - 1) {
+        if (tokens_[cursor].lexeme == "abi") {
+            ++cursor;
+            if (cursor >= end - 1 || tokens_[cursor].kind != TokenKind::String) fail("abi phải là chuỗi", cursor);
+            statement.foreignFunction.abi = unquoteToken(tokens_[cursor++].lexeme);
+            continue;
+        }
+        if (tokens_[cursor].lexeme == "khả năng") {
+            ++cursor;
+            if (cursor >= end - 1 || tokens_[cursor].kind != TokenKind::String) fail("khả năng phải là chuỗi", cursor);
+            statement.foreignFunction.capability = unquoteToken(tokens_[cursor++].lexeme);
+            continue;
+        }
+        fail("thuộc tính ngoại hàm không hợp lệ", cursor);
+    }
+    if (statement.foreignFunction.capability.empty()) {
+        fail("ngoại hàm phải khai báo 'khả năng'", begin);
+    }
+}
+
 // Thử dựng expression root từ dải token của câu lệnh; khi parse thành công hàm lưu ExprId, còn lỗi dạng legacy được giữ cho đường tương thích.
 ExprId Parser::tryParseExpression(std::size_t begin, std::size_t end) {
     while (end > begin && tokens_[end - 1].lexeme == ";") --end;
@@ -1177,6 +1395,14 @@ void Parser::attachExpressionRoots(AstStatement &statement) {
         const ExprId root = tryParseExpression(expressionBegin, expressionEnd);
         if (root != kInvalidExprId) statement.expressionRoots.push_back(root);
     };
+
+    if (statement.kind == AstStatementKind::VariableDeclaration) {
+        const std::size_t cursor = begin + 2;
+        if (cursor < end && tokens_[cursor].lexeme == "=") {
+            attach(cursor + 1, end);
+        }
+        return;
+    }
 
     if (statement.kind == AstStatementKind::Expression) {
         attach(begin, end);
@@ -1240,35 +1466,26 @@ void Parser::attachClassForm(AstStatement &statement) {
 
     std::size_t cursor = begin + 1;
     if (cursor < end && isVisibility(tokens_[cursor].lexeme)) ++cursor;
-    if (cursor >= end || tokens_[cursor].kind != TokenKind::Identifier ||
-        tokens_[cursor].lexeme.empty()) {
-        return;
-    }
-    ++cursor;
+    if (readTypeName(tokens_, cursor, end).empty()) return;
 
     // `kế thừa` là cú pháp chuẩn của V++; dấu `:` vẫn được chấp nhận để tương thích mã cũ.
     if (cursor < end &&
         (tokens_[cursor].lexeme == "kế thừa" || tokens_[cursor].lexeme == ":")) {
         ++cursor;
-        if (cursor >= end || tokens_[cursor].kind != TokenKind::Identifier ||
-            tokens_[cursor].lexeme.empty()) {
-            return;
-        }
-        statement.superclassName = tokens_[cursor].lexeme;
-        statement.superclassSpan = tokens_[cursor].span;
-        ++cursor;
+        statement.superclassName = readTypeName(
+            tokens_, cursor, end, &statement.superclassSpan);
+        if (statement.superclassName.empty()) return;
     }
 
     if (cursor < end && tokens_[cursor].lexeme == "triển khai") {
         ++cursor;
         while (cursor < end) {
-            if (tokens_[cursor].kind != TokenKind::Identifier ||
-                tokens_[cursor].lexeme.empty()) {
-                return;
-            }
+            SourceSpan interfaceSpan;
+            const std::string interfaceName = readTypeName(
+                tokens_, cursor, end, &interfaceSpan);
+            if (interfaceName.empty()) return;
             statement.implementedInterfaces.push_back(
-                AstTypeReference{tokens_[cursor].lexeme, tokens_[cursor].span});
-            ++cursor;
+                AstTypeReference{interfaceName, interfaceSpan});
             if (cursor >= end || tokens_[cursor].lexeme != ",") break;
             ++cursor;
         }
@@ -1304,11 +1521,7 @@ void Parser::attachInterfaceForm(AstStatement &statement) {
 
     std::size_t cursor = begin + 1;
     if (cursor < end && isVisibility(tokens_[cursor].lexeme)) ++cursor;
-    if (cursor >= end || tokens_[cursor].kind != TokenKind::Identifier ||
-        tokens_[cursor].lexeme.empty()) {
-        return;
-    }
-    ++cursor;
+    if (readTypeName(tokens_, cursor, end).empty()) return;
 
     // Theo mô hình Java: interface dùng cùng quan hệ `kế thừa` (extends) và
     // có thể kế thừa nhiều interface. Dấu `:` chỉ còn là alias tương thích cũ.
@@ -1316,13 +1529,12 @@ void Parser::attachInterfaceForm(AstStatement &statement) {
         (tokens_[cursor].lexeme == "kế thừa" || tokens_[cursor].lexeme == ":")) {
         ++cursor;
         while (cursor < end) {
-            if (tokens_[cursor].kind != TokenKind::Identifier ||
-                tokens_[cursor].lexeme.empty()) {
-                return;
-            }
+            SourceSpan interfaceSpan;
+            const std::string interfaceName = readTypeName(
+                tokens_, cursor, end, &interfaceSpan);
+            if (interfaceName.empty()) return;
             statement.extendedInterfaces.push_back(
-                AstTypeReference{tokens_[cursor].lexeme, tokens_[cursor].span});
-            ++cursor;
+                AstTypeReference{interfaceName, interfaceSpan});
             if (cursor >= end || tokens_[cursor].lexeme != ",") break;
             ++cursor;
         }
@@ -1378,8 +1590,7 @@ void Parser::attachConditionalForm(AstStatement &statement) {
 
     if (statement.children.size() != 2 || thenBlock.tokenEnd >= end) return;
     const std::size_t continuation = thenBlock.tokenEnd;
-    if (tokens_[continuation].lexeme != "hoặc" &&
-        tokens_[continuation].lexeme != "nếu không") {
+    if (tokens_[continuation].lexeme != "hoặc") {
         return;
     }
     const AstStatement &elseBlock = statement.children[1];
@@ -1495,7 +1706,7 @@ bool Parser::isCompound(AstStatementKind kind) const noexcept {
 bool Parser::isContinuation(std::size_t tokenIndex) const noexcept {
     if (tokenIndex >= tokens_.size()) return false;
     const std::string &lexeme = tokens_[tokenIndex].lexeme;
-    return lexeme == "hoặc" || lexeme == "nếu không";
+    return lexeme == "hoặc";
 }
 
 // Phân tích token; hàm duyệt đầu vào theo ngữ pháp/định dạng quy định, tạo cấu trúc kết quả và báo lỗi khi dữ liệu không hợp lệ.

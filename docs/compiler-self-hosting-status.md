@@ -1,0 +1,1194 @@
+# V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
+
+## Nạp artifact và kiểm thử i32 bằng compiler V++ (18/10/2026)
+
+`Bộ Mã Hóa Artifact` có API `biên dịch artifact giải mã dây` và
+`biên dịch chạy artifact văn bản`. CLI `run --artifact` dùng đường này để
+giữ bốn vùng ABI dưới dạng arrays qua bước kiểm tra và thực thi. Việc kiểm
+tra định dạng/version, loại artifact, StringPool, function ID/name index,
+initializer và bốn trường i32/opcode thực hiện bằng V++. Biểu diễn map
+version 1 vẫn được đọc qua cùng bộ kiểm tra; API giải mã trả artifact map
+tiếp tục phục vụ các công cụ cần chỉnh sửa bytecode.
+
+Serializer chỉ chuyển artifact map sang ABI một lần mỗi lần gọi. Bộ nạp
+dùng bảng khóa cho kiểm tra trùng function name index/initializer thay vì
+quét toàn bộ danh sách đã nạp. Mỗi lần tuần tự hóa đọc lại dữ liệu hiện tại,
+kể cả khi caller vừa sửa artifact. Đường VM chung cung cấp GC theo chi phí
+duyệt graph và phép cộng/trừ/nhân i32 có kết quả two's-complement xác định.
+
+CTest `vpp-selfhost-i32-artifact` chạy bộ kiểm thử V++ bằng bootstrap, biên
+dịch chính bộ kiểm thử và các module compiler bằng `--compiler=vpp`, rồi
+chạy artifact đó. Compiler trong artifact tiếp tục biên dịch nguồn mới có
+biên i32, phép toán tràn, tham số mặc định và gán kết hợp; bộ kiểm thử còn
+đối chiếu API map/wire và từ chối artifact sai ABI. Test CLI kiểm tra thêm
+C++/V++ parity và chạy artifact i32 sau khi xóa nguồn đầu vào.
+
+Kiểm chứng trên macOS ARM64 Release ngày 18/10/2026: chín CTest liên quan
+đến bootstrap, self-host i32/artifact, runtime GC/JIT, CLI, OOP, source corpus,
+import và tích hợp đều đạt. Bootstrap mở rộng chạy trực tiếp bằng
+`scripts/quality/checkbootstrapstage3.cmake` cũng đạt Stage 1 → Stage 2 →
+Stage 3; compiler Stage 3 sinh artifact cho chương trình kiểm tra chạy ra
+`52`. Test ba thế hệ vẫn là lựa chọn bật riêng trong CMake do thời gian
+biên dịch đầy đủ dài hơn kiểm thử thường quy.
+
+## Khảo sát bỏ toàn bộ C/C++ và libSystem (17/10/2026)
+
+Đích nghiên cứu được chọn là macOS ARM64 thử nghiệm, bỏ cả `libSystem`.
+Probe tự tạo Mach-O và chữ ký SHA-256 đã xác nhận trên macOS 26.6.2:
+executable qua dyld không có import dylib vẫn nạp `libSystem`; executable
+ARM64 tĩnh và executable dùng loader riêng đều không chạy xong probe.
+Vì vậy chưa thể công bố toolchain hoàn toàn độc lập trên host release
+hiện tại. Chi tiết bằng chứng, cách chạy lại và thứ tự thay startup,
+runtime, linker, signer, cache và bootstrap nằm trong
+[khảo sát freestanding macOS](native-freestanding-macos.md).
+
+## Native ARM64: biên dịch object theo module (17/10/2026)
+
+Nhánh native thử nghiệm giữ quy trình bootstrap Stage 0 (trình biên dịch
+V++ trên runtime hiện có) → Stage 1 (executable V++) → Stage 2–4.
+`module_loader.vi` nạp các module độc lập theo thứ tự phụ thuộc; bộ biên
+dịch hai lượt trong `module_compile.vi` trả bảng chữ ký toàn cục và ranh
+giới function ID của từng đơn vị nguồn.
+
+`program_codegen.vi` phát mã ARM64 riêng cho từng đoạn module. CALL cục
+bộ được vá trực tiếp, trong khi các CALL liên module giữ bản ghi relocation.
+`module_object.vi` tạo MH_OBJECT độc lập, xuất `_main` cho hàm vào và
+`_vpp_fn_<tên>` cho các hàm còn lại; các lời gọi ngoài module tạo symbol
+undefined cùng `ARM64_RELOC_BRANCH26`. Các lời gọi runtime sử dụng cùng cơ
+chế relocation. `driver.vi` đóng gói các object thành archive nhị phân:
+`[i32 độ dài][bytes Mach-O]...`.
+
+`vpp_native_link_macho_modules` trong `vpp_aot_runtime.c` tạo tệp object
+tạm riêng, gọi clang/ld của macOS để giải symbol và liên kết executable
+theo cách nguyên tử; tệp đầu ra cũ được giữ nếu liên kết thất bại. Đây là
+**separate compilation về mặt mã máy**, hiện vẫn thực hiện predeclare
+toàn bộ module trong một lần gọi compiler. Cache IR/object và build
+incremental được mô tả bên dưới; namespace/alias và export private/public
+chưa được hỗ trợ. Bộ biên dịch
+native vẫn chỉ hỗ trợ tập con i32 trên macOS ARM64, chưa thay đường
+production C++ hay loại bỏ runtime C và linker hệ điều hành.
+
+MH_OBJECT phát `LC_BUILD_VERSION` (macOS 11.0) để linker biết nền tảng
+của từng module. Bộ liên kết dùng danh sách object và argv cấp phát động,
+không còn giới hạn 32 module chứa mã máy; kích thước archive vẫn bị chặn
+bởi vùng bytes native tối đa 1 MiB, cùng các giới hạn tệp và hệ điều hành.
+Kiểm chứng trực tiếp ngày 17/10/2026: compiler mới liên kết thành công
+35 object Mach-O (34 module nhập và một entrypoint), chương trình chạy
+trả mã `52`. Trước thay đổi, cùng fixture thất bại ở bước liên kết với
+mã `17`. `checknativedriver.cmake` đã có fixture hồi quy 35 object.
+CTest `vpp-native-compiler-driver` chạy lại sau thay đổi đạt 1/1
+(289,19 giây), gồm bootstrap Stage 1 → 2 → 3 → 4 và các probe.
+Phần mã máy `__TEXT,__text` của Stage 2, 3 và 4 đều dài 173.344 byte,
+cùng SHA256 `1b1f6fe8b9b22fe9f0ad9edc6c37336df7c62784fe6136de124327999d150ff8`.
+
+## Native incremental, cache IR/object và runtime (17/10/2026)
+
+`gói/biên dịch/native/cache.vi` tái sử dụng IR thân hàm và MH_OBJECT theo
+từng module. Compiler vẫn đọc đồ thị nguồn, tokenize và đăng ký chữ ký
+ở lượt đầu; module có cache IR được bỏ qua lượt parse/hạ thân hàm. Cache
+object cho phép bỏ qua phát mã ARM64, vá CALL và đóng gói Mach-O. Liên kết
+executable vẫn chạy ở mỗi lần build, runtime C vẫn được biên dịch khi link.
+Phạm vi này là compiler i32 native Stage 1 trở đi trên macOS ARM64;
+CLI bytecode và đường Stage 0 `--emit-exe-selfhost` chưa dùng cache này.
+
+Khóa mỗi bản ghi gồm loại artifact, target/phiên bản định dạng, nội dung
+nguồn module, bảng tên/arity toàn cục theo thứ tự function ID, ranh giới
+function ID và điểm vào. IR lưu độ dài và byte của từng hàm; khi nạp lại,
+compiler dựng lại offset trong vùng IR toàn chương trình. Vì vậy, thay
+đổi kích thước thân hàm ở dependency không làm mất hiệu lực cache caller
+có chữ ký không đổi. Đổi tên/arity/thứ tự khai báo sẽ làm mất hiệu lực
+cache theo bảng chữ ký mới. Đây là invalidation bảo thủ: chưa có đồ thị
+phụ thuộc chữ ký riêng cho từng caller. Cache xét nội dung thay vì mtime.
+
+Runtime cung cấp `cache_đọc(key, data)` và `cache_ghi(key, data)` với hai
+handle byte riêng biệt, không rỗng đối với key. Đọc trả `1` khi hit, `0`
+khi miss/tắt/không truy cập được cache, `-1` nếu handle không hợp lệ;
+miss làm rỗng buffer đích. Ghi trả `0` hoặc `-1`. V++ giữ chính sách và
+serialization; C chỉ đảm nhiệm lưu trữ byte, SHA-256 và công bố nguyên tử.
+SHA-256 của **nội dung executable compiler đang chạy** tạo namespace cache,
+ngăn compiler phiên bản khác tái sử dụng artifact cũ. Di chuyển/copy cùng
+binary vẫn tái sử dụng được cache nếu chọn cùng thư mục.
+
+Mỗi record kiểm tra magic/phiên bản, độ dài, key chính xác và SHA-256 của
+header/key/payload trước khi cấp dữ liệu. Record hỏng, bị cắt ngắn hoặc
+symlink được xem là miss; bản ghi mới dùng tệp tạm riêng rồi `rename`.
+Hai build đồng thời có thể công bố cùng record mà không tạo bản ghi dở
+dang. Cache không khả dụng không ngăn build thông thường; lỗi nguồn và
+linker vẫn giữ nguyên artifact đầu ra đã có.
+
+| Biến môi trường | Hành vi |
+| --- | --- |
+| `VPP_NATIVE_CACHE_DIR` | Thư mục cache; mặc định `.vpp-native-cache` trong working directory. Tự tạo thư mục cuối, thư mục cha cần có sẵn. |
+| `VPP_NATIVE_NO_CACHE=1` | Bỏ qua đọc/ghi cache. |
+| `VPP_NATIVE_CACHE_STATS=1` | In `native cache: hits=… misses=… writes=…` ra stderr khi cache hoạt động. Mỗi module chứa hàm có tối đa hai lookup: IR và object. |
+
+```sh
+VPP_HOME="$PWD" VPP_NATIVE_CACHE_DIR="$PWD/build/native-cache" \
+  VPP_NATIVE_CACHE_STATS=1 \
+  build-p0-release/nativedriver/vpp-native build app.vi -o build/app
+```
+
+Có thể xóa thư mục cache để làm sạch; hiện chưa có cơ chế tự thu hồi entry
+cũ hoặc hạn mức tổng dung lượng đĩa. Key và payload riêng vẫn chịu giới
+hạn buffer 1 MiB; artifact không vừa cache được biên dịch bình thường.
+
+Stage 1 mở rộng bảng intrinsic từ 18 lên 25 mục, bổ sung cache cùng
+`byte_cắt`, `byte_tìm`, `byte_in`, `tệp_mở_ghi`, `tệp_ghi_khối`. Các API
+byte/file dùng cùng ABI C đã có ở Stage 0: lát sở hữu bản sao, tìm trên
+byte nhị phân, I/O giữ byte NUL và `0xff`; tên intrinsic được dành riêng
+và lời gọi được kiểm tra arity. Handle vẫn là i32 với giới hạn tài nguyên
+hiện hành, chưa phải string/GC hoặc FFI tổng quát.
+
+Trước khi gỡ công cụ Python, `check_native_incremental.py` được CTest gọi để kiểm
+chứng cold/warm cache, sửa dependency nhưng giữ mtime, đổi chữ ký/function
+ID, đổi compiler, record sai digest/cắt ngắn/symlink, cache không khả dụng,
+hai writer đồng thời, chế độ tắt cache, parity mã máy và ABI byte/file.
+Kiểm thử chuyên sâu này chưa được chuyển đầy đủ sang CMake/V++.
+Chuỗi Stage 1 → 2 → 3 → 4 tiếp tục được kiểm tra độc lập.
+
+Kiểm chứng macOS ARM64 Release ngày 17/10/2026: chín CTest native liên
+quan đều đạt sau khi cập nhật fixture codegen theo opcode MOVK từ
+assembler Clang. `__TEXT,__text` của Stage 2/3/4 cùng dài 187.840 byte,
+SHA-256 `893ff4d9add9f7b5c7ae99ce849a5a8a44ee67ca14a4254378d3641c8cd9429a`.
+Phép đo cục bộ biên dịch chính 12 module compiler: cold cache 1,024 giây
+(`0 hit / 24 miss / 24 write`), hai lần warm 0,210 và 0,204 giây
+(`24 hit / 0 miss / 0 write`), tắt cache 0,774 giây. Vùng mã máy của cả
+bốn artifact giống nhau. Đây là mẫu đo trên cùng máy, chưa phải gate
+hiệu năng đa nền tảng hoặc benchmark thống kê.
+
+Compiler vẫn cần Stage 0 C++ để bootstrap, runtime C/libc (SHA-256 dùng
+CommonCrypto của macOS) và clang/ld của hệ điều hành. Các thế hệ native
+tự biên dịch compiler i32 subset, **chưa độc lập khỏi hệ sinh thái C/C++**.
+
+
+## Luồng OOP hiện hành (15/10/2026)
+
+Compiler V++ có parser, semantic, IR, emitter và linker cho lớp, constructor,
+receiver `mình`/`gốc`, kế thừa, giao diện, phương thức và phân quyền. Kiểm tra
+hợp đồng phát hiện thiếu phương thức, sai số tham số, triển khai không công
+khai và ghi đè thu hẹp quyền. `kiểu mô đun.vi` quản lý kiểu trực tiếp, kiểu
+nhìn thấy và kiểu tái xuất theo định danh khai báo; có thể khởi tạo lớp nhập
+qua bí danh, triển khai giao diện nhập và kế thừa lớp ở mô-đun khác.
+
+Lời gọi phương thức/đọc/gán thuộc tính nhận cả receiver tạm như kết quả
+hàm, phần tử danh sách hoặc chuỗi lời gọi; ABI opcode hiện hành giữ nguyên.
+Đường C++ cũng mang chữ ký kiểu nhập để kiểm tra constructor và giao diện.
+Runtime giữ receiver cùng quyền truy cập lexical cho closure trong phương
+thức; compiler V++ tự chủ chưa parse/hạ lambda và FFI, nên các chương trình
+dùng chúng vẫn đi qua compiler C++ bootstrap. Các mục lịch sử phía dưới
+mô tả từng giai đoạn và không thay thế trạng thái hiện hành này.
+
+Trước đây `check_oop_pipeline.py` kiểm tra CLI C++/V++, alias nhập lặp,
+tái xuất, kế thừa/giao diện xuyên mô-đun, từ chối hợp đồng sai, artifact chạy
+khi đã xóa nguồn và module `Ngăn Xếp` được biên dịch bằng V++.
+Hiện `check_vpp_cli.cmake` duy trì kiểm tra smoke, chưa bao phủ toàn bộ ca cũ.
+
+## Bề mặt OOP của thư viện compiler
+
+`gói/biên dịch/giao diện cú pháp.vi` khai báo `Truy Cập Cú Pháp` và
+`Khách Duyệt Cú Pháp` độc lập với phần triển khai.
+`gói/biên dịch/nút cú pháp.vi` cung cấp lớp `Nút Cú Pháp`, `Nút Lớp`,
+`Nút Hàm` cho dữ liệu AST map (`loại`, `tên`,
+`thành viên`, `phương thức`, `câu lệnh`, `thân`).
+`gói/biên dịch/chính.vi` tái xuất cả giao diện và lớp qua `công khai nhập`. Các AST node
+được truy cập bằng `loại()`, `tên()`, `các con()` và `dữ liệu()`, hoặc qua
+visitor `Khách Duyệt Cú Pháp` với `duyệt(khách)`; parser và IR
+vẫn thao tác trên map để giữ ổn định đường self-hosting hiện tại. Đây là
+adapter thư viện, không phải chuyển toàn bộ frontend sang mô hình object.
+Visitor duyệt cả biểu thức và các nhánh lồng nhau (khối hàm, `nếu`,
+`chọn`, `thử`, danh sách/từ điển, lời gọi, toán hạng) thay vì chỉ duyệt
+danh sách khai báo. `kiem_tra_ast_oop.vi` kiểm thử AST parser thực và
+snapshot tùy biến.
+
+Các module HTTP, Database Connection, File Stream và Logger cũng có API lớp
+ở thư viện chuẩn; chúng chỉ bọc thao tác V++ hiện có, không thay thế VM hoặc
+thay đổi trạng thái self-hosting/native compiler được mô tả bên dưới.
+
+## Đường production và bootstrap
+
+CLI có đường bytecode opt-in qua compiler V++:
+
+```sh
+build/bin/vpp-cli build --compiler=vpp program.vi -o program.vbc
+build/bin/vpp-cli run --compiler=vpp program.vi
+build/bin/vpp-cli run --artifact program.vbc
+```
+
+Các alias tiếng Việt `dựng` / `chạy` hỗ trợ cùng tùy chọn. `--compiler=cpp`
+chọn bootstrap C++ tường minh; lệnh không có tùy chọn vẫn giữ backend C++.
+`gói/biên dịch/trình điều khiển.vi` điều phối nạp nguồn, lexer, parser,
+semantic, IR, phát bytecode và linker V++. Mã nguồn đích được đọc thành chuỗi
+trong V++; không được đưa vào `compilePipeline()` C++. C++ chỉ biên dịch
+wrapper và thư viện compiler để khởi động VM. Đây là compiler V++ chạy trên
+runtime bootstrap, **chưa phải compiler native tự biên dịch toàn bộ chính nó**.
+
+`nguồn tệp.vi` dựng đồ thị import từ các tệp thực, ưu tiên nguồn cục bộ ở
+thư mục importer và các tổ tiên, rồi tới `VPP_HOME`/thư viện workspace.
+Linker dùng chính identity đã phân giải, bảo toàn bí danh, tái xuất, thứ tự
+initializer và import trùng. Resolver hiện nhận đường import nguồn `.vi`
+không đuôi; chưa bao phủ package manifest, alias/redirect tương thích và
+canonical identity của symlink như resolver C++.
+
+`artifact.vi` tuần tự/giải mã JSON bằng V++, có định dạng `VPP bytecode`,
+version 1, ABI `Instruction 4*i32`. Payload giữ StringPool, function ID,
+bytecode gốc, thân hàm và initializer bằng bốn vùng wire arrays; từng lệnh
+có đúng bốn i32, tránh lặp tên trường trên mỗi opcode. Bộ nạp kiểm tra hình dạng, kiểu i32,
+opcode đã định nghĩa, bảng hàm và initializer; VM tiếp tục xác thực bytecode
+trước khi chạy. Artifact chạy được sau khi xóa nguồn và các dependency.
+`build` chỉ biên dịch, không chạy chương trình; lỗi compiler không tạo hoặc
+ghi đè artifact có sẵn. CLI từ chối đầu ra trùng với nguồn điểm vào.
+
+Parser đã bổ sung tên nhiều từ trong chương trình và tham số mặc định scalar
+(int/float/string/bool/null, số nguyên âm kể cả `-2147483648`). Emitter dùng
+`OP_PARAM_MAC_DINH` với cùng payload StringPool của C++. Phép gán `a[i] = x`
+và map/nested index dùng `OP_GAN_CHI_SO`, theo thứ tự base/index/value của C++.
+Gán kết hợp và cập nhật trực tiếp vào chỉ số chưa được hạ. `nội tại.vi` và
+`opcode.vi` duy trì ABI theo header C++; `vpp-opcode-abi` đối chiếu giá trị
+opcode, chưa kiểm tra arity, alias hay quy tắc reserved/shadowing. Lexer duyệt UTF-8 một lượt
+để dựng bảng ký tự, tránh lấy chỉ số từ đầu chuỗi cho mỗi ký tự.
+
+Kiểm chứng ngày 14/10/2026: CTest `vpp-compiler-vpp-cli` đạt; kiểm tra source
+C++/V++, defaults, module import trùng, artifact chạy không cần nguồn,
+version/truncation lỗi, output rỗng và từ chối class không có fallback. Fixture
+CLI còn biên dịch module `gói/biên dịch/opcode.vi` bằng V++ và thực thi các
+hàm tra opcode từ bytecode mới sinh. Đây là một module compiler; chưa phải
+toàn bộ compiler tự biên dịch. Fixture
+`kiemtracompilervpp.vi` có 33 phép kiểm tra; đối chiếu
+bytecode defaults, index store và intrinsic với oracle C++ độc lập. Lexer UTF-8
+và các fixture hồi quy parser/IR/native được chạy riêng. Chưa có bằng chứng
+toàn bộ integration suite hoặc bootstrap Stage 1/Stage 2 đạt.
+
+Đường import chấp nhận thành phần có từ khóa (ví dụ `chuyển kiểu`), và tên
+hàm nhiều từ có thể bắt đầu/chứa từ khóa theo parser C++. Module thống kê
+đã khai báo dependency từ điển/list trực tiếp, thay vì dựa vào namespace
+bootstrap được importer tình cờ nạp. Runtime heap bootstrap dùng registry
+weak theo địa chỉ để đăng ký allocation trung bình O(1), và ngân sách GC
+tỷ lệ với graph sống. Reader JSON cũng dựng bảng code point một lượt,
+để nạp artifact lớn không quét lại prefix UTF-8 ở mỗi lần đọc ký tự.
+Các module compiler đã khai báo dependency trực tiếp thay vì dựa vào
+symbol xuất hiện gián tiếp qua import khác. Kiểm thử runtime P0 bổ sung xác minh deduplication,
+address reuse, giữ graph reachable và thu gom các cycle đã tách khỏi root.
+
+Lexer đã được biên dịch bằng V++ thành artifact 79.211 byte, chứa 87 hàm,
+7 initializer và 5.950 lệnh thân hàm; artifact này đã được nạp/chạy bằng VM.
+Đây là một phần compiler được tự biên dịch, chưa phải kiểm chứng toàn bộ
+compiler qua các thế hệ Stage 1/Stage 2. Các fixture JSON, roundtrip tệp,
+GC và thống kê liên quan đến những thay đổi này đã khớp golden output.
+
+Lõi bytecode (lexer/parser/semantic/IR/emitter/linker và bộ nạp, cùng các
+dependency V++) đã được biên dịch bằng V++ thành artifact 301.406 byte,
+chứa 190 hàm, 20 initializer và 22.590 lệnh thân hàm. Chạy artifact đó đã
+gọi chính compiler vừa sinh để biên dịch chương trình mới có hàm, tham số
+mặc định và vòng lặp, rồi thực thi đúng kết quả `52`. Fixture
+`kiemtrabootstrapvpp.vi` và CTest `vpp-compiler-bytecode-bootstrap` giữ đường
+kiểm tra này; CTest đã đạt ngày 14/10/2026. Gate CLI và runtime P0 cũng đã
+đạt; fixture compiler 33 kiểm tra và JSON liên quan đạt interpreter/JIT.
+Đây là bootstrap tự chủ của **lõi compiler bytecode** trên VM,
+chưa chứng minh Stage 1/Stage 2 cho toàn compiler, chưa biên dịch driver
+FFI/CLI bằng V++ và chưa có executable compiler native độc lập.
+
+## Bootstrap compiler bytecode qua Stage 1 → Stage 2
+
+`scripts/quality/checkbootstrapstages.cmake` kiểm tra một lượt bootstrap
+theo ba vai trò:
+
+- **Stage 0:** `vpp-cli run --compiler=cpp` biên dịch và chạy chương trình
+  `bootstrap-stage1.vi` bằng bootstrap compiler/runtime C++ hiện hành.
+- **Stage 1:** chương trình V++ dựng đồ thị nguồn compiler từ các chuỗi
+  được đóng gói trong fixture, sau đó gọi parser, semantic, IR, emitter,
+  linker và serializer viết bằng V++ để tạo `stage2.vbc`. Python chỉ chuẩn
+  bị đồ thị nguồn và điều chỉnh đường import cho resolver trong bộ nhớ,
+  không thực hiện compiler pass.
+- **Stage 2:** `vpp-cli run --artifact stage2.vbc` chạy bytecode compiler V++
+  vừa được Stage 1 tạo ra. Compiler này biên dịch một chương trình nguồn mới
+  có tham số mặc định và vòng lặp thành `stage2-probe.vbc`; VM chạy artifact
+  kiểm thử phải in `52`.
+
+Lần chạy 16/10/2026 tạo thành công `stage2.vbc` (509 KiB, 464 hàm, 24
+initializer mô-đun, ABI `Instruction 4*i32`, SHA256
+`50ed78f0dde310dd831a8e47d3e53b5d3e539b629c112b8b88f6e791cf813c20`).
+Lần chạy nạp/chạy Stage 2 bằng CLI chưa tối ưu vượt timeout 1.200 giây.
+Chẩn đoán xác định nạp JSON artifact lớn là một bước tốn thời gian; lỗi
+timeout đó không chứng minh bytecode Stage 2 không chạy được.
+
+**Kiểm chứng 17/10/2026: bootstrap Stage 1 → Stage 2 → probe đã PASS với
+CLI Release.** CLI dựng bằng `-DCMAKE_BUILD_TYPE=Release` nạp, giải mã,
+kiểm tra và thực thi `stage2.vbc` thành công trong 113,23 giây ở lần đo
+chẩn đoán. `checkbootstrapstages.cmake` chạy lại với
+`VPP_BOOTSTRAP_REUSE_STAGE2=ON` đạt: Stage 2 tạo `stage2-probe.vbc`, VM
+chạy artifact thử nghiệm ra đúng `52`, và SHA256 Stage 2 giữ nguyên như
+trên. Tùy chọn `REUSE` chỉ bỏ qua bước sinh lại Stage 2; mọi bước thực thi
+và kiểm tra probe vẫn được chạy. Lệnh tái hiện:
+
+```sh
+cmake -S . -B build/bootstrap-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
+cmake --build build/bootstrap-release --target vpp-cli -j4
+cmake -DVPP_BOOTSTRAP_REUSE_STAGE2=ON \
+  -DVPP_EXEC="$PWD/build/bootstrap-release/bin/vpp-cli" \
+  -DVPP_ROOT="$PWD" \
+  -DVPP_OUTPUT_DIR="$PWD/build/compiler-bootstrap-stages" \
+  -P scripts/quality/checkbootstrapstages.cmake
+```
+
+Kết quả xác nhận **compiler bytecode V++ chạy qua hai thế hệ**; phép
+kiểm tra ba thế hệ được bổ sung ngay dưới đây. Compiler executable native
+tự lưu trữ và runtime độc lập khỏi C++ VM vẫn chưa hoàn thành. Đường nạp
+JSON artifact lớn trên CLI không tối ưu vẫn cần cải thiện hiệu năng.
+
+### Kiểm chứng compiler Stage 1 → Stage 2 → Stage 3 (17/10/2026)
+
+`scripts/quality/checkbootstrapstage3.cmake` kiểm tra thêm một thế hệ
+compiler. CMake dùng `prepare_bootstrap_stages.cmake` hai lần để đóng gói đồ
+thị 25 mô-đun V++ thành nguồn Stage 2, rồi đóng gói chính nguồn Stage 2
+thành nguồn Stage 1. Các bước parser, semantic, IR, emitter, linker và
+serializer của cả hai thế hệ đều chạy trong V++:
+
+- Stage 1 chạy trên VM bootstrap C++, biên dịch chương trình compiler Stage 2.
+- Stage 2 **thực thi từ artifact bytecode** và biên dịch lại toàn bộ đồ thị
+  compiler V++ thành artifact Stage 3. Không chuyển các pass này sang C++.
+- Stage 3 chạy từ bytecode, biên dịch chương trình kiểm thử có tham số mặc
+  định và vòng lặp. Chạy bytecode thử nghiệm trả đúng `52`.
+
+Kiểm chứng thực tế bằng `build/bootstrap-release/bin/vpp-cli`:
+
+| Artifact | Kích thước | Hàm | Module initializer | SHA256 |
+| --- | ---: | ---: | ---: | --- |
+| Stage 2 (chuỗi ba thế hệ) | 981.365 B | 489 | 24 | `2e912ea16052a5c8cb2552be0dfd2f18143b9d8fd18170214a2cde6a08ef7513` |
+| Stage 3 | 520.934 B | 464 | 24 | `50ed78f0dde310dd831a8e47d3e53b5d3e539b629c112b8b88f6e791cf813c20` |
+| Probe từ Stage 3 | 628 B | 2 | 0 | `2ae01a1925c54eef1611a6892e6156c999b81c61cb5ef0e2280e46ddb2d585d8` |
+
+**Stage 3 trùng từng byte với compiler `stage2.vbc` của bài kiểm tra hai
+thế hệ trước** (cùng SHA256); probe từ Stage 3 cũng trùng từng byte với
+probe cũ. Toàn chuỗi Stage 1 → Stage 2 → Stage 3 → probe **PASS**. Bước
+Stage 1 của chuỗi mới hoàn tất trong 117,07 giây ở lần đo Release.
+
+Chạy lại bằng CLI Release đã build:
+
+```sh
+cmake -DVPP_EXEC="$PWD/build/bootstrap-release/bin/vpp-cli" \
+  -DVPP_ROOT="$PWD" \
+  -DVPP_OUTPUT_DIR="$PWD/build/compiler-bootstrap-stages/three-stage" \
+  -P scripts/quality/checkbootstrapstage3.cmake
+```
+
+Thêm `-DVPP_BOOTSTRAP_REUSE_STAGE2=ON` để kiểm lại Stage 2 → Stage 3 mà
+không sinh lại Stage 2. Nếu có artifact chuẩn trước đó, truyền thêm
+`-DVPP_BOOTSTRAP_STAGE3_ORACLE=<đường-dẫn-stage2.vbc>` để kiểm tra SHA256.
+CTest toàn chuỗi là tùy chọn khi configure với
+`-DVPP_ENABLE_STAGE3_BOOTSTRAP_TEST=ON`, vì phép kiểm tra nặng hơn gate
+Stage 1 → Stage 2 hiện hành.
+
+Đây là bằng chứng **self-hosting compiler bytecode qua ba thế hệ**. VM vẫn
+được thực thi bởi C++, và Python chỉ đóng gói fixture nguồn. Native AOT
+hiện mới bao phủ subset i32, chưa đủ để tạo compiler executable độc lập.
+`io_doc_file_vm` bị runtime từ chối trong chế độ system FFI strict, vì vậy
+test ba thế hệ dùng đồ thị nguồn đóng gói sẵn; để self-host compiler qua
+nguồn tệp thực cần mở rộng compiler/runtime cho FFI và I/O chuẩn.
+
+`src/cli/main.cpp` vẫn gọi `vietvm::compiler::compilePipeline(...)` trong C++.
+Đã có thêm đường native AOT tự chủ **opt-in**:
+`vpp build --target <triple> --emit-obj-selfhost <function> <source.vi> <output.o>`.
+Lệnh này sử dụng `gói/biên dịch/mã máy từ cây.vi` để phân tích trực tiếp
+mã nguồn `.vi` bằng lexer/parser V++, dựng AST/IR, hạ Machine IR, phát mã
+máy AArch64 hoặc x86-64 và tạo object ELF/Mach-O/COFF từ thư viện V++.
+Bridge C++ `compileSourceMachineFunctionVpp` chỉ tạo chương trình V++
+gọi các API đó, khởi động VM hiện hành, giải mã bản ghi và ghi object.
+**Đây vẫn là bootstrap bằng VM/C++**, chưa phải compiler tự chạy bằng
+executable native do chính V++ tạo ra. Đường `--emit-obj` cũ tiếp tục dùng
+frontend/semantic C++ để tạo IR đầu vào.
+
+Ngày 16/10/2026 đã bổ sung đường **native executable self-host thử nghiệm**:
+
+```sh
+build/bin/vpp-cli build --target aarch64-apple-darwin --emit-exe-selfhost \
+  src/tests/nativeaotprogram.vi /tmp/nativeaotprogram
+/tmp/nativeaotprogram
+echo $? # 42
+```
+
+Trên Linux x86-64 sử dụng `--target x86_64-linux-gnu`; phải chọn đúng
+`hostTarget()` (chưa hỗ trợ cross-link). Mã nguồn khai báo `hàm chính()`
+hoặc `hàm main()` không tham số, trả về `i32`; entrypoint tiếng Việt được
+ánh xạ thành symbol ABI `main`, kể cả khi có hàm khác gọi `chính()`.
+Các hàm còn lại sử dụng tên symbol ASCII; khai báo đồng thời cả `chính`
+và `main` bị từ chối do trùng symbol khi biên dịch chương trình.
+`gói/biên dịch/mã máy từ cây.vi` parse và hạ IR **một lần cho toàn bộ chương
+trình**, phát object Mach-O/ELF riêng cho từng hàm. Bridge C++ thu các
+object rồi gọi `cc` trên host để liên kết relocation và tạo executable.
+Có thể chỉ định đường dẫn compiler/linker qua `VPP_NATIVE_CC` (một tên
+executable hoặc đường dẫn, không phải câu lệnh shell). Đầu ra chỉ được
+thay thế khi linker thành công; đường dẫn đầu ra trỏ về mã nguồn qua
+symlink/hard link cũng bị từ chối. CTest `vpp-native-selfhost-executable`
+đã chạy trên macOS ARM64, xác minh exit code `42`, relocation của lời gọi
+`chính()`, đường dẫn có dấu cách, từ chối biểu thức ngoài subset, không có
+entrypoint hoặc trùng `main()`/`chính()`, và bảo toàn artifact khi thất bại.
+
+**Tham số hàm có số lượng động (17/10/2026).** Đường native Stage 0
+(`--emit-obj-selfhost` và `--emit-exe-selfhost`) và lõi compiler native V++
+Stage 1 đã bỏ ngưỡng cố định bốn tham số. Machine IR biểu diễn riêng
+`CALL_ARITY` (số đối số) và `CALL` (định danh hàm), cho phép gọi hàm có
+nhiều đối số mà không phải nhét số lượng vào một bitfield nhỏ. Encoder
+AArch64 và x86-64 hỗ trợ tham số truyền qua stack theo ABI đích;
+trên macOS ARM64, đối số i32 trên stack xếp theo bước 4 byte, còn Linux
+AAPCS64 xếp theo bước 8 byte. Đường native C++/V++ đối chiếu IR và byte
+phát ra trên các target macOS ARM64, Linux ARM64/x86-64 và Windows x86-64.
+CTest `vpp-native-selfhost-executable` còn tạo, liên kết và chạy một
+chương trình 128 tham số, kiểm tra đối số cuối và mã thoát `52`.
+Thử thủ công 4.200 tham số trên macOS ARM64 cũng đã build/chạy, trả `52`.
+
+Không thể bảo đảm **vô hạn theo nghĩa toán học**: số lượng vẫn bị ràng
+buộc bởi bộ nhớ, kích thước nguồn/token/IR, i32 dùng cho chỉ số/số đếm,
+kích thước stack và giới hạn ABI/hệ điều hành. Runtime native vẫn có
+ngưỡng 1 MiB cho mỗi buffer byte và giới hạn các handle. Việc bỏ một
+ngưỡng cố định không đồng nghĩa mọi chương trình với số đối số bất kỳ
+đều biên dịch hoặc thực thi được.
+
+Đây là executable native của **chương trình trong subset i32**, chưa phải
+executable của **compiler V++**. Driver, VM/bootstrap, linker gọi qua C++ và
+toolchain hệ thống vẫn còn; import, GC, lambda, FFI tổng quát và các kiểu
+động của runtime VM chưa đi được qua đường AOT này. Chuỗi literal UTF-8
+được hỗ trợ qua handle i32 như mô tả dưới đây, chưa có kiểu chuỗi native
+đầy đủ hay kiểm tra kiểu tĩnh cho handle.
+
+Runtime AOT i32 hỗ trợ nhập/xuất console tối thiểu. `in biểu_thức` gọi
+`vpp_native_print_i32` và in số nguyên có dấu. Hai intrinsic chỉ dành cho
+native AOT là `đọc_số()` và `trạng_thái_đọc()`, được hạ trực tiếp thành
+`vpp_native_read_i32` và `vpp_native_read_status`, liên kết từ
+`src/runtime/native/vpp_aot_runtime.c`. Trạng thái trả về 0 nếu đọc thành
+công, 1 nếu EOF, 2 nếu đầu vào không hợp lệ, 3 nếu vượt miền i32; giá trị
+trả về từ `đọc_số()` chỉ có nghĩa khi trạng thái bằng 0. Tên intrinsic và
+symbol C runtime được dành riêng, và gọi intrinsic có đối số bị từ chối.
+`vpp-native-i32-input` kiểm tra hai biên i32, EOF, chữ không hợp lệ và tràn
+số; ngày 16/10/2026, ba CTest `vpp-native-i32-input`,
+`vpp-native-i32-runtime`, `vpp-native-selfhost-executable` đều đạt (3/3).
+
+**Bổ sung native UTF-8 và byte/file I/O (17/10/2026).**
+`src/runtime/native/vpp_aot_runtime.c` cung cấp ABI C cho bộ đệm byte có
+handle i32 và stream tệp nhị phân. Các intrinsic chỉ dành cho native AOT:
+
+- `byte_mới()` → handle dương hoặc `-1`; `byte_thêm(handle, byte)` → `0/-1`;
+  `byte_dài(handle)` và `byte_lấy(handle, index)` → giá trị hoặc `-1`;
+  `byte_hủy(handle)` → `0/-1`.
+- `byte_nối(đích, nguồn)` → `0/-1` (cho phép nối chính nó);
+  `byte_bằng(a, b)` → `1` nếu bằng, `0` nếu khác, `-1` nếu handle lỗi;
+  `byte_in(handle)` ghi nguyên vẹn byte ra stdout (không thêm newline),
+  trả về số byte ghi hoặc `-1`.
+- `byte_cắt(handle, vị_trí, số_byte)` → một handle **sở hữu bản sao** vùng
+  byte hoặc `-1`; chấp nhận lát rỗng ở cuối, từ chối offset/length âm và
+  lát vượt giới hạn. `byte_tìm(nguồn, mẫu)` trả về offset byte đầu tiên,
+  `-1` nếu không thấy, `-2` nếu handle không hợp lệ; mẫu rỗng khớp tại `0`.
+  `byte_làm_rỗng(handle)` đặt chiều dài về `0` để tái sử dụng, trả `0/-1`.
+  Offset áp dụng trên byte UTF-8, không phải chỉ số ký tự Unicode.
+- `tệp_mở_đọc(path)` và `tệp_mở_ghi(path)` → handle dương hoặc `-1`;
+  `tệp_đọc_byte(file)` → `0..255`, `-1` (EOF), `-2` (lỗi);
+  `tệp_ghi_byte(file, byte)` và `tệp_đóng(file)` → `0/-1`.
+- `tệp_đọc_khối(file, buffer)` nối tối đa 4096 byte vào buffer, trả số byte,
+  `0` khi EOF hoặc `-1` khi lỗi/hết dung lượng; nếu buffer đủ 1 MiB, hàm
+  từ chối trước khi đọc khỏi stream. `tệp_ghi_khối(file, buffer)` ghi toàn
+  bộ byte nhị phân (có NUL), trả số byte thực ghi hoặc `-1` với handle lỗi.
+
+`path` là handle của bộ đệm byte, không phải con trỏ C. Literal như
+`biến path = "vpp-io.in";` được compiler V++ chuyển trực tiếp thành byte
+UTF-8 và các lệnh gọi cấp phát/ghi byte của Machine IR; ký tự escape theo
+quy tắc literal trong frontend. Chương trình phải gọi `byte_hủy(path)`
+khi không dùng nữa; literal được tạo mới mỗi lần biểu thức được thực thi,
+chưa có GC/reference counting native. `in "chuỗi"` vẫn bị từ chối: `in`
+hiện chỉ in i32 và chưa có overload cho chuỗi. Hạn mức runtime: 64 handle
+byte và 64 handle tệp đang mở, tối đa 1 MiB/bộ đệm, tối đa 4096 byte
+cho đường dẫn; literal được giới hạn 4096 byte để tránh phát object quá lớn.
+Handle được cấp tăng dần, kiểm tra loại/hiệu lực, không tái sử dụng handle
+cũ trong vòng đời tiến trình. Đường dẫn chứa byte NUL bị từ chối.
+Lệnh ghi tệp dùng `wb` (tạo mới/cắt ngắn) theo ngữ nghĩa C; chương trình
+chịu trách nhiệm chọn đường dẫn và đóng stream để nhận lỗi flush.
+
+`gói/biên dịch/mã máy từ cây.vi` gắn tên intrinsic vào symbol C và kiểm tra
+arity; `gói/biên dịch/mã máy hạ ir.vi` xác minh whitelist ABI độc lập rồi
+phát `Call` tối đa hai đối số và relocation native. CLI nhận biết các
+`vpp_native_*` relocation để liên kết runtime C; backend encoder/object
+vẫn do V++ thực hiện. Đây là một ABI C **cố định**, chưa phải cơ chế
+`extern`/FFI động cho thư viện C bất kỳ.
+
+CTest `vpp-native-byte-file-io` xác minh chương trình V++ tạo executable,
+ghi/đọc/sao chép chính xác `00 ff 0a 41`, UTF-8 `Aé`, escape, byte NUL trong
+đường dẫn, EOF, handle đã đóng, byte ngoài phạm vi, arity và reserved symbol.
+Ngày 17/10/2026: `vpp-native-byte-file-io`, `vpp-native-i32-input`,
+`vpp-native-i32-runtime`, `vpp-native-selfhost-executable` và
+`vpp-native-selfhost-host-link` **đạt 5/5** trên macOS ARM64 (Release).
+
+Đợt kiểm chứng tiếp theo ngày 17/10/2026: CTest
+`vpp-native-block-file-io` xác minh 10.012 byte nhị phân, SHA-256 độc lập,
+ba lần đọc 4096 + 4096 + 1820 byte, EOF, UTF-8 và tên ABI dành riêng.
+`vpp-native-byte-ranges` xác minh `byte_cắt` (runtime CALL ba đối số),
+`byte_tìm` kể cả NUL/UTF-8/mẫu rỗng, lát sao chép giữ nguyên sau khi xóa
+nguồn, giới hạn 1 MiB khi nối/bổ sung/đọc file, xử lý handle lỗi và
+kiểm tra số đối số/tên dành riêng. Toàn bộ **7/7 CTest native tập trung
+đã đạt** trên macOS ARM64. Bộ đệm và file I/O hiện có ABI i32 cố định;
+chúng chưa thay thế kiểu string hoặc API file động trên VM C++.
+
+**Lõi lexer chạy native bằng V++ (17/10/2026).**
+`gói/biên dịch/native/lexer.vi` khai báo các hàm độc lập, ABI i32:
+`lex_space`, `lex_delim`, `lex_utf8_step`, `lex_two`, `lex_skip`,
+`lex_quote_end`, `lex_end`, `lex_kind`. Chúng quét byte UTF-8 trên handle
+runtime native và trả offset byte, không dùng VM, bộ sưu tập động hoặc
+intrinsic C++ để tách token. `lex_utf8_step` kiểm tra Unicode scalar,
+loại NUL, UTF-8 thiếu byte, overlong, surrogate và code point ngoài miền;
+`lex_skip` bỏ khoảng trắng/chú thích `//` và `/* */` (từ chối chú thích
+khối chưa đóng). `lex_end` hiểu dấu nháy/escape, toán tử đơn/đôi và
+định danh UTF-8. `lex_kind` trả mã `1` định danh, `2` số nguyên, `3` số
+thực, `4` chuỗi, `5` toán tử, `6` dấu câu; `-1` khi lỗi. Lõi quét còn chưa
+ghép từ khóa nhiều từ, chưa tạo AST hay bảng token, và chưa hỗ trợ import
+native, do đó **chưa phải frontend native hoàn chỉnh**.
+
+`scripts/quality/checknativelexer.cmake` nối **mã nguồn V++** của lõi và
+fixture V++ thành chương trình `.vi` độc lập (CMake chỉ ghép file), sau đó
+biên dịch bằng `--emit-exe-selfhost` và chạy executable thực. Fixture kiểm
+tra byte span của định danh tiếng Việt, CRLF, UTF-8 2/3/4 byte, toán tử,
+số, chuỗi escape, các lỗi UTF-8/chú thích/chuỗi, và đọc/token hóa tệp
+nguồn UTF-8 bằng `tệp_đọc_khối`. CTest `vpp-native-lexer-kernel` đã **PASS**
+trên macOS ARM64 (Release); toàn bộ 7/7 bài native tập trung gồm bài mới
+đã PASS ngày 17/10/2026. Có thể chạy độc lập bằng:
+
+```sh
+cmake -S . -B build-p0-release
+ctest --test-dir build-p0-release -R '^vpp-native-lexer-kernel$' --output-on-failure
+```
+
+**Token buffer, parser/semantic và IR i32 chạy native (17/10/2026).**
+`gói/biên dịch/native/tokens.vi` lưu token thành dãy byte có khuôn dạng
+`[i32 số_token][i32 start, i32 end, i32 kind]*số_token`, little-endian.
+`start/end` là byte offset UTF-8 trong buffer nguồn. `lex_tokenize` gọi
+lexer V++ để sinh token và dọn buffer khi gặp lỗi. `tok_validate` kiểm tra
+header, kích thước, offset, token kind, thứ tự và khoảng trắng/chú thích
+giữa các token **trước khi** parser tin dữ liệu; từ chối token bị sửa hoặc
+không khớp nguồn. ABI C trong `src/runtime/native/vpp_aot_runtime.c` hỗ trợ
+`byte_đẩy_i32`, `byte_đọc_i32`, `byte_ghi_i32`, đồng thời dành riêng các
+tên intrinsic, kiểm tra arity trong compiler AOT. `byte_đọc_i32` trả `-1`
+cho offset sai; không thể tự phân biệt với giá trị i32 hợp lệ bằng `-1`,
+nên caller phải xác thực offset/độ dài.
+
+`gói/biên dịch/native/parser.vi` parse **tập con có chủ ý**: một
+`hàm chính()` không tham số; `biến tên = biểu_thức;`, gán lại biến
+`tên = biểu_thức;` và `trả về biểu_thức;` cuối hàm. Biểu thức hỗ trợ
+i32 dương, định danh đã khai báo, ngoặc, dấu âm đơn ngôi, `+`, `-`, `*`
+với thứ tự ưu tiên. Semantic kiểm tra tên chưa khai báo, tên trùng, tên
+không hợp lệ, số ngoài miền và câu lệnh dư sau `trả về`. Kết quả là dãy
+IR stack-based gồm các cặp `[i32 opcode, i32 operand]`: `PUSH=1`,
+`LOAD=2`, `STORE=3`, `ADD=4`, `SUB=5`, `MUL=6`, `RET=7`, `NEG=8`.
+`gói/biên dịch/native/ir.vi` là bộ thực thi **tham chiếu** viết bằng V++
+để đối chiếu kết quả, chưa phát mã máy từ IR này. IR có thể lưu thành
+tệp nhị phân và nạp lại bằng ABI file native.
+
+Fixture `src/tests/nativeparserharness.vi` và
+`scripts/quality/checknativeparser.cmake` ghép bốn mô-đun V++ native,
+build thành executable ARM64, kiểm tra offset Unicode, ưu tiên biểu thức,
+gán lại biến, semantic lỗi, token buffer bị sửa, i32 âm/biên 1 MiB,
+đọc nguồn CRLF/UTF-8 và ghi/đọc lại artifact `.ir`. CTest
+`vpp-native-parser-ir` **PASS** trên macOS ARM64 ngày 17/10/2026;
+artifact của fixture dài 64 byte và khớp oracle i32 little-endian độc lập.
+Sau thay đổi này, **8/8 CTest native tập trung PASS** (`selfhost-executable`,
+`i32-runtime/input`, `byte-file/block-file/byte-ranges`, `lexer-kernel`,
+`parser-ir`). Kiểm tra C11 `-Wall -Wextra -Wpedantic -Werror` và
+`git diff --check` cũng đạt.
+
+Giới hạn còn lại: parser này chưa có import, nhiều hàm, class/OOP, luồng
+điều khiển, chuỗi dạng giá trị, số thực, I/O trong cú pháp nguồn hay
+`-2147483648` dạng literal; evaluator IR chưa có kênh báo lỗi riêng để
+phân biệt sentinel với kết quả hợp lệ, và chưa có codegen từ IR sang
+Mach-O/ELF/COFF. Các module hiện được ghép ở **thời điểm kiểm thử** vì
+đường AOT còn thiếu import native; executable compiler chưa tự đọc đối
+số CLI hay tự biên dịch lại toàn bộ nguồn compiler. Cần mở rộng tập ngôn
+ngữ/IR, codegen và driver native, sau đó chứng minh compiler executable
+Stage 1 → Stage 2 byte-for-byte/parity mà không cần VM C++ lúc chạy.
+
+**Cập nhật trình biên dịch native Stage 1 (17/10/2026):** Các giới hạn
+được ghi trong hai đoạn trên phản ánh phiên bản parser/IR ban đầu. Hiện
+`scripts/quality/checknativedriver.cmake` nối tám module V++ native và
+dùng compiler bootstrap Stage 0 tạo executable compiler Stage 1. Stage 1
+tự đọc mã nguồn, token hóa, parse các hàm i32, sinh IR, chuyển IR sang mã
+máy ARM64, đóng gói object Mach-O và liên kết executable. Pipeline này
+chạy bằng mã native V++ cùng các intrinsic runtime và linker nền tảng,
+không gọi compiler C++ để biên dịch chương trình đầu vào.
+
+Stage 1 hỗ trợ nhiều hàm, đệ quy, gọi hàm với tham số truyền trên stack,
+nhánh và vòng lặp của tập con i32. Bộ phân tích cú pháp chấp nhận trả về
+sớm trong nhánh, xác định trường hợp cả hai nhánh đều trả về, hỗ trợ biến
+cục bộ trong khối, `thoát;` và `bỏ qua;` ở vòng lặp lồng nhau. Hai lệnh
+điều khiển vòng lặp được hạ thành `JMP` sau khi xác định vị trí update/exit;
+`bỏ qua` vẫn chạy bước update của vòng lặp. Lệnh sau nhánh mà mọi đường đi
+đều `trả về` bị từ chối như mã không thể tới. CTest
+`vpp-native-compiler-driver` đã PASS (169,45 giây, 17/10/2026), gồm
+fixture nhánh trả về, vòng lặp lồng nhau, `thoát` và `bỏ qua`.
+CTest `vpp-native-parser-ir` cũng PASS (275,95 giây) sau khi nâng
+timeout dựng parser từ 180 lên 300 giây và cập nhật fixture cho phạm vi biến
+trong nhánh cùng quy tắc từ chối mã không thể tới.
+
+Đã bỏ hai giới hạn 32 hàm ở bảng khai
+báo và bước kiểm tra CALL. Số hàm vẫn chịu hạn mức bộ đệm byte 1 MiB và
+giới hạn kích thước mã máy; đây chưa phải số lượng vô hạn. Hàm điểm vào
+`chính()` có thể nằm ở đầu, giữa hoặc cuối tệp. Codegen xác định offset
+thực của nó và Mach-O writer ghi offset tương ứng cho symbol `_main`, còn
+ID của các lời gọi vẫn dựa trên thứ tự khai báo. Bộ kiểm thử driver có
+fixture 64/65 hàm, lời gọi tới/lùi, main ở cuối và trùng định danh sau
+vị trí 32. Các trường hợp sai phải giữ nguyên tệp output đã có.
+
+**Native executable compiler Stage 1 → Stage 2 → Stage 3 đã đạt
+(17/10/2026):** Stage 0 biên dịch mười module native thành executable Stage 1.
+Các thế hệ sau dùng `gói/biên dịch/native/compiler.vi` làm điểm vào;
+module này chứa các lệnh `nhập` trỏ tới các module compiler, gồm
+`module_loader.vi` và `module_compile.vi`. Stage 1 tự đọc từng tệp,
+giải import đệ quy bằng V++, tạo archive trong bộ nhớ với các bản ghi
+`[độ dài i32, mã nguồn tệp]`, giữ riêng từng đơn vị thay vì ghép
+chúng thành một chuỗi nguồn. `module_compile.vi` thực hiện hai lượt:
+đăng ký tên/arity và function ID trên toàn đồ thị, sau đó tokenize/parse
+và hạ IR riêng từng module. Các IR function được nối theo ID vào
+codegen/linker ARM64 đang dùng để tạo executable Stage 2.
+Stage 2 tiếp tục biên dịch đúng cùng điểm vào đa tệp
+thành executable Stage 3, Stage 3 sinh Stage 4 và biên dịch được chương
+trình mới; các executable đều chạy trực tiếp trên macOS mà không khởi động
+VM C++ trong những vòng sau Stage 0.
+
+Để khép chuỗi, parser native hỗ trợ gọi 17 intrinsic runtime, chuỗi
+literal UTF-8, biểu thức gọi hàm như câu lệnh, `lặp (...; ...; i++)`/
+`i--`, nhánh `hoặc nếu` và phạm vi từ vựng của biến tạo trong vòng lặp.
+Codegen phát lệnh gọi runtime theo ABI C ARM64, lưu relocation ngoài;
+Mach-O writer ghi symbol chưa xác định và `ARM64_RELOC_BRANCH26`. Runtime
+C nhỏ đảm nhiệm byte buffer, đối số lệnh, I/O và gọi `clang` để liên kết,
+đồng thời được ghép vào executable đích khi có relocation ngoài.
+
+Lỗi khó phát hiện cuối cùng nằm ở hằng lệnh `MOVK` ARM64 trong
+`cg_constant`: immediate cao đã bị dịch sai làm Stage 2 ghi CPU type
+Mach-O `0x0000000C` thay vì `0x0100000C`. Đã sửa base thành
+`0x72a00009` và kiểm tra lại các giá trị âm/dương 32 bit. Các ca probe
+`wide`, `negative`, `utf8`, `loop` và `else-if` đều chạy ra `52` khi
+biên dịch bằng Stage 2, Stage 3 và Stage 4. SHA-256 của vùng mã máy
+`__TEXT,__text` của ba compiler này đều là
+`da28894a17c7db1d8312b54a1b26ca7dbbc3dce3d11bead963d8cb1b7d36cc73`;
+hash toàn bộ Mach-O có khác biệt trong vùng UUID/chữ ký liên kết.
+`scripts/quality/checknativedriver.cmake` được mở rộng để chạy bootstrap
+native Stage 1 → Stage 2 → Stage 3 → Stage 4, thử biên dịch/chạy chương
+trình với cả ba compiler Stage 2/3/4. Script
+`scripts/quality/check_native_bootstrap_text.cmake` đọc trực tiếp section
+`__TEXT,__text` từ Mach-O ARM64 của ba compiler và kiểm tra mã máy
+giống từng byte; không so toàn bộ file vì metadata do linker sinh.
+Biên dịch trực tiếp bằng Stage 1 đã tạo được Stage 2 → Stage 3 → Stage 4;
+ba vùng mã máy đều 147.908 byte, cùng SHA256 như trên. Script kiểm tra
+phát hiện được sai lệch khi một byte trong `__text` bị thay đổi.
+
+Module loader `gói/biên dịch/native/module_loader.vi` cho phép `nhập tên;`
+và `nhập thư_mục/tên;` ở đầu tệp, tìm `.vi` tương đối với module đang
+nhập, loại bỏ import trùng, phát hiện vòng lặp import, module thiếu hoặc
+cú pháp import sai. Kiểm tra chạy trực tiếp bằng compiler Stage 1:
+import lồng nhau/nhập trùng và tệp điểm vào chỉ có import đều trả về 52;
+cycle, module thiếu và import lỗi đều bị từ chối với mã 12, không ghi đè
+binary có sẵn. Kiểm thử riêng xác nhận tên hàm trùng giữa các module,
+sai arity, lời gọi không xác định và thiếu `chính` đều bị từ chối
+với mã 14. Các ca này đã được thêm vào
+`scripts/quality/checknativedriver.cmake` để kiểm tra hồi quy.
+
+Fixture `src/tests/nativeparserharness.vi` đã cập nhật theo cú pháp `i++`
+và `i--` mới, kiểm tra biến vòng lặp ngoài phạm vi và nhánh `hoặc nếu`.
+Evaluator IR tham chiếu `gói/biên dịch/native/ir.vi` đã nhận `trả về`
+sớm trong nhánh, thống nhất với codegen ARM64. CTest
+`vpp-native-parser-ir` đã **PASS** (306,47 giây, 17/10/2026) với các
+ca mới. Hai CTest trọng tâm native compiler driver và parser/IR đều đạt.
+
+Phạm vi này là **self-hosting native của compiler i32/AOT subset**.
+Stage 0 vẫn cần compiler C++ bootstrap; Stage 1 và các thế hệ sau vẫn
+liên kết với runtime C, libc và toolchain hệ điều hành. Compiler native
+chỉ hỗ trợ import ở đầu tệp với định danh đường dẫn tương đối, tối đa
+12 cấp và không có bí danh/namespace. Frontend hiện đã parse từng đơn vị
+độc lập và dùng bảng ký hiệu toàn cục. Backend hiện phát object riêng
+theo module, liên kết theo symbol và có cache IR/object như mô tả ở đầu
+tài liệu. Compiler native
+chưa nhận toàn bộ ngôn ngữ V++ (OOP, lambda, FFI tổng quát), nên chưa
+thay thế compiler production/CLI C++.
+
+Hiện subset AOT tự chủ hỗ trợ hàm i32, biến cục bộ và số lượng tham số động,
+biểu thức số học/so sánh, if/else, for, break/continue, return và gọi hàm
+trực tiếp có relocation. Những toán tử hoặc câu lệnh ngoài tập hỗ trợ sẽ
+báo lỗi; không có fallback ngầm sang C++ compiler. Ví dụ:
+
+```sh
+build/bin/vpp-cli build --target aarch64-apple-darwin --emit-obj-selfhost \
+  sum src/tests/nativeaotsmoke.vi /tmp/sum.o
+```
+
+Khi chạy CLI từ thư mục khác repository, cấu hình `VPP_HOME` trỏ tới thư
+mục chứa `gói/` đã cài; bộ phân giải import dùng vị trí này để tìm các
+thư viện compiler V++. Kiểm thử `vpp-native-selfhost-host-link` thực hiện
+chính trường hợp đó, biên dịch độc lập các object, liên kết với harness C,
+chạy các giá trị biên của vòng lặp, tham số che tên hàm, và xác minh
+phép chia chưa hỗ trợ được từ chối mà không tạo object. Fixture
+`kiemtranativetuchu.vi` kiểm tra parser/IR/encoder V++ trong interpreter
+và JIT qua `run_tests.sh`.
+Ngày 14/10/2026, smoke host-link mới đạt trên macOS ARM64, kể cả khi
+source được sao chép ra thư mục build và import bắt buộc qua `VPP_HOME`.
+Năm CTest đối chiếu object, machine byte, host-link nhánh/CALL và
+relocation cũng đã đạt (5/5). Regression `kiemtramacdinh.vi` xác minh
+tham số mặc định âm `-1` và `-2147483648` trên interpreter và JIT.
+
+Riêng đường native tổng quát `--emit-raw`/`--emit-asm`/`--emit-obj` trên
+x86-64 và AArch64, bước hạ IR đã được chuyển sang
+`gói/biên dịch/mã máy hạ ir.vi`. Đường production gọi
+`compileMachineFunctionVpp` để hạ IR và phát byte trong **một lần chạy
+VM V++**;
+C++ `lowerMachineFunction` được giữ làm oracle đối chiếu từng lệnh.
+Đường hàm lá i32 của CLI dùng `compileRawLeafVpp` cũng trong một lượt VM
+cho 16 kiến trúc CPU; các API hạ/phát riêng còn phục vụ parity, C++ giữ
+oracle và bộ in assembly. Parser triple của
+`vpp build --target` đã chuyển sang `biên dịch phân tích đích` trong
+`gói/biên dịch/đích.vi` qua `parseTargetVpp`; C++ `parseTarget` vẫn là
+oracle và còn phục vụ các đường khác như liệt kê target.
+Đường `--emit-obj` đã chuyển **bước đóng gói object** sang
+`gói/biên dịch/đối tượng.vi`. Production tích hợp lowering, phát mã máy
+và đóng gói object **trong cùng một lượt chạy VM V++** qua
+`compileRawLeafVpp` hoặc `compileMachineFunctionVpp`; hàm
+`emitRawObjectBytesVpp` vẫn được dùng để đối chiếu độc lập. Bộ ghi V++
+nhận byte máy, symbol và relocation, rồi tạo ELF32/ELF64 (16 biến thể
+kiến trúc Linux), Mach-O64 (AArch64/x86_64 macOS) hoặc COFF
+(i386/x86_64 Windows). C++ `emitRawObjectBytes` được giữ làm oracle;
+không có đường tự động quay về bộ ghi C++ nếu V++ báo lỗi.
+
+Kiểm thử `vpp-native-object-parity` so byte-for-byte với oracle C++
+trên 38 ca: 32 ca bộ ghi độc lập gồm 16 kiến trúc ELF, ARMv7 hard-float GNU/musl, Mach-O,
+COFF với symbol dài, năm ca external CALL có hai relocation và năm
+ca đầu vào không hợp lệ/kiến trúc chưa hỗ trợ relocation; thêm 6 ca
+đường production tích hợp hạ IR + phát byte + ghi object một lần chạy VM,
+đối chiếu độc lập với encoder và object writer C++ (hàm lá RISC-V64,
+i386/COFF, AArch64/Mach-O; hàm có CALL trên AArch64/Mach-O,
+x86-64/ELF và x86-64/COFF). Lần chạy 13/10/2026: **38/38 đạt**.
+Đây là parity của các ca được kiểm thử;
+chưa đủ để chứng minh mọi object hợp chuẩn trên mọi toolchain.
+Trên macOS ARM64, `vpp-raw-object-host-link` và
+`vpp-native-control-flow-host-link` và `vpp-native-calls-host-link`
+đã liên kết/chạy thành công với
+object V++ (13/10/2026). Việc thực thi chéo trên các CPU khác
+cần toolchain và runner của hệ đích.
+
+Frontend compiler self-host toàn phần vẫn chưa hoàn thành.
+Các API `biên dịch phân tích`, `biên dịch bytecode` và `biên dịch tệp`
+trong `gói/biên dịch/chính.vi` vẫn phụ thuộc native
+`bien_dich_phan_tich_vm` (`src/runtime/native/vm_native_compiler_helpers.cpp`).
+
+Parser độc lập của V++ được triển khai tại:
+
+- `gói/biên dịch/từ vựng.vi`: lexer UTF-8.
+- `gói/biên dịch/biểu thức.vi`: AST biểu thức (có postfix `++` / `--`).
+- `gói/biên dịch/chương trình.vi`: AST câu lệnh và chương trình.
+- `gói/biên dịch/ngữ nghĩa.vi`: các kiểm tra ngữ nghĩa khởi đầu.
+
+API mới `biên dịch phân tích chương trình tự chủ(mã_nguồn)` được xuất từ
+`gói/biên dịch/chính.vi`; nó **không** gọi primitive C++ tạo AST/bytecode.
+AST được biểu diễn bằng map/list; các bước IR/bytecode bootstrap tự chủ
+đã có phiên bản giới hạn, mô tả tại phần cuối tài liệu.
+
+### Những cấu trúc được hỗ trợ
+
+Parser câu lệnh hiện đọc `nhập`, hàm có tên nhiều từ và tham số đơn giản,
+khối `{}`, `trả về`, `in`, khai báo `biến`, biểu thức, `nếu` / `hoặc nếu` / `hoặc`,
+`lặp(init; condition; update)`, `thoát`, `bỏ qua`, `chọn` / `ca` /
+`mặc định`, `thử` / `bắt lỗi` và `ném`.
+Semantic pass phát hiện trùng tên hàm/tham số, `trả về` ngoài hàm,
+`thoát` ngoài vòng lặp/`chọn`, `bỏ qua` ngoài vòng lặp, nhãn `ca`
+không hợp lệ, nhiều nhánh `mặc định` và đích gán/cập nhật không hợp lệ.
+Kiểm tra bí danh `nhập ... như ...` được thực hiện bằng V++ theo
+`SymbolSpace::Module` của C++: hai bí danh giống nhau trong **cùng một
+khối từ vựng** bị báo lỗi; các khối, hàm hoặc nhánh khác nhau có bảng tên
+riêng. Bí danh module được kiểm tra độc lập với tên biến và hàm;
+`nhập` không có `như` không tạo bí danh tường minh.
+Semantic V++ còn phát hiện gán `=`, gán kết hợp và `++`/`--` vào tên
+hàm toàn cục theo luật `SemanticBuilder::declareAssignmentTarget` của C++.
+Tham số hoặc biến cục bộ khai báo trong cùng hàm có quyền che tên hàm;
+việc kiểm tra được thực hiện sau khi thu thập khai báo biến trong thân.
+
+**Chưa hỗ trợ:** các dạng vòng lặp khác;
+`lớp`, `giao diện`, FFI và các dạng biểu thức chưa có trong
+parser V++. Trường hợp chưa được triển khai phải báo lỗi rõ ràng thay vì
+ngầm chuyển sang compiler C++.
+
+### Kiểm thử
+
+`src/tests/kiem_tra_bien_dich_chuong_trinh_vi.vi` kiểm tra AST, nhánh điều
+kiện, vòng lặp, lỗi cú pháp và lỗi ngữ nghĩa. Đã đăng ký trong
+`run_tests.sh` cho cả interpreter và JIT.
+Fixture còn đối chiếu với semantic C++ khi hai `nhập ... như ...` trùng
+bí danh ở cấp chương trình hoặc có bí danh khác nhau; kiểm tra trùng
+trong một khối, dùng lại ở các nhánh/hàm độc lập, và namespace module
+riêng với tên hàm/biến. Phần đối chiếu hiện chỉ xác nhận những ca được
+kiểm thử, chưa thay thế phân giải module và phạm vi tên đầy đủ của C++.
+Tám ca đối chiếu thêm kiểm tra ghi vào tên hàm, gán kết hợp, postfix,
+biến cục bộ khai báo sau phép gán và tham số trùng tên hàm. Ngày
+14/10/2026, fixture parser/semantic đạt **78/78** trên interpreter;
+đường JIT được kiểm tra cùng golden output.
+
+Phát hiện một bất nhất ở oracle: semantic C++ cho phép tham số che tên
+hàm toàn cục, nhưng `supportsFunction` của direct IR trước đây loại bỏ
+trường hợp này và báo `unsupported direct IR region`. Direct emitter C++
+đã được sửa để gắn slot VM theo SymbolId cho tham số, biến cục bộ và biến
+`bắt lỗi`; đọc/ghi, gọi gián tiếp và closure dùng đúng ràng buộc kể cả khi
+trùng tên hàm toàn cục. Bộ phát còn truyền SymbolId của receiver ngầm
+`mình`/`gốc` vào slot tham số của phương thức; trước bản sửa, phép gọi
+`gốc.value()` trong fixture kế thừa thất bại do đọc sai slot. Đã bỏ điều
+kiện từ chối direct IR lỗi thời với `bắt lỗi` trùng tên hàm. Fixture
+`src/tests/kiemtrathamsotrung.vi` hiện có **16 phép kiểm tra**, gồm hai
+khối `bắt lỗi` trùng tên, `bắt lỗi` che tham số/biến cục bộ, catch lồng
+nhau và kiểm tra hàm toàn cục vẫn gọi được; chạy đạt trên interpreter và
+JIT. Fixture kế thừa `kiem_tra_ke_thua.vi` cũng chạy
+đúng ở cả hai chế độ.
+
+Bộ hạ IR thuần V++ tại `gói/biên dịch/ir.vi` hiện có hai lượt phân giải
+ràng buộc: thu thập khai báo/tham số và đích gán implicit theo phạm vi
+hàm/toàn cục, sau đó gắn **SymbolId** vào lệnh đọc, ghi, gọi gián tiếp,
+nhãn `ca` và các biến `bắt lỗi` thuộc scope riêng. Bộ phát mã
+`gói/biên dịch/phát mã.vi` dùng SymbolId làm khóa slot; slot của một
+catch không còn va chạm với tham số, biến ngoài, hàm toàn cục hay catch
+anh em/lồng nhau cùng tên. Khóa dự phòng bằng tên văn bản vẫn dành cho
+các tên chưa được phân giải; đường cũ theo ID hàm + tên cục bộ đã dọn bỏ.
+Đối chiếu bytecode C++/V++ trong `kiem_tra_ir_bytecode_tu_chu.vi` hiện
+có **124 phép kiểm tra**, gồm cả trường hợp che tên trong `ca`, chạy đạt
+trên interpreter và JIT (14/10/2026). Đây là phạm vi syntax bootstrap
+đã hỗ trợ, chưa chứng minh tương đương toàn bộ semantic C++.
+Việc này sửa đường oracle/production C++ hiện hành; **frontend CLI vẫn
+chưa chuyển hoàn toàn sang V++**.
+
+### Các bước để chuyển CLI sang V++
+
+1. Mở rộng AST biểu thức/chương trình tới toàn bộ cú pháp V++ hiện hành;
+   so sánh snapshot AST C++ và V++ trên fixture thực.
+2. Hoàn chỉnh phân giải symbol/scope, kiểu, imports và chẩn đoán ngữ nghĩa.
+3. Hoàn thiện IR/bytecode V++ và đối chiếu toàn bộ với compiler C++.
+4. Bootstrap binary compiler V++ từ C++, rồi dùng compiler V++ biên dịch
+   lại mã nguồn compiler V++ và chạy cùng một bộ kiểm thử.
+5. Khi đã chứng minh tương đương mới thay đường `compilePipeline` mặc định
+   trong CLI. Đường opt-in `--compiler=vpp` đã được tích hợp ở giai đoạn hiện tại.
+
+**Đã sửa giới hạn direct IR của phép đọc chỉ số trên kết quả lời gọi hàm.**
+Trước đây `supportsValue` chỉ chấp nhận `LoadName` hoặc `Index` làm đối
+tượng được đọc, dù `emitValue(Index)` đã hỗ trợ lấy phần tử từ kết quả nằm
+trên VM stack. Bây giờ nhánh đọc chấp nhận thêm `Call`, `CallDynamic`,
+`Intrinsic` và `ForeignCall`; từng lời gọi vẫn phải vượt qua kiểm tra
+`supportsValue` của chính nó. Nhánh `StoreIndex` giữ nguyên điều kiện cũ.
+
+Ca tái hiện đã được sửa:
+
+```text
+nhập gói/bộ sưu tập/từ điển;
+hàm chính() {
+    danh_sách = [1, 2];
+    x = lấy map({"a": danh_sách}, "a", [])[0];
+    in x;
+};
+```
+
+Kiểm thử hồi quy `src/tests/kiem_tra_doc_chi_so_ket_qua_goi.vi` bao phủ
+`lấy map(...)[0]`, chuỗi lấy chỉ số trên kết quả gọi hàm, hàm V++ tự định
+nghĩa trả về list, và phép lấy chỉ số trên biến. Fixture parser
+`kiem_tra_bien_dich_chuong_trinh_vi.vi` cũng trực tiếp dùng cú pháp
+`lấy map(...)[0]`. Cả hai fixture được đăng ký cho interpreter và JIT.
+
+Kiểm chứng tại thời điểm sửa: build `vpp-cli` thành công; bốn fixture
+biên dịch và lấy chỉ số cho kết quả đúng ở cả hai chế độ (8/8 lượt chạy).
+Ba bài CTest hardening qua; CTest integration toàn bộ vượt quá giới hạn
+120 giây trong bước chạy fixture batch, nên chưa kết luận toàn bộ bộ test
+đã qua.
+
+Việc sửa backend C++ này độc lập với lộ trình chuyển compiler sang V++;
+đường production vẫn sử dụng `compilePipeline` trong C++.
+
+## IR và bytecode thuần V++ (bản bootstrap)
+
+Hai mô-đun mới:
+
+- gói/biên dịch/ir.vi: hạ AST từ parser/semantic V++ thành một chuỗi
+  lệnh IR stack-based, có chẩn đoán tường minh nếu chưa hỗ trợ cú pháp.
+- gói/biên dịch/phát mã.vi: phát opcode VM, quản lý slot biến, StringPool,
+  và bytecode riêng cho từng hàm. Hoàn toàn viết bằng V++.
+
+API nhập trực tiếp từ hai mô-đun tương ứng:
+biên dịch hạ IR thuần(mã_nguồn) và
+biên dịch phát bytecode thuần(mã_nguồn).
+
+Subset đã triển khai: số nguyên/thực, bool/null, chuỗi có escape
+(cả dấu nháy đơn/kép và `\\0`, theo `stripQuotes` của C++),
+biến, phép toán, so sánh, logic, đọc chỉ số, gán tên, gán kết hợp,
+list/map literal tĩnh và động (kể cả lồng nhau, key map dạng tên/chuỗi),
+khai báo biến (có/không có initializer), `nếu`/`hoặc nếu`/`hoặc` (kể cả lồng
+nhau), `chọn` / `ca` / `mặc định` (nhãn số nguyên, chuỗi, tên),
+`thử` / `bắt lỗi` / `ném` (kể cả lồng nhau), `thoát` trong `chọn`,
+in, trả về, khối, hàm có tham số cơ bản, lời gọi hàm trực tiếp theo tên
+(gồm gọi đệ quy/gọi trước khai báo), và `lặp(init; condition; update)`
+với `thoát` / `bỏ qua` kể cả lồng nhau. Lời gọi tên chưa phân giải dùng
+`OP_GOI` với chỉ số StringPool âm; lời gọi qua slot dùng `OP_GOI_GIAN_TIEP`.
+Gán kết hợp theo đúng
+direct IR C++ là đọc biến, phát opcode toán học tương ứng, sau đó
+`OP_TEN_BIEN_ID` và `OP_GAN`; KHÔNG phát trực tiếp opcode 72–76.
+Các dạng gọi phương thức/biểu thức động phức tạp, các vòng lặp khác
+và lớp/FFI vẫn chưa được emitter bootstrap hỗ trợ.
+Function ID của hàm tên được cấp trước khi phát mã. Linker một đơn vị
+và linker đồ thị đã được triển khai bằng V++.
+
+**Đã có đường thực thi artifact tự chủ:** `gói/biên dịch/bộ nạp.vi`
+chuyển bytecode map thành ABI bốn trường `[op, toán hạng, chỉ số, giá trị]`,
+đưa bảng hàm theo function ID và runtime name index, StringPool dùng chung,
+cùng initializer theo thứ tự dependency sang primitive `bytecode_chay_vm`.
+Primitive này (`src/runtime/native/vm_native_compiler_helpers.cpp`) chỉ nạp
+ABI và chạy VM; không biên dịch lại mã nguồn bằng C++.
+
+API có thể nhập trực tiếp:
+
+- `biên dịch chạy artifact(artifact)` cho artifact linker V++ đã tạo.
+- `biên dịch chạy chương trình tự chủ(mã_nguồn)` cho một đơn vị.
+- `biên dịch chạy chương trình mô đun tự chủ(điểm_vào, nguồn)` cho đồ thị.
+
+Loader kiểm tra dạng artifact, bốn trường lệnh, function ID liên tiếp,
+StringPool/runtime name index, initializer trùng/thiếu tên. Verifier VM
+tiếp tục kiểm tra opcode/operand trước khi thực thi initializer.
+`src/tests/kiem_tra_chay_bytecode_tu_chu.vi` đối chiếu đầu ra với compiler
+C++ cho chương trình đơn/đa mô-đun, đồng thời bao phủ import lặp,
+initializer, trùng tên hàm, StringPool xen kẽ, `chọn/ca`, opcode lỗi và
+metadata không hợp lệ. Ca này được đăng ký interpreter/JIT trong `run_tests.sh`.
+
+**Giới hạn còn lại:** chỉ subset parser/emitter/linker V++ được hỗ trợ;
+chưa có định dạng serialize bytecode trên đĩa, metadata debug/source hoàn
+chỉnh, FFI/class parity hay bootstrap compiler toàn phần. CLI production
+vẫn dùng C++ `compilePipeline` cho đến khi đủ bao phủ và parity.
+
+`gói/biên dịch/opcode.vi` lưu bảng mã theo enum `Opcode` trong
+`src/include/vm/instruction.h`. Chạy `ctest --test-dir build -R '^vpp-opcode-abi$'` để kiểm tra
+đồng bộ số opcode. Bộ sinh Python trước đây đã bị gỡ bỏ; kiểm tra này
+không kiểm chứng toàn bộ descriptor nội tại/alias.
+Các module phát mã V++ dùng `biên dịch mã opcode("OP_...")` thay vì
+tự đặt số opcode; ABI phụ thuộc đúng giá trị C++ đã định nghĩa.
+
+Fixture `src/tests/kiem_tra_ir_bytecode_tu_chu.vi` có **113 assertion**,
+bao gồm so sánh từng bộ bốn trường bytecode
+`op`, `toán hạng`, `chỉ số`, `giá trị` với oracle `biên dịch bytecode`
+do compiler C++ sinh. Các trường hợp đối chiếu có phép gán thường,
+gán kết hợp, điều kiện, `chọn` và `thử` (bao gồm offset nhảy),
+và khai báo biến/initializer; semantic V++ cũng
+từ chối khai báo trùng tên ở cùng phạm vi hàm/global như C++.
+Oracle hiện phơi bytecode top-level **và** từng thân hàm, nên fixture
+so cả opcode lẫn ba toán hạng trong hàm với đường C++.
+
+Kiểm chứng 12/10/2026: **113/113 assertion** trả `1` trong cả interpreter
+và JIT khi chạy `build/bin/vpp-cli`; bytecode khớp đầy đủ bốn trường,
+kể cả ca `chọn {}` rỗng, lời gọi hàm, vòng lặp, `thoát`, `bỏ qua`,
+khối/try/switch lồng nhau. Script đồng bộ opcode C++ ↔ V++ đã qua.
+C++ `supportsInstruction(Switch)` trước đây từ chối switch rỗng mặc dù
+emitter có thể sinh đúng `OP_CHON` và `OP_KET_THUC_CHUYEN`;
+điều kiện thừa đã được xóa và `vpp-cli` được biên dịch lại thành công.
+Fixture parser chương trình đạt 38/38 ở interpreter/JIT, fixture
+opcode `chọn/ca` khớp expected, ba bài CTest hardening đều đạt.
+Các kết quả này chưa bao gồm toàn bộ CTest integration.
+
+**Collection literal đã hạ bằng V++** tại `biểu thức.vi` → `ngữ nghĩa.vi`
+→ `ir.vi` → `phát mã.vi`. Danh sách/từ điển chỉ chứa hằng được mã hóa theo
+`src/include/vpp/bytecode/literal_wire.h` (separator 0x1e/0x1f,
+tag i/d/s/n/l/m, escape field), lưu StringPool và phát `OP_LIST_LITERAL`
+(88) / `OP_MAP_LITERAL` (85) với `chỉ số >= 0`. Biểu thức động đặt phần tử
+(hoặc cặp key/value) lên stack, phát cùng opcode với `chỉ số = -1` và
+`toán hạng = số phần tử/cặp`. Map key là chuỗi/tên; tên được mã hóa như
+chuỗi, không đọc biến. Đầu vào sai và trường hợp chưa hỗ trợ sẽ ném lỗi.
+
+Fixture `src/tests/kiem_tra_tap_hop_bien_dich_tu_chu.vi` so cả bốn trường
+opcode top-level/thân hàm với oracle C++, đối chiếu kết quả chạy bằng
+VM do V++ biên dịch và đường C++, kiểm tra wire format StringPool,
+opcode tĩnh/động, collection lồng nhau và lỗi cú pháp. Đã đăng ký
+interpreter và JIT trong `run_tests.sh`.
+
+**Đã chuyển decoder source string sang V++:** `biên dịch phát mã tách chuỗi`
+theo cùng quy tắc `stripQuotes` của C++ (cả escape `\\n`, `\\r`, `\\t`,
+`\\\\`, `\\'`, `\\"`, `\\0`, escape không nhận diện và hai kiểu dấu nháy).
+Emitter giải mã trước khi đưa vào StringPool và trước khi đóng gói list/map
+literal tĩnh; không giải mã hai lần. Fixture
+`src/tests/kiem_tra_escape_bien_dich_tu_chu.vi` kiểm tra decoder, bytecode
+ABI bốn trường, kết quả VM so với oracle C++, collection tĩnh/động
+và byte NUL; chạy cả interpreter/JIT trong `run_tests.sh`.
+
+Các bước tiếp: triển khai lời gọi/phương thức động và syntax còn thiếu,
+kiểm thử đầy đủ module/lớp/FFI, sau đó chứng minh parity
+trước khi chuyển CLI production.
+
+### Linker/function registry cho một chương trình thuần V++
+
+`gói/biên dịch/liên kết.vi` bổ sung API
+`biên dịch liên kết bytecode thuần(artifact)` và
+`biên dịch chương trình tự chủ(mã_nguồn)`; API thứ hai gọi tuần tự
+parser → semantic → IR → emitter → linker đều bằng V++.
+
+Linker xây bảng hàm `{tên, id, tên index, bytecode}` từ StringPool và
+slot/function ID đã predeclare, kiểm tra mọi `OP_HAM` khớp metadata,
+không thiếu/trùng khai báo, và thân hàm có khối mở/đóng. Theo
+`Emitter::emitProgram(true)` bên C++, linker tìm entrypoint `chính`,
+sau đó đến alias `main`, sinh `OP_GOI(0, slot, 0)` nếu tồn tại và luôn
+thêm `OP_DUNG_CHUONG_TRINH(0, 0, 0)`. Nó giữ nguyên bytecode top-level
+và thân hàm và **ném lỗi** khi metadata không nhất quán.
+
+Fixture `src/tests/kiem_tra_lien_ket_tu_chu.vi` so bốn trường opcode
+top-level với snapshot C++ trước liên kết, kiểm tra vị trí nối
+entrypoint, ưu tiên `chính`/`main`, và các lỗi metadata. Có đăng ký
+fixture cho interpreter và JIT trong `run_tests.sh`.
+Kiểm chứng 12/10/2026: fixture mới đạt 20/20 phép kiểm tra khi chạy
+interpreter và JIT; đầu ra interpreter khớp file expected, script đồng
+bộ opcode qua, và 3/3 CTest hardening đạt. Toàn bộ integration suite
+chưa chạy trong lượt này.
+
+Giới hạn: hiện mới liên kết **một đơn vị biên dịch**, không có import,
+module initializer, relocation liên mô-đun hay debug/source metadata.
+Artifact là dữ liệu V++ trong VM đang chạy; chưa có bộ nạp để biến
+artifact thành một phiên VM độc lập. CLI production vẫn chạy compiler
+C++ và các API snapshot gốc vẫn sử dụng native, nên **chưa self-host
+hoàn toàn**.
+
+### Đồ thị import local-source thuần V++ (bước chuẩn bị đa mô-đun)
+
+`gói/biên dịch/đồ thị mô đun.vi` triển khai
+`biên dịch dựng đồ thị nguồn thuần(điểm_vào, nguồn)`. `nguồn` là map
+định danh POSIX tương đối đã chuẩn hóa (không gồm đuôi `.vi`) đến mã
+nguồn của từng mô-đun, được cung cấp tường minh bởi caller. Graph quét
+AST import **top-level**, giải đường dẫn nhập tương đối từ thư mục của
+module đang nhập, duyệt DFS theo thứ tự câu lệnh, phát hiện chu trình
+kèm đường đi, ghi `load` / `duplicate_no_op`, và trả thứ tự khởi tạo
+**postorder** (mô-đun phụ thuộc trước importer). Parser thuần V++ nhận
+`nhập đích như bí_danh` và `công khai nhập đích như bí_danh` và giữ
+metadata alias/re-export trên AST. Nhập có đuôi `.vi` bị từ chối.
+
+Hợp đồng này lấy nguyên tắc dedup/DFS từ `src/compiler/module_graph.cpp`
+và thứ tự `moduleInitializers` từ `src/compiler/compileRegistry.cpp`,
+nhưng chưa thay các bộ giải quyết đường dẫn, package lookup, semantic
+cross-module hay registry của C++: **không đọc file trực tiếp**, không
+tự giả định module vắng mặt là package, chỉ chấp nhận key nguồn POSIX
+tương đối có trong map (không hỗ trợ Windows path ở phiên bản này).
+Artifact graph hiện được dùng để dựng sổ hàm toàn phiên và đầu vào
+`biên dịch liên kết đồ thị thuần`. Initializer của từng dependency
+được giữ riêng (không nối bytecode), cùng bảng slot theo emitter;
+chưa có bộ nạp thực thi các initializer trong một VM độc lập.
+
+Fixture `src/tests/kiem_tra_do_thi_module_tu_chu.vi` bao phủ import
+đa cấp, import lặp, alias, re-export, thứ tự khởi tạo, chu trình,
+module vắng mặt và chuẩn hóa path. Đã đăng ký cả interpreter và JIT
+trong `run_tests.sh`.
+Kiểm chứng lượt này: 32/32 assertion graph đạt ở interpreter;
+fixture parser và linker cũ khớp expected, fixture IR đạt 113/113;
+kiểm tra đồng bộ opcode (trước đây dùng công cụ Python), `bash -n run_tests.sh`,
+`git diff --check` và 3/3 CTest hardening đều đạt. Kiểm chứng bổ sung
+12/10/2026: fixture graph cũng đạt 32/32 trong JIT
+(`VPP_ENABLE_JIT=1`), đầu ra khớp file expected.
+
+### Sổ đăng ký function ID và export nhiều mô-đun bằng V++
+
+`gói/biên dịch/sổ đăng ký.vi` thêm hai API độc lập với compiler native:
+
+- `biên dịch đăng ký hàm IR thuần(ir)` cấp ID hàm từ 0, StringPool
+  deduplicate và bảng slot/tên hàm cho **một** emitter. Hàm
+  `biên dịch phát bytecode thuần` đã chuyển bước predeclare sang API này;
+  các pass còn lại vẫn chạy bằng V++ và vẫn phát bộ bốn trường opcode.
+- `biên dịch đăng ký hàm đồ thị thuần(đồ_thị)` nhận đồ thị import V++
+  và cấp function ID **toàn phiên** theo thứ tự predeclare: hàm trực tiếp
+  của importer trước, sau đó duyệt DFS qua các module import. Khởi tạo
+  module vẫn theo postorder. StringPool dùng chung, còn từng module
+  giữ bảng `trực tiếp`, `nhìn thấy`, `xuất` gắn function ID. Imports
+  có `như` tạo tên hiển thị `bí_danh.tên`; `công khai nhập` đưa các tên
+  đó vào export surface, kể cả re-export nhiều cấp. Nhập lặp cùng
+  function ID không đăng ký lại hàm. Hai hàm có cùng tên trong các
+  module khác nhau nhận **hai ID**, nhưng tên gốc được deduplicate
+  trong StringPool. Xung đột cùng tên hiển thị trỏ tới ID khác nhau
+  và trùng tên hàm trong một module đều ném lỗi rõ ràng.
+
+Giới hạn: sổ đã được emitter và linker đồ thị sử dụng để cấp function
+ID toàn phiên, giải lời gọi tên liên mô-đun và giữ slot riêng theo
+emitter. Bảng tên hiển thị vẫn chưa được nạp vào VM qua
+`CompilationRegistryState::setFunctionNameIndex`, chưa có loader,
+metadata debug/source hoặc đường production thay C++. Parser bootstrap
+chưa nhận `công khai hàm` / hàm private nên mọi hàm trực tiếp đều được
+xem là export mặc định. Những giới hạn đó phải được xử lý trước khi
+coi bộ biên dịch là self-host hoàn toàn.
+
+Fixture `src/tests/kiem_tra_so_ham_module_tu_chu.vi` kiểm tra 43 điều
+kiện: ID, StringPool, thứ tự module, alias, re-export nhiều cấp,
+trường hợp nhập lặp, thứ tự giả mạo, cùng tên ở hai module, xung đột namespace, và
+đối chiếu sổ IR với emitter một đơn vị. Đăng ký cả interpreter/JIT
+trong `run_tests.sh`.
+
+### Emitter và linker đồ thị dùng chung function ID
+
+`biên dịch hạ IR từ cây thuần(cây, bỏ_qua_nhập)` nhận AST đã parse để
+không token hóa lại từng mô-đun. Chỉ được bỏ qua câu `nhập` khi graph
+đã giải và đăng ký tất cả phụ thuộc. `biên dịch phát bytecode IR có sổ`
+nhận registry toàn phiên, dùng ID chính xác thay vì chỉ số hàm cục bộ,
+chia slot theo mô-đun và dùng StringPool chung. Những tên imported được
+giải bằng danh sách `nhìn thấy`, kể cả alias và tái xuất. Tên gọi
+không phân giải trong mô-đun gây lỗi tường minh.
+
+`gói/biên dịch/liên kết.vi` bổ sung
+`biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn)` để nối
+graph → registry → AST/IR → emitter → linker thuần V++.
+`biên dịch liên kết đồ thị thuần(đồ_thị)` trả bytecode root có
+entrypoint/HALT, bảng hàm toàn phiên, StringPool dùng chung, và
+`mô đun khởi tạo` chứa từng initializer cùng slot của mô-đun theo thứ
+tự postorder. Linker xác nhận `OP_HAM` đúng một lần cho từng ID, đúng
+metadata tên và mô-đun, cùng thân hàm có khối mở/đóng. Không nối
+initializer vào bytecode root bởi chỉ số jump và slot là cục bộ.
+
+`src/tests/kiem_tra_lien_ket_module_tu_chu.vi` chứa **71 phép kiểm**
+độc lập, kiểm tra đủ bốn trường của các opcode quan trọng, thứ tự
+initializer, alias/tái xuất đa cấp, tên trùng trong hai mô-đun,
+import lặp, root entrypoint, và lỗi tên chưa phân giải. Đã đăng ký
+interpreter/JIT trong `run_tests.sh`. Kiểm chứng 12/10/2026:
+71/71 đúng trên interpreter và JIT, output khớp expected;
+script opcode sync, `bash -n`, `git diff --check` và ba CTest
+hardening đều đạt. Không suy ra toàn bộ integration suite đã qua.
+
+Đây mới là **artifact dữ liệu** được dựng trong V++ VM đang chạy;
+chưa có VM loader, chuyển metadata debug, hay khởi động chương trình
+đã biên dịch bằng artifact. Linker V++ đã mô hình hóa tên khai báo
+và tên runtime sau alias, nhưng chưa lắp vào loader/VM độc lập.
+Do đó CLI sản phẩm vẫn dùng trình biên dịch C++ và chưa thể coi là
+self-host hoàn chỉnh.
+
+### Kiểm tra oracle C++ đa mô-đun và sửa lỗi bí danh import trùng
+
+`src/tests/kiem_tra_oracle_module_tu_chu.vi` đối chiếu snapshot bytecode
+C++ với artifact V++ trên 3 đồ thị: import thường với re-export,
+import một dependency thêm lần nữa dưới alias khác, và import lại
+module cha dưới alias khác. So sánh thứ tự/function ID, tên runtime,
+bytecode thân hàm và đủ bốn trường `op`, `toán hạng`, `chỉ số`,
+`giá trị`; root so phần trước CALL entrypoint/HALT do hai opcode đó
+chỉ được linker V++ bổ sung. 9/9 assertion đạt trên interpreter và JIT
+(12/10/2026). Oracle C++ **không** xuất initializer dependency nên
+chưa khẳng định bytecode initializer parity với snapshot.
+
+Đã xác nhận lỗi gốc C++: `compileImportSpec` từng bỏ qua toàn bộ import
+trùng canonical path, làm bí danh mới không vào lookup; `OP_GOI` của
+`toán.cộng()` thành chỉ số âm `-7` dù ID thực là `2`. Đã sửa registry
+C++ bằng ánh xạ tên import → function ID cho từng alias, độc lập với
+`functionNameIndices` (metadata runtime chỉ giữ một tên trên ID).
+Import trùng vẫn chỉ khởi tạo dependency một lần. Fixture runtime
+`src/tests/kiem_tra_module_alias_trung.vi` kiểm chứng output
+`99, 42, 42, 42` ở cả interpreter/JIT. Đây là sửa lỗi oracle/đường
+production, không phải chuyển thêm chức năng sang native C++.
+
+Đã sửa sai lệch StringPool giữa C++ và V++ khi literal chuỗi xen kẽ
+import. Trước đó `biên dịch đăng ký hàm đồ thị thuần` cấp trước toàn bộ
+tên hàm, còn emitter khởi tạo dependency theo postorder, làm lệch chỉ
+số chuỗi ở bytecode root (`1, 0, 1` ở ca tái hiện). Trong khi đó,
+C++ predeclare hàm của module đang xét và biên dịch dependency đúng
+vị trí gặp import. `gói/biên dịch/sổ đăng ký.vi` bổ sung chế độ đăng ký
+function ID **hoãn cấp StringPool** cho đồ thị; `gói/biên dịch/ir.vi`
+giữ lại vị trí import, còn `gói/biên dịch/phát mã.vi` phát đệ quy tại
+vị trí đó, theo dõi initializer đã phát, các alias và slot của từng
+module. `gói/biên dịch/liên kết.vi` thu initializer theo thứ tự
+postorder sau khi root đã được phát, bảo toàn function ID đã cấp.
+Đường đăng ký/emitter một đơn vị vẫn giữ hành vi cũ.
+
+`src/tests/kiem_tra_oracle_chuoi_module.vi` dùng oracle C++ và thư
+viện fixture `src/tests/fixtures/compiler_oracle/string_order/`, đối
+chiếu đủ bốn trường bytecode root và thân hàm, function ID và tên
+runtime trong **bốn tình huống**: literal trước/sau import; biến chứa
+chuỗi bao quanh import; import lặp dưới hai alias; và khai báo hàm/literal
+xen giữa dependency. Sau sửa, **12/12 kiểm tra đạt trên interpreter và
+12/12 trên JIT** (12/10/2026). Fixture đã được đăng ký trong
+`run_tests.sh` cùng file expected. Oracle C++ vẫn chưa xuất bytecode
+initializer của dependency, nên kiểm thử này chưa xác minh đối chiếu
+phần initializer. Chưa hoàn tất xác minh toàn bộ CTest integration và
+chưa chuyển compiler production từ C++ sang V++.

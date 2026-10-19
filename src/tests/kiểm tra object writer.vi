@@ -1,0 +1,34 @@
+// Smoke tập trung cho bộ ghi ELF/Mach-O/COFF tự chủ V++.
+nhập gói/biên dịch/đối tượng;
+
+hàm chính() {
+    mã = [184, 42, 0, 0, 0, 195];
+    elf = biên dịch object("x86_64", "linux", "gnu", mã, "answer", []);
+    nếu (độ dài(elf) <= độ dài(mã) || elf[0] != 127 || elf[1] != 69 || elf[2] != 76 || elf[3] != 70) {
+        ném "ELF header không hợp lệ";
+    };
+    in "ELF:" + độ dài(elf);
+
+    macho = biên dịch object("aarch64", "macos", "darwin", [192, 3, 95, 214], "answer", []);
+    nếu (macho[0] != 207 || macho[1] != 250 || macho[2] != 237 || macho[3] != 254) {
+        ném "Mach-O header không hợp lệ";
+    };
+    in "MachO:" + độ dài(macho);
+
+    coff = biên dịch object("x86_64", "windows", "msvc", mã, "answer", []);
+    nếu (coff[0] != 100 || coff[1] != 134) { ném "COFF header không hợp lệ"; };
+    in "COFF:" + độ dài(coff);
+
+    relocs = [{"offset": 1, "symbol": "callee"}];
+    elf_gọi = biên dịch object("x86_64", "linux", "gnu", [232, 0, 0, 0, 0, 195], "caller", relocs);
+    nếu (độ dài(elf_gọi) <= độ dài(elf)) { ném "ELF thiếu CALL relocation"; };
+    in "ELF-CALL:" + độ dài(elf_gọi);
+
+    mac_gọi = biên dịch object("aarch64", "macos", "darwin", [0, 0, 0, 148, 192, 3, 95, 214], "caller", [{"offset": 0, "symbol": "callee"}]);
+    nếu (độ dài(mac_gọi) <= độ dài(macho)) { ném "Mach-O thiếu CALL relocation"; };
+    in "MachO-CALL:" + độ dài(mac_gọi);
+
+    coff_gọi = biên dịch object("x86_64", "windows", "msvc", [232, 0, 0, 0, 0, 195], "caller", relocs);
+    nếu (độ dài(coff_gọi) <= độ dài(coff)) { ném "COFF thiếu CALL relocation"; };
+    in "COFF-CALL:" + độ dài(coff_gọi);
+}

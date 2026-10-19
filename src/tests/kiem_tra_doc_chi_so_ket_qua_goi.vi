@@ -1,0 +1,16 @@
+// Index reads must accept the temporary returned by a function call.
+nhập gói/bộ sưu tập/từ điển;
+
+hàm tạo_danh_sách() {
+    trả về [10, 20, 30];
+};
+
+hàm chính() {
+    mục = [4, 5];
+    in lấy map({"mục": mục}, "mục", [])[0];
+    in lấy map({"lồng": [[7, 8], [9, 10]]}, "lồng", [])[1][0];
+    in tạo_danh_sách()[2];
+    in mục[1];
+    bảng = {"số": [2, 3]};
+    in lấy map(bảng, "số", [])[0] + 10;
+};

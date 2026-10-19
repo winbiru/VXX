@@ -1,0 +1,4 @@
+// Opcode entropy native cũ phải bị từ chối trên POSIX và Windows.
+hàm chính() {
+    in do_dai(ngau_nhien_bao_mat_bytes_vm(16));
+};

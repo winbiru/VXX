@@ -1,0 +1,5 @@
+// A user exception that happens to contain the same I/O message must remain
+// a normal user exception. Only a structured error record carries OS facts.
+hàm chính() {
+    ném "đọc tệp: không thể mở tệp để đọc";
+};

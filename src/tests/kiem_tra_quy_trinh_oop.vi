@@ -1,0 +1,75 @@
+nhập gói/biên dịch/liên kết;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/chính;
+nhập fixtures/oop_pipeline/api như api;
+
+lớp Con Qua Mô Đun kế thừa api.Cha triển khai api.Có Giá Trị {
+    hàm khởi tạo(x) { gốc.khởi tạo(x); };
+    hàm công khai đọc() { trả về gốc.đọc() + 1; };
+};
+
+lớp Hộp Chuỗi {
+    hàm khởi tạo(x) { mình.x = x; };
+    hàm công khai đọc() { trả về mình.x; };
+    hàm công khai tự mình() { trả về mình; };
+    hàm công khai tạo hàm() {
+        f = hàm(x) { trả về mình.bí mật() + x; };
+        trả về f;
+    };
+    hàm riêng tư bí mật() { trả về mình.x; };
+};
+
+hàm chính() {
+    a = Hộp Chuỗi(7); ds = [a];
+    in ds[0].tự mình().đọc() == 7;
+    ds[0].tự mình().x = 9;
+    in a.đọc() == 9;
+    f = a.tạo hàm();
+    in f(3) == 12;
+    cha_nhập = api.Cha(10);
+    con = Con Qua Mô Đun(20);
+    in cha_nhập.đọc() == 10 && con.đọc() == 21;
+    tổng = 0;
+    lặp(i = 0; i < 3; i++) {
+        nếu (i == 0) { bỏ qua; };
+        lặp(j = 0; j < 2; j++) { tổng += 1; };
+    };
+    in tổng == 4;
+    nguồn = "giao diện Đọc Được { hàm đọc(); }; " +
+        "lớp Hộp triển khai Đọc Được { hàm khởi tạo(x = 5) { mình.x = x; }; " +
+        "hàm công khai đọc() { trả về mình.x; }; " +
+        "hàm công khai tự mình() { trả về mình; }; }; " +
+        "hàm tạo() { trả về [Hộp()]; }; " +
+        "hàm chính() { a = tạo(); a[0].x = 8; in a[0].tự mình().đọc(); };";
+    artifact = biên dịch chương trình tự chủ(nguồn);
+    in biên dịch chạy artifact(artifact) == "8\n";
+    sai_hợp_đồng = [
+        "giao diện I { hàm f(); }; lớp A triển khai I {};",
+        "giao diện I { hàm f(x); }; lớp A triển khai I { hàm f() {}; };",
+        "giao diện I { hàm f(); }; lớp A triển khai I { hàm riêng tư f() {}; };",
+        "giao diện I { hàm f(); }; giao diện J kế thừa I {}; lớp A triển khai J {};",
+        "lớp A { hàm công khai f() {}; }; lớp B kế thừa A { hàm riêng tư f() {}; };",
+        "lớp A { hàm f(x) {}; }; lớp B kế thừa A { hàm f() {}; };"
+    ];
+    lặp(i = 0; i < độ dài(sai_hợp_đồng); i++) {
+        bị_chặn = sai;
+        thử { biên dịch chương trình tự chủ(sai_hợp_đồng[i]); } bắt lỗi(e) { bị_chặn = đúng; };
+        in bị_chặn;
+    };
+    đồ_thị = {
+        "app/main": "nhập ../lib/api như api; " +
+            "lớp Con kế thừa api.Cha triển khai api.Có Giá Trị { " +
+            "hàm khởi tạo(x) { gốc.khởi tạo(x); }; " +
+            "hàm công khai đọc() { trả về gốc.đọc() + 1; }; }; " +
+            "hàm chính() { a = api.Cha(10); b = Con(20); in a.đọc(); in b.đọc(); };",
+        "lib/api": "công khai nhập base;",
+        "lib/base": "giao diện công khai Có Giá Trị { hàm đọc(); }; " +
+            "lớp công khai Cha triển khai Có Giá Trị { " +
+            "hàm khởi tạo(x) { mình.x = x; }; hàm công khai đọc() { trả về mình.x; }; };"
+    };
+    đa_module = biên dịch chương trình mô đun tự chủ("app/main", đồ_thị);
+    in biên dịch chạy artifact(đa_module) == "10\n21\n";
+    sai_nhập = biên dịch snapshot nội bộ("nhập fixtures/oop_pipeline/api như api; " +
+        "lớp Thiếu triển khai api.Có Giá Trị {};", "src/tests");
+    in sai_nhập["hợp lệ"] == 0;
+};

@@ -183,6 +183,13 @@ struct BuildContext {
         edge.importerIdentity = importerIdentity;
         edge.importedIdentity = location.identity;
         edge.importSpec = importSpec;
+        // `chính.vi` is a package entry point. Its unaliased imports compose
+        // the public package API without requiring `công khai nhập` at each line.
+        // Other modules still require an explicit re-export.
+        if (fs::path(importerIdentity).filename() == "chính.vi" &&
+            importSpec.alias.empty()) {
+            edge.importSpec.reExport = true;
+        }
 
         const auto existing = states.find(location.identity);
         if (existing != states.end()) {
@@ -350,6 +357,107 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
     SemanticEnvironment environment;
     std::unordered_set<std::string> seen;
 
+    auto declaringModule = [&](const ModuleExportSymbol &symbol)
+        -> const LocalModuleSemanticRecord * {
+        for (const auto &record : modules) {
+            if (record.path.lexically_normal() == symbol.sourcePath.lexically_normal())
+                return &record;
+        }
+        return nullptr;
+    };
+    auto declaration = [&](const ModuleExportSymbol &symbol)
+        -> const vietvm::frontend::AstStatement * {
+        const auto *record = declaringModule(symbol);
+        if (record == nullptr) return nullptr;
+        const auto parsed = parsedPrograms.find(record->identity);
+        if (parsed == parsedPrograms.end() || !parsed->second) return nullptr;
+        for (const auto &statement : parsed->second->statements) {
+            if (statement.span.begin.offset == symbol.declaration.begin.offset)
+                return &statement;
+        }
+        return nullptr;
+    };
+    auto resolveType = [&](const ModuleExportSymbol &owner, const std::string &name)
+        -> std::optional<ModuleExportSymbol> {
+        const auto *record = declaringModule(owner);
+        if (record == nullptr) return std::nullopt;
+        const auto parsed = parsedPrograms.find(record->identity);
+        if (parsed != parsedPrograms.end() && parsed->second) {
+            for (const auto &statement : parsed->second->statements) {
+                if (statement.declarationName != name) continue;
+                if (statement.kind != vietvm::frontend::AstStatementKind::Class &&
+                    statement.kind != vietvm::frontend::AstStatementKind::Interface) continue;
+                return ModuleExportSymbol{name,
+                    statement.kind == vietvm::frontend::AstStatementKind::Class
+                        ? SemanticSymbolKind::Class : SemanticSymbolKind::Interface,
+                    statement.span, record->path};
+            }
+        }
+        for (const auto &edge : graph.edges) {
+            if (edge.importerIdentity != record->identity) continue;
+            const auto *dependency = module(edge.importedIdentity);
+            if (dependency == nullptr) continue;
+            for (const auto &candidate : dependency->exports) {
+                const std::string visible = edge.importSpec.alias.empty()
+                    ? candidate.name : edge.importSpec.alias + "." + candidate.name;
+                if (visible == name) return candidate;
+            }
+        }
+        return std::nullopt;
+    };
+    std::unordered_map<std::string, std::size_t> canonicalTypes;
+    std::function<SemanticExternalSymbol(const ModuleExportSymbol &)> describe;
+    std::function<std::string(const ModuleExportSymbol &)> intern;
+    intern = [&](const ModuleExportSymbol &symbol) {
+        const std::string canonical = "@type:" + symbol.sourcePath.u8string() + ":" +
+            std::to_string(symbol.declaration.begin.offset);
+        if (canonicalTypes.count(canonical) != 0) return canonical;
+        const std::size_t index = environment.importedSymbols.size();
+        canonicalTypes.emplace(canonical, index);
+        environment.importedSymbols.emplace_back();
+        auto external = describe(symbol);
+        external.name = canonical;
+        environment.importedSymbols[index] = std::move(external);
+        return canonical;
+    };
+    describe = [&](const ModuleExportSymbol &symbol) {
+        SemanticExternalSymbol external{symbol.name, symbol.kind, symbol.declaration,
+            symbol.sourcePath.lexically_normal().u8string()};
+        const auto *statement = declaration(symbol);
+        if (statement == nullptr ||
+            (symbol.kind != SemanticSymbolKind::Class &&
+             symbol.kind != SemanticSymbolKind::Interface)) return external;
+        external.runtimeName = statement->declarationName;
+        auto referenceName = [&](const std::string &name) {
+            const auto target = resolveType(symbol, name);
+            return target ? intern(*target) : name;
+        };
+        if (!statement->superclassName.empty())
+            external.superclassName = referenceName(statement->superclassName);
+        for (const auto &reference : statement->implementedInterfaces)
+            external.implementedInterfaces.push_back(referenceName(reference.name));
+        for (const auto &reference : statement->extendedInterfaces)
+            external.extendedInterfaces.push_back(referenceName(reference.name));
+        if (!statement->children.empty()) {
+            for (const auto &method : statement->children.front().children) {
+                if (method.kind != vietvm::frontend::AstStatementKind::Function) continue;
+                SemanticExternalMethod info;
+                info.name = method.declarationName;
+                info.visibility = method.visibility == vietvm::frontend::AstVisibility::Private
+                    ? SemanticVisibility::Private
+                    : method.visibility == vietvm::frontend::AstVisibility::Protected
+                        ? SemanticVisibility::Protected : SemanticVisibility::Public;
+                info.parameterCount = method.parameters.size();
+                info.minimumArgumentCount = info.parameterCount;
+                while (info.minimumArgumentCount > 0 &&
+                       method.parameters[info.minimumArgumentCount - 1].hasDefault)
+                    --info.minimumArgumentCount;
+                external.methods.push_back(std::move(info));
+            }
+        }
+        return external;
+    };
+
     for (const LocalModuleEdge &edge : graph.edges) {
         if (edge.importerIdentity != importerIdentity) continue;
         const LocalModuleSemanticRecord *record = module(edge.importedIdentity);
@@ -360,11 +468,9 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
                 ? exported.name
                 : edge.importSpec.alias + "." + exported.name;
             if (!seen.insert(importedName).second) continue;
-            environment.importedSymbols.push_back(
-                SemanticExternalSymbol{importedName,
-                                       exported.kind,
-                                       exported.declaration,
-                                       exported.sourcePath.lexically_normal().u8string()});
+            auto external = describe(exported);
+            external.name = importedName;
+            environment.importedSymbols.push_back(std::move(external));
         }
         for (const ModuleExportSymbol &hidden : record->hiddenSymbols) {
             const std::string importedName = edge.importSpec.alias.empty()
@@ -424,6 +530,10 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
             edge.importerIdentity = entryIdentity;
             edge.importedIdentity = location.identity;
             edge.importSpec = candidate;
+            if (fs::path(entryIdentity).filename() == "chính.vi" &&
+                candidate.alias.empty()) {
+                edge.importSpec.reExport = true;
+            }
             if (!loaded.insert(location.identity).second) {
                 edge.action = LocalModuleEdgeAction::DuplicateNoOp;
                 index.graph.edges.push_back(std::move(edge));

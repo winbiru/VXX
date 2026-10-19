@@ -48,118 +48,118 @@ hàm công khai api project path admin users search() {
 };
 
 // Ghi chú hàm: JSON lỗi chuẩn có requestId.
-hàm app json error(message, requestId) {
+hàm api project json error(message, requestId) {
     trả về rest json lỗi(message, requestId);
 };
 
 // Ghi chú hàm: JSON thành công với value chuỗi.
-hàm app json value(message, requestId, value) {
+hàm api project json value(message, requestId, value) {
     dataJson = "{\"requestId\":\"" + requestId + "\",\"value\":\"" + value + "\"}";
     trả về rest json thành công object(message, dataJson);
 };
 
 // Ghi chú hàm: JSON tạo user thành công.
-hàm app json created user(requestId) {
-    trả về app json value("Tạo mới thành công", requestId, "created-user");
+hàm api project json created user(requestId) {
+    trả về api project json value("Tạo mới thành công", requestId, "created-user");
 };
 
 // Ghi chú hàm: JSON lỗi thiếu keyword.
-hàm app json missing keyword(requestId) {
+hàm api project json missing keyword(requestId) {
     trả về rest json lỗi("missing-keyword", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi thiếu username.
-hàm app json missing username(requestId) {
+hàm api project json missing username(requestId) {
     trả về rest json lỗi("missing-username", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi thiếu token.
-hàm app json missing token(requestId) {
+hàm api project json missing token(requestId) {
     trả về rest json lỗi("missing-token", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi token không hợp lệ.
-hàm app json invalid token(requestId) {
+hàm api project json invalid token(requestId) {
     trả về rest json lỗi("invalid-token", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi user không tồn tại.
-hàm app json user not found(requestId) {
+hàm api project json user not found(requestId) {
     trả về rest json lỗi("user-not-found", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi database chưa kết nối.
-hàm app json db not connected(requestId) {
+hàm api project json db not connected(requestId) {
     trả về rest json lỗi("db-not-connected", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi resource không tồn tại.
-hàm app json not found(requestId) {
+hàm api project json not found(requestId) {
     trả về rest json lỗi("not-found", requestId);
 };
 
 // Ghi chú hàm: JSON xóa user thành công.
-hàm app json deleted user(requestId) {
-    trả về app json value("Xóa thành công", requestId, "deleted");
+hàm api project json deleted user(requestId) {
+    trả về api project json value("Xóa thành công", requestId, "deleted");
 };
 
 lớp công khai ResponseEntity {
     hàm công khai ok(body, requestId) {
-        in app json value("Thành công", requestId, body);
+        in api project json value("Thành công", requestId, body);
         trả về 0;
     };
 
     hàm công khai created(body, requestId) {
         nếu (body == "created-user") {
-            in app json created user(requestId);
+            in api project json created user(requestId);
             trả về 0;
         };
-        in app json value("Tạo mới thành công", requestId, body);
+        in api project json value("Tạo mới thành công", requestId, body);
         trả về 0;
     };
 
     hàm công khai badRequest(message, requestId) {
         nếu (message == "missing-keyword") {
-            in app json missing keyword(requestId);
+            in api project json missing keyword(requestId);
             trả về 0;
         };
         nếu (message == "missing-username") {
-            in app json missing username(requestId);
+            in api project json missing username(requestId);
             trả về 0;
         };
-        in app json error(message, requestId);
+        in api project json error(message, requestId);
         trả về 0;
     };
 
     hàm công khai unauthorized(message, requestId) {
         nếu (message == "missing-token") {
-            in app json missing token(requestId);
+            in api project json missing token(requestId);
             trả về 0;
         };
-        in app json invalid token(requestId);
+        in api project json invalid token(requestId);
         trả về 0;
     };
 
     hàm công khai notFound(message, requestId) {
         nếu (message == "user-not-found") {
-            in app json user not found(requestId);
+            in api project json user not found(requestId);
             trả về 0;
         };
-        in app json not found(requestId);
+        in api project json not found(requestId);
         trả về 0;
     };
 
     hàm công khai serverError(message, requestId) {
         nếu (message == "db-not-connected") {
-            in app json db not connected(requestId);
+            in api project json db not connected(requestId);
             trả về 0;
         };
-        in app json error(message, requestId);
+        in api project json error(message, requestId);
         trả về 0;
     };
 
     hàm công khai noContent(requestId) {
-        in app json deleted user(requestId);
+        in api project json deleted user(requestId);
         trả về 0;
     };
 };

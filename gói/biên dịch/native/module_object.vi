@@ -1,0 +1,250 @@
+// Native Mach-O MH_OBJECT per source module. Each defined function exports a
+// stable _vpp_fn_<UTF-8 source name> symbol (entry point exports _main).
+// Calls to imported V++ functions and native runtime functions are emitted as
+// ARM64_RELOC_BRANCH26 records instead of patching across module boundaries.
+
+hàm om_function_name(registry, id, entry_id) {
+    nếu (id < 0) { trả về -1; };
+    nếu (id == entry_id) { trả về "_main"; };
+    biến count = 0;
+    lặp (offset = 0; offset < byte_dài(registry); offset = offset) {
+        nếu (offset + 8 > byte_dài(registry)) { trả về -1; };
+        biến size = byte_đọc_i32(registry, offset);
+        nếu (size <= 0) { trả về -1; };
+        nếu (size > byte_dài(registry) - offset - 8) { trả về -1; };
+        nếu (count == id) {
+            biến name = "_vpp_fn_";
+            lặp (i = offset + 8; i < offset + 8 + size; i++) {
+                nếu (byte_thêm(name, byte_lấy(registry, i)) != 0) {
+                    byte_hủy(name);
+                    trả về -1;
+                };
+            };
+            trả về name;
+        };
+        offset = offset + 8 + size;
+        count = count + 1;
+    };
+    trả về -1;
+};
+
+hàm om_used(pairs, id) {
+    lặp (off = 0; off < byte_dài(pairs); off = off + 8) {
+        nếu (byte_đọc_i32(pairs, off + 4) == id) { trả về 1; };
+    };
+    trả về 0;
+};
+
+// Add one nlist_64 and its UTF-8 string. is_defined selects N_SECT or N_UNDF.
+hàm om_add_symbol(nlists, strings, name, is_defined, value) {
+    nếu (name <= 0) { trả về -1; };
+    nếu (byte_dài(name) <= 0) { byte_hủy(name); trả về -1; };
+    biến start = byte_dài(strings);
+    biến status = 0;
+    nếu (byte_nối(strings, name) != 0) { status = -1; };
+    nếu (byte_thêm(strings, 0) != 0) { status = -1; };
+    nếu (obj_i32(nlists, start) != 0) { status = -1; };
+    biến kind = 1;
+    nếu (is_defined == 1) { kind = 15; };
+    nếu (byte_thêm(nlists, kind) != 0) { status = -1; };
+    nếu (byte_thêm(nlists, is_defined) != 0) { status = -1; };
+    nếu (byte_thêm(nlists, 0) != 0) { status = -1; };
+    nếu (byte_thêm(nlists, 0) != 0) { status = -1; };
+    nếu (obj_u64(nlists, value) != 0) { status = -1; };
+    byte_hủy(name);
+    trả về status;
+};
+
+// Local symbols precede deduplicated V++ undefined symbols, followed by
+// deduplicated native ABI undefined symbols. The same order is used to
+// compute BRANCH26 relocation symbol indexes.
+hàm om_import_index(imports, first, last, target) {
+    biến index = last - first;
+    lặp (id = 0; id < target; id++) {
+        nếu (id < first) {
+            nếu (om_used(imports, id) == 1) { index = index + 1; };
+        } hoặc nếu (id >= last) {
+            nếu (om_used(imports, id) == 1) { index = index + 1; };
+        };
+    };
+    trả về index;
+};
+
+hàm om_native_index(imports, native_calls, first, last, function_count, native_id) {
+    biến index = last - first;
+    lặp (id = 0; id < function_count; id++) {
+        nếu (om_used(imports, id) == 1) { index = index + 1; };
+    };
+    lặp (native_before = 0; native_before < native_id; native_before++) {
+        nếu (om_used(native_calls, native_before) == 1) { index = index + 1; };
+    };
+    trả về index;
+};
+
+// Objects for empty function modules are skipped. Each nonempty unit owns
+// only the machine code generated from its own function IDs.
+hàm om_macho_module(code, object, starts, registry, first, last, entry_id, imports, native_calls) {
+    nếu (first < 0) { trả về -1; };
+    nếu (last <= first) { trả về -1; };
+    nếu (code == object) { trả về -1; };
+    biến n = byte_dài(code);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 900000) { trả về -1; };
+    nếu (byte_dài(starts) != (last - first) * 4) { trả về -1; };
+    nếu (byte_làm_rỗng(object) != 0) { trả về -1; };
+    biến nlists = byte_mới();
+    biến strings = byte_mới();
+    biến relocs = byte_mới();
+    biến status = 0;
+    nếu (nlists <= 0) { status = -1; };
+    nếu (strings <= 0) { status = -1; };
+    nếu (relocs <= 0) { status = -1; };
+    nếu (status == 0) {
+        nếu (byte_thêm(strings, 0) != 0) { status = -1; };
+        lặp (fn = first; fn < last; fn++) {
+            biến name = om_function_name(registry, fn, entry_id);
+            biến start = byte_đọc_i32(starts, (fn - first) * 4);
+            nếu (start < 0) { status = -1; thoát; };
+            nếu (start >= n) { status = -1; thoát; };
+            nếu (om_add_symbol(nlists, strings, name, 1, start) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+    };
+    biến symbol_count = last - first;
+    // Global registry records are scanned once per imported symbol so each
+    // global function ID is emitted only once, even when called many times.
+    biến global_id = 0;
+    nếu (status == 0) {
+        lặp (offset = 0; offset < byte_dài(registry); offset = offset) {
+            nếu (offset + 8 > byte_dài(registry)) { status = -1; thoát; };
+            biến size = byte_đọc_i32(registry, offset);
+            nếu (size <= 0) { status = -1; thoát; };
+            nếu (size > byte_dài(registry) - offset - 8) { status = -1; thoát; };
+            nếu (om_used(imports, global_id) == 1) {
+                nếu (global_id >= first) { nếu (global_id < last) { status = -1; thoát; }; };
+                biến symbol = om_function_name(registry, global_id, entry_id);
+                nếu (om_add_symbol(nlists, strings, symbol, 0, 0) != 0) { status = -1; thoát; };
+                symbol_count = symbol_count + 1;
+            };
+            offset = offset + 8 + size;
+            global_id = global_id + 1;
+        };
+    };
+    nếu (status == 0) {
+        lặp (verify_offset = 0; verify_offset < byte_dài(imports); verify_offset = verify_offset + 8) {
+            nếu (verify_offset + 8 > byte_dài(imports)) { status = -1; thoát; };
+            biến verify_id = byte_đọc_i32(imports, verify_offset + 4);
+            nếu (verify_id < 0) { status = -1; thoát; };
+            nếu (verify_id >= global_id) { status = -1; thoát; };
+        };
+    };
+    nếu (status == 0) {
+        lặp (runtime_id = 0; runtime_id < 62; runtime_id++) {
+            nếu (om_used(native_calls, runtime_id) == 1) {
+                nếu (om_add_symbol(nlists, strings, obj_native_name(runtime_id), 0, 0) != 0) {
+                    status = -1;
+                    thoát;
+                };
+                symbol_count = symbol_count + 1;
+            };
+        };
+    };
+    nếu (status == 0) {
+        lặp (import_offset = 0; import_offset < byte_dài(imports); import_offset = import_offset + 8) {
+            biến import_at = byte_đọc_i32(imports, import_offset);
+            biến import_id = byte_đọc_i32(imports, import_offset + 4);
+            nếu (import_at < 0) { status = -1; thoát; };
+            nếu (import_at + 4 > n) { status = -1; thoát; };
+            nếu (obj_i32(relocs, import_at) != 0) { status = -1; thoát; };
+            nếu (obj_i32(relocs, 754974720 + om_import_index(imports, first, last, import_id)) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+        lặp (native_offset = 0; native_offset < byte_dài(native_calls); native_offset = native_offset + 8) {
+            biến native_at = byte_đọc_i32(native_calls, native_offset);
+            biến native_id = byte_đọc_i32(native_calls, native_offset + 4);
+            nếu (native_at < 0) { status = -1; thoát; };
+            nếu (native_at + 4 > n) { status = -1; thoát; };
+            nếu (native_id < 0) { status = -1; thoát; };
+            nếu (native_id > 61) { status = -1; thoát; };
+            nếu (obj_i32(relocs, native_at) != 0) { status = -1; thoát; };
+            nếu (obj_i32(relocs, 754974720 + om_native_index(imports, native_calls, first, last, global_id, native_id)) != 0) {
+                status = -1;
+                thoát;
+            };
+        };
+    };
+    nếu (status == 0) {
+        // Include LC_BUILD_VERSION (macOS 11+) so ld does not have to infer
+        // the platform for each independent object file.
+        biến reloc_offset = 232;
+        lặp (align_offset = 0; align_offset < n; align_offset = align_offset + 8) { reloc_offset = reloc_offset + 8; };
+        biến symoff = reloc_offset + byte_dài(relocs);
+        biến stroff = symoff + byte_dài(nlists);
+        nếu (stroff + byte_dài(strings) > 1048576) { status = -1; };
+        nếu (status == 0) {
+            obj_i32(object, -17958193); // mach_header_64
+            obj_i32(object, 16777228);
+            obj_i32(object, 0);
+            obj_i32(object, 1); // MH_OBJECT
+            obj_i32(object, 3);
+            obj_i32(object, 200);
+            obj_i32(object, 0);
+            obj_i32(object, 0);
+            obj_i32(object, 25); // LC_SEGMENT_64
+            obj_i32(object, 152);
+            nếu (obj_name(object, "", 16) != 0) { status = -1; };
+            obj_u64(object, 0);
+            obj_u64(object, n);
+            obj_u64(object, 232);
+            obj_u64(object, n);
+            obj_i32(object, 7);
+            obj_i32(object, 5);
+            obj_i32(object, 1);
+            obj_i32(object, 0);
+            nếu (obj_name(object, "__text", 16) != 0) { status = -1; };
+            nếu (obj_name(object, "__TEXT", 16) != 0) { status = -1; };
+            obj_u64(object, 0);
+            obj_u64(object, n);
+            obj_i32(object, 232);
+            obj_i32(object, 2);
+            biến reloc_pointer = 0;
+            nếu (byte_dài(relocs) > 0) { reloc_pointer = reloc_offset; };
+            obj_i32(object, reloc_pointer);
+            biến reloc_count = 0;
+            lặp (reloc_iter = 0; reloc_iter < byte_dài(relocs); reloc_iter = reloc_iter + 8) { reloc_count = reloc_count + 1; };
+            obj_i32(object, reloc_count);
+            obj_i32(object, -2147482624);
+            obj_i32(object, 0);
+            obj_i32(object, 0);
+            obj_i32(object, 0);
+            obj_i32(object, 2); // LC_SYMTAB
+            obj_i32(object, 24);
+            obj_i32(object, symoff);
+            obj_i32(object, symbol_count);
+            obj_i32(object, stroff);
+            obj_i32(object, byte_dài(strings));
+            obj_i32(object, 50); // LC_BUILD_VERSION
+            obj_i32(object, 24);
+            obj_i32(object, 1);  // PLATFORM_MACOS
+            obj_i32(object, 720896); // 11.0.0
+            obj_i32(object, 720896);
+            obj_i32(object, 0); // ntools
+            nếu (byte_dài(object) != 232) { status = -1; };
+            nếu (byte_nối(object, code) != 0) { status = -1; };
+            nếu (obj_pad(object, reloc_offset) != 0) { status = -1; };
+            nếu (byte_nối(object, relocs) != 0) { status = -1; };
+            nếu (byte_nối(object, nlists) != 0) { status = -1; };
+            nếu (byte_nối(object, strings) != 0) { status = -1; };
+            nếu (byte_dài(object) != stroff + byte_dài(strings)) { status = -1; };
+        };
+    };
+    nếu (nlists > 0) { byte_hủy(nlists); };
+    nếu (strings > 0) { byte_hủy(strings); };
+    nếu (relocs > 0) { byte_hủy(relocs); };
+    nếu (status != 0) { byte_làm_rỗng(object); trả về -1; };
+    trả về byte_dài(object);
+};

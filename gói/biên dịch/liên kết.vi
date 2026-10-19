@@ -1,0 +1,299 @@
+// Linker bytecode bootstrap thuần V++ cho một đơn vị và đồ thị mô-đun.
+// Hợp đồng ABI theo src/compiler/codegen.cpp::Emitter::emitProgram(true).
+// Đồ thị có initializer độc lập; bộ nạp VM ở gói/biên dịch/bộ nạp.vi.
+nhập gói/biên dịch/phát mã;
+nhập gói/biên dịch/ir;
+nhập gói/biên dịch/sổ đăng ký;
+nhập gói/biên dịch/kiểu mô đun;
+nhập gói/biên dịch/đồ thị mô đun;
+nhập gói/biên dịch/opcode;
+nhập gói/bộ sưu tập/từ điển;
+
+// Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
+lớp công khai Bộ Liên Kết Bytecode {
+    hàm công khai khởi tạo(mã_nguồn = "") {
+        mình.làm mới(mã_nguồn);
+    };
+
+    hàm công khai làm mới(mã_nguồn) {
+        nếu (loai_cua(mã_nguồn) != "chuỗi") {
+            ném "Bộ Liên Kết Bytecode: mã nguồn phải là chuỗi";
+        };
+        mình.nguồn = mã_nguồn;
+        mình.kết_quả = rỗng;
+        trả về mình;
+    };
+
+    hàm công khai liên kết() {
+        nếu (mình.kết_quả == rỗng) {
+            mình.kết_quả = mình.biên dịch chương trình tự chủ(mình.nguồn);
+        };
+        trả về mình.kết_quả;
+    };
+
+    // StringPool của C++ deduplicate chuỗi và đánh địa chỉ từ 0.
+    hàm riêng tư biên dịch liên kết tìm chuỗi(chuỗi, tên) {
+        lặp(i = 0; i < độ dài(chuỗi); i++) {
+            nếu (chuỗi[i] == tên) { trả về i; };
+        };
+        trả về -1;
+    };
+
+    hàm riêng tư biên dịch liên kết tìm slot(slots, tên) {
+        lặp(i = 0; i < độ dài(slots); i++) {
+            nếu (slots[i] == tên) { trả về i; };
+        };
+        trả về -1;
+    };
+
+    // Đối chiếu toàn bộ OP_HAM với registry đã predeclare. Một khai báo
+    // không được biến mất hoặc xuất hiện hai lần trong bytecode top-level.
+    hàm riêng tư biên dịch liên kết kiểm tra khai báo(bytecode, bảng_hàm) {
+        số_khai_báo = [];
+        lặp(i = 0; i < độ dài(bảng_hàm); i++) { thêm(số_khai_báo, 0); };
+        lặp(i = 0; i < độ dài(bytecode); i++) {
+            lệnh = bytecode[i];
+            nếu (lệnh["op"] == biên dịch mã opcode("OP_HAM")) {
+                id = lệnh["chỉ số"];
+                nếu (id < 0 || id >= độ dài(bảng_hàm)) {
+                    ném "biên dịch liên kết: OP_HAM có function ID không hợp lệ";
+                };
+                nếu (lệnh["toán hạng"] != bảng_hàm[id]["tên index"] ||
+                    lệnh["giá trị"] != 0) {
+                    ném "biên dịch liên kết: metadata OP_HAM sai lệch với bảng hàm";
+                };
+                số_khai_báo[id] = số_khai_báo[id] + 1;
+            };
+        };
+        lặp(i = 0; i < độ dài(số_khai_báo); i++) {
+            nếu (số_khai_báo[i] != 1) {
+                ném "biên dịch liên kết: thiếu hoặc trùng OP_HAM cho hàm '" +
+                    bảng_hàm[i]["tên"] + "'";
+            };
+        };
+    };
+
+    // Nhận artifact CHƯA liên kết từ biên dịch phát bytecode thuần.
+    // Giữ nguyên top-level và thân hàm; chỉ gắn registry, entrypoint, HALT.
+    hàm công khai biên dịch liên kết bytecode thuần(artifact) {
+        nếu (lấy map(artifact, "loại", "") != "bytecode V++ chưa liên kết") {
+            ném "biên dịch liên kết: cần bytecode V++ chưa liên kết";
+        };
+        nguồn = lấy map(artifact, "bytecode", []);
+        các_hàm = lấy map(artifact, "hàm", []);
+        slots = lấy map(artifact, "slots", []);
+        chuỗi = lấy map(artifact, "chuỗi", []);
+        bảng_hàm = [];
+        lặp(i = 0; i < độ dài(các_hàm); i++) {
+            h = các_hàm[i];
+            tên = lấy map(h, "tên", "");
+            id = lấy map(h, "id", -1);
+            nếu (tên == "" || id != i) {
+                ném "biên dịch liên kết: tên hoặc thứ tự function ID không hợp lệ";
+            };
+            nếu (mình.biên dịch liên kết tìm slot(slots, tên) != id) {
+                ném "biên dịch liên kết: slot hàm không khớp function ID";
+            };
+            tên_index = mình.biên dịch liên kết tìm chuỗi(chuỗi, tên);
+            nếu (tên_index < 0) {
+                ném "biên dịch liên kết: thiếu tên hàm trong StringPool";
+            };
+            lặp(j = 0; j < độ dài(bảng_hàm); j++) {
+                nếu (bảng_hàm[j]["tên"] == tên) {
+                    ném "biên dịch liên kết: trùng tên hàm '" + tên + "'";
+                };
+            };
+            thân = lấy map(h, "bytecode", []);
+            nếu (độ dài(thân) < 2) {
+                ném "biên dịch liên kết: bytecode thân hàm quá ngắn '" + tên + "'";
+            };
+            nếu (thân[0]["op"] != biên dịch mã opcode("OP_MO_KHOI") ||
+                thân[độ dài(thân) - 1]["op"] != biên dịch mã opcode("OP_DONG_KHOI")) {
+                ném "biên dịch liên kết: bytecode thân hàm không hợp lệ '" + tên + "'";
+            };
+            thêm(bảng_hàm, {"tên": tên, "id": id, "tên index": tên_index,
+                             "bytecode": thân});
+        };
+        mình.biên dịch liên kết kiểm tra khai báo(nguồn, bảng_hàm);
+
+        // C++ tra cứu entrypoint trong bảng slot CHIA SẺ với function ID.
+        // `chính` ưu tiên hơn alias tương thích `main`.
+        điểm_vào = mình.biên dịch liên kết tìm slot(slots, "chính");
+        nếu (điểm_vào == -1) { điểm_vào = mình.biên dịch liên kết tìm slot(slots, "main"); };
+        bytecode = [];
+        lặp(i = 0; i < độ dài(nguồn); i++) { thêm(bytecode, nguồn[i]); };
+        nếu (điểm_vào != -1) {
+            thêm(bytecode, {"op": biên dịch mã opcode("OP_GOI"),
+                            "toán hạng": 0, "chỉ số": điểm_vào, "giá trị": 0});
+        };
+        thêm(bytecode, {"op": biên dịch mã opcode("OP_DUNG_CHUONG_TRINH"),
+                        "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
+        trả về {"loại": "bytecode V++ đã liên kết", "bytecode": bytecode,
+                "hàm": bảng_hàm, "điểm vào": điểm_vào,
+                "ngoại": lấy map(artifact, "ngoại", []),
+                "slots": slots, "chuỗi": chuỗi};
+    };
+
+    hàm công khai biên dịch chương trình tự chủ(mã_nguồn) {
+        trả về mình.biên dịch liên kết bytecode thuần(biên dịch phát bytecode thuần(mã_nguồn));
+    };
+
+    // Linker nhiều mô-đun: mỗi initializer có bytecode và slot riêng, còn
+    // StringPool và function ID là duy nhất trong toàn phiên. Không nối trực
+    // tiếp các initializer vì jump/slot đều là offset cục bộ của emitter.
+    hàm công khai biên dịch liên kết đồ thị thuần(đồ_thị) {
+        nếu (lấy map(đồ_thị, "loại", "") != "đồ thị mô đun V++") {
+            ném "biên dịch liên kết: cần đồ thị mô đun V++";
+        };
+        sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ_thị);
+        bộ_kiểu = Bộ Đăng Ký Kiểu(sổ, đồ_thị);
+        bộ_kiểu.đăng ký();
+        phiên = {"đa mô đun": đúng, "cạnh dùng": [],
+                 "đã phát": [], "id tối đa": -1, "ngoại": []};
+        tên_gốc = đồ_thị["điểm vào"];
+        cây_gốc = bộ_kiểu.cây(tên_gốc);
+        ir_gốc = biên dịch hạ IR từ cây thuần(cây_gốc, đúng);
+        gốc_dữ_liệu = biên dịch phát bytecode IR đồ thị lõi(ir_gốc, sổ,
+            biên dịch sổ tìm mô đun(sổ["mô đun"], tên_gốc), đồ_thị, phiên);
+        bảng_hàm = [];
+        lặp(i = 0; i < độ dài(sổ["hàm"]); i++) {
+            khai = sổ["hàm"][i];
+            nếu (khai["id"] != i) {
+                ném "biên dịch liên kết: function ID toàn phiên không liên tiếp";
+            };
+            thêm(bảng_hàm, {"tên": khai["tên"], "id": i,
+                  "tên index": khai["tên index"], "mô đun": khai["mô đun"],
+                  "tên chạy": khai["tên chạy"],
+                  "tên index runtime": khai["tên index runtime"],
+                  "bytecode": []});
+        };
+        tất_cả_khai = [];
+        initializer = [];
+        thứ_tự = đồ_thị["thứ tự khởi tạo"];
+        lặp(i = 0; i <= độ dài(thứ_tự); i++) {
+            tên_mô_đun = đồ_thị["điểm vào"];
+            nếu (i < độ dài(thứ_tự)) { tên_mô_đun = thứ_tự[i]; };
+            ký_hiệu = biên dịch sổ tìm mô đun(sổ["mô đun"], tên_mô_đun);
+            phần = gốc_dữ_liệu;
+            nếu (i < độ dài(thứ_tự)) {
+                đã_tìm = sai;
+                các_phần = phiên["đã phát"];
+                lặp(j = 0; j < độ dài(các_phần); j++) {
+                    nếu (các_phần[j]["định danh"] == tên_mô_đun) {
+                        phần = các_phần[j]["phần"];
+                        đã_tìm = đúng;
+                    };
+                };
+                nếu (!đã_tìm) {
+                    ném "biên dịch liên kết: thiếu initializer '" + tên_mô_đun + "'";
+                };
+            };
+            nếu (lấy map(phần, "loại", "") != "bytecode V++ chưa liên kết") {
+                ném "biên dịch liên kết: emitter không trả bytecode chưa liên kết";
+            };
+            các_hàm = phần["hàm"];
+            số_global = độ dài(ký_hiệu["trực tiếp"]);
+            nếu (độ dài(các_hàm) < số_global) {
+                ném "biên dịch liên kết: số hàm không khớp sổ mô-đun";
+            };
+            lặp(j = 0; j < độ dài(các_hàm); j++) {
+                h = các_hàm[j];
+                id = h["id"];
+                nếu (j < số_global) {
+                    nếu (id != ký_hiệu["trực tiếp"][j]["id"] ||
+                        lấy map(h, "phương thức", sai)) {
+                        ném "biên dịch liên kết: hàm global không khớp sổ mô-đun";
+                    };
+                } hoặc {
+                    nếu (!lấy map(h, "phương thức", sai)) {
+                        ném "biên dịch liên kết: thiếu định danh phương thức";
+                    };
+                };
+                nếu (id < 0 || id >= độ dài(bảng_hàm) ||
+                    bảng_hàm[id]["mô đun"] != tên_mô_đun ||
+                    bảng_hàm[id]["tên"] != h["tên"] ||
+                    bảng_hàm[id]["tên index"] != h["tên index"] ||
+                    mình.biên dịch liên kết tìm slot(phần["slots"], h["tên"]) != id) {
+                    ném "biên dịch liên kết: thông tin hàm sai mô-đun/function ID";
+                };
+                thân = h["bytecode"];
+                nếu (độ dài(thân) < 2 ||
+                    thân[0]["op"] != biên dịch mã opcode("OP_MO_KHOI") ||
+                    thân[độ dài(thân) - 1]["op"] != biên dịch mã opcode("OP_DONG_KHOI")) {
+                    ném "biên dịch liên kết: thân hàm không hợp lệ '" + h["tên"] + "'";
+                };
+                bảng_hàm[id]["bytecode"] = thân;
+            };
+            nguồn = phần["bytecode"];
+            lặp(j = 0; j < độ dài(nguồn); j++) {
+                nếu (nguồn[j]["op"] == biên dịch mã opcode("OP_HAM")) {
+                    id = nguồn[j]["chỉ số"];
+                    nếu (id < 0 || id >= độ dài(bảng_hàm) ||
+                        bảng_hàm[id]["mô đun"] != tên_mô_đun) {
+                        ném "biên dịch liên kết: OP_HAM khai báo sai mô-đun";
+                    };
+                    thêm(tất_cả_khai, nguồn[j]);
+                };
+            };
+            nếu (i < độ dài(thứ_tự)) {
+                thêm(initializer, {"định danh": tên_mô_đun,
+                     "bytecode": nguồn, "slots": phần["slots"]});
+            } hoặc {
+                gốc_dữ_liệu = phần;
+            };
+        };
+        mình.biên dịch liên kết kiểm tra khai báo(tất_cả_khai, bảng_hàm);
+        lặp(i = 0; i < độ dài(bảng_hàm); i++) {
+            nếu (độ dài(bảng_hàm[i]["bytecode"]) == 0) {
+                ném "biên dịch liên kết: thiếu thân hàm '" + bảng_hàm[i]["tên"] + "'";
+            };
+        };
+        // Chỉ root có entrypoint; một hàm chính trong dependency không được
+        // tự động gọi. Giữ opcode call + HALT giống emitter C++.
+        điểm_vào = mình.biên dịch liên kết tìm slot(gốc_dữ_liệu["slots"], "chính");
+        nếu (điểm_vào == -1) {
+            điểm_vào = mình.biên dịch liên kết tìm slot(gốc_dữ_liệu["slots"], "main");
+        };
+        bytecode = [];
+        lặp(i = 0; i < độ dài(gốc_dữ_liệu["bytecode"]); i++) {
+            thêm(bytecode, gốc_dữ_liệu["bytecode"][i]);
+        };
+        nếu (điểm_vào != -1) {
+            thêm(bytecode, {"op": biên dịch mã opcode("OP_GOI"),
+                 "toán hạng": 0, "chỉ số": điểm_vào, "giá trị": 0});
+        };
+        thêm(bytecode, {"op": biên dịch mã opcode("OP_DUNG_CHUONG_TRINH"),
+             "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
+        trả về {"loại": "bytecode V++ đồ thị đã liên kết",
+            "bytecode": bytecode, "hàm": bảng_hàm,
+            "điểm vào": điểm_vào, "slots": gốc_dữ_liệu["slots"],
+            "chuỗi": sổ["chuỗi"], "mô đun khởi tạo": initializer,
+            "ngoại": phiên["ngoại"]};
+    };
+
+    hàm công khai biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn) {
+        trả về mình.biên dịch liên kết đồ thị thuần(
+            biên dịch dựng đồ thị nguồn thuần(điểm_vào, nguồn));
+    };
+};
+
+
+hàm công khai biên dịch liên kết bytecode thuần(artifact) {
+    __vpp_adapter = Bộ Liên Kết Bytecode();
+    trả về __vpp_adapter.biên dịch liên kết bytecode thuần(artifact);
+};
+
+hàm công khai biên dịch chương trình tự chủ(mã_nguồn) {
+    __vpp_adapter = Bộ Liên Kết Bytecode();
+    trả về __vpp_adapter.biên dịch chương trình tự chủ(mã_nguồn);
+};
+
+hàm công khai biên dịch liên kết đồ thị thuần(đồ_thị) {
+    __vpp_adapter = Bộ Liên Kết Bytecode();
+    trả về __vpp_adapter.biên dịch liên kết đồ thị thuần(đồ_thị);
+};
+
+hàm công khai biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn) {
+    __vpp_adapter = Bộ Liên Kết Bytecode();
+    trả về __vpp_adapter.biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn);
+};

@@ -94,11 +94,25 @@ public:
         vm_.pc = 0;
         vm_.activeBytecode_ = nullptr;
         vm_.activeBytecodeDebugInfo_ = nullptr;
+        vm_.lastForeignPosixError_ = 0;
     }
 
     // Chạy interpreter trực tiếp sau khi benchmark đã verify bytecode ngoài timer.
     // Đường này cố ý bỏ qua VM::run() để timing không gồm construction/verification.
     void runInterpreterPreverifiedForBenchmark() { vm_.runInterpreterLoop(); }
+
+    // Kiểm thử cả dispatcher hỗn hợp và mã đã compile, không phụ thuộc biến
+    // môi trường của máy chạy CTest.
+    void runJitCompiledForTesting() {
+        vm_.ensureBytecodeVerified();
+        vm_.runJitCompiled();
+    }
+
+    // Run actual AArch64 code in tests, independent of ambient environment.
+    void runMachineCompiledForTesting() {
+        vm_.ensureBytecodeVerified();
+        vm_.runMachineCompiled();
+    }
 
     // Hạ/nâng giới hạn độ sâu lời gọi trong test để kiểm tra guard đệ quy mà
     // không cần tạo hàng trăm native stack frame.
@@ -148,6 +162,10 @@ public:
         if (vm_.executionStack.size() > executionDepth) {
             vm_.runInterpreterLoop(executionDepth);
         }
+    }
+    // Invoke the FFI dispatcher in isolation to inspect per-VM error state.
+    void executeForeignCall(const Instruction &instruction) {
+        vm_.executeForeignCallOpcode(instruction);
     }
     // Thực thi giá trị; hàm đọc trạng thái VM/opcode đầu vào, cập nhật stack/frame/program counter và trả quyền điều khiển về vòng chạy chính.
     void executeValue(const Instruction &instruction) { vm_.executeValueOpcode(instruction); }

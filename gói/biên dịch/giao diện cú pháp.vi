@@ -1,0 +1,13 @@
+// Hợp đồng hướng đối tượng cho cây cú pháp và visitor.
+// Không phụ thuộc vào cách biểu diễn AST cụ thể.
+
+giao diện công khai Truy Cập Cú Pháp {
+    hàm công khai loại();
+    hàm công khai tên();
+    hàm công khai các con();
+    hàm công khai dữ liệu();
+};
+
+giao diện công khai Khách Duyệt Cú Pháp {
+    hàm công khai thăm(nút);
+};

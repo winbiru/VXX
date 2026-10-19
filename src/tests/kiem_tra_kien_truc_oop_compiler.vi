@@ -1,0 +1,48 @@
+// Kiểm thử kiến trúc OOP của thư viện và compiler, giữ các hàm tự do cũ.
+nhập gói/biên dịch/chính;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/trình điều khiển;
+nhập gói/biên dịch/liên kết;
+nhập gói/bộ sưu tập/ngăn xếp;
+nhập gói/bộ sưu tập/hàng đợi;
+
+hàm chính() {
+    mã = "hàm tính(x) { trả về x + 1; }; hàm chính() { in tính(4); };";
+    phiên = Bộ Biên Dịch(mã, ".");
+    in phiên.kiểm tra()["hợp lệ"] == 1;
+    in phiên.phân tích()["hợp lệ"] == 1;
+    in độ dài(phiên.bytecode()) == độ dài(biên dịch bytecode(mã));
+    in độ dài(phiên.bytecode hàm()) == độ dài(biên dịch bytecode hàm(mã));
+    in độ dài(phiên.cây cú pháp()) > 0;
+    in độ dài(phiên.tìm khai báo("tính")) == 1;
+    in phiên.thống kê()["lệnh"] == biên dịch thống kê(mã)["lệnh"];
+    in độ dài(phiên.thống kê opcode()) == độ dài(biên dịch thống kê opcode(mã));
+
+    lỗi = Bộ Biên Dịch("hàm", ".");
+    in lỗi.kiểm tra()["hợp lệ"] == 0;
+    bị_chặn = sai;
+    thử { lỗi.phân tích(); } bắt lỗi(e) { bị_chặn = đúng; };
+    in bị_chặn;
+
+    artifact = biên dịch chương trình tự chủ("hàm chính() { in 4; };");
+    bộ_nạp = Bộ Nạp Artifact(artifact);
+    abi = bộ_nạp.nạp();
+    in độ dài(abi) == 4;
+    in độ dài(bộ_nạp.nạp()) == độ dài(biên dịch nạp artifact(artifact));
+    in bộ_nạp.chạy() == "4\n";
+    in biên dịch chạy artifact(artifact) == "4\n";
+
+    điều_khiển = Trình Điều Khiển Biên Dịch("", "", "");
+    chế_độ_lỗi = sai;
+    thử { điều_khiển.chạy("không có"); } bắt lỗi(e) { chế_độ_lỗi = đúng; };
+    in chế_độ_lỗi;
+
+    ngăn = Ngăn Xếp();
+    đợi = Hàng Đợi();
+    in ngăn.trống() && đợi.trống();
+    ngăn.đẩy(10);
+    đợi.thêm(20);
+    in ngăn.số lượng() == 1 && đợi.số lượng() == 1;
+    in ngăn.rút() == 10 && đợi.lấy() == 20;
+    in ngăn.trống() && đợi.trống();
+};

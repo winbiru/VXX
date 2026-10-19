@@ -1,0 +1,5 @@
+// Hợp đồng chung cho đối tượng sở hữu tài nguyên hoặc có vòng đời đóng.
+// `đóng()` phải an toàn khi gọi lặp lại; kiểu kết quả tùy thuộc mỗi adapter.
+giao diện công khai Đóng Được {
+    hàm công khai đóng();
+};

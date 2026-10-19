@@ -1,133 +1,644 @@
-// vi.regex — biểu thức chính quy ECMAScript.
-// Native chỉ còn engine primitive quét mẫu và trả capture. Match/search,
-// thay thế và tách chuỗi đều là logic V++.
+// vi.regex — engine regex và API biểu thức chính quy viết bằng V++.
+// Runtime chỉ cung cấp primitive chuỗi/list/map; parser, backtracking, capture,
+// search, replace và split đều nằm ở tầng ngôn ngữ.
 
-hàm regex quét engine(văn bản, mẫu) {
-    trả về regex_quet_noi_bo(văn bản, mẫu);
-};
+nhập gói/bộ sưu tập/danh sách;
 
-hàm regex khớp(văn bản, mẫu) {
-    // std::regex_match yêu cầu toàn bộ input khớp. Dùng lookahead âm thay cho
-    // '$' để không nhận vị trí ngay trước newline cuối như một số engine.
-    mẫu_toàn_bộ = "^(?:" + mẫu + ")(?![\\s\\S])";
-    kết_quả_quét = regex quét engine(văn bản, mẫu_toàn_bộ);
-    trả về do_dai(kết_quả_quét[0]) > 0;
-};
-
-hàm regex tìm(văn bản, mẫu) {
-    kết_quả_quét = regex quét engine(văn bản, mẫu);
-    các_khớp = kết_quả_quét[0];
-    nếu (do_dai(các_khớp) == 0) {
-        trả về "";
+// Mẫu được phân tích một lần, còn trạng thái backtracking luôn riêng mỗi lần gọi.
+lớp công khai Biểu Thức Chính Quy {
+    hàm công khai khởi tạo(mẫu) { mình.phân_tích = mình.regex phân tích(mẫu); };
+    hàm công khai khớp(văn_bản) { trả về mình.regex khớp đã phân tích(văn_bản, mình.phân_tích); };
+    hàm công khai quét(văn_bản) { trả về mình.regex quét đã phân tích(văn_bản, mình.phân_tích); };
+    hàm công khai tìm(văn_bản) {
+        kết_quả_quét = mình.quét(văn_bản);
+        các_khớp = kết_quả_quét[0];
+        nếu (do_dai(các_khớp) == 0) { trả về ""; };
+        trả về các_khớp[0][1][0];
     };
-    trả về các_khớp[0][1][0];
-};
-
-hàm regex chữ số nhóm(c) {
-    chữ_số = "0123456789";
-    lặp(i = 0; i < 10; i++) {
-        nếu (chữ_số[i] == c) { trả về i; };
+    hàm công khai thay(văn_bản, thay_thế) {
+        nếu (loại của(thay_thế) != "chuỗi") { ném "regex thay: giá trị thay thế phải là chuỗi"; };
+        trả về mình.regex thay kết quả(mình.quét(văn_bản), thay_thế);
     };
-    trả về -1;
-};
+    hàm công khai tách(văn_bản) { trả về mình.regex tách kết quả(mình.quét(văn_bản)); };
 
-// scan trả [các khớp, đuôi]; mỗi khớp là [khoảng trước, các nhóm gồm nhóm 0].
-// Chỉ ghép các mảnh engine trả về, không đánh chỉ số Unicode vào byte offset.
-// Không lưu suffix đầy đủ cho từng khớp để tránh bộ nhớ O(n²) khi thay đơn giản.
-hàm regex phần sau(các_khớp, chỉ_số, đuôi) {
-    kết_quả = "";
-    lặp(i = chỉ_số + 1; i < do_dai(các_khớp); i++) {
-        khớp = các_khớp[i];
-        nhóm = khớp[1];
-        kết_quả = kết_quả + khớp[0] + nhóm[0];
+    hàm riêng tư regex lỗi mẫu() {
+        ném "regex: mẫu không hợp lệ";
     };
-    trả về kết_quả + đuôi;
-};
 
-hàm regex mở rộng thay thế(mẫu_thay, các_khớp, chỉ_số, đuôi) {
-    khớp = các_khớp[chỉ_số];
-    nhóm = khớp[1];
-    kết_quả = "";
-    n = do_dai(mẫu_thay);
-    lặp(i = 0; i < n; i++) {
-        c = mẫu_thay[i];
-        nếu (c != "$" || i + 1 >= n) {
-            kết_quả = kết_quả + c;
-        } nếu không {
-            tiếp = mẫu_thay[i + 1];
-            đã_xử_lý = sai;
-            nếu (tiếp == "$") {
-                kết_quả = kết_quả + "$";
-                i++;
-                đã_xử_lý = đúng;
+    hàm riêng tư regex sao chép danh sách(ds) {
+        kết_quả = [];
+        lặp(i = 0; i < do_dai(ds); i++) {
+            them(kết_quả, ds[i]);
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư regex đoạn(văn_bản, bắt_đầu, kết_thúc) {
+        kết_quả = "";
+        lặp(i = bắt_đầu; i < kết_thúc; i++) {
+            kết_quả = kết_quả + văn_bản[i];
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư regex parser tạo(mẫu) {
+        trả về {"mẫu": mẫu, "vị trí": 0, "nhóm": 0};
+    };
+
+    hàm riêng tư regex parser biểu thức(p) {
+        nhánh = [];
+        them(nhánh, mình.regex parser chuỗi(p));
+        mẫu = p["mẫu"];
+        tiếp = đúng;
+        lặp(vòng = 0; tiếp; vòng++) {
+            i = p["vị trí"];
+            nếu (i >= do_dai(mẫu)) {
+                tiếp = sai;
+            } hoặc {
+                nếu (mẫu[i] == "|") {
+                    p["vị trí"] = i + 1;
+                    them(nhánh, mình.regex parser chuỗi(p));
+                } hoặc {
+                    tiếp = sai;
+                };
             };
-            nếu (tiếp == "&") {
-                kết_quả = kết_quả + nhóm[0];
-                i++;
-                đã_xử_lý = đúng;
+        };
+        nếu (do_dai(nhánh) == 1) {
+            trả về nhánh[0];
+        };
+        trả về {"loại": "hoặc", "con": nhánh};
+    };
+
+    hàm riêng tư regex parser chuỗi(p) {
+        con = [];
+        mẫu = p["mẫu"];
+        tiếp = đúng;
+        lặp(vòng = 0; tiếp; vòng++) {
+            i = p["vị trí"];
+            nếu (i >= do_dai(mẫu)) {
+                tiếp = sai;
+            } hoặc {
+                c = mẫu[i];
+                nếu (c == ")" || c == "|") {
+                    tiếp = sai;
+                } hoặc {
+                    them(con, mình.regex parser phần tử(p));
+                };
             };
-            nếu (tiếp == "`") {
-                kết_quả = kết_quả + khớp[0];
+        };
+        trả về {"loại": "chuỗi", "con": con};
+    };
+
+    hàm riêng tư regex parser lớp(p) {
+        mẫu = p["mẫu"];
+        i = p["vị trí"] + 1;
+        phủ_định = sai;
+        nếu (i < do_dai(mẫu)) {
+            nếu (mẫu[i] == "^") {
+                phủ_định = đúng;
                 i++;
-                đã_xử_lý = đúng;
             };
-            nếu (tiếp == "'") {
-                kết_quả = kết_quả + regex phần sau(các_khớp, chỉ_số, đuôi);
+        };
+        nội_dung = "";
+        đóng = sai;
+        lặp(vòng = 0; i < do_dai(mẫu) && !đóng; vòng++) {
+            c = mẫu[i];
+            nếu (c == "]") {
+                đóng = đúng;
                 i++;
-                đã_xử_lý = đúng;
-            };
-            nếu (!đã_xử_lý) {
-                số_nhóm = regex chữ số nhóm(tiếp);
-                nếu (số_nhóm < 0) {
-                    kết_quả = kết_quả + "$";
-                } nếu không {
+            } hoặc {
+                nếu (c == "\\") {
+                    nội_dung = nội_dung + c;
                     i++;
-                    nếu (i + 1 < n) {
-                        chữ_số_sau = regex chữ số nhóm(mẫu_thay[i + 1]);
-                        nếu (chữ_số_sau >= 0) {
-                            số_nhóm = số_nhóm * 10 + chữ_số_sau;
-                            i++;
+                    nếu (i >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+                    nội_dung = nội_dung + mẫu[i];
+                    i++;
+                } hoặc {
+                    nội_dung = nội_dung + c;
+                    i++;
+                };
+            };
+        };
+        nếu (!đóng) { mình.regex lỗi mẫu(); };
+        p["vị trí"] = i;
+        trả về {"loại": "lớp", "mẫu": nội_dung, "phủ định": phủ_định};
+    };
+
+    hàm riêng tư regex parser atom(p) {
+        mẫu = p["mẫu"];
+        i = p["vị trí"];
+        nếu (i >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+        c = mẫu[i];
+
+        nếu (c == "(" ) {
+            p["vị trí"] = i + 1;
+            kiểu = "nhóm";
+            số_nhóm = 0;
+            j = p["vị trí"];
+            nếu (j < do_dai(mẫu)) {
+                nếu (mẫu[j] == "?") {
+                    j++;
+                    nếu (j >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+                    dấu = mẫu[j];
+                    nếu (dấu == ":") {
+                        kiểu = "không bắt";
+                    } hoặc {
+                        nếu (dấu == "=") {
+                            kiểu = "nhìn trước";
+                        } hoặc {
+                            nếu (dấu == "!") {
+                                kiểu = "không nhìn trước";
+                            } hoặc {
+                                mình.regex lỗi mẫu();
+                            };
                         };
                     };
-                    nếu (số_nhóm < do_dai(nhóm)) {
-                        kết_quả = kết_quả + nhóm[số_nhóm];
+                    p["vị trí"] = j + 1;
+                };
+            };
+            nếu (kiểu == "nhóm") {
+                p["nhóm"] = p["nhóm"] + 1;
+                số_nhóm = p["nhóm"];
+            };
+            thân = mình.regex parser biểu thức(p);
+            i = p["vị trí"];
+            nếu (i >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+            nếu (mẫu[i] != ")") { mình.regex lỗi mẫu(); };
+            p["vị trí"] = i + 1;
+            nếu (kiểu == "không bắt") { trả về thân; };
+            nếu (kiểu == "nhìn trước") {
+                trả về {"loại": "nhìn trước", "con": thân};
+            };
+            nếu (kiểu == "không nhìn trước") {
+                trả về {"loại": "không nhìn trước", "con": thân};
+            };
+            trả về {"loại": "nhóm", "con": thân, "số": số_nhóm};
+        };
+
+        nếu (c == "[") {
+            trả về mình.regex parser lớp(p);
+        };
+
+        nếu (c == "\\") {
+            i++;
+            nếu (i >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+            p["vị trí"] = i + 1;
+            e = mẫu[i];
+            nếu (e == "s" || e == "d" || e == "w") {
+                trả về {"loại": "lớp tắt", "mẫu": e};
+            };
+            nếu (e == "n") { trả về {"loại": "chữ", "giá trị": "\n"}; };
+            nếu (e == "r") { trả về {"loại": "chữ", "giá trị": "\r"}; };
+            nếu (e == "t") { trả về {"loại": "chữ", "giá trị": "\t"}; };
+            trả về {"loại": "chữ", "giá trị": e};
+        };
+
+        nếu (c == "*" || c == "+" || c == "?") { mình.regex lỗi mẫu(); };
+        p["vị trí"] = i + 1;
+        nếu (c == ".") { trả về {"loại": "bất kỳ"}; };
+        nếu (c == "^") { trả về {"loại": "đầu"}; };
+        nếu (c == "$") { trả về {"loại": "cuối"}; };
+        trả về {"loại": "chữ", "giá trị": c};
+    };
+
+    hàm riêng tư regex parser phần tử(p) {
+        atom = mình.regex parser atom(p);
+        mẫu = p["mẫu"];
+        i = p["vị trí"];
+        nếu (i >= do_dai(mẫu)) { trả về atom; };
+        q = mẫu[i];
+        nếu (q != "*" && q != "+" && q != "?") { trả về atom; };
+        tối_thiểu = 0;
+        tối_đa = -1;
+        nếu (q == "+") { tối_thiểu = 1; };
+        nếu (q == "?") { tối_đa = 1; };
+        i++;
+        tham = đúng;
+        nếu (i < do_dai(mẫu)) {
+            nếu (mẫu[i] == "?") {
+                tham = sai;
+                i++;
+            };
+        };
+        p["vị trí"] = i;
+        trả về {
+            "loại": "lặp",
+            "con": atom,
+            "tối thiểu": tối_thiểu,
+            "tối đa": tối_đa,
+            "tham": tham
+        };
+    };
+
+    hàm riêng tư regex phân tích(mẫu) {
+        nếu (loai_cua(mẫu) != "chuỗi") {
+            ném "regex: mẫu phải là chuỗi";
+        };
+        p = mình.regex parser tạo(mẫu);
+        cây = mình.regex parser biểu thức(p);
+        nếu (p["vị trí"] != do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+        trả về {"cây": cây, "nhóm": p["nhóm"]};
+    };
+
+    hàm riêng tư regex là chữ số(c) {
+        trả về c >= "0" && c <= "9";
+    };
+
+    hàm riêng tư regex là chữ(c) {
+        trả về (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") ||
+            mình.regex là chữ số(c) || c == "_";
+    };
+
+    hàm riêng tư regex là trắng(c) {
+        trả về c == " " || c == "\t" || c == "\n" || c == "\r";
+    };
+
+    hàm riêng tư regex lớp tắt khớp(mẫu, c) {
+        nếu (mẫu == "s") { trả về mình.regex là trắng(c); };
+        nếu (mẫu == "d") { trả về mình.regex là chữ số(c); };
+        nếu (mẫu == "w") { trả về mình.regex là chữ(c); };
+        trả về sai;
+    };
+
+    hàm riêng tư regex lớp khớp(nút, c) {
+        mẫu = nút["mẫu"];
+        mục_khớp = sai;
+        i = 0;
+        lặp(vòng = 0; i < do_dai(mẫu); vòng++) {
+            đầu = mẫu[i];
+            nếu (đầu == "\\") {
+                i++;
+                nếu (i >= do_dai(mẫu)) { mình.regex lỗi mẫu(); };
+                e = mẫu[i];
+                nếu (e == "s" || e == "d" || e == "w") {
+                    nếu (mình.regex lớp tắt khớp(e, c)) { mục_khớp = đúng; };
+                } hoặc {
+                    nếu (e == c) { mục_khớp = đúng; };
+                };
+                i++;
+            } hoặc {
+                có_range = sai;
+                nếu (i + 2 < do_dai(mẫu)) {
+                    nếu (mẫu[i + 1] == "-") { có_range = đúng; };
+                };
+                nếu (có_range) {
+                    cuối = mẫu[i + 2];
+                    nếu (c >= đầu && c <= cuối) { mục_khớp = đúng; };
+                    i = i + 3;
+                } hoặc {
+                    nếu (c == đầu) { mục_khớp = đúng; };
+                    i++;
+                };
+            };
+        };
+        nếu (nút["phủ định"]) { trả về !mục_khớp; };
+        trả về mục_khớp;
+    };
+
+    hàm riêng tư regex trạng thái(vị_trí, nhóm) {
+        trả về {"vị trí": vị_trí, "nhóm": nhóm};
+    };
+
+    hàm riêng tư regex ghép trạng thái(đích, nguồn) {
+        lặp(i = 0; i < do_dai(nguồn); i++) { them(đích, nguồn[i]); };
+        trả về đích;
+    };
+
+    hàm riêng tư regex khớp lặp(nút, văn_bản, trạng_thái, số_lần, kết_quả) {
+        tối_thiểu = nút["tối thiểu"];
+        tối_đa = nút["tối đa"];
+        tham = nút["tham"];
+        nếu (!tham && số_lần >= tối_thiểu) {
+            them(kết_quả, trạng_thái);
+        };
+
+        được_lặp = tối_đa < 0 || số_lần < tối_đa;
+        nếu (được_lặp) {
+            tiếp = mình.regex khớp nút(nút["con"], văn_bản, trạng_thái);
+            lặp(i = 0; i < do_dai(tiếp); i++) {
+                nếu (tiếp[i]["vị trí"] > trạng_thái["vị trí"]) {
+                    mình.regex khớp lặp(nút, văn_bản, tiếp[i], số_lần + 1, kết_quả);
+                };
+            };
+        };
+
+        nếu (tham && số_lần >= tối_thiểu) {
+            them(kết_quả, trạng_thái);
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư regex khớp nút(nút, văn_bản, trạng_thái) {
+        loại = nút["loại"];
+        vị_trí = trạng_thái["vị trí"];
+        n = do_dai(văn_bản);
+
+        nếu (loại == "chữ") {
+            nếu (vị_trí < n) {
+                nếu (văn_bản[vị_trí] == nút["giá trị"]) {
+                    trả về [mình.regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+                };
+            };
+            trả về [];
+        };
+        nếu (loại == "bất kỳ") {
+            nếu (vị_trí < n) {
+                c = văn_bản[vị_trí];
+                nếu (c != "\n" && c != "\r") {
+                    trả về [mình.regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+                };
+            };
+            trả về [];
+        };
+        nếu (loại == "lớp") {
+            nếu (vị_trí < n) {
+                nếu (mình.regex lớp khớp(nút, văn_bản[vị_trí])) {
+                    trả về [mình.regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+                };
+            };
+            trả về [];
+        };
+        nếu (loại == "lớp tắt") {
+            nếu (vị_trí < n) {
+                nếu (mình.regex lớp tắt khớp(nút["mẫu"], văn_bản[vị_trí])) {
+                    trả về [mình.regex trạng thái(vị_trí + 1, trạng_thái["nhóm"])];
+                };
+            };
+            trả về [];
+        };
+        nếu (loại == "đầu") {
+            nếu (vị_trí == 0) { trả về [trạng_thái]; };
+            trả về [];
+        };
+        nếu (loại == "cuối") {
+            nếu (vị_trí == n) { trả về [trạng_thái]; };
+            trả về [];
+        };
+        nếu (loại == "chuỗi") {
+            hiện = [trạng_thái];
+            con = nút["con"];
+            lặp(i = 0; i < do_dai(con); i++) {
+                kế = [];
+                lặp(j = 0; j < do_dai(hiện); j++) {
+                    mình.regex ghép trạng thái(kế, mình.regex khớp nút(con[i], văn_bản, hiện[j]));
+                };
+                hiện = kế;
+                nếu (do_dai(hiện) == 0) { trả về []; };
+            };
+            trả về hiện;
+        };
+        nếu (loại == "hoặc") {
+            kết_quả = [];
+            con = nút["con"];
+            lặp(i = 0; i < do_dai(con); i++) {
+                mình.regex ghép trạng thái(kết_quả, mình.regex khớp nút(con[i], văn_bản, trạng_thái));
+            };
+            trả về kết_quả;
+        };
+        nếu (loại == "nhóm") {
+            bắt_đầu = vị_trí;
+            kết_quả_con = mình.regex khớp nút(nút["con"], văn_bản, trạng_thái);
+            kết_quả = [];
+            lặp(i = 0; i < do_dai(kết_quả_con); i++) {
+                nhóm = mình.regex sao chép danh sách(kết_quả_con[i]["nhóm"]);
+                nhóm[nút["số"]] = mình.regex đoạn(văn_bản, bắt_đầu, kết_quả_con[i]["vị trí"]);
+                them(kết_quả, mình.regex trạng thái(kết_quả_con[i]["vị trí"], nhóm));
+            };
+            trả về kết_quả;
+        };
+        nếu (loại == "nhìn trước") {
+            thử_khớp = mình.regex khớp nút(nút["con"], văn_bản, trạng_thái);
+            nếu (do_dai(thử_khớp) == 0) { trả về []; };
+            trả về [mình.regex trạng thái(vị_trí, thử_khớp[0]["nhóm"])];
+        };
+        nếu (loại == "không nhìn trước") {
+            thử_khớp = mình.regex khớp nút(nút["con"], văn_bản, trạng_thái);
+            nếu (do_dai(thử_khớp) == 0) { trả về [trạng_thái]; };
+            trả về [];
+        };
+        nếu (loại == "lặp") {
+            trả về mình.regex khớp lặp(nút, văn_bản, trạng_thái, 0, []);
+        };
+        mình.regex lỗi mẫu();
+    };
+
+    hàm riêng tư regex nhóm rỗng(số_nhóm) {
+        nhóm = [];
+        lặp(i = 0; i <= số_nhóm; i++) { them(nhóm, ""); };
+        trả về nhóm;
+    };
+
+    hàm riêng tư regex thử tại(cây, số_nhóm, văn_bản, vị_trí) {
+        trạng_thái = mình.regex trạng thái(vị_trí, mình.regex nhóm rỗng(số_nhóm));
+        trả về mình.regex khớp nút(cây, văn_bản, trạng_thái);
+    };
+
+    hàm riêng tư regex chọn(kết_quả, bắt_đầu, cần_dương) {
+        lặp(i = 0; i < do_dai(kết_quả); i++) {
+            nếu (!cần_dương || kết_quả[i]["vị trí"] > bắt_đầu) {
+                trả về kết_quả[i];
+            };
+        };
+        trả về rỗng;
+    };
+
+    hàm riêng tư regex thêm match(các_khớp, văn_bản, bắt_đầu_trước, bắt_đầu, trạng_thái) {
+        nhóm = mình.regex sao chép danh sách(trạng_thái["nhóm"]);
+        nhóm[0] = mình.regex đoạn(văn_bản, bắt_đầu, trạng_thái["vị trí"]);
+        them(các_khớp, [mình.regex đoạn(văn_bản, bắt_đầu_trước, bắt_đầu), nhóm]);
+        trả về trạng_thái["vị trí"];
+    };
+
+    hàm riêng tư regex quét đã phân tích(văn bản, phân_tích) {
+        nếu (loai_cua(văn bản) != "chuỗi") {
+            ném "regex: văn bản phải là chuỗi";
+        };
+        cây = phân_tích["cây"];
+        số_nhóm = phân_tích["nhóm"];
+        n = do_dai(văn bản);
+        các_khớp = [];
+        tìm_từ = 0;
+        hết_trước = 0;
+        xong = sai;
+
+        lặp(vòng = 0; !xong; vòng++) {
+            tìm_thấy = rỗng;
+            bắt_đầu = -1;
+            p = tìm_từ;
+            lặp(bước_tìm = 0; p <= n && tìm_thấy == rỗng; bước_tìm++) {
+                thử_khớp = mình.regex thử tại(cây, số_nhóm, văn bản, p);
+                tìm_thấy = mình.regex chọn(thử_khớp, p, sai);
+                nếu (tìm_thấy == rỗng) { p++; };
+            };
+            nếu (tìm_thấy == rỗng) {
+                xong = đúng;
+            } hoặc {
+                bắt_đầu = p;
+                hết = mình.regex thêm match(các_khớp, văn bản, hết_trước, bắt_đầu, tìm_thấy);
+                hết_trước = hết;
+                nếu (hết > bắt_đầu) {
+                    tìm_từ = hết;
+                } hoặc {
+                    // ECMAScript iterator: sau empty match, thử một non-empty match
+                    // liên tục tại cùng vị trí trước khi tiến một code point.
+                    thử_dương = mình.regex thử tại(cây, số_nhóm, văn bản, bắt_đầu);
+                    dương = mình.regex chọn(thử_dương, bắt_đầu, đúng);
+                    nếu (dương != rỗng) {
+                        hết = mình.regex thêm match(các_khớp, văn bản, hết_trước, bắt_đầu, dương);
+                        hết_trước = hết;
+                        tìm_từ = hết;
+                    } hoặc {
+                        nếu (bắt_đầu >= n) {
+                            xong = đúng;
+                        } hoặc {
+                            tìm_từ = bắt_đầu + 1;
+                        };
                     };
                 };
             };
         };
+        trả về [các_khớp, mình.regex đoạn(văn bản, hết_trước, n)];
     };
-    trả về kết_quả;
+
+    hàm riêng tư regex khớp đã phân tích(văn bản, phân_tích) {
+        nếu (loai_cua(văn bản) != "chuỗi") {
+            ném "regex: văn bản phải là chuỗi";
+        };
+        kết_quả = mình.regex thử tại(phân_tích["cây"], phân_tích["nhóm"], văn bản, 0);
+        n = do_dai(văn bản);
+        lặp(i = 0; i < do_dai(kết_quả); i++) {
+            nếu (kết_quả[i]["vị trí"] == n) { trả về đúng; };
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư regex chữ số nhóm(c) {
+        chữ_số = "0123456789";
+        lặp(i = 0; i < 10; i++) {
+            nếu (chữ_số[i] == c) { trả về i; };
+        };
+        trả về -1;
+    };
+
+    // scan trả [các khớp, đuôi]; mỗi khớp là [khoảng trước, các nhóm gồm nhóm 0].
+    // Chỉ ghép các mảnh engine trả về, không đánh chỉ số Unicode vào byte offset.
+    // Không lưu suffix đầy đủ cho từng khớp để tránh bộ nhớ O(n²) khi thay đơn giản.
+    hàm riêng tư regex phần sau(các_khớp, chỉ_số, đuôi) {
+        kết_quả = "";
+        lặp(i = chỉ_số + 1; i < do_dai(các_khớp); i++) {
+            mục_khớp = các_khớp[i];
+            nhóm = mục_khớp[1];
+            kết_quả = kết_quả + mục_khớp[0] + nhóm[0];
+        };
+        trả về kết_quả + đuôi;
+    };
+
+    hàm riêng tư regex mở rộng thay thế(mẫu_thay, các_khớp, chỉ_số, đuôi) {
+        mục_khớp = các_khớp[chỉ_số];
+        nhóm = mục_khớp[1];
+        kết_quả = "";
+        n = do_dai(mẫu_thay);
+        lặp(i = 0; i < n; i++) {
+            c = mẫu_thay[i];
+            nếu (c != "$" || i + 1 >= n) {
+                kết_quả = kết_quả + c;
+            } hoặc {
+                tiếp = mẫu_thay[i + 1];
+                đã_xử_lý = sai;
+                nếu (tiếp == "$") {
+                    kết_quả = kết_quả + "$";
+                    i++;
+                    đã_xử_lý = đúng;
+                };
+                nếu (tiếp == "&") {
+                    kết_quả = kết_quả + nhóm[0];
+                    i++;
+                    đã_xử_lý = đúng;
+                };
+                nếu (tiếp == "`") {
+                    kết_quả = kết_quả + mục_khớp[0];
+                    i++;
+                    đã_xử_lý = đúng;
+                };
+                nếu (tiếp == "'") {
+                    kết_quả = kết_quả + mình.regex phần sau(các_khớp, chỉ_số, đuôi);
+                    i++;
+                    đã_xử_lý = đúng;
+                };
+                nếu (!đã_xử_lý) {
+                    số_nhóm = mình.regex chữ số nhóm(tiếp);
+                    nếu (số_nhóm < 0) {
+                        kết_quả = kết_quả + "$";
+                    } hoặc {
+                        i++;
+                        nếu (i + 1 < n) {
+                            chữ_số_sau = mình.regex chữ số nhóm(mẫu_thay[i + 1]);
+                            nếu (chữ_số_sau >= 0) {
+                                số_nhóm = số_nhóm * 10 + chữ_số_sau;
+                                i++;
+                            };
+                        };
+                        nếu (số_nhóm < do_dai(nhóm)) {
+                            kết_quả = kết_quả + nhóm[số_nhóm];
+                        };
+                    };
+                };
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư regex thay kết quả(kết_quả_quét, giá trị thay thế) {
+        các_khớp = kết_quả_quét[0];
+        đuôi = kết_quả_quét[1];
+        kết_quả = "";
+        lặp(i = 0; i < do_dai(các_khớp); i++) {
+            mục_khớp = các_khớp[i];
+            kết_quả = kết_quả + mục_khớp[0] +
+                mình.regex mở rộng thay thế(giá trị thay thế, các_khớp, i, đuôi);
+        };
+        trả về kết_quả + đuôi;
+    };
+
+    hàm riêng tư regex tách kết quả(kết_quả_quét) {
+        các_khớp = kết_quả_quét[0];
+        đuôi = kết_quả_quét[1];
+        kết_quả = [];
+        lặp(i = 0; i < do_dai(các_khớp); i++) {
+            mục_khớp = các_khớp[i];
+            them(kết_quả, mục_khớp[0]);
+        };
+        // Contract std::regex_token_iterator: giữ mảnh rỗng đầu/giữa nhưng không
+        // thêm đuôi rỗng sau delimiter cuối. Không khớp trả nguyên văn bản.
+        nếu (đuôi != "" || do_dai(các_khớp) == 0) {
+            them(kết_quả, đuôi);
+        };
+        trả về kết_quả;
+    };
 };
 
-hàm regex thay(văn bản, mẫu, giá trị thay thế) {
-    nếu (loại của(giá trị thay thế) != "chuỗi") {
-        ném "regex thay: giá trị thay thế phải là chuỗi";
-    };
-    kết_quả_quét = regex quét engine(văn bản, mẫu);
-    các_khớp = kết_quả_quét[0];
-    đuôi = kết_quả_quét[1];
-    kết_quả = "";
-    lặp(i = 0; i < do_dai(các_khớp); i++) {
-        khớp = các_khớp[i];
-        kết_quả = kết_quả + khớp[0] +
-            regex mở rộng thay thế(giá trị thay thế, các_khớp, i, đuôi);
-    };
-    trả về kết_quả + đuôi;
+// Hàm tiện ích dựng Biểu Thức Chính Quy; lớp giữ AST đã phân tích theo instance.
+hàm công khai regex khớp(văn_bản, mẫu) {
+    nếu (loai_cua(văn_bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    bộ = Biểu Thức Chính Quy(mẫu);
+    trả về bộ.khớp(văn_bản);
 };
 
-hàm regex tách(văn bản, mẫu) {
-    kết_quả_quét = regex quét engine(văn bản, mẫu);
-    các_khớp = kết_quả_quét[0];
-    đuôi = kết_quả_quét[1];
-    kết_quả = [];
-    lặp(i = 0; i < do_dai(các_khớp); i++) {
-        khớp = các_khớp[i];
-        them(kết_quả, khớp[0]);
-    };
-    // Contract std::regex_token_iterator: giữ mảnh rỗng đầu/giữa nhưng không
-    // thêm đuôi rỗng sau delimiter cuối. Không khớp trả nguyên văn bản.
-    nếu (đuôi != "" || do_dai(các_khớp) == 0) {
-        them(kết_quả, đuôi);
-    };
-    trả về kết_quả;
+hàm công khai regex tìm(văn bản, mẫu) {
+    nếu (loai_cua(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    bộ = Biểu Thức Chính Quy(mẫu);
+    trả về bộ.tìm(văn bản);
+};
+
+hàm công khai regex thay(văn bản, mẫu, giá trị thay thế) {
+    nếu (loai_cua(giá trị thay thế) != "chuỗi") { ném "regex thay: giá trị thay thế phải là chuỗi"; };
+    nếu (loai_cua(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    bộ = Biểu Thức Chính Quy(mẫu);
+    trả về bộ.thay(văn bản, giá trị thay thế);
+};
+
+hàm công khai regex tách(văn bản, mẫu) {
+    nếu (loai_cua(văn bản) != "chuỗi") { ném "regex: văn bản phải là chuỗi"; };
+    bộ = Biểu Thức Chính Quy(mẫu);
+    trả về bộ.tách(văn bản);
 };

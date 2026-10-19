@@ -1,0 +1,1 @@
+hàm công khai gấp đôi(x) { trả về x * 2; };

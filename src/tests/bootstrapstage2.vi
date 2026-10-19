@@ -1,0 +1,9 @@
+// Compiler Stage 2: compilation happens inside V++ bytecode.
+nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/liên kết;
+
+hàm chính() {
+    nguồn = "hàm tổng(n, b = 7) { s = b; lặp(i = 0; i < n; i++) { s += i; }; trả về s; }; " +
+            "hàm chính() { in tổng(10); };";
+    in biên dịch artifact tuần tự(biên dịch chương trình tự chủ(nguồn));
+};
