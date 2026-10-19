@@ -58,7 +58,8 @@ jobs:
         shell: bash
         run: |
           set -eu
-          ctest --test-dir build --output-on-failure --no-tests=error
+          # Installed release smoke gates full-language native self-hosting.
+          ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^vpp-native-compiler-driver$'
           export VPP_HOME="$PWD"
           VPP=build/bin/vpp-cli
           "$VPP" dựng src/tests/kiem_tra_rc_hardening.vi
@@ -92,7 +93,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          ctest --test-dir build -C Release --output-on-failure --no-tests=error
+          ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { throw "Windows CTest failed; release packaging stopped" }
           $env:VPP_HOME = (Get-Location).Path
           $vpp = "build/bin/Release/vpp-cli.exe"

@@ -23,9 +23,9 @@ if (VPP_ENABLE_COVERAGE)
     if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         message(FATAL_ERROR "Unsupported compiler for coverage: ${CMAKE_CXX_COMPILER_ID}")
     endif()
-    # The full suite bootstraps the compiler inside the VM. Keep counters and
-    # debug info, but optimize dispatcher/container overhead so instrumented
-    # self-hosting stays within the same execution deadlines as regular CI.
+    # Keep counters and debug info while reducing instrumented frontend and
+    # runtime overhead. Native compiler self-hosting is verified separately
+    # against machine-code executables, outside the coverage build.
     add_compile_options(-O1 -g --coverage)
     # GCC's gcov counters may be updated by multiple processes during the
     # integration suite. Atomic profile updates prevent corrupted/negative
@@ -307,51 +307,10 @@ if (BUILD_TESTS)
             "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
             "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_rc_source_corpus.cmake)
-    add_test(NAME vpp-compiler-bytecode-bootstrap
-        COMMAND ${CMAKE_COMMAND}
-            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-bootstrap"
-            -P ${CMAKE_SOURCE_DIR}/scripts/quality/checkbootstrapvpp.cmake)
-    set_tests_properties(vpp-compiler-bytecode-bootstrap PROPERTIES TIMEOUT 1800)
-    add_test(NAME vpp-compiler-stage1-stage2
-        COMMAND ${CMAKE_COMMAND}
-            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-bootstrap-stages"
-            -P ${CMAKE_SOURCE_DIR}/scripts/quality/checkbootstrapstages.cmake)
-    set_tests_properties(vpp-compiler-stage1-stage2 PROPERTIES TIMEOUT 3600)
-    add_test(NAME vpp-selfhost-i32-artifact
-        COMMAND ${CMAKE_COMMAND}
-            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-            "-DVPP_CASE=selfhost"
-            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/selfhost-i32-artifact"
-            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_cli.cmake)
-    set_tests_properties(vpp-selfhost-i32-artifact PROPERTIES
-        TIMEOUT 1800)
-    # These tests repeatedly run a compiler written in V++ inside Stage 0.
-    # Release CI covers the complete bootstrap; sanitizer CI selects the
-    # remaining tests by label to avoid repeating this instrumented VM work.
-    set_tests_properties(
-        vpp-compiler-bytecode-bootstrap
-        vpp-compiler-stage1-stage2
-        vpp-selfhost-i32-artifact
-        PROPERTIES LABELS bootstrap)
-
-    # The full three-generation bootstrap is intentionally opt-in: it compiles
-    # the complete compiler twice in V++ bytecode and takes several minutes.
-    option(VPP_ENABLE_STAGE3_BOOTSTRAP_TEST "Run the three-generation V++ compiler bootstrap test" OFF)
-    if (VPP_ENABLE_STAGE3_BOOTSTRAP_TEST)
-        add_test(NAME vpp-compiler-stage1-stage2-stage3
-            COMMAND ${CMAKE_COMMAND}
-                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
-                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/compiler-bootstrap-three-stage"
-                -P ${CMAKE_SOURCE_DIR}/scripts/quality/checkbootstrapstage3.cmake)
-        set_tests_properties(vpp-compiler-stage1-stage2-stage3 PROPERTIES
-            TIMEOUT 3900 LABELS bootstrap)
-    endif()
+    # Legacy compiler bootstrap via the C++ bytecode VM is retired from CTest.
+    # Native V++ Stage 1 -> Stage 2 -> Stage 3 is covered by installed smoke
+    # on Linux x86-64/AArch64; macOS ARM64 checks native self-hosting via
+    # vpp-native-compiler-driver. Ordinary VM feature regressions remain here.
 
     # Focused internal RC gate. The old broad C++ unit tree was removed on
     # purpose; keep only invariants that cannot be exercised from public .vi

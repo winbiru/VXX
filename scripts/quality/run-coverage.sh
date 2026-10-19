@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${VPP_COVERAGE_BUILD_DIR:-$ROOT_DIR/build-coverage}"
 MINIMUM="${VPP_COVERAGE_MINIMUM:-45}"
+CTEST_PARALLEL="${VPP_COVERAGE_CTEST_PARALLEL:-2}"
 
 command -v cmake >/dev/null
 command -v lcov >/dev/null
@@ -19,10 +20,14 @@ cmake --build "$BUILD_DIR" --parallel
 # files also makes repeated local runs deterministic after source/flag changes.
 find "$BUILD_DIR" -type f -name '*.gcda' -delete
 
-# The instrumented fixture compiles its V++ network modules before listening.
-# Allow that startup work without weakening any HTTP response assertions.
+# Native self-hosting runs against the release compiler in installed smoke.
+# Keep coverage focused on frontend, bytecode, runtime and integration tests;
+# native compiler/parser stress tests are already gated in CI release builds.
+# The instrumented HTTP fixture compiles its network modules before listening.
 VPP_HTTP_FIXTURE_TIMEOUT="${VPP_HTTP_FIXTURE_TIMEOUT:-300}" \
-  ctest --test-dir "$BUILD_DIR" --output-on-failure --no-tests=error
+  ctest --test-dir "$BUILD_DIR" --parallel "$CTEST_PARALLEL" \
+    --output-on-failure --no-tests=error \
+    -E '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
 lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \
