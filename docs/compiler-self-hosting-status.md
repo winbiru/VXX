@@ -1,5 +1,29 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## CI native bootstrap (19/10/2026)
+
+Compiler bootstrap bằng bytecode trên C++ VM đã ngừng đăng ký vào CTest:
+`vpp-compiler-bytecode-bootstrap`, `vpp-compiler-stage1-stage2`,
+`vpp-selfhost-i32-artifact` và tùy chọn Stage 3 qua VM. Các script bootstrap
+cũ được giữ để phục vụ tra cứu và debug; phần lịch sử bên dưới ghi lại những
+lần kiểm chứng trước khi thay CI gate.
+
+Trên Linux x86-64/AArch64 và macOS ARM64, installed native smoke chạy
+`check_native_aot_bootstrap.cmake`: Stage 0 tạo executable compiler V++
+Stage 1; Stage 1/2 tự biên dịch Stage 2/3 thành mã máy; SHA256 Stage 2/3
+phải trùng nhau. Stage 3 biên dịch, liên kết và chạy probe native, các
+fixture FFI, package import và re-export. Bài `vpp-native-compiler-driver`
+vẫn có thể chạy thủ công để kiểm chứng nhánh compiler i32 Stage 4 cũ,
+nhưng không được chạy lặp lại trong CI/release khi đã có full-language gate.
+Windows hiện vẫn kiểm chứng object COFF/ABI và các fixture native của bản
+cài đặt, chưa có gate self-hosting compiler ba thế hệ tương đương.
+
+`quality` dùng CTest song song tối đa 2 test (cấu hình qua
+`VPP_COVERAGE_CTEST_PARALLEL`), loại riêng các native compiler stress test đã
+được kiểm tra ngoài coverage; vẫn giữ ngưỡng line coverage 45%. C/C++ vẫn
+được dùng ở Stage 0 để tạo compiler V++ ban đầu; runtime ASM và linker hệ
+điều hành vẫn là thành phần của native toolchain ở các stage sau.
+
 ## Nạp artifact và kiểm thử i32 bằng compiler V++ (18/10/2026)
 
 `Bộ Mã Hóa Artifact` có API `biên dịch artifact giải mã dây` và

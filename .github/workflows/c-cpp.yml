@@ -54,9 +54,8 @@ jobs:
         run: ctest --test-dir cmake-build-debug -R '^vpp-native-elf-x86-writer$' --output-on-failure --no-tests=error
 
       - name: Run full V++ regression suite
-        # Installed native smoke now verifies Stage 1 -> Stage 2 -> Stage 3.
-        # Avoid repeating legacy bytecode bootstrap through the VM.
-        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        # Installed native smoke verifies the compiler Stage 1 -> Stage 2 -> Stage 3.
+        run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
       - name: Run RC compiler hardening checks
         shell: bash
@@ -98,14 +97,11 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized --parallel 2
-          # Native parser, ELF writer and self-host bootstrap are verified in Release above.
-          # Instrumented Stage 0 VM compilation can exceed 1200 seconds on CI;
-          # exclude bytecode bootstrap tests by label as well as native compiler
-          # stress tests, keeping frontend/runtime and integration under ASan/UBSan.
+          # Native compiler self-hosting is verified in installed Release smoke.
+          # Keep the sanitizer suite focused on frontend/runtime and integration.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --label-exclude '^bootstrap$' \
               --exclude-regex '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
   linux-arm64:
@@ -152,7 +148,7 @@ jobs:
 
       - name: Run Linux ARM64 regression suite
         # Native AOT bootstrap is covered by installed smoke above.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
       - name: Link and run Linux ARM64 native calls
         run: ctest --test-dir build -R '^vpp-native-calls-host-link$' --output-on-failure --no-tests=error
@@ -303,8 +299,7 @@ jobs:
       - name: Run Windows full V++ regression suite
         shell: pwsh
         run: |
-          # Avoid running the legacy VM-based compiler bootstrap in routine CI.
-          ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$'
+          ctest --test-dir build -C Release --parallel 2 --output-on-failure --no-tests=error
           if ($LASTEXITCODE -ne 0) { throw "Windows V++ regression suite failed" }
 
       - name: Link and run Windows x86-64 native COFF calls
@@ -385,12 +380,9 @@ jobs:
               -P scripts/quality/checknativeprint.cmake
           fi
 
-      - name: Verify native compiler self-hosting Stage 0 -> Stage 4 (macOS ARM64)
-        run: ctest --test-dir build -R '^vpp-native-compiler-driver$' --output-on-failure --verbose --no-tests=error
-
       - name: Run macOS full V++ regression suite
-        # Native Stage 0 -> Stage 4 is checked above; skip the legacy VM bootstrap.
-        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error --label-exclude '^bootstrap$' -E '^vpp-native-compiler-driver$'
+        # Installed smoke verifies full-language native Stage 1 -> Stage 2 -> Stage 3.
+        run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^vpp-native-compiler-driver$'
 
       - name: Run macOS RC compiler hardening checks
         shell: bash

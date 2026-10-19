@@ -36,10 +36,10 @@ add_test(NAME installed-stdlib-vi
 set_tests_properties(installed-stdlib-vi PROPERTIES
     PASS_REGULAR_EXPRESSION "vpp_installed_stdlib_ok" TIMEOUT 90)
 
-# Run host machine-code executables built by the full-language AOT compiler.
-# These fixtures cover anonymous closure metadata, captured exceptions, class
-# dispatch, and branch/loop lowering on both Linux runner architectures.
-if (UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$")
+# Prove the full-language V++ compiler self-hosts into native machine code.
+# Stage 2 and Stage 3 must converge, and Stage 3 executes FFI/package probes.
+if ((UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$") OR
+    (APPLE AND VPP_TARGET STREQUAL "aarch64-apple-darwin"))
     add_test(NAME installed-native-aot-bootstrap-three-stage
         COMMAND "${CMAKE_COMMAND}"
             "-DVPP_CLI=${VPP_CLI}"
@@ -49,7 +49,11 @@ if (UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$")
             -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_bootstrap.cmake")
     set_tests_properties(installed-native-aot-bootstrap-three-stage PROPERTIES
         TIMEOUT 900 LABELS bootstrap-native)
+endif()
 
+# These native fixtures cover anonymous closure metadata, captured exceptions,
+# class dispatch, and branch/loop lowering on both Linux runner architectures.
+if (UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$")
     foreach(case IN ITEMS
             kiem_tra_closure_capture
             kiem_tra_ngoai_le_xuyen_ham
