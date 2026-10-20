@@ -224,6 +224,20 @@ jobs:
           VPP_COVERAGE_MINIMUM: "45"
         run: ./scripts/quality/run-coverage.sh
 
+      - name: Upload coverage diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-coverage-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-coverage/ctest.log
+            build-coverage/coverage.capture.log
+            build-coverage/coverage.filter.log
+            build-coverage/coverage.info
+            build-coverage/Testing/Temporary/LastTestsFailed.log
+            build-coverage/Testing/Temporary/LastTest.log
+
       - name: Build and run benchmark baseline
         run: |
           cmake -S . -B build-benchmark \

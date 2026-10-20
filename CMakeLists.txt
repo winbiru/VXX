@@ -671,13 +671,17 @@ if (BUILD_TESTS)
     add_test(NAME vpp-opcode-abi
         COMMAND ${CMAKE_COMMAND} "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_opcodes.cmake)
-    if (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|aarch64|arm64)$")
+    # Full-language Stage 0 emits a native compiler for Unix x64/ARM64 and
+    # Windows x64. Every --compiler=vpp regression needs that executable.
+    if ((UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|aarch64|arm64)$") OR
+        (WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8))
         set(VPP_NATIVE_CLI_COMPILER "${CMAKE_CURRENT_BINARY_DIR}/native-compiler/vpp-native${CMAKE_EXECUTABLE_SUFFIX}")
         add_test(NAME vpp-native-cli-compiler-bootstrap
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
                 "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-compiler"
+                "-DVPP_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
