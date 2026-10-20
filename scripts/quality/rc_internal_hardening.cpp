@@ -613,8 +613,15 @@ void testPrimitivePipeline() {
     for (const auto &primitive : kVmIntrinsics) {
         const std::string name(primitive.name);
         expect(opcodes.insert(primitive.opcode).second, name + ": opcode duy nhất");
+        // The native artifact entry point uses its own serialized opcode
+        // namespace; the other intrinsics belong to the OP_VM_ family.
+        const auto registeredName = opcodeName(primitive.opcode);
+        const bool registeredInExpectedNamespace =
+            primitive.opcode == OP_NATIVE_ARTIFACT_CHAY
+                ? registeredName == "OP_NATIVE_ARTIFACT_CHAY"
+                : registeredName.find("OP_VM_") == 0;
         expect(isKnownOpcode(primitive.opcode) &&
-                   opcodeName(primitive.opcode).find("OP_VM_") == 0,
+                   registeredInExpectedNamespace,
                name + ": opcode được đăng ký");
         expect(verifyBytecode({{primitive.opcode, 1, 0, 0}}).has_value(),
                name + ": verifier từ chối immediate không hợp lệ");

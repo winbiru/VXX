@@ -1,5 +1,5 @@
-// CLI compiler V++: C++ bootstrap VM; mọi pass của nguồn đích và artifact
-// thực thi ở thư viện này. Không gọi snapshot hay kịch bản compiler C++.
+// Stage 0 tạo executable compiler V++ qua ASM. Từ Stage 1, mọi pass của
+// nguồn đích và artifact do thư viện V++ này thực hiện, không gọi VM.
 nhập gói/biên dịch/nguồn tệp;
 nhập gói/biên dịch/artifact;
 nhập gói/biên dịch/liên kết;

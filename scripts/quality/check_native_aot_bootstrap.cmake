@@ -5,10 +5,16 @@ foreach(required IN ITEMS VPP_CLI VPP_HOME VPP_SOURCE_ROOT VPP_OUTPUT_DIR)
 endforeach()
 
 function(run_native_stage label)
+    # Full compiler generation took 273 s for Stage 1 -> Stage 2 locally.
+    # Leave room for slower ARM64 CI runners without weakening the probes.
+    set(stage_timeout 300)
+    if (label MATCHES "^Stage [012] ->")
+        set(stage_timeout 600)
+    endif()
     execute_process(COMMAND ${ARGN}
         WORKING_DIRECTORY "${VPP_SOURCE_ROOT}"
         RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr
-        TIMEOUT 300)
+        TIMEOUT ${stage_timeout})
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "${label} failed (${status}):\n${stdout}\n${stderr}")
     endif()

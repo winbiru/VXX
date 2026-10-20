@@ -98,4 +98,16 @@ hàm chính() {
     in lấy map(unicode[1], "cột", 0) == 4;
     in lấy map(unicode[1], "vị trí ký tự", 0) == 2;
     in lấy map(unicode[1], "cột ký tự", 0) == 3;
+
+    // Lexer native phải giữ token nhiều âm tiết và span UTF-8 sau khi
+    // tối ưu bỏ phân loại lại token thô và kiểm tra tiền tố.
+    từ_khóa_đầy_đủ = biên dịch token hóa("kiểm tra sau ngoại thư viện trả về bỏ qua mặc định trường hợp khởi tạo điều kiện cập nhật bắt lỗi giao diện kế thừa triển khai công khai riêng tư bảo vệ ký hiệu khả năng");
+    in độ dài(từ_khóa_đầy_đủ) == 18;
+    in lấy map(từ_khóa_đầy_đủ[0], "giá trị", "") == "kiểm tra sau";
+    in lấy map(từ_khóa_đầy_đủ[1], "giá trị", "") == "ngoại thư viện";
+    in lấy map(từ_khóa_đầy_đủ[17], "giá trị", "") == "khả năng";
+    in lấy map(từ_khóa_đầy_đủ[17], "loại", "") == "từ khóa";
+    in lấy map(từ_khóa_đầy_đủ[0], "vị trí", -1) == 0;
+    in lấy map(từ_khóa_đầy_đủ[0], "kết thúc", -1) == 14;
+    in lấy map(từ_khóa_đầy_đủ[0], "kết thúc ký tự", -1) == 12;
 };

@@ -25,6 +25,16 @@ if (result EQUAL 0 OR NOT error MATCHES "Native AOT.*riscv64-unknown-linux-gnu")
     message(FATAL_ERROR "build --target must reject unsupported AOT with diagnostic: ${error}")
 endif()
 
+# This exercises the target parser used by the Windows COFF build commands.
+# Its native bridge must decode CRLF stdout records on Windows correctly.
+execute_process(
+    COMMAND "${VPP_EXEC}" build --target x86_64-windows-msvc ignored.vi
+    RESULT_VARIABLE result
+    ERROR_VARIABLE error)
+if (result EQUAL 0 OR NOT error MATCHES "Native AOT.*x86_64-pc-windows-msvc")
+    message(FATAL_ERROR "Windows target parser failed before native AOT dispatch: ${error}")
+endif()
+
 execute_process(
     COMMAND "${VPP_EXEC}" build --target riscv128-linux-gnu ignored.vi
     RESULT_VARIABLE result

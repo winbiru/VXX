@@ -14,9 +14,17 @@ file(WRITE "${source}" "${kernel}\n${driver}\n")
 file(WRITE "${VPP_OUTPUT_DIR}/native-lexer-input.vi"
     "// header\r\nhàm mẫu(a) { /* chú */ biến x = 12; in \"Chào\\n\"; trả về x; };\n")
 file(REMOVE "${executable}")
+if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
+    if (NOT EXISTS "${VPP_STAGE1}")
+        message(FATAL_ERROR "native Stage 1 compiler missing: ${VPP_STAGE1}")
+    endif()
+    set(compile_command "${VPP_STAGE1}" build "${source}" -o "${executable}")
+else()
+    set(compile_command "${VPP_EXEC}" build --target "${VPP_TARGET}"
+        --emit-exe-selfhost "${source}" "${executable}")
+endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
-    "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-    "${source}" "${executable}"
+    ${compile_command}
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE compile_status OUTPUT_VARIABLE compile_output
     ERROR_VARIABLE compile_errors TIMEOUT 180)

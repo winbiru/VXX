@@ -137,12 +137,19 @@ lớp công khai Bộ Nạp Nguồn {
         trả về đúng;
     };
 
-    hàm công khai đồ thị(điểm_vào) {
+    // Embedded source supplies its AST in memory, while imports still use
+    // the same resolver and relative base as files on disk.
+    hàm công khai đồ thị(điểm_vào, mã_nguồn = rỗng) {
         // Mỗi lần dựng bắt đầu bằng trạng thái riêng, kể cả khi tái dùng instance.
         mình.trạng_thái = {"đã thăm": {}, "ngăn": [], "mô đun": [],
             "cạnh": [], "thứ tự khởi tạo": [], "thư viện": mình.thư_viện};
         gốc_dữ_liệu = biên dịch nguồn chuẩn đường(điểm_vào);
-        cây = biên dịch nguồn cây(gốc_dữ_liệu);
+        cây = rỗng;
+        nếu (mã_nguồn == rỗng) {
+            cây = biên dịch nguồn cây(gốc_dữ_liệu);
+        } hoặc {
+            cây = biên dịch phân tích chương trình thuần(mã_nguồn);
+        };
         trạng_thái = mình.trạng_thái;
         thêm(trạng_thái["ngăn"], gốc_dữ_liệu);
         trạng_thái["đã thăm"][gốc_dữ_liệu] = 1;
@@ -187,4 +194,12 @@ hàm công khai biên dịch nguồn đồ thị(điểm_vào, thư_viện) {
 
 hàm công khai biên dịch nguồn tệp tự chủ(điểm_vào, thư_viện) {
     trả về biên dịch liên kết đồ thị thuần(biên dịch nguồn đồ thị(điểm_vào, thư_viện));
+};
+
+// Preserve the importer's directory without creating a .vi file beside it.
+// This also allows scripts to import modules from read-only directories.
+hàm công khai biên dịch nguồn nhúng tự chủ(mã_nguồn, gốc, thư_viện) {
+    bộ_nạp = Bộ Nạp Nguồn(thư_viện);
+    trả về biên dịch liên kết đồ thị thuần(
+        bộ_nạp.đồ thị(gốc + "/.vpp-embedded-entry.vi", mã_nguồn));
 };

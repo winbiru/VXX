@@ -16,9 +16,10 @@ struct IntrinsicDescriptor {
     bool reserved = true;
 };
 
-inline constexpr std::array<IntrinsicDescriptor, 52> kVmIntrinsics{{
+inline constexpr std::array<IntrinsicDescriptor, 53> kVmIntrinsics{{
     {"bien_dich_phan_tich_vm", OP_VM_BIEN_DICH_PHAN_TICH, 2},
     {"bytecode_chay_vm", OP_VM_BYTECODE_CHAY, 4},
+    {"bytecode_chay_native", OP_NATIVE_ARTIFACT_CHAY, 5},
     {"dns_phan_giai_vm", OP_VM_DNS_PHAN_GIAI, 1},
     {"doc_bien_moi_truong_vm", OP_VM_DOC_BIEN_MOI_TRUONG, 1},
     {"dong_ho_dia_phuong_vm", OP_VM_DONG_HO_DIA_PHUONG, 0},

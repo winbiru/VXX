@@ -376,9 +376,13 @@ void Frame::intrinsic(int operation) {
     const auto *descriptor = bytecode::intrinsicByOpcode(operation);
     if (!descriptor) fail("unknown intrinsic");
     auto args = take(static_cast<int>(descriptor->arity)); Value result = make_null_value(); std::string error;
-    if (operation == OP_VM_BYTECODE_CHAY) {
+    if (operation == OP_VM_BYTECODE_CHAY || operation == OP_NATIVE_ARTIFACT_CHAY) {
         if (!program.executeArtifact) fail("native artifact compiler unavailable");
         push(program.executeArtifact(args)); return;
+    }
+    if (operation == OP_VM_KICH_BAN_CHAY) {
+        if (!program.executeSource) fail("native embedded compiler unavailable");
+        push(program.executeSource(args)); return;
     }
     if (!representationIntrinsic(static_cast<Opcode>(operation), args, result, error) &&
         !helpers::handleNativeCollectionFunction(static_cast<Opcode>(operation), args, result, error) &&

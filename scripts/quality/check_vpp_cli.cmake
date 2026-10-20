@@ -5,14 +5,31 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_CASE OR
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(VPP_CHECK_TIMEOUT 240)
+if (DEFINED VPP_NATIVE_COMPILER AND NOT "${VPP_NATIVE_COMPILER}" STREQUAL "")
+    if (NOT EXISTS "${VPP_NATIVE_COMPILER}")
+        message(FATAL_ERROR "Native V++ compiler missing: ${VPP_NATIVE_COMPILER}")
+    endif()
+    set(ENV{VPP_NATIVE_COMPILER} "${VPP_NATIVE_COMPILER}")
+endif()
 
 function(vpp_check expected)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_EXEC}" ${ARGN}
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT ${VPP_CHECK_TIMEOUT})
+    # Windows CRT stdout uses CRLF, while the fixtures use LF. Compare the
+    # logical output without hiding extra lines or changes to its contents.
+    string(REPLACE "\r\n" "\n" output "${output}")
     if (NOT status EQUAL 0 OR NOT output STREQUAL expected)
-        message(FATAL_ERROR "V++ CLI failed (${status}): ${ARGN}\n${errors}\nOutput: ${output}\nExpected: ${expected}")
+        # Render invisible line endings as hex to diagnose Windows failures
+        # where the two multiline strings appear identical in Actions logs.
+        string(LENGTH "${output}" output_length)
+        string(LENGTH "${expected}" expected_length)
+        string(HEX "${output}" output_hex)
+        string(HEX "${expected}" expected_hex)
+        string(SUBSTRING "${output_hex}" 0 256 output_hex)
+        string(SUBSTRING "${expected_hex}" 0 256 expected_hex)
+        message(FATAL_ERROR "V++ CLI failed (${status}): ${ARGN}\n${errors}\nOutput: ${output}\nExpected: ${expected}\nOutput length: ${output_length}, hex prefix: ${output_hex}\nExpected length: ${expected_length}, hex prefix: ${expected_hex}")
     endif()
 endfunction()
 
@@ -26,7 +43,8 @@ if (VPP_CASE STREQUAL "compiler")
     vpp_check("${expected}" run --compiler=cpp "${main}")
     vpp_check("${expected}" run --compiler=vpp "${main}")
     set(artifact "${VPP_OUTPUT_DIR}/app.vbc")
-    execute_process(COMMAND "${VPP_EXEC}" build --compiler=vpp "${main}" -o "${artifact}"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp "${main}" -o "${artifact}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 240)
     if (NOT status EQUAL 0 OR NOT EXISTS "${artifact}")
@@ -35,7 +53,8 @@ if (VPP_CASE STREQUAL "compiler")
     file(REMOVE "${main}" "${VPP_OUTPUT_DIR}/lib/math.vi")
     vpp_check("${expected}" run --artifact "${artifact}")
     file(COPY "${fixtures}/unsupported_closure.vi" DESTINATION "${VPP_OUTPUT_DIR}")
-    execute_process(COMMAND "${VPP_EXEC}" build --compiler=vpp
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp
         "${VPP_OUTPUT_DIR}/unsupported_closure.vi" -o "${artifact}"
         RESULT_VARIABLE status TIMEOUT 240)
     if (status EQUAL 0)
@@ -59,6 +78,30 @@ if (VPP_CASE STREQUAL "compiler")
     endif()
     file(REMOVE "${i32_source}")
     vpp_check("${i32_expected}" run --artifact "${i32_artifact}")
+    # A compiled host invokes a second native compiler through the embedded
+    # scripting ABI. This must work without entering the VM interpreter.
+    file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/embedded/lib")
+    file(COPY "${fixtures}/lib/math.vi" DESTINATION "${VPP_OUTPUT_DIR}/embedded/lib")
+    vpp_check("1\n1\n" run --compiler=vpp "${fixtures}/embedded_native.vi")
+    if (UNIX AND DEFINED VPP_NATIVE_COMPILER AND NOT "${VPP_NATIVE_COMPILER}" STREQUAL "")
+        # The script is outside its import base. A native source graph with
+        # a virtual entrypoint must work even when the base cannot be written.
+        set(embedded_source "${VPP_OUTPUT_DIR}/embedded-source.vi")
+        file(WRITE "${embedded_source}" "nhập lib/math như m; in m.cộng(40);")
+        file(CHMOD "${VPP_OUTPUT_DIR}/embedded" PERMISSIONS
+            OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+            "${VPP_NATIVE_COMPILER}" embed "${embedded_source}"
+            --base "${VPP_OUTPUT_DIR}/embedded"
+            WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+            RESULT_VARIABLE embedded_status OUTPUT_VARIABLE embedded_output
+            ERROR_VARIABLE embedded_error TIMEOUT 240)
+        file(CHMOD "${VPP_OUTPUT_DIR}/embedded" PERMISSIONS
+            OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+        if (NOT embedded_status EQUAL 0 OR NOT embedded_output STREQUAL "init\n42\n")
+            message(FATAL_ERROR "Native embedded import from read-only base failed (${embedded_status}):\n${embedded_error}\n${embedded_output}")
+        endif()
+    endif()
     message(STATUS "V++ compiler CLI and artifact preservation: PASS")
 elseif (VPP_CASE STREQUAL "selfhost")
     set(VPP_CHECK_TIMEOUT 600)
@@ -84,7 +127,8 @@ elseif (VPP_CASE STREQUAL "oop")
     vpp_check("${expected}" run --compiler=cpp "${source}")
     vpp_check("${expected}" run --compiler=vpp "${source}")
     set(artifact "${VPP_OUTPUT_DIR}/objects.vbc")
-    execute_process(COMMAND "${VPP_EXEC}" build --compiler=vpp "${source}" -o "${artifact}"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp "${source}" -o "${artifact}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 240)
     if (NOT status EQUAL 0 OR NOT EXISTS "${artifact}")
@@ -93,7 +137,8 @@ elseif (VPP_CASE STREQUAL "oop")
     file(REMOVE "${source}")
     vpp_check("${expected}" run --artifact "${artifact}")
     file(COPY "${fixtures}/missing_interface.vi" DESTINATION "${VPP_OUTPUT_DIR}")
-    execute_process(COMMAND "${VPP_EXEC}" build --compiler=vpp
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp
         "${VPP_OUTPUT_DIR}/missing_interface.vi" -o "${artifact}"
         RESULT_VARIABLE status TIMEOUT 240)
     if (status EQUAL 0)
@@ -103,6 +148,34 @@ elseif (VPP_CASE STREQUAL "oop")
     file(COPY "${fixtures}/stdlib_collection.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     vpp_check("42\n1\n2\n3\n" run --compiler=vpp "${VPP_OUTPUT_DIR}/stdlib_collection.vi")
     message(STATUS "V++ OOP imported interfaces, inheritance and artifact: PASS")
+elseif (VPP_CASE STREQUAL "ffi")
+    # Exercise the native foreign descriptor table through the V++ compiler,
+    # the serialized five-region artifact, and a source-free native replay.
+    file(COPY "${VPP_ROOT}/src/tests/kiem_tra_native_ffi_binding.vi"
+        DESTINATION "${VPP_OUTPUT_DIR}")
+    set(source "${VPP_OUTPUT_DIR}/kiem_tra_native_ffi_binding.vi")
+    set(expected "1\n1\n1\n")
+    vpp_check("${expected}" run --compiler=vpp "${source}")
+    set(artifact "${VPP_OUTPUT_DIR}/ffi.vbc")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp "${source}" -o "${artifact}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 240)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${artifact}")
+        message(FATAL_ERROR "Native FFI artifact build failed (${status}): ${errors}\n${output}")
+    endif()
+    file(READ "${artifact}" contents)
+    string(JSON version ERROR_VARIABLE json_error GET "${contents}" "phiên bản")
+    if (json_error OR NOT version EQUAL 2)
+        message(FATAL_ERROR "Native FFI artifact needs version 2: ${json_error}")
+    endif()
+    string(JSON regions ERROR_VARIABLE json_error LENGTH "${contents}" "dây")
+    if (json_error OR NOT regions EQUAL 5)
+        message(FATAL_ERROR "Native FFI artifact needs five wire regions: ${json_error}")
+    endif()
+    file(REMOVE "${source}")
+    vpp_check("${expected}" run --artifact "${artifact}")
+    message(STATUS "V++ native FFI and five-region artifact: PASS")
 else()
     message(FATAL_ERROR "Unknown V++ CLI test case: ${VPP_CASE}")
 endif()

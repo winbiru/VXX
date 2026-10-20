@@ -145,6 +145,7 @@ hàm công khai biên dịch mã opcode(tên) {
         ca "OP_VM_FLOAT_FROM_BITS": { trả về 155; }
         ca "OP_FFI_CALL": { trả về 156; }
         ca "OP_VM_BYTECODE_CHAY": { trả về 157; }
+        ca "OP_NATIVE_ARTIFACT_CHAY": { trả về 158; }
         mặc định: { ném "opcode C++ chưa định nghĩa: " + tên; }
     }
 };
@@ -293,6 +294,7 @@ hàm công khai biên dịch có opcode(mã) {
         ca 155: { trả về đúng; }
         ca 156: { trả về đúng; }
         ca 157: { trả về đúng; }
+        ca 158: { trả về đúng; }
         mặc định: { trả về sai; }
     }
 };

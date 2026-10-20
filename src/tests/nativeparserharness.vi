@@ -88,7 +88,7 @@ hàm test_parser_invalid() {
     nếu (expect_reject("hàm chính() { biến a.b = 4; trả về a.b; };") != 0) { trả về 65; };
     nếu (expect_reject("hàm chính() { biến 1bad = 4; trả về 1bad; };") != 0) { trả về 66; };
     nếu (expect_reject("hàm chính() { x = 4; trả về 1; };") != 0) { trả về 67; };
-    nếu (expect_reject("hàm chính() { biến x = 4; x += 1; trả về x; };") != 0) { trả về 68; };
+    nếu (expect_reject("hàm chính() { biến x = 4; x /= ; trả về x; };") != 0) { trả về 68; };
     nếu (expect_reject("hàm chính() { biến x = 4; x = x + 1; trả về x + 0; }; xyz") != 0) { trả về 69; };
     nếu (expect_reject("hàm chính() { biến x = 0; nếu (x) { biến y = 1; }; trả về y; };") != 0) { trả về 70; };
     nếu (expect_reject("hàm chính() { biến x = 0; nếu (1) { trả về 52; } hoặc { trả về 51; }; trả về x; };") != 0) { trả về 71; };
@@ -111,6 +111,21 @@ hàm run_case(source, expected) {
     trả về status;
 };
 
+hàm test_division_by_zero_ir() {
+    biến ir = byte_mới();
+    nếu (ir <= 0) { trả về 120; };
+    lặp (op = 26; op <= 27; op++) {
+        byte_làm_rỗng(ir);
+        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
+        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 0);
+        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
+        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
+        nếu (ir_run(ir) != -2147483647) { trả về 121; };
+    };
+    nếu (byte_hủy(ir) != 0) { trả về 122; };
+    trả về 0;
+};
+
 hàm test_parser_precedence() {
     nếu (run_case("hàm chính() { trả về 2 + 3 * 4; };", 14) != 0) { trả về 81; };
     nếu (run_case("hàm chính() { trả về (2 + 3) * 4; };", 20) != 0) { trả về 82; };
@@ -131,6 +146,26 @@ hàm test_parser_precedence() {
     nếu (run_case("hàm chính() { biến a = 0; lặp (i = 52; i > 0; i--) { a = a + 1; }; trả về a; };", 52) != 0) { trả về 97; };
     nếu (run_case("hàm chính() { biến a = 0; lặp (i = 0; i < 26; i++) { a = a + 1; }; lặp (i = 0; i < 26; i++) { a = a + 1; }; trả về a; };", 52) != 0) { trả về 98; };
     nếu (run_case("hàm chính() { nếu (0) { trả về 1; } hoặc nếu (0) { trả về 2; } hoặc nếu (1) { trả về 52; } hoặc { trả về 3; }; };", 52) != 0) { trả về 99; };
+    nếu (run_case("hàm chính() { trả về !0 + !1 + !!7 + !(-3) + 50; };", 52) != 0) { trả về 100; };
+    nếu (run_case("hàm chính() { trả về +(+52); };", 52) != 0) { trả về 101; };
+    nếu (run_case("hàm chính() { trả về đúng * 50 + !sai + đúng; };", 52) != 0) { trả về 102; };
+    nếu (run_case("hàm chính() { biến x = 4; x += 10; x *= 4; x -= 4; x++; x--; trả về x; };", 52) != 0) { trả về 103; };
+    nếu (run_case("hàm chính() { biến x = 0; lặp (i = 0; i < 26; i += 1) { x += 2; }; trả về x; };", 52) != 0) { trả về 104; };
+    nếu (run_case("hàm chính() { biến x = 0; lặp (i = 52; i > 0; i -= 1) { x++; }; trả về x; };", 52) != 0) { trả về 105; };
+    nếu (run_case("hàm chính() { biến x = 2; lặp (i = 1; i < 16; i *= 2) { x += 10; }; trả về x + 10; };", 52) != 0) { trả về 106; };
+    nếu (run_case("hàm chính() { trả về 104 / 2; };", 52) != 0) { trả về 107; };
+    nếu (run_case("hàm chính() { trả về 157 % 105; };", 52) != 0) { trả về 108; };
+    nếu (run_case("hàm chính() { trả về -159 / -3; };", 53) != 0) { trả về 109; };
+    nếu (run_case("hàm chính() { trả về -159 % 52; };", -3) != 0) { trả về 110; };
+    nếu (run_case("hàm chính() { trả về -7 / 3; };", -2) != 0) { trả về 111; };
+    nếu (run_case("hàm chính() { trả về -7 % 3; };", -1) != 0) { trả về 112; };
+    nếu (run_case("hàm chính() { trả về 7 % -3; };", 1) != 0) { trả về 113; };
+    nếu (run_case("hàm chính() { trả về -2147483648 / -1; };", -2147483648) != 0) { trả về 114; };
+    nếu (run_case("hàm chính() { trả về -2147483648 % -1; };", 0) != 0) { trả về 115; };
+    nếu (run_case("hàm chính() { biến x = -159; x /= -3; x %= 52; x += 51; trả về x; };", 52) != 0) { trả về 116; };
+    nếu (run_case("hàm chính() { biến x = 0; lặp (i = 208; i > 0; i /= 2) { x += 13; }; trả về x; };", 104) != 0) { trả về 117; };
+    nếu (run_case("hàm chính() { biến x = 0; lặp (i = 52; i > 0; i %= 13) { x += 52; }; trả về x; };", 52) != 0) { trả về 118; };
+    nếu (run_case("hàm chính() { trả về 14 + 76 / 2 * 2 % 55; };", 35) != 0) { trả về 119; };
     trả về 0;
 };
 
@@ -206,17 +241,19 @@ hàm test_parser_file() {
 
 hàm chính() {
     biến code = test_int_buffer();
-    nếu (code != 0) { in code; trả về code; };
+    nếu (code != 0) { in_số(code); trả về code; };
     code = test_parser_program();
-    nếu (code != 0) { in code; trả về code; };
+    nếu (code != 0) { in_số(code); trả về code; };
     code = test_parser_invalid();
-    nếu (code != 0) { in code; trả về code; };
+    nếu (code != 0) { in_số(code); trả về code; };
     code = test_parser_precedence();
-    nếu (code != 0) { in code; trả về code; };
+    nếu (code != 0) { in_số(code); trả về code; };
+    code = test_division_by_zero_ir();
+    nếu (code != 0) { in_số(code); trả về code; };
     code = test_token_errors();
-    nếu (code != 0) { in code; trả về code; };
+    nếu (code != 0) { in_số(code); trả về code; };
     code = test_parser_file();
-    nếu (code != 0) { in code; trả về code; };
-    in 20261017;
+    nếu (code != 0) { in_số(code); trả về code; };
+    in_số(20261017);
     trả về 0;
 };

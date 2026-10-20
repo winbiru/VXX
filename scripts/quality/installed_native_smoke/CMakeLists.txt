@@ -48,7 +48,7 @@ if ((UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$") OR
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-bootstrap"
             -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_bootstrap.cmake")
     set_tests_properties(installed-native-aot-bootstrap-three-stage PROPERTIES
-        TIMEOUT 900 LABELS bootstrap-native)
+        TIMEOUT 1800 LABELS bootstrap-native)
 endif()
 
 # These native fixtures cover anonymous closure metadata, captured exceptions,

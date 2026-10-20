@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
+#include <atomic>
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -386,6 +387,57 @@ static std::string vppStringLiteral(const std::string &value) {
     return result + '"';
 }
 
+// Only Stage 0 uses the C++ bootstrap. --compiler=vpp must execute an already
+// bootstrapped native V++ compiler, with no implicit VM fallback.
+static fs::path nativeVppCompiler() {
+    if (const char *value = std::getenv("VPP_NATIVE_COMPILER"); value && *value) {
+        const fs::path configured = fs::absolute(vietvm::core::utf8Path(value));
+        if (!fs::is_regular_file(configured))
+            throw std::runtime_error("VPP_NATIVE_COMPILER không tồn tại: " + configured.u8string());
+        return configured;
+    }
+    for (const char *env : {"VPP_HOME", "VPP_AOT_ROOT"}) {
+        if (const char *value = std::getenv(env); value && *value) {
+            const fs::path candidate = fs::absolute(vietvm::core::utf8Path(value)) / "bin" /
+#ifdef _WIN32
+                "vpp-native.exe";
+#else
+                "vpp-native";
+#endif
+            if (fs::is_regular_file(candidate)) return candidate;
+        }
+    }
+    throw std::runtime_error(
+        "Compiler V++ native chưa được bootstrap. Chạy 'vpp --bootstrap-native "
+        "gói/biên dịch/native_cli.vi <VPP_HOME>/bin/vpp-native' ở Stage 0 "
+        "hoặc đặt VPP_NATIVE_COMPILER tới compiler native đã xây dựng.");
+}
+
+class NativeCompilerTemporaryDirectory {
+public:
+    NativeCompilerTemporaryDirectory() {
+        static std::atomic<unsigned long> sequence{0};
+        for (int i = 0; i < 100; ++i) {
+            path = fs::temp_directory_path() /
+                ("vpp-native-cli-" + std::to_string(++sequence) + "-" +
+#ifdef _WIN32
+                 std::to_string(GetCurrentProcessId())
+#else
+                 std::to_string(getpid())
+#endif
+                );
+            std::error_code error;
+            if (fs::create_directory(path, error)) return;
+        }
+        throw std::runtime_error("Compiler V++: không tạo được thư mục tạm");
+    }
+    ~NativeCompilerTemporaryDirectory() {
+        std::error_code ignored;
+        fs::remove_all(path, ignored);
+    }
+    fs::path path;
+};
+
 static int runVppCompiler(const std::string &filename, const std::string &mode,
                           const std::string &outputName = {}) {
     const fs::path sourcePath = fs::weakly_canonical(
@@ -396,40 +448,24 @@ static int runVppCompiler(const std::string &filename, const std::string &mode,
     if (!outputPath.empty() && fs::weakly_canonical(outputPath) == sourcePath)
         throw std::runtime_error("compiler V++: đầu ra không được ghi đè nguồn");
 
-    // Bootstrap library lookup is independent of target module resolution.
-    // Prefer VPP_HOME for installed use, then the workspace's bundled library.
-    fs::path bootstrapBase = fs::current_path();
-    std::string libraryHome;
-    if (const char *configured = std::getenv("VPP_HOME"); configured && *configured) {
-        bootstrapBase = fs::absolute(vietvm::core::utf8Path(configured));
-        libraryHome = bootstrapBase.generic_u8string();
+    const fs::path compiler = nativeVppCompiler();
+    NativeCompilerTemporaryDirectory temporary;
+    fs::path input = sourcePath;
+    std::vector<std::string> arguments{compiler.u8string()};
+    if (mode == "artifact") {
+        arguments.insert(arguments.end(), {"artifact", input.u8string()});
+    } else if (mode == "run") {
+        arguments.insert(arguments.end(), {"run", input.u8string()});
+    } else if (mode == "build") {
+        arguments.insert(arguments.end(), {"build", input.u8string(), "-o",
+            (outputPath.empty() ? temporary.path / "output.vbc" : outputPath).u8string(), "--bytecode"});
     } else {
-        const fs::path library = vietvm::core::utf8Path("gói/biên dịch/trình điều khiển.vi");
-        for (auto candidate = bootstrapBase;; candidate = candidate.parent_path()) {
-            if (fs::is_regular_file(candidate / library)) {
-                bootstrapBase = candidate;
-                libraryHome = candidate.generic_u8string();
-                break;
-            }
-            if (candidate == candidate.parent_path()) break;
-        }
+        throw std::invalid_argument("Compiler V++: chế độ chưa hỗ trợ: " + mode);
     }
-    const std::string wrapper = "nhập gói/biên dịch/trình điều khiển;\n"
-        "hàm chính() { in biên dịch cli(" +
-        vppStringLiteral(sourcePath.generic_u8string()) + "," +
-        vppStringLiteral(libraryHome) + "," + vppStringLiteral(mode) + "," +
-        vppStringLiteral(outputPath.generic_u8string()) + "); };\n";
-    std::string output;
-    const int status = runSnippet(wrapper, bootstrapBase, SnippetMode::Execute,
-        "<vpp-compiler-bootstrap>",
-        [&output](const std::string &text) { output += text; }, sourcePath.parent_path());
-    // OP_IN appends one newline to the returned output string. Remove exactly
-    // that framing byte so empty output and all target newlines stay intact.
-    if (output.empty() || output.back() != '\n')
-        throw std::runtime_error("compiler V++: kết quả bootstrap thiếu kết thúc bản ghi");
-    output.pop_back();
-    std::cout << output;
-    return status;
+    const auto result = vietvm::native::aot::runProcess(arguments);
+    if (result.status != 0) return result.status;
+    std::cout << result.output;
+    return EXIT_SUCCESS;
 }
 
 // Opt-in self-host native: frontend AST/IR, Machine IR, ISA và object đều

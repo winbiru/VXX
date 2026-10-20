@@ -7,6 +7,15 @@ nhập gói/bộ sưu tập/từ điển;
 // Thuật toán không giữ trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch sổ lưu chuỗi(sổ, tên) {
     pool = sổ["chuỗi"];
+    // Index chỉ là cache; thứ tự chèn vào pool vẫn quyết định StringPool ABI.
+    nếu (co_khoa(sổ, "chỉ mục chuỗi")) {
+        tra_cứu = sổ["chỉ mục chuỗi"];
+        nếu (co_khoa(tra_cứu, tên)) { trả về tra_cứu[tên]; };
+        id = độ dài(pool);
+        thêm(pool, tên);
+        tra_cứu[tên] = id;
+        trả về id;
+    };
     lặp(i = 0; i < độ dài(pool); i++) {
         nếu (pool[i] == tên) { trả về i; };
     };
@@ -40,6 +49,13 @@ hàm công khai biên dịch sổ cấp hàm(sổ, mô_đun, tên) {
     thêm(sổ["hàm"], {"id": id, "tên": tên, "tên index": tên_index,
                       "tên chạy": tên, "tên index runtime": tên_index,
                       "mô đun": mô_đun});
+    nếu (co_khoa(sổ, "chỉ mục hàm")) {
+        tra_cứu = sổ["chỉ mục hàm"];
+        nếu (!co_khoa(tra_cứu, mô_đun)) { tra_cứu[mô_đun] = {}; };
+        theo_mô_đun = tra_cứu[mô_đun];
+        // Khi có khai báo trùng, hàm tìm cũ luôn chọn ID đầu tiên.
+        nếu (!co_khoa(theo_mô_đun, tên)) { theo_mô_đun[tên] = id; };
+    };
     trả về id;
 };
 
@@ -147,6 +163,13 @@ hàm công khai biên dịch sổ cấp hàm duyệt(sổ, đồ_thị, định_
 };
 
 hàm công khai biên dịch sổ tìm hàm trực tiếp(sổ, mô_đun, tên) {
+    nếu (co_khoa(sổ, "chỉ mục hàm")) {
+        tra_cứu = sổ["chỉ mục hàm"];
+        nếu (co_khoa(tra_cứu, mô_đun)) {
+            theo_mô_đun = tra_cứu[mô_đun];
+            nếu (co_khoa(theo_mô_đun, tên)) { trả về theo_mô_đun[tên]; };
+        };
+    };
     các_hàm = sổ["hàm"];
     lặp(i = 0; i < độ dài(các_hàm); i++) {
         nếu (các_hàm[i]["mô đun"] == mô_đun &&
@@ -266,7 +289,8 @@ lớp công khai Bộ Đăng Ký Hàm {
     };
 
     hàm riêng tư chuẩn bị IR() {
-        mình.sổ = {"hàm": [], "chuỗi": []};
+        mình.sổ = {"hàm": [], "chuỗi": [],
+                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {}};
         mình.slots = [];
         mình.tên_đã_khai = [];
     };
@@ -308,6 +332,7 @@ lớp công khai Bộ Đăng Ký Hàm {
             ném "biên dịch sổ: cần đồ thị mô đun V++";
         };
         mình.sổ = {"loại": "sổ hàm V++", "hàm": [], "chuỗi": [],
+                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {},
                     "mô đun": [], "đã cấp": [], "hoãn chuỗi": mình.hoãn_chuỗi};
         mình.slots = [];
         mình.tên_đã_khai = [];

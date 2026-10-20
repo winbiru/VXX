@@ -267,7 +267,7 @@ lớp công khai Bộ Mã Hóa Artifact {
     hàm công khai chạy văn bản(văn_bản) {
         dây = mình.giải mã dây(văn_bản);
         nếu (độ dài(dây) == 5) {
-            ném "biên dịch artifact: chạy FFI cần native AOT";
+            trả về bytecode_chay_native(dây[0], dây[1], dây[2], dây[3], dây[4]);
         };
         trả về bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]);
     };

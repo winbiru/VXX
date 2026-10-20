@@ -11,7 +11,8 @@ $TemplatesDirectoryName = "templates"
 $ExamplesDirectoryName = "examples"
 $UninstallScriptName = "uninstall-vpp.ps1"
 $UninstallLauncherName = "vpp-uninstall.cmd"
-$ManagedDirectories = @($StdlibDirectoryName, $TemplatesDirectoryName, $ExamplesDirectoryName)
+$NativeManagedDirectories = @('bin', 'lib', 'scripts', 'src')
+$ManagedDirectories = @($StdlibDirectoryName, $TemplatesDirectoryName, $ExamplesDirectoryName) + $NativeManagedDirectories
 $UninstallFiles = @($UninstallScriptName, $UninstallLauncherName)
 $Utf8ProfileStart = '# >>> V++ UTF-8 >>>'
 $Utf8ProfileEnd = '# <<< V++ UTF-8 <<<'
@@ -120,6 +121,30 @@ foreach ($name in $UninstallFiles) {
         throw "Gói cài thiếu $name. Hãy tải và giải nén lại bộ cài đầy đủ."
     }
 }
+$nativeCompiler = Join-Path $scriptDir 'bin/vpp-native.exe'
+if (-not (Test-Path -LiteralPath $nativeCompiler -PathType Leaf)) {
+    throw 'Gói release thiếu bin/vpp-native.exe'
+}
+foreach ($directory in @('lib', 'scripts/ASM', 'scripts/quality/native_aot_link', 'src/runtime/native')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $scriptDir $directory) -PathType Container)) {
+        throw "Gói native V++ thiếu $directory"
+    }
+}
+foreach ($module in @('native-aot', 'runtime-native', 'compiler', 'frontend', 'bytecode', 'core')) {
+    $library = @("lib/vpp-$module.lib", "lib/libvpp-$module.a") |
+        Where-Object { Test-Path -LiteralPath (Join-Path $scriptDir $_) } | Select-Object -First 1
+    if (-not $library) { throw "Gói native V++ thiếu vpp-$module" }
+}
+if (-not (Test-Path -LiteralPath (Join-Path $scriptDir 'vpp-libraries.json'))) {
+    throw 'Gói release thiếu vpp-libraries.json'
+}
+foreach ($directory in $NativeManagedDirectories) {
+    $existing = Join-Path $InstallDir $directory
+    if ((Test-Path -LiteralPath $existing -PathType Container) -and
+        -not (Test-Path -LiteralPath (Join-Path $existing '.vpp-managed') -PathType Leaf)) {
+        throw "Không ghi đè thư mục không do V++ quản lý: $existing"
+    }
+}
 
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 $stagingDir = Join-Path $InstallDir ".vpp-install-$PID"
@@ -138,11 +163,22 @@ try {
     Copy-Item $sourceStdlib (Join-Path $stagingDir $StdlibDirectoryName) -Recurse
     Copy-Item $sourceTemplates (Join-Path $stagingDir $TemplatesDirectoryName) -Recurse
     Copy-Item $sourceExamples (Join-Path $stagingDir $ExamplesDirectoryName) -Recurse
+    New-Item -ItemType Directory -Force -Path (Join-Path $stagingDir 'bin'), (Join-Path $stagingDir 'lib'), (Join-Path $stagingDir 'scripts/quality'), (Join-Path $stagingDir 'src/runtime/native') | Out-Null
+    Copy-Item $nativeCompiler (Join-Path $stagingDir 'bin/vpp-native.exe')
+    Copy-Item (Join-Path $scriptDir 'lib/*') (Join-Path $stagingDir 'lib')
+    Copy-Item (Join-Path $scriptDir 'scripts/ASM') (Join-Path $stagingDir 'scripts/ASM') -Recurse
+    Copy-Item (Join-Path $scriptDir 'scripts/quality/native_aot_link') (Join-Path $stagingDir 'scripts/quality/native_aot_link') -Recurse
+    Copy-Item (Join-Path $scriptDir 'src/runtime/native/vpp_aot_runtime.c') (Join-Path $stagingDir 'src/runtime/native/')
+    Copy-Item (Join-Path $scriptDir 'vpp-libraries.json') (Join-Path $stagingDir 'vpp-libraries.json')
+    foreach ($directory in $NativeManagedDirectories) {
+        New-Item -ItemType File -Force -Path (Join-Path $stagingDir "$directory/.vpp-managed") | Out-Null
+    }
 
     Copy-Item (Join-Path $stagingDir $VppExecutableName) $targetExe -Force
     foreach ($name in $UninstallFiles) {
         Copy-Item (Join-Path $stagingDir $name) (Join-Path $InstallDir $name) -Force
     }
+    Copy-Item (Join-Path $stagingDir 'vpp-libraries.json') (Join-Path $InstallDir 'vpp-libraries.json') -Force
     foreach ($managedDir in $ManagedDirectories) {
         $target = Join-Path $InstallDir $managedDir
         Remove-Item $target -Recurse -Force -ErrorAction SilentlyContinue
@@ -180,6 +216,7 @@ Write-Host "Đã cài đặt/cập nhật V++ tại: $targetExe"
 Write-Host "Đã cài thư viện chuẩn tại: $targetStdlib"
 Write-Host "Đã cài templates tại: $targetTemplates"
 Write-Host "Đã cài examples tại: $targetExamples"
+Write-Host "Đã cài trình biên dịch native tại: $(Join-Path $InstallDir 'bin/vpp-native.exe')"
 if ($NoPathUpdate) {
     Write-Host "Đã bỏ qua cập nhật PATH/VPP_HOME và PowerShell profile theo -NoPathUpdate."
 } else {

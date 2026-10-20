@@ -14,7 +14,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libffi-dev pkg-config
+        # Ubuntu 26.04's static OpenSSL requires libjitterentropy.a at link time.
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl libssl-dev libjitterentropy3-dev libffi-dev pkg-config
 
       - name: Configure CMake
         run: cmake -S . -B cmake-build-debug -DCMAKE_BUILD_TYPE=Release
@@ -97,12 +98,13 @@ jobs:
             -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
           cmake --build cmake-build-sanitized --parallel 2
-          # Native compiler self-hosting is verified in installed Release smoke.
-          # Keep the sanitizer suite focused on frontend/runtime and integration.
+          # Release regression and installed smoke cover native self-hosting,
+          # linker and machine-code checks without sanitizer instrumentation.
+          # Exercise frontend, runtime and integration with ASan/UBSan here.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-parser-ir|vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -207,7 +209,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install quality tools
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev libffi-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl clang-tidy lcov libssl-dev libjitterentropy3-dev libffi-dev pkg-config
 
       - name: Run clang-tidy baseline
         run: |
@@ -221,6 +223,20 @@ jobs:
         env:
           VPP_COVERAGE_MINIMUM: "45"
         run: ./scripts/quality/run-coverage.sh
+
+      - name: Upload coverage diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-coverage-diagnostics
+          if-no-files-found: ignore
+          path: |
+            build-coverage/ctest.log
+            build-coverage/coverage.capture.log
+            build-coverage/coverage.filter.log
+            build-coverage/coverage.info
+            build-coverage/Testing/Temporary/LastTestsFailed.log
+            build-coverage/Testing/Temporary/LastTest.log
 
       - name: Build and run benchmark baseline
         run: |

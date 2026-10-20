@@ -17,6 +17,7 @@ $ManagedEntries = @(
     $StdlibDirectoryName,
     $TemplatesDirectoryName,
     $ExamplesDirectoryName,
+    'vpp-libraries.json',
     $UninstallLauncherName,
     $UninstallScriptName
 )
@@ -93,6 +94,12 @@ if (Test-Path -LiteralPath $InstallDir) {
     foreach ($name in $ManagedEntries) {
         $target = Join-Path $InstallDir $name
         if (Test-Path -LiteralPath $target) {
+            Remove-Item -LiteralPath $target -Recurse -Force
+        }
+    }
+    foreach ($nativeDirectory in @('bin', 'lib', 'scripts', 'src')) {
+        $target = Join-Path $InstallDir $nativeDirectory
+        if (Test-Path -LiteralPath (Join-Path $target '.vpp-managed') -PathType Leaf) {
             Remove-Item -LiteralPath $target -Recurse -Force
         }
     }

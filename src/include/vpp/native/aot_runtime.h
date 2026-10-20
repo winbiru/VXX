@@ -85,6 +85,7 @@ struct Program {
     int lastForeignError = 0;
     std::function<void(const std::string &)> output;
     std::function<Value(const std::vector<Value> &)> executeArtifact;
+    std::function<Value(const std::vector<Value> &)> executeSource;
     std::exception_ptr pendingError;
 
     Program();

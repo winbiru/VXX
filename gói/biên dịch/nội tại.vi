@@ -5,6 +5,7 @@ hàm công khai biên dịch nội tại(tên) {
     chọn (tên) {
         ca "bien_dich_phan_tich_vm": { trả về [biên dịch mã opcode("OP_VM_BIEN_DICH_PHAN_TICH"), 2, đúng]; }
         ca "bytecode_chay_vm": { trả về [biên dịch mã opcode("OP_VM_BYTECODE_CHAY"), 4, đúng]; }
+        ca "bytecode_chay_native": { trả về [biên dịch mã opcode("OP_NATIVE_ARTIFACT_CHAY"), 5, đúng]; }
         ca "dns_phan_giai_vm": { trả về [biên dịch mã opcode("OP_VM_DNS_PHAN_GIAI"), 1, đúng]; }
         ca "doc_bien_moi_truong_vm": { trả về [biên dịch mã opcode("OP_VM_DOC_BIEN_MOI_TRUONG"), 1, đúng]; }
         ca "dong_ho_dia_phuong_vm": { trả về [biên dịch mã opcode("OP_VM_DONG_HO_DIA_PHUONG"), 0, đúng]; }

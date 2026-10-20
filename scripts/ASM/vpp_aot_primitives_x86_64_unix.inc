@@ -473,12 +473,14 @@ PUBLIC(vpp_native_i32_div):
     cmpl $-1, %esi
     jne 2f
     cmpl $0x80000000, %edi
-    je 1f
+    je 3f
 2:  movl %edi, %eax
     cltd
     idivl %esi
     ret
 1:  movl $-1, %eax
+    ret
+3:  movl $0x80000000, %eax
     ret
 
 // macOS exposes argc/argv via libSystem. Linux/glibc preserves initial stack

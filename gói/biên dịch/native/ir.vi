@@ -64,6 +64,12 @@ hàm ir_run(ir) {
                             nếu (top < 1) { thoát; };
                             biến unary_value = byte_đọc_i32(stack, (top - 1) * 4);
                             byte_ghi_i32(stack, (top - 1) * 4, 0 - unary_value);
+                        } hoặc nếu (op == 25) {
+                            nếu (top < 1) { thoát; };
+                            biến boolean_operand = byte_đọc_i32(stack, (top - 1) * 4);
+                            biến normalized = 0;
+                            nếu (boolean_operand == 0) { normalized = 1; };
+                            byte_ghi_i32(stack, (top - 1) * 4, normalized);
                         } hoặc {
                             nếu (op == 9) {
                                 nếu (top < 1) { thoát; };
@@ -83,6 +89,14 @@ hàm ir_run(ir) {
                                 nếu (op == 5) { value = a - b; }
                                 hoặc {
                                     nếu (op == 6) { value = a * b; }
+                                    hoặc nếu (op == 26) {
+                                        nếu (b == 0) { thoát; };
+                                        value = máy_chia_i32(a, b);
+                                    }
+                                    hoặc nếu (op == 27) {
+                                        nếu (b == 0) { thoát; };
+                                        value = a - máy_chia_i32(a, b) * b;
+                                    }
                                     hoặc nếu (op == 11) { nếu (a == b) { value = 1; }; }
                                     hoặc nếu (op == 12) { nếu (a != b) { value = 1; }; }
                                     hoặc nếu (op == 13) { nếu (a < b) { value = 1; }; }

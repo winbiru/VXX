@@ -1,0 +1,4 @@
+hàm chính() {
+    in kich_ban_chay_vm("in 8;", ".") == "8\n";
+    in kich_ban_chay_vm("nhập lib/math như m; in m.cộng(40);", "embedded") == "init\n42\n";
+};

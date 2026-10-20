@@ -105,6 +105,15 @@ lớp công khai Bộ Phát Bytecode {
     hàm riêng tư biên dịch phát mã lưu chuỗi(trạng_thái, văn_bản) {
         // StringPool trong VM đánh địa chỉ bằng số nguyên.
         pool = trạng_thái["chuỗi"];
+        // Dùng chung index với registry, kể cả khi nhập module lồng nhau.
+        nếu (co_khoa(trạng_thái, "chỉ mục chuỗi")) {
+            tra_cứu = trạng_thái["chỉ mục chuỗi"];
+            nếu (co_khoa(tra_cứu, văn_bản)) { trả về tra_cứu[văn_bản]; };
+            chỉ_số = độ dài(pool);
+            thêm(pool, văn_bản);
+            tra_cứu[văn_bản] = chỉ_số;
+            trả về chỉ_số;
+        };
         lặp(i = 0; i < độ dài(pool); i++) {
             nếu (pool[i] == văn_bản) { trả về i; };
         };
@@ -1111,6 +1120,7 @@ lớp công khai Bộ Phát Bytecode {
             thêm(lớp_đã_khai, ir["lớp"][i]["tên"]);
         };
         trạng_thái = {"slots": slots, "khóa slots": [], "chuỗi": sổ["chuỗi"],
+                      "chỉ mục chuỗi": lấy map(sổ, "chỉ mục chuỗi", {}),
                       "mô đun": tên_module,
                       "ngoại": ngoại_cục_bộ,
                       "nhánh nếu": [], "chọn": [], "thử": [],

@@ -77,17 +77,25 @@ else()
     file(APPEND "${source}" "\nhàm xgp_emit_module(a,b,c,d,e,f,g,h) { trả về -1; };\n")
     file(APPEND "${source}" "hàm elf_module(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 endif()
-file(REMOVE "${compiler}")
-message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-    "VPP_ENABLE_MACHINE_JIT=1"
-    "VPP_NATIVE_STAGE0_PROFILE=1"
-    "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
-    "${source}" "${compiler}"
-    WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 300)
-if (NOT status EQUAL 0 OR NOT EXISTS "${compiler}")
-    message(FATAL_ERROR "native compiler Stage 1 build failed: ${status}\n${output}\n${errors}")
+if (NOT VPP_USE_PREPARED_COMPILER)
+    file(REMOVE "${compiler}")
+    message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "VPP_ENABLE_MACHINE_JIT=1"
+        "VPP_NATIVE_STAGE0_PROFILE=1"
+        "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
+        "${source}" "${compiler}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${compiler}")
+        message(FATAL_ERROR "native compiler Stage 1 build failed: ${status}\n${output}\n${errors}")
+    endif()
+elseif (NOT EXISTS "${compiler}")
+    message(FATAL_ERROR "prepared native Stage 1 compiler missing: ${compiler}")
+endif()
+if (VPP_PREPARE_ONLY)
+    message(STATUS "V++ native Stage 1 prepared: ${compiler}")
+    return()
 endif()
 
 function(run_native_case name code expected)
@@ -108,11 +116,28 @@ function(run_native_case name code expected)
 endfunction()
 
 run_native_case(program "hàm chính() { trả về 52; };" 52)
+run_native_case(entry-main-alias "hàm main() { trả về 52; };" 52)
 run_native_case(runtime-bytes "hàm chính() { biến b = byte_mới(); byte_thêm(b, 52); biến value = byte_lấy(b, 0); byte_hủy(b); trả về value; };" 52)
 run_native_case(runtime-string "hàm chính() { biến b = \"Hello\"; trả về byte_dài(b) + 47; };" 52)
 run_native_case(runtime-utf8 "hàm chính() { biến b = \"Tiếng Việt\"; trả về byte_dài(b) + 38; };" 52)
 run_native_case(sub-order "hàm chính() { trả về 20 - (4 - 8); };" 24)
 run_native_case(nested "hàm chính() { biến a = 9; biến b = 2; biến c = 5; trả về (a - b) * (b + c) - 1; };" 48)
+run_native_case(logical-not "hàm chính() { biến x = -7; trả về 50 + !0 + !!x + !x + !!0; };" 52)
+run_native_case(logical-not-condition "hàm chính() { biến x = 0; nếu (!x) { x = 52; }; trả về x; };" 52)
+run_native_case(unary-positive "hàm chính() { trả về +(+52); };" 52)
+run_native_case(boolean-literals "hàm chính() { trả về đúng * 50 + !sai + đúng; };" 52)
+run_native_case(compound-assignment "hàm chính() { biến x = 4; x += 10; x *= 4; x -= 4; x++; x--; trả về x; };" 52)
+run_native_case(loop-compound-add "hàm chính() { biến x = 0; lặp (i = 0; i < 26; i += 1) { x += 2; }; trả về x; };" 52)
+run_native_case(loop-compound-sub "hàm chính() { biến x = 0; lặp (i = 52; i > 0; i -= 1) { x++; }; trả về x; };" 52)
+run_native_case(loop-compound-mul "hàm chính() { biến x = 2; lặp (i = 1; i < 16; i *= 2) { x += 10; }; trả về x + 10; };" 52)
+run_native_case(divide-signed "hàm chính() { trả về -159 / -3; };" 53)
+run_native_case(remainder-signed "hàm chính() { trả về -159 % 52; };" 253)
+run_native_case(divide-mod-compound "hàm chính() { biến x = -159; x /= -3; x %= 52; trả về x + 51; };" 52)
+run_native_case(divide-overflow "hàm chính() { nếu (-2147483648 / -1 == -2147483648) { trả về 52; }; trả về 1; };" 52)
+run_native_case(remainder-overflow "hàm chính() { nếu (-2147483648 % -1 == 0) { trả về 52; }; trả về 1; };" 52)
+run_native_case(intrinsic-divide-signed "hàm chính() { trả về máy_chia_i32(-156, -3); };" 52)
+run_native_case(intrinsic-divide-by-zero "hàm chính() { trả về máy_chia_i32(52, 0); };" 255)
+run_native_case(intrinsic-divide-overflow "hàm chính() { nếu (máy_chia_i32(-2147483648, -1) == -2147483648) { trả về 52; }; trả về 1; };" 52)
 run_native_case(min-int "hàm chính() { biến x = -2147483648; trả về -x + x + 31; };" 31)
 run_native_case(max-int "hàm chính() { biến x = 2147483647; trả về (x + 1) - (-2147483648) + 63; };" 63)
 run_native_case(wide-immediate "hàm chính() { biến x = 16777228; biến expected = 256 * 256 * 256 + 12; nếu (x == expected) { trả về 52; }; trả về 1; };" 52)
@@ -216,6 +241,17 @@ file(READ "${sentinel}" content)
 if (status EQUAL 0 OR NOT content STREQUAL "preserve-me")
     message(FATAL_ERROR "native compiler accepted arity mismatch: ${status}")
 endif()
+foreach(entry IN ITEMS "hàm chính() { trả về 1; }; hàm main() { trả về 52; };"
+                       "hàm main() { trả về 1; }; hàm chính() { trả về 52; };")
+    file(WRITE "${VPP_OUTPUT_DIR}/duplicate-entry-alias.vi" "${entry}\n")
+    execute_process(COMMAND "${compiler}" build
+        "${VPP_OUTPUT_DIR}/duplicate-entry-alias.vi" -o "${sentinel}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}" RESULT_VARIABLE status TIMEOUT 30)
+    file(READ "${sentinel}" content)
+    if (status EQUAL 0 OR NOT content STREQUAL "preserve-me")
+        message(FATAL_ERROR "native compiler accepted conflicting entrypoint aliases: ${status}")
+    endif()
+endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi"
     "hàm chính() { trả về byte_lấy(1); };\n")
 execute_process(COMMAND "${compiler}" build "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi" -o "${sentinel}"
@@ -440,7 +476,7 @@ message(STATUS "${parity_output}")
 # Probe all self-hosted generations; the high-word immediate catches instruction
 # encoding regressions, alongside UTF-8 bytes, calls and loop updates.
 set(bootstrap_probe "${VPP_OUTPUT_DIR}/native-bootstrap-probe.vi")
-file(WRITE "${bootstrap_probe}" "hàm chính() { biến x = 16777228; biến y = 256 * 256 * 256 + 12; nếu (x != y) { trả về 1; }; biến s = \"Tiếng Việt\"; biến total = byte_dài(s) + 38; byte_hủy(s); lặp (i = 0; i < 3; i++) { total = total + 1; }; trả về total - 3; };\n")
+file(WRITE "${bootstrap_probe}" "hàm chính() { biến x = 16777228; biến y = 256 * 256 * 256 + 12; nếu (x != y) { trả về 1; }; nếu (máy_chia_i32(-156, -3) != 52) { trả về 2; }; nếu (máy_chia_i32(-2147483648, -1) != -2147483648) { trả về 3; }; nếu (máy_chia_i32(52, 0) != -1) { trả về 4; }; nếu (-159 % 52 != -3) { trả về 5; }; biến s = \"Tiếng Việt\"; biến total = byte_dài(s) + 38; byte_hủy(s); lặp (i = 0; i < 3; i++) { total = total + 1; }; trả về total - 3; };\n")
 foreach(generation IN ITEMS 2 3 4)
     set(generation_compiler "${stage${generation}}")
     set(probe_exe "${VPP_OUTPUT_DIR}/native-bootstrap-probe-stage${generation}")
