@@ -162,7 +162,12 @@ int compilerMain(Program &program,int argc,char **argv) {
         const auto wire=program.invokeName("aot_artifact_text_wire",{read(source)});
         const auto snapshot=snapshotFromWire(values(wire));
         TemporaryDirectory temporary(fs::temp_directory_path());
-        const auto executable=temporary.path/"artifact";
+        const auto executable=temporary.path/
+#if defined(_WIN32)
+            "artifact.exe";
+#else
+            "artifact";
+#endif
         compileExecutable(snapshot,executable,root);
         const auto result=process({executable.u8string()});
         program.output(result.output);
@@ -177,7 +182,12 @@ int compilerMain(Program &program,int argc,char **argv) {
             {text,fs::weakly_canonical(embedBase).u8string(),root.u8string()});
         const auto wire=program.invokeName("aot_artifact_wire",{artifact});
         TemporaryDirectory temporary(fs::temp_directory_path());
-        const auto executable=temporary.path/"embedded";
+        const auto executable=temporary.path/
+#if defined(_WIN32)
+            "embedded.exe";
+#else
+            "embedded";
+#endif
         compileExecutable(snapshotFromWire(values(wire)),executable,root);
         const auto result=process({executable.u8string()});
         program.output(result.output);
@@ -208,7 +218,13 @@ int compilerMain(Program &program,int argc,char **argv) {
         compileExecutable(snapshot,output,root,compiler);
         profiler.mark("native-asm-and-link");return 0;
     }
-    TemporaryDirectory temporary(fs::temp_directory_path());const auto executable=temporary.path/"program";
+    TemporaryDirectory temporary(fs::temp_directory_path());
+    const auto executable=temporary.path/
+#if defined(_WIN32)
+        "program.exe";
+#else
+        "program";
+#endif
     compileExecutable(snapshot,executable,root);const auto result=process({executable.u8string()});
     program.output(result.output);return result.status;
 }
@@ -225,7 +241,12 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
     TemporaryDirectory temporary(absolute.parent_path());const auto source=temporary.path/"program.S";
     {std::ofstream assembly(source,std::ios::binary);assembly<<emitAssembly(snapshot,compiler);if(!assembly)throw std::runtime_error("Native AOT: assembly write failed");}
     profiler.mark("emit-native-assembly");
-    const auto executable=temporary.path/"program";
+    const auto executable=temporary.path/
+#if defined(_WIN32)
+        "program.exe";
+#else
+        "program";
+#endif
     // Installed toolchains keep libraries under <root>/lib. A developer's
     // Stage 0 checkout can instead use the existing CMake build libraries.
     fs::path libraries=root;
@@ -235,9 +256,16 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
         // CI builds use arbitrary names (build-native-cross, build-coverage,
         // cmake-build-debug). Link against the libraries of the running
         // compiler so an instrumented build never picks a release library.
-        const auto executable=executableDirectory();
-        if(!executable.empty()&&fs::exists(executable.parent_path()/"lib")) {
-            libraries=executable.parent_path();
+        const auto exeDir=executableDirectory();
+        // Unix: <build>/bin/vpp-cli. Visual Studio:
+        // <build>/bin/Release/vpp-cli.exe, with libraries in <build>/lib/Release.
+        const auto buildDir=exeDir.empty()?fs::path{}:
+            (exeDir.filename()=="Release"||exeDir.filename()=="Debug"||
+             exeDir.filename()=="RelWithDebInfo"||exeDir.filename()=="MinSizeRel"
+                ? exeDir.parent_path().parent_path() : exeDir.parent_path());
+        if(!buildDir.empty() && (fs::exists(buildDir/"lib"/"Release") ||
+                                 fs::exists(buildDir/"lib"))) {
+            libraries=buildDir;
         } else {
             for(const char *candidate:{"build","cmake-build-debug","cmake-build-release","cmake-build-sanitized"}) {
                 if(fs::exists(root/candidate/"lib")) {libraries=root/candidate;break;}
@@ -245,7 +273,7 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
         }
     }
     auto configured=process({"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string(),
-        "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
+        "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
     profiler.mark("configure-native-linker");
     auto linked=process({"cmake","--build",(temporary.path/"build").u8string(),"--config","Release","--parallel","2"});
@@ -272,7 +300,13 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             program.foreignFunctions.push_back(std::move(descriptor));
         }
         program.executeArtifact=[](const std::vector<Value> &wire)->Value {
-            TemporaryDirectory temporary(fs::temp_directory_path());const auto executable=temporary.path/"artifact";
+            TemporaryDirectory temporary(fs::temp_directory_path());
+            const auto executable=temporary.path/
+#if defined(_WIN32)
+                "artifact.exe";
+#else
+                "artifact";
+#endif
             compileExecutable(snapshotFromWire(wire),executable,installation());const auto result=process({executable.u8string()});
             if(result.status)throw std::runtime_error("Native AOT: generated artifact failed: "+std::to_string(result.status));
             return result.output;

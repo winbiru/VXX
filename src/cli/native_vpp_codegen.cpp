@@ -522,7 +522,12 @@ std::string executeVppSource(const std::string &source,
             std::filesystem::remove_all(directory, ignored);
         }
     } temporary;
-    const auto executable = temporary.directory / "machine-bridge";
+    const auto executable = temporary.directory /
+#if defined(_WIN32)
+        "machine-bridge.exe";
+#else
+        "machine-bridge";
+#endif
     aot::compileExecutable(snapshot, executable, root);
     const auto result = aot::runProcess({executable.u8string()});
     if (partialOutput) *partialOutput += result.output;

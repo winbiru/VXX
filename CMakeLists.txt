@@ -364,6 +364,10 @@ if (BUILD_TESTS)
         COMMAND ${CMAKE_COMMAND}
             "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_target_cli.cmake)
+    # Target parsing compiles the V++ target registry package. This fixture
+    # must find the same stdlib when the build tree is outside the checkout.
+    set_tests_properties(vpp-target-cli-hardening PROPERTIES
+        ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
 
     add_executable(vpp-raw-machine-codegen-hardening
         ${CMAKE_SOURCE_DIR}/scripts/quality/raw_machine_codegen_hardening.cpp)
