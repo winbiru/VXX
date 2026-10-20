@@ -530,7 +530,18 @@ std::string executeVppSource(const std::string &source,
 #endif
     aot::compileExecutable(snapshot, executable, root);
     const auto result = aot::runProcess({executable.u8string()});
-    if (partialOutput) *partialOutput += result.output;
+    // Native wrappers emit newline-delimited text records. The Windows CRT
+    // writes CRLF to stdout, while the target parser and machine/object
+    // decoders consume LF records. Normalize at the bridge boundary so a
+    // Windows target's final field is "COFF", not "COFF\r".
+    std::string output;
+    output.reserve(result.output.size());
+    for (std::size_t i = 0; i < result.output.size(); ++i) {
+        if (result.output[i] == '\r' && i + 1 < result.output.size() &&
+            result.output[i + 1] == '\n') continue;
+        output.push_back(result.output[i]);
+    }
+    if (partialOutput) *partialOutput += output;
     if (result.status != 0)
         throw std::runtime_error("V++ native bridge: executable thất bại (" +
             std::to_string(result.status) + ")");
@@ -540,7 +551,7 @@ std::string executeVppSource(const std::string &source,
                          std::chrono::steady_clock::now() - afterFrontend).count()
                   << " ms\n";
     }
-    return result.output;
+    return output;
 }
 
 std::size_t parseOffset(const std::string &s) {
