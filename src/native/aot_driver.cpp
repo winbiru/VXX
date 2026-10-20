@@ -71,6 +71,17 @@ ProcessResult process(const std::vector<std::string> &arguments) {
     while(ReadFile(input,buffer,sizeof(buffer),&count,nullptr)&&count)result.output.append(buffer,count);
     CloseHandle(input);WaitForSingleObject(child.hProcess,INFINITE);DWORD status=1;GetExitCodeProcess(child.hProcess,&status);
     CloseHandle(child.hProcess);CloseHandle(child.hThread);result.status=static_cast<int>(status);
+    // Each native compiler/CLI layer relays the child's stdout via std::cout.
+    // MSVC's text-mode stdout turns LF into CRLF at every layer; without
+    // normalizing the captured text first, nesting produces CRCRLF (or more).
+    // Only remove CR directly before LF, preserving standalone CR bytes.
+    std::string normalized;
+    normalized.reserve(result.output.size());
+    for(std::size_t i=0;i<result.output.size();++i) {
+        if(result.output[i]=='\r'&&i+1<result.output.size()&&result.output[i+1]=='\n')continue;
+        normalized.push_back(result.output[i]);
+    }
+    result.output.swap(normalized);
 #else
     int descriptors[2];if(pipe(descriptors)!=0)throw std::runtime_error("Native AOT: pipe failed");
     const auto child=fork();

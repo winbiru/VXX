@@ -21,7 +21,15 @@ function(vpp_check expected)
     # logical output without hiding extra lines or changes to its contents.
     string(REPLACE "\r\n" "\n" output "${output}")
     if (NOT status EQUAL 0 OR NOT output STREQUAL expected)
-        message(FATAL_ERROR "V++ CLI failed (${status}): ${ARGN}\n${errors}\nOutput: ${output}\nExpected: ${expected}")
+        # Render invisible line endings as hex to diagnose Windows failures
+        # where the two multiline strings appear identical in Actions logs.
+        string(LENGTH "${output}" output_length)
+        string(LENGTH "${expected}" expected_length)
+        string(HEX "${output}" output_hex)
+        string(HEX "${expected}" expected_hex)
+        string(SUBSTRING "${output_hex}" 0 256 output_hex)
+        string(SUBSTRING "${expected_hex}" 0 256 expected_hex)
+        message(FATAL_ERROR "V++ CLI failed (${status}): ${ARGN}\n${errors}\nOutput: ${output}\nExpected: ${expected}\nOutput length: ${output_length}, hex prefix: ${output_hex}\nExpected length: ${expected_length}, hex prefix: ${expected_hex}")
     endif()
 endfunction()
 
