@@ -17,6 +17,9 @@ function(vpp_check expected)
         "${VPP_EXEC}" ${ARGN}
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT ${VPP_CHECK_TIMEOUT})
+    # Windows CRT stdout uses CRLF, while the fixtures use LF. Compare the
+    # logical output without hiding extra lines or changes to its contents.
+    string(REPLACE "\r\n" "\n" output "${output}")
     if (NOT status EQUAL 0 OR NOT output STREQUAL expected)
         message(FATAL_ERROR "V++ CLI failed (${status}): ${ARGN}\n${errors}\nOutput: ${output}\nExpected: ${expected}")
     endif()

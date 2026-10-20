@@ -272,8 +272,16 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
             }
         }
     }
-    auto configured=process({"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string(),
-        "-DCMAKE_BUILD_TYPE=Release","-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+root.u8string(),"-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),"-DVPP_AOT_OUTPUT="+executable.u8string()});
+    std::vector<std::string> configure={"cmake","-S",(root/"scripts/quality/native_aot_link").u8string(),"-B",(temporary.path/"build").u8string()};
+#if !defined(_WIN32)
+    // Unix CI uses single-configuration generators. Visual Studio ignores
+    // CMAKE_BUILD_TYPE and warns about it for each nested native link.
+    configure.push_back("-DCMAKE_BUILD_TYPE=Release");
+#endif
+    configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+root.u8string(),
+        "-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),
+        "-DVPP_AOT_OUTPUT="+executable.u8string()});
+    auto configured=process(configure);
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
     profiler.mark("configure-native-linker");
     auto linked=process({"cmake","--build",(temporary.path/"build").u8string(),"--config","Release","--parallel","2"});
