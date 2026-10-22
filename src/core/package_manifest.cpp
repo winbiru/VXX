@@ -10,6 +10,11 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
+
+#ifdef __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 #include "vpp/core/project_layout.h"
 #include "vpp/core/message_constants.h"
@@ -385,6 +390,33 @@ void hashText(std::uint64_t &hash, const std::string &text) {
     hashByte(hash, 0);
 }
 
+std::string fingerprintRelativePath(const std::filesystem::path &file,
+                                    const std::filesystem::path &root) {
+    const std::string relative = std::filesystem::relative(file, root).generic_u8string();
+#ifdef __APPLE__
+    // macOS can return decomposed UTF-8 (NFD) for filenames such as chính.vi;
+    // normalize to NFC so the same package has the same lock fingerprint as
+    // a Linux/Windows checkout with precomposed UTF-8 filenames.
+    CFStringRef original = CFStringCreateWithBytes(
+        kCFAllocatorDefault, reinterpret_cast<const UInt8 *>(relative.data()),
+        static_cast<CFIndex>(relative.size()), kCFStringEncodingUTF8, false);
+    if (!original) return relative;
+    CFMutableStringRef normalized = CFStringCreateMutableCopy(kCFAllocatorDefault, 0, original);
+    CFRelease(original);
+    if (!normalized) return relative;
+    CFStringNormalize(normalized, kCFStringNormalizationFormC);
+    const CFIndex maxBytes = CFStringGetMaximumSizeForEncoding(
+        CFStringGetLength(normalized), kCFStringEncodingUTF8);
+    std::vector<char> bytes(static_cast<std::size_t>(maxBytes) + 1);
+    const bool converted = CFStringGetCString(
+        normalized, bytes.data(), static_cast<CFIndex>(bytes.size()), kCFStringEncodingUTF8);
+    CFRelease(normalized);
+    return converted ? std::string(bytes.data()) : relative;
+#else
+    return relative;
+#endif
+}
+
 bool normalizeLineEndingsForFingerprint(const std::filesystem::path &file) {
     std::string extension = file.extension().u8string();
     std::transform(extension.begin(), extension.end(), extension.begin(),
@@ -724,13 +756,12 @@ std::string fingerprintPackageTree(const std::filesystem::path &root) {
         if (entry.is_regular_file()) files.push_back(entry.path());
     }
     std::sort(files.begin(), files.end(), [&](const auto &left, const auto &right) {
-        return std::filesystem::relative(left, root).generic_u8string() <
-               std::filesystem::relative(right, root).generic_u8string();
+        return fingerprintRelativePath(left, root) < fingerprintRelativePath(right, root);
     });
 
     std::uint64_t hash = 14695981039346656037ull;
     for (const auto &file : files) {
-        hashText(hash, std::filesystem::relative(file, root).generic_u8string());
+        hashText(hash, fingerprintRelativePath(file, root));
         std::ifstream input(file, std::ios::binary);
         if (!input.is_open()) {
             throw std::runtime_error(messages::formatMessage(
