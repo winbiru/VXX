@@ -7,20 +7,20 @@ hàm yêuCầu(điềuKiện, nhãn) {
     trả về đúng;
 };
 
-hàm url(gốc, đườngDẫn) {
+hàm nốiUrlKiểmThử(gốc, đườngDẫn) {
     trả về gốc + đườngDẫn;
 };
 
 hàm lấyJson(gốc, đườngDẫn) {
-    trả về json phân tích(mạng lấy(url(gốc, đườngDẫn)));
+    trả về json phân tích(mạng lấy(nốiUrlKiểmThử(gốc, đườngDẫn)));
 };
 
 hàm gửiJson(gốc, đườngDẫn, dữLiệu) {
-    trả về json phân tích(mạng gửi(url(gốc, đườngDẫn), json tạo(dữLiệu)));
+    trả về json phân tích(mạng gửi(nốiUrlKiểmThử(gốc, đườngDẫn), json tạo(dữLiệu)));
 };
 
 hàm cậpNhậtJson(gốc, đườngDẫn, dữLiệu) {
-    trả về json phân tích(mạng cập nhật(url(gốc, đườngDẫn), json tạo(dữLiệu)));
+    trả về json phân tích(mạng cập nhật(nốiUrlKiểmThử(gốc, đườngDẫn), json tạo(dữLiệu)));
 };
 
 hàm chờMáyChủ(gốc) {

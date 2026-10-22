@@ -204,6 +204,10 @@ endfunction()
 # receives function metadata from the CLI instead of reading compiler globals.
 # Tooling depends on compiler; CLI composes runtime and tooling.
 vpp_add_module(vpp-core ${VPP_CORE_SOURCES})
+if (APPLE)
+    find_library(VPP_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
+    target_link_libraries(vpp-core PUBLIC ${VPP_COREFOUNDATION_FRAMEWORK})
+endif()
 
 vpp_add_module(vpp-frontend ${VPP_FRONTEND_SOURCES})
 
