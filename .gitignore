@@ -51,6 +51,7 @@ vdk-*.zip
 __pycache__/
 *.pyc
 *.md
+!plans/release-1.0-execution-checklist.md
 !benchmark/NATIVE.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
