@@ -1,0 +1,7 @@
+nhập gói/mạng/dns;
+
+// A thành công, AAAA hết hạn: public API phải giữ kết quả A.
+hàm chính() {
+    kết_quả = dns phân giải("example.com");
+    in do_dai(kết_quả) == 1 && kết_quả[0] == "198.51.100.23";
+};

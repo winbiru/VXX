@@ -9,24 +9,10 @@ nhập gói/nhập xuất/đường dẫn;
 nhập gói/hệ thống/nền tảng;
 nhập gói/văn bản/chuỗi;
 
-ngoại thư viện c_thư_mục = "system.c";
-ngoại hàm tạo_mục_ffi(đường: c_chuỗi, quyền: u32): i32 từ c_thư_mục
-    ký hiệu "mkdir" abi "c" khả năng "system.fs.mkdir";
-ngoại hàm xóa_mục_ffi(đường: c_chuỗi): i32 từ c_thư_mục
-    ký hiệu "remove" abi "c" khả năng "system.fs.remove";
-ngoại hàm mở_thư_mục_ffi(đường: c_chuỗi): c_thư_mục từ c_thư_mục
-    ký hiệu "opendir" abi "c" khả năng "system.fs.dir.open";
-ngoại hàm đọc_mục_ffi(thư_mục: c_thư_mục): c_mục_thư_mục từ c_thư_mục
-    ký hiệu "readdir" abi "c" khả năng "system.fs.dir.read";
-ngoại hàm đóng_thư_mục_ffi(thư_mục: c_thư_mục): i32 từ c_thư_mục
-    ký hiệu "closedir" abi "c" khả năng "system.fs.dir.close";
-ngoại thư viện c_lỗi_thư_mục = "system.ffi";
-ngoại hàm errno_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
-    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
-ngoại hàm eexist_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
-    ký hiệu "eexist" abi "c" khả năng "system.ffi.error";
-ngoại hàm enoent_thư_mục_ffi(): i32 từ c_lỗi_thư_mục
-    ký hiệu "enoent" abi "c" khả năng "system.ffi.error";
+// Machine ABI: mkdir/remove -> [rc, loại lỗi, mã OS].
+// Loại lỗi: 0=thành công, 1=đã tồn tại, 2=không tồn tại, 3=lỗi khác.
+// open -> [token, errno]; next -> [1,tên] / [0,""] EOF / [-errno,""] lỗi.
+// close -> [rc, errno]. Token chỉ có hiệu lực trong VM đã mở.
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Thư Mục {
@@ -45,11 +31,11 @@ lớp công khai Thư Mục {
     };
 
     hàm riêng tư thư mục tạo một mục(đường) {
-        // V++ tự tạo các mục cha; FFI chỉ tạo một mục trên hệ điều hành.
-        mã = tạo_mục_ffi(mình.thư mục kiểm tra đường(đường), 511);
-        nếu (mã == 0) { trả về 1; };
-        lỗi = errno_thư_mục_ffi();
-        nếu (mã == -1 && lỗi == eexist_thư_mục_ffi()) {
+        // V++ tự tạo các mục cha; machine ABI chỉ tạo một mục.
+        kết_quả = máy_thư_mục_tạo(mình.thư mục kiểm tra đường(đường));
+        nếu (kết_quả[0] == 0) { trả về 1; };
+        lỗi = kết_quả[2];
+        nếu (kết_quả[1] == 1) {
             nếu (là thư mục(đường)) { trả về 0; };
         };
         ném "tạo thư mục: mkdir thất bại, errno=" + lỗi;
@@ -57,10 +43,10 @@ lớp công khai Thư Mục {
 
     hàm riêng tư thư mục xóa một mục(đường) {
         // V++ quyết định thứ tự duyệt và xóa cây.
-        mã = xóa_mục_ffi(mình.thư mục kiểm tra đường(đường));
-        nếu (mã == 0) { trả về 1; };
-        lỗi = errno_thư_mục_ffi();
-        nếu (mã == -1 && lỗi == enoent_thư_mục_ffi()) { trả về 0; };
+        kết_quả = máy_thư_mục_xóa(mình.thư mục kiểm tra đường(đường));
+        nếu (kết_quả[0] == 0) { trả về 1; };
+        lỗi = kết_quả[2];
+        nếu (kết_quả[1] == 2) { trả về 0; };
         ném "xóa đường dẫn: remove thất bại, errno=" + lỗi;
     };
 
@@ -122,27 +108,27 @@ lớp công khai Thư Mục {
 
     hàm công khai liệt kê thư mục(đường dẫn) {
         đường = thành chuỗi(đường dẫn);
-        thư_mục = mở_thư_mục_ffi(mình.thư mục kiểm tra đường(đường));
-        nếu (thư_mục == rỗng) { ném "liệt kê thư mục: không thể mở thư mục"; };
+        mở = máy_thư_mục_mở(mình.thư mục kiểm tra đường(đường));
+        thư_mục = mở[0];
+        nếu (thư_mục == 0) { ném "liệt kê thư mục: không thể mở thư mục, errno=" + mở[1]; };
         kết_quả = [];
         thử {
             đang_đọc = đúng;
             lặp(vòng = 0; đang_đọc; vòng++) {
-                tên = đọc_mục_ffi(thư_mục);
-                nếu (tên == rỗng) {
-                    nếu (errno_thư_mục_ffi() != 0) {
-                        ném "liệt kê thư mục: không thể đọc thư mục";
-                    };
+                mục = máy_thư_mục_kế(thư_mục);
+                nếu (mục[0] <= 0) {
+                    nếu (mục[0] < 0) { ném "liệt kê thư mục: không thể đọc thư mục"; };
                     đang_đọc = sai;
                 } hoặc {
+                    tên = mục[1];
                     nếu (tên != "." && tên != "..") { them(kết_quả, tên); };
                 };
             };
         } bắt lỗi(e) {
-            đóng_thư_mục_ffi(thư_mục);
+            máy_thư_mục_đóng(thư_mục);
             ném e;
         };
-        nếu (đóng_thư_mục_ffi(thư_mục) != 0) {
+        nếu (máy_thư_mục_đóng(thư_mục)[0] != 0) {
             ném "liệt kê thư mục: không thể đóng thư mục";
         };
         sắp xếp(kết_quả);

@@ -1,0 +1,39 @@
+nhập gói/mạng/ổ cắm;
+nhập gói/hệ thống/môi trường;
+
+// Chỉ dùng hosts giả lập. Không yêu cầu DNS, loopback bind hoặc network.
+hàm chính() {
+    bộ = Bộ Điều Khiển Ổ Cắm();
+    địa_chỉ = bộ.socket resolver danh sách("fixture.test", 443, sai);
+    in do_dai(địa_chỉ) == 2 &&
+       địa_chỉ[0][0] == "203.0.113.21" && địa_chỉ[0][1] == 443 &&
+       địa_chỉ[1][0] == "::1" && địa_chỉ[1][1] == 443;
+
+    alias = bộ.socket resolver danh sách("ALIAS.TEST.", 53, đúng);
+    in do_dai(alias) == 1 && alias[0][0] == "203.0.113.21" && alias[0][1] == 53;
+
+    không_cổng = bộ.socket resolver danh sách("fixture.test", 0, đúng);
+    in do_dai(không_cổng) == 2 &&
+       không_cổng[0] == "203.0.113.21" && không_cổng[1] == "::1";
+
+    // Tên IP vẫn đi thẳng vào parser, bất kể hosts đã cấu hình.
+    literal = bộ.socket resolver danh sách("127.0.0.1", 1234, sai);
+    in do_dai(literal) == 1 && literal[0][0] == "127.0.0.1" && literal[0][1] == 1234;
+
+    // Cổng biên và bản ghi IPv6 cùng địa chỉ phải giữ nguyên semantics.
+    cổng_thấp = bộ.socket resolver danh sách("fixture.test", 1, sai);
+    in do_dai(cổng_thấp) == 2 && cổng_thấp[0][1] == 1 && cổng_thấp[1][1] == 1;
+    cổng_cao = bộ.socket resolver danh sách("fixture.test", 65535, đúng);
+    in do_dai(cổng_cao) == 2 && cổng_cao[0][1] == 65535 && cổng_cao[1][1] == 65535;
+
+    nếu (đọc biến môi trường("VPP_SOCKET_VI_ONLY", "0") == "1") {
+        // Lỗi đặc trưng chứng minh nhánh không gọi OS resolver FFI.
+        bị_chặn = sai;
+        thử { bộ.socket resolver danh sách("not-in-hosts.invalid", 443, sai); }
+        bắt lỗi(e) {
+            bị_chặn = thành chuỗi(e) ==
+                "socket resolver: tên máy không có trong hosts V++ (chế độ VI_ONLY)";
+        };
+        in bị_chặn;
+    };
+};

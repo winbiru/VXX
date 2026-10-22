@@ -75,7 +75,13 @@ function(check_stage3_fixture label source expected target)
     if (NOT EXISTS "${executable}")
         message(FATAL_ERROR "Stage 3 did not produce ${label}")
     endif()
-    execute_process(COMMAND "${executable}"
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env
+        "VPP_HOME=${VPP_HOME}"
+        "VPP_STRICT_SYSTEM_FFI_POSIX=1"
+        "VPP_FFI_ENV_TEST=vpp-env-ffi-ok"
+        "VPP_FFI_ENV_EMPTY_TEST="
+        "TZ=EST5EDT,M3.2.0/2,M11.1.0/2"
+        "${executable}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE run_status OUTPUT_VARIABLE actual ERROR_VARIABLE errors TIMEOUT 30)
     file(READ "${expected}" expected_output)
@@ -123,5 +129,18 @@ check_stage3_fixture("FFI UTC"
 check_stage3_fixture("FFI entropy"
     "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_entropy.vi"
     "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_entropy.expected" "ffi-entropy")
+
+# Exercise the remaining public Process, clock, environment and time Machine
+# APIs with the actual self-hosted Stage 3 compiler, not a stale native binary.
+foreach(case IN ITEMS
+        kiem_tra_ffi_moi_truong
+        kiem_tra_ffi_don_dieu
+        kiem_tra_ffi_gio_dia_phuong
+        kiem_tra_ffi_ngu
+        kiem_tra_ffi_process_spawn)
+    check_stage3_fixture("Machine ${case}"
+        "${VPP_SOURCE_ROOT}/src/tests/${case}.vi"
+        "${VPP_SOURCE_ROOT}/src/tests/expected/${case}.expected" "${case}")
+endforeach()
 
 message(STATUS "Native AOT Stage 1 -> Stage 2 -> Stage 3, FFI and package imports: PASS (${stage3_hash})")

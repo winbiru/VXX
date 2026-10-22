@@ -146,6 +146,56 @@ hàm công khai biên dịch mã opcode(tên) {
         ca "OP_FFI_CALL": { trả về 156; }
         ca "OP_VM_BYTECODE_CHAY": { trả về 157; }
         ca "OP_NATIVE_ARTIFACT_CHAY": { trả về 158; }
+        ca "OP_VM_MACHINE_FILE_OPEN": { trả về 159; }
+        ca "OP_VM_MACHINE_FILE_READ": { trả về 160; }
+        ca "OP_VM_MACHINE_FILE_WRITE": { trả về 161; }
+        ca "OP_VM_MACHINE_FILE_CLOSE": { trả về 162; }
+        ca "OP_VM_MACHINE_FILE_SEEK": { trả về 163; }
+        ca "OP_VM_MACHINE_FILE_TELL": { trả về 164; }
+        ca "OP_VM_MACHINE_FILE_ERROR": { trả về 165; }
+        ca "OP_VM_MACHINE_FILE_REMOVE": { trả về 166; }
+        ca "OP_VM_MACHINE_PROCESS_PID": { trả về 167; }
+        ca "OP_VM_MACHINE_PROCESS_PPID": { trả về 168; }
+        ca "OP_VM_MACHINE_PROCESS_UID": { trả về 169; }
+        ca "OP_VM_MACHINE_PROCESS_EUID": { trả về 170; }
+        ca "OP_VM_MACHINE_PROCESS_GID": { trả về 171; }
+        ca "OP_VM_MACHINE_PROCESS_EGID": { trả về 172; }
+        ca "OP_VM_MACHINE_TIME_SLEEP": { trả về 173; }
+        ca "OP_VM_MACHINE_TIME_MONOTONIC": { trả về 174; }
+        ca "OP_VM_MACHINE_TIME_REALTIME": { trả về 175; }
+        ca "OP_VM_MACHINE_ENTROPY_READ": { trả về 176; }
+        ca "OP_VM_MACHINE_ENV_GET": { trả về 177; }
+        ca "OP_VM_MACHINE_TIME_LOCAL": { trả về 178; }
+        ca "OP_VM_MACHINE_DIR_MKDIR": { trả về 179; }
+        ca "OP_VM_MACHINE_DIR_REMOVE": { trả về 180; }
+        ca "OP_VM_MACHINE_DIR_OPEN": { trả về 181; }
+        ca "OP_VM_MACHINE_DIR_NEXT": { trả về 182; }
+        ca "OP_VM_MACHINE_DIR_CLOSE": { trả về 183; }
+        ca "OP_VM_MACHINE_PATH_KIND": { trả về 184; }
+        ca "OP_VM_MACHINE_SOCKET_KIND": { trả về 185; }
+        ca "OP_VM_MACHINE_SOCKET_CLOSE": { trả về 186; }
+        ca "OP_VM_MACHINE_SOCKET_TIMEOUT": { trả về 187; }
+        ca "OP_VM_MACHINE_SOCKET_SEND": { trả về 188; }
+        ca "OP_VM_MACHINE_SOCKET_RECV": { trả về 189; }
+        ca "OP_VM_MACHINE_SOCKET_ACCEPT": { trả về 190; }
+        ca "OP_VM_MACHINE_SOCKET_LISTEN": { trả về 191; }
+        ca "OP_VM_MACHINE_SOCKET_CONNECT": { trả về 192; }
+        ca "OP_VM_MACHINE_PROCESS_NEW": { trả về 193; }
+        ca "OP_VM_MACHINE_PROCESS_ARG": { trả về 194; }
+        ca "OP_VM_MACHINE_PROCESS_COMMAND_LINE": { trả về 195; }
+        ca "OP_VM_MACHINE_PROCESS_ENV": { trả về 196; }
+        ca "OP_VM_MACHINE_PROCESS_START": { trả về 197; }
+        ca "OP_VM_MACHINE_PROCESS_POLL": { trả về 198; }
+        ca "OP_VM_MACHINE_PROCESS_READ": { trả về 199; }
+        ca "OP_VM_MACHINE_PROCESS_WAIT": { trả về 200; }
+        ca "OP_VM_MACHINE_PROCESS_ERROR": { trả về 201; }
+        ca "OP_VM_MACHINE_PROCESS_CLOSE": { trả về 202; }
+        ca "OP_VM_MACHINE_RESOLVE_OPEN": { trả về 203; }
+        ca "OP_VM_MACHINE_RESOLVE_NEXT": { trả về 204; }
+        ca "OP_VM_MACHINE_RESOLVE_CLOSE": { trả về 205; }
+        ca "OP_VM_MACHINE_TLS_UPGRADE": { trả về 206; }
+        ca "OP_VM_MACHINE_TLS_SEND": { trả về 207; }
+        ca "OP_VM_MACHINE_TLS_RECV": { trả về 208; }
         mặc định: { ném "opcode C++ chưa định nghĩa: " + tên; }
     }
 };
@@ -295,6 +345,56 @@ hàm công khai biên dịch có opcode(mã) {
         ca 156: { trả về đúng; }
         ca 157: { trả về đúng; }
         ca 158: { trả về đúng; }
+        ca 159: { trả về đúng; }
+        ca 160: { trả về đúng; }
+        ca 161: { trả về đúng; }
+        ca 162: { trả về đúng; }
+        ca 163: { trả về đúng; }
+        ca 164: { trả về đúng; }
+        ca 165: { trả về đúng; }
+        ca 166: { trả về đúng; }
+        ca 167: { trả về đúng; }
+        ca 168: { trả về đúng; }
+        ca 169: { trả về đúng; }
+        ca 170: { trả về đúng; }
+        ca 171: { trả về đúng; }
+        ca 172: { trả về đúng; }
+        ca 173: { trả về đúng; }
+        ca 174: { trả về đúng; }
+        ca 175: { trả về đúng; }
+        ca 176: { trả về đúng; }
+        ca 177: { trả về đúng; }
+        ca 178: { trả về đúng; }
+        ca 179: { trả về đúng; }
+        ca 180: { trả về đúng; }
+        ca 181: { trả về đúng; }
+        ca 182: { trả về đúng; }
+        ca 183: { trả về đúng; }
+        ca 184: { trả về đúng; }
+        ca 185: { trả về đúng; }
+        ca 186: { trả về đúng; }
+        ca 187: { trả về đúng; }
+        ca 188: { trả về đúng; }
+        ca 189: { trả về đúng; }
+        ca 190: { trả về đúng; }
+        ca 191: { trả về đúng; }
+        ca 192: { trả về đúng; }
+        ca 193: { trả về đúng; }
+        ca 194: { trả về đúng; }
+        ca 195: { trả về đúng; }
+        ca 196: { trả về đúng; }
+        ca 197: { trả về đúng; }
+        ca 198: { trả về đúng; }
+        ca 199: { trả về đúng; }
+        ca 200: { trả về đúng; }
+        ca 201: { trả về đúng; }
+        ca 202: { trả về đúng; }
+        ca 203: { trả về đúng; }
+        ca 204: { trả về đúng; }
+        ca 205: { trả về đúng; }
+        ca 206: { trả về đúng; }
+        ca 207: { trả về đúng; }
+        ca 208: { trả về đúng; }
         mặc định: { trả về sai; }
     }
 };

@@ -166,6 +166,71 @@ enum Opcode {
     OP_VM_BYTECODE_CHAY = 157, // host VM nhận artifact bytecode đã được V++ liên kết
     OP_NATIVE_ARTIFACT_CHAY = 158, // native-only 5-region ABI with FFI descriptors
 
+    // Primitive máy cho thư viện tệp V++; không dùng foreign descriptor.
+    OP_VM_MACHINE_FILE_OPEN = 159,
+    OP_VM_MACHINE_FILE_READ = 160,
+    OP_VM_MACHINE_FILE_WRITE = 161,
+    OP_VM_MACHINE_FILE_CLOSE = 162,
+    OP_VM_MACHINE_FILE_SEEK = 163,
+    OP_VM_MACHINE_FILE_TELL = 164,
+    OP_VM_MACHINE_FILE_ERROR = 165,
+    OP_VM_MACHINE_FILE_REMOVE = 166,
+
+    // Process identity machine ABI; giữ opcode cũ và quyền system.* tương thích.
+    OP_VM_MACHINE_PROCESS_PID = 167,
+    OP_VM_MACHINE_PROCESS_PPID = 168,
+    OP_VM_MACHINE_PROCESS_UID = 169,
+    OP_VM_MACHINE_PROCESS_EUID = 170,
+    OP_VM_MACHINE_PROCESS_GID = 171,
+    OP_VM_MACHINE_PROCESS_EGID = 172,
+
+    // Một lần chờ OS tính bằng mili giây; trả errno trực tiếp (0 = thành công).
+    OP_VM_MACHINE_TIME_SLEEP = 173,
+    // Trả 16 byte little-endian [i64 seconds, i64 nanoseconds].
+    OP_VM_MACHINE_TIME_MONOTONIC = 174,
+    OP_VM_MACHINE_TIME_REALTIME = 175,
+    // Lấy 1..256 byte entropy từ OS; V++ sở hữu vòng chia khối lớn hơn.
+    OP_VM_MACHINE_ENTROPY_READ = 176,
+    // Đọc một biến môi trường: chuỗi hoặc rỗng khi không tồn tại.
+    OP_VM_MACHINE_ENV_GET = 177,
+    // Đổi epoch i64 (8 byte LE) thành snapshot lịch địa phương 64 byte LE.
+    OP_VM_MACHINE_TIME_LOCAL = 178,
+    // Directory resources are owned by their VM, never exposed as raw DIR*.
+    OP_VM_MACHINE_DIR_MKDIR = 179,
+    OP_VM_MACHINE_DIR_REMOVE = 180,
+    OP_VM_MACHINE_DIR_OPEN = 181,
+    OP_VM_MACHINE_DIR_NEXT = 182,
+    OP_VM_MACHINE_DIR_CLOSE = 183,
+    OP_VM_MACHINE_PATH_KIND = 184,
+    // VM-owned socket state shared with DNS/TLS adapters; close uses ASM OS ABI.
+    OP_VM_MACHINE_SOCKET_KIND = 185,
+    OP_VM_MACHINE_SOCKET_CLOSE = 186,
+    OP_VM_MACHINE_SOCKET_TIMEOUT = 187,
+    OP_VM_MACHINE_SOCKET_SEND = 188,
+    OP_VM_MACHINE_SOCKET_RECV = 189,
+    OP_VM_MACHINE_SOCKET_ACCEPT = 190,
+    OP_VM_MACHINE_SOCKET_LISTEN = 191,
+    OP_VM_MACHINE_SOCKET_CONNECT = 192,
+    // VM-owned child process operations. Bytecode only sees opaque tokens.
+    OP_VM_MACHINE_PROCESS_NEW = 193,
+    OP_VM_MACHINE_PROCESS_ARG = 194,
+    OP_VM_MACHINE_PROCESS_COMMAND_LINE = 195,
+    OP_VM_MACHINE_PROCESS_ENV = 196,
+    OP_VM_MACHINE_PROCESS_START = 197,
+    OP_VM_MACHINE_PROCESS_POLL = 198,
+    OP_VM_MACHINE_PROCESS_READ = 199,
+    OP_VM_MACHINE_PROCESS_WAIT = 200,
+    OP_VM_MACHINE_PROCESS_ERROR = 201,
+    OP_VM_MACHINE_PROCESS_CLOSE = 202,
+    // VM-owned OS name resolver. Public address policy remains in V++.
+    OP_VM_MACHINE_RESOLVE_OPEN = 203,
+    OP_VM_MACHINE_RESOLVE_NEXT = 204,
+    OP_VM_MACHINE_RESOLVE_CLOSE = 205,
+    // TLS provider boundary: certificate validation remains native, never downgraded.
+    OP_VM_MACHINE_TLS_UPGRADE = 206,
+    OP_VM_MACHINE_TLS_SEND = 207,
+    OP_VM_MACHINE_TLS_RECV = 208,
+
 };
 
 enum CompareOp {

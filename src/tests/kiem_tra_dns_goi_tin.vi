@@ -1,0 +1,341 @@
+nhập gói/mạng/dns_gói_tin;
+nhập gói/mạng/dns;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm chính() {
+    bộ = Bộ Mã DNS();
+    hỏi = bộ.dns tạo truy vấn("Example.COM.", 1, 4660);
+    in do_dai(hỏi) == 29 && hỏi[0] == 18 && hỏi[1] == 52 &&
+       hỏi[2] == 1 && hỏi[5] == 1 && hỏi[12] == 7 && hỏi[20] == 3 &&
+       hỏi[24] == 0 && hỏi[26] == 1 && hỏi[28] == 1;
+
+    // Phản hồi A: NAME pointer về QNAME tại offset 12.
+    phản_hồi = [18, 52, 129, 128, 0, 1, 0, 1, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi); i++) { thêm(phản_hồi, hỏi[i]); };
+    bản_ghi = [192, 12, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 203, 0, 113, 7];
+    lặp(i = 0; i < do_dai(bản_ghi); i++) { thêm(phản_hồi, bản_ghi[i]); };
+    kết_quả = bộ.dns đọc phản hồi(phản_hồi, "example.com", 1, 4660);
+    in do_dai(kết_quả) == 1 && kết_quả[0] == "203.0.113.7";
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(phản_hồi, "EXAMPLE.COM.", 1, 4660);
+    in lấy map(chi_tiết, "status", "") == "NOERROR" &&
+       lấy map(chi_tiết, "rcode", -1) == 0 &&
+       lấy map(chi_tiết, "ttl", -1) == 60 &&
+       lấy map(chi_tiết, "addresses", [])[0] == "203.0.113.7";
+
+    // TTL uint32 phải được giải mã không bị tràn dấu, kể cả giá trị tối đa.
+    ttl_max = [];
+    lặp(i = 0; i < do_dai(phản_hồi); i++) { thêm(ttl_max, phản_hồi[i]); };
+    lặp(i = do_dai(ttl_max) - 10; i < do_dai(ttl_max) - 6; i++) {
+        ttl_max[i] = 255;
+    };
+    in lấy map(bộ.dns đọc phản hồi đầy đủ(ttl_max, "example.com", 1, 4660),
+               "ttl", -1) == 4294967295.0;
+
+    // A cho một tên không liên quan phải bị bỏ qua.
+    sai_tên = [18, 52, 129, 128, 0, 1, 0, 1, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi); i++) { thêm(sai_tên, hỏi[i]); };
+    khác = [3, 98, 97, 100, 0, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 203, 0, 113, 8];
+    lặp(i = 0; i < do_dai(khác); i++) { thêm(sai_tên, khác[i]); };
+    in do_dai(bộ.dns đọc phản hồi(sai_tên, "example.com", 1, 4660)) == 0;
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(sai_tên, "example.com", 1, 4660);
+    in lấy map(chi_tiết, "status", "") == "NODATA" &&
+       lấy map(chi_tiết, "ttl", -1) == 0;
+
+    // CNAME www.example.com -> api.example.com -> A.
+    hỏi2 = bộ.dns tạo truy vấn("www.example.com", 1, 4660);
+    chuyển = [18, 52, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi2); i++) { thêm(chuyển, hỏi2[i]); };
+    cname = [192, 12, 0, 5, 0, 1, 0, 0, 0, 1, 0, 6,
+             3, 97, 112, 105, 192, 16];
+    a = [3, 97, 112, 105, 192, 16, 0, 1, 0, 1, 0, 0, 0, 1, 0, 4,
+         192, 0, 2, 9];
+    cname[9] = 20;
+    a[13] = 90;
+    lặp(i = 0; i < do_dai(cname); i++) { thêm(chuyển, cname[i]); };
+    lặp(i = 0; i < do_dai(a); i++) { thêm(chuyển, a[i]); };
+    kết_quả = bộ.dns đọc phản hồi(chuyển, "WWW.Example.COM", 1, 4660);
+    in do_dai(kết_quả) == 1 && kết_quả[0] == "192.0.2.9";
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(chuyển, "www.example.com", 1, 4660);
+    in lấy map(chi_tiết, "ttl", -1) == 20 &&
+       lấy map(chi_tiết, "status", "") == "NOERROR";
+    // RR của tên lạ với TTL=0 không được làm giảm TTL chuỗi CNAME hợp lệ.
+    chuyển[7] = 3;
+    khác[12] = 0;
+    lặp(i = 0; i < do_dai(khác); i++) { thêm(chuyển, khác[i]); };
+    in lấy map(bộ.dns đọc phản hồi đầy đủ(chuyển, "www.example.com", 1, 4660),
+               "ttl", -1) == 20;
+
+    // IPv6: dạng đầy đủ tương thích parser IP V++.
+    hỏi6 = bộ.dns tạo truy vấn("example.com", 28, 4660);
+    trả6 = [18, 52, 129, 128, 0, 1, 0, 1, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi6); i++) { thêm(trả6, hỏi6[i]); };
+    rr6 = [192, 12, 0, 28, 0, 1, 0, 0, 0, 60, 0, 16,
+           32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+    lặp(i = 0; i < do_dai(rr6); i++) { thêm(trả6, rr6[i]); };
+    kết_quả = bộ.dns đọc phản hồi(trả6, "example.com", 28, 4660);
+    in do_dai(kết_quả) == 1 &&
+       kết_quả[0] == "2001:0db8:0000:0000:0000:0000:0000:0001";
+
+    lỗi = sai;
+    thử { bộ.dns tạo truy vấn("a..b", 1, 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns tạo truy vấn("tên.vn", 1, 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns tạo truy vấn("example.com", 15, 0); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(phản_hồi, "example.com", 1, 4661); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(phản_hồi, "other.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi([18, 52], "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Pointer trỏ tiến/lặp tại NAME của answer.
+    sai_pointer = [18, 52, 129, 128, 0, 1, 0, 1, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi); i++) { thêm(sai_pointer, hỏi[i]); };
+    thêm(sai_pointer, 192);
+    thêm(sai_pointer, do_dai(sai_pointer) + 1);
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(sai_pointer, "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Header QR=0, TC=1, question type và độ dài bản ghi không hợp lệ.
+    sai_qr = [];
+    lặp(i = 0; i < do_dai(phản_hồi); i++) { thêm(sai_qr, phản_hồi[i]); };
+    sai_qr[2] = 1;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(sai_qr, "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    sai_tc = [];
+    lặp(i = 0; i < do_dai(phản_hồi); i++) { thêm(sai_tc, phản_hồi[i]); };
+    sai_tc[2] = 131;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(sai_tc, "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(phản_hồi, "example.com", 28, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    bị_cắt = [];
+    lặp(i = 0; i < do_dai(phản_hồi) - 1; i++) { thêm(bị_cắt, phản_hồi[i]); };
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(bị_cắt, "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    rác = [];
+    lặp(i = 0; i < do_dai(phản_hồi); i++) { thêm(rác, phản_hồi[i]); };
+    rác[0] = 999;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(rác, "example.com", 1, 4660); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    nhãn_dài = [];
+    lặp(i = 0; i < 64; i++) { thêm(nhãn_dài, 97); };
+    lỗi = sai;
+    thử { bộ.dns tạo truy vấn(chuoi_tu_bytes_vm(nhãn_dài) + ".vn", 1, 0); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Đường UDP thuần V++ phải kiểm tra máy chủ numeric trước khi mở socket.
+    bộ_phân_giải = Bộ Phân Giải DNS();
+    lỗi = sai;
+    thử { bộ_phân_giải.dns hỏi máy chủ("example.com", "not-an-ip", 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ_phân_giải.dns hỏi máy chủ("a..b", "127.0.0.1", 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Hai CNAME tạo chu trình a.test -> b.test -> a.test.
+    hỏi_vòng = bộ.dns tạo truy vấn("a.test", 1, 4660);
+    vòng_tên = [18, 52, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi_vòng); i++) { thêm(vòng_tên, hỏi_vòng[i]); };
+    cname_b = [192, 12, 0, 5, 0, 1, 0, 0, 0, 1, 0, 8,
+               1, 98, 4, 116, 101, 115, 116, 0];
+    cname_a = [1, 98, 4, 116, 101, 115, 116, 0,
+               0, 5, 0, 1, 0, 0, 0, 1, 0, 2, 192, 12];
+    lặp(i = 0; i < do_dai(cname_b); i++) { thêm(vòng_tên, cname_b[i]); };
+    lặp(i = 0; i < do_dai(cname_a); i++) { thêm(vòng_tên, cname_a[i]); };
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(vòng_tên, "a.test", 1, 4660); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Hai CNAME cùng tên nhưng trỏ sang hai tên khác nhau phải bị từ chối.
+    sai_alias = [18, 52, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi_vòng); i++) { thêm(sai_alias, hỏi_vòng[i]); };
+    lặp(i = 0; i < do_dai(cname_b); i++) { thêm(sai_alias, cname_b[i]); };
+    cname_c = [192, 12, 0, 5, 0, 1, 0, 0, 0, 1, 0, 8,
+               1, 99, 4, 116, 101, 115, 116, 0];
+    lặp(i = 0; i < do_dai(cname_c); i++) { thêm(sai_alias, cname_c[i]); };
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(sai_alias, "a.test", 1, 4660); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Chủ sở hữu không được chứa đồng thời CNAME và địa chỉ A.
+    sai_cname_a = [18, 52, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi_vòng); i++) { thêm(sai_cname_a, hỏi_vòng[i]); };
+    lặp(i = 0; i < do_dai(cname_b); i++) { thêm(sai_cname_a, cname_b[i]); };
+    a_cùng_tên = [192, 12, 0, 1, 0, 1, 0, 0, 0, 1, 0, 4, 192, 0, 2, 1];
+    lặp(i = 0; i < do_dai(a_cùng_tên); i++) { thêm(sai_cname_a, a_cùng_tên[i]); };
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(sai_cname_a, "a.test", 1, 4660); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Loại bỏ địa chỉ trùng, giữ thứ tự xuất hiện trong câu trả lời.
+    trùng_a = [18, 52, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi); i++) { thêm(trùng_a, hỏi[i]); };
+    lặp(i = 0; i < do_dai(bản_ghi); i++) { thêm(trùng_a, bản_ghi[i]); };
+    lặp(i = 0; i < do_dai(bản_ghi); i++) { thêm(trùng_a, bản_ghi[i]); };
+    kết_quả = bộ.dns đọc phản hồi(trùng_a, "example.com", 1, 4660);
+    in do_dai(kết_quả) == 1 && kết_quả[0] == "203.0.113.7";
+    trùng_a[do_dai(trùng_a) - 7] = 30;
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(trùng_a, "example.com", 1, 4660);
+    in do_dai(lấy map(chi_tiết, "addresses", [])) == 1 &&
+       lấy map(chi_tiết, "ttl", -1) == 30;
+
+    // Alias tới một tên không có bản ghi địa chỉ không được trả IP lạ.
+    chỉ_cname = [18, 52, 129, 128, 0, 1, 0, 1, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi_vòng); i++) { thêm(chỉ_cname, hỏi_vòng[i]); };
+    lặp(i = 0; i < do_dai(cname_b); i++) { thêm(chỉ_cname, cname_b[i]); };
+    in do_dai(bộ.dns đọc phản hồi(chỉ_cname, "a.test", 1, 4660)) == 0;
+
+    // Timeout và cổng phải bị từ chối trước khi thực hiện truy vấn UDP.
+    lỗi = sai;
+    thử { bộ_phân_giải.dns hỏi máy chủ("example.com", "127.0.0.1", 0, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ_phân_giải.dns hỏi máy chủ("example.com", "127.0.0.1", 53, 1, 0); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Chỉ TC=1 với transaction ID và header hợp lệ mới yêu cầu TCP.
+    in bộ.dns cần tcp(sai_tc, 4660);
+    in !bộ.dns cần tcp(phản_hồi, 4660);
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_tc, 4661); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Chỉ fallback sau khi xác minh câu hỏi, ngay cả khi TC=1.
+    in bộ.dns cần tcp(sai_tc, 4660, "example.com", 1);
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_tc, 4660, "other.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_tc, 4660, "example.com", 28); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    sai_lớp = [];
+    lặp(i = 0; i < do_dai(sai_tc); i++) { thêm(sai_lớp, sai_tc[i]); };
+    sai_lớp[28] = 2;
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_lớp, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    sai_số_hỏi = [];
+    lặp(i = 0; i < do_dai(sai_tc); i++) { thêm(sai_số_hỏi, sai_tc[i]); };
+    sai_số_hỏi[5] = 0;
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_số_hỏi, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    sai_z = [];
+    lặp(i = 0; i < do_dai(sai_tc); i++) { thêm(sai_z, sai_tc[i]); };
+    sai_z[3] = 192; // reserved Z = 1, cùng với RA.
+    lỗi = sai;
+    thử { bộ.dns cần tcp(sai_z, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    quá_nhiều = [];
+    lặp(i = 0; i < do_dai(sai_tc); i++) { thêm(quá_nhiều, sai_tc[i]); };
+    quá_nhiều[6] = 2;
+    lỗi = sai;
+    thử { bộ.dns cần tcp(quá_nhiều, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    câu_bị_cắt = [];
+    lặp(i = 0; i < 20; i++) { thêm(câu_bị_cắt, sai_tc[i]); };
+    lỗi = sai;
+    thử { bộ.dns cần tcp(câu_bị_cắt, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    pointer_hỏi = [];
+    lặp(i = 0; i < do_dai(sai_tc); i++) { thêm(pointer_hỏi, sai_tc[i]); };
+    pointer_hỏi[12] = 192;
+    pointer_hỏi[13] = 255;
+    lỗi = sai;
+    thử { bộ.dns cần tcp(pointer_hỏi, 4660, "example.com", 1); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // TC hợp lệ vẫn kích hoạt TCP dù phần answer đã bị UDP cắt.
+    tc_chỉ_hỏi = [];
+    lặp(i = 0; i < do_dai(hỏi); i++) { thêm(tc_chỉ_hỏi, hỏi[i]); };
+    tc_chỉ_hỏi[2] = 131;
+    tc_chỉ_hỏi[3] = 128;
+    in bộ.dns cần tcp(tc_chỉ_hỏi, 4660, "example.com", 1);
+
+    // Bit AD và CD có nghĩa hợp lệ, không được nhầm với reserved Z.
+    ad_cd = [];
+    lặp(i = 0; i < do_dai(phản_hồi); i++) { thêm(ad_cd, phản_hồi[i]); };
+    ad_cd[3] = 176;
+    in !bộ.dns cần tcp(ad_cd, 4660, "example.com", 1);
+    in do_dai(bộ.dns đọc phản hồi(ad_cd, "example.com", 1, 4660)) == 1;
+
+    // Phản hồi DNS hợp lệ phải được phân loại bằng RCODE, không gộp với
+    // packet sai giao thức. Dùng answer rỗng để kiểm tra negative response.
+    rcode_gói = [18, 52, 129, 128, 0, 1, 0, 0, 0, 0, 0, 0];
+    lặp(i = 12; i < do_dai(hỏi); i++) { thêm(rcode_gói, hỏi[i]); };
+    in do_dai(bộ.dns đọc phản hồi(rcode_gói, "example.com", 1, 4660)) == 0;
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(rcode_gói, "example.com", 1, 4660);
+    in lấy map(chi_tiết, "status", "") == "NODATA" &&
+       lấy map(chi_tiết, "rcode", -1) == 0 &&
+       lấy map(chi_tiết, "ttl", -1) == 0;
+    rcode_gói[3] = 131; // NXDOMAIN=3
+    in !bộ.dns cần tcp(rcode_gói, 4660, "example.com", 1);
+    in do_dai(bộ.dns đọc phản hồi(rcode_gói, "example.com", 1, 4660)) == 0;
+    chi_tiết = bộ.dns đọc phản hồi đầy đủ(rcode_gói, "example.com", 1, 4660);
+    in lấy map(chi_tiết, "status", "") == "NXDOMAIN" &&
+       lấy map(chi_tiết, "rcode", -1) == 3 &&
+       do_dai(lấy map(chi_tiết, "addresses", [])) == 0 &&
+       lấy map(chi_tiết, "ttl", -1) == 0;
+
+    // SERVFAIL, REFUSED, FORMERR, NOTIMP, unknown => lỗi có mã cụ thể.
+    mã_rcode = [2, 5, 1, 4, 15];
+    lặp(i = 0; i < do_dai(mã_rcode); i++) {
+        rcode_gói[3] = 128 + mã_rcode[i];
+        đúng_mã = sai;
+        thử { bộ.dns đọc phản hồi(rcode_gói, "example.com", 1, 4660); }
+        bắt lỗi(e) {
+            nếu (loai_cua(e) == "từ điển") {
+                đúng_mã = lấy map(e, "loại", "") == "dns_rcode" &&
+                    lấy map(e, "mã", -1) == mã_rcode[i];
+            };
+        };
+        in đúng_mã;
+    };
+
+    // NXDOMAIN vẫn phải xác thực ID, QNAME và cấu trúc answer.
+    rcode_gói[3] = 131;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(rcode_gói, "example.com", 1, 4661); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(rcode_gói, "other.com", 1, 4660); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    rcode_gói[7] = 1; // ANCOUNT=1 nhưng thiếu answer.
+    lỗi = sai;
+    thử { bộ.dns đọc phản hồi(rcode_gói, "example.com", 1, 4660); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    rcode_gói[7] = 0;
+    rcode_gói[2] = 131; // TC=1 trên negative reply vẫn yêu cầu TCP.
+    in bộ.dns cần tcp(rcode_gói, 4660, "example.com", 1);
+};

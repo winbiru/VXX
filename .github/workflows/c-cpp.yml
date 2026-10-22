@@ -23,6 +23,17 @@ jobs:
       - name: Build V++
         run: cmake --build cmake-build-debug --parallel 2
 
+      - name: Verify V++ Machine ABI without legacy libffi (Linux x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B machine-only-build -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF -DVPP_ENABLE_LEGACY_LIBFFI=OFF
+          cmake --build machine-only-build --parallel 2 --target vpp-cli
+          cmake -D"VPP_CLI=$PWD/machine-only-build/bin/vpp-cli" \
+            -D"VPP_ROOT=$PWD" \
+            -P scripts/quality/check_machine_no_ffi.cmake
+
       - name: Install V++ and execute native code compiled from .vi (Linux x64)
         shell: bash
         run: |
@@ -50,6 +61,18 @@ jobs:
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as x86-64 machine code$' "$diagnostics"
+
+      - name: Verify Linux x86-64 directory and path syscalls
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir cmake-build-debug --output-on-failure \
+            -R '^vpp-(directory-machine-hardening|path-machine-hardening|directory-vpp-fixture)$'
+          output="$(mktemp)"
+          trap 'rm -f "$output"' EXIT
+          VPP_HOME="$PWD" VPP_ENABLE_JIT=1 \
+            cmake-build-debug/bin/vpp-cli src/tests/kiem_tra_ffi_thu_muc.vi >"$output"
+          diff -u src/tests/expected/kiem_tra_ffi_thu_muc.expected "$output"
 
       - name: Verify Linux x86-64 V++ machine emitter and ELF64 object linker
         run: ctest --test-dir cmake-build-debug -R '^vpp-native-elf-x86-writer$' --output-on-failure --no-tests=error
@@ -120,6 +143,17 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
 
+      - name: Verify V++ Machine ABI without legacy libffi (Linux ARM64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B machine-only-build -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF -DVPP_ENABLE_LEGACY_LIBFFI=OFF
+          cmake --build machine-only-build --parallel 2 --target vpp-cli
+          cmake -D"VPP_CLI=$PWD/machine-only-build/bin/vpp-cli" \
+            -D"VPP_ROOT=$PWD" \
+            -P scripts/quality/check_machine_no_ffi.cmake
+
       - name: Install V++ and execute native code compiled from .vi (Linux ARM64)
         shell: bash
         run: |
@@ -147,6 +181,18 @@ jobs:
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as AArch64 machine code$' "$diagnostics"
+
+      - name: Verify Linux ARM64 directory and path syscalls
+        shell: bash
+        run: |
+          set -euo pipefail
+          ctest --test-dir build --output-on-failure \
+            -R '^vpp-(directory-machine-hardening|path-machine-hardening|directory-vpp-fixture)$'
+          output="$(mktemp)"
+          trap 'rm -f "$output"' EXIT
+          VPP_HOME="$PWD" VPP_ENABLE_JIT=1 \
+            build/bin/vpp-cli src/tests/kiem_tra_ffi_thu_muc.vi >"$output"
+          diff -u src/tests/expected/kiem_tra_ffi_thu_muc.expected "$output"
 
       - name: Run Linux ARM64 regression suite
         # Native AOT bootstrap is covered by installed smoke above.

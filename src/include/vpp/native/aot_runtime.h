@@ -5,6 +5,8 @@
 #include <vector>
 
 #include "vpp/runtime/foreign.h"
+#include "vpp/runtime/file_runtime.h"
+#include "vpp/runtime/directory_machine.h"
 #include "vpp/runtime/heap.h"
 #include "vpp/runtime/object.h"
 
@@ -81,6 +83,8 @@ struct Program {
     std::vector<Frame *> frames;
     runtime::RuntimeHeap heap;
     runtime::ForeignFileState files;
+    runtime::FileMachineState machineFiles;
+    runtime::DirectoryMachineState machineDirectories;
     std::unordered_set<std::string> capabilities;
     int lastForeignError = 0;
     std::function<void(const std::string &)> output;

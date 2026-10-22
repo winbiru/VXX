@@ -1,0 +1,285 @@
+// DNS wire format (RFC 1035): bộ mã hóa/giải mã thuần V++.
+// Các hàm này chỉ xử lý bytes, không đọc cấu hình DNS hoặc gọi resolver C.
+
+nhập gói/lõi/chuyển kiểu;
+nhập gói/bộ sưu tập/từ điển;
+
+lớp công khai Bộ Mã DNS {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư dns số16(bytes, vị_trí) {
+        nếu (vị_trí < 0 || vị_trí + 2 > do_dai(bytes)) { ném "DNS: gói tin bị cắt"; };
+        trả về bytes[vị_trí] * 256 + bytes[vị_trí + 1];
+    };
+
+    hàm riêng tư dns số32(bytes, vị_trí) {
+        nếu (vị_trí < 0 || vị_trí + 4 > do_dai(bytes)) { ném "DNS: TTL bị cắt"; };
+        cao = mình.dns số16(bytes, vị_trí);
+        thấp = mình.dns số16(bytes, vị_trí + 2);
+        // V++ hiện dùng i32. f64 biểu diễn chính xác mọi giá trị u32.
+        nếu (cao >= 32768) { trả về cao * 65536.0 + thấp; };
+        trả về cao * 65536 + thấp;
+    };
+
+    hàm riêng tư dns byte thường(k) {
+        nếu (k >= 65 && k <= 90) { trả về k + 32; };
+        trả về k;
+    };
+
+    hàm riêng tư dns tên chuẩn(tên) {
+        nếu (loai_cua(tên) != "chuỗi") { ném "DNS: tên máy phải là chuỗi"; };
+        bytes = chuoi_bytes_vm(tên);
+        n = do_dai(bytes);
+        nếu (n < 1 || n > 253) { ném "DNS: độ dài tên máy không hợp lệ"; };
+        // Tên tuyệt đối có thể có dấu chấm cuối cùng.
+        nếu (bytes[n - 1] == 46) { n = n - 1; };
+        nếu (n < 1) { ném "DNS: tên máy trống"; };
+        kết_quả = [];
+        độ_dài_nhãn = 0;
+        lặp(i = 0; i < n; i++) {
+            k = bytes[i];
+            nếu (k == 46) {
+                nếu (độ_dài_nhãn == 0 || độ_dài_nhãn > 63) { ném "DNS: nhãn không hợp lệ"; };
+                độ_dài_nhãn = 0;
+                thêm(kết_quả, 46);
+            } hoặc {
+                // Tên máy ASCII/IDNA; tên Unicode cần đổi sang Punycode trước.
+                nếu (!((k >= 48 && k <= 57) || (k >= 65 && k <= 90) ||
+                       (k >= 97 && k <= 122) || k == 45 || k == 95)) {
+                    ném "DNS: ký tự tên máy không hợp lệ";
+                };
+                độ_dài_nhãn = độ_dài_nhãn + 1;
+                nếu (độ_dài_nhãn > 63) { ném "DNS: nhãn dài quá 63 bytes"; };
+                thêm(kết_quả, mình.dns byte thường(k));
+            };
+        };
+        nếu (độ_dài_nhãn == 0) { ném "DNS: nhãn cuối trống"; };
+        trả về kết_quả;
+    };
+
+    hàm công khai dns tạo truy vấn(tên, loại, giao_dịch) {
+        nếu (loại != 1 && loại != 28) { ném "DNS: chỉ hỗ trợ A và AAAA"; };
+        nếu (loai_cua(giao_dịch) != "số nguyên" || giao_dịch < 0 || giao_dịch > 65535) {
+            ném "DNS: mã giao dịch không hợp lệ";
+        };
+        tên_bytes = mình.dns tên chuẩn(tên);
+        dữ_liệu = [
+            (giao_dịch - giao_dịch % 256) / 256, giao_dịch % 256,
+            1, 0, 0, 1, 0, 0, 0, 0, 0, 0
+        ];
+        bắt_đầu = 0;
+        n = do_dai(tên_bytes);
+        lặp(i = 0; i <= n; i++) {
+            hết_nhãn = i == n;
+            nếu (i < n) { nếu (tên_bytes[i] == 46) { hết_nhãn = đúng; }; };
+            nếu (hết_nhãn) {
+                thêm(dữ_liệu, i - bắt_đầu);
+                lặp(j = bắt_đầu; j < i; j++) { thêm(dữ_liệu, tên_bytes[j]); };
+                bắt_đầu = i + 1;
+            };
+        };
+        thêm(dữ_liệu, 0);
+        thêm(dữ_liệu, 0);
+        thêm(dữ_liệu, loại);
+        thêm(dữ_liệu, 0);
+        thêm(dữ_liệu, 1);
+        trả về dữ_liệu;
+    };
+
+    // Kết quả: [tên lowercase không có dấu chấm cuối, vị trí sau tên mã hóa].
+    // Pointer phải quay về vị trí trước nó; giới hạn nhảy ngăn chu trình.
+    hàm riêng tư dns đọc tên(bytes, vị_trí) {
+        n = do_dai(bytes);
+        nhãn = [];
+        vị_trí_kế = -1;
+        độ_dài = 0;
+        lặp(vòng = 0; vòng < 64; vòng++) {
+            nếu (vị_trí < 0 || vị_trí >= n) { ném "DNS: tên bị cắt"; };
+            k = bytes[vị_trí];
+            nếu (k >= 192) {
+                nếu (vị_trí + 1 >= n) { ném "DNS: pointer bị cắt"; };
+                đích = (k - 192) * 256 + bytes[vị_trí + 1];
+                nếu (đích >= vị_trí) { ném "DNS: pointer tiến hoặc lặp"; };
+                nếu (vị_trí_kế < 0) { vị_trí_kế = vị_trí + 2; };
+                vị_trí = đích;
+            } hoặc nếu (k == 0) {
+                nếu (vị_trí_kế < 0) { vị_trí_kế = vị_trí + 1; };
+                trả về [chuoi_tu_bytes_vm(nhãn), vị_trí_kế];
+            } hoặc {
+                nếu (k > 63 || vị_trí + 1 + k > n || độ_dài + k + 1 > 254) {
+                    ném "DNS: nhãn bị cắt hoặc quá dài";
+                };
+                nếu (do_dai(nhãn) > 0) { thêm(nhãn, 46); };
+                lặp(j = vị_trí + 1; j <= vị_trí + k; j++) {
+                    byte = bytes[j];
+                    nếu (byte == 0 || byte >= 128) { ném "DNS: tên không phải ASCII"; };
+                    thêm(nhãn, mình.dns byte thường(byte));
+                };
+                độ_dài = độ_dài + k + 1;
+                vị_trí = vị_trí + k + 1;
+            };
+        };
+        ném "DNS: tên có quá nhiều pointer";
+    };
+
+    hàm riêng tư dns ký tự hex(n) {
+        nếu (n < 10) { trả về chuoi_tu_bytes_vm([48 + n]); };
+        trả về chuoi_tu_bytes_vm([87 + n]);
+    };
+
+    hàm riêng tư dns địa chỉ(bytes, vị_trí, loại, kích_thước) {
+        nếu (loại == 1) {
+            nếu (kích_thước != 4) { ném "DNS: độ dài A không hợp lệ"; };
+            trả về thành chuỗi(bytes[vị_trí]) + "." + thành chuỗi(bytes[vị_trí + 1]) +
+                "." + thành chuỗi(bytes[vị_trí + 2]) + "." + thành chuỗi(bytes[vị_trí + 3]);
+        };
+        nếu (kích_thước != 16) { ném "DNS: độ dài AAAA không hợp lệ"; };
+        chuỗi = "";
+        lặp(i = 0; i < 16; i++) {
+            n = bytes[vị_trí + i];
+            chuỗi = chuỗi + mình.dns ký tự hex((n - n % 16) / 16) +
+                mình.dns ký tự hex(n % 16);
+            nếu (i % 2 == 1 && i != 15) { chuỗi = chuỗi + ":"; };
+        };
+        trả về chuỗi;
+    };
+
+    // Cờ TC chỉ đáng tin sau khi xác thực cả câu hỏi, kể cả khi bản tin
+    // bị cắt ở phần answer. Giữ hai tham số đầu để tương thích API cũ.
+    hàm công khai dns cần tcp(bytes, giao_dịch, tên = "", loại = 0) {
+        nếu (loai_cua(bytes) != "danh sách" || do_dai(bytes) < 12 ||
+            do_dai(bytes) > 65535) { ném "DNS: header không hợp lệ"; };
+        nếu (loai_cua(giao_dịch) != "số nguyên" || giao_dịch < 0 || giao_dịch > 65535) {
+            ném "DNS: mã giao dịch không hợp lệ";
+        };
+        lặp(i = 0; i < do_dai(bytes); i++) {
+            nếu (loai_cua(bytes[i]) != "số nguyên" || bytes[i] < 0 || bytes[i] > 255) {
+                ném "DNS: byte không hợp lệ";
+            };
+        };
+        nếu (mình.dns số16(bytes, 0) != giao_dịch) { ném "DNS: sai mã giao dịch"; };
+        cờ = mình.dns số16(bytes, 2);
+        // QR=1, OPCODE=0, reserved Z=0. RCODE là trạng thái DNS hợp lệ;
+        // chỉ giải nghĩa sau khi đã kiểm tra transaction ID và câu hỏi.
+        nếu (cờ < 32768 || (cờ / 2048) % 16 != 0 ||
+            (cờ / 64) % 2 != 0) {
+            ném "DNS: phản hồi sai opcode hoặc cờ dự trữ";
+        };
+        nếu (mình.dns số16(bytes, 4) != 1) { ném "DNS: số câu hỏi không hợp lệ"; };
+        nếu (mình.dns số16(bytes, 6) > 256) { ném "DNS: quá nhiều câu trả lời"; };
+        câu_hỏi = mình.dns đọc tên(bytes, 12);
+        vị_trí = câu_hỏi[1];
+        kiểu_hỏi = mình.dns số16(bytes, vị_trí);
+        nếu (mình.dns số16(bytes, vị_trí + 2) != 1) {
+            ném "DNS: lớp câu hỏi không hợp lệ";
+        };
+        nếu (tên != "" || loại != 0) {
+            nếu ((loại != 1 && loại != 28) ||
+                câu_hỏi[0] != chuoi_tu_bytes_vm(mình.dns tên chuẩn(tên)) ||
+                kiểu_hỏi != loại) { ném "DNS: câu hỏi không khớp"; };
+        };
+        trả về (cờ / 512) % 2 != 0;
+    };
+
+    // Giữ nguyên API cũ cho các caller đang nhận danh sách địa chỉ.
+    hàm công khai dns đọc phản hồi(bytes, tên, loại, giao_dịch) {
+        chi_tiết = mình.dns đọc phản hồi đầy đủ(bytes, tên, loại, giao_dịch);
+        trả về lấy map(chi_tiết, "addresses", []);
+    };
+
+    // Trả trạng thái và TTL của chuỗi RR thực sự dẫn tới địa chỉ kết quả.
+    // TTL=0 khi không có địa chỉ; negative caching cần SOA riêng (RFC 2308).
+    // Caller xác thực nguồn UDP và sinh transaction ID ngẫu nhiên.
+    hàm công khai dns đọc phản hồi đầy đủ(bytes, tên, loại, giao_dịch) {
+        nếu (loại != 1 && loại != 28) { ném "DNS: chỉ hỗ trợ A và AAAA"; };
+        // Header validation chung với quyết định fallback TCP.
+        nếu (mình.dns cần tcp(bytes, giao_dịch, tên, loại)) { ném "DNS: phản hồi UDP rút gọn"; };
+        mã_phản_hồi = mình.dns số16(bytes, 2) % 16;
+        số_câu_trả_lời = mình.dns số16(bytes, 6);
+        nếu (số_câu_trả_lời > 256) { ném "DNS: quá nhiều câu trả lời"; };
+        tên_cần = chuoi_tu_bytes_vm(mình.dns tên chuẩn(tên));
+        câu_hỏi = mình.dns đọc tên(bytes, 12);
+        vị_trí = câu_hỏi[1];
+        nếu (câu_hỏi[0] != tên_cần || mình.dns số16(bytes, vị_trí) != loại ||
+            mình.dns số16(bytes, vị_trí + 2) != 1) {
+            ném "DNS: câu hỏi không khớp";
+        };
+        vị_trí = vị_trí + 4;
+        bản_ghi = [];
+        lặp(i = 0; i < số_câu_trả_lời; i++) {
+            tên_bản_ghi = mình.dns đọc tên(bytes, vị_trí);
+            vị_trí = tên_bản_ghi[1];
+            nếu (vị_trí + 10 > do_dai(bytes)) { ném "DNS: bản ghi bị cắt"; };
+            kiểu = mình.dns số16(bytes, vị_trí);
+            lớp_dns = mình.dns số16(bytes, vị_trí + 2);
+            ttl = mình.dns số32(bytes, vị_trí + 4);
+            độ_dài = mình.dns số16(bytes, vị_trí + 8);
+            vị_trí = vị_trí + 10;
+            nếu (vị_trí + độ_dài > do_dai(bytes)) { ném "DNS: dữ liệu bản ghi bị cắt"; };
+            nếu (lớp_dns == 1 && (kiểu == 1 || kiểu == 28) && kiểu == loại) {
+                giá_trị = mình.dns địa chỉ(bytes, vị_trí, kiểu, độ_dài);
+                thêm(bản_ghi, [tên_bản_ghi[0], kiểu, giá_trị, ttl]);
+            } hoặc nếu (lớp_dns == 1 && kiểu == 5) {
+                tên_đích = mình.dns đọc tên(bytes, vị_trí);
+                nếu (tên_đích[1] != vị_trí + độ_dài) { ném "DNS: độ dài CNAME không hợp lệ"; };
+                thêm(bản_ghi, [tên_bản_ghi[0], 5, tên_đích[0], ttl]);
+            };
+            vị_trí = vị_trí + độ_dài;
+        };
+        // RCODE được phân loại sau khi kiểm tra đầy đủ question/answer.
+        // NXDOMAIN là trả lời phủ định hợp lệ, không thử nameserver khác.
+        nếu (mã_phản_hồi == 3) {
+            trả về {"status": "NXDOMAIN", "addresses": [], "rcode": 3, "ttl": 0};
+        };
+        nếu (mã_phản_hồi != 0) {
+            ném {"loại": "dns_rcode", "mã": mã_phản_hồi};
+        };
+        tên_hiện_tại = tên_cần;
+        đã_thăm = [];
+        ttl_nhỏ_nhất = -1;
+        // Chỉ theo CNAME do máy chủ trả về; không nhận địa chỉ cho tên khác.
+        lặp(bước = 0; bước <= 16; bước++) {
+            // Kiểm tra chu trình nhiều tên ngay khi gặp lại một tên cũ.
+            lặp(i = 0; i < do_dai(đã_thăm); i++) {
+                nếu (đã_thăm[i] == tên_hiện_tại) { ném "DNS: vòng lặp CNAME"; };
+            };
+            thêm(đã_thăm, tên_hiện_tại);
+            kết_quả = [];
+            đích = "";
+            lặp(i = 0; i < do_dai(bản_ghi); i++) {
+                rr = bản_ghi[i];
+                nếu (rr[0] == tên_hiện_tại) {
+                    // Chỉ các RR nằm trên đường CNAME/QNAME hợp lệ mới
+                    // được tính TTL; bỏ qua hoàn toàn những tên khác.
+                    nếu (ttl_nhỏ_nhất < 0 || rr[3] < ttl_nhỏ_nhất) {
+                        ttl_nhỏ_nhất = rr[3];
+                    };
+                    nếu (rr[1] == loại) {
+                        trùng = sai;
+                        lặp(j = 0; j < do_dai(kết_quả); j++) {
+                            nếu (kết_quả[j] == rr[2]) { trùng = đúng; thoát; };
+                        };
+                        nếu (!trùng) { thêm(kết_quả, rr[2]); };
+                    } hoặc nếu (rr[1] == 5) {
+                        // Một chủ sở hữu CNAME không thể trỏ tới hai đích khác nhau.
+                        nếu (đích != "" && đích != rr[2]) {
+                            ném "DNS: CNAME mâu thuẫn";
+                        };
+                        đích = rr[2];
+                    };
+                };
+            };
+            nếu (đích == "") {
+                nếu (do_dai(kết_quả) == 0) {
+                    trả về {"status": "NODATA", "addresses": [], "rcode": 0, "ttl": 0};
+                };
+                trả về {"status": "NOERROR", "addresses": kết_quả,
+                        "rcode": 0, "ttl": ttl_nhỏ_nhất};
+            };
+            nếu (do_dai(kết_quả) > 0) { ném "DNS: CNAME đi cùng địa chỉ"; };
+            nếu (đích == tên_hiện_tại || bước == 16) { ném "DNS: vòng lặp CNAME"; };
+            tên_hiện_tại = đích;
+        };
+        trả về kết_quả;
+    };
+};

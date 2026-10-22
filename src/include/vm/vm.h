@@ -21,6 +21,8 @@
 #include "vpp/bytecode/intrinsic.h"
 #include "vpp/bytecode/foreign.h"
 #include "vpp/runtime/foreign.h"
+#include "vpp/runtime/file_runtime.h"
+#include "vpp/runtime/directory_machine.h"
 #include "vpp/runtime/heap.h"
 #include "vpp/runtime/value.h"
 #include "vpp/runtime/module.h"
@@ -67,6 +69,7 @@ public:
     void setForeignFunctions(
         std::vector<vietvm::bytecode::ForeignFunctionDescriptor> descriptors);
     void setForeignCapabilities(std::unordered_set<std::string> capabilities);
+    void setMachineCapabilities(std::unordered_set<std::string> capabilities);
     // Bảo đảm snapshot bytecode hiện tại đã qua verifier. Nhiều lần gọi trên cùng
     // generation là O(1); mutation bytecode/module/function sẽ tạo generation mới.
     void ensureBytecodeVerified();
@@ -99,8 +102,11 @@ private:
     std::unordered_map<int, int> functionNameIndexById_;
     std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions_;
     std::unordered_set<std::string> foreignCapabilities_;
+    std::unordered_set<std::string> machineCapabilities_;
     int lastForeignPosixError_ = 0;
     vietvm::runtime::ForeignFileState foreignFileState_;
+    vietvm::runtime::FileMachineState fileMachineState_;
+    vietvm::runtime::DirectoryMachineState directoryMachineState_;
     std::size_t programGeneration_ = 1;
     std::size_t verifiedGeneration_ = 0;
     std::size_t verificationPassCount_ = 0;

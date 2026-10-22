@@ -292,6 +292,11 @@ void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs:
     configure.insert(configure.end(),{"-DVPP_AOT_CONFIGURATION=Release","-DVPP_AOT_ROOT="+root.u8string(),
         "-DVPP_AOT_LIB_ROOT="+libraries.u8string(),"-DVPP_AOT_SOURCE="+source.u8string(),
         "-DVPP_AOT_OUTPUT="+executable.u8string()});
+#if defined(VPP_AOT_LINK_LEGACY_LIBFFI) && VPP_AOT_LINK_LEGACY_LIBFFI
+    configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=ON");
+#else
+    configure.push_back("-DVPP_AOT_LINK_LEGACY_LIBFFI=OFF");
+#endif
     auto configured=process(configure);
     if(configured.status)throw std::runtime_error("Native AOT: linker configuration failed\n"+configured.output);
     profiler.mark("configure-native-linker");

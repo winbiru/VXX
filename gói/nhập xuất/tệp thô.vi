@@ -1,0 +1,70 @@
+// Các hàm V++ thay ngoại hàm tệp. máy_tệp_* là primitive opcode của ngôn ngữ:
+// compiler phát trực tiếp, runtime nối biểu diễn giá trị với ABI ASM của OS.
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/bảng mã;
+
+hàm riêng tư tệp thô kiểm tra đường(đường) {
+    nếu (loai_cua(đường) != "chuỗi") { ném "tệp thô: đường dẫn phải là chuỗi"; };
+    bytes = bảng mã utf8 mã hóa(đường);
+    lặp(i = 0; i < do_dai(bytes); i++) {
+        nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+    };
+    trả về đường;
+};
+
+hàm riêng tư tệp thô kiểm tra đệm(đệm, đếm, ghi) {
+    nếu (loai_cua(đệm) != "danh sách" || loai_cua(đếm) != "số nguyên") {
+        ném "tệp thô: cần danh sách byte và số lượng nguyên";
+    };
+    nếu (đếm < 1 || đếm > 65536 || do_dai(đệm) != đếm) {
+        ném "tệp thô: độ dài đệm phải khớp số byte trong 1..65536";
+    };
+    nếu (ghi) {
+        lặp(i = 0; i < đếm; i++) {
+            nếu (loai_cua(đệm[i]) != "số nguyên" || đệm[i] < 0 || đệm[i] > 255) {
+                ném "tệp thô: byte phải là số nguyên trong 0..255";
+            };
+        };
+    };
+    trả về đệm;
+};
+
+hàm công khai tệp_thô_mở(đường, chế_độ) {
+    đường = tệp thô kiểm tra đường(đường);
+    nếu (loai_cua(chế_độ) != "số nguyên" || chế_độ < 0 || chế_độ > 2) {
+        ném "tệp thô: chế độ phải là 0 (đọc), 1 (ghi) hoặc 2 (nối)";
+    };
+    trả về máy_tệp_mở(đường, chế_độ);
+};
+
+hàm công khai tệp_thô_đọc(tệp, đệm, đếm) {
+    tệp thô kiểm tra đệm(đệm, đếm, sai);
+    trả về máy_tệp_đọc(tệp, đệm, đếm);
+};
+
+hàm công khai tệp_thô_ghi(tệp, đệm, đếm) {
+    tệp thô kiểm tra đệm(đệm, đếm, đúng);
+    trả về máy_tệp_ghi(tệp, đệm, đếm);
+};
+
+hàm công khai tệp_thô_đóng(tệp) {
+    trả về máy_tệp_đóng(tệp);
+};
+
+hàm công khai tệp_thô_dịch(tệp, lệch, mốc) {
+    nếu (loai_cua(mốc) != "số nguyên" || mốc < 0 || mốc > 2) {
+        ném "tệp thô: gốc phải là 0, 1 hoặc 2";
+    };
+    trả về máy_tệp_dịch(tệp, lệch, mốc);
+};
+
+hàm công khai tệp_thô_vị_trí(tệp) {
+    trả về máy_tệp_vị_trí(tệp);
+};
+
+hàm công khai tệp_thô_errno() { trả về máy_tệp_lỗi(0); };
+hàm công khai tệp_thô_eintr() { trả về máy_tệp_lỗi(1); };
+
+hàm công khai tệp_thô_xóa(đường) {
+    trả về máy_tệp_xóa(tệp thô kiểm tra đường(đường));
+};

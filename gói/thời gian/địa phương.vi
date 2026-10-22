@@ -1,11 +1,6 @@
-// Đồng hồ địa phương POSIX/Windows. Trình tự epoch -> lịch do V++ điều phối;
-// runtime ánh xạ localtime_r sang CRT localtime_s trên Windows.
+// Đọc lịch địa phương qua machine ABI; V++ giải mã và định dạng.
 nhập gói/thời gian/utc;
 nhập gói/lõi/chuyển kiểu;
-
-ngoại thư viện c_địa_phương = "system.c";
-ngoại hàm đổi_giờ_địa_phương_ffi(giây: c_đệm_vào[8], kết_quả: c_đệm_ra[64]): c_cờ_con_trỏ từ c_địa_phương
-    ký hiệu "localtime_r" abi "c" khả năng "system.time.local";
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Đồng Hồ Địa Phương {
@@ -40,11 +35,7 @@ lớp công khai Đồng Hồ Địa Phương {
     // Nhận time_t 8 byte từ clock_gettime; hàm này cũng cho phép test mốc DST
     // mà không thay đổi đồng hồ hệ thống.
     hàm công khai thời gian địa phương từ epoch byte ffi(giây_byte) {
-        kết_quả = [];
-        lặp(i = 0; i < 64; i++) { them(kết_quả, 0); };
-        nếu (đổi_giờ_địa_phương_ffi(giây_byte, kết_quả) != 1) {
-            ném "giờ địa phương: localtime_r thất bại";
-        };
+        kết_quả = máy_đồng_hồ_địa_phương(giây_byte);
         giây = mình.thời gian địa phương đọc i32(kết_quả, 0);
         phút = mình.thời gian địa phương đọc i32(kết_quả, 4);
         giờ = mình.thời gian địa phương đọc i32(kết_quả, 8);

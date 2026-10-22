@@ -3,15 +3,6 @@
 nhập gói/lõi/chuyển kiểu;
 nhập gói/thời gian/đơn điệu;
 
-ngoại thư viện c_hệ_thống_nền_tảng = "system.c";
-ngoại hàm ngủ_vi_giây_ffi(thời_lượng: u32): i32 từ c_hệ_thống_nền_tảng
-    ký hiệu "usleep" abi "c" khả năng "system.time.sleep";
-ngoại thư viện c_lỗi_ffi_nền_tảng = "system.ffi";
-ngoại hàm mã_errno_ffi(): i32 từ c_lỗi_ffi_nền_tảng
-    ký hiệu "last_errno" abi "c" khả năng "system.ffi.error";
-ngoại hàm mã_eintr_ffi(): i32 từ c_lỗi_ffi_nền_tảng
-    ký hiệu "eintr" abi "c" khả năng "system.ffi.error";
-
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Nền Tảng {
     hàm công khai khởi tạo() {};
@@ -29,32 +20,32 @@ lớp công khai Nền Tảng {
         nếu (thời lượng < 0) {
             ném "ngủ mili giây: thời lượng phải là số nguyên không âm";
         };
-        // usleep có đối số micro giây u32; mỗi đợt < 1 giây để tương thích
-        // POSIX/macOS và tránh tràn số khi nhân 1000 trên số nguyên V++ 32 bit.
-        // POSIX có thể ngắt usleep bằng tín hiệu. Dùng deadline đơn điệu cho từng
+        // Một lần gọi máy tối đa 999 ms, giữ deadline trong thư viện V++.
+        // POSIX có thể ngắt syscall bằng tín hiệu. Dùng deadline đơn điệu cho từng
         // đợt để chỉ ngủ tiếp phần còn thiếu, không ngủ lại nguyên đợt.
         còn_lại = thời lượng;
-        mã_ngắt = mã_eintr_ffi();
+        // EINTR là 4 trên các ABI POSIX được hỗ trợ; máy trả errno nguyên tử
+        // cùng syscall, không cần đọc trạng thái errno qua một FFI riêng.
+        mã_ngắt = 4;
         lặp (vòng = 0; còn_lại > 0; vòng++) {
             đợt = còn_lại;
             nếu (đợt > 999) { đợt = 999; };
             hạn_đợt = thời gian đơn điệu mili giây() + đợt;
             cần_ngủ = đợt;
             lặp (lần_thử = 0; cần_ngủ > 0; lần_thử++) {
-                mã = ngủ_vi_giây_ffi(cần_ngủ * 1000);
+                mã = máy_ngủ_mili_giây(cần_ngủ);
                 nếu (mã == 0) {
                     cần_ngủ = 0;
                 } hoặc {
-                    // Snapshot errno đã được lấy ngay tại ranh giới native call.
+                    // Mã errno đã được trả trực tiếp tại ranh giới ASM/OS.
                     // Chỉ thử lại EINTR; lỗi khác không được âm thầm bỏ qua.
-                    lỗi_hệ_thống = mã_errno_ffi();
-                    nếu (mã != -1 || lỗi_hệ_thống != mã_ngắt) {
-                        ném "ngủ mili giây: usleep thất bại, errno=" + lỗi_hệ_thống;
+                    nếu (mã != mã_ngắt) {
+                        ném "ngủ mili giây: syscall thất bại, errno=" + mã;
                     };
                     // Chặn tình huống provider liên tục trả EINTR mà thời gian
                     // đơn điệu không tiến triển.
                     nếu (lần_thử >= 127) {
-                        ném "ngủ mili giây: usleep liên tục bị ngắt";
+                        ném "ngủ mili giây: syscall liên tục bị ngắt";
                     };
                     chênh_lệch = hạn_đợt - thời gian đơn điệu mili giây();
                     nếu (chênh_lệch <= 0) {

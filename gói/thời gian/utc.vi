@@ -1,13 +1,9 @@
-// UTC POSIX/Windows: FFI cung cấp 16 byte [seconds, nanoseconds] little-endian;
+// UTC: machine primitive cung cấp 16 byte [seconds, nanoseconds] little-endian;
 // đổi Unix epoch -> Gregorian và kiểm tra dữ liệu ở V++.
 // Giới hạn năm 0000..9999, phép toán giây có độ chính xác nguyên binary64.
 
 nhập gói/lõi/toán học;
 nhập gói/lõi/chuyển kiểu;
-
-ngoại thư viện c_utc = "system.c";
-ngoại hàm đọc_đồng_hồ_utc_ffi(mã_đồng_hồ: i32, đệm: c_đệm_ra[16]): i32 từ c_utc
-    ký hiệu "clock_gettime" abi "c" khả năng "system.time.realtime";
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Đồng Hồ UTC {
@@ -78,12 +74,7 @@ lớp công khai Đồng Hồ UTC {
     };
 
     hàm công khai thời gian utc đọc epoch byte ffi() {
-        // CLOCK_REALTIME = 0 trên POSIX; Win32 FFI dùng cùng ID và wire format.
-        đệm = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-        trạng_thái = đọc_đồng_hồ_utc_ffi(0, đệm);
-        nếu (trạng_thái != 0) {
-            ném "UTC: clock_gettime thất bại";
-        };
+        đệm = máy_đồng_hồ_utc();
         nano = mình.thời gian utc đọc i64(đệm, 8);
         nếu (nano < 0 || nano >= 1000000000.0) {
             ném "UTC: timespec không hợp lệ";

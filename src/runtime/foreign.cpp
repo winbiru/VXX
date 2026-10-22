@@ -22,7 +22,10 @@
 #include <cwchar>
 
 #include "vpp/runtime/error.h"
+#include "vpp/runtime/file_machine.h"
+#include "vpp/runtime/socket_machine.h"
 #include "common/vm_native_m3_helpers.h"
+#include "vpp/runtime/resource_token.h"
 
 #if defined(VPP_HAS_LIBFFI)
 #include <ffi.h>
@@ -59,7 +62,6 @@ namespace {
 
 // Tokens are unique across VM instances and resets. A token issued to VM A
 // must never accidentally match an unrelated open stream in VM B.
-std::atomic<std::uint64_t> nextForeignResourceToken{1};
 // Windows legacy native socket IDs use a separate range. FFI sockets and
 // their POSIX TLS sessions share one VM-owned token registry.
 constexpr int foreignSocketBase = 1 << 29;
@@ -330,11 +332,9 @@ struct ForeignLibraryGuard {
 };
 
 bool setForeignSocketTimeout(int fd, int milliseconds) {
-    timeval value{};
-    value.tv_sec = milliseconds / 1000;
-    value.tv_usec = (milliseconds % 1000) * 1000;
-    return ::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &value, sizeof(value)) == 0 &&
-           ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &value, sizeof(value)) == 0;
+    const auto result = socket_machine::setTimeout(fd, milliseconds);
+    if (result.value < 0) errno = result.error;
+    return result.value == 0;
 }
 
 void suppressForeignSocketSigpipe(int fd) {
@@ -880,6 +880,228 @@ union ReturnStorage {
 
 ForeignFileState::~ForeignFileState() { closeAll(); }
 
+bool isSocketMachinePrimitive(int opcode) noexcept {
+    return opcode == OP_VM_MACHINE_SOCKET_KIND ||
+           opcode == OP_VM_MACHINE_SOCKET_CLOSE ||
+           opcode == OP_VM_MACHINE_SOCKET_TIMEOUT ||
+           opcode == OP_VM_MACHINE_SOCKET_SEND ||
+           opcode == OP_VM_MACHINE_SOCKET_RECV ||
+           opcode == OP_VM_MACHINE_SOCKET_ACCEPT ||
+           opcode == OP_VM_MACHINE_SOCKET_LISTEN ||
+           opcode == OP_VM_MACHINE_SOCKET_CONNECT;
+}
+
+StackValue executeSocketMachinePrimitive(Opcode opcode,
+    const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state) {
+    const char *capability = opcode == OP_VM_MACHINE_SOCKET_KIND
+        ? "machine.net.socket.kind"
+        : opcode == OP_VM_MACHINE_SOCKET_CLOSE ? "machine.net.socket.close"
+        : opcode == OP_VM_MACHINE_SOCKET_TIMEOUT ? "machine.net.socket.timeout"
+        : opcode == OP_VM_MACHINE_SOCKET_SEND ? "machine.net.socket.send"
+        : opcode == OP_VM_MACHINE_SOCKET_RECV ? "machine.net.socket.recv"
+        : opcode == OP_VM_MACHINE_SOCKET_ACCEPT ? "machine.net.socket.accept"
+        : opcode == OP_VM_MACHINE_SOCKET_LISTEN ? "machine.net.socket.listen"
+        : opcode == OP_VM_MACHINE_SOCKET_CONNECT ? "machine.net.socket.connect" : nullptr;
+    const auto fail = [](const std::string &reason) -> RuntimeError {
+        return RuntimeError("máy socket: " + reason, RuntimeErrorKind::CallBoundary);
+    };
+    const auto socketError = [](const std::string &reason) -> LanguageException {
+        return LanguageException(make_string_value("FFI: " + reason));
+    };
+    if (!capability) throw fail("opcode không hợp lệ");
+    if (!capabilities.count(capability)) throw fail(std::string("thiếu quyền ") + capability);
+    const bool io = opcode == OP_VM_MACHINE_SOCKET_SEND ||
+                    opcode == OP_VM_MACHINE_SOCKET_RECV;
+    if (arguments.size() != (io || opcode == OP_VM_MACHINE_SOCKET_CONNECT ? 4u :
+            opcode == OP_VM_MACHINE_SOCKET_TIMEOUT ||
+            opcode == OP_VM_MACHINE_SOCKET_LISTEN ? 2u : 1u))
+        throw fail("sai số đối số socket");
+    if (opcode == OP_VM_MACHINE_SOCKET_LISTEN) {
+        const auto *port = std::get_if<int>(&arguments[0]);
+        const auto *backlog = std::get_if<int>(&arguments[1]);
+        if (!port || !backlog || *port <= 0 || *port > 65535 ||
+            *backlog <= 0 || *backlog > 1024)
+            throw fail("listen yêu cầu port 1..65535 và backlog 1..1024");
+#if defined(_WIN32)
+        ensureForeignWinsock();
+#endif
+        const auto opened = socket_machine::listen(*port, *backlog);
+        if (opened.value < 0)
+            throw socketError("socket_listen OS=" + std::to_string(opened.error));
+#if defined(_WIN32)
+        return make_int_value(registerForeignSocket(state,
+            static_cast<SOCKET>(opened.value), false, true));
+#else
+        return make_int_value(registerForeignSocket(state,
+            static_cast<int>(opened.value), false, true));
+#endif
+    }
+    if (opcode == OP_VM_MACHINE_SOCKET_CONNECT) {
+        const auto *host = std::get_if<ListHandle>(&arguments[0]);
+        const auto *port = std::get_if<int>(&arguments[1]);
+        const auto *udp = std::get_if<int>(&arguments[2]);
+        const auto *timeout = std::get_if<int>(&arguments[3]);
+        if (!host || !*host || !port || *port <= 0 || *port > 65535 ||
+            !udp || (*udp != 0 && *udp != 1) || !timeout ||
+            *timeout <= 0 || *timeout > 300000)
+            throw fail("connect yêu cầu IP byte, port 1..65535, udp 0/1, timeout 1..300000");
+        const auto &values = (*host)->elements;
+        if (values.size() != 4 && values.size() != 16)
+            throw fail("connect yêu cầu địa chỉ IPv4 bốn byte hoặc IPv6 mười sáu byte");
+        std::array<unsigned char, 16> bytes{};
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            const auto *value = std::get_if<int>(&values[i]);
+            if (!value || *value < 0 || *value > 255)
+                throw fail("connect địa chỉ có byte ngoài miền 0..255");
+            bytes[i] = static_cast<unsigned char>(*value);
+        }
+#if defined(_WIN32)
+        ensureForeignWinsock();
+#endif
+        const auto connected = socket_machine::connect(bytes.data(), values.size(),
+            *port, *udp == 1, *timeout);
+        if (connected.value < 0)
+            throw socketError("socket_connect OS=" + std::to_string(connected.error));
+#if defined(_WIN32)
+        return make_int_value(registerForeignSocket(state,
+            static_cast<SOCKET>(connected.value), *udp == 1, false));
+#else
+        return make_int_value(registerForeignSocket(state,
+            static_cast<int>(connected.value), *udp == 1, false));
+#endif
+    }
+    const auto *token = std::get_if<int>(&arguments[0]);
+    if (!token) throw fail("token socket phải là số nguyên");
+    const auto found = state.sockets.find(*token);
+    if (found == state.sockets.end())
+        throw socketError("socket đã đóng hoặc không thuộc VM");
+    const auto &socket = found->second;
+    if (opcode == OP_VM_MACHINE_SOCKET_KIND) {
+        return make_int_value(socket.tlsSession ? 2 : socket.datagram ? 1 : 0);
+    }
+    if (opcode == OP_VM_MACHINE_SOCKET_ACCEPT) {
+        if (!socket.listener || socket.datagram || socket.tlsSession)
+            throw fail("accept yêu cầu listener TCP");
+        const auto accepted = socket_machine::accept(socket.descriptor);
+        if (accepted.value < 0)
+            throw socketError("socket_accept OS=" + std::to_string(accepted.error));
+        // The registry owns the accepted descriptor only after configuration.
+        // On failure close it immediately to avoid leaking a raw OS handle.
+        const auto closeAccepted = [&]() noexcept {
+#if defined(_WIN32)
+            (void)::closesocket(static_cast<SOCKET>(accepted.value));
+#else
+            (void)file_machine::close(static_cast<int>(accepted.value));
+#endif
+        };
+        const auto noSignal = socket_machine::suppressSigpipe(accepted.value);
+        if (noSignal.value < 0) {
+            closeAccepted();
+            throw socketError("socket_accept SO_NOSIGPIPE=" +
+                              std::to_string(noSignal.error));
+        }
+        if (!setForeignSocketTimeout(
+                static_cast<std::intptr_t>(accepted.value), 300000)) {
+#if defined(_WIN32)
+            const int error = ::WSAGetLastError();
+#else
+            const int error = errno;
+#endif
+            closeAccepted();
+            throw socketError("socket_accept timeout OS=" + std::to_string(error));
+        }
+#if defined(_WIN32)
+        return make_int_value(registerForeignSocket(state,
+            static_cast<SOCKET>(accepted.value), false, false));
+#else
+        return make_int_value(registerForeignSocket(state,
+            static_cast<int>(accepted.value), false, false));
+#endif
+    }
+    if (io) {
+        if (socket.listener || socket.tlsSession != nullptr)
+            throw fail("raw send/recv yêu cầu socket TCP/UDP, không hỗ trợ listener/TLS");
+        const auto *handle = std::get_if<ListHandle>(&arguments[1]);
+        const auto *count = std::get_if<int>(&arguments[2]);
+        const auto *flags = std::get_if<int>(&arguments[3]);
+        if (!handle || !*handle || !count || *count <= 0 || *count > 65536 ||
+            !flags || *flags != 0 || (*handle)->elements.size() != static_cast<std::size_t>(*count))
+            throw fail("cần danh sách byte 1..65536, chiều dài khớp và flags=0");
+        if (opcode == OP_VM_MACHINE_SOCKET_SEND && socket.datagram && *count > 65507)
+            throw fail("datagram vượt quá 65507 byte");
+        auto &values = (*handle)->elements;
+        std::vector<char> bytes(static_cast<std::size_t>(*count));
+        if (opcode == OP_VM_MACHINE_SOCKET_SEND) {
+            for (int i = 0; i < *count; ++i) {
+                const auto *byte = std::get_if<int>(&values[static_cast<std::size_t>(i)]);
+                if (!byte || *byte < 0 || *byte > 255)
+                    throw fail("dữ liệu gửi chứa byte ngoài miền 0..255");
+                bytes[static_cast<std::size_t>(i)] = static_cast<char>(*byte);
+            }
+        }
+        const auto transferred = opcode == OP_VM_MACHINE_SOCKET_SEND
+            ? socket_machine::send(socket.descriptor, bytes.data(), bytes.size(), 0)
+            : socket_machine::receive(socket.descriptor, bytes.data(), bytes.size(), 0);
+        if (transferred.value < 0)
+            throw socketError(std::string(opcode == OP_VM_MACHINE_SOCKET_SEND
+                ? "socket_send" : "socket_recv") + ": OS=" +
+                std::to_string(transferred.error));
+        if (transferred.value > *count) throw fail("OS trả quá số byte yêu cầu");
+        if (opcode == OP_VM_MACHINE_SOCKET_RECV) {
+            for (std::int64_t i = 0; i < transferred.value; ++i)
+                values[static_cast<std::size_t>(i)] = make_int_value(
+                    static_cast<unsigned char>(bytes[static_cast<std::size_t>(i)]));
+        }
+        return make_int_value(static_cast<int>(transferred.value));
+    }
+
+    if (opcode == OP_VM_MACHINE_SOCKET_TIMEOUT) {
+        const auto *milliseconds = std::get_if<int>(&arguments[1]);
+        if (!milliseconds || *milliseconds <= 0 || *milliseconds > 300000)
+            throw fail("timeout phải trong 1..300000 mili giây");
+        if (socket.descriptor < 0) throw socketError("socket không có descriptor hợp lệ");
+#if !defined(_WIN32)
+        if (socket.descriptor > INT_MAX) throw fail("descriptor vượt miền POSIX");
+#endif
+        if (!setForeignSocketTimeout(socket.descriptor, *milliseconds)) {
+#if defined(_WIN32)
+            throw socketError("setsockopt WinSock=" + std::to_string(WSAGetLastError()));
+#else
+            throw socketError("setsockopt errno=" + std::to_string(errno));
+#endif
+        }
+        return make_int_value(1);
+    }
+
+#if !defined(_WIN32)
+    if (socket.tlsSession) {
+        // TLS provider owns the socket after upgrade and closes it with its session.
+        helpers::closeForeignTlsClient(socket.tlsSession);
+    } else
+#endif
+    if (socket.descriptor >= 0) {
+#if defined(_WIN32)
+        if (::closesocket(static_cast<SOCKET>(socket.descriptor)) != 0)
+            throw socketError("closesocket lỗi=" + std::to_string(WSAGetLastError()));
+#else
+        // Uses vpp_file_primitives.S on supported Unix ABIs, with no libc close.
+        const auto closed = file_machine::close(static_cast<int>(socket.descriptor));
+        // Linux closes the descriptor even when close reports EINTR.
+        // Never retry close: the descriptor number may already be reused.
+#if defined(__linux__)
+        if (closed.value < 0 && closed.error != EINTR)
+#else
+        if (closed.value < 0)
+#endif
+            throw socketError("close lỗi=" + std::to_string(closed.error));
+#endif
+    }
+    state.sockets.erase(found);
+    return make_int_value(0);
+}
+
 void ForeignFileState::closeAll() noexcept {
     for (const auto &[id, file] : files) {
         (void)id;
@@ -910,7 +1132,8 @@ void ForeignFileState::closeAll() noexcept {
 #else
         if (socket.tlsSession != nullptr)
             helpers::closeForeignTlsClient(socket.tlsSession);
-        else if (socket.descriptor >= 0) (void)::close(socket.descriptor);
+        else if (socket.descriptor >= 0)
+            (void)file_machine::close(static_cast<int>(socket.descriptor));
 #endif
     }
     sockets.clear();
@@ -919,6 +1142,499 @@ void ForeignFileState::closeAll() noexcept {
         closeForeignProcess(process);
     }
     processes.clear();
+}
+
+// Single implementation for both legacy process FFI and intrinsic dispatch.
+// Owns all child state and OS handles within the calling VM's registry.
+static ForeignCallResult executeProcessOperation(
+    std::string_view processOp,
+    const std::vector<StackValue> &arguments,
+    ForeignFileState &state, int previousPosixError) {
+        auto str = [&](std::size_t index) -> const std::string & {
+            if (index >= arguments.size() ||
+                !std::holds_alternative<std::string>(arguments[index]))
+                throw ffiError("system.process yêu cầu c_chuỗi");
+            const auto &result = std::get<std::string>(arguments[index]);
+            if (result.find('\0') != std::string::npos)
+                throw ffiError("system.process c_chuỗi chứa NUL");
+            return result;
+        };
+        auto integer = [&](std::size_t index) -> int {
+            if (index >= arguments.size() ||
+                !std::holds_alternative<int>(arguments[index]))
+                throw ffiError("system.process yêu cầu i32");
+            return std::get<int>(arguments[index]);
+        };
+        if (processOp == "new") {
+            const auto &program = str(0);
+            if (program.empty()) throw ffiError("system.process: chương trình rỗng");
+            const auto candidate = nextOpaqueResourceToken();
+            if (candidate > static_cast<std::uint64_t>(INT32_MAX))
+                throw ffiError("hết định danh tiến trình VM");
+            ForeignFileState::Process process{};
+            process.program = program;
+            state.processes.emplace(static_cast<int>(candidate), std::move(process));
+            return {make_int_value(static_cast<int>(candidate)), previousPosixError};
+        }
+        const int id = integer(0);
+        auto iterator = state.processes.find(id);
+        if (iterator == state.processes.end())
+            throw ffiError("tiến trình không thuộc VM hoặc đã đóng");
+        auto &process = iterator->second;
+        if (processOp == "close") {
+            closeForeignProcess(process);
+            state.processes.erase(iterator);
+            return {make_int_value(1), previousPosixError};
+        }
+        if (processOp == "error")
+            return {make_string_value(process.error), previousPosixError};
+        if (processOp == "command_line") {
+#if defined(_WIN32)
+            if (process.startAttempted || !process.windowsCommandLine.empty() ||
+                !process.arguments.empty())
+                throw ffiError("command_line chỉ được đặt một lần, trước khi spawn");
+            const auto &line = str(1);
+            if (line.empty() || foreignWide(line).size() > 32766)
+                throw ffiError("command_line Windows rỗng hoặc vượt 32766 ký tự UTF-16");
+            process.windowsCommandLine = line;
+            return {make_int_value(1), previousPosixError};
+#else
+            throw ffiError("command_line chỉ hỗ trợ Windows");
+#endif
+        }
+        if (processOp == "arg" || processOp == "env") {
+            if (process.startAttempted)
+                throw ffiError("không thể sửa argv/env sau khi spawn");
+            if (processOp == "arg") {
+#if defined(_WIN32)
+                throw ffiError("Windows argv phải dựng tại V++ qua command_line");
+#else
+                process.arguments.push_back(str(1));
+#endif
+            } else {
+                const auto &key = str(1);
+                const auto &value = str(2);
+                if (key.empty() || key.find('=') != std::string::npos)
+                    throw ffiError("tên biến môi trường không hợp lệ");
+                process.environment[key] = value;
+            }
+            return {make_int_value(1), previousPosixError};
+        }
+        if (processOp == "start") {
+            if (process.startAttempted)
+                throw ffiError("tiến trình đã khởi chạy");
+#if defined(_WIN32)
+            if (process.windowsCommandLine.empty())
+                throw ffiError("Windows process yêu cầu command_line từ V++ trước khi start");
+#endif
+            process.startAttempted = true;
+            return {make_int_value(launchForeignProcess(process) ? 1 : 0),
+                    previousPosixError};
+        }
+        if (process.pid <= 0)
+            throw ffiError("tiến trình chưa khởi chạy hoặc đã được wait");
+        if (processOp == "poll") {
+            const int timeout = integer(1);
+            if (timeout < 0 || timeout > 5000)
+                throw ffiError("poll tiến trình yêu cầu timeout 0..5000 ms");
+#if defined(_WIN32)
+            return {make_int_value(pollForeignWindowsProcess(process, timeout)),
+                    previousPosixError};
+#else
+            pollfd fds[2]{};
+            int count = 0;
+            if (process.stdoutFd >= 0) fds[count++] = {process.stdoutFd, POLLIN, 0};
+            if (process.stderrFd >= 0) fds[count++] = {process.stderrFd, POLLIN, 0};
+            if (count == 0) return {make_int_value(4), previousPosixError};
+            const auto deadline = std::chrono::steady_clock::now() +
+                                  std::chrono::milliseconds(timeout);
+            int rc = -1;
+            while (true) {
+                const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    deadline - std::chrono::steady_clock::now()).count();
+                rc = ::poll(fds, count, static_cast<int>(std::max<std::int64_t>(0, left)));
+                if (rc < 0 && errno == EINTR) continue;
+                break;
+            }
+            if (rc < 0) throwForeignSocketIoError("process_poll: " +
+                                                  std::string(std::strerror(errno)));
+            int ready = 0;
+            for (int i = 0; i < count; ++i) {
+                if ((fds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) != 0)
+                    ready |= fds[i].fd == process.stdoutFd ? 1 : 2;
+            }
+            return {make_int_value(ready), previousPosixError};
+#endif
+        }
+        if (processOp == "read") {
+            const int channel = integer(1);
+            if (channel != 1 && channel != 2)
+                throw ffiError("process_read: channel yêu cầu 1 hoặc 2");
+            if (!std::holds_alternative<ListHandle>(arguments[2]) ||
+                !std::get<ListHandle>(arguments[2]))
+                throw ffiError("process_read: c_đệm_ra yêu cầu danh sách byte");
+            auto &buffer = std::get<ListHandle>(arguments[2])->elements;
+            const auto count = ffiUnsigned64(arguments[3]);
+            if (count == 0 || count > 4096 || buffer.size() != count)
+                throw ffiError("process_read: đệm phải khớp 1..4096 byte");
+            // Both platforms expose the same c_đệm_ra and 1/2 pipe channels.
+#if defined(_WIN32)
+            void *&slot = channel == 1 ? process.windowsStdout : process.windowsStderr;
+            if (!slot) return {make_int_value(0), previousPosixError};
+            DWORD available = 0;
+            if (!PeekNamedPipe(static_cast<HANDLE>(slot), nullptr, 0,
+                               nullptr, &available, nullptr)) {
+                const DWORD error = GetLastError();
+                if (error == ERROR_BROKEN_PIPE || error == ERROR_PIPE_NOT_CONNECTED) {
+                    CloseHandle(static_cast<HANDLE>(slot));
+                    slot = nullptr;
+                    return {make_int_value(0), previousPosixError};
+                }
+                throwForeignSocketIoError("process_read: mã " + std::to_string(error));
+            }
+            if (available == 0) return {make_int_value(0), previousPosixError};
+            std::array<unsigned char, 4096> bytes{};
+            DWORD n = 0;
+            if (!ReadFile(static_cast<HANDLE>(slot), bytes.data(),
+                          static_cast<DWORD>(std::min<std::uint64_t>(count, available)),
+                          &n, nullptr)) {
+                const DWORD error = GetLastError();
+                if (error == ERROR_BROKEN_PIPE) {
+                    CloseHandle(static_cast<HANDLE>(slot));
+                    slot = nullptr;
+                    return {make_int_value(0), previousPosixError};
+                }
+                throwForeignSocketIoError("process_read: mã " + std::to_string(error));
+            }
+            for (DWORD i = 0; i < n; ++i)
+                buffer[static_cast<std::size_t>(i)] = make_int_value(bytes[i]);
+            return {make_int_value(static_cast<int>(n)), previousPosixError};
+#else
+            int &fd = channel == 1 ? process.stdoutFd : process.stderrFd;
+            if (fd < 0) return {make_int_value(0), previousPosixError};
+            std::array<unsigned char, 4096> bytes{};
+            ssize_t n = -1;
+            do { n = ::read(fd, bytes.data(), static_cast<std::size_t>(count)); }
+            while (n < 0 && errno == EINTR);
+            if (n < 0) throwForeignSocketIoError("process_read: " +
+                                                 std::string(std::strerror(errno)));
+            if (n == 0) { (void)::close(fd); fd = -1; }
+            for (ssize_t i = 0; i < n; ++i)
+                buffer[static_cast<std::size_t>(i)] = make_int_value(bytes[i]);
+            return {make_int_value(static_cast<int>(n)), previousPosixError};
+#endif
+        }
+        if (processOp == "wait") {
+#if defined(_WIN32)
+            if (process.windowsStdout || process.windowsStderr)
+                throw ffiError("process_wait: cần đọc hết cả hai pipe trước khi wait");
+            const HANDLE child = static_cast<HANDLE>(process.windowsProcess);
+            if (!child || WaitForSingleObject(child, INFINITE) != WAIT_OBJECT_0)
+                throwForeignSocketIoError("process_wait: WaitForSingleObject thất bại");
+            DWORD exitCode = 0;
+            if (!GetExitCodeProcess(child, &exitCode))
+                throwForeignSocketIoError("process_wait: GetExitCodeProcess thất bại");
+            process.pid = -1;
+            return {make_int_value(static_cast<int>(exitCode)), previousPosixError};
+#else
+            if (process.stdoutFd >= 0 || process.stderrFd >= 0)
+                throw ffiError("process_wait: cần đọc hết cả hai pipe trước khi wait");
+            int status = 0;
+            pid_t rc = -1;
+            do { rc = ::waitpid(static_cast<pid_t>(process.pid), &status, 0); }
+            while (rc < 0 && errno == EINTR);
+            if (rc < 0) throwForeignSocketIoError("process_wait: " +
+                                                 std::string(std::strerror(errno)));
+            process.pid = -1;
+            int exitCode = -1;
+            if (WIFEXITED(status)) exitCode = WEXITSTATUS(status);
+            else if (WIFSIGNALED(status)) exitCode = 128 + WTERMSIG(status);
+            return {make_int_value(exitCode), previousPosixError};
+#endif
+        }
+        throw ffiError("system.process: thao tác không hợp lệ");}
+
+bool isProcessMachinePrimitive(int opcode) noexcept {
+    return opcode >= OP_VM_MACHINE_PROCESS_NEW &&
+           opcode <= OP_VM_MACHINE_PROCESS_CLOSE;
+}
+
+StackValue executeProcessMachinePrimitive(
+    Opcode opcode, const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state) {
+    struct Operation { Opcode opcode; const char *name; std::size_t arity; };
+    constexpr Operation operations[] = {
+        {OP_VM_MACHINE_PROCESS_NEW, "new", 1},
+        {OP_VM_MACHINE_PROCESS_ARG, "arg", 2},
+        {OP_VM_MACHINE_PROCESS_COMMAND_LINE, "command_line", 2},
+        {OP_VM_MACHINE_PROCESS_ENV, "env", 3},
+        {OP_VM_MACHINE_PROCESS_START, "start", 1},
+        {OP_VM_MACHINE_PROCESS_POLL, "poll", 2},
+        {OP_VM_MACHINE_PROCESS_READ, "read", 4},
+        {OP_VM_MACHINE_PROCESS_WAIT, "wait", 1},
+        {OP_VM_MACHINE_PROCESS_ERROR, "error", 1},
+        {OP_VM_MACHINE_PROCESS_CLOSE, "close", 1},
+    };
+    for (const auto &operation : operations) {
+        if (opcode != operation.opcode) continue;
+        const std::string capability = std::string("system.process.") + operation.name;
+        if (!capabilities.count(capability))
+            throw ffiError("thiếu khả năng: " + capability);
+        if (arguments.size() != operation.arity)
+            throw ffiError("system.process: sai số đối số machine");
+        return executeProcessOperation(operation.name, arguments, state, 0).value;
+    }
+    throw ffiError("system.process: opcode không hợp lệ");
+}
+
+// getaddrinfo returns OS-owned linked memory, exposed only as VM-local tokens.
+// Shared by legacy FFI for older bytecode and the new Machine Resolver ABI.
+static StackValue executeResolverOperation(
+    Opcode opcode, const std::vector<StackValue> &arguments, ForeignFileState &state) {
+    const bool dnsOpen = opcode == OP_VM_MACHINE_RESOLVE_OPEN;
+    const bool dnsClose = opcode == OP_VM_MACHINE_RESOLVE_CLOSE;
+    if (!dnsOpen && !dnsClose && opcode != OP_VM_MACHINE_RESOLVE_NEXT)
+        throw ffiError("resolver: opcode không hợp lệ");
+    // Native resolver uses OS APIs directly, independently of libffi.
+    if (dnsOpen) {
+        if (!std::holds_alternative<std::string>(arguments[0]) ||
+            !std::holds_alternative<std::string>(arguments[1]) ||
+            !std::holds_alternative<int>(arguments[2])) {
+            throw ffiError("resolve_open yêu cầu tên máy, cổng và kiểu socket hợp lệ");
+        }
+        const auto &host = std::get<std::string>(arguments[0]);
+        const auto &service = std::get<std::string>(arguments[1]);
+        const int datagram = std::get<int>(arguments[2]);
+        if (host.empty() || host.size() > 1024 || host.find('\0') != std::string::npos ||
+            service.size() > 5 || service.find('\0') != std::string::npos ||
+            (datagram != 0 && datagram != 1)) {
+            throw ffiError("resolve_open: tên máy/cổng/kiểu không hợp lệ");
+        }
+        if (!service.empty()) {
+            unsigned port = 0;
+            const auto parsed = std::from_chars(service.data(),
+                service.data() + service.size(), port);
+            if (parsed.ec != std::errc{} ||
+                parsed.ptr != service.data() + service.size() ||
+                port == 0 || port > 65535) {
+                throw ffiError("resolve_open: cổng phải trong 1..65535");
+            }
+        }
+        addrinfo hints{};
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = datagram ? SOCK_DGRAM : SOCK_STREAM;
+        hints.ai_protocol = service.empty() ? 0 :
+            (datagram ? IPPROTO_UDP : IPPROTO_TCP);
+        addrinfo *head = nullptr;
+#if defined(_WIN32)
+        ensureForeignWinsock();
+#endif
+        const int status = ::getaddrinfo(host.c_str(),
+            service.empty() ? nullptr : service.c_str(), &hints, &head);
+        if (status != 0 || head == nullptr) {
+            if (head != nullptr) ::freeaddrinfo(head);
+#if defined(_WIN32)
+            throw ffiError("resolve_open: không phân giải được tên máy, mã " +
+                std::to_string(status));
+#else
+            throw ffiError("resolve_open: không phân giải được tên máy: " +
+                std::string(::gai_strerror(status)));
+#endif
+        }
+        const auto candidate = nextOpaqueResourceToken();
+        if (candidate > static_cast<std::uint64_t>(INT32_MAX)) {
+            ::freeaddrinfo(head);
+            throw ffiError("hết định danh resolver trong VM");
+        }
+        try {
+            state.resolvers.emplace(static_cast<int>(candidate),
+                ForeignFileState::Resolver{head, head});
+        } catch (...) {
+            ::freeaddrinfo(head);
+            throw;
+        }
+        return make_int_value(static_cast<int>(candidate));
+    }
+    if (!std::holds_alternative<int>(arguments[0])) {
+        throw ffiError("c_dns yêu cầu handle do VM sở hữu");
+    }
+    const int token = std::get<int>(arguments[0]);
+    auto entry = state.resolvers.find(token);
+    if (entry == state.resolvers.end()) {
+        throw ffiError("c_dns đã đóng hoặc không thuộc VM");
+    }
+    if (dnsClose) {
+        ::freeaddrinfo(static_cast<addrinfo *>(entry->second.head));
+        state.resolvers.erase(entry);
+        return make_int_value(1);
+    }
+    while (entry->second.cursor != nullptr) {
+        auto *current = static_cast<addrinfo *>(entry->second.cursor);
+        entry->second.cursor = current->ai_next;
+        char host[NI_MAXHOST]{};
+        if (::getnameinfo(current->ai_addr,
+                static_cast<int>(current->ai_addrlen),
+                host, sizeof(host), nullptr, 0, NI_NUMERICHOST) == 0) {
+            return make_string_value(host);
+        }
+    }
+    return make_null_value();
+}
+
+bool isResolverMachinePrimitive(int opcode) noexcept {
+    return opcode >= OP_VM_MACHINE_RESOLVE_OPEN &&
+           opcode <= OP_VM_MACHINE_RESOLVE_CLOSE;
+}
+
+StackValue executeResolverMachinePrimitive(
+    Opcode opcode, const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state) {
+    const char *operation = opcode == OP_VM_MACHINE_RESOLVE_OPEN ? "open"
+        : opcode == OP_VM_MACHINE_RESOLVE_NEXT ? "next"
+        : opcode == OP_VM_MACHINE_RESOLVE_CLOSE ? "close" : nullptr;
+    if (!operation) throw ffiError("resolver: opcode không hợp lệ");
+    const std::string capability = std::string("system.net.resolve.") + operation;
+    if (!capabilities.count(capability))
+        throw ffiError("thiếu khả năng: " + capability);
+    if (arguments.size() != (opcode == OP_VM_MACHINE_RESOLVE_OPEN ? 3u : 1u))
+        throw ffiError("resolver: sai số đối số machine");
+    return executeResolverOperation(opcode, arguments, state);
+}
+
+// Shared TLS provider call for legacy bytecode and Machine TLS intrinsics.
+// The VM owns tokens; the provider performs certificate and hostname checks.
+static StackValue executeTlsOperation(
+    Opcode opcode, const std::vector<StackValue> &arguments, ForeignFileState &state) {
+    const bool tlsUpgrade = opcode == OP_VM_MACHINE_TLS_UPGRADE;
+    const bool tlsSend = opcode == OP_VM_MACHINE_TLS_SEND;
+    if (!tlsUpgrade && !tlsSend && opcode != OP_VM_MACHINE_TLS_RECV)
+        throw ffiError("TLS: opcode không hợp lệ");
+#if !defined(_WIN32) // TLS provider is independent of the legacy libffi bridge.
+    if (!std::holds_alternative<int>(arguments[0]))
+        throw ffiError("TLS yêu cầu token số nguyên");
+    const int token = std::get<int>(arguments[0]);
+    auto found = state.sockets.find(token);
+    if (found == state.sockets.end())
+        throwForeignSocketIoError("c_socket đã đóng hoặc không thuộc VM");
+    auto &socket = found->second;
+            if (tlsUpgrade) {
+                if (socket.tlsSession != nullptr || socket.listener || socket.datagram ||
+                    socket.descriptor < 0) {
+                    throw ffiError("tls_upgrade yêu cầu socket TCP chưa nâng cấp");
+                }
+                if (!std::holds_alternative<std::string>(arguments[1])) {
+                    throw ffiError("tls_upgrade yêu cầu tên máy chuỗi");
+                }
+                const auto &host = std::get<std::string>(arguments[1]);
+                if (host.empty() || host.size() > 253 ||
+                    std::any_of(host.begin(), host.end(), [](unsigned char c) {
+                        return c <= 32 || c == 127;
+                    })) {
+                    throw ffiError("tls_upgrade yêu cầu tên máy hợp lệ");
+                }
+                int type = 0;
+                socklen_t typeSize = sizeof(type);
+                sockaddr_storage peer{};
+                socklen_t peerSize = sizeof(peer);
+                if (::getsockopt(socket.descriptor, SOL_SOCKET, SO_TYPE,
+                                 &type, &typeSize) != 0 || type != SOCK_STREAM ||
+                    ::getpeername(socket.descriptor,
+                                  reinterpret_cast<sockaddr *>(&peer), &peerSize) != 0) {
+                    throw ffiError("tls_upgrade yêu cầu socket stream đã kết nối");
+                }
+                // The provider consumes fd on both successful and failed
+                // handshakes. Invalidate the registry descriptor first.
+                const int fd = socket.descriptor;
+                socket.descriptor = -1;
+                std::string error;
+                void *session = nullptr;
+                try {
+                    session = helpers::createForeignTlsClient(fd, host, error);
+                } catch (...) {
+                    state.sockets.erase(token);
+                    throw;
+                }
+                if (session == nullptr) {
+                    state.sockets.erase(token);
+                    throwForeignSocketIoError(error.empty()
+                        ? "tls_upgrade: TLS handshake thất bại" : error);
+                }
+                socket.tlsSession = session;
+                socket.descriptor = fd; // for socket_timeout setsockopt only
+                return make_int_value(token);
+            }
+            if (socket.tlsSession == nullptr || socket.listener || socket.datagram) {
+                throw ffiError("tls_send/tls_recv yêu cầu phiên TLS do VM sở hữu");
+            }
+            if (!std::holds_alternative<ListHandle>(arguments[1]) ||
+                !std::get<ListHandle>(arguments[1])) {
+                throw ffiError("TLS yêu cầu danh sách byte hợp lệ");
+            }
+            auto &bytes = std::get<ListHandle>(arguments[1])->elements;
+            const auto count = ffiUnsigned64(arguments[2]);
+            if (count == 0 || count > 65536 || bytes.size() != count) {
+                throw ffiError("TLS yêu cầu đệm và độ dài khớp 1..65536 byte");
+            }
+            std::string payload;
+            std::string error;
+            int transferred = 0;
+            if (tlsSend) {
+                payload.reserve(bytes.size());
+                for (const auto &byte : bytes) {
+                    if (!std::holds_alternative<int>(byte) ||
+                        std::get<int>(byte) < 0 || std::get<int>(byte) > 255) {
+                        throw ffiError("tls_send chứa byte ngoài miền 0..255");
+                    }
+                    payload.push_back(static_cast<char>(std::get<int>(byte)));
+                }
+                if (!helpers::writeForeignTlsClient(socket.tlsSession, payload,
+                                                    transferred, error)) {
+                    throwForeignSocketIoError(error);
+                }
+            } else {
+                if (!helpers::readForeignTlsClient(socket.tlsSession,
+                        static_cast<int>(count), payload, error)) {
+                    throwForeignSocketIoError(error);
+                }
+                transferred = static_cast<int>(payload.size());
+                if (transferred < 0 || static_cast<std::size_t>(transferred) > count)
+                    throw ffiError("TLS provider trả về số byte vượt đệm");
+                for (int i = 0; i < transferred; ++i) {
+                    bytes[static_cast<std::size_t>(i)] = make_int_value(
+                        static_cast<unsigned char>(payload[static_cast<std::size_t>(i)]));
+                }
+            }
+            if (transferred < 0 || static_cast<std::size_t>(transferred) > count)
+                throw ffiError("TLS provider trả về số byte không hợp lệ");
+            return make_int_value(transferred);
+#else
+    (void)arguments;
+    (void)state;
+    throw ffiError("TLS provider POSIX không khả dụng trên nền tảng này");
+#endif
+}
+
+bool isTlsMachinePrimitive(int opcode) noexcept {
+    return opcode >= OP_VM_MACHINE_TLS_UPGRADE &&
+           opcode <= OP_VM_MACHINE_TLS_RECV;
+}
+
+StackValue executeTlsMachinePrimitive(
+    Opcode opcode, const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state) {
+    const char *operation = opcode == OP_VM_MACHINE_TLS_UPGRADE ? "upgrade"
+        : opcode == OP_VM_MACHINE_TLS_SEND ? "send"
+        : opcode == OP_VM_MACHINE_TLS_RECV ? "recv" : nullptr;
+    if (!operation) throw ffiError("TLS: opcode không hợp lệ");
+    const std::string capability = std::string("system.net.tls.") + operation;
+    if (!capabilities.count(capability))
+        throw ffiError("thiếu khả năng: " + capability);
+    if (arguments.size() != (opcode == OP_VM_MACHINE_TLS_UPGRADE ? 2u : 3u))
+        throw ffiError("TLS: sai số đối số machine");
+    return executeTlsOperation(opcode, arguments, state);
 }
 
 ForeignCallResult executeForeignCall(
@@ -1673,7 +2389,7 @@ ForeignCallResult executeForeignCall(
             if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
                 return {make_null_value(), ENOTDIR};
 
-            const auto candidate = nextForeignResourceToken.fetch_add(1);
+            const auto candidate = nextOpaqueResourceToken();
             if (candidate > static_cast<std::uint64_t>(INT32_MAX))
                 throw ffiError("hết định danh thư mục FFI");
             // Keep the search handle safe if inserting the VM token throws.
@@ -1739,7 +2455,7 @@ ForeignCallResult executeForeignCall(
                 throw ffiError("fopen: chế độ chỉ được rb, wb hoặc ab");
             const auto widePath = foreignWide(path);
             if (widePath.empty()) throw ffiError("fopen: đường dẫn rỗng");
-            const std::uint64_t candidate = nextForeignResourceToken.fetch_add(1);
+            const std::uint64_t candidate = nextOpaqueResourceToken();
             if (candidate > INT32_MAX) throw ffiError("hết định danh tệp FFI");
             errno = 0;
             std::FILE *file = _wfopen(widePath.c_str(),
@@ -1787,303 +2503,14 @@ ForeignCallResult executeForeignCall(
 #endif
 
     if (processBinding) {
-#if defined(VPP_HAS_LIBFFI) || defined(_WIN32)
-        auto str = [&](std::size_t index) -> const std::string & {
-            if (index >= arguments.size() ||
-                !std::holds_alternative<std::string>(arguments[index]))
-                throw ffiError("system.process yêu cầu c_chuỗi");
-            const auto &result = std::get<std::string>(arguments[index]);
-            if (result.find('\0') != std::string::npos)
-                throw ffiError("system.process c_chuỗi chứa NUL");
-            return result;
-        };
-        auto integer = [&](std::size_t index) -> int {
-            if (index >= arguments.size() ||
-                !std::holds_alternative<int>(arguments[index]))
-                throw ffiError("system.process yêu cầu i32");
-            return std::get<int>(arguments[index]);
-        };
-        if (processOp == "new") {
-            const auto &program = str(0);
-            if (program.empty()) throw ffiError("system.process: chương trình rỗng");
-            const auto candidate = nextForeignResourceToken.fetch_add(1);
-            if (candidate > static_cast<std::uint64_t>(INT32_MAX))
-                throw ffiError("hết định danh tiến trình VM");
-            ForeignFileState::Process process{};
-            process.program = program;
-            fileState->processes.emplace(static_cast<int>(candidate), std::move(process));
-            return {make_int_value(static_cast<int>(candidate)), previousPosixError};
-        }
-        const int id = integer(0);
-        auto iterator = fileState->processes.find(id);
-        if (iterator == fileState->processes.end())
-            throw ffiError("tiến trình không thuộc VM hoặc đã đóng");
-        auto &process = iterator->second;
-        if (processOp == "close") {
-            closeForeignProcess(process);
-            fileState->processes.erase(iterator);
-            return {make_int_value(1), previousPosixError};
-        }
-        if (processOp == "error")
-            return {make_string_value(process.error), previousPosixError};
-        if (processOp == "command_line") {
-#if defined(_WIN32)
-            if (process.startAttempted || !process.windowsCommandLine.empty() ||
-                !process.arguments.empty())
-                throw ffiError("command_line chỉ được đặt một lần, trước khi spawn");
-            const auto &line = str(1);
-            if (line.empty() || foreignWide(line).size() > 32766)
-                throw ffiError("command_line Windows rỗng hoặc vượt 32766 ký tự UTF-16");
-            process.windowsCommandLine = line;
-            return {make_int_value(1), previousPosixError};
-#else
-            throw ffiError("command_line chỉ hỗ trợ Windows");
-#endif
-        }
-        if (processOp == "arg" || processOp == "env") {
-            if (process.startAttempted)
-                throw ffiError("không thể sửa argv/env sau khi spawn");
-            if (processOp == "arg") {
-#if defined(_WIN32)
-                throw ffiError("Windows argv phải dựng tại V++ qua command_line");
-#else
-                process.arguments.push_back(str(1));
-#endif
-            } else {
-                const auto &key = str(1);
-                const auto &value = str(2);
-                if (key.empty() || key.find('=') != std::string::npos)
-                    throw ffiError("tên biến môi trường không hợp lệ");
-                process.environment[key] = value;
-            }
-            return {make_int_value(1), previousPosixError};
-        }
-        if (processOp == "start") {
-            if (process.startAttempted)
-                throw ffiError("tiến trình đã khởi chạy");
-#if defined(_WIN32)
-            if (process.windowsCommandLine.empty())
-                throw ffiError("Windows process yêu cầu command_line từ V++ trước khi start");
-#endif
-            process.startAttempted = true;
-            return {make_int_value(launchForeignProcess(process) ? 1 : 0),
-                    previousPosixError};
-        }
-        if (process.pid <= 0)
-            throw ffiError("tiến trình chưa khởi chạy hoặc đã được wait");
-        if (processOp == "poll") {
-            const int timeout = integer(1);
-            if (timeout < 0 || timeout > 5000)
-                throw ffiError("poll tiến trình yêu cầu timeout 0..5000 ms");
-#if defined(_WIN32)
-            return {make_int_value(pollForeignWindowsProcess(process, timeout)),
-                    previousPosixError};
-#else
-            pollfd fds[2]{};
-            int count = 0;
-            if (process.stdoutFd >= 0) fds[count++] = {process.stdoutFd, POLLIN, 0};
-            if (process.stderrFd >= 0) fds[count++] = {process.stderrFd, POLLIN, 0};
-            if (count == 0) return {make_int_value(4), previousPosixError};
-            const auto deadline = std::chrono::steady_clock::now() +
-                                  std::chrono::milliseconds(timeout);
-            int rc = -1;
-            while (true) {
-                const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    deadline - std::chrono::steady_clock::now()).count();
-                rc = ::poll(fds, count, static_cast<int>(std::max<std::int64_t>(0, left)));
-                if (rc < 0 && errno == EINTR) continue;
-                break;
-            }
-            if (rc < 0) throwForeignSocketIoError("process_poll: " +
-                                                  std::string(std::strerror(errno)));
-            int ready = 0;
-            for (int i = 0; i < count; ++i) {
-                if ((fds[i].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) != 0)
-                    ready |= fds[i].fd == process.stdoutFd ? 1 : 2;
-            }
-            return {make_int_value(ready), previousPosixError};
-#endif
-        }
-        if (processOp == "read") {
-            const int channel = integer(1);
-            if (channel != 1 && channel != 2)
-                throw ffiError("process_read: channel yêu cầu 1 hoặc 2");
-            if (!std::holds_alternative<ListHandle>(arguments[2]) ||
-                !std::get<ListHandle>(arguments[2]))
-                throw ffiError("process_read: c_đệm_ra yêu cầu danh sách byte");
-            auto &buffer = std::get<ListHandle>(arguments[2])->elements;
-            const auto count = ffiUnsigned64(arguments[3]);
-            if (count == 0 || count > 4096 || buffer.size() != count)
-                throw ffiError("process_read: đệm phải khớp 1..4096 byte");
-            // Both platforms expose the same c_đệm_ra and 1/2 pipe channels.
-#if defined(_WIN32)
-            void *&slot = channel == 1 ? process.windowsStdout : process.windowsStderr;
-            if (!slot) return {make_int_value(0), previousPosixError};
-            DWORD available = 0;
-            if (!PeekNamedPipe(static_cast<HANDLE>(slot), nullptr, 0,
-                               nullptr, &available, nullptr)) {
-                const DWORD error = GetLastError();
-                if (error == ERROR_BROKEN_PIPE || error == ERROR_PIPE_NOT_CONNECTED) {
-                    CloseHandle(static_cast<HANDLE>(slot));
-                    slot = nullptr;
-                    return {make_int_value(0), previousPosixError};
-                }
-                throwForeignSocketIoError("process_read: mã " + std::to_string(error));
-            }
-            if (available == 0) return {make_int_value(0), previousPosixError};
-            std::array<unsigned char, 4096> bytes{};
-            DWORD n = 0;
-            if (!ReadFile(static_cast<HANDLE>(slot), bytes.data(),
-                          static_cast<DWORD>(std::min<std::uint64_t>(count, available)),
-                          &n, nullptr)) {
-                const DWORD error = GetLastError();
-                if (error == ERROR_BROKEN_PIPE) {
-                    CloseHandle(static_cast<HANDLE>(slot));
-                    slot = nullptr;
-                    return {make_int_value(0), previousPosixError};
-                }
-                throwForeignSocketIoError("process_read: mã " + std::to_string(error));
-            }
-            for (DWORD i = 0; i < n; ++i)
-                buffer[static_cast<std::size_t>(i)] = make_int_value(bytes[i]);
-            return {make_int_value(static_cast<int>(n)), previousPosixError};
-#else
-            int &fd = channel == 1 ? process.stdoutFd : process.stderrFd;
-            if (fd < 0) return {make_int_value(0), previousPosixError};
-            std::array<unsigned char, 4096> bytes{};
-            ssize_t n = -1;
-            do { n = ::read(fd, bytes.data(), static_cast<std::size_t>(count)); }
-            while (n < 0 && errno == EINTR);
-            if (n < 0) throwForeignSocketIoError("process_read: " +
-                                                 std::string(std::strerror(errno)));
-            if (n == 0) { (void)::close(fd); fd = -1; }
-            for (ssize_t i = 0; i < n; ++i)
-                buffer[static_cast<std::size_t>(i)] = make_int_value(bytes[i]);
-            return {make_int_value(static_cast<int>(n)), previousPosixError};
-#endif
-        }
-        if (processOp == "wait") {
-#if defined(_WIN32)
-            if (process.windowsStdout || process.windowsStderr)
-                throw ffiError("process_wait: cần đọc hết cả hai pipe trước khi wait");
-            const HANDLE child = static_cast<HANDLE>(process.windowsProcess);
-            if (!child || WaitForSingleObject(child, INFINITE) != WAIT_OBJECT_0)
-                throwForeignSocketIoError("process_wait: WaitForSingleObject thất bại");
-            DWORD exitCode = 0;
-            if (!GetExitCodeProcess(child, &exitCode))
-                throwForeignSocketIoError("process_wait: GetExitCodeProcess thất bại");
-            process.pid = -1;
-            return {make_int_value(static_cast<int>(exitCode)), previousPosixError};
-#else
-            if (process.stdoutFd >= 0 || process.stderrFd >= 0)
-                throw ffiError("process_wait: cần đọc hết cả hai pipe trước khi wait");
-            int status = 0;
-            pid_t rc = -1;
-            do { rc = ::waitpid(static_cast<pid_t>(process.pid), &status, 0); }
-            while (rc < 0 && errno == EINTR);
-            if (rc < 0) throwForeignSocketIoError("process_wait: " +
-                                                 std::string(std::strerror(errno)));
-            process.pid = -1;
-            int exitCode = -1;
-            if (WIFEXITED(status)) exitCode = WEXITSTATUS(status);
-            else if (WIFSIGNALED(status)) exitCode = 128 + WTERMSIG(status);
-            return {make_int_value(exitCode), previousPosixError};
-#endif
-        }
-        throw ffiError("system.process: thao tác không hợp lệ");
-#else
-        throw ffiError("system.process FFI chỉ hỗ trợ POSIX/libffi");
-#endif
+        return executeProcessOperation(processOp, arguments, *fileState, previousPosixError);
     }
 
     if (dnsOpen || dnsNext || dnsClose) {
-#if defined(VPP_HAS_LIBFFI) || defined(_WIN32)
-        if (dnsOpen) {
-            if (!std::holds_alternative<std::string>(arguments[0]) ||
-                !std::holds_alternative<std::string>(arguments[1]) ||
-                !std::holds_alternative<int>(arguments[2])) {
-                throw ffiError("resolve_open yêu cầu tên máy, cổng và kiểu socket hợp lệ");
-            }
-            const auto &host = std::get<std::string>(arguments[0]);
-            const auto &service = std::get<std::string>(arguments[1]);
-            const int datagram = std::get<int>(arguments[2]);
-            if (host.empty() || host.size() > 1024 || host.find('\0') != std::string::npos ||
-                service.size() > 5 || service.find('\0') != std::string::npos ||
-                (datagram != 0 && datagram != 1)) {
-                throw ffiError("resolve_open: tên máy/cổng/kiểu không hợp lệ");
-            }
-            if (!service.empty()) {
-                unsigned port = 0;
-                const auto parsed = std::from_chars(service.data(),
-                    service.data() + service.size(), port);
-                if (parsed.ec != std::errc{} ||
-                    parsed.ptr != service.data() + service.size() ||
-                    port == 0 || port > 65535) {
-                    throw ffiError("resolve_open: cổng phải trong 1..65535");
-                }
-            }
-            addrinfo hints{};
-            hints.ai_family = AF_UNSPEC;
-            hints.ai_socktype = datagram ? SOCK_DGRAM : SOCK_STREAM;
-            hints.ai_protocol = service.empty() ? 0 :
-                (datagram ? IPPROTO_UDP : IPPROTO_TCP);
-            addrinfo *head = nullptr;
-#if defined(_WIN32)
-            ensureForeignWinsock();
-#endif
-            const int status = ::getaddrinfo(host.c_str(),
-                service.empty() ? nullptr : service.c_str(), &hints, &head);
-            if (status != 0 || head == nullptr) {
-                if (head != nullptr) ::freeaddrinfo(head);
-#if defined(_WIN32)
-                throw ffiError("resolve_open: không phân giải được tên máy, mã " +
-                    std::to_string(status));
-#else
-                throw ffiError("resolve_open: không phân giải được tên máy: " +
-                    std::string(::gai_strerror(status)));
-#endif
-            }
-            const auto candidate = nextForeignResourceToken.fetch_add(1);
-            if (candidate > static_cast<std::uint64_t>(INT32_MAX)) {
-                ::freeaddrinfo(head);
-                throw ffiError("hết định danh resolver trong VM");
-            }
-            try {
-                fileState->resolvers.emplace(static_cast<int>(candidate),
-                    ForeignFileState::Resolver{head, head});
-            } catch (...) {
-                ::freeaddrinfo(head);
-                throw;
-            }
-            return {make_int_value(static_cast<int>(candidate)), previousPosixError};
-        }
-        if (!std::holds_alternative<int>(arguments[0])) {
-            throw ffiError("c_dns yêu cầu handle do VM sở hữu");
-        }
-        const int token = std::get<int>(arguments[0]);
-        auto entry = fileState->resolvers.find(token);
-        if (entry == fileState->resolvers.end()) {
-            throw ffiError("c_dns đã đóng hoặc không thuộc VM");
-        }
-        if (dnsClose) {
-            ::freeaddrinfo(static_cast<addrinfo *>(entry->second.head));
-            fileState->resolvers.erase(entry);
-            return {make_int_value(1), previousPosixError};
-        }
-        while (entry->second.cursor != nullptr) {
-            auto *current = static_cast<addrinfo *>(entry->second.cursor);
-            entry->second.cursor = current->ai_next;
-            char host[NI_MAXHOST]{};
-            if (::getnameinfo(current->ai_addr,
-                    static_cast<int>(current->ai_addrlen),
-                    host, sizeof(host), nullptr, 0, NI_NUMERICHOST) == 0) {
-                return {make_string_value(host), previousPosixError};
-            }
-        }
-        return {make_null_value(), previousPosixError};
-#else
-        throw ffiError("resolver FFI yêu cầu POSIX/libffi hoặc Windows Winsock");
-#endif
+        return {executeResolverOperation(
+            dnsOpen ? OP_VM_MACHINE_RESOLVE_OPEN :
+            dnsNext ? OP_VM_MACHINE_RESOLVE_NEXT : OP_VM_MACHINE_RESOLVE_CLOSE,
+            arguments, *fileState), previousPosixError};
     }
 
 #if defined(_WIN32)
@@ -2328,97 +2755,10 @@ ForeignCallResult executeForeignCall(
             return {make_int_value(0), previousPosixError};
         }
         if (tlsBinding) {
-            if (tlsUpgrade) {
-                if (socket.tlsSession != nullptr || socket.listener || socket.datagram ||
-                    socket.descriptor < 0) {
-                    throw ffiError("tls_upgrade yêu cầu socket TCP chưa nâng cấp");
-                }
-                if (!std::holds_alternative<std::string>(arguments[1])) {
-                    throw ffiError("tls_upgrade yêu cầu tên máy chuỗi");
-                }
-                const auto &host = std::get<std::string>(arguments[1]);
-                if (host.empty() || host.size() > 253 ||
-                    std::any_of(host.begin(), host.end(), [](unsigned char c) {
-                        return c <= 32 || c == 127;
-                    })) {
-                    throw ffiError("tls_upgrade yêu cầu tên máy hợp lệ");
-                }
-                int type = 0;
-                socklen_t typeSize = sizeof(type);
-                sockaddr_storage peer{};
-                socklen_t peerSize = sizeof(peer);
-                if (::getsockopt(socket.descriptor, SOL_SOCKET, SO_TYPE,
-                                 &type, &typeSize) != 0 || type != SOCK_STREAM ||
-                    ::getpeername(socket.descriptor,
-                                  reinterpret_cast<sockaddr *>(&peer), &peerSize) != 0) {
-                    throw ffiError("tls_upgrade yêu cầu socket stream đã kết nối");
-                }
-                // The provider consumes fd on both successful and failed
-                // handshakes. Invalidate the registry descriptor first.
-                const int fd = socket.descriptor;
-                socket.descriptor = -1;
-                std::string error;
-                void *session = nullptr;
-                try {
-                    session = helpers::createForeignTlsClient(fd, host, error);
-                } catch (...) {
-                    fileState->sockets.erase(token);
-                    throw;
-                }
-                if (session == nullptr) {
-                    fileState->sockets.erase(token);
-                    throwForeignSocketIoError(error.empty()
-                        ? "tls_upgrade: TLS handshake thất bại" : error);
-                }
-                socket.tlsSession = session;
-                socket.descriptor = fd; // for socket_timeout setsockopt only
-                return {make_int_value(token), previousPosixError};
-            }
-            if (socket.tlsSession == nullptr || socket.listener || socket.datagram) {
-                throw ffiError("tls_send/tls_recv yêu cầu phiên TLS do VM sở hữu");
-            }
-            if (!std::holds_alternative<ListHandle>(arguments[1]) ||
-                !std::get<ListHandle>(arguments[1])) {
-                throw ffiError("TLS yêu cầu danh sách byte hợp lệ");
-            }
-            auto &bytes = std::get<ListHandle>(arguments[1])->elements;
-            const auto count = ffiUnsigned64(arguments[2]);
-            if (count == 0 || count > 65536 || bytes.size() != count) {
-                throw ffiError("TLS yêu cầu đệm và độ dài khớp 1..65536 byte");
-            }
-            std::string payload;
-            std::string error;
-            int transferred = 0;
-            if (tlsSend) {
-                payload.reserve(bytes.size());
-                for (const auto &byte : bytes) {
-                    if (!std::holds_alternative<int>(byte) ||
-                        std::get<int>(byte) < 0 || std::get<int>(byte) > 255) {
-                        throw ffiError("tls_send chứa byte ngoài miền 0..255");
-                    }
-                    payload.push_back(static_cast<char>(std::get<int>(byte)));
-                }
-                if (!helpers::writeForeignTlsClient(socket.tlsSession, payload,
-                                                    transferred, error)) {
-                    throwForeignSocketIoError(error);
-                }
-            } else {
-                if (!helpers::readForeignTlsClient(socket.tlsSession,
-                        static_cast<int>(count), payload, error)) {
-                    throwForeignSocketIoError(error);
-                }
-                transferred = static_cast<int>(payload.size());
-                if (transferred < 0 || static_cast<std::size_t>(transferred) > count)
-                    throw ffiError("TLS provider trả về số byte vượt đệm");
-                for (int i = 0; i < transferred; ++i) {
-                    bytes[static_cast<std::size_t>(i)] = make_int_value(
-                        static_cast<unsigned char>(payload[static_cast<std::size_t>(i)]));
-                }
-            }
-            if (transferred < 0 || static_cast<std::size_t>(transferred) > count)
-                throw ffiError("TLS provider trả về số byte không hợp lệ");
-            return {make_abi_integer_value(AbiInteger::signedNumber(transferred)),
-                    previousPosixError};
+            return {executeTlsOperation(
+                tlsUpgrade ? OP_VM_MACHINE_TLS_UPGRADE :
+                tlsSend ? OP_VM_MACHINE_TLS_SEND : OP_VM_MACHINE_TLS_RECV,
+                arguments, *fileState), previousPosixError};
         }
 #endif
     }
@@ -2684,7 +3024,7 @@ ForeignCallResult executeForeignCall(
     int openedFileToken = 0;
     int openedDirectoryToken = 0;
     if (fileOpen || dirOpen) {
-        const std::uint64_t candidate = nextForeignResourceToken.fetch_add(1);
+        const std::uint64_t candidate = nextOpaqueResourceToken();
         if (candidate > static_cast<std::uint64_t>(INT32_MAX)) {
             throw ffiError("hết định danh tài nguyên ngoại trong VM");
         }

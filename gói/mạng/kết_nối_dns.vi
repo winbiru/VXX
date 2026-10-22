@@ -1,0 +1,96 @@
+// TCP/UDP theo hostname thuần V++: DNS Wire + Hosts -> IP -> Machine Socket.
+// Chỉ hoạt động khi ứng dụng cấu hình DNS/hosts V++ hoặc cung cấp IP số.
+// Không có nhánh fallback getaddrinfo/libffi; Windows Machine Socket ABI
+// hiện chưa sẵn sàng cho đường kết nối này.
+nhập gói/mạng/dns;
+nhập gói/mạng/ổ cắm;
+nhập gói/mạng/ip;
+nhập gói/hệ thống/môi trường;
+
+lớp công khai Bộ Kết Nối DNS VPP {
+    hàm công khai khởi tạo() {};
+
+    // IP số đi thẳng vào parser; IPv4 zero-padding được chuẩn hóa để tránh
+    // ngữ nghĩa bát phân từ resolver libc trên các hệ điều hành cũ.
+    hàm riêng tư dns ip số(tên_máy) {
+        thử {
+            bộ = Bộ Phân Tích IP();
+            bytes = bộ.ip bytes(tên_máy);
+            nếu (do_dai(bytes) == 4) {
+                trả về thành chuỗi(bytes[0]) + "." + thành chuỗi(bytes[1]) +
+                    "." + thành chuỗi(bytes[2]) + "." + thành chuỗi(bytes[3]);
+            };
+            nếu (do_dai(bytes) == 16) { trả về tên_máy; };
+        } bắt lỗi(bỏ_qua) {};
+        trả về "";
+    };
+
+    hàm công khai socket dns vi địa chỉ(tên_máy) {
+        ổ = Bộ Điều Khiển Ổ Cắm();
+        tên_máy = ổ.socket yêu cầu tên máy(tên_máy, "socket_dns_vi_dia_chi");
+        địa_chỉ = mình.dns ip số(tên_máy);
+        nếu (địa_chỉ != "") { trả về [địa_chỉ]; };
+
+        // Đặt ít nhất một nguồn DNS do thư viện V++ xử lý. Nếu tất cả đều
+        // rỗng, dns.vi sẽ dùng OS resolver, nên từ chối trước khi gọi.
+        nếu (đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_SERVER", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_SERVERS", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "") == "") {
+            ném "socket DNS V++: cần cấu hình DNS V++ hoặc tệp hosts";
+        };
+        trả về dns phân giải(tên_máy);
+    };
+
+    hàm công khai socket dns vi mở(tên_máy, cổng, thời_gian_chờ, datagram) {
+        ổ = Bộ Điều Khiển Ổ Cắm();
+        cổng = ổ.socket yêu cầu cổng(cổng, "socket_dns_vi_mo");
+        thời_gian_chờ = ổ.socket yêu cầu timeout(thời_gian_chờ, "socket_dns_vi_mo");
+        nếu (ten_nen_tang_vm() == "windows") {
+            ném "socket DNS V++: Machine Socket ABI chưa hỗ trợ Windows";
+        };
+        địa_chỉ = mình.socket dns vi địa chỉ(tên_máy);
+        nếu (do_dai(địa_chỉ) == 0) { ném "socket DNS V++: không tìm thấy địa chỉ"; };
+        udp = 0;
+        nếu (datagram) { udp = 1; };
+        lỗi_cuối = "socket DNS V++: không kết nối được";
+        lặp(i = 0; i < do_dai(địa_chỉ); i++) {
+            thử {
+                bộ_ip = Bộ Phân Tích IP();
+                bytes = bộ_ip.ip bytes(địa_chỉ[i]);
+                mã = máy_socket_kết_nối(bytes, cổng, udp, thời_gian_chờ);
+                thử {
+                    máy_socket_timeout(mã, thời_gian_chờ);
+                } bắt lỗi(e) {
+                    thử { máy_socket_đóng(mã); } bắt lỗi(bỏ_qua) {};
+                    ném e;
+                };
+                trả về mã;
+            } bắt lỗi(e) { lỗi_cuối = e; };
+        };
+        ném "socket DNS V++: " + thành chuỗi(lỗi_cuối);
+    };
+
+    hàm công khai socket tcp mở dns vi(tên_máy, cổng, thời_gian_chờ = 5000) {
+        trả về mình.socket dns vi mở(tên_máy, cổng, thời_gian_chờ, sai);
+    };
+
+    hàm công khai socket udp mở dns vi(tên_máy, cổng, thời_gian_chờ = 5000) {
+        trả về mình.socket dns vi mở(tên_máy, cổng, thời_gian_chờ, đúng);
+    };
+};
+
+hàm công khai socket dns vi địa chỉ(tên_máy) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.socket dns vi địa chỉ(tên_máy);
+};
+
+hàm công khai socket tcp mở dns vi(tên_máy, cổng, thời_gian_chờ = 5000) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.socket tcp mở dns vi(tên_máy, cổng, thời_gian_chờ);
+};
+
+hàm công khai socket udp mở dns vi(tên_máy, cổng, thời_gian_chờ = 5000) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.socket udp mở dns vi(tên_máy, cổng, thời_gian_chờ);
+};

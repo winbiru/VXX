@@ -97,7 +97,7 @@ if ! wait_http_value "http://127.0.0.1:18080/health" '{"ok":true}' "$tmpdir/http
   if ! kill -0 "$HTTP_FIXTURE_PID" 2>/dev/null; then
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
   fi
-  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013))' "$tmpdir/http_fixture.log"; then
+  if grep -Eq '(socket_tcp_lang_nghe: bind .*( 1| 13| 10013)$|socket_listen: bind/listen thất bại, errno=(1|13|10013)|^Lỗi: ngoại lệ không bắt được: FFI: socket_listen OS=(1|13|10013)$)' "$tmpdir/http_fixture.log"; then
     kill "$HTTP_FIXTURE_PID" 2>/dev/null || true
     wait "$HTTP_FIXTURE_PID" 2>/dev/null || true
     HTTP_FIXTURE_PID=""
@@ -265,6 +265,10 @@ TESTS=(
   src/tests/kiem_tra_ffi_dns.vi
   src/tests/kiem_tra_ffi_socket.vi
   src/tests/kiem_tra_ffi_socket_loi.vi
+  src/tests/kiem_tra_socket_ip.vi
+  src/tests/kiem_tra_dns_goi_tin.vi
+  src/tests/kiem_tra_dns_cache.vi
+  src/tests/kiem_tra_dns_hosts.vi
   src/tests/kiem_tra_ffi_tls.vi
   src/tests/kiem_tra_chuoi_nen_tang.vi
   src/tests/kiem_tra_goi_ham.vi
@@ -288,6 +292,7 @@ TESTS=(
   src/tests/kiem_tra_http_client_oop.vi
   src/tests/kiem_tra_database_oop.vi
   src/tests/kiem_tra_file_stream_oop.vi
+  src/tests/kiem_tra_stdio_vpp.vi
   src/tests/kiem_tra_logger_oop.vi
   src/tests/kiem_tra_ast_oop.vi
   src/tests/kiem_tra_collections_oop.vi
@@ -671,6 +676,7 @@ for jit_case in \
   kiem_tra_http_client_oop \
   kiem_tra_database_oop \
   kiem_tra_file_stream_oop \
+  kiem_tra_stdio_vpp \
   kiem_tra_logger_oop \
   kiem_tra_ast_oop \
   kiem_tra_collections_oop \

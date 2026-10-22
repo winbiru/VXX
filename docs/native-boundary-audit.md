@@ -1,5 +1,497 @@
 # Ranh giới thư viện V++ và primitive VM
 
+## Trạng thái hiện tại (22/10/2026)
+
+Kiểm kê thư viện chuẩn `gói/**/*.vi`: **0 khai báo `ngoại hàm`**, **0 khai
+báo `ngoại thư viện`** (tại mốc trước khi chuyển Process/Resolver/TLS:
+16/2). Các module gọi Machine Intrinsics, còn VM thực thi các primitive và
+quản lý token tài nguyên. Các mục bên dưới ghi lại những mốc migration lịch
+sử; những con số FFI/TLS trong các mục ngày 20–21/10 phản ánh trạng thái ở
+thời điểm tương ứng, không phải số liệu hiện tại.
+
+| Nhóm | Machine opcode | Trạng thái |
+| --- | --- | --- |
+| Socket | 185–192 | API `.vi` gọi Machine Socket, adapter OS còn tồn tại |
+| Process | 193–202 | Đã chuyển khai báo FFI sang Machine Process; spawn/pipe/wait vẫn dùng adapter POSIX/Win32 |
+| Resolver | 203–205 | Đã chuyển khai báo FFI sang Machine Resolver; `getaddrinfo`/`getnameinfo` vẫn dùng OS |
+| TLS | 206–208 | Đã chuyển khai báo FFI sang Machine TLS trên POSIX; SecureTransport/OpenSSL vẫn cung cấp mã hóa, xác minh chứng chỉ và hostname |
+
+Registry hiện có **103 Machine Intrinsics** (110 tên nếu tính alias), đồng
+bộ với bảng opcode V++/C++ gồm **193 mục**. Trong `src/` vẫn có **76 tệp
+nguồn C/C++**; `foreign.cpp` vẫn chứa nhánh `ffi_call`/`dlopen`/`dlsym` để
+đọc bytecode FFI cũ. Binary build mặc định trên macOS vẫn liên kết `libffi`,
+`libc++`, `libSystem` và framework TLS của OS. Chưa đạt runtime chỉ có
+`.vi`/ASM.
+
+Resolver và TLS Machine ABI trên POSIX không cần macro `VPP_HAS_LIBFFI`;
+đường FFI tương thích cũ vẫn giữ kiểm tra ABI riêng. Native AOT đã được
+cấp các capability `system.net.tls.upgrade/send/recv` giống Interpreter;
+runtime P0 hardening kiểm tra capability, arity, token liên VM, trạng thái
+socket, dữ liệu TLS và cleanup khi handshake lỗi. Native AOT đã PASS DNS
+(7/7), Process spawn, File I/O và TLS validation với compiler mới
+bootstrap ngày 22/10/2026. TLS handshake/certificate/hostname thực tế và
+Windows parity vẫn cần kiểm chứng; Windows TLS tiếp tục dùng Schannel VM
+cũ. Máy chạy fixture bị hạn chế bind loopback nên kết quả SKIP không
+chứng minh kết nối TLS thực đã thành công.
+
+Có thể build POSIX **không liên kết libffi** bằng:
+
+```sh
+cmake -S . -B build-machine -DBUILD_TESTS=OFF -DVPP_ENABLE_LEGACY_LIBFFI=OFF
+cmake --build build-machine --target vpp-cli -j4
+```
+
+Kiểm chứng trên macOS ARM64: binary không còn phụ thuộc `libffi.dylib`
+(`otool -L`), **12/12 fixture `.vi`** cho Environment, Clock, UTC,
+Local Time, Sleep, Entropy, Process, DNS, File, Directory, Socket error
+và TLS validation PASS với cấu hình không libffi. Native AOT no-libffi
+cho DNS, Process spawn và TLS validation **3/3 PASS**: biên dịch, chạy và
+kiểm tra `otool -L` trên từng executable đều không thấy `libffi.dylib`.
+Nguyên nhân trước đây là linker phụ Native AOT liên kết `libffi` vô điều
+kiện; hiện `src/native/aot_driver.cpp` truyền trạng thái build xuống
+`scripts/quality/native_aot_link/CMakeLists.txt` để liên kết theo cấu hình.
+CTest `vpp-machine-no-legacy-libffi` PASS (46,53 giây, 22/10/2026).
+Build mặc định tiếp tục liên kết `libffi` cho executable Native AOT DNS;
+chạy fixture DNS và kiểm tra dependency đều PASS. `libc++`/`libSystem`/
+TLS framework vẫn được liên kết. CI Linux x64 và ARM64 đã được bổ sung bước build và
+kiểm tra không libffi, hiện chưa có kết quả runner sau thay đổi. Mặc định
+`VPP_ENABLE_LEGACY_LIBFFI=ON` để giữ tương thích bytecode FFI cũ; khi OFF,
+những chương trình thật sự sử dụng `ngoại hàm` cũ sẽ không gọi libffi được.
+Lỗi Native AOT `máy_môi_trường_đọc` trước đó bắt nguồn từ binary compiler
+`build/bin/vpp-native` cũ (19/10/2026) chưa đồng bộ Machine Intrinsics.
+Bootstrap lại compiler từ `gói/biên dịch/native_cli.vi` đã sửa lỗi này.
+Đã đồng bộ 16 intrinsic Process/Resolver/TLS và opcode 193–208 vào compiler
+`.vi`; import `gói/lõi/chuyển kiểu` được bổ sung trực tiếp cho DNS. Bài
+`vpp-native-machine-system-fixtures` dùng compiler Stage 1 **đầy đủ** do
+CTest `vpp-native-cli-compiler-bootstrap` tạo từ `native_cli.vi` để xác nhận
+12 fixture Native AOT. Compiler Stage 1 dạng leaf trong
+`checknativedriver.cmake` chỉ hỗ trợ tập cú pháp nhỏ, không biên dịch được
+fixture nhập thư viện hệ thống (mã thoát 12), nên đã sửa dependency CTest
+để dùng đúng compiler. Sau khi sửa, CTest **2/2 PASS**
+(`vpp-native-cli-compiler-bootstrap` + `vpp-native-machine-system-fixtures`,
+611,18 giây trên macOS ARM64, 22/10/2026). Installed three-stage smoke
+cũng kiểm tra thêm Process/Environment/Clock/Local Time/Sleep ở Stage 3.
+Kiểm tra Stage 0 → Stage 1 → Stage 2 → Stage 3 ngày 22/10/2026
+**PASS**, hash compiler Stage 2 và Stage 3 đồng nhất
+(`2dda44b7b789240c609cc253b09ff7162734a84a350acde5ac045ebf10b3bdcd`).
+Chưa kết luận runtime thuần V++/ASM hay TLS end-to-end đã hoàn tất.
+Full regression ngày 22/10/2026: **339 PASS, 0 FAIL**.
+
+## TCP/UDP hostname với DNS V++ và Machine Socket (21/10/2026)
+
+Module mới `gói/mạng/kết_nối_dns.vi` cung cấp `socket dns vi địa chỉ`,
+`socket tcp mở dns vi` và `socket udp mở dns vi`. Một hostname được tra
+qua DNS Hosts hoặc DNS Wire Resolver V++ khi đã cấu hình ít nhất một trong
+`VPP_DNS_VI_HOSTS_FILE`, `VPP_DNS_VI_SERVER`, `VPP_DNS_VI_SERVERS`,
+`VPP_DNS_VI_RESOLV_CONF`. Nếu chưa cấu hình, module từ chối tên máy để
+không rơi về OS/getaddrinfo. Địa chỉ IP literal đi thẳng qua parser V++,
+IPv4 với số 0 đầu được chuẩn hóa sang decimal dotted-quad.
+
+Danh sách địa chỉ từ DNS V++ được thử tuần tự: kết nối TCP/UDP qua
+`máy_socket_kết_nối`, áp timeout qua `máy_socket_timeout`; nếu cấu hình
+timeout thất bại thì đóng descriptor trước khi thử địa chỉ khác. API trả
+socket handle tương thích với `socket gửi` / `socket nhận` / `socket đóng`
+hiện hành. Không có `ngoại hàm` trong connector mới; thao tác socket thấp
+nhất vẫn có adapter C++ và ASM như đã ghi ở các mục dưới. Chế độ này
+chưa hỗ trợ Windows vì Machine Socket connect chưa có đường thực thi
+WinSock tương ứng; TLS vẫn là FFI.
+
+Kiểm thử không cần mạng thật xác nhận địa chỉ literal, chuẩn hóa IPv4,
+hosts V++, lỗi thiếu cấu hình (không fallback OS), lỗi cổng/timeout, trên
+cả interpreter/JIT. Chưa kiểm chứng trực tiếp kết nối qua DNS Wire với
+DNS server thực trong sandbox bị hạn chế bind.
+
+Kiểm chứng macOS ARM64: `cmake --build build -j4` PASS;
+CTest Socket DNS V++, Socket Hosts, DNS Config, DNS Search, DNS Hosts và
+DNS Hosts Integration **6/6 PASS** (84,29 giây); audit V++/ASM PASS với
+**16 ngoại hàm / 2 ngoại thư viện** còn lại. Full regression của đợt Socket
+Hosts trước đó kết thúc **339 PASS, 0 FAIL**; do tiếp tục sửa mã trong
+khi bộ này chạy, kết quả đó không thay thế cho việc chạy lại toàn bộ
+regression sau tất cả thay đổi hiện tại. Linux/Windows runtime và kết nối
+DNS thực vẫn chưa được xác minh ở lượt này.
+
+## DNS config độc lập và chặn resolver C theo yêu cầu (21/10/2026)
+
+`gói/mạng/dns_cấu_hình.vi` nay nhập `gói/mạng/ip.vi` và dùng trực tiếp
+`Bộ Phân Tích IP` để xác thực, so sánh và loại trùng nameserver.
+Không còn nhập Socket chỉ để gọi parser; giảm phụ thuộc giữa DNS Config
+và Socket, đồng thời giữ nguyên định dạng cấu hình/search/ndots.
+
+Đặt `VPP_SOCKET_VI_ONLY=1` để `socket resolver danh sách` chỉ chấp nhận
+địa chỉ số hợp lệ hoặc hostname có trong tệp `VPP_DNS_VI_HOSTS_FILE`
+được cấu hình. Nếu không tìm thấy, hàm báo lỗi `chế độ VI_ONLY` trước
+khi gọi `system.net.resolve.open`/`getaddrinfo`. Nhờ đó chương trình
+có thể chủ động chặn đường resolver C khi cần kiểm tra ranh giới
+V++/Assembly. Mặc định `VPP_SOCKET_VI_ONLY=0` để giữ hành vi tương
+thích; chế độ này chưa thực hiện DNS network resolver tự động bên
+trong Socket (ứng dụng có thể gọi API DNS V++ đã có để tra cứu trước).
+
+Fixture Socket chạy cả hai cấu hình trên Interpreter/JIT, xác nhận
+không gọi OS resolver khi tên vắng trong hosts ở chế độ VI_ONLY,
+không trùng IPv6 biểu diễn khác nhau, bỏ IP không hợp lệ và giữ
+cổng biên 1/65535. Boundary audit chặn DNS Config phụ thuộc trở lại
+Socket hoặc đưa FFI vào module này.
+
+## Socket hostname từ hosts thuần V++ (21/10/2026)
+
+Bộ phân tích IPv4/IPv6 được tách khỏi `gói/mạng/ổ cắm.vi` sang
+`gói/mạng/ip.vi` (`Bộ Phân Tích IP`). `dns_hosts.vi` dùng trực tiếp bộ
+phân tích chung, nên không cần nhập module Socket. Socket có thể nhập
+DNS Hosts mà không tạo vòng phụ thuộc. Mọi thao tác phân tích địa chỉ
+vẫn được thực hiện bằng V++; mã dữ liệu 4/16 byte chuyển sang Machine
+Socket ABI hiện có.
+
+Khi đặt `VPP_DNS_VI_HOSTS_FILE` trỏ tới tệp hosts, hàm
+`socket resolver danh sách` ưu tiên địa chỉ IP số, sau đó thử đọc
+hostname qua DNS Hosts và File Machine ABI. Tên có trong tệp sẽ không
+gọi `getaddrinfo` hoặc cấp token resolver FFI. Giữ thứ tự IP xuất hiện
+trong hosts (sau khi loại các địa chỉ trùng), với kết quả `[ip, port]`
+khi cổng khác 0 hoặc `ip` khi cổng bằng 0. Không có địa chỉ phù hợp
+thì tiếp tục dùng OS resolver để giữ tương thích. Chỉ đọc hosts khi
+được cấu hình rõ ràng, chưa tự đọc cấu hình OS mặc định hay tự động
+dùng DNS wire resolver cho socket.
+
+Fixture `vpp-socket-hosts-vpp-fixture` kiểm tra hostname, bí danh
+không phân biệt hoa/thường, IPv4/IPv6, kết quả có/không có cổng và IP
+literal trên Interpreter/JIT, không cần truy cập mạng. Phần nguồn
+Socket connect Unix bổ sung kiểm tra tràn khi tính `int64` deadline
+từ Machine Monotonic Clock; nhánh lỗi vẫn đóng descriptor.
+
+## Literal IP và deadline kết nối (21/10/2026)
+
+`socket resolver danh sách` kiểm tra IPv4/IPv6 dạng số bằng parser `.vi`
+trước khi gọi `system.net.resolve.open`/`getaddrinfo`. Các literal IPv4
+phải đúng dạng thập phân chuẩn (không có số 0 đầu), tránh trường hợp
+libc hiểu một cách khác; hostname và địa chỉ khác vẫn dùng OS resolver để
+giữ tương thích. Hàm trả về cấu trúc và thứ tự như API resolver hiện hành,
+không cấp token FFI khi nhận literal. Đường kết nối TCP/UDP vẫn dùng opcode
+192 và token socket được VM quản lý.
+
+Deadline cho `socket_machine::connect` trên Unix đã bỏ `std::chrono` và dùng
+`machineMonotonicMilliseconds` trong `time_clock.cpp`, chung đường đọc clock
+Machine ABI với `máy_đồng_hồ_đơn_điệu`. Linux ARM64/x86-64 gọi
+`SYS_clock_gettime` qua Assembly; Darwin gọi `clock_gettime` libSystem qua
+trampoline Assembly vì SDK không công bố syscall số tương ứng. Không thêm
+opcode hoặc phụ thuộc thư viện ngoài. Windows giữ WinSock và `std::chrono`.
+
+Phần connect và OS resolver chưa phải mã `.vi`/ASM hoàn toàn: vẫn có adapter
+C++ để tạo sockaddr, xử lý poll/setsockopt và quyền sở hữu token; hostname
+vẫn dùng getaddrinfo và TLS vẫn qua provider riêng.
+
+## TCP/UDP connect qua Machine ABI (20/10/2026)
+
+Opcode **192** (`máy_socket_kết_nối`, capability
+`machine.net.socket.connect`) nhận bốn hoặc mười sáu byte địa chỉ mạng,
+cổng 1..65535, cờ UDP 0/1 và timeout 1..300000 ms. Thư viện
+`gói/mạng/ổ cắm.vi` tự phân tích IPv4/IPv6 (bao gồm `::` và IPv4 suffix),
+quản lý danh sách DNS, retry, timeout public và vòng gửi dữ liệu; không
+gọi `inet_pton`/`getaddrinfo` tại primitive connect. Unix ARM64/x86-64
+sử dụng syscall `socket`, `fcntl`, `connect`, `poll`/`ppoll`,
+`getsockopt(SO_ERROR)`, `setsockopt` và `close` qua Assembly. Windows dùng
+WinSock adapter, token có kích thước phù hợp pointer. Descriptor được đóng
+khi connect, timeout hoặc thiết lập blocking thất bại. Legacy FFI bytecode
+vẫn duy trì tương thích trong runtime.
+
+Ngoại hàm `.vi` giảm **17 → 16**, ngoại thư viện vẫn **2**. IPv6 scope ID
+(`%interface`) chưa được biểu diễn trong byte address API. Cần kiểm tra
+connect TCP/UDP thực tế trên runner cho phép mạng, đặc biệt Linux và Windows.
+Hệ thống hiện vẫn dùng C++ runtime, libc++/libffi và TLS provider; đây là
+bước migration ranh giới Socket, chưa đạt mục tiêu runtime thuần `.vi`/ASM.
+
+## TCP listen qua Machine ABI (20/10/2026)
+
+`máy_socket_lắng_nghe` (**191**, capability `machine.net.socket.listen`)
+nhận cổng IPv4 1..65535 và backlog 1..1024, trả token listener thuộc VM.
+Lớp V++ tiếp tục kiểm tra tham số và xử lý accept/timeout. macOS và Linux
+ARM64/x86-64 gọi `socket`, `bind`, `listen` qua syscall 4 tham số trong
+Assembly; `setsockopt(SO_REUSEADDR/SO_NOSIGPIPE)` dùng cầu syscall 5 tham
+số trên nền tảng hỗ trợ. Windows giữ adapter WinSock với kiểm tra WSAStartup.
+Lỗi bind/listen được chuyển thành ngoại lệ bắt được trong V++, mọi socket
+tạo mà chưa thể đăng ký token sẽ được đóng.
+
+Ngoại hàm `.vi` giảm **18 → 17**; vẫn còn **2** thư viện ngoại. Chạy
+trên macOS sandbox có thể chặn bind loopback, vì vậy chưa thể xem fixture
+được SKIP như bằng chứng accept/listen runtime hoạt động; cần runner Linux
+và Windows, thêm kiểm thử macOS với quyền bind socket.
+
+## Socket accept qua Machine ABI (20/10/2026)
+
+`máy_socket_chấp_nhận` (opcode **190**, capability
+`machine.net.socket.accept`) thay binding `.vi` `socket_chấp_nhận_ffi`.
+Primitive chỉ nhận token listener TCP thuộc VM hiện tại và trả về token
+socket mới; không trả raw file descriptor. `gói/mạng/ổ cắm.vi` tiếp tục
+đặt timeout cho socket mới và đóng nếu cấu hình public API lỗi.
+Adapter Machine cũng đặt timeout mặc định 300000 ms và áp dụng
+`SO_NOSIGPIPE` trên macOS trước khi đăng ký token; nếu bất cứ bước nào
+thất bại thì đóng descriptor vừa accept. Trên macOS ARM64/x86-64 dùng
+`SYS_accept` qua `vpp_machine_file_syscall4` Assembly; trên Linux dùng
+`SYS_accept4` với flags=0. Windows giữ WinSock adapter và registry token
+pointer-sized. Lỗi OS/closed token có thể bắt bằng `bắt lỗi` trong V++;
+sai capability, arity và loại listener là lỗi VM.
+
+Ngoại hàm `.vi` giảm **19 → 18**, số khai báo ngoại thư viện giữ **2**.
+Bytecode FFI đời cũ vẫn được thực thi qua adapter tương thích. Cross-assembly
+Linux và bản build macOS không đồng nghĩa đã xác nhận Linux/Windows runtime;
+TLS, DNS, socket connect/listen và process FFI chưa chuyển.
+
+## Raw socket send/recv qua Machine ABI (20/10/2026)
+
+`máy_socket_gửi` (**188**) và `máy_socket_nhận` (**189**) nhận token VM,
+danh sách byte, chiều dài và flags=0. VM kiểm tra quyền riêng
+`machine.net.socket.send`/`machine.net.socket.recv`, độ dài đệm, byte 0..255,
+loại socket, và không cho raw I/O qua listener/TLS. Trên Unix ARM64/x86-64,
+`sendto`/`recvfrom` gọi syscall sáu tham số qua Assembly; Linux đặt
+`MSG_NOSIGNAL` chống SIGPIPE, macOS tiếp tục dùng `SO_NOSIGPIPE` trên socket
+được tạo bằng adapter. Hệ thống khác giữ WinSock/POSIX adapter.
+V++ tiếp tục sở hữu việc chia byte UTF-8, partial send và UDP datagram.
+Token socket sai/hết hiệu lực và lỗi OS là ngoại lệ V++ có thể `bắt lỗi`;
+thiếu capability hay sai kiểu/arity là lỗi VM. Bytecode FFI cũ vẫn được
+nhận diện để bảo toàn tương thích.
+
+Sau ba primitive này, ngoại hàm giảm **22 → 19**, ngoại thư viện `.vi`
+giảm **3 → 2**. Native TLS send/recv, DNS, connect/listen/accept và
+process launch vẫn còn phụ thuộc C/OS native.
+
+## Socket timeout qua machine ABI (20/10/2026)
+
+`socket đặt timeout` và timeout sau kết nối dùng `máy_socket_timeout`
+(opcode **187**, capability `machine.net.socket.timeout`). Interpreter
+và AOT kiểm tra token trong registry của từng VM, duration i32 trong miền
+1..300000 ms và quyền riêng; trả `1` khi hai tùy chọn nhận/gửi thành công.
+Trên macOS/Linux ARM64/x86-64, `SO_RCVTIMEO`/`SO_SNDTIMEO` đi qua syscall
+`setsockopt` năm tham số, dùng `vpp_machine_socket_syscall5` trong
+`scripts/ASM/vpp_file_primitives.S`. Trên Windows vẫn dùng WinSock, các
+nền POSIX chưa có ASM giữ đường dự phòng. Adapter kết nối POSIX cũng dùng
+machine timeout này để giảm thêm một phụ thuộc libc.
+
+Tổng `ngoại hàm` còn **21** (Network 11, Process 10); TLS, DNS, connect,
+listen, accept và raw send/recv chưa chuyển. Build trên hệ điều hành khác
+cần được kiểm chứng riêng; compiler/runtime vẫn còn C++ và libffi.
+
+## Socket kind/close qua machine ABI (20/10/2026)
+
+`gói/mạng/ổ cắm.vi` chuyển hai `ngoại hàm` sang `máy_socket_loại`
+(opcode **185**, capability `machine.net.socket.kind`) và
+`máy_socket_đóng` (opcode **186**, capability `machine.net.socket.close`).
+VM interpreter và native AOT dùng chung `ForeignFileState::sockets` cho
+token socket đã tạo qua TCP/UDP FFI, vì vậy cả TLS session, kiểm tra
+token thuộc VM, lỗi khi đóng hai lần và dọn dẹp khi VM hủy đều tiếp tục
+hoạt động. Trên Unix ARM64/x86-64, đóng raw socket gọi trực tiếp syscall
+`close` qua `scripts/ASM/vpp_file_primitives.S` (đã có); socket TLS vẫn
+phải đi qua provider TLS để giải phóng phiên và descriptor đúng cách.
+Windows hiện dùng `closesocket` của WinSock. Dữ liệu/chính sách trong V++
+không được phép truy cập file descriptor thô.
+
+Foreign declarations giảm **24 → 22**, audit giới hạn 22; vẫn còn 12
+Network FFI và 10 Process FFI. Đây là chuyển đổi hai primitive, chưa thay
+toàn bộ DNS, TCP/UDP send/recv/connect/listen, TLS và process launch.
+Compiler/runtime vẫn có C++; TLS vẫn dùng OpenSSL/SecureTransport/Schannel.
+
+## Path/Stat qua machine ABI (20/10/2026)
+
+`gói/nhập xuất/đường dẫn.vi` đã bỏ năm foreign bindings liên quan đến
+`access`, `stat`, `lstat`, `stat_mode_offset` và path-kind Windows; không
+còn khai báo ngoại thư viện ở module. Các API `đường dẫn tồn tại`,
+`đường dẫn loại posix/windows`, `là tệp`, `là thư mục` tiếp tục do V++
+triển khai. Opcode **184** (`máy_đường_loại`, capability
+`machine.path.kind`) nhận `(đường_dẫn UTF-8, follow i32)`; `follow=0`
+không theo symbolic link, `follow=1` theo symbolic link. Giá trị trả về
+là `-1` khi không thể lấy trạng thái; trên POSIX là `S_IFMT >> 12`
+(`4` thư mục, `8` tệp thường, `10` symbolic link), trên Windows là
+`0` khác/reparse, `1` tệp, `2` thư mục. Interpreter và native AOT dùng
+cùng một executor, kiểm tra quyền, arity, loại đối số, UTF-8 và byte NUL.
+
+Linux ARM64/x86-64 gọi thẳng `newfstatat` từ Assembly
+(`scripts/ASM/vpp_path_primitives.S`), sử dụng `AT_FDCWD` và
+`AT_SYMLINK_NOFOLLOW` khi `follow=0`; không cần `stat/lstat` của libc
+trong nhánh này. C++ adapter vẫn giải mã `struct stat` theo ABI của host.
+macOS ARM64/x86-64 còn Assembly branch đến `stat/lstat` của **libSystem**;
+Windows dùng adapter C++/Win32 `CreateFileW`, `GetFileInformationByHandle`.
+Quy ước `đường dẫn tồn tại` hiện dùng thống kê có theo symlink; dangling
+symlink vì vậy cho kết quả không tồn tại ở API này, nhưng được nhận diện
+khi `follow=0`. Khả năng quan sát khi thiếu quyền truy cập có thể khác
+`access(F_OK)` cũ và cần kiểm thử chuyên biệt.
+
+Trên macOS ARM64 đã xác nhận hardening Path/Stat và Directory (bao gồm
+symlink/dangling symlink), fixture interpreter/JIT, capability native AOT,
+cross-assembly cả bốn Unix ABI và audit. Cross-assembly chỉ xác nhận cú pháp
+và việc tạo object, **chưa phải kiểm thử Linux/Windows runtime**. Các bài
+test hồi quy được ghi nhận sau khi chạy. Số ngoại hàm trong `.vi` giảm
+**29 → 24**, thư viện ngoại **6 → 3**; audit giữ budget 24.
+`vpp-cli` trên macOS vẫn liên kết `libffi`, `libc++`, `libSystem`, Security
+và CoreFoundation; compiler/runtime hiện vẫn sử dụng C++.
+
+## Directory Operations qua machine ABI (20/10/2026)
+
+`gói/nhập xuất/thư mục.vi` đã bỏ 8 foreign bindings: `mkdir`, `remove`,
+`opendir`, `readdir`, `closedir`, `last_errno`, `eexist`, `enoent` và hai
+khai báo ngoại thư viện. Public API `tạo thư mục`, `liệt kê thư mục`,
+`xóa đường dẫn` giữ nguyên. V++ tiếp tục quản lý tạo cha, duyệt cây không
+đệ quy, thứ tự sắp xếp, phát hiện symlink và xử lý lỗi.
+
+Năm intrinsic `máy_thư_mục_tạo/xóa/mở/kế/đóng` có opcode **179–183** và
+quyền độc lập `machine.dir.mkdir/remove/open/next/close`. `mkdir/remove`
+trả `[rc, loại lỗi, errno]`, loại lỗi chuẩn hóa `1` = đã tồn tại,
+`2` = không tồn tại, `3` = lỗi khác. `open` trả `[token, errno]`;
+`next` trả `[1, tên]`, `[0, ""]` khi EOF, `[-errno, ""]` khi lỗi;
+`close` trả `[rc, errno]`. Token được cấp phát toàn cục, nhưng được xác
+minh trong state riêng của từng VM/AOT và được đóng khi VM hủy/reset; token
+đã đóng hay token từ VM khác bị từ chối. `readdir` phân biệt EOF và lỗi
+bằng cách chụp `errno` ngay trong primitive.
+
+macOS/Linux ARM64/x86-64: tạo/xóa sử dụng `SYS_mkdir`/`mkdirat`,
+`unlink`/`unlinkat`, `rmdir`/`unlinkat(AT_REMOVEDIR)` trực tiếp qua Assembly
+syscall, nên không dùng FFI cho tạo/xóa. Linux iteration nay sử dụng
+`openat(O_DIRECTORY|O_CLOEXEC)`, `getdents64` và `close` qua syscall Assembly;
+C++ adapter kiểm tra độ dài record, NUL, UTF-8, lưu buffer/tập tin theo token
+VM và phân biệt EOF/lỗi. macOS iteration vẫn branch đến
+`opendir/readdir/closedir` của **libSystem**; chưa đạt độc lập thư viện
+hệ thống ở macOS. Windows vẫn dùng adapter C++/Win32 `CreateDirectoryW`,
+`DeleteFileW`, `RemoveDirectoryW`, `FindFirstFileW`, `FindNextFileW`,
+`FindClose`, chuyển UTF-8/UTF-16. Windows/Linux runtime CI chưa được xác nhận.
+
+Regression migration gồm hardening (capability, arity, token, Unicode, EOF,
+EEXIST/ENOENT, AOT), V++ fixture, và cross-assembly của 4 Unix ABI.
+Linux getdents64 mới chưa được xác nhận bằng Linux runtime CI.
+Foreign functions **37 → 29**, foreign libraries **8 → 6**;
+audit giới hạn 29 và ngăn tái đưa FFI vào module thư mục.
+
+**Đây mới là chuyển một nhóm FFI sang machine ABI**; toàn bộ compiler,
+runtime, linker, TLS và nhiều API còn cần chuyển sang `.vi` + ASM.
+
+## Localtime/Timezone qua machine ABI (20/10/2026)
+
+`gói/thời gian/địa phương.vi` không còn khai báo ngoại thư viện
+`system.c`/`localtime_r`. Opcode **178** (`máy_đồng_hồ_địa_phương`) nhận
+epoch có dấu ở dạng **8 byte little-endian**, trả về **64 byte** với các
+trường `tm_sec`, `tm_min`, `tm_hour`, `tm_mday`, `tm_mon`, `tm_year`,
+`tm_wday`, `tm_yday`, `tm_isdst` (i32 LE ở offset 0–32) và `tm_gmtoff`
+(i64 LE ở offset 40). Runtime kiểm tra `system.time.local`, đúng 1 đối số,
+đúng 8 byte và miền 0–255 cho từng byte; native AOT dùng chính executor này.
+Các phép đổi Gregorian, offset giờ/phút, kiểm tra ngày và định dạng tiếp tục
+ở V++. API `thời gian địa phương từ epoch byte ffi/posix` vẫn tương thích.
+
+Trên macOS/Linux ARM64/x86-64, `scripts/ASM/vpp_localtime_primitives.S`
+gọi `localtime_r` công khai của libSystem/libc. C++ adapter tạm thời đóng gói
+`struct tm` thành wire layout ổn định, tránh phụ thuộc vào padding của host.
+Trên Windows dùng CRT `localtime_s` qua C++ adapter, `tm_gmtoff` trả 0; V++
+tính lại chênh lệch địa phương–UTC theo epoch gốc. **Đây chưa phải timezone
+thuần V++/ASM độc lập libc/CRT**; để tự chủ hoàn toàn phải thay việc tra cứu
+timezone của host bằng TZif/IANA parsing, xử lý TZ/DST và snapshot runtime
+trong `.vi`, đồng thời bootstrap dữ liệu timezone. Windows/Linux runtime CI
+chưa được xác nhận. macOS ARM64: native hardening, fixture DST interpreter/JIT
+6/6, AOT capability isolation PASS; cross-assembly đủ 4 Unix ABI PASS.
+Migration giảm foreign functions **38 → 37**, foreign libraries **9 → 8**;
+audit có ratchet chặn quay lại `localtime_r` FFI trong `.vi`.
+
+## Environment qua machine ABI (20/10/2026)
+
+`gói/hệ thống/môi trường.vi` đã chuyển `getenv` FFI sang
+`máy_môi_trường_đọc` (opcode **177**, quyền `system.env.read`). `.vi` tiếp
+tục kiểm tra tên rỗng, dấu `=`/NUL và chọn giá trị mặc định; primitive nhận
+một chuỗi tên, trả chuỗi hoặc `rỗng` khi không có biến. macOS/Linux ARM64/
+x86-64 sử dụng Assembly bridge gọi **getenv của libc/libSystem** vì kernel
+không có syscall getenv; Windows tạm dùng `GetEnvironmentVariableW` cùng
+chuyển đổi UTF-8/UTF-16 trong C++ adapter. Không thể coi như đã độc lập libc;
+kiến trúc tương lai cần chụp và quản lý environment từ process entry.
+
+macOS ARM64: build PASS; hardening/capability isolation, native AOT,
+interpreter/JIT fixture, 4 Unix ABI cross-assembly và regression machine
+primitive PASS. Chưa có kết quả runtime Linux/Windows. Foreign declarations
+giảm **39 → 38** và foreign libraries **10 → 9**.
+
+## Secure Entropy qua machine ABI (20/10/2026)
+
+`gói/lõi/entropy.vi` thay `getentropy` FFI bằng `máy_entropy_bytes`
+(opcode **176**, quyền `system.entropy.read`). Primitive nhận i32 từ 1 đến
+256 và trả list byte 0–255; `.vi` tự kiểm tra 1–4096 byte, chia khối <=256
+và ghép lại. Linux ARM64/x86-64 dùng `SYS_getrandom` qua Assembly syscall,
+xử lý partial read/EINTR; macOS dùng Assembly gọi `_getentropy` libSystem;
+Windows dùng C++ adapter `BCryptGenRandom`. Đường macOS vẫn liên kết libSystem.
+
+macOS ARM64: native hardening, interpreter/JIT fixture, AOT, cross-assembly
+hai macOS ABI và regression đều PASS. Runtime Linux/Windows chưa xác nhận.
+Foreign declarations giảm **40 → 39** và libraries **11 → 10**.
+
+Tính đến trước migration Directory: **37 foreign functions, 8 foreign libraries**
+trong `gói/*.vi`, **73 file C/C++** trong `src/` (tính cả `time_local.cpp`).
+Executable macOS vẫn liên kết `libffi`, `libc++`, `libSystem`, Security và
+CoreFoundation. Compiler, VM runtime, native AOT runtime, TLS và linker chưa
+đạt kiến trúc tự chủ `.vi` + Assembly. Các phần mô tả bên dưới ghi lại những
+đợt audit trước và có thể phản ánh baseline cũ hơn.
+
+## Monotonic và realtime clocks qua machine ABI (20/10/2026)
+
+Hai foreign bindings `clock_gettime` trong `gói/thời gian/đơn điệu.vi`
+và `gói/thời gian/utc.vi` đã chuyển sang opcode 174–175:
+`máy_đồng_hồ_đơn_điệu` (`system.time.monotonic`) và `máy_đồng_hồ_utc`
+(`system.time.realtime`). Intrinsic trả 16 byte little-endian
+`[signed i64 seconds, signed i64 nanoseconds]`; quy tắc decode, tính
+milliseconds, epoch âm và chuyển Gregorian vẫn do `.vi` sở hữu. Các API
+công khai, kể cả tên `ffi` cũ, giữ tương thích. Trên Linux ARM64/x86-64,
+`SYS_clock_gettime` đi qua ASM syscall; trên Darwin ARM64/x86-64, ASM gọi
+`_clock_gettime` public của libSystem vì SDK không xuất syscall tương ứng.
+Windows còn adapter tạm thời dùng QPC và FILETIME. Mục này **chưa loại bỏ
+libSystem, Windows C++ adapter hoặc runtime C++**. Foreign declarations
+giảm 42 → 40; audit ratchet và hardening kiểm tra capability isolation,
+arity, byte layout, tính đơn điệu, độ gần wall clock và native AOT.
+
+## Sleep qua machine ABI (20/10/2026)
+
+`gói/hệ thống/nền tảng.vi` đã bỏ ba foreign bindings `usleep`,
+`last_errno`, `eintr`. Hàm `ngủ mili giây()` giữ nguyên API, chia đợt
+tối đa 999 ms và xử lý `EINTR` bằng deadline của đồng hồ đơn điệu trong `.vi`.
+Machine intrinsic `máy_ngủ_mili_giây` (opcode 173, capability
+`system.time.sleep`) trả trực tiếp `0` hoặc mã lỗi syscall. ASM gọi
+`poll(nfds=0, timeout_ms)` trên macOS ARM64/x86-64 và `nanosleep`
+trên Linux ARM64/x86-64; Win32 tạm dùng `Sleep`. Các CPU POSIX chưa có
+ASM tiếp tục adapter dự phòng, không thuộc kiến trúc tự chủ cuối cùng.
+`EINTR=4` được xác nhận tại compile time trên POSIX. Không còn FFI
+snapshot errno trong đường sleep. Ratchet foreign functions giảm 45 → 42.
+Đã thêm kiểm thử machine sleep, quyền tách biệt, kiểm tra input và native
+AOT dispatcher; cần thực thi Linux/Windows CI và xác minh signal EINTR trên
+runner trước khi tuyên bố tương thích đầy đủ.
+
+## Process identity qua machine ABI (20/10/2026)
+
+Sáu API công khai `mã tiến trình`, `mã tiến trình cha`, `mã người dùng`,
+`mã người dùng hiệu lực`, `mã nhóm` và `mã nhóm hiệu lực` trong
+`gói/hệ thống/tiến trình.vi` đã đổi từ foreign descriptor sang opcode
+`OP_VM_MACHINE_PROCESS_*` (167–172). V++ vẫn kiểm tra platform/giữ API;
+dispatcher kiểm tra đúng từng capability `system.process.id`,
+`system.process.parent_id`, `system.user.*`, `system.group.*` trước khi gọi
+machine. PID/PPID trả i32, UID/GID lớn hơn INT32_MAX giữ giá trị bằng
+`AbiInteger` unsigned. VM, worker/module VM và native AOT dùng cùng contract.
+
+Trên macOS ARM64/x86-64 và Linux ARM64/x86-64, backend chuyển qua syscall
+Assembly `vpp_machine_file_syscall4` dùng chung với tệp thô, không gọi hàm C
+`getpid/getppid/getuid/geteuid/getgid/getegid`. Windows dùng Win32 API trong
+adapter C++ tạm thời để lấy PID/PPID, giữ từ chối UID/GID; các kiến trúc
+POSIX chưa có ASM verified vẫn dùng `syscall()` của libc. Đây là ranh giới
+machine ở VM hiện tại, **chưa phải compiler/runtime thuần `.vi` + ASM**.
+
+Kiểm kê nguồn trước đợt này có 51 khai báo `ngoại hàm` trong `gói/*.vi`;
+sau khi chuyển sáu hàm còn **45**. Script
+`scripts/quality/audit_vi_asm_boundary.sh` đặt ratchet 45, chặn tái sử dụng
+binding cũ và liệt kê C/C++, symbol FFI và dependency động. Test
+`vpp-process-identity-hardening` bao gồm grant tách biệt, arity, kiểu trả về,
+native AOT dispatcher; fixture `kiem_tra_ffi_tien_trinh.vi` giữ 10 dòng `1`
+trên interpreter/JIT macOS ARM64. Windows và Linux cần kết quả CI thật.
+`foreign.cpp`, native AOT runtime C++, `libffi`, TLS provider và các binding
+còn lại vẫn là việc chưa hoàn tất.
+
+## Thay stdio bằng thư viện V++ (20/10/2026)
+
+`gói/nhập xuất/bộ đệm tệp.vi` sở hữu buffering, EOF, partial write, retry
+EINTR và cursor logic. API tệp và `Luồng Tệp` dùng chung implementation này,
+không gọi stdio C. Sáu binding `system.file.raw.*` giữ descriptor OS trong
+registry VM riêng; không dùng libffi. Primitive máy ở `file_machine.cpp`
+dùng ASM syscall trên macOS/Linux ARM64/x86-64, Win32 API trên Windows và
+adapter POSIX trên các kiến trúc khác. Xem [contract và kiểm chứng](stdio-vpp.md).
+Backend stdio cũ chỉ còn phục vụ FFI tương thích; toàn toolchain vẫn còn
+runtime C++, libffi cho nhóm FFI khác và TLS provider. Các mục bên dưới là
+lịch sử audit trước thay đổi này.
+
 ## Kiểm kê self-host compiler (2026-10-12)
 
 `src/include/vpp/bytecode/intrinsic.h` hiện có **51 descriptor opcode**, không
