@@ -48,7 +48,25 @@ jobs:
           }
           Get-Command sqlite3.exe -ErrorAction Stop | Out-Null
 
-      - name: Configure CMake
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Ubuntu installs libffi.a in a multiarch directory, even when
+          # pkg-config reports libdir=/usr/lib without any -L flags.
+          ffi_archive="$(dpkg-query -L libffi-dev | awk '/\/libffi\.a$/ { print; exit }')"
+          if [ ! -f "$ffi_archive" ]; then
+            echo "libffi-dev did not install a static libffi.a archive" >&2
+            dpkg-query -L libffi-dev >&2
+            exit 1
+          fi
+          echo "Using static libffi: $ffi_archive"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DVPP_STATIC_LIBFFI=ON "-DVPP_LIBFFI_STATIC_ARCHIVE=$ffi_archive"
+
+      - name: Configure CMake (macOS/Windows)
+        if: runner.os != 'Linux'
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVPP_STATIC_LIBFFI=ON
 
       - name: Build V++ and RC test gate

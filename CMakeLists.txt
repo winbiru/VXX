@@ -242,15 +242,27 @@ if (VPP_ENABLE_LEGACY_LIBFFI AND VPP_LIBFFI_FOUND)
         # pkg-config's imported target normally selects libffi.so/.dylib.
         # A copied release binary cannot rely on a Homebrew/Linux runtime
         # installation, so require the distribution's actual static archive.
-        # pkg-config omits -L for system library directories, leaving
-        # VPP_LIBFFI_LIBRARY_DIRS empty even though libffi.a is installed.
+        # pkg-config omits -L for system library directories; on Linux its
+        # libdir can also be /usr/lib while the archive lives in a multiarch
+        # directory such as /usr/lib/x86_64-linux-gnu. The .pc file's parent
+        # directory is another reliable location for the matching archive.
         pkg_get_variable(VPP_LIBFFI_PKGCONFIG_LIBDIR libffi libdir)
+        pkg_get_variable(VPP_LIBFFI_PKGCONFIG_PCDIR libffi pcfiledir)
+        if (VPP_LIBFFI_PKGCONFIG_PCDIR)
+            get_filename_component(VPP_LIBFFI_PC_LIBRARY_DIR
+                "${VPP_LIBFFI_PKGCONFIG_PCDIR}" DIRECTORY)
+        endif()
         find_file(VPP_LIBFFI_STATIC_ARCHIVE NAMES libffi.a
-            HINTS ${VPP_LIBFFI_LIBRARY_DIRS} "${VPP_LIBFFI_PKGCONFIG_LIBDIR}")
+            HINTS ${VPP_LIBFFI_LIBRARY_DIRS}
+                  "${VPP_LIBFFI_PKGCONFIG_LIBDIR}"
+                  "${VPP_LIBFFI_PC_LIBRARY_DIR}"
+            PATH_SUFFIXES ${CMAKE_LIBRARY_ARCHITECTURE})
         if (NOT VPP_LIBFFI_STATIC_ARCHIVE)
             message(FATAL_ERROR
                 "Standalone V++ release requires libffi.a (pkg-config libdir: "
-                "${VPP_LIBFFI_PKGCONFIG_LIBDIR}; library dirs: ${VPP_LIBFFI_LIBRARY_DIRS})")
+                "${VPP_LIBFFI_PKGCONFIG_LIBDIR}; pcfiledir: "
+                "${VPP_LIBFFI_PKGCONFIG_PCDIR}; library dirs: ${VPP_LIBFFI_LIBRARY_DIRS}; "
+                "multiarch: ${CMAKE_LIBRARY_ARCHITECTURE})")
         endif()
         target_include_directories(vpp-runtime-native PRIVATE ${VPP_LIBFFI_INCLUDE_DIRS})
         target_link_libraries(vpp-runtime-native PUBLIC
