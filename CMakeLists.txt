@@ -242,11 +242,15 @@ if (VPP_ENABLE_LEGACY_LIBFFI AND VPP_LIBFFI_FOUND)
         # pkg-config's imported target normally selects libffi.so/.dylib.
         # A copied release binary cannot rely on a Homebrew/Linux runtime
         # installation, so require the distribution's actual static archive.
+        # pkg-config omits -L for system library directories, leaving
+        # VPP_LIBFFI_LIBRARY_DIRS empty even though libffi.a is installed.
+        pkg_get_variable(VPP_LIBFFI_PKGCONFIG_LIBDIR libffi libdir)
         find_file(VPP_LIBFFI_STATIC_ARCHIVE NAMES libffi.a
-            PATHS ${VPP_LIBFFI_LIBRARY_DIRS} NO_DEFAULT_PATH)
+            HINTS ${VPP_LIBFFI_LIBRARY_DIRS} "${VPP_LIBFFI_PKGCONFIG_LIBDIR}")
         if (NOT VPP_LIBFFI_STATIC_ARCHIVE)
             message(FATAL_ERROR
-                "Standalone V++ release requires libffi.a in ${VPP_LIBFFI_LIBRARY_DIRS}")
+                "Standalone V++ release requires libffi.a (pkg-config libdir: "
+                "${VPP_LIBFFI_PKGCONFIG_LIBDIR}; library dirs: ${VPP_LIBFFI_LIBRARY_DIRS})")
         endif()
         target_include_directories(vpp-runtime-native PRIVATE ${VPP_LIBFFI_INCLUDE_DIRS})
         target_link_libraries(vpp-runtime-native PUBLIC
