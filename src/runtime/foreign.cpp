@@ -1075,10 +1075,13 @@ StackValue executeSocketMachinePrimitive(Opcode opcode,
         return make_int_value(1);
     }
 
+#if !defined(_WIN32)
     if (socket.tlsSession) {
         // TLS provider owns the socket after upgrade and closes it with its session.
         helpers::closeForeignTlsClient(socket.tlsSession);
-    } else if (socket.descriptor >= 0) {
+    } else
+#endif
+    if (socket.descriptor >= 0) {
 #if defined(_WIN32)
         if (::closesocket(static_cast<SOCKET>(socket.descriptor)) != 0)
             throw socketError("closesocket lỗi=" + std::to_string(WSAGetLastError()));

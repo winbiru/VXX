@@ -7,6 +7,10 @@
 #include "vpp/runtime/error.h"
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 #include <bcrypt.h>
 #elif defined(__APPLE__)
 #include <unistd.h>
