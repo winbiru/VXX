@@ -28,8 +28,8 @@ constexpr std::array<const char *, 6> grants{{
     "system.group.id", "system.group.effective_id"}};
 
 std::uint64_t number(const StackValue &value) {
-    if (const auto *small = std::get_if<int>(&value))
-        return static_cast<std::uint64_t>(*small);
+    if (const auto *scalar32 = std::get_if<int>(&value))
+        return static_cast<std::uint64_t>(*scalar32);
     const auto *wide = std::get_if<AbiInteger>(&value);
     if (!wide || wide->isSigned) throw std::runtime_error("expected unsigned scalar");
     return wide->unsignedValue;
