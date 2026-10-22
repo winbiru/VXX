@@ -65,7 +65,9 @@ int main() {
         ("vpp-machine-directory-" + std::to_string(
             std::chrono::steady_clock::now().time_since_epoch().count()));
     const std::string root = base.u8string();
-    const std::string child = (base / u8"cà phê").u8string();
+    // On Windows, constructing fs::path from narrow UTF-8 bytes can use the
+    // active ANSI code page. u8path preserves the intended Unicode filename.
+    const std::string child = (base / fs::u8path(u8"cà phê")).u8string();
     try {
         check(item(call(OP_VM_MACHINE_DIR_MKDIR, {root}), 0) == 0, "mkdir failed");
         auto duplicate = call(OP_VM_MACHINE_DIR_MKDIR, {root});
