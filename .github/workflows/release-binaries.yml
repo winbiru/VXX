@@ -507,10 +507,20 @@ jobs:
           }
           & (Join-Path $profileInstallDir "vpp.exe") "gỡ" "cài" "đặt"
           if ($LASTEXITCODE -ne 0) { throw "Profile uninstall smoke failed" }
-          $deadline = [DateTime]::UtcNow.AddSeconds(30)
-          while ((Test-Path (Join-Path $profileInstallDir "vpp.exe")) -and [DateTime]::UtcNow -lt $deadline) {
+          # The Windows CLI starts a detached PowerShell uninstaller. It removes
+          # vpp.exe first, then cleans PATH/VPP_HOME and UTF-8 profiles. Waiting
+          # only for vpp.exe to disappear races the profile cleanup phase.
+          $deadline = [DateTime]::UtcNow.AddSeconds(60)
+          do {
+            $binaryExists = Test-Path -LiteralPath (Join-Path $profileInstallDir "vpp.exe")
+            $profilesWithMarker = @($profilePaths | Where-Object {
+              (Test-Path -LiteralPath $_ -PathType Leaf) -and
+              (Select-String -LiteralPath $_ -SimpleMatch '# >>> V++ UTF-8 >>>' -Quiet)
+            })
+            if (-not $binaryExists -and $profilesWithMarker.Count -eq 0) { break }
             Start-Sleep -Milliseconds 100
-          }
+          } while ([DateTime]::UtcNow -lt $deadline)
+          if ($binaryExists) { throw "Profile uninstall left vpp.exe" }
           foreach ($profilePath in $profilePaths) {
             if ((Test-Path -LiteralPath $profilePath) -and
                 (Select-String -LiteralPath $profilePath -SimpleMatch '# >>> V++ UTF-8 >>>' -Quiet)) {
