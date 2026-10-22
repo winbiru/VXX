@@ -20,7 +20,7 @@ hàm chính() {
     in đọc tệp(đường) == "A";
     in xóa đường dẫn(đường) == 1;
 
-    // Windows must open the UTF-8 public path through the wide CRT adapter.
+    // Windows must open the UTF-8 public path through the Win32 wide adapter.
     đường_unicode = ".tmp_ffi_tệp_cà_phê.bin";
     in ghi bytes tệp(đường_unicode, [0, 10, 127, 255]) == 1;
     bytes_unicode = đọc bytes tệp(đường_unicode);

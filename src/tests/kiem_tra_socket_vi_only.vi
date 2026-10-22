@@ -1,0 +1,15 @@
+nhập gói/mạng/ổ cắm;
+
+// Không có hosts và không được dùng resolver C/OS; chỉ IP số hợp lệ.
+hàm chính() {
+    bộ = Bộ Điều Khiển Ổ Cắm();
+    v4 = bộ.socket resolver danh sách("203.0.113.12", 65535, sai);
+    in do_dai(v4) == 1 && v4[0][0] == "203.0.113.12" && v4[0][1] == 65535;
+    v6 = bộ.socket resolver danh sách("::1", 0, đúng);
+    in do_dai(v6) == 1 && v6[0] == "::1";
+
+    lỗi = "";
+    thử { bộ.socket resolver danh sách("unknown.invalid", 80, sai); }
+    bắt lỗi(e) { lỗi = thành chuỗi(e); };
+    in lỗi == "socket resolver: tên máy không có trong hosts V++ (chế độ VI_ONLY)";
+};

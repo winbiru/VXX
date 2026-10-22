@@ -1,17 +1,355 @@
 // vi.naming.dns — phân giải tên bằng resolver của hệ điều hành.
 nhập gói/mạng/ổ cắm;
+nhập gói/mạng/dns_gói_tin;
+nhập gói/mạng/dns_cấu_hình;
+nhập gói/mạng/dns_hosts;
+nhập gói/mạng/dns_cache;
 nhập gói/bộ sưu tập/danh sách;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/entropy;
+nhập gói/lõi/toán học;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/hệ thống/môi trường;
+nhập gói/thời gian/đơn điệu;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phân Giải DNS {
-    hàm công khai khởi tạo() {};
+    hàm công khai khởi tạo() { mình.bộ_nhớ = Bộ Nhớ Đệm DNS(); };
 
+    // QNAME/QTYPE/cổng và thứ tự máy chủ đều tham gia cache key.
+    // Chuyển ASCII thành chữ thường để tên DNS không phân biệt hoa/thường.
+    hàm riêng tư dns khóa cache(tên_máy, danh_sách, cổng, loại) {
+        bytes = chuoi_bytes_vm(tên_máy);
+        tên = [];
+        lặp(i = 0; i < do_dai(bytes); i++) {
+            k = bytes[i];
+            nếu (k >= 65 && k <= 90) { k = k + 32; };
+            thêm(tên, k);
+        };
+        khóa = thành chuỗi(loại) + "|" + thành chuỗi(cổng) + "|" +
+               chuoi_tu_bytes_vm(tên);
+        lặp(i = 0; i < do_dai(danh_sách); i++) {
+            khóa = khóa + "|" + danh_sách[i];
+        };
+        trả về khóa;
+    };
+
+    // Lỗi giao thức không được retry sang máy chủ khác. RCODE từ DNS server
+    // được phân loại riêng để có chính sách retry cụ thể.
+    hàm riêng tư dns lỗi giao thức(e) {
+        trả về {"loại": "dns_giao_thức", "chi tiết": e};
+    };
+
+    hàm riêng tư dns kiểm tra lỗi giao thức(e) {
+        nếu (loai_cua(e) != "từ điển") { trả về sai; };
+        trả về lấy map(e, "loại", "") == "dns_giao_thức";
+    };
+
+    hàm riêng tư dns kiểm tra lỗi rcode(e) {
+        nếu (loai_cua(e) != "từ điển") { trả về sai; };
+        trả về lấy map(e, "loại", "") == "dns_rcode";
+    };
+
+    hàm riêng tư dns lỗi phân tích(e) {
+        nếu (mình.dns kiểm tra lỗi rcode(e)) { trả về e; };
+        trả về mình.dns lỗi giao thức(e);
+    };
+
+    // Một deadline chung ngăn việc reset timeout ở mỗi lần recv TCP.
+    hàm riêng tư dns thời gian còn(hạn_chót) {
+        còn = hạn_chót - thời gian đơn điệu mili giây();
+        nếu (còn <= 0) { ném "DNS: hết thời gian xử lý giao dịch"; };
+        mili_giây = làm tròn xuống(còn);
+        nếu (mili_giây < 1) { mili_giây = 1; };
+        trả về mili_giây;
+    };
+
+    // TCP là stream: recv có thể trả ít byte hơn yêu cầu, kể cả header 2 byte.
+    hàm riêng tư dns tcp đọc đủ(mã, số_byte, hạn_chót) {
+        dữ_liệu = [];
+        lặp(vòng = 0; do_dai(dữ_liệu) < số_byte; vòng++) {
+            socket đặt timeout(mã, mình.dns thời gian còn(hạn_chót));
+            phần = chuoi_bytes_vm(socket nhận(mã, số_byte - do_dai(dữ_liệu)));
+            nếu (do_dai(phần) == 0) { ném "DNS TCP: kết nối đóng giữa bản tin"; };
+            lặp(i = 0; i < do_dai(phần); i++) { thêm(dữ_liệu, phần[i]); };
+        };
+        trả về dữ_liệu;
+    };
+
+    // DNS over TCP: tiền tố chiều dài 16 bit big-endian (RFC 7766).
+    hàm riêng tư dns hỏi tcp(máy_chủ, cổng, truy_vấn, tên_máy, loại, giao_dịch,
+                             hạn_chót) {
+        ổ_cắm = Bộ Điều Khiển Ổ Cắm();
+        mã = máy_socket_kết_nối(
+            ổ_cắm.socket ip bytes(máy_chủ), cổng, 0, mình.dns thời gian còn(hạn_chót)
+        );
+        kết_quả = {};
+        thử {
+            socket đặt timeout(mã, mình.dns thời gian còn(hạn_chót));
+            kích_thước = do_dai(truy_vấn);
+            gói_tin = [(kích_thước - kích_thước % 256) / 256, kích_thước % 256];
+            lặp(i = 0; i < kích_thước; i++) { thêm(gói_tin, truy_vấn[i]); };
+            socket gửi(mã, chuoi_tu_bytes_vm(gói_tin));
+            đầu = mình.dns tcp đọc đủ(mã, 2, hạn_chót);
+            độ_dài = đầu[0] * 256 + đầu[1];
+            nếu (độ_dài < 12) {
+                ném mình.dns lỗi giao thức("DNS TCP: độ dài gói tin không hợp lệ");
+            };
+            phản_hồi = mình.dns tcp đọc đủ(mã, độ_dài, hạn_chót);
+            bộ = Bộ Mã DNS();
+            thử {
+                kết_quả = bộ.dns đọc phản hồi đầy đủ(phản_hồi, tên_máy, loại, giao_dịch);
+            } bắt lỗi(e) { ném mình.dns lỗi phân tích(e); };
+            socket đóng(mã);
+        } bắt lỗi(e) {
+            thử { socket đóng(mã); } bắt lỗi(bỏ_qua) {};
+            ném e;
+        };
+        trả về kết_quả;
+    };
+
+    // Lộ trình DNS thuần V++ thử nghiệm: UDP tới IP máy chủ được chỉ định,
+    // dùng Machine Socket ABI và giải mã DNS trong .vi. Không dùng getaddrinfo.
+    // VPP_DNS_VI_SERVER phải là IPv4/IPv6 dạng số; tên máy chủ DNS sẽ không
+    // được tự phân giải để tránh phụ thuộc vòng tròn vào resolver của OS.
+    hàm công khai dns hỏi máy chủ(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ = 2000) {
+        chi_tiết = mình.dns hỏi máy chủ đầy đủ(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ);
+        trả về lấy map(chi_tiết, "addresses", []);
+    };
+
+    // API transport có cấu trúc; sử dụng cùng parser cho UDP và TCP fallback.
+    hàm công khai dns hỏi máy chủ đầy đủ(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ = 2000) {
+        bộ = Bộ Mã DNS();
+        cổng = socket yêu cầu cổng(cổng, "dns_hoi_may_chu");
+        thời_gian_chờ = socket yêu cầu timeout(thời_gian_chờ, "dns_hoi_may_chu");
+        hạn_chót = thời gian đơn điệu mili giây() + thời_gian_chờ;
+        mã_ngẫu_nhiên = entropy bảo mật bytes(2);
+        giao_dịch = mã_ngẫu_nhiên[0] * 256 + mã_ngẫu_nhiên[1];
+        truy_vấn = bộ.dns tạo truy vấn(tên_máy, loại, giao_dịch);
+        ổ_cắm = Bộ Điều Khiển Ổ Cắm();
+        mã = máy_socket_kết_nối(
+            ổ_cắm.socket ip bytes(máy_chủ),
+            cổng,
+            1,
+            mình.dns thời gian còn(hạn_chót)
+        );
+        kết_quả = {};
+        cần_tcp = sai;
+        thử {
+            socket đặt timeout(mã, mình.dns thời gian còn(hạn_chót));
+            socket gửi(mã, chuoi_tu_bytes_vm(truy_vấn));
+            socket đặt timeout(mã, mình.dns thời gian còn(hạn_chót));
+            trả_lời = socket nhận(mã, 4096);
+            bytes = chuoi_bytes_vm(trả_lời);
+            thử {
+                cần_tcp = bộ.dns cần tcp(bytes, giao_dịch, tên_máy, loại);
+            } bắt lỗi(e) { ném mình.dns lỗi giao thức(e); };
+            nếu (!cần_tcp) {
+                thử {
+                    kết_quả = bộ.dns đọc phản hồi đầy đủ(bytes, tên_máy, loại, giao_dịch);
+                } bắt lỗi(e) { ném mình.dns lỗi phân tích(e); };
+            };
+            socket đóng(mã);
+        } bắt lỗi(e) {
+            thử { socket đóng(mã); } bắt lỗi(bỏ_qua) {};
+            ném e;
+        };
+        nếu (cần_tcp) {
+            trả về mình.dns hỏi tcp(
+                máy_chủ, cổng, truy_vấn, tên_máy, loại, giao_dịch, hạn_chót
+            );
+        };
+        trả về kết_quả;
+    };
+
+    // [] từ NOERROR hoặc NXDOMAIN đều là trả lời cuối cùng, không retry.
+    // SERVFAIL/REFUSED có thể chuyển nameserver; RCODE khác và lỗi giao thức
+    // được trả ngay để tránh che giấu lỗi phía server hoặc dữ liệu sai.
+    hàm công khai dns hỏi dự phòng(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ = 2000) {
+        chi_tiết = mình.dns hỏi dự phòng đầy đủ(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ);
+        trả về lấy map(chi_tiết, "addresses", []);
+    };
+
+    // NOERROR/NODATA/NXDOMAIN là phản hồi cuối cùng, giữ nguyên TTL và RCODE.
+    hàm công khai dns hỏi dự phòng đầy đủ(tên_máy, máy_chủ, cổng, loại, thời_gian_chờ = 2000) {
+        nếu (loai_cua(máy_chủ) != "danh sách" || do_dai(máy_chủ) > 8) {
+            ném "DNS: danh sách nameserver không hợp lệ";
+        };
+        nếu (do_dai(máy_chủ) == 0) { ném "DNS: không có nameserver"; };
+        // Validation trước khi retry: lỗi input không phải lỗi transport.
+        bộ = Bộ Mã DNS();
+        bộ.dns tạo truy vấn(tên_máy, loại, 0);
+        socket yêu cầu cổng(cổng, "dns_hoi_du_phong");
+        socket yêu cầu timeout(thời_gian_chờ, "dns_hoi_du_phong");
+        ổ_cắm = Bộ Điều Khiển Ổ Cắm();
+        lặp(i = 0; i < do_dai(máy_chủ); i++) {
+            nếu (loai_cua(máy_chủ[i]) != "chuỗi") {
+                ném "DNS: nameserver phải là địa chỉ IP";
+            };
+            ổ_cắm.socket ip bytes(máy_chủ[i]);
+        };
+        khóa = mình.dns khóa cache(tên_máy, máy_chủ, cổng, loại);
+        bộ_nhớ = mình.bộ_nhớ;
+        bản_nhớ = bộ_nhớ.dns đọc(khóa);
+        nếu (lấy map(bản_nhớ, "status", "") == "NOERROR") { trả về bản_nhớ; };
+        lỗi_cuối = "DNS: tất cả nameserver không phản hồi";
+        lỗi_máy_chủ = "";
+        lặp(i = 0; i < do_dai(máy_chủ); i++) {
+            thử {
+                phản_hồi = mình.dns hỏi máy chủ đầy đủ(
+                    tên_máy, máy_chủ[i], cổng, loại, thời_gian_chờ
+                );
+                bộ_nhớ.dns ghi(khóa, phản_hồi);
+                trả về phản_hồi;
+            } bắt lỗi(e) {
+                nếu (mình.dns kiểm tra lỗi giao thức(e)) { ném e; };
+                nếu (mình.dns kiểm tra lỗi rcode(e)) {
+                    mã = lấy map(e, "mã", -1);
+                    nếu (mã != 2 && mã != 5) { ném e; };
+                    lỗi_máy_chủ = e;
+                };
+                lỗi_cuối = e;
+            };
+        };
+        // Không làm mất thông tin SERVFAIL/REFUSED khi server cuối timeout.
+        nếu (loai_cua(lỗi_máy_chủ) == "từ điển") { ném lỗi_máy_chủ; };
+        ném lỗi_cuối;
+    };
+
+    // Kết hợp phản hồi A/AAAA và TTL của những địa chỉ thực sự trả về.
+    // Chỉ có kết quả phủ định chắc chắn khi cả hai loại trả lời hợp lệ.
+    hàm riêng tư dns phân giải ứng viên(tên_máy, danh_sách, cổng) {
+        a = {};
+        aaaa = {};
+        có_a = sai;
+        có_aaaa = sai;
+        lỗi_cuối = "DNS: không có phản hồi";
+        thử {
+            a = mình.dns hỏi dự phòng đầy đủ(tên_máy, danh_sách, cổng, 1);
+            có_a = đúng;
+        } bắt lỗi(e) {
+            nếu (mình.dns kiểm tra lỗi giao thức(e)) { ném e; };
+            nếu (mình.dns kiểm tra lỗi rcode(e)) {
+                mã = lấy map(e, "mã", -1);
+                nếu (mã != 2 && mã != 5) { ném e; };
+            };
+            lỗi_cuối = e;
+        };
+        thử {
+            aaaa = mình.dns hỏi dự phòng đầy đủ(tên_máy, danh_sách, cổng, 28);
+            có_aaaa = đúng;
+        } bắt lỗi(e) {
+            nếu (mình.dns kiểm tra lỗi giao thức(e)) { ném e; };
+            nếu (mình.dns kiểm tra lỗi rcode(e)) {
+                mã = lấy map(e, "mã", -1);
+                nếu (mã != 2 && mã != 5) { ném e; };
+            };
+            lỗi_cuối = e;
+        };
+        nếu (!có_a && !có_aaaa) { ném lỗi_cuối; };
+        kết_quả = [];
+        địa_chỉ_a = lấy map(a, "addresses", []);
+        địa_chỉ_aaaa = lấy map(aaaa, "addresses", []);
+        lặp(i = 0; i < do_dai(địa_chỉ_a); i++) { thêm(kết_quả, địa_chỉ_a[i]); };
+        lặp(i = 0; i < do_dai(địa_chỉ_aaaa); i++) { thêm(kết_quả, địa_chỉ_aaaa[i]); };
+        ttl = 0;
+        nếu (do_dai(địa_chỉ_a) > 0) { ttl = lấy map(a, "ttl", 0); };
+        nếu (do_dai(địa_chỉ_aaaa) > 0) {
+            ttl_aaaa = lấy map(aaaa, "ttl", 0);
+            nếu (do_dai(địa_chỉ_a) == 0 || ttl_aaaa < ttl) { ttl = ttl_aaaa; };
+        };
+        đầy_đủ = có_a && có_aaaa;
+        trạng_thái = "NOERROR";
+        mã = 0;
+        nếu (do_dai(kết_quả) == 0) {
+            nếu (!đầy_đủ) {
+                trạng_thái = "INCOMPLETE";
+                mã = -1;
+            } hoặc nếu (lấy map(a, "status", "") == "NXDOMAIN" &&
+                     lấy map(aaaa, "status", "") == "NXDOMAIN") {
+                trạng_thái = "NXDOMAIN";
+                mã = 3;
+            } hoặc { trạng_thái = "NODATA"; };
+        };
+        trả về {"status": trạng_thái, "addresses": kết_quả, "rcode": mã,
+                "ttl": ttl, "complete": đầy_đủ, "A": a, "AAAA": aaaa};
+    };
+
+    // API danh sách cũ chỉ lấy addresses từ cùng một đường thực thi.
     hàm công khai dns phân giải(tên máy) {
+        chi_tiết = mình.dns phân giải đầy đủ(tên máy);
+        trả về lấy map(chi_tiết, "addresses", []);
+    };
+
+    // HOSTS và OS không có TTL DNS; rcode=-1 phân biệt nguồn không phải DNS.
+    // complete=false khi một trong hai loại A/AAAA gặp lỗi retryable.
+    hàm công khai dns phân giải đầy đủ(tên máy) {
         tên máy = socket yêu cầu tên máy(tên máy, "dns_phan_giai");
-        kết_quả = socket resolver danh sách(tên máy, 0, sai);
+        máy_chủ = đọc biến môi trường("VPP_DNS_VI_SERVER", "");
+        danh_sách_cấu_hình = đọc biến môi trường("VPP_DNS_VI_SERVERS", "");
+        đường_cấu_hình = đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "");
+        đường_hosts = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
+        kết_quả = [];
+        chi_tiết = {"status": "NODATA", "addresses": [], "rcode": 0,
+                    "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+        nếu (danh_sách_cấu_hình != "" || máy_chủ != "" || đường_cấu_hình != "" || đường_hosts != "") {
+            // Hosts chỉ được bật khi chỉ định tệp. Kết quả cục bộ được ưu tiên
+            // trước DNS, và không khởi tạo socket/entropy nếu có tên khớp.
+            nếu (đường_hosts != "") {
+                hosts = Bộ Hosts DNS();
+                kết_quả = hosts.dns đọc hosts(tên máy, đường_hosts);
+                nếu (do_dai(kết_quả) > 0) {
+                    xóa trùng(kết_quả);
+                    sắp xếp(kết_quả);
+                    trả về {"status": "HOSTS", "addresses": kết_quả, "rcode": -1,
+                            "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+                };
+            };
+            nếu (danh_sách_cấu_hình == "" && máy_chủ == "" && đường_cấu_hình == "") {
+                ném "DNS hosts: không tìm thấy tên và chưa cấu hình DNS V++";
+            };
+            // Bật rõ ràng để có thể kiểm thử wire resolver trên các nền tảng.
+            // Danh sách > server đơn > đường tệp Linux, theo thứ tự ưu tiên.
+            cấu_hình = Bộ Cấu Hình DNS();
+            danh_sách = [];
+            search = [];
+            ndots = 1;
+            nếu (danh_sách_cấu_hình != "") {
+                danh_sách = cấu_hình.dns phân tích danh sách máy chủ(danh_sách_cấu_hình);
+            } hoặc nếu (máy_chủ != "") {
+                danh_sách = cấu_hình.dns phân tích danh sách máy chủ(máy_chủ);
+                nếu (do_dai(danh_sách) != 1) { ném "DNS: VPP_DNS_VI_SERVER phải là một IP"; };
+            } hoặc {
+                nếu (ten_nen_tang_vm() != "linux") {
+                    ném "DNS: VPP_DNS_VI_RESOLV_CONF chỉ hỗ trợ Linux";
+                };
+                đầy_đủ = cấu_hình.dns đọc cấu hình đầy đủ linux(đường_cấu_hình);
+                danh_sách = lấy map(đầy_đủ, "nameservers", []);
+                search = lấy map(đầy_đủ, "search", []);
+                ndots = lấy map(đầy_đủ, "ndots", 1);
+            };
+            nếu (do_dai(danh_sách) == 0) { ném "DNS: không có nameserver hợp lệ"; };
+            cổng = socket yêu cầu cổng(
+                đọc biến môi trường("VPP_DNS_VI_PORT", "53"), "dns_phan_giai"
+            );
+            ứng_viên = cấu_hình.dns tên ứng viên(tên máy, search, ndots);
+            lặp(i = 0; i < do_dai(ứng_viên); i++) {
+                chi_tiết = mình.dns phân giải ứng viên(ứng_viên[i], danh_sách, cổng);
+                kết_quả = lấy map(chi_tiết, "addresses", []);
+                // Tránh dùng lỗi mạng như bằng chứng NXDOMAIN/NODATA.
+                nếu (do_dai(kết_quả) > 0 || !lấy map(chi_tiết, "complete", sai)) {
+                    thoát;
+                };
+            };
+        } hoặc {
+            kết_quả = socket resolver danh sách(tên máy, 0, sai);
+            chi_tiết = {"status": "OS", "addresses": kết_quả, "rcode": -1,
+                        "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+        };
         xóa trùng(kết_quả);
         sắp xếp(kết_quả);
-        trả về kết_quả;
+        chi_tiết["addresses"] = kết_quả;
+        trả về chi_tiết;
     };
 };
 
@@ -19,4 +357,9 @@ lớp công khai Bộ Phân Giải DNS {
 hàm công khai dns phân giải(tên máy) {
     __vpp_adapter = Bộ Phân Giải DNS();
     trả về __vpp_adapter.dns phân giải(tên máy);
+};
+
+hàm công khai dns phân giải đầy đủ(tên máy) {
+    __vpp_adapter = Bộ Phân Giải DNS();
+    trả về __vpp_adapter.dns phân giải đầy đủ(tên máy);
 };

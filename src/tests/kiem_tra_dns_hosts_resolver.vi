@@ -1,0 +1,43 @@
+nhập gói/mạng/dns;
+nhập gói/hệ thống/môi trường;
+
+hàm chính() {
+    chế_độ = đọc biến môi trường("VPP_DNS_TEST_MODE", "");
+    nếu (chế_độ == "hosts") {
+        kết_quả = dns phân giải("fixture.test");
+        đầy_đủ = dns phân giải đầy đủ("fixture.test");
+        in do_dai(kết_quả) == 2 &&
+            kết_quả[0] == "127.0.0.1" && kết_quả[1] == "::1" &&
+            lấy map(đầy_đủ, "status", "") == "HOSTS" &&
+            lấy map(đầy_đủ, "rcode", 0) == -1 &&
+            lấy map(đầy_đủ, "ttl", -1) == 0 &&
+            lấy map(đầy_đủ, "complete", sai) &&
+            do_dai(lấy map(đầy_đủ, "addresses", [])) == 2;
+    } hoặc nếu (chế_độ == "hosts-only-miss") {
+        lỗi = sai;
+        thử { dns phân giải("unknown.test"); }
+        bắt lỗi(e) {
+            lỗi = e == "DNS hosts: không tìm thấy tên và chưa cấu hình DNS V++";
+        };
+        in lỗi;
+    } hoặc nếu (chế_độ == "hosts-dns-miss") {
+        // Khi thiếu hosts, cấu hình DNS phải được kiểm tra (server cố ý sai).
+        lỗi = sai;
+        thử { dns phân giải("unknown.test"); }
+        bắt lỗi(e) {
+            lỗi = e == "DNS: địa chỉ nameserver không hợp lệ";
+        };
+        in lỗi;
+    } hoặc nếu (chế_độ == "os-default") {
+        kết_quả = dns phân giải("localhost");
+        đầy_đủ = dns phân giải đầy đủ("localhost");
+        in do_dai(kết_quả) > 0 &&
+            lấy map(đầy_đủ, "status", "") == "OS" &&
+            lấy map(đầy_đủ, "rcode", 0) == -1 &&
+            lấy map(đầy_đủ, "ttl", -1) == 0 &&
+            lấy map(đầy_đủ, "complete", sai) &&
+            do_dai(lấy map(đầy_đủ, "addresses", [])) > 0;
+    } hoặc {
+        ném "DNS hosts test: chế độ không hợp lệ";
+    };
+};

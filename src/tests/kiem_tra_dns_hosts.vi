@@ -1,0 +1,97 @@
+nhập gói/mạng/dns_hosts;
+nhập gói/mạng/dns;
+nhập gói/nhập xuất/bộ đệm tệp;
+nhập gói/nhập xuất/tệp thô;
+
+hàm hosts phát sinh lỗi(bộ, nội_dung, tên) {
+    thử { bộ.dns phân tích hosts(nội_dung, tên); }
+    bắt lỗi(e) { trả về đúng; };
+    trả về sai;
+};
+
+hàm chính() {
+    bộ = Bộ Hosts DNS();
+    in do_dai(bộ.dns phân tích hosts("", "localhost")) == 0;
+    in do_dai(dns phân tích hosts("# empty\n", "localhost")) == 0;
+
+    nội_dung = "127.0.0.1 localhost LocalHost.Alias # comment\r\n" +
+        "::1 localhost other.alias\n" +
+        "192.0.2.10 Example.COM example.alias# inline comment\n" +
+        "256.1.1.1 invalid.test\n" +
+        "127.0.0.1 localhost\n" +
+        "0:0:0:0:0:0:0:1 localhost\n" +
+        "198.51.100.1 other.test";
+    địa_chỉ = bộ.dns phân tích hosts(nội_dung, "LOCALHOST.");
+    in do_dai(địa_chỉ) == 2 && địa_chỉ[0] == "127.0.0.1" && địa_chỉ[1] == "::1";
+    địa_chỉ = bộ.dns phân tích hosts(nội_dung, "localhost.alias");
+    in do_dai(địa_chỉ) == 1 && địa_chỉ[0] == "127.0.0.1";
+    địa_chỉ = bộ.dns phân tích hosts(nội_dung, "example.com.");
+    in do_dai(địa_chỉ) == 1 && địa_chỉ[0] == "192.0.2.10";
+    in do_dai(bộ.dns phân tích hosts(nội_dung, "invalid.test")) == 0;
+    in do_dai(bộ.dns phân tích hosts(nội_dung, "missing.test")) == 0;
+    địa_chỉ = bộ.dns phân tích hosts(nội_dung, "other.test");
+    in do_dai(địa_chỉ) == 1 && địa_chỉ[0] == "198.51.100.1";
+    in do_dai(bộ.dns phân tích hosts("127.0.0.1 foo#bar\n", "foo")) == 1;
+    in do_dai(bộ.dns phân tích hosts("127.0.0.1 foo#bar\n", "bar")) == 0;
+    nhiều = "127.0.0.1 edge.test ";
+    lặp(i = 0; i < 254; i++) { nhiều = nhiều + "x "; };
+    in do_dai(bộ.dns phân tích hosts(nhiều + "# comment", "edge.test")) == 1;
+    in do_dai(bộ.dns phân tích hosts(nhiều + "x # comment", "edge.test")) == 0;
+
+    in hosts phát sinh lỗi(bộ, "127.0.0.1 ok", "a..b");
+    in hosts phát sinh lỗi(bộ, "127.0.0.1 ok", "tên.vn");
+    in hosts phát sinh lỗi(bộ, 123, "localhost");
+    in hosts phát sinh lỗi(bộ, "127.0.0.1 ok", "");
+
+    // Dòng đúng 4096 bytes được đọc, dòng dài hơn bị bỏ qua hoàn toàn.
+    dòng = "127.0.0.1 edge.test ";
+    lặp(i = do_dai(dòng); i < 4096; i++) { dòng = dòng + " "; };
+    in do_dai(bộ.dns phân tích hosts(dòng, "edge.test")) == 1;
+    in do_dai(bộ.dns phân tích hosts(dòng + "x", "edge.test")) == 0;
+
+    // Giới hạn tệp: 65536 bytes hợp lệ, 65537 bytes phải báo lỗi.
+    lớn = " ";
+    lặp(i = 0; i < 16; i++) { lớn = lớn + lớn; };
+    in do_dai(lớn) == 65536 && do_dai(bộ.dns phân tích hosts(lớn, "edge.test")) == 0;
+    in hosts phát sinh lỗi(bộ, lớn + "x", "edge.test");
+
+    đường = ".tmp_vpp_dns_hosts_test";
+    tệp = Bộ Đệm Tệp(đường, "ghi");
+    tệp.ghi("203.0.113.12 fixture.test\n::1 fixture.test\n");
+    tệp.đóng();
+    địa_chỉ = bộ.dns đọc hosts("FiXtUrE.TeSt", đường);
+    in do_dai(địa_chỉ) == 2 && địa_chỉ[0] == "203.0.113.12" && địa_chỉ[1] == "::1";
+    in do_dai(dns đọc hosts("fixture.test", đường)) == 2;
+    tệp_thô_xóa(đường);
+
+    tệp = Bộ Đệm Tệp(đường, "ghi");
+    tệp.đóng();
+    in do_dai(bộ.dns đọc hosts("fixture.test", đường)) == 0;
+    tệp_thô_xóa(đường);
+
+    tệp = Bộ Đệm Tệp(đường, "ghi");
+    tệp.ghi(lớn);
+    tệp.đóng();
+    in do_dai(bộ.dns đọc hosts("fixture.test", đường)) == 0;
+    tệp_thô_xóa(đường);
+
+    lỗi = sai;
+    thử { bộ.dns đọc hosts("fixture.test", đường); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc hosts("fixture.test", ""); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.dns đọc hosts("fixture.test", "x" + chuoi_tu_bytes_vm([0]) + "y"); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // Đọc tệp vượt 64 KiB phải đóng handle kể cả khi ném lỗi.
+    tệp = Bộ Đệm Tệp(đường, "ghi");
+    tệp.ghi(lớn + "x");
+    tệp.đóng();
+    lỗi = sai;
+    thử { bộ.dns đọc hosts("edge.test", đường); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    tệp_thô_xóa(đường);
+};

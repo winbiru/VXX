@@ -1,0 +1,72 @@
+nhập gói/mạng/dns;
+
+// Các lỗi phải được phát hiện trước khi cần kết nối DNS; chạy được offline.
+hàm chính() {
+    bộ = Bộ Phân Giải DNS();
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ đầy đủ("bad..name", "127.0.0.1", 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ("bad..name", "127.0.0.1", 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ đầy đủ("example.com", "127.0.0.1", 0, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ đầy đủ("example.com", "127.0.0.1", 53, 1, 0); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ đầy đủ("example.com", "127.0.0.1", 53, 15); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi máy chủ đầy đủ("example.com", "not-an-ip", 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("example.com", [], 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("example.com",
+        ["::1", "::1", "::1", "::1", "::1", "::1", "::1", "::1", "::1"],
+        53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("example.com", ["127.0.0.1", "bad"], 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("example.com", ["127.0.0.1"], 0, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("example.com", ["127.0.0.1"], 53, 1, 0); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng đầy đủ("bad..name", ["127.0.0.1"], 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    lỗi = sai;
+    thử { bộ.dns hỏi dự phòng("example.com", [], 53, 1); }
+    bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+};

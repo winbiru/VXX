@@ -1,0 +1,94 @@
+nhập gói/mạng/ổ cắm;
+
+// Parser thuộc ngôn ngữ V++, test độc lập với quyền tạo socket của sandbox.
+hàm địa chỉ lỗi(bộ, ip) {
+    thử { bộ.socket ip bytes(ip); } bắt lỗi(e) { trả về đúng; };
+    trả về sai;
+};
+
+hàm chính() {
+    bộ = Bộ Điều Khiển Ổ Cắm();
+    v4 = bộ.socket ip bytes("127.0.0.1");
+    in do_dai(v4) == 4 && v4[0] == 127 && v4[1] == 0 && v4[3] == 1;
+    v4 = bộ.socket ip bytes("192.168.255.254");
+    in do_dai(v4) == 4 && v4[0] == 192 && v4[1] == 168 && v4[2] == 255 && v4[3] == 254;
+    v6 = bộ.socket ip bytes("::1");
+    in do_dai(v6) == 16 && v6[0] == 0 && v6[14] == 0 && v6[15] == 1;
+    v6 = bộ.socket ip bytes("2001:db8::1234");
+    in do_dai(v6) == 16 && v6[0] == 32 && v6[1] == 1 && v6[2] == 13 &&
+       v6[3] == 184 && v6[14] == 18 && v6[15] == 52;
+    v6 = bộ.socket ip bytes("::ffff:127.0.0.1");
+    in do_dai(v6) == 16 && v6[10] == 255 && v6[11] == 255 &&
+       v6[12] == 127 && v6[15] == 1;
+    v6 = bộ.socket ip bytes("2001:0db8:0:0:0:0:0:1");
+    in do_dai(v6) == 16 && v6[0] == 32 && v6[2] == 13 && v6[15] == 1;
+
+    lỗi = sai;
+    thử { bộ.socket ip bytes("256.0.0.1"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.socket ip bytes("1.2.3"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.socket ip bytes("2001::1::1"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+    lỗi = sai;
+    thử { bộ.socket ip bytes("1:2:3:4:5:6:7:"); } bắt lỗi(e) { lỗi = đúng; };
+    in lỗi;
+
+    // IPv6 rút gọn tại mọi vị trí, đầy đủ 8 nhóm, IPv4 suffix.
+    v6 = bộ.socket ip bytes("::");
+    in do_dai(v6) == 16 && v6[0] == 0 && v6[15] == 0;
+    v6 = bộ.socket ip bytes("fe80::1");
+    in do_dai(v6) == 16 && v6[0] == 254 && v6[1] == 128 && v6[15] == 1;
+    v6 = bộ.socket ip bytes("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff");
+    in do_dai(v6) == 16 && v6[0] == 255 && v6[15] == 255;
+    v6 = bộ.socket ip bytes("1:2:3:4:5:6:7:8");
+    in do_dai(v6) == 16 && v6[0] == 0 && v6[1] == 1 && v6[14] == 0 && v6[15] == 8;
+    v6 = bộ.socket ip bytes("::ffff:192.0.2.1");
+    in do_dai(v6) == 16 && v6[10] == 255 && v6[12] == 192 && v6[14] == 2 && v6[15] == 1;
+    v6 = bộ.socket ip bytes("2001:db8:0:0:0:0:192.0.2.1");
+    in do_dai(v6) == 16 && v6[0] == 32 && v6[2] == 13 && v6[12] == 192 && v6[15] == 1;
+    v6 = bộ.socket ip bytes("1::2:3:4:5:6:7");
+    in do_dai(v6) == 16 && v6[1] == 1 && v6[3] == 0 && v6[15] == 7;
+    v6 = bộ.socket ip bytes("1:2:3:4:5:6:7::");
+    in do_dai(v6) == 16 && v6[1] == 1 && v6[13] == 7 && v6[15] == 0;
+    v4 = bộ.socket ip bytes("255.255.255.255");
+    in do_dai(v4) == 4 && v4[0] == 255 && v4[3] == 255;
+    v4 = bộ.socket ip bytes("0.0.0.0");
+    in do_dai(v4) == 4 && v4[0] == 0 && v4[3] == 0;
+
+    // Mỗi trường hợp sai phải phát sinh lỗi tại parser V++.
+    in địa chỉ lỗi(bộ, "");
+    in địa chỉ lỗi(bộ, "1.2.3.4.5");
+    in địa chỉ lỗi(bộ, "1..2.3");
+    in địa chỉ lỗi(bộ, "1.2.3.");
+    in địa chỉ lỗi(bộ, "-1.2.3.4");
+    in địa chỉ lỗi(bộ, "999.0.0.0");
+    in địa chỉ lỗi(bộ, "0000.1.1.1");
+    in địa chỉ lỗi(bộ, ":1");
+    in địa chỉ lỗi(bộ, "1:");
+    in địa chỉ lỗi(bộ, "1:2:3:4:5:6:7");
+    in địa chỉ lỗi(bộ, "1:2:3:4:5:6:7:8:9");
+    in địa chỉ lỗi(bộ, "1:2:3:4:5:6:7:8::");
+    in địa chỉ lỗi(bộ, "1::2::3");
+    in địa chỉ lỗi(bộ, "1:::2");
+    in địa chỉ lỗi(bộ, "abcdx::");
+    in địa chỉ lỗi(bộ, "12345::");
+    in địa chỉ lỗi(bộ, "::ffff:1.2.3.4:1");
+    in địa chỉ lỗi(bộ, "fe80::1%en0");
+    in địa chỉ lỗi(bộ, "::ffff:256.0.0.1");
+    in địa chỉ lỗi(bộ, "::ffff:1.2.3");
+    in địa chỉ lỗi(bộ, "::ffff:1.2.3.4.5");
+    in địa chỉ lỗi(bộ, "1:2:3:4:5:6:192.0.2.1:9");
+    in địa chỉ lỗi(bộ, "::ffff:192.0.2.1 ");
+    in địa chỉ lỗi(bộ, chuoi_tu_bytes_vm([49, 58, 58, 49, 0]));
+
+    // Đường IP số do V++ tự xử lý; không cần getaddrinfo hay quyền DNS.
+    literal = bộ.socket resolver danh sách("127.0.0.1", 443, sai);
+    in do_dai(literal) == 1 && literal[0][0] == "127.0.0.1" && literal[0][1] == 443;
+    literal = bộ.socket resolver danh sách("::1", 0, đúng);
+    in do_dai(literal) == 1 && literal[0] == "::1";
+    literal = bộ.socket resolver danh sách("2001:db8::1234", 53, đúng);
+    in do_dai(literal) == 1 && literal[0][0] == "2001:db8::1234" && literal[0][1] == 53;
+};

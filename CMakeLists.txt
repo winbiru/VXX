@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_TESTS "Build V++ .vi regression tests" ON)
+option(VPP_TEST_DNS_LOOPBACK "Enable DNS TCP fallback loopback integration test" OFF)
 option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 # Standalone Windows executables must also run on machines without VC Redist.
@@ -117,6 +118,17 @@ set(VPP_RUNTIME_SOURCES
     ${CMAKE_SOURCE_DIR}/src/native/x64_jit.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/heap.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/foreign.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/file_machine.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/socket_machine.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/file_runtime.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/process_identity.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/time_sleep.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/time_clock.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/entropy_machine.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/environment_machine.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/time_local.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/directory_machine.cpp
+    ${CMAKE_SOURCE_DIR}/src/runtime/path_machine.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/module.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/object.cpp
     ${CMAKE_SOURCE_DIR}/src/runtime/literal.cpp
@@ -203,14 +215,29 @@ vpp_add_module(vpp-compiler ${VPP_COMPILER_SOURCES})
 target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 
 vpp_add_module(vpp-runtime-native ${VPP_RUNTIME_SOURCES})
+if (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|aarch64|arm64)$")
+    enable_language(ASM)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_file_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_environment_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_localtime_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_directory_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_path_primitives.S)
+    if(APPLE)
+        target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_clock_primitives.S)
+        target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_entropy_primitives.S)
+    endif()
+    target_compile_definitions(vpp-runtime-native PRIVATE VPP_FILE_MACHINE_ASM=1)
+endif()
 target_link_libraries(vpp-runtime-native PUBLIC vpp-bytecode vpp-core Threads::Threads)
 vpp_add_module(vpp-runtime ${VPP_VM_RUNTIME_SOURCES})
 target_link_libraries(vpp-runtime PUBLIC vpp-runtime-native vpp-compiler)
 option(VPP_STATIC_LIBFFI "Link libffi statically for standalone release archives" OFF)
-if (PkgConfig_FOUND)
+option(VPP_ENABLE_LEGACY_LIBFFI
+    "Enable legacy FFI bytecode compatibility via libffi (Machine ABI remains available without it)" ON)
+if (VPP_ENABLE_LEGACY_LIBFFI AND PkgConfig_FOUND)
     pkg_check_modules(VPP_LIBFFI QUIET IMPORTED_TARGET libffi)
 endif()
-if (VPP_LIBFFI_FOUND)
+if (VPP_ENABLE_LEGACY_LIBFFI AND VPP_LIBFFI_FOUND)
     if (VPP_STATIC_LIBFFI AND UNIX)
         # pkg-config's imported target normally selects libffi.so/.dylib.
         # A copied release binary cannot rely on a Homebrew/Linux runtime
@@ -228,12 +255,10 @@ if (VPP_LIBFFI_FOUND)
         target_link_libraries(vpp-runtime-native PUBLIC PkgConfig::VPP_LIBFFI ${CMAKE_DL_LIBS})
     endif()
     target_compile_definitions(vpp-runtime-native PRIVATE VPP_HAS_LIBFFI=1)
-elseif(UNIX)
-    # The POSIX standard library now requires FFI at runtime. A successful
-    # build without libffi would ship broken public System/file/socket APIs.
-    message(FATAL_ERROR "V++ POSIX System FFI requires libffi and pkg-config (install libffi-dev on Linux or libffi via Homebrew on macOS)")
+elseif(UNIX AND VPP_ENABLE_LEGACY_LIBFFI)
+    message(FATAL_ERROR "Legacy POSIX FFI requires libffi and pkg-config; set VPP_ENABLE_LEGACY_LIBFFI=OFF to build only Machine ABI paths")
 else()
-    message(STATUS "libffi unavailable; Windows System APIs use native backend")
+    message(STATUS "Legacy libffi bridge disabled/unavailable; Machine ABI remains enabled")
 endif()
 if (WIN32)
     target_link_libraries(vpp-runtime-native PUBLIC ws2_32 bcrypt secur32 crypt32)
@@ -256,6 +281,14 @@ vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp)
 target_link_libraries(vpp-native-aot PUBLIC vpp-runtime-native)
+# The AOT driver starts a separate linker CMake project. Carry the actual
+# runtime build's legacy-FFI choice into that project, including installs
+# where the original CMakeCache.txt is unavailable.
+if (VPP_ENABLE_LEGACY_LIBFFI AND VPP_LIBFFI_FOUND)
+    target_compile_definitions(vpp-native-aot PRIVATE VPP_AOT_LINK_LEGACY_LIBFFI=1)
+else()
+    target_compile_definitions(vpp-native-aot PRIVATE VPP_AOT_LINK_LEGACY_LIBFFI=0)
+endif()
 
 add_library(vpp::core ALIAS vpp-core)
 add_library(vpp::bytecode ALIAS vpp-bytecode)
@@ -305,6 +338,13 @@ add_custom_command(TARGET vpp-cli POST_BUILD
 # Regression tests are V++ .vi programs under src/tests/.
 if (BUILD_TESTS)
     enable_testing()
+    if (UNIX AND NOT VPP_ENABLE_LEGACY_LIBFFI)
+        add_test(NAME vpp-machine-no-legacy-libffi
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_machine_no_ffi.cmake)
+    endif()
     # Source-level V++ stress cases live alongside the interpreter regressions.
     add_test(NAME vpp-rc-source-corpus
         COMMAND ${CMAKE_COMMAND}
@@ -336,7 +376,7 @@ if (BUILD_TESTS)
     target_link_libraries(vpp-runtime-p0-hardening PRIVATE vpp-runtime)
     target_include_directories(vpp-runtime-p0-hardening PRIVATE ${VPP_INCLUDE_DIR})
     target_compile_features(vpp-runtime-p0-hardening PRIVATE cxx_std_17)
-    if (VPP_LIBFFI_FOUND AND NOT WIN32)
+    if (VPP_ENABLE_LEGACY_LIBFFI AND VPP_LIBFFI_FOUND AND NOT WIN32)
         target_compile_definitions(
             vpp-runtime-p0-hardening PRIVATE VPP_TEST_POSIX_LIBFFI=1)
         # Let dlsym(RTLD_DEFAULT, ...) resolve the C ABI roundtrip fixtures.
@@ -348,6 +388,172 @@ if (BUILD_TESTS)
         target_compile_options(vpp-runtime-p0-hardening PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME vpp-runtime-p0-hardening COMMAND vpp-runtime-p0-hardening)
+
+    add_executable(vpp-file-io-hardening scripts/quality/file_io_hardening.cpp)
+    target_link_libraries(vpp-file-io-hardening PRIVATE vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-file-io-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-file-io-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-file-io-hardening COMMAND vpp-file-io-hardening)
+
+    add_executable(vpp-process-identity-hardening
+        scripts/quality/process_identity_hardening.cpp)
+    target_link_libraries(vpp-process-identity-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-process-identity-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-process-identity-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-process-identity-hardening COMMAND vpp-process-identity-hardening)
+    add_executable(vpp-time-sleep-hardening scripts/quality/time_sleep_hardening.cpp)
+    target_link_libraries(vpp-time-sleep-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-time-sleep-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-time-sleep-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-time-sleep-hardening COMMAND vpp-time-sleep-hardening)
+    add_executable(vpp-time-clock-hardening scripts/quality/time_clock_hardening.cpp)
+    target_link_libraries(vpp-time-clock-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-time-clock-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-time-clock-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-time-clock-hardening COMMAND vpp-time-clock-hardening)
+    add_executable(vpp-entropy-machine-hardening scripts/quality/entropy_machine_hardening.cpp)
+    target_link_libraries(vpp-entropy-machine-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-entropy-machine-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-entropy-machine-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-entropy-machine-hardening COMMAND vpp-entropy-machine-hardening)
+    add_executable(vpp-environment-machine-hardening scripts/quality/environment_machine_hardening.cpp)
+    target_link_libraries(vpp-environment-machine-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-environment-machine-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-environment-machine-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-environment-machine-hardening COMMAND vpp-environment-machine-hardening)
+    add_executable(vpp-time-local-hardening scripts/quality/time_local_hardening.cpp)
+    target_link_libraries(vpp-time-local-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-time-local-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-time-local-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-time-local-hardening COMMAND vpp-time-local-hardening)
+    add_executable(vpp-directory-machine-hardening scripts/quality/directory_machine_hardening.cpp)
+    target_link_libraries(vpp-directory-machine-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-directory-machine-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-directory-machine-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-directory-machine-hardening COMMAND vpp-directory-machine-hardening)
+    add_executable(vpp-path-machine-hardening scripts/quality/path_machine_hardening.cpp)
+    target_link_libraries(vpp-path-machine-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-path-machine-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-path-machine-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-path-machine-hardening COMMAND vpp-path-machine-hardening)
+    add_executable(vpp-socket-machine-hardening scripts/quality/socket_machine_hardening.cpp)
+    target_link_libraries(vpp-socket-machine-hardening PRIVATE vpp-native-aot vpp-runtime-native)
+    if (MSVC)
+        target_compile_options(vpp-socket-machine-hardening PRIVATE /W4 /utf-8)
+    else()
+        target_compile_options(vpp-socket-machine-hardening PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+    add_test(NAME vpp-socket-machine-hardening COMMAND vpp-socket-machine-hardening)
+    add_test(NAME vpp-socket-ip-parser-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_socket_ip.cmake)
+    add_test(NAME vpp-socket-hosts-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_socket_hosts.cmake)
+    add_test(NAME vpp-socket-dns-vi-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_socket_dns_vi.cmake)
+    add_test(NAME vpp-dns-wire-codec-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_wire.cmake)
+    add_test(NAME vpp-dns-transport-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_transport.cmake)
+    add_test(NAME vpp-dns-cache-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_cache.cmake)
+    add_test(NAME vpp-dns-config-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_config.cmake)
+    add_test(NAME vpp-dns-search-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_search.cmake)
+    add_test(NAME vpp-dns-hosts-vpp-fixture
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_hosts.cmake)
+    add_test(NAME vpp-dns-hosts-integration
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_hosts_integration.cmake)
+    if (VPP_TEST_DNS_LOOPBACK)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        add_test(NAME vpp-dns-tcp-loopback
+            COMMAND "${Python3_EXECUTABLE}"
+                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_tcp_fallback.py
+                $<TARGET_FILE:vpp-cli>)
+        add_test(NAME vpp-dns-multiserver-loopback
+            COMMAND "${Python3_EXECUTABLE}"
+                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_multiserver.py
+                $<TARGET_FILE:vpp-cli>)
+        add_test(NAME vpp-dns-structured-transport-loopback
+            COMMAND "${Python3_EXECUTABLE}"
+                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_structured_transport.py
+                $<TARGET_FILE:vpp-cli>)
+    endif()
+    add_test(NAME vpp-directory-vpp-fixture
+        COMMAND $<TARGET_FILE:vpp-cli> ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_ffi_thu_muc.vi)
+    if (UNIX)
+        add_test(NAME vpp-time-local-vpp-fixture
+            COMMAND ${CMAKE_COMMAND} -E env TZ=EST5EDT,M3.2.0/2,M11.1.0/2
+                $<TARGET_FILE:vpp-cli> ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_ffi_gio_dia_phuong.vi)
+    endif()
+    add_test(NAME vpp-environment-vpp-fixture
+        COMMAND ${CMAKE_COMMAND} -E env VPP_FFI_ENV_TEST=vpp-env-ffi-ok
+            VPP_FFI_ENV_EMPTY_TEST= $<TARGET_FILE:vpp-cli>
+            ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_ffi_moi_truong.vi)
+    add_test(NAME vpp-entropy-vpp-fixture
+        COMMAND $<TARGET_FILE:vpp-cli> ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_ffi_entropy.vi)
+    add_test(NAME vpp-vi-asm-boundary-audit
+        COMMAND sh ${CMAKE_SOURCE_DIR}/scripts/quality/audit_vi_asm_boundary.sh)
 
     add_executable(vpp-target-registry-hardening
         ${CMAKE_SOURCE_DIR}/scripts/quality/target_registry_hardening.cpp)
@@ -685,6 +891,18 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
+        if (UNIX)
+            # System packages require the full-language compiler. The small
+            # native-stage1 leaf compiler cannot parse imports or Machine ABI.
+            add_test(NAME vpp-native-machine-system-fixtures
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_NATIVE_CLI=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-machine-system"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_machine_fixtures.cmake)
+            set_tests_properties(vpp-native-machine-system-fixtures PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 1200)
+        endif()
     endif()
     foreach(vpp_case IN ITEMS compiler oop ffi)
         if (vpp_case STREQUAL "compiler")

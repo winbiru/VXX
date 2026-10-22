@@ -51,6 +51,23 @@ if ((UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$") OR
         TIMEOUT 1800 LABELS bootstrap-native)
 endif()
 
+# The buffered V++ file library must also work from an installed AOT program.
+if (VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$" OR
+    VPP_TARGET STREQUAL "aarch64-apple-darwin" OR
+    VPP_TARGET STREQUAL "x86_64-windows-msvc")
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_stdio_vpp.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-stdio-vpp.vi" COPYONLY)
+    add_test(NAME installed-native-stdio-vpp
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-stdio-vpp.vi"
+            "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_stdio_vpp.expected"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-stdio-vpp"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+    set_tests_properties(installed-native-stdio-vpp PROPERTIES TIMEOUT 180)
+endif()
+
 # These native fixtures cover anonymous closure metadata, captured exceptions,
 # class dispatch, and branch/loop lowering on both Linux runner architectures.
 if (UNIX AND VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$")

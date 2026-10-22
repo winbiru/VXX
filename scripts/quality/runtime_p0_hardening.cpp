@@ -3289,6 +3289,246 @@ void testForeignSocketBindings() {
     }
 }
 
+void testResolverMachineBindings() {
+    using vietvm::runtime::ForeignFileState;
+    using vietvm::runtime::StackValue;
+    using vietvm::runtime::executeResolverMachinePrimitive;
+    using vietvm::runtime::make_int_value;
+    using vietvm::runtime::make_string_value;
+
+    ForeignFileState owner;
+    ForeignFileState other;
+    const std::unordered_set<std::string> grants{
+        "system.net.resolve.open", "system.net.resolve.next",
+        "system.net.resolve.close"};
+    const auto call = [&](Opcode opcode, const std::vector<StackValue> &args,
+                          const std::unordered_set<std::string> &permissions,
+                          ForeignFileState &state) {
+        return executeResolverMachinePrimitive(opcode, args, permissions, state);
+    };
+    const auto rejected = [&](Opcode opcode, const std::vector<StackValue> &args,
+                              const std::unordered_set<std::string> &permissions,
+                              ForeignFileState &state) {
+        try { (void)call(opcode, args, permissions, state); }
+        catch (const vietvm::runtime::RuntimeError &) { return true; }
+        return false;
+    };
+    const auto host = make_string_value("127.0.0.1");
+    const auto service = make_string_value("443");
+    const auto tcp = make_int_value(0);
+    expect(rejected(OP_VM_MACHINE_RESOLVE_OPEN, {host, service, tcp}, {}, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_OPEN, {host, service}, grants, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_OPEN,
+                    {make_string_value(""), service, tcp}, grants, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_OPEN,
+                    {make_string_value(std::string("127.0.0.1\0x", 12)), service, tcp},
+                    grants, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_OPEN,
+                    {host, make_string_value("65536"), tcp}, grants, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_OPEN,
+                    {host, service, make_int_value(2)}, grants, owner),
+           "machine resolver kiểm tra quyền, số tham số, hostname, port và protocol");
+    const int id = std::get<int>(call(OP_VM_MACHINE_RESOLVE_OPEN,
+        {host, service, tcp}, grants, owner));
+    const auto token = make_int_value(id);
+    expect(rejected(OP_VM_MACHINE_RESOLVE_NEXT, {token}, grants, other) &&
+           rejected(OP_VM_MACHINE_RESOLVE_CLOSE, {token}, grants, other) &&
+           rejected(OP_VM_MACHINE_RESOLVE_NEXT, {token},
+                    {"system.net.resolve.open"}, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_NEXT, {host}, grants, owner),
+           "machine resolver chỉ cho VM sở hữu token và quyền hợp lệ");
+    expect(call(OP_VM_MACHINE_RESOLVE_NEXT, {token}, grants, owner) == host,
+           "machine resolver trả địa chỉ IP số");
+    expect(call(OP_VM_MACHINE_RESOLVE_CLOSE, {token}, grants, owner) == make_int_value(1) &&
+           rejected(OP_VM_MACHINE_RESOLVE_NEXT, {token}, grants, owner) &&
+           rejected(OP_VM_MACHINE_RESOLVE_CLOSE, {token}, grants, owner),
+           "machine resolver thu hồi token và chống dùng sau close");
+}
+
+void testTlsMachineBindings() {
+    using vietvm::runtime::ForeignFileState;
+    using vietvm::runtime::StackValue;
+    using vietvm::runtime::executeTlsMachinePrimitive;
+    using vietvm::runtime::make_int_value;
+    using vietvm::runtime::make_list_value;
+    using vietvm::runtime::make_string_value;
+
+    ForeignFileState owner;
+    ForeignFileState other;
+    const std::unordered_set<std::string> grants{
+        "system.net.tls.upgrade", "system.net.tls.send", "system.net.tls.recv"};
+    const auto rejects = [&](Opcode opcode, const std::vector<StackValue> &args,
+                             const std::unordered_set<std::string> &permissions,
+                             ForeignFileState &state) {
+        try {
+            (void)executeTlsMachinePrimitive(opcode, args, permissions, state);
+        } catch (const vietvm::runtime::RuntimeError &) {
+            return true;
+        } catch (const vietvm::runtime::LanguageException &) {
+            return true;
+        }
+        return false;
+    };
+    const auto token = make_int_value(536870920);
+    const auto host = make_string_value("localhost");
+    const auto bytes = make_list_value({make_int_value(0), make_int_value(255)});
+    expect(rejects(OP_VM_MACHINE_TLS_UPGRADE, {token, host}, {}, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes, make_int_value(2)},
+                   {"system.net.tls.recv"}, owner) &&
+           rejects(OP_VM_MACHINE_TLS_RECV, {token, bytes, make_int_value(2)},
+                   {"system.net.tls.send"}, owner) &&
+           rejects(OP_VM_MACHINE_TLS_UPGRADE, {token}, grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes}, grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_RECV, {token, bytes}, grants, owner),
+           "machine TLS kiểm tra capability và arity của từng opcode");
+
+    owner.sockets.emplace(536870920, ForeignFileState::Socket{-1, false, false});
+    expect(rejects(OP_VM_MACHINE_TLS_UPGRADE, {token, host}, grants, other) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes, make_int_value(2)}, grants, other) &&
+           rejects(OP_VM_MACHINE_TLS_RECV, {token, bytes, make_int_value(2)}, grants, other) &&
+           rejects(OP_VM_MACHINE_TLS_UPGRADE, {make_string_value("536870920"), host},
+                   grants, owner),
+           "machine TLS chỉ dùng token socket thuộc VM và đúng kiểu");
+    expect(rejects(OP_VM_MACHINE_TLS_UPGRADE, {token, host}, grants, owner),
+           "machine TLS từ chối descriptor không hợp lệ");
+    owner.sockets.at(536870920).datagram = true;
+    expect(rejects(OP_VM_MACHINE_TLS_UPGRADE, {token, host}, grants, owner),
+           "machine TLS từ chối socket UDP");
+    owner.sockets.at(536870920).datagram = false;
+    owner.sockets.at(536870920).listener = true;
+    expect(rejects(OP_VM_MACHINE_TLS_UPGRADE, {token, host}, grants, owner),
+           "machine TLS từ chối listener");
+    owner.sockets.at(536870920).listener = false;
+
+    expect(rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes, make_int_value(2)},
+                   grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_RECV, {token, bytes, make_int_value(2)},
+                   grants, owner),
+           "machine TLS không gửi/nhận khi chưa handshake");
+
+    // Synthetic session is used only for validation paths that must reject
+    // before touching the provider; clear it before closing the VM state.
+    owner.sockets.at(536870920).tlsSession = reinterpret_cast<void *>(1);
+    const auto invalidBytes = make_list_value({make_int_value(256)});
+    const auto negativeBytes = make_list_value({make_int_value(-1)});
+    expect(rejects(OP_VM_MACHINE_TLS_SEND,
+                   {token, make_string_value("A"), make_int_value(1)}, grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_RECV,
+                   {token, make_string_value("A"), make_int_value(1)}, grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes, make_int_value(0)},
+                   grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, bytes, make_int_value(1)},
+                   grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_RECV, {token, bytes, make_int_value(65537)},
+                   grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, invalidBytes, make_int_value(1)},
+                   grants, owner) &&
+           rejects(OP_VM_MACHINE_TLS_SEND, {token, negativeBytes, make_int_value(1)},
+                   grants, owner),
+           "machine TLS kiểm tra buffer, độ dài và byte 0..255 trước provider");
+    owner.sockets.at(536870920).tlsSession = nullptr;
+
+    int pair[2] = {-1, -1};
+    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0) {
+        const auto connectedToken = make_int_value(536870921);
+        owner.sockets.emplace(536870921,
+            ForeignFileState::Socket{pair[0], false, false});
+        expect(rejects(OP_VM_MACHINE_TLS_UPGRADE,
+                       {connectedToken, make_string_value("")}, grants, owner) &&
+               rejects(OP_VM_MACHINE_TLS_UPGRADE,
+                       {connectedToken, make_string_value(std::string("a\0b", 3))},
+                       grants, owner) &&
+               rejects(OP_VM_MACHINE_TLS_UPGRADE,
+                       {connectedToken, make_int_value(2)}, grants, owner),
+               "machine TLS từ chối hostname rỗng, NUL và sai kiểu");
+
+        const char invalidTls[] = "not a TLS record";
+        const auto wrote = ::send(pair[1], invalidTls, sizeof(invalidTls) - 1, 0);
+        (void)::shutdown(pair[1], SHUT_WR);
+        expect(rejects(OP_VM_MACHINE_TLS_UPGRADE,
+                       {connectedToken, host}, grants, owner) &&
+               wrote == static_cast<ssize_t>(sizeof(invalidTls) - 1) &&
+               owner.sockets.count(536870921) == 0 &&
+               ::fcntl(pair[0], F_GETFD) == -1,
+               "machine TLS handshake thất bại thu hồi fd/token");
+        (void)::close(pair[1]);
+    }
+    owner.closeAll();
+}
+
+void testProcessMachineBindings() {
+    using vietvm::runtime::ForeignFileState;
+    using vietvm::runtime::StackValue;
+    using vietvm::runtime::executeProcessMachinePrimitive;
+    using vietvm::runtime::make_int_value;
+    using vietvm::runtime::make_string_value;
+
+    ForeignFileState owner;
+    ForeignFileState other;
+    const std::unordered_set<std::string> grants{
+        "system.process.new", "system.process.arg", "system.process.env",
+        "system.process.start", "system.process.poll", "system.process.read",
+        "system.process.wait", "system.process.error", "system.process.close"};
+    const auto call = [&](Opcode opcode, const std::vector<StackValue> &args,
+                          const std::unordered_set<std::string> &permissions,
+                          ForeignFileState &state) {
+        return executeProcessMachinePrimitive(opcode, args, permissions, state);
+    };
+    const auto rejected = [&](Opcode opcode, const std::vector<StackValue> &args,
+                              const std::unordered_set<std::string> &permissions,
+                              ForeignFileState &state) {
+        try { (void)call(opcode, args, permissions, state); }
+        catch (const vietvm::runtime::RuntimeError &) { return true; }
+        return false;
+    };
+    const auto program = make_string_value("/bin/sh");
+    expect(rejected(OP_VM_MACHINE_PROCESS_NEW, {program}, {}, owner) &&
+           rejected(OP_VM_MACHINE_PROCESS_NEW, {}, grants, owner) &&
+           rejected(OP_VM_MACHINE_PROCESS_NEW, {make_string_value("")}, grants, owner) &&
+           rejected(OP_VM_MACHINE_PROCESS_NEW, {make_string_value(std::string("a\0b", 3))},
+                    grants, owner), "machine process kiểm tra capability, arity và C-string");
+    const int id = std::get<int>(call(OP_VM_MACHINE_PROCESS_NEW, {program}, grants, owner));
+    const auto token = make_int_value(id);
+    expect(rejected(OP_VM_MACHINE_PROCESS_CLOSE, {token}, grants, other) &&
+           rejected(OP_VM_MACHINE_PROCESS_POLL, {token, make_int_value(0)}, grants, other) &&
+           rejected(OP_VM_MACHINE_PROCESS_ARG, {token, make_string_value("-c")},
+                    {"system.process.new"}, owner) &&
+           rejected(OP_VM_MACHINE_PROCESS_READ,
+                    {token, make_int_value(1), make_int_value(0), make_int_value(1)},
+                    grants, owner), "machine process khóa token liên VM và kiểm tra dữ liệu");
+    expect(call(OP_VM_MACHINE_PROCESS_ARG, {token, make_string_value("-c")},
+                grants, owner) == make_int_value(1) &&
+           call(OP_VM_MACHINE_PROCESS_ARG, {token, make_string_value("printf machine")},
+                grants, owner) == make_int_value(1), "machine process xây argv riêng");
+    expect(call(OP_VM_MACHINE_PROCESS_START, {token}, grants, owner) == make_int_value(1),
+           "machine process gọi spawn");
+    const auto buffer = vietvm::runtime::make_list_value(
+        std::vector<StackValue>(32, make_int_value(0)));
+    std::string output;
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        const int ready = std::get<int>(call(OP_VM_MACHINE_PROCESS_POLL,
+            {token, make_int_value(30)}, grants, owner));
+        if (ready == 4) break;
+        for (int channel = 1; channel <= 2; ++channel) {
+            if ((ready & (1 << (channel - 1))) == 0) continue;
+            const int n = std::get<int>(call(OP_VM_MACHINE_PROCESS_READ,
+                {token, make_int_value(channel), buffer, make_int_value(32)},
+                grants, owner));
+            if (channel == 1) {
+                const auto &bytes = std::get<vietvm::runtime::ListHandle>(buffer)->elements;
+                for (int i = 0; i < n; ++i)
+                    output.push_back(static_cast<char>(std::get<int>(bytes[i])));
+            }
+        }
+    }
+    expect(output == "machine", "machine process đọc được pipe stdout");
+    expect(call(OP_VM_MACHINE_PROCESS_WAIT, {token}, grants, owner) == make_int_value(0),
+           "machine process wait thành công sau EOF");
+    expect(call(OP_VM_MACHINE_PROCESS_CLOSE, {token}, grants, owner) == make_int_value(1) &&
+           rejected(OP_VM_MACHINE_PROCESS_CLOSE, {token}, grants, owner),
+           "machine process thu hồi token và không double-close");
+}
+
 void testForeignProcessBindings() {
     using vietvm::bytecode::ForeignAbiType;
     using vietvm::bytecode::ForeignFunctionDescriptor;
@@ -3566,8 +3806,11 @@ int main() {
     testForeignFilesystemBindings();
     testForeignFileBindings();
     testForeignDnsResolverBindings();
+    testResolverMachineBindings();
     testForeignSocketBindings();
+    testTlsMachineBindings();
     testForeignProcessBindings();
+    testProcessMachineBindings();
     testForeignPosixErrorSnapshot();
     testForeignExact64BitIntegers();
 #endif

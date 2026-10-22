@@ -38,6 +38,14 @@
 #include "vpp/runtime/vm_fixture.h"
 #include "vpp/runtime/object.h"
 #include "vpp/runtime/literal.h"
+#include "vpp/runtime/process_identity.h"
+#include "vpp/runtime/time_sleep.h"
+#include "vpp/runtime/time_clock.h"
+#include "vpp/runtime/entropy_machine.h"
+#include "vpp/runtime/environment_machine.h"
+#include "vpp/runtime/time_local.h"
+#include "vpp/runtime/directory_machine.h"
+#include "vpp/runtime/path_machine.h"
 
 #if defined(_WIN32) && defined(_MSC_VER)
 #ifndef popen
@@ -489,6 +497,10 @@ void VM::setForeignCapabilities(
     foreignCapabilities_ = std::move(capabilities);
 }
 
+void VM::setMachineCapabilities(std::unordered_set<std::string> capabilities) {
+    machineCapabilities_ = std::move(capabilities);
+}
+
 void VM::invalidateBytecodeVerification() noexcept {
     ++programGeneration_;
     if (programGeneration_ == 0) {
@@ -555,6 +567,8 @@ void VM::resetExecution() {
     activeBytecodeDebugInfo_ = nullptr;
     lastForeignPosixError_ = 0;
     foreignFileState_.closeAll();
+    fileMachineState_.closeAll();
+    directoryMachineState_.closeAll();
 }
 
 const std::vector<Instruction> &VM::currentBytecode() const noexcept {
@@ -621,6 +635,7 @@ void VM::initializeModules() {
             initializer.setFunctions(hamBytecodeMap, functionTableByNameIndex);
             initializer.setForeignFunctions(foreignFunctions_);
             initializer.setForeignCapabilities(foreignCapabilities_);
+            initializer.setMachineCapabilities(machineCapabilities_);
 
             // `VM::run()` của VM cha đã verify root, toàn bộ function bytecode
             // và toàn bộ module initializer trước khi bất kỳ initializer nào
@@ -1685,6 +1700,7 @@ bool VM::executeThreadIntrinsic(
         auto functionDebugSnapshot = functionDebugInfo;
         auto foreignFunctionsSnapshot = foreignFunctions_;
         auto foreignCapabilitiesSnapshot = foreignCapabilities_;
+        auto machineCapabilitiesSnapshot = machineCapabilities_;
         const std::size_t maxDepthSnapshot = maxCallDepth;
         OutputSink sinkSnapshot = outputSink;
 
@@ -1711,6 +1727,7 @@ bool VM::executeThreadIntrinsic(
                  functionDebug = std::move(functionDebugSnapshot),
                  foreignFunctions = std::move(foreignFunctionsSnapshot),
                  foreignCapabilities = std::move(foreignCapabilitiesSnapshot),
+                 machineCapabilities = std::move(machineCapabilitiesSnapshot),
                  workerVariables = std::move(variableSnapshot),
                  workerClasses = std::move(classSnapshot),
                  maxDepthSnapshot, sink = std::move(sinkSnapshot)]() mutable {
@@ -1728,6 +1745,7 @@ bool VM::executeThreadIntrinsic(
                         worker.setFunctions(std::move(functions), std::move(functionNames));
                         worker.setForeignFunctions(std::move(foreignFunctions));
                         worker.setForeignCapabilities(std::move(foreignCapabilities));
+                        worker.setMachineCapabilities(std::move(machineCapabilities));
 
                         StackValue workerResult = worker.runWorkerCallable(callable, callArgs);
                         ThreadValueCloner resultCloner;
@@ -1868,6 +1886,84 @@ bool VM::dispatchRegisteredIntrinsic(
     StackValue &result,
     std::string &err,
     bool &runtimeFailure) {
+    if (vietvm::runtime::isFileMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeFileMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, fileMachineState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isDirectoryMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeDirectoryMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, directoryMachineState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isPathMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executePathMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isSocketMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeSocketMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, foreignFileState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isProcessMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeProcessMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, foreignFileState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isResolverMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeResolverMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, foreignFileState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isTlsMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeTlsMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_, foreignFileState_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isProcessIdentityPrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeProcessIdentityPrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isTimeSleepPrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeTimeSleepPrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isTimeClockPrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeTimeClockPrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isEntropyMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeEntropyMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isEnvironmentMachinePrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeEnvironmentMachinePrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
+    if (vietvm::runtime::isTimeLocalPrimitive(intrinsic.opcode)) {
+        result = vietvm::runtime::executeTimeLocalPrimitive(
+            intrinsic.opcode, args, machineCapabilities_);
+        runtimeFailure = false;
+        return true;
+    }
 #if defined(_WIN32)
     // Windows filesystem and DNS policy now live in the V++ stdlib. Keep
     // bytecode descriptors for a stable migration diagnostic only.
@@ -3384,6 +3480,56 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_STRING_BYTES:
             case OP_VM_STRING_FROM_BYTES:
             case OP_VM_FLOAT_FROM_BITS:
+            case OP_VM_MACHINE_FILE_OPEN:
+            case OP_VM_MACHINE_FILE_READ:
+            case OP_VM_MACHINE_FILE_WRITE:
+            case OP_VM_MACHINE_FILE_CLOSE:
+            case OP_VM_MACHINE_FILE_SEEK:
+            case OP_VM_MACHINE_FILE_TELL:
+            case OP_VM_MACHINE_FILE_ERROR:
+            case OP_VM_MACHINE_FILE_REMOVE:
+            case OP_VM_MACHINE_PROCESS_PID:
+            case OP_VM_MACHINE_PROCESS_PPID:
+            case OP_VM_MACHINE_PROCESS_UID:
+            case OP_VM_MACHINE_PROCESS_EUID:
+            case OP_VM_MACHINE_PROCESS_GID:
+            case OP_VM_MACHINE_PROCESS_EGID:
+            case OP_VM_MACHINE_TIME_SLEEP:
+            case OP_VM_MACHINE_TIME_MONOTONIC:
+            case OP_VM_MACHINE_TIME_REALTIME:
+            case OP_VM_MACHINE_ENTROPY_READ:
+            case OP_VM_MACHINE_ENV_GET:
+            case OP_VM_MACHINE_TIME_LOCAL:
+            case OP_VM_MACHINE_DIR_MKDIR:
+            case OP_VM_MACHINE_DIR_REMOVE:
+            case OP_VM_MACHINE_DIR_OPEN:
+            case OP_VM_MACHINE_DIR_NEXT:
+            case OP_VM_MACHINE_DIR_CLOSE:
+            case OP_VM_MACHINE_PATH_KIND:
+            case OP_VM_MACHINE_SOCKET_KIND:
+            case OP_VM_MACHINE_SOCKET_CLOSE:
+            case OP_VM_MACHINE_SOCKET_TIMEOUT:
+            case OP_VM_MACHINE_SOCKET_SEND:
+            case OP_VM_MACHINE_SOCKET_RECV:
+            case OP_VM_MACHINE_SOCKET_ACCEPT:
+            case OP_VM_MACHINE_SOCKET_LISTEN:
+            case OP_VM_MACHINE_SOCKET_CONNECT:
+            case OP_VM_MACHINE_PROCESS_NEW:
+            case OP_VM_MACHINE_PROCESS_ARG:
+            case OP_VM_MACHINE_PROCESS_COMMAND_LINE:
+            case OP_VM_MACHINE_PROCESS_ENV:
+            case OP_VM_MACHINE_PROCESS_START:
+            case OP_VM_MACHINE_PROCESS_POLL:
+            case OP_VM_MACHINE_PROCESS_READ:
+            case OP_VM_MACHINE_PROCESS_WAIT:
+            case OP_VM_MACHINE_PROCESS_ERROR:
+            case OP_VM_MACHINE_PROCESS_CLOSE:
+            case OP_VM_MACHINE_RESOLVE_OPEN:
+            case OP_VM_MACHINE_RESOLVE_NEXT:
+            case OP_VM_MACHINE_RESOLVE_CLOSE:
+            case OP_VM_MACHINE_TLS_UPGRADE:
+            case OP_VM_MACHINE_TLS_SEND:
+            case OP_VM_MACHINE_TLS_RECV:
                 if (switchStack.empty() || !switchStack.back().skippingCase) {
                     executeIntrinsicOpcode(instr);
                 }

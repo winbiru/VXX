@@ -3,10 +3,6 @@
 
 nhập gói/lõi/chuyển kiểu;
 
-ngoại thư viện c_hệ_thống = "system.c";
-ngoại hàm getenv_hệ_thống_ffi(tên: c_chuỗi): c_chuỗi từ c_hệ_thống
-    ký hiệu "getenv" abi "c" khả năng "system.env.read";
-
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Môi Trường {
     hàm công khai khởi tạo() {};
@@ -27,7 +23,7 @@ lớp công khai Môi Trường {
 
     hàm công khai đọc biến môi trường(tên, giá_trị_mặc_định) {
         tên = mình.môi trường chuẩn hóa tên(tên);
-        giá_trị = getenv_hệ_thống_ffi(tên);
+        giá_trị = máy_môi_trường_đọc(tên);
         nếu (giá_trị == rỗng) {
             trả về giá_trị_mặc_định;
         };

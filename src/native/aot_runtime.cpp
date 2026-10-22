@@ -15,6 +15,14 @@
 #include "vpp/bytecode/literal_wire.h"
 #include "vpp/core/text.h"
 #include "vpp/runtime/literal.h"
+#include "vpp/runtime/process_identity.h"
+#include "vpp/runtime/time_sleep.h"
+#include "vpp/runtime/time_clock.h"
+#include "vpp/runtime/entropy_machine.h"
+#include "vpp/runtime/environment_machine.h"
+#include "vpp/runtime/time_local.h"
+#include "vpp/runtime/directory_machine.h"
+#include "vpp/runtime/path_machine.h"
 
 namespace vietvm::native::aot {
 namespace {
@@ -133,6 +141,8 @@ Program::Program() {
                                "system.fs.dir.close",
                                "system.net.resolve.open", "system.net.resolve.next",
                                "system.net.resolve.close",
+                               "system.net.tls.upgrade", "system.net.tls.send",
+                               "system.net.tls.recv",
                                "system.net.socket.connect", "system.net.socket.listen",
                                "system.net.socket.accept", "system.net.socket.timeout",
                                "system.net.socket.kind", "system.net.socket.send",
@@ -141,6 +151,19 @@ Program::Program() {
                                "system.file.write", "system.file.close",
                                "system.file.error",
                                "system.file.seek", "system.file.tell", "system.file.flush",
+                               "machine.file.open", "machine.file.read",
+                               "machine.file.write", "machine.file.close",
+                               "machine.file.seek", "machine.file.tell",
+                               "machine.file.error", "machine.file.remove",
+                               "machine.dir.mkdir", "machine.dir.remove",
+                               "machine.dir.open", "machine.dir.next", "machine.dir.close",
+                               "machine.path.kind",
+                               "machine.net.socket.kind", "machine.net.socket.close",
+                               "machine.net.socket.timeout",
+                               "machine.net.socket.send", "machine.net.socket.recv",
+                               "machine.net.socket.accept",
+                               "machine.net.socket.listen",
+                               "machine.net.socket.connect",
                                "system.ffi.error",
                                "system.ffi.layout",
                                "system.user.id", "system.user.effective_id",
@@ -376,6 +399,71 @@ void Frame::intrinsic(int operation) {
     const auto *descriptor = bytecode::intrinsicByOpcode(operation);
     if (!descriptor) fail("unknown intrinsic");
     auto args = take(static_cast<int>(descriptor->arity)); Value result = make_null_value(); std::string error;
+    if (runtime::isFileMachinePrimitive(operation)) {
+        push(runtime::executeFileMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.machineFiles));
+        return;
+    }
+    if (runtime::isDirectoryMachinePrimitive(operation)) {
+        push(runtime::executeDirectoryMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.machineDirectories));
+        return;
+    }
+    if (runtime::isPathMachinePrimitive(operation)) {
+        push(runtime::executePathMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities));
+        return;
+    }
+    if (runtime::isSocketMachinePrimitive(operation)) {
+        push(runtime::executeSocketMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.files));
+        return;
+    }
+    if (runtime::isProcessMachinePrimitive(operation)) {
+        push(runtime::executeProcessMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.files));
+        return;
+    }
+    if (runtime::isResolverMachinePrimitive(operation)) {
+        push(runtime::executeResolverMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.files));
+        return;
+    }
+    if (runtime::isTlsMachinePrimitive(operation)) {
+        push(runtime::executeTlsMachinePrimitive(static_cast<Opcode>(operation),
+            args, program.capabilities, program.files));
+        return;
+    }
+    if (runtime::isProcessIdentityPrimitive(operation)) {
+        push(runtime::executeProcessIdentityPrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
+    if (runtime::isTimeSleepPrimitive(operation)) {
+        push(runtime::executeTimeSleepPrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
+    if (runtime::isTimeClockPrimitive(operation)) {
+        push(runtime::executeTimeClockPrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
+    if (runtime::isEntropyMachinePrimitive(operation)) {
+        push(runtime::executeEntropyMachinePrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
+    if (runtime::isEnvironmentMachinePrimitive(operation)) {
+        push(runtime::executeEnvironmentMachinePrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
+    if (runtime::isTimeLocalPrimitive(operation)) {
+        push(runtime::executeTimeLocalPrimitive(
+            static_cast<Opcode>(operation), args, program.capabilities));
+        return;
+    }
     if (operation == OP_VM_BYTECODE_CHAY || operation == OP_NATIVE_ARTIFACT_CHAY) {
         if (!program.executeArtifact) fail("native artifact compiler unavailable");
         push(program.executeArtifact(args)); return;

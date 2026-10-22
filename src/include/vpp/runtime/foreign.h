@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "vpp/bytecode/foreign.h"
+#include "vpp/bytecode/instruction.h"
 #include "vpp/runtime/value.h"
 
 namespace vietvm::runtime {
@@ -70,5 +71,35 @@ ForeignCallResult executeForeignCall(
     const std::unordered_set<std::string> &grantedCapabilities,
     int previousPosixError,
     ForeignFileState *fileState = nullptr);
+
+// Socket machine intrinsic reuses the VM-owned registry during migration.
+// The raw socket descriptor is never exposed to V++ bytecode.
+bool isSocketMachinePrimitive(int opcode) noexcept;
+StackValue executeSocketMachinePrimitive(Opcode opcode,
+    const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state);
+
+// Process machine intrinsics share the existing OS adapter and per-VM ownership.
+// They require exactly the same granular system.process.* grants as legacy FFI.
+bool isProcessMachinePrimitive(int opcode) noexcept;
+StackValue executeProcessMachinePrimitive(Opcode opcode,
+    const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state);
+
+// Native resolver compatibility ABI: opaque results belong to one VM.
+bool isResolverMachinePrimitive(int opcode) noexcept;
+StackValue executeResolverMachinePrimitive(Opcode opcode,
+    const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state);
+
+// TLS session, certificate checks and transport are managed by the OS provider.
+bool isTlsMachinePrimitive(int opcode) noexcept;
+StackValue executeTlsMachinePrimitive(Opcode opcode,
+    const std::vector<StackValue> &arguments,
+    const std::unordered_set<std::string> &capabilities,
+    ForeignFileState &state);
 
 } // namespace vietvm::runtime

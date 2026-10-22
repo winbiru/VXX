@@ -1,0 +1,150 @@
+// /etc/hosts thuần V++: chỉ dùng File/Socket Machine ABI, không gọi getaddrinfo.
+// Hosts được bật rõ ràng trong resolver thử nghiệm qua VPP_DNS_VI_HOSTS_FILE.
+nhập gói/mạng/ip;
+nhập gói/mạng/dns_gói_tin;
+nhập gói/nhập xuất/bộ đệm tệp;
+
+lớp công khai Bộ Hosts DNS {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư hosts trắng(k) {
+        trả về k == 32 || k == 9 || k == 13 || k == 10;
+    };
+
+    // So khớp ASCII case-insensitive và chấp nhận dấu chấm cuối tên tuyệt đối.
+    // Tên Unicode cần IDNA riêng; không tự diễn giải bytes UTF-8 trong hosts.
+    hàm riêng tư hosts tên chuẩn(tên) {
+        nếu (loai_cua(tên) != "chuỗi") { trả về ""; };
+        bytes = chuoi_bytes_vm(tên);
+        n = do_dai(bytes);
+        nếu (n > 0 && bytes[n - 1] == 46) { n = n - 1; };
+        kết_quả = [];
+        lặp(i = 0; i < n; i++) {
+            k = bytes[i];
+            nếu (k >= 128 || k == 0) { trả về ""; };
+            nếu (k >= 65 && k <= 90) { k = k + 32; };
+            thêm(kết_quả, k);
+        };
+        trả về chuoi_tu_bytes_vm(kết_quả);
+    };
+
+    hàm riêng tư hosts ip bytes(ip) {
+        kết_quả = [];
+        thử {
+            bộ = Bộ Phân Tích IP();
+            kết_quả = bộ.ip bytes(ip);
+        } bắt lỗi(e) { trả về []; };
+        nếu (do_dai(kết_quả) != 4 && do_dai(kết_quả) != 16) { trả về []; };
+        trả về kết_quả;
+    };
+
+    hàm riêng tư hosts đã có(kết_quả_bytes, ip_bytes) {
+        lặp(i = 0; i < do_dai(kết_quả_bytes); i++) {
+            hiện_tại = kết_quả_bytes[i];
+            nếu (do_dai(hiện_tại) == do_dai(ip_bytes)) {
+                giống = đúng;
+                lặp(j = 0; j < do_dai(ip_bytes); j++) {
+                    nếu (hiện_tại[j] != ip_bytes[j]) { giống = sai; thoát; };
+                };
+                nếu (giống) { trả về đúng; };
+            };
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư hosts xử lý dòng(dòng, tên_cần, kết_quả, kết_quả_bytes) {
+        tokens = [];
+        token = [];
+        lặp(i = 0; i <= do_dai(dòng); i++) {
+            k = 32;
+            nếu (i < do_dai(dòng)) { k = dòng[i]; };
+            nếu (k == 35) { // '#' bắt đầu comment, kể cả khi sát hostname.
+                nếu (do_dai(token) > 0) { thêm(tokens, chuoi_tu_bytes_vm(token)); };
+                thoát;
+            };
+            nếu (mình.hosts trắng(k)) {
+                nếu (do_dai(token) > 0) {
+                    thêm(tokens, chuoi_tu_bytes_vm(token));
+                    token = [];
+                };
+            } hoặc {
+                thêm(token, k);
+            };
+            // Một dòng bất thường không thể buộc parser tích lũy vô hạn alias.
+            nếu (do_dai(tokens) > 256) { trả về sai; };
+        };
+        // Nhánh chú thích '#' thoát sớm nên cần kiểm tra lại cả dòng.
+        nếu (do_dai(tokens) > 256) { trả về sai; };
+        nếu (do_dai(tokens) < 2) { trả về sai; };
+        ip = tokens[0];
+        ip_bytes = mình.hosts ip bytes(ip);
+        nếu (do_dai(ip_bytes) == 0) { trả về sai; };
+        lặp(i = 1; i < do_dai(tokens); i++) {
+            nếu (mình.hosts tên chuẩn(tokens[i]) == tên_cần) {
+                nếu (!mình.hosts đã có(kết_quả_bytes, ip_bytes)) {
+                    thêm(kết_quả, ip);
+                    thêm(kết_quả_bytes, ip_bytes);
+                };
+                trả về đúng;
+            };
+        };
+        trả về sai;
+    };
+
+    // Giới hạn 64 KiB và số byte trên mỗi dòng để tránh file lỗi làm cạn RAM.
+    // Các dòng không có IP hợp lệ được bỏ qua như hosts trên các hệ điều hành.
+    hàm công khai dns phân tích hosts(nội_dung, tên_máy) {
+        nếu (loai_cua(nội_dung) != "chuỗi") { ném "DNS hosts: nội dung phải là chuỗi"; };
+        bộ = Bộ Mã DNS();
+        bộ.dns tạo truy vấn(tên_máy, 1, 0);
+        tên_cần = mình.hosts tên chuẩn(tên_máy);
+        dữ_liệu = chuoi_bytes_vm(nội_dung);
+        nếu (do_dai(dữ_liệu) > 65536) { ném "DNS hosts: tệp vượt quá 64 KiB"; };
+        kết_quả = [];
+        kết_quả_bytes = [];
+        dòng = [];
+        lặp(i = 0; i <= do_dai(dữ_liệu); i++) {
+            k = 10;
+            nếu (i < do_dai(dữ_liệu)) { k = dữ_liệu[i]; };
+            nếu (k == 10) {
+                nếu (do_dai(dòng) <= 4096) {
+                    mình.hosts xử lý dòng(dòng, tên_cần, kết_quả, kết_quả_bytes);
+                };
+                dòng = [];
+            } hoặc {
+                nếu (do_dai(dòng) <= 4096) { thêm(dòng, k); };
+            };
+        };
+        trả về kết_quả;
+    };
+
+    hàm công khai dns đọc hosts(tên_máy, đường_dẫn = "/etc/hosts") {
+        nếu (loai_cua(đường_dẫn) != "chuỗi" || đường_dẫn == "") {
+            ném "DNS hosts: đường dẫn không hợp lệ";
+        };
+        tệp = Bộ Đệm Tệp(đường_dẫn, "đọc", 4096, "DNS hosts");
+        dữ_liệu = [];
+        thử {
+            dữ_liệu = tệp.đọc bytes(65536);
+            nếu (do_dai(dữ_liệu) == 65536) {
+                phần_dư = tệp.đọc bytes(1);
+                nếu (do_dai(phần_dư) > 0) { ném "DNS hosts: tệp vượt quá 64 KiB"; };
+            };
+            tệp.đóng();
+        } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(bỏ_qua) {};
+            ném e;
+        };
+        trả về mình.dns phân tích hosts(chuoi_tu_bytes_vm(dữ_liệu), tên_máy);
+    };
+};
+
+hàm công khai dns phân tích hosts(nội_dung, tên_máy) {
+    bộ = Bộ Hosts DNS();
+    trả về bộ.dns phân tích hosts(nội_dung, tên_máy);
+};
+
+hàm công khai dns đọc hosts(tên_máy, đường_dẫn = "/etc/hosts") {
+    bộ = Bộ Hosts DNS();
+    trả về bộ.dns đọc hosts(tên_máy, đường_dẫn);
+};
