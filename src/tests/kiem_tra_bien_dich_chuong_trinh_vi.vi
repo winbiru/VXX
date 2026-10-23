@@ -36,6 +36,42 @@ hàm chính() {
     in lấy từ điển(biên dịch phân tích chương trình thuần(""), "loại", "") == "chương trình";
     in độ dài(lấy từ điển(biên dịch phân tích chương trình thuần(";;"), "câu lệnh", [])) == 2;
 
+    // Từ khóa có thể nằm giữa hoặc cuối định danh tham số nhiều từ.
+    // Bao gồm chữ ký phương thức và tham số mặc định của compiler self-hosted.
+    cây_tham_số = biên dịch phân tích chương trình thuần(
+        "hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện) { trả về đích; }; " +
+        "hàm công khai biên dịch đồ thị chu trình(ngăn, lặp lại) { trả về lặp lại; }; " +
+        "lớp công khai Bộ Tách { " +
+        "hàm công khai khởi tạo(mã nguồn = \"\") { trả về mã nguồn; }; " +
+        "hàm công khai làm mới(giá trị mặc định, mô đun nhập) { trả về mô đun nhập; }; " +
+        "};"
+    );
+    các_khai_báo = lấy từ điển(cây_tham_số, "câu lệnh", []);
+    các_tham_số = lấy từ điển(các_khai_báo[0], "tham số", []);
+    nếu (độ dài(các_tham_số) != 3 || các_tham_số[0] != "mô đun nhập" ||
+        các_tham_số[1] != "đích" || các_tham_số[2] != "thư viện") {
+        ném "parser tham số hàm nhiều từ không chính xác";
+    };
+    nếu (lấy từ điển(các_khai_báo[1], "tham số", [])[1] != "lặp lại") {
+        ném "parser tham số bắt đầu bằng từ khóa không chính xác";
+    };
+    các_phương_thức = lấy từ điển(các_khai_báo[2], "phương thức", []);
+    nếu (lấy từ điển(các_phương_thức[0], "tham số", [])[0] != "mã nguồn" ||
+        lấy từ điển(các_phương_thức[1], "tham số", [])[0] != "giá trị mặc định" ||
+        lấy từ điển(các_phương_thức[1], "tham số", [])[1] != "mô đun nhập" ||
+        lấy từ điển(các_phương_thức[0], "mặc định tham số", [])[0] == rỗng) {
+        ném "parser tham số phương thức nhiều từ không chính xác";
+    };
+    cây_tên_từ_khóa = biên dịch phân tích chương trình thuần(
+        "nhập gói/nhập xuất/đường dẫn như đường giao diện lập trình; " +
+        "thử {} bắt lỗi(số mục bỏ qua) {};"
+    );
+    các_lệnh_tên = lấy từ điển(cây_tên_từ_khóa, "câu lệnh", []);
+    nếu (lấy từ điển(các_lệnh_tên[0], "bí danh", "") != "đường giao diện lập trình" ||
+        lấy từ điển(các_lệnh_tên[1], "biến lỗi", "") != "số mục bỏ qua") {
+        ném "parser bí danh và biến bắt lỗi nhiều từ không chính xác";
+    };
+
     cây_nếu = biên dịch phân tích ngữ nghĩa thuần(
         "hàm f(x) { nếu (x) { trả về 1; } hoặc nếu (x == 0) { trả về 0; }; };" );
     in độ dài(lấy từ điển(cây_nếu, "câu lệnh", [])) == 1;

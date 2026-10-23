@@ -51,10 +51,19 @@ lớp công khai Bộ Phân Tích Cú Pháp {
     };
 
     // Tên kiểu có thể gồm nhiều từ; từ khóa kế thừa/triển khai kết thúc tên.
-    hàm riêng tư biên dịch chương trình tên kiểu(p, ngữ cảnh) {
-        tên = mình.biên dịch chương trình tên(p, ngữ cảnh);
-        lặp(i = 0; lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "định danh"; i++) {
-            tên += " " + mình.biên dịch chương trình tên(p, ngữ cảnh);
+    hàm riêng tư biên dịch chương trình tên kiểu(p, ngữ cảnh, cho phép từ khóa = sai) {
+        đầu = biên dịch biểu thức nhìn(p);
+        loại đầu = lấy từ điển(đầu, "loại", "");
+        nếu (loại đầu != "định danh" && !(cho phép từ khóa && loại đầu == "từ khóa")) {
+            biên dịch biểu thức lỗi(p, "cần tên " + ngữ cảnh);
+        };
+        tên = biên dịch biểu thức lấy(p)["giá trị"];
+        lặp(i = 0; đúng; i++) {
+            loại tiếp = lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "");
+            nếu (loại tiếp != "định danh" && !(cho phép từ khóa && loại tiếp == "từ khóa")) {
+                thoát;
+            };
+            tên += " " + biên dịch biểu thức lấy(p)["giá trị"];
         };
         trả về tên;
     };
@@ -113,15 +122,15 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != ")"; i++) {
             từ tố = biên dịch biểu thức nhìn(p);
             nếu (lấy từ điển(từ tố, "loại", "") != "định danh" &&
-                mình.biên dịch chương trình giá trị(p) != "mặc định") {
+                lấy từ điển(từ tố, "loại", "") != "từ khóa") {
                 biên dịch biểu thức lỗi(p, "cần tên tham số");
             };
             tên tham số = mình.biên dịch chương trình giá trị(p);
             biên dịch biểu thức lấy(p);
-            // Trong tên tham số nhiều từ, "mặc định" có thể là một phần
-            // định danh (ví dụ: giá trị mặc định), dù lexer gắn loại từ khóa.
+            // Từ khóa có thể đứng đầu hoặc trong tên tham số ("lặp lại",
+            // "mô đun nhập", "giá trị mặc định"). Dấu ',', '=' hoặc ')' kết thúc tên.
             lặp(j = 0; lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "định danh" ||
-                mình.biên dịch chương trình giá trị(p) == "mặc định"; j++) {
+                lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "từ khóa"; j++) {
                 tên tham số += " " + biên dịch biểu thức lấy(p)["giá trị"];
             };
             máy ảo thêm cuối danh sách(tham số, tên tham số);
@@ -316,7 +325,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         };
         bí danh = "";
         nếu (mình.biên dịch chương trình nhận(p, "như")) {
-            bí danh = mình.biên dịch chương trình tên kiểu(p, "bí danh nhập");
+            bí danh = mình.biên dịch chương trình tên kiểu(p, "bí danh nhập", đúng);
         };
         biên dịch biểu thức chờ(p, ";");
         trả về {"loại": "nhập", "đích": đích, "bí danh": bí danh,
@@ -371,7 +380,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         biên dịch biểu thức chờ(p, "bắt lỗi");
         tên lỗi = "";
         nếu (mình.biên dịch chương trình nhận(p, "(")) {
-            tên lỗi = mình.biên dịch chương trình tên kiểu(p, "biến bắt lỗi");
+            tên lỗi = mình.biên dịch chương trình tên kiểu(p, "biến bắt lỗi", đúng);
             biên dịch biểu thức chờ(p, ")");
         };
         bắt = mình.biên dịch chương trình khối(p);
