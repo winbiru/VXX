@@ -338,6 +338,15 @@ nghiệm tới mốc 1.0, hoặc chia sẻ V++ cho những người quan tâm t�
 - [Migration to 1.0](docs/migration-1.0.md)
 - [Roadmap 1.0](plans/roadmap-1.0.md)
 - [Changelog](CHANGELOG.md)
+  
+## Thông điệp
+V++ — Lập trình bằng tiếng Việt, kết nối với công nghệ thế giới.
+V++ được phát triển với mong muốn tiếng Việt có thể trở thành một phương tiện biểu đạt tư duy lập trình và xây dựng phần mềm hiện đại.
+Chúng tôi không phát triển V++ để phủ nhận Python, Java, C++ hay bất kỳ ngôn ngữ lập trình nào khác. Mỗi ngôn ngữ đều có giá trị, lịch sử và lĩnh vực ứng dụng riêng.
+V++ hướng tới việc mở rộng sự lựa chọn: để người Việt có thể học tập, nghiên cứu và sáng tạo phần mềm bằng chính tiếng mẹ đẻ, đồng thời tương tác với các tiêu chuẩn và hệ sinh thái công nghệ quốc tế.
+tôi hiểu rằng V++ còn nhiều điều cần hoàn thiện. Mọi phản biện kỹ thuật, góp ý thiết kế và đóng góp mã nguồn đều được trân trọng.
+tôi không mong mọi người đồng ý với V++. tôi mong V++ được đánh giá bằng những gì nó thực sự làm được. 
+Bản sắc V++ không có nghĩa là khép mình trước thế giới. Đó là khả năng đóng góp vào thế giới bằng bản sắc của chính mình.
 
 ## License
 
