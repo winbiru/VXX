@@ -16,6 +16,55 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         ném "V++ native AST: " + thông báo;
     };
 
+    // Native ABI v1: giữ tên ASCII thông thường; mã hóa UTF-8 của mọi tên
+    // Unicode thành vpp_u_<hex>. Hai tiền tố dành riêng phải được escape
+    // thành vpp_a_<hex> để không va chạm với định danh do compiler tạo.
+    // Quy tắc này khớp nativeAbiSymbol() trong C++ Stage 0.
+    hàm riêng tư biên dịch bản địa tên ABI(tên) {
+        các byte = chuỗi thành byte máy ảo(tên);
+        nếu (máy ảo lấy độ dài(các byte) == 0) {
+            mình.biên dịch bản địa lỗi("tên symbol native rỗng");
+        };
+        ascii = đúng;
+        đơn giản = đúng;
+        lặp (i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            b = các byte[i];
+            nếu (b >= 128) { ascii = sai; }
+            hoặc nếu (b < 32 || b == 127) {
+                mình.biên dịch bản địa lỗi("tên symbol native chứa ký tự điều khiển");
+            }
+            hoặc nếu (!((b >= 65 && b <= 90) || (b >= 97 && b <= 122) ||
+                        b == 95 || (i > 0 && b >= 48 && b <= 57))) {
+                đơn giản = sai;
+            };
+        };
+        dành riêng = sai;
+        nếu (máy ảo lấy độ dài(các byte) >= 6) {
+            dành riêng = các byte[0] == 118 && các byte[1] == 112 &&
+                        các byte[2] == 112 && các byte[3] == 95 &&
+                        (các byte[4] == 117 || các byte[4] == 97) &&
+                        các byte[5] == 95;
+        };
+        nếu (ascii && đơn giản && !dành riêng) { trả về tên; };
+        bảng = "0123456789abcdef";
+        kết quả = "vpp_u_";
+        nếu (ascii && đơn giản && dành riêng) { kết quả = "vpp_a_"; };
+        lặp (i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            b = các byte[i];
+            kết quả += bảng[(b - b % 16) / 16] + bảng[b % 16];
+        };
+        trả về kết quả;
+    };
+
+    // Symbol ID đã được semantic binding. Chỉ đổi tên xuất object và CALL
+    // trước khi lower; mọi định danh trong mã nguồn vẫn giữ nguyên có dấu.
+    hàm riêng tư biên dịch bản địa chuẩn hóa ABI(IR) {
+        các hàm = IR["functions"];
+        lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            các hàm[i]["name"] = mình.biên dịch bản địa tên ABI(các hàm[i]["name"]);
+        };
+    };
+
     // ABI native dùng handle i32, byte i32; không đưa con trỏ C qua V++.
     // Mọi tên ở đây phải khớp whitelist trong mã máy hạ ir.vi.
     hàm riêng tư biên dịch bản địa môi trường thực thi ABI(tên) {
@@ -427,7 +476,8 @@ lớp công khai Bộ Hạ Cây Bản Địa {
             mình.biên dịch bản địa lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
         biểu diễn trung gian = mình.biên dịch bản địa tạo IR(mã nguồn);
-        máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
+        mình.biên dịch bản địa chuẩn hóa ABI(biểu diễn trung gian);
+        máy = biên dịch máy hạ IR(biểu diễn trung gian, mình.biên dịch bản địa tên ABI(tên hàm));
         phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
         trả về {"ir": biểu diễn trung gian, "machine": máy, "bytes": phát["bytes"],
                 "relocations": phát["relocations"]};
@@ -437,7 +487,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
                                        hệ điều hành = "linux", abi = "gnu") {
         kết quả = mình.biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
         kết quả["object"] = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
-            kết quả["bytes"], tên hàm, kết quả["relocations"]);
+            kết quả["bytes"], mình.biên dịch bản địa tên ABI(tên hàm), kết quả["relocations"]);
         trả về kết quả;
     };
 
@@ -453,17 +503,19 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         // Đổi symbol sau khi semantic đã binding bằng symbolId. Nhờ vậy cả
         // hàm đích và CALL tới 'chính' cùng hạ thành ABI symbol 'main'.
         có chính = sai;
-        có chính = sai;
+        có main = sai;
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
-            nếu (các hàm[i]["name"] == "main") { có chính = đúng; };
+            nếu (các hàm[i]["name"] == "main") { có main = đúng; };
             nếu (các hàm[i]["name"] == "chính") { có chính = đúng; };
         };
-        nếu (có chính && có chính) {
+        nếu (có chính && có main) {
             mình.biên dịch bản địa lỗi("không thể khai báo đồng thời main() và chính()");
         };
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             nếu (các hàm[i]["name"] == "chính") {
                 các hàm[i]["name"] = "main";
+            } hoặc {
+                các hàm[i]["name"] = mình.biên dịch bản địa tên ABI(các hàm[i]["name"]);
             };
         };
         kết quả = [];

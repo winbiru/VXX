@@ -6,7 +6,7 @@ endif()
 
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(objects)
-foreach(func IN ITEMS co_so them ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
+foreach(func IN ITEMS co_so thêm ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
     set(obj "${VPP_OUTPUT_DIR}/native-call-${func}.o")
     execute_process(
         COMMAND "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj

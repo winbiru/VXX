@@ -16,6 +16,7 @@
 #include <unordered_set>
 
 #include "frontend/keywords.h"
+#include "vpp/native/abi_symbol.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/native/aot.h"
 
@@ -100,7 +101,9 @@ void writeSourceInstruction(std::ostream &out, const compiler::IrInstruction &in
     if (depth >= 64) throw std::runtime_error("IR statement lồng quá 64 tầng");
     out << "{\"opcode\":" << quoted(sourceOpcode(inst.opcode))
         << ",\"symbolId\":" << inst.symbolId
-        << ",\"name\":" << quoted(inst.declarationName)
+        << ",\"name\":" << quoted(inst.opcode == compiler::IrOpcode::DefineFunction
+                                   ? nativeAbiSymbol(inst.declarationName)
+                                   : inst.declarationName)
         << ",\"conditionalForm\":"
         << quoted(inst.conditionalForm == frontend::AstConditionalForm::IfBlock ? "IfBlock" :
                   inst.conditionalForm == frontend::AstConditionalForm::IfElseBlocks ? "IfElseBlocks" : "Unstructured")
@@ -237,7 +240,7 @@ std::string makeSelfHostedObjectSource(const Target &target,
                                        std::string_view functionName) {
     if (target.arch != Architecture::X86_64 && target.arch != Architecture::AArch64)
         throw std::runtime_error("native AST V++ chỉ hỗ trợ x86_64/AArch64");
-    if (!symbolSafe(std::string(functionName)))
+    if (!symbolSafe(nativeAbiSymbol(functionName)))
         throw std::runtime_error("tên symbol native không hợp lệ");
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
@@ -277,7 +280,8 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                                bool emitObject = false) {
     if (emitObject && !emitTarget)
         throw std::runtime_error("V++ object writer cần target phát mã máy");
-    if (emitObject && !symbolSafe(std::string(functionName)))
+    const auto abiName = nativeAbiSymbol(functionName);
+    if (emitObject && !symbolSafe(abiName))
         throw std::runtime_error("tên symbol native không hợp lệ");
     if (emitTarget && !leaf && emitTarget->arch != Architecture::X86_64 &&
         emitTarget->arch != Architecture::AArch64)
@@ -313,10 +317,10 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
     }
     code << "]};\n";
     if (leaf) {
-        code << "  fn = biên dịch máy hạ lá(ir, " << quoted(std::string(functionName)) << ");\n"
+        code << "  fn = biên dịch máy hạ lá(ir, " << quoted(abiName) << ");\n"
              << "  in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n";
     } else {
-        code << "  fn = biên dịch máy hạ IR(ir, " << quoted(std::string(functionName)) << ");\n"
+        code << "  fn = biên dịch máy hạ IR(ir, " << quoted(abiName) << ");\n"
              << "  in \"M:\" + fn[\"parameterCount\"] + \":\" + fn[\"slotCount\"] + \":\" + fn[\"maxStackDepth\"];\n"
              << "  lệnh = fn[\"instructions\"];\n"
              << "  lặp (i = 0; i < độ dài(lệnh); i++) {\n"
@@ -352,7 +356,7 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
         if (emitObject) {
             code << "  object = biên dịch đối tượng(" << arch << ", " << os << ", "
                  << quoted(targetAbi(*emitTarget)) << ", byte, "
-                 << quoted(std::string(functionName)) << ", "
+                 << quoted(abiName) << ", "
                  << (leaf ? "[]" : "tái_định_vị") << ");\n"
                  << "  hex = \"\";\n"
                  << "  lặp (i = 0; i < độ dài(object); i++) {\n"

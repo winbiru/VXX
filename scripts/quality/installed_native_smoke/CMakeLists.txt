@@ -117,7 +117,7 @@ else()
 endif()
 
 set(objects)
-foreach(func IN ITEMS co_so them ten_ham_dai nhan_sau ket_hop tinh_vong
+foreach(func IN ITEMS co_so thêm ten_ham_dai nhan_sau ket_hop tinh_vong
                       bon goi_bon tong_muoi goi_muoi)
     set(object "${object_dir}/${func}${object_suffix}")
     add_custom_command(OUTPUT "${object}"

@@ -654,6 +654,10 @@ if (BUILD_TESTS)
     target_link_libraries(vpp-native-machine-cpp-oracle PRIVATE vpp-runtime vpp-native-aot)
     target_include_directories(vpp-native-machine-cpp-oracle PRIVATE ${VPP_INCLUDE_DIR})
     target_compile_features(vpp-native-machine-cpp-oracle PRIVATE cxx_std_17)
+    add_executable(vpp-native-abi-symbol-smoke
+        ${CMAKE_SOURCE_DIR}/scripts/quality/native_abi_symbol_smoke.cpp)
+    target_include_directories(vpp-native-abi-symbol-smoke PRIVATE ${VPP_INCLUDE_DIR})
+    add_test(NAME vpp-native-abi-symbol COMMAND $<TARGET_FILE:vpp-native-abi-symbol-smoke>)
     add_test(NAME vpp-native-machine-lowering-parity
         COMMAND $<TARGET_FILE:vpp-native-machine-cpp-oracle>
             --lowering-parity
@@ -867,7 +871,7 @@ if (BUILD_TESTS)
     if (WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(VPP_WIN64_NATIVE_OBJ_DIR "${CMAKE_CURRENT_BINARY_DIR}/native-win64-calls")
         set(VPP_WIN64_NATIVE_CALL_OBJECTS)
-        foreach(func IN ITEMS co_so them ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
+        foreach(func IN ITEMS co_so thêm ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
             set(obj "${VPP_WIN64_NATIVE_OBJ_DIR}/${func}.obj")
             add_custom_command(OUTPUT "${obj}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${VPP_WIN64_NATIVE_OBJ_DIR}"
