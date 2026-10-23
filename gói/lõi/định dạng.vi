@@ -14,9 +14,9 @@ nhập gói/văn bản/chuỗi;
 nhập gói/lõi/định dạng số thực;
 
 // Thuật toán định dạng không giữ trạng thái được tổ chức thành hàm cấp mô-đun.
-hàm riêng tư định dạng có ký tự(văn_bản, ký_tự) {
-    lặp(i = 0; i < độ dài(văn_bản); i++) {
-        nếu (văn_bản[i] == ký_tự) {
+hàm riêng tư định dạng có ký tự(văn bản, ký tự) {
+    lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+        nếu (văn bản[i] == ký tự) {
             trả về đúng;
         };
     };
@@ -27,28 +27,28 @@ hàm riêng tư định dạng là chữ số(c) {
     trả về c >= "0" && c <= "9";
 };
 
-hàm riêng tư định dạng đọc số(pattern, bắt_đầu, kết_thúc, lỗi) {
-    nếu (bắt_đầu == kết_thúc) {
+hàm riêng tư định dạng đọc số(mẫu, bắt đầu, kết thúc, lỗi) {
+    nếu (bắt đầu == kết thúc) {
         ném lỗi;
     };
-    giá_trị = 0;
-    lặp(i = bắt_đầu; i < kết_thúc; i++) {
-        c = pattern[i];
+    giá trị = 0;
+    lặp(i = bắt đầu; i < kết thúc; i++) {
+        c = mẫu[i];
         nếu (!định dạng là chữ số(c)) {
             ném lỗi;
         };
-        chữ_số = thành số nguyên(c);
-        nếu (giá_trị > (1048576 - chữ_số) / 10) {
+        chữ số = thành số nguyên(c);
+        nếu (giá trị > (1048576 - chữ số) / 10) {
             ném lỗi;
         };
-        giá_trị = giá_trị * 10 + chữ_số;
+        giá trị = giá trị * 10 + chữ số;
     };
-    trả về giá_trị;
+    trả về giá trị;
 };
 
-hàm riêng tư định dạng cờ ngoài(cờ, cho_phép) {
-    lặp(i = 0; i < độ dài(cờ); i++) {
-        nếu (!định dạng có ký tự(cho_phép, cờ[i])) {
+hàm riêng tư định dạng cờ ngoài(cờ, cho phép) {
+    lặp(i = 0; i < máy ảo lấy độ dài(cờ); i++) {
+        nếu (!định dạng có ký tự(cho phép, cờ[i])) {
             trả về đúng;
         };
     };
@@ -63,10 +63,10 @@ hàm riêng tư định dạng chuyển đổi hợp lệ(c) {
 };
 
 hàm riêng tư định dạng xác thực spec(spec) {
-    cờ = lấy map(spec, "cờ", "");
-    chuyển = lấy map(spec, "chuyển", "");
-    có_rộng = lấy map(spec, "có rộng", sai);
-    có_chính_xác = lấy map(spec, "có chính xác", sai);
+    cờ = lấy từ điển(spec, "cờ", "");
+    chuyển = lấy từ điển(spec, "chuyển", "");
+    có rộng = lấy từ điển(spec, "có rộng", sai);
+    có chính xác = lấy từ điển(spec, "có chính xác", sai);
 
     nếu (định dạng có ký tự(cờ, "-") && định dạng có ký tự(cờ, "0")) {
         ném "FORMAT_FLAG_MISMATCH";
@@ -78,7 +78,7 @@ hàm riêng tư định dạng xác thực spec(spec) {
         (định dạng có ký tự(cờ, "+") || định dạng có ký tự(cờ, " "))) {
         ném "FORMAT_FLAG_MISMATCH";
     };
-    nếu ((định dạng có ký tự(cờ, "-") || định dạng có ký tự(cờ, "0")) && !có_rộng) {
+    nếu ((định dạng có ký tự(cờ, "-") || định dạng có ký tự(cờ, "0")) && !có rộng) {
         ném "FORMAT_MISSING_WIDTH";
     };
 
@@ -86,17 +86,17 @@ hàm riêng tư định dạng xác thực spec(spec) {
         nếu (định dạng cờ ngoài(cờ, "-")) { ném "FORMAT_FLAG_MISMATCH"; };
     } hoặc {
         nếu (chuyển == "c") {
-            nếu (định dạng cờ ngoài(cờ, "-") || có_chính_xác) {
+            nếu (định dạng cờ ngoài(cờ, "-") || có chính xác) {
                 ném "FORMAT_FLAG_MISMATCH";
             };
         } hoặc {
             nếu (chuyển == "d") {
-                nếu (định dạng cờ ngoài(cờ, "-+0 ,(") || có_chính_xác) {
+                nếu (định dạng cờ ngoài(cờ, "-+0 ,(") || có chính xác) {
                     ném "FORMAT_FLAG_MISMATCH";
                 };
             } hoặc {
                 nếu (chuyển == "o" || chuyển == "x" || chuyển == "X") {
-                    nếu (định dạng cờ ngoài(cờ, "-0") || có_chính_xác) {
+                    nếu (định dạng cờ ngoài(cờ, "-0") || có chính xác) {
                         ném "FORMAT_FLAG_MISMATCH";
                     };
                 } hoặc {
@@ -116,12 +116,12 @@ hàm riêng tư định dạng xác thực spec(spec) {
                                 };
                             } hoặc {
                                 nếu (chuyển == "%") {
-                                    nếu (định dạng cờ ngoài(cờ, "-") || có_chính_xác) {
+                                    nếu (định dạng cờ ngoài(cờ, "-") || có chính xác) {
                                         ném "FORMAT_FLAG_MISMATCH";
                                     };
                                 } hoặc {
                                     nếu (chuyển == "n") {
-                                        nếu (cờ != "" || có_rộng || có_chính_xác) {
+                                        nếu (cờ != "" || có rộng || có chính xác) {
                                             ném "FORMAT_FLAG_MISMATCH";
                                         };
                                     };
@@ -136,276 +136,276 @@ hàm riêng tư định dạng xác thực spec(spec) {
     trả về đúng;
 };
 
-hàm riêng tư định dạng lặp(ký_tự, số_lượng) {
-    kết_quả = "";
-    lặp(i = 0; i < số_lượng; i++) {
-        kết_quả = kết_quả + ký_tự;
+hàm riêng tư định dạng lặp(ký tự, số lượng) {
+    kết quả = "";
+    lặp(i = 0; i < số lượng; i++) {
+        kết quả = kết quả + ký tự;
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư định dạng đệm(giá_trị, spec, số = sai, tiền_tố = 0, hậu_tố = 0) {
-    nếu (!lấy map(spec, "có rộng", sai)) {
-        trả về giá_trị;
+hàm riêng tư định dạng đệm(giá trị, spec, số = sai, tiền tố = 0, hậu tố = 0) {
+    nếu (!lấy từ điển(spec, "có rộng", sai)) {
+        trả về giá trị;
     };
-    rộng = lấy map(spec, "rộng", 0);
-    n = độ dài(giá_trị);
+    rộng = lấy từ điển(spec, "rộng", 0);
+    n = máy ảo lấy độ dài(giá trị);
     nếu (rộng <= n) {
-        trả về giá_trị;
+        trả về giá trị;
     };
-    thêm_vào = rộng - n;
-    cờ = lấy map(spec, "cờ", "");
+    thêm vào = rộng - n;
+    cờ = lấy từ điển(spec, "cờ", "");
     nếu (định dạng có ký tự(cờ, "-")) {
-        trả về giá_trị + định dạng lặp(" ", thêm_vào);
+        trả về giá trị + định dạng lặp(" ", thêm vào);
     };
     nếu (số && định dạng có ký tự(cờ, "0")) {
-        giữa = n - tiền_tố - hậu_tố;
+        giữa = n - tiền tố - hậu tố;
         nếu (giữa < 0) { giữa = 0; };
-        đầu = cắt chuỗi(giá_trị, 0, tiền_tố);
-        thân = cắt chuỗi(giá_trị, tiền_tố, giữa);
-        đuôi = cắt chuỗi(giá_trị, tiền_tố + giữa, hậu_tố);
-        trả về đầu + định dạng lặp("0", thêm_vào) + thân + đuôi;
+        đầu = cắt chuỗi(giá trị, 0, tiền tố);
+        thân = cắt chuỗi(giá trị, tiền tố, giữa);
+        đuôi = cắt chuỗi(giá trị, tiền tố + giữa, hậu tố);
+        trả về đầu + định dạng lặp("0", thêm vào) + thân + đuôi;
     };
-    trả về định dạng lặp(" ", thêm_vào) + giá_trị;
+    trả về định dạng lặp(" ", thêm vào) + giá trị;
 };
 
-hàm riêng tư định dạng nhóm chữ số(chữ_số, phân_cách = ",") {
-    n = độ dài(chữ_số);
-    nếu (n == 0) { trả về chữ_số; };
+hàm riêng tư định dạng nhóm chữ số(chữ số, phân cách = ",") {
+    n = máy ảo lấy độ dài(chữ số);
+    nếu (n == 0) { trả về chữ số; };
     đầu = n % 3;
     nếu (đầu == 0) { đầu = 3; };
-    kết_quả = "";
+    kết quả = "";
     lặp(i = 0; i < n; i++) {
         nếu (i != 0 && (i == đầu || (i > đầu && (i - đầu) % 3 == 0))) {
-            kết_quả = kết_quả + phân_cách;
+            kết quả = kết quả + phân cách;
         };
-        kết_quả = kết_quả + chữ_số[i];
+        kết quả = kết quả + chữ số[i];
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư định dạng nhóm số thực(thân, phân_cách = ",", thập_phân = ".") {
-    n = độ dài(thân);
+hàm riêng tư định dạng nhóm số thực(thân, phân cách = ",", thập phân = ".") {
+    n = máy ảo lấy độ dài(thân);
     mũ = n;
     chấm = n;
     lặp(i = 0; i < n; i++) {
         nếu (mũ == n && (thân[i] == "e" || thân[i] == "E")) { mũ = i; };
-        nếu (chấm == n && thân[i] == thập_phân) { chấm = i; };
+        nếu (chấm == n && thân[i] == thập phân) { chấm = i; };
     };
-    hết_nguyên = chấm;
-    nếu (mũ < hết_nguyên) { hết_nguyên = mũ; };
-    trả về định dạng nhóm chữ số(cắt chuỗi(thân, 0, hết_nguyên), phân_cách) +
-        cắt chuỗi(thân, hết_nguyên, n - hết_nguyên);
+    hết nguyên = chấm;
+    nếu (mũ < hết nguyên) { hết nguyên = mũ; };
+    trả về định dạng nhóm chữ số(cắt chuỗi(thân, 0, hết nguyên), phân cách) +
+        cắt chuỗi(thân, hết nguyên, n - hết nguyên);
 };
 
-hàm riêng tư định dạng áp ký hiệu thập phân(thân, ký_hiệu) {
-    thập_phân = lấy map(ký_hiệu, "thập phân", ".");
-    nếu (thập_phân == ".") {
+hàm riêng tư định dạng áp ký hiệu thập phân(thân, ký hiệu) {
+    thập phân = lấy từ điển(ký hiệu, "thập phân", ".");
+    nếu (thập phân == ".") {
         trả về thân;
     };
-    kết_quả = "";
-    đã_thay = sai;
-    lặp(i = 0; i < độ dài(thân); i++) {
+    kết quả = "";
+    đã thay = sai;
+    lặp(i = 0; i < máy ảo lấy độ dài(thân); i++) {
         c = thân[i];
-        nếu (!đã_thay && c == ".") {
-            kết_quả = kết_quả + thập_phân;
-            đã_thay = đúng;
+        nếu (!đã thay && c == ".") {
+            kết quả = kết quả + thập phân;
+            đã thay = đúng;
         } hoặc {
-            kết_quả = kết_quả + c;
+            kết quả = kết quả + c;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư định dạng cơ số dương(giá_trị, cơ_số, hoa) {
+hàm riêng tư định dạng cơ số dương(giá trị, cơ số, hoa) {
     chữ = "0123456789abcdef";
     nếu (hoa) { chữ = "0123456789ABCDEF"; };
-    nếu (giá_trị == 0) { trả về "0"; };
-    kết_quả = "";
-    còn_lại = giá_trị;
-    lặp(vòng = 0; còn_lại > 0; vòng++) {
-        dư = còn_lại % cơ_số;
-        kết_quả = chữ[dư] + kết_quả;
-        còn_lại = lam_tron_xuong(còn_lại / cơ_số);
+    nếu (giá trị == 0) { trả về "0"; };
+    kết quả = "";
+    còn lại = giá trị;
+    lặp(vòng = 0; còn lại > 0; vòng++) {
+        dư = còn lại % cơ số;
+        kết quả = chữ[dư] + kết quả;
+        còn lại = làm tròn xuống(còn lại / cơ số);
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư định dạng thân số nguyên(giá_trị, chuyển) {
-    âm = giá_trị < 0;
-    nếu (giá_trị == 0 - 2147483647 - 1) {
+hàm riêng tư định dạng thân số nguyên(giá trị, chuyển) {
+    âm = giá trị < 0;
+    nếu (giá trị == 0 - 2147483647 - 1) {
         nếu (chuyển == "d") { trả về "2147483648"; };
         nếu (chuyển == "o") { trả về "20000000000"; };
         nếu (chuyển == "X") { trả về "80000000"; };
         trả về "80000000";
     };
-    độ_lớn = giá_trị;
-    nếu (âm) { độ_lớn = 0 - giá_trị; };
-    cơ_số = 10;
-    nếu (chuyển == "o") { cơ_số = 8; };
-    nếu (chuyển == "x" || chuyển == "X") { cơ_số = 16; };
-    trả về định dạng cơ số dương(độ_lớn, cơ_số, chuyển == "X");
+    độ lớn = giá trị;
+    nếu (âm) { độ lớn = 0 - giá trị; };
+    cơ số = 10;
+    nếu (chuyển == "o") { cơ số = 8; };
+    nếu (chuyển == "x" || chuyển == "X") { cơ số = 16; };
+    trả về định dạng cơ số dương(độ lớn, cơ số, chuyển == "X");
 };
 
 hàm riêng tư định dạng áp dấu(thân, âm, spec) {
-    cờ = lấy map(spec, "cờ", "");
-    tiền_tố = 0;
-    hậu_tố = 0;
+    cờ = lấy từ điển(spec, "cờ", "");
+    tiền tố = 0;
+    hậu tố = 0;
     nếu (âm && định dạng có ký tự(cờ, "(")) {
         thân = "(" + thân + ")";
-        tiền_tố = 1;
-        hậu_tố = 1;
+        tiền tố = 1;
+        hậu tố = 1;
     } hoặc {
         nếu (âm) {
             thân = "-" + thân;
-            tiền_tố = 1;
+            tiền tố = 1;
         } hoặc {
             nếu (định dạng có ký tự(cờ, "+")) {
                 thân = "+" + thân;
-                tiền_tố = 1;
+                tiền tố = 1;
             } hoặc {
                 nếu (định dạng có ký tự(cờ, " ")) {
                     thân = " " + thân;
-                    tiền_tố = 1;
+                    tiền tố = 1;
                 };
             };
         };
     };
-    trả về định dạng đệm(thân, spec, đúng, tiền_tố, hậu_tố);
+    trả về định dạng đệm(thân, spec, đúng, tiền tố, hậu tố);
 };
 
 hàm riêng tư định dạng ký tự mã(mã) {
     nếu (mã < 0 || mã > 1114111 || (mã >= 55296 && mã <= 57343)) {
         ném "FORMAT_CODEPOINT";
     };
-    bytes = [];
+    các byte = [];
     nếu (mã <= 127) {
-        thêm(bytes, mã);
+        máy ảo thêm cuối danh sách(các byte, mã);
     } hoặc {
         nếu (mã <= 2047) {
-            thêm(bytes, 192 + lam_tron_xuong(mã / 64));
-            thêm(bytes, 128 + mã % 64);
+            máy ảo thêm cuối danh sách(các byte, 192 + làm tròn xuống(mã / 64));
+            máy ảo thêm cuối danh sách(các byte, 128 + mã % 64);
         } hoặc {
             nếu (mã <= 65535) {
-                thêm(bytes, 224 + lam_tron_xuong(mã / 4096));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
-                thêm(bytes, 128 + mã % 64);
+                máy ảo thêm cuối danh sách(các byte, 224 + làm tròn xuống(mã / 4096));
+                máy ảo thêm cuối danh sách(các byte, 128 + (làm tròn xuống(mã / 64) % 64));
+                máy ảo thêm cuối danh sách(các byte, 128 + mã % 64);
             } hoặc {
-                thêm(bytes, 240 + lam_tron_xuong(mã / 262144));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 4096) % 64));
-                thêm(bytes, 128 + (lam_tron_xuong(mã / 64) % 64));
-                thêm(bytes, 128 + mã % 64);
+                máy ảo thêm cuối danh sách(các byte, 240 + làm tròn xuống(mã / 262144));
+                máy ảo thêm cuối danh sách(các byte, 128 + (làm tròn xuống(mã / 4096) % 64));
+                máy ảo thêm cuối danh sách(các byte, 128 + (làm tròn xuống(mã / 64) % 64));
+                máy ảo thêm cuối danh sách(các byte, 128 + mã % 64);
             };
         };
     };
-    trả về giải mã bảng mã(bytes, "UTF-8");
+    trả về giải mã bảng mã(các byte, "UTF-8");
 };
 
-hàm riêng tư định dạng truthy(giá_trị) {
-    kiểu = loại của(giá_trị);
+hàm riêng tư định dạng truthy(giá trị) {
+    kiểu = loại của(giá trị);
     nếu (kiểu == "rỗng") { trả về sai; };
     nếu (kiểu == "số nguyên" || kiểu == "số thực") {
-        trả về giá_trị != 0;
+        trả về giá trị != 0;
     };
     nếu (kiểu == "chuỗi" || kiểu == "danh sách" || kiểu == "tuple" || kiểu == "từ điển") {
-        trả về độ dài(giá_trị) > 0;
+        trả về máy ảo lấy độ dài(giá trị) > 0;
     };
     trả về đúng;
 };
 
-hàm công khai có thể định dạng(callback) {
+hàm công khai có thể định dạng(chương trình gọi lại) {
     trả về {
         "loại": "CóThểĐịnhDạng",
-        "callback": callback
+        "callback": chương trình gọi lại
     };
 };
 
-hàm riêng tư định dạng custom(giá_trị, spec, ký_hiệu) {
-    nếu (loại của(giá_trị) != "từ điển") {
+hàm riêng tư định dạng tùy biến(giá trị, spec, ký hiệu) {
+    nếu (loại của(giá trị) != "từ điển") {
         trả về rỗng;
     };
-    nếu (lấy map(giá_trị, "loại", "") != "CóThểĐịnhDạng") {
+    nếu (lấy từ điển(giá trị, "loại", "") != "CóThểĐịnhDạng") {
         trả về rỗng;
     };
-    callback = lấy map(giá_trị, "callback", rỗng);
-    context = {
-        "cờ": lấy map(spec, "cờ", ""),
-        "rộng": lấy map(spec, "rộng", 0),
-        "có rộng": lấy map(spec, "có rộng", sai),
-        "chính xác": lấy map(spec, "chính xác", 0),
-        "có chính xác": lấy map(spec, "có chính xác", sai),
-        "locale": lấy map(ký_hiệu, "tên", "C")
+    chương trình gọi lại = lấy từ điển(giá trị, "callback", rỗng);
+    ngữ cảnh = {
+        "cờ": lấy từ điển(spec, "cờ", ""),
+        "rộng": lấy từ điển(spec, "rộng", 0),
+        "có rộng": lấy từ điển(spec, "có rộng", sai),
+        "chính xác": lấy từ điển(spec, "chính xác", 0),
+        "có chính xác": lấy từ điển(spec, "có chính xác", sai),
+        "locale": lấy từ điển(ký hiệu, "tên", "C")
     };
-    văn_bản = callback(context);
-    nếu (loại của(văn_bản) != "chuỗi") {
+    văn bản = chương trình gọi lại(ngữ cảnh);
+    nếu (loại của(văn bản) != "chuỗi") {
         ném "FORMAT_FORMATTABLE";
     };
-    trả về văn_bản;
+    trả về văn bản;
 };
 
-hàm riêng tư định dạng giá trị(giá_trị, spec, ký_hiệu) {
-    chuyển = lấy map(spec, "chuyển", "");
-    có_chính_xác = lấy map(spec, "có chính xác", sai);
-    chính_xác = lấy map(spec, "chính xác", 0);
+hàm riêng tư định dạng giá trị(giá trị, spec, ký hiệu) {
+    chuyển = lấy từ điển(spec, "chuyển", "");
+    có chính xác = lấy từ điển(spec, "có chính xác", sai);
+    chính xác = lấy từ điển(spec, "chính xác", 0);
 
     nếu (chuyển == "s") {
-        văn_bản = định dạng custom(giá_trị, spec, ký_hiệu);
-        nếu (văn_bản == rỗng) {
-            văn_bản = thành chuỗi(giá_trị);
+        văn bản = định dạng tùy biến(giá trị, spec, ký hiệu);
+        nếu (văn bản == rỗng) {
+            văn bản = thành chuỗi(giá trị);
         };
-        nếu (có_chính_xác && độ dài(văn_bản) > chính_xác) {
-            văn_bản = cắt chuỗi(văn_bản, 0, chính_xác);
+        nếu (có chính xác && máy ảo lấy độ dài(văn bản) > chính xác) {
+            văn bản = cắt chuỗi(văn bản, 0, chính xác);
         };
-        trả về định dạng đệm(văn_bản, spec);
+        trả về định dạng đệm(văn bản, spec);
     };
     nếu (chuyển == "b") {
-        văn_bản = "false";
-        nếu (định dạng truthy(giá_trị)) { văn_bản = "true"; };
-        nếu (có_chính_xác && độ dài(văn_bản) > chính_xác) {
-            văn_bản = cắt chuỗi(văn_bản, 0, chính_xác);
+        văn bản = "false";
+        nếu (định dạng truthy(giá trị)) { văn bản = "true"; };
+        nếu (có chính xác && máy ảo lấy độ dài(văn bản) > chính xác) {
+            văn bản = cắt chuỗi(văn bản, 0, chính xác);
         };
-        trả về định dạng đệm(văn_bản, spec);
+        trả về định dạng đệm(văn bản, spec);
     };
     nếu (chuyển == "c") {
-        kiểu = loại của(giá_trị);
+        kiểu = loại của(giá trị);
         nếu (kiểu == "số nguyên") {
-            văn_bản = định dạng ký tự mã(giá_trị);
+            văn bản = định dạng ký tự mã(giá trị);
         } hoặc {
-            nếu (kiểu == "chuỗi" && độ dài(giá_trị) == 1) {
-                văn_bản = giá_trị;
+            nếu (kiểu == "chuỗi" && máy ảo lấy độ dài(giá trị) == 1) {
+                văn bản = giá trị;
             } hoặc {
                 ném "FORMAT_CONVERSION";
             };
         };
-        trả về định dạng đệm(văn_bản, spec);
+        trả về định dạng đệm(văn bản, spec);
     };
     nếu (chuyển == "d" || chuyển == "o" || chuyển == "x" || chuyển == "X") {
-        nếu (loại của(giá_trị) != "số nguyên") {
+        nếu (loại của(giá trị) != "số nguyên") {
             ném "FORMAT_CONVERSION";
         };
-        thân = định dạng thân số nguyên(giá_trị, chuyển);
-        nếu (chuyển == "d" && định dạng có ký tự(lấy map(spec, "cờ", ""), ",")) {
-            thân = định dạng nhóm chữ số(thân, lấy map(ký_hiệu, "nhóm", ","));
+        thân = định dạng thân số nguyên(giá trị, chuyển);
+        nếu (chuyển == "d" && định dạng có ký tự(lấy từ điển(spec, "cờ", ""), ",")) {
+            thân = định dạng nhóm chữ số(thân, lấy từ điển(ký hiệu, "nhóm", ","));
         };
-        trả về định dạng áp dấu(thân, giá_trị < 0, spec);
+        trả về định dạng áp dấu(thân, giá trị < 0, spec);
     };
     nếu (chuyển == "f" || chuyển == "e" || chuyển == "E" ||
         chuyển == "g" || chuyển == "G") {
-        kiểu = loại của(giá_trị);
+        kiểu = loại của(giá trị);
         nếu (kiểu != "số nguyên" && kiểu != "số thực") {
             ném "FORMAT_CONVERSION";
         };
-        nếu (!có_chính_xác) { chính_xác = 6; };
-        số_đã_định_dạng = định dạng số thực nội bộ(giá_trị, chuyển, chính_xác);
-        thân = lấy map(số_đã_định_dạng, "thân", "");
-        âm = lấy map(số_đã_định_dạng, "âm", sai);
-        thân = định dạng áp ký hiệu thập phân(thân, ký_hiệu);
-        nếu (định dạng có ký tự(lấy map(spec, "cờ", ""), ",") &&
+        nếu (!có chính xác) { chính xác = 6; };
+        số đã định dạng = định dạng số thực nội bộ(giá trị, chuyển, chính xác);
+        thân = lấy từ điển(số đã định dạng, "thân", "");
+        âm = lấy từ điển(số đã định dạng, "âm", sai);
+        thân = định dạng áp ký hiệu thập phân(thân, ký hiệu);
+        nếu (định dạng có ký tự(lấy từ điển(spec, "cờ", ""), ",") &&
             (chuyển == "f" || chuyển == "g" || chuyển == "G")) {
             thân = định dạng nhóm số thực(
                 thân,
-                lấy map(ký_hiệu, "nhóm", ","),
-                lấy map(ký_hiệu, "thập phân", ".")
+                lấy từ điển(ký hiệu, "nhóm", ","),
+                lấy từ điển(ký hiệu, "thập phân", ".")
             );
         };
         trả về định dạng áp dấu(thân, âm, spec);
@@ -413,173 +413,173 @@ hàm riêng tư định dạng giá trị(giá_trị, spec, ký_hiệu) {
     ném "FORMAT_UNKNOWN_CONVERSION";
 };
 
-hàm riêng tư định dạng thực thi(pattern, args, locale) {
-    nếu (loại của(pattern) != "chuỗi" || loại của(args) != "danh sách") {
+hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn ngữ) {
+    nếu (loại của(mẫu) != "chuỗi" || loại của(các đối số) != "danh sách") {
         ném "FORMAT_INVALID";
     };
     thử {
-        ký_hiệu = ký hiệu vùng lấy(locale);
+        ký hiệu = ký hiệu vùng lấy(vùng ngôn ngữ);
     } bắt lỗi (e) {
         ném "FORMAT_LOCALE";
     };
-    nếu (độ dài(mã hóa bảng mã(pattern, "UTF-8")) > 1048576) {
+    nếu (máy ảo lấy độ dài(mã hóa bảng mã(mẫu, "UTF-8")) > 1048576) {
         ném "FORMAT_RESOURCE_LIMIT";
     };
 
-    kết_quả = "";
-    n = độ dài(pattern);
-    con_trỏ = 0;
-    chỉ_số_ngầm = 0;
-    đã_tường_minh = sai;
-    đã_ngầm = sai;
+    kết quả = "";
+    n = máy ảo lấy độ dài(mẫu);
+    con trỏ = 0;
+    chỉ số ngầm = 0;
+    đã tường mình = sai;
+    đã ngầm = sai;
 
-    lặp(vòng = 0; con_trỏ < n; vòng++) {
-        nếu (pattern[con_trỏ] != "%") {
-            kết_quả = kết_quả + pattern[con_trỏ];
-            con_trỏ = con_trỏ + 1;
+    lặp(vòng = 0; con trỏ < n; vòng++) {
+        nếu (mẫu[con trỏ] != "%") {
+            kết quả = kết quả + mẫu[con trỏ];
+            con trỏ = con trỏ + 1;
         } hoặc {
-            pos = con_trỏ + 1;
-            nếu (pos >= n) { ném "FORMAT_INVALID"; };
+            vị trí hiện tại = con trỏ + 1;
+            nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
 
-            bắt_đầu_số = pos;
-            lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
-                pos = pos + 1;
+            bắt đầu số = vị trí hiện tại;
+            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+                vị trí hiện tại = vị trí hiện tại + 1;
             };
-            có_chỉ_số = sai;
-            chỉ_số = 0;
-            nếu (pos > bắt_đầu_số && pos < n && pattern[pos] == "$") {
-                một_gốc = định dạng đọc số(pattern, bắt_đầu_số, pos, "FORMAT_INVALID");
-                nếu (một_gốc == 0) { ném "FORMAT_INVALID"; };
-                chỉ_số = một_gốc - 1;
-                có_chỉ_số = đúng;
-                pos = pos + 1;
+            có chỉ số = sai;
+            chỉ số = 0;
+            nếu (vị trí hiện tại > bắt đầu số && vị trí hiện tại < n && mẫu[vị trí hiện tại] == "$") {
+                một gốc = định dạng đọc số(mẫu, bắt đầu số, vị trí hiện tại, "FORMAT_INVALID");
+                nếu (một gốc == 0) { ném "FORMAT_INVALID"; };
+                chỉ số = một gốc - 1;
+                có chỉ số = đúng;
+                vị trí hiện tại = vị trí hiện tại + 1;
             } hoặc {
-                pos = bắt_đầu_số;
+                vị trí hiện tại = bắt đầu số;
             };
 
             cờ = "";
-            đang_cờ = đúng;
-            lặp(k = 0; pos < n && đang_cờ; k++) {
-                c = pattern[pos];
+            đang cờ = đúng;
+            lặp(k = 0; vị trí hiện tại < n && đang cờ; k++) {
+                c = mẫu[vị trí hiện tại];
                 nếu (c == "-" || c == "+" || c == "0" || c == " " || c == "," || c == "(") {
                     nếu (định dạng có ký tự(cờ, c)) { ném "FORMAT_DUPLICATE_FLAG"; };
                     cờ = cờ + c;
-                    pos = pos + 1;
+                    vị trí hiện tại = vị trí hiện tại + 1;
                 } hoặc {
                     nếu (c == "#" || c == "<") { ném "FORMAT_UNKNOWN_FLAG"; };
-                    đang_cờ = sai;
+                    đang cờ = sai;
                 };
             };
 
-            bắt_đầu_rộng = pos;
-            lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
-                pos = pos + 1;
+            bắt đầu rộng = vị trí hiện tại;
+            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+                vị trí hiện tại = vị trí hiện tại + 1;
             };
-            có_rộng = pos > bắt_đầu_rộng;
+            có rộng = vị trí hiện tại > bắt đầu rộng;
             rộng = 0;
-            nếu (có_rộng) {
-                rộng = định dạng đọc số(pattern, bắt_đầu_rộng, pos, "FORMAT_WIDTH");
+            nếu (có rộng) {
+                rộng = định dạng đọc số(mẫu, bắt đầu rộng, vị trí hiện tại, "FORMAT_WIDTH");
             };
 
-            có_chính_xác = sai;
-            chính_xác = 0;
-            nếu (pos < n && pattern[pos] == ".") {
-                có_chính_xác = đúng;
-                pos = pos + 1;
-                bắt_đầu_chính_xác = pos;
-                lặp(k = 0; pos < n && định dạng là chữ số(pattern[pos]); k++) {
-                    pos = pos + 1;
+            có chính xác = sai;
+            chính xác = 0;
+            nếu (vị trí hiện tại < n && mẫu[vị trí hiện tại] == ".") {
+                có chính xác = đúng;
+                vị trí hiện tại = vị trí hiện tại + 1;
+                bắt đầu chính xác = vị trí hiện tại;
+                lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+                    vị trí hiện tại = vị trí hiện tại + 1;
                 };
-                nếu (bắt_đầu_chính_xác == pos) { ném "FORMAT_PRECISION"; };
-                chính_xác = định dạng đọc số(pattern, bắt_đầu_chính_xác, pos, "FORMAT_PRECISION");
+                nếu (bắt đầu chính xác == vị trí hiện tại) { ném "FORMAT_PRECISION"; };
+                chính xác = định dạng đọc số(mẫu, bắt đầu chính xác, vị trí hiện tại, "FORMAT_PRECISION");
             };
 
-            nếu (pos >= n) { ném "FORMAT_INVALID"; };
-            chuyển = pattern[pos];
-            pos = pos + 1;
+            nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
+            chuyển = mẫu[vị trí hiện tại];
+            vị trí hiện tại = vị trí hiện tại + 1;
             nếu (!định dạng chuyển đổi hợp lệ(chuyển)) {
                 ném "FORMAT_UNKNOWN_CONVERSION";
             };
-            nếu ((chuyển == "%" || chuyển == "n") && có_chỉ_số) {
+            nếu ((chuyển == "%" || chuyển == "n") && có chỉ số) {
                 ném "FORMAT_INVALID";
             };
 
             spec = {
                 "cờ": cờ,
                 "rộng": rộng,
-                "có rộng": có_rộng,
-                "chính xác": chính_xác,
-                "có chính xác": có_chính_xác,
+                "có rộng": có rộng,
+                "chính xác": chính xác,
+                "có chính xác": có chính xác,
                 "chuyển": chuyển
             };
             định dạng xác thực spec(spec);
 
             nếu (chuyển == "%") {
-                kết_quả = kết_quả + định dạng đệm("%", spec);
+                kết quả = kết quả + định dạng đệm("%", spec);
             } hoặc {
                 nếu (chuyển == "n") {
-                    kết_quả = kết_quả + "\n";
+                    kết quả = kết quả + "\n";
                 } hoặc {
-                    nếu (có_chỉ_số) {
-                        đã_tường_minh = đúng;
+                    nếu (có chỉ số) {
+                        đã tường mình = đúng;
                     } hoặc {
-                        đã_ngầm = đúng;
+                        đã ngầm = đúng;
                     };
-                    nếu (đã_tường_minh && đã_ngầm) { ném "FORMAT_INVALID"; };
+                    nếu (đã tường mình && đã ngầm) { ném "FORMAT_INVALID"; };
 
-                    dùng = chỉ_số_ngầm;
-                    nếu (có_chỉ_số) {
-                        dùng = chỉ_số;
+                    dùng = chỉ số ngầm;
+                    nếu (có chỉ số) {
+                        dùng = chỉ số;
                     } hoặc {
-                        chỉ_số_ngầm = chỉ_số_ngầm + 1;
+                        chỉ số ngầm = chỉ số ngầm + 1;
                     };
-                    nếu (dùng < 0 || dùng >= độ dài(args)) {
+                    nếu (dùng < 0 || dùng >= máy ảo lấy độ dài(các đối số)) {
                         ném "FORMAT_MISSING_ARGUMENT";
                     };
-                    kết_quả = kết_quả + định dạng giá trị(args[dùng], spec, ký_hiệu);
+                    kết quả = kết quả + định dạng giá trị(các đối số[dùng], spec, ký hiệu);
                 };
             };
-            nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+            nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
                 ném "FORMAT_RESOURCE_LIMIT";
             };
-            con_trỏ = pos;
+            con trỏ = vị trí hiện tại;
         };
     };
 
-    nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+    nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
         ném "FORMAT_RESOURCE_LIMIT";
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư định dạng nội bộ(pattern, args, locale) {
+hàm riêng tư định dạng nội bộ(mẫu, các đối số, vùng ngôn ngữ) {
     thử {
-        trả về {"giá trị": định dạng thực thi(pattern, args, locale), "lỗi": ""};
+        trả về {"giá trị": định dạng thực thi(mẫu, các đối số, vùng ngôn ngữ), "lỗi": ""};
     } bắt lỗi (e) {
         trả về {"giá trị": "", "lỗi": e};
     };
 };
 
-hàm công khai định dạng(pattern, args, locale = rỗng) {
-    kết_quả = định dạng nội bộ(pattern, args, locale);
-    lỗi = lấy map(kết_quả, "lỗi", "FORMAT_INVALID");
+hàm công khai định dạng(mẫu, các đối số, vùng ngôn ngữ = rỗng) {
+    kết quả = định dạng nội bộ(mẫu, các đối số, vùng ngôn ngữ);
+    lỗi = lấy từ điển(kết quả, "lỗi", "FORMAT_INVALID");
     nếu (lỗi != "") {
         ném lỗi;
     };
-    trả về lấy map(kết_quả, "giá trị", "");
+    trả về lấy từ điển(kết quả, "giá trị", "");
 };
 
 // Appendable V++ đầu tiên là BộDựngChuỗi. Engine format dựng output atomically
 // rồi append một lần, vì vậy formatter không để lại prefix dở nếu parse/render lỗi.
-hàm công khai định dạng vào(đích, pattern, args, locale = rỗng) {
+hàm công khai định dạng vào(đích, mẫu, các đối số, vùng ngôn ngữ = rỗng) {
     thử {
         bộ dựng yêu cầu(đích);
     } bắt lỗi (e) {
         ném "FORMAT_APPENDABLE";
     };
-    văn_bản = định dạng(pattern, args, locale);
+    văn bản = định dạng(mẫu, các đối số, vùng ngôn ngữ);
     thử {
-        bộ dựng thêm(đích, văn_bản);
+        bộ dựng máy ảo thêm cuối danh sách(đích, văn bản);
     } bắt lỗi (e) {
         nếu (e == "STRING_RESOURCE_LIMIT") {
             ném "FORMAT_RESOURCE_LIMIT";
@@ -591,22 +591,22 @@ hàm công khai định dạng vào(đích, pattern, args, locale = rỗng) {
 
 // Processor cho MẫuChuỗi. Format spec nằm ở danh sách `specs`, tách khỏi
 // values của template; vì vậy dữ liệu không bao giờ được diễn giải như cú pháp.
-hàm công khai bộ xử lý mẫu định dạng(specs = rỗng, locale = rỗng) {
-    processor = hàm(template) {
+hàm công khai bộ xử lý mẫu định dạng(specs = rỗng, vùng ngôn ngữ = rỗng) {
+    bộ xử lý = hàm(template) {
         mẫu chuỗi yêu cầu(template);
-        mảnh = lấy map(template, "mảnh", []);
-        giá_trị = lấy map(template, "giá trị", []);
+        mảnh = lấy từ điển(template, "mảnh", []);
+        giá trị = lấy từ điển(template, "giá trị", []);
         nếu (specs != rỗng) {
             nếu (loại của(specs) != "danh sách") {
                 ném "FORMAT_PROCESSOR_INVALID";
             };
-            nếu (độ dài(specs) != độ dài(giá_trị)) {
+            nếu (máy ảo lấy độ dài(specs) != máy ảo lấy độ dài(giá trị)) {
                 ném "FORMAT_PROCESSOR_INVALID";
             };
         };
 
-        kết_quả = "";
-        lặp(i = 0; i < độ dài(giá_trị); i++) {
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(giá trị); i++) {
             spec = "%s";
             nếu (specs != rỗng) {
                 spec = specs[i];
@@ -614,30 +614,30 @@ hàm công khai bộ xử lý mẫu định dạng(specs = rỗng, locale = rỗ
                     ném "FORMAT_PROCESSOR_INVALID";
                 };
             };
-            kết_quả = kết_quả + mảnh[i] + định dạng(spec, [giá_trị[i]], locale);
-            nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+            kết quả = kết quả + mảnh[i] + định dạng(spec, [giá trị[i]], vùng ngôn ngữ);
+            nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
                 ném "FORMAT_RESOURCE_LIMIT";
             };
         };
-        kết_quả = kết_quả + mảnh[độ dài(mảnh) - 1];
-        nếu (độ dài(mã hóa bảng mã(kết_quả, "UTF-8")) > 1048576) {
+        kết quả = kết quả + mảnh[máy ảo lấy độ dài(mảnh) - 1];
+        nếu (máy ảo lấy độ dài(mã hóa bảng mã(kết quả, "UTF-8")) > 1048576) {
             ném "FORMAT_RESOURCE_LIMIT";
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
-    trả về processor;
+    trả về bộ xử lý;
 };
 
 // Buffer chỉ đổi sau khi toàn bộ lần định dạng thành công.
 lớp công khai Bộ Định Dạng {
-    hàm công khai khởi tạo(vùng = rỗng) { mình.vùng = vùng; mình.văn_bản = ""; };
-    hàm công khai thêm(mẫu, đối_số) {
-        phần = định dạng(mẫu, đối_số, mình.vùng);
-        mới = mình.văn_bản + phần;
-        nếu (độ dài(mã hóa bảng mã(mới, "UTF-8")) > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
-        mình.văn_bản = mới;
+    hàm công khai khởi tạo(vùng = rỗng) { mình.vùng = vùng; mình.văn bản = ""; };
+    hàm công khai thêm(mẫu, đối số) {
+        phần = định dạng(mẫu, đối số, mình.vùng);
+        mới = mình.văn bản + phần;
+        nếu (máy ảo lấy độ dài(mã hóa bảng mã(mới, "UTF-8")) > 1048576) { ném "FORMAT_RESOURCE_LIMIT"; };
+        mình.văn bản = mới;
         trả về mình;
     };
-    hàm công khai kết quả() { trả về mình.văn_bản; };
-    hàm công khai đặt lại() { mình.văn_bản = ""; trả về mình; };
+    hàm công khai kết quả() { trả về mình.văn bản; };
+    hàm công khai đặt lại() { mình.văn bản = ""; trả về mình; };
 };

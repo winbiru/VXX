@@ -220,7 +220,7 @@ jobs:
           $env:VPP_HOME = (Get-Location).Path
           New-Item -ItemType Directory -Force -Path dist/bin, dist/lib, dist/scripts/quality, dist/src/runtime/native | Out-Null
           $nativeCompiler = Join-Path (Get-Location).Path "dist/bin/vpp-native.exe"
-          & $bin --bootstrap-native "gói/biên dịch/native_cli.vi" $nativeCompiler
+          & $bin --bootstrap-native "gói/biên dịch/dòng lệnh bản địa.vi" $nativeCompiler
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $nativeCompiler)) {
             throw "Windows release requires a working native V++ bootstrap compiler"
           }

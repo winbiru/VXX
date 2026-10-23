@@ -1,10 +1,10 @@
 nhập gói/dựng/ứng dụng;
 
 hàm chính() {
-    in banner ứng dụng("VPP", "1.0");
+    in biểu ngữ ứng dụng("VPP", "1.0");
     in độ dời dữ liệu(2, 10);
     in tổng số trang(95, 10);
-    in nối đường dẫn url("https://api.example.com", "/nguoi-dung");
+    in nối đường dẫn địa chỉ tài nguyên("https://api.example.com", "/nguoi-dung");
     in yêu cầu đúng(đúng, "không hợp lệ");
     in yêu cầu không rỗng("ok", "không được rỗng");
 };

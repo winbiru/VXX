@@ -1,0 +1,609 @@
+// vi.net.uri — URI parser, normalization, resolution và form encoding thuần V++.
+// URI là dữ liệu; không phát sinh DNS/network I/O khi parse/normalize/resolve.
+nhập gói/lõi/bảng mã;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/nhập xuất/tệp;
+nhập gói/văn bản/chuỗi;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/mạng/http/máy khách;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Xử Lý URI {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư định danh tài nguyên thập lục phân(chữ số) {
+        bảng = "0123456789ABCDEF";
+        c = chuỗi thường(chữ số);
+        lặp(i = 0; i < 16; i++) {
+            nếu (chuỗi thường(bảng[i]) == c) {
+                trả về i;
+            };
+        };
+        trả về -1;
+    };
+
+    hàm riêng tư định danh tài nguyên thập lục phân ký tự(giá trị) {
+        bảng = "0123456789ABCDEF";
+        trả về bảng[giá trị];
+    };
+
+    hàm riêng tư định danh tài nguyên không dành riêng(c) {
+        giá trị hoàn trả = sai;
+        bảng chữ cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+        lặp(i = 0; i < máy ảo lấy độ dài(bảng chữ cái) && !giá trị hoàn trả; i++) {
+            nếu (c == bảng chữ cái[i]) {
+                giá trị hoàn trả = đúng;
+            };
+        };
+        trả về giá trị hoàn trả;
+    };
+
+    hàm riêng tư định danh tài nguyên ký tự thập lục phân(c) {
+        mã = mã điểm unicode(c);
+        nếu (mã >= 48 && mã <= 57) { trả về mã - 48; };
+        nếu (mã >= 65 && mã <= 70) { trả về mã - 65 + 10; };
+        nếu (mã >= 97 && mã <= 102) { trả về mã - 97 + 10; };
+        trả về -1;
+    };
+
+    hàm công khai định danh tài nguyên phần trăm giải mã(văn bản, giữ dấu = sai) {
+        các byte = [];
+        i = 0;
+        n = máy ảo lấy độ dài(văn bản);
+        lặp(vòng = 0; i < n; vòng++) {
+            c = văn bản[i];
+            nếu (c == "%") {
+                nếu (i + 2 >= n) {
+                    ném "NET_URI_SYNTAX: percent escape bị thiếu";
+                };
+                hi = mình.định danh tài nguyên ký tự thập lục phân(văn bản[i + 1]);
+                lo = mình.định danh tài nguyên ký tự thập lục phân(văn bản[i + 2]);
+                nếu (hi < 0 || lo < 0) {
+                    ném "NET_URI_SYNTAX: percent escape không hợp lệ";
+                };
+                byte = hi * 16 + lo;
+                nếu (byte == 0) {
+                    ném "NET_URI_SYNTAX: NUL percent encoding không được phép";
+                };
+                nếu (giữ dấu && ((byte == 37) || (byte == 47) || (byte == 63) || (byte == 35))) {
+                    máy ảo thêm cuối danh sách(các byte, 37);
+                    máy ảo thêm cuối danh sách(các byte, mã điểm unicode(mình.định danh tài nguyên thập lục phân ký tự(hi)));
+                    máy ảo thêm cuối danh sách(các byte, mã điểm unicode(mình.định danh tài nguyên thập lục phân ký tự(lo)));
+                } hoặc {
+                    máy ảo thêm cuối danh sách(các byte, byte);
+                };
+                i = i + 3;
+            } hoặc {
+                mã = mã điểm unicode(c);
+                nếu (mã < 128) {
+                    máy ảo thêm cuối danh sách(các byte, mã);
+                } hoặc {
+                    đã mã hóa = mã hóa bảng mã(c, "UTF-8");
+                    lặp(j = 0; j < máy ảo lấy độ dài(đã mã hóa); j++) {
+                        máy ảo thêm cuối danh sách(các byte, đã mã hóa[j]);
+                    };
+                };
+                i = i + 1;
+            };
+        };
+        trả về giải mã bảng mã(các byte, "UTF-8", "BÁO_LỖI");
+    };
+
+    hàm công khai định danh tài nguyên phần trăm mã hóa(văn bản, giữ dấu = sai) {
+        các byte = mã hóa bảng mã(văn bản, "UTF-8");
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            byte = các byte[i];
+            được phép = (byte >= 65 && byte <= 90) ||
+                (byte >= 97 && byte <= 122) ||
+                (byte >= 48 && byte <= 57) ||
+                byte == 45 || byte == 46 || byte == 95 || byte == 126;
+            nếu (giữ dấu && (byte == 33 || byte == 36 || byte == 38 || byte == 39 ||
+                byte == 40 || byte == 41 || byte == 42 || byte == 43 || byte == 44 ||
+                byte == 47 || byte == 58 || byte == 59 || byte == 61 || byte == 63 ||
+                byte == 64)) {
+                được phép = đúng;
+            };
+            nếu (được phép) {
+                kết quả = kết quả + ký tự unicode(byte);
+            } hoặc {
+                kết quả = kết quả + "%" + mình.định danh tài nguyên thập lục phân ký tự(làm tròn xuống(byte / 16)) +
+                    mình.định danh tài nguyên thập lục phân ký tự(byte % 16);
+            };
+        };
+        trả về kết quả;
+    };
+
+    hàm riêng tư định danh tài nguyên lược đồ hợp lệ(s) {
+        nếu (s == "") { trả về sai; };
+        bảng chữ cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.";
+        đầu tiên = s[0];
+        đầu tiên thành công = (mã điểm unicode(đầu tiên) >= 65 && mã điểm unicode(đầu tiên) <= 90) ||
+            (mã điểm unicode(đầu tiên) >= 97 && mã điểm unicode(đầu tiên) <= 122);
+        nếu (!đầu tiên thành công) { trả về sai; };
+        lặp(i = 1; i < máy ảo lấy độ dài(s); i++) {
+            thành công = sai;
+            lặp(j = 0; j < máy ảo lấy độ dài(bảng chữ cái) && !thành công; j++) {
+                nếu (s[i] == bảng chữ cái[j]) { thành công = đúng; };
+            };
+            nếu (!thành công) { trả về sai; };
+        };
+        trả về đúng;
+    };
+
+    hàm riêng tư định danh tài nguyên chỉ số cuối(văn bản, ký tự) {
+        vị trí = rỗng;
+        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+            nếu (văn bản[i] == ký tự) { vị trí = i; };
+        };
+        trả về vị trí;
+    };
+
+    hàm công khai định danh tài nguyên phần(giá trị, tên, mặc định = "") {
+        nếu (loại của(giá trị) != "từ điển") { ném "NET_URI_SYNTAX"; };
+        trả về lấy từ điển(giá trị, tên, mặc định);
+    };
+
+    hàm công khai định danh tài nguyên ghép(định danh tài nguyên giá trị đang xét) {
+        lược đồ = lấy từ điển(định danh tài nguyên giá trị đang xét, "scheme", "");
+        thẩm quyền = lấy từ điển(định danh tài nguyên giá trị đang xét, "authority", "");
+        đường tệp = lấy từ điển(định danh tài nguyên giá trị đang xét, "đường_dẫn_thô", lấy từ điển(định danh tài nguyên giá trị đang xét, "đường_dẫn", ""));
+        truy vấn = lấy từ điển(định danh tài nguyên giá trị đang xét, "truy_vấn_thô", rỗng);
+        phân đoạn = lấy từ điển(định danh tài nguyên giá trị đang xét, "mảnh_thô", rỗng);
+        kết quả = "";
+        nếu (lược đồ != "") { kết quả = kết quả + lược đồ + ":"; };
+        nếu (thẩm quyền != "") { kết quả = kết quả + "//" + thẩm quyền; };
+        kết quả = kết quả + đường tệp;
+        nếu (truy vấn != rỗng) { kết quả = kết quả + "?" + truy vấn; };
+        nếu (phân đoạn != rỗng) { kết quả = kết quả + "#" + phân đoạn; };
+        trả về kết quả;
+    };
+
+    hàm công khai định danh tài nguyên phân tích(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi" || máy ảo lấy độ dài(văn bản) > 1048576) {
+            ném "NET_URI_SYNTAX: URI phải là chuỗi tối đa 1 MiB";
+        };
+        dấu hai chấm = tìm chuỗi chính xác(văn bản, ":", 0);
+        dấu gạch chéo = tìm chuỗi chính xác(văn bản, "/", 0);
+        hỏi = tìm chuỗi chính xác(văn bản, "?", 0);
+        băm = tìm chuỗi chính xác(văn bản, "#", 0);
+        có lược đồ = sai;
+        // &&/|| hiện đánh giá cả hai vế. Kiểm tra sentinel trước khi xếp thứ tự.
+        nếu (dấu hai chấm != rỗng) {
+            có lược đồ = đúng;
+            nếu (dấu gạch chéo != rỗng) {
+                nếu (dấu hai chấm >= dấu gạch chéo) { có lược đồ = sai; };
+            };
+            nếu (hỏi != rỗng) {
+                nếu (dấu hai chấm >= hỏi) { có lược đồ = sai; };
+            };
+            nếu (băm != rỗng) {
+                nếu (dấu hai chấm >= băm) { có lược đồ = sai; };
+            };
+        };
+        lược đồ = "";
+        bắt đầu = 0;
+        nếu (có lược đồ) {
+            lược đồ = chuỗi thường(cắt chuỗi(văn bản, 0, dấu hai chấm));
+            nếu (!mình.định danh tài nguyên lược đồ hợp lệ(lược đồ)) {
+                ném "NET_URI_SYNTAX: scheme không hợp lệ";
+            };
+            bắt đầu = dấu hai chấm + 1;
+        };
+
+        phân đoạn = rỗng;
+        phân đoạn thô = rỗng;
+        phân đoạn điểm bắt đầu = tìm chuỗi chính xác(văn bản, "#", bắt đầu);
+        thân điểm kết thúc = máy ảo lấy độ dài(văn bản);
+        nếu (phân đoạn điểm bắt đầu != rỗng) {
+            phân đoạn thô = cắt chuỗi(văn bản, phân đoạn điểm bắt đầu + 1, máy ảo lấy độ dài(văn bản) - phân đoạn điểm bắt đầu - 1);
+            phân đoạn = mình.định danh tài nguyên phần trăm giải mã(phân đoạn thô);
+            thân điểm kết thúc = phân đoạn điểm bắt đầu;
+        };
+
+        truy vấn = rỗng;
+        truy vấn thô = rỗng;
+        truy vấn điểm bắt đầu = tìm chuỗi chính xác(văn bản, "?", bắt đầu);
+        nếu (truy vấn điểm bắt đầu != rỗng) {
+            nếu (truy vấn điểm bắt đầu < thân điểm kết thúc) {
+                truy vấn thô = cắt chuỗi(văn bản, truy vấn điểm bắt đầu + 1, thân điểm kết thúc - truy vấn điểm bắt đầu - 1);
+                truy vấn = mình.định danh tài nguyên phần trăm giải mã(truy vấn thô);
+                thân điểm kết thúc = truy vấn điểm bắt đầu;
+            };
+        };
+
+        thẩm quyền = "";
+        thông tin người dùng = "";
+        máy đích = "";
+        cổng mạng = rỗng;
+        đường tệp thô = cắt chuỗi(văn bản, bắt đầu, thân điểm kết thúc - bắt đầu);
+        có thẩm quyền = bắt đầu + 1 < thân điểm kết thúc &&
+            cắt chuỗi(văn bản, bắt đầu, 2) == "//";
+        nếu (có thẩm quyền) {
+            xác thực điểm bắt đầu = bắt đầu + 2;
+            xác thực điểm kết thúc = tìm chuỗi chính xác(văn bản, "/", xác thực điểm bắt đầu);
+            nếu (xác thực điểm kết thúc == rỗng) {
+                xác thực điểm kết thúc = thân điểm kết thúc;
+            } hoặc {
+                nếu (xác thực điểm kết thúc > thân điểm kết thúc) { xác thực điểm kết thúc = thân điểm kết thúc; };
+            };
+            thẩm quyền = cắt chuỗi(văn bản, xác thực điểm bắt đầu, xác thực điểm kết thúc - xác thực điểm bắt đầu);
+            đường tệp thô = cắt chuỗi(văn bản, xác thực điểm kết thúc, thân điểm kết thúc - xác thực điểm kết thúc);
+            tại = mình.định danh tài nguyên chỉ số cuối(thẩm quyền, "@");
+            phần máy đích = thẩm quyền;
+            nếu (tại != rỗng) {
+                thông tin người dùng = mình.định danh tài nguyên phần trăm giải mã(cắt chuỗi(thẩm quyền, 0, tại));
+                phần máy đích = cắt chuỗi(thẩm quyền, tại + 1, máy ảo lấy độ dài(thẩm quyền) - tại - 1);
+            };
+            nếu (bắt đầu bằng(phần máy đích, "[")) {
+                đóng = tìm chuỗi chính xác(phần máy đích, "]", 1);
+                nếu (đóng == rỗng) { ném "NET_URI_SYNTAX: IPv6 host không hợp lệ"; };
+                máy đích = chuỗi thường(cắt chuỗi(phần máy đích, 1, đóng - 1));
+                hậu = cắt chuỗi(phần máy đích, đóng + 1, máy ảo lấy độ dài(phần máy đích) - đóng - 1);
+                nếu (hậu != "") {
+                    nếu (hậu[0] != ":") { ném "NET_URI_SYNTAX: authority không hợp lệ"; };
+                    cổng mạng văn bản = cắt chuỗi(hậu, 1, máy ảo lấy độ dài(hậu) - 1);
+                    nếu (cổng mạng văn bản == "") { ném "NET_URI_SYNTAX: port rỗng"; };
+                    cổng mạng = thành số nguyên(cổng mạng văn bản);
+                };
+            } hoặc {
+                dấu hai chấm cổng mạng = mình.định danh tài nguyên chỉ số cuối(phần máy đích, ":");
+                máy đích = chuỗi thường(phần máy đích);
+                nếu (dấu hai chấm cổng mạng != rỗng) {
+                    máy đích = chuỗi thường(cắt chuỗi(phần máy đích, 0, dấu hai chấm cổng mạng));
+                    cổng mạng văn bản = cắt chuỗi(phần máy đích, dấu hai chấm cổng mạng + 1, máy ảo lấy độ dài(phần máy đích) - dấu hai chấm cổng mạng - 1);
+                    nếu (cổng mạng văn bản == "") { ném "NET_URI_SYNTAX: port rỗng"; };
+                    cổng mạng = thành số nguyên(cổng mạng văn bản);
+                };
+            };
+            nếu (máy đích == "") { ném "NET_URI_SYNTAX: host rỗng"; };
+            nếu (cổng mạng != rỗng) {
+                nếu (cổng mạng < 0 || cổng mạng > 65535) {
+                    ném "NET_URI_SYNTAX: port ngoài 0..65535";
+                };
+            };
+        };
+
+        nếu (có thẩm quyền && đường tệp thô != "") {
+            nếu (đường tệp thô[0] != "/") {
+                ném "NET_URI_SYNTAX: path có authority phải bắt đầu bằng /";
+            };
+        };
+        nếu (!có thẩm quyền && bắt đầu bằng(đường tệp thô, "//")) {
+            ném "NET_URI_SYNTAX: relative path không được bắt đầu bằng //";
+        };
+
+        đường tệp = mình.định danh tài nguyên phần trăm giải mã(đường tệp thô);
+        dạng chuẩn thẩm quyền = thẩm quyền;
+        nếu (có thẩm quyền) {
+            dạng chuẩn thẩm quyền = "";
+            nếu (thông tin người dùng != "") { dạng chuẩn thẩm quyền = mình.định danh tài nguyên phần trăm mã hóa(thông tin người dùng, đúng) + "@"; };
+            nếu (bắt đầu bằng(máy đích, ":") || chứa chính xác(máy đích, ":")) {
+                dạng chuẩn thẩm quyền = dạng chuẩn thẩm quyền + "[" + máy đích + "]";
+            } hoặc {
+                dạng chuẩn thẩm quyền = dạng chuẩn thẩm quyền + máy đích;
+            };
+            nếu (cổng mạng != rỗng) {
+                dạng chuẩn thẩm quyền = dạng chuẩn thẩm quyền + ":" + thành chuỗi(cổng mạng);
+            };
+        };
+
+        dạng chuẩn = {
+            "scheme": lược đồ,
+            "authority": dạng chuẩn thẩm quyền,
+            "userinfo": thông tin người dùng,
+            "host": máy đích,
+            "port": cổng mạng,
+            "đường_dẫn": đường tệp,
+            "đường_dẫn_thô": đường tệp thô,
+            "truy_vấn": truy vấn,
+            "truy_vấn_thô": truy vấn thô,
+            "mảnh": phân đoạn,
+            "mảnh_thô": phân đoạn thô,
+            "có_authority": có thẩm quyền,
+            "raw": văn bản
+        };
+        đặt từ điển(dạng chuẩn, "canonical", mình.định danh tài nguyên ghép(dạng chuẩn));
+        trả về dạng chuẩn;
+    };
+
+    hàm riêng tư định danh tài nguyên bỏ chấm(đường tệp) {
+        tuyệt đối = bắt đầu bằng(đường tệp, "/");
+        phần đuôi = kết thúc bằng(đường tệp, "/") || kết thúc bằng(đường tệp, "/.") || kết thúc bằng(đường tệp, "/..");
+        các phần = tách hằng văn bản(đường tệp, "/");
+        stack = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(các phần); i++) {
+            p = các phần[i];
+            nếu (p == "" || p == ".") {
+                // Empty segment đầu/cuối được khôi phục theo slash layout.
+            } hoặc {
+                nếu (p == "..") {
+                    có cha = sai;
+                    nếu (máy ảo lấy độ dài(stack) > 0) {
+                        có cha = stack[máy ảo lấy độ dài(stack) - 1] != "..";
+                    };
+                    nếu (có cha) {
+                        máy ảo xóa vị trí danh sách(stack, máy ảo lấy độ dài(stack) - 1);
+                    } hoặc {
+                        nếu (!tuyệt đối) { máy ảo thêm cuối danh sách(stack, ".."); };
+                    };
+                } hoặc {
+                    máy ảo thêm cuối danh sách(stack, p);
+                };
+            };
+        };
+        kết quả = "";
+        nếu (tuyệt đối) { kết quả = "/"; };
+        lặp(i = 0; i < máy ảo lấy độ dài(stack); i++) {
+            nếu (i > 0) { kết quả = kết quả + "/"; };
+            kết quả = kết quả + stack[i];
+        };
+        nếu (phần đuôi && kết quả != "" && !kết thúc bằng(kết quả, "/")) { kết quả = kết quả + "/"; };
+        nếu (tuyệt đối && kết quả == "") { kết quả = "/"; };
+        trả về kết quả;
+    };
+
+    hàm công khai định danh tài nguyên chuẩn hóa(giá trị đang xét) {
+        đã phân tích = giá trị đang xét;
+        nếu (loại của(giá trị đang xét) == "chuỗi") {
+            đã phân tích = mình.định danh tài nguyên phân tích(giá trị đang xét);
+        } hoặc {
+            đã phân tích = mình.định danh tài nguyên phân tích(mình.định danh tài nguyên ghép(giá trị đang xét));
+        };
+        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, "scheme", ""));
+        máy đích = chuỗi thường(lấy từ điển(đã phân tích, "host", ""));
+        đường tệp thô = lấy từ điển(đã phân tích, "đường_dẫn_thô", "");
+        đường tệp thô = mình.định danh tài nguyên bỏ chấm(đường tệp thô);
+        thẩm quyền = lấy từ điển(đã phân tích, "authority", "");
+        cổng mạng = lấy từ điển(đã phân tích, "port", rỗng);
+        nếu ((lược đồ == "http" && cổng mạng == 80) || (lược đồ == "https" && cổng mạng == 443)) { cổng mạng = rỗng; };
+        nếu (máy đích != "") {
+            thẩm quyền = máy đích;
+            nếu (chứa chính xác(máy đích, ":")) { thẩm quyền = "[" + máy đích + "]"; };
+            thông tin người dùng = lấy từ điển(đã phân tích, "userinfo", "");
+            nếu (thông tin người dùng != "") { thẩm quyền = mình.định danh tài nguyên phần trăm mã hóa(thông tin người dùng, đúng) + "@" + thẩm quyền; };
+            nếu (cổng mạng != rỗng) { thẩm quyền = thẩm quyền + ":" + thành chuỗi(cổng mạng); };
+        };
+        kết quả trả về = {
+            "scheme": lược đồ,
+            "authority": thẩm quyền,
+            "userinfo": lấy từ điển(đã phân tích, "userinfo", ""),
+            "host": máy đích,
+            "port": cổng mạng,
+            "đường_dẫn": mình.định danh tài nguyên phần trăm giải mã(đường tệp thô),
+            "đường_dẫn_thô": đường tệp thô,
+            "truy_vấn": lấy từ điển(đã phân tích, "truy_vấn", rỗng),
+            "truy_vấn_thô": lấy từ điển(đã phân tích, "truy_vấn_thô", rỗng),
+            "mảnh": lấy từ điển(đã phân tích, "mảnh", rỗng),
+            "mảnh_thô": lấy từ điển(đã phân tích, "mảnh_thô", rỗng),
+            "có_authority": lấy từ điển(đã phân tích, "có_authority", sai),
+            "raw": lấy từ điển(đã phân tích, "raw", "")
+        };
+        đặt từ điển(kết quả trả về, "canonical", mình.định danh tài nguyên ghép(kết quả trả về));
+        trả về kết quả trả về;
+    };
+
+    hàm công khai định danh tài nguyên hợp nhất(base, tương đối) {
+        b = base;
+        r = tương đối;
+        nếu (loại của(base) == "chuỗi") { b = mình.định danh tài nguyên phân tích(base); };
+        nếu (loại của(tương đối) == "chuỗi") { r = mình.định danh tài nguyên phân tích(tương đối); };
+        rs = lấy từ điển(r, "scheme", "");
+        ra = lấy từ điển(r, "authority", "");
+        rp = lấy từ điển(r, "đường_dẫn_thô", "");
+        rq = lấy từ điển(r, "truy_vấn_thô", rỗng);
+        tệp tham chiếu = lấy từ điển(r, "mảnh_thô", rỗng);
+        bs = lấy từ điển(b, "scheme", "");
+        ba = lấy từ điển(b, "authority", "");
+        bp = lấy từ điển(b, "đường_dẫn_thô", "");
+        bq = lấy từ điển(b, "truy_vấn_thô", rỗng);
+        ta = ba;
+        tp = "";
+        tq = rq;
+        nếu (rs != "") {
+            bs = rs; ta = ra; tp = mình.định danh tài nguyên bỏ chấm(rp);
+        } hoặc {
+            nếu (ra != "") {
+                ta = ra; tp = mình.định danh tài nguyên bỏ chấm(rp);
+            } hoặc {
+                nếu (rp == "") {
+                    tp = bp;
+                    nếu (rq == rỗng) { tq = bq; };
+                } hoặc {
+                    nếu (bắt đầu bằng(rp, "/")) {
+                        tp = mình.định danh tài nguyên bỏ chấm(rp);
+                    } hoặc {
+                        tiền tố = "/";
+                        dấu gạch chéo = mình.định danh tài nguyên chỉ số cuối(bp, "/");
+                        nếu (dấu gạch chéo != rỗng) { tiền tố = cắt chuỗi(bp, 0, dấu gạch chéo + 1); };
+                        nếu (ba != "" && bp == "") { tiền tố = "/"; };
+                        tp = mình.định danh tài nguyên bỏ chấm(tiền tố + rp);
+                    };
+                };
+            };
+        };
+        kết quả trả về = {
+            "scheme": bs,
+            "authority": ta,
+            "userinfo": lấy từ điển(r, "userinfo", lấy từ điển(b, "userinfo", "")),
+            "host": lấy từ điển(r, "host", lấy từ điển(b, "host", "")),
+            "port": lấy từ điển(r, "port", lấy từ điển(b, "port", rỗng)),
+            "đường_dẫn": mình.định danh tài nguyên phần trăm giải mã(tp),
+            "đường_dẫn_thô": tp,
+            "truy_vấn": rỗng,
+            "truy_vấn_thô": tq,
+            "mảnh": rỗng,
+            "mảnh_thô": tệp tham chiếu,
+            "có_authority": ta != "",
+            "raw": ""
+        };
+        nếu (tq != rỗng) { đặt từ điển(kết quả trả về, "truy_vấn", mình.định danh tài nguyên phần trăm giải mã(tq)); };
+        nếu (tệp tham chiếu != rỗng) { đặt từ điển(kết quả trả về, "mảnh", mình.định danh tài nguyên phần trăm giải mã(tệp tham chiếu)); };
+        đặt từ điển(kết quả trả về, "canonical", mình.định danh tài nguyên ghép(kết quả trả về));
+        trả về kết quả trả về;
+    };
+
+    hàm công khai mã hóa biểu mẫu(văn bản, bảng mã = "UTF-8") {
+        nếu (chuỗi thường(bảng mã) != "utf-8" && chuỗi thường(bảng mã) != "utf8") {
+            ném "NET_ENCODING_INVALID: chỉ hỗ trợ UTF-8";
+        };
+        các byte = mã hóa bảng mã(văn bản, "UTF-8");
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            b = các byte[i];
+            nếu ((b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57) ||
+                b == 45 || b == 46 || b == 95 || b == 126) {
+                kết quả = kết quả + ký tự unicode(b);
+            } hoặc {
+                nếu (b == 32) {
+                    kết quả = kết quả + "+";
+                } hoặc {
+                    kết quả = kết quả + "%" + mình.định danh tài nguyên thập lục phân ký tự(làm tròn xuống(b / 16)) + mình.định danh tài nguyên thập lục phân ký tự(b % 16);
+                };
+            };
+        };
+        trả về kết quả;
+    };
+
+    hàm công khai giải mã biểu mẫu(văn bản, bảng mã = "UTF-8") {
+        nếu (chuỗi thường(bảng mã) != "utf-8" && chuỗi thường(bảng mã) != "utf8") {
+            ném "NET_ENCODING_INVALID: chỉ hỗ trợ UTF-8";
+        };
+        các byte = [];
+        i = 0;
+        lặp(vòng = 0; i < máy ảo lấy độ dài(văn bản); vòng++) {
+            c = văn bản[i];
+            nếu (c == "+") {
+                máy ảo thêm cuối danh sách(các byte, 32);
+                i = i + 1;
+            } hoặc {
+                nếu (c == "%") {
+                    nếu (i + 2 >= máy ảo lấy độ dài(văn bản)) { ném "NET_URI_SYNTAX: percent escape bị thiếu"; };
+                    hi = mình.định danh tài nguyên ký tự thập lục phân(văn bản[i + 1]);
+                    lo = mình.định danh tài nguyên ký tự thập lục phân(văn bản[i + 2]);
+                    nếu (hi < 0 || lo < 0) { ném "NET_URI_SYNTAX: percent escape không hợp lệ"; };
+                    máy ảo thêm cuối danh sách(các byte, hi * 16 + lo);
+                    i = i + 3;
+                } hoặc {
+                    đã mã hóa = mã hóa bảng mã(c, "UTF-8");
+                    lặp(j = 0; j < máy ảo lấy độ dài(đã mã hóa); j++) { máy ảo thêm cuối danh sách(các byte, đã mã hóa[j]); };
+                    i = i + 1;
+                };
+            };
+        };
+        trả về giải mã bảng mã(các byte, "UTF-8", "BÁO_LỖI");
+    };
+
+    hàm công khai địa chỉ tài nguyên(giá trị đang xét) {
+        đã phân tích = giá trị đang xét;
+        nếu (loại của(giá trị đang xét) == "chuỗi") { đã phân tích = mình.định danh tài nguyên phân tích(giá trị đang xét); };
+        lược đồ = chuỗi thường(lấy từ điển(đã phân tích, "scheme", ""));
+        nếu (lược đồ == "") { ném "NET_URL_MALFORMED: URL cần scheme"; };
+        nếu (lược đồ != "file" && lược đồ != "http" && lược đồ != "https") {
+            ném "NET_SCHEME_UNKNOWN: scheme chưa có resource handler: " + lược đồ;
+        };
+        đặt từ điển(đã phân tích, "resource_type", "url");
+        trả về đã phân tích;
+    };
+
+    hàm công khai kiểu nội dung(tên tệp dữ liệu) {
+        tên = chuỗi thường(thành chuỗi(tên tệp dữ liệu));
+        dấu = mình.định danh tài nguyên chỉ số cuối(tên, ".");
+        nếu (dấu == rỗng || dấu == máy ảo lấy độ dài(tên) - 1) { trả về rỗng; };
+        ext = cắt chuỗi(tên, dấu + 1, máy ảo lấy độ dài(tên) - dấu - 1);
+        nếu (ext == "html" || ext == "htm") { trả về "text/html"; };
+        nếu (ext == "css") { trả về "text/css"; };
+        nếu (ext == "js" || ext == "mjs") { trả về "text/javascript"; };
+        nếu (ext == "json") { trả về "application/json"; };
+        nếu (ext == "xml") { trả về "application/xml"; };
+        nếu (ext == "txt" || ext == "log") { trả về "text/plain"; };
+        nếu (ext == "csv") { trả về "text/csv"; };
+        nếu (ext == "pdf") { trả về "application/pdf"; };
+        nếu (ext == "zip") { trả về "application/zip"; };
+        nếu (ext == "gz") { trả về "application/gzip"; };
+        nếu (ext == "png") { trả về "image/png"; };
+        nếu (ext == "jpg" || ext == "jpeg") { trả về "image/jpeg"; };
+        nếu (ext == "gif") { trả về "image/gif"; };
+        nếu (ext == "svg") { trả về "image/svg+xml"; };
+        nếu (ext == "wasm") { trả về "application/wasm"; };
+        trả về rỗng;
+    };
+
+    // Mở resource chỉ thực hiện I/O khi caller gọi hàm này. HTTP/HTTPS trả response
+    // từ HTTP client; file trả nội dung tệp. Archive/unknown scheme không giả lập.
+    hàm công khai mở tài nguyên(giá trị đang xét, tùy chọn = rỗng) {
+        đã phân tích = mình.địa chỉ tài nguyên(giá trị đang xét);
+        lược đồ = lấy từ điển(đã phân tích, "scheme", "");
+        nếu (lược đồ == "file") {
+            đường tệp = lấy từ điển(đã phân tích, "đường_dẫn", "");
+            nếu (đường tệp == "") { ném "NET_RESOURCE_UNSUPPORTED: file URL thiếu path"; };
+            trả về {"scheme": "file", "url": lấy từ điển(đã phân tích, "canonical", ""), "nội_dung": đọc tệp(đường tệp), "kiểu": mình.kiểu nội dung(đường tệp)};
+        };
+        nếu (lược đồ == "http" || lược đồ == "https") {
+            phản hồi = mạng lấy(lấy từ điển(đã phân tích, "canonical", ""));
+            trả về {"scheme": lược đồ, "url": lấy từ điển(đã phân tích, "canonical", ""), "nội_dung": phản hồi, "kiểu": mình.kiểu nội dung(lấy từ điển(đã phân tích, "đường_dẫn", ""))};
+        };
+        ném "NET_RESOURCE_UNSUPPORTED: resource handler chưa có";
+    };
+};
+
+
+hàm công khai định danh tài nguyên phần trăm giải mã(văn bản, giữ dấu = sai) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên phần trăm giải mã(văn bản, giữ dấu);
+};
+
+hàm công khai định danh tài nguyên phần trăm mã hóa(văn bản, giữ dấu = sai) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên phần trăm mã hóa(văn bản, giữ dấu);
+};
+
+hàm công khai định danh tài nguyên phần(giá trị, tên, mặc định = "") {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên phần(giá trị, tên, mặc định);
+};
+
+hàm công khai định danh tài nguyên ghép(định danh tài nguyên giá trị đang xét) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên ghép(định danh tài nguyên giá trị đang xét);
+};
+
+hàm công khai định danh tài nguyên phân tích(văn bản) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên phân tích(văn bản);
+};
+
+hàm công khai định danh tài nguyên chuẩn hóa(giá trị đang xét) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên chuẩn hóa(giá trị đang xét);
+};
+
+hàm công khai định danh tài nguyên hợp nhất(base, tương đối) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.định danh tài nguyên hợp nhất(base, tương đối);
+};
+
+hàm công khai mã hóa biểu mẫu(văn bản, bảng mã = "UTF-8") {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.mã hóa biểu mẫu(văn bản, bảng mã);
+};
+
+hàm công khai giải mã biểu mẫu(văn bản, bảng mã = "UTF-8") {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.giải mã biểu mẫu(văn bản, bảng mã);
+};
+
+hàm công khai địa chỉ tài nguyên(giá trị đang xét) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.địa chỉ tài nguyên(giá trị đang xét);
+};
+
+hàm công khai kiểu nội dung(tên tệp dữ liệu) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.kiểu nội dung(tên tệp dữ liệu);
+};
+
+hàm công khai mở tài nguyên(giá trị đang xét, tùy chọn = rỗng) {
+    bộ chuyển tiếp = Bộ Xử Lý URI();
+    trả về bộ chuyển tiếp.mở tài nguyên(giá trị đang xét, tùy chọn);
+};

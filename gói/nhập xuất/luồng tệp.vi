@@ -4,17 +4,17 @@ nhập gói/nhập xuất/bộ đệm tệp;
 nhập gói/lõi/giao diện tài nguyên;
 
 lớp công khai Luồng Tệp triển khai Đóng Được {
-    hàm công khai khởi tạo(đường, chế_độ) {
+    hàm công khai khởi tạo(đường, chế độ) {
         đường = tệp chuẩn hóa đường dẫn(đường);
         nếu (đường == "") { ném "luồng tệp: đường dẫn rỗng"; };
-        mình.luồng = Bộ Đệm Tệp(đường, chế_độ);
+        mình.luồng = Bộ Đệm Tệp(đường, chế độ);
     };
 
     hàm công khai đang mở() { luồng = mình.luồng; trả về luồng.đang mở(); };
-    hàm công khai đọc bytes(đếm) { luồng = mình.luồng; trả về luồng.đọc bytes(đếm); };
+    hàm công khai đọc các byte(đếm) { luồng = mình.luồng; trả về luồng.đọc các byte(đếm); };
     hàm công khai đọc hết() { luồng = mình.luồng; trả về luồng.đọc hết(); };
-    hàm công khai ghi bytes(bytes) { luồng = mình.luồng; trả về luồng.ghi bytes(bytes); };
-    hàm công khai ghi(nội_dung) { luồng = mình.luồng; trả về luồng.ghi(nội_dung); };
+    hàm công khai ghi các byte(các byte) { luồng = mình.luồng; trả về luồng.ghi các byte(các byte); };
+    hàm công khai ghi(nội dung) { luồng = mình.luồng; trả về luồng.ghi(nội dung); };
     hàm công khai vị trí() { luồng = mình.luồng; trả về luồng.vị trí(); };
     hàm công khai dịch(lệch, mốc = 0) { luồng = mình.luồng; trả về luồng.dịch(lệch, mốc); };
     hàm công khai đẩy đệm() { luồng = mình.luồng; trả về luồng.đẩy đệm(); };

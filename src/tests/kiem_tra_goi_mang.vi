@@ -1,14 +1,14 @@
 // Kiểm tra package mạng thống nhất: HTTP helpers, JSON, REST và helper request.
 nhập mạng;
-nhập gói/mạng/kiểm thử/api;
+nhập gói/mạng/kiểm thử/giao diện lập trình;
 
 hàm chính() {
-    in nối đường dẫn url("https://example.test", "/health");
+    in nối đường dẫn địa chỉ tài nguyên("https://example.test", "/health");
     in json đối tượng hai chuỗi("dịch vụ", "V++", "trạng thái", "sẵn sàng");
 
     dataJson = json đối tượng một chuỗi("id", "req-42");
-    in rest json thành công an toàn("ok", dataJson);
+    in dịch vụ tài nguyên json thành công an toàn("ok", dataJson);
 
-    in api get có query("/users", "page=2");
-    in api post json("/users", "");
+    in giao diện lập trình lấy có truy vấn("/users", "page=2");
+    in giao diện lập trình post json("/users", "");
 };

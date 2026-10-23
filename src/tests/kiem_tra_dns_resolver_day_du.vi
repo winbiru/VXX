@@ -1,58 +1,58 @@
-nhập gói/mạng/dns;
+nhập gói/mạng/phân giải tên miền;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/hệ thống/môi trường;
 
 // Mock DNS trả A/AAAA với TTL khác nhau, hoặc lỗi/negative có chủ đích.
 hàm chính() {
     mode = đọc biến môi trường("VPP_DNS_TEST_MODE", "");
-    chi_tiết = dns phân giải đầy đủ("example.com");
-    địa_chỉ = lấy map(chi_tiết, "addresses", []);
-    a = lấy map(chi_tiết, "A", {});
-    aaaa = lấy map(chi_tiết, "AAAA", {});
+    chi_tiết = phân giải tên miền phân giải đầy đủ("example.com");
+    địa_chỉ = lấy từ điển(chi_tiết, "addresses", []);
+    a = lấy từ điển(chi_tiết, "A", {});
+    aaaa = lấy từ điển(chi_tiết, "AAAA", {});
     nếu (mode == "resolve_both") {
-        in lấy map(chi_tiết, "status", "") == "NOERROR" &&
-            lấy map(chi_tiết, "rcode", -1) == 0 &&
-            lấy map(chi_tiết, "ttl", -1) == 25 &&
-            lấy map(chi_tiết, "complete", sai) &&
-            do_dai(địa_chỉ) == 2 && địa_chỉ[0] == "2001:0db8:0000:0000:0000:0000:0000:0001" &&
+        in lấy từ điển(chi_tiết, "status", "") == "NOERROR" &&
+            lấy từ điển(chi_tiết, "rcode", -1) == 0 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 25 &&
+            lấy từ điển(chi_tiết, "complete", sai) &&
+            độ dài(địa_chỉ) == 2 && địa_chỉ[0] == "2001:0db8:0000:0000:0000:0000:0000:0001" &&
             địa_chỉ[1] == "203.0.113.47" &&
-            lấy map(a, "ttl", -1) == 60 && lấy map(aaaa, "ttl", -1) == 25;
+            lấy từ điển(a, "ttl", -1) == 60 && lấy từ điển(aaaa, "ttl", -1) == 25;
     } hoặc nếu (mode == "resolve_partial") {
-        in lấy map(chi_tiết, "status", "") == "NOERROR" &&
-            lấy map(chi_tiết, "rcode", -1) == 0 &&
-            lấy map(chi_tiết, "ttl", -1) == 60 &&
-            !lấy map(chi_tiết, "complete", đúng) &&
-            do_dai(địa_chỉ) == 1 && địa_chỉ[0] == "203.0.113.47" &&
-            lấy map(a, "status", "") == "NOERROR" &&
-            lấy map(aaaa, "status", "") == "";
+        in lấy từ điển(chi_tiết, "status", "") == "NOERROR" &&
+            lấy từ điển(chi_tiết, "rcode", -1) == 0 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 60 &&
+            !lấy từ điển(chi_tiết, "complete", đúng) &&
+            độ dài(địa_chỉ) == 1 && địa_chỉ[0] == "203.0.113.47" &&
+            lấy từ điển(a, "status", "") == "NOERROR" &&
+            lấy từ điển(aaaa, "status", "") == "";
     } hoặc nếu (mode == "resolve_negative") {
-        in lấy map(chi_tiết, "status", "") == "NXDOMAIN" &&
-            lấy map(chi_tiết, "rcode", -1) == 3 &&
-            lấy map(chi_tiết, "ttl", -1) == 0 &&
-            lấy map(chi_tiết, "complete", sai) && do_dai(địa_chỉ) == 0 &&
-            lấy map(a, "status", "") == "NXDOMAIN" &&
-            lấy map(aaaa, "status", "") == "NXDOMAIN";
+        in lấy từ điển(chi_tiết, "status", "") == "NXDOMAIN" &&
+            lấy từ điển(chi_tiết, "rcode", -1) == 3 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 0 &&
+            lấy từ điển(chi_tiết, "complete", sai) && độ dài(địa_chỉ) == 0 &&
+            lấy từ điển(a, "status", "") == "NXDOMAIN" &&
+            lấy từ điển(aaaa, "status", "") == "NXDOMAIN";
     } hoặc nếu (mode == "resolve_mixed") {
-        in lấy map(chi_tiết, "status", "") == "NODATA" &&
-            lấy map(chi_tiết, "rcode", -1) == 0 &&
-            lấy map(chi_tiết, "ttl", -1) == 0 &&
-            lấy map(chi_tiết, "complete", sai) && do_dai(địa_chỉ) == 0 &&
-            lấy map(a, "status", "") == "NXDOMAIN" &&
-            lấy map(aaaa, "status", "") == "NODATA";
+        in lấy từ điển(chi_tiết, "status", "") == "NODATA" &&
+            lấy từ điển(chi_tiết, "rcode", -1) == 0 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 0 &&
+            lấy từ điển(chi_tiết, "complete", sai) && độ dài(địa_chỉ) == 0 &&
+            lấy từ điển(a, "status", "") == "NXDOMAIN" &&
+            lấy từ điển(aaaa, "status", "") == "NODATA";
     } hoặc nếu (mode == "resolve_incomplete") {
-        in lấy map(chi_tiết, "status", "") == "INCOMPLETE" &&
-            lấy map(chi_tiết, "rcode", 0) == -1 &&
-            lấy map(chi_tiết, "ttl", -1) == 0 &&
-            !lấy map(chi_tiết, "complete", đúng) && do_dai(địa_chỉ) == 0 &&
-            lấy map(a, "status", "") == "NODATA" &&
-            lấy map(aaaa, "status", "") == "";
+        in lấy từ điển(chi_tiết, "status", "") == "INCOMPLETE" &&
+            lấy từ điển(chi_tiết, "rcode", 0) == -1 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 0 &&
+            !lấy từ điển(chi_tiết, "complete", đúng) && độ dài(địa_chỉ) == 0 &&
+            lấy từ điển(a, "status", "") == "NODATA" &&
+            lấy từ điển(aaaa, "status", "") == "";
     } hoặc nếu (mode == "resolve_aaaa_only") {
-        in lấy map(chi_tiết, "status", "") == "NOERROR" &&
-            lấy map(chi_tiết, "rcode", -1) == 0 &&
-            lấy map(chi_tiết, "ttl", -1) == 25 &&
-            lấy map(chi_tiết, "complete", sai) && do_dai(địa_chỉ) == 1 &&
+        in lấy từ điển(chi_tiết, "status", "") == "NOERROR" &&
+            lấy từ điển(chi_tiết, "rcode", -1) == 0 &&
+            lấy từ điển(chi_tiết, "ttl", -1) == 25 &&
+            lấy từ điển(chi_tiết, "complete", sai) && độ dài(địa_chỉ) == 1 &&
             địa_chỉ[0] == "2001:0db8:0000:0000:0000:0000:0000:0001" &&
-            lấy map(a, "status", "") == "NODATA" &&
-            lấy map(aaaa, "status", "") == "NOERROR";
+            lấy từ điển(a, "status", "") == "NODATA" &&
+            lấy từ điển(aaaa, "status", "") == "NOERROR";
     } hoặc { ném "DNS resolver fixture: mode không hợp lệ"; };
 };

@@ -1,0 +1,182 @@
+// Two-pass native module compilation.
+// Every source unit is lexed and parsed separately. Pass 1 registers all
+// function signatures; pass 2 lowers each body into its own IR segment.
+// Registry entries: [i32 byte_length, i32 arity, UTF-8 name bytes].
+// Function IDs and code sections remain in dependency-first module order.
+
+// Read one packed source module, returning next archive offset.
+hàm biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, nguồn đầu vào) {
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch + 4 > byte dài(kho lưu trữ)) { trả về -1; };
+    biến chiều dài = byte đọc số nguyên ba mươi hai bit(kho lưu trữ, độ lệch);
+    nếu (chiều dài <= 0) { trả về -1; };
+    nếu (chiều dài > byte dài(kho lưu trữ) - độ lệch - 4) { trả về -1; };
+    nếu (byte làm rỗng(nguồn đầu vào) != 0) { trả về -1; };
+    lặp (i = độ lệch + 4; i < độ lệch + 4 + chiều dài; i++) {
+        nếu (byte máy ảo thêm cuối danh sách(nguồn đầu vào, byte lấy(kho lưu trữ, i)) != 0) { trả về -1; };
+    };
+    trả về độ lệch + 4 + chiều dài;
+};
+
+// The global registry predeclares all signatures before any body is parsed.
+// entry is a single i32, initially -1, which tracks the unique main function.
+hàm biên dịch mô đun thu thập đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, các hàm, điểm vào) {
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, "hàm") == 1) {
+            biến số tham số = phân tích phần đầu số tham số(nguồn văn bản, các từ tố, i);
+            nếu (số tham số < 0) { trả về -1; };
+            nếu (phân tích sổ đăng ký mã định danh(nguồn văn bản, các từ tố, i + 1, sổ đăng ký) >= 0) { trả về -1; };
+            biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, i + 1, 0);
+            biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, i + 1, 1);
+            biến chiều dài = điểm kết thúc - điểm bắt đầu;
+            nếu (chiều dài <= 0) { trả về -1; };
+            nếu (byte dài(các hàm) > 1048576 - 24) { trả về -1; };
+            // Both Vietnamese `chính` and ABI-compatible `main` are valid
+            // entry aliases, but a program can declare only one of them.
+            biến là điểm vào = từ tố bằng(nguồn văn bản, các từ tố, i + 1, "chính");
+            nếu (từ tố bằng(nguồn văn bản, các từ tố, i + 1, "main") == 1) { là điểm vào = 1; };
+            nếu (là điểm vào == 1) {
+                nếu (số tham số != 0) { trả về -1; };
+                nếu (byte đọc số nguyên ba mươi hai bit(điểm vào, 0) >= 0) { trả về -1; };
+                biến mã định danh = 0;
+                lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < byte dài(các hàm); bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+                    mã định danh = mã định danh + 1;
+                };
+                nếu (byte ghi số nguyên ba mươi hai bit(điểm vào, 0, mã định danh) != 0) { trả về -1; };
+            };
+            nếu (byte đẩy số nguyên ba mươi hai bit(sổ đăng ký, chiều dài) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(sổ đăng ký, số tham số) != 0) { trả về -1; };
+            lặp (j = điểm bắt đầu; j < điểm kết thúc; j++) {
+                nếu (byte máy ảo thêm cuối danh sách(sổ đăng ký, byte lấy(nguồn văn bản, j)) != 0) { trả về -1; };
+            };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, i) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, điểm bắt đầu) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, điểm kết thúc) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, -1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, -1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, số tham số) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+// Parse this module's bodies and attach their local IR to the program table.
+// first_function is the global function ID of this module's first declaration.
+hàm biên dịch mô đun biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên chương trình con) {
+    biến con trỏ hiện tại = 0;
+    biến mã định danh = đầu tiên chương trình con;
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (con trỏ hiện tại == từ tố số phần tử(các từ tố)) { trả về mã định danh; };
+        nếu (mã định danh * 24 >= byte dài(các hàm)) { trả về -1; };
+        biến trạng thái nội bộ = byte mới();
+        biến đơn vị = byte mới();
+        nếu (trạng thái nội bộ <= 0) { trả về -1; };
+        nếu (đơn vị <= 0) { byte hủy(trạng thái nội bộ); trả về -1; };
+        biến mã trạng thái = 0;
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, con trỏ hiện tại) != 0) { mã trạng thái = -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) != 0) { mã trạng thái = -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) != 0) { mã trạng thái = -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) != 0) { mã trạng thái = -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, sổ đăng ký) != 0) { mã trạng thái = -1; };
+        biến kế tiếp = -1;
+        nếu (mã trạng thái == 0) { kế tiếp = chương trình thân khối(nguồn văn bản, các từ tố, trạng thái nội bộ, đơn vị); };
+        nếu (kế tiếp <= con trỏ hiện tại) { mã trạng thái = -1; };
+        nếu (byte dài(đơn vị) <= 0) { mã trạng thái = -1; };
+        nếu (mã trạng thái == 0) {
+            biến điểm mở đầu = byte dài(biểu diễn trung gian);
+            nếu (byte nối(biểu diễn trung gian, đơn vị) != 0) { mã trạng thái = -1; }
+            hoặc {
+                nếu (byte ghi số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 12, điểm mở đầu) != 0) { mã trạng thái = -1; };
+                nếu (byte ghi số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 16, byte dài(đơn vị)) != 0) { mã trạng thái = -1; };
+            };
+        };
+        byte hủy(trạng thái nội bộ);
+        byte hủy(đơn vị);
+        nếu (mã trạng thái != 0) { trả về -1; };
+        con trỏ hiện tại = kế tiếp;
+        mã định danh = mã định danh + 1;
+    };
+    nếu (con trỏ hiện tại != từ tố số phần tử(các từ tố)) { trả về -1; };
+    trả về mã định danh;
+};
+
+// Returns the unique main function ID + 1, or -1 on error.
+// registry is returned in global function-ID order; module_ends contains the
+// exclusive function-ID boundary of each source unit in archive order.
+hàm biên dịch mô đun biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) {
+    biến nguồn văn bản = byte mới();
+    biến các từ tố = byte mới();
+    biến điểm vào = byte mới();
+    biến mã trạng thái = 0;
+    nếu (nguồn văn bản <= 0) { mã trạng thái = -1; };
+    nếu (các từ tố <= 0) { mã trạng thái = -1; };
+    nếu (sổ đăng ký <= 0) { mã trạng thái = -1; };
+    nếu (mô đun ends <= 0) { mã trạng thái = -1; };
+    nếu (điểm vào <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        nếu (byte làm rỗng(biểu diễn trung gian) != 0) { mã trạng thái = -1; };
+        nếu (byte làm rỗng(các hàm) != 0) { mã trạng thái = -1; };
+        nếu (byte làm rỗng(sổ đăng ký) != 0) { mã trạng thái = -1; };
+        nếu (byte làm rỗng(mô đun ends) != 0) { mã trạng thái = -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(điểm vào, -1) != 0) { mã trạng thái = -1; };
+    };
+    biến độ lệch = 0;
+    nếu (mã trạng thái == 0) {
+        lặp (i = 0; i < byte dài(kho lưu trữ); i++) {
+            nếu (độ lệch == byte dài(kho lưu trữ)) { thoát; };
+            biến kế tiếp nguồn đầu vào = biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, nguồn văn bản);
+            nếu (kế tiếp nguồn đầu vào < 0) { mã trạng thái = -1; thoát; };
+            nếu (từ vựng tách từ tố(nguồn văn bản, các từ tố) <= 0) { mã trạng thái = -1; thoát; };
+            nếu (biên dịch mô đun thu thập đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, các hàm, điểm vào) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+            biến đã đăng ký số phần tử = 0;
+            lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < byte dài(các hàm); bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+                đã đăng ký số phần tử = đã đăng ký số phần tử + 1;
+            };
+            nếu (byte đẩy số nguyên ba mươi hai bit(mô đun ends, đã đăng ký số phần tử) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+            độ lệch = kế tiếp nguồn đầu vào;
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (độ lệch != byte dài(kho lưu trữ)) { mã trạng thái = -1; };
+        nếu (byte đọc số nguyên ba mươi hai bit(điểm vào, 0) < 0) { mã trạng thái = -1; };
+    };
+    biến chương trình con mã định danh = 0;
+    biến mô đun chỉ mục = 0;
+    độ lệch = 0;
+    nếu (mã trạng thái == 0) {
+        lặp (i = 0; i < byte dài(kho lưu trữ); i++) {
+            nếu (độ lệch == byte dài(kho lưu trữ)) { thoát; };
+            biến kế tiếp mã máy = biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, nguồn văn bản);
+            nếu (kế tiếp mã máy < 0) { mã trạng thái = -1; thoát; };
+            biến cuối cùng = byte đọc số nguyên ba mươi hai bit(mô đun ends, mô đun chỉ mục);
+            chương trình con mã định danh = bộ nhớ đệm biên dịch biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm,
+                chương trình con mã định danh, cuối cùng, byte đọc số nguyên ba mươi hai bit(điểm vào, 0));
+            nếu (chương trình con mã định danh < 0) { mã trạng thái = -1; thoát; };
+            nếu (chương trình con mã định danh != cuối cùng) { mã trạng thái = -1; thoát; };
+            mô đun chỉ mục = mô đun chỉ mục + 4;
+            độ lệch = kế tiếp mã máy;
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (độ lệch != byte dài(kho lưu trữ)) { mã trạng thái = -1; };
+        nếu (chương trình con mã định danh * 24 != byte dài(các hàm)) { mã trạng thái = -1; };
+    };
+    biến kết quả trả về = -1;
+    nếu (mã trạng thái == 0) { kết quả trả về = byte đọc số nguyên ba mươi hai bit(điểm vào, 0) + 1; };
+    nếu (nguồn văn bản > 0) { byte hủy(nguồn văn bản); };
+    nếu (các từ tố > 0) { byte hủy(các từ tố); };
+    nếu (điểm vào > 0) { byte hủy(điểm vào); };
+    nếu (kết quả trả về < 0) {
+        byte làm rỗng(biểu diễn trung gian);
+        byte làm rỗng(các hàm);
+        byte làm rỗng(sổ đăng ký);
+        byte làm rỗng(mô đun ends);
+    };
+    trả về kết quả trả về;
+};

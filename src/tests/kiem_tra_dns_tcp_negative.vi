@@ -1,13 +1,13 @@
-nhập gói/mạng/dns;
+nhập gói/mạng/phân giải tên miền;
 nhập gói/hệ thống/môi trường;
 
 // Mỗi ca đo deadline/validation của MỘT DNS A transaction (2 giây).
-// dns phân giải() có thể thử thêm AAAA để bảo toàn kết quả khi A lỗi mạng.
+// phân giải tên miền phân giải() có thể thử thêm AAAA để bảo toàn kết quả khi A lỗi mạng.
 hàm chính() {
     lỗi = sai;
     thử {
         bộ = Bộ Phân Giải DNS();
-        bộ.dns hỏi máy chủ(
+        bộ.phân giải tên miền hỏi máy chủ(
             "example.com",
             đọc biến môi trường("VPP_DNS_VI_SERVER", "127.0.0.1"),
             đọc biến môi trường("VPP_DNS_VI_PORT", "53"),

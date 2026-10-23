@@ -4,7 +4,7 @@
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
 nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/entropy;
+nhập gói/lõi/nguồn ngẫu nhiên;
 nhập gói/lõi/giao diện tài nguyên;
 
 
@@ -12,16 +12,16 @@ nhập gói/lõi/giao diện tài nguyên;
 lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
     hàm công khai khởi tạo() {};
 
-    hàm riêng tư ngẫu nhiên nguyên yêu cầu giới hạn(giá_trị) {
-        kiểu = loai_cua(giá_trị);
+    hàm riêng tư ngẫu nhiên nguyên yêu cầu giới hạn(giá trị) {
+        kiểu = loại của(giá trị);
         nếu (kiểu == "số nguyên") {
-            trả về giá_trị;
+            trả về giá trị;
         };
 
         nếu (kiểu == "số thực") {
             thử {
-                n = thành số nguyên(giá_trị);
-                nếu (thành số thực(n) == giá_trị) {
+                n = thành số nguyên(giá trị);
+                nếu (thành số thực(n) == giá trị) {
                     trả về n;
                 };
             } bắt lỗi (e) {
@@ -30,7 +30,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
 
         nếu (kiểu == "chuỗi") {
             thử {
-                trả về thành số nguyên(giá_trị);
+                trả về thành số nguyên(giá trị);
             } bắt lỗi (e) {
             };
         };
@@ -38,21 +38,21 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         ném "ngẫu nhiên nguyên: giới hạn phải là số nguyên";
     };
 
-    hàm riêng tư ngẫu nhiên entropy sáu byte() {
-        bytes = entropy bảo mật bytes(6);
-        nếu (do_dai(bytes) != 6) {
+    hàm riêng tư ngẫu nhiên nguồn ngẫu nhiên sáu byte() {
+        các byte = nguồn ngẫu nhiên bảo mật các byte(6);
+        nếu (máy ảo lấy độ dài(các byte) != 6) {
             ném "ngẫu nhiên nguyên: entropy không hợp lệ";
         };
 
-        giá_trị = 0.0;
+        giá trị = 0.0;
         lặp(i = 0; i < 6; i++) {
-            byte = bytes[i];
-            nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+            byte = các byte[i];
+            nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
                 ném "ngẫu nhiên nguyên: entropy không hợp lệ";
             };
-            giá_trị = giá_trị * 256.0 + thành số thực(byte);
+            giá trị = giá trị * 256.0 + thành số thực(byte);
         };
-        trả về giá_trị;
+        trả về giá trị;
     };
 
     // Dùng không gian 2^48. Double biểu diễn chính xác mọi số nguyên trong miền này.
@@ -67,19 +67,19 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
             trả về nhỏ;
         };
 
-        độ_rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
-        không_gian = 281474976710656.0;
-        số_khối = lam_tron_xuong(không_gian / độ_rộng);
-        giới_hạn = số_khối * độ_rộng;
+        độ rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
+        không gian = 281474976710656.0;
+        số khối = làm tròn xuống(không gian / độ rộng);
+        mức trần = số khối * độ rộng;
 
-        mẫu = không_gian;
-        lặp(vòng = 0; mẫu >= giới_hạn; vòng++) {
-            mẫu = mình.ngẫu nhiên entropy sáu byte();
+        mẫu = không gian;
+        lặp(vòng = 0; mẫu >= mức trần; vòng++) {
+            mẫu = mình.ngẫu nhiên nguồn ngẫu nhiên sáu byte();
         };
 
-        thương = lam_tron_xuong(mẫu / độ_rộng);
-        phần_dư = mẫu - thương * độ_rộng;
-        trả về thành số nguyên(thành số thực(nhỏ) + phần_dư);
+        thương = làm tròn xuống(mẫu / độ rộng);
+        phần dư = mẫu - thương * độ rộng;
+        trả về thành số nguyên(thành số thực(nhỏ) + phần dư);
     };
 
     // vi.random — bộ sinh giả ngẫu nhiên có hạt giống, tách khỏi nguồn mật mã.
@@ -88,7 +88,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
     // registry C++ toàn cục. Thuật toán Park-Miller dùng biến thể Schrage để mọi
     // phép nhân trung gian vẫn nằm trong miền số nguyên 32-bit của VM.
     hàm riêng tư ngẫu nhiên yêu cầu số nguyên(giá trị, nhãn) {
-        kiểu = loai_cua(giá trị);
+        kiểu = loại của(giá trị);
         nếu (kiểu == "số nguyên") {
             trả về giá trị;
         };
@@ -114,16 +114,16 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
     };
 
     hàm riêng tư ngẫu nhiên yêu cầu bộ sinh(bộ sinh) {
-        nếu (loai_cua(bộ sinh) != "từ điển") {
+        nếu (loại của(bộ sinh) != "từ điển") {
             ném "ngẫu nhiên: không tìm thấy bộ sinh";
         };
-        nếu (lấy map(bộ sinh, "__vpp_random", 0) != 1) {
+        nếu (lấy từ điển(bộ sinh, "__vpp_random", 0) != 1) {
             ném "ngẫu nhiên: không tìm thấy bộ sinh";
         };
-        nếu (lấy map(bộ sinh, "mở", 0) != 1) {
+        nếu (lấy từ điển(bộ sinh, "mở", 0) != 1) {
             ném "ngẫu nhiên: không tìm thấy bộ sinh";
         };
-        nếu (lấy map(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
+        nếu (lấy từ điển(bộ sinh, "thuật toán", "") != "park-miller-48271-v1") {
             ném "RANDOM_STATE";
         };
         trả về bộ sinh;
@@ -131,31 +131,31 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
 
     hàm riêng tư ngẫu nhiên bước(bộ sinh) {
         mình.ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
-        trạng_thái = lấy map(bộ sinh, "trạng thái", 1);
+        trạng thái = lấy từ điển(bộ sinh, "trạng thái", 1);
 
         // m = 2147483647, a = 48271, q = m / a = 44488, r = m % a = 3399.
-        hi = thành số nguyên(trạng_thái / 44488);
-        lo = trạng_thái % 44488;
+        hi = thành số nguyên(trạng thái / 44488);
+        lo = trạng thái % 44488;
         tiếp = 48271 * lo - 3399 * hi;
         nếu (tiếp <= 0) {
             tiếp = tiếp + 2147483647;
         };
 
-        đặt map(bộ sinh, "trạng thái", tiếp);
+        đặt từ điển(bộ sinh, "trạng thái", tiếp);
         trả về tiếp;
     };
 
     hàm công khai tạo bộ sinh ngẫu nhiên(hạt giống) {
-        seed = mình.ngẫu nhiên yêu cầu số nguyên(hạt giống, "hạt giống");
-        trạng_thái = seed % 2147483647;
-        nếu (trạng_thái <= 0) {
-            trạng_thái = trạng_thái + 2147483646;
+        hạt giống = mình.ngẫu nhiên yêu cầu số nguyên(hạt giống, "hạt giống");
+        trạng thái = hạt giống % 2147483647;
+        nếu (trạng thái <= 0) {
+            trạng thái = trạng thái + 2147483646;
         };
         trả về {
             "__vpp_random": 1,
             "mở": 1,
             "thuật toán": "park-miller-48271-v1",
-            "trạng thái": trạng_thái
+            "trạng thái": trạng thái
         };
     };
 
@@ -172,189 +172,189 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
 
         // Park-Miller sinh đều 1..2147483646. Dịch xuống 0..2147483645 rồi
         // rejection sampling để loại phần dư, tránh modulo/scale bias.
-        không_gian = 2147483646.0;
-        độ_rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
-        nếu (độ_rộng <= 0.0 || độ_rộng > không_gian) {
+        không gian = 2147483646.0;
+        độ rộng = thành số thực(lớn) - thành số thực(nhỏ) + 1.0;
+        nếu (độ rộng <= 0.0 || độ rộng > không gian) {
             ném "RANDOM_RANGE";
         };
-        số_khối = lam_tron_xuong(không_gian / độ_rộng);
-        giới_hạn = số_khối * độ_rộng;
+        số khối = làm tròn xuống(không gian / độ rộng);
+        mức trần = số khối * độ rộng;
 
-        mẫu = không_gian;
-        lặp(vòng = 0; mẫu >= giới_hạn; vòng++) {
+        mẫu = không gian;
+        lặp(vòng = 0; mẫu >= mức trần; vòng++) {
             mẫu = thành số thực(mình.ngẫu nhiên bước(bộ sinh) - 1);
         };
-        thương = lam_tron_xuong(mẫu / độ_rộng);
-        phần_dư = mẫu - thương * độ_rộng;
-        trả về thành số nguyên(thành số thực(nhỏ) + phần_dư);
+        thương = làm tròn xuống(mẫu / độ rộng);
+        phần dư = mẫu - thương * độ rộng;
+        trả về thành số nguyên(thành số thực(nhỏ) + phần dư);
     };
 
     hàm công khai ngẫu nhiên thực từ bộ(bộ sinh) {
-        trạng_thái = mình.ngẫu nhiên bước(bộ sinh);
-        trả về trạng_thái / 2147483647.0;
+        trạng thái = mình.ngẫu nhiên bước(bộ sinh);
+        trả về trạng thái / 2147483647.0;
     };
 
     hàm công khai ngẫu nhiên luận lý từ bộ(bộ sinh) {
-        trạng_thái = mình.ngẫu nhiên bước(bộ sinh);
-        trả về trạng_thái % 2 == 0;
+        trạng thái = mình.ngẫu nhiên bước(bộ sinh);
+        trả về trạng thái % 2 == 0;
     };
 
-    hàm công khai ngẫu nhiên bytes từ bộ(bộ sinh, số_lượng) {
+    hàm công khai ngẫu nhiên các byte từ bộ(bộ sinh, số lượng) {
         mình.ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
-        n = mình.ngẫu nhiên yêu cầu số nguyên(số_lượng, "số lượng byte");
+        n = mình.ngẫu nhiên yêu cầu số nguyên(số lượng, "số lượng byte");
         nếu (n < 0 || n > 1048576) {
             ném "RANDOM_RANGE";
         };
-        kết_quả = [];
+        kết quả = [];
         lặp(i = 0; i < n; i++) {
-            them(kết_quả, mình.ngẫu nhiên nguyên từ bộ(bộ sinh, 0, 255));
+            máy ảo thêm cuối danh sách(kết quả, mình.ngẫu nhiên nguyên từ bộ(bộ sinh, 0, 255));
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai trạng thái bộ sinh ngẫu nhiên(bộ sinh) {
         mình.ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
         trả về {
-            "thuật toán": lấy map(bộ sinh, "thuật toán", ""),
-            "trạng thái": lấy map(bộ sinh, "trạng thái", 0)
+            "thuật toán": lấy từ điển(bộ sinh, "thuật toán", ""),
+            "trạng thái": lấy từ điển(bộ sinh, "trạng thái", 0)
         };
     };
 
     hàm công khai khôi phục bộ sinh ngẫu nhiên(snapshot) {
-        nếu (loai_cua(snapshot) != "từ điển") {
+        nếu (loại của(snapshot) != "từ điển") {
             ném "RANDOM_STATE";
         };
-        thuật_toán = lấy map(snapshot, "thuật toán", "");
-        nếu (thuật_toán != "park-miller-48271-v1") {
+        thuật toán = lấy từ điển(snapshot, "thuật toán", "");
+        nếu (thuật toán != "park-miller-48271-v1") {
             ném "RANDOM_STATE";
         };
-        trạng_thái = lấy map(snapshot, "trạng thái", 0);
-        nếu (loai_cua(trạng_thái) != "số nguyên") {
+        trạng thái = lấy từ điển(snapshot, "trạng thái", 0);
+        nếu (loại của(trạng thái) != "số nguyên") {
             ném "RANDOM_STATE";
         };
-        nếu (trạng_thái <= 0 || trạng_thái >= 2147483647) {
+        nếu (trạng thái <= 0 || trạng thái >= 2147483647) {
             ném "RANDOM_STATE";
         };
         trả về {
             "__vpp_random": 1,
             "mở": 1,
-            "thuật toán": thuật_toán,
-            "trạng thái": trạng_thái
+            "thuật toán": thuật toán,
+            "trạng thái": trạng thái
         };
     };
 
     // Tên contract ngắn theo spec.
-    hàm công khai prng(hạt_giống) {
-        trả về mình.tạo bộ sinh ngẫu nhiên(hạt_giống);
+    hàm công khai bộ sinh giả ngẫu nhiên(hạt giống) {
+        trả về mình.tạo bộ sinh ngẫu nhiên(hạt giống);
     };
 
-    hàm công khai random i64(bộ_sinh, tối_thiểu, tối_đa) {
-        trả về mình.ngẫu nhiên nguyên từ bộ(bộ_sinh, tối_thiểu, tối_đa);
+    hàm công khai ngẫu nhiên i64(bộ sinh, tối thiểu, tối đa) {
+        trả về mình.ngẫu nhiên nguyên từ bộ(bộ sinh, tối thiểu, tối đa);
     };
 
-    hàm công khai random f64(bộ_sinh) {
-        trả về mình.ngẫu nhiên thực từ bộ(bộ_sinh);
+    hàm công khai ngẫu nhiên f64(bộ sinh) {
+        trả về mình.ngẫu nhiên thực từ bộ(bộ sinh);
     };
 
-    hàm công khai random bool(bộ_sinh) {
-        trả về mình.ngẫu nhiên luận lý từ bộ(bộ_sinh);
+    hàm công khai ngẫu nhiên luận lý(bộ sinh) {
+        trả về mình.ngẫu nhiên luận lý từ bộ(bộ sinh);
     };
 
     hàm công khai xóa bộ sinh ngẫu nhiên(bộ sinh) {
         mình.ngẫu nhiên yêu cầu bộ sinh(bộ sinh);
-        đặt map(bộ sinh, "mở", 0);
-        đặt map(bộ sinh, "trạng thái", 0);
+        đặt từ điển(bộ sinh, "mở", 0);
+        đặt từ điển(bộ sinh, "trạng thái", 0);
         trả về 1;
     };
 };
 
 
 hàm công khai ngẫu nhiên nguyên(tối thiểu, tối đa) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.ngẫu nhiên nguyên(tối thiểu, tối đa);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên nguyên(tối thiểu, tối đa);
 };
 
 
 hàm công khai tạo bộ sinh ngẫu nhiên(hạt giống) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.tạo bộ sinh ngẫu nhiên(hạt giống);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.tạo bộ sinh ngẫu nhiên(hạt giống);
 };
 
 
 hàm công khai ngẫu nhiên nguyên từ bộ(bộ sinh, tối thiểu, tối đa) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.ngẫu nhiên nguyên từ bộ(bộ sinh, tối thiểu, tối đa);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên nguyên từ bộ(bộ sinh, tối thiểu, tối đa);
 };
 
 
 hàm công khai ngẫu nhiên thực từ bộ(bộ sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.ngẫu nhiên thực từ bộ(bộ sinh);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên thực từ bộ(bộ sinh);
 };
 
 
 hàm công khai ngẫu nhiên luận lý từ bộ(bộ sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.ngẫu nhiên luận lý từ bộ(bộ sinh);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên luận lý từ bộ(bộ sinh);
 };
 
 
-hàm công khai ngẫu nhiên bytes từ bộ(bộ sinh, số_lượng) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.ngẫu nhiên bytes từ bộ(bộ sinh, số_lượng);
+hàm công khai ngẫu nhiên các byte từ bộ(bộ sinh, số lượng) {
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên các byte từ bộ(bộ sinh, số lượng);
 };
 
 
 hàm công khai trạng thái bộ sinh ngẫu nhiên(bộ sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.trạng thái bộ sinh ngẫu nhiên(bộ sinh);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.trạng thái bộ sinh ngẫu nhiên(bộ sinh);
 };
 
 
 hàm công khai khôi phục bộ sinh ngẫu nhiên(snapshot) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.khôi phục bộ sinh ngẫu nhiên(snapshot);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.khôi phục bộ sinh ngẫu nhiên(snapshot);
 };
 
 
-hàm công khai prng(hạt_giống) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.prng(hạt_giống);
+hàm công khai bộ sinh giả ngẫu nhiên(hạt giống) {
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.bộ sinh giả ngẫu nhiên(hạt giống);
 };
 
 
-hàm công khai random i64(bộ_sinh, tối_thiểu, tối_đa) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.random i64(bộ_sinh, tối_thiểu, tối_đa);
+hàm công khai ngẫu nhiên i64(bộ sinh, tối thiểu, tối đa) {
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên i64(bộ sinh, tối thiểu, tối đa);
 };
 
 
-hàm công khai random f64(bộ_sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.random f64(bộ_sinh);
+hàm công khai ngẫu nhiên f64(bộ sinh) {
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên f64(bộ sinh);
 };
 
 
-hàm công khai random bool(bộ_sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.random bool(bộ_sinh);
+hàm công khai ngẫu nhiên luận lý(bộ sinh) {
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.ngẫu nhiên luận lý(bộ sinh);
 };
 
 
 hàm công khai xóa bộ sinh ngẫu nhiên(bộ sinh) {
-    bộ_nội_bộ = Máy Ngẫu Nhiên Nội Bộ();
-    trả về bộ_nội_bộ.xóa bộ sinh ngẫu nhiên(bộ sinh);
+    bộ nội bộ = Máy Ngẫu Nhiên Nội Bộ();
+    trả về bộ nội bộ.xóa bộ sinh ngẫu nhiên(bộ sinh);
 };
 
 // Mỗi đối tượng sở hữu một chuỗi PRNG; snapshot không chia sẻ handle đang chạy.
 lớp công khai Bộ Sinh Ngẫu Nhiên triển khai Đóng Được {
-    hàm công khai khởi tạo(hạt_giống) {
-        mình.bộ = tạo bộ sinh ngẫu nhiên(hạt_giống);
+    hàm công khai khởi tạo(hạt giống) {
+        mình.bộ = tạo bộ sinh ngẫu nhiên(hạt giống);
     };
     hàm công khai nguyên(nhỏ, lớn) { trả về ngẫu nhiên nguyên từ bộ(mình.bộ, nhỏ, lớn); };
     hàm công khai thực() { trả về ngẫu nhiên thực từ bộ(mình.bộ); };
     hàm công khai luận lý() { trả về ngẫu nhiên luận lý từ bộ(mình.bộ); };
-    hàm công khai bytes(số_lượng) { trả về ngẫu nhiên bytes từ bộ(mình.bộ, số_lượng); };
+    hàm công khai các byte(số lượng) { trả về ngẫu nhiên các byte từ bộ(mình.bộ, số lượng); };
     hàm công khai trạng thái() { trả về trạng thái bộ sinh ngẫu nhiên(mình.bộ); };
     hàm công khai khôi phục(snapshot) {
         mình.trạng thái();
@@ -363,7 +363,7 @@ lớp công khai Bộ Sinh Ngẫu Nhiên triển khai Đóng Được {
         trả về mình;
     };
     hàm công khai đóng() {
-        nếu (lấy map(mình.bộ, "mở", 0) == 0) { trả về sai; };
+        nếu (lấy từ điển(mình.bộ, "mở", 0) == 0) { trả về sai; };
         xóa bộ sinh ngẫu nhiên(mình.bộ);
         trả về đúng;
     };

@@ -1,9 +1,9 @@
-nhập gói/mạng/dns;
+nhập gói/mạng/phân giải tên miền;
 
 // Fixture tích hợp: máy chủ local trả TC=1 qua UDP, rồi bản tin TCP chia nhỏ.
 hàm chính() {
-    địa_chỉ = dns phân giải("example.com");
-    in do_dai(địa_chỉ) == 2;
+    địa_chỉ = phân giải tên miền phân giải("example.com");
+    in độ dài(địa_chỉ) == 2;
     in địa_chỉ[0] == "198.51.100.42";
     in địa_chỉ[1] == "2001:0db8:0000:0000:0000:0000:0000:0005";
 };

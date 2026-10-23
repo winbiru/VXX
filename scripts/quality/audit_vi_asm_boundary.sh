@@ -6,19 +6,19 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 module="$root/gói/hệ thống/tiến trình.vi"
 sleep_module="$root/gói/hệ thống/nền tảng.vi"
 mono_module="$root/gói/thời gian/đơn điệu.vi"
-utc_module="$root/gói/thời gian/utc.vi"
-entropy_module="$root/gói/lõi/entropy.vi"
+utc_module="$root/gói/thời gian/giờ quốc tế.vi"
+entropy_module="$root/gói/lõi/nguồn ngẫu nhiên.vi"
 environment_module="$root/gói/hệ thống/môi trường.vi"
 local_module="$root/gói/thời gian/địa phương.vi"
 directory_module="$root/gói/nhập xuất/thư mục.vi"
 path_module="$root/gói/nhập xuất/đường dẫn.vi"
 socket_module="$root/gói/mạng/ổ cắm.vi"
-ip_module="$root/gói/mạng/ip.vi"
-hosts_module="$root/gói/mạng/dns_hosts.vi"
-dns_config_module="$root/gói/mạng/dns_cấu_hình.vi"
-dns_connect_module="$root/gói/mạng/kết_nối_dns.vi"
-dns_wire_module="$root/gói/mạng/dns_gói_tin.vi"
-dns_module="$root/gói/mạng/dns.vi"
+ip_module="$root/gói/mạng/địa chỉ mạng.vi"
+hosts_module="$root/gói/mạng/bảng tên máy.vi"
+dns_config_module="$root/gói/mạng/cấu hình phân giải tên miền.vi"
+dns_connect_module="$root/gói/mạng/kết nối phân giải tên miền.vi"
+dns_wire_module="$root/gói/mạng/gói tin tên miền.vi"
+dns_module="$root/gói/mạng/phân giải tên miền.vi"
 
 count_matches() {
     find "$root/gói" -type f -name '*.vi' -exec grep -h -E "$1" {} + | wc -l | tr -d '[:space:]'
@@ -81,13 +81,13 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$dns_wire_module"; then
     exit 1
 fi
 if ! grep -q 'máy_socket_kết_nối(' "$dns_module" ||
-   ! grep -q 'dns đọc phản hồi đầy đủ(' "$dns_module"; then
+   ! grep -q 'phân giải tên miền đọc phản hồi đầy đủ(' "$dns_module"; then
     echo 'FAIL: DNS UDP V++ machine binding missing' >&2
     exit 1
 fi
 # Numeric IPv4/IPv6 literals should be parsed in V++ before invoking the
 # compatibility OS name resolver. Connect deadline uses the machine clock.
-if ! grep -q 'socket ip bytes(tên_máy)' "$socket_module" ||
+if ! grep -q 'đầu nối địa chỉ mạng các byte(tên_máy)' "$socket_module" ||
    ! grep -q 'machineMonotonicMilliseconds' "$root/src/runtime/socket_machine.cpp"; then
     echo 'FAIL: socket literal or monotonic machine boundary missing' >&2
     exit 1
@@ -96,9 +96,9 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$ip_module" "$hosts_modul
     echo 'FAIL: V++ IP parser or hosts reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'bộ.ip bytes(ip)' "$socket_module" ||
-   ! grep -q 'bộ.ip bytes(ip)' "$hosts_module" ||
-   ! grep -q 'hosts.dns đọc hosts(tên_máy, đường_hosts)' "$socket_module"; then
+if ! grep -q 'bộ.địa chỉ mạng các byte(ip)' "$socket_module" ||
+   ! grep -q 'bộ.địa chỉ mạng các byte(ip)' "$hosts_module" ||
+   ! grep -q 'hosts.phân giải tên miền đọc bảng tên máy(tên_máy, đường_hosts)' "$socket_module"; then
     echo 'FAIL: shared IP parser or V++ hosts socket resolver missing' >&2
     exit 1
 fi
@@ -106,8 +106,8 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) |nhập gói/mạng/ổ cắ
     echo 'FAIL: DNS config must use the shared V++ IP parser without Socket/FFI' >&2
     exit 1
 fi
-if ! grep -q 'nhập gói/mạng/ip;' "$dns_config_module" ||
-   ! grep -q 'bộ.ip bytes(địa_chỉ)' "$dns_config_module" ||
+if ! grep -q 'nhập gói/mạng/địa chỉ mạng;' "$dns_config_module" ||
+   ! grep -q 'bộ.địa chỉ mạng các byte(địa_chỉ)' "$dns_config_module" ||
    ! grep -q 'VPP_SOCKET_VI_ONLY' "$socket_module"; then
     echo 'FAIL: DNS config parser or strict V++ socket resolver boundary missing' >&2
     exit 1
@@ -116,7 +116,7 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$dns_connect_module"; the
     echo 'FAIL: DNS socket connector reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'trả về dns phân giải(tên_máy)' "$dns_connect_module" ||
+if ! grep -q 'trả về phân giải tên miền phân giải(tên_máy)' "$dns_connect_module" ||
    ! grep -q 'máy_socket_kết_nối(bytes, cổng, udp, thời_gian_chờ)' "$dns_connect_module" ||
    ! grep -q 'máy_socket_đóng(mã)' "$dns_connect_module" ||
    ! grep -q 'cần cấu hình DNS V++ hoặc tệp hosts' "$dns_connect_module"; then

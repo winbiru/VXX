@@ -14,26 +14,26 @@ hàm công khai bằng giá trị(a, b) {
 hàm riêng tư giá trị xor byte(a, b) {
     x = a;
     y = b;
-    trọng_số = 1;
-    kết_quả = 0;
+    trọng số = 1;
+    kết quả = 0;
     lặp(i = 0; i < 8; i++) {
         nếu ((x % 2) != (y % 2)) {
-            kết_quả = kết_quả + trọng_số;
+            kết quả = kết quả + trọng số;
         };
-        x = lam_tron_xuong(x / 2);
-        y = lam_tron_xuong(y / 2);
-        trọng_số = trọng_số * 2;
+        x = làm tròn xuống(x / 2);
+        y = làm tròn xuống(y / 2);
+        trọng số = trọng số * 2;
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 // FNV-1a 32-bit biểu diễn bằng bốn byte để không phụ thuộc overflow i32.
 // Prime 0x01000193 được nhân modulo 2^32 theo từng byte.
-hàm riêng tư giá trị fnv1a32(văn_bản) {
-    bytes = mã hóa bảng mã(văn_bản, "UTF-8");
+hàm riêng tư giá trị fnv1a32(văn bản) {
+    các byte = mã hóa bảng mã(văn bản, "UTF-8");
     h = [197, 157, 28, 129]; // 0x811c9dc5, little-endian
-    lặp(i = 0; i < độ dài(bytes); i++) {
-        h[0] = giá trị xor byte(h[0], bytes[i]);
+    lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        h[0] = giá trị xor byte(h[0], các byte[i]);
 
         h0 = h[0];
         h1 = h[1];
@@ -42,15 +42,15 @@ hàm riêng tư giá trị fnv1a32(văn_bản) {
 
         t0 = h0 * 147;
         r0 = t0 % 256;
-        nhớ = lam_tron_xuong(t0 / 256);
+        nhớ = làm tròn xuống(t0 / 256);
 
         t1 = h1 * 147 + h0 + nhớ;
         r1 = t1 % 256;
-        nhớ = lam_tron_xuong(t1 / 256);
+        nhớ = làm tròn xuống(t1 / 256);
 
         t2 = h2 * 147 + h1 + nhớ;
         r2 = t2 % 256;
-        nhớ = lam_tron_xuong(t2 / 256);
+        nhớ = làm tròn xuống(t2 / 256);
 
         t3 = h3 * 147 + h2 + h0 + nhớ;
         r3 = t3 % 256;
@@ -63,68 +63,68 @@ hàm riêng tư giá trị fnv1a32(văn_bản) {
 
 // Scalar hash nằm hoàn toàn ở V++. VM chỉ còn identity hash cho các handle
 // tham chiếu của VM, vì định danh object/collection không thể quan sát từ V++.
-hàm công khai băm giá trị(giá_trị) {
-    kiểu = loại của(giá_trị);
+hàm công khai băm giá trị(giá trị) {
+    kiểu = loại của(giá trị);
     nếu (kiểu == "rỗng") {
         trả về 0;
     };
     nếu (kiểu == "số nguyên" || kiểu == "số thực") {
-        số = giá_trị + 0.0;
+        số = giá trị + 0.0;
         nếu (số == 0.0) {
             số = 0.0;
         };
         trả về giá trị fnv1a32("n:" + thành chuỗi(số));
     };
     nếu (kiểu == "chuỗi") {
-        trả về giá trị fnv1a32("s:" + giá_trị);
+        trả về giá trị fnv1a32("s:" + giá trị);
     };
-    trả về bam_dinh_danh(giá_trị);
+    trả về máy ảo băm định danh(giá trị);
 };
 
-hàm công khai yêu cầu không null(giá_trị, thông_điệp = "VALUE_NULL_REQUIRED") {
-    nếu (giá_trị == rỗng) {
-        ném thông_điệp;
+hàm công khai yêu cầu có giá trị(giá trị, thông điệp = "VALUE_NULL_REQUIRED") {
+    nếu (giá trị == rỗng) {
+        ném thông điệp;
     };
-    trả về giá_trị;
+    trả về giá trị;
 };
 
 // Tương đương Objects.checkIndex: trả lại index hợp lệ để dùng trực tiếp.
-hàm công khai index hợp lệ(chỉ_số, kích_thước) {
-    nếu (loại của(chỉ_số) != "số nguyên" ||
-        loại của(kích_thước) != "số nguyên") {
+hàm công khai chỉ mục hợp lệ(chỉ số, kích thước) {
+    nếu (loại của(chỉ số) != "số nguyên" ||
+        loại của(kích thước) != "số nguyên") {
         ném "VALUE_INDEX";
     };
-    nếu (kích_thước < 0 || chỉ_số < 0 || chỉ_số >= kích_thước) {
+    nếu (kích thước < 0 || chỉ số < 0 || chỉ số >= kích thước) {
         ném "VALUE_INDEX";
     };
-    trả về chỉ_số;
+    trả về chỉ số;
 };
 
 // Khoảng nửa kín [bắt_đầu, kết_thúc), tương đương checkFromToIndex.
-hàm công khai khoảng index hợp lệ(bắt_đầu, kết_thúc, kích_thước) {
-    nếu (loại của(bắt_đầu) != "số nguyên" ||
-        loại của(kết_thúc) != "số nguyên" ||
-        loại của(kích_thước) != "số nguyên") {
+hàm công khai khoảng chỉ mục hợp lệ(bắt đầu, kết thúc, kích thước) {
+    nếu (loại của(bắt đầu) != "số nguyên" ||
+        loại của(kết thúc) != "số nguyên" ||
+        loại của(kích thước) != "số nguyên") {
         ném "VALUE_INDEX";
     };
-    nếu (kích_thước < 0 || bắt_đầu < 0 || kết_thúc < bắt_đầu ||
-        kết_thúc > kích_thước) {
+    nếu (kích thước < 0 || bắt đầu < 0 || kết thúc < bắt đầu ||
+        kết thúc > kích thước) {
         ném "VALUE_INDEX";
     };
-    trả về bắt_đầu;
+    trả về bắt đầu;
 };
 
 // Vùng [bắt_đầu, bắt_đầu+số_lượng), tránh cộng trước kiểm tra để không làm
 // overflow phép cộng trên ABI i32 hiện tại.
-hàm công khai vùng index hợp lệ(bắt_đầu, số_lượng, kích_thước) {
-    nếu (loại của(bắt_đầu) != "số nguyên" ||
-        loại của(số_lượng) != "số nguyên" ||
-        loại của(kích_thước) != "số nguyên") {
+hàm công khai vùng chỉ mục hợp lệ(bắt đầu, số lượng, kích thước) {
+    nếu (loại của(bắt đầu) != "số nguyên" ||
+        loại của(số lượng) != "số nguyên" ||
+        loại của(kích thước) != "số nguyên") {
         ném "VALUE_INDEX";
     };
-    nếu (kích_thước < 0 || bắt_đầu < 0 || số_lượng < 0 ||
-        bắt_đầu > kích_thước || số_lượng > kích_thước - bắt_đầu) {
+    nếu (kích thước < 0 || bắt đầu < 0 || số lượng < 0 ||
+        bắt đầu > kích thước || số lượng > kích thước - bắt đầu) {
         ném "VALUE_INDEX";
     };
-    trả về bắt_đầu;
+    trả về bắt đầu;
 };

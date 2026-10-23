@@ -3,33 +3,33 @@ nhập gói/ứng dụng/giao diện;
 nhập gói/ứng dụng/vòng đời;
 
 lớp công khai Bộ Điều Khiển Ứng Dụng triển khai Vòng Đời Ứng Dụng {
-    hàm công khai khởi tạo(tên, phiên_bản) {
-        nếu (loai_cua(tên) != "chuỗi" || tên == "") {
+    hàm công khai khởi tạo(tên, phiên bản) {
+        nếu (loại của(tên) != "chuỗi" || tên == "") {
             ném "ứng dụng: tên phải là chuỗi không rỗng";
         };
-        nếu (loai_cua(phiên_bản) != "chuỗi" || phiên_bản == "") {
+        nếu (loại của(phiên bản) != "chuỗi" || phiên bản == "") {
             ném "ứng dụng: phiên bản phải là chuỗi không rỗng";
         };
         mình.tên = tên;
-        mình.phiên_bản = phiên_bản;
-        mình.đang_chạy = sai;
+        mình.phiên bản = phiên bản;
+        mình.đang chạy = sai;
     };
 
-    hàm công khai banner() { trả về banner ứng dụng(mình.tên, mình.phiên_bản); };
+    hàm công khai biểu ngữ() { trả về biểu ngữ ứng dụng(mình.tên, mình.phiên bản); };
 
-    hàm công khai đang chạy() { trả về mình.đang_chạy; };
+    hàm công khai đang chạy() { trả về mình.đang chạy; };
 
     hàm công khai chạy() {
-        nếu (mình.đang_chạy) { trả về sai; };
-        chạy ứng dụng(mình.tên, mình.phiên_bản);
-        mình.đang_chạy = đúng;
+        nếu (mình.đang chạy) { trả về sai; };
+        chạy ứng dụng(mình.tên, mình.phiên bản);
+        mình.đang chạy = đúng;
         trả về đúng;
     };
 
     hàm công khai dừng() {
-        nếu (!mình.đang_chạy) { trả về sai; };
+        nếu (!mình.đang chạy) { trả về sai; };
         dừng ứng dụng(mình.tên);
-        mình.đang_chạy = sai;
+        mình.đang chạy = sai;
         trả về đúng;
     };
 };

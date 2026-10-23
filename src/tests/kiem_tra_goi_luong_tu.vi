@@ -1,0 +1,243 @@
+nhập lượng tử;
+nhập kiểm thử;
+nhập json;
+hàm gần(a, b) {
+    trả về a - b > - 0.000000001 && a - b < 0.000000001;
+}
+;
+hàm chính() {
+    máy = Bộ Mô Phỏng Lượng Tử();
+    m = Mạch Lượng Tử(1);
+    m.h(0) .h(0);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 1.0) && gần(p[1], 0.0));
+    m = Mạch Lượng Tử(1);
+    m.y(0);
+    a = máy.trạng thái(m);
+    r = a["thực"];
+    im = a["ảo"];
+    khẳng định đúng(gần(r[1], 0.0) && gần(im[1], 1.0));
+    m.y(0);
+    a = máy.trạng thái(m);
+    r = a["thực"];
+    khẳng định đúng(gần(r[0], 1.0));
+    m = Mạch Lượng Tử(1);
+    m.h(0) .s(0);
+    a = máy.trạng thái(m);
+    im = a["ảo"];
+    khẳng định đúng(gần(im[1], 0.7071067811865476));
+    m.s(0) .h(0);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[1], 1.0));
+    m = Mạch Lượng Tử(1);
+    m.h(0) .t(0) .t(0) .t(0) .t(0) .h(0);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[1], 1.0));
+    m = Mạch Lượng Tử(1);
+    m.h(0) .z(0) .h(0);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[1], 1.0));
+    in "gates-and-complex-phase: ok";
+    m = Mạch Lượng Tử(2);
+    m.h(0) .cx(0, 1);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 0.5) && gần(p[3], 0.5) && gần(p[1], 0.0) && gần(p[2], 0.0));
+    m.cx(0, 1) .h(0);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 1.0));
+    m = Mạch Lượng Tử(3);
+    m.h(2) .cx(2, 0) .cx(0, 1);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    tổng = 0.0;
+    lặp (i = 0; i < độ dài(p); i++) {
+        tổng = tổng + p[i];
+    }
+    ;
+    khẳng định đúng(gần(p[0], 0.5) && gần(p[7], 0.5) && gần(tổng, 1.0));
+    in "bell-ghz-and-reverse-cx: ok";
+    m = Mạch Lượng Tử(2);
+    m.h(0) .cx(0, 1) .đo tất cả();
+    a = máy.chạy(m, 1024, 20261022);
+    d = a["đếm"];
+    khẳng định bằng(lấy từ điển(d, "01", 0) + lấy từ điển(d, "10", 0), 0);
+    khẳng định bằng(d["00"] + d["11"], 1024);
+    khẳng định đúng(d["00"] > 400 && d["00"] < 624);
+    b = máy.chạy(m, 1024, 20261022);
+    khẳng định bằng(json tạo(a), json tạo(b));
+    in "sampling-and-seed: ok";
+    m = Mạch Lượng Tử(3);
+    m.x(0) .đo tất cả();
+    a = máy.chạy(m, 4);
+    d = a["đếm"];
+    khẳng định bằng(d["001"], 4);
+    m = Mạch Lượng Tử(3);
+    m.x(2) .đo tất cả();
+    a = máy.chạy(m, 4);
+    d = a["đếm"];
+    khẳng định bằng(d["100"], 4);
+    m = Mạch Lượng Tử(2, 3);
+    m.x(0) .đo(0, 2) .đo(1, 0);
+    a = máy.chạy(m, 4);
+    d = a["đếm"];
+    khẳng định bằng(d["100"], 4);
+    // Lệnh đo sau ghi đè cùng bit cổ điển.
+    m.đo(1, 2);
+    a = máy.chạy(m, 4);
+    d = a["đếm"];
+    khẳng định bằng(d["000"], 4);
+    in "bit-order-mapping-and-overwrite: ok";
+    m = Mạch Lượng Tử(1, 2);
+    m.h(0) .đo(0, 0) .đo(0, 1);
+    a = máy.chạy(m, 128, 42);
+    d = a["đếm"];
+    khẳng định bằng(lấy từ điển(d, "01", 0) + lấy từ điển(d, "10", 0), 0);
+    m = Mạch Lượng Tử(1, 2);
+    m.h(0) .đo(0, 0) .x(0) .đo(0, 1);
+    a = máy.chạy(m, 128, 42);
+    d = a["đếm"];
+    khẳng định bằng(lấy từ điển(d, "00", 0) + lấy từ điển(d, "11", 0), 0);
+    khẳng định đúng(d["01"] > 0 && d["10"] > 0);
+    // Đo q0 phải giữ nguyên chồng chập và pha của q1.
+    m = Mạch Lượng Tử(2);
+    m.h(0) .h(1) .đo(0, 0) .h(1) .đo(1, 1);
+    a = máy.chạy(m, 128, 42);
+    d = a["đếm"];
+    khẳng định bằng(lấy từ điển(d, "10", 0) + lấy từ điển(d, "11", 0), 0);
+    khẳng định đúng(d["00"] > 0 && d["01"] > 0);
+    in "mid-circuit-measurement-and-collapse: ok";
+    m = Mạch Lượng Tử(2);
+    m.h(0) .cx(0, 1) .đặt lại(0) .đo tất cả();
+    a = máy.chạy(m, 128, 42);
+    d = a["đếm"];
+    khẳng định bằng(lấy từ điển(d, "01", 0) + lấy từ điển(d, "11", 0), 0);
+    khẳng định đúng(d["00"] > 0 && d["10"] > 0);
+    m = Mạch Lượng Tử(1);
+    m.x(0) .đặt lại(0) .đo tất cả();
+    a = máy.chạy(m, 4);
+    d = a["đếm"];
+    khẳng định bằng(d["0"], 4);
+    in "đặt lại-entangled-qubit: ok";
+    m = Mạch Lượng Tử(1);
+    m.h(0);
+    snapshot = m.các lệnh();
+    mục = snapshot[0];
+    mục[0] = "x";
+    thêm(snapshot, ["z", 0, - 1]);
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 0.5));
+    r = a["thực"];
+    r[0] = 0.0;
+    a = máy.trạng thái(m);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 0.5));
+    khác = Mạch Lượng Tử(1);
+    a = máy.trạng thái(khác);
+    p = a["xác suất"];
+    khẳng định đúng(gần(p[0], 1.0));
+    in "snapshot-and-instance-isolation: ok";
+    lỗi = 0;
+    thử {
+        Mạch Lượng Tử(0);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        Mạch Lượng Tử(1.5);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        Mạch Lượng Tử(1, 0);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        m.h( - 1);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        m.x(1);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        m.cx(0, 0);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        m.đo(0, 1);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        máy.chạy(m, 1);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    m.đo tất cả();
+    thử {
+        máy.trạng thái(m);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        máy.chạy(m, 0);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        máy.chạy(m, 1.5);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        máy.chạy(m, 1, "seed");
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        máy.trạng thái(Mạch Lượng Tử(13));
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        Bộ Mô Phỏng Lượng Tử(17);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    nhỏ = Mạch Lượng Tử(2, 1);
+    thử {
+        nhỏ.đo tất cả();
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    khẳng định bằng(lỗi, 15);
+    khẳng định bằng(độ dài(nhỏ.các lệnh()), 0);
+    in "validation-and-resource-limits: ok";
+}
+;

@@ -140,7 +140,7 @@
 | `io_doc_file(path)` | |
 | `io_ghi_file(path, content)` | |
 | `doc_config(path)` | |
-| `lay_thoi_gian_hien_tai()` | |
+| `lấy thời gian hiện tại()` | |
 | `mang_http_get(url)` | *(phụ thuộc `curl` và mạng)* |
 | `mang_http_post(url, payload)` | *(phụ thuộc `curl` và mạng)* |
 | `mang_http_put(url, payload)` | *(phụ thuộc `curl` và mạng)* |

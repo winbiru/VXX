@@ -219,7 +219,7 @@ std::string makeVppObjectSource(const Target &target,
         source << "{\"offset\":" << checkedInt(reloc.offset, "relocation offset")
                << ",\"symbol\":" << quoted(reloc.symbol) << '}';
     }
-    source << "];\n  object = biên dịch object("
+    source << "];\n  object = biên dịch đối tượng("
            << quoted(std::string(architectureName(target.arch))) << ','
            << quoted(os) << ',' << quoted(targetAbi(target)) << ",code,"
            << quoted(std::string(symbol)) << ",relocs);\n"
@@ -242,13 +242,13 @@ std::string makeSelfHostedObjectSource(const Target &target,
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  kết_quả = biên dịch native object tự chủ("
+         << "  kết_quả = biên dịch bản địa đối tượng tự chủ("
          << quoted(std::string(source)) << ','
          << quoted(std::string(functionName)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
-         << "  biên dịch native in bản ghi(kết_quả);\n"
+         << "  biên dịch bản địa in bản ghi(kết_quả);\n"
          << "}\n";
     return code.str();
 }
@@ -259,14 +259,14 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  các_hàm = biên dịch native chương trình object tự chủ("
+         << "  các_hàm = biên dịch bản địa chương trình đối tượng tự chủ("
          << quoted(std::string(source)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
          << "  lặp (i = 0; i < độ dài(các_hàm); i++) {\n"
          << "    in \"F:\" + các_hàm[i][\"name\"];\n"
-         << "    biên dịch native in bản ghi(các_hàm[i]);\n"
+         << "    biên dịch bản địa in bản ghi(các_hàm[i]);\n"
          << "  };\n}\n";
     return code.str();
 }
@@ -283,7 +283,7 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
         emitTarget->arch != Architecture::AArch64)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy hạ ir;\n";
+    code << "nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;\n";
     if (emitTarget) code << "nhập gói/biên dịch/mã máy;\n";
     if (emitObject) code << "nhập gói/biên dịch/đối tượng;\n";
     code << "hàm chính() {\n  ir = {\"values\":[";
@@ -350,7 +350,7 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                  << "  };\n";
         }
         if (emitObject) {
-            code << "  object = biên dịch object(" << arch << ", " << os << ", "
+            code << "  object = biên dịch đối tượng(" << arch << ", " << os << ", "
                  << quoted(targetAbi(*emitTarget)) << ", byte, "
                  << quoted(std::string(functionName)) << ", "
                  << (leaf ? "[]" : "tái_định_vị") << ");\n"

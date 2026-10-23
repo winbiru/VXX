@@ -1,0 +1,58 @@
+nhập lượng tử;
+nhập gói / lượng tử / qiskit;
+nhập kiểm thử;
+hàm chính() {
+    // Validation phải kết thúc trước khi khởi chạy đường dẫn Python giả.
+    lỗi = 0;
+    thử {
+        Cầu Nối Qiskit("", "bridge.py");
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        Cầu Nối Qiskit("python3", rỗng);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    sdk = Cầu Nối Qiskit("/nonexistent/python", "/nonexistent/bridge.py");
+    m = Mạch Lượng Tử(1);
+    thử {
+        sdk.mô phỏng(m);
+    } bắt lỗi(e) {
+        khẳng định bằng(e, "qiskit: mạch cần ít nhất một phép đo tường minh");
+        lỗi = lỗi + 1;
+    }
+    ;
+    m.đo tất cả();
+    thử {
+        sdk.mô phỏng(m, 0);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        sdk.mô phỏng(m, 1, - 1);
+    } bắt lỗi(e) {
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        sdk.gửi(m, "");
+    } bắt lỗi(e) {
+        khẳng định bằng(e, "qiskit: phải chỉ định backend khi gửi lên QPU");
+        lỗi = lỗi + 1;
+    }
+    ;
+    thử {
+        sdk.kết quả("");
+    } bắt lỗi(e) {
+        khẳng định bằng(e, "qiskit: mã job trống");
+        lỗi = lỗi + 1;
+    }
+    ;
+    khẳng định bằng(lỗi, 7);
+    in "qiskit-validation-without-python: ok";
+}
+;

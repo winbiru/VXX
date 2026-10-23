@@ -6,25 +6,25 @@ nhập gói/biên dịch/mã máy nền;
 lớp công khai Bộ Phát LOONGARCH64 {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    hàm công khai biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
-                        phần_cao = (hằng - (hằng % 4096)) / 4096;
-                        nếu (hằng < 0 && (hằng % 4096) != 0) { phần_cao -= 1; };
-                        nếu (phần_cao < 0) { phần_cao += 1048576; };
-                        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("14000004") + phần_cao * 32, ít);
-                        biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("03800084") + (hằng % 4096 + 4096) % 4096 * 1024, ít);
+                        phần cao = (hằng - (hằng % 4096)) / 4096;
+                        nếu (hằng < 0 && (hằng % 4096) != 0) { phần cao -= 1; };
+                        nếu (phần cao < 0) { phần cao += 1048576; };
+                        biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("14000004") + phần cao * 32, ít);
+                        biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("03800084") + (hằng % 4096 + 4096) % 4096 * 1024, ít);
                     } hoặc {
-                        nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "00101484", ít); }
-                        hoặc { biên dịch mã máy thêm hex(ra, "00111484", ít); };
+                        nếu (loại == "cộng") { biên dịch mã máy thêm thập lục phân(ra, "00101484", ít); }
+                        hoặc { biên dịch mã máy thêm thập lục phân(ra, "00111484", ít); };
                     };
-                    biên dịch mã máy thêm hex(ra, "4c000020", ít);
+                    biên dịch mã máy thêm thập lục phân(ra, "4c000020", ít);
         trả về ra;
     };
 };
 
 
-hàm công khai biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
-    __vpp_adapter = Bộ Phát LOONGARCH64();
-    trả về __vpp_adapter.biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ điều hành) {
+    bộ chuyển tiếp = Bộ Phát LOONGARCH64();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ điều hành);
 };

@@ -18,7 +18,7 @@ hàm chính() {
     a.lưu("tên", "Việt");
     khẳng định bằng(cùng.đọc("khác"), "42");
     khẳng định bằng(b.đọc("tên", "thiếu"), "thiếu");
-    khẳng định bằng(do_dai(a.các khóa()), 2);
+    khẳng định bằng(độ dài(a.các khóa()), 2);
     khẳng định đúng(a.xóa("tên"));
     khẳng định sai(a.xóa("tên"));
     a.xóa tất cả();
@@ -31,7 +31,7 @@ hàm chính() {
     lưu trữ tạo zip(zip, [nguồn]);
     kho = Hệ Tệp ZIP(zip);
     danh_mục = kho.liệt kê();
-    khẳng định bằng(do_dai(danh_mục), 1);
+    khẳng định bằng(độ dài(danh_mục), 1);
     khẳng định đúng(kho.đóng());
     khẳng định sai(kho.đóng());
     hành_động = hàm() { kho.liệt kê(); };
@@ -40,20 +40,20 @@ hàm chính() {
     xóa đường dẫn(zip);
     in "ZIP OOP: đạt";
 
-    manifest = {"schema": 1, "name": "oop-project", "version": "1.0.0", "dependencies": []};
-    dự_án = Dự Án Gói(manifest);
+    bản kê = {"schema": 1, "name": "oop-project", "version": "1.0.0", "dependencies": []};
+    dự_án = Dự Án Gói(bản kê);
     mục = dự_án.thêm("a", "^1.0.0", "path", "../a");
-    đặt map(mục, "version", "sai");
+    đặt từ điển(mục, "version", "sai");
     khẳng định bằng(dự_án.phụ thuộc("a")["version"], "^1.0.0");
-    khẳng định bằng(do_dai(manifest["dependencies"]), 0);
+    khẳng định bằng(độ dài(bản kê["dependencies"]), 0);
     hành_động = hàm() { dự_án.thêm("b", "không hợp lệ", "path", "../b"); };
     khẳng định ném lỗi(hành_động);
-    khẳng định bằng(do_dai(dự_án.manifest()["dependencies"]), 1);
+    khẳng định bằng(độ dài(dự_án.bản kê()["dependencies"]), 1);
     khẳng định bằng(dự_án.phụ thuộc("b"), rỗng);
-    snapshot = dự_án.manifest();
-    đặt map(snapshot, "name", "khác");
-    khẳng định bằng(dự_án.manifest()["name"], "oop-project");
-    khẳng định bằng(do_dai(dự_án.giải đồ thị({"a": {"version": "1.2.0", "dependencies": []}})), 1);
+    snapshot = dự_án.bản kê();
+    đặt từ điển(snapshot, "name", "khác");
+    khẳng định bằng(dự_án.bản kê()["name"], "oop-project");
+    khẳng định bằng(độ dài(dự_án.giải đồ thị({"a": {"version": "1.2.0", "dependencies": []}})), 1);
     đường_manifest = "src/tests/.tmp_oop_manifest.json";
     dự_án.lưu(đường_manifest);
     dự_án.xóa("a");

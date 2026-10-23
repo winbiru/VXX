@@ -40,16 +40,16 @@ lớp công khai DịchVụĐơnHàng {
         tổngTheoMã = {};
         lặp(i = 0; i < độ dài(cácMục); i = i + 1) {
             mục = cácMục[i];
-            mã = lấy map(mục, "maSanPham", "");
-            sốLượng = lấy map(mục, "soLuong", 0);
+            mã = lấy từ điển(mục, "maSanPham", "");
+            sốLượng = lấy từ điển(mục, "soLuong", 0);
             nếu (mã == "") {
                 ném "Dịch vụ đơn hàng: thiếu maSanPham";
             };
             nếu (sốLượng <= 0) {
                 ném "Dịch vụ đơn hàng: soLuong phải lớn hơn 0";
             };
-            hiệnTại = lấy map(tổngTheoMã, mã, 0);
-            đặt map(tổngTheoMã, mã, hiệnTại + sốLượng);
+            hiệnTại = lấy từ điển(tổngTheoMã, mã, 0);
+            đặt từ điển(tổngTheoMã, mã, hiệnTại + sốLượng);
         };
         trả về tổngTheoMã;
     }
@@ -73,12 +73,12 @@ lớp công khai DịchVụĐơnHàng {
         khoSảnPhẩm = mình.khoSảnPhẩm;
         lặp(i = 0; i < độ dài(snapshot); i = i + 1) {
             trạngThái = snapshot[i];
-            id = lấy map(trạngThái, "id", "");
+            id = lấy từ điển(trạngThái, "id", "");
             sảnPhẩm = khoSảnPhẩm.tìmTheoId(id);
             nếu (sảnPhẩm != rỗng) {
-                sảnPhẩm.tồnKho = lấy map(trạngThái, "tonKho", sảnPhẩm.tồnKho);
-                sảnPhẩm.đãBán = lấy map(trạngThái, "daBan", sảnPhẩm.đãBán);
-                sảnPhẩm.phiênBản = lấy map(trạngThái, "phienBan", sảnPhẩm.phiênBản);
+                sảnPhẩm.tồnKho = lấy từ điển(trạngThái, "tonKho", sảnPhẩm.tồnKho);
+                sảnPhẩm.đãBán = lấy từ điển(trạngThái, "daBan", sảnPhẩm.đãBán);
+                sảnPhẩm.phiênBản = lấy từ điển(trạngThái, "phienBan", sảnPhẩm.phiênBản);
                 khoSảnPhẩm.lưu(sảnPhẩm);
             };
         };
@@ -91,14 +91,14 @@ lớp công khai DịchVụĐơnHàng {
         };
 
         tổngTheoMã = mình.gomSốLượng(cácMục);
-        cácMã = khóa map(tổngTheoMã);
+        cácMã = khóa từ điển(tổngTheoMã);
         khoSảnPhẩm = mình.khoSảnPhẩm;
         cácSảnPhẩm = [];
 
         // Pass 1: chỉ kiểm tra. Chưa thay đổi tồn kho nếu có mục nào sai.
         lặp(i = 0; i < độ dài(cácMã); i = i + 1) {
             mã = cácMã[i];
-            sốLượng = lấy map(tổngTheoMã, mã, 0);
+            sốLượng = lấy từ điển(tổngTheoMã, mã, 0);
             sảnPhẩm = khoSảnPhẩm.tìmTheoId(mã);
             nếu (sảnPhẩm == rỗng) {
                 ném "Dịch vụ đơn hàng: sản phẩm không tồn tại: " + mã;
@@ -115,7 +115,7 @@ lớp công khai DịchVụĐơnHàng {
             cácDòng = [];
             lặp(i = 0; i < độ dài(cácSảnPhẩm); i = i + 1) {
                 sảnPhẩm = cácSảnPhẩm[i];
-                sốLượng = lấy map(tổngTheoMã, sảnPhẩm.id, 0);
+                sốLượng = lấy từ điển(tổngTheoMã, sảnPhẩm.id, 0);
                 dòng = DòngĐơnHàng(sảnPhẩm.id, sảnPhẩm.tên, sảnPhẩm.giá, sốLượng);
                 dòng.kiểmTraHợpLệ();
                 thêm(cácDòng, dòng);

@@ -59,7 +59,7 @@ kiểm tra không libffi, hiện chưa có kết quả runner sau thay đổi. M
 những chương trình thật sự sử dụng `ngoại hàm` cũ sẽ không gọi libffi được.
 Lỗi Native AOT `máy_môi_trường_đọc` trước đó bắt nguồn từ binary compiler
 `build/bin/vpp-native` cũ (19/10/2026) chưa đồng bộ Machine Intrinsics.
-Bootstrap lại compiler từ `gói/biên dịch/native_cli.vi` đã sửa lỗi này.
+Bootstrap lại compiler từ `gói/biên dịch/dòng lệnh bản địa.vi` đã sửa lỗi này.
 Đã đồng bộ 16 intrinsic Process/Resolver/TLS và opcode 193–208 vào compiler
 `.vi`; import `gói/lõi/chuyển kiểu` được bổ sung trực tiếp cho DNS. Bài
 `vpp-native-machine-system-fixtures` dùng compiler Stage 1 **đầy đủ** do
@@ -79,8 +79,8 @@ Full regression ngày 22/10/2026: **339 PASS, 0 FAIL**.
 
 ## TCP/UDP hostname với DNS V++ và Machine Socket (21/10/2026)
 
-Module mới `gói/mạng/kết_nối_dns.vi` cung cấp `socket dns vi địa chỉ`,
-`socket tcp mở dns vi` và `socket udp mở dns vi`. Một hostname được tra
+Module mới `gói/mạng/kết nối phân giải tên miền.vi` cung cấp `đầu nối phân giải tên miền vi địa chỉ`,
+`đầu nối giao vận tin cậy mở phân giải tên miền vi` và `đầu nối giao vận gói tin mở phân giải tên miền vi`. Một hostname được tra
 qua DNS Hosts hoặc DNS Wire Resolver V++ khi đã cấu hình ít nhất một trong
 `VPP_DNS_VI_HOSTS_FILE`, `VPP_DNS_VI_SERVER`, `VPP_DNS_VI_SERVERS`,
 `VPP_DNS_VI_RESOLV_CONF`. Nếu chưa cấu hình, module từ chối tên máy để
@@ -90,7 +90,7 @@ IPv4 với số 0 đầu được chuẩn hóa sang decimal dotted-quad.
 Danh sách địa chỉ từ DNS V++ được thử tuần tự: kết nối TCP/UDP qua
 `máy_socket_kết_nối`, áp timeout qua `máy_socket_timeout`; nếu cấu hình
 timeout thất bại thì đóng descriptor trước khi thử địa chỉ khác. API trả
-socket handle tương thích với `socket gửi` / `socket nhận` / `socket đóng`
+socket handle tương thích với `đầu nối gửi` / `đầu nối nhận` / `đầu nối đóng`
 hiện hành. Không có `ngoại hàm` trong connector mới; thao tác socket thấp
 nhất vẫn có adapter C++ và ASM như đã ghi ở các mục dưới. Chế độ này
 chưa hỗ trợ Windows vì Machine Socket connect chưa có đường thực thi
@@ -112,12 +112,12 @@ DNS thực vẫn chưa được xác minh ở lượt này.
 
 ## DNS config độc lập và chặn resolver C theo yêu cầu (21/10/2026)
 
-`gói/mạng/dns_cấu_hình.vi` nay nhập `gói/mạng/ip.vi` và dùng trực tiếp
+`gói/mạng/cấu hình phân giải tên miền.vi` nay nhập `gói/mạng/địa chỉ mạng.vi` và dùng trực tiếp
 `Bộ Phân Tích IP` để xác thực, so sánh và loại trùng nameserver.
 Không còn nhập Socket chỉ để gọi parser; giảm phụ thuộc giữa DNS Config
 và Socket, đồng thời giữ nguyên định dạng cấu hình/search/ndots.
 
-Đặt `VPP_SOCKET_VI_ONLY=1` để `socket resolver danh sách` chỉ chấp nhận
+Đặt `VPP_SOCKET_VI_ONLY=1` để `đầu nối bộ phân giải danh sách` chỉ chấp nhận
 địa chỉ số hợp lệ hoặc hostname có trong tệp `VPP_DNS_VI_HOSTS_FILE`
 được cấu hình. Nếu không tìm thấy, hàm báo lỗi `chế độ VI_ONLY` trước
 khi gọi `system.net.resolve.open`/`getaddrinfo`. Nhờ đó chương trình
@@ -135,14 +135,14 @@ Socket hoặc đưa FFI vào module này.
 ## Socket hostname từ hosts thuần V++ (21/10/2026)
 
 Bộ phân tích IPv4/IPv6 được tách khỏi `gói/mạng/ổ cắm.vi` sang
-`gói/mạng/ip.vi` (`Bộ Phân Tích IP`). `dns_hosts.vi` dùng trực tiếp bộ
+`gói/mạng/địa chỉ mạng.vi` (`Bộ Phân Tích IP`). `dns_hosts.vi` dùng trực tiếp bộ
 phân tích chung, nên không cần nhập module Socket. Socket có thể nhập
 DNS Hosts mà không tạo vòng phụ thuộc. Mọi thao tác phân tích địa chỉ
 vẫn được thực hiện bằng V++; mã dữ liệu 4/16 byte chuyển sang Machine
 Socket ABI hiện có.
 
 Khi đặt `VPP_DNS_VI_HOSTS_FILE` trỏ tới tệp hosts, hàm
-`socket resolver danh sách` ưu tiên địa chỉ IP số, sau đó thử đọc
+`đầu nối bộ phân giải danh sách` ưu tiên địa chỉ IP số, sau đó thử đọc
 hostname qua DNS Hosts và File Machine ABI. Tên có trong tệp sẽ không
 gọi `getaddrinfo` hoặc cấp token resolver FFI. Giữ thứ tự IP xuất hiện
 trong hosts (sau khi loại các địa chỉ trùng), với kết quả `[ip, port]`
@@ -159,7 +159,7 @@ từ Machine Monotonic Clock; nhánh lỗi vẫn đóng descriptor.
 
 ## Literal IP và deadline kết nối (21/10/2026)
 
-`socket resolver danh sách` kiểm tra IPv4/IPv6 dạng số bằng parser `.vi`
+`đầu nối bộ phân giải danh sách` kiểm tra IPv4/IPv6 dạng số bằng parser `.vi`
 trước khi gọi `system.net.resolve.open`/`getaddrinfo`. Các literal IPv4
 phải đúng dạng thập phân chuẩn (không có số 0 đầu), tránh trường hợp
 libc hiểu một cách khác; hostname và địa chỉ khác vẫn dùng OS resolver để
@@ -254,7 +254,7 @@ process launch vẫn còn phụ thuộc C/OS native.
 
 ## Socket timeout qua machine ABI (20/10/2026)
 
-`socket đặt timeout` và timeout sau kết nối dùng `máy_socket_timeout`
+`đầu nối đặt thời gian chờ` và timeout sau kết nối dùng `máy_socket_timeout`
 (opcode **187**, capability `machine.net.socket.timeout`). Interpreter
 và AOT kiểm tra token trong registry của từng VM, duration i32 trong miền
 1..300000 ms và quyền riêng; trả `1` khi hai tùy chọn nhận/gửi thành công.
@@ -402,7 +402,7 @@ giảm **39 → 38** và foreign libraries **10 → 9**.
 
 ## Secure Entropy qua machine ABI (20/10/2026)
 
-`gói/lõi/entropy.vi` thay `getentropy` FFI bằng `máy_entropy_bytes`
+`gói/lõi/nguồn ngẫu nhiên.vi` thay `getentropy` FFI bằng `máy_entropy_bytes`
 (opcode **176**, quyền `system.entropy.read`). Primitive nhận i32 từ 1 đến
 256 và trả list byte 0–255; `.vi` tự kiểm tra 1–4096 byte, chia khối <=256
 và ghép lại. Linux ARM64/x86-64 dùng `SYS_getrandom` qua Assembly syscall,
@@ -423,7 +423,7 @@ CoreFoundation. Compiler, VM runtime, native AOT runtime, TLS và linker chưa
 ## Monotonic và realtime clocks qua machine ABI (20/10/2026)
 
 Hai foreign bindings `clock_gettime` trong `gói/thời gian/đơn điệu.vi`
-và `gói/thời gian/utc.vi` đã chuyển sang opcode 174–175:
+và `gói/thời gian/giờ quốc tế.vi` đã chuyển sang opcode 174–175:
 `máy_đồng_hồ_đơn_điệu` (`system.time.monotonic`) và `máy_đồng_hồ_utc`
 (`system.time.realtime`). Intrinsic trả 16 byte little-endian
 `[signed i64 seconds, signed i64 nanoseconds]`; quy tắc decode, tính
@@ -528,9 +528,9 @@ lỗi ngữ nghĩa rõ ràng khi gán vào binding hàm. Cho phép biến cùng 
 vẫn cần symbol-scoped VM slots và kiểm thử bootstrap trước khi triển khai.
 
 
-**Đợt 2026-10-10 (TCP/UDP Windows):** API công khai `socket tcp mở`,
-`socket udp mở`, `socket tcp lắng nghe`, `socket chấp nhận`, `socket gửi`,
-`socket nhận`, `socket đặt timeout` và `socket đóng` nay mặc định điều phối
+**Đợt 2026-10-10 (TCP/UDP Windows):** API công khai `đầu nối giao vận tin cậy mở`,
+`đầu nối giao vận gói tin mở`, `đầu nối giao vận tin cậy lắng nghe`, `đầu nối chấp nhận`, `đầu nối gửi`,
+`đầu nối nhận`, `đầu nối đặt thời gian chờ` và `đầu nối đóng` nay mặc định điều phối
 trong `gói/mạng/ổ cắm.vi` qua `system.net.socket.*` FFI trên Windows.
 Adapter WinSock giữ `SOCKET` đúng độ rộng con trỏ trong registry từng VM,
 chỉ đưa token `c_socket` cho `.vi`; kiểm tra capability/chữ ký, kích thước
@@ -546,8 +546,8 @@ của V++ có thể xử lý; descriptor/capability/ABI sai vẫn là lỗi VM.
 `kiem_tra_ffi_socket_loi.vi` kiểm tra mười đường lỗi API, gồm token giả,
 không cần mở socket hay quyền bind localhost trên interpreter và JIT.
 
-**Đợt 2026-10-10 (DNS Windows):** đường public `dns phân giải` và
-`socket resolver danh sách` đã dùng **cùng thuật toán V++ qua ba binding
+**Đợt 2026-10-10 (DNS Windows):** đường public `phân giải tên miền phân giải` và
+`đầu nối bộ phân giải danh sách` đã dùng **cùng thuật toán V++ qua ba binding
 `system.net.resolve.*`** trên cả Windows và POSIX. Windows adapter tại
 `foreign.cpp` khởi tạo Winsock, quản lý token `addrinfo*` theo VM, trả IP dạng
 chuỗi và giải phóng khi đóng/reset; không trả con trỏ C cho `.vi`. Fixture
@@ -661,7 +661,7 @@ và chuyển pointer trả về thành trạng thái thành công. Windows FFI c
 V++ tính offset từ lịch và epoch của cùng một snapshot. Helper local clock
 Windows và opcode cũ đã gỡ; CI Windows vẫn cần xác minh thực tế.
 Entropy bảo mật trên POSIX và Windows đọc `getentropy(c_đệm_ra,u64)` qua quyền
-`system.entropy.read`, giới hạn 1–256 byte/call. `gói/lõi/entropy.vi`
+`system.entropy.read`, giới hạn 1–256 byte/call. `gói/lõi/nguồn ngẫu nhiên.vi`
 điều phối các khối cho mật mã và ngẫu nhiên. Windows FFI adapter gọi
 `BCryptGenRandom`; opcode entropy legacy đã bị chặn trên cả hai hệ điều hành.
 Linux cần libc có symbol `getentropy` và chưa qua CI thực tế.
@@ -724,22 +724,22 @@ không đồng nghĩa tất cả vẫn được thư viện chuẩn POSIX gọi.
 | --- | --- | --- |
 | `lấy thời gian hiện tại`, `lấy thời gian utc` | C++ đọc clock và ghép ISO-8601 bằng `strftime`/`snprintf` | V++ đệm số, ghép ngày giờ, dấu và offset; UTC POSIX/Windows đọc FFI realtime và đổi epoch sang Gregorian; localtime_r POSIX giải mã DST/offset từ `struct tm`, Windows FFI nhận trường CRT và V++ tự tính offset |
 | `độ lệch múi giờ` | Handler native riêng | V++ lấy offset từ snapshot clock |
-| `thành list` | C++ sao chép vector list/tuple | V++ kiểm tra kiểu, duyệt phần tử, tạo list mới bằng primitive `them` |
-| `regex khớp`, `regex tìm` | C++ từng tham gia engine regex | Parser/matcher và policy full-match/search chạy bằng V++ |
-| `regex thay`, `regex tách` | C++ từng tham gia thay/tách | V++ tự ghép capture, thay và tách; không còn regex hook C++ |
-| `lam_tron_xuong`, `lam_tron_len` | C++ gọi `std::floor` / `std::ceil` | V++ làm tròn số hữu hạn bằng phép toán IEEE-754, giữ nguyên kiểu int32/double của contract cũ |
+| `chuyển thành danh sách` | C++ sao chép vector list/tuple | V++ kiểm tra kiểu, duyệt phần tử, tạo list mới bằng primitive `them` |
+| `biểu thức chính quy khớp`, `biểu thức chính quy tìm` | C++ từng tham gia engine regex | Parser/matcher và policy full-match/search chạy bằng V++ |
+| `biểu thức chính quy thay`, `biểu thức chính quy tách` | C++ từng tham gia thay/tách | V++ tự ghép capture, thay và tách; không còn regex hook C++ |
+| `làm tròn xuống`, `làm tròn lên` | C++ gọi `std::floor` / `std::ceil` | V++ làm tròn số hữu hạn bằng phép toán IEEE-754, giữ nguyên kiểu int32/double của contract cũ |
 | `phụ thuộc kiểm tra tệp` | C++ gọi lại compiler rồi dựng `{hợp lệ, lỗi}` | V++ lấy compiler snapshot, giữ chính xác shape kết quả public; chỉ compiler pipeline còn là primitive |
 | HTTP server `Transfer-Encoding: chunked` | Từ chối request dù socket đã nhận được dữ liệu | V++ quét incrementally size line/chunk/trailer, giới hạn body và dựng request body trước khi route |
 | `tạo thư mục`, `xóa đường dẫn` | C++ dùng `create_directories`/`remove_all` | V++ duyệt cây bằng stack; primitive chỉ tạo/xóa một mục và đọc trạng thái không theo symlink |
 | DB client | C++ chọn client, ghép command và diễn giải kết quả | V++ dựng argv/environment, chọn client dự phòng và ánh xạ kết quả; VM chỉ spawn/read/wait process |
-| `socket gửi` | C++ lặp gửi hết stream | V++ giữ vòng gửi hết với byte offset và quy tắc một datagram UDP; primitive chỉ gửi một lần |
+| `đầu nối gửi` | C++ lặp gửi hết stream | V++ giữ vòng gửi hết với byte offset và quy tắc một datagram UDP; primitive chỉ gửi một lần |
 | `%f`, `%e`, `%g` | VM định dạng bằng `ostringstream` | V++ giải mã bit binary64, dựng thập phân chính xác, làm tròn ties-to-even và chọn bố cục; VM chỉ trả 8 byte biểu diễn số |
 
 Helper HTTP `splitPathAndQuery` không còn nơi gọi cũng được gỡ khỏi runtime,
 header và danh sách nguồn CMake; logic giao thức đã nằm trong gói HTTP V++.
 
-Các tên `lay_thoi_gian_hien_tai`, `lay_thoi_gian_utc`, `do_lech_mui_gio`,
-`thanh_list` được giữ dưới dạng hàm V++ trong gói tương ứng. Chúng không còn
+Các tên `lấy thời gian hiện tại`, `lấy giờ quốc tế`, `độ lệch múi giờ`,
+`chuyển thành danh sách` được giữ dưới dạng hàm V++ trong gói tương ứng. Chúng không còn
 được runtime dispatch trực tiếp; chương trình dùng các tên này cần nhập gói.
 Chuyển list vẫn là sao chép nông: sửa list ngoài không sửa nguồn, nhưng các
 phần tử là tham chiếu vẫn chia sẻ cùng đối tượng. Đối số sai kiểu được ném
@@ -826,7 +826,7 @@ thư viện V++.
   lên **30/30** assertions. Full CTest sau thay đổi process group đạt
   **4/4 PASS** (291,92 giây). Sau đó wrapper giới hạn thời gian chỉnh
   `poll` chỉ chờ số mili giây còn lại, làm tròn lên bằng hàm V++
-  `lam_tron_len`. Fixture strict POSIX interpreter/JIT chạy lại:
+  `làm tròn lên`. Fixture strict POSIX interpreter/JIT chạy lại:
   **30/30 PASS** mỗi chế độ; audit hiện tại **95 tệp/935 thân hàm/0 unfinished**.
 - FFI PID cha ngày 2026-10-08: `kiem_tra_ffi_tien_trinh.vi` kiểm tra PID hiện
   tại và PID cha thực tế qua VM; runtime hardening thử quyền thiếu, quyền PID

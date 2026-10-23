@@ -1,7 +1,7 @@
 nhập gói/bộ sưu tập/chính;
 nhập gói/lõi/tập bản ghi;
 nhập gói/dữ liệu/json/chính;
-nhập gói/dữ liệu/xml/dom;
+nhập gói/dữ liệu/xml/cây tài liệu;
 nhập gói/kiểm thử/chính;
 
 hàm chính() {
@@ -57,7 +57,7 @@ hàm chính() {
     khẳng định bằng(phần_tử_gốc.thuộc tính("id"), "1");
     khẳng định đúng(độ dài(phần_tử_gốc.văn bản()) > 0);
     phần_tử_gốc.con(0).đặt nội dung("mới");
-    khẳng định bằng(dom nội dung(dom con(phần_tử_gốc.cây())[0]), "mới");
+    khẳng định bằng(cây tài liệu nội dung(cây tài liệu con(phần_tử_gốc.cây())[0]), "mới");
     phần_tử_gốc.phân tích("<a>42</a>");
     khẳng định bằng(phần_tử_gốc.tên(), "a");
     hành_động = hàm() { phần_tử_gốc.phân tích("<a>"); };

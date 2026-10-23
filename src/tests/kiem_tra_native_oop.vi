@@ -5,32 +5,32 @@ nhập gói/biên dịch/đối tượng;
 nhập gói/kiểm thử/chính;
 
 hàm so byte OOP(a, b) {
-    khẳng định bằng(do_dai(a), do_dai(b));
-    lặp(i = 0; i < do_dai(a); i++) { khẳng định bằng(a[i], b[i]); };
+    khẳng định bằng(độ dài(a), độ dài(b));
+    lặp(i = 0; i < độ dài(a); i++) { khẳng định bằng(a[i], b[i]); };
 };
 
 hàm chính() {
     linux = Bộ Sinh Mã Bản Địa("x86_64-linux-gnu");
     mac = Bộ Sinh Mã Bản Địa("aarch64-apple-darwin");
     win = Bộ Sinh Mã Bản Địa("x86_64-pc-windows-msvc");
-    khẳng định bằng(linux.triple(), "x86_64-unknown-linux-gnu");
-    khẳng định bằng(mac.triple(), "aarch64-apple-darwin");
-    khẳng định bằng(win.triple(), "x86_64-pc-windows-msvc");
+    khẳng định bằng(linux.bộ ba(), "x86_64-unknown-linux-gnu");
+    khẳng định bằng(mac.bộ ba(), "aarch64-apple-darwin");
+    khẳng định bằng(win.bộ ba(), "x86_64-pc-windows-msvc");
     mã = linux.lá("hằng", 42);
     so byte OOP(mã, biên dịch mã máy lá("x86_64", "hằng", 42));
-    so byte OOP(linux.object(mã, "answer"), biên dịch object("x86_64", "linux", "gnu", mã, "answer", []));
+    so byte OOP(linux.đối tượng(mã, "answer"), biên dịch đối tượng("x86_64", "linux", "gnu", mã, "answer", []));
     mã_mac = mac.lá("hằng", -7);
-    so byte OOP(mac.object(mã_mac, "answer"), biên dịch object("aarch64", "macos", "darwin", mã_mac, "answer", []));
+    so byte OOP(mac.đối tượng(mã_mac, "answer"), biên dịch đối tượng("aarch64", "macos", "darwin", mã_mac, "answer", []));
     mã_win = win.lá("cộng");
-    so byte OOP(win.object(mã_win, "add"), biên dịch object("x86_64", "windows", "msvc", mã_win, "add", []));
+    so byte OOP(win.đối tượng(mã_win, "add"), biên dịch đối tượng("x86_64", "windows", "msvc", mã_win, "add", []));
     hàm_ir = {"parameterCount": 0, "slotCount": 0, "maxStackDepth": 1,
         "instructions": [biên dịch mã máy lệnh("PushConstant", 42),
             biên dịch mã máy lệnh("Return", 0, 0, 1), biên dịch mã máy lệnh("Trap")]};
     phát = linux.hàm máy(hàm_ir);
     trực_tiếp = biên dịch mã máy hàm("x86_64", hàm_ir);
-    so byte OOP(phát["bytes"], trực_tiếp["bytes"]);
-    khẳng định bằng(do_dai(phát["relocations"]), 0);
-    hành_động = hàm() { linux.object(mã, "ký hiệu sai"); };
+    so byte OOP(phát["các byte"], trực_tiếp["các byte"]);
+    khẳng định bằng(độ dài(phát["relocations"]), 0);
+    hành_động = hàm() { linux.đối tượng(mã, "ký hiệu sai"); };
     khẳng định ném lỗi(hành_động);
     so byte OOP(linux.lá("hằng", 42), mã);
     in "native OOP ELF/Mach-O/COFF: đạt";

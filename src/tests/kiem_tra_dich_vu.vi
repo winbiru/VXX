@@ -24,20 +24,20 @@ hàm chính() {
     in số_lần_tạo;
     providers = dịch vụ("demo", loader);
     in độ dài(providers);
-    in lấy map(providers[0], "implementation_id", "");
-    in lấy map(providers[1], "implementation_id", "");
+    in lấy từ điển(providers[0], "implementation_id", "");
+    in lấy từ điển(providers[1], "implementation_id", "");
     in số_lần_tạo;
 
     a1 = tải dịch vụ(providers[0]);
     a2 = tải dịch vụ(providers[0]);
-    in lấy map(a1, "lần", -1);
-    in lấy map(a2, "lần", -1);
+    in lấy từ điển(a1, "lần", -1);
+    in lấy từ điển(a2, "lần", -1);
     in số_lần_tạo;
 
     b1 = tải dịch vụ(providers[1]);
     b2 = tải dịch vụ(providers[1]);
-    in lấy map(b1, "lần", -1);
-    in lấy map(b2, "lần", -1);
+    in lấy từ điển(b1, "lần", -1);
+    in lấy từ điển(b2, "lần", -1);
     in số_lần_tạo;
 
     thử {

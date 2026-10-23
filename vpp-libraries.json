@@ -40,7 +40,7 @@
     {
       "name": "vi.science",
       "displayName": "Khoa học",
-      "libraries": ["vi.physics", "vi.chemistry"]
+      "libraries": ["vi.physics", "vi.chemistry", "vi.quantum", "vi.quantum.qiskit"]
     },
     {
       "name": "vpp.tooling",
@@ -260,11 +260,11 @@
     },
     {
       "id": "vi.naming.dns",
-      "package": "phân giải dns",
-      "displayName": "Phân giải DNS",
+      "package": "phân giải tên miền",
+      "displayName": "Phân giải tên miền",
       "version": "1.0.0",
       "sourceRoot": "gói/mạng",
-      "entry": "dns.vi",
+      "entry": "phân giải tên miền.vi",
       "requires": ["vi.net.sockets"],
       "stability": "experimental",
       "kind": "runtime",
@@ -290,6 +290,30 @@
       "sourceRoot": "gói/lõi",
       "entry": "vật lý.vi",
       "requires": ["vi.math"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.quantum",
+      "package": "lượng tử",
+      "displayName": "Lượng tử",
+      "version": "0.1.0",
+      "sourceRoot": "gói/lượng tử",
+      "entry": "chính.vi",
+      "requires": ["vi.collections", "vi.random"],
+      "stability": "experimental",
+      "kind": "runtime",
+      "platforms": ["windows", "linux", "macos"]
+    },
+    {
+      "id": "vi.quantum.qiskit",
+      "package": "gói/lượng tử/qiskit",
+      "displayName": "Cầu nối Qiskit",
+      "version": "0.1.0",
+      "sourceRoot": "gói/lượng tử",
+      "entry": "qiskit.vi",
+      "requires": ["vi.quantum", "vi.system", "vi.json"],
       "stability": "experimental",
       "kind": "runtime",
       "platforms": ["windows", "linux", "macos"]
@@ -384,7 +408,7 @@
       "displayName": "Cây tài liệu XML",
       "version": "1.0.0",
       "sourceRoot": "gói/dữ liệu/xml",
-      "entry": "dom.vi",
+      "entry": "cây tài liệu.vi",
       "requires": ["vi.collections", "vi.xml"],
       "stability": "experimental",
       "kind": "runtime",

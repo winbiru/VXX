@@ -7,7 +7,7 @@ nhập http/server;
 hàm chính() {
     chạy kiểm tra tính năng();
     ứngDụng = tạo ứng dụng("data");
-    router = lấy map(ứngDụng, "router", rỗng);
+    router = lấy từ điển(ứngDụng, "router", rỗng);
     nếu (router == rỗng) {
         ném "Không khởi tạo được router";
     };

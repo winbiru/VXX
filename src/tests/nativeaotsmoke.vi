@@ -1,4 +1,4 @@
-// Nguồn native self-host dùng để kiểm tra object đã liên kết/chạy trên CPU thật.
+// Nguồn native self-host dùng để kiểm tra đối tượng đã liên kết/chạy trên CPU thật.
 hàm twice(a) { trả về a + a; };
 
 hàm sum(n) {

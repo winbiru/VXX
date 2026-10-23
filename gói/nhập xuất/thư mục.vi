@@ -21,9 +21,9 @@ lớp công khai Thư Mục {
     // Kiểm tra trước khi tra cứu thư mục trên cả POSIX và Windows. Lỗi V++
     // cần bắt được bằng thử/bắt lỗi trước khi đi vào FFI c_chuỗi.
     hàm riêng tư thư mục kiểm tra đường(đường) {
-        bytes = bảng mã utf8 mã hóa(đường);
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (bytes[i] == 0) {
+        các byte = bảng mã unicode tám bit mã hóa(đường);
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (các byte[i] == 0) {
                 ném "đường dẫn không được chứa byte NUL";
             };
         };
@@ -32,10 +32,10 @@ lớp công khai Thư Mục {
 
     hàm riêng tư thư mục tạo một mục(đường) {
         // V++ tự tạo các mục cha; machine ABI chỉ tạo một mục.
-        kết_quả = máy_thư_mục_tạo(mình.thư mục kiểm tra đường(đường));
-        nếu (kết_quả[0] == 0) { trả về 1; };
-        lỗi = kết_quả[2];
-        nếu (kết_quả[1] == 1) {
+        kết quả = máy thư mục tạo(mình.thư mục kiểm tra đường(đường));
+        nếu (kết quả[0] == 0) { trả về 1; };
+        lỗi = kết quả[2];
+        nếu (kết quả[1] == 1) {
             nếu (là thư mục(đường)) { trả về 0; };
         };
         ném "tạo thư mục: mkdir thất bại, errno=" + lỗi;
@@ -43,15 +43,15 @@ lớp công khai Thư Mục {
 
     hàm riêng tư thư mục xóa một mục(đường) {
         // V++ quyết định thứ tự duyệt và xóa cây.
-        kết_quả = máy_thư_mục_xóa(mình.thư mục kiểm tra đường(đường));
-        nếu (kết_quả[0] == 0) { trả về 1; };
-        lỗi = kết_quả[2];
-        nếu (kết_quả[1] == 2) { trả về 0; };
+        kết quả = máy thư mục xóa(mình.thư mục kiểm tra đường(đường));
+        nếu (kết quả[0] == 0) { trả về 1; };
+        lỗi = kết quả[2];
+        nếu (kết quả[1] == 2) { trả về 0; };
         ném "xóa đường dẫn: remove thất bại, errno=" + lỗi;
     };
 
     hàm riêng tư thư mục là thư mục không theo liên kết(đường) {
-        nếu (ten_nen_tang_vm() != "windows") {
+        nếu (ten nền tảng máy ảo() != "windows") {
             trả về đường dẫn loại posix(đường, sai) == 4;
         };
         trả về đường dẫn loại windows(đường, sai) == 2;
@@ -60,16 +60,16 @@ lớp công khai Thư Mục {
     // Bỏ separator cuối trước lstat/unlink để symlink tới thư mục vẫn chỉ bị
     // xóa liên kết, kể cả khi caller truyền "link/". Giữ root POSIX/Windows.
     hàm riêng tư thư mục bỏ dấu cuối(đường) {
-        n = do_dai(đường);
-        gốc_dữ_liệu = 1;
+        n = máy ảo lấy độ dài(đường);
+        gốc dữ liệu = 1;
         nếu (tên nền tảng() == "windows") {
-            gốc_dữ_liệu = đường dẫn gốc windows dài(đường);
-            nếu (gốc_dữ_liệu < 1) { gốc_dữ_liệu = 1; };
+            gốc dữ liệu = đường dẫn gốc windows dài(đường);
+            nếu (gốc dữ liệu < 1) { gốc dữ liệu = 1; };
         };
-        đang_bỏ = đúng;
-        lặp(vòng = 0; n > gốc_dữ_liệu && đang_bỏ; vòng++) {
+        đang bỏ = đúng;
+        lặp(vòng = 0; n > gốc dữ liệu && đang bỏ; vòng++) {
             nếu (!đường dẫn là phân cách(đường[n - 1])) {
-                đang_bỏ = sai;
+                đang bỏ = sai;
             } hoặc {
                 n = n - 1;
             };
@@ -78,103 +78,103 @@ lớp công khai Thư Mục {
     };
 
     hàm công khai tạo thư mục(đường dẫn) {
-        đầu_vào = thành chuỗi(đường dẫn);
-        mình.thư mục kiểm tra đường(đầu_vào);
-        đường = mình.thư mục bỏ dấu cuối(đầu_vào);
-        cần_tạo = [];
-        hiện_tại = đường;
-        tìm_cha = đúng;
-        lặp(vòng = 0; tìm_cha; vòng++) {
-            nếu (là thư mục(hiện_tại)) {
-                tìm_cha = sai;
+        đầu vào = thành chuỗi(đường dẫn);
+        mình.thư mục kiểm tra đường(đầu vào);
+        đường = mình.thư mục bỏ dấu cuối(đầu vào);
+        cần tạo = [];
+        hiện tại = đường;
+        tìm cha = đúng;
+        lặp(vòng = 0; tìm cha; vòng++) {
+            nếu (là thư mục(hiện tại)) {
+                tìm cha = sai;
             } hoặc {
-                nếu (đường dẫn tồn tại(hiện_tại)) {
+                nếu (đường dẫn tồn tại(hiện tại)) {
                     ném "tạo thư mục: đường dẫn đã tồn tại và không phải thư mục";
                 };
-                them(cần_tạo, hiện_tại);
-                cha = đường dẫn cha(hiện_tại);
-                nếu (cha == "" || cha == hiện_tại) {
-                    tìm_cha = sai;
+                máy ảo thêm cuối danh sách(cần tạo, hiện tại);
+                cha = đường dẫn cha(hiện tại);
+                nếu (cha == "" || cha == hiện tại) {
+                    tìm cha = sai;
                 } hoặc {
-                    hiện_tại = cha;
+                    hiện tại = cha;
                 };
             };
         };
-        lặp(i = do_dai(cần_tạo) - 1; i >= 0; i--) {
-            mình.thư mục tạo một mục(cần_tạo[i]);
+        lặp(i = máy ảo lấy độ dài(cần tạo) - 1; i >= 0; i--) {
+            mình.thư mục tạo một mục(cần tạo[i]);
         };
         trả về 1;
     };
 
     hàm công khai liệt kê thư mục(đường dẫn) {
         đường = thành chuỗi(đường dẫn);
-        mở = máy_thư_mục_mở(mình.thư mục kiểm tra đường(đường));
-        thư_mục = mở[0];
-        nếu (thư_mục == 0) { ném "liệt kê thư mục: không thể mở thư mục, errno=" + mở[1]; };
-        kết_quả = [];
+        mở = máy thư mục mở(mình.thư mục kiểm tra đường(đường));
+        thư mục = mở[0];
+        nếu (thư mục == 0) { ném "liệt kê thư mục: không thể mở thư mục, errno=" + mở[1]; };
+        kết quả = [];
         thử {
-            đang_đọc = đúng;
-            lặp(vòng = 0; đang_đọc; vòng++) {
-                mục = máy_thư_mục_kế(thư_mục);
+            đang đọc = đúng;
+            lặp(vòng = 0; đang đọc; vòng++) {
+                mục = máy thư mục kế(thư mục);
                 nếu (mục[0] <= 0) {
                     nếu (mục[0] < 0) { ném "liệt kê thư mục: không thể đọc thư mục"; };
-                    đang_đọc = sai;
+                    đang đọc = sai;
                 } hoặc {
                     tên = mục[1];
-                    nếu (tên != "." && tên != "..") { them(kết_quả, tên); };
+                    nếu (tên != "." && tên != "..") { máy ảo thêm cuối danh sách(kết quả, tên); };
                 };
             };
         } bắt lỗi(e) {
-            máy_thư_mục_đóng(thư_mục);
+            máy thư mục đóng(thư mục);
             ném e;
         };
-        nếu (máy_thư_mục_đóng(thư_mục)[0] != 0) {
+        nếu (máy thư mục đóng(thư mục)[0] != 0) {
             ném "liệt kê thư mục: không thể đóng thư mục";
         };
-        sắp xếp(kết_quả);
-        trả về kết_quả;
+        sắp xếp(kết quả);
+        trả về kết quả;
     };
 
     hàm công khai xóa đường dẫn(đường dẫn) {
-        đầu_vào = thành chuỗi(đường dẫn);
-        mình.thư mục kiểm tra đường(đầu_vào);
-        đường = mình.thư mục bỏ dấu cuối(đầu_vào);
+        đầu vào = thành chuỗi(đường dẫn);
+        mình.thư mục kiểm tra đường(đầu vào);
+        đường = mình.thư mục bỏ dấu cuối(đầu vào);
         việc = [[đường, sai]];
-        đã_xóa = 0;
+        đã xóa = 0;
         // Stack tường minh thay cho lời gọi đệ quy: cây sâu không dùng call stack VM.
-        lặp(vòng = 0; do_dai(việc) > 0; vòng++) {
-            mục = xoa_tai(việc, do_dai(việc) - 1);
-            đường_mục = mục[0];
+        lặp(vòng = 0; máy ảo lấy độ dài(việc) > 0; vòng++) {
+            mục = máy ảo xóa vị trí danh sách(việc, máy ảo lấy độ dài(việc) - 1);
+            đường mục = mục[0];
             nếu (mục[1]) {
-                đã_xóa = đã_xóa + mình.thư mục xóa một mục(đường_mục);
+                đã xóa = đã xóa + mình.thư mục xóa một mục(đường mục);
             } hoặc {
-                nếu (mình.thư mục là thư mục không theo liên kết(đường_mục)) {
-                    them(việc, [đường_mục, đúng]);
-                    con = mình.liệt kê thư mục(đường_mục);
-                    lặp(i = 0; i < do_dai(con); i++) {
-                        them(việc, [đường dẫn nối(đường_mục, con[i]), sai]);
+                nếu (mình.thư mục là thư mục không theo liên kết(đường mục)) {
+                    máy ảo thêm cuối danh sách(việc, [đường mục, đúng]);
+                    con = mình.liệt kê thư mục(đường mục);
+                    lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
+                        máy ảo thêm cuối danh sách(việc, [đường dẫn nối(đường mục, con[i]), sai]);
                     };
                 } hoặc {
-                    đã_xóa = đã_xóa + mình.thư mục xóa một mục(đường_mục);
+                    đã xóa = đã xóa + mình.thư mục xóa một mục(đường mục);
                 };
             };
         };
-        trả về đã_xóa;
+        trả về đã xóa;
     };
 };
 
 
 hàm công khai tạo thư mục(đường dẫn) {
-    __vpp_adapter = Thư Mục();
-    trả về __vpp_adapter.tạo thư mục(đường dẫn);
+    bộ chuyển tiếp = Thư Mục();
+    trả về bộ chuyển tiếp.tạo thư mục(đường dẫn);
 };
 
 hàm công khai liệt kê thư mục(đường dẫn) {
-    __vpp_adapter = Thư Mục();
-    trả về __vpp_adapter.liệt kê thư mục(đường dẫn);
+    bộ chuyển tiếp = Thư Mục();
+    trả về bộ chuyển tiếp.liệt kê thư mục(đường dẫn);
 };
 
 hàm công khai xóa đường dẫn(đường dẫn) {
-    __vpp_adapter = Thư Mục();
-    trả về __vpp_adapter.xóa đường dẫn(đường dẫn);
+    bộ chuyển tiếp = Thư Mục();
+    trả về bộ chuyển tiếp.xóa đường dẫn(đường dẫn);
 };

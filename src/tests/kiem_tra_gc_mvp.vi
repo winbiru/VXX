@@ -67,7 +67,7 @@ hàm chính() {
     danh_sach_vong = rỗng;
 
     map_vong = {};
-    đặt map(map_vong, "self", map_vong);
+    đặt từ điển(map_vong, "self", map_vong);
     map_vong = rỗng;
 
     // Instance và field list giữ lẫn nhau; bỏ biến root phải không gây leak cycle.

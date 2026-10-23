@@ -130,16 +130,16 @@ hàm kiểmTraCollection() {
     yêuCầu(động[1] == 10, "dynamic list literal");
 
     dữLiệu = {"tên": "V++", "phiên bản": 1};
-    đặt map(dữLiệu, "ổn định", đúng);
-    yêuCầu(lấy map(dữLiệu, "tên", "") == "V++", "map get");
+    đặt từ điển(dữLiệu, "ổn định", đúng);
+    yêuCầu(lấy từ điển(dữLiệu, "tên", "") == "V++", "map get");
     yêuCầu(có khóa(dữLiệu, "ổn định"), "map key");
 
     bảnĐồĐộng = {"giá": ds[1], "kế": ds[1] + 1};
-    yêuCầu(lấy map(bảnĐồĐộng, "kế", 0) == 10, "dynamic map literal");
+    yêuCầu(lấy từ điển(bảnĐồĐộng, "kế", 0) == 10, "dynamic map literal");
 
     tập = tập hợp([1, 2, 2, 3]);
     yêuCầu(độ dài(tập) == 3, "set");
-    bộ = thành tuple(tập);
+    bộ = thành bộ giá trị(tập);
     yêuCầu(độ dài(bộ) == 3, "tuple");
 
     maTrận = [[1, 2], [3, 4]];
@@ -189,12 +189,12 @@ hàm kiểmTraStdlib() {
     xóa đường dẫn(cấuHình);
 
     yêuCầu(lấy thời gian hiện tại() != "", "local time");
-    yêuCầu(lấy thời gian utc() != "", "utc time");
+    yêuCầu(lấy thời gian giờ quốc tế() != "", "utc time");
 
     dữLiệu = {"tên": "Cà phê \"Đậm\"", "ds": [1, 2, 3]};
     jsonText = json tạo(dữLiệu);
     parsed = json phân tích(jsonText);
-    yêuCầu(lấy map(parsed, "tên", "") == "Cà phê \"Đậm\"", "json roundtrip");
+    yêuCầu(lấy từ điển(parsed, "tên", "") == "Cà phê \"Đậm\"", "json roundtrip");
     trả về đúng;
 }
 

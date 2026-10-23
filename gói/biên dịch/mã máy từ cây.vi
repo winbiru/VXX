@@ -3,7 +3,7 @@
 // Không gọi snapshot/IR của C++; mọi node ngoài tập hỗ trợ phải báo lỗi.
 nhập gói/biên dịch/ngữ nghĩa;
 nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/mã máy hạ ir;
+nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;
 nhập gói/biên dịch/mã máy;
 nhập gói/biên dịch/đối tượng;
 nhập gói/bộ sưu tập/từ điển;
@@ -12,83 +12,83 @@ nhập gói/bộ sưu tập/từ điển;
 lớp công khai Bộ Hạ Cây Bản Địa {
     hàm công khai khởi tạo() {};
 
-    hàm riêng tư biên dịch native lỗi(thông_báo) {
-        ném "V++ native AST: " + thông_báo;
+    hàm riêng tư biên dịch bản địa lỗi(thông báo) {
+        ném "V++ native AST: " + thông báo;
     };
 
     // ABI native dùng handle i32, byte i32; không đưa con trỏ C qua V++.
     // Mọi tên ở đây phải khớp whitelist trong mã máy hạ ir.vi.
-    hàm riêng tư biên dịch native runtime ABI(tên) {
-        nếu (tên == "đọc_số") { trả về {"symbol": "vpp_native_read_i32", "arity": 0}; };
-        nếu (tên == "trạng_thái_đọc") { trả về {"symbol": "vpp_native_read_status", "arity": 0}; };
-        nếu (tên == "byte_mới") { trả về {"symbol": "vpp_native_bytes_new", "arity": 0}; };
-        nếu (tên == "byte_thêm") { trả về {"symbol": "vpp_native_bytes_append", "arity": 2}; };
-        nếu (tên == "byte_nối") { trả về {"symbol": "vpp_native_bytes_concat", "arity": 2}; };
-        nếu (tên == "byte_bằng") { trả về {"symbol": "vpp_native_bytes_equal", "arity": 2}; };
-        nếu (tên == "byte_cắt") { trả về {"symbol": "vpp_native_bytes_slice", "arity": 3}; };
-        nếu (tên == "byte_tìm") { trả về {"symbol": "vpp_native_bytes_find", "arity": 2}; };
-        nếu (tên == "byte_làm_rỗng") { trả về {"symbol": "vpp_native_bytes_clear", "arity": 1}; };
-        nếu (tên == "byte_in") { trả về {"symbol": "vpp_native_bytes_print", "arity": 1}; };
-        nếu (tên == "byte_dài") { trả về {"symbol": "vpp_native_bytes_length", "arity": 1}; };
-        nếu (tên == "byte_lấy") { trả về {"symbol": "vpp_native_bytes_get", "arity": 2}; };
-        nếu (tên == "byte_đẩy_i32") { trả về {"symbol": "vpp_native_bytes_push_i32", "arity": 2}; };
-        nếu (tên == "byte_đọc_i32") { trả về {"symbol": "vpp_native_bytes_load_i32", "arity": 2}; };
-        nếu (tên == "byte_ghi_i32") { trả về {"symbol": "vpp_native_bytes_store_i32", "arity": 3}; };
-        nếu (tên == "byte_hủy") { trả về {"symbol": "vpp_native_bytes_free", "arity": 1}; };
-        nếu (tên == "tệp_mở_đọc") { trả về {"symbol": "vpp_native_file_open_read", "arity": 1}; };
-        nếu (tên == "tệp_mở_ghi") { trả về {"symbol": "vpp_native_file_open_write", "arity": 1}; };
-        nếu (tên == "tệp_đọc_byte") { trả về {"symbol": "vpp_native_file_read_byte", "arity": 1}; };
-        nếu (tên == "tệp_ghi_byte") { trả về {"symbol": "vpp_native_file_write_byte", "arity": 2}; };
-        nếu (tên == "tệp_đọc_khối") { trả về {"symbol": "vpp_native_file_read_block", "arity": 2}; };
-        nếu (tên == "tệp_ghi_khối") { trả về {"symbol": "vpp_native_file_write_block", "arity": 2}; };
-        nếu (tên == "tệp_đóng") { trả về {"symbol": "vpp_native_file_close", "arity": 1}; };
-        nếu (tên == "đối_số_đếm") { trả về {"symbol": "vpp_native_argc", "arity": 0}; };
-        nếu (tên == "đối_số_lấy") { trả về {"symbol": "vpp_native_argv", "arity": 1}; };
-        nếu (tên == "liên_kết_macho") { trả về {"symbol": "vpp_native_link_macho", "arity": 3}; };
-        nếu (tên == "liên_kết_đối_tượng") { trả về {"symbol": "vpp_native_link_macho_modules", "arity": 3}; };
-        nếu (tên == "cache_đọc") { trả về {"symbol": "vpp_native_cache_read", "arity": 2}; };
-        nếu (tên == "cache_ghi") { trả về {"symbol": "vpp_native_cache_write", "arity": 2}; };
-        nếu (tên == "máy_đọc_byte") { trả về {"symbol": "vpp_native_memory_read_byte", "arity": 1}; };
-        nếu (tên == "máy_ghi_byte") { trả về {"symbol": "vpp_native_memory_write_byte", "arity": 2}; };
-        nếu (tên == "máy_đọc_i32") { trả về {"symbol": "vpp_native_memory_read_i32", "arity": 1}; };
-        nếu (tên == "máy_ghi_i32") { trả về {"symbol": "vpp_native_memory_write_i32", "arity": 2}; };
-        nếu (tên == "máy_gắn_địa_chỉ") { trả về {"symbol": "vpp_native_memory_bind", "arity": 2}; };
-        nếu (tên == "máy_mở") { trả về {"symbol": "vpp_native_os_open", "arity": 2}; };
-        nếu (tên == "máy_đọc") { trả về {"symbol": "vpp_native_os_read", "arity": 3}; };
-        nếu (tên == "máy_ghi") { trả về {"symbol": "vpp_native_os_write", "arity": 3}; };
-        nếu (tên == "máy_đóng") { trả về {"symbol": "vpp_native_os_close", "arity": 1}; };
-        nếu (tên == "máy_lỗi") { trả về {"symbol": "vpp_native_os_errno", "arity": 0}; };
-        nếu (tên == "máy_đối_số_dài") { trả về {"symbol": "vpp_native_os_argument_length", "arity": 1}; };
-        nếu (tên == "máy_đối_số_byte") { trả về {"symbol": "vpp_native_os_argument_byte", "arity": 2}; };
-        nếu (tên == "máy_chia_i32") { trả về {"symbol": "vpp_native_i32_div", "arity": 2}; };
-        nếu (tên == "máy_home") { trả về {"symbol": "vpp_native_os_home", "arity": 1}; };
-        nếu (tên == "máy_cwd") { trả về {"symbol": "vpp_native_os_cwd", "arity": 1}; };
-        nếu (tên == "máy_tạm_mở") { trả về {"symbol": "vpp_native_os_mkstemp", "arity": 1}; };
-        nếu (tên == "máy_đổi_tên") { trả về {"symbol": "vpp_native_os_rename", "arity": 2}; };
-        nếu (tên == "máy_khởi_chạy_clang") { trả về {"symbol": "vpp_native_os_spawn_clang", "arity": 1}; };
-        nếu (tên == "máy_đợi") { trả về {"symbol": "vpp_native_os_waitpid", "arity": 2}; };
-        nếu (tên == "máy_stat") { trả về {"symbol": "vpp_native_os_stat", "arity": 2}; };
-        nếu (tên == "máy_lstat") { trả về {"symbol": "vpp_native_os_lstat", "arity": 2}; };
-        nếu (tên == "máy_quyền_chạy") { trả về {"symbol": "vpp_native_os_access_exec", "arity": 1}; };
-        nếu (tên == "máy_xóa") { trả về {"symbol": "vpp_native_os_unlink", "arity": 1}; };
-        nếu (tên == "máy_env_lấy") { trả về {"symbol": "vpp_native_os_env_copy", "arity": 2}; };
-        nếu (tên == "máy_exe_lấy") { trả về {"symbol": "vpp_native_os_executable_path", "arity": 1}; };
-        nếu (tên == "máy_mkdir") { trả về {"symbol": "vpp_native_os_mkdir", "arity": 1}; };
-        nếu (tên == "máy_fstat") { trả về {"symbol": "vpp_native_os_fstat", "arity": 2}; };
-        nếu (tên == "máy_sha_bắt_đầu") { trả về {"symbol": "vpp_native_sha_begin", "arity": 0}; };
-        nếu (tên == "máy_sha_nạp") { trả về {"symbol": "vpp_native_sha_update", "arity": 2}; };
-        nếu (tên == "máy_sha_kết") { trả về {"symbol": "vpp_native_sha_end", "arity": 1}; };
-        nếu (tên == "máy_báo_cáo_cache") { trả về {"symbol": "vpp_native_os_register_cache_report", "arity": 0}; };
-        nếu (tên == "runtime_nguồn") { trả về {"symbol": "vpp_native_runtime_module_path", "arity": 0}; };
-        nếu (tên == "in_số") { trả về {"symbol": "vpp_native_print_i32", "arity": 1}; };
+    hàm riêng tư biên dịch bản địa môi trường thực thi ABI(tên) {
+        nếu (tên == "đọc số") { trả về {"symbol": "vpp_native_read_i32", "arity": 0}; };
+        nếu (tên == "trạng thái đọc") { trả về {"symbol": "vpp_native_read_status", "arity": 0}; };
+        nếu (tên == "byte mới") { trả về {"symbol": "vpp_native_bytes_new", "arity": 0}; };
+        nếu (tên == "byte thêm") { trả về {"symbol": "vpp_native_bytes_append", "arity": 2}; };
+        nếu (tên == "byte nối") { trả về {"symbol": "vpp_native_bytes_concat", "arity": 2}; };
+        nếu (tên == "byte bằng") { trả về {"symbol": "vpp_native_bytes_equal", "arity": 2}; };
+        nếu (tên == "byte cắt") { trả về {"symbol": "vpp_native_bytes_slice", "arity": 3}; };
+        nếu (tên == "byte tìm") { trả về {"symbol": "vpp_native_bytes_find", "arity": 2}; };
+        nếu (tên == "byte làm rỗng") { trả về {"symbol": "vpp_native_bytes_clear", "arity": 1}; };
+        nếu (tên == "byte in") { trả về {"symbol": "vpp_native_bytes_print", "arity": 1}; };
+        nếu (tên == "byte dài") { trả về {"symbol": "vpp_native_bytes_length", "arity": 1}; };
+        nếu (tên == "byte lấy") { trả về {"symbol": "vpp_native_bytes_get", "arity": 2}; };
+        nếu (tên == "byte đẩy số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_push_i32", "arity": 2}; };
+        nếu (tên == "byte đọc số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_load_i32", "arity": 2}; };
+        nếu (tên == "byte ghi số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_store_i32", "arity": 3}; };
+        nếu (tên == "byte hủy") { trả về {"symbol": "vpp_native_bytes_free", "arity": 1}; };
+        nếu (tên == "tệp mở đọc") { trả về {"symbol": "vpp_native_file_open_read", "arity": 1}; };
+        nếu (tên == "tệp mở ghi") { trả về {"symbol": "vpp_native_file_open_write", "arity": 1}; };
+        nếu (tên == "tệp đọc byte") { trả về {"symbol": "vpp_native_file_read_byte", "arity": 1}; };
+        nếu (tên == "tệp ghi byte") { trả về {"symbol": "vpp_native_file_write_byte", "arity": 2}; };
+        nếu (tên == "tệp đọc khối") { trả về {"symbol": "vpp_native_file_read_block", "arity": 2}; };
+        nếu (tên == "tệp ghi khối") { trả về {"symbol": "vpp_native_file_write_block", "arity": 2}; };
+        nếu (tên == "tệp đóng") { trả về {"symbol": "vpp_native_file_close", "arity": 1}; };
+        nếu (tên == "đối số đếm") { trả về {"symbol": "vpp_native_argc", "arity": 0}; };
+        nếu (tên == "đối số lấy") { trả về {"symbol": "vpp_native_argv", "arity": 1}; };
+        nếu (tên == "liên kết macho") { trả về {"symbol": "vpp_native_link_macho", "arity": 3}; };
+        nếu (tên == "liên kết đối tượng") { trả về {"symbol": "vpp_native_link_macho_modules", "arity": 3}; };
+        nếu (tên == "bộ nhớ đệm đọc") { trả về {"symbol": "vpp_native_cache_read", "arity": 2}; };
+        nếu (tên == "bộ nhớ đệm ghi") { trả về {"symbol": "vpp_native_cache_write", "arity": 2}; };
+        nếu (tên == "máy đọc byte") { trả về {"symbol": "vpp_native_memory_read_byte", "arity": 1}; };
+        nếu (tên == "máy ghi byte") { trả về {"symbol": "vpp_native_memory_write_byte", "arity": 2}; };
+        nếu (tên == "máy đọc số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_memory_read_i32", "arity": 1}; };
+        nếu (tên == "máy ghi số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_memory_write_i32", "arity": 2}; };
+        nếu (tên == "máy gắn địa chỉ") { trả về {"symbol": "vpp_native_memory_bind", "arity": 2}; };
+        nếu (tên == "máy mở") { trả về {"symbol": "vpp_native_os_open", "arity": 2}; };
+        nếu (tên == "máy đọc") { trả về {"symbol": "vpp_native_os_read", "arity": 3}; };
+        nếu (tên == "máy ghi") { trả về {"symbol": "vpp_native_os_write", "arity": 3}; };
+        nếu (tên == "máy đóng") { trả về {"symbol": "vpp_native_os_close", "arity": 1}; };
+        nếu (tên == "máy lỗi") { trả về {"symbol": "vpp_native_os_errno", "arity": 0}; };
+        nếu (tên == "máy đối số dài") { trả về {"symbol": "vpp_native_os_argument_length", "arity": 1}; };
+        nếu (tên == "máy đối số byte") { trả về {"symbol": "vpp_native_os_argument_byte", "arity": 2}; };
+        nếu (tên == "máy chia số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_i32_div", "arity": 2}; };
+        nếu (tên == "máy thư mục nhà") { trả về {"symbol": "vpp_native_os_home", "arity": 1}; };
+        nếu (tên == "máy thư mục hiện hành") { trả về {"symbol": "vpp_native_os_cwd", "arity": 1}; };
+        nếu (tên == "máy tạm mở") { trả về {"symbol": "vpp_native_os_mkstemp", "arity": 1}; };
+        nếu (tên == "máy đổi tên") { trả về {"symbol": "vpp_native_os_rename", "arity": 2}; };
+        nếu (tên == "máy khởi chạy clang") { trả về {"symbol": "vpp_native_os_spawn_clang", "arity": 1}; };
+        nếu (tên == "máy đợi") { trả về {"symbol": "vpp_native_os_waitpid", "arity": 2}; };
+        nếu (tên == "máy thông tin tệp") { trả về {"symbol": "vpp_native_os_stat", "arity": 2}; };
+        nếu (tên == "máy thông tin liên kết") { trả về {"symbol": "vpp_native_os_lstat", "arity": 2}; };
+        nếu (tên == "máy quyền chạy") { trả về {"symbol": "vpp_native_os_access_exec", "arity": 1}; };
+        nếu (tên == "máy xóa") { trả về {"symbol": "vpp_native_os_unlink", "arity": 1}; };
+        nếu (tên == "máy giá trị môi trường lấy") { trả về {"symbol": "vpp_native_os_env_copy", "arity": 2}; };
+        nếu (tên == "máy tệp thực thi lấy") { trả về {"symbol": "vpp_native_os_executable_path", "arity": 1}; };
+        nếu (tên == "máy tạo thư mục") { trả về {"symbol": "vpp_native_os_mkdir", "arity": 1}; };
+        nếu (tên == "máy thông tin tệp mở") { trả về {"symbol": "vpp_native_os_fstat", "arity": 2}; };
+        nếu (tên == "máy sha bắt đầu") { trả về {"symbol": "vpp_native_sha_begin", "arity": 0}; };
+        nếu (tên == "máy sha nạp") { trả về {"symbol": "vpp_native_sha_update", "arity": 2}; };
+        nếu (tên == "máy sha kết") { trả về {"symbol": "vpp_native_sha_end", "arity": 1}; };
+        nếu (tên == "máy báo cáo bộ nhớ đệm") { trả về {"symbol": "vpp_native_os_register_cache_report", "arity": 0}; };
+        nếu (tên == "môi trường thực thi nguồn") { trả về {"symbol": "vpp_native_runtime_module_path", "arity": 0}; };
+        nếu (tên == "in số") { trả về {"symbol": "vpp_native_print_i32", "arity": 1}; };
         trả về rỗng;
     };
 
-    hàm riêng tư biên dịch native tên runtime dành riêng(tên) {
-        nếu (mình.biên dịch native runtime ABI(tên) != rỗng || tên == "vpp_native_print_i32") {
+    hàm riêng tư biên dịch bản địa tên môi trường thực thi dành riêng(tên) {
+        nếu (mình.biên dịch bản địa môi trường thực thi ABI(tên) != rỗng || tên == "vpp_native_print_i32") {
             trả về đúng;
         };
-        các_tên = ["vpp_native_read_i32", "vpp_native_read_status",
+        các tên = ["vpp_native_read_i32", "vpp_native_read_status",
                     "vpp_native_bytes_new", "vpp_native_bytes_append",
                     "vpp_native_bytes_concat", "vpp_native_bytes_equal", "vpp_native_bytes_print",
                     "vpp_native_bytes_slice", "vpp_native_bytes_find", "vpp_native_bytes_clear",
@@ -96,450 +96,450 @@ lớp công khai Bộ Hạ Cây Bản Địa {
                     "vpp_native_bytes_free", "vpp_native_file_open_read",
                     "vpp_native_file_open_write", "vpp_native_file_read_byte",
                     "vpp_native_file_write_byte", "vpp_native_file_close"];
-        thêm(các_tên, "vpp_native_file_read_block");
-        thêm(các_tên, "vpp_native_file_write_block");
-        thêm(các_tên, "vpp_native_bytes_push_i32");
-        thêm(các_tên, "vpp_native_bytes_load_i32");
-        thêm(các_tên, "vpp_native_bytes_store_i32");
-        thêm(các_tên, "vpp_native_argc");
-        thêm(các_tên, "vpp_native_argv");
-        thêm(các_tên, "vpp_native_link_macho");
-        thêm(các_tên, "vpp_native_link_macho_modules");
-        thêm(các_tên, "vpp_native_cache_read");
-        thêm(các_tên, "vpp_native_cache_write");
-        thêm(các_tên, "vpp_native_memory_read_byte");
-        thêm(các_tên, "vpp_native_memory_write_byte");
-        thêm(các_tên, "vpp_native_memory_read_i32");
-        thêm(các_tên, "vpp_native_memory_write_i32");
-        thêm(các_tên, "vpp_native_memory_bind");
-        thêm(các_tên, "vpp_native_os_open");
-        thêm(các_tên, "vpp_native_os_read");
-        thêm(các_tên, "vpp_native_os_write");
-        thêm(các_tên, "vpp_native_os_close");
-        thêm(các_tên, "vpp_native_os_errno");
-        thêm(các_tên, "vpp_native_os_argument_length");
-        thêm(các_tên, "vpp_native_os_argument_byte");
-        thêm(các_tên, "vpp_native_i32_div");
-        thêm(các_tên, "vpp_native_os_home");
-        thêm(các_tên, "vpp_native_os_cwd");
-        thêm(các_tên, "vpp_native_os_mkstemp");
-        thêm(các_tên, "vpp_native_os_rename");
-        thêm(các_tên, "vpp_native_os_spawn_clang");
-        thêm(các_tên, "vpp_native_os_waitpid");
-        thêm(các_tên, "vpp_native_runtime_module_path");
-        lặp (i = 0; i < độ dài(các_tên); i++) {
-            nếu (tên == các_tên[i]) { trả về đúng; };
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_file_read_block");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_file_write_block");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_bytes_push_i32");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_bytes_load_i32");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_bytes_store_i32");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_argc");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_argv");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_link_macho");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_link_macho_modules");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_cache_read");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_cache_write");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_memory_read_byte");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_memory_write_byte");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_memory_read_i32");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_memory_write_i32");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_memory_bind");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_open");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_read");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_write");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_close");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_errno");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_argument_length");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_argument_byte");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_i32_div");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_home");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_cwd");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_mkstemp");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_rename");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_spawn_clang");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_waitpid");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_runtime_module_path");
+        lặp (i = 0; i < máy ảo lấy độ dài(các tên); i++) {
+            nếu (tên == các tên[i]) { trả về đúng; };
         };
         trả về sai;
     };
 
-    hàm riêng tư biên dịch native symbol(trạng_thái) {
-        id = trạng_thái["nextId"];
-        trạng_thái["nextId"] = id + 1;
-        trả về id;
+    hàm riêng tư biên dịch bản địa mục ký hiệu(trạng thái) {
+        mã định danh = trạng thái["nextId"];
+        trạng thái["nextId"] = mã định danh + 1;
+        trả về mã định danh;
     };
 
-    hàm riêng tư biên dịch native vào phạm vi(trạng_thái) {
-        thêm(trạng_thái["scopes"], {});
+    hàm riêng tư biên dịch bản địa vào phạm vi(trạng thái) {
+        máy ảo thêm cuối danh sách(trạng thái["scopes"], {});
     };
 
-    hàm riêng tư biên dịch native ra phạm vi(trạng_thái) {
-        phạm_vi = trạng_thái["scopes"];
-        xóa tại(phạm_vi, độ dài(phạm_vi) - 1);
+    hàm riêng tư biên dịch bản địa ra phạm vi(trạng thái) {
+        phạm vi = trạng thái["scopes"];
+        máy ảo xóa vị trí danh sách(phạm vi, máy ảo lấy độ dài(phạm vi) - 1);
     };
 
-    hàm riêng tư biên dịch native tìm biến(trạng_thái, tên) {
-        phạm_vi = trạng_thái["scopes"];
-        lặp (i = độ dài(phạm_vi) - 1; i >= 0; i--) {
-            id = lấy map(phạm_vi[i], tên, -1);
-            nếu (id != -1) { trả về id; };
+    hàm riêng tư biên dịch bản địa tìm biến(trạng thái, tên) {
+        phạm vi = trạng thái["scopes"];
+        lặp (i = máy ảo lấy độ dài(phạm vi) - 1; i >= 0; i--) {
+            mã định danh = lấy từ điển(phạm vi[i], tên, -1);
+            nếu (mã định danh != -1) { trả về mã định danh; };
         };
         trả về -1;
     };
 
-    hàm riêng tư biên dịch native khai biến(trạng_thái, tên) {
-        phạm_vi = trạng_thái["scopes"];
-        hiện_tại = phạm_vi[độ dài(phạm_vi) - 1];
-        nếu (lấy map(hiện_tại, tên, -1) != -1) {
-            mình.biên dịch native lỗi("trùng biến/tham số: " + tên);
+    hàm riêng tư biên dịch bản địa khai biến(trạng thái, tên) {
+        phạm vi = trạng thái["scopes"];
+        hiện tại = phạm vi[máy ảo lấy độ dài(phạm vi) - 1];
+        nếu (lấy từ điển(hiện tại, tên, -1) != -1) {
+            mình.biên dịch bản địa lỗi("trùng biến/tham số: " + tên);
         };
-        id = mình.biên dịch native symbol(trạng_thái);
-        hiện_tại[tên] = id;
-        trả về id;
+        mã định danh = mình.biên dịch bản địa mục ký hiệu(trạng thái);
+        hiện tại[tên] = mã định danh;
+        trả về mã định danh;
     };
 
-    hàm riêng tư biên dịch native giá trị(trạng_thái, opcode, text = "", ops = rỗng, symbol = -1, call = "Invalid") {
-        nếu (ops == rỗng) { ops = []; };
-        danh_sách = trạng_thái["values"];
-        thêm(danh_sách, {"opcode": opcode, "text": text, "operands": ops,
-                         "symbolId": symbol, "callTarget": call});
-        trả về độ dài(danh_sách) - 1;
+    hàm riêng tư biên dịch bản địa giá trị(trạng thái, mã thao tác, văn bản = "", các mã phép toán = rỗng, mục ký hiệu = -1, lời triệu hồi = "Invalid") {
+        nếu (các mã phép toán == rỗng) { các mã phép toán = []; };
+        danh sách = trạng thái["values"];
+        máy ảo thêm cuối danh sách(danh sách, {"opcode": mã thao tác, "text": văn bản, "operands": các mã phép toán,
+                         "symbolId": mục ký hiệu, "callTarget": lời triệu hồi});
+        trả về máy ảo lấy độ dài(danh sách) - 1;
     };
 
-    hàm riêng tư biên dịch native câu(opcode, roots = rỗng, children = rỗng, symbol = -1,
-                              điều_kiện = "Unstructured", vòng = "Unstructured") {
-        nếu (roots == rỗng) { roots = []; };
-        nếu (children == rỗng) { children = []; };
-        trả về {"opcode": opcode, "roots": roots, "children": children,
-                "symbolId": symbol, "unsupported": sai,
-                "conditionalForm": điều_kiện, "loopForm": vòng};
+    hàm riêng tư biên dịch bản địa câu(mã thao tác, các gốc = rỗng, các con = rỗng, mục ký hiệu = -1,
+                              biểu thức điều kiện = "Unstructured", vòng = "Unstructured") {
+        nếu (các gốc == rỗng) { các gốc = []; };
+        nếu (các con == rỗng) { các con = []; };
+        trả về {"opcode": mã thao tác, "roots": các gốc, "children": các con,
+                "symbolId": mục ký hiệu, "unsupported": sai,
+                "conditionalForm": biểu thức điều kiện, "loopForm": vòng};
     };
 
-    hàm riêng tư biên dịch native tên biến(trạng_thái, cây) {
-        nếu (lấy map(cây, "loại", "") != "tên") {
-            mình.biên dịch native lỗi("phép gán i32 yêu cầu biến cục bộ");
+    hàm riêng tư biên dịch bản địa tên biến(trạng thái, cây) {
+        nếu (lấy từ điển(cây, "loại", "") != "tên") {
+            mình.biên dịch bản địa lỗi("phép gán i32 yêu cầu biến cục bộ");
         };
         tên = cây["giá trị"];
-        id = mình.biên dịch native tìm biến(trạng_thái, tên);
-        nếu (id == -1) { mình.biên dịch native lỗi("biến chưa khai báo: " + tên); };
-        trả về mình.biên dịch native giá trị(trạng_thái, "LoadName", tên, [], id);
+        mã định danh = mình.biên dịch bản địa tìm biến(trạng thái, tên);
+        nếu (mã định danh == -1) { mình.biên dịch bản địa lỗi("biến chưa khai báo: " + tên); };
+        trả về mình.biên dịch bản địa giá trị(trạng thái, "LoadName", tên, [], mã định danh);
     };
 
-    hàm riêng tư biên dịch native biểu thức(trạng_thái, cây, sâu = 0) {
-        nếu (sâu >= 64 || cây == rỗng) { mình.biên dịch native lỗi("biểu thức i32 rỗng hoặc quá sâu"); };
-        loại = lấy map(cây, "loại", "");
+    hàm riêng tư biên dịch bản địa biểu thức(trạng thái, cây, sâu = 0) {
+        nếu (sâu >= 64 || cây == rỗng) { mình.biên dịch bản địa lỗi("biểu thức i32 rỗng hoặc quá sâu"); };
+        loại = lấy từ điển(cây, "loại", "");
         chọn (loại) {
             ca "hằng": {
-                kiểu = lấy map(cây, "kiểu", "");
-                text = cây["giá trị"];
+                kiểu = lấy từ điển(cây, "kiểu", "");
+                văn bản = cây["giá trị"];
                 nếu (kiểu == "số nguyên") {
-                    trả về mình.biên dịch native giá trị(trạng_thái, "ConstInt", text);
+                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", văn bản);
                 };
                 nếu (kiểu == "chuỗi") {
                     // Chuỗi literal native là handle tới bộ đệm UTF-8, do caller giải phóng.
-                    trả về mình.biên dịch native giá trị(trạng_thái, "ConstString", text);
+                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstString", văn bản);
                 };
-                nếu (text == "đúng" || text == "sai") {
-                    trả về mình.biên dịch native giá trị(trạng_thái, "ConstBool", text);
+                nếu (văn bản == "đúng" || văn bản == "sai") {
+                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstBool", văn bản);
                 };
-                mình.biên dịch native lỗi("chưa hỗ trợ hằng khác i32/bool: " + text);
+                mình.biên dịch bản địa lỗi("chưa hỗ trợ hằng khác i32/bool: " + văn bản);
             }
-            ca "tên": { trả về mình.biên dịch native tên biến(trạng_thái, cây); }
+            ca "tên": { trả về mình.biên dịch bản địa tên biến(trạng thái, cây); }
             ca "một ngôi": {
-                op = cây["toán tử"];
-                nếu (op != "+" && op != "-" && op != "!") {
-                    mình.biên dịch native lỗi("toán tử một ngôi chưa hỗ trợ: " + op);
+                mã phép toán = cây["toán tử"];
+                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "!") {
+                    mình.biên dịch bản địa lỗi("toán tử một ngôi chưa hỗ trợ: " + mã phép toán);
                 };
-                trong = mình.biên dịch native biểu thức(trạng_thái, cây["toán hạng"], sâu + 1);
-                trả về mình.biên dịch native giá trị(trạng_thái, "Unary", op, [trong]);
+                trong = mình.biên dịch bản địa biểu thức(trạng thái, cây["toán hạng"], sâu + 1);
+                trả về mình.biên dịch bản địa giá trị(trạng thái, "Unary", mã phép toán, [trong]);
             }
             ca "hai ngôi": {
-                op = cây["toán tử"];
-                nếu (op == "=" || op == "+=" || op == "-=" || op == "*=") {
-                    lhs = mình.biên dịch native tên biến(trạng_thái, cây["trái"]);
-                    rhs = mình.biên dịch native biểu thức(trạng_thái, cây["phải"], sâu + 1);
-                    nếu (op != "=") {
+                mã phép toán = cây["toán tử"];
+                nếu (mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" || mã phép toán == "*=") {
+                    toán hạng trái = mình.biên dịch bản địa tên biến(trạng thái, cây["trái"]);
+                    toán hạng phải = mình.biên dịch bản địa biểu thức(trạng thái, cây["phải"], sâu + 1);
+                    nếu (mã phép toán != "=") {
                         toán = "+";
-                        nếu (op == "-=") { toán = "-"; };
-                        nếu (op == "*=") { toán = "*"; };
-                        rhs = mình.biên dịch native giá trị(trạng_thái, "Binary", toán, [lhs, rhs]);
+                        nếu (mã phép toán == "-=") { toán = "-"; };
+                        nếu (mã phép toán == "*=") { toán = "*"; };
+                        toán hạng phải = mình.biên dịch bản địa giá trị(trạng thái, "Binary", toán, [toán hạng trái, toán hạng phải]);
                     };
-                    trả về mình.biên dịch native giá trị(trạng_thái, "StoreName", "=", [lhs, rhs]);
+                    trả về mình.biên dịch bản địa giá trị(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
                 };
-                nếu (op != "+" && op != "-" && op != "*" && op != "==" &&
-                    op != "!=" && op != "<" && op != "<=" && op != ">" && op != ">=") {
-                    mình.biên dịch native lỗi("toán tử i32 chưa hỗ trợ: " + op);
+                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "*" && mã phép toán != "==" &&
+                    mã phép toán != "!=" && mã phép toán != "<" && mã phép toán != "<=" && mã phép toán != ">" && mã phép toán != ">=") {
+                    mình.biên dịch bản địa lỗi("toán tử i32 chưa hỗ trợ: " + mã phép toán);
                 };
-                trái = mình.biên dịch native biểu thức(trạng_thái, cây["trái"], sâu + 1);
-                phải = mình.biên dịch native biểu thức(trạng_thái, cây["phải"], sâu + 1);
-                trả về mình.biên dịch native giá trị(trạng_thái, "Binary", op, [trái, phải]);
+                trái = mình.biên dịch bản địa biểu thức(trạng thái, cây["trái"], sâu + 1);
+                phải = mình.biên dịch bản địa biểu thức(trạng thái, cây["phải"], sâu + 1);
+                trả về mình.biên dịch bản địa giá trị(trạng thái, "Binary", mã phép toán, [trái, phải]);
             }
             ca "cập nhật": {
-                lhs = mình.biên dịch native tên biến(trạng_thái, cây["đối tượng"]);
-                một = mình.biên dịch native giá trị(trạng_thái, "ConstInt", "1");
-                op = cây["toán tử"];
-                nếu (op != "++" && op != "--") { mình.biên dịch native lỗi("cập nhật chưa hỗ trợ: " + op); };
+                toán hạng trái = mình.biên dịch bản địa tên biến(trạng thái, cây["đối tượng"]);
+                một = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "1");
+                mã phép toán = cây["toán tử"];
+                nếu (mã phép toán != "++" && mã phép toán != "--") { mình.biên dịch bản địa lỗi("cập nhật chưa hỗ trợ: " + mã phép toán); };
                 phép = "+";
-                nếu (op == "--") { phép = "-"; };
-                rhs = mình.biên dịch native giá trị(trạng_thái, "Binary", phép, [lhs, một]);
+                nếu (mã phép toán == "--") { phép = "-"; };
+                toán hạng phải = mình.biên dịch bản địa giá trị(trạng thái, "Binary", phép, [toán hạng trái, một]);
                 // Postfix dùng được trong vị trí statement/update của vòng lặp.
-                trả về mình.biên dịch native giá trị(trạng_thái, "StoreName", "=", [lhs, rhs]);
+                trả về mình.biên dịch bản địa giá trị(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
             }
             ca "gọi": {
                 đích = cây["hàm"];
-                nếu (lấy map(đích, "loại", "") != "tên") {
-                    mình.biên dịch native lỗi("native chỉ hỗ trợ gọi hàm trực tiếp");
+                nếu (lấy từ điển(đích, "loại", "") != "tên") {
+                    mình.biên dịch bản địa lỗi("bản địa chỉ hỗ trợ gọi hàm trực tiếp");
                 };
                 tên = đích["giá trị"];
-                nếu (mình.biên dịch native tìm biến(trạng_thái, tên) != -1) {
-                    mình.biên dịch native lỗi("không thể gọi biến cục bộ như hàm native: " + tên);
+                nếu (mình.biên dịch bản địa tìm biến(trạng thái, tên) != -1) {
+                    mình.biên dịch bản địa lỗi("không thể gọi biến cục bộ như hàm bản địa: " + tên);
                 };
-                abi = mình.biên dịch native runtime ABI(tên);
+                abi = mình.biên dịch bản địa môi trường thực thi ABI(tên);
                 nếu (abi != rỗng) {
-                    args = cây["đối số"];
-                    nếu (độ dài(args) != abi["arity"]) {
+                    các đối số = cây["đối số"];
+                    nếu (máy ảo lấy độ dài(các đối số) != abi["arity"]) {
                         nếu (abi["arity"] == 0) {
-                            mình.biên dịch native lỗi("runtime native không nhận đối số: " + tên);
+                            mình.biên dịch bản địa lỗi("runtime native không nhận đối số: " + tên);
                         };
-                        mình.biên dịch native lỗi("runtime native sai số đối số: " + tên);
+                        mình.biên dịch bản địa lỗi("runtime native sai số đối số: " + tên);
                     };
-                    ops = [];
-                    lặp (i = 0; i < độ dài(args); i++) {
-                        thêm(ops, mình.biên dịch native biểu thức(trạng_thái, args[i], sâu + 1));
+                    các mã phép toán = [];
+                    lặp (i = 0; i < máy ảo lấy độ dài(các đối số); i++) {
+                        máy ảo thêm cuối danh sách(các mã phép toán, mình.biên dịch bản địa biểu thức(trạng thái, các đối số[i], sâu + 1));
                     };
-                    trả về mình.biên dịch native giá trị(trạng_thái, "Call", abi["symbol"], ops,
+                    trả về mình.biên dịch bản địa giá trị(trạng thái, "Call", abi["symbol"], các mã phép toán,
                                                          -1, "NativeRuntime");
                 };
-                id = lấy map(trạng_thái["functions"], tên, -1);
-                nếu (id == -1) { mình.biên dịch native lỗi("hàm native chưa định nghĩa: " + tên); };
-                args = cây["đối số"];
-                nếu (độ dài(args) != lấy map(trạng_thái["arity"], tên, -1)) {
-                    mình.biên dịch native lỗi("sai số đối số hàm: " + tên);
+                mã định danh = lấy từ điển(trạng thái["functions"], tên, -1);
+                nếu (mã định danh == -1) { mình.biên dịch bản địa lỗi("hàm bản địa chưa định nghĩa: " + tên); };
+                các đối số = cây["đối số"];
+                nếu (máy ảo lấy độ dài(các đối số) != lấy từ điển(trạng thái["arity"], tên, -1)) {
+                    mình.biên dịch bản địa lỗi("sai số đối số hàm: " + tên);
                 };
-                ops = [mình.biên dịch native giá trị(trạng_thái, "LoadName", tên, [], id)];
-                lặp (i = 0; i < độ dài(args); i++) {
-                    thêm(ops, mình.biên dịch native biểu thức(trạng_thái, args[i], sâu + 1));
+                các mã phép toán = [mình.biên dịch bản địa giá trị(trạng thái, "LoadName", tên, [], mã định danh)];
+                lặp (i = 0; i < máy ảo lấy độ dài(các đối số); i++) {
+                    máy ảo thêm cuối danh sách(các mã phép toán, mình.biên dịch bản địa biểu thức(trạng thái, các đối số[i], sâu + 1));
                 };
-                trả về mình.biên dịch native giá trị(trạng_thái, "Call", "", ops, id, "DirectFunction");
+                trả về mình.biên dịch bản địa giá trị(trạng thái, "Call", "", các mã phép toán, mã định danh, "DirectFunction");
             }
-            mặc định: { mình.biên dịch native lỗi("biểu thức chưa hỗ trợ: " + loại); }
+            mặc định: { mình.biên dịch bản địa lỗi("biểu thức chưa hỗ trợ: " + loại); }
         };
     };
 
-    hàm riêng tư biên dịch native hạ câu(trạng_thái, cây, sâu = 0) {
-        nếu (sâu >= 64) { mình.biên dịch native lỗi("khối lồng quá 64 tầng"); };
-        loại = lấy map(cây, "loại", "");
+    hàm riêng tư biên dịch bản địa hạ câu(trạng thái, cây, sâu = 0) {
+        nếu (sâu >= 64) { mình.biên dịch bản địa lỗi("khối lồng quá 64 tầng"); };
+        loại = lấy từ điển(cây, "loại", "");
         chọn (loại) {
-            ca "trống": { trả về mình.biên dịch native câu("NoOp"); }
+            ca "trống": { trả về mình.biên dịch bản địa câu("NoOp"); }
             ca "khối": {
-                mình.biên dịch native vào phạm vi(trạng_thái);
+                mình.biên dịch bản địa vào phạm vi(trạng thái);
                 con = [];
-                các_câu = cây["câu lệnh"];
-                lặp (i = 0; i < độ dài(các_câu); i++) {
-                    thêm(con, mình.biên dịch native hạ câu(trạng_thái, các_câu[i], sâu + 1));
+                các câu = cây["câu lệnh"];
+                lặp (i = 0; i < máy ảo lấy độ dài(các câu); i++) {
+                    máy ảo thêm cuối danh sách(con, mình.biên dịch bản địa hạ câu(trạng thái, các câu[i], sâu + 1));
                 };
-                mình.biên dịch native ra phạm vi(trạng_thái);
-                trả về mình.biên dịch native câu("Block", [], con);
+                mình.biên dịch bản địa ra phạm vi(trạng thái);
+                trả về mình.biên dịch bản địa câu("Block", [], con);
             }
             ca "biến": {
                 tên = cây["tên"];
-                id = mình.biên dịch native khai biến(trạng_thái, tên);
-                nếu (cây["giá trị"] == rỗng) { mình.biên dịch native lỗi("biến i32 cần giá trị khởi tạo: " + tên); };
-                giá_trị = mình.biên dịch native biểu thức(trạng_thái, cây["giá trị"]);
-                trả về mình.biên dịch native câu("DeclareVariable", [giá_trị], [], id);
+                mã định danh = mình.biên dịch bản địa khai biến(trạng thái, tên);
+                nếu (cây["giá trị"] == rỗng) { mình.biên dịch bản địa lỗi("biến i32 cần giá trị khởi tạo: " + tên); };
+                giá trị = mình.biên dịch bản địa biểu thức(trạng thái, cây["giá trị"]);
+                trả về mình.biên dịch bản địa câu("DeclareVariable", [giá trị], [], mã định danh);
             }
             ca "biểu thức": {
-                id = mình.biên dịch native biểu thức(trạng_thái, cây["biểu thức"]);
-                trả về mình.biên dịch native câu("Statement", [id]);
+                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.biên dịch bản địa câu("Statement", [mã định danh]);
             }
             ca "in": {
                 // Native print ABI nhận i32; literal UTF-8 là handle, không
                 // thể tự động coi handle đó là chuỗi in ra console.
-                biểu_thức = cây["biểu thức"];
-                nếu (lấy map(biểu_thức, "loại", "") == "hằng" &&
-                    lấy map(biểu_thức, "kiểu", "") == "chuỗi") {
-                    mình.biên dịch native lỗi("in chuỗi native chưa hỗ trợ");
+                biểu thức = cây["biểu thức"];
+                nếu (lấy từ điển(biểu thức, "loại", "") == "hằng" &&
+                    lấy từ điển(biểu thức, "kiểu", "") == "chuỗi") {
+                    mình.biên dịch bản địa lỗi("in chuỗi native chưa hỗ trợ");
                 };
-                id = mình.biên dịch native biểu thức(trạng_thái, cây["biểu thức"]);
-                trả về mình.biên dịch native câu("Print", [id]);
+                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.biên dịch bản địa câu("Print", [mã định danh]);
             }
             ca "trả về": {
-                id = mình.biên dịch native biểu thức(trạng_thái, cây["biểu thức"]);
-                trả về mình.biên dịch native câu("Return", [id]);
+                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.biên dịch bản địa câu("Return", [mã định danh]);
             }
             ca "nếu": {
-                điều_kiện = mình.biên dịch native biểu thức(trạng_thái, cây["điều kiện"]);
-                con = [mình.biên dịch native hạ câu(trạng_thái, cây["thân"], sâu + 1)];
+                biểu thức điều kiện = mình.biên dịch bản địa biểu thức(trạng thái, cây["điều kiện"]);
+                con = [mình.biên dịch bản địa hạ câu(trạng thái, cây["thân"], sâu + 1)];
                 dạng = "IfBlock";
                 nếu (cây["nhánh khác"] != rỗng) {
-                    thêm(con, mình.biên dịch native hạ câu(trạng_thái, cây["nhánh khác"], sâu + 1));
+                    máy ảo thêm cuối danh sách(con, mình.biên dịch bản địa hạ câu(trạng thái, cây["nhánh khác"], sâu + 1));
                     dạng = "IfElseBlocks";
                 };
-                trả về mình.biên dịch native câu("Conditional", [điều_kiện], con, -1, dạng);
+                trả về mình.biên dịch bản địa câu("Conditional", [biểu thức điều kiện], con, -1, dạng);
             }
             ca "lặp": {
-                mình.biên dịch native vào phạm vi(trạng_thái);
-                khởi_tạo = cây["khởi tạo"];
-                nếu (khởi_tạo != rỗng && lấy map(khởi_tạo, "loại", "") == "hai ngôi" &&
-                    lấy map(khởi_tạo, "toán tử", "") == "=" &&
-                    lấy map(khởi_tạo["trái"], "loại", "") == "tên") {
-                    tên = khởi_tạo["trái"]["giá trị"];
-                    nếu (mình.biên dịch native tìm biến(trạng_thái, tên) == -1) {
-                        mình.biên dịch native khai biến(trạng_thái, tên);
+                mình.biên dịch bản địa vào phạm vi(trạng thái);
+                bước khởi tạo = cây["khởi tạo"];
+                nếu (bước khởi tạo != rỗng && lấy từ điển(bước khởi tạo, "loại", "") == "hai ngôi" &&
+                    lấy từ điển(bước khởi tạo, "toán tử", "") == "=" &&
+                    lấy từ điển(bước khởi tạo["trái"], "loại", "") == "tên") {
+                    tên = bước khởi tạo["trái"]["giá trị"];
+                    nếu (mình.biên dịch bản địa tìm biến(trạng thái, tên) == -1) {
+                        mình.biên dịch bản địa khai biến(trạng thái, tên);
                     };
                 };
-                init = mình.biên dịch native giá trị(trạng_thái, "ConstInt", "0");
-                nếu (khởi_tạo != rỗng) { init = mình.biên dịch native biểu thức(trạng_thái, khởi_tạo); };
-                cond = mình.biên dịch native giá trị(trạng_thái, "ConstBool", "đúng");
-                nếu (cây["điều kiện"] != rỗng) { cond = mình.biên dịch native biểu thức(trạng_thái, cây["điều kiện"]); };
-                update = mình.biên dịch native giá trị(trạng_thái, "ConstInt", "0");
-                nếu (cây["cập nhật"] != rỗng) { update = mình.biên dịch native biểu thức(trạng_thái, cây["cập nhật"]); };
-                thân = mình.biên dịch native hạ câu(trạng_thái, cây["thân"], sâu + 1);
-                mình.biên dịch native ra phạm vi(trạng_thái);
-                trả về mình.biên dịch native câu("Loop", [init, cond, update], [thân], -1,
+                init = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "0");
+                nếu (bước khởi tạo != rỗng) { init = mình.biên dịch bản địa biểu thức(trạng thái, bước khởi tạo); };
+                cond = mình.biên dịch bản địa giá trị(trạng thái, "ConstBool", "đúng");
+                nếu (cây["điều kiện"] != rỗng) { cond = mình.biên dịch bản địa biểu thức(trạng thái, cây["điều kiện"]); };
+                bước cập nhật = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "0");
+                nếu (cây["cập nhật"] != rỗng) { bước cập nhật = mình.biên dịch bản địa biểu thức(trạng thái, cây["cập nhật"]); };
+                thân = mình.biên dịch bản địa hạ câu(trạng thái, cây["thân"], sâu + 1);
+                mình.biên dịch bản địa ra phạm vi(trạng thái);
+                trả về mình.biên dịch bản địa câu("Loop", [init, cond, bước cập nhật], [thân], -1,
                                            "Unstructured", "ForBlock");
             }
-            ca "thoát": { trả về mình.biên dịch native câu("Break"); }
-            ca "bỏ qua": { trả về mình.biên dịch native câu("Continue"); }
-            mặc định: { mình.biên dịch native lỗi("câu lệnh native chưa hỗ trợ: " + loại); }
+            ca "thoát": { trả về mình.biên dịch bản địa câu("Break"); }
+            ca "bỏ qua": { trả về mình.biên dịch bản địa câu("Continue"); }
+            mặc định: { mình.biên dịch bản địa lỗi("câu lệnh native chưa hỗ trợ: " + loại); }
         };
     };
 
     // Đây là IR đầu vào độc lập cho bộ hạ native V++, không phải bytecode VM.
-    hàm công khai biên dịch native tạo IR(mã_nguồn) {
-        cây = biên dịch phân tích ngữ nghĩa thuần(mã_nguồn);
-        trạng_thái = {"values": [], "nextId": 1, "functions": {}, "arity": {}, "scopes": []};
-        câu_lệnh = cây["câu lệnh"];
-        lặp (i = 0; i < độ dài(câu_lệnh); i++) {
-            khai_báo = câu_lệnh[i];
-            nếu (khai_báo["loại"] != "hàm") {
-                mình.biên dịch native lỗi("native chỉ nhận các khai báo hàm cấp chương trình");
+    hàm công khai biên dịch bản địa tạo IR(mã nguồn) {
+        cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn);
+        trạng thái = {"values": [], "nextId": 1, "functions": {}, "arity": {}, "scopes": []};
+        câu lệnh = cây["câu lệnh"];
+        lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
+            khai báo = câu lệnh[i];
+            nếu (khai báo["loại"] != "hàm") {
+                mình.biên dịch bản địa lỗi("bản địa chỉ nhận các khai báo hàm cấp chương trình");
             };
-            tên = khai_báo["tên"];
-            nếu (mình.biên dịch native tên runtime dành riêng(tên)) {
-                mình.biên dịch native lỗi("tên hàm dành riêng cho runtime native: " + tên);
+            tên = khai báo["tên"];
+            nếu (mình.biên dịch bản địa tên môi trường thực thi dành riêng(tên)) {
+                mình.biên dịch bản địa lỗi("tên hàm dành riêng cho môi trường thực thi bản địa: " + tên);
             };
-            nếu (lấy map(trạng_thái["functions"], tên, -1) != -1) {
-                mình.biên dịch native lỗi("trùng tên hàm: " + tên);
+            nếu (lấy từ điển(trạng thái["functions"], tên, -1) != -1) {
+                mình.biên dịch bản địa lỗi("trùng tên hàm: " + tên);
             };
-            trạng_thái["functions"][tên] = mình.biên dịch native symbol(trạng_thái);
-            trạng_thái["arity"][tên] = độ dài(khai_báo["tham số"]);
+            trạng thái["functions"][tên] = mình.biên dịch bản địa mục ký hiệu(trạng thái);
+            trạng thái["arity"][tên] = máy ảo lấy độ dài(khai báo["tham số"]);
         };
-        các_hàm = [];
-        lặp (i = 0; i < độ dài(câu_lệnh); i++) {
-            hàm_ast = câu_lệnh[i];
-            trạng_thái["scopes"] = [];
-            mình.biên dịch native vào phạm vi(trạng_thái);
-            tham_số = [];
-            danh_sách = hàm_ast["tham số"];
-            mặc_định = lấy map(hàm_ast, "mặc định tham số", []);
-            lặp (j = 0; j < độ dài(danh_sách); j++) {
-                nếu (j < độ dài(mặc_định)) {
-                    nếu (mặc_định[j] != rỗng) {
-                        mình.biên dịch native lỗi("tham số mặc định chưa hỗ trợ trong ABI i32");
+        các hàm = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
+            danh sách hàm cây cú pháp = câu lệnh[i];
+            trạng thái["scopes"] = [];
+            mình.biên dịch bản địa vào phạm vi(trạng thái);
+            tham số = [];
+            danh sách = danh sách hàm cây cú pháp["tham số"];
+            mặc định = lấy từ điển(danh sách hàm cây cú pháp, "mặc định tham số", []);
+            lặp (j = 0; j < máy ảo lấy độ dài(danh sách); j++) {
+                nếu (j < máy ảo lấy độ dài(mặc định)) {
+                    nếu (mặc định[j] != rỗng) {
+                        mình.biên dịch bản địa lỗi("tham số mặc định chưa hỗ trợ trong ABI i32");
                     };
                 };
-                id = mình.biên dịch native khai biến(trạng_thái, danh_sách[j]);
-                thêm(tham_số, {"symbolId": id, "hasDefault": sai});
+                mã định danh = mình.biên dịch bản địa khai biến(trạng thái, danh sách[j]);
+                máy ảo thêm cuối danh sách(tham số, {"symbolId": mã định danh, "hasDefault": sai});
             };
-            thân = mình.biên dịch native hạ câu(trạng_thái, hàm_ast["thân"]);
-            thêm(các_hàm, {"opcode": "DefineFunction", "name": hàm_ast["tên"],
-                            "symbolId": trạng_thái["functions"][hàm_ast["tên"]],
-                            "parameters": tham_số, "roots": [], "children": [thân],
+            thân = mình.biên dịch bản địa hạ câu(trạng thái, danh sách hàm cây cú pháp["thân"]);
+            máy ảo thêm cuối danh sách(các hàm, {"opcode": "DefineFunction", "name": danh sách hàm cây cú pháp["tên"],
+                            "symbolId": trạng thái["functions"][danh sách hàm cây cú pháp["tên"]],
+                            "parameters": tham số, "roots": [], "children": [thân],
                             "unsupported": sai});
         };
-        trả về {"values": trạng_thái["values"], "functions": các_hàm};
+        trả về {"values": trạng thái["values"], "functions": các hàm};
     };
 
     // Pipeline độc lập: nguồn .vi -> AST -> IR -> Machine IR -> ISA bytes.
-    hàm công khai biên dịch native tự chủ(mã_nguồn, tên_hàm, kiến_trúc, hệ_điều_hành = "linux") {
-        nếu (kiến_trúc != "aarch64" && kiến_trúc != "x86_64") {
-            mình.biên dịch native lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
+    hàm công khai biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
+        nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
+            mình.biên dịch bản địa lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        ir = mình.biên dịch native tạo IR(mã_nguồn);
-        máy = biên dịch máy hạ IR(ir, tên_hàm);
-        phát = biên dịch mã máy hàm(kiến_trúc, máy, hệ_điều_hành);
-        trả về {"ir": ir, "machine": máy, "bytes": phát["bytes"],
+        biểu diễn trung gian = mình.biên dịch bản địa tạo IR(mã nguồn);
+        máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
+        phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+        trả về {"ir": biểu diễn trung gian, "machine": máy, "bytes": phát["bytes"],
                 "relocations": phát["relocations"]};
     };
 
-    hàm công khai biên dịch native object tự chủ(mã_nguồn, tên_hàm, kiến_trúc,
-                                       hệ_điều_hành = "linux", abi = "gnu") {
-        kết_quả = mình.biên dịch native tự chủ(mã_nguồn, tên_hàm, kiến_trúc, hệ_điều_hành);
-        kết_quả["object"] = biên dịch object(kiến_trúc, hệ_điều_hành, abi,
-            kết_quả["bytes"], tên_hàm, kết_quả["relocations"]);
-        trả về kết_quả;
+    hàm công khai biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc,
+                                       hệ điều hành = "linux", abi = "gnu") {
+        kết quả = mình.biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
+        kết quả["object"] = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
+            kết quả["bytes"], tên hàm, kết quả["relocations"]);
+        trả về kết quả;
     };
 
     // Cả chương trình dùng chung một lần parse, semantic và IR; mỗi hàm
     // giữ object/relocation riêng để host linker xử lý các lời gọi chéo.
-    hàm công khai biên dịch native chương trình object tự chủ(mã_nguồn, kiến_trúc,
-                                             hệ_điều_hành = "linux", abi = "gnu") {
-        nếu (kiến_trúc != "aarch64" && kiến_trúc != "x86_64") {
-            mình.biên dịch native lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
+    hàm công khai biên dịch bản địa chương trình đối tượng tự chủ(mã nguồn, kiến trúc,
+                                             hệ điều hành = "linux", abi = "gnu") {
+        nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
+            mình.biên dịch bản địa lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        ir = mình.biên dịch native tạo IR(mã_nguồn);
-        các_hàm = ir["functions"];
+        biểu diễn trung gian = mình.biên dịch bản địa tạo IR(mã nguồn);
+        các hàm = biểu diễn trung gian["functions"];
         // Đổi symbol sau khi semantic đã binding bằng symbolId. Nhờ vậy cả
         // hàm đích và CALL tới 'chính' cùng hạ thành ABI symbol 'main'.
-        có_main = sai;
-        có_chính = sai;
-        lặp (i = 0; i < độ dài(các_hàm); i++) {
-            nếu (các_hàm[i]["name"] == "main") { có_main = đúng; };
-            nếu (các_hàm[i]["name"] == "chính") { có_chính = đúng; };
+        có chính = sai;
+        có chính = sai;
+        lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            nếu (các hàm[i]["name"] == "main") { có chính = đúng; };
+            nếu (các hàm[i]["name"] == "chính") { có chính = đúng; };
         };
-        nếu (có_main && có_chính) {
-            mình.biên dịch native lỗi("không thể khai báo đồng thời main() và chính()");
+        nếu (có chính && có chính) {
+            mình.biên dịch bản địa lỗi("không thể khai báo đồng thời main() và chính()");
         };
-        lặp (i = 0; i < độ dài(các_hàm); i++) {
-            nếu (các_hàm[i]["name"] == "chính") {
-                các_hàm[i]["name"] = "main";
+        lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            nếu (các hàm[i]["name"] == "chính") {
+                các hàm[i]["name"] = "main";
             };
         };
-        kết_quả = [];
-        lặp (i = 0; i < độ dài(các_hàm); i++) {
-            tên_hàm = các_hàm[i]["name"];
-            máy = biên dịch máy hạ IR(ir, tên_hàm);
-            phát = biên dịch mã máy hàm(kiến_trúc, máy, hệ_điều_hành);
-            object = biên dịch object(kiến_trúc, hệ_điều_hành, abi,
-                phát["bytes"], tên_hàm, phát["relocations"]);
-            thêm(kết_quả, {"name": tên_hàm, "machine": máy,
+        kết quả = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            tên hàm = các hàm[i]["name"];
+            máy = biên dịch máy hạ IR(biểu diễn trung gian, tên hàm);
+            phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
+            đối tượng = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
+                phát["bytes"], tên hàm, phát["relocations"]);
+            máy ảo thêm cuối danh sách(kết quả, {"name": tên hàm, "machine": máy,
                 "bytes": phát["bytes"], "relocations": phát["relocations"],
-                "object": object});
+                "object": đối tượng});
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Wire format cho CLI: giữ hợp đồng M:/I:/B:/R:/O: của bridge hiện hữu.
     // CLI chỉ vận chuyển dữ liệu, toàn bộ AST/IR/ISA/object được dựng bằng V++.
-    hàm công khai biên dịch native in bản ghi(kết_quả) {
-        fn = kết_quả["machine"];
-        in "M:" + fn["parameterCount"] + ":" + fn["slotCount"] + ":" + fn["maxStackDepth"];
-        lệnh = fn["instructions"];
-        lặp (i = 0; i < độ dài(lệnh); i++) {
-            op = lệnh[i];
-            in "I:" + op["opcode"] + ":" + op["immediate"] + ":" +
-                op["operand"] + ":" + op["depthBefore"] + ":" + op["symbol"];
+    hàm công khai biên dịch bản địa in bản ghi(kết quả) {
+        chương trình con hiện tại = kết quả["machine"];
+        in "M:" + chương trình con hiện tại["parameterCount"] + ":" + chương trình con hiện tại["slotCount"] + ":" + chương trình con hiện tại["maxStackDepth"];
+        lệnh = chương trình con hiện tại["instructions"];
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            mã phép toán = lệnh[i];
+            in "I:" + mã phép toán["opcode"] + ":" + mã phép toán["immediate"] + ":" +
+                mã phép toán["operand"] + ":" + mã phép toán["depthBefore"] + ":" + mã phép toán["symbol"];
         };
         bảng = "0123456789abcdef";
-        byte = kết_quả["bytes"];
-        hex = "";
-        lặp (i = 0; i < độ dài(byte); i++) {
+        byte = kết quả["bytes"];
+        thập lục phân = "";
+        lặp (i = 0; i < máy ảo lấy độ dài(byte); i++) {
             b = byte[i];
-            nếu (b < 0 || b > 255) { mình.biên dịch native lỗi("byte ISA ngoài u8"); };
-            hex += bảng[(b - b % 16) / 16] + bảng[b % 16];
+            nếu (b < 0 || b > 255) { mình.biên dịch bản địa lỗi("byte ISA ngoài u8"); };
+            thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
         };
-        in "B:" + hex;
-        relocs = kết_quả["relocations"];
-        lặp (i = 0; i < độ dài(relocs); i++) {
-            in "R:" + relocs[i]["offset"] + ":" + relocs[i]["symbol"];
+        in "B:" + thập lục phân;
+        các mục tái định vị = kết quả["relocations"];
+        lặp (i = 0; i < máy ảo lấy độ dài(các mục tái định vị); i++) {
+            in "R:" + các mục tái định vị[i]["offset"] + ":" + các mục tái định vị[i]["symbol"];
         };
-        object = kết_quả["object"];
-        hex = "";
-        lặp (i = 0; i < độ dài(object); i++) {
-            b = object[i];
-            nếu (b < 0 || b > 255) { mình.biên dịch native lỗi("byte object ngoài u8"); };
-            hex += bảng[(b - b % 16) / 16] + bảng[b % 16];
+        đối tượng = kết quả["object"];
+        thập lục phân = "";
+        lặp (i = 0; i < máy ảo lấy độ dài(đối tượng); i++) {
+            b = đối tượng[i];
+            nếu (b < 0 || b > 255) { mình.biên dịch bản địa lỗi("byte object ngoài u8"); };
+            thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
         };
-        in "O:" + hex;
+        in "O:" + thập lục phân;
     };
 };
 
 
-hàm công khai biên dịch native tạo IR(mã_nguồn) {
-    __vpp_adapter = Bộ Hạ Cây Bản Địa();
-    trả về __vpp_adapter.biên dịch native tạo IR(mã_nguồn);
+hàm công khai biên dịch bản địa tạo IR(mã nguồn) {
+    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
+    trả về bộ chuyển tiếp.biên dịch bản địa tạo IR(mã nguồn);
 };
 
-hàm công khai biên dịch native tự chủ(mã_nguồn, tên_hàm, kiến_trúc, hệ_điều_hành = "linux") {
-    __vpp_adapter = Bộ Hạ Cây Bản Địa();
-    trả về __vpp_adapter.biên dịch native tự chủ(mã_nguồn, tên_hàm, kiến_trúc, hệ_điều_hành);
+hàm công khai biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
+    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
+    trả về bộ chuyển tiếp.biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
 };
 
-hàm công khai biên dịch native object tự chủ(mã_nguồn, tên_hàm, kiến_trúc,
-                                   hệ_điều_hành = "linux", abi = "gnu") {
-    __vpp_adapter = Bộ Hạ Cây Bản Địa();
-    trả về __vpp_adapter.biên dịch native object tự chủ(mã_nguồn, tên_hàm, kiến_trúc, hệ_điều_hành, abi);
+hàm công khai biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc,
+                                   hệ điều hành = "linux", abi = "gnu") {
+    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
+    trả về bộ chuyển tiếp.biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành, abi);
 };
 
-hàm công khai biên dịch native chương trình object tự chủ(mã_nguồn, kiến_trúc,
-                                          hệ_điều_hành = "linux", abi = "gnu") {
-    __vpp_adapter = Bộ Hạ Cây Bản Địa();
-    trả về __vpp_adapter.biên dịch native chương trình object tự chủ(
-        mã_nguồn, kiến_trúc, hệ_điều_hành, abi);
+hàm công khai biên dịch bản địa chương trình đối tượng tự chủ(mã nguồn, kiến trúc,
+                                          hệ điều hành = "linux", abi = "gnu") {
+    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
+    trả về bộ chuyển tiếp.biên dịch bản địa chương trình đối tượng tự chủ(
+        mã nguồn, kiến trúc, hệ điều hành, abi);
 };
 
-hàm công khai biên dịch native in bản ghi(kết_quả) {
-    __vpp_adapter = Bộ Hạ Cây Bản Địa();
-    trả về __vpp_adapter.biên dịch native in bản ghi(kết_quả);
+hàm công khai biên dịch bản địa in bản ghi(kết quả) {
+    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
+    trả về bộ chuyển tiếp.biên dịch bản địa in bản ghi(kết quả);
 };

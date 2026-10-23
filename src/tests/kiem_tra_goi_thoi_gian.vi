@@ -2,7 +2,7 @@ nhập thời gian;
 
 hàm chính() {
     in lấy thời gian hiện tại() != "";
-    in lấy thời gian utc() != "";
+    in lấy thời gian giờ quốc tế() != "";
     lệch = độ lệch múi giờ();
     in lệch >= -1440 && lệch <= 1440;
 
@@ -15,10 +15,10 @@ hàm chính() {
     in thời gian định dạng đồng hồ([2016, 12, 31, 23, 59, 60, 0], đúng);
 
     // Cả Windows và POSIX đều đọc UTC qua System FFI rồi đổi lịch tại V++.
-    utc = thời gian đọc utc ffi();
+    utc = thời gian đọc giờ quốc tế ffi();
     in độ dài(utc) == 7 && utc[6] == 0;
     in utc[1] >= 1 && utc[1] <= 12 && utc[2] >= 1 && utc[2] <= 31;
-    in độ dài(lay_thoi_gian_hien_tai()) == 25;
-    in độ dài(lay_thoi_gian_utc()) == 20;
-    in loại của(do_lech_mui_gio()) == "số nguyên";
+    in độ dài(lấy thời gian hiện tại()) == 25;
+    in độ dài(lấy giờ quốc tế()) == 20;
+    in loại của(độ lệch múi giờ()) == "số nguyên";
 };

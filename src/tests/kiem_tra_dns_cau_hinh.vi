@@ -1,61 +1,61 @@
-nhập gói/mạng/dns_cấu_hình;
+nhập gói/mạng/cấu hình phân giải tên miền;
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/tệp thô;
 
 hàm chính() {
     bộ = Bộ Cấu Hình DNS();
-    in do_dai(bộ.dns phân tích resolv conf("")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("# comment\n; comment\nsearch example.com\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("# comment\n; comment\nsearch example.com\n")) == 0;
     dữ_liệu = "  nameserver\t1.1.1.1 # primary\r\n" +
         "nameserver 2606:4700:4700::1111\n" +
         "nameserver 1.1.1.1\n" +
         "options timeout:1\n" +
         "nameserver 8.8.8.8";
-    máy_chủ = bộ.dns phân tích resolv conf(dữ_liệu);
-    in do_dai(máy_chủ) == 3;
+    máy_chủ = bộ.phân giải tên miền phân tích cấu hình phân giải conf(dữ_liệu);
+    in độ dài(máy_chủ) == 3;
     in máy_chủ[0] == "1.1.1.1" && máy_chủ[1] == "2606:4700:4700::1111" &&
        máy_chủ[2] == "8.8.8.8";
-    in do_dai(bộ.dns phân tích resolv conf("nameserver\n")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("nameserver 999.0.0.1\n")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("nameserver 1:2:3\n")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("nameserver host.example\n")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("nameserver 8.8.8.8 extra\n")) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("nameserver 8.8.8.8; inline comment")) == 1;
-    in do_dai(bộ.dns phân tích resolv conf("  nameserver\t::1\r\n")) == 1;
-    in do_dai(bộ.dns phân tích resolv conf(
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver 999.0.0.1\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver 1:2:3\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver host.example\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver 8.8.8.8 extra\n")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("nameserver 8.8.8.8; inline comment")) == 1;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("  nameserver\t::1\r\n")) == 1;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf(
         "nameserver ::1\nnameserver 0:0:0:0:0:0:0:1\n")) == 1;
 
-    máy_chủ = bộ.dns phân tích danh sách máy chủ("127.0.0.1, ::1; 8.8.8.8\n127.0.0.1");
-    in do_dai(máy_chủ) == 3;
+    máy_chủ = bộ.phân giải tên miền phân tích danh sách máy chủ("127.0.0.1, ::1; 8.8.8.8\n127.0.0.1");
+    in độ dài(máy_chủ) == 3;
     in máy_chủ[0] == "127.0.0.1" && máy_chủ[1] == "::1" && máy_chủ[2] == "8.8.8.8";
-    in do_dai(bộ.dns phân tích danh sách máy chủ("::1,0:0:0:0:0:0:0:1")) == 1;
-    in do_dai(bộ.dns phân tích danh sách máy chủ(" , ;\t")) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích danh sách máy chủ("::1,0:0:0:0:0:0:0:1")) == 1;
+    in độ dài(bộ.phân giải tên miền phân tích danh sách máy chủ(" , ;\t")) == 0;
 
     lỗi = sai;
-    thử { bộ.dns phân tích danh sách máy chủ("127.0.0.1,bad.host"); }
+    thử { bộ.phân giải tên miền phân tích danh sách máy chủ("127.0.0.1,bad.host"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns phân tích resolv conf(123); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình phân giải conf(123); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
     lớn = "";
     lặp(i = 0; i < 170; i++) { lớn = lớn + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; };
-    thử { bộ.dns phân tích resolv conf(lớn); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình phân giải conf(lớn); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
     thử {
-        bộ.dns phân tích danh sách máy chủ("1.1.1.1,2.2.2.2,3.3.3.3,4.4.4.4,5.5.5.5,6.6.6.6,7.7.7.7,8.8.8.8,9.9.9.9");
+        bộ.phân giải tên miền phân tích danh sách máy chủ("1.1.1.1,2.2.2.2,3.3.3.3,4.4.4.4,5.5.5.5,6.6.6.6,7.7.7.7,8.8.8.8,9.9.9.9");
     } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     // Đọc file thật dùng cùng parser; fixture được cài cùng source repo.
     đường = ".tmp_vpp_dns_resolv_test.conf";
     ghi tệp(đường, "nameserver 127.0.0.1\nnameserver ::1\n");
-    máy_chủ = bộ.dns đọc cấu hình linux(đường);
-    in do_dai(máy_chủ) == 2 && máy_chủ[0] == "127.0.0.1" && máy_chủ[1] == "::1";
+    máy_chủ = bộ.phân giải tên miền đọc cấu hình linux(đường);
+    in độ dài(máy_chủ) == 2 && máy_chủ[0] == "127.0.0.1" && máy_chủ[1] == "::1";
     ghi tệp(đường, lớn);
     lỗi = sai;
-    thử { bộ.dns đọc cấu hình linux(đường); } bắt lỗi(e) { lỗi = đúng; };
-    tệp_thô_xóa(đường);
+    thử { bộ.phân giải tên miền đọc cấu hình linux(đường); } bắt lỗi(e) { lỗi = đúng; };
+    tệp thô xóa(đường);
     in lỗi;
 };

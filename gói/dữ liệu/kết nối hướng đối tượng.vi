@@ -4,35 +4,35 @@ nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
 nhập gói/lõi/tài nguyên có trạng thái;
 
 lớp công khai Kết Nối Cơ Sở Dữ Liệu kế thừa Tài Nguyên Có Trạng Thái {
-    hàm công khai khởi tạo(driver, url, tài_khoản, mật_khẩu) {
-        cấu_hình = db phân tích cấu hình(driver, url);
-        nếu (!lấy map(cấu_hình, "ok", sai)) {
-            ném "kết nối cơ sở dữ liệu: " + lấy map(cấu_hình, "reason", "invalid-config");
+    hàm công khai khởi tạo(trình điều khiển, địa chỉ tài nguyên, tài khoản, mật khẩu) {
+        cấu hình = cơ sở dữ liệu phân tích cấu hình(trình điều khiển, địa chỉ tài nguyên);
+        nếu (!lấy từ điển(cấu hình, "ok", sai)) {
+            ném "kết nối cơ sở dữ liệu: " + lấy từ điển(cấu hình, "reason", "invalid-config");
         };
         gốc.khởi tạo();
-        mình.driver = driver;
-        mình.url = url;
-        mình.tài_khoản = tài_khoản;
-        mình.mật_khẩu = mật_khẩu;
-        mình.cấu_hình = cấu_hình;
-        mình.đã_kết_nối = sai;
+        mình.trình điều khiển = trình điều khiển;
+        mình.địa chỉ tài nguyên = địa chỉ tài nguyên;
+        mình.tài khoản = tài khoản;
+        mình.mật khẩu = mật khẩu;
+        mình.cấu hình = cấu hình;
+        mình.đã kết nối = sai;
     };
 
     hàm công khai thông tin() {
         // Trả snapshot mới để caller không sửa trạng thái cấu hình của instance.
-        trả về db phân tích cấu hình(mình.driver, mình.url);
+        trả về cơ sở dữ liệu phân tích cấu hình(mình.trình điều khiển, mình.địa chỉ tài nguyên);
     };
 
     hàm công khai đang kết nối() {
-        trả về mình.đã_kết_nối && !mình.đã_đóng;
+        trả về mình.đã kết nối && !mình.đã đóng;
     };
 
     hàm công khai kết nối() {
         mình.yêu cầu mở("kết nối cơ sở dữ liệu");
-        nếu (mình.đã_kết_nối) { trả về "DB_OK|connected"; };
-        kết_quả = mình.mở kết nối();
-        mình.đã_kết_nối = kết_quả == "DB_OK|connected";
-        trả về kết_quả;
+        nếu (mình.đã kết nối) { trả về "DB_OK|connected"; };
+        kết quả = mình.mở kết nối();
+        mình.đã kết nối = kết quả == "DB_OK|connected";
+        trả về kết quả;
     };
 
     hàm công khai truy vấn(sql) {
@@ -42,31 +42,31 @@ lớp công khai Kết Nối Cơ Sở Dữ Liệu kế thừa Tài Nguyên Có T
         trả về mình.thực thi(sql);
     };
 
-    hàm công khai ping() {
+    hàm công khai kiểm tra kết nối() {
         trả về mình.truy vấn("SELECT 1;");
     };
 
     hàm công khai đóng() {
-        nếu (mình.đã_đóng) { trả về "DB_OK|disconnected"; };
-        mình.đã_đóng = đúng;
-        mình.đã_kết_nối = sai;
+        nếu (mình.đã đóng) { trả về "DB_OK|disconnected"; };
+        mình.đã đóng = đúng;
+        mình.đã kết nối = sai;
         thử {
-            kết_quả = mình.ngắt kết nối();
+            kết quả = mình.ngắt kết nối();
         } bắt lỗi(e) {
-            mình.mật_khẩu = "";
+            mình.mật khẩu = "";
             ném e;
         };
-        mình.mật_khẩu = "";
-        trả về kết_quả;
+        mình.mật khẩu = "";
+        trả về kết quả;
     };
 
     hàm bảo vệ mở kết nối() {
-        trả về db_ket_noi(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu);
+        trả về kết nối cơ sở dữ liệu(mình.trình điều khiển, mình.địa chỉ tài nguyên, mình.tài khoản, mình.mật khẩu);
     };
     hàm bảo vệ thực thi(sql) {
-        trả về db_truy_van(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu, sql);
+        trả về truy vấn cơ sở dữ liệu(mình.trình điều khiển, mình.địa chỉ tài nguyên, mình.tài khoản, mình.mật khẩu, sql);
     };
     hàm bảo vệ ngắt kết nối() {
-        trả về db_ngat_ket_noi(mình.driver, mình.url, mình.tài_khoản, mình.mật_khẩu);
+        trả về ngắt kết nối cơ sở dữ liệu(mình.trình điều khiển, mình.địa chỉ tài nguyên, mình.tài khoản, mình.mật khẩu);
     };
 };

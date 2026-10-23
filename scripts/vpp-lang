@@ -7,7 +7,7 @@ MANIFEST="$ROOT_DIR/vpp-language.json"
 
 NAME="vpp-language"
 DISPLAY_NAME="V++ Language"
-VERSION="0.1.2"
+VERSION=$(node -p 'require(process.argv[1]).version' "$ROOT_DIR/package.json")
 PUBLISHER="vpp"
 LANGUAGE_ID="vpp"
 EXTENSION_ID="$PUBLISHER.$NAME-$VERSION"

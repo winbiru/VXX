@@ -88,12 +88,12 @@ lớp công khai SảnPhẩm {
 
 hàm công khai sản phẩm từ map(dữLiệu) {
     sảnPhẩm = SảnPhẩm(
-        lấy map(dữLiệu, "id", ""),
-        lấy map(dữLiệu, "ten", ""),
-        lấy map(dữLiệu, "gia", 0),
-        lấy map(dữLiệu, "tonKho", 0),
-        lấy map(dữLiệu, "daBan", 0),
-        lấy map(dữLiệu, "phienBan", 1)
+        lấy từ điển(dữLiệu, "id", ""),
+        lấy từ điển(dữLiệu, "ten", ""),
+        lấy từ điển(dữLiệu, "gia", 0),
+        lấy từ điển(dữLiệu, "tonKho", 0),
+        lấy từ điển(dữLiệu, "daBan", 0),
+        lấy từ điển(dữLiệu, "phienBan", 1)
     );
     sảnPhẩm.kiểmTraHợpLệ();
     trả về sảnPhẩm;

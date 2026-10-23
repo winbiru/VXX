@@ -27,7 +27,7 @@ hàm chờMáyChủ(gốc) {
     lặp(i = 0; i < 50; i++) {
         thử {
             health = lấyJson(gốc, "/health");
-            nếu (lấy map(health, "trangThai", "") == "UP") {
+            nếu (lấy từ điển(health, "trangThai", "") == "UP") {
                 trả về đúng;
             };
         } bắt lỗi (e) {
@@ -42,10 +42,10 @@ hàm chính() {
     gốc = "http://127.0.0.1:" + cổng;
     chờMáyChủ(gốc);
 
-    features = lấy map(lấyJson(gốc, "/features"), "duLieu", {});
-    yêuCầu(lấy map(features, "http_server_routing", sai), "feature gate");
+    features = lấy từ điển(lấyJson(gốc, "/features"), "duLieu", {});
+    yêuCầu(lấy từ điển(features, "http_server_routing", sai), "feature gate");
 
-    sảnPhẩm = lấy map(
+    sảnPhẩm = lấy từ điển(
         gửiJson(gốc, "/san-pham", {
             "id": "SP-VERIFY",
             "ten": "Cà phê \"Đậm\" ☕",
@@ -55,17 +55,17 @@ hàm chính() {
         "duLieu",
         {}
     );
-    yêuCầu(lấy map(sảnPhẩm, "id", "") == "SP-VERIFY", "tạo sản phẩm");
-    yêuCầu(lấy map(sảnPhẩm, "ten", "") == "Cà phê \"Đậm\" ☕", "Unicode JSON");
+    yêuCầu(lấy từ điển(sảnPhẩm, "id", "") == "SP-VERIFY", "tạo sản phẩm");
+    yêuCầu(lấy từ điển(sảnPhẩm, "ten", "") == "Cà phê \"Đậm\" ☕", "Unicode JSON");
 
-    chiTiết = lấy map(
+    chiTiết = lấy từ điển(
         gửiJson(gốc, "/san-pham/chi-tiet", {"id": "SP-VERIFY"}),
         "duLieu",
         {}
     );
-    yêuCầu(lấy map(chiTiết, "ten", "") == "Cà phê \"Đậm\" ☕", "đọc chi tiết");
+    yêuCầu(lấy từ điển(chiTiết, "ten", "") == "Cà phê \"Đậm\" ☕", "đọc chi tiết");
 
-    tìmKiếm = lấy map(
+    tìmKiếm = lấy từ điển(
         gửiJson(gốc, "/san-pham/tim-kiem", {
             "tuKhoa": "Đậm",
             "trang": 1,
@@ -74,9 +74,9 @@ hàm chính() {
         "duLieu",
         {}
     );
-    yêuCầu(lấy map(tìmKiếm, "tong", 0) >= 1, "tìm kiếm");
+    yêuCầu(lấy từ điển(tìmKiếm, "tong", 0) >= 1, "tìm kiếm");
 
-    cậpNhật = lấy map(
+    cậpNhật = lấy từ điển(
         cậpNhậtJson(gốc, "/san-pham", {
             "id": "SP-VERIFY",
             "ten": "Cà phê kiểm thử",
@@ -86,10 +86,10 @@ hàm chính() {
         "duLieu",
         {}
     );
-    yêuCầu(lấy map(cậpNhật, "gia", 0) == 190000, "cập nhật sản phẩm");
-    yêuCầu(lấy map(cậpNhật, "tonKho", 0) == 12, "cập nhật tồn kho");
+    yêuCầu(lấy từ điển(cậpNhật, "gia", 0) == 190000, "cập nhật sản phẩm");
+    yêuCầu(lấy từ điển(cậpNhật, "tonKho", 0) == 12, "cập nhật tồn kho");
 
-    đơn = lấy map(
+    đơn = lấy từ điển(
         gửiJson(gốc, "/don-hang", {
             "khachHang": "Kiểm thử V++",
             "sanPham": [
@@ -99,19 +99,19 @@ hàm chính() {
         "duLieu",
         {}
     );
-    mãĐơn = lấy map(đơn, "id", "");
+    mãĐơn = lấy từ điển(đơn, "id", "");
     yêuCầu(mãĐơn != "", "tạo đơn hàng");
-    yêuCầu(lấy map(đơn, "tongTien", 0) == 380000, "tính tổng tiền");
+    yêuCầu(lấy từ điển(đơn, "tongTien", 0) == 380000, "tính tổng tiền");
 
-    đãHủy = lấy map(
+    đãHủy = lấy từ điển(
         gửiJson(gốc, "/don-hang/huy", {"id": mãĐơn}),
         "duLieu",
         {}
     );
-    yêuCầu(lấy map(đãHủy, "trangThai", "") == "DA_HUY", "hủy đơn hàng");
+    yêuCầu(lấy từ điển(đãHủy, "trangThai", "") == "DA_HUY", "hủy đơn hàng");
 
-    báoCáo = lấy map(lấyJson(gốc, "/bao-cao"), "duLieu", {});
-    yêuCầu(lấy map(báoCáo, "soDonHang", 0) >= 1, "báo cáo");
+    báoCáo = lấy từ điển(lấyJson(gốc, "/bao-cao"), "duLieu", {});
+    yêuCầu(lấy từ điển(báoCáo, "soDonHang", 0) >= 1, "báo cáo");
 
     in "PASS: V++ .vi HTTP release verification";
 };

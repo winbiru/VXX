@@ -2,7 +2,7 @@ nhập gói/ứng dụng/chính;
 
 hàm chính() {
     app = Bộ Điều Khiển Ứng Dụng("Thử", "1.0");
-    in app.banner() == "[ỨNG DỤNG] Thử v1.0";
+    in app.biểu ngữ() == "[ỨNG DỤNG] Thử v1.0";
     in !app.đang chạy();
     in !app.dừng();
     in app.chạy();

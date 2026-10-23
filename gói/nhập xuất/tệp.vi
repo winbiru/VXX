@@ -14,204 +14,204 @@ lớp công khai Hệ Tệp {
 
     // Giá trị lỗi có cấu trúc: bắt lỗi(e) có thể đọc mã, đường dẫn, errno.
     // VM nhận diện theo giao thức dữ liệu, không đoán từ thông báo hay tên hàm.
-    hàm tệp lỗi hệ thống(đường, thao_tác, mã, giai_đoạn, thông_báo, errno) {
+    hàm tệp lỗi hệ thống(đường, thao tác, mã, giải đoạn, thông báo, mã lỗi) {
         trả về {
             "loại": "lỗi hệ thống tệp",
             "mã": mã,
-            "thao tác": thao_tác,
-            "giai đoạn": giai_đoạn,
+            "thao tác": thao tác,
+            "giai đoạn": giải đoạn,
             "đường dẫn": đường,
-            "errno": errno,
-            "thông báo": thông_báo
+            "errno": mã lỗi,
+            "thông báo": thông báo
         };
     };
 
     hàm công khai tệp chuẩn hóa đường dẫn(đường dẫn) {
         đường = thành chuỗi(đường dẫn);
-        bytes = bảng mã utf8 mã hóa(đường);
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+        các byte = bảng mã unicode tám bit mã hóa(đường);
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (các byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
         };
         trả về đường;
     };
 
     // Dùng chung bộ đệm V++ với Luồng Tệp; lỗi giữ mã và đường dẫn có cấu trúc.
-    hàm công khai tệp đọc bytes posix(đường, thao_tác) {
-        tệp = Bộ Đệm Tệp(đường, "đọc", 4096, thao_tác);
-        kết_quả = [];
+    hàm công khai tệp đọc các byte posix(đường, thao tác) {
+        tệp = Bộ Đệm Tệp(đường, "đọc", 4096, thao tác);
+        kết quả = [];
         thử {
             lặp(vòng = 0; đúng; vòng++) {
-                khối = tệp.đọc bytes(4096);
-                nếu (do_dai(khối) == 0) { thoát; };
-                lặp(i = 0; i < do_dai(khối); i++) { thêm(kết_quả, khối[i]); };
+                khối = tệp.đọc các byte(4096);
+                nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
+                lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };
             };
         } bắt lỗi(e) {
-            thử { tệp.đóng(); } bắt lỗi(lỗi_đóng) {};
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
             ném e;
         };
         tệp.đóng();
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai tệp ghi bytes posix(đường, bytes, nối, thao_tác) {
-        chế_độ = "ghi";
-        nếu (nối) { chế_độ = "nối"; };
-        tệp = Bộ Đệm Tệp(đường, chế_độ, 4096, thao_tác);
+    hàm công khai tệp ghi các byte posix(đường, các byte, nối, thao tác) {
+        chế độ = "ghi";
+        nếu (nối) { chế độ = "nối"; };
+        tệp = Bộ Đệm Tệp(đường, chế độ, 4096, thao tác);
         thử {
-            tệp.ghi bytes(bytes);
+            tệp.ghi các byte(các byte);
         } bắt lỗi(e) {
-            thử { tệp.đóng(); } bắt lỗi(lỗi_đóng) {};
+            thử { tệp.đóng(); } bắt lỗi(lỗi đóng) {};
             ném e;
         };
         tệp.đóng();
         trả về 1;
     };
 
-    hàm công khai tệp yêu cầu bytes(bytes) {
-        nếu (loai_cua(bytes) != "danh sách") {
+    hàm công khai tệp yêu cầu các byte(các byte) {
+        nếu (loại của(các byte) != "danh sách") {
             ném "ghi bytes tệp: cần danh sách bytes";
         };
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (loai_cua(bytes[i]) != "số nguyên") {
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (loại của(các byte[i]) != "số nguyên") {
                 ném "ghi bytes tệp: mỗi byte phải là số nguyên";
             };
-            nếu (bytes[i] < 0 || bytes[i] > 255) {
+            nếu (các byte[i] < 0 || các byte[i] > 255) {
                 ném "ghi bytes tệp: byte phải trong 0..255";
             };
         };
-        trả về bytes;
+        trả về các byte;
     };
 
     // Ghi chú hàm: đọc tệp.
     hàm công khai đọc tệp(đường dẫn) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
-        trả về chuoi_tu_bytes_vm(mình.tệp đọc bytes posix(đường, "đọc tệp"));
+        trả về chuỗi từ byte máy ảo(mình.tệp đọc các byte posix(đường, "đọc tệp"));
     };
 
     // Ghi nguyên nội dung chuỗi runtime, không giải mã lại escape (kể cả JSON).
     hàm công khai ghi tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
-        văn_bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi bytes posix(đường, chuoi_bytes_vm(văn_bản), sai, "ghi tệp");
+        văn bản = thành chuỗi(nội dung);
+        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), sai, "ghi tệp");
     };
 
     // Ghi nối tiếp nội dung vào cuối tệp. Append là primitive file I/O; thư viện
     // cấp cao như nhật ký chỉ chịu trách nhiệm dựng nội dung cần ghi.
     hàm công khai ghi nối tệp(đường dẫn, nội dung) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
-        văn_bản = thành chuỗi(nội dung);
-        trả về mình.tệp ghi bytes posix(đường, chuoi_bytes_vm(văn_bản), đúng, "ghi nối tệp");
+        văn bản = thành chuỗi(nội dung);
+        trả về mình.tệp ghi các byte posix(đường, chuỗi thành byte máy ảo(văn bản), đúng, "ghi nối tệp");
     };
 
     // Đọc/ghi dữ liệu nhị phân dưới dạng danh sách số nguyên 0..255. Đây là
     // primitive file I/O để các codec/archive triển khai format bằng V++ mà không
     // phải đẩy thuật toán định dạng xuống C++.
-    hàm công khai đọc bytes tệp(đường dẫn) {
+    hàm công khai đọc các byte tệp(đường dẫn) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
-        trả về mình.tệp đọc bytes posix(đường, "đọc bytes tệp");
+        trả về mình.tệp đọc các byte posix(đường, "đọc bytes tệp");
     };
 
-    hàm công khai ghi bytes tệp(đường dẫn, bytes) {
+    hàm công khai ghi các byte tệp(đường dẫn, các byte) {
         đường = mình.tệp chuẩn hóa đường dẫn(đường dẫn);
-        dữ_liệu = mình.tệp yêu cầu bytes(bytes);
-        trả về mình.tệp ghi bytes posix(đường, dữ_liệu, sai, "ghi bytes tệp");
+        dữ liệu = mình.tệp yêu cầu các byte(các byte);
+        trả về mình.tệp ghi các byte posix(đường, dữ liệu, sai, "ghi bytes tệp");
     };
 
     // Đếm dòng vật lý; tệp rỗng có 0 dòng.
     hàm công khai đếm dòng tệp(đường dẫn) {
-        nội_dung = mình.đọc tệp(đường dẫn);
-        n = do_dai(nội_dung);
+        nội dung = mình.đọc tệp(đường dẫn);
+        n = máy ảo lấy độ dài(nội dung);
         nếu (n == 0) {
             trả về 0;
         };
 
-        số_dòng = 0;
+        số dòng = 0;
         lặp(i = 0; i < n; i++) {
-            nếu (nội_dung[i] == "\n") {
-                số_dòng = số_dòng + 1;
+            nếu (nội dung[i] == "\n") {
+                số dòng = số dòng + 1;
             };
         };
 
         // std::getline không tạo thêm một dòng rỗng sau dấu xuống dòng cuối tệp.
-        nếu (nội_dung[n - 1] != "\n") {
-            số_dòng = số_dòng + 1;
+        nếu (nội dung[n - 1] != "\n") {
+            số dòng = số dòng + 1;
         };
-        trả về số_dòng;
+        trả về số dòng;
     };
 
     // Đếm từ phân tách bởi ASCII whitespace.
     hàm công khai đếm từ tệp(đường dẫn) {
-        nội_dung = mình.đọc tệp(đường dẫn);
-        số_từ = 0;
-        trong_từ = sai;
-        lặp(i = 0; i < do_dai(nội_dung); i++) {
-            c = nội_dung[i];
+        nội dung = mình.đọc tệp(đường dẫn);
+        số từ = 0;
+        trong từ = sai;
+        lặp(i = 0; i < máy ảo lấy độ dài(nội dung); i++) {
+            c = nội dung[i];
             trắng = c == " " || c == "\t" || c == "\n" || c == "\r";
             nếu (trắng) {
-                trong_từ = sai;
+                trong từ = sai;
             } hoặc {
-                nếu (!trong_từ) {
-                    số_từ = số_từ + 1;
-                    trong_từ = đúng;
+                nếu (!trong từ) {
+                    số từ = số từ + 1;
+                    trong từ = đúng;
                 };
             };
         };
-        trả về số_từ;
+        trả về số từ;
     };
 };
 
 
 hàm công khai tệp chuẩn hóa đường dẫn(đường dẫn) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.tệp chuẩn hóa đường dẫn(đường dẫn);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.tệp chuẩn hóa đường dẫn(đường dẫn);
 };
 
-hàm công khai tệp đọc bytes posix(đường, thao_tác) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.tệp đọc bytes posix(đường, thao_tác);
+hàm công khai tệp đọc các byte posix(đường, thao tác) {
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.tệp đọc các byte posix(đường, thao tác);
 };
 
-hàm công khai tệp ghi bytes posix(đường, bytes, nối, thao_tác) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.tệp ghi bytes posix(đường, bytes, nối, thao_tác);
+hàm công khai tệp ghi các byte posix(đường, các byte, nối, thao tác) {
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.tệp ghi các byte posix(đường, các byte, nối, thao tác);
 };
 
-hàm công khai tệp yêu cầu bytes(bytes) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.tệp yêu cầu bytes(bytes);
+hàm công khai tệp yêu cầu các byte(các byte) {
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.tệp yêu cầu các byte(các byte);
 };
 
 hàm công khai đọc tệp(đường dẫn) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.đọc tệp(đường dẫn);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.đọc tệp(đường dẫn);
 };
 
 hàm công khai ghi tệp(đường dẫn, nội dung) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.ghi tệp(đường dẫn, nội dung);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.ghi tệp(đường dẫn, nội dung);
 };
 
 hàm công khai ghi nối tệp(đường dẫn, nội dung) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.ghi nối tệp(đường dẫn, nội dung);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.ghi nối tệp(đường dẫn, nội dung);
 };
 
-hàm công khai đọc bytes tệp(đường dẫn) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.đọc bytes tệp(đường dẫn);
+hàm công khai đọc các byte tệp(đường dẫn) {
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.đọc các byte tệp(đường dẫn);
 };
 
-hàm công khai ghi bytes tệp(đường dẫn, bytes) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.ghi bytes tệp(đường dẫn, bytes);
+hàm công khai ghi các byte tệp(đường dẫn, các byte) {
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.ghi các byte tệp(đường dẫn, các byte);
 };
 
 hàm công khai đếm dòng tệp(đường dẫn) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.đếm dòng tệp(đường dẫn);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.đếm dòng tệp(đường dẫn);
 };
 
 hàm công khai đếm từ tệp(đường dẫn) {
-    __vpp_adapter = Hệ Tệp();
-    trả về __vpp_adapter.đếm từ tệp(đường dẫn);
+    bộ chuyển tiếp = Hệ Tệp();
+    trả về bộ chuyển tiếp.đếm từ tệp(đường dẫn);
 };

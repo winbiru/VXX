@@ -1,0 +1,16 @@
+// Native compiler entry point. Imports are resolved recursively by the
+// self-hosted module loader, keeping source files independently editable.
+nhập phân tích từ vựng;
+nhập từ tố;
+nhập phân tích cú pháp;
+nhập chương trình;
+nhập sinh mã;
+nhập mã máy x86 64;
+nhập sinh mã chương trình;
+nhập đối tượng;
+nhập đối tượng mô đun;
+nhập định dạng elf 64;
+nhập nạp mô đun;
+nhập biên dịch mô đun;
+nhập bộ nhớ đệm;
+nhập trình điều khiển;

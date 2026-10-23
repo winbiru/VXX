@@ -6,7 +6,7 @@ hàm công khai tập bản ghi(danh sách hàng) {
 };
 
 hàm công khai số hàng tập bản ghi(bản ghi) {
-    trả về độ dài(bản ghi);
+    trả về máy ảo lấy độ dài(bản ghi);
 };
 
 hàm công khai hàng tập bản ghi(bản ghi, chỉ số) {
@@ -15,10 +15,10 @@ hàm công khai hàng tập bản ghi(bản ghi, chỉ số) {
 
 hàm công khai lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
     kết quả = [];
-    lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
+    lặp (i = 0; i < máy ảo lấy độ dài(bản ghi); i = i + 1) {
         hàng = bản ghi[i];
-        nếu (lấy map(hàng, cột, rỗng) == giá trị) {
-            thêm(kết quả, hàng);
+        nếu (lấy từ điển(hàng, cột, rỗng) == giá trị) {
+            máy ảo thêm cuối danh sách(kết quả, hàng);
         };
     };
     trả về kết quả;
@@ -26,8 +26,8 @@ hàm công khai lọc tập bản ghi bằng(bản ghi, cột, giá trị) {
 
 hàm công khai cột tập bản ghi(bản ghi, cột, mặc định = rỗng) {
     kết quả = [];
-    lặp (i = 0; i < độ dài(bản ghi); i = i + 1) {
-        thêm(kết quả, lấy map(bản ghi[i], cột, mặc định));
+    lặp (i = 0; i < máy ảo lấy độ dài(bản ghi); i = i + 1) {
+        máy ảo thêm cuối danh sách(kết quả, lấy từ điển(bản ghi[i], cột, mặc định));
     };
     trả về kết quả;
 };
@@ -35,30 +35,30 @@ hàm công khai cột tập bản ghi(bản ghi, cột, mặc định = rỗng) 
 // Sao chép danh sách ngoài để cursor/kích thước không phụ thuộc nguồn gọi.
 // Map của mỗi hàng vẫn được chia sẻ như API tập bản ghi hiện có.
 lớp công khai Tập Bản Ghi triển khai Bộ Chứa {
-    hàm công khai khởi tạo(các_hàng) {
-        nếu (loai_cua(các_hàng) != "danh sách") { ném "tập bản ghi: cần danh sách hàng"; };
+    hàm công khai khởi tạo(các hàng) {
+        nếu (loại của(các hàng) != "danh sách") { ném "tập bản ghi: cần danh sách hàng"; };
         mình.hàng = [];
-        lặp(i = 0; i < do_dai(các_hàng); i++) {
-            nếu (loai_cua(các_hàng[i]) != "từ điển") { ném "tập bản ghi: hàng phải là từ điển"; };
-            them(mình.hàng, các_hàng[i]);
+        lặp(i = 0; i < máy ảo lấy độ dài(các hàng); i++) {
+            nếu (loại của(các hàng[i]) != "từ điển") { ném "tập bản ghi: hàng phải là từ điển"; };
+            máy ảo thêm cuối danh sách(mình.hàng, các hàng[i]);
         };
     };
-    hàm công khai số lượng() { trả về do_dai(mình.hàng); };
+    hàm công khai số lượng() { trả về máy ảo lấy độ dài(mình.hàng); };
     hàm công khai trống() { trả về mình.số lượng() == 0; };
-    hàm công khai tại(chỉ_số) {
-        nếu (loai_cua(chỉ_số) != "số nguyên" || chỉ_số < 0 || chỉ_số >= mình.số lượng()) {
+    hàm công khai tại(chỉ số) {
+        nếu (loại của(chỉ số) != "số nguyên" || chỉ số < 0 || chỉ số >= mình.số lượng()) {
             ném "tập bản ghi: chỉ số ngoài phạm vi";
         };
         hàng = mình.hàng;
-        trả về hàng[chỉ_số];
+        trả về hàng[chỉ số];
     };
-    hàm công khai lọc bằng(cột, giá_trị) {
-        trả về Tập Bản Ghi(lọc tập bản ghi bằng(mình.hàng, cột, giá_trị));
+    hàm công khai lọc bằng(cột, giá trị) {
+        trả về Tập Bản Ghi(lọc tập bản ghi bằng(mình.hàng, cột, giá trị));
     };
-    hàm công khai cột(tên, mặc_định = rỗng) { trả về cột tập bản ghi(mình.hàng, tên, mặc_định); };
+    hàm công khai cột(tên, mặc định = rỗng) { trả về cột tập bản ghi(mình.hàng, tên, mặc định); };
     hàm công khai danh sách() {
-        kết_quả = [];
-        lặp(i = 0; i < mình.số lượng(); i++) { them(kết_quả, mình.tại(i)); };
-        trả về kết_quả;
+        kết quả = [];
+        lặp(i = 0; i < mình.số lượng(); i++) { máy ảo thêm cuối danh sách(kết quả, mình.tại(i)); };
+        trả về kết quả;
     };
 };

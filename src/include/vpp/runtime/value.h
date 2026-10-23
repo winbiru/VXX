@@ -406,7 +406,7 @@ inline std::string stackValueToString(
 } // namespace detail
 
 // Các tập hợp là giá trị tham chiếu và có thể tạo chu trình qua thao tác native
-// (`thêm(ds, ds)` hoặc `đặt map(m, "self", m)`). Giữ tập phần tử đang được dựng
+// (`thêm(ds, ds)` hoặc `đặt từ điển(m, "self", m)`). Giữ tập phần tử đang được dựng
 // chuỗi cho từng lần hiển thị để tránh lặp vô hạn, đồng thời vẫn cho phép các
 // tham chiếu lặp nhưng không tạo chu trình được hiển thị bình thường.
 inline std::string sv_to_string(const StackValue &value) {

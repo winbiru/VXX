@@ -234,6 +234,10 @@ local path, Git source và filesystem registry.
 
 Đọc thêm: [Package System](docs/package-system.md).
 
+Gói thử nghiệm `lượng tử` hỗ trợ dựng mạch, mô phỏng vector trạng thái phức,
+phép đo/reset và xuất OpenQASM 3.0. Chạy ví dụ Bell bằng
+`vpp chạy examples/luong-tu/bell.vi`; xem [API và cầu nối Qiskit](docs/thư-viện-vpp/lượng%20tử/chính.md).
+
 ## 🧪 Build từ source
 
 Yêu cầu chính: compiler C++17 và CMake.

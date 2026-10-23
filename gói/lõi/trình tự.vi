@@ -3,21 +3,21 @@
 
 // Chuỗi: trả về chuỗi mới theo thứ tự ngược.
 // Danh sách: đảo tại chỗ và trả về rỗng để giữ API hiện có.
-hàm công khai đảo ngược(giá_trị) {
-    nếu (loai_cua(giá_trị) == "chuỗi") {
-        kết_quả = "";
-        lặp(i = do_dai(giá_trị) - 1; i >= 0; i--) {
-            kết_quả = kết_quả + giá_trị[i];
+hàm công khai đảo ngược(giá trị) {
+    nếu (loại của(giá trị) == "chuỗi") {
+        kết quả = "";
+        lặp(i = máy ảo lấy độ dài(giá trị) - 1; i >= 0; i--) {
+            kết quả = kết quả + giá trị[i];
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    n = do_dai(giá_trị);
+    n = máy ảo lấy độ dài(giá trị);
     lặp(i = 0; i < n - 1 - i; i++) {
         j = n - 1 - i;
-        tạm = giá_trị[i];
-        giá_trị[i] = giá_trị[j];
-        giá_trị[j] = tạm;
+        tạm = giá trị[i];
+        giá trị[i] = giá trị[j];
+        giá trị[j] = tạm;
     };
     trả về rỗng;
 };

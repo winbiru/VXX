@@ -5,8 +5,8 @@ nhập gói/thời gian/địa phương;
 
 hàm chính() {
     epoch = [0, 0, 0, 0, 0, 0, 0, 0];
-    lúc_đầu = thời gian địa phương từ epoch byte ffi(epoch);
-    lần_hai = thời gian địa phương từ epoch byte ffi(epoch);
+    lúc_đầu = thời gian địa phương từ mốc thời gian byte ffi(epoch);
+    lần_hai = thời gian địa phương từ mốc thời gian byte ffi(epoch);
     in thời gian định dạng đồng hồ(lúc_đầu, sai) ==
         thời gian định dạng đồng hồ(lần_hai, sai);
     in lúc_đầu[0] >= 1969 && lúc_đầu[0] <= 1970;

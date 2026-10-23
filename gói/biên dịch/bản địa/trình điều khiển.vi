@@ -1,0 +1,152 @@
+hàm bản địa đọc nguồn đầu vào(đường tệp, nguồn đầu vào) {
+    biến tệp dữ liệu = tệp mở đọc(đường tệp);
+    nếu (tệp dữ liệu <= 0) { trả về -1; };
+    biến hoàn thành = 0;
+    lặp (i = 0; i < 300; i++) {
+        biến số phần tử = tệp đọc khối(tệp dữ liệu, nguồn đầu vào);
+        nếu (số phần tử < 0) { thoát; };
+        nếu (số phần tử == 0) { hoàn thành = 1; thoát; };
+    };
+    nếu (tệp đóng(tệp dữ liệu) != 0) { trả về -1; };
+    nếu (hoàn thành != 1) { trả về -1; };
+    trả về byte dài(nguồn đầu vào);
+};
+
+// The self-host executable discovers Linux from procfs. This works for the
+// Stage 0 bootstrap and every later generation without a VM/platform API.
+hàm bản địa là linux() {
+    biến đường tệp = "/proc/self/exe";
+    biến mã tài nguyên = tệp mở đọc(đường tệp);
+    byte hủy(đường tệp);
+    nếu (mã tài nguyên <= 0) { trả về 0; };
+    tệp đóng(mã tài nguyên);
+    trả về 1;
+};
+
+hàm bản địa bản dựng(nguồn đầu vào đường tệp, executable đường tệp) {
+    biến linux = bản địa là linux();
+    biến nguồn đầu vào = byte mới();
+    biến biểu diễn trung gian = byte mới();
+    biến các hàm = byte mới();
+    biến mã máy = byte mới();
+    biến đối tượng = byte mới();
+    biến ngoại các lời gọi = byte mới();
+    biến sổ đăng ký = byte mới();
+    biến mô đun ends = byte mới();
+    biến các điểm bắt đầu = byte mới();
+    biến các phần nhập = byte mới();
+    biến đối tượng kho lưu trữ = byte mới();
+    biến đơn vị nguồn đầu vào = byte mới();
+    nếu (nguồn đầu vào <= 0) { trả về 11; };
+    nếu (biểu diễn trung gian <= 0) { trả về 11; };
+    nếu (các hàm <= 0) { trả về 11; };
+    nếu (mã máy <= 0) { trả về 11; };
+    nếu (đối tượng <= 0) { trả về 11; };
+    nếu (ngoại các lời gọi <= 0) { trả về 11; };
+    nếu (sổ đăng ký <= 0) { trả về 11; };
+    nếu (mô đun ends <= 0) { trả về 11; };
+    nếu (các điểm bắt đầu <= 0) { trả về 11; };
+    nếu (các phần nhập <= 0) { trả về 11; };
+    nếu (đối tượng kho lưu trữ <= 0) { trả về 11; };
+    nếu (đơn vị nguồn đầu vào <= 0) { trả về 11; };
+
+    biến mã trạng thái = 0;
+    biến điểm vào mã định danh = -1;
+    nếu (nạp mô đun chuẩn bị(nguồn đầu vào đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = 12; };
+    nếu (mã trạng thái == 0) {
+        điểm vào mã định danh = biên dịch mô đun biên dịch các mô đun(nguồn đầu vào, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) - 1;
+        nếu (điểm vào mã định danh < 0) { mã trạng thái = 14; };
+    };
+    nếu (mã trạng thái == 0) {
+        biến đầu tiên = 0;
+        biến nguồn đầu vào độ lệch = 0;
+        lặp (đơn vị = 0; đơn vị < byte dài(mô đun ends); đơn vị = đơn vị + 4) {
+            biến cuối cùng = byte đọc số nguyên ba mươi hai bit(mô đun ends, đơn vị);
+            nếu (cuối cùng < đầu tiên) { mã trạng thái = 14; thoát; };
+            nguồn đầu vào độ lệch = biên dịch mô đun đọc đơn vị(nguồn đầu vào, nguồn đầu vào độ lệch, đơn vị nguồn đầu vào);
+            nếu (nguồn đầu vào độ lệch < 0) { mã trạng thái = 14; thoát; };
+            nếu (cuối cùng > đầu tiên) {
+                biến định dạng xuất = 2;
+                nếu (linux == 1) { định dạng xuất = 3; };
+                biến khóa tra cứu = bộ nhớ đệm biên dịch khóa tra cứu(định dạng xuất, đơn vị nguồn đầu vào, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh);
+                biến đã có bộ nhớ đệm = 0;
+                nếu (khóa tra cứu > 0) { đã có bộ nhớ đệm = bộ nhớ đệm đọc(khóa tra cứu, đối tượng); };
+                nếu (đã có bộ nhớ đệm != 1) {
+                    biến đã sinh mã = -1;
+                    nếu (linux == 1) {
+                        đã sinh mã = sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, ngoại các lời gọi);
+                    } hoặc {
+                        đã sinh mã = sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, ngoại các lời gọi);
+                    };
+                    nếu (đã sinh mã <= 0) {
+                        mã trạng thái = 15;
+                    }
+                    hoặc {
+                        biến đã phát mã = -1;
+                        nếu (linux == 1) {
+                            đã phát mã = elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
+                        } hoặc {
+                            đã phát mã = đối tượng mô đun macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, ngoại các lời gọi);
+                        };
+                        nếu (đã phát mã <= 0) {
+                            mã trạng thái = 16;
+                        };
+                    };
+                    nếu (mã trạng thái == 0) {
+                        nếu (khóa tra cứu > 0) { bộ nhớ đệm ghi(khóa tra cứu, đối tượng); };
+                    };
+                };
+                nếu (khóa tra cứu > 0) { byte hủy(khóa tra cứu); };
+                nếu (mã trạng thái != 0) { thoát; };
+                nếu (byte đẩy số nguyên ba mươi hai bit(đối tượng kho lưu trữ, byte dài(đối tượng)) != 0) { mã trạng thái = 16; thoát; };
+                nếu (byte nối(đối tượng kho lưu trữ, đối tượng) != 0) { mã trạng thái = 16; thoát; };
+            };
+            đầu tiên = cuối cùng;
+        };
+        nếu (byte dài(đối tượng kho lưu trữ) <= 0) { mã trạng thái = 16; };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (liên kết đối tượng(đối tượng kho lưu trữ, executable đường tệp, nguồn đầu vào đường tệp) != 0) { mã trạng thái = 17; };
+    };
+
+    byte hủy(nguồn đầu vào);
+    byte hủy(biểu diễn trung gian);
+    byte hủy(các hàm);
+    byte hủy(mã máy);
+    byte hủy(đối tượng);
+    byte hủy(ngoại các lời gọi);
+    byte hủy(sổ đăng ký);
+    byte hủy(mô đun ends);
+    byte hủy(các điểm bắt đầu);
+    byte hủy(các phần nhập);
+    byte hủy(đối tượng kho lưu trữ);
+    byte hủy(đơn vị nguồn đầu vào);
+    trả về mã trạng thái;
+};
+
+hàm chính() {
+    nếu (đối số đếm() != 5) { trả về 2; };
+    biến lệnh = đối số lấy(1);
+    biến nguồn đầu vào = đối số lấy(2);
+    biến tùy chọn = đối số lấy(3);
+    biến kết xuất = đối số lấy(4);
+    nếu (lệnh <= 0) { trả về 2; };
+    nếu (nguồn đầu vào <= 0) { trả về 2; };
+    nếu (tùy chọn <= 0) { trả về 2; };
+    nếu (kết xuất <= 0) { trả về 2; };
+    biến bản dựng hằng văn bản = "build";
+    biến tùy chọn hằng văn bản = "-o";
+    biến đạt = 1;
+    nếu (byte bằng(lệnh, bản dựng hằng văn bản) != 1) { đạt = 0; };
+    nếu (byte bằng(tùy chọn, tùy chọn hằng văn bản) != 1) { đạt = 0; };
+    biến kết quả trả về = 2;
+    nếu (đạt == 1) { kết quả trả về = bản địa bản dựng(nguồn đầu vào, kết xuất); };
+    byte hủy(bản dựng hằng văn bản);
+    byte hủy(tùy chọn hằng văn bản);
+    byte hủy(lệnh);
+    byte hủy(nguồn đầu vào);
+    byte hủy(tùy chọn);
+    byte hủy(kết xuất);
+    trả về kết quả trả về;
+};
+

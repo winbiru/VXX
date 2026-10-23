@@ -5,20 +5,20 @@ nhập gói/biên dịch/mã máy;
 nhập gói/biên dịch/đối tượng;
 
 lớp công khai Bộ Sinh Mã Bản Địa {
-    hàm công khai khởi tạo(triple) { mình.đích = biên dịch phân tích đích(triple); };
-    hàm công khai triple() { trả về biên dịch triple chuẩn(mình.đích); };
+    hàm công khai khởi tạo(bộ ba) { mình.đích = biên dịch phân tích đích(bộ ba); };
+    hàm công khai bộ ba() { trả về biên dịch bộ ba chuẩn(mình.đích); };
     hàm công khai lá(loại, hằng = 0) {
         đích = mình.đích;
         trả về biên dịch mã máy lá(đích["kiến trúc"], loại, hằng, đích["hệ điều hành"]);
     };
-    hàm công khai hàm máy(hàm_ir) {
+    hàm công khai hàm máy(danh sách hàm biểu diễn trung gian) {
         đích = mình.đích;
-        trả về biên dịch mã máy hàm(đích["kiến trúc"], hàm_ir, đích["hệ điều hành"]);
+        trả về biên dịch mã máy hàm(đích["kiến trúc"], danh sách hàm biểu diễn trung gian, đích["hệ điều hành"]);
     };
-    hàm công khai object(mã, tên, tái_định_vị = rỗng) {
-        nếu (tái_định_vị == rỗng) { tái_định_vị = []; };
+    hàm công khai đối tượng(mã, tên, tái định vị = rỗng) {
+        nếu (tái định vị == rỗng) { tái định vị = []; };
         đích = mình.đích;
-        trả về biên dịch object(đích["kiến trúc"], đích["hệ điều hành"],
-            đích["ABI"], mã, tên, tái_định_vị);
+        trả về biên dịch đối tượng(đích["kiến trúc"], đích["hệ điều hành"],
+            đích["ABI"], mã, tên, tái định vị);
     };
 };

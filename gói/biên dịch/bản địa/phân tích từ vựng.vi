@@ -1,0 +1,293 @@
+// Lõi lexer native viết bằng V++; mọi vị trí là byte offset UTF-8.
+// Tương thích ABI i32/byte-handle hiện tại, không dùng VM hoặc import.
+// Kết quả âm: đầu vào/vị trí/UTF-8/chú thích/chuỗi không hợp lệ.
+
+hàm từ vựng khoảng trắng(c) {
+    nếu (c == 32) { trả về 1; };
+    nếu (c == 9) { trả về 1; };
+    nếu (c == 10) { trả về 1; };
+    nếu (c == 13) { trả về 1; };
+    nếu (c == 11) { trả về 1; };
+    nếu (c == 12) { trả về 1; };
+    trả về 0;
+};
+
+hàm từ vựng dấu phân cách(c) {
+    nếu (c == 34) { trả về 1; };
+    nếu (c == 39) { trả về 1; };
+    nếu (c == 43) { trả về 1; };
+    nếu (c == 45) { trả về 1; };
+    nếu (c == 42) { trả về 1; };
+    nếu (c == 47) { trả về 1; };
+    nếu (c == 40) { trả về 1; };
+    nếu (c == 41) { trả về 1; };
+    nếu (c == 123) { trả về 1; };
+    nếu (c == 125) { trả về 1; };
+    nếu (c == 91) { trả về 1; };
+    nếu (c == 93) { trả về 1; };
+    nếu (c == 59) { trả về 1; };
+    nếu (c == 44) { trả về 1; };
+    nếu (c == 60) { trả về 1; };
+    nếu (c == 62) { trả về 1; };
+    nếu (c == 61) { trả về 1; };
+    nếu (c == 33) { trả về 1; };
+    nếu (c == 58) { trả về 1; };
+    nếu (c == 37) { trả về 1; };
+    nếu (c == 38) { trả về 1; };
+    nếu (c == 124) { trả về 1; };
+    trả về 0;
+};
+
+// Số byte của một Unicode scalar tại pos; từ chối NUL, overlong,
+// surrogate, code point > U+10FFFF và continuation rời rạc.
+hàm từ vựng unicode tám bit bước(nguồn văn bản, vị trí hiện tại) {
+    biến n = byte dài(nguồn văn bản);
+    nếu (n < 0) { trả về -1; };
+    nếu (vị trí hiện tại < 0) { trả về -1; };
+    nếu (vị trí hiện tại >= n) { trả về -1; };
+    biến a = byte lấy(nguồn văn bản, vị trí hiện tại);
+    nếu (a <= 0) { trả về -1; };
+    nếu (a < 128) { trả về 1; };
+    nếu (a < 194) { trả về -1; };
+    nếu (a > 244) { trả về -1; };
+    biến số ký tự = 2;
+    nếu (a >= 224) { số ký tự = 3; };
+    nếu (a >= 240) { số ký tự = 4; };
+    nếu (vị trí hiện tại + số ký tự > n) { trả về -1; };
+    biến b = byte lấy(nguồn văn bản, vị trí hiện tại + 1);
+    nếu (b < 128) { trả về -1; };
+    nếu (b > 191) { trả về -1; };
+    nếu (a == 224) { nếu (b < 160) { trả về -1; }; };
+    nếu (a == 237) { nếu (b > 159) { trả về -1; }; };
+    nếu (a == 240) { nếu (b < 144) { trả về -1; }; };
+    nếu (a == 244) { nếu (b > 143) { trả về -1; }; };
+    nếu (số ký tự >= 3) {
+        biến c = byte lấy(nguồn văn bản, vị trí hiện tại + 2);
+        nếu (c < 128) { trả về -1; };
+        nếu (c > 191) { trả về -1; };
+    };
+    nếu (số ký tự == 4) {
+        biến d = byte lấy(nguồn văn bản, vị trí hiện tại + 3);
+        nếu (d < 128) { trả về -1; };
+        nếu (d > 191) { trả về -1; };
+    };
+    trả về số ký tự;
+};
+
+// 1 nếu cặp byte là toán tử đôi mà lexer hiện hành hiểu.
+hàm từ vựng hai(a, b) {
+    nếu (b == 61) {
+        nếu (a == 61) { trả về 1; };
+        nếu (a == 33) { trả về 1; };
+        nếu (a == 60) { trả về 1; };
+        nếu (a == 62) { trả về 1; };
+        nếu (a == 43) { trả về 1; };
+        nếu (a == 45) { trả về 1; };
+        nếu (a == 42) { trả về 1; };
+        nếu (a == 47) { trả về 1; };
+        nếu (a == 37) { trả về 1; };
+    };
+    nếu (a == 38) { nếu (b == 38) { trả về 1; }; };
+    nếu (a == 124) { nếu (b == 124) { trả về 1; }; };
+    nếu (a == 43) { nếu (b == 43) { trả về 1; }; };
+    nếu (a == 45) { nếu (b == 45) { trả về 1; }; };
+    trả về 0;
+};
+
+// Bỏ khoảng trắng và //, /* */; trả về offset token tiếp theo hoặc -1.
+hàm từ vựng số mục bỏ qua(nguồn văn bản, độ lệch) {
+    biến n = byte dài(nguồn văn bản);
+    nếu (n < 0) { trả về -1; };
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch > n) { trả về -1; };
+    biến i = độ lệch;
+    lặp (i = độ lệch; i < n; i = i) {
+        biến bước = từ vựng unicode tám bit bước(nguồn văn bản, i);
+        nếu (bước < 0) { trả về -1; };
+        biến c = byte lấy(nguồn văn bản, i);
+        nếu (từ vựng khoảng trắng(c) == 1) {
+            i = i + 1;
+        } hoặc {
+            biến kế tiếp = -1;
+            nếu (i + 1 < n) { kế tiếp = byte lấy(nguồn văn bản, i + 1); };
+            nếu (c == 47) {
+                nếu (kế tiếp == 47) {
+                    i = i + 2;
+                    lặp (j = i; j < n; j = j) {
+                        nếu (byte lấy(nguồn văn bản, j) == 10) { thoát; };
+                        biến độ rộng hiện tại dòng = từ vựng unicode tám bit bước(nguồn văn bản, j);
+                        nếu (độ rộng hiện tại dòng < 0) { trả về -1; };
+                        j = j + độ rộng hiện tại dòng;
+                        i = j;
+                    };
+                } hoặc {
+                    nếu (kế tiếp == 42) {
+                        i = i + 2;
+                        biến đã khép = 0;
+                        lặp (k = i; k < n; k = k) {
+                            biến độ rộng hiện tại khối = từ vựng unicode tám bit bước(nguồn văn bản, k);
+                            nếu (độ rộng hiện tại khối < 0) { trả về -1; };
+                            nếu (byte lấy(nguồn văn bản, k) == 42) {
+                                nếu (k + 1 < n) {
+                                    nếu (byte lấy(nguồn văn bản, k + 1) == 47) {
+                                        i = k + 2;
+                                        đã khép = 1;
+                                        thoát;
+                                    };
+                                };
+                            };
+                            k = k + độ rộng hiện tại khối;
+                        };
+                        nếu (đã khép == 0) { trả về -1; };
+                    } hoặc { thoát; };
+                };
+            } hoặc { thoát; };
+        };
+    };
+    trả về i;
+};
+
+// Kết thúc exclusive của token bắt đầu tại start (đã lex_skip).
+hàm từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu) {
+    biến n = byte dài(nguồn văn bản);
+    nếu (n < 0) { trả về -1; };
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    nếu (điểm bắt đầu >= n) { trả về -1; };
+    biến bước = từ vựng unicode tám bit bước(nguồn văn bản, điểm bắt đầu);
+    nếu (bước < 0) { trả về -1; };
+    biến c = byte lấy(nguồn văn bản, điểm bắt đầu);
+    nếu (từ vựng khoảng trắng(c) == 1) { trả về -1; };
+    nếu (c == 34) {
+        trả về từ vựng nháy điểm kết thúc(nguồn văn bản, điểm bắt đầu, c);
+    };
+    nếu (c == 39) {
+        trả về từ vựng nháy điểm kết thúc(nguồn văn bản, điểm bắt đầu, c);
+    };
+    nếu (điểm bắt đầu + 1 < n) {
+        nếu (từ vựng hai(c, byte lấy(nguồn văn bản, điểm bắt đầu + 1)) == 1) { trả về điểm bắt đầu + 2; };
+    };
+    nếu (từ vựng dấu phân cách(c) == 1) { trả về điểm bắt đầu + 1; };
+    biến i = điểm bắt đầu;
+    lặp (i = điểm bắt đầu; i < n; i = i) {
+        biến độ rộng hiện tại = từ vựng unicode tám bit bước(nguồn văn bản, i);
+        nếu (độ rộng hiện tại < 0) { trả về -1; };
+        biến hiện hành = byte lấy(nguồn văn bản, i);
+        nếu (từ vựng khoảng trắng(hiện hành) == 1) { thoát; };
+        nếu (từ vựng dấu phân cách(hiện hành) == 1) { thoát; };
+        i = i + độ rộng hiện tại;
+    };
+    trả về i;
+};
+
+// Từ khóa mở đầu câu đứng riêng; những từ tiếp theo của định danh có thể
+// chứa từ khóa, giống cách đặt tên nhiều từ của bộ biên dịch đầy đủ.
+hàm từ vựng từ khóa đơn(nguồn văn bản, điểm bắt đầu, điểm kết thúc) {
+    biến từ khóa = "hàm|biến|trả|về|nếu|hoặc|lặp|in|thoát|bỏ|qua|đúng|sai|rỗng|nhập";
+    biến đầu từ = 0;
+    biến khớp từ = 0;
+    lặp (vị trí = 0; vị trí <= byte dài(từ khóa); vị trí++) {
+        biến kết thúc từ = 0;
+        nếu (vị trí == byte dài(từ khóa)) { kết thúc từ = 1; }
+        hoặc nếu (byte lấy(từ khóa, vị trí) == 124) { kết thúc từ = 1; };
+        nếu (kết thúc từ == 1) {
+            nếu (vị trí - đầu từ == điểm kết thúc - điểm bắt đầu) {
+                khớp từ = 1;
+                lặp (chỉ số = 0; chỉ số < vị trí - đầu từ; chỉ số++) {
+                    nếu (byte lấy(từ khóa, đầu từ + chỉ số) != byte lấy(nguồn văn bản, điểm bắt đầu + chỉ số)) {
+                        khớp từ = 0;
+                    };
+                };
+            };
+            nếu (khớp từ == 1) { thoát; };
+            đầu từ = vị trí + 1;
+        };
+    };
+    byte hủy(từ khóa);
+    trả về khớp từ;
+};
+
+hàm từ vựng điểm kết thúc tên(nguồn văn bản, điểm bắt đầu) {
+    biến điểm kết thúc = từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu);
+    nếu (điểm kết thúc <= điểm bắt đầu) { trả về điểm kết thúc; };
+    nếu (từ vựng loại từ tố(nguồn văn bản, điểm bắt đầu, điểm kết thúc) != 1) { trả về điểm kết thúc; };
+    nếu (từ vựng từ khóa đơn(nguồn văn bản, điểm bắt đầu, điểm kết thúc) == 1) { trả về điểm kết thúc; };
+    biến chiều dài = byte dài(nguồn văn bản);
+    lặp (lần = 0; lần < chiều dài; lần++) {
+        biến kế tiếp = điểm kết thúc;
+        lặp (kế tiếp = điểm kết thúc; kế tiếp < chiều dài; kế tiếp++) {
+            biến ký tự = byte lấy(nguồn văn bản, kế tiếp);
+            nếu (ký tự != 32) { nếu (ký tự != 9) { thoát; }; };
+        };
+        nếu (kế tiếp == điểm kết thúc) { thoát; };
+        nếu (kế tiếp >= chiều dài) { thoát; };
+        biến cuối từ = từ vựng điểm kết thúc(nguồn văn bản, kế tiếp);
+        nếu (cuối từ <= kế tiếp) { thoát; };
+        nếu (từ vựng loại từ tố(nguồn văn bản, kế tiếp, cuối từ) != 1) { thoát; };
+        điểm kết thúc = cuối từ;
+    };
+    trả về điểm kết thúc;
+};
+
+hàm từ vựng loại từ tố ghép(nguồn văn bản, điểm bắt đầu, điểm kết thúc) {
+    biến cuối từ = từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu);
+    nếu (cuối từ == điểm kết thúc) { trả về từ vựng loại từ tố(nguồn văn bản, điểm bắt đầu, điểm kết thúc); };
+    nếu (từ vựng điểm kết thúc tên(nguồn văn bản, điểm bắt đầu) == điểm kết thúc) { trả về 1; };
+    trả về -1;
+};
+
+hàm từ vựng nháy điểm kết thúc(nguồn văn bản, điểm bắt đầu, nháy) {
+    biến n = byte dài(nguồn văn bản);
+    lặp (i = điểm bắt đầu + 1; i < n; i = i) {
+        biến độ rộng hiện tại = từ vựng unicode tám bit bước(nguồn văn bản, i);
+        nếu (độ rộng hiện tại < 0) { trả về -1; };
+        biến c = byte lấy(nguồn văn bản, i);
+        nếu (c == 10) { trả về -1; };
+        nếu (c == 13) { trả về -1; };
+        nếu (c == nháy) { trả về i + 1; };
+        nếu (c == 92) {
+            i = i + 1;
+            nếu (i >= n) { trả về -1; };
+            độ rộng hiện tại = từ vựng unicode tám bit bước(nguồn văn bản, i);
+            nếu (độ rộng hiện tại < 0) { trả về -1; };
+            nếu (byte lấy(nguồn văn bản, i) == 10) { trả về -1; };
+            nếu (byte lấy(nguồn văn bản, i) == 13) { trả về -1; };
+        };
+        i = i + độ rộng hiện tại;
+    };
+    trả về -1;
+};
+
+// 1: định danh, 2: số nguyên, 3: số thực, 4: chuỗi,
+// 5: toán tử, 6: dấu câu. -1: span/token không hợp lệ.
+hàm từ vựng loại từ tố(nguồn văn bản, điểm bắt đầu, điểm kết thúc) {
+    nếu (điểm kết thúc <= điểm bắt đầu) { trả về -1; };
+    nếu (từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu) != điểm kết thúc) { trả về -1; };
+    biến a = byte lấy(nguồn văn bản, điểm bắt đầu);
+    nếu (a == 34) { trả về 4; };
+    nếu (a == 39) { trả về 4; };
+    nếu (từ vựng dấu phân cách(a) == 1) {
+        nếu (a == 40) { trả về 6; };
+        nếu (a == 41) { trả về 6; };
+        nếu (a == 123) { trả về 6; };
+        nếu (a == 125) { trả về 6; };
+        nếu (a == 91) { trả về 6; };
+        nếu (a == 93) { trả về 6; };
+        nếu (a == 59) { trả về 6; };
+        nếu (a == 44) { trả về 6; };
+        nếu (a == 58) { trả về 6; };
+        trả về 5;
+    };
+    biến các dấu chấm = 0;
+    lặp (i = điểm bắt đầu; i < điểm kết thúc; i++) {
+        biến c = byte lấy(nguồn văn bản, i);
+        nếu (c == 46) {
+            các dấu chấm = các dấu chấm + 1;
+        } hoặc {
+            nếu (c < 48) { trả về 1; };
+            nếu (c > 57) { trả về 1; };
+        };
+    };
+    nếu (các dấu chấm == 0) { trả về 2; };
+    nếu (các dấu chấm == 1) { trả về 3; };
+    trả về 1;
+};

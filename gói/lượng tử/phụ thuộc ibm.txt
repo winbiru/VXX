@@ -1,0 +1,2 @@
+-r phụ thuộc qiskit.txt
+qiskit-ibm-runtime>=0.40,<1

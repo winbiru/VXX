@@ -6,62 +6,62 @@ nhập gói/biên dịch/cây cú pháp;
 nhập gói/biên dịch/nút cú pháp;
 
 lớp công khai Bộ Biên Dịch {
-    hàm công khai khởi tạo(mã_nguồn, thư_mục) {
-        mình.snapshot = biên dịch snapshot nội bộ(mã_nguồn, thư_mục);
-        mình.chỉ_mục_khai_báo = rỗng;
+    hàm công khai khởi tạo(mã nguồn, thư mục) {
+        mình.snapshot = biên dịch snapshot nội bộ(mã nguồn, thư mục);
+        mình.chỉ mục khai báo = rỗng;
     };
 
     hàm công khai kiểm tra() {
-        kết_quả = mình.snapshot;
+        kết quả = mình.snapshot;
         trả về {
-            "hợp lệ": lấy map(kết_quả, "hợp lệ", 0),
-            "lỗi": lấy map(kết_quả, "lỗi", ""),
-            "lệnh": lấy map(kết_quả, "lệnh", 0)
+            "hợp lệ": lấy từ điển(kết quả, "hợp lệ", 0),
+            "lỗi": lấy từ điển(kết quả, "lỗi", ""),
+            "lệnh": lấy từ điển(kết quả, "lệnh", 0)
         };
     };
 
     hàm công khai phân tích() {
-        kết_quả = mình.snapshot;
-        nếu (!lấy map(kết_quả, "hợp lệ", 0)) {
-            ném lấy map(kết_quả, "lỗi", "biên dịch thất bại");
+        kết quả = mình.snapshot;
+        nếu (!lấy từ điển(kết quả, "hợp lệ", 0)) {
+            ném lấy từ điển(kết quả, "lỗi", "biên dịch thất bại");
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai bytecode() {
-        trả về lấy map(mình.phân tích(), "bytecode", []);
+    hàm công khai mã trung gian() {
+        trả về lấy từ điển(mình.phân tích(), "bytecode", []);
     };
 
-    hàm công khai bytecode hàm() {
-        trả về lấy map(mình.phân tích(), "hàm", []);
+    hàm công khai mã trung gian hàm() {
+        trả về lấy từ điển(mình.phân tích(), "hàm", []);
     };
 
     hàm công khai cây cú pháp() {
-        trả về lấy map(mình.phân tích(), "cây cú pháp", []);
+        trả về lấy từ điển(mình.phân tích(), "cây cú pháp", []);
     };
 
     hàm công khai thống kê() {
-        kết_quả = mình.phân tích();
+        kết quả = mình.phân tích();
         trả về {
-            "token": lấy map(kết_quả, "token", 0),
-            "ký hiệu": lấy map(kết_quả, "ký hiệu", 0),
-            "phạm vi": lấy map(kết_quả, "phạm vi", 0),
-            "tham chiếu": lấy map(kết_quả, "tham chiếu", 0),
-            "lệnh": lấy map(kết_quả, "lệnh", 0),
-            "mô đun": lấy map(kết_quả, "mô đun", 0)
+            "token": lấy từ điển(kết quả, "token", 0),
+            "ký hiệu": lấy từ điển(kết quả, "ký hiệu", 0),
+            "phạm vi": lấy từ điển(kết quả, "phạm vi", 0),
+            "tham chiếu": lấy từ điển(kết quả, "tham chiếu", 0),
+            "lệnh": lấy từ điển(kết quả, "lệnh", 0),
+            "mô đun": lấy từ điển(kết quả, "mô đun", 0)
         };
     };
 
     hàm công khai tìm khai báo(tên) {
-        nếu (loai_cua(tên) != "chuỗi") { ném "biên dịch: tên phải là chuỗi"; };
-        nếu (mình.chỉ_mục_khai_báo == rỗng) {
-            mình.chỉ_mục_khai_báo = Bộ Chỉ Mục Khai Báo(mình.cây cú pháp());
+        nếu (loại của(tên) != "chuỗi") { ném "biên dịch: tên phải là chuỗi"; };
+        nếu (mình.chỉ mục khai báo == rỗng) {
+            mình.chỉ mục khai báo = Bộ Chỉ Mục Khai Báo(mình.cây cú pháp());
         };
-        chỉ_mục = mình.chỉ_mục_khai_báo;
-        trả về chỉ_mục.tìm(tên);
+        chỉ mục = mình.chỉ mục khai báo;
+        trả về chỉ mục.tìm(tên);
     };
 
-    hàm công khai thống kê opcode() {
-        trả về biên dịch thống kê opcode từ bytecode(mình.bytecode());
+    hàm công khai thống kê mã thao tác() {
+        trả về biên dịch thống kê mã thao tác từ mã trung gian(mình.mã trung gian());
     };
 };

@@ -49,7 +49,7 @@ Mỗi lệnh lưu `depthBefore`. Bộ kiểm tra CFG xét độ sâu stack ở c
 tại từng lệnh để tính địa chỉ biến tạm cho đúng ở mọi nhánh.
 Các lệnh mới đi qua **`--emit-raw`, `--emit-asm`, `--emit-obj` thực tế**.
 CLI hạ `compiler::IrProgram` đã được frontend/semantic C++ tạo ra thành
-`MachineFunction` qua thư viện **V++** `gói/biên dịch/mã máy hạ ir.vi`, rồi
+`MachineFunction` qua thư viện **V++** `gói/biên dịch/mã máy hạ biểu diễn trung gian.vi`, rồi
 phát byte mã máy và relocation từ thư viện V++ qua bridge
 `src/cli/native_vpp_codegen.cpp`. Từ 13/10, mỗi đường production
 `compileRawLeafVpp` hoặc `compileMachineFunctionVpp` thực hiện cả hạ IR và
@@ -113,7 +113,7 @@ thay thế toàn bộ** compiler và bộ in assembly C++.
 `gói/biên dịch/mã máy x86 64.vi` hiện có bộ phát Machine IR i32
 **viết hoàn toàn bằng V++**. Hai hàm tương ứng là
 `biên dịch mã máy phát aarch64 hàm(hàm_ir)` và
-`biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành)`.
+`biên dịch mã máy phát x86 sáu mươi tư hàm(hàm_ir, hệ_điều_hành)`.
 Chúng nhận MachineOpcode đúng tên trong `src/include/vpp/native/raw_codegen.h`:
 `PushConstant`, `LoadSlot`, `StoreSlot`, `Drop`, `Add`, `Sub`, `Mul`,
 `Equal`, `NotEqual`, `Less`, `LessEqual`, `Greater`, `GreaterEqual`,
@@ -172,7 +172,7 @@ nguồn fixture: `src/tests/kiem_tra_native_i32_boundaries.vi`.
 **Đường production đã tích hợp một phần:** CLI gọi `compileRawLeafVpp` để
 nhận diện và phát hàm lá i32 trên 16 kiến trúc **trong một lần chạy VM**.
 Khi hạ lá bị từ chối, trên x86-64/AArch64 `vpp-cli` gọi
-`compileMachineFunctionVpp`: thư viện `gói/biên dịch/mã máy hạ ir.vi`
+`compileMachineFunctionVpp`: thư viện `gói/biên dịch/mã máy hạ biểu diễn trung gian.vi`
 hạ IR tổng quát và `gói/biên dịch/mã máy.vi` phát mã máy, cũng **trong
 một lần chạy VM**. Cầu nối nhận `MachineFunction`, byte mã máy và CALL
 relocation để ghi `--emit-raw`/`--emit-obj`. Khi đã nhận được bản ghi
@@ -233,7 +233,7 @@ File x86-64 sử dụng `mov eax, edi; add eax, esi; ret`, còn ARM64 phát
 `add w0, w0, w1; ret`. CLI xuất **mã máy thực** cho `--emit-raw`, hoặc
 **lệnh assembly có nhãn hàm** cho `--emit-asm`, hoặc **object có symbol
 exported** cho `--emit-obj`. Lệnh này chưa tự liên kết executable. Bộ kiểm thử
-`vpp-raw-object-host-link` biên dịch object từ các hàm hằng số, cộng và trừ,
+`vpp-raw-object-host-link` biên dịch đối tượng từ các hàm hằng số, cộng và trừ,
 liên kết chúng bằng compiler C++ của máy chủ, rồi chạy executable để đối chiếu
 giá trị trả về thực. Lệnh assembly trên ARM64 đã được lắp ráp độc lập bằng Clang
 và đối chiếu với byte được phát trực tiếp. Bộ phát hiện hỗ trợ:
@@ -336,7 +336,7 @@ chương trình. Test nguồn ở `scripts/quality/nativeobjectparity.cpp`.
 `parseTargetVpp` trong `src/cli/native_vpp_codegen.cpp` để thực thi
 `biên dịch phân tích đích` từ `gói/biên dịch/đích.vi`. Parser V++ xử lý
 16 kiến trúc, alias, vendor, hệ điều hành và ABI như `src/native/target.cpp`;
-`biên dịch triple chuẩn` tạo tên triple canonical. CTest
+`biên dịch bộ ba chuẩn` tạo tên triple canonical. CTest
 `vpp-target-vpp-cpp-parity` đối chiếu với parser C++ độc lập trên 16 tên CPU,
 13 triple bổ sung và 10 trường hợp bị từ chối (39/39); toàn bộ 4/4
 CTest `vpp-target-*` đã đạt. C++ vẫn nhận diện host và cung cấp oracle.
@@ -527,7 +527,7 @@ test bằng Rosetta x86-64 trên macOS, gồm `CALL rel32`, tràn số và nhán
 máy được chạy, trên `ubuntu-latest` (Linux x86-64), `ubuntu-24.04-arm`
 (Linux ARM64) và `windows-latest` (Win64). Thư viện V++ chuyển kết quả
 `close()`/`closesocket()` trả 0 khi thành công thành giá trị `đúng` của API
-`socket đóng()`, đồng thời báo lỗi nếu đóng thất bại. Linux và Windows
+`đầu nối đóng()`, đồng thời báo lỗi nếu đóng thất bại. Linux và Windows
 vẫn cần kết quả CI thực tế để xác nhận khả năng phát hành.
 
 **Giới hạn còn lại:** đây là JIT cục bộ cho số nguyên, phép chọn PC,

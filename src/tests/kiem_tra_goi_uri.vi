@@ -1,36 +1,36 @@
-nhập gói/mạng/uri;
+nhập gói/mạng/định danh tài nguyên;
 
 hàm chính() {
-    u = uri phân tích("HTTP://Example.COM:80/a/../b?q=hello%20world#frag");
-    in lấy map(u, "scheme", "") == "http";
-    in lấy map(u, "host", "") == "example.com";
-    in lấy map(u, "port", 0) == 80;
-    in lấy map(u, "đường_dẫn", "") == "/a/../b";
-    n = uri chuẩn hóa(u);
-    in lấy map(n, "canonical", "") == "http://example.com/b?q=hello%20world#frag";
+    u = định danh tài nguyên phân tích("HTTP://Example.COM:80/a/../b?q=hello%20world#frag");
+    in lấy từ điển(u, "scheme", "") == "http";
+    in lấy từ điển(u, "host", "") == "example.com";
+    in lấy từ điển(u, "port", 0) == 80;
+    in lấy từ điển(u, "đường_dẫn", "") == "/a/../b";
+    n = định danh tài nguyên chuẩn hóa(u);
+    in lấy từ điển(n, "canonical", "") == "http://example.com/b?q=hello%20world#frag";
 
-    b = uri phân tích("http://a/b/c/d;p?q");
-    r = uri hợp nhất(b, "../g");
-    in lấy map(r, "canonical", "") == "http://a/b/g";
-    r2 = uri hợp nhất(b, "g?y#s");
-    in lấy map(r2, "canonical", "") == "http://a/b/c/g?y#s";
-    r3 = uri hợp nhất(b, "../../g");
-    in lấy map(r3, "canonical", "") == "http://a/g";
+    b = định danh tài nguyên phân tích("http://a/b/c/d;p?q");
+    r = định danh tài nguyên hợp nhất(b, "../g");
+    in lấy từ điển(r, "canonical", "") == "http://a/b/g";
+    r2 = định danh tài nguyên hợp nhất(b, "g?y#s");
+    in lấy từ điển(r2, "canonical", "") == "http://a/b/c/g?y#s";
+    r3 = định danh tài nguyên hợp nhất(b, "../../g");
+    in lấy từ điển(r3, "canonical", "") == "http://a/g";
 
-    in encode form("xin chào + V++") == "xin+ch%C3%A0o+%2B+V%2B%2B";
-    in decode form("xin+ch%C3%A0o+%2B+V%2B%2B") == "xin chào + V++";
+    in mã hóa biểu mẫu("xin chào + V++") == "xin+ch%C3%A0o+%2B+V%2B%2B";
+    in giải mã biểu mẫu("xin+ch%C3%A0o+%2B+V%2B%2B") == "xin chào + V++";
     in kiểu nội dung("a.json") == "application/json";
     in kiểu nội dung("a.unknown") == rỗng;
 
     thử {
-        uri phân tích("http://a/%ZZ");
+        định danh tài nguyên phân tích("http://a/%ZZ");
         in sai;
     } bắt lỗi (e) {
         in đúng;
     };
 
     thử {
-        url("gopher://example.com/");
+        địa chỉ tài nguyên("gopher://example.com/");
         in sai;
     } bắt lỗi (e) {
         in đúng;

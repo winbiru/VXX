@@ -4,65 +4,65 @@ nhập gói/mạng/http/máy khách;
 nhập gói/lõi/giao diện tài nguyên;
 
 lớp công khai Khách HTTP triển khai Đóng Được {
-    hàm công khai khởi tạo(url_gốc) {
-        nếu (loai_cua(url_gốc) != "chuỗi") { ném "khách HTTP: URL gốc phải là chuỗi"; };
-        mạng http phân tích url(url_gốc);
-        nếu (chứa chính xác(url_gốc, "?") || chứa chính xác(url_gốc, "#")) {
+    hàm công khai khởi tạo(địa chỉ tài nguyên gốc) {
+        nếu (loại của(địa chỉ tài nguyên gốc) != "chuỗi") { ném "khách HTTP: URL gốc phải là chuỗi"; };
+        mạng http phân tích địa chỉ tài nguyên(địa chỉ tài nguyên gốc);
+        nếu (chứa chính xác(địa chỉ tài nguyên gốc, "?") || chứa chính xác(địa chỉ tài nguyên gốc, "#")) {
             ném "khách HTTP: URL gốc không được chứa query hoặc fragment";
         };
-        mình.url_gốc = url_gốc;
-        mình.đã_đóng = sai;
+        mình.địa chỉ tài nguyên gốc = địa chỉ tài nguyên gốc;
+        mình.đã đóng = sai;
     };
 
     hàm công khai tạo URL(đường) {
-        nếu (mình.đã_đóng) { ném "khách HTTP: đã đóng"; };
-        nếu (loai_cua(đường) != "chuỗi") { ném "khách HTTP: đường phải là chuỗi"; };
-        nếu (đường == "") { trả về mình.url_gốc; };
+        nếu (mình.đã đóng) { ném "khách HTTP: đã đóng"; };
+        nếu (loại của(đường) != "chuỗi") { ném "khách HTTP: đường phải là chuỗi"; };
+        nếu (đường == "") { trả về mình.địa chỉ tài nguyên gốc; };
         nếu (bắt đầu bằng(đường, "http://") || bắt đầu bằng(đường, "https://")) {
             ném "khách HTTP: đường tương đối không được là URL tuyệt đối";
         };
-        gốc_dữ_liệu = mình.url_gốc;
+        gốc dữ liệu = mình.địa chỉ tài nguyên gốc;
         nếu (đường[0] == "?" || đường[0] == "#") {
-            kết_quả = gốc_dữ_liệu + đường;
-            mạng http phân tích url(kết_quả);
-            trả về kết_quả;
+            kết quả = gốc dữ liệu + đường;
+            mạng http phân tích địa chỉ tài nguyên(kết quả);
+            trả về kết quả;
         };
-        cuối = gốc_dữ_liệu[do_dai(gốc_dữ_liệu) - 1] == "/";
+        cuối = gốc dữ liệu[máy ảo lấy độ dài(gốc dữ liệu) - 1] == "/";
         đầu = đường[0] == "/";
         nếu (cuối && đầu) {
-            kết_quả = gốc_dữ_liệu + con chuỗi(đường, 1, do_dai(đường));
+            kết quả = gốc dữ liệu + con chuỗi(đường, 1, máy ảo lấy độ dài(đường));
         } hoặc {
-            nếu (!cuối && !đầu) { kết_quả = gốc_dữ_liệu + "/" + đường; }
-            hoặc { kết_quả = gốc_dữ_liệu + đường; };
+            nếu (!cuối && !đầu) { kết quả = gốc dữ liệu + "/" + đường; }
+            hoặc { kết quả = gốc dữ liệu + đường; };
         };
-        mạng http phân tích url(kết_quả);
-        trả về kết_quả;
+        mạng http phân tích địa chỉ tài nguyên(kết quả);
+        trả về kết quả;
     };
 
-    hàm công khai yêu cầu(phương_thức, đường, dữ_liệu = "") {
-        nếu (phương_thức != "GET" && phương_thức != "POST" &&
-            phương_thức != "PUT" && phương_thức != "DELETE") {
+    hàm công khai yêu cầu(phương thức, đường, dữ liệu = "") {
+        nếu (phương thức != "GET" && phương thức != "POST" &&
+            phương thức != "PUT" && phương thức != "DELETE") {
             ném "khách HTTP: phương thức không hợp lệ";
         };
-        trả về mình.thực thi(phương_thức, mình.tạo URL(đường), dữ_liệu);
+        trả về mình.thực thi(phương thức, mình.tạo URL(đường), dữ liệu);
     };
 
-    hàm bảo vệ thực thi(phương_thức, url, dữ_liệu) {
-        trả về mạng thực thi yêu cầu(phương_thức, url, dữ_liệu);
+    hàm bảo vệ thực thi(phương thức, địa chỉ tài nguyên, dữ liệu) {
+        trả về mạng thực thi yêu cầu(phương thức, địa chỉ tài nguyên, dữ liệu);
     };
 
-    hàm công khai đóng() { mình.đã_đóng = đúng; trả về đúng; };
+    hàm công khai đóng() { mình.đã đóng = đúng; trả về đúng; };
 
     hàm công khai lấy(đường) {
         trả về mình.yêu cầu("GET", đường);
     };
 
-    hàm công khai gửi(đường, dữ_liệu) {
-        trả về mình.yêu cầu("POST", đường, dữ_liệu);
+    hàm công khai gửi(đường, dữ liệu) {
+        trả về mình.yêu cầu("POST", đường, dữ liệu);
     };
 
-    hàm công khai cập nhật(đường, dữ_liệu) {
-        trả về mình.yêu cầu("PUT", đường, dữ_liệu);
+    hàm công khai cập nhật(đường, dữ liệu) {
+        trả về mình.yêu cầu("PUT", đường, dữ liệu);
     };
 
     hàm công khai xóa(đường) {

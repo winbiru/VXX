@@ -2,6 +2,6 @@ nhập phân giải dns;
 nhập bộ sưu tập;
 
 hàm chính() {
-    địa chỉ = dns phân giải("localhost");
+    địa chỉ = phân giải tên miền phân giải("localhost");
     in độ dài(địa chỉ) > 0;
 };

@@ -1,0 +1,94 @@
+// Incremental policy stays in V++. The runtime stores opaque byte records.
+// Include the full ordered signature registry: changing arity or function
+// IDs must invalidate callers, even when their own source is unchanged.
+hàm bộ nhớ đệm biên dịch khóa tra cứu(loại từ tố, nguồn văn bản, sổ đăng ký, đầu tiên, cuối cùng, điểm vào) {
+    // One wire format for Mach-O/AArch64 and ELF64/x86-64; `kind` keeps
+    // their emitted-object namespaces distinct.
+    biến khóa tra cứu = "vpp-native-object-cache-v2";
+    nếu (khóa tra cứu <= 0) { trả về -1; };
+    biến mã trạng thái = byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, loại từ tố);
+    nếu (byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, đầu tiên) != 0) { mã trạng thái = -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, cuối cùng) != 0) { mã trạng thái = -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, điểm vào) != 0) { mã trạng thái = -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(khóa tra cứu, byte dài(nguồn văn bản)) != 0) { mã trạng thái = -1; };
+    nếu (byte nối(khóa tra cứu, nguồn văn bản) != 0) { mã trạng thái = -1; };
+    nếu (byte nối(khóa tra cứu, sổ đăng ký) != 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái != 0) { byte hủy(khóa tra cứu); trả về -1; };
+    trả về khóa tra cứu;
+};
+
+// IR records contain [i32 length, function-local IR bytes] for each function.
+// Global IR offsets are reconstructed, so unrelated body-size changes do not
+// prevent reuse. Validate the complete record before changing function data.
+hàm bộ nhớ đệm biên dịch khôi phục(dữ liệu đầu vào, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng) {
+    biến con trỏ hiện tại = 0;
+    biến tổng số = 0;
+    lặp (mã định danh = đầu tiên; mã định danh < cuối cùng; mã định danh++) {
+        nếu (con trỏ hiện tại + 4 > byte dài(dữ liệu đầu vào)) { trả về -1; };
+        biến chiều dài = byte đọc số nguyên ba mươi hai bit(dữ liệu đầu vào, con trỏ hiện tại);
+        nếu (chiều dài <= 0) { trả về -1; };
+        nếu (chiều dài > byte dài(dữ liệu đầu vào) - con trỏ hiện tại - 4) { trả về -1; };
+        tổng số = tổng số + chiều dài;
+        con trỏ hiện tại = con trỏ hiện tại + 4 + chiều dài;
+    };
+    nếu (con trỏ hiện tại != byte dài(dữ liệu đầu vào)) { trả về -1; };
+    nếu (tổng số > 1048576 - byte dài(biểu diễn trung gian)) { trả về -1; };
+    con trỏ hiện tại = 0;
+    lặp (mã định danh = đầu tiên; mã định danh < cuối cùng; mã định danh++) {
+        biến đã khôi phục chiều dài = byte đọc số nguyên ba mươi hai bit(dữ liệu đầu vào, con trỏ hiện tại);
+        biến phần = byte cắt(dữ liệu đầu vào, con trỏ hiện tại + 4, đã khôi phục chiều dài);
+        nếu (phần <= 0) { trả về -1; };
+        biến điểm mở đầu = byte dài(biểu diễn trung gian);
+        biến đã sao chép = byte nối(biểu diễn trung gian, phần);
+        byte hủy(phần);
+        nếu (đã sao chép != 0) { trả về -1; };
+        nếu (byte ghi số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 12, điểm mở đầu) != 0) { trả về -1; };
+        nếu (byte ghi số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 16, đã khôi phục chiều dài) != 0) { trả về -1; };
+        con trỏ hiện tại = con trỏ hiện tại + 4 + đã khôi phục chiều dài;
+    };
+    trả về cuối cùng;
+};
+
+hàm bộ nhớ đệm biên dịch lưu lại(khóa tra cứu, dữ liệu đầu vào, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng) {
+    nếu (byte làm rỗng(dữ liệu đầu vào) != 0) { trả về -1; };
+    lặp (mã định danh = đầu tiên; mã định danh < cuối cùng; mã định danh++) {
+        biến điểm mở đầu = byte đọc số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 12);
+        biến chiều dài = byte đọc số nguyên ba mươi hai bit(các hàm, mã định danh * 24 + 16);
+        biến phần = byte cắt(biểu diễn trung gian, điểm mở đầu, chiều dài);
+        nếu (phần <= 0) { trả về -1; };
+        biến đã sao chép = byte đẩy số nguyên ba mươi hai bit(dữ liệu đầu vào, chiều dài);
+        nếu (byte nối(dữ liệu đầu vào, phần) != 0) { đã sao chép = -1; };
+        byte hủy(phần);
+        nếu (đã sao chép != 0) { trả về -1; };
+    };
+    trả về bộ nhớ đệm ghi(khóa tra cứu, dữ liệu đầu vào);
+};
+
+hàm bộ nhớ đệm biên dịch biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng, điểm vào) {
+    biến khóa tra cứu = bộ nhớ đệm biên dịch khóa tra cứu(1, nguồn văn bản, sổ đăng ký, đầu tiên, cuối cùng, điểm vào);
+    biến dữ liệu đầu vào = byte mới();
+    biến kết quả trả về = -1;
+    nếu (khóa tra cứu > 0) {
+        nếu (dữ liệu đầu vào > 0) {
+            nếu (bộ nhớ đệm đọc(khóa tra cứu, dữ liệu đầu vào) == 1) {
+                kết quả trả về = bộ nhớ đệm biên dịch khôi phục(dữ liệu đầu vào, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng);
+                // Allocation failures after restore begins are fatal; never
+                // parse over partially restored function metadata.
+                byte hủy(khóa tra cứu);
+                byte hủy(dữ liệu đầu vào);
+                trả về kết quả trả về;
+            };
+        };
+    };
+    nếu (từ vựng tách từ tố(nguồn văn bản, các từ tố) > 0) {
+        kết quả trả về = biên dịch mô đun biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên);
+    };
+    nếu (kết quả trả về == cuối cùng) {
+        nếu (khóa tra cứu > 0) {
+            nếu (dữ liệu đầu vào > 0) { bộ nhớ đệm biên dịch lưu lại(khóa tra cứu, dữ liệu đầu vào, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng); };
+        };
+    };
+    nếu (khóa tra cứu > 0) { byte hủy(khóa tra cứu); };
+    nếu (dữ liệu đầu vào > 0) { byte hủy(dữ liệu đầu vào); };
+    trả về kết quả trả về;
+};

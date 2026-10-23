@@ -14,22 +14,22 @@ hàm riêng tư cấu hình là khoảng trắng(c) {
 
 hàm riêng tư cấu hình cắt khoảng trắng(s) {
     đầu = 0;
-    cuối = do_dai(s);
-    đang_cắt = đúng;
-    lặp(i = 0; i < cuối && đang_cắt; i++) {
+    cuối = máy ảo lấy độ dài(s);
+    đang cắt = đúng;
+    lặp(i = 0; i < cuối && đang cắt; i++) {
         nếu (cấu hình là khoảng trắng(s[đầu])) {
             đầu = đầu + 1;
-            nếu (đầu == cuối) { đang_cắt = sai; };
+            nếu (đầu == cuối) { đang cắt = sai; };
         } hoặc {
-            đang_cắt = sai;
+            đang cắt = sai;
         };
     };
-    đang_cắt = đúng;
-    lặp(i = 0; i < cuối - đầu && đang_cắt; i++) {
+    đang cắt = đúng;
+    lặp(i = 0; i < cuối - đầu && đang cắt; i++) {
         nếu (cấu hình là khoảng trắng(s[cuối - 1])) {
             cuối = cuối - 1;
         } hoặc {
-            đang_cắt = sai;
+            đang cắt = sai;
         };
     };
     trả về cắt chuỗi(s, đầu, cuối - đầu);
@@ -45,24 +45,24 @@ hàm riêng tư cấu hình phân tích dòng(dòng) {
         trả về rỗng;
     };
 
-    vị_trí = -1;
-    lặp(i = 0; i < do_dai(dòng) && vị_trí < 0; i++) {
+    vị trí = -1;
+    lặp(i = 0; i < máy ảo lấy độ dài(dòng) && vị trí < 0; i++) {
         nếu (dòng[i] == "=") {
-            vị_trí = i;
+            vị trí = i;
         };
     };
-    nếu (vị_trí < 0) {
+    nếu (vị trí < 0) {
         trả về rỗng;
     };
 
-    khóa = cấu hình cắt khoảng trắng(cắt chuỗi(dòng, 0, vị_trí));
+    khóa = cấu hình cắt khoảng trắng(cắt chuỗi(dòng, 0, vị trí));
     nếu (khóa == "") {
         trả về rỗng;
     };
-    giá_trị = cấu hình cắt khoảng trắng(
-        cắt chuỗi(dòng, vị_trí + 1, do_dai(dòng) - vị_trí - 1)
+    giá trị = cấu hình cắt khoảng trắng(
+        cắt chuỗi(dòng, vị trí + 1, máy ảo lấy độ dài(dòng) - vị trí - 1)
     );
-    trả về {"khóa": khóa, "giá trị": giá_trị};
+    trả về {"khóa": khóa, "giá trị": giá trị};
 };
 
 hàm riêng tư cấu hình là chữ số(c) {
@@ -70,61 +70,61 @@ hàm riêng tư cấu hình là chữ số(c) {
 };
 
 hàm riêng tư cấu hình là số nguyên(s) {
-    n = do_dai(s);
+    n = máy ảo lấy độ dài(s);
     nếu (n == 0) { trả về sai; };
     i = 0;
     nếu (s[0] == "+" || s[0] == "-") { i = 1; };
     nếu (i >= n) { trả về sai; };
-    hợp_lệ = đúng;
-    lặp(vòng = 0; i < n && hợp_lệ; vòng++) {
+    hợp lệ = đúng;
+    lặp(vòng = 0; i < n && hợp lệ; vòng++) {
         nếu (!cấu hình là chữ số(s[i])) {
-            hợp_lệ = sai;
+            hợp lệ = sai;
         };
         i = i + 1;
     };
-    trả về hợp_lệ;
+    trả về hợp lệ;
 };
 
 // Decimal/exponent parser đủ cho cú pháp mà native std::stod trước đây nhận
 // trong file cấu hình: 2.5, .5, 5., 1e3, -2.5E-4.
 hàm riêng tư cấu hình là số thực(s) {
-    n = do_dai(s);
+    n = máy ảo lấy độ dài(s);
     nếu (n == 0) { trả về sai; };
     i = 0;
     nếu (s[0] == "+" || s[0] == "-") { i = 1; };
     nếu (i >= n) { trả về sai; };
 
-    có_chữ_số = sai;
-    có_chấm = sai;
-    có_mũ = sai;
-    chữ_số_sau_mũ = đúng;
-    hợp_lệ = đúng;
+    có chữ số = sai;
+    có chấm = sai;
+    có mũ = sai;
+    chữ số sau mũ = đúng;
+    hợp lệ = đúng;
 
-    lặp(vòng = 0; i < n && hợp_lệ; vòng++) {
+    lặp(vòng = 0; i < n && hợp lệ; vòng++) {
         c = s[i];
         nếu (cấu hình là chữ số(c)) {
-            có_chữ_số = đúng;
-            nếu (có_mũ) { chữ_số_sau_mũ = đúng; };
+            có chữ số = đúng;
+            nếu (có mũ) { chữ số sau mũ = đúng; };
         } hoặc {
-            nếu (c == "." && !có_chấm && !có_mũ) {
-                có_chấm = đúng;
+            nếu (c == "." && !có chấm && !có mũ) {
+                có chấm = đúng;
             } hoặc {
-                nếu ((c == "e" || c == "E") && !có_mũ && có_chữ_số) {
-                    có_mũ = đúng;
-                    chữ_số_sau_mũ = sai;
+                nếu ((c == "e" || c == "E") && !có mũ && có chữ số) {
+                    có mũ = đúng;
+                    chữ số sau mũ = sai;
                     nếu (i + 1 < n) {
                         nếu (s[i + 1] == "+" || s[i + 1] == "-") {
                             i = i + 1;
                         };
                     };
                 } hoặc {
-                    hợp_lệ = sai;
+                    hợp lệ = sai;
                 };
             };
         };
         i = i + 1;
     };
-    trả về hợp_lệ && có_chữ_số && (có_chấm || có_mũ) && chữ_số_sau_mũ;
+    trả về hợp lệ && có chữ số && (có chấm || có mũ) && chữ số sau mũ;
 };
 
 hàm riêng tư cấu hình chuyển giá trị(s) {
@@ -137,29 +137,29 @@ hàm riêng tư cấu hình chuyển giá trị(s) {
 };
 
 hàm công khai đọc cấu hình(đường dẫn) {
-    nội_dung = đọc tệp(đường dẫn);
-    kết_quả = {};
+    nội dung = đọc tệp(đường dẫn);
+    kết quả = {};
     dòng = "";
-    n = do_dai(nội_dung);
+    n = máy ảo lấy độ dài(nội dung);
 
     lặp(i = 0; i <= n; i++) {
         hết = i == n;
         c = "\n";
-        nếu (!hết) { c = nội_dung[i]; };
+        nếu (!hết) { c = nội dung[i]; };
 
         nếu (c == "\n") {
             mục = cấu hình phân tích dòng(dòng);
             nếu (mục != rỗng) {
-                khóa = lấy map(mục, "khóa", "");
-                giá_trị = lấy map(mục, "giá trị", "");
-                đặt map(kết_quả, khóa, cấu hình chuyển giá trị(giá_trị));
+                khóa = lấy từ điển(mục, "khóa", "");
+                giá trị = lấy từ điển(mục, "giá trị", "");
+                đặt từ điển(kết quả, khóa, cấu hình chuyển giá trị(giá trị));
             };
             dòng = "";
         } hoặc {
             dòng = dòng + c;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm công khai đọc cấu hình khóa(đường dẫn, khóa, giá trị mặc định) {
@@ -168,23 +168,23 @@ hàm công khai đọc cấu hình khóa(đường dẫn, khóa, giá trị mặ
         trả về giá trị mặc định;
     };
 
-    nội_dung = đọc tệp(đường dẫn);
+    nội dung = đọc tệp(đường dẫn);
     dòng = "";
-    n = do_dai(nội_dung);
-    kết_quả = giá trị mặc định;
-    tìm_thấy = sai;
+    n = máy ảo lấy độ dài(nội dung);
+    kết quả = giá trị mặc định;
+    tìm thấy = sai;
 
-    lặp(i = 0; i <= n && !tìm_thấy; i++) {
+    lặp(i = 0; i <= n && !tìm thấy; i++) {
         hết = i == n;
         c = "\n";
-        nếu (!hết) { c = nội_dung[i]; };
+        nếu (!hết) { c = nội dung[i]; };
 
         nếu (c == "\n") {
             mục = cấu hình phân tích dòng(dòng);
             nếu (mục != rỗng) {
-                nếu (lấy map(mục, "khóa", "") == khóa) {
-                    kết_quả = lấy map(mục, "giá trị", "");
-                    tìm_thấy = đúng;
+                nếu (lấy từ điển(mục, "khóa", "") == khóa) {
+                    kết quả = lấy từ điển(mục, "giá trị", "");
+                    tìm thấy = đúng;
                 };
             };
             dòng = "";
@@ -192,5 +192,5 @@ hàm công khai đọc cấu hình khóa(đường dẫn, khóa, giá trị mặ
             dòng = dòng + c;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };

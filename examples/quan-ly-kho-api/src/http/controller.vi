@@ -43,8 +43,8 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
     }
 
     hàm xửLý(requestId) {
-        method = mạng method yêu cầu(requestId);
-        path = mạng path yêu cầu(requestId);
+        method = mạng phương thức yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
         dịchVụ = mình.dịchVụKho;
 
         nếu (method == "GET" && path == "/san-pham") {
@@ -63,11 +63,11 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/san-pham") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
-                tên = lấy map(body, "ten", "");
-                giá = lấy map(body, "gia", 0);
-                tồnKho = lấy map(body, "tonKho", 0);
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
+                tên = lấy từ điển(body, "ten", "");
+                giá = lấy từ điển(body, "gia", 0);
+                tồnKho = lấy từ điển(body, "tonKho", 0);
                 sảnPhẩm = dịchVụ.tạo(id, tên, giá, tồnKho);
                 trả về phản hồi json(requestId, 201, {
                     "thanhCong": đúng,
@@ -80,9 +80,9 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/san-pham/nhap-kho") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
-                sốLượng = lấy map(body, "soLuong", 0);
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
+                sốLượng = lấy từ điển(body, "soLuong", 0);
                 sảnPhẩm = dịchVụ.nhậpKho(id, sốLượng);
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
@@ -95,8 +95,8 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/san-pham/chi-tiet") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
                     "duLieu": dịchVụ.chiTiết(id)
@@ -108,10 +108,10 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/san-pham/tim-kiem") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                từKhóa = lấy map(body, "tuKhoa", "");
-                trang = lấy map(body, "trang", 1);
-                kíchThước = lấy map(body, "kichThuoc", 10);
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                từKhóa = lấy từ điển(body, "tuKhoa", "");
+                trang = lấy từ điển(body, "trang", 1);
+                kíchThước = lấy từ điển(body, "kichThuoc", 10);
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
                     "duLieu": dịchVụ.tìmKiếm(từKhóa, trang, kíchThước)
@@ -123,11 +123,11 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "PUT" && path == "/san-pham") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
-                tên = lấy map(body, "ten", "");
-                giá = lấy map(body, "gia", -1);
-                tồnKho = lấy map(body, "tonKho", -1);
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
+                tên = lấy từ điển(body, "ten", "");
+                giá = lấy từ điển(body, "gia", -1);
+                tồnKho = lấy từ điển(body, "tonKho", -1);
                 sảnPhẩm = dịchVụ.cậpNhật(id, tên, giá, tồnKho);
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
@@ -140,8 +140,8 @@ lớp công khai SảnPhẩmController triển khai TrìnhXửLýHttp {
 
         nếu (method == "DELETE" && path == "/san-pham") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
                 sảnPhẩm = dịchVụ.loạiBỏ(id);
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
@@ -162,8 +162,8 @@ lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
     }
 
     hàm xửLý(requestId) {
-        method = mạng method yêu cầu(requestId);
-        path = mạng path yêu cầu(requestId);
+        method = mạng phương thức yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
         dịchVụ = mình.dịchVụĐơnHàng;
 
         nếu (method == "GET" && path == "/don-hang") {
@@ -175,9 +175,9 @@ lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/don-hang") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                kháchHàng = lấy map(body, "khachHang", "");
-                cácMục = lấy map(body, "sanPham", []);
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                kháchHàng = lấy từ điển(body, "khachHang", "");
+                cácMục = lấy từ điển(body, "sanPham", []);
                 đơn = dịchVụ.đặtHàng(kháchHàng, cácMục);
                 trả về phản hồi json(requestId, 201, {
                     "thanhCong": đúng,
@@ -190,8 +190,8 @@ lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/don-hang/huy") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
                 đơn = dịchVụ.hủy(id);
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
@@ -204,8 +204,8 @@ lớp công khai ĐơnHàngController triển khai TrìnhXửLýHttp {
 
         nếu (method == "POST" && path == "/don-hang/chi-tiet") {
             thử {
-                body = json phân tích(mạng body yêu cầu(requestId));
-                id = lấy map(body, "id", "");
+                body = json phân tích(mạng thân khối yêu cầu(requestId));
+                id = lấy từ điển(body, "id", "");
                 trả về phản hồi json(requestId, 200, {
                     "thanhCong": đúng,
                     "duLieu": dịchVụ.chiTiết(id)
@@ -225,8 +225,8 @@ lớp công khai BáoCáoController triển khai TrìnhXửLýHttp {
     }
 
     hàm xửLý(requestId) {
-        method = mạng method yêu cầu(requestId);
-        path = mạng path yêu cầu(requestId);
+        method = mạng phương thức yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
         nếu (method == "GET" && path == "/bao-cao") {
             dịchVụ = mình.dịchVụBáoCáo;
             trả về phản hồi json(requestId, 200, {

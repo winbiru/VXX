@@ -1,0 +1,8 @@
+gates-and-complex-phase: ok
+bell-ghz-and-reverse-cx: ok
+sampling-and-seed: ok
+bit-order-mapping-and-overwrite: ok
+mid-circuit-measurement-and-collapse: ok
+reset-entangled-qubit: ok
+snapshot-and-instance-isolation: ok
+validation-and-resource-limits: ok

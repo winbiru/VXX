@@ -14,7 +14,7 @@ lớp CấuHìnhApi {
     }
 };
 
-// Tạo một object cấu hình để module khác nhận dependency qua API công khai.
+// Tạo một đối tượng cấu hình để module khác nhận dependency qua API công khai.
 hàm công khai tạo cấu hình api(đườngDẫn) {
     trả về CấuHìnhApi(đườngDẫn);
 }

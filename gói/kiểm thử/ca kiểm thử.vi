@@ -2,18 +2,18 @@
 nhập gói/kiểm thử/vòng đời;
 
 lớp công khai Ca Kiểm Thử {
-    hàm công khai khởi tạo(thân, thiết_lập = rỗng, dọn_dẹp = rỗng) {
+    hàm công khai khởi tạo(thân, thiết lập = rỗng, dọn dẹp = rỗng) {
         nếu (thân == rỗng) { ném "TEST_ARGUMENT"; };
         mình.thân = thân;
-        mình.thiết_lập = thiết_lập;
-        mình.dọn_dẹp = dọn_dẹp;
-        mình.số_lần = 0;
+        mình.thiết lập = thiết lập;
+        mình.dọn dẹp = dọn dẹp;
+        mình.số lần = 0;
     };
 
     hàm công khai chạy() {
-        mình.số_lần = mình.số_lần + 1;
-        trả về chạy ca kiểm thử(mình.thân, mình.thiết_lập, mình.dọn_dẹp);
+        mình.số lần = mình.số lần + 1;
+        trả về chạy ca kiểm thử(mình.thân, mình.thiết lập, mình.dọn dẹp);
     };
 
-    hàm công khai số lần chạy() { trả về mình.số_lần; };
+    hàm công khai số lần chạy() { trả về mình.số lần; };
 };

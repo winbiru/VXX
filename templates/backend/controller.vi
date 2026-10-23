@@ -1,6 +1,6 @@
 nhập mạng;
 
-// Hợp đồng chung cho object có thể xử lý một HTTP request.
+// Hợp đồng chung cho đối tượng có thể xử lý một HTTP request.
 giao diện TrìnhXửLýHttp {
     // Nhận mã request và chịu trách nhiệm tạo phản hồi HTTP tương ứng.
     hàm xửLý(requestId);

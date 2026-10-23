@@ -3,7 +3,7 @@ lớp Base {
         trả về value + 1;
     }
 
-    hàm bảo vệ token(value) {
+    hàm bảo vệ từ tố(value) {
         trả về value + 2;
     }
 
@@ -14,7 +14,7 @@ lớp Base {
 
 lớp Child kế thừa Base {
     hàm công khai read(value) {
-        trả về mình.token(value) + gốc.viaPrivate(value);
+        trả về mình.từ tố(value) + gốc.viaPrivate(value);
     }
 }
 

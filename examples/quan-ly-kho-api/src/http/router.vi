@@ -12,7 +12,7 @@ lớp công khai RouterApi {
     }
 
     hàm xửLý(requestId) {
-        path = mạng path yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
 
         nếu (path == "/health") {
             controller = mình.healthController;

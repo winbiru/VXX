@@ -6,23 +6,23 @@ nhập gói/biên dịch/mã máy nền;
 lớp công khai Bộ Phát MIPS {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    hàm công khai biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
-                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("3c020000") + cao, ít);
-                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("34420000") + thấp, ít);
+                biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("3c020000") + cao, ít);
+                biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("34420000") + thấp, ít);
             } hoặc {
-                nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "00851021", ít); }
-                hoặc { biên dịch mã máy thêm hex(ra, "00851023", ít); };
+                nếu (loại == "cộng") { biên dịch mã máy thêm thập lục phân(ra, "00851021", ít); }
+                hoặc { biên dịch mã máy thêm thập lục phân(ra, "00851023", ít); };
             };
-            biên dịch mã máy thêm hex(ra, "03e00008", ít);
-            biên dịch mã máy thêm hex(ra, "00000000", ít);
+            biên dịch mã máy thêm thập lục phân(ra, "03e00008", ít);
+            biên dịch mã máy thêm thập lục phân(ra, "00000000", ít);
         trả về ra;
     };
 };
 
 
-hàm công khai biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
-    __vpp_adapter = Bộ Phát MIPS();
-    trả về __vpp_adapter.biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành) {
+    bộ chuyển tiếp = Bộ Phát MIPS();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành);
 };

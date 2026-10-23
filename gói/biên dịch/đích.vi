@@ -55,13 +55,13 @@ hàm công khai biên dịch thông tin kiến trúc(tên) {
 };
 
 // Không quảng cáo backend chỉ vì kiến trúc đã có trong registry.
-hàm công khai biên dịch jit máy thử nghiệm(tên, hệ_điều_hành) {
+hàm công khai biên dịch jit máy thử nghiệm(tên, hệ điều hành) {
     tên = biên dịch thông tin kiến trúc(tên)["tên"];
-    chọn (hệ_điều_hành) {
+    chọn (hệ điều hành) {
         ca "linux": { trả về tên == "x86_64" || tên == "aarch64"; }
         ca "windows": { trả về tên == "x86_64"; }
         ca "macos": { trả về tên == "aarch64"; }
-        mặc định: { ném "biên dịch: hệ điều hành target chưa đăng ký: " + hệ_điều_hành; }
+        mặc định: { ném "biên dịch: hệ điều hành target chưa đăng ký: " + hệ điều hành; }
     };
 };
 
@@ -70,82 +70,82 @@ hàm công khai biên dịch jit máy thử nghiệm(tên, hệ_điều_hành) {
 hàm công khai biên dịch đích chữ thường ASCII(chuỗi) {
     hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     thường = "abcdefghijklmnopqrstuvwxyz";
-    kết_quả = "";
-    lặp (i = 0; i < độ dài(chuỗi); i++) {
-        ký_tự = chuỗi[i];
+    kết quả = "";
+    lặp (i = 0; i < máy ảo lấy độ dài(chuỗi); i++) {
+        ký tự = chuỗi[i];
         lặp (j = 0; j < 26; j++) {
-            nếu (ký_tự == hoa[j]) { ký_tự = thường[j]; thoát; };
+            nếu (ký tự == hoa[j]) { ký tự = thường[j]; thoát; };
         };
-        kết_quả += ký_tự;
+        kết quả += ký tự;
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm công khai biên dịch đích cắt(chuỗi, bắt_đầu) {
-    kết_quả = "";
-    lặp (i = bắt_đầu; i < độ dài(chuỗi); i++) { kết_quả += chuỗi[i]; };
-    trả về kết_quả;
+hàm công khai biên dịch đích cắt(chuỗi, bắt đầu) {
+    kết quả = "";
+    lặp (i = bắt đầu; i < máy ảo lấy độ dài(chuỗi); i++) { kết quả += chuỗi[i]; };
+    trả về kết quả;
 };
 
-hàm công khai biên dịch đích bắt đầu(chuỗi, tiền_tố) {
-    nếu (độ dài(chuỗi) < độ dài(tiền_tố)) { trả về sai; };
-    lặp (i = 0; i < độ dài(tiền_tố); i++) {
-        nếu (chuỗi[i] != tiền_tố[i]) { trả về sai; };
+hàm công khai biên dịch đích bắt đầu(chuỗi, tiền tố) {
+    nếu (máy ảo lấy độ dài(chuỗi) < máy ảo lấy độ dài(tiền tố)) { trả về sai; };
+    lặp (i = 0; i < máy ảo lấy độ dài(tiền tố); i++) {
+        nếu (chuỗi[i] != tiền tố[i]) { trả về sai; };
     };
     trả về đúng;
 };
 
-hàm công khai biên dịch phân tích đích(triple) {
-    nếu (loai_cua(triple) != "chuỗi") { ném "target phải là chuỗi"; };
-    đầu_vào = biên dịch đích chữ thường ASCII(triple);
-    vị_trí = -1;
-    lặp (i = 0; i < độ dài(đầu_vào); i++) {
-        nếu (đầu_vào[i] == "-") { vị_trí = i; thoát; };
+hàm công khai biên dịch phân tích đích(bộ ba) {
+    nếu (loại của(bộ ba) != "chuỗi") { ném "target phải là chuỗi"; };
+    đầu vào = biên dịch đích chữ thường ASCII(bộ ba);
+    vị trí = -1;
+    lặp (i = 0; i < máy ảo lấy độ dài(đầu vào); i++) {
+        nếu (đầu vào[i] == "-") { vị trí = i; thoát; };
     };
-    nếu (vị_trí <= 0) { ném "target cần kiến trúc, hệ điều hành và ABI"; };
-    tên_cpu = "";
-    lặp (i = 0; i < vị_trí; i++) { tên_cpu += đầu_vào[i]; };
-    tên_cpu = biên dịch chuẩn hóa kiến trúc(tên_cpu);
-    cpu = rỗng;
-    thử { cpu = biên dịch thông tin kiến trúc(tên_cpu); }
-    bắt lỗi (e) { ném "kiến trúc CPU chưa được đăng ký: " + tên_cpu; };
+    nếu (vị trí <= 0) { ném "target cần kiến trúc, hệ điều hành và ABI"; };
+    tên bộ xử lý trung tâm = "";
+    lặp (i = 0; i < vị trí; i++) { tên bộ xử lý trung tâm += đầu vào[i]; };
+    tên bộ xử lý trung tâm = biên dịch chuẩn hóa kiến trúc(tên bộ xử lý trung tâm);
+    bộ xử lý trung tâm = rỗng;
+    thử { bộ xử lý trung tâm = biên dịch thông tin kiến trúc(tên bộ xử lý trung tâm); }
+    bắt lỗi (e) { ném "kiến trúc CPU chưa được đăng ký: " + tên bộ xử lý trung tâm; };
 
-    phần_sau = biên dịch đích cắt(đầu_vào, vị_trí + 1);
-    tiền_tố = ["unknown-", "pc-", "w64-", "apple-"];
-    lặp (i = 0; i < độ dài(tiền_tố); i++) {
-        nếu (biên dịch đích bắt đầu(phần_sau, tiền_tố[i])) {
-            phần_sau = biên dịch đích cắt(phần_sau, độ dài(tiền_tố[i]));
+    phần sau = biên dịch đích cắt(đầu vào, vị trí + 1);
+    tiền tố = ["unknown-", "pc-", "w64-", "apple-"];
+    lặp (i = 0; i < máy ảo lấy độ dài(tiền tố); i++) {
+        nếu (biên dịch đích bắt đầu(phần sau, tiền tố[i])) {
+            phần sau = biên dịch đích cắt(phần sau, máy ảo lấy độ dài(tiền tố[i]));
             thoát;
         };
     };
 
     hệ = "";
     abi = "";
-    định_dạng = "";
-    chọn (phần_sau) {
-        ca "linux": { hệ = "linux"; abi = "gnu"; định_dạng = "ELF"; }
-        ca "linux-gnu": { hệ = "linux"; abi = "gnu"; định_dạng = "ELF"; }
-        ca "linux-gnueabihf": { hệ = "linux"; abi = "gnueabihf"; định_dạng = "ELF"; }
-        ca "linux-musl": { hệ = "linux"; abi = "musl"; định_dạng = "ELF"; }
-        ca "linux-musleabihf": { hệ = "linux"; abi = "musleabihf"; định_dạng = "ELF"; }
-        ca "windows-msvc": { hệ = "windows"; abi = "msvc"; định_dạng = "COFF"; }
-        ca "windows-gnu": { hệ = "windows"; abi = "gnu"; định_dạng = "COFF"; }
-        ca "mingw32": { hệ = "windows"; abi = "gnu"; định_dạng = "COFF"; }
-        ca "darwin": { hệ = "macos"; abi = "darwin"; định_dạng = "Mach-O"; }
-        ca "macos": { hệ = "macos"; abi = "darwin"; định_dạng = "Mach-O"; }
-        mặc định: { ném "hệ điều hành hoặc ABI chưa hỗ trợ: " + phần_sau; }
+    định dạng = "";
+    chọn (phần sau) {
+        ca "linux": { hệ = "linux"; abi = "gnu"; định dạng = "ELF"; }
+        ca "linux-gnu": { hệ = "linux"; abi = "gnu"; định dạng = "ELF"; }
+        ca "linux-gnueabihf": { hệ = "linux"; abi = "gnueabihf"; định dạng = "ELF"; }
+        ca "linux-musl": { hệ = "linux"; abi = "musl"; định dạng = "ELF"; }
+        ca "linux-musleabihf": { hệ = "linux"; abi = "musleabihf"; định dạng = "ELF"; }
+        ca "windows-msvc": { hệ = "windows"; abi = "msvc"; định dạng = "COFF"; }
+        ca "windows-gnu": { hệ = "windows"; abi = "gnu"; định dạng = "COFF"; }
+        ca "mingw32": { hệ = "windows"; abi = "gnu"; định dạng = "COFF"; }
+        ca "darwin": { hệ = "macos"; abi = "darwin"; định dạng = "Mach-O"; }
+        ca "macos": { hệ = "macos"; abi = "darwin"; định dạng = "Mach-O"; }
+        mặc định: { ném "hệ điều hành hoặc ABI chưa hỗ trợ: " + phần sau; }
     };
-    nếu (hệ == "macos" && tên_cpu != "aarch64" && tên_cpu != "x86_64") {
+    nếu (hệ == "macos" && tên bộ xử lý trung tâm != "aarch64" && tên bộ xử lý trung tâm != "x86_64") {
         ném "kiến trúc này không có target macOS";
     };
-    nếu (hệ == "windows" && tên_cpu != "x86_64" && tên_cpu != "i386" && tên_cpu != "aarch64") {
+    nếu (hệ == "windows" && tên bộ xử lý trung tâm != "x86_64" && tên bộ xử lý trung tâm != "i386" && tên bộ xử lý trung tâm != "aarch64") {
         ném "kiến trúc này không có target Windows";
     };
-    trả về {"kiến trúc": tên_cpu, "hệ điều hành": hệ, "ABI": abi,
-            "định dạng": định_dạng, "bit": cpu["bit"], "little endian": cpu["little endian"]};
+    trả về {"kiến trúc": tên bộ xử lý trung tâm, "hệ điều hành": hệ, "ABI": abi,
+            "định dạng": định dạng, "bit": bộ xử lý trung tâm["bit"], "little endian": bộ xử lý trung tâm["little endian"]};
 };
 
-hàm công khai biên dịch triple chuẩn(đích) {
+hàm công khai biên dịch bộ ba chuẩn(đích) {
     tên = đích["kiến trúc"];
     hệ = đích["hệ điều hành"];
     abi = đích["ABI"];

@@ -8,51 +8,51 @@ nhập gói/biên dịch/chính;
 
 // Một phiên compiler được dùng chung cho việc kiểm tra và liệt kê import.
 lớp công khai Bộ Phân Tích Phụ Thuộc {
-    hàm công khai khởi tạo(mã_nguồn, thư_mục) {
-        mình.phiên = Bộ Biên Dịch(mã_nguồn, thư_mục);
+    hàm công khai khởi tạo(mã nguồn, thư mục) {
+        mình.phiên = Bộ Biên Dịch(mã nguồn, thư mục);
     };
 
     hàm công khai danh sách() {
         phiên = mình.phiên;
         cây = phiên.cây cú pháp();
-        kết_quả = [];
-        lặp(i = 0; i < độ dài(cây); i++) {
+        kết quả = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(cây); i++) {
             mục = cây[i];
-            nếu (lấy map(mục, "loại", "") == "nhập") {
-                đích = lấy map(mục, "đích", "");
+            nếu (lấy từ điển(mục, "loại", "") == "nhập") {
+                đích = lấy từ điển(mục, "đích", "");
                 nếu (đích != "") {
-                    thêm(kết_quả, {
+                    máy ảo thêm cuối danh sách(kết quả, {
                         "tên": đích,
-                        "bí danh": lấy map(mục, "bí danh", ""),
-                        "công khai": lấy map(mục, "công khai", 0)
+                        "bí danh": lấy từ điển(mục, "bí danh", ""),
+                        "công khai": lấy từ điển(mục, "công khai", 0)
                     });
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai kiểm tra() {
         phiên = mình.phiên;
-        kết_quả = phiên.kiểm tra();
+        kết quả = phiên.kiểm tra();
         trả về {
-            "hợp lệ": lấy map(kết_quả, "hợp lệ", 0),
-            "lỗi": lấy map(kết_quả, "lỗi", "")
+            "hợp lệ": lấy từ điển(kết quả, "hợp lệ", 0),
+            "lỗi": lấy từ điển(kết quả, "lỗi", "")
         };
     };
 };
 
 hàm công khai phụ thuộc danh sách(mã nguồn) {
-    phân_tích = Bộ Phân Tích Phụ Thuộc(mã nguồn, ".");
-    trả về phân_tích.danh sách();
+    phân tích = Bộ Phân Tích Phụ Thuộc(mã nguồn, ".");
+    trả về phân tích.danh sách();
 };
 
 hàm công khai phụ thuộc tệp(đường dẫn) {
-    phân_tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), ".");
-    trả về phân_tích.danh sách();
+    phân tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), ".");
+    trả về phân tích.danh sách();
 };
 
 hàm công khai phụ thuộc kiểm tra tệp(đường dẫn) {
-    phân_tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), đường dẫn cha(đường dẫn));
-    trả về phân_tích.kiểm tra();
+    phân tích = Bộ Phân Tích Phụ Thuộc(đọc tệp(đường dẫn), đường dẫn cha(đường dẫn));
+    trả về phân tích.kiểm tra();
 };

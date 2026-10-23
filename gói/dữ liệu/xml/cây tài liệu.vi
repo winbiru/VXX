@@ -1,0 +1,123 @@
+// vi.xml.dom — thao tác cây node do vi.xml tạo ra.
+nhập gói/dữ liệu/xml/xml;
+nhập gói/bộ sưu tập/chính;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp riêng tư Xử Lý Nội Bộ Cây Tài Liệu {
+    hàm công khai khởi tạo() {};
+
+    hàm công khai cây tài liệu phần tử(tên) {
+        trả về {"tên": tên, "thuộc tính": {}, "nội dung": "", "con": []};
+    };
+
+    hàm công khai cây tài liệu tên(nút) {
+        trả về lấy từ điển(nút, "tên", "");
+    };
+
+    hàm công khai cây tài liệu nội dung(nút) {
+        trả về lấy từ điển(nút, "nội dung", "");
+    };
+
+    hàm công khai cây tài liệu đặt nội dung(nút, nội dung) {
+        đặt từ điển(nút, "nội dung", nội dung);
+        trả về nút;
+    };
+
+    hàm công khai cây tài liệu thuộc tính(nút, khóa, mặc định = rỗng) {
+        các thuộc tính phần tử = lấy từ điển(nút, "thuộc tính", rỗng);
+        nếu (các thuộc tính phần tử == rỗng) {
+            trả về mặc định;
+        };
+        trả về lấy từ điển(các thuộc tính phần tử, khóa, mặc định);
+    };
+
+    hàm công khai cây tài liệu đặt thuộc tính(nút, khóa, giá trị) {
+        các thuộc tính phần tử = lấy từ điển(nút, "thuộc tính", rỗng);
+        nếu (các thuộc tính phần tử == rỗng) {
+            các thuộc tính phần tử = {};
+            đặt từ điển(nút, "thuộc tính", các thuộc tính phần tử);
+        };
+        đặt từ điển(các thuộc tính phần tử, khóa, giá trị);
+        trả về nút;
+    };
+
+    hàm công khai cây tài liệu con(nút) {
+        trả về lấy từ điển(nút, "con", []);
+    };
+
+    hàm công khai cây tài liệu thêm con(nút, con) {
+        các con = lấy từ điển(nút, "con", rỗng);
+        nếu (các con == rỗng) {
+            các con = [];
+            đặt từ điển(nút, "con", các con);
+        };
+        máy ảo thêm cuối danh sách(các con, con);
+        trả về nút;
+    };
+};
+
+hàm công khai cây tài liệu phần tử(tên) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu phần tử(tên);
+};
+
+hàm công khai cây tài liệu tên(nút) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu tên(nút);
+};
+
+hàm công khai cây tài liệu nội dung(nút) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu nội dung(nút);
+};
+
+hàm công khai cây tài liệu đặt nội dung(nút, nội dung) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu đặt nội dung(nút, nội dung);
+};
+
+hàm công khai cây tài liệu thuộc tính(nút, khóa, mặc định = rỗng) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu thuộc tính(nút, khóa, mặc định);
+};
+
+hàm công khai cây tài liệu đặt thuộc tính(nút, khóa, giá trị) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu đặt thuộc tính(nút, khóa, giá trị);
+};
+
+hàm công khai cây tài liệu con(nút) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu con(nút);
+};
+
+hàm công khai cây tài liệu thêm con(nút, con) {
+    trả về Xử Lý Nội Bộ Cây Tài Liệu().cây tài liệu thêm con(nút, con);
+};
+
+// Adapter giữ cùng cây map với XML/DOM thủ tục để hai API dùng chung dữ liệu.
+lớp công khai Phần Tử DOM {
+    hàm công khai khởi tạo(tên) { mình.nút = cây tài liệu phần tử(tên); };
+    hàm công khai nạp(cây) {
+        nếu (loại của(cây) != "từ điển" || !máy ảo có khóa từ điển(cây, "tên")) {
+            ném "dom: cây không hợp lệ";
+        };
+        mình.nút = cây;
+        trả về mình;
+    };
+    hàm công khai cây() { trả về mình.nút; };
+    hàm công khai phân tích(văn bản) {
+        mới = xml phân tích(văn bản);
+        mình.nút = mới;
+        trả về mình;
+    };
+    hàm công khai tên() { trả về cây tài liệu tên(mình.nút); };
+    hàm công khai nội dung() { trả về cây tài liệu nội dung(mình.nút); };
+    hàm công khai đặt nội dung(văn bản) { cây tài liệu đặt nội dung(mình.nút, văn bản); trả về mình; };
+    hàm công khai thuộc tính(khóa, mặc định = rỗng) { trả về cây tài liệu thuộc tính(mình.nút, khóa, mặc định); };
+    hàm công khai đặt thuộc tính(khóa, giá trị) { cây tài liệu đặt thuộc tính(mình.nút, khóa, giá trị); trả về mình; };
+    hàm công khai thêm con(phần tử) { cây tài liệu thêm con(mình.nút, phần tử.cây()); trả về mình; };
+    hàm công khai số con() { trả về máy ảo lấy độ dài(cây tài liệu con(mình.nút)); };
+    hàm công khai con(chỉ số) {
+        nếu (loại của(chỉ số) != "số nguyên" || chỉ số < 0 || chỉ số >= mình.số con()) {
+            ném "dom: chỉ số ngoài phạm vi";
+        };
+        các con = cây tài liệu con(mình.nút);
+        phần tử = Phần Tử DOM("");
+        trả về phần tử.nạp(các con[chỉ số]);
+    };
+    hàm công khai văn bản() { trả về xml tạo(mình.nút); };
+};

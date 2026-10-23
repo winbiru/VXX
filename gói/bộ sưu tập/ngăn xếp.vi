@@ -10,23 +10,23 @@ lớp công khai Ngăn Xếp kế thừa Bộ Đệm Danh Sách {
     };
 
     // Thêm một phần tử và trả về kích thước mới.
-    hàm công khai đẩy(giá_trị) {
-        them(mình.phần_tử, giá_trị);
-        trả về do_dai(mình.phần_tử);
+    hàm công khai đẩy(giá trị) {
+        máy ảo thêm cuối danh sách(mình.phần tử, giá trị);
+        trả về máy ảo lấy độ dài(mình.phần tử);
     };
 
     // Lấy phần tử cuối (LIFO), báo lỗi rõ ràng khi rỗng.
     hàm công khai rút() {
-        n = do_dai(mình.phần_tử);
+        n = máy ảo lấy độ dài(mình.phần tử);
         nếu (n == 0) { ném "ngăn xếp: không có phần tử để rút"; };
-        trả về xoa_tai(mình.phần_tử, n - 1);
+        trả về máy ảo xóa vị trí danh sách(mình.phần tử, n - 1);
     };
 
     hàm công khai đỉnh() {
-        n = do_dai(mình.phần_tử);
+        n = máy ảo lấy độ dài(mình.phần tử);
         nếu (n == 0) { ném "ngăn xếp: không có phần tử ở đỉnh"; };
-        ds = mình.phần_tử;
-        trả về ds[n - 1];
+        danh sách đầu vào = mình.phần tử;
+        trả về danh sách đầu vào[n - 1];
     };
 
 };

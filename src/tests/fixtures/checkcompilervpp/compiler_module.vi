@@ -1,1 +1,1 @@
-nhập gói/biên dịch/opcode; hàm chính() { in biên dịch mã opcode("OP_GOI"); in biên dịch có opcode(42); };
+nhập gói/biên dịch/mã thao tác; hàm chính() { in biên dịch mã thao tác("OP_GOI"); in biên dịch có mã thao tác(42); };

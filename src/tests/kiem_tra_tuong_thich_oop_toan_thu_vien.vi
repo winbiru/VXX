@@ -3,7 +3,7 @@ nhập gói/bộ sưu tập/danh sách như a;
 nhập gói/bộ sưu tập/danh sách như b;
 nhập gói/văn bản/chuỗi;
 nhập gói/dữ liệu/json/json;
-nhập gói/dữ liệu/xml/dom;
+nhập gói/dữ liệu/xml/cây tài liệu;
 nhập gói/kiểm thử/khẳng định;
 
 lớp công khai Chuỗi Tùy Biến kế thừa Xử Lý Chuỗi {
@@ -15,10 +15,10 @@ hàm chính() {
     a.sắp xếp(trái);
     khẳng định bằng(trái[0], 1);
     khẳng định bằng(phải[0], 9);
-    khẳng định bằng(a.tổng list(trái), 6);
-    khẳng định bằng(b.tổng list(phải), 17);
+    khẳng định bằng(a.tổng danh sách(trái), 6);
+    khẳng định bằng(b.tổng danh sách(phải), 17);
     tiện_ích = a.Tiện Ích Danh Sách();
-    khẳng định bằng(tiện_ích.tổng list(trái), a.tổng list(trái));
+    khẳng định bằng(tiện_ích.tổng danh sách(trái), a.tổng danh sách(trái));
 
     gốc_chuỗi = Xử Lý Chuỗi();
     tùy_biến = Chuỗi Tùy Biến();
@@ -29,17 +29,17 @@ hàm chính() {
     lỗi_json = hàm() { json phân tích("{chưa đóng"); };
     khẳng định ném lỗi(lỗi_json);
     khẳng định bằng(json phân tích("{\"x\":[1,2]}")["x"][1], 2);
-    vòng = []; them(vòng, vòng);
+    vòng = []; thêm(vòng, vòng);
     lỗi_vòng = hàm() { json tạo(vòng); };
     khẳng định ném lỗi(lỗi_vòng);
     khẳng định bằng(json tạo({"x": [1, 2]}), "{\"x\":[1,2]}");
 
-    node_a = dom phần tử("a"); node_b = dom phần tử("b");
-    dom đặt nội dung(node_a, "một");
-    khẳng định bằng(dom nội dung(node_a), "một");
-    khẳng định bằng(dom nội dung(node_b), "");
+    node_a = cây tài liệu phần tử("a"); node_b = cây tài liệu phần tử("b");
+    cây tài liệu đặt nội dung(node_a, "một");
+    khẳng định bằng(cây tài liệu nội dung(node_a), "một");
+    khẳng định bằng(cây tài liệu nội dung(node_b), "");
     lặp(i = 0; i < 50; i++) {
-        khẳng định bằng(a.tổng list([i, 1]), i + 1);
+        khẳng định bằng(a.tổng danh sách([i, 1]), i + 1);
         khẳng định bằng(json phân tích(json tạo([i]))[0], i);
     };
     in "tương thích OOP toàn thư viện: đạt";

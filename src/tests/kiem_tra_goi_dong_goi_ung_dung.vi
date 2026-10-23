@@ -12,8 +12,8 @@ hàm chính() {
     kq = đóng gói ứng dụng(đích, "demo", nguồn, [tài_nguyên]);
     in đường dẫn tồn tại(đường dẫn nối(đích, đường dẫn tên(nguồn)));
     in đọc tệp(đường dẫn nối(đích, đường dẫn tên(tài_nguyên))) == "DATA";
-    in lấy map(kq, "tài nguyên", 0) == 1;
-    in đường dẫn tồn tại(lấy map(kq, "manifest", ""));
+    in lấy từ điển(kq, "tài nguyên", 0) == 1;
+    in đường dẫn tồn tại(lấy từ điển(kq, "bản kê", ""));
     zip = ".tmp_pack_dist.zip";
     in đóng gói ứng dụng zip(zip, đích, "demo", nguồn, [tài_nguyên]) == 3;
     in đường dẫn tồn tại(zip);

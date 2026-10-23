@@ -8,9 +8,9 @@ nhập kịch bản;
 nhập gói/lõi/giao diện tài nguyên;
 
 hàm riêng tư repl yêu cầu phiên(phiên) {
-    nếu (có khóa(phiên, "__repl") == 0 ||
-        lấy map(phiên, "__repl", 0) != 1 ||
-        lấy map(phiên, "mở", 0) != 1) {
+    nếu (máy ảo có khóa từ điển(phiên, "__repl") == 0 ||
+        lấy từ điển(phiên, "__repl", 0) != 1 ||
+        lấy từ điển(phiên, "mở", 0) != 1) {
         ném "repl: phiên không tồn tại";
     };
     trả về phiên;
@@ -27,44 +27,44 @@ hàm công khai repl tạo() {
 
 hàm công khai repl chạy(phiên, dòng) {
     repl yêu cầu phiên(phiên);
-    nguồn_cũ = lấy map(phiên, "nguồn", "");
-    đầu_ra_cũ = lấy map(phiên, "đầu ra", "");
+    nguồn cũ = lấy từ điển(phiên, "nguồn", "");
+    đầu ra cũ = lấy từ điển(phiên, "đầu ra", "");
 
-    nguồn_mới = nguồn_cũ + dòng;
-    nếu (kết thúc bằng(nguồn_mới, "\n") == sai) {
-        nguồn_mới = nguồn_mới + "\n";
+    nguồn mới = nguồn cũ + dòng;
+    nếu (kết thúc bằng(nguồn mới, "\n") == sai) {
+        nguồn mới = nguồn mới + "\n";
     };
 
-    đầu_ra_mới = kịch bản chạy(nguồn_mới);
-    phần_mới = đầu_ra_mới;
-    nếu (bắt đầu bằng(đầu_ra_mới, đầu_ra_cũ)) {
-        phần_mới = con chuỗi(
-            đầu_ra_mới,
-            độ dài(đầu_ra_cũ),
-            độ dài(đầu_ra_mới)
+    đầu ra mới = kịch bản chạy(nguồn mới);
+    phần mới = đầu ra mới;
+    nếu (bắt đầu bằng(đầu ra mới, đầu ra cũ)) {
+        phần mới = con chuỗi(
+            đầu ra mới,
+            máy ảo lấy độ dài(đầu ra cũ),
+            máy ảo lấy độ dài(đầu ra mới)
         );
     };
 
-    đặt map(phiên, "nguồn", nguồn_mới);
-    đặt map(phiên, "đầu ra", đầu_ra_mới);
-    trả về phần_mới;
+    đặt từ điển(phiên, "nguồn", nguồn mới);
+    đặt từ điển(phiên, "đầu ra", đầu ra mới);
+    trả về phần mới;
 };
 
 hàm công khai repl nguồn(phiên) {
     repl yêu cầu phiên(phiên);
-    trả về lấy map(phiên, "nguồn", "");
+    trả về lấy từ điển(phiên, "nguồn", "");
 };
 
 hàm công khai repl đặt lại(phiên) {
     repl yêu cầu phiên(phiên);
-    đặt map(phiên, "nguồn", "");
-    đặt map(phiên, "đầu ra", "");
+    đặt từ điển(phiên, "nguồn", "");
+    đặt từ điển(phiên, "đầu ra", "");
     trả về 1;
 };
 
 hàm công khai repl đóng(phiên) {
     repl yêu cầu phiên(phiên);
-    đặt map(phiên, "mở", 0);
+    đặt từ điển(phiên, "mở", 0);
     trả về 1;
 };
 
@@ -74,7 +74,7 @@ lớp công khai Phiên Tương Tác triển khai Đóng Được {
     hàm công khai nguồn() { trả về repl nguồn(mình.phiên); };
     hàm công khai đặt lại() { repl đặt lại(mình.phiên); trả về mình; };
     hàm công khai đóng() {
-        nếu (lấy map(mình.phiên, "mở", 0) == 0) { trả về sai; };
+        nếu (lấy từ điển(mình.phiên, "mở", 0) == 0) { trả về sai; };
         repl đóng(mình.phiên);
         trả về đúng;
     };

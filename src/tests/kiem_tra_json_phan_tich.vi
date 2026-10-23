@@ -11,15 +11,15 @@ hàm chính() {
         json thuộc tính thô("meta", meta json) + "}";
     dữ liệu = json phân tích(nội dung);
 
-    in lấy map(dữ liệu, "tên", "");
-    in lấy map(dữ liệu, "số", 0);
-    in lấy map(dữ liệu, "ok", 0);
-    in loại của(lấy map(dữ liệu, "không", 1));
+    in lấy từ điển(dữ liệu, "tên", "");
+    in lấy từ điển(dữ liệu, "số", 0);
+    in lấy từ điển(dữ liệu, "ok", 0);
+    in loại của(lấy từ điển(dữ liệu, "không", 1));
 
-    ds = lấy map(dữ liệu, "ds", rỗng);
-    meta = lấy map(dữ liệu, "meta", rỗng);
+    ds = lấy từ điển(dữ liệu, "ds", rỗng);
+    meta = lấy từ điển(dữ liệu, "meta", rỗng);
     in json tạo(ds);
-    in lấy map(meta, "ngôn ngữ", "");
+    in lấy từ điển(meta, "ngôn ngữ", "");
 
     danh sách json = json phân tích("[1," + json chuỗi("hai") + ",null]");
     in json tạo(danh sách json);
@@ -30,19 +30,19 @@ hàm chính() {
     in json tạo(dữ liệu hai);
 
     thứ tự json = {};
-    đặt map(thứ tự json, "z", 1);
-    đặt map(thứ tự json, "a", 2);
-    đặt map(thứ tự json, "m", 3);
+    đặt từ điển(thứ tự json, "z", 1);
+    đặt từ điển(thứ tự json, "a", 2);
+    đặt từ điển(thứ tự json, "m", 3);
     in json tạo(thứ tự json);
 
     escaped = json phân tích(
         "{\"x\":\"a\\\"b\\\\c\",\"u\":\"Việt \\uD83D\\uDE80\"}"
     );
-    in lấy map(escaped, "x", "") == "a\"b\\c";
-    in lấy map(escaped, "u", "") == "Việt 🚀";
+    in lấy từ điển(escaped, "x", "") == "a\"b\\c";
+    in lấy từ điển(escaped, "u", "") == "Việt 🚀";
 
     trùng = json phân tích("{\"k\":\"đầu\",\"k\":\"cuối\"}");
-    in lấy map(trùng, "k", "") == "cuối";
+    in lấy từ điển(trùng, "k", "") == "cuối";
 
     số = json phân tích("[-12,3.5,1e3,2147483648]");
     in số[0] == -12;

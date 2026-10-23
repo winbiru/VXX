@@ -3,7 +3,7 @@
 nhập gói/biên dịch/kết quả;
 nhập gói/biên dịch/liên kết;
 
-hàm oracle bytecode khớp(cũ, mới) {
+hàm oracle mã trung gian khớp(cũ, mới) {
     nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
     lặp(i = 0; i < độ dài(cũ); i++) {
         nếu (cũ[i]["op"] != mới[i]["op"] ||
@@ -34,7 +34,7 @@ hàm oracle hàm khớp(cũ, mới) {
     lặp(i = 0; i < độ dài(cũ); i++) {
         nếu (cũ[i]["id"] != mới[i]["id"] ||
             cũ[i]["tên"] != mới[i]["tên chạy"] ||
-            !oracle bytecode khớp(cũ[i]["bytecode"], mới[i]["bytecode"])) {
+            !oracle mã trung gian khớp(cũ[i]["mã trung gian"], mới[i]["mã trung gian"])) {
             trả về sai;
         };
     };
@@ -52,7 +52,7 @@ hàm oracle chạy ca(nguồn_gốc) {
     });
     in oracle["hợp lệ"] == 1;
     nếu (oracle["hợp lệ"] == 1) {
-        in oracle root khớp(oracle["bytecode"], vpp["bytecode"]);
+        in oracle root khớp(oracle["mã trung gian"], vpp["mã trung gian"]);
         in oracle hàm khớp(oracle["hàm"], vpp["hàm"]);
     } hoặc {
         in sai;

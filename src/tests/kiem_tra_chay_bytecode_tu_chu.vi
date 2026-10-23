@@ -1,4 +1,4 @@
-// Thực thi bytecode do V++ tự phân tích, phát mã và liên kết.
+// Thực thi mã trung gian do V++ tự phân tích, phát mã và liên kết.
 // So sánh kết quả VM với compiler C++ cho subset đã hỗ trợ.
 nhập gói/biên dịch/bộ nạp;
 nhập gói/lõi/kịch bản;
@@ -23,7 +23,7 @@ hàm chính() {
 
     // Nạp artifact đã liên kết nhiều lần cho ra kết quả như nhau.
     artifact = biên dịch chương trình mô đun tự chủ("app/main", mô_đun);
-    in biên dịch chạy artifact(artifact) == kết_quả;
+    in biên dịch chạy sản phẩm biên dịch(artifact) == kết_quả;
 
     lặp_lại = biên dịch chạy chương trình mô đun tự chủ("main", {
         "main": "nhập dep như x; nhập dep như y; hàm chính() { in x.f(); in y.f(); };",
@@ -60,47 +60,47 @@ hàm chính() {
         "hàm chính() { a = 20; chọn (a) { ca 20: { in 2; } mặc định: { in 3; } }; };"
     ) == "2\n";
 
-    // Bộ nạp phải báo lỗi cho dữ liệu bị hỏng, không chạy bytecode đó.
+    // Bộ nạp phải báo lỗi cho dữ liệu bị hỏng, không chạy mã trung gian đó.
     lỗi = sai;
-    thử { biên dịch chạy artifact({"loại": "chưa liên kết"}); }
+    thử { biên dịch chạy sản phẩm biên dịch({"loại": "chưa liên kết"}); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "đã liên kết"); };
     in lỗi;
 
     lỗi = sai;
-    thử { bytecode_chay_vm([[2147483647, 0, 0, 0]], [], [], []); }
-    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
+    thử { mã trung gian chạy máy ảo([[2147483647, 0, 0, 0]], [], [], []); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "mã trung gian không hợp lệ"); };
     in lỗi;
 
     lỗi = sai;
-    thử { bytecode_chay_vm([[1, 0, 0]], [], [], []); }
+    thử { mã trung gian chạy máy ảo([[1, 0, 0]], [], [], []); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "4 trường"); };
     in lỗi;
 
     lỗi = sai;
-    thử { bytecode_chay_vm([], [], [[1, 0, []]], []); }
+    thử { mã trung gian chạy máy ảo([], [], [[1, 0, []]], []); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "function ID"); };
     in lỗi;
 
     lỗi = sai;
-    thử { bytecode_chay_vm([], [], [], [["m", []], ["m", []]]); }
+    thử { mã trung gian chạy máy ảo([], [], [], [["m", []], ["m", []]]); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "trùng định danh"); };
     in lỗi;
 
     // Lỗi phải lan qua API artifact công khai sau chuyển đổi map -> ABI.
     hỏng = biên dịch chương trình tự chủ("in 1;");
-    các_lệnh = hỏng["bytecode"];
+    các_lệnh = hỏng["mã trung gian"];
     lệnh = các_lệnh[0];
     lệnh["op"] = 2147483647;
     lỗi = sai;
-    thử { biên dịch chạy artifact(hỏng); }
-    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
+    thử { biên dịch chạy sản phẩm biên dịch(hỏng); }
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "mã trung gian không hợp lệ"); };
     in lỗi;
 
     hỏng_hàm = biên dịch chương trình tự chủ("hàm chính() { in 1; };");
     hàm_đã_khai = hỏng_hàm["hàm"][0];
     hàm_đã_khai["id"] = 3;
     lỗi = sai;
-    thử { biên dịch chạy artifact(hỏng_hàm); }
+    thử { biên dịch chạy sản phẩm biên dịch(hỏng_hàm); }
     bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "function ID"); };
     in lỗi;
 };

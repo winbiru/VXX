@@ -1,0 +1,146 @@
+// Native module loader for the self-hosted i32 compiler.
+// Supported source form: leading `nhập tên[/tên]*;` declarations.
+// Paths are relative to the importing file; imports are compiled once in
+// dependency-first order. The current subset uses a single function namespace.
+
+// Seen table records: i32 path_length, i32 state (1 visiting, 2 done), bytes.
+// Return 0 for missing, 1 for an active dependency, 2 for completed.
+hàm nạp mô đun đã gặp(bảng, đường tệp) {
+    biến chiều dài = byte dài(đường tệp);
+    lặp (độ lệch = 0; độ lệch < byte dài(bảng); độ lệch = độ lệch) {
+        nếu (độ lệch + 8 > byte dài(bảng)) { trả về -1; };
+        biến kích cỡ = byte đọc số nguyên ba mươi hai bit(bảng, độ lệch);
+        nếu (kích cỡ <= 0) { trả về -1; };
+        nếu (kích cỡ > byte dài(bảng) - độ lệch - 8) { trả về -1; };
+        nếu (kích cỡ == chiều dài) {
+            biến bằng nhau = 1;
+            lặp (i = 0; i < kích cỡ; i++) {
+                nếu (byte lấy(bảng, độ lệch + 8 + i) != byte lấy(đường tệp, i)) {
+                    bằng nhau = 0;
+                    thoát;
+                };
+            };
+            nếu (bằng nhau == 1) { trả về byte đọc số nguyên ba mươi hai bit(bảng, độ lệch + 4); };
+        };
+        độ lệch = độ lệch + 8 + kích cỡ;
+    };
+    trả về 0;
+};
+
+// Build path from the importer's directory and unqualified import tokens.
+// Only identifiers and '/' separators are accepted (no '.', '..', aliases,
+// or absolute imports); the .vi suffix is inferred.
+// Returns token index after ';', or -1 if the directive is malformed.
+hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, các từ tố, điểm bắt đầu, con) {
+    nếu (byte làm rỗng(con) != 0) { trả về -1; };
+    biến cuối cùng dấu gạch chéo = -1;
+    lặp (i = 0; i < byte dài(đường tệp); i++) {
+        nếu (byte lấy(đường tệp, i) == 47) { cuối cùng dấu gạch chéo = i; };
+    };
+    lặp (i = 0; i <= cuối cùng dấu gạch chéo; i++) {
+        nếu (byte máy ảo thêm cuối danh sách(con, byte lấy(đường tệp, i)) != 0) { trả về -1; };
+    };
+    biến con trỏ hiện tại = điểm bắt đầu;
+    lặp (n = 0; n < từ tố số phần tử(các từ tố); n++) {
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
+        biến đầu tiên = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
+        biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
+        lặp (i = đầu tiên; i < điểm kết thúc; i++) {
+            nếu (byte máy ảo thêm cuối danh sách(con, byte lấy(nguồn văn bản, i)) != 0) { trả về -1; };
+        };
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ";") == 1) {
+            biến hậu tố = ".vi";
+            biến mã trạng thái = byte nối(con, hậu tố);
+            byte hủy(hậu tố);
+            nếu (mã trạng thái != 0) { trả về -1; };
+            trả về con trỏ hiện tại + 1;
+        };
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "/") != 1) { trả về -1; };
+        nếu (byte máy ảo thêm cuối danh sách(con, 47) != 0) { trả về -1; };
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+    };
+    trả về -1;
+};
+
+// Recursively collect independent module payloads using the native lexer.
+// Import-only files are allowed. Source and token handles remain local to
+// their recursion frame. Cycles, missing modules and malformed imports fail.
+hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu hiện tại) {
+    nếu (độ sâu hiện tại >= 12) { trả về -1; };
+    biến trạng thái nội bộ = nạp mô đun đã gặp(bảng, đường tệp);
+    nếu (trạng thái nội bộ == 2) { trả về 0; };
+    nếu (trạng thái nội bộ != 0) { trả về -1; };
+    biến đánh dấu = byte dài(bảng);
+    nếu (byte đẩy số nguyên ba mươi hai bit(bảng, byte dài(đường tệp)) != 0) { trả về -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(bảng, 1) != 0) { trả về -1; };
+    lặp (i = 0; i < byte dài(đường tệp); i++) {
+        nếu (byte máy ảo thêm cuối danh sách(bảng, byte lấy(đường tệp, i)) != 0) { trả về -1; };
+    };
+    biến nguồn đầu vào = byte mới();
+    biến các từ tố = byte mới();
+    biến con = byte mới();
+    biến mã trạng thái = 0;
+    nếu (nguồn đầu vào <= 0) { mã trạng thái = -1; };
+    nếu (các từ tố <= 0) { mã trạng thái = -1; };
+    nếu (con <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        nếu (bản địa đọc nguồn đầu vào(đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = -1; };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (từ vựng tách từ tố(nguồn đầu vào, các từ tố) < 0) { mã trạng thái = -1; };
+    };
+    biến con trỏ hiện tại = 0;
+    nếu (mã trạng thái == 0) {
+        lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+            nếu (từ tố bằng(nguồn đầu vào, các từ tố, con trỏ hiện tại, "nhập") != 1) { thoát; };
+            biến kế tiếp = nạp mô đun nhập đường tệp(đường tệp, nguồn đầu vào, các từ tố, con trỏ hiện tại + 1, con);
+            nếu (kế tiếp < 0) { mã trạng thái = -1; thoát; };
+            nếu (nạp mô đun nạp(con, đã kết hợp, bảng, độ sâu hiện tại + 1) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+            con trỏ hiện tại = kế tiếp;
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (con trỏ hiện tại < từ tố số phần tử(các từ tố)) {
+            biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
+            // Wire format: [i32 source_length, source_bytes] per module.
+            // The parser now lexes each payload independently.
+            nếu (byte đẩy số nguyên ba mươi hai bit(đã kết hợp, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) { mã trạng thái = -1; };
+            nếu (mã trạng thái == 0) {
+                lặp (i = điểm bắt đầu; i < byte dài(nguồn đầu vào); i++) {
+                    nếu (byte máy ảo thêm cuối danh sách(đã kết hợp, byte lấy(nguồn đầu vào, i)) != 0) {
+                        mã trạng thái = -1;
+                        thoát;
+                    };
+                };
+            };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        nếu (byte ghi số nguyên ba mươi hai bit(bảng, đánh dấu + 4, 2) != 0) { mã trạng thái = -1; };
+    };
+    nếu (nguồn đầu vào > 0) { byte hủy(nguồn đầu vào); };
+    nếu (các từ tố > 0) { byte hủy(các từ tố); };
+    nếu (con > 0) { byte hủy(con); };
+    trả về mã trạng thái;
+};
+
+hàm nạp mô đun chuẩn bị(đường tệp, đã kết hợp) {
+    nếu (byte làm rỗng(đã kết hợp) != 0) { trả về -1; };
+    biến bảng = byte mới();
+    nếu (bảng <= 0) { trả về -1; };
+    biến môi trường thực thi = môi trường thực thi nguồn();
+    biến mã trạng thái = -1;
+    nếu (môi trường thực thi > 0) {
+        mã trạng thái = nạp mô đun nạp(môi trường thực thi, đã kết hợp, bảng, 0);
+        byte hủy(môi trường thực thi);
+        nếu (mã trạng thái == 0) { mã trạng thái = nạp mô đun nạp(đường tệp, đã kết hợp, bảng, 0); };
+    };
+    byte hủy(bảng);
+    nếu (mã trạng thái != 0) { byte làm rỗng(đã kết hợp); trả về -1; };
+    nếu (byte dài(đã kết hợp) <= 0) { trả về -1; };
+    trả về byte dài(đã kết hợp);
+};

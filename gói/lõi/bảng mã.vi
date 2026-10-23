@@ -6,91 +6,91 @@ nhập gói/lõi/toán học;
 nhập gói/lõi/chuyển kiểu;
 
 hàm công khai mã điểm unicode(c) {
-    nếu (loai_cua(c) != "chuỗi" || do_dai(c) != 1) {
+    nếu (loại của(c) != "chuỗi" || máy ảo lấy độ dài(c) != 1) {
         ném "bảng mã: cần đúng một ký tự Unicode";
     };
-    bytes = chuoi_bytes_vm(c);
-    n = do_dai(bytes);
-    nếu (bảng mã utf8 độ dài đoạn(bytes, 0) != n) {
+    các byte = chuỗi thành byte máy ảo(c);
+    n = máy ảo lấy độ dài(các byte);
+    nếu (bảng mã unicode tám bit độ dài đoạn(các byte, 0) != n) {
         ném "bảng mã: cần đúng một ký tự Unicode";
     };
-    mã = bytes[0];
+    mã = các byte[0];
     nếu (n == 2) { mã = mã % 32; };
     nếu (n == 3) { mã = mã % 16; };
     nếu (n == 4) { mã = mã % 8; };
     lặp(i = 1; i < n; i++) {
-        mã = mã * 64 + bytes[i] % 64;
+        mã = mã * 64 + các byte[i] % 64;
     };
     trả về mã;
 };
 
 hàm công khai ký tự unicode(mã) {
-    nếu (loai_cua(mã) != "số nguyên" || mã < 0 || mã > 1114111 ||
+    nếu (loại của(mã) != "số nguyên" || mã < 0 || mã > 1114111 ||
         (mã >= 55296 && mã <= 57343)) {
         ném "bảng mã: mã Unicode không hợp lệ";
     };
-    nếu (mã <= 127) { trả về chuoi_tu_bytes_vm([mã]); };
+    nếu (mã <= 127) { trả về chuỗi từ byte máy ảo([mã]); };
     nếu (mã <= 2047) {
-        trả về chuoi_tu_bytes_vm([
-            192 + lam_tron_xuong(mã / 64), 128 + mã % 64
+        trả về chuỗi từ byte máy ảo([
+            192 + làm tròn xuống(mã / 64), 128 + mã % 64
         ]);
     };
     nếu (mã <= 65535) {
-        trả về chuoi_tu_bytes_vm([
-            224 + lam_tron_xuong(mã / 4096),
-            128 + lam_tron_xuong(mã / 64) % 64, 128 + mã % 64
+        trả về chuỗi từ byte máy ảo([
+            224 + làm tròn xuống(mã / 4096),
+            128 + làm tròn xuống(mã / 64) % 64, 128 + mã % 64
         ]);
     };
-    trả về chuoi_tu_bytes_vm([
-        240 + lam_tron_xuong(mã / 262144),
-        128 + lam_tron_xuong(mã / 4096) % 64,
-        128 + lam_tron_xuong(mã / 64) % 64, 128 + mã % 64
+    trả về chuỗi từ byte máy ảo([
+        240 + làm tròn xuống(mã / 262144),
+        128 + làm tròn xuống(mã / 4096) % 64,
+        128 + làm tròn xuống(mã / 64) % 64, 128 + mã % 64
     ]);
 };
 
-hàm công khai bảng mã utf8 mã hóa(văn_bản) {
-    bytes = chuoi_bytes_vm(văn_bản);
-    vị_trí = 0;
-    lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
-        n = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
+hàm công khai bảng mã unicode tám bit mã hóa(văn bản) {
+    các byte = chuỗi thành byte máy ảo(văn bản);
+    vị trí = 0;
+    lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        n = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
         nếu (n < 1) { ném "bảng mã: cần đúng một ký tự Unicode"; };
-        vị_trí = vị_trí + n;
+        vị trí = vị trí + n;
     };
-    trả về bytes;
+    trả về các byte;
 };
 
 // Hạ chữ ngay trong V++ để module bảng mã không cần primitive đổi
 // hoa/thường của runtime. Chế độ lỗi có cả từ khóa tiếng Việt như BÁO_LỖI,
 // vì vậy bảng giữ cùng contract ASCII + chữ dựng sẵn tiếng Việt của vi.text.
-hàm riêng tư bảng mã thường nội bộ(văn_bản) {
+hàm riêng tư bảng mã thường nội bộ(văn bản) {
     hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
           "ĂÂÊÔƠƯĐÀÁẢÃẠẰẮẲẴẶẦẤẨẪẬÈÉẺẼẸỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌỒỐỔỖỘỜỚỞỠỢÙÚỦŨỤỪỨỬỮỰỲÝỶỸỴ";
     thường = "abcdefghijklmnopqrstuvwxyz" +
              "ăâêôơưđàáảãạằắẳẵặầấẩẫậèéẻẽẹềếểễệìíỉĩịòóỏõọồốổỗộờớởỡợùúủũụừứửữựỳýỷỹỵ";
-    kết_quả = "";
-    lặp(i = 0; i < do_dai(văn_bản); i++) {
-        c = văn_bản[i];
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+        c = văn bản[i];
         thay = c;
-        tìm_thấy = sai;
-        lặp(j = 0; j < do_dai(hoa) && !tìm_thấy; j++) {
+        tìm thấy = sai;
+        lặp(j = 0; j < máy ảo lấy độ dài(hoa) && !tìm thấy; j++) {
             nếu (hoa[j] == c) {
                 thay = thường[j];
-                tìm_thấy = đúng;
+                tìm thấy = đúng;
             };
         };
-        kết_quả = kết_quả + thay;
+        kết quả = kết quả + thay;
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm riêng tư bảng mã chuẩn hóa tên(tên bảng mã) {
-    nếu (loai_cua(tên bảng mã) != "chuỗi") {
+    nếu (loại của(tên bảng mã) != "chuỗi") {
         ném "bảng mã: tên bảng mã phải là chuỗi";
     };
 
     tên = bảng mã thường nội bộ(tên bảng mã);
     gọn = "";
-    lặp(i = 0; i < do_dai(tên); i++) {
+    lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
         c = tên[i];
         nếu (c != "-" && c != "_" && c != " ") {
             gọn = gọn + c;
@@ -102,15 +102,15 @@ hàm riêng tư bảng mã chuẩn hóa tên(tên bảng mã) {
     trả về "";
 };
 
-hàm riêng tư bảng mã kiểm tra bytes(bytes) {
-    nếu (loai_cua(bytes) != "danh sách") {
+hàm riêng tư bảng mã kiểm tra các byte(các byte) {
+    nếu (loại của(các byte) != "danh sách") {
         ném "bảng mã: dữ liệu byte phải là danh sách";
     };
-    lặp(i = 0; i < do_dai(bytes); i++) {
-        nếu (loai_cua(bytes[i]) != "số nguyên") {
+    lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        nếu (loại của(các byte[i]) != "số nguyên") {
             ném "bảng mã: mỗi byte phải là số nguyên";
         };
-        nếu (bytes[i] < 0 || bytes[i] > 255) {
+        nếu (các byte[i] < 0 || các byte[i] > 255) {
             ném "bảng mã: byte phải trong 0..255";
         };
     };
@@ -118,7 +118,7 @@ hàm riêng tư bảng mã kiểm tra bytes(bytes) {
 };
 
 hàm riêng tư bảng mã chuẩn hóa chế độ lỗi(chế độ) {
-    nếu (loai_cua(chế độ) != "chuỗi") {
+    nếu (loại của(chế độ) != "chuỗi") {
         ném "bảng mã: chế độ lỗi phải là chuỗi";
     };
     tên = bảng mã thường nội bộ(chế độ);
@@ -131,78 +131,78 @@ hàm riêng tư bảng mã chuẩn hóa chế độ lỗi(chế độ) {
     ném "bảng mã: chế độ lỗi không được hỗ trợ";
 };
 
-hàm riêng tư bảng mã utf8 là byte tiếp(byte) {
+hàm riêng tư bảng mã unicode tám bit là byte tiếp(byte) {
     trả về byte >= 128 && byte <= 191;
 };
 
 // Số dương: sequence hợp lệ. Số âm: số byte của maximal valid prefix cần
 // tiêu thụ khi thay malformed UTF-8 bằng U+FFFD.
-hàm công khai bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
-    n = do_dai(bytes);
-    b0 = bytes[vị_trí];
+hàm công khai bảng mã unicode tám bit độ dài đoạn(các byte, vị trí) {
+    n = máy ảo lấy độ dài(các byte);
+    b0 = các byte[vị trí];
     nếu (b0 <= 127) {
         trả về 1;
     };
 
     nếu (b0 >= 194 && b0 <= 223) {
-        nếu (vị_trí + 1 >= n) {
+        nếu (vị trí + 1 >= n) {
             trả về -1;
         };
-        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 1])) {
+        nếu (bảng mã unicode tám bit là byte tiếp(các byte[vị trí + 1])) {
             trả về 2;
         };
         trả về -1;
     };
 
     nếu (b0 >= 224 && b0 <= 239) {
-        nếu (vị_trí + 1 >= n) {
+        nếu (vị trí + 1 >= n) {
             trả về -1;
         };
-        b1 = bytes[vị_trí + 1];
-        hợp_lệ_b1 = bảng mã utf8 là byte tiếp(b1);
+        b1 = các byte[vị trí + 1];
+        hợp lệ b1 = bảng mã unicode tám bit là byte tiếp(b1);
         nếu (b0 == 224 && b1 < 160) {
-            hợp_lệ_b1 = sai;
+            hợp lệ b1 = sai;
         };
         nếu (b0 == 237 && b1 > 159) {
-            hợp_lệ_b1 = sai;
+            hợp lệ b1 = sai;
         };
-        nếu (!hợp_lệ_b1) {
+        nếu (!hợp lệ b1) {
             trả về -1;
         };
-        nếu (vị_trí + 2 >= n) {
+        nếu (vị trí + 2 >= n) {
             trả về -2;
         };
-        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 2])) {
+        nếu (bảng mã unicode tám bit là byte tiếp(các byte[vị trí + 2])) {
             trả về 3;
         };
         trả về -2;
     };
 
     nếu (b0 >= 240 && b0 <= 244) {
-        nếu (vị_trí + 1 >= n) {
+        nếu (vị trí + 1 >= n) {
             trả về -1;
         };
-        b1 = bytes[vị_trí + 1];
-        hợp_lệ_b1 = bảng mã utf8 là byte tiếp(b1);
+        b1 = các byte[vị trí + 1];
+        hợp lệ b1 = bảng mã unicode tám bit là byte tiếp(b1);
         nếu (b0 == 240 && b1 < 144) {
-            hợp_lệ_b1 = sai;
+            hợp lệ b1 = sai;
         };
         nếu (b0 == 244 && b1 > 143) {
-            hợp_lệ_b1 = sai;
+            hợp lệ b1 = sai;
         };
-        nếu (!hợp_lệ_b1) {
+        nếu (!hợp lệ b1) {
             trả về -1;
         };
-        nếu (vị_trí + 2 >= n) {
+        nếu (vị trí + 2 >= n) {
             trả về -2;
         };
-        nếu (!bảng mã utf8 là byte tiếp(bytes[vị_trí + 2])) {
+        nếu (!bảng mã unicode tám bit là byte tiếp(các byte[vị trí + 2])) {
             trả về -2;
         };
-        nếu (vị_trí + 3 >= n) {
+        nếu (vị trí + 3 >= n) {
             trả về -3;
         };
-        nếu (bảng mã utf8 là byte tiếp(bytes[vị_trí + 3])) {
+        nếu (bảng mã unicode tám bit là byte tiếp(các byte[vị trí + 3])) {
             trả về 4;
         };
         trả về -3;
@@ -211,43 +211,43 @@ hàm công khai bảng mã utf8 độ dài đoạn(bytes, vị_trí) {
     trả về -1;
 };
 
-hàm riêng tư bảng mã utf8 giải mã(bytes, chế độ) {
-    kết_quả = "";
-    ký_tự_thay = ký tự unicode(65533);
-    vị_trí = 0;
-    n = do_dai(bytes);
-    lặp(vòng = 0; vị_trí < n; vòng++) {
-        độ_dài = bảng mã utf8 độ dài đoạn(bytes, vị_trí);
-        nếu (độ_dài > 0) {
-            b0 = bytes[vị_trí];
+hàm riêng tư bảng mã unicode tám bit giải mã(các byte, chế độ) {
+    kết quả = "";
+    ký tự thay = ký tự unicode(65533);
+    vị trí = 0;
+    n = máy ảo lấy độ dài(các byte);
+    lặp(vòng = 0; vị trí < n; vòng++) {
+        độ dài = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
+        nếu (độ dài > 0) {
+            b0 = các byte[vị trí];
             mã = b0;
-            nếu (độ_dài == 2) {
-                mã = (b0 % 32) * 64 + (bytes[vị_trí + 1] % 64);
+            nếu (độ dài == 2) {
+                mã = (b0 % 32) * 64 + (các byte[vị trí + 1] % 64);
             } hoặc {
-                nếu (độ_dài == 3) {
+                nếu (độ dài == 3) {
                     mã = (b0 % 16) * 4096 +
-                        (bytes[vị_trí + 1] % 64) * 64 +
-                        (bytes[vị_trí + 2] % 64);
+                        (các byte[vị trí + 1] % 64) * 64 +
+                        (các byte[vị trí + 2] % 64);
                 } hoặc {
-                    nếu (độ_dài == 4) {
+                    nếu (độ dài == 4) {
                         mã = (b0 % 8) * 262144 +
-                            (bytes[vị_trí + 1] % 64) * 4096 +
-                            (bytes[vị_trí + 2] % 64) * 64 +
-                            (bytes[vị_trí + 3] % 64);
+                            (các byte[vị trí + 1] % 64) * 4096 +
+                            (các byte[vị trí + 2] % 64) * 64 +
+                            (các byte[vị trí + 3] % 64);
                     };
                 };
             };
-            kết_quả = kết_quả + ký tự unicode(mã);
-            vị_trí = vị_trí + độ_dài;
+            kết quả = kết quả + ký tự unicode(mã);
+            vị trí = vị trí + độ dài;
         } hoặc {
             nếu (chế độ == "nghiêm") {
                 ném "TEXT_DECODE_INVALID";
             };
-            kết_quả = kết_quả + ký_tự_thay;
-            vị_trí = vị_trí - độ_dài;
+            kết quả = kết quả + ký tự thay;
+            vị trí = vị trí - độ dài;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm công khai bảng mã hỗ trợ(tên bảng mã) {
@@ -255,7 +255,7 @@ hàm công khai bảng mã hỗ trợ(tên bảng mã) {
 };
 
 hàm công khai mã hóa bảng mã(văn bản, tên bảng mã) {
-    nếu (loai_cua(văn bản) != "chuỗi") {
+    nếu (loại của(văn bản) != "chuỗi") {
         ném "mã hóa bảng mã: văn bản phải là chuỗi";
     };
     bảng = bảng mã chuẩn hóa tên(tên bảng mã);
@@ -263,11 +263,11 @@ hàm công khai mã hóa bảng mã(văn bản, tên bảng mã) {
         ném "mã hóa bảng mã: bảng mã không được hỗ trợ";
     };
     nếu (bảng == "utf8") {
-        trả về bảng mã utf8 mã hóa(văn bản);
+        trả về bảng mã unicode tám bit mã hóa(văn bản);
     };
 
-    kết_quả = [];
-    lặp(i = 0; i < do_dai(văn bản); i++) {
+    kết quả = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
         mã = mã điểm unicode(văn bản[i]);
         nếu (bảng == "ascii" && mã > 127) {
             ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
@@ -275,37 +275,37 @@ hàm công khai mã hóa bảng mã(văn bản, tên bảng mã) {
         nếu (mã > 255) {
             ném "mã hóa bảng mã: ký tự không biểu diễn được trong bảng mã đích";
         };
-        thêm(kết_quả, mã);
+        máy ảo thêm cuối danh sách(kết quả, mã);
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm công khai giải mã bảng mã(bytes, tên bảng mã, chế độ lỗi = "BÁO_LỖI") {
-    bảng mã kiểm tra bytes(bytes);
+hàm công khai giải mã bảng mã(các byte, tên bảng mã, chế độ lỗi = "BÁO_LỖI") {
+    bảng mã kiểm tra các byte(các byte);
     bảng = bảng mã chuẩn hóa tên(tên bảng mã);
     nếu (bảng == "") {
         ném "giải mã bảng mã: bảng mã không được hỗ trợ";
     };
-    chế_độ = bảng mã chuẩn hóa chế độ lỗi(chế độ lỗi);
+    chế độ = bảng mã chuẩn hóa chế độ lỗi(chế độ lỗi);
     nếu (bảng == "utf8") {
-        trả về bảng mã utf8 giải mã(bytes, chế_độ);
+        trả về bảng mã unicode tám bit giải mã(các byte, chế độ);
     };
 
-    kết_quả = "";
-    lặp(i = 0; i < do_dai(bytes); i++) {
-        byte = bytes[i];
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+        byte = các byte[i];
         nếu (bảng == "ascii") {
             nếu (byte > 127) {
-                nếu (chế_độ == "nghiêm") {
+                nếu (chế độ == "nghiêm") {
                     ném "TEXT_DECODE_INVALID";
                 };
-                kết_quả = kết_quả + ký tự unicode(65533);
+                kết quả = kết quả + ký tự unicode(65533);
             } hoặc {
-                kết_quả = kết_quả + ký tự unicode(byte);
+                kết quả = kết quả + ký tự unicode(byte);
             };
         } hoặc {
-            kết_quả = kết_quả + ký tự unicode(byte);
+            kết quả = kết quả + ký tự unicode(byte);
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };

@@ -9,11 +9,11 @@ hàm công khai vận tốc(s, t) {
     trả về s / t;
 };
 
-hàm công khai gia tốc(delta_v, t) {
+hàm công khai gia tốc(chênh lệch v, t) {
     nếu (t == 0 || t == 0.0) {
         ném "vật lý: thời gian phải khác 0";
     };
-    trả về delta_v / t;
+    trả về chênh lệch v / t;
 };
 
 hàm công khai lực(m, a) {

@@ -50,7 +50,9 @@ vdk-*.zip
 # Python tooling
 __pycache__/
 *.pyc
+.venv-quantum/
 *.md
+!docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md
 !benchmark/NATIVE.md
 !docs/system-ffi-migration-plan.md

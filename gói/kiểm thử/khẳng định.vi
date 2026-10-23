@@ -58,20 +58,20 @@ lớp công khai Khẳng Định {
     // Ghi chú hàm: chạy callback và yêu cầu callback phải ném lỗi. Nếu `lỗi kỳ vọng`
     // khác rỗng thì giá trị lỗi bắt được phải bằng chính xác giá trị đó.
     hàm công khai khẳng định ném lỗi(hành động, lỗi kỳ vọng = rỗng, thông điệp = "khẳng định ném lỗi thất bại") {
-        đãNém = sai;
-        lỗiBắtĐược = rỗng;
+        đã ném = sai;
+        lỗi bắt được = rỗng;
 
         thử {
             hành động();
         } bắt lỗi (e) {
-            đãNém = đúng;
-            lỗiBắtĐược = e;
+            đã ném = đúng;
+            lỗi bắt được = e;
         }
 
-        nếu (!đãNém) {
+        nếu (!đã ném) {
             ném thông điệp;
         };
-        nếu (lỗi kỳ vọng != rỗng && lỗiBắtĐược != lỗi kỳ vọng) {
+        nếu (lỗi kỳ vọng != rỗng && lỗi bắt được != lỗi kỳ vọng) {
             ném thông điệp;
         };
         trả về đúng;

@@ -1,0 +1,13 @@
+nhập lượng tử;
+hàm chính() {
+    mạch = Mạch Lượng Tử(2);
+    mạch.h(0) .cx(0, 1);
+    máy = Bộ Mô Phỏng Lượng Tử();
+    trạng thái = máy.trạng thái(mạch);
+    in trạng thái["xác suất"];
+    mạch.đo tất cả();
+    kết quả = máy.chạy(mạch, 1024, 20261022);
+    in kết quả["đếm"];
+    in xuất openqasm(mạch);
+}
+;

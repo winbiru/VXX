@@ -77,7 +77,7 @@ lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
         tìmThấy = sai;
         lặp(i = 0; i < độ dài(raw); i = i + 1) {
             item = raw[i];
-            nếu (lấy map(item, "id", "") == sảnPhẩm.id) {
+            nếu (lấy từ điển(item, "id", "") == sảnPhẩm.id) {
                 raw[i] = sảnPhẩm.thànhMap();
                 tìmThấy = đúng;
             };
@@ -95,7 +95,7 @@ lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
         đãBỏ = sai;
         lặp(i = 0; i < độ dài(raw); i = i + 1) {
             item = raw[i];
-            nếu (lấy map(item, "id", "") == id) {
+            nếu (lấy từ điển(item, "id", "") == id) {
                 đãBỏ = đúng;
             } hoặc {
                 thêm(kếtQuả, item);

@@ -1,8 +1,8 @@
 nhập gói/mạng/rest;
 
 hàm chính() {
-    token = "eyJhbGciOiJIUzUxMiJ9.demo-token";
+    từ tố = "eyJhbGciOiJIUzUxMiJ9.demo-từ tố";
     refresh = "eyJhbGciOiJIUzUxMiJ9.demo-refresh";
 
-    rest in json thành công jwt("Đăng nhập thành công", token, refresh);
+    dịch vụ tài nguyên in json thành công jwt("Đăng nhập thành công", từ tố, refresh);
 };

@@ -9,44 +9,44 @@ hàm chính() {
         "trả về kết_quả; }; " +
         "hàm chính() { tính_tổng(1, 2); };";
     cây = biên dịch phân tích chương trình tự chủ(nguồn);
-    in lấy map(cây, "loại", "") == "chương trình";
-    câu_lệnh = lấy map(cây, "câu lệnh", []);
+    in lấy từ điển(cây, "loại", "") == "chương trình";
+    câu_lệnh = lấy từ điển(cây, "câu lệnh", []);
     in độ dài(câu_lệnh) == 3;
-    in lấy map(câu_lệnh[0], "loại", "") == "nhập";
-    in lấy map(câu_lệnh[0], "đích", "") == "gói/bộ sưu tập/từ điển";
+    in lấy từ điển(câu_lệnh[0], "loại", "") == "nhập";
+    in lấy từ điển(câu_lệnh[0], "đích", "") == "gói/bộ sưu tập/từ điển";
     khai_báo = câu_lệnh[1];
-    in lấy map(khai_báo, "tên", "") == "tính tổng";
-    in độ dài(lấy map(khai_báo, "tham số", [])) == 2;
-    thân = lấy map(khai_báo, "thân", {});
-    các_lệnh = lấy map(thân, "câu lệnh", []);
+    in lấy từ điển(khai_báo, "tên", "") == "tính tổng";
+    in độ dài(lấy từ điển(khai_báo, "tham số", [])) == 2;
+    thân = lấy từ điển(khai_báo, "thân", {});
+    các_lệnh = lấy từ điển(thân, "câu lệnh", []);
     in độ dài(các_lệnh) == 3;
-    in lấy map(các_lệnh[0], "loại", "") == "biến";
-    biểu_thức = lấy map(các_lệnh[0], "giá trị", {});
-    in lấy map(biểu_thức, "toán tử", "") == "+";
-    in lấy map(lấy map(biểu_thức, "phải", {}), "toán tử", "") == "*";
+    in lấy từ điển(các_lệnh[0], "loại", "") == "biến";
+    biểu_thức = lấy từ điển(các_lệnh[0], "giá trị", {});
+    in lấy từ điển(biểu_thức, "toán tử", "") == "+";
+    in lấy từ điển(lấy từ điển(biểu_thức, "phải", {}), "toán tử", "") == "*";
     nhánh = các_lệnh[1];
-    in lấy map(nhánh, "loại", "") == "nếu";
-    in lấy map(lấy map(nhánh, "điều kiện", {}), "toán tử", "") == ">";
-    in lấy map(lấy map(nhánh, "nhánh khác", {}), "loại", "") == "khối";
-    in lấy map(các_lệnh[2], "loại", "") == "trả về";
-    in lấy map(lấy map(các_lệnh[2], "biểu thức", {}), "giá trị", "") == "kết_quả";
+    in lấy từ điển(nhánh, "loại", "") == "nếu";
+    in lấy từ điển(lấy từ điển(nhánh, "điều kiện", {}), "toán tử", "") == ">";
+    in lấy từ điển(lấy từ điển(nhánh, "nhánh khác", {}), "loại", "") == "khối";
+    in lấy từ điển(các_lệnh[2], "loại", "") == "trả về";
+    in lấy từ điển(lấy từ điển(các_lệnh[2], "biểu thức", {}), "giá trị", "") == "kết_quả";
 
     // Không bắt buộc khai báo trước khi gọi; biểu thức được phân tích độc lập.
-    in độ dài(lấy map(lấy map(câu_lệnh[2], "thân", {}), "câu lệnh", [])) == 1;
-    in lấy map(biên dịch phân tích chương trình thuần(""), "loại", "") == "chương trình";
-    in độ dài(lấy map(biên dịch phân tích chương trình thuần(";;"), "câu lệnh", [])) == 2;
+    in độ dài(lấy từ điển(lấy từ điển(câu_lệnh[2], "thân", {}), "câu lệnh", [])) == 1;
+    in lấy từ điển(biên dịch phân tích chương trình thuần(""), "loại", "") == "chương trình";
+    in độ dài(lấy từ điển(biên dịch phân tích chương trình thuần(";;"), "câu lệnh", [])) == 2;
 
     cây_nếu = biên dịch phân tích ngữ nghĩa thuần(
         "hàm f(x) { nếu (x) { trả về 1; } hoặc nếu (x == 0) { trả về 0; }; };" );
-    in độ dài(lấy map(cây_nếu, "câu lệnh", [])) == 1;
+    in độ dài(lấy từ điển(cây_nếu, "câu lệnh", [])) == 1;
     chuỗi_nhánh = biên dịch phân tích chương trình thuần(
         "nếu (sai) { in 1; } hoặc nếu (đúng) { in 2; } hoặc { in 3; };"
     );
-    nhánh_đầu = lấy map(chuỗi_nhánh, "câu lệnh", [])[0];
-    in lấy map(nhánh_đầu, "loại", "") == "nếu";
-    nhánh_giữa = lấy map(nhánh_đầu, "nhánh khác", {});
-    in lấy map(nhánh_giữa, "loại", "") == "nếu";
-    in lấy map(lấy map(nhánh_giữa, "nhánh khác", {}), "loại", "") == "khối";
+    nhánh_đầu = lấy từ điển(chuỗi_nhánh, "câu lệnh", [])[0];
+    in lấy từ điển(nhánh_đầu, "loại", "") == "nếu";
+    nhánh_giữa = lấy từ điển(nhánh_đầu, "nhánh khác", {});
+    in lấy từ điển(nhánh_giữa, "loại", "") == "nếu";
+    in lấy từ điển(lấy từ điển(nhánh_giữa, "nhánh khác", {}), "loại", "") == "khối";
     lỗi_cũ = sai;
     thử { biên dịch phân tích chương trình thuần("nếu (đúng) {} nếu không {};"); }
     bắt lỗi (e) { lỗi_cũ = đúng; };
@@ -78,20 +78,20 @@ hàm chính() {
     vòng = biên dịch phân tích ngữ nghĩa thuần(
         "hàm f() { lặp(i = 0; i < 3; i++) { " +
         "nếu (i == 2) { thoát; }; bỏ qua; }; };" );
-    khai_báo_vòng = lấy map(vòng, "câu lệnh", []);
+    khai_báo_vòng = lấy từ điển(vòng, "câu lệnh", []);
     hàm_vòng = khai_báo_vòng[0];
-    thân_vòng = lấy map(hàm_vòng, "thân", {});
-    vòng_lặp = lấy map(thân_vòng, "câu lệnh", [])[0];
-    in lấy map(vòng_lặp, "loại", "") == "lặp";
-    in lấy map(lấy map(vòng_lặp, "khởi tạo", {}), "toán tử", "") == "=";
-    in lấy map(lấy map(vòng_lặp, "điều kiện", {}), "toán tử", "") == "<";
-    in lấy map(lấy map(vòng_lặp, "cập nhật", {}), "loại", "") == "cập nhật";
-    in lấy map(lấy map(vòng_lặp, "cập nhật", {}), "toán tử", "") == "++";
-    in độ dài(lấy map(lấy map(vòng_lặp, "thân", {}), "câu lệnh", [])) == 2;
+    thân_vòng = lấy từ điển(hàm_vòng, "thân", {});
+    vòng_lặp = lấy từ điển(thân_vòng, "câu lệnh", [])[0];
+    in lấy từ điển(vòng_lặp, "loại", "") == "lặp";
+    in lấy từ điển(lấy từ điển(vòng_lặp, "khởi tạo", {}), "toán tử", "") == "=";
+    in lấy từ điển(lấy từ điển(vòng_lặp, "điều kiện", {}), "toán tử", "") == "<";
+    in lấy từ điển(lấy từ điển(vòng_lặp, "cập nhật", {}), "loại", "") == "cập nhật";
+    in lấy từ điển(lấy từ điển(vòng_lặp, "cập nhật", {}), "toán tử", "") == "++";
+    in độ dài(lấy từ điển(lấy từ điển(vòng_lặp, "thân", {}), "câu lệnh", [])) == 2;
 
     trống = biên dịch phân tích ngữ nghĩa thuần("lặp(;;) { thoát; };");
-    danh_sách_trống = lấy map(trống, "câu lệnh", []);
-    in lấy map(danh_sách_trống[0], "điều kiện", 1) == rỗng;
+    danh_sách_trống = lấy từ điển(trống, "câu lệnh", []);
+    in lấy từ điển(danh_sách_trống[0], "điều kiện", 1) == rỗng;
 
     lỗi = sai;
     thử { biên dịch phân tích chương trình thuần("hàm f(a) { trả về a;"); }

@@ -1,5 +1,5 @@
 // Old filesystem intrinsics are deliberately disabled. Directory operations
 // must be called through gói/nhập xuất/thư mục.vi and đường dẫn.vi.
 hàm chính() {
-    in tao_thu_muc_vm(".tmp_vpp_legacy_directory_opcode_must_not_create");
+    in tạo thư mục máy ảo(".tmp_vpp_legacy_directory_opcode_must_not_create");
 };

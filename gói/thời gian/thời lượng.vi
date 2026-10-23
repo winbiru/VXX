@@ -23,16 +23,16 @@ lớp công khai Thời Lượng {
 
 
 hàm công khai thời lượng mili giây(bắt đầu, kết thúc) {
-    __vpp_adapter = Thời Lượng();
-    trả về __vpp_adapter.thời lượng mili giây(bắt đầu, kết thúc);
+    bộ chuyển tiếp = Thời Lượng();
+    trả về bộ chuyển tiếp.thời lượng mili giây(bắt đầu, kết thúc);
 };
 
 hàm công khai mili giây thành giây(mili giây) {
-    __vpp_adapter = Thời Lượng();
-    trả về __vpp_adapter.mili giây thành giây(mili giây);
+    bộ chuyển tiếp = Thời Lượng();
+    trả về bộ chuyển tiếp.mili giây thành giây(mili giây);
 };
 
 hàm công khai giây thành mili giây(giây) {
-    __vpp_adapter = Thời Lượng();
-    trả về __vpp_adapter.giây thành mili giây(giây);
+    bộ chuyển tiếp = Thời Lượng();
+    trả về bộ chuyển tiếp.giây thành mili giây(giây);
 };

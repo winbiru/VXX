@@ -18,203 +18,203 @@ lớp công khai Bộ Chạy Tiến Trình {
 
     // PID của chính tiến trình đang chạy VM.
     hàm công khai mã tiến trình() {
-        trả về máy_tiến_trình_pid();
+        trả về máy tiến trình mã tiến trình();
     };
 
     // PID của tiến trình cha tại thời điểm gọi; có thể thay đổi nếu cha kết thúc.
     hàm công khai mã tiến trình cha() {
-        trả về máy_tiến_trình_ppid();
+        trả về máy tiến trình mã tiến trình cha();
     };
 
     // POSIX real/effective IDs. UID/GID lớn hơn INT32_MAX chưa biểu diễn được
     // dưới dạng số nguyên i32 nên machine primitive trả AbiInteger u32.
     hàm công khai mã người dùng() {
-        nếu (ten_nen_tang_vm() == "windows") {
+        nếu (ten nền tảng máy ảo() == "windows") {
             ném "mã người dùng: Windows chưa được hỗ trợ";
         };
-        trả về máy_tiến_trình_uid();
+        trả về máy tiến trình mã người dùng();
     };
 
     hàm công khai mã người dùng hiệu lực() {
-        nếu (ten_nen_tang_vm() == "windows") {
+        nếu (ten nền tảng máy ảo() == "windows") {
             ném "mã người dùng hiệu lực: Windows chưa được hỗ trợ";
         };
-        trả về máy_tiến_trình_euid();
+        trả về máy tiến trình mã người dùng hiệu lực();
     };
 
     hàm công khai mã nhóm() {
-        nếu (ten_nen_tang_vm() == "windows") {
+        nếu (ten nền tảng máy ảo() == "windows") {
             ném "mã nhóm: Windows chưa được hỗ trợ";
         };
-        trả về máy_tiến_trình_gid();
+        trả về máy tiến trình mã nhóm();
     };
 
     hàm công khai mã nhóm hiệu lực() {
-        nếu (ten_nen_tang_vm() == "windows") {
+        nếu (ten nền tảng máy ảo() == "windows") {
             ném "mã nhóm hiệu lực: Windows chưa được hỗ trợ";
         };
-        trả về máy_tiến_trình_egid();
+        trả về máy tiến trình mã nhóm hiệu lực();
     };
 
-    hàm công khai tiến trình yêu cầu chuỗi(giá_trị, nhãn) {
-        nếu (loai_cua(giá_trị) != "chuỗi") {
+    hàm công khai tiến trình yêu cầu chuỗi(giá trị, nhãn) {
+        nếu (loại của(giá trị) != "chuỗi") {
             ném "chạy tiến trình: " + nhãn + " phải là chuỗi";
         };
-        nul = ký tự unicode(0);
-        lặp(i = 0; i < do_dai(giá_trị); i++) {
-            nếu (giá_trị[i] == nul) {
+        ký tự không = ký tự unicode(0);
+        lặp(i = 0; i < máy ảo lấy độ dài(giá trị); i++) {
+            nếu (giá trị[i] == ký tự không) {
                 ném "chạy tiến trình: " + nhãn + " không được chứa NUL";
             };
         };
-        trả về giá_trị;
+        trả về giá trị;
     };
 
     // Quy tắc quote đối số CreateProcessW / argv của C runtime trên Windows:
     // backslash đứng trước quote phải gấp đôi và thêm một; cuối chuỗi có quote
     // thì các backslash cuối cũng phải gấp đôi. Unicode được giữ nguyên.
-    hàm công khai tiến trình quote windows(đối_số) {
-        cần_quote = đối_số == "";
-        lặp(i = 0; i < do_dai(đối_số); i++) {
-            c = đối_số[i];
+    hàm công khai tiến trình nháy windows(đối số) {
+        cần nháy = đối số == "";
+        lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+            c = đối số[i];
             nếu (c == " " || c == "\t" || c == "\n" ||
-                c == ký tự unicode(11) || c == "\"") { cần_quote = đúng; };
+                c == ký tự unicode(11) || c == "\"") { cần nháy = đúng; };
         };
-        nếu (!cần_quote) { trả về đối_số; };
-        kết_quả = "\"";
-        dấu_gạch = 0;
-        lặp(i = 0; i < do_dai(đối_số); i++) {
-            c = đối_số[i];
+        nếu (!cần nháy) { trả về đối số; };
+        kết quả = "\"";
+        dấu gạch = 0;
+        lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+            c = đối số[i];
             nếu (c == "\\") {
-                dấu_gạch = dấu_gạch + 1;
+                dấu gạch = dấu gạch + 1;
             } hoặc {
-                số_gạch = dấu_gạch;
-                nếu (c == "\"") { số_gạch = dấu_gạch * 2 + 1; };
-                lặp(j = 0; j < số_gạch; j++) { kết_quả = kết_quả + "\\"; };
-                kết_quả = kết_quả + c;
-                dấu_gạch = 0;
+                số gạch = dấu gạch;
+                nếu (c == "\"") { số gạch = dấu gạch * 2 + 1; };
+                lặp(j = 0; j < số gạch; j++) { kết quả = kết quả + "\\"; };
+                kết quả = kết quả + c;
+                dấu gạch = 0;
             };
         };
-        lặp(j = 0; j < dấu_gạch * 2; j++) { kết_quả = kết_quả + "\\"; };
-        trả về kết_quả + "\"";
+        lặp(j = 0; j < dấu gạch * 2; j++) { kết quả = kết quả + "\\"; };
+        trả về kết quả + "\"";
     };
 
-    hàm công khai tiến trình dựng lệnh windows(chương_trình, đối_số) {
-        dòng_lệnh = mình.tiến trình quote windows(chương_trình);
-        lặp(i = 0; i < do_dai(đối_số); i++) {
-            dòng_lệnh = dòng_lệnh + " " + mình.tiến trình quote windows(đối_số[i]);
+    hàm công khai tiến trình dựng lệnh windows(chương trình, đối số) {
+        dòng lệnh = mình.tiến trình nháy windows(chương trình);
+        lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+            dòng lệnh = dòng lệnh + " " + mình.tiến trình nháy windows(đối số[i]);
         };
-        trả về dòng_lệnh;
+        trả về dòng lệnh;
     };
 
     // Kết quả công khai được V++ dựng thống nhất cho mọi backend.
-    hàm công khai tiến trình kết quả(khởi_chạy, mã_thoát, đầu_ra, lỗi) {
+    hàm công khai tiến trình kết quả(khởi chạy, mã thoát, đầu ra, lỗi) {
         trả về {
-            "khởi chạy": khởi_chạy, "mã thoát": mã_thoát,
-            "đầu ra": đầu_ra, "lỗi": lỗi
+            "khởi chạy": khởi chạy, "mã thoát": mã thoát,
+            "đầu ra": đầu ra, "lỗi": lỗi
         };
     };
 
     // Đọc đúng một khối đã sẵn sàng. Machine chỉ sao chép byte vào đệm do V++ cấp;
     // việc dựng chuỗi, kể cả dữ liệu chứa NUL, do gói này thực hiện.
     hàm công khai tiến trình đọc khối(mã, kênh, đệm) {
-        n = máy_tiến_trình_đọc(mã, kênh, đệm, 4096);
-        byte_đọc = [];
-        lặp(i = 0; i < n; i++) { them(byte_đọc, đệm[i]); };
-        trả về chuoi_tu_bytes_vm(byte_đọc);
+        n = máy tiến trình đọc(mã, kênh, đệm, 4096);
+        byte đọc = [];
+        lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(byte đọc, đệm[i]); };
+        trả về chuỗi từ byte máy ảo(byte đọc);
     };
 
-    hàm công khai chạy tiến trình(chương_trình, đối_số = rỗng, môi_trường = rỗng, giới_hạn_mili_giây = rỗng) {
-        chương_trình = mình.tiến trình yêu cầu chuỗi(chương_trình, "chương trình");
-        nếu (chương_trình == "") { ném "chạy tiến trình: chương trình không được rỗng"; };
-        nếu (đối_số == rỗng) { đối_số = []; };
-        nếu (môi_trường == rỗng) { môi_trường = {}; };
-        nếu (loai_cua(đối_số) != "danh sách") {
+    hàm công khai chạy tiến trình(chương trình, đối số = rỗng, môi trường = rỗng, mức trần mili giây = rỗng) {
+        chương trình = mình.tiến trình yêu cầu chuỗi(chương trình, "chương trình");
+        nếu (chương trình == "") { ném "chạy tiến trình: chương trình không được rỗng"; };
+        nếu (đối số == rỗng) { đối số = []; };
+        nếu (môi trường == rỗng) { môi trường = {}; };
+        nếu (loại của(đối số) != "danh sách") {
             ném "chạy tiến trình: đối số phải là danh sách";
         };
-        nếu (loai_cua(môi_trường) != "từ điển") {
+        nếu (loại của(môi trường) != "từ điển") {
             ném "chạy tiến trình: môi trường phải là từ điển";
         };
-        nếu (giới_hạn_mili_giây != rỗng) {
-            nếu (loai_cua(giới_hạn_mili_giây) != "số nguyên" ||
-                giới_hạn_mili_giây < 1) {
+        nếu (mức trần mili giây != rỗng) {
+            nếu (loại của(mức trần mili giây) != "số nguyên" ||
+                mức trần mili giây < 1) {
                 ném "chạy tiến trình: giới hạn mili giây phải là số nguyên dương";
             };
         };
-        lặp(i = 0; i < do_dai(đối_số); i++) {
-            mình.tiến trình yêu cầu chuỗi(đối_số[i], "đối số");
+        lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+            mình.tiến trình yêu cầu chuỗi(đối số[i], "đối số");
         };
-        tên = khóa map(môi_trường);
-        lặp(i = 0; i < do_dai(tên); i++) {
-            key = mình.tiến trình yêu cầu chuỗi(tên[i], "tên biến môi trường");
-            nếu (key == "") { ném "chạy tiến trình: tên biến môi trường không được rỗng"; };
-            lặp(j = 0; j < do_dai(key); j++) {
-                nếu (key[j] == "=") { ném "chạy tiến trình: tên biến môi trường không được chứa ="; };
+        tên = khóa từ điển(môi trường);
+        lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+            khóa tra cứu = mình.tiến trình yêu cầu chuỗi(tên[i], "tên biến môi trường");
+            nếu (khóa tra cứu == "") { ném "chạy tiến trình: tên biến môi trường không được rỗng"; };
+            lặp(j = 0; j < máy ảo lấy độ dài(khóa tra cứu); j++) {
+                nếu (khóa tra cứu[j] == "=") { ném "chạy tiến trình: tên biến môi trường không được chứa ="; };
             };
-            mình.tiến trình yêu cầu chuỗi(môi_trường[key], "giá trị biến môi trường");
+            mình.tiến trình yêu cầu chuỗi(môi trường[khóa tra cứu], "giá trị biến môi trường");
         };
         // POSIX và Windows dùng cùng thuật toán V++ với vòng đời child do VM quản lý.
-        mã = máy_tiến_trình_tạo(chương_trình);
+        mã = máy tiến trình tạo(chương trình);
         thử {
-            nếu (ten_nen_tang_vm() == "windows") {
-                máy_tiến_trình_lệnh_windows(mã, mình.tiến trình dựng lệnh windows(chương_trình, đối_số));
+            nếu (ten nền tảng máy ảo() == "windows") {
+                máy tiến trình lệnh windows(mã, mình.tiến trình dựng lệnh windows(chương trình, đối số));
             } hoặc {
-                lặp(i = 0; i < do_dai(đối_số); i++) {
-                    máy_tiến_trình_đối_số(mã, đối_số[i]);
+                lặp(i = 0; i < máy ảo lấy độ dài(đối số); i++) {
+                    máy tiến trình đối số(mã, đối số[i]);
                 };
             };
-            lặp(i = 0; i < do_dai(tên); i++) {
-                máy_tiến_trình_môi_trường(mã, tên[i], môi_trường[tên[i]]);
+            lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
+                máy tiến trình môi trường(mã, tên[i], môi trường[tên[i]]);
             };
-            nếu (máy_tiến_trình_bắt_đầu(mã) == 0) {
-                lỗi = máy_tiến_trình_lỗi(mã);
-                máy_tiến_trình_đóng(mã);
+            nếu (máy tiến trình bắt đầu(mã) == 0) {
+                lỗi = máy tiến trình lỗi(mã);
+                máy tiến trình đóng(mã);
                 trả về mình.tiến trình kết quả(sai, -1, "", lỗi);
             };
-            đầu_ra = "";
-            lỗi_ra = "";
-            hết_hạn = 0.0;
-            nếu (giới_hạn_mili_giây != rỗng) {
-                hết_hạn = thời gian đơn điệu mili giây() + giới_hạn_mili_giây;
+            đầu ra = "";
+            lỗi ra = "";
+            hết hạn = 0.0;
+            nếu (mức trần mili giây != rỗng) {
+                hết hạn = thời gian đơn điệu mili giây() + mức trần mili giây;
             };
             // Cấp đệm một lần cho cả hai pipe; adapter chỉ ghi các byte đầu n.
             đệm = [];
-            lặp(j = 0; j < 4096; j++) { them(đệm, 0); };
+            lặp(j = 0; j < 4096; j++) { máy ảo thêm cuối danh sách(đệm, 0); };
             // poll đồng thời hai pipe để child không bị kẹt vì một pipe đầy.
             lặp(vòng = 0; vòng < 2147483647; vòng++) {
                 chờ = 1000;
-                nếu (giới_hạn_mili_giây != rỗng) {
-                    còn = hết_hạn - thời gian đơn điệu mili giây();
+                nếu (mức trần mili giây != rỗng) {
+                    còn = hết hạn - thời gian đơn điệu mili giây();
                     nếu (còn <= 0.0) {
-                        máy_tiến_trình_đóng(mã);
-                        trả về mình.tiến trình kết quả(đúng, -1, đầu_ra,
-                            lỗi_ra + "chạy tiến trình: quá thời hạn");
+                        máy tiến trình đóng(mã);
+                        trả về mình.tiến trình kết quả(đúng, -1, đầu ra,
+                            lỗi ra + "chạy tiến trình: quá thời hạn");
                     };
                     // Chỉ chờ phần thời gian còn lại; làm tròn lên để số thực
                     // có phần lẻ không bị chuyển sang số nguyên sai contract.
-                    nếu (còn < 1000.0) { chờ = lam_tron_len(còn); };
+                    nếu (còn < 1000.0) { chờ = làm tròn lên(còn); };
                 };
-                sẵn_sàng = máy_tiến_trình_thăm_dò(mã, chờ);
-                nếu (sẵn_sàng == 4) { thoát; };
+                sẵn sàng = máy tiến trình thăm dò(mã, chờ);
+                nếu (sẵn sàng == 4) { thoát; };
                 lặp(kênh = 1; kênh <= 2; kênh++) {
-                    đọc_kênh = sai;
-                    nếu (kênh == 1 && (sẵn_sàng % 2) == 1) { đọc_kênh = đúng; };
-                    nếu (kênh == 2 && sẵn_sàng >= 2) { đọc_kênh = đúng; };
-                    nếu (đọc_kênh) {
+                    đọc kênh = sai;
+                    nếu (kênh == 1 && (sẵn sàng % 2) == 1) { đọc kênh = đúng; };
+                    nếu (kênh == 2 && sẵn sàng >= 2) { đọc kênh = đúng; };
+                    nếu (đọc kênh) {
                         khối = mình.tiến trình đọc khối(mã, kênh, đệm);
                         nếu (kênh == 1) {
-                            đầu_ra = đầu_ra + khối;
+                            đầu ra = đầu ra + khối;
                         } hoặc {
-                            lỗi_ra = lỗi_ra + khối;
+                            lỗi ra = lỗi ra + khối;
                         };
                     };
                 };
             };
             nếu (vòng == 2147483647) { ném "chạy tiến trình: vượt giới hạn vòng đọc"; };
-            mã_thoát = máy_tiến_trình_đợi(mã);
-            máy_tiến_trình_đóng(mã);
-            trả về mình.tiến trình kết quả(đúng, mã_thoát, đầu_ra, lỗi_ra);
+            mã thoát = máy tiến trình đợi(mã);
+            máy tiến trình đóng(mã);
+            trả về mình.tiến trình kết quả(đúng, mã thoát, đầu ra, lỗi ra);
         } bắt lỗi(e) {
-            thử { máy_tiến_trình_đóng(mã); } bắt lỗi(bỏ_qua) {};
+            thử { máy tiến trình đóng(mã); } bắt lỗi(số mục bỏ qua) {};
             ném e;
         };
     };
@@ -222,61 +222,61 @@ lớp công khai Bộ Chạy Tiến Trình {
 
 
 hàm công khai mã tiến trình() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã tiến trình();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã tiến trình();
 };
 
 hàm công khai mã tiến trình cha() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã tiến trình cha();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã tiến trình cha();
 };
 
 hàm công khai mã người dùng() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã người dùng();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã người dùng();
 };
 
 hàm công khai mã người dùng hiệu lực() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã người dùng hiệu lực();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã người dùng hiệu lực();
 };
 
 hàm công khai mã nhóm() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã nhóm();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã nhóm();
 };
 
 hàm công khai mã nhóm hiệu lực() {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.mã nhóm hiệu lực();
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.mã nhóm hiệu lực();
 };
 
-hàm công khai tiến trình yêu cầu chuỗi(giá_trị, nhãn) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.tiến trình yêu cầu chuỗi(giá_trị, nhãn);
+hàm công khai tiến trình yêu cầu chuỗi(giá trị, nhãn) {
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.tiến trình yêu cầu chuỗi(giá trị, nhãn);
 };
 
-hàm công khai tiến trình quote windows(đối_số) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.tiến trình quote windows(đối_số);
+hàm công khai tiến trình nháy windows(đối số) {
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.tiến trình nháy windows(đối số);
 };
 
-hàm công khai tiến trình dựng lệnh windows(chương_trình, đối_số) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.tiến trình dựng lệnh windows(chương_trình, đối_số);
+hàm công khai tiến trình dựng lệnh windows(chương trình, đối số) {
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.tiến trình dựng lệnh windows(chương trình, đối số);
 };
 
-hàm công khai tiến trình kết quả(khởi_chạy, mã_thoát, đầu_ra, lỗi) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.tiến trình kết quả(khởi_chạy, mã_thoát, đầu_ra, lỗi);
+hàm công khai tiến trình kết quả(khởi chạy, mã thoát, đầu ra, lỗi) {
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.tiến trình kết quả(khởi chạy, mã thoát, đầu ra, lỗi);
 };
 
 hàm công khai tiến trình đọc khối(mã, kênh, đệm) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.tiến trình đọc khối(mã, kênh, đệm);
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.tiến trình đọc khối(mã, kênh, đệm);
 };
 
-hàm công khai chạy tiến trình(chương_trình, đối_số = rỗng, môi_trường = rỗng, giới_hạn_mili_giây = rỗng) {
-    __vpp_adapter = Bộ Chạy Tiến Trình();
-    trả về __vpp_adapter.chạy tiến trình(chương_trình, đối_số, môi_trường, giới_hạn_mili_giây);
+hàm công khai chạy tiến trình(chương trình, đối số = rỗng, môi trường = rỗng, mức trần mili giây = rỗng) {
+    bộ chuyển tiếp = Bộ Chạy Tiến Trình();
+    trả về bộ chuyển tiếp.chạy tiến trình(chương trình, đối số, môi trường, mức trần mili giây);
 };

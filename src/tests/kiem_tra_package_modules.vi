@@ -8,11 +8,11 @@ nhập gói/dữ liệu/chính;
 nhập gói/ứng dụng/chính;
 nhập gói/dựng/chính;
 nhập gói/kiểm thử/chính;
-nhập gói/ứng dụng/cầu nối/api;
+nhập gói/ứng dụng/cầu nối/giao diện lập trình;
 nhập gói/chuẩn/chính;
 
 hàm chính() {
     in nối chuỗi("cốt", " lõi");
-    in nối đường dẫn url("https://example.test", "/health");
-    in banner ứng dụng("VPP", "1");
+    in nối đường dẫn địa chỉ tài nguyên("https://example.test", "/health");
+    in biểu ngữ ứng dụng("VPP", "1");
 };

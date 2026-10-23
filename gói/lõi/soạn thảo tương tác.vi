@@ -7,28 +7,28 @@ hàm công khai soạn thảo tạo() {
     trả về {"dòng": []};
 };
 
-hàm công khai soạn thảo thêm(bộ, dòng) {
-    ds = lấy map(bộ, "dòng", []);
-    thêm(ds, dòng);
-    trả về độ dài(ds);
+hàm công khai soạn thảo máy ảo thêm cuối danh sách(bộ, dòng) {
+    danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
+    máy ảo thêm cuối danh sách(danh sách đầu vào, dòng);
+    trả về máy ảo lấy độ dài(danh sách đầu vào);
 };
 
 hàm công khai soạn thảo thay(bộ, chỉ số, dòng) {
-    ds = lấy map(bộ, "dòng", []);
-    ds[chỉ số] = dòng;
+    danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
+    danh sách đầu vào[chỉ số] = dòng;
     trả về 1;
 };
 
 hàm công khai soạn thảo xóa dòng(bộ, chỉ số) {
-    ds = lấy map(bộ, "dòng", []);
-    trả về xóa tại(ds, chỉ số);
+    danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
+    trả về máy ảo xóa vị trí danh sách(danh sách đầu vào, chỉ số);
 };
 
 hàm công khai soạn thảo nội dung(bộ) {
-    ds = lấy map(bộ, "dòng", []);
+    danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
     nối = bộ nối chuỗi("\n");
-    lặp(i = 0; i < độ dài(ds); i++) {
-        bộ nối thêm(nối, ds[i]);
+    lặp(i = 0; i < máy ảo lấy độ dài(danh sách đầu vào); i++) {
+        bộ nối máy ảo thêm cuối danh sách(nối, danh sách đầu vào[i]);
     };
     trả về bộ nối kết quả(nối);
 };

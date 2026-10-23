@@ -1,0 +1,113 @@
+
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Kiểm Thử API {
+    hàm công khai khởi tạo() {};
+
+    // Module: mạng.kiểm thử.api
+    // Mục đích: helper tạo request theo HTTP verb để test/mô phỏng controller.
+    // Nhóm hàm: api get, api post, api put, api delete và biến thể json/query.
+
+    // Ghi chú hàm: api url hợp lệ.
+    hàm riêng tư giao diện lập trình địa chỉ tài nguyên hợp lệ(đường dẫn yêu cầu) {
+        nếu (đường dẫn yêu cầu == "") {
+            trả về sai;
+        };
+        trả về đúng;
+    };
+
+    // Ghi chú hàm: api payload mặc định.
+    hàm riêng tư giao diện lập trình nội dung đệm mặc định(nội dung đệm) {
+        nếu (nội dung đệm == "") {
+            trả về "{}";
+        };
+        trả về nội dung đệm;
+    };
+
+    // Ghi chú hàm: api tạo yêu cầu.
+    hàm riêng tư giao diện lập trình tạo yêu cầu(phương thức, đường dẫn yêu cầu, nội dung đệm) {
+        nếu (!mình.giao diện lập trình địa chỉ tài nguyên hợp lệ(đường dẫn yêu cầu)) {
+            trả về "ERR|missing-url";
+        };
+
+        nếu (phương thức == "GET" || phương thức == "DELETE") {
+            trả về phương thức + "|" + đường dẫn yêu cầu;
+        };
+
+        trả về phương thức + "|" + đường dẫn yêu cầu + "|" + nội dung đệm;
+    };
+
+    // Ghi chú hàm: api get.
+    hàm công khai giao diện lập trình lấy(đường dẫn yêu cầu) {
+        trả về mình.giao diện lập trình tạo yêu cầu("GET", đường dẫn yêu cầu, "");
+    };
+
+    // Ghi chú hàm: api post.
+    hàm công khai giao diện lập trình post(đường dẫn yêu cầu, nội dung đệm) {
+        trả về mình.giao diện lập trình tạo yêu cầu("POST", đường dẫn yêu cầu, nội dung đệm);
+    };
+
+    // Ghi chú hàm: api put.
+    hàm công khai giao diện lập trình put(đường dẫn yêu cầu, nội dung đệm) {
+        trả về mình.giao diện lập trình tạo yêu cầu("PUT", đường dẫn yêu cầu, nội dung đệm);
+    };
+
+    // Ghi chú hàm: api delete.
+    hàm công khai giao diện lập trình xóa(đường dẫn yêu cầu) {
+        trả về mình.giao diện lập trình tạo yêu cầu("DELETE", đường dẫn yêu cầu, "");
+    };
+
+    // Ghi chú hàm: api post json.
+    hàm công khai giao diện lập trình post json(đường dẫn yêu cầu, nội dung đệm) {
+        trả về mình.giao diện lập trình post(đường dẫn yêu cầu, mình.giao diện lập trình nội dung đệm mặc định(nội dung đệm));
+    };
+
+    // Ghi chú hàm: api put json.
+    hàm công khai giao diện lập trình put json(đường dẫn yêu cầu, nội dung đệm) {
+        trả về mình.giao diện lập trình put(đường dẫn yêu cầu, mình.giao diện lập trình nội dung đệm mặc định(nội dung đệm));
+    };
+
+    // Ghi chú hàm: api get có query.
+    hàm công khai giao diện lập trình lấy có truy vấn(đường dẫn yêu cầu, truy vấn) {
+        nếu (truy vấn == "") {
+            trả về mình.giao diện lập trình lấy(đường dẫn yêu cầu);
+        };
+        trả về mình.giao diện lập trình lấy(đường dẫn yêu cầu + "?" + truy vấn);
+    };
+};
+
+
+hàm công khai giao diện lập trình lấy(đường dẫn yêu cầu) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình lấy(đường dẫn yêu cầu);
+};
+
+hàm công khai giao diện lập trình post(đường dẫn yêu cầu, nội dung đệm) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình post(đường dẫn yêu cầu, nội dung đệm);
+};
+
+hàm công khai giao diện lập trình put(đường dẫn yêu cầu, nội dung đệm) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình put(đường dẫn yêu cầu, nội dung đệm);
+};
+
+hàm công khai giao diện lập trình xóa(đường dẫn yêu cầu) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình xóa(đường dẫn yêu cầu);
+};
+
+hàm công khai giao diện lập trình post json(đường dẫn yêu cầu, nội dung đệm) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình post json(đường dẫn yêu cầu, nội dung đệm);
+};
+
+hàm công khai giao diện lập trình put json(đường dẫn yêu cầu, nội dung đệm) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình put json(đường dẫn yêu cầu, nội dung đệm);
+};
+
+hàm công khai giao diện lập trình lấy có truy vấn(đường dẫn yêu cầu, truy vấn) {
+    bộ chuyển tiếp = Bộ Kiểm Thử API();
+    trả về bộ chuyển tiếp.giao diện lập trình lấy có truy vấn(đường dẫn yêu cầu, truy vấn);
+};

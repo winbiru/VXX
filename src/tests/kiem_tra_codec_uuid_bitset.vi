@@ -33,14 +33,14 @@ hàm chính() {
     };
     in roundtrip;
 
-    in hex mã([0, 15, 16, 255]);
-    in hex mã([0, 15, 16, 255], đúng, ":");
-    in hex giải("000f10ff");
-    in hex giải("00:0F:10:FF", ":");
+    in thập lục phân mã([0, 15, 16, 255]);
+    in thập lục phân mã([0, 15, 16, 255], đúng, ":");
+    in thập lục phân giải("000f10ff");
+    in thập lục phân giải("00:0F:10:FF", ":");
     hex_roundtrip = đúng;
     lặp(i = 0; i < 256; i++) {
-        encoded = hex mã([i], i % 2 == 0);
-        decoded = hex giải(encoded);
+        encoded = thập lục phân mã([i], i % 2 == 0);
+        decoded = thập lục phân giải(encoded);
         nếu (độ dài(decoded) != 1) {
             hex_roundtrip = sai;
         } hoặc {
@@ -51,7 +51,7 @@ hàm chính() {
     };
     in hex_roundtrip;
     thử {
-        hex giải("00-0f:10", ":");
+        thập lục phân giải("00-0f:10", ":");
     } bắt lỗi (e) {
         in e;
     };
@@ -60,7 +60,7 @@ hàm chính() {
     in độ dài(id) == 36;
     in id[14] == "4";
     in chứa chuỗi("89ab", id[19]);
-    in uuid text(uuid parse("550E8400-E29B-41D4-A716-446655440000"));
+    in uuid văn bản(uuid phân tích("550E8400-E29B-41D4-A716-446655440000"));
 
     a = tập bit();
     bit đặt(a, 1);

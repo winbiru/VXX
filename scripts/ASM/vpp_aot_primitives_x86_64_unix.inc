@@ -661,3 +661,5 @@ PUBLIC(vpp_native_arena_base): .quad 0
 #ifdef __linux__
 .section .note.GNU-stack,"",@progbits
 #endif
+
+#include "vpp_vietnamese_runtime_symbols.inc"

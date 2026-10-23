@@ -451,7 +451,7 @@ static fs::path nativeVppCompiler() {
     }
     throw std::runtime_error(
         "Compiler V++ native chưa được bootstrap. Chạy 'vpp --bootstrap-native "
-        "gói/biên dịch/native_cli.vi <VPP_HOME>/bin/vpp-native' ở Stage 0 "
+        "gói/biên dịch/dòng lệnh bản địa.vi <VPP_HOME>/bin/vpp-native' ở Stage 0 "
         "hoặc đặt VPP_NATIVE_COMPILER tới compiler native đã xây dựng.");
 }
 
@@ -597,7 +597,7 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
         }
         for (const auto &root : roots) {
             if (fs::is_regular_file(root / primitiveRelative) &&
-                fs::is_regular_file(root / vietvm::core::utf8Path("gói/biên dịch/native/runtime.vi"))) {
+                fs::is_regular_file(root / vietvm::core::utf8Path("gói/biên dịch/bản địa/môi trường thực thi.vi"))) {
                 nativeRuntimeRoot = fs::absolute(root);
                 break;
             }
@@ -605,7 +605,7 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
         if (nativeRuntimeRoot.empty())
             throw std::runtime_error("thiếu runtime V++/primitive assembly; đặt VPP_HOME tới bộ cài V++");
         nativeSource = readFile((nativeRuntimeRoot /
-            vietvm::core::utf8Path("gói/biên dịch/native/runtime.vi")).string()) + "\n" + nativeSource;
+            vietvm::core::utf8Path("gói/biên dịch/bản địa/môi trường thực thi.vi")).string()) + "\n" + nativeSource;
     }
     const auto compiled = vietvm::native::compileSourceProgramVpp(
         target, nativeSource, input.parent_path());
@@ -3124,7 +3124,7 @@ static int runCli(int argc, char* argv[]) {
                     std::cerr << "Native AOT chưa được triển khai cho "
                               << vietvm::native::canonicalTriple(*parsed.target)
                               << " (" << vietvm::native::objectFormatName(parsed.target->objectFormat)
-                              << "). 'vpp build <source.vi>' hiện chỉ xác thực biên dịch bytecode; "
+                              << "). 'vpp build <source.vi>' hiện chỉ xác thực biên dịch mã trung gian; "
                                  "JIT mã máy thử nghiệm chỉ chạy trên host tương ứng.\n";
                     return EXIT_FAILURE;
                 }

@@ -1,0 +1,279 @@
+nhập gói / lượng tử / mạch;
+nhập ngẫu nhiên;
+// Vector trạng thái phức thuần V++. Đếm kết quả theo c[n-1]...c[0].
+lớp công khai Bộ Mô Phỏng Lượng Tử {
+    hàm công khai khởi tạo(mức trần qubit = 12) {
+        mình.mức trần = lượng tử yêu cầu nguyên(mức trần qubit, "giới hạn mô phỏng", 1, 16);
+    };
+    hàm riêng tư kiểm tra mạch(mạch) {
+        lượng tử yêu cầu nguyên(mạch.số qubit(), "số qubit mô phỏng", 1, mình.mức trần);
+    };
+    hàm riêng tư tạo trạng thái(n) {
+        thực = [];
+        ảo = [];
+        kích thước = lượng tử lũy thừa hai(n);
+        lặp (i = 0; i < kích thước; i++) {
+            máy ảo thêm cuối danh sách(thực, 0.0);
+            máy ảo thêm cuối danh sách(ảo, 0.0);
+        };
+        thực[0] = 1.0;
+        trả về[thực, ảo];
+    };
+    hàm riêng tư áp dụng(thực, ảo, mục) {
+        tên = mục[0];
+        bước = lượng tử lũy thừa hai(mục[1]);
+        nếu (tên == "cx") {
+            đích = lượng tử lũy thừa hai(mục[2]);
+            lặp (i = 0; i < máy ảo lấy độ dài(thực); i++) {
+                nếu (i % (2 * bước) >= bước && i % (2 * đích) < đích) {
+                    j = i + đích;
+                    r = thực[i];
+                    im = ảo[i];
+                    thực[i] = thực[j];
+                    ảo[i] = ảo[j];
+                    thực[j] = r;
+                    ảo[j] = im;
+                };
+            };
+            trả về rỗng;
+        };
+        k = 0.7071067811865475244;
+        lặp (gốc = 0; gốc < máy ảo lấy độ dài(thực); gốc = gốc + 2 * bước) {
+            lặp (j = 0; j < bước; j++) {
+                a = gốc + j;
+                b = a + bước;
+                ar = thực[a];
+                ai = ảo[a];
+                br = thực[b];
+                bi = ảo[b];
+                nếu (tên == "h") {
+                    thực[a] = (ar + br) * k;
+                    ảo[a] = (ai + bi) * k;
+                    thực[b] = (ar - br) * k;
+                    ảo[b] = (ai - bi) * k;
+                } hoặc nếu (tên == "x") {
+                    thực[a] = br;
+                    ảo[a] = bi;
+                    thực[b] = ar;
+                    ảo[b] = ai;
+                } hoặc nếu (tên == "y") {
+                    thực[a] = bi;
+                    ảo[a] = 0.0 - br;
+                    thực[b] = 0.0 - ai;
+                    ảo[b] = ar;
+                } hoặc nếu (tên == "z") {
+                    thực[b] = 0.0 - br;
+                    ảo[b] = 0.0 - bi;
+                } hoặc nếu (tên == "s") {
+                    thực[b] = 0.0 - bi;
+                    ảo[b] = br;
+                } hoặc nếu (tên == "t") {
+                    thực[b] = (br - bi) * k;
+                    ảo[b] = (br + bi) * k;
+                } hoặc {
+                    ném "lượng tử: cổng chưa được hỗ trợ: " + tên;
+                }
+                ;
+            }
+            ;
+        };
+    };
+    hàm riêng tư xác suất tại(thực, ảo, i) {
+        trả về thực[i] * thực[i] + ảo[i] * ảo[i];
+    };
+    // Newton đủ cho miền xác suất dương; không phụ thuộc libm/FFI.
+    hàm riêng tư căn xác suất(p) {
+        nếu (p <= 0.0) {
+            ném "lượng tử: nhánh đo có xác suất bằng không";
+        };
+        x = 1.0;
+        lặp (i = 0; i < 64; i++) {
+            x = (x + p / x) * 0.5;
+        };
+        trả về x;
+    };
+    hàm riêng tư đo qubit(thực, ảo, q, bộ) {
+        bước = lượng tử lũy thừa hai(q);
+        p0 = 0.0;
+        p1 = 0.0;
+        lặp (i = 0; i < máy ảo lấy độ dài(thực); i++) {
+            p = mình.xác suất tại(thực, ảo, i);
+            nếu (i % (2 * bước) < bước) {
+                p0 = p0 + p;
+            } hoặc {
+                p1 = p1 + p;
+            }
+            ;
+        };
+        kết quả = 0;
+        p = p0;
+        nếu (ngẫu nhiên thực từ bộ(bộ) * (p0 + p1) < p1) {
+            kết quả = 1;
+            p = p1;
+        };
+        chuẩn = mình.căn xác suất(p);
+        lặp (i = 0; i < máy ảo lấy độ dài(thực); i++) {
+            bit = 0;
+            nếu (i % (2 * bước) >= bước) {
+                bit = 1;
+            }
+            ;
+            nếu (bit == kết quả) {
+                thực[i] = thực[i] / chuẩn;
+                ảo[i] = ảo[i] / chuẩn;
+            } hoặc {
+                thực[i] = 0.0;
+                ảo[i] = 0.0;
+            }
+            ;
+        };
+        trả về kết quả;
+    };
+    hàm riêng tư tạo bit(n) {
+        bit = [];
+        lặp (i = 0; i < n; i++) {
+            máy ảo thêm cuối danh sách(bit, 0);
+        };
+        trả về bit;
+    };
+    hàm riêng tư chuỗi bit(bit) {
+        chuỗi = "";
+        lặp (i = máy ảo lấy độ dài(bit) - 1; i >= 0; i--) {
+            chuỗi = chuỗi + bit[i];
+        };
+        trả về chuỗi;
+    };
+    hàm riêng tư ghi đếm(đếm, bit) {
+        khóa = mình.chuỗi bit(bit);
+        đặt từ điển(đếm, khóa, lấy từ điển(đếm, khóa, 0) + 1);
+    };
+    hàm công khai trạng thái(mạch) {
+        mình.kiểm tra mạch(mạch);
+        lệnh = mạch.các lệnh();
+        a = mình.tạo trạng thái(mạch.số qubit());
+        thực = a[0];
+        ảo = a[1];
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            nếu (mục[0] == "measure" || mục[0] == "reset") {
+                ném "lượng tử: trạng thái chỉ nhận mạch không có đo hoặc reset";
+            }
+            ;
+            mình.áp dụng(thực, ảo, mục);
+        };
+        xác suất = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(thực); i++) {
+            máy ảo thêm cuối danh sách(xác suất, mình.xác suất tại(thực, ảo, i));
+        };
+        trả về {
+            "thực": thực, "ảo": ảo, "xác suất": xác suất
+        };
+    };
+    // Chỉ đo ở cuối: một lần tính vector, mỗi shot tìm CDF bằng tìm kiếm nhị phân.
+    hàm riêng tư chạy đo cuối(mạch, lệnh, đầu đo, số lần, bộ) {
+        a = mình.tạo trạng thái(mạch.số qubit());
+        thực = a[0];
+        ảo = a[1];
+        lặp (i = 0; i < đầu đo; i++) {
+            mình.áp dụng(thực, ảo, lệnh[i]);
+        };
+        cdf = [];
+        tổng = 0.0;
+        lặp (i = 0; i < máy ảo lấy độ dài(thực); i++) {
+            tổng = tổng + mình.xác suất tại(thực, ảo, i);
+            máy ảo thêm cuối danh sách(cdf, tổng);
+        };
+        đếm = {};
+        lặp (shot = 0; shot < số lần; shot++) {
+            u = ngẫu nhiên thực từ bộ(bộ) * tổng;
+            trái = 0;
+            phải = máy ảo lấy độ dài(cdf) - 1;
+            lặp (vòng = 0; trái < phải; vòng++) {
+                giữa = thành số nguyên((trái + phải) / 2);
+                nếu (u < cdf[giữa]) {
+                    phải = giữa;
+                } hoặc {
+                    trái = giữa + 1;
+                }
+                ;
+            }
+            ;
+            bit = mình.tạo bit(mạch.số bit());
+            lặp (i = đầu đo; i < máy ảo lấy độ dài(lệnh); i++) {
+                mục = lệnh[i];
+                bước = lượng tử lũy thừa hai(mục[1]);
+                giá trị = 0;
+                nếu (trái % (2 * bước) >= bước) {
+                    giá trị = 1;
+                }
+                ;
+                bit[mục[2]] = giá trị;
+            }
+            ;
+            mình.ghi đếm(đếm, bit);
+        };
+        trả về đếm;
+    };
+    hàm riêng tư chạy từng lần(mạch, lệnh, số lần, bộ) {
+        đếm = {
+        };
+        lặp (shot = 0; shot < số lần; shot++) {
+            a = mình.tạo trạng thái(mạch.số qubit());
+            thực = a[0];
+            ảo = a[1];
+            bit = mình.tạo bit(mạch.số bit());
+            lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+                mục = lệnh[i];
+                tên = mục[0];
+                nếu (tên == "measure" || tên == "reset") {
+                    k = mình.đo qubit(thực, ảo, mục[1], bộ);
+                    nếu (tên == "measure") {
+                        bit[mục[2]] = k;
+                    } hoặc nếu (k == 1) {
+                        mình.áp dụng(thực, ảo, ["x", mục[1], - 1]);
+                    }
+                    ;
+                } hoặc {
+                    mình.áp dụng(thực, ảo, mục);
+                }
+                ;
+            }
+            ;
+            mình.ghi đếm(đếm, bit);
+        };
+        trả về đếm;
+    };
+    hàm công khai chạy(mạch, số lần = 1024, hạt giống = 1) {
+        mình.kiểm tra mạch(mạch);
+        lượng tử yêu cầu nguyên(số lần, "số lần đo", 1, 1000000);
+        lượng tử yêu cầu nguyên(hạt giống, "hạt giống", - 2147483648, 2147483647);
+        lệnh = mạch.các lệnh();
+        đầu đo = - 1;
+        đo cuối = đúng;
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            tên = mục[0];
+            nếu (tên == "measure" && đầu đo == - 1) {
+                đầu đo = i;
+            }
+            ;
+            nếu (tên == "reset" || (đầu đo != - 1 && tên != "measure")) {
+                đo cuối = sai;
+            }
+            ;
+        };
+        nếu (đầu đo == - 1) {
+            ném "lượng tử: chạy cần ít nhất một phép đo tường minh";
+        };
+        bộ = tạo bộ sinh ngẫu nhiên(hạt giống);
+        nếu (đo cuối) {
+            đếm = mình.chạy đo cuối(mạch, lệnh, đầu đo, số lần, bộ);
+        } hoặc {
+            đếm = mình.chạy từng lần(mạch, lệnh, số lần, bộ);
+        };
+        trả về {
+            "đếm": đếm, "số lần": số lần, "backend": "vpp-statevector"
+        };
+    };
+}
+;

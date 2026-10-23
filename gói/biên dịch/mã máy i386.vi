@@ -3,15 +3,15 @@
 nhập gói/biên dịch/mã máy nền;
 
 // Bộ phát không giữ trạng thái, nên cung cấp trực tiếp hàm cấp mô-đun.
-hàm công khai biên dịch mã máy phát i386(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+hàm công khai biên dịch mã máy phát i386(loại, hằng, thấp, cao, ít, hệ điều hành) {
     ra = [];
     nếu (loại == "hằng") {
-        thêm(ra, 184);
-        biên dịch mã máy thêm word(ra, hằng, đúng);
+        máy ảo thêm cuối danh sách(ra, 184);
+        biên dịch mã máy thêm từ máy(ra, hằng, đúng);
     } hoặc {
         nếu (loại == "cộng") { ra = [139, 68, 36, 4, 3, 68, 36, 8]; }
         hoặc { ra = [139, 68, 36, 4, 43, 68, 36, 8]; };
     };
-    thêm(ra, 195);
+    máy ảo thêm cuối danh sách(ra, 195);
     trả về ra;
 };

@@ -14,7 +14,7 @@ hàm chính() {
     in định dạng("%,.2f", [1234.5], "en_US.UTF-8");
 
     callback_tùy_biến = hàm(context) {
-        trả về "V++/" + lấy map(context, "locale", "");
+        trả về "V++/" + lấy từ điển(context, "vùng ngôn ngữ", "");
     };
     tùy_biến = có thể định dạng(callback_tùy_biến);
     in định dạng("[%-12s]", [tùy_biến], "vi-VN");

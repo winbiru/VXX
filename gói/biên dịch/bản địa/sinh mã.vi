@@ -1,0 +1,435 @@
+hàm sinh mã nhị phân(mã phép toán) {
+    nếu (mã phép toán == 4) { trả về 1; };
+    nếu (mã phép toán == 5) { trả về 1; };
+    nếu (mã phép toán == 6) { trả về 1; };
+    nếu (mã phép toán == 26) { trả về 1; };
+    nếu (mã phép toán == 27) { trả về 1; };
+    nếu (mã phép toán >= 11) { nếu (mã phép toán <= 16) { trả về 1; }; };
+    trả về 0;
+};
+
+hàm sinh mã nhánh đích đến(biểu diễn trung gian, đích đến) {
+    nếu (đích đến < 0) { trả về 0; };
+    lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+        nếu (đích đến == pc) { trả về 1; };
+    };
+    trả về 0;
+};
+
+hàm sinh mã khung(biểu diễn trung gian) {
+    biến chiều dài = byte dài(biểu diễn trung gian);
+    nếu (chiều dài < 8) { trả về -1; };
+    biến độ sâu hiện tại = 0;
+    biến cao nhất = 0;
+    biến locals = 0;
+    biến đã hoàn trả = 0;
+    biến các lời gọi = 0;
+    biến đang chờ = -1;
+    lặp (pc = 0; pc < chiều dài; pc = pc + 8) {
+        nếu (pc + 8 > chiều dài) { trả về -1; };
+        biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        biến đối số = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+        nếu (đang chờ >= 0) { nếu (mã phép toán != 17) { trả về -1; }; };
+        nếu (mã phép toán == 1) { độ sâu hiện tại = độ sâu hiện tại + 1; }
+        hoặc nếu (mã phép toán == 2) {
+            nếu (đối số < 0) { trả về -1; };
+            nếu (đối số >= locals) { trả về -1; };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 3) {
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+            nếu (đối số < 0) { trả về -1; };
+            nếu (đối số > locals) { trả về -1; };
+            nếu (đối số >= 130000) { trả về -1; };
+            nếu (đối số == locals) { locals = locals + 1; };
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+        }
+        hoặc nếu (sinh mã nhị phân(mã phép toán) == 1) {
+            nếu (đối số != 0) { trả về -1; };
+            nếu (độ sâu hiện tại < 2) { trả về -1; };
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+        }
+        hoặc nếu (mã phép toán == 8) {
+            nếu (đối số != 0) { trả về -1; };
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+        }
+        hoặc nếu (mã phép toán == 25) {
+            nếu (đối số != 0) { trả về -1; };
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+        }
+        hoặc nếu (mã phép toán == 17) {
+            nếu (đối số < -62) { trả về -1; };
+            // The program codegen resolves and bounds-checks function IDs
+            // against the complete function table when patching CALLs.
+            nếu (đang chờ < 0) { trả về -1; };
+            nếu (độ sâu hiện tại < đang chờ) { trả về -1; };
+            các lời gọi = 1;
+            độ sâu hiện tại = độ sâu hiện tại - đang chờ + 1;
+            đang chờ = -1;
+        }
+        hoặc nếu (mã phép toán == 19) {
+            nếu (đối số < 0) { trả về -1; };
+            nếu (đối số > 130000) { trả về -1; };
+            đang chờ = đối số;
+        }
+        hoặc nếu (mã phép toán == 22) {
+            nếu (đối số != 0) { trả về -1; };
+            các lời gọi = 1;
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 23) {
+            nếu (đối số < 0) { trả về -1; };
+            nếu (đối số > 255) { trả về -1; };
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+            các lời gọi = 1;
+        }
+        hoặc nếu (mã phép toán == 24) {
+            nếu (đối số != 0) { trả về -1; };
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+        }
+        hoặc nếu (mã phép toán == 18) {
+            nếu (đối số < 0) { trả về -1; };
+            nếu (đối số >= 130000) { trả về -1; };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 9) {
+            nếu (độ sâu hiện tại < 1) { trả về -1; };
+            nếu (sinh mã nhánh đích đến(biểu diễn trung gian, đối số) != 1) { trả về -1; };
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+        }
+        hoặc nếu (mã phép toán == 10) {
+            nếu (độ sâu hiện tại != 0) { trả về -1; };
+            nếu (sinh mã nhánh đích đến(biểu diễn trung gian, đối số) != 1) { trả về -1; };
+        }
+        hoặc nếu (mã phép toán == 7) {
+            nếu (đối số != 0) { trả về -1; };
+            nếu (độ sâu hiện tại != 1) { trả về -1; };
+            // Return trong nhánh có thể đứng trước JZ/JMP hoặc mã nhánh khác.
+            // Sau return, luồng tuyến tính dùng lại độ sâu stack bằng 0.
+            độ sâu hiện tại = 0;
+            đã hoàn trả = 1;
+        }
+        hoặc { trả về -1; };
+        nếu (độ sâu hiện tại > cao nhất) { cao nhất = độ sâu hiện tại; };
+        nếu (độ sâu hiện tại > 130000) { trả về -1; };
+    };
+    nếu (đã hoàn trả != 1) { trả về -1; };
+    nếu (byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, chiều dài - 8) != 7) { trả về -1; };
+    nếu (đang chờ >= 0) { trả về -1; };
+    // Outgoing arguments are allocated below SP for each individual call.
+    // This prevents callee frames from overwriting the caller's saved LR.
+    nếu (locals + cao nhất > 260000) { trả về -1; };
+    biến khung = 0;
+    lặp (i = 0; i < locals + cao nhất; i = i + 4) { khung = khung + 16; };
+    nếu (các lời gọi == 1) { khung = khung + 16; }; // LR at SP + 0
+    trả về khung;
+};
+
+// Recompute the slot count before emitting. The validation pass ensures
+// all references fit and prevents writing any code for a malformed IR.
+hàm sinh mã các ô nhớ(biểu diễn trung gian) {
+    biến các ô nhớ = 0;
+    lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+        nếu (byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc) == 3) {
+            biến chỉ mục = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+            nếu (chỉ mục == các ô nhớ) { các ô nhớ = các ô nhớ + 1; };
+        };
+    };
+    trả về các ô nhớ;
+};
+
+hàm sinh mã từ máy(đầu ra, từ máy) {
+    trả về byte đẩy số nguyên ba mươi hai bit(đầu ra, từ máy);
+};
+
+// MOVZ/MOVK W9, signed i32 (16-bit chunks are unsigned).
+hàm sinh mã hằng số(đầu ra, biểu diễn trung gian, hằng tức thời độ lệch) {
+    biến lo = byte lấy(biểu diễn trung gian, hằng tức thời độ lệch) + byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 1) * 256;
+    biến hi = byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 2) + byte lấy(biểu diễn trung gian, hằng tức thời độ lệch + 3) * 256;
+    nếu (sinh mã từ máy(đầu ra, 1384120329 + lo * 32) != 0) { trả về -1; };
+    // MOVK W9, #hi, LSL #16: 0x72a00009 | (hi << 5).
+    // The immediate field starts at zero; carrying out of a pre-filled
+    // field would corrupt high 32-bit literals and Mach-O header constants.
+    nếu (hi != 0) { trả về sinh mã từ máy(đầu ra, 1923088393 + hi * 32); };
+    trả về 0;
+};
+
+// LDR/STR Wn from SP + slot*4. Large offsets use X11 as a scratch address.
+hàm sinh mã truy cập(đầu ra, thanh ghi, ô nhớ, nạp) {
+    nếu (ô nhớ < 0) { trả về -1; };
+    nếu (ô nhớ < 4096) {
+        nếu (nạp == 1) { trả về sinh mã từ máy(đầu ra, -1186987031 + ô nhớ * 1024 + thanh ghi - 9); };
+        trả về sinh mã từ máy(đầu ra, -1191181335 + ô nhớ * 1024 + thanh ghi - 9);
+    };
+    nếu (sinh mã từ máy(đầu ra, -1862269973) != 0) { trả về -1; }; // ADD X11,SP,#0
+    biến độ lệch = ô nhớ * 4;
+    lặp (i = 0; i < độ lệch; i = i + 4095) {
+        biến bước = độ lệch - i;
+        nếu (bước > 4095) { bước = 4095; };
+        nếu (sinh mã từ máy(đầu ra, -1862270613 + bước * 1024) != 0) { trả về -1; };
+    };
+    nếu (nạp == 1) { trả về sinh mã từ máy(đầu ra, -1186987671 + thanh ghi - 9); };
+    trả về sinh mã từ máy(đầu ra, -1191181975 + thanh ghi - 9);
+};
+
+hàm sinh mã nạp(đầu ra, thanh ghi, ô nhớ) {
+    trả về sinh mã truy cập(đầu ra, thanh ghi, ô nhớ, 1);
+};
+
+hàm sinh mã lưu(đầu ra, thanh ghi, ô nhớ) {
+    trả về sinh mã truy cập(đầu ra, thanh ghi, ô nhớ, 0);
+};
+
+// Preserve the 16-byte AArch64 stack alignment at every BL.
+hàm sinh mã điều chỉnh con trỏ ngăn xếp(đầu ra, các byte, trừ) {
+    biến vế trái = các byte;
+    lặp (i = 0; i < các byte; i = i + 4095) {
+        biến bước = vế trái;
+        nếu (bước > 4095) { bước = 4095; };
+        biến base = -1862269953;
+        nếu (trừ == 1) { base = -788528129; };
+        nếu (sinh mã từ máy(đầu ra, base + bước * 1024) != 0) { trả về -1; };
+        vế trái = vế trái - bước;
+    };
+    trả về 0;
+};
+
+// Patch relative branch displacements only after all instructions have been
+// emitted. offsets holds the machine-code starting offset of each IR op.
+hàm sinh mã vá các nhánh(biểu diễn trung gian, mã máy, các độ lệch) {
+    biến nguồn đầu vào ô nhớ = 0;
+    lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+        biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        biến nhánh = 0;
+        nếu (mã phép toán == 9) { nhánh = 1; };
+        nếu (mã phép toán == 10) { nhánh = 1; };
+        nếu (nhánh == 1) {
+            biến đích đến = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+            biến đích đến ô nhớ = 0;
+            lặp (i = 0; i < đích đến; i = i + 8) { đích đến ô nhớ = đích đến ô nhớ + 4; };
+            biến nguồn = byte đọc số nguyên ba mươi hai bit(các độ lệch, nguồn đầu vào ô nhớ);
+            biến to = byte đọc số nguyên ba mươi hai bit(các độ lệch, đích đến ô nhớ);
+            nếu (mã phép toán == 9) { nguồn = nguồn + 4; }; // after the condition LDR
+            biến chênh lệch = 0;
+            lặp (bước = nguồn; bước < to; bước = bước + 4) { chênh lệch = chênh lệch + 1; };
+            lặp (bước = nguồn; bước > to; bước = bước - 4) { chênh lệch = chênh lệch - 1; };
+            biến từ máy = 0;
+            nếu (mã phép toán == 9) {
+                nếu (chênh lệch < -262144) { trả về -1; };
+                nếu (chênh lệch > 262143) { trả về -1; };
+                nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 524288; };
+                từ máy = 872415241 + chênh lệch * 32; // CBZ W9, imm19
+            } hoặc {
+                nếu (chênh lệch < -33554432) { trả về -1; };
+                nếu (chênh lệch > 33554431) { trả về -1; };
+                nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 67108864; };
+                từ máy = 335544320 + chênh lệch; // B imm26
+            };
+            nếu (byte ghi số nguyên ba mươi hai bit(mã máy, nguồn, từ máy) != 0) { trả về -1; };
+        };
+        nguồn đầu vào ô nhớ = nguồn đầu vào ô nhớ + 4;
+    };
+    trả về 0;
+};
+
+// CALL relocations are pairs (machine offset, callee index). The caller
+// must resolve all BL placeholders before making the object executable.
+hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời gọi) {
+    nếu (biểu diễn trung gian == mã máy) { trả về -1; };
+    nếu (byte dài(mã máy) < 0) { trả về -1; };
+    nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
+    biến khung = sinh mã khung(biểu diễn trung gian);
+    nếu (khung < 0) { trả về -1; };
+    biến các độ lệch = byte mới();
+    nếu (các độ lệch <= 0) { trả về -1; };
+    biến các ô nhớ = sinh mã các ô nhớ(biểu diễn trung gian);
+    biến độ sâu hiện tại = 0;
+    biến mã trạng thái = sinh mã điều chỉnh con trỏ ngăn xếp(mã máy, khung, 1);
+    biến có các lời gọi = 0;
+    lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+        biến lời triệu hồi mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        nếu (lời triệu hồi mã phép toán == 17) { có các lời gọi = 1; };
+        nếu (lời triệu hồi mã phép toán == 22) { có các lời gọi = 1; };
+        nếu (lời triệu hồi mã phép toán == 23) { có các lời gọi = 1; };
+    };
+    nếu (có các lời gọi == 1) {
+        nếu (các lời gọi <= 0) { byte hủy(các độ lệch); byte làm rỗng(mã máy); trả về -1; };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -117439490); }; // STR X30,[SP]
+    };
+    nếu (mã trạng thái != 0) { byte hủy(các độ lệch); byte làm rỗng(mã máy); trả về -1; };
+    biến base = 0;
+    nếu (có các lời gọi == 1) { base = 4; }; // LR occupies first aligned 16 bytes
+    biến khung các ô nhớ = 0;
+    lặp (i = 0; i < khung; i = i + 4) { khung các ô nhớ = khung các ô nhớ + 1; };
+    biến đang chờ = -1;
+    lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
+        nếu (byte đẩy số nguyên ba mươi hai bit(các độ lệch, byte dài(mã máy)) != 0) {
+            byte hủy(các độ lệch); byte làm rỗng(mã máy); trả về -1;
+        };
+        biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        biến đối số = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+        biến độ lệch = base + các ô nhớ + độ sâu hiện tại;
+        nếu (mã phép toán == 1) {
+            mã trạng thái = sinh mã hằng số(mã máy, biểu diễn trung gian, pc + 4);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 2) {
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + đối số);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 3) {
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + đối số); };
+        }
+        hoặc nếu (sinh mã nhị phân(mã phép toán) == 1) {
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã nạp(mã máy, 10, base + các ô nhớ + độ sâu hiện tại); };
+            nếu (mã trạng thái == 0) {
+                nếu (mã phép toán == 4) { mã trạng thái = sinh mã từ máy(mã máy, 185205033); };
+                nếu (mã phép toán == 5) { mã trạng thái = sinh mã từ máy(mã máy, 1258946857); };
+                nếu (mã phép toán == 6) { mã trạng thái = sinh mã từ máy(mã máy, 453672233); };
+                nếu (mã phép toán == 26) {
+                    // CBNZ W10,+8; BRK on divide by zero; SDIV W9,W9,W10.
+                    mã trạng thái = sinh mã từ máy(mã máy, 889192522);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -736100352); };
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 449449257); };
+                };
+                nếu (mã phép toán == 27) {
+                    // W11 = a / b; W9 = a - W11*b. Remainder follows dividend sign.
+                    mã trạng thái = sinh mã từ máy(mã máy, 889192522);
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -736100352); };
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 449449259); };
+                    nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 453682537); };
+                };
+                nếu (mã phép toán >= 11) { nếu (mã phép toán <= 16) {
+                    mã trạng thái = sinh mã từ máy(mã máy, 1795817791); // CMP W9, W10
+                    nếu (mã trạng thái == 0) {
+                        biến biểu thức điều kiện = 0;
+                        nếu (mã phép toán == 11) { biểu thức điều kiện = 446633961; }; // EQ
+                        nếu (mã phép toán == 12) { biểu thức điều kiện = 446629865; }; // NE
+                        nếu (mã phép toán == 13) { biểu thức điều kiện = 446670825; }; // LT
+                        nếu (mã phép toán == 14) { biểu thức điều kiện = 446679017; }; // LE
+                        nếu (mã phép toán == 15) { biểu thức điều kiện = 446683113; }; // GT
+                        nếu (mã phép toán == 16) { biểu thức điều kiện = 446674921; }; // GE
+                        mã trạng thái = sinh mã từ máy(mã máy, biểu thức điều kiện);
+                    };
+                }; };
+            };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+        }
+        hoặc nếu (mã phép toán == 8) {
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1258882025); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+        }
+        hoặc nếu (mã phép toán == 25) {
+            // !x: compare against zero and materialize a normalized i32 bool.
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1384120330); }; // MOVZ W10,#0
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1795817791); }; // CMP W9,W10
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 446633961); }; // CSET W9,EQ
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+        }
+        hoặc nếu (mã phép toán == 7) {
+            mã trạng thái = sinh mã nạp(mã máy, 0, base + các ô nhớ);
+            nếu (có các lời gọi == 1) {
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -113245186); }; // LDR X30,[SP]
+            };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã điều chỉnh con trỏ ngăn xếp(mã máy, khung, 0); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -698416192); }; // RET
+            độ sâu hiện tại = 0;
+        }
+        hoặc nếu (mã phép toán == 18) {
+            // On entry, incoming arguments begin at the previous SP.
+            // Our prologue lowered SP by frame bytes.
+            mã trạng thái = sinh mã nạp(mã máy, 9, khung các ô nhớ + đối số);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, độ lệch); };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 19) {
+            đang chờ = đối số;
+        }
+        hoặc nếu (mã phép toán == 22) {
+            // C ABI: bytes_new() returns an i32 handle in W0.
+            mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, byte dài(mã máy));
+            nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, -1); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -1811939328); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 0, độ lệch); };
+            độ sâu hiện tại = độ sâu hiện tại + 1;
+        }
+        hoặc nếu (mã phép toán == 23) {
+            // C ABI: bytes_append(handle, byte); W0 and W1.
+            mã trạng thái = sinh mã nạp(mã máy, 0, base + các ô nhớ + độ sâu hiện tại - 1);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1384120321 + đối số * 32); };
+            nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, byte dài(mã máy)); };
+            nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, -4); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -1811939328); };
+        }
+        hoặc nếu (mã phép toán == 24) {
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+        }
+        hoặc nếu (mã phép toán == 17) {
+            nếu (đối số < 0) {
+                // AAPCS64: native C intrinsics accept i32 parameters in W0-W7.
+                nếu (đang chờ > 8) { mã trạng thái = -1; };
+                lặp (i = 0; i < đang chờ; i++) {
+                    nếu (mã trạng thái == 0) {
+                        mã trạng thái = sinh mã nạp(mã máy, i, độ lệch - đang chờ + i);
+                    };
+                };
+            } hoặc {
+                // Internal V++ calls retain the unbounded stack ABI.
+                biến đối số các ô nhớ = 0;
+                lặp (i = 0; i < đang chờ; i = i + 4) { đối số các ô nhớ = đối số các ô nhớ + 4; };
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã điều chỉnh con trỏ ngăn xếp(mã máy, đối số các ô nhớ * 4, 1); };
+                lặp (i = 0; i < đang chờ; i++) {
+                    nếu (sinh mã nạp(mã máy, 9, đối số các ô nhớ + độ lệch - đang chờ + i) != 0) { mã trạng thái = -1; thoát; };
+                    nếu (sinh mã lưu(mã máy, 9, i) != 0) { mã trạng thái = -1; thoát; };
+                };
+            };
+            nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, byte dài(mã máy)); };
+            nếu (mã trạng thái == 0) { mã trạng thái = byte đẩy số nguyên ba mươi hai bit(các lời gọi, đối số); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, -1811939328); }; // BL imm26 placeholder
+            nếu (đối số >= 0) {
+                biến các ô đối số gửi đi = 0;
+                lặp (i = 0; i < đang chờ; i = i + 4) { các ô đối số gửi đi = các ô đối số gửi đi + 4; };
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã điều chỉnh con trỏ ngăn xếp(mã máy, các ô đối số gửi đi * 4, 0); };
+            };
+            độ sâu hiện tại = độ sâu hiện tại - đang chờ + 1;
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 0, base + các ô nhớ + độ sâu hiện tại - 1); };
+            đang chờ = -1;
+        }
+        hoặc nếu (mã phép toán == 9) {
+            độ sâu hiện tại = độ sâu hiện tại - 1;
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 872415241); }; // CBZ placeholder
+        }
+        hoặc nếu (mã phép toán == 10) {
+            mã trạng thái = sinh mã từ máy(mã máy, 335544320); // B placeholder
+        };
+        nếu (mã trạng thái != 0) {
+            byte hủy(các độ lệch);
+            byte làm rỗng(mã máy);
+            trả về -1;
+        };
+    };
+    biến đã vá = sinh mã vá các nhánh(biểu diễn trung gian, mã máy, các độ lệch);
+    byte hủy(các độ lệch);
+    nếu (đã vá != 0) { byte làm rỗng(mã máy); trả về -1; };
+    trả về byte dài(mã máy);
+};
+
+// Leaf-only callers of the original API must reject unresolved CALLs.
+hàm sinh mã phát(biểu diễn trung gian, mã máy) {
+    trả về sinh mã phát nội bộ(biểu diễn trung gian, mã máy, 0);
+};
+
+// Emit IR to ARM64 machine code. External runtime CALL sites are retained
+// for Mach-O BRANCH26 relocations in object.vi.
+// Dedicated to the validated, leaf-only i32 native IR subset.
+

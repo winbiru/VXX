@@ -1,29 +1,29 @@
-// Fixture linker V++: đối chiếu với bytecode C++ trước giai đoạn nối.
+// Fixture linker V++: đối chiếu với mã trung gian C++ trước giai đoạn nối.
 nhập gói/biên dịch/liên kết;
 nhập gói/biên dịch/chính;
 
 hàm chính() {
     nguồn = "hàm f(x) { trả về x + 1; }; hàm chính() { in f(2); };";
-    chưa = biên dịch phát bytecode thuần(nguồn);
-    đã = biên dịch liên kết bytecode thuần(chưa);
-    cpp = biên dịch bytecode(nguồn);
-    in đã["loại"] == "bytecode V++ đã liên kết";
+    chưa = biên dịch phát mã trung gian thuần(nguồn);
+    đã = biên dịch liên kết mã trung gian thuần(chưa);
+    cpp = biên dịch mã trung gian(nguồn);
+    in đã["loại"] == "mã trung gian V++ đã liên kết";
     in đã["điểm vào"] == 1;
     in độ dài(đã["hàm"]) == 2;
     in đã["hàm"][0]["id"] == 0;
     in đã["hàm"][1]["tên"] == "chính";
     in đã["hàm"][1]["tên index"] == 1;
-    in độ dài(đã["bytecode"]) == độ dài(chưa["bytecode"]) + 2;
-    in độ dài(chưa["bytecode"]) == độ dài(cpp);
-    in đã["bytecode"][độ dài(cpp)]["op"] == 39;
-    in đã["bytecode"][độ dài(cpp)]["chỉ số"] == 1;
-    in đã["bytecode"][độ dài(cpp) + 1]["op"] == 44;
-    in độ dài(chưa["bytecode"]) == độ dài(cpp);
+    in độ dài(đã["mã trung gian"]) == độ dài(chưa["mã trung gian"]) + 2;
+    in độ dài(chưa["mã trung gian"]) == độ dài(cpp);
+    in đã["mã trung gian"][độ dài(cpp)]["op"] == 39;
+    in đã["mã trung gian"][độ dài(cpp)]["chỉ số"] == 1;
+    in đã["mã trung gian"][độ dài(cpp) + 1]["op"] == 44;
+    in độ dài(chưa["mã trung gian"]) == độ dài(cpp);
 
-    khớp = độ dài(cpp) == độ dài(chưa["bytecode"]);
+    khớp = độ dài(cpp) == độ dài(chưa["mã trung gian"]);
     lặp(i = 0; i < độ dài(cpp); i++) {
         a = cpp[i];
-        b = đã["bytecode"][i];
+        b = đã["mã trung gian"][i];
         nếu (a["op"] != b["op"] || a["toán hạng"] != b["toán hạng"] ||
             a["chỉ số"] != b["chỉ số"] || a["giá trị"] != b["giá trị"]) {
             khớp = sai;
@@ -33,7 +33,7 @@ hàm chính() {
 
     không = biên dịch chương trình tự chủ("in 1;");
     in không["điểm vào"] == -1;
-    in không["bytecode"][độ dài(không["bytecode"]) - 1]["op"] == 44;
+    in không["mã trung gian"][độ dài(không["mã trung gian"]) - 1]["op"] == 44;
     alias = biên dịch chương trình tự chủ("hàm main() { in 1; };");
     in alias["điểm vào"] == 0;
     ưu_tiên = biên dịch chương trình tự chủ(
@@ -42,20 +42,20 @@ hàm chính() {
 
     // Metadata bị hỏng phải ném lỗi, không nối artifact thiếu khai báo.
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
-        "bytecode": [], "hàm": chưa["hàm"],
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "mã trung gian V++ chưa liên kết",
+        "mã trung gian": [], "hàm": chưa["hàm"],
         "slots": chưa["slots"], "chuỗi": chưa["chuỗi"]}); }
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
-        "bytecode": chưa["bytecode"], "hàm": chưa["hàm"],
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "mã trung gian V++ chưa liên kết",
+        "mã trung gian": chưa["mã trung gian"], "hàm": chưa["hàm"],
         "slots": [], "chuỗi": chưa["chuỗi"]}); }
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
-        "bytecode": chưa["bytecode"], "hàm": chưa["hàm"],
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "mã trung gian V++ chưa liên kết",
+        "mã trung gian": chưa["mã trung gian"], "hàm": chưa["hàm"],
         "slots": chưa["slots"], "chuỗi": []}); }
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;

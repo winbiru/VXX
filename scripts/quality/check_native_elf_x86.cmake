@@ -11,11 +11,11 @@ set(object "${VPP_OUTPUT_DIR}/elf-x86-output.o")
 set(relocation_object "${VPP_OUTPUT_DIR}/elf-x86-relocation.o")
 file(WRITE "${source}" "")
 foreach(part IN ITEMS
-    "gói/biên dịch/native/codegen.vi"
-    "gói/biên dịch/native/x86_64.vi"
-    "gói/biên dịch/native/object.vi"
-    "gói/biên dịch/native/module_object.vi"
-    "gói/biên dịch/native/elf64.vi"
+    "gói/biên dịch/bản địa/sinh mã.vi"
+    "gói/biên dịch/bản địa/mã máy x86 64.vi"
+    "gói/biên dịch/bản địa/đối tượng.vi"
+    "gói/biên dịch/bản địa/đối tượng mô đun.vi"
+    "gói/biên dịch/bản địa/định dạng elf 64.vi"
     "src/tests/native_elf_x86_harness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
     file(APPEND "${source}" "${contents}\n")

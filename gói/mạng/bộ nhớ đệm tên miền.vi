@@ -1,0 +1,64 @@
+// Bộ nhớ đệm DNS dương thuần V++; TTL tính theo đồng hồ đơn điệu.
+// Mỗi instance sở hữu bộ nhớ riêng. Không cache NXDOMAIN/NODATA khi chưa
+// phân tích SOA negative TTL theo RFC 2308.
+nhập gói/bộ sưu tập/danh sách;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/toán học;
+nhập gói/thời gian/đơn điệu;
+
+lớp công khai Bộ Nhớ Đệm DNS {
+    hàm công khai khởi tạo(mức trần = 64) {
+        nếu (loại của(mức trần) != "số nguyên" || mức trần < 1 || mức trần > 256) {
+            ném "DNS cache: giới hạn mục không hợp lệ";
+        };
+        mình.mục = [];
+        mình.mức trần = mức trần;
+    };
+
+    hàm riêng tư phân giải tên miền sao chép(danh sách đầu vào) {
+        bản sao = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách đầu vào); i++) { máy ảo thêm cuối danh sách(bản sao, danh sách đầu vào[i]); };
+        trả về bản sao;
+    };
+
+    // Bản ghi: [khóa, thời điểm hết hạn (ms), địa chỉ].
+    // Trả {} nếu không có kết quả; TTL được giảm khi đọc cache.
+    hàm công khai phân giải tên miền đọc(khóa) {
+        bây giờ = thời gian đơn điệu mili giây();
+        i = 0;
+        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+            mục = mình.mục[i];
+            nếu (mục[1] <= bây giờ) {
+                máy ảo xóa vị trí danh sách(mình.mục, i);
+            } hoặc nếu (mục[0] == khóa) {
+                còn = làm tròn xuống((mục[1] - bây giờ) / 1000.0);
+                nếu (còn < 0) { còn = 0; };
+                trả về {"status": "NOERROR", "addresses": mình.phân giải tên miền sao chép(mục[2]),
+                        "rcode": 0, "ttl": còn};
+            } hoặc { i = i + 1; };
+        };
+        trả về {};
+    };
+
+    // Lưu duy nhất phản hồi NOERROR có địa chỉ và TTL dương.
+    hàm công khai phân giải tên miền ghi(khóa, chi tiết) {
+        nếu (lấy từ điển(chi tiết, "status", "") != "NOERROR") { trả về sai; };
+        địa chỉ = lấy từ điển(chi tiết, "addresses", []);
+        thời gian tồn tại = lấy từ điển(chi tiết, "ttl", 0);
+        nếu (máy ảo lấy độ dài(địa chỉ) == 0 || thời gian tồn tại <= 0) { trả về sai; };
+        bây giờ = thời gian đơn điệu mili giây();
+        i = 0;
+        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+            mục = mình.mục[i];
+            nếu (mục[1] <= bây giờ || mục[0] == khóa) {
+                máy ảo xóa vị trí danh sách(mình.mục, i);
+            } hoặc { i = i + 1; };
+        };
+        nếu (máy ảo lấy độ dài(mình.mục) >= mình.mức trần) { máy ảo xóa vị trí danh sách(mình.mục, 0); };
+        máy ảo thêm cuối danh sách(mình.mục, [khóa, bây giờ + thời gian tồn tại * 1000.0,
+                        mình.phân giải tên miền sao chép(địa chỉ)]);
+        trả về đúng;
+    };
+
+    hàm công khai phân giải tên miền số mục() { trả về máy ảo lấy độ dài(mình.mục); };
+};

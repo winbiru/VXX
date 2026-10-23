@@ -1,6 +1,60 @@
-# V++ syntax highlighting
+# V++ Language Extension 1.0.0
 
-This project includes a local VS Code language extension for `.vi` and `.vvm` files.
+Extension hỗ trợ `.vi` và `.vvm` trong VS Code, Cursor và VSCodium. Ngoài tô màu
+cú pháp, extension cung cấp diagnostics, completion, go-to-definition, hover,
+rename, formatting, Outline, references, signature help và cây thư viện V++.
+Các chức năng phân tích ngữ nghĩa sử dụng compiler V++ chạy với `--lsp`.
+
+## Cú pháp V++ 1.0
+
+Extension nhận diện tên định danh tiếng Việt có dấu và nhiều từ, khai báo `lớp`,
+`giao diện`, `hàm`, `biến`, visibility (`công khai`, `riêng tư`, `bảo vệ`),
+`kế thừa`/`triển khai`, import module có alias `như` và `công khai nhập`.
+System FFI cũng được tô màu theo cú pháp hiện có:
+
+```vi
+công khai nhập gói/mạng/http/chính;
+nhập gói/bộ sưu tập/chính như sưuTập;
+
+ngoại thư viện c_hệ_thống = "system.c";
+ngoại hàm getenv(tên: c_chuỗi): c_chuỗi từ c_hệ_thống
+    ký hiệu "getenv" abi "c" khả năng "system.env.read";
+
+lớp Bộ Điều Khiển Ứng Dụng {
+    hàm công khai chạy() {
+        in "Xin chào V++";
+    };
+}
+```
+
+Trong Explorer của VS Code, mở **Thư viện V++** để duyệt cây thư viện từ
+`vpp-libraries.json`; dùng lệnh `V++: Làm mới thư viện` để cập nhật.
+Extension tự tải snapshot thư viện từ LSP hoặc dùng catalog trong workspace.
+
+## Gợi ý khi gõ (IntelliSense)
+
+Trong tệp `.vi` và `.vvm`, gõ để nhận gợi ý từ khóa tiếng Việt (`nếu`,
+`trả về`, `công khai`, ...), hàm dựng sẵn, các khai báo trong tệp và mẫu
+code (snippet) cho `hàm`, `lớp`, `nếu`, `lặp`, `thử`, ... Chọn gợi ý bằng
+`Tab`/`Enter`; dùng `Ctrl+Space` để mở danh sách thủ công.
+
+- Hỗ trợ tên nhiều từ và gõ không dấu, ví dụ `tra v` gợi ý `trả về`.
+- Gõ `nhập gói/` để duyệt thư mục và tên tệp `.vi` của mô đun; phần mở rộng
+  `.vi` được bỏ khi chèn đường dẫn.
+- Khi compiler đang chạy ở chế độ LSP, danh sách còn gồm tên biến, hàm,
+  lớp và mô đun theo phạm vi ngữ nghĩa. Gợi ý cơ bản vẫn hoạt động khi
+  chưa cài VM hoặc đã tắt LSP.
+
+## Chọn compiler cho LSP
+
+Khi mở workspace chứa mã nguồn V++ (`vpp-libraries.json`), extension ưu tiên
+compiler build từ workspace (ví dụ `build/bin/vpp` trên macOS/Linux,
+`build/bin/vpp.exe` hoặc `build/bin/Release/vpp-cli.exe` trên Windows).
+Nếu không tìm thấy, extension dùng VM do nó quản lý, rồi tìm `vpp`/`vpp.exe`
+trong `PATH`. Có thể đặt đường dẫn thủ công bằng setting
+`vpp.lsp.executable`; dùng `vpp.lsp.enabled` để bật/tắt LSP.
+Khi binary compiler được build lại, extension tự khởi động lại LSP;
+có thể dùng lệnh `V++: Khởi động lại máy chủ ngôn ngữ` khi cần.
 
 ## Cài V++ VM trực tiếp từ GitHub
 
@@ -11,7 +65,7 @@ Extension có thể tải và cài V++ VM từ GitHub Releases chính thức:
 Sau khi cài extension, mở Command Palette (`Cmd/Ctrl+Shift+P`) và chạy:
 
 ```text
-V++: Install/Update VM from GitHub
+V++: Cài đặt/Cập nhật VM từ GitHub
 ```
 
 Extension tải release mới nhất phù hợp với hệ điều hành, cài vào vùng lưu trữ riêng của extension và tự thêm thư mục VM vào `PATH`/`VPP_HOME` cho các terminal mới mở trong VS Code.
@@ -22,11 +76,14 @@ Các asset release hiện được hỗ trợ:
 - Linux x64: `vpp-linux-x64.tar.gz`
 - Windows x64: `vpp-windows-x64.zip`
 
-Bạn cũng có thể dùng `V++: Show VM Installation` để xem VM đang được cài ở đâu, hoặc `V++: Open GitHub Releases` để mở trang release.
+Bạn cũng có thể dùng `V++: Hiển thị thông tin VM` để xem VM đang được cài ở đâu,
+hoặc `V++: Mở GitHub Releases` để mở trang release.
 
 ## V++-style installer
 
-This is the V++ installer for V++ language support. It does not require external package managers.
+Script `vpp-lang` yêu cầu Node.js để đọc version từ `package.json` và đồng bộ
+cấu hình editor. Các lệnh `install` ghi vào thư mục extension của editor;
+`pack` chỉ tạo gói mà không cài vào editor.
 
 ```bash
 ./scripts/vpp-lang install
@@ -56,7 +113,12 @@ Other commands:
 ./scripts/vpp-lang self-uninstall
 ```
 
-The `pack` command creates a `.vlang` package in `dist/`.
+Lệnh `pack` tạo gói `dist/vpp-language-1.0.0.vlang`.
+Để kiểm tra nhanh các regex, symbols và thứ tự chọn compiler:
+
+```bash
+node scripts/quality/check_vpp_extension.js
+```
 
 ## VS Code
 

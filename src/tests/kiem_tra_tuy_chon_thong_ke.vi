@@ -24,43 +24,43 @@ hàm chính() {
     in lọc tùy chọn(2, lớn_hơn_5) == rỗng;
 
     s = thống kê số nguyên([1, 2, 3, 4]);
-    in lấy map(s, "đếm", -1);
-    in lấy map(s, "tổng", -1);
-    in lấy map(s, "nhỏ nhất", -1);
-    in lấy map(s, "lớn nhất", -1);
-    in lấy map(s, "trung bình", -1);
+    in lấy từ điển(s, "đếm", -1);
+    in lấy từ điển(s, "tổng", -1);
+    in lấy từ điển(s, "nhỏ nhất", -1);
+    in lấy từ điển(s, "lớn nhất", -1);
+    in lấy từ điển(s, "trung bình", -1);
 
     r = thống kê số thực([1, 2.5, 4]);
-    in lấy map(r, "đếm", -1);
-    in lấy map(r, "tổng", -1);
-    in lấy map(r, "nhỏ nhất", -1);
-    in lấy map(r, "lớn nhất", -1);
-    in lấy map(r, "trung bình", -1);
+    in lấy từ điển(r, "đếm", -1);
+    in lấy từ điển(r, "tổng", -1);
+    in lấy từ điển(r, "nhỏ nhất", -1);
+    in lấy từ điển(r, "lớn nhất", -1);
+    in lấy từ điển(r, "trung bình", -1);
 
     trống = thống kê số nguyên([]);
-    in lấy map(trống, "đếm", -1);
-    in lấy map(trống, "nhỏ nhất", 123) == rỗng;
+    in lấy từ điển(trống, "đếm", -1);
+    in lấy từ điển(trống, "nhỏ nhất", 123) == rỗng;
 
     a = thống kê số nguyên([1, 2]);
     b = thống kê số nguyên([3, 4]);
     g = gộp thống kê(a, b);
-    in lấy map(g, "đếm", -1);
-    in lấy map(g, "tổng", -1);
-    in lấy map(g, "nhỏ nhất", -1);
-    in lấy map(g, "lớn nhất", -1);
-    in lấy map(g, "trung bình", -1);
+    in lấy từ điển(g, "đếm", -1);
+    in lấy từ điển(g, "tổng", -1);
+    in lấy từ điển(g, "nhỏ nhất", -1);
+    in lấy từ điển(g, "lớn nhất", -1);
+    in lấy từ điển(g, "trung bình", -1);
 
     nan = thành số thực("nan");
     n = thống kê số thực([1.0, nan, 3.0]);
-    in thống kê là nan(lấy map(n, "tổng", 0.0));
-    in thống kê là nan(lấy map(n, "nhỏ nhất", 0.0));
-    in thống kê là nan(lấy map(n, "lớn nhất", 0.0));
-    in thống kê là nan(lấy map(n, "trung bình", 0.0));
+    in thống kê là không phải số(lấy từ điển(n, "tổng", 0.0));
+    in thống kê là không phải số(lấy từ điển(n, "nhỏ nhất", 0.0));
+    in thống kê là không phải số(lấy từ điển(n, "lớn nhất", 0.0));
+    in thống kê là không phải số(lấy từ điển(n, "trung bình", 0.0));
 
     n2 = thống kê số thực([4.0, 5.0]);
     gn = gộp thống kê(n, n2);
-    in lấy map(gn, "đếm", -1);
-    in thống kê là nan(lấy map(gn, "nhỏ nhất", 0.0));
+    in lấy từ điển(gn, "đếm", -1);
+    in thống kê là không phải số(lấy từ điển(gn, "nhỏ nhất", 0.0));
 
     thử {
         gộp thống kê(a, n2);

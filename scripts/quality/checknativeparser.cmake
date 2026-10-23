@@ -8,10 +8,10 @@ set(source "${VPP_OUTPUT_DIR}/nativeparser.vi")
 set(executable "${VPP_OUTPUT_DIR}/nativeparser")
 file(WRITE "${source}" "")
 foreach(part IN ITEMS
-    "gói/biên dịch/native/lexer.vi"
-    "gói/biên dịch/native/tokens.vi"
-    "gói/biên dịch/native/parser.vi"
-    "gói/biên dịch/native/ir.vi"
+    "gói/biên dịch/bản địa/phân tích từ vựng.vi"
+    "gói/biên dịch/bản địa/từ tố.vi"
+    "gói/biên dịch/bản địa/phân tích cú pháp.vi"
+    "gói/biên dịch/bản địa/biểu diễn trung gian.vi"
     "src/tests/nativeparserharness.vi")
     file(READ "${VPP_ROOT}/${part}" contents)
     file(APPEND "${source}" "${contents}\n")

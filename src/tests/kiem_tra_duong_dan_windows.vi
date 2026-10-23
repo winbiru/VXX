@@ -4,7 +4,7 @@ nhập gói/nhập xuất/đường dẫn;
 hàm chính() {
     b = "\\";
     drive = "C:" + b;
-    in đường dẫn gốc windows dài(drive) == do_dai(drive);
+    in đường dẫn gốc windows dài(drive) == độ dài(drive);
     in đường dẫn cha windows(drive) == drive;
     in đường dẫn cha windows(drive + "one") == drive;
     in đường dẫn cha windows(drive + "one" + b + "two") == drive + "one";
@@ -14,18 +14,18 @@ hàm chính() {
     in đường dẫn cha windows("one") == "";
 
     unc = b + b + "server" + b + "share" + b;
-    in đường dẫn gốc windows dài(unc) == do_dai(unc);
+    in đường dẫn gốc windows dài(unc) == độ dài(unc);
     in đường dẫn cha windows(unc) == unc;
     in đường dẫn cha windows(unc + "one") == unc;
     in đường dẫn cha windows(unc + "one" + b + "two") == unc + "one";
 
     extended = b + b + "?" + b + "UNC" + b + "server" + b + "share" + b;
-    in đường dẫn gốc windows dài(extended) == do_dai(extended);
+    in đường dẫn gốc windows dài(extended) == độ dài(extended);
     in đường dẫn cha windows(extended) == extended;
     in đường dẫn cha windows(extended + "one") == extended;
     in đường dẫn cha windows(extended + "one" + b + "two") == extended + "one";
     extended_drive = b + b + "?" + b + drive;
-    in đường dẫn gốc windows dài(extended_drive) == do_dai(extended_drive);
+    in đường dẫn gốc windows dài(extended_drive) == độ dài(extended_drive);
     in đường dẫn cha windows(extended_drive + "one") == extended_drive;
 
     // Chuỗi ngắn không được đọc ký tự vượt phạm vi khi thử nhận diện UNC.
@@ -38,10 +38,10 @@ hàm chính() {
 
     // UNC hợp lệ có thể không có dấu phân cách kết thúc tên share.
     unc_không_dấu_cuối = b + b + "server" + b + "share";
-    in đường dẫn gốc windows dài(unc_không_dấu_cuối) == do_dai(unc_không_dấu_cuối);
+    in đường dẫn gốc windows dài(unc_không_dấu_cuối) == độ dài(unc_không_dấu_cuối);
     in đường dẫn cha windows(unc_không_dấu_cuối) == unc_không_dấu_cuối;
     extended_không_dấu_cuối = b + b + "?" + b + "UNC" + b + "server" + b + "share";
-    in đường dẫn gốc windows dài(extended_không_dấu_cuối) == do_dai(extended_không_dấu_cuối);
+    in đường dẫn gốc windows dài(extended_không_dấu_cuối) == độ dài(extended_không_dấu_cuối);
     in đường dẫn cha windows(extended_không_dấu_cuối) == extended_không_dấu_cuối;
     in đường dẫn cha windows("//server/share/leaf") == "//server/share/";
     in đường dẫn cha windows(b + b + "?" + b + "unc" + b + "server" + b + "share" + b + "leaf") ==

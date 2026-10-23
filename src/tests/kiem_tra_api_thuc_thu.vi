@@ -1,10 +1,10 @@
 nhập gói/dựng/ứng dụng;
-nhập gói/mạng/kiểm thử/api;
+nhập gói/mạng/kiểm thử/giao diện lập trình;
 
 // Java-style API implementation in test: Controller -> Service -> ResponseEntity
 lớp công khai UserService {
     hàm công khai getUsers() {
-        request = api get("/admin/users");
+        request = giao diện lập trình lấy("/admin/users");
         nếu (request == "GET|/admin/users") {
             trả về "200|users=[an,binh,chi]";
         };
@@ -12,7 +12,7 @@ lớp công khai UserService {
     };
 
     hàm công khai createUser(payload) {
-        request = api post("/admin/users", payload);
+        request = giao diện lập trình post("/admin/users", payload);
         nếu (payload == "") {
             trả về "400|missing-body";
         };
@@ -23,7 +23,7 @@ lớp công khai UserService {
     };
 
     hàm công khai updateUser(userId, payload) {
-        request = api put("/admin/users/" + userId, payload);
+        request = giao diện lập trình put("/admin/users/" + userId, payload);
         nếu (userId == "") {
             trả về "400|missing-user-id";
         };
@@ -40,7 +40,7 @@ lớp công khai UserService {
     };
 
     hàm công khai deleteUser(userId) {
-        request = api delete("/admin/users/" + userId);
+        request = giao diện lập trình xóa("/admin/users/" + userId);
         nếu (userId == "") {
             trả về "400|missing-user-id";
         };

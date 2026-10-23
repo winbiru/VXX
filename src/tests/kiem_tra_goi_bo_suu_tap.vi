@@ -3,14 +3,14 @@ nhập bộ sưu tập;
 hàm chính() {
     ds = [3, 1, 2];
     in tìm chỉ số(ds, 1);
-    in tổng list(ds);
-    in nhỏ nhất list(ds);
-    in lớn nhất list(ds);
+    in tổng danh sách(ds);
+    in nhỏ nhất danh sách(ds);
+    in lớn nhất danh sách(ds);
     in có khóa({"tên": "V++"}, "tên");
     trực_tiếp = {"a": 1};
     in trực_tiếp["a"];
     trực_tiếp["b"] = 2;
-    in lấy map(trực_tiếp, "b", 0);
+    in lấy từ điển(trực_tiếp, "b", 0);
     in rời nhau([1, 2], [3, 4]);
 
     s = tập hợp([3, 1, 3, 2, 1]);
@@ -39,7 +39,7 @@ hàm chính() {
     };
 
     gốc = [1, [2]];
-    bản_sao = thành list(gốc);
+    bản_sao = thành danh sách(gốc);
     bản_sao[0] = 9;
     thêm(bản_sao, 3);
     in gốc[0] == 1 && độ dài(gốc) == 2 && độ dài(bản_sao) == 3;
@@ -47,19 +47,19 @@ hàm chính() {
     con[0] = 7;
     in gốc[1][0] == 7;
 
-    bộ = thành tuple(gốc);
-    từ_bộ = thành list(bộ);
+    bộ = thành bộ giá trị(gốc);
+    từ_bộ = thành danh sách(bộ);
     từ_bộ[0] = 8;
     in bộ[0] == 1;
     con_bộ = từ_bộ[1];
     con_bộ[0] = 6;
     in bộ[1][0] == 6;
-    in thành list([]);
-    in thành list(thành tuple([]));
-    in thành list(bộ([8, 9]));
-    in thanh_list([4, 5]);
-    thử { thành tuple("abc"); } bắt lỗi (e) { in e; };
-    thử { thành list("abc"); } bắt lỗi (e) { in e; };
-    thử { thành list({}); } bắt lỗi (e) { in e; };
-    thử { thành list(rỗng); } bắt lỗi (e) { in e; };
+    in thành danh sách([]);
+    in thành danh sách(thành bộ giá trị([]));
+    in thành danh sách(bộ([8, 9]));
+    in chuyển thành danh sách([4, 5]);
+    thử { thành bộ giá trị("abc"); } bắt lỗi (e) { in e; };
+    thử { thành danh sách("abc"); } bắt lỗi (e) { in e; };
+    thử { thành danh sách({}); } bắt lỗi (e) { in e; };
+    thử { thành danh sách(rỗng); } bắt lỗi (e) { in e; };
 };

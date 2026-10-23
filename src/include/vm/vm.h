@@ -319,7 +319,7 @@ private:
     void executeValueOpcode(const Instruction& instr);
     // Xử lý truy cập theo chỉ số cho list/map/string; hàm đọc toán hạng trên stack và áp dụng quy tắc kiểm tra biên/khóa runtime.
     void executeIndexOpcode(const Instruction& instr);
-    // Xử lý opcode object model như tạo lớp, tạo instance, đọc/ghi field và gọi phương thức có receiver.
+    // Xử lý opcode object model như tạo lớp, tạo thể hiện, đọc/ghi field và gọi phương thức có receiver.
     void executeObjectOpcode(const Instruction& instr);
     // Xử lý opcode biến cục bộ/tham số bằng cách đọc hoặc ghi slot trong call frame hiện tại.
     void executeVariableOpcode(const Instruction& instr);

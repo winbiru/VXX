@@ -170,7 +170,7 @@ int compilerMain(Program &program,int argc,char **argv) {
     if(command=="artifact") {
         if(!output.empty()||bytecode||compiler)
             throw std::runtime_error("Native AOT: artifact command does not accept build options");
-        const auto wire=program.invokeName("aot_artifact_text_wire",{read(source)});
+        const auto wire=program.invokeName("biên dịch trước văn bản dạng thô",{read(source)});
         const auto snapshot=snapshotFromWire(values(wire));
         TemporaryDirectory temporary(fs::temp_directory_path());
         const auto executable=temporary.path/
@@ -189,9 +189,9 @@ int compilerMain(Program &program,int argc,char **argv) {
             throw std::runtime_error("Native AOT: embed requires --base directory and no build options");
         const auto text=read(source);
         if(!core::isValidUtf8(text))throw std::runtime_error("Native AOT: embedded script is not valid UTF-8");
-        const auto artifact=program.invokeName("aot_compile_embedded_source",
+        const auto artifact=program.invokeName("biên dịch trước nguồn nhúng",
             {text,fs::weakly_canonical(embedBase).u8string(),root.u8string()});
-        const auto wire=program.invokeName("aot_artifact_wire",{artifact});
+        const auto wire=program.invokeName("biên dịch trước sản phẩm dạng thô",{artifact});
         TemporaryDirectory temporary(fs::temp_directory_path());
         const auto executable=temporary.path/
 #if defined(_WIN32)
@@ -206,7 +206,7 @@ int compilerMain(Program &program,int argc,char **argv) {
     }
     if(bytecode) {
         if(output.empty())throw std::runtime_error("Native AOT: bytecode output required");
-        const auto result=program.invokeName("aot_bytecode_cli",{source.u8string(),root.u8string(),output.u8string()});
+        const auto result=program.invokeName("biên dịch trước dòng lệnh mã trung gian",{source.u8string(),root.u8string(),output.u8string()});
         program.output(sv_to_string(result));return 0;
     }
     Value artifact;
@@ -218,9 +218,9 @@ int compilerMain(Program &program,int argc,char **argv) {
         artifact=program.invokeName("biên dịch liên kết đồ thị thuần",{graph});
         profiler.mark("semantic-ir-codegen-link");
     } else {
-        artifact=program.invokeName("aot_compile_source",{source.u8string(),root.u8string()});
+        artifact=program.invokeName("biên dịch trước nguồn tệp",{source.u8string(),root.u8string()});
     }
-    const auto wire=program.invokeName("aot_artifact_wire",{artifact});
+    const auto wire=program.invokeName("biên dịch trước sản phẩm dạng thô",{artifact});
     profiler.mark("artifact-wire");
     const auto snapshot=snapshotFromWire(values(wire));
     profiler.mark("snapshot");

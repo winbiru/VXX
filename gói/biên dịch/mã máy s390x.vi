@@ -6,13 +6,13 @@ nhập gói/biên dịch/mã máy nền;
 lớp công khai Bộ Phát S390X {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
                         nếu (hằng < -32768 || hằng > 32767) {
                             // LGFI r2, signed imm32: C0 21 XX XX XX XX.
                             ra = [192, 33];
-                            biên dịch mã máy thêm word(ra, hằng, sai);
+                            biên dịch mã máy thêm từ máy(ra, hằng, sai);
                         } hoặc {
                             ra = [167, 41, (thấp - thấp % 256) / 256, thấp % 256];
                         };
@@ -20,14 +20,14 @@ lớp công khai Bộ Phát S390X {
                         nếu (loại == "cộng") { ra = [26, 35]; }
                         hoặc { ra = [27, 35]; };
                     };
-                    thêm(ra, 7);
-                    thêm(ra, 254);
+                    máy ảo thêm cuối danh sách(ra, 7);
+                    máy ảo thêm cuối danh sách(ra, 254);
         trả về ra;
     };
 };
 
 
-hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
-    __vpp_adapter = Bộ Phát S390X();
-    trả về __vpp_adapter.biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ điều hành) {
+    bộ chuyển tiếp = Bộ Phát S390X();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ điều hành);
 };

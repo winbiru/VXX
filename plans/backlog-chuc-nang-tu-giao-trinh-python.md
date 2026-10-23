@@ -30,16 +30,16 @@
 1. **Array/list:** direct compiler nhận literal scalar và list lồng nhau; hỗ trợ đọc/ghi
    index list không âm, kể cả chain trên list lồng nhau; chuỗi hỗ trợ đọc index code point UTF-8
    không âm. API đi kèm gồm `độ dài`, `thêm`, `xóa tại`,
-   `đảo ngược`, `tìm chỉ số`, `xóa trùng`, `sắp xếp`, `tổng list`, `nhỏ nhất list`,
-   `lớn nhất list`. Chưa có `for-each`, slice hay equality sâu cho collection.
-2. **Map/dictionary:** map literal trực tiếp hiện chứa scalar; `lấy map`, `đặt map`,
-   `có khóa`, `xóa khóa`, `khóa map` đã có. `đặt map` có thể lưu list/map theo tham
-   chiếu; key được chuẩn hóa về chuỗi và `khóa map` trả theo thứ tự từ điển. Chưa có
+   `đảo ngược`, `tìm chỉ số`, `xóa trùng`, `sắp xếp`, `tổng danh sách`, `nhỏ nhất danh sách`,
+   `lớn nhất danh sách`. Chưa có `for-each`, slice hay equality sâu cho collection.
+2. **Map/dictionary:** map literal trực tiếp hiện chứa scalar; `lấy từ điển`, `đặt từ điển`,
+   `có khóa`, `xóa khóa`, `khóa từ điển` đã có. `đặt từ điển` có thể lưu list/map theo tham
+   chiếu; key được chuẩn hóa về chuỗi và `khóa từ điển` trả theo thứ tự từ điển. Chưa có
    cú pháp duyệt entry hoặc map merge chuyên dụng.
 3. **Set:** set MVP là list không trùng lặp, giữ thứ tự xuất hiện đầu tiên; có
    `tập hợp`, `hợp tập`, `giao tập`, `rời nhau`. Số và chuỗi so theo giá trị, còn
    collection theo identity handle; chưa có set runtime độc lập/hash tổng quát.
-4. **Tuple:** `thành tuple`/`thành list`, `độ dài` và đọc index đã có; tuple bất biến.
+4. **Tuple:** `thành bộ giá trị`/`chuyển thành danh sách`, `độ dài` và đọc index đã có; tuple bất biến.
    Chưa có tuple literal hay destructuring/multiple assignment.
 5. **Chuỗi:** API đếm/tìm/thay/case/word/Caesar đã có; `độ dài`, index, reverse và slice dùng
    code point UTF-8; case/NFC tập trung tiếng Việt, còn whitespace tokenizer giữ contract ASCII. Cần
@@ -132,8 +132,8 @@
 
 | Bài | Chức năng | Trạng thái | Công việc còn thiếu |
 |---:|---|---|---|
-| 56 | Tổng và trung bình list | Có nền tảng | `tổng list`, `độ dài` và iteration MVP; trung bình là `tổng list(ds) / độ dài(ds)`. |
-| 57 | Lớn nhất/nhỏ nhất | Có nền tảng | `lớn nhất list` / `nhỏ nhất list` cho list số hoặc chuỗi. |
+| 56 | Tổng và trung bình list | Có nền tảng | `tổng danh sách`, `độ dài` và iteration MVP; trung bình là `tổng danh sách(ds) / độ dài(ds)`. |
+| 57 | Lớn nhất/nhỏ nhất | Có nền tảng | `lớn nhất danh sách` / `nhỏ nhất danh sách` cho list số hoặc chuỗi. |
 | 58 | Đảo ngược list | Có nền tảng | `đảo ngược(ds)` mutate tại chỗ. |
 | 59 | Loại phần tử trùng | Có nền tảng | `xóa trùng(ds)` giữ thứ tự đầu tiên. |
 | 60 | Tìm số chẵn/lẻ | Có nền tảng | iteration MVP + `ds[i]`. |
@@ -142,7 +142,7 @@
 | 63 | Tổng hai ma trận | Có nền tảng | Nested list và index lồng nhau cho phép cài bằng vòng lặp; cần ví dụ riêng và validation shape/chữ nhật. |
 | 64 | Làm phẳng list lồng nhau | Cần hoàn thiện | List lồng nhau đã có, nhưng chưa có type test hoặc `flatten` tổng quát; có thể bắt đầu bằng ví dụ cấu trúc biết trước. |
 | 65 | Trộn hai list đã sắp xếp | Có nền tảng | `độ dài`, index và `thêm` đủ cho thuật toán; chưa có merge/slice helper. |
-| 66 | Phần tử xuất hiện nhiều nhất | Có nền tảng | Bảng tần suất cài được bằng `lấy map`/`đặt map`/`khóa map`; cần chốt tie policy và regression. |
+| 66 | Phần tử xuất hiện nhiều nhất | Có nền tảng | Bảng tần suất cài được bằng `lấy từ điển`/`đặt từ điển`/`khóa từ điển`; cần chốt tie policy và regression. |
 | 67 | Xoay list | Có nền tảng | Có thể tạo list mới bằng index và `thêm`; chưa có slice/rotate helper. |
 | 68 | Kiểm tra list con | Có nền tảng | So sánh phần tử scalar bằng vòng lặp index; chưa có sequence/deep-equality helper. |
 | 69 | Tổng đường chéo ma trận | Có nền tảng | Nested index cho phép tính trực tiếp; validation ma trận vuông phải nằm trong bài/hàm. |
@@ -152,14 +152,14 @@
 
 | Bài | Chức năng | Trạng thái | Công việc còn thiếu |
 |---:|---|---|---|
-| 71 | Đổi list ↔ tuple | Có nền tảng | `thành tuple`/`thành list`; tuple MVP bất biến và đọc index được. |
-| 72 | Đếm từ bằng dictionary | Cần hoàn thiện | `lấy map`/`đặt map`/`khóa map` đã có; còn tokenizer công khai (hoặc scan ASCII thủ công) và ví dụ tần suất từ. |
-| 73 | Gộp hai dictionary | Có nền tảng | Duyệt `khóa map` rồi `lấy map`/`đặt map`; chưa có `merge` chuyên dụng, cần chốt policy xung đột. |
-| 74 | Key có giá trị lớn nhất | Có nền tảng | `khóa map`, `lấy map` và so sánh đủ để cài; cần policy map rỗng/tie. |
-| 75 | Đảo key–value dictionary | Có nền tảng | Có thể tạo map mới qua `khóa map`/`lấy map`/`đặt map`; cần giới hạn giá trị thành key và collision policy. |
+| 71 | Đổi list ↔ tuple | Có nền tảng | `thành bộ giá trị`/`chuyển thành danh sách`; tuple MVP bất biến và đọc index được. |
+| 72 | Đếm từ bằng dictionary | Cần hoàn thiện | `lấy từ điển`/`đặt từ điển`/`khóa từ điển` đã có; còn tokenizer công khai (hoặc scan ASCII thủ công) và ví dụ tần suất từ. |
+| 73 | Gộp hai dictionary | Có nền tảng | Duyệt `khóa từ điển` rồi `lấy từ điển`/`đặt từ điển`; chưa có `merge` chuyên dụng, cần chốt policy xung đột. |
+| 74 | Key có giá trị lớn nhất | Có nền tảng | `khóa từ điển`, `lấy từ điển` và so sánh đủ để cài; cần policy map rỗng/tie. |
+| 75 | Đảo key–value dictionary | Có nền tảng | Có thể tạo map mới qua `khóa từ điển`/`lấy từ điển`/`đặt từ điển`; cần giới hạn giá trị thành key và collision policy. |
 | 76 | Giao và hợp hai set | Có nền tảng | `giao tập` / `hợp tập`; set MVP là list unique giữ thứ tự. |
 | 77 | Loại trùng bằng set | Có nền tảng | `tập hợp(ds)` hoặc `xóa trùng(ds)`. |
-| 78 | Danh bạ điện thoại | Có nền tảng | `lấy map`/`đặt map`/`xóa khóa`; value scalar là đủ cho bài, list/map cũng lưu được theo tham chiếu. |
+| 78 | Danh bạ điện thoại | Có nền tảng | `lấy từ điển`/`đặt từ điển`/`xóa khóa`; value scalar là đủ cho bài, list/map cũng lưu được theo tham chiếu. |
 | 79 | Hai tập hợp rời nhau | Có nền tảng | `rời nhau(a, b)` trên list/set MVP. |
 | 80 | Nhóm học sinh theo xếp loại | Có nền tảng | Map value có thể giữ list/map theo tham chiếu; còn helper grouping chuyên dụng. |
 
@@ -213,7 +213,7 @@ Vertical slice collection hiện đã gồm **list literal scalar/lồng nhau, i
 Đọc/ghi index nhận số nguyên không âm, báo lỗi vượt biên và mutation chỉ áp dụng cho
 list; iteration MVP vẫn là `lặp(i = 0; i < độ dài(ds); i++)` cùng `ds[i]`, chưa có
 `for-each` hay slice. Map literal trực tiếp vẫn là scalar, còn collection lồng nhau
-được gắn vào map qua `đặt map`.
+được gắn vào map qua `đặt từ điển`.
 
 Ưu tiên tiếp theo nên là regression/tutorial cho các bài 63–75 có thể ghép từ
 primitive hiện tại, rồi mới cân nhắc helper thực sự thiếu: `join`/tokenizer,

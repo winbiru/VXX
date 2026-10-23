@@ -6,27 +6,27 @@ nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/giao diện tài nguyên;
 
 // Các hàm quản lý task/worker dùng chung registry VM; Luồng Công Việc giữ worker ID.
-hàm riêng tư đồng thời yêu cầu số nguyên(giá_trị, tên_hàm, nhãn) {
+hàm riêng tư đồng thời yêu cầu số nguyên(giá trị, tên hàm, nhãn) {
     thử {
-        trả về thành số nguyên(giá_trị);
+        trả về thành số nguyên(giá trị);
     } bắt lỗi (e) {
-        ném tên_hàm + ": " + nhãn + " không hợp lệ";
+        ném tên hàm + ": " + nhãn + " không hợp lệ";
     };
 };
 
-hàm riêng tư đồng thời yêu cầu mã tác vụ(giá_trị, tên_hàm) {
-    mã = đồng thời yêu cầu số nguyên(giá_trị, tên_hàm, "mã tác vụ");
+hàm riêng tư đồng thời yêu cầu mã tác vụ(giá trị, tên hàm) {
+    mã = đồng thời yêu cầu số nguyên(giá trị, tên hàm, "mã tác vụ");
     nếu (mã <= 0) {
-        ném tên_hàm + ": mã tác vụ phải dương";
+        ném tên hàm + ": mã tác vụ phải dương";
     };
     trả về mã;
 };
 
-hàm riêng tư đồng thời yêu cầu kết quả scalar(giá_trị) {
-    kiểu = loai_cua(giá_trị);
+hàm riêng tư đồng thời yêu cầu kết quả vô hướng(giá trị) {
+    kiểu = loại của(giá trị);
     nếu (kiểu == "số nguyên" || kiểu == "số thực" ||
         kiểu == "chuỗi" || kiểu == "rỗng") {
-        trả về giá_trị;
+        trả về giá trị;
     };
     ném "tác vụ sau: kết quả phiên bản 0.2 chỉ hỗ trợ scalar";
 };
@@ -40,14 +40,14 @@ hàm công khai tác vụ sau(độ trễ mili giây, kết quả) {
     nếu (độ trễ mili giây < 0 || độ trễ mili giây > 86400000) {
         ném "tác vụ sau: độ trễ phải trong 0..86400000 ms";
     };
-    kết quả = đồng thời yêu cầu kết quả scalar(kết quả);
-    công_việc = hàm() {
+    kết quả = đồng thời yêu cầu kết quả vô hướng(kết quả);
+    công việc = hàm() {
         // Park là primitive VM có thể bị đánh thức bởi cooperative cancel.
         // Registry, trạng thái và policy tác vụ đều nằm ở V++.
-        thread_vm_park(độ trễ mili giây);
+        luồng máy ảo nghỉ(độ trễ mili giây);
         trả về kết quả;
     };
-    trả về thread_vm_spawn(công_việc, []);
+    trả về luồng máy ảo khởi chạy(công việc, []);
 };
 
 hàm công khai chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
@@ -61,7 +61,7 @@ hàm công khai chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
         ném "chờ tác vụ: thời gian chờ phải không âm";
     };
     // Snapshot được chụp dưới cùng một lock: không hỏi lại status sau wait.
-    snapshot = thread_vm_wait(mã tác vụ, thời gian chờ mili giây);
+    snapshot = luồng máy ảo đợi(mã tác vụ, thời gian chờ mili giây);
     nếu (snapshot[0] == 1) { trả về snapshot[1]; };
     nếu (snapshot[0] == 3 && snapshot[2] != "") { ném snapshot[2]; };
     trả về rỗng;
@@ -69,23 +69,23 @@ hàm công khai chờ tác vụ(mã tác vụ, thời gian chờ mili giây) {
 
 hàm công khai hủy tác vụ(mã tác vụ) {
     mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "huy_tac_vu");
-    kết_quả = thread_vm_cancel(mã tác vụ);
+    kết quả = luồng máy ảo hủy(mã tác vụ);
     // Tác vụ trễ dùng park hủy được, nên đợi worker ghi trạng thái cuối cùng để
     // `trạng thái tác vụ` ngay sau lời gọi này luôn quan sát "đã hủy".
-    nếu (kết_quả) { thread_vm_wait(mã tác vụ, -1); };
-    trả về kết_quả;
+    nếu (kết quả) { luồng máy ảo đợi(mã tác vụ, -1); };
+    trả về kết quả;
 };
 
 hàm công khai trạng thái tác vụ(mã tác vụ) {
     mã tác vụ = đồng thời yêu cầu mã tác vụ(mã tác vụ, "trang_thai_tac_vu");
-    trạng_thái = thread_vm_status(mã tác vụ);
-    nếu (trạng_thái == 0) {
+    trạng thái = luồng máy ảo trạng thái(mã tác vụ);
+    nếu (trạng thái == 0) {
         trả về "đang chạy";
     };
-    nếu (trạng_thái == 1) {
+    nếu (trạng thái == 1) {
         trả về "hoàn tất";
     };
-    nếu (trạng_thái == 3) {
+    nếu (trạng thái == 3) {
         trả về "lỗi";
     };
     trả về "đã hủy";
@@ -94,12 +94,12 @@ hàm công khai trạng thái tác vụ(mã tác vụ) {
 // Chạy một callback V++ trên OS thread riêng. VM chụp snapshot sâu của closure,
 // globals và đối_số trước khi worker bắt đầu, vì vậy mutable object không bị
 // chia sẻ ngầm giữa hai heap. Kết quả được sao chép ngược về VM gọi khi join.
-hàm công khai chạy luồng(công_việc, đối_số = rỗng) {
-    nếu (đối_số == rỗng) { đối_số = []; };
-    nếu (loai_cua(đối_số) != "danh sách") {
+hàm công khai chạy luồng(công việc, đối số = rỗng) {
+    nếu (đối số == rỗng) { đối số = []; };
+    nếu (loại của(đối số) != "danh sách") {
         ném "chạy luồng: đối số phải là danh sách";
     };
-    trả về thread_vm_spawn(công_việc, đối_số);
+    trả về luồng máy ảo khởi chạy(công việc, đối số);
 };
 
 // timeout = -1 nghĩa là chờ vô hạn; 0 chỉ chụp trạng thái hiện tại.
@@ -115,7 +115,7 @@ hàm công khai chờ luồng(mã luồng, thời gian chờ mili giây = rỗng
     nếu (thời gian chờ mili giây < -1) {
         ném "chờ luồng: thời gian chờ phải là -1 hoặc không âm";
     };
-    snapshot = thread_vm_wait(mã luồng, thời gian chờ mili giây);
+    snapshot = luồng máy ảo đợi(mã luồng, thời gian chờ mili giây);
     nếu (snapshot[0] == 0) { trả về rỗng; };
     nếu (snapshot[0] == 1) { trả về snapshot[1]; };
     nếu (snapshot[0] == 2) { ném "chờ luồng: luồng đã hủy"; };
@@ -126,39 +126,39 @@ hàm công khai chờ luồng(mã luồng, thời gian chờ mili giây = rỗng
 hàm công khai hủy luồng(mã luồng) {
     mã luồng = đồng thời yêu cầu số nguyên(mã luồng, "huy_luong", "mã luồng");
     nếu (mã luồng <= 0) { ném "hủy luồng: mã luồng phải dương"; };
-    trả về thread_vm_cancel(mã luồng);
+    trả về luồng máy ảo hủy(mã luồng);
 };
 
 hàm công khai trạng thái luồng(mã luồng) {
     mã luồng = đồng thời yêu cầu số nguyên(mã luồng, "trang_thai_luong", "mã luồng");
     nếu (mã luồng <= 0) { ném "trạng thái luồng: mã luồng phải dương"; };
-    trạng_thái = thread_vm_status(mã luồng);
-    nếu (trạng_thái == 0) { trả về "đang chạy"; };
-    nếu (trạng_thái == 1) { trả về "hoàn tất"; };
-    nếu (trạng_thái == 2) { trả về "đã hủy"; };
+    trạng thái = luồng máy ảo trạng thái(mã luồng);
+    nếu (trạng thái == 0) { trả về "đang chạy"; };
+    nếu (trạng thái == 1) { trả về "hoàn tất"; };
+    nếu (trạng thái == 2) { trả về "đã hủy"; };
     trả về "lỗi";
 };
 
 // Đối tượng sở hữu worker ID; đóng hủy và join để worker không sống quá chủ.
 lớp công khai Luồng Công Việc triển khai Đóng Được {
-    hàm công khai khởi tạo(công_việc, đối_số = rỗng) {
-        mình.mã = chạy luồng(công_việc, đối_số);
-        mình.đã_đóng = sai;
+    hàm công khai khởi tạo(công việc, đối số = rỗng) {
+        mình.mã = chạy luồng(công việc, đối số);
+        mình.đã đóng = sai;
     };
     hàm riêng tư yêu cầu mở() {
-        nếu (mình.đã_đóng) { ném "luồng công việc: đã đóng"; };
+        nếu (mình.đã đóng) { ném "luồng công việc: đã đóng"; };
     };
-    hàm công khai chờ(thời_gian = rỗng) {
+    hàm công khai chờ(thời gian = rỗng) {
         mình.yêu cầu mở();
-        trả về chờ luồng(mình.mã, thời_gian);
+        trả về chờ luồng(mình.mã, thời gian);
     };
     hàm công khai trạng thái() { mình.yêu cầu mở(); trả về trạng thái luồng(mình.mã); };
     hàm công khai hủy() { mình.yêu cầu mở(); trả về hủy luồng(mình.mã); };
     hàm công khai đóng() {
-        nếu (mình.đã_đóng) { trả về sai; };
+        nếu (mình.đã đóng) { trả về sai; };
         hủy luồng(mình.mã);
-        thread_vm_wait(mình.mã, -1);
-        mình.đã_đóng = đúng;
+        luồng máy ảo đợi(mình.mã, -1);
+        mình.đã đóng = đúng;
         trả về đúng;
     };
 };

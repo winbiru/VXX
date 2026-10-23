@@ -42,7 +42,7 @@ hàm chính() {
         "hàm tạo() { trả về [Hộp()]; }; " +
         "hàm chính() { a = tạo(); a[0].x = 8; in a[0].tự mình().đọc(); };";
     artifact = biên dịch chương trình tự chủ(nguồn);
-    in biên dịch chạy artifact(artifact) == "8\n";
+    in biên dịch chạy sản phẩm biên dịch(artifact) == "8\n";
     sai_hợp_đồng = [
         "giao diện I { hàm f(); }; lớp A triển khai I {};",
         "giao diện I { hàm f(x); }; lớp A triển khai I { hàm f() {}; };",
@@ -68,7 +68,7 @@ hàm chính() {
             "hàm khởi tạo(x) { mình.x = x; }; hàm công khai đọc() { trả về mình.x; }; };"
     };
     đa_module = biên dịch chương trình mô đun tự chủ("app/main", đồ_thị);
-    in biên dịch chạy artifact(đa_module) == "10\n21\n";
+    in biên dịch chạy sản phẩm biên dịch(đa_module) == "10\n21\n";
     sai_nhập = biên dịch snapshot nội bộ("nhập fixtures/oop_pipeline/api như api; " +
         "lớp Thiếu triển khai api.Có Giá Trị {};", "src/tests");
     in sai_nhập["hợp lệ"] == 0;

@@ -1,89 +1,89 @@
 hàm chính() {
-    nếu (máy_đọc_byte(-1) != -1) { trả về 1; };
-    nếu (máy_đọc_byte(68162560) != -1) { trả về 2; };
-    nếu (máy_đọc_i32(68162557) != -1) { trả về 3; };
-    nếu (máy_ghi_i32(68162556, -2147483648) != 0) { trả về 4; };
-    nếu (máy_đọc_i32(68162556) != -2147483648) { trả về 5; };
-    nếu (máy_gắn_địa_chỉ(3, 4096) != -1) { trả về 6; };
-    nếu (máy_gắn_địa_chỉ(4000, -1) != -1) { trả về 7; };
-    nếu (máy_gắn_địa_chỉ(4000, 4096) != 0) { trả về 8; };
-    nếu (máy_đọc_i32(4004) == 0) { trả về 9; }; // Actual pointer is above 4 GiB on this host.
+    nếu (máy đọc byte(-1) != -1) { trả về 1; };
+    nếu (máy đọc byte(68162560) != -1) { trả về 2; };
+    nếu (máy đọc số nguyên ba mươi hai bit(68162557) != -1) { trả về 3; };
+    nếu (máy ghi số nguyên ba mươi hai bit(68162556, -2147483648) != 0) { trả về 4; };
+    nếu (máy đọc số nguyên ba mươi hai bit(68162556) != -2147483648) { trả về 5; };
+    nếu (máy gắn địa chỉ(3, 4096) != -1) { trả về 6; };
+    nếu (máy gắn địa chỉ(4000, -1) != -1) { trả về 7; };
+    nếu (máy gắn địa chỉ(4000, 4096) != 0) { trả về 8; };
+    nếu (máy đọc số nguyên ba mươi hai bit(4004) == 0) { trả về 9; }; // Actual pointer is above 4 GiB on this host.
 
-    biến bytes = byte_mới();
-    nếu (bytes <= 0) { trả về 10; };
-    nếu (byte_thêm(bytes, 255) != 0) { trả về 11; };
-    nếu (byte_đẩy_i32(bytes, -2147483648) != 0) { trả về 12; };
-    nếu (byte_đọc_i32(bytes, 1) != -2147483648) { trả về 13; };
-    nếu (byte_lấy(bytes, 4) != 128) { trả về 14; };
-    biến part = byte_cắt(bytes, 1, 4);
+    biến các byte = byte mới();
+    nếu (các byte <= 0) { trả về 10; };
+    nếu (byte thêm(các byte, 255) != 0) { trả về 11; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(các byte, -2147483648) != 0) { trả về 12; };
+    nếu (byte đọc số nguyên ba mươi hai bit(các byte, 1) != -2147483648) { trả về 13; };
+    nếu (byte lấy(các byte, 4) != 128) { trả về 14; };
+    biến part = byte cắt(các byte, 1, 4);
     nếu (part <= 0) { trả về 15; };
-    nếu (byte_tìm(bytes, part) != 1) { trả về 16; };
-    byte_làm_rỗng(bytes);
-    nếu (byte_đọc_i32(part, 0) != -2147483648) { trả về 17; };
-    byte_thêm(bytes, 90);
+    nếu (byte tìm(các byte, part) != 1) { trả về 16; };
+    byte làm rỗng(các byte);
+    nếu (byte đọc số nguyên ba mươi hai bit(part, 0) != -2147483648) { trả về 17; };
+    byte thêm(các byte, 90);
     lặp (i = 0; i < 20; i++) {
-        nếu (byte_nối(bytes, bytes) != 0) { trả về 18; };
+        nếu (byte nối(các byte, các byte) != 0) { trả về 18; };
     };
-    nếu (byte_dài(bytes) != 1048576) { trả về 19; };
-    nếu (byte_thêm(bytes, 1) != -1) { trả về 20; };
-    nếu (byte_đẩy_i32(bytes, 0) != -1) { trả về 21; };
-    nếu (byte_lấy(bytes, 1048575) != 90) { trả về 22; };
+    nếu (byte dài(các byte) != 1048576) { trả về 19; };
+    nếu (byte thêm(các byte, 1) != -1) { trả về 20; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(các byte, 0) != -1) { trả về 21; };
+    nếu (byte lấy(các byte, 1048575) != 90) { trả về 22; };
 
-    biến handles = byte_mới();
+    biến handles = byte mới();
     biến count = 0;
     lặp (j = 0; j < 64; j++) {
-        biến h = byte_mới();
+        biến h = byte mới();
         nếu (h < 0) { thoát; };
-        byte_đẩy_i32(handles, h);
+        byte đẩy số nguyên ba mươi hai bit(handles, h);
         count = count + 1;
     };
     nếu (count != 61) { trả về 23; };
     lặp (k = 0; k < count; k++) {
-        nếu (byte_hủy(byte_đọc_i32(handles, k * 4)) != 0) { trả về 24; };
+        nếu (byte hủy(byte đọc số nguyên ba mươi hai bit(handles, k * 4)) != 0) { trả về 24; };
     };
-    byte_hủy(part);
-    biến replacement = byte_mới();
+    byte hủy(part);
+    biến replacement = byte mới();
     nếu (replacement <= part) { trả về 25; };
-    nếu (byte_dài(part) != -1) { trả về 26; };
-    byte_hủy(replacement);
+    nếu (byte dài(part) != -1) { trả về 26; };
+    byte hủy(replacement);
 
-    byte_làm_rỗng(bytes);
-    byte_thêm(bytes, 0); byte_thêm(bytes, 255); byte_thêm(bytes, 10); byte_thêm(bytes, 52);
+    byte làm rỗng(các byte);
+    byte thêm(các byte, 0); byte thêm(các byte, 255); byte thêm(các byte, 10); byte thêm(các byte, 52);
     biến path = "runtime-owned.bin";
-    biến file = tệp_mở_ghi(path);
+    biến file = tệp mở ghi(path);
     nếu (file <= 0) { trả về 27; };
-    nếu (tệp_ghi_khối(file, bytes) != 4) { trả về 28; };
-    nếu (tệp_đóng(file) != 0) { trả về 29; };
-    nếu (tệp_đóng(file) != -1) { trả về 30; };
-    nếu (byte_dài(file) != -1) { trả về 31; };
-    byte_làm_rỗng(handles);
+    nếu (tệp ghi khối(file, các byte) != 4) { trả về 28; };
+    nếu (tệp đóng(file) != 0) { trả về 29; };
+    nếu (tệp đóng(file) != -1) { trả về 30; };
+    nếu (byte dài(file) != -1) { trả về 31; };
+    byte làm rỗng(handles);
     lặp (f = 0; f < 64; f++) {
-        biến opened = tệp_mở_đọc(path);
+        biến opened = tệp mở đọc(path);
         nếu (opened <= 0) { trả về 32; };
-        byte_đẩy_i32(handles, opened);
+        byte đẩy số nguyên ba mươi hai bit(handles, opened);
     };
-    nếu (tệp_mở_ghi(path) != -1) { trả về 33; }; // Full table must not truncate.
+    nếu (tệp mở ghi(path) != -1) { trả về 33; }; // Full table must not truncate.
     lặp (close_index = 0; close_index < 64; close_index++) {
-        nếu (tệp_đóng(byte_đọc_i32(handles, close_index * 4)) != 0) { trả về 34; };
+        nếu (tệp đóng(byte đọc số nguyên ba mươi hai bit(handles, close_index * 4)) != 0) { trả về 34; };
     };
-    biến loaded = byte_mới();
-    file = tệp_mở_đọc(path);
-    nếu (tệp_đọc_khối(file, loaded) != 4) { trả về 35; };
-    nếu (byte_bằng(bytes, loaded) != 1) { trả về 36; };
-    nếu (tệp_đọc_byte(file) != -1) { trả về 37; };
-    nếu (tệp_ghi_byte(file, 52) != -1) { trả về 38; };
-    nếu (tệp_đóng(file) != 0) { trả về 39; };
-    byte_hủy(path); byte_hủy(loaded); byte_hủy(handles); byte_hủy(bytes);
+    biến loaded = byte mới();
+    file = tệp mở đọc(path);
+    nếu (tệp đọc khối(file, loaded) != 4) { trả về 35; };
+    nếu (byte bằng(các byte, loaded) != 1) { trả về 36; };
+    nếu (tệp đọc byte(file) != -1) { trả về 37; };
+    nếu (tệp ghi byte(file, 52) != -1) { trả về 38; };
+    nếu (tệp đóng(file) != 0) { trả về 39; };
+    byte hủy(path); byte hủy(loaded); byte hủy(handles); byte hủy(các byte);
 
-    nếu (đối_số_đếm() != 3) { trả về 40; };
-    biến empty = đối_số_lấy(1);
-    biến utf8 = đối_số_lấy(2);
-    nếu (byte_dài(empty) != 0) { trả về 41; };
-    nếu (byte_dài(utf8) != 14) { trả về 42; };
-    nếu (đối_số_lấy(3) != -1) { trả về 43; };
-    nếu (máy_đối_số_byte(1, 0) != -1) { trả về 44; };
-    nếu (máy_đối_số_byte(2, 14) != -1) { trả về 45; };
-    byte_hủy(empty); byte_hủy(utf8);
-    in_số(-2147483648); in_số(2147483647); in_số(0);
+    nếu (đối số đếm() != 3) { trả về 40; };
+    biến empty = đối số lấy(1);
+    biến utf8 = đối số lấy(2);
+    nếu (byte dài(empty) != 0) { trả về 41; };
+    nếu (byte dài(utf8) != 14) { trả về 42; };
+    nếu (đối số lấy(3) != -1) { trả về 43; };
+    nếu (máy đối số byte(1, 0) != -1) { trả về 44; };
+    nếu (máy đối số byte(2, 14) != -1) { trả về 45; };
+    byte hủy(empty); byte hủy(utf8);
+    in số(-2147483648); in số(2147483647); in số(0);
     trả về 52;
 };

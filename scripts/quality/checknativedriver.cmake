@@ -6,7 +6,7 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
 endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/vpp-native-source.vi")
-set(module_entry "${VPP_ROOT}/gói/biên dịch/native/compiler.vi")
+set(module_entry "${VPP_ROOT}/gói/biên dịch/bản địa/bộ biên dịch.vi")
 set(compiler "${VPP_OUTPUT_DIR}/vpp-native")
 set(stage0_linux FALSE)
 if (VPP_TARGET MATCHES "^x86_64-.*linux")
@@ -14,20 +14,20 @@ if (VPP_TARGET MATCHES "^x86_64-.*linux")
 endif()
 file(WRITE "${source}" "")
 foreach(part IN ITEMS
-    "gói/biên dịch/native/lexer.vi"
-    "gói/biên dịch/native/tokens.vi"
-    "gói/biên dịch/native/parser.vi"
-    "gói/biên dịch/native/program.vi"
-    "gói/biên dịch/native/codegen.vi"
-    "gói/biên dịch/native/x86_64.vi"
-    "gói/biên dịch/native/program_codegen.vi"
-    "gói/biên dịch/native/object.vi"
-    "gói/biên dịch/native/module_object.vi"
-    "gói/biên dịch/native/elf64.vi"
-    "gói/biên dịch/native/module_loader.vi"
-    "gói/biên dịch/native/module_compile.vi"
-    "gói/biên dịch/native/cache.vi"
-    "gói/biên dịch/native/driver.vi")
+    "gói/biên dịch/bản địa/phân tích từ vựng.vi"
+    "gói/biên dịch/bản địa/từ tố.vi"
+    "gói/biên dịch/bản địa/phân tích cú pháp.vi"
+    "gói/biên dịch/bản địa/chương trình.vi"
+    "gói/biên dịch/bản địa/sinh mã.vi"
+    "gói/biên dịch/bản địa/mã máy x86 64.vi"
+    "gói/biên dịch/bản địa/sinh mã chương trình.vi"
+    "gói/biên dịch/bản địa/đối tượng.vi"
+    "gói/biên dịch/bản địa/đối tượng mô đun.vi"
+    "gói/biên dịch/bản địa/định dạng elf 64.vi"
+    "gói/biên dịch/bản địa/nạp mô đun.vi"
+    "gói/biên dịch/bản địa/biên dịch mô đun.vi"
+    "gói/biên dịch/bản địa/bộ nhớ đệm.vi"
+    "gói/biên dịch/bản địa/trình điều khiển.vi")
     # Stage 0 only needs code for the host ISA. Once bootstrapped, Stage 1
     # resolves the complete, unchanged native/*.vi library for Stage 2.
     if (NOT stage0_linux AND (part MATCHES "/x86_64.vi$" OR
@@ -71,11 +71,11 @@ foreach(part IN ITEMS
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 if (stage0_linux)
-    file(APPEND "${source}" "\nhàm cgp_emit_module(a,b,c,d,e,f,g,h) { trả về -1; };\n")
-    file(APPEND "${source}" "hàm om_macho_module(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
+    file(APPEND "${source}" "\nhàm sinh mã chương trình phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
+    file(APPEND "${source}" "hàm đối tượng mô đun macho mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 else()
-    file(APPEND "${source}" "\nhàm xgp_emit_module(a,b,c,d,e,f,g,h) { trả về -1; };\n")
-    file(APPEND "${source}" "hàm elf_module(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
+    file(APPEND "${source}" "\nhàm sinh mã chương trình x86 phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
+    file(APPEND "${source}" "hàm elf mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 endif()
 if (NOT VPP_USE_PREPARED_COMPILER)
     file(REMOVE "${compiler}")

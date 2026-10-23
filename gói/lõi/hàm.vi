@@ -5,52 +5,52 @@ hàm công khai áp dụng(f, giá trị) { trả về f(giá trị); };
 
 hàm công khai áp dụng hai(f, a, b) { trả về f(a, b); };
 
-hàm công khai kiểm tra(predicate, giá trị) { trả về predicate(giá trị); };
+hàm công khai kiểm tra(biểu thức lọc, giá trị) { trả về biểu thức lọc(giá trị); };
 
 // Gọi consumer; giá trị trả về của consumer bị bỏ qua.
-hàm công khai nhận(consumer, giá trị) {
-    consumer(giá trị);
+hàm công khai nhận(bộ tiêu thụ, giá trị) {
+    bộ tiêu thụ(giá trị);
     trả về rỗng;
 };
 
-hàm công khai lấy(supplier) { trả về supplier(); };
+hàm công khai lấy(bộ cung cấp) { trả về bộ cung cấp(); };
 
 // compose(f, g): x -> f(g(x)).
 hàm công khai nối hàm(f, g) {
-    kết_quả = hàm(x) { trả về f(g(x)); };
-    trả về kết_quả;
+    kết quả = hàm(x) { trả về f(g(x)); };
+    trả về kết quả;
 };
 
 // andThen(f, g): x -> g(f(x)).
 hàm công khai trước rồi(f, g) {
-    kết_quả = hàm(x) { trả về g(f(x)); };
-    trả về kết_quả;
+    kết quả = hàm(x) { trả về g(f(x)); };
+    trả về kết quả;
 };
 
 // Predicate AND có short-circuit.
 hàm công khai và điều kiện(a, b) {
-    kết_quả = hàm(x) {
+    kết quả = hàm(x) {
         nếu (!a(x)) { trả về sai; };
         trả về b(x);
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 // Predicate OR có short-circuit.
 hàm công khai hoặc điều kiện(a, b) {
-    kết_quả = hàm(x) {
+    kết quả = hàm(x) {
         nếu (a(x)) { trả về đúng; };
         trả về b(x);
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm công khai phủ định điều kiện(predicate) {
-    kết_quả = hàm(x) { trả về !predicate(x); };
-    trả về kết_quả;
+hàm công khai phủ định điều kiện(biểu thức lọc) {
+    kết quả = hàm(x) { trả về !biểu thức lọc(x); };
+    trả về kết quả;
 };
 
 hàm công khai hàm đồng nhất() {
-    kết_quả = hàm(x) { trả về x; };
-    trả về kết_quả;
+    kết quả = hàm(x) { trả về x; };
+    trả về kết quả;
 };

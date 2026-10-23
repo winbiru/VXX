@@ -21,7 +21,7 @@ function(run_native_stage label)
 endfunction()
 
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
-set(source "${VPP_SOURCE_ROOT}/gói/biên dịch/native_cli.vi")
+set(source "${VPP_SOURCE_ROOT}/gói/biên dịch/dòng lệnh bản địa.vi")
 set(stage1 "${VPP_OUTPUT_DIR}/stage1")
 set(stage2 "${VPP_OUTPUT_DIR}/stage2")
 set(stage3 "${VPP_OUTPUT_DIR}/stage3")
@@ -98,7 +98,7 @@ check_stage3_fixture("FFI lexical binding"
     "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_ffi_binding.vi"
     "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_ffi_binding.expected" "ffi-binding")
 
-# Bare-name package imports (phân giải dns -> gói/mạng/dns.vi).
+# Bare-name package imports (phân giải dns -> gói/mạng/phân giải tên miền.vi).
 check_stage3_fixture("FFI DNS package alias"
     "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_ffi_dns.vi"
     "${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_ffi_dns.expected" "ffi-dns")

@@ -10,8 +10,8 @@ hàm chính() {
 
     in lũy thừa(2, 8);
     in lũy thừa(5, 0);
-    in giai thừa(5);
-    in giai thừa(0);
+    in giải thừa(5);
+    in giải thừa(0);
 
     thử {
         in lũy thừa(2, 2.5);
@@ -24,12 +24,12 @@ hàm chính() {
         in e;
     };
     thử {
-        in giai thừa(3.5);
+        in giải thừa(3.5);
     } bắt lỗi (e) {
         in e;
     };
     thử {
-        in giai thừa(-1);
+        in giải thừa(-1);
     } bắt lỗi (e) {
         in e;
     };

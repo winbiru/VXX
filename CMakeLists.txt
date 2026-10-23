@@ -771,7 +771,7 @@ if (BUILD_TESTS)
         add_test(NAME vpp-native-lexer-kernel
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                "-DVPP_KERNEL=${CMAKE_SOURCE_DIR}/gói/biên dịch/native/lexer.vi"
+                "-DVPP_KERNEL=${CMAKE_SOURCE_DIR}/gói/biên dịch/bản địa/phân tích từ vựng.vi"
                 "-DVPP_HARNESS=${CMAKE_SOURCE_DIR}/src/tests/nativelexerharness.vi"
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
@@ -974,6 +974,19 @@ if (BUILD_TESTS)
     endif()
     add_test(NAME vpp-import-precedence-hardening COMMAND vpp-import-precedence-hardening)
 
+    # The pure V++ quantum regressions run in vpp-integration. The bridge
+    # protocol needs Python; SDK comparisons run only when Qiskit is installed.
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if (Python3_Interpreter_FOUND)
+        add_test(NAME vpp-quantum-bridge
+            COMMAND ${CMAKE_COMMAND} -E env
+                "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "PYTHONDONTWRITEBYTECODE=1"
+                "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/quality/check_quantum.py")
+        set_tests_properties(vpp-quantum-bridge PROPERTIES TIMEOUT 240)
+    endif()
+
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
                  COMMAND ${CMAKE_COMMAND} -E env
@@ -1018,7 +1031,9 @@ install(FILES
         DESTINATION .)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
         DESTINATION gói
-        PATTERN ".DS_Store" EXCLUDE)
+        PATTERN ".DS_Store" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
+        PATTERN "*.pyc" EXCLUDE)
 install(FILES
         # Retain the C source only for native AOT bootstrap/fallback targets.
         # macOS ARM64 self-hosting uses runtime.vi + the assembly primitives.

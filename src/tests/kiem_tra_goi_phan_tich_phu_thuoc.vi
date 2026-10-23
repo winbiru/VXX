@@ -6,14 +6,14 @@ hàm chính() {
     nguồn = "nhập bộ sưu tập; nhập văn bản; hàm chính() {};";
     ds = phụ thuộc danh sách(nguồn);
     in độ dài(ds) == 2;
-    in lấy map(ds[0], "tên", "") == "bộ sưu tập";
-    in lấy map(ds[1], "tên", "") == "văn bản";
+    in lấy từ điển(ds[0], "tên", "") == "bộ sưu tập";
+    in lấy từ điển(ds[1], "tên", "") == "văn bản";
 
     đường = ".tmp_dep_target.vi";
     ghi tệp(đường, nguồn);
     từ_tệp = phụ thuộc tệp(đường);
     in độ dài(từ_tệp) == 2;
     kiểm = phụ thuộc kiểm tra tệp(đường);
-    in lấy map(kiểm, "hợp lệ", 0);
+    in lấy từ điển(kiểm, "hợp lệ", 0);
     xóa đường dẫn(đường);
 };

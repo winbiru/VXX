@@ -1,0 +1,250 @@
+// Native Mach-O MH_OBJECT per source module. Each defined function exports a
+// stable _vpp_fn_<UTF-8 source name> symbol (entry point exports _main).
+// Calls to imported V++ functions and native runtime functions are emitted as
+// ARM64_RELOC_BRANCH26 records instead of patching across module boundaries.
+
+hàm đối tượng mô đun chương trình con tên định danh(sổ đăng ký, mã định danh, điểm vào mã định danh) {
+    nếu (mã định danh < 0) { trả về -1; };
+    nếu (mã định danh == điểm vào mã định danh) { trả về "_main"; };
+    biến số phần tử = 0;
+    lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+        nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { trả về -1; };
+        biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+        nếu (kích cỡ <= 0) { trả về -1; };
+        nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { trả về -1; };
+        nếu (số phần tử == mã định danh) {
+            biến tên định danh = "_vpp_fn_";
+            lặp (i = độ lệch + 8; i < độ lệch + 8 + kích cỡ; i++) {
+                nếu (byte máy ảo thêm cuối danh sách(tên định danh, byte lấy(sổ đăng ký, i)) != 0) {
+                    byte hủy(tên định danh);
+                    trả về -1;
+                };
+            };
+            trả về tên định danh;
+        };
+        độ lệch = độ lệch + 8 + kích cỡ;
+        số phần tử = số phần tử + 1;
+    };
+    trả về -1;
+};
+
+hàm đối tượng mô đun đã dùng(các cặp, mã định danh) {
+    lặp (độ dời = 0; độ dời < byte dài(các cặp); độ dời = độ dời + 8) {
+        nếu (byte đọc số nguyên ba mươi hai bit(các cặp, độ dời + 4) == mã định danh) { trả về 1; };
+    };
+    trả về 0;
+};
+
+// Add one nlist_64 and its UTF-8 string. is_defined selects N_SECT or N_UNDF.
+hàm đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, tên định danh, là đã định nghĩa, giá trị đang xét) {
+    nếu (tên định danh <= 0) { trả về -1; };
+    nếu (byte dài(tên định danh) <= 0) { byte hủy(tên định danh); trả về -1; };
+    biến điểm bắt đầu = byte dài(các chuỗi);
+    biến mã trạng thái = 0;
+    nếu (byte nối(các chuỗi, tên định danh) != 0) { mã trạng thái = -1; };
+    nếu (byte máy ảo thêm cuối danh sách(các chuỗi, 0) != 0) { mã trạng thái = -1; };
+    nếu (đối tượng i32(các mục ký hiệu, điểm bắt đầu) != 0) { mã trạng thái = -1; };
+    biến loại từ tố = 1;
+    nếu (là đã định nghĩa == 1) { loại từ tố = 15; };
+    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, loại từ tố) != 0) { mã trạng thái = -1; };
+    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, là đã định nghĩa) != 0) { mã trạng thái = -1; };
+    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
+    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
+    nếu (đối tượng u64(các mục ký hiệu, giá trị đang xét) != 0) { mã trạng thái = -1; };
+    byte hủy(tên định danh);
+    trả về mã trạng thái;
+};
+
+// Local symbols precede deduplicated V++ undefined symbols, followed by
+// deduplicated native ABI undefined symbols. The same order is used to
+// compute BRANCH26 relocation symbol indexes.
+hàm đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, đích đến) {
+    biến chỉ mục = cuối cùng - đầu tiên;
+    lặp (mã định danh = 0; mã định danh < đích đến; mã định danh++) {
+        nếu (mã định danh < đầu tiên) {
+            nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+        } hoặc nếu (mã định danh >= cuối cùng) {
+            nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+        };
+    };
+    trả về chỉ mục;
+};
+
+hàm đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, chương trình con số phần tử, bản địa mã định danh) {
+    biến chỉ mục = cuối cùng - đầu tiên;
+    lặp (mã định danh = 0; mã định danh < chương trình con số phần tử; mã định danh++) {
+        nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+    };
+    lặp (bản địa trước = 0; bản địa trước < bản địa mã định danh; bản địa trước++) {
+        nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, bản địa trước) == 1) { chỉ mục = chỉ mục + 1; };
+    };
+    trả về chỉ mục;
+};
+
+// Objects for empty function modules are skipped. Each nonempty unit owns
+// only the machine code generated from its own function IDs.
+hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, bản địa các lời gọi) {
+    nếu (đầu tiên < 0) { trả về -1; };
+    nếu (cuối cùng <= đầu tiên) { trả về -1; };
+    nếu (mã máy == đối tượng) { trả về -1; };
+    biến n = byte dài(mã máy);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 900000) { trả về -1; };
+    nếu (byte dài(các điểm bắt đầu) != (cuối cùng - đầu tiên) * 4) { trả về -1; };
+    nếu (byte làm rỗng(đối tượng) != 0) { trả về -1; };
+    biến các mục ký hiệu = byte mới();
+    biến các chuỗi = byte mới();
+    biến các mục tái định vị = byte mới();
+    biến mã trạng thái = 0;
+    nếu (các mục ký hiệu <= 0) { mã trạng thái = -1; };
+    nếu (các chuỗi <= 0) { mã trạng thái = -1; };
+    nếu (các mục tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        nếu (byte máy ảo thêm cuối danh sách(các chuỗi, 0) != 0) { mã trạng thái = -1; };
+        lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
+            biến tên định danh = đối tượng mô đun chương trình con tên định danh(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh);
+            biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);
+            nếu (điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
+            nếu (điểm bắt đầu >= n) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, tên định danh, 1, điểm bắt đầu) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+    };
+    biến mục ký hiệu số phần tử = cuối cùng - đầu tiên;
+    // Global registry records are scanned once per imported symbol so each
+    // global function ID is emitted only once, even when called many times.
+    biến toàn cục mã định danh = 0;
+    nếu (mã trạng thái == 0) {
+        lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+            nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { mã trạng thái = -1; thoát; };
+            biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+            nếu (kích cỡ <= 0) { mã trạng thái = -1; thoát; };
+            nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng mô đun đã dùng(các phần nhập, toàn cục mã định danh) == 1) {
+                nếu (toàn cục mã định danh >= đầu tiên) { nếu (toàn cục mã định danh < cuối cùng) { mã trạng thái = -1; thoát; }; };
+                biến mục ký hiệu = đối tượng mô đun chương trình con tên định danh(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh);
+                nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, mục ký hiệu, 0, 0) != 0) { mã trạng thái = -1; thoát; };
+                mục ký hiệu số phần tử = mục ký hiệu số phần tử + 1;
+            };
+            độ lệch = độ lệch + 8 + kích cỡ;
+            toàn cục mã định danh = toàn cục mã định danh + 1;
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (xác minh độ lệch = 0; xác minh độ lệch < byte dài(các phần nhập); xác minh độ lệch = xác minh độ lệch + 8) {
+            nếu (xác minh độ lệch + 8 > byte dài(các phần nhập)) { mã trạng thái = -1; thoát; };
+            biến xác minh mã định danh = byte đọc số nguyên ba mươi hai bit(các phần nhập, xác minh độ lệch + 4);
+            nếu (xác minh mã định danh < 0) { mã trạng thái = -1; thoát; };
+            nếu (xác minh mã định danh >= toàn cục mã định danh) { mã trạng thái = -1; thoát; };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 62; môi trường thực thi mã định danh++) {
+            nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, môi trường thực thi mã định danh) == 1) {
+                nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, đối tượng bản địa tên định danh(môi trường thực thi mã định danh), 0, 0) != 0) {
+                    mã trạng thái = -1;
+                    thoát;
+                };
+                mục ký hiệu số phần tử = mục ký hiệu số phần tử + 1;
+            };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (độ lệch nhập = 0; độ lệch nhập < byte dài(các phần nhập); độ lệch nhập = độ lệch nhập + 8) {
+            biến vị trí nhập = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ lệch nhập);
+            biến mã định danh nhập = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ lệch nhập + 4);
+            nếu (vị trí nhập < 0) { mã trạng thái = -1; thoát; };
+            nếu (vị trí nhập + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, vị trí nhập) != 0) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, mã định danh nhập)) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+        lặp (bản địa độ lệch = 0; bản địa độ lệch < byte dài(bản địa các lời gọi); bản địa độ lệch = bản địa độ lệch + 8) {
+            biến bản địa tại = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, bản địa độ lệch);
+            biến bản địa mã định danh = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, bản địa độ lệch + 4);
+            nếu (bản địa tại < 0) { mã trạng thái = -1; thoát; };
+            nếu (bản địa tại + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (bản địa mã định danh < 0) { mã trạng thái = -1; thoát; };
+            nếu (bản địa mã định danh > 61) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, bản địa tại) != 0) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, toàn cục mã định danh, bản địa mã định danh)) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        // Include LC_BUILD_VERSION (macOS 11+) so ld does not have to infer
+        // the platform for each independent object file.
+        biến tái định vị độ lệch = 232;
+        lặp (căn chỉnh độ lệch = 0; căn chỉnh độ lệch < n; căn chỉnh độ lệch = căn chỉnh độ lệch + 8) { tái định vị độ lệch = tái định vị độ lệch + 8; };
+        biến độ lệch ký hiệu = tái định vị độ lệch + byte dài(các mục tái định vị);
+        biến độ lệch chuỗi = độ lệch ký hiệu + byte dài(các mục ký hiệu);
+        nếu (độ lệch chuỗi + byte dài(các chuỗi) > 1048576) { mã trạng thái = -1; };
+        nếu (mã trạng thái == 0) {
+            đối tượng i32(đối tượng, -17958193); // mach_header_64
+            đối tượng i32(đối tượng, 16777228);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 1); // MH_OBJECT
+            đối tượng i32(đối tượng, 3);
+            đối tượng i32(đối tượng, 200);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 25); // LC_SEGMENT_64
+            đối tượng i32(đối tượng, 152);
+            nếu (đối tượng tên định danh(đối tượng, "", 16) != 0) { mã trạng thái = -1; };
+            đối tượng u64(đối tượng, 0);
+            đối tượng u64(đối tượng, n);
+            đối tượng u64(đối tượng, 232);
+            đối tượng u64(đối tượng, n);
+            đối tượng i32(đối tượng, 7);
+            đối tượng i32(đối tượng, 5);
+            đối tượng i32(đối tượng, 1);
+            đối tượng i32(đối tượng, 0);
+            nếu (đối tượng tên định danh(đối tượng, "__text", 16) != 0) { mã trạng thái = -1; };
+            nếu (đối tượng tên định danh(đối tượng, "__TEXT", 16) != 0) { mã trạng thái = -1; };
+            đối tượng u64(đối tượng, 0);
+            đối tượng u64(đối tượng, n);
+            đối tượng i32(đối tượng, 232);
+            đối tượng i32(đối tượng, 2);
+            biến tái định vị con trỏ = 0;
+            nếu (byte dài(các mục tái định vị) > 0) { tái định vị con trỏ = tái định vị độ lệch; };
+            đối tượng i32(đối tượng, tái định vị con trỏ);
+            biến tái định vị số phần tử = 0;
+            lặp (tái định vị iter = 0; tái định vị iter < byte dài(các mục tái định vị); tái định vị iter = tái định vị iter + 8) { tái định vị số phần tử = tái định vị số phần tử + 1; };
+            đối tượng i32(đối tượng, tái định vị số phần tử);
+            đối tượng i32(đối tượng, -2147482624);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 0);
+            đối tượng i32(đối tượng, 2); // LC_SYMTAB
+            đối tượng i32(đối tượng, 24);
+            đối tượng i32(đối tượng, độ lệch ký hiệu);
+            đối tượng i32(đối tượng, mục ký hiệu số phần tử);
+            đối tượng i32(đối tượng, độ lệch chuỗi);
+            đối tượng i32(đối tượng, byte dài(các chuỗi));
+            đối tượng i32(đối tượng, 50); // LC_BUILD_VERSION
+            đối tượng i32(đối tượng, 24);
+            đối tượng i32(đối tượng, 1);  // PLATFORM_MACOS
+            đối tượng i32(đối tượng, 720896); // 11.0.0
+            đối tượng i32(đối tượng, 720896);
+            đối tượng i32(đối tượng, 0); // ntools
+            nếu (byte dài(đối tượng) != 232) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, mã máy) != 0) { mã trạng thái = -1; };
+            nếu (đối tượng đệm(đối tượng, tái định vị độ lệch) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các mục tái định vị) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các mục ký hiệu) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các chuỗi) != 0) { mã trạng thái = -1; };
+            nếu (byte dài(đối tượng) != độ lệch chuỗi + byte dài(các chuỗi)) { mã trạng thái = -1; };
+        };
+    };
+    nếu (các mục ký hiệu > 0) { byte hủy(các mục ký hiệu); };
+    nếu (các chuỗi > 0) { byte hủy(các chuỗi); };
+    nếu (các mục tái định vị > 0) { byte hủy(các mục tái định vị); };
+    nếu (mã trạng thái != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    trả về byte dài(đối tượng);
+};

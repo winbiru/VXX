@@ -183,6 +183,9 @@ TESTS=(
   src/tests/kiem_tra_goi_kiem_thu.vi
   src/tests/kiem_tra_goi_toan_hoc.vi
   src/tests/kiem_tra_goi_vat_ly.vi
+  src/tests/kiem_tra_goi_luong_tu.vi
+  src/tests/kiem_tra_luong_tu_openqasm.vi
+  src/tests/kiem_tra_luong_tu_qiskit.vi
   src/tests/kiem_tra_goi_hoa_hoc.vi
   src/tests/kiem_tra_goi_bo_suu_tap.vi
   src/tests/kiem_tra_goi_van_ban.vi
@@ -241,6 +244,7 @@ TESTS=(
   src/tests/kiem_tra_oracle_chuoi_module.vi
   src/tests/kiem_tra_opcode_chon_ca.vi
   src/tests/kiem_tra_khai_bao_bien_runtime.vi
+  "src/tests/kiểm tra tên tiếng Việt cách từ.vi"
   src/tests/kiem_tra_goi_phan_tich_phu_thuoc.vi
   src/tests/kiem_tra_goi_tai_lieu.vi
   src/tests/kiem_tra_goi_kich_ban.vi

@@ -1,0 +1,19 @@
+// Kernel cung cấp entropy qua machine ABI; V++ kiểm tra giới hạn, chia khối
+// và ghép bytes. Chỉ machine primitive có quyền system.entropy.read.
+
+// Hàm thuần theo lời gọi: dữ liệu entropy không lưu trên một đối tượng.
+hàm công khai nguồn ngẫu nhiên bảo mật các byte(số byte) {
+    nếu (loại của(số byte) != "số nguyên" || số byte < 1 || số byte > 4096) {
+        ném "entropy bảo mật: số byte phải là số nguyên từ 1 đến 4096";
+    };
+    kết quả = [];
+    còn lại = số byte;
+    lặp(vòng = 0; còn lại > 0; vòng++) {
+        số đọc = còn lại;
+        nếu (số đọc > 256) { số đọc = 256; };
+        đệm = máy nguồn ngẫu nhiên các byte(số đọc);
+        lặp(i = 0; i < số đọc; i++) { máy ảo thêm cuối danh sách(kết quả, đệm[i]); };
+        còn lại = còn lại - số đọc;
+    };
+    trả về kết quả;
+};

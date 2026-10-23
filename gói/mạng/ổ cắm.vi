@@ -4,8 +4,8 @@
 
 nhập gói/lõi/chuyển kiểu;
 nhập gói/hệ thống/môi trường;
-nhập gói/mạng/ip;
-nhập gói/mạng/dns_hosts;
+nhập gói/mạng/địa chỉ mạng;
+nhập gói/mạng/bảng tên máy;
 
 // Resolver Machine ABI giữ getaddrinfo/addrinfo trong OS adapter và trả token
 // sở hữu VM. Thuật toán chọn địa chỉ và xử lý lỗi vẫn nằm trong V++.
@@ -18,55 +18,55 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
 
     // Token FFI nằm trong miền dành riêng, bao gồm phiên TLS POSIX.
     // Runtime xác nhận sở hữu token thật sự trước mọi lời gọi.
-    hàm riêng tư socket dùng ffi(mã) {
+    hàm riêng tư đầu nối dùng ffi(mã) {
         trả về mã >= 536870912;
     };
 
     // Đường public ưu tiên V++ trên Windows; cờ 0 dành cho kiểm thử parity
     // và rollback đến khi có xác nhận thực thi từ Windows CI.
-    hàm riêng tư socket mở bằng ffi() {
-        trả về ten_nen_tang_vm() != "windows" ||
+    hàm riêng tư đầu nối mở bằng ffi() {
+        trả về ten nền tảng máy ảo() != "windows" ||
             đọc biến môi trường("VPP_WINDOWS_SOCKET_FFI", "1") != "0";
     };
 
     // Giữ thứ tự trả về của resolver; DNS public tự sort/deduplicate còn kết nối
     // TCP/UDP dùng thứ tự này để thử từng địa chỉ. Mọi nhánh đều đóng token.
-    hàm công khai socket resolver danh sách(tên_máy, cổng, datagram) {
+    hàm công khai đầu nối bộ phân giải danh sách(tên máy, cổng, datagram) {
         // Địa chỉ số đã có parser trong V++; tránh đi qua getaddrinfo của C.
         // Chỉ nhận IPv4 thập phân chuẩn: libc có thể hiểu các số 0 đầu là
         // bát phân, nên dạng không chuẩn tiếp tục đi qua OS resolver.
-        là_ip = sai;
+        là địa chỉ mạng = sai;
         thử {
-            bytes = mình.socket ip bytes(tên_máy);
-            nếu (do_dai(bytes) == 16) {
-                là_ip = đúng;
+            các byte = mình.đầu nối địa chỉ mạng các byte(tên máy);
+            nếu (máy ảo lấy độ dài(các byte) == 16) {
+                là địa chỉ mạng = đúng;
             } hoặc {
-                dạng_chuẩn = thành chuỗi(bytes[0]) + "." + thành chuỗi(bytes[1]) +
-                    "." + thành chuỗi(bytes[2]) + "." + thành chuỗi(bytes[3]);
-                là_ip = tên_máy == dạng_chuẩn;
+                dạng chuẩn = thành chuỗi(các byte[0]) + "." + thành chuỗi(các byte[1]) +
+                    "." + thành chuỗi(các byte[2]) + "." + thành chuỗi(các byte[3]);
+                là địa chỉ mạng = tên máy == dạng chuẩn;
             };
-        } bắt lỗi(bỏ_qua) {};
-        nếu (là_ip && loai_cua(cổng) == "số nguyên" && cổng >= 0 && cổng <= 65535) {
-            nếu (cổng == 0) { trả về [tên_máy]; };
-            trả về [[tên_máy, cổng]];
+        } bắt lỗi(số mục bỏ qua) {};
+        nếu (là địa chỉ mạng && loại của(cổng) == "số nguyên" && cổng >= 0 && cổng <= 65535) {
+            nếu (cổng == 0) { trả về [tên máy]; };
+            trả về [[tên máy, cổng]];
         };
         // Tệp hosts đã cấu hình: đọc bằng V++ qua File Machine ABI, không
         // cần OS getaddrinfo và không cấp token resolver FFI khi tìm thấy tên.
-        đường_hosts = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
-        nếu (đường_hosts != "" && loai_cua(cổng) == "số nguyên" &&
+        đường bảng tên máy = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
+        nếu (đường bảng tên máy != "" && loại của(cổng) == "số nguyên" &&
             cổng >= 0 && cổng <= 65535) {
-            hosts = Bộ Hosts DNS();
-            địa_chỉ_hosts = hosts.dns đọc hosts(tên_máy, đường_hosts);
-            nếu (do_dai(địa_chỉ_hosts) > 0) {
-                kết_quả_hosts = [];
-                lặp(i = 0; i < do_dai(địa_chỉ_hosts); i++) {
+            bảng tên máy = Bộ Bảng Tên Máy DNS();
+            địa chỉ bảng tên máy = bảng tên máy.phân giải tên miền đọc bảng tên máy(tên máy, đường bảng tên máy);
+            nếu (máy ảo lấy độ dài(địa chỉ bảng tên máy) > 0) {
+                kết quả bảng tên máy = [];
+                lặp(i = 0; i < máy ảo lấy độ dài(địa chỉ bảng tên máy); i++) {
                     nếu (cổng == 0) {
-                        them(kết_quả_hosts, địa_chỉ_hosts[i]);
+                        máy ảo thêm cuối danh sách(kết quả bảng tên máy, địa chỉ bảng tên máy[i]);
                     } hoặc {
-                        them(kết_quả_hosts, [địa_chỉ_hosts[i], cổng]);
+                        máy ảo thêm cuối danh sách(kết quả bảng tên máy, [địa chỉ bảng tên máy[i], cổng]);
                     };
                 };
-                trả về kết_quả_hosts;
+                trả về kết quả bảng tên máy;
             };
         };
         // Chế độ chặn resolver libc để ứng dụng có thể kiểm chứng đường
@@ -75,254 +75,254 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
         nếu (đọc biến môi trường("VPP_SOCKET_VI_ONLY", "0") == "1") {
             ném "socket resolver: tên máy không có trong hosts V++ (chế độ VI_ONLY)";
         };
-        dịch_vụ = "";
-        nếu (cổng != 0) { dịch_vụ = thành chuỗi(cổng); };
-        udp = 0;
-        nếu (datagram) { udp = 1; };
-        mã_resolver = máy_resolver_mở(tên_máy, dịch_vụ, udp);
-        kết_quả = [];
+        dịch vụ = "";
+        nếu (cổng != 0) { dịch vụ = thành chuỗi(cổng); };
+        giao vận gói tin = 0;
+        nếu (datagram) { giao vận gói tin = 1; };
+        mã bộ phân giải = máy bộ phân giải mở(tên máy, dịch vụ, giao vận gói tin);
+        kết quả = [];
         thử {
             lặp(i = 0; i < 16384; i++) {
-                địa_chỉ = máy_resolver_tiếp(mã_resolver);
-                nếu (địa_chỉ == rỗng) { thoát; };
+                địa chỉ = máy bộ phân giải tiếp(mã bộ phân giải);
+                nếu (địa chỉ == rỗng) { thoát; };
                 nếu (cổng == 0) {
-                    them(kết_quả, địa_chỉ);
+                    máy ảo thêm cuối danh sách(kết quả, địa chỉ);
                 } hoặc {
-                    them(kết_quả, [địa_chỉ, cổng]);
+                    máy ảo thêm cuối danh sách(kết quả, [địa chỉ, cổng]);
                 };
             };
             nếu (i == 16384) { ném "resolver: quá nhiều địa chỉ"; };
-            máy_resolver_đóng(mã_resolver);
+            máy bộ phân giải đóng(mã bộ phân giải);
         } bắt lỗi(e) {
-            thử { máy_resolver_đóng(mã_resolver); } bắt lỗi(bỏ_qua) {};
+            thử { máy bộ phân giải đóng(mã bộ phân giải); } bắt lỗi(số mục bỏ qua) {};
             ném e;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai socket yêu cầu tên máy(giá_trị, tên_hàm) {
-        nếu (loai_cua(giá_trị) != "chuỗi") {
-            ném tên_hàm + ": tên máy phải là chuỗi";
+    hàm công khai đầu nối yêu cầu tên máy(giá trị, tên hàm) {
+        nếu (loại của(giá trị) != "chuỗi") {
+            ném tên hàm + ": tên máy phải là chuỗi";
         };
-        nếu (do_dai(giá_trị) == 0) {
-            ném tên_hàm + ": tên máy không được rỗng";
+        nếu (máy ảo lấy độ dài(giá trị) == 0) {
+            ném tên hàm + ": tên máy không được rỗng";
         };
-        trả về giá_trị;
+        trả về giá trị;
     };
 
-    hàm riêng tư socket yêu cầu số nguyên(giá_trị, tên_hàm, nhãn) {
+    hàm riêng tư đầu nối yêu cầu số nguyên(giá trị, tên hàm, nhãn) {
         thử {
-            trả về thành số nguyên(giá_trị);
+            trả về thành số nguyên(giá trị);
         } bắt lỗi (e) {
-            ném tên_hàm + ": " + nhãn + " không hợp lệ";
+            ném tên hàm + ": " + nhãn + " không hợp lệ";
         };
     };
 
-    hàm công khai socket yêu cầu cổng(giá_trị, tên_hàm) {
-        cổng = mình.socket yêu cầu số nguyên(giá_trị, tên_hàm, "cổng");
+    hàm công khai đầu nối yêu cầu cổng(giá trị, tên hàm) {
+        cổng = mình.đầu nối yêu cầu số nguyên(giá trị, tên hàm, "cổng");
         nếu (cổng <= 0 || cổng > 65535) {
-            ném tên_hàm + ": cổng phải trong 1..65535";
+            ném tên hàm + ": cổng phải trong 1..65535";
         };
         trả về cổng;
     };
 
-    hàm công khai socket yêu cầu timeout(giá_trị, tên_hàm) {
-        thời_gian_chờ = mình.socket yêu cầu số nguyên(giá_trị, tên_hàm, "thời gian chờ");
-        nếu (thời_gian_chờ <= 0 || thời_gian_chờ > 300000) {
-            ném tên_hàm + ": thời gian chờ phải trong 1..300000 ms";
+    hàm công khai đầu nối yêu cầu thời gian chờ(giá trị, tên hàm) {
+        thời gian chờ = mình.đầu nối yêu cầu số nguyên(giá trị, tên hàm, "thời gian chờ");
+        nếu (thời gian chờ <= 0 || thời gian chờ > 300000) {
+            ném tên hàm + ": thời gian chờ phải trong 1..300000 ms";
         };
-        trả về thời_gian_chờ;
+        trả về thời gian chờ;
     };
 
-    hàm riêng tư socket yêu cầu mã(giá_trị, tên_hàm, nhãn) {
-        mã = mình.socket yêu cầu số nguyên(giá_trị, tên_hàm, nhãn);
+    hàm riêng tư đầu nối yêu cầu mã(giá trị, tên hàm, nhãn) {
+        mã = mình.đầu nối yêu cầu số nguyên(giá trị, tên hàm, nhãn);
         nếu (mã <= 0) {
-            ném tên_hàm + ": " + nhãn + " không hợp lệ";
+            ném tên hàm + ": " + nhãn + " không hợp lệ";
         };
         trả về mã;
     };
 
     // Gói IP độc lập cũng được DNS Hosts dùng; giữ nguyên API socket.
-    hàm công khai socket ip bytes(ip) {
+    hàm công khai đầu nối địa chỉ mạng các byte(địa chỉ mạng) {
         bộ = Bộ Phân Tích IP();
-        trả về bộ.ip bytes(ip);
+        trả về bộ.địa chỉ mạng các byte(địa chỉ mạng);
     };
 
-    hàm công khai socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm, dùng_tls_cũ = sai) {
-        địa_chỉ = [];
+    hàm công khai đầu nối mở kết nối(tên máy, cổng, thời gian chờ, là datagram, tên hàm, dùng tls cũ = sai) {
+        địa chỉ = [];
         thử {
             // Giữ thứ tự resolver, không dùng danh sách DNS đã sort/deduplicate.
-            địa_chỉ = mình.socket resolver danh sách(tên_máy, cổng, là_datagram);
+            địa chỉ = mình.đầu nối bộ phân giải danh sách(tên máy, cổng, là datagram);
         } bắt lỗi (e) {
-            ném tên_hàm + ": " + e;
+            ném tên hàm + ": " + e;
         };
-        lỗi_cuối = "không có địa chỉ kết nối";
-        lặp(i = 0; i < do_dai(địa_chỉ); i++) {
+        lỗi cuối = "không có địa chỉ kết nối";
+        lặp(i = 0; i < máy ảo lấy độ dài(địa chỉ); i++) {
             thử {
                 mã = 0;
-                nếu (!dùng_tls_cũ && mình.socket mở bằng ffi()) {
-                    udp = 0;
-                    nếu (là_datagram) { udp = 1; };
-                    mã = máy_socket_kết_nối(
-                        mình.socket ip bytes(địa_chỉ[i][0]), cổng, udp, thời_gian_chờ
+                nếu (!dùng tls cũ && mình.đầu nối mở bằng ffi()) {
+                    giao vận gói tin = 0;
+                    nếu (là datagram) { giao vận gói tin = 1; };
+                    mã = máy đầu nối kết nối(
+                        mình.đầu nối địa chỉ mạng các byte(địa chỉ[i][0]), cổng, giao vận gói tin, thời gian chờ
                     );
-                } hoặc nếu (là_datagram) {
-                    mã = socket_udp_mo_vm(địa_chỉ[i], thời_gian_chờ);
+                } hoặc nếu (là datagram) {
+                    mã = đầu nối giao vận gói tin mở máy ảo(địa chỉ[i], thời gian chờ);
                 } hoặc {
-                    mã = socket_tcp_mo_vm(địa_chỉ[i], thời_gian_chờ);
+                    mã = đầu nối giao vận tin cậy mở máy ảo(địa chỉ[i], thời gian chờ);
                 };
                 // Cấu hình timeout sau connect; lỗi phải đóng rồi thử địa chỉ kế.
                 thử {
-                    nếu (mình.socket dùng ffi(mã)) {
-                        máy_socket_timeout(mã, thời_gian_chờ);
+                    nếu (mình.đầu nối dùng ffi(mã)) {
+                        máy đầu nối thời gian chờ(mã, thời gian chờ);
                     } hoặc {
-                        socket_dat_timeout_vm(mã, thời_gian_chờ);
+                        đầu nối đặt thời gian chờ máy ảo(mã, thời gian chờ);
                     };
                 } bắt lỗi (e) {
-                    thử { mình.socket đóng(mã); } bắt lỗi (bỏ_qua) {};
+                    thử { mình.đầu nối đóng(mã); } bắt lỗi (số mục bỏ qua) {};
                     ném e;
                 };
                 trả về mã;
             } bắt lỗi (e) {
-                lỗi_cuối = e;
+                lỗi cuối = e;
             };
         };
-        ném tên_hàm + ": " + lỗi_cuối;
+        ném tên hàm + ": " + lỗi cuối;
     };
 
-    hàm công khai socket tcp mở(tên máy, cổng, thời gian chờ = 5000) {
-        tên máy = mình.socket yêu cầu tên máy(tên máy, "socket_tcp_mo");
-        cổng = mình.socket yêu cầu cổng(cổng, "socket_tcp_mo");
-        thời gian chờ = mình.socket yêu cầu timeout(thời gian chờ, "socket_tcp_mo");
-        trả về mình.socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tcp_mo");
+    hàm công khai đầu nối giao vận tin cậy mở(tên máy, cổng, thời gian chờ = 5000) {
+        tên máy = mình.đầu nối yêu cầu tên máy(tên máy, "socket_tcp_mo");
+        cổng = mình.đầu nối yêu cầu cổng(cổng, "socket_tcp_mo");
+        thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_tcp_mo");
+        trả về mình.đầu nối mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tcp_mo");
     };
 
-    hàm công khai socket udp mở(tên máy, cổng, thời gian chờ = 5000) {
-        tên máy = mình.socket yêu cầu tên máy(tên máy, "socket_udp_mo");
-        cổng = mình.socket yêu cầu cổng(cổng, "socket_udp_mo");
-        thời gian chờ = mình.socket yêu cầu timeout(thời gian chờ, "socket_udp_mo");
-        trả về mình.socket mở kết nối(tên máy, cổng, thời gian chờ, đúng, "socket_udp_mo");
+    hàm công khai đầu nối giao vận gói tin mở(tên máy, cổng, thời gian chờ = 5000) {
+        tên máy = mình.đầu nối yêu cầu tên máy(tên máy, "socket_udp_mo");
+        cổng = mình.đầu nối yêu cầu cổng(cổng, "socket_udp_mo");
+        thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_udp_mo");
+        trả về mình.đầu nối mở kết nối(tên máy, cổng, thời gian chờ, đúng, "socket_udp_mo");
     };
 
     // TLS client primitive: hệ điều hành/thư viện TLS thực hiện handshake, xác minh
     // chứng chỉ và mã hóa; framing HTTP/ứng dụng vẫn nằm hoàn toàn ở V++.
-    hàm công khai socket tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
-        tên máy = mình.socket yêu cầu tên máy(tên máy, "socket_tls_mo");
-        cổng = mình.socket yêu cầu cổng(cổng, "socket_tls_mo");
-        thời gian chờ = mình.socket yêu cầu timeout(thời gian chờ, "socket_tls_mo");
-        cũ = ten_nen_tang_vm() == "windows";
-        mã = mình.socket mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo", cũ);
+    hàm công khai đầu nối tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
+        tên máy = mình.đầu nối yêu cầu tên máy(tên máy, "socket_tls_mo");
+        cổng = mình.đầu nối yêu cầu cổng(cổng, "socket_tls_mo");
+        thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_tls_mo");
+        cũ = ten nền tảng máy ảo() == "windows";
+        mã = mình.đầu nối mở kết nối(tên máy, cổng, thời gian chờ, sai, "socket_tls_mo", cũ);
         // TLS chỉ bắt đầu sau khi đã chọn kết nối. Lỗi chứng chỉ/handshake được
         // trả ngay; V++ đóng socket TCP, không thử lại TLS trên địa chỉ khác.
         thử {
-            nếu (!cũ) { trả về máy_tls_nâng_cấp(mã, tên máy); };
-            trả về socket_tls_nang_cap_vm(mã, tên máy);
+            nếu (!cũ) { trả về máy tls nâng cấp(mã, tên máy); };
+            trả về đầu nối tls nâng cấp máy ảo(mã, tên máy);
         } bắt lỗi (e) {
-            thử { mình.socket đóng(mã); } bắt lỗi (bỏ_qua) {};
+            thử { mình.đầu nối đóng(mã); } bắt lỗi (số mục bỏ qua) {};
             ném e;
         };
     };
 
     // Primitive máy chủ: bind/listen và accept do hệ điều hành thực hiện. Mọi
     // protocol framing/parsing phía trên (HTTP, WebSocket...) thuộc thư viện V++.
-    hàm công khai socket tcp lắng nghe(cổng, backlog = 64) {
-        cổng = mình.socket yêu cầu cổng(cổng, "socket_tcp_lang_nghe");
-        backlog = mình.socket yêu cầu số nguyên(backlog, "socket_tcp_lang_nghe", "backlog");
-        nếu (backlog <= 0 || backlog > 1024) {
+    hàm công khai đầu nối giao vận tin cậy lắng nghe(cổng, hàng đợi chờ = 64) {
+        cổng = mình.đầu nối yêu cầu cổng(cổng, "socket_tcp_lang_nghe");
+        hàng đợi chờ = mình.đầu nối yêu cầu số nguyên(hàng đợi chờ, "socket_tcp_lang_nghe", "backlog");
+        nếu (hàng đợi chờ <= 0 || hàng đợi chờ > 1024) {
             ném "socket_tcp_lang_nghe: backlog phải trong 1..1024";
         };
-        nếu (mình.socket mở bằng ffi()) {
-            trả về máy_socket_lắng_nghe(cổng, backlog);
+        nếu (mình.đầu nối mở bằng ffi()) {
+            trả về máy đầu nối lắng nghe(cổng, hàng đợi chờ);
         };
-        trả về socket_tcp_lang_nghe_vm(cổng, backlog);
+        trả về đầu nối giao vận tin cậy lắng nghe máy ảo(cổng, hàng đợi chờ);
     };
 
-    hàm công khai socket chấp nhận(mã socket lắng nghe, thời gian chờ = 300000) {
-        mã socket lắng nghe = mình.socket yêu cầu mã(
-            mã socket lắng nghe,
+    hàm công khai đầu nối chấp nhận(mã đầu nối lắng nghe, thời gian chờ = 300000) {
+        mã đầu nối lắng nghe = mình.đầu nối yêu cầu mã(
+            mã đầu nối lắng nghe,
             "socket_chap_nhan",
             "mã socket lắng nghe"
         );
-        thời gian chờ = mình.socket yêu cầu timeout(
+        thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(
             thời gian chờ,
             "socket_chap_nhan"
         );
 
         // `accept()` chỉ là primitive OS. Chính sách timeout của connection mới
         // thuộc thư viện V++; nếu cấu hình thất bại phải đóng handle vừa nhận.
-        mã socket = rỗng;
-        nếu (mình.socket dùng ffi(mã socket lắng nghe)) {
-            mã socket = máy_socket_chấp_nhận(mã socket lắng nghe);
+        mã đầu nối = rỗng;
+        nếu (mình.đầu nối dùng ffi(mã đầu nối lắng nghe)) {
+            mã đầu nối = máy đầu nối chấp nhận(mã đầu nối lắng nghe);
         } hoặc {
-            mã socket = socket_chap_nhan_vm(mã socket lắng nghe);
+            mã đầu nối = đầu nối chấp nhận máy ảo(mã đầu nối lắng nghe);
         };
         thử {
-            mình.socket đặt timeout(mã socket, thời gian chờ);
+            mình.đầu nối đặt thời gian chờ(mã đầu nối, thời gian chờ);
         } bắt lỗi (e) {
-            mình.socket đóng(mã socket);
+            mình.đầu nối đóng(mã đầu nối);
             ném e;
         };
-        trả về mã socket;
+        trả về mã đầu nối;
     };
 
-    hàm công khai socket gửi(mã socket, dữ liệu) {
-        mã socket = mình.socket yêu cầu mã(mã socket, "socket_gui", "mã socket");
-        nếu (loai_cua(dữ liệu) != "chuỗi") { ném "socket_gui: dữ liệu phải là chuỗi"; };
-        nếu (mình.socket dùng ffi(mã socket)) {
-            bytes = chuoi_bytes_vm(dữ liệu);
-            tổng = do_dai(bytes);
-            loại = máy_socket_loại(mã socket);
+    hàm công khai đầu nối gửi(mã đầu nối, dữ liệu) {
+        mã đầu nối = mình.đầu nối yêu cầu mã(mã đầu nối, "socket_gui", "mã socket");
+        nếu (loại của(dữ liệu) != "chuỗi") { ném "socket_gui: dữ liệu phải là chuỗi"; };
+        nếu (mình.đầu nối dùng ffi(mã đầu nối)) {
+            các byte = chuỗi thành byte máy ảo(dữ liệu);
+            tổng = máy ảo lấy độ dài(các byte);
+            loại = máy đầu nối loại(mã đầu nối);
             datagram = loại == 1;
             tls = loại == 2;
             nếu (datagram && tổng > 65507) {
                 ném "socket_gui: datagram vượt quá 65507 byte";
             };
-            đã_gửi = 0;
-            lặp(vòng = 0; đã_gửi < tổng; vòng++) {
+            đã gửi = 0;
+            lặp(vòng = 0; đã gửi < tổng; vòng++) {
                 đệm = [];
-                hết = đã_gửi + 65536;
+                hết = đã gửi + 65536;
                 nếu (hết > tổng) { hết = tổng; };
-                lặp(i = đã_gửi; i < hết; i++) { them(đệm, bytes[i]); };
+                lặp(i = đã gửi; i < hết; i++) { máy ảo thêm cuối danh sách(đệm, các byte[i]); };
                 n = 0;
                 nếu (tls) {
-                    n = máy_tls_gửi(mã socket, đệm, do_dai(đệm));
+                    n = máy tls gửi(mã đầu nối, đệm, máy ảo lấy độ dài(đệm));
                 } hoặc {
-                    n = máy_socket_gửi(mã socket, đệm, do_dai(đệm), 0);
+                    n = máy đầu nối gửi(mã đầu nối, đệm, máy ảo lấy độ dài(đệm), 0);
                 };
-                nếu (n <= 0 || n > do_dai(đệm)) { ném "socket_gui: gửi thất bại hoặc không tiến triển"; };
-                đã_gửi = đã_gửi + n;
+                nếu (n <= 0 || n > máy ảo lấy độ dài(đệm)) { ném "socket_gui: gửi thất bại hoặc không tiến triển"; };
+                đã gửi = đã gửi + n;
                 // UDP phải là một datagram; không gửi tiếp phần còn thiếu.
                 nếu (datagram) {
-                    nếu (đã_gửi != tổng) { ném "socket_gui: gửi datagram không đủ"; };
-                    trả về đã_gửi;
+                    nếu (đã gửi != tổng) { ném "socket_gui: gửi datagram không đủ"; };
+                    trả về đã gửi;
                 };
             };
-            trả về đã_gửi;
+            trả về đã gửi;
         };
-        đã_gửi = 0;
+        đã gửi = 0;
         xong = sai;
         // VM chỉ send/SSLWrite một lần (một record với SChannel). V++ sở hữu
         // vòng gửi hết stream và quy tắc chỉ gửi một datagram cho UDP.
         // Offset tính theo byte nên partial write giữa hai byte UTF-8 vẫn đúng.
         lặp(vòng = 0; !xong; vòng++) {
-            lần_gửi = socket_gui_vm(mã socket, dữ liệu, đã_gửi);
-            byte = lần_gửi[0];
-            tổng_byte = lần_gửi[1];
-            nếu (byte < 0 || byte > tổng_byte - đã_gửi) {
+            lần gửi = đầu nối gửi máy ảo(mã đầu nối, dữ liệu, đã gửi);
+            byte = lần gửi[0];
+            tổng byte = lần gửi[1];
+            nếu (byte < 0 || byte > tổng byte - đã gửi) {
                 ném "socket_gui: số byte gửi không hợp lệ";
             };
-            nếu (byte == 0 && đã_gửi < tổng_byte) {
+            nếu (byte == 0 && đã gửi < tổng byte) {
                 ném "socket_gui: gửi không tiến triển";
             };
-            đã_gửi = đã_gửi + byte;
-            xong = lần_gửi[2] || đã_gửi == tổng_byte;
+            đã gửi = đã gửi + byte;
+            xong = lần gửi[2] || đã gửi == tổng byte;
         };
-        trả về đã_gửi;
+        trả về đã gửi;
     };
 
-    hàm công khai socket nhận(mã socket, số byte tối đa = 65536) {
-        mã socket = mình.socket yêu cầu mã(mã socket, "socket_nhan", "mã socket");
-        số byte tối đa = mình.socket yêu cầu số nguyên(
+    hàm công khai đầu nối nhận(mã đầu nối, số byte tối đa = 65536) {
+        mã đầu nối = mình.đầu nối yêu cầu mã(mã đầu nối, "socket_nhan", "mã socket");
+        số byte tối đa = mình.đầu nối yêu cầu số nguyên(
             số byte tối đa,
             "socket_nhan",
             "số byte tối đa"
@@ -330,114 +330,114 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
         nếu (số byte tối đa <= 0 || số byte tối đa > 16777216) {
             ném "socket_nhan: số byte tối đa phải trong 1..16777216";
         };
-        nếu (mình.socket dùng ffi(mã socket)) {
-            giới_hạn = số byte tối đa;
-            nếu (giới_hạn > 65536) { giới_hạn = 65536; };
+        nếu (mình.đầu nối dùng ffi(mã đầu nối)) {
+            mức trần = số byte tối đa;
+            nếu (mức trần > 65536) { mức trần = 65536; };
             đệm = [];
-            lặp(i = 0; i < giới_hạn; i++) { them(đệm, 0); };
+            lặp(i = 0; i < mức trần; i++) { máy ảo thêm cuối danh sách(đệm, 0); };
             n = 0;
-            nếu (máy_socket_loại(mã socket) == 2) {
-                n = máy_tls_nhận(mã socket, đệm, giới_hạn);
+            nếu (máy đầu nối loại(mã đầu nối) == 2) {
+                n = máy tls nhận(mã đầu nối, đệm, mức trần);
             } hoặc {
-                n = máy_socket_nhận(mã socket, đệm, giới_hạn, 0);
+                n = máy đầu nối nhận(mã đầu nối, đệm, mức trần, 0);
             };
-            nếu (n < 0 || n > giới_hạn) { ném "socket_nhan: nhận thất bại"; };
-            bytes = [];
-            lặp(i = 0; i < n; i++) { them(bytes, đệm[i]); };
-            trả về chuoi_tu_bytes_vm(bytes);
+            nếu (n < 0 || n > mức trần) { ném "socket_nhan: nhận thất bại"; };
+            các byte = [];
+            lặp(i = 0; i < n; i++) { máy ảo thêm cuối danh sách(các byte, đệm[i]); };
+            trả về chuỗi từ byte máy ảo(các byte);
         };
-        trả về socket_nhan_vm(mã socket, số byte tối đa);
+        trả về đầu nối nhận máy ảo(mã đầu nối, số byte tối đa);
     };
 
-    hàm công khai socket đặt timeout(mã socket, thời gian chờ) {
-        mã socket = mình.socket yêu cầu mã(mã socket, "socket_dat_timeout", "mã socket");
-        thời gian chờ = mình.socket yêu cầu timeout(thời gian chờ, "socket_dat_timeout");
-        nếu (mình.socket dùng ffi(mã socket)) {
-            trả về máy_socket_timeout(mã socket, thời gian chờ);
+    hàm công khai đầu nối đặt thời gian chờ(mã đầu nối, thời gian chờ) {
+        mã đầu nối = mình.đầu nối yêu cầu mã(mã đầu nối, "socket_dat_timeout", "mã socket");
+        thời gian chờ = mình.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_dat_timeout");
+        nếu (mình.đầu nối dùng ffi(mã đầu nối)) {
+            trả về máy đầu nối thời gian chờ(mã đầu nối, thời gian chờ);
         };
-        trả về socket_dat_timeout_vm(mã socket, thời gian chờ);
+        trả về đầu nối đặt thời gian chờ máy ảo(mã đầu nối, thời gian chờ);
     };
 
-    hàm công khai socket đóng(mã socket) {
-        mã socket = mình.socket yêu cầu mã(mã socket, "socket_dong", "mã socket");
-        nếu (mình.socket dùng ffi(mã socket)) {
-            kết_quả = máy_socket_đóng(mã socket);
+    hàm công khai đầu nối đóng(mã đầu nối) {
+        mã đầu nối = mình.đầu nối yêu cầu mã(mã đầu nối, "socket_dong", "mã socket");
+        nếu (mình.đầu nối dùng ffi(mã đầu nối)) {
+            kết quả = máy đầu nối đóng(mã đầu nối);
             // close()/closesocket() trả về 0 nếu thành công, còn API công khai
             // socket đóng() trả về đúng và giữ nguyên lỗi OS khi thất bại.
-            nếu (kết_quả != 0) { ném "socket_dong: đóng socket thất bại"; };
+            nếu (kết quả != 0) { ném "socket_dong: đóng socket thất bại"; };
             trả về đúng;
         };
-        trả về socket_dong_vm(mã socket);
+        trả về đầu nối đóng máy ảo(mã đầu nối);
     };
 };
 
 
-hàm công khai socket resolver danh sách(tên_máy, cổng, datagram) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket resolver danh sách(tên_máy, cổng, datagram);
+hàm công khai đầu nối bộ phân giải danh sách(tên máy, cổng, datagram) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối bộ phân giải danh sách(tên máy, cổng, datagram);
 };
 
-hàm công khai socket yêu cầu tên máy(giá_trị, tên_hàm) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket yêu cầu tên máy(giá_trị, tên_hàm);
+hàm công khai đầu nối yêu cầu tên máy(giá trị, tên hàm) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối yêu cầu tên máy(giá trị, tên hàm);
 };
 
-hàm công khai socket yêu cầu cổng(giá_trị, tên_hàm) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket yêu cầu cổng(giá_trị, tên_hàm);
+hàm công khai đầu nối yêu cầu cổng(giá trị, tên hàm) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối yêu cầu cổng(giá trị, tên hàm);
 };
 
-hàm công khai socket yêu cầu timeout(giá_trị, tên_hàm) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket yêu cầu timeout(giá_trị, tên_hàm);
+hàm công khai đầu nối yêu cầu thời gian chờ(giá trị, tên hàm) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối yêu cầu thời gian chờ(giá trị, tên hàm);
 };
 
-hàm công khai socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm, dùng_tls_cũ = sai) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket mở kết nối(tên_máy, cổng, thời_gian_chờ, là_datagram, tên_hàm, dùng_tls_cũ);
+hàm công khai đầu nối mở kết nối(tên máy, cổng, thời gian chờ, là datagram, tên hàm, dùng tls cũ = sai) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối mở kết nối(tên máy, cổng, thời gian chờ, là datagram, tên hàm, dùng tls cũ);
 };
 
-hàm công khai socket tcp mở(tên máy, cổng, thời gian chờ = 5000) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket tcp mở(tên máy, cổng, thời gian chờ);
+hàm công khai đầu nối giao vận tin cậy mở(tên máy, cổng, thời gian chờ = 5000) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối giao vận tin cậy mở(tên máy, cổng, thời gian chờ);
 };
 
-hàm công khai socket udp mở(tên máy, cổng, thời gian chờ = 5000) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket udp mở(tên máy, cổng, thời gian chờ);
+hàm công khai đầu nối giao vận gói tin mở(tên máy, cổng, thời gian chờ = 5000) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối giao vận gói tin mở(tên máy, cổng, thời gian chờ);
 };
 
-hàm công khai socket tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket tls mở(tên máy, cổng, thời gian chờ);
+hàm công khai đầu nối tls mở(tên máy, cổng = 443, thời gian chờ = 20000) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối tls mở(tên máy, cổng, thời gian chờ);
 };
 
-hàm công khai socket tcp lắng nghe(cổng, backlog = 64) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket tcp lắng nghe(cổng, backlog);
+hàm công khai đầu nối giao vận tin cậy lắng nghe(cổng, hàng đợi chờ = 64) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối giao vận tin cậy lắng nghe(cổng, hàng đợi chờ);
 };
 
-hàm công khai socket chấp nhận(mã socket lắng nghe, thời gian chờ = 300000) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket chấp nhận(mã socket lắng nghe, thời gian chờ);
+hàm công khai đầu nối chấp nhận(mã đầu nối lắng nghe, thời gian chờ = 300000) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối chấp nhận(mã đầu nối lắng nghe, thời gian chờ);
 };
 
-hàm công khai socket gửi(mã socket, dữ liệu) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket gửi(mã socket, dữ liệu);
+hàm công khai đầu nối gửi(mã đầu nối, dữ liệu) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối gửi(mã đầu nối, dữ liệu);
 };
 
-hàm công khai socket nhận(mã socket, số byte tối đa = 65536) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket nhận(mã socket, số byte tối đa);
+hàm công khai đầu nối nhận(mã đầu nối, số byte tối đa = 65536) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối nhận(mã đầu nối, số byte tối đa);
 };
 
-hàm công khai socket đặt timeout(mã socket, thời gian chờ) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket đặt timeout(mã socket, thời gian chờ);
+hàm công khai đầu nối đặt thời gian chờ(mã đầu nối, thời gian chờ) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối đặt thời gian chờ(mã đầu nối, thời gian chờ);
 };
 
-hàm công khai socket đóng(mã socket) {
-    __vpp_adapter = Bộ Điều Khiển Ổ Cắm();
-    trả về __vpp_adapter.socket đóng(mã socket);
+hàm công khai đầu nối đóng(mã đầu nối) {
+    bộ chuyển tiếp = Bộ Điều Khiển Ổ Cắm();
+    trả về bộ chuyển tiếp.đầu nối đóng(mã đầu nối);
 };

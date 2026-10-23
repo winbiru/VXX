@@ -1,0 +1,23 @@
+// Full-language compiler entry points for the native process ABI.
+// The existing parser, semantics, OOP/closure IR and bytecode emitter are reused.
+nhập gói/biên dịch/trình điều khiển;
+nhập gói/biên dịch/nguồn tệp;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/sản phẩm biên dịch;
+
+hàm biên dịch trước nguồn tệp(đường, thư viện) {
+    trả về biên dịch nguồn tệp tự chủ(đường, thư viện);
+};
+hàm biên dịch trước nguồn nhúng(mã nguồn, gốc, thư viện) {
+    trả về biên dịch nguồn nhúng tự chủ(mã nguồn, gốc, thư viện);
+};
+hàm biên dịch trước sản phẩm dạng thô(sản phẩm biên dịch) {
+    trả về biên dịch nạp sản phẩm biên dịch(sản phẩm biên dịch);
+};
+hàm biên dịch trước văn bản dạng thô(văn bản) {
+    trả về biên dịch sản phẩm biên dịch giải mã dây(văn bản);
+};
+hàm biên dịch trước dòng lệnh mã trung gian(đường, thư viện, đầu ra) {
+    trả về biên dịch dòng lệnh(đường, thư viện, "build", đầu ra);
+};
+hàm chính() {};

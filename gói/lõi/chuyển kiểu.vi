@@ -5,21 +5,21 @@
 // - loai_cua(value): đọc tag kiểu runtime.
 // - so_thuc_tu_bits_vm(bytes): diễn giải 8 byte IEEE-754 little-endian.
 // Thư viện tự dựng biểu diễn NaN/+Inf/-Inf.
-hàm riêng tư chuyển_kiểu_lỗi_số_nguyên() {
+hàm riêng tư chuyển kiểu lỗi số nguyên() {
     ném "thành số nguyên: giá trị không thể chuyển đổi";
 };
 
-hàm riêng tư chuyển_kiểu_lỗi_số_thực() {
+hàm riêng tư chuyển kiểu lỗi số thực() {
     ném "thành số thực: giá trị không thể chuyển đổi";
 };
 
 hàm riêng tư chuyển kiểu số thực đặc biệt(mã) {
     nếu (mã != -1 && mã != 0 && mã != 1) {
-        chuyển_kiểu_lỗi_số_thực();
+        chuyển kiểu lỗi số thực();
     };
-    nếu (mã == 0) { trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 248, 127]); };
-    nếu (mã == 1) { trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 240, 127]); };
-    trả về so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 240, 255]);
+    nếu (mã == 0) { trả về số thực từ bit máy ảo([0, 0, 0, 0, 0, 0, 248, 127]); };
+    nếu (mã == 1) { trả về số thực từ bit máy ảo([0, 0, 0, 0, 0, 0, 240, 127]); };
+    trả về số thực từ bit máy ảo([0, 0, 0, 0, 0, 0, 240, 255]);
 };
 
 hàm riêng tư chuyển kiểu là khoảng trắng đầu(c) {
@@ -40,15 +40,15 @@ hàm riêng tư chuyển kiểu chữ số(c) {
     trả về -1;
 };
 
-hàm riêng tư chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
+hàm riêng tư chuyển kiểu bỏ khoảng trắng đầu(văn bản) {
     i = 0;
-    n = do_dai(văn_bản);
-    đang_bỏ = đúng;
-    lặp(vòng = 0; i < n && đang_bỏ; vòng++) {
-        nếu (chuyển kiểu là khoảng trắng đầu(văn_bản[i])) {
+    n = máy ảo lấy độ dài(văn bản);
+    đang bỏ = đúng;
+    lặp(vòng = 0; i < n && đang bỏ; vòng++) {
+        nếu (chuyển kiểu là khoảng trắng đầu(văn bản[i])) {
             i = i + 1;
         } hoặc {
-            đang_bỏ = sai;
+            đang bỏ = sai;
         };
     };
     trả về i;
@@ -56,42 +56,42 @@ hàm riêng tư chuyển kiểu bỏ khoảng trắng đầu(văn_bản) {
 
 // Parse số nguyên 32-bit theo contract cũ của std::stoi:
 // cho phép khoảng trắng ở đầu, dấu +/- và yêu cầu phần còn lại toàn chữ số.
-hàm riêng tư chuyển kiểu phân tích số nguyên(văn_bản) {
-    n = do_dai(văn_bản);
-    i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
-    nếu (i >= n) { chuyển_kiểu_lỗi_số_nguyên(); };
+hàm riêng tư chuyển kiểu phân tích số nguyên(văn bản) {
+    n = máy ảo lấy độ dài(văn bản);
+    i = chuyển kiểu bỏ khoảng trắng đầu(văn bản);
+    nếu (i >= n) { chuyển kiểu lỗi số nguyên(); };
 
     âm = sai;
-    nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
-        âm = văn_bản[i] == "-";
+    nếu (văn bản[i] == "+" || văn bản[i] == "-") {
+        âm = văn bản[i] == "-";
         i = i + 1;
     };
-    nếu (i >= n) { chuyển_kiểu_lỗi_số_nguyên(); };
+    nếu (i >= n) { chuyển kiểu lỗi số nguyên(); };
 
-    kết_quả = 0;
-    có_chữ_số = sai;
+    kết quả = 0;
+    có chữ số = sai;
     lặp(vòng = 0; i < n; vòng++) {
-        chữ_số = chuyển kiểu chữ số(văn_bản[i]);
-        nếu (chữ_số < 0) { chuyển_kiểu_lỗi_số_nguyên(); };
-        có_chữ_số = đúng;
+        chữ số = chuyển kiểu chữ số(văn bản[i]);
+        nếu (chữ số < 0) { chuyển kiểu lỗi số nguyên(); };
+        có chữ số = đúng;
 
         nếu (âm) {
-            nếu (kết_quả < -214748364 ||
-                (kết_quả == -214748364 && chữ_số > 8)) {
-                chuyển_kiểu_lỗi_số_nguyên();
+            nếu (kết quả < -214748364 ||
+                (kết quả == -214748364 && chữ số > 8)) {
+                chuyển kiểu lỗi số nguyên();
             };
-            kết_quả = kết_quả * 10 - chữ_số;
+            kết quả = kết quả * 10 - chữ số;
         } hoặc {
-            nếu (kết_quả > 214748364 ||
-                (kết_quả == 214748364 && chữ_số > 7)) {
-                chuyển_kiểu_lỗi_số_nguyên();
+            nếu (kết quả > 214748364 ||
+                (kết quả == 214748364 && chữ số > 7)) {
+                chuyển kiểu lỗi số nguyên();
             };
-            kết_quả = kết_quả * 10 + chữ_số;
+            kết quả = kết quả * 10 + chữ số;
         };
         i = i + 1;
     };
-    nếu (!có_chữ_số) { chuyển_kiểu_lỗi_số_nguyên(); };
-    trả về kết_quả;
+    nếu (!có chữ số) { chuyển kiểu lỗi số nguyên(); };
+    trả về kết quả;
 };
 
 hàm công khai thành chuỗi(giá trị) {
@@ -101,7 +101,7 @@ hàm công khai thành chuỗi(giá trị) {
 };
 
 hàm công khai thành số nguyên(giá trị) {
-    kiểu = loai_cua(giá trị);
+    kiểu = loại của(giá trị);
     nếu (kiểu == "số nguyên") {
         trả về giá trị;
     };
@@ -110,162 +110,162 @@ hàm công khai thành số nguyên(giá trị) {
     };
     nếu (kiểu == "số thực") {
         nếu (!(giá trị >= -2147483648.0 && giá trị <= 2147483647.0)) {
-            chuyển_kiểu_lỗi_số_nguyên();
+            chuyển kiểu lỗi số nguyên();
         };
-        văn_bản = thành chuỗi(giá trị);
-        n = do_dai(văn_bản);
-        nếu (n < 3 || văn_bản[n - 2] != "." || văn_bản[n - 1] != "0") {
-            chuyển_kiểu_lỗi_số_nguyên();
+        văn bản = thành chuỗi(giá trị);
+        n = máy ảo lấy độ dài(văn bản);
+        nếu (n < 3 || văn bản[n - 2] != "." || văn bản[n - 1] != "0") {
+            chuyển kiểu lỗi số nguyên();
         };
         nguyên = "";
         lặp(i = 0; i < n - 2; i++) {
-            nguyên = nguyên + văn_bản[i];
+            nguyên = nguyên + văn bản[i];
         };
         trả về chuyển kiểu phân tích số nguyên(nguyên);
     };
-    chuyển_kiểu_lỗi_số_nguyên();
+    chuyển kiểu lỗi số nguyên();
 };
 
-hàm riêng tư chuyển kiểu lũy thừa mười(số_mũ) {
-    kết_quả = 1.0;
-    nếu (số_mũ >= 0) {
-        lặp(i = 0; i < số_mũ; i++) {
-            kết_quả = kết_quả * 10.0;
+hàm riêng tư chuyển kiểu lũy thừa mười(số mũ) {
+    kết quả = 1.0;
+    nếu (số mũ >= 0) {
+        lặp(i = 0; i < số mũ; i++) {
+            kết quả = kết quả * 10.0;
         };
     } hoặc {
-        lặp(i = 0; i > số_mũ; i--) {
-            kết_quả = kết_quả / 10.0;
+        lặp(i = 0; i > số mũ; i--) {
+            kết quả = kết quả / 10.0;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 // Parser thập phân/scientific notation thuần V++.
 // Native không còn dùng std::stod cho conversion thông thường.
-hàm riêng tư chuyển kiểu phân tích số thực(văn_bản) {
-    n = do_dai(văn_bản);
-    i = chuyển kiểu bỏ khoảng trắng đầu(văn_bản);
-    nếu (i >= n) { chuyển_kiểu_lỗi_số_thực(); };
+hàm riêng tư chuyển kiểu phân tích số thực(văn bản) {
+    n = máy ảo lấy độ dài(văn bản);
+    i = chuyển kiểu bỏ khoảng trắng đầu(văn bản);
+    nếu (i >= n) { chuyển kiểu lỗi số thực(); };
 
     âm = sai;
-    nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
-        âm = văn_bản[i] == "-";
+    nếu (văn bản[i] == "+" || văn bản[i] == "-") {
+        âm = văn bản[i] == "-";
         i = i + 1;
     };
-    nếu (i >= n) { chuyển_kiểu_lỗi_số_thực(); };
+    nếu (i >= n) { chuyển kiểu lỗi số thực(); };
 
     // NaN/Infinity không thể tự tạo bằng toán tử V++ vì phép chia cho 0
     // chủ động ném lỗi, nên chỉ ba giá trị IEEE này đi qua primitive runtime.
-    còn_lại = "";
+    còn lại = "";
     lặp(j = i; j < n; j++) {
-        còn_lại = còn_lại + văn_bản[j];
+        còn lại = còn lại + văn bản[j];
     };
-    nếu (còn_lại == "nan" || còn_lại == "NaN" || còn_lại == "NAN") {
+    nếu (còn lại == "nan" || còn lại == "NaN" || còn lại == "NAN") {
         trả về chuyển kiểu số thực đặc biệt(0);
     };
-    nếu (còn_lại == "inf" || còn_lại == "Inf" || còn_lại == "INF" ||
-        còn_lại == "infinity" || còn_lại == "Infinity" || còn_lại == "INFINITY") {
+    nếu (còn lại == "inf" || còn lại == "Inf" || còn lại == "INF" ||
+        còn lại == "infinity" || còn lại == "Infinity" || còn lại == "INFINITY") {
         nếu (âm) { trả về chuyển kiểu số thực đặc biệt(-1); };
         trả về chuyển kiểu số thực đặc biệt(1);
     };
 
-    giá_trị = 0.0;
-    có_chữ_số = sai;
-    đang_đọc = đúng;
-    lặp(vòng = 0; i < n && đang_đọc; vòng++) {
-        chữ_số = chuyển kiểu chữ số(văn_bản[i]);
-        nếu (chữ_số < 0) {
-            đang_đọc = sai;
+    giá trị = 0.0;
+    có chữ số = sai;
+    đang đọc = đúng;
+    lặp(vòng = 0; i < n && đang đọc; vòng++) {
+        chữ số = chuyển kiểu chữ số(văn bản[i]);
+        nếu (chữ số < 0) {
+            đang đọc = sai;
         } hoặc {
-            có_chữ_số = đúng;
-            giá_trị = giá_trị * 10.0 + chữ_số;
+            có chữ số = đúng;
+            giá trị = giá trị * 10.0 + chữ số;
             i = i + 1;
         };
     };
 
     nếu (i < n) {
-        nếu (văn_bản[i] == ".") {
+        nếu (văn bản[i] == ".") {
             i = i + 1;
-            hệ_số = 0.1;
-            đang_đọc = đúng;
-            lặp(vòng = 0; i < n && đang_đọc; vòng++) {
-                chữ_số = chuyển kiểu chữ số(văn_bản[i]);
-                nếu (chữ_số < 0) {
-                    đang_đọc = sai;
+            hệ số = 0.1;
+            đang đọc = đúng;
+            lặp(vòng = 0; i < n && đang đọc; vòng++) {
+                chữ số = chuyển kiểu chữ số(văn bản[i]);
+                nếu (chữ số < 0) {
+                    đang đọc = sai;
                 } hoặc {
-                    có_chữ_số = đúng;
-                    giá_trị = giá_trị + chữ_số * hệ_số;
-                    hệ_số = hệ_số / 10.0;
+                    có chữ số = đúng;
+                    giá trị = giá trị + chữ số * hệ số;
+                    hệ số = hệ số / 10.0;
                     i = i + 1;
                 };
             };
         };
     };
-    nếu (!có_chữ_số) { chuyển_kiểu_lỗi_số_thực(); };
+    nếu (!có chữ số) { chuyển kiểu lỗi số thực(); };
 
-    số_mũ = 0;
-    có_số_mũ = sai;
+    số mũ = 0;
+    có số mũ = sai;
     nếu (i < n) {
-        nếu (văn_bản[i] == "e" || văn_bản[i] == "E") {
+        nếu (văn bản[i] == "e" || văn bản[i] == "E") {
             i = i + 1;
-            âm_mũ = sai;
+            âm mũ = sai;
             nếu (i < n) {
-                nếu (văn_bản[i] == "+" || văn_bản[i] == "-") {
-                    âm_mũ = văn_bản[i] == "-";
+                nếu (văn bản[i] == "+" || văn bản[i] == "-") {
+                    âm mũ = văn bản[i] == "-";
                     i = i + 1;
                 };
             };
-            đang_đọc = đúng;
-            lặp(vòng = 0; i < n && đang_đọc; vòng++) {
-                chữ_số = chuyển kiểu chữ số(văn_bản[i]);
-                nếu (chữ_số < 0) {
-                    đang_đọc = sai;
+            đang đọc = đúng;
+            lặp(vòng = 0; i < n && đang đọc; vòng++) {
+                chữ số = chuyển kiểu chữ số(văn bản[i]);
+                nếu (chữ số < 0) {
+                    đang đọc = sai;
                 } hoặc {
-                    có_số_mũ = đúng;
-                    nếu (số_mũ > 10000) { chuyển_kiểu_lỗi_số_thực(); };
-                    số_mũ = số_mũ * 10 + chữ_số;
+                    có số mũ = đúng;
+                    nếu (số mũ > 10000) { chuyển kiểu lỗi số thực(); };
+                    số mũ = số mũ * 10 + chữ số;
                     i = i + 1;
                 };
             };
-            nếu (!có_số_mũ) { chuyển_kiểu_lỗi_số_thực(); };
-            nếu (âm_mũ) { số_mũ = 0 - số_mũ; };
+            nếu (!có số mũ) { chuyển kiểu lỗi số thực(); };
+            nếu (âm mũ) { số mũ = 0 - số mũ; };
         };
     };
 
-    nếu (i != n) { chuyển_kiểu_lỗi_số_thực(); };
-    nếu (số_mũ > 400 || số_mũ < -400) {
-        chuyển_kiểu_lỗi_số_thực();
+    nếu (i != n) { chuyển kiểu lỗi số thực(); };
+    nếu (số mũ > 400 || số mũ < -400) {
+        chuyển kiểu lỗi số thực();
     };
-    nếu (số_mũ != 0) {
-        giá_trị = giá_trị * chuyển kiểu lũy thừa mười(số_mũ);
+    nếu (số mũ != 0) {
+        giá trị = giá trị * chuyển kiểu lũy thừa mười(số mũ);
     };
     nếu (âm) {
         // 0.0 - 0.0 tạo +0 theo IEEE-754. Parse dấu âm của zero bằng
         // primitive bit-pattern để không làm mất bit dấu.
-        nếu (giá_trị == 0.0) {
-            giá_trị = so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 0, 128]);
+        nếu (giá trị == 0.0) {
+            giá trị = số thực từ bit máy ảo([0, 0, 0, 0, 0, 0, 0, 128]);
         } hoặc {
-            giá_trị = 0.0 - giá_trị;
+            giá trị = 0.0 - giá trị;
         };
     };
 
-    vô_cực_dương = chuyển kiểu số thực đặc biệt(1);
-    vô_cực_âm = chuyển kiểu số thực đặc biệt(-1);
-    nếu (giá_trị == vô_cực_dương || giá_trị == vô_cực_âm) {
-        chuyển_kiểu_lỗi_số_thực();
+    vô cực dương = chuyển kiểu số thực đặc biệt(1);
+    vô cực âm = chuyển kiểu số thực đặc biệt(-1);
+    nếu (giá trị == vô cực dương || giá trị == vô cực âm) {
+        chuyển kiểu lỗi số thực();
     };
-    trả về giá_trị;
+    trả về giá trị;
 };
 
 hàm công khai thành số thực(giá trị) {
-    kiểu = loai_cua(giá trị);
+    kiểu = loại của(giá trị);
     nếu (kiểu == "số thực") { trả về giá trị; };
     nếu (kiểu == "số nguyên") { trả về giá trị * 1.0; };
     nếu (kiểu == "chuỗi") { trả về chuyển kiểu phân tích số thực(giá trị); };
-    chuyển_kiểu_lỗi_số_thực();
+    chuyển kiểu lỗi số thực();
 };
 
 hàm công khai loại của(giá trị) {
     // Type tag là metadata của VM nên primitive này vẫn thuộc runtime.
-    trả về loai_cua(giá trị);
+    trả về máy ảo lấy loại(giá trị);
 };

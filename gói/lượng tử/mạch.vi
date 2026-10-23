@@ -1,0 +1,104 @@
+nhập gói / lượng tử / nền;
+nhập gói / bộ sưu tập / danh sách;
+// Mạch lưu chỉ dẫn, không lưu bản sao trạng thái vật lý của từng qubit.
+lớp công khai Mạch Lượng Tử {
+    hàm công khai khởi tạo(số qubit, số bit = rỗng) {
+        mình.qubit = lượng tử yêu cầu nguyên(số qubit, "số qubit", 1, 1024);
+        nếu (số bit == rỗng) {
+            số bit = số qubit;
+        }
+        ;
+        mình.bit = lượng tử yêu cầu nguyên(số bit, "số bit", 1, 1024);
+        mình.lệnh = [];
+    }
+    ;
+    hàm công khai số qubit() {
+        trả về mình.qubit;
+    }
+    ;
+    hàm công khai số bit() {
+        trả về mình.bit;
+    }
+    ;
+    hàm riêng tư kiểm tra qubit(q) {
+        trả về lượng tử yêu cầu nguyên(q, "chỉ số qubit", 0, mình.qubit - 1);
+    }
+    ;
+    hàm riêng tư thêm cổng(tên, q) {
+        mình.kiểm tra qubit(q);
+        máy ảo thêm cuối danh sách(mình.lệnh, [tên, q, - 1]);
+        trả về mình;
+    }
+    ;
+    hàm công khai h(q) {
+        trả về mình.thêm cổng("h", q);
+    }
+    ;
+    hàm công khai x(q) {
+        trả về mình.thêm cổng("x", q);
+    }
+    ;
+    hàm công khai y(q) {
+        trả về mình.thêm cổng("y", q);
+    }
+    ;
+    hàm công khai z(q) {
+        trả về mình.thêm cổng("z", q);
+    }
+    ;
+    hàm công khai s(q) {
+        trả về mình.thêm cổng("s", q);
+    }
+    ;
+    hàm công khai t(q) {
+        trả về mình.thêm cổng("t", q);
+    }
+    ;
+    hàm công khai cx(điều khiển, đích) {
+        mình.kiểm tra qubit(điều khiển);
+        mình.kiểm tra qubit(đích);
+        nếu (điều khiển == đích) {
+            ném "lượng tử: qubit điều khiển và đích phải khác nhau";
+        }
+        ;
+        máy ảo thêm cuối danh sách(mình.lệnh, ["cx", điều khiển, đích]);
+        trả về mình;
+    }
+    ;
+    hàm công khai đo(q, bit) {
+        mình.kiểm tra qubit(q);
+        lượng tử yêu cầu nguyên(bit, "chỉ số bit", 0, mình.bit - 1);
+        máy ảo thêm cuối danh sách(mình.lệnh, ["measure", q, bit]);
+        trả về mình;
+    }
+    ;
+    hàm công khai đo tất cả() {
+        nếu (mình.bit < mình.qubit) {
+            ném "lượng tử: đo tất cả cần số bit ít nhất bằng số qubit";
+        }
+        ;
+        lặp (q = 0; q < mình.qubit; q++) {
+            mình.đo(q, q);
+        }
+        ;
+        trả về mình;
+    }
+    ;
+    hàm công khai đặt lại(q) {
+        trả về mình.thêm cổng("reset", q);
+    }
+    ;
+    // Snapshot sâu để caller không thay đổi mạch qua kết quả trả về.
+    hàm công khai các lệnh() {
+        bản sao = [];
+        lệnh = mình.lệnh;
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            máy ảo thêm cuối danh sách(bản sao, [mục[0], mục[1], mục[2]]);
+        }
+        ;
+        trả về bản sao;
+    }
+    ;
+}
+;

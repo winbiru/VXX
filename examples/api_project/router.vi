@@ -11,7 +11,7 @@ lớp BộĐịnhTuyến {
 
     // Đọc path của request rồi chuyển quyền xử lý cho controller tương ứng.
     hàm xửLý(requestId) {
-        path = mạng path yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
         nếu (path == "/health") {
             controller = mình.healthController;
             trả về controller.xửLý(requestId);

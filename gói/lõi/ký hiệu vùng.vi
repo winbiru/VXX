@@ -4,18 +4,18 @@
 nhập gói/văn bản/chuỗi;
 
 hàm công khai ký hiệu vùng chuẩn hóa(vùng) {
-    nếu (loai_cua(vùng) != "chuỗi") {
+    nếu (loại của(vùng) != "chuỗi") {
         ném "LOCALE_INVALID";
     };
     nếu (vùng == "C" || vùng == "POSIX" || vùng == "c" || vùng == "posix") {
         trả về "C";
     };
 
-    kết_quả = "";
-    lặp(i = 0; i < do_dai(vùng); i++) {
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(vùng); i++) {
         c = vùng[i];
         nếu (c == ".") {
-            trả về kết_quả;
+            trả về kết quả;
         };
         nếu (c == "_") {
             c = "-";
@@ -23,9 +23,9 @@ hàm công khai ký hiệu vùng chuẩn hóa(vùng) {
         nếu (i < 2) {
             c = chuỗi thường(c);
         };
-        kết_quả = kết_quả + c;
+        kết quả = kết quả + c;
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm công khai ký hiệu vùng lấy(vùng = rỗng) {

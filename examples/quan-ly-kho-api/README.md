@@ -95,7 +95,7 @@ vpp chạy src/demo.vi
 Demo thực hiện tuần tự:
 
 1. Ghi seed JSON xuống file.
-2. Đọc JSON thành list/map runtime và hydrate thành object `SảnPhẩm`.
+2. Đọc JSON chuyển thành danh sách/map runtime và hydrate thành object `SảnPhẩm`.
 3. Nhập kho.
 4. Tạo đơn có SKU trùng nhau để kiểm tra bước gom số lượng bằng map.
 5. Xuất kho và persist cả sản phẩm lẫn đơn hàng.

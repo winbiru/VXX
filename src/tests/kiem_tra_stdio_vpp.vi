@@ -3,9 +3,9 @@ nhập gói/nhập xuất/tệp thô;
 nhập gói/nhập xuất/bộ đệm tệp;
 nhập gói/kiểm thử/chính;
 
-hàm khẳng định bytes(thực, kỳ_vọng) {
-    khẳng định bằng(do_dai(thực), do_dai(kỳ_vọng), "sai số byte");
-    lặp(i = 0; i < do_dai(thực); i++) {
+hàm khẳng định các byte(thực, kỳ_vọng) {
+    khẳng định bằng(độ dài(thực), độ dài(kỳ_vọng), "sai số byte");
+    lặp(i = 0; i < độ dài(thực); i++) {
         khẳng định bằng(thực[i], kỳ_vọng[i], "sai byte tại " + i);
     };
 };
@@ -13,45 +13,45 @@ hàm khẳng định bytes(thực, kỳ_vọng) {
 hàm chính() {
     đường = ".tmp_stdio_vpp_cà_phê.bin";
     ghi = Bộ Đệm Tệp(đường, "ghi", 4);
-    ghi.ghi bytes([0, 255, 65]);
+    ghi.ghi các byte([0, 255, 65]);
     khẳng định bằng(ghi.vị trí(), 3);
     // Dữ liệu vẫn trong đệm V++; reader khác chưa thấy trước flush.
-    khẳng định bằng(do_dai(đọc bytes tệp(đường)), 0);
+    khẳng định bằng(độ dài(đọc các byte tệp(đường)), 0);
     khẳng định đúng(ghi.đẩy đệm());
-    khẳng định bytes(đọc bytes tệp(đường), [0, 255, 65]);
-    ghi.ghi bytes([66, 67, 68, 69]);
-    khẳng định bytes(đọc bytes tệp(đường), [0, 255, 65, 66, 67, 68, 69]);
-    ghi.ghi bytes([70]);
+    khẳng định các byte(đọc các byte tệp(đường), [0, 255, 65]);
+    ghi.ghi các byte([66, 67, 68, 69]);
+    khẳng định các byte(đọc các byte tệp(đường), [0, 255, 65, 66, 67, 68, 69]);
+    ghi.ghi các byte([70]);
     khẳng định bằng(ghi.vị trí(), 8);
     ghi.đóng();
     khẳng định đúng(ghi.đóng());
-    khẳng định bytes(đọc bytes tệp(đường), [0, 255, 65, 66, 67, 68, 69, 70]);
+    khẳng định các byte(đọc các byte tệp(đường), [0, 255, 65, 66, 67, 68, 69, 70]);
     in "đệm ghi V++: đạt";
 
     đọc = Bộ Đệm Tệp(đường, "đọc", 4);
-    khẳng định bytes(đọc.đọc bytes(1), [0]);
+    khẳng định các byte(đọc.đọc các byte(1), [0]);
     khẳng định bằng(đọc.vị trí(), 1);
     khẳng định đúng(đọc.dịch(1, 1));
     khẳng định bằng(đọc.vị trí(), 2);
-    khẳng định bytes(đọc.đọc bytes(3), [65, 66, 67]);
+    khẳng định các byte(đọc.đọc các byte(3), [65, 66, 67]);
     khẳng định bằng(đọc.vị trí(), 5);
     khẳng định đúng(đọc.dịch(-2, 1));
-    khẳng định bytes(đọc.đọc bytes(2), [66, 67]);
+    khẳng định các byte(đọc.đọc các byte(2), [66, 67]);
     khẳng định đúng(đọc.dịch(-1, 2));
-    khẳng định bytes(đọc.đọc bytes(4), [70]);
-    khẳng định bytes(đọc.đọc bytes(1), []);
-    khẳng định bytes(đọc.đọc bytes(0), []);
+    khẳng định các byte(đọc.đọc các byte(4), [70]);
+    khẳng định các byte(đọc.đọc các byte(1), []);
+    khẳng định các byte(đọc.đọc các byte(0), []);
     khẳng định đúng(đọc.dịch(0));
-    khẳng định bytes(đọc.đọc bytes(2), [0, 255]);
+    khẳng định các byte(đọc.đọc các byte(2), [0, 255]);
     đọc.đóng();
     in "đệm đọc, EOF và vị trí: đạt";
 
     nối = Bộ Đệm Tệp(đường, "nối", 2);
     nối.dịch(0);
-    nối.ghi bytes([71]);
+    nối.ghi các byte([71]);
     khẳng định bằng(nối.vị trí(), 9);
     nối.đóng();
-    khẳng định bytes(đọc bytes tệp(đường), [0, 255, 65, 66, 67, 68, 69, 70, 71]);
+    khẳng định các byte(đọc các byte tệp(đường), [0, 255, 65, 66, 67, 68, 69, 70, 71]);
     in "nối sau seek: đạt";
 
     // Kiểm tra i64 mà không ghi tệp khổng lồ trên Windows.
@@ -62,17 +62,17 @@ hàm chính() {
     ghi.ghi("V");
     khẳng định bằng(đọc tệp(đường), "V");
     sai_byte = sai;
-    thử { ghi.ghi bytes([65, 256]); } bắt lỗi(e) { sai_byte = đúng; };
+    thử { ghi.ghi các byte([65, 256]); } bắt lỗi(e) { sai_byte = đúng; };
     khẳng định đúng(sai_byte);
     ghi.đóng();
     khẳng định bằng(đọc tệp(đường), "V");
     đã_đóng = sai;
-    thử { ghi.đọc bytes(0); } bắt lỗi(e) { đã_đóng = đúng; };
+    thử { ghi.đọc các byte(0); } bắt lỗi(e) { đã_đóng = đúng; };
     khẳng định đúng(đã_đóng);
     sai_đệm = sai;
     thử { Bộ Đệm Tệp(đường, "ghi", 0); } bắt lỗi(e) { sai_đệm = đúng; };
     khẳng định đúng(sai_đệm);
     khẳng định bằng(đọc tệp(đường), "V");
-    khẳng định bằng(tệp_thô_xóa(đường), 0);
+    khẳng định bằng(tệp thô xóa(đường), 0);
     in "i64, validation và đóng: đạt";
 };

@@ -18,6 +18,6 @@ nhập khởi động;
 
 hàm chính() {
     in nối chuỗi("gói", " tiếng Việt");
-    in nối đường dẫn url("https://example.test", "/health");
-    in banner ứng dụng("VPP", "1");
+    in nối đường dẫn địa chỉ tài nguyên("https://example.test", "/health");
+    in biểu ngữ ứng dụng("VPP", "1");
 };

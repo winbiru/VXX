@@ -1,4 +1,4 @@
-// Các hàm i32 độc lập, xuất thành object và gọi bằng ABI C thông thường.
+// Các hàm i32 độc lập, xuất thành đối tượng và gọi bằng ABI C thông thường.
 // Miền đầu vào được harness giới hạn để không xảy ra tràn số có dấu.
 hàm vpp_arithmetic(a, b, c, d) {
     trả về (a + b) - c * d;

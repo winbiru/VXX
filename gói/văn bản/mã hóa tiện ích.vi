@@ -6,7 +6,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
 
     // Module: lõi.mã hóa tiện ích
     // Bytes ở ABI V++ hiện tại được biểu diễn bằng list số nguyên 0..255.
-    hàm riêng tư codec kiểm tra giới hạn(n) {
+    hàm riêng tư bộ mã hóa kiểm tra giới hạn(n) {
         // 16 MiB payload logical là trần v1 cho helper in-memory.
         nếu (n > 16777216) {
             ném "CODEC_RESOURCE_LIMIT";
@@ -14,7 +14,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         trả về đúng;
     };
 
-    hàm riêng tư codec byte hợp lệ(x) {
+    hàm riêng tư bộ mã hóa byte hợp lệ(x) {
         nếu (loại của(x) != "số nguyên") {
             trả về sai;
         };
@@ -24,80 +24,80 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         trả về x <= 255;
     };
 
-    hàm riêng tư codec kiểm tra bytes(bytes) {
-        kiểu = loại của(bytes);
+    hàm riêng tư bộ mã hóa kiểm tra các byte(các byte) {
+        kiểu = loại của(các byte);
         nếu (kiểu != "danh sách") {
             nếu (kiểu != "tuple") {
                 ném "CODEC_INVALID";
             };
         };
-        mình.codec kiểm tra giới hạn(độ dài(bytes));
-        lặp(i = 0; i < độ dài(bytes); i++) {
-            nếu (!mình.codec byte hợp lệ(bytes[i])) {
+        mình.bộ mã hóa kiểm tra giới hạn(máy ảo lấy độ dài(các byte));
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (!mình.bộ mã hóa byte hợp lệ(các byte[i])) {
                 ném "CODEC_INVALID";
             };
         };
         trả về đúng;
     };
 
-    hàm riêng tư codec yêu cầu chuỗi(văn_bản) {
-        nếu (loại của(văn_bản) != "chuỗi") {
+    hàm riêng tư bộ mã hóa yêu cầu chuỗi(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi") {
             ném "CODEC_INVALID";
         };
         trả về đúng;
     };
 
-    hàm riêng tư base64 alphabet(biến_thể) {
-        nếu (biến_thể == "CHUẨN" || biến_thể == "MIME") {
+    hàm riêng tư base64 bảng chữ cái(dạng biến thể) {
+        nếu (dạng biến thể == "CHUẨN" || dạng biến thể == "MIME") {
             trả về "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         };
-        nếu (biến_thể == "URL_AN_TOÀN") {
+        nếu (dạng biến thể == "URL_AN_TOÀN") {
             trả về "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         };
         ném "CODEC_INVALID";
     };
 
-    hàm riêng tư base64 chỉ số(alphabet, ký_tự) {
-        vị_trí = -1;
-        lặp(i = 0; i < độ dài(alphabet) && vị_trí < 0; i++) {
-            nếu (alphabet[i] == ký_tự) {
-                vị_trí = i;
+    hàm riêng tư base64 chỉ số(bảng chữ cái, ký tự) {
+        vị trí = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(bảng chữ cái) && vị trí < 0; i++) {
+            nếu (bảng chữ cái[i] == ký tự) {
+                vị trí = i;
             };
         };
-        trả về vị_trí;
+        trả về vị trí;
     };
 
-    hàm riêng tư base64 bọc mime(văn_bản) {
-        nếu (độ dài(văn_bản) <= 76) {
-            trả về văn_bản;
+    hàm riêng tư base64 bọc mime(văn bản) {
+        nếu (máy ảo lấy độ dài(văn bản) <= 76) {
+            trả về văn bản;
         };
-        kết_quả = "";
-        lặp(i = 0; i < độ dài(văn_bản); i += 76) {
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i += 76) {
             nếu (i > 0) {
-                kết_quả = kết_quả + "\r\n";
+                kết quả = kết quả + "\r\n";
             };
-            kết_quả = kết_quả + cắt chuỗi(văn_bản, i, 76);
+            kết quả = kết quả + cắt chuỗi(văn bản, i, 76);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai base64 mã(bytes, biến_thể = "CHUẨN", padding = đúng) {
-        mình.codec kiểm tra bytes(bytes);
-        alphabet = mình.base64 alphabet(biến_thể);
-        kết_quả = "";
-        n = độ dài(bytes);
+    hàm công khai base64 mã(các byte, dạng biến thể = "CHUẨN", phần đệm = đúng) {
+        mình.bộ mã hóa kiểm tra các byte(các byte);
+        bảng chữ cái = mình.base64 bảng chữ cái(dạng biến thể);
+        kết quả = "";
+        n = máy ảo lấy độ dài(các byte);
 
         lặp(i = 0; i < n; i += 3) {
-            b0 = bytes[i];
-            có_b1 = i + 1 < n;
-            có_b2 = i + 2 < n;
+            b0 = các byte[i];
+            có b1 = i + 1 < n;
+            có b2 = i + 2 < n;
             b1 = 0;
             b2 = 0;
-            nếu (có_b1) {
-                b1 = bytes[i + 1];
+            nếu (có b1) {
+                b1 = các byte[i + 1];
             };
-            nếu (có_b2) {
-                b2 = bytes[i + 2];
+            nếu (có b2) {
+                b2 = các byte[i + 2];
             };
 
             s0 = thành số nguyên(b0 / 4);
@@ -105,45 +105,45 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             s2 = (b1 % 16) * 4 + thành số nguyên(b2 / 64);
             s3 = b2 % 64;
 
-            kết_quả = kết_quả + alphabet[s0] + alphabet[s1];
-            nếu (có_b1) {
-                kết_quả = kết_quả + alphabet[s2];
+            kết quả = kết quả + bảng chữ cái[s0] + bảng chữ cái[s1];
+            nếu (có b1) {
+                kết quả = kết quả + bảng chữ cái[s2];
             } hoặc {
-                nếu (padding) {
-                    kết_quả = kết_quả + "=";
+                nếu (phần đệm) {
+                    kết quả = kết quả + "=";
                 };
             };
-            nếu (có_b2) {
-                kết_quả = kết_quả + alphabet[s3];
+            nếu (có b2) {
+                kết quả = kết quả + bảng chữ cái[s3];
             } hoặc {
-                nếu (padding) {
-                    kết_quả = kết_quả + "=";
+                nếu (phần đệm) {
+                    kết quả = kết quả + "=";
                 };
             };
         };
 
-        nếu (biến_thể == "MIME") {
-            trả về mình.base64 bọc mime(kết_quả);
+        nếu (dạng biến thể == "MIME") {
+            trả về mình.base64 bọc mime(kết quả);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm riêng tư base64 là khoảng trắng(c) {
         trả về c == " " || c == "\t" || c == "\r" || c == "\n";
     };
 
-    hàm riêng tư base64 làm sạch(văn_bản, alphabet, biến_thể, bỏ_qua_khoảng_trắng) {
+    hàm riêng tư base64 làm sạch(văn bản, bảng chữ cái, dạng biến thể, số mục bỏ qua khoảng trắng) {
         sạch = "";
-        lặp(i = 0; i < độ dài(văn_bản); i++) {
-            c = văn_bản[i];
-            hợp_lệ = c == "=" || mình.base64 chỉ số(alphabet, c) >= 0;
-            nếu (hợp_lệ) {
+        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+            c = văn bản[i];
+            hợp lệ = c == "=" || mình.base64 chỉ số(bảng chữ cái, c) >= 0;
+            nếu (hợp lệ) {
                 sạch = sạch + c;
             } hoặc {
-                nếu (biến_thể == "MIME") {
+                nếu (dạng biến thể == "MIME") {
                     // MIME decoder bỏ ký tự ngoài alphabet/padding.
                 } hoặc {
-                    nếu (bỏ_qua_khoảng_trắng && mình.base64 là khoảng trắng(c)) {
+                    nếu (số mục bỏ qua khoảng trắng && mình.base64 là khoảng trắng(c)) {
                         // Bỏ whitespace explicit.
                     } hoặc {
                         ném "CODEC_INVALID";
@@ -154,12 +154,12 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         trả về sạch;
     };
 
-    hàm công khai base64 giải(văn_bản, biến_thể = "CHUẨN", bỏ_qua_khoảng_trắng = sai) {
-        mình.codec yêu cầu chuỗi(văn_bản);
-        mình.codec kiểm tra giới hạn(độ dài(văn_bản));
-        alphabet = mình.base64 alphabet(biến_thể);
-        sạch = mình.base64 làm sạch(văn_bản, alphabet, biến_thể, bỏ_qua_khoảng_trắng);
-        n = độ dài(sạch);
+    hàm công khai base64 giải(văn bản, dạng biến thể = "CHUẨN", số mục bỏ qua khoảng trắng = sai) {
+        mình.bộ mã hóa yêu cầu chuỗi(văn bản);
+        mình.bộ mã hóa kiểm tra giới hạn(máy ảo lấy độ dài(văn bản));
+        bảng chữ cái = mình.base64 bảng chữ cái(dạng biến thể);
+        sạch = mình.base64 làm sạch(văn bản, bảng chữ cái, dạng biến thể, số mục bỏ qua khoảng trắng);
+        n = máy ảo lấy độ dài(sạch);
         nếu (n == 0) {
             trả về [];
         };
@@ -172,7 +172,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
             };
         };
 
-        kết_quả = [];
+        kết quả = [];
         nhóm = thành số nguyên((n + 3) / 4);
         lặp(g = 0; g < nhóm; g++) {
             p = g * 4;
@@ -202,115 +202,115 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
                 ném "CODEC_INVALID";
             };
 
-            s0 = mình.base64 chỉ số(alphabet, c0);
-            s1 = mình.base64 chỉ số(alphabet, c1);
+            s0 = mình.base64 chỉ số(bảng chữ cái, c0);
+            s1 = mình.base64 chỉ số(bảng chữ cái, c1);
             nếu (s0 < 0 || s1 < 0) {
                 ném "CODEC_INVALID";
             };
 
-            thêm(kết_quả, s0 * 4 + thành số nguyên(s1 / 16));
+            máy ảo thêm cuối danh sách(kết quả, s0 * 4 + thành số nguyên(s1 / 16));
 
             nếu (c2 == "=") {
                 nếu (s1 % 16 != 0) {
                     ném "CODEC_INVALID";
                 };
             } hoặc {
-                s2 = mình.base64 chỉ số(alphabet, c2);
+                s2 = mình.base64 chỉ số(bảng chữ cái, c2);
                 nếu (s2 < 0) {
                     ném "CODEC_INVALID";
                 };
-                thêm(kết_quả, (s1 % 16) * 16 + thành số nguyên(s2 / 4));
+                máy ảo thêm cuối danh sách(kết quả, (s1 % 16) * 16 + thành số nguyên(s2 / 4));
 
                 nếu (c3 == "=") {
                     nếu (s2 % 4 != 0) {
                         ném "CODEC_INVALID";
                     };
                 } hoặc {
-                    s3 = mình.base64 chỉ số(alphabet, c3);
+                    s3 = mình.base64 chỉ số(bảng chữ cái, c3);
                     nếu (s3 < 0) {
                         ném "CODEC_INVALID";
                     };
-                    thêm(kết_quả, (s2 % 4) * 64 + s3);
+                    máy ảo thêm cuối danh sách(kết quả, (s2 % 4) * 64 + s3);
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm riêng tư hex chỉ số(c) {
+    hàm riêng tư thập lục phân chỉ số(c) {
         chữ = chuỗi thường(c);
-        alphabet = "0123456789abcdef";
-        vị_trí = -1;
-        lặp(i = 0; i < 16 && vị_trí < 0; i++) {
-            nếu (alphabet[i] == chữ) {
-                vị_trí = i;
+        bảng chữ cái = "0123456789abcdef";
+        vị trí = -1;
+        lặp(i = 0; i < 16 && vị trí < 0; i++) {
+            nếu (bảng chữ cái[i] == chữ) {
+                vị trí = i;
             };
         };
-        trả về vị_trí;
+        trả về vị trí;
     };
 
-    hàm công khai hex mã(bytes, hoa = sai, phân_cách = "") {
-        mình.codec kiểm tra bytes(bytes);
-        alphabet = "0123456789abcdef";
+    hàm công khai thập lục phân mã(các byte, hoa = sai, phân cách = "") {
+        mình.bộ mã hóa kiểm tra các byte(các byte);
+        bảng chữ cái = "0123456789abcdef";
         nếu (hoa) {
-            alphabet = "0123456789ABCDEF";
+            bảng chữ cái = "0123456789ABCDEF";
         };
-        kết_quả = "";
-        lặp(i = 0; i < độ dài(bytes); i++) {
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
             nếu (i > 0) {
-                kết_quả = kết_quả + phân_cách;
+                kết quả = kết quả + phân cách;
             };
-            byte = bytes[i];
+            byte = các byte[i];
             cao = thành số nguyên(byte / 16);
             thấp = byte % 16;
-            kết_quả = kết_quả + alphabet[cao] + alphabet[thấp];
+            kết quả = kết quả + bảng chữ cái[cao] + bảng chữ cái[thấp];
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai hex giải(văn_bản, phân_cách = "") {
-        mình.codec yêu cầu chuỗi(văn_bản);
-        mình.codec yêu cầu chuỗi(phân_cách);
-        mình.codec kiểm tra giới hạn(độ dài(văn_bản));
-        n = độ dài(văn_bản);
+    hàm công khai thập lục phân giải(văn bản, phân cách = "") {
+        mình.bộ mã hóa yêu cầu chuỗi(văn bản);
+        mình.bộ mã hóa yêu cầu chuỗi(phân cách);
+        mình.bộ mã hóa kiểm tra giới hạn(máy ảo lấy độ dài(văn bản));
+        n = máy ảo lấy độ dài(văn bản);
         nếu (n == 0) {
             trả về [];
         };
-        sep_len = độ dài(phân_cách);
-        nếu (sep_len == 0) {
+        sep số ký tự = máy ảo lấy độ dài(phân cách);
+        nếu (sep số ký tự == 0) {
             nếu (n % 2 != 0) {
                 ném "CODEC_INVALID";
             };
-            số_byte = thành số nguyên(n / 2);
+            số byte = thành số nguyên(n / 2);
         } hoặc {
-            tử = n + sep_len;
-            mẫu = 2 + sep_len;
+            tử = n + sep số ký tự;
+            mẫu = 2 + sep số ký tự;
             nếu (tử % mẫu != 0) {
                 ném "CODEC_INVALID";
             };
-            số_byte = thành số nguyên(tử / mẫu);
+            số byte = thành số nguyên(tử / mẫu);
         };
 
-        kết_quả = [];
-        lặp(i = 0; i < số_byte; i++) {
-            vị_trí = i * (2 + sep_len);
-            nếu (i > 0 && sep_len > 0) {
-                sep_pos = vị_trí - sep_len;
-                nếu (cắt chuỗi(văn_bản, sep_pos, sep_len) != phân_cách) {
+        kết quả = [];
+        lặp(i = 0; i < số byte; i++) {
+            vị trí = i * (2 + sep số ký tự);
+            nếu (i > 0 && sep số ký tự > 0) {
+                sep vị trí hiện tại = vị trí - sep số ký tự;
+                nếu (cắt chuỗi(văn bản, sep vị trí hiện tại, sep số ký tự) != phân cách) {
                     ném "CODEC_INVALID";
                 };
             };
-            cao = mình.hex chỉ số(văn_bản[vị_trí]);
-            thấp = mình.hex chỉ số(văn_bản[vị_trí + 1]);
+            cao = mình.thập lục phân chỉ số(văn bản[vị trí]);
+            thấp = mình.thập lục phân chỉ số(văn bản[vị trí + 1]);
             nếu (cao < 0 || thấp < 0) {
                 ném "CODEC_INVALID";
             };
-            thêm(kết_quả, cao * 16 + thấp);
+            máy ảo thêm cuối danh sách(kết quả, cao * 16 + thấp);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm riêng tư uuid nibble biến thể(c) {
+    hàm riêng tư uuid nửa byte biến thể(c) {
         c = chuỗi thường(c);
         nếu (c == "0" || c == "4" || c == "8" || c == "c") {
             trả về "8";
@@ -325,44 +325,44 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
     };
 
     hàm công khai uuid ngẫu nhiên() {
-        raw = ngẫu nhiên bảo mật(16);
-        trả về cắt chuỗi(raw, 0, 8)
+        thô = ngẫu nhiên bảo mật(16);
+        trả về cắt chuỗi(thô, 0, 8)
             + "-"
-            + cắt chuỗi(raw, 8, 4)
+            + cắt chuỗi(thô, 8, 4)
             + "-4"
-            + cắt chuỗi(raw, 13, 3)
+            + cắt chuỗi(thô, 13, 3)
             + "-"
-            + mình.uuid nibble biến thể(raw[16])
-            + cắt chuỗi(raw, 17, 3)
+            + mình.uuid nửa byte biến thể(thô[16])
+            + cắt chuỗi(thô, 17, 3)
             + "-"
-            + cắt chuỗi(raw, 20, 12);
+            + cắt chuỗi(thô, 20, 12);
     };
 
-    hàm công khai uuid parse(văn_bản) {
-        nếu (loại của(văn_bản) != "chuỗi") {
+    hàm công khai uuid phân tích(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi") {
             ném "UUID_INVALID";
         };
-        nếu (độ dài(văn_bản) != 36) {
+        nếu (máy ảo lấy độ dài(văn bản) != 36) {
             ném "UUID_INVALID";
         };
         lặp(i = 0; i < 36; i++) {
-            c = văn_bản[i];
-            là_gạch = i == 8 || i == 13 || i == 18 || i == 23;
-            nếu (là_gạch) {
+            c = văn bản[i];
+            là gạch = i == 8 || i == 13 || i == 18 || i == 23;
+            nếu (là gạch) {
                 nếu (c != "-") {
                     ném "UUID_INVALID";
                 };
             } hoặc {
-                nếu (mình.hex chỉ số(c) < 0) {
+                nếu (mình.thập lục phân chỉ số(c) < 0) {
                     ném "UUID_INVALID";
                 };
             };
         };
-        trả về chuỗi thường(văn_bản);
+        trả về chuỗi thường(văn bản);
     };
 
-    hàm công khai uuid text(id) {
-        trả về mình.uuid parse(id);
+    hàm công khai uuid văn bản(mã định danh) {
+        trả về mình.uuid phân tích(mã định danh);
     };
 
     hàm công khai tập bit() {
@@ -373,94 +373,94 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         nếu (loại của(tập) != "từ điển") {
             ném "BITSET_INDEX";
         };
-        nếu (lấy map(tập, "__vpp_bitset__", 0) != 1) {
+        nếu (lấy từ điển(tập, "__vpp_bitset__", 0) != 1) {
             ném "BITSET_INDEX";
         };
-        trả về lấy map(tập, "bits", []);
+        trả về lấy từ điển(tập, "bits", []);
     };
 
-    hàm riêng tư bit yêu cầu chỉ số(index) {
-        nếu (loại của(index) != "số nguyên") {
+    hàm riêng tư bit yêu cầu chỉ số(chỉ mục) {
+        nếu (loại của(chỉ mục) != "số nguyên") {
             ném "BITSET_INDEX";
         };
-        nếu (index < 0) {
+        nếu (chỉ mục < 0) {
             ném "BITSET_INDEX";
         };
-        nếu (index > 1000000000) {
+        nếu (chỉ mục > 1000000000) {
             ném "BITSET_RESOURCE_LIMIT";
         };
-        trả về index;
+        trả về chỉ mục;
     };
 
-    hàm công khai bit đặt(tập, index) {
-        mình.bit yêu cầu chỉ số(index);
-        bits = mình.bit yêu cầu tập(tập);
-        nếu (tìm chỉ số(bits, index) < 0) {
-            nếu (độ dài(bits) >= 1000000) {
+    hàm công khai bit đặt(tập, chỉ mục) {
+        mình.bit yêu cầu chỉ số(chỉ mục);
+        các bit = mình.bit yêu cầu tập(tập);
+        nếu (tìm chỉ số(các bit, chỉ mục) < 0) {
+            nếu (máy ảo lấy độ dài(các bit) >= 1000000) {
                 ném "BITSET_RESOURCE_LIMIT";
             };
-            thêm(bits, index);
-            sắp xếp(bits);
+            máy ảo thêm cuối danh sách(các bit, chỉ mục);
+            sắp xếp(các bit);
         };
         trả về tập;
     };
 
-    hàm công khai bit xóa(tập, index) {
-        mình.bit yêu cầu chỉ số(index);
-        bits = mình.bit yêu cầu tập(tập);
-        vị_trí = tìm chỉ số(bits, index);
-        nếu (vị_trí >= 0) {
-            xóa tại(bits, vị_trí);
+    hàm công khai bit xóa(tập, chỉ mục) {
+        mình.bit yêu cầu chỉ số(chỉ mục);
+        các bit = mình.bit yêu cầu tập(tập);
+        vị trí = tìm chỉ số(các bit, chỉ mục);
+        nếu (vị trí >= 0) {
+            máy ảo xóa vị trí danh sách(các bit, vị trí);
         };
         trả về tập;
     };
 
-    hàm công khai bit lật(tập, index) {
-        nếu (mình.bit có(tập, index)) {
-            trả về mình.bit xóa(tập, index);
+    hàm công khai bit lật(tập, chỉ mục) {
+        nếu (mình.bit có(tập, chỉ mục)) {
+            trả về mình.bit xóa(tập, chỉ mục);
         };
-        trả về mình.bit đặt(tập, index);
+        trả về mình.bit đặt(tập, chỉ mục);
     };
 
-    hàm công khai bit có(tập, index) {
-        mình.bit yêu cầu chỉ số(index);
-        bits = mình.bit yêu cầu tập(tập);
-        trả về tìm chỉ số(bits, index) >= 0;
+    hàm công khai bit có(tập, chỉ mục) {
+        mình.bit yêu cầu chỉ số(chỉ mục);
+        các bit = mình.bit yêu cầu tập(tập);
+        trả về tìm chỉ số(các bit, chỉ mục) >= 0;
     };
 
-    hàm công khai bit tiếp đặt(tập, từ_index) {
-        mình.bit yêu cầu chỉ số(từ_index);
-        bits = mình.bit yêu cầu tập(tập);
-        kết_quả = -1;
-        lặp(i = 0; i < độ dài(bits) && kết_quả < 0; i++) {
-            nếu (bits[i] >= từ_index) {
-                kết_quả = bits[i];
+    hàm công khai bit tiếp đặt(tập, từ chỉ mục) {
+        mình.bit yêu cầu chỉ số(từ chỉ mục);
+        các bit = mình.bit yêu cầu tập(tập);
+        kết quả = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit) && kết quả < 0; i++) {
+            nếu (các bit[i] >= từ chỉ mục) {
+                kết quả = các bit[i];
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai bit độ dài(tập) {
-        bits = mình.bit yêu cầu tập(tập);
-        n = độ dài(bits);
+    hàm công khai bit máy ảo lấy độ dài(tập) {
+        các bit = mình.bit yêu cầu tập(tập);
+        n = máy ảo lấy độ dài(các bit);
         nếu (n == 0) {
             trả về 0;
         };
-        trả về bits[n - 1] + 1;
+        trả về các bit[n - 1] + 1;
     };
 
     hàm công khai bit số bit(tập) {
-        trả về độ dài(mình.bit yêu cầu tập(tập));
+        trả về máy ảo lấy độ dài(mình.bit yêu cầu tập(tập));
     };
 
     hàm công khai bit bằng(a, b) {
-        bits_a = mình.bit yêu cầu tập(a);
-        bits_b = mình.bit yêu cầu tập(b);
-        nếu (độ dài(bits_a) != độ dài(bits_b)) {
+        các bit thứ nhất = mình.bit yêu cầu tập(a);
+        các bit thứ hai = mình.bit yêu cầu tập(b);
+        nếu (máy ảo lấy độ dài(các bit thứ nhất) != máy ảo lấy độ dài(các bit thứ hai)) {
             trả về sai;
         };
-        lặp(i = 0; i < độ dài(bits_a); i++) {
-            nếu (bits_a[i] != bits_b[i]) {
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit thứ nhất); i++) {
+            nếu (các bit thứ nhất[i] != các bit thứ hai[i]) {
                 trả về sai;
             };
         };
@@ -469,149 +469,149 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
 
     hàm công khai bit sao chép(tập) {
         nguồn = mình.bit yêu cầu tập(tập);
-        kết_quả = mình.tập bit();
-        lặp(i = 0; i < độ dài(nguồn); i++) {
-            mình.bit đặt(kết_quả, nguồn[i]);
+        kết quả = mình.tập bit();
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+            mình.bit đặt(kết quả, nguồn[i]);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai bit và(a, b) {
-        kết_quả = mình.tập bit();
-        bits_a = mình.bit yêu cầu tập(a);
-        lặp(i = 0; i < độ dài(bits_a); i++) {
-            nếu (mình.bit có(b, bits_a[i])) {
-                mình.bit đặt(kết_quả, bits_a[i]);
+        kết quả = mình.tập bit();
+        các bit thứ nhất = mình.bit yêu cầu tập(a);
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit thứ nhất); i++) {
+            nếu (mình.bit có(b, các bit thứ nhất[i])) {
+                mình.bit đặt(kết quả, các bit thứ nhất[i]);
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai bit hoặc(a, b) {
-        kết_quả = mình.tập bit();
-        bits_a = mình.bit yêu cầu tập(a);
-        bits_b = mình.bit yêu cầu tập(b);
-        lặp(i = 0; i < độ dài(bits_a); i++) {
-            mình.bit đặt(kết_quả, bits_a[i]);
+        kết quả = mình.tập bit();
+        các bit thứ nhất = mình.bit yêu cầu tập(a);
+        các bit thứ hai = mình.bit yêu cầu tập(b);
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit thứ nhất); i++) {
+            mình.bit đặt(kết quả, các bit thứ nhất[i]);
         };
-        lặp(i = 0; i < độ dài(bits_b); i++) {
-            mình.bit đặt(kết_quả, bits_b[i]);
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit thứ hai); i++) {
+            mình.bit đặt(kết quả, các bit thứ hai[i]);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai bit xor(a, b) {
-        kết_quả = mình.tập bit();
-        tất_cả = mình.bit hoặc(a, b);
-        bits = mình.bit yêu cầu tập(tất_cả);
-        lặp(i = 0; i < độ dài(bits); i++) {
-            index = bits[i];
-            nếu (mình.bit có(a, index) != mình.bit có(b, index)) {
-                mình.bit đặt(kết_quả, index);
+        kết quả = mình.tập bit();
+        tất cả = mình.bit hoặc(a, b);
+        các bit = mình.bit yêu cầu tập(tất cả);
+        lặp(i = 0; i < máy ảo lấy độ dài(các bit); i++) {
+            chỉ mục = các bit[i];
+            nếu (mình.bit có(a, chỉ mục) != mình.bit có(b, chỉ mục)) {
+                mình.bit đặt(kết quả, chỉ mục);
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 };
 
 
-hàm công khai base64 mã(bytes, biến_thể = "CHUẨN", padding = đúng) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.base64 mã(bytes, biến_thể, padding);
+hàm công khai base64 mã(các byte, dạng biến thể = "CHUẨN", phần đệm = đúng) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.base64 mã(các byte, dạng biến thể, phần đệm);
 };
 
-hàm công khai base64 giải(văn_bản, biến_thể = "CHUẨN", bỏ_qua_khoảng_trắng = sai) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.base64 giải(văn_bản, biến_thể, bỏ_qua_khoảng_trắng);
+hàm công khai base64 giải(văn bản, dạng biến thể = "CHUẨN", số mục bỏ qua khoảng trắng = sai) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.base64 giải(văn bản, dạng biến thể, số mục bỏ qua khoảng trắng);
 };
 
-hàm công khai hex mã(bytes, hoa = sai, phân_cách = "") {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.hex mã(bytes, hoa, phân_cách);
+hàm công khai thập lục phân mã(các byte, hoa = sai, phân cách = "") {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.thập lục phân mã(các byte, hoa, phân cách);
 };
 
-hàm công khai hex giải(văn_bản, phân_cách = "") {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.hex giải(văn_bản, phân_cách);
+hàm công khai thập lục phân giải(văn bản, phân cách = "") {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.thập lục phân giải(văn bản, phân cách);
 };
 
 hàm công khai uuid ngẫu nhiên() {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.uuid ngẫu nhiên();
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.uuid ngẫu nhiên();
 };
 
-hàm công khai uuid parse(văn_bản) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.uuid parse(văn_bản);
+hàm công khai uuid phân tích(văn bản) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.uuid phân tích(văn bản);
 };
 
-hàm công khai uuid text(id) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.uuid text(id);
+hàm công khai uuid văn bản(mã định danh) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.uuid văn bản(mã định danh);
 };
 
 hàm công khai tập bit() {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.tập bit();
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.tập bit();
 };
 
-hàm công khai bit đặt(tập, index) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit đặt(tập, index);
+hàm công khai bit đặt(tập, chỉ mục) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit đặt(tập, chỉ mục);
 };
 
-hàm công khai bit xóa(tập, index) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit xóa(tập, index);
+hàm công khai bit xóa(tập, chỉ mục) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit xóa(tập, chỉ mục);
 };
 
-hàm công khai bit lật(tập, index) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit lật(tập, index);
+hàm công khai bit lật(tập, chỉ mục) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit lật(tập, chỉ mục);
 };
 
-hàm công khai bit có(tập, index) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit có(tập, index);
+hàm công khai bit có(tập, chỉ mục) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit có(tập, chỉ mục);
 };
 
-hàm công khai bit tiếp đặt(tập, từ_index) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit tiếp đặt(tập, từ_index);
+hàm công khai bit tiếp đặt(tập, từ chỉ mục) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit tiếp đặt(tập, từ chỉ mục);
 };
 
-hàm công khai bit độ dài(tập) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit độ dài(tập);
+hàm công khai bit máy ảo lấy độ dài(tập) {
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit máy ảo lấy độ dài(tập);
 };
 
 hàm công khai bit số bit(tập) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit số bit(tập);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit số bit(tập);
 };
 
 hàm công khai bit bằng(a, b) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit bằng(a, b);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit bằng(a, b);
 };
 
 hàm công khai bit sao chép(tập) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit sao chép(tập);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit sao chép(tập);
 };
 
 hàm công khai bit và(a, b) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit và(a, b);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit và(a, b);
 };
 
 hàm công khai bit hoặc(a, b) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit hoặc(a, b);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit hoặc(a, b);
 };
 
 hàm công khai bit xor(a, b) {
-    __vpp_adapter = Bộ Mã Hóa Tiện Ích();
-    trả về __vpp_adapter.bit xor(a, b);
+    bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
+    trả về bộ chuyển tiếp.bit xor(a, b);
 };
 nhập gói/lõi/chuyển kiểu;

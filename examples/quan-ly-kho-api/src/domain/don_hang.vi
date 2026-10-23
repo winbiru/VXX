@@ -38,10 +38,10 @@ lớp công khai DòngĐơnHàng {
 
 hàm công khai dòng đơn hàng từ map(dữLiệu) {
     dòng = DòngĐơnHàng(
-        lấy map(dữLiệu, "maSanPham", ""),
-        lấy map(dữLiệu, "tenSanPham", ""),
-        lấy map(dữLiệu, "donGia", 0),
-        lấy map(dữLiệu, "soLuong", 0)
+        lấy từ điển(dữLiệu, "maSanPham", ""),
+        lấy từ điển(dữLiệu, "tenSanPham", ""),
+        lấy từ điển(dữLiệu, "donGia", 0),
+        lấy từ điển(dữLiệu, "soLuong", 0)
     );
     dòng.kiểmTraHợpLệ();
     trả về dòng;
@@ -112,16 +112,16 @@ lớp công khai ĐơnHàng {
 };
 
 hàm công khai đơn hàng từ map(dữLiệu) {
-    cácDòngMap = lấy map(dữLiệu, "cacDong", []);
+    cácDòngMap = lấy từ điển(dữLiệu, "cacDong", []);
     cácDòng = [];
     lặp(i = 0; i < độ dài(cácDòngMap); i = i + 1) {
         thêm(cácDòng, dòng đơn hàng từ map(cácDòngMap[i]));
     };
     đơn = ĐơnHàng(
-        lấy map(dữLiệu, "id", ""),
-        lấy map(dữLiệu, "khachHang", ""),
+        lấy từ điển(dữLiệu, "id", ""),
+        lấy từ điển(dữLiệu, "khachHang", ""),
         cácDòng,
-        lấy map(dữLiệu, "trangThai", "MOI")
+        lấy từ điển(dữLiệu, "trangThai", "MOI")
     );
     đơn.kiểmTraHợpLệ();
     trả về đơn;

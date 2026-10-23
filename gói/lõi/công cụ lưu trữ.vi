@@ -9,6 +9,6 @@ hàm công khai gói tài nguyên liệt kê(đường gói) {
     trả về lưu trữ liệt kê zip(đường gói);
 };
 
-hàm công khai gói tài nguyên giải nén(đường gói, thư mục đích, giới hạn byte = 67108864) {
-    trả về lưu trữ giải nén zip(đường gói, thư mục đích, giới hạn byte);
+hàm công khai gói tài nguyên giải nén(đường gói, thư mục đích, mức trần byte = 67108864) {
+    trả về lưu trữ giải nén zip(đường gói, thư mục đích, mức trần byte);
 };

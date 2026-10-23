@@ -228,10 +228,10 @@ function functionDefinitionInDocument(document, functionName) {
 function importedSourcePaths(document) {
   const result = [];
   const seen = new Set();
-  const importPattern = /\bnhập\s+([^;\r\n]+?)(?:\s+(?:là|như)\s+[\p{L}\p{N}_]+)?\s*;/gu;
+  const importPattern = /(?:^|\n)\s*(?:công\s+khai\s+)?nhập\s+([^;\r\n]+?)\s*;/gu;
   let match;
   while ((match = importPattern.exec(document.getText())) !== null) {
-    const target = match[1]?.trim();
+    const target = match[1]?.replace(/\s+như\s+[\p{L}\p{N}_ ]+$/u, '').trim();
     if (!target) continue;
     const sourceTarget = `${target}.vi`;
     let directory = path.dirname(document.uri.fsPath);
@@ -408,17 +408,215 @@ function completionKind(kind) {
   }
 }
 
+// Keep basic editing assistance available while the compiler/LSP is starting,
+// and when the user deliberately disables the language server.
+const VPP_KEYWORDS = [
+  'nhập', 'như', 'công khai', 'riêng tư', 'bảo vệ', 'hàm', 'lớp',
+  'giao diện', 'biến', 'nếu', 'nếu không', 'lặp', 'chọn', 'ca',
+  'mặc định', 'trả về', 'thoát', 'dừng', 'thử', 'bắt lỗi', 'ném',
+  'gọi', 'mình', 'gốc', 'kế thừa', 'triển khai', 'ngoại thư viện',
+  'ngoại hàm', 'ký hiệu', 'khả năng', 'abi', 'từ', 'đúng', 'sai',
+  'rỗng', 'in'
+];
+
+const VPP_BUILTINS = [
+  'độ dài', 'thêm', 'xóa tại', 'xóa trùng', 'sắp xếp', 'đảo ngược',
+  'tìm chỉ số', 'tổng list', 'nhỏ nhất list', 'lớn nhất list',
+  'lấy map', 'đặt map', 'có khóa', 'khóa map', 'xóa khóa',
+  'tập hợp', 'hợp tập', 'giao tập', 'rời nhau', 'thành tuple',
+  'thành list', 'ghi tệp', 'đọc tệp', 'đếm dòng tệp', 'đếm từ tệp',
+  'đếm ký tự', 'chứa chuỗi', 'thay thế', 'chuỗi thường', 'chuỗi hoa',
+  'chuẩn hóa khoảng trắng', 'đếm từ', 'từ dài nhất',
+  'viết hoa đầu từ', 'là palindrome', 'là anagram', 'mã hóa caesar',
+  'mạng lấy', 'mạng gửi', 'mạng cập nhật', 'mạng xóa',
+  'mạng mở máy chủ api', 'mạng đóng máy chủ api',
+  'mạng lấy yêu cầu kế tiếp', 'mạng trả phản hồi',
+  'mạng method yêu cầu', 'mạng path yêu cầu',
+  'mạng query yêu cầu', 'mạng body yêu cầu'
+];
+
+const VPP_SNIPPETS = [
+  { trigger: 'hàm', description: 'Khai báo hàm', body: 'hàm ${1:tên}(${2:thamSố}) {\n\t$0\n};' },
+  { trigger: 'lớp', description: 'Khai báo lớp', body: 'lớp ${1:TênLớp} {\n\t$0\n}' },
+  { trigger: 'giao diện', description: 'Khai báo giao diện', body: 'giao diện ${1:TênGiaoDiện} {\n\t$0\n}' },
+  { trigger: 'nếu', description: 'Rẽ nhánh', body: 'nếu (${1:điềuKiện}) {\n\t$0\n}' },
+  { trigger: 'nếu không', description: 'Nhánh còn lại', body: 'nếu không {\n\t$0\n}' },
+  { trigger: 'lặp', description: 'Vòng lặp', body: 'lặp (${1:i = 0}; ${2:i < n}; ${3:i++}) {\n\t$0\n}' },
+  { trigger: 'chọn', description: 'Rẽ nhánh chọn', body: 'chọn (${1:giáTrị}) {\n\tca ${2:1}: {\n\t\t$0\n\t}\n}' },
+  { trigger: 'thử', description: 'Bắt ngoại lệ', body: 'thử {\n\t${1:// Xử lý}\n} bắt lỗi (${2:lỗi}) {\n\t$0\n}' },
+  { trigger: 'nhập', description: 'Nhập mô đun', body: 'nhập ${1:gói/chuẩn/chính};$0' }
+];
+
+function foldVietnamese(value) {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/gu, 'd')
+    .replace(/Đ/gu, 'D').toLowerCase();
+}
+
+function completionMatch(prefix, label) {
+  const words = [...prefix.matchAll(/[\p{L}_][\p{L}\p{N}_]*/gu)];
+  const last = words[words.length - 1];
+  if (!last) return { start: prefix.length, typed: '' };
+  if (last.index + last[0].length < prefix.trimEnd().length) {
+    return { start: prefix.length, typed: '' }; // after punctuation
+  }
+  const maxWords = label.trim().split(/[ \t]+/u).length;
+  const foldedLabel = foldVietnamese(label);
+  for (let count = Math.min(maxWords, words.length); count > 0; --count) {
+    const start = words[words.length - count].index;
+    const typed = prefix.slice(start);
+    if (!/^[\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*[ \t]*$/u.test(typed)) continue;
+    if (foldedLabel.startsWith(foldVietnamese(typed))) return { start, typed };
+  }
+  return null;
+}
+
+function completionInCommentOrString(document, position) {
+  // Scan up to the cursor so multiline comments are excluded as well.
+  const source = document.getText().slice(0, document.offsetAt(position));
+  let state = 'code';
+  for (let index = 0; index < source.length; ++index) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (state === 'line') {
+      if (char === '\n') state = 'code';
+    } else if (state === 'block') {
+      if (char === '*' && next === '/') { state = 'code'; ++index; }
+    } else if (state === 'string' || state === 'character') {
+      if (char === '\\') ++index;
+      else if (char === (state === 'string' ? '"' : "'")) state = 'code';
+    } else if (char === '/' && next === '/') {
+      state = 'line'; ++index;
+    } else if (char === '/' && next === '*') {
+      state = 'block'; ++index;
+    } else if (char === '"') {
+      state = 'string';
+    } else if (char === "'") {
+      state = 'character';
+    }
+  }
+  return state !== 'code';
+}
+
+function vppImportCompletionItems(document, position, prefix, context) {
+  const match = /^\s*(?:công\s+khai\s+)?nhập\s+([^;]*)$/u.exec(prefix);
+  if (!match) return null;
+  const typedPath = match[1];
+  if (!/^[\p{L}\p{N}_./ \t-]*$/u.test(typedPath) || /\s+như\s+/u.test(typedPath)) return [];
+
+  const separator = typedPath.lastIndexOf('/');
+  const directory = typedPath.slice(0, separator + 1);
+  const segment = typedPath.slice(separator + 1);
+  const roots = [path.dirname(document.uri.fsPath),
+    ...(vscode.workspace.workspaceFolders || []).map((folder) => folder.uri.fsPath)];
+  if (context?.globalStorageUri?.fsPath) roots.push(vmDirectory(context));
+
+  const items = [];
+  const seen = new Set();
+  for (const root of new Set(roots)) {
+    const directoryPath = path.resolve(root, directory);
+    let entries;
+    try {
+      entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+    } catch (_) {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || /^(?:node_modules|build(?:-.*)?|dist|\.git)$/u.test(entry.name)) continue;
+      if (!entry.isDirectory() && !(entry.isFile() && /\.(?:vi|vvm)$/u.test(entry.name))) continue;
+      const name = entry.isDirectory() ? `${entry.name}/` : entry.name.replace(/\.(?:vi|vvm)$/u, '');
+      if (!foldVietnamese(name).startsWith(foldVietnamese(segment))) continue;
+      const label = `${directory}${name}`;
+      if (seen.has(label)) continue;
+      seen.add(label);
+      const item = new vscode.CompletionItem(label,
+        entry.isDirectory() ? vscode.CompletionItemKind.Folder : vscode.CompletionItemKind.Module);
+      item.detail = entry.isDirectory() ? 'Thư mục mô đun V++' : 'Mô đun V++';
+      item.insertText = label;
+      item.range = new vscode.Range(new vscode.Position(position.line, prefix.length - typedPath.length), position);
+      item.filterText = foldVietnamese(segment) === segment.toLowerCase()
+        ? foldVietnamese(label) : label;
+      item.sortText = `${entry.isDirectory() ? '0' : '1'}_${label}`;
+      items.push(item);
+      if (items.length >= 200) return items;
+    }
+  }
+  return items;
+}
+
+function vppCompletionItems(document, position, lspItems = [], context = null, triggerCharacter = null) {
+  if (completionInCommentOrString(document, position)) return [];
+
+  const prefix = document.lineAt(position.line).text.slice(0, position.character);
+  if (triggerCharacter === ' ' && !/[\p{L}\p{N}_][ \t]+$/u.test(prefix)) return [];
+  if (triggerCharacter === '/' && !/^\s*(?:công\s+khai\s+)?nhập\s+/u.test(prefix)) return [];
+  const importItems = vppImportCompletionItems(document, position, prefix, context);
+  if (importItems) return importItems;
+  const memberAccess = /\.[\p{L}\p{N}_]*$/u.test(prefix);
+  const result = [];
+  const seen = new Set();
+  const add = (label, kind, detail, insertText, sortOrder = '2', key = label) => {
+    const match = completionMatch(prefix, label);
+    if (!match || seen.has(key)) return;
+    seen.add(key);
+    const item = new vscode.CompletionItem(label, kind);
+    item.range = new vscode.Range(new vscode.Position(position.line, match.start), position);
+    item.detail = detail;
+    item.sortText = `${sortOrder}_${label}`;
+    // VS Code also filters by filterText after receiving a completion list.
+    // A folded label lets ASCII input find accented Vietnamese identifiers.
+    item.filterText = foldVietnamese(match.typed) === match.typed.toLowerCase()
+      ? foldVietnamese(label) : label;
+    if (insertText !== undefined) item.insertText = insertText;
+    result.push(item);
+  };
+
+  for (const source of lspItems) {
+    if (!source?.label) continue;
+    add(source.label, completionKind(source.kind), source.detail,
+      source.insertTextFormat === 2 && source.insertText
+        ? new vscode.SnippetString(source.insertText)
+        : source.insertText, '0');
+  }
+
+  if (memberAccess) return result;
+
+  for (const symbol of documentSymbols(document)) {
+    const kind = symbol.kind === vscode.SymbolKind.Function
+      ? vscode.CompletionItemKind.Function
+      : symbol.kind === vscode.SymbolKind.Class
+        ? vscode.CompletionItemKind.Class
+        : symbol.kind === vscode.SymbolKind.Interface
+          ? vscode.CompletionItemKind.Interface
+          : vscode.CompletionItemKind.Variable;
+    add(symbol.name, kind, symbol.detail, undefined, '0');
+  }
+  for (const keyword of VPP_KEYWORDS) {
+    add(keyword, vscode.CompletionItemKind.Keyword, 'Từ khóa V++', undefined, '1');
+  }
+  for (const snippet of VPP_SNIPPETS) {
+    add(snippet.trigger, vscode.CompletionItemKind.Snippet, snippet.description,
+      new vscode.SnippetString(snippet.body), '2', `${snippet.trigger}#snippet`);
+  }
+  for (const builtin of VPP_BUILTINS) {
+    const suffix = document.lineAt(position.line).text.slice(position.character);
+    add(builtin, vscode.CompletionItemKind.Function, 'Hàm dựng sẵn V++',
+      suffix.startsWith('(') ? builtin : new vscode.SnippetString(`${builtin}($0)`), '3');
+  }
+  return result;
+}
+
 function symbolKind(keyword) {
   if (keyword === 'lớp') return vscode.SymbolKind.Class;
   if (keyword === 'giao diện') return vscode.SymbolKind.Interface;
-  if (keyword === 'hàm') return vscode.SymbolKind.Function;
+  if (keyword === 'hàm' || keyword === 'ngoại hàm') return vscode.SymbolKind.Function;
+  if (keyword === 'ngoại thư viện') return vscode.SymbolKind.Module;
   return vscode.SymbolKind.Variable;
 }
 
 function documentSymbols(document) {
   const text = document.getText();
   const symbols = [];
-  const pattern = /(^|\n)[\t ]*(?:(công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?(lớp|giao\s+diện|hàm|biến)\s+(?:(?:công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)?)/gu;
+  const pattern = /(^|\n)[\t ]*(?:(công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?(lớp|giao\s+diện|hàm|ngoại\s+hàm|ngoại\s+thư\s+viện|biến)\s+(?:(?:công\s+khai|riêng\s+tư|bảo\s+vệ)\s+)?([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*?)(?=\s*(?:\(|\{|:|=|;|kế\s+thừa\b|triển\s+khai\b))/gu;
   let match;
   while ((match = pattern.exec(text)) !== null) {
     const keyword = match[3].replace(/\s+/gu, ' ');
@@ -443,10 +641,21 @@ function signatureAtPosition(document, position) {
   const linePrefix = document.lineAt(position.line).text.slice(0, position.character);
   const open = linePrefix.lastIndexOf('(');
   if (open < 0) return null;
-  const nameMatch = linePrefix.slice(0, open).match(/([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)?)\s*$/u);
+  const nameMatch = linePrefix.slice(0, open).match(/([\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)*)\s*$/u);
   if (!nameMatch) return null;
-  const functionName = nameMatch[1].trim();
-  const declaration = functionDeclarationMatch(document.getText(), functionName);
+  // Find the longest declared suffix; the prefix may contain `in`, `gọi`, etc.
+  const words = nameMatch[1].trim().split(/[ \t]+/u);
+  let functionName = '';
+  let declaration = null;
+  for (let index = 0; index < words.length; ++index) {
+    const candidate = words.slice(index).join(' ');
+    const match = functionDeclarationMatch(document.getText(), candidate);
+    if (match) {
+      functionName = candidate;
+      declaration = match;
+      break;
+    }
+  }
   if (!declaration) return null;
   const signature = declaration[0].replace(/^\n/u, '').trim().replace(/\s+/gu, ' ');
   const parametersText = declaration[3] || '';
@@ -500,7 +709,12 @@ class VppLanguageServer {
   async start() {
     this.output.appendLine(`Khởi động: ${this.executable} --lsp`);
     const executableDir = path.dirname(this.executable);
-    const candidateHomes = [executableDir, path.dirname(executableDir)];
+    const candidateHomes = [
+      executableDir,
+      path.dirname(executableDir),
+      path.dirname(path.dirname(executableDir)),
+      ...(vscode.workspace.workspaceFolders || []).map((folder) => folder.uri.fsPath)
+    ];
     const vppHome = candidateHomes.find((directory) =>
       fs.existsSync(path.join(directory, 'vpp-libraries.json')) &&
       fs.existsSync(path.join(directory, 'gói'))
@@ -689,6 +903,25 @@ class VppLanguageServer {
 function languageServerExecutable(context) {
   const configured = vscode.workspace.getConfiguration('vpp').get('lsp.executable', '').trim();
   if (configured) return configured;
+  // In a V++ source checkout, use the current compiler before an older installed release.
+  const localCandidates = process.platform === 'win32'
+    ? [
+        'build/bin/vpp.exe',
+        'build/bin/Release/vpp-cli.exe',
+        'build/Release/vpp-cli.exe',
+        'build/vpp-cli.exe',
+        'build-cicd-release/bin/vpp.exe',
+        'bin/vpp.exe'
+      ]
+    : ['build/bin/vpp', 'build-cicd-release/bin/vpp', 'bin/vpp'];
+  for (const folder of vscode.workspace.workspaceFolders || []) {
+    const root = folder.uri.fsPath;
+    if (!fs.existsSync(path.join(root, 'vpp-libraries.json'))) continue;
+    for (const relative of localCandidates) {
+      const candidate = path.join(root, relative);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+    }
+  }
   const managed = vmBinary(context);
   if (fs.existsSync(managed)) return managed;
   return process.platform === 'win32' ? 'vpp.exe' : 'vpp';
@@ -726,6 +959,16 @@ function watchLanguageServerExecutable(context) {
 
 function documentParams(document) {
   return { uri: document.uri.toString() };
+}
+
+function renameRequestName(newName) {
+  // The current LSP accepts a single lexer identifier as newName, while V++
+  // declarations also support names consisting of several identifier words.
+  // Request semantic edit ranges using a valid single-word probe in that case.
+  if (!/^[\p{L}_][\p{L}\p{N}_]*(?:[ \t]+[\p{L}_][\p{L}\p{N}_]*)+$/u.test(newName)) {
+    return newName;
+  }
+  return '__vpp_rename_probe';
 }
 
 async function ensureLanguageServer(context) {
@@ -819,24 +1062,23 @@ function registerLanguageFeatures(context) {
       languageServer.notify('textDocument/didClose', { textDocument: documentParams(document) });
     }),
     vscode.languages.registerCompletionItemProvider(VPP_LANGUAGE_SELECTOR, {
-      async provideCompletionItems(document, position) {
-        const server = await ensureLanguageServer(context);
-        if (!server) return [];
-        const result = await server.request('textDocument/completion', {
-          textDocument: documentParams(document),
-          position: lspPosition(position)
-        }).catch(() => null);
-        if (!result) return [];
-        const sourceItems = Array.isArray(result) ? result : (result?.items || []);
-        const items = sourceItems.map((source) => {
-          const item = new vscode.CompletionItem(source.label, completionKind(source.kind));
-          item.detail = source.detail;
-          if (source.insertText) item.insertText = source.insertText;
-          return item;
-        });
-        return new vscode.CompletionList(items, Boolean(result?.isIncomplete));
+      async provideCompletionItems(document, position, _token, completionContext) {
+        if (completionInCommentOrString(document, position)) return [];
+        // Opening a V++ document starts LSP; keep completion responsive if
+        // startup is still in progress or the compiler is unavailable.
+        const response = languageServer
+          ? await languageServer.request('textDocument/completion', {
+              textDocument: documentParams(document),
+              position: lspPosition(position)
+            }).catch(() => null)
+          : null;
+        const sourceItems = Array.isArray(response) ? response : (response?.items || []);
+        return new vscode.CompletionList(
+          vppCompletionItems(document, position, sourceItems, context, completionContext?.triggerCharacter),
+          Boolean(response?.isIncomplete)
+        );
       }
-    }, '.'),
+    }, '.', ' ', '/'),
     vscode.languages.registerDefinitionProvider(VPP_LANGUAGE_SELECTOR, {
       async provideDefinition(document, position) {
         await ensureLanguageServer(context);
@@ -921,17 +1163,18 @@ function registerLanguageFeatures(context) {
       async provideRenameEdits(document, position, newName) {
         const server = await ensureLanguageServer(context);
         if (!server) return null;
+        const requestName = renameRequestName(newName);
         const result = await server.request('textDocument/rename', {
           textDocument: documentParams(document),
           position: lspPosition(position),
-          newName
+          newName: requestName
         });
         if (!result) return null;
         const workspaceEdit = new vscode.WorkspaceEdit();
         for (const [uri, edits] of Object.entries(result.changes || {})) {
           const target = vscode.Uri.parse(uri);
           for (const edit of edits) {
-            workspaceEdit.replace(target, vscodeRange(edit.range), edit.newText);
+            workspaceEdit.replace(target, vscodeRange(edit.range), requestName === newName ? edit.newText : newName);
           }
         }
         return workspaceEdit;

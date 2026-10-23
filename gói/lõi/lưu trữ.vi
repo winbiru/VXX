@@ -13,66 +13,66 @@ nhập gói/bộ sưu tập/từ điển;
 lớp công khai Bộ Lưu Trữ ZIP {
     hàm công khai khởi tạo() {};
 
-    hàm riêng tư lưu trữ yêu cầu khoảng(bytes, vị_trí, số_lượng, thông_báo) {
-        nếu (vị_trí < 0 || số_lượng < 0 || vị_trí + số_lượng > do_dai(bytes)) {
-            ném thông_báo;
+    hàm riêng tư lưu trữ yêu cầu khoảng(các byte, vị trí, số lượng, thông báo) {
+        nếu (vị trí < 0 || số lượng < 0 || vị trí + số lượng > máy ảo lấy độ dài(các byte)) {
+            ném thông báo;
         };
         trả về đúng;
     };
 
-    hàm riêng tư lưu trữ thêm bytes(đích, nguồn) {
-        lặp(i = 0; i < do_dai(nguồn); i++) {
-            them(đích, nguồn[i]);
+    hàm riêng tư lưu trữ thêm các byte(đích, nguồn) {
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
+            máy ảo thêm cuối danh sách(đích, nguồn[i]);
         };
         trả về đích;
     };
 
-    hàm riêng tư lưu trữ lấy bytes(bytes, vị_trí, số_lượng) {
-        mình.lưu trữ yêu cầu khoảng(bytes, vị_trí, số_lượng, "lưu trữ: dữ liệu ZIP bị cắt ngắn");
-        kết_quả = [];
-        lặp(i = 0; i < số_lượng; i++) {
-            them(kết_quả, bytes[vị_trí + i]);
+    hàm riêng tư lưu trữ lấy các byte(các byte, vị trí, số lượng) {
+        mình.lưu trữ yêu cầu khoảng(các byte, vị trí, số lượng, "lưu trữ: dữ liệu ZIP bị cắt ngắn");
+        kết quả = [];
+        lặp(i = 0; i < số lượng; i++) {
+            máy ảo thêm cuối danh sách(kết quả, các byte[vị trí + i]);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm riêng tư lưu trữ thêm u16(đích, giá_trị) {
-        nếu (giá_trị < 0 || giá_trị > 65535) {
+    hàm riêng tư lưu trữ thêm u16(đích, giá trị) {
+        nếu (giá trị < 0 || giá trị > 65535) {
             ném "lưu trữ: giá trị vượt giới hạn ZIP16";
         };
-        thấp = giá_trị % 256;
-        cao = lam_tron_xuong(giá_trị / 256) % 256;
-        them(đích, thấp);
-        them(đích, cao);
+        thấp = giá trị % 256;
+        cao = làm tròn xuống(giá trị / 256) % 256;
+        máy ảo thêm cuối danh sách(đích, thấp);
+        máy ảo thêm cuối danh sách(đích, cao);
         trả về đích;
     };
 
-    hàm riêng tư lưu trữ thêm u32(đích, giá_trị) {
-        nếu (giá_trị < 0 || giá_trị > 2147483647) {
+    hàm riêng tư lưu trữ thêm u32(đích, giá trị) {
+        nếu (giá trị < 0 || giá trị > 2147483647) {
             ném "lưu trữ: ZIP vượt giới hạn 2 GiB của runtime hiện tại";
         };
-        còn_lại = giá_trị;
+        còn lại = giá trị;
         lặp(i = 0; i < 4; i++) {
-            them(đích, còn_lại % 256);
-            còn_lại = lam_tron_xuong(còn_lại / 256);
+            máy ảo thêm cuối danh sách(đích, còn lại % 256);
+            còn lại = làm tròn xuống(còn lại / 256);
         };
         trả về đích;
     };
 
-    hàm riêng tư lưu trữ đọc u16(bytes, vị_trí) {
-        mình.lưu trữ yêu cầu khoảng(bytes, vị_trí, 2, "lưu trữ: header ZIP bị cắt ngắn");
-        trả về bytes[vị_trí] + bytes[vị_trí + 1] * 256;
+    hàm riêng tư lưu trữ đọc u16(các byte, vị trí) {
+        mình.lưu trữ yêu cầu khoảng(các byte, vị trí, 2, "lưu trữ: header ZIP bị cắt ngắn");
+        trả về các byte[vị trí] + các byte[vị trí + 1] * 256;
     };
 
-    hàm riêng tư lưu trữ đọc u32 giới hạn(bytes, vị_trí) {
-        mình.lưu trữ yêu cầu khoảng(bytes, vị_trí, 4, "lưu trữ: header ZIP bị cắt ngắn");
-        nếu (bytes[vị_trí + 3] >= 128) {
+    hàm riêng tư lưu trữ đọc u32 giới hạn(các byte, vị trí) {
+        mình.lưu trữ yêu cầu khoảng(các byte, vị trí, 4, "lưu trữ: header ZIP bị cắt ngắn");
+        nếu (các byte[vị trí + 3] >= 128) {
             ném "lưu trữ: ZIP vượt giới hạn 2 GiB của runtime hiện tại";
         };
-        trả về bytes[vị_trí] +
-               bytes[vị_trí + 1] * 256 +
-               bytes[vị_trí + 2] * 65536 +
-               bytes[vị_trí + 3] * 16777216;
+        trả về các byte[vị trí] +
+               các byte[vị trí + 1] * 256 +
+               các byte[vị trí + 2] * 65536 +
+               các byte[vị trí + 3] * 16777216;
     };
 
     hàm riêng tư lưu trữ xor byte(a, b) {
@@ -81,37 +81,37 @@ lớp công khai Bộ Lưu Trữ ZIP {
         };
         x = a;
         y = b;
-        trọng_số = 1;
-        kết_quả = 0;
+        trọng số = 1;
+        kết quả = 0;
         lặp(i = 0; i < 8; i++) {
-            bit_x = x % 2;
-            bit_y = y % 2;
-            nếu (bit_x != bit_y) {
-                kết_quả = kết_quả + trọng_số;
+            bit thứ nhất = x % 2;
+            bit thứ hai = y % 2;
+            nếu (bit thứ nhất != bit thứ hai) {
+                kết quả = kết quả + trọng số;
             };
-            x = lam_tron_xuong(x / 2);
-            y = lam_tron_xuong(y / 2);
-            trọng_số = trọng_số * 2;
+            x = làm tròn xuống(x / 2);
+            y = làm tròn xuống(y / 2);
+            trọng số = trọng số * 2;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // CRC32 IEEE ở dạng bốn byte little-endian để tránh phụ thuộc integer unsigned
     // 32-bit/bitwise native của VM.
-    hàm riêng tư lưu trữ crc32(bytes) {
+    hàm riêng tư lưu trữ crc32(các byte) {
         crc = [255, 255, 255, 255];
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            byte = bytes[i];
-            nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            byte = các byte[i];
+            nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
                 ném "lưu trữ: dữ liệu phải là danh sách byte 0..255";
             };
             crc[0] = mình.lưu trữ xor byte(crc[0], byte);
             lặp(bit = 0; bit < 8; bit++) {
                 thấp = crc[0] % 2;
-                b0 = lam_tron_xuong(crc[0] / 2) + (crc[1] % 2) * 128;
-                b1 = lam_tron_xuong(crc[1] / 2) + (crc[2] % 2) * 128;
-                b2 = lam_tron_xuong(crc[2] / 2) + (crc[3] % 2) * 128;
-                b3 = lam_tron_xuong(crc[3] / 2);
+                b0 = làm tròn xuống(crc[0] / 2) + (crc[1] % 2) * 128;
+                b1 = làm tròn xuống(crc[1] / 2) + (crc[2] % 2) * 128;
+                b2 = làm tròn xuống(crc[2] / 2) + (crc[3] % 2) * 128;
+                b3 = làm tròn xuống(crc[3] / 2);
                 crc[0] = b0;
                 crc[1] = b1;
                 crc[2] = b2;
@@ -130,11 +130,11 @@ lớp công khai Bộ Lưu Trữ ZIP {
         trả về crc;
     };
 
-    hàm riêng tư lưu trữ bytes bằng(a, b) {
-        nếu (do_dai(a) != do_dai(b)) {
+    hàm riêng tư lưu trữ các byte bằng(a, b) {
+        nếu (máy ảo lấy độ dài(a) != máy ảo lấy độ dài(b)) {
             trả về sai;
         };
-        lặp(i = 0; i < do_dai(a); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(a); i++) {
             nếu (a[i] != b[i]) {
                 trả về sai;
             };
@@ -143,93 +143,93 @@ lớp công khai Bộ Lưu Trữ ZIP {
     };
 
     hàm riêng tư lưu trữ tên an toàn(tên) {
-        nếu (loai_cua(tên) != "chuỗi" || do_dai(tên) == 0) {
+        nếu (loại của(tên) != "chuỗi" || máy ảo lấy độ dài(tên) == 0) {
             ném "lưu trữ: tên mục ZIP không an toàn";
         };
         nếu (tên[0] == "/" || tên[0] == "\\") {
             ném "lưu trữ: tên mục ZIP không an toàn";
         };
 
-        kết_quả = "";
+        kết quả = "";
         đoạn = "";
-        lặp(i = 0; i <= do_dai(tên); i++) {
-            phân_cách = i == do_dai(tên);
-            nếu (!phân_cách) {
-                phân_cách = tên[i] == "/" || tên[i] == "\\";
+        lặp(i = 0; i <= máy ảo lấy độ dài(tên); i++) {
+            phân cách = i == máy ảo lấy độ dài(tên);
+            nếu (!phân cách) {
+                phân cách = tên[i] == "/" || tên[i] == "\\";
             };
-            nếu (phân_cách) {
+            nếu (phân cách) {
                 nếu (đoạn == "..") {
                     ném "lưu trữ: tên mục ZIP không an toàn";
                 };
                 nếu (đoạn != "" && đoạn != ".") {
-                    lặp(j = 0; j < do_dai(đoạn); j++) {
+                    lặp(j = 0; j < máy ảo lấy độ dài(đoạn); j++) {
                         nếu (đoạn[j] == ":") {
                             ném "lưu trữ: tên mục ZIP không an toàn";
                         };
                     };
-                    kết_quả = đường dẫn nối(kết_quả, đoạn);
+                    kết quả = đường dẫn nối(kết quả, đoạn);
                 };
                 đoạn = "";
             } hoặc {
                 đoạn = đoạn + tên[i];
             };
         };
-        nếu (kết_quả == "") {
+        nếu (kết quả == "") {
             ném "lưu trữ: tên mục ZIP không an toàn";
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm riêng tư lưu trữ đọc local entry(bytes, vị_trí) {
-        mình.lưu trữ yêu cầu khoảng(bytes, vị_trí, 4, "lưu trữ: ZIP bị cắt ngắn");
-        chữ_ký = mình.lưu trữ đọc u32 giới hạn(bytes, vị_trí);
-        nếu (chữ_ký == 33639248 || chữ_ký == 101010256) {
-            trả về {"xong": đúng, "vị trí": vị_trí};
+    hàm riêng tư lưu trữ đọc local điểm vào(các byte, vị trí) {
+        mình.lưu trữ yêu cầu khoảng(các byte, vị trí, 4, "lưu trữ: ZIP bị cắt ngắn");
+        chữ ký = mình.lưu trữ đọc u32 giới hạn(các byte, vị trí);
+        nếu (chữ ký == 33639248 || chữ ký == 101010256) {
+            trả về {"xong": đúng, "vị trí": vị trí};
         };
-        nếu (chữ_ký != 67324752) {
+        nếu (chữ ký != 67324752) {
             ném "lưu trữ: chữ ký ZIP không hợp lệ";
         };
-        mình.lưu trữ yêu cầu khoảng(bytes, vị_trí, 30, "lưu trữ: header ZIP bị cắt ngắn");
-        cờ = mình.lưu trữ đọc u16(bytes, vị_trí + 6);
-        nếu (lam_tron_xuong(cờ / 8) % 2 == 1) {
+        mình.lưu trữ yêu cầu khoảng(các byte, vị trí, 30, "lưu trữ: header ZIP bị cắt ngắn");
+        cờ = mình.lưu trữ đọc u16(các byte, vị trí + 6);
+        nếu (làm tròn xuống(cờ / 8) % 2 == 1) {
             ném "lưu trữ: ZIP dùng data descriptor chưa được hỗ trợ";
         };
-        phương_thức = mình.lưu trữ đọc u16(bytes, vị_trí + 8);
-        crc = mình.lưu trữ lấy bytes(bytes, vị_trí + 14, 4);
-        kích_thước_nén = mình.lưu trữ đọc u32 giới hạn(bytes, vị_trí + 18);
-        kích_thước_gốc = mình.lưu trữ đọc u32 giới hạn(bytes, vị_trí + 22);
-        dài_tên = mình.lưu trữ đọc u16(bytes, vị_trí + 26);
-        dài_extra = mình.lưu trữ đọc u16(bytes, vị_trí + 28);
-        đầu_tên = vị_trí + 30;
-        đầu_dữ_liệu = đầu_tên + dài_tên + dài_extra;
-        mình.lưu trữ yêu cầu khoảng(bytes, đầu_tên, dài_tên + dài_extra + kích_thước_nén,
+        phương thức = mình.lưu trữ đọc u16(các byte, vị trí + 8);
+        crc = mình.lưu trữ lấy các byte(các byte, vị trí + 14, 4);
+        kích thước nén = mình.lưu trữ đọc u32 giới hạn(các byte, vị trí + 18);
+        kích thước gốc = mình.lưu trữ đọc u32 giới hạn(các byte, vị trí + 22);
+        dài tên = mình.lưu trữ đọc u16(các byte, vị trí + 26);
+        dài phần bổ sung = mình.lưu trữ đọc u16(các byte, vị trí + 28);
+        đầu tên = vị trí + 30;
+        đầu dữ liệu = đầu tên + dài tên + dài phần bổ sung;
+        mình.lưu trữ yêu cầu khoảng(các byte, đầu tên, dài tên + dài phần bổ sung + kích thước nén,
                                "lưu trữ: dữ liệu mục ZIP bị cắt ngắn");
-        tên_bytes = mình.lưu trữ lấy bytes(bytes, đầu_tên, dài_tên);
-        tên = giải mã bảng mã(tên_bytes, "UTF-8");
+        tên các byte = mình.lưu trữ lấy các byte(các byte, đầu tên, dài tên);
+        tên = giải mã bảng mã(tên các byte, "UTF-8");
         trả về {
             "xong": sai,
-            "vị trí": vị_trí,
-            "vị trí dữ liệu": đầu_dữ_liệu,
-            "vị trí kế": đầu_dữ_liệu + kích_thước_nén,
+            "vị trí": vị trí,
+            "vị trí dữ liệu": đầu dữ liệu,
+            "vị trí kế": đầu dữ liệu + kích thước nén,
             "tên": tên,
-            "phương thức": phương_thức,
+            "phương thức": phương thức,
             "crc": crc,
-            "kích thước nén": kích_thước_nén,
-            "kích thước gốc": kích_thước_gốc
+            "kích thước nén": kích thước nén,
+            "kích thước gốc": kích thước gốc
         };
     };
 
     hàm công khai lưu trữ tạo zip(đường zip, danh sách tệp) {
-        nếu (loai_cua(danh sách tệp) != "danh sách") {
+        nếu (loại của(danh sách tệp) != "danh sách") {
             ném "lưu trữ tạo zip: danh sách tệp phải là danh sách";
         };
         zip = [];
         mục = [];
-        đã_dùng = {};
+        đã dùng = {};
 
-        lặp(i = 0; i < do_dai(danh sách tệp); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách tệp); i++) {
             nguồn = danh sách tệp[i];
-            nếu (loai_cua(nguồn) != "chuỗi") {
+            nếu (loại của(nguồn) != "chuỗi") {
                 ném "lưu trữ tạo zip: danh sách chỉ được chứa đường dẫn chuỗi";
             };
             nếu (!là tệp(nguồn)) {
@@ -237,18 +237,18 @@ lớp công khai Bộ Lưu Trữ ZIP {
             };
             tên = đường dẫn tên(nguồn);
             mình.lưu trữ tên an toàn(tên);
-            nếu (co_khoa(đã_dùng, tên)) {
+            nếu (máy ảo có khóa từ điển(đã dùng, tên)) {
                 ném "lưu trữ tạo zip: tên mục không hợp lệ hoặc bị trùng";
             };
-            đặt map(đã_dùng, tên, đúng);
-            tên_bytes = mã hóa bảng mã(tên, "UTF-8");
-            nếu (do_dai(tên_bytes) > 65535) {
+            đặt từ điển(đã dùng, tên, đúng);
+            tên các byte = mã hóa bảng mã(tên, "UTF-8");
+            nếu (máy ảo lấy độ dài(tên các byte) > 65535) {
                 ném "lưu trữ: tên mục ZIP quá dài";
             };
-            dữ_liệu = đọc bytes tệp(nguồn);
-            kích_thước = do_dai(dữ_liệu);
-            vị_trí = do_dai(zip);
-            crc = mình.lưu trữ crc32(dữ_liệu);
+            dữ liệu = đọc các byte tệp(nguồn);
+            kích thước = máy ảo lấy độ dài(dữ liệu);
+            vị trí = máy ảo lấy độ dài(zip);
+            crc = mình.lưu trữ crc32(dữ liệu);
 
             mình.lưu trữ thêm u32(zip, 67324752);
             mình.lưu trữ thêm u16(zip, 20);
@@ -256,30 +256,30 @@ lớp công khai Bộ Lưu Trữ ZIP {
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
-            mình.lưu trữ thêm bytes(zip, crc);
-            mình.lưu trữ thêm u32(zip, kích_thước);
-            mình.lưu trữ thêm u32(zip, kích_thước);
-            mình.lưu trữ thêm u16(zip, do_dai(tên_bytes));
+            mình.lưu trữ thêm các byte(zip, crc);
+            mình.lưu trữ thêm u32(zip, kích thước);
+            mình.lưu trữ thêm u32(zip, kích thước);
+            mình.lưu trữ thêm u16(zip, máy ảo lấy độ dài(tên các byte));
             mình.lưu trữ thêm u16(zip, 0);
-            mình.lưu trữ thêm bytes(zip, tên_bytes);
-            mình.lưu trữ thêm bytes(zip, dữ_liệu);
+            mình.lưu trữ thêm các byte(zip, tên các byte);
+            mình.lưu trữ thêm các byte(zip, dữ liệu);
 
-            them(mục, {
+            máy ảo thêm cuối danh sách(mục, {
                 "tên": tên,
-                "tên bytes": tên_bytes,
+                "tên bytes": tên các byte,
                 "crc": crc,
-                "kích thước": kích_thước,
-                "vị trí": vị_trí
+                "kích thước": kích thước,
+                "vị trí": vị trí
             });
         };
 
-        vị_trí_trung_tâm = do_dai(zip);
-        lặp(i = 0; i < do_dai(mục); i++) {
-            entry = mục[i];
-            tên_bytes = lấy map(entry, "tên bytes", []);
-            crc = lấy map(entry, "crc", []);
-            kích_thước = lấy map(entry, "kích thước", 0);
-            vị_trí = lấy map(entry, "vị trí", 0);
+        vị trí trung tâm = máy ảo lấy độ dài(zip);
+        lặp(i = 0; i < máy ảo lấy độ dài(mục); i++) {
+            điểm vào = mục[i];
+            tên các byte = lấy từ điển(điểm vào, "tên bytes", []);
+            crc = lấy từ điển(điểm vào, "crc", []);
+            kích thước = lấy từ điển(điểm vào, "kích thước", 0);
+            vị trí = lấy từ điển(điểm vào, "vị trí", 0);
             mình.lưu trữ thêm u32(zip, 33639248);
             mình.lưu trữ thêm u16(zip, 20);
             mình.lưu trữ thêm u16(zip, 20);
@@ -287,89 +287,89 @@ lớp công khai Bộ Lưu Trữ ZIP {
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
-            mình.lưu trữ thêm bytes(zip, crc);
-            mình.lưu trữ thêm u32(zip, kích_thước);
-            mình.lưu trữ thêm u32(zip, kích_thước);
-            mình.lưu trữ thêm u16(zip, do_dai(tên_bytes));
+            mình.lưu trữ thêm các byte(zip, crc);
+            mình.lưu trữ thêm u32(zip, kích thước);
+            mình.lưu trữ thêm u32(zip, kích thước);
+            mình.lưu trữ thêm u16(zip, máy ảo lấy độ dài(tên các byte));
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u16(zip, 0);
             mình.lưu trữ thêm u32(zip, 0);
-            mình.lưu trữ thêm u32(zip, vị_trí);
-            mình.lưu trữ thêm bytes(zip, tên_bytes);
+            mình.lưu trữ thêm u32(zip, vị trí);
+            mình.lưu trữ thêm các byte(zip, tên các byte);
         };
-        kích_thước_trung_tâm = do_dai(zip) - vị_trí_trung_tâm;
-        nếu (do_dai(mục) > 65535) {
+        kích thước trung tâm = máy ảo lấy độ dài(zip) - vị trí trung tâm;
+        nếu (máy ảo lấy độ dài(mục) > 65535) {
             ném "lưu trữ: ZIP vượt giới hạn ZIP32";
         };
         mình.lưu trữ thêm u32(zip, 101010256);
         mình.lưu trữ thêm u16(zip, 0);
         mình.lưu trữ thêm u16(zip, 0);
-        mình.lưu trữ thêm u16(zip, do_dai(mục));
-        mình.lưu trữ thêm u16(zip, do_dai(mục));
-        mình.lưu trữ thêm u32(zip, kích_thước_trung_tâm);
-        mình.lưu trữ thêm u32(zip, vị_trí_trung_tâm);
+        mình.lưu trữ thêm u16(zip, máy ảo lấy độ dài(mục));
+        mình.lưu trữ thêm u16(zip, máy ảo lấy độ dài(mục));
+        mình.lưu trữ thêm u32(zip, kích thước trung tâm);
+        mình.lưu trữ thêm u32(zip, vị trí trung tâm);
         mình.lưu trữ thêm u16(zip, 0);
-        ghi bytes tệp(đường zip, zip);
-        trả về do_dai(mục);
+        ghi các byte tệp(đường zip, zip);
+        trả về máy ảo lấy độ dài(mục);
     };
 
     hàm công khai lưu trữ liệt kê zip(đường zip) {
-        bytes = đọc bytes tệp(đường zip);
-        kết_quả = [];
-        vị_trí = 0;
-        lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
-            entry = mình.lưu trữ đọc local entry(bytes, vị_trí);
-            nếu (lấy map(entry, "xong", sai)) {
-                trả về kết_quả;
+        các byte = đọc các byte tệp(đường zip);
+        kết quả = [];
+        vị trí = 0;
+        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+            điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
+            nếu (lấy từ điển(điểm vào, "xong", sai)) {
+                trả về kết quả;
             };
-            them(kết_quả, lấy map(entry, "tên", ""));
-            vị_trí = lấy map(entry, "vị trí kế", vị_trí);
+            máy ảo thêm cuối danh sách(kết quả, lấy từ điển(điểm vào, "tên", ""));
+            vị trí = lấy từ điển(điểm vào, "vị trí kế", vị trí);
         };
         ném "lưu trữ: ZIP bị cắt ngắn";
     };
 
-    hàm công khai lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn byte = 67108864) {
-        nếu (loai_cua(giới hạn byte) != "số nguyên" || giới hạn byte < 0) {
+    hàm công khai lưu trữ giải nén zip(đường zip, thư mục đích, mức trần byte = 67108864) {
+        nếu (loại của(mức trần byte) != "số nguyên" || mức trần byte < 0) {
             ném "lưu trữ giải nén zip: giới hạn byte phải không âm";
         };
-        bytes = đọc bytes tệp(đường zip);
+        các byte = đọc các byte tệp(đường zip);
         tạo thư mục(thư mục đích);
-        vị_trí = 0;
+        vị trí = 0;
         tổng = 0;
-        số_mục = 0;
-        lặp(vòng = 0; vị_trí < do_dai(bytes); vòng++) {
-            entry = mình.lưu trữ đọc local entry(bytes, vị_trí);
-            nếu (lấy map(entry, "xong", sai)) {
-                trả về số_mục;
+        số mục = 0;
+        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+            điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
+            nếu (lấy từ điển(điểm vào, "xong", sai)) {
+                trả về số mục;
             };
-            phương_thức = lấy map(entry, "phương thức", -1);
-            kích_thước_nén = lấy map(entry, "kích thước nén", -1);
-            kích_thước_gốc = lấy map(entry, "kích thước gốc", -1);
-            nếu (phương_thức != 0 || kích_thước_nén != kích_thước_gốc) {
+            phương thức = lấy từ điển(điểm vào, "phương thức", -1);
+            kích thước nén = lấy từ điển(điểm vào, "kích thước nén", -1);
+            kích thước gốc = lấy từ điển(điểm vào, "kích thước gốc", -1);
+            nếu (phương thức != 0 || kích thước nén != kích thước gốc) {
                 ném "lưu trữ: chỉ giải nén ZIP phương thức STORE (không nén)";
             };
-            tổng = tổng + kích_thước_gốc;
-            nếu (tổng > giới hạn byte) {
+            tổng = tổng + kích thước gốc;
+            nếu (tổng > mức trần byte) {
                 ném "lưu trữ: vượt giới hạn dung lượng giải nén";
             };
-            tên = lấy map(entry, "tên", "");
-            tương_đối = mình.lưu trữ tên an toàn(tên);
-            đầu = lấy map(entry, "vị trí dữ liệu", -1);
-            dữ_liệu = mình.lưu trữ lấy bytes(bytes, đầu, kích_thước_gốc);
-            crc_mong_đợi = lấy map(entry, "crc", []);
-            nếu (!mình.lưu trữ bytes bằng(mình.lưu trữ crc32(dữ_liệu), crc_mong_đợi)) {
+            tên = lấy từ điển(điểm vào, "tên", "");
+            tương đối = mình.lưu trữ tên an toàn(tên);
+            đầu = lấy từ điển(điểm vào, "vị trí dữ liệu", -1);
+            dữ liệu = mình.lưu trữ lấy các byte(các byte, đầu, kích thước gốc);
+            crc mong đợi = lấy từ điển(điểm vào, "crc", []);
+            nếu (!mình.lưu trữ các byte bằng(mình.lưu trữ crc32(dữ liệu), crc mong đợi)) {
                 ném "lưu trữ: CRC32 không khớp";
             };
-            đích = đường dẫn nối(thư mục đích, tương_đối);
+            đích = đường dẫn nối(thư mục đích, tương đối);
             cha = đường dẫn cha(đích);
             nếu (cha != "") {
                 tạo thư mục(cha);
             };
-            ghi bytes tệp(đích, dữ_liệu);
-            số_mục = số_mục + 1;
-            vị_trí = lấy map(entry, "vị trí kế", vị_trí);
+            ghi các byte tệp(đích, dữ liệu);
+            số mục = số mục + 1;
+            vị trí = lấy từ điển(điểm vào, "vị trí kế", vị trí);
         };
         ném "lưu trữ: ZIP bị cắt ngắn";
     };
@@ -377,16 +377,16 @@ lớp công khai Bộ Lưu Trữ ZIP {
 
 
 hàm công khai lưu trữ tạo zip(đường zip, danh sách tệp) {
-    __vpp_adapter = Bộ Lưu Trữ ZIP();
-    trả về __vpp_adapter.lưu trữ tạo zip(đường zip, danh sách tệp);
+    bộ chuyển tiếp = Bộ Lưu Trữ ZIP();
+    trả về bộ chuyển tiếp.lưu trữ tạo zip(đường zip, danh sách tệp);
 };
 
 hàm công khai lưu trữ liệt kê zip(đường zip) {
-    __vpp_adapter = Bộ Lưu Trữ ZIP();
-    trả về __vpp_adapter.lưu trữ liệt kê zip(đường zip);
+    bộ chuyển tiếp = Bộ Lưu Trữ ZIP();
+    trả về bộ chuyển tiếp.lưu trữ liệt kê zip(đường zip);
 };
 
-hàm công khai lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn byte = 67108864) {
-    __vpp_adapter = Bộ Lưu Trữ ZIP();
-    trả về __vpp_adapter.lưu trữ giải nén zip(đường zip, thư mục đích, giới hạn byte);
+hàm công khai lưu trữ giải nén zip(đường zip, thư mục đích, mức trần byte = 67108864) {
+    bộ chuyển tiếp = Bộ Lưu Trữ ZIP();
+    trả về bộ chuyển tiếp.lưu trữ giải nén zip(đường zip, thư mục đích, mức trần byte);
 };

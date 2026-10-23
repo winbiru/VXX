@@ -57,7 +57,7 @@
     },
     {
       "name": "Declaration keywords",
-      "scope": ["storage.type.class.vietvm", "storage.type.function.vietvm", "storage.type.variable.vietvm"],
+      "scope": ["storage.type.class.vietvm", "storage.type.function.vietvm", "storage.type.variable.vietvm", "storage.type.foreign.vietvm", "keyword.control.foreign.vietvm", "support.type.ffi.vietvm"],
       "settings": { "foreground": "#CC7832", "fontStyle": "bold" }
     },
     {

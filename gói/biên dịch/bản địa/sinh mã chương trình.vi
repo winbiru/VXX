@@ -1,0 +1,271 @@
+// Link CALL instructions inside one Mach-O __text section. The only public
+// symbol is _main, which may occur at any declaration-order function ID.
+// Each ARM64 BL displacement counts four-byte instructions. Skip 64 words
+// per iteration on long calls; this native subset does not yet expose i32 /.
+hàm sinh mã chương trình từ máy chênh lệch(nguồn, to) {
+    biến vị trí hiện tại = nguồn;
+    biến các từ máy = 0;
+    lặp (i = 0; vị trí hiện tại + 256 <= to; i++) { vị trí hiện tại = vị trí hiện tại + 256; các từ máy = các từ máy + 64; };
+    lặp (i = 0; vị trí hiện tại < to; i++) { vị trí hiện tại = vị trí hiện tại + 4; các từ máy = các từ máy + 1; };
+    lặp (i = 0; vị trí hiện tại - 256 >= to; i++) { vị trí hiện tại = vị trí hiện tại - 256; các từ máy = các từ máy - 64; };
+    lặp (i = 0; vị trí hiện tại > to; i++) { vị trí hiện tại = vị trí hiện tại - 4; các từ máy = các từ máy - 1; };
+    trả về các từ máy;
+};
+
+hàm sinh mã chương trình vá các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, ngoại các lời gọi) {
+    biến số phần tử = byte dài(các điểm bắt đầu);
+    lặp (i = 0; i < byte dài(các tái định vị); i = i + 8) {
+        biến nguồn = byte đọc số nguyên ba mươi hai bit(các tái định vị, i);
+        biến chương trình con hiện tại = byte đọc số nguyên ba mươi hai bit(các tái định vị, i + 4);
+        nếu (nguồn < 0) { trả về -1; };
+        nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
+        nếu (chương trình con hiện tại < 0) {
+            nếu (chương trình con hiện tại < -62) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(ngoại các lời gọi, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(ngoại các lời gọi, -chương trình con hiện tại - 1) != 0) { trả về -1; };
+            bỏ qua;
+        };
+        nếu (chương trình con hiện tại * 4 >= số phần tử) { trả về -1; };
+        biến to = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, chương trình con hiện tại * 4);
+        biến chênh lệch = sinh mã chương trình từ máy chênh lệch(nguồn, to);
+        nếu (chênh lệch < -33554432) { trả về -1; };
+        nếu (chênh lệch > 33554431) { trả về -1; };
+        nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 67108864; };
+        nếu (byte ghi số nguyên ba mươi hai bit(mã máy, nguồn, -1811939328 + chênh lệch) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// Concatenates independently validated function machine-code bodies.
+// Function IR branch offsets remain local; BL targets are patched globally.
+// Returns the _main byte offset + 1 (zero on failure is therefore reserved).
+hàm sinh mã chương trình phát điểm vào(biểu diễn trung gian, các hàm, mã máy, điểm vào mã định danh, ngoại các lời gọi) {
+    nếu (mã máy == biểu diễn trung gian) { trả về -1; };
+    nếu (mã máy == các hàm) { trả về -1; };
+    nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
+    nếu (byte làm rỗng(ngoại các lời gọi) != 0) { trả về -1; };
+    biến bảng kích cỡ = byte dài(các hàm);
+    nếu (bảng kích cỡ < 24) { trả về -1; };
+    biến các điểm bắt đầu = byte mới();
+    biến các tái định vị = byte mới();
+    biến đơn vị = byte mới();
+    biến machine = byte mới();
+    biến các lời gọi = byte mới();
+    biến mã trạng thái = 0;
+    biến điểm vào độ lệch = -1;
+    nếu (các điểm bắt đầu <= 0) { mã trạng thái = -1; };
+    nếu (các tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (đơn vị <= 0) { mã trạng thái = -1; };
+    nếu (machine <= 0) { mã trạng thái = -1; };
+    nếu (các lời gọi <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        biến kế tiếp biểu diễn trung gian = 0;
+        lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < bảng kích cỡ; bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+            nếu (bản ghi dữ liệu + 24 > bảng kích cỡ) { mã trạng thái = -1; thoát; };
+            biến biểu diễn trung gian điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu + 12);
+            biến biểu diễn trung gian kích cỡ = byte đọc số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu + 16);
+            nếu (biểu diễn trung gian điểm bắt đầu != kế tiếp biểu diễn trung gian) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian kích cỡ < 8) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ > byte dài(biểu diễn trung gian)) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
+            lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời = độ dời + 1) {
+                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            biến điểm bắt đầu = byte dài(mã máy);
+            nếu (byte đẩy số nguyên ba mươi hai bit(các điểm bắt đầu, điểm bắt đầu) != 0) { mã trạng thái = -1; thoát; };
+            nếu (sinh mã phát nội bộ(đơn vị, machine, các lời gọi) <= 0) { mã trạng thái = -1; thoát; };
+            lặp (độ lệch = 0; độ lệch < byte dài(các lời gọi); độ lệch = độ lệch + 8) {
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, điểm bắt đầu + byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch + 4)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            nếu (byte nối(mã máy, machine) != 0) { mã trạng thái = -1; thoát; };
+            kế tiếp biểu diễn trung gian = biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ;
+        };
+        nếu (kế tiếp biểu diễn trung gian != byte dài(biểu diễn trung gian)) { mã trạng thái = -1; };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình vá các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, ngoại các lời gọi); };
+        nếu (mã trạng thái == 0) {
+            nếu (điểm vào mã định danh < 0) { mã trạng thái = -1; };
+            nếu (điểm vào mã định danh * 4 >= byte dài(các điểm bắt đầu)) { mã trạng thái = -1; };
+            nếu (mã trạng thái == 0) { điểm vào độ lệch = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, điểm vào mã định danh * 4); };
+        };
+    };
+    nếu (các điểm bắt đầu > 0) { byte hủy(các điểm bắt đầu); };
+    nếu (các tái định vị > 0) { byte hủy(các tái định vị); };
+    nếu (đơn vị > 0) { byte hủy(đơn vị); };
+    nếu (machine > 0) { byte hủy(machine); };
+    nếu (các lời gọi > 0) { byte hủy(các lời gọi); };
+    nếu (mã trạng thái != 0) { byte làm rỗng(mã máy); byte làm rỗng(ngoại các lời gọi); trả về -1; };
+    trả về điểm vào độ lệch + 1;
+};
+
+// In a separately compiled module local function calls can be patched
+// immediately. Cross-module CALLs retain BRANCH26 relocations and their
+// global function IDs for the Mach-O symbol table.
+hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi) {
+    lặp (i = 0; i < byte dài(các lời gọi); i = i + 8) {
+        biến nguồn = byte đọc số nguyên ba mươi hai bit(các lời gọi, i);
+        biến đích đến = byte đọc số nguyên ba mươi hai bit(các lời gọi, i + 4);
+        nếu (nguồn < 0) { trả về -1; };
+        nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
+        nếu (đích đến < 0) {
+            nếu (đích đến < -62) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, -đích đến - 1) != 0) { trả về -1; };
+        } hoặc nếu (đích đến < đầu tiên) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
+        } hoặc nếu (đích đến >= cuối cùng) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
+        } hoặc {
+            biến to = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (đích đến - đầu tiên) * 4);
+            biến chênh lệch = sinh mã chương trình từ máy chênh lệch(nguồn, to);
+            nếu (chênh lệch < -33554432) { trả về -1; };
+            nếu (chênh lệch > 33554431) { trả về -1; };
+            nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 67108864; };
+            nếu (byte ghi số nguyên ba mươi hai bit(mã máy, nguồn, -1811939328 + chênh lệch) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+// Exposes local starts to the module object writer. Calls outside [first,last)
+// remain relocation records instead of being patched into a common text blob.
+hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, bản địa các lời gọi) {
+    nếu (mã máy == biểu diễn trung gian) { trả về -1; };
+    nếu (đầu tiên < 0) { trả về -1; };
+    nếu (cuối cùng <= đầu tiên) { trả về -1; };
+    biến tổng số = 0;
+    lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < byte dài(các hàm); bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+        nếu (bản ghi dữ liệu + 24 > byte dài(các hàm)) { trả về -1; };
+        tổng số = tổng số + 1;
+    };
+    nếu (cuối cùng > tổng số) { trả về -1; };
+    nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
+    nếu (byte làm rỗng(các điểm bắt đầu) != 0) { trả về -1; };
+    nếu (byte làm rỗng(các phần nhập) != 0) { trả về -1; };
+    nếu (byte làm rỗng(bản địa các lời gọi) != 0) { trả về -1; };
+    biến đơn vị = byte mới();
+    biến machine = byte mới();
+    biến các lời gọi = byte mới();
+    biến các tái định vị = byte mới();
+    biến mã trạng thái = 0;
+    nếu (đơn vị <= 0) { mã trạng thái = -1; };
+    nếu (machine <= 0) { mã trạng thái = -1; };
+    nếu (các lời gọi <= 0) { mã trạng thái = -1; };
+    nếu (các tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
+            biến biểu diễn trung gian điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các hàm, chương trình con hiện tại * 24 + 12);
+            biến biểu diễn trung gian kích cỡ = byte đọc số nguyên ba mươi hai bit(các hàm, chương trình con hiện tại * 24 + 16);
+            nếu (biểu diễn trung gian kích cỡ < 8) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ > byte dài(biểu diễn trung gian)) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
+            lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời++) {
+                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            biến điểm bắt đầu = byte dài(mã máy);
+            nếu (byte đẩy số nguyên ba mươi hai bit(các điểm bắt đầu, điểm bắt đầu) != 0) { mã trạng thái = -1; thoát; };
+            nếu (sinh mã phát nội bộ(đơn vị, machine, các lời gọi) <= 0) { mã trạng thái = -1; thoát; };
+            lặp (độ lệch = 0; độ lệch < byte dài(các lời gọi); độ lệch = độ lệch + 8) {
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, điểm bắt đầu + byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch + 4)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            nếu (byte nối(mã máy, machine) != 0) { mã trạng thái = -1; thoát; };
+        };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi); };
+    };
+    nếu (đơn vị > 0) { byte hủy(đơn vị); };
+    nếu (machine > 0) { byte hủy(machine); };
+    nếu (các lời gọi > 0) { byte hủy(các lời gọi); };
+    nếu (các tái định vị > 0) { byte hủy(các tái định vị); };
+    nếu (mã trạng thái != 0) { byte làm rỗng(mã máy); trả về -1; };
+    trả về 1;
+};
+
+// Linux AMD64 uses rel32 call displacements. Internal calls are resolved
+// directly; external module/runtime calls become ELF64 .rela.text entries.
+hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi) {
+    lặp (i = 0; i < byte dài(các lời gọi); i = i + 8) {
+        biến nguồn = byte đọc số nguyên ba mươi hai bit(các lời gọi, i);
+        biến đích đến = byte đọc số nguyên ba mươi hai bit(các lời gọi, i + 4);
+        nếu (nguồn < 0) { trả về -1; };
+        nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
+        nếu (đích đến < 0) {
+            nếu (đích đến < -62) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, -đích đến - 1) != 0) { trả về -1; };
+        } hoặc nếu (đích đến < đầu tiên) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
+        } hoặc nếu (đích đến >= cuối cùng) {
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
+        } hoặc {
+            biến to = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (đích đến - đầu tiên) * 4);
+            nếu (byte ghi số nguyên ba mươi hai bit(mã máy, nguồn, to - nguồn - 4) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, bản địa các lời gọi) {
+    nếu (mã máy == biểu diễn trung gian) { trả về -1; };
+    nếu (đầu tiên < 0) { trả về -1; };
+    nếu (cuối cùng <= đầu tiên) { trả về -1; };
+    biến đã làm tròn các hàm = 0;
+    lặp (i = 0; i < byte dài(các hàm); i = i + 24) { đã làm tròn các hàm = đã làm tròn các hàm + 24; };
+    nếu (đã làm tròn các hàm != byte dài(các hàm)) { trả về -1; };
+    nếu (cuối cùng * 24 > byte dài(các hàm)) { trả về -1; };
+    nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
+    nếu (byte làm rỗng(các điểm bắt đầu) != 0) { trả về -1; };
+    nếu (byte làm rỗng(các phần nhập) != 0) { trả về -1; };
+    nếu (byte làm rỗng(bản địa các lời gọi) != 0) { trả về -1; };
+    biến đơn vị = byte mới();
+    biến machine = byte mới();
+    biến các lời gọi = byte mới();
+    biến các tái định vị = byte mới();
+    biến mã trạng thái = 0;
+    nếu (đơn vị <= 0) { mã trạng thái = -1; };
+    nếu (machine <= 0) { mã trạng thái = -1; };
+    nếu (các lời gọi <= 0) { mã trạng thái = -1; };
+    nếu (các tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (mã trạng thái == 0) {
+        lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
+            biến biểu diễn trung gian điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các hàm, chương trình con hiện tại * 24 + 12);
+            biến biểu diễn trung gian kích cỡ = byte đọc số nguyên ba mươi hai bit(các hàm, chương trình con hiện tại * 24 + 16);
+            nếu (biểu diễn trung gian kích cỡ < 8) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
+            nếu (biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ > byte dài(biểu diễn trung gian)) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
+            nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
+            lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời++) {
+                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            biến điểm bắt đầu = byte dài(mã máy);
+            nếu (byte đẩy số nguyên ba mươi hai bit(các điểm bắt đầu, điểm bắt đầu) != 0) { mã trạng thái = -1; thoát; };
+            nếu (sinh mã x86 phát nội bộ(đơn vị, machine, các lời gọi) <= 0) { mã trạng thái = -1; thoát; };
+            lặp (độ lệch = 0; độ lệch < byte dài(các lời gọi); độ lệch = độ lệch + 8) {
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, điểm bắt đầu + byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch + 4)) != 0) { mã trạng thái = -1; thoát; };
+            };
+            nếu (mã trạng thái < 0) { thoát; };
+            nếu (byte nối(mã máy, machine) != 0) { mã trạng thái = -1; thoát; };
+        };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi); };
+    };
+    nếu (đơn vị > 0) { byte hủy(đơn vị); };
+    nếu (machine > 0) { byte hủy(machine); };
+    nếu (các lời gọi > 0) { byte hủy(các lời gọi); };
+    nếu (các tái định vị > 0) { byte hủy(các tái định vị); };
+    nếu (mã trạng thái != 0) { byte làm rỗng(mã máy); trả về -1; };
+    trả về 1;
+};

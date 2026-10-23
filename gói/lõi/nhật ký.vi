@@ -4,61 +4,61 @@
 
 nhập gói/nhập xuất/tệp;
 
-lớp công khai NhậtKý {
+lớp công khai Nhật ký {
     // Ghi chú hàm: công khai ghi thông tin.
-    hàm công khai ghi thông tin(msg) {
-        in "[THÔNG TIN] " + msg;
+    hàm công khai ghi thông tin(tin nhắn) {
+        in "[THÔNG TIN] " + tin nhắn;
         trả về 0;
     };
 
     // Ghi chú hàm: công khai ghi cảnh báo.
-    hàm công khai ghi cảnh báo(msg) {
-        in "[CẢNH BÁO] " + msg;
+    hàm công khai ghi cảnh báo(tin nhắn) {
+        in "[CẢNH BÁO] " + tin nhắn;
         trả về 0;
     };
 
     // Ghi chú hàm: công khai ghi lỗi.
-    hàm công khai ghi lỗi(msg) {
-        in "[LỖI] " + msg;
+    hàm công khai ghi lỗi(tin nhắn) {
+        in "[LỖI] " + tin nhắn;
         trả về 0;
     };
 };
 
-hàm công khai ghi thông tin(msg) { trả về NhậtKý.ghi thông tin(msg); };
+hàm công khai ghi thông tin(tin nhắn) { trả về Nhật ký.ghi thông tin(tin nhắn); };
 
-hàm công khai ghi cảnh báo(msg) { trả về NhậtKý.ghi cảnh báo(msg); };
+hàm công khai ghi cảnh báo(tin nhắn) { trả về Nhật ký.ghi cảnh báo(tin nhắn); };
 
-hàm công khai ghi lỗi(msg) { trả về NhậtKý.ghi lỗi(msg); };
+hàm công khai ghi lỗi(tin nhắn) { trả về Nhật ký.ghi lỗi(tin nhắn); };
 
 // Logging chỉ dựng nội dung; append OS nằm sau wrapper file V++.
 hàm công khai nhật ký ghi tệp(đường dẫn, nội dung) {
     trả về ghi nối tệp(đường dẫn, nội dung);
 };
 
-hàm công khai ghi thông tin tệp(đường dẫn, msg) {
-    trả về nhật ký ghi tệp(đường dẫn, "[THÔNG TIN] " + msg + "\n");
+hàm công khai ghi thông tin tệp(đường dẫn, tin nhắn) {
+    trả về nhật ký ghi tệp(đường dẫn, "[THÔNG TIN] " + tin nhắn + "\n");
 };
 
-hàm công khai ghi cảnh báo tệp(đường dẫn, msg) {
-    trả về nhật ký ghi tệp(đường dẫn, "[CẢNH BÁO] " + msg + "\n");
+hàm công khai ghi cảnh báo tệp(đường dẫn, tin nhắn) {
+    trả về nhật ký ghi tệp(đường dẫn, "[CẢNH BÁO] " + tin nhắn + "\n");
 };
 
-hàm công khai ghi lỗi tệp(đường dẫn, msg) {
-    trả về nhật ký ghi tệp(đường dẫn, "[LỖI] " + msg + "\n");
+hàm công khai ghi lỗi tệp(đường dẫn, tin nhắn) {
+    trả về nhật ký ghi tệp(đường dẫn, "[LỖI] " + tin nhắn + "\n");
 };
 
-hàm công khai ghi theo cấu hình(đích, đường dẫn, mức, msg) {
+hàm công khai ghi theo cấu hình(đích, đường dẫn, mức, tin nhắn) {
     nếu (đích == "bảng điều khiển") {
-        nếu (mức == "thông tin") { trả về ghi thông tin(msg); };
-        nếu (mức == "cảnh báo") { trả về ghi cảnh báo(msg); };
-        nếu (mức == "lỗi") { trả về ghi lỗi(msg); };
+        nếu (mức == "thông tin") { trả về ghi thông tin(tin nhắn); };
+        nếu (mức == "cảnh báo") { trả về ghi cảnh báo(tin nhắn); };
+        nếu (mức == "lỗi") { trả về ghi lỗi(tin nhắn); };
         ném "nhật ký: mức không hợp lệ";
     };
     nếu (đích == "tệp") {
         nếu (đường dẫn == "") { ném "nhật ký: đường dẫn tệp rỗng"; };
-        nếu (mức == "thông tin") { trả về ghi thông tin tệp(đường dẫn, msg); };
-        nếu (mức == "cảnh báo") { trả về ghi cảnh báo tệp(đường dẫn, msg); };
-        nếu (mức == "lỗi") { trả về ghi lỗi tệp(đường dẫn, msg); };
+        nếu (mức == "thông tin") { trả về ghi thông tin tệp(đường dẫn, tin nhắn); };
+        nếu (mức == "cảnh báo") { trả về ghi cảnh báo tệp(đường dẫn, tin nhắn); };
+        nếu (mức == "lỗi") { trả về ghi lỗi tệp(đường dẫn, tin nhắn); };
         ném "nhật ký: mức không hợp lệ";
     };
     ném "nhật ký: đích ghi không hợp lệ";

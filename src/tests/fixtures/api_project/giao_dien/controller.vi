@@ -1,11 +1,11 @@
 // Các contract của tầng HTTP controller trong api_project.
 
 giao diện UserCrudControllerContract {
-    hàm getUsers(dbSession, token, requestId);
-    hàm createUser(dbSession, token, requestBody, requestId);
-    hàm updateUser(dbSession, token, userId, requestBody, requestId);
-    hàm deleteUser(dbSession, token, userId, requestId);
-    hàm searchUsers(dbSession, token, keyword, requestId);
+    hàm getUsers(dbSession, từ tố, requestId);
+    hàm createUser(dbSession, từ tố, requestBody, requestId);
+    hàm updateUser(dbSession, từ tố, userId, requestBody, requestId);
+    hàm deleteUser(dbSession, từ tố, userId, requestId);
+    hàm searchUsers(dbSession, từ tố, keyword, requestId);
 };
 
 giao diện HealthControllerContract {

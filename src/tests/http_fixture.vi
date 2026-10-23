@@ -2,20 +2,20 @@
 nhập gói/mạng/chính;
 
 hàm chính() {
-    serverId = mạng mở máy chủ api(18080);
+    serverId = mạng mở máy chủ giao diện lập trình(18080);
     lặp(i = 0; i < 2147483647; i = i + 1) {
         requestId = mạng lấy yêu cầu kế tiếp(serverId);
-        path = mạng path yêu cầu(requestId);
-        method = mạng method yêu cầu(requestId);
-        body = mạng body yêu cầu(requestId);
+        path = mạng đường tệp yêu cầu(requestId);
+        method = mạng phương thức yêu cầu(requestId);
+        body = mạng thân khối yêu cầu(requestId);
         response = method + "|" + body;
         nếu (path == "/health") {
             response = '{"ok":true}';
         };
-        nếu (mạng path suffix yêu cầu(requestId, "/inspect/") != "") {
-            keyword = mạng query param yêu cầu(requestId, "keyword");
-            name = mạng json field yêu cầu(requestId, "name");
-            suffix = mạng path suffix yêu cầu(requestId, "/inspect/");
+        nếu (mạng đường tệp hậu tố yêu cầu(requestId, "/inspect/") != "") {
+            keyword = mạng truy vấn tham số yêu cầu(requestId, "keyword");
+            name = mạng json trường dữ liệu yêu cầu(requestId, "name");
+            suffix = mạng đường tệp hậu tố yêu cầu(requestId, "/inspect/");
             response = keyword + "|" + name + "|" + suffix;
         };
         mạng trả phản hồi(requestId, 200, response);

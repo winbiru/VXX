@@ -2,21 +2,21 @@ nhập gói/mạng/http/máy khách;
 nhập gói/văn bản/chuỗi;
 
 hàm chính() {
-    url = mạng http phân tích url("http://example.com:8080/api/items?q=1#fragment");
-    in url[0] == "example.com";
-    in url[1] == 8080;
-    in url[2] == "/api/items?q=1";
-    in url[3] == "example.com:8080";
-    in url[4] == sai;
+    địa chỉ tài nguyên = mạng http phân tích địa chỉ tài nguyên("http://example.com:8080/api/items?q=1#fragment");
+    in địa chỉ tài nguyên[0] == "example.com";
+    in địa chỉ tài nguyên[1] == 8080;
+    in địa chỉ tài nguyên[2] == "/api/items?q=1";
+    in địa chỉ tài nguyên[3] == "example.com:8080";
+    in địa chỉ tài nguyên[4] == sai;
 
-    tls_url = mạng http phân tích url("https://example.com/secure?q=2#ignored");
+    tls_url = mạng http phân tích địa chỉ tài nguyên("https://example.com/secure?q=2#ignored");
     in tls_url[0] == "example.com";
     in tls_url[1] == 443;
     in tls_url[2] == "/secure?q=2";
     in tls_url[3] == "example.com";
     in tls_url[4] == đúng;
 
-    request = mạng http dựng request(
+    request = mạng http dựng yêu cầu(
         "POST",
         "/api",
         "example.com",
@@ -27,5 +27,5 @@ hàm chính() {
     in chứa chính xác(request, "Content-Length: 9\r\n");
 
     phản_hồi = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
-    in mạng http tách body(phản_hồi) == "hello";
+    in mạng http tách thân khối(phản_hồi) == "hello";
 };

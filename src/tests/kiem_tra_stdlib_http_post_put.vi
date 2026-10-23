@@ -16,5 +16,5 @@ hàm chính() {
     ) == "V%2B%2B|An|user-42";
 
     in mạng xóa("http://127.0.0.1:18080/delete") == "DELETE|";
-    in rest xóa("http://127.0.0.1:18080", "/delete") == "DELETE|";
+    in dịch vụ tài nguyên xóa("http://127.0.0.1:18080", "/delete") == "DELETE|";
 };

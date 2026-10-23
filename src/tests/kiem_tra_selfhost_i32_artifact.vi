@@ -1,8 +1,8 @@
 // No C++ compiler oracle: compile sources, validate and execute artifacts in V++.
-nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/sản phẩm biên dịch;
 nhập gói/biên dịch/bộ nạp;
 nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/opcode;
+nhập gói/biên dịch/mã thao tác;
 nhập gói/dữ liệu/json/json;
 
 hàm yêu cầu selfhost(điều_kiện, tên) {
@@ -14,9 +14,9 @@ hàm yêu cầu từ chối artifact(gói, tên) {
     cũ = sai;
     dây = sai;
     chạy = sai;
-    thử { biên dịch artifact giải mã(văn_bản); } bắt lỗi(e) { cũ = đúng; };
-    thử { biên dịch artifact giải mã dây(văn_bản); } bắt lỗi(e) { dây = đúng; };
-    thử { biên dịch chạy artifact văn bản(văn_bản); } bắt lỗi(e) { chạy = đúng; };
+    thử { biên dịch sản phẩm biên dịch giải mã(văn_bản); } bắt lỗi(e) { cũ = đúng; };
+    thử { biên dịch sản phẩm biên dịch giải mã dây(văn_bản); } bắt lỗi(e) { dây = đúng; };
+    thử { biên dịch chạy sản phẩm biên dịch văn bản(văn_bản); } bắt lỗi(e) { chạy = đúng; };
     yêu cầu selfhost(cũ && dây && chạy, "phải từ chối " + tên);
 };
 
@@ -30,17 +30,17 @@ hàm chính() {
     mong_đợi = "-2147483648\n2147483647\n1\n2147483647\n-2147483647\n" +
         "-2147483648\n-2147483648\n2147483647\n1\n-2147483648\n-2147483648\n";
     artifact = biên dịch chương trình tự chủ(mã);
-    văn_bản = biên dịch artifact tuần tự(artifact);
-    yêu cầu selfhost(biên dịch chạy artifact(artifact) == mong_đợi, "i32 từ source");
-    yêu cầu selfhost(biên dịch chạy artifact văn bản(văn_bản) == mong_đợi, "i32 từ wire");
-    yêu cầu selfhost(biên dịch chạy artifact(biên dịch artifact giải mã(văn_bản)) == mong_đợi,
+    văn_bản = biên dịch sản phẩm biên dịch tuần tự(artifact);
+    yêu cầu selfhost(biên dịch chạy sản phẩm biên dịch(artifact) == mong_đợi, "i32 từ source");
+    yêu cầu selfhost(biên dịch chạy sản phẩm biên dịch văn bản(văn_bản) == mong_đợi, "i32 từ wire");
+    yêu cầu selfhost(biên dịch chạy sản phẩm biên dịch(biên dịch sản phẩm biên dịch giải mã(văn_bản)) == mong_đợi,
                     "i32 từ API map");
-    dây = biên dịch artifact giải mã dây(văn_bản);
-    yêu cầu selfhost(bytecode_chay_vm(dây[0], dây[1], dây[2], dây[3]) == mong_đợi,
+    dây = biên dịch sản phẩm biên dịch giải mã dây(văn_bản);
+    yêu cầu selfhost(mã trung gian chạy máy ảo(dây[0], dây[1], dây[2], dây[3]) == mong_đợi,
                     "ABI trực tiếp");
-    cũ = json tạo({"định dạng": "VPP bytecode", "phiên bản": 1,
+    cũ = json tạo({"định dạng": "VPP mã trung gian", "phiên bản": 1,
                    "ABI": "Instruction 4*i32", "artifact": artifact});
-    yêu cầu selfhost(biên dịch chạy artifact văn bản(cũ) == mong_đợi, "định dạng map cũ");
+    yêu cầu selfhost(biên dịch chạy sản phẩm biên dịch văn bản(cũ) == mong_đợi, "định dạng map cũ");
 
     lỗi = sai;
     thử { biên dịch chương trình tự chủ("in 2147483648;"); } bắt lỗi(e) { lỗi = đúng; };
@@ -90,25 +90,25 @@ hàm chính() {
     gói["dây"][3] = [["m", []]];
     yêu cầu từ chối artifact(gói, "initializer trong artifact đơn");
     gói = json phân tích(văn_bản);
-    gói["loại"] = "bytecode V++ đồ thị đã liên kết";
+    gói["loại"] = "mã trung gian V++ đồ thị đã liên kết";
     gói["dây"][3] = [["m", []], ["m", []]];
     yêu cầu từ chối artifact(gói, "initializer trùng");
     gói = json phân tích(văn_bản);
-    gói["loại"] = "bytecode V++ đồ thị đã liên kết";
+    gói["loại"] = "mã trung gian V++ đồ thị đã liên kết";
     gói["dây"][3] = [[1, []]];
     yêu cầu từ chối artifact(gói, "định danh initializer không phải chuỗi");
 
     // Serialization must observe mutations, rather than reuse a stale ABI.
     nhỏ = biên dịch chương trình tự chủ("in 7;");
-    codec = Bộ Mã Hóa Artifact(nhỏ);
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(nhỏ);
     trước = codec.tuần tự();
-    lặp(i = 0; i < độ dài(nhỏ["bytecode"]); i++) {
-        nếu (nhỏ["bytecode"][i]["op"] == biên dịch mã opcode("OP_BIEN_SO")) {
-            nhỏ["bytecode"][i]["toán hạng"] = 8;
+    lặp(i = 0; i < độ dài(nhỏ["mã trung gian"]); i++) {
+        nếu (nhỏ["mã trung gian"][i]["op"] == biên dịch mã thao tác("OP_BIEN_SO")) {
+            nhỏ["mã trung gian"][i]["toán hạng"] = 8;
         };
     };
     sau = codec.tuần tự();
-    yêu cầu selfhost(trước != sau && biên dịch chạy artifact văn bản(sau) == "8\n",
+    yêu cầu selfhost(trước != sau && biên dịch chạy sản phẩm biên dịch văn bản(sau) == "8\n",
                     "codec không giữ cache cũ");
     in "selfhost_i32_artifact_ok";
 };

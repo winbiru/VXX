@@ -10,30 +10,30 @@ lớp công khai Vòng Đời Kiểm Thử {
     // Chạy một ca kiểm thử. `thiếtLập` chạy trước thân khi khác rỗng; `dọnDẹp`
     // luôn chạy sau thân nếu setup đã hoàn tất, kể cả khi thân ném lỗi. Lỗi của thân
     // được ném lại sau cleanup để CLI vẫn đánh dấu tệp kiểm thử là thất bại.
-    hàm công khai chạy ca kiểm thử(thân, thiếtLập = rỗng, dọnDẹp = rỗng) {
-        nếu (thiếtLập != rỗng) {
-            thiếtLập();
+    hàm công khai chạy ca kiểm thử(thân, thiết lập = rỗng, dọn dẹp = rỗng) {
+        nếu (thiết lập != rỗng) {
+            thiết lập();
         };
 
-        kếtQuả = rỗng;
+        kết quả = rỗng;
         thử {
-            kếtQuả = thân();
+            kết quả = thân();
         } bắt lỗi (e) {
-            nếu (dọnDẹp != rỗng) {
-                dọnDẹp();
+            nếu (dọn dẹp != rỗng) {
+                dọn dẹp();
             };
             ném e;
         }
 
-        nếu (dọnDẹp != rỗng) {
-            dọnDẹp();
+        nếu (dọn dẹp != rỗng) {
+            dọn dẹp();
         };
-        trả về kếtQuả;
+        trả về kết quả;
     };
 };
 
 
-hàm công khai chạy ca kiểm thử(thân, thiếtLập = rỗng, dọnDẹp = rỗng) {
-    __vpp_adapter = Vòng Đời Kiểm Thử();
-    trả về __vpp_adapter.chạy ca kiểm thử(thân, thiếtLập, dọnDẹp);
+hàm công khai chạy ca kiểm thử(thân, thiết lập = rỗng, dọn dẹp = rỗng) {
+    bộ chuyển tiếp = Vòng Đời Kiểm Thử();
+    trả về bộ chuyển tiếp.chạy ca kiểm thử(thân, thiết lập, dọn dẹp);
 };

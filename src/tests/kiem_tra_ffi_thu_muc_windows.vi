@@ -8,11 +8,11 @@ hàm chính() {
     in tạo thư mục(con) == 1;
     in là thư mục(con);
     in !là tệp(con);
-    in do_dai(liệt kê thư mục(con)) == 0;
+    in độ dài(liệt kê thư mục(con)) == 0;
     in tạo thư mục(con) == 1;
     ghi tệp(gốc + "/tiếng Việt/ghi.txt", "dữ liệu");
     danh_sách = liệt kê thư mục(gốc + "/tiếng Việt");
-    in do_dai(danh_sách) == 2;
+    in độ dài(danh_sách) == 2;
     in danh_sách[0] == "ghi.txt";
     in danh_sách[1] == "rỗng";
     in đọc tệp(gốc + "/tiếng Việt/ghi.txt") == "dữ liệu";

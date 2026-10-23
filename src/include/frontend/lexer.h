@@ -157,7 +157,7 @@ namespace vietvm::compiler {
     // (để không phá mã UTF-8). Dùng để chuẩn hoá khi so sánh từ khóa ASCII.
     std::string toLowerAscii(const std::string &s);
 
-    // Bộ phân tích token cơ bản: chia source thành các token thô.
+    // Bộ phân tích token cơ bản: chia source thành các từ tố thô.
     // Hàm này hỗ trợ UTF-8 và xử lý comment/chuỗi/toán tử tương đối.
     // Ném exception (UnclosedStringError, UnclosedCommentError, InvalidCharacterError)
     // khi gặp các trường hợp lỗi.

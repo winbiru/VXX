@@ -4,9 +4,9 @@ nhập gói/biên dịch/bộ nạp;
 nhập gói/biên dịch/chính;
 nhập gói/lõi/kịch bản;
 
-hàm gọi khớp bytecode(nguồn) {
-    cpp = biên dịch bytecode(nguồn);
-    vi = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+hàm gọi khớp mã trung gian(nguồn) {
+    cpp = biên dịch mã trung gian(nguồn);
+    vi = biên dịch phát mã trung gian thuần(nguồn)["mã trung gian"];
     nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["op"] != vi[i]["op"] ||
@@ -18,15 +18,15 @@ hàm gọi khớp bytecode(nguồn) {
 };
 
 hàm gọi khớp thân hàm(nguồn) {
-    cpp = biên dịch bytecode hàm(nguồn);
-    vi = biên dịch phát bytecode thuần(nguồn)["hàm"];
+    cpp = biên dịch mã trung gian hàm(nguồn);
+    vi = biên dịch phát mã trung gian thuần(nguồn)["hàm"];
     nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["id"] != vi[i]["id"] || cpp[i]["tên"] != vi[i]["tên"]) {
             trả về sai;
         };
-        c = cpp[i]["bytecode"];
-        v = vi[i]["bytecode"];
+        c = cpp[i]["mã trung gian"];
+        v = vi[i]["mã trung gian"];
         nếu (độ dài(c) != độ dài(v)) { trả về sai; };
         lặp(j = 0; j < độ dài(c); j++) {
             nếu (c[j]["op"] != v[j]["op"] ||
@@ -44,31 +44,31 @@ hàm gọi khớp chạy(nguồn) {
 
 hàm chính() {
     trực_tiếp = "hàm f(x) { in x + 1; }; gọi f(2);";
-    in gọi khớp bytecode(trực_tiếp);
+    in gọi khớp mã trung gian(trực_tiếp);
     in gọi khớp chạy(trực_tiếp);
     trong_hàm = "hàm f(x) { in x; }; hàm chính() { gọi f(2 + 3); };";
     in gọi khớp thân hàm(trong_hàm);
     in gọi khớp chạy(trong_hàm);
     tên_dài = "hàm tính tổng(x, y) { in x + y; }; gọi tính tổng(20, 22);";
-    in gọi khớp bytecode(tên_dài);
+    in gọi khớp mã trung gian(tên_dài);
     in gọi khớp chạy(tên_dài);
 
     // C++ dedicated call dùng OP_GOI tên, ngay cả khi có slot cùng tên.
     // Không thực thi một callable chưa được định nghĩa.
     tên_động = "biến fn = 2; gọi fn(1);";
-    in gọi khớp bytecode(tên_động);
-    v = biên dịch phát bytecode thuần(tên_động)["bytecode"];
+    in gọi khớp mã trung gian(tên_động);
+    v = biên dịch phát mã trung gian thuần(tên_động)["mã trung gian"];
     // Phần tử sau đối số phải là OP_GOI (23), không OP_GOI_GIAN_TIEP.
-    in v[độ dài(v) - 1]["op"] == biên dịch mã opcode("OP_GOI");
+    in v[độ dài(v) - 1]["op"] == biên dịch mã thao tác("OP_GOI");
 
     chưa_có = "gọi chưa_có(4);";
-    in gọi khớp bytecode(chưa_có);
+    in gọi khớp mã trung gian(chưa_có);
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("gọi f(1,);"); }
+    thử { biên dịch phát mã trung gian thuần("gọi f(1,);"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("gọi f(1) + 2;"); }
+    thử { biên dịch phát mã trung gian thuần("gọi f(1) + 2;"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
 };

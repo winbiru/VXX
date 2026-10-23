@@ -2,12 +2,12 @@
 nhập gói/biên dịch/từ vựng;
 nhập gói/kiểm thử/khẳng định;
 
-hàm so token từ vựng(a, b) {
-    khẳng định bằng(do_dai(a), do_dai(b));
+hàm so từ tố từ vựng(a, b) {
+    khẳng định bằng(độ dài(a), độ dài(b));
     trường = ["loại", "giá trị", "dòng", "cột", "vị trí", "kết thúc",
         "cột ký tự", "vị trí ký tự", "kết thúc ký tự"];
-    lặp(i = 0; i < do_dai(a); i++) {
-        lặp(j = 0; j < do_dai(trường); j++) {
+    lặp(i = 0; i < độ dài(a); i++) {
+        lặp(j = 0; j < độ dài(trường); j++) {
             khẳng định bằng(a[i][trường[j]], b[i][trường[j]]);
         };
     };
@@ -16,56 +16,56 @@ hàm so token từ vựng(a, b) {
 hàm chính() {
     nguồn = "\n  hoặc { trả về \"Việt\"; }";
     bộ = Bộ Tách Từ Vựng(nguồn);
-    thô = bộ.token thô();
-    ghép = bộ.token();
-    khẳng định bằng(do_dai(thô), 7);
-    khẳng định bằng(do_dai(ghép), 6);
+    thô = bộ.từ tố thô();
+    ghép = bộ.từ tố();
+    khẳng định bằng(độ dài(thô), 7);
+    khẳng định bằng(độ dài(ghép), 6);
     khẳng định bằng(thô[2]["giá trị"], "trả");
     khẳng định bằng(ghép[2]["giá trị"], "trả về");
     khẳng định bằng(ghép[0]["dòng"], 2);
     khẳng định bằng(ghép[0]["cột"], 3);
     khẳng định bằng(ghép[0]["kết thúc"], 9);
     khẳng định bằng(ghép[0]["kết thúc ký tự"], 7);
-    khẳng định bằng(bam_dinh_danh(bộ.token thô()), bam_dinh_danh(thô));
-    khẳng định bằng(bam_dinh_danh(bộ.token()), bam_dinh_danh(ghép));
-    so token từ vựng(thô, biên dịch token hóa thô(nguồn));
-    so token từ vựng(ghép, biên dịch token hóa(nguồn));
+    khẳng định bằng(băm định danh(bộ.từ tố thô()), băm định danh(thô));
+    khẳng định bằng(băm định danh(bộ.từ tố()), băm định danh(ghép));
+    so từ tố từ vựng(thô, biên dịch từ tố hóa thô(nguồn));
+    so từ tố từ vựng(ghép, biên dịch từ tố hóa(nguồn));
 
     khác = Bộ Tách Từ Vựng("in 7;");
-    khẳng định bằng(khác.token()[1]["giá trị"], "7");
-    khẳng định bằng(bộ.token()[0]["giá trị"], "hoặc");
+    khẳng định bằng(khác.từ tố()[1]["giá trị"], "7");
+    khẳng định bằng(bộ.từ tố()[0]["giá trị"], "hoặc");
     // Các phương thức cũ nhận nguồn trực tiếp không thay nguồn/cache của phiên.
-    so token từ vựng(bộ.biên dịch token hóa("in 8;"), biên dịch token hóa("in 8;"));
-    so token từ vựng(bộ.biên dịch token hóa thô("trả về 8;"), biên dịch token hóa thô("trả về 8;"));
-    khẳng định bằng(bam_dinh_danh(bộ.token()), bam_dinh_danh(ghép));
+    so từ tố từ vựng(bộ.biên dịch từ tố hóa("in 8;"), biên dịch từ tố hóa("in 8;"));
+    so từ tố từ vựng(bộ.biên dịch từ tố hóa thô("trả về 8;"), biên dịch từ tố hóa thô("trả về 8;"));
+    khẳng định bằng(băm định danh(bộ.từ tố()), băm định danh(ghép));
 
     lỗi_kiểu = hàm() { bộ.làm mới(42); };
     khẳng định ném lỗi(lỗi_kiểu);
-    khẳng định bằng(bam_dinh_danh(bộ.token thô()), bam_dinh_danh(thô));
-    khẳng định bằng(bam_dinh_danh(bộ.token()), bam_dinh_danh(ghép));
+    khẳng định bằng(băm định danh(bộ.từ tố thô()), băm định danh(thô));
+    khẳng định bằng(băm định danh(bộ.từ tố()), băm định danh(ghép));
     khẳng định bằng(bộ.làm mới("in 9;"), bộ);
-    khẳng định bằng(bộ.token()[1]["giá trị"], "9");
-    khẳng định bằng(bộ.token thô()[1]["giá trị"], "9");
+    khẳng định bằng(bộ.từ tố()[1]["giá trị"], "9");
+    khẳng định bằng(bộ.từ tố thô()[1]["giá trị"], "9");
     khẳng định bằng(ghép[0]["giá trị"], "hoặc");
     khẳng định bằng(thô[2]["giá trị"], "trả");
-    khẳng định bằng(khác.token()[1]["giá trị"], "7");
+    khẳng định bằng(khác.từ tố()[1]["giá trị"], "7");
 
     trống = Bộ Tách Từ Vựng();
-    khẳng định bằng(do_dai(trống.token()), 0);
-    rỗng_thô = trống.token thô();
-    rỗng_ghép = trống.token();
-    khẳng định bằng(bam_dinh_danh(trống.token thô()), bam_dinh_danh(rỗng_thô));
-    khẳng định bằng(bam_dinh_danh(trống.token()), bam_dinh_danh(rỗng_ghép));
-    khẳng định bằng(trống.biên dịch token hóa("in 1;")[1]["giá trị"], "1");
-    khẳng định bằng(do_dai(trống.token()), 0);
+    khẳng định bằng(độ dài(trống.từ tố()), 0);
+    rỗng_thô = trống.từ tố thô();
+    rỗng_ghép = trống.từ tố();
+    khẳng định bằng(băm định danh(trống.từ tố thô()), băm định danh(rỗng_thô));
+    khẳng định bằng(băm định danh(trống.từ tố()), băm định danh(rỗng_ghép));
+    khẳng định bằng(trống.biên dịch từ tố hóa("in 1;")[1]["giá trị"], "1");
+    khẳng định bằng(độ dài(trống.từ tố()), 0);
 
     bộ.làm mới("/* chưa đóng");
-    lỗi_tách = hàm() { bộ.token(); };
+    lỗi_tách = hàm() { bộ.từ tố(); };
     khẳng định ném lỗi(lỗi_tách);
     khẳng định ném lỗi(lỗi_tách);
     bộ.làm mới("in 10;");
-    khẳng định bằng(bộ.token()[1]["giá trị"], "10");
-    khẳng định bằng(bộ.token thô()[1]["giá trị"], "10");
+    khẳng định bằng(bộ.từ tố()[1]["giá trị"], "10");
+    khẳng định bằng(bộ.từ tố thô()[1]["giá trị"], "10");
     lỗi_tạo = hàm() { Bộ Tách Từ Vựng(42); };
     khẳng định ném lỗi(lỗi_tạo);
     in "từ vựng OOP: đạt";
