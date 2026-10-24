@@ -6,7 +6,7 @@ hàm chính() {
         đọc tệp(đường_đọc);
         in sai;
     } bắt lỗi(e) {
-        in loai_cua(e) == "từ điển";
+        in loại của(e) == "từ điển";
         in e["loại"] == "lỗi hệ thống tệp";
         in e["mã"] == "FILE_OPEN_FAILED";
         in e["giai đoạn"] == "mở";

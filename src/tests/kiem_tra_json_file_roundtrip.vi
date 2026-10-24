@@ -19,9 +19,9 @@ hàm chính() {
     ghi tệp(tệp, encoded);
     in đọc tệp(tệp) == encoded;
     decoded = json phân tích(đọc tệp(tệp));
-    in lấy map(decoded, "ten", "") == tên;
-    in lấy map(decoded, "duongDan", "") == đườngDẫn;
-    in lấy map(decoded, "noiDung", "") == nộiDung;
+    in lấy từ điển(decoded, "ten", "") == tên;
+    in lấy từ điển(decoded, "duongDan", "") == đườngDẫn;
+    in lấy từ điển(decoded, "noiDung", "") == nộiDung;
     ghi tệp(tệp, nộiDung);
     in đọc tệp(tệp) == nộiDung;
     xóa đường dẫn(tệp);

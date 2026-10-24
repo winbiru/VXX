@@ -22,15 +22,15 @@ hàm công khai biên dịch phân tích(mã nguồn) {
     trả về phiên.phân tích();
 };
 
-hàm công khai biên dịch bytecode(mã nguồn) {
+hàm công khai biên dịch mã trung gian(mã nguồn) {
     phiên = Bộ Biên Dịch(mã nguồn, ".");
-    trả về phiên.bytecode();
+    trả về phiên.mã trung gian();
 };
 
 // Oracle tạm thời để kiểm chứng bytecode thân hàm từ compiler C++.
-hàm công khai biên dịch bytecode hàm(mã nguồn) {
+hàm công khai biên dịch mã trung gian hàm(mã nguồn) {
     phiên = Bộ Biên Dịch(mã nguồn, ".");
-    trả về phiên.bytecode hàm();
+    trả về phiên.mã trung gian hàm();
 };
 
 // Các tiện ích dưới đây chỉ diễn giải snapshot compiler bằng V++; native không
@@ -46,8 +46,8 @@ hàm công khai biên dịch thống kê(mã nguồn) {
 };
 
 hàm công khai biên dịch tệp(đường dẫn) {
-    mã_nguồn = đọc tệp(đường dẫn);
-    phiên = Bộ Biên Dịch(mã_nguồn, đường dẫn cha(đường dẫn));
+    mã nguồn = đọc tệp(đường dẫn);
+    phiên = Bộ Biên Dịch(mã nguồn, đường dẫn cha(đường dẫn));
     trả về phiên.phân tích();
 };
 
@@ -57,13 +57,13 @@ hàm công khai biên dịch tìm khai báo(mã nguồn, tên) {
     trả về phiên.tìm khai báo(tên);
 };
 
-hàm công khai biên dịch thống kê opcode(mã nguồn) {
+hàm công khai biên dịch thống kê mã thao tác(mã nguồn) {
     phiên = Bộ Biên Dịch(mã nguồn, ".");
-    trả về phiên.thống kê opcode();
+    trả về phiên.thống kê mã thao tác();
 };
 
 // Compiler bootstrap: phân tích câu lệnh và kiểm tra ngữ nghĩa thuần V++.
 // Trả về AST; chưa tạo bytecode và chưa thay compilePipeline của CLI.
-hàm công khai biên dịch phân tích chương trình tự chủ(mã_nguồn) {
-    trả về biên dịch phân tích ngữ nghĩa thuần(mã_nguồn);
+hàm công khai biên dịch phân tích chương trình tự chủ(mã nguồn) {
+    trả về biên dịch phân tích ngữ nghĩa thuần(mã nguồn);
 };

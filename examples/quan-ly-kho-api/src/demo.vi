@@ -25,9 +25,9 @@ hàm chính() {
 
     ghi dữ liệu demo();
     ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
-    dịchVụKho = lấy map(ứngDụng, "dichVuKho", rỗng);
-    dịchVụĐơnHàng = lấy map(ứngDụng, "dichVuDonHang", rỗng);
-    dịchVụBáoCáo = lấy map(ứngDụng, "dichVuBaoCao", rỗng);
+    dịchVụKho = lấy từ điển(ứngDụng, "dichVuKho", rỗng);
+    dịchVụĐơnHàng = lấy từ điển(ứngDụng, "dichVuDonHang", rỗng);
+    dịchVụBáoCáo = lấy từ điển(ứngDụng, "dichVuBaoCao", rỗng);
 
     in "=== DANH SACH SAN PHAM BAN DAU ===";
     in json tạo(dịchVụKho.tấtCả());

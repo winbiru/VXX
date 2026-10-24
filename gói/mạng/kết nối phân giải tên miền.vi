@@ -1,0 +1,96 @@
+// TCP/UDP theo hostname thuần V++: DNS Wire + Hosts -> IP -> Machine Socket.
+// Chỉ hoạt động khi ứng dụng cấu hình DNS/hosts V++ hoặc cung cấp IP số.
+// Không có nhánh fallback getaddrinfo/libffi; Windows Machine Socket ABI
+// hiện chưa sẵn sàng cho đường kết nối này.
+nhập gói/mạng/phân giải tên miền;
+nhập gói/mạng/ổ cắm;
+nhập gói/mạng/địa chỉ mạng;
+nhập gói/hệ thống/môi trường;
+
+lớp công khai Bộ Kết Nối DNS VPP {
+    hàm công khai khởi tạo() {};
+
+    // IP số đi thẳng vào parser; IPv4 zero-padding được chuẩn hóa để tránh
+    // ngữ nghĩa bát phân từ resolver libc trên các hệ điều hành cũ.
+    hàm riêng tư phân giải tên miền địa chỉ mạng số(tên máy) {
+        thử {
+            bộ = Bộ Phân Tích IP();
+            các byte = bộ.địa chỉ mạng các byte(tên máy);
+            nếu (máy ảo lấy độ dài(các byte) == 4) {
+                trả về thành chuỗi(các byte[0]) + "." + thành chuỗi(các byte[1]) +
+                    "." + thành chuỗi(các byte[2]) + "." + thành chuỗi(các byte[3]);
+            };
+            nếu (máy ảo lấy độ dài(các byte) == 16) { trả về tên máy; };
+        } bắt lỗi(số mục bỏ qua) {};
+        trả về "";
+    };
+
+    hàm công khai đầu nối phân giải tên miền vi địa chỉ(tên máy) {
+        ổ = Bộ Điều Khiển Ổ Cắm();
+        tên máy = ổ.đầu nối yêu cầu tên máy(tên máy, "socket_dns_vi_dia_chi");
+        địa chỉ = mình.phân giải tên miền địa chỉ mạng số(tên máy);
+        nếu (địa chỉ != "") { trả về [địa chỉ]; };
+
+        // Đặt ít nhất một nguồn DNS do thư viện V++ xử lý. Nếu tất cả đều
+        // rỗng, dns.vi sẽ dùng OS resolver, nên từ chối trước khi gọi.
+        nếu (đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_SERVER", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_SERVERS", "") == "" &&
+            đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "") == "") {
+            ném "socket DNS V++: cần cấu hình DNS V++ hoặc tệp hosts";
+        };
+        trả về phân giải tên miền phân giải(tên máy);
+    };
+
+    hàm công khai đầu nối phân giải tên miền vi mở(tên máy, cổng, thời gian chờ, datagram) {
+        ổ = Bộ Điều Khiển Ổ Cắm();
+        cổng = ổ.đầu nối yêu cầu cổng(cổng, "socket_dns_vi_mo");
+        thời gian chờ = ổ.đầu nối yêu cầu thời gian chờ(thời gian chờ, "socket_dns_vi_mo");
+        nếu (ten nền tảng máy ảo() == "windows") {
+            ném "socket DNS V++: Machine Socket ABI chưa hỗ trợ Windows";
+        };
+        địa chỉ = mình.đầu nối phân giải tên miền vi địa chỉ(tên máy);
+        nếu (máy ảo lấy độ dài(địa chỉ) == 0) { ném "socket DNS V++: không tìm thấy địa chỉ"; };
+        giao vận gói tin = 0;
+        nếu (datagram) { giao vận gói tin = 1; };
+        lỗi cuối = "socket DNS V++: không kết nối được";
+        lặp(i = 0; i < máy ảo lấy độ dài(địa chỉ); i++) {
+            thử {
+                bộ địa chỉ mạng = Bộ Phân Tích IP();
+                các byte = bộ địa chỉ mạng.địa chỉ mạng các byte(địa chỉ[i]);
+                mã = máy đầu nối kết nối(các byte, cổng, giao vận gói tin, thời gian chờ);
+                thử {
+                    máy đầu nối thời gian chờ(mã, thời gian chờ);
+                } bắt lỗi(e) {
+                    thử { máy đầu nối đóng(mã); } bắt lỗi(số mục bỏ qua) {};
+                    ném e;
+                };
+                trả về mã;
+            } bắt lỗi(e) { lỗi cuối = e; };
+        };
+        ném "socket DNS V++: " + thành chuỗi(lỗi cuối);
+    };
+
+    hàm công khai đầu nối giao vận tin cậy mở phân giải tên miền vi(tên máy, cổng, thời gian chờ = 5000) {
+        trả về mình.đầu nối phân giải tên miền vi mở(tên máy, cổng, thời gian chờ, sai);
+    };
+
+    hàm công khai đầu nối giao vận gói tin mở phân giải tên miền vi(tên máy, cổng, thời gian chờ = 5000) {
+        trả về mình.đầu nối phân giải tên miền vi mở(tên máy, cổng, thời gian chờ, đúng);
+    };
+};
+
+hàm công khai đầu nối phân giải tên miền vi địa chỉ(tên máy) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.đầu nối phân giải tên miền vi địa chỉ(tên máy);
+};
+
+hàm công khai đầu nối giao vận tin cậy mở phân giải tên miền vi(tên máy, cổng, thời gian chờ = 5000) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.đầu nối giao vận tin cậy mở phân giải tên miền vi(tên máy, cổng, thời gian chờ);
+};
+
+hàm công khai đầu nối giao vận gói tin mở phân giải tên miền vi(tên máy, cổng, thời gian chờ = 5000) {
+    bộ = Bộ Kết Nối DNS VPP();
+    trả về bộ.đầu nối giao vận gói tin mở phân giải tên miền vi(tên máy, cổng, thời gian chờ);
+};

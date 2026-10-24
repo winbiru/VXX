@@ -2,29 +2,29 @@
 nhập gói/dữ liệu/phân trang;
 
 lớp công khai Bộ Phân Trang {
-    hàm công khai khởi tạo(trang = 0, kích_thước = 20) {
+    hàm công khai khởi tạo(trang = 0, kích thước = 20) {
         mình.đặt trang(trang);
-        mình.đặt kích thước(kích_thước);
+        mình.đặt kích thước(kích thước);
     };
 
     hàm công khai đặt trang(trang) {
-        nếu (loai_cua(trang) != "số nguyên") { ném "phân trang: trang phải là số nguyên"; };
+        nếu (loại của(trang) != "số nguyên") { ném "phân trang: trang phải là số nguyên"; };
         mình.trang = trang hợp lệ(trang);
         trả về mình;
     };
 
-    hàm công khai đặt kích thước(kích_thước) {
-        nếu (loai_cua(kích_thước) != "số nguyên") {
+    hàm công khai đặt kích thước(kích thước) {
+        nếu (loại của(kích thước) != "số nguyên") {
             ném "phân trang: kích thước phải là số nguyên";
         };
-        mình.kích_thước = kích thước hợp lệ(kích_thước);
+        mình.kích thước = kích thước hợp lệ(kích thước);
         trả về mình;
     };
 
     hàm công khai số trang hiện tại() { trả về mình.trang; };
-    hàm công khai số phần tử mỗi trang() { trả về mình.kích_thước; };
-    hàm công khai độ dời() { trả về độ dời dữ liệu(mình.trang, mình.kích_thước); };
-    hàm công khai tổng trang(tổng_bản_ghi) {
-        trả về tổng số trang(tổng_bản_ghi, mình.kích_thước);
+    hàm công khai số phần tử mỗi trang() { trả về mình.kích thước; };
+    hàm công khai độ dời() { trả về độ dời dữ liệu(mình.trang, mình.kích thước); };
+    hàm công khai tổng trang(tổng bản ghi) {
+        trả về tổng số trang(tổng bản ghi, mình.kích thước);
     };
 };

@@ -1,0 +1,99 @@
+// Import riêng: tiến trình Python/SDK là dependency tùy chọn của vi.quantum.qiskit.
+nhập gói/lượng tử/openqasm;
+nhập gói/hệ thống/tiến trình;
+nhập json;
+lớp công khai Cầu Nối Qiskit {
+    // Đường dẫn tường minh: hoạt động cả trong source tree lẫn SDK đã cài.
+    hàm công khai khởi tạo(python, tệp cầu nối) {
+        nếu (loại của(python) != "chuỗi" || python == "" || loại của(tệp cầu nối) != "chuỗi" || tệp cầu nối == "") {
+            ném "qiskit: cần đường dẫn Python và tệp cầu nối qiskit.py";
+        };
+        mình.python = python;
+        mình.tệp = tệp cầu nối;
+    };
+    hàm riêng tư gọi(yêu cầu) {
+        yêu cầu["protocol"] = 1;
+        văn bản = json tạo(yêu cầu);
+        // Bounded argv để chạy được trên cả POSIX và Windows; không ghép shell.
+        nếu (máy ảo lấy độ dài(văn bản) > 24000) {
+            ném "qiskit: yêu cầu vượt giới hạn 24000 ký tự của cầu nối";
+        };
+        tiến trình = chạy tiến trình(mình.python, [mình.tệp, văn bản], {
+        }
+        , 120000);
+        nếu (!tiến trình["khởi chạy"]) {
+            ném "qiskit: không khởi chạy được Python";
+        };
+        nếu (tiến trình["mã thoát"] != 0) {
+            ném "qiskit: tiến trình thất bại: " + tiến trình["lỗi"];
+        };
+        phản hồi = rỗng;
+        thử {
+            phản hồi = json phân tích(tiến trình["đầu ra"]);
+        } bắt lỗi(e) {
+            ném "qiskit: phản hồi JSON không hợp lệ";
+        };
+        nếu (loại của(phản hồi) != "từ điển") {
+            ném "qiskit: phản hồi JSON không hợp lệ";
+        };
+        nếu (lấy từ điển(phản hồi, "protocol", 0) != 1) {
+            ném "qiskit: sai phiên bản giao thức";
+        };
+        nếu (lấy từ điển(phản hồi, "ok", sai) != đúng) {
+            ném "qiskit: " + lấy từ điển(phản hồi, "error", "cầu nối không trả thông tin lỗi");
+        };
+        dữ liệu cuối = lấy từ điển(phản hồi, "result", rỗng);
+        nếu (loại của(dữ liệu cuối) != "từ điển") {
+            ném "qiskit: phản hồi thiếu kết quả hợp lệ";
+        };
+        trả về dữ liệu cuối;
+    };
+    hàm riêng tư kiểm tra phép đo(mạch) {
+        lệnh = mạch.các lệnh();
+        có đo = sai;
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            mục = lệnh[i];
+            nếu (mục[0] == "measure") {
+                có đo = đúng;
+            };
+        };
+        nếu (!có đo) {
+            ném "qiskit: mạch cần ít nhất một phép đo tường minh";
+        };
+    };
+    hàm công khai mô phỏng(mạch, số lần = 1024, hạt giống = 1) {
+        mình.kiểm tra phép đo(mạch);
+        lượng tử yêu cầu nguyên(số lần, "số lần đo", 1, 1000000);
+        lượng tử yêu cầu nguyên(hạt giống, "hạt giống Qiskit", 0, 2147483647);
+        trả về mình.gọi(
+            {
+                "action": "simulate", 
+                "qasm": xuất openqasm(mạch),
+                "shots": số lần, 
+                "seed": hạt giống
+            }
+        );
+    };
+    // Gửi bất đồng bộ. Không tự retry: một yêu cầu tạo đúng một job.
+    hàm công khai gửi(mạch, backend, số lần = 1024) {
+        mình.kiểm tra phép đo(mạch);
+        lượng tử yêu cầu nguyên(số lần, "số lần đo", 1, 1000000);
+        nếu (loại của(backend) != "chuỗi" || backend == "") {
+            ném "qiskit: phải chỉ định backend khi gửi lên QPU";
+        };
+        trả về mình.gọi( {
+            "action": "submit", "qasm": xuất openqasm(mạch), "shots": số lần, "backend": backend
+        }
+        );
+    };
+    hàm công khai kết quả(mã công việc) {
+        nếu (loại của(mã công việc) != "chuỗi" || mã công việc == "") {
+            ném "qiskit: mã job trống";
+        };
+        trả về mình.gọi( {
+            "action": "result", "job_id": mã công việc
+        }
+        );
+    };
+}
+;

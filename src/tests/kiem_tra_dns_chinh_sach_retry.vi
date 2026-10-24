@@ -1,4 +1,4 @@
-nhập gói/mạng/dns;
+nhập gói/mạng/phân giải tên miền;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/hệ thống/môi trường;
 
@@ -11,27 +11,27 @@ hàm chính() {
     nếu (chế_độ == "bad_id") {
         đúng_loại = sai;
         thử {
-            bộ.dns hỏi dự phòng("example.com", ["127.0.0.1", "127.0.0.2"], cổng, 1, 10000);
+            bộ.phân giải tên miền hỏi dự phòng("example.com", ["127.0.0.1", "127.0.0.2"], cổng, 1, 10000);
         } bắt lỗi(e) {
-            nếu (loai_cua(e) == "từ điển") {
-                đúng_loại = lấy map(e, "loại", "") == "dns_giao_thức";
+            nếu (loại của(e) == "từ điển") {
+                đúng_loại = lấy từ điển(e, "loại", "") == "dns_giao_thức";
             };
         };
         in đúng_loại;
     } hoặc nếu (chế_độ == "rcode_retry") {
         // Máy chủ IPv4 trả SERVFAIL/REFUSED, IPv6 trả A hợp lệ.
-        địa_chỉ = bộ.dns hỏi dự phòng(
+        địa_chỉ = bộ.phân giải tên miền hỏi dự phòng(
             "example.com", ["127.0.0.1", "::1"], cổng, 1, 3000
         );
-        in do_dai(địa_chỉ) == 1 && địa_chỉ[0] == "203.0.113.47";
+        in độ dài(địa_chỉ) == 1 && địa_chỉ[0] == "203.0.113.47";
     } hoặc nếu (chế_độ == "rcode_exhausted") {
         đúng_loại = sai;
         thử {
-            bộ.dns hỏi dự phòng("example.com", ["127.0.0.1", "::1"], cổng, 1, 3000);
+            bộ.phân giải tên miền hỏi dự phòng("example.com", ["127.0.0.1", "::1"], cổng, 1, 3000);
         } bắt lỗi(e) {
-            nếu (loai_cua(e) == "từ điển") {
-                đúng_loại = lấy map(e, "loại", "") == "dns_rcode" &&
-                    lấy map(e, "mã", -1) == 5;
+            nếu (loại của(e) == "từ điển") {
+                đúng_loại = lấy từ điển(e, "loại", "") == "dns_rcode" &&
+                    lấy từ điển(e, "mã", -1) == 5;
             };
         };
         in đúng_loại;
@@ -41,19 +41,19 @@ hàm chính() {
         nếu (chế_độ == "unknown") { mã_mong_đợi = 15; };
         đúng_loại = sai;
         thử {
-            bộ.dns hỏi dự phòng("example.com", ["127.0.0.1", "127.0.0.2"], cổng, 1, 10000);
+            bộ.phân giải tên miền hỏi dự phòng("example.com", ["127.0.0.1", "127.0.0.2"], cổng, 1, 10000);
         } bắt lỗi(e) {
-            nếu (loai_cua(e) == "từ điển") {
-                đúng_loại = lấy map(e, "loại", "") == "dns_rcode" &&
-                    lấy map(e, "mã", -1) == mã_mong_đợi;
+            nếu (loại của(e) == "từ điển") {
+                đúng_loại = lấy từ điển(e, "loại", "") == "dns_rcode" &&
+                    lấy từ điển(e, "mã", -1) == mã_mong_đợi;
             };
         };
         in đúng_loại;
     } hoặc {
         // NOERROR/ANCOUNT=0 và NXDOMAIN là kết quả hợp lệ, không retry.
-        địa_chỉ = bộ.dns hỏi dự phòng(
+        địa_chỉ = bộ.phân giải tên miền hỏi dự phòng(
             "example.com", ["127.0.0.1", "127.0.0.2"], cổng, 1, 10000
         );
-        in do_dai(địa_chỉ) == 0;
+        in độ dài(địa_chỉ) == 0;
     };
 };

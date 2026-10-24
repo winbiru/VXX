@@ -1,0 +1,150 @@
+// /etc/hosts thuần V++: chỉ dùng File/Socket Machine ABI, không gọi getaddrinfo.
+// Hosts được bật rõ ràng trong resolver thử nghiệm qua VPP_DNS_VI_HOSTS_FILE.
+nhập gói/mạng/địa chỉ mạng;
+nhập gói/mạng/gói tin tên miền;
+nhập gói/nhập xuất/bộ đệm tệp;
+
+lớp công khai Bộ Bảng Tên Máy DNS {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư bảng tên máy trắng(k) {
+        trả về k == 32 || k == 9 || k == 13 || k == 10;
+    };
+
+    // So khớp ASCII case-insensitive và chấp nhận dấu chấm cuối tên tuyệt đối.
+    // Tên Unicode cần IDNA riêng; không tự diễn giải bytes UTF-8 trong hosts.
+    hàm riêng tư bảng tên máy tên chuẩn(tên) {
+        nếu (loại của(tên) != "chuỗi") { trả về ""; };
+        các byte = chuỗi thành byte máy ảo(tên);
+        n = máy ảo lấy độ dài(các byte);
+        nếu (n > 0 && các byte[n - 1] == 46) { n = n - 1; };
+        kết quả = [];
+        lặp(i = 0; i < n; i++) {
+            k = các byte[i];
+            nếu (k >= 128 || k == 0) { trả về ""; };
+            nếu (k >= 65 && k <= 90) { k = k + 32; };
+            máy ảo thêm cuối danh sách(kết quả, k);
+        };
+        trả về chuỗi từ byte máy ảo(kết quả);
+    };
+
+    hàm riêng tư bảng tên máy địa chỉ mạng các byte(địa chỉ mạng) {
+        kết quả = [];
+        thử {
+            bộ = Bộ Phân Tích IP();
+            kết quả = bộ.địa chỉ mạng các byte(địa chỉ mạng);
+        } bắt lỗi(e) { trả về []; };
+        nếu (máy ảo lấy độ dài(kết quả) != 4 && máy ảo lấy độ dài(kết quả) != 16) { trả về []; };
+        trả về kết quả;
+    };
+
+    hàm riêng tư bảng tên máy đã có(kết quả các byte, byte địa chỉ mạng) {
+        lặp(i = 0; i < máy ảo lấy độ dài(kết quả các byte); i++) {
+            hiện tại = kết quả các byte[i];
+            nếu (máy ảo lấy độ dài(hiện tại) == máy ảo lấy độ dài(byte địa chỉ mạng)) {
+                giống = đúng;
+                lặp(j = 0; j < máy ảo lấy độ dài(byte địa chỉ mạng); j++) {
+                    nếu (hiện tại[j] != byte địa chỉ mạng[j]) { giống = sai; thoát; };
+                };
+                nếu (giống) { trả về đúng; };
+            };
+        };
+        trả về sai;
+    };
+
+    hàm riêng tư bảng tên máy xử lý dòng(dòng, tên cần, kết quả, kết quả các byte) {
+        các từ tố = [];
+        từ tố = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dòng); i++) {
+            k = 32;
+            nếu (i < máy ảo lấy độ dài(dòng)) { k = dòng[i]; };
+            nếu (k == 35) { // '#' bắt đầu comment, kể cả khi sát hostname.
+                nếu (máy ảo lấy độ dài(từ tố) > 0) { máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố)); };
+                thoát;
+            };
+            nếu (mình.bảng tên máy trắng(k)) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) {
+                    máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố));
+                    từ tố = [];
+                };
+            } hoặc {
+                máy ảo thêm cuối danh sách(từ tố, k);
+            };
+            // Một dòng bất thường không thể buộc parser tích lũy vô hạn alias.
+            nếu (máy ảo lấy độ dài(các từ tố) > 256) { trả về sai; };
+        };
+        // Nhánh chú thích '#' thoát sớm nên cần kiểm tra lại cả dòng.
+        nếu (máy ảo lấy độ dài(các từ tố) > 256) { trả về sai; };
+        nếu (máy ảo lấy độ dài(các từ tố) < 2) { trả về sai; };
+        địa chỉ mạng = các từ tố[0];
+        byte địa chỉ mạng = mình.bảng tên máy địa chỉ mạng các byte(địa chỉ mạng);
+        nếu (máy ảo lấy độ dài(byte địa chỉ mạng) == 0) { trả về sai; };
+        lặp(i = 1; i < máy ảo lấy độ dài(các từ tố); i++) {
+            nếu (mình.bảng tên máy tên chuẩn(các từ tố[i]) == tên cần) {
+                nếu (!mình.bảng tên máy đã có(kết quả các byte, byte địa chỉ mạng)) {
+                    máy ảo thêm cuối danh sách(kết quả, địa chỉ mạng);
+                    máy ảo thêm cuối danh sách(kết quả các byte, byte địa chỉ mạng);
+                };
+                trả về đúng;
+            };
+        };
+        trả về sai;
+    };
+
+    // Giới hạn 64 KiB và số byte trên mỗi dòng để tránh file lỗi làm cạn RAM.
+    // Các dòng không có IP hợp lệ được bỏ qua như hosts trên các hệ điều hành.
+    hàm công khai phân giải tên miền phân tích bảng tên máy(nội dung, tên máy) {
+        nếu (loại của(nội dung) != "chuỗi") { ném "DNS hosts: nội dung phải là chuỗi"; };
+        bộ = Bộ Mã DNS();
+        bộ.phân giải tên miền tạo truy vấn(tên máy, 1, 0);
+        tên cần = mình.bảng tên máy tên chuẩn(tên máy);
+        dữ liệu = chuỗi thành byte máy ảo(nội dung);
+        nếu (máy ảo lấy độ dài(dữ liệu) > 65536) { ném "DNS hosts: tệp vượt quá 64 KiB"; };
+        kết quả = [];
+        kết quả các byte = [];
+        dòng = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dữ liệu); i++) {
+            k = 10;
+            nếu (i < máy ảo lấy độ dài(dữ liệu)) { k = dữ liệu[i]; };
+            nếu (k == 10) {
+                nếu (máy ảo lấy độ dài(dòng) <= 4096) {
+                    mình.bảng tên máy xử lý dòng(dòng, tên cần, kết quả, kết quả các byte);
+                };
+                dòng = [];
+            } hoặc {
+                nếu (máy ảo lấy độ dài(dòng) <= 4096) { máy ảo thêm cuối danh sách(dòng, k); };
+            };
+        };
+        trả về kết quả;
+    };
+
+    hàm công khai phân giải tên miền đọc bảng tên máy(tên máy, đường dẫn = "/etc/hosts") {
+        nếu (loại của(đường dẫn) != "chuỗi" || đường dẫn == "") {
+            ném "DNS hosts: đường dẫn không hợp lệ";
+        };
+        tệp = Bộ Đệm Tệp(đường dẫn, "đọc", 4096, "DNS hosts");
+        dữ liệu = [];
+        thử {
+            dữ liệu = tệp.đọc các byte(65536);
+            nếu (máy ảo lấy độ dài(dữ liệu) == 65536) {
+                phần dư = tệp.đọc các byte(1);
+                nếu (máy ảo lấy độ dài(phần dư) > 0) { ném "DNS hosts: tệp vượt quá 64 KiB"; };
+            };
+            tệp.đóng();
+        } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(số mục bỏ qua) {};
+            ném e;
+        };
+        trả về mình.phân giải tên miền phân tích bảng tên máy(chuỗi từ byte máy ảo(dữ liệu), tên máy);
+    };
+};
+
+hàm công khai phân giải tên miền phân tích bảng tên máy(nội dung, tên máy) {
+    bộ = Bộ Bảng Tên Máy DNS();
+    trả về bộ.phân giải tên miền phân tích bảng tên máy(nội dung, tên máy);
+};
+
+hàm công khai phân giải tên miền đọc bảng tên máy(tên máy, đường dẫn = "/etc/hosts") {
+    bộ = Bộ Bảng Tên Máy DNS();
+    trả về bộ.phân giải tên miền đọc bảng tên máy(tên máy, đường dẫn);
+};

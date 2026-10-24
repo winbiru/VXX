@@ -5,54 +5,54 @@ nhập gói/bộ sưu tập/từ điển;
 lớp công khai Bộ Đọc Mã Lệnh {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch bytecode từ thô(bytecode_thô) {
-        kết_quả = [];
-        lặp(i = 0; i < do_dai(bytecode_thô); i++) {
-            lệnh = bytecode_thô[i];
-            thêm(kết_quả, {
+    hàm công khai biên dịch mã trung gian từ thô(mã trung gian thô) {
+        kết quả = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(mã trung gian thô); i++) {
+            lệnh = mã trung gian thô[i];
+            máy ảo thêm cuối danh sách(kết quả, {
                 "op": lệnh[0],
                 "toán hạng": lệnh[1],
                 "chỉ số": lệnh[2],
                 "giá trị": lệnh[3]
             });
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Pass đếm tần suất opcode thực hiện trong V++ (không cần native riêng).
     // Giữ thứ tự opcode xuất hiện đầu tiên để kết quả có tính quyết định.
-    hàm công khai biên dịch thống kê opcode từ bytecode(bytecode) {
-        kết_quả = [];
-        lặp(i = 0; i < độ dài(bytecode); i++) {
-            op = lấy map(bytecode[i], "op", -1);
-            đã_có = sai;
-            lặp(j = 0; j < độ dài(kết_quả); j++) {
-                mục = kết_quả[j];
-                nếu (lấy map(mục, "op", -1) == op) {
-                    kết_quả[j] = {
-                        "op": op,
-                        "số lượng": lấy map(mục, "số lượng", 0) + 1
+    hàm công khai biên dịch thống kê mã thao tác từ mã trung gian(mã trung gian) {
+        kết quả = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(mã trung gian); i++) {
+            mã phép toán = lấy từ điển(mã trung gian[i], "op", -1);
+            đã có = sai;
+            lặp(j = 0; j < máy ảo lấy độ dài(kết quả); j++) {
+                mục = kết quả[j];
+                nếu (lấy từ điển(mục, "op", -1) == mã phép toán) {
+                    kết quả[j] = {
+                        "op": mã phép toán,
+                        "số lượng": lấy từ điển(mục, "số lượng", 0) + 1
                     };
-                    đã_có = đúng;
+                    đã có = đúng;
                     thoát;
                 };
             };
-            nếu (!đã_có) {
-                thêm(kết_quả, {"op": op, "số lượng": 1});
+            nếu (!đã có) {
+                máy ảo thêm cuối danh sách(kết quả, {"op": mã phép toán, "số lượng": 1});
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 };
 
 
-hàm công khai biên dịch bytecode từ thô(bytecode_thô) {
-    __vpp_adapter = Bộ Đọc Mã Lệnh();
-    trả về __vpp_adapter.biên dịch bytecode từ thô(bytecode_thô);
+hàm công khai biên dịch mã trung gian từ thô(mã trung gian thô) {
+    bộ chuyển tiếp = Bộ Đọc Mã Lệnh();
+    trả về bộ chuyển tiếp.biên dịch mã trung gian từ thô(mã trung gian thô);
 };
 
-hàm công khai biên dịch thống kê opcode từ bytecode(bytecode) {
-    __vpp_adapter = Bộ Đọc Mã Lệnh();
-    trả về __vpp_adapter.biên dịch thống kê opcode từ bytecode(bytecode);
+hàm công khai biên dịch thống kê mã thao tác từ mã trung gian(mã trung gian) {
+    bộ chuyển tiếp = Bộ Đọc Mã Lệnh();
+    trả về bộ chuyển tiếp.biên dịch thống kê mã thao tác từ mã trung gian(mã trung gian);
 };
 

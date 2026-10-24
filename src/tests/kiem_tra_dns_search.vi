@@ -1,4 +1,4 @@
-nhập gói/mạng/dns_cấu_hình;
+nhập gói/mạng/cấu hình phân giải tên miền;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/nhập xuất/tệp;
 nhập gói/nhập xuất/tệp thô;
@@ -6,73 +6,73 @@ nhập gói/nhập xuất/tệp thô;
 // Fixture offline kiểm tra search/domain/ndots và thứ tự candidate.
 hàm chính() {
     bộ = Bộ Cấu Hình DNS();
-    cấu_hình = bộ.dns phân tích cấu hình đầy đủ("");
-    in do_dai(lấy map(cấu_hình, "nameservers", [])) == 0;
-    in do_dai(lấy map(cấu_hình, "search", [])) == 0;
-    in lấy map(cấu_hình, "ndots", -1) == 1;
+    cấu_hình = bộ.phân giải tên miền phân tích cấu hình đầy đủ("");
+    in độ dài(lấy từ điển(cấu_hình, "nameservers", [])) == 0;
+    in độ dài(lấy từ điển(cấu_hình, "search", [])) == 0;
+    in lấy từ điển(cấu_hình, "ndots", -1) == 1;
 
-    cấu_hình = bộ.dns phân tích cấu hình đầy đủ(
+    cấu_hình = bộ.phân giải tên miền phân tích cấu hình đầy đủ(
         "nameserver 1.1.1.1\r\nsearch CORP.Example.com. example.com corp.example.com # test\n" +
         "options rotate timeout:2 ndots:2 attempts:3\n"
     );
-    máy_chủ = lấy map(cấu_hình, "nameservers", []);
-    search = lấy map(cấu_hình, "search", []);
-    in do_dai(máy_chủ) == 1 && máy_chủ[0] == "1.1.1.1";
-    in do_dai(search) == 2 && search[0] == "corp.example.com" && search[1] == "example.com";
-    in lấy map(cấu_hình, "ndots", -1) == 2;
+    máy_chủ = lấy từ điển(cấu_hình, "nameservers", []);
+    search = lấy từ điển(cấu_hình, "search", []);
+    in độ dài(máy_chủ) == 1 && máy_chủ[0] == "1.1.1.1";
+    in độ dài(search) == 2 && search[0] == "corp.example.com" && search[1] == "example.com";
+    in lấy từ điển(cấu_hình, "ndots", -1) == 2;
 
-    cấu_hình = bộ.dns phân tích cấu hình đầy đủ(
+    cấu_hình = bộ.phân giải tên miền phân tích cấu hình đầy đủ(
         "search one.example two.example\ndomain org.example.\nsearch x.example y.example\n" +
         "domain Last.Example; trailing comment\noptions ndots:0\n"
     );
-    search = lấy map(cấu_hình, "search", []);
-    in do_dai(search) == 1 && search[0] == "last.example";
-    in lấy map(cấu_hình, "ndots", -1) == 0;
-    in do_dai(bộ.dns phân tích resolv conf("search one.example\n")) == 0;
+    search = lấy từ điển(cấu_hình, "search", []);
+    in độ dài(search) == 1 && search[0] == "last.example";
+    in lấy từ điển(cấu_hình, "ndots", -1) == 0;
+    in độ dài(bộ.phân giải tên miền phân tích cấu hình phân giải conf("search one.example\n")) == 0;
 
-    tên = bộ.dns tên ứng viên("printer", ["corp.example.com", "example.com"], 1);
-    in do_dai(tên) == 3 && tên[0] == "printer.corp.example.com" &&
+    tên = bộ.phân giải tên miền tên ứng viên("printer", ["corp.example.com", "example.com"], 1);
+    in độ dài(tên) == 3 && tên[0] == "printer.corp.example.com" &&
         tên[1] == "printer.example.com" && tên[2] == "printer";
-    tên = bộ.dns tên ứng viên("api.internal", ["corp.example.com", "example.com"], 1);
-    in do_dai(tên) == 3 && tên[0] == "api.internal" &&
+    tên = bộ.phân giải tên miền tên ứng viên("api.internal", ["corp.example.com", "example.com"], 1);
+    in độ dài(tên) == 3 && tên[0] == "api.internal" &&
         tên[1] == "api.internal.corp.example.com" && tên[2] == "api.internal.example.com";
-    tên = bộ.dns tên ứng viên("api.internal.", ["corp.example.com"], 1);
-    in do_dai(tên) == 1 && tên[0] == "api.internal";
-    tên = bộ.dns tên ứng viên("printer", ["corp.example.com"], 0);
-    in do_dai(tên) == 2 && tên[0] == "printer" && tên[1] == "printer.corp.example.com";
-    tên = bộ.dns tên ứng viên("api.internal", ["corp.example.com"], 2);
-    in do_dai(tên) == 2 && tên[0] == "api.internal.corp.example.com" && tên[1] == "api.internal";
-    tên = bộ.dns tên ứng viên("a.b.c", ["corp.example.com"], 2);
-    in do_dai(tên) == 2 && tên[0] == "a.b.c" && tên[1] == "a.b.c.corp.example.com";
-    tên = bộ.dns tên ứng viên("a", [], 15);
-    in do_dai(tên) == 1 && tên[0] == "a";
+    tên = bộ.phân giải tên miền tên ứng viên("api.internal.", ["corp.example.com"], 1);
+    in độ dài(tên) == 1 && tên[0] == "api.internal";
+    tên = bộ.phân giải tên miền tên ứng viên("printer", ["corp.example.com"], 0);
+    in độ dài(tên) == 2 && tên[0] == "printer" && tên[1] == "printer.corp.example.com";
+    tên = bộ.phân giải tên miền tên ứng viên("api.internal", ["corp.example.com"], 2);
+    in độ dài(tên) == 2 && tên[0] == "api.internal.corp.example.com" && tên[1] == "api.internal";
+    tên = bộ.phân giải tên miền tên ứng viên("a.b.c", ["corp.example.com"], 2);
+    in độ dài(tên) == 2 && tên[0] == "a.b.c" && tên[1] == "a.b.c.corp.example.com";
+    tên = bộ.phân giải tên miền tên ứng viên("a", [], 15);
+    in độ dài(tên) == 1 && tên[0] == "a";
 
     lỗi = sai;
-    thử { bộ.dns phân tích cấu hình đầy đủ("options ndots:16\n"); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình đầy đủ("options ndots:16\n"); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns phân tích cấu hình đầy đủ("options ndots:-1\n"); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình đầy đủ("options ndots:-1\n"); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns phân tích cấu hình đầy đủ("options ndots:\n"); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình đầy đủ("options ndots:\n"); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns phân tích cấu hình đầy đủ("search bad..name\n"); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình đầy đủ("search bad..name\n"); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns phân tích cấu hình đầy đủ("search a b c d e f g\n"); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền phân tích cấu hình đầy đủ("search a b c d e f g\n"); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { bộ.dns tên ứng viên("bad..name", [], 1); } bắt lỗi(e) { lỗi = đúng; };
+    thử { bộ.phân giải tên miền tên ứng viên("bad..name", [], 1); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
-    tên = bộ.dns tên ứng viên("A.", ["example.com"], 1);
-    in do_dai(tên) == 1 && tên[0] == "A";
+    tên = bộ.phân giải tên miền tên ứng viên("A.", ["example.com"], 1);
+    in độ dài(tên) == 1 && tên[0] == "A";
 
     đường = ".tmp_vpp_dns_search_resolv_test.conf";
     ghi tệp(đường, "nameserver ::1\nsearch team.example\noptions ndots:3\n");
-    cấu_hình = bộ.dns đọc cấu hình đầy đủ linux(đường);
-    tệp_thô_xóa(đường);
-    in lấy map(cấu_hình, "ndots", -1) == 3;
-    in lấy map(cấu_hình, "search", [])[0] == "team.example";
-    in lấy map(cấu_hình, "nameservers", [])[0] == "::1";
+    cấu_hình = bộ.phân giải tên miền đọc cấu hình đầy đủ linux(đường);
+    tệp thô xóa(đường);
+    in lấy từ điển(cấu_hình, "ndots", -1) == 3;
+    in lấy từ điển(cấu_hình, "search", [])[0] == "team.example";
+    in lấy từ điển(cấu_hình, "nameservers", [])[0] == "::1";
 };

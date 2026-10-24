@@ -1,118 +1,221 @@
-// BẢNG ABI đối chiếu với vpp/bytecode/intrinsic.h; không tự đánh lại ABI.
-// Giữ ABI tương thích với vpp/bytecode/intrinsic.h; script Python cũ đã bỏ.
-nhập gói/biên dịch/opcode;
+// Tên tiếng Việt và tên tương thích dùng chung mã thao tác, số tham số và quyền gọi.
+nhập gói/biên dịch/mã thao tác;
 hàm công khai biên dịch nội tại(tên) {
     chọn (tên) {
-        ca "bien_dich_phan_tich_vm": { trả về [biên dịch mã opcode("OP_VM_BIEN_DICH_PHAN_TICH"), 2, đúng]; }
-        ca "bytecode_chay_vm": { trả về [biên dịch mã opcode("OP_VM_BYTECODE_CHAY"), 4, đúng]; }
-        ca "bytecode_chay_native": { trả về [biên dịch mã opcode("OP_NATIVE_ARTIFACT_CHAY"), 5, đúng]; }
-        ca "dns_phan_giai_vm": { trả về [biên dịch mã opcode("OP_VM_DNS_PHAN_GIAI"), 1, đúng]; }
-        ca "doc_bien_moi_truong_vm": { trả về [biên dịch mã opcode("OP_VM_DOC_BIEN_MOI_TRUONG"), 1, đúng]; }
-        ca "dong_ho_dia_phuong_vm": { trả về [biên dịch mã opcode("OP_VM_DONG_HO_DIA_PHUONG"), 0, đúng]; }
-        ca "dong_ho_utc_vm": { trả về [biên dịch mã opcode("OP_VM_DONG_HO_UTC"), 0, đúng]; }
-        ca "duong_dan_ton_tai_vm": { trả về [biên dịch mã opcode("OP_VM_DUONG_DAN_TON_TAI"), 1, đúng]; }
-        ca "io_doc_bytes_vm": { trả về [biên dịch mã opcode("OP_VM_IO_DOC_BYTES"), 1, đúng]; }
-        ca "io_doc_file_vm": { trả về [biên dịch mã opcode("OP_VM_IO_DOC_FILE"), 1, đúng]; }
-        ca "io_ghi_bytes_vm": { trả về [biên dịch mã opcode("OP_VM_IO_GHI_BYTES"), 2, đúng]; }
-        ca "io_ghi_file_vm": { trả về [biên dịch mã opcode("OP_VM_IO_GHI_FILE"), 2, đúng]; }
-        ca "io_ghi_tiep_file_vm": { trả về [biên dịch mã opcode("OP_VM_IO_GHI_TIEP_FILE"), 2, đúng]; }
-        ca "kich_ban_chay_vm": { trả về [biên dịch mã opcode("OP_VM_KICH_BAN_CHAY"), 2, đúng]; }
-        ca "la_tep_vm": { trả về [biên dịch mã opcode("OP_VM_LA_TEP"), 1, đúng]; }
-        ca "la_thu_muc_khong_theo_lien_ket_vm": { trả về [biên dịch mã opcode("OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET"), 1, đúng]; }
-        ca "la_thu_muc_vm": { trả về [biên dịch mã opcode("OP_VM_LA_THU_MUC"), 1, đúng]; }
-        ca "liet_ke_thu_muc_vm": { trả về [biên dịch mã opcode("OP_VM_LIET_KE_THU_MUC"), 1, đúng]; }
-        ca "ngau_nhien_bao_mat_bytes_vm": { trả về [biên dịch mã opcode("OP_VM_NGAU_NHIEN_BAO_MAT_BYTES"), 1, đúng]; }
-        ca "ngu_mili_giay_vm": { trả về [biên dịch mã opcode("OP_VM_NGU_MILI_GIAY"), 1, đúng]; }
-        ca "so_thuc_bits_vm": { trả về [biên dịch mã opcode("OP_VM_SO_THUC_BITS"), 1, đúng]; }
-        ca "socket_chap_nhan_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_CHAP_NHAN"), 1, đúng]; }
-        ca "socket_dat_timeout_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_DAT_TIMEOUT"), 2, đúng]; }
-        ca "socket_dong_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_DONG"), 1, đúng]; }
-        ca "socket_gui_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_GUI"), 3, đúng]; }
-        ca "socket_nhan_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_NHAN"), 2, đúng]; }
-        ca "socket_phan_giai_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_PHAN_GIAI"), 3, đúng]; }
-        ca "socket_tcp_lang_nghe_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_TCP_LANG_NGHE"), 2, đúng]; }
-        ca "socket_tcp_mo_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_TCP_MO"), 2, đúng]; }
-        ca "socket_tls_nang_cap_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_TLS_NANG_CAP"), 2, đúng]; }
-        ca "socket_udp_mo_vm": { trả về [biên dịch mã opcode("OP_VM_SOCKET_UDP_MO"), 2, đúng]; }
-        ca "tao_thu_muc_vm": { trả về [biên dịch mã opcode("OP_VM_TAO_THU_MUC"), 1, đúng]; }
-        ca "ten_nen_tang_vm": { trả về [biên dịch mã opcode("OP_VM_TEN_NEN_TANG"), 0, đúng]; }
-        ca "thoi_gian_don_dieu_ms_vm": { trả về [biên dịch mã opcode("OP_VM_THOI_GIAN_DON_DIEU_MS"), 0, đúng]; }
-        ca "tien_trinh_chay_vm": { trả về [biên dịch mã opcode("OP_VM_TIEN_TRINH_CHAY"), 3, đúng]; }
-        ca "xoa_duong_dan_vm": { trả về [biên dịch mã opcode("OP_VM_XOA_DUONG_DAN"), 1, đúng]; }
-        ca "thread_vm_spawn": { trả về [biên dịch mã opcode("OP_VM_THREAD_SPAWN"), 2, đúng]; }
-        ca "thread_vm_wait": { trả về [biên dịch mã opcode("OP_VM_THREAD_WAIT"), 2, đúng]; }
-        ca "thread_vm_cancel": { trả về [biên dịch mã opcode("OP_VM_THREAD_CANCEL"), 1, đúng]; }
-        ca "thread_vm_status": { trả về [biên dịch mã opcode("OP_VM_THREAD_STATUS"), 1, đúng]; }
-        ca "thread_vm_park": { trả về [biên dịch mã opcode("OP_VM_THREAD_PARK"), 1, đúng]; }
-        ca "bộ": { trả về [biên dịch mã opcode("OP_VM_TUPLE_FROM_LIST"), 1, đúng]; }
-        ca "loai_cua": { trả về [biên dịch mã opcode("OP_VM_TYPE_OF"), 1, sai]; }
-        ca "bam_dinh_danh": { trả về [biên dịch mã opcode("OP_VM_IDENTITY_HASH"), 1, sai]; }
-        ca "do_dai": { trả về [biên dịch mã opcode("OP_VM_LENGTH"), 1, sai]; }
-        ca "them": { trả về [biên dịch mã opcode("OP_VM_LIST_APPEND"), 2, sai]; }
-        ca "xoa_tai": { trả về [biên dịch mã opcode("OP_VM_LIST_REMOVE"), 2, sai]; }
-        ca "co_khoa": { trả về [biên dịch mã opcode("OP_VM_MAP_HAS"), 2, sai]; }
-        ca "xoa_khoa": { trả về [biên dịch mã opcode("OP_VM_MAP_REMOVE"), 2, sai]; }
-        ca "khoa_map": { trả về [biên dịch mã opcode("OP_VM_MAP_KEYS"), 1, sai]; }
-        ca "chuoi_bytes_vm": { trả về [biên dịch mã opcode("OP_VM_STRING_BYTES"), 1, đúng]; }
-        ca "chuoi_tu_bytes_vm": { trả về [biên dịch mã opcode("OP_VM_STRING_FROM_BYTES"), 1, đúng]; }
-        ca "so_thuc_tu_bits_vm": { trả về [biên dịch mã opcode("OP_VM_FLOAT_FROM_BITS"), 1, đúng]; }
-        ca "loại của": { trả về [biên dịch mã opcode("OP_VM_TYPE_OF"), 1, sai]; }
-        ca "độ dài": { trả về [biên dịch mã opcode("OP_VM_LENGTH"), 1, sai]; }
-        ca "thêm": { trả về [biên dịch mã opcode("OP_VM_LIST_APPEND"), 2, sai]; }
-        ca "xóa tại": { trả về [biên dịch mã opcode("OP_VM_LIST_REMOVE"), 2, sai]; }
-        ca "có khóa": { trả về [biên dịch mã opcode("OP_VM_MAP_HAS"), 2, sai]; }
-        ca "xóa khóa": { trả về [biên dịch mã opcode("OP_VM_MAP_REMOVE"), 2, sai]; }
-        ca "khóa map": { trả về [biên dịch mã opcode("OP_VM_MAP_KEYS"), 1, sai]; }
-        ca "máy_tệp_mở": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_OPEN"), 2, đúng]; }
-        ca "máy_tệp_đọc": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_READ"), 3, đúng]; }
-        ca "máy_tệp_ghi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_WRITE"), 3, đúng]; }
-        ca "máy_tệp_đóng": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_CLOSE"), 1, đúng]; }
-        ca "máy_tệp_dịch": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_SEEK"), 3, đúng]; }
-        ca "máy_tệp_vị_trí": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_TELL"), 1, đúng]; }
-        ca "máy_tệp_lỗi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_ERROR"), 1, đúng]; }
-        ca "máy_tệp_xóa": { trả về [biên dịch mã opcode("OP_VM_MACHINE_FILE_REMOVE"), 1, đúng]; }
-        ca "máy_tiến_trình_pid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_PID"), 0, đúng]; }
-        ca "máy_tiến_trình_ppid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_PPID"), 0, đúng]; }
-        ca "máy_tiến_trình_uid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_UID"), 0, đúng]; }
-        ca "máy_tiến_trình_euid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_EUID"), 0, đúng]; }
-        ca "máy_tiến_trình_gid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_GID"), 0, đúng]; }
-        ca "máy_tiến_trình_egid": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_EGID"), 0, đúng]; }
-        ca "máy_ngủ_mili_giây": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TIME_SLEEP"), 1, đúng]; }
-        ca "máy_đồng_hồ_đơn_điệu": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TIME_MONOTONIC"), 0, đúng]; }
-        ca "máy_đồng_hồ_utc": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TIME_REALTIME"), 0, đúng]; }
-        ca "máy_entropy_bytes": { trả về [biên dịch mã opcode("OP_VM_MACHINE_ENTROPY_READ"), 1, đúng]; }
-        ca "máy_môi_trường_đọc": { trả về [biên dịch mã opcode("OP_VM_MACHINE_ENV_GET"), 1, đúng]; }
-        ca "máy_đồng_hồ_địa_phương": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TIME_LOCAL"), 1, đúng]; }
-        ca "máy_thư_mục_tạo": { trả về [biên dịch mã opcode("OP_VM_MACHINE_DIR_MKDIR"), 1, đúng]; }
-        ca "máy_thư_mục_xóa": { trả về [biên dịch mã opcode("OP_VM_MACHINE_DIR_REMOVE"), 1, đúng]; }
-        ca "máy_thư_mục_mở": { trả về [biên dịch mã opcode("OP_VM_MACHINE_DIR_OPEN"), 1, đúng]; }
-        ca "máy_thư_mục_kế": { trả về [biên dịch mã opcode("OP_VM_MACHINE_DIR_NEXT"), 1, đúng]; }
-        ca "máy_thư_mục_đóng": { trả về [biên dịch mã opcode("OP_VM_MACHINE_DIR_CLOSE"), 1, đúng]; }
-        ca "máy_đường_loại": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PATH_KIND"), 2, đúng]; }
-        ca "máy_socket_loại": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
-        ca "máy_socket_đóng": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
-        ca "máy_socket_timeout": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_TIMEOUT"), 2, đúng]; }
-        ca "máy_socket_gửi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_SEND"), 4, đúng]; }
-        ca "máy_socket_nhận": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_RECV"), 4, đúng]; }
-        ca "máy_socket_chấp_nhận": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_ACCEPT"), 1, đúng]; }
-        ca "máy_socket_lắng_nghe": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_LISTEN"), 2, đúng]; }
-        ca "máy_socket_kết_nối": { trả về [biên dịch mã opcode("OP_VM_MACHINE_SOCKET_CONNECT"), 4, đúng]; }
-        ca "máy_tiến_trình_tạo": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_NEW"), 1, đúng]; }
-        ca "máy_tiến_trình_đối_số": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_ARG"), 2, đúng]; }
-        ca "máy_tiến_trình_lệnh_windows": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_COMMAND_LINE"), 2, đúng]; }
-        ca "máy_tiến_trình_môi_trường": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_ENV"), 3, đúng]; }
-        ca "máy_tiến_trình_bắt_đầu": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_START"), 1, đúng]; }
-        ca "máy_tiến_trình_thăm_dò": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_POLL"), 2, đúng]; }
-        ca "máy_tiến_trình_đọc": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_READ"), 4, đúng]; }
-        ca "máy_tiến_trình_đợi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_WAIT"), 1, đúng]; }
-        ca "máy_tiến_trình_lỗi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_ERROR"), 1, đúng]; }
-        ca "máy_tiến_trình_đóng": { trả về [biên dịch mã opcode("OP_VM_MACHINE_PROCESS_CLOSE"), 1, đúng]; }
-        ca "máy_resolver_mở": { trả về [biên dịch mã opcode("OP_VM_MACHINE_RESOLVE_OPEN"), 3, đúng]; }
-        ca "máy_resolver_tiếp": { trả về [biên dịch mã opcode("OP_VM_MACHINE_RESOLVE_NEXT"), 1, đúng]; }
-        ca "máy_resolver_đóng": { trả về [biên dịch mã opcode("OP_VM_MACHINE_RESOLVE_CLOSE"), 1, đúng]; }
-        ca "máy_tls_nâng_cấp": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TLS_UPGRADE"), 2, đúng]; }
-        ca "máy_tls_gửi": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TLS_SEND"), 3, đúng]; }
-        ca "máy_tls_nhận": { trả về [biên dịch mã opcode("OP_VM_MACHINE_TLS_RECV"), 3, đúng]; }
-        mặc định: { trả về rỗng; }
-    }
+        ca "máy ảo lấy loại": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }
+        ca "máy ảo băm định danh": { trả về [biên dịch mã thao tác("OP_VM_IDENTITY_HASH"), 1, sai]; }
+        ca "bien_dich_phan_tich_vm": { trả về [biên dịch mã thao tác("OP_VM_BIEN_DICH_PHAN_TICH"), 2, đúng]; }
+        ca "bytecode_chay_vm": { trả về [biên dịch mã thao tác("OP_VM_BYTECODE_CHAY"), 4, đúng]; }
+        ca "bytecode_chay_native": { trả về [biên dịch mã thao tác("OP_NATIVE_ARTIFACT_CHAY"), 5, đúng]; }
+        ca "dns_phan_giai_vm": { trả về [biên dịch mã thao tác("OP_VM_DNS_PHAN_GIAI"), 1, đúng]; }
+        ca "doc_bien_moi_truong_vm": { trả về [biên dịch mã thao tác("OP_VM_DOC_BIEN_MOI_TRUONG"), 1, đúng]; }
+        ca "dong_ho_dia_phuong_vm": { trả về [biên dịch mã thao tác("OP_VM_DONG_HO_DIA_PHUONG"), 0, đúng]; }
+        ca "dong_ho_utc_vm": { trả về [biên dịch mã thao tác("OP_VM_DONG_HO_UTC"), 0, đúng]; }
+        ca "duong_dan_ton_tai_vm": { trả về [biên dịch mã thao tác("OP_VM_DUONG_DAN_TON_TAI"), 1, đúng]; }
+        ca "io_doc_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_DOC_BYTES"), 1, đúng]; }
+        ca "io_doc_file_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_DOC_FILE"), 1, đúng]; }
+        ca "io_ghi_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_BYTES"), 2, đúng]; }
+        ca "io_ghi_file_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_FILE"), 2, đúng]; }
+        ca "io_ghi_tiep_file_vm": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_TIEP_FILE"), 2, đúng]; }
+        ca "kich_ban_chay_vm": { trả về [biên dịch mã thao tác("OP_VM_KICH_BAN_CHAY"), 2, đúng]; }
+        ca "la_tep_vm": { trả về [biên dịch mã thao tác("OP_VM_LA_TEP"), 1, đúng]; }
+        ca "la_thu_muc_khong_theo_lien_ket_vm": { trả về [biên dịch mã thao tác("OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET"), 1, đúng]; }
+        ca "la_thu_muc_vm": { trả về [biên dịch mã thao tác("OP_VM_LA_THU_MUC"), 1, đúng]; }
+        ca "liet_ke_thu_muc_vm": { trả về [biên dịch mã thao tác("OP_VM_LIET_KE_THU_MUC"), 1, đúng]; }
+        ca "ngau_nhien_bao_mat_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_NGAU_NHIEN_BAO_MAT_BYTES"), 1, đúng]; }
+        ca "ngu_mili_giay_vm": { trả về [biên dịch mã thao tác("OP_VM_NGU_MILI_GIAY"), 1, đúng]; }
+        ca "so_thuc_bits_vm": { trả về [biên dịch mã thao tác("OP_VM_SO_THUC_BITS"), 1, đúng]; }
+        ca "socket_chap_nhan_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_CHAP_NHAN"), 1, đúng]; }
+        ca "socket_dat_timeout_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_DAT_TIMEOUT"), 2, đúng]; }
+        ca "socket_dong_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_DONG"), 1, đúng]; }
+        ca "socket_gui_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_GUI"), 3, đúng]; }
+        ca "socket_nhan_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_NHAN"), 2, đúng]; }
+        ca "socket_phan_giai_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_PHAN_GIAI"), 3, đúng]; }
+        ca "socket_tcp_lang_nghe_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TCP_LANG_NGHE"), 2, đúng]; }
+        ca "socket_tcp_mo_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TCP_MO"), 2, đúng]; }
+        ca "socket_tls_nang_cap_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TLS_NANG_CAP"), 2, đúng]; }
+        ca "socket_udp_mo_vm": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_UDP_MO"), 2, đúng]; }
+        ca "tao_thu_muc_vm": { trả về [biên dịch mã thao tác("OP_VM_TAO_THU_MUC"), 1, đúng]; }
+        ca "ten_nen_tang_vm": { trả về [biên dịch mã thao tác("OP_VM_TEN_NEN_TANG"), 0, đúng]; }
+        ca "thoi_gian_don_dieu_ms_vm": { trả về [biên dịch mã thao tác("OP_VM_THOI_GIAN_DON_DIEU_MS"), 0, đúng]; }
+        ca "tien_trinh_chay_vm": { trả về [biên dịch mã thao tác("OP_VM_TIEN_TRINH_CHAY"), 3, đúng]; }
+        ca "xoa_duong_dan_vm": { trả về [biên dịch mã thao tác("OP_VM_XOA_DUONG_DAN"), 1, đúng]; }
+        ca "thread_vm_spawn": { trả về [biên dịch mã thao tác("OP_VM_THREAD_SPAWN"), 2, đúng]; }
+        ca "thread_vm_wait": { trả về [biên dịch mã thao tác("OP_VM_THREAD_WAIT"), 2, đúng]; }
+        ca "thread_vm_cancel": { trả về [biên dịch mã thao tác("OP_VM_THREAD_CANCEL"), 1, đúng]; }
+        ca "thread_vm_status": { trả về [biên dịch mã thao tác("OP_VM_THREAD_STATUS"), 1, đúng]; }
+        ca "thread_vm_park": { trả về [biên dịch mã thao tác("OP_VM_THREAD_PARK"), 1, đúng]; }
+        ca "bộ": { trả về [biên dịch mã thao tác("OP_VM_TUPLE_FROM_LIST"), 1, đúng]; }
+        ca "loai_cua": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }
+        ca "bam_dinh_danh": { trả về [biên dịch mã thao tác("OP_VM_IDENTITY_HASH"), 1, sai]; }
+        ca "do_dai": { trả về [biên dịch mã thao tác("OP_VM_LENGTH"), 1, sai]; }
+        ca "them": { trả về [biên dịch mã thao tác("OP_VM_LIST_APPEND"), 2, sai]; }
+        ca "xoa_tai": { trả về [biên dịch mã thao tác("OP_VM_LIST_REMOVE"), 2, sai]; }
+        ca "co_khoa": { trả về [biên dịch mã thao tác("OP_VM_MAP_HAS"), 2, sai]; }
+        ca "xoa_khoa": { trả về [biên dịch mã thao tác("OP_VM_MAP_REMOVE"), 2, sai]; }
+        ca "khoa_map": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
+        ca "chuoi_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTES"), 1, đúng]; }
+        ca "chuoi_tu_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_FROM_BYTES"), 1, đúng]; }
+        ca "so_thuc_tu_bits_vm": { trả về [biên dịch mã thao tác("OP_VM_FLOAT_FROM_BITS"), 1, đúng]; }
+        ca "máy_tệp_mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_OPEN"), 2, đúng]; }
+        ca "máy_tệp_đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_READ"), 3, đúng]; }
+        ca "máy_tệp_ghi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_WRITE"), 3, đúng]; }
+        ca "máy_tệp_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_CLOSE"), 1, đúng]; }
+        ca "máy_tệp_dịch": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_SEEK"), 3, đúng]; }
+        ca "máy_tệp_vị_trí": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_TELL"), 1, đúng]; }
+        ca "máy_tệp_lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_ERROR"), 1, đúng]; }
+        ca "máy_tệp_xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_REMOVE"), 1, đúng]; }
+        ca "máy_tiến_trình_pid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PID"), 0, đúng]; }
+        ca "máy_tiến_trình_ppid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PPID"), 0, đúng]; }
+        ca "máy_tiến_trình_uid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_UID"), 0, đúng]; }
+        ca "máy_tiến_trình_euid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_EUID"), 0, đúng]; }
+        ca "máy_tiến_trình_gid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_GID"), 0, đúng]; }
+        ca "máy_tiến_trình_egid": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_EGID"), 0, đúng]; }
+        ca "máy_ngủ_mili_giây": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_SLEEP"), 1, đúng]; }
+        ca "máy_đồng_hồ_đơn_điệu": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_MONOTONIC"), 0, đúng]; }
+        ca "máy_đồng_hồ_utc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_REALTIME"), 0, đúng]; }
+        ca "máy_entropy_bytes": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_ENTROPY_READ"), 1, đúng]; }
+        ca "máy_môi_trường_đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_ENV_GET"), 1, đúng]; }
+        ca "máy_đồng_hồ_địa_phương": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_LOCAL"), 1, đúng]; }
+        ca "máy_thư_mục_tạo": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_MKDIR"), 1, đúng]; }
+        ca "máy_thư_mục_xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_REMOVE"), 1, đúng]; }
+        ca "máy_thư_mục_mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_OPEN"), 1, đúng]; }
+        ca "máy_thư_mục_kế": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_NEXT"), 1, đúng]; }
+        ca "máy_thư_mục_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_CLOSE"), 1, đúng]; }
+        ca "máy_đường_loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_KIND"), 2, đúng]; }
+        ca "máy_socket_loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
+        ca "máy_socket_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
+        ca "máy_socket_timeout": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_TIMEOUT"), 2, đúng]; }
+        ca "máy_socket_gửi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_SEND"), 4, đúng]; }
+        ca "máy_socket_nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_RECV"), 4, đúng]; }
+        ca "máy_socket_chấp_nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_ACCEPT"), 1, đúng]; }
+        ca "máy_socket_lắng_nghe": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_LISTEN"), 2, đúng]; }
+        ca "máy_socket_kết_nối": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CONNECT"), 4, đúng]; }
+        ca "máy_tiến_trình_tạo": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_NEW"), 1, đúng]; }
+        ca "máy_tiến_trình_đối_số": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ARG"), 2, đúng]; }
+        ca "máy_tiến_trình_lệnh_windows": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_COMMAND_LINE"), 2, đúng]; }
+        ca "máy_tiến_trình_môi_trường": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ENV"), 3, đúng]; }
+        ca "máy_tiến_trình_bắt_đầu": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_START"), 1, đúng]; }
+        ca "máy_tiến_trình_thăm_dò": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_POLL"), 2, đúng]; }
+        ca "máy_tiến_trình_đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_READ"), 4, đúng]; }
+        ca "máy_tiến_trình_đợi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_WAIT"), 1, đúng]; }
+        ca "máy_tiến_trình_lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ERROR"), 1, đúng]; }
+        ca "máy_tiến_trình_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_CLOSE"), 1, đúng]; }
+        ca "máy_resolver_mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_OPEN"), 3, đúng]; }
+        ca "máy_resolver_tiếp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_NEXT"), 1, đúng]; }
+        ca "máy_resolver_đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_CLOSE"), 1, đúng]; }
+        ca "máy_tls_nâng_cấp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_UPGRADE"), 2, đúng]; }
+        ca "máy_tls_gửi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_SEND"), 3, đúng]; }
+        ca "máy_tls_nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_RECV"), 3, đúng]; }
+        ca "máy ảo liệt kê khóa từ điển": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
+        ca "máy ảo thêm cuối danh sách": { trả về [biên dịch mã thao tác("OP_VM_LIST_APPEND"), 2, sai]; }
+        ca "máy ảo xóa vị trí danh sách": { trả về [biên dịch mã thao tác("OP_VM_LIST_REMOVE"), 2, sai]; }
+        ca "máy ảo có khóa từ điển": { trả về [biên dịch mã thao tác("OP_VM_MAP_HAS"), 2, sai]; }
+        ca "máy ảo xóa khóa từ điển": { trả về [biên dịch mã thao tác("OP_VM_MAP_REMOVE"), 2, sai]; }
+        ca "máy ảo lấy độ dài": { trả về [biên dịch mã thao tác("OP_VM_LENGTH"), 1, sai]; }
+        ca "biên dịch phân tích máy ảo": { trả về [biên dịch mã thao tác("OP_VM_BIEN_DICH_PHAN_TICH"), 2, đúng]; }
+        ca "mã trung gian chạy máy ảo": { trả về [biên dịch mã thao tác("OP_VM_BYTECODE_CHAY"), 4, đúng]; }
+        ca "mã trung gian chạy bản địa": { trả về [biên dịch mã thao tác("OP_NATIVE_ARTIFACT_CHAY"), 5, đúng]; }
+        ca "phân giải tên miền phân giải máy ảo": { trả về [biên dịch mã thao tác("OP_VM_DNS_PHAN_GIAI"), 1, đúng]; }
+        ca "đọc biến moi truong máy ảo": { trả về [biên dịch mã thao tác("OP_VM_DOC_BIEN_MOI_TRUONG"), 1, đúng]; }
+        ca "đóng ho dia phuong máy ảo": { trả về [biên dịch mã thao tác("OP_VM_DONG_HO_DIA_PHUONG"), 0, đúng]; }
+        ca "đóng ho giờ quốc tế máy ảo": { trả về [biên dịch mã thao tác("OP_VM_DONG_HO_UTC"), 0, đúng]; }
+        ca "đường dẫn tồn tại máy ảo": { trả về [biên dịch mã thao tác("OP_VM_DUONG_DAN_TON_TAI"), 1, đúng]; }
+        ca "io đọc các byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_IO_DOC_BYTES"), 1, đúng]; }
+        ca "io đọc tệp dữ liệu máy ảo": { trả về [biên dịch mã thao tác("OP_VM_IO_DOC_FILE"), 1, đúng]; }
+        ca "io ghi các byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_BYTES"), 2, đúng]; }
+        ca "io ghi tệp dữ liệu máy ảo": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_FILE"), 2, đúng]; }
+        ca "io ghi tiep tệp dữ liệu máy ảo": { trả về [biên dịch mã thao tác("OP_VM_IO_GHI_TIEP_FILE"), 2, đúng]; }
+        ca "chạy kịch bản máy ảo": { trả về [biên dịch mã thao tác("OP_VM_KICH_BAN_CHAY"), 2, đúng]; }
+        ca "la tệp máy ảo": { trả về [biên dịch mã thao tác("OP_VM_LA_TEP"), 1, đúng]; }
+        ca "la thư mục không theo liên kết máy ảo": { trả về [biên dịch mã thao tác("OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET"), 1, đúng]; }
+        ca "la thư mục máy ảo": { trả về [biên dịch mã thao tác("OP_VM_LA_THU_MUC"), 1, đúng]; }
+        ca "liet ke thư mục máy ảo": { trả về [biên dịch mã thao tác("OP_VM_LIET_KE_THU_MUC"), 1, đúng]; }
+        ca "ngẫu nhiên bảo mật các byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_NGAU_NHIEN_BAO_MAT_BYTES"), 1, đúng]; }
+        ca "ngủ mili giây máy ảo": { trả về [biên dịch mã thao tác("OP_VM_NGU_MILI_GIAY"), 1, đúng]; }
+        ca "bit số thực máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SO_THUC_BITS"), 1, đúng]; }
+        ca "đầu nối chấp nhận máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_CHAP_NHAN"), 1, đúng]; }
+        ca "đầu nối đặt thời gian chờ máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_DAT_TIMEOUT"), 2, đúng]; }
+        ca "đầu nối đóng máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_DONG"), 1, đúng]; }
+        ca "đầu nối gửi máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_GUI"), 3, đúng]; }
+        ca "đầu nối nhận máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_NHAN"), 2, đúng]; }
+        ca "đầu nối phân giải máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_PHAN_GIAI"), 3, đúng]; }
+        ca "đầu nối giao vận tin cậy lắng nghe máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TCP_LANG_NGHE"), 2, đúng]; }
+        ca "đầu nối giao vận tin cậy mở máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TCP_MO"), 2, đúng]; }
+        ca "đầu nối tls nâng cấp máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_TLS_NANG_CAP"), 2, đúng]; }
+        ca "đầu nối giao vận gói tin mở máy ảo": { trả về [biên dịch mã thao tác("OP_VM_SOCKET_UDP_MO"), 2, đúng]; }
+        ca "tạo thư mục máy ảo": { trả về [biên dịch mã thao tác("OP_VM_TAO_THU_MUC"), 1, đúng]; }
+        ca "ten nền tảng máy ảo": { trả về [biên dịch mã thao tác("OP_VM_TEN_NEN_TANG"), 0, đúng]; }
+        ca "thời gian đơn điệu ms máy ảo": { trả về [biên dịch mã thao tác("OP_VM_THOI_GIAN_DON_DIEU_MS"), 0, đúng]; }
+        ca "tiến trình chạy máy ảo": { trả về [biên dịch mã thao tác("OP_VM_TIEN_TRINH_CHAY"), 3, đúng]; }
+        ca "xóa đường dẫn máy ảo": { trả về [biên dịch mã thao tác("OP_VM_XOA_DUONG_DAN"), 1, đúng]; }
+        ca "luồng máy ảo khởi chạy": { trả về [biên dịch mã thao tác("OP_VM_THREAD_SPAWN"), 2, đúng]; }
+        ca "luồng máy ảo đợi": { trả về [biên dịch mã thao tác("OP_VM_THREAD_WAIT"), 2, đúng]; }
+        ca "luồng máy ảo hủy": { trả về [biên dịch mã thao tác("OP_VM_THREAD_CANCEL"), 1, đúng]; }
+        ca "luồng máy ảo trạng thái": { trả về [biên dịch mã thao tác("OP_VM_THREAD_STATUS"), 1, đúng]; }
+        ca "luồng máy ảo nghỉ": { trả về [biên dịch mã thao tác("OP_VM_THREAD_PARK"), 1, đúng]; }
+        ca "băm định danh": { trả về [biên dịch mã thao tác("OP_VM_IDENTITY_HASH"), 1, sai]; }
+        ca "khóa từ điển": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
+        ca "chuỗi thành byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTES"), 1, đúng]; }
+        ca "chuỗi từ byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_STRING_FROM_BYTES"), 1, đúng]; }
+        ca "số thực từ bit máy ảo": { trả về [biên dịch mã thao tác("OP_VM_FLOAT_FROM_BITS"), 1, đúng]; }
+        ca "máy tệp mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_OPEN"), 2, đúng]; }
+        ca "máy tệp đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_READ"), 3, đúng]; }
+        ca "máy tệp ghi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_WRITE"), 3, đúng]; }
+        ca "máy tệp đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_CLOSE"), 1, đúng]; }
+        ca "máy tệp dịch": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_SEEK"), 3, đúng]; }
+        ca "máy tệp vị trí": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_TELL"), 1, đúng]; }
+        ca "máy tệp lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_ERROR"), 1, đúng]; }
+        ca "máy tệp xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_REMOVE"), 1, đúng]; }
+        ca "máy tiến trình mã tiến trình": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PID"), 0, đúng]; }
+        ca "máy tiến trình mã tiến trình cha": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_PPID"), 0, đúng]; }
+        ca "máy tiến trình mã người dùng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_UID"), 0, đúng]; }
+        ca "máy tiến trình mã người dùng hiệu lực": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_EUID"), 0, đúng]; }
+        ca "máy tiến trình mã nhóm": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_GID"), 0, đúng]; }
+        ca "máy tiến trình mã nhóm hiệu lực": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_EGID"), 0, đúng]; }
+        ca "máy ngủ mili giây": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_SLEEP"), 1, đúng]; }
+        ca "máy đồng hồ đơn điệu": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_MONOTONIC"), 0, đúng]; }
+        ca "máy đồng hồ giờ quốc tế": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_REALTIME"), 0, đúng]; }
+        ca "máy nguồn ngẫu nhiên các byte": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_ENTROPY_READ"), 1, đúng]; }
+        ca "máy môi trường đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_ENV_GET"), 1, đúng]; }
+        ca "máy đồng hồ địa phương": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TIME_LOCAL"), 1, đúng]; }
+        ca "máy thư mục tạo": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_MKDIR"), 1, đúng]; }
+        ca "máy thư mục xóa": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_REMOVE"), 1, đúng]; }
+        ca "máy thư mục mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_OPEN"), 1, đúng]; }
+        ca "máy thư mục kế": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_NEXT"), 1, đúng]; }
+        ca "máy thư mục đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_DIR_CLOSE"), 1, đúng]; }
+        ca "máy đường loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PATH_KIND"), 2, đúng]; }
+        ca "máy đầu nối loại": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_KIND"), 1, đúng]; }
+        ca "máy đầu nối đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CLOSE"), 1, đúng]; }
+        ca "máy đầu nối thời gian chờ": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_TIMEOUT"), 2, đúng]; }
+        ca "máy đầu nối gửi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_SEND"), 4, đúng]; }
+        ca "máy đầu nối nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_RECV"), 4, đúng]; }
+        ca "máy đầu nối chấp nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_ACCEPT"), 1, đúng]; }
+        ca "máy đầu nối lắng nghe": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_LISTEN"), 2, đúng]; }
+        ca "máy đầu nối kết nối": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_SOCKET_CONNECT"), 4, đúng]; }
+        ca "máy tiến trình tạo": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_NEW"), 1, đúng]; }
+        ca "máy tiến trình đối số": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ARG"), 2, đúng]; }
+        ca "máy tiến trình lệnh windows": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_COMMAND_LINE"), 2, đúng]; }
+        ca "máy tiến trình môi trường": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ENV"), 3, đúng]; }
+        ca "máy tiến trình bắt đầu": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_START"), 1, đúng]; }
+        ca "máy tiến trình thăm dò": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_POLL"), 2, đúng]; }
+        ca "máy tiến trình đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_READ"), 4, đúng]; }
+        ca "máy tiến trình đợi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_WAIT"), 1, đúng]; }
+        ca "máy tiến trình lỗi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_ERROR"), 1, đúng]; }
+        ca "máy tiến trình đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_PROCESS_CLOSE"), 1, đúng]; }
+        ca "máy bộ phân giải mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_OPEN"), 3, đúng]; }
+        ca "máy bộ phân giải tiếp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_NEXT"), 1, đúng]; }
+        ca "máy bộ phân giải đóng": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_RESOLVE_CLOSE"), 1, đúng]; }
+        ca "máy tls nâng cấp": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_UPGRADE"), 2, đúng]; }
+        ca "máy tls gửi": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_SEND"), 3, đúng]; }
+        ca "máy tls nhận": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_TLS_RECV"), 3, đúng]; }
+        ca "loại của": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }
+        ca "độ dài": { trả về [biên dịch mã thao tác("OP_VM_LENGTH"), 1, sai]; }
+        ca "thêm": { trả về [biên dịch mã thao tác("OP_VM_LIST_APPEND"), 2, sai]; }
+        ca "xóa tại": { trả về [biên dịch mã thao tác("OP_VM_LIST_REMOVE"), 2, sai]; }
+        ca "có khóa": { trả về [biên dịch mã thao tác("OP_VM_MAP_HAS"), 2, sai]; }
+        ca "xóa khóa": { trả về [biên dịch mã thao tác("OP_VM_MAP_REMOVE"), 2, sai]; }
+        ca "khóa map": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
+    };
+    trả về rỗng;
 };

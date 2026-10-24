@@ -14,11 +14,11 @@ nhập gói/biên dịch/mã máy s390x;
 nhập gói/biên dịch/mã máy sparc;
 
 // Hợp đồng ABI leaf i32: hằng số, cộng hoặc trừ hai tham số (chưa xử lý tràn VM).
-hàm công khai biên dịch mã máy lá(kiến_trúc, loại, hằng = 0, hệ_điều_hành = "linux") {
-    đích = biên dịch thông tin kiến trúc(kiến_trúc);
+hàm công khai biên dịch mã máy lá(kiến trúc, loại, hằng = 0, hệ điều hành = "linux") {
+    đích = biên dịch thông tin kiến trúc(kiến trúc);
     tên = đích["tên"];
     ít = đích["little endian"];
-    nếu (tên == "aarch64" && hệ_điều_hành == "windows") {
+    nếu (tên == "aarch64" && hệ điều hành == "windows") {
         ném "Windows ARM64 native ABI chưa được triển khai";
     };
     nếu (loại != "hằng" && loại != "cộng" && loại != "trừ") {
@@ -32,44 +32,44 @@ hàm công khai biên dịch mã máy lá(kiến_trúc, loại, hằng = 0, hệ
         cao = phần["hi"];
     };
     chọn (tên) {
-        ca "x86_64": { trả về biên dịch mã máy phát x86_64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "aarch64": { trả về biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "riscv64": { trả về biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "armv7": { trả về biên dịch mã máy phát armv7(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "i386": { trả về biên dịch mã máy phát i386(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "powerpc": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "powerpc64": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "powerpc64le": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "mips": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "mipsel": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "mips64": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "mips64el": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "loongarch64": { trả về biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "s390x": { trả về biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "sparc": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
-        ca "sparc64": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành); }
+        ca "x86_64": { trả về biên dịch mã máy phát x86 sáu mươi tư(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "aarch64": { trả về biên dịch mã máy phát aarch64(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "riscv64": { trả về biên dịch mã máy phát riscv64(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "armv7": { trả về biên dịch mã máy phát armv7(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "i386": { trả về biên dịch mã máy phát i386(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "powerpc": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "powerpc64": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "powerpc64le": { trả về biên dịch mã máy phát powerpc(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "mips": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "mipsel": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "mips64": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "mips64el": { trả về biên dịch mã máy phát mips(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "loongarch64": { trả về biên dịch mã máy phát loongarch64(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "s390x": { trả về biên dịch mã máy phát s390x(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "sparc": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ điều hành); }
+        ca "sparc64": { trả về biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ điều hành); }
         mặc định: { ném "mã máy: kiến trúc chưa hỗ trợ"; }
     };
 };
 
 // Phát hàm MachineOpcode i32 qua thư viện V++; kết quả gồm bytes và relocations.
 // Chỉ công bố target đã có encoder tổng quát thuần V++ và kiểm tra parity.
-hàm công khai biên dịch mã máy hàm(kiến_trúc, hàm_ir, hệ_điều_hành = "linux") {
-    tên = biên dịch thông tin kiến trúc(kiến_trúc)["tên"];
-    biên dịch mã máy kiểm tra CFG(hàm_ir);
+hàm công khai biên dịch mã máy hàm(kiến trúc, danh sách hàm biểu diễn trung gian, hệ điều hành = "linux") {
+    tên = biên dịch thông tin kiến trúc(kiến trúc)["tên"];
+    biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian);
     chọn (tên) {
         ca "x86_64": {
-            nếu (hệ_điều_hành != "linux" && hệ_điều_hành != "macos" &&
-                hệ_điều_hành != "windows") {
-                ném "x86_64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ_điều_hành;
+            nếu (hệ điều hành != "linux" && hệ điều hành != "macos" &&
+                hệ điều hành != "windows") {
+                ném "x86_64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ điều hành;
             };
-            trả về biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành);
+            trả về biên dịch mã máy phát x86 sáu mươi tư hàm(danh sách hàm biểu diễn trung gian, hệ điều hành);
         }
         ca "aarch64": {
-            nếu (hệ_điều_hành != "linux" && hệ_điều_hành != "macos") {
-                ném "AArch64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ_điều_hành;
+            nếu (hệ điều hành != "linux" && hệ điều hành != "macos") {
+                ném "AArch64 Machine IR V++ chưa hỗ trợ hệ điều hành: " + hệ điều hành;
             };
-            trả về biên dịch mã máy phát aarch64 hàm(hàm_ir, hệ_điều_hành);
+            trả về biên dịch mã máy phát aarch64 hàm(danh sách hàm biểu diễn trung gian, hệ điều hành);
         }
         mặc định: { ném "Machine IR V++ chưa có backend tổng quát: " + tên; }
     };

@@ -11,7 +11,7 @@ nhập gói/nhập xuất/chính;
 hàm chính() {
     tệp = Bộ Đệm Tệp("dữ liệu.bin", "ghi", 4096);
     thử {
-        tệp.ghi bytes([0, 255, 65]);
+        tệp.ghi các byte([0, 255, 65]);
         tệp.đẩy đệm();
     } bắt lỗi(e) {
         thử { tệp.đóng(); } bắt lỗi(lỗi_đóng) {};
@@ -25,9 +25,9 @@ Constructor nhận đường dẫn UTF-8, chế độ `đọc`/`ghi`/`nối` và
 1..65536 byte (mặc định 4096). Tham số thứ tư tùy chọn là tên thao tác dùng
 trong bản ghi lỗi. `Luồng Tệp(đường, chế_độ)` giữ API hiện có.
 
-- `đọc bytes(n)` trả tối đa n byte; n trong 0..65536; EOF trả danh sách rỗng.
+- `đọc các byte(n)` trả tối đa n byte; n trong 0..65536; EOF trả danh sách rỗng.
 - `đọc hết()` trả chuỗi byte còn lại, giữ nguyên NUL và byte nhị phân.
-- `ghi bytes(bytes)` kiểm tra toàn bộ đầu vào trước khi chấp nhận byte đầu tiên.
+- `ghi các byte(bytes)` kiểm tra toàn bộ đầu vào trước khi chấp nhận byte đầu tiên.
 - `ghi(nội_dung)` ghi biểu diễn chuỗi bằng UTF-8.
 - `đẩy đệm()` đẩy các byte đang chờ xuống OS; không cam kết đồng bộ xuống đĩa.
 - `vị trí()` trả vị trí byte logic, gồm dữ liệu ghi đang chờ và trừ dữ liệu đọc trước.

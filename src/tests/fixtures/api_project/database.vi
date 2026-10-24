@@ -1,13 +1,13 @@
 nhập nhập xuất;
 nhập dữ liệu;
 
-// Ghi chú hàm: đường dẫn application.properties của test API project.
+// Ghi chú hàm: đường dẫn application.các thuộc tính của test API project.
 hàm db đường dẫn cấu hình() {
-    trả về "fixtures/api_project/application.properties";
+    trả về "fixtures/api_project/application.các thuộc tính";
 };
 
 // Ghi chú hàm: JDBC URL mặc định theo cấu hình V++ datasource.
-hàm db mặc định url() {
+hàm db mặc định địa chỉ tài nguyên() {
     trả về "jdbc:sqlite:.tmp_api_project.db";
 };
 
@@ -26,11 +26,11 @@ hàm db mặc định driver() {
     trả về "org.sqlite.JDBC";
 };
 
-// Ghi chú hàm: lấy URL từ properties, có fallback mặc định.
-hàm db url từ cấu hình() {
+// Ghi chú hàm: lấy URL từ các thuộc tính, có fallback mặc định.
+hàm db địa chỉ tài nguyên từ cấu hình() {
     value = đọc cấu hình khóa(
         db đường dẫn cấu hình(),
-        "url",
+        "địa chỉ tài nguyên",
         ""
     );
     nếu (value != "") {
@@ -39,17 +39,17 @@ hàm db url từ cấu hình() {
 
     value = đọc cấu hình khóa(
         db đường dẫn cấu hình(),
-        "vpp.datasource.url",
+        "vpp.datasource.địa chỉ tài nguyên",
         ""
     );
     nếu (value != "") {
         trả về value;
     };
 
-    trả về db mặc định url();
+    trả về db mặc định địa chỉ tài nguyên();
 };
 
-// Ghi chú hàm: lấy username từ properties, có fallback mặc định.
+// Ghi chú hàm: lấy username từ các thuộc tính, có fallback mặc định.
 hàm db username từ cấu hình() {
     value = đọc cấu hình khóa(
         db đường dẫn cấu hình(),
@@ -72,7 +72,7 @@ hàm db username từ cấu hình() {
     trả về db mặc định username();
 };
 
-// Ghi chú hàm: lấy password từ properties, có fallback mặc định.
+// Ghi chú hàm: lấy password từ các thuộc tính, có fallback mặc định.
 hàm db password từ cấu hình() {
     value = đọc cấu hình khóa(
         db đường dẫn cấu hình(),
@@ -95,7 +95,7 @@ hàm db password từ cấu hình() {
     trả về db mặc định password();
 };
 
-// Ghi chú hàm: lấy driver từ properties, có fallback mặc định.
+// Ghi chú hàm: lấy driver từ các thuộc tính, có fallback mặc định.
 hàm db driver từ cấu hình() {
     value = đọc cấu hình khóa(
         db đường dẫn cấu hình(),
@@ -119,22 +119,22 @@ hàm db driver từ cấu hình() {
 };
 
 hàm db connect(connectionString) {
-    url = db url từ cấu hình();
+    địa chỉ tài nguyên = db địa chỉ tài nguyên từ cấu hình();
     driver = db driver từ cấu hình();
     username = db username từ cấu hình();
     password = db password từ cấu hình();
 
     nếu (connectionString != "") {
-        url = connectionString;
+        địa chỉ tài nguyên = connectionString;
     };
 
-    nếu (url == "") {
+    nếu (địa chỉ tài nguyên == "") {
         trả về "DB_ERR|missing-connection-string";
     };
 
-    connectRes = db_ket_noi(
+    connectRes = kết nối cơ sở dữ liệu(
         driver,
-        url,
+        địa chỉ tài nguyên,
         username,
         password
     );
@@ -143,24 +143,24 @@ hàm db connect(connectionString) {
     };
 
     // Prepare full schema and deterministic seed rows for API tests.
-    db_truy_van(driver, url, username, password, "DROP TABLE IF EXISTS users;");
-    db_truy_van(driver, url, username, password, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, city TEXT, country TEXT, country_code TEXT, created_at TEXT, delete_flag INTEGER, email TEXT, first_names TEXT, is_active INTEGER, last_name TEXT, password TEXT, phone_number TEXT, postal_code TEXT, updated_at TEXT, user_code TEXT, username TEXT UNIQUE, vatnumber TEXT, company_code TEXT, role_id INTEGER);");
-    db_truy_van(driver, url, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-an','HCM','VN','VN','2026-07-04T00:00:00Z',0,'an@example.com','An',1,'Nguyen','pwd-an','0900000001','700000','2026-07-04T00:00:00Z','U001','an','VAT001','CP001',1);");
-    db_truy_van(driver, url, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-binh','HN','VN','VN','2026-07-04T00:00:00Z',0,'binh@example.com','Binh',1,'Tran','pwd-binh','0900000002','100000','2026-07-04T00:00:00Z','U002','binh','VAT002','CP001',2);");
-    db_truy_van(driver, url, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-chi','DN','VN','VN','2026-07-04T00:00:00Z',0,'chi@example.com','Chi',1,'Le','pwd-chi','0900000003','550000','2026-07-04T00:00:00Z','U003','chi','VAT003','CP001',3);");
+    truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "DROP TABLE IF EXISTS users;");
+    truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, city TEXT, country TEXT, country_code TEXT, created_at TEXT, delete_flag INTEGER, email TEXT, first_names TEXT, is_active INTEGER, last_name TEXT, password TEXT, phone_number TEXT, postal_code TEXT, updated_at TEXT, user_code TEXT, username TEXT UNIQUE, vatnumber TEXT, company_code TEXT, role_id INTEGER);");
+    truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-an','HCM','VN','VN','2026-07-04T00:00:00Z',0,'an@example.com','An',1,'Nguyen','pwd-an','0900000001','700000','2026-07-04T00:00:00Z','U001','an','VAT001','CP001',1);");
+    truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-binh','HN','VN','VN','2026-07-04T00:00:00Z',0,'binh@example.com','Binh',1,'Tran','pwd-binh','0900000002','100000','2026-07-04T00:00:00Z','U002','binh','VAT002','CP001',2);");
+    truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-chi','DN','VN','VN','2026-07-04T00:00:00Z',0,'chi@example.com','Chi',1,'Le','pwd-chi','0900000003','550000','2026-07-04T00:00:00Z','U003','chi','VAT003','CP001',3);");
 
     trả về connectRes;
 };
 
 hàm db disconnect() {
     driver = db driver từ cấu hình();
-    url = db url từ cấu hình();
+    địa chỉ tài nguyên = db địa chỉ tài nguyên từ cấu hình();
     username = db username từ cấu hình();
     password = db password từ cấu hình();
 
-    trả về db_ngat_ket_noi(
+    trả về ngắt kết nối cơ sở dữ liệu(
         driver,
-        url,
+        địa chỉ tài nguyên,
         username,
         password
     );
@@ -168,7 +168,7 @@ hàm db disconnect() {
 
 hàm db query(dbSession, sql) {
     driver = db driver từ cấu hình();
-    url = db url từ cấu hình();
+    địa chỉ tài nguyên = db địa chỉ tài nguyên từ cấu hình();
     username = db username từ cấu hình();
     password = db password từ cấu hình();
 
@@ -177,7 +177,7 @@ hàm db query(dbSession, sql) {
     };
 
     nếu (sql == "SELECT * FROM users") {
-        rows = db_truy_van(driver, url, username, password, "SELECT username FROM users ORDER BY username;");
+        rows = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "SELECT username FROM users ORDER BY username;");
         nếu (rows == "DB_OK|" || rows == "DB_OK|NULL") {
             trả về "DB_OK|users=[]";
         };
@@ -195,7 +195,7 @@ hàm db query(dbSession, sql) {
     };
 
     nếu (sql == "INSERT INTO users") {
-        execRes = db_truy_van(driver, url, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-an-new','HCM','VN','VN','2026-07-04T01:00:00Z',0,'an.new@example.com','An',1,'Nguyen','pwd-an-new','0900000011','700001','2026-07-04T01:00:00Z','U004','an','VAT004','CP002',2) ON CONFLICT(username) DO UPDATE SET email='an.new@example.com',updated_at='2026-07-04T01:00:00Z',company_code='CP002',role_id=2;");
+        execRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "INSERT INTO users(address,city,country,country_code,created_at,delete_flag,email,first_names,is_active,last_name,password,phone_number,postal_code,updated_at,user_code,username,vatnumber,company_code,role_id) VALUES ('addr-an-new','HCM','VN','VN','2026-07-04T01:00:00Z',0,'an.new@example.com','An',1,'Nguyen','pwd-an-new','0900000011','700001','2026-07-04T01:00:00Z','U004','an','VAT004','CP002',2) ON CONFLICT(username) DO UPDATE SET email='an.new@example.com',updated_at='2026-07-04T01:00:00Z',company_code='CP002',role_id=2;");
         nếu (execRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
@@ -203,7 +203,7 @@ hàm db query(dbSession, sql) {
     };
 
     nếu (sql == "UPDATE users") {
-        execRes = db_truy_van(driver, url, username, password, "UPDATE users SET first_names='An',last_name='Nguyen',username='an-nguyen',email='an.nguyen@example.com',updated_at='2026-07-04T02:00:00Z',address='addr-an-updated',city='HCM',country='VN',country_code='VN',phone_number='0900000099',postal_code='700099',user_code='U005',vatnumber='VAT005',company_code='CP003',role_id=4,is_active=1,delete_flag=0 WHERE username='an';");
+        execRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "UPDATE users SET first_names='An',last_name='Nguyen',username='an-nguyen',email='an.nguyen@example.com',updated_at='2026-07-04T02:00:00Z',address='addr-an-updated',city='HCM',country='VN',country_code='VN',phone_number='0900000099',postal_code='700099',user_code='U005',vatnumber='VAT005',company_code='CP003',role_id=4,is_active=1,delete_flag=0 WHERE username='an';");
         nếu (execRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
@@ -211,20 +211,20 @@ hàm db query(dbSession, sql) {
     };
 
     nếu (sql == "DELETE users") {
-        execRes = db_truy_van(driver, url, username, password, "DELETE FROM users WHERE LOWER(username) LIKE '%nguyen%' OR LOWER(username)='an';");
+        execRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "DELETE FROM users WHERE LOWER(username) LIKE '%nguyen%' OR LOWER(username)='an';");
         nếu (execRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
         trả về "DB_OK|deleted-user";
     };
 
-    trả về db_truy_van(driver, url, username, password, sql);
+    trả về truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, sql);
 };
 
 // Ghi chú hàm: tìm kiếm user theo từ khóa trên DB thật.
 hàm db search users(dbSession, keyword) {
     driver = db driver từ cấu hình();
-    url = db url từ cấu hình();
+    địa chỉ tài nguyên = db địa chỉ tài nguyên từ cấu hình();
     username = db username từ cấu hình();
     password = db password từ cấu hình();
 
@@ -237,7 +237,7 @@ hàm db search users(dbSession, keyword) {
     };
 
     nếu (keyword == "an") {
-        countRes = db_truy_van(driver, url, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%an%' OR LOWER(first_names) LIKE '%an%';");
+        countRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%an%' OR LOWER(first_names) LIKE '%an%';");
         nếu (countRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
@@ -248,7 +248,7 @@ hàm db search users(dbSession, keyword) {
     };
 
     nếu (keyword == "binh") {
-        countRes = db_truy_van(driver, url, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%binh%' OR LOWER(first_names) LIKE '%binh%';");
+        countRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%binh%' OR LOWER(first_names) LIKE '%binh%';");
         nếu (countRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
@@ -259,7 +259,7 @@ hàm db search users(dbSession, keyword) {
     };
 
     nếu (keyword == "chi") {
-        countRes = db_truy_van(driver, url, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%chi%' OR LOWER(first_names) LIKE '%chi%';");
+        countRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%chi%' OR LOWER(first_names) LIKE '%chi%';");
         nếu (countRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };
@@ -270,7 +270,7 @@ hàm db search users(dbSession, keyword) {
     };
 
     nếu (keyword == "nguyen") {
-        countRes = db_truy_van(driver, url, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%nguyen%' OR LOWER(last_name) LIKE '%nguyen%';");
+        countRes = truy vấn cơ sở dữ liệu(driver, địa chỉ tài nguyên, username, password, "SELECT COUNT(*) FROM users WHERE LOWER(username) LIKE '%nguyen%' OR LOWER(last_name) LIKE '%nguyen%';");
         nếu (countRes == "DB_ERR|not-connected") {
             trả về "DB_ERR|not-connected";
         };

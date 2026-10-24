@@ -7,18 +7,18 @@ lớp công khai Đồng Hồ Đơn Điệu {
     hàm công khai khởi tạo() {};
 
     // Đệm 16 byte, giây/nanosecond little-endian từ machine intrinsic.
-    hàm riêng tư đơn điệu đọc u64(đệm, bắt_đầu) {
+    hàm riêng tư đơn điệu đọc u64(đệm, bắt đầu) {
         số = 0.0;
         bội = 1.0;
         lặp(i = 0; i < 8; i++) {
-            số = số + đệm[bắt_đầu + i] * bội;
+            số = số + đệm[bắt đầu + i] * bội;
             bội = bội * 256.0;
         };
         trả về số;
     };
 
     hàm công khai thời gian đơn điệu mili giây() {
-        đệm = máy_đồng_hồ_đơn_điệu();
+        đệm = máy đồng hồ đơn điệu();
         giây = mình.đơn điệu đọc u64(đệm, 0);
         nano = mình.đơn điệu đọc u64(đệm, 8);
         nếu (giây > 9007199254.0 || nano >= 1000000000.0) {
@@ -38,16 +38,16 @@ lớp công khai Đồng Hồ Đơn Điệu {
 
 
 hàm công khai thời gian đơn điệu mili giây() {
-    __vpp_adapter = Đồng Hồ Đơn Điệu();
-    trả về __vpp_adapter.thời gian đơn điệu mili giây();
+    bộ chuyển tiếp = Đồng Hồ Đơn Điệu();
+    trả về bộ chuyển tiếp.thời gian đơn điệu mili giây();
 };
 
 hàm công khai bắt đầu đo thời gian() {
-    __vpp_adapter = Đồng Hồ Đơn Điệu();
-    trả về __vpp_adapter.bắt đầu đo thời gian();
+    bộ chuyển tiếp = Đồng Hồ Đơn Điệu();
+    trả về bộ chuyển tiếp.bắt đầu đo thời gian();
 };
 
 hàm công khai kết thúc đo thời gian(bắt đầu) {
-    __vpp_adapter = Đồng Hồ Đơn Điệu();
-    trả về __vpp_adapter.kết thúc đo thời gian(bắt đầu);
+    bộ chuyển tiếp = Đồng Hồ Đơn Điệu();
+    trả về bộ chuyển tiếp.kết thúc đo thời gian(bắt đầu);
 };

@@ -8,7 +8,7 @@ hàm chính() {
     in json chuỗi("Việt");
 
     vòng = {};
-    đặt map(vòng, "self", vòng);
+    đặt từ điển(vòng, "self", vòng);
     thử {
         json tạo(vòng);
         in 0;

@@ -1,7 +1,7 @@
-// Native object linkage: direct calls, nested calls, recursion, loops and ABI arguments.
+// Native đối tượng linkage: direct calls, nested calls, recursion, loops and ABI arguments.
 hàm co_so() { trả về 7; }
 
-hàm them(a, b) { trả về a + b; }
+hàm thêm(a, b) { trả về a + b; }
 hàm ten_ham_dai(x) { trả về x; }
 
 hàm nhan_sau(n) {
@@ -10,13 +10,13 @@ hàm nhan_sau(n) {
 }
 
 hàm ket_hop(a, b, c, d) {
-    trả về them(them(a, b), them(c, d)) + ten_ham_dai(co_so());
+    trả về thêm(thêm(a, b), thêm(c, d)) + ten_ham_dai(co_so());
 }
 
 hàm tinh_vong(n) {
     biến kq = 0;
     lặp (i = 0; i < n; i = i + 1) {
-        kq = kq + them(i, co_so());
+        kq = kq + thêm(i, co_so());
     };
     trả về kq;
 }

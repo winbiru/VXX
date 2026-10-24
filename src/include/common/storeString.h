@@ -32,7 +32,7 @@ namespace vietvm::compiler {
         int functionId = -1;
     };
 
-    // Gom toàn bộ trạng thái mutable của một lượt biên dịch như bytecode hàm, StringPool, import và class context để các pipeline độc lập không dùng chung dữ liệu cũ.
+    // Gom toàn bộ trạng thái mutable của một lượt biên dịch như mã trung gian hàm, StringPool, import và class context để các pipeline độc lập không dùng chung dữ liệu cũ.
     struct CompilationRegistryState {
         std::vector<std::string> stringPool;
         std::unordered_map<std::string, int> stringPoolIndexMap;

@@ -1,0 +1,365 @@
+// vi.naming.dns — phân giải tên bằng resolver của hệ điều hành.
+nhập gói/mạng/ổ cắm;
+nhập gói/mạng/gói tin tên miền;
+nhập gói/mạng/cấu hình phân giải tên miền;
+nhập gói/mạng/bảng tên máy;
+nhập gói/mạng/bộ nhớ đệm tên miền;
+nhập gói/bộ sưu tập/danh sách;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/lõi/nguồn ngẫu nhiên;
+nhập gói/lõi/toán học;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/hệ thống/môi trường;
+nhập gói/thời gian/đơn điệu;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Phân Giải DNS {
+    hàm công khai khởi tạo() { mình.bộ nhớ = Bộ Nhớ Đệm DNS(); };
+
+    // QNAME/QTYPE/cổng và thứ tự máy chủ đều tham gia cache key.
+    // Chuyển ASCII thành chữ thường để tên DNS không phân biệt hoa/thường.
+    hàm riêng tư phân giải tên miền khóa bộ nhớ đệm(tên máy, danh sách, cổng, loại) {
+        các byte = chuỗi thành byte máy ảo(tên máy);
+        tên = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            k = các byte[i];
+            nếu (k >= 65 && k <= 90) { k = k + 32; };
+            máy ảo thêm cuối danh sách(tên, k);
+        };
+        khóa = thành chuỗi(loại) + "|" + thành chuỗi(cổng) + "|" +
+               chuỗi từ byte máy ảo(tên);
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
+            khóa = khóa + "|" + danh sách[i];
+        };
+        trả về khóa;
+    };
+
+    // Lỗi giao thức không được retry sang máy chủ khác. RCODE từ DNS server
+    // được phân loại riêng để có chính sách retry cụ thể.
+    hàm riêng tư phân giải tên miền lỗi giao thức(e) {
+        trả về {"loại": "dns_giao_thức", "chi tiết": e};
+    };
+
+    hàm riêng tư phân giải tên miền kiểm tra lỗi giao thức(e) {
+        nếu (loại của(e) != "từ điển") { trả về sai; };
+        trả về lấy từ điển(e, "loại", "") == "dns_giao_thức";
+    };
+
+    hàm riêng tư phân giải tên miền kiểm tra lỗi mã phản hồi(e) {
+        nếu (loại của(e) != "từ điển") { trả về sai; };
+        trả về lấy từ điển(e, "loại", "") == "dns_rcode";
+    };
+
+    hàm riêng tư phân giải tên miền lỗi phân tích(e) {
+        nếu (mình.phân giải tên miền kiểm tra lỗi mã phản hồi(e)) { trả về e; };
+        trả về mình.phân giải tên miền lỗi giao thức(e);
+    };
+
+    // Một deadline chung ngăn việc reset timeout ở mỗi lần recv TCP.
+    hàm riêng tư phân giải tên miền thời gian còn(hạn chót) {
+        còn = hạn chót - thời gian đơn điệu mili giây();
+        nếu (còn <= 0) { ném "DNS: hết thời gian xử lý giao dịch"; };
+        mili giây = làm tròn xuống(còn);
+        nếu (mili giây < 1) { mili giây = 1; };
+        trả về mili giây;
+    };
+
+    // TCP là stream: recv có thể trả ít byte hơn yêu cầu, kể cả header 2 byte.
+    hàm riêng tư phân giải tên miền giao vận tin cậy đọc đủ(mã, số byte, hạn chót) {
+        dữ liệu = [];
+        lặp(vòng = 0; máy ảo lấy độ dài(dữ liệu) < số byte; vòng++) {
+            đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
+            phần = chuỗi thành byte máy ảo(đầu nối nhận(mã, số byte - máy ảo lấy độ dài(dữ liệu)));
+            nếu (máy ảo lấy độ dài(phần) == 0) { ném "DNS TCP: kết nối đóng giữa bản tin"; };
+            lặp(i = 0; i < máy ảo lấy độ dài(phần); i++) { máy ảo thêm cuối danh sách(dữ liệu, phần[i]); };
+        };
+        trả về dữ liệu;
+    };
+
+    // DNS over TCP: tiền tố chiều dài 16 bit big-endian (RFC 7766).
+    hàm riêng tư phân giải tên miền hỏi giao vận tin cậy(máy chủ, cổng, truy vấn, tên máy, loại, giao dịch,
+                             hạn chót) {
+        ổ cắm = Bộ Điều Khiển Ổ Cắm();
+        mã = máy đầu nối kết nối(
+            ổ cắm.đầu nối địa chỉ mạng các byte(máy chủ), cổng, 0, mình.phân giải tên miền thời gian còn(hạn chót)
+        );
+        kết quả = {};
+        thử {
+            đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
+            kích thước = máy ảo lấy độ dài(truy vấn);
+            gói tin = [(kích thước - kích thước % 256) / 256, kích thước % 256];
+            lặp(i = 0; i < kích thước; i++) { máy ảo thêm cuối danh sách(gói tin, truy vấn[i]); };
+            đầu nối gửi(mã, chuỗi từ byte máy ảo(gói tin));
+            đầu = mình.phân giải tên miền giao vận tin cậy đọc đủ(mã, 2, hạn chót);
+            độ dài = đầu[0] * 256 + đầu[1];
+            nếu (độ dài < 12) {
+                ném mình.phân giải tên miền lỗi giao thức("DNS TCP: độ dài gói tin không hợp lệ");
+            };
+            phản hồi = mình.phân giải tên miền giao vận tin cậy đọc đủ(mã, độ dài, hạn chót);
+            bộ = Bộ Mã DNS();
+            thử {
+                kết quả = bộ.phân giải tên miền đọc phản hồi đầy đủ(phản hồi, tên máy, loại, giao dịch);
+            } bắt lỗi(e) { ném mình.phân giải tên miền lỗi phân tích(e); };
+            đầu nối đóng(mã);
+        } bắt lỗi(e) {
+            thử { đầu nối đóng(mã); } bắt lỗi(số mục bỏ qua) {};
+            ném e;
+        };
+        trả về kết quả;
+    };
+
+    // Lộ trình DNS thuần V++ thử nghiệm: UDP tới IP máy chủ được chỉ định,
+    // dùng Machine Socket ABI và giải mã DNS trong .vi. Không dùng getaddrinfo.
+    // VPP_DNS_VI_SERVER phải là IPv4/IPv6 dạng số; tên máy chủ DNS sẽ không
+    // được tự phân giải để tránh phụ thuộc vòng tròn vào resolver của OS.
+    hàm công khai phân giải tên miền hỏi máy chủ(tên máy, máy chủ, cổng, loại, thời gian chờ = 2000) {
+        chi tiết = mình.phân giải tên miền hỏi máy chủ đầy đủ(tên máy, máy chủ, cổng, loại, thời gian chờ);
+        trả về lấy từ điển(chi tiết, "addresses", []);
+    };
+
+    // API transport có cấu trúc; sử dụng cùng parser cho UDP và TCP fallback.
+    hàm công khai phân giải tên miền hỏi máy chủ đầy đủ(tên máy, máy chủ, cổng, loại, thời gian chờ = 2000) {
+        bộ = Bộ Mã DNS();
+        cổng = đầu nối yêu cầu cổng(cổng, "dns_hoi_may_chu");
+        thời gian chờ = đầu nối yêu cầu thời gian chờ(thời gian chờ, "dns_hoi_may_chu");
+        hạn chót = thời gian đơn điệu mili giây() + thời gian chờ;
+        mã ngẫu nhiên = nguồn ngẫu nhiên bảo mật các byte(2);
+        giao dịch = mã ngẫu nhiên[0] * 256 + mã ngẫu nhiên[1];
+        truy vấn = bộ.phân giải tên miền tạo truy vấn(tên máy, loại, giao dịch);
+        ổ cắm = Bộ Điều Khiển Ổ Cắm();
+        mã = máy đầu nối kết nối(
+            ổ cắm.đầu nối địa chỉ mạng các byte(máy chủ),
+            cổng,
+            1,
+            mình.phân giải tên miền thời gian còn(hạn chót)
+        );
+        kết quả = {};
+        cần giao vận tin cậy = sai;
+        thử {
+            đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
+            đầu nối gửi(mã, chuỗi từ byte máy ảo(truy vấn));
+            đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
+            trả lời = đầu nối nhận(mã, 4096);
+            các byte = chuỗi thành byte máy ảo(trả lời);
+            thử {
+                cần giao vận tin cậy = bộ.phân giải tên miền cần giao vận tin cậy(các byte, giao dịch, tên máy, loại);
+            } bắt lỗi(e) { ném mình.phân giải tên miền lỗi giao thức(e); };
+            nếu (!cần giao vận tin cậy) {
+                thử {
+                    kết quả = bộ.phân giải tên miền đọc phản hồi đầy đủ(các byte, tên máy, loại, giao dịch);
+                } bắt lỗi(e) { ném mình.phân giải tên miền lỗi phân tích(e); };
+            };
+            đầu nối đóng(mã);
+        } bắt lỗi(e) {
+            thử { đầu nối đóng(mã); } bắt lỗi(số mục bỏ qua) {};
+            ném e;
+        };
+        nếu (cần giao vận tin cậy) {
+            trả về mình.phân giải tên miền hỏi giao vận tin cậy(
+                máy chủ, cổng, truy vấn, tên máy, loại, giao dịch, hạn chót
+            );
+        };
+        trả về kết quả;
+    };
+
+    // [] từ NOERROR hoặc NXDOMAIN đều là trả lời cuối cùng, không retry.
+    // SERVFAIL/REFUSED có thể chuyển nameserver; RCODE khác và lỗi giao thức
+    // được trả ngay để tránh che giấu lỗi phía server hoặc dữ liệu sai.
+    hàm công khai phân giải tên miền hỏi dự phòng(tên máy, máy chủ, cổng, loại, thời gian chờ = 2000) {
+        chi tiết = mình.phân giải tên miền hỏi dự phòng đầy đủ(tên máy, máy chủ, cổng, loại, thời gian chờ);
+        trả về lấy từ điển(chi tiết, "addresses", []);
+    };
+
+    // NOERROR/NODATA/NXDOMAIN là phản hồi cuối cùng, giữ nguyên TTL và RCODE.
+    hàm công khai phân giải tên miền hỏi dự phòng đầy đủ(tên máy, máy chủ, cổng, loại, thời gian chờ = 2000) {
+        nếu (loại của(máy chủ) != "danh sách" || máy ảo lấy độ dài(máy chủ) > 8) {
+            ném "DNS: danh sách nameserver không hợp lệ";
+        };
+        nếu (máy ảo lấy độ dài(máy chủ) == 0) { ném "DNS: không có nameserver"; };
+        // Validation trước khi retry: lỗi input không phải lỗi transport.
+        bộ = Bộ Mã DNS();
+        bộ.phân giải tên miền tạo truy vấn(tên máy, loại, 0);
+        đầu nối yêu cầu cổng(cổng, "dns_hoi_du_phong");
+        đầu nối yêu cầu thời gian chờ(thời gian chờ, "dns_hoi_du_phong");
+        ổ cắm = Bộ Điều Khiển Ổ Cắm();
+        lặp(i = 0; i < máy ảo lấy độ dài(máy chủ); i++) {
+            nếu (loại của(máy chủ[i]) != "chuỗi") {
+                ném "DNS: nameserver phải là địa chỉ IP";
+            };
+            ổ cắm.đầu nối địa chỉ mạng các byte(máy chủ[i]);
+        };
+        khóa = mình.phân giải tên miền khóa bộ nhớ đệm(tên máy, máy chủ, cổng, loại);
+        bộ nhớ = mình.bộ nhớ;
+        bản nhớ = bộ nhớ.phân giải tên miền đọc(khóa);
+        nếu (lấy từ điển(bản nhớ, "status", "") == "NOERROR") { trả về bản nhớ; };
+        lỗi cuối = "DNS: tất cả nameserver không phản hồi";
+        lỗi máy chủ = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(máy chủ); i++) {
+            thử {
+                phản hồi = mình.phân giải tên miền hỏi máy chủ đầy đủ(
+                    tên máy, máy chủ[i], cổng, loại, thời gian chờ
+                );
+                bộ nhớ.phân giải tên miền ghi(khóa, phản hồi);
+                trả về phản hồi;
+            } bắt lỗi(e) {
+                nếu (mình.phân giải tên miền kiểm tra lỗi giao thức(e)) { ném e; };
+                nếu (mình.phân giải tên miền kiểm tra lỗi mã phản hồi(e)) {
+                    mã = lấy từ điển(e, "mã", -1);
+                    nếu (mã != 2 && mã != 5) { ném e; };
+                    lỗi máy chủ = e;
+                };
+                lỗi cuối = e;
+            };
+        };
+        // Không làm mất thông tin SERVFAIL/REFUSED khi server cuối timeout.
+        nếu (loại của(lỗi máy chủ) == "từ điển") { ném lỗi máy chủ; };
+        ném lỗi cuối;
+    };
+
+    // Kết hợp phản hồi A/AAAA và TTL của những địa chỉ thực sự trả về.
+    // Chỉ có kết quả phủ định chắc chắn khi cả hai loại trả lời hợp lệ.
+    hàm riêng tư phân giải tên miền phân giải ứng viên(tên máy, danh sách, cổng) {
+        a = {};
+        aaaa = {};
+        có a = sai;
+        có aaaa = sai;
+        lỗi cuối = "DNS: không có phản hồi";
+        thử {
+            a = mình.phân giải tên miền hỏi dự phòng đầy đủ(tên máy, danh sách, cổng, 1);
+            có a = đúng;
+        } bắt lỗi(e) {
+            nếu (mình.phân giải tên miền kiểm tra lỗi giao thức(e)) { ném e; };
+            nếu (mình.phân giải tên miền kiểm tra lỗi mã phản hồi(e)) {
+                mã = lấy từ điển(e, "mã", -1);
+                nếu (mã != 2 && mã != 5) { ném e; };
+            };
+            lỗi cuối = e;
+        };
+        thử {
+            aaaa = mình.phân giải tên miền hỏi dự phòng đầy đủ(tên máy, danh sách, cổng, 28);
+            có aaaa = đúng;
+        } bắt lỗi(e) {
+            nếu (mình.phân giải tên miền kiểm tra lỗi giao thức(e)) { ném e; };
+            nếu (mình.phân giải tên miền kiểm tra lỗi mã phản hồi(e)) {
+                mã = lấy từ điển(e, "mã", -1);
+                nếu (mã != 2 && mã != 5) { ném e; };
+            };
+            lỗi cuối = e;
+        };
+        nếu (!có a && !có aaaa) { ném lỗi cuối; };
+        kết quả = [];
+        địa chỉ a = lấy từ điển(a, "addresses", []);
+        địa chỉ aaaa = lấy từ điển(aaaa, "addresses", []);
+        lặp(i = 0; i < máy ảo lấy độ dài(địa chỉ a); i++) { máy ảo thêm cuối danh sách(kết quả, địa chỉ a[i]); };
+        lặp(i = 0; i < máy ảo lấy độ dài(địa chỉ aaaa); i++) { máy ảo thêm cuối danh sách(kết quả, địa chỉ aaaa[i]); };
+        thời gian tồn tại = 0;
+        nếu (máy ảo lấy độ dài(địa chỉ a) > 0) { thời gian tồn tại = lấy từ điển(a, "ttl", 0); };
+        nếu (máy ảo lấy độ dài(địa chỉ aaaa) > 0) {
+            thời gian tồn tại aaaa = lấy từ điển(aaaa, "ttl", 0);
+            nếu (máy ảo lấy độ dài(địa chỉ a) == 0 || thời gian tồn tại aaaa < thời gian tồn tại) { thời gian tồn tại = thời gian tồn tại aaaa; };
+        };
+        đầy đủ = có a && có aaaa;
+        trạng thái = "NOERROR";
+        mã = 0;
+        nếu (máy ảo lấy độ dài(kết quả) == 0) {
+            nếu (!đầy đủ) {
+                trạng thái = "INCOMPLETE";
+                mã = -1;
+            } hoặc nếu (lấy từ điển(a, "status", "") == "NXDOMAIN" &&
+                     lấy từ điển(aaaa, "status", "") == "NXDOMAIN") {
+                trạng thái = "NXDOMAIN";
+                mã = 3;
+            } hoặc { trạng thái = "NODATA"; };
+        };
+        trả về {"status": trạng thái, "addresses": kết quả, "rcode": mã,
+                "ttl": thời gian tồn tại, "complete": đầy đủ, "A": a, "AAAA": aaaa};
+    };
+
+    // API danh sách cũ chỉ lấy addresses từ cùng một đường thực thi.
+    hàm công khai phân giải tên miền phân giải(tên máy) {
+        chi tiết = mình.phân giải tên miền phân giải đầy đủ(tên máy);
+        trả về lấy từ điển(chi tiết, "addresses", []);
+    };
+
+    // HOSTS và OS không có TTL DNS; rcode=-1 phân biệt nguồn không phải DNS.
+    // complete=false khi một trong hai loại A/AAAA gặp lỗi retryable.
+    hàm công khai phân giải tên miền phân giải đầy đủ(tên máy) {
+        tên máy = đầu nối yêu cầu tên máy(tên máy, "dns_phan_giai");
+        máy chủ = đọc biến môi trường("VPP_DNS_VI_SERVER", "");
+        danh sách cấu hình = đọc biến môi trường("VPP_DNS_VI_SERVERS", "");
+        đường cấu hình = đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "");
+        đường bảng tên máy = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
+        kết quả = [];
+        chi tiết = {"status": "NODATA", "addresses": [], "rcode": 0,
+                    "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+        nếu (danh sách cấu hình != "" || máy chủ != "" || đường cấu hình != "" || đường bảng tên máy != "") {
+            // Hosts chỉ được bật khi chỉ định tệp. Kết quả cục bộ được ưu tiên
+            // trước DNS, và không khởi tạo socket/entropy nếu có tên khớp.
+            nếu (đường bảng tên máy != "") {
+                bảng tên máy = Bộ Bảng Tên Máy DNS();
+                kết quả = bảng tên máy.phân giải tên miền đọc bảng tên máy(tên máy, đường bảng tên máy);
+                nếu (máy ảo lấy độ dài(kết quả) > 0) {
+                    xóa trùng(kết quả);
+                    sắp xếp(kết quả);
+                    trả về {"status": "HOSTS", "addresses": kết quả, "rcode": -1,
+                            "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+                };
+            };
+            nếu (danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "") {
+                ném "DNS hosts: không tìm thấy tên và chưa cấu hình DNS V++";
+            };
+            // Bật rõ ràng để có thể kiểm thử wire resolver trên các nền tảng.
+            // Danh sách > server đơn > đường tệp Linux, theo thứ tự ưu tiên.
+            cấu hình = Bộ Cấu Hình DNS();
+            danh sách = [];
+            tìm kiếm = [];
+            ngưỡng dấu chấm = 1;
+            nếu (danh sách cấu hình != "") {
+                danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(danh sách cấu hình);
+            } hoặc nếu (máy chủ != "") {
+                danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(máy chủ);
+                nếu (máy ảo lấy độ dài(danh sách) != 1) { ném "DNS: VPP_DNS_VI_SERVER phải là một IP"; };
+            } hoặc {
+                nếu (ten nền tảng máy ảo() != "linux") {
+                    ném "DNS: VPP_DNS_VI_RESOLV_CONF chỉ hỗ trợ Linux";
+                };
+                đầy đủ = cấu hình.phân giải tên miền đọc cấu hình đầy đủ linux(đường cấu hình);
+                danh sách = lấy từ điển(đầy đủ, "nameservers", []);
+                tìm kiếm = lấy từ điển(đầy đủ, "search", []);
+                ngưỡng dấu chấm = lấy từ điển(đầy đủ, "ndots", 1);
+            };
+            nếu (máy ảo lấy độ dài(danh sách) == 0) { ném "DNS: không có nameserver hợp lệ"; };
+            cổng = đầu nối yêu cầu cổng(
+                đọc biến môi trường("VPP_DNS_VI_PORT", "53"), "dns_phan_giai"
+            );
+            ứng viên = cấu hình.phân giải tên miền tên ứng viên(tên máy, tìm kiếm, ngưỡng dấu chấm);
+            lặp(i = 0; i < máy ảo lấy độ dài(ứng viên); i++) {
+                chi tiết = mình.phân giải tên miền phân giải ứng viên(ứng viên[i], danh sách, cổng);
+                kết quả = lấy từ điển(chi tiết, "addresses", []);
+                // Tránh dùng lỗi mạng như bằng chứng NXDOMAIN/NODATA.
+                nếu (máy ảo lấy độ dài(kết quả) > 0 || !lấy từ điển(chi tiết, "complete", sai)) {
+                    thoát;
+                };
+            };
+        } hoặc {
+            kết quả = đầu nối bộ phân giải danh sách(tên máy, 0, sai);
+            chi tiết = {"status": "OS", "addresses": kết quả, "rcode": -1,
+                        "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
+        };
+        xóa trùng(kết quả);
+        sắp xếp(kết quả);
+        chi tiết["addresses"] = kết quả;
+        trả về chi tiết;
+    };
+};
+
+
+hàm công khai phân giải tên miền phân giải(tên máy) {
+    bộ chuyển tiếp = Bộ Phân Giải DNS();
+    trả về bộ chuyển tiếp.phân giải tên miền phân giải(tên máy);
+};
+
+hàm công khai phân giải tên miền phân giải đầy đủ(tên máy) {
+    bộ chuyển tiếp = Bộ Phân Giải DNS();
+    trả về bộ chuyển tiếp.phân giải tên miền phân giải đầy đủ(tên máy);
+};

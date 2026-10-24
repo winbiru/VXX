@@ -1,0 +1,860 @@
+// Parser/semantic và IR tuyến tính native cho tập con hàm chính() i32.
+// Ngữ pháp: hàm chính() { (biến tên = expr; | tên = expr; | nếu ...)* trả về expr; };
+// expr: i32, đúng/sai, tên đã khai báo, dấu ngoặc, unary -/+/!, +, -, *, /, %, so sánh.
+// Câu lệnh và bước cập nhật vòng lặp hỗ trợ =, +=, -=, *=, /=, %=; biến cục bộ
+// cũng có thể dùng ++/--. Các phép tính dùng opcode IR i32 hiện có.
+// IR là dãy (i32 opcode, i32 operand) dùng stack, có thể tự chạy bằng V++.
+// op: 1 PUSH, 2 LOAD, 3 STORE, 4 ADD, 5 SUB, 6 MUL, 7 RET, 8 NEG,
+// 9 JZ (pop), 10 JMP; 11 EQ, 12 NE, 13 LT, 14 LE, 15 GT, 16 GE;
+// 25 NOT, 26 DIV (signed i32), 27 MOD (signed i32). Chia cho 0 là lỗi.
+// Đích JZ/JMP là byte offset (bội của 8) trong buffer IR.
+// parser state: cursor, số biến, return-flag, loop-depth,
+//               (start,end) * số biến.
+
+hàm phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, giá trị mong đợi) {
+    biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    biến đã khớp = từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, giá trị mong đợi);
+    nếu (đã khớp == 1) { byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1); };
+    trả về đã khớp;
+};
+
+hàm phân tích phát(biểu diễn trung gian, mã phép toán, toán hạng) {
+    nếu (byte dài(biểu diễn trung gian) > 1048568) { trả về -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(biểu diễn trung gian, mã phép toán) != 0) { trả về -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(biểu diễn trung gian, toán hạng) != 0) { trả về -1; };
+    trả về 0;
+};
+
+// Symbol lookup: same UTF-8 byte span, no name allocation.
+hàm phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, chỉ mục) {
+    biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, chỉ mục, 0);
+    biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, chỉ mục, 1);
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    biến số phần tử = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 4);
+    lặp (i = 0; i < số phần tử; i++) {
+        biến điểm mở đầu = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 20 + i * 8);
+        biến điểm hoàn thành = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 24 + i * 8);
+        nếu (điểm mở đầu < 0) { bỏ qua; };
+        biến giống nhau = 1;
+        nếu (điểm kết thúc - điểm bắt đầu != điểm hoàn thành - điểm mở đầu) { giống nhau = 0; };
+        nếu (giống nhau == 1) {
+            lặp (j = 0; j < điểm kết thúc - điểm bắt đầu; j++) {
+                nếu (byte lấy(nguồn văn bản, điểm bắt đầu + j) != byte lấy(nguồn văn bản, điểm mở đầu + j)) {
+                    giống nhau = 0;
+                    thoát;
+                };
+            };
+        };
+        nếu (giống nhau == 1) { trả về i; };
+    };
+    trả về -1;
+};
+
+// Parse i32 không dấu, báo lỗi trước khi overflow.
+hàm phân tích số(nguồn văn bản, điểm bắt đầu, điểm kết thúc) {
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    nếu (điểm kết thúc <= điểm bắt đầu) { trả về -1; };
+    biến giá trị đang xét = 0;
+    lặp (i = điểm bắt đầu; i < điểm kết thúc; i++) {
+        biến chữ số đang xét = byte lấy(nguồn văn bản, i) - 48;
+        nếu (chữ số đang xét < 0) { trả về -1; };
+        nếu (chữ số đang xét > 9) { trả về -1; };
+        nếu (giá trị đang xét > 214748364) { trả về -1; };
+        nếu (giá trị đang xét == 214748364) {
+            nếu (chữ số đang xét > 7) { trả về -1; };
+        };
+        giá trị đang xét = giá trị đang xét * 10 + chữ số đang xét;
+    };
+    trả về giá trị đang xét;
+};
+
+// Một định danh trong tập con native phải là chuỗi UTF-8 bắt đầu bằng
+// chữ cái hoặc dấu gạch dưới; dấu chấm/số ở đầu và từ khóa bị từ chối.
+hàm phân tích định danh(nguồn văn bản, các từ tố, chỉ mục) {
+    nếu (từ tố trường dữ liệu(các từ tố, chỉ mục, 2) != 1) { trả về 0; };
+    biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, chỉ mục, 0);
+    biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, chỉ mục, 1);
+    nếu (điểm bắt đầu < 0) { trả về 0; };
+    biến đầu tiên = byte lấy(nguồn văn bản, điểm bắt đầu);
+    nếu (đầu tiên >= 48) { nếu (đầu tiên <= 57) { trả về 0; }; };
+    lặp (i = điểm bắt đầu; i < điểm kết thúc; i++) {
+        biến ch = byte lấy(nguồn văn bản, i);
+        nếu (ch < 128) {
+            biến hợp lệ = 0;
+            nếu (ch >= 65) { nếu (ch <= 90) { hợp lệ = 1; }; };
+            nếu (ch >= 97) { nếu (ch <= 122) { hợp lệ = 1; }; };
+            nếu (ch >= 48) { nếu (ch <= 57) { hợp lệ = 1; }; };
+            nếu (ch == 95) { hợp lệ = 1; };
+            nếu (ch == 32) { hợp lệ = 1; };
+            nếu (ch == 9) { hợp lệ = 1; };
+            nếu (hợp lệ == 0) { trả về 0; };
+        };
+    };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "hàm") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "biến") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "trả") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "về") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "nếu") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "lặp") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "đúng") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "sai") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, "rỗng") == 1) { trả về 0; };
+    trả về 1;
+};
+
+// Name matching keeps all function references in UTF-8 source byte spans.
+hàm phân tích giống nhau từ tố(nguồn văn bản, các từ tố, a chỉ mục, b chỉ mục) {
+    biến a = từ tố trường dữ liệu(các từ tố, a chỉ mục, 0);
+    biến a điểm kết thúc = từ tố trường dữ liệu(các từ tố, a chỉ mục, 1);
+    biến b = từ tố trường dữ liệu(các từ tố, b chỉ mục, 0);
+    biến b điểm kết thúc = từ tố trường dữ liệu(các từ tố, b chỉ mục, 1);
+    nếu (a < 0) { trả về 0; };
+    nếu (b < 0) { trả về 0; };
+    nếu (a điểm kết thúc - a != b điểm kết thúc - b) { trả về 0; };
+    lặp (i = 0; i < a điểm kết thúc - a; i++) {
+        nếu (byte lấy(nguồn văn bản, a + i) != byte lấy(nguồn văn bản, b + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+
+// The machine runtime owns the entire vpp_native_* symbol namespace.
+// Reject declarations at the V++ frontend so user objects cannot shadow
+// ASM primitives when the native linker resolves external symbols.
+hàm phân tích dành riêng abi tên định danh(nguồn văn bản, các từ tố, chỉ mục) {
+    biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, chỉ mục, 0);
+    biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, chỉ mục, 1);
+    nếu (điểm bắt đầu < 0) { trả về 0; };
+    nếu (điểm kết thúc - điểm bắt đầu < 11) { trả về 0; };
+    biến tiền tố = "vpp_native_";
+    biến đã khớp = 1;
+    lặp (i = 0; i < 11; i++) {
+        nếu (byte lấy(nguồn văn bản, điểm bắt đầu + i) != byte lấy(tiền tố, i)) {
+            đã khớp = 0;
+            thoát;
+        };
+    };
+    byte hủy(tiền tố);
+    trả về đã khớp;
+};
+
+// Return the number of i32 parameters in a function header.
+// The first parameter starts at declaration token + 3.
+hàm phân tích phần đầu số tham số(nguồn văn bản, các từ tố, chương trình con hiện tại từ tố) {
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, chương trình con hiện tại từ tố + 1) != 1) { trả về -1; };
+    nếu (phân tích bản địa mã định danh(nguồn văn bản, các từ tố, chương trình con hiện tại từ tố + 1) >= 0) { trả về -1; };
+    nếu (phân tích dành riêng abi tên định danh(nguồn văn bản, các từ tố, chương trình con hiện tại từ tố + 1) == 1) { trả về -1; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, chương trình con hiện tại từ tố + 2, "(") != 1) { trả về -1; };
+    biến con trỏ hiện tại = chương trình con hiện tại từ tố + 3;
+    biến n = 0;
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ")") == 1) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại + 1, "{") == 1) { trả về 0; };
+        trả về -1;
+    };
+    lặp (k = 0; k < từ tố số phần tử(các từ tố); k++) {
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
+        n = n + 1;
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ")") == 1) {
+            nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại + 1, "{") == 1) { trả về n; };
+            trả về -1;
+        };
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ",") != 1) { trả về -1; };
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+    };
+    trả về -1;
+};
+
+// Function IDs follow declaration order; calls may reference later functions.
+// CALL's function ID and CALL_ARITY's argument count are separate IR fields,
+// so the argument count is not limited by bit packing.
+hàm phân tích chương trình con mã định danh(nguồn văn bản, các từ tố, tên định danh chỉ mục) {
+    biến số phần tử = 0;
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, "hàm") == 1) {
+            biến số tham số = phân tích phần đầu số tham số(nguồn văn bản, các từ tố, i);
+            nếu (số tham số >= 0) {
+                nếu (phân tích giống nhau từ tố(nguồn văn bản, các từ tố, tên định danh chỉ mục, i + 1) == 1) {
+                    trả về số phần tử;
+                };
+                số phần tử = số phần tử + 1;
+            };
+        };
+    };
+    trả về -1;
+};
+
+hàm phân tích chương trình con số tham số(nguồn văn bản, các từ tố, chương trình con mã định danh) {
+    biến số phần tử = 0;
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, "hàm") == 1) {
+            biến số tham số = phân tích phần đầu số tham số(nguồn văn bản, các từ tố, i);
+            nếu (số tham số >= 0) {
+                nếu (số phần tử == chương trình con mã định danh) { trả về số tham số; };
+                số phần tử = số phần tử + 1;
+            };
+        };
+    };
+    trả về -1;
+};
+
+// Shared signature lookup belongs to the parser so standalone parser and
+// codegen users do not depend on the module compilation driver.
+// Registry records are [i32 byte_length, i32 arity, UTF-8 name bytes].
+hàm phân tích sổ đăng ký mã định danh(nguồn văn bản, các từ tố, tên định danh chỉ mục, sổ đăng ký) {
+    biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, tên định danh chỉ mục, 0);
+    biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, tên định danh chỉ mục, 1);
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    biến chỉ mục = 0;
+    lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+        nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { trả về -1; };
+        biến chiều dài = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+        nếu (chiều dài <= 0) { trả về -1; };
+        nếu (chiều dài > byte dài(sổ đăng ký) - độ lệch - 8) { trả về -1; };
+        nếu (chiều dài == điểm kết thúc - điểm bắt đầu) {
+            biến khớp = 1;
+            lặp (i = 0; i < chiều dài; i++) {
+                nếu (byte lấy(nguồn văn bản, điểm bắt đầu + i) != byte lấy(sổ đăng ký, độ lệch + 8 + i)) {
+                    khớp = 0;
+                    thoát;
+                };
+            };
+            nếu (khớp == 1) { trả về chỉ mục; };
+        };
+        độ lệch = độ lệch + 8 + chiều dài;
+        chỉ mục = chỉ mục + 1;
+    };
+    trả về -1;
+};
+
+hàm phân tích sổ đăng ký số tham số(sổ đăng ký, chương trình con mã định danh) {
+    nếu (chương trình con mã định danh < 0) { trả về -1; };
+    biến chỉ mục = 0;
+    lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+        nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { trả về -1; };
+        biến chiều dài = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+        nếu (chiều dài <= 0) { trả về -1; };
+        nếu (chiều dài > byte dài(sổ đăng ký) - độ lệch - 8) { trả về -1; };
+        nếu (chỉ mục == chương trình con mã định danh) { trả về byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch + 4); };
+        độ lệch = độ lệch + 8 + chiều dài;
+        chỉ mục = chỉ mục + 1;
+    };
+    trả về -1;
+};
+
+// IDs of the closed native runtime ABI. A negative CALL operand encodes
+// -(id + 1); nonnegative operands continue to name user-defined functions.
+// Keep this table in the same order as obj_native_name in object.vi.
+hàm phân tích bản địa mã định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) {
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte mới") == 1) { trả về 0; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte dài") == 1) { trả về 1; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte lấy") == 1) { trả về 2; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte thêm") == 1) { trả về 3; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte đẩy số nguyên ba mươi hai bit") == 1) { trả về 4; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte đọc số nguyên ba mươi hai bit") == 1) { trả về 5; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte ghi số nguyên ba mươi hai bit") == 1) { trả về 6; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte làm rỗng") == 1) { trả về 7; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte nối") == 1) { trả về 8; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte bằng") == 1) { trả về 9; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte hủy") == 1) { trả về 10; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "đối số đếm") == 1) { trả về 11; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "đối số lấy") == 1) { trả về 12; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp mở đọc") == 1) { trả về 13; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp đọc khối") == 1) { trả về 14; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp đóng") == 1) { trả về 15; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "liên kết macho") == 1) { trả về 16; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "liên kết đối tượng") == 1) { trả về 17; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "bộ nhớ đệm đọc") == 1) { trả về 18; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "bộ nhớ đệm ghi") == 1) { trả về 19; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte cắt") == 1) { trả về 20; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte tìm") == 1) { trả về 21; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "byte in") == 1) { trả về 22; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp mở ghi") == 1) { trả về 23; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp ghi khối") == 1) { trả về 24; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đọc byte") == 1) { trả về 25; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ghi byte") == 1) { trả về 26; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đọc số nguyên ba mươi hai bit") == 1) { trả về 27; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ghi số nguyên ba mươi hai bit") == 1) { trả về 28; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy gắn địa chỉ") == 1) { trả về 29; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy mở") == 1) { trả về 30; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đọc") == 1) { trả về 31; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ghi") == 1) { trả về 32; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đóng") == 1) { trả về 33; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy lỗi") == 1) { trả về 34; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đối số dài") == 1) { trả về 35; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đối số byte") == 1) { trả về 36; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy chia số nguyên ba mươi hai bit") == 1) { trả về 37; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "môi trường thực thi nguồn") == 1) { trả về 38; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "đọc số") == 1) { trả về 40; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "trạng thái đọc") == 1) { trả về 41; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp đọc byte") == 1) { trả về 42; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp ghi byte") == 1) { trả về 43; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thư mục nhà") == 1) { trả về 44; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thư mục hiện hành") == 1) { trả về 45; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tạm mở") == 1) { trả về 46; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đổi tên") == 1) { trả về 47; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy khởi chạy clang") == 1) { trả về 48; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đợi") == 1) { trả về 49; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thông tin tệp") == 1) { trả về 50; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thông tin liên kết") == 1) { trả về 51; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy quyền chạy") == 1) { trả về 52; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy xóa") == 1) { trả về 53; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy giá trị môi trường lấy") == 1) { trả về 54; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tệp thực thi lấy") == 1) { trả về 55; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tạo thư mục") == 1) { trả về 56; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thông tin tệp mở") == 1) { trả về 57; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sha bắt đầu") == 1) { trả về 58; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sha nạp") == 1) { trả về 59; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sha kết") == 1) { trả về 60; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy báo cáo bộ nhớ đệm") == 1) { trả về 61; };
+    trả về -1;
+};
+
+hàm phân tích bản địa số tham số(mã định danh) {
+    nếu (mã định danh == 0) { trả về 0; };
+    nếu (mã định danh == 1) { trả về 1; };
+    nếu (mã định danh == 2) { trả về 2; };
+    nếu (mã định danh == 3) { trả về 2; };
+    nếu (mã định danh == 4) { trả về 2; };
+    nếu (mã định danh == 5) { trả về 2; };
+    nếu (mã định danh == 6) { trả về 3; };
+    nếu (mã định danh == 7) { trả về 1; };
+    nếu (mã định danh == 8) { trả về 2; };
+    nếu (mã định danh == 9) { trả về 2; };
+    nếu (mã định danh == 10) { trả về 1; };
+    nếu (mã định danh == 11) { trả về 0; };
+    nếu (mã định danh == 12) { trả về 1; };
+    nếu (mã định danh == 13) { trả về 1; };
+    nếu (mã định danh == 14) { trả về 2; };
+    nếu (mã định danh == 15) { trả về 1; };
+    nếu (mã định danh == 16) { trả về 3; };
+    nếu (mã định danh == 17) { trả về 3; };
+    nếu (mã định danh == 18) { trả về 2; };
+    nếu (mã định danh == 19) { trả về 2; };
+    nếu (mã định danh == 20) { trả về 3; };
+    nếu (mã định danh == 21) { trả về 2; };
+    nếu (mã định danh == 22) { trả về 1; };
+    nếu (mã định danh == 23) { trả về 1; };
+    nếu (mã định danh == 24) { trả về 2; };
+    nếu (mã định danh == 25) { trả về 1; };
+    nếu (mã định danh == 26) { trả về 2; };
+    nếu (mã định danh == 27) { trả về 1; };
+    nếu (mã định danh == 28) { trả về 2; };
+    nếu (mã định danh == 29) { trả về 2; };
+    nếu (mã định danh == 30) { trả về 2; };
+    nếu (mã định danh == 31) { trả về 3; };
+    nếu (mã định danh == 32) { trả về 3; };
+    nếu (mã định danh == 33) { trả về 1; };
+    nếu (mã định danh == 34) { trả về 0; };
+    nếu (mã định danh == 35) { trả về 1; };
+    nếu (mã định danh == 36) { trả về 2; };
+    nếu (mã định danh == 37) { trả về 2; };
+    nếu (mã định danh == 38) { trả về 0; };
+    nếu (mã định danh == 39) { trả về 1; };
+    nếu (mã định danh == 40) { trả về 0; };
+    nếu (mã định danh == 41) { trả về 0; };
+    nếu (mã định danh == 42) { trả về 1; };
+    nếu (mã định danh == 43) { trả về 2; };
+    nếu (mã định danh == 44) { trả về 1; };
+    nếu (mã định danh == 45) { trả về 1; };
+    nếu (mã định danh == 46) { trả về 1; };
+    nếu (mã định danh == 47) { trả về 2; };
+    nếu (mã định danh == 48) { trả về 1; };
+    nếu (mã định danh == 49) { trả về 2; };
+    nếu (mã định danh == 50) { trả về 2; };
+    nếu (mã định danh == 51) { trả về 2; };
+    nếu (mã định danh == 52) { trả về 1; };
+    nếu (mã định danh == 53) { trả về 1; };
+    nếu (mã định danh == 54) { trả về 2; };
+    nếu (mã định danh == 55) { trả về 1; };
+    nếu (mã định danh == 56) { trả về 1; };
+    nếu (mã định danh == 57) { trả về 2; };
+    nếu (mã định danh == 58) { trả về 0; };
+    nếu (mã định danh == 59) { trả về 2; };
+    nếu (mã định danh == 60) { trả về 1; };
+    nếu (mã định danh == 61) { trả về 0; };
+    trả về -1;
+};
+
+hàm phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    biến loại từ tố = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 2);
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "đúng") == 1) {
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        trả về phân tích phát(biểu diễn trung gian, 1, 1);
+    };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "sai") == 1) {
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        trả về phân tích phát(biểu diễn trung gian, 1, 0);
+    };
+    nếu (loại từ tố == 2) {
+        biến giá trị đang xét = phân tích số(nguồn văn bản, từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0), từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1));
+        nếu (giá trị đang xét < 0) { trả về -1; };
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        trả về phân tích phát(biểu diễn trung gian, 1, giá trị đang xét);
+    };
+    nếu (loại từ tố == 4) {
+        biến điểm mở đầu = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0) + 1;
+        biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1) - 1;
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        // STR_NEW / STR_APPEND_BYTE keep the resulting handle on the stack.
+        nếu (phân tích phát(biểu diễn trung gian, 22, 0) != 0) { trả về -1; };
+        lặp (i = điểm mở đầu; i < điểm kết thúc; i++) {
+            biến ch = byte lấy(nguồn văn bản, i);
+            nếu (ch == 92) {
+                i = i + 1;
+                nếu (i >= điểm kết thúc) { trả về -1; };
+                ch = byte lấy(nguồn văn bản, i);
+                nếu (ch == 110) { ch = 10; }
+                hoặc nếu (ch == 114) { ch = 13; }
+                hoặc nếu (ch == 116) { ch = 9; }
+                hoặc nếu (ch == 48) { ch = 0; };
+            };
+            nếu (phân tích phát(biểu diễn trung gian, 23, ch) != 0) { trả về -1; };
+        };
+        trả về 0;
+    };
+    nếu (loại từ tố == 1) {
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại + 1, "(") == 1) {
+            biến sổ đăng ký = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 16);
+            biến chương trình con hiện tại = -1;
+            nếu (sổ đăng ký > 0) { chương trình con hiện tại = phân tích sổ đăng ký mã định danh(nguồn văn bản, các từ tố, con trỏ hiện tại, sổ đăng ký); }
+            hoặc { chương trình con hiện tại = phân tích chương trình con mã định danh(nguồn văn bản, các từ tố, con trỏ hiện tại); };
+            biến giá trị mong đợi = -1;
+            nếu (chương trình con hiện tại < 0) {
+                biến bản địa mã định danh = phân tích bản địa mã định danh(nguồn văn bản, các từ tố, con trỏ hiện tại);
+                nếu (bản địa mã định danh < 0) { trả về -1; };
+                chương trình con hiện tại = -bản địa mã định danh - 1;
+                giá trị mong đợi = phân tích bản địa số tham số(bản địa mã định danh);
+            } hoặc {
+                nếu (sổ đăng ký > 0) { giá trị mong đợi = phân tích sổ đăng ký số tham số(sổ đăng ký, chương trình con hiện tại); }
+                hoặc { giá trị mong đợi = phân tích chương trình con số tham số(nguồn văn bản, các từ tố, chương trình con hiện tại); };
+            };
+            nếu (giá trị mong đợi < 0) { trả về -1; };
+            byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 2);
+            biến đã cung cấp = 0;
+            nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) {
+                lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+                    nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+                    đã cung cấp = đã cung cấp + 1;
+                    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") == 1) { thoát; };
+                    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ",") != 1) { trả về -1; };
+                };
+                biến trước đó = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+                nếu (từ tố bằng(nguồn văn bản, các từ tố, trước đó - 1, ")") != 1) { trả về -1; };
+            };
+            nếu (đã cung cấp != giá trị mong đợi) { trả về -1; };
+            nếu (phân tích phát(biểu diễn trung gian, 19, đã cung cấp) != 0) { trả về -1; };
+            trả về phân tích phát(biểu diễn trung gian, 17, chương trình con hiện tại);
+        };
+        biến ô nhớ = phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, con trỏ hiện tại);
+        nếu (ô nhớ < 0) { trả về -1; };
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        trả về phân tích phát(biểu diễn trung gian, 2, ô nhớ);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "(") == 1) {
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+        trả về 0;
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "-") == 1) {
+        // The magnitude of INT32_MIN is one larger than INT32_MAX.
+        // Recognize that exact token without overflowing p_number().
+        biến kế tiếp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (từ tố trường dữ liệu(các từ tố, kế tiếp, 2) == 2) {
+            nếu (từ tố bằng(nguồn văn bản, các từ tố, kế tiếp, "2147483648") == 1) {
+                byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, kế tiếp + 1);
+                trả về phân tích phát(biểu diễn trung gian, 1, -2147483648);
+            };
+        };
+        nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 8, 0);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "!") == 1) {
+        nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 25, 0);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "+") == 1) {
+        trả về phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian);
+    };
+    trả về -1;
+};
+
+hàm phân tích tích(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (n = 0; n < từ tố số phần tử(các từ tố); n++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "*") == 1) { mã phép toán = 6; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "/") == 1) { mã phép toán = 26; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "%") == 1) { mã phép toán = 27; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích tích(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (n = 0; n < từ tố số phần tử(các từ tố); n++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "+") == 1) { mã phép toán = 4; }
+        hoặc { nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "-") == 1) { mã phép toán = 5; }; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích tích(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<") == 1) { mã phép toán = 13; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<=") == 1) { mã phép toán = 14; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">") == 1) { mã phép toán = 15; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">=") == 1) { mã phép toán = 16; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "==") == 1) { mã phép toán = 11; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "!=") == 1) { mã phép toán = 12; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// Nhánh có thể có biến cục bộ và kết thúc bằng 'trả về' sớm.
+// Giữ số slot tăng đơn điệu để các STORE/LOAD có ID ổn định, nhưng đánh dấu
+// tên khai báo trong nhánh đã hết phạm vi khi đóng block. Trả 1 nếu tất cả
+// đường đi trong block kết thúc bằng return, 0 nếu còn fallthrough, -1 nếu lỗi.
+hàm phân tích nhánh khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "{") != 1) { trả về -1; };
+    biến đã hoàn trả trước = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8);
+    biến locals trước = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 4);
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "}") == 1) {
+            biến khối đã hoàn trả = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8);
+            lặp (ô nhớ = locals trước; ô nhớ < byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 4); ô nhớ++) {
+                nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 20 + ô nhớ * 8, -1) != 0) { trả về -1; };
+                nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 24 + ô nhớ * 8, -1) != 0) { trả về -1; };
+            };
+            byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 8, đã hoàn trả trước);
+            nếu (khối đã hoàn trả != đã hoàn trả trước) { trả về 1; };
+            trả về 0;
+        };
+        // Không cho phép câu lệnh sau return trong cùng block.
+        nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8) != đã hoàn trả trước) { trả về -1; };
+        biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (con trỏ hiện tại >= từ tố số phần tử(các từ tố)) { trả về -1; };
+        nếu (phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    };
+    trả về -1;
+};
+
+hàm phân tích vòng lặp bước cập nhật(nguồn văn bản, các từ tố, trạng thái nội bộ, bước cập nhật) {
+    biến bước cập nhật con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, bước cập nhật con trỏ hiện tại) != 1) { trả về -1; };
+    biến bước cập nhật ô nhớ = phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, bước cập nhật con trỏ hiện tại);
+    nếu (bước cập nhật ô nhớ < 0) { trả về -1; };
+    byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, bước cập nhật con trỏ hiện tại + 1);
+    biến lượng tăng = 0;
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "++") == 1) { lượng tăng = 4; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "--") == 1) { lượng tăng = 5; };
+    nếu (lượng tăng != 0) {
+        nếu (phân tích phát(bước cập nhật, 2, bước cập nhật ô nhớ) != 0) { trả về -1; };
+        nếu (phân tích phát(bước cập nhật, 1, 1) != 0) { trả về -1; };
+        nếu (phân tích phát(bước cập nhật, lượng tăng, 0) != 0) { trả về -1; };
+        nếu (phân tích phát(bước cập nhật, 3, bước cập nhật ô nhớ) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+        trả về 0;
+    };
+    biến kết hợp = 0;
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "=") == 1) { kết hợp = 0; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "+=") == 1) { kết hợp = 4; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "-=") == 1) { kết hợp = 5; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "*=") == 1) { kết hợp = 6; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "/=") == 1) { kết hợp = 26; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "%=") == 1) { kết hợp = 27; }
+    hoặc { trả về -1; };
+    nếu (kết hợp != 0) {
+        nếu (phân tích phát(bước cập nhật, 2, bước cập nhật ô nhớ) != 0) { trả về -1; };
+    };
+    nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, bước cập nhật) != 0) { trả về -1; };
+    nếu (kết hợp != 0) {
+        nếu (phân tích phát(bước cập nhật, kết hợp, 0) != 0) { trả về -1; };
+    };
+    nếu (phân tích phát(bước cập nhật, 3, bước cập nhật ô nhớ) != 0) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+    trả về 0;
+};
+
+// BREAK/CONTINUE là opcode tạm chỉ tồn tại trong khi phân tích cú pháp.
+// Gắn loop-depth để vòng lặp ngoài không sửa nhầm lệnh của vòng lặp trong.
+// Trước khi đến codegen, mọi opcode tạm được đổi thành JMP thông thường.
+hàm phân tích vá vòng lặp(biểu diễn trung gian, điểm mở đầu, điểm kết thúc, cấp, bước cập nhật đích đến, exit đích đến) {
+    lặp (pc = điểm mở đầu; pc < điểm kết thúc; pc = pc + 8) {
+        biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        nếu (mã phép toán == 20) {
+            nếu (byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4) != cấp) { trả về -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, pc, 10) != 0) { trả về -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4, exit đích đến) != 0) { trả về -1; };
+        };
+        nếu (mã phép toán == 21) {
+            nếu (byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4) != cấp) { trả về -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, pc, 10) != 0) { trả về -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4, bước cập nhật đích đến) != 0) { trả về -1; };
+        };
+    };
+    trả về 0;
+};
+
+hàm phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    // Câu lệnh in thống nhất với frontend đầy đủ; mã định danh ABI 39
+    // chỉ dùng nội bộ cho thao tác in số nguyên i32.
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "in") == 1) {
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 19, 1) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 17, -40) != 0) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 24, 0);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "thoát") == 1) {
+        biến cấp thoát lặp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 12);
+        nếu (cấp thoát lặp <= 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 20, cấp thoát lặp);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "bỏ") == 1) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "qua") != 1) { trả về -1; };
+        biến tiếp tục cấp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 12);
+        nếu (tiếp tục cấp <= 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 21, tiếp tục cấp);
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "lặp") == 1) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "(") != 1) { trả về -1; };
+        biến vòng lặp con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, vòng lặp con trỏ hiện tại) != 1) { trả về -1; };
+        biến vòng lặp ô nhớ = phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, vòng lặp con trỏ hiện tại);
+        biến vòng lặp đã khai báo = 0;
+        nếu (vòng lặp ô nhớ < 0) {
+            vòng lặp đã khai báo = 1;
+            vòng lặp ô nhớ = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 4);
+            nếu (vòng lặp ô nhớ >= 130000) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, từ tố trường dữ liệu(các từ tố, vòng lặp con trỏ hiện tại, 0)) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, từ tố trường dữ liệu(các từ tố, vòng lặp con trỏ hiện tại, 1)) != 0) { trả về -1; };
+            byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 4, vòng lặp ô nhớ + 1);
+        };
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, vòng lặp con trỏ hiện tại + 1);
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "=") != 1) { trả về -1; };
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 3, vòng lặp ô nhớ) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        biến biểu thức điều kiện location = byte dài(biểu diễn trung gian);
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        biến số mục bỏ qua vòng lặp = byte dài(biểu diễn trung gian);
+        nếu (phân tích phát(biểu diễn trung gian, 9, -1) != 0) { trả về -1; };
+        // Parse update now, but append it to IR after the loop body.
+        biến bước cập nhật biểu diễn trung gian = byte mới();
+        nếu (bước cập nhật biểu diễn trung gian <= 0) { trả về -1; };
+        biến bước cập nhật mã trạng thái = phân tích vòng lặp bước cập nhật(nguồn văn bản, các từ tố, trạng thái nội bộ, bước cập nhật biểu diễn trung gian);
+        nếu (bước cập nhật mã trạng thái != 0) { byte hủy(bước cập nhật biểu diễn trung gian); trả về -1; };
+        biến vòng lặp cấp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 12) + 1;
+        nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 12, vòng lặp cấp) != 0) { byte hủy(bước cập nhật biểu diễn trung gian); trả về -1; };
+        biến thân khối điểm mở đầu = byte dài(biểu diễn trung gian);
+        biến thân khối kết quả trả về = phân tích nhánh khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian);
+        biến thân khối điểm kết thúc = byte dài(biểu diễn trung gian);
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 12, vòng lặp cấp - 1);
+        nếu (thân khối kết quả trả về < 0) {
+            byte hủy(bước cập nhật biểu diễn trung gian);
+            trả về -1;
+        };
+        nếu (byte dài(biểu diễn trung gian) > 1048568 - byte dài(bước cập nhật biểu diễn trung gian) - 8) {
+            byte hủy(bước cập nhật biểu diễn trung gian); trả về -1;
+        };
+        biến bước cập nhật đích đến = byte dài(biểu diễn trung gian);
+        nếu (byte nối(biểu diễn trung gian, bước cập nhật biểu diễn trung gian) != 0) { byte hủy(bước cập nhật biểu diễn trung gian); trả về -1; };
+        byte hủy(bước cập nhật biểu diễn trung gian);
+        nếu (phân tích phát(biểu diễn trung gian, 10, biểu thức điều kiện location) != 0) { trả về -1; };
+        biến exit đích đến = byte dài(biểu diễn trung gian);
+        nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, số mục bỏ qua vòng lặp + 4, exit đích đến) != 0) { trả về -1; };
+        nếu (phân tích vá vòng lặp(biểu diễn trung gian, thân khối điểm mở đầu, thân khối điểm kết thúc, vòng lặp cấp, bước cập nhật đích đến, exit đích đến) != 0) { trả về -1; };
+        // A loop-introduced variable is only visible inside this loop.
+        // Preserve its allocated slot for IR references, but hide its name.
+        nếu (vòng lặp đã khai báo == 1) {
+            nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 20 + vòng lặp ô nhớ * 8, -1) != 0) { trả về -1; };
+            nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 24 + vòng lặp ô nhớ * 8, -1) != 0) { trả về -1; };
+        };
+        phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";");
+        trả về 0;
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "nếu") == 1) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "(") != 1) { trả về -1; };
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+        biến số mục bỏ qua = byte dài(biểu diễn trung gian);
+        nếu (phân tích phát(biểu diễn trung gian, 9, -1) != 0) { trả về -1; };
+        biến lần hoàn trả thứ nhất = phân tích nhánh khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian);
+        nếu (lần hoàn trả thứ nhất < 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "hoặc") == 1) {
+            biến jump điểm kết thúc location = -1;
+            // Khi nhánh đúng đã return, không phát JMP thừa tới cuối hàm.
+            nếu (lần hoàn trả thứ nhất != 1) {
+                jump điểm kết thúc location = byte dài(biểu diễn trung gian);
+                nếu (phân tích phát(biểu diễn trung gian, 10, -1) != 0) { trả về -1; };
+            };
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, số mục bỏ qua + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
+            biến lần hoàn trả thứ hai = -1;
+            nếu (từ tố bằng(nguồn văn bản, các từ tố, byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0), "nếu") == 1) {
+                // 'hoặc nếu' is a nested conditional that shares this branch.
+                // Restore the outer return flag before merging both arms.
+                nếu (phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+                lần hoàn trả thứ hai = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8);
+                nếu (byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 8, 0) != 0) { trả về -1; };
+            } hoặc {
+                lần hoàn trả thứ hai = phân tích nhánh khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian);
+            };
+            nếu (lần hoàn trả thứ hai < 0) { trả về -1; };
+            nếu (jump điểm kết thúc location >= 0) {
+                nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, jump điểm kết thúc location + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
+            };
+            nếu (lần hoàn trả thứ nhất == 1) {
+                nếu (lần hoàn trả thứ hai == 1) { byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 8, 1); };
+            };
+        } hoặc {
+            nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, số mục bỏ qua + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
+        };
+        phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";");
+        trả về 0;
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "biến") == 1) {
+        biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
+        nếu (phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, con trỏ hiện tại) >= 0) { trả về -1; };
+        biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
+        biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "=") != 1) { trả về -1; };
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        biến ô nhớ = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 4);
+        nếu (ô nhớ >= 130000) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 3, ô nhớ) != 0) { trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, điểm bắt đầu) != 0) { trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, điểm kết thúc) != 0) { trả về -1; };
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 4, ô nhớ + 1);
+        trả về 0;
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "trả") == 1) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "về") != 1) { trả về -1; };
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 7, 0) != 0) { trả về -1; };
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 8, 1);
+        trả về 0;
+    };
+    // Standalone calls are legal statements; discard their i32 return value.
+    biến câu lệnh con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, câu lệnh con trỏ hiện tại) == 1) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, câu lệnh con trỏ hiện tại + 1, "(") == 1) {
+            nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+            nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+            trả về phân tích phát(biểu diễn trung gian, 24, 0);
+        };
+    };
+    // Gán lại biến cục bộ đã khai báo, không cấp slot mới.
+    biến assign con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, assign con trỏ hiện tại) != 1) { trả về -1; };
+    biến assign ô nhớ = phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, assign con trỏ hiện tại);
+    nếu (assign ô nhớ < 0) { trả về -1; };
+    byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, assign con trỏ hiện tại + 1);
+    biến kết hợp = 0;
+    biến hậu tố = 0;
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "=") == 1) { kết hợp = 0; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "+=") == 1) { kết hợp = 4; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "-=") == 1) { kết hợp = 5; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "*=") == 1) { kết hợp = 6; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "/=") == 1) { kết hợp = 26; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "%=") == 1) { kết hợp = 27; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "++") == 1) {
+        kết hợp = 4;
+        hậu tố = 1;
+    }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "--") == 1) {
+        kết hợp = 5;
+        hậu tố = 1;
+    }
+    hoặc { trả về -1; };
+    nếu (kết hợp != 0) {
+        nếu (phân tích phát(biểu diễn trung gian, 2, assign ô nhớ) != 0) { trả về -1; };
+    };
+    nếu (hậu tố == 1) {
+        nếu (phân tích phát(biểu diễn trung gian, 1, 1) != 0) { trả về -1; };
+    } hoặc {
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    };
+    nếu (kết hợp != 0) {
+        nếu (phân tích phát(biểu diễn trung gian, kết hợp, 0) != 0) { trả về -1; };
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+    trả về phân tích phát(biểu diễn trung gian, 3, assign ô nhớ);
+};
+
+hàm phân tích thân khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "hàm") != 1) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "chính") != 1) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "(") != 1) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "{") != 1) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (con trỏ hiện tại >= từ tố số phần tử(các từ tố)) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "}") == 1) {
+            nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8) != 1) { trả về -1; };
+            // Dấu ; sau khai báo hàm là tùy chọn.
+            phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";");
+            nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0) != từ tố số phần tử(các từ tố)) { trả về -1; };
+            trả về byte dài(biểu diễn trung gian);
+        };
+        nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8) != 0) { trả về -1; };
+        nếu (phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    };
+    trả về -1;
+};
+
+// IR đích phải có handle riêng. Thành công: số byte IR; lỗi: -1,
+// luôn xóa IR nếu parse/semantic thất bại, tránh sinh artifact dang dở.
+hàm phân tích biên dịch(nguồn văn bản, các từ tố, biểu diễn trung gian) {
+    nếu (byte dài(nguồn văn bản) < 0) { trả về -1; };
+    nếu (byte dài(biểu diễn trung gian) < 0) { trả về -1; };
+    nếu (biểu diễn trung gian == nguồn văn bản) { trả về -1; };
+    nếu (biểu diễn trung gian == các từ tố) { trả về -1; };
+    nếu (byte làm rỗng(biểu diễn trung gian) != 0) { trả về -1; };
+    nếu (từ tố kiểm tra hợp lệ(nguồn văn bản, các từ tố) < 0) { trả về -1; };
+    biến trạng thái nội bộ = byte mới();
+    nếu (trạng thái nội bộ <= 0) { trả về -1; };
+    biến sẵn sàng = 0;
+    nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) == 0) { sẵn sàng = sẵn sàng + 1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) == 0) { sẵn sàng = sẵn sàng + 1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) == 0) { sẵn sàng = sẵn sàng + 1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) == 0) { sẵn sàng = sẵn sàng + 1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0) == 0) { sẵn sàng = sẵn sàng + 1; };
+    biến kết quả trả về = -1;
+    nếu (sẵn sàng == 5) { kết quả trả về = phân tích thân khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian); };
+    byte hủy(trạng thái nội bộ);
+    nếu (kết quả trả về < 0) { byte làm rỗng(biểu diễn trung gian); };
+    trả về kết quả trả về;
+};

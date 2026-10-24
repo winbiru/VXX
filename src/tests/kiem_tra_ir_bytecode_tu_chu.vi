@@ -4,8 +4,8 @@ nhập gói/biên dịch/chính;
 nhập gói/bộ sưu tập/từ điển;
 
 hàm khớp opcode(nguồn) {
-    cpp = biên dịch bytecode(nguồn);
-    vpp = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+    cpp = biên dịch mã trung gian(nguồn);
+    vpp = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(cpp) != độ dài(vpp)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["op"] != vpp[i]["op"] ||
@@ -19,10 +19,10 @@ hàm khớp opcode(nguồn) {
 };
 
 // Kiểm chứng đúng opcode ID và cả ba toán hạng cho từng thân hàm.
-// Oracle C++ xuất bytecode hàm từ cùng registry mà CLI đang dùng.
+// Oracle C++ xuất mã trung gian hàm từ cùng registry mà CLI đang dùng.
 hàm khớp opcode hàm(nguồn) {
-    cpp = biên dịch bytecode hàm(nguồn);
-    vpp = biên dịch phát bytecode thuần(nguồn)["hàm"];
+    cpp = biên dịch mã trung gian hàm(nguồn);
+    vpp = biên dịch phát mã trung gian thuần(nguồn)["hàm"];
     nếu (độ dài(cpp) != độ dài(vpp)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["tên"] != vpp[i]["tên"] || cpp[i]["id"] != vpp[i]["id"]) {
@@ -47,23 +47,23 @@ hàm khớp opcode hàm(nguồn) {
 hàm khớp lỗi khai báo(nguồn) {
     cpp_lỗi = sai;
     vpp_lỗi = sai;
-    thử { biên dịch bytecode(nguồn); }
+    thử { biên dịch mã trung gian(nguồn); }
     bắt lỗi (e) { cpp_lỗi = đúng; };
-    thử { biên dịch phát bytecode thuần(nguồn); }
+    thử { biên dịch phát mã trung gian thuần(nguồn); }
     bắt lỗi (e) { vpp_lỗi = đúng; };
     trả về cpp_lỗi && vpp_lỗi;
 };
 
 hàm chính() {
     ir = biên dịch hạ IR thuần("in 2 + 3 * 4;");
-    lệnh = lấy map(ir, "lệnh", []);
+    lệnh = lấy từ điển(ir, "lệnh", []);
     in độ dài(lệnh) == 6;
-    in lấy map(lệnh[0], "mã", "") == "số nguyên";
-    in lấy map(lệnh[3], "giá trị", "") == "*";
-    in lấy map(lệnh[4], "giá trị", "") == "+";
+    in lấy từ điển(lệnh[0], "mã", "") == "số nguyên";
+    in lấy từ điển(lệnh[3], "giá trị", "") == "*";
+    in lấy từ điển(lệnh[4], "giá trị", "") == "+";
 
-    mã = biên dịch phát bytecode thuần("in 2 + 3 * 4;");
-    mã_lệnh = lấy map(mã, "bytecode", []);
+    mã = biên dịch phát mã trung gian thuần("in 2 + 3 * 4;");
+    mã_lệnh = lấy từ điển(mã, "bytecode", []);
     in độ dài(mã_lệnh) == 6;
     in mã_lệnh[0]["op"] == 41 && mã_lệnh[0]["toán hạng"] == 2;
     in mã_lệnh[3]["op"] == 2;
@@ -72,7 +72,7 @@ hàm chính() {
     in mã_lệnh[5]["op"] == 43;
 
     // Oracle kiểm thử độc lập: các opcode thực tế do compiler C++ phát.
-    chuẩn = biên dịch bytecode("in 2 + 3 * 4;");
+    chuẩn = biên dịch mã trung gian("in 2 + 3 * 4;");
     in độ dài(chuẩn) == độ dài(mã_lệnh);
     khớp = độ dài(chuẩn) == độ dài(mã_lệnh);
     lặp(i = 0; i < độ dài(chuẩn) && i < độ dài(mã_lệnh); i++) {
@@ -88,21 +88,21 @@ hàm chính() {
     in khớp opcode("in \"abc\";");
     in khớp opcode("in danh_sách[0];");
     // Compound gán được hạ về thao tác số học và OP_GAN giống direct IR C++.
-    gán = biên dịch phát bytecode thuần("n = 2; n += 3; in n;");
+    gán = biên dịch phát mã trung gian thuần("n = 2; n += 3; in n;");
     in gán["bytecode"][5]["op"] == 0;
 
-    chương_trình = biên dịch phát bytecode thuần(
+    chương_trình = biên dịch phát mã trung gian thuần(
         "hàm tính(a) { biến b = a + 2; in b; trả về b; };");
-    hàm_lệnh = lấy map(chương_trình, "hàm", []);
+    hàm_lệnh = lấy từ điển(chương_trình, "hàm", []);
     in độ dài(hàm_lệnh) == 1;
-    in lấy map(hàm_lệnh[0], "tên", "") == "tính";
-    thân = lấy map(hàm_lệnh[0], "bytecode", []);
+    in lấy từ điển(hàm_lệnh[0], "tên", "") == "tính";
+    thân = lấy từ điển(hàm_lệnh[0], "bytecode", []);
     in độ dài(thân) == 14;
     in thân[0]["op"] == 14 && thân[1]["op"] == 27 && thân[2]["op"] == 69;
     in thân[7]["op"] == 60 && thân[8]["op"] == 13;
     in thân[12]["op"] == 40 && thân[13]["op"] == 15;
     // C++ dành slot 0 cho tên hàm trước khi cấp slot cho tham số.
-    in độ dài(lấy map(chương_trình, "slots", [])) == 3;
+    in độ dài(lấy từ điển(chương_trình, "slots", [])) == 3;
     in khớp opcode hàm("hàm tính(a) { biến b = a + 2; in b; trả về b; };");
     in khớp opcode hàm("hàm f() { biến x; x = 2; trả về x; };");
     in khớp opcode hàm("hàm f(a, b) { trả về a + b; };");
@@ -144,9 +144,9 @@ hàm chính() {
     in khớp opcode("hàm f() { trả về 1; }; hàm g() { trả về 2; };");
     in khớp opcode hàm("hàm f() { trả về 1; }; hàm g() { trả về 2; };");
 
-    số_âm = biên dịch phát bytecode thuần("in -7;");
+    số_âm = biên dịch phát mã trung gian thuần("in -7;");
     in số_âm["bytecode"][0]["toán hạng"] == -7;
-    chuỗi = biên dịch phát bytecode thuần("in \"Việt Nam\";");
+    chuỗi = biên dịch phát mã trung gian thuần("in \"Việt Nam\";");
     in chuỗi["bytecode"][0]["op"] == 65;
     in chuỗi["chuỗi"][0] == "Việt Nam";
 
@@ -154,18 +154,18 @@ hàm chính() {
     in khớp opcode("lặp(i = 0; i < 2; i++) { in i; };");
 
     // Giữ thứ tự cấp slot: C++ đăng ký đích x trước biến y trong RHS.
-    thứ_tự = biên dịch phát bytecode thuần("x = y + 3; in x;");
+    thứ_tự = biên dịch phát mã trung gian thuần("x = y + 3; in x;");
     in thứ_tự["slots"][0] == "x" && thứ_tự["slots"][1] == "y";
     in thứ_tự["bytecode"][0]["chỉ số"] == 1;
     in thứ_tự["bytecode"][3]["chỉ số"] == 0;
 
-    // Offset nhảy là vị trí tuyệt đối trong bytecode đang được sinh.
-    nhánh = biên dịch phát bytecode thuần("nếu (đúng) { in 2; };");
+    // Offset nhảy là vị trí tuyệt đối trong mã trung gian đang được sinh.
+    nhánh = biên dịch phát mã trung gian thuần("nếu (đúng) { in 2; };");
     in nhánh["bytecode"][0]["op"] == 22;
     in nhánh["bytecode"][2]["op"] == 62 && nhánh["bytecode"][2]["toán hạng"] == 7;
     in khớp opcode("nếu (đúng) { in 2; };");
 
-    hai_nhánh = biên dịch phát bytecode thuần("nếu (sai) { in 1; } hoặc { in 2; };");
+    hai_nhánh = biên dịch phát mã trung gian thuần("nếu (sai) { in 1; } hoặc { in 2; };");
     in hai_nhánh["bytecode"][2]["toán hạng"] == 8;
     in hai_nhánh["bytecode"][7]["op"] == 63 && hai_nhánh["bytecode"][7]["toán hạng"] == 12;
     in khớp opcode("nếu (sai) { in 1; } hoặc { in 2; };");
@@ -200,7 +200,7 @@ hàm chính() {
     in khớp lỗi khai báo("hàm f() { nếu (đúng) { biến x = 1; } hoặc { biến x = 2; }; };");
     in khớp lỗi khai báo("hàm f() {}; biến f = 2;");
     // Hai hàm được phép khai báo cùng tên biến cục bộ, giống bảng symbol C++.
-    vpp_cục_bộ = biên dịch phát bytecode thuần(
+    vpp_cục_bộ = biên dịch phát mã trung gian thuần(
         "hàm f() { biến x = 1; }; hàm g() { biến x = 2; };");
     in độ dài(vpp_cục_bộ["hàm"]) == 2;
     // Switch: mã opcode và ba toán hạng (gồm vị trí nhảy bỏ qua từng ca).

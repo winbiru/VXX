@@ -1,15 +1,15 @@
-nhập gói/ứng dụng/cầu nối/api;
+nhập gói/ứng dụng/cầu nối/giao diện lập trình;
 
 hàm chính() {
-    app in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");
-    in app json health();
-    in app json login thành công("eyJhbGciOiJIUzUxMiJ9.demo-token", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");
-    in app json missing token("req-001");
-    in app json invalid token("req-002");
-    in app json users("req-003", "[\"an\",\"binh\"]");
-    in app json created user("req-004");
-    in app json updated user("req-005");
-    in app json deleted user("req-006");
-    in app json not found("req-007");
-    app in tắt vpp("V++ API Project");
+    ứng dụng in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");
+    in ứng dụng json tình trạng();
+    in ứng dụng json đăng nhập thành công("eyJhbGciOiJIUzUxMiJ9.demo-token", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");
+    in ứng dụng json thiếu từ tố("req-001");
+    in ứng dụng json không hợp lệ từ tố("req-002");
+    in ứng dụng json các người dùng("req-003", "[\"an\",\"binh\"]");
+    in ứng dụng json đã tạo người dùng("req-004");
+    in ứng dụng json đã cập nhật người dùng("req-005");
+    in ứng dụng json đã xóa người dùng("req-006");
+    in ứng dụng json phủ định đã tìm thấy("req-007");
+    ứng dụng in tắt vpp("V++ API Project");
 };

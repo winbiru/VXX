@@ -12,7 +12,7 @@ lớp MáyChủApi {
     hàm chạy() {
         cổng = mình.cổng;
         router = mình.router;
-        serverId = mạng mở máy chủ api(cổng);
+        serverId = mạng mở máy chủ giao diện lập trình(cổng);
         lặp(i = 0; i < 2147483647; i = i + 1) {
             requestId = mạng lấy yêu cầu kế tiếp(serverId);
             router.xửLý(requestId);

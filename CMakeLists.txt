@@ -636,6 +636,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/raw-native-link-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_raw_object_link.cmake)
+        set_tests_properties(vpp-raw-object-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     endif()
     add_test(NAME vpp-raw-machine-cli-hardening
         COMMAND ${CMAKE_COMMAND}
@@ -643,6 +645,8 @@ if (BUILD_TESTS)
             "-DVPP_SOURCE=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_leaf.vi"
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/raw-machine-fixtures"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_raw_machine_cli.cmake)
+    set_tests_properties(vpp-raw-machine-cli-hardening PROPERTIES
+        ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     add_test(NAME vpp-raw-machine-vpp-parity
         COMMAND $<TARGET_FILE:vpp-cli>
             ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_leaf_vi.vi)
@@ -654,6 +658,10 @@ if (BUILD_TESTS)
     target_link_libraries(vpp-native-machine-cpp-oracle PRIVATE vpp-runtime vpp-native-aot)
     target_include_directories(vpp-native-machine-cpp-oracle PRIVATE ${VPP_INCLUDE_DIR})
     target_compile_features(vpp-native-machine-cpp-oracle PRIVATE cxx_std_17)
+    add_executable(vpp-native-abi-symbol-smoke
+        ${CMAKE_SOURCE_DIR}/scripts/quality/native_abi_symbol_smoke.cpp)
+    target_include_directories(vpp-native-abi-symbol-smoke PRIVATE ${VPP_INCLUDE_DIR})
+    add_test(NAME vpp-native-abi-symbol COMMAND $<TARGET_FILE:vpp-native-abi-symbol-smoke>)
     add_test(NAME vpp-native-machine-lowering-parity
         COMMAND $<TARGET_FILE:vpp-native-machine-cpp-oracle>
             --lowering-parity
@@ -673,6 +681,8 @@ if (BUILD_TESTS)
             "-DVPP_CALL_SOURCE=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_calls.vi"
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-aarch64-vpp-parity"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_machine_vpp_parity.cmake)
+    set_tests_properties(vpp-native-machine-vpp-parity PROPERTIES
+        ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     find_program(VPP_NATIVE_SMOKE_CC NAMES clang cc gcc)
     if (VPP_NATIVE_SMOKE_TARGET AND VPP_NATIVE_SMOKE_CC)
         # Runtime regressions share the native Stage 1 fixture with the
@@ -693,6 +703,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-native-link-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_control_flow_link.cmake)
+        set_tests_properties(vpp-native-control-flow-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         add_test(NAME vpp-native-calls-host-link
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -702,6 +714,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-native-calls-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_calls_link.cmake)
+        set_tests_properties(vpp-native-calls-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         add_test(NAME vpp-native-selfhost-host-link
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -771,7 +785,7 @@ if (BUILD_TESTS)
         add_test(NAME vpp-native-lexer-kernel
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                "-DVPP_KERNEL=${CMAKE_SOURCE_DIR}/gói/biên dịch/native/lexer.vi"
+                "-DVPP_KERNEL=${CMAKE_SOURCE_DIR}/gói/biên dịch/bản địa/phân tích từ vựng.vi"
                 "-DVPP_HARNESS=${CMAKE_SOURCE_DIR}/src/tests/nativelexerharness.vi"
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_HOME=${CMAKE_SOURCE_DIR}"
@@ -867,7 +881,7 @@ if (BUILD_TESTS)
     if (WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(VPP_WIN64_NATIVE_OBJ_DIR "${CMAKE_CURRENT_BINARY_DIR}/native-win64-calls")
         set(VPP_WIN64_NATIVE_CALL_OBJECTS)
-        foreach(func IN ITEMS co_so them ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
+        foreach(func IN ITEMS co_so thêm ten_ham_dai nhan_sau ket_hop tinh_vong bon goi_bon tong_muoi goi_muoi)
             set(obj "${VPP_WIN64_NATIVE_OBJ_DIR}/${func}.obj")
             add_custom_command(OUTPUT "${obj}"
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${VPP_WIN64_NATIVE_OBJ_DIR}"
@@ -954,6 +968,8 @@ if (BUILD_TESTS)
                 "-DVPP_GENERAL=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_control_flow.vi"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/real-native-assembler-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_assembler.cmake)
+        set_tests_properties(vpp-native-real-assembler-smoke PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         if (UNIX)
             add_test(NAME vpp-aot-platform-primitives-asm
                 COMMAND ${CMAKE_COMMAND} -E env
@@ -973,6 +989,19 @@ if (BUILD_TESTS)
         target_compile_options(vpp-import-precedence-hardening PRIVATE -Wall -Wextra -Wpedantic)
     endif()
     add_test(NAME vpp-import-precedence-hardening COMMAND vpp-import-precedence-hardening)
+
+    # The pure V++ quantum regressions run in vpp-integration. The bridge
+    # protocol needs Python; SDK comparisons run only when Qiskit is installed.
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if (Python3_Interpreter_FOUND)
+        add_test(NAME vpp-quantum-bridge
+            COMMAND ${CMAKE_COMMAND} -E env
+                "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "PYTHONDONTWRITEBYTECODE=1"
+                "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/quality/check_quantum.py")
+        set_tests_properties(vpp-quantum-bridge PROPERTIES TIMEOUT 240)
+    endif()
 
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration
@@ -1018,7 +1047,9 @@ install(FILES
         DESTINATION .)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/gói/
         DESTINATION gói
-        PATTERN ".DS_Store" EXCLUDE)
+        PATTERN ".DS_Store" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
+        PATTERN "*.pyc" EXCLUDE)
 install(FILES
         # Retain the C source only for native AOT bootstrap/fallback targets.
         # macOS ARM64 self-hosting uses runtime.vi + the assembly primitives.

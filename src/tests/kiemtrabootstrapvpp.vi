@@ -1,5 +1,5 @@
 // Khi tệp này được biên dịch bằng --compiler=vpp, lexer/parser/semantic/
-// IR/emitter/linker/bộ nạp đều nằm trong artifact do V++ tự phát bytecode.
+// IR/emitter/linker/bộ nạp đều nằm trong artifact do V++ tự phát mã trung gian.
 // Compiler đã sinh ra tiếp tục biên dịch một chương trình mới tại runtime.
 nhập gói/biên dịch/bộ nạp;
 

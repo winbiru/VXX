@@ -1,5 +1,5 @@
 nhập mạng;
-nhập gói/mạng/kiểm thử/api;
+nhập gói/mạng/kiểm thử/giao diện lập trình;
 nhập service;
 nhập giao_dien/controller;
 
@@ -49,13 +49,13 @@ hàm công khai api project path admin users search() {
 
 // Ghi chú hàm: JSON lỗi chuẩn có requestId.
 hàm api project json error(message, requestId) {
-    trả về rest json lỗi(message, requestId);
+    trả về dịch vụ tài nguyên json lỗi(message, requestId);
 };
 
 // Ghi chú hàm: JSON thành công với value chuỗi.
 hàm api project json value(message, requestId, value) {
     dataJson = "{\"requestId\":\"" + requestId + "\",\"value\":\"" + value + "\"}";
-    trả về rest json thành công object(message, dataJson);
+    trả về dịch vụ tài nguyên json thành công đối tượng(message, dataJson);
 };
 
 // Ghi chú hàm: JSON tạo user thành công.
@@ -65,37 +65,37 @@ hàm api project json created user(requestId) {
 
 // Ghi chú hàm: JSON lỗi thiếu keyword.
 hàm api project json missing keyword(requestId) {
-    trả về rest json lỗi("missing-keyword", requestId);
+    trả về dịch vụ tài nguyên json lỗi("missing-keyword", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi thiếu username.
 hàm api project json missing username(requestId) {
-    trả về rest json lỗi("missing-username", requestId);
+    trả về dịch vụ tài nguyên json lỗi("missing-username", requestId);
 };
 
-// Ghi chú hàm: JSON lỗi thiếu token.
-hàm api project json missing token(requestId) {
-    trả về rest json lỗi("missing-token", requestId);
+// Ghi chú hàm: JSON lỗi thiếu từ tố.
+hàm api project json missing từ tố(requestId) {
+    trả về dịch vụ tài nguyên json lỗi("missing-từ tố", requestId);
 };
 
-// Ghi chú hàm: JSON lỗi token không hợp lệ.
-hàm api project json invalid token(requestId) {
-    trả về rest json lỗi("invalid-token", requestId);
+// Ghi chú hàm: JSON lỗi từ tố không hợp lệ.
+hàm api project json invalid từ tố(requestId) {
+    trả về dịch vụ tài nguyên json lỗi("invalid-từ tố", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi user không tồn tại.
 hàm api project json user not found(requestId) {
-    trả về rest json lỗi("user-not-found", requestId);
+    trả về dịch vụ tài nguyên json lỗi("user-not-found", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi database chưa kết nối.
 hàm api project json db not connected(requestId) {
-    trả về rest json lỗi("db-not-connected", requestId);
+    trả về dịch vụ tài nguyên json lỗi("db-not-connected", requestId);
 };
 
 // Ghi chú hàm: JSON lỗi resource không tồn tại.
 hàm api project json not found(requestId) {
-    trả về rest json lỗi("not-found", requestId);
+    trả về dịch vụ tài nguyên json lỗi("not-found", requestId);
 };
 
 // Ghi chú hàm: JSON xóa user thành công.
@@ -132,11 +132,11 @@ lớp công khai ResponseEntity {
     };
 
     hàm công khai unauthorized(message, requestId) {
-        nếu (message == "missing-token") {
-            in api project json missing token(requestId);
+        nếu (message == "missing-từ tố") {
+            in api project json missing từ tố(requestId);
             trả về 0;
         };
-        in api project json invalid token(requestId);
+        in api project json invalid từ tố(requestId);
         trả về 0;
     };
 
@@ -209,11 +209,11 @@ lớp công khai UserRestController triển khai UserCrudControllerContract {
         nếu (result == "400|missing-keyword") {
             trả về responseEntity.badRequest("missing-keyword", requestId);
         };
-        nếu (result == "401|missing-token") {
-            trả về responseEntity.unauthorized("missing-token", requestId);
+        nếu (result == "401|missing-từ tố") {
+            trả về responseEntity.unauthorized("missing-từ tố", requestId);
         };
-        nếu (result == "401|invalid-token") {
-            trả về responseEntity.unauthorized("invalid-token", requestId);
+        nếu (result == "401|invalid-từ tố") {
+            trả về responseEntity.unauthorized("invalid-từ tố", requestId);
         };
         nếu (result == "404|user-not-found") {
             trả về responseEntity.notFound("user-not-found", requestId);
@@ -224,58 +224,58 @@ lớp công khai UserRestController triển khai UserCrudControllerContract {
         trả về responseEntity.serverError("unknown-error", requestId);
     };
 
-    hàm công khai getUsers(dbSession, token, requestId) {
-        req = api get(ApiProjectRoutes.adminUsers());
-        nếu (req == "ERR|missing-url") {
+    hàm công khai getUsers(dbSession, từ tố, requestId) {
+        req = giao diện lập trình lấy(ApiProjectRoutes.adminUsers());
+        nếu (req == "ERR|missing-địa chỉ tài nguyên") {
             responseEntity = mình.responseEntity;
-            trả về responseEntity.badRequest("invalid-url", requestId);
+            trả về responseEntity.badRequest("invalid-địa chỉ tài nguyên", requestId);
         };
         service = mình.service;
-        serviceRes = service.getUsers(dbSession, token);
+        serviceRes = service.getUsers(dbSession, từ tố);
         trả về mình.mapResult(serviceRes, requestId);
     };
 
-    hàm công khai createUser(dbSession, token, requestBody, requestId) {
-        req = api post json(ApiProjectRoutes.adminUsers(), requestBody);
-        nếu (req == "ERR|missing-url") {
+    hàm công khai createUser(dbSession, từ tố, requestBody, requestId) {
+        req = giao diện lập trình post json(ApiProjectRoutes.adminUsers(), requestBody);
+        nếu (req == "ERR|missing-địa chỉ tài nguyên") {
             responseEntity = mình.responseEntity;
-            trả về responseEntity.badRequest("invalid-url", requestId);
+            trả về responseEntity.badRequest("invalid-địa chỉ tài nguyên", requestId);
         };
         service = mình.service;
-        serviceRes = service.createUser(dbSession, token, requestBody);
+        serviceRes = service.createUser(dbSession, từ tố, requestBody);
         trả về mình.mapResult(serviceRes, requestId);
     };
 
-    hàm công khai updateUser(dbSession, token, userId, requestBody, requestId) {
-        req = api put json(ApiProjectRoutes.adminUserById(userId), requestBody);
-        nếu (req == "ERR|missing-url") {
+    hàm công khai updateUser(dbSession, từ tố, userId, requestBody, requestId) {
+        req = giao diện lập trình put json(ApiProjectRoutes.adminUserById(userId), requestBody);
+        nếu (req == "ERR|missing-địa chỉ tài nguyên") {
             responseEntity = mình.responseEntity;
-            trả về responseEntity.badRequest("invalid-url", requestId);
+            trả về responseEntity.badRequest("invalid-địa chỉ tài nguyên", requestId);
         };
         service = mình.service;
-        serviceRes = service.updateUser(dbSession, token, userId, requestBody);
+        serviceRes = service.updateUser(dbSession, từ tố, userId, requestBody);
         trả về mình.mapResult(serviceRes, requestId);
     };
 
-    hàm công khai deleteUser(dbSession, token, userId, requestId) {
-        req = api delete(ApiProjectRoutes.adminUserById(userId));
-        nếu (req == "ERR|missing-url") {
+    hàm công khai deleteUser(dbSession, từ tố, userId, requestId) {
+        req = giao diện lập trình xóa(ApiProjectRoutes.adminUserById(userId));
+        nếu (req == "ERR|missing-địa chỉ tài nguyên") {
             responseEntity = mình.responseEntity;
-            trả về responseEntity.badRequest("invalid-url", requestId);
+            trả về responseEntity.badRequest("invalid-địa chỉ tài nguyên", requestId);
         };
         service = mình.service;
-        serviceRes = service.deleteUser(dbSession, token, userId);
+        serviceRes = service.deleteUser(dbSession, từ tố, userId);
         trả về mình.mapResult(serviceRes, requestId);
     };
 
-    hàm công khai searchUsers(dbSession, token, keyword, requestId) {
-        req = api get có query(ApiProjectRoutes.adminUsersSearch(), "keyword=" + keyword);
-        nếu (req == "ERR|missing-url") {
+    hàm công khai searchUsers(dbSession, từ tố, keyword, requestId) {
+        req = giao diện lập trình lấy có truy vấn(ApiProjectRoutes.adminUsersSearch(), "keyword=" + keyword);
+        nếu (req == "ERR|missing-địa chỉ tài nguyên") {
             responseEntity = mình.responseEntity;
-            trả về responseEntity.badRequest("invalid-url", requestId);
+            trả về responseEntity.badRequest("invalid-địa chỉ tài nguyên", requestId);
         };
         service = mình.service;
-        serviceRes = service.searchUsers(dbSession, token, keyword);
+        serviceRes = service.searchUsers(dbSession, từ tố, keyword);
         trả về mình.mapResult(serviceRes, requestId);
     };
 };

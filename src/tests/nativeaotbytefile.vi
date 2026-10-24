@@ -1,21 +1,21 @@
 // Native AOT: đường dẫn là byte buffer (handle i32), file ABI dùng byte thô.
 // Chạy trong working directory của fixture; tạo vpp-io.in/out ở đó.
 hàm path_base() {
-    biến path = byte_mới();
-    byte_thêm(path, 118); // v
-    byte_thêm(path, 112); // p
-    byte_thêm(path, 112); // p
-    byte_thêm(path, 45);  // -
-    byte_thêm(path, 105); // i
-    byte_thêm(path, 111); // o
-    byte_thêm(path, 46);  // .
+    biến path = byte mới();
+    byte thêm(path, 118); // v
+    byte thêm(path, 112); // p
+    byte thêm(path, 112); // p
+    byte thêm(path, 45);  // -
+    byte thêm(path, 105); // i
+    byte thêm(path, 111); // o
+    byte thêm(path, 46);  // .
     trả về path;
 };
 
 hàm path_copy(base) {
-    biến path = byte_mới();
-    lặp (i = 0; i < byte_dài(base); i++) {
-        nếu (byte_thêm(path, byte_lấy(base, i)) != 0) { trả về -1; };
+    biến path = byte mới();
+    lặp (i = 0; i < byte dài(base); i++) {
+        nếu (byte thêm(path, byte lấy(base, i)) != 0) { trả về -1; };
     };
     trả về path;
 };
@@ -23,77 +23,77 @@ hàm path_copy(base) {
 hàm chính() {
     biến base = path_base();
     biến input = path_copy(base);
-    byte_thêm(input, 105); // i
-    byte_thêm(input, 110); // n
+    byte thêm(input, 105); // i
+    byte thêm(input, 110); // n
     biến output = path_copy(base);
-    byte_thêm(output, 111); // o
-    byte_thêm(output, 117); // u
-    byte_thêm(output, 116); // t
+    byte thêm(output, 111); // o
+    byte thêm(output, 117); // u
+    byte thêm(output, 116); // t
 
-    nếu (byte_dài(input) != 9) { trả về 10; };
-    nếu (byte_lấy(input, 7) != 105) { trả về 10; };
-    nếu (byte_lấy(input, 99) != -1) { trả về 11; };
-    nếu (byte_thêm(input, 256) != -1) { trả về 11; };
-    nếu (tệp_mở_đọc(99999) != -1) { trả về 12; };
+    nếu (byte dài(input) != 9) { trả về 10; };
+    nếu (byte lấy(input, 7) != 105) { trả về 10; };
+    nếu (byte lấy(input, 99) != -1) { trả về 11; };
+    nếu (byte thêm(input, 256) != -1) { trả về 11; };
+    nếu (tệp mở đọc(99999) != -1) { trả về 12; };
 
-    biến writer = tệp_mở_ghi(input);
+    biến writer = tệp mở ghi(input);
     nếu (writer <= 0) { trả về 13; };
-    nếu (tệp_ghi_byte(writer, 0) != 0) { trả về 14; };
-    nếu (tệp_ghi_byte(writer, 255) != 0) { trả về 14; };
-    nếu (tệp_ghi_byte(writer, 10) != 0) { trả về 14; };
-    nếu (tệp_ghi_byte(writer, 65) != 0) { trả về 14; };
-    nếu (tệp_ghi_byte(writer, -1) != -1) { trả về 15; };
-    nếu (tệp_đóng(writer) != 0) { trả về 15; };
-    nếu (tệp_đóng(writer) != -1) { trả về 16; };
-    nếu (tệp_ghi_byte(writer, 3) != -1) { trả về 16; };
+    nếu (tệp ghi byte(writer, 0) != 0) { trả về 14; };
+    nếu (tệp ghi byte(writer, 255) != 0) { trả về 14; };
+    nếu (tệp ghi byte(writer, 10) != 0) { trả về 14; };
+    nếu (tệp ghi byte(writer, 65) != 0) { trả về 14; };
+    nếu (tệp ghi byte(writer, -1) != -1) { trả về 15; };
+    nếu (tệp đóng(writer) != 0) { trả về 15; };
+    nếu (tệp đóng(writer) != -1) { trả về 16; };
+    nếu (tệp ghi byte(writer, 3) != -1) { trả về 16; };
 
-    biến reader = tệp_mở_đọc(input);
-    writer = tệp_mở_ghi(output);
+    biến reader = tệp mở đọc(input);
+    writer = tệp mở ghi(output);
     nếu (reader <= 0) { trả về 17; };
     nếu (writer <= 0) { trả về 17; };
     nếu (reader == writer) { trả về 17; };
     biến count = 0;
     biến sum = 0;
-    lặp (value = tệp_đọc_byte(reader); value >= 0; value = tệp_đọc_byte(reader)) {
+    lặp (value = tệp đọc byte(reader); value >= 0; value = tệp đọc byte(reader)) {
         count += 1;
         sum += value;
-        nếu (tệp_ghi_byte(writer, value) != 0) { trả về 18; };
+        nếu (tệp ghi byte(writer, value) != 0) { trả về 18; };
     };
     in count;
     in sum;
-    in tệp_đọc_byte(reader); // EOF == -1
-    nếu (tệp_đóng(reader) != 0) { trả về 19; };
-    nếu (tệp_đóng(writer) != 0) { trả về 19; };
-    in tệp_đọc_byte(reader); // invalid handle == -2
+    in tệp đọc byte(reader); // EOF == -1
+    nếu (tệp đóng(reader) != 0) { trả về 19; };
+    nếu (tệp đóng(writer) != 0) { trả về 19; };
+    in tệp đọc byte(reader); // invalid handle == -2
 
     // UTF-8 is materialized as a native byte buffer, not a VM string pointer.
     biến utf = "Aé";
-    nếu (byte_dài(utf) != 3) { trả về 22; };
-    nếu (byte_lấy(utf, 0) != 65) { trả về 22; };
-    nếu (byte_lấy(utf, 1) != 195) { trả về 22; };
-    nếu (byte_lấy(utf, 2) != 169) { trả về 22; };
-    nếu (byte_hủy(utf) != 0) { trả về 22; };
+    nếu (byte dài(utf) != 3) { trả về 22; };
+    nếu (byte lấy(utf, 0) != 65) { trả về 22; };
+    nếu (byte lấy(utf, 1) != 195) { trả về 22; };
+    nếu (byte lấy(utf, 2) != 169) { trả về 22; };
+    nếu (byte hủy(utf) != 0) { trả về 22; };
 
     biến literal_path = "vpp-io.in";
-    biến literal_reader = tệp_mở_đọc(literal_path);
+    biến literal_reader = tệp mở đọc(literal_path);
     nếu (literal_reader <= 0) { trả về 23; };
-    nếu (tệp_đọc_byte(literal_reader) != 0) { trả về 23; };
-    nếu (tệp_đóng(literal_reader) != 0) { trả về 23; };
-    nếu (byte_hủy(literal_path) != 0) { trả về 23; };
+    nếu (tệp đọc byte(literal_reader) != 0) { trả về 23; };
+    nếu (tệp đóng(literal_reader) != 0) { trả về 23; };
+    nếu (byte hủy(literal_path) != 0) { trả về 23; };
 
     biến escaped = "X\nY";
-    nếu (byte_dài(escaped) != 3) { trả về 24; };
-    nếu (byte_lấy(escaped, 1) != 10) { trả về 24; };
-    nếu (byte_hủy(escaped) != 0) { trả về 24; };
+    nếu (byte dài(escaped) != 3) { trả về 24; };
+    nếu (byte lấy(escaped, 1) != 10) { trả về 24; };
+    nếu (byte hủy(escaped) != 0) { trả về 24; };
 
     biến nul_path = "vpp\0evil";
-    nếu (tệp_mở_ghi(nul_path) != -1) { trả về 25; };
-    nếu (byte_hủy(nul_path) != 0) { trả về 25; };
+    nếu (tệp mở ghi(nul_path) != -1) { trả về 25; };
+    nếu (byte hủy(nul_path) != 0) { trả về 25; };
 
-    nếu (byte_hủy(base) != 0) { trả về 20; };
-    nếu (byte_hủy(input) != 0) { trả về 20; };
-    nếu (byte_hủy(output) != 0) { trả về 20; };
-    nếu (byte_dài(input) != -1) { trả về 21; };
-    nếu (byte_hủy(input) != -1) { trả về 21; };
+    nếu (byte hủy(base) != 0) { trả về 20; };
+    nếu (byte hủy(input) != 0) { trả về 20; };
+    nếu (byte hủy(output) != 0) { trả về 20; };
+    nếu (byte dài(input) != -1) { trả về 21; };
+    nếu (byte hủy(input) != -1) { trả về 21; };
     trả về 0;
 };

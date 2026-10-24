@@ -111,7 +111,7 @@ concurrency/async phức tạp không phải release blocker mặc định của
      superclass cũng có thể thỏa hợp đồng. Interface hiện là contract compile-time nên không
      tạo runtime class/vtable riêng và không thay đổi dynamic method dispatch.
      Constructor có tham số đã chạy end-to-end bằng `hàm khởi tạo(...)`: lời gọi
-     `Class(args...)` chuyển đối số qua opcode tạo instance, bind receiver `mình`, hỗ trợ
+     `Class(args...)` chuyển đối số qua opcode tạo thể hiện, bind receiver `mình`, hỗ trợ
      default parameter và giữ instance làm kết quả biểu thức. Constructor lớp cha không tự
      chạy; lớp con có thể gọi tường minh `gốc.khởi tạo(...)`. Visibility của method qua
      instance hiện được kiểm tra hai tầng: semantic suy luận lớp từ `Class(...)`/alias và
@@ -229,7 +229,7 @@ concurrency/async phức tạp không phải release blocker mặc định của
    - [ ] Nâng testing package và audit collection/file/JSON/HTTP/math/random/env/log/config
      bằng regression đa nền tảng trước release candidate. Audit cục bộ file/config/random đã
      khóa line/word count, config key/fallback, UTF-8 path và strict integer bounds;
-     collection/JSON đã khóa thứ tự key deterministic cho `khóa map` và `json tạo`; HTTP
+     collection/JSON đã khóa thứ tự key deterministic cho `khóa từ điển` và `json tạo`; HTTP
      client validate URL HTTP(S)/UTF-8/host và ký tự điều khiển trước native transport; math
      giữ lỗi chia 0 ở API thường, fallback chỉ ở `chia an toàn`, và khóa domain số nguyên không
      âm cho lũy thừa/giai thừa.

@@ -21,43 +21,43 @@ hàm riêng tư tùy chọn yêu cầu chuỗi(giá trị, nhãn) {
     trả về giá trị;
 };
 
-hàm riêng tư tùy chọn mã hex(văn bản) {
-    trả về hex mã(mã hóa bảng mã(văn bản, "UTF-8"));
+hàm riêng tư tùy chọn mã thập lục phân(văn bản) {
+    trả về thập lục phân mã(mã hóa bảng mã(văn bản, "UTF-8"));
 };
 
-hàm riêng tư tùy chọn giải hex(văn bản) {
+hàm riêng tư tùy chọn giải thập lục phân(văn bản) {
     thử {
-        trả về giải mã bảng mã(hex giải(văn bản), "UTF-8");
+        trả về giải mã bảng mã(thập lục phân giải(văn bản), "UTF-8");
     } bắt lỗi (e) {
         ném "tùy chọn: dữ liệu lưu không hợp lệ";
     };
 };
 
 hàm riêng tư tùy chọn thư mục gốc() {
-    chỉ_định = đọc biến môi trường("VPP_PREFERENCES_HOME", "");
-    nếu (chỉ_định != "") {
-        trả về chỉ_định;
+    chỉ định = đọc biến môi trường("VPP_PREFERENCES_HOME", "");
+    nếu (chỉ định != "") {
+        trả về chỉ định;
     };
 
-    nền_tảng = tên nền tảng();
-    nếu (nền_tảng == "windows") {
+    nền tảng = tên nền tảng();
+    nếu (nền tảng == "windows") {
         local = đọc biến môi trường("LOCALAPPDATA", "");
         nếu (local != "") {
             trả về đường dẫn nối(đường dẫn nối(local, "VPP"), "preferences");
         };
-        home = đọc biến môi trường("USERPROFILE", "");
-        nếu (home != "") {
-            trả về đường dẫn nối(đường dẫn nối(home, ".vpp"), "preferences");
+        thư mục nhà = đọc biến môi trường("USERPROFILE", "");
+        nếu (thư mục nhà != "") {
+            trả về đường dẫn nối(đường dẫn nối(thư mục nhà, ".vpp"), "preferences");
         };
     } hoặc {
         xdg = đọc biến môi trường("XDG_CONFIG_HOME", "");
         nếu (xdg != "") {
             trả về đường dẫn nối(đường dẫn nối(xdg, "vpp"), "preferences");
         };
-        home = đọc biến môi trường("HOME", "");
-        nếu (home != "") {
+        thư mục nhà = đọc biến môi trường("HOME", "");
+        nếu (thư mục nhà != "") {
             trả về đường dẫn nối(
-                đường dẫn nối(đường dẫn nối(home, ".config"), "vpp"),
+                đường dẫn nối(đường dẫn nối(thư mục nhà, ".config"), "vpp"),
                 "preferences"
             );
         };
@@ -70,67 +70,67 @@ hàm riêng tư tùy chọn đường dẫn(không gian) {
     nếu (không gian == "") {
         ném "tùy chọn: không gian không được rỗng";
     };
-    gốc_dữ_liệu = tùy chọn thư mục gốc();
-    tạo thư mục(gốc_dữ_liệu);
-    trả về đường dẫn nối(gốc_dữ_liệu, tùy chọn mã hex(không gian) + ".prefs");
+    gốc dữ liệu = tùy chọn thư mục gốc();
+    tạo thư mục(gốc dữ liệu);
+    trả về đường dẫn nối(gốc dữ liệu, tùy chọn mã thập lục phân(không gian) + ".prefs");
 };
 
-hàm riêng tư tùy chọn đọc dòng(dòng, kết_quả) {
+hàm riêng tư tùy chọn đọc dòng(dòng, kết quả) {
     nếu (dòng == "") {
         trả về rỗng;
     };
-    vị_trí = -1;
-    lặp(i = 0; i < độ dài(dòng) && vị_trí < 0; i++) {
+    vị trí = -1;
+    lặp(i = 0; i < máy ảo lấy độ dài(dòng) && vị trí < 0; i++) {
         nếu (dòng[i] == "=") {
-            vị_trí = i;
+            vị trí = i;
         };
     };
-    nếu (vị_trí < 0) {
+    nếu (vị trí < 0) {
         ném "tùy chọn: dữ liệu lưu bị hỏng";
     };
 
-    khóa_hex = cắt chuỗi(dòng, 0, vị_trí);
-    giá_trị_hex = cắt chuỗi(dòng, vị_trí + 1, độ dài(dòng) - vị_trí - 1);
-    khóa = tùy chọn giải hex(khóa_hex);
-    giá_trị = tùy chọn giải hex(giá_trị_hex);
-    đặt map(kết_quả, khóa, giá_trị);
+    khóa thập lục phân = cắt chuỗi(dòng, 0, vị trí);
+    giá trị thập lục phân = cắt chuỗi(dòng, vị trí + 1, máy ảo lấy độ dài(dòng) - vị trí - 1);
+    khóa = tùy chọn giải thập lục phân(khóa thập lục phân);
+    giá trị = tùy chọn giải thập lục phân(giá trị thập lục phân);
+    đặt từ điển(kết quả, khóa, giá trị);
     trả về rỗng;
 };
 
 hàm riêng tư tùy chọn đọc tất cả(đường dẫn) {
-    kết_quả = {};
+    kết quả = {};
     nếu (!đường dẫn tồn tại(đường dẫn)) {
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    nội_dung = đọc tệp(đường dẫn);
+    nội dung = đọc tệp(đường dẫn);
     dòng = "";
-    n = độ dài(nội_dung);
+    n = máy ảo lấy độ dài(nội dung);
     lặp(i = 0; i <= n; i++) {
         hết = i == n;
         c = "\n";
         nếu (!hết) {
-            c = nội_dung[i];
+            c = nội dung[i];
         };
         nếu (c == "\n") {
-            tùy chọn đọc dòng(dòng, kết_quả);
+            tùy chọn đọc dòng(dòng, kết quả);
             dòng = "";
         } hoặc {
             dòng = dòng + c;
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư tùy chọn ghi tất cả(đường dẫn, giá_trị) {
-    khóa = khóa map(giá_trị);
-    nội_dung = "";
-    lặp(i = 0; i < độ dài(khóa); i++) {
+hàm riêng tư tùy chọn ghi tất cả(đường dẫn, giá trị) {
+    khóa = khóa từ điển(giá trị);
+    nội dung = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
         tên = khóa[i];
-        nội_dung = nội_dung + tùy chọn mã hex(tên) + "=" +
-            tùy chọn mã hex(lấy map(giá_trị, tên, "")) + "\n";
+        nội dung = nội dung + tùy chọn mã thập lục phân(tên) + "=" +
+            tùy chọn mã thập lục phân(lấy từ điển(giá trị, tên, "")) + "\n";
     };
-    ghi tệp(đường dẫn, nội_dung);
+    ghi tệp(đường dẫn, nội dung);
     trả về đúng;
 };
 
@@ -139,8 +139,8 @@ hàm công khai tùy chọn đọc(không gian, khóa, giá trị mặc định)
     nếu (khóa == "") {
         ném "tùy chọn đọc: khóa không được rỗng";
     };
-    dữ_liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
-    trả về lấy map(dữ_liệu, khóa, giá trị mặc định);
+    dữ liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
+    trả về lấy từ điển(dữ liệu, khóa, giá trị mặc định);
 };
 
 hàm công khai tùy chọn lưu(không gian, khóa, giá trị) {
@@ -150,9 +150,9 @@ hàm công khai tùy chọn lưu(không gian, khóa, giá trị) {
         ném "tùy chọn lưu: khóa không được rỗng";
     };
     đường = tùy chọn đường dẫn(không gian);
-    dữ_liệu = tùy chọn đọc tất cả(đường);
-    đặt map(dữ_liệu, khóa, giá trị);
-    tùy chọn ghi tất cả(đường, dữ_liệu);
+    dữ liệu = tùy chọn đọc tất cả(đường);
+    đặt từ điển(dữ liệu, khóa, giá trị);
+    tùy chọn ghi tất cả(đường, dữ liệu);
     trả về đúng;
 };
 
@@ -162,18 +162,18 @@ hàm công khai tùy chọn xóa(không gian, khóa) {
         ném "tùy chọn xóa: khóa không được rỗng";
     };
     đường = tùy chọn đường dẫn(không gian);
-    dữ_liệu = tùy chọn đọc tất cả(đường);
-    nếu (!có khóa(dữ_liệu, khóa)) {
+    dữ liệu = tùy chọn đọc tất cả(đường);
+    nếu (!máy ảo có khóa từ điển(dữ liệu, khóa)) {
         trả về sai;
     };
-    xóa khóa(dữ_liệu, khóa);
-    tùy chọn ghi tất cả(đường, dữ_liệu);
+    máy ảo xóa khóa từ điển(dữ liệu, khóa);
+    tùy chọn ghi tất cả(đường, dữ liệu);
     trả về đúng;
 };
 
 hàm công khai tùy chọn khóa(không gian) {
-    dữ_liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
-    trả về khóa map(dữ_liệu);
+    dữ liệu = tùy chọn đọc tất cả(tùy chọn đường dẫn(không gian));
+    trả về khóa từ điển(dữ liệu);
 };
 
 hàm công khai tùy chọn xóa không gian(không gian) {
@@ -188,14 +188,14 @@ hàm công khai tùy chọn xóa không gian(không gian) {
 // Giữ namespace theo instance, đọc lại tệp ở mỗi thao tác để không ghi đè
 // thay đổi từ một instance khác cùng namespace bằng cache cũ.
 lớp công khai Kho Tùy Chọn {
-    hàm công khai khởi tạo(không_gian) {
-        tùy chọn yêu cầu chuỗi(không_gian, "không gian");
-        nếu (không_gian == "") { ném "tùy chọn: không gian không được rỗng"; };
-        mình.không_gian = không_gian;
+    hàm công khai khởi tạo(không gian) {
+        tùy chọn yêu cầu chuỗi(không gian, "không gian");
+        nếu (không gian == "") { ném "tùy chọn: không gian không được rỗng"; };
+        mình.không gian = không gian;
     };
-    hàm công khai đọc(khóa, mặc_định = rỗng) { trả về tùy chọn đọc(mình.không_gian, khóa, mặc_định); };
-    hàm công khai lưu(khóa, giá_trị) { trả về tùy chọn lưu(mình.không_gian, khóa, giá_trị); };
-    hàm công khai xóa(khóa) { trả về tùy chọn xóa(mình.không_gian, khóa); };
-    hàm công khai các khóa() { trả về tùy chọn khóa(mình.không_gian); };
-    hàm công khai xóa tất cả() { trả về tùy chọn xóa không gian(mình.không_gian); };
+    hàm công khai đọc(khóa, mặc định = rỗng) { trả về tùy chọn đọc(mình.không gian, khóa, mặc định); };
+    hàm công khai lưu(khóa, giá trị) { trả về tùy chọn lưu(mình.không gian, khóa, giá trị); };
+    hàm công khai xóa(khóa) { trả về tùy chọn xóa(mình.không gian, khóa); };
+    hàm công khai các khóa() { trả về tùy chọn khóa(mình.không gian); };
+    hàm công khai xóa tất cả() { trả về tùy chọn xóa không gian(mình.không gian); };
 };

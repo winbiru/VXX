@@ -23,13 +23,13 @@ hàm chính() {
     có_lỗi = sai;
     thử { biên dịch thông tin kiến trúc("riscv128"); } bắt lỗi (e) { có_lỗi = đúng; };
     nếu (!có_lỗi) { ném "không chặn kiến trúc lạ"; };
-    // Cùng bộ triple/alias với oracle C++ target_registry_hardening.cpp.
+    // Cùng bộ bộ ba/alias với oracle C++ target_registry_hardening.cpp.
     lặp (i = 0; i < độ dài(danh_sách); i++) {
         tên = danh_sách[i];
         đích = biên dịch phân tích đích(tên + "-unknown-linux-gnu");
         nếu (đích["kiến trúc"] != tên || đích["định dạng"] != "ELF" ||
-            biên dịch triple chuẩn(đích) != tên + "-unknown-linux-gnu") {
-            ném "triple Linux sai: " + tên;
+            biên dịch bộ ba chuẩn(đích) != tên + "-unknown-linux-gnu") {
+            ném "bộ ba Linux sai: " + tên;
         };
     };
     bí_danh = [
@@ -45,10 +45,10 @@ hàm chính() {
     ];
     lặp (i = 0; i < độ dài(bí_danh); i++) {
         đích = biên dịch phân tích đích(bí_danh[i][0]);
-        chuẩn = biên dịch triple chuẩn(đích);
+        chuẩn = biên dịch bộ ba chuẩn(đích);
         nếu (chuẩn != bí_danh[i][1] ||
-            biên dịch triple chuẩn(biên dịch phân tích đích(chuẩn)) != chuẩn) {
-            ném "alias triple sai: " + bí_danh[i][0];
+            biên dịch bộ ba chuẩn(biên dịch phân tích đích(chuẩn)) != chuẩn) {
+            ném "alias bộ ba sai: " + bí_danh[i][0];
         };
     };
     sai_triple = ["riscv128-linux-gnu", "aarch64", "aarch64-plan9",
@@ -59,7 +59,7 @@ hàm chính() {
         có_lỗi = sai;
         thử { biên dịch phân tích đích(sai_triple[i]); }
         bắt lỗi (e) { có_lỗi = đúng; };
-        nếu (!có_lỗi) { ném "triple không bị từ chối: " + sai_triple[i]; };
+        nếu (!có_lỗi) { ném "bộ ba không bị từ chối: " + sai_triple[i]; };
     };
     nếu (biên dịch phân tích đích("aarch64-pc-windows-msvc")["định dạng"] != "COFF") {
         ném "Windows ARM64 phải được nhận diện dù chưa phát mã native";

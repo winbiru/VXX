@@ -1,0 +1,125 @@
+// IPv4/IPv6 parser thuần V++ dùng chung cho socket, DNS hosts và DNS config.
+// Không gọi libc hoặc hệ điều hành.
+nhập gói/lõi/chuyển kiểu;
+
+lớp công khai Bộ Phân Tích IP {
+    hàm công khai khởi tạo() {};
+
+    // Chuyển IPv4 thập phân thành bốn byte mạng. Không dùng inet_pton/libc.
+    hàm riêng tư địa chỉ mạng phiên bản bốn các byte(địa chỉ mạng) {
+        mã = chuỗi thành byte máy ảo(địa chỉ mạng);
+        n = máy ảo lấy độ dài(mã);
+        nếu (n < 7 || n > 15) { ném "socket_connect: IPv4 không hợp lệ"; };
+        kết quả = [];
+        phần = 0;
+        chữ số = 0;
+        lặp(i = 0; i <= n; i++) {
+            k = 46;
+            nếu (i < n) { k = mã[i]; };
+            nếu (k == 46) {
+                nếu (chữ số == 0 || phần > 255 || máy ảo lấy độ dài(kết quả) >= 4) {
+                    ném "socket_connect: IPv4 không hợp lệ";
+                };
+                máy ảo thêm cuối danh sách(kết quả, phần);
+                phần = 0;
+                chữ số = 0;
+            } hoặc {
+                nếu (k < 48 || k > 57 || chữ số >= 3) {
+                    ném "socket_connect: IPv4 không hợp lệ";
+                };
+                phần = phần * 10 + k - 48;
+                chữ số = chữ số + 1;
+            };
+        };
+        nếu (máy ảo lấy độ dài(kết quả) != 4) { ném "socket_connect: IPv4 không hợp lệ"; };
+        trả về kết quả;
+    };
+
+    // IPv6 hỗ trợ dạng đầy đủ, :: rút gọn và IPv4 suffix (::ffff:127.0.0.1).
+    // Nhóm hex và số byte zero-padding được tính hoàn toàn trong V++.
+    hàm công khai địa chỉ mạng các byte(địa chỉ mạng) {
+        mã = chuỗi thành byte máy ảo(địa chỉ mạng);
+        n = máy ảo lấy độ dài(mã);
+        có hai chấm = sai;
+        lặp(i = 0; i < n; i++) {
+            nếu (mã[i] == 58) { có hai chấm = đúng; thoát; };
+        };
+        nếu (!có hai chấm) { trả về mình.địa chỉ mạng phiên bản bốn các byte(địa chỉ mạng); };
+        nếu (n < 2 || n > 45) { ném "socket_connect: IPv6 không hợp lệ"; };
+        phần = [];
+        vị trí nén = -1;
+        i = 0;
+        nếu (mã[0] == 58) {
+            nếu (mã[1] != 58) { ném "socket_connect: IPv6 không hợp lệ"; };
+            vị trí nén = 0;
+            i = 2;
+        };
+        lặp(vòng = 0; i < n && vòng < 16; vòng++) {
+            bắt đầu = i;
+            giá trị = 0;
+            chữ số = 0;
+            có chấm = sai;
+            lặp(j = i; j < n; j++) {
+                nếu (mã[j] == 58) { thoát; };
+                k = mã[j];
+                nếu (k == 46) { có chấm = đúng; };
+            };
+            nếu (có chấm) {
+                đuôi = [];
+                lặp(j = bắt đầu; j < n; j++) { máy ảo thêm cuối danh sách(đuôi, mã[j]); };
+                v4 = mình.địa chỉ mạng phiên bản bốn các byte(chuỗi từ byte máy ảo(đuôi));
+                lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(phần, v4[j]); };
+                i = n;
+            } hoặc {
+                lặp(j = i; j < n; j++) {
+                    nếu (mã[j] == 58) { thoát; };
+                    k = mã[j];
+                    chữ = -1;
+                    nếu (k >= 48 && k <= 57) { chữ = k - 48; }
+                    hoặc nếu (k >= 65 && k <= 70) { chữ = k - 65 + 10; }
+                    hoặc nếu (k >= 97 && k <= 102) { chữ = k - 97 + 10; };
+                    nếu (chữ < 0 || chữ số >= 4) {
+                        ném "socket_connect: IPv6 không hợp lệ";
+                    };
+                    giá trị = giá trị * 16 + chữ;
+                    chữ số = chữ số + 1;
+                };
+                nếu (chữ số == 0) { ném "socket_connect: IPv6 không hợp lệ"; };
+                máy ảo thêm cuối danh sách(phần, (giá trị - giá trị % 256) / 256);
+                máy ảo thêm cuối danh sách(phần, giá trị % 256);
+                i = j;
+                nếu (i < n) {
+                    i = i + 1;
+                    nếu (i == n) {
+                        ném "socket_connect: IPv6 kết thúc bằng dấu hai chấm";
+                    };
+                    nếu (mã[i] == 58) {
+                        nếu (vị trí nén >= 0) { ném "socket_connect: IPv6 nén hai lần"; };
+                        vị trí nén = máy ảo lấy độ dài(phần);
+                        i = i + 1;
+                    };
+                };
+            };
+        };
+        nếu (i != n || máy ảo lấy độ dài(phần) > 16) { ném "socket_connect: IPv6 không hợp lệ"; };
+        nếu (vị trí nén < 0) {
+            nếu (máy ảo lấy độ dài(phần) != 16) { ném "socket_connect: IPv6 thiếu nhóm"; };
+            trả về phần;
+        };
+        thiếu = 16 - máy ảo lấy độ dài(phần);
+        nếu (thiếu < 2 || thiếu % 2 != 0) {
+            ném "socket_connect: IPv6 nén không hợp lệ";
+        };
+        kết quả = [];
+        lặp(j = 0; j < vị trí nén; j++) { máy ảo thêm cuối danh sách(kết quả, phần[j]); };
+        lặp(j = 0; j < thiếu; j++) { máy ảo thêm cuối danh sách(kết quả, 0); };
+        lặp(j = vị trí nén; j < máy ảo lấy độ dài(phần); j++) { máy ảo thêm cuối danh sách(kết quả, phần[j]); };
+        trả về kết quả;
+    };
+
+};
+
+hàm công khai địa chỉ mạng các byte(địa chỉ mạng) {
+    bộ = Bộ Phân Tích IP();
+    trả về bộ.địa chỉ mạng các byte(địa chỉ mạng);
+};

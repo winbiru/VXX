@@ -75,7 +75,7 @@ lớp công khai KhoĐơnHàngTệp triển khai KhoĐơnHàng {
         tìmThấy = sai;
         lặp(i = 0; i < độ dài(raw); i = i + 1) {
             item = raw[i];
-            nếu (lấy map(item, "id", "") == đơnHàng.id) {
+            nếu (lấy từ điển(item, "id", "") == đơnHàng.id) {
                 raw[i] = đơnHàng.thànhMap();
                 tìmThấy = đúng;
             };

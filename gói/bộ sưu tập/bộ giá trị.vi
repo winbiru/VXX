@@ -1,0 +1,55 @@
+
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Tiện Ích Bộ Giá Trị {
+    hàm công khai khởi tạo() {};
+
+    // Module: lõi.tuple
+    // Tuple MVP là collection bất biến, tạo từ list và chuyển ngược về list.
+    hàm riêng tư thành danh sách nội bộ(giá trị, chỉ số, kết quả) {
+        nếu (chỉ số >= máy ảo lấy độ dài(giá trị)) {
+            trả về kết quả;
+        };
+        máy ảo thêm cuối danh sách(kết quả, giá trị[chỉ số]);
+        trả về mình.thành danh sách nội bộ(giá trị, chỉ số + 1, kết quả);
+    };
+
+    hàm công khai thành danh sách(giá trị) {
+        nếu (loại của(giá trị) != "danh sách" && loại của(giá trị) != "tuple") {
+            ném "thành danh sách chỉ nhận danh sách hoặc bộ";
+        };
+        // Sao chép nông: list mới độc lập, phần tử tham chiếu vẫn được chia sẻ.
+        trả về mình.thành danh sách nội bộ(giá trị, 0, []);
+    };
+
+    hàm công khai thành bộ giá trị(danh sách đầu vào) {
+        nếu (loại của(danh sách đầu vào) == "tuple") {
+            trả về danh sách đầu vào;
+        };
+        nếu (loại của(danh sách đầu vào) != "danh sách") {
+            ném "thành bộ chỉ nhận danh sách hoặc bộ";
+        };
+        // Policy và sao chép nông nằm ở V++; VM chỉ vật chất hóa tuple bất biến.
+        trả về bộ(mình.thành danh sách(danh sách đầu vào));
+    };
+
+    hàm công khai chuyển thành danh sách(giá trị) {
+        trả về mình.thành danh sách(giá trị);
+    };
+};
+
+
+hàm công khai thành danh sách(giá trị) {
+    bộ chuyển tiếp = Tiện Ích Bộ Giá Trị();
+    trả về bộ chuyển tiếp.thành danh sách(giá trị);
+};
+
+hàm công khai thành bộ giá trị(danh sách đầu vào) {
+    bộ chuyển tiếp = Tiện Ích Bộ Giá Trị();
+    trả về bộ chuyển tiếp.thành bộ giá trị(danh sách đầu vào);
+};
+
+hàm công khai chuyển thành danh sách(giá trị) {
+    bộ chuyển tiếp = Tiện Ích Bộ Giá Trị();
+    trả về bộ chuyển tiếp.chuyển thành danh sách(giá trị);
+};

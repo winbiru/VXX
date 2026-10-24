@@ -1,72 +1,72 @@
 // Kiểm tra tokenizer, parser, semantic/IR và thực thi IR thuần native V++.
 hàm test_int_buffer() {
-    biến b = byte_mới();
+    biến b = byte mới();
     nếu (b <= 0) { trả về 10; };
-    nếu (byte_đẩy_i32(b, -2147483647) != 0) { trả về 11; };
-    nếu (byte_đẩy_i32(b, 2147483647) != 0) { trả về 12; };
-    nếu (byte_dài(b) != 8) { trả về 13; };
-    nếu (byte_lấy(b, 0) != 1) { trả về 14; };
-    nếu (byte_lấy(b, 3) != 128) { trả về 15; };
-    nếu (byte_đọc_i32(b, 0) != -2147483647) { trả về 16; };
-    nếu (byte_đọc_i32(b, 4) != 2147483647) { trả về 17; };
-    nếu (byte_ghi_i32(b, 4, -1234567) != 0) { trả về 18; };
-    nếu (byte_đọc_i32(b, 4) != -1234567) { trả về 19; };
-    nếu (byte_ghi_i32(b, 5, 0) != -1) { trả về 20; };
-    nếu (byte_đọc_i32(b, 5) != -1) { trả về 21; };
-    nếu (byte_ghi_i32(b, -1, 0) != -1) { trả về 22; };
-    nếu (byte_đọc_i32(b, -1) != -1) { trả về 23; };
-    nếu (byte_dài(b) != 8) { trả về 24; };
-    nếu (byte_hủy(b) != 0) { trả về 25; };
-    nếu (byte_đẩy_i32(b, 1) != -1) { trả về 26; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(b, -2147483647) != 0) { trả về 11; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(b, 2147483647) != 0) { trả về 12; };
+    nếu (byte dài(b) != 8) { trả về 13; };
+    nếu (byte lấy(b, 0) != 1) { trả về 14; };
+    nếu (byte lấy(b, 3) != 128) { trả về 15; };
+    nếu (byte đọc số nguyên ba mươi hai bit(b, 0) != -2147483647) { trả về 16; };
+    nếu (byte đọc số nguyên ba mươi hai bit(b, 4) != 2147483647) { trả về 17; };
+    nếu (byte ghi số nguyên ba mươi hai bit(b, 4, -1234567) != 0) { trả về 18; };
+    nếu (byte đọc số nguyên ba mươi hai bit(b, 4) != -1234567) { trả về 19; };
+    nếu (byte ghi số nguyên ba mươi hai bit(b, 5, 0) != -1) { trả về 20; };
+    nếu (byte đọc số nguyên ba mươi hai bit(b, 5) != -1) { trả về 21; };
+    nếu (byte ghi số nguyên ba mươi hai bit(b, -1, 0) != -1) { trả về 22; };
+    nếu (byte đọc số nguyên ba mươi hai bit(b, -1) != -1) { trả về 23; };
+    nếu (byte dài(b) != 8) { trả về 24; };
+    nếu (byte hủy(b) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(b, 1) != -1) { trả về 26; };
     biến full = "x";
     lặp (i = 0; i < 20; i++) {
-        nếu (byte_nối(full, full) != 0) { trả về 27; };
+        nếu (byte nối(full, full) != 0) { trả về 27; };
     };
-    nếu (byte_dài(full) != 1048576) { trả về 28; };
-    nếu (byte_đẩy_i32(full, 9) != -1) { trả về 29; };
-    nếu (byte_ghi_i32(full, 1048573, 9) != -1) { trả về 29; };
-    nếu (byte_ghi_i32(full, 1048572, -1) != 0) { trả về 29; };
-    nếu (byte_đọc_i32(full, 1048572) != -1) { trả về 29; };
-    nếu (byte_dài(full) != 1048576) { trả về 29; };
-    nếu (byte_hủy(full) != 0) { trả về 29; };
+    nếu (byte dài(full) != 1048576) { trả về 28; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(full, 9) != -1) { trả về 29; };
+    nếu (byte ghi số nguyên ba mươi hai bit(full, 1048573, 9) != -1) { trả về 29; };
+    nếu (byte ghi số nguyên ba mươi hai bit(full, 1048572, -1) != 0) { trả về 29; };
+    nếu (byte đọc số nguyên ba mươi hai bit(full, 1048572) != -1) { trả về 29; };
+    nếu (byte dài(full) != 1048576) { trả về 29; };
+    nếu (byte hủy(full) != 0) { trả về 29; };
     trả về 0;
 };
 
 hàm test_parser_program() {
     biến source = "// V++\n hàm chính() { /* UTF-8 */ biến số = 2 + 3 * 4; biến kết_quả = (số - 5) * 2; trả về kết_quả + -1; };";
-    biến tokens = byte_mới();
-    biến ir = byte_mới();
-    nếu (lex_tokenize(source, tokens) != 34) { trả về 31; };
-    nếu (tok_count(tokens) != 34) { trả về 32; };
-    nếu (tok_field(tokens, 0, 0) != 8) { trả về 33; };
-    nếu (tok_field(tokens, 0, 1) != 12) { trả về 34; };
-    nếu (tok_field(tokens, 0, 2) != 1) { trả về 35; };
-    nếu (tok_equals(source, tokens, 0, "hàm") != 1) { trả về 36; };
-    nếu (tok_equals(source, tokens, 1, "hàm") != 0) { trả về 37; };
-    nếu (tok_field(tokens, -1, 0) != -1) { trả về 38; };
-    nếu (tok_field(tokens, 34, 0) != -1) { trả về 39; };
-    nếu (p_compile(source, tokens, ir) <= 0) { trả về 40; };
-    nếu (ir_run(ir) != 17) { trả về 41; };
-    nếu (byte_hủy(source) != 0) { trả về 42; };
-    nếu (byte_hủy(tokens) != 0) { trả về 43; };
-    nếu (byte_hủy(ir) != 0) { trả về 44; };
+    biến tokens = byte mới();
+    biến ir = byte mới();
+    nếu (từ vựng tách từ tố(source, tokens) != 34) { trả về 31; };
+    nếu (từ tố số phần tử(tokens) != 34) { trả về 32; };
+    nếu (từ tố trường dữ liệu(tokens, 0, 0) != 8) { trả về 33; };
+    nếu (từ tố trường dữ liệu(tokens, 0, 1) != 12) { trả về 34; };
+    nếu (từ tố trường dữ liệu(tokens, 0, 2) != 1) { trả về 35; };
+    nếu (từ tố bằng(source, tokens, 0, "hàm") != 1) { trả về 36; };
+    nếu (từ tố bằng(source, tokens, 1, "hàm") != 0) { trả về 37; };
+    nếu (từ tố trường dữ liệu(tokens, -1, 0) != -1) { trả về 38; };
+    nếu (từ tố trường dữ liệu(tokens, 34, 0) != -1) { trả về 39; };
+    nếu (phân tích biên dịch(source, tokens, ir) <= 0) { trả về 40; };
+    nếu (biểu diễn trung gian run(ir) != 17) { trả về 41; };
+    nếu (byte hủy(source) != 0) { trả về 42; };
+    nếu (byte hủy(tokens) != 0) { trả về 43; };
+    nếu (byte hủy(ir) != 0) { trả về 44; };
     trả về 0;
 };
 
 // Every parser error must clear a previously populated IR buffer.
 hàm expect_reject(source) {
-    biến tokens = byte_mới();
-    biến ir = byte_mới();
+    biến tokens = byte mới();
+    biến ir = byte mới();
     biến status = 0;
-    byte_đẩy_i32(ir, 123);
-    nếu (lex_tokenize(source, tokens) < 0) { status = 5; }
+    byte đẩy số nguyên ba mươi hai bit(ir, 123);
+    nếu (từ vựng tách từ tố(source, tokens) < 0) { status = 5; }
     hoặc {
-        nếu (p_compile(source, tokens, ir) >= 0) { status = 1; };
-        nếu (byte_dài(ir) != 0) { status = 2; };
+        nếu (phân tích biên dịch(source, tokens, ir) >= 0) { status = 1; };
+        nếu (byte dài(ir) != 0) { status = 2; };
     };
-    nếu (byte_hủy(tokens) != 0) { status = 3; };
-    nếu (byte_hủy(ir) != 0) { status = 4; };
-    nếu (byte_hủy(source) != 0) { status = 6; };
+    nếu (byte hủy(tokens) != 0) { status = 3; };
+    nếu (byte hủy(ir) != 0) { status = 4; };
+    nếu (byte hủy(source) != 0) { status = 6; };
     trả về status;
 };
 
@@ -97,32 +97,32 @@ hàm test_parser_invalid() {
 };
 
 hàm run_case(source, expected) {
-    biến tokens = byte_mới();
-    biến ir = byte_mới();
+    biến tokens = byte mới();
+    biến ir = byte mới();
     biến status = 0;
-    nếu (lex_tokenize(source, tokens) < 0) { status = 1; }
+    nếu (từ vựng tách từ tố(source, tokens) < 0) { status = 1; }
     hoặc {
-        nếu (p_compile(source, tokens, ir) < 1) { status = 2; }
-        hoặc { nếu (ir_run(ir) != expected) { status = 3; }; };
+        nếu (phân tích biên dịch(source, tokens, ir) < 1) { status = 2; }
+        hoặc { nếu (biểu diễn trung gian run(ir) != expected) { status = 3; }; };
     };
-    nếu (byte_hủy(source) != 0) { status = 4; };
-    nếu (byte_hủy(tokens) != 0) { status = 5; };
-    nếu (byte_hủy(ir) != 0) { status = 6; };
+    nếu (byte hủy(source) != 0) { status = 4; };
+    nếu (byte hủy(tokens) != 0) { status = 5; };
+    nếu (byte hủy(ir) != 0) { status = 6; };
     trả về status;
 };
 
 hàm test_division_by_zero_ir() {
-    biến ir = byte_mới();
+    biến ir = byte mới();
     nếu (ir <= 0) { trả về 120; };
     lặp (op = 26; op <= 27; op++) {
-        byte_làm_rỗng(ir);
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 0);
-        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
-        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-        nếu (ir_run(ir) != -2147483647) { trả về 121; };
+        byte làm rỗng(ir);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 7);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        byte đẩy số nguyên ba mươi hai bit(ir, op); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        nếu (biểu diễn trung gian run(ir) != -2147483647) { trả về 121; };
     };
-    nếu (byte_hủy(ir) != 0) { trả về 122; };
+    nếu (byte hủy(ir) != 0) { trả về 122; };
     trả về 0;
 };
 
@@ -170,90 +170,90 @@ hàm test_parser_precedence() {
 };
 
 hàm test_token_errors() {
-    biến src = byte_mới();
-    biến tokens = byte_mới();
-    byte_thêm(src, 65);
-    byte_thêm(src, 32);
-    byte_thêm(src, 192);
-    byte_thêm(src, 128);
-    nếu (lex_tokenize(src, tokens) != -1) { trả về 91; };
-    nếu (byte_dài(tokens) != 0) { trả về 92; };
-    byte_làm_rỗng(src);
-    byte_thêm(src, 65);
-    nếu (lex_tokenize(src, tokens) != 1) { trả về 93; };
-    nếu (tok_count(tokens) != 1) { trả về 94; };
-    nếu (tok_field(tokens, 0, 1) != 1) { trả về 95; };
-    nếu (lex_tokenize(src, tokens) != 1) { trả về 96; };
-    nếu (byte_dài(tokens) != 16) { trả về 97; };
-    nếu (byte_ghi_i32(tokens, 0, 2) != 0) { trả về 98; };
-    nếu (tok_count(tokens) != -1) { trả về 99; };
-    nếu (tok_field(tokens, 0, 0) != -1) { trả về 100; };
-    biến ir = byte_mới();
+    biến src = byte mới();
+    biến tokens = byte mới();
+    byte thêm(src, 65);
+    byte thêm(src, 32);
+    byte thêm(src, 192);
+    byte thêm(src, 128);
+    nếu (từ vựng tách từ tố(src, tokens) != -1) { trả về 91; };
+    nếu (byte dài(tokens) != 0) { trả về 92; };
+    byte làm rỗng(src);
+    byte thêm(src, 65);
+    nếu (từ vựng tách từ tố(src, tokens) != 1) { trả về 93; };
+    nếu (từ tố số phần tử(tokens) != 1) { trả về 94; };
+    nếu (từ tố trường dữ liệu(tokens, 0, 1) != 1) { trả về 95; };
+    nếu (từ vựng tách từ tố(src, tokens) != 1) { trả về 96; };
+    nếu (byte dài(tokens) != 16) { trả về 97; };
+    nếu (byte ghi số nguyên ba mươi hai bit(tokens, 0, 2) != 0) { trả về 98; };
+    nếu (từ tố số phần tử(tokens) != -1) { trả về 99; };
+    nếu (từ tố trường dữ liệu(tokens, 0, 0) != -1) { trả về 100; };
+    biến ir = byte mới();
     nếu (ir <= 0) { trả về 103; };
-    nếu (byte_đẩy_i32(ir, 17) != 0) { trả về 104; };
-    nếu (p_compile(src, tokens, ir) != -1) { trả về 105; };
-    nếu (byte_dài(ir) != 0) { trả về 106; };
-    nếu (lex_tokenize(src, tokens) != 1) { trả về 107; };
-    nếu (tok_validate(src, tokens) != 1) { trả về 108; };
-    nếu (byte_ghi_i32(tokens, 4, 1) != 0) { trả về 109; };
-    nếu (tok_validate(src, tokens) != -1) { trả về 110; };
-    nếu (lex_tokenize(src, tokens) != 1) { trả về 111; };
-    nếu (byte_ghi_i32(tokens, 12, 2) != 0) { trả về 112; };
-    nếu (tok_validate(src, tokens) != -1) { trả về 113; };
-    nếu (byte_hủy(ir) != 0) { trả về 114; };
-    nếu (byte_hủy(src) != 0) { trả về 101; };
-    nếu (byte_hủy(tokens) != 0) { trả về 102; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 17) != 0) { trả về 104; };
+    nếu (phân tích biên dịch(src, tokens, ir) != -1) { trả về 105; };
+    nếu (byte dài(ir) != 0) { trả về 106; };
+    nếu (từ vựng tách từ tố(src, tokens) != 1) { trả về 107; };
+    nếu (từ tố kiểm tra hợp lệ(src, tokens) != 1) { trả về 108; };
+    nếu (byte ghi số nguyên ba mươi hai bit(tokens, 4, 1) != 0) { trả về 109; };
+    nếu (từ tố kiểm tra hợp lệ(src, tokens) != -1) { trả về 110; };
+    nếu (từ vựng tách từ tố(src, tokens) != 1) { trả về 111; };
+    nếu (byte ghi số nguyên ba mươi hai bit(tokens, 12, 2) != 0) { trả về 112; };
+    nếu (từ tố kiểm tra hợp lệ(src, tokens) != -1) { trả về 113; };
+    nếu (byte hủy(ir) != 0) { trả về 114; };
+    nếu (byte hủy(src) != 0) { trả về 101; };
+    nếu (byte hủy(tokens) != 0) { trả về 102; };
     trả về 0;
 };
 
 hàm test_parser_file() {
     biến path = "native-parser-input.vi";
-    biến file = tệp_mở_đọc(path);
+    biến file = tệp mở đọc(path);
     nếu (file <= 0) { trả về 71; };
-    biến source = byte_mới();
-    biến tokens = byte_mới();
-    biến ir = byte_mới();
-    nếu (tệp_đọc_khối(file, source) <= 0) { trả về 72; };
-    nếu (tệp_đóng(file) != 0) { trả về 73; };
-    nếu (lex_tokenize(source, tokens) < 1) { trả về 74; };
-    nếu (p_compile(source, tokens, ir) < 1) { trả về 75; };
-    nếu (ir_run(ir) != 52) { trả về 76; };
+    biến source = byte mới();
+    biến tokens = byte mới();
+    biến ir = byte mới();
+    nếu (tệp đọc khối(file, source) <= 0) { trả về 72; };
+    nếu (tệp đóng(file) != 0) { trả về 73; };
+    nếu (từ vựng tách từ tố(source, tokens) < 1) { trả về 74; };
+    nếu (phân tích biên dịch(source, tokens, ir) < 1) { trả về 75; };
+    nếu (biểu diễn trung gian run(ir) != 52) { trả về 76; };
     biến path_ir = "native-parser-output.ir";
-    biến output = tệp_mở_ghi(path_ir);
+    biến output = tệp mở ghi(path_ir);
     nếu (output <= 0) { trả về 115; };
-    nếu (tệp_ghi_khối(output, ir) != byte_dài(ir)) { trả về 116; };
-    nếu (tệp_đóng(output) != 0) { trả về 117; };
-    biến input = tệp_mở_đọc(path_ir);
+    nếu (tệp ghi khối(output, ir) != byte dài(ir)) { trả về 116; };
+    nếu (tệp đóng(output) != 0) { trả về 117; };
+    biến input = tệp mở đọc(path_ir);
     nếu (input <= 0) { trả về 118; };
-    biến restored = byte_mới();
-    nếu (tệp_đọc_khối(input, restored) != byte_dài(ir)) { trả về 119; };
-    nếu (tệp_đóng(input) != 0) { trả về 120; };
-    nếu (byte_bằng(ir, restored) != 1) { trả về 121; };
-    nếu (ir_run(restored) != 52) { trả về 122; };
-    nếu (byte_hủy(restored) != 0) { trả về 123; };
-    nếu (byte_hủy(path_ir) != 0) { trả về 124; };
-    nếu (byte_hủy(path) != 0) { trả về 77; };
-    nếu (byte_hủy(source) != 0) { trả về 78; };
-    nếu (byte_hủy(tokens) != 0) { trả về 79; };
-    nếu (byte_hủy(ir) != 0) { trả về 80; };
+    biến restored = byte mới();
+    nếu (tệp đọc khối(input, restored) != byte dài(ir)) { trả về 119; };
+    nếu (tệp đóng(input) != 0) { trả về 120; };
+    nếu (byte bằng(ir, restored) != 1) { trả về 121; };
+    nếu (biểu diễn trung gian run(restored) != 52) { trả về 122; };
+    nếu (byte hủy(restored) != 0) { trả về 123; };
+    nếu (byte hủy(path_ir) != 0) { trả về 124; };
+    nếu (byte hủy(path) != 0) { trả về 77; };
+    nếu (byte hủy(source) != 0) { trả về 78; };
+    nếu (byte hủy(tokens) != 0) { trả về 79; };
+    nếu (byte hủy(ir) != 0) { trả về 80; };
     trả về 0;
 };
 
 hàm chính() {
     biến code = test_int_buffer();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_program();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_invalid();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_precedence();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_division_by_zero_ir();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_token_errors();
-    nếu (code != 0) { in_số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_file();
-    nếu (code != 0) { in_số(code); trả về code; };
-    in_số(20261017);
+    nếu (code != 0) { in (code); trả về code; };
+    in 20261017;
     trả về 0;
 };

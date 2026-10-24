@@ -31,7 +31,7 @@ hàm chính() {
     in artifact["hàm"][1]["tên"] == "tính";
     in artifact["hàm"][2]["tên"] == "Lõi.giá_trị";
     in artifact["hàm"][3]["tên"] == "Vỏ.giá_trị";
-    in biên dịch chạy artifact(artifact) == "7\n5\n";
+    in biên dịch chạy sản phẩm biên dịch(artifact) == "7\n5\n";
     oracle = biên dịch snapshot nội bộ(nguồn["app/main"],
                                      "fixtures/compiler_oracle/oop/app");
     in oracle["hợp lệ"] == 1;
@@ -67,7 +67,7 @@ hàm chính() {
     in đảo_oracle["hợp lệ"] == 1;
     nếu (đảo_oracle["hợp lệ"] == 1) {
         in đảo_artifact["hàm"][1]["tên"] == "Trước.nhận";
-        in biên dịch chạy artifact(đảo_artifact) == "9\n7\n";
+        in biên dịch chạy sản phẩm biên dịch(đảo_artifact) == "9\n7\n";
         trước_link = [];
         oracle_top = đảo_oracle["bytecode"];
         nếu (độ dài(đảo_artifact["bytecode"]) >= độ dài(oracle_top)) {
@@ -105,7 +105,7 @@ hàm chính() {
     nếu (kế_thừa_oracle["hợp lệ"] == 1) {
         in kế_thừa_artifact["hàm"][1]["tên"] == "Cha.đọc";
         in kế_thừa_artifact["hàm"][2]["tên"] == "Con.đọc";
-        in biên dịch chạy artifact(kế_thừa_artifact) == "31\n7\n";
+        in biên dịch chạy sản phẩm biên dịch(kế_thừa_artifact) == "31\n7\n";
         so_top = [];
         chuẩn_top = kế_thừa_oracle["bytecode"];
         nếu (độ dài(kế_thừa_artifact["bytecode"]) >= độ dài(chuẩn_top)) {

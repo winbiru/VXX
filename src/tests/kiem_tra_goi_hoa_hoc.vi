@@ -7,8 +7,8 @@ hàm chính() {
     in số mol từ nồng độ(0.5, 2);
     in nồng độ phần trăm(10, 100);
     in khối lượng chất tan(20, 200);
-    in thể tích khí ở đktc(2);
-    in số mol khí ở đktc(22.414);
+    in thể tích khí ở điều kiện tiêu chuẩn(2);
+    in số mol khí ở điều kiện tiêu chuẩn(22.414);
     in nồng độ sau pha loãng(2, 1, 4);
     in hằng số avogadro() > 0;
     in số hạt từ số mol(1) > 0;

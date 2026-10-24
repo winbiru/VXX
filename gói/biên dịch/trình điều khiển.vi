@@ -1,7 +1,7 @@
 // Stage 0 tạo executable compiler V++ qua ASM. Từ Stage 1, mọi pass của
 // nguồn đích và artifact do thư viện V++ này thực hiện, không gọi VM.
 nhập gói/biên dịch/nguồn tệp;
-nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/sản phẩm biên dịch;
 nhập gói/biên dịch/liên kết;
 nhập gói/biên dịch/bộ nạp;
 nhập gói/nhập xuất/tệp;
@@ -9,51 +9,51 @@ nhập gói/lõi/chuyển kiểu;
 
 // Điều khiển một phiên CLI. Trạng thái đường dẫn và cấu hình được giữ trong lớp.
 lớp công khai Trình Điều Khiển Biên Dịch {
-    hàm công khai khởi tạo(đường, thư_viện, đầu_ra) {
+    hàm công khai khởi tạo(đường, thư viện, đầu ra) {
         mình.đường = đường;
-        mình.thư_viện = thư_viện;
-        mình.đầu_ra = đầu_ra;
+        mình.thư viện = thư viện;
+        mình.đầu ra = đầu ra;
     };
 
-    hàm riêng tư kiểm tra đầu ra(đồ_thị) {
-        nếu (mình.đầu_ra == "") { trả về; };
-        đích = biên dịch nguồn chuẩn đường(mình.đầu_ra);
-        nếu (đích == đồ_thị["điểm vào"]) { ném "biên dịch cli: đầu ra trùng nguồn"; };
-        mô_đun = đồ_thị["mô đun"];
-        lặp(i = 0; i < độ dài(mô_đun); i++) {
-            nếu (đích == mô_đun[i]["định danh"]) {
+    hàm riêng tư kiểm tra đầu ra(đồ thị) {
+        nếu (mình.đầu ra == "") { trả về; };
+        đích = biên dịch nguồn chuẩn đường(mình.đầu ra);
+        nếu (đích == đồ thị["điểm vào"]) { ném "biên dịch cli: đầu ra trùng nguồn"; };
+        mô đun = đồ thị["mô đun"];
+        lặp(i = 0; i < máy ảo lấy độ dài(mô đun); i++) {
+            nếu (đích == mô đun[i]["định danh"]) {
                 ném "biên dịch cli: đầu ra trùng nguồn phụ thuộc";
             };
         };
     };
 
     hàm công khai dựng() {
-        đồ_thị = biên dịch nguồn đồ thị(mình.đường, mình.thư_viện);
-        mình.kiểm tra đầu ra(đồ_thị);
-        artifact = biên dịch liên kết đồ thị thuần(đồ_thị);
-        nếu (mình.đầu_ra != "") {
-            ghi tệp(mình.đầu_ra, biên dịch artifact tuần tự(artifact));
+        đồ thị = biên dịch nguồn đồ thị(mình.đường, mình.thư viện);
+        mình.kiểm tra đầu ra(đồ thị);
+        sản phẩm biên dịch = biên dịch liên kết đồ thị thuần(đồ thị);
+        nếu (mình.đầu ra != "") {
+            ghi tệp(mình.đầu ra, biên dịch sản phẩm biên dịch tuần tự(sản phẩm biên dịch));
         };
         trả về "Compiler V++: " + mình.đường + ": " +
-            thành chuỗi(độ dài(artifact["bytecode"])) + " lệnh bytecode, " +
-            thành chuỗi(độ dài(artifact["hàm"])) + " hàm.\n";
+            thành chuỗi(máy ảo lấy độ dài(sản phẩm biên dịch["bytecode"])) + " lệnh bytecode, " +
+            thành chuỗi(máy ảo lấy độ dài(sản phẩm biên dịch["hàm"])) + " hàm.\n";
     };
 
-    hàm công khai chạy(chế_độ) {
-        chọn (chế_độ) {
+    hàm công khai chạy(chế độ) {
+        chọn (chế độ) {
             ca "artifact": {
-                trả về biên dịch chạy artifact văn bản(đọc tệp(mình.đường));
+                trả về biên dịch chạy sản phẩm biên dịch văn bản(đọc tệp(mình.đường));
             }
             ca "run": {
-                trả về biên dịch chạy artifact(biên dịch nguồn tệp tự chủ(mình.đường, mình.thư_viện));
+                trả về biên dịch chạy sản phẩm biên dịch(biên dịch nguồn tệp tự chủ(mình.đường, mình.thư viện));
             }
             ca "build": { trả về mình.dựng(); }
-            mặc định: { ném "biên dịch cli: chế độ chưa hỗ trợ '" + chế_độ + "'"; }
+            mặc định: { ném "biên dịch cli: chế độ chưa hỗ trợ '" + chế độ + "'"; }
         }
     };
 };
 
-hàm công khai biên dịch cli(đường, thư_viện, chế_độ, đầu_ra) {
-    điều_khiển = Trình Điều Khiển Biên Dịch(đường, thư_viện, đầu_ra);
-    trả về điều_khiển.chạy(chế_độ);
+hàm công khai biên dịch dòng lệnh(đường, thư viện, chế độ, đầu ra) {
+    điều khiển = Trình Điều Khiển Biên Dịch(đường, thư viện, đầu ra);
+    trả về điều khiển.chạy(chế độ);
 };

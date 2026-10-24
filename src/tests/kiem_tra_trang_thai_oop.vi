@@ -7,9 +7,9 @@ nhập gói/kiểm thử/chính;
 hàm chính() {
     a = Bộ Sinh Ngẫu Nhiên(12345);
     b = tạo bộ sinh ngẫu nhiên(12345);
-    khẳng định bằng(a.nguyên(-100, 100), random i64(b, -100, 100));
-    khẳng định bằng(a.thực(), random f64(b));
-    khẳng định bằng(a.luận lý(), random bool(b));
+    khẳng định bằng(a.nguyên(-100, 100), ngẫu nhiên i64(b, -100, 100));
+    khẳng định bằng(a.thực(), ngẫu nhiên f64(b));
+    khẳng định bằng(a.luận lý(), ngẫu nhiên luận lý(b));
     snapshot = a.trạng thái();
     tiếp = a.nguyên(0, 100000);
     khẳng định bằng(a.khôi phục(snapshot), a);
@@ -18,8 +18,8 @@ hàm chính() {
     hành_động_1 = hàm() { a.khôi phục({"thuật toán": "sai"}); };
     khẳng định ném lỗi(hành_động_1, "RANDOM_STATE");
     khẳng định bằng(a.trạng thái()["trạng thái"], snapshot["trạng thái"]);
-    bytes = a.bytes(5);
-    khẳng định bằng(do_dai(bytes), 5);
+    các byte = a.các byte(5);
+    khẳng định bằng(độ dài(các byte), 5);
     khẳng định đúng(a.đóng());
     khẳng định sai(a.đóng());
     hành_động_2 = hàm() { a.thực(); };
@@ -58,7 +58,7 @@ hàm chính() {
     hành_động_7 = hàm() { lỗi_worker.chờ(); };
     khẳng định ném lỗi(hành_động_7, "worker lỗi");
     khẳng định đúng(lỗi_worker.đóng());
-    công_việc_chậm = hàm() { thread_vm_park(60000); trả về 1; };
+    công_việc_chậm = hàm() { luồng máy ảo nghỉ(60000); trả về 1; };
     chậm = Luồng Công Việc(công_việc_chậm);
     khẳng định bằng(chậm.chờ(0), rỗng);
     khẳng định đúng(chậm.hủy());

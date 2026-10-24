@@ -1,0 +1,104 @@
+// Buffer token native: i32 count, rồi (i32 start, i32 end, i32 kind)*count.
+// Offset byte UTF-8, không cấp phát chuỗi/token trên heap cho từng từ.
+// Chỉ dùng với ABI native và lexer.vi (nối file nguồn khi chưa hỗ trợ import).
+
+hàm từ tố số phần tử(các từ tố) {
+    biến n = byte dài(các từ tố);
+    nếu (n < 4) { trả về -1; };
+    biến số phần tử = byte đọc số nguyên ba mươi hai bit(các từ tố, 0);
+    nếu (số phần tử < 0) { trả về -1; };
+    nếu (số phần tử > 87381) { trả về -1; };
+    nếu (n != 4 + số phần tử * 12) { trả về -1; };
+    trả về số phần tử;
+};
+
+// field: 0 start, 1 end, 2 loại (theo lex_kind).
+hàm từ tố trường dữ liệu(các từ tố, chỉ mục, trường dữ liệu) {
+    biến số phần tử = từ tố số phần tử(các từ tố);
+    nếu (số phần tử < 0) { trả về -1; };
+    nếu (chỉ mục < 0) { trả về -1; };
+    nếu (chỉ mục >= số phần tử) { trả về -1; };
+    nếu (trường dữ liệu < 0) { trả về -1; };
+    nếu (trường dữ liệu > 2) { trả về -1; };
+    trả về byte đọc số nguyên ba mươi hai bit(các từ tố, 4 + chỉ mục * 12 + trường dữ liệu * 4);
+};
+
+// Không tin token buffer do caller truyền vào: kiểm tra đủ source span,
+// loại token, thứ tự và cả trivia (khoảng trắng/chú thích) giữa các token.
+// Thành công trả số token, lỗi trả -1.
+hàm từ tố kiểm tra hợp lệ(nguồn văn bản, các từ tố) {
+    biến chiều dài = byte dài(nguồn văn bản);
+    biến số phần tử = từ tố số phần tử(các từ tố);
+    nếu (chiều dài < 0) { trả về -1; };
+    nếu (số phần tử < 0) { trả về -1; };
+    biến con trỏ hiện tại = 0;
+    lặp (i = 0; i < số phần tử; i++) {
+        biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, i, 0);
+        biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, i, 1);
+        biến loại từ tố = từ tố trường dữ liệu(các từ tố, i, 2);
+        nếu (điểm bắt đầu != từ vựng số mục bỏ qua(nguồn văn bản, con trỏ hiện tại)) { trả về -1; };
+        nếu (điểm kết thúc <= điểm bắt đầu) { trả về -1; };
+        nếu (điểm kết thúc > chiều dài) { trả về -1; };
+        nếu (loại từ tố < 1) { trả về -1; };
+        nếu (loại từ tố > 6) { trả về -1; };
+        nếu (từ vựng loại từ tố ghép(nguồn văn bản, điểm bắt đầu, điểm kết thúc) != loại từ tố) { trả về -1; };
+        con trỏ hiện tại = điểm kết thúc;
+    };
+    nếu (từ vựng số mục bỏ qua(nguồn văn bản, con trỏ hiện tại) != chiều dài) { trả về -1; };
+    trả về số phần tử;
+};
+
+// Thành công trả số token >=0; lỗi trả -1 và xóa toàn bộ kết quả.
+hàm từ vựng tách từ tố(nguồn văn bản, các từ tố) {
+    nếu (byte dài(nguồn văn bản) < 0) { trả về -1; };
+    nếu (byte dài(các từ tố) < 0) { trả về -1; };
+    nếu (nguồn văn bản == các từ tố) { trả về -1; };
+    nếu (byte làm rỗng(các từ tố) != 0) { trả về -1; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(các từ tố, 0) != 0) { trả về -1; };
+    biến số phần tử = 0;
+    biến vị trí hiện tại = 0;
+    lặp (vòng lặp = 0; vòng lặp < 87382; vòng lặp++) {
+        vị trí hiện tại = từ vựng số mục bỏ qua(nguồn văn bản, vị trí hiện tại);
+        nếu (vị trí hiện tại < 0) { byte làm rỗng(các từ tố); trả về -1; };
+        nếu (vị trí hiện tại == byte dài(nguồn văn bản)) {
+            nếu (byte ghi số nguyên ba mươi hai bit(các từ tố, 0, số phần tử) != 0) {
+                byte làm rỗng(các từ tố);
+                trả về -1;
+            };
+            trả về số phần tử;
+        };
+        biến điểm kết thúc = từ vựng điểm kết thúc tên(nguồn văn bản, vị trí hiện tại);
+        nếu (điểm kết thúc <= vị trí hiện tại) { byte làm rỗng(các từ tố); trả về -1; };
+        biến loại từ tố = từ vựng loại từ tố ghép(nguồn văn bản, vị trí hiện tại, điểm kết thúc);
+        nếu (loại từ tố < 1) { byte làm rỗng(các từ tố); trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(các từ tố, vị trí hiện tại) != 0) { byte làm rỗng(các từ tố); trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(các từ tố, điểm kết thúc) != 0) { byte làm rỗng(các từ tố); trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(các từ tố, loại từ tố) != 0) { byte làm rỗng(các từ tố); trả về -1; };
+        vị trí hiện tại = điểm kết thúc;
+        số phần tử = số phần tử + 1;
+    };
+    byte làm rỗng(các từ tố);
+    trả về -1;
+};
+
+// So token với literal UTF-8. Hàm này SỞ HỮU và hủy expected.
+// Điều này tránh rò handle khi truyền thẳng "hàm"/"biến"/"chính".
+hàm từ tố bằng(nguồn văn bản, các từ tố, chỉ mục, giá trị mong đợi) {
+    biến điểm bắt đầu = từ tố trường dữ liệu(các từ tố, chỉ mục, 0);
+    biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, chỉ mục, 1);
+    biến số ký tự = byte dài(giá trị mong đợi);
+    biến bằng nhau = 1;
+    nếu (điểm bắt đầu < 0) { bằng nhau = 0; };
+    nếu (điểm kết thúc - điểm bắt đầu != số ký tự) { bằng nhau = 0; };
+    nếu (số ký tự < 0) { bằng nhau = 0; };
+    nếu (bằng nhau == 1) {
+        lặp (i = 0; i < số ký tự; i++) {
+            nếu (byte lấy(nguồn văn bản, điểm bắt đầu + i) != byte lấy(giá trị mong đợi, i)) {
+                bằng nhau = 0;
+                thoát;
+            };
+        };
+    };
+    nếu (byte hủy(giá trị mong đợi) != 0) { trả về -1; };
+    trả về bằng nhau;
+};

@@ -3,7 +3,7 @@ nhập src/tests/fixtures/api_project/controller;
 nhập src/tests/fixtures/api_project/repository;
 nhập src/tests/fixtures/api_project/mapper;
 nhập src/tests/fixtures/api_project/service;
-nhập gói/ứng dụng/cầu nối/api;
+nhập gói/ứng dụng/cầu nối/giao diện lập trình;
 
 lớp công khai ApiDbProjectTest {
     // Nhận controller đã ghép đủ dependency để test không tự tạo tầng nghiệp vụ.
@@ -17,7 +17,7 @@ lớp công khai ApiDbProjectTest {
         dbSession = "OPEN";
 
         connectRes = db connect("");
-        in app json db bootstrap(connectRes);
+        in ứng dụng json cơ sở dữ liệu khởi động(connectRes);
 
         controller.getUsers(dbSession, "Bearer demo-token", "db-req-001");
         controller.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
@@ -29,7 +29,7 @@ lớp công khai ApiDbProjectTest {
         controller.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
 
         disconnectRes = db disconnect();
-        in app json db shutdown(disconnectRes);
+        in ứng dụng json cơ sở dữ liệu tắt(disconnectRes);
         dbSession = "CLOSED";
 
         // verify API behavior when DB is disconnected
@@ -40,7 +40,7 @@ lớp công khai ApiDbProjectTest {
 };
 
 hàm chính() {
-    // Composition root của fixture: tạo object graph một lần rồi inject từ ngoài vào.
+    // Composition root của fixture: tạo đối tượng graph một lần rồi inject từ ngoài vào.
     repository = UserRepository();
     mapper = UserMapper();
     service = UserService(repository, mapper);

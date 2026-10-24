@@ -1,5 +1,8 @@
 # Roadmap V++ 1.0
 
+Checklist công việc theo phiên, điều kiện nghiệm thu và quy trình triển khai:
+[Release 1.0 — Checklist thực thi và phát hành](release-1.0-execution-checklist.md).
+
 > Cập nhật: 01/10/2026
 >
 > Mục tiêu 1.0 không còn là mở rộng cú pháp theo chiều rộng. Trọng tâm là đóng băng
@@ -283,14 +286,14 @@ evidence và vẫn cần before/after report từ hai revision độc lập.
 - [ ] Audit các package đã có: collection, file, JSON, HTTP client/server, math, random,
   environment, logging và config; đóng behavior + lỗi + cross-platform test cho 1.0. Slice
   file/config/random đã khóa UTF-8 path, line/word count, config key/fallback và strict integer
-  bounds; collection/JSON đã khóa thứ tự key deterministic cho `khóa map` và `json tạo` để
+  bounds; collection/JSON đã khóa thứ tự key deterministic cho `khóa từ điển` và `json tạo` để
   output không phụ thuộc `unordered_map`; HTTP client đã validate URL HTTP(S), UTF-8, host và
   ký tự điều khiển trước khi gọi curl. Math đã khóa chia/chia dư cho 0 theo runtime error,
   giữ `chia an toàn` làm fallback riêng và từ chối số mũ/giai thừa không phải số nguyên không âm.
   Environment đã validate tên biến nhất quán trước host API (rỗng/`=`/NUL/UTF-8 lỗi bị từ chối),
   giữ fallback cho biến hợp lệ bị thiếu. Logging đã khóa wrapper, Unicode tiếng Việt, giá trị động
   và giá trị trả `0` bằng regression. JSON parser/serializer đã chặn UTF-8 lỗi ở input, string value
-  và object key, đồng thời giữ tiếng Việt/Unicode ngoài BMP hợp lệ. Collection đã chặn overflow ở `tổng list`
+  và object key, đồng thời giữ tiếng Việt/Unicode ngoài BMP hợp lệ. Collection đã chặn overflow ở `tổng danh sách`
   và khóa diagnostic cho sort hỗn hợp/min rỗng; HTTP validate authority, port và IPv6 trước curl;
   math từ chối modulo số thực có phần lẻ và cận `giới hạn` đảo ngược; text + helper integer
   dùng chung chấp nhận số thực tích phân nhưng từ chối phần lẻ/suffix thay vì cắt ngầm. Phần còn lại là xác nhận

@@ -1,4 +1,4 @@
-// Chạy bytecode C++ theo đúng ABI của khai báo biến dùng trong compiler V++.
+// Chạy mã trung gian C++ theo đúng ABI của khai báo biến dùng trong compiler V++.
 biến cơ_sở = 5;
 biến chưa_gán;
 chưa_gán = 7;

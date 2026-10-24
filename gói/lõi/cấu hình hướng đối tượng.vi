@@ -3,25 +3,25 @@ nhập gói/lõi/cấu hình;
 nhập gói/bộ sưu tập/từ điển;
 
 lớp công khai Cấu Hình Tệp {
-    hàm công khai khởi tạo(đường_dẫn) {
-        nếu (loai_cua(đường_dẫn) != "chuỗi") { ném "CONFIG_ARGUMENT"; };
-        mình.đường = đường_dẫn;
-        mình.nội_dung = {};
+    hàm công khai khởi tạo(đường dẫn) {
+        nếu (loại của(đường dẫn) != "chuỗi") { ném "CONFIG_ARGUMENT"; };
+        mình.đường = đường dẫn;
+        mình.nội dung = {};
         mình.tải lại();
     };
 
     hàm công khai tải lại() {
         mới = đọc cấu hình(mình.đường);
-        mình.nội_dung = mới;
+        mình.nội dung = mới;
         trả về mình;
     };
 
-    hàm công khai lấy(khóa, mặc_định = rỗng) {
-        trả về lấy map(mình.nội_dung, khóa, mặc_định);
+    hàm công khai lấy(khóa, mặc định = rỗng) {
+        trả về lấy từ điển(mình.nội dung, khóa, mặc định);
     };
 
     hàm công khai có(khóa) {
-        trả về có khóa(mình.nội_dung, khóa);
+        trả về máy ảo có khóa từ điển(mình.nội dung, khóa);
     };
 
     hàm công khai đường dẫn() { trả về mình.đường; };

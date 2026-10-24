@@ -1,9 +1,9 @@
 hàm chính() {
-    nếu (đối_số_đếm() != 4) { trả về 9; };
-    biến source = đối_số_lấy(1);
-    biến output = đối_số_lấy(2);
-    biến executable = đối_số_lấy(3);
-    nếu (rt_link_validate_files(output, source) != 0) { trả về 1; };
-    nếu (rt_link_executable_ready(executable) != 0) { trả về 2; };
+    nếu (đối số đếm() != 4) { trả về 9; };
+    biến source = đối số lấy(1);
+    biến output = đối số lấy(2);
+    biến executable = đối số lấy(3);
+    nếu (thực thi liên kết kiểm tra hợp lệ files(output, source) != 0) { trả về 1; };
+    nếu (thực thi liên kết executable sẵn sàng(executable) != 0) { trả về 2; };
     trả về 52;
 };

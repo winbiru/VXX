@@ -2,45 +2,45 @@
 nhập gói/kiểm thử/ca kiểm thử;
 
 lớp công khai Bộ Kiểm Thử {
-    hàm công khai khởi tạo(dừng_khi_lỗi = sai) {
-        mình.dừng_khi_lỗi = dừng_khi_lỗi;
-        mình.các_ca = [];
-        mình.kết_quả = [];
+    hàm công khai khởi tạo(dừng khi lỗi = sai) {
+        mình.dừng khi lỗi = dừng khi lỗi;
+        mình.các ca = [];
+        mình.kết quả = [];
     };
 
     hàm công khai đăng ký(tên, ca) {
-        nếu (loai_cua(tên) != "chuỗi" || tên == "" || ca == rỗng) {
+        nếu (loại của(tên) != "chuỗi" || tên == "" || ca == rỗng) {
             ném "TEST_ARGUMENT";
         };
-        thêm(mình.các_ca, {"tên": tên, "ca": ca});
+        máy ảo thêm cuối danh sách(mình.các ca, {"tên": tên, "ca": ca});
         trả về mình;
     };
 
     hàm công khai chạy() {
-        mình.kết_quả = [];
-        các_ca = mình.các_ca;
-        kết_quả = mình.kết_quả;
-        lặp(i = 0; i < độ dài(các_ca); i++) {
-            ca = các_ca[i]["ca"];
-            tên = các_ca[i]["tên"];
+        mình.kết quả = [];
+        các ca = mình.các ca;
+        kết quả = mình.kết quả;
+        lặp(i = 0; i < máy ảo lấy độ dài(các ca); i++) {
+            ca = các ca[i]["ca"];
+            tên = các ca[i]["tên"];
             thử {
-                giá_trị = ca.chạy();
-                thêm(kết_quả, {"tên": tên, "đạt": đúng, "giá trị": giá_trị, "lỗi": rỗng});
+                giá trị = ca.chạy();
+                máy ảo thêm cuối danh sách(kết quả, {"tên": tên, "đạt": đúng, "giá trị": giá trị, "lỗi": rỗng});
             } bắt lỗi(e) {
-                thêm(kết_quả, {"tên": tên, "đạt": sai, "giá trị": rỗng, "lỗi": e});
-                nếu (mình.dừng_khi_lỗi) { thoát; };
+                máy ảo thêm cuối danh sách(kết quả, {"tên": tên, "đạt": sai, "giá trị": rỗng, "lỗi": e});
+                nếu (mình.dừng khi lỗi) { thoát; };
             };
         };
         trả về mình.báo cáo();
     };
 
     hàm công khai báo cáo() {
-        kết_quả = mình.kết_quả;
+        kết quả = mình.kết quả;
         đạt = 0;
-        lặp(i = 0; i < độ dài(kết_quả); i++) {
-            nếu (kết_quả[i]["đạt"]) { đạt += 1; };
+        lặp(i = 0; i < máy ảo lấy độ dài(kết quả); i++) {
+            nếu (kết quả[i]["đạt"]) { đạt += 1; };
         };
-        trả về {"tổng": độ dài(kết_quả), "đạt": đạt,
-                "lỗi": độ dài(kết_quả) - đạt, "kết quả": kết_quả};
+        trả về {"tổng": máy ảo lấy độ dài(kết quả), "đạt": đạt,
+                "lỗi": máy ảo lấy độ dài(kết quả) - đạt, "kết quả": kết quả};
     };
 };

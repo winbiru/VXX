@@ -6,30 +6,30 @@
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/bộ sưu tập/danh sách;
 
-hàm công khai thống kê là nan(giá_trị) {
-    nếu (loại của(giá_trị) != "số thực") {
+hàm công khai thống kê là không phải số(giá trị) {
+    nếu (loại của(giá trị) != "số thực") {
         trả về sai;
     };
-    trả về giá_trị != giá_trị;
+    trả về giá trị != giá trị;
 };
 
 hàm công khai thống kê yêu cầu(bản) {
     nếu (loại của(bản) != "từ điển") {
         ném "VALUE_STATS_INVALID";
     };
-    loại = lấy map(bản, "__vpp_stats__", "");
+    loại = lấy từ điển(bản, "__vpp_stats__", "");
     nếu (loại != "integer" && loại != "float") {
         ném "VALUE_STATS_INVALID";
     };
-    đếm = lấy map(bản, "đếm", -1);
+    đếm = lấy từ điển(bản, "đếm", -1);
     nếu (loại của(đếm) != "số nguyên" || đếm < 0) {
         ném "VALUE_STATS_INVALID";
     };
     trả về loại;
 };
 
-hàm công khai thống kê số nguyên(ds) {
-    n = độ dài(ds);
+hàm công khai thống kê số nguyên(danh sách đầu vào) {
+    n = máy ảo lấy độ dài(danh sách đầu vào);
     nếu (n == 0) {
         trả về {
             "__vpp_stats__": "integer",
@@ -42,27 +42,27 @@ hàm công khai thống kê số nguyên(ds) {
     };
 
     lặp(i = 0; i < n; i++) {
-        nếu (loại của(ds[i]) != "số nguyên") {
+        nếu (loại của(danh sách đầu vào[i]) != "số nguyên") {
             ném "VALUE_STATS_INTEGER_REQUIRED";
         };
     };
 
-    tổng = tổng list(ds);
-    nhỏ = nhỏ nhất list(ds);
-    lớn = lớn nhất list(ds);
-    trung_bình = tổng / (n + 0.0);
+    tổng = tổng danh sách(danh sách đầu vào);
+    nhỏ = nhỏ nhất danh sách(danh sách đầu vào);
+    lớn = lớn nhất danh sách(danh sách đầu vào);
+    trung bình = tổng / (n + 0.0);
     trả về {
         "__vpp_stats__": "integer",
         "đếm": n,
         "tổng": tổng,
         "nhỏ nhất": nhỏ,
         "lớn nhất": lớn,
-        "trung bình": trung_bình
+        "trung bình": trung bình
     };
 };
 
-hàm công khai thống kê số thực(ds) {
-    n = độ dài(ds);
+hàm công khai thống kê số thực(danh sách đầu vào) {
+    n = máy ảo lấy độ dài(danh sách đầu vào);
     nếu (n == 0) {
         trả về {
             "__vpp_stats__": "float",
@@ -75,37 +75,37 @@ hàm công khai thống kê số thực(ds) {
     };
 
     lặp(i = 0; i < n; i++) {
-        kiểu = loại của(ds[i]);
+        kiểu = loại của(danh sách đầu vào[i]);
         nếu (kiểu != "số nguyên" && kiểu != "số thực") {
             ném "VALUE_STATS_NUMBER_REQUIRED";
         };
     };
 
     tổng = 0.0;
-    nhỏ = ds[0] + 0.0;
-    lớn = ds[0] + 0.0;
-    có_nan = sai;
+    nhỏ = danh sách đầu vào[0] + 0.0;
+    lớn = danh sách đầu vào[0] + 0.0;
+    có không phải số = sai;
     lặp(i = 0; i < n; i++) {
-        giá_trị = ds[i] + 0.0;
-        tổng = tổng + giá_trị;
-        nếu (thống kê là nan(giá_trị)) {
-            có_nan = đúng;
+        giá trị = danh sách đầu vào[i] + 0.0;
+        tổng = tổng + giá trị;
+        nếu (thống kê là không phải số(giá trị)) {
+            có không phải số = đúng;
         } hoặc {
-            nếu (!có_nan) {
-                nếu (giá_trị < nhỏ) {
-                    nhỏ = giá_trị;
+            nếu (!có không phải số) {
+                nếu (giá trị < nhỏ) {
+                    nhỏ = giá trị;
                 };
-                nếu (giá_trị > lớn) {
-                    lớn = giá_trị;
+                nếu (giá trị > lớn) {
+                    lớn = giá trị;
                 };
             };
         };
     };
 
-    nếu (có_nan) {
-        nan = thành số thực("nan");
-        nhỏ = nan;
-        lớn = nan;
+    nếu (có không phải số) {
+        không phải số = thành số thực("nan");
+        nhỏ = không phải số;
+        lớn = không phải số;
     };
 
     trả về {
@@ -119,57 +119,57 @@ hàm công khai thống kê số thực(ds) {
 };
 
 hàm công khai gộp thống kê(a, b) {
-    loại_a = thống kê yêu cầu(a);
-    loại_b = thống kê yêu cầu(b);
-    nếu (loại_a != loại_b) {
+    loại a = thống kê yêu cầu(a);
+    loại b = thống kê yêu cầu(b);
+    nếu (loại a != loại b) {
         ném "VALUE_STATS_INVALID";
     };
 
-    đếm_a = lấy map(a, "đếm", 0);
-    đếm_b = lấy map(b, "đếm", 0);
-    nếu (đếm_a == 0) {
+    đếm a = lấy từ điển(a, "đếm", 0);
+    đếm b = lấy từ điển(b, "đếm", 0);
+    nếu (đếm a == 0) {
         trả về b;
     };
-    nếu (đếm_b == 0) {
+    nếu (đếm b == 0) {
         trả về a;
     };
 
-    tổng_a = lấy map(a, "tổng", 0);
-    tổng_b = lấy map(b, "tổng", 0);
-    nhỏ_a = lấy map(a, "nhỏ nhất", rỗng);
-    nhỏ_b = lấy map(b, "nhỏ nhất", rỗng);
-    lớn_a = lấy map(a, "lớn nhất", rỗng);
-    lớn_b = lấy map(b, "lớn nhất", rỗng);
-    đếm = đếm_a + đếm_b;
-    tổng = tổng_a + tổng_b;
+    tổng a = lấy từ điển(a, "tổng", 0);
+    tổng b = lấy từ điển(b, "tổng", 0);
+    nhỏ a = lấy từ điển(a, "nhỏ nhất", rỗng);
+    nhỏ b = lấy từ điển(b, "nhỏ nhất", rỗng);
+    lớn a = lấy từ điển(a, "lớn nhất", rỗng);
+    lớn b = lấy từ điển(b, "lớn nhất", rỗng);
+    đếm = đếm a + đếm b;
+    tổng = tổng a + tổng b;
 
-    nếu (loại_a == "float") {
-        nếu (thống kê là nan(tổng_a) || thống kê là nan(tổng_b) ||
-            thống kê là nan(nhỏ_a) || thống kê là nan(nhỏ_b) ||
-            thống kê là nan(lớn_a) || thống kê là nan(lớn_b)) {
-            nan = thành số thực("nan");
+    nếu (loại a == "float") {
+        nếu (thống kê là không phải số(tổng a) || thống kê là không phải số(tổng b) ||
+            thống kê là không phải số(nhỏ a) || thống kê là không phải số(nhỏ b) ||
+            thống kê là không phải số(lớn a) || thống kê là không phải số(lớn b)) {
+            không phải số = thành số thực("nan");
             trả về {
                 "__vpp_stats__": "float",
                 "đếm": đếm,
-                "tổng": nan,
-                "nhỏ nhất": nan,
-                "lớn nhất": nan,
-                "trung bình": nan
+                "tổng": không phải số,
+                "nhỏ nhất": không phải số,
+                "lớn nhất": không phải số,
+                "trung bình": không phải số
             };
         };
     };
 
-    nhỏ = nhỏ_a;
-    lớn = lớn_a;
-    nếu (nhỏ_b < nhỏ) {
-        nhỏ = nhỏ_b;
+    nhỏ = nhỏ a;
+    lớn = lớn a;
+    nếu (nhỏ b < nhỏ) {
+        nhỏ = nhỏ b;
     };
-    nếu (lớn_b > lớn) {
-        lớn = lớn_b;
+    nếu (lớn b > lớn) {
+        lớn = lớn b;
     };
 
     trả về {
-        "__vpp_stats__": loại_a,
+        "__vpp_stats__": loại a,
         "đếm": đếm,
         "tổng": tổng,
         "nhỏ nhất": nhỏ,

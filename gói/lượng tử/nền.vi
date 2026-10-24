@@ -1,0 +1,22 @@
+// Kiểm tra dữ liệu dùng chung; số qubit 0 là bit thấp nhất của chỉ số cơ sở.
+hàm công khai lượng tử yêu cầu nguyên(giá trị, nhãn, nhỏ nhất, lớn nhất) {
+    nếu (loại của(giá trị) != "số nguyên") {
+        ném "lượng tử: " + nhãn + " phải là số nguyên";
+    }
+    ;
+    nếu (giá trị < nhỏ nhất || giá trị > lớn nhất) {
+        ném "lượng tử: " + nhãn + " ngoài phạm vi " + nhỏ nhất + ".." + lớn nhất;
+    }
+    ;
+    trả về giá trị;
+}
+;
+hàm công khai lượng tử lũy thừa hai(n) {
+    kết quả = 1;
+    lặp (i = 0; i < n; i++) {
+        kết quả = kết quả * 2;
+    }
+    ;
+    trả về kết quả;
+}
+;

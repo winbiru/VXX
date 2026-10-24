@@ -2,8 +2,8 @@ nhập gói/mạng/http/chính;
 
 lớp HTTP Kiểm Thử kế thừa Khách HTTP {
     hàm khởi tạo() { gốc.khởi tạo("https://example.com/api"); };
-    hàm bảo vệ thực thi(phương_thức, url, dữ_liệu) {
-        trả về phương_thức + "|" + url + "|" + dữ_liệu;
+    hàm bảo vệ thực thi(phương_thức, địa chỉ tài nguyên, dữ_liệu) {
+        trả về phương_thức + "|" + địa chỉ tài nguyên + "|" + dữ_liệu;
     };
 };
 
@@ -19,7 +19,7 @@ hàm chính() {
     thử { khách.tạo URL("https://evil.example/"); } bắt lỗi(e) { chặn_tuyệt_đối = đúng; };
     in chặn_tuyệt_đối;
     chặn_url_gốc = sai;
-    thử { Khách HTTP("url-không-hợp-lệ"); } bắt lỗi(e) { chặn_url_gốc = đúng; };
+    thử { Khách HTTP("địa chỉ tài nguyên-không-hợp-lệ"); } bắt lỗi(e) { chặn_url_gốc = đúng; };
     in chặn_url_gốc;
     chặn_query = sai;
     thử { Khách HTTP("https://example.com/base?x=1"); } bắt lỗi(e) { chặn_query = đúng; };

@@ -2,4 +2,4 @@
 nhập gói/mạng/http/máy khách;
 nhập gói/mạng/http/khách;
 nhập gói/mạng/http/máy chủ;
-nhập gói/mạng/http/rest;
+nhập gói/mạng/http/dịch vụ tài nguyên;

@@ -2,298 +2,298 @@
 // Hợp đồng ABI theo src/compiler/codegen.cpp::Emitter::emitProgram(true).
 // Đồ thị có initializer độc lập; bộ nạp VM ở gói/biên dịch/bộ nạp.vi.
 nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/ir;
+nhập gói/biên dịch/biểu diễn trung gian;
 nhập gói/biên dịch/sổ đăng ký;
 nhập gói/biên dịch/kiểu mô đun;
 nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/opcode;
+nhập gói/biên dịch/mã thao tác;
 nhập gói/bộ sưu tập/từ điển;
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Liên Kết Bytecode {
-    hàm công khai khởi tạo(mã_nguồn = "") {
-        mình.làm mới(mã_nguồn);
+    hàm công khai khởi tạo(mã nguồn = "") {
+        mình.làm mới(mã nguồn);
     };
 
-    hàm công khai làm mới(mã_nguồn) {
-        nếu (loai_cua(mã_nguồn) != "chuỗi") {
+    hàm công khai làm mới(mã nguồn) {
+        nếu (loại của(mã nguồn) != "chuỗi") {
             ném "Bộ Liên Kết Bytecode: mã nguồn phải là chuỗi";
         };
-        mình.nguồn = mã_nguồn;
-        mình.kết_quả = rỗng;
+        mình.nguồn = mã nguồn;
+        mình.kết quả = rỗng;
         trả về mình;
     };
 
     hàm công khai liên kết() {
-        nếu (mình.kết_quả == rỗng) {
-            mình.kết_quả = mình.biên dịch chương trình tự chủ(mình.nguồn);
+        nếu (mình.kết quả == rỗng) {
+            mình.kết quả = mình.biên dịch chương trình tự chủ(mình.nguồn);
         };
-        trả về mình.kết_quả;
+        trả về mình.kết quả;
     };
 
     // StringPool của C++ deduplicate chuỗi và đánh địa chỉ từ 0.
     hàm riêng tư biên dịch liên kết tìm chuỗi(chuỗi, tên) {
-        lặp(i = 0; i < độ dài(chuỗi); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(chuỗi); i++) {
             nếu (chuỗi[i] == tên) { trả về i; };
         };
         trả về -1;
     };
 
-    hàm riêng tư biên dịch liên kết tìm slot(slots, tên) {
-        lặp(i = 0; i < độ dài(slots); i++) {
-            nếu (slots[i] == tên) { trả về i; };
+    hàm riêng tư biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) {
+        lặp(i = 0; i < máy ảo lấy độ dài(các ô nhớ); i++) {
+            nếu (các ô nhớ[i] == tên) { trả về i; };
         };
         trả về -1;
     };
 
     // Đối chiếu toàn bộ OP_HAM với registry đã predeclare. Một khai báo
     // không được biến mất hoặc xuất hiện hai lần trong bytecode top-level.
-    hàm riêng tư biên dịch liên kết kiểm tra khai báo(bytecode, bảng_hàm) {
-        số_khai_báo = [];
-        lặp(i = 0; i < độ dài(bảng_hàm); i++) { thêm(số_khai_báo, 0); };
-        lặp(i = 0; i < độ dài(bytecode); i++) {
-            lệnh = bytecode[i];
-            nếu (lệnh["op"] == biên dịch mã opcode("OP_HAM")) {
-                id = lệnh["chỉ số"];
-                nếu (id < 0 || id >= độ dài(bảng_hàm)) {
+    hàm riêng tư biên dịch liên kết kiểm tra khai báo(mã trung gian, bảng hàm) {
+        số khai báo = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(bảng hàm); i++) { máy ảo thêm cuối danh sách(số khai báo, 0); };
+        lặp(i = 0; i < máy ảo lấy độ dài(mã trung gian); i++) {
+            lệnh = mã trung gian[i];
+            nếu (lệnh["op"] == biên dịch mã thao tác("OP_HAM")) {
+                mã định danh = lệnh["chỉ số"];
+                nếu (mã định danh < 0 || mã định danh >= máy ảo lấy độ dài(bảng hàm)) {
                     ném "biên dịch liên kết: OP_HAM có function ID không hợp lệ";
                 };
-                nếu (lệnh["toán hạng"] != bảng_hàm[id]["tên index"] ||
+                nếu (lệnh["toán hạng"] != bảng hàm[mã định danh]["tên index"] ||
                     lệnh["giá trị"] != 0) {
                     ném "biên dịch liên kết: metadata OP_HAM sai lệch với bảng hàm";
                 };
-                số_khai_báo[id] = số_khai_báo[id] + 1;
+                số khai báo[mã định danh] = số khai báo[mã định danh] + 1;
             };
         };
-        lặp(i = 0; i < độ dài(số_khai_báo); i++) {
-            nếu (số_khai_báo[i] != 1) {
+        lặp(i = 0; i < máy ảo lấy độ dài(số khai báo); i++) {
+            nếu (số khai báo[i] != 1) {
                 ném "biên dịch liên kết: thiếu hoặc trùng OP_HAM cho hàm '" +
-                    bảng_hàm[i]["tên"] + "'";
+                    bảng hàm[i]["tên"] + "'";
             };
         };
     };
 
     // Nhận artifact CHƯA liên kết từ biên dịch phát bytecode thuần.
     // Giữ nguyên top-level và thân hàm; chỉ gắn registry, entrypoint, HALT.
-    hàm công khai biên dịch liên kết bytecode thuần(artifact) {
-        nếu (lấy map(artifact, "loại", "") != "bytecode V++ chưa liên kết") {
+    hàm công khai biên dịch liên kết mã trung gian thuần(sản phẩm biên dịch) {
+        nếu (lấy từ điển(sản phẩm biên dịch, "loại", "") != "bytecode V++ chưa liên kết") {
             ném "biên dịch liên kết: cần bytecode V++ chưa liên kết";
         };
-        nguồn = lấy map(artifact, "bytecode", []);
-        các_hàm = lấy map(artifact, "hàm", []);
-        slots = lấy map(artifact, "slots", []);
-        chuỗi = lấy map(artifact, "chuỗi", []);
-        bảng_hàm = [];
-        lặp(i = 0; i < độ dài(các_hàm); i++) {
-            h = các_hàm[i];
-            tên = lấy map(h, "tên", "");
-            id = lấy map(h, "id", -1);
-            nếu (tên == "" || id != i) {
+        nguồn = lấy từ điển(sản phẩm biên dịch, "bytecode", []);
+        các hàm = lấy từ điển(sản phẩm biên dịch, "hàm", []);
+        các ô nhớ = lấy từ điển(sản phẩm biên dịch, "slots", []);
+        chuỗi = lấy từ điển(sản phẩm biên dịch, "chuỗi", []);
+        bảng hàm = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
+            h = các hàm[i];
+            tên = lấy từ điển(h, "tên", "");
+            mã định danh = lấy từ điển(h, "id", -1);
+            nếu (tên == "" || mã định danh != i) {
                 ném "biên dịch liên kết: tên hoặc thứ tự function ID không hợp lệ";
             };
-            nếu (mình.biên dịch liên kết tìm slot(slots, tên) != id) {
-                ném "biên dịch liên kết: slot hàm không khớp function ID";
+            nếu (mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) != mã định danh) {
+                ném "biên dịch liên kết: ô nhớ hàm không khớp function ID";
             };
-            tên_index = mình.biên dịch liên kết tìm chuỗi(chuỗi, tên);
-            nếu (tên_index < 0) {
+            tên chỉ mục = mình.biên dịch liên kết tìm chuỗi(chuỗi, tên);
+            nếu (tên chỉ mục < 0) {
                 ném "biên dịch liên kết: thiếu tên hàm trong StringPool";
             };
-            lặp(j = 0; j < độ dài(bảng_hàm); j++) {
-                nếu (bảng_hàm[j]["tên"] == tên) {
+            lặp(j = 0; j < máy ảo lấy độ dài(bảng hàm); j++) {
+                nếu (bảng hàm[j]["tên"] == tên) {
                     ném "biên dịch liên kết: trùng tên hàm '" + tên + "'";
                 };
             };
-            thân = lấy map(h, "bytecode", []);
-            nếu (độ dài(thân) < 2) {
-                ném "biên dịch liên kết: bytecode thân hàm quá ngắn '" + tên + "'";
+            thân = lấy từ điển(h, "bytecode", []);
+            nếu (máy ảo lấy độ dài(thân) < 2) {
+                ném "biên dịch liên kết: mã trung gian thân hàm quá ngắn '" + tên + "'";
             };
-            nếu (thân[0]["op"] != biên dịch mã opcode("OP_MO_KHOI") ||
-                thân[độ dài(thân) - 1]["op"] != biên dịch mã opcode("OP_DONG_KHOI")) {
-                ném "biên dịch liên kết: bytecode thân hàm không hợp lệ '" + tên + "'";
+            nếu (thân[0]["op"] != biên dịch mã thao tác("OP_MO_KHOI") ||
+                thân[máy ảo lấy độ dài(thân) - 1]["op"] != biên dịch mã thao tác("OP_DONG_KHOI")) {
+                ném "biên dịch liên kết: mã trung gian thân hàm không hợp lệ '" + tên + "'";
             };
-            thêm(bảng_hàm, {"tên": tên, "id": id, "tên index": tên_index,
+            máy ảo thêm cuối danh sách(bảng hàm, {"tên": tên, "id": mã định danh, "tên index": tên chỉ mục,
                              "bytecode": thân});
         };
-        mình.biên dịch liên kết kiểm tra khai báo(nguồn, bảng_hàm);
+        mình.biên dịch liên kết kiểm tra khai báo(nguồn, bảng hàm);
 
         // C++ tra cứu entrypoint trong bảng slot CHIA SẺ với function ID.
         // `chính` ưu tiên hơn alias tương thích `main`.
-        điểm_vào = mình.biên dịch liên kết tìm slot(slots, "chính");
-        nếu (điểm_vào == -1) { điểm_vào = mình.biên dịch liên kết tìm slot(slots, "main"); };
-        bytecode = [];
-        lặp(i = 0; i < độ dài(nguồn); i++) { thêm(bytecode, nguồn[i]); };
-        nếu (điểm_vào != -1) {
-            thêm(bytecode, {"op": biên dịch mã opcode("OP_GOI"),
-                            "toán hạng": 0, "chỉ số": điểm_vào, "giá trị": 0});
+        điểm vào = mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, "chính");
+        nếu (điểm vào == -1) { điểm vào = mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, "main"); };
+        mã trung gian = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) { máy ảo thêm cuối danh sách(mã trung gian, nguồn[i]); };
+        nếu (điểm vào != -1) {
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
+                            "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
         };
-        thêm(bytecode, {"op": biên dịch mã opcode("OP_DUNG_CHUONG_TRINH"),
+        máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
                         "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
-        trả về {"loại": "bytecode V++ đã liên kết", "bytecode": bytecode,
-                "hàm": bảng_hàm, "điểm vào": điểm_vào,
-                "ngoại": lấy map(artifact, "ngoại", []),
-                "slots": slots, "chuỗi": chuỗi};
+        trả về {"loại": "bytecode V++ đã liên kết", "bytecode": mã trung gian,
+                "hàm": bảng hàm, "điểm vào": điểm vào,
+                "ngoại": lấy từ điển(sản phẩm biên dịch, "ngoại", []),
+                "slots": các ô nhớ, "chuỗi": chuỗi};
     };
 
-    hàm công khai biên dịch chương trình tự chủ(mã_nguồn) {
-        trả về mình.biên dịch liên kết bytecode thuần(biên dịch phát bytecode thuần(mã_nguồn));
+    hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
+        trả về mình.biên dịch liên kết mã trung gian thuần(biên dịch phát mã trung gian thuần(mã nguồn));
     };
 
     // Linker nhiều mô-đun: mỗi initializer có bytecode và slot riêng, còn
     // StringPool và function ID là duy nhất trong toàn phiên. Không nối trực
     // tiếp các initializer vì jump/slot đều là offset cục bộ của emitter.
-    hàm công khai biên dịch liên kết đồ thị thuần(đồ_thị) {
-        nếu (lấy map(đồ_thị, "loại", "") != "đồ thị mô đun V++") {
+    hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+        nếu (lấy từ điển(đồ thị, "loại", "") != "đồ thị mô đun V++") {
             ném "biên dịch liên kết: cần đồ thị mô đun V++";
         };
-        sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ_thị);
-        bộ_kiểu = Bộ Đăng Ký Kiểu(sổ, đồ_thị);
-        bộ_kiểu.đăng ký();
+        sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+        bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
+        bộ kiểu.đăng ký();
         phiên = {"đa mô đun": đúng, "cạnh dùng": [],
                  "đã phát": [], "id tối đa": -1, "ngoại": []};
-        tên_gốc = đồ_thị["điểm vào"];
-        cây_gốc = bộ_kiểu.cây(tên_gốc);
-        ir_gốc = biên dịch hạ IR từ cây thuần(cây_gốc, đúng);
-        gốc_dữ_liệu = biên dịch phát bytecode IR đồ thị lõi(ir_gốc, sổ,
-            biên dịch sổ tìm mô đun(sổ["mô đun"], tên_gốc), đồ_thị, phiên);
-        bảng_hàm = [];
-        lặp(i = 0; i < độ dài(sổ["hàm"]); i++) {
+        tên gốc = đồ thị["điểm vào"];
+        cây gốc = bộ kiểu.cây(tên gốc);
+        biểu diễn trung gian gốc = biên dịch hạ IR từ cây thuần(cây gốc, đúng);
+        gốc dữ liệu = biên dịch phát mã trung gian IR đồ thị lõi(biểu diễn trung gian gốc, sổ,
+            biên dịch sổ tìm mô đun(sổ["mô đun"], tên gốc), đồ thị, phiên);
+        bảng hàm = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(sổ["hàm"]); i++) {
             khai = sổ["hàm"][i];
             nếu (khai["id"] != i) {
                 ném "biên dịch liên kết: function ID toàn phiên không liên tiếp";
             };
-            thêm(bảng_hàm, {"tên": khai["tên"], "id": i,
+            máy ảo thêm cuối danh sách(bảng hàm, {"tên": khai["tên"], "id": i,
                   "tên index": khai["tên index"], "mô đun": khai["mô đun"],
                   "tên chạy": khai["tên chạy"],
                   "tên index runtime": khai["tên index runtime"],
                   "bytecode": []});
         };
-        tất_cả_khai = [];
+        tất cả khai = [];
         initializer = [];
-        thứ_tự = đồ_thị["thứ tự khởi tạo"];
-        lặp(i = 0; i <= độ dài(thứ_tự); i++) {
-            tên_mô_đun = đồ_thị["điểm vào"];
-            nếu (i < độ dài(thứ_tự)) { tên_mô_đun = thứ_tự[i]; };
-            ký_hiệu = biên dịch sổ tìm mô đun(sổ["mô đun"], tên_mô_đun);
-            phần = gốc_dữ_liệu;
-            nếu (i < độ dài(thứ_tự)) {
-                đã_tìm = sai;
-                các_phần = phiên["đã phát"];
-                lặp(j = 0; j < độ dài(các_phần); j++) {
-                    nếu (các_phần[j]["định danh"] == tên_mô_đun) {
-                        phần = các_phần[j]["phần"];
-                        đã_tìm = đúng;
+        thứ tự = đồ thị["thứ tự khởi tạo"];
+        lặp(i = 0; i <= máy ảo lấy độ dài(thứ tự); i++) {
+            tên mô đun = đồ thị["điểm vào"];
+            nếu (i < máy ảo lấy độ dài(thứ tự)) { tên mô đun = thứ tự[i]; };
+            ký hiệu = biên dịch sổ tìm mô đun(sổ["mô đun"], tên mô đun);
+            phần = gốc dữ liệu;
+            nếu (i < máy ảo lấy độ dài(thứ tự)) {
+                đã tìm = sai;
+                các phần = phiên["đã phát"];
+                lặp(j = 0; j < máy ảo lấy độ dài(các phần); j++) {
+                    nếu (các phần[j]["định danh"] == tên mô đun) {
+                        phần = các phần[j]["phần"];
+                        đã tìm = đúng;
                     };
                 };
-                nếu (!đã_tìm) {
-                    ném "biên dịch liên kết: thiếu initializer '" + tên_mô_đun + "'";
+                nếu (!đã tìm) {
+                    ném "biên dịch liên kết: thiếu initializer '" + tên mô đun + "'";
                 };
             };
-            nếu (lấy map(phần, "loại", "") != "bytecode V++ chưa liên kết") {
+            nếu (lấy từ điển(phần, "loại", "") != "bytecode V++ chưa liên kết") {
                 ném "biên dịch liên kết: emitter không trả bytecode chưa liên kết";
             };
-            các_hàm = phần["hàm"];
-            số_global = độ dài(ký_hiệu["trực tiếp"]);
-            nếu (độ dài(các_hàm) < số_global) {
+            các hàm = phần["hàm"];
+            số toàn cục = máy ảo lấy độ dài(ký hiệu["trực tiếp"]);
+            nếu (máy ảo lấy độ dài(các hàm) < số toàn cục) {
                 ném "biên dịch liên kết: số hàm không khớp sổ mô-đun";
             };
-            lặp(j = 0; j < độ dài(các_hàm); j++) {
-                h = các_hàm[j];
-                id = h["id"];
-                nếu (j < số_global) {
-                    nếu (id != ký_hiệu["trực tiếp"][j]["id"] ||
-                        lấy map(h, "phương thức", sai)) {
+            lặp(j = 0; j < máy ảo lấy độ dài(các hàm); j++) {
+                h = các hàm[j];
+                mã định danh = h["id"];
+                nếu (j < số toàn cục) {
+                    nếu (mã định danh != ký hiệu["trực tiếp"][j]["id"] ||
+                        lấy từ điển(h, "phương thức", sai)) {
                         ném "biên dịch liên kết: hàm global không khớp sổ mô-đun";
                     };
                 } hoặc {
-                    nếu (!lấy map(h, "phương thức", sai)) {
+                    nếu (!lấy từ điển(h, "phương thức", sai)) {
                         ném "biên dịch liên kết: thiếu định danh phương thức";
                     };
                 };
-                nếu (id < 0 || id >= độ dài(bảng_hàm) ||
-                    bảng_hàm[id]["mô đun"] != tên_mô_đun ||
-                    bảng_hàm[id]["tên"] != h["tên"] ||
-                    bảng_hàm[id]["tên index"] != h["tên index"] ||
-                    mình.biên dịch liên kết tìm slot(phần["slots"], h["tên"]) != id) {
+                nếu (mã định danh < 0 || mã định danh >= máy ảo lấy độ dài(bảng hàm) ||
+                    bảng hàm[mã định danh]["mô đun"] != tên mô đun ||
+                    bảng hàm[mã định danh]["tên"] != h["tên"] ||
+                    bảng hàm[mã định danh]["tên index"] != h["tên index"] ||
+                    mình.biên dịch liên kết tìm ô nhớ(phần["slots"], h["tên"]) != mã định danh) {
                     ném "biên dịch liên kết: thông tin hàm sai mô-đun/function ID";
                 };
                 thân = h["bytecode"];
-                nếu (độ dài(thân) < 2 ||
-                    thân[0]["op"] != biên dịch mã opcode("OP_MO_KHOI") ||
-                    thân[độ dài(thân) - 1]["op"] != biên dịch mã opcode("OP_DONG_KHOI")) {
+                nếu (máy ảo lấy độ dài(thân) < 2 ||
+                    thân[0]["op"] != biên dịch mã thao tác("OP_MO_KHOI") ||
+                    thân[máy ảo lấy độ dài(thân) - 1]["op"] != biên dịch mã thao tác("OP_DONG_KHOI")) {
                     ném "biên dịch liên kết: thân hàm không hợp lệ '" + h["tên"] + "'";
                 };
-                bảng_hàm[id]["bytecode"] = thân;
+                bảng hàm[mã định danh]["bytecode"] = thân;
             };
             nguồn = phần["bytecode"];
-            lặp(j = 0; j < độ dài(nguồn); j++) {
-                nếu (nguồn[j]["op"] == biên dịch mã opcode("OP_HAM")) {
-                    id = nguồn[j]["chỉ số"];
-                    nếu (id < 0 || id >= độ dài(bảng_hàm) ||
-                        bảng_hàm[id]["mô đun"] != tên_mô_đun) {
+            lặp(j = 0; j < máy ảo lấy độ dài(nguồn); j++) {
+                nếu (nguồn[j]["op"] == biên dịch mã thao tác("OP_HAM")) {
+                    mã định danh = nguồn[j]["chỉ số"];
+                    nếu (mã định danh < 0 || mã định danh >= máy ảo lấy độ dài(bảng hàm) ||
+                        bảng hàm[mã định danh]["mô đun"] != tên mô đun) {
                         ném "biên dịch liên kết: OP_HAM khai báo sai mô-đun";
                     };
-                    thêm(tất_cả_khai, nguồn[j]);
+                    máy ảo thêm cuối danh sách(tất cả khai, nguồn[j]);
                 };
             };
-            nếu (i < độ dài(thứ_tự)) {
-                thêm(initializer, {"định danh": tên_mô_đun,
+            nếu (i < máy ảo lấy độ dài(thứ tự)) {
+                máy ảo thêm cuối danh sách(initializer, {"định danh": tên mô đun,
                      "bytecode": nguồn, "slots": phần["slots"]});
             } hoặc {
-                gốc_dữ_liệu = phần;
+                gốc dữ liệu = phần;
             };
         };
-        mình.biên dịch liên kết kiểm tra khai báo(tất_cả_khai, bảng_hàm);
-        lặp(i = 0; i < độ dài(bảng_hàm); i++) {
-            nếu (độ dài(bảng_hàm[i]["bytecode"]) == 0) {
-                ném "biên dịch liên kết: thiếu thân hàm '" + bảng_hàm[i]["tên"] + "'";
+        mình.biên dịch liên kết kiểm tra khai báo(tất cả khai, bảng hàm);
+        lặp(i = 0; i < máy ảo lấy độ dài(bảng hàm); i++) {
+            nếu (máy ảo lấy độ dài(bảng hàm[i]["bytecode"]) == 0) {
+                ném "biên dịch liên kết: thiếu thân hàm '" + bảng hàm[i]["tên"] + "'";
             };
         };
         // Chỉ root có entrypoint; một hàm chính trong dependency không được
         // tự động gọi. Giữ opcode call + HALT giống emitter C++.
-        điểm_vào = mình.biên dịch liên kết tìm slot(gốc_dữ_liệu["slots"], "chính");
-        nếu (điểm_vào == -1) {
-            điểm_vào = mình.biên dịch liên kết tìm slot(gốc_dữ_liệu["slots"], "main");
+        điểm vào = mình.biên dịch liên kết tìm ô nhớ(gốc dữ liệu["slots"], "chính");
+        nếu (điểm vào == -1) {
+            điểm vào = mình.biên dịch liên kết tìm ô nhớ(gốc dữ liệu["slots"], "main");
         };
-        bytecode = [];
-        lặp(i = 0; i < độ dài(gốc_dữ_liệu["bytecode"]); i++) {
-            thêm(bytecode, gốc_dữ_liệu["bytecode"][i]);
+        mã trung gian = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(gốc dữ liệu["bytecode"]); i++) {
+            máy ảo thêm cuối danh sách(mã trung gian, gốc dữ liệu["bytecode"][i]);
         };
-        nếu (điểm_vào != -1) {
-            thêm(bytecode, {"op": biên dịch mã opcode("OP_GOI"),
-                 "toán hạng": 0, "chỉ số": điểm_vào, "giá trị": 0});
+        nếu (điểm vào != -1) {
+            máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_GOI"),
+                 "toán hạng": 0, "chỉ số": điểm vào, "giá trị": 0});
         };
-        thêm(bytecode, {"op": biên dịch mã opcode("OP_DUNG_CHUONG_TRINH"),
+        máy ảo thêm cuối danh sách(mã trung gian, {"op": biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH"),
              "toán hạng": 0, "chỉ số": 0, "giá trị": 0});
         trả về {"loại": "bytecode V++ đồ thị đã liên kết",
-            "bytecode": bytecode, "hàm": bảng_hàm,
-            "điểm vào": điểm_vào, "slots": gốc_dữ_liệu["slots"],
+            "bytecode": mã trung gian, "hàm": bảng hàm,
+            "điểm vào": điểm vào, "slots": gốc dữ liệu["slots"],
             "chuỗi": sổ["chuỗi"], "mô đun khởi tạo": initializer,
             "ngoại": phiên["ngoại"]};
     };
 
-    hàm công khai biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn) {
+    hàm công khai biên dịch chương trình mô đun tự chủ(điểm vào, nguồn) {
         trả về mình.biên dịch liên kết đồ thị thuần(
-            biên dịch dựng đồ thị nguồn thuần(điểm_vào, nguồn));
+            biên dịch dựng đồ thị nguồn thuần(điểm vào, nguồn));
     };
 };
 
 
-hàm công khai biên dịch liên kết bytecode thuần(artifact) {
-    __vpp_adapter = Bộ Liên Kết Bytecode();
-    trả về __vpp_adapter.biên dịch liên kết bytecode thuần(artifact);
+hàm công khai biên dịch liên kết mã trung gian thuần(sản phẩm biên dịch) {
+    bộ chuyển tiếp = Bộ Liên Kết Bytecode();
+    trả về bộ chuyển tiếp.biên dịch liên kết mã trung gian thuần(sản phẩm biên dịch);
 };
 
-hàm công khai biên dịch chương trình tự chủ(mã_nguồn) {
-    __vpp_adapter = Bộ Liên Kết Bytecode();
-    trả về __vpp_adapter.biên dịch chương trình tự chủ(mã_nguồn);
+hàm công khai biên dịch chương trình tự chủ(mã nguồn) {
+    bộ chuyển tiếp = Bộ Liên Kết Bytecode();
+    trả về bộ chuyển tiếp.biên dịch chương trình tự chủ(mã nguồn);
 };
 
-hàm công khai biên dịch liên kết đồ thị thuần(đồ_thị) {
-    __vpp_adapter = Bộ Liên Kết Bytecode();
-    trả về __vpp_adapter.biên dịch liên kết đồ thị thuần(đồ_thị);
+hàm công khai biên dịch liên kết đồ thị thuần(đồ thị) {
+    bộ chuyển tiếp = Bộ Liên Kết Bytecode();
+    trả về bộ chuyển tiếp.biên dịch liên kết đồ thị thuần(đồ thị);
 };
 
-hàm công khai biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn) {
-    __vpp_adapter = Bộ Liên Kết Bytecode();
-    trả về __vpp_adapter.biên dịch chương trình mô đun tự chủ(điểm_vào, nguồn);
+hàm công khai biên dịch chương trình mô đun tự chủ(điểm vào, nguồn) {
+    bộ chuyển tiếp = Bộ Liên Kết Bytecode();
+    trả về bộ chuyển tiếp.biên dịch chương trình mô đun tự chủ(điểm vào, nguồn);
 };

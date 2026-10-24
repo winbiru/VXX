@@ -6,34 +6,34 @@ nhập gói/bộ sưu tập/từ điển;
 hàm chính() {
     nguồn = "hàm cộng(a, b) { trả về a + b; }; hàm nhân(a, b) { trả về a * b; };";
     snapshot = biên dịch phân tích(nguồn);
-    in lấy map(snapshot, "hợp lệ", 0) == 1;
+    in lấy từ điển(snapshot, "hợp lệ", 0) == 1;
 
     khai_báo = biên dịch tìm khai báo(nguồn, "cộng");
     in độ dài(khai_báo) == 1;
-    in lấy map(khai_báo[0], "loại", "") == "hàm";
+    in lấy từ điển(khai_báo[0], "loại", "") == "hàm";
     in độ dài(biên dịch tìm khai báo(nguồn, "không có")) == 0;
 
-    bytecode = biên dịch bytecode(nguồn);
-    tần_suất = biên dịch thống kê opcode(nguồn);
+    mã trung gian = biên dịch mã trung gian(nguồn);
+    tần_suất = biên dịch thống kê mã thao tác(nguồn);
     tổng = 0;
     lặp(i = 0; i < độ dài(tần_suất); i++) {
-        tổng = tổng + lấy map(tần_suất[i], "số lượng", 0);
+        tổng = tổng + lấy từ điển(tần_suất[i], "số lượng", 0);
     };
-    in tổng == độ dài(bytecode);
+    in tổng == độ dài(mã trung gian);
     in độ dài(tần_suất) > 0;
 
     // Test pass đếm với opcode trùng nhau, giữ thứ tự xuất hiện đầu tiên.
     mẫu = [{"op": 10}, {"op": 20}, {"op": 10}];
-    bảng = biên dịch thống kê opcode từ bytecode(mẫu);
+    bảng = biên dịch thống kê mã thao tác từ mã trung gian(mẫu);
     in độ dài(bảng) == 2;
-    in lấy map(bảng[0], "op", -1) == 10;
-    in lấy map(bảng[0], "số lượng", 0) == 2;
-    in lấy map(bảng[1], "số lượng", 0) == 1;
+    in lấy từ điển(bảng[0], "op", -1) == 10;
+    in lấy từ điển(bảng[0], "số lượng", 0) == 2;
+    in lấy từ điển(bảng[1], "số lượng", 0) == 1;
 
     phụ_thuộc = phụ thuộc danh sách("nhập bộ sưu tập; hàm chính() {};");
     in độ dài(phụ_thuộc) == 1;
 
     kiểm = biên dịch kiểm tra("hàm");
-    in lấy map(kiểm, "hợp lệ", 1) == 0;
-    in lấy map(kiểm, "lỗi", "") != "";
+    in lấy từ điển(kiểm, "hợp lệ", 1) == 0;
+    in lấy từ điển(kiểm, "lỗi", "") != "";
 };

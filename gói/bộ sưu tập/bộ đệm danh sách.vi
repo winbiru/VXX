@@ -3,9 +3,9 @@
 nhập gói/bộ sưu tập/giao diện;
 
 lớp công khai Bộ Đệm Danh Sách triển khai Bộ Chứa {
-    hàm công khai khởi tạo() { mình.phần_tử = []; };
+    hàm công khai khởi tạo() { mình.phần tử = []; };
 
-    hàm công khai số lượng() { trả về do_dai(mình.phần_tử); };
+    hàm công khai số lượng() { trả về máy ảo lấy độ dài(mình.phần tử); };
 
     hàm công khai trống() { trả về mình.số lượng() == 0; };
 };

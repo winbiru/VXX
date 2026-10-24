@@ -7,25 +7,25 @@ lớp công khai Bộ Nối Chuỗi {
     // Module: lõi.bộ nối chuỗi
     // ABI hiện tại biểu diễn BộNốiChuỗi bằng map nội bộ để package chuẩn không
     // phụ thuộc class-lowering. Public semantics giữ encounter order.
-    hàm công khai bộ nối chuỗi(phân_cách, tiền_tố = "", hậu_tố = "", giá_trị_rỗng = rỗng) {
-        nếu (loại của(phân_cách) != "chuỗi") {
+    hàm công khai bộ nối chuỗi(phân cách, tiền tố = "", hậu tố = "", giá trị rỗng = rỗng) {
+        nếu (loại của(phân cách) != "chuỗi") {
             ném "JOIN_ARGUMENT";
         };
-        nếu (loại của(tiền_tố) != "chuỗi") {
+        nếu (loại của(tiền tố) != "chuỗi") {
             ném "JOIN_ARGUMENT";
         };
-        nếu (loại của(hậu_tố) != "chuỗi") {
+        nếu (loại của(hậu tố) != "chuỗi") {
             ném "JOIN_ARGUMENT";
         };
-        nếu (giá_trị_rỗng != rỗng && loại của(giá_trị_rỗng) != "chuỗi") {
+        nếu (giá trị rỗng != rỗng && loại của(giá trị rỗng) != "chuỗi") {
             ném "JOIN_ARGUMENT";
         };
         trả về {
             "__vpp_string_joiner__": 1,
-            "phân cách": phân_cách,
-            "tiền tố": tiền_tố,
-            "hậu tố": hậu_tố,
-            "giá trị rỗng": giá_trị_rỗng,
+            "phân cách": phân cách,
+            "tiền tố": tiền tố,
+            "hậu tố": hậu tố,
+            "giá trị rỗng": giá trị rỗng,
             "các phần": []
         };
     };
@@ -34,112 +34,112 @@ lớp công khai Bộ Nối Chuỗi {
         nếu (loại của(bộ) != "từ điển") {
             ném "JOIN_ARGUMENT";
         };
-        nếu (lấy map(bộ, "__vpp_string_joiner__", 0) != 1) {
+        nếu (lấy từ điển(bộ, "__vpp_string_joiner__", 0) != 1) {
             ném "JOIN_ARGUMENT";
         };
-        các_phần = lấy map(bộ, "các phần", rỗng);
-        nếu (loại của(các_phần) != "danh sách") {
+        các phần = lấy từ điển(bộ, "các phần", rỗng);
+        nếu (loại của(các phần) != "danh sách") {
             ném "JOIN_ARGUMENT";
         };
-        trả về các_phần;
+        trả về các phần;
     };
 
-    hàm công khai bộ nối thêm(bộ, giá_trị) {
-        các_phần = mình.bộ nối yêu cầu(bộ);
-        thêm(các_phần, thành chuỗi(giá_trị));
+    hàm công khai bộ nối thêm(bộ, giá trị) {
+        các phần = mình.bộ nối yêu cầu(bộ);
+        máy ảo thêm cuối danh sách(các phần, thành chuỗi(giá trị));
         trả về bộ;
     };
 
     hàm công khai bộ nối số phần(bộ) {
-        các_phần = mình.bộ nối yêu cầu(bộ);
-        trả về độ dài(các_phần);
+        các phần = mình.bộ nối yêu cầu(bộ);
+        trả về máy ảo lấy độ dài(các phần);
     };
 
     hàm công khai bộ nối kết quả(bộ) {
-        các_phần = mình.bộ nối yêu cầu(bộ);
+        các phần = mình.bộ nối yêu cầu(bộ);
 
-        phân_cách = lấy map(bộ, "phân cách", "");
-        tiền_tố = lấy map(bộ, "tiền tố", "");
-        hậu_tố = lấy map(bộ, "hậu tố", "");
-        giá_trị_rỗng = lấy map(bộ, "giá trị rỗng", rỗng);
-        n = độ dài(các_phần);
+        phân cách = lấy từ điển(bộ, "phân cách", "");
+        tiền tố = lấy từ điển(bộ, "tiền tố", "");
+        hậu tố = lấy từ điển(bộ, "hậu tố", "");
+        giá trị rỗng = lấy từ điển(bộ, "giá trị rỗng", rỗng);
+        n = máy ảo lấy độ dài(các phần);
         nếu (n == 0) {
-            nếu (giá_trị_rỗng != rỗng) {
-                trả về giá_trị_rỗng;
+            nếu (giá trị rỗng != rỗng) {
+                trả về giá trị rỗng;
             };
-            trả về tiền_tố + hậu_tố;
+            trả về tiền tố + hậu tố;
         };
 
-        kết_quả = tiền_tố;
+        kết quả = tiền tố;
         lặp(i = 0; i < n; i++) {
             nếu (i > 0) {
-                kết_quả = kết_quả + phân_cách;
+                kết quả = kết quả + phân cách;
             };
-            kết_quả = kết_quả + các_phần[i];
+            kết quả = kết quả + các phần[i];
         };
-        trả về kết_quả + hậu_tố;
+        trả về kết quả + hậu tố;
     };
 
     // Tương đương StringJoiner.merge: nội dung nguồn được nối thành đúng một phần
     // theo delimiter của nguồn, không mang prefix/suffix và không dùng emptyValue.
     hàm công khai bộ nối gộp(đích, nguồn) {
-        đích_phần = mình.bộ nối yêu cầu(đích);
-        nguồn_phần = mình.bộ nối yêu cầu(nguồn);
-        nếu (độ dài(nguồn_phần) == 0) {
+        đích phần = mình.bộ nối yêu cầu(đích);
+        nguồn phần = mình.bộ nối yêu cầu(nguồn);
+        nếu (máy ảo lấy độ dài(nguồn phần) == 0) {
             trả về đích;
         };
 
-        phân_cách_nguồn = lấy map(nguồn, "phân cách", "");
-        nội_dung = "";
-        lặp(i = 0; i < độ dài(nguồn_phần); i++) {
+        phân cách nguồn = lấy từ điển(nguồn, "phân cách", "");
+        nội dung = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn phần); i++) {
             nếu (i > 0) {
-                nội_dung = nội_dung + phân_cách_nguồn;
+                nội dung = nội dung + phân cách nguồn;
             };
-            nội_dung = nội_dung + nguồn_phần[i];
+            nội dung = nội dung + nguồn phần[i];
         };
-        thêm(đích_phần, nội_dung);
+        máy ảo thêm cuối danh sách(đích phần, nội dung);
         trả về đích;
     };
 
     // Độ dài observable của chuỗi kết quả theo Unicode code point.
     hàm công khai bộ nối độ dài(bộ) {
-        trả về độ dài(mình.bộ nối kết quả(bộ));
+        trả về máy ảo lấy độ dài(mình.bộ nối kết quả(bộ));
     };
 };
 
 
-hàm công khai bộ nối chuỗi(phân_cách, tiền_tố = "", hậu_tố = "", giá_trị_rỗng = rỗng) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối chuỗi(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng);
+hàm công khai bộ nối chuỗi(phân cách, tiền tố = "", hậu tố = "", giá trị rỗng = rỗng) {
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối chuỗi(phân cách, tiền tố, hậu tố, giá trị rỗng);
 };
 
 hàm công khai bộ nối yêu cầu(bộ) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối yêu cầu(bộ);
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối yêu cầu(bộ);
 };
 
-hàm công khai bộ nối thêm(bộ, giá_trị) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối thêm(bộ, giá_trị);
+hàm công khai bộ nối thêm(bộ, giá trị) {
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối thêm(bộ, giá trị);
 };
 
 hàm công khai bộ nối số phần(bộ) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối số phần(bộ);
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối số phần(bộ);
 };
 
 hàm công khai bộ nối kết quả(bộ) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối kết quả(bộ);
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối kết quả(bộ);
 };
 
 hàm công khai bộ nối gộp(đích, nguồn) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối gộp(đích, nguồn);
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối gộp(đích, nguồn);
 };
 
 hàm công khai bộ nối độ dài(bộ) {
-    __vpp_adapter = Bộ Nối Chuỗi();
-    trả về __vpp_adapter.bộ nối độ dài(bộ);
+    bộ chuyển tiếp = Bộ Nối Chuỗi();
+    trả về bộ chuyển tiếp.bộ nối độ dài(bộ);
 };
 nhập gói/lõi/chuyển kiểu;

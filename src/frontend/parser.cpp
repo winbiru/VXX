@@ -46,6 +46,16 @@ bool isExpressionNamePiece(const Token &token) {
            lexeme != ":";
 }
 
+// Tên biến dùng cùng cách ghép từ như tên hàm và tên thuộc tính.
+std::size_t variableNameEnd(const std::vector<Token> &tokens,
+                            std::size_t begin, std::size_t end) {
+    if (begin >= end || tokens[begin].kind != TokenKind::Identifier) return begin;
+    ++begin;
+    while (begin < end && (tokens[begin].kind == TokenKind::Identifier ||
+                           tokens[begin].kind == TokenKind::Keyword)) ++begin;
+    return begin;
+}
+
 // Kiểm tra điều kiện của `isCallableNamePiece`.
 bool isCallableNamePiece(const Token &token) {
     const std::string &lexeme = token.lexeme;
@@ -379,7 +389,7 @@ private:
     ExprId parseName(bool callable) {
         const std::size_t begin = pos_;
         while (pos_ < end_ &&
-               (callable ? isCallableNamePiece(tokens_[pos_])
+               (callable || pos_ > begin ? isCallableNamePiece(tokens_[pos_])
                          : isExpressionNamePiece(tokens_[pos_]))) {
             ++pos_;
         }
@@ -981,9 +991,7 @@ AstStatement Parser::parseStatement(bool insideBlock) {
     statement.span = spanFor(begin, pos_);
     statement.declarationName = declarationName(begin, pos_, kind);
     if (kind == AstStatementKind::VariableDeclaration) {
-        // Align the grammar with gói/biên dịch/chương trình.vi: `biến name [= expr];`.
-        // Reject malformed declarations at the parser boundary, not during IR emission.
-        const std::size_t cursor = begin + 2;
+        const std::size_t cursor = variableNameEnd(tokens_, begin + 1, pos_);
         if (statement.declarationName.empty() || pos_ <= cursor ||
             tokens_[pos_ - 1].lexeme != ";" ||
             (cursor != pos_ - 1 && tokens_[cursor].lexeme != "=")) {
@@ -996,9 +1004,8 @@ AstStatement Parser::parseStatement(bool insideBlock) {
     attachForeignForm(statement);
     attachExpressionRoots(statement);
     if (kind == AstStatementKind::VariableDeclaration &&
-        statement.tokenBegin + 2 < statement.tokenEnd - 1 &&
-        (statement.expressionRoots.size() != 1 ||
-         tokens_[statement.tokenBegin + 2].lexeme != "=")) {
+        variableNameEnd(tokens_, begin + 1, pos_) < statement.tokenEnd - 1 &&
+        statement.expressionRoots.size() != 1) {
         throw ParseError("biểu thức khởi tạo biến không hợp lệ", statement.span);
     }
     attachClassForm(statement);
@@ -1050,10 +1057,13 @@ std::string Parser::declarationName(std::size_t begin,
     if (begin >= end || end > tokens_.size()) return {};
 
     if (kind == AstStatementKind::VariableDeclaration) {
-        // `biến` introduces one identifier, as in the V++ bootstrap parser.
-        const std::size_t index = begin + 1;
-        if (index >= end || tokens_[index].kind != TokenKind::Identifier) return {};
-        return tokens_[index].lexeme;
+        std::string name;
+        const std::size_t finish = variableNameEnd(tokens_, begin + 1, end);
+        for (std::size_t index = begin + 1; index < finish; ++index) {
+            if (!name.empty()) name += ' ';
+            name += tokens_[index].lexeme;
+        }
+        return name;
     }
 
     if (kind == AstStatementKind::Class || kind == AstStatementKind::Interface) {
@@ -1229,12 +1239,13 @@ void Parser::attachImportForm(AstStatement &statement) {
 
     if (cursor < end - 1 && tokens_[cursor].lexeme == "như") {
         ++cursor;
-        if (cursor >= end - 1 || tokens_[cursor].kind != TokenKind::Identifier) {
+        const std::size_t aliasBegin = cursor;
+        cursor = variableNameEnd(tokens_, cursor, end - 1);
+        if (cursor == aliasBegin || cursor != end - 1) {
             return;
         }
-        spec.alias = tokens_[cursor].lexeme;
-        spec.aliasSpan = tokens_[cursor].span;
-        ++cursor;
+        spec.alias = joinTokenText(tokens_, aliasBegin, cursor);
+        spec.aliasSpan = spanFor(aliasBegin, cursor);
     }
     if (cursor != end - 1) return;
 
@@ -1397,7 +1408,7 @@ void Parser::attachExpressionRoots(AstStatement &statement) {
     };
 
     if (statement.kind == AstStatementKind::VariableDeclaration) {
-        const std::size_t cursor = begin + 2;
+        const std::size_t cursor = variableNameEnd(tokens_, begin + 1, end);
         if (cursor < end && tokens_[cursor].lexeme == "=") {
             attach(cursor + 1, end);
         }
@@ -1672,11 +1683,11 @@ void Parser::attachTryForm(AstStatement &statement) {
         if (close >= catchBody.tokenBegin) return;
         // Omitting parentheses is the no-binding form. Once a binding list is
         // opened, the structured grammar requires exactly one catch name.
-        if (close != cursor + 2 || !isNamePiece(tokens_[cursor + 1].lexeme)) {
+        if (close <= cursor + 1 || variableNameEnd(tokens_, cursor + 1, close) != close) {
             return;
         }
-        statement.catchVariable = tokens_[cursor + 1].lexeme;
-        statement.catchVariableSpan = tokens_[cursor + 1].span;
+        statement.catchVariable = joinTokenText(tokens_, cursor + 1, close);
+        statement.catchVariableSpan = spanFor(cursor + 1, close);
         cursor = close + 1;
     }
 

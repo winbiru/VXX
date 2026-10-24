@@ -1,0 +1,4 @@
+// vi.quantum — phần thuần V++; cầu nối Python được import riêng qua lượng tử/qiskit.
+nhập gói / lượng tử / mạch;
+nhập gói / lượng tử / mô phỏng;
+nhập gói / lượng tử / openqasm;

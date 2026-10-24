@@ -1,5 +1,5 @@
 hàm chính() {
-    biến path = rt_runtime_file_path(1);
-    nếu (path > 0) { byte_hủy(path); trả về 1; };
+    biến path = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
+    nếu (path > 0) { byte hủy(path); trả về 1; };
     trả về 52;
 };

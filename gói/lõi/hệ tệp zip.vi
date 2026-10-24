@@ -11,33 +11,33 @@ hàm công khai zipfs mở(đường zip) {
 };
 
 hàm riêng tư zipfs yêu cầu mở(kho) {
-    nếu (lấy map(kho, "mở", 0) != 1) {
+    nếu (lấy từ điển(kho, "mở", 0) != 1) {
         ném "zipfs: kho đã đóng";
     };
-    trả về lấy map(kho, "đường", "");
+    trả về lấy từ điển(kho, "đường", "");
 };
 
 hàm công khai zipfs liệt kê(kho) {
     trả về lưu trữ liệt kê zip(zipfs yêu cầu mở(kho));
 };
 
-hàm công khai zipfs giải nén(kho, thư mục đích, giới hạn byte = 67108864) {
-    trả về lưu trữ giải nén zip(zipfs yêu cầu mở(kho), thư mục đích, giới hạn byte);
+hàm công khai zipfs giải nén(kho, thư mục đích, mức trần byte = 67108864) {
+    trả về lưu trữ giải nén zip(zipfs yêu cầu mở(kho), thư mục đích, mức trần byte);
 };
 
 hàm công khai zipfs đóng(kho) {
-    đặt map(kho, "mở", 0);
+    đặt từ điển(kho, "mở", 0);
     trả về 1;
 };
 
 lớp công khai Hệ Tệp ZIP triển khai Đóng Được {
-    hàm công khai khởi tạo(đường_zip) { mình.kho = zipfs mở(đường_zip); };
+    hàm công khai khởi tạo(đường zip) { mình.kho = zipfs mở(đường zip); };
     hàm công khai liệt kê() { trả về zipfs liệt kê(mình.kho); };
-    hàm công khai giải nén(đích, giới_hạn_byte = 67108864) {
-        trả về zipfs giải nén(mình.kho, đích, giới_hạn_byte);
+    hàm công khai giải nén(đích, mức trần byte = 67108864) {
+        trả về zipfs giải nén(mình.kho, đích, mức trần byte);
     };
     hàm công khai đóng() {
-        nếu (lấy map(mình.kho, "mở", 0) == 0) { trả về sai; };
+        nếu (lấy từ điển(mình.kho, "mở", 0) == 0) { trả về sai; };
         zipfs đóng(mình.kho);
         trả về đúng;
     };

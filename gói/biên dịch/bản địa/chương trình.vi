@@ -1,0 +1,144 @@
+// Multiple i32 functions. Each body keeps its own IR and
+// local variable slots. Function table records are six i32 values:
+// declaration token, name start/end (source bytes), IR start/length, arity.
+hàm chương trình thu thập(nguồn văn bản, các từ tố, các hàm) {
+    biến điểm vào số phần tử = 0;
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, "hàm") == 1) {
+            biến số tham số = phân tích phần đầu số tham số(nguồn văn bản, các từ tố, i);
+            nếu (số tham số < 0) { trả về -1; };
+            biến tên định danh điểm bắt đầu = từ tố trường dữ liệu(các từ tố, i + 1, 0);
+            biến tên định danh điểm kết thúc = từ tố trường dữ liệu(các từ tố, i + 1, 1);
+            biến số phần tử = 0;
+            lặp (k = 0; k < byte dài(các hàm); k = k + 24) {
+                nếu (phân tích giống nhau từ tố(nguồn văn bản, các từ tố, i + 1,
+                        byte đọc số nguyên ba mươi hai bit(các hàm, k) + 1) == 1) { trả về -1; };
+                số phần tử = số phần tử + 1;
+            };
+            // Function count is bounded by the byte-buffer capacity, not
+            // an arbitrary small limit. The table uses 24 bytes per entry.
+            nếu (byte dài(các hàm) > 1048576 - 24) { trả về -1; };
+            biến là điểm vào = từ tố bằng(nguồn văn bản, các từ tố, i + 1, "chính");
+            nếu (từ tố bằng(nguồn văn bản, các từ tố, i + 1, "main") == 1) { là điểm vào = 1; };
+            nếu (là điểm vào == 1) {
+                nếu (số tham số != 0) { trả về -1; };
+                điểm vào số phần tử = điểm vào số phần tử + 1;
+                nếu (điểm vào số phần tử > 1) { trả về -1; };
+            };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, i) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, tên định danh điểm bắt đầu) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, tên định danh điểm kết thúc) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, -1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, -1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, số tham số) != 0) { trả về -1; };
+        };
+    };
+    nếu (byte dài(các hàm) < 24) { trả về -1; };
+    nếu (điểm vào số phần tử != 1) { trả về -1; };
+    trả về byte dài(các hàm);
+};
+
+// Object writer needs the declaration-order ID of the entrypoint. Calls
+// retain declaration-order IDs even when 'chính' is in the middle or end.
+hàm chương trình điểm vào(nguồn văn bản, các từ tố, các hàm) {
+    biến mã định danh = 0;
+    lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < byte dài(các hàm); bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+        biến khai báo = byte đọc số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu);
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, khai báo + 1, "chính") == 1) { trả về mã định danh; };
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, khai báo + 1, "main") == 1) { trả về mã định danh; };
+        mã định danh = mã định danh + 1;
+    };
+    trả về -1;
+};
+
+hàm chương trình thân khối(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "hàm") != 1) { trả về -1; };
+    biến tên định danh chỉ mục = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+    nếu (phân tích định danh(nguồn văn bản, các từ tố, tên định danh chỉ mục) != 1) { trả về -1; };
+    byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, tên định danh chỉ mục + 1);
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "(") != 1) { trả về -1; };
+    biến đối số = 0;
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến con trỏ hiện tại = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ")") == 1) { thoát; };
+        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
+        nếu (phân tích mục ký hiệu(nguồn văn bản, các từ tố, trạng thái nội bộ, con trỏ hiện tại) >= 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 18, đối số) != 0) { trả về -1; }; // ARG from incoming stack
+        nếu (phân tích phát(biểu diễn trung gian, 3, đối số) != 0) { trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0)) != 0) { trả về -1; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1)) != 0) { trả về -1; };
+        đối số = đối số + 1;
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 4, đối số);
+        byte ghi số nguyên ba mươi hai bit(trạng thái nội bộ, 0, con trỏ hiện tại + 1);
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại + 1, ")") == 1) { thoát; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ",") != 1) { trả về -1; };
+    };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ")") != 1) { trả về -1; };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "{") != 1) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "}") == 1) {
+            nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8) != 1) { trả về -1; };
+            phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";");
+            trả về byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+        };
+        nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 8) != 0) { trả về -1; };
+        nếu (byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 0) >= từ tố số phần tử(các từ tố)) { trả về -1; };
+        nếu (phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    };
+    trả về -1;
+};
+
+// No output on failure. IR branch offsets are relative to each function.
+hàm chương trình biên dịch(nguồn văn bản, các từ tố, biểu diễn trung gian, các hàm) {
+    nếu (nguồn văn bản == các từ tố) { trả về -1; };
+    nếu (biểu diễn trung gian == các hàm) { trả về -1; };
+    nếu (biểu diễn trung gian == nguồn văn bản) { trả về -1; };
+    nếu (biểu diễn trung gian == các từ tố) { trả về -1; };
+    nếu (các hàm == nguồn văn bản) { trả về -1; };
+    nếu (các hàm == các từ tố) { trả về -1; };
+    nếu (byte làm rỗng(biểu diễn trung gian) != 0) { trả về -1; };
+    nếu (byte làm rỗng(các hàm) != 0) { trả về -1; };
+    nếu (từ tố kiểm tra hợp lệ(nguồn văn bản, các từ tố) < 0) { trả về -1; };
+    biến mã trạng thái = chương trình thu thập(nguồn văn bản, các từ tố, các hàm);
+    nếu (mã trạng thái > 0) {
+        biến con trỏ hiện tại = 0;
+        biến số phần tử = 0;
+        lặp (bản ghi dữ liệu = 0; bản ghi dữ liệu < byte dài(các hàm); bản ghi dữ liệu = bản ghi dữ liệu + 24) {
+            nếu (con trỏ hiện tại != byte đọc số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu)) { mã trạng thái = -1; thoát; };
+            biến trạng thái nội bộ = byte mới();
+            biến đơn vị = byte mới();
+            nếu (trạng thái nội bộ <= 0) { mã trạng thái = -1; thoát; };
+            nếu (đơn vị <= 0) { byte hủy(trạng thái nội bộ); mã trạng thái = -1; thoát; };
+            byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, con trỏ hiện tại);
+            byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+            byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+            byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+            byte đẩy số nguyên ba mươi hai bit(trạng thái nội bộ, 0);
+            biến kế tiếp = chương trình thân khối(nguồn văn bản, các từ tố, trạng thái nội bộ, đơn vị);
+            nếu (kế tiếp < 0) { mã trạng thái = -1; }
+            hoặc {
+                nếu (byte dài(đơn vị) <= 0) { mã trạng thái = -1; }
+                hoặc {
+                    biến điểm bắt đầu = byte dài(biểu diễn trung gian);
+                    nếu (byte nối(biểu diễn trung gian, đơn vị) != 0) { mã trạng thái = -1; }
+                    hoặc {
+                        byte ghi số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu + 12, điểm bắt đầu);
+                        byte ghi số nguyên ba mươi hai bit(các hàm, bản ghi dữ liệu + 16, byte dài(đơn vị));
+                        con trỏ hiện tại = kế tiếp;
+                    };
+                };
+            };
+            byte hủy(trạng thái nội bộ);
+            byte hủy(đơn vị);
+            nếu (mã trạng thái < 0) { thoát; };
+            số phần tử = số phần tử + 1;
+        };
+        nếu (con trỏ hiện tại != từ tố số phần tử(các từ tố)) { mã trạng thái = -1; };
+    };
+    nếu (mã trạng thái < 0) {
+        byte làm rỗng(biểu diễn trung gian);
+        byte làm rỗng(các hàm);
+        trả về -1;
+    };
+    trả về byte dài(biểu diễn trung gian);
+};

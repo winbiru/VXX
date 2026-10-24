@@ -1,0 +1,211 @@
+// Linux ELF64 relocatable object, System V AMD64 ABI. The section layout is
+// null, .text, .rela.text, .symtab, .strtab, .shstrtab. Every external CALL
+// has a R_X86_64_PLT32 RELA entry with addend -4.
+
+// Mach-O uses leading underscores in names; ELF uses the same V++ registry
+// and native ABI names without that decoration.
+hàm elf mục ký hiệu(các ký hiệu, các chuỗi, đã trang trí, đã định nghĩa, giá trị đang xét) {
+    nếu (đã trang trí <= 0) { trả về -1; };
+    biến chiều dài = byte dài(đã trang trí);
+    nếu (chiều dài < 2) { byte hủy(đã trang trí); trả về -1; };
+    biến độ lệch = byte dài(các chuỗi);
+    biến mã trạng thái = 0;
+    lặp (i = 1; i < chiều dài; i++) {
+        nếu (byte thêm(các chuỗi, byte lấy(đã trang trí, i)) != 0) { mã trạng thái = -1; thoát; };
+    };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các chuỗi, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = đối tượng i32(các ký hiệu, độ lệch); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 18); }; // STB_GLOBAL | STT_FUNC
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 0); };  // st_other
+    biến phân đoạn = 0;
+    nếu (đã định nghĩa == 1) { phân đoạn = 1; };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, phân đoạn); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = đối tượng u64(các ký hiệu, giá trị đang xét); };
+    nếu (mã trạng thái == 0) { mã trạng thái = đối tượng u64(các ký hiệu, 0); }; // st_size
+    byte hủy(đã trang trí);
+    trả về mã trạng thái;
+};
+
+hàm elf tái định vị bổ sung(các mục tái định vị, độ lệch, mục ký hiệu chỉ mục) {
+    nếu (đối tượng u64(các mục tái định vị, độ lệch) != 0) { trả về -1; };
+    nếu (đối tượng i32(các mục tái định vị, 4) != 0) { trả về -1; }; // R_X86_64_PLT32
+    nếu (đối tượng i32(các mục tái định vị, mục ký hiệu chỉ mục) != 0) { trả về -1; };
+    nếu (đối tượng i32(các mục tái định vị, -4) != 0) { trả về -1; };
+    trả về đối tượng i32(các mục tái định vị, -1); // sign extension of RELA addend
+};
+
+hàm elf tiêu đề phân đoạn(đầu ra, tên định danh, loại từ tố, các cờ hiệu, độ lệch, kích cỡ, liên kết, thông tin, căn chỉnh, kích thước mục) {
+    nếu (đối tượng i32(đầu ra, tên định danh) != 0) { trả về -1; };
+    nếu (đối tượng i32(đầu ra, loại từ tố) != 0) { trả về -1; };
+    nếu (đối tượng u64(đầu ra, các cờ hiệu) != 0) { trả về -1; };
+    nếu (đối tượng u64(đầu ra, 0) != 0) { trả về -1; }; // address in ET_REL
+    nếu (đối tượng u64(đầu ra, độ lệch) != 0) { trả về -1; };
+    nếu (đối tượng u64(đầu ra, kích cỡ) != 0) { trả về -1; };
+    nếu (đối tượng i32(đầu ra, liên kết) != 0) { trả về -1; };
+    nếu (đối tượng i32(đầu ra, thông tin) != 0) { trả về -1; };
+    nếu (đối tượng u64(đầu ra, căn chỉnh) != 0) { trả về -1; };
+    trả về đối tượng u64(đầu ra, kích thước mục);
+};
+
+hàm elf tên định danh(đầu ra, tên định danh) {
+    biến mã trạng thái = byte nối(đầu ra, tên định danh);
+    byte hủy(tên định danh);
+    nếu (mã trạng thái != 0) { trả về -1; };
+    trả về byte thêm(đầu ra, 0);
+};
+
+hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, bản địa các lời gọi) {
+    nếu (mã máy == đối tượng) { trả về -1; };
+    nếu (đầu tiên < 0) { trả về -1; };
+    nếu (cuối cùng <= đầu tiên) { trả về -1; };
+    biến n = byte dài(mã máy);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 900000) { trả về -1; };
+    nếu (byte dài(các điểm bắt đầu) != (cuối cùng - đầu tiên) * 4) { trả về -1; };
+    nếu (byte làm rỗng(đối tượng) != 0) { trả về -1; };
+    biến các ký hiệu = byte mới();
+    biến các chuỗi = byte mới();
+    biến các mục tái định vị = byte mới();
+    biến phân đoạn các tên định danh = byte mới();
+    biến mã trạng thái = 0;
+    nếu (các ký hiệu <= 0) { mã trạng thái = -1; };
+    nếu (các chuỗi <= 0) { mã trạng thái = -1; };
+    nếu (các mục tái định vị <= 0) { mã trạng thái = -1; };
+    nếu (phân đoạn các tên định danh <= 0) { mã trạng thái = -1; };
+    // ELF index 0 is mandatory STN_UNDEF. All other symbols are global.
+    nếu (mã trạng thái == 0) { mã trạng thái = đối tượng đệm(các ký hiệu, 24); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các chuỗi, 0); };
+    nếu (mã trạng thái == 0) {
+        lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
+            biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);
+            nếu (điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
+            nếu (điểm bắt đầu >= n) { mã trạng thái = -1; thoát; };
+            nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng mô đun chương trình con tên định danh(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh), 1, điểm bắt đầu) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+    };
+    biến toàn cục mã định danh = 0;
+    nếu (mã trạng thái == 0) {
+        lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+            nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { mã trạng thái = -1; thoát; };
+            biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
+            nếu (kích cỡ <= 0) { mã trạng thái = -1; thoát; };
+            nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng mô đun đã dùng(các phần nhập, toàn cục mã định danh) == 1) {
+                nếu (toàn cục mã định danh >= đầu tiên) { nếu (toàn cục mã định danh < cuối cùng) { mã trạng thái = -1; thoát; }; };
+                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng mô đun chương trình con tên định danh(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh), 0, 0) != 0) {
+                    mã trạng thái = -1;
+                    thoát;
+                };
+            };
+            độ lệch = độ lệch + 8 + kích cỡ;
+            toàn cục mã định danh = toàn cục mã định danh + 1;
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (độ dời = 0; độ dời < byte dài(các phần nhập); độ dời = độ dời + 8) {
+            nếu (độ dời + 8 > byte dài(các phần nhập)) { mã trạng thái = -1; thoát; };
+            biến đã mã định danh nhập = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ dời + 4);
+            nếu (đã mã định danh nhập < 0) { mã trạng thái = -1; thoát; };
+            nếu (đã mã định danh nhập >= toàn cục mã định danh) { mã trạng thái = -1; thoát; };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (bản địa mã định danh = 0; bản địa mã định danh < 62; bản địa mã định danh++) {
+            nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, bản địa mã định danh) == 1) {
+                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng bản địa tên định danh(bản địa mã định danh), 0, 0) != 0) {
+                    mã trạng thái = -1;
+                    thoát;
+                };
+            };
+        };
+    };
+    nếu (mã trạng thái == 0) {
+        lặp (độ dời = 0; độ dời < byte dài(các phần nhập); độ dời = độ dời + 8) {
+            biến tại = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ dời);
+            biến mã định danh = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ dời + 4);
+            nếu (tại < 0) { mã trạng thái = -1; thoát; };
+            nếu (tại + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (elf tái định vị bổ sung(các mục tái định vị, tại, 1 + đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, mã định danh)) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+        lặp (độ dời = 0; độ dời < byte dài(bản địa các lời gọi); độ dời = độ dời + 8) {
+            biến bản địa tại = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, độ dời);
+            biến bản địa mục ký hiệu mã định danh = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, độ dời + 4);
+            nếu (bản địa tại < 0) { mã trạng thái = -1; thoát; };
+            nếu (bản địa tại + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (bản địa mục ký hiệu mã định danh < 0) { mã trạng thái = -1; thoát; };
+            nếu (bản địa mục ký hiệu mã định danh >= 62) { mã trạng thái = -1; thoát; };
+            nếu (elf tái định vị bổ sung(các mục tái định vị, bản địa tại, 1 + đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, toàn cục mã định danh, bản địa mục ký hiệu mã định danh)) != 0) {
+                mã trạng thái = -1;
+                thoát;
+            };
+        };
+    };
+    // Section-name indexes: 1 .text, 7 .rela.text, 18 .symtab,
+    // 26 .strtab, 34 .shstrtab.
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(phân đoạn các tên định danh, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".text"); };
+    nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".rela.text"); };
+    nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".symtab"); };
+    nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".strtab"); };
+    nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".shstrtab"); };
+    nếu (mã trạng thái == 0) {
+        biến tái định vị độ lệch = 64;
+        lặp (i = 0; i < n; i = i + 8) { tái định vị độ lệch = tái định vị độ lệch + 8; };
+        biến mục ký hiệu độ lệch = tái định vị độ lệch + byte dài(các mục tái định vị);
+        biến chuỗi độ lệch = mục ký hiệu độ lệch + byte dài(các ký hiệu);
+        biến các tên định danh độ lệch = chuỗi độ lệch + byte dài(các chuỗi);
+        biến các phần đầu độ lệch = 0;
+        biến các tên định danh điểm kết thúc = các tên định danh độ lệch + byte dài(phân đoạn các tên định danh);
+        lặp (i = 0; i < các tên định danh điểm kết thúc; i = i + 8) { các phần đầu độ lệch = các phần đầu độ lệch + 8; };
+        nếu (các phần đầu độ lệch + 384 > 1048576) { mã trạng thái = -1; };
+        nếu (mã trạng thái == 0) {
+            đối tượng i32(đối tượng, 1179403647); // ELF magic, little endian
+            byte thêm(đối tượng, 2); // 64-bit
+            byte thêm(đối tượng, 1); // little-endian
+            byte thêm(đối tượng, 1); // current ELF version
+            byte thêm(đối tượng, 0); // SYSV
+            đối tượng u64(đối tượng, 0); // remaining e_ident bytes
+            byte thêm(đối tượng, 1); byte thêm(đối tượng, 0); // ET_REL
+            byte thêm(đối tượng, 62); byte thêm(đối tượng, 0); // EM_X86_64
+            đối tượng i32(đối tượng, 1); // EV_CURRENT
+            đối tượng u64(đối tượng, 0); // entry
+            đối tượng u64(đối tượng, 0); // program headers
+            đối tượng u64(đối tượng, các phần đầu độ lệch);
+            đối tượng i32(đối tượng, 0); // flags
+            byte thêm(đối tượng, 64); byte thêm(đối tượng, 0); // header size
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // phentsize
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // phnum
+            byte thêm(đối tượng, 64); byte thêm(đối tượng, 0); // shentsize
+            byte thêm(đối tượng, 6); byte thêm(đối tượng, 0); // shnum
+            byte thêm(đối tượng, 5); byte thêm(đối tượng, 0); // shstrndx
+            nếu (byte dài(đối tượng) != 64) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, mã máy) != 0) { mã trạng thái = -1; };
+            nếu (đối tượng đệm(đối tượng, tái định vị độ lệch) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các mục tái định vị) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các ký hiệu) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, các chuỗi) != 0) { mã trạng thái = -1; };
+            nếu (byte nối(đối tượng, phân đoạn các tên định danh) != 0) { mã trạng thái = -1; };
+            nếu (đối tượng đệm(đối tượng, các phần đầu độ lệch) != 0) { mã trạng thái = -1; };
+            nếu (đối tượng đệm(đối tượng, các phần đầu độ lệch + 64) != 0) { mã trạng thái = -1; };
+            nếu (elf tiêu đề phân đoạn(đối tượng, 1, 1, 6, 64, n, 0, 0, 16, 0) != 0) { mã trạng thái = -1; };
+            nếu (elf tiêu đề phân đoạn(đối tượng, 7, 4, 0, tái định vị độ lệch, byte dài(các mục tái định vị), 3, 1, 8, 24) != 0) { mã trạng thái = -1; };
+            nếu (elf tiêu đề phân đoạn(đối tượng, 18, 2, 0, mục ký hiệu độ lệch, byte dài(các ký hiệu), 4, 1, 8, 24) != 0) { mã trạng thái = -1; };
+            nếu (elf tiêu đề phân đoạn(đối tượng, 26, 3, 0, chuỗi độ lệch, byte dài(các chuỗi), 0, 0, 1, 0) != 0) { mã trạng thái = -1; };
+            nếu (elf tiêu đề phân đoạn(đối tượng, 34, 3, 0, các tên định danh độ lệch, byte dài(phân đoạn các tên định danh), 0, 0, 1, 0) != 0) { mã trạng thái = -1; };
+            nếu (byte dài(đối tượng) != các phần đầu độ lệch + 384) { mã trạng thái = -1; };
+        };
+    };
+    nếu (các ký hiệu > 0) { byte hủy(các ký hiệu); };
+    nếu (các chuỗi > 0) { byte hủy(các chuỗi); };
+    nếu (các mục tái định vị > 0) { byte hủy(các mục tái định vị); };
+    nếu (phân đoạn các tên định danh > 0) { byte hủy(phân đoạn các tên định danh); };
+    nếu (mã trạng thái != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    trả về byte dài(đối tượng);
+};

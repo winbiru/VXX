@@ -11,6 +11,6 @@ hàm chính() {
     in json thoát("a\0b");
 
     dataJson = json đối tượng một chuỗi("id", "req-1");
-    in rest json thành công an toàn("hoàn tất", dataJson);
-    in rest json lỗi an toàn("không tìm thấy", json đối tượng rỗng());
+    in dịch vụ tài nguyên json thành công an toàn("hoàn tất", dataJson);
+    in dịch vụ tài nguyên json lỗi an toàn("không tìm thấy", json đối tượng rỗng());
 };

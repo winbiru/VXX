@@ -183,7 +183,7 @@ bao gồm `clock_gettime(i32, c_đệm_ra):i32` của `system.c` với capabilit
 `system.entropy.read`: vùng đệm 1–256 byte, kích thước `u64` phải khớp
 **chính xác** vùng đệm và target có `size_t` 64-bit. Khi `getentropy` báo lỗi,
 runtime không chép vùng đệm có thể chỉ ghi một phần về danh sách V++.
-`gói/lõi/entropy.vi` ghép các khối thành 1–4096 byte; `ngẫu nhiên bảo mật`
+`gói/lõi/nguồn ngẫu nhiên.vi` ghép các khối thành 1–4096 byte; `ngẫu nhiên bảo mật`
 và `ngẫu nhiên nguyên` dùng đường này trên POSIX. Windows giữ primitive VM.
 
 Trên POSIX, thư viện tệp dùng `fopen(c_chuỗi,c_chuỗi):c_tệp`,
@@ -222,7 +222,7 @@ thay đổi theo DST; Windows tiếp tục dùng primitive đồng hồ cũ.
 
 `gói/hệ thống/tiến trình.vi` cung cấp `chạy tiến trình(chương_trình,
 đối_số = rỗng, môi_trường = rỗng, giới_hạn_mili_giây = rỗng)`.
-Hai đối số `rỗng` được chuẩn hóa thành danh sách/từ điển rỗng trước spawn.
+Hai đối số `rỗng` được chuẩn hóa chuyển thành danh sách/từ điển rỗng trước spawn.
 `đối_số` là danh sách chuỗi argv literal, không chạy shell ngầm. `môi_trường`
 là từ điển chuỗi được ghi đè lên môi trường kế thừa của tiến trình con.
 Hàm trả từ điển có các khóa `"khởi chạy"` (bool), `"mã thoát"` (int),
@@ -318,7 +318,7 @@ trong khi API hàm trước đây vẫn dùng được qua đường dẫn modul
 | --- | --- | --- |
 | HTTP Client | `gói/mạng/http/chính` | `Khách HTTP(url_gốc)`: `tạo URL`, `yêu cầu`, `lấy`, `gửi`, `cập nhật`, `xóa`, `đóng` |
 | Database Connection | `gói/dữ liệu/cơ sở dữ liệu/chính` | `Kết Nối Cơ Sở Dữ Liệu(driver, url, tài_khoản, mật_khẩu)`: `thông tin`, `đang kết nối`, `kết nối`, `truy vấn`, `ping`, `đóng` |
-| File Stream | `gói/nhập xuất/chính` | `Luồng Tệp(đường, chế_độ)`: `đang mở`, `đọc bytes`, `đọc hết`, `ghi bytes`, `ghi`, `vị trí`, `dịch`, `đẩy đệm`, `đóng` |
+| File Stream | `gói/nhập xuất/chính` | `Luồng Tệp(đường, chế_độ)`: `đang mở`, `đọc các byte`, `đọc hết`, `ghi các byte`, `ghi`, `vị trí`, `dịch`, `đẩy đệm`, `đóng` |
 | Logger | `gói/lõi/chính` | `Bộ Ghi Nhật Ký(đích, đường, mức_tối_thiểu)`: `đổi mức`, `ghi`, `thông tin`, `cảnh báo`, `lỗi`, `đóng` |
 | Collections | `gói/bộ sưu tập/chính` | `Ngăn Xếp`, `Hàng Đợi`, `Tập Hợp`, `Từ Điển` triển khai `Bộ Chứa` (`số lượng`, `trống`) |
 | Compiler AST | `gói/biên dịch/chính` | `Nút Cú Pháp`, `Nút Lớp`, `Nút Hàm`, `Truy Cập Cú Pháp`, `Khách Duyệt Cú Pháp`; factory `tạo nút cú pháp` |
@@ -376,7 +376,7 @@ vẫn gọi chương trình DB bên ngoài cho từng truy vấn, không hỗ tr
 hay connection pooling. Mật khẩu lưu trong instance, không được ghi vào log.
 `Luồng Tệp` mở handle trong constructor và giữ cursor đến khi `đóng()`.
 `dịch(lệch, mốc = 0)` dùng độ lệch byte, mốc 0 = đầu, 1 = hiện tại, 2 = cuối;
-`vị trí()` trả số nguyên ABI 64-bit. `đọc bytes(đếm)` nhận 0..65536 byte,
+`vị trí()` trả số nguyên ABI 64-bit. `đọc các byte(đếm)` nhận 0..65536 byte,
 `đọc hết()` đọc từ cursor hiện tại tới EOF. `đẩy đệm()` flush tệp đang ghi;
 chế độ `ghi` truncate ngay khi mở, chế độ `nối` luôn ghi ở cuối. Đóng lặp
 được chấp nhận; thao tác I/O sau khi đóng ném lỗi. VM thu hồi handle còn mở

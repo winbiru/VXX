@@ -1,15 +1,15 @@
 nhập gói/lõi/chuyển kiểu;
 
 hàm cùng bits(a, b) {
-    nếu (do_dai(a) != do_dai(b)) { trả về sai; };
-    lặp(i = 0; i < do_dai(a); i++) {
+    nếu (độ dài(a) != độ dài(b)) { trả về sai; };
+    lặp(i = 0; i < độ dài(a); i++) {
         nếu (a[i] != b[i]) { trả về sai; };
     };
     trả về đúng;
 };
 
-hàm giữ bits(bytes) {
-    trả về cùng bits(so_thuc_bits_vm(so_thuc_tu_bits_vm(bytes)), bytes);
+hàm giữ bits(các byte) {
+    trả về cùng bits(bit số thực máy ảo(số thực từ bit máy ảo(các byte)), các byte);
 };
 
 hàm chính() {
@@ -22,14 +22,14 @@ hàm chính() {
     in giữ bits([0, 0, 0, 0, 0, 0, 240, 255]);
     in giữ bits([1, 0, 0, 0, 0, 0, 248, 127]);
 
-    in cùng bits(so_thuc_bits_vm(thành số thực("-0.0")), [0, 0, 0, 0, 0, 0, 0, 128]);
-    in cùng bits(so_thuc_bits_vm(thành số thực("-0e5")), [0, 0, 0, 0, 0, 0, 0, 128]);
-    in cùng bits(so_thuc_bits_vm(thành số thực("+0.0")), [0, 0, 0, 0, 0, 0, 0, 0]);
+    in cùng bits(bit số thực máy ảo(thành số thực("-0.0")), [0, 0, 0, 0, 0, 0, 0, 128]);
+    in cùng bits(bit số thực máy ảo(thành số thực("-0e5")), [0, 0, 0, 0, 0, 0, 0, 128]);
+    in cùng bits(bit số thực máy ảo(thành số thực("+0.0")), [0, 0, 0, 0, 0, 0, 0, 0]);
     in thành số thực("nan") != thành số thực("nan");
     in thành số thực("+Infinity") > 1.0;
     in thành số thực("-inf") < -1.0;
 
-    thử { so_thuc_tu_bits_vm([0]); } bắt lỗi (e) { in loai_cua(e) == "chuỗi"; };
-    thử { so_thuc_tu_bits_vm([0, 0, 0, 0, 0, 0, 0, -1]); } bắt lỗi (e) { in loai_cua(e) == "chuỗi"; };
-    thử { so_thuc_tu_bits_vm("không phải bytes"); } bắt lỗi (e) { in loai_cua(e) == "chuỗi"; };
+    thử { số thực từ bit máy ảo([0]); } bắt lỗi (e) { in loại của(e) == "chuỗi"; };
+    thử { số thực từ bit máy ảo([0, 0, 0, 0, 0, 0, 0, -1]); } bắt lỗi (e) { in loại của(e) == "chuỗi"; };
+    thử { số thực từ bit máy ảo("không phải các byte"); } bắt lỗi (e) { in loại của(e) == "chuỗi"; };
 };

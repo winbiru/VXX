@@ -6,7 +6,7 @@ hàm chính() {
     in lệnh.thêm đối số("oop") == lệnh;
     in lệnh.đặt biến("VPP_OOP", "1") == lệnh;
     in lệnh.đặt thời hạn(2000) == lệnh;
-    nếu (ten_nen_tang_vm() != "windows") {
+    nếu (ten nền tảng máy ảo() != "windows") {
         kết_quả = lệnh.chạy();
         in kết_quả["khởi chạy"];
         in kết_quả["mã thoát"] == 0;

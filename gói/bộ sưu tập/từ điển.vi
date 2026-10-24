@@ -9,43 +9,43 @@ lớp công khai Tiện Ích Từ Điển {
     hàm công khai khởi tạo() {};
 
     // Lấy value theo key; trả về mặc định khi key không tồn tại.
-    hàm công khai lấy map(bảng, khóa, mặc định) {
-        nếu (!co_khoa(bảng, khóa)) {
+    hàm công khai lấy từ điển(bảng, khóa, mặc định) {
+        nếu (!máy ảo có khóa từ điển(bảng, khóa)) {
             trả về mặc định;
         };
         trả về bảng[khóa];
     };
 
     // Đặt value theo key; list/map cũng được giữ theo tham chiếu. Trả về rỗng.
-    hàm công khai đặt map(bảng, khóa, giá trị) {
+    hàm công khai đặt từ điển(bảng, khóa, giá trị) {
         bảng[khóa] = giá trị;
         trả về rỗng;
     };
 
     // Kiểm tra key tồn tại, trả về đúng/sai theo quy ước số 1/0.
     hàm công khai có khóa(bảng, khóa) {
-        trả về co_khoa(bảng, khóa);
+        trả về máy ảo có khóa từ điển(bảng, khóa);
     };
 
     // Xóa key, trả về value cũ hoặc rỗng.
     hàm công khai xóa khóa(bảng, khóa) {
-        trả về xoa_khoa(bảng, khóa);
+        trả về máy ảo xóa khóa từ điển(bảng, khóa);
     };
 
     // Trả về list key đã sắp theo thứ tự từ điển.
-    hàm công khai khóa map(bảng) {
-        khóa = khoa_map(bảng);
+    hàm công khai khóa từ điển(bảng) {
+        khóa = máy ảo liệt kê khóa từ điển(bảng);
         sắp xếp(khóa);
         trả về khóa;
     };
 };
 
-hàm công khai lấy map(bảng, khóa, mặc định) {
-    trả về Tiện Ích Từ Điển().lấy map(bảng, khóa, mặc định);
+hàm công khai lấy từ điển(bảng, khóa, mặc định) {
+    trả về Tiện Ích Từ Điển().lấy từ điển(bảng, khóa, mặc định);
 };
 
-hàm công khai đặt map(bảng, khóa, giá trị) {
-    trả về Tiện Ích Từ Điển().đặt map(bảng, khóa, giá trị);
+hàm công khai đặt từ điển(bảng, khóa, giá trị) {
+    trả về Tiện Ích Từ Điển().đặt từ điển(bảng, khóa, giá trị);
 };
 
 hàm công khai có khóa(bảng, khóa) {
@@ -56,6 +56,6 @@ hàm công khai xóa khóa(bảng, khóa) {
     trả về Tiện Ích Từ Điển().xóa khóa(bảng, khóa);
 };
 
-hàm công khai khóa map(bảng) {
-    trả về Tiện Ích Từ Điển().khóa map(bảng);
+hàm công khai khóa từ điển(bảng) {
+    trả về Tiện Ích Từ Điển().khóa từ điển(bảng);
 };

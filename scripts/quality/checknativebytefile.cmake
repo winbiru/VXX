@@ -35,7 +35,7 @@ endforeach()
 
 # Neither a bad ABI call nor a reserved runtime name may publish an executable.
 file(WRITE "${VPP_OUTPUT_DIR}/bad-arity.vi"
-    "hàm chính() { trả về byte_thêm(1); };\n")
+    "hàm chính() { trả về byte thêm(1); };\n")
 file(REMOVE "${VPP_OUTPUT_DIR}/bad-arity")
 vpp_native_compile_command("${VPP_OUTPUT_DIR}/bad-arity.vi"
     "${VPP_OUTPUT_DIR}/bad-arity" compile_command)
@@ -46,7 +46,7 @@ if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/bad-arity" OR
     (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "sai số đối số"))
     message(FATAL_ERROR "native must reject byte ABI arity: ${status}\n${errors}")
 endif()
-foreach(name IN ITEMS byte_mới tệp_đóng vpp_native_bytes_get vpp_native_file_close)
+foreach(name IN ITEMS "byte mới" "tệp đóng" vpp_native_bytes_get vpp_native_file_close)
     file(WRITE "${VPP_OUTPUT_DIR}/reserved.vi"
         "hàm ${name}(a) { trả về a; }; hàm chính() { trả về 0; };\n")
     file(REMOVE "${VPP_OUTPUT_DIR}/reserved")

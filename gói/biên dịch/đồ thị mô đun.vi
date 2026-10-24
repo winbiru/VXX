@@ -8,7 +8,7 @@ nhập gói/bộ sưu tập/từ điển;
 // Chuẩn hóa lexical, không gọi filesystem. Khóa trong `nguồn` và import
 // phải thuộc cùng một gốc logic, không thoát lên trên gốc đó.
 hàm công khai biên dịch đồ thị chuẩn đường(đường) {
-    nếu (loai_cua(đường) != "chuỗi") {
+    nếu (loại của(đường) != "chuỗi") {
         ném "biên dịch đồ thị: cần đường dẫn tương đối không rỗng";
     };
     nếu (đường == "") {
@@ -19,42 +19,42 @@ hàm công khai biên dịch đồ thị chuẩn đường(đường) {
     };
     phần = [];
     mục = "";
-    lặp(i = 0; i <= độ dài(đường); i++) {
-        ký_tự = "/";
-        nếu (i < độ dài(đường)) { ký_tự = đường[i]; };
-        nếu (ký_tự == "\\") {
+    lặp(i = 0; i <= máy ảo lấy độ dài(đường); i++) {
+        ký tự = "/";
+        nếu (i < máy ảo lấy độ dài(đường)) { ký tự = đường[i]; };
+        nếu (ký tự == "\\") {
             ném "biên dịch đồ thị: chưa hỗ trợ dấu phân cách Windows";
         };
-        nếu (ký_tự == "/") {
+        nếu (ký tự == "/") {
             nếu (mục == "..") {
-                nếu (độ dài(phần) == 0) {
+                nếu (máy ảo lấy độ dài(phần) == 0) {
                     ném "biên dịch đồ thị: đường dẫn thoát khỏi gốc nguồn '" + đường + "'";
                 };
-                xóa tại(phần, độ dài(phần) - 1);
+                máy ảo xóa vị trí danh sách(phần, máy ảo lấy độ dài(phần) - 1);
             } hoặc {
-                nếu (mục != "" && mục != ".") { thêm(phần, mục); };
+                nếu (mục != "" && mục != ".") { máy ảo thêm cuối danh sách(phần, mục); };
             };
             mục = "";
         } hoặc {
-            mục += ký_tự;
+            mục += ký tự;
         };
     };
-    nếu (độ dài(phần) == 0) {
+    nếu (máy ảo lấy độ dài(phần) == 0) {
         ném "biên dịch đồ thị: đường dẫn không xác định mô-đun '" + đường + "'";
     };
-    kết_quả = phần[0];
-    lặp(i = 1; i < độ dài(phần); i++) { kết_quả += "/" + phần[i]; };
-    trả về kết_quả;
+    kết quả = phần[0];
+    lặp(i = 1; i < máy ảo lấy độ dài(phần); i++) { kết quả += "/" + phần[i]; };
+    trả về kết quả;
 };
 
-hàm công khai biên dịch đồ thị đích nhập(nguồn_nhập, đích) {
+hàm công khai biên dịch đồ thị đích nhập(nguồn nhập, đích) {
     // Import tương đối được giải từ thư mục CHỨA module importer.
     // Mỗi module được coi là tệp không đuôi .vi trong graph in-memory.
     cha = "";
-    lặp(i = 0; i < độ dài(nguồn_nhập); i++) {
-        nếu (nguồn_nhập[i] == "/") {
+    lặp(i = 0; i < máy ảo lấy độ dài(nguồn nhập); i++) {
+        nếu (nguồn nhập[i] == "/") {
             cha = "";
-            lặp(j = 0; j < i; j++) { cha += nguồn_nhập[j]; };
+            lặp(j = 0; j < i; j++) { cha += nguồn nhập[j]; };
         };
     };
     nếu (cha == "") { trả về biên dịch đồ thị chuẩn đường(đích); };
@@ -63,120 +63,120 @@ hàm công khai biên dịch đồ thị đích nhập(nguồn_nhập, đích) {
 
 // Đồ thị nguồn tệp đã phân giải import bằng filesystem. Emitter phải dùng
 // đúng identity đó, kể cả khi import được tìm ở thư mục tổ tiên/VPP_HOME.
-hàm công khai biên dịch đồ thị tìm đích(đồ_thị, nguồn_nhập, đích) {
-    nếu (lấy map(đồ_thị, "nguồn tệp", sai)) {
-        cạnh = đồ_thị["cạnh"];
-        lặp(i = 0; i < độ dài(cạnh); i++) {
-            nếu (cạnh[i]["nguồn"] == nguồn_nhập && cạnh[i]["yêu cầu"] == đích) {
+hàm công khai biên dịch đồ thị tìm đích(đồ thị, nguồn nhập, đích) {
+    nếu (lấy từ điển(đồ thị, "nguồn tệp", sai)) {
+        cạnh = đồ thị["cạnh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(cạnh); i++) {
+            nếu (cạnh[i]["nguồn"] == nguồn nhập && cạnh[i]["yêu cầu"] == đích) {
                 trả về cạnh[i]["đích"];
             };
         };
         ném "biên dịch đồ thị: chưa phân giải import '" + đích + "'";
     };
-    trả về biên dịch đồ thị đích nhập(nguồn_nhập, đích);
+    trả về biên dịch đồ thị đích nhập(nguồn nhập, đích);
 };
 
 hàm công khai biên dịch đồ thị quét nhập(cây) {
-    imports = [];
-    lệnh = lấy map(cây, "câu lệnh", []);
-    lặp(i = 0; i < độ dài(lệnh); i++) {
-        nếu (lấy map(lệnh[i], "loại", "") == "nhập") {
-            thêm(imports, lệnh[i]);
+    các phần nhập = [];
+    lệnh = lấy từ điển(cây, "câu lệnh", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+        nếu (lấy từ điển(lệnh[i], "loại", "") == "nhập") {
+            máy ảo thêm cuối danh sách(các phần nhập, lệnh[i]);
         };
     };
-    trả về imports;
+    trả về các phần nhập;
 };
 
-hàm công khai biên dịch đồ thị chu trình(ngăn, lặp_lại) {
-    bắt_đầu = -1;
-    lặp(i = 0; i < độ dài(ngăn); i++) {
-        nếu (ngăn[i] == lặp_lại) { bắt_đầu = i; };
+hàm công khai biên dịch đồ thị chu trình(ngăn, lặp lại) {
+    bắt đầu = -1;
+    lặp(i = 0; i < máy ảo lấy độ dài(ngăn); i++) {
+        nếu (ngăn[i] == lặp lại) { bắt đầu = i; };
     };
-    kết_quả = "";
-    lặp(i = bắt_đầu; i < độ dài(ngăn); i++) {
-        nếu (kết_quả != "") { kết_quả += " -> "; };
-        kết_quả += ngăn[i];
+    kết quả = "";
+    lặp(i = bắt đầu; i < máy ảo lấy độ dài(ngăn); i++) {
+        nếu (kết quả != "") { kết quả += " -> "; };
+        kết quả += ngăn[i];
     };
-    trả về kết_quả + " -> " + lặp_lại;
+    trả về kết quả + " -> " + lặp lại;
 };
 
-hàm công khai biên dịch đồ thị duyệt(trạng_thái, nguồn_nhập, spec) {
-    bộ_dựng = Bộ Dựng Đồ Thị Mô Đun(trạng_thái);
-    trả về bộ_dựng.duyệt(nguồn_nhập, spec);
+hàm công khai biên dịch đồ thị duyệt(trạng thái, nguồn nhập, spec) {
+    bộ dựng = Bộ Dựng Đồ Thị Mô Đun(trạng thái);
+    trả về bộ dựng.duyệt(nguồn nhập, spec);
 };
 
 // `nguồn`: map định danh POSIX -> mã nguồn V++ (không có hậu tố .vi).
 // `điểm_vào`: định danh module gốc; các module trong `mô đun` không gồm gốc.
 // Trả cả cạnh import trùng để phục vụ alias / re-export ở linker về sau.
-hàm công khai biên dịch dựng đồ thị nguồn thuần(điểm_vào, nguồn) {
-    bộ_dựng = Bộ Dựng Đồ Thị Mô Đun({"nguồn": nguồn});
-    trả về bộ_dựng.dựng(điểm_vào);
+hàm công khai biên dịch dựng đồ thị nguồn thuần(điểm vào, nguồn) {
+    bộ dựng = Bộ Dựng Đồ Thị Mô Đun({"nguồn": nguồn});
+    trả về bộ dựng.dựng(điểm vào);
 };
 
 // Một đối tượng quản lý toàn bộ trạng thái DFS của một lần dựng đồ thị.
 // API hàm tự do phía dưới được giữ để tương thích với các trình liên kết cũ.
 lớp công khai Bộ Dựng Đồ Thị Mô Đun {
-    hàm công khai khởi tạo(trạng_thái) {
-        mình.trạng_thái = trạng_thái;
+    hàm công khai khởi tạo(trạng thái) {
+        mình.trạng thái = trạng thái;
     };
 
-    hàm công khai duyệt(nguồn_nhập, spec) {
-    trạng_thái = mình.trạng_thái;
-    đích = biên dịch đồ thị đích nhập(nguồn_nhập, spec["đích"]);
-    nguồn = trạng_thái["nguồn"];
-    nếu (!có khóa(nguồn, đích)) {
+    hàm công khai duyệt(nguồn nhập, spec) {
+    trạng thái = mình.trạng thái;
+    đích = biên dịch đồ thị đích nhập(nguồn nhập, spec["đích"]);
+    nguồn = trạng thái["nguồn"];
+    nếu (!máy ảo có khóa từ điển(nguồn, đích)) {
         ném "biên dịch đồ thị: không tìm thấy nguồn mô-đun '" + đích + "'";
     };
-    trạng_thái_đích = lấy map(trạng_thái["đã thăm"], đích, 0);
-    nếu (trạng_thái_đích == 1) {
+    trạng thái đích = lấy từ điển(trạng thái["đã thăm"], đích, 0);
+    nếu (trạng thái đích == 1) {
         ném "biên dịch đồ thị: import vòng " +
-            biên dịch đồ thị chu trình(trạng_thái["ngăn"], đích);
+            biên dịch đồ thị chu trình(trạng thái["ngăn"], đích);
     };
-    hành_động = "load";
-    nếu (trạng_thái_đích == 2) { hành_động = "duplicate_no_op"; };
-    thêm(trạng_thái["cạnh"], {"nguồn": nguồn_nhập, "đích": đích,
-         "bí danh": lấy map(spec, "bí danh", ""),
-         "tái xuất": lấy map(spec, "tái xuất", sai),
-         "hành động": hành_động});
-    nếu (trạng_thái_đích == 2) { trả về đúng; };
-    trạng_thái["đã thăm"][đích] = 1;
-    thêm(trạng_thái["ngăn"], đích);
+    hành động = "load";
+    nếu (trạng thái đích == 2) { hành động = "duplicate_no_op"; };
+    máy ảo thêm cuối danh sách(trạng thái["cạnh"], {"nguồn": nguồn nhập, "đích": đích,
+         "bí danh": lấy từ điển(spec, "bí danh", ""),
+         "tái xuất": lấy từ điển(spec, "tái xuất", sai),
+         "hành động": hành động});
+    nếu (trạng thái đích == 2) { trả về đúng; };
+    trạng thái["đã thăm"][đích] = 1;
+    máy ảo thêm cuối danh sách(trạng thái["ngăn"], đích);
     cây = biên dịch phân tích chương trình thuần(nguồn[đích]);
-    thêm(trạng_thái["mô đun"], {"định danh": đích, "cây": cây});
-    imports = biên dịch đồ thị quét nhập(cây);
-    lặp(i = 0; i < độ dài(imports); i++) {
-        mình.duyệt(đích, imports[i]);
+    máy ảo thêm cuối danh sách(trạng thái["mô đun"], {"định danh": đích, "cây": cây});
+    các phần nhập = biên dịch đồ thị quét nhập(cây);
+    lặp(i = 0; i < máy ảo lấy độ dài(các phần nhập); i++) {
+        mình.duyệt(đích, các phần nhập[i]);
     };
-    xóa tại(trạng_thái["ngăn"], độ dài(trạng_thái["ngăn"]) - 1);
-    trạng_thái["đã thăm"][đích] = 2;
+    máy ảo xóa vị trí danh sách(trạng thái["ngăn"], máy ảo lấy độ dài(trạng thái["ngăn"]) - 1);
+    trạng thái["đã thăm"][đích] = 2;
     // Postorder: initializer của dependency phải đi trước importer.
-    thêm(trạng_thái["thứ tự khởi tạo"], đích);
+    máy ảo thêm cuối danh sách(trạng thái["thứ tự khởi tạo"], đích);
     trả về đúng;
     };
 
-    hàm công khai dựng(điểm_vào) {
-        nguồn = mình.trạng_thái["nguồn"];
-        nếu (loai_cua(nguồn) != "từ điển") {
+    hàm công khai dựng(điểm vào) {
+        nguồn = mình.trạng thái["nguồn"];
+        nếu (loại của(nguồn) != "từ điển") {
             ném "biên dịch đồ thị: cần bảng nguồn mô-đun";
         };
-        gốc_dữ_liệu = biên dịch đồ thị chuẩn đường(điểm_vào);
-        nếu (!có khóa(nguồn, gốc_dữ_liệu)) {
-            ném "biên dịch đồ thị: không tìm thấy nguồn gốc '" + gốc_dữ_liệu + "'";
+        gốc dữ liệu = biên dịch đồ thị chuẩn đường(điểm vào);
+        nếu (!máy ảo có khóa từ điển(nguồn, gốc dữ liệu)) {
+            ném "biên dịch đồ thị: không tìm thấy nguồn gốc '" + gốc dữ liệu + "'";
         };
-        cây = biên dịch phân tích chương trình thuần(nguồn[gốc_dữ_liệu]);
-        mình.trạng_thái = {"nguồn": nguồn, "đã thăm": {}, "ngăn": [],
+        cây = biên dịch phân tích chương trình thuần(nguồn[gốc dữ liệu]);
+        mình.trạng thái = {"nguồn": nguồn, "đã thăm": {}, "ngăn": [],
                             "mô đun": [], "cạnh": [], "thứ tự khởi tạo": []};
-        trạng_thái = mình.trạng_thái;
-        trạng_thái["đã thăm"][gốc_dữ_liệu] = 1;
-        thêm(trạng_thái["ngăn"], gốc_dữ_liệu);
-        imports = biên dịch đồ thị quét nhập(cây);
-        lặp(i = 0; i < độ dài(imports); i++) {
-            mình.duyệt(gốc_dữ_liệu, imports[i]);
+        trạng thái = mình.trạng thái;
+        trạng thái["đã thăm"][gốc dữ liệu] = 1;
+        máy ảo thêm cuối danh sách(trạng thái["ngăn"], gốc dữ liệu);
+        các phần nhập = biên dịch đồ thị quét nhập(cây);
+        lặp(i = 0; i < máy ảo lấy độ dài(các phần nhập); i++) {
+            mình.duyệt(gốc dữ liệu, các phần nhập[i]);
         };
-        trả về {"loại": "đồ thị mô đun V++", "điểm vào": gốc_dữ_liệu,
-                "cây điểm vào": cây, "mô đun": trạng_thái["mô đun"],
-                "cạnh": trạng_thái["cạnh"],
-                "thứ tự khởi tạo": trạng_thái["thứ tự khởi tạo"]};
+        trả về {"loại": "đồ thị mô đun V++", "điểm vào": gốc dữ liệu,
+                "cây điểm vào": cây, "mô đun": trạng thái["mô đun"],
+                "cạnh": trạng thái["cạnh"],
+                "thứ tự khởi tạo": trạng thái["thứ tự khởi tạo"]};
     };
 };
 

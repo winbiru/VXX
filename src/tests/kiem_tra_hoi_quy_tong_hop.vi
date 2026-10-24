@@ -1,6 +1,6 @@
 // Smoke regression tổng hợp chạy sau mỗi thay đổi compiler/runtime.
 // File cố ý ghép nhiều tính năng trong cùng một chương trình để bắt lỗi tương tác
-// giữa parser, semantic, direct IR, bytecode và VM thay vì chỉ kiểm tra từng phần riêng lẻ.
+// giữa parser, semantic, direct IR, mã trung gian và VM thay vì chỉ kiểm tra từng phần riêng lẻ.
 
 giao diện CóGiáTrị {
     hàm giáTrị();

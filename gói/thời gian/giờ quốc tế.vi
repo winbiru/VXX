@@ -1,0 +1,131 @@
+// UTC: machine primitive cung cấp 16 byte [seconds, nanoseconds] little-endian;
+// đổi Unix epoch -> Gregorian và kiểm tra dữ liệu ở V++.
+// Giới hạn năm 0000..9999, phép toán giây có độ chính xác nguyên binary64.
+
+nhập gói/lõi/toán học;
+nhập gói/lõi/chuyển kiểu;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Đồng Hồ UTC {
+    hàm công khai khởi tạo() {};
+
+    // Decode two's-complement signed 64-bit little-endian without ever turning
+    // a negative tv_sec into an unsigned 2^64-sized value.
+    hàm công khai thời gian giờ quốc tế đọc i64(đệm, bắt đầu) {
+        âm = đệm[bắt đầu + 7] >= 128;
+        số = 0.0;
+        bội = 1.0;
+        nhớ = 1;
+        lặp(i = 0; i < 8; i++) {
+            byte = đệm[bắt đầu + i];
+            nếu (âm) {
+                byte = 255 - byte + nhớ;
+                nếu (byte == 256) {
+                    byte = 0;
+                    nhớ = 1;
+                } hoặc {
+                    nhớ = 0;
+                };
+            };
+            số = số + byte * bội;
+            bội = bội * 256.0;
+        };
+        nếu (âm) { trả về 0.0 - số; };
+        trả về số;
+    };
+
+    // Các thương ở đây luôn nằm trong miền int32 sau khi kiểm tra epoch.
+    // Quy tắc floor quan trọng với giây trước 1970 và các chu kỳ 400 năm.
+    hàm công khai thời gian giờ quốc tế chia sàn(tử, mẫu) {
+        // Phép chia int/int của V++ làm tròn về 0 trước khi tới lam_tron_xuong.
+        trả về làm tròn xuống(tử / (mẫu * 1.0));
+    };
+
+    // Đổi giây nguyên Unix thành [năm, tháng, ngày, giờ, phút, giây, 0].
+    // Gregorian proleptic, gồm ngày âm trước epoch và ngày nhuận 2000/2400.
+    hàm công khai thời gian giờ quốc tế từ mốc thời gian giây(giây mốc thời gian) {
+        nếu (giây mốc thời gian < -62167219200.0 || giây mốc thời gian >= 253402300800.0) {
+            ném "TIME_RANGE";
+        };
+        nếu (làm tròn xuống(giây mốc thời gian) != giây mốc thời gian) { ném "TIME_RANGE"; };
+        ngày mốc thời gian = mình.thời gian giờ quốc tế chia sàn(giây mốc thời gian, 86400);
+        giây ngày = giây mốc thời gian - ngày mốc thời gian * 86400.0;
+        giờ = mình.thời gian giờ quốc tế chia sàn(giây ngày, 3600);
+        phút = mình.thời gian giờ quốc tế chia sàn(giây ngày - giờ * 3600, 60);
+        giây = thành số nguyên(giây ngày - giờ * 3600 - phút * 60);
+
+        // Civil-from-days: kỷ nguyên 400 năm có 146097 ngày.
+        z = ngày mốc thời gian + 719468;
+        kỷ = mình.thời gian giờ quốc tế chia sàn(z, 146097);
+        ngày kỷ = z - kỷ * 146097;
+        năm kỷ = mình.thời gian giờ quốc tế chia sàn(
+            ngày kỷ - mình.thời gian giờ quốc tế chia sàn(ngày kỷ, 1460) +
+            mình.thời gian giờ quốc tế chia sàn(ngày kỷ, 36524) -
+            mình.thời gian giờ quốc tế chia sàn(ngày kỷ, 146096), 365);
+        năm = năm kỷ + kỷ * 400;
+        ngày năm = ngày kỷ - (365 * năm kỷ +
+            mình.thời gian giờ quốc tế chia sàn(năm kỷ, 4) - mình.thời gian giờ quốc tế chia sàn(năm kỷ, 100));
+        tháng mốc = mình.thời gian giờ quốc tế chia sàn(5 * ngày năm + 2, 153);
+        ngày = ngày năm - mình.thời gian giờ quốc tế chia sàn(153 * tháng mốc + 2, 5) + 1;
+        tháng = tháng mốc + 3;
+        nếu (tháng mốc >= 10) { tháng = tháng mốc - 9; };
+        nếu (tháng <= 2) { năm = năm + 1; };
+        trả về [năm, tháng, ngày, giờ, phút, giây, 0];
+    };
+
+    hàm công khai thời gian giờ quốc tế đọc mốc thời gian byte ffi() {
+        đệm = máy đồng hồ giờ quốc tế();
+        nano = mình.thời gian giờ quốc tế đọc i64(đệm, 8);
+        nếu (nano < 0 || nano >= 1000000000.0) {
+            ném "UTC: timespec không hợp lệ";
+        };
+        giây byte = [];
+        lặp(i = 0; i < 8; i++) { máy ảo thêm cuối danh sách(giây byte, đệm[i]); };
+        trả về giây byte;
+    };
+
+    hàm công khai thời gian đọc giờ quốc tế ffi() {
+        giây = mình.thời gian giờ quốc tế đọc i64(mình.thời gian giờ quốc tế đọc mốc thời gian byte ffi(), 0);
+        trả về mình.thời gian giờ quốc tế từ mốc thời gian giây(giây);
+    };
+
+    // Tương thích các caller cũ dùng tên POSIX trước khi adapter Windows xuất hiện.
+    hàm riêng tư thời gian giờ quốc tế đọc mốc thời gian byte posix() {
+        trả về mình.thời gian giờ quốc tế đọc mốc thời gian byte ffi();
+    };
+
+    hàm công khai thời gian đọc giờ quốc tế posix() {
+        trả về mình.thời gian đọc giờ quốc tế ffi();
+    };
+};
+
+
+hàm công khai thời gian giờ quốc tế đọc i64(đệm, bắt đầu) {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian giờ quốc tế đọc i64(đệm, bắt đầu);
+};
+
+hàm công khai thời gian giờ quốc tế chia sàn(tử, mẫu) {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian giờ quốc tế chia sàn(tử, mẫu);
+};
+
+hàm công khai thời gian giờ quốc tế từ mốc thời gian giây(giây mốc thời gian) {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian giờ quốc tế từ mốc thời gian giây(giây mốc thời gian);
+};
+
+hàm công khai thời gian giờ quốc tế đọc mốc thời gian byte ffi() {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian giờ quốc tế đọc mốc thời gian byte ffi();
+};
+
+hàm công khai thời gian đọc giờ quốc tế ffi() {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian đọc giờ quốc tế ffi();
+};
+
+hàm công khai thời gian đọc giờ quốc tế posix() {
+    bộ chuyển tiếp = Đồng Hồ UTC();
+    trả về bộ chuyển tiếp.thời gian đọc giờ quốc tế posix();
+};

@@ -12,10 +12,10 @@ tự chủ triển khai các pass bằng V++.
 | `gói/biên dịch/trình điều khiển.vi` | `Trình Điều Khiển Biên Dịch` | Điều phối chạy, dựng và nạp artifact theo cấu hình CLI. |
 | `gói/biên dịch/phụ thuộc.vi` | `Bộ Phân Tích Phụ Thuộc` | Tái sử dụng một phiên `Bộ Biên Dịch` để kiểm tra mã nguồn và truy vấn import. |
 | `gói/biên dịch/đồ thị mô đun.vi` | `Bộ Dựng Đồ Thị Mô Đun` | Giữ trạng thái DFS theo phiên, phát hiện chu trình, bảo toàn cạnh import và thứ tự khởi tạo. |
-| `gói/biên dịch/artifact.vi` | `Bộ Mã Hóa Artifact` | Kiểm tra ABI, mã hóa/giải mã artifact v1 và đọc biểu diễn bootstrap cũ. |
+| `gói/biên dịch/sản phẩm biên dịch.vi` | `Bộ Mã Hóa Artifact` | Kiểm tra ABI, mã hóa/giải mã artifact v1 và đọc biểu diễn bootstrap cũ. |
 | `gói/biên dịch/cây cú pháp.vi` | `Bộ Chỉ Mục Khai Báo` | Lập chỉ mục theo tên của AST một lần; truy vấn liên tiếp giữ thứ tự DFS, trả danh sách riêng và hỗ trợ làm mới. |
 | `gói/biên dịch/sổ đăng ký.vi` | `Bộ Đăng Ký Hàm` | Quản lý Function ID, StringPool và bảng ký hiệu/export theo từng phiên IR hoặc đồ thị; bảo toàn thứ tự khai trước, hỗ trợ hoãn chuỗi khi liên kết mô-đun. |
-| `gói/mạng/http/rest.vi` | `Bộ Dựng Phản Hồi REST` | Dựng JSON success/error, dữ liệu request và JWT từ trạng thái phản hồi dùng chung. |
+| `gói/mạng/http/dịch vụ tài nguyên.vi` | `Bộ Dựng Phản Hồi REST` | Dựng JSON success/error, dữ liệu request và JWT từ trạng thái phản hồi dùng chung. |
 | `gói/kiểm thử/bộ kiểm thử.vi` | `Bộ Kiểm Thử` | Gom nhiều `Ca Kiểm Thử`, chạy có hoặc không dừng khi lỗi và trả báo cáo mỗi lần chạy. |
 | `gói/bộ sưu tập/bộ đệm danh sách.vi` | `Bộ Đệm Danh Sách` | Cung cấp bộ đệm, `số lượng()` và `trống()` cho ngăn xếp và hàng đợi. |
 | `gói/lõi/tài nguyên có trạng thái.vi` | `Tài Nguyên Có Trạng Thái` | Cung cấp vòng đời và kiểm tra đóng cho logger, kết nối DB. |
@@ -26,7 +26,7 @@ tự chủ triển khai các pass bằng V++.
 | `gói/lõi/ngẫu nhiên.vi` | `Bộ Sinh Ngẫu Nhiên` | Sở hữu PRNG Park–Miller, snapshot/khôi phục và vòng đời đóng; tách khỏi entropy mật mã. |
 | `gói/lõi/tập bản ghi.vi` | `Tập Bản Ghi` | Sở hữu danh sách hàng độc lập kết nối, truy vấn cột/lọc và kiểm tra chỉ số. |
 | `gói/dữ liệu/json/json.vi` | `Tài Liệu JSON` | Giữ dữ liệu đã parse; nạp lại lỗi bảo toàn tài liệu trước đó. |
-| `gói/dữ liệu/xml/dom.vi` | `Phần Tử DOM` | Truy cập và sửa cây XML, điều hướng node con, chia sẻ cây map với API DOM hiện có. |
+| `gói/dữ liệu/xml/cây tài liệu.vi` | `Phần Tử DOM` | Truy cập và sửa cây XML, điều hướng node con, chia sẻ cây map với API DOM hiện có. |
 | `gói/lõi/hệ tệp zip.vi` | `Hệ Tệp ZIP` | Sở hữu handle kho ZIP, liệt kê/giải nén và từ chối sử dụng sau đóng. |
 | `gói/lõi/tùy chọn bền vững.vi` | `Kho Tùy Chọn` | Giữ namespace; đọc lại dữ liệu mỗi thao tác để các instance cùng namespace không ghi đè bằng cache cũ. |
 | `gói/lõi/quốc tế hóa.vi` | `Gói Tài Nguyên` | Giữ nguồn bundle và locale đã chọn; đổi vùng chỉ được ghi nhận khi hợp lệ. |
@@ -34,8 +34,8 @@ tự chủ triển khai các pass bằng V++.
 | `gói/lõi/đồng thời.vi` | `Luồng Công Việc` | Sở hữu worker ID, chờ/hủy/trạng thái; đóng hủy và join worker, không tự động đóng khi ra khỏi scope. |
 | `gói/lõi/quản lý gói.vi` | `Dự Án Gói` | Chỉnh manifest trên bản sao, xác thực trước khi ghi nhận, truy vấn phụ thuộc, lưu/tải lại. |
 | `gói/biên dịch/chương trình.vi` | `Bộ Phân Tích Cú Pháp` | Giữ token theo nguồn; mỗi lần phân tích bắt đầu bằng cursor mới. |
-| `gói/biên dịch/từ vựng.vi` | `Bộ Tách Từ Vựng` | Giữ nguồn và cache token thô/token hợp nhất theo từng đối tượng; làm mới bỏ cả hai cache. |
-| `gói/biên dịch/ir.vi` | `Bộ Hạ IR` | Giữ nguồn và kết quả hạ IR của một phiên; tái sử dụng kết quả đến khi làm mới nguồn. |
+| `gói/biên dịch/từ vựng.vi` | `Bộ Tách Từ Vựng` | Giữ nguồn và cache từ tố thô/token hợp nhất theo từng đối tượng; làm mới bỏ cả hai cache. |
+| `gói/biên dịch/biểu diễn trung gian.vi` | `Bộ Hạ IR` | Giữ nguồn và kết quả hạ IR của một phiên; tái sử dụng kết quả đến khi làm mới nguồn. |
 | `gói/biên dịch/phát mã.vi` | `Bộ Phát Bytecode` | Giữ nguồn và bytecode chưa liên kết của một phiên; lỗi không ghi cache dở dang. |
 | `gói/biên dịch/liên kết.vi` | `Bộ Liên Kết Bytecode` | Giữ nguồn và artifact đã liên kết theo từng đối tượng; API nhiều mô-đun tiếp tục giữ chữ ký cũ. |
 | `gói/biên dịch/phiên tự chủ.vi` | `Bộ Biên Dịch Tự Chủ` | Giữ token, AST, IR và bytecode theo nguồn, chạy từng bước khi cần và vô hiệu hóa cache khi làm mới. |
@@ -80,7 +80,7 @@ bytecode = phiên.bytecode();
 ```
 
 Để gọi API hiện có, tiếp tục dùng `biên dịch phân tích(mã)`, `biên dịch
-bytecode(mã)`, `biên dịch cli(...)`, `biên dịch chạy artifact(...)` và các API
+bytecode(mã)`, `biên dịch cli(...)`, `biên dịch chạy sản phẩm biên dịch(...)` và các API
 collection như trước. Những hàm này chuyển yêu cầu vào đối tượng thích hợp.
 Tạo một `Bộ Biên Dịch` khi cần thực hiện nhiều truy vấn trên cùng nguồn để
 tránh lặp lại công đoạn phân tích.
@@ -89,7 +89,7 @@ Các phần mở rộng có thể gọi trực tiếp:
 
 ```text
 nhập gói/biên dịch/phụ thuộc;
-nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/sản phẩm biên dịch;
 nhập gói/mạng/rest;
 
 phân_tích = Bộ Phân Tích Phụ Thuộc("nhập bộ sưu tập;", ".");
@@ -185,13 +185,13 @@ bytecode = phiên.bytecode();
 phiên.làm mới("in 7;");
 ```
 
-`Bộ Tách Từ Vựng(nguồn = "")` cung cấp `token thô()`, `token()` và
+`Bộ Tách Từ Vựng(nguồn = "")` cung cấp `từ tố thô()`, `token()` và
 `làm mới(nguồn)`. Hai truy vấn token tái sử dụng cache riêng của đối tượng;
-token hợp nhất dùng lại token thô đã tách. `làm mới()` kiểm tra kiểu trước
+token hợp nhất dùng lại từ tố thô đã tách. `làm mới()` kiểm tra kiểu trước
 khi thay nguồn và bỏ cache, nên đối số sai không làm mất kết quả hiện có.
 Các danh sách trả về là tham chiếu cache; không sửa chúng giữa các truy vấn.
-Các phương thức cũ `biên dịch token hóa thô(nguồn)` và
-`biên dịch token hóa(nguồn)` vẫn nhận nguồn trực tiếp và không đổi cache phiên.
+Các phương thức cũ `biên dịch từ tố hóa thô(nguồn)` và
+`biên dịch từ tố hóa(nguồn)` vẫn nhận nguồn trực tiếp và không đổi cache phiên.
 Các hàm cùng tên ở cấp mô-đun tạo phiên mới cho mỗi lần gọi.
 Kiểm thử `kiem_tra_tu_vung_oop.vi` bao phủ cache, tách trạng thái, chỉ số UTF-8,
 nguồn rỗng, phục hồi sau lỗi và tương thích các API này trên interpreter/JIT.

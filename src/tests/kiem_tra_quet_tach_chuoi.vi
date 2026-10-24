@@ -1,10 +1,10 @@
 nhập gói/chuẩn/chính;
 
 hàm chính() {
-    s = scanner("  alpha 42 ff 3.5 nope");
-    in có token(s);
-    in có token(s);
-    in token(s);
+    s = bộ quét("  alpha 42 ff 3.5 nope");
+    in có từ tố(s);
+    in có từ tố(s);
+    in từ tố(s);
     in xem i32(s);
     in i32(s);
     in i32(s, 16);
@@ -15,24 +15,24 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
-    in token(s);
+    in từ tố(s);
     thử {
-        in token(s);
+        in từ tố(s);
     } bắt lỗi (e) {
         in e;
     };
 
-    custom = scanner("a,b;;c", ",;");
-    lặp(i = 0; có token(custom); i++) {
-        in token(custom);
+    custom = bộ quét("a,b;;c", ",;");
+    lặp(i = 0; có từ tố(custom); i++) {
+        in từ tố(custom);
     };
 
-    phần = tách token("a,b;;c", ",;", đúng);
+    phần = tách từ tố("a,b;;c", ",;", đúng);
     lặp(i = 0; i < độ dài(phần); i++) {
         in phần[i];
     };
 
-    số = scanner("-2147483648 7fffffff 2147483648");
+    số = bộ quét("-2147483648 7fffffff 2147483648");
     in i32(số);
     in i32(số, 16);
     in xem i32(số);
@@ -41,48 +41,48 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
-    in token(số);
+    in từ tố(số);
 
-    skip_scan = scanner("prefix123", "");
-    scanner bỏ literal(skip_scan, "prefix");
-    in token(skip_scan);
+    skip_scan = bộ quét("prefix123", "");
+    bộ quét bỏ hằng văn bản(skip_scan, "prefix");
+    in từ tố(skip_scan);
 
-    giới_hạn = scanner("abcd", " ", 3);
+    giới_hạn = bộ quét("abcd", " ", 3);
     thử {
-        in có token(giới_hạn);
+        in có từ tố(giới_hạn);
     } bắt lỗi (e) {
         in e;
     };
 
-    đóng = scanner("x");
-    đóng scanner(đóng);
+    đóng = bộ quét("x");
+    đóng bộ quét(đóng);
     thử {
-        in có token(đóng);
+        in có từ tố(đóng);
     } bắt lỗi (e) {
         in e;
     };
 
-    regex_scan = scanner regex("a   b\tc", "\\s+");
-    in token(regex_scan);
-    in token(regex_scan);
-    in token(regex_scan);
+    regex_scan = bộ quét biểu thức chính quy("a   b\tc", "\\s+");
+    in từ tố(regex_scan);
+    in từ tố(regex_scan);
+    in từ tố(regex_scan);
 
-    regex_parts = tách token regex("a--b---c", "-+");
+    regex_parts = tách từ tố biểu thức chính quy("a--b---c", "-+");
     lặp(i = 0; i < độ dài(regex_parts); i++) {
         in regex_parts[i];
     };
 
-    regex_keep = tách token regex("a--b---c", "-+", đúng);
+    regex_keep = tách từ tố biểu thức chính quy("a--b---c", "-+", đúng);
     lặp(i = 0; i < độ dài(regex_keep); i++) {
         in regex_keep[i];
     };
 
-    regex_skip = scanner("abc123", "");
-    scanner bỏ regex(regex_skip, "[a-z]+");
-    in token(regex_skip);
+    regex_skip = bộ quét("abc123", "");
+    bộ quét bỏ biểu thức chính quy(regex_skip, "[a-z]+");
+    in từ tố(regex_skip);
 
     thử {
-        scanner regex("abc", "a*");
+        bộ quét biểu thức chính quy("abc", "a*");
     } bắt lỗi (e) {
         in e;
     };

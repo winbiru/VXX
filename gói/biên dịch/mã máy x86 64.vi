@@ -3,16 +3,16 @@
 nhập gói/biên dịch/mã máy nền;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
-lớp công khai Bộ Phát x86_64 {
+lớp công khai Bộ Phát x86 sáu mươi tư {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch mã máy phát x86_64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    hàm công khai biên dịch mã máy phát x86 sáu mươi tư(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
-                        thêm(ra, 184);
-                        biên dịch mã máy thêm word(ra, hằng, đúng);
+                        máy ảo thêm cuối danh sách(ra, 184);
+                        biên dịch mã máy thêm từ máy(ra, hằng, đúng);
                     } hoặc {
-                        nếu (hệ_điều_hành == "windows") {
+                        nếu (hệ điều hành == "windows") {
                             nếu (loại == "cộng") { ra = [137, 200, 1, 208]; }
                             hoặc { ra = [137, 200, 41, 208]; };
                         } hoặc {
@@ -20,213 +20,213 @@ lớp công khai Bộ Phát x86_64 {
                             hoặc { ra = [137, 248, 41, 240]; };
                         };
                     };
-                    thêm(ra, 195);
+                    máy ảo thêm cuối danh sách(ra, 195);
         trả về ra;
     };
 
     // Backend MachineOpcode i32 thuần V++, tương ứng với emitX86_64Function C++.
     // Hàm nhận IR đã qua semantic binding + CFG/depth validation.
-    hàm riêng tư biên dịch mã máy x86_64 bộ nhớ(ra, tải, reg, slot) {
-        nếu (reg < 0 || reg > 7 || slot < 0 || slot > 134217724) {
+    hàm riêng tư biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, tải, thanh ghi, ô nhớ) {
+        nếu (thanh ghi < 0 || thanh ghi > 7 || ô nhớ < 0 || ô nhớ > 134217724) {
             ném "x86_64: thanh ghi hoặc frame slot không hợp lệ";
         };
-        nếu (tải) { thêm(ra, 139); } hoặc { thêm(ra, 137); };
-        thêm(ra, 133 + reg * 8);
-        biên dịch mã máy thêm word(ra, -4 * (slot + 1), đúng);
+        nếu (tải) { máy ảo thêm cuối danh sách(ra, 139); } hoặc { máy ảo thêm cuối danh sách(ra, 137); };
+        máy ảo thêm cuối danh sách(ra, 133 + thanh ghi * 8);
+        biên dịch mã máy thêm từ máy(ra, -4 * (ô nhớ + 1), đúng);
     };
 
-    hàm riêng tư biên dịch mã máy x86_64 thanh ghi đối số(i, windows) {
+    hàm riêng tư biên dịch mã máy x86 sáu mươi tư thành ghi đối số(i, windows) {
         nếu (i < 0 || (windows && i >= 4) || (!windows && i >= 6)) {
             ném "x86_64: chỉ tham số truyền thanh ghi dùng helper này";
         };
         nếu (windows) {
-            thanh_ghi = [1, 2, 0, 1];
-            trả về thanh_ghi[i];
+            thành ghi = [1, 2, 0, 1];
+            trả về thành ghi[i];
         };
-        thanh_ghi = [7, 6, 2, 1, 0, 1];
-        trả về thanh_ghi[i];
+        thành ghi = [7, 6, 2, 1, 0, 1];
+        trả về thành ghi[i];
     };
 
-    hàm riêng tư biên dịch mã máy x86_64 nhị phân(ra, opcode, d, slot) {
+    hàm riêng tư biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã thao tác, d, ô nhớ) {
         nếu (d < 2) { ném "x86 binary stack underflow"; };
-        mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, slot + d - 2);
-        mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 1, slot + d - 1);
-        chọn (opcode) {
-            ca "Add": { thêm(ra, 1); thêm(ra, 200); }
-            ca "Sub": { thêm(ra, 41); thêm(ra, 200); }
-            ca "Mul": { thêm(ra, 15); thêm(ra, 175); thêm(ra, 193); }
-            ca "Equal": { mình.biên dịch mã máy x86_64 so sánh(ra, 148); }
-            ca "NotEqual": { mình.biên dịch mã máy x86_64 so sánh(ra, 149); }
-            ca "Less": { mình.biên dịch mã máy x86_64 so sánh(ra, 156); }
-            ca "LessEqual": { mình.biên dịch mã máy x86_64 so sánh(ra, 158); }
-            ca "Greater": { mình.biên dịch mã máy x86_64 so sánh(ra, 159); }
-            ca "GreaterEqual": { mình.biên dịch mã máy x86_64 so sánh(ra, 157); }
-            mặc định: { ném "x86_64: opcode nhị phân C++ chưa định nghĩa: " + opcode; }
+        mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, ô nhớ + d - 2);
+        mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 1, ô nhớ + d - 1);
+        chọn (mã thao tác) {
+            ca "Add": { máy ảo thêm cuối danh sách(ra, 1); máy ảo thêm cuối danh sách(ra, 200); }
+            ca "Sub": { máy ảo thêm cuối danh sách(ra, 41); máy ảo thêm cuối danh sách(ra, 200); }
+            ca "Mul": { máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 175); máy ảo thêm cuối danh sách(ra, 193); }
+            ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 148); }
+            ca "NotEqual": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 149); }
+            ca "Less": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 156); }
+            ca "LessEqual": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 158); }
+            ca "Greater": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 159); }
+            ca "GreaterEqual": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 157); }
+            mặc định: { ném "x86_64: opcode nhị phân C++ chưa định nghĩa: " + mã thao tác; }
         };
-        mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, slot + d - 2);
+        mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d - 2);
     };
 
-    hàm riêng tư biên dịch mã máy x86_64 so sánh(ra, cc) {
+    hàm riêng tư biên dịch mã máy x86 sáu mươi tư số sánh(ra, cc) {
         // cmp eax,ecx; setcc al; movzx eax,al.
-        thêm(ra, 57); thêm(ra, 200);
-        thêm(ra, 15); thêm(ra, cc); thêm(ra, 192);
-        thêm(ra, 15); thêm(ra, 182); thêm(ra, 192);
+        máy ảo thêm cuối danh sách(ra, 57); máy ảo thêm cuối danh sách(ra, 200);
+        máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, cc); máy ảo thêm cuối danh sách(ra, 192);
+        máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 182); máy ảo thêm cuối danh sách(ra, 192);
     };
 
-    hàm công khai biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành = "linux") {
-        tham_số = hàm_ir["parameterCount"];
-        slot = hàm_ir["slotCount"];
-        sâu_nhất = hàm_ir["maxStackDepth"];
-        lệnh = hàm_ir["instructions"];
-        nếu (tham_số < 0 || slot < tham_số || slot < 0 ||
-            sâu_nhất < 0 || slot + sâu_nhất > 134217711 || độ dài(lệnh) == 0) {
+    hàm công khai biên dịch mã máy phát x86 sáu mươi tư hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux") {
+        tham số = danh sách hàm biểu diễn trung gian["parameterCount"];
+        ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
+        sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
+        lệnh = danh sách hàm biểu diễn trung gian["instructions"];
+        nếu (tham số < 0 || ô nhớ < tham số || ô nhớ < 0 ||
+            sâu nhất < 0 || ô nhớ + sâu nhất > 134217711 || máy ảo lấy độ dài(lệnh) == 0) {
             ném "x86_64 machine IR/frame không hợp lệ";
         };
-        windows = hệ_điều_hành == "windows";
-        frame = 4 * (slot + sâu_nhất);
-        nếu (windows) { frame += 32; };
-        frame = ((frame + 15) / 16) * 16;
+        windows = hệ điều hành == "windows";
+        khung = 4 * (ô nhớ + sâu nhất);
+        nếu (windows) { khung += 32; };
+        khung = ((khung + 15) / 16) * 16;
         ra = [85, 72, 137, 229]; // push rbp; mov rbp,rsp
-        nếu (frame > 0) {
-            thêm(ra, 72); thêm(ra, 129); thêm(ra, 236);
-            biên dịch mã máy thêm word(ra, frame, đúng);
+        nếu (khung > 0) {
+            máy ảo thêm cuối danh sách(ra, 72); máy ảo thêm cuối danh sách(ra, 129); máy ảo thêm cuối danh sách(ra, 236);
+            biên dịch mã máy thêm từ máy(ra, khung, đúng);
         };
-        số_reg = 6;
-        nếu (windows) { số_reg = 4; };
-        lặp (i = 0; i < tham_số; i++) {
-            nếu (i < số_reg) {
-                reg = mình.biên dịch mã máy x86_64 thanh ghi đối số(i, windows);
-                nếu ((windows && i >= 2) || (!windows && i >= 4)) { thêm(ra, 68); };
-                mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, reg, i);
+        số thanh ghi = 6;
+        nếu (windows) { số thanh ghi = 4; };
+        lặp (i = 0; i < tham số; i++) {
+            nếu (i < số thanh ghi) {
+                thanh ghi = mình.biên dịch mã máy x86 sáu mươi tư thành ghi đối số(i, windows);
+                nếu ((windows && i >= 2) || (!windows && i >= 4)) { máy ảo thêm cuối danh sách(ra, 68); };
+                mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, thanh ghi, i);
             } hoặc {
-                offset = 16 + (i - số_reg) * 8;
-                nếu (windows) { offset += 32; };
-                thêm(ra, 139); thêm(ra, 133);
-                biên dịch mã máy thêm word(ra, offset, đúng);
-                mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, i);
+                độ lệch = 16 + (i - số thanh ghi) * 8;
+                nếu (windows) { độ lệch += 32; };
+                máy ảo thêm cuối danh sách(ra, 139); máy ảo thêm cuối danh sách(ra, 133);
+                biên dịch mã máy thêm từ máy(ra, độ lệch, đúng);
+                mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, i);
             };
         };
 
-        vá_nhánh = [];
-        vị_trí_lệnh = [];
-        tái_định_vị = [];
-        lặp (i = 0; i < độ dài(lệnh); i++) {
-            thêm(vị_trí_lệnh, độ dài(ra));
-            op = lệnh[i];
-            mã = op["opcode"];
-            d = op["depthBefore"];
-            số = op["operand"];
-            nếu (d < 0 || d > sâu_nhất) { ném "x86_64: độ sâu stack không hợp lệ"; };
+        vá nhánh = [];
+        vị trí lệnh = [];
+        tái định vị = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(lệnh); i++) {
+            máy ảo thêm cuối danh sách(vị trí lệnh, máy ảo lấy độ dài(ra));
+            mã phép toán = lệnh[i];
+            mã = mã phép toán["opcode"];
+            d = mã phép toán["depthBefore"];
+            số = mã phép toán["operand"];
+            nếu (d < 0 || d > sâu nhất) { ném "x86_64: độ sâu stack không hợp lệ"; };
             chọn (mã) {
                 ca "PushConstant": {
-                    nếu (d >= sâu_nhất) { ném "x86 eval stack overflow"; };
-                    biên dịch mã máy trả về(op["immediate"]);
-                    thêm(ra, 184);
-                    biên dịch mã máy thêm word(ra, op["immediate"], đúng);
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, slot + d);
+                    nếu (d >= sâu nhất) { ném "x86 eval stack overflow"; };
+                    biên dịch mã máy trả về(mã phép toán["immediate"]);
+                    máy ảo thêm cuối danh sách(ra, 184);
+                    biên dịch mã máy thêm từ máy(ra, mã phép toán["immediate"], đúng);
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d);
                 }
                 ca "LoadSlot": {
-                    nếu (số < 0 || số >= slot || d >= sâu_nhất) { ném "x86 load slot ngoài frame"; };
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, số);
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, slot + d);
+                    nếu (số < 0 || số >= ô nhớ || d >= sâu nhất) { ném "x86 load slot ngoài frame"; };
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, số);
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d);
                 }
                 ca "StoreSlot": {
-                    nếu (số < 0 || số >= slot || d == 0) { ném "x86 store slot ngoài frame"; };
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, slot + d - 1);
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, số);
+                    nếu (số < 0 || số >= ô nhớ || d == 0) { ném "x86 store slot ngoài frame"; };
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, ô nhớ + d - 1);
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, số);
                 }
                 ca "Drop": {
                     nếu (d == 0) { ném "x86 eval stack underflow"; };
                 }
-                ca "Add": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "Sub": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "Mul": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "Equal": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "NotEqual": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "Less": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "LessEqual": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "Greater": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
-                ca "GreaterEqual": { mình.biên dịch mã máy x86_64 nhị phân(ra, mã, d, slot); }
+                ca "Add": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Sub": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Mul": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "NotEqual": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Less": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "LessEqual": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Greater": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "GreaterEqual": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "BranchZero": {
-                    nếu (d == 0 || số < 0 || số >= độ dài(lệnh)) { ném "x86 branch không hợp lệ"; };
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, slot + d - 1);
-                    thêm(ra, 133); thêm(ra, 192); // test eax,eax
-                    thêm(ra, 15); thêm(ra, 132);   // je rel32
-                    thêm(vá_nhánh, {"vị trí": độ dài(ra), "đích": số});
-                    biên dịch mã máy thêm word(ra, 0, đúng);
+                    nếu (d == 0 || số < 0 || số >= máy ảo lấy độ dài(lệnh)) { ném "x86 branch không hợp lệ"; };
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, ô nhớ + d - 1);
+                    máy ảo thêm cuối danh sách(ra, 133); máy ảo thêm cuối danh sách(ra, 192); // test eax,eax
+                    máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 132);   // je rel32
+                    máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số});
+                    biên dịch mã máy thêm từ máy(ra, 0, đúng);
                 }
                 ca "Jump": {
-                    nếu (số < 0 || số >= độ dài(lệnh)) { ném "x86 jump không hợp lệ"; };
-                    thêm(ra, 233); // jmp rel32
-                    thêm(vá_nhánh, {"vị trí": độ dài(ra), "đích": số});
-                    biên dịch mã máy thêm word(ra, 0, đúng);
+                    nếu (số < 0 || số >= máy ảo lấy độ dài(lệnh)) { ném "x86 jump không hợp lệ"; };
+                    máy ảo thêm cuối danh sách(ra, 233); // jmp rel32
+                    máy ảo thêm cuối danh sách(vá nhánh, {"vị trí": máy ảo lấy độ dài(ra), "đích": số});
+                    biên dịch mã máy thêm từ máy(ra, 0, đúng);
                 }
                 ca "Call": {
-                    nếu (số < 0 || d < số || op["symbol"] == "") {
+                    nếu (số < 0 || d < số || mã phép toán["symbol"] == "") {
                         ném "x86 call thiếu arguments/symbol";
                     };
-                    vượt = số - số_reg;
+                    vượt = số - số thanh ghi;
                     nếu (vượt < 0) { vượt = 0; };
-                    kích_cỡ = vượt * 8;
-                    nếu (windows) { kích_cỡ += 32; };
-                    kích_cỡ = ((kích_cỡ + 15) / 16) * 16;
-                    nếu (kích_cỡ > 0) {
-                        thêm(ra, 72); thêm(ra, 129); thêm(ra, 236);
-                        biên dịch mã máy thêm word(ra, kích_cỡ, đúng);
+                    kích cỡ = vượt * 8;
+                    nếu (windows) { kích cỡ += 32; };
+                    kích cỡ = ((kích cỡ + 15) / 16) * 16;
+                    nếu (kích cỡ > 0) {
+                        máy ảo thêm cuối danh sách(ra, 72); máy ảo thêm cuối danh sách(ra, 129); máy ảo thêm cuối danh sách(ra, 236);
+                        biên dịch mã máy thêm từ máy(ra, kích cỡ, đúng);
                     };
-                    lặp (n = số_reg; n < số; n++) {
-                        mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, slot + d - số + n);
-                        thêm(ra, 137); thêm(ra, 132); thêm(ra, 36);
-                        offset = (n - số_reg) * 8;
-                        nếu (windows) { offset += 32; };
-                        biên dịch mã máy thêm word(ra, offset, đúng);
+                    lặp (n = số thanh ghi; n < số; n++) {
+                        mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, ô nhớ + d - số + n);
+                        máy ảo thêm cuối danh sách(ra, 137); máy ảo thêm cuối danh sách(ra, 132); máy ảo thêm cuối danh sách(ra, 36);
+                        độ lệch = (n - số thanh ghi) * 8;
+                        nếu (windows) { độ lệch += 32; };
+                        biên dịch mã máy thêm từ máy(ra, độ lệch, đúng);
                     };
-                    trực_tiếp = số;
-                    nếu (trực_tiếp > số_reg) { trực_tiếp = số_reg; };
-                    lặp (n = 0; n < trực_tiếp; n++) {
-                        reg = mình.biên dịch mã máy x86_64 thanh ghi đối số(n, windows);
-                        nếu ((windows && n >= 2) || (!windows && n >= 4)) { thêm(ra, 68); };
-                        mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, reg, slot + d - số + n);
+                    trực tiếp = số;
+                    nếu (trực tiếp > số thanh ghi) { trực tiếp = số thanh ghi; };
+                    lặp (n = 0; n < trực tiếp; n++) {
+                        thanh ghi = mình.biên dịch mã máy x86 sáu mươi tư thành ghi đối số(n, windows);
+                        nếu ((windows && n >= 2) || (!windows && n >= 4)) { máy ảo thêm cuối danh sách(ra, 68); };
+                        mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, thanh ghi, ô nhớ + d - số + n);
                     };
-                    thêm(ra, 232); // call rel32
-                    thêm(tái_định_vị, {"offset": độ dài(ra), "symbol": op["symbol"]});
-                    biên dịch mã máy thêm word(ra, 0, đúng);
-                    nếu (kích_cỡ > 0) {
-                        thêm(ra, 72); thêm(ra, 129); thêm(ra, 196);
-                        biên dịch mã máy thêm word(ra, kích_cỡ, đúng);
+                    máy ảo thêm cuối danh sách(ra, 232); // call rel32
+                    máy ảo thêm cuối danh sách(tái định vị, {"offset": máy ảo lấy độ dài(ra), "symbol": mã phép toán["symbol"]});
+                    biên dịch mã máy thêm từ máy(ra, 0, đúng);
+                    nếu (kích cỡ > 0) {
+                        máy ảo thêm cuối danh sách(ra, 72); máy ảo thêm cuối danh sách(ra, 129); máy ảo thêm cuối danh sách(ra, 196);
+                        biên dịch mã máy thêm từ máy(ra, kích cỡ, đúng);
                     };
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, sai, 0, slot + d - số);
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d - số);
                 }
                 ca "Return": {
                     nếu (d == 0) { ném "x86 return không có giá trị"; };
-                    mình.biên dịch mã máy x86_64 bộ nhớ(ra, đúng, 0, slot + d - 1);
-                    thêm(ra, 201); thêm(ra, 195); // leave; ret
+                    mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, đúng, 0, ô nhớ + d - 1);
+                    máy ảo thêm cuối danh sách(ra, 201); máy ảo thêm cuối danh sách(ra, 195); // leave; ret
                 }
-                ca "Trap": { thêm(ra, 15); thêm(ra, 11); } // ud2
+                ca "Trap": { máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 11); } // ud2
                 mặc định: { ném "x86_64 MachineOpcode C++ chưa định nghĩa: " + mã; }
             };
         };
-        lặp (i = 0; i < độ dài(vá_nhánh); i++) {
-            f = vá_nhánh[i];
-            delta = vị_trí_lệnh[f["đích"]] - (f["vị trí"] + 4);
-            nếu (delta < -2147483647 - 1 || delta > 2147483647) {
+        lặp (i = 0; i < máy ảo lấy độ dài(vá nhánh); i++) {
+            f = vá nhánh[i];
+            chênh lệch = vị trí lệnh[f["đích"]] - (f["vị trí"] + 4);
+            nếu (chênh lệch < -2147483647 - 1 || chênh lệch > 2147483647) {
                 ném "x86 branch vượt quá rel32";
             };
-            bytes = [];
-            biên dịch mã máy thêm word(bytes, delta, đúng);
-            lặp (n = 0; n < 4; n++) { ra[f["vị trí"] + n] = bytes[n]; };
+            các byte = [];
+            biên dịch mã máy thêm từ máy(các byte, chênh lệch, đúng);
+            lặp (n = 0; n < 4; n++) { ra[f["vị trí"] + n] = các byte[n]; };
         };
-        trả về {"bytes": ra, "relocations": tái_định_vị};
+        trả về {"bytes": ra, "relocations": tái định vị};
     };
 };
 
 
-hàm công khai biên dịch mã máy phát x86_64(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
-    __vpp_adapter = Bộ Phát x86_64();
-    trả về __vpp_adapter.biên dịch mã máy phát x86_64(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát x86 sáu mươi tư(loại, hằng, thấp, cao, ít, hệ điều hành) {
+    bộ chuyển tiếp = Bộ Phát x86 sáu mươi tư();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát x86 sáu mươi tư(loại, hằng, thấp, cao, ít, hệ điều hành);
 };
 
-hàm công khai biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành = "linux") {
-    __vpp_adapter = Bộ Phát x86_64();
-    trả về __vpp_adapter.biên dịch mã máy phát x86_64 hàm(hàm_ir, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát x86 sáu mươi tư hàm(danh sách hàm biểu diễn trung gian, hệ điều hành = "linux") {
+    bộ chuyển tiếp = Bộ Phát x86 sáu mươi tư();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát x86 sáu mươi tư hàm(danh sách hàm biểu diễn trung gian, hệ điều hành);
 };

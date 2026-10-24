@@ -11,18 +11,18 @@ lớp công khai UserService triển khai UserServiceContract {
         mình.mapper = mapper;
     };
 
-    hàm riêng tư validateToken(token) {
-        nếu (token == "") {
-            trả về "401|missing-token";
+    hàm riêng tư validateToken(từ tố) {
+        nếu (từ tố == "") {
+            trả về "401|missing-từ tố";
         };
-        nếu (token != "Bearer demo-token") {
-            trả về "401|invalid-token";
+        nếu (từ tố != "Bearer demo-token") {
+            trả về "401|invalid-từ tố";
         };
         trả về "";
     };
 
-    hàm công khai getUsers(dbSession, token) {
-        tokenErr = mình.validateToken(token);
+    hàm công khai getUsers(dbSession, từ tố) {
+        tokenErr = mình.validateToken(từ tố);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
@@ -35,8 +35,8 @@ lớp công khai UserService triển khai UserServiceContract {
         trả về "200|users=[an,binh,chi]";
     };
 
-    hàm công khai createUser(dbSession, token, payload) {
-        tokenErr = mình.validateToken(token);
+    hàm công khai createUser(dbSession, từ tố, payload) {
+        tokenErr = mình.validateToken(từ tố);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
@@ -59,8 +59,8 @@ lớp công khai UserService triển khai UserServiceContract {
         trả về "201|created-user";
     };
 
-    hàm công khai updateUser(dbSession, token, userId, payload) {
-        tokenErr = mình.validateToken(token);
+    hàm công khai updateUser(dbSession, từ tố, userId, payload) {
+        tokenErr = mình.validateToken(từ tố);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
@@ -89,8 +89,8 @@ lớp công khai UserService triển khai UserServiceContract {
         trả về "200|updated-user";
     };
 
-    hàm công khai deleteUser(dbSession, token, userId) {
-        tokenErr = mình.validateToken(token);
+    hàm công khai deleteUser(dbSession, từ tố, userId) {
+        tokenErr = mình.validateToken(từ tố);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };
@@ -109,8 +109,8 @@ lớp công khai UserService triển khai UserServiceContract {
         trả về "204|deleted";
     };
 
-    hàm công khai searchUsers(dbSession, token, keyword) {
-        tokenErr = mình.validateToken(token);
+    hàm công khai searchUsers(dbSession, từ tố, keyword) {
+        tokenErr = mình.validateToken(từ tố);
         nếu (tokenErr != "") {
             trả về tokenErr;
         };

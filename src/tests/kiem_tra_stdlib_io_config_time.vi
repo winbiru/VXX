@@ -9,7 +9,7 @@ hàm chính() {
     ghi nối tệp(tệp_io, đúng);
     in đọc tệp(tệp_io);
     thử {
-        ghi bytes tệp(tệp_io, [0, 256]);
+        ghi các byte tệp(tệp_io, [0, 256]);
     } bắt lỗi (e) {
         in e;
     };
@@ -28,7 +28,7 @@ hàm chính() {
 
     now = lấy thời gian hiện tại();
     in now != "";
-    utc = lấy thời gian utc();
+    utc = lấy thời gian giờ quốc tế();
     in utc != "";
     offset = độ lệch múi giờ();
     in offset >= -1440 && offset <= 1440;

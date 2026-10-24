@@ -1,4 +1,4 @@
 // Negative migration gate: DNS resolver public API now lives in V++.
 hàm chính() {
-    in dns_phan_giai_vm("localhost");
+    in phân giải tên miền phân giải máy ảo("localhost");
 };

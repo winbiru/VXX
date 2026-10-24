@@ -313,7 +313,7 @@ static bool executeVmPrimitive(Opcode opcode,
                 vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_DONG_HO_UTC:
             throw vietvm::runtime::RuntimeError(
-                "System FFI: legacy UTC clock opcode is disabled; use gói/thời gian/utc.vi",
+                "System FFI: legacy UTC clock opcode is disabled; use gói/thời gian/giờ quốc tế.vi",
                 vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_DONG_HO_DIA_PHUONG:
             throw vietvm::runtime::RuntimeError(
@@ -321,7 +321,7 @@ static bool executeVmPrimitive(Opcode opcode,
                 vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_NGAU_NHIEN_BAO_MAT_BYTES:
             throw vietvm::runtime::RuntimeError(
-                "System FFI: legacy secure entropy opcode is disabled; use gói/lõi/entropy.vi",
+                "System FFI: legacy secure entropy opcode is disabled; use gói/lõi/nguồn ngẫu nhiên.vi",
                 vietvm::runtime::RuntimeErrorKind::CallBoundary);
         case OP_VM_THOI_GIAN_DON_DIEU_MS:
             throw vietvm::runtime::RuntimeError(
@@ -2067,8 +2067,8 @@ void VM::executeIntrinsicOpcode(const Instruction &instr) {
             std::string diagnosticName(intrinsic->name);
             if (intrinsic->name == "io_doc_file_vm") diagnosticName = "đọc tệp";
             else if (intrinsic->name == "io_ghi_file_vm") diagnosticName = "ghi tệp";
-            else if (intrinsic->name == "io_doc_bytes_vm") diagnosticName = "đọc bytes tệp";
-            else if (intrinsic->name == "io_ghi_bytes_vm") diagnosticName = "ghi bytes tệp";
+            else if (intrinsic->name == "io_doc_bytes_vm") diagnosticName = "đọc các byte tệp";
+            else if (intrinsic->name == "io_ghi_bytes_vm") diagnosticName = "ghi các byte tệp";
             else if (intrinsic->name == "io_ghi_tiep_file_vm") diagnosticName = "ghi tiếp tệp";
             throw runtime_error_op(
                 err, instr.op, pc,
@@ -2436,7 +2436,7 @@ void VM::executeIndexOpcode(const Instruction& instr) {
     list->elements[static_cast<std::size_t>(index)] = std::move(value);
 }
 
-// Xử lý opcode object model như tạo lớp, tạo instance, đọc/ghi field và gọi phương thức có receiver.
+// Xử lý opcode object model như tạo lớp, tạo thể hiện, đọc/ghi field và gọi phương thức có receiver.
 void VM::executeObjectOpcode(const Instruction& instr) {
     auto stringAt = [&](int index, std::string_view errorMessage) -> const std::string & {
         if (index < 0 || index >= static_cast<int>(stringPool.size())) {

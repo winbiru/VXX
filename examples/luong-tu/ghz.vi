@@ -1,0 +1,9 @@
+nhập lượng tử;
+hàm chính() {
+    mạch = Mạch Lượng Tử(3);
+    mạch.h(0) .cx(0, 1) .cx(1, 2) .đo tất cả();
+    máy = Bộ Mô Phỏng Lượng Tử();
+    kết quả = máy.chạy(mạch, 1024, 42);
+    in kết quả["đếm"];
+}
+;

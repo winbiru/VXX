@@ -5,9 +5,9 @@ nhập gói/lõi/kịch bản;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/lõi/bảng mã;
 
-hàm cùng bytecode(nguồn) {
-    c = biên dịch bytecode(nguồn);
-    v = biên dịch phát bytecode thuần(nguồn)["bytecode"];
+hàm cùng mã trung gian(nguồn) {
+    c = biên dịch mã trung gian(nguồn);
+    v = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(c) != độ dài(v)) { trả về sai; };
     lặp(i = 0; i < độ dài(c); i++) {
         nếu (c[i]["op"] != v[i]["op"] ||
@@ -22,9 +22,9 @@ hàm cùng kết quả(nguồn) {
     trả về biên dịch chạy chương trình tự chủ(nguồn) == kịch bản chạy(nguồn);
 };
 
-hàm cùng bytecode hàm(nguồn) {
-    c = biên dịch bytecode hàm(nguồn);
-    v = biên dịch phát bytecode thuần(nguồn)["hàm"];
+hàm cùng mã trung gian hàm(nguồn) {
+    c = biên dịch mã trung gian hàm(nguồn);
+    v = biên dịch phát mã trung gian thuần(nguồn)["hàm"];
     nếu (độ dài(c) != độ dài(v)) { trả về sai; };
     lặp(i = 0; i < độ dài(c); i++) {
         nếu (c[i]["tên"] != v[i]["tên"] || c[i]["id"] != v[i]["id"]) {
@@ -46,63 +46,63 @@ hàm cùng bytecode hàm(nguồn) {
 hàm chính() {
     // Opcode hằng 88 và 85 với StringPool chứa literal wire C++.
     a = "biến ds = [1, 2, 3]; in ds[1];";
-    in cùng bytecode(a);
+    in cùng mã trung gian(a);
     in cùng kết quả(a);
     b = "biến m = {\"a\": 4, \"b\": đúng}; in m[\"a\"];";
-    in cùng bytecode(b);
+    in cùng mã trung gian(b);
     in cùng kết quả(b);
     c = "biến ds = [1, [2, 3], {\"x\": \"xin chào\"}]; in ds[1][0];";
-    in cùng bytecode(c);
+    in cùng mã trung gian(c);
     in cùng kết quả(c);
     d = "biến m = {tên: [1, {\"đúng\": rỗng}]}; in m[\"tên\"][0];";
-    in cùng bytecode(d);
+    in cùng mã trung gian(d);
     in cùng kết quả(d);
     // Tập hợp động lấy các biểu thức trên stack (operandIndex = -1).
     e = "biến x = 5; biến ds = [1, x + 2, 3]; in ds[1];";
-    in cùng bytecode(e);
+    in cùng mã trung gian(e);
     in cùng kết quả(e);
     f = "biến x = 3; biến m = {\"a\": x + 1, b: 2}; in m[\"a\"];";
-    in cùng bytecode(f);
+    in cùng mã trung gian(f);
     in cùng kết quả(f);
     g = "biến x = 5; biến ds = [[1, 2], x]; in ds[0][1];";
-    in cùng bytecode(g);
+    in cùng mã trung gian(g);
     in cùng kết quả(g);
     h = "biến x = 5; biến m = {a: [1, 2], b: x}; in m[\"a\"][1];";
-    in cùng bytecode(h);
+    in cùng mã trung gian(h);
     in cùng kết quả(h);
     // Empty collections luôn dùng static StringPool index.
     i = "biến a = []; biến b = {}; in a; in b;";
-    in cùng bytecode(i);
+    in cùng mã trung gian(i);
     in cùng kết quả(i);
     // Static wire format chính xác, gồm tags i/s/n, dấu 0x1e và 0x1f.
-    tĩnh = biên dịch phát bytecode thuần("biến a = [1, \"hai\", rỗng];");
+    tĩnh = biên dịch phát mã trung gian thuần("biến a = [1, \"hai\", rỗng];");
     in tĩnh["chuỗi"][0] == "i" + ký tự unicode(31) + "1" + ký tự unicode(30) +
         "s" + ký tự unicode(31) + "hai" + ký tự unicode(30) + "n" + ký tự unicode(31);
     in tĩnh["bytecode"][1]["op"] == 88 && tĩnh["bytecode"][1]["chỉ số"] == 0;
-    động = biên dịch phát bytecode thuần("biến x = 5; biến a = [x, 3];");
+    động = biên dịch phát mã trung gian thuần("biến x = 5; biến a = [x, 3];");
     in động["bytecode"][7]["op"] == 88 &&
        động["bytecode"][7]["toán hạng"] == 2 && động["bytecode"][7]["chỉ số"] == -1;
     j = "hàm chính() { biến a = [1, {x: 3}]; in a[1][\"x\"]; };";
-    in cùng bytecode hàm(j);
+    in cùng mã trung gian hàm(j);
     in cùng kết quả(j);
     k = "hàm chính() { biến x = 5; biến a = {x: x, y: [1, 2]}; in a[\"y\"][0]; };";
-    in cùng bytecode hàm(k);
+    in cùng mã trung gian hàm(k);
     in cùng kết quả(k);
     // Đầu vào lỗi phải bị parser V++ từ chối ngay.
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("biến a = [1,];"); }
+    thử { biên dịch phát mã trung gian thuần("biến a = [1,];"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("biến a = {1: 2};"); }
+    thử { biên dịch phát mã trung gian thuần("biến a = {1: 2};"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("biến a = [1, 2;"); }
+    thử { biên dịch phát mã trung gian thuần("biến a = [1, 2;"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch phát bytecode thuần("biến a = {\"x\" 2};"); }
+    thử { biên dịch phát mã trung gian thuần("biến a = {\"x\" 2};"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
 };

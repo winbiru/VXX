@@ -16,7 +16,7 @@ hàm công khai quản lý gói tên hợp lệ(tên) {
         trả về sai;
     };
     cấm = "/\\:*?\"<>|";
-    lặp(i = 0; i < độ dài(tên); i++) {
+    lặp(i = 0; i < máy ảo lấy độ dài(tên); i++) {
         mã = chuỗi mã điểm unicode(tên[i]);
         nếu (mã < 32 || mã == 127 || chứa chính xác(cấm, tên[i])) {
             trả về sai;
@@ -25,12 +25,12 @@ hàm công khai quản lý gói tên hợp lệ(tên) {
     trả về đúng;
 };
 
-hàm riêng tư quản lý gói đoạn semver hợp lệ(đoạn) {
+hàm riêng tư quản lý gói đoạn phiên bản ngữ nghĩa hợp lệ(đoạn) {
     nếu (đoạn == "") { trả về sai; };
-    nếu (độ dài(đoạn) > 1 && đoạn[0] == "0") { trả về sai; };
-    nếu (độ dài(đoạn) > 10) { trả về sai; };
-    nếu (độ dài(đoạn) == 10 && đoạn > "2147483647") { trả về sai; };
-    lặp(i = 0; i < độ dài(đoạn); i++) {
+    nếu (máy ảo lấy độ dài(đoạn) > 1 && đoạn[0] == "0") { trả về sai; };
+    nếu (máy ảo lấy độ dài(đoạn) > 10) { trả về sai; };
+    nếu (máy ảo lấy độ dài(đoạn) == 10 && đoạn > "2147483647") { trả về sai; };
+    lặp(i = 0; i < máy ảo lấy độ dài(đoạn); i++) {
         nếu (đoạn[i] < "0" || đoạn[i] > "9") {
             trả về sai;
         };
@@ -41,412 +41,412 @@ hàm riêng tư quản lý gói đoạn semver hợp lệ(đoạn) {
 // SemVer ở package layer phải tương thích implementation C++ hiện hành:
 // core là i32 không dấu, prerelease cấm numeric identifier có số 0 đầu,
 // build metadata không tham gia precedence.
-hàm riêng tư quản lý gói định danh semver hợp lệ(định_danh, cấm_số_0_đầu) {
-    nếu (định_danh == "") { trả về sai; };
-    toàn_số = đúng;
-    lặp(i = 0; i < độ dài(định_danh); i++) {
-        c = định_danh[i];
+hàm riêng tư quản lý gói định danh phiên bản ngữ nghĩa hợp lệ(định danh, cấm số không đầu) {
+    nếu (định danh == "") { trả về sai; };
+    toàn số = đúng;
+    lặp(i = 0; i < máy ảo lấy độ dài(định danh); i++) {
+        c = định danh[i];
         chữ = (c >= "a" && c <= "z") || (c >= "A" && c <= "Z");
         số = c >= "0" && c <= "9";
         nếu (!chữ && !số && c != "-") { trả về sai; };
-        nếu (!số) { toàn_số = sai; };
+        nếu (!số) { toàn số = sai; };
     };
-    nếu (cấm_số_0_đầu && toàn_số && độ dài(định_danh) > 1 && định_danh[0] == "0") {
+    nếu (cấm số không đầu && toàn số && máy ảo lấy độ dài(định danh) > 1 && định danh[0] == "0") {
         trả về sai;
     };
     trả về đúng;
 };
 
-hàm riêng tư quản lý gói danh sách định danh semver(văn_bản, cấm_số_0_đầu) {
-    nếu (văn_bản == "") { ném "SEMVER_IDENTIFIER_INVALID"; };
-    ds = tách literal(văn_bản, ".");
-    lặp(i = 0; i < độ dài(ds); i++) {
-        nếu (!quản lý gói định danh semver hợp lệ(ds[i], cấm_số_0_đầu)) {
+hàm riêng tư quản lý gói danh sách định danh phiên bản ngữ nghĩa(văn bản, cấm số không đầu) {
+    nếu (văn bản == "") { ném "SEMVER_IDENTIFIER_INVALID"; };
+    danh sách đầu vào = tách hằng văn bản(văn bản, ".");
+    lặp(i = 0; i < máy ảo lấy độ dài(danh sách đầu vào); i++) {
+        nếu (!quản lý gói định danh phiên bản ngữ nghĩa hợp lệ(danh sách đầu vào[i], cấm số không đầu)) {
             ném "SEMVER_IDENTIFIER_INVALID";
         };
     };
-    trả về ds;
+    trả về danh sách đầu vào;
 };
 
-hàm riêng tư quản lý gói phân tích semver(phiên_bản) {
-    nếu (loại của(phiên_bản) != "chuỗi" || phiên_bản == "") {
+hàm riêng tư quản lý gói phân tích phiên bản ngữ nghĩa(phiên bản) {
+    nếu (loại của(phiên bản) != "chuỗi" || phiên bản == "") {
         ném "SEMVER_INVALID";
     };
 
-    dấu_cộng = tìm chuỗi chính xác(phiên_bản, "+", 0);
-    dấu_trừ_tìm = tìm chuỗi chính xác(phiên_bản, "-", 0);
-    dấu_trừ = rỗng;
-    nếu (dấu_trừ_tìm != rỗng) {
-        nếu (dấu_cộng == rỗng) {
-            dấu_trừ = dấu_trừ_tìm;
+    dấu cộng = tìm chuỗi chính xác(phiên bản, "+", 0);
+    dấu trừ tìm = tìm chuỗi chính xác(phiên bản, "-", 0);
+    dấu trừ = rỗng;
+    nếu (dấu trừ tìm != rỗng) {
+        nếu (dấu cộng == rỗng) {
+            dấu trừ = dấu trừ tìm;
         } hoặc {
-            nếu (dấu_trừ_tìm < dấu_cộng) { dấu_trừ = dấu_trừ_tìm; };
+            nếu (dấu trừ tìm < dấu cộng) { dấu trừ = dấu trừ tìm; };
         };
     };
 
-    kết_core = độ dài(phiên_bản);
-    nếu (dấu_trừ != rỗng) { kết_core = dấu_trừ; };
-    nếu (dấu_trừ == rỗng && dấu_cộng != rỗng) { kết_core = dấu_cộng; };
-    core = con chuỗi(phiên_bản, 0, kết_core);
-    phần = tách literal(core, ".");
-    nếu (độ dài(phần) != 3) { ném "SEMVER_CORE_INVALID"; };
+    kết lõi = máy ảo lấy độ dài(phiên bản);
+    nếu (dấu trừ != rỗng) { kết lõi = dấu trừ; };
+    nếu (dấu trừ == rỗng && dấu cộng != rỗng) { kết lõi = dấu cộng; };
+    lõi = con chuỗi(phiên bản, 0, kết lõi);
+    phần = tách hằng văn bản(lõi, ".");
+    nếu (máy ảo lấy độ dài(phần) != 3) { ném "SEMVER_CORE_INVALID"; };
     lặp(i = 0; i < 3; i++) {
-        nếu (!quản lý gói đoạn semver hợp lệ(phần[i])) {
+        nếu (!quản lý gói đoạn phiên bản ngữ nghĩa hợp lệ(phần[i])) {
             ném "SEMVER_CORE_INVALID";
         };
     };
 
-    prerelease = [];
-    nếu (dấu_trừ != rỗng) {
-        kết_prerelease = độ dài(phiên_bản);
-        nếu (dấu_cộng != rỗng) { kết_prerelease = dấu_cộng; };
-        chữ_prerelease = con chuỗi(phiên_bản, dấu_trừ + 1, kết_prerelease);
-        prerelease = quản lý gói danh sách định danh semver(chữ_prerelease, đúng);
+    tiền phát hành = [];
+    nếu (dấu trừ != rỗng) {
+        kết tiền phát hành = máy ảo lấy độ dài(phiên bản);
+        nếu (dấu cộng != rỗng) { kết tiền phát hành = dấu cộng; };
+        chữ tiền phát hành = con chuỗi(phiên bản, dấu trừ + 1, kết tiền phát hành);
+        tiền phát hành = quản lý gói danh sách định danh phiên bản ngữ nghĩa(chữ tiền phát hành, đúng);
     };
 
-    build = [];
-    nếu (dấu_cộng != rỗng) {
-        chữ_build = con chuỗi(phiên_bản, dấu_cộng + 1, độ dài(phiên_bản));
-        build = quản lý gói danh sách định danh semver(chữ_build, sai);
+    bản dựng = [];
+    nếu (dấu cộng != rỗng) {
+        chữ bản dựng = con chuỗi(phiên bản, dấu cộng + 1, máy ảo lấy độ dài(phiên bản));
+        bản dựng = quản lý gói danh sách định danh phiên bản ngữ nghĩa(chữ bản dựng, sai);
     };
 
     trả về {
         "major": thành số nguyên(phần[0]),
         "minor": thành số nguyên(phần[1]),
         "patch": thành số nguyên(phần[2]),
-        "prerelease": prerelease,
-        "build": build,
-        "text": phiên_bản
+        "prerelease": tiền phát hành,
+        "build": bản dựng,
+        "text": phiên bản
     };
 };
 
-hàm công khai quản lý gói semver hợp lệ(phiên_bản) {
+hàm công khai quản lý gói phiên bản ngữ nghĩa hợp lệ(phiên bản) {
     thử {
-        quản lý gói phân tích semver(phiên_bản);
+        quản lý gói phân tích phiên bản ngữ nghĩa(phiên bản);
         trả về đúng;
     } bắt lỗi (e) {
         trả về sai;
     };
 };
 
-hàm riêng tư quản lý gói định danh semver là số(định_danh) {
-    nếu (định_danh == "") { trả về sai; };
-    lặp(i = 0; i < độ dài(định_danh); i++) {
-        nếu (định_danh[i] < "0" || định_danh[i] > "9") { trả về sai; };
+hàm riêng tư quản lý gói định danh phiên bản ngữ nghĩa là số(định danh) {
+    nếu (định danh == "") { trả về sai; };
+    lặp(i = 0; i < máy ảo lấy độ dài(định danh); i++) {
+        nếu (định danh[i] < "0" || định danh[i] > "9") { trả về sai; };
     };
     trả về đúng;
 };
 
-hàm riêng tư quản lý gói so sánh định danh semver(a, b) {
-    a_số = quản lý gói định danh semver là số(a);
-    b_số = quản lý gói định danh semver là số(b);
-    nếu (a_số && b_số) {
-        nếu (độ dài(a) < độ dài(b)) { trả về -1; };
-        nếu (độ dài(a) > độ dài(b)) { trả về 1; };
+hàm riêng tư quản lý gói số sánh định danh phiên bản ngữ nghĩa(a, b) {
+    số thứ nhất = quản lý gói định danh phiên bản ngữ nghĩa là số(a);
+    số thứ hai = quản lý gói định danh phiên bản ngữ nghĩa là số(b);
+    nếu (số thứ nhất && số thứ hai) {
+        nếu (máy ảo lấy độ dài(a) < máy ảo lấy độ dài(b)) { trả về -1; };
+        nếu (máy ảo lấy độ dài(a) > máy ảo lấy độ dài(b)) { trả về 1; };
         nếu (a < b) { trả về -1; };
         nếu (a > b) { trả về 1; };
         trả về 0;
     };
-    nếu (a_số && !b_số) { trả về -1; };
-    nếu (!a_số && b_số) { trả về 1; };
+    nếu (số thứ nhất && !số thứ hai) { trả về -1; };
+    nếu (!số thứ nhất && số thứ hai) { trả về 1; };
     nếu (a < b) { trả về -1; };
     nếu (a > b) { trả về 1; };
     trả về 0;
 };
 
-hàm công khai quản lý gói so sánh semver(a, b) {
+hàm công khai quản lý gói số sánh phiên bản ngữ nghĩa(a, b) {
     trái = a;
     phải = b;
-    nếu (loại của(trái) == "chuỗi") { trái = quản lý gói phân tích semver(trái); };
-    nếu (loại của(phải) == "chuỗi") { phải = quản lý gói phân tích semver(phải); };
+    nếu (loại của(trái) == "chuỗi") { trái = quản lý gói phân tích phiên bản ngữ nghĩa(trái); };
+    nếu (loại của(phải) == "chuỗi") { phải = quản lý gói phân tích phiên bản ngữ nghĩa(phải); };
 
     khóa = ["major", "minor", "patch"];
-    lặp(i = 0; i < độ dài(khóa); i++) {
-        x = lấy map(trái, khóa[i], 0);
-        y = lấy map(phải, khóa[i], 0);
+    lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
+        x = lấy từ điển(trái, khóa[i], 0);
+        y = lấy từ điển(phải, khóa[i], 0);
         nếu (x < y) { trả về -1; };
         nếu (x > y) { trả về 1; };
     };
 
-    pre_trái = lấy map(trái, "prerelease", []);
-    pre_phải = lấy map(phải, "prerelease", []);
-    nếu (độ dài(pre_trái) == 0 && độ dài(pre_phải) > 0) { trả về 1; };
-    nếu (độ dài(pre_trái) > 0 && độ dài(pre_phải) == 0) { trả về -1; };
-    chung = độ dài(pre_trái);
-    nếu (độ dài(pre_phải) < chung) { chung = độ dài(pre_phải); };
+    trước trái = lấy từ điển(trái, "prerelease", []);
+    trước phải = lấy từ điển(phải, "prerelease", []);
+    nếu (máy ảo lấy độ dài(trước trái) == 0 && máy ảo lấy độ dài(trước phải) > 0) { trả về 1; };
+    nếu (máy ảo lấy độ dài(trước trái) > 0 && máy ảo lấy độ dài(trước phải) == 0) { trả về -1; };
+    chung = máy ảo lấy độ dài(trước trái);
+    nếu (máy ảo lấy độ dài(trước phải) < chung) { chung = máy ảo lấy độ dài(trước phải); };
     lặp(i = 0; i < chung; i++) {
-        cmp = quản lý gói so sánh định danh semver(pre_trái[i], pre_phải[i]);
+        cmp = quản lý gói số sánh định danh phiên bản ngữ nghĩa(trước trái[i], trước phải[i]);
         nếu (cmp != 0) { trả về cmp; };
     };
-    nếu (độ dài(pre_trái) < độ dài(pre_phải)) { trả về -1; };
-    nếu (độ dài(pre_trái) > độ dài(pre_phải)) { trả về 1; };
+    nếu (máy ảo lấy độ dài(trước trái) < máy ảo lấy độ dài(trước phải)) { trả về -1; };
+    nếu (máy ảo lấy độ dài(trước trái) > máy ảo lấy độ dài(trước phải)) { trả về 1; };
     trả về 0;
 };
 
-hàm riêng tư quản lý gói tách khoảng trắng(văn_bản) {
-    token = [];
-    hiện_tại = "";
-    lặp(i = 0; i < độ dài(văn_bản); i++) {
-        c = văn_bản[i];
+hàm riêng tư quản lý gói tách khoảng trắng(văn bản) {
+    từ tố = [];
+    hiện tại = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+        c = văn bản[i];
         trắng = c == " " || c == "\t" || c == "\r" || c == "\n";
         nếu (trắng) {
-            nếu (hiện_tại != "") { thêm(token, hiện_tại); hiện_tại = ""; };
+            nếu (hiện tại != "") { máy ảo thêm cuối danh sách(từ tố, hiện tại); hiện tại = ""; };
         } hoặc {
-            hiện_tại = hiện_tại + c;
+            hiện tại = hiện tại + c;
         };
     };
-    nếu (hiện_tại != "") { thêm(token, hiện_tại); };
-    trả về token;
+    nếu (hiện tại != "") { máy ảo thêm cuối danh sách(từ tố, hiện tại); };
+    trả về từ tố;
 };
 
-hàm riêng tư quản lý gói comparator(op, phiên_bản) {
-    trả về {"op": op, "version": phiên_bản};
+hàm riêng tư quản lý gói bộ so sánh(mã phép toán, phiên bản) {
+    trả về {"op": mã phép toán, "version": phiên bản};
 };
 
-hàm riêng tư quản lý gói upper caret(phiên_bản) {
-    major = lấy map(phiên_bản, "major", 0);
-    minor = lấy map(phiên_bản, "minor", 0);
-    patch = lấy map(phiên_bản, "patch", 0);
-    nếu (major > 0) { trả về {"major": major + 1, "minor": 0, "patch": 0, "prerelease": [], "build": []}; };
-    nếu (minor > 0) { trả về {"major": 0, "minor": minor + 1, "patch": 0, "prerelease": [], "build": []}; };
-    trả về {"major": 0, "minor": 0, "patch": patch + 1, "prerelease": [], "build": []};
+hàm riêng tư quản lý gói hoa dấu mũ(phiên bản) {
+    chính = lấy từ điển(phiên bản, "major", 0);
+    phụ = lấy từ điển(phiên bản, "minor", 0);
+    vá = lấy từ điển(phiên bản, "patch", 0);
+    nếu (chính > 0) { trả về {"major": chính + 1, "minor": 0, "patch": 0, "prerelease": [], "build": []}; };
+    nếu (phụ > 0) { trả về {"major": 0, "minor": phụ + 1, "patch": 0, "prerelease": [], "build": []}; };
+    trả về {"major": 0, "minor": 0, "patch": vá + 1, "prerelease": [], "build": []};
 };
 
-hàm riêng tư quản lý gói upper tilde(phiên_bản) {
+hàm riêng tư quản lý gói hoa dấu ngã(phiên bản) {
     trả về {
-        "major": lấy map(phiên_bản, "major", 0),
-        "minor": lấy map(phiên_bản, "minor", 0) + 1,
+        "major": lấy từ điển(phiên bản, "major", 0),
+        "minor": lấy từ điển(phiên bản, "minor", 0) + 1,
         "patch": 0,
         "prerelease": [],
         "build": []
     };
 };
 
-hàm riêng tư quản lý gói phân tích range(range) {
-    nếu (loại của(range) != "chuỗi") { ném "SEMVER_RANGE_INVALID"; };
-    token = quản lý gói tách khoảng trắng(range);
-    nếu (độ dài(token) == 0) { trả về {"bất kỳ": 1, "comparators": []}; };
-    nếu (độ dài(token) == 1 && token[0] == "*") {
+hàm riêng tư quản lý gói phân tích khoảng(khoảng) {
+    nếu (loại của(khoảng) != "chuỗi") { ném "SEMVER_RANGE_INVALID"; };
+    từ tố = quản lý gói tách khoảng trắng(khoảng);
+    nếu (máy ảo lấy độ dài(từ tố) == 0) { trả về {"bất kỳ": 1, "comparators": []}; };
+    nếu (máy ảo lấy độ dài(từ tố) == 1 && từ tố[0] == "*") {
         trả về {"bất kỳ": 1, "comparators": []};
     };
 
-    comparators = [];
-    lặp(i = 0; i < độ dài(token); i++) {
-        t = token[i];
+    các bộ so sánh = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(từ tố); i++) {
+        t = từ tố[i];
         nếu (t == "*") { ném "SEMVER_WILDCARD_MUST_STAND_ALONE"; };
         nếu (tìm chuỗi chính xác(t, "||", 0) != rỗng) { ném "SEMVER_OR_UNSUPPORTED"; };
         nếu (t == "") { ném "SEMVER_RANGE_INVALID"; };
 
         đầu = t[0];
         nếu (đầu == "^" || đầu == "~") {
-            nếu (độ dài(t) == 1) { ném "SEMVER_COMPARATOR_MISSING_VERSION"; };
-            v = quản lý gói phân tích semver(con chuỗi(t, 1, độ dài(t)));
-            thêm(comparators, quản lý gói comparator(">=", v));
+            nếu (máy ảo lấy độ dài(t) == 1) { ném "SEMVER_COMPARATOR_MISSING_VERSION"; };
+            v = quản lý gói phân tích phiên bản ngữ nghĩa(con chuỗi(t, 1, máy ảo lấy độ dài(t)));
+            máy ảo thêm cuối danh sách(các bộ so sánh, quản lý gói bộ so sánh(">=", v));
             nếu (đầu == "^") {
-                thêm(comparators, quản lý gói comparator("<", quản lý gói upper caret(v)));
+                máy ảo thêm cuối danh sách(các bộ so sánh, quản lý gói bộ so sánh("<", quản lý gói hoa dấu mũ(v)));
             } hoặc {
-                thêm(comparators, quản lý gói comparator("<", quản lý gói upper tilde(v)));
+                máy ảo thêm cuối danh sách(các bộ so sánh, quản lý gói bộ so sánh("<", quản lý gói hoa dấu ngã(v)));
             };
         } hoặc {
-            op = "=";
-            offset = 0;
-            nếu (độ dài(t) >= 2 && con chuỗi(t, 0, 2) == ">=") { op = ">="; offset = 2; }
-            nếu (độ dài(t) >= 2 && con chuỗi(t, 0, 2) == "<=") { op = "<="; offset = 2; }
-            nếu (offset == 0 && đầu == ">") { op = ">"; offset = 1; };
-            nếu (offset == 0 && đầu == "<") { op = "<"; offset = 1; };
-            nếu (offset == 0 && đầu == "=") { offset = 1; };
-            nếu (offset >= độ dài(t)) { ném "SEMVER_COMPARATOR_MISSING_VERSION"; };
-            v = quản lý gói phân tích semver(con chuỗi(t, offset, độ dài(t)));
-            thêm(comparators, quản lý gói comparator(op, v));
+            mã phép toán = "=";
+            độ lệch = 0;
+            nếu (máy ảo lấy độ dài(t) >= 2 && con chuỗi(t, 0, 2) == ">=") { mã phép toán = ">="; độ lệch = 2; }
+            nếu (máy ảo lấy độ dài(t) >= 2 && con chuỗi(t, 0, 2) == "<=") { mã phép toán = "<="; độ lệch = 2; }
+            nếu (độ lệch == 0 && đầu == ">") { mã phép toán = ">"; độ lệch = 1; };
+            nếu (độ lệch == 0 && đầu == "<") { mã phép toán = "<"; độ lệch = 1; };
+            nếu (độ lệch == 0 && đầu == "=") { độ lệch = 1; };
+            nếu (độ lệch >= máy ảo lấy độ dài(t)) { ném "SEMVER_COMPARATOR_MISSING_VERSION"; };
+            v = quản lý gói phân tích phiên bản ngữ nghĩa(con chuỗi(t, độ lệch, máy ảo lấy độ dài(t)));
+            máy ảo thêm cuối danh sách(các bộ so sánh, quản lý gói bộ so sánh(mã phép toán, v));
         };
     };
-    trả về {"bất kỳ": 0, "comparators": comparators};
+    trả về {"bất kỳ": 0, "comparators": các bộ so sánh};
 };
 
-hàm công khai quản lý gói range hợp lệ(range) {
+hàm công khai quản lý gói khoảng hợp lệ(khoảng) {
     thử {
-        quản lý gói phân tích range(range);
+        quản lý gói phân tích khoảng(khoảng);
         trả về đúng;
     } bắt lỗi (e) {
         trả về sai;
     };
 };
 
-hàm công khai quản lý gói khớp range(phiên_bản, range) {
-    v = phiên_bản;
-    nếu (loại của(v) == "chuỗi") { v = quản lý gói phân tích semver(v); };
-    r = range;
-    nếu (loại của(r) == "chuỗi") { r = quản lý gói phân tích range(r); };
-    nếu (lấy map(r, "bất kỳ", 0) == 1) { trả về đúng; };
-    comparators = lấy map(r, "comparators", []);
-    lặp(i = 0; i < độ dài(comparators); i++) {
-        c = comparators[i];
-        cmp = quản lý gói so sánh semver(v, lấy map(c, "version", {}));
-        op = lấy map(c, "op", "=");
+hàm công khai quản lý gói khớp khoảng(phiên bản, khoảng) {
+    v = phiên bản;
+    nếu (loại của(v) == "chuỗi") { v = quản lý gói phân tích phiên bản ngữ nghĩa(v); };
+    r = khoảng;
+    nếu (loại của(r) == "chuỗi") { r = quản lý gói phân tích khoảng(r); };
+    nếu (lấy từ điển(r, "bất kỳ", 0) == 1) { trả về đúng; };
+    các bộ so sánh = lấy từ điển(r, "comparators", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(các bộ so sánh); i++) {
+        c = các bộ so sánh[i];
+        cmp = quản lý gói số sánh phiên bản ngữ nghĩa(v, lấy từ điển(c, "version", {}));
+        mã phép toán = lấy từ điển(c, "op", "=");
         hợp = sai;
-        nếu (op == "=" && cmp == 0) { hợp = đúng; };
-        nếu (op == ">" && cmp > 0) { hợp = đúng; };
-        nếu (op == ">=" && cmp >= 0) { hợp = đúng; };
-        nếu (op == "<" && cmp < 0) { hợp = đúng; };
-        nếu (op == "<=" && cmp <= 0) { hợp = đúng; };
+        nếu (mã phép toán == "=" && cmp == 0) { hợp = đúng; };
+        nếu (mã phép toán == ">" && cmp > 0) { hợp = đúng; };
+        nếu (mã phép toán == ">=" && cmp >= 0) { hợp = đúng; };
+        nếu (mã phép toán == "<" && cmp < 0) { hợp = đúng; };
+        nếu (mã phép toán == "<=" && cmp <= 0) { hợp = đúng; };
         nếu (!hợp) { trả về sai; };
     };
     trả về đúng;
 };
 
-hàm riêng tư quản lý gói xác minh phụ thuộc(phụ_thuộc, tên_đã_gặp) {
-    nếu (loại của(phụ_thuộc) != "từ điển") {
+hàm riêng tư quản lý gói xác mình phụ thuộc(phụ thuộc, tên đã gặp) {
+    nếu (loại của(phụ thuộc) != "từ điển") {
         ném "vpp.json: mỗi dependency phải là object";
     };
-    tên = lấy map(phụ_thuộc, "name", "");
+    tên = lấy từ điển(phụ thuộc, "name", "");
     nếu (!quản lý gói tên hợp lệ(tên)) {
         ném "vpp.json: dependency name không hợp lệ";
     };
-    nếu (tìm chỉ số(tên_đã_gặp, tên) >= 0) {
+    nếu (tìm chỉ số(tên đã gặp, tên) >= 0) {
         ném "vpp.json: dependency bị khai báo trùng: " + tên;
     };
-    thêm(tên_đã_gặp, tên);
+    máy ảo thêm cuối danh sách(tên đã gặp, tên);
 
-    phiên_bản = lấy map(phụ_thuộc, "version", "");
-    nếu (loại của(phiên_bản) != "chuỗi" || phiên_bản == "") {
+    phiên bản = lấy từ điển(phụ thuộc, "version", "");
+    nếu (loại của(phiên bản) != "chuỗi" || phiên bản == "") {
         ném "vpp.json: version range của dependency không hợp lệ: " + tên;
     };
-    nếu (!quản lý gói range hợp lệ(phiên_bản)) {
-        ném "vpp.json: version range của dependency không hợp lệ: " + tên + " = " + phiên_bản;
+    nếu (!quản lý gói khoảng hợp lệ(phiên bản)) {
+        ném "vpp.json: version range của dependency không hợp lệ: " + tên + " = " + phiên bản;
     };
 
-    nguồn = lấy map(phụ_thuộc, "source", "path");
+    nguồn = lấy từ điển(phụ thuộc, "source", "path");
     nếu (nguồn != "path" && nguồn != "git" && nguồn != "registry") {
         ném "vpp.json: source dependency không hợp lệ: " + thành chuỗi(nguồn);
     };
-    vị_trí = lấy map(phụ_thuộc, "location", "");
+    vị trí = lấy từ điển(phụ thuộc, "location", "");
     nếu ((nguồn == "path" || nguồn == "git") &&
-        (loại của(vị_trí) != "chuỗi" || vị_trí == "")) {
+        (loại của(vị trí) != "chuỗi" || vị trí == "")) {
         ném "vpp.json: dependency '" + tên + "' thiếu location";
     };
     trả về đúng;
 };
 
-hàm riêng tư quản lý gói xác minh manifest(manifest) {
-    nếu (loại của(manifest) != "từ điển") {
+hàm riêng tư quản lý gói xác mình bản kê(bản kê) {
+    nếu (loại của(bản kê) != "từ điển") {
         ném "vpp.json: root phải là object";
     };
-    schema = lấy map(manifest, "schema", 1);
-    nếu (loại của(schema) != "số nguyên" || schema != 1) {
-        ném "vpp.json: schema không được hỗ trợ: " + thành chuỗi(schema);
+    lược đồ dữ liệu = lấy từ điển(bản kê, "schema", 1);
+    nếu (loại của(lược đồ dữ liệu) != "số nguyên" || lược đồ dữ liệu != 1) {
+        ném "vpp.json: schema không được hỗ trợ: " + thành chuỗi(lược đồ dữ liệu);
     };
-    tên = lấy map(manifest, "name", "");
+    tên = lấy từ điển(bản kê, "name", "");
     nếu (!quản lý gói tên hợp lệ(tên)) {
         ném "vpp.json: name không hợp lệ: " + thành chuỗi(tên);
     };
-    phiên_bản = lấy map(manifest, "version", "");
-    nếu (!quản lý gói semver hợp lệ(phiên_bản)) {
-        ném "vpp.json: version không hợp lệ: " + thành chuỗi(phiên_bản);
+    phiên bản = lấy từ điển(bản kê, "version", "");
+    nếu (!quản lý gói phiên bản ngữ nghĩa hợp lệ(phiên bản)) {
+        ném "vpp.json: version không hợp lệ: " + thành chuỗi(phiên bản);
     };
 
-    phụ_thuộc = lấy map(manifest, "dependencies", []);
-    nếu (loại của(phụ_thuộc) != "danh sách") {
+    phụ thuộc = lấy từ điển(bản kê, "dependencies", []);
+    nếu (loại của(phụ thuộc) != "danh sách") {
         ném "vpp.json: dependencies phải là array";
     };
-    tên_đã_gặp = [];
-    lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
-        quản lý gói xác minh phụ thuộc(phụ_thuộc[i], tên_đã_gặp);
+    tên đã gặp = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        quản lý gói xác mình phụ thuộc(phụ thuộc[i], tên đã gặp);
     };
     trả về đúng;
 };
 
-hàm công khai quản lý gói kiểm tra manifest(manifest) {
+hàm công khai quản lý gói kiểm tra bản kê(bản kê) {
     thử {
-        quản lý gói xác minh manifest(manifest);
+        quản lý gói xác mình bản kê(bản kê);
         trả về {"hợp lệ": 1, "lỗi": ""};
     } bắt lỗi (e) {
         trả về {"hợp lệ": 0, "lỗi": thành chuỗi(e)};
     };
 };
 
-hàm công khai quản lý gói đọc manifest(đường_dẫn = "vpp.json") {
-    manifest = json phân tích(đọc tệp(đường_dẫn));
-    quản lý gói xác minh manifest(manifest);
-    trả về manifest;
+hàm công khai quản lý gói đọc bản kê(đường dẫn = "vpp.json") {
+    bản kê = json phân tích(đọc tệp(đường dẫn));
+    quản lý gói xác mình bản kê(bản kê);
+    trả về bản kê;
 };
 
-hàm công khai quản lý gói ghi manifest(đường_dẫn, manifest) {
-    quản lý gói xác minh manifest(manifest);
-    ghi tệp(đường_dẫn, json tạo(manifest) + "\n");
-    trả về manifest;
+hàm công khai quản lý gói ghi bản kê(đường dẫn, bản kê) {
+    quản lý gói xác mình bản kê(bản kê);
+    ghi tệp(đường dẫn, json tạo(bản kê) + "\n");
+    trả về bản kê;
 };
 
-hàm công khai quản lý gói phụ thuộc(manifest, tên) {
-    phụ_thuộc = lấy map(manifest, "dependencies", []);
-    lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
-        nếu (lấy map(phụ_thuộc[i], "name", "") == tên) {
-            trả về phụ_thuộc[i];
+hàm công khai quản lý gói phụ thuộc(bản kê, tên) {
+    phụ thuộc = lấy từ điển(bản kê, "dependencies", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        nếu (lấy từ điển(phụ thuộc[i], "name", "") == tên) {
+            trả về phụ thuộc[i];
         };
     };
     trả về rỗng;
 };
 
-hàm công khai quản lý gói có phụ thuộc(manifest, tên) {
-    trả về quản lý gói phụ thuộc(manifest, tên) != rỗng;
+hàm công khai quản lý gói có phụ thuộc(bản kê, tên) {
+    trả về quản lý gói phụ thuộc(bản kê, tên) != rỗng;
 };
 
-hàm công khai quản lý gói danh sách phụ thuộc(manifest) {
-    quản lý gói xác minh manifest(manifest);
-    phụ_thuộc = lấy map(manifest, "dependencies", []);
+hàm công khai quản lý gói danh sách phụ thuộc(bản kê) {
+    quản lý gói xác mình bản kê(bản kê);
+    phụ thuộc = lấy từ điển(bản kê, "dependencies", []);
     tên = [];
-    lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
-        thêm(tên, lấy map(phụ_thuộc[i], "name", ""));
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        máy ảo thêm cuối danh sách(tên, lấy từ điển(phụ thuộc[i], "name", ""));
     };
     sắp xếp(tên);
     trả về tên;
 };
 
 hàm riêng tư quản lý gói phụ thuộc đứng trước(a, b) {
-    tên_a = lấy map(a, "name", "");
-    tên_b = lấy map(b, "name", "");
-    nếu (tên_a < tên_b) { trả về đúng; };
-    nếu (tên_a > tên_b) { trả về sai; };
-    range_a = lấy map(a, "version", "");
-    range_b = lấy map(b, "version", "");
-    nếu (range_a < range_b) { trả về đúng; };
-    nếu (range_a > range_b) { trả về sai; };
-    trả về lấy map(a, "location", "") < lấy map(b, "location", "");
+    tên a = lấy từ điển(a, "name", "");
+    tên b = lấy từ điển(b, "name", "");
+    nếu (tên a < tên b) { trả về đúng; };
+    nếu (tên a > tên b) { trả về sai; };
+    khoảng a = lấy từ điển(a, "version", "");
+    khoảng b = lấy từ điển(b, "version", "");
+    nếu (khoảng a < khoảng b) { trả về đúng; };
+    nếu (khoảng a > khoảng b) { trả về sai; };
+    trả về lấy từ điển(a, "location", "") < lấy từ điển(b, "location", "");
 };
 
-hàm riêng tư quản lý gói sắp xếp phụ thuộc(phụ_thuộc) {
-    kết_quả = [];
-    lặp(i = 0; i < độ dài(phụ_thuộc); i++) { thêm(kết_quả, phụ_thuộc[i]); };
-    n = độ dài(kết_quả);
+hàm riêng tư quản lý gói sắp xếp phụ thuộc(phụ thuộc) {
+    kết quả = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) { máy ảo thêm cuối danh sách(kết quả, phụ thuộc[i]); };
+    n = máy ảo lấy độ dài(kết quả);
     lặp(i = 0; i < n; i++) {
         lặp(j = 0; j + 1 < n - i; j++) {
-            nếu (quản lý gói phụ thuộc đứng trước(kết_quả[j + 1], kết_quả[j])) {
-                tạm = kết_quả[j];
-                kết_quả[j] = kết_quả[j + 1];
-                kết_quả[j + 1] = tạm;
+            nếu (quản lý gói phụ thuộc đứng trước(kết quả[j + 1], kết quả[j])) {
+                tạm = kết quả[j];
+                kết quả[j] = kết quả[j + 1];
+                kết quả[j + 1] = tạm;
             };
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
-hàm riêng tư quản lý gói đường vòng lặp(ngăn_xếp, tên) {
-    bắt_đầu = tìm chỉ số(ngăn_xếp, tên);
-    nếu (bắt_đầu < 0) { bắt_đầu = 0; };
-    kết_quả = "";
-    lặp(i = bắt_đầu; i < độ dài(ngăn_xếp); i++) {
-        nếu (kết_quả != "") { kết_quả = kết_quả + " -> "; };
-        kết_quả = kết_quả + ngăn_xếp[i];
+hàm riêng tư quản lý gói đường vòng lặp(ngăn xếp, tên) {
+    bắt đầu = tìm chỉ số(ngăn xếp, tên);
+    nếu (bắt đầu < 0) { bắt đầu = 0; };
+    kết quả = "";
+    lặp(i = bắt đầu; i < máy ảo lấy độ dài(ngăn xếp); i++) {
+        nếu (kết quả != "") { kết quả = kết quả + " -> "; };
+        kết quả = kết quả + ngăn xếp[i];
     };
-    nếu (kết_quả != "") { kết_quả = kết_quả + " -> "; };
-    trả về kết_quả + tên;
+    nếu (kết quả != "") { kết quả = kết quả + " -> "; };
+    trả về kết quả + tên;
 };
 
-hàm riêng tư quản lý gói thêm range yêu cầu(mục, range) {
-    ds = lấy map(mục, "requestedRanges", []);
-    nếu (tìm chỉ số(ds, range) < 0) {
-        thêm(ds, range);
-        sắp xếp(ds);
-        đặt map(mục, "requestedRanges", ds);
+hàm riêng tư quản lý gói thêm khoảng yêu cầu(mục, khoảng) {
+    danh sách đầu vào = lấy từ điển(mục, "requestedRanges", []);
+    nếu (tìm chỉ số(danh sách đầu vào, khoảng) < 0) {
+        máy ảo thêm cuối danh sách(danh sách đầu vào, khoảng);
+        sắp xếp(danh sách đầu vào);
+        đặt từ điển(mục, "requestedRanges", danh sách đầu vào);
     };
 };
 
@@ -454,202 +454,202 @@ hàm riêng tư quản lý gói thêm range yêu cầu(mục, range) {
 // key = package name, value = {version, dependencies}. Filesystem/Git/registry
 // vẫn cấp snapshot này ở boundary toolchain.
 hàm riêng tư quản lý gói giải phụ thuộc(
-    phụ_thuộc,
-    bảng_gói,
-    đã_giải,
-    đang_thăm,
-    ngăn_xếp,
-    kết_quả,
-    người_yêu_cầu
+    phụ thuộc,
+    bảng gói,
+    đã giải,
+    đang thăm,
+    ngăn xếp,
+    kết quả,
+    người yêu cầu
 ) {
-    tên = lấy map(phụ_thuộc, "name", "");
-    range = lấy map(phụ_thuộc, "version", "");
-    nếu (!có khóa(bảng_gói, tên)) {
+    tên = lấy từ điển(phụ thuộc, "name", "");
+    khoảng = lấy từ điển(phụ thuộc, "version", "");
+    nếu (!máy ảo có khóa từ điển(bảng gói, tên)) {
         ném "package source metadata không tồn tại: " + tên;
     };
-    metadata = lấy map(bảng_gói, tên, {});
-    phiên_bản = lấy map(metadata, "version", "");
-    nếu (!quản lý gói semver hợp lệ(phiên_bản)) {
-        ném "package source version không hợp lệ: " + tên + " = " + phiên_bản;
+    siêu dữ liệu = lấy từ điển(bảng gói, tên, {});
+    phiên bản = lấy từ điển(siêu dữ liệu, "version", "");
+    nếu (!quản lý gói phiên bản ngữ nghĩa hợp lệ(phiên bản)) {
+        ném "package source version không hợp lệ: " + tên + " = " + phiên bản;
     };
-    nếu (!quản lý gói khớp range(phiên_bản, range)) {
-        ném "xung đột version dependency: " + tên + " " + phiên_bản + " không khớp " + range + " từ " + người_yêu_cầu;
+    nếu (!quản lý gói khớp khoảng(phiên bản, khoảng)) {
+        ném "xung đột version dependency: " + tên + " " + phiên bản + " không khớp " + khoảng + " từ " + người yêu cầu;
     };
 
-    nếu (có khóa(đã_giải, tên)) {
-        quản lý gói thêm range yêu cầu(lấy map(đã_giải, tên, {}), range);
+    nếu (máy ảo có khóa từ điển(đã giải, tên)) {
+        quản lý gói thêm khoảng yêu cầu(lấy từ điển(đã giải, tên, {}), khoảng);
         trả về rỗng;
     };
-    nếu (tìm chỉ số(đang_thăm, tên) >= 0) {
-        ném "phát hiện vòng lặp dependency: " + quản lý gói đường vòng lặp(ngăn_xếp, tên);
+    nếu (tìm chỉ số(đang thăm, tên) >= 0) {
+        ném "phát hiện vòng lặp dependency: " + quản lý gói đường vòng lặp(ngăn xếp, tên);
     };
 
-    thêm(đang_thăm, tên);
-    thêm(ngăn_xếp, tên);
-    con = lấy map(metadata, "dependencies", []);
+    máy ảo thêm cuối danh sách(đang thăm, tên);
+    máy ảo thêm cuối danh sách(ngăn xếp, tên);
+    con = lấy từ điển(siêu dữ liệu, "dependencies", []);
     nếu (loại của(con) != "danh sách") {
         ném "package dependencies phải là array: " + tên;
     };
     con = quản lý gói sắp xếp phụ thuộc(con);
-    lặp(i = 0; i < độ dài(con); i++) {
-        quản lý gói xác minh phụ thuộc(con[i], []);
+    lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
+        quản lý gói xác mình phụ thuộc(con[i], []);
         quản lý gói giải phụ thuộc(
-            con[i], bảng_gói, đã_giải, đang_thăm, ngăn_xếp, kết_quả, tên
+            con[i], bảng gói, đã giải, đang thăm, ngăn xếp, kết quả, tên
         );
     };
-    xóa tại(ngăn_xếp, độ dài(ngăn_xếp) - 1);
-    vị_trí_thăm = tìm chỉ số(đang_thăm, tên);
-    nếu (vị_trí_thăm >= 0) { xóa tại(đang_thăm, vị_trí_thăm); };
+    máy ảo xóa vị trí danh sách(ngăn xếp, máy ảo lấy độ dài(ngăn xếp) - 1);
+    vị trí thăm = tìm chỉ số(đang thăm, tên);
+    nếu (vị trí thăm >= 0) { máy ảo xóa vị trí danh sách(đang thăm, vị trí thăm); };
 
     mục = {
         "name": tên,
-        "version": phiên_bản,
-        "requestedRanges": [range]
+        "version": phiên bản,
+        "requestedRanges": [khoảng]
     };
-    đặt map(đã_giải, tên, mục);
-    thêm(kết_quả, mục);
+    đặt từ điển(đã giải, tên, mục);
+    máy ảo thêm cuối danh sách(kết quả, mục);
     trả về rỗng;
 };
 
-hàm công khai quản lý gói giải đồ thị(manifest, bảng_gói) {
-    quản lý gói xác minh manifest(manifest);
-    nếu (loại của(bảng_gói) != "từ điển") {
+hàm công khai quản lý gói giải đồ thị(bản kê, bảng gói) {
+    quản lý gói xác mình bản kê(bản kê);
+    nếu (loại của(bảng gói) != "từ điển") {
         ném "package metadata table phải là object";
     };
-    gốc_dữ_liệu = quản lý gói sắp xếp phụ thuộc(lấy map(manifest, "dependencies", []));
-    đã_giải = {};
-    đang_thăm = [];
-    ngăn_xếp = [];
-    kết_quả = [];
-    lặp(i = 0; i < độ dài(gốc_dữ_liệu); i++) {
+    gốc dữ liệu = quản lý gói sắp xếp phụ thuộc(lấy từ điển(bản kê, "dependencies", []));
+    đã giải = {};
+    đang thăm = [];
+    ngăn xếp = [];
+    kết quả = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(gốc dữ liệu); i++) {
         quản lý gói giải phụ thuộc(
-            gốc_dữ_liệu[i], bảng_gói, đã_giải, đang_thăm, ngăn_xếp, kết_quả,
-            lấy map(manifest, "name", "root")
+            gốc dữ liệu[i], bảng gói, đã giải, đang thăm, ngăn xếp, kết quả,
+            lấy từ điển(bản kê, "name", "root")
         );
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 // Dạng cầu nối ổn định cho host/toolchain: mỗi dòng là
 // name|version|range1|range2... theo đúng thứ tự dependency-first.
-hàm công khai quản lý gói giải đồ thị dòng(manifest, bảng_gói) {
-    graph = quản lý gói giải đồ thị(manifest, bảng_gói);
+hàm công khai quản lý gói giải đồ thị dòng(bản kê, bảng gói) {
+    graph = quản lý gói giải đồ thị(bản kê, bảng gói);
     dòng = [];
-    lặp(i = 0; i < độ dài(graph); i++) {
+    lặp(i = 0; i < máy ảo lấy độ dài(graph); i++) {
         mục = graph[i];
-        văn_bản = lấy map(mục, "name", "") + "|" +
-            lấy map(mục, "version", "");
-        ranges = lấy map(mục, "requestedRanges", []);
-        lặp(j = 0; j < độ dài(ranges); j++) {
-            văn_bản = văn_bản + "|" + ranges[j];
+        văn bản = lấy từ điển(mục, "name", "") + "|" +
+            lấy từ điển(mục, "version", "");
+        các khoảng = lấy từ điển(mục, "requestedRanges", []);
+        lặp(j = 0; j < máy ảo lấy độ dài(các khoảng); j++) {
+            văn bản = văn bản + "|" + các khoảng[j];
         };
-        thêm(dòng, văn_bản);
+        máy ảo thêm cuối danh sách(dòng, văn bản);
     };
     trả về dòng;
 };
 
 hàm công khai quản lý gói thêm phụ thuộc(
-    manifest,
+    bản kê,
     tên,
-    phiên_bản = "*",
+    phiên bản = "*",
     nguồn = "path",
-    vị_trí = "",
-    ref = ""
+    vị trí = "",
+    tham chiếu = ""
 ) {
-    quản lý gói xác minh manifest(manifest);
+    quản lý gói xác mình bản kê(bản kê);
     nếu (!quản lý gói tên hợp lệ(tên)) {
         ném "vpp.json: dependency name không hợp lệ: " + thành chuỗi(tên);
     };
-    nếu (quản lý gói có phụ thuộc(manifest, tên)) {
+    nếu (quản lý gói có phụ thuộc(bản kê, tên)) {
         ném "vpp.json: dependency bị khai báo trùng: " + tên;
     };
     nếu (nguồn != "path" && nguồn != "git" && nguồn != "registry") {
         ném "vpp.json: source dependency không hợp lệ: " + thành chuỗi(nguồn);
     };
-    nếu ((nguồn == "path" || nguồn == "git") && vị_trí == "") {
+    nếu ((nguồn == "path" || nguồn == "git") && vị trí == "") {
         ném "vpp.json: dependency '" + tên + "' thiếu location";
     };
 
     mục = {
         "name": tên,
-        "version": phiên_bản,
+        "version": phiên bản,
         "source": nguồn,
-        "location": vị_trí
+        "location": vị trí
     };
     nếu (nguồn == "git") {
-        nếu (ref == "") { ref = "HEAD"; };
-        đặt map(mục, "ref", ref);
+        nếu (tham chiếu == "") { tham chiếu = "HEAD"; };
+        đặt từ điển(mục, "ref", tham chiếu);
     };
 
-    phụ_thuộc = lấy map(manifest, "dependencies", []);
-    thêm(phụ_thuộc, mục);
-    đặt map(manifest, "dependencies", phụ_thuộc);
-    quản lý gói xác minh manifest(manifest);
+    phụ thuộc = lấy từ điển(bản kê, "dependencies", []);
+    máy ảo thêm cuối danh sách(phụ thuộc, mục);
+    đặt từ điển(bản kê, "dependencies", phụ thuộc);
+    quản lý gói xác mình bản kê(bản kê);
     trả về mục;
 };
 
-hàm công khai quản lý gói xóa phụ thuộc(manifest, tên) {
-    quản lý gói xác minh manifest(manifest);
-    phụ_thuộc = lấy map(manifest, "dependencies", []);
-    lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
-        nếu (lấy map(phụ_thuộc[i], "name", "") == tên) {
-            trả về xóa tại(phụ_thuộc, i);
+hàm công khai quản lý gói xóa phụ thuộc(bản kê, tên) {
+    quản lý gói xác mình bản kê(bản kê);
+    phụ thuộc = lấy từ điển(bản kê, "dependencies", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+        nếu (lấy từ điển(phụ thuộc[i], "name", "") == tên) {
+            trả về máy ảo xóa vị trí danh sách(phụ thuộc, i);
         };
     };
     trả về rỗng;
 };
 
 hàm công khai quản lý gói thêm phụ thuộc tệp(
-    đường_dẫn,
+    đường dẫn,
     tên,
-    phiên_bản = "*",
+    phiên bản = "*",
     nguồn = "path",
-    vị_trí = "",
-    ref = ""
+    vị trí = "",
+    tham chiếu = ""
 ) {
-    manifest = quản lý gói đọc manifest(đường_dẫn);
-    quản lý gói thêm phụ thuộc(manifest, tên, phiên_bản, nguồn, vị_trí, ref);
-    quản lý gói ghi manifest(đường_dẫn, manifest);
-    trả về manifest;
+    bản kê = quản lý gói đọc bản kê(đường dẫn);
+    quản lý gói thêm phụ thuộc(bản kê, tên, phiên bản, nguồn, vị trí, tham chiếu);
+    quản lý gói ghi bản kê(đường dẫn, bản kê);
+    trả về bản kê;
 };
 
-hàm công khai quản lý gói xóa phụ thuộc tệp(đường_dẫn, tên) {
-    manifest = quản lý gói đọc manifest(đường_dẫn);
-    đã_xóa = quản lý gói xóa phụ thuộc(manifest, tên);
-    nếu (đã_xóa != rỗng) {
-        quản lý gói ghi manifest(đường_dẫn, manifest);
+hàm công khai quản lý gói xóa phụ thuộc tệp(đường dẫn, tên) {
+    bản kê = quản lý gói đọc bản kê(đường dẫn);
+    đã xóa = quản lý gói xóa phụ thuộc(bản kê, tên);
+    nếu (đã xóa != rỗng) {
+        quản lý gói ghi bản kê(đường dẫn, bản kê);
     };
-    trả về đã_xóa;
+    trả về đã xóa;
 };
 
 // Phiên chỉnh manifest: mọi cập nhật được xác thực trên bản sao trước khi ghi nhận.
 lớp công khai Dự Án Gói {
-    hàm công khai khởi tạo(manifest) {
-        quản lý gói xác minh manifest(manifest);
-        mình.cấu_hình = json phân tích(json tạo(manifest));
+    hàm công khai khởi tạo(bản kê) {
+        quản lý gói xác mình bản kê(bản kê);
+        mình.cấu hình = json phân tích(json tạo(bản kê));
     };
-    hàm công khai manifest() { trả về json phân tích(json tạo(mình.cấu_hình)); };
-    hàm công khai thêm(tên, phiên_bản = "*", nguồn = "path", vị_trí = "", ref = "") {
-        mới = mình.manifest();
-        mục = quản lý gói thêm phụ thuộc(mới, tên, phiên_bản, nguồn, vị_trí, ref);
-        mình.cấu_hình = mới;
+    hàm công khai bản kê() { trả về json phân tích(json tạo(mình.cấu hình)); };
+    hàm công khai thêm(tên, phiên bản = "*", nguồn = "path", vị trí = "", tham chiếu = "") {
+        mới = mình.bản kê();
+        mục = quản lý gói thêm phụ thuộc(mới, tên, phiên bản, nguồn, vị trí, tham chiếu);
+        mình.cấu hình = mới;
         trả về json phân tích(json tạo(mục));
     };
     hàm công khai xóa(tên) {
-        mới = mình.manifest();
+        mới = mình.bản kê();
         mục = quản lý gói xóa phụ thuộc(mới, tên);
-        mình.cấu_hình = mới;
+        mình.cấu hình = mới;
         trả về mục;
     };
-    hàm công khai phụ thuộc(tên) { trả về quản lý gói phụ thuộc(mình.manifest(), tên); };
-    hàm công khai giải đồ thị(bảng_gói) { trả về quản lý gói giải đồ thị(mình.cấu_hình, bảng_gói); };
-    hàm công khai lưu(đường_dẫn = "vpp.json") {
-        quản lý gói ghi manifest(đường_dẫn, mình.cấu_hình);
-        trả về mình.manifest();
+    hàm công khai phụ thuộc(tên) { trả về quản lý gói phụ thuộc(mình.bản kê(), tên); };
+    hàm công khai giải đồ thị(bảng gói) { trả về quản lý gói giải đồ thị(mình.cấu hình, bảng gói); };
+    hàm công khai lưu(đường dẫn = "vpp.json") {
+        quản lý gói ghi bản kê(đường dẫn, mình.cấu hình);
+        trả về mình.bản kê();
     };
-    hàm công khai tải lại(đường_dẫn = "vpp.json") {
-        mới = quản lý gói đọc manifest(đường_dẫn);
-        mình.cấu_hình = mới;
+    hàm công khai tải lại(đường dẫn = "vpp.json") {
+        mới = quản lý gói đọc bản kê(đường dẫn);
+        mình.cấu hình = mới;
         trả về mình;
     };
 };

@@ -6,8 +6,8 @@ hàm chính() {
     chạy kiểm tra tính năng();
 
     ứngDụng = tạo ngữ cảnh ứng dụng("data/demo-san-pham.json", "data/demo-don-hang.json");
-    yêuCầu(lấy map(ứngDụng, "dichVuKho", rỗng) != rỗng, "warehouse service graph");
-    yêuCầu(lấy map(ứngDụng, "router", rỗng) != rỗng, "warehouse router graph");
+    yêuCầu(lấy từ điển(ứngDụng, "dichVuKho", rỗng) != rỗng, "warehouse service graph");
+    yêuCầu(lấy từ điển(ứngDụng, "router", rỗng) != rỗng, "warehouse router graph");
 
     in json tạo(báo cáo tính năng());
 };

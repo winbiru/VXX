@@ -31,17 +31,17 @@ hàm chính() {
     in từ dài nhất("a" + em_space + "Việt" + nbsp + "b") == "Việt";
     in là anagram("a" + narrow_nbsp + "b", "ba");
 
-    bytes_việt = chuỗi thành bytes("Việt");
-    in chuỗi từ bytes(bytes_việt) == "Việt";
+    bytes_việt = chuỗi thành các byte("Việt");
+    in chuỗi từ các byte(bytes_việt) == "Việt";
     ký_tự_thay = ký tự unicode(65533);
-    in chuỗi từ bytes([226, 130], "UTF-8", "THAY_THẾ") == ký_tự_thay;
+    in chuỗi từ các byte([226, 130], "UTF-8", "THAY_THẾ") == ký_tự_thay;
     thử {
-        in chuỗi từ bytes([226, 130]);
+        in chuỗi từ các byte([226, 130]);
     } bắt lỗi (e) {
         in e;
     };
 
-    phần = tách literal("a::b::", "::");
+    phần = tách hằng văn bản("a::b::", "::");
     in độ dài(phần);
     lặp(i = 0; i < độ dài(phần); i++) {
         in "[" + phần[i] + "]";
@@ -66,8 +66,8 @@ hàm chính() {
     in nội suy mẫu(template);
 
     processor = hàm(t) {
-        parts = lấy map(t, "mảnh", []);
-        values = lấy map(t, "giá trị", []);
+        parts = lấy từ điển(t, "mảnh", []);
+        values = lấy từ điển(t, "giá trị", []);
         trả về parts[0] + "[" + thành chuỗi(values[0]) + "]" + parts[1] +
                thành chuỗi(values[1]) + parts[2];
     };

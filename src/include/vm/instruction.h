@@ -96,7 +96,7 @@ enum Opcode {
     OP_GAN_CHI_SO = 90,          // assign list element by integer index
     OP_TAO_LOP = 91,             // class name=operandIndex; operandValue=superclass string index+1, 0=none
     OP_THEM_PHUONG_THUC = 92,    // đăng ký method; function id âm=private, class index âm=protected
-    OP_TAO_DOI_TUONG = 93,       // tạo instance; operand = số đối số truyền cho hàm `khởi tạo`
+    OP_TAO_DOI_TUONG = 93,       // tạo thể hiện; operand = số đối số truyền cho hàm `khởi tạo`
     OP_DOC_THUOC_TINH = 94,      // instance field read
     OP_GAN_THUOC_TINH = 95,      // instance field write
     OP_GOI_PHUONG_THUC = 96,     // bound method dispatch; operandValue = 1 starts at superclass

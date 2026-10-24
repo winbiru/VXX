@@ -1,0 +1,328 @@
+// Đọc DNS nameserver theo thứ tự bằng V++, không tra cứu DNS khi parse.
+// Chỉ sử dụng cấu hình Linux khi caller yêu cầu rõ ràng.
+nhập gói/mạng/địa chỉ mạng;
+nhập gói/mạng/gói tin tên miền;
+nhập gói/nhập xuất/bộ đệm tệp;
+
+lớp công khai Bộ Cấu Hình DNS {
+    hàm công khai khởi tạo() {};
+
+    hàm riêng tư phân giải tên miền trắng(k) {
+        trả về k == 32 || k == 9 || k == 13 || k == 10;
+    };
+
+    hàm riêng tư phân giải tên miền trùng(danh sách, địa chỉ) {
+        bộ = Bộ Phân Tích IP();
+        mới = bộ.địa chỉ mạng các byte(địa chỉ);
+        lặp(i = 0; i < máy ảo lấy độ dài(danh sách); i++) {
+            cũ = bộ.địa chỉ mạng các byte(danh sách[i]);
+            nếu (máy ảo lấy độ dài(cũ) == máy ảo lấy độ dài(mới)) {
+                giống = đúng;
+                lặp(j = 0; j < máy ảo lấy độ dài(mới); j++) {
+                    nếu (cũ[j] != mới[j]) { giống = sai; thoát; };
+                };
+                nếu (giống) { trả về đúng; };
+            };
+        };
+        trả về sai;
+    };
+
+    // Không chấp nhận hostname, zone ID hoặc địa chỉ không hợp lệ.
+    hàm riêng tư phân giải tên miền địa chỉ hợp lệ(địa chỉ) {
+        các byte = [];
+        thử {
+            bộ = Bộ Phân Tích IP();
+            các byte = bộ.địa chỉ mạng các byte(địa chỉ);
+        } bắt lỗi(e) { trả về sai; };
+        trả về máy ảo lấy độ dài(các byte) == 4 || máy ảo lấy độ dài(các byte) == 16;
+    };
+
+    hàm riêng tư phân giải tên miền thêm máy chủ(danh sách, địa chỉ) {
+        nếu (!mình.phân giải tên miền trùng(danh sách, địa chỉ)) {
+            nếu (máy ảo lấy độ dài(danh sách) >= 8) { ném "DNS: quá 8 nameserver"; };
+            máy ảo thêm cuối danh sách(danh sách, địa chỉ);
+        };
+        trả về danh sách;
+    };
+
+    // Tokenize riêng cho resolv.conf: # và ; mở đầu phần chú thích.
+    hàm riêng tư phân giải tên miền dòng nameserver(dòng) {
+        các từ tố = [];
+        từ tố = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dòng); i++) {
+            k = 32;
+            nếu (i < máy ảo lấy độ dài(dòng)) { k = dòng[i]; };
+            nếu (k == 35 || k == 59) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) { máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố)); };
+                thoát;
+            };
+            nếu (mình.phân giải tên miền trắng(k)) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) {
+                    máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố));
+                    từ tố = [];
+                };
+            } hoặc {
+                máy ảo thêm cuối danh sách(từ tố, k);
+            };
+            nếu (máy ảo lấy độ dài(các từ tố) > 2) { thoát; };
+        };
+        nếu (máy ảo lấy độ dài(các từ tố) != 2) { trả về ""; };
+        nếu (các từ tố[0] != "nameserver") { trả về ""; };
+        nếu (!mình.phân giải tên miền địa chỉ hợp lệ(các từ tố[1])) { trả về ""; };
+        trả về các từ tố[1];
+    };
+
+    // Tách token cho search/domain/options; dấu # và ; bắt đầu comment.
+    hàm riêng tư phân giải tên miền dòng các từ tố(dòng) {
+        các từ tố = [];
+        từ tố = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dòng); i++) {
+            k = 32;
+            nếu (i < máy ảo lấy độ dài(dòng)) { k = dòng[i]; };
+            nếu (k == 35 || k == 59) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) { máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố)); };
+                thoát;
+            };
+            nếu (mình.phân giải tên miền trắng(k)) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) {
+                    máy ảo thêm cuối danh sách(các từ tố, chuỗi từ byte máy ảo(từ tố));
+                    từ tố = [];
+                };
+            } hoặc {
+                máy ảo thêm cuối danh sách(từ tố, k);
+            };
+            nếu (máy ảo lấy độ dài(các từ tố) > 32) { ném "DNS: quá nhiều token trên dòng cấu hình"; };
+        };
+        trả về các từ tố;
+    };
+
+    // Domain trong search phải là DNS name hợp lệ, không giữ dấu chấm cuối.
+    hàm riêng tư phân giải tên miền chuẩn tên miền(tên) {
+        các byte = chuỗi thành byte máy ảo(tên);
+        n = máy ảo lấy độ dài(các byte);
+        nếu (n > 0 && các byte[n - 1] == 46) { n = n - 1; };
+        chuẩn = [];
+        lặp(i = 0; i < n; i++) {
+            k = các byte[i];
+            nếu (k >= 65 && k <= 90) { k = k + 32; };
+            máy ảo thêm cuối danh sách(chuẩn, k);
+        };
+        kết quả = chuỗi từ byte máy ảo(chuẩn);
+        bộ = Bộ Mã DNS();
+        bộ.phân giải tên miền tạo truy vấn(kết quả, 1, 0);
+        trả về kết quả;
+    };
+
+    hàm riêng tư phân giải tên miền ngưỡng dấu chấm(từ tố) {
+        các byte = chuỗi thành byte máy ảo(từ tố);
+        nếu (máy ảo lấy độ dài(các byte) < 6 || các byte[0] != 110 || các byte[1] != 100 ||
+            các byte[2] != 111 || các byte[3] != 116 || các byte[4] != 115 ||
+            các byte[5] != 58) {
+            trả về -1;
+        };
+        nếu (máy ảo lấy độ dài(các byte) < 7 || máy ảo lấy độ dài(các byte) > 8) {
+            ném "DNS: ndots không hợp lệ";
+        };
+        số = 0;
+        lặp(i = 6; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (các byte[i] < 48 || các byte[i] > 57) {
+                ném "DNS: ndots không hợp lệ";
+            };
+            số = số * 10 + các byte[i] - 48;
+        };
+        nếu (số > 15) { ném "DNS: ndots phải từ 0 đến 15"; };
+        trả về số;
+    };
+
+    // API mới giữ nguyên parser nameserver cũ, bổ sung cấu hình search.
+    // Giới hạn 6 suffix và 256 bytes tổng để tránh khuếch đại truy vấn.
+    hàm công khai phân giải tên miền phân tích cấu hình đầy đủ(nội dung) {
+        máy chủ = mình.phân giải tên miền phân tích cấu hình phân giải conf(nội dung);
+        dữ liệu = chuỗi thành byte máy ảo(nội dung);
+        tìm kiếm = [];
+        ngưỡng dấu chấm = 1;
+        dòng = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dữ liệu); i++) {
+            k = 10;
+            nếu (i < máy ảo lấy độ dài(dữ liệu)) { k = dữ liệu[i]; };
+            nếu (k == 10) {
+                các từ tố = mình.phân giải tên miền dòng các từ tố(dòng);
+                nếu (máy ảo lấy độ dài(các từ tố) > 0) {
+                    nếu (các từ tố[0] == "search" || các từ tố[0] == "domain") {
+                        tìm kiếm = [];
+                        tổng = 0;
+                        mức trần = máy ảo lấy độ dài(các từ tố);
+                        nếu (các từ tố[0] == "domain" && mức trần > 2) { mức trần = 2; };
+                        lặp(j = 1; j < mức trần; j++) {
+                            hậu tố = mình.phân giải tên miền chuẩn tên miền(các từ tố[j]);
+                            trùng = sai;
+                            lặp(m = 0; m < máy ảo lấy độ dài(tìm kiếm); m++) {
+                                nếu (tìm kiếm[m] == hậu tố) { trùng = đúng; thoát; };
+                            };
+                            nếu (!trùng) {
+                                nếu (máy ảo lấy độ dài(tìm kiếm) >= 6 || tổng + máy ảo lấy độ dài(hậu tố) > 256) {
+                                    ném "DNS: danh sách search quá dài";
+                                };
+                                máy ảo thêm cuối danh sách(tìm kiếm, hậu tố);
+                                tổng = tổng + máy ảo lấy độ dài(hậu tố);
+                            };
+                        };
+                    } hoặc nếu (các từ tố[0] == "options") {
+                        lặp(j = 1; j < máy ảo lấy độ dài(các từ tố); j++) {
+                            giá trị = mình.phân giải tên miền ngưỡng dấu chấm(các từ tố[j]);
+                            nếu (giá trị >= 0) { ngưỡng dấu chấm = giá trị; };
+                        };
+                    };
+                };
+                dòng = [];
+            } hoặc {
+                máy ảo thêm cuối danh sách(dòng, k);
+            };
+        };
+        trả về {"nameservers": máy chủ, "search": tìm kiếm, "ndots": ngưỡng dấu chấm};
+    };
+
+    // FQDN có dấu chấm cuối bỏ qua suffix. ndots quyết định thứ tự thử.
+    hàm công khai phân giải tên miền tên ứng viên(tên máy, tìm kiếm, ngưỡng dấu chấm) {
+        nếu (loại của(tìm kiếm) != "danh sách" || loại của(ngưỡng dấu chấm) != "số nguyên" ||
+            ngưỡng dấu chấm < 0 || ngưỡng dấu chấm > 15) { ném "DNS: cấu hình search không hợp lệ"; };
+        bộ = Bộ Mã DNS();
+        bộ.phân giải tên miền tạo truy vấn(tên máy, 1, 0);
+        các byte = chuỗi thành byte máy ảo(tên máy);
+        n = máy ảo lấy độ dài(các byte);
+        tuyệt đối = n > 0 && các byte[n - 1] == 46;
+        tên = tên máy;
+        nếu (tuyệt đối) {
+            phần = [];
+            lặp(i = 0; i < n - 1; i++) { máy ảo thêm cuối danh sách(phần, các byte[i]); };
+            tên = chuỗi từ byte máy ảo(phần);
+        };
+        số chấm = 0;
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (các byte[i] == 46) { số chấm = số chấm + 1; };
+        };
+        kết quả = [];
+        nếu (tuyệt đối || số chấm >= ngưỡng dấu chấm) { máy ảo thêm cuối danh sách(kết quả, tên); };
+        nếu (!tuyệt đối) {
+            lặp(i = 0; i < máy ảo lấy độ dài(tìm kiếm); i++) {
+                hậu tố = mình.phân giải tên miền chuẩn tên miền(tìm kiếm[i]);
+                lượt thử tên = tên + "." + hậu tố;
+                // Tên vượt giới hạn wire format không thể gửi truy vấn.
+                nếu (máy ảo lấy độ dài(chuỗi thành byte máy ảo(lượt thử tên)) <= 253) {
+                    bộ.phân giải tên miền tạo truy vấn(lượt thử tên, 1, 0);
+                    trùng = sai;
+                    lặp(j = 0; j < máy ảo lấy độ dài(kết quả); j++) {
+                        nếu (kết quả[j] == lượt thử tên) { trùng = đúng; thoát; };
+                    };
+                    nếu (!trùng) { máy ảo thêm cuối danh sách(kết quả, lượt thử tên); };
+                };
+            };
+            nếu (số chấm < ngưỡng dấu chấm) { máy ảo thêm cuối danh sách(kết quả, tên); };
+        };
+        trả về kết quả;
+    };
+
+    hàm công khai phân giải tên miền phân tích cấu hình phân giải conf(nội dung) {
+        nếu (loại của(nội dung) != "chuỗi") { ném "DNS: cấu hình phải là chuỗi"; };
+        dữ liệu = chuỗi thành byte máy ảo(nội dung);
+        nếu (máy ảo lấy độ dài(dữ liệu) > 16384) { ném "DNS: tệp cấu hình quá lớn"; };
+        máy chủ = [];
+        dòng = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dữ liệu); i++) {
+            k = 10;
+            nếu (i < máy ảo lấy độ dài(dữ liệu)) { k = dữ liệu[i]; };
+            nếu (k == 10) {
+                địa chỉ = mình.phân giải tên miền dòng nameserver(dòng);
+                nếu (địa chỉ != "") { máy chủ = mình.phân giải tên miền thêm máy chủ(máy chủ, địa chỉ); };
+                dòng = [];
+            } hoặc {
+                máy ảo thêm cuối danh sách(dòng, k);
+            };
+        };
+        trả về máy chủ;
+    };
+
+    // Đọc tối đa 16 KiB + 1 byte rồi đóng handle kể cả khi lỗi.
+    hàm công khai phân giải tên miền đọc cấu hình linux(đường dẫn = "/etc/resolv.conf") {
+        tệp = Bộ Đệm Tệp(đường dẫn, "đọc", 4096, "DNS resolv.conf");
+        dữ liệu = [];
+        thử {
+            dữ liệu = tệp.đọc các byte(16385);
+            tệp.đóng();
+        } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(số mục bỏ qua) {};
+            ném e;
+        };
+        nếu (máy ảo lấy độ dài(dữ liệu) > 16384) { ném "DNS: tệp cấu hình quá lớn"; };
+        trả về mình.phân giải tên miền phân tích cấu hình phân giải conf(chuỗi từ byte máy ảo(dữ liệu));
+    };
+
+    hàm công khai phân giải tên miền đọc cấu hình đầy đủ linux(đường dẫn = "/etc/resolv.conf") {
+        tệp = Bộ Đệm Tệp(đường dẫn, "đọc", 4096, "DNS resolv.conf");
+        dữ liệu = [];
+        thử {
+            dữ liệu = tệp.đọc các byte(16385);
+            tệp.đóng();
+        } bắt lỗi(e) {
+            thử { tệp.đóng(); } bắt lỗi(số mục bỏ qua) {};
+            ném e;
+        };
+        nếu (máy ảo lấy độ dài(dữ liệu) > 16384) { ném "DNS: tệp cấu hình quá lớn"; };
+        trả về mình.phân giải tên miền phân tích cấu hình đầy đủ(chuỗi từ byte máy ảo(dữ liệu));
+    };
+
+    // Cấu hình VPP_DNS_VI_SERVERS: danh sách IP cách nhau bởi dấu phẩy,
+    // dấu chấm phẩy hoặc whitespace. Địa chỉ lỗi bị từ chối có chủ đích.
+    hàm công khai phân giải tên miền phân tích danh sách máy chủ(nội dung) {
+        nếu (loại của(nội dung) != "chuỗi") { ném "DNS: danh sách phải là chuỗi"; };
+        dữ liệu = chuỗi thành byte máy ảo(nội dung);
+        nếu (máy ảo lấy độ dài(dữ liệu) > 4096) { ném "DNS: danh sách quá dài"; };
+        máy chủ = [];
+        từ tố = [];
+        lặp(i = 0; i <= máy ảo lấy độ dài(dữ liệu); i++) {
+            k = 32;
+            nếu (i < máy ảo lấy độ dài(dữ liệu)) { k = dữ liệu[i]; };
+            nếu (mình.phân giải tên miền trắng(k) || k == 44 || k == 59) {
+                nếu (máy ảo lấy độ dài(từ tố) > 0) {
+                    địa chỉ mạng = chuỗi từ byte máy ảo(từ tố);
+                    nếu (!mình.phân giải tên miền địa chỉ hợp lệ(địa chỉ mạng)) { ném "DNS: địa chỉ nameserver không hợp lệ"; };
+                    máy chủ = mình.phân giải tên miền thêm máy chủ(máy chủ, địa chỉ mạng);
+                    từ tố = [];
+                };
+            } hoặc {
+                máy ảo thêm cuối danh sách(từ tố, k);
+            };
+        };
+        trả về máy chủ;
+    };
+};
+
+hàm công khai phân giải tên miền phân tích cấu hình phân giải conf(nội dung) {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền phân tích cấu hình phân giải conf(nội dung);
+};
+
+hàm công khai phân giải tên miền phân tích cấu hình đầy đủ(nội dung) {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền phân tích cấu hình đầy đủ(nội dung);
+};
+
+hàm công khai phân giải tên miền tên ứng viên(tên máy, tìm kiếm, ngưỡng dấu chấm) {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền tên ứng viên(tên máy, tìm kiếm, ngưỡng dấu chấm);
+};
+
+hàm công khai phân giải tên miền đọc cấu hình đầy đủ linux(đường dẫn = "/etc/resolv.conf") {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền đọc cấu hình đầy đủ linux(đường dẫn);
+};
+
+hàm công khai phân giải tên miền đọc cấu hình linux(đường dẫn = "/etc/resolv.conf") {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền đọc cấu hình linux(đường dẫn);
+};
+
+hàm công khai phân giải tên miền phân tích danh sách máy chủ(nội dung) {
+    bộ = Bộ Cấu Hình DNS();
+    trả về bộ.phân giải tên miền phân tích danh sách máy chủ(nội dung);
+};

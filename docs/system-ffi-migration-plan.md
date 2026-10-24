@@ -180,7 +180,7 @@ lỗi, token giả/đã đóng/khác VM, IPv4/IPv6, EOF và cleanup. Test
 POSIX và được thêm vào suite Windows interpreter/JIT (chưa xác nhận kết quả).
 
 Socket TCP/UDP POSIX và Windows đã có adapter `socket_connect/listen/accept/timeout/kind`
-và `send/recv/close` qua FFI. Mỗi socket nhận token không trùng giữa các VM;
+và `send/recv/close` qua FFI. Mỗi đầu nối nhận token không trùng giữa các VM;
 backend kiểm tra token, chiều/extent đệm, cờ send/recv và giới hạn datagram;
 V++ giữ vòng partial-send, timeout sau connect/accept và quy tắc một datagram.
 Token socket không tồn tại/đã đóng thuộc lỗi thao tác công khai và ném
@@ -426,7 +426,7 @@ với cùng contract kích thước và kiểm tra từng byte 0..255. Ngoài ra
 `stat/lstat` chỉ nhận đệm 256 byte với layout được kiểm tra;
 `localtime_r` nhận `c_đệm_vào` đúng 8 byte và `c_đệm_ra` đúng 64 byte,
 trả `c_cờ_con_trỏ` dưới dạng 0/1, không lộ pointer. `c_tệp` và `c_thư_mục`
-chỉ dùng trong binding được kiểm tra, có token sở hữu VM và cleanup;
+chỉ dùng trong binding được kiểm tra, có từ tố sở hữu VM và cleanup;
 `c_mục_thư_mục` sao chép ngay tên từ `readdir` thay vì trả pointer mượn.
 Capability khác không được dùng kiểu bộ đệm/handle này, kể cả khi host đã
 cấp quyền gọi FFI tương ứng; muốn mở rộng phải bổ sung metadata
@@ -742,7 +742,7 @@ vẫn cần gate riêng trước khi coi M7 hoàn tất.
 
 Win32 quoting `argv` (khoảng trắng, dấu nháy, chuỗi rỗng, dấu `\\` trước
 nháy và cuối chuỗi) đã chuyển từ `appendForeignWindowsArgument` ở
-`foreign.cpp` sang `tiến trình quote windows` / `tiến trình dựng lệnh windows`
+`foreign.cpp` sang `tiến trình nháy windows` / `tiến trình dựng lệnh windows`
 trong `gói/hệ thống/tiến trình.vi`. Theo đường mặc định Windows,
 V++ gửi dòng lệnh đã escape qua adapter `system.process.command_line`
 (capability riêng, chỉ dùng trên Win32); C++ chuyển UTF-8 sang UTF-16,
@@ -789,8 +789,8 @@ không đợi mọi nhóm xong và cũng không xóa trước khi có parity.
 
 ### Gỡ native file/process POSIX trong đợt M8
 
-- Các hàm V++ public trong `gói/nhập xuất/tệp.vi`: `đọc tệp`, `đọc bytes tệp`,
-  `ghi tệp`, `ghi bytes tệp`, `ghi nối tệp`. Gói tự điều phối chunk, xử lý EOF,
+- Các hàm V++ public trong `gói/nhập xuất/tệp.vi`: `đọc tệp`, `đọc các byte tệp`,
+  `ghi tệp`, `ghi các byte tệp`, `ghi nối tệp`. Gói tự điều phối chunk, xử lý EOF,
   partial write và cleanup; FFI `fopen/fread/fwrite/fclose/ferror` chỉ là
   biên ABI/tài nguyên. Đệm 4096 byte được dùng lại qua các vòng đọc.
 - Hàm V++ public `chạy tiến trình` trong `gói/hệ thống/tiến trình.vi` dùng

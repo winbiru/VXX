@@ -335,7 +335,7 @@ Long-term: 20/41
     Audit stdlib cục bộ đã đưa đọc/ghi/đếm tệp và đọc cấu hình về cùng UTF-8 path boundary,
     khóa đường dẫn tiếng Việt + Unicode ngoài BMP end-to-end, thêm contract `đọc cấu hình khóa`/fallback
     và chặn `ngẫu nhiên nguyên`/`ngủ mili giây` âm thầm cắt số thực có phần lẻ. Collection/JSON
-    đã khóa output xác định: `khóa map` và object từ `json tạo` sắp khóa theo thứ tự từ điển
+    đã khóa output xác định: `khóa từ điển` và object từ `json tạo` sắp khóa theo thứ tự từ điển
     thay vì phụ thuộc iteration của `unordered_map`. HTTP client đã chặn URL rỗng, UTF-8 lỗi,
     scheme ngoài HTTP(S), thiếu host và whitespace/ký tự điều khiển ngay tại native boundary
     thay vì phụ thuộc diagnostic của curl. Còn filesystem edge case đa nền tảng và
@@ -346,7 +346,7 @@ Long-term: 20/41
     trả fallback. Logging đã có regression cho wrapper module, tiếng Việt/Unicode ngoài BMP, giá trị không phải
     chuỗi và contract trả `0`. JSON đã khóa thêm UTF-8 boundary: parser từ chối input malformed,
     serializer từ chối chuỗi/khóa object malformed và regression giữ tiếng Việt + Unicode ngoài BMP hợp lệ.
-    Collection đã chặn `tổng list` tràn số nguyên/số thực và khóa lỗi sort hỗn hợp/min rỗng.
+    Collection đã chặn `tổng danh sách` tràn số nguyên/số thực và khóa lỗi sort hỗn hợp/min rỗng.
     HTTP đã validate authority/port rõ hơn, gồm host rỗng sau scheme/userinfo, port sai và IPv6
     không có ngoặc vuông. Math không còn âm thầm cắt số thực có phần lẻ ở `%`/`chia dư`, còn
     `giới hạn` từ chối cận nhỏ nhất lớn hơn cận lớn nhất. Integer parser dùng chung đã chặn

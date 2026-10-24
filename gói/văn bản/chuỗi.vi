@@ -13,7 +13,7 @@ lớp công khai Xử Lý Chuỗi {
 
     // Ghi chú hàm: độ dài của chuỗi hoặc list. Native runtime cung cấp implementation.
     hàm công khai độ dài(giá trị) {
-        trả về do_dai(giá trị);
+        trả về máy ảo lấy độ dài(giá trị);
     };
 
     // Ghi chú hàm: nối chuỗi.
@@ -46,116 +46,116 @@ lớp công khai Xử Lý Chuỗi {
     hàm công khai đếm ký tự(s, ký tự) {
         nguồn = mình.chuẩn hóa unicode(s);
         mẫu = mình.chuẩn hóa unicode(ký tự);
-        m = do_dai(mẫu);
+        m = máy ảo lấy độ dài(mẫu);
         nếu (m == 0) {
             ném "đếm ký tự: mẫu không được rỗng";
         };
-        n = do_dai(nguồn);
-        kết_quả = 0;
-        vị_trí = 0;
-        lặp(vòng = 0; vị_trí + m <= n; vòng++) {
-            nếu (mình.cắt chuỗi(nguồn, vị_trí, m) == mẫu) {
-                kết_quả = kết_quả + 1;
-                vị_trí = vị_trí + m;
+        n = máy ảo lấy độ dài(nguồn);
+        kết quả = 0;
+        vị trí = 0;
+        lặp(vòng = 0; vị trí + m <= n; vòng++) {
+            nếu (mình.cắt chuỗi(nguồn, vị trí, m) == mẫu) {
+                kết quả = kết quả + 1;
+                vị trí = vị trí + m;
             } hoặc {
-                vị_trí = vị_trí + 1;
+                vị trí = vị trí + 1;
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai chứa chuỗi(s, chuỗi con) {
         nguồn = mình.chuẩn hóa unicode(s);
         mẫu = mình.chuẩn hóa unicode(chuỗi con);
-        m = do_dai(mẫu);
+        m = máy ảo lấy độ dài(mẫu);
         nếu (m == 0) {
             trả về đúng;
         };
-        tìm_thấy = sai;
-        lặp(i = 0; i + m <= do_dai(nguồn) && !tìm_thấy; i++) {
+        tìm thấy = sai;
+        lặp(i = 0; i + m <= máy ảo lấy độ dài(nguồn) && !tìm thấy; i++) {
             nếu (mình.cắt chuỗi(nguồn, i, m) == mẫu) {
-                tìm_thấy = đúng;
+                tìm thấy = đúng;
             };
         };
-        trả về tìm_thấy;
+        trả về tìm thấy;
     };
 
     hàm công khai thay thế(s, cũ, mới) {
         nguồn = mình.chuẩn hóa unicode(s);
         mẫu = mình.chuẩn hóa unicode(cũ);
         thay = mình.chuẩn hóa unicode(mới);
-        m = do_dai(mẫu);
+        m = máy ảo lấy độ dài(mẫu);
         nếu (m == 0) {
             ném "thay thế: mẫu không được rỗng";
         };
 
-        kết_quả = "";
-        vị_trí = 0;
-        n = do_dai(nguồn);
-        lặp(vòng = 0; vị_trí < n; vòng++) {
-            nếu (vị_trí + m <= n && mình.cắt chuỗi(nguồn, vị_trí, m) == mẫu) {
-                kết_quả = kết_quả + thay;
-                vị_trí = vị_trí + m;
+        kết quả = "";
+        vị trí = 0;
+        n = máy ảo lấy độ dài(nguồn);
+        lặp(vòng = 0; vị trí < n; vòng++) {
+            nếu (vị trí + m <= n && mình.cắt chuỗi(nguồn, vị trí, m) == mẫu) {
+                kết quả = kết quả + thay;
+                vị trí = vị trí + m;
             } hoặc {
-                kết_quả = kết_quả + nguồn[vị_trí];
-                vị_trí = vị_trí + 1;
+                kết quả = kết quả + nguồn[vị trí];
+                vị trí = vị trí + 1;
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Ghi chú hàm: cắt `số_lượng` code point kể từ `bắt_đầu` (chỉ số bắt đầu từ 0).
     // Tham số nguyên chấp nhận cả dạng số thực tích phân như 1.0; giá trị có phần lẻ bị từ chối.
     // Nếu độ dài vượt phần còn lại, kết quả dừng ở cuối chuỗi.
-    hàm công khai cắt chuỗi(s, bắt_đầu, số_lượng) {
-        văn_bản = thành chuỗi(s);
+    hàm công khai cắt chuỗi(s, bắt đầu, số lượng) {
+        văn bản = thành chuỗi(s);
         thử {
-            bắt_đầu = thành số nguyên(bắt_đầu);
-            số_lượng = thành số nguyên(số_lượng);
+            bắt đầu = thành số nguyên(bắt đầu);
+            số lượng = thành số nguyên(số lượng);
         } bắt lỗi (e) {
             ném "cắt chuỗi: vị trí và độ dài phải là số nguyên";
         };
-        nếu (bắt_đầu < 0 || số_lượng < 0) {
+        nếu (bắt đầu < 0 || số lượng < 0) {
             ném "cắt chuỗi không nhận vị trí hoặc độ dài âm";
         };
-        n = mình.độ dài(văn_bản);
-        nếu (bắt_đầu >= n || số_lượng == 0) {
+        n = mình.độ dài(văn bản);
+        nếu (bắt đầu >= n || số lượng == 0) {
             trả về "";
         };
-        kết_thúc = bắt_đầu + số_lượng;
-        nếu (kết_thúc > n) {
-            kết_thúc = n;
+        kết thúc = bắt đầu + số lượng;
+        nếu (kết thúc > n) {
+            kết thúc = n;
         };
-        kết_quả = "";
-        lặp(i = bắt_đầu; i < kết_thúc; i++) {
-            kết_quả = kết_quả + văn_bản[i];
+        kết quả = "";
+        lặp(i = bắt đầu; i < kết thúc; i++) {
+            kết quả = kết quả + văn bản[i];
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Bảng chữ cái public hiện giữ đúng contract runtime 1.0: ASCII và các
     // chữ dựng sẵn tiếng Việt. Ký tự ngoài bảng được giữ nguyên. Đây là logic
     // thư viện nên được thực hiện bằng V++, không cần native hook riêng.
     hàm riêng tư chuỗi đổi hoa thường(s, nguồn, đích) {
-        văn_bản = s;
-        nếu (loại của(văn_bản) != "chuỗi") {
-            văn_bản = thành chuỗi(văn_bản);
+        văn bản = s;
+        nếu (loại của(văn bản) != "chuỗi") {
+            văn bản = thành chuỗi(văn bản);
         };
 
-        kết_quả = "";
-        lặp(i = 0; i < do_dai(văn_bản); i++) {
-            c = văn_bản[i];
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+            c = văn bản[i];
             thay = c;
-            tìm_thấy = sai;
-            lặp(j = 0; j < do_dai(nguồn) && !tìm_thấy; j++) {
+            tìm thấy = sai;
+            lặp(j = 0; j < máy ảo lấy độ dài(nguồn) && !tìm thấy; j++) {
                 nếu (nguồn[j] == c) {
                     thay = đích[j];
-                    tìm_thấy = đúng;
+                    tìm thấy = đúng;
                 };
             };
-            kết_quả = kết_quả + thay;
+            kết quả = kết quả + thay;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai chuỗi thường(s) {
@@ -187,31 +187,31 @@ lớp công khai Xử Lý Chuỗi {
 
     // Trả canonical decomposition của một nguyên âm dựng sẵn tiếng Việt.
     // `mục_tiêu` là chuỗi 144 code point; `phân_rã` là danh sách song song.
-    hàm riêng tư chuỗi nfc phân rã ký tự(c, mục_tiêu, phân_rã) {
-        vị_trí = -1;
-        lặp(i = 0; i < do_dai(mục_tiêu) && vị_trí < 0; i++) {
-            nếu (mục_tiêu[i] == c) {
-                vị_trí = i;
+    hàm riêng tư chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã) {
+        vị trí = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(mục tiêu) && vị trí < 0; i++) {
+            nếu (mục tiêu[i] == c) {
+                vị trí = i;
             };
         };
-        nếu (vị_trí < 0) {
+        nếu (vị trí < 0) {
             trả về c;
         };
-        trả về phân_rã[vị_trí];
+        trả về phân rã[vị trí];
     };
 
     // Sắp dấu theo canonical combining class rồi ghép lại nếu tổ hợp có dạng
     // dựng sẵn trong bảng tiếng Việt. Dấu cùng class giữ encounter order.
-    hàm riêng tư chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã) {
-        nếu (do_dai(đoạn) == 0) {
+    hàm riêng tư chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã) {
+        nếu (máy ảo lấy độ dài(đoạn) == 0) {
             trả về "";
         };
 
         dấu = [];
-        lặp(i = 1; i < do_dai(đoạn); i++) {
-            them(dấu, đoạn[i]);
+        lặp(i = 1; i < máy ảo lấy độ dài(đoạn); i++) {
+            máy ảo thêm cuối danh sách(dấu, đoạn[i]);
         };
-        n = do_dai(dấu);
+        n = máy ảo lấy độ dài(dấu);
         lặp(i = 0; i < n; i++) {
             lặp(j = 0; j + 1 < n - i; j++) {
                 nếu (mình.chuỗi nfc hạng dấu(dấu[j]) > mình.chuỗi nfc hạng dấu(dấu[j + 1])) {
@@ -223,18 +223,18 @@ lớp công khai Xử Lý Chuỗi {
         };
 
         khóa = đoạn[0];
-        lặp(i = 0; i < do_dai(dấu); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(dấu); i++) {
             khóa = khóa + dấu[i];
         };
 
-        vị_trí = -1;
-        lặp(i = 0; i < do_dai(phân_rã) && vị_trí < 0; i++) {
-            nếu (phân_rã[i] == khóa) {
-                vị_trí = i;
+        vị trí = -1;
+        lặp(i = 0; i < máy ảo lấy độ dài(phân rã) && vị trí < 0; i++) {
+            nếu (phân rã[i] == khóa) {
+                vị trí = i;
             };
         };
-        nếu (vị_trí >= 0) {
-            trả về mục_tiêu[vị_trí];
+        nếu (vị trí >= 0) {
+            trả về mục tiêu[vị trí];
         };
         trả về khóa;
     };
@@ -243,16 +243,16 @@ lớp công khai Xử Lý Chuỗi {
     // Đây là thuật toán thư viện thuần V++; code point thuộc script khác được giữ
     // nguyên. Bảng và thứ tự dấu tương đương implementation C++ trước đây.
     hàm công khai chuẩn hóa unicode(s) {
-        văn_bản = s;
-        nếu (loại của(văn_bản) != "chuỗi") {
-            văn_bản = thành chuỗi(văn_bản);
+        văn bản = s;
+        nếu (loại của(văn bản) != "chuỗi") {
+            văn bản = thành chuỗi(văn bản);
         };
 
-        mục_tiêu = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩị" +
+        mục tiêu = "aàáảãạăằắẳẵặâầấẩẫậeèéẻẽẹêềếểễệiìíỉĩị" +
                    "oòóỏõọôồốổỗộơờớởỡợuùúủũụưừứửữựyỳýỷỹỵ" +
                    "AÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬEÈÉẺẼẸÊỀẾỂỄỆIÌÍỈĨỊ" +
                    "OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢUÙÚỦŨỤƯỪỨỬỮỰYỲÝỶỸỴ";
-        phân_rã = [
+        phân rã = [
             "a", "à", "á", "ả", "ã", "ạ", "ă", "ằ", "ắ", "ẳ", "ẵ", "ặ",
             "â", "ầ", "ấ", "ẩ", "ẫ", "ậ", "e", "è", "é", "ẻ", "ẽ", "ẹ",
             "ê", "ề", "ế", "ể", "ễ", "ệ", "i", "ì", "í", "ỉ", "ĩ", "ị",
@@ -267,34 +267,34 @@ lớp công khai Xử Lý Chuỗi {
             "Ư", "Ừ", "Ứ", "Ử", "Ữ", "Ự", "Y", "Ỳ", "Ý", "Ỷ", "Ỹ", "Ỵ"
         ];
 
-        kết_quả = "";
+        kết quả = "";
         đoạn = [];
-        lặp(i = 0; i < do_dai(văn_bản); i++) {
-            c = văn_bản[i];
-            hạng_dấu = mình.chuỗi nfc hạng dấu(c);
-            nếu (hạng_dấu != 0) {
-                nếu (do_dai(đoạn) == 0) {
+        lặp(i = 0; i < máy ảo lấy độ dài(văn bản); i++) {
+            c = văn bản[i];
+            hạng dấu = mình.chuỗi nfc hạng dấu(c);
+            nếu (hạng dấu != 0) {
+                nếu (máy ảo lấy độ dài(đoạn) == 0) {
                     // Giữ đúng hành vi cũ: combining mark đứng độc lập được phát ra ngay.
-                    kết_quả = kết_quả + c;
+                    kết quả = kết quả + c;
                 } hoặc {
-                    them(đoạn, c);
+                    máy ảo thêm cuối danh sách(đoạn, c);
                 };
             } hoặc {
-                kết_quả = kết_quả + mình.chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã);
+                kết quả = kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
                 đoạn = [];
-                phân_rã_c = mình.chuỗi nfc phân rã ký tự(c, mục_tiêu, phân_rã);
-                lặp(j = 0; j < do_dai(phân_rã_c); j++) {
-                    them(đoạn, phân_rã_c[j]);
+                phân rã c = mình.chuỗi nfc phân rã ký tự(c, mục tiêu, phân rã);
+                lặp(j = 0; j < máy ảo lấy độ dài(phân rã c); j++) {
+                    máy ảo thêm cuối danh sách(đoạn, phân rã c[j]);
                 };
             };
         };
-        trả về kết_quả + mình.chuỗi nfc ghép đoạn(đoạn, mục_tiêu, phân_rã);
+        trả về kết quả + mình.chuỗi nfc ghép đoạn(đoạn, mục tiêu, phân rã);
     };
 
     // Phân loại theo Unicode White_Space. Việc xác định code point dùng opcode chuỗi
     // cơ bản của VM; policy whitespace nằm hoàn toàn ở V++.
     hàm công khai chuỗi mã điểm unicode(c) {
-        nếu (loại của(c) != "chuỗi" || do_dai(c) != 1) {
+        nếu (loại của(c) != "chuỗi" || máy ảo lấy độ dài(c) != 1) {
             ném "STRING_TYPE";
         };
         trả về mã điểm unicode(c);
@@ -310,39 +310,39 @@ lớp công khai Xử Lý Chuỗi {
     };
 
     hàm công khai chuẩn hóa khoảng trắng(s) {
-        kết_quả = "";
-        đang_trong_từ = sai;
-        lặp(i = 0; i < do_dai(s); i++) {
+        kết quả = "";
+        đang trong từ = sai;
+        lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
             c = s[i];
             trắng = mình.là khoảng trắng unicode(c);
             nếu (trắng) {
-                nếu (đang_trong_từ) {
-                    kết_quả = kết_quả + " ";
-                    đang_trong_từ = sai;
+                nếu (đang trong từ) {
+                    kết quả = kết quả + " ";
+                    đang trong từ = sai;
                 };
             } hoặc {
-                kết_quả = kết_quả + c;
-                đang_trong_từ = đúng;
+                kết quả = kết quả + c;
+                đang trong từ = đúng;
             };
         };
-        nếu (do_dai(kết_quả) > 0 && kết_quả[do_dai(kết_quả) - 1] == " ") {
-            kết_quả = mình.cắt chuỗi(kết_quả, 0, do_dai(kết_quả) - 1);
+        nếu (máy ảo lấy độ dài(kết quả) > 0 && kết quả[máy ảo lấy độ dài(kết quả) - 1] == " ") {
+            kết quả = mình.cắt chuỗi(kết quả, 0, máy ảo lấy độ dài(kết quả) - 1);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai đếm từ(s) {
         đếm = 0;
-        trong_từ = sai;
-        lặp(i = 0; i < do_dai(s); i++) {
+        trong từ = sai;
+        lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
             c = s[i];
             trắng = mình.là khoảng trắng unicode(c);
             nếu (trắng) {
-                trong_từ = sai;
+                trong từ = sai;
             } hoặc {
-                nếu (!trong_từ) {
+                nếu (!trong từ) {
                     đếm = đếm + 1;
-                    trong_từ = đúng;
+                    trong từ = đúng;
                 };
             };
         };
@@ -350,25 +350,25 @@ lớp công khai Xử Lý Chuỗi {
     };
 
     hàm công khai từ dài nhất(s) {
-        dài_nhất = "";
-        hiện_tại = "";
-        lặp(i = 0; i <= do_dai(s); i++) {
-            hết = i == do_dai(s);
+        dài nhất = "";
+        hiện tại = "";
+        lặp(i = 0; i <= máy ảo lấy độ dài(s); i++) {
+            hết = i == máy ảo lấy độ dài(s);
             c = " ";
             nếu (!hết) {
                 c = s[i];
             };
             trắng = hết || mình.là khoảng trắng unicode(c);
             nếu (trắng) {
-                nếu (do_dai(hiện_tại) > do_dai(dài_nhất)) {
-                    dài_nhất = hiện_tại;
+                nếu (máy ảo lấy độ dài(hiện tại) > máy ảo lấy độ dài(dài nhất)) {
+                    dài nhất = hiện tại;
                 };
-                hiện_tại = "";
+                hiện tại = "";
             } hoặc {
-                hiện_tại = hiện_tại + c;
+                hiện tại = hiện tại + c;
             };
         };
-        trả về dài_nhất;
+        trả về dài nhất;
     };
 
     hàm công khai viết hoa đầu từ(s) {
@@ -377,216 +377,216 @@ lớp công khai Xử Lý Chuỗi {
             trả về "";
         };
         nguồn = mình.chuỗi thường(nguồn);
-        kết_quả = "";
-        đầu_từ = đúng;
-        lặp(i = 0; i < do_dai(nguồn); i++) {
+        kết quả = "";
+        đầu từ = đúng;
+        lặp(i = 0; i < máy ảo lấy độ dài(nguồn); i++) {
             c = nguồn[i];
             nếu (c == " ") {
-                kết_quả = kết_quả + " ";
-                đầu_từ = đúng;
+                kết quả = kết quả + " ";
+                đầu từ = đúng;
             } hoặc {
-                nếu (đầu_từ) {
-                    kết_quả = kết_quả + mình.chuỗi hoa(c);
-                    đầu_từ = sai;
+                nếu (đầu từ) {
+                    kết quả = kết quả + mình.chuỗi hoa(c);
+                    đầu từ = sai;
                 } hoặc {
-                    kết_quả = kết_quả + c;
+                    kết quả = kết quả + c;
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Không phân biệt hoa/thường tiếng Việt; giữ nguyên whitespace/dấu câu trong phép so sánh.
     hàm công khai là palindrome(s) {
         nguồn = mình.chuỗi thường(mình.chuẩn hóa unicode(s));
         trái = 0;
-        phải = do_dai(nguồn) - 1;
-        kết_quả = đúng;
-        lặp(vòng = 0; trái < phải && kết_quả; vòng++) {
+        phải = máy ảo lấy độ dài(nguồn) - 1;
+        kết quả = đúng;
+        lặp(vòng = 0; trái < phải && kết quả; vòng++) {
             nếu (nguồn[trái] != nguồn[phải]) {
-                kết_quả = sai;
+                kết quả = sai;
             };
             trái = trái + 1;
             phải = phải - 1;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // So sánh theo code point sau chuẩn hóa NFC + chữ thường tiếng Việt; bỏ whitespace.
     hàm công khai là anagram(a, b) {
         trái = mình.chuỗi thường(mình.chuẩn hóa unicode(a));
         phải = mình.chuỗi thường(mình.chuẩn hóa unicode(b));
-        a_list = [];
-        b_list = [];
-        lặp(i = 0; i < do_dai(trái); i++) {
+        a danh sách = [];
+        b danh sách = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(trái); i++) {
             c = trái[i];
             nếu (!mình.là khoảng trắng unicode(c)) {
-                them(a_list, c);
+                máy ảo thêm cuối danh sách(a danh sách, c);
             };
         };
-        lặp(i = 0; i < do_dai(phải); i++) {
+        lặp(i = 0; i < máy ảo lấy độ dài(phải); i++) {
             c = phải[i];
             nếu (!mình.là khoảng trắng unicode(c)) {
-                them(b_list, c);
+                máy ảo thêm cuối danh sách(b danh sách, c);
             };
         };
-        nếu (do_dai(a_list) != do_dai(b_list)) {
+        nếu (máy ảo lấy độ dài(a danh sách) != máy ảo lấy độ dài(b danh sách)) {
             trả về sai;
         };
-        lặp(i = 0; i < do_dai(a_list); i++) {
-            vị_trí = -1;
-            lặp(j = 0; j < do_dai(b_list) && vị_trí < 0; j++) {
-                nếu (a_list[i] == b_list[j]) {
-                    vị_trí = j;
+        lặp(i = 0; i < máy ảo lấy độ dài(a danh sách); i++) {
+            vị trí = -1;
+            lặp(j = 0; j < máy ảo lấy độ dài(b danh sách) && vị trí < 0; j++) {
+                nếu (a danh sách[i] == b danh sách[j]) {
+                    vị trí = j;
                 };
             };
-            nếu (vị_trí < 0) {
+            nếu (vị trí < 0) {
                 trả về sai;
             };
-            xoa_tai(b_list, vị_trí);
+            máy ảo xóa vị trí danh sách(b danh sách, vị trí);
         };
         trả về đúng;
     };
 
     // Khóa phải biểu diễn số nguyên; số thực tích phân được chấp nhận, phần lẻ bị từ chối.
     hàm công khai mã hóa caesar(s, khóa) {
-        chữ_thường = "abcdefghijklmnopqrstuvwxyz";
-        chữ_hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        chữ thường = "abcdefghijklmnopqrstuvwxyz";
+        chữ hoa = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         dịch = khóa % 26;
         nếu (dịch < 0) {
             dịch = dịch + 26;
         };
-        kết_quả = "";
-        lặp(i = 0; i < do_dai(s); i++) {
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(s); i++) {
             c = s[i];
-            vị_trí = -1;
+            vị trí = -1;
             hoa = sai;
-            lặp(j = 0; j < 26 && vị_trí < 0; j++) {
-                nếu (chữ_thường[j] == c) {
-                    vị_trí = j;
+            lặp(j = 0; j < 26 && vị trí < 0; j++) {
+                nếu (chữ thường[j] == c) {
+                    vị trí = j;
                 };
-                nếu (chữ_hoa[j] == c) {
-                    vị_trí = j;
+                nếu (chữ hoa[j] == c) {
+                    vị trí = j;
                     hoa = đúng;
                 };
             };
-            nếu (vị_trí < 0) {
-                kết_quả = kết_quả + c;
+            nếu (vị trí < 0) {
+                kết quả = kết quả + c;
             } hoặc {
-                mới = (vị_trí + dịch) % 26;
+                mới = (vị trí + dịch) % 26;
                 nếu (hoa) {
-                    kết_quả = kết_quả + chữ_hoa[mới];
+                    kết quả = kết quả + chữ hoa[mới];
                 } hoặc {
-                    kết_quả = kết_quả + chữ_thường[mới];
+                    kết quả = kết quả + chữ thường[mới];
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // --- Chuỗi nền tảng theo VPP-CORE-STRING-001 ---
     // Các API dưới đây giữ equality/lookup exact theo code point. Chúng không
     // chuẩn hóa NFC ngầm như nhóm helper tiếng Việt lịch sử ở phía trên.
-    hàm công khai chuỗi yêu cầu(văn_bản) {
-        nếu (loại của(văn_bản) != "chuỗi") {
+    hàm công khai chuỗi yêu cầu(văn bản) {
+        nếu (loại của(văn bản) != "chuỗi") {
             ném "STRING_TYPE";
         };
-        trả về văn_bản;
+        trả về văn bản;
     };
 
-    hàm riêng tư chuỗi yêu cầu index(chỉ_số, nhỏ_nhất, lớn_nhất) {
-        nếu (loại của(chỉ_số) != "số nguyên" ||
-            chỉ_số < nhỏ_nhất || chỉ_số > lớn_nhất) {
+    hàm riêng tư chuỗi yêu cầu chỉ mục(chỉ số, nhỏ nhất, lớn nhất) {
+        nếu (loại của(chỉ số) != "số nguyên" ||
+            chỉ số < nhỏ nhất || chỉ số > lớn nhất) {
             ném "STRING_INDEX";
         };
-        trả về chỉ_số;
+        trả về chỉ số;
     };
 
-    hàm công khai ký tự tại(văn_bản, chỉ_số) {
-        mình.chuỗi yêu cầu(văn_bản);
-        n = mình.độ dài(văn_bản);
-        mình.chuỗi yêu cầu index(chỉ_số, 0, n - 1);
-        trả về văn_bản[chỉ_số];
+    hàm công khai ký tự tại(văn bản, chỉ số) {
+        mình.chuỗi yêu cầu(văn bản);
+        n = mình.độ dài(văn bản);
+        mình.chuỗi yêu cầu chỉ mục(chỉ số, 0, n - 1);
+        trả về văn bản[chỉ số];
     };
 
     // Khoảng nửa kín [bắt_đầu, kết_thúc), chỉ số theo Unicode code point.
-    hàm công khai con chuỗi(văn_bản, bắt_đầu, kết_thúc) {
-        mình.chuỗi yêu cầu(văn_bản);
-        n = mình.độ dài(văn_bản);
-        mình.chuỗi yêu cầu index(bắt_đầu, 0, n);
-        mình.chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
-        trả về mình.cắt chuỗi(văn_bản, bắt_đầu, kết_thúc - bắt_đầu);
+    hàm công khai con chuỗi(văn bản, bắt đầu, kết thúc) {
+        mình.chuỗi yêu cầu(văn bản);
+        n = mình.độ dài(văn bản);
+        mình.chuỗi yêu cầu chỉ mục(bắt đầu, 0, n);
+        mình.chuỗi yêu cầu chỉ mục(kết thúc, bắt đầu, n);
+        trả về mình.cắt chuỗi(văn bản, bắt đầu, kết thúc - bắt đầu);
     };
 
-    hàm công khai bỏ khoảng trắng đầu(văn_bản) {
-        mình.chuỗi yêu cầu(văn_bản);
-        n = mình.độ dài(văn_bản);
-        bắt_đầu = 0;
-        đang_bỏ = đúng;
-        lặp(vòng = 0; bắt_đầu < n && đang_bỏ; vòng++) {
-            nếu (mình.là khoảng trắng unicode(văn_bản[bắt_đầu])) {
-                bắt_đầu = bắt_đầu + 1;
+    hàm công khai bỏ khoảng trắng đầu(văn bản) {
+        mình.chuỗi yêu cầu(văn bản);
+        n = mình.độ dài(văn bản);
+        bắt đầu = 0;
+        đang bỏ = đúng;
+        lặp(vòng = 0; bắt đầu < n && đang bỏ; vòng++) {
+            nếu (mình.là khoảng trắng unicode(văn bản[bắt đầu])) {
+                bắt đầu = bắt đầu + 1;
             } hoặc {
-                đang_bỏ = sai;
+                đang bỏ = sai;
             };
         };
-        trả về mình.con chuỗi(văn_bản, bắt_đầu, n);
+        trả về mình.con chuỗi(văn bản, bắt đầu, n);
     };
 
-    hàm công khai bỏ khoảng trắng cuối(văn_bản) {
-        mình.chuỗi yêu cầu(văn_bản);
-        kết_thúc = mình.độ dài(văn_bản);
-        đang_bỏ = đúng;
-        lặp(vòng = 0; kết_thúc > 0 && đang_bỏ; vòng++) {
-            nếu (mình.là khoảng trắng unicode(văn_bản[kết_thúc - 1])) {
-                kết_thúc = kết_thúc - 1;
+    hàm công khai bỏ khoảng trắng cuối(văn bản) {
+        mình.chuỗi yêu cầu(văn bản);
+        kết thúc = mình.độ dài(văn bản);
+        đang bỏ = đúng;
+        lặp(vòng = 0; kết thúc > 0 && đang bỏ; vòng++) {
+            nếu (mình.là khoảng trắng unicode(văn bản[kết thúc - 1])) {
+                kết thúc = kết thúc - 1;
             } hoặc {
-                đang_bỏ = sai;
+                đang bỏ = sai;
             };
         };
-        trả về mình.con chuỗi(văn_bản, 0, kết_thúc);
+        trả về mình.con chuỗi(văn bản, 0, kết thúc);
     };
 
-    hàm công khai bỏ khoảng trắng(văn_bản) {
-        mình.chuỗi yêu cầu(văn_bản);
-        n = mình.độ dài(văn_bản);
-        bắt_đầu = 0;
-        kết_thúc = n;
-        đang_bỏ = đúng;
-        lặp(vòng = 0; bắt_đầu < kết_thúc && đang_bỏ; vòng++) {
-            nếu (mình.là khoảng trắng unicode(văn_bản[bắt_đầu])) {
-                bắt_đầu = bắt_đầu + 1;
+    hàm công khai bỏ khoảng trắng(văn bản) {
+        mình.chuỗi yêu cầu(văn bản);
+        n = mình.độ dài(văn bản);
+        bắt đầu = 0;
+        kết thúc = n;
+        đang bỏ = đúng;
+        lặp(vòng = 0; bắt đầu < kết thúc && đang bỏ; vòng++) {
+            nếu (mình.là khoảng trắng unicode(văn bản[bắt đầu])) {
+                bắt đầu = bắt đầu + 1;
             } hoặc {
-                đang_bỏ = sai;
+                đang bỏ = sai;
             };
         };
-        đang_bỏ = đúng;
-        lặp(vòng = 0; kết_thúc > bắt_đầu && đang_bỏ; vòng++) {
-            nếu (mình.là khoảng trắng unicode(văn_bản[kết_thúc - 1])) {
-                kết_thúc = kết_thúc - 1;
+        đang bỏ = đúng;
+        lặp(vòng = 0; kết thúc > bắt đầu && đang bỏ; vòng++) {
+            nếu (mình.là khoảng trắng unicode(văn bản[kết thúc - 1])) {
+                kết thúc = kết thúc - 1;
             } hoặc {
-                đang_bỏ = sai;
+                đang bỏ = sai;
             };
         };
-        trả về mình.con chuỗi(văn_bản, bắt_đầu, kết_thúc);
+        trả về mình.con chuỗi(văn bản, bắt đầu, kết thúc);
     };
 
-    hàm công khai chuỗi thành bytes(văn_bản, bảng_mã = "UTF-8") {
-        mình.chuỗi yêu cầu(văn_bản);
-        trả về mã hóa bảng mã(văn_bản, bảng_mã);
+    hàm công khai chuỗi thành các byte(văn bản, bảng mã = "UTF-8") {
+        mình.chuỗi yêu cầu(văn bản);
+        trả về mã hóa bảng mã(văn bản, bảng mã);
     };
 
-    hàm công khai chuỗi từ bytes(bytes, bảng_mã = "UTF-8", chế_độ_lỗi = "BÁO_LỖI") {
-        trả về giải mã bảng mã(bytes, bảng_mã, chế_độ_lỗi);
+    hàm công khai chuỗi từ các byte(các byte, bảng mã = "UTF-8", chế độ lỗi = "BÁO_LỖI") {
+        trả về giải mã bảng mã(các byte, bảng mã, chế độ lỗi);
     };
 
     // Tìm exact, trả về chỉ số code point đầu tiên hoặc rỗng.
-    hàm công khai tìm chuỗi chính xác(văn_bản, mẫu, từ = 0) {
-        mình.chuỗi yêu cầu(văn_bản);
+    hàm công khai tìm chuỗi chính xác(văn bản, mẫu, từ = 0) {
+        mình.chuỗi yêu cầu(văn bản);
         mình.chuỗi yêu cầu(mẫu);
-        n = mình.độ dài(văn_bản);
+        n = mình.độ dài(văn bản);
         m = mình.độ dài(mẫu);
-        mình.chuỗi yêu cầu index(từ, 0, n);
+        mình.chuỗi yêu cầu chỉ mục(từ, 0, n);
 
         nếu (m == 0) {
             trả về từ;
@@ -595,231 +595,231 @@ lớp công khai Xử Lý Chuỗi {
             trả về rỗng;
         };
 
-        kết_quả = rỗng;
-        giới_hạn = n - m;
-        lặp(i = từ; i <= giới_hạn && kết_quả == rỗng; i++) {
-            nếu (mình.con chuỗi(văn_bản, i, i + m) == mẫu) {
-                kết_quả = i;
+        kết quả = rỗng;
+        mức trần = n - m;
+        lặp(i = từ; i <= mức trần && kết quả == rỗng; i++) {
+            nếu (mình.con chuỗi(văn bản, i, i + m) == mẫu) {
+                kết quả = i;
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai bắt đầu bằng(văn_bản, tiền_tố) {
-        vị_trí = mình.tìm chuỗi chính xác(văn_bản, tiền_tố, 0);
-        trả về vị_trí == 0;
+    hàm công khai bắt đầu bằng(văn bản, tiền tố) {
+        vị trí = mình.tìm chuỗi chính xác(văn bản, tiền tố, 0);
+        trả về vị trí == 0;
     };
 
-    hàm công khai kết thúc bằng(văn_bản, hậu_tố) {
-        mình.chuỗi yêu cầu(văn_bản);
-        mình.chuỗi yêu cầu(hậu_tố);
-        n = mình.độ dài(văn_bản);
-        m = mình.độ dài(hậu_tố);
+    hàm công khai kết thúc bằng(văn bản, hậu tố) {
+        mình.chuỗi yêu cầu(văn bản);
+        mình.chuỗi yêu cầu(hậu tố);
+        n = mình.độ dài(văn bản);
+        m = mình.độ dài(hậu tố);
         nếu (m > n) {
             trả về sai;
         };
-        trả về mình.con chuỗi(văn_bản, n - m, n) == hậu_tố;
+        trả về mình.con chuỗi(văn bản, n - m, n) == hậu tố;
     };
 
-    hàm công khai chứa chính xác(văn_bản, mẫu) {
-        trả về mình.tìm chuỗi chính xác(văn_bản, mẫu, 0) != rỗng;
+    hàm công khai chứa chính xác(văn bản, mẫu) {
+        trả về mình.tìm chuỗi chính xác(văn bản, mẫu, 0) != rỗng;
     };
 
     // Thay tất cả match literal không chồng lấp. Mẫu rỗng chèn replacement tại
     // mọi biên code point, tương đương semantics String.replace CharSequence.
-    hàm công khai thay chính xác(văn_bản, cũ, mới) {
-        mình.chuỗi yêu cầu(văn_bản);
+    hàm công khai thay chính xác(văn bản, cũ, mới) {
+        mình.chuỗi yêu cầu(văn bản);
         mình.chuỗi yêu cầu(cũ);
         mình.chuỗi yêu cầu(mới);
-        n = mình.độ dài(văn_bản);
+        n = mình.độ dài(văn bản);
         m = mình.độ dài(cũ);
 
         nếu (m == 0) {
-            kết_quả = mới;
+            kết quả = mới;
             lặp(i = 0; i < n; i++) {
-                kết_quả = kết_quả + mình.ký tự tại(văn_bản, i) + mới;
+                kết quả = kết quả + mình.ký tự tại(văn bản, i) + mới;
             };
-            trả về kết_quả;
+            trả về kết quả;
         };
 
-        kết_quả = "";
-        con_trỏ = 0;
-        tiếp_tục = đúng;
-        lặp(vòng = 0; tiếp_tục; vòng++) {
-            vị_trí = mình.tìm chuỗi chính xác(văn_bản, cũ, con_trỏ);
-            nếu (vị_trí == rỗng) {
-                kết_quả = kết_quả + mình.con chuỗi(văn_bản, con_trỏ, n);
-                tiếp_tục = sai;
+        kết quả = "";
+        con trỏ = 0;
+        tiếp tục = đúng;
+        lặp(vòng = 0; tiếp tục; vòng++) {
+            vị trí = mình.tìm chuỗi chính xác(văn bản, cũ, con trỏ);
+            nếu (vị trí == rỗng) {
+                kết quả = kết quả + mình.con chuỗi(văn bản, con trỏ, n);
+                tiếp tục = sai;
             } hoặc {
-                kết_quả = kết_quả + mình.con chuỗi(văn_bản, con_trỏ, vị_trí) + mới;
-                con_trỏ = vị_trí + m;
-                nếu (con_trỏ == n) {
-                    tiếp_tục = sai;
+                kết quả = kết quả + mình.con chuỗi(văn bản, con trỏ, vị trí) + mới;
+                con trỏ = vị trí + m;
+                nếu (con trỏ == n) {
+                    tiếp tục = sai;
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // Split literal, không dùng regex. Separator rỗng tách theo code point.
-    hàm công khai tách literal(văn_bản, phân_cách) {
-        mình.chuỗi yêu cầu(văn_bản);
-        mình.chuỗi yêu cầu(phân_cách);
-        kết_quả = [];
-        n = mình.độ dài(văn_bản);
-        m = mình.độ dài(phân_cách);
+    hàm công khai tách hằng văn bản(văn bản, phân cách) {
+        mình.chuỗi yêu cầu(văn bản);
+        mình.chuỗi yêu cầu(phân cách);
+        kết quả = [];
+        n = mình.độ dài(văn bản);
+        m = mình.độ dài(phân cách);
 
         nếu (m == 0) {
             lặp(i = 0; i < n; i++) {
-                thêm(kết_quả, mình.ký tự tại(văn_bản, i));
+                máy ảo thêm cuối danh sách(kết quả, mình.ký tự tại(văn bản, i));
             };
-            trả về kết_quả;
+            trả về kết quả;
         };
 
-        con_trỏ = 0;
-        tiếp_tục = đúng;
-        lặp(vòng = 0; tiếp_tục; vòng++) {
-            vị_trí = mình.tìm chuỗi chính xác(văn_bản, phân_cách, con_trỏ);
-            nếu (vị_trí == rỗng) {
-                thêm(kết_quả, mình.con chuỗi(văn_bản, con_trỏ, n));
-                tiếp_tục = sai;
+        con trỏ = 0;
+        tiếp tục = đúng;
+        lặp(vòng = 0; tiếp tục; vòng++) {
+            vị trí = mình.tìm chuỗi chính xác(văn bản, phân cách, con trỏ);
+            nếu (vị trí == rỗng) {
+                máy ảo thêm cuối danh sách(kết quả, mình.con chuỗi(văn bản, con trỏ, n));
+                tiếp tục = sai;
             } hoặc {
-                thêm(kết_quả, mình.con chuỗi(văn_bản, con_trỏ, vị_trí));
-                con_trỏ = vị_trí + m;
-                nếu (con_trỏ == n) {
-                    thêm(kết_quả, "");
-                    tiếp_tục = sai;
+                máy ảo thêm cuối danh sách(kết quả, mình.con chuỗi(văn bản, con trỏ, vị trí));
+                con trỏ = vị trí + m;
+                nếu (con trỏ == n) {
+                    máy ảo thêm cuối danh sách(kết quả, "");
+                    tiếp tục = sai;
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     // --- BộDựngChuỗi ---
     // V1 dùng map nội bộ để tránh phụ thuộc class-lowering. Builder giữ đồng thời
     // budget code point và budget byte UTF-8; không cần native allocator riêng.
-    hàm công khai bộ dựng chuỗi(giới_hạn = 1048576, giới_hạn_byte = 4194304) {
-        nếu (loại của(giới_hạn) != "số nguyên" || giới_hạn < 0) {
+    hàm công khai bộ dựng chuỗi(mức trần = 1048576, mức trần byte = 4194304) {
+        nếu (loại của(mức trần) != "số nguyên" || mức trần < 0) {
             ném "STRING_RESOURCE_LIMIT";
         };
-        nếu (loại của(giới_hạn_byte) != "số nguyên" || giới_hạn_byte < 0) {
+        nếu (loại của(mức trần byte) != "số nguyên" || mức trần byte < 0) {
             ném "STRING_RESOURCE_LIMIT";
         };
         trả về {
             "loại": "BộDựngChuỗi",
             "giá trị": "",
-            "giới hạn": giới_hạn,
-            "giới hạn byte": giới_hạn_byte
+            "giới hạn": mức trần,
+            "giới hạn byte": mức trần byte
         };
     };
 
-    hàm công khai bộ dựng yêu cầu(builder) {
-        nếu (loại của(builder) != "từ điển") {
+    hàm công khai bộ dựng yêu cầu(bộ dựng) {
+        nếu (loại của(bộ dựng) != "từ điển") {
             ném "STRING_BUILDER_INVALID";
         };
-        nếu (lấy map(builder, "loại", "") != "BộDựngChuỗi") {
+        nếu (lấy từ điển(bộ dựng, "loại", "") != "BộDựngChuỗi") {
             ném "STRING_BUILDER_INVALID";
         };
-        trả về builder;
+        trả về bộ dựng;
     };
 
-    hàm riêng tư bộ dựng đặt(builder, văn_bản) {
-        mình.bộ dựng yêu cầu(builder);
-        mình.chuỗi yêu cầu(văn_bản);
-        giới_hạn = lấy map(builder, "giới hạn", 0);
-        nếu (mình.độ dài(văn_bản) > giới_hạn) {
+    hàm riêng tư bộ dựng đặt(bộ dựng, văn bản) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        mình.chuỗi yêu cầu(văn bản);
+        mức trần = lấy từ điển(bộ dựng, "giới hạn", 0);
+        nếu (mình.độ dài(văn bản) > mức trần) {
             ném "STRING_RESOURCE_LIMIT";
         };
-        giới_hạn_byte = lấy map(builder, "giới hạn byte", 4194304);
-        nếu (mình.độ dài(mình.chuỗi thành bytes(văn_bản, "UTF-8")) > giới_hạn_byte) {
+        mức trần byte = lấy từ điển(bộ dựng, "giới hạn byte", 4194304);
+        nếu (mình.độ dài(mình.chuỗi thành các byte(văn bản, "UTF-8")) > mức trần byte) {
             ném "STRING_RESOURCE_LIMIT";
         };
-        đặt map(builder, "giá trị", văn_bản);
-        trả về builder;
+        đặt từ điển(bộ dựng, "giá trị", văn bản);
+        trả về bộ dựng;
     };
 
-    hàm công khai bộ dựng thêm(builder, giá_trị) {
-        mình.bộ dựng yêu cầu(builder);
-        hiện_tại = lấy map(builder, "giá trị", "");
-        trả về mình.bộ dựng đặt(builder, hiện_tại + thành chuỗi(giá_trị));
+    hàm công khai bộ dựng thêm(bộ dựng, giá trị) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
+        trả về mình.bộ dựng đặt(bộ dựng, hiện tại + thành chuỗi(giá trị));
     };
 
-    hàm công khai bộ dựng chèn(builder, chỉ_số, giá_trị) {
-        mình.bộ dựng yêu cầu(builder);
-        hiện_tại = lấy map(builder, "giá trị", "");
-        n = mình.độ dài(hiện_tại);
-        mình.chuỗi yêu cầu index(chỉ_số, 0, n);
-        mới = mình.con chuỗi(hiện_tại, 0, chỉ_số) + thành chuỗi(giá_trị) +
-              mình.con chuỗi(hiện_tại, chỉ_số, n);
-        trả về mình.bộ dựng đặt(builder, mới);
+    hàm công khai bộ dựng chèn(bộ dựng, chỉ số, giá trị) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
+        n = mình.độ dài(hiện tại);
+        mình.chuỗi yêu cầu chỉ mục(chỉ số, 0, n);
+        mới = mình.con chuỗi(hiện tại, 0, chỉ số) + thành chuỗi(giá trị) +
+              mình.con chuỗi(hiện tại, chỉ số, n);
+        trả về mình.bộ dựng đặt(bộ dựng, mới);
     };
 
-    hàm công khai bộ dựng xóa(builder, bắt_đầu, kết_thúc) {
-        mình.bộ dựng yêu cầu(builder);
-        hiện_tại = lấy map(builder, "giá trị", "");
-        n = mình.độ dài(hiện_tại);
-        mình.chuỗi yêu cầu index(bắt_đầu, 0, n);
-        mình.chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
-        mới = mình.con chuỗi(hiện_tại, 0, bắt_đầu) + mình.con chuỗi(hiện_tại, kết_thúc, n);
-        trả về mình.bộ dựng đặt(builder, mới);
+    hàm công khai bộ dựng xóa(bộ dựng, bắt đầu, kết thúc) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
+        n = mình.độ dài(hiện tại);
+        mình.chuỗi yêu cầu chỉ mục(bắt đầu, 0, n);
+        mình.chuỗi yêu cầu chỉ mục(kết thúc, bắt đầu, n);
+        mới = mình.con chuỗi(hiện tại, 0, bắt đầu) + mình.con chuỗi(hiện tại, kết thúc, n);
+        trả về mình.bộ dựng đặt(bộ dựng, mới);
     };
 
-    hàm công khai bộ dựng thay(builder, bắt_đầu, kết_thúc, giá_trị) {
-        mình.bộ dựng yêu cầu(builder);
-        hiện_tại = lấy map(builder, "giá trị", "");
-        n = mình.độ dài(hiện_tại);
-        mình.chuỗi yêu cầu index(bắt_đầu, 0, n);
-        mình.chuỗi yêu cầu index(kết_thúc, bắt_đầu, n);
-        mới = mình.con chuỗi(hiện_tại, 0, bắt_đầu) + thành chuỗi(giá_trị) +
-              mình.con chuỗi(hiện_tại, kết_thúc, n);
-        trả về mình.bộ dựng đặt(builder, mới);
+    hàm công khai bộ dựng thay(bộ dựng, bắt đầu, kết thúc, giá trị) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
+        n = mình.độ dài(hiện tại);
+        mình.chuỗi yêu cầu chỉ mục(bắt đầu, 0, n);
+        mình.chuỗi yêu cầu chỉ mục(kết thúc, bắt đầu, n);
+        mới = mình.con chuỗi(hiện tại, 0, bắt đầu) + thành chuỗi(giá trị) +
+              mình.con chuỗi(hiện tại, kết thúc, n);
+        trả về mình.bộ dựng đặt(bộ dựng, mới);
     };
 
-    hàm công khai bộ dựng đảo(builder) {
-        mình.bộ dựng yêu cầu(builder);
-        hiện_tại = lấy map(builder, "giá trị", "");
-        trả về mình.bộ dựng đặt(builder, đảo ngược(hiện_tại));
+    hàm công khai bộ dựng đảo(bộ dựng) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
+        trả về mình.bộ dựng đặt(bộ dựng, đảo ngược(hiện tại));
     };
 
-    hàm công khai bộ dựng kết quả(builder) {
-        mình.bộ dựng yêu cầu(builder);
-        trả về lấy map(builder, "giá trị", "");
+    hàm công khai bộ dựng kết quả(bộ dựng) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        trả về lấy từ điển(bộ dựng, "giá trị", "");
     };
 
-    hàm công khai bộ dựng số byte(builder) {
-        mình.bộ dựng yêu cầu(builder);
-        văn_bản = lấy map(builder, "giá trị", "");
-        trả về mình.độ dài(mình.chuỗi thành bytes(văn_bản, "UTF-8"));
+    hàm công khai bộ dựng số byte(bộ dựng) {
+        mình.bộ dựng yêu cầu(bộ dựng);
+        văn bản = lấy từ điển(bộ dựng, "giá trị", "");
+        trả về mình.độ dài(mình.chuỗi thành các byte(văn bản, "UTF-8"));
     };
 
     // --- MẫuChuỗi ---
     // Snapshot hai list cấu trúc lúc tạo để mutation danh sách của caller không
     // đổi topology template sau đó.
-    hàm công khai mẫu chuỗi(mảnh, giá_trị) {
+    hàm công khai mẫu chuỗi(mảnh, giá trị) {
         nếu (loại của(mảnh) != "danh sách") {
             ném "STRING_TEMPLATE_INVALID";
         };
-        nếu (loại của(giá_trị) != "danh sách") {
+        nếu (loại của(giá trị) != "danh sách") {
             ném "STRING_TEMPLATE_INVALID";
         };
-        nếu (mình.độ dài(mảnh) != mình.độ dài(giá_trị) + 1) {
+        nếu (mình.độ dài(mảnh) != mình.độ dài(giá trị) + 1) {
             ném "STRING_TEMPLATE_INVALID";
         };
 
-        mảnh_copy = [];
-        giá_trị_copy = [];
+        mảnh sao chép = [];
+        giá trị sao chép = [];
         lặp(i = 0; i < mình.độ dài(mảnh); i++) {
             mình.chuỗi yêu cầu(mảnh[i]);
-            thêm(mảnh_copy, mảnh[i]);
+            máy ảo thêm cuối danh sách(mảnh sao chép, mảnh[i]);
         };
-        lặp(i = 0; i < mình.độ dài(giá_trị); i++) {
-            thêm(giá_trị_copy, giá_trị[i]);
+        lặp(i = 0; i < mình.độ dài(giá trị); i++) {
+            máy ảo thêm cuối danh sách(giá trị sao chép, giá trị[i]);
         };
 
         trả về {
             "loại": "MẫuChuỗi",
-            "mảnh": mảnh_copy,
-            "giá trị": giá_trị_copy
+            "mảnh": mảnh sao chép,
+            "giá trị": giá trị sao chép
         };
     };
 
@@ -827,7 +827,7 @@ lớp công khai Xử Lý Chuỗi {
         nếu (loại của(template) != "từ điển") {
             ném "STRING_TEMPLATE_INVALID";
         };
-        nếu (lấy map(template, "loại", "") != "MẫuChuỗi") {
+        nếu (lấy từ điển(template, "loại", "") != "MẫuChuỗi") {
             ném "STRING_TEMPLATE_INVALID";
         };
         trả về template;
@@ -835,18 +835,18 @@ lớp công khai Xử Lý Chuỗi {
 
     hàm công khai nội suy mẫu(template) {
         mình.mẫu chuỗi yêu cầu(template);
-        mảnh = lấy map(template, "mảnh", []);
-        giá_trị = lấy map(template, "giá trị", []);
-        kết_quả = "";
-        lặp(i = 0; i < mình.độ dài(giá_trị); i++) {
-            kết_quả = kết_quả + mảnh[i] + thành chuỗi(giá_trị[i]);
+        mảnh = lấy từ điển(template, "mảnh", []);
+        giá trị = lấy từ điển(template, "giá trị", []);
+        kết quả = "";
+        lặp(i = 0; i < mình.độ dài(giá trị); i++) {
+            kết quả = kết quả + mảnh[i] + thành chuỗi(giá trị[i]);
         };
-        trả về kết_quả + mảnh[mình.độ dài(mảnh) - 1];
+        trả về kết quả + mảnh[mình.độ dài(mảnh) - 1];
     };
 
-    hàm công khai xử lý mẫu(template, processor) {
+    hàm công khai xử lý mẫu(template, bộ xử lý) {
         mình.mẫu chuỗi yêu cầu(template);
-        trả về processor(template);
+        trả về bộ xử lý(template);
     };
 };
 
@@ -887,8 +887,8 @@ hàm công khai thay thế(s, cũ, mới) {
     trả về Xử Lý Chuỗi().thay thế(s, cũ, mới);
 };
 
-hàm công khai cắt chuỗi(s, bắt_đầu, số_lượng) {
-    trả về Xử Lý Chuỗi().cắt chuỗi(s, bắt_đầu, số_lượng);
+hàm công khai cắt chuỗi(s, bắt đầu, số lượng) {
+    trả về Xử Lý Chuỗi().cắt chuỗi(s, bắt đầu, số lượng);
 };
 
 hàm công khai chuỗi thường(s) {
@@ -939,100 +939,100 @@ hàm công khai mã hóa caesar(s, khóa) {
     trả về Xử Lý Chuỗi().mã hóa caesar(s, khóa);
 };
 
-hàm công khai chuỗi yêu cầu(văn_bản) {
-    trả về Xử Lý Chuỗi().chuỗi yêu cầu(văn_bản);
+hàm công khai chuỗi yêu cầu(văn bản) {
+    trả về Xử Lý Chuỗi().chuỗi yêu cầu(văn bản);
 };
 
-hàm công khai ký tự tại(văn_bản, chỉ_số) {
-    trả về Xử Lý Chuỗi().ký tự tại(văn_bản, chỉ_số);
+hàm công khai ký tự tại(văn bản, chỉ số) {
+    trả về Xử Lý Chuỗi().ký tự tại(văn bản, chỉ số);
 };
 
-hàm công khai con chuỗi(văn_bản, bắt_đầu, kết_thúc) {
-    trả về Xử Lý Chuỗi().con chuỗi(văn_bản, bắt_đầu, kết_thúc);
+hàm công khai con chuỗi(văn bản, bắt đầu, kết thúc) {
+    trả về Xử Lý Chuỗi().con chuỗi(văn bản, bắt đầu, kết thúc);
 };
 
-hàm công khai bỏ khoảng trắng đầu(văn_bản) {
-    trả về Xử Lý Chuỗi().bỏ khoảng trắng đầu(văn_bản);
+hàm công khai bỏ khoảng trắng đầu(văn bản) {
+    trả về Xử Lý Chuỗi().bỏ khoảng trắng đầu(văn bản);
 };
 
-hàm công khai bỏ khoảng trắng cuối(văn_bản) {
-    trả về Xử Lý Chuỗi().bỏ khoảng trắng cuối(văn_bản);
+hàm công khai bỏ khoảng trắng cuối(văn bản) {
+    trả về Xử Lý Chuỗi().bỏ khoảng trắng cuối(văn bản);
 };
 
-hàm công khai bỏ khoảng trắng(văn_bản) {
-    trả về Xử Lý Chuỗi().bỏ khoảng trắng(văn_bản);
+hàm công khai bỏ khoảng trắng(văn bản) {
+    trả về Xử Lý Chuỗi().bỏ khoảng trắng(văn bản);
 };
 
-hàm công khai chuỗi thành bytes(văn_bản, bảng_mã = "UTF-8") {
-    trả về Xử Lý Chuỗi().chuỗi thành bytes(văn_bản, bảng_mã);
+hàm công khai chuỗi thành các byte(văn bản, bảng mã = "UTF-8") {
+    trả về Xử Lý Chuỗi().chuỗi thành các byte(văn bản, bảng mã);
 };
 
-hàm công khai chuỗi từ bytes(bytes, bảng_mã = "UTF-8", chế_độ_lỗi = "BÁO_LỖI") {
-    trả về Xử Lý Chuỗi().chuỗi từ bytes(bytes, bảng_mã, chế_độ_lỗi);
+hàm công khai chuỗi từ các byte(các byte, bảng mã = "UTF-8", chế độ lỗi = "BÁO_LỖI") {
+    trả về Xử Lý Chuỗi().chuỗi từ các byte(các byte, bảng mã, chế độ lỗi);
 };
 
-hàm công khai tìm chuỗi chính xác(văn_bản, mẫu, từ = 0) {
-    trả về Xử Lý Chuỗi().tìm chuỗi chính xác(văn_bản, mẫu, từ);
+hàm công khai tìm chuỗi chính xác(văn bản, mẫu, từ = 0) {
+    trả về Xử Lý Chuỗi().tìm chuỗi chính xác(văn bản, mẫu, từ);
 };
 
-hàm công khai bắt đầu bằng(văn_bản, tiền_tố) {
-    trả về Xử Lý Chuỗi().bắt đầu bằng(văn_bản, tiền_tố);
+hàm công khai bắt đầu bằng(văn bản, tiền tố) {
+    trả về Xử Lý Chuỗi().bắt đầu bằng(văn bản, tiền tố);
 };
 
-hàm công khai kết thúc bằng(văn_bản, hậu_tố) {
-    trả về Xử Lý Chuỗi().kết thúc bằng(văn_bản, hậu_tố);
+hàm công khai kết thúc bằng(văn bản, hậu tố) {
+    trả về Xử Lý Chuỗi().kết thúc bằng(văn bản, hậu tố);
 };
 
-hàm công khai chứa chính xác(văn_bản, mẫu) {
-    trả về Xử Lý Chuỗi().chứa chính xác(văn_bản, mẫu);
+hàm công khai chứa chính xác(văn bản, mẫu) {
+    trả về Xử Lý Chuỗi().chứa chính xác(văn bản, mẫu);
 };
 
-hàm công khai thay chính xác(văn_bản, cũ, mới) {
-    trả về Xử Lý Chuỗi().thay chính xác(văn_bản, cũ, mới);
+hàm công khai thay chính xác(văn bản, cũ, mới) {
+    trả về Xử Lý Chuỗi().thay chính xác(văn bản, cũ, mới);
 };
 
-hàm công khai tách literal(văn_bản, phân_cách) {
-    trả về Xử Lý Chuỗi().tách literal(văn_bản, phân_cách);
+hàm công khai tách hằng văn bản(văn bản, phân cách) {
+    trả về Xử Lý Chuỗi().tách hằng văn bản(văn bản, phân cách);
 };
 
-hàm công khai bộ dựng chuỗi(giới_hạn = 1048576, giới_hạn_byte = 4194304) {
-    trả về Xử Lý Chuỗi().bộ dựng chuỗi(giới_hạn, giới_hạn_byte);
+hàm công khai bộ dựng chuỗi(mức trần = 1048576, mức trần byte = 4194304) {
+    trả về Xử Lý Chuỗi().bộ dựng chuỗi(mức trần, mức trần byte);
 };
 
-hàm công khai bộ dựng yêu cầu(builder) {
-    trả về Xử Lý Chuỗi().bộ dựng yêu cầu(builder);
+hàm công khai bộ dựng yêu cầu(bộ dựng) {
+    trả về Xử Lý Chuỗi().bộ dựng yêu cầu(bộ dựng);
 };
 
-hàm công khai bộ dựng thêm(builder, giá_trị) {
-    trả về Xử Lý Chuỗi().bộ dựng thêm(builder, giá_trị);
+hàm công khai bộ dựng thêm(bộ dựng, giá trị) {
+    trả về Xử Lý Chuỗi().bộ dựng thêm(bộ dựng, giá trị);
 };
 
-hàm công khai bộ dựng chèn(builder, chỉ_số, giá_trị) {
-    trả về Xử Lý Chuỗi().bộ dựng chèn(builder, chỉ_số, giá_trị);
+hàm công khai bộ dựng chèn(bộ dựng, chỉ số, giá trị) {
+    trả về Xử Lý Chuỗi().bộ dựng chèn(bộ dựng, chỉ số, giá trị);
 };
 
-hàm công khai bộ dựng xóa(builder, bắt_đầu, kết_thúc) {
-    trả về Xử Lý Chuỗi().bộ dựng xóa(builder, bắt_đầu, kết_thúc);
+hàm công khai bộ dựng xóa(bộ dựng, bắt đầu, kết thúc) {
+    trả về Xử Lý Chuỗi().bộ dựng xóa(bộ dựng, bắt đầu, kết thúc);
 };
 
-hàm công khai bộ dựng thay(builder, bắt_đầu, kết_thúc, giá_trị) {
-    trả về Xử Lý Chuỗi().bộ dựng thay(builder, bắt_đầu, kết_thúc, giá_trị);
+hàm công khai bộ dựng thay(bộ dựng, bắt đầu, kết thúc, giá trị) {
+    trả về Xử Lý Chuỗi().bộ dựng thay(bộ dựng, bắt đầu, kết thúc, giá trị);
 };
 
-hàm công khai bộ dựng đảo(builder) {
-    trả về Xử Lý Chuỗi().bộ dựng đảo(builder);
+hàm công khai bộ dựng đảo(bộ dựng) {
+    trả về Xử Lý Chuỗi().bộ dựng đảo(bộ dựng);
 };
 
-hàm công khai bộ dựng kết quả(builder) {
-    trả về Xử Lý Chuỗi().bộ dựng kết quả(builder);
+hàm công khai bộ dựng kết quả(bộ dựng) {
+    trả về Xử Lý Chuỗi().bộ dựng kết quả(bộ dựng);
 };
 
-hàm công khai bộ dựng số byte(builder) {
-    trả về Xử Lý Chuỗi().bộ dựng số byte(builder);
+hàm công khai bộ dựng số byte(bộ dựng) {
+    trả về Xử Lý Chuỗi().bộ dựng số byte(bộ dựng);
 };
 
-hàm công khai mẫu chuỗi(mảnh, giá_trị) {
-    trả về Xử Lý Chuỗi().mẫu chuỗi(mảnh, giá_trị);
+hàm công khai mẫu chuỗi(mảnh, giá trị) {
+    trả về Xử Lý Chuỗi().mẫu chuỗi(mảnh, giá trị);
 };
 
 hàm công khai mẫu chuỗi yêu cầu(template) {
@@ -1043,6 +1043,6 @@ hàm công khai nội suy mẫu(template) {
     trả về Xử Lý Chuỗi().nội suy mẫu(template);
 };
 
-hàm công khai xử lý mẫu(template, processor) {
-    trả về Xử Lý Chuỗi().xử lý mẫu(template, processor);
+hàm công khai xử lý mẫu(template, bộ xử lý) {
+    trả về Xử Lý Chuỗi().xử lý mẫu(template, bộ xử lý);
 };

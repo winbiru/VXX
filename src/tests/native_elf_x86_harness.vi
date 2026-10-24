@@ -1,17 +1,17 @@
 // This harness is compiled to the host's native ISA, then runs the V++
 // x86-64 encoder and ELF writer without invoking the C++ VM at runtime.
 hàm chính() {
-    nếu (đối_số_đếm() != 3) { trả về 1; };
-    biến output_path = đối_số_lấy(1);
-    biến relocation_path = đối_số_lấy(2);
-    biến ir = byte_mới();
-    biến code = byte_mới();
-    biến calls = byte_mới();
-    biến starts = byte_mới();
-    biến registry = byte_mới();
-    biến imports = byte_mới();
-    biến native_calls = byte_mới();
-    biến object = byte_mới();
+    nếu (đối số đếm() != 3) { trả về 1; };
+    biến output_path = đối số lấy(1);
+    biến relocation_path = đối số lấy(2);
+    biến ir = byte mới();
+    biến code = byte mới();
+    biến calls = byte mới();
+    biến starts = byte mới();
+    biến registry = byte mới();
+    biến imports = byte mới();
+    biến native_calls = byte mới();
+    biến đối tượng = byte mới();
     nếu (output_path <= 0) { trả về 2; };
     nếu (relocation_path <= 0) { trả về 2; };
     nếu (ir <= 0) { trả về 2; };
@@ -21,110 +21,110 @@ hàm chính() {
     nếu (registry <= 0) { trả về 2; };
     nếu (imports <= 0) { trả về 2; };
     nếu (native_calls <= 0) { trả về 2; };
-    nếu (object <= 0) { trả về 2; };
+    nếu (đối tượng <= 0) { trả về 2; };
 
     // Signed divide/remainder and NOT must execute in the generated ELF.
     // -159 / -3 = 53; 53 % 52 = 1; 1 + 51 = 52.
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, -159) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, -3) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 26) != 0) { trả về 3; }; // DIV
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 52) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 27) != 0) { trả về 3; }; // MOD
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 51) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 4) != 0) { trả về 3; }; // ADD
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 52) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 11) != 0) { trả về 3; }; // EQ
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 25) != 0) { trả về 3; }; // NOT
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 9) != 0) { trả về 3; }; // JZ
-    nếu (byte_đẩy_i32(ir, 104) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 13) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 7) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 52) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 7) != 0) { trả về 3; };
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 3; };
-    nếu (xg_emit_internal(ir, code, calls) <= 0) { trả về 4; };
-    nếu (byte_dài(calls) != 0) { trả về 5; };
-    nếu (byte_lấy(code, 0) != 85) { trả về 6; };
-    nếu (byte_lấy(code, 1) != 72) { trả về 6; };
-    nếu (byte_lấy(code, 2) != 137) { trả về 6; };
-    nếu (byte_lấy(code, 3) != 229) { trả về 6; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, -159) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, -3) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 26) != 0) { trả về 3; }; // DIV
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 52) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 27) != 0) { trả về 3; }; // MOD
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 51) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 4) != 0) { trả về 3; }; // ADD
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 52) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 11) != 0) { trả về 3; }; // EQ
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 25) != 0) { trả về 3; }; // NOT
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 9) != 0) { trả về 3; }; // JZ
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 104) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 13) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 52) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 3; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 4; };
+    nếu (byte dài(calls) != 0) { trả về 5; };
+    nếu (byte lấy(code, 0) != 85) { trả về 6; };
+    nếu (byte lấy(code, 1) != 72) { trả về 6; };
+    nếu (byte lấy(code, 2) != 137) { trả về 6; };
+    nếu (byte lấy(code, 3) != 229) { trả về 6; };
     // Cross-host verification also checks that x86-64 IDIV and remainder
-    // extraction are actually present before the ELF object is written.
+    // extraction are actually present before the ELF đối tượng is written.
     biến idiv_count = 0;
     biến modulo_count = 0;
-    lặp (i = 0; i + 2 < byte_dài(code); i++) {
-        nếu (byte_lấy(code, i) == 72) {
-            nếu (byte_lấy(code, i + 1) == 247) {
-                nếu (byte_lấy(code, i + 2) == 249) { idiv_count = idiv_count + 1; };
+    lặp (i = 0; i + 2 < byte dài(code); i++) {
+        nếu (byte lấy(code, i) == 72) {
+            nếu (byte lấy(code, i + 1) == 247) {
+                nếu (byte lấy(code, i + 2) == 249) { idiv_count = idiv_count + 1; };
             };
         };
-        nếu (byte_lấy(code, i) == 137) {
-            nếu (byte_lấy(code, i + 1) == 208) { modulo_count = modulo_count + 1; };
+        nếu (byte lấy(code, i) == 137) {
+            nếu (byte lấy(code, i + 1) == 208) { modulo_count = modulo_count + 1; };
         };
     };
     nếu (idiv_count != 2) { trả về 21; };
     nếu (modulo_count < 1) { trả về 22; };
 
-    nếu (byte_đẩy_i32(starts, 0) != 0) { trả về 7; };
-    nếu (elf_module(code, object, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 8; };
-    nếu (byte_lấy(object, 0) != 127) { trả về 9; };
-    nếu (byte_lấy(object, 1) != 69) { trả về 9; };
-    nếu (byte_lấy(object, 2) != 76) { trả về 9; };
-    nếu (byte_lấy(object, 3) != 70) { trả về 9; };
-    biến handle = tệp_mở_ghi(output_path);
+    nếu (byte đẩy số nguyên ba mươi hai bit(starts, 0) != 0) { trả về 7; };
+    nếu (elf mô đun(code, đối tượng, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 8; };
+    nếu (byte lấy(đối tượng, 0) != 127) { trả về 9; };
+    nếu (byte lấy(đối tượng, 1) != 69) { trả về 9; };
+    nếu (byte lấy(đối tượng, 2) != 76) { trả về 9; };
+    nếu (byte lấy(đối tượng, 3) != 70) { trả về 9; };
+    biến handle = tệp mở ghi(output_path);
     nếu (handle <= 0) { trả về 10; };
-    nếu (tệp_ghi_khối(handle, object) != byte_dài(object)) { trả về 11; };
-    nếu (tệp_đóng(handle) != 0) { trả về 12; };
+    nếu (tệp ghi khối(handle, đối tượng) != byte dài(đối tượng)) { trả về 11; };
+    nếu (tệp đóng(handle) != 0) { trả về 12; };
 
     // CALL vpp_native_argc via ELF R_X86_64_PLT32 with eight integer args.
     // The Linux smoke defines a test-only C symbol with the same name and
     // eight parameters, proving SysV registers and stack arguments together.
-    nếu (byte_làm_rỗng(ir) != 0) { trả về 13; };
-    nếu (byte_làm_rỗng(calls) != 0) { trả về 13; };
+    nếu (byte làm rỗng(ir) != 0) { trả về 13; };
+    nếu (byte làm rỗng(calls) != 0) { trả về 13; };
     lặp (j = 0; j < 8; j++) {
         biến value = j + 1;
         nếu (j == 7) { value = 24; };
-        nếu (byte_đẩy_i32(ir, 1) != 0) { trả về 13; };
-        nếu (byte_đẩy_i32(ir, value) != 0) { trả về 13; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 13; };
+        nếu (byte đẩy số nguyên ba mươi hai bit(ir, value) != 0) { trả về 13; };
     };
-    nếu (byte_đẩy_i32(ir, 19) != 0) { trả về 13; }; // ARG_COUNT
-    nếu (byte_đẩy_i32(ir, 8) != 0) { trả về 13; };
-    nếu (byte_đẩy_i32(ir, 17) != 0) { trả về 13; }; // CALL
-    nếu (byte_đẩy_i32(ir, -12) != 0) { trả về 13; }; // runtime ID 11
-    nếu (byte_đẩy_i32(ir, 7) != 0) { trả về 13; }; // RETURN
-    nếu (byte_đẩy_i32(ir, 0) != 0) { trả về 13; };
-    nếu (xg_emit_internal(ir, code, calls) <= 0) { trả về 14; };
-    nếu (byte_dài(calls) != 8) { trả về 15; };
-    nếu (byte_đọc_i32(calls, 4) != -12) { trả về 15; };
-    nếu (byte_đẩy_i32(native_calls, byte_đọc_i32(calls, 0)) != 0) { trả về 16; };
-    nếu (byte_đẩy_i32(native_calls, 11) != 0) { trả về 16; };
-    nếu (elf_module(code, object, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 17; };
-    biến second = tệp_mở_ghi(relocation_path);
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 19) != 0) { trả về 13; }; // ARG_COUNT
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 8) != 0) { trả về 13; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 17) != 0) { trả về 13; }; // CALL
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, -12) != 0) { trả về 13; }; // runtime ID 11
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 13; }; // RETURN
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 13; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 14; };
+    nếu (byte dài(calls) != 8) { trả về 15; };
+    nếu (byte đọc số nguyên ba mươi hai bit(calls, 4) != -12) { trả về 15; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, byte đọc số nguyên ba mươi hai bit(calls, 0)) != 0) { trả về 16; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, 11) != 0) { trả về 16; };
+    nếu (elf mô đun(code, đối tượng, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 17; };
+    biến second = tệp mở ghi(relocation_path);
     nếu (second <= 0) { trả về 18; };
-    nếu (tệp_ghi_khối(second, object) != byte_dài(object)) { trả về 19; };
-    nếu (tệp_đóng(second) != 0) { trả về 20; };
-    byte_hủy(output_path);
-    byte_hủy(relocation_path);
-    byte_hủy(ir);
-    byte_hủy(code);
-    byte_hủy(calls);
-    byte_hủy(starts);
-    byte_hủy(registry);
-    byte_hủy(imports);
-    byte_hủy(native_calls);
-    byte_hủy(object);
+    nếu (tệp ghi khối(second, đối tượng) != byte dài(đối tượng)) { trả về 19; };
+    nếu (tệp đóng(second) != 0) { trả về 20; };
+    byte hủy(output_path);
+    byte hủy(relocation_path);
+    byte hủy(ir);
+    byte hủy(code);
+    byte hủy(calls);
+    byte hủy(starts);
+    byte hủy(registry);
+    byte hủy(imports);
+    byte hủy(native_calls);
+    byte hủy(đối tượng);
     trả về 0;
 };

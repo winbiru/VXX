@@ -1,0 +1,121 @@
+// Máy thực thi tham chiếu cho IR i32 sinh ra bởi parser.vi.
+// Đây là logic V++ chạy trong native executable, không gọi VM C++.
+hàm biểu diễn trung gian đẩy(stack, đỉnh, giá trị đang xét) {
+    nếu (đỉnh < 0) { trả về -1; };
+    nếu (đỉnh >= 1000) { trả về -1; };
+    nếu (byte dài(stack) >= (đỉnh + 1) * 4) {
+        trả về byte ghi số nguyên ba mươi hai bit(stack, đỉnh * 4, giá trị đang xét);
+    };
+    trả về byte đẩy số nguyên ba mươi hai bit(stack, giá trị đang xét);
+};
+
+hàm biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đích đến) {
+    nếu (đích đến < 0) { trả về 0; };
+    lặp (độ lệch = 0; độ lệch < byte dài(biểu diễn trung gian); độ lệch = độ lệch + 8) {
+        nếu (độ lệch == đích đến) { trả về 1; };
+    };
+    trả về 0;
+};
+
+// Kết quả hợp lệ có thể âm; lỗi trả -2147483647 (không dùng trong fixture).
+hàm biểu diễn trung gian run(biểu diễn trung gian) {
+    biến chiều dài = byte dài(biểu diễn trung gian);
+    nếu (chiều dài < 8) { trả về -2147483647; };
+    biến locals = byte mới();
+    biến stack = byte mới();
+    nếu (locals <= 0) { trả về -2147483647; };
+    nếu (stack <= 0) { byte hủy(locals); trả về -2147483647; };
+    lặp (i = 0; i < 1000; i++) { byte đẩy số nguyên ba mươi hai bit(locals, 0); };
+    biến đỉnh = 0;
+    biến kết quả trả về = -2147483647;
+    biến steps = 0;
+    lặp (pc = 0; pc < chiều dài; pc = pc + 8) {
+        steps = steps + 1;
+        nếu (steps > 200000) { thoát; };
+        nếu (pc + 8 > chiều dài) { thoát; };
+        biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
+        biến đối số = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
+        nếu (mã phép toán == 1) {
+            nếu (biểu diễn trung gian đẩy(stack, đỉnh, đối số) != 0) { thoát; };
+            đỉnh = đỉnh + 1;
+        } hoặc {
+            nếu (mã phép toán == 2) {
+                nếu (đối số < 0) { thoát; };
+                nếu (đối số >= 1000) { thoát; };
+                nếu (biểu diễn trung gian đẩy(stack, đỉnh, byte đọc số nguyên ba mươi hai bit(locals, đối số * 4)) != 0) { thoát; };
+                đỉnh = đỉnh + 1;
+            } hoặc {
+                nếu (mã phép toán == 3) {
+                    nếu (đỉnh < 1) { thoát; };
+                    nếu (đối số < 0) { thoát; };
+                    nếu (đối số >= 1000) { thoát; };
+                    đỉnh = đỉnh - 1;
+                    nếu (byte ghi số nguyên ba mươi hai bit(locals, đối số * 4, byte đọc số nguyên ba mươi hai bit(stack, đỉnh * 4)) != 0) { thoát; };
+                } hoặc {
+                    nếu (mã phép toán == 7) {
+                        nếu (đỉnh != 1) { thoát; };
+                        // A return inside a conditional can precede other IR
+                        // branches. The native codegen accepts these early
+                        // returns; the reference evaluator must do so too.
+                        kết quả trả về = byte đọc số nguyên ba mươi hai bit(stack, 0);
+                        thoát;
+                    } hoặc {
+                        nếu (mã phép toán == 8) {
+                            nếu (đỉnh < 1) { thoát; };
+                            biến một ngôi giá trị đang xét = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
+                            byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, 0 - một ngôi giá trị đang xét);
+                        } hoặc nếu (mã phép toán == 25) {
+                            nếu (đỉnh < 1) { thoát; };
+                            biến luận lý toán hạng = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
+                            biến đã chuẩn hóa = 0;
+                            nếu (luận lý toán hạng == 0) { đã chuẩn hóa = 1; };
+                            byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, đã chuẩn hóa);
+                        } hoặc {
+                            nếu (mã phép toán == 9) {
+                                nếu (đỉnh < 1) { thoát; };
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                đỉnh = đỉnh - 1;
+                                nếu (byte đọc số nguyên ba mươi hai bit(stack, đỉnh * 4) == 0) { pc = đối số - 8; };
+                            } hoặc nếu (mã phép toán == 10) {
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                pc = đối số - 8;
+                            } hoặc {
+                            nếu (đỉnh < 2) { thoát; };
+                            biến b = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4);
+                            biến a = byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 2) * 4);
+                            biến giá trị đang xét = 0;
+                            nếu (mã phép toán == 4) { giá trị đang xét = a + b; }
+                            hoặc {
+                                nếu (mã phép toán == 5) { giá trị đang xét = a - b; }
+                                hoặc {
+                                    nếu (mã phép toán == 6) { giá trị đang xét = a * b; }
+                                    hoặc nếu (mã phép toán == 26) {
+                                        nếu (b == 0) { thoát; };
+                                        giá trị đang xét = máy chia số nguyên ba mươi hai bit(a, b);
+                                    }
+                                    hoặc nếu (mã phép toán == 27) {
+                                        nếu (b == 0) { thoát; };
+                                        giá trị đang xét = a - máy chia số nguyên ba mươi hai bit(a, b) * b;
+                                    }
+                                    hoặc nếu (mã phép toán == 11) { nếu (a == b) { giá trị đang xét = 1; }; }
+                                    hoặc nếu (mã phép toán == 12) { nếu (a != b) { giá trị đang xét = 1; }; }
+                                    hoặc nếu (mã phép toán == 13) { nếu (a < b) { giá trị đang xét = 1; }; }
+                                    hoặc nếu (mã phép toán == 14) { nếu (a <= b) { giá trị đang xét = 1; }; }
+                                    hoặc nếu (mã phép toán == 15) { nếu (a > b) { giá trị đang xét = 1; }; }
+                                    hoặc nếu (mã phép toán == 16) { nếu (a >= b) { giá trị đang xét = 1; }; }
+                                    hoặc { thoát; };
+                                };
+                            };
+                            đỉnh = đỉnh - 1;
+                            nếu (byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, giá trị đang xét) != 0) { thoát; };
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+    byte hủy(locals);
+    byte hủy(stack);
+    trả về kết quả trả về;
+};

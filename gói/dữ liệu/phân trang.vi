@@ -49,21 +49,21 @@ lớp công khai Tiện Ích Phân Trang {
 
 
 hàm công khai trang hợp lệ(trang) {
-    __vpp_adapter = Tiện Ích Phân Trang();
-    trả về __vpp_adapter.trang hợp lệ(trang);
+    bộ chuyển tiếp = Tiện Ích Phân Trang();
+    trả về bộ chuyển tiếp.trang hợp lệ(trang);
 };
 
 hàm công khai kích thước hợp lệ(kích thước) {
-    __vpp_adapter = Tiện Ích Phân Trang();
-    trả về __vpp_adapter.kích thước hợp lệ(kích thước);
+    bộ chuyển tiếp = Tiện Ích Phân Trang();
+    trả về bộ chuyển tiếp.kích thước hợp lệ(kích thước);
 };
 
 hàm công khai độ dời dữ liệu(trang, kích thước) {
-    __vpp_adapter = Tiện Ích Phân Trang();
-    trả về __vpp_adapter.độ dời dữ liệu(trang, kích thước);
+    bộ chuyển tiếp = Tiện Ích Phân Trang();
+    trả về bộ chuyển tiếp.độ dời dữ liệu(trang, kích thước);
 };
 
 hàm công khai tổng số trang(tổng bản ghi, kích thước) {
-    __vpp_adapter = Tiện Ích Phân Trang();
-    trả về __vpp_adapter.tổng số trang(tổng bản ghi, kích thước);
+    bộ chuyển tiếp = Tiện Ích Phân Trang();
+    trả về bộ chuyển tiếp.tổng số trang(tổng bản ghi, kích thước);
 };

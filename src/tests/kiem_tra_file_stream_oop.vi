@@ -38,10 +38,10 @@ hàm chính() {
     in độc_lập.đọc hết() == "abXYef";
     in độc_lập.đọc hết() == "";
     độc_lập.dịch(-2, 2);
-    bytes = độc_lập.đọc bytes(2);
-    in bytes[0] == 101 && bytes[1] == 102;
+    các byte = độc_lập.đọc các byte(2);
+    in các byte[0] == 101 && các byte[1] == 102;
     in độc_lập.dịch(0) && độc_lập.vị trí() == 0;
-    in do_dai(độc_lập.đọc bytes(0)) == 0;
+    in độ dài(độc_lập.đọc các byte(0)) == 0;
     độc_lập.đóng(); ghi_mới.đóng();
     in ghi_mới.đóng();
     chặn_đóng = sai;

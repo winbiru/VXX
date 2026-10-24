@@ -5,5 +5,5 @@ nhập bộ sưu tập;
 hàm chính() {
     in xml thoát("A & B < C > D");
     node = xml phân tích("<gốc id=\"1\"><con>Việt &amp; V++</con></gốc>");
-    in lấy map(node, "tên", "");
+    in lấy từ điển(node, "tên", "");
 };

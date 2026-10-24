@@ -5,83 +5,83 @@ nhập biên dịch;
 hàm công khai khởi tạo() {};
 
 hàm riêng tư tài liệu dựng tham số(tham số) {
-    nếu (độ dài(tham số) == 0) {
+    nếu (máy ảo lấy độ dài(tham số) == 0) {
         trả về "không có";
     };
-    kết_quả = "";
-    lặp(i = 0; i < độ dài(tham số); i++) {
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
         nếu (i > 0) {
-            kết_quả = kết_quả + ", ";
+            kết quả = kết quả + ", ";
         };
         mục = tham số[i];
-        kết_quả = kết_quả + lấy map(mục, "tên", "");
-        nếu (lấy map(mục, "có mặc định", 0)) {
-            kết_quả = kết_quả + " (có mặc định)";
+        kết quả = kết quả + lấy từ điển(mục, "tên", "");
+        nếu (lấy từ điển(mục, "có mặc định", 0)) {
+            kết quả = kết quả + " (có mặc định)";
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm riêng tư tài liệu dựng hàm(mục, tiền tố) {
-    trả về tiền tố + " Hàm " + lấy map(mục, "tên", "") + "\n\n" +
-        "- Phạm vi: " + lấy map(mục, "phạm vi", "mặc định") + "\n" +
-        "- Tham số: " + tài liệu dựng tham số(lấy map(mục, "tham số", [])) + "\n\n";
+    trả về tiền tố + " Hàm " + lấy từ điển(mục, "tên", "") + "\n\n" +
+        "- Phạm vi: " + lấy từ điển(mục, "phạm vi", "mặc định") + "\n" +
+        "- Tham số: " + tài liệu dựng tham số(lấy từ điển(mục, "tham số", [])) + "\n\n";
 };
 
 hàm riêng tư tài liệu dựng kiểu(mục) {
-    loại = lấy map(mục, "loại", "");
+    loại = lấy từ điển(mục, "loại", "");
     nhãn = "Giao diện";
     nếu (loại == "lớp") {
         nhãn = "Lớp";
     };
-    kết_quả = "## " + nhãn + " " + lấy map(mục, "tên", "") + "\n\n" +
-        "- Phạm vi: " + lấy map(mục, "phạm vi", "mặc định") + "\n\n";
-    thành_viên = lấy map(mục, "thành viên", []);
-    lặp(i = 0; i < độ dài(thành_viên); i++) {
-        kết_quả = kết_quả + tài liệu dựng hàm(thành_viên[i], "###");
+    kết quả = "## " + nhãn + " " + lấy từ điển(mục, "tên", "") + "\n\n" +
+        "- Phạm vi: " + lấy từ điển(mục, "phạm vi", "mặc định") + "\n\n";
+    thành viên = lấy từ điển(mục, "thành viên", []);
+    lặp(i = 0; i < máy ảo lấy độ dài(thành viên); i++) {
+        kết quả = kết quả + tài liệu dựng hàm(thành viên[i], "###");
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm công khai tài liệu dựng(mã nguồn, tiêu đề) {
-    phân_tích = biên dịch phân tích(mã nguồn);
-    cây = lấy map(phân_tích, "cây cú pháp", []);
+    phân tích = biên dịch phân tích(mã nguồn);
+    cây = lấy từ điển(phân tích, "cây cú pháp", []);
     nếu (tiêu đề == "") {
         tiêu đề = "Tài liệu V++";
     };
-    kết_quả = "# " + tiêu đề + "\n\n";
+    kết quả = "# " + tiêu đề + "\n\n";
 
-    phụ_thuộc = [];
-    lặp(i = 0; i < độ dài(cây); i++) {
+    phụ thuộc = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(cây); i++) {
         mục = cây[i];
-        nếu (lấy map(mục, "loại", "") == "nhập") {
-            đích = lấy map(mục, "đích", "");
-            nếu (đích != "") { thêm(phụ_thuộc, đích); };
+        nếu (lấy từ điển(mục, "loại", "") == "nhập") {
+            đích = lấy từ điển(mục, "đích", "");
+            nếu (đích != "") { máy ảo thêm cuối danh sách(phụ thuộc, đích); };
         };
     };
-    nếu (độ dài(phụ_thuộc) > 0) {
-        kết_quả = kết_quả + "## Phụ thuộc\n\n";
-        lặp(i = 0; i < độ dài(phụ_thuộc); i++) {
-            kết_quả = kết_quả + "- " + phụ_thuộc[i] + "\n";
+    nếu (máy ảo lấy độ dài(phụ thuộc) > 0) {
+        kết quả = kết quả + "## Phụ thuộc\n\n";
+        lặp(i = 0; i < máy ảo lấy độ dài(phụ thuộc); i++) {
+            kết quả = kết quả + "- " + phụ thuộc[i] + "\n";
         };
-        kết_quả = kết_quả + "\n";
+        kết quả = kết quả + "\n";
     };
 
-    lặp(i = 0; i < độ dài(cây); i++) {
+    lặp(i = 0; i < máy ảo lấy độ dài(cây); i++) {
         mục = cây[i];
-        phạm_vi = lấy map(mục, "phạm vi", "mặc định");
-        nếu (phạm_vi != "riêng tư" && phạm_vi != "bảo vệ") {
-            loại = lấy map(mục, "loại", "");
+        phạm vi = lấy từ điển(mục, "phạm vi", "mặc định");
+        nếu (phạm vi != "riêng tư" && phạm vi != "bảo vệ") {
+            loại = lấy từ điển(mục, "loại", "");
             nếu (loại == "hàm") {
-                kết_quả = kết_quả + tài liệu dựng hàm(mục, "##");
+                kết quả = kết quả + tài liệu dựng hàm(mục, "##");
             } hoặc {
                 nếu (loại == "lớp" || loại == "giao diện") {
-                    kết_quả = kết_quả + tài liệu dựng kiểu(mục);
+                    kết quả = kết quả + tài liệu dựng kiểu(mục);
                 };
             };
         };
     };
-    trả về kết_quả;
+    trả về kết quả;
 };
 
 hàm công khai tài liệu tạo(mã nguồn) {
@@ -89,12 +89,12 @@ hàm công khai tài liệu tạo(mã nguồn) {
 };
 
 hàm công khai tài liệu tạo từ tệp(đường dẫn) {
-    mã_nguồn = đọc tệp(đường dẫn);
-    trả về tài liệu dựng(mã_nguồn, đường dẫn tên(đường dẫn));
+    mã nguồn = đọc tệp(đường dẫn);
+    trả về tài liệu dựng(mã nguồn, đường dẫn tên(đường dẫn));
 };
 
 hàm công khai tài liệu ghi tệp(mã nguồn, đường dẫn) {
-    nội_dung = tài liệu tạo(mã nguồn);
-    ghi tệp(đường dẫn, nội_dung);
-    trả về độ dài(nội_dung);
+    nội dung = tài liệu tạo(mã nguồn);
+    ghi tệp(đường dẫn, nội dung);
+    trả về máy ảo lấy độ dài(nội dung);
 };

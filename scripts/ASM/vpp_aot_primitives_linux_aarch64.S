@@ -504,3 +504,5 @@ Lclang_path: .asciz "/usr/bin/clang"
 .p2align 3
 vpp_native_arena_base: .skip 8
 .section .note.GNU-stack,"",@progbits
+
+#include "vpp_vietnamese_runtime_symbols.inc"

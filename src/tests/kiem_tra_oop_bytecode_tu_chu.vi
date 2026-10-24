@@ -1,4 +1,4 @@
-// So sánh ABI bytecode OOP compiler tự chủ với C++ (từng toán hạng).
+// So sánh ABI mã trung gian OOP compiler tự chủ với C++ (từng toán hạng).
 nhập gói/biên dịch/phát mã;
 nhập gói/biên dịch/chính;
 
@@ -22,10 +22,10 @@ hàm so_lệnh(c, v, nhãn) {
 };
 
 hàm so_oop(nguồn) {
-    tự_chủ = biên dịch phát bytecode thuần(nguồn);
-    chuẩn = biên dịch bytecode(nguồn);
+    tự_chủ = biên dịch phát mã trung gian thuần(nguồn);
+    chuẩn = biên dịch mã trung gian(nguồn);
     khớp = so_lệnh(chuẩn, tự_chủ["bytecode"], "top");
-    hàm_cpp = biên dịch bytecode hàm(nguồn);
+    hàm_cpp = biên dịch mã trung gian hàm(nguồn);
     hàm_vi = tự_chủ["hàm"];
     nếu (độ dài(hàm_cpp) != độ dài(hàm_vi)) {
         in "số hàm: " + thành chuỗi(độ dài(hàm_cpp)) + "/" + thành chuỗi(độ dài(hàm_vi));

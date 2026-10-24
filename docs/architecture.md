@@ -295,13 +295,13 @@ nhập nhập xuất;
 nhập hệ thống;
 nhập mạng;
 nhập dựng;
-nhập gói/mạng/kiểm thử/api;
+nhập gói/mạng/kiểm thử/giao diện lập trình;
 ```
 
 Bare import ưu tiên package cùng tên của project, rồi mới tìm package bundle
 dưới `$VPP_HOME/gói/`. Các alias package cũ được xử lý ở resolver khi cần,
 không xuất hiện trong layout canonical.
-`gói/ứng dụng/chính.vi` không import `gói/ứng dụng/cầu nối/api.vi`;
+`gói/ứng dụng/chính.vi` không import `gói/ứng dụng/cầu nối/giao diện lập trình.vi`;
 routes/schema/token của một project mẫu không phải standard library.
 
 Các package này được bundle cùng runtime nhưng chưa có dependency/version resolver. HTTP, REST và JSON hiện cùng nằm trong package `mạng` để dùng một entrypoint thống nhất. JSON object/array được ánh xạ trực tiếp sang map/list runtime. `lõi` nối native cho chuyển kiểu/type và random; `nhập xuất` nối path/filesystem; `hệ thống` nối env/platform/sleep. Các native helper này không phụ thuộc CLI/stdout.

@@ -7,37 +7,37 @@ nhập công cụ lưu trữ;
 hàm công khai đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên) {
     tạo thư mục(thư mục đích);
 
-    tên_chính = đường dẫn tên(tệp chính);
-    đích_chính = đường dẫn nối(thư mục đích, tên_chính);
-    ghi tệp(đích_chính, đọc tệp(tệp chính));
+    tên chính = đường dẫn tên(tệp chính);
+    đích chính = đường dẫn nối(thư mục đích, tên chính);
+    ghi tệp(đích chính, đọc tệp(tệp chính));
 
-    lặp(i = 0; i < độ dài(tài nguyên); i++) {
+    lặp(i = 0; i < máy ảo lấy độ dài(tài nguyên); i++) {
         nguồn = tài nguyên[i];
-        tên_tệp = đường dẫn tên(nguồn);
-        đích = đường dẫn nối(thư mục đích, tên_tệp);
+        tên tệp = đường dẫn tên(nguồn);
+        đích = đường dẫn nối(thư mục đích, tên tệp);
         ghi tệp(đích, đọc tệp(nguồn));
     };
 
-    manifest = "name=" + tên + "\nentry=" + tên_chính +
-        "\nresources=" + độ dài(tài nguyên) + "\n";
-    đường_manifest = đường dẫn nối(thư mục đích, "vpp-package.txt");
-    ghi tệp(đường_manifest, manifest);
+    bản kê = "name=" + tên + "\nentry=" + tên chính +
+        "\nresources=" + máy ảo lấy độ dài(tài nguyên) + "\n";
+    đường bản kê = đường dẫn nối(thư mục đích, "vpp-package.txt");
+    ghi tệp(đường bản kê, bản kê);
 
     trả về {
         "thư mục": thư mục đích,
-        "tệp chính": tên_chính,
-        "tài nguyên": độ dài(tài nguyên),
-        "manifest": đường_manifest
+        "tệp chính": tên chính,
+        "tài nguyên": máy ảo lấy độ dài(tài nguyên),
+        "bản kê": đường bản kê
     };
 };
 
 hàm công khai đóng gói ứng dụng zip(đường zip, thư mục đích, tên, tệp chính, tài nguyên) {
-    kq = đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên);
-    các_tệp = [];
-    thêm(các_tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tệp chính)));
-    lặp(i = 0; i < độ dài(tài nguyên); i++) {
-        thêm(các_tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tài nguyên[i])));
+    kết quả = đóng gói ứng dụng(thư mục đích, tên, tệp chính, tài nguyên);
+    các tệp = [];
+    máy ảo thêm cuối danh sách(các tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tệp chính)));
+    lặp(i = 0; i < máy ảo lấy độ dài(tài nguyên); i++) {
+        máy ảo thêm cuối danh sách(các tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tài nguyên[i])));
     };
-    thêm(các_tệp, lấy map(kq, "manifest", ""));
-    trả về gói tài nguyên tạo(đường zip, các_tệp);
+    máy ảo thêm cuối danh sách(các tệp, lấy từ điển(kết quả, "bản kê", ""));
+    trả về gói tài nguyên tạo(đường zip, các tệp);
 };

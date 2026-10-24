@@ -9,53 +9,53 @@
 nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/toán học;
 nhập gói/lõi/bảng mã;
-nhập gói/lõi/entropy;
+nhập gói/lõi/nguồn ngẫu nhiên;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Mật Mã {
     hàm công khai khởi tạo() {};
 
     hàm công khai mật mã lũy thừa hai(n) {
-        kết_quả = 1;
+        kết quả = 1;
         lặp(i = 0; i < n; i++) {
-            kết_quả = kết_quả * 2;
+            kết quả = kết quả * 2;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai mật mã xor byte(a, b) {
         x = a;
         y = b;
-        trọng_số = 1;
-        kết_quả = 0;
+        trọng số = 1;
+        kết quả = 0;
         lặp(i = 0; i < 8; i++) {
             nếu ((x % 2) != (y % 2)) {
-                kết_quả = kết_quả + trọng_số;
+                kết quả = kết quả + trọng số;
             };
-            x = lam_tron_xuong(x / 2);
-            y = lam_tron_xuong(y / 2);
-            trọng_số = trọng_số * 2;
+            x = làm tròn xuống(x / 2);
+            y = làm tròn xuống(y / 2);
+            trọng số = trọng số * 2;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai mật mã và byte(a, b) {
         x = a;
         y = b;
-        trọng_số = 1;
-        kết_quả = 0;
+        trọng số = 1;
+        kết quả = 0;
         lặp(i = 0; i < 8; i++) {
             nếu ((x % 2) == 1 && (y % 2) == 1) {
-                kết_quả = kết_quả + trọng_số;
+                kết quả = kết quả + trọng số;
             };
-            x = lam_tron_xuong(x / 2);
-            y = lam_tron_xuong(y / 2);
-            trọng_số = trọng_số * 2;
+            x = làm tròn xuống(x / 2);
+            y = làm tròn xuống(y / 2);
+            trọng số = trọng số * 2;
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã xor word(a, b) {
+    hàm công khai mật mã xor từ máy(a, b) {
         trả về [
             mình.mật mã xor byte(a[0], b[0]),
             mình.mật mã xor byte(a[1], b[1]),
@@ -64,11 +64,11 @@ lớp công khai Bộ Mật Mã {
         ];
     };
 
-    hàm công khai mật mã xor ba word(a, b, c) {
-        trả về mình.mật mã xor word(mình.mật mã xor word(a, b), c);
+    hàm công khai mật mã xor ba từ máy(a, b, c) {
+        trả về mình.mật mã xor từ máy(mình.mật mã xor từ máy(a, b), c);
     };
 
-    hàm công khai mật mã và word(a, b) {
+    hàm công khai mật mã và từ máy(a, b) {
         trả về [
             mình.mật mã và byte(a[0], b[0]),
             mình.mật mã và byte(a[1], b[1]),
@@ -77,80 +77,80 @@ lớp công khai Bộ Mật Mã {
         ];
     };
 
-    hàm công khai mật mã cộng word(a, b) {
-        kết_quả = [0, 0, 0, 0];
+    hàm công khai mật mã cộng từ máy(a, b) {
+        kết quả = [0, 0, 0, 0];
         nhớ = 0;
         lặp(i = 3; i >= 0; i--) {
             tổng = a[i] + b[i] + nhớ;
-            kết_quả[i] = tổng % 256;
-            nhớ = lam_tron_xuong(tổng / 256);
+            kết quả[i] = tổng % 256;
+            nhớ = làm tròn xuống(tổng / 256);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã quay phải(word, số_bit) {
-        dịch_byte = lam_tron_xuong(số_bit / 8);
-        dịch_bit = số_bit % 8;
-        kết_quả = [0, 0, 0, 0];
+    hàm công khai mật mã quay phải(từ máy, số bit) {
+        dịch byte = làm tròn xuống(số bit / 8);
+        dịch bit = số bit % 8;
+        kết quả = [0, 0, 0, 0];
         lặp(i = 0; i < 4; i++) {
-            nguồn = i - dịch_byte;
+            nguồn = i - dịch byte;
             lặp(v = 0; nguồn < 0; v++) {
                 nguồn = nguồn + 4;
             };
             nguồn = nguồn % 4;
-            nếu (dịch_bit == 0) {
-                kết_quả[i] = word[nguồn];
+            nếu (dịch bit == 0) {
+                kết quả[i] = từ máy[nguồn];
             } hoặc {
                 trước = nguồn - 1;
                 nếu (trước < 0) {
                     trước = trước + 4;
                 };
-                mẫu = mình.mật mã lũy thừa hai(dịch_bit);
-                kết_quả[i] = lam_tron_xuong(word[nguồn] / mẫu) +
-                             (word[trước] % mẫu) * mình.mật mã lũy thừa hai(8 - dịch_bit);
+                mẫu = mình.mật mã lũy thừa hai(dịch bit);
+                kết quả[i] = làm tròn xuống(từ máy[nguồn] / mẫu) +
+                             (từ máy[trước] % mẫu) * mình.mật mã lũy thừa hai(8 - dịch bit);
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã dịch phải(word, số_bit) {
-        dịch_byte = lam_tron_xuong(số_bit / 8);
-        dịch_bit = số_bit % 8;
-        kết_quả = [0, 0, 0, 0];
+    hàm công khai mật mã dịch phải(từ máy, số bit) {
+        dịch byte = làm tròn xuống(số bit / 8);
+        dịch bit = số bit % 8;
+        kết quả = [0, 0, 0, 0];
         lặp(i = 0; i < 4; i++) {
-            nguồn = i - dịch_byte;
+            nguồn = i - dịch byte;
             nếu (nguồn >= 0) {
-                nếu (dịch_bit == 0) {
-                    kết_quả[i] = word[nguồn];
+                nếu (dịch bit == 0) {
+                    kết quả[i] = từ máy[nguồn];
                 } hoặc {
-                    mẫu = mình.mật mã lũy thừa hai(dịch_bit);
-                    giá_trị = lam_tron_xuong(word[nguồn] / mẫu);
+                    mẫu = mình.mật mã lũy thừa hai(dịch bit);
+                    giá trị = làm tròn xuống(từ máy[nguồn] / mẫu);
                     nếu (nguồn - 1 >= 0) {
-                        giá_trị = giá_trị +
-                                  (word[nguồn - 1] % mẫu) * mình.mật mã lũy thừa hai(8 - dịch_bit);
+                        giá trị = giá trị +
+                                  (từ máy[nguồn - 1] % mẫu) * mình.mật mã lũy thừa hai(8 - dịch bit);
                     };
-                    kết_quả[i] = giá_trị;
+                    kết quả[i] = giá trị;
                 };
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm công khai mật mã lựa chọn(e, f, g) {
         // Ch(e,f,g) = g xor (e and (f xor g)).
-        trả về mình.mật mã xor word(g, mình.mật mã và word(e, mình.mật mã xor word(f, g)));
+        trả về mình.mật mã xor từ máy(g, mình.mật mã và từ máy(e, mình.mật mã xor từ máy(f, g)));
     };
 
     hàm công khai mật mã đa số(a, b, c) {
-        trả về mình.mật mã xor ba word(
-            mình.mật mã và word(a, b),
-            mình.mật mã và word(a, c),
-            mình.mật mã và word(b, c)
+        trả về mình.mật mã xor ba từ máy(
+            mình.mật mã và từ máy(a, b),
+            mình.mật mã và từ máy(a, c),
+            mình.mật mã và từ máy(b, c)
         );
     };
 
     hàm công khai mật mã sigma lớn không(a) {
-        trả về mình.mật mã xor ba word(
+        trả về mình.mật mã xor ba từ máy(
             mình.mật mã quay phải(a, 2),
             mình.mật mã quay phải(a, 13),
             mình.mật mã quay phải(a, 22)
@@ -158,7 +158,7 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sigma lớn một(e) {
-        trả về mình.mật mã xor ba word(
+        trả về mình.mật mã xor ba từ máy(
             mình.mật mã quay phải(e, 6),
             mình.mật mã quay phải(e, 11),
             mình.mật mã quay phải(e, 25)
@@ -166,7 +166,7 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sigma nhỏ không(x) {
-        trả về mình.mật mã xor ba word(
+        trả về mình.mật mã xor ba từ máy(
             mình.mật mã quay phải(x, 7),
             mình.mật mã quay phải(x, 18),
             mình.mật mã dịch phải(x, 3)
@@ -174,7 +174,7 @@ lớp công khai Bộ Mật Mã {
     };
 
     hàm công khai mật mã sigma nhỏ một(x) {
-        trả về mình.mật mã xor ba word(
+        trả về mình.mật mã xor ba từ máy(
             mình.mật mã quay phải(x, 17),
             mình.mật mã quay phải(x, 19),
             mình.mật mã dịch phải(x, 10)
@@ -202,39 +202,39 @@ lớp công khai Bộ Mật Mã {
         ];
     };
 
-    hàm công khai mật mã độ dài bit bytes(số_byte) {
-        kết_quả = [0, 0, 0, 0, 0, 0, 0, 0];
-        còn_lại = số_byte;
+    hàm công khai mật mã độ dài bit các byte(số byte) {
+        kết quả = [0, 0, 0, 0, 0, 0, 0, 0];
+        còn lại = số byte;
         lặp(i = 7; i >= 0; i--) {
-            kết_quả[i] = còn_lại % 256;
-            còn_lại = lam_tron_xuong(còn_lại / 256);
+            kết quả[i] = còn lại % 256;
+            còn lại = làm tròn xuống(còn lại / 256);
         };
         nhớ = 0;
         lặp(i = 7; i >= 0; i--) {
-            giá_trị = kết_quả[i] * 8 + nhớ;
-            kết_quả[i] = giá_trị % 256;
-            nhớ = lam_tron_xuong(giá_trị / 256);
+            giá trị = kết quả[i] * 8 + nhớ;
+            kết quả[i] = giá trị % 256;
+            nhớ = làm tròn xuống(giá trị / 256);
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã sha256 bytes(bytes) {
-        thông_điệp = [];
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            byte = bytes[i];
-            nếu (loai_cua(byte) != "số nguyên" || byte < 0 || byte > 255) {
+    hàm công khai mật mã sha256 các byte(các byte) {
+        thông điệp = [];
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            byte = các byte[i];
+            nếu (loại của(byte) != "số nguyên" || byte < 0 || byte > 255) {
                 ném "băm sha256: dữ liệu byte không hợp lệ";
             };
-            them(thông_điệp, byte);
+            máy ảo thêm cuối danh sách(thông điệp, byte);
         };
-        độ_dài_gốc = do_dai(thông_điệp);
-        them(thông_điệp, 128);
-        lặp(vòng = 0; do_dai(thông_điệp) % 64 != 56; vòng++) {
-            them(thông_điệp, 0);
+        độ dài gốc = máy ảo lấy độ dài(thông điệp);
+        máy ảo thêm cuối danh sách(thông điệp, 128);
+        lặp(vòng = 0; máy ảo lấy độ dài(thông điệp) % 64 != 56; vòng++) {
+            máy ảo thêm cuối danh sách(thông điệp, 0);
         };
-        dài_bit = mình.mật mã độ dài bit bytes(độ_dài_gốc);
+        dài bit = mình.mật mã độ dài bit các byte(độ dài gốc);
         lặp(i = 0; i < 8; i++) {
-            them(thông_điệp, dài_bit[i]);
+            máy ảo thêm cuối danh sách(thông điệp, dài bit[i]);
         };
 
         h = [
@@ -243,23 +243,23 @@ lớp công khai Bộ Mật Mã {
         ];
         k = mình.mật mã hằng số sha256();
 
-        lặp(bắt_đầu = 0; bắt_đầu < do_dai(thông_điệp); bắt_đầu += 64) {
+        lặp(bắt đầu = 0; bắt đầu < máy ảo lấy độ dài(thông điệp); bắt đầu += 64) {
             w = [];
             lặp(t = 0; t < 16; t++) {
-                p = bắt_đầu + t * 4;
-                them(w, [thông_điệp[p], thông_điệp[p + 1], thông_điệp[p + 2], thông_điệp[p + 3]]);
+                p = bắt đầu + t * 4;
+                máy ảo thêm cuối danh sách(w, [thông điệp[p], thông điệp[p + 1], thông điệp[p + 2], thông điệp[p + 3]]);
             };
-            lặp(t_mở_rộng = 16; t_mở_rộng < 64; t_mở_rộng++) {
-                giá_trị = mình.mật mã cộng word(
-                    mình.mật mã sigma nhỏ một(w[t_mở_rộng - 2]),
-                    w[t_mở_rộng - 7]
+            lặp(t mở rộng = 16; t mở rộng < 64; t mở rộng++) {
+                giá trị = mình.mật mã cộng từ máy(
+                    mình.mật mã sigma nhỏ một(w[t mở rộng - 2]),
+                    w[t mở rộng - 7]
                 );
-                giá_trị = mình.mật mã cộng word(
-                    giá_trị,
-                    mình.mật mã sigma nhỏ không(w[t_mở_rộng - 15])
+                giá trị = mình.mật mã cộng từ máy(
+                    giá trị,
+                    mình.mật mã sigma nhỏ không(w[t mở rộng - 15])
                 );
-                giá_trị = mình.mật mã cộng word(giá_trị, w[t_mở_rộng - 16]);
-                them(w, giá_trị);
+                giá trị = mình.mật mã cộng từ máy(giá trị, w[t mở rộng - 16]);
+                máy ảo thêm cuối danh sách(w, giá trị);
             };
 
             a = h[0];
@@ -271,57 +271,57 @@ lớp công khai Bộ Mật Mã {
             g = h[6];
             hh = h[7];
 
-            lặp(t_vòng = 0; t_vòng < 64; t_vòng++) {
-                t1 = mình.mật mã cộng word(hh, mình.mật mã sigma lớn một(e));
-                t1 = mình.mật mã cộng word(t1, mình.mật mã lựa chọn(e, f, g));
-                t1 = mình.mật mã cộng word(t1, k[t_vòng]);
-                t1 = mình.mật mã cộng word(t1, w[t_vòng]);
-                t2 = mình.mật mã cộng word(mình.mật mã sigma lớn không(a), mình.mật mã đa số(a, b, c));
+            lặp(t vòng = 0; t vòng < 64; t vòng++) {
+                t1 = mình.mật mã cộng từ máy(hh, mình.mật mã sigma lớn một(e));
+                t1 = mình.mật mã cộng từ máy(t1, mình.mật mã lựa chọn(e, f, g));
+                t1 = mình.mật mã cộng từ máy(t1, k[t vòng]);
+                t1 = mình.mật mã cộng từ máy(t1, w[t vòng]);
+                t2 = mình.mật mã cộng từ máy(mình.mật mã sigma lớn không(a), mình.mật mã đa số(a, b, c));
 
                 hh = g;
                 g = f;
                 f = e;
-                e = mình.mật mã cộng word(d, t1);
+                e = mình.mật mã cộng từ máy(d, t1);
                 d = c;
                 c = b;
                 b = a;
-                a = mình.mật mã cộng word(t1, t2);
+                a = mình.mật mã cộng từ máy(t1, t2);
             };
 
-            h[0] = mình.mật mã cộng word(h[0], a);
-            h[1] = mình.mật mã cộng word(h[1], b);
-            h[2] = mình.mật mã cộng word(h[2], c);
-            h[3] = mình.mật mã cộng word(h[3], d);
-            h[4] = mình.mật mã cộng word(h[4], e);
-            h[5] = mình.mật mã cộng word(h[5], f);
-            h[6] = mình.mật mã cộng word(h[6], g);
-            h[7] = mình.mật mã cộng word(h[7], hh);
+            h[0] = mình.mật mã cộng từ máy(h[0], a);
+            h[1] = mình.mật mã cộng từ máy(h[1], b);
+            h[2] = mình.mật mã cộng từ máy(h[2], c);
+            h[3] = mình.mật mã cộng từ máy(h[3], d);
+            h[4] = mình.mật mã cộng từ máy(h[4], e);
+            h[5] = mình.mật mã cộng từ máy(h[5], f);
+            h[6] = mình.mật mã cộng từ máy(h[6], g);
+            h[7] = mình.mật mã cộng từ máy(h[7], hh);
         };
 
-        kết_quả = [];
+        kết quả = [];
         lặp(i = 0; i < 8; i++) {
             lặp(j = 0; j < 4; j++) {
-                them(kết_quả, h[i][j]);
+                máy ảo thêm cuối danh sách(kết quả, h[i][j]);
             };
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã hex(bytes) {
-        alphabet = "0123456789abcdef";
-        kết_quả = "";
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            byte = bytes[i];
-            kết_quả = kết_quả + alphabet[lam_tron_xuong(byte / 16)] + alphabet[byte % 16];
+    hàm công khai mật mã thập lục phân(các byte) {
+        bảng chữ cái = "0123456789abcdef";
+        kết quả = "";
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            byte = các byte[i];
+            kết quả = kết quả + bảng chữ cái[làm tròn xuống(byte / 16)] + bảng chữ cái[byte % 16];
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
-    hàm công khai mật mã utf8 bytes(văn_bản, tên_hàm) {
-        nếu (loai_cua(văn_bản) != "chuỗi") {
-            ném tên_hàm + ": văn bản phải là chuỗi";
+    hàm công khai mật mã unicode tám bit các byte(văn bản, tên hàm) {
+        nếu (loại của(văn bản) != "chuỗi") {
+            ném tên hàm + ": văn bản phải là chuỗi";
         };
-        trả về mã hóa bảng mã(văn_bản, "UTF-8");
+        trả về mã hóa bảng mã(văn bản, "UTF-8");
     };
 
     hàm công khai ngẫu nhiên bảo mật(số byte) {
@@ -334,159 +334,159 @@ lớp công khai Bộ Mật Mã {
         nếu (số byte < 1 || số byte > 4096) {
             ném "ngẫu nhiên bảo mật: số byte phải là số nguyên từ 1 đến 4096";
         };
-        trả về mình.mật mã hex(entropy bảo mật bytes(số byte));
+        trả về mình.mật mã thập lục phân(nguồn ngẫu nhiên bảo mật các byte(số byte));
     };
 
     hàm công khai băm sha256(văn bản) {
-        bytes = mình.mật mã utf8 bytes(văn bản, "băm sha256");
-        trả về mình.mật mã hex(mình.mật mã sha256 bytes(bytes));
+        các byte = mình.mật mã unicode tám bit các byte(văn bản, "băm sha256");
+        trả về mình.mật mã thập lục phân(mình.mật mã sha256 các byte(các byte));
     };
 
     hàm công khai hmac sha256(khóa, văn bản) {
-        nếu (loai_cua(khóa) != "chuỗi") {
+        nếu (loại của(khóa) != "chuỗi") {
             ném "hmac sha256: khóa phải là chuỗi";
         };
-        nếu (loai_cua(văn bản) != "chuỗi") {
+        nếu (loại của(văn bản) != "chuỗi") {
             ném "hmac sha256: văn bản phải là chuỗi";
         };
-        khóa_bytes = mã hóa bảng mã(khóa, "UTF-8");
-        nếu (do_dai(khóa_bytes) > 64) {
-            khóa_bytes = mình.mật mã sha256 bytes(khóa_bytes);
+        khóa các byte = mã hóa bảng mã(khóa, "UTF-8");
+        nếu (máy ảo lấy độ dài(khóa các byte) > 64) {
+            khóa các byte = mình.mật mã sha256 các byte(khóa các byte);
         };
-        lặp(i = do_dai(khóa_bytes); i < 64; i++) {
-            them(khóa_bytes, 0);
+        lặp(i = máy ảo lấy độ dài(khóa các byte); i < 64; i++) {
+            máy ảo thêm cuối danh sách(khóa các byte, 0);
         };
 
         trong = [];
         ngoài = [];
         lặp(i = 0; i < 64; i++) {
-            them(trong, mình.mật mã xor byte(khóa_bytes[i], 54));
-            them(ngoài, mình.mật mã xor byte(khóa_bytes[i], 92));
+            máy ảo thêm cuối danh sách(trong, mình.mật mã xor byte(khóa các byte[i], 54));
+            máy ảo thêm cuối danh sách(ngoài, mình.mật mã xor byte(khóa các byte[i], 92));
         };
-        dữ_liệu = mã hóa bảng mã(văn bản, "UTF-8");
-        lặp(i = 0; i < do_dai(dữ_liệu); i++) {
-            them(trong, dữ_liệu[i]);
+        dữ liệu = mã hóa bảng mã(văn bản, "UTF-8");
+        lặp(i = 0; i < máy ảo lấy độ dài(dữ liệu); i++) {
+            máy ảo thêm cuối danh sách(trong, dữ liệu[i]);
         };
-        băm_trong = mình.mật mã sha256 bytes(trong);
-        lặp(i = 0; i < do_dai(băm_trong); i++) {
-            them(ngoài, băm_trong[i]);
+        băm trong = mình.mật mã sha256 các byte(trong);
+        lặp(i = 0; i < máy ảo lấy độ dài(băm trong); i++) {
+            máy ảo thêm cuối danh sách(ngoài, băm trong[i]);
         };
-        trả về mình.mật mã hex(mình.mật mã sha256 bytes(ngoài));
+        trả về mình.mật mã thập lục phân(mình.mật mã sha256 các byte(ngoài));
     };
 };
 
 
 hàm công khai mật mã lũy thừa hai(n) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã lũy thừa hai(n);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã lũy thừa hai(n);
 };
 
 hàm công khai mật mã xor byte(a, b) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã xor byte(a, b);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã xor byte(a, b);
 };
 
 hàm công khai mật mã và byte(a, b) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã và byte(a, b);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã và byte(a, b);
 };
 
-hàm công khai mật mã xor word(a, b) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã xor word(a, b);
+hàm công khai mật mã xor từ máy(a, b) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã xor từ máy(a, b);
 };
 
-hàm công khai mật mã xor ba word(a, b, c) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã xor ba word(a, b, c);
+hàm công khai mật mã xor ba từ máy(a, b, c) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã xor ba từ máy(a, b, c);
 };
 
-hàm công khai mật mã và word(a, b) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã và word(a, b);
+hàm công khai mật mã và từ máy(a, b) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã và từ máy(a, b);
 };
 
-hàm công khai mật mã cộng word(a, b) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã cộng word(a, b);
+hàm công khai mật mã cộng từ máy(a, b) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã cộng từ máy(a, b);
 };
 
-hàm công khai mật mã quay phải(word, số_bit) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã quay phải(word, số_bit);
+hàm công khai mật mã quay phải(từ máy, số bit) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã quay phải(từ máy, số bit);
 };
 
-hàm công khai mật mã dịch phải(word, số_bit) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã dịch phải(word, số_bit);
+hàm công khai mật mã dịch phải(từ máy, số bit) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã dịch phải(từ máy, số bit);
 };
 
 hàm công khai mật mã lựa chọn(e, f, g) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã lựa chọn(e, f, g);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã lựa chọn(e, f, g);
 };
 
 hàm công khai mật mã đa số(a, b, c) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã đa số(a, b, c);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã đa số(a, b, c);
 };
 
 hàm công khai mật mã sigma lớn không(a) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã sigma lớn không(a);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã sigma lớn không(a);
 };
 
 hàm công khai mật mã sigma lớn một(e) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã sigma lớn một(e);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã sigma lớn một(e);
 };
 
 hàm công khai mật mã sigma nhỏ không(x) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã sigma nhỏ không(x);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã sigma nhỏ không(x);
 };
 
 hàm công khai mật mã sigma nhỏ một(x) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã sigma nhỏ một(x);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã sigma nhỏ một(x);
 };
 
 hàm công khai mật mã hằng số sha256() {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã hằng số sha256();
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã hằng số sha256();
 };
 
-hàm công khai mật mã độ dài bit bytes(số_byte) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã độ dài bit bytes(số_byte);
+hàm công khai mật mã độ dài bit các byte(số byte) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã độ dài bit các byte(số byte);
 };
 
-hàm công khai mật mã sha256 bytes(bytes) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã sha256 bytes(bytes);
+hàm công khai mật mã sha256 các byte(các byte) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã sha256 các byte(các byte);
 };
 
-hàm công khai mật mã hex(bytes) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã hex(bytes);
+hàm công khai mật mã thập lục phân(các byte) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã thập lục phân(các byte);
 };
 
-hàm công khai mật mã utf8 bytes(văn_bản, tên_hàm) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.mật mã utf8 bytes(văn_bản, tên_hàm);
+hàm công khai mật mã unicode tám bit các byte(văn bản, tên hàm) {
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.mật mã unicode tám bit các byte(văn bản, tên hàm);
 };
 
 hàm công khai ngẫu nhiên bảo mật(số byte) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.ngẫu nhiên bảo mật(số byte);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.ngẫu nhiên bảo mật(số byte);
 };
 
 hàm công khai băm sha256(văn bản) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.băm sha256(văn bản);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.băm sha256(văn bản);
 };
 
 hàm công khai hmac sha256(khóa, văn bản) {
-    __vpp_adapter = Bộ Mật Mã();
-    trả về __vpp_adapter.hmac sha256(khóa, văn bản);
+    bộ chuyển tiếp = Bộ Mật Mã();
+    trả về bộ chuyển tiếp.hmac sha256(khóa, văn bản);
 };

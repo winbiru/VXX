@@ -48,7 +48,7 @@ hàm chính() {
     // Literal bao quanh import, C++ phân bổ StringPool khi gặp từng lệnh.
     oracle kiểm thử chuỗi("in \"trước\"; nhập ../lib/math như toán; in \"sau\"; " +
                           "hàm chính() { in \"gốc\"; in toán.cộng(); };");
-    // Các biến cũng sinh bytecode nạp chuỗi trước và sau import.
+    // Các biến cũng sinh mã trung gian nạp chuỗi trước và sau import.
     oracle kiểm thử chuỗi("biến x = \"trước\"; nhập ../lib/math như toán; " +
                           "biến y = \"sau\"; " +
                           "hàm chính() { in x; in toán.cộng(); in y; };");

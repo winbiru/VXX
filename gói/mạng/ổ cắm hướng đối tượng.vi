@@ -4,51 +4,51 @@ nhập gói/mạng/ổ cắm;
 nhập gói/lõi/giao diện tài nguyên;
 
 lớp công khai Ổ Cắm TCP triển khai Đóng Được {
-    hàm công khai khởi tạo(tên_máy, cổng, thời_gian_chờ = 5000) {
-        mình.tên_máy = socket yêu cầu tên máy(tên_máy, "ổ cắm TCP");
-        mình.cổng = socket yêu cầu cổng(cổng, "ổ cắm TCP");
-        mình.thời_gian_chờ = socket yêu cầu timeout(thời_gian_chờ, "ổ cắm TCP");
+    hàm công khai khởi tạo(tên máy, cổng, thời gian chờ = 5000) {
+        mình.tên máy = đầu nối yêu cầu tên máy(tên máy, "ổ cắm TCP");
+        mình.cổng = đầu nối yêu cầu cổng(cổng, "ổ cắm TCP");
+        mình.thời gian chờ = đầu nối yêu cầu thời gian chờ(thời gian chờ, "ổ cắm TCP");
         mình.mã = rỗng;
-        mình.đã_đóng = sai;
+        mình.đã đóng = sai;
     };
 
-    hàm công khai đang mở() { trả về !mình.đã_đóng && mình.mã != rỗng; };
+    hàm công khai đang mở() { trả về !mình.đã đóng && mình.mã != rỗng; };
 
     hàm riêng tư yêu cầu kết nối() {
         nếu (!mình.đang mở()) { ném "ổ cắm TCP: chưa kết nối hoặc đã đóng"; };
     };
 
     hàm công khai kết nối() {
-        nếu (mình.đã_đóng) { ném "ổ cắm TCP: đã đóng"; };
+        nếu (mình.đã đóng) { ném "ổ cắm TCP: đã đóng"; };
         nếu (mình.đang mở()) { trả về sai; };
-        mình.mã = socket tcp mở(mình.tên_máy, mình.cổng, mình.thời_gian_chờ);
+        mình.mã = đầu nối giao vận tin cậy mở(mình.tên máy, mình.cổng, mình.thời gian chờ);
         trả về đúng;
     };
 
-    hàm công khai đặt thời gian chờ(mili_giây) {
-        nếu (mình.đã_đóng) { ném "ổ cắm TCP: đã đóng"; };
-        mới = socket yêu cầu timeout(mili_giây, "ổ cắm TCP");
-        nếu (mình.đang mở()) { socket đặt timeout(mình.mã, mới); };
-        mình.thời_gian_chờ = mới;
+    hàm công khai đặt thời gian chờ(mili giây) {
+        nếu (mình.đã đóng) { ném "ổ cắm TCP: đã đóng"; };
+        mới = đầu nối yêu cầu thời gian chờ(mili giây, "ổ cắm TCP");
+        nếu (mình.đang mở()) { đầu nối đặt thời gian chờ(mình.mã, mới); };
+        mình.thời gian chờ = mới;
         trả về đúng;
     };
 
-    hàm công khai gửi(dữ_liệu) {
+    hàm công khai gửi(dữ liệu) {
         mình.yêu cầu kết nối();
-        trả về socket gửi(mình.mã, dữ_liệu);
+        trả về đầu nối gửi(mình.mã, dữ liệu);
     };
 
-    hàm công khai nhận(số_byte_tối_đa = 65536) {
+    hàm công khai nhận(số byte tối đa = 65536) {
         mình.yêu cầu kết nối();
-        trả về socket nhận(mình.mã, số_byte_tối_đa);
+        trả về đầu nối nhận(mình.mã, số byte tối đa);
     };
 
     hàm công khai đóng() {
-        nếu (mình.đã_đóng) { trả về đúng; };
-        mình.đã_đóng = đúng;
+        nếu (mình.đã đóng) { trả về đúng; };
+        mình.đã đóng = đúng;
         mã = mình.mã;
         mình.mã = rỗng;
-        nếu (mã != rỗng) { socket đóng(mã); };
+        nếu (mã != rỗng) { đầu nối đóng(mã); };
         trả về đúng;
     };
 };

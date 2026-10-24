@@ -8,7 +8,7 @@ lớp công khai Tiện Ích Mã Máy {
     // Trả về DANH SÁCH BYTE, không phải ELF/COFF/Mach-O hay executable.
     // Các word/opcode phải khớp src/native/raw_codegen.cpp (parity tests).
     // Tiện ích ghép byte được dùng chung bởi các backend ISA.
-    hàm công khai biên dịch mã máy chữ hex(chữ) {
+    hàm công khai biên dịch mã máy chữ thập lục phân(chữ) {
         bảng = "0123456789abcdef";
         lặp (i = 0; i < 16; i++) {
             nếu (bảng[i] == chữ) { trả về i; };
@@ -18,13 +18,13 @@ lớp công khai Tiện Ích Mã Máy {
 
     // V++ hiện dùng int32 cho nhiều phép tính. Ghép hai halfword ở dạng signed
     // để không tạo intermediate unsigned 0xffffffff vượt miền số nguyên.
-    hàm công khai biên dịch mã máy word hex(chuỗi) {
-        nếu (độ dài(chuỗi) != 8) { ném "mã máy: word hex cần 8 chữ số"; };
+    hàm công khai biên dịch mã máy từ máy thập lục phân(chuỗi) {
+        nếu (máy ảo lấy độ dài(chuỗi) != 8) { ném "mã máy: word hex cần 8 chữ số"; };
         cao = 0;
         thấp = 0;
         lặp (i = 0; i < 4; i++) {
-            cao = cao * 16 + mình.biên dịch mã máy chữ hex(chuỗi[i]);
-            thấp = thấp * 16 + mình.biên dịch mã máy chữ hex(chuỗi[i + 4]);
+            cao = cao * 16 + mình.biên dịch mã máy chữ thập lục phân(chuỗi[i]);
+            thấp = thấp * 16 + mình.biên dịch mã máy chữ thập lục phân(chuỗi[i + 4]);
         };
         trả về mình.biên dịch mã máy ghép(cao, thấp);
     };
@@ -38,25 +38,25 @@ lớp công khai Tiện Ích Mã Máy {
     };
 
     // Chia nguyên signed sau khi trừ remainder chính xác; hỗ trợ word âm.
-    hàm công khai biên dịch mã máy thêm word(ra, word, ít_trước) {
-        các_byte = [];
-        số = word;
+    hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trước) {
+        các byte = [];
+        số = từ máy;
         lặp (i = 0; i < 4; i++) {
             byte = số % 256;
             nếu (byte < 0) { byte += 256; };
-            thêm(các_byte, byte);
+            máy ảo thêm cuối danh sách(các byte, byte);
             số = (số - byte) / 256;
         };
         lặp (i = 0; i < 4; i++) {
-            nếu (ít_trước) { thêm(ra, các_byte[i]); }
-            hoặc { thêm(ra, các_byte[3 - i]); };
+            nếu (ít trước) { máy ảo thêm cuối danh sách(ra, các byte[i]); }
+            hoặc { máy ảo thêm cuối danh sách(ra, các byte[3 - i]); };
         };
         trả về ra;
     };
 
-    hàm công khai biên dịch mã máy thêm hex(ra, word_hex, ít_trước) {
-        trả về mình.biên dịch mã máy thêm word(ra,
-            mình.biên dịch mã máy word hex(word_hex), ít_trước);
+    hàm công khai biên dịch mã máy thêm thập lục phân(ra, từ máy thập lục phân, ít trước) {
+        trả về mình.biên dịch mã máy thêm từ máy(ra,
+            mình.biên dịch mã máy từ máy thập lục phân(từ máy thập lục phân), ít trước);
     };
 
     hàm công khai biên dịch mã máy trả về(hằng) {
@@ -71,22 +71,22 @@ lớp công khai Tiện Ích Mã Máy {
     };
 
     // Machine IR dùng cùng tên opcode và các trường với C++ MachineInstruction.
-    hàm công khai biên dịch mã máy lệnh(opcode, immediate = 0, operand = 0,
-                               depthBefore = 0, symbol = "") {
-        trả về {"opcode": opcode, "immediate": immediate, "operand": operand,
-                "depthBefore": depthBefore, "symbol": symbol};
+    hàm công khai biên dịch mã máy lệnh(mã thao tác, hằng tức thời = 0, toán hạng = 0,
+                               độ sâu trước đó = 0, mục ký hiệu = "") {
+        trả về {"opcode": mã thao tác, "immediate": hằng tức thời, "operand": toán hạng,
+                "depthBefore": độ sâu trước đó, "symbol": mục ký hiệu};
     };
 
     // C++ symbolNameSafe: chỉ chấp nhận ASCII [A-Za-z_][A-Za-z0-9_]*.
     hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
-        nếu (độ dài(tên) == 0) { trả về sai; };
-        chữ_cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
-        chữ_số = chữ_cái + "0123456789";
-        lặp (i = 0; i < độ dài(tên); i++) {
-            bảng = chữ_số;
-            nếu (i == 0) { bảng = chữ_cái; };
+        nếu (máy ảo lấy độ dài(tên) == 0) { trả về sai; };
+        chữ cái = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
+        chữ số = chữ cái + "0123456789";
+        lặp (i = 0; i < máy ảo lấy độ dài(tên); i++) {
+            bảng = chữ số;
+            nếu (i == 0) { bảng = chữ cái; };
             có = sai;
-            lặp (j = 0; j < độ dài(bảng); j++) {
+            lặp (j = 0; j < máy ảo lấy độ dài(bảng); j++) {
                 nếu (tên[i] == bảng[j]) { có = đúng; thoát; };
             };
             nếu (!có) { trả về sai; };
@@ -95,29 +95,29 @@ lớp công khai Tiện Ích Mã Máy {
     };
 
     // Validate stack transfer từng opcode, kể cả lệnh không thể tới được.
-    hàm riêng tư biên dịch mã máy stack sau(op, slot, sâu_nhất, tổng_lệnh) {
-        mã = op["opcode"];
-        trước = op["depthBefore"];
-        toán_hạng = op["operand"];
-        nếu (trước < 0 || trước > sâu_nhất) { ném "machine IR stack vượt frame"; };
+    hàm riêng tư biên dịch mã máy stack sau(mã phép toán, ô nhớ, sâu nhất, tổng lệnh) {
+        mã = mã phép toán["opcode"];
+        trước = mã phép toán["depthBefore"];
+        toán hạng = mã phép toán["operand"];
+        nếu (trước < 0 || trước > sâu nhất) { ném "machine IR stack vượt frame"; };
         nếu (mã == "Jump" || mã == "BranchZero") {
-            nếu (toán_hạng < 0 || toán_hạng >= tổng_lệnh) {
+            nếu (toán hạng < 0 || toán hạng >= tổng lệnh) {
                 ném "machine IR branch ngoài phạm vi";
             };
         };
         chọn (mã) {
             ca "PushConstant": {
-                nếu (trước >= sâu_nhất) { ném "machine IR stack overflow"; };
+                nếu (trước >= sâu nhất) { ném "machine IR stack overflow"; };
                 trả về trước + 1;
             }
             ca "LoadSlot": {
-                nếu (toán_hạng < 0 || toán_hạng >= slot || trước >= sâu_nhất) {
+                nếu (toán hạng < 0 || toán hạng >= ô nhớ || trước >= sâu nhất) {
                     ném "machine IR load slot ngoài frame";
                 };
                 trả về trước + 1;
             }
             ca "StoreSlot": {
-                nếu (toán_hạng < 0 || toán_hạng >= slot || trước == 0) {
+                nếu (toán hạng < 0 || toán hạng >= ô nhớ || trước == 0) {
                     ném "machine IR store slot ngoài frame";
                 };
                 trả về trước;
@@ -144,12 +144,12 @@ lớp công khai Tiện Ích Mã Máy {
             ca "Greater": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "GreaterEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Call": {
-                nếu (toán_hạng < 0 || trước < toán_hạng ||
-                    trước - toán_hạng >= sâu_nhất ||
-                    !mình.biên dịch mã máy ký hiệu hợp lệ(op["symbol"])) {
+                nếu (toán hạng < 0 || trước < toán hạng ||
+                    trước - toán hạng >= sâu nhất ||
+                    !mình.biên dịch mã máy ký hiệu hợp lệ(mã phép toán["symbol"])) {
                     ném "machine IR call/stack/symbol không hợp lệ";
                 };
-                trả về trước - toán_hạng + 1;
+                trả về trước - toán hạng + 1;
             }
             ca "Jump": { trả về trước; }
             ca "Trap": { trả về trước; }
@@ -164,44 +164,44 @@ lớp công khai Tiện Ích Mã Máy {
 
     // Bản V++ của validateMachineStack C++: kiểm tra các đường CFG, nhảy lùi,
     // độ sâu tại điểm hợp nhánh, return và fallthrough.
-    hàm riêng tư biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, đích, sâu) {
-        nếu (độ_sâu_đến[đích] == -1) {
-            độ_sâu_đến[đích] = sâu;
-            thêm(hàng_đợi, đích);
+    hàm riêng tư biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, đích, sâu) {
+        nếu (độ sâu đến[đích] == -1) {
+            độ sâu đến[đích] = sâu;
+            máy ảo thêm cuối danh sách(hàng đợi, đích);
         };
-        nếu (độ_sâu_đến[đích] != sâu) {
+        nếu (độ sâu đến[đích] != sâu) {
             ném "machine IR stack không khớp tại CFG join/branch";
         };
     };
 
-    hàm công khai biên dịch mã máy kiểm tra CFG(hàm_ir) {
-        lệnh = hàm_ir["instructions"];
-        n = độ dài(lệnh);
+    hàm công khai biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian) {
+        lệnh = danh sách hàm biểu diễn trung gian["instructions"];
+        n = máy ảo lấy độ dài(lệnh);
         nếu (n == 0) { ném "machine IR không có lệnh"; };
-        slot = hàm_ir["slotCount"];
-        sâu_nhất = hàm_ir["maxStackDepth"];
+        ô nhớ = danh sách hàm biểu diễn trung gian["slotCount"];
+        sâu nhất = danh sách hàm biểu diễn trung gian["maxStackDepth"];
         sau = [];
-        độ_sâu_đến = [];
+        độ sâu đến = [];
         lặp (i = 0; i < n; i++) {
-            thêm(sau, mình.biên dịch mã máy stack sau(lệnh[i], slot, sâu_nhất, n));
-            thêm(độ_sâu_đến, -1);
+            máy ảo thêm cuối danh sách(sau, mình.biên dịch mã máy stack sau(lệnh[i], ô nhớ, sâu nhất, n));
+            máy ảo thêm cuối danh sách(độ sâu đến, -1);
         };
-        độ_sâu_đến[0] = 0;
-        hàng_đợi = [0];
-        lặp (head = 0; head < độ dài(hàng_đợi); head++) {
-            i = hàng_đợi[head];
-            op = lệnh[i];
-            nếu (độ_sâu_đến[i] != op["depthBefore"]) {
+        độ sâu đến[0] = 0;
+        hàng đợi = [0];
+        lặp (head = 0; head < máy ảo lấy độ dài(hàng đợi); head++) {
+            i = hàng đợi[head];
+            mã phép toán = lệnh[i];
+            nếu (độ sâu đến[i] != mã phép toán["depthBefore"]) {
                 ném "machine IR stack depth sai tại CFG join/branch";
             };
-            mã = op["opcode"];
+            mã = mã phép toán["opcode"];
             nếu (mã == "Return" || mã == "Trap") { bỏ qua; };
             nếu (mã == "Jump" || mã == "BranchZero") {
-                mình.biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, op["operand"], sau[i]);
+                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, mã phép toán["operand"], sau[i]);
             };
             nếu (mã != "Jump") {
                 nếu (i + 1 >= n) { ném "machine IR fallthrough vượt cuối hàm"; };
-                mình.biên dịch mã máy CFG nối(độ_sâu_đến, hàng_đợi, i + 1, sau[i]);
+                mình.biên dịch mã máy CFG nối(độ sâu đến, hàng đợi, i + 1, sau[i]);
             };
         };
         trả về đúng;
@@ -209,49 +209,49 @@ lớp công khai Tiện Ích Mã Máy {
 };
 
 
-hàm công khai biên dịch mã máy chữ hex(chữ) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy chữ hex(chữ);
+hàm công khai biên dịch mã máy chữ thập lục phân(chữ) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy chữ thập lục phân(chữ);
 };
 
-hàm công khai biên dịch mã máy word hex(chuỗi) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy word hex(chuỗi);
+hàm công khai biên dịch mã máy từ máy thập lục phân(chuỗi) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy từ máy thập lục phân(chuỗi);
 };
 
 hàm công khai biên dịch mã máy ghép(cao, thấp) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy ghép(cao, thấp);
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy ghép(cao, thấp);
 };
 
-hàm công khai biên dịch mã máy thêm word(ra, word, ít_trước) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy thêm word(ra, word, ít_trước);
+hàm công khai biên dịch mã máy thêm từ máy(ra, từ máy, ít trước) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy thêm từ máy(ra, từ máy, ít trước);
 };
 
-hàm công khai biên dịch mã máy thêm hex(ra, word_hex, ít_trước) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy thêm hex(ra, word_hex, ít_trước);
+hàm công khai biên dịch mã máy thêm thập lục phân(ra, từ máy thập lục phân, ít trước) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy thêm thập lục phân(ra, từ máy thập lục phân, ít trước);
 };
 
 hàm công khai biên dịch mã máy trả về(hằng) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy trả về(hằng);
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy trả về(hằng);
 };
 
-hàm công khai biên dịch mã máy lệnh(opcode, immediate = 0, operand = 0,
-                           depthBefore = 0, symbol = "") {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy lệnh(opcode, immediate, operand, depthBefore, symbol);
+hàm công khai biên dịch mã máy lệnh(mã thao tác, hằng tức thời = 0, toán hạng = 0,
+                           độ sâu trước đó = 0, mục ký hiệu = "") {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy lệnh(mã thao tác, hằng tức thời, toán hạng, độ sâu trước đó, mục ký hiệu);
 };
 
 hàm công khai biên dịch mã máy ký hiệu hợp lệ(tên) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy ký hiệu hợp lệ(tên);
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy ký hiệu hợp lệ(tên);
 };
 
-hàm công khai biên dịch mã máy kiểm tra CFG(hàm_ir) {
-    __vpp_adapter = Tiện Ích Mã Máy();
-    trả về __vpp_adapter.biên dịch mã máy kiểm tra CFG(hàm_ir);
+hàm công khai biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian) {
+    bộ chuyển tiếp = Tiện Ích Mã Máy();
+    trả về bộ chuyển tiếp.biên dịch mã máy kiểm tra CFG(danh sách hàm biểu diễn trung gian);
 };
 

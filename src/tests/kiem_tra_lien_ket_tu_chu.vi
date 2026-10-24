@@ -1,12 +1,12 @@
-// Fixture linker V++: đối chiếu với bytecode C++ trước giai đoạn nối.
+// Fixture linker V++: đối chiếu với mã trung gian C++ trước giai đoạn nối.
 nhập gói/biên dịch/liên kết;
 nhập gói/biên dịch/chính;
 
 hàm chính() {
     nguồn = "hàm f(x) { trả về x + 1; }; hàm chính() { in f(2); };";
-    chưa = biên dịch phát bytecode thuần(nguồn);
-    đã = biên dịch liên kết bytecode thuần(chưa);
-    cpp = biên dịch bytecode(nguồn);
+    chưa = biên dịch phát mã trung gian thuần(nguồn);
+    đã = biên dịch liên kết mã trung gian thuần(chưa);
+    cpp = biên dịch mã trung gian(nguồn);
     in đã["loại"] == "bytecode V++ đã liên kết";
     in đã["điểm vào"] == 1;
     in độ dài(đã["hàm"]) == 2;
@@ -42,19 +42,19 @@ hàm chính() {
 
     // Metadata bị hỏng phải ném lỗi, không nối artifact thiếu khai báo.
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "bytecode V++ chưa liên kết",
         "bytecode": [], "hàm": chưa["hàm"],
         "slots": chưa["slots"], "chuỗi": chưa["chuỗi"]}); }
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "bytecode V++ chưa liên kết",
         "bytecode": chưa["bytecode"], "hàm": chưa["hàm"],
         "slots": [], "chuỗi": chưa["chuỗi"]}); }
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch liên kết bytecode thuần({"loại": "bytecode V++ chưa liên kết",
+    thử { biên dịch liên kết mã trung gian thuần({"loại": "bytecode V++ chưa liên kết",
         "bytecode": chưa["bytecode"], "hàm": chưa["hàm"],
         "slots": chưa["slots"], "chuỗi": []}); }
     bắt lỗi (e) { lỗi = đúng; };

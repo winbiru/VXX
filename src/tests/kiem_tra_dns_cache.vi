@@ -1,41 +1,41 @@
-nhập gói/mạng/dns_cache;
+nhập gói/mạng/bộ nhớ đệm tên miền;
 nhập gói/bộ sưu tập/từ điển;
 
 hàm chính() {
     cache = Bộ Nhớ Đệm DNS(2);
-    in cache.dns số mục() == 0 &&
-       lấy map(cache.dns đọc("rỗng"), "status", "") == "";
+    in cache.phân giải tên miền số mục() == 0 &&
+       lấy từ điển(cache.phân giải tên miền đọc("rỗng"), "status", "") == "";
 
     nguồn = ["203.0.113.4"];
     hợp_lệ = {"status": "NOERROR", "addresses": nguồn, "rcode": 0, "ttl": 60};
-    in cache.dns ghi("A", hợp_lệ) && cache.dns số mục() == 1;
+    in cache.phân giải tên miền ghi("A", hợp_lệ) && cache.phân giải tên miền số mục() == 1;
     nguồn[0] = "203.0.113.99";
-    lần_đọc = cache.dns đọc("A");
-    địa_chỉ = lấy map(lần_đọc, "addresses", []);
+    lần_đọc = cache.phân giải tên miền đọc("A");
+    địa_chỉ = lấy từ điển(lần_đọc, "addresses", []);
     in địa_chỉ[0] == "203.0.113.4" &&
-       lấy map(lần_đọc, "ttl", -1) >= 0 &&
-       lấy map(lần_đọc, "ttl", -1) <= 60;
+       lấy từ điển(lần_đọc, "ttl", -1) >= 0 &&
+       lấy từ điển(lần_đọc, "ttl", -1) <= 60;
 
     địa_chỉ[0] = "203.0.113.88";
-    in lấy map(cache.dns đọc("A"), "addresses", [])[0] == "203.0.113.4";
+    in lấy từ điển(cache.phân giải tên miền đọc("A"), "addresses", [])[0] == "203.0.113.4";
 
     // Không lưu phản hồi phủ định và những bản ghi TTL=0.
-    in !cache.dns ghi("phủ định", {"status": "NXDOMAIN", "addresses": [], "ttl": 60}) &&
-       !cache.dns ghi("không dữ liệu", {"status": "NODATA", "addresses": [], "ttl": 60}) &&
-       !cache.dns ghi("hết hạn", {"status": "NOERROR", "addresses": ["x"], "ttl": 0}) &&
-       cache.dns số mục() == 1;
+    in !cache.phân giải tên miền ghi("phủ định", {"status": "NXDOMAIN", "addresses": [], "ttl": 60}) &&
+       !cache.phân giải tên miền ghi("không dữ liệu", {"status": "NODATA", "addresses": [], "ttl": 60}) &&
+       !cache.phân giải tên miền ghi("hết hạn", {"status": "NOERROR", "addresses": ["x"], "ttl": 0}) &&
+       cache.phân giải tên miền số mục() == 1;
 
-    in cache.dns ghi("B", {"status": "NOERROR", "addresses": ["203.0.113.5"], "ttl": 120});
-    in cache.dns ghi("C", {"status": "NOERROR", "addresses": ["203.0.113.6"], "ttl": 10}) &&
-       cache.dns số mục() == 2 &&
-       lấy map(cache.dns đọc("A"), "status", "") == "";
-    in lấy map(cache.dns đọc("B"), "addresses", [])[0] == "203.0.113.5" &&
-       lấy map(cache.dns đọc("C"), "addresses", [])[0] == "203.0.113.6";
+    in cache.phân giải tên miền ghi("B", {"status": "NOERROR", "addresses": ["203.0.113.5"], "ttl": 120});
+    in cache.phân giải tên miền ghi("C", {"status": "NOERROR", "addresses": ["203.0.113.6"], "ttl": 10}) &&
+       cache.phân giải tên miền số mục() == 2 &&
+       lấy từ điển(cache.phân giải tên miền đọc("A"), "status", "") == "";
+    in lấy từ điển(cache.phân giải tên miền đọc("B"), "addresses", [])[0] == "203.0.113.5" &&
+       lấy từ điển(cache.phân giải tên miền đọc("C"), "addresses", [])[0] == "203.0.113.6";
 
     // Ghi đè khóa cũ phải cập nhật nội dung và không tăng số mục.
-    in cache.dns ghi("B", {"status": "NOERROR", "addresses": ["203.0.113.7"], "ttl": 4}) &&
-       cache.dns số mục() == 2 &&
-       lấy map(cache.dns đọc("B"), "addresses", [])[0] == "203.0.113.7";
+    in cache.phân giải tên miền ghi("B", {"status": "NOERROR", "addresses": ["203.0.113.7"], "ttl": 4}) &&
+       cache.phân giải tên miền số mục() == 2 &&
+       lấy từ điển(cache.phân giải tên miền đọc("B"), "addresses", [])[0] == "203.0.113.7";
 
     lỗi = sai;
     thử { Bộ Nhớ Đệm DNS(0); } bắt lỗi(e) { lỗi = đúng; };

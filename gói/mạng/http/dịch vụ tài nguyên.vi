@@ -1,0 +1,276 @@
+// Module: mạng.rest
+// Mục đích: wrapper REST tiện dụng trên nền module mạng.
+// Nhóm hàm: nối URL, rest lấy, rest gửi, rest cập nhật.
+
+nhập gói/mạng/http/máy khách;
+nhập gói/dữ liệu/json/chính;
+
+// Lưu ngữ cảnh của một phản hồi, gom quy tắc thành công/lỗi và tạo JSON.
+// Hai phương thức giữ nguyên định dạng cũ: an toàn escape message, còn
+// object chèn message trực tiếp để tương thích với những API đang sử dụng.
+lớp công khai Bộ Dựng Phản Hồi REST {
+    hàm công khai khởi tạo(thành công, thông báo) {
+        mình.thành công = thành công;
+        mình.thông báo = thông báo;
+    };
+
+    hàm công khai an toàn(dữ liệu json) {
+        trạng thái = "false";
+        nếu (mình.thành công) { trạng thái = "true"; };
+        trả về "{" + json thuộc tính thô("data", dữ liệu json) + "," +
+            json thuộc tính thô("success", trạng thái) + "," +
+            json thuộc tính chuỗi("message", mình.thông báo) + "}";
+    };
+
+    hàm công khai đối tượng(dữ liệu json) {
+        trạng thái = "false";
+        nếu (mình.thành công) { trạng thái = "true"; };
+        trả về "{\"data\":" + dữ liệu json + ",\"success\":" + trạng thái +
+            ",\"message\":\"" + mình.thông báo + "\"}";
+    };
+
+    hàm công khai dữ liệu(mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+        dữ liệu json = "{\"requestId\":\"" + mã yêu cầu + "\",\"" + khóa dữ liệu +
+            "\":\"" + giá trị dữ liệu + "\"}";
+        trả về mình.đối tượng(dữ liệu json);
+    };
+
+    hàm công khai jwt(từ tố, mã làm mới) {
+        dữ liệu json = "{\"token\":\"" + từ tố + "\",\"refreshToken\":\"" +
+            mã làm mới + "\"}";
+        trả về mình.đối tượng(dữ liệu json);
+    };
+};
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp riêng tư Xử Lý Nội Bộ Dịch Vụ Tài Nguyên {
+    hàm công khai khởi tạo() {};
+
+    // Ghi chú hàm: nối đường dẫn url.
+    hàm công khai nối đường dẫn địa chỉ tài nguyên(gốc dữ liệu, đường dẫn) {
+        nếu (đường dẫn == "") {
+            trả về gốc dữ liệu;
+        };
+        nếu (gốc dữ liệu == "") {
+            trả về đường dẫn;
+        };
+        trả về gốc dữ liệu + đường dẫn;
+    };
+
+    // Ghi chú hàm: rest lấy.
+    hàm công khai dịch vụ tài nguyên lấy(gốc dữ liệu, đường dẫn) {
+        trả về mạng lấy(mình.nối đường dẫn địa chỉ tài nguyên(gốc dữ liệu, đường dẫn));
+    };
+
+    // Ghi chú hàm: rest gửi.
+    hàm công khai dịch vụ tài nguyên gửi(gốc dữ liệu, đường dẫn, dữ liệu) {
+        trả về mạng gửi(mình.nối đường dẫn địa chỉ tài nguyên(gốc dữ liệu, đường dẫn), dữ liệu);
+    };
+
+    // Ghi chú hàm: rest cập nhật.
+    hàm công khai dịch vụ tài nguyên cập nhật(gốc dữ liệu, đường dẫn, dữ liệu) {
+        trả về mạng cập nhật(mình.nối đường dẫn địa chỉ tài nguyên(gốc dữ liệu, đường dẫn), dữ liệu);
+    };
+
+    // Ghi chú hàm: rest xóa.
+    hàm công khai dịch vụ tài nguyên xóa(gốc dữ liệu, đường dẫn) {
+        trả về mạng xóa(mình.nối đường dẫn địa chỉ tài nguyên(gốc dữ liệu, đường dẫn));
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công không escape dữ liệu raw.
+    // Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
+    hàm công khai dịch vụ tài nguyên json thành công an toàn(thông điệp, dữ liệu json) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, thông điệp).an toàn(dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi không escape dữ liệu raw.
+    // Dùng khi dataJson đã là JSON hợp lệ, ví dụ từ json đối tượng một chuỗi(...).
+    hàm công khai dịch vụ tài nguyên json lỗi an toàn(thông điệp, dữ liệu json) {
+        trả về Bộ Dựng Phản Hồi REST(sai, thông điệp).an toàn(dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công chuẩn API.
+    hàm công khai dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, thông điệp).đối tượng(dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi chuẩn API với data object tùy biến.
+    hàm công khai dịch vụ tài nguyên json lỗi đối tượng(thông điệp, dữ liệu json) {
+        trả về Bộ Dựng Phản Hồi REST(sai, thông điệp).đối tượng(dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON response thành công chuẩn API.
+    hàm công khai dịch vụ tài nguyên json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu) {
+        dữ liệu json = "{\"requestId\":\"" + mã yêu cầu + "\",\"value\":\"" + giá trị dữ liệu + "\"}";
+        trả về mình.dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON response lỗi chuẩn API.
+    hàm công khai dịch vụ tài nguyên json lỗi(thông điệp, mã yêu cầu) {
+        dữ liệu json = "{\"requestId\":\"" + mã yêu cầu + "\"}";
+        trả về mình.dịch vụ tài nguyên json lỗi đối tượng(thông điệp, dữ liệu json);
+    };
+
+    // Ghi chú hàm: dựng JSON thành công với data object gồm requestId và một key bất kỳ.
+    hàm công khai dịch vụ tài nguyên json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, thông điệp).dữ liệu(mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+    };
+
+    // Ghi chú hàm: dựng JSON lỗi với data object gồm requestId và một key bất kỳ.
+    hàm công khai dịch vụ tài nguyên json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+        trả về Bộ Dựng Phản Hồi REST(sai, thông điệp).dữ liệu(mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+    };
+
+    // Ghi chú hàm: in JSON response thành công với data object tùy biến.
+    hàm công khai dịch vụ tài nguyên in json thành công đối tượng(thông điệp, dữ liệu json) {
+        in mình.dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response lỗi với data object tùy biến.
+    hàm công khai dịch vụ tài nguyên in json lỗi đối tượng(thông điệp, dữ liệu json) {
+        in mình.dịch vụ tài nguyên json lỗi đối tượng(thông điệp, dữ liệu json);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON thành công với data object requestId + key/value.
+    hàm công khai dịch vụ tài nguyên in json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+        in mình.dịch vụ tài nguyên json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON lỗi với data object requestId + key/value.
+    hàm công khai dịch vụ tài nguyên in json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+        in mình.dịch vụ tài nguyên json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: dựng JSON thành công cho luồng đăng nhập JWT.
+    hàm công khai dịch vụ tài nguyên json thành công jwt(thông điệp, từ tố, mã làm mới) {
+        trả về Bộ Dựng Phản Hồi REST(đúng, thông điệp).jwt(từ tố, mã làm mới);
+    };
+
+    // Ghi chú hàm: in JSON thành công cho luồng đăng nhập JWT.
+    hàm công khai dịch vụ tài nguyên in json thành công jwt(thông điệp, từ tố, mã làm mới) {
+        in mình.dịch vụ tài nguyên json thành công jwt(thông điệp, từ tố, mã làm mới);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response thành công.
+    hàm công khai dịch vụ tài nguyên in json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu) {
+        in mình.dịch vụ tài nguyên json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu);
+        trả về 0;
+    };
+
+    // Ghi chú hàm: in JSON response lỗi.
+    hàm công khai dịch vụ tài nguyên in json lỗi(thông điệp, mã yêu cầu) {
+        in mình.dịch vụ tài nguyên json lỗi(thông điệp, mã yêu cầu);
+        trả về 0;
+    };
+};
+
+
+hàm công khai nối đường dẫn địa chỉ tài nguyên(gốc, đường dẫn) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.nối đường dẫn địa chỉ tài nguyên(gốc, đường dẫn);
+};
+
+hàm công khai dịch vụ tài nguyên lấy(gốc, đường dẫn) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên lấy(gốc, đường dẫn);
+};
+
+hàm công khai dịch vụ tài nguyên gửi(gốc, đường dẫn, dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên gửi(gốc, đường dẫn, dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên cập nhật(gốc, đường dẫn, dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên cập nhật(gốc, đường dẫn, dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên xóa(gốc, đường dẫn) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên xóa(gốc, đường dẫn);
+};
+
+hàm công khai dịch vụ tài nguyên json thành công an toàn(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json thành công an toàn(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên json lỗi an toàn(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json lỗi an toàn(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên json lỗi đối tượng(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json lỗi đối tượng(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu);
+};
+
+hàm công khai dịch vụ tài nguyên json lỗi(thông điệp, mã yêu cầu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json lỗi(thông điệp, mã yêu cầu);
+};
+
+hàm công khai dịch vụ tài nguyên json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên in json thành công đối tượng(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json thành công đối tượng(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên in json lỗi đối tượng(thông điệp, dữ liệu json) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json lỗi đối tượng(thông điệp, dữ liệu json);
+};
+
+hàm công khai dịch vụ tài nguyên in json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json thành công dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên in json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json lỗi dữ liệu(thông điệp, mã yêu cầu, khóa dữ liệu, giá trị dữ liệu);
+};
+
+hàm công khai dịch vụ tài nguyên json thành công jwt(thông điệp, từ tố, mã làm mới) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên json thành công jwt(thông điệp, từ tố, mã làm mới);
+};
+
+hàm công khai dịch vụ tài nguyên in json thành công jwt(thông điệp, từ tố, mã làm mới) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json thành công jwt(thông điệp, từ tố, mã làm mới);
+};
+
+hàm công khai dịch vụ tài nguyên in json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json thành công(thông điệp, giá trị dữ liệu, mã yêu cầu);
+};
+
+hàm công khai dịch vụ tài nguyên in json lỗi(thông điệp, mã yêu cầu) {
+    bộ chuyển tiếp = Xử Lý Nội Bộ Dịch Vụ Tài Nguyên();
+    trả về bộ chuyển tiếp.dịch vụ tài nguyên in json lỗi(thông điệp, mã yêu cầu);
+};

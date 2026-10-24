@@ -3,7 +3,7 @@ Lỗi: đọc tệp: không thể mở tệp để đọc
 Cách sửa: Hãy kiểm tra dữ liệu truyền vào, tệp/đường dẫn, quyền truy cập hoặc kết nối mà tác vụ này cần.
 Dấu vết lỗi:
   ở Bộ Đệm Tệp.báo lỗi (gói/nhập xuất/bộ đệm tệp.vi:56:9) [mô đun=gói/nhập xuất/bộ đệm tệp.vi]
-  ở Hệ Tệp.tệp đọc bytes posix (gói/nhập xuất/tệp.vi:40:17) [mô đun=gói/nhập xuất/tệp.vi]
-  ở Hệ Tệp.đọc tệp (gói/nhập xuất/tệp.vi:88:38) [mô đun=gói/nhập xuất/tệp.vi]
+  ở Hệ Tệp.tệp đọc các byte posix (gói/nhập xuất/tệp.vi:40:17) [mô đun=gói/nhập xuất/tệp.vi]
+  ở Hệ Tệp.đọc tệp (gói/nhập xuất/tệp.vi:88:48) [mô đun=gói/nhập xuất/tệp.vi]
   ở đọc tệp (gói/nhập xuất/tệp.vi:186:16) [mô đun=gói/nhập xuất/tệp.vi]
   ở chính (src/tests/kiem_tra_loi_doc_tep_that_bai.vi:5:8) [mô đun=src/tests/kiem_tra_loi_doc_tep_that_bai.vi]

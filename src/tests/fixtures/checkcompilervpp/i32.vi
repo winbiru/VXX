@@ -1,4 +1,4 @@
-// Source compiler, bytecode artifact and VM must agree at the i32 boundaries.
+// Source compiler, mã trung gian artifact and VM must agree at the i32 boundaries.
 hàm tính(a, b) {
     in a + b;
     in a - b;

@@ -1,0 +1,15 @@
+nhập lượng tử;
+nhập kiểm thử;
+hàm chính() {
+    m = Mạch Lượng Tử(2, 3);
+    m.h(0) .x(1) .y(0) .z(1) .s(0) .t(1) .cx(1, 0) .đo(0, 2) .đặt lại(1);
+    kỳ vọng = "OPENQASM 3.0;\ninclude \"stdgates.inc\";\nqubit[2] q;\nbit[3] c;\n" + "h q[0];\nx q[1];\ny q[0];\nz q[1];\ns q[0];\nt q[1];\n" + "cx q[1], q[0];\nc[2] = measure q[0];\nreset q[1];\n";
+    khẳng định bằng(xuất openqasm(m), kỳ vọng);
+    khẳng định bằng(độ dài(m.các lệnh()), 9);
+    // Bộ xuất không bị giới hạn bộ nhớ của bộ mô phỏng.
+    lớn = Mạch Lượng Tử(100);
+    lớn.h(99) .đo(99, 99);
+    khẳng định bằng(xuất openqasm(lớn), "OPENQASM 3.0;\ninclude \"stdgates.inc\";\nqubit[100] q;\nbit[100] c;\n" + "h q[99];\nc[99] = measure q[99];\n");
+    in "openqasm-registers-gates-measure-reset: ok";
+}
+;

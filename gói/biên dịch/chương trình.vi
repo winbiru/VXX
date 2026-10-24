@@ -6,67 +6,76 @@ nhập gói/bộ sưu tập/từ điển;
 
 
 // API parser thuần V++: không gọi snapshot / compiler C++.
-hàm công khai biên dịch phân tích chương trình thuần(mã_nguồn) {
-    bộ = Bộ Phân Tích Cú Pháp(mã_nguồn);
+hàm công khai biên dịch phân tích chương trình thuần(mã nguồn) {
+    bộ = Bộ Phân Tích Cú Pháp(mã nguồn);
     trả về bộ.phân tích();
 };
 
 lớp công khai Bộ Phân Tích Cú Pháp {
-    hàm công khai khởi tạo(mã_nguồn, các_token = rỗng) {
-        nếu (các_token == rỗng) { các_token = biên dịch token hóa(mã_nguồn); };
-        mình.các_token = các_token;
-        mình.vị_trí = 0;
+    hàm công khai khởi tạo(mã nguồn, các từ tố = rỗng) {
+        nếu (các từ tố == rỗng) { các từ tố = biên dịch từ tố hóa(mã nguồn); };
+        mình.các từ tố = các từ tố;
+        mình.vị trí = 0;
     };
     hàm công khai phân tích() {
-        p = biên dịch biểu thức tạo parser(mình.các_token);
+        p = biên dịch biểu thức tạo phân tích cú pháp(mình.các từ tố);
         p["tên nhiều từ"] = đúng;
-        câu_lệnh = [];
-        lặp(i = 0; p["vị trí"] < độ dài(p["token"]); i++) {
-            thêm(câu_lệnh, mình.biên dịch chương trình câu lệnh(p));
+        câu lệnh = [];
+        lặp(i = 0; p["vị trí"] < máy ảo lấy độ dài(p["token"]); i++) {
+            máy ảo thêm cuối danh sách(câu lệnh, mình.biên dịch chương trình câu lệnh(p));
         };
-        mình.vị_trí = p["vị trí"];
-        trả về {"loại": "chương trình", "câu lệnh": câu_lệnh};
+        mình.vị trí = p["vị trí"];
+        trả về {"loại": "chương trình", "câu lệnh": câu lệnh};
     };
-    hàm công khai vị trí() { trả về mình.vị_trí; };
+    hàm công khai vị trí() { trả về mình.vị trí; };
 
     hàm riêng tư biên dịch chương trình giá trị(p) {
-        trả về lấy map(biên dịch biểu thức nhìn(p), "giá trị", "");
+        trả về lấy từ điển(biên dịch biểu thức nhìn(p), "giá trị", "");
     };
 
-    hàm riêng tư biên dịch chương trình nhận(p, giá_trị) {
-        nếu (mình.biên dịch chương trình giá trị(p) == giá_trị) {
+    hàm riêng tư biên dịch chương trình nhận(p, giá trị) {
+        nếu (mình.biên dịch chương trình giá trị(p) == giá trị) {
             biên dịch biểu thức lấy(p);
             trả về đúng;
         };
         trả về sai;
     };
 
-    hàm riêng tư biên dịch chương trình tên(p, ngữ_cảnh) {
-        token = biên dịch biểu thức nhìn(p);
-        nếu (lấy map(token, "loại", "") != "định danh") {
-            biên dịch biểu thức lỗi(p, "cần tên " + ngữ_cảnh);
+    hàm riêng tư biên dịch chương trình tên(p, ngữ cảnh) {
+        từ tố = biên dịch biểu thức nhìn(p);
+        nếu (lấy từ điển(từ tố, "loại", "") != "định danh") {
+            biên dịch biểu thức lỗi(p, "cần tên " + ngữ cảnh);
         };
         biên dịch biểu thức lấy(p);
-        trả về lấy map(token, "giá trị", "");
+        trả về lấy từ điển(từ tố, "giá trị", "");
     };
 
     // Tên kiểu có thể gồm nhiều từ; từ khóa kế thừa/triển khai kết thúc tên.
-    hàm riêng tư biên dịch chương trình tên kiểu(p, ngữ_cảnh) {
-        tên = mình.biên dịch chương trình tên(p, ngữ_cảnh);
-        lặp(i = 0; lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "định danh"; i++) {
-            tên += " " + mình.biên dịch chương trình tên(p, ngữ_cảnh);
+    hàm riêng tư biên dịch chương trình tên kiểu(p, ngữ cảnh, cho phép từ khóa = sai) {
+        đầu = biên dịch biểu thức nhìn(p);
+        loại đầu = lấy từ điển(đầu, "loại", "");
+        nếu (loại đầu != "định danh" && !(cho phép từ khóa && loại đầu == "từ khóa")) {
+            biên dịch biểu thức lỗi(p, "cần tên " + ngữ cảnh);
+        };
+        tên = biên dịch biểu thức lấy(p)["giá trị"];
+        lặp(i = 0; đúng; i++) {
+            loại tiếp = lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "");
+            nếu (loại tiếp != "định danh" && !(cho phép từ khóa && loại tiếp == "từ khóa")) {
+                thoát;
+            };
+            tên += " " + biên dịch biểu thức lấy(p)["giá trị"];
         };
         trả về tên;
     };
 
     hàm riêng tư biên dịch chương trình kiểu ABI(p) {
-        token = biên dịch biểu thức nhìn(p);
-        nếu (lấy map(token, "loại", "") != "định danh" &&
-            lấy map(token, "giá trị", "") != "rỗng") {
+        từ tố = biên dịch biểu thức nhìn(p);
+        nếu (lấy từ điển(từ tố, "loại", "") != "định danh" &&
+            lấy từ điển(từ tố, "giá trị", "") != "rỗng") {
             biên dịch biểu thức lỗi(p, "cần tên kiểu ABI");
         };
         biên dịch biểu thức lấy(p);
-        trả về token["giá trị"];
+        trả về từ tố["giá trị"];
     };
 
     hàm riêng tư biên dịch chương trình biểu thức(p) {
@@ -75,61 +84,61 @@ lớp công khai Bộ Phân Tích Cú Pháp {
 
     hàm riêng tư biên dịch chương trình khối(p) {
         biên dịch biểu thức chờ(p, "{");
-        câu_lệnh = [];
+        câu lệnh = [];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != "}"; i++) {
-            nếu (lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                 biên dịch biểu thức lỗi(p, "thiếu '}' đóng khối");
             };
-            thêm(câu_lệnh, mình.biên dịch chương trình câu lệnh(p));
+            máy ảo thêm cuối danh sách(câu lệnh, mình.biên dịch chương trình câu lệnh(p));
         };
         biên dịch biểu thức chờ(p, "}");
-        trả về {"loại": "khối", "câu lệnh": câu_lệnh};
+        trả về {"loại": "khối", "câu lệnh": câu lệnh};
     };
 
     // V++ chấp nhận tên hàm nhiều âm tiết, ví dụ "hàm tính tổng(...)".
-    hàm riêng tư biên dịch chương trình hàm(p, chữ_ký = sai) {
+    hàm riêng tư biên dịch chương trình hàm(p, chữ ký = sai) {
         biên dịch biểu thức chờ(p, "hàm");
-        phạm_vi = "";
+        phạm vi = "";
         nếu (mình.biên dịch chương trình giá trị(p) == "công khai" ||
             mình.biên dịch chương trình giá trị(p) == "bảo vệ" ||
             mình.biên dịch chương trình giá trị(p) == "riêng tư") {
-            phạm_vi = biên dịch biểu thức lấy(p)["giá trị"];
+            phạm vi = biên dịch biểu thức lấy(p)["giá trị"];
         };
-        loại_tên = lấy map(biên dịch biểu thức nhìn(p), "loại", "");
-        nếu (loại_tên != "định danh" && loại_tên != "từ khóa") {
+        loại tên = lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "");
+        nếu (loại tên != "định danh" && loại tên != "từ khóa") {
             biên dịch biểu thức lỗi(p, "cần tên hàm");
         };
         tên = biên dịch biểu thức lấy(p)["giá trị"];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != "("; i++) {
-            loại = lấy map(biên dịch biểu thức nhìn(p), "loại", "");
+            loại = lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "");
             nếu (loại != "định danh" && loại != "từ khóa") {
                 biên dịch biểu thức lỗi(p, "cần '(' sau tên hàm");
             };
             tên += " " + biên dịch biểu thức lấy(p)["giá trị"];
         };
         biên dịch biểu thức chờ(p, "(");
-        tham_số = [];
-        mặc_định = [];
+        tham số = [];
+        mặc định = [];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != ")"; i++) {
-            token = biên dịch biểu thức nhìn(p);
-            nếu (lấy map(token, "loại", "") != "định danh" &&
-                mình.biên dịch chương trình giá trị(p) != "mặc định") {
+            từ tố = biên dịch biểu thức nhìn(p);
+            nếu (lấy từ điển(từ tố, "loại", "") != "định danh" &&
+                lấy từ điển(từ tố, "loại", "") != "từ khóa") {
                 biên dịch biểu thức lỗi(p, "cần tên tham số");
             };
-            tên_tham_số = mình.biên dịch chương trình giá trị(p);
+            tên tham số = mình.biên dịch chương trình giá trị(p);
             biên dịch biểu thức lấy(p);
-            // Trong tên tham số nhiều từ, "mặc định" có thể là một phần
-            // định danh (ví dụ: giá trị mặc định), dù lexer gắn loại từ khóa.
-            lặp(j = 0; lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "định danh" ||
-                mình.biên dịch chương trình giá trị(p) == "mặc định"; j++) {
-                tên_tham_số += " " + biên dịch biểu thức lấy(p)["giá trị"];
+            // Từ khóa có thể đứng đầu hoặc trong tên tham số ("lặp lại",
+            // "mô đun nhập", "giá trị mặc định"). Dấu ',', '=' hoặc ')' kết thúc tên.
+            lặp(j = 0; lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "định danh" ||
+                lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "từ khóa"; j++) {
+                tên tham số += " " + biên dịch biểu thức lấy(p)["giá trị"];
             };
-            thêm(tham_số, tên_tham_số);
-            giá_trị = rỗng;
+            máy ảo thêm cuối danh sách(tham số, tên tham số);
+            giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
-                giá_trị = mình.biên dịch chương trình biểu thức(p);
+                giá trị = mình.biên dịch chương trình biểu thức(p);
             };
-            thêm(mặc_định, giá_trị);
+            máy ảo thêm cuối danh sách(mặc định, giá trị);
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {
                 biên dịch biểu thức chờ(p, ",");
                 nếu (mình.biên dịch chương trình giá trị(p) == ")") {
@@ -139,7 +148,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         };
         biên dịch biểu thức chờ(p, ")");
         thân = rỗng;
-        nếu (!chữ_ký) {
+        nếu (!chữ ký) {
             thân = mình.biên dịch chương trình khối(p);
         } hoặc {
             nếu (mình.biên dịch chương trình giá trị(p) != ";") {
@@ -147,80 +156,80 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             };
         };
         mình.biên dịch chương trình nhận(p, ";");
-        trả về {"loại": "hàm", "tên": tên, "tham số": tham_số,
-                "mặc định tham số": mặc_định, "thân": thân,
-                "phạm vi": phạm_vi, "chữ ký": chữ_ký};
+        trả về {"loại": "hàm", "tên": tên, "tham số": tham số,
+                "mặc định tham số": mặc định, "thân": thân,
+                "phạm vi": phạm vi, "chữ ký": chữ ký};
     };
 
     // AST lớp/giao diện độc lập. Lowering bytecode phải xử lý node này trước
     // khi có thể bật compiler V++ cho chương trình hướng đối tượng.
-    hàm riêng tư biên dịch chương trình kiểu(p, giao_diện) {
-        nếu (giao_diện) { biên dịch biểu thức chờ(p, "giao diện"); }
+    hàm riêng tư biên dịch chương trình kiểu(p, danh sách giao diện) {
+        nếu (danh sách giao diện) { biên dịch biểu thức chờ(p, "giao diện"); }
         hoặc { biên dịch biểu thức chờ(p, "lớp"); };
-        phạm_vi = "";
+        phạm vi = "";
         nếu (mình.biên dịch chương trình giá trị(p) == "công khai" ||
             mình.biên dịch chương trình giá trị(p) == "bảo vệ" ||
             mình.biên dịch chương trình giá trị(p) == "riêng tư") {
-            phạm_vi = biên dịch biểu thức lấy(p)["giá trị"];
+            phạm vi = biên dịch biểu thức lấy(p)["giá trị"];
         };
         tên = mình.biên dịch chương trình tên kiểu(p, "lớp/giao diện");
-        lớp_cha = "";
+        kiểu lớp cha = "";
         cha = [];
-        triển_khai = [];
+        triển khai = [];
         nếu (mình.biên dịch chương trình nhận(p, "kế thừa") ||
             mình.biên dịch chương trình nhận(p, ":")) {
-            nếu (giao_diện) {
-                thêm(cha, mình.biên dịch chương trình tên kiểu(p, "giao diện cha"));
+            nếu (danh sách giao diện) {
+                máy ảo thêm cuối danh sách(cha, mình.biên dịch chương trình tên kiểu(p, "giao diện cha"));
                 lặp(i = 0; mình.biên dịch chương trình nhận(p, ","); i++) {
-                    thêm(cha, mình.biên dịch chương trình tên kiểu(p, "giao diện cha"));
+                    máy ảo thêm cuối danh sách(cha, mình.biên dịch chương trình tên kiểu(p, "giao diện cha"));
                 };
             } hoặc {
-                lớp_cha = mình.biên dịch chương trình tên kiểu(p, "lớp cha");
+                kiểu lớp cha = mình.biên dịch chương trình tên kiểu(p, "lớp cha");
             };
         };
-        nếu (!giao_diện && mình.biên dịch chương trình nhận(p, "triển khai")) {
-            thêm(triển_khai, mình.biên dịch chương trình tên kiểu(p, "giao diện triển khai"));
+        nếu (!danh sách giao diện && mình.biên dịch chương trình nhận(p, "triển khai")) {
+            máy ảo thêm cuối danh sách(triển khai, mình.biên dịch chương trình tên kiểu(p, "giao diện triển khai"));
             lặp(i = 0; mình.biên dịch chương trình nhận(p, ","); i++) {
-                thêm(triển_khai, mình.biên dịch chương trình tên kiểu(p, "giao diện triển khai"));
+                máy ảo thêm cuối danh sách(triển khai, mình.biên dịch chương trình tên kiểu(p, "giao diện triển khai"));
             };
         };
         biên dịch biểu thức chờ(p, "{");
-        phương_thức = [];
+        phương thức = [];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != "}"; i++) {
-            nếu (lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                 biên dịch biểu thức lỗi(p, "thiếu '}' đóng lớp/giao diện");
             };
             nếu (mình.biên dịch chương trình nhận(p, ";")) { bỏ qua; };
             nếu (mình.biên dịch chương trình giá trị(p) != "hàm") {
                 biên dịch biểu thức lỗi(p, "lớp/giao diện chỉ nhận phương thức");
             };
-            thêm(phương_thức, mình.biên dịch chương trình hàm(p, giao_diện));
+            máy ảo thêm cuối danh sách(phương thức, mình.biên dịch chương trình hàm(p, danh sách giao diện));
         };
         biên dịch biểu thức chờ(p, "}");
         mình.biên dịch chương trình nhận(p, ";");
-        nếu (giao_diện) {
-            trả về {"loại": "giao diện", "tên": tên, "phạm vi": phạm_vi,
-                "giao diện cha": cha, "phương thức": phương_thức};
+        nếu (danh sách giao diện) {
+            trả về {"loại": "giao diện", "tên": tên, "phạm vi": phạm vi,
+                "giao diện cha": cha, "phương thức": phương thức};
         };
-        trả về {"loại": "lớp", "tên": tên, "phạm vi": phạm_vi,
-            "lớp cha": lớp_cha, "triển khai": triển_khai,
-            "phương thức": phương_thức};
+        trả về {"loại": "lớp", "tên": tên, "phạm vi": phạm vi,
+            "lớp cha": kiểu lớp cha, "triển khai": triển khai,
+            "phương thức": phương thức};
     };
 
-    hàm riêng tư biên dịch chương trình chuỗi(p, ngữ_cảnh) {
-        token = biên dịch biểu thức nhìn(p);
-        nếu (lấy map(token, "loại", "") != "chuỗi") {
-            biên dịch biểu thức lỗi(p, "cần chuỗi " + ngữ_cảnh);
+    hàm riêng tư biên dịch chương trình chuỗi(p, ngữ cảnh) {
+        từ tố = biên dịch biểu thức nhìn(p);
+        nếu (lấy từ điển(từ tố, "loại", "") != "chuỗi") {
+            biên dịch biểu thức lỗi(p, "cần chuỗi " + ngữ cảnh);
         };
         biên dịch biểu thức lấy(p);
-        text = token["giá trị"];
+        văn bản = từ tố["giá trị"];
         // Lexer giữ dấu nháy của literal nguồn. Chỉ cần bỏ ký tự đầu/cuối;
         // không cần kéo toàn bộ gói/văn bản/chuỗi vào compiler bootstrap.
-        kết_quả = "";
-        lặp(i = 1; i + 1 < độ dài(text); i++) {
-            kết_quả += text[i];
+        kết quả = "";
+        lặp(i = 1; i + 1 < máy ảo lấy độ dài(văn bản); i++) {
+            kết quả += văn bản[i];
         };
-        trả về kết_quả;
+        trả về kết quả;
     };
 
     hàm riêng tư biên dịch chương trình ngoại(p) {
@@ -233,150 +242,150 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             trả về {"loại": loại, "tên": tên, "đích": đích};
         };
         biên dịch biểu thức chờ(p, "(");
-        tham_số = [];
+        tham số = [];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != ")"; i++) {
-            tên_tham_số = mình.biên dịch chương trình tên(p, "tham số ngoại");
+            tên tham số = mình.biên dịch chương trình tên(p, "tham số ngoại");
             biên dịch biểu thức chờ(p, ":");
             kiểu = mình.biên dịch chương trình kiểu ABI(p);
-            độ_dài = "";
+            độ dài = "";
             nếu (mình.biên dịch chương trình nhận(p, "[")) {
-                token = biên dịch biểu thức nhìn(p);
-                nếu (lấy map(token, "loại", "") != "định danh" &&
-                    lấy map(token, "loại", "") != "số nguyên") {
+                từ tố = biên dịch biểu thức nhìn(p);
+                nếu (lấy từ điển(từ tố, "loại", "") != "định danh" &&
+                    lấy từ điển(từ tố, "loại", "") != "số nguyên") {
                     biên dịch biểu thức lỗi(p, "độ dài đệm FFI không hợp lệ");
                 };
-                độ_dài = biên dịch biểu thức lấy(p)["giá trị"];
+                độ dài = biên dịch biểu thức lấy(p)["giá trị"];
                 biên dịch biểu thức chờ(p, "]");
             };
-            thêm(tham_số, {"tên": tên_tham_số, "kiểu": kiểu, "độ dài": độ_dài});
+            máy ảo thêm cuối danh sách(tham số, {"tên": tên tham số, "kiểu": kiểu, "độ dài": độ dài});
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {
                 biên dịch biểu thức chờ(p, ",");
             };
         };
         biên dịch biểu thức chờ(p, ")");
         biên dịch biểu thức chờ(p, ":");
-        kiểu_trả_về = mình.biên dịch chương trình kiểu ABI(p);
+        kiểu trả về = mình.biên dịch chương trình kiểu ABI(p);
         biên dịch biểu thức chờ(p, "từ");
-        thư_viện = mình.biên dịch chương trình tên(p, "thư viện FFI");
+        thư viện = mình.biên dịch chương trình tên(p, "thư viện FFI");
         biên dịch biểu thức chờ(p, "ký hiệu");
-        ký_hiệu = mình.biên dịch chương trình chuỗi(p, "ký hiệu FFI");
+        ký hiệu = mình.biên dịch chương trình chuỗi(p, "ký hiệu FFI");
         // Tương ứng AstForeignFunctionSpec::abi mặc định trong parser C++.
         abi = "c";
-        khả_năng = "";
+        quyền truy cập = "";
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != ";"; i++) {
-            nếu (lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                 biên dịch biểu thức lỗi(p, "thiếu ';' kết thúc ngoại hàm");
             };
             nếu (mình.biên dịch chương trình nhận(p, "abi")) {
                 abi = mình.biên dịch chương trình chuỗi(p, "ABI FFI");
             } hoặc {
                 nếu (mình.biên dịch chương trình nhận(p, "khả năng")) {
-                    khả_năng = mình.biên dịch chương trình chuỗi(p, "khả năng FFI");
+                    quyền truy cập = mình.biên dịch chương trình chuỗi(p, "khả năng FFI");
                 } hoặc {
                     biên dịch biểu thức lỗi(p, "thuộc tính ngoại hàm không hợp lệ");
                 };
             };
         };
         biên dịch biểu thức chờ(p, ";");
-        nếu (khả_năng == "") { biên dịch biểu thức lỗi(p, "ngoại hàm thiếu khả năng"); };
-        trả về {"loại": loại, "tên": tên, "tham số": tham_số,
-            "kiểu trả về": kiểu_trả_về, "thư viện": thư_viện,
-            "ký hiệu": ký_hiệu, "abi": abi, "khả năng": khả_năng};
+        nếu (quyền truy cập == "") { biên dịch biểu thức lỗi(p, "ngoại hàm thiếu khả năng"); };
+        trả về {"loại": loại, "tên": tên, "tham số": tham số,
+            "kiểu trả về": kiểu trả về, "thư viện": thư viện,
+            "ký hiệu": ký hiệu, "abi": abi, "khả năng": quyền truy cập};
     };
 
-    hàm riêng tư biên dịch chương trình nhập(p, công_khai) {
+    hàm riêng tư biên dịch chương trình nhập(p, mức công khai) {
         biên dịch biểu thức chờ(p, "nhập");
         đích = "";
         trước = "";
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != ";" &&
                  mình.biên dịch chương trình giá trị(p) != "như"; i++) {
-            token = biên dịch biểu thức nhìn(p);
-            giá_trị = lấy map(token, "giá trị", "");
-            nếu (lấy map(token, "loại", "") == "hết" ||
-                (lấy map(token, "loại", "") != "định danh" &&
-                 lấy map(token, "loại", "") != "từ khóa" && giá_trị != "/")) {
+            từ tố = biên dịch biểu thức nhìn(p);
+            giá trị = lấy từ điển(từ tố, "giá trị", "");
+            nếu (lấy từ điển(từ tố, "loại", "") == "hết" ||
+                (lấy từ điển(từ tố, "loại", "") != "định danh" &&
+                 lấy từ điển(từ tố, "loại", "") != "từ khóa" && giá trị != "/")) {
                 biên dịch biểu thức lỗi(p, "đường dẫn nhập không hợp lệ");
             };
-            nếu (đích != "" && trước != "/" && giá_trị != "/") {
+            nếu (đích != "" && trước != "/" && giá trị != "/") {
                 đích += " ";
             };
-            đích += giá_trị;
-            trước = giá_trị;
+            đích += giá trị;
+            trước = giá trị;
             biên dịch biểu thức lấy(p);
         };
         nếu (đích == "" || trước == "/") {
             biên dịch biểu thức lỗi(p, "thiếu đường dẫn nhập");
         };
-        n = độ dài(đích);
+        n = máy ảo lấy độ dài(đích);
         nếu (n >= 3) {
             nếu (đích[n - 3] == "." && đích[n - 2] == "v" &&
                 đích[n - 1] == "i") {
                 biên dịch biểu thức lỗi(p, "đường dẫn nhập không được chứa đuôi .vi");
             };
         };
-        bí_danh = "";
+        bí danh = "";
         nếu (mình.biên dịch chương trình nhận(p, "như")) {
-            bí_danh = mình.biên dịch chương trình tên(p, "bí danh nhập");
+            bí danh = mình.biên dịch chương trình tên kiểu(p, "bí danh nhập", đúng);
         };
         biên dịch biểu thức chờ(p, ";");
-        trả về {"loại": "nhập", "đích": đích, "bí danh": bí_danh,
-                "tái xuất": công_khai};
+        trả về {"loại": "nhập", "đích": đích, "bí danh": bí danh,
+                "tái xuất": mức công khai};
     };
 
     hàm riêng tư biên dịch chương trình chọn(p) {
         biên dịch biểu thức chờ(p, "chọn");
         biên dịch biểu thức chờ(p, "(");
-        selector = mình.biên dịch chương trình biểu thức(p);
+        bộ chọn = mình.biên dịch chương trình biểu thức(p);
         biên dịch biểu thức chờ(p, ")");
         biên dịch biểu thức chờ(p, "{");
         nhánh = [];
         lặp(i = 0; mình.biên dịch chương trình giá trị(p) != "}"; i++) {
-            nếu (lấy map(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
+            nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                 biên dịch biểu thức lỗi(p, "thiếu '}' đóng chọn");
             };
             nếu (mình.biên dịch chương trình nhận(p, ";")) { bỏ qua; };
             s = mình.biên dịch chương trình giá trị(p);
             nếu (s == "ca" || s == "mặc định") {
-                loại_nhánh = "mặc định";
+                loại nhánh = "mặc định";
                 nhãn = rỗng;
                 nếu (mình.biên dịch chương trình nhận(p, "ca")) {
                     nếu (mình.biên dịch chương trình giá trị(p) != "mặc định") {
-                        loại_nhánh = "ca";
+                        loại nhánh = "ca";
                         // Direct IR C++ chỉ chấp nhận đúng một token nhãn.
                         nhãn = biên dịch biểu thức sơ cấp(p);
-                        kiểu = lấy map(nhãn, "loại", "");
+                        kiểu = lấy từ điển(nhãn, "loại", "");
                         nếu (kiểu != "tên" && kiểu != "hằng") {
                             biên dịch biểu thức lỗi(p, "nhãn ca không hợp lệ");
                         };
                     };
                 };
-                nếu (loại_nhánh == "mặc định") {
+                nếu (loại nhánh == "mặc định") {
                     biên dịch biểu thức chờ(p, "mặc định");
                 };
                 mình.biên dịch chương trình nhận(p, ":");
                 thân = mình.biên dịch chương trình khối(p);
-                thêm(nhánh, {"loại": loại_nhánh, "nhãn": nhãn, "thân": thân});
+                máy ảo thêm cuối danh sách(nhánh, {"loại": loại nhánh, "nhãn": nhãn, "thân": thân});
             } hoặc {
                 biên dịch biểu thức lỗi(p, "cần 'ca' hoặc 'mặc định' trong chọn");
             };
         };
         biên dịch biểu thức chờ(p, "}");
         mình.biên dịch chương trình nhận(p, ";");
-        trả về {"loại": "chọn", "biểu thức": selector, "nhánh": nhánh};
+        trả về {"loại": "chọn", "biểu thức": bộ chọn, "nhánh": nhánh};
     };
 
     hàm riêng tư biên dịch chương trình thử(p) {
         biên dịch biểu thức chờ(p, "thử");
         thân = mình.biên dịch chương trình khối(p);
         biên dịch biểu thức chờ(p, "bắt lỗi");
-        tên_lỗi = "";
+        tên lỗi = "";
         nếu (mình.biên dịch chương trình nhận(p, "(")) {
-            tên_lỗi = mình.biên dịch chương trình tên(p, "biến bắt lỗi");
+            tên lỗi = mình.biên dịch chương trình tên kiểu(p, "biến bắt lỗi", đúng);
             biên dịch biểu thức chờ(p, ")");
         };
         bắt = mình.biên dịch chương trình khối(p);
         mình.biên dịch chương trình nhận(p, ";");
-        trả về {"loại": "thử", "thân": thân, "bắt": bắt, "biến lỗi": tên_lỗi};
+        trả về {"loại": "thử", "thân": thân, "bắt": bắt, "biến lỗi": tên lỗi};
     };
 
     hàm riêng tư biên dịch chương trình câu lệnh(p) {
@@ -405,24 +414,24 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             biên dịch biểu thức lấy(p);
             tên = mình.biên dịch chương trình tên(p, "hàm cần gọi");
             lặp(i = 0; mình.biên dịch chương trình giá trị(p) != "("; i++) {
-                nếu (lấy map(biên dịch biểu thức nhìn(p), "loại", "") != "định danh") {
+                nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") != "định danh") {
                     biên dịch biểu thức lỗi(p, "cần '(' sau tên hàm được gọi");
                 };
                 tên += " " + mình.biên dịch chương trình tên(p, "hàm cần gọi");
             };
             biên dịch biểu thức chờ(p, "(");
-            đối_số = [];
+            đối số = [];
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {
-                thêm(đối_số, mình.biên dịch chương trình biểu thức(p));
+                máy ảo thêm cuối danh sách(đối số, mình.biên dịch chương trình biểu thức(p));
                 lặp(i = 0; mình.biên dịch chương trình nhận(p, ","); i++) {
-                    thêm(đối_số, mình.biên dịch chương trình biểu thức(p));
+                    máy ảo thêm cuối danh sách(đối số, mình.biên dịch chương trình biểu thức(p));
                 };
             };
             biên dịch biểu thức chờ(p, ")");
             biên dịch biểu thức chờ(p, ";");
             trả về {"loại": "biểu thức", "biểu thức": {
                 "loại": "gọi", "hàm": {"loại": "tên", "giá trị": tên},
-                "đối số": đối_số, "tường minh": đúng
+                "đối số": đối số, "tường minh": đúng
             }};
         };
         nếu (s == "nhập") { trả về mình.biên dịch chương trình nhập(p, sai); };
@@ -437,37 +446,39 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         nếu (s == "thử") { trả về mình.biên dịch chương trình thử(p); };
         nếu (s == "ném") {
             biên dịch biểu thức lấy(p);
-            giá_trị = rỗng;
+            giá trị = rỗng;
             nếu (mình.biên dịch chương trình giá trị(p) != ";") {
-                giá_trị = mình.biên dịch chương trình biểu thức(p);
+                giá trị = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
-            trả về {"loại": "ném", "biểu thức": giá_trị};
+            trả về {"loại": "ném", "biểu thức": giá trị};
         };
         nếu (s == "trả về") {
             biên dịch biểu thức lấy(p);
-            giá_trị = rỗng;
+            giá trị = rỗng;
             nếu (mình.biên dịch chương trình giá trị(p) != ";") {
-                giá_trị = mình.biên dịch chương trình biểu thức(p);
+                giá trị = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
-            trả về {"loại": "trả về", "biểu thức": giá_trị};
+            trả về {"loại": "trả về", "biểu thức": giá trị};
         };
         nếu (s == "in") {
             biên dịch biểu thức lấy(p);
-            giá_trị = mình.biên dịch chương trình biểu thức(p);
+            giá trị = mình.biên dịch chương trình biểu thức(p);
             biên dịch biểu thức chờ(p, ";");
-            trả về {"loại": "in", "biểu thức": giá_trị};
+            trả về {"loại": "in", "biểu thức": giá trị};
         };
         nếu (s == "biến") {
             biên dịch biểu thức lấy(p);
-            tên = mình.biên dịch chương trình tên(p, "biến");
-            giá_trị = rỗng;
+            // Từ khóa ngữ cảnh vẫn có thể là một phần của định danh nhiều từ,
+            // ví dụ "bước cập nhật con trỏ hiện tại". Dấu '=' / ';' kết thúc tên.
+            tên = mình.biên dịch chương trình tên kiểu(p, "biến", đúng);
+            giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
-                giá_trị = mình.biên dịch chương trình biểu thức(p);
+                giá trị = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
-            trả về {"loại": "biến", "tên": tên, "giá trị": giá_trị};
+            trả về {"loại": "biến", "tên": tên, "giá trị": giá trị};
         };
         nếu (s == "nếu") {
             biên dịch biểu thức lấy(p);
@@ -475,43 +486,43 @@ lớp công khai Bộ Phân Tích Cú Pháp {
                 biên dịch biểu thức lỗi(p, "đã bỏ 'nếu không'; dùng 'hoặc' hoặc 'hoặc nếu'");
             };
             biên dịch biểu thức chờ(p, "(");
-            điều_kiện = mình.biên dịch chương trình biểu thức(p);
+            biểu thức điều kiện = mình.biên dịch chương trình biểu thức(p);
             biên dịch biểu thức chờ(p, ")");
             thân = mình.biên dịch chương trình khối(p);
-            nhánh_khác = rỗng;
+            nhánh khác = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "hoặc")) {
                 nếu (mình.biên dịch chương trình giá trị(p) == "nếu") {
-                    nhánh_khác = mình.biên dịch chương trình câu lệnh(p);
+                    nhánh khác = mình.biên dịch chương trình câu lệnh(p);
                 } hoặc {
-                    nhánh_khác = mình.biên dịch chương trình khối(p);
+                    nhánh khác = mình.biên dịch chương trình khối(p);
                 };
             };
             mình.biên dịch chương trình nhận(p, ";");
-            trả về {"loại": "nếu", "điều kiện": điều_kiện,
-                     "thân": thân, "nhánh khác": nhánh_khác};
+            trả về {"loại": "nếu", "điều kiện": biểu thức điều kiện,
+                     "thân": thân, "nhánh khác": nhánh khác};
         };
         nếu (s == "lặp") {
             biên dịch biểu thức lấy(p);
             biên dịch biểu thức chờ(p, "(");
-            khởi_tạo = rỗng;
-            điều_kiện = rỗng;
-            cập_nhật = rỗng;
+            bước khởi tạo = rỗng;
+            biểu thức điều kiện = rỗng;
+            bước cập nhật = rỗng;
             nếu (mình.biên dịch chương trình giá trị(p) != ";") {
-                khởi_tạo = mình.biên dịch chương trình biểu thức(p);
+                bước khởi tạo = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
             nếu (mình.biên dịch chương trình giá trị(p) != ";") {
-                điều_kiện = mình.biên dịch chương trình biểu thức(p);
+                biểu thức điều kiện = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ";");
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {
-                cập_nhật = mình.biên dịch chương trình biểu thức(p);
+                bước cập nhật = mình.biên dịch chương trình biểu thức(p);
             };
             biên dịch biểu thức chờ(p, ")");
             thân = mình.biên dịch chương trình khối(p);
             mình.biên dịch chương trình nhận(p, ";");
-            trả về {"loại": "lặp", "khởi tạo": khởi_tạo,
-                     "điều kiện": điều_kiện, "cập nhật": cập_nhật, "thân": thân};
+            trả về {"loại": "lặp", "khởi tạo": bước khởi tạo,
+                     "điều kiện": biểu thức điều kiện, "cập nhật": bước cập nhật, "thân": thân};
         };
         nếu (s == "thoát" || s == "bỏ qua") {
             biên dịch biểu thức lấy(p);
@@ -521,8 +532,8 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         nếu (s == "}" || s == "hoặc") {
             biên dịch biểu thức lỗi(p, "câu lệnh không hợp lệ '" + s + "'");
         };
-        giá_trị = mình.biên dịch chương trình biểu thức(p);
+        giá trị = mình.biên dịch chương trình biểu thức(p);
         biên dịch biểu thức chờ(p, ";");
-        trả về {"loại": "biểu thức", "biểu thức": giá_trị};
+        trả về {"loại": "biểu thức", "biểu thức": giá trị};
     };
 };

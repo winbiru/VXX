@@ -1,0 +1,267 @@
+hàm đối tượng i32(đầu ra, giá trị đang xét) {
+    trả về byte đẩy số nguyên ba mươi hai bit(đầu ra, giá trị đang xét);
+};
+
+hàm đối tượng u64(đầu ra, thấp) {
+    nếu (đối tượng i32(đầu ra, thấp) != 0) { trả về -1; };
+    trả về đối tượng i32(đầu ra, 0);
+};
+
+// Consumes the given UTF-8 string handle; names in this writer are ASCII.
+hàm đối tượng tên định danh(đầu ra, tên định danh, độ rộng hiện tại) {
+    biến n = byte dài(tên định danh);
+    nếu (n < 0) { byte hủy(tên định danh); trả về -1; };
+    nếu (n > độ rộng hiện tại) { byte hủy(tên định danh); trả về -1; };
+    biến kết quả trả về = 0;
+    lặp (i = 0; i < độ rộng hiện tại; i++) {
+        biến ch = 0;
+        nếu (i < n) { ch = byte lấy(tên định danh, i); };
+        nếu (byte thêm(đầu ra, ch) != 0) { kết quả trả về = -1; thoát; };
+    };
+    byte hủy(tên định danh);
+    trả về kết quả trả về;
+};
+
+hàm đối tượng đệm(đầu ra, đích đến) {
+    lặp (i = byte dài(đầu ra); i < đích đến; i++) {
+        nếu (byte thêm(đầu ra, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// Closed runtime symbol table; indexes must agree with p_native_id.
+hàm đối tượng bản địa tên định danh(mã định danh) {
+    nếu (mã định danh == 0) { trả về "_vpp_native_bytes_new"; };
+    nếu (mã định danh == 1) { trả về "_vpp_native_bytes_length"; };
+    nếu (mã định danh == 2) { trả về "_vpp_native_bytes_get"; };
+    nếu (mã định danh == 3) { trả về "_vpp_native_bytes_append"; };
+    nếu (mã định danh == 4) { trả về "_vpp_native_bytes_push_i32"; };
+    nếu (mã định danh == 5) { trả về "_vpp_native_bytes_load_i32"; };
+    nếu (mã định danh == 6) { trả về "_vpp_native_bytes_store_i32"; };
+    nếu (mã định danh == 7) { trả về "_vpp_native_bytes_clear"; };
+    nếu (mã định danh == 8) { trả về "_vpp_native_bytes_concat"; };
+    nếu (mã định danh == 9) { trả về "_vpp_native_bytes_equal"; };
+    nếu (mã định danh == 10) { trả về "_vpp_native_bytes_free"; };
+    nếu (mã định danh == 11) { trả về "_vpp_native_argc"; };
+    nếu (mã định danh == 12) { trả về "_vpp_native_argv"; };
+    nếu (mã định danh == 13) { trả về "_vpp_native_file_open_read"; };
+    nếu (mã định danh == 14) { trả về "_vpp_native_file_read_block"; };
+    nếu (mã định danh == 15) { trả về "_vpp_native_file_close"; };
+    nếu (mã định danh == 16) { trả về "_vpp_native_link_macho"; };
+    nếu (mã định danh == 17) { trả về "_vpp_native_link_macho_modules"; };
+    nếu (mã định danh == 18) { trả về "_vpp_native_cache_read"; };
+    nếu (mã định danh == 19) { trả về "_vpp_native_cache_write"; };
+    nếu (mã định danh == 20) { trả về "_vpp_native_bytes_slice"; };
+    nếu (mã định danh == 21) { trả về "_vpp_native_bytes_find"; };
+    nếu (mã định danh == 22) { trả về "_vpp_native_bytes_print"; };
+    nếu (mã định danh == 23) { trả về "_vpp_native_file_open_write"; };
+    nếu (mã định danh == 24) { trả về "_vpp_native_file_write_block"; };
+    nếu (mã định danh == 25) { trả về "_vpp_native_memory_read_byte"; };
+    nếu (mã định danh == 26) { trả về "_vpp_native_memory_write_byte"; };
+    nếu (mã định danh == 27) { trả về "_vpp_native_memory_read_i32"; };
+    nếu (mã định danh == 28) { trả về "_vpp_native_memory_write_i32"; };
+    nếu (mã định danh == 29) { trả về "_vpp_native_memory_bind"; };
+    nếu (mã định danh == 30) { trả về "_vpp_native_os_open"; };
+    nếu (mã định danh == 31) { trả về "_vpp_native_os_read"; };
+    nếu (mã định danh == 32) { trả về "_vpp_native_os_write"; };
+    nếu (mã định danh == 33) { trả về "_vpp_native_os_close"; };
+    nếu (mã định danh == 34) { trả về "_vpp_native_os_errno"; };
+    nếu (mã định danh == 35) { trả về "_vpp_native_os_argument_length"; };
+    nếu (mã định danh == 36) { trả về "_vpp_native_os_argument_byte"; };
+    nếu (mã định danh == 37) { trả về "_vpp_native_i32_div"; };
+    nếu (mã định danh == 38) { trả về "_vpp_native_runtime_module_path"; };
+    nếu (mã định danh == 39) { trả về "_vpp_native_print_i32"; };
+    nếu (mã định danh == 40) { trả về "_vpp_native_read_i32"; };
+    nếu (mã định danh == 41) { trả về "_vpp_native_read_status"; };
+    nếu (mã định danh == 42) { trả về "_vpp_native_file_read_byte"; };
+    nếu (mã định danh == 43) { trả về "_vpp_native_file_write_byte"; };
+    nếu (mã định danh == 44) { trả về "_vpp_native_os_home"; };
+    nếu (mã định danh == 45) { trả về "_vpp_native_os_cwd"; };
+    nếu (mã định danh == 46) { trả về "_vpp_native_os_mkstemp"; };
+    nếu (mã định danh == 47) { trả về "_vpp_native_os_rename"; };
+    nếu (mã định danh == 48) { trả về "_vpp_native_os_spawn_clang"; };
+    nếu (mã định danh == 49) { trả về "_vpp_native_os_waitpid"; };
+    nếu (mã định danh == 50) { trả về "_vpp_native_os_stat"; };
+    nếu (mã định danh == 51) { trả về "_vpp_native_os_lstat"; };
+    nếu (mã định danh == 52) { trả về "_vpp_native_os_access_exec"; };
+    nếu (mã định danh == 53) { trả về "_vpp_native_os_unlink"; };
+    nếu (mã định danh == 54) { trả về "_vpp_native_os_env_copy"; };
+    nếu (mã định danh == 55) { trả về "_vpp_native_os_executable_path"; };
+    nếu (mã định danh == 56) { trả về "_vpp_native_os_mkdir"; };
+    nếu (mã định danh == 57) { trả về "_vpp_native_os_fstat"; };
+    nếu (mã định danh == 58) { trả về "_vpp_native_sha_begin"; };
+    nếu (mã định danh == 59) { trả về "_vpp_native_sha_update"; };
+    nếu (mã định danh == 60) { trả về "_vpp_native_sha_end"; };
+    nếu (mã định danh == 61) { trả về "_vpp_native_os_register_cache_report"; };
+    trả về "";
+};
+
+hàm đối tượng bản địa đã dùng(ngoại các lời gọi, mã định danh) {
+    nếu (ngoại các lời gọi <= 0) { trả về 0; };
+    lặp (độ dời = 0; độ dời < byte dài(ngoại các lời gọi); độ dời = độ dời + 8) {
+        nếu (byte đọc số nguyên ba mươi hai bit(ngoại các lời gọi, độ dời + 4) == mã định danh) { trả về 1; };
+    };
+    trả về 0;
+};
+
+hàm đối tượng bản địa chỉ mục(ngoại các lời gọi, mã định danh) {
+    biến chỉ mục = 1; // _main occupies symbol index 0.
+    lặp (i = 0; i < mã định danh; i++) {
+        nếu (đối tượng bản địa đã dùng(ngoại các lời gọi, i) == 1) { chỉ mục = chỉ mục + 1; };
+    };
+    trả về chỉ mục;
+};
+
+// Returns byte length, or -1 with output cleared. One owned code buffer and
+// a separate output buffer are required. Mach-O layout uses offsets relative
+// to the beginning of the object (the linker's ordinary MH_OBJECT contract).
+hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào độ lệch, ngoại các lời gọi) {
+    nếu (mã máy == đối tượng) { trả về -1; };
+    nếu (byte dài(đối tượng) < 0) { trả về -1; };
+    nếu (byte làm rỗng(đối tượng) != 0) { trả về -1; };
+    biến n = byte dài(mã máy);
+    nếu (n <= 0) { trả về -1; };
+    nếu (n > 1048200) { trả về -1; };
+    nếu (điểm vào độ lệch < 0) { trả về -1; };
+    nếu (điểm vào độ lệch >= n) { trả về -1; };
+    lặp (i = 0; i < điểm vào độ lệch; i = i + 4) {
+        nếu (i + 4 > điểm vào độ lệch) { trả về -1; };
+    };
+    lặp (i = 0; i < n; i = i + 4) { nếu (i + 4 > n) { trả về -1; }; };
+    biến tái định vị số phần tử = 0;
+    nếu (ngoại các lời gọi > 0) {
+        nếu (byte dài(ngoại các lời gọi) < 0) { trả về -1; };
+        lặp (i = 0; i < byte dài(ngoại các lời gọi); i = i + 8) {
+            nếu (i + 8 > byte dài(ngoại các lời gọi)) { trả về -1; };
+            biến đã kiểm tra độ lệch = byte đọc số nguyên ba mươi hai bit(ngoại các lời gọi, i);
+            biến đã kiểm tra mã định danh = byte đọc số nguyên ba mươi hai bit(ngoại các lời gọi, i + 4);
+            nếu (đã kiểm tra độ lệch < 0) { trả về -1; };
+            nếu (đã kiểm tra độ lệch + 4 > n) { trả về -1; };
+            nếu (đã kiểm tra mã định danh < 0) { trả về -1; };
+            nếu (đã kiểm tra mã định danh > 61) { trả về -1; };
+            tái định vị số phần tử = tái định vị số phần tử + 1;
+        };
+    };
+    biến các ký hiệu = 1;
+    biến chuỗi kích cỡ = 7; // \0_main\0
+    lặp (mã định danh = 0; mã định danh < 62; mã định danh++) {
+        nếu (đối tượng bản địa đã dùng(ngoại các lời gọi, mã định danh) == 1) {
+            biến mục ký hiệu tên định danh = đối tượng bản địa tên định danh(mã định danh);
+            chuỗi kích cỡ = chuỗi kích cỡ + byte dài(mục ký hiệu tên định danh) + 1;
+            byte hủy(mục ký hiệu tên định danh);
+            các ký hiệu = các ký hiệu + 1;
+        };
+    };
+    biến tái định vị độ lệch = 208;
+    lặp (i = 0; i < n; i = i + 8) { tái định vị độ lệch = tái định vị độ lệch + 8; };
+    biến độ lệch ký hiệu = tái định vị độ lệch + tái định vị số phần tử * 8;
+    biến độ lệch chuỗi = độ lệch ký hiệu + các ký hiệu * 16;
+    nếu (độ lệch chuỗi + chuỗi kích cỡ > 1048576) { trả về -1; };
+
+    // mach_header_64: MH_MAGIC_64, CPU_TYPE_ARM64, subtype ALL, MH_OBJECT.
+    đối tượng i32(đối tượng, -17958193);
+    đối tượng i32(đối tượng, 16777228);
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, 1);
+    đối tượng i32(đối tượng, 2);     // ncmds
+    đối tượng i32(đối tượng, 176);   // sizeofcmds
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, 0);
+
+    // segment_command_64 (72 bytes), with one section_64 (80 bytes).
+    đối tượng i32(đối tượng, 25);   // LC_SEGMENT_64
+    đối tượng i32(đối tượng, 152);
+    nếu (đối tượng tên định danh(đối tượng, "", 16) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    đối tượng u64(đối tượng, 0);     // vmaddr
+    đối tượng u64(đối tượng, n);     // vmsize
+    đối tượng u64(đối tượng, 208);   // fileoff
+    đối tượng u64(đối tượng, n);     // filesize
+    đối tượng i32(đối tượng, 7);     // maxprot RWX
+    đối tượng i32(đối tượng, 5);     // initprot RX
+    đối tượng i32(đối tượng, 1);     // nsects
+    đối tượng i32(đối tượng, 0);
+
+    nếu (đối tượng tên định danh(đối tượng, "__text", 16) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    nếu (đối tượng tên định danh(đối tượng, "__TEXT", 16) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    đối tượng u64(đối tượng, 0);     // addr
+    đối tượng u64(đối tượng, n);     // size
+    đối tượng i32(đối tượng, 208);   // offset
+    đối tượng i32(đối tượng, 2);     // align 2**2
+    nếu (tái định vị số phần tử > 0) { đối tượng i32(đối tượng, tái định vị độ lệch); }
+    hoặc { đối tượng i32(đối tượng, 0); };
+    đối tượng i32(đối tượng, tái định vị số phần tử);
+    đối tượng i32(đối tượng, -2147482624); // S_REGULAR | PURE_INSTRUCTIONS | SOME_INSTRUCTIONS
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, 0);
+    đối tượng i32(đối tượng, 0);
+
+    // symtab_command (24 bytes).
+    đối tượng i32(đối tượng, 2);     // LC_SYMTAB
+    đối tượng i32(đối tượng, 24);
+    đối tượng i32(đối tượng, độ lệch ký hiệu);
+    đối tượng i32(đối tượng, các ký hiệu);
+    đối tượng i32(đối tượng, độ lệch chuỗi);
+    đối tượng i32(đối tượng, chuỗi kích cỡ);
+
+    nếu (byte dài(đối tượng) != 208) { byte làm rỗng(đối tượng); trả về -1; };
+    nếu (byte nối(đối tượng, mã máy) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    nếu (đối tượng đệm(đối tượng, tái định vị độ lệch) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    // ARM64_RELOC_BRANCH26 (type 2, pcrel 1, length 2, extern 1).
+    lặp (i = 0; i < tái định vị số phần tử * 8; i = i + 8) {
+        biến độ dời = byte đọc số nguyên ba mươi hai bit(ngoại các lời gọi, i);
+        biến mã định danh = byte đọc số nguyên ba mươi hai bit(ngoại các lời gọi, i + 4);
+        nếu (đối tượng i32(đối tượng, độ dời) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+        nếu (đối tượng i32(đối tượng, 754974720 + đối tượng bản địa chỉ mục(ngoại các lời gọi, mã định danh)) != 0) {
+            byte làm rỗng(đối tượng); trả về -1;
+        };
+    };
+    nếu (đối tượng đệm(đối tượng, độ lệch ký hiệu) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    // nlist_64: strx, N_SECT|N_EXT, section index, desc, value.
+    đối tượng i32(đối tượng, 1);
+    byte thêm(đối tượng, 15);
+    byte thêm(đối tượng, 1);
+    byte thêm(đối tượng, 0);
+    byte thêm(đối tượng, 0);
+    đối tượng u64(đối tượng, điểm vào độ lệch);
+    // N_UNDF | N_EXT symbols for the linked native runtime.
+    biến chỉ mục chuỗi = 7;
+    lặp (mã định danh = 0; mã định danh < 62; mã định danh++) {
+        nếu (đối tượng bản địa đã dùng(ngoại các lời gọi, mã định danh) == 1) {
+            biến bản ghi dữ liệu tên định danh = đối tượng bản địa tên định danh(mã định danh);
+            biến bản ghi dữ liệu kích cỡ = byte dài(bản ghi dữ liệu tên định danh);
+            đối tượng i32(đối tượng, chỉ mục chuỗi);
+            byte thêm(đối tượng, 1);
+            byte thêm(đối tượng, 0);
+            byte thêm(đối tượng, 0);
+            byte thêm(đối tượng, 0);
+            đối tượng u64(đối tượng, 0);
+            chỉ mục chuỗi = chỉ mục chuỗi + bản ghi dữ liệu kích cỡ + 1;
+            byte hủy(bản ghi dữ liệu tên định danh);
+        };
+    };
+    byte thêm(đối tượng, 0);
+    nếu (đối tượng tên định danh(đối tượng, "_main", 5) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+    byte thêm(đối tượng, 0);
+    lặp (mã định danh = 0; mã định danh < 62; mã định danh++) {
+        nếu (đối tượng bản địa đã dùng(ngoại các lời gọi, mã định danh) == 1) {
+            biến tên định danh = đối tượng bản địa tên định danh(mã định danh);
+            biến kích cỡ = byte dài(tên định danh);
+            nếu (đối tượng tên định danh(đối tượng, tên định danh, kích cỡ) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+            nếu (byte thêm(đối tượng, 0) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+        };
+    };
+    nếu (byte dài(đối tượng) != độ lệch chuỗi + chuỗi kích cỡ) {
+        byte làm rỗng(đối tượng);
+        trả về -1;
+    };
+    trả về byte dài(đối tượng);
+};
+
+// Preserve the original entry-at-zero API for standalone codegen fixtures.
+hàm đối tượng macho arm64(mã máy, đối tượng) {
+    trả về đối tượng macho arm64 tại(mã máy, đối tượng, 0, 0);
+};
+
+// Executable compiled from V++ source. Only the initial build uses Stage 0.
+// The file -> frontend -> i32 IR -> ARM64 machine code -> Mach-O path below
+// executes entirely inside the native V++ executable.

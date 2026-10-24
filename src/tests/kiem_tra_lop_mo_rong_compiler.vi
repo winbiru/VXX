@@ -1,7 +1,7 @@
 // Kiểm chứng lớp mới và hàm cũ cùng hoạt động với một định dạng dữ liệu.
 nhập gói/biên dịch/phụ thuộc;
 nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/artifact;
+nhập gói/biên dịch/sản phẩm biên dịch;
 nhập gói/biên dịch/liên kết;
 nhập gói/mạng/rest;
 
@@ -29,13 +29,13 @@ hàm chính() {
     in độ dài(bộ_đồ_thị.dựng("main")["cạnh"]) == 1;
 
     artifact = biên dịch chương trình tự chủ("hàm chính() { in 7; };");
-    codec = Bộ Mã Hóa Artifact(artifact);
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(artifact);
     văn_bản = codec.tuần tự();
     in codec.kiểm tra()["loại"] == artifact["loại"];
-    in văn_bản == biên dịch artifact tuần tự(artifact);
-    codec_đọc = Bộ Mã Hóa Artifact(rỗng);
+    in văn_bản == biên dịch sản phẩm biên dịch tuần tự(artifact);
+    codec_đọc = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
     bản_đọc = codec_đọc.giải mã(văn_bản);
-    in biên dịch chạy artifact(bản_đọc) == "7\n";
+    in biên dịch chạy sản phẩm biên dịch(bản_đọc) == "7\n";
     in codec_đọc.tuần tự() == văn_bản;
     bắt_lỗi = sai;
     thử { codec_đọc.đọc lệnh([[1, 2, 3]]); }
@@ -43,16 +43,16 @@ hàm chính() {
     in bắt_lỗi;
     bắt_lỗi = sai;
     thử {
-        codec_đọc.giải mã("{\"định dạng\":\"VPP bytecode\",\"phiên bản\":2,\"ABI\":\"Instruction 4*i32\"}");
+        codec_đọc.giải mã("{\"định dạng\":\"VPP mã trung gian\",\"phiên bản\":2,\"ABI\":\"Instruction 4*i32\"}");
     } bắt lỗi(e) { bắt_lỗi = đúng; };
     in bắt_lỗi;
 
     phản_hồi = Bộ Dựng Phản Hồi REST(đúng, "ok");
-    in phản_hồi.object("{\"n\":1}") == rest json thành công object("ok", "{\"n\":1}");
-    in phản_hồi.dữ liệu("r1", "n", "2") == rest json thành công dữ liệu("ok", "r1", "n", "2");
-    in phản_hồi.jwt("a", "b") == rest json thành công jwt("ok", "a", "b");
-    in phản_hồi.an toàn("null") == rest json thành công an toàn("ok", "null");
+    in phản_hồi.đối tượng("{\"n\":1}") == dịch vụ tài nguyên json thành công đối tượng("ok", "{\"n\":1}");
+    in phản_hồi.dữ liệu("r1", "n", "2") == dịch vụ tài nguyên json thành công dữ liệu("ok", "r1", "n", "2");
+    in phản_hồi.jwt("a", "b") == dịch vụ tài nguyên json thành công jwt("ok", "a", "b");
+    in phản_hồi.an toàn("null") == dịch vụ tài nguyên json thành công an toàn("ok", "null");
     phản_hồi_lỗi = Bộ Dựng Phản Hồi REST(sai, "lỗi");
-    in phản_hồi_lỗi.object("null") == rest json lỗi object("lỗi", "null");
-    in phản_hồi_lỗi.an toàn("null") == rest json lỗi an toàn("lỗi", "null");
+    in phản_hồi_lỗi.đối tượng("null") == dịch vụ tài nguyên json lỗi đối tượng("lỗi", "null");
+    in phản_hồi_lỗi.an toàn("null") == dịch vụ tài nguyên json lỗi an toàn("lỗi", "null");
 };

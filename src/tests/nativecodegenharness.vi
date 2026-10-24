@@ -1,129 +1,129 @@
 hàm test_bad_ir() {
-    biến ir = byte_mới();
-    biến code = byte_mới();
+    biến ir = byte mới();
+    biến code = byte mới();
     nếu (ir <= 0) { trả về 10; };
     nếu (code <= 0) { trả về 10; };
-    byte_đẩy_i32(ir, 4); byte_đẩy_i32(ir, 0);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 11; };
-    nếu (byte_dài(code) != 0) { trả về 11; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 2); byte_đẩy_i32(ir, 0); // uninitialized LOAD
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 12; };
-    nếu (byte_dài(code) != 0) { trả về 12; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 9); byte_đẩy_i32(ir, 0);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 13; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 42);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 1); // trailing instructions
-    nếu (cg_emit(ir, code) != -1) { trả về 14; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 42);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 1); // invalid RET operand
-    nếu (cg_emit(ir, code) != -1) { trả về 15; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 42);
-    byte_thêm(ir, 1); // truncated instruction
-    nếu (cg_emit(ir, code) != -1) { trả về 16; };
-    nếu (byte_dài(code) != 0) { trả về 16; };
-    nếu (cg_emit(ir, ir) != -1) { trả về 17; };
+    byte đẩy số nguyên ba mươi hai bit(ir, 4); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 11; };
+    nếu (byte dài(code) != 0) { trả về 11; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 2); byte đẩy số nguyên ba mươi hai bit(ir, 0); // uninitialized LOAD
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 12; };
+    nếu (byte dài(code) != 0) { trả về 12; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 9); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 13; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 42);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 1); // trailing instructions
+    nếu (sinh mã phát(ir, code) != -1) { trả về 14; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 42);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 1); // invalid RET operand
+    nếu (sinh mã phát(ir, code) != -1) { trả về 15; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 42);
+    byte thêm(ir, 1); // truncated instruction
+    nếu (sinh mã phát(ir, code) != -1) { trả về 16; };
+    nếu (byte dài(code) != 0) { trả về 16; };
+    nếu (sinh mã phát(ir, ir) != -1) { trả về 17; };
     // INT32_MIN must be encoded by MOVZ/MOVK, including its high sign bit.
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, -2147483648);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != 28) { trả về 19; };
-    nếu (byte_đọc_i32(code, 4) != 1384120329) { trả về 19; };
-    nếu (byte_đọc_i32(code, 8) != 1924136969) { trả về 19; }; // clang: 0x72b00009
-    nếu (cg_emit(ir, code) != 28) { trả về 19; }; // reset populated output
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 2147483647);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != 28) { trả về 20; };
-    nếu (byte_đọc_i32(code, 4) != 1386217449) { trả về 20; };
-    nếu (byte_đọc_i32(code, 8) != 1924136937) { trả về 20; }; // clang: 0x72afffe9
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, -2147483648);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != 28) { trả về 19; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 4) != 1384120329) { trả về 19; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 8) != 1924136969) { trả về 19; }; // clang: 0x72b00009
+    nếu (sinh mã phát(ir, code) != 28) { trả về 19; }; // đặt lại populated output
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 2147483647);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != 28) { trả về 20; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 4) != 1386217449) { trả về 20; };
+    nếu (byte đọc số nguyên ba mươi hai bit(code, 8) != 1924136937) { trả về 20; }; // clang: 0x72afffe9
     // RET must reject unconsumed evaluation operands without emitting code.
-    byte_làm_rỗng(ir);
+    byte làm rỗng(ir);
     lặp (i = 0; i < 1001; i++) {
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 0);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 0);
     };
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 21; };
-    nếu (byte_dài(code) != 0) { trả về 21; };
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 21; };
+    nếu (byte dài(code) != 0) { trả về 21; };
     // NOT needs one operand and an unused immediate field.
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 25); byte_đẩy_i32(ir, 0);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 22; };
-    byte_làm_rỗng(ir);
-    byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 0);
-    byte_đẩy_i32(ir, 25); byte_đẩy_i32(ir, 1);
-    byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-    nếu (cg_emit(ir, code) != -1) { trả về 23; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 25); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 22; };
+    byte làm rỗng(ir);
+    byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    byte đẩy số nguyên ba mươi hai bit(ir, 25); byte đẩy số nguyên ba mươi hai bit(ir, 1);
+    byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+    nếu (sinh mã phát(ir, code) != -1) { trả về 23; };
     // DIV and MOD need two operands and a zero immediate in the IR wire format.
     lặp (op = 26; op <= 27; op++) {
-        byte_làm_rỗng(ir);
-        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
-        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-        nếu (cg_emit(ir, code) != -1) { trả về 30; };
-        nếu (byte_dài(code) != 0) { trả về 31; };
-        byte_làm_rỗng(ir);
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
-        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 0);
-        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-        nếu (cg_emit(ir, code) != -1) { trả về 32; };
-        byte_làm_rỗng(ir);
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 7);
-        byte_đẩy_i32(ir, 1); byte_đẩy_i32(ir, 2);
-        byte_đẩy_i32(ir, op); byte_đẩy_i32(ir, 1);
-        byte_đẩy_i32(ir, 7); byte_đẩy_i32(ir, 0);
-        nếu (cg_emit(ir, code) != -1) { trả về 33; };
-        nếu (byte_dài(code) != 0) { trả về 34; };
+        byte làm rỗng(ir);
+        byte đẩy số nguyên ba mươi hai bit(ir, op); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        nếu (sinh mã phát(ir, code) != -1) { trả về 30; };
+        nếu (byte dài(code) != 0) { trả về 31; };
+        byte làm rỗng(ir);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 7);
+        byte đẩy số nguyên ba mươi hai bit(ir, op); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        nếu (sinh mã phát(ir, code) != -1) { trả về 32; };
+        byte làm rỗng(ir);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 7);
+        byte đẩy số nguyên ba mươi hai bit(ir, 1); byte đẩy số nguyên ba mươi hai bit(ir, 2);
+        byte đẩy số nguyên ba mươi hai bit(ir, op); byte đẩy số nguyên ba mươi hai bit(ir, 1);
+        byte đẩy số nguyên ba mươi hai bit(ir, 7); byte đẩy số nguyên ba mươi hai bit(ir, 0);
+        nếu (sinh mã phát(ir, code) != -1) { trả về 33; };
+        nếu (byte dài(code) != 0) { trả về 34; };
     };
-    nếu (byte_hủy(ir) != 0) { trả về 18; };
-    nếu (byte_hủy(code) != 0) { trả về 18; };
+    nếu (byte hủy(ir) != 0) { trả về 18; };
+    nếu (byte hủy(code) != 0) { trả về 18; };
     trả về 0;
 };
 
 hàm chính() {
     biến check = test_bad_ir();
-    nếu (check != 0) { in_số(check); trả về check; };
+    nếu (check != 0) { in (check); trả về check; };
     biến source_path = "native-codegen-input.vi";
-    biến source = byte_mới();
-    biến input = tệp_mở_đọc(source_path);
+    biến source = byte mới();
+    biến input = tệp mở đọc(source_path);
     nếu (input <= 0) { trả về 20; };
     biến n = 1;
     lặp (i = 0; i < 300; i++) {
-        n = tệp_đọc_khối(input, source);
+        n = tệp đọc khối(input, source);
         nếu (n <= 0) { thoát; };
     };
-    nếu (tệp_đóng(input) != 0) { trả về 21; };
+    nếu (tệp đóng(input) != 0) { trả về 21; };
     nếu (n != 0) { trả về 21; };
-    biến tokens = byte_mới();
-    biến ir = byte_mới();
-    biến code = byte_mới();
-    biến object = byte_mới();
-    nếu (lex_tokenize(source, tokens) <= 0) { trả về 22; };
-    nếu (p_compile(source, tokens, ir) <= 0) { trả về 23; };
-    nếu (ir_run(ir) != 52) { trả về 24; };
-    nếu (cg_emit(ir, code) <= 0) { trả về 25; };
-    nếu (obj_macho_arm64(code, object) <= 0) { trả về 26; };
+    biến tokens = byte mới();
+    biến ir = byte mới();
+    biến code = byte mới();
+    biến đối tượng = byte mới();
+    nếu (từ vựng tách từ tố(source, tokens) <= 0) { trả về 22; };
+    nếu (phân tích biên dịch(source, tokens, ir) <= 0) { trả về 23; };
+    nếu (biểu diễn trung gian run(ir) != 52) { trả về 24; };
+    nếu (sinh mã phát(ir, code) <= 0) { trả về 25; };
+    nếu (đối tượng macho arm64(code, đối tượng) <= 0) { trả về 26; };
     biến path = "native-codegen-output.o";
-    biến output = tệp_mở_ghi(path);
+    biến output = tệp mở ghi(path);
     nếu (output <= 0) { trả về 27; };
-    nếu (tệp_ghi_khối(output, object) != byte_dài(object)) { trả về 28; };
-    nếu (tệp_đóng(output) != 0) { trả về 29; };
-    byte_hủy(path);
-    byte_hủy(source_path);
-    byte_hủy(source);
-    byte_hủy(tokens);
-    byte_hủy(ir);
-    byte_hủy(code);
-    byte_hủy(object);
-    in_số(20261017);
+    nếu (tệp ghi khối(output, đối tượng) != byte dài(đối tượng)) { trả về 28; };
+    nếu (tệp đóng(output) != 0) { trả về 29; };
+    byte hủy(path);
+    byte hủy(source_path);
+    byte hủy(source);
+    byte hủy(tokens);
+    byte hủy(ir);
+    byte hủy(code);
+    byte hủy(đối tượng);
+    in 20261017;
     trả về 0;
 };
 

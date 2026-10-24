@@ -1,0 +1,19 @@
+nhập gói/bộ sưu tập/danh sách như bộ sưu tập;
+
+hàm cộng hai giá trị(giá trị đầu, giá trị sau) {
+    biến tổng hai giá trị = giá trị đầu + giá trị sau;
+    trả về tổng hai giá trị;
+};
+
+hàm chính() {
+    biến các số đầu vào = [2, 3, 5];
+    biến kết quả tính tổng = bộ sưu tập.tổng danh sách(các số đầu vào);
+    in cộng hai giá trị(kết quả tính tổng, 7);
+
+    thử {
+        ném "Lỗi có dấu tiếng Việt";
+    } bắt lỗi(lỗi nhận được) {
+        biến nội dung lỗi = lỗi nhận được;
+        in nội dung lỗi;
+    };
+};

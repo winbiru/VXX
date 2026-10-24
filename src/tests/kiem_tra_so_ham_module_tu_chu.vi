@@ -1,7 +1,7 @@
 // Sổ hàm của compiler V++: global ID/StringPool; export và alias theo module.
 nhập gói/biên dịch/sổ đăng ký;
 nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/ir;
+nhập gói/biên dịch/biểu diễn trung gian;
 nhập gói/biên dịch/phát mã;
 nhập gói/lõi/chuyển kiểu;
 nhập gói/văn bản/chuỗi;
@@ -71,13 +71,13 @@ hàm chính() {
     // Emitter đơn vị dùng cùng bộ cấp phát và giữ ABI C++.
     ir = biên dịch hạ IR thuần("hàm f() {}; hàm chính() { in f(); };");
     một = biên dịch đăng ký hàm IR thuần(ir);
-    bytecode = biên dịch phát bytecode thuần("hàm f() {}; hàm chính() { in f(); };");
+    mã trung gian = biên dịch phát mã trung gian thuần("hàm f() {}; hàm chính() { in f(); };");
     in độ dài(một["hàm"]) == 2;
     in một["hàm"][0]["id"] == 0;
     in một["slots"][1] == "chính";
     in một["chuỗi"][1] == "chính";
-    in bytecode["hàm"][1]["id"] == một["hàm"][1]["id"];
-    in bytecode["slots"][1] == một["slots"][1];
+    in mã trung gian["hàm"][1]["id"] == một["hàm"][1]["id"];
+    in mã trung gian["slots"][1] == một["slots"][1];
 
     // Các xung đột phải báo lỗi ngay, không được lặng lẽ chọn một ID.
     lỗi = sai;

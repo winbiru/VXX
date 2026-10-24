@@ -83,7 +83,7 @@
         "vpp.lsp.executable": {
           "type": "string",
           "default": "",
-          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Để trống để ưu tiên VM do extension quản lý rồi tới lệnh vpp trong PATH."
+          "description": "Đường dẫn tùy chọn tới executable V++ dùng cho LSP. Để trống sẽ ưu tiên compiler build trong workspace V++, sau đó VM do extension quản lý, rồi vpp trong PATH."
         }
       }
     },
@@ -128,6 +128,9 @@
               "storage.type.interface.vietvm",
               "storage.type.function.vietvm",
               "storage.type.variable.vietvm",
+              "storage.type.foreign.vietvm",
+              "keyword.control.foreign.vietvm",
+              "support.type.ffi.vietvm",
               "storage.modifier.access.vietvm",
               "keyword.other.inheritance.vietvm",
               "constant.language.boolean.vietvm",
@@ -178,7 +181,7 @@
           {
             "scope": "variable.parameter.vietvm",
             "settings": {
-              "foreground": "#9876AA"
+              "foreground": "#A9B7C6"
             }
           },
           {

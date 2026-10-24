@@ -1,4 +1,4 @@
 // Negative migration gate: socket address selection now lives in V++.
 hàm chính() {
-    in socket_phan_giai_vm("localhost", 8080, 0);
+    in đầu nối phân giải máy ảo("localhost", 8080, 0);
 };

@@ -6,27 +6,27 @@ nhập gói/biên dịch/mã máy nền;
 lớp công khai Bộ Phát SPARC {
     hàm công khai khởi tạo() {};
 
-    hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
+    hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ điều hành) {
         ra = [];
         nếu (loại == "hằng") {
                 thấp = hằng % 1024;
                 nếu (thấp < 0) { thấp += 1024; };
                 cao = (hằng - thấp) / 1024;
                 nếu (cao < 0) { cao += 4194304; };
-                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("11000000") + cao, ít);
-                biên dịch mã máy thêm word(ra, biên dịch mã máy word hex("90122000") + thấp, ít);
+                biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("11000000") + cao, ít);
+                biên dịch mã máy thêm từ máy(ra, biên dịch mã máy từ máy thập lục phân("90122000") + thấp, ít);
             } hoặc {
-                nếu (loại == "cộng") { biên dịch mã máy thêm hex(ra, "90020009", ít); }
-                hoặc { biên dịch mã máy thêm hex(ra, "90220009", ít); };
+                nếu (loại == "cộng") { biên dịch mã máy thêm thập lục phân(ra, "90020009", ít); }
+                hoặc { biên dịch mã máy thêm thập lục phân(ra, "90220009", ít); };
             };
-            biên dịch mã máy thêm hex(ra, "81c3e008", ít);
-            biên dịch mã máy thêm hex(ra, "01000000", ít);
+            biên dịch mã máy thêm thập lục phân(ra, "81c3e008", ít);
+            biên dịch mã máy thêm thập lục phân(ra, "01000000", ít);
         trả về ra;
     };
 };
 
 
-hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành) {
-    __vpp_adapter = Bộ Phát SPARC();
-    trả về __vpp_adapter.biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ_điều_hành);
+hàm công khai biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ điều hành) {
+    bộ chuyển tiếp = Bộ Phát SPARC();
+    trả về bộ chuyển tiếp.biên dịch mã máy phát sparc(loại, hằng, thấp, cao, ít, hệ điều hành);
 };

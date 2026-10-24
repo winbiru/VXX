@@ -15,17 +15,17 @@ lớp công khai Tiện Ích Đường Dẫn {
     hàm công khai khởi tạo() {};
 
     hàm riêng tư đường dẫn kiểm tra byte(đường) {
-        bytes = bảng mã utf8 mã hóa(đường);
-        lặp(i = 0; i < do_dai(bytes); i++) {
-            nếu (bytes[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
+        các byte = bảng mã unicode tám bit mã hóa(đường);
+        lặp(i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            nếu (các byte[i] == 0) { ném "đường dẫn không được chứa byte NUL"; };
         };
         trả về đường;
     };
 
-    hàm công khai đường dẫn loại windows(đường, theo_liên_kết) {
+    hàm công khai đường dẫn loại windows(đường, theo liên kết) {
         mình.đường dẫn kiểm tra byte(đường);
-        nếu (theo_liên_kết) { trả về máy_đường_loại(đường, 1); };
-        trả về máy_đường_loại(đường, 0);
+        nếu (theo liên kết) { trả về máy đường loại(đường, 1); };
+        trả về máy đường loại(đường, 0);
     };
 
     hàm riêng tư đường dẫn dấu phân cách() {
@@ -51,35 +51,35 @@ lớp công khai Tiện Ích Đường Dẫn {
         trả về c == "/" || c == "\\";
     };
 
-    hàm riêng tư đường dẫn gốc windows unc(đường, bắt_đầu) {
-        n = do_dai(đường);
-        i = bắt_đầu;
-        tìm_tên_máy = đúng;
-        lặp(vòng = 0; i < n && tìm_tên_máy; vòng++) {
+    hàm riêng tư đường dẫn gốc windows unc(đường, bắt đầu) {
+        n = máy ảo lấy độ dài(đường);
+        i = bắt đầu;
+        tìm tên máy = đúng;
+        lặp(vòng = 0; i < n && tìm tên máy; vòng++) {
             nếu (mình.đường dẫn là phân cách windows(đường[i])) {
-                tìm_tên_máy = sai;
+                tìm tên máy = sai;
             } hoặc {
                 i = i + 1;
             };
         };
-        nếu (i == bắt_đầu || i == n) { trả về bắt_đầu; };
+        nếu (i == bắt đầu || i == n) { trả về bắt đầu; };
         i = i + 1;
-        bắt_đầu_share = i;
-        tìm_share = đúng;
-        lặp(vòng = 0; i < n && tìm_share; vòng++) {
+        bắt đầu chia sẻ = i;
+        tìm chia sẻ = đúng;
+        lặp(vòng = 0; i < n && tìm chia sẻ; vòng++) {
             nếu (mình.đường dẫn là phân cách windows(đường[i])) {
-                tìm_share = sai;
+                tìm chia sẻ = sai;
             } hoặc {
                 i = i + 1;
             };
         };
-        nếu (i == bắt_đầu_share) { trả về bắt_đầu; };
+        nếu (i == bắt đầu chia sẻ) { trả về bắt đầu; };
         nếu (i < n) { trả về i + 1; };
         trả về n;
     };
 
     hàm công khai đường dẫn gốc windows dài(đường) {
-        n = do_dai(đường);
+        n = máy ảo lấy độ dài(đường);
         nếu (n >= 3) {
             nếu (đường[1] == ":" && mình.đường dẫn là phân cách windows(đường[2])) {
                 trả về 3;
@@ -107,14 +107,14 @@ lớp công khai Tiện Ích Đường Dẫn {
     };
 
     hàm công khai đường dẫn là tuyệt đối(đường dẫn) {
-        nếu (do_dai(đường dẫn) == 0) {
+        nếu (máy ảo lấy độ dài(đường dẫn) == 0) {
             trả về sai;
         };
         nếu (mình.đường dẫn là phân cách(đường dẫn[0])) {
             trả về đúng;
         };
         nếu (tên nền tảng() == "windows") {
-            nếu (do_dai(đường dẫn) >= 3) {
+            nếu (máy ảo lấy độ dài(đường dẫn) >= 3) {
                 nếu (đường dẫn[1] == ":") {
                     nếu (mình.đường dẫn là phân cách(đường dẫn[2])) {
                         trả về đúng;
@@ -125,126 +125,126 @@ lớp công khai Tiện Ích Đường Dẫn {
         trả về sai;
     };
 
-    hàm công khai đường dẫn nối(gốc_dữ_liệu, phần con) {
-        nếu (gốc_dữ_liệu == "") {
+    hàm công khai đường dẫn nối(gốc dữ liệu, phần con) {
+        nếu (gốc dữ liệu == "") {
             trả về phần con;
         };
         nếu (mình.đường dẫn là tuyệt đối(phần con)) {
             trả về phần con;
         };
 
-        phân_cách = mình.đường dẫn dấu phân cách();
+        phân cách = mình.đường dẫn dấu phân cách();
         // Trên Windows cả '/' và '\\' đều hợp lệ. Nối thêm vào đường dẫn
         // đã có dấu phân cách thì giữ nguyên kiểu dấu của phần cha.
         nếu (tên nền tảng() == "windows") {
-            lặp(i = do_dai(gốc_dữ_liệu) - 1; i >= 0; i--) {
-                nếu (mình.đường dẫn là phân cách(gốc_dữ_liệu[i])) {
-                    phân_cách = gốc_dữ_liệu[i];
+            lặp(i = máy ảo lấy độ dài(gốc dữ liệu) - 1; i >= 0; i--) {
+                nếu (mình.đường dẫn là phân cách(gốc dữ liệu[i])) {
+                    phân cách = gốc dữ liệu[i];
                     i = -1;
                 };
             };
         };
         nếu (phần con == "") {
-            nếu (mình.đường dẫn là phân cách(gốc_dữ_liệu[do_dai(gốc_dữ_liệu) - 1])) {
-                trả về gốc_dữ_liệu;
+            nếu (mình.đường dẫn là phân cách(gốc dữ liệu[máy ảo lấy độ dài(gốc dữ liệu) - 1])) {
+                trả về gốc dữ liệu;
             };
-            trả về gốc_dữ_liệu + phân_cách;
+            trả về gốc dữ liệu + phân cách;
         };
 
-        nếu (mình.đường dẫn là phân cách(gốc_dữ_liệu[do_dai(gốc_dữ_liệu) - 1])) {
-            trả về gốc_dữ_liệu + phần con;
+        nếu (mình.đường dẫn là phân cách(gốc dữ liệu[máy ảo lấy độ dài(gốc dữ liệu) - 1])) {
+            trả về gốc dữ liệu + phần con;
         };
-        trả về gốc_dữ_liệu + phân_cách + phần con;
+        trả về gốc dữ liệu + phân cách + phần con;
     };
 
     hàm công khai đường dẫn tên(đường dẫn) {
-        n = do_dai(đường dẫn);
+        n = máy ảo lấy độ dài(đường dẫn);
         nếu (n == 0 || mình.đường dẫn là phân cách(đường dẫn[n - 1])) {
             trả về "";
         };
 
-        bắt_đầu = 0;
+        bắt đầu = 0;
         lặp(i = n - 1; i >= 0; i--) {
             nếu (mình.đường dẫn là phân cách(đường dẫn[i])) {
-                bắt_đầu = i + 1;
+                bắt đầu = i + 1;
                 i = -1;
             };
         };
-        trả về cắt chuỗi(đường dẫn, bắt_đầu, n - bắt_đầu);
+        trả về cắt chuỗi(đường dẫn, bắt đầu, n - bắt đầu);
     };
 
-    hàm riêng tư đường dẫn cha nội bộ(đường dẫn, độ_dài_gốc) {
-        n = do_dai(đường dẫn);
+    hàm riêng tư đường dẫn cha nội bộ(đường dẫn, độ dài gốc) {
+        n = máy ảo lấy độ dài(đường dẫn);
         nếu (n == 0) {
             trả về "";
         };
 
-        kết_thúc = n;
-        mức_tối_thiểu = 1;
-        nếu (độ_dài_gốc > mức_tối_thiểu) { mức_tối_thiểu = độ_dài_gốc; };
-        lặp(vòng = 0; kết_thúc > mức_tối_thiểu && mình.đường dẫn là phân cách(đường dẫn[kết_thúc - 1]); vòng++) {
-            kết_thúc = kết_thúc - 1;
+        kết thúc = n;
+        mức tối thiểu = 1;
+        nếu (độ dài gốc > mức tối thiểu) { mức tối thiểu = độ dài gốc; };
+        lặp(vòng = 0; kết thúc > mức tối thiểu && mình.đường dẫn là phân cách(đường dẫn[kết thúc - 1]); vòng++) {
+            kết thúc = kết thúc - 1;
         };
 
-        nếu (kết_thúc < n) {
-            trả về cắt chuỗi(đường dẫn, 0, kết_thúc);
+        nếu (kết thúc < n) {
+            trả về cắt chuỗi(đường dẫn, 0, kết thúc);
         };
 
-        nếu (độ_dài_gốc > 0 && kết_thúc <= độ_dài_gốc) {
-            trả về cắt chuỗi(đường dẫn, 0, độ_dài_gốc);
+        nếu (độ dài gốc > 0 && kết thúc <= độ dài gốc) {
+            trả về cắt chuỗi(đường dẫn, 0, độ dài gốc);
         };
 
-        vị_trí = -1;
-        lặp(i = kết_thúc - 1; i >= 0; i--) {
+        vị trí = -1;
+        lặp(i = kết thúc - 1; i >= 0; i--) {
             nếu (mình.đường dẫn là phân cách(đường dẫn[i])) {
-                vị_trí = i;
+                vị trí = i;
                 i = -1;
             };
         };
 
-        nếu (vị_trí < 0) {
+        nếu (vị trí < 0) {
             trả về "";
         };
-        nếu (độ_dài_gốc > 0 && vị_trí < độ_dài_gốc) {
-            trả về cắt chuỗi(đường dẫn, 0, độ_dài_gốc);
+        nếu (độ dài gốc > 0 && vị trí < độ dài gốc) {
+            trả về cắt chuỗi(đường dẫn, 0, độ dài gốc);
         };
-        nếu (vị_trí == 0) {
+        nếu (vị trí == 0) {
             trả về mình.đường dẫn dấu phân cách();
         };
-        trả về cắt chuỗi(đường dẫn, 0, vị_trí);
+        trả về cắt chuỗi(đường dẫn, 0, vị trí);
     };
 
     hàm công khai đường dẫn cha windows(đường) {
         // Không dựa vào OS hiện tại: phép toán lexical này kiểm thử được trên macOS.
-        gốc_dữ_liệu = mình.đường dẫn gốc windows dài(đường);
-        n = do_dai(đường);
+        gốc dữ liệu = mình.đường dẫn gốc windows dài(đường);
+        n = máy ảo lấy độ dài(đường);
         nếu (n == 0) { trả về ""; };
-        kết_thúc = n;
-        tối_thiểu = 1;
-        nếu (gốc_dữ_liệu > tối_thiểu) { tối_thiểu = gốc_dữ_liệu; };
-        lặp(vòng = 0; kết_thúc > tối_thiểu && mình.đường dẫn là phân cách windows(đường[kết_thúc - 1]); vòng++) {
-            kết_thúc = kết_thúc - 1;
+        kết thúc = n;
+        tối thiểu = 1;
+        nếu (gốc dữ liệu > tối thiểu) { tối thiểu = gốc dữ liệu; };
+        lặp(vòng = 0; kết thúc > tối thiểu && mình.đường dẫn là phân cách windows(đường[kết thúc - 1]); vòng++) {
+            kết thúc = kết thúc - 1;
         };
-        nếu (kết_thúc < n) { trả về cắt chuỗi(đường, 0, kết_thúc); };
-        nếu (gốc_dữ_liệu > 0 && kết_thúc <= gốc_dữ_liệu) { trả về cắt chuỗi(đường, 0, gốc_dữ_liệu); };
-        vị_trí = -1;
-        lặp(i = kết_thúc - 1; i >= 0; i--) {
+        nếu (kết thúc < n) { trả về cắt chuỗi(đường, 0, kết thúc); };
+        nếu (gốc dữ liệu > 0 && kết thúc <= gốc dữ liệu) { trả về cắt chuỗi(đường, 0, gốc dữ liệu); };
+        vị trí = -1;
+        lặp(i = kết thúc - 1; i >= 0; i--) {
             nếu (mình.đường dẫn là phân cách windows(đường[i])) {
-                vị_trí = i;
+                vị trí = i;
                 i = -1;
             };
         };
-        nếu (vị_trí < 0) { trả về ""; };
-        nếu (gốc_dữ_liệu > 0 && vị_trí < gốc_dữ_liệu) { trả về cắt chuỗi(đường, 0, gốc_dữ_liệu); };
-        nếu (vị_trí == 0) { trả về cắt chuỗi(đường, 0, 1); };
-        trả về cắt chuỗi(đường, 0, vị_trí);
+        nếu (vị trí < 0) { trả về ""; };
+        nếu (gốc dữ liệu > 0 && vị trí < gốc dữ liệu) { trả về cắt chuỗi(đường, 0, gốc dữ liệu); };
+        nếu (vị trí == 0) { trả về cắt chuỗi(đường, 0, 1); };
+        trả về cắt chuỗi(đường, 0, vị trí);
     };
 
     hàm công khai đường dẫn cha(đường dẫn) {
         nếu (tên nền tảng() == "windows") { trả về mình.đường dẫn cha windows(đường dẫn); };
-        gốc_dữ_liệu = 0;
-        nếu (do_dai(đường dẫn) > 0 && đường dẫn[0] == "/") { gốc_dữ_liệu = 1; };
-        trả về mình.đường dẫn cha nội bộ(đường dẫn, gốc_dữ_liệu);
+        gốc dữ liệu = 0;
+        nếu (máy ảo lấy độ dài(đường dẫn) > 0 && đường dẫn[0] == "/") { gốc dữ liệu = 1; };
+        trả về mình.đường dẫn cha nội bộ(đường dẫn, gốc dữ liệu);
     };
 
     hàm công khai đường dẫn tồn tại(đường dẫn) {
@@ -253,17 +253,17 @@ lớp công khai Tiện Ích Đường Dẫn {
             trả về mình.đường dẫn loại windows(đường, đúng) >= 0;
         };
         mình.đường dẫn kiểm tra byte(đường);
-        trả về máy_đường_loại(đường, 1) >= 0;
+        trả về máy đường loại(đường, 1) >= 0;
     };
 
     // POSIX kernel/host trả struct stat phụ thuộc ABI; machine adapter đọc
     // st_mode và trả mã loại chuẩn 0..15 cho V++.
-    hàm công khai đường dẫn loại posix(đường, theo_liên_kết) {
+    hàm công khai đường dẫn loại posix(đường, theo liên kết) {
         mình.đường dẫn kiểm tra byte(đường);
-        nếu (theo_liên_kết) {
-            trả về máy_đường_loại(đường, 1);
+        nếu (theo liên kết) {
+            trả về máy đường loại(đường, 1);
         };
-        trả về máy_đường_loại(đường, 0);
+        trả về máy đường loại(đường, 0);
     };
 
     hàm công khai là tệp(đường dẫn) {
@@ -284,62 +284,62 @@ lớp công khai Tiện Ích Đường Dẫn {
 };
 
 
-hàm công khai đường dẫn loại windows(đường, theo_liên_kết) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn loại windows(đường, theo_liên_kết);
+hàm công khai đường dẫn loại windows(đường, theo liên kết) {
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn loại windows(đường, theo liên kết);
 };
 
 hàm công khai đường dẫn là phân cách(c) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn là phân cách(c);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn là phân cách(c);
 };
 
 hàm công khai đường dẫn gốc windows dài(đường) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn gốc windows dài(đường);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn gốc windows dài(đường);
 };
 
 hàm công khai đường dẫn là tuyệt đối(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn là tuyệt đối(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn là tuyệt đối(đường dẫn);
 };
 
 hàm công khai đường dẫn nối(gốc, phần con) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn nối(gốc, phần con);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn nối(gốc, phần con);
 };
 
 hàm công khai đường dẫn tên(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn tên(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn tên(đường dẫn);
 };
 
 hàm công khai đường dẫn cha windows(đường) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn cha windows(đường);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn cha windows(đường);
 };
 
 hàm công khai đường dẫn cha(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn cha(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn cha(đường dẫn);
 };
 
 hàm công khai đường dẫn tồn tại(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn tồn tại(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn tồn tại(đường dẫn);
 };
 
-hàm công khai đường dẫn loại posix(đường, theo_liên_kết) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.đường dẫn loại posix(đường, theo_liên_kết);
+hàm công khai đường dẫn loại posix(đường, theo liên kết) {
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.đường dẫn loại posix(đường, theo liên kết);
 };
 
 hàm công khai là tệp(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.là tệp(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.là tệp(đường dẫn);
 };
 
 hàm công khai là thư mục(đường dẫn) {
-    __vpp_adapter = Tiện Ích Đường Dẫn();
-    trả về __vpp_adapter.là thư mục(đường dẫn);
+    bộ chuyển tiếp = Tiện Ích Đường Dẫn();
+    trả về bộ chuyển tiếp.là thư mục(đường dẫn);
 };

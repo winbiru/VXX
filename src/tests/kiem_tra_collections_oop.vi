@@ -16,7 +16,7 @@ hàm chính() {
     in tập.thêm("a") && !tập.thêm("a");
     in tập.thêm("b") && tập.số lượng() == 2;
     in tập.chứa("a") && tập_khác.trống();
-    bản_sao = tập.danh sách(); them(bản_sao, "c");
+    bản_sao = tập.danh sách(); thêm(bản_sao, "c");
     in tập.số lượng() == 2;
     in tập.xóa("a") && !tập.xóa("a");
     bảng = Từ Điển(); khác = Từ Điển();

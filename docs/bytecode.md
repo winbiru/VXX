@@ -165,7 +165,7 @@ Notes:
 
 ## 7. Assembler / Disassembler API (mục tiêu)
 - Assembler: input là human-readable mnemonics (ví dụ PUSH_CONST 10; LOAD_LOCAL 0; OP_CONG), output là file `.vbc`.
-- Disassembler `.vbc`: đọc bytes, map opcode -> mnemonic, resolve constant-pool indices.
+- Disassembler `.vbc`: đọc các byte, map opcode -> mnemonic, resolve constant-pool indices.
 - Hiện tại [`src/tooling/tooling.cpp`](../src/tooling/tooling.cpp) chỉ disassemble `std::vector<Instruction>` trong bộ nhớ; nó chưa đọc file `.vbc`.
 - JSON/TOML IR giữa compiler và assembler vẫn chỉ là một lựa chọn thiết kế tương lai. Compiler hiện có IR nội bộ không kiểu và chỉ emit bytecode qua Direct IR; region chưa được hỗ trợ làm compilation thất bại với diagnostic. IR này không phải JSON/TOML, serializer hay compatibility contract cho `.vbc`.
 

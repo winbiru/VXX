@@ -392,3 +392,5 @@ Lhome_key: .asciz "VPP_HOME"
 .data
 .p2align 3
 vpp_native_arena_base: .quad 0
+
+#include "vpp_vietnamese_runtime_symbols.inc"

@@ -39,7 +39,7 @@ endif()
 
 # Rejection checks use the same frontend whitelist and Machine IR ABI gate.
 file(WRITE "${VPP_OUTPUT_DIR}/bad-block-arity.vi"
-    "hàm chính() { trả về tệp_đọc_khối(1); };\n")
+    "hàm chính() { trả về tệp đọc khối(1); };\n")
 file(REMOVE "${VPP_OUTPUT_DIR}/bad-block-arity")
 vpp_native_compile_command("${VPP_OUTPUT_DIR}/bad-block-arity.vi"
     "${VPP_OUTPUT_DIR}/bad-block-arity" compile_command)
@@ -50,7 +50,7 @@ if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/bad-block-arity" OR
     (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "sai số đối số"))
     message(FATAL_ERROR "native bulk arity must fail: ${status}\n${errors}")
 endif()
-foreach(name IN ITEMS byte_nối byte_bằng byte_in tệp_đọc_khối tệp_ghi_khối
+foreach(name IN ITEMS "byte nối" "byte bằng" "byte in" "tệp đọc khối" "tệp ghi khối"
                       vpp_native_bytes_concat vpp_native_file_read_block)
     file(WRITE "${VPP_OUTPUT_DIR}/reserved.vi"
         "hàm ${name}() { trả về 0; }; hàm chính() { trả về 0; };\n")

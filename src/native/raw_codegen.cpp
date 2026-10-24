@@ -1,4 +1,5 @@
 #include "vpp/native/raw_codegen.h"
+#include "vpp/native/abi_symbol.h"
 
 #include <charconv>
 #include <cctype>
@@ -109,6 +110,20 @@ bool symbolNameSafe(std::string_view name) {
         if (!(std::isalnum(ch) || ch == '_')) return false;
     return true;
 }
+
+// Assembly entry labels originate from source identifiers. Preserve
+// Vietnamese identifiers (UTF-8 and spaces), but reject punctuation that
+// could be interpreted as assembler directives before ABI mangling.
+bool sourceSymbolSafe(std::string_view name) {
+    if (name.empty()) return false;
+    for (unsigned char ch : name) {
+        if (ch >= 128) continue; // UTF-8 validity is checked by nativeAbiSymbol.
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') || ch == '_' || ch == ' ') continue;
+        return false;
+    }
+    return true;
+}
 } // namespace
 
 RawLeafLowering lowerRawLeaf(const compiler::IrProgram &ir,
@@ -186,7 +201,9 @@ RawLeafResult emitRawLeaf(const Target &target, const RawLeaf &leaf) {
 
 RawAssemblyResult emitRawAssembly(const Target &target, const RawLeaf &leaf,
                                   std::string_view symbol) {
-    if (!symbolNameSafe(symbol)) return {{}, "tên nhãn assembly không hợp lệ"};
+    if (!sourceSymbolSafe(symbol)) return {{}, "tên nhãn assembly không hợp lệ"};
+    const auto abiName = nativeAbiSymbol(symbol);
+    if (!symbolNameSafe(abiName)) return {{}, "tên nhãn assembly không hợp lệ"};
     if (target.arch == Architecture::AArch64 &&
         target.os == OperatingSystem::Windows)
         return {{}, "Windows ARM64 native ABI chưa được triển khai"};
@@ -197,7 +214,7 @@ RawAssemblyResult emitRawAssembly(const Target &target, const RawLeaf &leaf,
     if (output.bytes.empty() || output.assembly.empty())
         return {{}, "backend chưa tạo đủ mã máy và assembly"};
     const std::string label =
-        (target.os == OperatingSystem::MacOS ? "_" : "") + std::string(symbol);
+        (target.os == OperatingSystem::MacOS ? "_" : "") + abiName;
     // x86 emitters write Intel mnemonics. GNU/LLVM integrated assemblers
     // default to AT&T syntax, which rejects `mov eax, edi` without this.
     const std::string dialect =
@@ -381,7 +398,8 @@ private:
                     if (target) return fail("native call có nhiều định nghĩa cùng symbol");
                     target = &inst;
                 }
-                if (!target || !symbolNameSafe(target->declarationName) ||
+                const auto abiName = target ? nativeAbiSymbol(target->declarationName) : std::string{};
+                if (!target || !symbolNameSafe(abiName) ||
                     target->parameters.size() != argc)
                     return fail("native call thiếu định nghĩa hàm/không đúng arity hoặc tên symbol");
                 for (const auto &param : target->parameters)
@@ -390,7 +408,7 @@ private:
                 for (std::size_t i = 1; i < v->operands.size(); ++i)
                     if (!value(v->operands[i], nesting + 1)) return false;
                 const auto call = add(MachineOpcode::Call, 0, argc);
-                result.instructions[call].symbol = target->declarationName;
+                result.instructions[call].symbol = abiName;
                 depth -= argc;
                 push();
                 return true;
@@ -615,10 +633,11 @@ MachineEmission emitMachineFunction(const Target &target,
 RawAssemblyResult emitMachineAssembly(const Target &target,
                                       const MachineEmission &emission,
                                       std::string_view symbol) {
-    if (!symbolNameSafe(symbol)) return {{}, "tên nhãn assembly không hợp lệ"};
+    const auto abiName = nativeAbiSymbol(symbol);
+    if (!symbolNameSafe(abiName)) return {{}, "tên nhãn assembly không hợp lệ"};
     if (!emission) return {{}, "machine IR chưa tạo mã máy"};
     const auto label = (target.os == OperatingSystem::MacOS ? "_" : "") +
-                       std::string(symbol);
+                       abiName;
     const std::string dialect = target.arch == Architecture::X86_64
         ? ".intel_syntax noprefix\n" : "";
     return {dialect + ".text\n.globl " + label + "\n" + label + ":\n" +

@@ -17,97 +17,97 @@ hàm chính() {
     in tra ve(4) == 7;
 
     nguồn = "hàm chính() { /* lời chào\nViệt */ in \"Việt\"; trả về 1 + 2; };";
-    tokens = biên dịch token hóa(nguồn);
+    tokens = biên dịch từ tố hóa(nguồn);
     snapshot = biên dịch phân tích(nguồn);
-    in độ dài(tokens) == lấy map(snapshot, "token", -1);
-    in lấy map(tokens[0], "giá trị", "") == "hàm";
-    in lấy map(tokens[0], "loại", "") == "từ khóa";
-    in lấy map(tokens[0], "dòng", 0) == 1;
-    in lấy map(tokens[0], "cột", 0) == 1;
-    in lấy map(tokens[8], "giá trị", "") == "trả về";
-    in lấy map(tokens[8], "loại", "") == "từ khóa";
-    in lấy map(tokens[8], "kết thúc", 0) > lấy map(tokens[8], "vị trí", 0);
+    in độ dài(tokens) == lấy từ điển(snapshot, "token", -1);
+    in lấy từ điển(tokens[0], "giá trị", "") == "hàm";
+    in lấy từ điển(tokens[0], "loại", "") == "từ khóa";
+    in lấy từ điển(tokens[0], "dòng", 0) == 1;
+    in lấy từ điển(tokens[0], "cột", 0) == 1;
+    in lấy từ điển(tokens[8], "giá trị", "") == "trả về";
+    in lấy từ điển(tokens[8], "loại", "") == "từ khóa";
+    in lấy từ điển(tokens[8], "kết thúc", 0) > lấy từ điển(tokens[8], "vị trí", 0);
 
-    chuỗi = biên dịch token hóa("in \"a\\\"b\"; // comment");
+    chuỗi = biên dịch từ tố hóa("in \"a\\\"b\"; // comment");
     in độ dài(chuỗi) == 3;
-    in lấy map(chuỗi[1], "giá trị", "") == "\"a\\\"b\"";
-    in lấy map(chuỗi[1], "loại", "") == "chuỗi";
+    in lấy từ điển(chuỗi[1], "giá trị", "") == "\"a\\\"b\"";
+    in lấy từ điển(chuỗi[1], "loại", "") == "chuỗi";
 
-    dấu = biên dịch token hóa("a==b && c!=d || e<=f ++ -- += %= 1.2");
+    dấu = biên dịch từ tố hóa("a==b && c!=d || e<=f ++ -- += %= 1.2");
     in độ dài(dấu) == 16;
-    in lấy map(dấu[1], "giá trị", "") == "==";
-    in lấy map(dấu[3], "giá trị", "") == "&&";
-    in lấy map(dấu[5], "giá trị", "") == "!=";
-    in lấy map(dấu[7], "giá trị", "") == "||";
-    in lấy map(dấu[9], "giá trị", "") == "<=";
-    in lấy map(dấu[10], "giá trị", "") == "f";
-    in lấy map(dấu[14], "giá trị", "") == "%=";
-    in lấy map(dấu[15], "loại", "") == "số thực";
+    in lấy từ điển(dấu[1], "giá trị", "") == "==";
+    in lấy từ điển(dấu[3], "giá trị", "") == "&&";
+    in lấy từ điển(dấu[5], "giá trị", "") == "!=";
+    in lấy từ điển(dấu[7], "giá trị", "") == "||";
+    in lấy từ điển(dấu[9], "giá trị", "") == "<=";
+    in lấy từ điển(dấu[10], "giá trị", "") == "f";
+    in lấy từ điển(dấu[14], "giá trị", "") == "%=";
+    in lấy từ điển(dấu[15], "loại", "") == "số thực";
 
-    từ_ghép = biên dịch token hóa("hoặc { trả về 0; } bắt lỗi (e) {};");
-    in lấy map(từ_ghép[0], "giá trị", "") == "hoặc";
-    in lấy map(từ_ghép[2], "giá trị", "") == "trả về";
-    in lấy map(từ_ghép[6], "giá trị", "") == "bắt lỗi";
-    nhánh_nhiều = biên dịch token hóa("nếu (a) {} hoặc nếu (b) {} hoặc {};");
-    in lấy map(nhánh_nhiều[6], "giá trị", "") == "hoặc";
-    in lấy map(nhánh_nhiều[7], "giá trị", "") == "nếu";
-    in lấy map(nhánh_nhiều[7], "loại", "") == "từ khóa";
+    từ_ghép = biên dịch từ tố hóa("hoặc { trả về 0; } bắt lỗi (e) {};");
+    in lấy từ điển(từ_ghép[0], "giá trị", "") == "hoặc";
+    in lấy từ điển(từ_ghép[2], "giá trị", "") == "trả về";
+    in lấy từ điển(từ_ghép[6], "giá trị", "") == "bắt lỗi";
+    nhánh_nhiều = biên dịch từ tố hóa("nếu (a) {} hoặc nếu (b) {} hoặc {};");
+    in lấy từ điển(nhánh_nhiều[6], "giá trị", "") == "hoặc";
+    in lấy từ điển(nhánh_nhiều[7], "giá trị", "") == "nếu";
+    in lấy từ điển(nhánh_nhiều[7], "loại", "") == "từ khóa";
 
     // Chữ v/f từng bị nhận nhầm là escape \v/\f của khoảng trắng.
-    chữ = biên dịch token hóa("v f vf five vpp");
+    chữ = biên dịch từ tố hóa("v f vf five vpp");
     in độ dài(chữ) == 5;
-    in lấy map(chữ[0], "giá trị", "") == "v";
-    in lấy map(chữ[1], "giá trị", "") == "f";
-    in lấy map(chữ[3], "giá trị", "") == "five";
-    trắng = biên dịch token hóa("a" + ký tự unicode(11) + "b" + ký tự unicode(12) + "c");
+    in lấy từ điển(chữ[0], "giá trị", "") == "v";
+    in lấy từ điển(chữ[1], "giá trị", "") == "f";
+    in lấy từ điển(chữ[3], "giá trị", "") == "five";
+    trắng = biên dịch từ tố hóa("a" + ký tự unicode(11) + "b" + ký tự unicode(12) + "c");
     in độ dài(trắng) == 3;
-    in lấy map(trắng[2], "giá trị", "") == "c";
+    in lấy từ điển(trắng[2], "giá trị", "") == "c";
 
     // Không suy diễn thiếu dấu trong lexer: chúng là các định danh hợp lệ.
-    không_dấu = biên dịch token hóa("HAM ham thu thập lop tra ve duoc bao ve");
+    không_dấu = biên dịch từ tố hóa("HAM ham thu thập lop tra ve duoc bao ve");
     in độ dài(không_dấu) == 10;
-    in lấy map(không_dấu[0], "giá trị", "") == "HAM";
-    in lấy map(không_dấu[0], "loại", "") == "định danh";
-    in lấy map(không_dấu[2], "giá trị", "") == "thu";
-    in lấy map(không_dấu[2], "loại", "") == "định danh";
-    in lấy map(không_dấu[3], "giá trị", "") == "thập";
-    in lấy map(không_dấu[4], "giá trị", "") == "lop";
-    in lấy map(không_dấu[5], "giá trị", "") == "tra";
-    in lấy map(không_dấu[6], "giá trị", "") == "ve";
-    in lấy map(không_dấu[9], "giá trị", "") == "ve";
+    in lấy từ điển(không_dấu[0], "giá trị", "") == "HAM";
+    in lấy từ điển(không_dấu[0], "loại", "") == "định danh";
+    in lấy từ điển(không_dấu[2], "giá trị", "") == "thu";
+    in lấy từ điển(không_dấu[2], "loại", "") == "định danh";
+    in lấy từ điển(không_dấu[3], "giá trị", "") == "thập";
+    in lấy từ điển(không_dấu[4], "giá trị", "") == "lop";
+    in lấy từ điển(không_dấu[5], "giá trị", "") == "tra";
+    in lấy từ điển(không_dấu[6], "giá trị", "") == "ve";
+    in lấy từ điển(không_dấu[9], "giá trị", "") == "ve";
 
     lỗi_chuỗi = sai;
-    thử { biên dịch token hóa("in \"chưa đóng"); }
+    thử { biên dịch từ tố hóa("in \"chưa đóng"); }
     bắt lỗi (e) { lỗi_chuỗi = đúng; };
     in lỗi_chuỗi;
     lỗi_khối = sai;
-    thử { biên dịch token hóa("/* chưa đóng"); }
+    thử { biên dịch từ tố hóa("/* chưa đóng"); }
     bắt lỗi (e) { lỗi_khối = đúng; };
     in lỗi_khối;
 
     // SourceSpan của compiler C++ đo byte UTF-8; API bổ sung chỉ số ký tự.
-    việt = biên dịch token hóa("\n  hoặc { in \"đúng\"; }");
-    in lấy map(việt[0], "dòng", 0) == 2;
-    in lấy map(việt[0], "cột", 0) == 3;
-    in lấy map(việt[0], "vị trí", -1) == 3;
-    in lấy map(việt[0], "kết thúc", 0) == 9;
-    in lấy map(việt[0], "kết thúc ký tự", 0) == 7;
-    unicode = biên dịch token hóa("à x");
-    in lấy map(unicode[0], "kết thúc", 0) == 2;
-    in lấy map(unicode[1], "vị trí", 0) == 3;
-    in lấy map(unicode[1], "cột", 0) == 4;
-    in lấy map(unicode[1], "vị trí ký tự", 0) == 2;
-    in lấy map(unicode[1], "cột ký tự", 0) == 3;
+    việt = biên dịch từ tố hóa("\n  hoặc { in \"đúng\"; }");
+    in lấy từ điển(việt[0], "dòng", 0) == 2;
+    in lấy từ điển(việt[0], "cột", 0) == 3;
+    in lấy từ điển(việt[0], "vị trí", -1) == 3;
+    in lấy từ điển(việt[0], "kết thúc", 0) == 9;
+    in lấy từ điển(việt[0], "kết thúc ký tự", 0) == 7;
+    unicode = biên dịch từ tố hóa("à x");
+    in lấy từ điển(unicode[0], "kết thúc", 0) == 2;
+    in lấy từ điển(unicode[1], "vị trí", 0) == 3;
+    in lấy từ điển(unicode[1], "cột", 0) == 4;
+    in lấy từ điển(unicode[1], "vị trí ký tự", 0) == 2;
+    in lấy từ điển(unicode[1], "cột ký tự", 0) == 3;
 
-    // Lexer native phải giữ token nhiều âm tiết và span UTF-8 sau khi
-    // tối ưu bỏ phân loại lại token thô và kiểm tra tiền tố.
-    từ_khóa_đầy_đủ = biên dịch token hóa("kiểm tra sau ngoại thư viện trả về bỏ qua mặc định trường hợp khởi tạo điều kiện cập nhật bắt lỗi giao diện kế thừa triển khai công khai riêng tư bảo vệ ký hiệu khả năng");
+    // Lexer native phải giữ từ tố nhiều âm tiết và span UTF-8 sau khi
+    // tối ưu bỏ phân loại lại từ tố thô và kiểm tra tiền tố.
+    từ_khóa_đầy_đủ = biên dịch từ tố hóa("kiểm tra sau ngoại thư viện trả về bỏ qua mặc định trường hợp khởi tạo điều kiện cập nhật bắt lỗi giao diện kế thừa triển khai công khai riêng tư bảo vệ ký hiệu khả năng");
     in độ dài(từ_khóa_đầy_đủ) == 18;
-    in lấy map(từ_khóa_đầy_đủ[0], "giá trị", "") == "kiểm tra sau";
-    in lấy map(từ_khóa_đầy_đủ[1], "giá trị", "") == "ngoại thư viện";
-    in lấy map(từ_khóa_đầy_đủ[17], "giá trị", "") == "khả năng";
-    in lấy map(từ_khóa_đầy_đủ[17], "loại", "") == "từ khóa";
-    in lấy map(từ_khóa_đầy_đủ[0], "vị trí", -1) == 0;
-    in lấy map(từ_khóa_đầy_đủ[0], "kết thúc", -1) == 14;
-    in lấy map(từ_khóa_đầy_đủ[0], "kết thúc ký tự", -1) == 12;
+    in lấy từ điển(từ_khóa_đầy_đủ[0], "giá trị", "") == "kiểm tra sau";
+    in lấy từ điển(từ_khóa_đầy_đủ[1], "giá trị", "") == "ngoại thư viện";
+    in lấy từ điển(từ_khóa_đầy_đủ[17], "giá trị", "") == "khả năng";
+    in lấy từ điển(từ_khóa_đầy_đủ[17], "loại", "") == "từ khóa";
+    in lấy từ điển(từ_khóa_đầy_đủ[0], "vị trí", -1) == 0;
+    in lấy từ điển(từ_khóa_đầy_đủ[0], "kết thúc", -1) == 14;
+    in lấy từ điển(từ_khóa_đầy_đủ[0], "kết thúc ký tự", -1) == 12;
 };

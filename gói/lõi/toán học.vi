@@ -1,7 +1,7 @@
 // Thư viện vi.math — điểm sở hữu duy nhất cho API toán học của V++.
 // Các primitive collection/thống kê vẫn dùng lại từ vi.base.
 nhập gói/lõi/thống kê;
-nhập gói/bộ sưu tập/danh sách;
+công khai nhập gói/bộ sưu tập/danh sách;
 nhập gói/lõi/chuyển kiểu;
 
 // Số học cơ bản.
@@ -54,7 +54,7 @@ hàm công khai lũy thừa(cơ sở, số mũ) {
     trả về kết quả;
 };
 
-hàm công khai giai thừa(n) {
+hàm công khai giải thừa(n) {
     nếu (n < 0) {
         ném "giai thừa: đối số phải là số nguyên không âm";
     };
@@ -135,7 +135,7 @@ hàm công khai tổng hai(a, b) {
 // Làm tròn số hữu hạn bằng phép toán IEEE-754 của VM.
 // Từ 2^52 trở lên mọi double hữu hạn đều đã là số nguyên.
 hàm riêng tư số học làm tròn nội bộ(x, lên, tên) {
-    kiểu = loai_cua(x);
+    kiểu = loại của(x);
     nếu (kiểu == "số nguyên") { trả về x; };
     nếu (kiểu != "số thực") {
         ném tên + ": đối số phải là số hữu hạn";
@@ -145,14 +145,14 @@ hàm riêng tư số học làm tròn nội bộ(x, lên, tên) {
     };
 
     âm = x < 0.0;
-    độ_lớn = x;
-    nếu (âm) { độ_lớn = 0.0 - x; };
-    nếu (độ_lớn >= 4503599627370496.0) { trả về x; };
+    độ lớn = x;
+    nếu (âm) { độ lớn = 0.0 - x; };
+    nếu (độ lớn >= 4503599627370496.0) { trả về x; };
 
-    gần = độ_lớn + 4503599627370496.0;
+    gần = độ lớn + 4503599627370496.0;
     nguyên = gần - 4503599627370496.0;
-    nếu (nguyên > độ_lớn) { nguyên = nguyên - 1.0; };
-    nếu (nguyên < độ_lớn) {
+    nếu (nguyên > độ lớn) { nguyên = nguyên - 1.0; };
+    nếu (nguyên < độ lớn) {
         nếu ((âm && !lên) || (!âm && lên)) {
             nguyên = nguyên + 1.0;
         };
@@ -165,52 +165,37 @@ hàm riêng tư số học làm tròn nội bộ(x, lên, tên) {
     trả về nguyên;
 };
 
-hàm công khai lam_tron_xuong(x) {
-    trả về số học làm tròn nội bộ(x, sai, "lam_tron_xuong");
+hàm công khai làm tròn xuống(x) {
+    trả về số học làm tròn nội bộ(x, sai, "làm tròn xuống");
 };
 
-hàm công khai lam_tron_len(x) {
-    trả về số học làm tròn nội bộ(x, đúng, "lam_tron_len");
+hàm công khai làm tròn lên(x) {
+    trả về số học làm tròn nội bộ(x, đúng, "làm tròn lên");
 };
 
 // Làm tròn về số nguyên gần nhất theo quy tắc nửa đơn vị ra xa 0.
 hàm công khai làm tròn(x) {
     nếu (x >= 0) {
-        trả về lam_tron_xuong(x + 0.5);
+        trả về làm tròn xuống(x + 0.5);
     };
-    trả về lam_tron_len(x - 0.5);
+    trả về làm tròn lên(x - 0.5);
 };
 
 // Làm tròn về phía âm vô cùng.
-hàm công khai làm tròn xuống(x) {
-    trả về lam_tron_xuong(x);
-};
 
 // Làm tròn về phía dương vô cùng.
-hàm công khai làm tròn lên(x) {
-    trả về lam_tron_len(x);
-};
 
 // Giá trị nhỏ nhất trong danh sách số. Danh sách rỗng giữ lỗi chuẩn của lõi.
-hàm công khai nhỏ nhất danh sách(ds) {
-    trả về nhỏ nhất list(ds);
-};
 
 // Giá trị lớn nhất trong danh sách số. Danh sách rỗng giữ lỗi chuẩn của lõi.
-hàm công khai lớn nhất danh sách(ds) {
-    trả về lớn nhất list(ds);
-};
 
 // Tổng các phần tử số trong danh sách.
-hàm công khai tổng danh sách(ds) {
-    trả về tổng list(ds);
-};
 
 // Trung bình cộng của danh sách số; từ chối danh sách rỗng để tránh kết quả không xác định.
-hàm công khai trung bình danh sách(ds) {
-    n = độ dài(ds);
+hàm công khai trung bình danh sách(danh sách đầu vào) {
+    n = máy ảo lấy độ dài(danh sách đầu vào);
     nếu (n == 0) {
         ném "toán học: không thể tính trung bình danh sách rỗng";
     };
-    trả về tổng list(ds) / (n + 0.0);
+    trả về tổng danh sách(danh sách đầu vào) / (n + 0.0);
 };

@@ -1,60 +1,60 @@
 // Pipeline hướng đối tượng trên implementation luồng lazy, single-use.
 nhập gói/lõi/giao diện tài nguyên;
-nhập gói/lõi/luồng dữ liệu như luồng_api;
+nhập gói/lõi/luồng dữ liệu như luồng giao diện lập trình;
 
 lớp công khai Luồng Truy Vấn triển khai Đóng Được {
     hàm công khai khởi tạo(nguồn) {
-        mình.ống = luồng_api.luồng(nguồn);
+        mình.ống = luồng giao diện lập trình.luồng(nguồn);
     };
 
-    hàm công khai ánh xạ(fn) {
-        mình.ống = luồng_api.ánh xạ(mình.ống, fn);
+    hàm công khai ánh xạ(chương trình con hiện tại) {
+        mình.ống = luồng giao diện lập trình.ánh xạ(mình.ống, chương trình con hiện tại);
         trả về mình;
     };
 
-    hàm công khai lọc(predicate) {
-        mình.ống = luồng_api.lọc(mình.ống, predicate);
+    hàm công khai lọc(biểu thức lọc) {
+        mình.ống = luồng giao diện lập trình.lọc(mình.ống, biểu thức lọc);
         trả về mình;
     };
 
-    hàm công khai ánh xạ phẳng(fn) {
-        mình.ống = luồng_api.ánh xạ phẳng(mình.ống, fn);
+    hàm công khai ánh xạ phẳng(chương trình con hiện tại) {
+        mình.ống = luồng giao diện lập trình.ánh xạ phẳng(mình.ống, chương trình con hiện tại);
         trả về mình;
     };
 
     hàm công khai bỏ(n) {
-        mình.ống = luồng_api.bỏ(mình.ống, n);
+        mình.ống = luồng giao diện lập trình.bỏ(mình.ống, n);
         trả về mình;
     };
 
     hàm công khai giới hạn(n) {
-        mình.ống = luồng_api.giới hạn luồng(mình.ống, n);
+        mình.ống = luồng giao diện lập trình.giới hạn luồng(mình.ống, n);
         trả về mình;
     };
 
     hàm công khai phân biệt() {
-        mình.ống = luồng_api.phân biệt(mình.ống);
+        mình.ống = luồng giao diện lập trình.phân biệt(mình.ống);
         trả về mình;
     };
 
-    hàm công khai sắp xếp(so_sánh = rỗng) {
-        mình.ống = luồng_api.sắp xếp luồng(mình.ống, so_sánh);
+    hàm công khai sắp xếp(số sánh = rỗng) {
+        mình.ống = luồng giao diện lập trình.sắp xếp luồng(mình.ống, số sánh);
         trả về mình;
     };
 
-    hàm công khai khi đóng(cleanup) {
-        luồng_api.khi đóng luồng(mình.ống, cleanup);
+    hàm công khai khi đóng(dọn dẹp) {
+        luồng giao diện lập trình.khi đóng luồng(mình.ống, dọn dẹp);
         trả về mình;
     };
 
-    hàm công khai gom danh sách() { trả về luồng_api.gom danh sách(mình.ống); };
-    hàm công khai duyệt(consumer) { trả về luồng_api.duyệt(mình.ống, consumer); };
-    hàm công khai đếm() { trả về luồng_api.đếm luồng(mình.ống); };
-    hàm công khai bất kỳ(predicate) { trả về luồng_api.bất kỳ(mình.ống, predicate); };
-    hàm công khai tất cả(predicate) { trả về luồng_api.tất cả luồng(mình.ống, predicate); };
-    hàm công khai đầu tiên() { trả về luồng_api.đầu tiên(mình.ống); };
-    hàm công khai rút gọn(giá_trị_đầu, reducer) {
-        trả về luồng_api.rút gọn(mình.ống, giá_trị_đầu, reducer);
+    hàm công khai gom danh sách() { trả về luồng giao diện lập trình.gom danh sách(mình.ống); };
+    hàm công khai duyệt(bộ tiêu thụ) { trả về luồng giao diện lập trình.duyệt(mình.ống, bộ tiêu thụ); };
+    hàm công khai đếm() { trả về luồng giao diện lập trình.đếm luồng(mình.ống); };
+    hàm công khai bất kỳ(biểu thức lọc) { trả về luồng giao diện lập trình.bất kỳ(mình.ống, biểu thức lọc); };
+    hàm công khai tất cả(biểu thức lọc) { trả về luồng giao diện lập trình.tất cả luồng(mình.ống, biểu thức lọc); };
+    hàm công khai đầu tiên() { trả về luồng giao diện lập trình.đầu tiên(mình.ống); };
+    hàm công khai rút gọn(giá trị đầu, bộ thu gọn) {
+        trả về luồng giao diện lập trình.rút gọn(mình.ống, giá trị đầu, bộ thu gọn);
     };
-    hàm công khai đóng() { trả về luồng_api.đóng luồng(mình.ống); };
+    hàm công khai đóng() { trả về luồng giao diện lập trình.đóng luồng(mình.ống); };
 };

@@ -11,17 +11,17 @@ hàm chính() {
     emitter = bộ phát sự kiện(8, "thu thập");
 
     listener_a = hàm(e) {
-        thêm(nhật_ký, "a:" + lấy map(e, "payload", ""));
+        thêm(nhật_ký, "a:" + lấy từ điển(e, "payload", ""));
     };
     listener_b = hàm(e) {
-        thêm(nhật_ký, "b:" + lấy map(e, "payload", ""));
+        thêm(nhật_ký, "b:" + lấy từ điển(e, "payload", ""));
     };
     đăng ký sự kiện(emitter, listener_a);
     đăng ký sự kiện(emitter, listener_b);
     báo_cáo = phát sự kiện(emitter, tạo sự kiện("test", "x"));
     ghi danh sách(nhật_ký);
-    in lấy map(báo_cáo, "đã gọi", -1);
-    in độ dài(lấy map(báo_cáo, "lỗi", []));
+    in lấy từ điển(báo_cáo, "đã gọi", -1);
+    in độ dài(lấy từ điển(báo_cáo, "lỗi", []));
 
     một_lần = 0;
     listener_once = hàm(e) {
@@ -61,7 +61,7 @@ hàm chính() {
     bị_hủy = đăng ký sự kiện(cancel_emitter, listener_hủy);
     in hủy đăng ký(bị_hủy);
     in hủy đăng ký(bị_hủy);
-    in số listener(cancel_emitter);
+    in số bộ lắng nghe(cancel_emitter);
 
     limit_emitter = bộ phát sự kiện(1);
     listener_limit_1 = hàm(e) { trả về rỗng; };
@@ -79,8 +79,8 @@ hàm chính() {
     đăng ký sự kiện(error_emitter, listener_lỗi);
     đăng ký sự kiện(error_emitter, listener_sau_lỗi);
     error_report = phát sự kiện(error_emitter, tạo sự kiện("test", 3));
-    in lấy map(error_report, "đã gọi", -1);
-    errors = lấy map(error_report, "lỗi", []);
+    in lấy từ điển(error_report, "đã gọi", -1);
+    errors = lấy từ điển(error_report, "lỗi", []);
     in độ dài(errors);
     in errors[0];
     in nhật_ký[độ dài(nhật_ký) - 1];

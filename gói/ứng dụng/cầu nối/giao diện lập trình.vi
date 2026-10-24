@@ -1,0 +1,651 @@
+// Legacy API-project adapter. It is intentionally excluded from gói/ứng dụng/chính.vi
+// because its routes, users schema, and JSON contracts are project-specific.
+
+nhập gói/mạng/chính;
+nhập gói/dữ liệu/chính;
+nhập gói/nhập xuất/chính;
+
+// Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
+lớp công khai Bộ Cầu Nối API {
+    hàm công khai khởi tạo() {};
+
+    // Ghi chú hàm: in log khởi động ứng dụng kiểu V++.
+    hàm công khai ứng dụng in khởi động vpp(tên ứng dụng, cổng, nguồn dữ liệu) {
+        in ":: " + tên ứng dụng + " ::";
+        in "(V++ style startup)";
+        in "Datasource: " + nguồn dữ liệu;
+        in "Tomcat started on port(s): " + cổng + " (http) with context path ''";
+        in "Started ApiProjectApplication in 0.000 seconds";
+        in "Press Ctrl+C to stop";
+        trả về 1;
+    };
+
+    // Ghi chú hàm: in log tắt ứng dụng kiểu V++.
+    hàm công khai ứng dụng in tắt vpp(tên ứng dụng) {
+        in "Stopping " + tên ứng dụng;
+        trả về 0;
+    };
+
+    // Ghi chú hàm: JSON health chuẩn actuator.
+    hàm công khai ứng dụng json tình trạng() {
+        trả về dịch vụ tài nguyên json thành công đối tượng("UP", "{\"status\":\"UP\"}");
+    };
+
+    // Ghi chú hàm: JSON đăng nhập thành công với token JWT.
+    hàm công khai ứng dụng json đăng nhập thành công(từ tố, mã làm mới) {
+        trả về dịch vụ tài nguyên json thành công jwt("Đăng nhập thành công", từ tố, mã làm mới);
+    };
+
+    // Ghi chú hàm: JSON lỗi thiếu thông tin đăng nhập.
+    hàm công khai ứng dụng json thiếu thông tin xác thực(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("missing-credentials", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi thiếu token.
+    hàm công khai ứng dụng json thiếu từ tố(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("missing-token", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi token không hợp lệ.
+    hàm công khai ứng dụng json không hợp lệ từ tố(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("invalid-token", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi thiếu keyword tìm kiếm.
+    hàm công khai ứng dụng json thiếu keyword(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("missing-keyword", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi thiếu username khi tạo user.
+    hàm công khai ứng dụng json thiếu tên đăng nhập(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("missing-username", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi user không tồn tại.
+    hàm công khai ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("user-not-found", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi database chưa kết nối.
+    hàm công khai ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("db-not-connected", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON lỗi resource không tồn tại.
+    hàm công khai ứng dụng json phủ định đã tìm thấy(mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi("not-found", mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON danh sách users theo contract API project.
+    hàm công khai ứng dụng json các người dùng(mã yêu cầu, mảng người dùng json) {
+        dữ liệu json = "{\"requestId\":\"" + mã yêu cầu + "\",\"users\":" + mảng người dùng json + "}";
+        trả về dịch vụ tài nguyên json thành công đối tượng("Thành công", dữ liệu json);
+    };
+
+    // Ghi chú hàm: JSON thành công với value chuỗi theo contract cũ của api_project.
+    hàm công khai ứng dụng json giá trị đang xét(thông điệp, mã yêu cầu, giá trị đang xét) {
+        dữ liệu json = "{\"requestId\":\"" + mã yêu cầu + "\",\"value\":\"" + giá trị đang xét + "\"}";
+        trả về dịch vụ tài nguyên json thành công đối tượng(thông điệp, dữ liệu json);
+    };
+
+    // Ghi chú hàm: JSON lỗi chuẩn có requestId.
+    hàm công khai ứng dụng json lỗi(thông điệp, mã yêu cầu) {
+        trả về dịch vụ tài nguyên json lỗi(thông điệp, mã yêu cầu);
+    };
+
+    // Ghi chú hàm: JSON tạo user thành công.
+    hàm công khai ứng dụng json đã tạo người dùng(mã yêu cầu) {
+        trả về mình.ứng dụng json giá trị đang xét("Tạo mới thành công", mã yêu cầu, "created-user");
+    };
+
+    // Ghi chú hàm: JSON cập nhật user thành công.
+    hàm công khai ứng dụng json đã cập nhật người dùng(mã yêu cầu) {
+        trả về mình.ứng dụng json giá trị đang xét("Thành công", mã yêu cầu, "updated-user");
+    };
+
+    // Ghi chú hàm: JSON xóa user thành công.
+    hàm công khai ứng dụng json đã xóa người dùng(mã yêu cầu) {
+        trả về mình.ứng dụng json giá trị đang xét("Xóa thành công", mã yêu cầu, "deleted");
+    };
+
+    // Ghi chú hàm: JSON kết quả bootstrap database.
+    hàm công khai ứng dụng json cơ sở dữ liệu khởi động(kết quả trả về) {
+        dữ liệu json = "{\"requestId\":\"db-bootstrap\",\"result\":\"" + kết quả trả về + "\"}";
+        trả về dịch vụ tài nguyên json thành công đối tượng("Khởi tạo kết nối", dữ liệu json);
+    };
+
+    // Ghi chú hàm: JSON kết quả shutdown database.
+    hàm công khai ứng dụng json cơ sở dữ liệu tắt(kết quả trả về) {
+        dữ liệu json = "{\"requestId\":\"db-shutdown\",\"result\":\"" + kết quả trả về + "\"}";
+        trả về dịch vụ tài nguyên json thành công đối tượng("Đóng kết nối", dữ liệu json);
+    };
+
+    // Ghi chú hàm: chuẩn bị DB schema + seed cho API trước khi mở server.
+    hàm công khai ứng dụng chuẩn bị dữ liệu giao diện lập trình(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu) {
+        kết quả kết nối = kết nối cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu);
+        nếu (kết quả kết nối != "DB_OK|connected") {
+            trả về kết quả kết nối;
+        };
+
+        kết quả tạo = truy vấn cơ sở dữ liệu(
+            trình điều khiển,
+            địa chỉ kết nối cơ sở dữ liệu,
+            tên đăng nhập,
+            mật khẩu,
+            "CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(120) UNIQUE, first_names VARCHAR(255), last_name VARCHAR(255), email VARCHAR(255), phone_number VARCHAR(50), city VARCHAR(100), country VARCHAR(100), is_active INT DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);"
+        );
+        nếu (kết quả tạo == "DB_ERR|not-connected") {
+            trả về kết quả tạo;
+        };
+
+        kết quả đếm = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT COUNT(*) FROM users;");
+        nếu (kết quả đếm == "DB_OK|0") {
+            kết quả khởi tạo = truy vấn cơ sở dữ liệu(
+                trình điều khiển,
+                địa chỉ kết nối cơ sở dữ liệu,
+                tên đăng nhập,
+                mật khẩu,
+                "INSERT INTO users(username, first_names, last_name, email, phone_number, city, country, is_active) VALUES ('an','An','Nguyen','an@example.com','0900000001','HCM','VN',1),('binh','Binh','Tran','binh@example.com','0900000002','HN','VN',1),('chi','Chi','Le','chi@example.com','0900000003','DN','VN',1);"
+            );
+            nếu (kết quả khởi tạo == "DB_ERR|not-connected") {
+                trả về kết quả khởi tạo;
+            };
+        };
+
+        trả về "DB_OK|prepared";
+    };
+
+    // Ghi chú hàm: chạy server HTTP V++ trên socket primitives cho API project.
+    hàm công khai ứng dụng chạy máy chủ giao diện lập trình(cổng, trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, mã xác thực, mã làm mới, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị) {
+        kết quả chuẩn bị = mình.ứng dụng chuẩn bị dữ liệu giao diện lập trình(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu);
+        nếu (kết quả chuẩn bị == "DB_ERR|not-connected") {
+            trả về kết quả chuẩn bị;
+        };
+
+        mã máy chủ = mạng mở máy chủ giao diện lập trình(cổng);
+        lặp(i = 0; i < 2147483647; i = i + 1) {
+            mã yêu cầu = mạng lấy yêu cầu kế tiếp(mã máy chủ);
+            phương thức = mạng phương thức yêu cầu(mã yêu cầu);
+            đường tệp = mạng đường tệp yêu cầu(mã yêu cầu);
+            xác thực = mạng phần đầu yêu cầu(mã yêu cầu, "authorization");
+            xác thực mong đợi = "Bearer " + mã xác thực;
+            tiền tố định danh người dùng quản trị = đường người dùng quản trị + "/";
+
+            mã trạng thái = 200;
+            phản hồi = mình.ứng dụng json phủ định đã tìm thấy(mã yêu cầu);
+
+            nếu (phương thức == "GET") {
+                nếu (đường tệp == đường tình trạng) {
+                    mã trạng thái = 200;
+                    phản hồi = mình.ứng dụng json tình trạng();
+                };
+            };
+
+            nếu (phương thức == "POST") {
+                nếu (đường tệp == đường đăng nhập) {
+                    nội dung tên đăng nhập = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "username");
+                    nội dung mật khẩu = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "password");
+                    thiếu thông tin xác thực = sai;
+                    nếu (nội dung tên đăng nhập == "") {
+                        thiếu thông tin xác thực = đúng;
+                    };
+                    nếu (nội dung mật khẩu == "") {
+                        thiếu thông tin xác thực = đúng;
+                    };
+                    nếu (thiếu thông tin xác thực) {
+                        mã trạng thái = 400;
+                        phản hồi = mình.ứng dụng json thiếu thông tin xác thực(mã yêu cầu);
+                    } hoặc {
+                        mã trạng thái = 200;
+                        phản hồi = mình.ứng dụng json đăng nhập thành công(mã xác thực, mã làm mới);
+                    };
+                };
+            };
+
+            đường cần xác thực = sai;
+            nếu (đường tệp == đường người dùng quản trị) {
+                đường cần xác thực = đúng;
+            };
+            nếu (đường tệp == đường tìm người dùng quản trị) {
+                đường cần xác thực = đúng;
+            };
+            nếu (mạng đường tệp hậu tố yêu cầu(mã yêu cầu, tiền tố định danh người dùng quản trị) != "") {
+                đường cần xác thực = đúng;
+            };
+            nếu (đường cần xác thực) {
+                nếu (xác thực == "") {
+                    mã trạng thái = 401;
+                    phản hồi = mình.ứng dụng json thiếu từ tố(mã yêu cầu);
+                } hoặc {
+                    nếu (xác thực != xác thực mong đợi) {
+                        mã trạng thái = 401;
+                        phản hồi = mình.ứng dụng json không hợp lệ từ tố(mã yêu cầu);
+                    };
+                };
+            };
+
+            nếu (mã trạng thái == 200) {
+                nếu (phương thức == "GET") {
+                    nếu (đường tệp == đường người dùng quản trị) {
+                        các hàng = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT username FROM users ORDER BY username;");
+                        dữ liệu người dùng json = "[]";
+                        nếu (các hàng == "DB_OK|an binh chi") {
+                            dữ liệu người dùng json = "[\"an\",\"binh\",\"chi\"]";
+                        };
+                        nếu (các hàng == "DB_OK|binh chi") {
+                            dữ liệu người dùng json = "[\"binh\",\"chi\"]";
+                        };
+                        nếu (các hàng == "DB_OK|an binh") {
+                            dữ liệu người dùng json = "[\"an\",\"binh\"]";
+                        };
+                        nếu (các hàng == "DB_OK|an chi") {
+                            dữ liệu người dùng json = "[\"an\",\"chi\"]";
+                        };
+                        nếu (các hàng == "DB_OK|an") {
+                            dữ liệu người dùng json = "[\"an\"]";
+                        };
+                        nếu (các hàng == "DB_OK|binh") {
+                            dữ liệu người dùng json = "[\"binh\"]";
+                        };
+                        nếu (các hàng == "DB_OK|chi") {
+                            dữ liệu người dùng json = "[\"chi\"]";
+                        };
+                        nếu (các hàng == "DB_ERR|not-connected") {
+                            mã trạng thái = 500;
+                            phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+                        } hoặc {
+                            phản hồi = mình.ứng dụng json các người dùng(mã yêu cầu, dữ liệu người dùng json);
+                        };
+                    };
+
+                    nếu (đường tệp == đường tìm người dùng quản trị) {
+                        keyword = mạng truy vấn tham số yêu cầu(mã yêu cầu, "keyword");
+                        nếu (keyword == "") {
+                            mã trạng thái = 400;
+                            phản hồi = mình.ứng dụng json thiếu keyword(mã yêu cầu);
+                        } hoặc {
+                            sql = "SELECT username FROM users WHERE username LIKE '%" + keyword + "%' OR first_names LIKE '%" + keyword + "%' OR last_name LIKE '%" + keyword + "%' ORDER BY username;";
+                            các hàng = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql);
+                            dữ liệu người dùng json = "[]";
+                            nếu (các hàng == "DB_OK|an binh chi") {
+                                dữ liệu người dùng json = "[\"an\",\"binh\",\"chi\"]";
+                            };
+                            nếu (các hàng == "DB_OK|an") {
+                                dữ liệu người dùng json = "[\"an\"]";
+                            };
+                            nếu (các hàng == "DB_OK|binh") {
+                                dữ liệu người dùng json = "[\"binh\"]";
+                            };
+                            nếu (các hàng == "DB_OK|chi") {
+                                dữ liệu người dùng json = "[\"chi\"]";
+                            };
+                            nếu (các hàng == "DB_OK|binh chi") {
+                                dữ liệu người dùng json = "[\"binh\",\"chi\"]";
+                            };
+                            nếu (các hàng == "DB_ERR|not-connected") {
+                                mã trạng thái = 500;
+                                phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+                            } hoặc {
+                                phản hồi = mình.ứng dụng json các người dùng(mã yêu cầu, dữ liệu người dùng json);
+                            };
+                        };
+                    };
+                };
+            };
+
+            nếu (mã trạng thái == 200) {
+                nếu (phương thức == "POST") {
+                    nếu (đường tệp == đường người dùng quản trị) {
+                        tên đăng nhập mới = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "username");
+                        nếu (tên đăng nhập mới == "") {
+                            mã trạng thái = 400;
+                            phản hồi = mình.ứng dụng json thiếu tên đăng nhập(mã yêu cầu);
+                        } hoặc {
+                            các tên gọi = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "first_names");
+                            họ = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "last_name");
+                            thư điện tử = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "email");
+                            sql = "INSERT INTO users(username, first_names, last_name, email, phone_number, city, country, is_active) VALUES ('" + tên đăng nhập mới + "','" + các tên gọi + "','" + họ + "','" + thư điện tử + "','','','',1);";
+                            kết quả cơ sở dữ liệu = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql);
+                            nếu (kết quả cơ sở dữ liệu == "DB_ERR|not-connected") {
+                                mã trạng thái = 500;
+                                phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+                            } hoặc {
+                                mã trạng thái = 201;
+                                phản hồi = mình.ứng dụng json đã tạo người dùng(mã yêu cầu);
+                            };
+                        };
+                    };
+                };
+            };
+
+            hậu tố định danh = mạng đường tệp hậu tố yêu cầu(mã yêu cầu, tiền tố định danh người dùng quản trị);
+            nếu (mã trạng thái == 200) {
+                nếu (hậu tố định danh != "") {
+                    nếu (phương thức == "DELETE") {
+                        kết quả đếm = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT COUNT(*) FROM users WHERE id=" + hậu tố định danh + ";");
+                        nếu (kết quả đếm == "DB_OK|0") {
+                            mã trạng thái = 404;
+                            phản hồi = mình.ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu);
+                        } hoặc {
+                            kết quả xóa = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "DELETE FROM users WHERE id=" + hậu tố định danh + ";");
+                            nếu (kết quả xóa == "DB_ERR|not-connected") {
+                                mã trạng thái = 500;
+                                phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+                            } hoặc {
+                                mã trạng thái = 200;
+                                phản hồi = mình.ứng dụng json đã xóa người dùng(mã yêu cầu);
+                            };
+                        };
+                    };
+
+                    nếu (phương thức == "PUT") {
+                        kết quả đếm = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, "SELECT COUNT(*) FROM users WHERE id=" + hậu tố định danh + ";");
+                        nếu (kết quả đếm == "DB_OK|0") {
+                            mã trạng thái = 404;
+                            phản hồi = mình.ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu);
+                        } hoặc {
+                            tên đăng nhập mới = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "username");
+                            các tên gọi = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "first_names");
+                            họ = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "last_name");
+                            thư điện tử = mạng json trường dữ liệu yêu cầu(mã yêu cầu, "email");
+                            sql = "UPDATE users SET username=IF('" + tên đăng nhập mới + "'='',username,'" + tên đăng nhập mới + "'),first_names=IF('" + các tên gọi + "'='',first_names,'" + các tên gọi + "'),last_name=IF('" + họ + "'='',last_name,'" + họ + "'),email=IF('" + thư điện tử + "'='',email,'" + thư điện tử + "') WHERE id=" + hậu tố định danh + ";";
+                            kết quả cập nhật = truy vấn cơ sở dữ liệu(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, sql);
+                            nếu (kết quả cập nhật == "DB_ERR|not-connected") {
+                                mã trạng thái = 500;
+                                phản hồi = mình.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+                            } hoặc {
+                                mã trạng thái = 200;
+                                phản hồi = mình.ứng dụng json đã cập nhật người dùng(mã yêu cầu);
+                            };
+                        };
+                    };
+                };
+            };
+
+            mạng trả phản hồi(mã yêu cầu, mã trạng thái, phản hồi);
+        };
+
+        mạng đóng máy chủ giao diện lập trình(mã máy chủ);
+        trả về "DB_OK|server-stopped";
+    };
+
+    // Ghi chú hàm: đường dẫn cấu hình mặc định cho legacy api_project.
+    hàm công khai ứng dụng đường dẫn cấu hình giao diện lập trình dự án() {
+        trả về "application.properties";
+    };
+
+    // Ghi chú hàm: nạp cổng server từ properties.
+    hàm công khai ứng dụng cổng từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "port", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "server.port", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.server.port", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp datasource URL từ properties.
+    hàm công khai ứng dụng nguồn dữ liệu địa chỉ tài nguyên từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "url", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.datasource.url", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp datasource username từ properties.
+    hàm công khai ứng dụng nguồn dữ liệu tên đăng nhập từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "username", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.datasource.username", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp datasource password từ properties.
+    hàm công khai ứng dụng nguồn dữ liệu mật khẩu từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "password", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.datasource.password", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp datasource driver từ properties.
+    hàm công khai ứng dụng nguồn dữ liệu trình điều khiển từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "driverClassName", "");
+        nếu (giá trị đang xét != "") {
+            trả về giá trị đang xét;
+        };
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.datasource.driverClassName", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp access token từ properties.
+    hàm công khai ứng dụng xác thực từ tố từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.auth.token", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: nạp refresh token từ properties.
+    hàm công khai ứng dụng làm mới từ tố từ cấu hình(đường dẫn cấu hình) {
+        giá trị đang xét = đọc cấu hình khóa(đường dẫn cấu hình, "vpp.auth.refreshToken", "");
+        trả về giá trị đang xét;
+    };
+
+    // Ghi chú hàm: khởi động server theo thông tin do project truyền từ main.
+    hàm công khai ứng dụng chạy máy chủ từ cấu hình dự án(tên ứng dụng, cổng, đường dẫn cấu hình, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị) {
+        đường cấu hình = đường dẫn cấu hình;
+        nếu (đường cấu hình == "") {
+            đường cấu hình = mình.ứng dụng đường dẫn cấu hình giao diện lập trình dự án();
+        };
+        cổng chạy = cổng;
+        nếu (cổng chạy == "") {
+            cổng chạy = mình.ứng dụng cổng từ cấu hình(đường cấu hình);
+        };
+
+        địa chỉ kết nối cơ sở dữ liệu = mình.ứng dụng nguồn dữ liệu địa chỉ tài nguyên từ cấu hình(đường cấu hình);
+        trình điều khiển = mình.ứng dụng nguồn dữ liệu trình điều khiển từ cấu hình(đường cấu hình);
+        tên đăng nhập = mình.ứng dụng nguồn dữ liệu tên đăng nhập từ cấu hình(đường cấu hình);
+        mật khẩu = mình.ứng dụng nguồn dữ liệu mật khẩu từ cấu hình(đường cấu hình);
+        mã xác thực = mình.ứng dụng xác thực từ tố từ cấu hình(đường cấu hình);
+        mã làm mới = mình.ứng dụng làm mới từ tố từ cấu hình(đường cấu hình);
+
+        nếu (cổng chạy == "") {
+            trả về "APP_ERR|missing-port";
+        };
+        nếu (địa chỉ kết nối cơ sở dữ liệu == "") {
+            trả về "APP_ERR|missing-jdbc-url";
+        };
+        nếu (trình điều khiển == "") {
+            trả về "APP_ERR|missing-driver";
+        };
+        nếu (mã xác thực == "") {
+            trả về "APP_ERR|missing-auth-token";
+        };
+        nếu (mã làm mới == "") {
+            trả về "APP_ERR|missing-refresh-token";
+        };
+        nếu (đường tình trạng == "") {
+            trả về "APP_ERR|missing-route-health";
+        };
+        nếu (đường đăng nhập == "") {
+            trả về "APP_ERR|missing-route-login";
+        };
+        nếu (đường người dùng quản trị == "") {
+            trả về "APP_ERR|missing-route-users";
+        };
+        nếu (đường tìm người dùng quản trị == "") {
+            trả về "APP_ERR|missing-route-users-search";
+        };
+
+        mình.ứng dụng in khởi động vpp(tên ứng dụng, cổng chạy, địa chỉ kết nối cơ sở dữ liệu);
+        in mình.ứng dụng json tình trạng();
+        mình.ứng dụng chạy máy chủ giao diện lập trình(cổng chạy, trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, mã xác thực, mã làm mới, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị);
+        mình.ứng dụng in tắt vpp(tên ứng dụng);
+        trả về 0;
+    };
+};
+
+
+hàm công khai ứng dụng in khởi động vpp(tên ứng dụng, cổng, nguồn dữ liệu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng in khởi động vpp(tên ứng dụng, cổng, nguồn dữ liệu);
+};
+
+hàm công khai ứng dụng in tắt vpp(tên ứng dụng) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng in tắt vpp(tên ứng dụng);
+};
+
+hàm công khai ứng dụng json tình trạng() {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json tình trạng();
+};
+
+hàm công khai ứng dụng json đăng nhập thành công(từ tố, mã làm mới) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json đăng nhập thành công(từ tố, mã làm mới);
+};
+
+hàm công khai ứng dụng json thiếu thông tin xác thực(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json thiếu thông tin xác thực(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json thiếu từ tố(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json thiếu từ tố(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json không hợp lệ từ tố(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json không hợp lệ từ tố(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json thiếu keyword(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json thiếu keyword(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json thiếu tên đăng nhập(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json thiếu tên đăng nhập(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json người dùng phủ định đã tìm thấy(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json cơ sở dữ liệu phủ định đã kết nối(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json phủ định đã tìm thấy(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json phủ định đã tìm thấy(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json các người dùng(mã yêu cầu, mảng người dùng json) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json các người dùng(mã yêu cầu, mảng người dùng json);
+};
+
+hàm công khai ứng dụng json giá trị đang xét(thông điệp, mã yêu cầu, giá trị đang xét) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json giá trị đang xét(thông điệp, mã yêu cầu, giá trị đang xét);
+};
+
+hàm công khai ứng dụng json lỗi(thông điệp, mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json lỗi(thông điệp, mã yêu cầu);
+};
+
+hàm công khai ứng dụng json đã tạo người dùng(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json đã tạo người dùng(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json đã cập nhật người dùng(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json đã cập nhật người dùng(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json đã xóa người dùng(mã yêu cầu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json đã xóa người dùng(mã yêu cầu);
+};
+
+hàm công khai ứng dụng json cơ sở dữ liệu khởi động(kết quả trả về) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json cơ sở dữ liệu khởi động(kết quả trả về);
+};
+
+hàm công khai ứng dụng json cơ sở dữ liệu tắt(kết quả trả về) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng json cơ sở dữ liệu tắt(kết quả trả về);
+};
+
+hàm công khai ứng dụng chuẩn bị dữ liệu giao diện lập trình(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng chuẩn bị dữ liệu giao diện lập trình(trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu);
+};
+
+hàm công khai ứng dụng chạy máy chủ giao diện lập trình(cổng, trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, mã xác thực, mã làm mới, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng chạy máy chủ giao diện lập trình(cổng, trình điều khiển, địa chỉ kết nối cơ sở dữ liệu, tên đăng nhập, mật khẩu, mã xác thực, mã làm mới, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị);
+};
+
+hàm công khai ứng dụng đường dẫn cấu hình giao diện lập trình dự án() {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng đường dẫn cấu hình giao diện lập trình dự án();
+};
+
+hàm công khai ứng dụng cổng từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng cổng từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng nguồn dữ liệu địa chỉ tài nguyên từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng nguồn dữ liệu địa chỉ tài nguyên từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng nguồn dữ liệu tên đăng nhập từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng nguồn dữ liệu tên đăng nhập từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng nguồn dữ liệu mật khẩu từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng nguồn dữ liệu mật khẩu từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng nguồn dữ liệu trình điều khiển từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng nguồn dữ liệu trình điều khiển từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng xác thực từ tố từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng xác thực từ tố từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng làm mới từ tố từ cấu hình(đường dẫn cấu hình) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng làm mới từ tố từ cấu hình(đường dẫn cấu hình);
+};
+
+hàm công khai ứng dụng chạy máy chủ từ cấu hình dự án(tên ứng dụng, cổng, đường dẫn cấu hình, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị) {
+    bộ chuyển tiếp = Bộ Cầu Nối API();
+    trả về bộ chuyển tiếp.ứng dụng chạy máy chủ từ cấu hình dự án(tên ứng dụng, cổng, đường dẫn cấu hình, đường tình trạng, đường đăng nhập, đường người dùng quản trị, đường tìm người dùng quản trị);
+};

@@ -1,41 +1,41 @@
-nhập gói/mạng/kết_nối_dns;
+nhập gói/mạng/kết nối phân giải tên miền;
 nhập gói/hệ thống/môi trường;
 
 hàm chính() {
     // Không dùng hệ thống DNS hay mạng cho các trường hợp này.
-    chuẩn = socket dns vi địa chỉ("192.000.2.10");
-    in do_dai(chuẩn) == 1 && chuẩn[0] == "192.0.2.10";
-    ipv6 = socket dns vi địa chỉ("::1");
-    in do_dai(ipv6) == 1 && ipv6[0] == "::1";
+    chuẩn = đầu nối phân giải tên miền vi địa chỉ("192.000.2.10");
+    in độ dài(chuẩn) == 1 && chuẩn[0] == "192.0.2.10";
+    ipv6 = đầu nối phân giải tên miền vi địa chỉ("::1");
+    in độ dài(ipv6) == 1 && ipv6[0] == "::1";
 
     lỗi_cổng = sai;
-    thử { socket tcp mở dns vi("fixture.test", 0, 5000); }
+    thử { đầu nối giao vận tin cậy mở phân giải tên miền vi("fixture.test", 0, 5000); }
     bắt lỗi(e) { lỗi_cổng = đúng; };
     in lỗi_cổng;
 
     lỗi_timeout = sai;
-    thử { socket udp mở dns vi("fixture.test", 53, 0); }
+    thử { đầu nối giao vận gói tin mở phân giải tên miền vi("fixture.test", 53, 0); }
     bắt lỗi(e) { lỗi_timeout = đúng; };
     in lỗi_timeout;
 
     nếu (đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "") != "") {
-        địa_chỉ = socket dns vi địa chỉ("fixture.test");
-        in do_dai(địa_chỉ) == 2 &&
+        địa_chỉ = đầu nối phân giải tên miền vi địa chỉ("fixture.test");
+        in độ dài(địa_chỉ) == 2 &&
             địa_chỉ[0] == "203.0.113.21" && địa_chỉ[1] == "::1";
         thiếu = sai;
-        thử { socket dns vi địa chỉ("missing.test"); }
+        thử { đầu nối phân giải tên miền vi địa chỉ("missing.test"); }
         bắt lỗi(e) { thiếu = đúng; };
         in thiếu;
     } hoặc {
         thiếu_cấu_hình = sai;
-        thử { socket dns vi địa chỉ("fixture.test"); }
+        thử { đầu nối phân giải tên miền vi địa chỉ("fixture.test"); }
         bắt lỗi(e) {
             thiếu_cấu_hình = thành chuỗi(e) ==
                 "socket DNS V++: cần cấu hình DNS V++ hoặc tệp hosts";
         };
         in thiếu_cấu_hình;
         // Không có nguồn DNS nhưng IP số vẫn được sử dụng trực tiếp.
-        ip_số = socket dns vi địa chỉ("203.0.113.21");
-        in do_dai(ip_số) == 1 && ip_số[0] == "203.0.113.21";
+        ip_số = đầu nối phân giải tên miền vi địa chỉ("203.0.113.21");
+        in độ dài(ip_số) == 1 && ip_số[0] == "203.0.113.21";
     };
 };

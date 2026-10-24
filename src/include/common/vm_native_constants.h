@@ -43,7 +43,7 @@ inline constexpr std::array<const char *, 2> kFnMapRemove = {
 };
 
 inline constexpr std::array<const char *, 2> kFnMapKeys = {
-    "khoa_map", "khóa map"
+    "khoa_map", "khóa từ điển"
 };
 
 inline constexpr int kHttpStatusOk = 200;

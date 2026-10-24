@@ -1,37 +1,37 @@
 nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
 
 hàm chính() {
-    mysql = db phân tích cấu hình(
+    mysql = cơ sở dữ liệu phân tích cấu hình(
         "com.mysql.cj.jdbc.Driver",
         "jdbc:mysql://db.local:3307/app_db?createDatabaseIfNotExist=true"
     );
-    in lấy map(mysql, "ok", sai);
-    in lấy map(mysql, "engine", "");
-    in lấy map(mysql, "host", "");
-    in lấy map(mysql, "port", 0);
-    in lấy map(mysql, "database", "");
-    in lấy map(mysql, "create", sai);
+    in lấy từ điển(mysql, "ok", sai);
+    in lấy từ điển(mysql, "engine", "");
+    in lấy từ điển(mysql, "host", "");
+    in lấy từ điển(mysql, "port", 0);
+    in lấy từ điển(mysql, "database", "");
+    in lấy từ điển(mysql, "create", sai);
 
-    pg = db phân tích cấu hình(
+    pg = cơ sở dữ liệu phân tích cấu hình(
         "org.postgresql.Driver",
         "jdbc:postgresql://localhost/demo"
     );
-    in lấy map(pg, "port", 0);
-    in lấy map(pg, "database", "");
+    in lấy từ điển(pg, "port", 0);
+    in lấy từ điển(pg, "database", "");
 
-    sqlite = db phân tích cấu hình(
+    sqlite = cơ sở dữ liệu phân tích cấu hình(
         "org.sqlite.JDBC",
         "jdbc:sqlite:src/tests/.tmp-db.sqlite"
     );
-    in lấy map(sqlite, "engine", "");
-    in lấy map(sqlite, "path", "");
+    in lấy từ điển(sqlite, "engine", "");
+    in lấy từ điển(sqlite, "path", "");
 
-    lỗi_cổng = db phân tích cấu hình(
+    lỗi_cổng = cơ sở dữ liệu phân tích cấu hình(
         "mysql",
         "jdbc:mysql://localhost:x/demo"
     );
-    in lấy map(lỗi_cổng, "reason", "");
-    in lấy map(db phân tích cấu hình("", "ftp://localhost/a"), "reason", "");
-    in db định danh an toàn("app_2026");
-    in db định danh an toàn("app-prod");
+    in lấy từ điển(lỗi_cổng, "reason", "");
+    in lấy từ điển(cơ sở dữ liệu phân tích cấu hình("", "ftp://localhost/a"), "reason", "");
+    in cơ sở dữ liệu định danh an toàn("app_2026");
+    in cơ sở dữ liệu định danh an toàn("app-prod");
 };

@@ -16,6 +16,7 @@
 #include <unordered_set>
 
 #include "frontend/keywords.h"
+#include "vpp/native/abi_symbol.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/native/aot.h"
 
@@ -100,7 +101,9 @@ void writeSourceInstruction(std::ostream &out, const compiler::IrInstruction &in
     if (depth >= 64) throw std::runtime_error("IR statement lồng quá 64 tầng");
     out << "{\"opcode\":" << quoted(sourceOpcode(inst.opcode))
         << ",\"symbolId\":" << inst.symbolId
-        << ",\"name\":" << quoted(inst.declarationName)
+        << ",\"name\":" << quoted(inst.opcode == compiler::IrOpcode::DefineFunction
+                                   ? nativeAbiSymbol(inst.declarationName)
+                                   : inst.declarationName)
         << ",\"conditionalForm\":"
         << quoted(inst.conditionalForm == frontend::AstConditionalForm::IfBlock ? "IfBlock" :
                   inst.conditionalForm == frontend::AstConditionalForm::IfElseBlocks ? "IfElseBlocks" : "Unstructured")
@@ -219,7 +222,7 @@ std::string makeVppObjectSource(const Target &target,
         source << "{\"offset\":" << checkedInt(reloc.offset, "relocation offset")
                << ",\"symbol\":" << quoted(reloc.symbol) << '}';
     }
-    source << "];\n  object = biên dịch object("
+    source << "];\n  object = biên dịch đối tượng("
            << quoted(std::string(architectureName(target.arch))) << ','
            << quoted(os) << ',' << quoted(targetAbi(target)) << ",code,"
            << quoted(std::string(symbol)) << ",relocs);\n"
@@ -237,18 +240,18 @@ std::string makeSelfHostedObjectSource(const Target &target,
                                        std::string_view functionName) {
     if (target.arch != Architecture::X86_64 && target.arch != Architecture::AArch64)
         throw std::runtime_error("native AST V++ chỉ hỗ trợ x86_64/AArch64");
-    if (!symbolSafe(std::string(functionName)))
+    if (!symbolSafe(nativeAbiSymbol(functionName)))
         throw std::runtime_error("tên symbol native không hợp lệ");
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  kết_quả = biên dịch native object tự chủ("
+         << "  kết_quả = biên dịch bản địa đối tượng tự chủ("
          << quoted(std::string(source)) << ','
          << quoted(std::string(functionName)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
-         << "  biên dịch native in bản ghi(kết_quả);\n"
+         << "  biên dịch bản địa in bản ghi(kết_quả);\n"
          << "}\n";
     return code.str();
 }
@@ -259,14 +262,14 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  các_hàm = biên dịch native chương trình object tự chủ("
+         << "  các_hàm = biên dịch bản địa chương trình đối tượng tự chủ("
          << quoted(std::string(source)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
          << "  lặp (i = 0; i < độ dài(các_hàm); i++) {\n"
          << "    in \"F:\" + các_hàm[i][\"name\"];\n"
-         << "    biên dịch native in bản ghi(các_hàm[i]);\n"
+         << "    biên dịch bản địa in bản ghi(các_hàm[i]);\n"
          << "  };\n}\n";
     return code.str();
 }
@@ -277,13 +280,14 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                                bool emitObject = false) {
     if (emitObject && !emitTarget)
         throw std::runtime_error("V++ object writer cần target phát mã máy");
-    if (emitObject && !symbolSafe(std::string(functionName)))
+    const auto abiName = nativeAbiSymbol(functionName);
+    if (emitObject && !symbolSafe(abiName))
         throw std::runtime_error("tên symbol native không hợp lệ");
     if (emitTarget && !leaf && emitTarget->arch != Architecture::X86_64 &&
         emitTarget->arch != Architecture::AArch64)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy hạ ir;\n";
+    code << "nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;\n";
     if (emitTarget) code << "nhập gói/biên dịch/mã máy;\n";
     if (emitObject) code << "nhập gói/biên dịch/đối tượng;\n";
     code << "hàm chính() {\n  ir = {\"values\":[";
@@ -313,10 +317,10 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
     }
     code << "]};\n";
     if (leaf) {
-        code << "  fn = biên dịch máy hạ lá(ir, " << quoted(std::string(functionName)) << ");\n"
+        code << "  fn = biên dịch máy hạ lá(ir, " << quoted(abiName) << ");\n"
              << "  in \"L:\" + fn[\"kind\"] + \":\" + fn[\"constant\"];\n";
     } else {
-        code << "  fn = biên dịch máy hạ IR(ir, " << quoted(std::string(functionName)) << ");\n"
+        code << "  fn = biên dịch máy hạ IR(ir, " << quoted(abiName) << ");\n"
              << "  in \"M:\" + fn[\"parameterCount\"] + \":\" + fn[\"slotCount\"] + \":\" + fn[\"maxStackDepth\"];\n"
              << "  lệnh = fn[\"instructions\"];\n"
              << "  lặp (i = 0; i < độ dài(lệnh); i++) {\n"
@@ -350,9 +354,9 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                  << "  };\n";
         }
         if (emitObject) {
-            code << "  object = biên dịch object(" << arch << ", " << os << ", "
+            code << "  object = biên dịch đối tượng(" << arch << ", " << os << ", "
                  << quoted(targetAbi(*emitTarget)) << ", byte, "
-                 << quoted(std::string(functionName)) << ", "
+                 << quoted(abiName) << ", "
                  << (leaf ? "[]" : "tái_định_vị") << ");\n"
                  << "  hex = \"\";\n"
                  << "  lặp (i = 0; i < độ dài(object); i++) {\n"
@@ -529,7 +533,16 @@ std::string executeVppSource(const std::string &source,
         "machine-bridge";
 #endif
     aot::compileExecutable(snapshot, executable, root);
+    if (profile) {
+        std::cerr << "native Stage 0 ASM/link: "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - afterFrontend).count()
+                  << " ms\n";
+    }
     const auto result = aot::runProcess({executable.u8string()});
+    if (profile) {
+        std::cerr << "native Stage 0 bridge exit: " << result.status << '\n';
+    }
     // Native wrappers emit newline-delimited text records. The Windows CRT
     // writes CRLF to stdout, while the target parser and machine/object
     // decoders consume LF records. Normalize at the bridge boundary so a

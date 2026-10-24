@@ -114,7 +114,7 @@ struct AstTypeReference {
     SourceSpan span{};
 };
 
-// Lưu cấu trúc câu lệnh nhập đã parse như target, alias và semicolon để module resolver không phải phân tích token thô.
+// Lưu cấu trúc câu lệnh nhập đã parse như target, alias và semicolon để module resolver không phải phân tích từ tố thô.
 struct AstImportSpec {
     std::string target;
     SourceSpan targetSpan{};

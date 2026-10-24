@@ -2,12 +2,12 @@
 nhập gói/văn bản/bộ nối chuỗi;
 
 lớp công khai Bộ Nối Văn Bản {
-    hàm công khai khởi tạo(phân_cách, tiền_tố = "", hậu_tố = "", giá_trị_rỗng = rỗng) {
-        mình.bộ = bộ nối chuỗi(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng);
+    hàm công khai khởi tạo(phân cách, tiền tố = "", hậu tố = "", giá trị rỗng = rỗng) {
+        mình.bộ = bộ nối chuỗi(phân cách, tiền tố, hậu tố, giá trị rỗng);
     };
 
-    hàm công khai thêm(giá_trị) {
-        bộ nối thêm(mình.bộ, giá_trị);
+    hàm công khai thêm(giá trị) {
+        bộ nối thêm(mình.bộ, giá trị);
         trả về mình;
     };
 
@@ -22,12 +22,12 @@ lớp công khai Bộ Nối Văn Bản {
 
     // Bản sao dữ liệu; không để caller sửa trạng thái nội bộ.
     hàm công khai bộ gốc() {
-        gốc_dữ_liệu = mình.bộ;
-        bản_sao = bộ nối chuỗi(lấy map(gốc_dữ_liệu, "phân cách", ""),
-            lấy map(gốc_dữ_liệu, "tiền tố", ""), lấy map(gốc_dữ_liệu, "hậu tố", ""),
-            lấy map(gốc_dữ_liệu, "giá trị rỗng", rỗng));
-        các_phần = bộ nối yêu cầu(gốc_dữ_liệu);
-        lặp(i = 0; i < bộ nối số phần(gốc_dữ_liệu); i++) { bộ nối thêm(bản_sao, các_phần[i]); };
-        trả về bản_sao;
+        gốc dữ liệu = mình.bộ;
+        bản sao = bộ nối chuỗi(lấy từ điển(gốc dữ liệu, "phân cách", ""),
+            lấy từ điển(gốc dữ liệu, "tiền tố", ""), lấy từ điển(gốc dữ liệu, "hậu tố", ""),
+            lấy từ điển(gốc dữ liệu, "giá trị rỗng", rỗng));
+        các phần = bộ nối yêu cầu(gốc dữ liệu);
+        lặp(i = 0; i < bộ nối số phần(gốc dữ liệu); i++) { bộ nối thêm(bản sao, các phần[i]); };
+        trả về bản sao;
     };
 };

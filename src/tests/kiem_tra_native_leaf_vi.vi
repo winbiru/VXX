@@ -7,8 +7,8 @@ hàm kiểm tra mã lá(kiến_trúc, loại, hex, hằng = 42, hệ_điều_hà
         ném "độ dài mã máy sai: " + kiến_trúc + " " + loại;
     };
     lặp (i = 0; i < độ dài(byte); i++) {
-        mong_đợi = biên dịch mã máy chữ hex(hex[i * 2]) * 16 +
-            biên dịch mã máy chữ hex(hex[i * 2 + 1]);
+        mong_đợi = biên dịch mã máy chữ thập lục phân(hex[i * 2]) * 16 +
+            biên dịch mã máy chữ thập lục phân(hex[i * 2 + 1]);
         nếu (byte[i] != mong_đợi) {
             ném "mã máy sai: " + kiến_trúc + " " + loại + " offset " + i;
         };

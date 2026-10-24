@@ -13,7 +13,7 @@ set(compiler "${VPP_OUTPUT_DIR}/vpp-native${VPP_EXECUTABLE_SUFFIX}")
 execute_process(
     COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_CLI}" --bootstrap-native
-        "${VPP_ROOT}/gói/biên dịch/native_cli.vi" "${compiler}"
+        "${VPP_ROOT}/gói/biên dịch/dòng lệnh bản địa.vi" "${compiler}"
     WORKING_DIRECTORY "${VPP_ROOT}"
     RESULT_VARIABLE status OUTPUT_VARIABLE stdout ERROR_VARIABLE stderr TIMEOUT 360)
 if (NOT status STREQUAL "0" OR NOT EXISTS "${compiler}")

@@ -1,0 +1,1528 @@
+// Native runtime algorithms. Only máy_* operations cross the machine/OS ABI.
+// Arena: counter at 0, input status at 8, 64 byte records at 16 (32 bytes
+// each), 64 file records at 2064 (16 bytes each), scratch at 3104, cache
+// record header at 3200 (16 bytes), digest at 3216 (32 bytes), cache hex
+// at 3248 (65 bytes), linker argv table in dedicated high arena region, wait status
+// at 3360 (4 bytes), Darwin stat scratch at 3376 and 3584 (208 bytes
+// each), payloads at 4096. Pointers in byte
+// records are bound as full-width 64-bit addresses.
+// Handles encode a monotonically increasing generation and a 7-bit slot tag.
+hàm thực thi mã tài nguyên(nhãn) {
+    biến thế hệ = máy đọc số nguyên ba mươi hai bit(0);
+    nếu (thế hệ == 0) { thế hệ = 1; };
+    nếu (thế hệ < 1) { trả về -1; };
+    nếu (thế hệ >= 16777215) { trả về -1; };
+    nếu (máy ghi số nguyên ba mươi hai bit(0, thế hệ + 1) != 0) { trả về -1; };
+    trả về thế hệ * 128 + nhãn;
+};
+
+hàm thực thi các byte ô nhớ(mã tài nguyên) {
+    nếu (mã tài nguyên <= 0) { trả về -1; };
+    biến ô nhớ = mã tài nguyên - máy chia số nguyên ba mươi hai bit(mã tài nguyên, 128) * 128;
+    nếu (ô nhớ >= 64) { trả về -1; };
+    nếu (máy đọc số nguyên ba mươi hai bit(16 + ô nhớ * 32) != mã tài nguyên) { trả về -1; };
+    trả về ô nhớ;
+};
+
+hàm thực thi nội dung đệm(ô nhớ) { trả về 4096 + ô nhớ * 1048592; };
+
+hàm thực thi các byte dự trữ(mã tài nguyên, phần bổ sung) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    nếu (phần bổ sung < 0) { trả về -1; };
+    biến bản ghi dữ liệu = 16 + ô nhớ * 32;
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 16);
+    nếu (phần bổ sung > 1048576 - chiều dài) { trả về -1; };
+    biến dung lượng cần = chiều dài + phần bổ sung + 1;
+    biến dung lượng = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 24);
+    lặp (i = 0; dung lượng < dung lượng cần; i++) {
+        nếu (dung lượng > 524288) { dung lượng = 1048577; }
+        hoặc { dung lượng = dung lượng * 2; };
+    };
+    trả về máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 24, dung lượng);
+};
+
+hàm thực thi các byte mới() {
+    lặp (ô nhớ = 0; ô nhớ < 64; ô nhớ++) {
+        biến bản ghi dữ liệu = 16 + ô nhớ * 32;
+        nếu (máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu) == 0) {
+            nếu (máy gắn địa chỉ(bản ghi dữ liệu + 8, thực thi nội dung đệm(ô nhớ)) != 0) { trả về -1; };
+            biến mã tài nguyên = thực thi mã tài nguyên(ô nhớ);
+            nếu (mã tài nguyên <= 0) { trả về -1; };
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 16, 0);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 20, 0);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 24, 1);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 28, 0);
+            máy ghi byte(thực thi nội dung đệm(ô nhớ), 0);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, mã tài nguyên);
+            trả về mã tài nguyên;
+        };
+    };
+    trả về -1;
+};
+
+hàm thực thi các byte chiều dài(mã tài nguyên) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    trả về máy đọc số nguyên ba mươi hai bit(16 + ô nhớ * 32 + 16);
+};
+
+hàm thực thi các byte lấy(mã tài nguyên, chỉ mục) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    nếu (chỉ mục < 0) { trả về -1; };
+    nếu (chỉ mục >= máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32)) { trả về -1; };
+    trả về máy đọc byte(thực thi nội dung đệm(ô nhớ) + chỉ mục);
+};
+
+hàm thực thi các byte thêm cuối(mã tài nguyên, giá trị đang xét) {
+    nếu (giá trị đang xét < 0) { trả về -1; };
+    nếu (giá trị đang xét > 255) { trả về -1; };
+    nếu (thực thi các byte dự trữ(mã tài nguyên, 1) != 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    biến bản ghi dữ liệu = 32 + ô nhớ * 32;
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu);
+    máy ghi byte(thực thi nội dung đệm(ô nhớ) + chiều dài, giá trị đang xét);
+    máy ghi byte(thực thi nội dung đệm(ô nhớ) + chiều dài + 1, 0);
+    trả về máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, chiều dài + 1);
+};
+
+hàm thực thi các byte nối(đích nhận, nguồn đầu vào) {
+    biến nguồn văn bản = thực thi các byte ô nhớ(nguồn đầu vào);
+    nếu (nguồn văn bản < 0) { trả về -1; };
+    biến số phần tử = máy đọc số nguyên ba mươi hai bit(32 + nguồn văn bản * 32);
+    nếu (thực thi các byte dự trữ(đích nhận, số phần tử) != 0) { trả về -1; };
+    biến đích sao chép = thực thi các byte ô nhớ(đích nhận);
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + đích sao chép * 32);
+    lặp (i = 0; i < số phần tử; i++) {
+        máy ghi byte(thực thi nội dung đệm(đích sao chép) + chiều dài + i, máy đọc byte(thực thi nội dung đệm(nguồn văn bản) + i));
+    };
+    máy ghi byte(thực thi nội dung đệm(đích sao chép) + chiều dài + số phần tử, 0);
+    trả về máy ghi số nguyên ba mươi hai bit(32 + đích sao chép * 32, chiều dài + số phần tử);
+};
+
+hàm thực thi các byte bằng nhau(vế trái, vế phải) {
+    biến a = thực thi các byte ô nhớ(vế trái);
+    biến b = thực thi các byte ô nhớ(vế phải);
+    nếu (a < 0) { trả về -1; };
+    nếu (b < 0) { trả về -1; };
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + a * 32);
+    nếu (chiều dài != máy đọc số nguyên ba mươi hai bit(32 + b * 32)) { trả về 0; };
+    lặp (i = 0; i < chiều dài; i++) {
+        nếu (máy đọc byte(thực thi nội dung đệm(a) + i) != máy đọc byte(thực thi nội dung đệm(b) + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+
+hàm thực thi các byte cắt(mã tài nguyên, điểm bắt đầu, số phần tử) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    nếu (số phần tử < 0) { trả về -1; };
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32);
+    nếu (điểm bắt đầu > chiều dài) { trả về -1; };
+    nếu (số phần tử > chiều dài - điểm bắt đầu) { trả về -1; };
+    biến kết quả trả về = thực thi các byte mới();
+    nếu (kết quả trả về <= 0) { trả về -1; };
+    biến đích sao chép = thực thi các byte ô nhớ(kết quả trả về);
+    nếu (thực thi các byte dự trữ(kết quả trả về, số phần tử) != 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    lặp (i = 0; i < số phần tử; i++) {
+        máy ghi byte(thực thi nội dung đệm(đích sao chép) + i, máy đọc byte(thực thi nội dung đệm(ô nhớ) + điểm bắt đầu + i));
+    };
+    máy ghi byte(thực thi nội dung đệm(đích sao chép) + số phần tử, 0);
+    máy ghi số nguyên ba mươi hai bit(32 + đích sao chép * 32, số phần tử);
+    trả về kết quả trả về;
+};
+
+hàm thực thi các byte tìm(mã tài nguyên, chuỗi tìm) {
+    biến nguồn văn bản = thực thi các byte ô nhớ(mã tài nguyên);
+    biến mẫu = thực thi các byte ô nhớ(chuỗi tìm);
+    nếu (nguồn văn bản < 0) { trả về -2; };
+    nếu (mẫu < 0) { trả về -2; };
+    biến số phần tử = máy đọc số nguyên ba mươi hai bit(32 + mẫu * 32);
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + nguồn văn bản * 32);
+    nếu (số phần tử == 0) { trả về 0; };
+    lặp (i = 0; i <= chiều dài - số phần tử; i++) {
+        biến bằng nhau = 1;
+        lặp (j = 0; j < số phần tử; j++) {
+            nếu (máy đọc byte(thực thi nội dung đệm(nguồn văn bản) + i + j) != máy đọc byte(thực thi nội dung đệm(mẫu) + j)) {
+                bằng nhau = 0; thoát;
+            };
+        };
+        nếu (bằng nhau == 1) { trả về i; };
+    };
+    trả về -1;
+};
+
+hàm thực thi các byte làm rỗng(mã tài nguyên) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    máy ghi byte(thực thi nội dung đệm(ô nhớ), 0);
+    trả về máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, 0);
+};
+
+hàm thực thi các byte đẩy i32(mã tài nguyên, giá trị đang xét) {
+    nếu (thực thi các byte dự trữ(mã tài nguyên, 4) != 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32);
+    máy ghi số nguyên ba mươi hai bit(thực thi nội dung đệm(ô nhớ) + chiều dài, giá trị đang xét);
+    máy ghi byte(thực thi nội dung đệm(ô nhớ) + chiều dài + 4, 0);
+    trả về máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, chiều dài + 4);
+};
+
+hàm thực thi các byte nạp i32(mã tài nguyên, độ lệch) {
+    biến chiều dài = thực thi các byte chiều dài(mã tài nguyên);
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch > chiều dài - 4) { trả về -1; };
+    trả về máy đọc số nguyên ba mươi hai bit(thực thi nội dung đệm(thực thi các byte ô nhớ(mã tài nguyên)) + độ lệch);
+};
+
+hàm thực thi các byte lưu i32(mã tài nguyên, độ lệch, giá trị đang xét) {
+    biến chiều dài = thực thi các byte chiều dài(mã tài nguyên);
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch > chiều dài - 4) { trả về -1; };
+    trả về máy ghi số nguyên ba mươi hai bit(thực thi nội dung đệm(thực thi các byte ô nhớ(mã tài nguyên)) + độ lệch, giá trị đang xét);
+};
+
+hàm thực thi các byte giải phóng(mã tài nguyên) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    lặp (i = 0; i < 32; i = i + 4) { máy ghi số nguyên ba mươi hai bit(16 + ô nhớ * 32 + i, 0); };
+    trả về 0;
+};
+
+hàm thực thi ghi tất cả(mã tệp mở, độ lệch, chiều dài) {
+    biến done = 0;
+    lặp (i = 0; done < chiều dài; i++) {
+        biến số phần tử = máy ghi(mã tệp mở, độ lệch + done, chiều dài - done);
+        nếu (số phần tử < 0) {
+            nếu (máy lỗi() == 4) { bỏ qua; };
+            trả về -1;
+        };
+        nếu (số phần tử == 0) { trả về -1; };
+        done = done + số phần tử;
+    };
+    trả về done;
+};
+
+hàm thực thi các byte in(mã tài nguyên) {
+    biến ô nhớ = thực thi các byte ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    trả về thực thi ghi tất cả(1, thực thi nội dung đệm(ô nhớ), máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32));
+};
+
+hàm thực thi đối số dòng lệnh(chỉ mục) {
+    biến chiều dài = máy đối số dài(chỉ mục);
+    nếu (chiều dài < 0) { trả về -1; };
+    biến kết quả trả về = thực thi các byte mới();
+    nếu (kết quả trả về <= 0) { trả về -1; };
+    nếu (thực thi các byte dự trữ(kết quả trả về, chiều dài) != 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(kết quả trả về);
+    lặp (i = 0; i < chiều dài; i++) { máy ghi byte(thực thi nội dung đệm(ô nhớ) + i, máy đối số byte(chỉ mục, i)); };
+    máy ghi byte(thực thi nội dung đệm(ô nhớ) + chiều dài, 0);
+    máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, chiều dài);
+    trả về kết quả trả về;
+};
+
+// Resolve the native library in V++ itself. The machine boundary only copies
+// VPP_HOME / getcwd bytes into an arena buffer; it never returns a pointer as
+// i32. Use the normal V++ file API to check candidate source paths.
+hàm thực thi hệ điều hành đường tệp(loại từ tố) {
+    biến kết quả trả về = thực thi các byte mới();
+    nếu (kết quả trả về <= 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(kết quả trả về);
+    biến số phần tử = -1;
+    nếu (loại từ tố == 0) { số phần tử = máy thư mục nhà(thực thi nội dung đệm(ô nhớ)); }
+    hoặc { số phần tử = máy thư mục hiện hành(thực thi nội dung đệm(ô nhớ)); };
+    nếu (số phần tử <= 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    nếu (số phần tử >= 4096) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    nếu (thực thi các byte dự trữ(kết quả trả về, số phần tử) != 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, số phần tử);
+    trả về kết quả trả về;
+};
+
+hàm thực thi môi trường thực thi ứng viên(gốc, hậu tố) {
+    biến ứng viên = thực thi các byte mới();
+    nếu (ứng viên <= 0) { trả về -1; };
+    biến thành công = thực thi các byte nối(ứng viên, gốc);
+    biến chiều dài = thực thi các byte chiều dài(gốc);
+    nếu (chiều dài <= 0) { thành công = -1; };
+    nếu (thành công == 0) {
+        nếu (thực thi các byte lấy(gốc, chiều dài - 1) != 47) {
+            nếu (thực thi các byte thêm cuối(ứng viên, 47) != 0) { thành công = -1; };
+        };
+    };
+    nếu (thành công == 0) {
+        nếu (thực thi các byte nối(ứng viên, hậu tố) != 0) { thành công = -1; };
+    };
+    nếu (thực thi các byte chiều dài(ứng viên) >= 4096) { thành công = -1; };
+    nếu (thành công == 0) {
+        // O_NONBLOCK (Darwin = 4) prevents a malicious FIFO in VPP_HOME
+        // from hanging runtime discovery. Regular files read as usual.
+        biến tệp dữ liệu = thực thi tệp dữ liệu mở(ứng viên, 4);
+        nếu (tệp dữ liệu > 0) {
+            // A directory is not a valid runtime module. Read one byte to
+            // reject non-files before passing the candidate to the loader.
+            biến ch = thực thi tệp dữ liệu đọc byte(tệp dữ liệu);
+            biến đã khép = thực thi tệp dữ liệu đóng(tệp dữ liệu);
+            nếu (ch >= 0) {
+                nếu (đã khép == 0) { trả về ứng viên; };
+            };
+        };
+    };
+    thực thi các byte giải phóng(ứng viên);
+    trả về -1;
+};
+
+// Linux exposes this procfs entry; Darwin does not. Cache the host choice
+// outside the handle table and linker/cache scratch slots.
+hàm thực thi máy đích linux() {
+    biến trạng thái nội bộ = máy đọc số nguyên ba mươi hai bit(3832);
+    nếu (trạng thái nội bộ == 1) { trả về 1; };
+    nếu (trạng thái nội bộ == 2) { trả về 0; };
+    biến thăm dò = "/proc/self/exe";
+    biến tệp dữ liệu = thực thi tệp dữ liệu mở đọc(thăm dò);
+    thực thi các byte giải phóng(thăm dò);
+    nếu (tệp dữ liệu > 0) {
+        thực thi tệp dữ liệu đóng(tệp dữ liệu);
+        máy ghi số nguyên ba mươi hai bit(3832, 1);
+        trả về 1;
+    };
+    máy ghi số nguyên ba mươi hai bit(3832, 2);
+    trả về 0;
+};
+
+// The caller chooses one of two trusted in-tree runtime files. Keep the
+// same VPP_HOME/ancestor search for the runtime module and linker resources.
+// Return an owned path handle (or -1), never a truncated machine pointer.
+hàm thực thi môi trường thực thi tệp dữ liệu đường tệp(loại từ tố) {
+    biến hậu tố = -1;
+    nếu (loại từ tố == 0) { hậu tố = "gói/biên dịch/bản địa/môi trường thực thi.vi"; }
+    hoặc nếu (loại từ tố == 1) {
+        nếu (thực thi máy đích linux() == 1) {
+            hậu tố = "scripts/ASM/vpp_aot_primitives_linux_x86_64.S";
+        } hoặc {
+            hậu tố = "scripts/ASM/vpp_aot_primitives_aarch64.S";
+        };
+    };
+    nếu (hậu tố <= 0) { trả về -1; };
+    biến thư mục nhà = thực thi hệ điều hành đường tệp(0);
+    nếu (thư mục nhà > 0) {
+        nếu (thực thi các byte lấy(thư mục nhà, 0) == 47) {
+            biến kết quả trả về = thực thi môi trường thực thi ứng viên(thư mục nhà, hậu tố);
+            thực thi các byte giải phóng(thư mục nhà);
+            nếu (kết quả trả về > 0) { thực thi các byte giải phóng(hậu tố); trả về kết quả trả về; };
+        } hoặc { thực thi các byte giải phóng(thư mục nhà); };
+    };
+    biến thư mục = thực thi hệ điều hành đường tệp(1);
+    nếu (thư mục <= 0) { thực thi các byte giải phóng(hậu tố); trả về -1; };
+    lặp (độ sâu hiện tại = 0; độ sâu hiện tại < 128; độ sâu hiện tại++) {
+        biến ứng viên = thực thi môi trường thực thi ứng viên(thư mục, hậu tố);
+        nếu (ứng viên > 0) {
+            thực thi các byte giải phóng(thư mục);
+            thực thi các byte giải phóng(hậu tố);
+            trả về ứng viên;
+        };
+        biến cuối cùng dấu gạch chéo = -1;
+        lặp (i = 0; i < thực thi các byte chiều dài(thư mục); i++) {
+            nếu (thực thi các byte lấy(thư mục, i) == 47) { cuối cùng dấu gạch chéo = i; };
+        };
+        nếu (cuối cùng dấu gạch chéo <= 0) {
+            nếu (thực thi các byte chiều dài(thư mục) == 1) { thoát; };
+            nếu (thực thi các byte làm rỗng(thư mục) != 0) { thoát; };
+            nếu (thực thi các byte thêm cuối(thư mục, 47) != 0) { thoát; };
+        } hoặc {
+            biến cha = thực thi các byte cắt(thư mục, 0, cuối cùng dấu gạch chéo);
+            nếu (cha <= 0) { thoát; };
+            thực thi các byte giải phóng(thư mục);
+            thư mục = cha;
+        };
+    };
+    thực thi các byte giải phóng(thư mục);
+    thực thi các byte giải phóng(hậu tố);
+    trả về -1;
+};
+
+hàm thực thi môi trường thực thi mô đun đường tệp() { trả về thực thi môi trường thực thi tệp dữ liệu đường tệp(0); };
+
+// Read the Mach-O symtab within one object of a packed object archive.
+// Values on disk are u32; negative i32 values can never represent a valid
+// offset/length in the bounded (1 MiB) V++ byte arena.
+hàm thực thi đối tượng tên định danh matches(kho lưu trữ, độ lệch, khả dụng, giá trị mong đợi) {
+    biến số phần tử = thực thi các byte chiều dài(giá trị mong đợi);
+    nếu (số phần tử < 0) { trả về 0; };
+    nếu (số phần tử >= khả dụng) { trả về 0; };
+    lặp (i = 0; i < số phần tử; i++) {
+        nếu (thực thi các byte lấy(kho lưu trữ, độ lệch + i) != thực thi các byte lấy(giá trị mong đợi, i)) { trả về 0; };
+    };
+    nếu (thực thi các byte lấy(kho lưu trữ, độ lệch + số phần tử) != 0) { trả về 0; };
+    trả về 1;
+};
+
+hàm thực thi đối tượng dịch vụ tên định danh(kho lưu trữ, độ lệch, khả dụng) {
+    biến tên định danh = "_vpp_native_cache_read";
+    nếu (tên định danh <= 0) { trả về -1; };
+    nếu (thực thi đối tượng tên định danh matches(kho lưu trữ, độ lệch, khả dụng, tên định danh) == 1) {
+        thực thi các byte giải phóng(tên định danh); trả về 1;
+    };
+    thực thi các byte giải phóng(tên định danh);
+    tên định danh = "_vpp_native_cache_write";
+    nếu (tên định danh <= 0) { trả về -1; };
+    nếu (thực thi đối tượng tên định danh matches(kho lưu trữ, độ lệch, khả dụng, tên định danh) == 1) {
+        thực thi các byte giải phóng(tên định danh); trả về 1;
+    };
+    thực thi các byte giải phóng(tên định danh);
+    tên định danh = "_vpp_native_link_macho";
+    nếu (tên định danh <= 0) { trả về -1; };
+    nếu (thực thi đối tượng tên định danh matches(kho lưu trữ, độ lệch, khả dụng, tên định danh) == 1) {
+        thực thi các byte giải phóng(tên định danh); trả về 1;
+    };
+    thực thi các byte giải phóng(tên định danh);
+    tên định danh = "_vpp_native_link_macho_modules";
+    nếu (tên định danh <= 0) { trả về -1; };
+    biến kết quả trả về = thực thi đối tượng tên định danh matches(kho lưu trữ, độ lệch, khả dụng, tên định danh);
+    thực thi các byte giải phóng(tên định danh);
+    trả về kết quả trả về;
+};
+
+// Validate the exact ELF64 ET_REL layout emitted by elf64.vi. All offsets
+// must fit signed i32 and remain inside the single archived object. This
+// also checks string-table references before the host linker sees an object.
+hàm thực thi elf các dịch vụ(kho lưu trữ, điểm bắt đầu, chiều dài) {
+    nếu (chiều dài < 448) { trả về -1; };
+    biến các phần đầu = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 40);
+    nếu (các phần đầu < 64) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 44) != 0) { trả về -1; };
+    nếu (các phần đầu > chiều dài - 384) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 58) != 64) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 59) != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 60) != 6) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 61) != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 62) != 5) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 63) != 0) { trả về -1; };
+    biến mục ký hiệu độ lệch = -1;
+    biến mục ký hiệu kích cỡ = -1;
+    biến chuỗi độ lệch = -1;
+    biến chuỗi kích cỡ = -1;
+    lặp (i = 1; i < 6; i++) {
+        biến phân đoạn = điểm bắt đầu + các phần đầu + i * 64;
+        biến loại từ tố = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 4);
+        biến giá trị mong đợi = 3;
+        nếu (i == 1) { giá trị mong đợi = 1; };
+        nếu (i == 2) { giá trị mong đợi = 4; };
+        nếu (i == 3) { giá trị mong đợi = 2; };
+        nếu (loại từ tố != giá trị mong đợi) { trả về -1; };
+        biến độ lệch = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 24);
+        biến kích cỡ = thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 32);
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 28) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 36) != 0) { trả về -1; };
+        nếu (độ lệch < 0) { trả về -1; };
+        nếu (kích cỡ < 0) { trả về -1; };
+        nếu (độ lệch > chiều dài) { trả về -1; };
+        nếu (kích cỡ > chiều dài - độ lệch) { trả về -1; };
+        nếu (i == 3) {
+            mục ký hiệu độ lệch = độ lệch;
+            mục ký hiệu kích cỡ = kích cỡ;
+            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 40) != 4) { trả về -1; };
+            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 56) != 24) { trả về -1; };
+            nếu (thực thi các byte nạp i32(kho lưu trữ, phân đoạn + 60) != 0) { trả về -1; };
+        };
+        nếu (i == 4) { chuỗi độ lệch = độ lệch; chuỗi kích cỡ = kích cỡ; };
+    };
+    nếu (mục ký hiệu kích cỡ < 24) { trả về -1; };
+    nếu (chuỗi kích cỡ <= 0) { trả về -1; };
+    nếu (mục ký hiệu kích cỡ - máy chia số nguyên ba mươi hai bit(mục ký hiệu kích cỡ, 24) * 24 != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + chuỗi độ lệch) != 0) { trả về -1; };
+    biến số phần tử = máy chia số nguyên ba mươi hai bit(mục ký hiệu kích cỡ, 24);
+    lặp (i = 1; i < số phần tử; i++) {
+        biến mục ký hiệu = điểm bắt đầu + mục ký hiệu độ lệch + i * 24;
+        biến tên định danh độ lệch = thực thi các byte nạp i32(kho lưu trữ, mục ký hiệu);
+        nếu (tên định danh độ lệch <= 0) { trả về -1; };
+        nếu (tên định danh độ lệch >= chuỗi kích cỡ) { trả về -1; };
+        biến khả dụng = chuỗi kích cỡ - tên định danh độ lệch;
+        biến terminated = 0;
+        lặp (j = 0; j < khả dụng; j++) {
+            nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + chuỗi độ lệch + tên định danh độ lệch + j) == 0) {
+                terminated = 1; thoát;
+            };
+        };
+        nếu (terminated == 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// 1: references compiler services, 0: assembly/OS only, -1: corrupt Mach-O.
+// C supplies the archive handle and the object's byte range. All reads are
+// bounded by the object itself, even when the archive contains later modules.
+hàm thực thi đối tượng các dịch vụ(kho lưu trữ, điểm bắt đầu, chiều dài) {
+    biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    nếu (chiều dài < 32) { trả về -1; };
+    nếu (tổng số < 0) { trả về -1; };
+    nếu (điểm bắt đầu > tổng số - chiều dài) { trả về -1; };
+    nếu (thực thi máy đích linux() == 1) { trả về thực thi elf các dịch vụ(kho lưu trữ, điểm bắt đầu, chiều dài); };
+    biến các lệnh = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 16);
+    nếu (các lệnh < 0) { trả về -1; };
+    nếu (các lệnh > máy chia số nguyên ba mươi hai bit(chiều dài - 32, 8)) { trả về -1; };
+    biến độ lệch = 32;
+    biến needs các dịch vụ = 0;
+    lặp (lệnh = 0; lệnh < các lệnh; lệnh++) {
+        nếu (độ lệch > chiều dài - 8) { trả về -1; };
+        biến loại từ tố = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch);
+        biến kích cỡ = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch + 4);
+        nếu (kích cỡ < 8) { trả về -1; };
+        nếu (kích cỡ > chiều dài - độ lệch) { trả về -1; };
+        nếu (loại từ tố == 2) {
+            nếu (kích cỡ < 24) { trả về -1; };
+            biến các ký hiệu = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch + 8);
+            biến số phần tử = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch + 12);
+            biến các chuỗi = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch + 16);
+            biến chuỗi kích cỡ = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + độ lệch + 20);
+            nếu (các ký hiệu < 0) { trả về -1; };
+            nếu (số phần tử < 0) { trả về -1; };
+            nếu (các chuỗi < 0) { trả về -1; };
+            nếu (chuỗi kích cỡ < 0) { trả về -1; };
+            nếu (các ký hiệu > chiều dài) { trả về -1; };
+            nếu (số phần tử > máy chia số nguyên ba mươi hai bit(chiều dài - các ký hiệu, 16)) { trả về -1; };
+            nếu (các chuỗi > chiều dài) { trả về -1; };
+            nếu (chuỗi kích cỡ > chiều dài - các chuỗi) { trả về -1; };
+            lặp (i = 0; i < số phần tử; i++) {
+                biến mục ký hiệu = các ký hiệu + i * 16;
+                biến kiểu dữ liệu = thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + mục ký hiệu + 4);
+                biến các bit = kiểu dữ liệu - máy chia số nguyên ba mươi hai bit(kiểu dữ liệu, 16) * 16;
+                nếu (các bit >= 2) { bỏ qua; };
+                biến tên định danh độ lệch = thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + mục ký hiệu);
+                nếu (tên định danh độ lệch < 0) { trả về -1; };
+                nếu (tên định danh độ lệch >= chuỗi kích cỡ) { trả về -1; };
+                biến tên định danh điểm bắt đầu = điểm bắt đầu + các chuỗi + tên định danh độ lệch;
+                biến khả dụng = chuỗi kích cỡ - tên định danh độ lệch;
+                biến terminated = 0;
+                lặp (j = 0; j < khả dụng; j++) {
+                    nếu (thực thi các byte lấy(kho lưu trữ, tên định danh điểm bắt đầu + j) == 0) {
+                        terminated = 1; thoát;
+                    };
+                };
+                nếu (terminated == 0) { trả về -1; };
+                biến dịch vụ = thực thi đối tượng dịch vụ tên định danh(kho lưu trữ, tên định danh điểm bắt đầu, khả dụng);
+                nếu (dịch vụ < 0) { trả về -1; };
+                nếu (dịch vụ > 0) { needs các dịch vụ = 1; };
+            };
+        };
+        độ lệch = độ lệch + kích cỡ;
+    };
+    trả về needs các dịch vụ;
+};
+
+// A packed linker archive stores [u32 object length][MH_OBJECT bytes]...
+// Return the validated object length at the prefix, or -1. This function
+// bounds every read by the actual archive and rejects non-ARM64 Mach-O files.
+hàm thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, độ lệch) {
+    biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
+    nếu (tổng số < 0) { trả về -1; };
+    nếu (độ lệch < 0) { trả về -1; };
+    nếu (độ lệch > tổng số - 4) { trả về -1; };
+    biến chiều dài = thực thi các byte nạp i32(kho lưu trữ, độ lệch);
+    nếu (chiều dài > tổng số - độ lệch - 4) { trả về -1; };
+    biến điểm bắt đầu = độ lệch + 4;
+    nếu (thực thi máy đích linux() == 1) {
+        nếu (chiều dài < 448) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu) != 1179403647) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 4) != 2) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 5) != 1) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 6) != 1) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 16) != 1) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 17) != 0) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 18) != 62) { trả về -1; };
+        nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 19) != 0) { trả về -1; };
+        nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 20) != 1) { trả về -1; };
+        trả về chiều dài;
+    };
+    nếu (chiều dài < 232) { trả về -1; };
+    // MH_MAGIC_64 (little-endian), CPU_TYPE_ARM64 and MH_OBJECT.
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu) != 207) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 1) != 250) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 2) != 237) { trả về -1; };
+    nếu (thực thi các byte lấy(kho lưu trữ, điểm bắt đầu + 3) != 254) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 4) != 16777228) { trả về -1; };
+    nếu (thực thi các byte nạp i32(kho lưu trữ, điểm bắt đầu + 12) != 1) { trả về -1; };
+    trả về chiều dài;
+};
+
+// Validates the entire archive, including each Mach-O symbol table. The
+// packed result is (count * 2 + needs_compiler_services), or -1 on error.
+// With <= 1 MiB archives and 232-byte minimum objects, this fits in i32.
+hàm thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ) {
+    biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
+    nếu (tổng số < 5) { trả về -1; };
+    biến độ lệch = 0;
+    biến số phần tử = 0;
+    biến needs các dịch vụ = 0;
+    lặp (i = 0; độ lệch < tổng số; i++) {
+        biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, độ lệch);
+        nếu (chiều dài < 0) { trả về -1; };
+        biến các dịch vụ = thực thi đối tượng các dịch vụ(kho lưu trữ, độ lệch + 4, chiều dài);
+        nếu (các dịch vụ < 0) { trả về -1; };
+        nếu (các dịch vụ > 0) { needs các dịch vụ = 1; };
+        số phần tử = số phần tử + 1;
+        độ lệch = độ lệch + chiều dài + 4;
+    };
+    nếu (số phần tử == 0) { trả về -1; };
+    nếu (độ lệch != tổng số) { trả về -1; };
+    trả về số phần tử * 2 + needs các dịch vụ;
+};
+
+// Wrap a single Mach-O object using the same [u32 length][body] wire format
+// as the multi-module linker. Return an owned archive handle or -1. The
+// downstream archive validator checks its Mach-O framing and symbols.
+hàm thực thi liên kết kho lưu trữ đơn(đối tượng) {
+    biến chiều dài = thực thi các byte chiều dài(đối tượng);
+    nếu (chiều dài < 232) { trả về -1; };
+    nếu (chiều dài > 1048572) { trả về -1; };
+    biến kho lưu trữ = thực thi các byte mới();
+    nếu (kho lưu trữ <= 0) { trả về -1; };
+    nếu (thực thi các byte đẩy i32(kho lưu trữ, chiều dài) != 0) {
+        thực thi các byte giải phóng(kho lưu trữ);
+        trả về -1;
+    };
+    nếu (thực thi các byte nối(kho lưu trữ, đối tượng) != 0) {
+        thực thi các byte giải phóng(kho lưu trữ);
+        trả về -1;
+    };
+    trả về kho lưu trữ;
+};
+
+// Build the mkstemp pathname in V++. index == -1 selects the executable;
+// nonnegative indexes select object files.
+// The destination is a separate reusable bytes handle, with a trailing NUL.
+hàm thực thi liên kết hợp lệ đường tệp(mã tài nguyên, cực đại) {
+    biến chiều dài = thực thi các byte chiều dài(mã tài nguyên);
+    nếu (chiều dài <= 0) { trả về -1; };
+    nếu (chiều dài > cực đại) { trả về -1; };
+    lặp (i = 0; i < chiều dài; i++) {
+        nếu (thực thi các byte lấy(mã tài nguyên, i) == 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// Validate the path bytes before the OS borrows their NUL-terminated data.
+// The source is bounded by PATH_MAX; output leaves room for temp suffixes.
+// Filesystem policy (regular-file and same-inode checks) stays at the OS edge.
+hàm thực thi liên kết kiểm tra hợp lệ paths(kết xuất, nguồn đầu vào) {
+    nếu (thực thi liên kết hợp lệ đường tệp(kết xuất, 4048) != 0) { trả về -1; };
+    nếu (thực thi liên kết hợp lệ đường tệp(nguồn đầu vào, 4096) != 0) { trả về -1; };
+    trả về 0;
+};
+
+// Darwin arm64 stat layout: dev_t at +0 (4 bytes), mode_t at +4
+// (2 bytes), ino_t at +8 (8 bytes). Both stat scratch areas are private
+// to this synchronous linker operation and never carry truncated pointers.
+hàm thực thi liên kết thông tin tệp thông thường(độ lệch) {
+    biến chế độ xử lý = máy đọc byte(độ lệch + 4) + máy đọc byte(độ lệch + 5) * 256;
+    trả về máy chia số nguyên ba mươi hai bit(chế độ xử lý, 4096) == 8;
+};
+
+hàm thực thi liên kết giống nhau định danh(đầu tiên, thứ hai) {
+    lặp (i = 0; i < 4; i++) {
+        nếu (máy đọc byte(đầu tiên + i) != máy đọc byte(thứ hai + i)) { trả về 0; };
+    };
+    lặp (i = 8; i < 16; i++) {
+        nếu (máy đọc byte(đầu tiên + i) != máy đọc byte(thứ hai + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+
+// Reject a non-regular source, symlink/directory destination and an output
+// that aliases the source inode (including hard links). A missing destination
+// is permitted; any other lstat error fails closed.
+hàm thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) {
+    nếu (thực thi liên kết kiểm tra hợp lệ paths(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    biến nguồn đầu vào ô nhớ = thực thi các byte ô nhớ(nguồn đầu vào);
+    biến kết xuất ô nhớ = thực thi các byte ô nhớ(kết xuất);
+    nếu (nguồn đầu vào ô nhớ < 0) { trả về -1; };
+    nếu (kết xuất ô nhớ < 0) { trả về -1; };
+    nếu (máy thông tin tệp(thực thi nội dung đệm(nguồn đầu vào ô nhớ), 3376) != 0) { trả về -1; };
+    nếu (thực thi liên kết thông tin tệp thông thường(3376) != 1) { trả về -1; };
+    nếu (máy thông tin liên kết(thực thi nội dung đệm(kết xuất ô nhớ), 3584) == 0) {
+        nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { trả về -1; };
+        nếu (thực thi liên kết giống nhau định danh(3376, 3584) == 1) { trả về -1; };
+    } hoặc {
+        nếu (máy lỗi() != 2) { trả về -1; }; // ENOENT
+    };
+    trả về 0;
+};
+
+// Only a real, executable regular file is eligible for atomic publication.
+hàm thực thi liên kết executable sẵn sàng(tạm thời) {
+    nếu (thực thi liên kết hợp lệ đường tệp(tạm thời, 4095) != 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(tạm thời);
+    nếu (ô nhớ < 0) { trả về -1; };
+    biến đường tệp = thực thi nội dung đệm(ô nhớ);
+    nếu (máy thông tin tệp(đường tệp, 3584) != 0) { trả về -1; };
+    nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { trả về -1; };
+    nếu (máy quyền chạy(đường tệp) != 0) { trả về -1; };
+    trả về 0;
+};
+
+hàm thực thi liên kết thêm cuối văn bản(đích nhận, văn bản) {
+    nếu (văn bản <= 0) { trả về -1; };
+    biến mã trạng thái = thực thi các byte nối(đích nhận, văn bản);
+    thực thi các byte giải phóng(văn bản);
+    trả về mã trạng thái;
+};
+
+hàm thực thi liên kết tạm thời đường tệp(kết xuất, đích nhận, chỉ mục) {
+    nếu (thực thi liên kết hợp lệ đường tệp(kết xuất, 4048) != 0) { trả về -1; };
+    nếu (chỉ mục < -1) { trả về -1; };
+    nếu (chỉ mục > 1048576) { trả về -1; };
+    nếu (thực thi các byte ô nhớ(đích nhận) < 0) { trả về -1; };
+    nếu (kết xuất == đích nhận) { trả về -1; };
+    nếu (thực thi các byte làm rỗng(đích nhận) != 0) { trả về -1; };
+    nếu (thực thi các byte lấy(kết xuất, 0) == 45) {
+        nếu (thực thi liên kết thêm cuối văn bản(đích nhận, "./") != 0) { trả về -1; };
+    };
+    nếu (thực thi các byte nối(đích nhận, kết xuất) != 0) { trả về -1; };
+    nếu (chỉ mục == -1) {
+        nếu (thực thi liên kết thêm cuối văn bản(đích nhận, ".vpp-exe-XXXXXX") != 0) { trả về -1; };
+    } hoặc {
+        nếu (thực thi liên kết thêm cuối văn bản(đích nhận, ".vpp-module-") != 0) { trả về -1; };
+        biến số chia = 1;
+        lặp (i = 0; máy chia số nguyên ba mươi hai bit(chỉ mục, số chia) >= 10; i++) {
+            số chia = số chia * 10;
+        };
+        biến dịch vụ tài nguyên = chỉ mục;
+        lặp (j = 0; số chia > 0; j++) {
+            biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
+            nếu (thực thi các byte thêm cuối(đích nhận, chữ số đang xét + 48) != 0) { trả về -1; };
+            dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;
+            số chia = máy chia số nguyên ba mươi hai bit(số chia, 10);
+        };
+        nếu (thực thi liên kết thêm cuối văn bản(đích nhận, "-XXXXXX") != 0) { trả về -1; };
+    };
+    nếu (thực thi các byte chiều dài(đích nhận) >= 4096) { trả về -1; };
+    trả về 0;
+};
+
+// The OS fills XXXXXX in-place and returns a descriptor with mode 0600.
+// Validate the full path and suffix before crossing the raw pointer boundary.
+hàm thực thi liên kết tạm mở(template) {
+    nếu (thực thi liên kết hợp lệ đường tệp(template, 4095) != 0) { trả về -1; };
+    biến chiều dài = thực thi các byte chiều dài(template);
+    nếu (chiều dài < 6) { trả về -1; };
+    lặp (i = chiều dài - 6; i < chiều dài; i++) {
+        nếu (thực thi các byte lấy(template, i) != 88) { trả về -1; };
+    };
+    biến ô nhớ = thực thi các byte ô nhớ(template);
+    nếu (ô nhớ < 0) { trả về -1; };
+    trả về máy tạm mở(thực thi nội dung đệm(ô nhớ));
+};
+
+// Publish only a validated path pair. The caller verifies the executable and
+// retains control of the failure path and temporary-file cleanup.
+hàm thực thi liên kết công bố(tạm thời, kết xuất) {
+    nếu (tạm thời == kết xuất) { trả về -1; };
+    nếu (thực thi liên kết hợp lệ đường tệp(tạm thời, 4095) != 0) { trả về -1; };
+    nếu (thực thi liên kết hợp lệ đường tệp(kết xuất, 4048) != 0) { trả về -1; };
+    biến tạm ô nhớ = thực thi các byte ô nhớ(tạm thời);
+    biến đầu ra ô nhớ = thực thi các byte ô nhớ(kết xuất);
+    nếu (tạm ô nhớ < 0) { trả về -1; };
+    nếu (đầu ra ô nhớ < 0) { trả về -1; };
+    trả về máy đổi tên(thực thi nội dung đệm(tạm ô nhớ), thực thi nội dung đệm(đầu ra ô nhớ));
+};
+
+// V++ builds the full-width argv table in the private linker arena.
+// The machine primitive obtains environ and invokes clang directly;
+// V++ owns the waitpid EINTR retry and successful-exit decision.
+hàm thực thi liên kết khởi chạy đợi() {
+    biến con = máy khởi chạy clang(67113984);
+    nếu (con <= 0) { trả về -1; };
+    lặp (lần thử lại = 0; lần thử lại < 1000000; lần thử lại++) {
+        biến đã đợi = máy đợi(con, 3360);
+        nếu (đã đợi == con) {
+            nếu (máy đọc số nguyên ba mươi hai bit(3360) == 0) { trả về 0; };
+            trả về -1;
+        };
+        nếu (đã đợi != -1) { trả về -1; };
+        nếu (máy lỗi() != 4) { trả về -1; };
+    };
+    trả về -1;
+};
+
+// The OS boundary creates the temporary descriptor. V++ validates the
+// archive entry and writes all its bytes through the existing EINTR-safe
+// write primitive. Return bytes written or -1 on failure.
+hàm thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, tiền tố) {
+    nếu (mã tệp mở < 0) { trả về -1; };
+    biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, tiền tố);
+    nếu (chiều dài < 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(kho lưu trữ);
+    nếu (ô nhớ < 0) { trả về -1; };
+    trả về thực thi ghi tất cả(mã tệp mở, thực thi nội dung đệm(ô nhớ) + tiền tố + 4, chiều dài);
+};
+
+// Cache record framing is owned by V++. The OS boundary owns SHA-256, file
+// descriptors and atomic rename. C reads/writes the first 16 header bytes
+// through the dedicated arena scratch range [3200, 3216); the remaining 32
+// bytes hold the SHA-256 digest of header[0:16], key and payload.
+// This fixed scratch slot is used synchronously by the native compiler.
+hàm thực thi bộ nhớ đệm phần đầu dấu nhận dạng(ghi) {
+    biến dấu nhận dạng = "VPPCACH1";
+    nếu (dấu nhận dạng <= 0) { trả về -1; };
+    biến hợp lệ = 1;
+    lặp (i = 0; i < 8; i++) {
+        biến giá trị mong đợi = thực thi các byte lấy(dấu nhận dạng, i);
+        nếu (ghi == 1) {
+            nếu (máy ghi byte(3200 + i, giá trị mong đợi) != 0) { hợp lệ = 0; };
+        } hoặc {
+            nếu (máy đọc byte(3200 + i) != giá trị mong đợi) { hợp lệ = 0; };
+        };
+    };
+    thực thi các byte giải phóng(dấu nhận dạng);
+    nếu (hợp lệ != 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm phần đầu ghi(khóa tra cứu, nội dung đệm) {
+    biến khóa tra cứu kích cỡ = thực thi các byte chiều dài(khóa tra cứu);
+    biến dữ liệu đầu vào kích cỡ = thực thi các byte chiều dài(nội dung đệm);
+    nếu (khóa tra cứu kích cỡ <= 0) { trả về -1; };
+    nếu (dữ liệu đầu vào kích cỡ < 0) { trả về -1; };
+    nếu (thực thi bộ nhớ đệm phần đầu dấu nhận dạng(1) != 0) { trả về -1; };
+    nếu (máy ghi số nguyên ba mươi hai bit(3208, khóa tra cứu kích cỡ) != 0) { trả về -1; };
+    nếu (máy ghi số nguyên ba mươi hai bit(3212, dữ liệu đầu vào kích cỡ) != 0) { trả về -1; };
+    trả về 0;
+};
+
+// Return the validated payload size, or -1 on an invalid magic, key size,
+// payload size or total record length. The caller checks the digest/key bytes.
+hàm thực thi bộ nhớ đệm phần đầu kiểm tra(khóa tra cứu, tệp dữ liệu kích cỡ) {
+    biến khóa tra cứu kích cỡ = thực thi các byte chiều dài(khóa tra cứu);
+    nếu (khóa tra cứu kích cỡ <= 0) { trả về -1; };
+    nếu (tệp dữ liệu kích cỡ < 48) { trả về -1; };
+    nếu (thực thi bộ nhớ đệm phần đầu dấu nhận dạng(0) != 0) { trả về -1; };
+    biến saved khóa tra cứu kích cỡ = máy đọc số nguyên ba mươi hai bit(3208);
+    biến dữ liệu đầu vào kích cỡ = máy đọc số nguyên ba mươi hai bit(3212);
+    nếu (saved khóa tra cứu kích cỡ != khóa tra cứu kích cỡ) { trả về -1; };
+    nếu (dữ liệu đầu vào kích cỡ < 0) { trả về -1; };
+    nếu (dữ liệu đầu vào kích cỡ > 1048576) { trả về -1; };
+    nếu (tệp dữ liệu kích cỡ != 48 + saved khóa tra cứu kích cỡ + dữ liệu đầu vào kích cỡ) { trả về -1; };
+    trả về dữ liệu đầu vào kích cỡ;
+};
+
+// The SHA machine primitive hashes the compiler image and key into
+// arena[3216:3248]. V++ encodes its lowercase filename component at
+// arena[3248:3313] (including NUL), without allocating a temporary handle.
+hàm thực thi bộ nhớ đệm thập lục phân chữ số đang xét(giá trị đang xét) {
+    nếu (giá trị đang xét < 10) { trả về giá trị đang xét + 48; };
+    trả về giá trị đang xét + 87;
+};
+
+hàm thực thi bộ nhớ đệm băm thập lục phân() {
+    lặp (i = 0; i < 32; i++) {
+        biến octet = máy đọc byte(3216 + i);
+        nếu (octet < 0) { trả về -1; };
+        biến hoa = máy chia số nguyên ba mươi hai bit(octet, 16);
+        biến thường = octet - hoa * 16;
+        nếu (máy ghi byte(3248 + i * 2, thực thi bộ nhớ đệm thập lục phân chữ số đang xét(hoa)) != 0) { trả về -1; };
+        nếu (máy ghi byte(3249 + i * 2, thực thi bộ nhớ đệm thập lục phân chữ số đang xét(thường)) != 0) { trả về -1; };
+    };
+    trả về máy ghi byte(3312, 0);
+};
+
+hàm thực thi tệp dữ liệu ô nhớ(mã tài nguyên) {
+    nếu (mã tài nguyên <= 0) { trả về -1; };
+    biến nhãn = mã tài nguyên - máy chia số nguyên ba mươi hai bit(mã tài nguyên, 128) * 128;
+    nếu (nhãn < 64) { trả về -1; };
+    biến ô nhớ = nhãn - 64;
+    nếu (máy đọc số nguyên ba mươi hai bit(2064 + ô nhớ * 16) != mã tài nguyên) { trả về -1; };
+    trả về ô nhớ;
+};
+
+hàm thực thi tệp dữ liệu mở(đường tệp, chế độ xử lý) {
+    biến ô nhớ = thực thi các byte ô nhớ(đường tệp);
+    nếu (ô nhớ < 0) { trả về -1; };
+    biến chiều dài = thực thi các byte chiều dài(đường tệp);
+    nếu (chiều dài < 1) { trả về -1; };
+    nếu (chiều dài > 4096) { trả về -1; };
+    lặp (i = 0; i < chiều dài; i++) {
+        nếu (máy đọc byte(thực thi nội dung đệm(ô nhớ) + i) == 0) { trả về -1; };
+    };
+    lặp (tệp dữ liệu ô nhớ = 0; tệp dữ liệu ô nhớ < 64; tệp dữ liệu ô nhớ++) {
+        biến bản ghi dữ liệu = 2064 + tệp dữ liệu ô nhớ * 16;
+        nếu (máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu) == 0) {
+            // Allocate before opening: exhausted handles cannot truncate a file.
+            biến mã tài nguyên = thực thi mã tài nguyên(tệp dữ liệu ô nhớ + 64);
+            nếu (mã tài nguyên <= 0) { trả về -1; };
+            biến mã tệp mở = máy mở(thực thi nội dung đệm(ô nhớ), chế độ xử lý);
+            nếu (mã tệp mở < 0) { trả về -1; };
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 4, mã tệp mở);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu + 8, chế độ xử lý);
+            máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, mã tài nguyên);
+            trả về mã tài nguyên;
+        };
+    };
+    trả về -1;
+};
+
+hàm thực thi tệp dữ liệu mở đọc(đường tệp) { trả về thực thi tệp dữ liệu mở(đường tệp, 0); };
+hàm thực thi tệp dữ liệu mở ghi(đường tệp) { trả về thực thi tệp dữ liệu mở(đường tệp, 1537); };
+
+hàm thực thi tệp dữ liệu đóng(mã tài nguyên) {
+    biến ô nhớ = thực thi tệp dữ liệu ô nhớ(mã tài nguyên);
+    nếu (ô nhớ < 0) { trả về -1; };
+    biến bản ghi dữ liệu = 2064 + ô nhớ * 16;
+    biến mã trạng thái = máy đóng(máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 4));
+    máy ghi số nguyên ba mươi hai bit(bản ghi dữ liệu, 0);
+    trả về mã trạng thái;
+};
+
+hàm thực thi đọc lần thử lại(mã tệp mở, độ lệch, chiều dài) {
+    biến kết quả trả về = -1;
+    lặp (i = 0; i < 1; i = i) {
+        kết quả trả về = máy đọc(mã tệp mở, độ lệch, chiều dài);
+        nếu (kết quả trả về >= 0) { thoát; };
+        nếu (máy lỗi() != 4) { thoát; };
+    };
+    trả về kết quả trả về;
+};
+
+hàm thực thi tệp dữ liệu đọc khối(mã tài nguyên, các byte) {
+    biến tệp dữ liệu = thực thi tệp dữ liệu ô nhớ(mã tài nguyên);
+    biến ô nhớ = thực thi các byte ô nhớ(các byte);
+    nếu (tệp dữ liệu < 0) { trả về -1; };
+    nếu (ô nhớ < 0) { trả về -1; };
+    biến chiều dài = máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32);
+    biến số phần tử = 1048576 - chiều dài;
+    nếu (số phần tử > 4096) { số phần tử = 4096; };
+    nếu (số phần tử <= 0) { trả về -1; };
+    nếu (thực thi các byte dự trữ(các byte, số phần tử) != 0) { trả về -1; };
+    biến đọc = thực thi đọc lần thử lại(máy đọc số nguyên ba mươi hai bit(2068 + tệp dữ liệu * 16), thực thi nội dung đệm(ô nhớ) + chiều dài, số phần tử);
+    nếu (đọc < 0) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, chiều dài + đọc);
+    máy ghi byte(thực thi nội dung đệm(ô nhớ) + chiều dài + đọc, 0);
+    trả về đọc;
+};
+
+hàm thực thi tệp dữ liệu ghi khối(mã tài nguyên, các byte) {
+    biến tệp dữ liệu = thực thi tệp dữ liệu ô nhớ(mã tài nguyên);
+    biến ô nhớ = thực thi các byte ô nhớ(các byte);
+    nếu (tệp dữ liệu < 0) { trả về -1; };
+    nếu (ô nhớ < 0) { trả về -1; };
+    trả về thực thi ghi tất cả(máy đọc số nguyên ba mươi hai bit(2068 + tệp dữ liệu * 16), thực thi nội dung đệm(ô nhớ), máy đọc số nguyên ba mươi hai bit(32 + ô nhớ * 32));
+};
+
+hàm thực thi tệp dữ liệu đọc byte(mã tài nguyên) {
+    biến tệp dữ liệu = thực thi tệp dữ liệu ô nhớ(mã tài nguyên);
+    nếu (tệp dữ liệu < 0) { trả về -2; };
+    biến số phần tử = thực thi đọc lần thử lại(máy đọc số nguyên ba mươi hai bit(2068 + tệp dữ liệu * 16), 3104, 1);
+    nếu (số phần tử < 0) { trả về -2; };
+    nếu (số phần tử == 0) { trả về -1; };
+    trả về máy đọc byte(3104);
+};
+
+hàm thực thi tệp dữ liệu ghi byte(mã tài nguyên, giá trị đang xét) {
+    biến tệp dữ liệu = thực thi tệp dữ liệu ô nhớ(mã tài nguyên);
+    nếu (tệp dữ liệu < 0) { trả về -1; };
+    nếu (giá trị đang xét < 0) { trả về -1; };
+    nếu (giá trị đang xét > 255) { trả về -1; };
+    máy ghi byte(3104, giá trị đang xét);
+    nếu (thực thi ghi tất cả(máy đọc số nguyên ba mươi hai bit(2068 + tệp dữ liệu * 16), 3104, 1) != 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm thực thi in i32(giá trị đang xét) {
+    biến là âm = 0;
+    biến phần còn = giá trị đang xét;
+    nếu (giá trị đang xét < 0) { là âm = 1; } hoặc { phần còn = -giá trị đang xét; };
+    biến chiều dài = 0;
+    lặp (i = 0; i < 11; i++) {
+        biến thương = máy chia số nguyên ba mươi hai bit(phần còn, 10);
+        máy ghi byte(3104 + chiều dài, 48 + thương * 10 - phần còn);
+        chiều dài = chiều dài + 1;
+        phần còn = thương;
+        nếu (phần còn == 0) { thoát; };
+    };
+    nếu (là âm == 1) { máy ghi byte(3104 + chiều dài, 45); chiều dài = chiều dài + 1; };
+    lặp (j = 0; j < máy chia số nguyên ba mươi hai bit(chiều dài, 2); j++) {
+        biến đầu tiên = máy đọc byte(3104 + j);
+        máy ghi byte(3104 + j, máy đọc byte(3104 + chiều dài - 1 - j));
+        máy ghi byte(3104 + chiều dài - 1 - j, đầu tiên);
+    };
+    máy ghi byte(3104 + chiều dài, 10);
+    nếu (thực thi ghi tất cả(1, 3104, chiều dài + 1) != chiều dài + 1) { trả về -1; };
+    trả về 0;
+};
+
+hàm thực thi khoảng trắng(ch) {
+    nếu (ch == 32) { trả về 1; };
+    nếu (ch >= 9) { nếu (ch <= 13) { trả về 1; }; };
+    trả về 0;
+};
+
+hàm thực thi đọc mã trạng thái() { trả về máy đọc số nguyên ba mươi hai bit(8); };
+
+hàm thực thi đọc i32() {
+    máy ghi số nguyên ba mươi hai bit(8, 0);
+    biến chiều dài = 0;
+    biến overflow dòng = 0;
+    lặp (i = 0; i < 1; i = i) {
+        biến số phần tử = thực thi đọc lần thử lại(0, 3184, 1);
+        nếu (số phần tử < 0) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
+        nếu (số phần tử == 0) {
+            nếu (chiều dài == 0) { máy ghi số nguyên ba mươi hai bit(8, 1); trả về 0; };
+            thoát;
+        };
+        biến ch = máy đọc byte(3184);
+        nếu (ch == 10) { thoát; };
+        nếu (chiều dài < 63) {
+            máy ghi byte(3104 + chiều dài, ch);
+            chiều dài = chiều dài + 1;
+        } hoặc { overflow dòng = 1; };
+    };
+    nếu (overflow dòng == 1) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
+    biến con trỏ hiện tại = 0;
+    lặp (j = 0; con trỏ hiện tại < chiều dài; j++) {
+        nếu (thực thi khoảng trắng(máy đọc byte(3104 + con trỏ hiện tại)) != 1) { thoát; };
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+    };
+    biến dấu = 1;
+    nếu (con trỏ hiện tại < chiều dài) {
+        biến tiền tố = máy đọc byte(3104 + con trỏ hiện tại);
+        nếu (tiền tố == 45) { dấu = -1; con trỏ hiện tại = con trỏ hiện tại + 1; }
+        hoặc nếu (tiền tố == 43) { con trỏ hiện tại = con trỏ hiện tại + 1; };
+    };
+    biến các chữ số = 0;
+    biến giá trị đang xét = 0;
+    biến đầu ra of khoảng = 0;
+    lặp (k = 0; con trỏ hiện tại < chiều dài; k++) {
+        biến chữ số đang xét = máy đọc byte(3104 + con trỏ hiện tại) - 48;
+        nếu (chữ số đang xét < 0) { thoát; };
+        nếu (chữ số đang xét > 9) { thoát; };
+        nếu (giá trị đang xét < -214748364) { đầu ra of khoảng = 1; };
+        nếu (giá trị đang xét == -214748364) {
+            biến mức trần = 7;
+            nếu (dấu == -1) { mức trần = 8; };
+            nếu (chữ số đang xét > mức trần) { đầu ra of khoảng = 1; };
+        };
+        nếu (đầu ra of khoảng == 0) { giá trị đang xét = giá trị đang xét * 10 - chữ số đang xét; };
+        các chữ số = các chữ số + 1;
+        con trỏ hiện tại = con trỏ hiện tại + 1;
+    };
+    nếu (các chữ số == 0) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
+    lặp (tail = con trỏ hiện tại; tail < chiều dài; tail++) {
+        nếu (thực thi khoảng trắng(máy đọc byte(3104 + tail)) != 1) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
+    };
+    nếu (đầu ra of khoảng == 1) { máy ghi số nguyên ba mươi hai bit(8, 3); trả về 0; };
+    nếu (dấu == 1) { trả về -giá trị đang xét; };
+    trả về giá trị đang xét;
+};
+
+
+// Cache/link state is in the metadata scratch page. OS pointers stay 64 bit:
+// linker argv at 67113984, 4096 pointers; offset table at 67146752;
+// copied NUL-terminated arguments begin at 67163136. The extra 1 MiB region
+// is mapped by the machine primitive and is never issued as a byte handle.
+hàm thực thi liên kết các đối số đặt lại() {
+    máy ghi số nguyên ba mươi hai bit(3800, 0);
+    máy ghi số nguyên ba mươi hai bit(3804, 67163136);
+    trả về 0;
+};
+
+hàm thực thi liên kết các đối số đẩy(văn bản) {
+    biến ô nhớ = thực thi các byte ô nhớ(văn bản);
+    biến chiều dài = thực thi các byte chiều dài(văn bản);
+    nếu (ô nhớ < 0) { trả về -1; };
+    nếu (chiều dài <= 0) { trả về -1; };
+    biến chỉ mục = máy đọc số nguyên ba mươi hai bit(3800);
+    biến con trỏ hiện tại = máy đọc số nguyên ba mươi hai bit(3804);
+    nếu (chỉ mục < 0) { trả về -1; };
+    nếu (chỉ mục >= 4095) { trả về -1; };
+    nếu (con trỏ hiện tại < 67163136) { trả về -1; };
+    nếu (chiều dài >= 68162560 - con trỏ hiện tại) { trả về -1; };
+    nếu (máy gắn địa chỉ(67113984 + chỉ mục * 8, con trỏ hiện tại) != 0) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(67146752 + chỉ mục * 4, con trỏ hiện tại);
+    lặp (i = 0; i < chiều dài; i++) {
+        máy ghi byte(con trỏ hiện tại + i, thực thi các byte lấy(văn bản, i));
+    };
+    máy ghi byte(con trỏ hiện tại + chiều dài, 0);
+    máy ghi số nguyên ba mươi hai bit(3804, con trỏ hiện tại + chiều dài + 1);
+    máy ghi số nguyên ba mươi hai bit(3800, chỉ mục + 1);
+    trả về chỉ mục;
+};
+
+hàm thực thi liên kết các đối số đồng bộ(chỉ mục, văn bản) {
+    nếu (chỉ mục < 0) { trả về -1; };
+    nếu (chỉ mục >= máy đọc số nguyên ba mươi hai bit(3800)) { trả về -1; };
+    biến con trỏ hiện tại = máy đọc số nguyên ba mươi hai bit(67146752 + chỉ mục * 4);
+    biến chiều dài = thực thi các byte chiều dài(văn bản);
+    nếu (chiều dài <= 0) { trả về -1; };
+    biến điểm kết thúc = máy đọc số nguyên ba mươi hai bit(3804);
+    nếu (con trỏ hiện tại < 67163136) { trả về -1; };
+    nếu (chiều dài >= điểm kết thúc - con trỏ hiện tại) { trả về -1; };
+    lặp (i = 0; i < chiều dài; i++) {
+        máy ghi byte(con trỏ hiện tại + i, thực thi các byte lấy(văn bản, i));
+    };
+    máy ghi byte(con trỏ hiện tại + chiều dài, 0);
+    trả về 0;
+};
+
+hàm thực thi liên kết các đối số hằng văn bản(văn bản) {
+    nếu (văn bản <= 0) { trả về -1; };
+    biến kết quả trả về = thực thi liên kết các đối số đẩy(văn bản);
+    thực thi các byte giải phóng(văn bản);
+    trả về kết quả trả về;
+};
+
+hàm thực thi liên kết các đối số xóa liên kết(chỉ mục) {
+    nếu (chỉ mục < 0) { trả về -1; };
+    nếu (chỉ mục >= máy đọc số nguyên ba mươi hai bit(3800)) { trả về -1; };
+    trả về máy xóa(máy đọc số nguyên ba mươi hai bit(67146752 + chỉ mục * 4));
+};
+
+hàm thực thi liên kết macho(đối tượng, kết xuất, nguồn đầu vào) {
+    biến kho lưu trữ = thực thi liên kết kho lưu trữ đơn(đối tượng);
+    nếu (kho lưu trữ <= 0) { trả về -1; };
+    biến kết quả trả về = thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào);
+    thực thi các byte giải phóng(kho lưu trữ);
+    trả về kết quả trả về;
+};
+
+// V++ owns every module, path, argv entry, descriptor and cleanup decision.
+// The fixed-size address array holds full-width 64-bit pointers; no i32
+// handle or offset is reinterpreted as a process pointer.
+hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    nếu (kho lưu trữ == kết xuất) { trả về -1; };
+    nếu (kho lưu trữ == nguồn đầu vào) { trả về -1; };
+    nếu (kết xuất == nguồn đầu vào) { trả về -1; };
+    nếu (thực thi liên kết kiểm tra hợp lệ files(kết xuất, nguồn đầu vào) != 0) { trả về -1; };
+    biến bản tổng hợp = thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ);
+    nếu (bản tổng hợp < 2) { trả về -1; };
+    biến tổng số = thực thi các byte chiều dài(kho lưu trữ);
+    biến các mô đun = máy chia số nguyên ba mươi hai bit(bản tổng hợp, 2);
+    nếu (các mô đun < 1) { trả về -1; };
+    nếu (các mô đun > 4086) { trả về -1; };
+    thực thi liên kết các đối số đặt lại();
+    biến tạm = thực thi các byte mới();
+    nếu (tạm <= 0) { trả về -1; };
+    biến mã trạng thái = -1;
+    biến đã tạo = 0;
+    biến tệp thực thi chỉ mục = -1;
+    biến mã tệp mở = -1;
+    biến vị trí đang xét = 0;
+    biến linux = thực thi máy đích linux();
+    biến đối tượng điểm bắt đầu = 0;
+    nếu (linux == 1) {
+        nếu (thực thi liên kết các đối số hằng văn bản("cc") < 0) { mã trạng thái = -2; };
+    } hoặc {
+        nếu (thực thi liên kết các đối số hằng văn bản("/usr/bin/clang") < 0) { mã trạng thái = -2; };
+        nếu (mã trạng thái == -1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-arch") < 0) { mã trạng thái = -2; };
+        };
+        nếu (mã trạng thái == -1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("arm64") < 0) { mã trạng thái = -2; };
+        };
+    };
+    đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
+    nếu (mã trạng thái == -1) {
+        lặp (i = 0; i < các mô đun; i++) {
+            biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, vị trí đang xét);
+            nếu (chiều dài < 0) { mã trạng thái = -2; thoát; };
+            nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, i) != 0) { mã trạng thái = -2; thoát; };
+            biến đối số = thực thi liên kết các đối số đẩy(tạm);
+            nếu (đối số < 0) { mã trạng thái = -2; thoát; };
+            mã tệp mở = thực thi liên kết tạm mở(tạm);
+            nếu (mã tệp mở < 0) { mã trạng thái = -2; thoát; };
+            đã tạo = đã tạo + 1;
+            nếu (thực thi liên kết các đối số đồng bộ(đối số, tạm) != 0) {
+                máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm)));
+                mã trạng thái = -2;
+                thoát;
+            };
+            nếu (thực thi liên kết ghi đối tượng(mã tệp mở, kho lưu trữ, vị trí đang xét) != chiều dài) {
+                mã trạng thái = -2; thoát;
+            };
+            nếu (máy đóng(mã tệp mở) != 0) {
+                mã tệp mở = -1; mã trạng thái = -2; thoát;
+            };
+            mã tệp mở = -1;
+            vị trí đang xét = vị trí đang xét + chiều dài + 4;
+        };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (vị trí đang xét != tổng số) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        biến primitive = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
+        nếu (primitive <= 0) { mã trạng thái = -2; }
+        hoặc {
+            nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
+            thực thi các byte giải phóng(primitive);
+        };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (linux == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-lcrypto") < 0) { mã trạng thái = -2; };
+        };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, -1) != 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết các đối số hằng văn bản("-o") < 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        tệp thực thi chỉ mục = thực thi liên kết các đối số đẩy(tạm);
+        nếu (tệp thực thi chỉ mục < 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        mã tệp mở = thực thi liên kết tạm mở(tạm);
+        nếu (mã tệp mở < 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết các đối số đồng bộ(tệp thực thi chỉ mục, tạm) != 0) {
+            máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm)));
+            mã trạng thái = -2;
+        };
+    };
+    nếu (mã tệp mở >= 0) {
+        nếu (máy đóng(mã tệp mở) != 0) { mã trạng thái = -2; };
+        mã tệp mở = -1;
+    };
+    nếu (mã trạng thái == -1) {
+        biến số đối số dòng lệnh = máy đọc số nguyên ba mươi hai bit(3800);
+        máy ghi số nguyên ba mươi hai bit(67113984 + số đối số dòng lệnh * 8, 0);
+        máy ghi số nguyên ba mươi hai bit(67113984 + số đối số dòng lệnh * 8 + 4, 0);
+        nếu (thực thi liên kết khởi chạy đợi() != 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) {
+        nếu (thực thi liên kết công bố(tạm, kết xuất) != 0) { mã trạng thái = -2; };
+    };
+    nếu (mã trạng thái == -1) { mã trạng thái = 0; };
+    nếu (mã tệp mở >= 0) { máy đóng(mã tệp mở); };
+    nếu (tệp thực thi chỉ mục >= 0) { thực thi liên kết các đối số xóa liên kết(tệp thực thi chỉ mục); };
+    lặp (i = 0; i < đã tạo; i++) {
+        thực thi liên kết các đối số xóa liên kết(đối tượng điểm bắt đầu + i);
+    };
+    thực thi các byte giải phóng(tạm);
+    nếu (mã trạng thái == 0) { trả về 0; };
+    trả về -1;
+};
+
+// No C file streams or allocation are used by the content-addressed cache.
+hàm thực thi bộ nhớ đệm giá trị môi trường(khóa tra cứu) {
+    nếu (khóa tra cứu <= 0) { trả về -1; };
+    biến kết quả trả về = thực thi các byte mới();
+    nếu (kết quả trả về <= 0) { thực thi các byte giải phóng(khóa tra cứu); trả về -1; };
+    biến tên định danh ô nhớ = thực thi các byte ô nhớ(khóa tra cứu);
+    biến dữ liệu đầu vào ô nhớ = thực thi các byte ô nhớ(kết quả trả về);
+    biến chiều dài = máy giá trị môi trường lấy(thực thi nội dung đệm(tên định danh ô nhớ), thực thi nội dung đệm(dữ liệu đầu vào ô nhớ));
+    thực thi các byte giải phóng(khóa tra cứu);
+    nếu (chiều dài < 0) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    nếu (chiều dài >= 4096) { thực thi các byte giải phóng(kết quả trả về); trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(32 + dữ liệu đầu vào ô nhớ * 32, chiều dài);
+    trả về kết quả trả về;
+};
+
+hàm thực thi bộ nhớ đệm init() {
+    nếu (máy đọc số nguyên ba mươi hai bit(3812) == 1) { trả về 0; };
+    biến tệp thực thi = thực thi các byte mới();
+    nếu (tệp thực thi <= 0) { trả về -1; };
+    biến ô nhớ = thực thi các byte ô nhớ(tệp thực thi);
+    biến chiều dài = máy tệp thực thi lấy(thực thi nội dung đệm(ô nhớ));
+    nếu (chiều dài <= 0) { thực thi các byte giải phóng(tệp thực thi); trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(32 + ô nhớ * 32, chiều dài);
+    biến mã tệp mở = máy mở(thực thi nội dung đệm(ô nhớ), 4);
+    thực thi các byte giải phóng(tệp thực thi);
+    nếu (mã tệp mở < 0) { trả về -1; };
+    biến vùng đệm = thực thi các byte mới();
+    nếu (vùng đệm <= 0) { máy đóng(mã tệp mở); trả về -1; };
+    biến dữ liệu đầu vào = thực thi nội dung đệm(thực thi các byte ô nhớ(vùng đệm));
+    biến đã thành công = máy sha bắt đầu();
+    nếu (đã thành công == 0) {
+        lặp (i = 0; i < 1000000; i++) {
+            biến số phần tử = thực thi đọc lần thử lại(mã tệp mở, dữ liệu đầu vào, 4096);
+            nếu (số phần tử < 0) { đã thành công = -1; thoát; };
+            nếu (số phần tử == 0) { thoát; };
+            nếu (máy sha nạp(dữ liệu đầu vào, số phần tử) != 0) { đã thành công = -1; thoát; };
+        };
+    };
+    nếu (máy đóng(mã tệp mở) != 0) { đã thành công = -1; };
+    thực thi các byte giải phóng(vùng đệm);
+    nếu (đã thành công != 0) { trả về -1; };
+    nếu (máy sha kết(3856) != 0) { trả về -1; };
+    máy ghi số nguyên ba mươi hai bit(3812, 1);
+    nếu (máy báo cáo bộ nhớ đệm() != 0) { trả về -1; };
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm đường tệp(khóa tra cứu) {
+    biến đã tắt = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_NO_CACHE");
+    nếu (đã tắt > 0) {
+        biến một = "1";
+        biến là độ dời = thực thi các byte bằng nhau(đã tắt, một);
+        thực thi các byte giải phóng(một);
+        thực thi các byte giải phóng(đã tắt);
+        nếu (là độ dời == 1) { trả về -1; };
+    };
+    nếu (thực thi bộ nhớ đệm init() != 0) { trả về -1; };
+    biến thư mục = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_CACHE_DIR");
+    nếu (thư mục <= 0) { thư mục = ".vpp-native-cache"; };
+    nếu (thực thi các byte chiều dài(thư mục) == 0) {
+        thực thi các byte giải phóng(thư mục);
+        thư mục = ".vpp-native-cache";
+    };
+    nếu (thực thi liên kết hợp lệ đường tệp(thư mục, 4010) != 0) {
+        thực thi các byte giải phóng(thư mục); trả về -1;
+    };
+    biến ô nhớ = thực thi các byte ô nhớ(thư mục);
+    biến chế độ xử lý = máy tạo thư mục(thực thi nội dung đệm(ô nhớ));
+    nếu (chế độ xử lý != 0) {
+        nếu (máy lỗi() != 17) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    };
+    nếu (máy thông tin liên kết(thực thi nội dung đệm(ô nhớ), 3584) != 0) {
+        thực thi các byte giải phóng(thư mục); trả về -1;
+    };
+    biến quyền truy cập = máy đọc byte(3588) + 256 * máy đọc byte(3589);
+    nếu (máy chia số nguyên ba mươi hai bit(quyền truy cập, 4096) != 4) {
+        thực thi các byte giải phóng(thư mục); trả về -1;
+    };
+    biến khóa tra cứu chiều dài = thực thi các byte chiều dài(khóa tra cứu);
+    biến khóa tra cứu ô nhớ = thực thi các byte ô nhớ(khóa tra cứu);
+    nếu (khóa tra cứu ô nhớ < 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    nếu (máy sha bắt đầu() != 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    nếu (máy sha nạp(3856, 32) != 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    nếu (máy sha nạp(thực thi nội dung đệm(khóa tra cứu ô nhớ), khóa tra cứu chiều dài) != 0) {
+        thực thi các byte giải phóng(thư mục); trả về -1;
+    };
+    nếu (máy sha kết(3216) != 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    nếu (thực thi bộ nhớ đệm băm thập lục phân() != 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    biến đường tệp = thực thi các byte mới();
+    nếu (đường tệp <= 0) { thực thi các byte giải phóng(thư mục); trả về -1; };
+    biến kết quả trả về = thực thi các byte nối(đường tệp, thư mục);
+    nếu (kết quả trả về == 0) {
+        nếu (thực thi các byte thêm cuối(đường tệp, 47) != 0) { kết quả trả về = -1; };
+    };
+    nếu (kết quả trả về == 0) {
+        lặp (i = 0; i < 64; i++) {
+            nếu (thực thi các byte thêm cuối(đường tệp, máy đọc byte(3248 + i)) != 0) {
+                kết quả trả về = -1; thoát;
+            };
+        };
+    };
+    nếu (kết quả trả về == 0) {
+        nếu (thực thi liên kết thêm cuối văn bản(đường tệp, ".cache") != 0) { kết quả trả về = -1; };
+    };
+    thực thi các byte giải phóng(thư mục);
+    nếu (kết quả trả về != 0) { thực thi các byte giải phóng(đường tệp); trả về -1; };
+    nếu (thực thi liên kết hợp lệ đường tệp(đường tệp, 4088) != 0) {
+        thực thi các byte giải phóng(đường tệp); trả về -1;
+    };
+    trả về đường tệp;
+};
+
+hàm thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, độ lệch, chiều dài) {
+    biến done = 0;
+    lặp (i = 0; done < chiều dài; i++) {
+        biến số phần tử = thực thi đọc lần thử lại(mã tệp mở, độ lệch + done, chiều dài - done);
+        nếu (số phần tử <= 0) { trả về -1; };
+        done = done + số phần tử;
+    };
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm bản ghi dữ liệu đọc(mã tệp mở, khóa tra cứu, dữ liệu đầu vào, tệp dữ liệu kích cỡ) {
+    nếu (tệp dữ liệu kích cỡ < 48) { trả về 0; };
+    nếu (tệp dữ liệu kích cỡ > 2097200) { trả về 0; };
+    nếu (thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, 3200, 48) != 0) { trả về 0; };
+    biến nội dung đệm kích cỡ = thực thi bộ nhớ đệm phần đầu kiểm tra(khóa tra cứu, tệp dữ liệu kích cỡ);
+    nếu (nội dung đệm kích cỡ < 0) { trả về 0; };
+    biến khóa tra cứu sao chép = thực thi các byte mới();
+    nếu (khóa tra cứu sao chép <= 0) { trả về 0; };
+    biến khóa tra cứu kích cỡ = thực thi các byte chiều dài(khóa tra cứu);
+    biến hợp lệ = thực thi các byte dự trữ(khóa tra cứu sao chép, khóa tra cứu kích cỡ);
+    biến khóa tra cứu ô nhớ = thực thi các byte ô nhớ(khóa tra cứu sao chép);
+    nếu (hợp lệ == 0) {
+        hợp lệ = thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, thực thi nội dung đệm(khóa tra cứu ô nhớ), khóa tra cứu kích cỡ);
+    };
+    nếu (hợp lệ == 0) {
+        máy ghi số nguyên ba mươi hai bit(32 + khóa tra cứu ô nhớ * 32, khóa tra cứu kích cỡ);
+        máy ghi byte(thực thi nội dung đệm(khóa tra cứu ô nhớ) + khóa tra cứu kích cỡ, 0);
+        nếu (thực thi các byte bằng nhau(khóa tra cứu sao chép, khóa tra cứu) != 1) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (thực thi các byte dự trữ(dữ liệu đầu vào, nội dung đệm kích cỡ) != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        biến dữ liệu đầu vào ô nhớ = thực thi các byte ô nhớ(dữ liệu đầu vào);
+        nếu (thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, thực thi nội dung đệm(dữ liệu đầu vào ô nhớ), nội dung đệm kích cỡ) != 0) {
+            hợp lệ = -1;
+        } hoặc {
+            máy ghi byte(thực thi nội dung đệm(dữ liệu đầu vào ô nhớ) + nội dung đệm kích cỡ, 0);
+            máy ghi số nguyên ba mươi hai bit(32 + dữ liệu đầu vào ô nhớ * 32, nội dung đệm kích cỡ);
+        };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (thực thi đọc lần thử lại(mã tệp mở, 3104, 1) != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (máy sha bắt đầu() != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (máy sha nạp(3200, 16) != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (máy sha nạp(thực thi nội dung đệm(khóa tra cứu ô nhớ), khóa tra cứu kích cỡ) != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (máy sha nạp(thực thi nội dung đệm(thực thi các byte ô nhớ(dữ liệu đầu vào)), nội dung đệm kích cỡ) != 0) {
+            hợp lệ = -1;
+        };
+    };
+    nếu (hợp lệ == 0) {
+        nếu (máy sha kết(3376) != 0) { hợp lệ = -1; };
+    };
+    nếu (hợp lệ == 0) {
+        lặp (i = 0; i < 32; i++) {
+            nếu (máy đọc byte(3376 + i) != máy đọc byte(3216 + i)) {
+                hợp lệ = -1; thoát;
+            };
+        };
+    };
+    thực thi các byte giải phóng(khóa tra cứu sao chép);
+    nếu (hợp lệ == 0) { trả về 1; };
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm bộ đếm(độ lệch) {
+    biến cũ = máy đọc số nguyên ba mươi hai bit(độ lệch);
+    nếu (cũ >= 2147483647) { trả về 0; };
+    trả về máy ghi số nguyên ba mươi hai bit(độ lệch, cũ + 1);
+};
+
+hàm thực thi bộ nhớ đệm đọc(khóa tra cứu, dữ liệu đầu vào) {
+    nếu (khóa tra cứu == dữ liệu đầu vào) { trả về -1; };
+    nếu (thực thi các byte ô nhớ(khóa tra cứu) < 0) { trả về -1; };
+    nếu (thực thi các byte ô nhớ(dữ liệu đầu vào) < 0) { trả về -1; };
+    nếu (thực thi các byte chiều dài(khóa tra cứu) <= 0) { trả về -1; };
+    thực thi các byte làm rỗng(dữ liệu đầu vào);
+    biến đường tệp = thực thi bộ nhớ đệm đường tệp(khóa tra cứu);
+    nếu (đường tệp <= 0) { trả về 0; };
+    thực thi bộ nhớ đệm bộ đếm(3820);
+    biến mã tệp mở = máy mở(thực thi nội dung đệm(thực thi các byte ô nhớ(đường tệp)), 260);
+    thực thi các byte giải phóng(đường tệp);
+    nếu (mã tệp mở < 0) { trả về 0; };
+    biến trúng = 0;
+    nếu (máy thông tin tệp mở(mã tệp mở, 3376) == 0) {
+        nếu (thực thi liên kết thông tin tệp thông thường(3376) == 1) {
+            biến kích cỡ = máy đọc số nguyên ba mươi hai bit(3472);
+            biến cao = máy đọc số nguyên ba mươi hai bit(3476);
+            nếu (cao == 0) {
+                nếu (kích cỡ >= 48) {
+                    trúng = thực thi bộ nhớ đệm bản ghi dữ liệu đọc(mã tệp mở, khóa tra cứu, dữ liệu đầu vào, kích cỡ);
+                };
+            };
+        };
+    };
+    nếu (máy đóng(mã tệp mở) != 0) { trúng = 0; };
+    nếu (trúng == 1) {
+        thực thi bộ nhớ đệm bộ đếm(3816);
+        máy ghi số nguyên ba mươi hai bit(3820, máy đọc số nguyên ba mươi hai bit(3820) - 1);
+        trả về 1;
+    };
+    thực thi các byte làm rỗng(dữ liệu đầu vào);
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm ghi(khóa tra cứu, dữ liệu đầu vào) {
+    nếu (khóa tra cứu == dữ liệu đầu vào) { trả về -1; };
+    nếu (thực thi các byte ô nhớ(khóa tra cứu) < 0) { trả về -1; };
+    nếu (thực thi các byte ô nhớ(dữ liệu đầu vào) < 0) { trả về -1; };
+    nếu (thực thi các byte chiều dài(khóa tra cứu) <= 0) { trả về -1; };
+    biến đường tệp = thực thi bộ nhớ đệm đường tệp(khóa tra cứu);
+    nếu (đường tệp <= 0) { trả về -1; };
+    nếu (thực thi bộ nhớ đệm phần đầu ghi(khóa tra cứu, dữ liệu đầu vào) != 0) {
+        thực thi các byte giải phóng(đường tệp); trả về -1;
+    };
+    biến đạt = máy sha bắt đầu();
+    nếu (đạt == 0) { đạt = máy sha nạp(3200, 16); };
+    nếu (đạt == 0) { đạt = máy sha nạp(thực thi nội dung đệm(thực thi các byte ô nhớ(khóa tra cứu)), thực thi các byte chiều dài(khóa tra cứu)); };
+    nếu (đạt == 0) { đạt = máy sha nạp(thực thi nội dung đệm(thực thi các byte ô nhớ(dữ liệu đầu vào)), thực thi các byte chiều dài(dữ liệu đầu vào)); };
+    nếu (đạt == 0) { đạt = máy sha kết(3216); };
+    nếu (đạt != 0) { thực thi các byte giải phóng(đường tệp); trả về -1; };
+    biến tạm thời = thực thi các byte mới();
+    nếu (tạm thời <= 0) { thực thi các byte giải phóng(đường tệp); trả về -1; };
+    đạt = thực thi các byte nối(tạm thời, đường tệp);
+    nếu (đạt == 0) { đạt = thực thi liên kết thêm cuối văn bản(tạm thời, ".XXXXXX"); };
+    biến mã tệp mở = -1;
+    nếu (đạt == 0) { mã tệp mở = thực thi liên kết tạm mở(tạm thời); };
+    nếu (mã tệp mở < 0) { đạt = -1; };
+    nếu (đạt == 0) {
+        nếu (thực thi ghi tất cả(mã tệp mở, 3200, 48) != 48) { đạt = -1; };
+    };
+    nếu (đạt == 0) {
+        nếu (thực thi ghi tất cả(mã tệp mở, thực thi nội dung đệm(thực thi các byte ô nhớ(khóa tra cứu)), thực thi các byte chiều dài(khóa tra cứu)) != thực thi các byte chiều dài(khóa tra cứu)) {
+            đạt = -1;
+        };
+    };
+    nếu (đạt == 0) {
+        nếu (thực thi ghi tất cả(mã tệp mở, thực thi nội dung đệm(thực thi các byte ô nhớ(dữ liệu đầu vào)), thực thi các byte chiều dài(dữ liệu đầu vào)) != thực thi các byte chiều dài(dữ liệu đầu vào)) {
+            đạt = -1;
+        };
+    };
+    nếu (mã tệp mở >= 0) {
+        nếu (máy đóng(mã tệp mở) != 0) { đạt = -1; };
+    };
+    nếu (đạt == 0) { đạt = thực thi liên kết công bố(tạm thời, đường tệp); };
+    nếu (đạt == 0) { thực thi bộ nhớ đệm bộ đếm(3824); };
+    nếu (đạt != 0) { máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(tạm thời))); };
+    thực thi các byte giải phóng(tạm thời);
+    thực thi các byte giải phóng(đường tệp);
+    nếu (đạt == 0) { trả về 0; };
+    trả về -1;
+};
+
+hàm thực thi bộ nhớ đệm thêm cuối số(văn bản, giá trị đang xét) {
+    biến số chia = 1;
+    lặp (i = 0; i < 10; i++) {
+        nếu (số chia > 214748364) { thoát; };
+        nếu (máy chia số nguyên ba mươi hai bit(giá trị đang xét, số chia) < 10) { thoát; };
+        số chia = số chia * 10;
+    };
+    biến dịch vụ tài nguyên = giá trị đang xét;
+    lặp (i = 0; số chia > 0; i++) {
+        biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
+        nếu (thực thi các byte thêm cuối(văn bản, chữ số đang xét + 48) != 0) { trả về -1; };
+        dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;
+        số chia = máy chia số nguyên ba mươi hai bit(số chia, 10);
+    };
+    trả về 0;
+};
+
+hàm thực thi bộ nhớ đệm báo cáo() {
+    biến cờ hiệu = thực thi bộ nhớ đệm giá trị môi trường("VPP_NATIVE_CACHE_STATS");
+    nếu (cờ hiệu <= 0) { trả về 0; };
+    biến một = "1";
+    biến đã bật = thực thi các byte bằng nhau(cờ hiệu, một);
+    thực thi các byte giải phóng(một);
+    thực thi các byte giải phóng(cờ hiệu);
+    nếu (đã bật != 1) { trả về 0; };
+    biến kết xuất = "native cache: hits=";
+    nếu (kết xuất <= 0) { trả về -1; };
+    thực thi bộ nhớ đệm thêm cuối số(kết xuất, máy đọc số nguyên ba mươi hai bit(3816));
+    thực thi liên kết thêm cuối văn bản(kết xuất, " misses=");
+    thực thi bộ nhớ đệm thêm cuối số(kết xuất, máy đọc số nguyên ba mươi hai bit(3820));
+    thực thi liên kết thêm cuối văn bản(kết xuất, " writes=");
+    thực thi bộ nhớ đệm thêm cuối số(kết xuất, máy đọc số nguyên ba mươi hai bit(3824));
+    thực thi các byte thêm cuối(kết xuất, 10);
+    thực thi ghi tất cả(2, thực thi nội dung đệm(thực thi các byte ô nhớ(kết xuất)), thực thi các byte chiều dài(kết xuất));
+    thực thi các byte giải phóng(kết xuất);
+    trả về 0;
+};

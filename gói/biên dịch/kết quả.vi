@@ -9,6 +9,7 @@ hàm công khai biên dịch snapshot lỗi(lỗi) {
         "hợp lệ": 0,
         "lỗi": lỗi,
         "token": 0,
+        "từ tố": 0,
         "ký hiệu": 0,
         "phạm vi": 0,
         "tham chiếu": 0,
@@ -22,7 +23,7 @@ hàm công khai biên dịch snapshot lỗi(lỗi) {
 };
 
 hàm công khai biên dịch chuẩn hóa gốc(gốc) {
-    nếu (loai_cua(gốc) != "chuỗi") {
+    nếu (loại của(gốc) != "chuỗi") {
         ném "biên dịch: gốc phải là chuỗi";
     };
     nếu (gốc == "") {
@@ -32,34 +33,35 @@ hàm công khai biên dịch chuẩn hóa gốc(gốc) {
 };
 
 hàm công khai biên dịch snapshot nội bộ(mã nguồn, gốc = ".") {
-    nếu (loai_cua(mã nguồn) != "chuỗi") {
+    nếu (loại của(mã nguồn) != "chuỗi") {
         ném "biên dịch: mã nguồn phải là chuỗi";
     };
     gốc = biên dịch chuẩn hóa gốc(gốc);
     thô = rỗng;
     thử {
-        thô = bien_dich_phan_tich_vm(mã nguồn, gốc);
+        thô = biên dịch phân tích máy ảo(mã nguồn, gốc);
     } bắt lỗi (e) {
         trả về biên dịch snapshot lỗi(e);
     };
-    các_hàm = [];
-    lặp(i = 0; i < độ dài(thô[9]); i++) {
+    các hàm = [];
+    lặp(i = 0; i < máy ảo lấy độ dài(thô[9]); i++) {
         h = thô[9][i];
-        thêm(các_hàm, {"tên": h[0], "id": h[1],
-                        "bytecode": biên dịch bytecode từ thô(h[2])});
+        máy ảo thêm cuối danh sách(các hàm, {"tên": h[0], "id": h[1],
+                        "bytecode": biên dịch mã trung gian từ thô(h[2])});
     };
     trả về {
         "hợp lệ": 1,
         "lỗi": "",
         "token": thô[0],
+        "từ tố": thô[0],
         "ký hiệu": thô[1],
         "phạm vi": thô[2],
         "tham chiếu": thô[3],
         "lệnh": thô[4],
         "vùng ir chưa trực tiếp": thô[5],
         "mô đun": thô[6],
-        "bytecode": biên dịch bytecode từ thô(thô[7]),
-        "hàm": các_hàm,
+        "bytecode": biên dịch mã trung gian từ thô(thô[7]),
+        "hàm": các hàm,
         "cây cú pháp": biên dịch cây từ thô(thô[8])
     };
 };
