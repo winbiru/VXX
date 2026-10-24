@@ -81,18 +81,18 @@ function(expect_native_rejection name code diagnostic)
     endif()
 endfunction()
 
-foreach(name IN ITEMS byte_đẩy_i32 byte_đọc_i32 byte_ghi_i32
+foreach(name IN ITEMS "byte đẩy số nguyên ba mươi hai bit" "byte đọc số nguyên ba mươi hai bit" "byte ghi số nguyên ba mươi hai bit"
                       vpp_native_bytes_push_i32 vpp_native_bytes_load_i32
                       vpp_native_bytes_store_i32)
     expect_native_rejection("reserved-${name}"
         "hàm ${name}() { trả về 0; }; hàm chính() { trả về 0; };" "dành riêng")
 endforeach()
 expect_native_rejection("bad-parser-arity"
-    "hàm chính() { trả về byte_ghi_i32(1, 2); };" "sai số đối số")
+    "hàm chính() { trả về byte ghi số nguyên ba mươi hai bit(1, 2); };" "sai số đối số")
 if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
     expect_native_rejection("reserved-máy_chia_i32"
-        "hàm máy_chia_i32() { trả về 0; }; hàm chính() { trả về 0; };" "dành riêng")
+        "hàm máy chia số nguyên ba mươi hai bit() { trả về 0; }; hàm chính() { trả về 0; };" "dành riêng")
     expect_native_rejection("bad-native-div-arity"
-        "hàm chính() { trả về máy_chia_i32(52); };" "sai số đối số")
+        "hàm chính() { trả về máy chia số nguyên ba mươi hai bit(52); };" "sai số đối số")
 endif()
 message(STATUS "V++ native tokenizer + parser + semantic/i32 IR: PASS")

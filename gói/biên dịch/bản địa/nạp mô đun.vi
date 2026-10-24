@@ -49,6 +49,27 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
             nếu (byte thêm(con, byte lấy(nguồn văn bản, i)) != 0) { trả về -1; };
         };
         con trỏ hiện tại = con trỏ hiện tại + 1;
+        // Lexer tách hậu tố thuần số thành token riêng (ví dụ "x86 64").
+        // Cho phép hậu tố ấy trong tên mô-đun, giữ nguyên khoảng trắng trong tên tệp.
+        lặp (s = 0; s < từ tố số phần tử(các từ tố); s++) {
+            nếu (từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 2) != 2) { thoát; };
+            biến đầu số = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
+            biến cuối số = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
+            nếu (đầu số <= điểm kết thúc) { trả về -1; };
+            lặp (i = điểm kết thúc; i < đầu số; i++) {
+                biến khoảng trắng = byte lấy(nguồn văn bản, i);
+                nếu (khoảng trắng != 32) { nếu (khoảng trắng != 9) { trả về -1; }; };
+                nếu (byte thêm(con, khoảng trắng) != 0) { trả về -1; };
+            };
+            lặp (i = đầu số; i < cuối số; i++) {
+                biến chữ số = byte lấy(nguồn văn bản, i);
+                nếu (chữ số < 48) { trả về -1; };
+                nếu (chữ số > 57) { trả về -1; };
+                nếu (byte thêm(con, chữ số) != 0) { trả về -1; };
+            };
+            điểm kết thúc = cuối số;
+            con trỏ hiện tại = con trỏ hiện tại + 1;
+        };
         nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ";") == 1) {
             biến hậu tố = ".vi";
             biến mã trạng thái = byte nối(con, hậu tố);

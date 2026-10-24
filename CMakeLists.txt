@@ -636,6 +636,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/raw-native-link-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_raw_object_link.cmake)
+        set_tests_properties(vpp-raw-object-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     endif()
     add_test(NAME vpp-raw-machine-cli-hardening
         COMMAND ${CMAKE_COMMAND}
@@ -643,6 +645,8 @@ if (BUILD_TESTS)
             "-DVPP_SOURCE=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_leaf.vi"
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/raw-machine-fixtures"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_raw_machine_cli.cmake)
+    set_tests_properties(vpp-raw-machine-cli-hardening PROPERTIES
+        ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     add_test(NAME vpp-raw-machine-vpp-parity
         COMMAND $<TARGET_FILE:vpp-cli>
             ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_leaf_vi.vi)
@@ -677,6 +681,8 @@ if (BUILD_TESTS)
             "-DVPP_CALL_SOURCE=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_calls.vi"
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-aarch64-vpp-parity"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_machine_vpp_parity.cmake)
+    set_tests_properties(vpp-native-machine-vpp-parity PROPERTIES
+        ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
     find_program(VPP_NATIVE_SMOKE_CC NAMES clang cc gcc)
     if (VPP_NATIVE_SMOKE_TARGET AND VPP_NATIVE_SMOKE_CC)
         # Runtime regressions share the native Stage 1 fixture with the
@@ -697,6 +703,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-native-link-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_control_flow_link.cmake)
+        set_tests_properties(vpp-native-control-flow-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         add_test(NAME vpp-native-calls-host-link
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -706,6 +714,8 @@ if (BUILD_TESTS)
                 "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/machine-native-calls-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_calls_link.cmake)
+        set_tests_properties(vpp-native-calls-host-link PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         add_test(NAME vpp-native-selfhost-host-link
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -958,6 +968,8 @@ if (BUILD_TESTS)
                 "-DVPP_GENERAL=${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_native_control_flow.vi"
                 "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/real-native-assembler-fixtures"
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_assembler.cmake)
+        set_tests_properties(vpp-native-real-assembler-smoke PROPERTIES
+            ENVIRONMENT "VPP_HOME=${CMAKE_SOURCE_DIR}")
         if (UNIX)
             add_test(NAME vpp-aot-platform-primitives-asm
                 COMMAND ${CMAKE_COMMAND} -E env

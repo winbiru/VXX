@@ -4,6 +4,8 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR)
     message(FATAL_ERROR "missing native compiler-driver test arguments")
 endif()
+# All Stage 1 and later invocations must resolve the installed V++ modules.
+set(ENV{VPP_HOME} "${VPP_ROOT}")
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/vpp-native-source.vi")
 set(module_entry "${VPP_ROOT}/gói/biên dịch/bản địa/bộ biên dịch.vi")
@@ -354,6 +356,25 @@ endif()
 execute_process(COMMAND "${module_program}" RESULT_VARIABLE status TIMEOUT 30)
 if (NOT status EQUAL 52)
     message(FATAL_ERROR "native nested/repeated module imports expected 52, got ${status}")
+endif()
+
+# Multiword module paths may end in a numeric token (x86 64, elf 64).
+file(WRITE "${module_dir}/sub/mã máy x86 64.vi"
+    "hàm nạp_x86() { trả về 27; };\n")
+file(WRITE "${module_dir}/sub/định dạng elf 64.vi"
+    "hàm nạp_elf() { trả về 25; };\n")
+file(WRITE "${module_dir}/numeric-suffix.vi"
+    "nhập sub/mã máy x86 64;\nnhập sub/định dạng elf 64;\nhàm chính() { trả về nạp_x86() + nạp_elf(); };\n")
+set(numeric_suffix_program "${module_dir}/numeric-suffix-exe")
+file(REMOVE "${numeric_suffix_program}")
+execute_process(COMMAND "${compiler}" build "${module_dir}/numeric-suffix.vi" -o "${numeric_suffix_program}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+if (NOT status EQUAL 0 OR NOT EXISTS "${numeric_suffix_program}")
+    message(FATAL_ERROR "native numeric-suffix module imports failed: ${status}\n${output}\n${errors}")
+endif()
+execute_process(COMMAND "${numeric_suffix_program}" RESULT_VARIABLE status TIMEOUT 30)
+if (NOT status EQUAL 52)
+    message(FATAL_ERROR "native numeric-suffix module imports expected 52, got ${status}")
 endif()
 
 # Cross-module native relocations must resolve in both directions, including

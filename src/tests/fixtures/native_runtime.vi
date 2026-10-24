@@ -84,6 +84,6 @@ hàm chính() {
     nếu (máy đối số byte(1, 0) != -1) { trả về 44; };
     nếu (máy đối số byte(2, 14) != -1) { trả về 45; };
     byte hủy(empty); byte hủy(utf8);
-    in số(-2147483648); in số(2147483647); in số(0);
+    in -2147483648; in (2147483647); in 0;
     trả về 52;
 };

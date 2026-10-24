@@ -25,7 +25,7 @@ if (NOT content STREQUAL "41")
     message(FATAL_ERROR "native byte-range fixture wrote unexpected bytes: ${content}")
 endif()
 file(WRITE "${VPP_OUTPUT_DIR}/bad-slice-arity.vi"
-    "hàm chính() { trả về byte_cắt(1, 0); };\n")
+    "hàm chính() { trả về byte cắt(1, 0); };\n")
 file(REMOVE "${VPP_OUTPUT_DIR}/bad-slice-arity")
 vpp_native_compile_command("${VPP_OUTPUT_DIR}/bad-slice-arity.vi"
     "${VPP_OUTPUT_DIR}/bad-slice-arity" compile_command)
@@ -36,7 +36,7 @@ if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/bad-slice-arity" OR
     (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "sai số đối số"))
     message(FATAL_ERROR "native slice arity must fail: ${status}\n${errors}")
 endif()
-foreach(name IN ITEMS byte_cắt byte_tìm byte_làm_rỗng
+foreach(name IN ITEMS "byte cắt" "byte tìm" "byte làm rỗng"
                       vpp_native_bytes_slice vpp_native_bytes_find vpp_native_bytes_clear)
     file(WRITE "${VPP_OUTPUT_DIR}/reserved.vi"
         "hàm ${name}() { trả về 0; }; hàm chính() { trả về 0; };\n")

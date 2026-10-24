@@ -90,7 +90,7 @@ hàm test_bad_ir() {
 
 hàm chính() {
     biến check = test_bad_ir();
-    nếu (check != 0) { in số(check); trả về check; };
+    nếu (check != 0) { in (check); trả về check; };
     biến source_path = "native-codegen-input.vi";
     biến source = byte mới();
     biến input = tệp mở đọc(source_path);
@@ -123,7 +123,7 @@ hàm chính() {
     byte hủy(ir);
     byte hủy(code);
     byte hủy(đối tượng);
-    in số(20261017);
+    in 20261017;
     trả về 0;
 };
 

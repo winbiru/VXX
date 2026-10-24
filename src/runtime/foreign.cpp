@@ -470,6 +470,15 @@ void closeForeignProcess(ForeignFileState::Process &process) noexcept {
 // argv and envp are transient contiguous C arrays owned until spawn returns.
 // V++ adds one argument/environment entry at a time; no shell interpretation.
 bool launchForeignProcess(ForeignFileState::Process &process) {
+    // Some emulated Linux hosts report a successful posix_spawnp for a
+    // missing explicit path, then exit the child with status 127. Reject
+    // inaccessible pathnames before spawning so start/error have the same
+    // contract across native and emulated hosts. Bare names still use PATH.
+    if (process.program.find('/') != std::string::npos &&
+        ::access(process.program.c_str(), X_OK) != 0) {
+        process.error = std::strerror(errno);
+        return false;
+    }
     int output[2] = {-1, -1};
     int errors[2] = {-1, -1};
     if (::pipe(output) != 0 || ::pipe(errors) != 0) {

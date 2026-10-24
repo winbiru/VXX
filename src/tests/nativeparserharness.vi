@@ -241,19 +241,19 @@ hàm test_parser_file() {
 
 hàm chính() {
     biến code = test_int_buffer();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_program();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_invalid();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_precedence();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_division_by_zero_ir();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_token_errors();
-    nếu (code != 0) { in số(code); trả về code; };
+    nếu (code != 0) { in (code); trả về code; };
     code = test_parser_file();
-    nếu (code != 0) { in số(code); trả về code; };
-    in số(20261017);
+    nếu (code != 0) { in (code); trả về code; };
+    in 20261017;
     trả về 0;
 };

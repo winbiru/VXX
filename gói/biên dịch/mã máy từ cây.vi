@@ -129,7 +129,6 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         nếu (tên == "máy sha kết") { trả về {"symbol": "vpp_native_sha_end", "arity": 1}; };
         nếu (tên == "máy báo cáo bộ nhớ đệm") { trả về {"symbol": "vpp_native_os_register_cache_report", "arity": 0}; };
         nếu (tên == "môi trường thực thi nguồn") { trả về {"symbol": "vpp_native_runtime_module_path", "arity": 0}; };
-        nếu (tên == "in số") { trả về {"symbol": "vpp_native_print_i32", "arity": 1}; };
         trả về rỗng;
     };
 

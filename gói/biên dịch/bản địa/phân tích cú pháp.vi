@@ -284,7 +284,6 @@ hàm phân tích bản địa mã định danh(nguồn văn bản, các từ t�
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đối số byte") == 1) { trả về 36; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy chia số nguyên ba mươi hai bit") == 1) { trả về 37; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "môi trường thực thi nguồn") == 1) { trả về 38; };
-    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "in số") == 1) { trả về 39; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "đọc số") == 1) { trả về 40; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "trạng thái đọc") == 1) { trả về 41; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "tệp đọc byte") == 1) { trả về 42; };
@@ -622,6 +621,15 @@ hàm phân tích vá vòng lặp(biểu diễn trung gian, điểm mở đầu, 
 };
 
 hàm phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    // Câu lệnh in thống nhất với frontend đầy đủ; mã định danh ABI 39
+    // chỉ dùng nội bộ cho thao tác in số nguyên i32.
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "in") == 1) {
+        nếu (phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ";") != 1) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 19, 1) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 17, -40) != 0) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 24, 0);
+    };
     nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "thoát") == 1) {
         biến cấp thoát lặp = byte đọc số nguyên ba mươi hai bit(trạng thái nội bộ, 12);
         nếu (cấp thoát lặp <= 0) { trả về -1; };

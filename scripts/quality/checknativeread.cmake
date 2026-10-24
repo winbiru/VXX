@@ -48,7 +48,7 @@ endforeach()
 
 # Bad arity and reserved symbols must be rejected before publishing output.
 file(WRITE "${VPP_OUTPUT_DIR}/wrong-arity.vi"
-    "hàm chính() { trả về đọc_số(12); };\n")
+    "hàm chính() { trả về đọc số(12); };\n")
 file(REMOVE "${VPP_OUTPUT_DIR}/bad-output")
 vpp_native_compile_command("${VPP_OUTPUT_DIR}/wrong-arity.vi"
     "${VPP_OUTPUT_DIR}/bad-output" compile_command)
@@ -60,7 +60,7 @@ if (status EQUAL 0 OR EXISTS "${VPP_OUTPUT_DIR}/bad-output" OR
     (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "không nhận đối số"))
     message(FATAL_ERROR "native input should reject wrong arity: ${status}\n${errors}")
 endif()
-foreach(symbol IN ITEMS đọc_số vpp_native_read_i32 vpp_native_read_status)
+foreach(symbol IN ITEMS "đọc số" vpp_native_read_i32 vpp_native_read_status)
     file(WRITE "${VPP_OUTPUT_DIR}/reserved-symbol.vi"
         "hàm ${symbol}() { trả về 0; }; hàm chính() { trả về 0; };\n")
     file(REMOVE "${VPP_OUTPUT_DIR}/bad-output")
