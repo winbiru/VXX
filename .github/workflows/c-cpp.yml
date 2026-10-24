@@ -434,13 +434,10 @@ jobs:
             "-DVPP_TARGET=$native_target"
           cmake --build "$smoke" --parallel 2
           ctest --test-dir "$smoke" --output-on-failure --no-tests=error
-          if [ "$native_target" = aarch64-apple-darwin ]; then
-            cmake "-DVPP_EXEC=$prefix/bin/vpp" \
-              "-DVPP_SOURCE=$PWD/src/tests/nativeaotprint.vi" \
-              "-DVPP_TARGET=$native_target" \
-              "-DVPP_HOME=$prefix" "-DVPP_OUTPUT_DIR=$smoke/aot-runtime" \
-              -P scripts/quality/checknativeprint.cmake
-          fi
+          # The installed-native-aot-bootstrap-three-stage test already
+          # compiles and runs nativeaotprint.vi with the self-hosted Stage 3
+          # compiler. The legacy --emit-exe-selfhost replay used another
+          # frontend, duplicated this smoke check and could time out in CI.
 
       - name: Run macOS full V++ regression suite
         # Installed smoke verifies full-language native Stage 1 -> Stage 2 -> Stage 3.

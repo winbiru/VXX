@@ -27,7 +27,7 @@ hàm công khai đóng gói ứng dụng(thư mục đích, tên, tệp chính, 
         "thư mục": thư mục đích,
         "tệp chính": tên chính,
         "tài nguyên": máy ảo lấy độ dài(tài nguyên),
-        "manifest": đường bản kê
+        "bản kê": đường bản kê
     };
 };
 
@@ -38,6 +38,6 @@ hàm công khai đóng gói ứng dụng zip(đường zip, thư mục đích, t
     lặp(i = 0; i < máy ảo lấy độ dài(tài nguyên); i++) {
         máy ảo thêm cuối danh sách(các tệp, đường dẫn nối(thư mục đích, đường dẫn tên(tài nguyên[i])));
     };
-    máy ảo thêm cuối danh sách(các tệp, lấy từ điển(kết quả, "manifest", ""));
+    máy ảo thêm cuối danh sách(các tệp, lấy từ điển(kết quả, "bản kê", ""));
     trả về gói tài nguyên tạo(đường zip, các tệp);
 };

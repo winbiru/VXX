@@ -440,7 +440,7 @@ lớp công khai Bộ Mã Hóa Tiện Ích {
         trả về kết quả;
     };
 
-    hàm công khai bit máy ảo lấy độ dài(tập) {
+    hàm công khai bit độ dài(tập) {
         các bit = mình.bit yêu cầu tập(tập);
         n = máy ảo lấy độ dài(các bit);
         nếu (n == 0) {
@@ -580,9 +580,9 @@ hàm công khai bit tiếp đặt(tập, từ chỉ mục) {
     trả về bộ chuyển tiếp.bit tiếp đặt(tập, từ chỉ mục);
 };
 
-hàm công khai bit máy ảo lấy độ dài(tập) {
+hàm công khai bit độ dài(tập) {
     bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
-    trả về bộ chuyển tiếp.bit máy ảo lấy độ dài(tập);
+    trả về bộ chuyển tiếp.bit độ dài(tập);
 };
 
 hàm công khai bit số bit(tập) {

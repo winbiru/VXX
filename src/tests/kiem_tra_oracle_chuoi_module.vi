@@ -21,8 +21,8 @@ hàm oracle kiểm thử chuỗi(root) {
     });
     in oracle["hợp lệ"] == 1;
     nếu (oracle["hợp lệ"] == 1) {
-        cũ = oracle["mã trung gian"];
-        mới_root = mới["mã trung gian"];
+        cũ = oracle["bytecode"];
+        mới_root = mới["bytecode"];
         đầu = [];
         nếu (độ dài(mới_root) >= độ dài(cũ)) {
             lặp(i = 0; i < độ dài(cũ); i++) { thêm(đầu, mới_root[i]); };
@@ -35,7 +35,7 @@ hàm oracle kiểm thử chuỗi(root) {
             lặp(i = 0; i < độ dài(hàm_cũ); i++) {
                 nếu (hàm_cũ[i]["id"] != hàm_mới[i]["id"] ||
                     hàm_cũ[i]["tên"] != hàm_mới[i]["tên chạy"] ||
-                    !khớp lệnh(hàm_cũ[i]["mã trung gian"], hàm_mới[i]["mã trung gian"])) {
+                    !khớp lệnh(hàm_cũ[i]["bytecode"], hàm_mới[i]["bytecode"])) {
                     đúng_hàm = sai;
                 };
             };

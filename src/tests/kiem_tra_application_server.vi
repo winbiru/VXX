@@ -3,7 +3,7 @@ nhập gói/ứng dụng/cầu nối/giao diện lập trình;
 hàm chính() {
     ứng dụng in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");
     in ứng dụng json tình trạng();
-    in ứng dụng json đăng nhập thành công("eyJhbGciOiJIUzUxMiJ9.demo-từ tố", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");
+    in ứng dụng json đăng nhập thành công("eyJhbGciOiJIUzUxMiJ9.demo-token", "eyJhbGciOiJIUzUxMiJ9.demo-refresh");
     in ứng dụng json thiếu từ tố("req-001");
     in ứng dụng json không hợp lệ từ tố("req-002");
     in ứng dụng json các người dùng("req-003", "[\"an\",\"binh\"]");

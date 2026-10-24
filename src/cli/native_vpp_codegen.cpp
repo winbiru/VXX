@@ -533,7 +533,16 @@ std::string executeVppSource(const std::string &source,
         "machine-bridge";
 #endif
     aot::compileExecutable(snapshot, executable, root);
+    if (profile) {
+        std::cerr << "native Stage 0 ASM/link: "
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - afterFrontend).count()
+                  << " ms\n";
+    }
     const auto result = aot::runProcess({executable.u8string()});
+    if (profile) {
+        std::cerr << "native Stage 0 bridge exit: " << result.status << '\n';
+    }
     // Native wrappers emit newline-delimited text records. The Windows CRT
     // writes CRLF to stdout, while the target parser and machine/object
     // decoders consume LF records. Normalize at the bridge boundary so a

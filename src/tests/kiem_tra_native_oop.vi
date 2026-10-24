@@ -28,7 +28,7 @@ hàm chính() {
             biên dịch mã máy lệnh("Return", 0, 0, 1), biên dịch mã máy lệnh("Trap")]};
     phát = linux.hàm máy(hàm_ir);
     trực_tiếp = biên dịch mã máy hàm("x86_64", hàm_ir);
-    so byte OOP(phát["các byte"], trực_tiếp["các byte"]);
+    so byte OOP(phát["bytes"], trực_tiếp["bytes"]);
     khẳng định bằng(độ dài(phát["relocations"]), 0);
     hành_động = hàm() { linux.đối tượng(mã, "ký hiệu sai"); };
     khẳng định ném lỗi(hành_động);

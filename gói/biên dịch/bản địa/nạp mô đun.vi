@@ -38,7 +38,7 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
         nếu (byte lấy(đường tệp, i) == 47) { cuối cùng dấu gạch chéo = i; };
     };
     lặp (i = 0; i <= cuối cùng dấu gạch chéo; i++) {
-        nếu (byte máy ảo thêm cuối danh sách(con, byte lấy(đường tệp, i)) != 0) { trả về -1; };
+        nếu (byte thêm(con, byte lấy(đường tệp, i)) != 0) { trả về -1; };
     };
     biến con trỏ hiện tại = điểm bắt đầu;
     lặp (n = 0; n < từ tố số phần tử(các từ tố); n++) {
@@ -46,7 +46,7 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
         biến đầu tiên = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
         biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
         lặp (i = đầu tiên; i < điểm kết thúc; i++) {
-            nếu (byte máy ảo thêm cuối danh sách(con, byte lấy(nguồn văn bản, i)) != 0) { trả về -1; };
+            nếu (byte thêm(con, byte lấy(nguồn văn bản, i)) != 0) { trả về -1; };
         };
         con trỏ hiện tại = con trỏ hiện tại + 1;
         nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ";") == 1) {
@@ -57,7 +57,7 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
             trả về con trỏ hiện tại + 1;
         };
         nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "/") != 1) { trả về -1; };
-        nếu (byte máy ảo thêm cuối danh sách(con, 47) != 0) { trả về -1; };
+        nếu (byte thêm(con, 47) != 0) { trả về -1; };
         con trỏ hiện tại = con trỏ hiện tại + 1;
     };
     trả về -1;
@@ -75,7 +75,7 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
     nếu (byte đẩy số nguyên ba mươi hai bit(bảng, byte dài(đường tệp)) != 0) { trả về -1; };
     nếu (byte đẩy số nguyên ba mươi hai bit(bảng, 1) != 0) { trả về -1; };
     lặp (i = 0; i < byte dài(đường tệp); i++) {
-        nếu (byte máy ảo thêm cuối danh sách(bảng, byte lấy(đường tệp, i)) != 0) { trả về -1; };
+        nếu (byte thêm(bảng, byte lấy(đường tệp, i)) != 0) { trả về -1; };
     };
     biến nguồn đầu vào = byte mới();
     biến các từ tố = byte mới();
@@ -111,7 +111,7 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
             nếu (byte đẩy số nguyên ba mươi hai bit(đã kết hợp, byte dài(nguồn đầu vào) - điểm bắt đầu) != 0) { mã trạng thái = -1; };
             nếu (mã trạng thái == 0) {
                 lặp (i = điểm bắt đầu; i < byte dài(nguồn đầu vào); i++) {
-                    nếu (byte máy ảo thêm cuối danh sách(đã kết hợp, byte lấy(nguồn đầu vào, i)) != 0) {
+                    nếu (byte thêm(đã kết hợp, byte lấy(nguồn đầu vào, i)) != 0) {
                         mã trạng thái = -1;
                         thoát;
                     };

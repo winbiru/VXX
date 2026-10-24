@@ -1,7 +1,7 @@
 // Standalone Linux x86-64 System V lowering for the validated i32 IR.
 // Internal V++ calls and C runtime calls share the SysV register/stack ABI.
 // CALL fixups point to the rel32 field (immediately after opcode E8).
-hàm sinh mã x86 byte(đầu ra, giá trị đang xét) { trả về byte máy ảo thêm cuối danh sách(đầu ra, giá trị đang xét); };
+hàm sinh mã x86 byte(đầu ra, giá trị đang xét) { trả về byte thêm(đầu ra, giá trị đang xét); };
 
 hàm sinh mã x86 hằng tức thời(đầu ra, giá trị đang xét) { trả về byte đẩy số nguyên ba mươi hai bit(đầu ra, giá trị đang xét); };
 

@@ -123,7 +123,7 @@ hàm chính() {
     a = máy.chạy(m, 4);
     d = a["đếm"];
     khẳng định bằng(d["0"], 4);
-    in "đặt lại-entangled-qubit: ok";
+    in "reset-entangled-qubit: ok";
     m = Mạch Lượng Tử(1);
     m.h(0);
     snapshot = m.các lệnh();

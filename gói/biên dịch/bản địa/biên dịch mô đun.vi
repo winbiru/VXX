@@ -13,7 +13,7 @@ hàm biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, ngu�
     nếu (chiều dài > byte dài(kho lưu trữ) - độ lệch - 4) { trả về -1; };
     nếu (byte làm rỗng(nguồn đầu vào) != 0) { trả về -1; };
     lặp (i = độ lệch + 4; i < độ lệch + 4 + chiều dài; i++) {
-        nếu (byte máy ảo thêm cuối danh sách(nguồn đầu vào, byte lấy(kho lưu trữ, i)) != 0) { trả về -1; };
+        nếu (byte thêm(nguồn đầu vào, byte lấy(kho lưu trữ, i)) != 0) { trả về -1; };
     };
     trả về độ lệch + 4 + chiều dài;
 };
@@ -47,7 +47,7 @@ hàm biên dịch mô đun thu thập đơn vị(nguồn văn bản, các từ t
             nếu (byte đẩy số nguyên ba mươi hai bit(sổ đăng ký, chiều dài) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(sổ đăng ký, số tham số) != 0) { trả về -1; };
             lặp (j = điểm bắt đầu; j < điểm kết thúc; j++) {
-                nếu (byte máy ảo thêm cuối danh sách(sổ đăng ký, byte lấy(nguồn văn bản, j)) != 0) { trả về -1; };
+                nếu (byte thêm(sổ đăng ký, byte lấy(nguồn văn bản, j)) != 0) { trả về -1; };
             };
             nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, i) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(các hàm, điểm bắt đầu) != 0) { trả về -1; };

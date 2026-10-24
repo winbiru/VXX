@@ -6,7 +6,7 @@ nhập gói/lõi/kịch bản;
 
 hàm escape cùng mã trung gian(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);
-    vi = biên dịch phát mã trung gian thuần(nguồn)["mã trung gian"];
+    vi = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["op"] != vi[i]["op"] ||

@@ -24,7 +24,7 @@ hàm so_lệnh(c, v, nhãn) {
 hàm so_oop(nguồn) {
     tự_chủ = biên dịch phát mã trung gian thuần(nguồn);
     chuẩn = biên dịch mã trung gian(nguồn);
-    khớp = so_lệnh(chuẩn, tự_chủ["mã trung gian"], "top");
+    khớp = so_lệnh(chuẩn, tự_chủ["bytecode"], "top");
     hàm_cpp = biên dịch mã trung gian hàm(nguồn);
     hàm_vi = tự_chủ["hàm"];
     nếu (độ dài(hàm_cpp) != độ dài(hàm_vi)) {
@@ -39,7 +39,7 @@ hàm so_oop(nguồn) {
             in hàm_vi[i]["tên"];
             khớp = sai;
         };
-        nếu (!so_lệnh(hàm_cpp[i]["mã trung gian"], hàm_vi[i]["mã trung gian"],
+        nếu (!so_lệnh(hàm_cpp[i]["bytecode"], hàm_vi[i]["bytecode"],
             "hàm " + thành chuỗi(i))) { khớp = sai; };
     };
     trả về khớp;

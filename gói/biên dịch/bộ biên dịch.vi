@@ -44,6 +44,7 @@ lớp công khai Bộ Biên Dịch {
         kết quả = mình.phân tích();
         trả về {
             "token": lấy từ điển(kết quả, "token", 0),
+            "từ tố": lấy từ điển(kết quả, "token", 0),
             "ký hiệu": lấy từ điển(kết quả, "ký hiệu", 0),
             "phạm vi": lấy từ điển(kết quả, "phạm vi", 0),
             "tham chiếu": lấy từ điển(kết quả, "tham chiếu", 0),

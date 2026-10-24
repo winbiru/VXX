@@ -12,7 +12,7 @@ hàm native in byte(kiến_trúc, hệ_điều_hành, tên, tham_số, slot, sâ
         "parameterCount": tham_số, "slotCount": slot,
         "maxStackDepth": sâu_nhất, "instructions": lệnh
     }, hệ_điều_hành);
-    byte = kết_quả["các byte"];
+    byte = kết_quả["bytes"];
     bảng = "0123456789abcdef";
     hex = "";
     lặp (i = 0; i < độ dài(byte); i++) {
@@ -125,7 +125,7 @@ hàm chính() {
         ném "AArch64 CALL: sai relocation của hàm bon";
     };
     offset = tái_định_vị[0]["offset"];
-    byte = kết_quả["các byte"];
+    byte = kết_quả["bytes"];
     nếu (offset < 0 || offset + 4 > độ dài(byte) ||
         byte[offset] != 0 || byte[offset + 1] != 0 ||
         byte[offset + 2] != 0 || byte[offset + 3] != 148) {

@@ -7,13 +7,13 @@ lớp công khai Bộ Nối Văn Bản {
     };
 
     hàm công khai thêm(giá trị) {
-        bộ nối máy ảo thêm cuối danh sách(mình.bộ, giá trị);
+        bộ nối thêm(mình.bộ, giá trị);
         trả về mình;
     };
 
     hàm công khai số phần() { trả về bộ nối số phần(mình.bộ); };
     hàm công khai kết quả() { trả về bộ nối kết quả(mình.bộ); };
-    hàm công khai độ dài() { trả về bộ nối máy ảo lấy độ dài(mình.bộ); };
+    hàm công khai độ dài() { trả về bộ nối độ dài(mình.bộ); };
 
     hàm công khai gộp(nguồn) {
         bộ nối gộp(mình.bộ, nguồn.bộ gốc());
@@ -27,7 +27,7 @@ lớp công khai Bộ Nối Văn Bản {
             lấy từ điển(gốc dữ liệu, "tiền tố", ""), lấy từ điển(gốc dữ liệu, "hậu tố", ""),
             lấy từ điển(gốc dữ liệu, "giá trị rỗng", rỗng));
         các phần = bộ nối yêu cầu(gốc dữ liệu);
-        lặp(i = 0; i < bộ nối số phần(gốc dữ liệu); i++) { bộ nối máy ảo thêm cuối danh sách(bản sao, các phần[i]); };
+        lặp(i = 0; i < bộ nối số phần(gốc dữ liệu); i++) { bộ nối thêm(bản sao, các phần[i]); };
         trả về bản sao;
     };
 };

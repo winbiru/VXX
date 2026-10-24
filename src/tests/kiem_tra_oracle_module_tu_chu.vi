@@ -34,7 +34,7 @@ hàm oracle hàm khớp(cũ, mới) {
     lặp(i = 0; i < độ dài(cũ); i++) {
         nếu (cũ[i]["id"] != mới[i]["id"] ||
             cũ[i]["tên"] != mới[i]["tên chạy"] ||
-            !oracle mã trung gian khớp(cũ[i]["mã trung gian"], mới[i]["mã trung gian"])) {
+            !oracle mã trung gian khớp(cũ[i]["bytecode"], mới[i]["bytecode"])) {
             trả về sai;
         };
     };
@@ -52,7 +52,7 @@ hàm oracle chạy ca(nguồn_gốc) {
     });
     in oracle["hợp lệ"] == 1;
     nếu (oracle["hợp lệ"] == 1) {
-        in oracle root khớp(oracle["mã trung gian"], vpp["mã trung gian"]);
+        in oracle root khớp(oracle["bytecode"], vpp["bytecode"]);
         in oracle hàm khớp(oracle["hàm"], vpp["hàm"]);
     } hoặc {
         in sai;

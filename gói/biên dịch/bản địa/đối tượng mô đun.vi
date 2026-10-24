@@ -15,7 +15,7 @@ hàm đối tượng mô đun chương trình con tên định danh(sổ đăng 
         nếu (số phần tử == mã định danh) {
             biến tên định danh = "_vpp_fn_";
             lặp (i = độ lệch + 8; i < độ lệch + 8 + kích cỡ; i++) {
-                nếu (byte máy ảo thêm cuối danh sách(tên định danh, byte lấy(sổ đăng ký, i)) != 0) {
+                nếu (byte thêm(tên định danh, byte lấy(sổ đăng ký, i)) != 0) {
                     byte hủy(tên định danh);
                     trả về -1;
                 };
@@ -42,14 +42,14 @@ hàm đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các c
     biến điểm bắt đầu = byte dài(các chuỗi);
     biến mã trạng thái = 0;
     nếu (byte nối(các chuỗi, tên định danh) != 0) { mã trạng thái = -1; };
-    nếu (byte máy ảo thêm cuối danh sách(các chuỗi, 0) != 0) { mã trạng thái = -1; };
+    nếu (byte thêm(các chuỗi, 0) != 0) { mã trạng thái = -1; };
     nếu (đối tượng i32(các mục ký hiệu, điểm bắt đầu) != 0) { mã trạng thái = -1; };
     biến loại từ tố = 1;
     nếu (là đã định nghĩa == 1) { loại từ tố = 15; };
-    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, loại từ tố) != 0) { mã trạng thái = -1; };
-    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, là đã định nghĩa) != 0) { mã trạng thái = -1; };
-    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
-    nếu (byte máy ảo thêm cuối danh sách(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
+    nếu (byte thêm(các mục ký hiệu, loại từ tố) != 0) { mã trạng thái = -1; };
+    nếu (byte thêm(các mục ký hiệu, là đã định nghĩa) != 0) { mã trạng thái = -1; };
+    nếu (byte thêm(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
+    nếu (byte thêm(các mục ký hiệu, 0) != 0) { mã trạng thái = -1; };
     nếu (đối tượng u64(các mục ký hiệu, giá trị đang xét) != 0) { mã trạng thái = -1; };
     byte hủy(tên định danh);
     trả về mã trạng thái;
@@ -100,7 +100,7 @@ hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các đi
     nếu (các chuỗi <= 0) { mã trạng thái = -1; };
     nếu (các mục tái định vị <= 0) { mã trạng thái = -1; };
     nếu (mã trạng thái == 0) {
-        nếu (byte máy ảo thêm cuối danh sách(các chuỗi, 0) != 0) { mã trạng thái = -1; };
+        nếu (byte thêm(các chuỗi, 0) != 0) { mã trạng thái = -1; };
         lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
             biến tên định danh = đối tượng mô đun chương trình con tên định danh(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh);
             biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);

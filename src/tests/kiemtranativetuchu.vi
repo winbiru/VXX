@@ -23,16 +23,16 @@ hàm chính() {
     xác nhận(độ dài(ir["functions"]) == 2, "tạo IR cho hai hàm");
     xác nhận(độ dài(ir["values"]) > 10, "phân tích biểu thức native");
     mac = biên dịch bản địa đối tượng tự chủ(nguồn, "sum", "aarch64", "macos", "darwin");
-    xác nhận(độ dài(mac["các byte"]) > 20, "phát mã AArch64");
+    xác nhận(độ dài(mac["bytes"]) > 20, "phát mã AArch64");
     xác nhận(độ dài(mac["relocations"]) == 1, "relocation AArch64");
     xác nhận(mac["relocations"][0]["symbol"] == "twice", "đích gọi AArch64");
-    xác nhận(độ dài(mac["đối tượng"]) > độ dài(mac["các byte"]), "Mach-O đối tượng");
+    xác nhận(độ dài(mac["object"]) > độ dài(mac["bytes"]), "Mach-O đối tượng");
     linux = biên dịch bản địa đối tượng tự chủ(nguồn, "sum", "x86_64", "linux", "gnu");
-    xác nhận(độ dài(linux["các byte"]) > 20, "phát mã x86_64");
+    xác nhận(độ dài(linux["bytes"]) > 20, "phát mã x86_64");
     xác nhận(độ dài(linux["relocations"]) == 1, "relocation x86_64");
-    xác nhận(độ dài(linux["đối tượng"]) > độ dài(linux["các byte"]), "ELF đối tượng");
+    xác nhận(độ dài(linux["object"]) > độ dài(linux["bytes"]), "ELF đối tượng");
     win = biên dịch bản địa đối tượng tự chủ(nguồn, "sum", "x86_64", "windows", "msvc");
-    xác nhận(độ dài(win["đối tượng"]) > độ dài(win["các byte"]), "COFF đối tượng");
+    xác nhận(độ dài(win["object"]) > độ dài(win["bytes"]), "COFF đối tượng");
 
     // Parameter/local có tên trùng function ID phải có namespace riêng.
     che = "hàm item(x) { trả về x + 1; }; " +

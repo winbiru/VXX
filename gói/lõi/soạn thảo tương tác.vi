@@ -7,7 +7,7 @@ hàm công khai soạn thảo tạo() {
     trả về {"dòng": []};
 };
 
-hàm công khai soạn thảo máy ảo thêm cuối danh sách(bộ, dòng) {
+hàm công khai soạn thảo thêm(bộ, dòng) {
     danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
     máy ảo thêm cuối danh sách(danh sách đầu vào, dòng);
     trả về máy ảo lấy độ dài(danh sách đầu vào);
@@ -28,7 +28,7 @@ hàm công khai soạn thảo nội dung(bộ) {
     danh sách đầu vào = lấy từ điển(bộ, "dòng", []);
     nối = bộ nối chuỗi("\n");
     lặp(i = 0; i < máy ảo lấy độ dài(danh sách đầu vào); i++) {
-        bộ nối máy ảo thêm cuối danh sách(nối, danh sách đầu vào[i]);
+        bộ nối thêm(nối, danh sách đầu vào[i]);
     };
     trả về bộ nối kết quả(nối);
 };

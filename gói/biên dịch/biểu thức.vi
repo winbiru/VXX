@@ -41,8 +41,12 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     };
 
     hàm công khai biên dịch biểu thức chờ(p, cần) {
-        nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != cần) {
-            mình.biên dịch biểu thức lỗi(p, "cần '" + cần + "'");
+        nhận = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "");
+        nếu (nhận != cần) {
+            vị trí = p["vị trí"];
+            trước = "";
+            nếu (vị trí > 0) { trước = p["token"][vị trí - 1]["giá trị"]; };
+            mình.biên dịch biểu thức lỗi(p, "cần '" + cần + "' (gặp '" + nhận + "' sau '" + trước + "')");
         };
         mình.biên dịch biểu thức lấy(p);
         trả về đúng;

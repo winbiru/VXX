@@ -11,16 +11,16 @@ hàm elf mục ký hiệu(các ký hiệu, các chuỗi, đã trang trí, đã �
     biến độ lệch = byte dài(các chuỗi);
     biến mã trạng thái = 0;
     lặp (i = 1; i < chiều dài; i++) {
-        nếu (byte máy ảo thêm cuối danh sách(các chuỗi, byte lấy(đã trang trí, i)) != 0) { mã trạng thái = -1; thoát; };
+        nếu (byte thêm(các chuỗi, byte lấy(đã trang trí, i)) != 0) { mã trạng thái = -1; thoát; };
     };
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các chuỗi, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các chuỗi, 0); };
     nếu (mã trạng thái == 0) { mã trạng thái = đối tượng i32(các ký hiệu, độ lệch); };
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các ký hiệu, 18); }; // STB_GLOBAL | STT_FUNC
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các ký hiệu, 0); };  // st_other
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 18); }; // STB_GLOBAL | STT_FUNC
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 0); };  // st_other
     biến phân đoạn = 0;
     nếu (đã định nghĩa == 1) { phân đoạn = 1; };
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các ký hiệu, phân đoạn); };
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các ký hiệu, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, phân đoạn); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các ký hiệu, 0); };
     nếu (mã trạng thái == 0) { mã trạng thái = đối tượng u64(các ký hiệu, giá trị đang xét); };
     nếu (mã trạng thái == 0) { mã trạng thái = đối tượng u64(các ký hiệu, 0); }; // st_size
     byte hủy(đã trang trí);
@@ -52,7 +52,7 @@ hàm elf tên định danh(đầu ra, tên định danh) {
     biến mã trạng thái = byte nối(đầu ra, tên định danh);
     byte hủy(tên định danh);
     nếu (mã trạng thái != 0) { trả về -1; };
-    trả về byte máy ảo thêm cuối danh sách(đầu ra, 0);
+    trả về byte thêm(đầu ra, 0);
 };
 
 hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, bản địa các lời gọi) {
@@ -75,7 +75,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
     nếu (phân đoạn các tên định danh <= 0) { mã trạng thái = -1; };
     // ELF index 0 is mandatory STN_UNDEF. All other symbols are global.
     nếu (mã trạng thái == 0) { mã trạng thái = đối tượng đệm(các ký hiệu, 24); };
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(các chuỗi, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(các chuỗi, 0); };
     nếu (mã trạng thái == 0) {
         lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
             biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);
@@ -149,7 +149,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
     };
     // Section-name indexes: 1 .text, 7 .rela.text, 18 .symtab,
     // 26 .strtab, 34 .shstrtab.
-    nếu (mã trạng thái == 0) { mã trạng thái = byte máy ảo thêm cuối danh sách(phân đoạn các tên định danh, 0); };
+    nếu (mã trạng thái == 0) { mã trạng thái = byte thêm(phân đoạn các tên định danh, 0); };
     nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".text"); };
     nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".rela.text"); };
     nếu (mã trạng thái == 0) { mã trạng thái = elf tên định danh(phân đoạn các tên định danh, ".symtab"); };
@@ -167,24 +167,24 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
         nếu (các phần đầu độ lệch + 384 > 1048576) { mã trạng thái = -1; };
         nếu (mã trạng thái == 0) {
             đối tượng i32(đối tượng, 1179403647); // ELF magic, little endian
-            byte máy ảo thêm cuối danh sách(đối tượng, 2); // 64-bit
-            byte máy ảo thêm cuối danh sách(đối tượng, 1); // little-endian
-            byte máy ảo thêm cuối danh sách(đối tượng, 1); // current ELF version
-            byte máy ảo thêm cuối danh sách(đối tượng, 0); // SYSV
+            byte thêm(đối tượng, 2); // 64-bit
+            byte thêm(đối tượng, 1); // little-endian
+            byte thêm(đối tượng, 1); // current ELF version
+            byte thêm(đối tượng, 0); // SYSV
             đối tượng u64(đối tượng, 0); // remaining e_ident bytes
-            byte máy ảo thêm cuối danh sách(đối tượng, 1); byte máy ảo thêm cuối danh sách(đối tượng, 0); // ET_REL
-            byte máy ảo thêm cuối danh sách(đối tượng, 62); byte máy ảo thêm cuối danh sách(đối tượng, 0); // EM_X86_64
+            byte thêm(đối tượng, 1); byte thêm(đối tượng, 0); // ET_REL
+            byte thêm(đối tượng, 62); byte thêm(đối tượng, 0); // EM_X86_64
             đối tượng i32(đối tượng, 1); // EV_CURRENT
             đối tượng u64(đối tượng, 0); // entry
             đối tượng u64(đối tượng, 0); // program headers
             đối tượng u64(đối tượng, các phần đầu độ lệch);
             đối tượng i32(đối tượng, 0); // flags
-            byte máy ảo thêm cuối danh sách(đối tượng, 64); byte máy ảo thêm cuối danh sách(đối tượng, 0); // header size
-            byte máy ảo thêm cuối danh sách(đối tượng, 0); byte máy ảo thêm cuối danh sách(đối tượng, 0); // phentsize
-            byte máy ảo thêm cuối danh sách(đối tượng, 0); byte máy ảo thêm cuối danh sách(đối tượng, 0); // phnum
-            byte máy ảo thêm cuối danh sách(đối tượng, 64); byte máy ảo thêm cuối danh sách(đối tượng, 0); // shentsize
-            byte máy ảo thêm cuối danh sách(đối tượng, 6); byte máy ảo thêm cuối danh sách(đối tượng, 0); // shnum
-            byte máy ảo thêm cuối danh sách(đối tượng, 5); byte máy ảo thêm cuối danh sách(đối tượng, 0); // shstrndx
+            byte thêm(đối tượng, 64); byte thêm(đối tượng, 0); // header size
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // phentsize
+            byte thêm(đối tượng, 0); byte thêm(đối tượng, 0); // phnum
+            byte thêm(đối tượng, 64); byte thêm(đối tượng, 0); // shentsize
+            byte thêm(đối tượng, 6); byte thêm(đối tượng, 0); // shnum
+            byte thêm(đối tượng, 5); byte thêm(đối tượng, 0); // shstrndx
             nếu (byte dài(đối tượng) != 64) { mã trạng thái = -1; };
             nếu (byte nối(đối tượng, mã máy) != 0) { mã trạng thái = -1; };
             nếu (đối tượng đệm(đối tượng, tái định vị độ lệch) != 0) { mã trạng thái = -1; };

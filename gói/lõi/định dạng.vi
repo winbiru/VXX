@@ -334,7 +334,8 @@ hàm riêng tư định dạng tùy biến(giá trị, spec, ký hiệu) {
         "có rộng": lấy từ điển(spec, "có rộng", sai),
         "chính xác": lấy từ điển(spec, "chính xác", 0),
         "có chính xác": lấy từ điển(spec, "có chính xác", sai),
-        "locale": lấy từ điển(ký hiệu, "tên", "C")
+        "locale": lấy từ điển(ký hiệu, "tên", "C"),
+        "vùng ngôn ngữ": lấy từ điển(ký hiệu, "tên", "C")
     };
     văn bản = chương trình gọi lại(ngữ cảnh);
     nếu (loại của(văn bản) != "chuỗi") {
@@ -579,7 +580,7 @@ hàm công khai định dạng vào(đích, mẫu, các đối số, vùng ngôn
     };
     văn bản = định dạng(mẫu, các đối số, vùng ngôn ngữ);
     thử {
-        bộ dựng máy ảo thêm cuối danh sách(đích, văn bản);
+        bộ dựng thêm(đích, văn bản);
     } bắt lỗi (e) {
         nếu (e == "STRING_RESOURCE_LIMIT") {
             ném "FORMAT_RESOURCE_LIMIT";

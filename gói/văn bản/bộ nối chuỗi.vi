@@ -44,7 +44,7 @@ lớp công khai Bộ Nối Chuỗi {
         trả về các phần;
     };
 
-    hàm công khai bộ nối máy ảo thêm cuối danh sách(bộ, giá trị) {
+    hàm công khai bộ nối thêm(bộ, giá trị) {
         các phần = mình.bộ nối yêu cầu(bộ);
         máy ảo thêm cuối danh sách(các phần, thành chuỗi(giá trị));
         trả về bộ;
@@ -102,7 +102,7 @@ lớp công khai Bộ Nối Chuỗi {
     };
 
     // Độ dài observable của chuỗi kết quả theo Unicode code point.
-    hàm công khai bộ nối máy ảo lấy độ dài(bộ) {
+    hàm công khai bộ nối độ dài(bộ) {
         trả về máy ảo lấy độ dài(mình.bộ nối kết quả(bộ));
     };
 };
@@ -118,9 +118,9 @@ hàm công khai bộ nối yêu cầu(bộ) {
     trả về bộ chuyển tiếp.bộ nối yêu cầu(bộ);
 };
 
-hàm công khai bộ nối máy ảo thêm cuối danh sách(bộ, giá trị) {
+hàm công khai bộ nối thêm(bộ, giá trị) {
     bộ chuyển tiếp = Bộ Nối Chuỗi();
-    trả về bộ chuyển tiếp.bộ nối máy ảo thêm cuối danh sách(bộ, giá trị);
+    trả về bộ chuyển tiếp.bộ nối thêm(bộ, giá trị);
 };
 
 hàm công khai bộ nối số phần(bộ) {
@@ -138,8 +138,8 @@ hàm công khai bộ nối gộp(đích, nguồn) {
     trả về bộ chuyển tiếp.bộ nối gộp(đích, nguồn);
 };
 
-hàm công khai bộ nối máy ảo lấy độ dài(bộ) {
+hàm công khai bộ nối độ dài(bộ) {
     bộ chuyển tiếp = Bộ Nối Chuỗi();
-    trả về bộ chuyển tiếp.bộ nối máy ảo lấy độ dài(bộ);
+    trả về bộ chuyển tiếp.bộ nối độ dài(bộ);
 };
 nhập gói/lõi/chuyển kiểu;

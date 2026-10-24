@@ -30,38 +30,38 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/trình điều khiển.vi")
     # Stage 0 only needs code for the host ISA. Once bootstrapped, Stage 1
     # resolves the complete, unchanged native/*.vi library for Stage 2.
-    if (NOT stage0_linux AND (part MATCHES "/x86_64.vi$" OR
-                              part MATCHES "/elf64.vi$"))
+    if (NOT stage0_linux AND (part MATCHES "/mã máy x86 64\\.vi$" OR
+                              part MATCHES "/định dạng elf 64\\.vi$"))
         continue()
     endif()
     file(READ "${VPP_ROOT}/${part}" contents)
     if (stage0_linux)
-        if (part MATCHES "/codegen.vi$")
+        if (part MATCHES "/sinh mã\\.vi$")
             string(FIND "${contents}" "// MOVZ/MOVK W9" cut)
             if (cut LESS 0)
                 message(FATAL_ERROR "cannot trim ARM64 codegen for Linux Stage 0")
             endif()
             string(SUBSTRING "${contents}" 0 ${cut} contents)
-        elseif (part MATCHES "/program_codegen.vi$")
+        elseif (part MATCHES "/sinh mã chương trình\\.vi$")
             string(FIND "${contents}" "// Linux AMD64 uses rel32" cut)
             if (cut LESS 0)
                 message(FATAL_ERROR "cannot extract Linux program codegen")
             endif()
             string(SUBSTRING "${contents}" ${cut} -1 contents)
-        elseif (part MATCHES "/object.vi$")
+        elseif (part MATCHES "/đối tượng\\.vi$")
             string(FIND "${contents}" "// Returns byte length" cut)
             if (cut LESS 0)
                 message(FATAL_ERROR "cannot trim Mach-O object writer")
             endif()
             string(SUBSTRING "${contents}" 0 ${cut} contents)
-        elseif (part MATCHES "/module_object.vi$")
+        elseif (part MATCHES "/đối tượng mô đun\\.vi$")
             string(FIND "${contents}" "// Objects for empty function modules" cut)
             if (cut LESS 0)
                 message(FATAL_ERROR "cannot trim Mach-O module writer")
             endif()
             string(SUBSTRING "${contents}" 0 ${cut} contents)
         endif()
-    elseif (part MATCHES "/program_codegen.vi$")
+    elseif (part MATCHES "/sinh mã chương trình\\.vi$")
         string(FIND "${contents}" "// Linux AMD64 uses rel32" cut)
         if (cut LESS 0)
             message(FATAL_ERROR "cannot trim Linux program codegen for Darwin Stage 0")
@@ -83,6 +83,7 @@ if (NOT VPP_USE_PREPARED_COMPILER)
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "VPP_ENABLE_MACHINE_JIT=1"
         "VPP_NATIVE_STAGE0_PROFILE=1"
+        "VPP_NATIVE_PROFILE=1"
         "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
         "${source}" "${compiler}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
@@ -117,9 +118,9 @@ endfunction()
 
 run_native_case(program "hàm chính() { trả về 52; };" 52)
 run_native_case(entry-main-alias "hàm main() { trả về 52; };" 52)
-run_native_case(runtime-bytes "hàm chính() { biến b = byte_mới(); byte_thêm(b, 52); biến value = byte_lấy(b, 0); byte_hủy(b); trả về value; };" 52)
-run_native_case(runtime-string "hàm chính() { biến b = \"Hello\"; trả về byte_dài(b) + 47; };" 52)
-run_native_case(runtime-utf8 "hàm chính() { biến b = \"Tiếng Việt\"; trả về byte_dài(b) + 38; };" 52)
+run_native_case(runtime-bytes "hàm chính() { biến b = byte mới(); byte thêm(b, 52); biến value = byte lấy(b, 0); byte hủy(b); trả về value; };" 52)
+run_native_case(runtime-string "hàm chính() { biến b = \"Hello\"; trả về byte dài(b) + 47; };" 52)
+run_native_case(runtime-utf8 "hàm chính() { biến b = \"Tiếng Việt\"; trả về byte dài(b) + 38; };" 52)
 run_native_case(sub-order "hàm chính() { trả về 20 - (4 - 8); };" 24)
 run_native_case(nested "hàm chính() { biến a = 9; biến b = 2; biến c = 5; trả về (a - b) * (b + c) - 1; };" 48)
 run_native_case(logical-not "hàm chính() { biến x = -7; trả về 50 + !0 + !!x + !x + !!0; };" 52)
@@ -135,9 +136,9 @@ run_native_case(remainder-signed "hàm chính() { trả về -159 % 52; };" 253)
 run_native_case(divide-mod-compound "hàm chính() { biến x = -159; x /= -3; x %= 52; trả về x + 51; };" 52)
 run_native_case(divide-overflow "hàm chính() { nếu (-2147483648 / -1 == -2147483648) { trả về 52; }; trả về 1; };" 52)
 run_native_case(remainder-overflow "hàm chính() { nếu (-2147483648 % -1 == 0) { trả về 52; }; trả về 1; };" 52)
-run_native_case(intrinsic-divide-signed "hàm chính() { trả về máy_chia_i32(-156, -3); };" 52)
-run_native_case(intrinsic-divide-by-zero "hàm chính() { trả về máy_chia_i32(52, 0); };" 255)
-run_native_case(intrinsic-divide-overflow "hàm chính() { nếu (máy_chia_i32(-2147483648, -1) == -2147483648) { trả về 52; }; trả về 1; };" 52)
+run_native_case(intrinsic-divide-signed "hàm chính() { trả về máy chia số nguyên ba mươi hai bit(-156, -3); };" 52)
+run_native_case(intrinsic-divide-by-zero "hàm chính() { trả về máy chia số nguyên ba mươi hai bit(52, 0); };" 255)
+run_native_case(intrinsic-divide-overflow "hàm chính() { nếu (máy chia số nguyên ba mươi hai bit(-2147483648, -1) == -2147483648) { trả về 52; }; trả về 1; };" 52)
 run_native_case(min-int "hàm chính() { biến x = -2147483648; trả về -x + x + 31; };" 31)
 run_native_case(max-int "hàm chính() { biến x = 2147483647; trả về (x + 1) - (-2147483648) + 63; };" 63)
 run_native_case(wide-immediate "hàm chính() { biến x = 16777228; biến expected = 256 * 256 * 256 + 12; nếu (x == expected) { trả về 52; }; trả về 1; };" 52)
@@ -253,7 +254,7 @@ foreach(entry IN ITEMS "hàm chính() { trả về 1; }; hàm main() { trả v�
     endif()
 endforeach()
 file(WRITE "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi"
-    "hàm chính() { trả về byte_lấy(1); };\n")
+    "hàm chính() { trả về byte lấy(1); };\n")
 execute_process(COMMAND "${compiler}" build "${VPP_OUTPUT_DIR}/runtime-arity-invalid.vi" -o "${sentinel}"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}" RESULT_VARIABLE status TIMEOUT 30)
 file(READ "${sentinel}" content)
@@ -358,7 +359,7 @@ endif()
 # Cross-module native relocations must resolve in both directions, including
 # calls to a declaration in the importer that appears after the import.
 file(WRITE "${module_dir}/sub/forward.vi"
-    "hàm từ_phụ() { biến x = \"Tiếng Việt\"; biến n = byte_dài(x); byte_hủy(x); trả về từ_chính() + n - 14; };\n")
+    "hàm từ_phụ() { biến x = \"Tiếng Việt\"; biến n = byte dài(x); byte hủy(x); trả về từ_chính() + n - 14; };\n")
 file(WRITE "${module_dir}/forward.vi"
     "nhập sub/forward;\nhàm chính() { trả về từ_phụ(); };\nhàm từ_chính() { trả về 52; };\n")
 set(forward_program "${module_dir}/forward-exe")
@@ -476,7 +477,7 @@ message(STATUS "${parity_output}")
 # Probe all self-hosted generations; the high-word immediate catches instruction
 # encoding regressions, alongside UTF-8 bytes, calls and loop updates.
 set(bootstrap_probe "${VPP_OUTPUT_DIR}/native-bootstrap-probe.vi")
-file(WRITE "${bootstrap_probe}" "hàm chính() { biến x = 16777228; biến y = 256 * 256 * 256 + 12; nếu (x != y) { trả về 1; }; nếu (máy_chia_i32(-156, -3) != 52) { trả về 2; }; nếu (máy_chia_i32(-2147483648, -1) != -2147483648) { trả về 3; }; nếu (máy_chia_i32(52, 0) != -1) { trả về 4; }; nếu (-159 % 52 != -3) { trả về 5; }; biến s = \"Tiếng Việt\"; biến total = byte_dài(s) + 38; byte_hủy(s); lặp (i = 0; i < 3; i++) { total = total + 1; }; trả về total - 3; };\n")
+file(WRITE "${bootstrap_probe}" "hàm chính() { biến x = 16777228; biến y = 256 * 256 * 256 + 12; nếu (x != y) { trả về 1; }; nếu (máy chia số nguyên ba mươi hai bit(-156, -3) != 52) { trả về 2; }; nếu (máy chia số nguyên ba mươi hai bit(-2147483648, -1) != -2147483648) { trả về 3; }; nếu (máy chia số nguyên ba mươi hai bit(52, 0) != -1) { trả về 4; }; nếu (-159 % 52 != -3) { trả về 5; }; biến s = \"Tiếng Việt\"; biến total = byte dài(s) + 38; byte hủy(s); lặp (i = 0; i < 3; i++) { total = total + 1; }; trả về total - 3; };\n")
 foreach(generation IN ITEMS 2 3 4)
     set(generation_compiler "${stage${generation}}")
     set(probe_exe "${VPP_OUTPUT_DIR}/native-bootstrap-probe-stage${generation}")

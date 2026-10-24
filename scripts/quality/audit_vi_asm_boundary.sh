@@ -24,6 +24,20 @@ count_matches() {
     find "$root/gói" -type f -name '*.vi' -exec grep -h -E "$1" {} + | wc -l | tr -d '[:space:]'
 }
 
+# Inspect executable source lines, not comments. Machine primitives use the
+# Vietnamese identifiers of the current V++ ABI (including spaces); checking
+# the former underscore spellings silently broke the boundary audit.
+has_call() {
+    grep -E -v '^[[:space:]]*//' "$1" | grep -Fq "$2"
+}
+
+require_call() {
+    if ! has_call "$1" "$2"; then
+        printf 'FAIL: missing machine binding %s in %s\n' "$2" "$1" >&2
+        exit 1
+    fi
+}
+
 foreign_functions=$(count_matches '^[[:space:]]*ngoại hàm ')
 foreign_libraries=$(count_matches '^[[:space:]]*ngoại thư viện ')
 printf 'V++ foreign library declarations: %s\n' "$foreign_libraries"
@@ -43,51 +57,36 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$module"; then
     echo 'FAIL: Process FFI declarations were reintroduced' >&2
     exit 1
 fi
-for operation in tạo đối_số lệnh_windows môi_trường bắt_đầu thăm_dò đọc đợi lỗi đóng; do
-    if ! grep -q "máy_tiến_trình_${operation}(" "$module"; then
-        echo "FAIL: missing Process machine operation $operation" >&2
-        exit 1
-    fi
+for operation in tạo 'đối số' 'lệnh windows' 'môi trường' 'bắt đầu' 'thăm dò' đọc đợi lỗi đóng; do
+    require_call "$module" "máy tiến trình ${operation}("
 done
 for operation in mở tiếp đóng; do
-    if ! grep -q "máy_resolver_${operation}(" "$socket_module"; then
-        echo "FAIL: missing Resolver machine operation $operation" >&2
-        exit 1
-    fi
+    require_call "$socket_module" "máy bộ phân giải ${operation}("
 done
-for operation in nâng_cấp gửi nhận; do
-    if ! grep -q "máy_tls_${operation}(" "$socket_module"; then
-        echo "FAIL: missing TLS machine operation $operation" >&2
-        exit 1
-    fi
+for operation in 'nâng cấp' gửi nhận; do
+    require_call "$socket_module" "máy tls ${operation}("
 done
 if grep -E '^[[:space:]]*ngoại hàm socket_(loại|đóng|timeout|gửi|nhận|chấp_nhận|lắng_nghe|kết_nối)_ffi|^[[:space:]]*ngoại thư viện c_socket_posix' "$socket_module"; then
     echo 'FAIL: migrated socket FFI declarations were reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_socket_loại(mã socket)' "$socket_module" ||
-   ! grep -q 'máy_socket_đóng(mã socket)' "$socket_module" ||
-   ! grep -q 'máy_socket_timeout(mã socket, thời gian chờ)' "$socket_module" ||
-   ! grep -q 'máy_socket_gửi(mã socket, đệm, do_dai(đệm), 0)' "$socket_module" ||
-   ! grep -q 'máy_socket_nhận(mã socket, đệm, giới_hạn, 0)' "$socket_module" ||
-   ! grep -q 'máy_socket_chấp_nhận(mã socket lắng nghe)' "$socket_module" ||
-   ! grep -q 'máy_socket_lắng_nghe(cổng, backlog)' "$socket_module" ||
-   ! grep -q 'máy_socket_kết_nối(' "$socket_module"; then
-    echo 'FAIL: missing migrated socket machine operations' >&2
-    exit 1
-fi
+require_call "$socket_module" 'máy đầu nối loại(mã đầu nối)'
+require_call "$socket_module" 'máy đầu nối đóng(mã đầu nối)'
+require_call "$socket_module" 'máy đầu nối thời gian chờ(mã đầu nối, thời gian chờ)'
+require_call "$socket_module" 'máy đầu nối gửi(mã đầu nối, đệm, máy ảo lấy độ dài(đệm), 0)'
+require_call "$socket_module" 'máy đầu nối nhận(mã đầu nối, đệm, mức trần, 0)'
+require_call "$socket_module" 'máy đầu nối chấp nhận(mã đầu nối lắng nghe)'
+require_call "$socket_module" 'máy đầu nối lắng nghe(cổng, hàng đợi chờ)'
+require_call "$socket_module" 'máy đầu nối kết nối('
 if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$dns_wire_module"; then
     echo 'FAIL: DNS wire codec reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'máy_socket_kết_nối(' "$dns_module" ||
-   ! grep -q 'phân giải tên miền đọc phản hồi đầy đủ(' "$dns_module"; then
-    echo 'FAIL: DNS UDP V++ machine binding missing' >&2
-    exit 1
-fi
+require_call "$dns_module" 'máy đầu nối kết nối('
+require_call "$dns_module" 'phân giải tên miền đọc phản hồi đầy đủ('
 # Numeric IPv4/IPv6 literals should be parsed in V++ before invoking the
 # compatibility OS name resolver. Connect deadline uses the machine clock.
-if ! grep -q 'đầu nối địa chỉ mạng các byte(tên_máy)' "$socket_module" ||
+if ! has_call "$socket_module" 'đầu nối địa chỉ mạng các byte(tên máy)' ||
    ! grep -q 'machineMonotonicMilliseconds' "$root/src/runtime/socket_machine.cpp"; then
     echo 'FAIL: socket literal or monotonic machine boundary missing' >&2
     exit 1
@@ -96,9 +95,9 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$ip_module" "$hosts_modul
     echo 'FAIL: V++ IP parser or hosts reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'bộ.địa chỉ mạng các byte(ip)' "$socket_module" ||
-   ! grep -q 'bộ.địa chỉ mạng các byte(ip)' "$hosts_module" ||
-   ! grep -q 'hosts.phân giải tên miền đọc bảng tên máy(tên_máy, đường_hosts)' "$socket_module"; then
+if ! has_call "$socket_module" 'bộ.địa chỉ mạng các byte(địa chỉ mạng)' ||
+   ! has_call "$hosts_module" 'bộ.địa chỉ mạng các byte(địa chỉ mạng)' ||
+   ! has_call "$socket_module" 'bảng tên máy.phân giải tên miền đọc bảng tên máy(tên máy, đường bảng tên máy)' ; then
     echo 'FAIL: shared IP parser or V++ hosts socket resolver missing' >&2
     exit 1
 fi
@@ -106,8 +105,8 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) |nhập gói/mạng/ổ cắ
     echo 'FAIL: DNS config must use the shared V++ IP parser without Socket/FFI' >&2
     exit 1
 fi
-if ! grep -q 'nhập gói/mạng/địa chỉ mạng;' "$dns_config_module" ||
-   ! grep -q 'bộ.địa chỉ mạng các byte(địa_chỉ)' "$dns_config_module" ||
+if ! has_call "$dns_config_module" 'nhập gói/mạng/địa chỉ mạng;' ||
+   ! has_call "$dns_config_module" 'bộ.địa chỉ mạng các byte(địa chỉ)' ||
    ! grep -q 'VPP_SOCKET_VI_ONLY' "$socket_module"; then
     echo 'FAIL: DNS config parser or strict V++ socket resolver boundary missing' >&2
     exit 1
@@ -116,9 +115,9 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$dns_connect_module"; the
     echo 'FAIL: DNS socket connector reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'trả về phân giải tên miền phân giải(tên_máy)' "$dns_connect_module" ||
-   ! grep -q 'máy_socket_kết_nối(bytes, cổng, udp, thời_gian_chờ)' "$dns_connect_module" ||
-   ! grep -q 'máy_socket_đóng(mã)' "$dns_connect_module" ||
+if ! has_call "$dns_connect_module" 'trả về phân giải tên miền phân giải(tên máy)' ||
+   ! has_call "$dns_connect_module" 'máy đầu nối kết nối(các byte, cổng, giao vận gói tin, thời gian chờ)' ||
+   ! has_call "$dns_connect_module" 'máy đầu nối đóng(mã)' ||
    ! grep -q 'cần cấu hình DNS V++ hoặc tệp hosts' "$dns_connect_module"; then
     echo 'FAIL: native DNS-to-Socket V++ path or cleanup is missing' >&2
     exit 1
@@ -132,17 +131,14 @@ if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$directory_module"; then
     exit 1
 fi
 for operation in tạo xóa mở kế đóng; do
-    if ! grep -q "máy_thư_mục_$operation(" "$directory_module"; then
-        echo "FAIL: missing directory primitive $operation" >&2
-        exit 1
-    fi
+    require_call "$directory_module" "máy thư mục $operation("
 done
 if grep -E '^[[:space:]]*ngoại (hàm|thư viện) ' "$path_module"; then
     echo 'FAIL: path module reintroduced FFI' >&2
     exit 1
 fi
-if ! grep -q 'máy_đường_loại(đường, 1)' "$path_module" ||
-   ! grep -q 'máy_đường_loại(đường, 0)' "$path_module"; then
+if ! has_call "$path_module" 'máy đường loại(đường, 1)' ||
+   ! has_call "$path_module" 'máy đường loại(đường, 0)'; then
     echo 'FAIL: missing path machine primitive bindings' >&2
     exit 1
 fi
@@ -150,7 +146,7 @@ if grep -E 'ngoại hàm (ngủ_vi_giây_ffi|mã_errno_ffi|mã_eintr_ffi)' "$sle
     echo 'FAIL: migrated sleep FFI was reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_ngủ_mili_giây(cần_ngủ)' "$sleep_module"; then
+if ! has_call "$sleep_module" 'máy ngủ mili giây(cần ngủ)'; then
     echo 'FAIL: sleep module no longer calls the machine primitive' >&2
     exit 1
 fi
@@ -158,8 +154,8 @@ if grep -E 'ngoại hàm đọc_đồng_hồ_(đơn_điệu|utc)_ffi|ngoại th�
     echo 'FAIL: migrated clock FFI was reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_đồng_hồ_đơn_điệu()' "$mono_module" ||
-   ! grep -q 'máy_đồng_hồ_utc()' "$utc_module"; then
+if ! has_call "$mono_module" 'máy đồng hồ đơn điệu()' ||
+   ! has_call "$utc_module" 'máy đồng hồ giờ quốc tế()'; then
     echo 'FAIL: clock module no longer calls machine primitive' >&2
     exit 1
 fi
@@ -167,7 +163,7 @@ if grep -E 'ngoại hàm lấy_entropy_ffi|ngoại thư viện c_entropy' "$entr
     echo 'FAIL: entropy getentropy FFI was reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_entropy_bytes(số_đọc)' "$entropy_module"; then
+if ! has_call "$entropy_module" 'máy nguồn ngẫu nhiên các byte(số đọc)'; then
     echo 'FAIL: entropy module no longer calls machine primitive' >&2
     exit 1
 fi
@@ -175,7 +171,7 @@ if grep -E 'ngoại hàm getenv_hệ_thống_ffi|ngoại thư viện c_hệ_th�
     echo 'FAIL: environment getenv FFI was reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_môi_trường_đọc(tên)' "$environment_module"; then
+if ! has_call "$environment_module" 'máy môi trường đọc(tên)'; then
     echo 'FAIL: environment module no longer calls machine primitive' >&2
     exit 1
 fi
@@ -183,16 +179,13 @@ if grep -E 'ngoại hàm đổi_giờ_địa_phương_ffi|ngoại thư viện c_
     echo 'FAIL: localtime FFI was reintroduced' >&2
     exit 1
 fi
-if ! grep -q 'máy_đồng_hồ_địa_phương(giây_byte)' "$local_module"; then
+if ! has_call "$local_module" 'máy đồng hồ địa phương(giây byte)'; then
     echo 'FAIL: localtime no longer calls machine primitive' >&2
     exit 1
 fi
 
-for identity in pid ppid uid euid gid egid; do
-    if ! grep -q "máy_tiến_trình_${identity}()" "$module"; then
-        echo "FAIL: missing .vi machine call for $identity" >&2
-        exit 1
-    fi
+for identity in 'mã tiến trình' 'mã tiến trình cha' 'mã người dùng' 'mã người dùng hiệu lực' 'mã nhóm' 'mã nhóm hiệu lực'; do
+    require_call "$module" "máy tiến trình ${identity}()"
 done
 
 cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) | wc -l | tr -d '[:space:]')

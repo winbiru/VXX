@@ -15,7 +15,7 @@ lớp công khai UserService triển khai UserServiceContract {
         nếu (từ tố == "") {
             trả về "401|missing-từ tố";
         };
-        nếu (từ tố != "Bearer demo-từ tố") {
+        nếu (từ tố != "Bearer demo-token") {
             trả về "401|invalid-từ tố";
         };
         trả về "";

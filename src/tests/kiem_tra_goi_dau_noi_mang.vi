@@ -10,6 +10,7 @@ hàm chính() {
     in đầu nối đóng(tcp);
 
     udp = đầu nối giao vận gói tin mở("127.0.0.1", "9", 1000.0);
-    in đầu nối gửi(udp, "kiểm tra kết nối") == 4;
+    // UDP send trả về số byte UTF-8 đã gửi.
+    in đầu nối gửi(udp, "kiểm tra kết nối") == 22;
     in đầu nối đóng(udp);
 };

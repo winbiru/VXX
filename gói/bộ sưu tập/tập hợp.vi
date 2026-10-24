@@ -123,7 +123,7 @@ lớp công khai Tiện Ích Tập Hợp {
         trả về mình.tập con(aa, bb);
     };
 
-    hàm công khai tập máy ảo thêm cuối danh sách(danh sách đầu vào, giá trị) {
+    hàm công khai tập thêm(danh sách đầu vào, giá trị) {
         mình.tập yêu cầu danh sách(danh sách đầu vào);
         nếu (mình.tập chứa(danh sách đầu vào, giá trị)) {
             trả về sai;
@@ -205,9 +205,9 @@ hàm công khai tập bằng(a, b) {
     trả về bộ chuyển tiếp.tập bằng(a, b);
 };
 
-hàm công khai tập máy ảo thêm cuối danh sách(danh sách đầu vào, giá trị) {
+hàm công khai tập thêm(danh sách đầu vào, giá trị) {
     bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập máy ảo thêm cuối danh sách(danh sách đầu vào, giá trị);
+    trả về bộ chuyển tiếp.tập thêm(danh sách đầu vào, giá trị);
 };
 
 hàm công khai tập xóa(danh sách đầu vào, giá trị) {

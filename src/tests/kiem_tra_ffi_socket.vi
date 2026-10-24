@@ -21,6 +21,7 @@ hàm chính() {
 
     udp = đầu nối giao vận gói tin mở("127.0.0.1", 9, 1000);
     in udp >= 536870912;
-    in đầu nối gửi(udp, "kiểm tra kết nối") == 4;
+    // Gửi UDP trả về số byte UTF-8, không phải số ký tự Unicode.
+    in đầu nối gửi(udp, "kiểm tra kết nối") == 22;
     in đầu nối đóng(udp);
 };

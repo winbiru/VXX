@@ -21,13 +21,13 @@ hàm chính() {
     in biên dịch chạy sản phẩm biên dịch(artifact) == "-2147483648\n1.25\nx\ny\n1\nrỗng\n";
     oracle = biên dịch snapshot nội bộ(mã, ".");
     in oracle["hợp lệ"] == 1;
-    in compiler mã trung gian bằng(oracle["hàm"][0]["mã trung gian"], artifact["hàm"][0]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
 
     in biên dịch chạy chương trình tự chủ(
         "hàm đọc mặc định(x) { trả về x; }; hàm chính() { in đọc mặc định(7); };") == "7\n";
     cây = biên dịch phân tích chương trình thuần("nhập gói/lõi/chuyển kiểu; nhập gói/biên dịch/chương trình;");
     in cây["câu lệnh"][0]["đích"] == "gói/lõi/chuyển kiểu";
-    in compiler mã trung gian bằng(oracle["hàm"][1]["mã trung gian"], artifact["hàm"][1]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][1]["bytecode"], artifact["hàm"][1]["bytecode"]);
 
     văn_bản = biên dịch sản phẩm biên dịch tuần tự(artifact);
     in biên dịch sản phẩm biên dịch tuần tự(biên dịch sản phẩm biên dịch giải mã(văn_bản)) == văn_bản;
@@ -35,7 +35,7 @@ hàm chính() {
     in độ dài(đóng_gói["dây"]) == 4;
     in độ dài(đóng_gói["dây"][0][0]) == 4;
     in biên dịch chạy sản phẩm biên dịch(biên dịch sản phẩm biên dịch giải mã(văn_bản)) == biên dịch chạy sản phẩm biên dịch(artifact);
-    cũ = json tạo({"định dạng": "VPP mã trung gian", "phiên bản": 1,
+    cũ = json tạo({"định dạng": "VPP bytecode", "phiên bản": 1,
                    "ABI": "Instruction 4*i32", "artifact": artifact});
     in biên dịch chạy sản phẩm biên dịch(biên dịch sản phẩm biên dịch giải mã(cũ)) == biên dịch chạy sản phẩm biên dịch(artifact);
     in biên dịch chạy chương trình tự chủ(
@@ -43,19 +43,19 @@ hàm chính() {
     mã = "hàm f(a = 0, b = -0, c = -0001, d = -1) { trả về a + b + c + d; };";
     artifact = biên dịch chương trình tự chủ(mã);
     oracle = biên dịch snapshot nội bộ(mã, ".");
-    in compiler mã trung gian bằng(oracle["hàm"][0]["mã trung gian"], artifact["hàm"][0]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
 
     mã = "hàm chính() { a = [1, 2]; a[1] = 7; b = {\"x\": a}; b[\"x\"][0] = 8; in a[0]; in a[1]; };";
     artifact = biên dịch chương trình tự chủ(mã);
     in biên dịch chạy sản phẩm biên dịch(artifact) == "8\n7\n";
     oracle = biên dịch snapshot nội bộ(mã, ".");
-    in compiler mã trung gian bằng(oracle["hàm"][0]["mã trung gian"], artifact["hàm"][0]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
 
     mã = "hàm chính() { d = [1, 2]; thêm(d, 3); in độ dài(d); in loại của(d); in chuỗi từ byte máy ảo([65, 66]); };";
     artifact = biên dịch chương trình tự chủ(mã);
     in biên dịch chạy sản phẩm biên dịch(artifact) == "3\ndanh sách\nAB\n";
     oracle = biên dịch snapshot nội bộ(mã, ".");
-    in compiler mã trung gian bằng(oracle["hàm"][0]["mã trung gian"], artifact["hàm"][0]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
     in biên dịch chạy chương trình tự chủ("hàm độ dài(x) { trả về 9; }; hàm chính() { in độ dài([]); };") == "9\n";
     in biên dịch chạy chương trình tự chủ("hàm chính() { chuỗi từ byte máy ảo = 3; in chuỗi từ byte máy ảo([65]); };") == "A\n";
     in biên dịch nội tại("độ dài")[0] == biên dịch mã thao tác("OP_VM_LENGTH");
@@ -65,10 +65,10 @@ hàm chính() {
     artifact = biên dịch chương trình tự chủ(mã);
     oracle = biên dịch snapshot nội bộ(mã, ".");
     in biên dịch chạy sản phẩm biên dịch(artifact) == "-3\n3\n-1.25\n";
-    in compiler mã trung gian bằng(oracle["hàm"][0]["mã trung gian"], artifact["hàm"][0]["mã trung gian"]);
+    in compiler mã trung gian bằng(oracle["hàm"][0]["bytecode"], artifact["hàm"][0]["bytecode"]);
 
     lỗi = sai;
-    thử { biên dịch sản phẩm biên dịch giải mã("{\"định dạng\":\"VPP mã trung gian\",\"phiên bản\":2,\"ABI\":\"Instruction 4*i32\"}"); }
+    thử { biên dịch sản phẩm biên dịch giải mã("{\"định dạng\":\"VPP bytecode\",\"phiên bản\":2,\"ABI\":\"Instruction 4*i32\"}"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     đóng_gói["dây"][0][0] = [1, 2, 3];
@@ -77,7 +77,7 @@ hàm chính() {
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
-    thử { biên dịch sản phẩm biên dịch giải mã("{\"định dạng\":\"VPP mã trung gian\",\"phiên bản\":1.0,\"ABI\":\"Instruction 4*i32\"}"); }
+    thử { biên dịch sản phẩm biên dịch giải mã("{\"định dạng\":\"VPP bytecode\",\"phiên bản\":1.0,\"ABI\":\"Instruction 4*i32\"}"); }
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     lỗi = sai;
@@ -89,7 +89,7 @@ hàm chính() {
     bắt lỗi(e) { lỗi = đúng; };
     in lỗi;
     hỏng = biên dịch chương trình tự chủ("in 1;");
-    hỏng["mã trung gian"][0]["op"] = 42;
+    hỏng["bytecode"][0]["op"] = 42;
     lỗi = sai;
     thử { biên dịch sản phẩm biên dịch tuần tự(hỏng); } bắt lỗi(e) { lỗi = đúng; };
     in lỗi;

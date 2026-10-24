@@ -10,6 +10,6 @@ hàm chính() {
     lớn = Mạch Lượng Tử(100);
     lớn.h(99) .đo(99, 99);
     khẳng định bằng(xuất openqasm(lớn), "OPENQASM 3.0;\ninclude \"stdgates.inc\";\nqubit[100] q;\nbit[100] c;\n" + "h q[99];\nc[99] = measure q[99];\n");
-    in "openqasm-registers-gates-measure-đặt lại: ok";
+    in "openqasm-registers-gates-measure-reset: ok";
 }
 ;

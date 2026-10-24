@@ -11,7 +11,10 @@
 #define PUBLIC(x) x
 #define LIB(x) x@PLT
 #endif
-#if VPP_NATIVE_RUNTIME_STACK_ABI
+#ifdef __APPLE__
+#include "vpp_vietnamese_runtime_symbols.inc"
+#define RT_TARGET(x) x
+#elif VPP_NATIVE_RUNTIME_STACK_ABI
 #define RT_TARGET(x) PUBLIC(vpp_fn_##x)
 #else
 #define RT_TARGET(x) PUBLIC(x)
@@ -589,11 +592,19 @@ PUBLIC(vpp_native_os_argument_byte):
     .if \argc > 2
     movl %edx, 8(%rsp)
     .endif
+#ifdef __APPLE__
+    call "\target"
+#else
     call \target
+#endif
     addq $(40), %rsp
     ret
 #else
+#ifdef __APPLE__
+    jmp "\target"
+#else
     jmp \target
+#endif
 #endif
 .endm
 RT_EXPORT PUBLIC(vpp_native_bytes_new), RT_TARGET(rt_bytes_new), 0
@@ -662,4 +673,7 @@ PUBLIC(vpp_native_arena_base): .quad 0
 .section .note.GNU-stack,"",@progbits
 #endif
 
+#ifndef __APPLE__
 #include "vpp_vietnamese_runtime_symbols.inc"
+
+#endif

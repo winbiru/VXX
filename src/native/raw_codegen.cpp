@@ -110,6 +110,20 @@ bool symbolNameSafe(std::string_view name) {
         if (!(std::isalnum(ch) || ch == '_')) return false;
     return true;
 }
+
+// Assembly entry labels originate from source identifiers. Preserve
+// Vietnamese identifiers (UTF-8 and spaces), but reject punctuation that
+// could be interpreted as assembler directives before ABI mangling.
+bool sourceSymbolSafe(std::string_view name) {
+    if (name.empty()) return false;
+    for (unsigned char ch : name) {
+        if (ch >= 128) continue; // UTF-8 validity is checked by nativeAbiSymbol.
+        if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') || ch == '_' || ch == ' ') continue;
+        return false;
+    }
+    return true;
+}
 } // namespace
 
 RawLeafLowering lowerRawLeaf(const compiler::IrProgram &ir,
@@ -187,6 +201,7 @@ RawLeafResult emitRawLeaf(const Target &target, const RawLeaf &leaf) {
 
 RawAssemblyResult emitRawAssembly(const Target &target, const RawLeaf &leaf,
                                   std::string_view symbol) {
+    if (!sourceSymbolSafe(symbol)) return {{}, "tên nhãn assembly không hợp lệ"};
     const auto abiName = nativeAbiSymbol(symbol);
     if (!symbolNameSafe(abiName)) return {{}, "tên nhãn assembly không hợp lệ"};
     if (target.arch == Architecture::AArch64 &&

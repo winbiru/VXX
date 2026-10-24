@@ -5,6 +5,8 @@
 #define VPP_NATIVE_RUNTIME_STACK_ABI 0
 #endif
 
+#include "vpp_vietnamese_runtime_symbols.inc"
+
 .text
 .p2align 2
 .globl _vpp_native_memory_base
@@ -608,12 +610,12 @@ _\public:
     .if \arity > 2
     str w2, [sp, #8]
     .endif
-    bl _vpp_fn_\target
+    bl "\target"
     ldr x30, [sp, #16]
     add sp, sp, #32
     ret
 #else
-    b _\target
+    b "\target"
 #endif
 .endm
 RUNTIME_EXPORT vpp_native_bytes_new, rt_bytes_new, 0
@@ -667,5 +669,3 @@ RUNTIME_EXPORT vpp_native_cache_report_entry, rt_cache_report, 0
 
 .zerofill __DATA,__bss,_vpp_native_arena_base,8,3
 .subsections_via_symbols
-
-#include "vpp_vietnamese_runtime_symbols.inc"

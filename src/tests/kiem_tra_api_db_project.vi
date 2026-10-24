@@ -19,21 +19,21 @@ lớp công khai ApiDbProjectTest {
         connectRes = db connect("");
         in ứng dụng json cơ sở dữ liệu khởi động(connectRes);
 
-        controller.getUsers(dbSession, "Bearer demo-từ tố", "db-req-001");
-        controller.searchUsers(dbSession, "Bearer demo-từ tố", "an", "db-req-001a");
-        controller.createUser(dbSession, "Bearer demo-từ tố", "{\"name\":\"An\"}", "db-req-002");
-        controller.updateUser(dbSession, "Bearer demo-từ tố", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
-        controller.searchUsers(dbSession, "Bearer demo-từ tố", "nguyen", "db-req-003a");
-        controller.deleteUser(dbSession, "Bearer demo-từ tố", "12", "db-req-004");
-        controller.searchUsers(dbSession, "Bearer demo-từ tố", "nguyen", "db-req-004a");
-        controller.deleteUser(dbSession, "Bearer demo-từ tố", "404", "db-req-005");
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-001");
+        controller.searchUsers(dbSession, "Bearer demo-token", "an", "db-req-001a");
+        controller.createUser(dbSession, "Bearer demo-token", "{\"name\":\"An\"}", "db-req-002");
+        controller.updateUser(dbSession, "Bearer demo-token", "12", "{\"name\":\"An Nguyen\"}", "db-req-003");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-003a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "12", "db-req-004");
+        controller.searchUsers(dbSession, "Bearer demo-token", "nguyen", "db-req-004a");
+        controller.deleteUser(dbSession, "Bearer demo-token", "404", "db-req-005");
 
         disconnectRes = db disconnect();
         in ứng dụng json cơ sở dữ liệu tắt(disconnectRes);
         dbSession = "CLOSED";
 
         // verify API behavior when DB is disconnected
-        controller.getUsers(dbSession, "Bearer demo-từ tố", "db-req-006");
+        controller.getUsers(dbSession, "Bearer demo-token", "db-req-006");
 
         trả về 0;
     };

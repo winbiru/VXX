@@ -38,7 +38,7 @@ hàm chính() {
     dây = biên dịch sản phẩm biên dịch giải mã dây(văn_bản);
     yêu cầu selfhost(mã trung gian chạy máy ảo(dây[0], dây[1], dây[2], dây[3]) == mong_đợi,
                     "ABI trực tiếp");
-    cũ = json tạo({"định dạng": "VPP mã trung gian", "phiên bản": 1,
+    cũ = json tạo({"định dạng": "VPP bytecode", "phiên bản": 1,
                    "ABI": "Instruction 4*i32", "artifact": artifact});
     yêu cầu selfhost(biên dịch chạy sản phẩm biên dịch văn bản(cũ) == mong_đợi, "định dạng map cũ");
 
@@ -90,11 +90,11 @@ hàm chính() {
     gói["dây"][3] = [["m", []]];
     yêu cầu từ chối artifact(gói, "initializer trong artifact đơn");
     gói = json phân tích(văn_bản);
-    gói["loại"] = "mã trung gian V++ đồ thị đã liên kết";
+    gói["loại"] = "bytecode V++ đồ thị đã liên kết";
     gói["dây"][3] = [["m", []], ["m", []]];
     yêu cầu từ chối artifact(gói, "initializer trùng");
     gói = json phân tích(văn_bản);
-    gói["loại"] = "mã trung gian V++ đồ thị đã liên kết";
+    gói["loại"] = "bytecode V++ đồ thị đã liên kết";
     gói["dây"][3] = [[1, []]];
     yêu cầu từ chối artifact(gói, "định danh initializer không phải chuỗi");
 
@@ -102,9 +102,9 @@ hàm chính() {
     nhỏ = biên dịch chương trình tự chủ("in 7;");
     codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(nhỏ);
     trước = codec.tuần tự();
-    lặp(i = 0; i < độ dài(nhỏ["mã trung gian"]); i++) {
-        nếu (nhỏ["mã trung gian"][i]["op"] == biên dịch mã thao tác("OP_BIEN_SO")) {
-            nhỏ["mã trung gian"][i]["toán hạng"] = 8;
+    lặp(i = 0; i < độ dài(nhỏ["bytecode"]); i++) {
+        nếu (nhỏ["bytecode"][i]["op"] == biên dịch mã thao tác("OP_BIEN_SO")) {
+            nhỏ["bytecode"][i]["toán hạng"] = 8;
         };
     };
     sau = codec.tuần tự();

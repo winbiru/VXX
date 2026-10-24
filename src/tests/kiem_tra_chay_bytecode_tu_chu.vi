@@ -68,7 +68,7 @@ hàm chính() {
 
     lỗi = sai;
     thử { mã trung gian chạy máy ảo([[2147483647, 0, 0, 0]], [], [], []); }
-    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "mã trung gian không hợp lệ"); };
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
     in lỗi;
 
     lỗi = sai;
@@ -88,12 +88,12 @@ hàm chính() {
 
     // Lỗi phải lan qua API artifact công khai sau chuyển đổi map -> ABI.
     hỏng = biên dịch chương trình tự chủ("in 1;");
-    các_lệnh = hỏng["mã trung gian"];
+    các_lệnh = hỏng["bytecode"];
     lệnh = các_lệnh[0];
     lệnh["op"] = 2147483647;
     lỗi = sai;
     thử { biên dịch chạy sản phẩm biên dịch(hỏng); }
-    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "mã trung gian không hợp lệ"); };
+    bắt lỗi(e) { lỗi = chứa chuỗi(thành chuỗi(e), "bytecode không hợp lệ"); };
     in lỗi;
 
     hỏng_hàm = biên dịch chương trình tự chủ("hàm chính() { in 1; };");

@@ -470,7 +470,9 @@ lớp công khai Bộ Phân Tích Cú Pháp {
         };
         nếu (s == "biến") {
             biên dịch biểu thức lấy(p);
-            tên = mình.biên dịch chương trình tên kiểu(p, "biến");
+            // Từ khóa ngữ cảnh vẫn có thể là một phần của định danh nhiều từ,
+            // ví dụ "bước cập nhật con trỏ hiện tại". Dấu '=' / ';' kết thúc tên.
+            tên = mình.biên dịch chương trình tên kiểu(p, "biến", đúng);
             giá trị = rỗng;
             nếu (mình.biên dịch chương trình nhận(p, "=")) {
                 giá trị = mình.biên dịch chương trình biểu thức(p);

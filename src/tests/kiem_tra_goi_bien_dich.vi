@@ -12,7 +12,7 @@ hàm chính() {
     in lấy từ điển(kiểm_sai, "lỗi", "") != "";
 
     phân tích = biên dịch phân tích(nguồn);
-    in lấy từ điển(phân tích, "từ tố", 0) > 0;
+    in lấy từ điển(phân tích, "từ tố", 0) > 0 && lấy từ điển(phân tích, "từ tố", 0) == lấy từ điển(phân tích, "token", -1);
     in lấy từ điển(phân tích, "lệnh", 0) > 0;
 
     mã trung gian = biên dịch mã trung gian(nguồn);
@@ -22,7 +22,7 @@ hàm chính() {
     cây = biên dịch cây cú pháp(nguồn);
     in độ dài(cây) > 0;
     thống_kê = biên dịch thống kê(nguồn);
-    in lấy từ điển(thống_kê, "từ tố", 0) > 0;
+    in lấy từ điển(thống_kê, "từ tố", 0) > 0 && lấy từ điển(thống_kê, "từ tố", 0) == lấy từ điển(thống_kê, "token", -1);
     in lấy từ điển(thống_kê, "lệnh", 0) > 0;
 
     tệp = ".tmp_compiler_api.vi";

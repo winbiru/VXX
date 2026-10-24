@@ -40,7 +40,7 @@ hàm chính() {
     mã = phiên.mã trung gian();
     khẳng định bằng(mã, phiên.mã trung gian());
     cũ = biên dịch phát mã trung gian thuần(nguồn);
-    khẳng định bằng(độ dài(mã["mã trung gian"]), độ dài(cũ["mã trung gian"]));
+    khẳng định bằng(độ dài(mã["bytecode"]), độ dài(cũ["bytecode"]));
     khẳng định bằng(độ dài(mã["hàm"]), độ dài(cũ["hàm"]));
 
     khác = Bộ Biên Dịch Tự Chủ("in 7;");
@@ -65,8 +65,8 @@ hàm chính() {
     đọc_bytecode = hàm() { trả về phát.phát(); };
     đọc_artifact = hàm() { trả về liên_kết.liên kết(); };
     kiểm cache pass compiler(hạ, đọc_ir, "chương trình IR");
-    kiểm cache pass compiler(phát, đọc_bytecode, "mã trung gian V++ chưa liên kết");
-    kiểm cache pass compiler(liên_kết, đọc_artifact, "mã trung gian V++ đã liên kết");
+    kiểm cache pass compiler(phát, đọc_bytecode, "bytecode V++ chưa liên kết");
+    kiểm cache pass compiler(liên_kết, đọc_artifact, "bytecode V++ đã liên kết");
     hạ_khác = Bộ Hạ IR("in 11;");
     khẳng định khác(băm định danh(hạ.hạ()), băm định danh(hạ_khác.hạ()));
     in "phiên compiler OOP: đạt";

@@ -19,7 +19,7 @@ hàm chính() {
     nguồn = "hàm chính() { /* lời chào\nViệt */ in \"Việt\"; trả về 1 + 2; };";
     tokens = biên dịch từ tố hóa(nguồn);
     snapshot = biên dịch phân tích(nguồn);
-    in độ dài(tokens) == lấy từ điển(snapshot, "từ tố", -1);
+    in độ dài(tokens) == lấy từ điển(snapshot, "token", -1);
     in lấy từ điển(tokens[0], "giá trị", "") == "hàm";
     in lấy từ điển(tokens[0], "loại", "") == "từ khóa";
     in lấy từ điển(tokens[0], "dòng", 0) == 1;

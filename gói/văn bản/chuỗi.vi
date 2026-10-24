@@ -738,7 +738,7 @@ lớp công khai Xử Lý Chuỗi {
         trả về bộ dựng;
     };
 
-    hàm công khai bộ dựng máy ảo thêm cuối danh sách(bộ dựng, giá trị) {
+    hàm công khai bộ dựng thêm(bộ dựng, giá trị) {
         mình.bộ dựng yêu cầu(bộ dựng);
         hiện tại = lấy từ điển(bộ dựng, "giá trị", "");
         trả về mình.bộ dựng đặt(bộ dựng, hiện tại + thành chuỗi(giá trị));
@@ -1003,8 +1003,8 @@ hàm công khai bộ dựng yêu cầu(bộ dựng) {
     trả về Xử Lý Chuỗi().bộ dựng yêu cầu(bộ dựng);
 };
 
-hàm công khai bộ dựng máy ảo thêm cuối danh sách(bộ dựng, giá trị) {
-    trả về Xử Lý Chuỗi().bộ dựng máy ảo thêm cuối danh sách(bộ dựng, giá trị);
+hàm công khai bộ dựng thêm(bộ dựng, giá trị) {
+    trả về Xử Lý Chuỗi().bộ dựng thêm(bộ dựng, giá trị);
 };
 
 hàm công khai bộ dựng chèn(bộ dựng, chỉ số, giá trị) {

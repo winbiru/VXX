@@ -37,7 +37,7 @@ hàm chính() {
     thông_tin = a.thông tin(); thông_tin["path"] = "đã sửa";
     in a.thông tin()["path"] == "test";
     a.đóng();
-    in !a.đang kết nối() && a.mật_khẩu == "";
+    in !a.đang kết nối() && a.mật khẩu == "";
     chặn_ping = sai;
     thử { a.kiểm tra kết nối(); } bắt lỗi(e) { chặn_ping = đúng; };
     in chặn_ping;

@@ -6,7 +6,7 @@ nhập gói/lõi/kịch bản;
 
 hàm gọi khớp mã trung gian(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);
-    vi = biên dịch phát mã trung gian thuần(nguồn)["mã trung gian"];
+    vi = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(cpp) != độ dài(vi)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["op"] != vi[i]["op"] ||
@@ -25,8 +25,8 @@ hàm gọi khớp thân hàm(nguồn) {
         nếu (cpp[i]["id"] != vi[i]["id"] || cpp[i]["tên"] != vi[i]["tên"]) {
             trả về sai;
         };
-        c = cpp[i]["mã trung gian"];
-        v = vi[i]["mã trung gian"];
+        c = cpp[i]["bytecode"];
+        v = vi[i]["bytecode"];
         nếu (độ dài(c) != độ dài(v)) { trả về sai; };
         lặp(j = 0; j < độ dài(c); j++) {
             nếu (c[j]["op"] != v[j]["op"] ||
@@ -57,7 +57,7 @@ hàm chính() {
     // Không thực thi một callable chưa được định nghĩa.
     tên_động = "biến fn = 2; gọi fn(1);";
     in gọi khớp mã trung gian(tên_động);
-    v = biên dịch phát mã trung gian thuần(tên_động)["mã trung gian"];
+    v = biên dịch phát mã trung gian thuần(tên_động)["bytecode"];
     // Phần tử sau đối số phải là OP_GOI (23), không OP_GOI_GIAN_TIEP.
     in v[độ dài(v) - 1]["op"] == biên dịch mã thao tác("OP_GOI");
 

@@ -70,7 +70,7 @@ hàm sinh mã chương trình phát điểm vào(biểu diễn trung gian, các 
             nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
             nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
             lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời = độ dời + 1) {
-                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte thêm(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
             };
             nếu (mã trạng thái < 0) { thoát; };
             biến điểm bắt đầu = byte dài(mã máy);
@@ -167,7 +167,7 @@ hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm
             nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
             nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
             lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời++) {
-                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte thêm(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
             };
             nếu (mã trạng thái < 0) { thoát; };
             biến điểm bắt đầu = byte dài(mã máy);
@@ -247,7 +247,7 @@ hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các 
             nếu (byte làm rỗng(đơn vị) != 0) { mã trạng thái = -1; thoát; };
             nếu (byte làm rỗng(các lời gọi) != 0) { mã trạng thái = -1; thoát; };
             lặp (độ dời = biểu diễn trung gian điểm bắt đầu; độ dời < biểu diễn trung gian điểm bắt đầu + biểu diễn trung gian kích cỡ; độ dời++) {
-                nếu (byte máy ảo thêm cuối danh sách(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
+                nếu (byte thêm(đơn vị, byte lấy(biểu diễn trung gian, độ dời)) != 0) { mã trạng thái = -1; thoát; };
             };
             nếu (mã trạng thái < 0) { thoát; };
             biến điểm bắt đầu = byte dài(mã máy);

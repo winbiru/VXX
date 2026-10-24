@@ -72,6 +72,17 @@ hàm chính() {
         ném "parser bí danh và biến bắt lỗi nhiều từ không chính xác";
     };
 
+    // Các từ khóa ngữ cảnh vẫn hợp lệ trong tên biến nhiều từ.
+    cây_biến_từ_khóa = biên dịch phân tích chương trình thuần(
+        "hàm chính() { biến bước cập nhật con trỏ hiện tại = 1; " +
+        "biến giá trị điều kiện mới = 2; " +
+        "in bước cập nhật con trỏ hiện tại + giá trị điều kiện mới; };"
+    );
+    khai_báo_biến = lấy từ điển(
+        lấy từ điển(lấy từ điển(cây_biến_từ_khóa, "câu lệnh", [])[0], "thân", {}), "câu lệnh", []);
+    in lấy từ điển(khai_báo_biến[0], "tên", "") == "bước cập nhật con trỏ hiện tại";
+    in lấy từ điển(khai_báo_biến[1], "tên", "") == "giá trị điều kiện mới";
+
     cây_nếu = biên dịch phân tích ngữ nghĩa thuần(
         "hàm f(x) { nếu (x) { trả về 1; } hoặc nếu (x == 0) { trả về 0; }; };" );
     in độ dài(lấy từ điển(cây_nếu, "câu lệnh", [])) == 1;

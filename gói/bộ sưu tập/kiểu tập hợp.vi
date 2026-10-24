@@ -6,7 +6,7 @@ lớp công khai Tập Hợp triển khai Bộ Chứa {
     hàm công khai số lượng() { trả về máy ảo lấy độ dài(mình.phần tử); };
     hàm công khai trống() { trả về mình.số lượng() == 0; };
     hàm công khai chứa(giá trị) { trả về tập chứa(mình.phần tử, giá trị); };
-    hàm công khai thêm(giá trị) { trả về tập máy ảo thêm cuối danh sách(mình.phần tử, giá trị); };
+    hàm công khai thêm(giá trị) { trả về tập thêm(mình.phần tử, giá trị); };
     hàm công khai xóa(giá trị) { trả về tập xóa(mình.phần tử, giá trị); };
     hàm công khai danh sách() { trả về tập hợp(mình.phần tử); };
 };

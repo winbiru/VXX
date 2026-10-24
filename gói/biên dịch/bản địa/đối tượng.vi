@@ -16,7 +16,7 @@ hàm đối tượng tên định danh(đầu ra, tên định danh, độ rộn
     lặp (i = 0; i < độ rộng hiện tại; i++) {
         biến ch = 0;
         nếu (i < n) { ch = byte lấy(tên định danh, i); };
-        nếu (byte máy ảo thêm cuối danh sách(đầu ra, ch) != 0) { kết quả trả về = -1; thoát; };
+        nếu (byte thêm(đầu ra, ch) != 0) { kết quả trả về = -1; thoát; };
     };
     byte hủy(tên định danh);
     trả về kết quả trả về;
@@ -24,7 +24,7 @@ hàm đối tượng tên định danh(đầu ra, tên định danh, độ rộn
 
 hàm đối tượng đệm(đầu ra, đích đến) {
     lặp (i = byte dài(đầu ra); i < đích đến; i++) {
-        nếu (byte máy ảo thêm cuối danh sách(đầu ra, 0) != 0) { trả về -1; };
+        nếu (byte thêm(đầu ra, 0) != 0) { trả về -1; };
     };
     trả về 0;
 };
@@ -218,10 +218,10 @@ hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào �
     nếu (đối tượng đệm(đối tượng, độ lệch ký hiệu) != 0) { byte làm rỗng(đối tượng); trả về -1; };
     // nlist_64: strx, N_SECT|N_EXT, section index, desc, value.
     đối tượng i32(đối tượng, 1);
-    byte máy ảo thêm cuối danh sách(đối tượng, 15);
-    byte máy ảo thêm cuối danh sách(đối tượng, 1);
-    byte máy ảo thêm cuối danh sách(đối tượng, 0);
-    byte máy ảo thêm cuối danh sách(đối tượng, 0);
+    byte thêm(đối tượng, 15);
+    byte thêm(đối tượng, 1);
+    byte thêm(đối tượng, 0);
+    byte thêm(đối tượng, 0);
     đối tượng u64(đối tượng, điểm vào độ lệch);
     // N_UNDF | N_EXT symbols for the linked native runtime.
     biến chỉ mục chuỗi = 7;
@@ -230,24 +230,24 @@ hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào �
             biến bản ghi dữ liệu tên định danh = đối tượng bản địa tên định danh(mã định danh);
             biến bản ghi dữ liệu kích cỡ = byte dài(bản ghi dữ liệu tên định danh);
             đối tượng i32(đối tượng, chỉ mục chuỗi);
-            byte máy ảo thêm cuối danh sách(đối tượng, 1);
-            byte máy ảo thêm cuối danh sách(đối tượng, 0);
-            byte máy ảo thêm cuối danh sách(đối tượng, 0);
-            byte máy ảo thêm cuối danh sách(đối tượng, 0);
+            byte thêm(đối tượng, 1);
+            byte thêm(đối tượng, 0);
+            byte thêm(đối tượng, 0);
+            byte thêm(đối tượng, 0);
             đối tượng u64(đối tượng, 0);
             chỉ mục chuỗi = chỉ mục chuỗi + bản ghi dữ liệu kích cỡ + 1;
             byte hủy(bản ghi dữ liệu tên định danh);
         };
     };
-    byte máy ảo thêm cuối danh sách(đối tượng, 0);
+    byte thêm(đối tượng, 0);
     nếu (đối tượng tên định danh(đối tượng, "_main", 5) != 0) { byte làm rỗng(đối tượng); trả về -1; };
-    byte máy ảo thêm cuối danh sách(đối tượng, 0);
+    byte thêm(đối tượng, 0);
     lặp (mã định danh = 0; mã định danh < 62; mã định danh++) {
         nếu (đối tượng bản địa đã dùng(ngoại các lời gọi, mã định danh) == 1) {
             biến tên định danh = đối tượng bản địa tên định danh(mã định danh);
             biến kích cỡ = byte dài(tên định danh);
             nếu (đối tượng tên định danh(đối tượng, tên định danh, kích cỡ) != 0) { byte làm rỗng(đối tượng); trả về -1; };
-            nếu (byte máy ảo thêm cuối danh sách(đối tượng, 0) != 0) { byte làm rỗng(đối tượng); trả về -1; };
+            nếu (byte thêm(đối tượng, 0) != 0) { byte làm rỗng(đối tượng); trả về -1; };
         };
     };
     nếu (byte dài(đối tượng) != độ lệch chuỗi + chuỗi kích cỡ) {

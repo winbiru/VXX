@@ -5,7 +5,7 @@ nhập gói/bộ sưu tập/từ điển;
 
 hàm khớp opcode(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);
-    vpp = biên dịch phát mã trung gian thuần(nguồn)["mã trung gian"];
+    vpp = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(cpp) != độ dài(vpp)) { trả về sai; };
     lặp(i = 0; i < độ dài(cpp); i++) {
         nếu (cpp[i]["op"] != vpp[i]["op"] ||
@@ -28,8 +28,8 @@ hàm khớp opcode hàm(nguồn) {
         nếu (cpp[i]["tên"] != vpp[i]["tên"] || cpp[i]["id"] != vpp[i]["id"]) {
             trả về sai;
         };
-        c = cpp[i]["mã trung gian"];
-        v = vpp[i]["mã trung gian"];
+        c = cpp[i]["bytecode"];
+        v = vpp[i]["bytecode"];
         nếu (độ dài(c) != độ dài(v)) { trả về sai; };
         lặp(j = 0; j < độ dài(c); j++) {
             nếu (c[j]["op"] != v[j]["op"] ||
@@ -63,7 +63,7 @@ hàm chính() {
     in lấy từ điển(lệnh[4], "giá trị", "") == "+";
 
     mã = biên dịch phát mã trung gian thuần("in 2 + 3 * 4;");
-    mã_lệnh = lấy từ điển(mã, "mã trung gian", []);
+    mã_lệnh = lấy từ điển(mã, "bytecode", []);
     in độ dài(mã_lệnh) == 6;
     in mã_lệnh[0]["op"] == 41 && mã_lệnh[0]["toán hạng"] == 2;
     in mã_lệnh[3]["op"] == 2;
@@ -89,14 +89,14 @@ hàm chính() {
     in khớp opcode("in danh_sách[0];");
     // Compound gán được hạ về thao tác số học và OP_GAN giống direct IR C++.
     gán = biên dịch phát mã trung gian thuần("n = 2; n += 3; in n;");
-    in gán["mã trung gian"][5]["op"] == 0;
+    in gán["bytecode"][5]["op"] == 0;
 
     chương_trình = biên dịch phát mã trung gian thuần(
         "hàm tính(a) { biến b = a + 2; in b; trả về b; };");
     hàm_lệnh = lấy từ điển(chương_trình, "hàm", []);
     in độ dài(hàm_lệnh) == 1;
     in lấy từ điển(hàm_lệnh[0], "tên", "") == "tính";
-    thân = lấy từ điển(hàm_lệnh[0], "mã trung gian", []);
+    thân = lấy từ điển(hàm_lệnh[0], "bytecode", []);
     in độ dài(thân) == 14;
     in thân[0]["op"] == 14 && thân[1]["op"] == 27 && thân[2]["op"] == 69;
     in thân[7]["op"] == 60 && thân[8]["op"] == 13;
@@ -145,9 +145,9 @@ hàm chính() {
     in khớp opcode hàm("hàm f() { trả về 1; }; hàm g() { trả về 2; };");
 
     số_âm = biên dịch phát mã trung gian thuần("in -7;");
-    in số_âm["mã trung gian"][0]["toán hạng"] == -7;
+    in số_âm["bytecode"][0]["toán hạng"] == -7;
     chuỗi = biên dịch phát mã trung gian thuần("in \"Việt Nam\";");
-    in chuỗi["mã trung gian"][0]["op"] == 65;
+    in chuỗi["bytecode"][0]["op"] == 65;
     in chuỗi["chuỗi"][0] == "Việt Nam";
 
     in khớp opcode("in chưa_hỗ_trợ(1);");
@@ -156,18 +156,18 @@ hàm chính() {
     // Giữ thứ tự cấp slot: C++ đăng ký đích x trước biến y trong RHS.
     thứ_tự = biên dịch phát mã trung gian thuần("x = y + 3; in x;");
     in thứ_tự["slots"][0] == "x" && thứ_tự["slots"][1] == "y";
-    in thứ_tự["mã trung gian"][0]["chỉ số"] == 1;
-    in thứ_tự["mã trung gian"][3]["chỉ số"] == 0;
+    in thứ_tự["bytecode"][0]["chỉ số"] == 1;
+    in thứ_tự["bytecode"][3]["chỉ số"] == 0;
 
     // Offset nhảy là vị trí tuyệt đối trong mã trung gian đang được sinh.
     nhánh = biên dịch phát mã trung gian thuần("nếu (đúng) { in 2; };");
-    in nhánh["mã trung gian"][0]["op"] == 22;
-    in nhánh["mã trung gian"][2]["op"] == 62 && nhánh["mã trung gian"][2]["toán hạng"] == 7;
+    in nhánh["bytecode"][0]["op"] == 22;
+    in nhánh["bytecode"][2]["op"] == 62 && nhánh["bytecode"][2]["toán hạng"] == 7;
     in khớp opcode("nếu (đúng) { in 2; };");
 
     hai_nhánh = biên dịch phát mã trung gian thuần("nếu (sai) { in 1; } hoặc { in 2; };");
-    in hai_nhánh["mã trung gian"][2]["toán hạng"] == 8;
-    in hai_nhánh["mã trung gian"][7]["op"] == 63 && hai_nhánh["mã trung gian"][7]["toán hạng"] == 12;
+    in hai_nhánh["bytecode"][2]["toán hạng"] == 8;
+    in hai_nhánh["bytecode"][7]["op"] == 63 && hai_nhánh["bytecode"][7]["toán hạng"] == 12;
     in khớp opcode("nếu (sai) { in 1; } hoặc { in 2; };");
     in khớp opcode("nếu (đúng) { nếu (sai) { in 1; }; in 2; };");
     in khớp opcode("n = 2;");

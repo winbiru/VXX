@@ -7,7 +7,7 @@ nhập gói/lõi/bảng mã;
 
 hàm cùng mã trung gian(nguồn) {
     c = biên dịch mã trung gian(nguồn);
-    v = biên dịch phát mã trung gian thuần(nguồn)["mã trung gian"];
+    v = biên dịch phát mã trung gian thuần(nguồn)["bytecode"];
     nếu (độ dài(c) != độ dài(v)) { trả về sai; };
     lặp(i = 0; i < độ dài(c); i++) {
         nếu (c[i]["op"] != v[i]["op"] ||
@@ -30,8 +30,8 @@ hàm cùng mã trung gian hàm(nguồn) {
         nếu (c[i]["tên"] != v[i]["tên"] || c[i]["id"] != v[i]["id"]) {
             trả về sai;
         };
-        x = c[i]["mã trung gian"];
-        y = v[i]["mã trung gian"];
+        x = c[i]["bytecode"];
+        y = v[i]["bytecode"];
         nếu (độ dài(x) != độ dài(y)) { trả về sai; };
         lặp(j = 0; j < độ dài(x); j++) {
             nếu (x[j]["op"] != y[j]["op"] ||
@@ -78,10 +78,10 @@ hàm chính() {
     tĩnh = biên dịch phát mã trung gian thuần("biến a = [1, \"hai\", rỗng];");
     in tĩnh["chuỗi"][0] == "i" + ký tự unicode(31) + "1" + ký tự unicode(30) +
         "s" + ký tự unicode(31) + "hai" + ký tự unicode(30) + "n" + ký tự unicode(31);
-    in tĩnh["mã trung gian"][1]["op"] == 88 && tĩnh["mã trung gian"][1]["chỉ số"] == 0;
+    in tĩnh["bytecode"][1]["op"] == 88 && tĩnh["bytecode"][1]["chỉ số"] == 0;
     động = biên dịch phát mã trung gian thuần("biến x = 5; biến a = [x, 3];");
-    in động["mã trung gian"][7]["op"] == 88 &&
-       động["mã trung gian"][7]["toán hạng"] == 2 && động["mã trung gian"][7]["chỉ số"] == -1;
+    in động["bytecode"][7]["op"] == 88 &&
+       động["bytecode"][7]["toán hạng"] == 2 && động["bytecode"][7]["chỉ số"] == -1;
     j = "hàm chính() { biến a = [1, {x: 3}]; in a[1][\"x\"]; };";
     in cùng mã trung gian hàm(j);
     in cùng kết quả(j);

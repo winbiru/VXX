@@ -13,7 +13,7 @@ hàm chính() {
                     "in 99;"
     };
     kết = biên dịch chương trình mô đun tự chủ("app/main", nguồn);
-    in kết["loại"] == "mã trung gian V++ đồ thị đã liên kết";
+    in kết["loại"] == "bytecode V++ đồ thị đã liên kết";
     in độ dài(kết["mô đun khởi tạo"]) == 2;
     in kết["mô đun khởi tạo"][0]["định danh"] == "lib/math";
     in kết["mô đun khởi tạo"][1]["định danh"] == "lib/feature";
@@ -26,27 +26,27 @@ hàm chính() {
     in kết["hàm"][2]["id"] == 2;
     in kết["điểm vào"] == 0;
     in kết["slots"][0] == "chính";
-    in độ dài(kết["hàm"][0]["mã trung gian"]) > 3;
-    in độ dài(kết["hàm"][1]["mã trung gian"]) > 3;
-    in độ dài(kết["hàm"][2]["mã trung gian"]) > 3;
+    in độ dài(kết["hàm"][0]["bytecode"]) > 3;
+    in độ dài(kết["hàm"][1]["bytecode"]) > 3;
+    in độ dài(kết["hàm"][2]["bytecode"]) > 3;
 
     a = kết["mô đun khởi tạo"][0];
     b = kết["mô đun khởi tạo"][1];
     in a["slots"][2] == "cộng";
     in b["slots"][1] == "tính";
-    in độ dài(a["mã trung gian"]) == 3;
-    in a["mã trung gian"][0]["op"] == biên dịch mã thao tác("OP_HAM");
-    in a["mã trung gian"][0]["toán hạng"] == kết["hàm"][2]["tên index"];
-    in a["mã trung gian"][0]["chỉ số"] == 2;
-    in a["mã trung gian"][0]["giá trị"] == 0;
-    in a["mã trung gian"][1]["op"] == biên dịch mã thao tác("OP_BIEN_SO");
-    in a["mã trung gian"][1]["toán hạng"] == 99;
-    in a["mã trung gian"][2]["op"] == biên dịch mã thao tác("OP_IN");
-    in độ dài(b["mã trung gian"]) == 1;
-    in b["mã trung gian"][0]["chỉ số"] == 1;
-    in b["mã trung gian"][0]["toán hạng"] == kết["hàm"][1]["tên index"];
+    in độ dài(a["bytecode"]) == 3;
+    in a["bytecode"][0]["op"] == biên dịch mã thao tác("OP_HAM");
+    in a["bytecode"][0]["toán hạng"] == kết["hàm"][2]["tên index"];
+    in a["bytecode"][0]["chỉ số"] == 2;
+    in a["bytecode"][0]["giá trị"] == 0;
+    in a["bytecode"][1]["op"] == biên dịch mã thao tác("OP_BIEN_SO");
+    in a["bytecode"][1]["toán hạng"] == 99;
+    in a["bytecode"][2]["op"] == biên dịch mã thao tác("OP_IN");
+    in độ dài(b["bytecode"]) == 1;
+    in b["bytecode"][0]["chỉ số"] == 1;
+    in b["bytecode"][0]["toán hạng"] == kết["hàm"][1]["tên index"];
 
-    thân = kết["hàm"][1]["mã trung gian"];
+    thân = kết["hàm"][1]["bytecode"];
     in thân[0]["op"] == biên dịch mã thao tác("OP_MO_KHOI");
     in thân[1]["op"] == biên dịch mã thao tác("OP_GOI");
     in thân[1]["toán hạng"] == 0;
@@ -55,7 +55,7 @@ hàm chính() {
     in thân[2]["op"] == biên dịch mã thao tác("OP_TRA_VE");
     in thân[độ dài(thân) - 1]["op"] == biên dịch mã thao tác("OP_DONG_KHOI");
 
-    thân_gốc = kết["hàm"][0]["mã trung gian"];
+    thân_gốc = kết["hàm"][0]["bytecode"];
     in thân_gốc[1]["op"] == biên dịch mã thao tác("OP_GOI");
     in thân_gốc[1]["chỉ số"] == 1;
     in thân_gốc[1]["toán hạng"] == 0;
@@ -63,17 +63,17 @@ hàm chính() {
     in thân_gốc[3]["op"] == biên dịch mã thao tác("OP_GOI");
     in thân_gốc[5]["op"] == biên dịch mã thao tác("OP_GOI");
     in thân_gốc[5]["chỉ số"] == 2;
-    in độ dài(kết["mã trung gian"]) == 3;
-    in kết["mã trung gian"][0]["op"] == biên dịch mã thao tác("OP_HAM");
-    in kết["mã trung gian"][0]["chỉ số"] == 0;
-    in kết["mã trung gian"][1]["op"] == biên dịch mã thao tác("OP_GOI");
-    in kết["mã trung gian"][1]["chỉ số"] == 0;
-    in kết["mã trung gian"][1]["toán hạng"] == 0;
-    in kết["mã trung gian"][1]["giá trị"] == 0;
-    in kết["mã trung gian"][2]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
-    in kết["mã trung gian"][2]["toán hạng"] == 0;
-    in kết["mã trung gian"][2]["chỉ số"] == 0;
-    in kết["mã trung gian"][2]["giá trị"] == 0;
+    in độ dài(kết["bytecode"]) == 3;
+    in kết["bytecode"][0]["op"] == biên dịch mã thao tác("OP_HAM");
+    in kết["bytecode"][0]["chỉ số"] == 0;
+    in kết["bytecode"][1]["op"] == biên dịch mã thao tác("OP_GOI");
+    in kết["bytecode"][1]["chỉ số"] == 0;
+    in kết["bytecode"][1]["toán hạng"] == 0;
+    in kết["bytecode"][1]["giá trị"] == 0;
+    in kết["bytecode"][2]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
+    in kết["bytecode"][2]["toán hạng"] == 0;
+    in kết["bytecode"][2]["chỉ số"] == 0;
+    in kết["bytecode"][2]["giá trị"] == 0;
 
     // Hai module trùng tên hàm phải có ID khác và không dùng lẫn slot.
     hai = biên dịch chương trình mô đun tự chủ("main", {
@@ -84,8 +84,8 @@ hàm chính() {
     in hai["hàm"][0]["id"] == 0;
     in hai["hàm"][1]["id"] == 1;
     in hai["hàm"][1]["tên index"] == hai["hàm"][2]["tên index"];
-    in hai["hàm"][0]["mã trung gian"][1]["chỉ số"] == 1;
-    in hai["hàm"][0]["mã trung gian"][3]["chỉ số"] == 2;
+    in hai["hàm"][0]["bytecode"][1]["chỉ số"] == 1;
+    in hai["hàm"][0]["bytecode"][3]["chỉ số"] == 2;
     in hai["mô đun khởi tạo"][1]["slots"][2] == "f";
     in hai["điểm vào"] == 0;
 
@@ -96,9 +96,9 @@ hàm chính() {
     });
     in độ dài(lặp_lại["mô đun khởi tạo"]) == 1;
     in độ dài(lặp_lại["hàm"]) == 2;
-    in lặp_lại["hàm"][0]["mã trung gian"][1]["chỉ số"] == 1;
-    in lặp_lại["hàm"][0]["mã trung gian"][3]["chỉ số"] == 1;
-    in độ dài(lặp_lại["mô đun khởi tạo"][0]["mã trung gian"]) == 3;
+    in lặp_lại["hàm"][0]["bytecode"][1]["chỉ số"] == 1;
+    in lặp_lại["hàm"][0]["bytecode"][3]["chỉ số"] == 1;
+    in độ dài(lặp_lại["mô đun khởi tạo"][0]["bytecode"]) == 3;
 
     // Chỉ root quyết định entrypoint; mô-đun phụ có `chính` không được gọi.
     không_gọi = biên dịch chương trình mô đun tự chủ("main", {
@@ -106,8 +106,8 @@ hàm chính() {
         "dep": "hàm chính() { in 2; };"
     });
     in không_gọi["điểm vào"] == -1;
-    in độ dài(không_gọi["mã trung gian"]) == 3;
-    in không_gọi["mã trung gian"][2]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
+    in độ dài(không_gọi["bytecode"]) == 3;
+    in không_gọi["bytecode"][2]["op"] == biên dịch mã thao tác("OP_DUNG_CHUONG_TRINH");
 
     lỗi = sai;
     thử {

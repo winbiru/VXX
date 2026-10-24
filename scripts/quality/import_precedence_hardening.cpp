@@ -99,7 +99,8 @@ void testResolverPrecedence() {
 
     const fs::path compatibilityTarget =
         project / utf8(vietvm::core::kPrimaryPackageDirectory) /
-        utf8(u8"ứng dụng") / utf8(u8"cầu nối") / "api.vi";
+        utf8(u8"ứng dụng") / utf8(u8"cầu nối") /
+        utf8(u8"giao diện lập trình.vi");
     writeFile(compatibilityTarget, "hàm api() { trả về 1; }\n");
     expect(packageResolver.resolve("gói/ứng dụng/tương thích/api").path ==
                absoluteNormalized(compatibilityTarget),
