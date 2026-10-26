@@ -200,9 +200,9 @@ function(vpp_add_module name)
 endfunction()
 
 # The dependency graph is intentionally one-way:
-# core -> bytecode -> frontend -> compiler; runtime consumes bytecode and
-# receives function metadata from the CLI instead of reading compiler globals.
-# Tooling depends on compiler; CLI composes runtime and tooling.
+# core -> bytecode -> frontend -> compiler; the native code generator uses
+# compiler IR helpers. Runtime receives function metadata from the CLI instead
+# of reading compiler globals. Tooling depends on compiler.
 vpp_add_module(vpp-core ${VPP_CORE_SOURCES})
 if (APPLE)
     find_library(VPP_COREFOUNDATION_FRAMEWORK CoreFoundation REQUIRED)
@@ -233,6 +233,10 @@ if (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|aarch64|arm64)$")
     target_compile_definitions(vpp-runtime-native PRIVATE VPP_FILE_MACHINE_ASM=1)
 endif()
 target_link_libraries(vpp-runtime-native PUBLIC vpp-bytecode vpp-core Threads::Threads)
+# raw_codegen.cpp calls irOpcodeName/irValueOpcodeName from compiler/ir.cpp.
+# Keep this dependency on the library so static linkers see vpp-compiler after
+# vpp-runtime-native, including when linking the standalone AOT oracle.
+target_link_libraries(vpp-runtime-native PRIVATE vpp-compiler)
 vpp_add_module(vpp-runtime ${VPP_VM_RUNTIME_SOURCES})
 target_link_libraries(vpp-runtime PUBLIC vpp-runtime-native vpp-compiler)
 option(VPP_STATIC_LIBFFI "Link libffi statically for standalone release archives" OFF)

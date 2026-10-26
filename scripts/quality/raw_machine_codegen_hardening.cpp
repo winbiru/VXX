@@ -128,6 +128,9 @@ int main() {
             "reject injected assembly symbol");
 
         // Exercise the highest available register and the next-slot fallback.
+        // PushConstant + LoadSlot intentionally keeps both eval registers live:
+        // two adjacent LoadSlot operations would be fused into direct ADD
+        // operands and would no longer exercise w17.
         // A fixed slot assignment must remain within the platform's volatile
         // registers; no platform/callee-saved register may be silently used.
         MachineFunction boundary;
@@ -138,8 +141,8 @@ int main() {
             {MachineOpcode::LoadSlot, 0, 0, 0},
             {MachineOpcode::StoreSlot, 0, 13, 1},
             {MachineOpcode::Drop, 0, 0, 1},
-            {MachineOpcode::LoadSlot, 0, 13, 0},
-            {MachineOpcode::LoadSlot, 0, 1, 1},
+            {MachineOpcode::PushConstant, 0, 0, 0},
+            {MachineOpcode::LoadSlot, 0, 13, 1},
             {MachineOpcode::Add, 0, 0, 2},
             {MachineOpcode::Return, 0, 0, 1},
             {MachineOpcode::Trap, 0, 0, 0},
