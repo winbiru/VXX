@@ -67,7 +67,7 @@ lớp công khai Bộ Phân Giải DNS {
     // TCP là stream: recv có thể trả ít byte hơn yêu cầu, kể cả header 2 byte.
     hàm riêng tư phân giải tên miền giao vận tin cậy đọc đủ(mã, số byte, hạn chót) {
         dữ liệu = [];
-        lặp(vòng = 0; máy ảo lấy độ dài(dữ liệu) < số byte; vòng++) {
+        khi (máy ảo lấy độ dài(dữ liệu) < số byte) {
             đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
             phần = chuỗi thành byte máy ảo(đầu nối nhận(mã, số byte - máy ảo lấy độ dài(dữ liệu)));
             nếu (máy ảo lấy độ dài(phần) == 0) { ném "DNS TCP: kết nối đóng giữa bản tin"; };

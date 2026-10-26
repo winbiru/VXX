@@ -1022,6 +1022,23 @@ bool supportsInstruction(const IrProgram &program,
         return true;
     }
     if (instruction.opcode == IrOpcode::Loop) {
+        if (instruction.loopForm == vietvm::frontend::AstLoopForm::WhileBlock) {
+            if (instruction.expressionRoots.size() != 1 ||
+                instruction.children.size() != 1 ||
+                instruction.children.front().opcode != IrOpcode::Block) {
+                return false;
+            }
+            const IrValue *condition = program.value(instruction.expressionRoots.front());
+            if (condition == nullptr || condition->opcode == IrValueOpcode::StoreName ||
+                condition->opcode == IrValueOpcode::MapLiteral) {
+                return false;
+            }
+            std::unordered_set<IrValueId> visiting;
+            return supportsValue(program, sourceOwner, context, condition->id,
+                                 ValueContext::Nested, visiting) &&
+                supportsInstruction(program, instruction.children.front(), sourceOwner,
+                                    context, insideFunction, true, switchDepth + 1, false);
+        }
         if (instruction.loopForm != vietvm::frontend::AstLoopForm::ForBlock ||
             instruction.expressionRoots.size() != 3 ||
             instruction.children.size() != 1 ||
@@ -2121,24 +2138,28 @@ struct Emitter {
                 return;
             }
             case IrOpcode::Loop: {
-                const IrValue *init = program.value(
-                    instruction.expressionRoots[0]);
-                const IrValue *target = init == nullptr || init->operands.empty()
-                    ? nullptr
-                    : program.value(init->operands.front());
-                if (target == nullptr) {
-                    throw std::logic_error(std::string(
-                        messages::kInternalDirectIrLoopMissingInitializerTarget));
+                const bool isWhile = instruction.loopForm ==
+                    vietvm::frontend::AstLoopForm::WhileBlock;
+                if (!isWhile) {
+                    const IrValue *init = program.value(
+                        instruction.expressionRoots[0]);
+                    const IrValue *target = init == nullptr || init->operands.empty()
+                        ? nullptr
+                        : program.value(init->operands.front());
+                    if (target == nullptr) {
+                        throw std::logic_error(std::string(
+                            messages::kInternalDirectIrLoopMissingInitializerTarget));
+                    }
+                    const int initSlot = slotForSymbol(target->symbolId, target->text);
+                    // The legacy loop wrapper emits KHỞI_TẠO on every loop,
+                    // including when the textual slot already exists.
+                    output.push_back({OP_KHOI_TAO, 0, initSlot, 0});
+                    emitValue(init->id, output);
                 }
-                const int initSlot = slotForSymbol(target->symbolId, target->text);
-                // The legacy loop wrapper emits KHỞI_TẠO on every loop,
-                // including when the textual slot already exists.
-                output.push_back({OP_KHOI_TAO, 0, initSlot, 0});
-                emitValue(init->id, output);
                 output.push_back({OP_LAP, 0, 0, 0});
                 const int conditionTarget = static_cast<int>(output.size());
                 output.push_back({OP_DIEU_KIEN, 0, 0, 0});
-                emitValue(instruction.expressionRoots[1], output);
+                emitValue(instruction.expressionRoots[isWhile ? 0 : 1], output);
                 const std::size_t exitJump = output.size();
                 output.push_back({OP_JUMP_IF_FALSE, 0, 0, 0});
                 breakScopes.push_back({true, emittedBlockDepth, emittedTryDepth, {}});
@@ -2146,7 +2167,7 @@ struct Emitter {
                 BreakScope loopScope = std::move(breakScopes.back());
                 breakScopes.pop_back();
                 output.push_back({OP_CAP_NHAT, 0, 0, 0});
-                emitValue(instruction.expressionRoots[2], output);
+                if (!isWhile) emitValue(instruction.expressionRoots[2], output);
                 output.push_back({OP_JUMP, conditionTarget, 0, 0});
                 output[exitJump].operand = static_cast<int>(output.size());
                 for (const std::size_t jump : loopScope.pendingJumps) {

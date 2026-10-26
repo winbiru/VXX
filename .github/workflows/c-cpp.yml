@@ -284,14 +284,42 @@ jobs:
             build-coverage/Testing/Temporary/LastTestsFailed.log
             build-coverage/Testing/Temporary/LastTest.log
 
-      - name: Build and run benchmark baseline
+  benchmark-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install benchmark build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake python3 libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+
+      - name: Test PASS, FAIL, INCONCLUSIVE and invalid-evidence decisions
+        run: python3 scripts/quality/test_benchmark_gate.py
+
+      - name: Compare baseline and candidate on the same runner
+        env:
+          BASELINE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
         run: |
-          cmake -S . -B build-benchmark \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTS=OFF \
-            -DBUILD_BENCHMARKS=ON
-          cmake --build build-benchmark --target vpp-benchmark-baseline --parallel 2
-          ./build-benchmark/bin/vpp-benchmark-baseline
+          set -euo pipefail
+          baseline="$BASELINE_SHA"
+          if [ -z "$baseline" ] || [[ "$baseline" =~ ^0+$ ]]; then
+            baseline="$(git rev-parse HEAD^1)"
+          fi
+          python3 scripts/quality/run_benchmarks.py \
+            --baseline "$baseline" --candidate HEAD \
+            --samples 40 --warmups 3 --target-ms 100 --jobs 2 \
+            --output benchmark/reports/ci
+
+      - name: Upload raw measurements, build logs and gate decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: same-machine-benchmark
+          if-no-files-found: error
+          path: benchmark/reports/ci/
 
   windows-build:
     runs-on: windows-latest

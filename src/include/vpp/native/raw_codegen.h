@@ -26,7 +26,7 @@ struct RawLeaf {
 // stack. Branch targets index the instruction vector.
 enum class MachineOpcode {
     PushConstant, LoadSlot, StoreSlot, Drop,
-    Add, Sub, Mul, Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
+    Add, Sub, Mul, Div, Mod, Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     BranchZero, Jump, Call, Return, Trap,
 };
 

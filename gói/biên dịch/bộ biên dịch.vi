@@ -2,6 +2,7 @@
 // Mỗi phiên phân tích một lần; API hàm tự do ở chính.vi vẫn tương thích.
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/biên dịch/kết quả;
+nhập gói/biên dịch/mã lệnh;
 nhập gói/biên dịch/cây cú pháp;
 nhập gói/biên dịch/nút cú pháp;
 

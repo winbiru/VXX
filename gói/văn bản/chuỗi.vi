@@ -53,7 +53,7 @@ lớp công khai Xử Lý Chuỗi {
         n = máy ảo lấy độ dài(nguồn);
         kết quả = 0;
         vị trí = 0;
-        lặp(vòng = 0; vị trí + m <= n; vòng++) {
+        khi (vị trí + m <= n) {
             nếu (mình.cắt chuỗi(nguồn, vị trí, m) == mẫu) {
                 kết quả = kết quả + 1;
                 vị trí = vị trí + m;
@@ -92,7 +92,7 @@ lớp công khai Xử Lý Chuỗi {
         kết quả = "";
         vị trí = 0;
         n = máy ảo lấy độ dài(nguồn);
-        lặp(vòng = 0; vị trí < n; vòng++) {
+        khi (vị trí < n) {
             nếu (vị trí + m <= n && mình.cắt chuỗi(nguồn, vị trí, m) == mẫu) {
                 kết quả = kết quả + thay;
                 vị trí = vị trí + m;
@@ -402,7 +402,7 @@ lớp công khai Xử Lý Chuỗi {
         trái = 0;
         phải = máy ảo lấy độ dài(nguồn) - 1;
         kết quả = đúng;
-        lặp(vòng = 0; trái < phải && kết quả; vòng++) {
+        khi (trái < phải && kết quả) {
             nếu (nguồn[trái] != nguồn[phải]) {
                 kết quả = sai;
             };
@@ -523,7 +523,7 @@ lớp công khai Xử Lý Chuỗi {
         n = mình.độ dài(văn bản);
         bắt đầu = 0;
         đang bỏ = đúng;
-        lặp(vòng = 0; bắt đầu < n && đang bỏ; vòng++) {
+        khi (bắt đầu < n && đang bỏ) {
             nếu (mình.là khoảng trắng unicode(văn bản[bắt đầu])) {
                 bắt đầu = bắt đầu + 1;
             } hoặc {
@@ -537,7 +537,7 @@ lớp công khai Xử Lý Chuỗi {
         mình.chuỗi yêu cầu(văn bản);
         kết thúc = mình.độ dài(văn bản);
         đang bỏ = đúng;
-        lặp(vòng = 0; kết thúc > 0 && đang bỏ; vòng++) {
+        khi (kết thúc > 0 && đang bỏ) {
             nếu (mình.là khoảng trắng unicode(văn bản[kết thúc - 1])) {
                 kết thúc = kết thúc - 1;
             } hoặc {
@@ -553,7 +553,7 @@ lớp công khai Xử Lý Chuỗi {
         bắt đầu = 0;
         kết thúc = n;
         đang bỏ = đúng;
-        lặp(vòng = 0; bắt đầu < kết thúc && đang bỏ; vòng++) {
+        khi (bắt đầu < kết thúc && đang bỏ) {
             nếu (mình.là khoảng trắng unicode(văn bản[bắt đầu])) {
                 bắt đầu = bắt đầu + 1;
             } hoặc {
@@ -561,7 +561,7 @@ lớp công khai Xử Lý Chuỗi {
             };
         };
         đang bỏ = đúng;
-        lặp(vòng = 0; kết thúc > bắt đầu && đang bỏ; vòng++) {
+        khi (kết thúc > bắt đầu && đang bỏ) {
             nếu (mình.là khoảng trắng unicode(văn bản[kết thúc - 1])) {
                 kết thúc = kết thúc - 1;
             } hoặc {
@@ -580,6 +580,53 @@ lớp công khai Xử Lý Chuỗi {
         trả về giải mã bảng mã(các byte, bảng mã, chế độ lỗi);
     };
 
+    // Lập chỉ mục byte một lần. Một byte UTF-8 sai được xem là một đơn vị
+    // riêng, giống utf8CodePointAt/utf8CodePointCount trong runtime.
+    // [byte, chỉ số code point tại đầu đơn vị (-1 ở giữa), byte offset của mỗi đơn vị].
+    hàm riêng tư chuỗi chỉ mục byte(văn bản) {
+        các byte = chuỗi thành byte máy ảo(văn bản);
+        biên = [];
+        vị trí byte = [0];
+        n = máy ảo lấy độ dài(các byte);
+        i = 0;
+        chỉ số = 0;
+        khi (i < n) {
+            độ rộng = 1;
+            nếu (các byte[i] > 127) {
+                độ rộng = bảng mã unicode tám bit độ dài đoạn(các byte, i);
+                nếu (độ rộng < 1) { độ rộng = 1; };
+            };
+            máy ảo thêm cuối danh sách(biên, chỉ số);
+            lặp(j = 1; j < độ rộng; j++) {
+                máy ảo thêm cuối danh sách(biên, -1);
+            };
+            i = i + độ rộng;
+            chỉ số = chỉ số + 1;
+            máy ảo thêm cuối danh sách(vị trí byte, i);
+        };
+        máy ảo thêm cuối danh sách(biên, chỉ số);
+        trả về [các byte, biên, vị trí byte];
+    };
+
+    // KMP trên byte để số lần so sánh tăng tuyến tính theo độ dài đầu vào.
+    // Kết quả chỉ được chấp nhận tại biên code point ở cả hai đầu.
+    hàm riêng tư chuỗi bảng tiền tố(các byte) {
+        n = máy ảo lấy độ dài(các byte);
+        tiền tố = [];
+        lặp(i = 0; i < n; i++) {
+            máy ảo thêm cuối danh sách(tiền tố, 0);
+        };
+        lặp(i = 1; i < n; i++) {
+            j = tiền tố[i - 1];
+            khi (j > 0 && các byte[i] != các byte[j]) {
+                j = tiền tố[j - 1];
+            };
+            nếu (các byte[i] == các byte[j]) { j = j + 1; };
+            tiền tố[i] = j;
+        };
+        trả về tiền tố;
+    };
+
     // Tìm exact, trả về chỉ số code point đầu tiên hoặc rỗng.
     hàm công khai tìm chuỗi chính xác(văn bản, mẫu, từ = 0) {
         mình.chuỗi yêu cầu(văn bản);
@@ -595,14 +642,29 @@ lớp công khai Xử Lý Chuỗi {
             trả về rỗng;
         };
 
-        kết quả = rỗng;
-        mức trần = n - m;
-        lặp(i = từ; i <= mức trần && kết quả == rỗng; i++) {
-            nếu (mình.con chuỗi(văn bản, i, i + m) == mẫu) {
-                kết quả = i;
+        nguồn = mình.chuỗi chỉ mục byte(văn bản);
+        các byte = nguồn[0];
+        biên = nguồn[1];
+        vị trí byte = nguồn[2];
+        mẫu byte = chuỗi thành byte máy ảo(mẫu);
+        số byte mẫu = máy ảo lấy độ dài(mẫu byte);
+        số byte nguồn = máy ảo lấy độ dài(các byte);
+        tiền tố = mình.chuỗi bảng tiền tố(mẫu byte);
+        khớp = 0;
+        lặp(i = vị trí byte[từ]; i < số byte nguồn; i++) {
+            khi (khớp > 0 && các byte[i] != mẫu byte[khớp]) {
+                khớp = tiền tố[khớp - 1];
+            };
+            nếu (các byte[i] == mẫu byte[khớp]) { khớp = khớp + 1; };
+            nếu (khớp == số byte mẫu) {
+                bắt đầu = i + 1 - số byte mẫu;
+                nếu (biên[bắt đầu] >= 0 && biên[i + 1] >= 0) {
+                    trả về biên[bắt đầu];
+                };
+                khớp = tiền tố[khớp - 1];
             };
         };
-        trả về kết quả;
+        trả về rỗng;
     };
 
     hàm công khai bắt đầu bằng(văn bản, tiền tố) {
@@ -634,31 +696,58 @@ lớp công khai Xử Lý Chuỗi {
         n = mình.độ dài(văn bản);
         m = mình.độ dài(cũ);
 
+        nguồn = mình.chuỗi chỉ mục byte(văn bản);
+        các byte = nguồn[0];
+        biên = nguồn[1];
+        vị trí byte = nguồn[2];
+        thay byte = chuỗi thành byte máy ảo(mới);
+        kết quả = [];
+        số byte thay = máy ảo lấy độ dài(thay byte);
         nếu (m == 0) {
-            kết quả = mới;
-            lặp(i = 0; i < n; i++) {
-                kết quả = kết quả + mình.ký tự tại(văn bản, i) + mới;
+            lặp(i = 0; i <= n; i++) {
+                lặp(j = 0; j < số byte thay; j++) {
+                    máy ảo thêm cuối danh sách(kết quả, thay byte[j]);
+                };
+                nếu (i < n) {
+                    lặp(j = vị trí byte[i]; j < vị trí byte[i + 1]; j++) {
+                        máy ảo thêm cuối danh sách(kết quả, các byte[j]);
+                    };
+                };
             };
-            trả về kết quả;
+            trả về chuỗi từ byte máy ảo(kết quả);
         };
 
-        kết quả = "";
+        mẫu byte = chuỗi thành byte máy ảo(cũ);
+        số byte mẫu = máy ảo lấy độ dài(mẫu byte);
+        số byte nguồn = máy ảo lấy độ dài(các byte);
+        tiền tố = mình.chuỗi bảng tiền tố(mẫu byte);
+        khớp = 0;
         con trỏ = 0;
-        tiếp tục = đúng;
-        lặp(vòng = 0; tiếp tục; vòng++) {
-            vị trí = mình.tìm chuỗi chính xác(văn bản, cũ, con trỏ);
-            nếu (vị trí == rỗng) {
-                kết quả = kết quả + mình.con chuỗi(văn bản, con trỏ, n);
-                tiếp tục = sai;
-            } hoặc {
-                kết quả = kết quả + mình.con chuỗi(văn bản, con trỏ, vị trí) + mới;
-                con trỏ = vị trí + m;
-                nếu (con trỏ == n) {
-                    tiếp tục = sai;
+        lặp(i = 0; i < số byte nguồn; i++) {
+            khi (khớp > 0 && các byte[i] != mẫu byte[khớp]) {
+                khớp = tiền tố[khớp - 1];
+            };
+            nếu (các byte[i] == mẫu byte[khớp]) { khớp = khớp + 1; };
+            nếu (khớp == số byte mẫu) {
+                bắt đầu = i + 1 - số byte mẫu;
+                nếu (biên[bắt đầu] >= 0 && biên[i + 1] >= 0) {
+                    lặp(j = con trỏ; j < bắt đầu; j++) {
+                        máy ảo thêm cuối danh sách(kết quả, các byte[j]);
+                    };
+                    lặp(j = 0; j < số byte thay; j++) {
+                        máy ảo thêm cuối danh sách(kết quả, thay byte[j]);
+                    };
+                    con trỏ = i + 1;
+                    khớp = 0;
+                } hoặc {
+                    khớp = tiền tố[khớp - 1];
                 };
             };
         };
-        trả về kết quả;
+        lặp(i = con trỏ; i < số byte nguồn; i++) {
+            máy ảo thêm cuối danh sách(kết quả, các byte[i]);
+        };
+        trả về chuỗi từ byte máy ảo(kết quả);
     };
 
     // Split literal, không dùng regex. Separator rỗng tách theo code point.
@@ -678,7 +767,7 @@ lớp công khai Xử Lý Chuỗi {
 
         con trỏ = 0;
         tiếp tục = đúng;
-        lặp(vòng = 0; tiếp tục; vòng++) {
+        khi (tiếp tục) {
             vị trí = mình.tìm chuỗi chính xác(văn bản, phân cách, con trỏ);
             nếu (vị trí == rỗng) {
                 máy ảo thêm cuối danh sách(kết quả, mình.con chuỗi(văn bản, con trỏ, n));

@@ -257,6 +257,14 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
         nếu (cây == rỗng) { trả về đúng; };
         loại = lấy từ điển(cây, "loại", "");
         nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "hàm ẩn danh") {
+            // Thân closure có phạm vi hàm riêng, kể cả khi nằm trong vòng lặp.
+            khai = {"loại": "hàm", "tham số": cây["tham số"],
+                "mặc định tham số": cây["mặc định tham số"], "thân": cây["thân"]};
+            mình.biên dịch ngữ nghĩa câu lệnh(khai, sai, sai, sai);
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(khai, [], []);
+            trả về đúng;
+        };
         nếu (loại == "danh sách") {
             phần tử = lấy từ điển(cây, "phần tử", []);
             lặp(i = 0; i < máy ảo lấy độ dài(phần tử); i++) {
@@ -555,6 +563,21 @@ lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {
         nếu (cây == rỗng) { trả về đúng; };
         loại = lấy từ điển(cây, "loại", "");
         nếu (loại == "hằng" || loại == "tên") { trả về đúng; };
+        nếu (loại == "hàm ẩn danh") {
+            tên trong hàm = [];
+            tham số = cây["tham số"];
+            lặp(i = 0; i < máy ảo lấy độ dài(tham số); i++) {
+                máy ảo thêm cuối danh sách(tên trong hàm, tham số[i]);
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra khai báo biến(cây["thân"], tên trong hàm, các hàm);
+            lặp(i = 0; i < máy ảo lấy độ dài(tên cục bộ); i++) {
+                nếu (!mình.biên dịch ngữ nghĩa chứa(tên trong hàm, tên cục bộ[i])) {
+                    máy ảo thêm cuối danh sách(tên trong hàm, tên cục bộ[i]);
+                };
+            };
+            mình.biên dịch ngữ nghĩa kiểm tra gán hàm câu lệnh(cây["thân"], các hàm, tên trong hàm);
+            trả về đúng;
+        };
         nếu (loại == "hai ngôi") {
             trái = lấy từ điển(cây, "trái", rỗng);
             nếu (biên dịch biểu thức là phép gán(lấy từ điển(cây, "toán tử", ""))) {

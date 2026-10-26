@@ -115,6 +115,7 @@ const char *astLoopFormName(AstLoopForm form) noexcept {
     switch (form) {
         case AstLoopForm::Unstructured: return "unstructured";
         case AstLoopForm::ForBlock: return "for_block";
+        case AstLoopForm::WhileBlock: return "while_block";
     }
     return "unstructured";
 }

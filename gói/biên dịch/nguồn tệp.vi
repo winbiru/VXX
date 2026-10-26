@@ -77,7 +77,7 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
     // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
     // khi áp dụng bí danh và gói của toolchain.
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
+    khi (đúng) {
         tệp = biên dịch nguồn chuẩn đường(thư mục + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
         cha = đường dẫn cha(thư mục);
@@ -85,7 +85,7 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
         thư mục = cha;
     };
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
+    khi (đúng) {
         tệp = biên dịch nguồn tìm gói(thư mục, đích);
         nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);

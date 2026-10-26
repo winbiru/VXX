@@ -52,13 +52,28 @@ if (VPP_CASE STREQUAL "compiler")
     endif()
     file(REMOVE "${main}" "${VPP_OUTPUT_DIR}/lib/math.vi")
     vpp_check("${expected}" run --artifact "${artifact}")
-    file(COPY "${fixtures}/unsupported_closure.vi" DESTINATION "${VPP_OUTPUT_DIR}")
+    file(COPY "${fixtures}/closure.vi" DESTINATION "${VPP_OUTPUT_DIR}")
+    set(closure_source "${VPP_OUTPUT_DIR}/closure.vi")
+    set(closure_artifact "${VPP_OUTPUT_DIR}/closure.vbc")
+    vpp_check("1\n" run --compiler=cpp "${closure_source}")
+    vpp_check("1\n" run --compiler=vpp "${closure_source}")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+        "${VPP_EXEC}" build --compiler=vpp "${closure_source}" -o "${closure_artifact}"
+        RESULT_VARIABLE status TIMEOUT 240)
+    if (NOT status EQUAL 0)
+        message(FATAL_ERROR "Compiler V++ không tạo được artifact closure")
+    endif()
+    file(REMOVE "${closure_source}")
+    vpp_check("1\n" run --artifact "${closure_artifact}")
+    # Closure hợp lệ đã được hỗ trợ; dùng tham số trùng để thử giữ artifact cũ.
+    file(WRITE "${VPP_OUTPUT_DIR}/invalid-closure.vi"
+        "hàm chính() { biến f = hàm(x, x) { trả về x; }; };\n")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "${VPP_EXEC}" build --compiler=vpp
-        "${VPP_OUTPUT_DIR}/unsupported_closure.vi" -o "${artifact}"
+        "${VPP_OUTPUT_DIR}/invalid-closure.vi" -o "${artifact}"
         RESULT_VARIABLE status TIMEOUT 240)
     if (status EQUAL 0)
-        message(FATAL_ERROR "V++ compiler accepted unsupported closure")
+        message(FATAL_ERROR "Compiler V++ chấp nhận closure trùng tham số")
     endif()
     vpp_check("${expected}" run --artifact "${artifact}")
     # Exercise boundary arithmetic through both source compilers, and then run

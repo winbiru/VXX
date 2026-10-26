@@ -150,7 +150,7 @@ lớp công khai Bộ Phát Bytecode {
         // Escape không nhận diện: C++ giữ ký tự sau dấu gạch chéo.
         văn bản = "";
         i = 1;
-        lặp(vòng = 0; i < n - 1; vòng++) {
+        khi (i < n - 1) {
             c = từ tố[i];
             nếu (c == "\\" && i + 1 < n - 1) {
                 i += 1;
@@ -301,10 +301,50 @@ lớp công khai Bộ Phát Bytecode {
         ném "biên dịch phát mã: chỉ nhận danh sách hoặc từ điển tĩnh";
     };
 
+    hàm riêng tư phát hàm ẩn danh(khai, trạng thái, thô) {
+        sổ = trạng thái["sổ hàm"];
+        mã định danh = máy ảo lấy độ dài(sổ["hàm"]);
+        // Hàm ẩn danh không tạo tên xuất hay ô biến dành cho tên hàm.
+        máy ảo thêm cuối danh sách(sổ["hàm"], {"id": mã định danh, "tên": "",
+            "tên index": -1, "tên chạy": "", "tên index runtime": -1,
+            "mô đun": trạng thái["mô đun"], "ẩn danh": đúng});
+        các hàm = trạng thái["hàm ẩn danh"];
+        vị trí = máy ảo lấy độ dài(các hàm);
+        máy ảo thêm cuối danh sách(các hàm, rỗng);
+        con = {};
+        khóa = khóa từ điển(trạng thái);
+        lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) { con[khóa[i]] = trạng thái[khóa[i]]; };
+        // Không để return/break/try của closure làm đổi khung điều khiển bên ngoài.
+        khung = ["nhánh nếu", "chọn", "thử", "gọi thành viên", "gán thành viên", "lặp", "phạm vi thoát"];
+        lặp(i = 0; i < máy ảo lấy độ dài(khung); i++) { con[khung[i]] = []; };
+        con["độ sâu khối"] = 0;
+        con["độ sâu thử"] = 0;
+        thân = mình.biên dịch phát mã thân phương thức(khai, con);
+        các hàm[vị trí] = {"id": mã định danh, "tên": "", "tên index": -1,
+            "bytecode": thân, "ẩn danh": đúng};
+        bắt giữ = khai["bắt giữ"];
+        lặp(i = 0; i < máy ảo lấy độ dài(bắt giữ); i++) {
+            ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, bắt giữ[i]["tên"], bắt giữ[i]["id"]);
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_ID"), 0, ô nhớ, 0);
+        };
+        nếu (máy ảo lấy độ dài(bắt giữ) == 0) {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"), mã định danh, 0, 0);
+        } hoặc {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TAO_DONG_BAO"),
+                mã định danh, máy ảo lấy độ dài(bắt giữ), 0);
+        };
+        trả về đúng;
+    };
+
     hàm riêng tư biên dịch phát mã IR một(mục, trạng thái, thô) {
         mã = lấy từ điển(mục, "mã", "");
         giá trị = lấy từ điển(mục, "giá trị", "");
         mục ký hiệu = lấy từ điển(mục, "symbol", -1);
+        nếu (mã == "hàm ẩn danh") { trả về mình.phát hàm ẩn danh(giá trị, trạng thái, thô); };
+        nếu (mã == "gọi giá trị") {
+            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_GIAN_TIEP"), giá trị, 0, 0);
+            trả về đúng;
+        };
         nếu (mã == "danh sách tĩnh" || mã == "từ điển tĩnh") {
             dây = mình.biên dịch phát mã chuỗi tập hợp(giá trị);
             chỉ số = mình.biên dịch phát mã lưu chuỗi(trạng thái, dây);
@@ -704,9 +744,11 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo xóa vị trí danh sách(phạm vi, máy ảo lấy độ dài(phạm vi) - 1);
             trả về đúng;
         };
-        nếu (mã == "bắt đầu lặp") {
-            ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, giá trị, mục ký hiệu);
-            mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_KHOI_TAO"), 0, ô nhớ, 0);
+        nếu (mã == "bắt đầu lặp" || mã == "bắt đầu khi") {
+            nếu (mã == "bắt đầu lặp") {
+                ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, giá trị, mục ký hiệu);
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_KHOI_TAO"), 0, ô nhớ, 0);
+            };
             máy ảo thêm cuối danh sách(trạng thái["lặp"], {"điều kiện": -1, "nhảy ra": -1,
                                      "khối": trạng thái["độ sâu khối"],
                                      "thử": trạng thái["độ sâu thử"],
@@ -1120,6 +1162,7 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo thêm cuối danh sách(kiểu lớp đã khai, biểu diễn trung gian["lớp"][i]["tên"]);
         };
         trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chuỗi": sổ["chuỗi"],
+                      "sổ hàm": sổ, "hàm ẩn danh": [],
                       "chỉ mục chuỗi": lấy từ điển(sổ, "chỉ mục chuỗi", {}),
                       "mô đun": tên mô đun,
                       "ngoại": ngoại cục bộ,
@@ -1199,6 +1242,21 @@ lớp công khai Bộ Phát Bytecode {
             máy ảo lấy độ dài(trạng thái["chọn"]) != 0 || máy ảo lấy độ dài(trạng thái["thử"]) != 0 ||
             máy ảo lấy độ dài(trạng thái["lặp"]) != 0 || máy ảo lấy độ dài(trạng thái["phạm vi thoát"]) != 0) {
             ném "biên dịch phát mã: khối điều khiển chưa đóng trong chương trình";
+        };
+        ẩn danh = trạng thái["hàm ẩn danh"];
+        lặp(i = 0; i < máy ảo lấy độ dài(ẩn danh); i++) { máy ảo thêm cuối danh sách(các hàm, ẩn danh[i]); };
+        nếu (máy ảo lấy độ dài(ẩn danh) > 0) {
+            // Closure lồng nhau được cấp ID trước khi phát xong thân hàm ngoài.
+            lặp(i = 1; i < máy ảo lấy độ dài(các hàm); i++) {
+                mục = các hàm[i];
+                j = i;
+                khi (j > 0) {
+                    nếu (các hàm[j - 1]["id"] < mục["id"]) { thoát; };
+                    các hàm[j] = các hàm[j - 1];
+                    j -= 1;
+                };
+                các hàm[j] = mục;
+            };
         };
         // Giống compilePipeline(..., emitEntryPointCall=false) trong snapshot C++:
         // opcode 44 (halt) và lời gọi entrypoint thuộc bước linker cuối cùng.

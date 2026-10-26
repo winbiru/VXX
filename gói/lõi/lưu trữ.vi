@@ -319,7 +319,7 @@ lớp công khai Bộ Lưu Trữ ZIP {
         các byte = đọc các byte tệp(đường zip);
         kết quả = [];
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
             nếu (lấy từ điển(điểm vào, "xong", sai)) {
                 trả về kết quả;
@@ -339,7 +339,7 @@ lớp công khai Bộ Lưu Trữ ZIP {
         vị trí = 0;
         tổng = 0;
         số mục = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
             nếu (lấy từ điển(điểm vào, "xong", sai)) {
                 trả về số mục;

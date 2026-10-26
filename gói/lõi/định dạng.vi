@@ -223,7 +223,7 @@ hàm riêng tư định dạng cơ số dương(giá trị, cơ số, hoa) {
     nếu (giá trị == 0) { trả về "0"; };
     kết quả = "";
     còn lại = giá trị;
-    lặp(vòng = 0; còn lại > 0; vòng++) {
+    khi (còn lại > 0) {
         dư = còn lại % cơ số;
         kết quả = chữ[dư] + kết quả;
         còn lại = làm tròn xuống(còn lại / cơ số);
@@ -434,7 +434,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
     đã tường mình = sai;
     đã ngầm = sai;
 
-    lặp(vòng = 0; con trỏ < n; vòng++) {
+    khi (con trỏ < n) {
         nếu (mẫu[con trỏ] != "%") {
             kết quả = kết quả + mẫu[con trỏ];
             con trỏ = con trỏ + 1;
@@ -443,7 +443,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             nếu (vị trí hiện tại >= n) { ném "FORMAT_INVALID"; };
 
             bắt đầu số = vị trí hiện tại;
-            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+            khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                 vị trí hiện tại = vị trí hiện tại + 1;
             };
             có chỉ số = sai;
@@ -460,7 +460,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
 
             cờ = "";
             đang cờ = đúng;
-            lặp(k = 0; vị trí hiện tại < n && đang cờ; k++) {
+            khi (vị trí hiện tại < n && đang cờ) {
                 c = mẫu[vị trí hiện tại];
                 nếu (c == "-" || c == "+" || c == "0" || c == " " || c == "," || c == "(") {
                     nếu (định dạng có ký tự(cờ, c)) { ném "FORMAT_DUPLICATE_FLAG"; };
@@ -473,7 +473,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
             };
 
             bắt đầu rộng = vị trí hiện tại;
-            lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+            khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                 vị trí hiện tại = vị trí hiện tại + 1;
             };
             có rộng = vị trí hiện tại > bắt đầu rộng;
@@ -488,7 +488,7 @@ hàm riêng tư định dạng thực thi(mẫu, các đối số, vùng ngôn n
                 có chính xác = đúng;
                 vị trí hiện tại = vị trí hiện tại + 1;
                 bắt đầu chính xác = vị trí hiện tại;
-                lặp(k = 0; vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại]); k++) {
+                khi (vị trí hiện tại < n && định dạng là chữ số(mẫu[vị trí hiện tại])) {
                     vị trí hiện tại = vị trí hiện tại + 1;
                 };
                 nếu (bắt đầu chính xác == vị trí hiện tại) { ném "FORMAT_PRECISION"; };

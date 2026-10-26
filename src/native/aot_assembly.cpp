@@ -62,6 +62,17 @@ class Assembly {
         emit(MachineOpcode::Call,0,args.size()+1,"vpp_native_dynamic_"+name);
     }
     void call(const std::string &name,std::initializer_list<int> args={}) {
+        // Most dynamic helpers return no language value. Their C ABI return
+        // now signals failure directly: zero for success, one for error.
+        // Check it with a single call, preserving the existing exception path.
+        // Conditions/cases return booleans and must keep the value in slot 1.
+        if(name!="condition"&&name!="case"&&name!="default") {
+            rawCall(name,args);
+            const auto success=fn.instructions.size();emit(MachineOpcode::BranchZero);
+            errors.push_back(fn.instructions.size());emit(MachineOpcode::Jump);
+            fn.instructions[success].operand=fn.instructions.size();
+            return;
+        }
         // Machine StoreSlot keeps the value on the evaluation stack.
         // Consume it explicitly so both sides of every error branch join at
         // the same stack depth (including backward branches in loops).

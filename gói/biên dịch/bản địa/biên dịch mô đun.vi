@@ -103,7 +103,7 @@ hàm biên dịch mô đun biên dịch đơn vị(nguồn văn bản, các từ
 // Returns the unique main function ID + 1, or -1 on error.
 // registry is returned in global function-ID order; module_ends contains the
 // exclusive function-ID boundary of each source unit in archive order.
-hàm biên dịch mô đun biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) {
+hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các hàm, sổ đăng ký, mô đun ends) {
     biến nguồn văn bản = byte mới();
     biến các từ tố = byte mới();
     biến điểm vào = byte mới();
@@ -155,7 +155,7 @@ hàm biên dịch mô đun biên dịch các mô đun(kho lưu trữ, biểu di�
             biến kế tiếp mã máy = biên dịch mô đun đọc đơn vị(kho lưu trữ, độ lệch, nguồn văn bản);
             nếu (kế tiếp mã máy < 0) { mã trạng thái = -1; thoát; };
             biến cuối cùng = byte đọc số nguyên ba mươi hai bit(mô đun ends, mô đun chỉ mục);
-            chương trình con mã định danh = bộ nhớ đệm biên dịch biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm,
+            chương trình con mã định danh = biên dịch đơn vị có đệm(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm,
                 chương trình con mã định danh, cuối cùng, byte đọc số nguyên ba mươi hai bit(điểm vào, 0));
             nếu (chương trình con mã định danh < 0) { mã trạng thái = -1; thoát; };
             nếu (chương trình con mã định danh != cuối cùng) { mã trạng thái = -1; thoát; };

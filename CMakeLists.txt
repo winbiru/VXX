@@ -926,6 +926,30 @@ if (BUILD_TESTS)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
         if (UNIX)
+            if (VPP_NATIVE_SMOKE_CC)
+                add_executable(vpp-native-aot-cpp-oracle scripts/quality/native_aot_cpp_oracle.cpp)
+                target_link_libraries(vpp-native-aot-cpp-oracle PRIVATE vpp-runtime vpp-native-aot)
+                target_include_directories(vpp-native-aot-cpp-oracle PRIVATE ${VPP_INCLUDE_DIR})
+                add_test(NAME vpp-native-aot-vpp-parity
+                    COMMAND ${CMAKE_COMMAND}
+                        "-DVPP_NATIVE_CLI=${VPP_NATIVE_CLI_COMPILER}"
+                        "-DVPP_CPP_ORACLE=$<TARGET_FILE:vpp-native-aot-cpp-oracle>"
+                        "-DVPP_CC=${VPP_NATIVE_SMOKE_CC}"
+                        "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                        "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-vpp-parity"
+                        -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_aot_vpp_parity.cmake)
+                set_tests_properties(vpp-native-aot-vpp-parity PROPERTIES
+                    FIXTURES_REQUIRED native-cli-compiler TIMEOUT 360)
+            endif()
+            add_test(NAME vpp-native-object-cli
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_NATIVE_CLI=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_STAGE0=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-object-cli"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_object_cli.cmake)
+            set_tests_properties(vpp-native-object-cli PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
             # System packages require the full-language compiler. The small
             # native-stage1 leaf compiler cannot parse imports or Machine ABI.
             add_test(NAME vpp-native-machine-system-fixtures
@@ -936,6 +960,14 @@ if (BUILD_TESTS)
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_machine_fixtures.cmake)
             set_tests_properties(vpp-native-machine-system-fixtures PROPERTIES
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 1200)
+            add_test(NAME vpp-native-anonymous-functions
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_NATIVE_CLI=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-anonymous"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_anonymous.cmake)
+            set_tests_properties(vpp-native-anonymous-functions PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
         endif()
     endif()
     foreach(vpp_case IN ITEMS compiler oop ffi)
@@ -1031,6 +1063,31 @@ endif()
 
 if (BUILD_BENCHMARKS)
     add_subdirectory(benchmark)
+endif()
+
+# Tạo CLI compiler tổng quát V++ theo yêu cầu. Cùng entrypoint với bootstrap
+# và các CTest; không cài nhầm CLI i32 subset dưới tên vpp-native.
+set(VPP_NATIVE_CLI_TARGET "")
+if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+    set(VPP_NATIVE_CLI_TARGET "aarch64-apple-darwin")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    set(VPP_NATIVE_CLI_TARGET "x86_64-linux-gnu")
+endif()
+if (VPP_NATIVE_CLI_TARGET)
+    set(VPP_NATIVE_CLI_DIR "${CMAKE_CURRENT_BINARY_DIR}/native-cli")
+    add_custom_target(vpp-native-cli
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_OUTPUT_DIR=${VPP_NATIVE_CLI_DIR}"
+            "-DVPP_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake
+        DEPENDS vpp-cli
+        BYPRODUCTS "${VPP_NATIVE_CLI_DIR}/vpp-native"
+        COMMENT "Bootstrap CLI compiler tổng quát V++ (Stage 0)")
+    install(PROGRAMS "${VPP_NATIVE_CLI_DIR}/vpp-native"
+        DESTINATION bin OPTIONAL)
 endif()
 
 # Install rules (optional)

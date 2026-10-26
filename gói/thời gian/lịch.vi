@@ -217,7 +217,7 @@ lớp công khai Lịch {
         phần = mình.thời gian đệm số(nano, 9);
         cuối = máy ảo lấy độ dài(phần);
         đang bỏ = đúng;
-        lặp(vòng = 0; cuối > 1 && đang bỏ; vòng++) {
+        khi (cuối > 1 && đang bỏ) {
             nếu (phần[cuối - 1] == "0") {
                 cuối = cuối - 1;
             } hoặc {

@@ -108,7 +108,8 @@ void writeSourceInstruction(std::ostream &out, const compiler::IrInstruction &in
         << quoted(inst.conditionalForm == frontend::AstConditionalForm::IfBlock ? "IfBlock" :
                   inst.conditionalForm == frontend::AstConditionalForm::IfElseBlocks ? "IfElseBlocks" : "Unstructured")
         << ",\"loopForm\":"
-        << quoted(inst.loopForm == frontend::AstLoopForm::ForBlock ? "ForBlock" : "Unstructured")
+        << quoted(inst.loopForm == frontend::AstLoopForm::ForBlock ? "ForBlock" :
+                  inst.loopForm == frontend::AstLoopForm::WhileBlock ? "WhileBlock" : "Unstructured")
         << ",\"unsupported\":" << (inst.unsupportedDirectRegion ? "đúng" : "sai")
         << ",\"parameters\":[";
     for (std::size_t i = 0; i < inst.parameters.size(); ++i) {
@@ -139,6 +140,8 @@ const char *opcodeName(MachineOpcode op) {
         case Op::Add: return "Add";
         case Op::Sub: return "Sub";
         case Op::Mul: return "Mul";
+        case Op::Div: return "Div";
+        case Op::Mod: return "Mod";
         case Op::Equal: return "Equal";
         case Op::NotEqual: return "NotEqual";
         case Op::Less: return "Less";
@@ -245,13 +248,13 @@ std::string makeSelfHostedObjectSource(const Target &target,
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  kết_quả = biên dịch bản địa đối tượng tự chủ("
+         << "  kết_quả = tạo đối tượng hàm("
          << quoted(std::string(source)) << ','
          << quoted(std::string(functionName)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
-         << "  biên dịch bản địa in bản ghi(kết_quả);\n"
+         << "  xuất bản ghi(kết_quả);\n"
          << "}\n";
     return code.str();
 }
@@ -262,14 +265,14 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
     std::ostringstream code;
     code << "nhập gói/biên dịch/mã máy từ cây;\n"
          << "hàm chính() {\n"
-         << "  các_hàm = biên dịch bản địa chương trình đối tượng tự chủ("
+         << "  các_hàm = tạo đối tượng chương trình("
          << quoted(std::string(source)) << ','
          << quoted(std::string(architectureName(target.arch))) << ','
          << quoted(targetOperatingSystem(target)) << ','
          << quoted(targetAbi(target)) << ");\n"
          << "  lặp (i = 0; i < độ dài(các_hàm); i++) {\n"
          << "    in \"F:\" + các_hàm[i][\"name\"];\n"
-         << "    biên dịch bản địa in bản ghi(các_hàm[i]);\n"
+         << "    xuất bản ghi(các_hàm[i]);\n"
          << "  };\n}\n";
     return code.str();
 }
@@ -277,7 +280,7 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
 std::string makeLoweringSource(const compiler::IrProgram &ir,
                                std::string_view functionName, bool leaf = false,
                                const Target *emitTarget = nullptr,
-                               bool emitObject = false) {
+                               bool emitObject = false, bool emitAssembly = false) {
     if (emitObject && !emitTarget)
         throw std::runtime_error("V++ object writer cần target phát mã máy");
     const auto abiName = nativeAbiSymbol(functionName);
@@ -290,6 +293,7 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
     code << "nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;\n";
     if (emitTarget) code << "nhập gói/biên dịch/mã máy;\n";
     if (emitObject) code << "nhập gói/biên dịch/đối tượng;\n";
+    if (emitAssembly) code << "nhập gói/biên dịch/lắp ráp;\n";
     code << "hàm chính() {\n  ir = {\"values\":[";
     for (std::size_t i = 0; i < ir.values.size(); ++i) {
         const auto &v = ir.values[i];
@@ -352,6 +356,22 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
                  << "    mục = tái_định_vị[i];\n"
                  << "    in \"R:\" + mục[\"offset\"] + \":\" + mục[\"symbol\"];\n"
                  << "  };\n";
+        }
+        if (emitAssembly) {
+            if (leaf) {
+                code << "  asm = biên dịch lắp ráp lá(" << arch << ", " << os << ", "
+                     << quoted(abiName) << ", fn[\"kind\"], fn[\"constant\"], byte);\n";
+            } else {
+                code << "  asm = biên dịch lắp ráp mã máy(" << arch << ", " << os << ", "
+                     << quoted(abiName) << ", kết_quả);\n";
+            }
+            code << "  asm_bytes = chuỗi thành byte máy ảo(asm);\n"
+                 << "  asm_hex = \"\";\n"
+                 << "  lặp (i = 0; i < độ dài(asm_bytes); i++) {\n"
+                 << "    b = asm_bytes[i];\n"
+                 << "    asm_hex += bảng[(b - b % 16) / 16] + bảng[b % 16];\n"
+                 << "  };\n"
+                 << "  in \"A:\" + asm_hex;\n";
         }
         if (emitObject) {
             code << "  object = biên dịch đối tượng(" << arch << ", " << os << ", "
@@ -711,6 +731,16 @@ MachineEmission decodeOutput(const std::string &text, const MachineFunction &fun
         result.bytes.push_back(static_cast<std::uint8_t>(hexNibble(line[i]) * 16 + hexNibble(line[i + 1])));
     while (std::getline(lines, line)) {
         if (line.empty()) continue;
+        if (line.compare(0, 2, "A:") == 0) {
+            if (!result.assembly.empty() || line.size() <= 2 || (line.size() - 2) % 2)
+                throw std::runtime_error("V++ assembly trả bản ghi A: không hợp lệ");
+            for (std::size_t i = 2; i < line.size(); i += 2)
+                result.assembly.push_back(static_cast<char>(hexNibble(line[i]) * 16 +
+                                                             hexNibble(line[i + 1])));
+            if (result.assembly.compare(0, 6, ".text\n") != 0)
+                throw std::runtime_error("V++ assembly thiếu section .text");
+            continue;
+        }
         if (line.compare(0, 2, "R:") != 0)
             throw std::runtime_error("V++ encoder trả bản ghi không hợp lệ");
         const auto colon = line.find(':', 2);
@@ -839,12 +869,12 @@ RawObjectResult emitRawObjectBytesVpp(const Target &target,
 VppCompiledLeaf compileRawLeafVpp(const Target &target, const compiler::IrProgram &ir,
                                   std::string_view functionName,
                                   const std::filesystem::path &sourceBase,
-                                  bool emitObject) {
+                                  bool emitObject, bool emitAssembly) {
     VppCompiledLeaf result;
     std::string partial;
     try {
         const auto output = executeVppSource(
-            makeLoweringSource(ir, functionName, true, &target, emitObject), sourceBase, &partial);
+            makeLoweringSource(ir, functionName, true, &target, emitObject, emitAssembly), sourceBase, &partial);
         const auto start = encodedRecordStart(output);
         result.leaf = decodeLeafLowering(output.substr(0, start));
         result.lowered = true;
@@ -852,6 +882,12 @@ VppCompiledLeaf compileRawLeafVpp(const Target &target, const compiler::IrProgra
             const auto objectStart = encodedObjectRecordStart(output);
             result.emission = decodeLeafOutput(output.substr(start, objectStart - start));
             result.object = decodeObjectOutput(output.substr(objectStart));
+        } else if (emitAssembly) {
+            const auto decoded = decodeOutput(output.substr(start), {});
+            result.emission = {decoded.bytes, {}};
+            result.assembly = decoded.assembly;
+            if (result.assembly.empty())
+                throw std::runtime_error("V++ leaf assembly không trả bản ghi A:");
         } else {
             result.emission = decodeLeafOutput(output.substr(start));
         }
@@ -868,11 +904,11 @@ VppCompiledMachine compileMachineFunctionVpp(const Target &target,
                                              const compiler::IrProgram &ir,
                                              std::string_view functionName,
                                              const std::filesystem::path &sourceBase,
-                                             bool emitObject) {
+                                             bool emitObject, bool emitAssembly) {
     VppCompiledMachine result;
     try {
         const auto output = executeVppSource(
-            makeLoweringSource(ir, functionName, false, &target, emitObject), sourceBase);
+            makeLoweringSource(ir, functionName, false, &target, emitObject, emitAssembly), sourceBase);
         const auto start = encodedRecordStart(output);
         result.function = decodeLowering(output.substr(0, start));
         if (emitObject) {

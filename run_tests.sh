@@ -135,12 +135,15 @@ TESTS=(
   src/tests/kiem_tra_boolean.vi
   src/tests/kiem_tra_bo_qua.vi
   src/tests/kiem_tra_thoat_vong_lap.vi
+  src/tests/kiem_tra_khi.vi
+  src/tests/kiem_tra_bien_dich_khi.vi
   src/tests/kiem_tra_chon_ca.vi
   src/tests/kiem_tra_chuoi_co_ban.vi
   src/tests/kiem_tra_de_quy.vi
   src/tests/kiem_tra_file_dem.vi
   src/tests/kiem_tra_ngoai_le.vi
   src/tests/kiem_tra_ngoai_le_xuyen_ham.vi
+  src/tests/kiem_tra_aot_tang.vi
   src/tests/kiem_tra_dieu_kien_long_nhieu_cap.vi
   src/tests/kiem_tra_dieu_kien_phu_dinh.vi
   src/tests/kiem_tra_ham.vi
@@ -317,6 +320,7 @@ TESTS=(
   src/tests/kiem_tra_ten_kieu_nhieu_tu.vi
   src/tests/kiem_tra_lambda_hof_mac_dinh.vi
   src/tests/kiem_tra_closure_capture.vi
+  src/tests/kiem_tra_ham_an_danh_tu_chu.vi
   src/tests/kiem_tra_list_literal.vi
   src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
@@ -716,6 +720,8 @@ for jit_case in \
   kiem_tra_opcode_chon_ca \
   kiem_tra_khai_bao_bien_runtime \
   kiem_tra_goi_bo_suu_tap \
+  kiem_tra_goi_cau_hinh \
+  kiem_tra_luong_du_lieu \
   kiem_tra_goi_regex \
   kiem_tra_goi_bang_ma \
   kiem_tra_goi_thoi_gian \
@@ -723,6 +729,7 @@ for jit_case in \
   kiem_tra_vm_ieee754 \
   kiem_tra_hoi_quy_tong_hop \
   kiem_tra_closure_capture \
+  kiem_tra_ham_an_danh_tu_chu \
   kiem_tra_lambda_hof_mac_dinh \
   kiem_tra_goi_dong_thoi; do
   jit_test="src/tests/${jit_case}.vi"

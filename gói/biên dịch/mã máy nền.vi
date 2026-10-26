@@ -137,6 +137,8 @@ lớp công khai Tiện Ích Mã Máy {
             ca "Add": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Sub": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Mul": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Div": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "Mod": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Equal": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "NotEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Less": { trả về mình.biên dịch mã máy stack nhị phân(trước); }

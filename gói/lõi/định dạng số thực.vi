@@ -9,7 +9,7 @@ nhập gói/văn bản/chuỗi;
 hàm riêng tư định dạng số lặp(ký tự, n) {
     kết quả = "";
     khối = ký tự;
-    lặp(vòng = 0; n > 0; vòng++) {
+    khi (n > 0) {
         nếu (n % 2 == 1) { kết quả = kết quả + khối; };
         n = làm tròn xuống(n / 2);
         nếu (n > 0) { khối = khối + khối; };
@@ -24,7 +24,7 @@ hàm riêng tư định dạng số nhân lớn(các nhóm số, thừa số, nh
         các nhóm số[i] = tổng % 10000;
         nhớ = làm tròn xuống(tổng / 10000);
     };
-    lặp(vòng = 0; nhớ > 0; vòng++) {
+    khi (nhớ > 0) {
         máy ảo thêm cuối danh sách(các nhóm số, nhớ % 10000);
         nhớ = làm tròn xuống(nhớ / 10000);
     };
@@ -70,7 +70,7 @@ hàm riêng tư định dạng số thập phân chính xác(giá trị) {
     nếu (mũ hai < 0) {
         tỉ lệ = 0 - mũ hai;
         còn lại = tỉ lệ;
-        lặp(vòng = 0; còn lại > 0; vòng++) {
+        khi (còn lại > 0) {
             bước = 7;
             nếu (còn lại < bước) { bước = còn lại; };
             thừa số = 1;
@@ -80,7 +80,7 @@ hàm riêng tư định dạng số thập phân chính xác(giá trị) {
         };
     } hoặc {
         còn lại = mũ hai;
-        lặp(vòng = 0; còn lại > 0; vòng++) {
+        khi (còn lại > 0) {
             bước = 16;
             nếu (còn lại < bước) { bước = còn lại; };
             thừa số = 1;
@@ -149,7 +149,7 @@ hàm riêng tư định dạng số bỏ không lẻ(thân) {
     nếu (!dấu chấm) { trả về thân; };
     n = máy ảo lấy độ dài(thân);
     đang bỏ = đúng;
-    lặp(vòng = 0; n > 0 && đang bỏ; vòng++) {
+    khi (n > 0 && đang bỏ) {
         nếu (thân[n - 1] == "0") { n = n - 1; } hoặc { đang bỏ = sai; };
     };
     nếu (n > 0) {

@@ -7,7 +7,8 @@
 // Return 0 for missing, 1 for an active dependency, 2 for completed.
 hàm nạp mô đun đã gặp(bảng, đường tệp) {
     biến chiều dài = byte dài(đường tệp);
-    lặp (độ lệch = 0; độ lệch < byte dài(bảng); độ lệch = độ lệch) {
+    biến độ lệch = 0;
+    khi (độ lệch < byte dài(bảng)) {
         nếu (độ lệch + 8 > byte dài(bảng)) { trả về -1; };
         biến kích cỡ = byte đọc số nguyên ba mươi hai bit(bảng, độ lệch);
         nếu (kích cỡ <= 0) { trả về -1; };
@@ -106,7 +107,7 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
     nếu (các từ tố <= 0) { mã trạng thái = -1; };
     nếu (con <= 0) { mã trạng thái = -1; };
     nếu (mã trạng thái == 0) {
-        nếu (bản địa đọc nguồn đầu vào(đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = -1; };
+        nếu (đọc tệp nguồn(đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = -1; };
     };
     nếu (mã trạng thái == 0) {
         nếu (từ vựng tách từ tố(nguồn đầu vào, các từ tố) < 0) { mã trạng thái = -1; };

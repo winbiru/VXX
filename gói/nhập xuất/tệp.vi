@@ -40,7 +40,7 @@ lớp công khai Hệ Tệp {
         tệp = Bộ Đệm Tệp(đường, "đọc", 4096, thao tác);
         kết quả = [];
         thử {
-            lặp(vòng = 0; đúng; vòng++) {
+            khi (đúng) {
                 khối = tệp.đọc các byte(4096);
                 nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
                 lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };

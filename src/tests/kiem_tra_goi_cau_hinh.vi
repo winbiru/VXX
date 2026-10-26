@@ -1,5 +1,7 @@
 nhập cấu hình;
 nhập nhập xuất;
+nhập kiểm thử;
+nhập gói/bộ sưu tập/từ điển;
 
 hàm chính() {
     tệp = ".tmp_goi_cau_hinh.ini";
@@ -7,5 +9,26 @@ hàm chính() {
     in đọc cấu hình khóa(tệp, "tên", "");
     in đọc cấu hình khóa(tệp, "số", 0);
     in đọc cấu hình khóa(tệp, "thiếu", "mặc định");
+
+    // Cắt hết khoảng trắng dù phần đuôi dài hơn nội dung; dòng cuối không có LF.
+    ghi tệp(tệp,
+        "  tên          =          V++          \n" +
+        " \t \t \t \n" +
+        "  số          =          42          \n" +
+        " cờ=đúng              \n" +
+        " trống=                 \n" +
+        " cuối=x                 "
+    );
+    cấu hình = đọc cấu hình(tệp);
+    khẳng định bằng(cấu hình["tên"], "V++");
+    khẳng định bằng(cấu hình["số"], 42);
+    khẳng định bằng(cấu hình["cờ"], đúng);
+    khẳng định bằng(cấu hình["trống"], "");
+    khẳng định bằng(cấu hình["cuối"], "x");
+
+    ghi tệp(tệp, " \t \r \n   \t   ");
+    khẳng định bằng(độ dài(khóa từ điển(đọc cấu hình(tệp))), 0);
+    ghi tệp(tệp, "");
+    khẳng định bằng(độ dài(khóa từ điển(đọc cấu hình(tệp))), 0);
     xóa đường dẫn(tệp);
 };

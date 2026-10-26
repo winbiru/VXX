@@ -15,13 +15,20 @@ CTestTestfile.cmake
 Makefile
 # Compiled binaries
 *.a
+*.o
+*.obj
 *.so
 *.dylib
+*.dll
 *.exe
+*.class
+*.pdb
+*.dSYM/
 bin/
 # Editor
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 *~
@@ -37,6 +44,23 @@ src/tests/.perf_batch/
 dist/
 *.vsix
 
+# Generated benchmark runs (keep reproducible reports and source snapshots)
+benchmark/reports/ci/
+benchmark/reports/*/build/
+
+# Logs, temporary files and coverage/profiling outputs
+*.log
+*.tmp
+*.bak
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
 # Local/generated packaging artifacts
 .tmp/
 _CPack_Packages/
@@ -50,7 +74,18 @@ vdk-*.zip
 # Python tooling
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
 .venv-quantum/
+venv/
+
+# Generated dependency/cache directories
+node_modules/
+.cache/
 *.md
 !docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md

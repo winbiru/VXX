@@ -1,0 +1,152 @@
+// Xuất nguồn Assembly từ byte mã máy và relocation do backend V++ tạo.
+// Không chạy lại encoder C++: dữ liệu xuất luôn là byte production.
+// .byte giữ nguyên encoding của từng ISA; CALL giữ relocation thật cho linker.
+nhập gói/biên dịch/mã máy nền;
+
+// Ghép cân bằng: source ASM của hàm lớn không bị sao chép lại sau mỗi byte.
+hàm công khai biên dịch lắp ráp nối các phần(phần) {
+    nếu (độ dài(phần) == 0) { trả về ""; };
+    khi (độ dài(phần) > 1) {
+        tiếp = [];
+        lặp(i = 0; i < độ dài(phần); i += 2) {
+            mục = phần[i];
+            nếu (i + 1 < độ dài(phần)) { mục += phần[i + 1]; };
+            máy ảo thêm cuối danh sách(tiếp, mục);
+        };
+        phần = tiếp;
+    };
+    trả về phần[0];
+};
+
+hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả) {
+    nếu (kiến trúc != "x86_64" && kiến trúc != "aarch64") {
+        ném "assembly Machine IR chưa hỗ trợ kiến trúc";
+    };
+    nếu (!biên dịch mã máy ký hiệu hợp lệ(tên)) {
+        ném "assembly: ký hiệu xuất không hợp lệ";
+    };
+    các byte = kết quả["bytes"];
+    các liên kết = kết quả["relocations"];
+    nếu (độ dài(các byte) == 0) { ném "assembly: mã máy rỗng"; };
+    tên xuất = tên;
+    nếu (hệ điều hành == "macos") { tên xuất = "_" + tên; };
+    phần = [".text\n.globl " + tên xuất + "\n" + tên xuất + ":\n"];
+    văn bản = "";
+    vị trí = 0;
+    số byte dòng = 0;
+    liên kết trước = -1;
+    lặp (r = 0; r < độ dài(các liên kết); r++) {
+        mục = các liên kết[r];
+        vị trí liên kết = mục["offset"];
+        ký hiệu = mục["symbol"];
+        nếu (!biên dịch mã máy ký hiệu hợp lệ(ký hiệu) ||
+            vị trí liên kết < 0 || vị trí liên kết + 4 > độ dài(các byte) ||
+            vị trí liên kết < vị trí || vị trí liên kết <= liên kết trước) {
+            ném "assembly: relocation CALL không hợp lệ";
+        };
+        liên kết trước = vị trí liên kết;
+        khi (vị trí < vị trí liên kết) {
+            nếu (số byte dòng == 0) { văn bản += ".byte "; }
+            hoặc { văn bản += ", "; };
+            văn bản += "" + các byte[vị trí];
+            số byte dòng += 1;
+            vị trí += 1;
+            nếu (số byte dòng == 16) {
+                máy ảo thêm cuối danh sách(phần, văn bản + "\n");
+                văn bản = ""; số byte dòng = 0;
+            };
+        };
+        nếu (số byte dòng > 0) { văn bản += "\n"; số byte dòng = 0; };
+        tên gọi = ký hiệu;
+        nếu (hệ điều hành == "macos") { tên gọi = "_" + ký hiệu; };
+        nếu (kiến trúc == "x86_64") {
+            // Offset là displacement sau opcode E8. REL32 = S - (P+4).
+            nếu (vị trí == 0 || các byte[vị trí - 1] != 232) {
+                ném "assembly x86_64: CALL không có opcode E8";
+            };
+            văn bản += ".long " + tên gọi + " - . - 4\n";
+        } hoặc {
+            // ARM64 BL có relocation CALL26 trên toàn bộ word 0x94000000.
+            nếu (các byte[vị trí] != 0 || các byte[vị trí + 1] != 0 ||
+                các byte[vị trí + 2] != 0 || các byte[vị trí + 3] != 148) {
+                ném "assembly AArch64: relocation không trỏ đến BL";
+            };
+            văn bản += "bl " + tên gọi + "\n";
+        };
+        máy ảo thêm cuối danh sách(phần, văn bản);
+        văn bản = "";
+        vị trí += 4;
+    };
+    khi (vị trí < độ dài(các byte)) {
+        nếu (số byte dòng == 0) { văn bản += ".byte "; }
+        hoặc { văn bản += ", "; };
+        văn bản += "" + các byte[vị trí];
+        vị trí += 1;
+        số byte dòng += 1;
+        nếu (số byte dòng == 16) {
+            máy ảo thêm cuối danh sách(phần, văn bản + "\n");
+            văn bản = ""; số byte dòng = 0;
+        };
+    };
+    nếu (số byte dòng > 0) { văn bản += "\n"; };
+    máy ảo thêm cuối danh sách(phần, văn bản);
+    trả về biên dịch lắp ráp nối các phần(phần);
+};
+
+// Xuất assembly cho ABI leaf trực tiếp trong V++. Các ISA chưa có bộ in
+// mnemonic sử dụng .byte từ chính output production, tránh tái mã hóa opcode.
+// RISC-V/ARM64 dùng mnemonic để phục vụ kiểm tra bằng assembler độc lập.
+hàm công khai biên dịch lắp ráp lá(kiến trúc, hệ điều hành, tên, loại, hằng, các byte) {
+    nếu (!biên dịch mã máy ký hiệu hợp lệ(tên)) {
+        ném "assembly lá: ký hiệu xuất không hợp lệ";
+    };
+    nếu (loại != "hằng" && loại != "cộng" && loại != "trừ") {
+        ném "assembly lá: phép toán chưa hỗ trợ";
+    };
+    nếu (độ dài(các byte) == 0) { ném "assembly lá: mã máy rỗng"; };
+    tên xuất = tên;
+    nếu (hệ điều hành == "macos") { tên xuất = "_" + tên; };
+    văn bản = ".text\n.globl " + tên xuất + "\n" + tên xuất + ":\n";
+
+    nếu (kiến trúc == "riscv64") {
+        nếu (loại == "hằng") {
+            // Đồng nhất quy tắc chia signed, carry và sign extension với emitter.
+            phần cao = hằng / 4096;
+            dư = hằng % 4096;
+            nếu (dư > 2047) { dư -= 4096; phần cao += 1; };
+            nếu (dư < -2048) { dư += 4096; phần cao -= 1; };
+            nếu (phần cao >= 524288) { phần cao -= 1048576; };
+            nếu (phần cao < -524288) { phần cao += 1048576; };
+            văn bản += "lui a0, " + phần cao + "\naddiw a0, a0, " + dư + "\n";
+        } hoặc {
+            nếu (loại == "cộng") { văn bản += "addw a0, a0, a1\n"; }
+            hoặc { văn bản += "subw a0, a0, a1\n"; };
+        };
+        trả về văn bản + "jalr zero, ra, 0\n";
+    };
+    nếu (kiến trúc == "aarch64") {
+        nếu (loại == "hằng") {
+            phần = biên dịch mã máy trả về(hằng);
+            văn bản += "movz w0, #" + phần["lo"] + "\n";
+            văn bản += "movk w0, #" + phần["hi"] + ", lsl #16\n";
+        } hoặc {
+            nếu (loại == "cộng") { văn bản += "add w0, w0, w1\n"; }
+            hoặc { văn bản += "sub w0, w0, w1\n"; };
+        };
+        trả về văn bản + "ret\n";
+    };
+
+    // .byte là cú pháp assembler, không phụ thuộc backend C++ hoặc decoder ISA.
+    số byte dòng = 0;
+    lặp (i = 0; i < độ dài(các byte); i++) {
+        byte = các byte[i];
+        nếu (byte < 0 || byte > 255) { ném "assembly lá: byte ngoài u8"; };
+        nếu (số byte dòng == 0) { văn bản += ".byte "; }
+        hoặc { văn bản += ", "; };
+        văn bản += "" + byte;
+        số byte dòng += 1;
+        nếu (số byte dòng == 16) { văn bản += "\n"; số byte dòng = 0; };
+    };
+    nếu (số byte dòng > 0) { văn bản += "\n"; };
+    trả về văn bản;
+};

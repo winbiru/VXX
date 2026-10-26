@@ -37,6 +37,8 @@ function capture(rule, text, index) {
 }
 
 const typeRules = grammar.repository;
+assert.equal(capture(typeRules.controlKeywords.patterns[0].match, 'khi (x < 3)', 1), 'khi');
+assert.equal(new RegExp(typeRules.controlKeywords.patterns[0].match, 'u').test('khich'), false);
 assert.equal(
   capture(typeRules.classDefinitions.patterns[0].match,
     'lớp Bộ Điều Khiển Ứng Dụng kế thừa Nền triển khai CóTên {', 3),

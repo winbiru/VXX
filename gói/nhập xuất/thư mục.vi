@@ -67,7 +67,7 @@ lớp công khai Thư Mục {
             nếu (gốc dữ liệu < 1) { gốc dữ liệu = 1; };
         };
         đang bỏ = đúng;
-        lặp(vòng = 0; n > gốc dữ liệu && đang bỏ; vòng++) {
+        khi (n > gốc dữ liệu && đang bỏ) {
             nếu (!đường dẫn là phân cách(đường[n - 1])) {
                 đang bỏ = sai;
             } hoặc {
@@ -84,7 +84,7 @@ lớp công khai Thư Mục {
         cần tạo = [];
         hiện tại = đường;
         tìm cha = đúng;
-        lặp(vòng = 0; tìm cha; vòng++) {
+        khi (tìm cha) {
             nếu (là thư mục(hiện tại)) {
                 tìm cha = sai;
             } hoặc {
@@ -114,7 +114,7 @@ lớp công khai Thư Mục {
         kết quả = [];
         thử {
             đang đọc = đúng;
-            lặp(vòng = 0; đang đọc; vòng++) {
+            khi (đang đọc) {
                 mục = máy thư mục kế(thư mục);
                 nếu (mục[0] <= 0) {
                     nếu (mục[0] < 0) { ném "liệt kê thư mục: không thể đọc thư mục"; };
@@ -142,7 +142,7 @@ lớp công khai Thư Mục {
         việc = [[đường, sai]];
         đã xóa = 0;
         // Stack tường minh thay cho lời gọi đệ quy: cây sâu không dùng call stack VM.
-        lặp(vòng = 0; máy ảo lấy độ dài(việc) > 0; vòng++) {
+        khi (máy ảo lấy độ dài(việc) > 0) {
             mục = máy ảo xóa vị trí danh sách(việc, máy ảo lấy độ dài(việc) - 1);
             đường mục = mục[0];
             nếu (mục[1]) {

@@ -26,7 +26,7 @@ lớp công khai Bộ Nhớ Đệm DNS {
     hàm công khai phân giải tên miền đọc(khóa) {
         bây giờ = thời gian đơn điệu mili giây();
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+        khi (i < máy ảo lấy độ dài(mình.mục)) {
             mục = mình.mục[i];
             nếu (mục[1] <= bây giờ) {
                 máy ảo xóa vị trí danh sách(mình.mục, i);
@@ -48,7 +48,7 @@ lớp công khai Bộ Nhớ Đệm DNS {
         nếu (máy ảo lấy độ dài(địa chỉ) == 0 || thời gian tồn tại <= 0) { trả về sai; };
         bây giờ = thời gian đơn điệu mili giây();
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mình.mục); vòng++) {
+        khi (i < máy ảo lấy độ dài(mình.mục)) {
             mục = mình.mục[i];
             nếu (mục[1] <= bây giờ || mục[0] == khóa) {
                 máy ảo xóa vị trí danh sách(mình.mục, i);

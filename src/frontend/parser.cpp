@@ -1038,7 +1038,7 @@ AstStatementKind Parser::classify(std::size_t begin) const noexcept {
     if (lexeme == "lớp") return AstStatementKind::Class;
     if (lexeme == "giao diện") return AstStatementKind::Interface;
     if (lexeme == "nếu") return AstStatementKind::Conditional;
-    if (lexeme == "lặp") return AstStatementKind::Loop;
+    if (lexeme == "lặp" || lexeme == "khi") return AstStatementKind::Loop;
     if (lexeme == "chọn") return AstStatementKind::Switch;
     if (lexeme == "trả về") return AstStatementKind::Return;
     if (lexeme == "in") return AstStatementKind::Print;
@@ -1437,7 +1437,7 @@ void Parser::attachExpressionRoots(AstStatement &statement) {
     const std::size_t close = matchingDelimiter(tokens_, open, end, "(", ")");
     if (close >= end) return;
 
-    if (statement.kind != AstStatementKind::Loop) {
+    if (statement.kind != AstStatementKind::Loop || tokens_[begin].lexeme == "khi") {
         attach(open + 1, close);
         return;
     }
@@ -1612,8 +1612,25 @@ void Parser::attachConditionalForm(AstStatement &statement) {
     statement.conditionalForm = AstConditionalForm::IfElseBlocks;
 }
 
-// Nhận diện header vòng `lặp` và gắn ba biểu thức init/condition/update cùng dạng vòng lặp vào AST.
+// Nhận diện header vòng `lặp` hoặc `khi` và gắn dạng vòng lặp vào AST.
 void Parser::attachLoopForm(AstStatement &statement) {
+    if (statement.kind == AstStatementKind::Loop &&
+        tokens_[statement.tokenBegin].lexeme == "khi") {
+        const std::size_t begin = statement.tokenBegin;
+        const std::size_t end = statement.tokenEnd;
+        const std::size_t close = begin + 1 < end && tokens_[begin + 1].lexeme == "("
+            ? matchingDelimiter(tokens_, begin + 1, end, "(", ")") : end;
+        if (statement.expressionRoots.size() != 1 || statement.children.size() != 1 ||
+            close + 1 >= end || tokens_[close + 1].lexeme != "{" ||
+            tokens_[close - 1].lexeme == ";" ||
+            statement.children.front().kind != AstStatementKind::Block ||
+            statement.children.front().tokenBegin != close + 1 ||
+            statement.children.front().tokenEnd != end) {
+            throw ParseError("cú pháp khi: khi (điều kiện) { ... }", statement.span);
+        }
+        statement.loopForm = AstLoopForm::WhileBlock;
+        return;
+    }
     if (statement.kind != AstStatementKind::Loop ||
         statement.expressionRoots.size() != 3 ||
         statement.children.size() != 1) {

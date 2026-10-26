@@ -29,7 +29,95 @@ hàm native kiểm tra byte(tên, tham_số, slot, sâu_nhất, lệnh) {
     native in byte("x86_64", "windows", tên, tham_số, slot, sâu_nhất, lệnh);
 }
 
+// ADD/SUB imm12 tạo một lệnh trong khoảng 0..4095; hằng lớn/âm
+// được nạp thẳng vào scratch W9 mà không sao chép slot nguồn.
+hàm native kiểm tra immediate(mã, số, byte_đầu_0, byte_đầu_1, byte_đầu_2, byte_đầu_3) {
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "PushConstant", số, 0, 1);
+    native thêm lệnh(lệnh, mã, 0, 0, 2);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    kết_quả = biên dịch mã máy hàm("aarch64", {
+        "parameterCount": 1, "slotCount": 1,
+        "maxStackDepth": 2, "instructions": lệnh
+    }, "macos");
+    byte = kết_quả["bytes"];
+    nếu (độ dài(byte) < 4 || byte[0] != byte_đầu_0 ||
+        byte[1] != byte_đầu_1 || byte[2] != byte_đầu_2 ||
+        byte[3] != byte_đầu_3) {
+        ném "AArch64 ADD/SUB imm12 hoặc fallback sinh byte sai";
+    };
+}
+
+// Hai phép toán trở lên dùng lại 65521 trong một vòng lặp phải tải W10
+// đúng một lần ở đầu hàm, đồng thời giữ nguyên mã của các nhánh quay ngược.
+hàm native kiểm tra giữ hằng vòng lặp() {
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "PushConstant", 0, 0, 0);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 3, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 3, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 1, 1);
+    native thêm lệnh(lệnh, "Less", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 30, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "PushConstant", 65521, 0, 1);
+    native thêm lệnh(lệnh, "Add", 0, 0, 2);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "PushConstant", 65521, 0, 1);
+    native thêm lệnh(lệnh, "GreaterEqual", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 24, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "PushConstant", 65521, 0, 1);
+    native thêm lệnh(lệnh, "Sub", 0, 0, 2);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 2, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 3, 0);
+    native thêm lệnh(lệnh, "PushConstant", 1, 0, 1);
+    native thêm lệnh(lệnh, "Add", 0, 0, 2);
+    native thêm lệnh(lệnh, "StoreSlot", 0, 3, 1);
+    native thêm lệnh(lệnh, "Drop", 0, 0, 1);
+    native thêm lệnh(lệnh, "Jump", 0, 6, 0);
+    native thêm lệnh(lệnh, "LoadSlot", 0, 2, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+
+    kết_quả = biên dịch mã máy hàm("aarch64", {
+        "parameterCount": 2, "slotCount": 4,
+        "maxStackDepth": 2, "instructions": lệnh
+    }, "macos");
+    byte = kết_quả["bytes"];
+    // MOVZ W10, #65521: 0x529ffe2a (little-endian).
+    nếu (độ dài(byte) < 4 || byte[0] != 42 || byte[1] != 254 ||
+        byte[2] != 159 || byte[3] != 82) {
+        ném "AArch64 không đưa hằng vòng lặp vào W10";
+    };
+    số_lần = 0;
+    lặp (i = 0; i + 3 < độ dài(byte); i = i + 4) {
+        nếu (byte[i] == 42 && byte[i + 1] == 254 &&
+            byte[i + 2] == 159 && byte[i + 3] == 82) {
+            số_lần += 1;
+        };
+    };
+    nếu (số_lần != 1) { ném "AArch64 nạp lại W10 trong vòng lặp"; };
+}
+
 hàm chính() {
+    native kiểm tra giữ hằng vòng lặp();
+    // W1 = W0 +/- imm12; ngoài miền immediate thì MOVZ W9 là lệnh đầu.
+    native kiểm tra immediate("Add", 0, 1, 0, 0, 17);
+    native kiểm tra immediate("Add", 4095, 1, 252, 63, 17);
+    native kiểm tra immediate("Sub", 0, 1, 0, 0, 81);
+    native kiểm tra immediate("Sub", 4095, 1, 252, 63, 81);
+    native kiểm tra immediate("Add", 4096, 9, 0, 130, 82);
+    native kiểm tra immediate("Sub", -1, 233, 255, 159, 82);
+
     // Hàm tru_dao(a,b) { trả về b-a; } (cần Machine IR).
     lệnh = [];
     native thêm lệnh(lệnh, "LoadSlot", 0, 1, 0);
@@ -64,6 +152,28 @@ hàm chính() {
     native thêm lệnh(lệnh, "Return", 0, 0, 1);
     native thêm lệnh(lệnh, "Trap");
     native kiểm tra byte("dieu_kien", 1, 1, 2, lệnh);
+
+    // Immediate CMP 4095, và scratch W9 cho 65521/-1.
+    // Các đường này được đối chiếu byte với encoder C++ và CLI.
+    lệnh = [];
+    native thêm lệnh(lệnh, "LoadSlot", 0, 0, 0);
+    native thêm lệnh(lệnh, "PushConstant", 4095, 0, 1);
+    native thêm lệnh(lệnh, "Less", 0, 0, 2);
+    native thêm lệnh(lệnh, "BranchZero", 0, 6, 1);
+    native thêm lệnh(lệnh, "PushConstant", 12, 0, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "PushConstant", -12, 0, 0);
+    native thêm lệnh(lệnh, "Return", 0, 0, 1);
+    native thêm lệnh(lệnh, "Trap");
+    native kiểm tra byte("so_sanh_nho", 1, 1, 2, lệnh);
+
+    lệnh[1] = biên dịch mã máy lệnh("PushConstant", 65521, 0, 1);
+    lệnh[2] = biên dịch mã máy lệnh("GreaterEqual", 0, 0, 2);
+    native kiểm tra byte("so_sanh_lon", 1, 1, 2, lệnh);
+
+    lệnh[1] = biên dịch mã máy lệnh("PushConstant", -1, 0, 1);
+    lệnh[2] = biên dịch mã máy lệnh("Equal", 0, 0, 2);
+    native kiểm tra byte("so_sanh_am", 1, 1, 2, lệnh);
 
     // Hàm max_i32(a,b): nhánh có else, Jump nhảy tới Trap ở cuối.
     lệnh = [];

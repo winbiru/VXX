@@ -4,6 +4,7 @@ nhập gói/biên dịch/trình điều khiển;
 nhập gói/biên dịch/nguồn tệp;
 nhập gói/biên dịch/bộ nạp;
 nhập gói/biên dịch/sản phẩm biên dịch;
+nhập gói/biên dịch/dòng lệnh máy;
 
 hàm biên dịch trước nguồn tệp(đường, thư viện) {
     trả về biên dịch nguồn tệp tự chủ(đường, thư viện);

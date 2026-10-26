@@ -51,7 +51,7 @@ hàm công khai ký tự unicode(mã) {
 hàm công khai bảng mã unicode tám bit mã hóa(văn bản) {
     các byte = chuỗi thành byte máy ảo(văn bản);
     vị trí = 0;
-    lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+    khi (vị trí < máy ảo lấy độ dài(các byte)) {
         n = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
         nếu (n < 1) { ném "bảng mã: cần đúng một ký tự Unicode"; };
         vị trí = vị trí + n;
@@ -86,6 +86,13 @@ hàm riêng tư bảng mã thường nội bộ(văn bản) {
 hàm riêng tư bảng mã chuẩn hóa tên(tên bảng mã) {
     nếu (loại của(tên bảng mã) != "chuỗi") {
         ném "bảng mã: tên bảng mã phải là chuỗi";
+    };
+
+    // Tên chuẩn xuất hiện trong vòng lặp JSON và các thư viện văn bản.
+    // Tránh bảng chuyển hoa/thường Unicode khi chuỗi đã là tên chuẩn.
+    nếu (tên bảng mã == "UTF-8" || tên bảng mã == "utf8" ||
+        tên bảng mã == "UTF8" || tên bảng mã == "utf-8") {
+        trả về "utf8";
     };
 
     tên = bảng mã thường nội bộ(tên bảng mã);
@@ -216,7 +223,7 @@ hàm riêng tư bảng mã unicode tám bit giải mã(các byte, chế độ) {
     ký tự thay = ký tự unicode(65533);
     vị trí = 0;
     n = máy ảo lấy độ dài(các byte);
-    lặp(vòng = 0; vị trí < n; vòng++) {
+    khi (vị trí < n) {
         độ dài = bảng mã unicode tám bit độ dài đoạn(các byte, vị trí);
         nếu (độ dài > 0) {
             b0 = các byte[vị trí];

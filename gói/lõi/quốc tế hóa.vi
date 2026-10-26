@@ -278,7 +278,7 @@ hàm riêng tư quốc tế ký tự mã(mã) {
 hàm riêng tư quốc tế giải ký tự thoát các thuộc tính(s) {
     kết quả = "";
     i = 0;
-    lặp(vòng = 0; i < máy ảo lấy độ dài(s); vòng++) {
+    khi (i < máy ảo lấy độ dài(s)) {
         c = s[i];
         nếu (c != "\\") {
             kết quả = kết quả + c;
@@ -323,7 +323,7 @@ hàm riêng tư quốc tế dòng tiếp diễn(s) {
     đếm = 0;
     i = máy ảo lấy độ dài(s) - 1;
     đang đếm = đúng;
-    lặp(vòng = 0; đang đếm; vòng++) {
+    khi (đang đếm) {
         nếu (i < 0) {
             đang đếm = sai;
         } hoặc {
@@ -341,7 +341,7 @@ hàm riêng tư quốc tế dòng tiếp diễn(s) {
 hàm riêng tư quốc tế bỏ trắng đầu các thuộc tính(s) {
     i = 0;
     đang bỏ = đúng;
-    lặp(vòng = 0; đang bỏ; vòng++) {
+    khi (đang bỏ) {
         nếu (i >= máy ảo lấy độ dài(s)) {
             đang bỏ = sai;
         } hoặc {
@@ -392,7 +392,7 @@ hàm riêng tư quốc tế phân tích dòng các thuộc tính(dòng) {
     i = vị trí;
     nếu (kiểu == "space") {
         đang bỏ = đúng;
-        lặp(vòng = 0; đang bỏ; vòng++) {
+        khi (đang bỏ) {
             nếu (i >= máy ảo lấy độ dài(s)) {
                 đang bỏ = sai;
             } hoặc {
@@ -410,7 +410,7 @@ hàm riêng tư quốc tế phân tích dòng các thuộc tính(dòng) {
         i += 1;
     };
     đang bỏ = đúng;
-    lặp(vòng = 0; đang bỏ; vòng++) {
+    khi (đang bỏ) {
         nếu (i >= máy ảo lấy độ dài(s)) {
             đang bỏ = sai;
         } hoặc {

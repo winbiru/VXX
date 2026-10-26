@@ -113,7 +113,9 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   nhiều hàm và nhiều module, không chỉ source hai hàm; khóa checksum/output để tránh đo no-op.
   Harness hiện có `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, direct-call/module
   cases, các compiler stage, package/module graph và `gc_collect_cycles`. HTTP/JSON performance
-  case theo implementation V++ hiện hành và telemetry allocation/RSS của GC vẫn chưa có.
+  case theo implementation V++ hiện hành vẫn chưa có. Bộ đo `harness-v3` ngày
+  24/10 bổ sung GC burst/collect/reuse và explicit trim, C++ allocation requests/bytes,
+  peak RSS và từng GC pause; chưa đo biến-map rehash hoặc mọi scheduling path của GC.
 - [ ] Chạy **same-machine baseline vs candidate** bằng cùng harness, corpus, iteration và chính
   sách GC/JIT trên **cùng máy, cùng toolchain/flags, Release**, không bật
   sanitizer/coverage/profiler trong timing.
@@ -131,8 +133,10 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   GC pause p95 và peak RSS tăng >15%. Chốt threshold theo case trước khi so candidate, không
   tự cập nhật baseline hoặc nới ngưỡng để làm xanh gate. MAD/median >5% đánh dấu inconclusive,
   cần đo lại trước khi nghiệm thu; thiếu case/sample hoặc khác metadata đo phải báo lỗi.
-  Rà soát source hiện tại chưa có runner/comparator tương ứng trong `scripts/quality/`, nên
-  mục này không được tính hoàn tất chỉ dựa trên format output của benchmark executable.
+  Đã có `scripts/quality/run_benchmarks.py`, `compare_benchmarks.py` và bộ kiểm thử
+  quyết định PASS/FAIL/INCONCLUSIVE/INVALID. Bằng chứng local ngày 24/10 được lưu dưới
+  `benchmark/reports/local-2026-10-24/`: 16 PASS, 3 INCONCLUSIVE, 0 FAIL; các case
+  nhiễu cần đo lại trước khi nghiệm thu, không đổi ngưỡng để đóng gate.
 - [ ] Nối comparator vào CI với baseline/candidate cùng runner trong một job (hoặc host
   benchmark cố định), lưu raw report thành CI artifact và fail gate khi vượt regression budget.
   CI phải đọc trực tiếp telemetry GC allocation/RSS/p95 cùng timing report thay vì chỉ in số đo
@@ -177,9 +181,12 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
 
 Trạng thái local Release ngày 22/09/2026: CTest 4/4 PASS (`vpp-rc-internal-hardening`,
 `vpp-runtime-p0-hardening`, `vpp-import-precedence-hardening`, `vpp-integration`).
-Benchmark executable đã xuất metadata/case ổn định, nhưng source hiện tại chưa có
-runner/comparator lặp baseline/candidate; vì vậy chưa có self-comparison hợp lệ để dùng làm
-evidence và vẫn cần before/after report từ hai revision độc lập.
+Bộ đo ngày 24/10 đã so sánh hai revision độc lập `cc675ca` và `b39933e` + dirty
+benchmark patch trên cùng máy Release, cùng harness/corpus/iterations. Raw samples,
+GC allocation/RSS/p95 và kết quả replay nằm trong `benchmark/reports/local-2026-10-24/`.
+Hai case GC PASS; kết quả toàn bộ vẫn INCONCLUSIVE vì ba case có MAD/median >5%.
+Job `benchmark-gate` đã được thêm vào workflow; chưa có bằng chứng CI runner cho thay
+đổi này, nên các checkbox release gate vẫn để mở.
 
 ## 1. Đóng băng semantics ngôn ngữ
 

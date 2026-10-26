@@ -1,5 +1,5 @@
-// Native compiler entry point. Imports are resolved recursively by the
-// self-hosted module loader, keeping source files independently editable.
+// Điểm vào compiler i32; bộ nạp tự chủ xử lý các mô-đun bên dưới.
+// Các mô-đun dùng chung bảng hàm; phụ thuộc được tập hợp tại điểm vào này.
 nhập phân tích từ vựng;
 nhập từ tố;
 nhập phân tích cú pháp;

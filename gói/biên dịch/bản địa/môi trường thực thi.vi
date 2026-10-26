@@ -35,7 +35,7 @@ hàm thực thi các byte dự trữ(mã tài nguyên, phần bổ sung) {
     nếu (phần bổ sung > 1048576 - chiều dài) { trả về -1; };
     biến dung lượng cần = chiều dài + phần bổ sung + 1;
     biến dung lượng = máy đọc số nguyên ba mươi hai bit(bản ghi dữ liệu + 24);
-    lặp (i = 0; dung lượng < dung lượng cần; i++) {
+    khi (dung lượng < dung lượng cần) {
         nếu (dung lượng > 524288) { dung lượng = 1048577; }
         hoặc { dung lượng = dung lượng * 2; };
     };
@@ -193,7 +193,7 @@ hàm thực thi các byte giải phóng(mã tài nguyên) {
 
 hàm thực thi ghi tất cả(mã tệp mở, độ lệch, chiều dài) {
     biến done = 0;
-    lặp (i = 0; done < chiều dài; i++) {
+    khi (done < chiều dài) {
         biến số phần tử = máy ghi(mã tệp mở, độ lệch + done, chiều dài - done);
         nếu (số phần tử < 0) {
             nếu (máy lỗi() == 4) { bỏ qua; };
@@ -557,7 +557,7 @@ hàm thực thi đối tượng kho lưu trữ bản tổng hợp(kho lưu trữ
     biến độ lệch = 0;
     biến số phần tử = 0;
     biến needs các dịch vụ = 0;
-    lặp (i = 0; độ lệch < tổng số; i++) {
+    khi (độ lệch < tổng số) {
         biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, độ lệch);
         nếu (chiều dài < 0) { trả về -1; };
         biến các dịch vụ = thực thi đối tượng các dịch vụ(kho lưu trữ, độ lệch + 4, chiều dài);
@@ -686,11 +686,11 @@ hàm thực thi liên kết tạm thời đường tệp(kết xuất, đích nh
     } hoặc {
         nếu (thực thi liên kết thêm cuối văn bản(đích nhận, ".vpp-module-") != 0) { trả về -1; };
         biến số chia = 1;
-        lặp (i = 0; máy chia số nguyên ba mươi hai bit(chỉ mục, số chia) >= 10; i++) {
+        khi (máy chia số nguyên ba mươi hai bit(chỉ mục, số chia) >= 10) {
             số chia = số chia * 10;
         };
         biến dịch vụ tài nguyên = chỉ mục;
-        lặp (j = 0; số chia > 0; j++) {
+        khi (số chia > 0) {
             biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
             nếu (thực thi các byte thêm cuối(đích nhận, chữ số đang xét + 48) != 0) { trả về -1; };
             dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;
@@ -877,7 +877,7 @@ hàm thực thi tệp dữ liệu đóng(mã tài nguyên) {
 
 hàm thực thi đọc lần thử lại(mã tệp mở, độ lệch, chiều dài) {
     biến kết quả trả về = -1;
-    lặp (i = 0; i < 1; i = i) {
+    khi (đúng) {
         kết quả trả về = máy đọc(mã tệp mở, độ lệch, chiều dài);
         nếu (kết quả trả về >= 0) { thoát; };
         nếu (máy lỗi() != 4) { thoát; };
@@ -964,7 +964,7 @@ hàm thực thi đọc i32() {
     máy ghi số nguyên ba mươi hai bit(8, 0);
     biến chiều dài = 0;
     biến overflow dòng = 0;
-    lặp (i = 0; i < 1; i = i) {
+    khi (đúng) {
         biến số phần tử = thực thi đọc lần thử lại(0, 3184, 1);
         nếu (số phần tử < 0) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
         nếu (số phần tử == 0) {
@@ -980,7 +980,7 @@ hàm thực thi đọc i32() {
     };
     nếu (overflow dòng == 1) { máy ghi số nguyên ba mươi hai bit(8, 2); trả về 0; };
     biến con trỏ hiện tại = 0;
-    lặp (j = 0; con trỏ hiện tại < chiều dài; j++) {
+    khi (con trỏ hiện tại < chiều dài) {
         nếu (thực thi khoảng trắng(máy đọc byte(3104 + con trỏ hiện tại)) != 1) { thoát; };
         con trỏ hiện tại = con trỏ hiện tại + 1;
     };
@@ -993,7 +993,7 @@ hàm thực thi đọc i32() {
     biến các chữ số = 0;
     biến giá trị đang xét = 0;
     biến đầu ra of khoảng = 0;
-    lặp (k = 0; con trỏ hiện tại < chiều dài; k++) {
+    khi (con trỏ hiện tại < chiều dài) {
         biến chữ số đang xét = máy đọc byte(3104 + con trỏ hiện tại) - 48;
         nếu (chữ số đang xét < 0) { thoát; };
         nếu (chữ số đang xét > 9) { thoát; };
@@ -1089,7 +1089,10 @@ hàm thực thi liên kết macho(đối tượng, kết xuất, nguồn đầu 
 // V++ owns every module, path, argv entry, descriptor and cleanup decision.
 // The fixed-size address array holds full-width 64-bit pointers; no i32
 // handle or offset is reinterpreted as a process pointer.
-hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+// mode 0 links an executable with runtime/ASM. Mode 1 merges only source
+// objects, preserving undefined runtime symbols for a later final link.
+hàm thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, chế độ xuất) {
+    nếu (chế độ xuất != 0) { nếu (chế độ xuất != 1) { trả về -1; }; };
     nếu (kho lưu trữ == kết xuất) { trả về -1; };
     nếu (kho lưu trữ == nguồn đầu vào) { trả về -1; };
     nếu (kết xuất == nguồn đầu vào) { trả về -1; };
@@ -1100,6 +1103,7 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     biến các mô đun = máy chia số nguyên ba mươi hai bit(bản tổng hợp, 2);
     nếu (các mô đun < 1) { trả về -1; };
     nếu (các mô đun > 4086) { trả về -1; };
+    nếu (chế độ xuất == 1) { nếu (các mô đun < 2) { trả về -1; }; };
     thực thi liên kết các đối số đặt lại();
     biến tạm = thực thi các byte mới();
     nếu (tạm <= 0) { trả về -1; };
@@ -1121,9 +1125,23 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
             nếu (thực thi liên kết các đối số hằng văn bản("arm64") < 0) { mã trạng thái = -2; };
         };
     };
-    đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
     nếu (mã trạng thái == -1) {
-        lặp (i = 0; i < các mô đun; i++) {
+        nếu (chế độ xuất == 1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-r") < 0) { mã trạng thái = -2; };
+        };
+    };
+    // Snapshot the first temporary object argument after optional linker
+    // flags; otherwise cleanup unlinks '-r' and leaks the last object.
+    đối tượng điểm bắt đầu = máy đọc số nguyên ba mươi hai bit(3800);
+    nếu (chế độ xuất == 1) {
+        biến runtime chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, 0);
+        nếu (runtime chiều dài <= 0) { mã trạng thái = -2; }
+        hoặc { vị trí đang xét = runtime chiều dài + 4; };
+    };
+    nếu (mã trạng thái == -1) {
+        biến đầu = 0;
+        nếu (chế độ xuất == 1) { đầu = 1; };
+        lặp (i = đầu; i < các mô đun; i++) {
             biến chiều dài = thực thi đối tượng kho lưu trữ điểm vào(kho lưu trữ, vị trí đang xét);
             nếu (chiều dài < 0) { mã trạng thái = -2; thoát; };
             nếu (thực thi liên kết tạm thời đường tệp(kết xuất, tạm, i) != 0) { mã trạng thái = -2; thoát; };
@@ -1150,23 +1168,25 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     nếu (mã trạng thái == -1) {
         nếu (vị trí đang xét != tổng số) { mã trạng thái = -2; };
     };
-    nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { mã trạng thái = -2; };
-    };
-    nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { mã trạng thái = -2; };
-    };
-    nếu (mã trạng thái == -1) {
-        biến primitive = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
-        nếu (primitive <= 0) { mã trạng thái = -2; }
-        hoặc {
-            nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
-            thực thi các byte giải phóng(primitive);
+    nếu (chế độ xuất == 0) {
+        nếu (mã trạng thái == -1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_VPP_RUNTIME=1") < 0) { mã trạng thái = -2; };
         };
-    };
-    nếu (mã trạng thái == -1) {
-        nếu (linux == 1) {
-            nếu (thực thi liên kết các đối số hằng văn bản("-lcrypto") < 0) { mã trạng thái = -2; };
+        nếu (mã trạng thái == -1) {
+            nếu (thực thi liên kết các đối số hằng văn bản("-DVPP_NATIVE_RUNTIME_STACK_ABI=1") < 0) { mã trạng thái = -2; };
+        };
+        nếu (mã trạng thái == -1) {
+            biến primitive = thực thi môi trường thực thi tệp dữ liệu đường tệp(1);
+            nếu (primitive <= 0) { mã trạng thái = -2; }
+            hoặc {
+                nếu (thực thi liên kết các đối số đẩy(primitive) < 0) { mã trạng thái = -2; };
+                thực thi các byte giải phóng(primitive);
+            };
+        };
+        nếu (mã trạng thái == -1) {
+            nếu (linux == 1) {
+                nếu (thực thi liên kết các đối số hằng văn bản("-lcrypto") < 0) { mã trạng thái = -2; };
+            };
         };
     };
     nếu (mã trạng thái == -1) {
@@ -1200,7 +1220,18 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
         nếu (thực thi liên kết khởi chạy đợi() != 0) { mã trạng thái = -2; };
     };
     nếu (mã trạng thái == -1) {
-        nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
+        nếu (chế độ xuất == 0) {
+            nếu (thực thi liên kết executable sẵn sàng(tạm) != 0) { mã trạng thái = -2; };
+        } hoặc {
+            biến đường tệp ô nhớ = thực thi các byte ô nhớ(tạm);
+            nếu (đường tệp ô nhớ < 0) { mã trạng thái = -2; }
+            hoặc {
+                nếu (máy thông tin tệp(thực thi nội dung đệm(đường tệp ô nhớ), 3584) != 0) { mã trạng thái = -2; }
+                hoặc {
+                    nếu (thực thi liên kết thông tin tệp thông thường(3584) != 1) { mã trạng thái = -2; };
+                };
+            };
+        };
     };
     nếu (mã trạng thái == -1) {
         nếu (thực thi liên kết công bố(tạm, kết xuất) != 0) { mã trạng thái = -2; };
@@ -1214,6 +1245,14 @@ hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, ng
     thực thi các byte giải phóng(tạm);
     nếu (mã trạng thái == 0) { trả về 0; };
     trả về -1;
+};
+
+hàm thực thi liên kết macho các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    trả về thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, 0);
+};
+
+hàm thực thi liên kết đối tượng các mô đun(kho lưu trữ, kết xuất, nguồn đầu vào) {
+    trả về thực thi liên kết các mô đun theo chế độ(kho lưu trữ, kết xuất, nguồn đầu vào, 1);
 };
 
 // No C file streams or allocation are used by the content-addressed cache.
@@ -1330,7 +1369,7 @@ hàm thực thi bộ nhớ đệm đường tệp(khóa tra cứu) {
 
 hàm thực thi bộ nhớ đệm đọc chính xác(mã tệp mở, độ lệch, chiều dài) {
     biến done = 0;
-    lặp (i = 0; done < chiều dài; i++) {
+    khi (done < chiều dài) {
         biến số phần tử = thực thi đọc lần thử lại(mã tệp mở, độ lệch + done, chiều dài - done);
         nếu (số phần tử <= 0) { trả về -1; };
         done = done + số phần tử;
@@ -1497,7 +1536,7 @@ hàm thực thi bộ nhớ đệm thêm cuối số(văn bản, giá trị đang
         số chia = số chia * 10;
     };
     biến dịch vụ tài nguyên = giá trị đang xét;
-    lặp (i = 0; số chia > 0; i++) {
+    khi (số chia > 0) {
         biến chữ số đang xét = máy chia số nguyên ba mươi hai bit(dịch vụ tài nguyên, số chia);
         nếu (thực thi các byte thêm cuối(văn bản, chữ số đang xét + 48) != 0) { trả về -1; };
         dịch vụ tài nguyên = dịch vụ tài nguyên - chữ số đang xét * số chia;

@@ -100,7 +100,7 @@ lớp công khai Bộ Tách Từ Vựng {
             s == "[" || s == "]" || s == ";" || s == "," || s == ":") {
             trả về "dấu câu";
         };
-        nếu (s == "nếu" || s == "hoặc" || s == "lặp" || s == "hàm" ||
+        nếu (s == "nếu" || s == "hoặc" || s == "lặp" || s == "khi" || s == "hàm" ||
             s == "gọi" || s == "biến" || s == "in" || s == "dừng" ||
             s == "thoát" || s == "chọn" || s == "ca" || s == "đúng" ||
             s == "sai" || s == "rỗng" || s == "ném" || s == "thử" ||
@@ -152,7 +152,7 @@ lớp công khai Bộ Tách Từ Vựng {
         cột byte = [1];
         cột hiện tại = 1;
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             bước = 1;
             c = "";
             nếu (các byte[vị trí] < 128) {
@@ -176,7 +176,7 @@ lớp công khai Bộ Tách Từ Vựng {
         i = 0;
         dòng = 1;
         cột = 1;
-        lặp(vòng = 0; i < n; vòng++) {
+        khi (i < n) {
             c = ký tự[i];
             tiếp = "";
             nếu (i + 1 < n) { tiếp = ký tự[i + 1]; };
@@ -188,7 +188,7 @@ lớp công khai Bộ Tách Từ Vựng {
                 nếu (c == "/" && tiếp == "/") {
                     i += 2;
                     cột += 2;
-                    lặp(j = 0; i < n; j++) {
+                    khi (i < n) {
                         nếu (ký tự[i] == "\n") { thoát; };
                         i += 1;
                         cột += 1;
@@ -200,7 +200,7 @@ lớp công khai Bộ Tách Từ Vựng {
                         i += 2;
                         cột += 2;
                         đóng = sai;
-                        lặp(j = 0; i < n && !đóng; j++) {
+                        khi (i < n && !đóng) {
                             a = ký tự[i];
                             b = "";
                             nếu (i + 1 < n) { b = ký tự[i + 1]; };
@@ -226,7 +226,7 @@ lớp công khai Bộ Tách Từ Vựng {
                             i += 1;
                             cột += 1;
                             đóng = sai;
-                            lặp(j = 0; i < n && !đóng; j++) {
+                            khi (i < n && !đóng) {
                                 a = ký tự[i];
                                 b = "";
                                 nếu (i + 1 < n) { b = ký tự[i + 1]; };
@@ -257,7 +257,7 @@ lớp công khai Bộ Tách Từ Vựng {
                                     i += 1;
                                     cột += 1;
                                 } hoặc {
-                                    lặp(j = 0; i < n; j++) {
+                                    khi (i < n) {
                                         a = ký tự[i];
                                         nếu (mình.biên dịch từ vựng trắng(a) || mình.biên dịch từ vựng ngăn cách(a)) {
                                             thoát;
@@ -299,7 +299,7 @@ lớp công khai Bộ Tách Từ Vựng {
             "kế": đúng, "triển": đúng, "công": đúng, "riêng": đúng,
             "bảo": đúng, "ký": đúng, "khả": đúng};
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(thô); vòng++) {
+        khi (i < máy ảo lấy độ dài(thô)) {
             đầu = thô[i];
             chuỗi ghép = lấy từ điển(đầu, "giá trị", "");
             bước = 1;

@@ -3,11 +3,12 @@
 // Calls to imported V++ functions and native runtime functions are emitted as
 // ARM64_RELOC_BRANCH26 records instead of patching across module boundaries.
 
-hàm đối tượng mô đun chương trình con tên định danh(sổ đăng ký, mã định danh, điểm vào mã định danh) {
+hàm tên ký hiệu hàm(sổ đăng ký, mã định danh, điểm vào mã định danh) {
     nếu (mã định danh < 0) { trả về -1; };
     nếu (mã định danh == điểm vào mã định danh) { trả về "_main"; };
     biến số phần tử = 0;
-    lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+    biến độ lệch = 0;
+    khi (độ lệch < byte dài(sổ đăng ký)) {
         nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { trả về -1; };
         biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
         nếu (kích cỡ <= 0) { trả về -1; };
@@ -28,7 +29,7 @@ hàm đối tượng mô đun chương trình con tên định danh(sổ đăng 
     trả về -1;
 };
 
-hàm đối tượng mô đun đã dùng(các cặp, mã định danh) {
+hàm có tham chiếu hàm(các cặp, mã định danh) {
     lặp (độ dời = 0; độ dời < byte dài(các cặp); độ dời = độ dời + 8) {
         nếu (byte đọc số nguyên ba mươi hai bit(các cặp, độ dời + 4) == mã định danh) { trả về 1; };
     };
@@ -36,7 +37,7 @@ hàm đối tượng mô đun đã dùng(các cặp, mã định danh) {
 };
 
 // Add one nlist_64 and its UTF-8 string. is_defined selects N_SECT or N_UNDF.
-hàm đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, tên định danh, là đã định nghĩa, giá trị đang xét) {
+hàm thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên định danh, là đã định nghĩa, giá trị đang xét) {
     nếu (tên định danh <= 0) { trả về -1; };
     nếu (byte dài(tên định danh) <= 0) { byte hủy(tên định danh); trả về -1; };
     biến điểm bắt đầu = byte dài(các chuỗi);
@@ -58,32 +59,32 @@ hàm đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các c
 // Local symbols precede deduplicated V++ undefined symbols, followed by
 // deduplicated native ABI undefined symbols. The same order is used to
 // compute BRANCH26 relocation symbol indexes.
-hàm đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, đích đến) {
+hàm chỉ mục ký hiệu nhập(các phần nhập, đầu tiên, cuối cùng, đích đến) {
     biến chỉ mục = cuối cùng - đầu tiên;
     lặp (mã định danh = 0; mã định danh < đích đến; mã định danh++) {
         nếu (mã định danh < đầu tiên) {
-            nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+            nếu (có tham chiếu hàm(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
         } hoặc nếu (mã định danh >= cuối cùng) {
-            nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+            nếu (có tham chiếu hàm(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
         };
     };
     trả về chỉ mục;
 };
 
-hàm đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, chương trình con số phần tử, bản địa mã định danh) {
+hàm chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, chương trình con số phần tử, mã lõi) {
     biến chỉ mục = cuối cùng - đầu tiên;
     lặp (mã định danh = 0; mã định danh < chương trình con số phần tử; mã định danh++) {
-        nếu (đối tượng mô đun đã dùng(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
+        nếu (có tham chiếu hàm(các phần nhập, mã định danh) == 1) { chỉ mục = chỉ mục + 1; };
     };
-    lặp (bản địa trước = 0; bản địa trước < bản địa mã định danh; bản địa trước++) {
-        nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, bản địa trước) == 1) { chỉ mục = chỉ mục + 1; };
+    lặp (mã lõi trước = 0; mã lõi trước < mã lõi; mã lõi trước++) {
+        nếu (có tham chiếu hàm(lời gọi lõi, mã lõi trước) == 1) { chỉ mục = chỉ mục + 1; };
     };
     trả về chỉ mục;
 };
 
 // Objects for empty function modules are skipped. Each nonempty unit owns
 // only the machine code generated from its own function IDs.
-hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, bản địa các lời gọi) {
+hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, lời gọi lõi) {
     nếu (đầu tiên < 0) { trả về -1; };
     nếu (cuối cùng <= đầu tiên) { trả về -1; };
     nếu (mã máy == đối tượng) { trả về -1; };
@@ -102,11 +103,11 @@ hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các đi
     nếu (mã trạng thái == 0) {
         nếu (byte thêm(các chuỗi, 0) != 0) { mã trạng thái = -1; };
         lặp (chương trình con hiện tại = đầu tiên; chương trình con hiện tại < cuối cùng; chương trình con hiện tại++) {
-            biến tên định danh = đối tượng mô đun chương trình con tên định danh(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh);
+            biến tên định danh = tên ký hiệu hàm(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh);
             biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);
             nếu (điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
             nếu (điểm bắt đầu >= n) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, tên định danh, 1, điểm bắt đầu) != 0) {
+            nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên định danh, 1, điểm bắt đầu) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
@@ -117,15 +118,16 @@ hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các đi
     // global function ID is emitted only once, even when called many times.
     biến toàn cục mã định danh = 0;
     nếu (mã trạng thái == 0) {
-        lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+        biến độ lệch = 0;
+        khi (độ lệch < byte dài(sổ đăng ký)) {
             nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { mã trạng thái = -1; thoát; };
             biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
             nếu (kích cỡ <= 0) { mã trạng thái = -1; thoát; };
             nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng mô đun đã dùng(các phần nhập, toàn cục mã định danh) == 1) {
+            nếu (có tham chiếu hàm(các phần nhập, toàn cục mã định danh) == 1) {
                 nếu (toàn cục mã định danh >= đầu tiên) { nếu (toàn cục mã định danh < cuối cùng) { mã trạng thái = -1; thoát; }; };
-                biến mục ký hiệu = đối tượng mô đun chương trình con tên định danh(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh);
-                nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, mục ký hiệu, 0, 0) != 0) { mã trạng thái = -1; thoát; };
+                biến mục ký hiệu = tên ký hiệu hàm(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh);
+                nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, mục ký hiệu, 0, 0) != 0) { mã trạng thái = -1; thoát; };
                 mục ký hiệu số phần tử = mục ký hiệu số phần tử + 1;
             };
             độ lệch = độ lệch + 8 + kích cỡ;
@@ -142,8 +144,8 @@ hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các đi
     };
     nếu (mã trạng thái == 0) {
         lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 62; môi trường thực thi mã định danh++) {
-            nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, môi trường thực thi mã định danh) == 1) {
-                nếu (đối tượng mô đun add mục ký hiệu(các mục ký hiệu, các chuỗi, đối tượng bản địa tên định danh(môi trường thực thi mã định danh), 0, 0) != 0) {
+            nếu (có tham chiếu hàm(lời gọi lõi, môi trường thực thi mã định danh) == 1) {
+                nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên ký hiệu lõi(môi trường thực thi mã định danh), 0, 0) != 0) {
                     mã trạng thái = -1;
                     thoát;
                 };
@@ -158,20 +160,20 @@ hàm đối tượng mô đun macho mô đun(mã máy, đối tượng, các đi
             nếu (vị trí nhập < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí nhập + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, vị trí nhập) != 0) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng i32(các mục tái định vị, 754974720 + đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, mã định danh nhập)) != 0) {
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục ký hiệu nhập(các phần nhập, đầu tiên, cuối cùng, mã định danh nhập)) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
         };
-        lặp (bản địa độ lệch = 0; bản địa độ lệch < byte dài(bản địa các lời gọi); bản địa độ lệch = bản địa độ lệch + 8) {
-            biến bản địa tại = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, bản địa độ lệch);
-            biến bản địa mã định danh = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, bản địa độ lệch + 4);
-            nếu (bản địa tại < 0) { mã trạng thái = -1; thoát; };
-            nếu (bản địa tại + 4 > n) { mã trạng thái = -1; thoát; };
-            nếu (bản địa mã định danh < 0) { mã trạng thái = -1; thoát; };
-            nếu (bản địa mã định danh > 61) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng i32(các mục tái định vị, bản địa tại) != 0) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng i32(các mục tái định vị, 754974720 + đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, toàn cục mã định danh, bản địa mã định danh)) != 0) {
+        lặp (độ lệch gọi lõi = 0; độ lệch gọi lõi < byte dài(lời gọi lõi); độ lệch gọi lõi = độ lệch gọi lõi + 8) {
+            biến vị trí gọi lõi = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, độ lệch gọi lõi);
+            biến mã lõi = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, độ lệch gọi lõi + 4);
+            nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
+            nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (mã lõi < 0) { mã trạng thái = -1; thoát; };
+            nếu (mã lõi > 61) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, vị trí gọi lõi) != 0) { mã trạng thái = -1; thoát; };
+            nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, toàn cục mã định danh, mã lõi)) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };

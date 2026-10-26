@@ -1,0 +1,10 @@
+nhập counter như bộ đếm;
+
+hàm chính() {
+    biến tạo = bộ đếm.tạo bộ đếm(40);
+    biến tăng = tạo();
+    in tăng();
+    in tăng();
+    biến tăng khác = bộ đếm.tạo bộ đếm(10)();
+    in tăng khác();
+};

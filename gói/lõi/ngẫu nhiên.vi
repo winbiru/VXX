@@ -73,7 +73,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         mức trần = số khối * độ rộng;
 
         mẫu = không gian;
-        lặp(vòng = 0; mẫu >= mức trần; vòng++) {
+        khi (mẫu >= mức trần) {
             mẫu = mình.ngẫu nhiên nguồn ngẫu nhiên sáu byte();
         };
 
@@ -181,7 +181,7 @@ lớp riêng tư Máy Ngẫu Nhiên Nội Bộ {
         mức trần = số khối * độ rộng;
 
         mẫu = không gian;
-        lặp(vòng = 0; mẫu >= mức trần; vòng++) {
+        khi (mẫu >= mức trần) {
             mẫu = thành số thực(mình.ngẫu nhiên bước(bộ sinh) - 1);
         };
         thương = làm tròn xuống(mẫu / độ rộng);

@@ -2,13 +2,13 @@
 // symbol is _main, which may occur at any declaration-order function ID.
 // Each ARM64 BL displacement counts four-byte instructions. Skip 64 words
 // per iteration on long calls; this native subset does not yet expose i32 /.
-hàm sinh mã chương trình từ máy chênh lệch(nguồn, to) {
+hàm độ dời lệnh(nguồn, to) {
     biến vị trí hiện tại = nguồn;
     biến các từ máy = 0;
-    lặp (i = 0; vị trí hiện tại + 256 <= to; i++) { vị trí hiện tại = vị trí hiện tại + 256; các từ máy = các từ máy + 64; };
-    lặp (i = 0; vị trí hiện tại < to; i++) { vị trí hiện tại = vị trí hiện tại + 4; các từ máy = các từ máy + 1; };
-    lặp (i = 0; vị trí hiện tại - 256 >= to; i++) { vị trí hiện tại = vị trí hiện tại - 256; các từ máy = các từ máy - 64; };
-    lặp (i = 0; vị trí hiện tại > to; i++) { vị trí hiện tại = vị trí hiện tại - 4; các từ máy = các từ máy - 1; };
+    khi (vị trí hiện tại + 256 <= to) { vị trí hiện tại = vị trí hiện tại + 256; các từ máy = các từ máy + 64; };
+    khi (vị trí hiện tại < to) { vị trí hiện tại = vị trí hiện tại + 4; các từ máy = các từ máy + 1; };
+    khi (vị trí hiện tại - 256 >= to) { vị trí hiện tại = vị trí hiện tại - 256; các từ máy = các từ máy - 64; };
+    khi (vị trí hiện tại > to) { vị trí hiện tại = vị trí hiện tại - 4; các từ máy = các từ máy - 1; };
     trả về các từ máy;
 };
 
@@ -27,7 +27,7 @@ hàm sinh mã chương trình vá các lời gọi(mã máy, các điểm bắt 
         };
         nếu (chương trình con hiện tại * 4 >= số phần tử) { trả về -1; };
         biến to = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, chương trình con hiện tại * 4);
-        biến chênh lệch = sinh mã chương trình từ máy chênh lệch(nguồn, to);
+        biến chênh lệch = độ dời lệnh(nguồn, to);
         nếu (chênh lệch < -33554432) { trả về -1; };
         nếu (chênh lệch > 33554431) { trả về -1; };
         nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 67108864; };
@@ -104,7 +104,7 @@ hàm sinh mã chương trình phát điểm vào(biểu diễn trung gian, các 
 // In a separately compiled module local function calls can be patched
 // immediately. Cross-module CALLs retain BRANCH26 relocations and their
 // global function IDs for the Mach-O symbol table.
-hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi) {
+hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, lời gọi lõi) {
     lặp (i = 0; i < byte dài(các lời gọi); i = i + 8) {
         biến nguồn = byte đọc số nguyên ba mươi hai bit(các lời gọi, i);
         biến đích đến = byte đọc số nguyên ba mươi hai bit(các lời gọi, i + 4);
@@ -112,8 +112,8 @@ hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các đi�
         nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
         nếu (đích đến < 0) {
             nếu (đích đến < -62) { trả về -1; };
-            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, nguồn) != 0) { trả về -1; };
-            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, -đích đến - 1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, -đích đến - 1) != 0) { trả về -1; };
         } hoặc nếu (đích đến < đầu tiên) {
             nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
@@ -122,7 +122,7 @@ hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các đi�
             nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
         } hoặc {
             biến to = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (đích đến - đầu tiên) * 4);
-            biến chênh lệch = sinh mã chương trình từ máy chênh lệch(nguồn, to);
+            biến chênh lệch = độ dời lệnh(nguồn, to);
             nếu (chênh lệch < -33554432) { trả về -1; };
             nếu (chênh lệch > 33554431) { trả về -1; };
             nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 67108864; };
@@ -134,7 +134,7 @@ hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các đi�
 
 // Exposes local starts to the module object writer. Calls outside [first,last)
 // remain relocation records instead of being patched into a common text blob.
-hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, bản địa các lời gọi) {
+hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, lời gọi lõi) {
     nếu (mã máy == biểu diễn trung gian) { trả về -1; };
     nếu (đầu tiên < 0) { trả về -1; };
     nếu (cuối cùng <= đầu tiên) { trả về -1; };
@@ -147,7 +147,7 @@ hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm
     nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
     nếu (byte làm rỗng(các điểm bắt đầu) != 0) { trả về -1; };
     nếu (byte làm rỗng(các phần nhập) != 0) { trả về -1; };
-    nếu (byte làm rỗng(bản địa các lời gọi) != 0) { trả về -1; };
+    nếu (byte làm rỗng(lời gọi lõi) != 0) { trả về -1; };
     biến đơn vị = byte mới();
     biến machine = byte mới();
     biến các lời gọi = byte mới();
@@ -180,7 +180,7 @@ hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm
             nếu (mã trạng thái < 0) { thoát; };
             nếu (byte nối(mã máy, machine) != 0) { mã trạng thái = -1; thoát; };
         };
-        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi); };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, lời gọi lõi); };
     };
     nếu (đơn vị > 0) { byte hủy(đơn vị); };
     nếu (machine > 0) { byte hủy(machine); };
@@ -192,7 +192,7 @@ hàm sinh mã chương trình phát mô đun(biểu diễn trung gian, các hàm
 
 // Linux AMD64 uses rel32 call displacements. Internal calls are resolved
 // directly; external module/runtime calls become ELF64 .rela.text entries.
-hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi) {
+hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các lời gọi, đầu tiên, cuối cùng, các phần nhập, lời gọi lõi) {
     lặp (i = 0; i < byte dài(các lời gọi); i = i + 8) {
         biến nguồn = byte đọc số nguyên ba mươi hai bit(các lời gọi, i);
         biến đích đến = byte đọc số nguyên ba mươi hai bit(các lời gọi, i + 4);
@@ -200,8 +200,8 @@ hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các �
         nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
         nếu (đích đến < 0) {
             nếu (đích đến < -62) { trả về -1; };
-            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, nguồn) != 0) { trả về -1; };
-            nếu (byte đẩy số nguyên ba mươi hai bit(bản địa các lời gọi, -đích đến - 1) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, nguồn) != 0) { trả về -1; };
+            nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, -đích đến - 1) != 0) { trả về -1; };
         } hoặc nếu (đích đến < đầu tiên) {
             nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, nguồn) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(các phần nhập, đích đến) != 0) { trả về -1; };
@@ -216,7 +216,7 @@ hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các �
     trả về 0;
 };
 
-hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, bản địa các lời gọi) {
+hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, lời gọi lõi) {
     nếu (mã máy == biểu diễn trung gian) { trả về -1; };
     nếu (đầu tiên < 0) { trả về -1; };
     nếu (cuối cùng <= đầu tiên) { trả về -1; };
@@ -227,7 +227,7 @@ hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các 
     nếu (byte làm rỗng(mã máy) != 0) { trả về -1; };
     nếu (byte làm rỗng(các điểm bắt đầu) != 0) { trả về -1; };
     nếu (byte làm rỗng(các phần nhập) != 0) { trả về -1; };
-    nếu (byte làm rỗng(bản địa các lời gọi) != 0) { trả về -1; };
+    nếu (byte làm rỗng(lời gọi lõi) != 0) { trả về -1; };
     biến đơn vị = byte mới();
     biến machine = byte mới();
     biến các lời gọi = byte mới();
@@ -260,7 +260,7 @@ hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các 
             nếu (mã trạng thái < 0) { thoát; };
             nếu (byte nối(mã máy, machine) != 0) { mã trạng thái = -1; thoát; };
         };
-        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, bản địa các lời gọi); };
+        nếu (mã trạng thái == 0) { mã trạng thái = sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các điểm bắt đầu, các tái định vị, đầu tiên, cuối cùng, các phần nhập, lời gọi lõi); };
     };
     nếu (đơn vị > 0) { byte hủy(đơn vị); };
     nếu (machine > 0) { byte hủy(machine); };

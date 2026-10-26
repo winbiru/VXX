@@ -6,7 +6,7 @@ endif()
 
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(objects)
-foreach(func IN ITEMS tinh tong max_i32 tong_bon tru_dao phu_dinh phan_loai tim_dau dieu_kien bo_qua register_limit register_overflow)
+foreach(func IN ITEMS tinh tong tong_khi dieu_khien_khi max_i32 tong_bon tru_dao chia_i32 chia_qua_ham phu_dinh phan_loai tim_dau dieu_kien bo_qua register_limit register_overflow hoist_vong hoist_hai_vong hoist_long_nhau hoist_goi)
     set(obj "${VPP_OUTPUT_DIR}/machine-${func}.o")
     execute_process(
         COMMAND "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj

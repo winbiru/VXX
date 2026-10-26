@@ -105,6 +105,18 @@ lớp công khai Bộ Phân Tích Biểu Thức {
         từ tố = mình.biên dịch biểu thức nhìn(p);
         s = lấy từ điển(từ tố, "giá trị", "");
         loại = lấy từ điển(từ tố, "loại", "hết");
+        là hàm ẩn danh = sai;
+        nếu (s == "hàm") {
+            tiếp = p["vị trí"] + 1;
+            nếu (tiếp < máy ảo lấy độ dài(p["token"])) {
+                là hàm ẩn danh = p["token"][tiếp]["giá trị"] == "(";
+            };
+        };
+        nếu (là hàm ẩn danh) {
+            bộ = lấy từ điển(p, "bộ phân tích", rỗng);
+            nếu (bộ == rỗng) { mình.biên dịch biểu thức lỗi(p, "hàm ẩn danh cần bộ phân tích chương trình"); };
+            trả về bộ.đọc hàm ẩn danh(p);
+        };
         nếu (s == "(" ) {
             mình.biên dịch biểu thức lấy(p);
             trong = mình.biên dịch biểu thức đọc(p, 1);
@@ -114,7 +126,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
         nếu (s == "[") {
             mình.biên dịch biểu thức lấy(p);
             phần tử = [];
-            lặp(i = 0; lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]"; i++) {
+            khi (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "]") {
                 nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                     mình.biên dịch biểu thức lỗi(p, "thiếu ']' đóng danh sách");
                 };
@@ -132,7 +144,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
         nếu (s == "{") {
             mình.biên dịch biểu thức lấy(p);
             mục = [];
-            lặp(i = 0; lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}"; i++) {
+            khi (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != "}") {
                 nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "") == "hết") {
                     mình.biên dịch biểu thức lỗi(p, "thiếu '}' đóng từ điển");
                 };
@@ -162,7 +174,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
             (loại == "từ khóa" && lấy từ điển(p, "tên nhiều từ", sai))) {
             mình.biên dịch biểu thức lấy(p);
             nếu (lấy từ điển(p, "tên nhiều từ", sai)) {
-                lặp(i = 0; đúng; i++) {
+                khi (đúng) {
                     loại tiếp = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "loại", "");
                     nếu (loại tiếp != "định danh" && loại tiếp != "từ khóa") { thoát; };
                     s += " " + mình.biên dịch biểu thức lấy(p)["giá trị"];
@@ -183,7 +195,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
         trái = mình.biên dịch biểu thức sơ cấp(p);
         // Gọi hàm và truy cập chỉ số có độ ưu tiên cao hơn toán tử một ngôi.
         tiếp tục = đúng;
-        lặp(vòng = 0; tiếp tục; vòng++) {
+        khi (tiếp tục) {
             s = lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "");
             nếu (s == "++" || s == "--") {
                 mình.biên dịch biểu thức lấy(p);
@@ -195,7 +207,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                 nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") != ")") {
                     máy ảo thêm cuối danh sách(đối số, mình.biên dịch biểu thức đọc(p, 1));
                     còn = đúng;
-                    lặp(i = 0; còn; i++) {
+                    khi (còn) {
                         nếu (lấy từ điển(mình.biên dịch biểu thức nhìn(p), "giá trị", "") == ",") {
                             mình.biên dịch biểu thức lấy(p);
                             máy ảo thêm cuối danh sách(đối số, mình.biên dịch biểu thức đọc(p, 1));
@@ -219,7 +231,7 @@ lớp công khai Bộ Phân Tích Biểu Thức {
                         tên = mình.biên dịch biểu thức lấy(p)["giá trị"];
                     };
                     nếu (lấy từ điển(p, "tên nhiều từ", sai)) {
-                        lặp(i = 0; đúng; i++) {
+                        khi (đúng) {
                             tiếp = mình.biên dịch biểu thức nhìn(p);
                             kiểu = lấy từ điển(tiếp, "loại", "");
                             nếu (kiểu != "định danh" && kiểu != "từ khóa") { thoát; };

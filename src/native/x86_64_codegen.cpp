@@ -141,6 +141,10 @@ BackendEmission emitX86_64Function(const MachineFunction &fn, const Target &targ
             case Op::Drop:
                 if (!stackDepth) return fail("x86 eval stack underflow");
                 --stackDepth; break;
+            // Legacy C++ oracle remains restricted; production i32 division
+            // is emitted directly by the V++ backend.
+            case Op::Div: case Op::Mod:
+                return fail("x86 Div/Mod: dùng backend V++ native");
             case Op::Add: case Op::Sub: case Op::Mul:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual: {

@@ -431,7 +431,7 @@ static std::string vppStringLiteral(const std::string &value) {
 
 // Only Stage 0 uses the C++ bootstrap. --compiler=vpp must execute an already
 // bootstrapped native V++ compiler, with no implicit VM fallback.
-static fs::path nativeVppCompiler() {
+static fs::path nativeVppCompiler(bool required = true) {
     if (const char *value = std::getenv("VPP_NATIVE_COMPILER"); value && *value) {
         const fs::path configured = fs::absolute(vietvm::core::utf8Path(value));
         if (!fs::is_regular_file(configured))
@@ -449,6 +449,7 @@ static fs::path nativeVppCompiler() {
             if (fs::is_regular_file(candidate)) return candidate;
         }
     }
+    if (!required) return {};
     throw std::runtime_error(
         "Compiler V++ native chưa được bootstrap. Chạy 'vpp --bootstrap-native "
         "gói/biên dịch/dòng lệnh bản địa.vi <VPP_HOME>/bin/vpp-native' ở Stage 0 "
@@ -709,21 +710,20 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
     const bool assembly = mode == "--emit-asm";
     const bool object = mode == "--emit-obj";
     const auto compiledLeaf = vietvm::native::compileRawLeafVpp(
-        target, artifacts.ir, functionName, context.importResolutionBase, object);
+        target, artifacts.ir, functionName, context.importResolutionBase, object, assembly);
     const bool generalized = !compiledLeaf && !compiledLeaf.lowered &&
         (target.arch == vietvm::native::Architecture::X86_64 ||
          target.arch == vietvm::native::Architecture::AArch64);
     const auto compiledMachine = generalized
         ? vietvm::native::compileMachineFunctionVpp(
-              target, artifacts.ir, functionName, context.importResolutionBase, object)
+              target, artifacts.ir, functionName, context.importResolutionBase, object, assembly)
         : vietvm::native::VppCompiledMachine{};
     if (!compiledLeaf && (!generalized || !compiledMachine)) {
         std::cerr << "Native V++ compile lỗi: "
                   << (generalized ? compiledMachine.error : compiledLeaf.error) << '\n';
         return EXIT_FAILURE;
     }
-    // One V++ VM run owns lowering, encoding and optional object packing.
-    // C++ only prints ISA assembly; the object writer itself lives in V++.
+    // One V++ VM run owns lowering, encoding and optional object/ASM output.
     auto machineEmission = generalized
         ? compiledMachine.emission
         : vietvm::native::MachineEmission{};
@@ -741,38 +741,15 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
         return EXIT_FAILURE;
     }
     if (assembly && generalized) {
-        const auto cppListing = vietvm::native::emitMachineFunction(target, compiledMachine.function);
-        if (!cppListing) {
-            std::cerr << "C++ assembly printer lỗi: " << cppListing.error << '\n';
-            return EXIT_FAILURE;
-        }
-        if (cppListing.bytes != machineEmission.bytes ||
-            cppListing.relocations.size() != machineEmission.relocations.size()) {
-            std::cerr << "V++ và C++ assembly printer không khớp mã máy/relocation\n";
-            return EXIT_FAILURE;
-        }
-        for (std::size_t i = 0; i < cppListing.relocations.size(); ++i) {
-            if (cppListing.relocations[i].offset != machineEmission.relocations[i].offset ||
-                cppListing.relocations[i].symbol != machineEmission.relocations[i].symbol) {
-                std::cerr << "V++ và C++ assembly printer không khớp CALL relocation\n";
-                return EXIT_FAILURE;
-            }
-        }
-        machineEmission.assembly = cppListing.assembly;
-    }
-    if (assembly && !generalized) {
-        // C++ remains the textual ISA printer; check its independently
-        // encoded bytes against V++ before exposing an assembly listing.
-        const auto reference = vietvm::native::emitRawLeaf(target, compiledLeaf.leaf);
-        if (!reference || reference.bytes != leafEmission.bytes) {
-            std::cerr << "V++ và C++ leaf encoder không khớp byte mã máy\n";
+        if (machineEmission.assembly.empty()) {
+            std::cerr << "V++ assembly printer không trả bản ghi ASM\n";
             return EXIT_FAILURE;
         }
     }
     const auto listing = assembly
         ? (generalized
-            ? vietvm::native::emitMachineAssembly(target, machineEmission, functionName)
-            : vietvm::native::emitRawAssembly(target, compiledLeaf.leaf, functionName))
+            ? vietvm::native::RawAssemblyResult{machineEmission.assembly, {}}
+            : vietvm::native::RawAssemblyResult{compiledLeaf.assembly, {}})
         : vietvm::native::RawAssemblyResult{};
     if (assembly && !listing) {
         std::cerr << "Native assembly lỗi: " << listing.error << '\n';
@@ -798,7 +775,7 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
               << functionName << " -> " << outputName
               << " (" << vietvm::native::canonicalTriple(target) << ", "
               << bytes.size() << " machine bytes; "
-              << (assembly ? "ISA instructions, not linked" : (object ? "relocatable object, not executable" : "function body, not executable"))
+              << (assembly ? "assembly source, not linked" : (object ? "relocatable object, not executable" : "function body, not executable"))
               << ")\n";
     return EXIT_SUCCESS;
 }
@@ -2983,6 +2960,7 @@ static int runCli(int argc, char* argv[]) {
             if (argc >= 3) {
                 std::string twoWordCommand = command + " " + std::string(argv[2]);
                 if (twoWordCommand == vietvm::cli::kCmdHelpVi || twoWordCommand == vietvm::cli::kCmdVersionVi ||
+                    twoWordCommand == vietvm::cli::kCmdCompileVi ||
                     twoWordCommand == vietvm::cli::kCmdDoctorVi || twoWordCommand == vietvm::cli::kCmdDiagnoseVi ||
                     twoWordCommand == vietvm::cli::kPkgListVi ||
                     twoWordCommand == vietvm::cli::kCmdInitVi || twoWordCommand == vietvm::cli::kPkgInfoVi ||
@@ -3060,18 +3038,20 @@ static int runCli(int argc, char* argv[]) {
                         : vietvm::core::utf8Path("tests");
                 return runTests(path);
             }
-            if (command == vietvm::cli::kCmdBuild || command == vietvm::cli::kCmdBuildVi) {
+            if (command == vietvm::cli::kCmdBuild || command == vietvm::cli::kCmdBuildVi ||
+                command == vietvm::cli::kCmdCompileVi) {
                 const int firstArgument = 2 + commandWordOffset;
                 if (argc > firstArgument &&
                     std::string(argv[firstArgument]).rfind("--compiler=", 0) == 0) {
                     const std::string choice = argv[firstArgument];
                     const bool withOutput = choice == "--compiler=vpp" &&
                         argc == firstArgument + 4 &&
-                        std::string(argv[firstArgument + 2]) == "-o";
+                        (std::string(argv[firstArgument + 2]) == "-o" ||
+                         std::string(argv[firstArgument + 2]) == "--đầu-ra");
                     if ((!withOutput && argc != firstArgument + 2) ||
                         (choice != "--compiler=vpp" && choice != "--compiler=cpp")) {
-                        std::cerr << "Cú pháp: vpp build --compiler=vpp <source.vi> [-o output.vbc]\n"
-                                  << "   hoặc: vpp build --compiler=cpp <source.vi>\n";
+                        std::cerr << "Cú pháp: vpp biên dịch --compiler=vpp <source.vi> [--đầu-ra output.vbc]\n"
+                                  << "   hoặc: vpp biên dịch --compiler=cpp <source.vi>\n";
                         return EXIT_FAILURE;
                     }
                     if (choice == "--compiler=vpp")
@@ -3100,6 +3080,21 @@ static int runCli(int argc, char* argv[]) {
                                   << "   hoặc: vpp build --target <triple> --emit-exe-selfhost "
                                      "<source.vi> <output>\n";
                         return EXIT_FAILURE;
+                    }
+                    if (rawLeaf && std::string(argv[firstArgument + 2]) == "--emit-obj-selfhost") {
+                        // Once bootstrapped, use the persistent V++ compiler.
+                        // It owns target parsing, source lowering, encoding and
+                        // object IO; no generated Stage 0 wrapper is needed.
+                        const auto compiler = nativeVppCompiler(false);
+                        if (!compiler.empty()) {
+                            verifyLockedProjectForSource(vietvm::core::utf8Path(argv[firstArgument + 4]));
+                            const auto result = vietvm::native::aot::runProcess({
+                                compiler.u8string(), "build", "--target", argv[firstArgument + 1],
+                                "--emit-obj-selfhost", argv[firstArgument + 3],
+                                argv[firstArgument + 4], argv[firstArgument + 5]});
+                            std::cout << result.output;
+                            return result.status;
+                        }
                     }
                     const auto parsed = vietvm::native::parseTargetVpp(
                         argv[firstArgument + 1], fs::current_path());

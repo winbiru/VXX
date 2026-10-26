@@ -473,19 +473,24 @@ private:
                 return true;
             }
             case I::Loop: {
-                if (inst.loopForm != vietvm::frontend::AstLoopForm::ForBlock ||
-                    inst.expressionRoots.size() != 3 || inst.children.size() != 1)
-                    return fail("native chỉ hỗ trợ lặp(init; condition; update) { ... }");
-                if (!value(inst.expressionRoots[0])) return false;
-                drop();
+                const bool isWhile = inst.loopForm == vietvm::frontend::AstLoopForm::WhileBlock;
+                if ((!isWhile && inst.loopForm != vietvm::frontend::AstLoopForm::ForBlock) ||
+                    inst.expressionRoots.size() != (isWhile ? 1u : 3u) || inst.children.size() != 1)
+                    return fail("native cần lặp(init; condition; update) { ... } hoặc khi(condition) { ... }");
+                if (!isWhile) {
+                    if (!value(inst.expressionRoots[0])) return false;
+                    drop();
+                }
                 const auto start = result.instructions.size();
-                if (!value(inst.expressionRoots[1])) return false;
+                if (!value(inst.expressionRoots[isWhile ? 0 : 1])) return false;
                 const auto exit = add(MachineOpcode::BranchZero); --depth;
                 loops.push_back({});
                 if (!statement(inst.children.front())) return false;
                 const auto update = result.instructions.size();
-                if (!value(inst.expressionRoots[2])) return false;
-                drop();
+                if (!isWhile) {
+                    if (!value(inst.expressionRoots[2])) return false;
+                    drop();
+                }
                 add(MachineOpcode::Jump, 0, start);
                 const auto end = result.instructions.size();
                 result.instructions[exit].operand = end;
@@ -545,7 +550,7 @@ std::string validateMachineStack(const MachineFunction &fn) {
             case Op::Return:
                 if (before == 0) return "machine IR stack underflow";
                 --after; break;
-            case Op::Add: case Op::Sub: case Op::Mul:
+            case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual:
                 if (before < 2) return "machine IR binary stack underflow";

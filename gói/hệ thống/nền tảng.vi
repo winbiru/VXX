@@ -27,7 +27,7 @@ lớp công khai Nền Tảng {
         // EINTR là 4 trên các ABI POSIX được hỗ trợ; máy trả errno nguyên tử
         // cùng syscall, không cần đọc trạng thái errno qua một FFI riêng.
         mã ngắt = 4;
-        lặp (vòng = 0; còn lại > 0; vòng++) {
+        khi (còn lại > 0) {
             đợt = còn lại;
             nếu (đợt > 999) { đợt = 999; };
             hạn đợt = thời gian đơn điệu mili giây() + đợt;

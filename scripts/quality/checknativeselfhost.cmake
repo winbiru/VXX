@@ -39,8 +39,59 @@ if (NOT status EQUAL 0 OR NOT output MATCHES "native-selfhost-host-link-ok")
     message(FATAL_ERROR "V++ self-host execution failed: ${status} ${errors} ${output}")
 endif()
 
+# Exercise the AST -> V++ Machine IR -> native object path directly. Stage 1's
+# separate executable compiler already tests division, so verify this path too.
+set(arithmetic "${VPP_OUTPUT_DIR}/arithmetic.vi")
+file(WRITE "${arithmetic}"
+    "hàm arith(a, b) { trả về a / b + a % b; };\n"
+    "hàm compound(a, b) { biến x = a; x /= b; x %= 52; trả về x; };\n")
+set(arithmetic_objects)
+foreach(func IN ITEMS arith compound)
+    set(obj "${VPP_OUTPUT_DIR}/${func}.o")
+    file(REMOVE "${obj}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
+            "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-obj-selfhost
+            "${func}" "${arithmetic}" "${obj}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE status ERROR_VARIABLE errors)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${obj}")
+        message(FATAL_ERROR "V++ native self-host arithmetic failed (${func}): ${errors}")
+    endif()
+    list(APPEND arithmetic_objects "${obj}")
+endforeach()
+set(driver "${VPP_OUTPUT_DIR}/arithmetic_smoke.c")
+file(WRITE "${driver}" [=[
+#include <stdint.h>
+extern int32_t arith(int32_t, int32_t);
+extern int32_t compound(int32_t, int32_t);
+int main(void) {
+    if (arith(-159, -3) != 53) return 1;
+    if (arith(-159, 52) != -6) return 2;
+    if (arith(10, -3) != -2) return 3;
+    if (arith(INT32_MIN, -1) != INT32_MIN) return 4;
+    if (arith(52, 0) != -2) return 5;
+    if (compound(-159, -3) != 1) return 6;
+    if (compound(INT32_MIN, -1) != -24) return 7;
+    return 0;
+}
+]=])
+set(arithmetic_exe "${VPP_OUTPUT_DIR}/arithmetic_smoke")
+execute_process(COMMAND "${VPP_CC}" "${driver}" ${arithmetic_objects} -o "${arithmetic_exe}"
+    RESULT_VARIABLE status ERROR_VARIABLE errors)
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host arithmetic host-link failed: ${errors}")
+endif()
+execute_process(COMMAND "${arithmetic_exe}" RESULT_VARIABLE status
+    ERROR_VARIABLE errors)
+if (NOT status EQUAL 0)
+    message(FATAL_ERROR "V++ self-host arithmetic wrong result: ${status} ${errors}")
+endif()
+
+# Keep a negative semantic test: unsupported logical operations cannot silently
+# be compiled as a different integer opcode.
 file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
-    "hàm bad(a) { trả về a / 2; };\n")
+    "hàm bad(a) { trả về a && 1; };\n")
 set(unwanted "${VPP_OUTPUT_DIR}/unsupported.o")
 file(REMOVE "${unwanted}")
 execute_process(
@@ -50,5 +101,5 @@ execute_process(
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status ERROR_VARIABLE errors)
 if (status EQUAL 0 OR EXISTS "${unwanted}" OR NOT errors MATCHES "chưa hỗ trợ")
-    message(FATAL_ERROR "V++ native self-host must reject unsupported division: ${status} ${errors}")
+    message(FATAL_ERROR "V++ native self-host must reject unsupported logical op: ${status} ${errors}")
 endif()

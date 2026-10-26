@@ -6,7 +6,7 @@
 //#  - OP_NEU_KHONG -> "hoặc nếu" (else if / elif; hai token cú pháp)
 //#  - OP_HOAC -> "hoặc" (else); logical OR dùng "||"
 //#  - OP_KHONG -> logical NOT ("không"/"khong")
-//#  - OP_LAP -> loop ("lặp"/"lap") (for/while style)
+//#  - OP_LAP -> loop ("lặp" for-style / "khi" while-style)
 //#  - OP_HAM -> "hàm"/"ham" (function)
 //#  - OP_GOI -> "gọi"/"goi" (call)
 //#  - OP_TRA_VE -> "trả về"/"tra ve" (return)
@@ -71,7 +71,7 @@
 
 //# While
 <while_stmt>            ::= <WHILE_KW> "(" <expression> ")" <block>
-<WHILE_KW>              ::= "lặp" | "lap" | "trong khi" | "trongkhi"
+<WHILE_KW>              ::= "khi"
 
 //# For (C-style): lặp (khởi tạo; điều kiện; cập nhật) { ... }
 <for_stmt>              ::= <FOR_KW> "(" <for_init_opt> ";" <expression_opt> ";" <for_update_opt> ")" <block>

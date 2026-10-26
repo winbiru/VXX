@@ -64,7 +64,7 @@ hàm bộ nhớ đệm biên dịch lưu lại(khóa tra cứu, dữ liệu đ�
     trả về bộ nhớ đệm ghi(khóa tra cứu, dữ liệu đầu vào);
 };
 
-hàm bộ nhớ đệm biên dịch biên dịch đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng, điểm vào) {
+hàm biên dịch đơn vị có đệm(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm, đầu tiên, cuối cùng, điểm vào) {
     biến khóa tra cứu = bộ nhớ đệm biên dịch khóa tra cứu(1, nguồn văn bản, sổ đăng ký, đầu tiên, cuối cùng, điểm vào);
     biến dữ liệu đầu vào = byte mới();
     biến kết quả trả về = -1;

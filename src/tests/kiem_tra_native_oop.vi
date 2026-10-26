@@ -10,9 +10,9 @@ hàm so byte OOP(a, b) {
 };
 
 hàm chính() {
-    linux = Bộ Sinh Mã Bản Địa("x86_64-linux-gnu");
-    mac = Bộ Sinh Mã Bản Địa("aarch64-apple-darwin");
-    win = Bộ Sinh Mã Bản Địa("x86_64-pc-windows-msvc");
+    linux = Bộ Sinh Mã Máy("x86_64-linux-gnu");
+    mac = Bộ Sinh Mã Máy("aarch64-apple-darwin");
+    win = Bộ Sinh Mã Máy("x86_64-pc-windows-msvc");
     khẳng định bằng(linux.bộ ba(), "x86_64-unknown-linux-gnu");
     khẳng định bằng(mac.bộ ba(), "aarch64-apple-darwin");
     khẳng định bằng(win.bộ ba(), "x86_64-pc-windows-msvc");

@@ -412,7 +412,7 @@ function completionKind(kind) {
 // and when the user deliberately disables the language server.
 const VPP_KEYWORDS = [
   'nhập', 'như', 'công khai', 'riêng tư', 'bảo vệ', 'hàm', 'lớp',
-  'giao diện', 'biến', 'nếu', 'nếu không', 'lặp', 'chọn', 'ca',
+  'giao diện', 'biến', 'nếu', 'nếu không', 'lặp', 'khi', 'chọn', 'ca',
   'mặc định', 'trả về', 'thoát', 'dừng', 'thử', 'bắt lỗi', 'ném',
   'gọi', 'mình', 'gốc', 'kế thừa', 'triển khai', 'ngoại thư viện',
   'ngoại hàm', 'ký hiệu', 'khả năng', 'abi', 'từ', 'đúng', 'sai',
@@ -442,6 +442,7 @@ const VPP_SNIPPETS = [
   { trigger: 'nếu', description: 'Rẽ nhánh', body: 'nếu (${1:điềuKiện}) {\n\t$0\n}' },
   { trigger: 'nếu không', description: 'Nhánh còn lại', body: 'nếu không {\n\t$0\n}' },
   { trigger: 'lặp', description: 'Vòng lặp', body: 'lặp (${1:i = 0}; ${2:i < n}; ${3:i++}) {\n\t$0\n}' },
+  { trigger: 'khi', description: 'Lặp khi điều kiện đúng', body: 'khi (${1:điềuKiện}) {\n\t$0\n}' },
   { trigger: 'chọn', description: 'Rẽ nhánh chọn', body: 'chọn (${1:giáTrị}) {\n\tca ${2:1}: {\n\t\t$0\n\t}\n}' },
   { trigger: 'thử', description: 'Bắt ngoại lệ', body: 'thử {\n\t${1:// Xử lý}\n} bắt lỗi (${2:lỗi}) {\n\t$0\n}' },
   { trigger: 'nhập', description: 'Nhập mô đun', body: 'nhập ${1:gói/chuẩn/chính};$0' }

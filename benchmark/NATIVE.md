@@ -1,6 +1,60 @@
 # Đo tốc độ C++ và V++ sau khi sinh mã máy
 
-**Kết quả mới nhất: 18/10/2026**, macOS 26.6.2, ARM64, Apple Clang 21.0.0
+## Xuất object qua CLI V++ native (26/10/2026)
+
+CLI compiler đã bootstrap nhận trực tiếp `build --target <triple>
+--emit-obj-selfhost <function> <source.vi> <output.o>`. Phân tích tham số,
+đọc nguồn, AST/IR/ISA và ghi object chạy bằng V++, không tạo wrapper qua
+bridge Stage 0 ở mỗi lần xuất object. Script ưu tiên `build/native-cli/vpp-native`
+nếu đã tạo; có thể chọn compiler của một build khác bằng `VPP_EXEC`:
+
+```sh
+cmake --build build-p0-release --target vpp-native-cli -j 6
+VPP_EXEC="$PWD/build-p0-release/native-cli/vpp-native" \
+  bash benchmark/native/run.sh build-benchmark/native-vpp-cli 15 0.03
+```
+
+Compiler native vẫn liên kết runtime C++/ASM và thư viện hệ điều hành;
+bootstrap ban đầu và backend ASM tổng quát vẫn dùng C++. Kết quả này chỉ
+loại đường bridge Stage 0 khỏi việc xuất object i32. Script lưu riêng
+`compiler-dependencies.txt` và `dependencies.txt` của harness để phân biệt.
+Thay CLI không tự làm kernel chạy nhanh hơn; byte object và correctness
+phải giữ nguyên. Chi phí biên dịch nằm ngoài phần đo ns/lần gọi.
+
+Phép đo cục bộ trên macOS ARM64, năm lượt xen kẽ sau warm-up, xuất một
+object `vpp_cycle`: median đường CLI/bridge Stage 0 là **5,295 giây**,
+CLI V++ Stage 3 trực tiếp là **24,84 ms** (khoảng 213×). Cả hai đường xuất
+object trùng byte; không tính chi phí bootstrap. Mẫu thô, executable hashes
+và tham số ở `build-benchmark/native-cli-latency-20261026/results.json`.
+
+## Kết quả mới nhất: 24/10/2026
+
+Đã đo lại với V++ CLI Release tại commit `b39933e` cùng benchmark patch,
+Apple M3 Pro, macOS 26.6.2 ARM64, Apple Clang 21.0.0. **15 lượt**, target
+0,1 giây, input/checksum/harness như phần phương pháp bên dưới:
+
+| Kernel | C++ `-O3` (ns/lần gọi) | V++ native i32 (ns/lần gọi) | V++ / C++ |
+| --- | ---: | ---: | ---: |
+| Số học | 0.874 | 0.947 | 1.08× |
+| Vòng lặp có nhánh | 146.527 | 184.143 | 1.26× |
+| Fibonacci vòng lặp | 13.359 | 41.781 | 3.13× |
+
+Kết quả đúng và checksum **PASS**, MAD/median <5% cho mọi backend/kernel.
+[Raw samples, disassembly, môi trường và source hashes](reports/native-2026-10-24/).
+SHA256 V++ CLI: `88f8876d2341094c15a7938826128ac91edeab55fd7f98d177d1787989f74c72`.
+
+```sh
+VPP_HOME="$PWD" VPP_EXEC="$PWD/build-performance/bin/vpp-cli" \
+  bash benchmark/native/run.sh build-benchmark/native-rerun 15 0.1
+```
+
+Đây là kernel i32 độc lập; kết quả AOT ứng dụng dùng runtime giá trị động,
+V++ VM, Python, Node.js và Java được đo riêng tại
+[README](../README.md#-benchmark) và [report đa ngôn ngữ](reports/languages-2026-10-24/report.json).
+
+## Kết quả lịch sử: 18/10/2026
+
+macOS 26.6.2, ARM64, Apple Clang 21.0.0
 (`aarch64-apple-darwin`). V++ dùng `build/bin/vpp` và backend
 `--emit-obj-selfhost` để xuất object Mach-O chứa mã máy trực tiếp.
 

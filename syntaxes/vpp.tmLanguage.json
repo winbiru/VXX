@@ -196,7 +196,7 @@
     "controlKeywords": {
       "patterns": [
         {
-          "match": "(?<![\\p{L}\\p{N}_])(nếu[ \\t]+không|trả[ \\t]+về|mặc[ \\t]+định|bỏ[ \\t]+qua|bắt[ \\t]+lỗi|khởi[ \\t]+tạo|điều[ \\t]+kiện|cập[ \\t]+nhật|kiểm[ \\t]+tra[ \\t]+sau|trường[ \\t]+hợp|nếu|hoặc|lặp|chọn|ca|thoát|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
+          "match": "(?<![\\p{L}\\p{N}_])(nếu[ \\t]+không|trả[ \\t]+về|mặc[ \\t]+định|bỏ[ \\t]+qua|bắt[ \\t]+lỗi|khởi[ \\t]+tạo|điều[ \\t]+kiện|cập[ \\t]+nhật|kiểm[ \\t]+tra[ \\t]+sau|trường[ \\t]+hợp|nếu|hoặc|lặp|khi|chọn|ca|thoát|thử|ném|chuyển|gọi|dừng)(?![\\p{L}\\p{N}_])",
           "name": "keyword.control.vietvm"
         }
       ]
@@ -283,7 +283,7 @@
     "functionCalls": {
       "patterns": [
         {
-          "match": "(?<![\\p{L}\\p{N}_.])((?!(?:nếu|lặp|chọn|ca|hàm|lớp|in|trả|ném|thử|dừng|nhập)\\b)[\\p{L}_][\\p{L}\\p{N}_]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_]*)*)(?=[ \\t]*\\()",
+          "match": "(?<![\\p{L}\\p{N}_.])((?!(?:nếu|lặp|khi|chọn|ca|hàm|lớp|in|trả|ném|thử|dừng|nhập)\\b)[\\p{L}_][\\p{L}\\p{N}_]*(?:[ \\t]+[\\p{L}_][\\p{L}\\p{N}_]*)*)(?=[ \\t]*\\()",
           "name": "meta.function-call.vietvm",
           "captures": { "1": { "name": "entity.name.function.vietvm" } }
         }

@@ -57,6 +57,7 @@ enum class AstConditionalForm {
 enum class AstLoopForm {
     Unstructured,
     ForBlock,
+    WhileBlock,
 };
 
 enum class AstClassForm {

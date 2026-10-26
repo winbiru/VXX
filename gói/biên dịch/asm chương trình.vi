@@ -1,0 +1,342 @@
+// Full-language AOT: ABI bytecode -> Machine IR -> byte/relocation -> ASM.
+// Không gọi compiler/encoder C++; runtime động được gọi qua symbol ABI.
+nhập gói/biên dịch/mã thao tác;
+nhập gói/biên dịch/mã máy;
+nhập gói/biên dịch/mã máy nền;
+nhập gói/biên dịch/lắp ráp;
+nhập gói/biên dịch/đích;
+nhập gói/biên dịch/sản phẩm biên dịch;
+nhập gói/bộ sưu tập/từ điển;
+
+hàm công khai biên dịch asm tên nội tại() {
+    // BEGIN native intrinsic opcodes: đối chiếu bởi vpp-opcode-abi.
+    trả về [
+        "OP_VM_BIEN_DICH_PHAN_TICH", "OP_VM_BYTECODE_CHAY", "OP_NATIVE_ARTIFACT_CHAY", "OP_VM_DNS_PHAN_GIAI",
+        "OP_VM_DOC_BIEN_MOI_TRUONG", "OP_VM_DONG_HO_DIA_PHUONG", "OP_VM_DONG_HO_UTC", "OP_VM_DUONG_DAN_TON_TAI",
+        "OP_VM_IO_DOC_BYTES", "OP_VM_IO_DOC_FILE", "OP_VM_IO_GHI_BYTES", "OP_VM_IO_GHI_FILE",
+        "OP_VM_IO_GHI_TIEP_FILE", "OP_VM_KICH_BAN_CHAY", "OP_VM_LA_TEP", "OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET",
+        "OP_VM_LA_THU_MUC", "OP_VM_LIET_KE_THU_MUC", "OP_VM_NGAU_NHIEN_BAO_MAT_BYTES", "OP_VM_NGU_MILI_GIAY",
+        "OP_VM_SO_THUC_BITS", "OP_VM_SOCKET_CHAP_NHAN", "OP_VM_SOCKET_DAT_TIMEOUT", "OP_VM_SOCKET_DONG",
+        "OP_VM_SOCKET_GUI", "OP_VM_SOCKET_NHAN", "OP_VM_SOCKET_PHAN_GIAI", "OP_VM_SOCKET_TCP_LANG_NGHE",
+        "OP_VM_SOCKET_TCP_MO", "OP_VM_SOCKET_TLS_NANG_CAP", "OP_VM_SOCKET_UDP_MO", "OP_VM_TAO_THU_MUC",
+        "OP_VM_TEN_NEN_TANG", "OP_VM_THOI_GIAN_DON_DIEU_MS", "OP_VM_TIEN_TRINH_CHAY", "OP_VM_XOA_DUONG_DAN",
+        "OP_VM_THREAD_SPAWN", "OP_VM_THREAD_WAIT", "OP_VM_THREAD_CANCEL", "OP_VM_THREAD_STATUS",
+        "OP_VM_THREAD_PARK", "OP_VM_TUPLE_FROM_LIST", "OP_VM_TYPE_OF", "OP_VM_IDENTITY_HASH",
+        "OP_VM_LENGTH", "OP_VM_LIST_APPEND", "OP_VM_LIST_REMOVE", "OP_VM_MAP_HAS",
+        "OP_VM_MAP_REMOVE", "OP_VM_MAP_KEYS", "OP_VM_STRING_BYTES", "OP_VM_STRING_FROM_BYTES",
+        "OP_VM_FLOAT_FROM_BITS", "OP_VM_MACHINE_FILE_OPEN", "OP_VM_MACHINE_FILE_READ", "OP_VM_MACHINE_FILE_WRITE",
+        "OP_VM_MACHINE_FILE_CLOSE", "OP_VM_MACHINE_FILE_SEEK", "OP_VM_MACHINE_FILE_TELL", "OP_VM_MACHINE_FILE_ERROR",
+        "OP_VM_MACHINE_FILE_REMOVE", "OP_VM_MACHINE_PROCESS_PID", "OP_VM_MACHINE_PROCESS_PPID", "OP_VM_MACHINE_PROCESS_UID",
+        "OP_VM_MACHINE_PROCESS_EUID", "OP_VM_MACHINE_PROCESS_GID", "OP_VM_MACHINE_PROCESS_EGID", "OP_VM_MACHINE_TIME_SLEEP",
+        "OP_VM_MACHINE_TIME_MONOTONIC", "OP_VM_MACHINE_TIME_REALTIME", "OP_VM_MACHINE_ENTROPY_READ", "OP_VM_MACHINE_ENV_GET",
+        "OP_VM_MACHINE_TIME_LOCAL", "OP_VM_MACHINE_DIR_MKDIR", "OP_VM_MACHINE_DIR_REMOVE", "OP_VM_MACHINE_DIR_OPEN",
+        "OP_VM_MACHINE_DIR_NEXT", "OP_VM_MACHINE_DIR_CLOSE", "OP_VM_MACHINE_PATH_KIND", "OP_VM_MACHINE_SOCKET_KIND",
+        "OP_VM_MACHINE_SOCKET_CLOSE", "OP_VM_MACHINE_SOCKET_TIMEOUT", "OP_VM_MACHINE_SOCKET_SEND", "OP_VM_MACHINE_SOCKET_RECV",
+        "OP_VM_MACHINE_SOCKET_ACCEPT", "OP_VM_MACHINE_SOCKET_LISTEN", "OP_VM_MACHINE_SOCKET_CONNECT", "OP_VM_MACHINE_PROCESS_NEW",
+        "OP_VM_MACHINE_PROCESS_ARG", "OP_VM_MACHINE_PROCESS_COMMAND_LINE", "OP_VM_MACHINE_PROCESS_ENV", "OP_VM_MACHINE_PROCESS_START",
+        "OP_VM_MACHINE_PROCESS_POLL", "OP_VM_MACHINE_PROCESS_READ", "OP_VM_MACHINE_PROCESS_WAIT", "OP_VM_MACHINE_PROCESS_ERROR",
+        "OP_VM_MACHINE_PROCESS_CLOSE", "OP_VM_MACHINE_RESOLVE_OPEN", "OP_VM_MACHINE_RESOLVE_NEXT", "OP_VM_MACHINE_RESOLVE_CLOSE",
+        "OP_VM_MACHINE_TLS_UPGRADE", "OP_VM_MACHINE_TLS_SEND", "OP_VM_MACHINE_TLS_RECV"
+    ];
+    // END native intrinsic opcodes.
+};
+
+hàm riêng tư biên dịch asm bảng mã() {
+    tên = ["OP_HAM", "OP_NEU", "OP_DIEU_KIEN", "OP_LAP", "OP_CAP_NHAT",
+        "OP_DONG_LENH", "OP_MO_NGOAC", "OP_DONG_NGOAC", "OP_MO_KHOI", "OP_DONG_KHOI",
+        "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_TEN_BIEN_GIA_TRI", "OP_CHUOI", "OP_BIEN_SO_FLOAT",
+        "OP_RONG_GIA_TRI", "OP_DUNG_GIA_TRI", "OP_SAI_GIA_TRI", "OP_KHOI_TAO", "OP_GAN",
+        "OP_PARAM", "OP_PARAM_MAC_DINH", "OP_CONG_MOT", "OP_TRU_MOT", "OP_CONG", "OP_TRU",
+        "OP_NHAN", "OP_CHIA", "OP_MODULO", "OP_Logic_VA", "OP_Logic_HOAC", "OP_SO_SANH_BANG",
+        "OP_KHAC_BANG", "OP_LON_HON", "OP_NHO_HON", "OP_LON_HON_HOAC_BANG", "OP_NHO_HON_HOAC_BANG",
+        "OP_KHONG", "OP_PHU_DINH", "OP_LIST_LITERAL", "OP_MAP_LITERAL", "OP_DOC_CHI_SO", "OP_GAN_CHI_SO",
+        "OP_GOI", "OP_GOI_GIAN_TIEP", "OP_TAO_DONG_BAO", "OP_TAO_LOP", "OP_THEM_PHUONG_THUC",
+        "OP_TAO_DOI_TUONG", "OP_DOC_THUOC_TINH", "OP_GAN_THUOC_TINH", "OP_GOI_PHUONG_THUC",
+        "OP_IN", "OP_TRA_VE", "OP_DUNG_CHUONG_TRINH", "OP_JUMP", "OP_JUMP_IF_FALSE", "OP_BO_QUA",
+        "OP_THOAT", "OP_CHON", "OP_CA", "OP_MAC_DINH", "OP_KET_THUC_CHUYEN", "OP_THU",
+        "OP_THU_KET_THUC", "OP_BAT_LOI", "OP_NEM", "OP_FFI_CALL"];
+    bảng = {};
+    lặp(i = 0; i < độ dài(tên); i++) { bảng["" + biên dịch mã thao tác(tên[i])] = tên[i]; };
+    nội tại = biên dịch asm tên nội tại();
+    lặp(i = 0; i < độ dài(nội tại); i++) { bảng["" + biên dịch mã thao tác(nội tại[i])] = "intrinsic"; };
+    trả về bảng;
+};
+
+lớp công khai Bộ Hạ ASM Động {
+    hàm công khai khởi tạo(lệnh, bảng) {
+        mình.nguồn = lệnh;
+        mình.bảng = bảng;
+        mình.lệnh = [];
+        mình.sâu = 0;
+        mình.sâu nhất = 0;
+        mình.vị trí = [];
+        mình.vá = [];
+        mình.lỗi = [];
+        mình.trả = [];
+        mình.chuyển = [];
+        mình.bắt = [];
+    };
+    hàm riêng tư phát(mã, hằng = 0, ô = 0, ký hiệu = "") {
+        máy ảo thêm cuối danh sách(mình.lệnh, biên dịch mã máy lệnh(mã, hằng, ô, mình.sâu, ký hiệu));
+        nếu (mã == "PushConstant" || mã == "LoadSlot") { mình.sâu = mình.sâu + 1; }
+        hoặc nếu (mã == "Call") { mình.sâu = mình.sâu - ô + 1; }
+        hoặc nếu (mã == "Drop" || mã == "BranchZero" || mã == "Return" || mã == "Equal") { mình.sâu = mình.sâu - 1; };
+        nếu (mình.sâu < 0) { ném "AOT V++: stack lowering không hợp lệ"; };
+        nếu (mình.sâu > mình.sâu nhất) { mình.sâu nhất = mình.sâu; };
+    };
+    hàm riêng tư gọi thô(tên, đối số = rỗng) {
+        nếu (đối số == rỗng) { đối số = []; };
+        mình.phát("LoadSlot", 0, 0);
+        lặp(i = 0; i < độ dài(đối số); i++) { mình.phát("PushConstant", đối số[i]); };
+        mình.phát("Call", 0, độ dài(đối số) + 1, "vpp_native_dynamic_" + tên);
+    };
+    hàm riêng tư gọi(tên, đối số = rỗng) {
+        mình.gọi thô(tên, đối số);
+        nếu (tên == "condition" || tên == "case" || tên == "default") {
+            mình.phát("StoreSlot", 0, 1);
+            mình.phát("Drop");
+            mình.gọi thô("failed");
+        };
+        thành công = độ dài(mình.lệnh);
+        mình.phát("BranchZero");
+        máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+        mình.phát("Jump");
+        mình.lệnh[thành công]["operand"] = độ dài(mình.lệnh);
+    };
+    hàm riêng tư nhảy(đích, từ) {
+        nếu (đích < 0 || đích > độ dài(mình.nguồn)) { ném "AOT V++: invalid branch target"; };
+        nếu (đích <= từ) { mình.gọi("safepoint"); };
+        máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), đích]);
+        mình.phát("Jump");
+    };
+    hàm riêng tư điều kiện(đích) {
+        mình.phát("LoadSlot", 0, 1);
+        máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), đích]);
+        mình.phát("BranchZero");
+    };
+    hàm riêng tư đích tiếp tục(từ) {
+        sâu = 0;
+        nguồn = mình.nguồn;
+        lặp(i = từ + 1; i < độ dài(nguồn); i++) {
+            tên = lấy từ điển(mình.bảng, "" + nguồn[i][0], "");
+            nếu (tên == "OP_LAP") { sâu += 1; };
+            nếu (tên == "OP_CAP_NHAT") {
+                nếu (sâu == 0) { trả về i; };
+                sâu -= 1;
+            };
+        };
+        ném "AOT V++: continue outside loop";
+    };
+    hàm công khai hạ() {
+        nguồn = mình.nguồn;
+        lặp(i = 0; i < độ dài(nguồn); i++) {
+            máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
+            v = nguồn[i];
+            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            chọn(tên) {
+                ca "OP_HAM": {} ca "OP_NEU": {} ca "OP_DIEU_KIEN": {} ca "OP_LAP": {}
+                ca "OP_CAP_NHAT": {} ca "OP_DONG_LENH": {} ca "OP_MO_NGOAC": {}
+                ca "OP_DONG_NGOAC": {} ca "OP_MO_KHOI": {} ca "OP_DONG_KHOI": {}
+                ca "OP_BIEN_SO": { mình.gọi("integer", [v[1]]); }
+                ca "OP_TEN_BIEN_ID": { mình.gọi("integer", [v[2]]); }
+                ca "OP_TEN_BIEN_GIA_TRI": { mình.gọi("load", [v[2]]); }
+                ca "OP_CHUOI": { mình.gọi("string", [v[2]]); }
+                ca "OP_BIEN_SO_FLOAT": { mình.gọi("floating", [v[2]]); }
+                ca "OP_RONG_GIA_TRI": { mình.gọi("null"); }
+                ca "OP_DUNG_GIA_TRI": { mình.gọi("integer", [1]); }
+                ca "OP_SAI_GIA_TRI": { mình.gọi("integer", [0]); }
+                ca "OP_KHOI_TAO": { mình.gọi("initialize", [v[2]]); }
+                ca "OP_GAN": { mình.gọi("assign"); }
+                ca "OP_PARAM": { mình.gọi("parameter", [v[2], v[3], -1]); }
+                ca "OP_PARAM_MAC_DINH": { mình.gọi("parameter", [v[2], v[3], v[1]]); }
+                ca "OP_CONG_MOT": { mình.gọi("increment", [1]); }
+                ca "OP_TRU_MOT": { mình.gọi("increment", [-1]); }
+                ca "OP_CONG": { mình.gọi("binary", [v[0]]); }
+                ca "OP_TRU": { mình.gọi("binary", [v[0]]); }
+                ca "OP_NHAN": { mình.gọi("binary", [v[0]]); }
+                ca "OP_CHIA": { mình.gọi("binary", [v[0]]); }
+                ca "OP_MODULO": { mình.gọi("binary", [v[0]]); }
+                ca "OP_Logic_VA": { mình.gọi("binary", [v[0]]); }
+                ca "OP_Logic_HOAC": { mình.gọi("binary", [v[0]]); }
+                ca "OP_SO_SANH_BANG": { mình.gọi("binary", [v[0]]); }
+                ca "OP_KHAC_BANG": { mình.gọi("binary", [v[0]]); }
+                ca "OP_LON_HON": { mình.gọi("binary", [v[0]]); }
+                ca "OP_NHO_HON": { mình.gọi("binary", [v[0]]); }
+                ca "OP_LON_HON_HOAC_BANG": { mình.gọi("binary", [v[0]]); }
+                ca "OP_NHO_HON_HOAC_BANG": { mình.gọi("binary", [v[0]]); }
+                ca "OP_KHONG": { mình.gọi("negate"); }
+                ca "OP_PHU_DINH": { mình.gọi("negate"); }
+                ca "OP_LIST_LITERAL": { mình.gọi("list", [v[1], v[2]]); }
+                ca "OP_MAP_LITERAL": { mình.gọi("map", [v[1], v[2]]); }
+                ca "OP_DOC_CHI_SO": { mình.gọi("index"); }
+                ca "OP_GAN_CHI_SO": { mình.gọi("set_index"); }
+                ca "OP_GOI": { mình.gọi("call", [v[2], v[1]]); }
+                ca "OP_GOI_GIAN_TIEP": { mình.gọi("indirect", [v[1]]); }
+                ca "OP_TAO_DONG_BAO": { mình.gọi("closure", [v[1], v[2]]); }
+                ca "OP_TAO_LOP": { mình.gọi("define_class", [v[2], v[3]]); }
+                ca "OP_THEM_PHUONG_THUC": { mình.gọi("define_method", [v[1], v[2], v[3]]); }
+                ca "OP_TAO_DOI_TUONG": { mình.gọi("construct", [v[2], v[1]]); }
+                ca "OP_DOC_THUOC_TINH": { mình.gọi("property", [v[2], 0]); }
+                ca "OP_GAN_THUOC_TINH": { mình.gọi("property", [v[2], 1]); }
+                ca "OP_GOI_PHUONG_THUC": { mình.gọi("method", [v[2], v[1], v[3]]); }
+                ca "OP_IN": { mình.gọi("print"); }
+                ca "OP_TRA_VE": { mình.gọi("return_value"); máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); mình.phát("Jump"); }
+                ca "OP_DUNG_CHUONG_TRINH": { mình.gọi("return_value"); máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh)); mình.phát("Jump"); }
+                ca "OP_JUMP": { mình.nhảy(v[1], i); }
+                ca "OP_JUMP_IF_FALSE": { mình.gọi("condition"); mình.điều kiện(v[1]); }
+                ca "OP_BO_QUA": { mình.nhảy(mình.đích tiếp tục(i), i); }
+                ca "OP_THOAT": {
+                    đích = v[1];
+                    nếu (v[2] >= 0) {
+                        nếu (độ dài(mình.chuyển) == 0) { ném "AOT V++: break outside switch"; };
+                        đích = mình.chuyển[độ dài(mình.chuyển) - 1];
+                    };
+                    mình.nhảy(đích, i);
+                }
+                ca "OP_CHON": { máy ảo thêm cuối danh sách(mình.chuyển, v[1]); mình.gọi("switch_begin"); }
+                ca "OP_CA": { mình.gọi("case", [v[1], v[2]]); mình.điều kiện(v[3]); }
+                ca "OP_MAC_DINH": { mình.gọi("default"); mình.điều kiện(v[3]); }
+                ca "OP_KET_THUC_CHUYEN": {
+                    nếu (độ dài(mình.chuyển) == 0) { ném "AOT V++: switch end"; };
+                    máy ảo xóa vị trí danh sách(mình.chuyển, độ dài(mình.chuyển) - 1);
+                    mình.gọi("switch_end");
+                }
+                ca "OP_THU": { máy ảo thêm cuối danh sách(mình.bắt, v[1]); mình.gọi("try_begin", [v[1], v[2]]); }
+                ca "OP_THU_KET_THUC": { mình.gọi("try_end"); mình.nhảy(v[1], i); }
+                ca "OP_BAT_LOI": { mình.gọi("catch_value", [v[2]]); }
+                ca "OP_NEM": { mình.gọi("throw_value"); }
+                ca "OP_FFI_CALL": { mình.gọi("foreign", [v[2], v[1]]); }
+                ca "intrinsic": { mình.gọi("intrinsic", [v[0]]); }
+                mặc định: { ném "AOT V++: unsupported opcode " + v[0]; }
+            };
+        };
+        máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
+        máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
+        mình.phát("Jump");
+        lỗi = độ dài(mình.lệnh);
+        mình.gọi thô("handle_error");
+        mình.phát("StoreSlot", 0, 1);
+        mình.phát("Drop");
+        lặp(i = 0; i < độ dài(mình.bắt); i++) {
+            mình.phát("LoadSlot", 0, 1);
+            mình.phát("PushConstant", mình.bắt[i]);
+            mình.phát("Equal");
+            bỏ = độ dài(mình.lệnh);
+            mình.phát("BranchZero");
+            máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), mình.bắt[i]]);
+            mình.phát("Jump");
+            mình.lệnh[bỏ]["operand"] = độ dài(mình.lệnh);
+        };
+        xong = độ dài(mình.lệnh);
+        mình.phát("PushConstant", 0);
+        mình.phát("Return");
+        lặp(i = 0; i < độ dài(mình.vá); i++) {
+            vá = mình.vá[i];
+            nếu (vá[1] < 0 || vá[1] > độ dài(nguồn)) { ném "AOT V++: branch target"; };
+            mình.lệnh[vá[0]]["operand"] = mình.vị trí[vá[1]];
+        };
+        lặp(i = 0; i < độ dài(mình.lỗi); i++) { mình.lệnh[mình.lỗi[i]]["operand"] = lỗi; };
+        lặp(i = 0; i < độ dài(mình.trả); i++) { mình.lệnh[mình.trả[i]]["operand"] = xong; };
+        trả về {"parameterCount": 1, "slotCount": 2, "maxStackDepth": mình.sâu nhất, "instructions": mình.lệnh};
+    };
+};
+
+// Quote theo byte UTF-8, không theo số ký tự. Octal đủ ba chữ số giữ cả
+// NUL, dấu nháy, dấu gạch chéo và chữ số đứng ngay sau escape.
+hàm riêng tư biên dịch asm nháy(văn bản) {
+    các byte = chuỗi thành byte máy ảo(văn bản);
+    bảng = "01234567";
+    ra = "\"";
+    lặp(i = 0; i < độ dài(các byte); i++) {
+        b = các byte[i];
+        nếu (b == 34 || b == 92) { ra += "\\" + chuỗi từ byte máy ảo([b]); }
+        hoặc nếu (b >= 32 && b < 127) { ra += chuỗi từ byte máy ảo([b]); }
+        hoặc { ra += "\\" + bảng[b / 64] + bảng[(b / 8) % 8] + bảng[b % 8]; };
+    };
+    trả về ra + "\"";
+};
+
+hàm riêng tư biên dịch asm thân(lệnh, tên, đích, bảng) {
+    hạ = Bộ Hạ ASM Động(lệnh, bảng);
+    máy = hạ.hạ();
+    phát = biên dịch mã máy hàm(đích["kiến trúc"], máy, đích["hệ điều hành"]);
+    trả về biên dịch lắp ráp mã máy(đích["kiến trúc"], đích["hệ điều hành"], tên, phát);
+};
+
+hàm công khai biên dịch asm chương trình(dây, bộ ba, compiler = sai) {
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
+    codec.kiểm tra dây(dây, "bytecode V++ đồ thị đã liên kết");
+    đích = biên dịch phân tích đích(bộ ba);
+    nếu (đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
+        ném "AOT V++: cần target aarch64/x86_64";
+    };
+    bảng = biên dịch asm bảng mã();
+    các hàm = dây[2];
+    khởi tạo = dây[3];
+    chuỗi = dây[1];
+    ngoại = [];
+    nếu (độ dài(dây) == 5) { ngoại = dây[4]; };
+    // Dùng các phần thay vì nối lại toàn bộ assembly khi thêm từng hàm.
+    phần = [];
+    lặp(i = 0; i < độ dài(các hàm); i++) {
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(các hàm[i][2], "vpp_aot_function_" + i, đích, bảng));
+    };
+    lặp(i = 0; i < độ dài(khởi tạo); i++) {
+        máy ảo thêm cuối danh sách(phần, biên dịch asm thân(khởi tạo[i][1], "vpp_aot_init_" + i, đích, bảng));
+    };
+    máy ảo thêm cuối danh sách(phần, biên dịch asm thân(dây[0], "vpp_aot_entry", đích, bảng));
+    tiền tố = "";
+    meta = ".section .data.rel.ro,\"aw\",@progbits\n";
+    nếu (đích["hệ điều hành"] == "macos") { tiền tố = "_"; meta = ".section __DATA,__const\n"; };
+    nếu (đích["hệ điều hành"] == "windows") { meta = ".section .rdata,\"dr\"\n"; };
+    lặp(i = 0; i < độ dài(chuỗi); i++) {
+        meta += ".Laot_string_" + i + ": .asciz " + biên dịch asm nháy(chuỗi[i]) + "\n";
+        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+    };
+    meta += ".p2align 3\n.Laot_strings:\n";
+    lặp(i = 0; i < độ dài(chuỗi); i++) {
+        meta += ".quad .Laot_string_" + i + "," + độ dài(chuỗi thành byte máy ảo(chuỗi[i])) + "\n";
+        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+    };
+    meta += ".p2align 3\n.Laot_functions:\n";
+    lặp(i = 0; i < độ dài(các hàm); i++) {
+        cần = 0; tối đa = 0;
+        mã = các hàm[i][2];
+        lặp(j = 0; j < độ dài(mã); j++) {
+            tên = lấy từ điển(bảng, "" + mã[j][0], "");
+            nếu ((tên == "OP_PARAM" || tên == "OP_PARAM_MAC_DINH") && mã[j][3] >= 0) {
+                nếu (tối đa < mã[j][3] + 1) { tối đa = mã[j][3] + 1; };
+                nếu (tên == "OP_PARAM" && cần < mã[j][3] + 1) { cần = mã[j][3] + 1; };
+            };
+        };
+        meta += ".long " + các hàm[i][1] + "," + cần + "," + tối đa + ",0\n.quad " + tiền tố + "vpp_aot_function_" + i + "\n";
+        nếu (i % 32 == 31) { máy ảo thêm cuối danh sách(phần, meta); meta = ""; };
+    };
+    meta += ".Laot_initializers:\n";
+    lặp(i = 0; i < độ dài(khởi tạo); i++) { meta += ".quad " + tiền tố + "vpp_aot_init_" + i + "\n"; };
+    lặp(i = 0; i < độ dài(ngoại); i++) {
+        d = ngoại[i];
+        meta += ".Laot_foreign_lib_" + i + ":.asciz " + biên dịch asm nháy(d[1]) + "\n.Laot_foreign_sym_" + i + ":.asciz " + biên dịch asm nháy(d[2]) +
+            "\n.Laot_foreign_abi_" + i + ":.asciz " + biên dịch asm nháy(d[6]) + "\n.Laot_foreign_cap_" + i + ":.asciz " + biên dịch asm nháy(d[7]) +
+            "\n.p2align 3\n.Laot_foreign_params_" + i + ":\n";
+        lặp(j = 0; j < độ dài(d[3]); j++) { meta += ".long " + d[3][j] + "\n"; };
+        meta += ".p2align 3\n.Laot_foreign_extents_" + i + ":\n";
+        lặp(j = 0; j < độ dài(d[4]); j++) {
+            e = d[4][j];
+            meta += ".quad " + e[0] + "\n.long " + e[1] + ",0\n.quad " + e[2] + "\n";
+        };
+    };
+    meta += ".p2align 3\n.Laot_foreign:\n";
+    lặp(i = 0; i < độ dài(ngoại); i++) {
+        d = ngoại[i];
+        meta += ".long " + d[0] + "," + d[5] + "\n.quad .Laot_foreign_lib_" + i + ",.Laot_foreign_sym_" + i +
+            ",.Laot_foreign_abi_" + i + ",.Laot_foreign_cap_" + i + "\n.quad " + độ dài(d[3]) + ",.Laot_foreign_params_" + i +
+            "," + độ dài(d[4]) + ",.Laot_foreign_extents_" + i + "\n";
+    };
+    cờ = 0;
+    nếu (compiler) { cờ = 1; };
+    meta += ".p2align 3\n" + tiền tố + "vpp_aot_spec:\n.quad " + độ dài(chuỗi) + ",.Laot_strings," + độ dài(các hàm) + ",.Laot_functions," +
+        độ dài(khởi tạo) + ",.Laot_initializers," + tiền tố + "vpp_aot_entry\n.long " + cờ + ",0\n.quad " + độ dài(ngoại) + ",.Laot_foreign\n";
+    máy ảo thêm cuối danh sách(phần, meta + "\n#define VPP_NATIVE_DYNAMIC_RUNTIME 1\n#include \"vpp_aot_dynamic_runtime.inc\"\n");
+    trả về biên dịch lắp ráp nối các phần(phần);
+};

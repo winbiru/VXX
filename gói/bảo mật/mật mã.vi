@@ -94,7 +94,7 @@ lớp công khai Bộ Mật Mã {
         kết quả = [0, 0, 0, 0];
         lặp(i = 0; i < 4; i++) {
             nguồn = i - dịch byte;
-            lặp(v = 0; nguồn < 0; v++) {
+            khi (nguồn < 0) {
                 nguồn = nguồn + 4;
             };
             nguồn = nguồn % 4;
@@ -229,7 +229,7 @@ lớp công khai Bộ Mật Mã {
         };
         độ dài gốc = máy ảo lấy độ dài(thông điệp);
         máy ảo thêm cuối danh sách(thông điệp, 128);
-        lặp(vòng = 0; máy ảo lấy độ dài(thông điệp) % 64 != 56; vòng++) {
+        khi (máy ảo lấy độ dài(thông điệp) % 64 != 56) {
             máy ảo thêm cuối danh sách(thông điệp, 0);
         };
         dài bit = mình.mật mã độ dài bit các byte(độ dài gốc);

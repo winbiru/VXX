@@ -50,7 +50,7 @@ lớp công khai Bộ Xử Lý URI {
         các byte = [];
         i = 0;
         n = máy ảo lấy độ dài(văn bản);
-        lặp(vòng = 0; i < n; vòng++) {
+        khi (i < n) {
             c = văn bản[i];
             nếu (c == "%") {
                 nếu (i + 2 >= n) {
@@ -471,7 +471,7 @@ lớp công khai Bộ Xử Lý URI {
         };
         các byte = [];
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(văn bản); vòng++) {
+        khi (i < máy ảo lấy độ dài(văn bản)) {
             c = văn bản[i];
             nếu (c == "+") {
                 máy ảo thêm cuối danh sách(các byte, 32);

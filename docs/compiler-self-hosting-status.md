@@ -1,5 +1,257 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Backend AOT tổng quát và điều phối CLI bằng V++ (26/10/2026)
+
+Compiler native từ Stage 1 dùng `gói/biên dịch/asm chương trình.vi` để hạ
+ABI bytecode thành Machine IR, phát byte/relocation bằng encoder V++ và
+tạo nguồn ASM. Backend giữ đường xử lý lỗi, nhánh quay ngược/safepoint,
+switch, try/catch, closure, OOP, tham số mặc định và metadata FFI. Chuỗi
+được quote theo byte UTF-8 với escape octal ba chữ số, giữ đúng NUL và độ
+dài byte trong ABI. Danh sách 103 opcode intrinsic được gate ABI đối chiếu
+với registry C++; không coi opcode ngoài danh sách là intrinsic hợp lệ.
+
+`gói/biên dịch/dòng lệnh máy.vi` nay đọc nguồn/artifact, chọn pipeline
+`build`/`run`/`artifact`/`embed`, kiểm tra wire, phát ASM và quyết định thao
+tác host. `src/native/aot_driver.cpp` nhận yêu cầu đã chuẩn bị; C++ giữ kiểm
+tra danh tính đường dẫn, tạo tệp tạm, gọi assembler/linker và chạy process.
+API `compileAssembly` liên kết ASM do V++ cung cấp, không tạo lại Snapshot
+hoặc gọi bộ phát ASM C++ trên các đường CLI này. Artifact được chạy ngay
+trong compiler native cũng dùng backend V++. Không thêm opcode hay đổi ABI.
+
+`gói/biên dịch/lắp ráp.vi` ghép các dòng byte theo cây cân bằng, và metadata
+chương trình được ghi theo khối, tránh sao chép lại toàn bộ chuỗi ASM sau
+mỗi byte/bản ghi khi biên dịch compiler lớn.
+
+Kiểm chứng macOS ARM64:
+
+- **9/9 CTest PASS** (132,04 giây): bootstrap CLI, opcode ABI, full AOT
+  parity, object CLI, CLI/artifact/embed, closure, OOP, FFI và assembler.
+- Oracle `native_aot_cpp_oracle.cpp` cung cấp cùng wire cho C++ và V++,
+  bao phủ các helper, toàn bộ intrinsic, nhánh/exception, chuỗi có NUL,
+  tham số mặc định, hàm vô danh và metadata FFI. Object sau assembler trùng
+  byte; nhãn nhánh tạm C++ được chuyển sang tiền tố private của Darwin để
+  không làm khác symbol table không cần thiết.
+- `check_native_aot_bootstrap.cmake` PASS Stage 0 → 1 → 2 → 3, các probe
+  native, FFI, package import/re-export, file/directory, TLS, socket lỗi,
+  UTC, entropy, môi trường, đồng hồ và process spawn.
+- SHA-256 Stage 2/3 trùng nhau:
+  `f8880cde94086f25b942cad82d9ea2e152b09a945677a3bd70e470cfc406ec94`.
+  Artifact và `verification.json` ở `build-p0-release/native-aot-vpp-bootstrap/`.
+- Benchmark ba kernel qua Stage 3, 15 vòng, correctness PASS; cả ba object
+  trùng byte với bản tối ưu trước khi chuyển backend AOT. Dữ liệu ở
+  `build-benchmark/native-aot-vpp-20261026/`. Chuyển backend compiler không
+  được diễn giải thành mức tăng tốc thực thi kernel.
+
+**Phụ thuộc còn lại:** runtime giá trị động và host ABI vẫn viết bằng C++/ASM;
+assembler/linker hệ thống vẫn được gọi. Bộ phát ASM C++ được giữ cho Stage 0,
+oracle và callback artifact của executable thông thường chưa nhúng compiler
+V++; symbol này vẫn có trong binary liên kết. CLI quản lý gói/công cụ cũ
+cũng còn C++. Vì vậy đã chuyển backend và điều phối CLI ở Stage 1+, chưa
+loại toàn bộ C++ khỏi binary hoặc quá trình bootstrap ban đầu.
+
+## Bước trước: chính sách CLI và đường object khỏi bridge Stage 0 (26/10/2026)
+
+`gói/biên dịch/dòng lệnh máy.vi` sở hữu việc phân tích/kiểm tra tham số
+`build`, `run`, `artifact`, `embed`, trợ giúp và chế độ xuất object.
+`gói/biên dịch/dòng lệnh bản địa.vi` nhập mô-đun này vào compiler native.
+`src/native/aot_driver.cpp` chuyển argv thành danh sách rồi gọi parser V++;
+host tiếp tục kiểm tra danh tính tệp (kể cả symbolic/hard link) và thực hiện
+các thao tác ABI còn lại. Tùy chọn thiếu, lặp hoặc mâu thuẫn bị từ chối
+trước khi mở đầu ra.
+
+Compiler native đã bootstrap có thể nhận trực tiếp:
+
+```sh
+cmake --build build-p0-release --target vpp-native-cli -j 6
+build-p0-release/native-cli/vpp-native build --target aarch64-apple-darwin \
+  --emit-obj-selfhost vpp_cycle benchmark/native/kernels.vi /tmp/vpp_cycle.o
+```
+
+Đường này gọi `tạo đối tượng hàm` và ghi byte bằng V++ ngay trong process
+compiler: không sinh wrapper nguồn, không gọi `executeVppSource`, không
+truyền object dưới dạng bản ghi hex qua C++, không cần khởi chạy lại Stage 0.
+Với compiler V++ được tìm thấy qua `VPP_NATIVE_COMPILER` hoặc
+`<VPP_HOME>/bin/vpp-native`, CLI tương thích `vpp-cli build --emit-obj-selfhost`
+chuyển tiếp lệnh trước khi phân tích target qua bridge. Lỗi của compiler
+đã cấu hình được trả về, không tự chuyển về Stage 0. Nếu chưa có compiler
+native, đường Stage 0 cũ vẫn phục vụ bootstrap.
+
+Target CMake `vpp-native-cli` nay tạo compiler tổng quát cùng entrypoint
+với CTest/bootstrap, thay vì cài CLI i32 subset dưới cùng tên.
+`benchmark/native/run.sh` ưu tiên compiler native ở build mặc định nếu có,
+và vẫn cho chọn executable qua `VPP_EXEC`.
+
+Kiểm chứng macOS ARM64: bootstrap CLI, kiểm thử CLI/artifact/embed, closure/OOP
+và đường object mới đều PASS (4/4 CTest; 73,27 giây). Kiểm thử object so
+trùng byte 12/12 object (ba kernel trên AArch64 macOS/Linux và x86-64
+Linux/Windows), chạy với `PATH` rỗng và bỏ các biến gốc toolchain. Kiểm thử
+còn xác nhận CLI tương thích chuyển tiếp trước bridge, lỗi tham số giữ đầu
+ra cũ và từ chối ghi đè nguồn qua đường trực tiếp/symbolic/hard link.
+
+Compiler mới tự biên dịch Stage 1 → 2 → 3 thành công; SHA-256 Stage 2/3:
+`476d976ea7d32d1de2cb0518999145142d313873a9c7272fd08843e2bd8a4c59`.
+Stage 3 xuất object Cycle trùng byte với bản tối ưu trước khi chuyển CLI.
+Kết quả ở `build-p0-release/native-cli-convergence/results.json`.
+
+Đo riêng **thời gian xuất một object `vpp_cycle`**, năm lượt xen kẽ sau
+một lượt warm-up mỗi đường: CLI/bridge Stage 0 cũ có median **5,295 giây**,
+CLI V++ Stage 3 trực tiếp **0,02484 giây** (khoảng 213× trong phép đo cục bộ
+này). Mọi lượt phải xuất object trùng byte. Đo này gồm khởi động process,
+đọc nguồn và ghi object, không gồm bootstrap compiler, và không phải tốc độ
+thực thi kernel. Dữ liệu ở `build-benchmark/native-cli-latency-20261026/results.json`.
+
+Benchmark ba kernel qua CLI Stage 3, 15 vòng, correctness PASS; cả ba object
+trùng byte với bản tối ưu trước khi chuyển CLI. Kết quả và phụ thuộc compiler/
+harness được lưu riêng ở `build-benchmark/native-vpp-cli-20261026/`.
+
+Phạm vi còn lại: `src/cli/main.cpp` vẫn chứa CLI cũ cho quản lý gói và
+công cụ; `src/native/aot_driver.cpp`, bộ phát ASM `aot_assembly.cpp` và
+runtime giá trị động vẫn dùng C++. Việc xuất object trực tiếp hỗ trợ tập
+con i32 AArch64/x86-64 của `mã máy từ cây.vi`, chưa thay backend toàn ngôn
+ngữ. Muốn bỏ C++ khỏi binary compiler phải chuyển tiếp backend tổng quát,
+runtime và host ABI; muốn bootstrap không dùng mã nguồn C++ cần phân phối
+một compiler V++ seed đã kiểm chứng. Đây chưa phải công cụ hoàn toàn thuần V++.
+
+## ARM64 native: so sánh trực tiếp và giữ hằng trong thanh ghi (26/10/2026)
+
+Bộ phát mã AArch64 bằng V++ (`gói/biên dịch/mã máy aarch64.vi`) và bộ
+đối chiếu C++ (`src/native/aarch64_codegen.cpp`) hiện gộp chuỗi
+`LoadSlot` / `PushConstant` / `Compare` thành so sánh trực tiếp: `CMP #imm12`
+cho hằng không âm đến 4095, hoặc tải hằng lớn/âm vào W9. Với `ADD/SUB`
+và hằng ngoài immediate, backend dùng trực tiếp thanh ghi slot nguồn,
+tránh hai lượt sao chép qua evaluation stack.
+
+Trong hàm lá có đủ thanh ghi, bộ phát mã xác định vùng vòng lặp từ cạnh
+nhảy ngược và chọn tối đa một hằng lớn/âm được dùng ít nhất hai lần trong
+vùng đó để tải vào W10 **một lần trước phần thân**. W10 được dành riêng,
+không cấp cho slot; W9 vẫn phục vụ scratch. Hàm có `CALL` hoặc vượt ngân
+sách thanh ghi dùng đường fallback. Đây là tối ưu cục bộ theo back-edge,
+chưa có CFG dominance, liveness và register allocation tổng quát.
+
+Kết quả benchmark macOS ARM64, 15 vòng, trung vị ns/lần gọi, correctness PASS:
+
+| Workload | V++ selfhost trước direct compare | V++ sau hoisting | C++ `-O3` cùng lượt cuối |
+| --- | ---: | ---: | ---: |
+| Arithmetic | 0,911 | 0,845 | 0,848 |
+| Cycle | 123,022 | 118,777 | 151,241 |
+| Fibonacci | 15,530 | 14,944 | 13,849 |
+
+Object Cycle giảm từ 64 xuống 56 byte sau hoisting (giảm 12,5%); `otool`
+xác nhận tải hằng 65521 vào W10 trước vòng lặp. Ở lượt cuối, Cycle nhanh
+hơn C++ `-O3` khoảng 21,5%, Fibonacci chậm hơn khoảng 7,9%. Các lượt đo
+đều có nhiễu hệ thống; riêng Arithmetic dưới 1 ns/lần gọi cần được diễn
+giải thận trọng. Dữ liệu thô và disassembly nằm ở
+`build-benchmark/native-hoisted-20261026/`.
+
+Sau cập nhật encoder, ba CTest `vpp-native-object-parity`,
+`vpp-native-machine-vpp-parity`, `vpp-native-control-flow-host-link`
+đều PASS (3/3; 480,48 giây). Bổ sung regression: fixture kiểm tra
+`MOVZ W10, #65521` chỉ xuất hiện một lần; ba hàm `hoist_vong`,
+`hoist_hai_vong`, `hoist_long_nhau` kiểm tra parity C++ oracle với
+CLI V++ native trên ARM64 macOS/Linux và x86-64 Linux/Windows
+(12/12 trường hợp mới ngoài 44/44 trường hợp cũ). Bài host-link còn
+chạy thực tế các vòng lặp, nhánh `continue`, hằng âm/lớn, và hàm
+`hoist_goi` có `CALL` để xác nhận fallback. Hai CTest bị ảnh hưởng bởi
+các fixture mới PASS (2/2; 465,22 giây) trên macOS ARM64; chạy lại
+`vpp-native-object-parity` sau đó cũng PASS (1/1; 54,35 giây).
+
+`--emit-obj-selfhost` vẫn được CLI/bridge Stage 0 C++ gọi. Benchmark dùng
+C++ harness và thư viện hệ thống; chỉ các kernel phát mã máy là chạy
+native không qua VM bytecode. Vì vậy hiệu năng các kernel chưa thể đại diện
+cho toàn ngôn ngữ, và công cụ chưa tự chủ hoàn toàn khỏi C++.
+
+Hướng tối ưu tiếp theo có dữ kiện cụ thể là Fibonacci: disassembly của
+`vpp_fibonacci.o` còn `mov w4, w5` và `mov w5, w7` ở mỗi vòng sau
+`add w7, w4, w5`. Cần phân tích liveness và giá trị mang qua back-edge
+để coalesce thanh ghi/copy propagation an toàn tại điểm nối CFG, sau đó
+đo lại cùng input và C++ `-O3` trong một lượt đo. Các tối ưu nhánh/phi
+phải được kiểm tra với vòng lặp lồng, `break`/`continue` và đường có `CALL`.
+
+## ARM64 native: tối ưu immediate trước direct compare (26/10/2026)
+
+Bộ phát mã máy ARM64 bằng V++ (`gói/biên dịch/mã máy aarch64.vi`) hiện
+gộp compare/branch, dùng trực tiếp thanh ghi slot, gộp kết quả với StoreSlot
+và phát `add/sub Wd, Wn, #imm12` cho hằng trong `[0, 4095]` khi CFG cho
+phép. `src/native/aarch64_codegen.cpp` tiếp tục làm C++ oracle kiểm thử.
+Regression kiểm tra các biên immediate `0`, `4095`, `-1`, `4096`. Ba CTest
+`vpp-native-object-parity`, `vpp-native-machine-vpp-parity` và
+`vpp-native-control-flow-host-link` cùng PASS (3/3, 384,76 giây).
+
+Trên macOS ARM64, 15 vòng benchmark (median ns/lần gọi, correctness PASS):
+
+| Workload | V++ 24/10 | V++ trước immediate | V++ immediate `--emit-obj` | V++ immediate selfhost | C++ `-O3` cùng lượt selfhost |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Arithmetic | 0,947 | 0,852 | 0,844 | 0,911 | 0,885 |
+| Cycle | 184,143 | 122,588 | 120,255 | 123,022 | 154,702 |
+| Fibonacci | 41,781 | 20,858 | 15,182 | 15,530 | 14,227 |
+
+`otool` xác nhận Fibonacci dùng `add w6, w6, #1` và mã máy giảm từ
+60 xuống 52 byte. Cả ba object ARM64 từ `--emit-obj` và
+`--emit-obj-selfhost` trùng byte, với ba kernel selfhost biên dịch và chạy
+PASS. Dữ liệu ở `benchmark/reports/native-2026-10-24/results.json` và
+`build-benchmark/native-{direct-stores,immediate,immediate-selfhost}-20261026/results.json`.
+Các lượt đo có nhiễu môi trường: cùng object nhưng các median vẫn chênh.
+
+Phụ thuộc còn lại: `--emit-obj` vẫn đi qua C++ `compilePipeline`, CLI C++
+và wrapper Stage 0 trong `src/cli/native_vpp_codegen.cpp`;
+`--emit-obj-selfhost` dùng compiler nguồn V++ nhưng vẫn được gọi từ
+CLI/bridge Stage 0 C++. Mã máy kernel khi chạy không sử dụng bytecode VM.
+Executable benchmark liên kết C++ harness cùng `libc++` và `libSystem`, không
+phải executable compiler V++ độc lập. Bước tối ưu tiếp theo nên tập trung
+loại MOV/hằng tải lại trong vòng `cycle`, kết hợp liveness, copy propagation
+và constant hoisting; để bỏ phụ thuộc toolchain cần hoàn tất bootstrap native
+nhiều thế hệ và tách CLI/linker khỏi Stage 0.
+
+## Hàm ẩn danh qua compiler tự chủ (26/10/2026)
+
+Parser chương trình V++ đọc được `hàm(tham số) { ... }` trong biểu thức.
+Phân giải IR giữ cùng SymbolId cho ô biến được bắt giữ, truyền tiếp biến
+qua closure lồng nhau và tách biến cục bộ, tham số, biến catch cùng tên.
+Closure trong phương thức bắt được receiver `mình`; thân closure có khung
+điều khiển riêng để `thoát`/`bỏ qua` không trỏ tới vòng lặp ngoài.
+
+Bộ phát V++ tạo hàm không có tên runtime (`nameIndex = -1`) và phát
+`OP_TAO_DONG_BAO` với danh sách ô biến. Hàm không bắt biến dùng function ID
+trực tiếp. Linker một đơn vị, linker mô-đun và artifact giữ các hàm này mà
+không tạo tên xuất hay `OP_HAM`. Kiểm tra ABI của Stage 0 được đồng bộ để
+nhận giá trị `-1` đã được định dạng artifact cho phép; phần phân tích,
+phân giải biến và phát closure nằm trong thư viện V++.
+
+Kiểm chứng macOS ARM64: compiler tổng quát tự biên dịch Stage 1 → 2 → 3,
+hai executable Stage 2/3 có cùng SHA256
+`ecf6632d6ee2d48223d0a0aa734707c240efb3a33c0f1be09ca75246bbe47059`.
+Stage 3 biên dịch và chạy đạt các fixture bắt biến, phạm vi, mô-đun nhập
+và OOP; đồng thời từ chối closure dùng vòng lặp ngoài và giữ nguyên đầu ra
+cũ. CTest `vpp-native-anonymous-functions`, kiểm thử CLI/artifact, OOP,
+FFI và kiểm thử tích hợp đều đạt. Bài V++ `kiem_tra_ham_an_danh_tu_chu.vi`
+còn kiểm tra vòng tuần tự hóa/giải mã artifact và các lỗi ngữ nghĩa.
+
+## Tên API và nhập mô-đun (26/10/2026)
+
+API sinh mã dùng các tên `Bộ Hạ Cây`, `sinh mã hàm`, `tạo đối tượng hàm`,
+`tạo đối tượng chương trình` và `Bộ Sinh Mã Máy`. Tên symbol ABI
+`vpp_native_*` và đường dẫn mô-đun được giữ nguyên. Hai hàm CLI i32 đổi
+thành `hiện trợ giúp` và `hiện phiên bản`: từ khóa `in` ở đầu tên cũ làm
+lexer i32 tách sai định danh, khiến compiler tự biên dịch trả mã 14.
+
+Trong nhánh i32, `bản địa/bộ biên dịch.vi` tập hợp các khai báo nhập;
+trình điều khiển và bộ sinh mã dùng chung bảng hàm toàn chương trình.
+Đây chưa phải cơ chế phụ thuộc riêng của từng mô-đun. Compiler tổng quát
+dùng các khai báo nhập trong từng tệp; `bộ biên dịch.vi` đã bổ sung phụ
+thuộc trực tiếp vào `mã lệnh.vi`. Parser chương trình V++ cũng nhận từ tố
+số nguyên trong đường nhập, để nạp các tên như `mã máy x86 64` và
+`định dạng elf 64`.
+
+Kiểm chứng trên macOS ARM64: bootstrap i32 Stage 1 → 2 → 3 → 4 đạt,
+phần mã máy của Stage 2–4 khớp nhau và các probe thực thi đạt. Năm CTest
+đối chiếu object/ABI/Machine IR/ISA, kiểm thử liên kết phép chia và chia
+dư, cùng bước tạo compiler tổng quát Stage 1 đều đạt. Các bài kiểm thử
+parser, API sinh mã và OOP đạt trên VM; hai probe dùng parser nhập mô-đun
+và `Bộ Sinh Mã Máy` được compiler tổng quát tự biên dịch và chạy đạt.
+
+Facade compiler còn API snapshot dựa vào compiler C++ cho đối chiếu.
+Các kiểm chứng trên chưa chứng minh việc loại bỏ toàn bộ C++ khỏi toolchain.
+
 ## CI native bootstrap (19/10/2026)
 
 Compiler bootstrap bằng bytecode trên C++ VM đã ngừng đăng ký vào CTest:
@@ -149,8 +401,53 @@ linker vẫn giữ nguyên artifact đầu ra đã có.
 ```sh
 VPP_HOME="$PWD" VPP_NATIVE_CACHE_DIR="$PWD/build/native-cache" \
   VPP_NATIVE_CACHE_STATS=1 \
-  build-p0-release/nativedriver/vpp-native build app.vi -o build/app
+  build-p0-release/nativedriver/vpp-native 'biên dịch' app.vi --đầu-ra build/app
 ```
+
+CLI native dùng tiếng Việt: `vpp-native kiểm tra app.vi`,
+`vpp-native biên dịch app.vi --đầu-ra build/app`,
+`vpp-native đối tượng app.vi --đầu-ra build/app.o` hoặc
+`vpp-native xuất đối tượng app.vi --đầu-ra build/app.o`.
+Các bí danh `check`, `build`, `dựng`, `object` và tùy chọn `-o` được giữ
+để các tập lệnh hiện có tiếp tục hoạt động.
+
+Ngày 25/10/2026, bộ xử lý lệnh trong chính thư viện V++ native đã có thêm
+`vpp-native --trợ-giúp`, `vpp-native --phiên-bản`, `trợ giúp`, `phiên bản`
+(kèm `--help`, `--version`, `help`, `version`). Khi không truyền tham số,
+CLI in hướng dẫn. Có thể bỏ `--đầu-ra`: `biên dịch chương-trình.vi` tạo
+`chương-trình`, `đối tượng chương-trình.vi` tạo `chương-trình.o`;
+đối với nguồn không kết thúc bằng `.vi`, tên đầu ra mặc định lần lượt
+thêm `.out` hoặc `.o`. Hai từ `biên dịch`, `kiểm tra`, `xuất đối tượng`
+đều có thể truyền thành một tham số có khoảng trắng hoặc hai tham số.
+Việc chọn lệnh, xác định tên đầu ra và gọi compiler native chạy trong mã
+V++ đã biên dịch, không cần chạy `src/cli/main.cpp` tại thời điểm đó.
+Các lệnh hiện dùng chung một bộ phân tích đối số V++ thay vì lặp lại
+việc phân nhánh theo số tham số. Có thể viết `biên dịch --đầu-ra app
+"nguồn có dấu.vi"` hoặc `object -o app.o "nguồn có dấu.vi"`, bên cạnh
+cú pháp truyền nguồn trước `-o`. Tham số thừa sau lệnh trợ giúp/phiên
+bản, tham số đầu ra cho `kiểm tra` và đường đầu ra bị bỏ trống đều bị
+từ chối với mã thoát 2. Khi không cấp phát được bộ đệm, đường biên dịch
+đi qua phần giải phóng tài nguyên đã tạo trước đó.
+Để tự tạo executable CLI native trên macOS ARM64 hoặc Linux x86-64:
+
+```sh
+cmake --build build-p0-release --target vpp-native-cli
+build-p0-release/native-cli/vpp-native --trợ-giúp
+```
+
+`cmake --install build-p0-release --prefix <thư-mục-đích>` sẽ kèm
+`bin/vpp-native` nếu đã chạy mục tiêu build trên. Mục tiêu này sử dụng
+compiler C++ Stage 0 **lúc bootstrap**; executable Stage 1 chạy các
+lệnh native trực tiếp. `vpp`/`vpp-cli` vẫn giữ các lệnh chưa chuyển đổi.
+
+Kiểm chứng trên macOS ARM64: compiler đã có tự biên dịch phiên bản CLI
+mới; `checknativedriver.cmake` kiểm tra các lệnh, đầu ra mặc định, đường dẫn
+UTF-8 có khoảng trắng, thứ tự tùy chọn đầu ra và đối số sai, đối tượng
+native và chuỗi Stage 1 → 2 → 3 → 4; parity mã máy và các chương trình
+kiểm tra đều PASS. CLI C++ vẫn phục vụ các lệnh bao quát hơn như chạy VM,
+quản lý gói, định dạng, kiểm thử và giai đoạn bootstrap. Runtime native
+C và linker của hệ điều hành cũng chưa được loại bỏ; các chức năng này
+là phạm vi chuyển đổi tiếp theo.
 
 Có thể xóa thư mục cache để làm sạch; hiện chưa có cơ chế tự thu hồi entry
 cũ hoặc hạn mức tổng dung lượng đĩa. Key và payload riêng vẫn chịu giới

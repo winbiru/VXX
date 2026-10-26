@@ -28,6 +28,9 @@ std::string emitAssembly(const Snapshot &, bool compiler = false);
 Snapshot snapshotFromWire(const std::vector<Value> &wire);
 void compileExecutable(const Snapshot &, const std::filesystem::path &output,
                        const std::filesystem::path &installation, bool compiler = false);
+// Host assembler/linker ABI for source emitted by the V++ compiler itself.
+void compileAssembly(const std::string &, const std::filesystem::path &output,
+                     const std::filesystem::path &installation);
 struct ProcessResult {
     int status = 1;
     std::string output;

@@ -360,7 +360,7 @@ lớp công khai Bộ Xử Lý Luồng {
             lấy từ điển(nguồn, "__vpp_stream_generator__", 0) == 1) {
             tiếp = lấy từ điển(nguồn, "tiếp", rỗng);
             còn = đúng;
-            lặp(vòng = 0; còn && tiếp tục; vòng++) {
+            khi (còn && tiếp tục) {
                 bước = tiếp();
                 nếu (loại của(bước) != "từ điển" ||
                     lấy từ điển(bước, "__vpp_stream_step__", 0) != 1) {

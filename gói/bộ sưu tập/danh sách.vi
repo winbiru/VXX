@@ -32,9 +32,9 @@ lớp công khai Tiện Ích Danh Sách {
     // Loại bỏ phần tử trùng lặp, giữ thứ tự xuất hiện đầu tiên.
     hàm công khai xóa trùng(danh sách đầu vào) {
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(danh sách đầu vào); vòng++) {
+        khi (i < máy ảo lấy độ dài(danh sách đầu vào)) {
             j = i + 1;
-            lặp(vòng con = 0; j < máy ảo lấy độ dài(danh sách đầu vào); vòng con++) {
+            khi (j < máy ảo lấy độ dài(danh sách đầu vào)) {
                 nếu (danh sách đầu vào[j] == danh sách đầu vào[i]) {
                     máy ảo xóa vị trí danh sách(danh sách đầu vào, j);
                 } hoặc {

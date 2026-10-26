@@ -4,7 +4,7 @@ nhập gói/biên dịch/đích;
 nhập gói/biên dịch/mã máy;
 nhập gói/biên dịch/đối tượng;
 
-lớp công khai Bộ Sinh Mã Bản Địa {
+lớp công khai Bộ Sinh Mã Máy {
     hàm công khai khởi tạo(bộ ba) { mình.đích = biên dịch phân tích đích(bộ ba); };
     hàm công khai bộ ba() { trả về biên dịch bộ ba chuẩn(mình.đích); };
     hàm công khai lá(loại, hằng = 0) {

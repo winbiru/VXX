@@ -1,0 +1,106 @@
+nhập gói/dữ liệu/json/json;
+nhập gói/văn bản/chuỗi;
+nhập gói/thời gian/đơn điệu;
+
+hàm bench arithmetic(i, texts, documents) {
+    trả về (1000 + i * 7 + 20 + i) - (i % 7) * (i % 11);
+};
+
+hàm bench branch(i, texts, documents) {
+    x = i * 4093 + 7;
+    lặp(j = 0; j < 128 + i; j++) {
+        x = x + 251;
+        nếu (x >= 65521) { x = x - 65521; };
+    };
+    trả về x;
+};
+
+hàm bench fibonacci(i, texts, documents) {
+    a = 0;
+    b = 1;
+    lặp(j = 0; j < 20 + i; j++) {
+        next = a + b;
+        a = b;
+        b = next;
+    };
+    trả về a;
+};
+
+hàm bench list(i, texts, documents) {
+    values = [];
+    lặp(j = 0; j < 128; j++) {
+        máy ảo thêm cuối danh sách(values, (j * 17 + i) % 1000);
+    };
+    result = 0;
+    lặp(j = 0; j < 128; j++) {
+        value = values[j];
+        nếu (value >= 500) { result = result + value; };
+    };
+    trả về result;
+};
+
+hàm bench text(i, texts, documents) {
+    result = thay chính xác(texts[i], "Việt", "V++");
+    trả về máy ảo lấy độ dài(result);
+};
+
+hàm bench json(i, texts, documents) {
+    parsed = json phân tích(documents[i]);
+    values = parsed["values"];
+    result = parsed["quantity"] + máy ảo lấy độ dài(parsed["name"]);
+    lặp(j = 0; j < 16; j++) { result = result + values[j]; };
+    trả về result;
+};
+
+hàm bench iterations() {
+    raw = máy môi trường đọc("VPP_BENCH_ITERS");
+    digits = "0123456789";
+    result = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(raw); i++) {
+        found = -1;
+        lặp(j = 0; j < 10; j++) {
+            nếu (raw[i] == digits[j]) { found = j; };
+        };
+        nếu (found < 0) { ném "invalid iteration count"; };
+        result = result * 10 + found;
+    };
+    nếu (result <= 0 || result > 100000000) { ném "iteration count out of range"; };
+    trả về result;
+};
+
+hàm chính() {
+    name = máy môi trường đọc("VPP_BENCH_CASE");
+    iterations = bench iterations();
+    texts = [];
+    documents = [];
+    text = "";
+    lặp(i = 0; i < 16; i++) {
+        text = text + "Xin chào Việt Nam! ";
+        máy ảo thêm cuối danh sách(texts, text);
+        máy ảo thêm cuối danh sách(documents, "{\"name\":\"V++ Việt\",\"quantity\":" + i + ",\"active\":true,\"values\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}");
+    };
+    work = bench arithmetic;
+    nếu (name == "branch") { work = bench branch; };
+    nếu (name == "fibonacci") { work = bench fibonacci; };
+    nếu (name == "list") { work = bench list; };
+    nếu (name == "text") { work = bench text; };
+    nếu (name == "json") { work = bench json; };
+    lặp(i = 0; i < 16; i++) { in work(i, texts, documents); };
+    previous = -1.0;
+    elapsed = 0.0;
+    checksum = 0.0;
+    // Three warm-up batches in this process, then one measured batch.
+    lặp(batch = 0; batch < 4; batch++) {
+        checksum = 0.0;
+        started = thời gian đơn điệu mili giây();
+        lặp(i = 0; i < iterations; i++) {
+            checksum = checksum + work(i % 16, texts, documents);
+        };
+        elapsed = thời gian đơn điệu mili giây() - started;
+        nếu (previous >= 0.0 && previous != checksum) { ném "unstable checksum"; };
+        previous = checksum;
+    };
+    in elapsed;
+    in checksum;
+    in iterations;
+};

@@ -278,7 +278,7 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
                 ném "socket_gui: datagram vượt quá 65507 byte";
             };
             đã gửi = 0;
-            lặp(vòng = 0; đã gửi < tổng; vòng++) {
+            khi (đã gửi < tổng) {
                 đệm = [];
                 hết = đã gửi + 65536;
                 nếu (hết > tổng) { hết = tổng; };
@@ -304,7 +304,7 @@ lớp công khai Bộ Điều Khiển Ổ Cắm {
         // VM chỉ send/SSLWrite một lần (một record với SChannel). V++ sở hữu
         // vòng gửi hết stream và quy tắc chỉ gửi một datagram cho UDP.
         // Offset tính theo byte nên partial write giữa hai byte UTF-8 vẫn đúng.
-        lặp(vòng = 0; !xong; vòng++) {
+        khi (!xong) {
             lần gửi = đầu nối gửi máy ảo(mã đầu nối, dữ liệu, đã gửi);
             byte = lần gửi[0];
             tổng byte = lần gửi[1];

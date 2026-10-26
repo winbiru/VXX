@@ -1,0 +1,1206 @@
+{
+  "status": "INCONCLUSIVE",
+  "cases": [
+    {
+      "case": "vm_verify",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 52224.177527399996,
+            "p95": 53438.014555454996,
+            "mad": 315.5584653000042,
+            "mad_over_median": 0.006042382671023261,
+            "min": 51355.8252132,
+            "max": 65118.8270402,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 52113.95980510001,
+            "p95": 54347.634196059975,
+            "mad": 357.00883070000054,
+            "mad_over_median": 0.006850541237610248,
+            "min": 51451.998173,
+            "max": 65283.3416565,
+            "samples": 40
+          },
+          "change_fraction": -0.0021104731087849826,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "vm_dispatch_preverified",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 21060.4133716,
+            "p95": 22848.868261044994,
+            "mad": 445.1110756500002,
+            "mad_over_median": 0.02113496386781435,
+            "min": 20133.3460884,
+            "max": 25235.4942602,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 20773.6705995,
+            "p95": 22170.364551404997,
+            "mad": 284.5509141500006,
+            "mad_over_median": 0.013697671424367798,
+            "min": 20255.1130952,
+            "max": 24481.9404762,
+            "samples": 40
+          },
+          "change_fraction": -0.013615249000129892,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "vm_end_to_end",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 1851002.1875,
+            "p95": 2068494.8479165,
+            "mad": 48274.729165000026,
+            "mad_over_median": 0.026080319888871027,
+            "min": 1710571.1875,
+            "max": 2112859.39583,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 1867779.09375,
+            "p95": 2128328.8927115,
+            "mad": 86872.78125,
+            "mad_over_median": 0.04651127188471883,
+            "min": 1715964.39583,
+            "max": 2302963.47917,
+            "samples": 40
+          },
+          "change_fraction": 0.00906368796498258,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 13877248.0,
+            "p95": 13894451.2,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 13828096,
+            "max": 13910016,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 13910016.0,
+            "p95": 13926400.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 13844480,
+            "max": 13959168,
+            "samples": 40
+          },
+          "change_fraction": 0.0023612750885477762,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "vm_direct_function_calls_10k",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 1120872.5639550001,
+            "p95": 1172764.8843065,
+            "mad": 18157.639535000082,
+            "mad_over_median": 0.016199557486652034,
+            "min": 1068323.68605,
+            "max": 1210630.32558,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 1125191.1511650002,
+            "p95": 1204455.4843009997,
+            "mad": 16257.250000000116,
+            "mad_over_median": 0.014448433924464913,
+            "min": 1074348.2907,
+            "max": 1449875.05814,
+            "samples": 40
+          },
+          "change_fraction": 0.0038528797553594174,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "vm_direct_function_calls_consumed_10k",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 1099808.566665,
+            "p95": 1147705.6294464997,
+            "mad": 16635.394440000062,
+            "mad_over_median": 0.015125718187888217,
+            "min": 1053960.15556,
+            "max": 1162702.8,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 1102008.072225,
+            "p95": 1166953.3422219995,
+            "mad": 18899.322219999973,
+            "mad_over_median": 0.01714989453919467,
+            "min": 1058111.62222,
+            "max": 1505231.46667,
+            "samples": 40
+          },
+          "change_fraction": 0.0019998985520448542,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 8617984.0,
+            "p95": 8617984.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8617984,
+            "max": 8617984,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "vm_module_init_32x622_functions",
+      "status": "INCONCLUSIVE",
+      "reasons": [
+        "ns_per_iteration MAD/median exceeds 5%"
+      ],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 102021250.0,
+            "p95": 120888320.84999998,
+            "mad": 5901229.5,
+            "mad_over_median": 0.05784314052219513,
+            "min": 92827208,
+            "max": 133812792,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 100892167.0,
+            "p95": 123486516.99999997,
+            "mad": 3987188.0,
+            "mad_over_median": 0.03951930183043843,
+            "min": 93891333,
+            "max": 136440375,
+            "samples": 40
+          },
+          "change_fraction": -0.011067135523236571,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 19202048.0,
+            "p95": 19234816.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 19169280,
+            "max": 19234816,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 19234816.0,
+            "p95": 19251200.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0008517887563884157,
+            "min": 19185664,
+            "max": 19267584,
+            "samples": 40
+          },
+          "change_fraction": 0.0017064846416381396,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_lexer",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 205597.35576900002,
+            "p95": 210805.92692329996,
+            "mad": 2347.1228630000114,
+            "mad_over_median": 0.01141611405565514,
+            "min": 199355.792735,
+            "max": 247279.547009,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 205428.820513,
+            "p95": 211345.55288424998,
+            "mad": 2547.1378205000074,
+            "mad_over_median": 0.012399125955838405,
+            "min": 199757.444444,
+            "max": 227496.333333,
+            "samples": 40
+          },
+          "change_fraction": -0.0008197345504256104,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9043968.0,
+            "p95": 9061171.2,
+            "mad": 16384.0,
+            "mad_over_median": 0.0018115942028985507,
+            "min": 8994816,
+            "max": 9093120,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9060352.0,
+            "p95": 9079193.6,
+            "mad": 16384.0,
+            "mad_over_median": 0.0018083182640144665,
+            "min": 9011200,
+            "max": 9175040,
+            "samples": 40
+          },
+          "change_fraction": 0.0018115942028984477,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_token_normalize",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 208638.492291,
+            "p95": 229430.6949337,
+            "mad": 2151.291850499998,
+            "mad_over_median": 0.01031109756822566,
+            "min": 203434.017621,
+            "max": 243926.215859,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 208941.21365649998,
+            "p95": 230766.44702685002,
+            "mad": 3547.4449339999846,
+            "mad_over_median": 0.01697819626831495,
+            "min": 202689.414097,
+            "max": 267507.960352,
+            "samples": 40
+          },
+          "change_fraction": 0.00145093727516854,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9011200.0,
+            "p95": 9076736.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8978432,
+            "max": 9076736,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9043968.0,
+            "p95": 9077555.2,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 8994816,
+            "max": 9109504,
+            "samples": 40
+          },
+          "change_fraction": 0.0036363636363636598,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_parser",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 29252.573199550003,
+            "p95": 34219.040864834984,
+            "mad": 692.2346516999987,
+            "mad_over_median": 0.023664060148754624,
+            "min": 27587.7718418,
+            "max": 44943.4442149,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 29319.60050175,
+            "p95": 35994.360227255,
+            "mad": 790.7275678999995,
+            "mad_over_median": 0.026969247683057734,
+            "min": 27696.4285714,
+            "max": 77124.8190673,
+            "samples": 40
+          },
+          "change_fraction": 0.0022913301247982076,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9256960.0,
+            "p95": 9306931.2,
+            "mad": 49152.0,
+            "mad_over_median": 0.005309734513274336,
+            "min": 9191424,
+            "max": 9338880,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9297920.0,
+            "p95": 9339699.2,
+            "mad": 49152.0,
+            "mad_over_median": 0.0052863436123348016,
+            "min": 9207808,
+            "max": 9371648,
+            "samples": 40
+          },
+          "change_fraction": 0.004424778761061843,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_semantic",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 24281.43444015,
+            "p95": 25572.46772902999,
+            "mad": 637.5084827999981,
+            "mad_over_median": 0.026254976178254973,
+            "min": 22741.7898691,
+            "max": 32984.7532719,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 24084.314590399998,
+            "p95": 24753.08499756,
+            "mad": 531.3299806000032,
+            "mad_over_median": 0.022061245654538625,
+            "min": 22509.7961706,
+            "max": 28490.6519632,
+            "samples": 40
+          },
+          "change_fraction": -0.008118130345053154,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9191424.0,
+            "p95": 9240576.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017825311942959,
+            "min": 9142272,
+            "max": 9256960,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9224192.0,
+            "p95": 9273344.0,
+            "mad": 32768.0,
+            "mad_over_median": 0.003552397868561279,
+            "min": 9142272,
+            "max": 9289728,
+            "samples": 40
+          },
+          "change_fraction": 0.0035650623885918886,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_ir_lower",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 18466.508777000003,
+            "p95": 18850.198186725,
+            "mad": 205.57542439999997,
+            "mad_over_median": 0.011132338379848157,
+            "min": 18083.9886188,
+            "max": 19137.2613812,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 18465.216049399998,
+            "p95": 18954.19785876,
+            "mad": 229.87037039999814,
+            "mad_over_median": 0.012448831889376536,
+            "min": 17975.9670139,
+            "max": 23630.2216435,
+            "samples": 40
+          },
+          "change_fraction": -7.000389817135577e-05,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9109504.0,
+            "p95": 9128345.6,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017985611510791368,
+            "min": 9093120,
+            "max": 9175040,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9142272.0,
+            "p95": 9191424.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017921146953405018,
+            "min": 9109504,
+            "max": 9207808,
+            "samples": 40
+          },
+          "change_fraction": 0.003597122302158251,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_optimizer",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 732.933325,
+            "p95": 805.6365040000001,
+            "mad": 11.563865000000021,
+            "mad_over_median": 0.015777512913606462,
+            "min": 691.67832,
+            "max": 837.07329,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 726.919995,
+            "p95": 780.0442805,
+            "mad": 14.502859999999941,
+            "mad_over_median": 0.019951108924992415,
+            "min": 696.20615,
+            "max": 815.53076,
+            "samples": 40
+          },
+          "change_fraction": -0.008204470713621848,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9027584.0,
+            "p95": 9027584.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9011200,
+            "max": 9027584,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9060352.0,
+            "p95": 9060352.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9011200,
+            "max": 9060352,
+            "samples": 40
+          },
+          "change_fraction": 0.003629764065335772,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_codegen",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 26085.6399555,
+            "p95": 27122.510475835,
+            "mad": 327.35225374999754,
+            "mad_over_median": 0.012549136394906705,
+            "min": 25432.6035058,
+            "max": 28041.7328881,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 26277.4085977,
+            "p95": 27799.345200374988,
+            "mad": 422.61032279999927,
+            "mad_over_median": 0.01608264837945205,
+            "min": 25239.9652198,
+            "max": 32823.3169171,
+            "samples": 40
+          },
+          "change_fraction": 0.007351502302689994,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9256960.0,
+            "p95": 9256960.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9240576,
+            "max": 9256960,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9289728.0,
+            "p95": 9289728.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9224192,
+            "max": 9289728,
+            "samples": 40
+          },
+          "change_fraction": 0.003539823008849474,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_pipeline",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 533830.875,
+            "p95": 550091.4499998,
+            "mad": 4662.3125,
+            "mad_over_median": 0.008733688361505879,
+            "min": 525607.895833,
+            "max": 571672.451389,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 533508.1284719999,
+            "p95": 546252.4798607,
+            "mad": 4031.2256950001465,
+            "mad_over_median": 0.007556071744484616,
+            "min": 524751.986111,
+            "max": 554277.513889,
+            "samples": 40
+          },
+          "change_fraction": -0.0006045857276428812,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9895936.0,
+            "p95": 9912320.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0016556291390728477,
+            "min": 9846784,
+            "max": 9945088,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9928704.0,
+            "p95": 9928704.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9846784,
+            "max": 9928704,
+            "samples": 40
+          },
+          "change_fraction": 0.0033112582781456013,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_package_resolve",
+      "status": "INCONCLUSIVE",
+      "reasons": [
+        "ns_per_iteration MAD/median exceeds 5%"
+      ],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 13158.9597216,
+            "p95": 14500.001391929998,
+            "mad": 952.8687249999994,
+            "mad_over_median": 0.0724121621434783,
+            "min": 11416.4147786,
+            "max": 15867.7651414,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 12970.2491485,
+            "p95": 14590.934673495,
+            "mad": 1119.24937065,
+            "mad_over_median": 0.08629359065006399,
+            "min": 11539.9058196,
+            "max": 14792.6120243,
+            "samples": 40
+          },
+          "change_fraction": -0.014340842824394295,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9109504.0,
+            "p95": 9125888.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9043968,
+            "max": 9125888,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9142272.0,
+            "p95": 9158656.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017921146953405018,
+            "min": 9043968,
+            "max": 9158656,
+            "samples": 40
+          },
+          "change_fraction": 0.003597122302158251,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "compiler_module_graph",
+      "status": "INCONCLUSIVE",
+      "reasons": [
+        "ns_per_iteration MAD/median exceeds 5%"
+      ],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 40754.757326399995,
+            "p95": 45888.81091931999,
+            "mad": 2937.698514699994,
+            "mad_over_median": 0.07208234590068385,
+            "min": 35948.662786,
+            "max": 48584.5929346,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 39956.2689683,
+            "p95": 44456.253512675,
+            "mad": 2936.815134499997,
+            "mad_over_median": 0.07350073493673721,
+            "min": 35995.9967884,
+            "max": 44758.5596146,
+            "samples": 40
+          },
+          "change_fraction": -0.019592519020662946,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9191424.0,
+            "p95": 9207808.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017825311942959,
+            "min": 9125888,
+            "max": 9207808,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9240576.0,
+            "p95": 9240576.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9142272,
+            "max": 9240576,
+            "samples": 40
+          },
+          "change_fraction": 0.005347593582887722,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "gc_collect_cycles",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 5817.747507425,
+            "p95": 6457.008802039999,
+            "mad": 87.59144531999937,
+            "mad_over_median": 0.015055903544835743,
+            "min": 5621.93698151,
+            "max": 6678.44204277,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 5819.50342492,
+            "p95": 6540.637845343498,
+            "mad": 143.3072912749999,
+            "mad_over_median": 0.02462534701179765,
+            "min": 5600.55780501,
+            "max": 6950.78423015,
+            "samples": 40
+          },
+          "change_fraction": 0.00030182084952290467,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9109504.0,
+            "p95": 9125888.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9109504,
+            "max": 9125888,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9158656.0,
+            "p95": 9158656.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9109504,
+            "max": 9175040,
+            "samples": 40
+          },
+          "change_fraction": 0.0053956834532373765,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "gc_burst_collect_reuse",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 198248.175705,
+            "p95": 212950.77657299998,
+            "mad": 2422.3069415000064,
+            "mad_over_median": 0.01221855854605432,
+            "min": 193492.579176,
+            "max": 249987.787419,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 199108.0021695,
+            "p95": 219504.4998915999,
+            "mad": 2430.9815615000116,
+            "mad_over_median": 0.012209361427023535,
+            "min": 193021.583514,
+            "max": 261657.273319,
+            "samples": 40
+          },
+          "change_fraction": 0.004337121698307245,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9306112.0,
+            "p95": 9306112.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9289728,
+            "max": 9322496,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9322496.0,
+            "p95": 9355264.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017574692442882249,
+            "min": 9306112,
+            "max": 9355264,
+            "samples": 40
+          },
+          "change_fraction": 0.0017605633802817433,
+          "budget": 0.15,
+          "regression": false
+        },
+        "allocation_count": {
+          "baseline": {
+            "median": 6182.01952278,
+            "p95": 6182.01952278,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 6182.01952278,
+            "max": 6182.01952278,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 6182.01952278,
+            "p95": 6182.01952278,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 6182.01952278,
+            "max": 6182.01952278,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "allocation_bytes": {
+          "baseline": {
+            "median": 216439.0282,
+            "p95": 216439.0282,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 216439.0282,
+            "max": 216439.0282,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 216439.0282,
+            "p95": 216439.0282,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 216439.0282,
+            "max": 216439.0282,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "gc_allocation_count": {
+          "baseline": {
+            "median": 38.0,
+            "p95": 38.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 38,
+            "max": 38,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 38.0,
+            "p95": 38.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 38,
+            "max": 38,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "gc_pause_p95_ns": {
+          "baseline": {
+            "median": 57854.0,
+            "p95": 69535.39999999992,
+            "mad": 1146.0,
+            "mad_over_median": 0.01980848342379092,
+            "min": 54125.0,
+            "max": 115584.0,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 58479.0,
+            "p95": 67553.84999999986,
+            "mad": 1999.5,
+            "mad_over_median": 0.03419176114502642,
+            "min": 53959.0,
+            "max": 122083.0,
+            "samples": 40
+          },
+          "baseline_pooled_p95": 58750.0,
+          "candidate_pooled_p95": 59583.0,
+          "change_fraction": 0.014178723404255411,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    },
+    {
+      "case": "gc_burst_collect_trim_reuse",
+      "status": "PASS",
+      "reasons": [],
+      "metrics": {
+        "ns_per_iteration": {
+          "baseline": {
+            "median": 202249.73178799998,
+            "p95": 213280.5912800499,
+            "mad": 3368.9933774999663,
+            "mad_over_median": 0.016657591323934986,
+            "min": 193147.743929,
+            "max": 258313.19426,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 201016.0651215,
+            "p95": 208460.89525419998,
+            "mad": 3239.6026494999824,
+            "mad_over_median": 0.01611613801882885,
+            "min": 195154.183223,
+            "max": 238125.373068,
+            "samples": 40
+          },
+          "change_fraction": -0.006099719666343595,
+          "budget": 0.1,
+          "regression": false
+        },
+        "peak_rss_bytes": {
+          "baseline": {
+            "median": 9322496.0,
+            "p95": 9322496.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 9306112,
+            "max": 9322496,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 9355264.0,
+            "p95": 9371648.0,
+            "mad": 16384.0,
+            "mad_over_median": 0.0017513134851138354,
+            "min": 9322496,
+            "max": 9371648,
+            "samples": 40
+          },
+          "change_fraction": 0.0035149384885764245,
+          "budget": 0.15,
+          "regression": false
+        },
+        "allocation_count": {
+          "baseline": {
+            "median": 6188.01986755,
+            "p95": 6188.01986755,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 6188.01986755,
+            "max": 6188.01986755,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 6188.01986755,
+            "p95": 6188.01986755,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 6188.01986755,
+            "max": 6188.01986755,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "allocation_bytes": {
+          "baseline": {
+            "median": 280952.0,
+            "p95": 280952.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 280952,
+            "max": 280952,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 280952.0,
+            "p95": 280952.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 280952,
+            "max": 280952,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "gc_allocation_count": {
+          "baseline": {
+            "median": 39.0,
+            "p95": 39.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 39,
+            "max": 39,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 39.0,
+            "p95": 39.0,
+            "mad": 0.0,
+            "mad_over_median": 0.0,
+            "min": 39,
+            "max": 39,
+            "samples": 40
+          },
+          "change_fraction": 0.0,
+          "budget": 0.15,
+          "regression": false
+        },
+        "gc_pause_p95_ns": {
+          "baseline": {
+            "median": 59421.0,
+            "p95": 67514.16999999985,
+            "mad": 1628.9000000000015,
+            "mad_over_median": 0.027412867504754235,
+            "min": 52899.799999999996,
+            "max": 118658.4,
+            "samples": 40
+          },
+          "candidate": {
+            "median": 59291.49999999999,
+            "p95": 62206.259999999995,
+            "mad": 1279.5000000000036,
+            "mad_over_median": 0.021579821728241043,
+            "min": 53683.59999999999,
+            "max": 115491.59999999999,
+            "samples": 40
+          },
+          "baseline_pooled_p95": 60333.0,
+          "candidate_pooled_p95": 59917.0,
+          "change_fraction": -0.006895065718595106,
+          "budget": 0.15,
+          "regression": false
+        }
+      }
+    }
+  ]
+}

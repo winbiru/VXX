@@ -188,7 +188,7 @@ lớp công khai Bộ Mô Phỏng Lượng Tử {
             u = ngẫu nhiên thực từ bộ(bộ) * tổng;
             trái = 0;
             phải = máy ảo lấy độ dài(cdf) - 1;
-            lặp (vòng = 0; trái < phải; vòng++) {
+            khi (trái < phải) {
                 giữa = thành số nguyên((trái + phải) / 2);
                 nếu (u < cdf[giữa]) {
                     phải = giữa;

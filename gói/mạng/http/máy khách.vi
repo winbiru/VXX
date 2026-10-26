@@ -191,7 +191,7 @@ lớp công khai Bộ Giao Thức HTTP {
         hoàn tất = sai;
         cần thêm = sai;
 
-        lặp(vòng = 0; !hoàn tất && !cần thêm; vòng++) {
+        khi (!hoàn tất && !cần thêm) {
             nếu (vị trí >= máy ảo lấy độ dài(nguồn)) {
                 cần thêm = mình.mạng http chia khối cần máy ảo thêm cuối danh sách(
                     cho phép thiếu,
@@ -238,9 +238,7 @@ lớp công khai Bộ Giao Thức HTTP {
                         // rỗng. Trailer chưa được nhập vào headers nhưng phải được
                         // xác thực để không chấp nhận message bị cắt cụt.
                         phần kết xong = sai;
-                        lặp(vòng phần kết = 0;
-                             !phần kết xong && !cần thêm;
-                             vòng phần kết++) {
+                        khi (!phần kết xong && !cần thêm) {
                             cuối phần kết = -1;
                             lặp(i = vị trí;
                                  i + 1 < máy ảo lấy độ dài(nguồn) && cuối phần kết < 0;
@@ -400,7 +398,7 @@ lớp công khai Bộ Giao Thức HTTP {
             yêu cầu = mình.mạng http dựng yêu cầu(phương thức, đích, máy đích phần đầu, dữ liệu, có thân khối);
             đầu nối gửi(đầu nối, yêu cầu);
             đang đọc = đúng;
-            lặp(vòng = 0; đang đọc; vòng++) {
+            khi (đang đọc) {
                 phần = đầu nối nhận(đầu nối, 65536);
                 nếu (phần == "") {
                     đang đọc = sai;
@@ -666,7 +664,7 @@ lớp công khai Bộ Giao Thức HTTP {
     hàm riêng tư mạng http đọc yêu cầu đầu nối(mã đầu nối) {
         dữ liệu = "";
         vị trí ngăn = rỗng;
-        lặp(vòng = 0; vị trí ngăn == rỗng; vòng++) {
+        khi (vị trí ngăn == rỗng) {
             phần = đầu nối nhận(mã đầu nối, 65536);
             nếu (phần == "") {
                 nếu (dữ liệu == "") {
@@ -693,7 +691,7 @@ lớp công khai Bộ Giao Thức HTTP {
                 "mạng http server",
                 "request"
             );
-            lặp(vòng = 0; !lấy từ điển(quét, "hoàn tất", sai); vòng++) {
+            khi (!lấy từ điển(quét, "hoàn tất", sai)) {
                 phần = đầu nối nhận(mã đầu nối, 65536);
                 nếu (phần == "") {
                     ném "mạng http server: kết nối đóng trước khi nhận đủ chunked body";
@@ -711,9 +709,7 @@ lớp công khai Bộ Giao Thức HTTP {
             };
             đặt từ điển(yêu cầu, "body", lấy từ điển(quét, "body", ""));
         } hoặc {
-            lặp(vòng = 0;
-                máy ảo lấy độ dài(chuỗi thành các byte(thân khối, "UTF-8")) < nội dung chiều dài;
-                vòng++) {
+            khi (máy ảo lấy độ dài(chuỗi thành các byte(thân khối, "UTF-8")) < nội dung chiều dài) {
                 phần = đầu nối nhận(mã đầu nối, 65536);
                 nếu (phần == "") {
                     ném "mạng http server: kết nối đóng trước khi nhận đủ body";
@@ -793,7 +789,7 @@ lớp công khai Bộ Giao Thức HTTP {
         kết quả = "";
         tìm thấy = sai;
 
-        lặp(vòng = 0; bắt đầu <= n && !tìm thấy; vòng++) {
+        khi (bắt đầu <= n && !tìm thấy) {
             kết thúc = bắt đầu;
             đang quét = đúng;
             lặp(i = bắt đầu; i < n && đang quét; i++) {

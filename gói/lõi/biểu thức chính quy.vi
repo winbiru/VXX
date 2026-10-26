@@ -50,7 +50,7 @@ lớp công khai Biểu Thức Chính Quy {
         máy ảo thêm cuối danh sách(nhánh, mình.biểu thức chính quy phân tích cú pháp chuỗi(p));
         mẫu = p["mẫu"];
         tiếp = đúng;
-        lặp(vòng = 0; tiếp; vòng++) {
+        khi (tiếp) {
             i = p["vị trí"];
             nếu (i >= máy ảo lấy độ dài(mẫu)) {
                 tiếp = sai;
@@ -73,7 +73,7 @@ lớp công khai Biểu Thức Chính Quy {
         con = [];
         mẫu = p["mẫu"];
         tiếp = đúng;
-        lặp(vòng = 0; tiếp; vòng++) {
+        khi (tiếp) {
             i = p["vị trí"];
             nếu (i >= máy ảo lấy độ dài(mẫu)) {
                 tiếp = sai;
@@ -101,7 +101,7 @@ lớp công khai Biểu Thức Chính Quy {
         };
         nội dung = "";
         đóng = sai;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mẫu) && !đóng; vòng++) {
+        khi (i < máy ảo lấy độ dài(mẫu) && !đóng) {
             c = mẫu[i];
             nếu (c == "]") {
                 đóng = đúng;
@@ -264,7 +264,7 @@ lớp công khai Biểu Thức Chính Quy {
         mẫu = nút["mẫu"];
         mục khớp = sai;
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(mẫu); vòng++) {
+        khi (i < máy ảo lấy độ dài(mẫu)) {
             đầu = mẫu[i];
             nếu (đầu == "\\") {
                 i++;
@@ -461,11 +461,11 @@ lớp công khai Biểu Thức Chính Quy {
         hết trước = 0;
         xong = sai;
 
-        lặp(vòng = 0; !xong; vòng++) {
+        khi (!xong) {
             tìm thấy = rỗng;
             bắt đầu = -1;
             p = tìm từ;
-            lặp(bước tìm = 0; p <= n && tìm thấy == rỗng; bước tìm++) {
+            khi (p <= n && tìm thấy == rỗng) {
                 lượt thử khớp = mình.biểu thức chính quy thử tại(cây, số nhóm, văn bản, p);
                 tìm thấy = mình.biểu thức chính quy chọn(lượt thử khớp, p, sai);
                 nếu (tìm thấy == rỗng) { p++; };

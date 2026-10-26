@@ -55,7 +55,7 @@ lớp công khai Tiện Ích Đường Dẫn {
         n = máy ảo lấy độ dài(đường);
         i = bắt đầu;
         tìm tên máy = đúng;
-        lặp(vòng = 0; i < n && tìm tên máy; vòng++) {
+        khi (i < n && tìm tên máy) {
             nếu (mình.đường dẫn là phân cách windows(đường[i])) {
                 tìm tên máy = sai;
             } hoặc {
@@ -66,7 +66,7 @@ lớp công khai Tiện Ích Đường Dẫn {
         i = i + 1;
         bắt đầu chia sẻ = i;
         tìm chia sẻ = đúng;
-        lặp(vòng = 0; i < n && tìm chia sẻ; vòng++) {
+        khi (i < n && tìm chia sẻ) {
             nếu (mình.đường dẫn là phân cách windows(đường[i])) {
                 tìm chia sẻ = sai;
             } hoặc {
@@ -182,7 +182,7 @@ lớp công khai Tiện Ích Đường Dẫn {
         kết thúc = n;
         mức tối thiểu = 1;
         nếu (độ dài gốc > mức tối thiểu) { mức tối thiểu = độ dài gốc; };
-        lặp(vòng = 0; kết thúc > mức tối thiểu && mình.đường dẫn là phân cách(đường dẫn[kết thúc - 1]); vòng++) {
+        khi (kết thúc > mức tối thiểu && mình.đường dẫn là phân cách(đường dẫn[kết thúc - 1])) {
             kết thúc = kết thúc - 1;
         };
 
@@ -222,7 +222,7 @@ lớp công khai Tiện Ích Đường Dẫn {
         kết thúc = n;
         tối thiểu = 1;
         nếu (gốc dữ liệu > tối thiểu) { tối thiểu = gốc dữ liệu; };
-        lặp(vòng = 0; kết thúc > tối thiểu && mình.đường dẫn là phân cách windows(đường[kết thúc - 1]); vòng++) {
+        khi (kết thúc > tối thiểu && mình.đường dẫn là phân cách windows(đường[kết thúc - 1])) {
             kết thúc = kết thúc - 1;
         };
         nếu (kết thúc < n) { trả về cắt chuỗi(đường, 0, kết thúc); };

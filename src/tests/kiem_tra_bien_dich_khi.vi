@@ -1,0 +1,43 @@
+nhập gói/biên dịch/chính;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/lõi/kịch bản;
+nhập kiểm thử;
+
+hàm chính() {
+    biến từ tố = biên dịch từ tố hóa("khi (đúng) {}");
+    khẳng định bằng(từ tố[0]["giá trị"], "khi");
+    khẳng định bằng(từ tố[0]["loại"], "từ khóa");
+
+    biến cây = biên dịch phân tích chương trình thuần("khi (sai) {};");
+    biến vòng = cây["câu lệnh"][0];
+    khẳng định bằng(vòng["loại"], "lặp");
+    khẳng định bằng(vòng["dạng"], "khi");
+    khẳng định rỗng(vòng["khởi tạo"]);
+    khẳng định rỗng(vòng["cập nhật"]);
+
+    biến nguồn = "hàm chính() { biến x = 0; biến tổng = 0; " +
+        "khi (sai) { in 99; }; khi (x < 8) { x++; " +
+        "nếu (x == 2) { bỏ qua; }; nếu (x == 5) { thoát; }; tổng += x; }; " +
+        "in tổng; in x; };";
+    khẳng định bằng(kịch bản chạy(nguồn), "8\n5\n");
+    khẳng định bằng(biên dịch chạy chương trình tự chủ(nguồn), "8\n5\n");
+
+    nguồn = "hàm chính() { biến n = 0; biến a = 0; khi (a < 2) { a++; " +
+        "lặp (b = 0; b < 3; b++) { khi (đúng) { n++; thoát; }; }; }; in n; };";
+    khẳng định bằng(kịch bản chạy(nguồn), "6\n");
+    khẳng định bằng(biên dịch chạy chương trình tự chủ(nguồn), "6\n");
+
+    biến mã sai = ["khi () {};", "khi (đúng; sai; đúng) {};", "khi (đúng;) {};",
+                   "khi đúng {};", "khi (đúng) in 1;", "khi (đúng)"];
+    lặp (i = 0; i < độ dài(mã sai); i++) {
+        biến lỗi = sai;
+        thử { biên dịch phân tích chương trình thuần(mã sai[i]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        khẳng định đúng(lỗi, "parser V++ phải từ chối cú pháp khi sai");
+        lỗi = sai;
+        thử { biên dịch phân tích(mã sai[i]); }
+        bắt lỗi (e) { lỗi = đúng; };
+        khẳng định đúng(lỗi, "parser C++ phải từ chối cú pháp khi sai");
+    };
+    in "khi: đạt";
+};

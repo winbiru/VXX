@@ -167,6 +167,7 @@ const char *tenDangLap(vietvm::frontend::AstLoopForm form) noexcept {
     switch (form) {
         case AstLoopForm::Unstructured: return "chưa cấu trúc";
         case AstLoopForm::ForBlock: return "khối lặp";
+        case AstLoopForm::WhileBlock: return "khối khi";
     }
     return "chưa cấu trúc";
 }
@@ -674,7 +675,7 @@ bool isOperatorToken(const std::string &token) noexcept {
 }
 
 bool isControlBeforeParen(const std::string &token) noexcept {
-    return token == "nếu" || token == "lặp" || token == "chọn" ||
+    return token == "nếu" || token == "lặp" || token == "khi" || token == "chọn" ||
            token == "bắt" || token == "bắt lỗi";
 }
 

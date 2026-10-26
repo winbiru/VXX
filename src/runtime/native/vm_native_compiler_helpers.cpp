@@ -255,10 +255,11 @@ std::string executeLinkedBytecode(const std::vector<StackValue> &args) {
         if (id != static_cast<int>(i)) {
             throw std::runtime_error("bytecode_chay_vm: function ID phải liên tiếp từ 0");
         }
-        if (nameIndex < 0 || static_cast<std::size_t>(nameIndex) >= pool.size()) {
+        if (nameIndex < -1 || (nameIndex >= 0 && static_cast<std::size_t>(nameIndex) >= pool.size())) {
             throw std::runtime_error("bytecode_chay_vm: function name index ngoài StringPool");
         }
-        if (!functionNames.emplace(nameIndex, id).second) {
+        // Chỉ hàm có tên mới tham gia bảng tra cứu; -1 là hàm ẩn danh trong ABI.
+        if (nameIndex >= 0 && !functionNames.emplace(nameIndex, id).second) {
             throw std::runtime_error("bytecode_chay_vm: trùng function runtime name index");
         }
         functionBytecode.emplace(id, loadWireInstructions(row[2], "thân hàm " + std::to_string(id)));

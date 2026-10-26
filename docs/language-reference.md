@@ -79,10 +79,28 @@ lặp(i = 0; i < 10; i++) {
     };
     tổng += i;
 };
+
+i = 0;
+khi (i < 3) {
+    in i;
+    i++;
+};
 ```
 
-`thoát;` rời vòng `lặp` hoặc nhánh `chọn` gần nhất đang bao quanh câu lệnh;
-`bỏ qua;` chuyển sang lượt lặp tiếp theo. Khi lồng `lặp` và `chọn`,
+`khi (điều kiện) { ... }` hoạt động như `while`: kiểm tra điều kiện trước mỗi
+lượt và lặp khi điều kiện đúng. Nếu điều kiện sai ngay từ đầu, thân vòng lặp
+không chạy. Cập nhật biến điều kiện trong thân vòng lặp khi cần.
+
+Dùng `lặp` khi cần đếm lượt, duyệt chỉ số hoặc giới hạn số lần thử. Dùng `khi`
+khi việc tiếp tục phụ thuộc vào trạng thái, con trỏ phân tích hoặc dữ liệu còn
+lại; không thêm biến đếm giả chỉ để viết thành vòng `lặp`.
+
+Với lời gọi độc lập tới hàm có tên bắt đầu bằng từ khóa `khi`, dùng `gọi`
+để phân biệt với vòng lặp, ví dụ `gọi khi đóng luồng(nguồn, dọn dẹp);`.
+
+`thoát;` rời vòng `lặp`, vòng `khi` hoặc nhánh `chọn` gần nhất đang bao quanh câu lệnh;
+`bỏ qua;` chuyển sang lượt lặp tiếp theo; với `khi`, điều kiện được kiểm tra lại.
+Khi lồng các vòng lặp và `chọn`,
 `thoát;` chỉ kết thúc cấu trúc gần nhất, sau đó chương trình tiếp tục
 thực thi các lệnh bên ngoài cấu trúc đó.
 

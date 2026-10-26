@@ -304,20 +304,20 @@ int main(int argc, char **argv) {
         if (lowering) {
             verifyLoweringFixture(argv[2],
                 {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong",
-                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh"}, {});
+                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh", "tong_khi", "dieu_khien_khi"}, {});
             verifyLoweringFixture(argv[3],
                 {"goi_bon", "goi_muoi", "tong_muoi", "nhan_sau", "tinh_vong", "ket_hop"}, {});
             verifyLoweringFixture(argv[4],
                 {"min_i32", "max_i32_const", "add_limit", "neg_limit"}, {});
             verifySyntheticBoundaries(argv[4]);
-            std::cout << "Machine IR C++/V++ lowering parity: 26/26 cases\n";
+            std::cout << "Machine IR C++/V++ lowering parity: 28/28 cases\n";
             return 0;
         }
         const std::vector<std::string> targets = {
             "aarch64-apple-darwin", "aarch64-linux-gnu",
             "x86_64-linux-gnu", "x86_64-windows-msvc",
         };
-        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong"}, targets);
+        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "so_sanh_nho", "so_sanh_lon", "so_sanh_am", "max_i32", "tong", "tong_khi", "dieu_khien_khi", "hoist_vong", "hoist_hai_vong", "hoist_long_nhau"}, targets);
         verifyFunctions(argv[2], {"goi_bon", "goi_muoi", "tong_muoi"}, targets);
     } catch (const std::exception &e) {
         std::cerr << "C++ machine oracle: " << e.what() << '\n';

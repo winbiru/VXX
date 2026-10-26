@@ -28,6 +28,7 @@ inline constexpr std::string_view kCmdTestVi = "kiểm thử";
 inline constexpr std::string_view kCmdTestViHyphen = "kiểm-thử";
 inline constexpr std::string_view kCmdBuild = "build";
 inline constexpr std::string_view kCmdBuildVi = "dựng";
+inline constexpr std::string_view kCmdCompileVi = "biên dịch";
 inline constexpr std::string_view kCmdDisassemble = "--disassemble";
 inline constexpr std::string_view kCmdDisassembleVi = "--giải mã";
 inline constexpr std::string_view kCmdDisassembleViHyphen = "--giải-mã";

@@ -201,13 +201,28 @@ runtime::CellHandle Frame::cell(int slot, bool create) {
     return result;
 }
 Value Frame::load(int slot) {
-    auto existing = cell(slot, false);
-    if (existing) return existing->value;
+    // Hot path for locals: avoid copying a shared_ptr on every variable read.
+    // Keep the lookup order (closure/local before global) unchanged.
+    if (auto it = locals.find(slot); it != locals.end()) return it->second->value;
+    if (auto it = program.globals.find(slot); it != program.globals.end())
+        return it->second->value;
     auto result = std::make_shared<runtime::RuntimeCell>(); result->value = 0;
     program.globals[slot] = result;
     return result->value;
 }
-void Frame::store(int slot, Value value) { cell(slot)->value = std::move(value); }
+void Frame::store(int slot, Value value) {
+    if (auto it = locals.find(slot); it != locals.end()) {
+        it->second->value = std::move(value);
+        return;
+    }
+    if (auto it = program.globals.find(slot); it != program.globals.end()) {
+        it->second->value = std::move(value);
+        return;
+    }
+    auto cell = std::make_shared<runtime::RuntimeCell>();
+    cell->value = std::move(value);
+    (global ? program.globals : locals)[slot] = std::move(cell);
+}
 void Frame::initialize(int slot) {
     auto &scope = global ? program.globals : locals;
     if (!global || !scope.count(slot)) {
@@ -236,12 +251,37 @@ void Frame::increment(int delta) {
     const auto id = pop();
     if (!std::holds_alternative<int>(id)) fail("increment requires a variable ID");
     const int slot = std::get<int>(id);
-    const auto before = load(slot);
-    auto after = evaluateBinaryOperator(OP_CONG, before, Value(delta), 0);
+    // The VM converts variable ++/-- through as_int (including truncating
+    // doubles) and stores an i32. Regular binary addition differs here.
+    const int current = as_int(load(slot), delta > 0 ? OP_CONG_MOT : OP_TRU_MOT, -1);
+    auto after = Value(wrapRuntimeInt32(std::int64_t{current} + delta));
     store(slot, after); push(std::move(after));
 }
 void Frame::binary(int operation) {
     auto right = pop(); auto left = pop();
+    // The common i32 path does not need dynamic numeric coercion, string
+    // conversion or ABI-integer checks. Preserve the VM's wrapping semantics.
+    if (const auto *a = std::get_if<int>(&left)) {
+        if (const auto *b = std::get_if<int>(&right)) {
+            switch (operation) {
+                case OP_CONG:
+                    push(wrapRuntimeInt32(std::int64_t{*a} + *b)); return;
+                case OP_TRU:
+                    push(wrapRuntimeInt32(std::int64_t{*a} - *b)); return;
+                case OP_NHAN:
+                    push(wrapRuntimeInt32(std::int64_t{*a} * *b)); return;
+                case OP_SO_SANH_BANG: push(make_int_value(*a == *b)); return;
+                case OP_KHAC_BANG: push(make_int_value(*a != *b)); return;
+                case OP_LON_HON: push(make_int_value(*a > *b)); return;
+                case OP_NHO_HON: push(make_int_value(*a < *b)); return;
+                case OP_LON_HON_HOAC_BANG: push(make_int_value(*a >= *b)); return;
+                case OP_NHO_HON_HOAC_BANG: push(make_int_value(*a <= *b)); return;
+                case OP_Logic_VA: push(make_int_value(*a != 0 && *b != 0)); return;
+                case OP_Logic_HOAC: push(make_int_value(*a != 0 || *b != 0)); return;
+                default: break;
+            }
+        }
+    }
     push(operation == OP_MODULO ? evaluateModuloOperator(left, right, operation, 0)
                                 : evaluateBinaryOperator(operation, left, right, 0));
 }
@@ -339,7 +379,7 @@ void Frame::call(int target, int count, int nameIndex, bool indirect) {
         push(program.invoke(target, std::move(args))); return;
     }
     const auto *primitive = bytecode::intrinsicByName(program.string(nameIndex));
-    if (!primitive) fail("call target not found");
+    if (!primitive) fail("call target not found: " + program.string(nameIndex));
     for (auto &value : args) push(std::move(value));
     intrinsic(primitive->opcode);
 }
@@ -539,14 +579,24 @@ template<class Operation> int boundary(int id, Operation operation) noexcept {
     try { return operation(frame); }
     catch (...) { frame.program.pendingError = std::current_exception(); return 0; }
 }
+// AOT operations without a value result return their error status directly.
+// The code generator can branch on this status without making a second ABI
+// call to vpp_aot_failed. Value-producing condition/case helpers still use
+// boundary() so their boolean results retain their original meaning.
+template<class Operation> int boundaryChecked(int id, Operation operation) noexcept {
+    auto &frame = *nativeFrames[static_cast<std::size_t>(id)];
+    if (frame.program.pendingError) return 1;
+    try { operation(frame); return 0; }
+    catch (...) { frame.program.pendingError = std::current_exception(); return 1; }
+}
 }
 
 // C ABI boundaries always contain C++ exceptions. Generated machine frames
 // route pending language exceptions to native catch labels explicitly.
-#define AOT0(name, body) extern "C" int vpp_aot_##name(int id) noexcept { return boundary(id, [](Frame &f) { body; return 0; }); }
-#define AOT1(name, body) extern "C" int vpp_aot_##name(int id, int a) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
-#define AOT2(name, body) extern "C" int vpp_aot_##name(int id, int a, int b) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
-#define AOT3(name, body) extern "C" int vpp_aot_##name(int id, int a, int b, int c) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
+#define AOT0(name, body) extern "C" int vpp_aot_##name(int id) noexcept { return boundaryChecked(id, [](Frame &f) { body; }); }
+#define AOT1(name, body) extern "C" int vpp_aot_##name(int id, int a) noexcept { return boundaryChecked(id, [=](Frame &f) { body; }); }
+#define AOT2(name, body) extern "C" int vpp_aot_##name(int id, int a, int b) noexcept { return boundaryChecked(id, [=](Frame &f) { body; }); }
+#define AOT3(name, body) extern "C" int vpp_aot_##name(int id, int a, int b, int c) noexcept { return boundaryChecked(id, [=](Frame &f) { body; }); }
 AOT1(integer, f.push(a))
 AOT1(string, f.push(f.program.string(a)))
 AOT1(floating, f.push(std::stod(f.program.string(a))))

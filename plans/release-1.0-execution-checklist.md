@@ -49,6 +49,14 @@
 
 ## 2. P0 — Benchmark và regression gate (P0.4)
 
+Tiến độ triển khai ngày 24/10/2026: đã có harness-v3, runner/comparator,
+GC burst/collect/reuse + explicit trim, allocation requests/bytes, peak RSS và
+GC pause p95. Raw report tại `benchmark/reports/local-2026-10-24/` so sánh
+`cc675ca` với `b39933e` + benchmark patch: **16 PASS, 3 INCONCLUSIVE, 0 FAIL**.
+Job CI `benchmark-gate` đã bổ sung, chưa được chạy trên GitHub ở phiên này.
+Giữ các mục nghiệm thu bên dưới mở vì còn ba case nhiễu, HTTP/JSON workload,
+variable-map rehash telemetry và bằng chứng CI trên SHA ứng viên.
+
 - [ ] **REL-04 / P0 — Chuẩn hóa harness.** Rà soát
   `benchmark/benchmark_baseline.cpp` và `benchmark/CMakeLists.txt`:
   `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, các compiler

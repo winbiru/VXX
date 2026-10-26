@@ -34,7 +34,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
         mình.đã đóng = đúng;
         mình.lỗi gián đoạn = tệp thô lỗi gián đoạn();
         mã tài nguyên = rỗng;
-        lặp(vòng = 0; đúng; vòng++) {
+        khi (đúng) {
             mã tài nguyên = tệp thô mở(đường, mã);
             nếu (mã tài nguyên != rỗng) { thoát; };
             nếu (tệp thô mã lỗi() != mình.lỗi gián đoạn) {
@@ -69,7 +69,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
             ném "luồng tệp: số byte phải trong 0..65536";
         };
         kết quả = [];
-        lặp(vòng = 0; máy ảo lấy độ dài(kết quả) < đếm; vòng++) {
+        khi (máy ảo lấy độ dài(kết quả) < đếm) {
             nếu (mình.vị trí đọc == mình.số đọc) {
                 nếu (mình.hết tệp) { thoát; };
                 nếu (máy ảo lấy độ dài(mình.đệm đọc) == 0) {
@@ -97,7 +97,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
 
     hàm công khai đọc hết() {
         kết quả = [];
-        lặp(vòng = 0; đúng; vòng++) {
+        khi (đúng) {
             khối = mình.đọc các byte(4096);
             nếu (máy ảo lấy độ dài(khối) == 0) { thoát; };
             lặp(i = 0; i < máy ảo lấy độ dài(khối); i++) { máy ảo thêm cuối danh sách(kết quả, khối[i]); };
@@ -131,7 +131,7 @@ lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
         mình.yêu cầu mở();
         nếu (mình.chế độ == "đọc") { ném "luồng tệp: không ở chế độ ghi"; };
         // Preserve the accepted prefix across errors to avoid duplicate writes.
-        lặp(vòng = 0; mình.đã ghi < máy ảo lấy độ dài(mình.đệm ghi); vòng++) {
+        khi (mình.đã ghi < máy ảo lấy độ dài(mình.đệm ghi)) {
             đệm = mình.đệm ghi;
             nếu (mình.đã ghi > 0) {
                 đệm = [];

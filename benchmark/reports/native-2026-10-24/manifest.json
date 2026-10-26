@@ -1,0 +1,12 @@
+{
+  "description": "Fresh direct i32 native kernels; same C++ indirect-call harness, no LTO; excludes compilation/startup.",
+  "command": "VPP_HOME=\"$PWD\" VPP_EXEC=\"$PWD/build-performance/bin/vpp-cli\" bash benchmark/native/run.sh \"$PWD/build-benchmark/native-comparison-20261024\" 15 0.1",
+  "commit": "b39933e2b2a280e94a759b5e9f2f47b3821aa9b7",
+  "source_sha256": {
+    "run.sh": "b3b97db0c4cafa56fe663ab97c6e83c97f3ba4c08e548ee4af48919b856d04b6",
+    "kernels.cpp": "9195d00c87ce66d65712fa87575dc7733e595adfe49a5d707131421cd4cf7b4f",
+    "kernels.vi": "1282015ecc44c84cdea4b8a87a81b3ca9e3a620893f1b300c3a5c87faefd7b24",
+    "harness.cpp": "38036a6c6782f320c7e6d2cecb344e07af1e000ac1ce535fc317202957392c2a"
+  },
+  "binary_sha256": "5cbbd27cad8e3181d90c28924270dd30dff2fb1f0914250f083503a66b49c869"
+}

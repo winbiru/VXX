@@ -72,6 +72,18 @@ hàm chính() {
         ném "parser bí danh và biến bắt lỗi nhiều từ không chính xác";
     };
 
+    // Tên mô-đun kiến trúc có hậu tố số được tách thành từ tố số nguyên.
+    cây_kiến_trúc = biên dịch phân tích chương trình thuần(
+        "nhập gói/biên dịch/mã máy x86 64 như x86; " +
+        "nhập gói/biên dịch/bản địa/định dạng elf 64;"
+    );
+    các_nhập = lấy từ điển(cây_kiến_trúc, "câu lệnh", []);
+    nếu (các_nhập[0]["đích"] != "gói/biên dịch/mã máy x86 64" ||
+        các_nhập[0]["bí danh"] != "x86" ||
+        các_nhập[1]["đích"] != "gói/biên dịch/bản địa/định dạng elf 64") {
+        ném "parser làm sai tên mô-đun có hậu tố số";
+    };
+
     // Các từ khóa ngữ cảnh vẫn hợp lệ trong tên biến nhiều từ.
     cây_biến_từ_khóa = biên dịch phân tích chương trình thuần(
         "hàm chính() { biến bước cập nhật con trỏ hiện tại = 1; " +

@@ -143,7 +143,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         vị trí = lấy từ điển(trạng thái, "vị trí", 0);
         n = máy ảo lấy độ dài(nội dung);
         đang bỏ = đúng;
-        lặp(vòng = 0; vị trí < n && đang bỏ; vòng++) {
+        khi (vị trí < n && đang bỏ) {
             nếu (mình.json là khoảng trắng(nội dung[vị trí])) {
                 vị trí = vị trí + 1;
             } hoặc {
@@ -231,7 +231,7 @@ lớp riêng tư Bộ Xử Lý JSON {
 
         kết quả = "";
         hoàn tất = sai;
-        lặp(vòng = 0; vị trí < n && !hoàn tất; vòng++) {
+        khi (vị trí < n && !hoàn tất) {
             c = nội dung[vị trí];
             vị trí = vị trí + 1;
             đặt từ điển(trạng thái, "vị trí", vị trí);
@@ -355,7 +355,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                 mình.json lỗi(trạng thái, "số không hợp lệ");
             };
             đang đọc = đúng;
-            lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+            khi (vị trí < n && đang đọc) {
                 nếu (mình.json là chữ số(nội dung[vị trí])) {
                     vị trí = vị trí + 1;
                 } hoặc {
@@ -377,7 +377,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "phần thập phân thiếu chữ số");
                 };
                 đang đọc = đúng;
-                lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+                khi (vị trí < n && đang đọc) {
                     nếu (mình.json là chữ số(nội dung[vị trí])) {
                         vị trí = vị trí + 1;
                     } hoặc {
@@ -405,7 +405,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "số mũ thiếu chữ số");
                 };
                 đang đọc = đúng;
-                lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+                khi (vị trí < n && đang đọc) {
                     nếu (mình.json là chữ số(nội dung[vị trí])) {
                         vị trí = vị trí + 1;
                     } hoặc {
@@ -449,7 +449,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
 
         hoàn tất = sai;
-        lặp(vòng = 0; !hoàn tất; vòng++) {
+        khi (!hoàn tất) {
             máy ảo thêm cuối danh sách(kết quả, mình.json đọc giá trị(trạng thái));
             mình.json bỏ khoảng trắng(trạng thái);
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
@@ -488,7 +488,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
 
         hoàn tất = sai;
-        lặp(vòng = 0; !hoàn tất; vòng++) {
+        khi (!hoàn tất) {
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
             nếu (vị trí >= n) {
                 mình.json lỗi(trạng thái, "đối tượng thiếu khóa");
@@ -583,7 +583,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(mã ký tự cơ bản, chuỗi từ byte máy ảo([i])); };
         ký tự = [];
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             bước = 1;
             c = "";
             nếu (các byte[vị trí] < 128) {
