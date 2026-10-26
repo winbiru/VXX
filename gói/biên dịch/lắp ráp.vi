@@ -39,13 +39,15 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
         mục = các liên kết[r];
         vị trí liên kết = mục["offset"];
         ký hiệu = mục["symbol"];
+        bắt đầu lệnh gọi = vị trí liên kết;
+        nếu (kiến trúc == "x86_64") { bắt đầu lệnh gọi -= 1; };
         nếu (!biên dịch mã máy ký hiệu hợp lệ(ký hiệu) ||
             vị trí liên kết < 0 || vị trí liên kết + 4 > độ dài(các byte) ||
-            vị trí liên kết < vị trí || vị trí liên kết <= liên kết trước) {
+            bắt đầu lệnh gọi < vị trí || vị trí liên kết <= liên kết trước) {
             ném "assembly: relocation CALL không hợp lệ";
         };
         liên kết trước = vị trí liên kết;
-        khi (vị trí < vị trí liên kết) {
+        khi (vị trí < bắt đầu lệnh gọi) {
             nếu (số byte dòng == 0) { văn bản += ".byte "; }
             hoặc { văn bản += ", "; };
             văn bản += "" + các byte[vị trí];
@@ -60,11 +62,13 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
         tên gọi = ký hiệu;
         nếu (hệ điều hành == "macos") { tên gọi = "_" + ký hiệu; };
         nếu (kiến trúc == "x86_64") {
-            // Offset là displacement sau opcode E8. REL32 = S - (P+4).
-            nếu (vị trí == 0 || các byte[vị trí - 1] != 232) {
+            // GAS ghi R_X86_64_PLT32 cho `call symbol` trên ELF. Dùng
+            // `.long symbol - . - 4` sẽ tạo R_X86_64_PC32 khác C++ oracle.
+            // CALL rel32 gồm opcode E8 trước displacement 4 byte.
+            nếu (bắt đầu lệnh gọi < 0 || các byte[bắt đầu lệnh gọi] != 232) {
                 ném "assembly x86_64: CALL không có opcode E8";
             };
-            văn bản += ".long " + tên gọi + " - . - 4\n";
+            văn bản += "call " + tên gọi + "\n";
         } hoặc {
             // ARM64 BL có relocation CALL26 trên toàn bộ word 0x94000000.
             nếu (các byte[vị trí] != 0 || các byte[vị trí + 1] != 0 ||
@@ -75,7 +79,7 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
         };
         máy ảo thêm cuối danh sách(phần, văn bản);
         văn bản = "";
-        vị trí += 4;
+        vị trí = vị trí liên kết + 4;
     };
     khi (vị trí < độ dài(các byte)) {
         nếu (số byte dòng == 0) { văn bản += ".byte "; }
