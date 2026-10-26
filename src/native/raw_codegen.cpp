@@ -1,6 +1,7 @@
 #include "vpp/native/raw_codegen.h"
 #include "vpp/native/abi_symbol.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cctype>
 #include <cstdint>
@@ -645,8 +646,39 @@ RawAssemblyResult emitMachineAssembly(const Target &target,
                        abiName;
     const std::string dialect = target.arch == Architecture::X86_64
         ? ".intel_syntax noprefix\n" : "";
+    std::string body = emission.assembly;
+    if (target.arch == Architecture::X86_64) {
+        // GAS/Clang may shorten jumps and memory displacements in mnemonic
+        // assembly. The native V++ emitter uses fixed-width encoded bytes;
+        // preserve the same instructions, leaving CALL operands relocatable.
+        body.clear();
+        std::size_t cursor = 0;
+        const auto appendBytes = [&](std::size_t end) {
+            while (cursor < end) {
+                const auto count = std::min<std::size_t>(16, end - cursor);
+                body += ".byte ";
+                for (std::size_t i = 0; i < count; ++i) {
+                    if (i) body += ", ";
+                    body += std::to_string(emission.bytes[cursor++]);
+                }
+                body += '\n';
+            }
+        };
+        for (const auto &relocation : emission.relocations) {
+            if (relocation.offset <= cursor || relocation.offset + 4 > emission.bytes.size() ||
+                emission.bytes[relocation.offset - 1] != 0xe8 ||
+                !symbolNameSafe(relocation.symbol))
+                return {{}, "x86_64: vị trí hoặc tên relocation không hợp lệ"};
+            appendBytes(relocation.offset - 1);
+            body += "call ";
+            if (target.os == OperatingSystem::MacOS) body += '_';
+            body += relocation.symbol + '\n';
+            cursor = relocation.offset + 4;
+        }
+        appendBytes(emission.bytes.size());
+    }
     return {dialect + ".text\n.globl " + label + "\n" + label + ":\n" +
-            emission.assembly, {}};
+            body, {}};
 }
 
 } // namespace vietvm::native

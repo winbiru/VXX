@@ -99,6 +99,8 @@ struct RawAssemblyResult {
 };
 RawAssemblyResult emitRawAssembly(const Target &target, const RawLeaf &leaf,
                                   std::string_view symbol);
+// x86-64 machine assembly preserves the encoder's exact bytes; CALL sites
+// remain assembler relocations so linking works across object formats.
 RawAssemblyResult emitMachineAssembly(const Target &target,
                                       const MachineEmission &emission,
                                       std::string_view symbol);

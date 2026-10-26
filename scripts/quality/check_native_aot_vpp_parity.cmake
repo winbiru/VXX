@@ -34,6 +34,13 @@ endforeach()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E compare_files
     "${VPP_OUTPUT_DIR}/cpp.o" "${VPP_OUTPUT_DIR}/vpp.o" RESULT_VARIABLE status)
 if (NOT status STREQUAL "0")
-    message(FATAL_ERROR "C++ and V++ AOT objects differ (helpers/CFG/strings/functions/FFI)")
+    file(SHA256 "${VPP_OUTPUT_DIR}/cpp.o" cpp_hash)
+    file(SHA256 "${VPP_OUTPUT_DIR}/vpp.o" vpp_hash)
+    file(SIZE "${VPP_OUTPUT_DIR}/cpp.o" cpp_size)
+    file(SIZE "${VPP_OUTPUT_DIR}/vpp.o" vpp_size)
+    message(FATAL_ERROR "C++ and V++ AOT objects differ (helpers/CFG/strings/functions/FFI):\n"
+        "C++: ${cpp_size} bytes, sha256=${cpp_hash}\n"
+        "V++: ${vpp_size} bytes, sha256=${vpp_hash}\n"
+        "Assembly and objects: ${VPP_OUTPUT_DIR}")
 endif()
 message(STATUS "Independent C++/V++ full-language AOT object parity: PASS")

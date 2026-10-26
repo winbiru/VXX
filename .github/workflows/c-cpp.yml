@@ -81,6 +81,14 @@ jobs:
         # Installed native smoke verifies the compiler Stage 1 -> Stage 2 -> Stage 3.
         run: ctest --test-dir cmake-build-debug --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
 
+      - name: Preserve native AOT parity evidence on failure (x86-64)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-aot-parity-linux-x86-64
+          path: cmake-build-debug/native-aot-vpp-parity/
+          if-no-files-found: ignore
+
       - name: Run RC compiler hardening checks
         shell: bash
         run: |
@@ -197,6 +205,14 @@ jobs:
       - name: Run Linux ARM64 regression suite
         # Native AOT bootstrap is covered by installed smoke above.
         run: ctest --test-dir build --parallel 2 --output-on-failure --no-tests=error -E '^(vpp-native-compiler-driver|vpp-native-elf-x86-writer)$'
+
+      - name: Preserve native AOT parity evidence on failure (ARM64)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-aot-parity-linux-arm64
+          path: build/native-aot-vpp-parity/
+          if-no-files-found: ignore
 
       - name: Link and run Linux ARM64 native calls
         run: ctest --test-dir build -R '^vpp-native-calls-host-link$' --output-on-failure --no-tests=error

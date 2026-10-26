@@ -191,6 +191,8 @@ def run(args):
         shutil.copy2(Path(__file__).with_name(name), tooling / name)
     report["tooling_sha256"] = tree_digest(tooling)
     for side in paths:
+        # Older revisions may predate the benchmark directory entirely.
+        (paths[side] / "benchmark").mkdir(parents=True, exist_ok=True)
         for name in HARNESS_FILES:
             shutil.copy2(shared / name, paths[side] / "benchmark" / name)
         report["sources"][side]["compiled_source_sha256"] = tree_digest(paths[side])
