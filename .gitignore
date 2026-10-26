@@ -47,6 +47,7 @@ dist/
 # Generated benchmark runs (keep reproducible reports and source snapshots)
 benchmark/reports/ci/
 benchmark/reports/*/build/
+benchmark/reports/*/native-comparison
 
 # Logs, temporary files and coverage/profiling outputs
 *.log
@@ -97,3 +98,7 @@ node_modules/
 !docs/compiler-self-hosting-status.md
 !docs/native-freestanding-macos.md
 !docs/kien-truc-oop-thu-vien-va-bien-dich.md
+
+# Project reports must stay versioned even when most Markdown files are ignored.
+!report/
+!report/*.md
