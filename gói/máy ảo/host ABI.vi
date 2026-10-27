@@ -1,0 +1,548 @@
+// Host ABI policy in V++; raw memory, I/O and scalar f64 operations call ASM.
+// No generic native dispatcher, C++ callback, libffi or bytecode bridge.
+hàm vm_path_handle(s) {
+    nếu (vm_tag(s) != 3 || vm_get(s, 1) < 1 || vm_get(s, 1) > 4095) { vm_error(2); trả về -1; };
+    biến h = byte mới(); nếu (h <= 0) { vm_error(1); trả về -1; };
+    lặp(i = 0; i < vm_get(s, 1); i++) {
+        biến b = máy đọc byte(vm_get(s, 2) + i);
+        nếu (b == 0) { byte hủy(h); vm_error(2); trả về -1; };
+        byte thêm(h, b);
+    };
+    trả về h;
+};
+hàm vm_write(fd, s) {
+    nếu (vm_tag(s) != 3) { trả về vm_error(2); };
+    biến n = vm_get(s, 1); biến done = 0;
+    khi (done < n) {
+        biến got = máy ghi(fd, vm_get(s, 2) + done, n - done);
+        nếu (got < 0 && máy lỗi() == 4) { bỏ qua; };
+        nếu (got <= 0) { trả về vm_error(20); };
+        done = done + got;
+    };
+    trả về 0;
+};
+hàm vm_utf8_width(s, at) {
+    biến b = máy đọc byte(vm_get(s, 2) + at);
+    nếu (b < 128) { trả về 1; }; nếu (b < 224) { trả về 2; }; nếu (b < 240) { trả về 3; }; trả về 4;
+};
+hàm vm_ascii_at(s, at) {
+    // Source lexers repeatedly request one-character strings. Intern ASCII
+    // codepoints, which are immutable value types in the VM, to avoid two
+    // managed allocations (string + bytes) for each source[i] read.
+    biến ascii = máy đọc byte(vm_get(s, 2) + at);
+    biến cache = vm_get(4198464, 18);
+    nếu (cache == 0) {
+        cache = vm_alloc(512, 1);
+        nếu (cache == 0) { trả về 0; };
+        vm_set(4198464, 18, cache);
+    };
+    biến existing = vm_get(cache, ascii);
+    nếu (existing != 0) { trả về existing; };
+    biến value = vm_string(1);
+    nếu (value == 0) { trả về 0; };
+    máy ghi byte(vm_get(value, 2), ascii);
+    vm_set(cache, ascii, value);
+    trả về value;
+};
+hàm vm_length(v) {
+    biến tag = vm_tag(v);
+    nếu (tag == 3) {
+        biến cached = vm_get(v, 3);
+        nếu (cached < -1) { trả về 0 - cached - 2; };
+        nếu (cached > 0) { trả về vm_get(cached, 0); };
+        biến at = 0; biến n = 0;
+        khi (at < vm_get(v, 1)) { at = at + vm_utf8_width(v, at); n = n + 1; };
+        vm_set(v, 3, 0 - n - 2);
+        trả về n;
+    };
+    nếu (tag >= 4 && tag <= 6) { biến n = vm_get(v, 1); nếu (tag == 5) { n = máy chia số nguyên ba mươi hai bit(n, 2); }; trả về n; };
+    vm_error(2); trả về 0;
+};
+hàm vm_index(container, key) {
+    biến tag = vm_tag(container);
+    nếu (tag == 5) { trả về vm_map_get(container, vm_text(key)); };
+    nếu (vm_tag(key) != 1) { trả về vm_error(2); }; biến i = vm_number(key);
+    nếu (i < 0) { trả về vm_error(4); };
+    nếu (tag == 4 || tag == 6) { trả về vm_at(container, i); };
+    nếu (tag == 3) {
+        // Lexer/source text is indexed by Unicode codepoint. Re-scanning the
+        // prefix for every source[i] is quadratic; checkpoint every 64 chars.
+        nếu (vm_get(container, 1) >= 128) {
+            biến index = vm_get(container, 3);
+            nếu (index <= 0) {
+                biến capacity = máy chia số nguyên ba mươi hai bit(vm_get(container, 1), 64) + 1;
+                index = vm_alloc(8 + capacity * 4, 0);
+                nếu (index == 0) { trả về 0; };
+                biến at = 0; biến cp = 0;
+                khi (at < vm_get(container, 1)) {
+                    nếu (cp - máy chia số nguyên ba mươi hai bit(cp, 64) * 64 == 0) {
+                        vm_set(index, 1 + máy chia số nguyên ba mươi hai bit(cp, 64), at);
+                    };
+                    at = at + vm_utf8_width(container, at); cp = cp + 1;
+                };
+                vm_set(index, 0, cp);
+                vm_set(container, 3, index);
+            };
+            nếu (i >= vm_get(index, 0)) { trả về vm_error(4); };
+            biến block = máy chia số nguyên ba mươi hai bit(i, 64);
+            biến at = vm_get(index, 1 + block); biến current = block * 64;
+            khi (current < i) { at = at + vm_utf8_width(container, at); current = current + 1; };
+            biến width = vm_utf8_width(container, at);
+            nếu (width == 1) { trả về vm_ascii_at(container, at); };
+            trả về vm_slice(container, at, width);
+        };
+        biến at = 0; biến current = 0;
+        khi (at < vm_get(container, 1)) {
+            biến width = vm_utf8_width(container, at);
+            nếu (current == i) {
+                nếu (width == 1) { trả về vm_ascii_at(container, at); };
+                trả về vm_slice(container, at, width);
+            };
+            at = at + width; current = current + 1;
+        };
+        trả về vm_error(4);
+    };
+    trả về vm_error(2);
+};
+hàm vm_type(v) {
+    biến t = vm_tag(v);
+    nếu (t == 0) { trả về vm_literal("rỗng"); }; nếu (t == 1) { trả về vm_literal("số nguyên"); };
+    nếu (t == 2) { trả về vm_literal("số thực"); }; nếu (t == 3) { trả về vm_literal("chuỗi"); };
+    nếu (t == 4) { trả về vm_literal("danh sách"); }; nếu (t == 5) { trả về vm_literal("từ điển"); };
+    nếu (t == 6) { trả về vm_literal("tuple"); }; nếu (t == 7) { trả về vm_literal("hàm"); };
+    nếu (t == 8) { trả về vm_literal("lớp"); }; trả về vm_literal("đối tượng");
+};
+hàm vm_file_fd(token) {
+    biến slot = thực thi tệp dữ liệu ô nhớ(token); nếu (slot < 0) { trả về -1; };
+    trả về vm_get(2064 + slot * 16, 1);
+};
+hàm vm_host(state, op, args) {
+    biến n = vm_get(args, 1);
+    nếu (n != vm_host_arity(op)) { trả về vm_error(21); };
+    biến a = 0; biến b = 0; biến c = 0;
+    nếu (n > 0) { a = vm_at(args, 0); }; nếu (n > 1) { b = vm_at(args, 1); }; nếu (n > 2) { c = vm_at(args, 2); };
+    nếu (op == 145) { trả về vm_type(a); };
+    nếu (op == 146) {
+        // Identity is only defined for VM reference values, as on Stage 0.
+        biến kind = vm_tag(a);
+        nếu (kind < 4 || kind > 9) { trả về vm_error(2); };
+        trả về vm_int(a);
+    };
+    nếu (op == 147) { trả về vm_int(vm_length(a)); };
+    nếu (op == 148) { nếu (vm_tag(a) != 4) { trả về vm_error(2); }; vm_append(a, b); trả về 0; };
+    nếu (op == 149) { nếu (vm_tag(a) != 4 || vm_tag(b) != 1) { trả về vm_error(2); }; trả về vm_remove(a, vm_number(b)); };
+    nếu (op == 150) { trả về vm_int(vm_map_find(a, vm_text(b)) >= 0); };
+    nếu (op == 151) {
+        biến i = vm_map_find(a, vm_text(b)); nếu (i < 0) { trả về vm_int(0); };
+        vm_remove(a, i); vm_remove(a, i); trả về vm_int(1);
+    };
+    nếu (op == 152) {
+        nếu (vm_tag(a) != 5) { trả về vm_error(2); }; biến keys = vm_vector(4);
+        lặp(i = 0; i < vm_get(a, 1); i = i + 2) { vm_append(keys, vm_at(a, i)); }; trả về keys;
+    };
+    nếu (op == 144) {
+        nếu (vm_tag(a) != 4) { trả về vm_error(2); }; biến tuple = vm_vector(6);
+        lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(tuple, vm_at(a, i)); }; trả về tuple;
+    };
+    nếu (op == 153) {
+        nếu (vm_tag(a) != 3) { trả về vm_error(2); }; biến list = vm_vector(4);
+        lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(list, vm_int(máy đọc byte(vm_get(a, 2) + i))); }; trả về list;
+    };
+    nếu (op == 154 || op == 155) {
+        nếu (vm_tag(a) != 4) { trả về vm_error(2); }; biến size = vm_get(a, 1);
+        nếu (op == 155 && size != 8) { trả về vm_error(2); };
+        biến value = vm_string(size);
+        lặp(i = 0; i < size; i++) {
+            biến item = vm_at(a, i); nếu (vm_tag(item) != 1) { trả về vm_error(2); };
+            biến byte = vm_number(item); nếu (byte < 0 || byte > 255) { trả về vm_error(2); };
+            máy ghi byte(vm_get(value, 2) + i, byte);
+        };
+        nếu (op == 154) { trả về value; };
+        biến real = vm_alloc(16, 0); nếu (real == 0) { trả về 0; }; vm_set(real, 0, 2);
+        vm_set(real, 2, vm_get(vm_get(value, 2), 0)); vm_set(real, 3, vm_get(vm_get(value, 2), 1)); trả về real;
+    };
+    nếu (op == 118) {
+        biến real = vm_real(a); biến list = vm_vector(4);
+        lặp(i = 0; i < 8; i++) { vm_append(list, vm_int(máy đọc byte(real + 8 + i))); }; trả về list;
+    };
+    nếu (op == 135) {
+        nếu (vm_get(4198464, 8) == 1) { trả về vm_literal("linux"); }; trả về vm_literal("macos");
+    };
+    nếu (op == 159) {
+        biến mode = vm_number(b); nếu (mode < 0 || mode > 2) { trả về vm_error(2); };
+        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
+        biến flags = 0; nếu (mode == 1) { flags = 1537; }; nếu (mode == 2) { flags = 521; };
+        biến token = thực thi tệp dữ liệu mở(path, flags); byte hủy(path);
+        vm_set(state, 9, máy lỗi()); trả về vm_int(token);
+    };
+    nếu (op == 160 || op == 161) {
+        biến fd = vm_file_fd(vm_number(a)); biến count = vm_number(c);
+        nếu (vm_tag(b) != 4 || count < 1 || count > 65536 || vm_get(b, 1) != count || fd < 0) { trả về vm_int(-1); };
+        biến raw = vm_alloc(count, 0); nếu (raw == 0) { trả về 0; };
+        nếu (op == 161) {
+            lặp(i = 0; i < count; i++) { biến item = vm_at(b, i); biến byte = vm_number(item); nếu (vm_tag(item) != 1 || byte < 0 || byte > 255) { trả về vm_error(2); }; máy ghi byte(raw + i, byte); };
+        };
+        biến got = 0;
+        nếu (op == 160) { got = máy đọc(fd, raw, count); }
+        hoặc { got = máy ghi(fd, raw, count); };
+        vm_set(state, 9, máy lỗi());
+        nếu (op == 160 && got > 0) { lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(raw + i))); }; };
+        trả về vm_int(got);
+    };
+    nếu (op == 162) { biến status = tệp đóng(vm_number(a)); vm_set(state, 9, máy lỗi()); trả về vm_int(status); };
+    nếu (op == 165) { nếu (vm_number(a) == 1) { trả về vm_int(4); }; trả về vm_int(vm_get(state, 9)); };
+    nếu (op == 166) {
+        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
+        biến status = máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(path))); byte hủy(path);
+        vm_set(state, 9, máy lỗi()); trả về vm_int(status);
+    };
+    nếu (op == 177) {
+        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; }; biến raw = vm_alloc(4096, 0);
+        nếu (raw == 0) { byte hủy(path); trả về 0; };
+        biến count = máy giá trị môi trường lấy(thực thi nội dung đệm(thực thi các byte ô nhớ(path)), raw); byte hủy(path);
+        nếu (count < 0) { trả về 0; }; biến value = vm_string(count);
+        nếu (value == 0) { trả về 0; };
+        lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(value, 2) + i, máy đọc byte(raw + i)); }; trả về value;
+    };
+    nếu (op == 179) {
+        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
+        biến status = máy tạo thư mục(thực thi nội dung đệm(thực thi các byte ô nhớ(path))); byte hủy(path);
+        vm_set(state, 9, máy lỗi()); trả về vm_int(status);
+    };
+    nếu (op == 184) {
+        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
+        biến offset = thực thi nội dung đệm(thực thi các byte ô nhớ(path)); biến status = -1;
+        nếu (vm_number(b) == 1) { status = máy thông tin tệp(offset, 3376); } hoặc { status = máy thông tin liên kết(offset, 3376); };
+        byte hủy(path); nếu (status < 0) { trả về vm_int(-1); };
+        biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
+        nếu (vm_get(4198464, 8) == 1) { mode = vm_get(3376, 6); };
+        trả về vm_int(máy chia số nguyên ba mươi hai bit(mode, 4096));
+    };
+    vm_set(4198464, 5, op); trả về vm_error(22);
+};
+
+// Stable Stage 0 opcode numbers; checked with the compiler ABI gate.
+hàm vm_host_arity(op) {
+    nếu (op == 98) { trả về 2; }; // OP_VM_BIEN_DICH_PHAN_TICH
+    nếu (op == 157) { trả về 4; }; // OP_VM_BYTECODE_CHAY
+    nếu (op == 158) { trả về 5; }; // OP_NATIVE_ARTIFACT_CHAY
+    nếu (op == 99) { trả về 1; }; // OP_VM_DNS_PHAN_GIAI
+    nếu (op == 100) { trả về 1; }; // OP_VM_DOC_BIEN_MOI_TRUONG
+    nếu (op == 101) { trả về 0; }; // OP_VM_DONG_HO_DIA_PHUONG
+    nếu (op == 102) { trả về 0; }; // OP_VM_DONG_HO_UTC
+    nếu (op == 103) { trả về 1; }; // OP_VM_DUONG_DAN_TON_TAI
+    nếu (op == 104) { trả về 1; }; // OP_VM_IO_DOC_BYTES
+    nếu (op == 105) { trả về 1; }; // OP_VM_IO_DOC_FILE
+    nếu (op == 106) { trả về 2; }; // OP_VM_IO_GHI_BYTES
+    nếu (op == 107) { trả về 2; }; // OP_VM_IO_GHI_FILE
+    nếu (op == 108) { trả về 2; }; // OP_VM_IO_GHI_TIEP_FILE
+    nếu (op == 109) { trả về 2; }; // OP_VM_KICH_BAN_CHAY
+    nếu (op == 111) { trả về 1; }; // OP_VM_LA_TEP
+    nếu (op == 112) { trả về 1; }; // OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET
+    nếu (op == 113) { trả về 1; }; // OP_VM_LA_THU_MUC
+    nếu (op == 114) { trả về 1; }; // OP_VM_LIET_KE_THU_MUC
+    nếu (op == 116) { trả về 1; }; // OP_VM_NGAU_NHIEN_BAO_MAT_BYTES
+    nếu (op == 117) { trả về 1; }; // OP_VM_NGU_MILI_GIAY
+    nếu (op == 118) { trả về 1; }; // OP_VM_SO_THUC_BITS
+    nếu (op == 120) { trả về 1; }; // OP_VM_SOCKET_CHAP_NHAN
+    nếu (op == 121) { trả về 2; }; // OP_VM_SOCKET_DAT_TIMEOUT
+    nếu (op == 122) { trả về 1; }; // OP_VM_SOCKET_DONG
+    nếu (op == 123) { trả về 3; }; // OP_VM_SOCKET_GUI
+    nếu (op == 124) { trả về 2; }; // OP_VM_SOCKET_NHAN
+    nếu (op == 125) { trả về 3; }; // OP_VM_SOCKET_PHAN_GIAI
+    nếu (op == 126) { trả về 2; }; // OP_VM_SOCKET_TCP_LANG_NGHE
+    nếu (op == 127) { trả về 2; }; // OP_VM_SOCKET_TCP_MO
+    nếu (op == 128) { trả về 2; }; // OP_VM_SOCKET_TLS_NANG_CAP
+    nếu (op == 129) { trả về 2; }; // OP_VM_SOCKET_UDP_MO
+    nếu (op == 130) { trả về 1; }; // OP_VM_TAO_THU_MUC
+    nếu (op == 135) { trả về 0; }; // OP_VM_TEN_NEN_TANG
+    nếu (op == 136) { trả về 0; }; // OP_VM_THOI_GIAN_DON_DIEU_MS
+    nếu (op == 137) { trả về 3; }; // OP_VM_TIEN_TRINH_CHAY
+    nếu (op == 138) { trả về 1; }; // OP_VM_XOA_DUONG_DAN
+    nếu (op == 139) { trả về 2; }; // OP_VM_THREAD_SPAWN
+    nếu (op == 140) { trả về 2; }; // OP_VM_THREAD_WAIT
+    nếu (op == 141) { trả về 1; }; // OP_VM_THREAD_CANCEL
+    nếu (op == 142) { trả về 1; }; // OP_VM_THREAD_STATUS
+    nếu (op == 143) { trả về 1; }; // OP_VM_THREAD_PARK
+    nếu (op == 144) { trả về 1; }; // OP_VM_TUPLE_FROM_LIST
+    nếu (op == 145) { trả về 1; }; // OP_VM_TYPE_OF
+    nếu (op == 146) { trả về 1; }; // OP_VM_IDENTITY_HASH
+    nếu (op == 147) { trả về 1; }; // OP_VM_LENGTH
+    nếu (op == 148) { trả về 2; }; // OP_VM_LIST_APPEND
+    nếu (op == 149) { trả về 2; }; // OP_VM_LIST_REMOVE
+    nếu (op == 150) { trả về 2; }; // OP_VM_MAP_HAS
+    nếu (op == 151) { trả về 2; }; // OP_VM_MAP_REMOVE
+    nếu (op == 152) { trả về 1; }; // OP_VM_MAP_KEYS
+    nếu (op == 153) { trả về 1; }; // OP_VM_STRING_BYTES
+    nếu (op == 154) { trả về 1; }; // OP_VM_STRING_FROM_BYTES
+    nếu (op == 155) { trả về 1; }; // OP_VM_FLOAT_FROM_BITS
+    nếu (op == 159) { trả về 2; }; // OP_VM_MACHINE_FILE_OPEN
+    nếu (op == 160) { trả về 3; }; // OP_VM_MACHINE_FILE_READ
+    nếu (op == 161) { trả về 3; }; // OP_VM_MACHINE_FILE_WRITE
+    nếu (op == 162) { trả về 1; }; // OP_VM_MACHINE_FILE_CLOSE
+    nếu (op == 163) { trả về 3; }; // OP_VM_MACHINE_FILE_SEEK
+    nếu (op == 164) { trả về 1; }; // OP_VM_MACHINE_FILE_TELL
+    nếu (op == 165) { trả về 1; }; // OP_VM_MACHINE_FILE_ERROR
+    nếu (op == 166) { trả về 1; }; // OP_VM_MACHINE_FILE_REMOVE
+    nếu (op == 167) { trả về 0; }; // OP_VM_MACHINE_PROCESS_PID
+    nếu (op == 168) { trả về 0; }; // OP_VM_MACHINE_PROCESS_PPID
+    nếu (op == 169) { trả về 0; }; // OP_VM_MACHINE_PROCESS_UID
+    nếu (op == 170) { trả về 0; }; // OP_VM_MACHINE_PROCESS_EUID
+    nếu (op == 171) { trả về 0; }; // OP_VM_MACHINE_PROCESS_GID
+    nếu (op == 172) { trả về 0; }; // OP_VM_MACHINE_PROCESS_EGID
+    nếu (op == 173) { trả về 1; }; // OP_VM_MACHINE_TIME_SLEEP
+    nếu (op == 174) { trả về 0; }; // OP_VM_MACHINE_TIME_MONOTONIC
+    nếu (op == 175) { trả về 0; }; // OP_VM_MACHINE_TIME_REALTIME
+    nếu (op == 176) { trả về 1; }; // OP_VM_MACHINE_ENTROPY_READ
+    nếu (op == 177) { trả về 1; }; // OP_VM_MACHINE_ENV_GET
+    nếu (op == 178) { trả về 1; }; // OP_VM_MACHINE_TIME_LOCAL
+    nếu (op == 179) { trả về 1; }; // OP_VM_MACHINE_DIR_MKDIR
+    nếu (op == 180) { trả về 1; }; // OP_VM_MACHINE_DIR_REMOVE
+    nếu (op == 181) { trả về 1; }; // OP_VM_MACHINE_DIR_OPEN
+    nếu (op == 182) { trả về 1; }; // OP_VM_MACHINE_DIR_NEXT
+    nếu (op == 183) { trả về 1; }; // OP_VM_MACHINE_DIR_CLOSE
+    nếu (op == 184) { trả về 2; }; // OP_VM_MACHINE_PATH_KIND
+    nếu (op == 185) { trả về 1; }; // OP_VM_MACHINE_SOCKET_KIND
+    nếu (op == 186) { trả về 1; }; // OP_VM_MACHINE_SOCKET_CLOSE
+    nếu (op == 187) { trả về 2; }; // OP_VM_MACHINE_SOCKET_TIMEOUT
+    nếu (op == 188) { trả về 4; }; // OP_VM_MACHINE_SOCKET_SEND
+    nếu (op == 189) { trả về 4; }; // OP_VM_MACHINE_SOCKET_RECV
+    nếu (op == 190) { trả về 1; }; // OP_VM_MACHINE_SOCKET_ACCEPT
+    nếu (op == 191) { trả về 2; }; // OP_VM_MACHINE_SOCKET_LISTEN
+    nếu (op == 192) { trả về 4; }; // OP_VM_MACHINE_SOCKET_CONNECT
+    nếu (op == 193) { trả về 1; }; // OP_VM_MACHINE_PROCESS_NEW
+    nếu (op == 194) { trả về 2; }; // OP_VM_MACHINE_PROCESS_ARG
+    nếu (op == 195) { trả về 2; }; // OP_VM_MACHINE_PROCESS_COMMAND_LINE
+    nếu (op == 196) { trả về 3; }; // OP_VM_MACHINE_PROCESS_ENV
+    nếu (op == 197) { trả về 1; }; // OP_VM_MACHINE_PROCESS_START
+    nếu (op == 198) { trả về 2; }; // OP_VM_MACHINE_PROCESS_POLL
+    nếu (op == 199) { trả về 4; }; // OP_VM_MACHINE_PROCESS_READ
+    nếu (op == 200) { trả về 1; }; // OP_VM_MACHINE_PROCESS_WAIT
+    nếu (op == 201) { trả về 1; }; // OP_VM_MACHINE_PROCESS_ERROR
+    nếu (op == 202) { trả về 1; }; // OP_VM_MACHINE_PROCESS_CLOSE
+    nếu (op == 203) { trả về 3; }; // OP_VM_MACHINE_RESOLVE_OPEN
+    nếu (op == 204) { trả về 1; }; // OP_VM_MACHINE_RESOLVE_NEXT
+    nếu (op == 205) { trả về 1; }; // OP_VM_MACHINE_RESOLVE_CLOSE
+    nếu (op == 206) { trả về 2; }; // OP_VM_MACHINE_TLS_UPGRADE
+    nếu (op == 207) { trả về 3; }; // OP_VM_MACHINE_TLS_SEND
+    nếu (op == 208) { trả về 3; }; // OP_VM_MACHINE_TLS_RECV
+    trả về -1;
+};
+
+hàm vm_host_name(name) {
+    nếu (vm_equal(name, vm_literal("máy ảo lấy loại")) == 1) { trả về 145; };
+    nếu (vm_equal(name, vm_literal("máy ảo băm định danh")) == 1) { trả về 146; };
+    nếu (vm_equal(name, vm_literal("bien_dich_phan_tich_vm")) == 1) { trả về 98; };
+    nếu (vm_equal(name, vm_literal("bytecode_chay_vm")) == 1) { trả về 157; };
+    nếu (vm_equal(name, vm_literal("bytecode_chay_native")) == 1) { trả về 158; };
+    nếu (vm_equal(name, vm_literal("dns_phan_giai_vm")) == 1) { trả về 99; };
+    nếu (vm_equal(name, vm_literal("doc_bien_moi_truong_vm")) == 1) { trả về 100; };
+    nếu (vm_equal(name, vm_literal("dong_ho_dia_phuong_vm")) == 1) { trả về 101; };
+    nếu (vm_equal(name, vm_literal("dong_ho_utc_vm")) == 1) { trả về 102; };
+    nếu (vm_equal(name, vm_literal("duong_dan_ton_tai_vm")) == 1) { trả về 103; };
+    nếu (vm_equal(name, vm_literal("io_doc_bytes_vm")) == 1) { trả về 104; };
+    nếu (vm_equal(name, vm_literal("io_doc_file_vm")) == 1) { trả về 105; };
+    nếu (vm_equal(name, vm_literal("io_ghi_bytes_vm")) == 1) { trả về 106; };
+    nếu (vm_equal(name, vm_literal("io_ghi_file_vm")) == 1) { trả về 107; };
+    nếu (vm_equal(name, vm_literal("io_ghi_tiep_file_vm")) == 1) { trả về 108; };
+    nếu (vm_equal(name, vm_literal("kich_ban_chay_vm")) == 1) { trả về 109; };
+    nếu (vm_equal(name, vm_literal("la_tep_vm")) == 1) { trả về 111; };
+    nếu (vm_equal(name, vm_literal("la_thu_muc_khong_theo_lien_ket_vm")) == 1) { trả về 112; };
+    nếu (vm_equal(name, vm_literal("la_thu_muc_vm")) == 1) { trả về 113; };
+    nếu (vm_equal(name, vm_literal("liet_ke_thu_muc_vm")) == 1) { trả về 114; };
+    nếu (vm_equal(name, vm_literal("ngau_nhien_bao_mat_bytes_vm")) == 1) { trả về 116; };
+    nếu (vm_equal(name, vm_literal("ngu_mili_giay_vm")) == 1) { trả về 117; };
+    nếu (vm_equal(name, vm_literal("so_thuc_bits_vm")) == 1) { trả về 118; };
+    nếu (vm_equal(name, vm_literal("socket_chap_nhan_vm")) == 1) { trả về 120; };
+    nếu (vm_equal(name, vm_literal("socket_dat_timeout_vm")) == 1) { trả về 121; };
+    nếu (vm_equal(name, vm_literal("socket_dong_vm")) == 1) { trả về 122; };
+    nếu (vm_equal(name, vm_literal("socket_gui_vm")) == 1) { trả về 123; };
+    nếu (vm_equal(name, vm_literal("socket_nhan_vm")) == 1) { trả về 124; };
+    nếu (vm_equal(name, vm_literal("socket_phan_giai_vm")) == 1) { trả về 125; };
+    nếu (vm_equal(name, vm_literal("socket_tcp_lang_nghe_vm")) == 1) { trả về 126; };
+    nếu (vm_equal(name, vm_literal("socket_tcp_mo_vm")) == 1) { trả về 127; };
+    nếu (vm_equal(name, vm_literal("socket_tls_nang_cap_vm")) == 1) { trả về 128; };
+    nếu (vm_equal(name, vm_literal("socket_udp_mo_vm")) == 1) { trả về 129; };
+    nếu (vm_equal(name, vm_literal("tao_thu_muc_vm")) == 1) { trả về 130; };
+    nếu (vm_equal(name, vm_literal("ten_nen_tang_vm")) == 1) { trả về 135; };
+    nếu (vm_equal(name, vm_literal("thoi_gian_don_dieu_ms_vm")) == 1) { trả về 136; };
+    nếu (vm_equal(name, vm_literal("tien_trinh_chay_vm")) == 1) { trả về 137; };
+    nếu (vm_equal(name, vm_literal("xoa_duong_dan_vm")) == 1) { trả về 138; };
+    nếu (vm_equal(name, vm_literal("thread_vm_spawn")) == 1) { trả về 139; };
+    nếu (vm_equal(name, vm_literal("thread_vm_wait")) == 1) { trả về 140; };
+    nếu (vm_equal(name, vm_literal("thread_vm_cancel")) == 1) { trả về 141; };
+    nếu (vm_equal(name, vm_literal("thread_vm_status")) == 1) { trả về 142; };
+    nếu (vm_equal(name, vm_literal("thread_vm_park")) == 1) { trả về 143; };
+    nếu (vm_equal(name, vm_literal("bộ")) == 1) { trả về 144; };
+    nếu (vm_equal(name, vm_literal("loai_cua")) == 1) { trả về 145; };
+    nếu (vm_equal(name, vm_literal("bam_dinh_danh")) == 1) { trả về 146; };
+    nếu (vm_equal(name, vm_literal("do_dai")) == 1) { trả về 147; };
+    nếu (vm_equal(name, vm_literal("them")) == 1) { trả về 148; };
+    nếu (vm_equal(name, vm_literal("xoa_tai")) == 1) { trả về 149; };
+    nếu (vm_equal(name, vm_literal("co_khoa")) == 1) { trả về 150; };
+    nếu (vm_equal(name, vm_literal("xoa_khoa")) == 1) { trả về 151; };
+    nếu (vm_equal(name, vm_literal("khoa_map")) == 1) { trả về 152; };
+    nếu (vm_equal(name, vm_literal("chuoi_bytes_vm")) == 1) { trả về 153; };
+    nếu (vm_equal(name, vm_literal("chuoi_tu_bytes_vm")) == 1) { trả về 154; };
+    nếu (vm_equal(name, vm_literal("so_thuc_tu_bits_vm")) == 1) { trả về 155; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_mở")) == 1) { trả về 159; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_đọc")) == 1) { trả về 160; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_ghi")) == 1) { trả về 161; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_đóng")) == 1) { trả về 162; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_dịch")) == 1) { trả về 163; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_vị_trí")) == 1) { trả về 164; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_lỗi")) == 1) { trả về 165; };
+    nếu (vm_equal(name, vm_literal("máy_tệp_xóa")) == 1) { trả về 166; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_pid")) == 1) { trả về 167; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_ppid")) == 1) { trả về 168; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_uid")) == 1) { trả về 169; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_euid")) == 1) { trả về 170; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_gid")) == 1) { trả về 171; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_egid")) == 1) { trả về 172; };
+    nếu (vm_equal(name, vm_literal("máy_ngủ_mili_giây")) == 1) { trả về 173; };
+    nếu (vm_equal(name, vm_literal("máy_đồng_hồ_đơn_điệu")) == 1) { trả về 174; };
+    nếu (vm_equal(name, vm_literal("máy_đồng_hồ_utc")) == 1) { trả về 175; };
+    nếu (vm_equal(name, vm_literal("máy_entropy_bytes")) == 1) { trả về 176; };
+    nếu (vm_equal(name, vm_literal("máy_môi_trường_đọc")) == 1) { trả về 177; };
+    nếu (vm_equal(name, vm_literal("máy_đồng_hồ_địa_phương")) == 1) { trả về 178; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_tạo")) == 1) { trả về 179; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_xóa")) == 1) { trả về 180; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_mở")) == 1) { trả về 181; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_kế")) == 1) { trả về 182; };
+    nếu (vm_equal(name, vm_literal("máy_thư_mục_đóng")) == 1) { trả về 183; };
+    nếu (vm_equal(name, vm_literal("máy_đường_loại")) == 1) { trả về 184; };
+    nếu (vm_equal(name, vm_literal("máy_socket_loại")) == 1) { trả về 185; };
+    nếu (vm_equal(name, vm_literal("máy_socket_đóng")) == 1) { trả về 186; };
+    nếu (vm_equal(name, vm_literal("máy_socket_timeout")) == 1) { trả về 187; };
+    nếu (vm_equal(name, vm_literal("máy_socket_gửi")) == 1) { trả về 188; };
+    nếu (vm_equal(name, vm_literal("máy_socket_nhận")) == 1) { trả về 189; };
+    nếu (vm_equal(name, vm_literal("máy_socket_chấp_nhận")) == 1) { trả về 190; };
+    nếu (vm_equal(name, vm_literal("máy_socket_lắng_nghe")) == 1) { trả về 191; };
+    nếu (vm_equal(name, vm_literal("máy_socket_kết_nối")) == 1) { trả về 192; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_tạo")) == 1) { trả về 193; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_đối_số")) == 1) { trả về 194; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_lệnh_windows")) == 1) { trả về 195; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_môi_trường")) == 1) { trả về 196; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_bắt_đầu")) == 1) { trả về 197; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_thăm_dò")) == 1) { trả về 198; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_đọc")) == 1) { trả về 199; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_đợi")) == 1) { trả về 200; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_lỗi")) == 1) { trả về 201; };
+    nếu (vm_equal(name, vm_literal("máy_tiến_trình_đóng")) == 1) { trả về 202; };
+    nếu (vm_equal(name, vm_literal("máy_resolver_mở")) == 1) { trả về 203; };
+    nếu (vm_equal(name, vm_literal("máy_resolver_tiếp")) == 1) { trả về 204; };
+    nếu (vm_equal(name, vm_literal("máy_resolver_đóng")) == 1) { trả về 205; };
+    nếu (vm_equal(name, vm_literal("máy_tls_nâng_cấp")) == 1) { trả về 206; };
+    nếu (vm_equal(name, vm_literal("máy_tls_gửi")) == 1) { trả về 207; };
+    nếu (vm_equal(name, vm_literal("máy_tls_nhận")) == 1) { trả về 208; };
+    nếu (vm_equal(name, vm_literal("máy ảo liệt kê khóa từ điển")) == 1) { trả về 152; };
+    nếu (vm_equal(name, vm_literal("máy ảo thêm cuối danh sách")) == 1) { trả về 148; };
+    nếu (vm_equal(name, vm_literal("máy ảo xóa vị trí danh sách")) == 1) { trả về 149; };
+    nếu (vm_equal(name, vm_literal("máy ảo có khóa từ điển")) == 1) { trả về 150; };
+    nếu (vm_equal(name, vm_literal("máy ảo xóa khóa từ điển")) == 1) { trả về 151; };
+    nếu (vm_equal(name, vm_literal("máy ảo lấy độ dài")) == 1) { trả về 147; };
+    nếu (vm_equal(name, vm_literal("biên dịch phân tích máy ảo")) == 1) { trả về 98; };
+    nếu (vm_equal(name, vm_literal("mã trung gian chạy máy ảo")) == 1) { trả về 157; };
+    nếu (vm_equal(name, vm_literal("mã trung gian chạy bản địa")) == 1) { trả về 158; };
+    nếu (vm_equal(name, vm_literal("phân giải tên miền phân giải máy ảo")) == 1) { trả về 99; };
+    nếu (vm_equal(name, vm_literal("đọc biến moi truong máy ảo")) == 1) { trả về 100; };
+    nếu (vm_equal(name, vm_literal("đóng ho dia phuong máy ảo")) == 1) { trả về 101; };
+    nếu (vm_equal(name, vm_literal("đóng ho giờ quốc tế máy ảo")) == 1) { trả về 102; };
+    nếu (vm_equal(name, vm_literal("đường dẫn tồn tại máy ảo")) == 1) { trả về 103; };
+    nếu (vm_equal(name, vm_literal("io đọc các byte máy ảo")) == 1) { trả về 104; };
+    nếu (vm_equal(name, vm_literal("io đọc tệp dữ liệu máy ảo")) == 1) { trả về 105; };
+    nếu (vm_equal(name, vm_literal("io ghi các byte máy ảo")) == 1) { trả về 106; };
+    nếu (vm_equal(name, vm_literal("io ghi tệp dữ liệu máy ảo")) == 1) { trả về 107; };
+    nếu (vm_equal(name, vm_literal("io ghi tiep tệp dữ liệu máy ảo")) == 1) { trả về 108; };
+    nếu (vm_equal(name, vm_literal("chạy kịch bản máy ảo")) == 1) { trả về 109; };
+    nếu (vm_equal(name, vm_literal("la tệp máy ảo")) == 1) { trả về 111; };
+    nếu (vm_equal(name, vm_literal("la thư mục không theo liên kết máy ảo")) == 1) { trả về 112; };
+    nếu (vm_equal(name, vm_literal("la thư mục máy ảo")) == 1) { trả về 113; };
+    nếu (vm_equal(name, vm_literal("liet ke thư mục máy ảo")) == 1) { trả về 114; };
+    nếu (vm_equal(name, vm_literal("ngẫu nhiên bảo mật các byte máy ảo")) == 1) { trả về 116; };
+    nếu (vm_equal(name, vm_literal("ngủ mili giây máy ảo")) == 1) { trả về 117; };
+    nếu (vm_equal(name, vm_literal("bit số thực máy ảo")) == 1) { trả về 118; };
+    nếu (vm_equal(name, vm_literal("đầu nối chấp nhận máy ảo")) == 1) { trả về 120; };
+    nếu (vm_equal(name, vm_literal("đầu nối đặt thời gian chờ máy ảo")) == 1) { trả về 121; };
+    nếu (vm_equal(name, vm_literal("đầu nối đóng máy ảo")) == 1) { trả về 122; };
+    nếu (vm_equal(name, vm_literal("đầu nối gửi máy ảo")) == 1) { trả về 123; };
+    nếu (vm_equal(name, vm_literal("đầu nối nhận máy ảo")) == 1) { trả về 124; };
+    nếu (vm_equal(name, vm_literal("đầu nối phân giải máy ảo")) == 1) { trả về 125; };
+    nếu (vm_equal(name, vm_literal("đầu nối giao vận tin cậy lắng nghe máy ảo")) == 1) { trả về 126; };
+    nếu (vm_equal(name, vm_literal("đầu nối giao vận tin cậy mở máy ảo")) == 1) { trả về 127; };
+    nếu (vm_equal(name, vm_literal("đầu nối tls nâng cấp máy ảo")) == 1) { trả về 128; };
+    nếu (vm_equal(name, vm_literal("đầu nối giao vận gói tin mở máy ảo")) == 1) { trả về 129; };
+    nếu (vm_equal(name, vm_literal("tạo thư mục máy ảo")) == 1) { trả về 130; };
+    nếu (vm_equal(name, vm_literal("ten nền tảng máy ảo")) == 1) { trả về 135; };
+    nếu (vm_equal(name, vm_literal("thời gian đơn điệu ms máy ảo")) == 1) { trả về 136; };
+    nếu (vm_equal(name, vm_literal("tiến trình chạy máy ảo")) == 1) { trả về 137; };
+    nếu (vm_equal(name, vm_literal("xóa đường dẫn máy ảo")) == 1) { trả về 138; };
+    nếu (vm_equal(name, vm_literal("luồng máy ảo khởi chạy")) == 1) { trả về 139; };
+    nếu (vm_equal(name, vm_literal("luồng máy ảo đợi")) == 1) { trả về 140; };
+    nếu (vm_equal(name, vm_literal("luồng máy ảo hủy")) == 1) { trả về 141; };
+    nếu (vm_equal(name, vm_literal("luồng máy ảo trạng thái")) == 1) { trả về 142; };
+    nếu (vm_equal(name, vm_literal("luồng máy ảo nghỉ")) == 1) { trả về 143; };
+    nếu (vm_equal(name, vm_literal("băm định danh")) == 1) { trả về 146; };
+    nếu (vm_equal(name, vm_literal("khóa từ điển")) == 1) { trả về 152; };
+    nếu (vm_equal(name, vm_literal("chuỗi thành byte máy ảo")) == 1) { trả về 153; };
+    nếu (vm_equal(name, vm_literal("chuỗi từ byte máy ảo")) == 1) { trả về 154; };
+    nếu (vm_equal(name, vm_literal("số thực từ bit máy ảo")) == 1) { trả về 155; };
+    nếu (vm_equal(name, vm_literal("máy tệp mở")) == 1) { trả về 159; };
+    nếu (vm_equal(name, vm_literal("máy tệp đọc")) == 1) { trả về 160; };
+    nếu (vm_equal(name, vm_literal("máy tệp ghi")) == 1) { trả về 161; };
+    nếu (vm_equal(name, vm_literal("máy tệp đóng")) == 1) { trả về 162; };
+    nếu (vm_equal(name, vm_literal("máy tệp dịch")) == 1) { trả về 163; };
+    nếu (vm_equal(name, vm_literal("máy tệp vị trí")) == 1) { trả về 164; };
+    nếu (vm_equal(name, vm_literal("máy tệp lỗi")) == 1) { trả về 165; };
+    nếu (vm_equal(name, vm_literal("máy tệp xóa")) == 1) { trả về 166; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã tiến trình")) == 1) { trả về 167; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã tiến trình cha")) == 1) { trả về 168; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã người dùng")) == 1) { trả về 169; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã người dùng hiệu lực")) == 1) { trả về 170; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã nhóm")) == 1) { trả về 171; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình mã nhóm hiệu lực")) == 1) { trả về 172; };
+    nếu (vm_equal(name, vm_literal("máy ngủ mili giây")) == 1) { trả về 173; };
+    nếu (vm_equal(name, vm_literal("máy đồng hồ đơn điệu")) == 1) { trả về 174; };
+    nếu (vm_equal(name, vm_literal("máy đồng hồ giờ quốc tế")) == 1) { trả về 175; };
+    nếu (vm_equal(name, vm_literal("máy nguồn ngẫu nhiên các byte")) == 1) { trả về 176; };
+    nếu (vm_equal(name, vm_literal("máy môi trường đọc")) == 1) { trả về 177; };
+    nếu (vm_equal(name, vm_literal("máy đồng hồ địa phương")) == 1) { trả về 178; };
+    nếu (vm_equal(name, vm_literal("máy thư mục tạo")) == 1) { trả về 179; };
+    nếu (vm_equal(name, vm_literal("máy thư mục xóa")) == 1) { trả về 180; };
+    nếu (vm_equal(name, vm_literal("máy thư mục mở")) == 1) { trả về 181; };
+    nếu (vm_equal(name, vm_literal("máy thư mục kế")) == 1) { trả về 182; };
+    nếu (vm_equal(name, vm_literal("máy thư mục đóng")) == 1) { trả về 183; };
+    nếu (vm_equal(name, vm_literal("máy đường loại")) == 1) { trả về 184; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối loại")) == 1) { trả về 185; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối đóng")) == 1) { trả về 186; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối thời gian chờ")) == 1) { trả về 187; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối gửi")) == 1) { trả về 188; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối nhận")) == 1) { trả về 189; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối chấp nhận")) == 1) { trả về 190; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối lắng nghe")) == 1) { trả về 191; };
+    nếu (vm_equal(name, vm_literal("máy đầu nối kết nối")) == 1) { trả về 192; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình tạo")) == 1) { trả về 193; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình đối số")) == 1) { trả về 194; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình lệnh windows")) == 1) { trả về 195; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình môi trường")) == 1) { trả về 196; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình bắt đầu")) == 1) { trả về 197; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình thăm dò")) == 1) { trả về 198; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình đọc")) == 1) { trả về 199; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình đợi")) == 1) { trả về 200; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình lỗi")) == 1) { trả về 201; };
+    nếu (vm_equal(name, vm_literal("máy tiến trình đóng")) == 1) { trả về 202; };
+    nếu (vm_equal(name, vm_literal("máy bộ phân giải mở")) == 1) { trả về 203; };
+    nếu (vm_equal(name, vm_literal("máy bộ phân giải tiếp")) == 1) { trả về 204; };
+    nếu (vm_equal(name, vm_literal("máy bộ phân giải đóng")) == 1) { trả về 205; };
+    nếu (vm_equal(name, vm_literal("máy tls nâng cấp")) == 1) { trả về 206; };
+    nếu (vm_equal(name, vm_literal("máy tls gửi")) == 1) { trả về 207; };
+    nếu (vm_equal(name, vm_literal("máy tls nhận")) == 1) { trả về 208; };
+    nếu (vm_equal(name, vm_literal("loại của")) == 1) { trả về 145; };
+    nếu (vm_equal(name, vm_literal("độ dài")) == 1) { trả về 147; };
+    nếu (vm_equal(name, vm_literal("thêm")) == 1) { trả về 148; };
+    nếu (vm_equal(name, vm_literal("xóa tại")) == 1) { trả về 149; };
+    nếu (vm_equal(name, vm_literal("có khóa")) == 1) { trả về 150; };
+    nếu (vm_equal(name, vm_literal("xóa khóa")) == 1) { trả về 151; };
+    nếu (vm_equal(name, vm_literal("khóa map")) == 1) { trả về 152; };
+    trả về -1;
+};

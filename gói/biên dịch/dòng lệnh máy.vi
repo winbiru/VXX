@@ -1,12 +1,20 @@
 // Chính sách CLI thuộc V++; host chỉ chuyển argv và thực hiện ABI hệ điều hành.
 nhập gói/biên dịch/mã máy từ cây;
+nhập gói/biên dịch/mã máy;
+nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;
+nhập gói/biên dịch/lắp ráp;
 nhập gói/biên dịch/đích;
 nhập gói/nhập xuất/tệp;
 nhập gói/biên dịch/nguồn tệp;
 nhập gói/biên dịch/trình điều khiển;
 nhập gói/biên dịch/asm chương trình;
 nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/máy ảo ASM;
 nhập gói/biên dịch/sản phẩm biên dịch;
+nhập gói/biên dịch/giải mã bytecode;
+nhập gói/biên dịch/hiển thị cây và IR;
+nhập gói/biên dịch/định dạng mã nguồn;
+nhập gói/biên dịch/soát lỗi mã nguồn;
 nhập gói/nhập xuất/đường dẫn;
 nhập gói/lõi/bảng mã;
 
@@ -14,8 +22,15 @@ hàm công khai biên dịch hướng dẫn dòng lệnh máy() {
     trả về "V++ native compiler\n" +
         "  build|run <source.vi> [-o output] [--bytecode] [--compiler]\n" +
         "  artifact <artifact.vbc>\n" +
+        "  vm-build <source.vi> -o <output.vmb>\n" +
+        "  disassemble <source.vi>\n" +
+        "  dump-ast|dump-ir <source.vi>\n" +
+        "  format <source.vi>\n" +
+        "  lint <source.vi> [--base <directory>]\n" +
         "  embed <source.vi> --base <directory>\n" +
-        "  build --target <triple> --emit-obj-selfhost <function> <source.vi> <output.o>\n";
+        "  build --target <triple> --emit-obj|--emit-obj-selfhost <function> <source.vi> <output.o>\n" +
+        "  build --target <triple> --emit-raw <function> <source.vi> <output.bin>\n" +
+        "  build --target <triple> --emit-asm <function> <source.vi> <output.s>\n";
 };
 
 // Wire v1: command, source, output, bytecode, compiler, base, target, function.
@@ -30,13 +45,16 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
     nếu (n == 1 && (lệnh == "--version" || lệnh == "phiên bản")) {
         trả về ["message", "V++ native compiler\n", "", sai, sai, "", "", ""];
     };
-    nếu (lệnh != "build" && lệnh != "run" && lệnh != "artifact" && lệnh != "embed") {
+    nếu (lệnh != "vm-build" && lệnh != "build" && lệnh != "run" && lệnh != "artifact" && lệnh != "embed" &&
+        lệnh != "disassemble" && lệnh != "dump-ast" && lệnh != "dump-ir" &&
+        lệnh != "format" && lệnh != "lint") {
         ném "Native CLI: unknown command " + lệnh;
     };
     đầu ra = "";
     gốc nhúng = "";
     bộ ba = "";
     tên hàm = "";
+    dạng xuất máy = "";
     mã trung gian = sai;
     compiler = sai;
     vị trí = [];
@@ -45,7 +63,8 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
         mục = đối số[i];
         nếu (!hết tùy chọn && mục == "--") { hết tùy chọn = đúng; }
         hoặc nếu (!hết tùy chọn && (mục == "-o" || mục == "--base" ||
-                    mục == "--target" || mục == "--emit-obj-selfhost")) {
+                    mục == "--target" || mục == "--emit-obj-selfhost" ||
+                    mục == "--emit-obj" || mục == "--emit-raw" || mục == "--emit-asm")) {
             nếu (i + 1 >= n || đối số[i + 1] == "") {
                 ném "Native CLI: missing value for " + mục;
             };
@@ -61,8 +80,9 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
                 nếu (bộ ba != "") { ném "Native CLI: duplicate --target"; };
                 bộ ba = giá trị;
             } hoặc {
-                nếu (tên hàm != "") { ném "Native CLI: duplicate --emit-obj-selfhost"; };
+                nếu (tên hàm != "") { ném "Native CLI: duplicate machine output mode"; };
                 tên hàm = giá trị;
+                dạng xuất máy = mục;
             };
         } hoặc nếu (!hết tùy chọn && mục == "--bytecode") {
             nếu (mã trung gian) { ném "Native CLI: duplicate --bytecode"; };
@@ -79,7 +99,7 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
     nếu (tên hàm != "" || bộ ba != "") {
         nếu (lệnh != "build" || tên hàm == "" || bộ ba == "" ||
             mã trung gian || compiler || gốc nhúng != "") {
-            ném "Native CLI: object requires build --target and --emit-obj-selfhost";
+            ném "Native CLI: machine output requires build --target and --emit-obj|--emit-obj-selfhost|--emit-raw|--emit-asm";
         };
         nếu (máy ảo lấy độ dài(vị trí) == 2 && đầu ra == "") {
             đầu ra = vị trí[1];
@@ -88,22 +108,41 @@ hàm công khai biên dịch phân tích dòng lệnh máy(đối số) {
         };
         // Xác thực target trước khi đọc nguồn hoặc mở đầu ra.
         đích = biên dịch phân tích đích(bộ ba);
-        nếu (đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
+        nếu (dạng xuất máy != "--emit-raw" && dạng xuất máy != "--emit-asm" &&
+            đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
             ném "Native CLI: object backend requires aarch64/x86_64";
         };
-        trả về ["object", vị trí[0], đầu ra, sai, sai, "", bộ ba, tên hàm];
+        lệnh máy = "object";
+        nếu (dạng xuất máy == "--emit-raw") { lệnh máy = "raw"; };
+        nếu (dạng xuất máy == "--emit-asm") { lệnh máy = "asm"; };
+        trả về [lệnh máy, vị trí[0], đầu ra, sai, sai, "", bộ ba, tên hàm];
     };
     nếu (máy ảo lấy độ dài(vị trí) != 1) { ném "Native CLI: expected one source file"; };
-    nếu (lệnh != "embed" && gốc nhúng != "") { ném "Native CLI: --base requires embed"; };
+    nếu (lệnh != "embed" && lệnh != "lint" && gốc nhúng != "") {
+        ném "Native CLI: --base requires embed or lint";
+    };
     nếu (lệnh == "artifact" && (đầu ra != "" || mã trung gian || compiler)) {
         ném "Native CLI: artifact command does not accept build options";
+    };
+    nếu (lệnh == "disassemble" && (đầu ra != "" || mã trung gian || compiler)) {
+        ném "Native CLI: disassemble does not accept build options";
+    };
+    nếu ((lệnh == "dump-ast" || lệnh == "dump-ir") &&
+        (đầu ra != "" || mã trung gian || compiler || gốc nhúng != "")) {
+        ném "Native CLI: dump does not accept build options";
+    };
+    nếu ((lệnh == "format" || lệnh == "lint") &&
+        (đầu ra != "" || mã trung gian || compiler ||
+         (lệnh == "format" && gốc nhúng != ""))) {
+        ném "Native CLI: source inspection does not accept build options";
     };
     nếu (lệnh == "embed" && (đầu ra != "" || mã trung gian || compiler || gốc nhúng == "")) {
         ném "Native CLI: embed requires --base directory and no build options";
     };
-    nếu ((lệnh == "build" || mã trung gian) && đầu ra == "") {
+    nếu ((lệnh == "build" || lệnh == "vm-build" || mã trung gian) && đầu ra == "") {
         ném "Native CLI: build output required (-o)";
     };
+    nếu (lệnh == "vm-build" && (mã trung gian || compiler || gốc nhúng != "")) { ném "Native CLI: vm-build does not accept native build options"; };
     trả về [lệnh, vị trí[0], đầu ra, mã trung gian, compiler, gốc nhúng, "", ""];
 };
 
@@ -118,6 +157,66 @@ hàm công khai biên dịch xuất đối tượng máy(đường, đầu ra, b
     trả về "Native object (V++ CLI): " + tên hàm + " -> " + đầu ra + "\n";
 };
 
+// Ghi byte mã máy V++ trực tiếp. Mã có CALL chưa liên kết chỉ hợp lệ ở
+// định dạng object, tránh tạo .bin không thể chạy hoặc thiếu relocation.
+hàm công khai biên dịch xuất mã máy thô(đường, đầu ra, bộ ba, tên hàm) {
+    đích = biên dịch phân tích đích(bộ ba);
+    mã nguồn = đọc tệp(đường);
+    // Bảo toàn ABI leaf và các byte tối giản trên mọi target đã có encoder
+    // .vi. Hàm phức tạp rơi sang Machine IR tổng quát (aarch64/x86_64).
+    IR = tạo IR(mã nguồn);
+    lá = rỗng;
+    thử {
+        lá = biên dịch máy hạ lá(IR, tên hàm);
+    } bắt lỗi (lỗi) {
+        nếu (đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
+            ném lỗi;
+        };
+    };
+    nếu (lá != rỗng) {
+        byte lá = biên dịch mã máy lá(đích["kiến trúc"], lá["kind"],
+            lá["constant"], đích["hệ điều hành"]);
+        ghi các byte tệp(đầu ra, byte lá);
+        trả về "Raw machine code (V++ CLI): " + tên hàm + " -> " + đầu ra + "\n";
+    };
+    kết quả = sinh mã hàm(mã nguồn, tên hàm,
+        đích["kiến trúc"], đích["hệ điều hành"]);
+    nếu (máy ảo lấy độ dài(kết quả["relocations"]) != 0) {
+        ném "Raw machine code không thể chứa CALL chưa liên kết; dùng --emit-obj";
+    };
+    ghi các byte tệp(đầu ra, kết quả["bytes"]);
+    trả về "Raw machine code (V++ CLI): " + tên hàm + " -> " + đầu ra + "\n";
+};
+
+// Xuất assembly từ encoder leaf V++, hoặc từ Machine IR tổng quát khi
+// hàm có CFG/slot/CALL. Trình lắp ráp hệ thống chỉ cần thiết khi liên kết.
+hàm công khai biên dịch xuất lắp ráp máy(đường, đầu ra, bộ ba, tên hàm) {
+    đích = biên dịch phân tích đích(bộ ba);
+    mã nguồn = đọc tệp(đường);
+    IR = tạo IR(mã nguồn);
+    lá = rỗng;
+    thử {
+        lá = biên dịch máy hạ lá(IR, tên hàm);
+    } bắt lỗi (lỗi) {
+        nếu (đích["kiến trúc"] != "aarch64" && đích["kiến trúc"] != "x86_64") {
+            ném lỗi;
+        };
+    };
+    nếu (lá != rỗng) {
+        mã = biên dịch mã máy lá(đích["kiến trúc"], lá["kind"],
+            lá["constant"], đích["hệ điều hành"]);
+        văn bản = biên dịch lắp ráp lá(đích["kiến trúc"], đích["hệ điều hành"],
+            tên hàm, lá["kind"], lá["constant"], mã);
+    } hoặc {
+        kết quả = sinh mã hàm(mã nguồn, tên hàm,
+            đích["kiến trúc"], đích["hệ điều hành"]);
+        văn bản = biên dịch lắp ráp mã máy(đích["kiến trúc"],
+            đích["hệ điều hành"], tên hàm, kết quả);
+    };
+    ghi tệp(đầu ra, văn bản);
+    trả về "Assembly source (V++ CLI): " + tên hàm + " -> " + đầu ra + "\n";
+};
+
 // Host đã chuẩn hóa đường dẫn và chặn các alias của tệp nguồn. Kết quả chỉ
 // còn một thao tác ABI: hoàn tất, liên kết ASM, hoặc liên kết rồi chạy.
 // Việc đọc nguồn/artifact, chọn pipeline, kiểm tra wire và phát ASM ở V++.
@@ -129,10 +228,37 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     nếu (lệnh == "object") {
         trả về ["complete", biên dịch xuất đối tượng máy(đường, đầu ra, kế hoạch[6], kế hoạch[7])];
     };
+    nếu (lệnh == "raw") {
+        trả về ["complete", biên dịch xuất mã máy thô(đường, đầu ra, kế hoạch[6], kế hoạch[7])];
+    };
+    nếu (lệnh == "asm") {
+        trả về ["complete", biên dịch xuất lắp ráp máy(đường, đầu ra, kế hoạch[6], kế hoạch[7])];
+    };
+    nếu (lệnh == "format") {
+        trả về ["complete", biên dịch định dạng mã nguồn(đọc tệp(đường))];
+    };
+    nếu (lệnh == "lint") {
+        nếu (kế hoạch[5] != "") {
+            nếu (!là thư mục(kế hoạch[5])) { ném "Native CLI: lint base is not a directory"; };
+            trả về biên dịch soát lỗi lệnh bộ đệm(đọc tệp(đường), kế hoạch[5], thư viện);
+        };
+        trả về biên dịch soát lỗi lệnh tệp(đường, thư viện);
+    };
     nếu (thư viện == "") { ném "Native CLI: set VPP_HOME to the installed toolchain"; };
     nếu (lệnh == "artifact") {
         dây = biên dịch sản phẩm biên dịch giải mã dây(đọc tệp(đường));
         trả về ["execute", biên dịch asm chương trình(dây, bộ ba)];
+    };
+    nếu (lệnh == "disassemble") {
+        sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
+        dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
+        trả về ["complete", biên dịch giải mã bytecode(dây[0], dây[1])];
+    };
+    nếu (lệnh == "dump-ast") {
+        trả về ["complete", biên dịch hiển thị cây cú pháp(đọc tệp(đường))];
+    };
+    nếu (lệnh == "dump-ir") {
+        trả về ["complete", biên dịch hiển thị biểu diễn trung gian(đọc tệp(đường))];
     };
     nếu (lệnh == "embed") {
         nếu (!là thư mục(kế hoạch[5])) { ném "Native CLI: embedded base is not a directory"; };
@@ -146,6 +272,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
         sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
     };
     dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
+    nếu (lệnh == "vm-build") { trả về ["complete", biên dịch VM ghi(dây, đầu ra)]; };
     asm = biên dịch asm chương trình(dây, bộ ba, kế hoạch[4]);
     nếu (lệnh == "build") { trả về ["assemble", asm]; };
     trả về ["execute", asm];

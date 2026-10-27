@@ -677,3 +677,5 @@ PUBLIC(vpp_native_arena_base): .quad 0
 #include "vpp_vietnamese_runtime_symbols.inc"
 
 #endif
+
+#include "vpp_vm_f64_primitives.inc"

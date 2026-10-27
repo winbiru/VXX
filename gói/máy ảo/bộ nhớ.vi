@@ -1,0 +1,136 @@
+// Native i32 V++ only: every memory access is an ASM primitive.
+// Reserve byte slots 4..63. The byte/file runtime keeps slots 0..3.
+// Header at 4198464; allocation-start bitmap below 8388608;
+// nonmoving managed heap [8388608,67000000). No C/C++ allocator.
+hàm vm_get(p, i) { trả về máy đọc số nguyên ba mươi hai bit(p + i * 4); };
+hàm vm_set(p, i, v) { trả về máy ghi số nguyên ba mươi hai bit(p + i * 4, v); };
+hàm vm_error(code) {
+    nếu (vm_get(4198464, 1) == 0) { vm_set(4198464, 1, code); };
+    trả về 0;
+};
+hàm vm_init() {
+    lặp(i = 4; i < 64; i++) { vm_set(16 + i * 32, 0, -1); };
+    lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
+    vm_set(4198464, 0, 8388608);
+    trả về 0;
+};
+hàm vm_free_bucket(size) {
+    nếu (size <= 32) { trả về 0; };
+    nếu (size <= 48) { trả về 1; };
+    nếu (size <= 64) { trả về 2; };
+    nếu (size <= 96) { trả về 3; };
+    nếu (size <= 128) { trả về 4; };
+    nếu (size <= 192) { trả về 5; };
+    nếu (size <= 256) { trả về 6; };
+    nếu (size <= 512) { trả về 7; };
+    nếu (size <= 1024) { trả về 8; };
+    trả về 9;
+};
+hàm vm_free_push(p) {
+    biến bucket = 19 + vm_free_bucket(vm_get(p, 0));
+    vm_set(p, 3, vm_get(4198464, bucket));
+    vm_set(4198464, bucket, p);
+    trả về 0;
+};
+hàm vm_alloc(bytes, scan) {
+    nếu (bytes < 0) { trả về vm_error(1); };
+    nếu (bytes > 31000000) { trả về vm_error(1); };
+    biến size = máy chia số nguyên ba mươi hai bit(bytes + 31, 16) * 16;
+    biến end = vm_get(4198464, 0);
+    // Segregate free blocks by size; the lexer makes millions of tiny
+    // allocations, which should not traverse large fragmented free blocks.
+    biến p = 0; biến bucket = vm_free_bucket(size);
+    khi (bucket < 10 && p == 0) {
+        biến slot = 19 + bucket;
+        biến candidate = vm_get(4198464, slot);
+        biến previous = 0;
+        khi (candidate != 0) {
+            nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 16, vm_get(4198464, 16) + 1); };
+            biến n = vm_get(candidate, 0);
+            nếu (n >= size) {
+                biến next = vm_get(candidate, 3);
+                nếu (previous == 0) { vm_set(4198464, slot, next); }
+                hoặc { vm_set(previous, 3, next); };
+                p = candidate;
+                nếu (n - size >= 32) {
+                    biến rest = candidate + size;
+                    vm_set(rest, 0, n - size); vm_set(rest, 1, -1);
+                    vm_free_push(rest);
+                } hoặc { size = n; };
+                thoát;
+            };
+            previous = candidate; candidate = vm_get(candidate, 3);
+        };
+        bucket = bucket + 1;
+    };
+    nếu (p == 0) { p = end; };
+    nếu (p == end) {
+        nếu (size > 67000000 - end) { trả về vm_error(1); };
+        vm_set(4198464, 0, end + size);
+    };
+    vm_set(p, 0, size); vm_set(p, 1, scan); vm_set(p, 2, 0); vm_set(p, 3, 0);
+    máy ghi byte(4198720 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 1);
+    lặp(i = 16; i < size; i = i + 4) { máy ghi số nguyên ba mươi hai bit(p + i, 0); };
+    vm_set(4198464, 9, vm_get(4198464, 9) + size);
+    nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 14, vm_get(4198464, 14) + 1); };
+    trả về p + 16;
+};
+hàm vm_mark(p, epoch) {
+    nếu (p < 8388624 || p >= vm_get(4198464, 0)) { trả về 0; };
+    nếu (p - máy chia số nguyên ba mươi hai bit(p, 16) * 16 != 0) { trả về 0; };
+    nếu (máy đọc byte(4198720 + máy chia số nguyên ba mươi hai bit(p - 8388608, 16)) != 1) { trả về 0; };
+    nếu (vm_get(p - 16, 2) == epoch) { trả về 0; };
+    vm_set(p - 16, 2, epoch);
+    // Field 3 links the pending mark stack. Slot 11 is reserved for GC.
+    // Live blocks do not use the allocator's free-list link.
+    vm_set(p - 16, 3, vm_get(4198464, 11));
+    vm_set(4198464, 11, p);
+    trả về 1;
+};
+// Collection only runs between guest instructions, with the whole guest
+// state rooted. Temporary values inside a helper never cross a collection.
+hàm vm_collect(root) {
+    nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 15, vm_get(4198464, 15) + 1); };
+    biến epoch = vm_get(4198464, 6) + 1;
+    nếu (epoch <= 0) { epoch = 1; };
+    vm_set(4198464, 6, epoch);
+    vm_set(4198464, 11, 0);
+    vm_mark(root, epoch);
+    vm_mark(vm_get(4198464, 3), epoch);
+    vm_mark(vm_get(4198464, 7), epoch);
+    vm_mark(vm_get(4198464, 17), epoch);
+    vm_mark(vm_get(4198464, 18), epoch);
+    biến end = vm_get(4198464, 0);
+    // Trace each reachable block once, independent of reference-chain depth.
+    // Header links avoid allocating temporary guest objects during GC.
+    khi (vm_get(4198464, 11) != 0) {
+        biến object = vm_get(4198464, 11);
+        biến header = object - 16;
+        vm_set(4198464, 11, vm_get(header, 3));
+        vm_set(header, 3, 0);
+        nếu (vm_get(header, 1) == 1) {
+            lặp(i = 16; i < vm_get(header, 0); i = i + 4) {
+                vm_mark(máy đọc số nguyên ba mươi hai bit(header + i), epoch);
+            };
+        };
+    };
+    biến p = 8388608;
+    biến previous = 0;
+    lặp(i = 19; i < 29; i++) { vm_set(4198464, i, 0); };
+    khi (p < end) {
+        biến size = vm_get(p, 0);
+        nếu (vm_get(p, 2) != epoch || vm_get(p, 1) == -1) {
+            máy ghi byte(4198720 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 0);
+            vm_set(p, 1, -1);
+            nếu (previous != 0) { vm_set(previous, 0, vm_get(previous, 0) + size); }
+            hoặc { previous = p; };
+        } hoặc {
+            nếu (previous != 0) { vm_free_push(previous); };
+            previous = 0;
+        };
+        p = p + size;
+    };
+    nếu (previous != 0) { vm_free_push(previous); };
+    vm_set(4198464, 9, 0);
+    trả về 0;
+};

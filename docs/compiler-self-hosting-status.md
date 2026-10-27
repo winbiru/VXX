@@ -1,5 +1,175 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Tối ưu VM/runtime thuần V++ (27/10/2026)
+
+`gói/máy ảo/bộ nhớ.vi` dùng stack đánh dấu liên kết ngay trong header
+heap cho mark/sweep: mỗi block còn sống được duyệt một lần, rồi toàn
+bộ heap được quét một lần để thu hồi. Cách này thay thế việc quét lặp
+toàn heap theo từng lớp tham chiếu; không tạo thêm đối tượng guest khi GC.
+`gói/máy ảo/giá trị.vi` bổ sung tra cứu ô nhớ với khóa i32 trực tiếp,
+được `runtime.vi` và `thực thi.vi` dùng để tránh cấp phát `vm_int`
+tạm thời cho mỗi lần LOAD biến. Binary-search trên scope có khóa i32
+vẫn giữ thứ tự và cách xử lý khóa cũ.
+
+Kiểm thử `scripts/quality/check_vm_asm.cmake` chạy được cả đồ thị sống
+12.000 lớp tham chiếu, kiểm thử GC chu trình, closure, OOP, exception,
+ABI host và giới hạn phụ thuộc C++; toàn bộ PASS. Compiler Stage 1
+`.vmb` chạy trên VM V++/ASM tạo ảnh fixture trùng byte với native
+compiler, SHA-256 `a162af05c9c7464cf0a3e048a880e7a219188851b06992b5ba8114f6e4692498`.
+Thử tái biên dịch compiler đầy đủ thành Stage 2 bằng VM trước tối ưu
+vượt thời gian giới hạn 360 giây; Stage 2/3 chưa được xác nhận.
+
+## Profiler và cải thiện hiệu năng VM/ASM (27/10/2026)
+
+VM độc lập có profiler nội bộ, **mặc định tắt**. Đặt `VPP_VM_PROFILE=1`
+để ghi một dòng stderr sau mỗi 250.000 guest instruction:
+
+```text
+vm-profile: steps=250000 function=136 pc=480 allocations=... gc=... free-list-probes=...
+```
+
+`steps` là số lệnh **trong khoảng lấy mẫu**, không phải tổng cộng;
+`function` và `pc` là vị trí guest đang chạy ở ranh giới lấy mẫu, không
+phải CPU sampling profiler. `allocations`, `gc` và `free-list-probes`
+là bộ đếm cộng dồn từ lúc bật profiler. Profiler giúp khoanh vùng nhưng
+không đo trực tiếp tỷ lệ thời gian CPU của từng hàm.
+
+Để chạy phép đo có giới hạn thời gian, lưu log cùng báo cáo JSON:
+
+```sh
+python3 scripts/quality/profile_vm_asm_stage2.py --seconds 45 --name local
+```
+
+Script mặc định dùng `build/vm-asm-optimized/vpp-vm`, ảnh
+`build/vm-asm-selfhost/compiler-stage1.vmb` và nguồn
+`gói/biên dịch/dòng lệnh VM.vi`; hỗ trợ `--vm`, `--seed`, `--source`,
+`--output-dir` để thay đổi đầu vào. Mọi phép đo dưới đây dùng cùng ảnh
+Stage 1 và máy macOS ARM64, thời gian quan sát khoảng 45 giây. Các số
+liệu so sánh là một lượt đo cục bộ cho từng phiên bản, chưa phải benchmark
+đa lượt với sai số thống kê.
+
+| Phiên bản VM | Guest instructions đã quan sát | Cấp phát | GC | Lượt dò free-list | Stage 2 trong 45 giây |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Trước cache UTF-8 | 29.750.000 | 19.839.107 | 720 | 106.229.833 | Chưa xong |
+| UTF-8 length + sparse index | 43.500.000 | 13.241.534 | 548 | 133.222.165 | Chưa xong |
+| Thêm cache ký tự ASCII | 43.500.000 | 13.108.464 | 544 | 128.390.227 | Chưa xong |
+| Thêm 10 bucket free-list | 44.000.000 | 13.254.933 | 551 | 13.253.854 | Chưa xong |
+| Fast path `OP_GOI` cho độ dài/thêm | 44.500.000 | 13.526.755 | 562 | 13.490.436 | Chưa xong |
+| Thêm cache tên host trong StringPool | 44.750.000 | 13.673.098 | 568 | 13.677.586 | Chưa xong |
+
+Tối ưu `vm_length()` ghi nhớ số codepoint; `vm_index()` trên chuỗi
+>= 128 byte dùng checkpoint mỗi 64 codepoint và tái sử dụng chuỗi
+ASCII một ký tự. Các chuỗi Unicode vẫn được truy cập theo **codepoint**,
+không theo byte. `vm_alloc()` phân nhóm các khối trống theo kích thước
+và `vm_collect()` gộp khối liền kề trước khi đưa về bucket. Cache số
+nguyên -16..255, cache ASCII và chỉ mục chuỗi đều được GC bảo vệ.
+
+Lệnh gọi host tĩnh `OP_GOI` tới `độ dài` và `thêm` (kể cả các
+bí danh cùng primitive) xử lý trực tiếp trên guest stack khi đúng số
+đối số. Các lời gọi khác giữ đường kiểm tra số đối số của `vm_host()`.
+`vm_host_cached()` lưu mã primitive theo **StringPool index** trong
+state slot 10, giải tên lần đầu rồi tái sử dụng. Bảng cache chứa số
+nguyên thô (`scan=0`), được state giữ sống qua GC; slot 9 vẫn dành
+cho mã lỗi I/O. Test chạy cả tên đầy đủ lẫn alias và lời gọi host
+khác để kiểm tra cache phân giải đúng tên.
+
+Sau các thay đổi, số lượt dò free-list tại mốc 45 giây giảm khoảng
+**9,7 lần** so với phiên bản cache ASCII nhưng chưa phân bucket. Số
+guest instruction xử lý trong cùng thời gian chỉ tăng khoảng **1%**:
+nghẽn cấp phát đã giảm nhưng compiler vẫn dành nhiều lượt thực thi ở
+lexer/Unicode (đặc biệt các function ID 136, 39, 129, 133). Cần tối ưu
+tiếp theo số liệu; không suy diễn Stage 2 đã hội tụ từ throughput tăng.
+Fast path và cache tên host tăng số guest instruction quan sát từ
+44 lên 44,75 triệu trong một lần đo 45 giây (**khoảng 1,7%**), nhưng
+chưa đủ để kết luận tăng tốc ổn định vì chưa có nhiều lượt đo.
+
+Regression `scripts/quality/check_vm_asm.cmake` đã **PASS** sau khi
+phân bucket: GC chu trình/đồ thị sống sâu, closure/OOP/exception,
+host ABI và kiểm tra symbol C++, cùng test ASCII, UTF-8 2/3/4 byte,
+ranh giới chỉ mục 63/64, giữ chuỗi sau áp lực cấp phát và lỗi
+out-of-range `error=4`. Các số liệu và log profiler nằm trong
+`build/vm-asm-optimized/profile-stage2-*.log` (thư mục build không
+là bằng chứng Stage 2/3 hội tụ).
+
+Sau cache host, regression VM/ASM vẫn **PASS**, bao gồm fixture host
+cache mới. Compiler Stage 1 `.vmb` chạy trên VM/ASM hiện tại biên dịch
+fixture `src/tests/fixtures/vm_asm.vi` byte-for-byte trùng với native
+compiler: SHA-256
+`a162af05c9c7464cf0a3e048a880e7a219188851b06992b5ba8114f6e4692498`;
+ảnh sinh ra cũng chạy đúng. Stage 2/3 của **compiler đầy đủ** chưa
+được xác nhận qua đường VM/ASM.
+
+## Xem AST và IR bằng compiler V++ (27/10/2026)
+
+`vpp --dump-ast <source.vi>` và `vpp --dump-ir <source.vi>` chuyển đến
+compiler đã bootstrap khi có sẵn. Có thể chọn `--compiler=vpp` để bắt buộc
+đường native hoặc `--compiler=cpp` để đối chiếu Stage 0; compiler native
+nhận trực tiếp `dump-ast`/`dump-ir`. Frontend, duyệt cây và hạ IR nằm trong
+`gói/biên dịch/hiển thị cây và IR.vi`; CLI C++ chỉ chuẩn hóa đường dẫn và
+chạy compiler con. Bản dump Stage 1 hiển thị AST dạng map và stack IR của
+V++ nên định dạng khác Stage 0; không yêu cầu trùng byte giữa hai thế hệ.
+
+`dump-ir` ở cấp tệp giữ import thành metadata `(chưa liên kết)`; bước
+liên kết nhiều mô-đun thuộc compiler đầy đủ. Dump không chạy `chính()`.
+CTest `vpp-native-ast-ir` kiểm tra cả hai chế độ, lỗi cú pháp, lớp, vòng lặp,
+lambda, Unicode, import metadata, nguồn không bị sửa và việc không thực thi.
+
+
+## Xuất mã máy qua compiler V++ (27/10/2026)
+
+Sau bootstrap, `vpp build --target ... --emit-raw` chuyển trực tiếp tới
+compiler `.vi` cho các kiến trúc đã có encoder leaf. Các hàm i32 đơn giản
+dùng `biên dịch máy hạ lá` và `biên dịch mã máy lá`, giữ byte ABI cũ; hàm
+phức tạp trên AArch64/x86-64 dùng Machine IR tổng quát, từ chối raw có
+relocation `CALL` chưa liên kết. Tệp đầu ra chỉ được ghi sau khi phát mã
+thành công. `--emit-obj` và `--emit-obj-selfhost` trên AArch64/x86-64 cùng
+gọi `tạo đối tượng hàm` trong compiler V++ và ghi object trực tiếp. Các
+đường này không cần wrapper V++ do C++ sinh hoặc bridge `executeVppSource`.
+
+`--emit-asm` dùng bộ in assembly leaf bằng V++, hoặc bộ in Machine IR trên
+AArch64/x86-64 cho hàm phức tạp. Object của kiến trúc chưa có backend tương
+ứng tiếp tục đi qua Stage 0. C++ vẫn điều phối lệnh, kiểm tra khóa dự án và thực
+hiện ABI host; assembler/linker tạo executable vẫn do host gọi. Vì vậy
+chuyển xuất raw/object sang V++ không đồng nghĩa đã loại bỏ toàn bộ C++
+hoặc VM trong toolchain.
+
+## Điều phối nguồn mặc định qua compiler V++ (27/10/2026)
+
+`vpp run <source.vi>`, `vpp build <source.vi>` và `vpp <source.vi>` nay
+tự chọn compiler V++ native đã bootstrap nếu tìm thấy qua
+`VPP_NATIVE_COMPILER` hoặc `<VPP_HOME>/bin/vpp-native` (cũng hỗ trợ
+`VPP_AOT_ROOT`). CLI trong build tree ưu tiên bản bootstrap chính
+`native-cli/vpp-native`, rồi thử `native-compiler/vpp-native` từ CTest.
+Nếu cây mã nguồn có đủ thư viện `.vi` và script liên kết ASM thì có thể
+tự tìm compiler lẫn root toolchain từ vị trí executable mà không cần xuất
+`VPP_HOME`/`VPP_AOT_ROOT`. Đường `run` sử dụng backend ASM V++ và host linker;
+đường `build` xác thực và sinh bytecode bằng compiler V++, ghi artifact
+tạm rồi xóa khi hoàn tất. `vpp build <source.vi> -o <output.vbc>` cũng
+chuyển tới compiler V++ để giữ artifact. CLI C++ chỉ điều phối process
+ở các đường này.
+
+Khi chưa có compiler V++ native, Stage 0 tiếp tục dùng compiler C++/VM
+để bootstrap. `--compiler=cpp` giữ đường cũ tường minh;
+`--compiler=vpp` yêu cầu compiler native và báo lỗi nếu vắng mặt.
+Nếu `VPP_NATIVE_COMPILER` được đặt nhưng trỏ tới tệp không tồn tại thì
+CLI báo lỗi thay vì tự động chạy VM. Lint/format, package management và
+các cầu nối OS còn cần migration.
+
+`vpp test <file.vi|directory>` và `--batch-run-tests` nay thực thi từng tệp
+qua compiler V++ native khi có sẵn; bộ điều phối file và phép so khớp
+output vẫn ở C++. `vpp --repl`/`vpp repl` dùng `embed` của compiler native,
+ghi snippet ra tệp tạm và truyền `--base` là cwd để nhập mô-đun tương đối
+không sai thư mục. REPL mới chạy snippet V++ trực tiếp, không chèn cú pháp
+`nhập "stdlib"` cũ (native parser không chấp nhận import dạng chuỗi);
+`--repl --compiler=cpp` vẫn chạy REPL cũ khi cần tương thích. Với Stage 0
+chưa có compiler hoặc root toolchain, CLI có thể dùng đường VM để bootstrap.
+Chế độ batch nay gom stdout và stderr của compiler con vào tệp `.output`
+để giữ diagnostic của ca kiểm thử âm tính, đồng thời ghi mã thoát riêng
+vào `.status`. Đường `run` thường vẫn giữ stderr ở terminal; stdout trước
+khi lỗi cũng được chuyển lên CLI thay vì bị bỏ.
+Kiểm thử CLI bổ sung parity đường mặc định và shim phát dấu xác nhận
+đã thực sự gọi native compiler (kể cả build, run, đường tệp trực tiếp).
+
 ## Backend AOT tổng quát và điều phối CLI bằng V++ (26/10/2026)
 
 Compiler native từ Stage 1 dùng `gói/biên dịch/asm chương trình.vi` để hạ

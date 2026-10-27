@@ -19,9 +19,50 @@ execute_process(
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")
     message(FATAL_ERROR "self-host executable build failed: ${status} ${errors} ${output}")
 endif()
-execute_process(COMMAND "${executable}" RESULT_VARIABLE status ERROR_VARIABLE errors)
+execute_process(COMMAND "${executable}" RESULT_VARIABLE status
+    OUTPUT_VARIABLE reference_output ERROR_VARIABLE errors)
 if (NOT status EQUAL 42)
     message(FATAL_ERROR "self-host executable should exit 42: ${status} ${errors}")
+endif()
+
+# Once Stage 1 is available, the public CLI can build the same program via
+# the native V++ compiler and ASM linker, without entering the Stage 0 VM.
+if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
+    set(nativeVppExecutable "${VPP_OUTPUT_DIR}/native vpp executable")
+    file(REMOVE "${nativeVppExecutable}")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
+            "VPP_NATIVE_COMPILER=${VPP_STAGE1}"
+            "VPP_NATIVE_CC=${VPP_OUTPUT_DIR}/missing host cc"
+            "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-vpp
+            "${sourcecopy}" "${nativeVppExecutable}"
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE native_status OUTPUT_VARIABLE native_output ERROR_VARIABLE native_errors)
+    if (NOT native_status EQUAL 0 OR NOT EXISTS "${nativeVppExecutable}")
+        message(FATAL_ERROR "V++/ASM executable CLI failed: ${native_status} ${native_errors} ${native_output}")
+    endif()
+    execute_process(COMMAND "${nativeVppExecutable}"
+        RESULT_VARIABLE native_status OUTPUT_VARIABLE native_output ERROR_VARIABLE native_errors)
+    if (NOT native_status EQUAL status OR NOT native_output STREQUAL reference_output)
+        message(FATAL_ERROR "V++/ASM CLI must match direct Stage 1 build: ${native_status} ${native_errors} ${native_output}")
+    endif()
+endif()
+
+# Stage 0 uses the shared host process ABI for linking. An unavailable linker
+# must surface its exit code and preserve an already published executable.
+if (NOT DEFINED VPP_STAGE1 OR "${VPP_STAGE1}" STREQUAL "")
+    file(SHA256 "${executable}" linked_hash)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_HOME}"
+            "VPP_NATIVE_CC=${VPP_OUTPUT_DIR}/missing native linker"
+            ${compile_command}
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+        RESULT_VARIABLE linker_status OUTPUT_VARIABLE linker_output ERROR_VARIABLE linker_errors)
+    file(SHA256 "${executable}" preserved_hash)
+    if (linker_status EQUAL 0 OR NOT linked_hash STREQUAL preserved_hash OR
+        NOT linker_errors MATCHES "Native host linker thất bại \\(mã 127\\)")
+        message(FATAL_ERROR "self-host linker failure must report 127 and preserve output: ${linker_status} ${linker_errors} ${linker_output}")
+    endif()
 endif()
 
 # Exercise the full native compilation/link/run path with arguments well

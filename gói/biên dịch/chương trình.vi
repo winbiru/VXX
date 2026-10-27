@@ -401,6 +401,7 @@ lớp công khai Bộ Phân Tích Cú Pháp {
     };
 
     hàm riêng tư biên dịch chương trình câu lệnh(p) {
+        từ tố đầu = biên dịch biểu thức nhìn(p);
         s = mình.biên dịch chương trình giá trị(p);
         nếu (s == "") { biên dịch biểu thức lỗi(p, "thiếu câu lệnh"); };
         nếu (s == ";") {
@@ -412,12 +413,23 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             mình.biên dịch chương trình nhận(p, ";");
             trả về khối;
         };
-        nếu (s == "hàm") { trả về mình.biên dịch chương trình hàm(p); };
+        nếu (s == "hàm") {
+            khai báo = mình.biên dịch chương trình hàm(p);
+            khai báo["dòng"] = lấy từ điển(từ tố đầu, "dòng", 1);
+            khai báo["cột"] = lấy từ điển(từ tố đầu, "cột", 1);
+            trả về khai báo;
+        };
         nếu (s == "lớp" || s == "giao diện") {
-            trả về mình.biên dịch chương trình kiểu(p, s == "giao diện");
+            khai báo = mình.biên dịch chương trình kiểu(p, s == "giao diện");
+            khai báo["dòng"] = lấy từ điển(từ tố đầu, "dòng", 1);
+            khai báo["cột"] = lấy từ điển(từ tố đầu, "cột", 1);
+            trả về khai báo;
         };
         nếu (s == "ngoại hàm" || s == "ngoại thư viện") {
-            trả về mình.biên dịch chương trình ngoại(p);
+            khai báo = mình.biên dịch chương trình ngoại(p);
+            khai báo["dòng"] = lấy từ điển(từ tố đầu, "dòng", 1);
+            khai báo["cột"] = lấy từ điển(từ tố đầu, "cột", 1);
+            trả về khai báo;
         };
         nếu (s == "gọi") {
             // Giống cú pháp dedicated call của C++: `gọi tên hàm(args);`.

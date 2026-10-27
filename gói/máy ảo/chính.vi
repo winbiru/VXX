@@ -1,0 +1,59 @@
+// Build this entry with the existing i32 native V++ compiler.
+// The binary links only V++-generated objects and platform ASM primitives.
+nhập bộ nhớ;
+nhập giá trị;
+nhập host ABI;
+nhập nạp chương trình;
+nhập runtime;
+nhập thực thi;
+
+hàm vm_absolute(s, cwd) {
+    nếu (vm_get(s, 1) > 0) { nếu (máy đọc byte(vm_get(s, 2)) == 47) { trả về s; }; };
+    trả về vm_concat(vm_concat(cwd, vm_literal("/")), s);
+};
+hàm chính() {
+    nếu (đối số đếm() < 2) {
+        biến help = "V++ VM ASM: vpp-vm <program.vmb> [compiler arguments]\n"; byte in(help); byte hủy(help); trả về 2;
+    };
+    vm_init();
+    biến probe = "/proc/self/exe"; biến fd = tệp mở đọc(probe); byte hủy(probe);
+    nếu (fd > 0) { tệp đóng(fd); vm_set(4198464, 8, 1); };
+    biến path = đối số lấy(1); biến state = vm_load(path); byte hủy(path);
+    nếu (state != 0 && vm_get(4198464, 1) == 0) {
+        // Diagnostic switch; disabled by default and independent of the guest.
+        biến profile_args = vm_vector(4);
+        vm_append(profile_args, vm_literal("VPP_VM_PROFILE"));
+        biến profile_value = vm_host(state, 177, profile_args);
+        nếu (vm_tag(profile_value) == 3) {
+            nếu (vm_equal(profile_value, vm_literal("1")) == 1) { vm_set(4198464, 12, 1); };
+        };
+        vm_run(state);
+        nếu (vm_get(4198464, 1) == 0) {
+            biến compiler = vm_find_function(state, vm_literal("biên dịch dòng lệnh VM"));
+            nếu (compiler >= 0) {
+                biến args = vm_vector(4);
+                biến cwd = vm_string(4095); nếu (cwd == 0) { trả về 1; };
+                biến count = máy thư mục hiện hành(vm_get(cwd, 2)); nếu (count < 0) { vm_error(20); };
+                vm_set(cwd, 1, count);
+                lặp(i = 2; i < đối số đếm(); i++) {
+                    biến value = vm_literal(đối số lấy(i));
+                    nếu (i == 3 || i == 5) { value = vm_absolute(value, cwd); }; vm_append(args, value);
+                };
+                biến envargs = vm_vector(4); vm_append(envargs, vm_literal("VPP_HOME"));
+                biến root = vm_host(state, 177, envargs);
+                nếu (root == 0) { root = cwd; };
+                biến callargs = vm_vector(4); vm_append(callargs, args); vm_append(callargs, root);
+                vm_invoke(state, compiler, callargs, 0, 0, 0); vm_execute(state);
+            };
+        };
+    };
+    biến error = vm_get(4198464, 1);
+    nếu (error != 0) {
+        biến message = vm_concat(vm_literal("V++ VM ASM: error="), vm_integer_text(error));
+        message = vm_concat(message, vm_concat(vm_literal(" opcode="), vm_integer_text(vm_get(4198464, 5))));
+        vm_write(2, vm_concat(message, vm_literal("\n")));
+        nếu (error == 16) { vm_write(2, vm_concat(vm_text(vm_get(4198464, 3)), vm_literal("\n"))); };
+        trả về 1;
+    };
+    trả về 0;
+};

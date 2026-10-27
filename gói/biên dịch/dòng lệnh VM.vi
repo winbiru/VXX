@@ -1,0 +1,20 @@
+// Full-language compiler entry for the V++/ASM VM. The native launcher
+// supplies argv and VPP_HOME as guest values; no compiler callback exists.
+nhập gói/biên dịch/nguồn tệp;
+nhập gói/biên dịch/bộ nạp;
+nhập gói/biên dịch/máy ảo ASM;
+
+hàm công khai biên dịch dòng lệnh VM(args, thư viện) {
+    nếu (độ dài(args) != 4) {
+        ném "Cú pháp: vpp-vm compiler.vmb build <source.vi> -o <output.vmb>";
+    };
+    nếu ((args[0] != "build" && args[0] != "vm-build") || args[2] != "-o") {
+        ném "Cú pháp: vpp-vm compiler.vmb build <source.vi> -o <output.vmb>";
+    };
+    source = biên dịch nguồn chuẩn đường(args[1]);
+    output = biên dịch nguồn chuẩn đường(args[3]);
+    nếu (source == output) { ném "VM ASM: output must not overwrite source"; };
+    product = biên dịch nguồn tệp tự chủ(source, thư viện);
+    trả về biên dịch VM ghi(biên dịch nạp sản phẩm biên dịch(product), output);
+};
+hàm chính() {};

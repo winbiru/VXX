@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_TESTS "Build V++ .vi regression tests" ON)
+set(VPP_NATIVE_I32_SEED "" CACHE FILEPATH "Existing native V++ i32 compiler seed for ASM bootstrap")
 option(VPP_TEST_DNS_LOOPBACK "Enable DNS TCP fallback loopback integration test" OFF)
 option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
@@ -82,9 +83,11 @@ set(VPP_BYTECODE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/bytecode/opcode.cpp
     ${CMAKE_SOURCE_DIR}/src/bytecode/verifier.cpp)
 set(VPP_COMPILER_SOURCES
-    ${CMAKE_SOURCE_DIR}/src/compiler/support/expression.cpp
+    # Legacy postfix/shunting-yard compiler has no in-tree callers since the AST/IR parser.
+    # ${CMAKE_SOURCE_DIR}/src/compiler/support/expression.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/storeString.cpp
-    ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
+    # Legacy symbolTable has no in-tree callers; semantic symbols use SemanticModel.
+    # ${CMAKE_SOURCE_DIR}/src/compiler/support/symbolTable.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/support/token_utils.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/module_graph.cpp
     ${CMAKE_SOURCE_DIR}/src/compiler/package_resolver.cpp
@@ -806,6 +809,7 @@ if (BUILD_TESTS)
                     "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
                     "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/nativedriver"
+                    "-DVPP_SEED=${VPP_NATIVE_I32_SEED}"
                     "-DVPP_PREPARE_ONLY=1"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativedriver.cmake)
             set_tests_properties(vpp-native-stage1-bootstrap PROPERTIES
@@ -929,6 +933,104 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
+        if (VPP_NATIVE_HARNESS_STAGE1_ARG)
+            add_test(NAME vpp-vm-asm
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_STAGE1=${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-check"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm.cmake)
+            set_tests_properties(vpp-vm-asm PROPERTIES
+                FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 900)
+            add_test(NAME vpp-vm-asm-selfhost
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_VM=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-check/vpp-vm"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-selfhost"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm_selfhost.cmake)
+            set_tests_properties(vpp-vm-asm-selfhost PROPERTIES
+                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 1500)
+
+        endif()
+        if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$") OR
+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+             CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
+            add_test(NAME vpp-native-executable-vpp-cli
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-executable-vpp-cli"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_executable_cli.cmake)
+            set_tests_properties(vpp-native-executable-vpp-cli PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
+        endif()
+        add_executable(vpp-native-formatter-cpp-oracle
+            scripts/quality/native_formatter_cpp_oracle.cpp)
+        target_link_libraries(vpp-native-formatter-cpp-oracle PRIVATE vpp-tooling)
+        add_test(NAME vpp-native-formatter-parity
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_CPP_ORACLE=$<TARGET_FILE:vpp-native-formatter-cpp-oracle>"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-formatter"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_format.cmake)
+        set_tests_properties(vpp-native-formatter-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        add_test(NAME vpp-native-lint
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-lint"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lint.cmake)
+        set_tests_properties(vpp-native-lint PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        find_package(Python3 QUIET COMPONENTS Interpreter)
+        if (Python3_Interpreter_FOUND)
+            add_test(NAME vpp-native-lsp-format
+                COMMAND "${Python3_EXECUTABLE}"
+                    ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_format.py
+                    $<TARGET_FILE:vpp-cli> ${VPP_NATIVE_CLI_COMPILER} ${CMAKE_SOURCE_DIR})
+            set_tests_properties(vpp-native-lsp-format PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+            add_test(NAME vpp-native-lsp-diagnostics
+                COMMAND "${Python3_EXECUTABLE}"
+                    ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_diagnostics.py
+                    $<TARGET_FILE:vpp-cli> ${VPP_NATIVE_CLI_COMPILER} ${CMAKE_SOURCE_DIR})
+            set_tests_properties(vpp-native-lsp-diagnostics PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        endif()
+        add_test(NAME vpp-native-disassemble-parity
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-disassemble"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_disassemble.cmake)
+        set_tests_properties(vpp-native-disassemble-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        add_test(NAME vpp-native-ast-ir
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-ast-ir"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_ast_ir.cmake)
+        set_tests_properties(vpp-native-ast-ir PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        # The raw CLI tests also dispatch to the bootstrapped V++ compiler.
+        # Running them alongside a rebuild can otherwise use a stale binary.
+        set_tests_properties(vpp-raw-machine-cli-hardening PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler)
+        if (TEST vpp-raw-object-host-link)
+            set_tests_properties(vpp-raw-object-host-link PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler)
+        endif()
         if (UNIX)
             if (VPP_NATIVE_SMOKE_CC)
                 add_executable(vpp-native-aot-cpp-oracle scripts/quality/native_aot_cpp_oracle.cpp)
@@ -1090,6 +1192,17 @@ if (VPP_NATIVE_CLI_TARGET)
         DEPENDS vpp-cli
         BYPRODUCTS "${VPP_NATIVE_CLI_DIR}/vpp-native"
         COMMENT "Bootstrap CLI compiler tổng quát V++ (Stage 0)")
+    add_custom_target(vpp-vm-asm
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_TARGET=${VPP_NATIVE_CLI_TARGET}"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-vm"
+            "-DVPP_SEED=${VPP_NATIVE_I32_SEED}"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_vm_asm.cmake
+        DEPENDS vpp-cli
+        BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/native-vm/vpp-vm"
+        COMMENT "Build standalone VM with V++ and direct ASM primitives")
     install(PROGRAMS "${VPP_NATIVE_CLI_DIR}/vpp-native"
         DESTINATION bin OPTIONAL)
 endif()

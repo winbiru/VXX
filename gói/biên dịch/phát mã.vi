@@ -92,13 +92,24 @@ lớp công khai Bộ Phát Bytecode {
         lặp(i = máy ảo lấy độ dài(khóa); i < máy ảo lấy độ dài(các ô nhớ); i++) {
             máy ảo thêm cuối danh sách(khóa, các ô nhớ[i]);
         };
+        // Các SymbolId trong một phiên là duy nhất. Tra trực tiếp ID đã
+        // phân giải để tránh quét lại toàn bộ slots ở mỗi LOAD/STORE của IR.
+        // Cache là metadata nội bộ, không làm đổi thứ tự hay nội dung slots.
+        chỉ mục = trạng thái["chỉ mục symbol slots"];
+        nếu (máy ảo có khóa từ điển(chỉ mục, mục ký hiệu)) {
+            trả về chỉ mục[mục ký hiệu];
+        };
         tên khóa = "symbol:" + thành chuỗi(mục ký hiệu);
         lặp(i = 0; i < máy ảo lấy độ dài(khóa); i++) {
-            nếu (khóa[i] == tên khóa) { trả về i; };
+            nếu (khóa[i] == tên khóa) {
+                chỉ mục[mục ký hiệu] = i;
+                trả về i;
+            };
         };
         chỉ số = máy ảo lấy độ dài(các ô nhớ);
         máy ảo thêm cuối danh sách(các ô nhớ, tên);
         máy ảo thêm cuối danh sách(khóa, tên khóa);
+        chỉ mục[mục ký hiệu] = chỉ số;
         trả về chỉ số;
     };
 
@@ -1161,7 +1172,7 @@ lớp công khai Bộ Phát Bytecode {
         lặp(i = 0; i < máy ảo lấy độ dài(lấy từ điển(biểu diễn trung gian, "lớp", [])); i++) {
             máy ảo thêm cuối danh sách(kiểu lớp đã khai, biểu diễn trung gian["lớp"][i]["tên"]);
         };
-        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chuỗi": sổ["chuỗi"],
+        trạng thái = {"slots": các ô nhớ, "khóa slots": [], "chỉ mục symbol slots": {}, "chuỗi": sổ["chuỗi"],
                       "sổ hàm": sổ, "hàm ẩn danh": [],
                       "chỉ mục chuỗi": lấy từ điển(sổ, "chỉ mục chuỗi", {}),
                       "mô đun": tên mô đun,

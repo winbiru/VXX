@@ -44,7 +44,7 @@ public:
         previous=now;
     }
 };
-ProcessResult process(const std::vector<std::string> &arguments) {
+ProcessResult process(const std::vector<std::string> &arguments, bool captureStderr = false) {
     ProcessResult result;
 #if defined(_WIN32)
     // Windows CRT quoting, without a shell or command substitution.
@@ -63,7 +63,8 @@ ProcessResult process(const std::vector<std::string> &arguments) {
     if(!CreatePipe(&input,&output,&security,0))throw std::runtime_error("Native AOT: CreatePipe failed");
     SetHandleInformation(input,HANDLE_FLAG_INHERIT,0);
     STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;
-    startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=output;startup.hStdError=GetStdHandle(STD_ERROR_HANDLE);
+    startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=output;
+    startup.hStdError=captureStderr?output:GetStdHandle(STD_ERROR_HANDLE);
     PROCESS_INFORMATION child{};
     if(!CreateProcessW(nullptr,command.data(),nullptr,nullptr,TRUE,0,nullptr,nullptr,&startup,&child)) {
         CloseHandle(input);CloseHandle(output);throw std::runtime_error("Native AOT: CreateProcess failed");
@@ -88,7 +89,9 @@ ProcessResult process(const std::vector<std::string> &arguments) {
     const auto child=fork();
     if(child<0){close(descriptors[0]);close(descriptors[1]);throw std::runtime_error("Native AOT: fork failed");}
     if(child==0) {
-        close(descriptors[0]);if(dup2(descriptors[1],STDOUT_FILENO)<0)_exit(127);close(descriptors[1]);
+        close(descriptors[0]);if(dup2(descriptors[1],STDOUT_FILENO)<0)_exit(127);
+        if(captureStderr&&dup2(descriptors[1],STDERR_FILENO)<0)_exit(127);
+        close(descriptors[1]);
         std::vector<char *> argv;for(const auto &argument:arguments)argv.push_back(const_cast<char *>(argument.c_str()));argv.push_back(nullptr);
         execvp(argv[0],argv.data());_exit(127);
     }
@@ -117,8 +120,21 @@ struct TemporaryDirectory {
     }
     ~TemporaryDirectory(){std::error_code ignored;fs::remove_all(path,ignored);}
 };
+fs::path executableDirectory();
 fs::path installation(bool required=true) {
     for(const char *name:{"VPP_AOT_ROOT","VPP_HOME"})if(const char *root=std::getenv(name);root&&*root)return fs::absolute(core::utf8Path(root));
+    // An uninstalled native compiler in <build>/native-compiler (or its
+    // multi-config subdirectory) can use the source checkout's V++ runtime
+    // and ASM linker without requiring a manually exported VPP_HOME.
+    const auto executable=executableDirectory();
+    if(!executable.empty()) {
+        for(const auto &buildDir:{executable.parent_path(),executable.parent_path().parent_path()}) {
+            const auto sourceRoot=buildDir.parent_path();
+            if(fs::is_regular_file(sourceRoot/core::utf8Path("gói/biên dịch/dòng lệnh máy.vi"))&&
+               fs::is_directory(sourceRoot/"scripts/quality/native_aot_link"))
+                return sourceRoot;
+        }
+    }
     if(!required)return {};
     throw std::runtime_error("Native AOT: set VPP_HOME to the installed toolchain");
 }
@@ -184,6 +200,7 @@ int compilerMain(Program &program,int argc,char **argv) {
     const auto &operation=std::get<std::string>(request[0]);
     const auto &text=std::get<std::string>(request[1]);
     if(operation=="complete") {program.output(text);return 0;}
+    if(operation=="diagnostic-error") {program.output(text);return 1;}
     if(operation=="assemble") {
         compileAssembly(text,output,root);
         return 0;
@@ -203,8 +220,11 @@ int compilerMain(Program &program,int argc,char **argv) {
 } // namespace
 
 ProcessResult runProcess(const std::vector<std::string> &arguments) {
+    return runProcess(arguments,false);
+}
+ProcessResult runProcess(const std::vector<std::string> &arguments, bool captureStderr) {
     if (arguments.empty()) throw std::invalid_argument("Native AOT: empty process arguments");
-    return process(arguments);
+    return process(arguments,captureStderr);
 }
 
 void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs::path &root,bool compiler) {

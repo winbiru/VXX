@@ -46,6 +46,18 @@ foreach(target IN ITEMS aarch64-apple-darwin aarch64-linux-gnu
         if (NOT actual_hash STREQUAL reference_hash)
             message(FATAL_ERROR "V++ CLI object differs from Stage 0: ${target}/${kernel}")
         endif()
+        # The ordinary --emit-obj command must use the same V++ writer.
+        set(ordinary "${VPP_OUTPUT_DIR}/ordinary-${target}-${kernel}.o")
+        execute_process(COMMAND ${native_command} build --target "${target}"
+            --emit-obj "${kernel}" "${source}" "${ordinary}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+        if (NOT status STREQUAL "0" OR NOT EXISTS "${ordinary}")
+            message(FATAL_ERROR "Native --emit-obj failed: ${target}/${kernel}: ${output} ${errors}")
+        endif()
+        file(SHA256 "${ordinary}" ordinary_hash)
+        if (NOT ordinary_hash STREQUAL actual_hash)
+            message(FATAL_ERROR "Native --emit-obj disagrees with selfhost: ${target}/${kernel}")
+        endif()
         math(EXPR checked "${checked} + 1")
     endforeach()
 endforeach()
@@ -78,6 +90,70 @@ endif()
 file(SHA256 "${delegated}" actual_hash)
 if (NOT actual_hash STREQUAL reference_hash)
     message(FATAL_ERROR "Compatibility CLI changed native object")
+endif()
+set(regular_delegated "${VPP_OUTPUT_DIR}/regular-delegated.o")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
+    "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI}" "VPP_NATIVE_STAGE0_PROFILE=1"
+    "${VPP_STAGE0}" build --target aarch64-apple-darwin --emit-obj
+    vpp_cycle "${source}" "${regular_delegated}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if (NOT status STREQUAL "0" OR errors MATCHES "native Stage 0")
+    message(FATAL_ERROR "--emit-obj used Stage 0 bridge: ${status} ${output} ${errors}")
+endif()
+file(SHA256 "${regular_delegated}" ordinary_hash)
+if (NOT ordinary_hash STREQUAL reference_hash)
+    message(FATAL_ERROR "--emit-obj delegation changed native object")
+endif()
+
+# The raw leaf encoder is entirely V++ and preserves the old ABI bytes.
+set(raw "${VPP_OUTPUT_DIR}/leaf-raw.bin")
+set(leaf "${VPP_ROOT}/src/tests/kiem_tra_native_leaf.vi")
+execute_process(COMMAND ${native_command} build --target x86_64-linux-gnu
+    --emit-raw cong_dao "${leaf}" "${raw}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "Native raw leaf failed: ${status} ${output} ${errors}")
+endif()
+file(READ "${raw}" bytes HEX)
+if (NOT bytes STREQUAL "89f801f0c3")
+    message(FATAL_ERROR "Native leaf ABI changed: ${bytes}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
+    "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI}" "VPP_NATIVE_STAGE0_PROFILE=1"
+    "${VPP_STAGE0}" build --target riscv64-linux-gnu --emit-raw
+    tra42 "${leaf}" "${raw}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if (NOT status STREQUAL "0" OR errors MATCHES "native Stage 0")
+    message(FATAL_ERROR "Raw RISC-V dispatch still used Stage 0: ${status} ${output} ${errors}")
+endif()
+file(READ "${raw}" bytes HEX)
+if (NOT bytes STREQUAL "370500001b05a50267800000")
+    message(FATAL_ERROR "Native RISC-V leaf ABI changed: ${bytes}")
+endif()
+set(assembly "${VPP_OUTPUT_DIR}/leaf-assembly.s")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
+    "VPP_NATIVE_COMPILER=${VPP_NATIVE_CLI}" "VPP_NATIVE_STAGE0_PROFILE=1"
+    "${VPP_STAGE0}" build --target riscv64-linux-gnu --emit-asm
+    tra42 "${leaf}" "${assembly}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if (NOT status STREQUAL "0" OR errors MATCHES "native Stage 0")
+    message(FATAL_ERROR "Assembly dispatch still used Stage 0: ${status} ${output} ${errors}")
+endif()
+file(READ "${assembly}" listing)
+if (NOT listing MATCHES "lui a0, 0" OR NOT listing MATCHES "addiw a0, a0, 42" OR
+    NOT listing MATCHES "jalr zero, ra, 0")
+    message(FATAL_ERROR "Native RISC-V assembly printer regressed: ${listing}")
+endif()
+set(general_assembly "${VPP_OUTPUT_DIR}/machine-call.s")
+execute_process(COMMAND ${native_command} build --target aarch64-apple-darwin
+    --emit-asm chua_ho_tro "${leaf}" "${general_assembly}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+if (NOT status STREQUAL "0" OR NOT EXISTS "${general_assembly}")
+    message(FATAL_ERROR "Native Machine IR assembly failed: ${status} ${output} ${errors}")
+endif()
+file(READ "${general_assembly}" listing)
+if (NOT listing MATCHES "bl " OR NOT listing MATCHES "_chua_ho_tro:")
+    message(FATAL_ERROR "Native Machine IR assembly lost CALL or function symbol: ${listing}")
 endif()
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
     "VPP_NATIVE_COMPILER=/missing-compiler"
@@ -112,6 +188,10 @@ reject("extra input" build "${source}" "${source}" -o "${preserved}")
 file(WRITE "${VPP_OUTPUT_DIR}/invalid.vi" "hàm bad(a) { trả về a && 1; };\n")
 reject("unsupported source" build --target aarch64-apple-darwin --emit-obj-selfhost bad
     "${VPP_OUTPUT_DIR}/invalid.vi" "${preserved}")
+reject("unlinked raw CALL" build --target aarch64-apple-darwin --emit-raw chua_ho_tro
+    "${leaf}" "${preserved}")
+reject("unknown assembly function" build --target aarch64-apple-darwin --emit-asm missing
+    "${leaf}" "${preserved}")
 
 # Host identity checks must still reject direct, symbolic and hard-link aliases
 # of the input before the V++ file writer is called.

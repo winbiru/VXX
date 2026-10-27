@@ -1,0 +1,92 @@
+// Portable binary image: VPPVM\0\1\0, counts, UTF-8 strings,
+// [id,name,count,instructions] functions, initializer regions, entry region.
+// Instruction is the existing four little-endian i32 fields.
+hàm vm_read_byte(reader) {
+    nếu (vm_get(4198464, 1) != 0) { trả về -1; };
+    biến position = vm_get(reader, 3);
+    nếu (position == vm_get(reader, 2)) {
+        biến n = máy đọc(vm_get(reader, 0), vm_get(reader, 1), 4096);
+        nếu (n <= 0) { vm_error(10); trả về -1; };
+        vm_set(reader, 2, n); vm_set(reader, 3, 0); position = 0;
+    };
+    vm_set(reader, 3, position + 1);
+    trả về máy đọc byte(vm_get(reader, 1) + position);
+};
+hàm vm_read_i32(reader) {
+    biến result = 0; biến weight = 1;
+    lặp(i = 0; i < 4; i++) { result = result + vm_read_byte(reader) * weight; weight = weight * 256; };
+    trả về result;
+};
+hàm vm_read_code(reader, count) {
+    nếu (count < 0 || count > 1000000) { trả về vm_error(10); };
+    biến code = vm_alloc(4 + count * 16, 0); nếu (code == 0) { trả về 0; };
+    vm_set(code, 0, count);
+    lặp(i = 0; i < count * 4; i++) { nếu (vm_get(4198464, 1) != 0) { thoát; }; vm_set(code, i + 1, vm_read_i32(reader)); };
+    trả về code;
+};
+hàm vm_load(path) {
+    biến fd = tệp mở đọc(path); nếu (fd <= 0) { trả về vm_error(11); };
+    // Extract the descriptor through the existing V++ file table, then use
+    // buffered ASM reads. File ownership remains in the V++ runtime.
+    biến slot = thực thi tệp dữ liệu ô nhớ(fd);
+    biến reader = vm_alloc(16, 1);
+    nếu (reader == 0) { tệp đóng(fd); trả về 0; };
+    vm_set(reader, 0, vm_get(2064 + slot * 16, 1)); vm_set(reader, 1, vm_alloc(4096, 0));
+    biến magic = vm_literal("VPPVM");
+    lặp(i = 0; i < 5; i++) { nếu (vm_read_byte(reader) != máy đọc byte(vm_get(magic, 2) + i)) { vm_error(10); }; };
+    nếu (vm_read_byte(reader) != 0) { vm_error(10); };
+    nếu (vm_read_byte(reader) != 1) { vm_error(10); };
+    nếu (vm_read_byte(reader) != 0) { vm_error(10); };
+    biến strings = vm_read_i32(reader); biến functions = vm_read_i32(reader);
+    biến initializers = vm_read_i32(reader); biến entry = vm_read_i32(reader);
+    nếu (strings < 0 || strings > 1000000 || functions < 0 || functions > 100000 || initializers < 0 || initializers > 100000) { vm_error(10); };
+    biến state = vm_alloc(64, 1); nếu (state == 0) { tệp đóng(fd); trả về 0; };
+    vm_set(state, 0, vm_vector(4)); vm_set(state, 1, vm_vector(4)); vm_set(state, 2, vm_vector(4));
+    vm_set(state, 4, vm_vector(5)); vm_set(state, 5, vm_vector(5)); vm_set(state, 6, vm_vector(4)); vm_set(state, 8, vm_vector(4));
+    // Slot 10: lazy host-name cache, indexed by immutable StringPool index.
+    // Use scan=0: values are primitive IDs, never managed heap references.
+    // 0 = unresolved; 1 = unknown; ID + 2 = resolved host primitive.
+    vm_set(state, 10, vm_alloc((strings + 1) * 4, 0));
+    nếu (vm_get(4198464, 1) == 0) {
+        lặp(i = 0; i < strings; i++) {
+            biến n = vm_read_i32(reader); biến s = vm_string(n); nếu (s == 0) { thoát; };
+            lặp(j = 0; j < n; j++) { nếu (vm_get(4198464, 1) != 0) { thoát; }; máy ghi byte(vm_get(s, 2) + j, vm_read_byte(reader)); };
+            vm_append(vm_get(state, 0), s);
+        };
+        lặp(i = 0; i < functions; i++) {
+            biến id = vm_read_i32(reader); biến name = vm_read_i32(reader); biến count = vm_read_i32(reader);
+            nếu (id != i || name < -1 || name >= strings) { vm_error(10); thoát; };
+            biến fn = vm_alloc(16, 1); nếu (fn == 0) { thoát; };
+            vm_set(fn, 0, name); biến code = vm_read_code(reader, count); vm_set(fn, 1, code);
+            biến required = 0; biến maximum = 0;
+            nếu (code != 0) {
+                lặp(j = 0; j < count; j++) {
+                    biến op = vm_get(code, 1 + j * 4);
+                    nếu (op == 69 || op == 87) {
+                        biến arg = vm_get(code, 4 + j * 4);
+                        nếu (arg >= 0) { nếu (arg + 1 > maximum) { maximum = arg + 1; }; nếu (op == 69) { required = required + 1; }; };
+                    };
+                };
+            };
+            vm_set(fn, 2, required); vm_set(fn, 3, maximum); vm_append(vm_get(state, 1), fn);
+        };
+        lặp(i = 0; i < initializers; i++) { vm_append(vm_get(state, 2), vm_read_code(reader, vm_read_i32(reader))); };
+        vm_set(state, 3, vm_read_code(reader, entry));
+        // Trailing bytes are rejected; there is one unambiguous image per wire.
+        nếu (vm_get(reader, 3) != vm_get(reader, 2)) { vm_error(10); }
+        hoặc { nếu (máy đọc(vm_get(reader, 0), vm_get(reader, 1), 1) != 0) { vm_error(10); }; };
+    };
+    tệp đóng(fd); trả về state;
+};
+hàm vm_pool(state, index) {
+    nếu (index < 0 || index >= vm_get(vm_get(state, 0), 1)) { trả về vm_error(12); };
+    trả về vm_at(vm_get(state, 0), index);
+};
+hàm vm_find_function(state, name) {
+    biến functions = vm_get(state, 1);
+    lặp(i = 0; i < vm_get(functions, 1); i++) {
+        biến fn = vm_at(functions, i);
+        nếu (vm_get(fn, 0) >= 0) { nếu (vm_equal(vm_pool(state, vm_get(fn, 0)), name) == 1) { trả về i; }; };
+    };
+    trả về -1;
+};

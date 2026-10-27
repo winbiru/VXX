@@ -1,0 +1,32 @@
+foreach(required IN ITEMS VPP_VM VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
+    if (NOT DEFINED ${required})
+        message(FATAL_ERROR "VM ASM selfhost missing ${required}")
+    endif()
+endforeach()
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
+set(source "${VPP_ROOT}/gói/biên dịch/dòng lệnh VM.vi")
+set(seed "${VPP_OUTPUT_DIR}/compiler-stage1.vmb")
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${source}" -o "${seed}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "Compiler VM seed failed: ${status}\n${output}\n${errors}")
+endif()
+foreach(stage IN ITEMS 2 3)
+    set(next "${VPP_OUTPUT_DIR}/compiler-stage${stage}.vmb")
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "VPP_HOME=${VPP_ROOT}"
+        "${VPP_VM}" "${seed}" build "${source}" -o "${next}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "ASM VM compiler Stage ${stage} failed: ${status}\n${output}\n${errors}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E compare_files "${seed}" "${next}"
+        RESULT_VARIABLE differs)
+    if (NOT differs STREQUAL "0")
+        message(FATAL_ERROR "ASM VM compiler image changed at Stage ${stage}")
+    endif()
+    set(seed "${next}")
+endforeach()
+file(SHA256 "${seed}" digest)
+file(WRITE "${VPP_OUTPUT_DIR}/verification.json"
+    "{\n  \"compiler\": \"V++ bytecode on V++/ASM VM\",\n  \"stage2_stage3_equal\": true,\n  \"sha256\": \"${digest}\"\n}\n")
+message(STATUS "V++/ASM compiler Stage 1 -> 2 -> 3 converged: ${digest}")

@@ -161,3 +161,32 @@ if (NOT cpp_intrinsic_opcodes STREQUAL aot_intrinsic_opcodes)
     message(FATAL_ERROR "V++ native AOT intrinsic opcode table differs from C++ ABI")
 endif()
 message(STATUS "V++ native AOT recognizes all intrinsic opcodes")
+
+# The standalone interpreter calls ASM directly and owns its own host policy.
+# Check its closed arity table against the same stable instruction ABI.
+file(STRINGS "${VPP_ROOT}/gói/máy ảo/host ABI.vi" vm_host_rows
+    REGEX "// OP_" ENCODING UTF-8)
+set(vm_host_count 0)
+foreach(row IN LISTS vm_host_rows)
+    if (NOT row MATCHES "op == ([0-9]+).*trả về ([0-9]+).*// (OP_[A-Za-z0-9_]+)")
+        message(FATAL_ERROR "Malformed ASM VM host ABI row: ${row}")
+    endif()
+    set(number "${CMAKE_MATCH_1}")
+    set(arity "${CMAKE_MATCH_2}")
+    set(opcode "${CMAKE_MATCH_3}")
+    if (NOT DEFINED "cpp_intrinsic_by_opcode_${opcode}" OR
+        NOT number STREQUAL "${cpp_${opcode}}" OR
+        NOT "${cpp_intrinsic_by_opcode_${opcode}}" MATCHES "^${arity}[|]")
+        message(FATAL_ERROR "ASM VM host ABI mismatch: ${opcode}")
+    endif()
+    if (DEFINED "vm_host_${opcode}")
+        message(FATAL_ERROR "Duplicate ASM VM host ABI: ${opcode}")
+    endif()
+    set("vm_host_${opcode}" TRUE)
+    math(EXPR vm_host_count "${vm_host_count} + 1")
+endforeach()
+list(LENGTH cpp_intrinsic_opcodes native_intrinsic_count)
+if (NOT vm_host_count EQUAL native_intrinsic_count)
+    message(FATAL_ERROR "ASM VM host ABI count mismatch")
+endif()
+message(STATUS "V++ ASM VM host ABI: all ${vm_host_count} arities agree")

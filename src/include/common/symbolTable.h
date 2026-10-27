@@ -8,6 +8,8 @@
 
 namespace vietvm::compiler {
 
+    // Obsolete symbol table API disabled with src/compiler/support/symbolTable.cpp.
+#if 0
     // Quản lý ký hiệu bảng; lớp đóng gói bảng tra cứu và các thao tác thêm/đọc/xóa để duy trì trạng thái nhất quán.
     class symbolTable {
     public:
@@ -19,4 +21,5 @@ namespace vietvm::compiler {
     private:
         std::unordered_map<std::string,int> table_;
     };
+#endif
 } // namespace vietvm::Compiler

@@ -81,15 +81,26 @@ else()
 endif()
 if (NOT VPP_USE_PREPARED_COMPILER)
     file(REMOVE "${compiler}")
-    message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
-    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    if (DEFINED VPP_SEED AND NOT "${VPP_SEED}" STREQUAL "")
+        if (NOT EXISTS "${VPP_SEED}")
+            message(FATAL_ERROR "Native V++ seed not found: ${VPP_SEED}")
+        endif()
+        message(STATUS "Native V++ seed -> Stage 1 (direct ASM runtime)")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+            "${VPP_SEED}" build "${module_entry}" -o "${compiler}"
+            WORKING_DIRECTORY "${VPP_ROOT}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+    else()
+        message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "VPP_ENABLE_MACHINE_JIT=1"
         "VPP_NATIVE_STAGE0_PROFILE=1"
         "VPP_NATIVE_PROFILE=1"
         "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
         "${source}" "${compiler}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+    endif()
     if (NOT status EQUAL 0 OR NOT EXISTS "${compiler}")
         message(FATAL_ERROR "native compiler Stage 1 build failed: ${status}\n${output}\n${errors}")
     endif()

@@ -1,0 +1,24 @@
+lớp Bộ Đếm VM {
+    hàm công khai khởi tạo(n) { mình.n = n; };
+    hàm công khai tăng() { mình.n = mình.n + 1; trả về mình.n; };
+};
+hàm tạo bộ đếm VM(n) { trả về hàm() { n += 1; trả về n; }; };
+hàm phát lỗi VM() { ném "ngoại lệ VM"; };
+hàm chính() {
+    in -2147483648;
+    in 2147483647 + 1;
+    in -7 % 3;
+    in 1.25 + 2.5;
+    in 3.0;
+    in "Tiếng Việt"[1];
+    ds = [1, 2, 3]; ds[1] = 9; in ds;
+    m = {"a": 7}; m["b"] = ds; in m["a"] + m["b"][1];
+    f = tạo bộ đếm VM(40); in f(); in f();
+    đối tượng = Bộ Đếm VM(8); in đối tượng.tăng();
+    tổng = 0;
+    lặp(i = 0; i < 10; i++) { nếu (i == 3) { bỏ qua; }; nếu (i == 8) { thoát; }; tổng += i; };
+    in tổng;
+    chọn(tổng) { ca 25: { in "switch"; } mặc định: { in "sai"; } };
+    thử { phát lỗi VM(); } bắt lỗi(e) { in e; };
+    in "ASM VM OK";
+};

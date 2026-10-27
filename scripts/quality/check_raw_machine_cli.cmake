@@ -26,8 +26,10 @@ foreach(out_of_range IN ITEMS "2147483648" "-2147483649" "-9223372036854775809")
         COMMAND "${VPP_EXEC}" chạy "${VPP_OUTPUT_DIR}/out_of_range.vi"
         RESULT_VARIABLE overflow_result ERROR_VARIABLE overflow_error
         OUTPUT_VARIABLE overflow_output)
+    # Native V++ reports a failed i32 conversion, while Stage 0 includes
+    # the literal-specific overflow diagnostic. Both must reject the input.
     if (overflow_result EQUAL 0 OR
-        NOT overflow_error MATCHES "Số nguyên vượt phạm vi i32")
+        NOT overflow_error MATCHES "Số nguyên vượt phạm vi i32|thành số nguyên: giá trị không thể chuyển đổi")
         message(FATAL_ERROR "integer literal overflow not rejected (${out_of_range}): ${overflow_error}; ${overflow_output}")
     endif()
 endforeach()

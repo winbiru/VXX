@@ -43,10 +43,10 @@ lớp công khai Bộ Tách Từ Vựng {
 
     hàm riêng tư biên dịch từ vựng trắng(c) {
         // Chuỗi escape \v / \f không được V++ diễn giải thành ký tự điều khiển:
-        // dùng code point để tránh nuốt nhầm chữ 'v' và 'f' của định danh.
+        // Hai byte ASCII 11 và 12 nằm giữa LF (10) và CR (13).
+        // So sánh chuỗi UTF-8 trực tiếp, tránh giải mã Unicode ở mỗi ký tự.
         nếu (c == " " || c == "\n" || c == "\r" || c == "\t") { trả về đúng; };
-        mã = mã điểm unicode(c);
-        trả về mã == 11 || mã == 12;
+        trả về c > "\n" && c < "\r";
     };
 
     hàm riêng tư biên dịch từ vựng ngăn cách(c) {
@@ -65,8 +65,8 @@ lớp công khai Bộ Tách Từ Vựng {
 
     hàm riêng tư biên dịch từ vựng chữ số(c) {
         nếu (c == "") { trả về sai; };
-        mã = mã điểm unicode(c);
-        trả về mã >= 48 && mã <= 57;
+        // Cả UTF-8 của ký tự phi ASCII đều nằm ngoài khoảng byte '0'..'9'.
+        trả về c >= "0" && c <= "9";
     };
 
     hàm riêng tư biên dịch từ vựng số(s) {

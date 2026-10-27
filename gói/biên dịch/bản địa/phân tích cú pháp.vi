@@ -308,6 +308,12 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sha nạp") == 1) { trả về 59; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy sha kết") == 1) { trả về 60; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy báo cáo bộ nhớ đệm") == 1) { trả về 61; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực từ nguyên") == 1) { trả về 62; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực phép") == 1) { trả về 63; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực so sánh") == 1) { trả về 64; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực sang nguyên") == 1) { trả về 65; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực đọc") == 1) { trả về 66; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực văn bản") == 1) { trả về 67; };
     trả về -1;
 };
 
@@ -374,6 +380,12 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 59) { trả về 2; };
     nếu (mã định danh == 60) { trả về 1; };
     nếu (mã định danh == 61) { trả về 0; };
+    nếu (mã định danh == 62) { trả về 2; };
+    nếu (mã định danh == 63) { trả về 3; };
+    nếu (mã định danh == 64) { trả về 2; };
+    nếu (mã định danh == 65) { trả về 1; };
+    nếu (mã định danh == 66) { trả về 2; };
+    nếu (mã định danh == 67) { trả về 2; };
     trả về -1;
 };
 
@@ -524,7 +536,7 @@ hàm phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái n�
     trả về 0;
 };
 
-hàm phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+hàm phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
     nếu (phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
     lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
         biến mã phép toán = 0;
@@ -533,6 +545,39 @@ hàm phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái
         nếu (mã phép toán == 0) { thoát; };
         nếu (phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
         nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+// IR 28/29 preserve a normalized left value on the taken edge, and
+// consume it on the fallthrough edge. RHS produces the one merged value.
+hàm phân tích luận lý và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp(i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "&&") != 1) { thoát; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        biến branch = byte dài(biểu diễn trung gian);
+        nếu (phân tích phát(biểu diễn trung gian, 28, 0) != 0) { trả về -1; };
+        nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, branch + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+hàm phân tích biểu thức(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích luận lý và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp(i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "||") != 1) { thoát; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        biến branch = byte dài(biểu diễn trung gian);
+        nếu (phân tích phát(biểu diễn trung gian, 29, 0) != 0) { trả về -1; };
+        nếu (phân tích luận lý và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
+        nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, branch + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
     };
     trả về 0;
 };

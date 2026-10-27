@@ -243,7 +243,7 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
                 nếu (mã trạng thái != 0) { thoát; };
                 mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại - đang chờ + j);
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 137); };
-                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); };
+                nếu (mã trạng thái == 0) { biến jump = 132; nếu (mã phép toán == 29) { jump = 133; }; mã trạng thái = sinh mã x86 byte(mã máy, jump); };
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 36); };
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, (j - 6) * 8); };
             };
@@ -259,13 +259,13 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 lưu(mã máy, 0, các ô nhớ + độ sâu hiện tại - 1); };
             đang chờ = -1;
         }
-        hoặc nếu (mã phép toán == 9) {
+        hoặc nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {
             độ sâu hiện tại = độ sâu hiện tại - 1;
             mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 133); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 192); }; // test eax,eax
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 15); };
-            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); }; // je rel32
+            nếu (mã trạng thái == 0) { biến jump = 132; nếu (mã phép toán == 29) { jump = 133; }; mã trạng thái = sinh mã x86 byte(mã máy, jump); }; // je rel32
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(fixups, byte dài(mã máy)); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(fixups, đối số); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, 0); };

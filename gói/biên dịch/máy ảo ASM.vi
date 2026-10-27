@@ -1,0 +1,105 @@
+// Portable VM image backend. Compilation, validation and serialization are
+// V++; the resulting image runs on the standalone V++/ASM interpreter.
+nhập gói/biên dịch/sản phẩm biên dịch;
+nhập gói/nhập xuất/tệp;
+nhập gói/nhập xuất/tệp thô;
+
+hàm riêng tư biên dịch VM i32(bytes, value) {
+    // Phần lớn field opcode/slot là số không âm. Tránh bốn lượt nhánh
+    // và vòng lặp cho từng i32 trong ảnh compiler nhiều trăm KiB.
+    nếu (value >= 0) {
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        trả về;
+    };
+    // Division is truncating: normalize each remainder for negative i32.
+    lặp(i = 0; i < 4; i++) {
+        byte = value % 256;
+        nếu (byte < 0) { byte += 256; };
+        máy ảo thêm cuối danh sách(bytes, byte);
+        value = (value - byte) / 256;
+    };
+};
+
+hàm riêng tư biên dịch VM vùng(bytes, code) {
+    lặp(i = 0; i < độ dài(code); i++) {
+        lặp(j = 0; j < 4; j++) { biên dịch VM i32(bytes, code[i][j]); };
+    };
+};
+
+hàm công khai biên dịch VM mã hóa(dây) {
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
+    codec.kiểm tra dây(dây, "bytecode V++ đồ thị đã liên kết");
+    nếu (độ dài(dây) == 5) {
+        nếu (độ dài(dây[4]) > 0) { ném "VM ASM: descriptor FFI chưa có primitive ASM tương ứng"; };
+    };
+    bytes = [86, 80, 80, 86, 77, 0, 1, 0];
+    biên dịch VM i32(bytes, độ dài(dây[1]));
+    biên dịch VM i32(bytes, độ dài(dây[2]));
+    biên dịch VM i32(bytes, độ dài(dây[3]));
+    biên dịch VM i32(bytes, độ dài(dây[0]));
+    lặp(i = 0; i < độ dài(dây[1]); i++) {
+        encoded = chuỗi thành byte máy ảo(dây[1][i]);
+        biên dịch VM i32(bytes, độ dài(encoded));
+        lặp(j = 0; j < độ dài(encoded); j++) { máy ảo thêm cuối danh sách(bytes, encoded[j]); };
+    };
+    lặp(i = 0; i < độ dài(dây[2]); i++) {
+        function = dây[2][i];
+        biên dịch VM i32(bytes, function[0]); biên dịch VM i32(bytes, function[1]);
+        biên dịch VM i32(bytes, độ dài(function[2])); biên dịch VM vùng(bytes, function[2]);
+    };
+    lặp(i = 0; i < độ dài(dây[3]); i++) {
+        code = dây[3][i][1]; biên dịch VM i32(bytes, độ dài(code)); biên dịch VM vùng(bytes, code);
+    };
+    biên dịch VM vùng(bytes, dây[0]);
+    trả về bytes;
+};
+
+hàm công khai biên dịch VM ghi(dây, đường) {
+    bytes = biên dịch VM mã hóa(dây);
+    // Ảnh lớn được ghi theo khối tối đa 65536 byte trực tiếp qua primitive
+    // tệp thô V++/ASM. Tránh hai lượt quét xác thực và một lần sao chép
+    // từng byte qua Bộ Đệm Tệp (bản mã hóa đã tạo byte hợp lệ 0..255).
+    tệp = tệp thô mở(đường, 1);
+    nếu (tệp == rỗng) { ném "VM ASM: không mở được tệp ảnh"; };
+    thử {
+        vị trí = 0;
+        tổng = máy ảo lấy độ dài(bytes);
+        khi (vị trí < tổng) {
+            n = tổng - vị trí;
+            nếu (n > 65536) { n = 65536; };
+            khối = [];
+            lặp(i = 0; i < n; i++) {
+                máy ảo thêm cuối danh sách(khối, bytes[vị trí + i]);
+            };
+            đã ghi = 0;
+            khi (đã ghi < n) {
+                phần = khối;
+                nếu (đã ghi > 0) {
+                    phần = [];
+                    lặp(i = đã ghi; i < n; i++) {
+                        máy ảo thêm cuối danh sách(phần, khối[i]);
+                    };
+                };
+                // Các byte do biên dịch VM mã hóa tạo ra đã thuộc 0..255;
+                // primitive máy tệp ghi kiểm tra kiểu, giới hạn và nội dung.
+                // Tránh lớp tệp thô kiểm tra đệm quét lại 65536 phần tử.
+                ghi = máy tệp ghi(tệp, phần, máy ảo lấy độ dài(phần));
+                nếu (ghi < 0 && tệp thô mã lỗi() == tệp thô lỗi gián đoạn()) { bỏ qua; };
+                nếu (ghi <= 0) { ném "VM ASM: ghi tệp ảnh thất bại"; };
+                đã ghi += ghi;
+            };
+            vị trí += n;
+        };
+    } bắt lỗi(e) {
+        tệp thô đóng(tệp);
+        ném e;
+    };
+    nếu (tệp thô đóng(tệp) != 0) { ném "VM ASM: đóng tệp ảnh thất bại"; };
+    trả về "";
+};

@@ -8,6 +8,9 @@
 
 namespace vietvm::compiler {
 
+// Legacy postfix/parser helpers have no callers since the AST/IR migration.
+// Keep their implementation for reference, but exclude them from the build.
+#if 0
 // Loại bỏ khoảng trắng ở đầu và cuối chuỗi; hàm tìm biên trái/phải đầu tiên không phải whitespace rồi trả lát cắt tương ứng.
 std::string trim(const std::string &s) {
     return vietvm::core::trim(s);
@@ -29,6 +32,7 @@ bool isIdentifierLikeToken(const std::string &token) {
     if (token == "đúng" || token == "sai" || token == "rỗng") return false;
     return isVariable(token);
 }
+#endif
 
 // Kiểm tra điều kiện của `isCallableNamePiece`.
 bool isCallableNamePiece(const std::string &token) {
@@ -43,6 +47,8 @@ bool isCallableNamePiece(const std::string &token) {
     return true;
 }
 
+// These shunting-yard-era parsing helpers have no in-tree callers.
+#if 0
 // Tách top level fields; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
 std::vector<std::string> splitTopLevelFields(const std::string &text,
                                              char delimiter) {
@@ -148,5 +154,6 @@ std::string extractAssignedVar(const std::string& expr) {
     std::string left = expr.substr(0, eqPos);
     return trim(left);
 }
+#endif
 
 } // namespace vietvm::Compiler
