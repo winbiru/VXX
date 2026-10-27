@@ -78,8 +78,11 @@ STAGE_STARTED=$SECONDS
 echo '[coverage] Capture gcov counters'
 # LCOV/GCC can enumerate thousands of system headers. Preserve the complete
 # logs in CI artifacts, and print their final diagnostics if either step fails.
+# GCC 15 may report an executed std::variant header line with an unhit inline
+# function; ignore only LCOV's inconsistent hit-count diagnostic during capture.
 lcov --capture --directory "$BUILD_DIR" \
   --rc geninfo_unexecuted_blocks=1 \
+  --ignore-errors inconsistent \
   --output-file "$BUILD_DIR/coverage.raw.info" \
   >"$BUILD_DIR/coverage.capture.log" 2>&1
 report_duration

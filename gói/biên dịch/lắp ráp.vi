@@ -18,6 +18,21 @@ hàm công khai biên dịch lắp ráp nối các phần(phần) {
     trả về phần[0];
 };
 
+// AArch64 ELF requires instruction mapping symbols ($x). Emit machine words
+// with .inst rather than .byte so the assembler does not insert a $d/$x pair
+// around every relocated BL, changing the ELF symbol table and object parity.
+hàm riêng tư biên dịch lắp ráp lệnh aarch64(các byte, vị trí) {
+    nếu (vị trí + 4 > độ dài(các byte)) { ném "assembly AArch64: lệnh không đủ 4 byte"; };
+    chữ số = "0123456789abcdef";
+    mã = "0x";
+    lặp (i = 0; i < 4; i++) {
+        byte = các byte[vị trí + 3 - i];
+        nếu (byte < 0 || byte > 255) { ném "assembly AArch64: byte mã máy không hợp lệ"; };
+        mã += chữ số[byte / 16] + chữ số[byte % 16];
+    };
+    trả về mã;
+};
+
 hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hành, tên, kết quả) {
     nếu (kiến trúc != "x86_64" && kiến trúc != "aarch64") {
         ném "assembly Machine IR chưa hỗ trợ kiến trúc";
@@ -35,6 +50,7 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
     vị trí = 0;
     số byte dòng = 0;
     liên kết trước = -1;
+    lệnh aarch64 elf = kiến trúc == "aarch64" && hệ điều hành != "macos";
     lặp (r = 0; r < độ dài(các liên kết); r++) {
         mục = các liên kết[r];
         vị trí liên kết = mục["offset"];
@@ -48,17 +64,28 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
         };
         liên kết trước = vị trí liên kết;
         khi (vị trí < bắt đầu lệnh gọi) {
-            nếu (số byte dòng == 0) { văn bản += ".byte "; }
-            hoặc { văn bản += ", "; };
-            văn bản += "" + các byte[vị trí];
-            số byte dòng += 1;
-            vị trí += 1;
+            nếu (lệnh aarch64 elf) {
+                nếu (vị trí + 4 > bắt đầu lệnh gọi) { ném "assembly AArch64: mã lệnh không thẳng hàng"; };
+                văn bản += ".inst " + biên dịch lắp ráp lệnh aarch64(các byte, vị trí) + "\n";
+                số byte dòng += 4;
+                vị trí += 4;
+            } hoặc {
+                nếu (số byte dòng == 0) { văn bản += ".byte "; }
+                hoặc { văn bản += ", "; };
+                văn bản += "" + các byte[vị trí];
+                số byte dòng += 1;
+                vị trí += 1;
+            };
             nếu (số byte dòng == 16) {
-                máy ảo thêm cuối danh sách(phần, văn bản + "\n");
+                nếu (!lệnh aarch64 elf) { văn bản += "\n"; };
+                máy ảo thêm cuối danh sách(phần, văn bản);
                 văn bản = ""; số byte dòng = 0;
             };
         };
-        nếu (số byte dòng > 0) { văn bản += "\n"; số byte dòng = 0; };
+        nếu (số byte dòng > 0) {
+            nếu (!lệnh aarch64 elf) { văn bản += "\n"; };
+            số byte dòng = 0;
+        };
         tên gọi = ký hiệu;
         nếu (hệ điều hành == "macos") { tên gọi = "_" + ký hiệu; };
         nếu (kiến trúc == "x86_64") {
@@ -82,17 +109,24 @@ hàm công khai biên dịch lắp ráp mã máy(kiến trúc, hệ điều hàn
         vị trí = vị trí liên kết + 4;
     };
     khi (vị trí < độ dài(các byte)) {
-        nếu (số byte dòng == 0) { văn bản += ".byte "; }
-        hoặc { văn bản += ", "; };
-        văn bản += "" + các byte[vị trí];
-        vị trí += 1;
-        số byte dòng += 1;
+        nếu (lệnh aarch64 elf) {
+            văn bản += ".inst " + biên dịch lắp ráp lệnh aarch64(các byte, vị trí) + "\n";
+            vị trí += 4;
+            số byte dòng += 4;
+        } hoặc {
+            nếu (số byte dòng == 0) { văn bản += ".byte "; }
+            hoặc { văn bản += ", "; };
+            văn bản += "" + các byte[vị trí];
+            vị trí += 1;
+            số byte dòng += 1;
+        };
         nếu (số byte dòng == 16) {
-            máy ảo thêm cuối danh sách(phần, văn bản + "\n");
+            nếu (!lệnh aarch64 elf) { văn bản += "\n"; };
+            máy ảo thêm cuối danh sách(phần, văn bản);
             văn bản = ""; số byte dòng = 0;
         };
     };
-    nếu (số byte dòng > 0) { văn bản += "\n"; };
+    nếu (số byte dòng > 0 && !lệnh aarch64 elf) { văn bản += "\n"; };
     máy ảo thêm cuối danh sách(phần, văn bản);
     trả về biên dịch lắp ráp nối các phần(phần);
 };

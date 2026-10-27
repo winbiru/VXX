@@ -2843,6 +2843,9 @@ void VM::executeVariableOpcode(const Instruction& instr) {
             StackValue top = stack.back(); stack.pop_back();
             const int delta = instr.op == OP_CONG_MOT ? 1 : -1;
             auto pushResult = [&](int value) { stack.push_back(make_int_value(value)); };
+            const auto updatedValue = [delta](int current) {
+                return wrapRuntimeInt32(static_cast<std::int64_t>(current) + delta);
+            };
             if (std::holds_alternative<int>(top)) {
                 const int idOrVal = std::get<int>(top);
                 bool updated = false;
@@ -2851,23 +2854,26 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                     const auto captured = frame.capturedCells.find(idOrVal);
                     if (captured != frame.capturedCells.end() && captured->second != nullptr) {
                         const int current = as_int(captured->second->value, instr.op, pc);
-                        captured->second->value = make_int_value(current + delta);
-                        pushResult(current + delta);
+                        const int next = updatedValue(current);
+                        captured->second->value = make_int_value(next);
+                        pushResult(next);
                         updated = true;
                     }
                     if (!updated && frame.localsIndexed) {
                         if (frame.hasIndexedLocal(idOrVal)) {
                             const int current = as_int(frame.localsVec[idOrVal], instr.op, pc);
-                            frame.localsVec[idOrVal] = make_int_value(current + delta);
-                            pushResult(current + delta);
+                            const int next = updatedValue(current);
+                            frame.localsVec[idOrVal] = make_int_value(next);
+                            pushResult(next);
                             updated = true;
                         }
                     } else if (!updated) {
                         auto itLoc = frame.localsMap.find(idOrVal);
                         if (itLoc != frame.localsMap.end()) {
                             const int current = as_int(itLoc->second, instr.op, pc);
-                            itLoc->second = make_int_value(current + delta);
-                            pushResult(current + delta);
+                            const int next = updatedValue(current);
+                            itLoc->second = make_int_value(next);
+                            pushResult(next);
                             updated = true;
                         }
                     }
@@ -2875,14 +2881,15 @@ void VM::executeVariableOpcode(const Instruction& instr) {
                 if (!updated) {
                     const int current = variables.count(idOrVal)
                         ? as_int(variables[idOrVal], instr.op, pc) : 0;
-                    variables[idOrVal] = make_int_value(current + delta);
-                    pushResult(current + delta);
+                    const int next = updatedValue(current);
+                    variables[idOrVal] = make_int_value(next);
+                    pushResult(next);
                 }
                 return;
             }
             if (instr.op == OP_CONG_MOT && std::holds_alternative<std::string>(top)) {
                 try {
-                    pushResult(std::stoi(std::get<std::string>(top)) + 1);
+                    pushResult(updatedValue(std::stoi(std::get<std::string>(top))));
                     return;
                 } catch (...) {
                     throw runtime_error_op(vietvm::messages::formatMessage(

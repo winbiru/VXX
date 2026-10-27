@@ -80,7 +80,7 @@ if (VPP_CASE STREQUAL "compiler")
     # the V++-generated artifact after its source has been removed.
     file(COPY "${fixtures}/i32.vi" DESTINATION "${VPP_OUTPUT_DIR}")
     set(i32_source "${VPP_OUTPUT_DIR}/i32.vi")
-    set(i32_expected "-2147483648\n2147483647\n1\n-2147483648\n2147483646\n2147483647\n2147483647\n-2147483647\n-2147483648\n-2147483648\n2147483647\n1\n-2147483648\n-2147483648\n")
+    set(i32_expected "-2147483648\n2147483647\n1\n-2147483648\n2147483646\n2147483647\n2147483647\n-2147483647\n-2147483648\n-2147483648\n2147483647\n1\n-2147483648\n-2147483648\n-2147483648\n2147483647\n2147483647\n-2147483648\n")
     vpp_check("${i32_expected}" run --compiler=cpp "${i32_source}")
     vpp_check("${i32_expected}" run --compiler=vpp "${i32_source}")
     set(i32_artifact "${VPP_OUTPUT_DIR}/i32.vbc")

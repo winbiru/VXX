@@ -61,10 +61,11 @@ if (NOT status EQUAL 52)
 endif()
 
 # A failure must preserve an existing executable (no partial publication).
-# Stage 1 already supports division, so use an undefined variable instead.
+# Stage 1 accepts unresolved identifiers as dynamic variables, so require a
+# genuinely malformed expression to exercise its failed-build publication path.
 if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
     file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
-        "hàm chính() { trả về unknown; };\n")
+        "hàm chính() { trả về ( ; };\n")
 else()
     file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
         "hàm main() { trả về 20 / 2; };\n")
