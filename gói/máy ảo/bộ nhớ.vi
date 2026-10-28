@@ -5,7 +5,10 @@
 hàm vm_get(p, i) { trả về máy đọc số nguyên ba mươi hai bit(p + i * 4); };
 hàm vm_set(p, i, v) { trả về máy ghi số nguyên ba mươi hai bit(p + i * 4, v); };
 hàm vm_error(code) {
-    nếu (vm_get(4198464, 1) == 0) { vm_set(4198464, 1, code); };
+    nếu (vm_get(4198464, 1) == 0) {
+        vm_set(4198464, 1, code);
+        vm_set(4198464, 5, vm_get(4198464, 13));
+    };
     trả về 0;
 };
 hàm vm_init() {
@@ -96,6 +99,11 @@ hàm vm_collect(root) {
     vm_set(4198464, 6, epoch);
     vm_set(4198464, 11, 0);
     vm_mark(root, epoch);
+    // Nested V++ providers share the arena, but have independent guest
+    // stacks. Keep both program states and the executable path rooted.
+    vm_mark(vm_get(4198464, 2), epoch);
+    vm_mark(vm_get(4198464, 4), epoch);
+    vm_mark(vm_get(4198464, 10), epoch);
     vm_mark(vm_get(4198464, 3), epoch);
     vm_mark(vm_get(4198464, 7), epoch);
     vm_mark(vm_get(4198464, 17), epoch);

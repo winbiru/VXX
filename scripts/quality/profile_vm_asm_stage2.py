@@ -21,6 +21,7 @@ def main():
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seconds", type=float, default=45)
+    parser.add_argument("--stage", type=int, choices=(2, 3), default=2)
     parser.add_argument("--name", default="current", help="label for profiling artifacts")
     parser.add_argument("--vm", type=Path, default=root / "build/vm-asm-optimized/vpp-vm")
     parser.add_argument("--seed", type=Path, default=root / "build/vm-asm-selfhost/compiler-stage1.vmb")
@@ -32,8 +33,8 @@ def main():
 
     outdir = args.output_dir.resolve()
     outdir.mkdir(parents=True, exist_ok=True)
-    prefix = outdir / f"profile-stage2-{args.name}"
-    target = outdir / f"compiler-stage2-{args.name}.vmb"
+    prefix = outdir / f"profile-stage{args.stage}-{args.name}"
+    target = outdir / f"compiler-stage{args.stage}-{args.name}.vmb"
     command = [str(args.vm.resolve()), str(args.seed.resolve()), "build",
                str(args.source.resolve()), "-o", str(target)]
     env = os.environ.copy()
@@ -53,6 +54,7 @@ def main():
     last = samples[-1] if samples else None
     report = {
         "status": result,
+        "stage": args.stage,
         "seconds": round(time.monotonic() - start, 2),
         "samples": len(samples),
         "guest_instructions_observed": sum(int(row[0]) for row in samples),

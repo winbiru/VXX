@@ -1,6 +1,45 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
-## Kiểm chứng VM process/UID-GID/socket và biên AOT (28/10/2026)
+## Stage 2 → Stage 3 qua VM/ASM đã hội tụ (28/10/2026)
+
+Compiler đầy đủ đã tự biên dịch qua VM V++/ASM thành **Stage 2 và Stage 3**.
+Ảnh Stage 1, Stage 2 và Stage 3 đều dài **857.938 byte** và khớp từng byte:
+
+```text
+8235556272902985abff7be472bbfea7fceab8f4772d8938a944fa0987ff6923
+```
+
+Lượt chạy có profiler trên macOS ARM64: Stage 2 **588,51 giây**, Stage 3
+**605,99 giây**, mỗi bước quan sát 363 triệu guest instruction. Stage 3
+tiếp tục biên dịch một chương trình riêng và VM thực thi kết quả, in
+`STAGE 3 VM OK`. Bằng chứng tại
+`build-ci-regression-fix/vm-asm-selfhost/verification.json`, hai tệp
+`profile-stage{2,3}-bounded-writer.{json,log}` và các ảnh `compiler-stage*.vmb`.
+Đây là lượt kiểm chứng trực tiếp qua profiler và phép so byte; không gọi
+kết quả này là một lượt CTest selfhost đã chạy. CTest tương ứng đã được
+nâng timeout từng stage lên 900 giây và kiểm tra thêm chương trình do Stage 3 tạo.
+
+Sửa chặn bootstrap nằm ở `gói/biên dịch/máy ảo ASM.vi`: bộ ghi hiện tuần tự
+hóa vào khối khoảng 16 KiB thay vì giữ cả ảnh dưới dạng list byte rồi tạo
+list khối thứ hai cùng tồn tại với IR. API mã hóa vào bộ nhớ vẫn còn để
+giữ tương thích. Lỗi `error=1` và ảnh 448 KiB ở các mục cũ là **kết quả
+trước sửa**, không phải trạng thái hiện tại.
+
+VM hiện chạy resolver hostname bằng thư viện DNS/hosts V++, qua ảnh
+`dns-provider.vmb` cùng thư mục executable hoặc `VPP_VM_DNS_PROVIDER`.
+Không gọi libc resolver/C++ callback. HKDF-SHA256, ChaCha20-Poly1305 và
+codec bản ghi TLS đã có mã V++ và vector kiểm thử; handshake/X.509/CA/SNI
+vẫn còn thiếu, nên opcode TLS 206–208 vẫn bị từ chối. Xem `docs/tls-vpp.md`.
+
+Regression: macOS **4/4 PASS (267,45 giây)**; Ubuntu 24.04 linux/amd64
+trong Docker trên engine aarch64 (có lớp mô phỏng CPU) **5/5 PASS
+(381,00 giây)**, gồm native ELF, runtime AOT, CLI bootstrap và VM/ASM.
+Process/socket harness Linux ARM64 cũng đã chạy PASS. Đây chưa phải
+kiểm chứng toàn bộ VM/compiler trên Linux ARM64 hay Windows.
+
+Các mục bên dưới giữ lịch sử các mốc kiểm chứng trước đó.
+
+## Mốc trước: VM process/UID-GID/socket và biên AOT (28/10/2026)
 
 VM độc lập đã có process spawn/pipe/wait, credential u32 và socket
 TCP/UDP IPv4/IPv6 bằng V++/ASM. Native intrinsic mới ID 74 bổ sung

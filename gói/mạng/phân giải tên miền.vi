@@ -283,12 +283,20 @@ lớp công khai Bộ Phân Giải DNS {
 
     // HOSTS và OS không có TTL DNS; rcode=-1 phân biệt nguồn không phải DNS.
     // complete=false khi một trong hai loại A/AAAA gặp lỗi retryable.
-    hàm công khai phân giải tên miền phân giải đầy đủ(tên máy) {
+    hàm công khai phân giải tên miền phân giải đầy đủ(tên máy, tự chủ = sai) {
         tên máy = đầu nối yêu cầu tên máy(tên máy, "dns_phan_giai");
         máy chủ = đọc biến môi trường("VPP_DNS_VI_SERVER", "");
         danh sách cấu hình = đọc biến môi trường("VPP_DNS_VI_SERVERS", "");
         đường cấu hình = đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "");
         đường bảng tên máy = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
+        // Standalone provider: parse hosts/resolv.conf in V++ and use the
+        // existing UDP/TCP wire resolver. Never recurse into Machine Resolver.
+        nếu (tự chủ) {
+            nếu (danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "" && đường bảng tên máy == "") {
+                đường cấu hình = "/etc/resolv.conf";
+            };
+            nếu (đường bảng tên máy == "") { đường bảng tên máy = "/etc/hosts"; };
+        };
         kết quả = [];
         chi tiết = {"status": "NODATA", "addresses": [], "rcode": 0,
                     "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
@@ -320,7 +328,7 @@ lớp công khai Bộ Phân Giải DNS {
                 danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(máy chủ);
                 nếu (máy ảo lấy độ dài(danh sách) != 1) { ném "DNS: VPP_DNS_VI_SERVER phải là một IP"; };
             } hoặc {
-                nếu (ten nền tảng máy ảo() != "linux") {
+                nếu (!tự chủ && ten nền tảng máy ảo() != "linux") {
                     ném "DNS: VPP_DNS_VI_RESOLV_CONF chỉ hỗ trợ Linux";
                 };
                 đầy đủ = cấu hình.phân giải tên miền đọc cấu hình đầy đủ linux(đường cấu hình);

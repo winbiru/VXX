@@ -28,8 +28,16 @@ endif()
 if(runtime_nm)
     execute_process(COMMAND "${runtime_nm}" -g "${executable}"
         RESULT_VARIABLE nm_status OUTPUT_VARIABLE symbols ERROR_VARIABLE nm_errors TIMEOUT 10)
+    set(audited_symbols "${symbols}")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        # glibc's C atexit adapter and ELF crt finalization use these two
+        # versioned imports even for a plain C executable. Keep every other
+        # __cxa_* symbol (and any locally defined one) in the rejection gate.
+        string(REGEX REPLACE "[ \t]+[Uw][ \t]+__cxa_(atexit|finalize)@GLIBC_[0-9.]+[ \t]*([\r\n]|$)" "\\2"
+            audited_symbols "${audited_symbols}")
+    endif()
     if(NOT nm_status STREQUAL "0" OR
-        symbols MATCHES "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vpp_aot_|linkedBytecodeRun|executeVpp")
+        audited_symbols MATCHES "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vpp_aot_|linkedBytecodeRun|executeVpp")
         message(FATAL_ERROR "V++ native AOT linked C++/Stage 0 symbols: ${nm_status}\n${symbols}\n${nm_errors}")
     endif()
 else()

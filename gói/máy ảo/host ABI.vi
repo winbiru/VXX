@@ -117,6 +117,7 @@ hàm vm_file_fd(token) {
     trả về vm_get(2064 + slot * 16, 1);
 };
 hàm vm_host(state, op, args) {
+    vm_set(4198464, 13, op);
     biến n = vm_get(args, 1);
     nếu (n != vm_host_arity(op)) { trả về vm_error(21); };
     biến a = 0; biến b = 0; biến c = 0; biến d = 0;
@@ -232,19 +233,16 @@ hàm vm_host(state, op, args) {
         trả về vm_int(máy chia số nguyên ba mươi hai bit(mode, 4096));
     };
     nếu (op >= 185 && op <= 192) {
-        vm_set(4198464, 5, op);
         trả về vm_socket_host(state, op, a, b, c, d);
     };
     nếu (op >= 193 && op <= 202) {
-        vm_set(4198464, 5, op);
         trả về vm_process_host(state, op, a, b, c, d);
     };
     nếu (op >= 203 && op <= 205) {
         // Preserve the host opcode when the V++ resolver rejects a request.
-        vm_set(4198464, 5, op);
         trả về vm_resolver_host(state, op, a, b, c);
     };
-    vm_set(4198464, 5, op); trả về vm_error(22);
+    trả về vm_error(22);
 };
 
 // Stable Stage 0 opcode numbers; checked with the compiler ABI gate.

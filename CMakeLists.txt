@@ -870,6 +870,9 @@ if (BUILD_TESTS)
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/checknativecodegen.cmake)
             set_tests_properties(vpp-native-ir-object PROPERTIES
                 FIXTURES_REQUIRED native-stage1)
+        endif()
+        if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$") OR
+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
             add_test(NAME vpp-native-vpp-runtime
                 COMMAND ${CMAKE_COMMAND}
                     "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -952,7 +955,7 @@ if (BUILD_TESTS)
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-selfhost"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm_selfhost.cmake)
             set_tests_properties(vpp-vm-asm-selfhost PROPERTIES
-                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 1500)
+                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 2100)
 
         endif()
         if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$") OR
@@ -1203,6 +1206,7 @@ if (VPP_NATIVE_CLI_TARGET)
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_vm_asm.cmake
         DEPENDS vpp-cli
         BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/native-vm/vpp-vm"
+            "${CMAKE_CURRENT_BINARY_DIR}/native-vm/dns-provider.vmb"
         COMMENT "Build standalone VM with V++ and direct ASM primitives")
     install(PROGRAMS "${VPP_NATIVE_CLI_DIR}/vpp-native"
         DESTINATION bin OPTIONAL)

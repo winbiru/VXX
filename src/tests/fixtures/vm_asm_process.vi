@@ -30,8 +30,15 @@ hàm chính() {
     yêu cầu tiến trình(độ dài(r["lỗi"]) > 0);
 
     r = chạy tiến trình("/this-vpp-program-must-not-exist", []);
-    yêu cầu tiến trình(r["khởi chạy"] == sai && r["mã thoát"] == -1);
-    yêu cầu tiến trình(độ dài(r["lỗi"]) > 0);
+    // POSIX permits either a synchronous spawn error or a child exit 127
+    // when exec fails after posix_spawnp has returned successfully.
+    nếu (r["khởi chạy"]) { yêu cầu tiến trình(r["mã thoát"] == 127); }
+    hoặc {
+        yêu cầu tiến trình(r["mã thoát"] == -1);
+        yêu cầu tiến trình(độ dài(r["lỗi"]) > 0);
+    };
+    r = chạy tiến trình("/bin/sh", ["-c", "exit 127"]);
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == 127);
 
     p = máy tiến trình tạo("/bin/sh");
     máy tiến trình đối số(p, "-c");

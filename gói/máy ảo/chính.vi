@@ -21,9 +21,16 @@ hàm chính() {
         biến help = "V++ VM ASM: vpp-vm <program.vmb> [compiler arguments]\n"; byte in(help); byte hủy(help); trả về 2;
     };
     vm_init();
+    biến executable = vm_string(4095);
+    nếu (executable == 0) { trả về 1; };
+    biến executable_length = máy tệp thực thi lấy(vm_get(executable, 2));
+    nếu (executable_length > 0 && executable_length <= 4095) { vm_set(executable, 1, executable_length); }
+    hoặc { executable = vm_literal(đối số lấy(0)); };
+    vm_set(4198464, 10, executable);
     biến probe = "/proc/self/exe"; biến fd = tệp mở đọc(probe); byte hủy(probe);
     nếu (fd > 0) { tệp đóng(fd); vm_set(4198464, 8, 1); };
     biến path = đối số lấy(1); biến state = vm_load(path); byte hủy(path);
+    vm_set(4198464, 2, state);
     nếu (state != 0 && vm_get(4198464, 1) == 0) {
         // Diagnostic switch; disabled by default and independent of the guest.
         biến profile_args = vm_vector(4);
@@ -55,6 +62,10 @@ hàm chính() {
     vm_socket_close_all(state);
     vm_process_close_all(state);
     vm_dir_close_all(state);
+    biến provider = vm_get(4198464, 4);
+    vm_socket_close_all(provider);
+    vm_process_close_all(provider);
+    vm_dir_close_all(provider);
     biến error = vm_get(4198464, 1);
     nếu (error != 0) {
         biến message = vm_concat(vm_literal("V++ VM ASM: error="), vm_integer_text(error));

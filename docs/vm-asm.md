@@ -1,6 +1,53 @@
 # VM và runtime V++ gọi ASM trực tiếp
 
-## Xác nhận process, credential u32, socket, numeric resolver và native AOT (28/10/2026)
+## Trạng thái sau bootstrap đầy đủ và DNS V++ (28/10/2026)
+
+**Stage 1 → Stage 2 → Stage 3 đã khớp từng byte trên VM/ASM macOS ARM64**,
+SHA-256 `8235556272902985abff7be472bbfea7fceab8f4772d8938a944fa0987ff6923`.
+Stage 3 đã sinh và chạy một chương trình riêng. Bộ ghi ảnh dùng khối
+khoảng 16 KiB để tránh giữ toàn bộ list byte đầu ra bên cạnh IR.
+Chi tiết thời gian và artifact ở `docs/compiler-self-hosting-status.md`.
+
+Opcode resolver 203–205 hiện dùng **DNS/hosts bằng V++** cho hostname:
+VM nạp `dns-provider.vmb` bên cạnh executable, hoặc đường dẫn được cấu hình
+qua `VPP_VM_DNS_PROVIDER`. Provider chạy bytecode V++ trên chính interpreter
+V++/ASM, không chạy compiler ngoài, không gọi VM C++ hoặc `getaddrinfo`.
+Nó tái sử dụng thư viện DNS UDP/TCP, parser gói tin và cấu hình V++ hiện có.
+Không có cấu hình riêng thì đọc `/etc/hosts` và `/etc/resolv.conf` bằng V++.
+Các biến `VPP_DNS_VI_*` tiếp tục được hỗ trợ; chưa tích hợp nguồn cấu hình
+DNS riêng của macOS như split DNS qua SystemConfiguration/mDNS.
+
+Provider và chương trình chính có state/stack riêng nhưng dùng chung arena.
+Header slot 2 giữ root chương trình, slot 4 giữ provider, slot 10 giữ đường
+executable; GC đánh dấu cả ba. Địa chỉ trả về được giữ trong bảng resolver
+của caller. Lỗi giao vận OS bên trong provider được chuyển thành ngoại lệ
+guest để thư viện DNS thực hiện retry/failover; lỗi đối số và OOM vẫn fatal.
+Đường thoát đóng tài nguyên của cả hai state.
+
+Build target `vpp-vm-asm` tạo cả executable và ảnh provider. Khi phân phối,
+giữ hai tệp cùng thư mục. Có i32 seed và compiler đầy đủ sẵn thì truyền
+`VPP_NATIVE_I32_SEED` và biến môi trường `VPP_NATIVE_COMPILER` để không
+bootstrap lại compiler đầy đủ qua Stage 0 khi tạo provider.
+
+Kiểm chứng mạng riêng với loopback được cho phép đã PASS DNS A/AAAA,
+TCP fallback với frame chia nhỏ, NXDOMAIN, sai ID/câu hỏi/pointer nén.
+Hosts và root GC được kiểm tra cả trong sandbox không cho phép bind.
+Socket close trả đúng **0** như Machine ABI Stage 0; wrapper V++ trả
+boolean thành công. Trả 1 trước đây làm wrapper DNS thử đóng socket lần hai.
+
+macOS CTest **4/4 PASS, 267,45 giây**; Linux x86-64 CTest **5/5 PASS,
+381,00 giây** trong container linux/amd64 trên Docker engine ARM64.
+Linux chạy thật các syscall process/socket/file/clock/entropy và audit
+AOT bằng `nm`/`readelf`; CPU x86-64 được mô phỏng. Harness process/socket
+Linux ARM64 PASS riêng. Các kết quả trước ghi SKIP/cross-assembly bên dưới
+là lịch sử, không thay thế kết quả mới hoặc kiểm chứng Linux ARM64 đầy đủ.
+
+Mật mã bản ghi TLS và HKDF nay có triển khai V++, xem `docs/tls-vpp.md`.
+**TLS có xác thực CA/hostname/SNI chưa hoàn tất**; 206–208 vẫn fail-closed.
+C++ Stage 0/fallback và thư viện OS vẫn được giữ; không suy ra toàn bộ AOT
+tổng quát đã loại bỏ mọi mã C/C++ từ các fixture này.
+
+## Mốc trước: process, credential u32, numeric resolver và native AOT (28/10/2026)
 
 Lượt CTest `build-ci-regression-fix`, lọc `^vpp-(vm-asm|native-vpp-runtime)$`,
 đạt **4/4 PASS** trong 83,48 giây (tính cả dependency bootstrap Stage 1

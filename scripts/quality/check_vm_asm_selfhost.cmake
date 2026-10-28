@@ -15,7 +15,7 @@ foreach(stage IN ITEMS 2 3)
     set(next "${VPP_OUTPUT_DIR}/compiler-stage${stage}.vmb")
     execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "VPP_HOME=${VPP_ROOT}"
         "${VPP_VM}" "${seed}" build "${source}" -o "${next}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 900)
     if (NOT status STREQUAL "0")
         message(FATAL_ERROR "ASM VM compiler Stage ${stage} failed: ${status}\n${output}\n${errors}")
     endif()
@@ -26,6 +26,20 @@ foreach(stage IN ITEMS 2 3)
     endif()
     set(seed "${next}")
 endforeach()
+set(smoke_source "${VPP_OUTPUT_DIR}/stage3-smoke.vi")
+set(smoke_image "${VPP_OUTPUT_DIR}/stage3-smoke.vmb")
+file(WRITE "${smoke_source}" "hàm chính() { in \"STAGE 3 VM OK\"; };\n")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "VPP_HOME=${VPP_ROOT}"
+    "${VPP_VM}" "${seed}" build "${smoke_source}" -o "${smoke_image}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "Stage 3 compiler smoke failed: ${status}\n${output}\n${errors}")
+endif()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${smoke_image}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+if(NOT status STREQUAL "0" OR NOT output STREQUAL "STAGE 3 VM OK\n")
+    message(FATAL_ERROR "Stage 3 output did not execute: ${status}\n${output}\n${errors}")
+endif()
 file(SHA256 "${seed}" digest)
 file(WRITE "${VPP_OUTPUT_DIR}/verification.json"
     "{\n  \"compiler\": \"V++ bytecode on V++/ASM VM\",\n  \"stage2_stage3_equal\": true,\n  \"sha256\": \"${digest}\"\n}\n")

@@ -1,0 +1,83 @@
+nhập gói/bảo mật/bản ghi TLS;
+nhập gói/bảo mật/khóa TLS;
+nhập gói/bảo mật/mật mã;
+
+hàm tls vector hex(text) {
+    data = chuỗi thành byte máy ảo(text); output = [];
+    lặp(i = 0; i < độ dài(data); i = i + 2) {
+        a = data[i] - 48; b = data[i+1] - 48;
+        nếu (a > 9) { a = data[i] - 87; };
+        nếu (b > 9) { b = data[i+1] - 87; };
+        thêm(output, a * 16 + b);
+    };
+    trả về output;
+};
+hàm tls vector bằng(actual, expected) {
+    hash = Bộ Mật Mã();
+    nếu (hash.mật mã thập lục phân(actual) != expected) { ném "TLS RFC vector mismatch"; };
+};
+hàm chính() {
+    crypto = Mã Bản Ghi TLS VPP(); hkdf = Khóa TLS VPP();
+    key = []; lặp(i = 0; i < 32; i++) { thêm(key, i); };
+    tls vector bằng(crypto.khối(key, tls vector hex("000000090000004a00000000"), 1),
+        "10f1e7e4d13b5915500fdd1fa32071c4c7d1f4c733c068030422aa9ac3d46c4ed2826446079faa0914c2d705d98b02a2b5129cd1de164eb9cbd083e8a2503c4e");
+    tls vector bằng(crypto.poly(tls vector hex("85d6be7857556d337f4452fe42d506a80103808afb0db2fd4abff6af4149f51b"),
+        chuỗi thành byte máy ảo("Cryptographic Forum Research Group")), "a8061dc1305136c6c22b8baf0c0127a9");
+    ikm = []; lặp(i = 0; i < 22; i++) { thêm(ikm, 11); };
+    prk = hkdf.trích(tls vector hex("000102030405060708090a0b0c"), ikm);
+    tls vector bằng(prk, "077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5");
+    tls vector bằng(hkdf.mở rộng(prk, tls vector hex("f0f1f2f3f4f5f6f7f8f9"), 42),
+        "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865");
+    key = []; lặp(i = 128; i < 160; i++) { thêm(key, i); };
+    nonce = tls vector hex("070000004041424344454647");
+    aad = tls vector hex("50515253c0c1c2c3c4c5c6c7");
+    plain = chuỗi thành byte máy ảo("Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.");
+    encrypted = crypto.niêm(key, nonce, plain, aad);
+    tls vector bằng(encrypted[0], "d31a8d34648e60db7b86afbc53ef7ec2a4aded51296e08fea9e2b5a736ee62d63dbea45e8ca9671282fafb69da92728b1a71de0a9e060b2905d6a5b67ecd3b3692ddbd7f2d778b8c9803aee328091b58fab324e4fad675945585808b4831d7bc3ff4def08e4b7a9de576d26586cec64b6116");
+    tls vector bằng(encrypted[1], "1ae10b594f09e26a7e902ecbd0600691");
+    decrypted = crypto.mở(key, nonce, encrypted[0], aad, encrypted[1]);
+    nếu (chuỗi từ byte máy ảo(decrypted) != chuỗi từ byte máy ảo(plain)) { ném "TLS decrypt"; };
+    refused = 0;
+    lặp(i = 0; i < 16; i++) {
+        tag = []; lặp(j = 0; j < 16; j++) { thêm(tag, encrypted[1][j]); };
+        tag[i] = (tag[i] + 1) % 256;
+        thử { crypto.mở(key, nonce, encrypted[0], aad, tag); }
+        bắt lỗi(e) { refused = refused + 1; };
+    };
+    nếu (refused != 16) { ném "TLS accepted modified tag"; };
+    refused = 0;
+    thử { hkdf.mở rộng(prk, [], 8161); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.niêm([], nonce, [], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.niêm(key, [], [], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.niêm(key, nonce, [256], []); } bắt lỗi(e) { refused = refused + 1; };
+    thử { crypto.mở(key, nonce, [], [], []); } bắt lỗi(e) { refused = refused + 1; };
+    nếu (refused != 5) { ném "TLS accepted malformed parameters"; };
+    secret = []; lặp(i = 0; i < 32; i++) { thêm(secret, i); };
+    sender = Bản Ghi TLS VPP(secret, 1); receiver = Bản Ghi TLS VPP(secret, 0);
+    record = sender.niêm(chuỗi thành byte máy ảo("V++ TLS record"), 23, 3);
+    tls vector bằng(record, "1703030022e48540de5339e9c19d08fbabc991591885eba535ea42ec63ceab88fce012b314b26f");
+    decoded = receiver.mở(record);
+    nếu (decoded[0] != 23 || chuỗi từ byte máy ảo(decoded[1]) != "V++ TLS record") { ném "TLS record plaintext"; };
+    second = sender.niêm([], 22);
+    decoded = receiver.mở(second);
+    nếu (decoded[0] != 22 || độ dài(decoded[1]) != 0) { ném "TLS record sequence"; };
+    refused = 0;
+    broken = Bản Ghi TLS VPP(secret, 0);
+    record[độ dài(record)-1] = (record[độ dài(record)-1] + 1) % 256;
+    thử { broken.mở(record); } bắt lỗi(e) { refused = refused + 1; };
+    thử { broken.mở(second); } bắt lỗi(e) { refused = refused + 1; };
+    thử { receiver.niêm([]); } bắt lỗi(e) { refused = refused + 1; };
+    thử { sender.mở(second); } bắt lỗi(e) { refused = refused + 1; };
+    nếu (refused != 4) { ném "TLS record accepted bad authentication/state/direction"; };
+    full = []; lặp(i = 0; i < 32; i++) { thêm(full, 255); };
+    edges = [[0,"ffffffffffffffffffffffffffffffff"], [1,"23feffef23f8ffef23f8ffef23f8ffef"],
+        [15,"fbff27e6030028e6030028e6030028ee"], [16,"fbffff17faffff17faffff17faffff17"],
+        [17,"7cfe7ff768f81f2763f8bf565df85f86"], [31,"5400a8ed4800481d4300e84c3d008884"],
+        [32,"5400801f3f00204f3900c07e330060ae"], [33,"86fa6a437bf4ec24a274504dc37495bc"],
+        [64,"900fe32bc15fa8d7bca8efe4c7e37eb1"]];
+    lặp(i = 0; i < độ dài(edges); i++) {
+        message = []; lặp(j = 0; j < edges[i][0]; j++) { thêm(message, 255); };
+        tls vector bằng(crypto.poly(full, message), edges[i][1]);
+    };
+    in "TLS VPP RFC VECTORS OK";
+};

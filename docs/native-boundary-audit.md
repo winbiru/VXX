@@ -1,6 +1,39 @@
 # Ranh giới thư viện V++ và primitive VM
 
-## Process, credential và socket VM/ASM (28/10/2026)
+## DNS V++, mã hóa bản ghi TLS và bootstrap hội tụ (28/10/2026)
+
+Resolver hostname 203–205 trên standalone VM đã chuyển sang thư viện DNS
+V++: ảnh provider dùng parser, hosts, resolv.conf, UDP và TCP fallback sẵn có.
+ASM chỉ làm socket/file/time/entropy; không thêm `getaddrinfo`, `getnameinfo`,
+libc DNS adapter hay C++ callback. Provider là bytecode V++ chạy trong state
+riêng trên cùng interpreter/arena. Cần phân phối `dns-provider.vmb` cùng
+executable hoặc cấu hình `VPP_VM_DNS_PROVIDER`; GC giữ cả hai state và cleanup
+đóng các tài nguyên còn sống. Chi tiết và kiểm thử ở `docs/vm-asm.md`.
+
+`gói/bảo mật/khóa TLS.vi` thực hiện HMAC byte/HKDF-SHA256/Expand-Label;
+`gói/bảo mật/bản ghi TLS.vi` thực hiện ChaCha20, Poly1305, AEAD và codec
+bản ghi một chiều với sequence/nonce/padding bằng V++. Vector RFC và
+đối chiếu số nguyên lớn Python cho Poly1305 đã PASS qua VM/ASM, bao gồm
+tag bị sửa và trạng thái record đã hỏng. **Chưa có handshake/X.509/CA/SNI**,
+chưa bật provider cho opcode 206–208, chưa thay provider TLS Stage 0/AOT.
+Không coi các primitive này là TLS client hoàn chỉnh; xem `docs/tls-vpp.md`.
+
+Compiler đầy đủ đã chạy Stage 2 rồi Stage 3 trên VM/ASM, cùng hash
+`8235556272902985abff7be472bbfea7fceab8f4772d8938a944fa0987ff6923`.
+Stage 3 tiếp tục tạo được chương trình chạy trên VM; chứng cứ ở
+`docs/compiler-self-hosting-status.md`.
+
+macOS regression **4/4 PASS** và Linux x86-64 Docker **5/5 PASS**. Linux
+runtime AOT đã thực thi và qua `nm -g`/`readelf -d`. Gate chỉ cho phép hai
+import glibc C `__cxa_atexit@GLIBC_*`, `__cxa_finalize@GLIBC_*`: C `atexit`
+và crt ELF cũng dùng chúng. Các `__cxa_*` khác, symbol C++ mangled, Stage 0,
+libstdc++/libc++/libffi vẫn bị từ chối; symbol được định nghĩa không được
+miễn theo hai tên này. libc/libcrypto cho SHA cache của toolchain vẫn có
+thể được liên kết; điều đó không có nghĩa TLS mới gọi OpenSSL để mã hóa.
+
+Các mục bên dưới là lịch sử trước mốc này.
+
+## Mốc trước: process, credential và socket VM/ASM (28/10/2026)
 
 VM độc lập đã nhận UID/EUID/GID/EGID dạng u32 (tag 11 cho giá trị lớn
 hơn INT32_MAX), process spawn/pipe/poll/read/wait/cleanup (193–202) và

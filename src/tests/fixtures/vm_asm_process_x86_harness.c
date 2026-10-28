@@ -159,8 +159,15 @@ int main(void) {
     assert(vpp_native_os_process(4, CONTROL) == 0);
 
     const char *const missing[] = {"/this-vpp-program-must-not-exist", NULL};
-    assert(spawn_process(missing, NULL) == 0);
-    assert(get32(48) == ENOENT);
+    int missing_status = spawn_process(missing, NULL);
+    if (missing_status == 0) {
+        assert(get32(48) == ENOENT);
+    } else {
+        // POSIX also permits failure after the successful parent return.
+        assert(missing_status == 1);
+        drain(out, sizeof out, err, sizeof err);
+        assert(vpp_native_os_process(3, CONTROL) == 127);
+    }
     assert(vpp_native_os_process(4, CONTROL) == 0);
 
     const char *const sleeper[] = {"/bin/sleep", "5", NULL};

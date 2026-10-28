@@ -196,13 +196,21 @@ hàm vm_step(state) {
     nếu (op == 14 || op == 15 || op == 16 || op == 17 || op == 20 || op == 22 || op == 26 || op == 28 || op == 29 || op == 38) { trả về 0; };
     biến arity = vm_host_arity(op);
     nếu (arity >= 0) { vm_append(stack, vm_host(state, op, vm_take(stack, arity))); trả về 0; };
-    vm_set(4198464, 5, op); trả về vm_error(22);
+    vm_set(4198464, 13, op); trả về vm_error(22);
 };
 hàm vm_execute(state) {
     biến steps = 0;
     biến profile_steps = 0;
     khi (vm_get(vm_get(state, 6), 1) > 0 && vm_get(4198464, 1) == 0) {
         vm_step(state); steps = steps + 1;
+        // DNS transport failures are recoverable guest exceptions inside the
+        // V++ provider, so its retry/failover policy can close the socket and
+        // try another server. Keep malformed arguments/OOM fatal, and keep
+        // the main guest's existing machine-error contract unchanged.
+        nếu (vm_get(4198464, 1) == 20 && state == vm_get(4198464, 4)) {
+            vm_set(4198464, 1, 0);
+            vm_throw(state, vm_literal("DNS: OS transport failed"));
+        };
         nếu (vm_get(4198464, 12) == 1) {
             profile_steps = profile_steps + 1;
             nếu (profile_steps >= 250000) {

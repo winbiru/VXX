@@ -9,7 +9,7 @@ hàm chính() {
         yêu cầu ổ cắm(máy đầu nối loại(mã) == 1);
         yêu cầu ổ cắm(máy đầu nối thời gian chờ(mã, 1000) == 1);
         yêu cầu ổ cắm(máy đầu nối gửi(mã, [65, 66, 67], 3, 0) == 3);
-        yêu cầu ổ cắm(máy đầu nối đóng(mã) == 1);
+        yêu cầu ổ cắm(máy đầu nối đóng(mã) == 0);
     };
     in "VM ASM SOCKET GUEST OK";
 };

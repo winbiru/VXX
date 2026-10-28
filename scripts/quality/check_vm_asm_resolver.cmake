@@ -12,10 +12,10 @@ execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${resolve
 if(NOT status STREQUAL "0" OR NOT output STREQUAL "VM ASM RESOLVER OK\n")
     message(FATAL_ERROR "Resolver VM/ASM numeric parity: ${status}\n${output}\n${errors}")
 endif()
-# A hostname still requires the full V++ DNS provider and must fail closed.
+# Invalid hostnames must fail before any DNS transport is attempted.
 # Strict IP syntax prevents ambiguous legacy getaddrinfo abbreviations.
 set(resolver_invalid_cases
-    "máy bộ phân giải mở(\"example.com\", \"443\", 0)"
+    "máy bộ phân giải mở(\"bad..example\", \"443\", 0)"
     "máy bộ phân giải mở(\"127.1\", \"80\", 0)"
     "máy bộ phân giải mở(\"1::2::3\", \"80\", 0)"
     "máy bộ phân giải mở(\"1:2:3:4:5:6:7\", \"80\", 0)"
@@ -55,3 +55,36 @@ foreach(expression IN LISTS resolver_invalid_cases)
     endif()
 endforeach()
 message(STATUS "V++ resolver 203..205: numeric IPv4/IPv6, monotonic tokens, strict invalid input PASS")
+
+set(provider "${VPP_OUTPUT_DIR}/dns-provider.vmb")
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+    "${VPP_ROOT}/gói/máy ảo/nhà cung cấp DNS.vi" -o "${provider}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 180)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "V++ DNS provider compile: ${status}\n${output}\n${errors}")
+endif()
+set(dns_image "${VPP_OUTPUT_DIR}/resolver-dns.vmb")
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+    "${VPP_ROOT}/src/tests/fixtures/vm_asm_resolver_dns.vi" -o "${dns_image}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "DNS resolver guest compile: ${status}\n${output}\n${errors}")
+endif()
+find_program(resolver_python NAMES python3 REQUIRED)
+execute_process(COMMAND "${resolver_python}" "${VPP_ROOT}/scripts/quality/check_vm_dns_provider.py"
+    "${VPP_VM}" "${dns_image}" "${provider}" "${VPP_OUTPUT_DIR}" hosts
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+if(NOT status STREQUAL "0")
+    message(FATAL_ERROR "V++ DNS hosts/GC: ${status}\n${output}\n${errors}")
+endif()
+message(STATUS "${output}")
+execute_process(COMMAND "${resolver_python}" "${VPP_ROOT}/scripts/quality/check_vm_dns_provider.py"
+    "${VPP_VM}" "${dns_image}" "${provider}" "${VPP_OUTPUT_DIR}" wire
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if(status STREQUAL "77")
+    message(STATUS "V++ DNS wire: sandbox bind denied, SKIP (hosts/GC still tested)")
+elseif(NOT status STREQUAL "0")
+    message(FATAL_ERROR "V++ DNS wire: ${status}\n${output}\n${errors}")
+else()
+    message(STATUS "${output}")
+endif()

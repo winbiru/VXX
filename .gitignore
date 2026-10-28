@@ -94,6 +94,7 @@ node_modules/
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
 !docs/vm-asm.md
+!docs/tls-vpp.md
 !docs/stdio-vpp.md
 !docs/native-code-generator-implementation.md
 !docs/compiler-self-hosting-status.md

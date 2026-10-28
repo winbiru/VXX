@@ -98,7 +98,9 @@ hàm vm_socket_host(state, op, a, b, c, d) {
         vm_set(resource, 1, -1);
         biến rc = máy ổ cắm thô(5, ctl);
         nếu (rc < 0) { trả về vm_error(20); };
-        trả về vm_int(1);
+        // Machine ABI returns the POSIX status (0), as Stage 0 does.
+        // The public V++ socket wrapper turns that into boolean success.
+        trả về vm_int(0);
     };
     nếu (op == 187) {
         nếu (vm_tag(b) != 1 || vm_number(b) <= 0 || vm_number(b) > 300000) { trả về vm_error(2); };
