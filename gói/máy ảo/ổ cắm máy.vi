@@ -1,0 +1,162 @@
+// POSIX socket policy for the standalone VM. No host pointers or raw file
+// descriptors escape the V++ resource table; the OS boundary is ASM.
+// Opcode parity: 185..192. Resolver (203..205) and verified TLS (206..208)
+// are deliberately separate providers.
+hàm vm_socket_find(state, value) {
+    nếu (vm_tag(value) != 1 || vm_number(value) < 1073741825) { vm_error(2); trả về 0; };
+    biến table = vm_get(state, 13);
+    nếu (table == 0) { vm_error(2); trả về 0; };
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến r = vm_at(table, i);
+        nếu (r != 0 && vm_get(r, 0) == vm_number(value) && vm_get(r, 3) == 1) { trả về r; };
+    };
+    vm_error(2); trả về 0;
+};
+hàm vm_socket_register(state, fd, kind, ctl) {
+    biến table = vm_get(state, 13);
+    nếu (table == 0) { table = vm_vector(4); nếu (table == 0) { trả về 0; }; vm_set(state, 13, table); };
+    biến token = vm_get(4198464, 31);
+    nếu (token == 0) { token = 1073741824; };
+    nếu (token >= 2147483000) { trả về vm_error(3); };
+    token = token + 1;
+    // Allocate the guest token before publishing ownership of the FD.
+    // Failure must leave the caller responsible for closing it exactly once.
+    biến guest_token = vm_int(token);
+    nếu (guest_token == 0) { trả về 0; };
+    biến resource = vm_alloc(32, 1); nếu (resource == 0) { trả về 0; };
+    vm_set(resource, 0, token); vm_set(resource, 1, fd);
+    // The caller still owns the FD until the table append and token publish
+    // both succeed. Keep provisional entries inactive: otherwise an OOM
+    // during append makes the caller close the FD while shutdown closes it
+    // again, potentially after the OS has reused that descriptor number.
+    vm_set(resource, 2, kind); vm_set(resource, 3, 0);
+    vm_set(resource, 4, ctl); // Retain ASM control as a GC root for shutdown.
+    biến reused = 0;
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến existing = vm_at(table, i);
+        nếu (existing == 0 || vm_get(existing, 3) == 0) {
+            vm_put(table, i, resource); reused = 1; thoát;
+        };
+    };
+    nếu (reused == 0) { vm_append(table, resource); };
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(4198464, 31, token);
+    vm_set(resource, 3, 1);
+    trả về guest_token;
+};
+hàm vm_socket_control(fd) {
+    biến ctl = vm_alloc(128, 0);
+    nếu (ctl == 0) { trả về 0; };
+    vm_set(ctl, 0, fd);
+    trả về ctl;
+};
+hàm vm_socket_open(state, op, a, b, c, d) {
+    biến port = 0; biến timeout = 300000;
+    biến ctl = vm_socket_control(-1); nếu (ctl == 0) { trả về 0; };
+    nếu (op == 192) {
+        nếu (vm_tag(a) != 4 || vm_tag(b) != 1 || vm_tag(c) != 1 || vm_tag(d) != 1) { trả về vm_error(2); };
+        biến size = vm_get(a, 1);
+        nếu (size != 4 && size != 16) { trả về vm_error(2); };
+        port = vm_number(b); timeout = vm_number(d);
+        nếu (port <= 0 || port > 65535 || timeout < 1 || timeout > 300000 ||
+            vm_number(c) < 0 || vm_number(c) > 1) { trả về vm_error(2); };
+        vm_set(ctl, 1, vm_number(c)); vm_set(ctl, 6, size);
+        lặp(i = 0; i < size; i++) {
+            biến v = vm_at(a, i);
+            nếu (vm_tag(v) != 1) { trả về vm_error(2); };
+            biến n = vm_number(v);
+            nếu (n < 0 || n > 255) { trả về vm_error(2); };
+            máy ghi byte(ctl + 32 + i, n);
+        };
+    } hoặc {
+        nếu (vm_tag(a) != 1 || vm_tag(b) != 1) { trả về vm_error(2); };
+        port = vm_number(a);
+        nếu (port <= 0 || port > 65535 || vm_number(b) <= 0 || vm_number(b) > 1024) { trả về vm_error(2); };
+        vm_set(ctl, 5, vm_number(b));
+    };
+    vm_set(ctl, 2, port); vm_set(ctl, 3, timeout);
+    biến operation = 0; nếu (op == 191) { operation = 1; };
+    biến fd = máy ổ cắm thô(operation, ctl);
+    nếu (fd < 0) { trả về vm_error(20); };
+    biến kind = 0;
+    nếu (op == 191) { kind = 3; };
+    nếu (op == 192) { kind = vm_number(c); };
+    biến token = vm_socket_register(state, fd, kind, ctl);
+    nếu (token == 0) { vm_set(ctl, 0, fd); máy ổ cắm thô(5, ctl); };
+    trả về token;
+};
+hàm vm_socket_host(state, op, a, b, c, d) {
+    nếu (op == 191 || op == 192) { trả về vm_socket_open(state, op, a, b, c, d); };
+    biến resource = vm_socket_find(state, a); nếu (resource == 0) { trả về 0; };
+    biến kind = vm_get(resource, 2);
+    nếu (op == 185) { trả về vm_int(kind); };
+    biến ctl = vm_get(resource, 4);
+    nếu (op == 186) {
+        // Invalidate token before closing: a close failure must not allow
+        // accidental reuse of a descriptor that the OS may have recycled.
+        vm_set(resource, 3, 0);
+        vm_set(resource, 1, -1);
+        biến rc = máy ổ cắm thô(5, ctl);
+        nếu (rc < 0) { trả về vm_error(20); };
+        trả về vm_int(1);
+    };
+    nếu (op == 187) {
+        nếu (vm_tag(b) != 1 || vm_number(b) <= 0 || vm_number(b) > 300000) { trả về vm_error(2); };
+        vm_set(ctl, 3, vm_number(b));
+        nếu (máy ổ cắm thô(6, ctl) < 0) { trả về vm_error(20); };
+        trả về vm_int(1);
+    };
+    nếu (op == 190) {
+        nếu (kind != 3) { trả về vm_error(2); };
+        biến accepted_control = vm_socket_control(vm_get(resource, 1));
+        nếu (accepted_control == 0) { trả về 0; };
+        // accept() uses the listener deadline; accepted sockets inherit the
+        // requested send/receive timeout, independently of the listener FD.
+        vm_set(accepted_control, 3, vm_get(ctl, 3));
+        biến fd = máy ổ cắm thô(2, accepted_control);
+        nếu (fd < 0) { trả về vm_error(20); };
+        biến result = vm_socket_register(state, fd, 0, accepted_control);
+        nếu (result == 0) { vm_set(accepted_control, 0, fd); máy ổ cắm thô(5, accepted_control); };
+        trả về result;
+    };
+    nếu (op == 188 || op == 189) {
+        nếu (kind == 3 || vm_tag(b) != 4 || vm_tag(c) != 1 || vm_tag(d) != 1) { trả về vm_error(2); };
+        biến count = vm_number(c);
+        nếu (count < 1 || count > 65536 || vm_get(b, 1) != count || vm_number(d) != 0) { trả về vm_error(2); };
+        nếu (kind == 1 && op == 188 && count > 65507) { trả về vm_error(2); };
+        biến raw = vm_alloc(count, 0); nếu (raw == 0) { trả về 0; };
+        nếu (op == 188) {
+            lặp(i = 0; i < count; i++) {
+                biến v = vm_at(b, i);
+                nếu (vm_tag(v) != 1 || vm_number(v) < 0 || vm_number(v) > 255) { trả về vm_error(2); };
+                máy ghi byte(raw + i, vm_number(v));
+            };
+        };
+        vm_set(ctl, 4, raw); vm_set(ctl, 5, count);
+        biến mode = 3; nếu (op == 189) { mode = 4; };
+        biến got = máy ổ cắm thô(mode, ctl);
+        nếu (got < 0 || got > count) { trả về vm_error(20); };
+        nếu (op == 189) {
+            lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(raw + i))); };
+        };
+        trả về vm_int(got);
+    };
+    trả về vm_error(22);
+};
+hàm vm_socket_close_all(state) {
+    nếu (state == 0) { trả về 0; };
+    biến table = vm_get(state, 13);
+    nếu (table == 0) { trả về 0; };
+    // Always attempt every close. This path is also used after guest errors.
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến resource = vm_at(table, i);
+        nếu (resource != 0 && vm_get(resource, 3) == 1) {
+            biến ctl = vm_get(resource, 4);
+            vm_set(ctl, 0, vm_get(resource, 1));
+            vm_set(resource, 3, 0);
+            vm_set(resource, 1, -1);
+            máy ổ cắm thô(5, ctl);
+        };
+    };
+    trả về 0;
+};

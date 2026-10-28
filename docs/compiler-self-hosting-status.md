@@ -1,5 +1,116 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Kiểm chứng VM process/UID-GID/socket và biên AOT (28/10/2026)
+
+VM độc lập đã có process spawn/pipe/wait, credential u32 và socket
+TCP/UDP IPv4/IPv6 bằng V++/ASM. Native intrinsic mới ID 74 bổ sung
+socket boundary; compiler/object writer cập nhật tổng thành 75 ID.
+Sửa ASM x86-64 căn stack tại lời gọi libc lồng nhau, số AF_INET6 trên
+Darwin và đăng ký token trước/sau cấp phát để không đóng trùng FD.
+
+MacOS ARM64 và x86-64/Rosetta: harness socket và guest VM đã từng **PASS**,
+gồm 40 vòng không rò FD. Ở lượt CTest cuối ngày 28/10,
+`vpp-native-stage1-bootstrap`, `vpp-native-vpp-runtime`,
+`vpp-native-cli-compiler-bootstrap`, `vpp-vm-asm` **4/4 PASS**
+(83,48 giây sau cập nhật resolver). Process harness hai kiến trúc và fixture UTF-8/NUL/env
+không hợp lệ đều PASS; socket guest lỗi đối số/token và TLS fail-closed
+PASS nhưng hai harness socket cần `bind` được **SKIP** do sandbox.
+Lớp đăng ký socket chỉ kích hoạt token sau khi công bố tài nguyên thành
+công, tránh đóng FD lần hai ở cleanup khi cấp phát thất bại.
+Script `check_aot_primitives.sh` cross-assemble socket và tập
+primitive AOT macOS/Linux hai kiến trúc (cùng ABI 0/1) **PASS**.
+Kiểm chứng trên Linux ở mức assembly/object, chưa chạy syscall thật.
+
+Runtime V++/ASM vẫn phụ thuộc OS linker và một số công cụ Stage 0;
+`vpp_aot_runtime.c` được giữ cho fallback khi không chọn
+`VPP_NATIVE_VPP_RUNTIME`. Resolver 203–205 đã có phần địa chỉ IPv4/IPv6
+dạng số, kiểm tra NUL/UTF-8, opcode và vòng đời token; hostname DNS
+và verified TLS 206–208 chưa có provider trên VM độc lập.
+`vm_process_new` chỉ công bố token sau khi đăng ký tài nguyên thành công.
+Kiểm toán fixture native AOT hiện dùng
+`nm -g` cho cả symbol được định nghĩa và `otool -L` trên macOS để phát
+hiện thư viện C++/FFI; trên Linux thiếu `readelf`/`llvm-readelf` là lỗi
+kiểm toán thay vì bỏ qua. Chưa chạy thực tế trên Linux; không suy ra
+mọi executable đều độc lập C++.
+Stage 2→3 **trên VM/ASM** vẫn chưa chứng minh (bootstrap native AOT là
+phép kiểm chứng riêng).
+
+## Bổ sung thư mục và PID/PPID trên VM độc lập (28/10/2026)
+
+Opcode 167/168 và 179..183 nay đi qua policy V++ và ASM trực tiếp,
+gồm tạo/xóa/mở/đọc/đóng thư mục và lấy PID/PPID. ABI `mkdir` được sửa
+về list ba trường và quyền theo umask. Runtime giữ token theo owner,
+đóng tài nguyên còn sống khi thoát/lỗi và kiểm tra bản ghi/UTF-8 bằng V++.
+Compiler i32 thêm hai ABI riêng 71/72; bảng symbol/relocation có 73 mục.
+
+**10/10 CTest liên quan PASS** trên macOS ARM64, cùng kiểm tra parser
+getdents Linux bằng dữ liệu giả lập, ASM bốn tổ hợp CPU/OS và ELF.
+Chi tiết, log và giới hạn thực thi Linux ở `docs/vm-asm.md`.
+Đây là trạng thái tại mốc kiểm chứng thư mục trước khi bổ sung process,
+credential u32 và socket. Stage 2/3 qua VM/ASM vẫn chưa được xác nhận.
+
+## Bổ sung host hệ thống thuần V++/ASM (28/10/2026)
+
+VM độc lập đã nhận opcode ngủ, đồng hồ đơn điệu, UTC và entropy (173..176)
+qua policy V++ và primitive ASM trực tiếp. Trước thay đổi, fixture hệ thống
+dừng ở `error=22 opcode=174`; cùng fixture nay chạy được với `PATH` rỗng.
+Lượt CTest liên quan đạt **7/7 PASS**, gồm đối chiếu VM C++, đối số sai,
+GC, bounds và native bootstrap. ABI riêng của compiler i32 thêm ba mục
+68..70; opcode/ảnh guest không đổi. Chi tiết ở `docs/vm-asm.md`.
+
+Đây là mở rộng chức năng VM, chưa phải kết quả tự biên dịch compiler
+Stage 2/3 và chưa thay toàn bộ runtime AOT C++.
+
+## Sửa bootstrap x86-64 và kiểm thử CI (28/10/2026)
+
+Lỗi `biên dịch ngữ nghĩa: trùng khai báo 'jump'` khi dựng Stage 1
+trên Linux x86-64 xuất phát từ nhánh phát đối số stack của opcode CALL.
+Đoạn này phải ghi ModR/M `0x84` cho `mov [rsp+disp32], eax`; logic chọn
+JE/JNE chỉ thuộc nhánh nhảy điều kiện. Khôi phục byte MOV cũng loại bỏ
+khai báo `jump` thừa, giữ nguyên kiểm tra khai báo trùng của frontend.
+
+Harness ELF x86-64 kiểm tra cả hai lần ghi đối số thứ 7 và 8 lên stack,
+với displacement 0 và 8, trên mọi host. Trên Linux x86-64, ca kiểm thử
+tiếp tục liên kết và thực thi lời gọi tám tham số qua relocation PLT32.
+Trên macOS ARM64, harness kiểm tra byte và cấu trúc ELF, không thực thi
+mã máy x86-64.
+
+Các mô-đun và fixture dùng helper từ điển, chuyển kiểu, mã máy nền và
+toán học phải nhập trực tiếp mô-đun sở hữu helper. Không dựa vào import
+gián tiếp tình cờ có trong namespace của Stage 0. Kiểm thử bảo toàn tệp
+đầu ra khi build thất bại dùng biểu thức sai cú pháp cho cả Stage 0 và
+Stage 1; phép chia không còn là ví dụ cú pháp chưa được hỗ trợ.
+Parser lời gọi tường minh dùng cùng quy tắc tên với khai báo hàm,
+cho phép `gọi in lời chào();`; fixture hiện có cho kết quả `5`,
+`xin chào`, `6` đúng như Stage 0. Các fixture REST dùng đường dẫn
+hiện tại `gói/mạng/http/dịch vụ tài nguyên`.
+
+Kiểm chứng tại `build-ci-regression-fix/` trên macOS ARM64, Release:
+
+- `vpp-native-stage1-bootstrap` và `vpp-native-elf-x86-writer`: **2/2 PASS**.
+- Harness ELF qua đường Stage 0 không dùng compiler Stage 1: **PASS**;
+  trước sửa tái hiện đúng lỗi `jump` trong log Linux.
+- `checknativeprogram.cmake` qua Stage 0 và Stage 1: **PASS**, gồm 128
+  đối số, lỗi cú pháp và bảo toàn executable đã có.
+- DNS hosts integration, raw machine V++ parity và quantum bridge:
+  **PASS**; các ca Qiskit tùy chọn bỏ qua khi chưa cài SDK.
+- Lượt CTest cuối: **11/11 PASS**, 143,11 giây, gồm cả bootstrap CLI,
+  AST/IR, OOP và library visibility. Log ở
+  `build-ci-regression-fix/validation.log`; `git diff --check` sạch.
+
+Lượt integration mở rộng chưa PASS: sau khi HTTP fixture khởi động
+được, còn gặp `thread_vm_spawn` chưa được AOT hỗ trợ, lỗi arity của
+thư viện nhật ký và một số phụ thuộc chưa được nhập trực tiếp. Kết
+quả quan sát trước khi dừng lượt chạy nằm tại
+`build-ci-regression-fix/integration-observations/partial-run.json`;
+đây không phải kết quả của toàn bộ suite.
+
+Stage 2/3 qua VM/ASM vẫn chưa được xác nhận. Lượt đo trước đó ở
+`build/vm-asm-optimized/profile-stage2-direct-write.json` kết thúc
+với `exit:1` sau 564,38 giây và VM báo `error=1`. Tệp Stage 2 mới
+ghi được 448 KiB là ảnh dở dang, không được dùng làm compiler cho
+Stage 3 hay bằng chứng hội tụ.
+
 ## Tối ưu VM/runtime thuần V++ (27/10/2026)
 
 `gói/máy ảo/bộ nhớ.vi` dùng stack đánh dấu liên kết ngay trong header
@@ -1683,3 +1794,25 @@ xen giữa dependency. Sau sửa, **12/12 kiểm tra đạt trên interpreter v�
 initializer của dependency, nên kiểm thử này chưa xác minh đối chiếu
 phần initializer. Chưa hoàn tất xác minh toàn bộ CTest integration và
 chưa chuyển compiler production từ C++ sang V++.
+## Cập nhật socket deadline và runtime AOT (28/10/2026)
+
+VM độc lập dùng V++ để quản lý token, trạng thái timeout và ownership;
+ASM ARM64/x86-64 bổ sung `fcntl` + `poll` + `SO_ERROR` cho `connect`,
+`poll` cho `accept`, và đặt send/recv timeout trên FD mới được accept.
+Deadline sử dụng `CLOCK_MONOTONIC`; khi `poll` bị EINTR, ASM tính
+thời gian còn lại rồi thử tiếp, kể cả trạng thái connect đang chờ.
+Harness macOS hai kiến trúc kiểm tra SIGALRM trong accept, timeout
+không bị kéo dài và descriptor listener vẫn còn dùng được.
+Kiểm thử ASM socket có thêm ca deadline `accept` và kiểm tra cờ
+blocking sau `connect`, chạy thành công trên macOS ARM64 và x86-64/Rosetta
+khi được cấp quyền loopback. Các primitive process spawn/pipe/wait và
+UID/GID u32 của đợt trước giữ nguyên.
+
+CTest `vpp-native-vpp-runtime` và `vpp-aot-platform-primitives-asm`
+đã PASS, cùng dependency Stage 1 bootstrap (3/3, 28/10/2026).
+Runtime AOT `VPP_NATIVE_VPP_RUNTIME` loại hẳn nội dung
+`src/runtime/native/vpp_aot_runtime.c` lúc biên dịch; linker/argv,
+spawn/wait, bộ đệm và cleanup thuộc V++/ASM trong nhánh này.
+Bản C fallback vẫn phục vụ các cấu hình tương thích và toolchain còn
+phụ thuộc linker hệ thống. TLS verified cho VM 206–208,
+DNS 203–205 và compiler self-hosting Stage 2→3 chưa hoàn tất.

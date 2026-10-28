@@ -109,6 +109,21 @@ hàm chính() {
     nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 14; };
     nếu (byte dài(calls) != 8) { trả về 15; };
     nếu (byte đọc số nguyên ba mươi hai bit(calls, 4) != -12) { trả về 15; };
+    // Verify both SysV stack stores on every host, including ARM64 where
+    // the generated x86-64 object cannot be executed. These are MOV bytes,
+    // unrelated to the JE/JNE selection used by conditional branches.
+    biến stack_store_count = 0;
+    lặp (i = 0; i + 6 < byte dài(code); i++) {
+        nếu (byte lấy(code, i) == 137) {
+            nếu (byte lấy(code, i + 1) == 132) {
+                nếu (byte lấy(code, i + 2) == 36) {
+                    nếu (byte đọc số nguyên ba mươi hai bit(code, i + 3) != stack_store_count * 8) { trả về 23; };
+                    stack_store_count = stack_store_count + 1;
+                };
+            };
+        };
+    };
+    nếu (stack_store_count != 2) { trả về 24; };
     nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, byte đọc số nguyên ba mươi hai bit(calls, 0)) != 0) { trả về 16; };
     nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, 11) != 0) { trả về 16; };
     nếu (elf mô đun(code, đối tượng, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 17; };
@@ -116,6 +131,32 @@ hàm chính() {
     nếu (second <= 0) { trả về 18; };
     nếu (tệp ghi khối(second, đối tượng) != byte dài(đối tượng)) { trả về 19; };
     nếu (tệp đóng(second) != 0) { trả về 20; };
+    // The newest raw system ABI entry must also survive x86-64 relocation
+    // and ELF symbol emission, even when this harness executes on ARM64.
+    nếu (byte làm rỗng(ir) != 0) { trả về 25; };
+    nếu (byte làm rỗng(calls) != 0) { trả về 25; };
+    nếu (byte làm rỗng(native_calls) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 4096) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 1) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 8192) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 19) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 3) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 17) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, -73) != 0) { trả về 25; }; // raw directory ID 72
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 25; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 25; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 26; };
+    nếu (byte dài(calls) != 8) { trả về 26; };
+    nếu (byte đọc số nguyên ba mươi hai bit(calls, 4) != -73) { trả về 26; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, byte đọc số nguyên ba mươi hai bit(calls, 0)) != 0) { trả về 27; };
+    nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, 72) != 0) { trả về 27; };
+    nếu (elf mô đun(code, đối tượng, starts, registry, 0, 1, 0, imports, native_calls) <= 0) { trả về 27; };
+    biến system_symbol = "vpp_native_os_directory";
+    nếu (byte tìm(đối tượng, system_symbol) < 0) { trả về 28; };
+    byte hủy(system_symbol);
     byte hủy(output_path);
     byte hủy(relocation_path);
     byte hủy(ir);

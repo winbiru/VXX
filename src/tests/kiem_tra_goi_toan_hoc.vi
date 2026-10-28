@@ -1,4 +1,5 @@
 nhập toán học;
+nhập gói/lõi/thống kê;
 
 hàm chính() {
     in làm tròn xuống(3.9);

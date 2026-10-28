@@ -936,6 +936,7 @@ if (BUILD_TESTS)
         if (VPP_NATIVE_HARNESS_STAGE1_ARG)
             add_test(NAME vpp-vm-asm
                 COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
                     "-DVPP_STAGE1=${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native"
                     "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
                     "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"

@@ -1,5 +1,7 @@
 // Import riêng: tiến trình Python/SDK là dependency tùy chọn của vi.quantum.qiskit.
 nhập gói/lượng tử/openqasm;
+nhập gói/lượng tử/nền;
+nhập gói/bộ sưu tập/từ điển;
 nhập gói/hệ thống/tiến trình;
 nhập json;
 lớp công khai Cầu Nối Qiskit {

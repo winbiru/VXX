@@ -2,6 +2,11 @@
 // The binary links only V++-generated objects and platform ASM primitives.
 nhập bộ nhớ;
 nhập giá trị;
+nhập máy hệ thống;
+nhập thư mục máy;
+nhập tiến trình máy;
+nhập ổ cắm máy;
+nhập phân giải máy;
 nhập host ABI;
 nhập nạp chương trình;
 nhập runtime;
@@ -32,7 +37,7 @@ hàm chính() {
             biến compiler = vm_find_function(state, vm_literal("biên dịch dòng lệnh VM"));
             nếu (compiler >= 0) {
                 biến args = vm_vector(4);
-                biến cwd = vm_string(4095); nếu (cwd == 0) { trả về 1; };
+                biến cwd = vm_string(4095); nếu (cwd == 0) { vm_socket_close_all(state); vm_process_close_all(state); vm_dir_close_all(state); trả về 1; };
                 biến count = máy thư mục hiện hành(vm_get(cwd, 2)); nếu (count < 0) { vm_error(20); };
                 vm_set(cwd, 1, count);
                 lặp(i = 2; i < đối số đếm(); i++) {
@@ -47,6 +52,9 @@ hàm chính() {
             };
         };
     };
+    vm_socket_close_all(state);
+    vm_process_close_all(state);
+    vm_dir_close_all(state);
     biến error = vm_get(4198464, 1);
     nếu (error != 0) {
         biến message = vm_concat(vm_literal("V++ VM ASM: error="), vm_integer_text(error));

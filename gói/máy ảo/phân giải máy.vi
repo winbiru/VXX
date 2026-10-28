@@ -1,0 +1,135 @@
+// Standalone machine resolver, numeric IP subset of 203..205.
+// The V++ guest owns each token; no libc addrinfo pointer crosses the ABI.
+// Hostname DNS and IPv4-mapped IPv6 remain unsupported until the V++ DNS
+// transport is integrated. Callers receive error=22, never a fake address.
+hàm vm_resolver_ipv4(host) {
+    biến n = vm_get(host, 1);
+    nếu (n < 7 || n > 15) { trả về 0; };
+    biến p = vm_get(host, 2); biến i = 0; biến groups = 0;
+    khi (i < n) {
+        biến start = i; biến number = 0;
+        khi (i < n) {
+            biến c = máy đọc byte(p + i);
+            nếu (c < 48 || c > 57) { thoát; };
+            number = number * 10 + c - 48;
+            i = i + 1;
+            nếu (i - start > 3 || number > 255) { trả về 0; };
+        };
+        nếu (i == start || (i - start > 1 && máy đọc byte(p + start) == 48)) { trả về 0; };
+        groups = groups + 1;
+        nếu (i < n) {
+            nếu (máy đọc byte(p + i) != 46 || groups >= 4) { trả về 0; };
+            i = i + 1;
+            nếu (i == n) { trả về 0; };
+        };
+    };
+    trả về groups == 4;
+};
+hàm vm_resolver_hex(c) {
+    nếu (c >= 48 && c <= 57) { trả về 1; };
+    nếu (c >= 65 && c <= 70) { trả về 1; };
+    nếu (c >= 97 && c <= 102) { trả về 1; };
+    trả về 0;
+};
+hàm vm_resolver_ipv6(host) {
+    biến n = vm_get(host, 1);
+    nếu (n < 2 || n > 39) { trả về 0; };
+    biến p = vm_get(host, 2); biến i = 0; biến groups = 0; biến compressed = 0;
+    nếu (máy đọc byte(p) == 58) {
+        nếu (máy đọc byte(p + 1) != 58) { trả về 0; };
+        compressed = 1; i = 2;
+    };
+    khi (i < n) {
+        biến start = i;
+        khi (i < n && vm_resolver_hex(máy đọc byte(p + i)) == 1) {
+            i = i + 1;
+            nếu (i - start > 4) { trả về 0; };
+        };
+        nếu (i == start) { trả về 0; };
+        groups = groups + 1;
+        nếu (groups > 8) { trả về 0; };
+        nếu (i < n) {
+            nếu (máy đọc byte(p + i) != 58) { trả về 0; };
+            i = i + 1;
+            nếu (i < n && máy đọc byte(p + i) == 58) {
+                nếu (compressed == 1) { trả về 0; };
+                compressed = 1; i = i + 1;
+            } hoặc nếu (i == n) { trả về 0; };
+        };
+    };
+    nếu (compressed == 1) { trả về groups < 8; };
+    trả về groups == 8;
+};
+hàm vm_resolver_find(state, token) {
+    nếu (vm_tag(token) != 1 || vm_number(token) < 1342177281) { vm_error(2); trả về 0; };
+    biến table = vm_get(state, 14);
+    nếu (table != 0) {
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            biến resource = vm_at(table, i);
+            nếu (resource != 0 && vm_get(resource, 0) == vm_number(token)) { trả về resource; };
+        };
+    };
+    vm_error(2); trả về 0;
+};
+hàm vm_resolver_open(state, host, service, datagram) {
+    nếu (vm_tag(host) != 3 || vm_tag(service) != 3 || vm_tag(datagram) != 1 ||
+        vm_get(host, 1) == 0 || vm_get(host, 1) > 1024 ||
+        vm_get(service, 1) > 5 || vm_number(datagram) < 0 || vm_number(datagram) > 1) {
+        trả về vm_error(2);
+    };
+    // A guest string is byte-counted, so reject embedded NUL explicitly.
+    // Malformed UTF-8 must never flow into a future DNS transport provider.
+    nếu (vm_utf8_valid(vm_get(host, 2), vm_get(host, 1)) == 0) {
+        trả về vm_error(2);
+    };
+    lặp(i = 0; i < vm_get(host, 1); i++) {
+        nếu (máy đọc byte(vm_get(host, 2) + i) == 0) { trả về vm_error(2); };
+    };
+    biến port = 0; biến n = vm_get(service, 1);
+    lặp(i = 0; i < n; i++) {
+        biến c = máy đọc byte(vm_get(service, 2) + i);
+        nếu (c < 48 || c > 57) { trả về vm_error(2); };
+        port = port * 10 + c - 48;
+    };
+    nếu (n > 0 && (port == 0 || port > 65535)) { trả về vm_error(2); };
+    nếu (vm_resolver_ipv4(host) == 0 && vm_resolver_ipv6(host) == 0) {
+        trả về vm_error(22);
+    };
+    biến table = vm_get(state, 14);
+    nếu (table == 0) {
+        table = vm_vector(4); nếu (table == 0) { trả về 0; };
+        vm_set(state, 14, table);
+    };
+    biến token = vm_get(state, 15);
+    nếu (token == 0) { token = 1342177280; };
+    nếu (token >= 2147483000) { trả về vm_error(3); };
+    token = token + 1;
+    biến guest_token = vm_int(token); nếu (guest_token == 0) { trả về 0; };
+    biến resource = vm_alloc(16, 1); nếu (resource == 0) { trả về 0; };
+    vm_set(resource, 0, token); vm_set(resource, 1, host);
+    biến reused = 0;
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        nếu (vm_at(table, i) == 0) { vm_put(table, i, resource); reused = 1; thoát; };
+    };
+    nếu (reused == 0) { vm_append(table, resource); };
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(state, 15, token);
+    trả về guest_token;
+};
+hàm vm_resolver_host(state, op, a, b, c) {
+    nếu (op == 203) { trả về vm_resolver_open(state, a, b, c); };
+    biến resource = vm_resolver_find(state, a); nếu (resource == 0) { trả về 0; };
+    nếu (op == 204) {
+        nếu (vm_get(resource, 2) == 1) { trả về 0; };
+        vm_set(resource, 2, 1);
+        trả về vm_get(resource, 1);
+    };
+    nếu (op == 205) {
+        biến table = vm_get(state, 14);
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            nếu (vm_at(table, i) == resource) { vm_put(table, i, 0); thoát; };
+        };
+        trả về vm_int(1);
+    };
+    trả về vm_error(22);
+};

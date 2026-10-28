@@ -22,6 +22,18 @@ x86_64-unknown-linux-gnu|vpp_aot_primitives_linux_x86_64.S
 x86_64-pc-windows-msvc|vpp_aot_primitives_windows_x86_64.S
 TARGETS
 
+# Standalone VM machine helpers: validate their pointer conversion and OS
+# calling conventions independently from the larger platform object.
+for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
+    for kind in system directory process socket; do
+        "$compiler" -target "$target" -x assembler-with-cpp \
+            -c "$repo_root/scripts/ASM/vpp_vm_${kind}_primitives.inc" \
+            -o "$work/vm-${kind}-${target}.o"
+        test -s "$work/vm-${kind}-${target}.o"
+        printf 'PASS VM %s machine %s\n' "$kind" "$target"
+    done
+done
+
 # The same assembler workflow also validates the direct V++ file syscall ABI.
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
     "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_file_primitives.S" \
@@ -65,6 +77,13 @@ elif command -v xcrun >/dev/null 2>&1; then
 fi
 if test -n "$llvm_nm"; then
     for target in aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
+        for kind in system directory; do
+            unresolved=$("$llvm_nm" --undefined-only "$work/vm-${kind}-${target}.o")
+            if printf '%s\n' "$unresolved" | grep -Eq 'clock_gettime|getentropy|getrandom|nanosleep|poll|errno|opendir|readdir|closedir|memcpy|memchr|rmdir|mkdir|_Z'; then
+                printf 'FAIL Linux VM %s ASM has external OS/C++ imports:\n%s\n' "$kind" "$unresolved" >&2
+                exit 1
+            fi
+        done
         for source in path directory; do
             unresolved=$("$llvm_nm" --undefined-only "$work/${source}-${target}.o")
             test -z "$unresolved" || {

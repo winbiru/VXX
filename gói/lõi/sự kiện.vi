@@ -1,5 +1,6 @@
 
-
+nhập gói/lõi/chuyển kiểu;
+nhập gói/bộ sưu tập/từ điển;
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Hạ Tầng Sự Kiện {
     hàm công khai khởi tạo() {};
@@ -415,4 +416,3 @@ hàm công khai tải dịch vụ(nhà cung cấp) {
     bộ chuyển tiếp = Hạ Tầng Sự Kiện();
     trả về bộ chuyển tiếp.tải dịch vụ(nhà cung cấp);
 };
-nhập gói/lõi/chuyển kiểu;

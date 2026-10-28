@@ -1,5 +1,6 @@
 // Logger cấp instance: đích và ngưỡng mức được lưu trong mỗi đối tượng.
 nhập gói/lõi/nhật ký;
+nhập gói/lõi/chuyển kiểu;
 nhập gói/lõi/tài nguyên có trạng thái;
 
 hàm công khai nhật ký thứ tự mức(mức) {

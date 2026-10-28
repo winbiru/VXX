@@ -1,6 +1,7 @@
 // Tagged values and collections. All references are arena offsets, never
 // truncated native pointers. 0=null, 1=i32, 2=f64, 3=UTF-8, 4=list,
-// 5=map, 6=tuple, 7=closure, 8=class, 9=instance, 10=shared cell.
+// 5=map, 6=tuple, 7=closure, 8=class, 9=instance, 10=shared cell,
+// 11=unsigned u32 ABI (only needed when uid_t/gid_t exceeds INT32_MAX).
 hàm vm_tag(v) { nếu (v == 0) { trả về 0; }; trả về vm_get(v, 0); };
 hàm vm_int(n) {
     // i32 values are immutable, and identity hashing accepts references only.
@@ -21,6 +22,13 @@ hàm vm_int(n) {
     vm_set(v, 0, 1); vm_set(v, 1, n);
     nếu (cache != 0) { vm_set(cache, index, v); };
     trả về v;
+};
+// Preserve the full uid_t/gid_t bit pattern without interpreting an unsigned
+// value >= 2^31 as a negative signed VM integer.
+hàm vm_uint32(bits) {
+    nếu (bits >= 0) { trả về vm_int(bits); };
+    biến v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; };
+    vm_set(v, 0, 11); vm_set(v, 1, bits); trả về v;
 };
 hàm vm_number(v) {
     nếu (vm_tag(v) == 1) { trả về vm_get(v, 1); };
@@ -55,6 +63,10 @@ hàm vm_slice(s, start, n) {
 };
 hàm vm_equal(a, b) {
     biến ta = vm_tag(a); biến tb = vm_tag(b);
+    nếu (ta == 11 || tb == 11) {
+        nếu (ta == 11 && tb == 11) { trả về vm_get(a, 1) == vm_get(b, 1); };
+        trả về 0;
+    };
     nếu (ta == 1 && tb == 1) { trả về vm_get(a, 1) == vm_get(b, 1); };
     nếu ((ta == 1 || ta == 2) && (tb == 1 || tb == 2)) { trả về máy thực so sánh(vm_real(a), vm_real(b)) == 0; };
     nếu (ta != tb) { trả về 0; };
@@ -203,6 +215,18 @@ hàm vm_integer_text(n) {
     lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(raw + count - i - 1)); };
     trả về s;
 };
+// UINT32_MAX = 2*10^9 + 147483648 + (bits - INT32_MIN).
+// All intermediates fit signed i32, including the input 0xffffffff.
+hàm vm_unsigned_text(bits) {
+    nếu (bits >= 0) { trả về vm_integer_text(bits); };
+    biến lowbits = (bits + 2147483647) + 1;
+    biến high = 2 + máy chia số nguyên ba mươi hai bit(lowbits, 1000000000);
+    biến low = lowbits - máy chia số nguyên ba mươi hai bit(lowbits, 1000000000) * 1000000000 + 147483648;
+    nếu (low >= 1000000000) { low = low - 1000000000; high++; };
+    biến suffix = vm_integer_text(low);
+    biến zeros = vm_literal("000000000");
+    trả về vm_concat(vm_integer_text(high), vm_concat(vm_slice(zeros, 0, 9 - vm_get(suffix, 1)), suffix));
+};
 hàm vm_concat(a, b) {
     biến n = vm_get(a, 1); biến m = vm_get(b, 1); biến s = vm_string(n + m);
     nếu (s == 0) { trả về 0; };
@@ -214,6 +238,7 @@ hàm vm_text(v) {
     biến t = vm_tag(v);
     nếu (t == 0) { trả về vm_literal("rỗng"); };
     nếu (t == 1) { trả về vm_integer_text(vm_get(v, 1)); };
+    nếu (t == 11) { trả về vm_unsigned_text(vm_get(v, 1)); };
     nếu (t == 2) {
         biến raw = vm_alloc(512, 0); nếu (raw == 0) { trả về 0; };
         biến n = máy thực văn bản(v, raw); biến s = vm_string(n);
@@ -251,6 +276,24 @@ hàm vm_binary(op, a, b) {
     nếu (op == 8) { trả về vm_int(1 - vm_equal(a, b)); };
     nếu (op == 4) { trả về vm_int(vm_truth(a) && vm_truth(b)); };
     nếu (op == 5) { trả về vm_int(vm_truth(a) || vm_truth(b)); };
+    // UID/GID u32 is intentionally not narrowed to signed i32 for arithmetic.
+    // Tag 11 is only allocated for the upper half [2^31, 2^32-1]; an
+    // ordinary signed i32 always compares lower than it. When both values
+    // have tag 11 their sign bits are set, so signed i32 ordering agrees
+    // with unsigned u32 ordering within that half.
+    nếu (vm_tag(a) == 11 || vm_tag(b) == 11) {
+        nếu (op >= 9 && op <= 12) {
+            biến ta = vm_tag(a); biến tb = vm_tag(b); biến cmp = 0;
+            nếu ((ta != 1 && ta != 11) || (tb != 1 && tb != 11)) { trả về vm_error(2); };
+            nếu (ta == 11 && tb != 11) { cmp = 1; }
+            hoặc nếu (ta != 11 && tb == 11) { cmp = -1; }
+            hoặc nếu (vm_get(a, 1) < vm_get(b, 1)) { cmp = -1; }
+            hoặc nếu (vm_get(a, 1) > vm_get(b, 1)) { cmp = 1; };
+            nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
+            nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
+        };
+        trả về vm_error(2);
+    };
     nếu (op == 0 && ((vm_tag(a) != 1 && vm_tag(a) != 2) || (vm_tag(b) != 1 && vm_tag(b) != 2))) { trả về vm_concat(vm_text(a), vm_text(b)); };
     nếu (op >= 9 && op <= 12 && vm_tag(a) == 3 && vm_tag(b) == 3) {
         biến cmp = vm_string_compare(a, b);

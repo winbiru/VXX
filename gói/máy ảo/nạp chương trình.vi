@@ -43,6 +43,7 @@ hàm vm_load(path) {
     biến state = vm_alloc(64, 1); nếu (state == 0) { tệp đóng(fd); trả về 0; };
     vm_set(state, 0, vm_vector(4)); vm_set(state, 1, vm_vector(4)); vm_set(state, 2, vm_vector(4));
     vm_set(state, 4, vm_vector(5)); vm_set(state, 5, vm_vector(5)); vm_set(state, 6, vm_vector(4)); vm_set(state, 8, vm_vector(4));
+    // Slot 11 is the lazily allocated, GC-rooted directory resource table.
     // Slot 10: lazy host-name cache, indexed by immutable StringPool index.
     // Use scan=0: values are primitive IDs, never managed heap references.
     // 0 = unresolved; 1 = unknown; ID + 2 = resolved host primitive.

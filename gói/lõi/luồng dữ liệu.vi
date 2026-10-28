@@ -1,5 +1,6 @@
-
-
+nhập gói/lõi/chuyển kiểu;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/bộ sưu tập/danh sách;
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Xử Lý Luồng {
     hàm công khai khởi tạo() {};
@@ -670,4 +671,3 @@ hàm công khai đóng luồng(luồng) {
     bộ chuyển tiếp = Bộ Xử Lý Luồng();
     trả về bộ chuyển tiếp.đóng luồng(luồng);
 };
-nhập gói/lõi/chuyển kiểu;

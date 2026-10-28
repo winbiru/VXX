@@ -17,6 +17,48 @@ execute_process(
 if (NOT status EQUAL 0 OR NOT EXISTS "${executable}")
     message(FATAL_ERROR "V++ native runtime compilation failed: ${status}\n${errors}\n${output}")
 endif()
+# Guard the V++/ASM AOT path against silently relinking the Stage 0 C++
+# driver, VM bridge or legacy native runtime services. Undefined symbols
+# alone miss a statically linked fallback that defines its own ABI symbols.
+if(APPLE)
+    set(runtime_nm /usr/bin/nm)
+elseif(UNIX)
+    find_program(runtime_nm NAMES nm llvm-nm)
+endif()
+if(runtime_nm)
+    execute_process(COMMAND "${runtime_nm}" -g "${executable}"
+        RESULT_VARIABLE nm_status OUTPUT_VARIABLE symbols ERROR_VARIABLE nm_errors TIMEOUT 10)
+    if(NOT nm_status STREQUAL "0" OR
+        symbols MATCHES "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vpp_aot_|linkedBytecodeRun|executeVpp")
+        message(FATAL_ERROR "V++ native AOT linked C++/Stage 0 symbols: ${nm_status}\n${symbols}\n${nm_errors}")
+    endif()
+else()
+    message(FATAL_ERROR "V++ native AOT symbol audit needs nm/llvm-nm")
+endif()
+if(APPLE)
+    execute_process(COMMAND /usr/bin/otool -L "${executable}"
+        RESULT_VARIABLE dependency_status OUTPUT_VARIABLE dependencies
+        ERROR_VARIABLE dependency_errors TIMEOUT 10)
+    if(NOT dependency_status STREQUAL "0" OR
+        dependencies MATCHES "libc\\+\\+|libstdc\\+\\+|libffi")
+        message(FATAL_ERROR "V++ native AOT linked legacy C++/FFI libraries: ${dependency_status}\n${dependencies}\n${dependency_errors}")
+    endif()
+elseif(UNIX)
+    # Linux also needs a dynamic dependency gate: nm cannot identify a
+    # library that is loaded through DT_NEEDED but exposes no used C++ symbol.
+    find_program(runtime_readelf NAMES readelf llvm-readelf)
+    if(runtime_readelf)
+        execute_process(COMMAND "${runtime_readelf}" -d "${executable}"
+            RESULT_VARIABLE dependency_status OUTPUT_VARIABLE dependencies
+            ERROR_VARIABLE dependency_errors TIMEOUT 10)
+        if(NOT dependency_status STREQUAL "0" OR
+            dependencies MATCHES "libc\\+\\+|libstdc\\+\\+|libffi")
+            message(FATAL_ERROR "V++ native AOT linked legacy C++/FFI libraries: ${dependency_status}\n${dependencies}\n${dependency_errors}")
+        endif()
+    else()
+        message(FATAL_ERROR "V++ native AOT dependency audit requires readelf or llvm-readelf on Linux")
+    endif()
+endif()
 execute_process(COMMAND "${executable}" "" "Tiếng Việt"
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)

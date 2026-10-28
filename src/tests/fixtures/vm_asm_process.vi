@@ -1,0 +1,43 @@
+nhập gói/hệ thống/tiến trình;
+
+hàm yêu cầu tiến trình(điều kiện) {
+    nếu (!điều kiện) { ném "V++ VM process regression"; };
+};
+
+hàm chính() {
+    r = chạy tiến trình("/bin/sh", ["-c", "printf 'hello'; printf 'oops' 1>&2; exit 7"]);
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == 7);
+    yêu cầu tiến trình(r["đầu ra"] == "hello" && r["lỗi"] == "oops");
+
+    r = chạy tiến trình("/bin/echo", ["A B", "á🐱"]);
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == 0);
+    yêu cầu tiến trình(r["đầu ra"] == "A B á🐱\n" && r["lỗi"] == "");
+
+    r = chạy tiến trình("/bin/sh", ["-c", "printf '%s|%s' \"$VPP_VM_TEST\" \"$PATH\""],
+                       {"VPP_VM_TEST": "mới", "PATH": "vpp-only-child"});
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == 0);
+    yêu cầu tiến trình(r["đầu ra"] == "mới|vpp-only-child");
+
+    // Both pipes exceed the usual 16 KiB pipe size. A sequential reader
+    // would deadlock when both child streams fill up.
+    r = chạy tiến trình("/bin/sh", ["-c", "i=0; while [ $i -lt 700 ]; do printf 'ABCDEFGHIJKLMNOPQRSTUVWX'; printf 'abcdefghijklmnopqrstuvwx' 1>&2; i=$((i+1)); done; exit 3"]);
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == 3);
+    yêu cầu tiến trình(độ dài(r["đầu ra"]) == 16800 && độ dài(r["lỗi"]) == 16800);
+
+    // Deadline cleanup must terminate a live child process group.
+    r = chạy tiến trình("/bin/sh", ["-c", "/bin/sleep 5"], {}, 25);
+    yêu cầu tiến trình(r["khởi chạy"] == đúng && r["mã thoát"] == -1);
+    yêu cầu tiến trình(độ dài(r["lỗi"]) > 0);
+
+    r = chạy tiến trình("/this-vpp-program-must-not-exist", []);
+    yêu cầu tiến trình(r["khởi chạy"] == sai && r["mã thoát"] == -1);
+    yêu cầu tiến trình(độ dài(r["lỗi"]) > 0);
+
+    p = máy tiến trình tạo("/bin/sh");
+    máy tiến trình đối số(p, "-c");
+    máy tiến trình đối số(p, "exit 0");
+    yêu cầu tiến trình(máy tiến trình bắt đầu(p) == 1);
+    // Closing without reading must terminate/reap the child and release pipes.
+    yêu cầu tiến trình(máy tiến trình đóng(p) == 1);
+    in "VM ASM PROCESS OK";
+};

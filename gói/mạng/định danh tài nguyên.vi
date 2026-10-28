@@ -2,6 +2,7 @@
 // URI là dữ liệu; không phát sinh DNS/network I/O khi parse/normalize/resolve.
 nhập gói/lõi/bảng mã;
 nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
 nhập gói/nhập xuất/tệp;
 nhập gói/văn bản/chuỗi;
 nhập gói/bộ sưu tập/từ điển;

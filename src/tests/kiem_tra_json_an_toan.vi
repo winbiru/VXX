@@ -1,5 +1,5 @@
 nhập gói/dữ liệu/json/chính;
-nhập gói/mạng/rest;
+nhập gói/mạng/http/dịch vụ tài nguyên;
 nhập gói/nhập xuất/tệp;
 
 hàm chính() {

@@ -1,5 +1,90 @@
 # Ranh giới thư viện V++ và primitive VM
 
+## Process, credential và socket VM/ASM (28/10/2026)
+
+VM độc lập đã nhận UID/EUID/GID/EGID dạng u32 (tag 11 cho giá trị lớn
+hơn INT32_MAX), process spawn/pipe/poll/read/wait/cleanup (193–202) và
+socket TCP/UDP connect/listen/accept/send/recv/close/timeout (185–192).
+Policy và quyền sở hữu tài nguyên ở `gói/máy ảo/*.vi`, ranh giới OS
+ở `scripts/ASM/vpp_vm_{process,socket}_primitives.inc`; compiler i32
+đã cấp tới native ID 74. Cửa sổ control và token ngăn chương trình guest
+truy cập trực tiếp FD hoặc con trỏ hệ điều hành.
+
+Kiểm chứng ngày 28/10/2026 tại `build-ci-regression-fix`:
+`vpp-native-stage1-bootstrap`, `vpp-native-vpp-runtime`,
+`vpp-native-cli-compiler-bootstrap` và `vpp-vm-asm` **4/4 PASS**
+(83,48 giây, sau regression resolver). Process harness macOS ARM64 và x86-64/Rosetta **PASS**;
+fixture VM bác bỏ UTF-8 sai trong executable/argv, NUL và tên biến môi
+trường chứa `=`. Socket guest bác bỏ đối số/token sai, TLS 206–208
+fail-closed **PASS**. Hai socket harness cần `bind` đều bị sandbox chặn,
+**SKIP runtime** ở lượt này. Lượt chạy trước đã ghi nhận socket IPv6,
+40 vòng không rò FD và bytecode guest PASS; không chuyển kết quả lịch sử
+đó thành PASS của lượt mới. ASM lắp ráp cho macOS/Linux × ARM64/x86-64;
+Linux mới có bằng chứng cross-assembly.
+
+Deadline đơn điệu cho connect/accept và một số nhánh poll EINTR đã có;
+chưa xác nhận toàn bộ send/recv hoặc tất cả trường hợp lỗi trên Linux.
+Resolver số IPv4/IPv6 (203–205) đã được viết bằng V++ trong
+`gói/máy ảo/phân giải máy.vi`, kiểm tra token, NUL, UTF-8, cổng và
+các dạng IPv6 biên. Hostname DNS còn thiếu, IPv4-mapped IPv6 chưa hỗ trợ;
+`example.com` trả `error=22 opcode=203`. Token resolver chỉ công bố sau
+khi đăng ký thành công; `vm_process_new` cũng kiểm tra cấp phát và
+append trước khi công bố token. Verified TLS (206–208) và những đường
+AOT C/C++ khác còn phải di trú tiếp. Trên VM độc lập, TLS chưa có provider nên trả
+`error=22 opcode=206/207/208`; không bỏ xác thực chứng chỉ, hostname hay SNI.
+`src/runtime/native/vpp_aot_runtime.c` chỉ còn biên dịch trong chế độ
+fallback không chọn `VPP_NATIVE_VPP_RUNTIME`; các đường Stage 0,
+linker và runtime khác vẫn cần kiểm chứng riêng trước khi bỏ C/C++.
+
+Trong `vpp-native-vpp-runtime`, kiểm toán đã mở rộng từ `nm -u` sang
+`nm -g` (cả symbol được định nghĩa), từ chối dấu vết C++/Stage 0 và
+trên macOS kiểm tra thư viện động bằng `otool -L` (libc++, libstdc++,
+libffi). Đây là bằng chứng cho **executable fixture** được kiểm tra;
+ASM vẫn gọi các dịch vụ của hệ điều hành và kết quả này không chứng minh
+toàn bộ compiler/toolchain độc lập với C/C++. Trên Linux, kiểm toán
+DT_NEEDED bằng `readelf` hoặc `llvm-readelf` là bắt buộc; thiếu công cụ
+kiểm toán khiến bài kiểm thử FAIL. Chưa chạy kiểm toán này trên Linux
+thực tế trong lượt hiện tại.
+
+## Thư mục và PID/PPID khỏi adapter VM C++ (28/10/2026)
+
+VM độc lập xử lý opcode 167/168 và 179..183 bằng V++/ASM. Policy,
+UTF-8, bản ghi thư mục, token/owner và cleanup nằm trong
+`gói/máy ảo/thư mục máy.vi`; syscall và con trỏ OS nằm trong
+`scripts/ASM/vpp_vm_directory_primitives.inc`. Đường này không gọi
+`executeDirectoryMachinePrimitive` hoặc `executeProcessIdentityPrimitive`.
+`mkdir` đã sửa về `[rc, loại lỗi, errno]` và mode `0777` theo umask;
+helper cache native `0700` giữ nguyên.
+
+Kiểm chứng macOS ARM64: **10/10 CTest PASS**, cả API chuẩn, GC, UTF-8,
+symlink, token stale/khác owner, cleanup lỗi và đối chiếu Stage 0. PID/PPID
+còn được so trực tiếp với thông tin của tiến trình cha OS. Quét symbol VM
+không thấy cầu nối C++ và `otool -L` chỉ có libSystem. ASM bốn tổ hợp
+macOS/Linux × ARM64/x86-64 và ELF relocation ID mới đã kiểm tra; chưa
+có kết quả thực thi runner Linux. Chi tiết ở `docs/vm-asm.md`.
+
+Ở mốc chỉ kiểm thử thư mục, UID/GID rộng, spawn/pipe/wait và socket
+chưa chuyển; tình trạng mới được ghi ở mục Process/socket phía trên.
+Adapter C++ vẫn có caller ở Stage 0/AOT và được giữ làm oracle.
+
+## Chuyển Clock/Sleep/Entropy khỏi adapter VM C++ (28/10/2026)
+
+VM độc lập thực thi opcode 173..176 qua `gói/máy ảo/máy hệ thống.vi`
+và `scripts/ASM/vpp_vm_system_primitives.inc`. Kiểm tra kiểu/giới hạn,
+timespec, tạo list byte và vòng đọc entropy nằm ở V++; ASM chỉ kiểm tra
+offset/con trỏ và gọi OS. Chính sách ngủ có deadline/EINTR vẫn ở thư viện
+V++ hiện có. Các hàm `executeTimeClockPrimitive`, `executeTimeSleepPrimitive`,
+`executeEntropyMachinePrimitive` của C++ không được gọi trên đường này.
+
+Kiểm thử VM với PATH rỗng, đối chiếu Stage 0 và quét symbol đã PASS;
+regression còn kiểm tra đối số sai, GC, biên arena và ELF relocation của
+ABI mới. Bốn tổ hợp macOS/Linux × ARM64/x86-64 lắp ráp thành công; thực thi
+đã kiểm chứng trên macOS ARM64. Chi tiết và lệnh dựng ở `docs/vm-asm.md`.
+
+Các adapter C++ trên vẫn còn caller ở interpreter Stage 0 và runtime AOT
+tổng quát nên được giữ lại. Chưa vô hiệu hóa hay xóa chúng; phụ thuộc OS
+libSystem trên Darwin vẫn hiện diện qua lời gọi ASM trực tiếp.
+
 ## Bằng chứng đường VM/ASM độc lập (27/10/2026)
 
 `gói/máy ảo/` thực thi heap, GC, collections, closure, class và
@@ -1029,6 +1114,30 @@ thư viện V++.
   số trên 2^52 và double lớn; 1268 dòng giá trị + kiểu trả về trùng từng byte với
 handler native cũ.
 
+### Bổ sung boundary VM độc lập — Process, credential (28/10/2026)
+
+VM standalone gọi `máy tiến trình định danh thô` qua ASM (PID/PPID và
+UID/EUID/GID/EGID dạng u32) và `máy tiến trình thô` qua ASM cho
+spawn/pipe/poll/read/wait/close. V++ sở hữu token, argv, environment merge,
+truyền byte và hạn chót; ASM sở hữu `posix_spawnp` và descriptor POSIX.
+Giao diện `193–202` và native compiler primitive ID 73 giữ ABI ổn định.
+Fixture `vm_asm_process.vi` chạy trên **macOS ARM64**, bao gồm hai pipe
+16.800 byte, Unicode argv, child-only env override, lỗi start và deadline.
+Lượt `vpp-vm-asm` sau sửa harness **3/3 PASS**; các kiểm tra socket machine
+và native V++ runtime có gate riêng.
+
+Ranh giới chưa chuyển: `src/runtime/foreign.cpp` vẫn phục vụ oracle Stage 0
+và Win32; socket, resolver và TLS của standalone VM chưa có provider ASM.
+Đường socket POSIX trong Stage 0 vẫn dựa vào lớp `socket_machine` C++/
+FFI. TLS vẫn nằm ở crypto provider OS/OpenSSL/SecureTransport với xác thực
+chứng chỉ và hostname. Không được dùng trạng thái của Stage 0 để tuyên bố
+VM độc lập đã có TCP/UDP/TLS. ARM64 Linux mới qua kiểm tra assembly;
+x86-64 process đã có ASM với harness riêng. Native runtime C `vpp_aot_runtime.c` còn
+đường fallback và hàm linker tổng quát; `VPP_NATIVE_VPP_RUNTIME` có
+`vpp_native_link_spawn_wait` bằng V++/ASM cho nhánh liên kết riêng.
+Di trú runtime AOT toàn diện cần xác minh từng caller cùng parity đầu ra,
+quyền, lỗi, resource lifetime và các target Linux/Windows.
+
 Package-manager policy cũng đã bắt đầu rời CLI C++: module `vpp.packages`
 đọc/ghi `vpp.json`, parse/so sánh SemVer 2.0, parse range `*`/exact/`^`/`~`/
 comparator chain, kiểm tra version conflict, deduplicate dependency và phát hiện
@@ -1044,3 +1153,26 @@ giữ SemVer/cycle policy.
   `run_tests.sh` mặc định ưu tiên `bin/vpp-cli` nên có thể chọn binary cũ nếu
   chưa cập nhật bản cài đặt. Kiểm thử socket cần môi trường cho phép bind
   localhost; khi bị giới hạn, script ghi rõ các ca socket đã bỏ qua.
+## Socket deadline độc lập VM và kiểm kê AOT (28/10/2026)
+
+Socket VM opcode 185–192 hiện do V++ quản lý token và ASM làm OS boundary.
+Đã bổ sung deadline `connect` với O_NONBLOCK/poll + SO_ERROR, timeout
+`accept` với poll, và send/recv timeout cho socket mới được accept.
+`connect`/`accept` dùng hạn chót `CLOCK_MONOTONIC` và thử lại `poll`
+khi gặp EINTR, giới hạn tổng thời gian chờ qua nhiều tín hiệu. Harness
+ARM64 và x86-64 gửi SIGALRM trong accept, xác nhận ETIMEDOUT thay vì
+đẩy EINTR về VM và không làm mất descriptor listener.
+Trước khi trả FD sau connect, ASM khôi phục trạng thái blocking ban đầu;
+timeout accept giữ nguyên listener. Harness macOS ARM64/x86-64
+đã PASS trong môi trường được cấp quyền bind loopback. Chưa xác minh
+deadline blackhole và kết quả thực thi Linux.
+
+`vpp-native-vpp-runtime` và `vpp-aot-platform-primitives-asm` đạt
+3/3 CTest (gồm Stage 1 bootstrap). Đường VPP_NATIVE_VPP_RUNTIME đã
+chuyển các helper quản lý byte/đường dẫn và spawn/wait sang V++/ASM,
+và file `src/runtime/native/vpp_aot_runtime.c` bị loại hoàn toàn khỏi
+binary khi macro này được chọn (`#if !defined(VPP_NATIVE_VPP_RUNTIME)`).
+Nhánh khác vẫn giữ runtime/linker fallback C; phụ thuộc Stage 0 và OS
+linker bên ngoài chưa được loại bỏ. TLS của VM độc lập chưa
+có provider xác minh CA/hostname/SNI; opcode 206–208 tiếp tục bị từ
+chối rõ ràng cho tới khi có thể kiểm thử handshake thực tế.

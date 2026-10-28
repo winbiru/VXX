@@ -99,6 +99,13 @@ hàm tên ký hiệu lõi(mã định danh) {
     nếu (mã định danh == 65) { trả về "_vpp_native_f64_to_i32"; };
     nếu (mã định danh == 66) { trả về "_vpp_native_f64_parse"; };
     nếu (mã định danh == 67) { trả về "_vpp_native_f64_text"; };
+    nếu (mã định danh == 68) { trả về "_vpp_native_os_clock"; };
+    nếu (mã định danh == 69) { trả về "_vpp_native_os_sleep"; };
+    nếu (mã định danh == 70) { trả về "_vpp_native_os_entropy"; };
+    nếu (mã định danh == 71) { trả về "_vpp_native_os_identity"; };
+    nếu (mã định danh == 72) { trả về "_vpp_native_os_directory"; };
+    nếu (mã định danh == 73) { trả về "_vpp_native_os_process"; };
+    nếu (mã định danh == 74) { trả về "_vpp_native_os_socket"; };
     trả về "";
 };
 
@@ -144,13 +151,13 @@ hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào �
             nếu (đã kiểm tra độ lệch < 0) { trả về -1; };
             nếu (đã kiểm tra độ lệch + 4 > n) { trả về -1; };
             nếu (đã kiểm tra mã định danh < 0) { trả về -1; };
-            nếu (đã kiểm tra mã định danh > 67) { trả về -1; };
+            nếu (đã kiểm tra mã định danh > 74) { trả về -1; };
             tái định vị số phần tử = tái định vị số phần tử + 1;
         };
     };
     biến các ký hiệu = 1;
     biến chuỗi kích cỡ = 7; // \0_main\0
-    lặp (mã định danh = 0; mã định danh < 68; mã định danh++) {
+    lặp (mã định danh = 0; mã định danh < 75; mã định danh++) {
         nếu (có lời gọi lõi(ngoại các lời gọi, mã định danh) == 1) {
             biến mục ký hiệu tên định danh = tên ký hiệu lõi(mã định danh);
             chuỗi kích cỡ = chuỗi kích cỡ + byte dài(mục ký hiệu tên định danh) + 1;
@@ -231,7 +238,7 @@ hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào �
     đối tượng u64(đối tượng, điểm vào độ lệch);
     // N_UNDF | N_EXT symbols for the linked native runtime.
     biến chỉ mục chuỗi = 7;
-    lặp (mã định danh = 0; mã định danh < 68; mã định danh++) {
+    lặp (mã định danh = 0; mã định danh < 75; mã định danh++) {
         nếu (có lời gọi lõi(ngoại các lời gọi, mã định danh) == 1) {
             biến bản ghi dữ liệu tên định danh = tên ký hiệu lõi(mã định danh);
             biến bản ghi dữ liệu kích cỡ = byte dài(bản ghi dữ liệu tên định danh);
@@ -248,7 +255,7 @@ hàm đối tượng macho arm64 tại(mã máy, đối tượng, điểm vào �
     byte thêm(đối tượng, 0);
     nếu (đối tượng tên định danh(đối tượng, "_main", 5) != 0) { byte làm rỗng(đối tượng); trả về -1; };
     byte thêm(đối tượng, 0);
-    lặp (mã định danh = 0; mã định danh < 68; mã định danh++) {
+    lặp (mã định danh = 0; mã định danh < 75; mã định danh++) {
         nếu (có lời gọi lõi(ngoại các lời gọi, mã định danh) == 1) {
             biến tên định danh = tên ký hiệu lõi(mã định danh);
             biến kích cỡ = byte dài(tên định danh);

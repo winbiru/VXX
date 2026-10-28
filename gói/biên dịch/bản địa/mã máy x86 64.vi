@@ -243,7 +243,7 @@ hàm sinh mã x86 phát nội bộ(biểu diễn trung gian, mã máy, các lờ
                 nếu (mã trạng thái != 0) { thoát; };
                 mã trạng thái = sinh mã x86 nạp(mã máy, 0, các ô nhớ + độ sâu hiện tại - đang chờ + j);
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 137); };
-                nếu (mã trạng thái == 0) { biến jump = 132; nếu (mã phép toán == 29) { jump = 133; }; mã trạng thái = sinh mã x86 byte(mã máy, jump); };
+                nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 132); }; // mov [rsp+disp32],eax: ModR/M
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 byte(mã máy, 36); };
                 nếu (mã trạng thái == 0) { mã trạng thái = sinh mã x86 hằng tức thời(mã máy, (j - 6) * 8); };
             };

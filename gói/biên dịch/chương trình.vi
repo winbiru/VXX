@@ -436,13 +436,8 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             // Tên hàm có thể gồm nhiều từ; lời gọi tường minh phải là câu
             // lệnh độc lập để giữ đúng ngữ nghĩa resolve-before-arguments.
             biên dịch biểu thức lấy(p);
-            tên = mình.biên dịch chương trình tên(p, "hàm cần gọi");
-            khi (mình.biên dịch chương trình giá trị(p) != "(") {
-                nếu (lấy từ điển(biên dịch biểu thức nhìn(p), "loại", "") != "định danh") {
-                    biên dịch biểu thức lỗi(p, "cần '(' sau tên hàm được gọi");
-                };
-                tên += " " + mình.biên dịch chương trình tên(p, "hàm cần gọi");
-            };
+            // Cùng quy tắc tên với khai báo hàm, kể cả `in lời chào`.
+            tên = mình.biên dịch chương trình tên kiểu(p, "hàm cần gọi", đúng);
             biên dịch biểu thức chờ(p, "(");
             đối số = [];
             nếu (mình.biên dịch chương trình giá trị(p) != ")") {

@@ -1,0 +1,98 @@
+// Appended to the VM core sources by check_vm_asm_directory.cmake.
+
+hàm chính() {
+    vm_init();
+    biến raw = vm_alloc(8192, 0);
+    biến info = vm_alloc(8, 0);
+    máy ghi byte(raw + 16, 24);
+    máy ghi byte(raw + 19, 97);
+    nếu (vm_dir_record(raw, 24, 1, info) != 24) { trả về 1; };
+    nếu (vm_get(info, 0) != raw + 19) { trả về 2; };
+    nếu (vm_get(info, 1) != 1) { trả về 3; };
+    nếu (vm_dir_record(raw, 19, 1, info) != 0) { trả về 4; };
+    máy ghi byte(raw + 16, 19);
+    nếu (vm_dir_record(raw, 24, 1, info) != 0) { trả về 5; };
+    máy ghi byte(raw + 16, 40);
+    nếu (vm_dir_record(raw, 24, 1, info) != 0) { trả về 6; };
+    máy ghi byte(raw + 16, 24);
+    lặp(i = 19; i < 24; i++) { máy ghi byte(raw + i, 65); };
+    nếu (vm_dir_record(raw, 24, 1, info) != 0) { trả về 7; };
+    máy ghi byte(raw + 19, 192); máy ghi byte(raw + 20, 175); máy ghi byte(raw + 21, 0);
+    nếu (vm_dir_record(raw, 24, 1, info) != -1) { trả về 8; };
+    máy ghi byte(raw + 19, 237); máy ghi byte(raw + 20, 160); máy ghi byte(raw + 21, 128); máy ghi byte(raw + 22, 0);
+    nếu (vm_dir_record(raw, 24, 1, info) != -1) { trả về 9; };
+    máy ghi byte(raw + 19, 240); máy ghi byte(raw + 20, 159); máy ghi byte(raw + 21, 144); máy ghi byte(raw + 22, 177); máy ghi byte(raw + 23, 0);
+    nếu (vm_dir_record(raw, 24, 1, info) != 24) { trả về 10; };
+    nếu (vm_get(info, 1) != 4) { trả về 11; };
+    // Darwin record: reclen=32, namlen=2, d_name begins at byte 21.
+    máy ghi byte(raw + 16, 32); máy ghi byte(raw + 18, 2); máy ghi byte(raw + 19, 0);
+    máy ghi byte(raw + 21, 195); máy ghi byte(raw + 22, 161); máy ghi byte(raw + 23, 0);
+    nếu (vm_dir_record(raw, 32, 0, info) != 32) { trả về 12; };
+    nếu (vm_get(info, 1) != 2) { trả về 13; };
+    máy ghi byte(raw + 18, 3);
+    nếu (vm_dir_record(raw, 32, 0, info) != 0) { trả về 14; };
+    // Tokens are process-wide, owner-scoped and revoked during fatal cleanup.
+    biến first = vm_alloc(64, 1); biến second = vm_alloc(64, 1);
+    biến a = vm_dir_open(first, vm_literal("."));
+    biến b = vm_dir_open(second, vm_literal("."));
+    biến token = vm_at(a, 0);
+    nếu (vm_number(token) == vm_number(vm_at(b, 0))) { trả về 15; };
+    biến resource = vm_at(vm_get(first, 11), 0);
+    biến control = vm_get(resource, 1);
+    nếu (thực thi tệp dữ liệu ô nhớ(vm_number(token)) != -1) { trả về 29; };
+    nếu (máy thư mục thô(1, control, -1) != -22) { trả về 30; };
+    biến buffer = vm_get(resource, 2);
+    máy ghi byte(buffer + 16, 24); máy ghi byte(buffer + 19, 97);
+    máy ghi byte(buffer + 40, 24); máy ghi byte(buffer + 43, 98);
+    vm_set(resource, 3, 48);
+    biến saved_linux = vm_get(4198464, 8); vm_set(4198464, 8, 1);
+    biến entry = vm_dir_next(first, token);
+    nếu (vm_equal(vm_at(entry, 1), vm_literal("a")) != 1) { trả về 26; };
+    entry = vm_dir_next(first, token);
+    nếu (vm_equal(vm_at(entry, 1), vm_literal("b")) != 1) { trả về 27; };
+    nếu (vm_get(resource, 4) != 48) { trả về 28; };
+    vm_set(4198464, 8, saved_linux);
+    nếu (vm_dir_find(second, token) != -1) { trả về 16; };
+    nếu (vm_get(4198464, 1) != 2) { trả về 17; };
+    vm_dir_close_all(first); vm_dir_close_all(second);
+    nếu (vm_get(4198464, 1) != 2) { trả về 18; };
+    nếu (vm_at(vm_get(first, 11), 0) != 0) { trả về 19; };
+    nếu (vm_get(control, 2) != 0) { trả về 20; };
+    nếu (máy thư mục thô(2, control, 0) != -9) { trả về 21; };
+    nếu (máy tiến trình định danh thô(6) != -22) { trả về 22; };
+    biến largest = vm_uint32(-1);
+    biến high = vm_uint32(-2147483648);
+    nếu (vm_tag(largest) != 11 || vm_tag(high) != 11) { trả về 31; };
+    nếu (vm_equal(largest, high) || !vm_equal(largest, vm_uint32(-1))) { trả về 32; };
+    nếu (vm_equal(largest, vm_int(-1))) { trả về 33; };
+    nếu (vm_equal(vm_binary(9, largest, high), vm_int(1)) != 1) { trả về 34; };
+    nếu (vm_equal(vm_binary(10, high, largest), vm_int(1)) != 1) { trả về 35; };
+    nếu (vm_equal(vm_text(largest), vm_literal("4294967295")) != 1) { trả về 36; };
+    nếu (vm_equal(vm_text(high), vm_literal("2147483648")) != 1) { trả về 37; };
+    // Unsigned credentials must retain ordering across INT32_MAX and the
+    // sign bit, without confusing UINT32_MAX with signed -1.
+    biến low = vm_uint32(2147483647);
+    biến middle = vm_uint32(-1073741824); // 0xc0000000
+    biến below_max = vm_uint32(-2);
+    nếu (vm_tag(low) != 1 || vm_tag(middle) != 11) { trả về 38; };
+    nếu (!vm_equal(vm_binary(9, high, low), vm_int(1))) { trả về 39; };
+    nếu (!vm_equal(vm_binary(10, low, high), vm_int(1))) { trả về 40; };
+    nếu (!vm_equal(vm_binary(9, middle, high), vm_int(1))) { trả về 41; };
+    nếu (!vm_equal(vm_binary(10, middle, largest), vm_int(1))) { trả về 42; };
+    nếu (!vm_equal(vm_binary(9, largest, below_max), vm_int(1))) { trả về 43; };
+    nếu (!vm_equal(vm_binary(10, vm_int(-1), high), vm_int(1))) { trả về 44; };
+    nếu (!vm_equal(vm_binary(11, high, high), vm_int(1))) { trả về 45; };
+    nếu (!vm_equal(vm_binary(12, largest, largest), vm_int(1))) { trả về 46; };
+    nếu (!vm_equal(vm_binary(7, largest, vm_int(-1)), vm_int(0))) { trả về 47; };
+    nếu (!vm_equal(vm_binary(8, largest, below_max), vm_int(1))) { trả về 48; };
+    nếu (!vm_equal(vm_text(middle), vm_literal("3221225472"))) { trả về 49; };
+    nếu (!vm_equal(vm_text(below_max), vm_literal("4294967294"))) { trả về 50; };
+    nếu (máy thư mục thô(5, 0, 0) != -22) { trả về 23; };
+    nếu (máy thư mục thô(0, -1, 4096) != -22) { trả về 24; };
+    nếu (máy thư mục thô(0, 4096, 68162560) != -22) { trả về 25; };
+    // A boxed POSIX credential must not silently order against a string.
+    vm_set(4198464, 1, 0);
+    vm_binary(9, high, vm_literal("bad"));
+    nếu (vm_get(4198464, 1) != 2) { trả về 51; };
+    trả về 0;
+};

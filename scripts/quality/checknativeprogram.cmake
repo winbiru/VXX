@@ -102,15 +102,10 @@ if (NOT status EQUAL 52)
 endif()
 
 # A failure must preserve an existing executable (no partial publication).
-# Stage 1 accepts unresolved identifiers as dynamic variables, so require a
-# genuinely malformed expression to exercise its failed-build publication path.
-if (DEFINED VPP_STAGE1 AND NOT "${VPP_STAGE1}" STREQUAL "")
-    file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
-        "hàm chính() { trả về ( ; };\n")
-else()
-    file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
-        "hàm main() { trả về 20 / 2; };\n")
-endif()
+# Both compilation paths support division. Use a malformed expression to
+# exercise failed-build publication regardless of the available opcodes.
+file(WRITE "${VPP_OUTPUT_DIR}/unsupported.vi"
+    "hàm chính() { trả về ( ; };\n")
 file(WRITE "${executable}" "existing-executable")
 vpp_native_compile_command("${VPP_OUTPUT_DIR}/unsupported.vi"
     "${executable}" compile_command)
@@ -120,8 +115,7 @@ execute_process(
     WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
     RESULT_VARIABLE status ERROR_VARIABLE errors)
 file(READ "${executable}" content)
-if (status EQUAL 0 OR NOT content STREQUAL "existing-executable" OR
-    (NOT DEFINED VPP_STAGE1 AND NOT errors MATCHES "chưa hỗ trợ"))
+if (status EQUAL 0 OR NOT content STREQUAL "existing-executable")
     message(FATAL_ERROR "self-host AOT must reject unsupported syntax without overwriting output: ${status} ${errors}")
 endif()
 

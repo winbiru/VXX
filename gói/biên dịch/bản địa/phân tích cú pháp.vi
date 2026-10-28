@@ -314,6 +314,13 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực sang nguyên") == 1) { trả về 65; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực đọc") == 1) { trả về 66; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thực văn bản") == 1) { trả về 67; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đồng hồ thô") == 1) { trả về 68; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ngủ thô") == 1) { trả về 69; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy entropy thô") == 1) { trả về 70; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiến trình định danh thô") == 1) { trả về 71; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy thư mục thô") == 1) { trả về 72; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiến trình thô") == 1) { trả về 73; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ổ cắm thô") == 1) { trả về 74; };
     trả về -1;
 };
 
@@ -386,6 +393,13 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 65) { trả về 1; };
     nếu (mã định danh == 66) { trả về 2; };
     nếu (mã định danh == 67) { trả về 2; };
+    nếu (mã định danh == 68) { trả về 2; };
+    nếu (mã định danh == 69) { trả về 1; };
+    nếu (mã định danh == 70) { trả về 2; };
+    nếu (mã định danh == 71) { trả về 1; };
+    nếu (mã định danh == 72) { trả về 3; };
+    nếu (mã định danh == 73) { trả về 2; };
+    nếu (mã định danh == 74) { trả về 2; };
     trả về -1;
 };
 

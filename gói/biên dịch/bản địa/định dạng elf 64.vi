@@ -115,7 +115,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
         };
     };
     nếu (mã trạng thái == 0) {
-        lặp (mã lõi = 0; mã lõi < 68; mã lõi++) {
+        lặp (mã lõi = 0; mã lõi < 75; mã lõi++) {
             nếu (có tham chiếu hàm(lời gọi lõi, mã lõi) == 1) {
                 nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(mã lõi), 0, 0) != 0) {
                     mã trạng thái = -1;
@@ -141,7 +141,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
             nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (mã ký hiệu lõi < 0) { mã trạng thái = -1; thoát; };
-            nếu (mã ký hiệu lõi >= 68) { mã trạng thái = -1; thoát; };
+            nếu (mã ký hiệu lõi >= 75) { mã trạng thái = -1; thoát; };
             nếu (elf tái định vị bổ sung(các mục tái định vị, vị trí gọi lõi, 1 + chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, toàn cục mã định danh, mã ký hiệu lõi)) != 0) {
                 mã trạng thái = -1;
                 thoát;

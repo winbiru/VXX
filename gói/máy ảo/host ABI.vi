@@ -106,7 +106,7 @@ hàm vm_index(container, key) {
 };
 hàm vm_type(v) {
     biến t = vm_tag(v);
-    nếu (t == 0) { trả về vm_literal("rỗng"); }; nếu (t == 1) { trả về vm_literal("số nguyên"); };
+    nếu (t == 0) { trả về vm_literal("rỗng"); }; nếu (t == 1 || t == 11) { trả về vm_literal("số nguyên"); };
     nếu (t == 2) { trả về vm_literal("số thực"); }; nếu (t == 3) { trả về vm_literal("chuỗi"); };
     nếu (t == 4) { trả về vm_literal("danh sách"); }; nếu (t == 5) { trả về vm_literal("từ điển"); };
     nếu (t == 6) { trả về vm_literal("tuple"); }; nếu (t == 7) { trả về vm_literal("hàm"); };
@@ -119,8 +119,8 @@ hàm vm_file_fd(token) {
 hàm vm_host(state, op, args) {
     biến n = vm_get(args, 1);
     nếu (n != vm_host_arity(op)) { trả về vm_error(21); };
-    biến a = 0; biến b = 0; biến c = 0;
-    nếu (n > 0) { a = vm_at(args, 0); }; nếu (n > 1) { b = vm_at(args, 1); }; nếu (n > 2) { c = vm_at(args, 2); };
+    biến a = 0; biến b = 0; biến c = 0; biến d = 0;
+    nếu (n > 0) { a = vm_at(args, 0); }; nếu (n > 1) { b = vm_at(args, 1); }; nếu (n > 2) { c = vm_at(args, 2); }; nếu (n > 3) { d = vm_at(args, 3); };
     nếu (op == 145) { trả về vm_type(a); };
     nếu (op == 146) {
         // Identity is only defined for VM reference values, as on Stage 0.
@@ -196,6 +196,17 @@ hàm vm_host(state, op, args) {
         biến status = máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(path))); byte hủy(path);
         vm_set(state, 9, máy lỗi()); trả về vm_int(status);
     };
+    nếu (op >= 167 && op <= 172) {
+        biến identity = máy tiến trình định danh thô(op - 167);
+        // PID/PPID are signed i32; POSIX credentials are unsigned u32.
+        nếu (op <= 168 && identity < 0) { trả về vm_error(20); };
+        nếu (op >= 169) { trả về vm_uint32(identity); };
+        trả về vm_int(identity);
+    };
+    nếu (op == 173) { trả về vm_system_sleep(a); };
+    nếu (op == 174) { trả về vm_system_clock(0); };
+    nếu (op == 175) { trả về vm_system_clock(1); };
+    nếu (op == 176) { trả về vm_system_entropy(a); };
     nếu (op == 177) {
         biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; }; biến raw = vm_alloc(4096, 0);
         nếu (raw == 0) { byte hủy(path); trả về 0; };
@@ -204,19 +215,34 @@ hàm vm_host(state, op, args) {
         nếu (value == 0) { trả về 0; };
         lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(value, 2) + i, máy đọc byte(raw + i)); }; trả về value;
     };
-    nếu (op == 179) {
-        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
-        biến status = máy tạo thư mục(thực thi nội dung đệm(thực thi các byte ô nhớ(path))); byte hủy(path);
-        vm_set(state, 9, máy lỗi()); trả về vm_int(status);
-    };
+    nếu (op == 179) { trả về vm_dir_mutate(a, 0); };
+    nếu (op == 180) { trả về vm_dir_mutate(a, 1); };
+    nếu (op == 181) { trả về vm_dir_open(state, a); };
+    nếu (op == 182) { trả về vm_dir_next(state, a); };
+    nếu (op == 183) { trả về vm_dir_close(state, a); };
     nếu (op == 184) {
-        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
+        biến path = vm_dir_path(a);
+        nếu (path == -2) { trả về vm_int(-1); };
+        nếu (path < 0) { trả về 0; };
         biến offset = thực thi nội dung đệm(thực thi các byte ô nhớ(path)); biến status = -1;
         nếu (vm_number(b) == 1) { status = máy thông tin tệp(offset, 3376); } hoặc { status = máy thông tin liên kết(offset, 3376); };
         byte hủy(path); nếu (status < 0) { trả về vm_int(-1); };
         biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
         nếu (vm_get(4198464, 8) == 1) { mode = vm_get(3376, 6); };
         trả về vm_int(máy chia số nguyên ba mươi hai bit(mode, 4096));
+    };
+    nếu (op >= 185 && op <= 192) {
+        vm_set(4198464, 5, op);
+        trả về vm_socket_host(state, op, a, b, c, d);
+    };
+    nếu (op >= 193 && op <= 202) {
+        vm_set(4198464, 5, op);
+        trả về vm_process_host(state, op, a, b, c, d);
+    };
+    nếu (op >= 203 && op <= 205) {
+        // Preserve the host opcode when the V++ resolver rejects a request.
+        vm_set(4198464, 5, op);
+        trả về vm_resolver_host(state, op, a, b, c);
     };
     vm_set(4198464, 5, op); trả về vm_error(22);
 };
