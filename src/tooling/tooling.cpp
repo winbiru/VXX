@@ -614,6 +614,20 @@ struct FormatItem {
     std::size_t end = 0;
 };
 
+std::string normalizeCommentNewlines(std::string_view text) {
+    std::string result;
+    result.reserve(text.size());
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\r') {
+            result.push_back('\n');
+            if (i + 1 < text.size() && text[i + 1] == '\n') ++i;
+        } else {
+            result.push_back(text[i]);
+        }
+    }
+    return result;
+}
+
 void appendGapComments(const std::string &source,
                        std::size_t begin,
                        std::size_t end,
@@ -623,7 +637,7 @@ void appendGapComments(const std::string &source,
         if (source[index] == '/' && index + 1 < end && source[index + 1] == '/') {
             const std::size_t commentBegin = index;
             index += 2;
-            while (index < end && source[index] != '\n') ++index;
+            while (index < end && source[index] != '\n' && source[index] != '\r') ++index;
             items.push_back({FormatItemKind::LineComment,
                              source.substr(commentBegin, index - commentBegin),
                              commentBegin, index});
@@ -638,7 +652,7 @@ void appendGapComments(const std::string &source,
             }
             if (index + 1 < end) index += 2;
             items.push_back({FormatItemKind::BlockComment,
-                             source.substr(commentBegin, index - commentBegin),
+                             normalizeCommentNewlines(std::string_view(source).substr(commentBegin, index - commentBegin)),
                              commentBegin, index});
             continue;
         }

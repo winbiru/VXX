@@ -3,6 +3,18 @@
 nhập gói/biên dịch/từ vựng;
 nhập gói/văn bản/chuỗi;
 
+hàm riêng tư định dạng dòng bình luận(chữ) {
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(chữ); i++) {
+        nếu (chữ[i] == "\r") {
+            kết quả += "\n";
+            nếu (i + 1 < máy ảo lấy độ dài(chữ)) {
+                nếu (chữ[i + 1] == "\n") { i += 1; };
+            };
+        } hoặc { kết quả += chữ[i]; };
+    };
+    trả về kết quả;
+};
 hàm riêng tư định dạng thêm bình luận(kết quả, nguồn, đầu, cuối) {
     nếu (cuối <= đầu) { trả về; };
     đoạn = cắt chuỗi(nguồn, đầu, cuối - đầu);
@@ -17,7 +29,10 @@ hàm riêng tư định dạng thêm bình luận(kết quả, nguồn, đầu, 
         nếu (kiểu == "dòng") {
             bắt đầu = i;
             i += 2;
-            khi (i < n && đoạn[i] != "\n") { i += 1; };
+            khi (i < n) {
+                nếu (đoạn[i] == "\n" || đoạn[i] == "\r") { thoát; };
+                i += 1;
+            };
             máy ảo thêm cuối danh sách(kết quả, {
                 "loại": "dòng", "văn bản": cắt chuỗi(đoạn, bắt đầu, i - bắt đầu)
             });
@@ -30,7 +45,7 @@ hàm riêng tư định dạng thêm bình luận(kết quả, nguồn, đầu, 
             };
             nếu (i + 1 < n) { i += 2; };
             máy ảo thêm cuối danh sách(kết quả, {
-                "loại": "khối", "văn bản": cắt chuỗi(đoạn, bắt đầu, i - bắt đầu)
+                "loại": "khối", "văn bản": định dạng dòng bình luận(cắt chuỗi(đoạn, bắt đầu, i - bắt đầu))
             });
         } hoặc { i += 1; };
     };

@@ -1,5 +1,59 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Sửa hồi quy integration và công cụ Windows (30/10/2026)
+
+Hai log CI cho thấy integration đang chọn native AOT sau khi compiler V++
+được bootstrap, trong khi golden chẩn đoán và các cờ JIT/GC thuộc interpreter.
+`run_tests.sh` và runner PowerShell nay chọn `run --compiler=cpp` tường minh;
+batch worker có lựa chọn `--compiler=cpp|vpp`. CLI chạy nguồn thông thường
+vẫn ưu tiên compiler V++, không thay mặc định hoặc thêm fallback tự động.
+Các gate native compiler/AOT vẫn chạy riêng. Test `vpp-integration-backend`
+đặt đường native compiler không tồn tại để xác nhận interpreter được chọn
+đúng, giữ UTF-8/stack trace và không thay hành vi mặc định.
+
+Resolver nguồn V++ đã sửa trường hợp tìm import lên gốc ổ đĩa rồi nối
+`C:/` với `/import.vi`, tạo `C://import.vi` và làm parser đường tương đối
+báo lỗi. Bộ chuẩn hóa tiêu thụ dấu phân cách dư sau root, nhận diện đường
+drive/UNC khi kiểm thử trên POSIX và không đọc chuỗi vượt biên ở root.
+Fixture `native_source_paths.vi` kiểm tra 10 trường hợp drive/UNC/POSIX,
+bao gồm dấu phân cách Windows và tên tiếng Việt.
+
+Formatter C++ oracle và V++ không giữ CR cuối line comment; block comment
+được chuẩn hóa xuống dòng mà không sửa nội dung string literal. Gate
+formatter mở rộng thành 11 fixture, thêm CRLF và comment ở EOF. LSP
+Windows mở stdin/stdout ở binary mode để Content-Length đo đúng byte,
+và host bỏ chuyển đổi CRLF của stdout formatter trước khi tạo JSON.
+
+Kiểm chứng trên macOS: integration **1/1 PASS (140,17 giây)**; formatter/
+LSP cùng bootstrap **4/4 PASS (7,36 giây)**; lint/backend-selection cùng
+bootstrap **3/3 PASS (9,23 giây)**; backend-selection/quantum/AOT parity cùng bootstrap
+**4/4 PASS (67,90 giây)**. Các bộ đếm này là các lượt lọc riêng, có dependency
+trùng nhau. Quantum SDK tùy chọn vẫn SKIP khi chưa cài.
+
+Lượt kiểm chứng bổ sung đúng tám nhóm thất bại trong log Windows, cùng
+bootstrap và backend-selection, đạt **10/10 PASS trên macOS (135,47 giây)**:
+directory, entropy, formatter, lint, hai ca LSP, quantum và integration.
+Log ở `build-ci-regression-fix/windows-regression-recheck.log`. Hai harness
+Python `check_quantum.py` và `check_integration_backend.py` nay đọc stdout/
+stderr bằng UTF-8 tường minh, tránh phụ thuộc code page Windows. Trước sửa,
+cả hai tái hiện `UnicodeDecodeError` dưới locale ASCII; sau sửa, backend
+PASS và quantum đạt **5 PASS, 5 SKIP** (SDK tùy chọn), với `LC_ALL=C`,
+`PYTHONUTF8=0`, `PYTHONCOERCECLOCALE=0`. Đây là kiểm chứng tính độc lập
+với locale trên macOS, chưa thay thế chạy Windows thực tế.
+
+Ubuntu linux/amd64 trong Docker trên engine ARM64: VM/ASM và công cụ
+**7/7 PASS (377,69 giây)** với `--parallel 2`; log ở
+`build-linux-x86-validation/ci-repair-ctest.log`. Với libffi được bật như CI,
+toàn bộ integration đạt **357 PASS, 0 FAIL**, gồm interpreter, JIT, GC và
+HTTP loopback; log ở `build-linux-x86-validation/ci-repair-integration.log`.
+Lint/backend-selection cùng bootstrap kiểm chứng thêm **3/3 PASS (15,61 giây)**.
+CI Linux cài SQLite CLI tường minh vì fixture CRUD dùng chương trình sqlite3,
+không chỉ thư viện SQLite. Chưa tái hiện được lỗi
+VM/ASM trong đoạn log CI bị thiếu phần chẩn đoán. Workflow Linux/Windows
+nay giữ LastTest.log/LastTestsFailed.log khi thất bại. Chưa chạy MSVC/CRT
+trên Windows thực tế trong lượt này; các trường hợp đường Windows và CRLF
+đã chạy như dữ liệu trên macOS/Linux, LSP Windows cần xác nhận lại ở CI.
+
 ## Stage 2 → Stage 3 qua VM/ASM đã hội tụ (28/10/2026)
 
 Compiler đầy đủ đã tự biên dịch qua VM V++/ASM thành **Stage 2 và Stage 3**.

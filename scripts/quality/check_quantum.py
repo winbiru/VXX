@@ -41,7 +41,7 @@ def vpp(source, environment=None):
         path = Path(directory) / "main.vi"
         path.write_text(source, encoding="utf-8")
         completed = subprocess.run([str(CLI), "chạy", str(path)], cwd=ROOT,
-                                   env=environment, capture_output=True, text=True, timeout=120)
+                                   env=environment, capture_output=True, encoding="utf-8", timeout=120)
         if completed.returncode:
             raise AssertionError(completed.stderr + completed.stdout)
         return [json.loads(line) for line in completed.stdout.splitlines() if line.strip()]

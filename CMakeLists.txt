@@ -1136,6 +1136,11 @@ if (BUILD_TESTS)
     # protocol needs Python; SDK comparisons run only when Qiskit is installed.
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if (Python3_Interpreter_FOUND)
+        add_test(NAME vpp-integration-backend
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.py"
+                "$<TARGET_FILE:vpp-cli>" "${CMAKE_SOURCE_DIR}")
+        set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
         add_test(NAME vpp-quantum-bridge
             COMMAND ${CMAKE_COMMAND} -E env
                 "VPP_EXEC=$<TARGET_FILE:vpp-cli>"

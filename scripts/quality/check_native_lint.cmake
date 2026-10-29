@@ -94,4 +94,39 @@ if (DEFINED VPP_CLI AND NOT "${VPP_CLI}" STREQUAL "")
     lint_cli(invalid_option 1 "Cú pháp: vpp --soát-lỗi" --compiler=unknown
         "${VPP_OUTPUT_DIR}/valid.vi")
 endif()
-message(STATUS "Native V++ lint: syntax, span, semantic, unicode, recursive import and read-only checks PASS")
+# Exercise Windows drive/UNC paths as data on every host, so a failed import
+# reaching C:/ cannot regress to the relative graph parser's leading-/ error.
+# Compile the real lexical helpers directly, avoiding a second compilation of
+# the entire compiler graph just to test these two functions. Force the Windows
+# platform branch even when this regression runs on a POSIX CI host.
+set(path_helpers "")
+foreach(module IN ITEMS "nguồn tệp" "đồ thị mô đun")
+    file(READ "${VPP_ROOT}/gói/biên dịch/${module}.vi" implementation)
+    if(module STREQUAL "nguồn tệp")
+        set(begin_marker "hàm công khai biên dịch nguồn chuẩn đường(")
+        set(end_marker "// Những tên gói tương thích")
+    else()
+        set(begin_marker "hàm công khai biên dịch đồ thị chuẩn đường(")
+        set(end_marker "hàm công khai biên dịch đồ thị đích nhập(")
+    endif()
+    string(FIND "${implementation}" "${begin_marker}" first)
+    string(FIND "${implementation}" "${end_marker}" last)
+    if(first LESS 0 OR last LESS first)
+        message(FATAL_ERROR "Missing source path helper in ${module}")
+    endif()
+    math(EXPR length "${last} - ${first}")
+    string(SUBSTRING "${implementation}" ${first} ${length} helper)
+    string(APPEND path_helpers "${helper}\n")
+endforeach()
+file(READ "${VPP_ROOT}/src/tests/fixtures/native_source_paths.vi" path_fixture)
+string(REPLACE "nhập gói/biên dịch/nguồn tệp;" "" path_fixture "${path_fixture}")
+set(path_source "${VPP_OUTPUT_DIR}/source-path-roots.vi")
+file(WRITE "${path_source}"
+    "hàm tên nền tảng() { trả về \"windows\"; };\n${path_helpers}\n${path_fixture}")
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    "${VPP_NATIVE_COMPILER}" run "${path_source}"
+    RESULT_VARIABLE path_status OUTPUT_VARIABLE path_output ERROR_VARIABLE path_errors TIMEOUT 120)
+if(NOT path_status STREQUAL "0" OR NOT path_output STREQUAL "SOURCE PATH ROOTS OK\n")
+    message(FATAL_ERROR "Native source path normalization: ${path_status}\n${path_output}\n${path_errors}")
+endif()
+message(STATUS "Native V++ lint: syntax, span, semantic, unicode, recursive import, path roots and read-only checks PASS")

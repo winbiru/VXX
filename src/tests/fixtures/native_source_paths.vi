@@ -1,0 +1,21 @@
+// Lexical path normalization must work on every host, including drive roots.
+nhập gói/biên dịch/nguồn tệp;
+
+hàm chính() {
+    paths = [
+        ["C://missing.vi", "C:/missing.vi"],
+        ["C:////gói/../missing.vi", "C:/missing.vi"],
+        ["D:/a/./b/../c.vi", "D:/a/c.vi"],
+        ["C:\\gói\\mã.vi", "C:/gói/mã.vi"],
+        ["\\\\server\\share\\mã.vi", "//server/share/mã.vi"],
+        ["/gói//mã.vi", "/gói/mã.vi"],
+        ["///gói/mã.vi", "//gói/mã.vi"],
+        ["C:////", "C:/"],
+        ["C:/", "C:/"],
+        ["/", "/"]
+    ];
+    lặp(i = 0; i < độ dài(paths); i++) {
+        nếu (biên dịch nguồn chuẩn đường(paths[i][0]) != paths[i][1]) { ném "source path normalization"; };
+    };
+    in "SOURCE PATH ROOTS OK";
+};

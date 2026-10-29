@@ -29,8 +29,13 @@ file(WRITE "${VPP_OUTPUT_DIR}/format-6.vi"
 file(WRITE "${VPP_OUTPUT_DIR}/format-7.vi"
     "hàm f(){in \"dấu /* không là comment */\";/*nhiều\ndòng*/in 3;}")
 file(WRITE "${VPP_OUTPUT_DIR}/format-8.vi" "  \n\n")
+file(WRITE "${VPP_OUTPUT_DIR}/format-9.vi"
+    "// bình luận CRLF\r\nhàm chính(){in \"chào 🌿\";};\r\n")
+file(WRITE "${VPP_OUTPUT_DIR}/format-10.vi"
+    "/* nhiều\r\ndòng */\r\nhàm chính(){in \"literal \\\\r\\\\n\";};\r\n")
+file(WRITE "${VPP_OUTPUT_DIR}/format-11.vi" "// comment at EOF")
 
-foreach(index RANGE 1 8)
+foreach(index RANGE 1 11)
     set(source "${VPP_OUTPUT_DIR}/format-${index}.vi")
     file(SHA256 "${source}" original_hash)
 

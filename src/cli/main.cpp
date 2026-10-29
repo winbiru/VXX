@@ -14,12 +14,15 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
+#include <cstdio>
 #include <atomic>
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #else
 #include <climits>
 #include <sys/types.h>
@@ -323,7 +326,8 @@ static int runFile(const std::string &filename,
 // process để compiler có thể tái sử dụng cache AST giữa các lượt, nhưng vẫn ghi
 // output/status riêng cho từng file để run_tests.sh giữ nguyên golden semantics.
 static int runBatchTestFiles(const fs::path &outputDir,
-                             const std::vector<fs::path> &testFiles) {
+                             const std::vector<fs::path> &testFiles,
+                             bool forceCpp = false) {
     fs::create_directories(outputDir);
     for (const fs::path &testFile : testFiles) {
         std::ostringstream captured;
@@ -331,7 +335,8 @@ static int runBatchTestFiles(const fs::path &outputDir,
         std::streambuf *oldErr = std::cerr.rdbuf(captured.rdbuf());
         int status = EXIT_FAILURE;
         try {
-            status = runSourceWithAvailableCompiler(testFile.u8string(), true);
+            status = forceCpp ? runFile(testFile.u8string(), SnippetMode::Execute)
+                              : runSourceWithAvailableCompiler(testFile.u8string(), true);
         } catch (const vietvm::runtime::RuntimeError &error) {
             printErrorMessage(messages::kCliUnhandledException,
                               vietvm::runtime::formatRuntimeError(error));
@@ -590,7 +595,21 @@ static std::string formatWithAvailableCompiler(const fs::path &path,
     if (result.status != EXIT_SUCCESS) {
         throw std::runtime_error("Formatter V++ native thất bại: " + result.output);
     }
+#if defined(_WIN32)
+    // The native compiler writes through the CRT text stream. Undo its
+    // LF->CRLF transport conversion before comparing files or embedding text
+    // in a byte-counted LSP response.
+    std::string formatted;
+    formatted.reserve(result.output.size());
+    for (std::size_t i = 0; i < result.output.size(); ++i) {
+        if (result.output[i] == '\r' && i + 1 < result.output.size() &&
+            result.output[i + 1] == '\n') continue;
+        formatted.push_back(result.output[i]);
+    }
+    return formatted;
+#else
     return result.output;
+#endif
 }
 
 // LSP giữ văn bản chưa lưu trong bộ nhớ. Ghi snapshot tạm để dùng chung
@@ -2884,6 +2903,15 @@ static void publishDiagnostics(const std::string &uri, const std::string &text) 
 
 // Chạy language máy chủ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runLanguageServer() {
+#if defined(_WIN32)
+    // LSP Content-Length counts raw UTF-8 bytes, including CRLF headers.
+    // Windows text streams would turn "\r\n" into "\r\r\n" on stdout and
+    // translate or truncate bytes on stdin.
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1 ||
+        _setmode(_fileno(stdout), _O_BINARY) == -1) {
+        throw std::runtime_error("LSP: không thể mở stdin/stdout ở chế độ binary");
+    }
+#endif
     std::unordered_map<std::string, std::string> openDocuments;
     bool shutdownRequested = false;
     fs::path workspaceRoot;
@@ -3228,13 +3256,22 @@ static int runCli(int argc, char* argv[]) {
                 return buildFullNative(argv[2], argv[3], command == "--bootstrap-native");
             }
             if (command == "--batch-run-tests") {
-                if (argc < 4) return EXIT_FAILURE;
+                int outputArgument = 2;
+                bool forceCpp = false;
+                if (argc > outputArgument &&
+                    std::string(argv[outputArgument]).rfind("--compiler=", 0) == 0) {
+                    const std::string choice = argv[outputArgument++];
+                    if (choice == "--compiler=cpp") forceCpp = true;
+                    else if (choice == "--compiler=vpp") (void)nativeVppCompiler();
+                    else return EXIT_FAILURE;
+                }
+                if (argc < outputArgument + 2) return EXIT_FAILURE;
                 std::vector<fs::path> testFiles;
-                testFiles.reserve(static_cast<std::size_t>(argc - 3));
-                for (int index = 3; index < argc; ++index) {
+                testFiles.reserve(static_cast<std::size_t>(argc - outputArgument - 1));
+                for (int index = outputArgument + 1; index < argc; ++index) {
                     testFiles.push_back(vietvm::core::utf8Path(argv[index]));
                 }
-                return runBatchTestFiles(vietvm::core::utf8Path(argv[2]), testFiles);
+                return runBatchTestFiles(vietvm::core::utf8Path(argv[outputArgument]), testFiles, forceCpp);
             }
             int commandWordOffset = 0;
             if (argc >= 3) {

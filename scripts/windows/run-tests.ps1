@@ -109,7 +109,10 @@ function Invoke-Vpp {
     # SetEnvironmentVariable(name, "") can remove the entry; that makes an
     # explicitly empty getenv() value indistinguishable from a missing key.
     # Start-Process -Environment keeps "" and $null distinct in the child.
-    $process = Start-Process -FilePath $script:Vpp -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
+    # These are interpreter/JIT golden tests, including VM-only intrinsics and
+    # runtime diagnostics. Native compiler parity has its own CTest gates.
+    $vmArguments = @("run", "--compiler=cpp") + $Arguments
+    $process = Start-Process -FilePath $script:Vpp -ArgumentList $vmArguments -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -Environment $Environment -PassThru -Wait -NoNewWindow
     return $process.ExitCode
 }
 
@@ -122,7 +125,7 @@ function Start-VppServer {
     )
 
     Remove-Item -LiteralPath $StdOut, $StdErr -Force -ErrorAction SilentlyContinue
-    return Start-Process -FilePath $script:Vpp -ArgumentList @($Source) -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -PassThru -NoNewWindow
+    return Start-Process -FilePath $script:Vpp -ArgumentList @("run", "--compiler=cpp", $Source) -WorkingDirectory $WorkingDirectory -RedirectStandardOutput $StdOut -RedirectStandardError $StdErr -PassThru -NoNewWindow
 }
 
 function Stop-VppServer {

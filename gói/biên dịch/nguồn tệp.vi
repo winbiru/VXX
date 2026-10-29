@@ -11,10 +11,16 @@ nhập gói/lõi/chuyển kiểu;
 
 // Các phép biến đổi không lưu trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch nguồn chuẩn đường(đường) {
+    đường windows = tên nền tảng() == "windows";
+    nếu (máy ảo lấy độ dài(đường) > 1) {
+        nếu (đường[1] == ":" || (đường[0] == "\\" && đường[1] == "\\")) {
+            đường windows = đúng;
+        };
+    };
     văn bản = "";
     lặp(i = 0; i < máy ảo lấy độ dài(đường); i++) {
         c = đường[i];
-        nếu (c == "\\" && tên nền tảng() == "windows") { c = "/"; };
+        nếu (c == "\\" && đường windows) { c = "/"; };
         văn bản += c;
     };
     gốc dữ liệu = "";
@@ -33,6 +39,12 @@ hàm công khai biên dịch nguồn chuẩn đường(đường) {
         };
         gốc dữ liệu = văn bản[0] + ":/";
         bắt đầu = 3;
+    };
+    // Joining a root with "/import.vi" produces C://import.vi (or ///...).
+    // Consume redundant root separators before the relative graph parser.
+    khi (bắt đầu < máy ảo lấy độ dài(văn bản)) {
+        nếu (văn bản[bắt đầu] != "/") { thoát; };
+        bắt đầu += 1;
     };
     đuôi = "";
     lặp(i = bắt đầu; i < máy ảo lấy độ dài(văn bản); i++) { đuôi += văn bản[i]; };
