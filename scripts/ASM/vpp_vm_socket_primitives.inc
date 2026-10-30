@@ -1,8 +1,9 @@
 // VM socket boundary: op 0 connect, 1 listen, 2 accept, 3 send,
-// 4 recv, 5 close, 6 set timeout. Descriptor ownership is in V++.
+// 4 recv, 5 close, 6 set timeout; 7 UDP bind, 8 recvfrom, 9 sendto,
+// 10 local port. Descriptor ownership and DNS mock policy are in V++.
 // control (128 bytes): fd@0, kind@4, port@8, timeout@12,
 // data offset@16, length@20, IP length@24, errno@28, IP@32,
-// sockaddr@48, timeval@80; pollfd@96; saved flags@104; error@108.
+// sockaddr@48, timeval@80; pollfd@96; saved flags@104; error@108; socklen@112.
 // Monotonic poll deadline and timespec are private ASM stack locals.
 #if defined(__aarch64__) || defined(__arm64__)
 #ifdef __APPLE__
@@ -46,7 +47,7 @@ VMSOCK_SYM(vpp_native_os_socket):
     mov w21, w1
     bl VMSOCK_SYM(vpp_native_memory_base)
     cbz x0, Lsock_bad_a
-    cmp w19, #6
+    cmp w19, #10
     b.hi Lsock_bad_a
     // arena is 68162560; each control is 128 bytes, 16-aligned.
     mov w9, #4992
@@ -57,6 +58,14 @@ VMSOCK_SYM(vpp_native_os_socket):
     b.ne Lsock_bad_a
     add x20, x0, w21, uxtw
     str wzr, [x20, #28]
+    cmp w19, #7
+    b.eq Lsock_udp_bind_a
+    cmp w19, #8
+    b.eq Lsock_io_a
+    cmp w19, #9
+    b.eq Lsock_io_a
+    cmp w19, #10
+    b.eq Lsock_port_a
     cbz w19, Lsock_connect_a
     cmp w19, #1
     b.eq Lsock_listen_a
@@ -96,6 +105,55 @@ Lsock_addr_a:
 3:  ldp x9, x10, [x20, #32]
     stp x9, x10, [x20, #56]
     ret
+Lsock_udp_bind_a:
+    ldr w9, [x20, #8]
+    cmp w9, #0
+    b.lt Lsock_bad_a
+    mov w10, #65535
+    cmp w9, w10
+    b.gt Lsock_bad_a
+    ldr w9, [x20, #12]
+    cmp w9, #1
+    b.lt Lsock_bad_a
+    mov w10, #0x93e0
+    movk w10, #4, lsl #16
+    cmp w9, w10
+    b.gt Lsock_bad_a
+    mov w0, #2
+    bl Lsock_addr_a
+    mov w0, #2
+    mov w1, #2
+    mov w2, #0
+    bl VMSOCK_LIB(socket)
+    cmp w0, #0
+    b.lt Lsock_errno_ret_a
+    str w0, [x20]
+    bl Lsock_set_timeout_a
+    cmp w0, #0
+    b.lt Lsock_close_error_a
+    ldr w0, [x20]
+    add x1, x20, #48
+    mov w2, #16
+    bl VMSOCK_LIB(bind)
+    cmp w0, #0
+    b.lt Lsock_errno_close_a
+    ldr w0, [x20]
+    b Lsock_ret_a
+Lsock_port_a:
+    ldr w0, [x20]
+    cmp w0, #0
+    b.lt Lsock_bad_a
+    mov w9, #32
+    str w9, [x20, #112]
+    add x1, x20, #48
+    add x2, x20, #112
+    bl VMSOCK_LIB(getsockname)
+    cmp w0, #0
+    b.lt Lsock_errno_ret_a
+    ldrh w0, [x20, #50]
+    rev16 w0, w0
+    str w0, [x20, #8]
+    b Lsock_ret_a
 Lsock_connect_a:
     ldr w9, [x20, #24]
     cmp w9, #4
@@ -356,12 +414,35 @@ Lsock_io_a:
     ldr w0, [x20]
     ldr w2, [x20, #20]
     mov w3, #VMSOCK_MSG
+    cmp w19, #8
+    b.eq Lsock_recvfrom_a
+    cmp w19, #9
+    b.eq Lsock_sendto_a
     cmp w19, #3
     b.ne 1f
     bl VMSOCK_LIB(send)
     b 2f
 1:  bl VMSOCK_LIB(recv)
 2:  cmp w0, #0
+    b.lt Lsock_errno_ret_a
+    b Lsock_ret_a
+Lsock_recvfrom_a:
+    mov w3, #0
+    mov w9, #32
+    str w9, [x20, #112]
+    add x4, x20, #48
+    add x5, x20, #112
+    bl VMSOCK_LIB(recvfrom)
+    cmp w0, #0
+    b.lt Lsock_errno_ret_a
+    b Lsock_ret_a
+Lsock_sendto_a:
+    ldr w5, [x20, #112]
+    cmp w5, #16
+    b.ne Lsock_bad_a
+    add x4, x20, #48
+    bl VMSOCK_LIB(sendto)
+    cmp w0, #0
     b.lt Lsock_errno_ret_a
     b Lsock_ret_a
 Lsock_close_a:

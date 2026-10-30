@@ -551,12 +551,16 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
         nếu (c == "t") {
             nếu (mình.json khớp hằng văn bản(trạng thái, "true")) {
+                tạo boolean = lấy từ điển(trạng thái, "tạo boolean", rỗng);
+                nếu (tạo boolean != rỗng) { trả về tạo boolean(đúng); };
                 trả về đúng;
             };
             mình.json lỗi(trạng thái, "literal không hợp lệ");
         };
         nếu (c == "f") {
             nếu (mình.json khớp hằng văn bản(trạng thái, "false")) {
+                tạo boolean = lấy từ điển(trạng thái, "tạo boolean", rỗng);
+                nếu (tạo boolean != rỗng) { trả về tạo boolean(sai); };
                 trả về sai;
             };
             mình.json lỗi(trạng thái, "literal không hợp lệ");
@@ -611,7 +615,14 @@ lớp riêng tư Bộ Xử Lý JSON {
         nếu (loại của(nội dung) != "chuỗi") {
             ném "json phân tích: nội dung phải là chuỗi";
         };
-        trạng thái = {"nội dung": mình.json ký tự nguồn(nội dung), "vị trí": 0};
+        trả về mình.json phân tích với boolean(nội dung, rỗng);
+    };
+
+    // Optional factory preserves JSON booleans for consumers whose numeric
+    // schemas must distinguish true/false from V++'s ordinary 1/0 mapping.
+    hàm công khai json phân tích với boolean(nội dung, tạo boolean) {
+        nếu (loại của(nội dung) != "chuỗi") { ném "json phân tích: nội dung phải là chuỗi"; };
+        trạng thái = {"nội dung": mình.json ký tự nguồn(nội dung), "vị trí": 0, "tạo boolean": tạo boolean};
         kết quả = mình.json đọc giá trị(trạng thái);
         mình.json bỏ khoảng trắng(trạng thái);
         nếu (lấy từ điển(trạng thái, "vị trí", 0) != máy ảo lấy độ dài(nội dung)) {
@@ -700,6 +711,11 @@ lớp riêng tư Bộ Xử Lý JSON {
 hàm công khai json phân tích(nội dung) {
     bộ chuyển tiếp = Xử Lý Nội Bộ Json();
     trả về bộ chuyển tiếp.json phân tích(nội dung);
+};
+
+hàm công khai json phân tích với boolean(nội dung, tạo boolean) {
+    bộ chuyển tiếp = Bộ Xử Lý JSON();
+    trả về bộ chuyển tiếp.json phân tích với boolean(nội dung, tạo boolean);
 };
 
 // Tài liệu giữ kết quả đã parse, nạp lỗi không làm mất tài liệu trước đó.

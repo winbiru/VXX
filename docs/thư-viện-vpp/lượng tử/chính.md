@@ -101,36 +101,30 @@ là trợ giúp triển khai, không phải API dựng mạch.
 
 ## Cầu nối Qiskit
 
-Từ thư mục gốc repository, tạo môi trường Python 3.10 trở lên:
-
-```bash
-python3 -m venv .venv-quantum
-.venv-quantum/bin/python -m pip install -r 'gói/lượng tử/phụ thuộc qiskit.txt'
-```
-
-Windows dùng `.venv-quantum\Scripts\python.exe`. Muốn dùng QPU, cài thêm
-`phụ thuộc ibm.txt` và cấu hình tài khoản QiskitRuntimeService theo tài liệu IBM.
-Adapter dùng tài khoản đã lưu của SDK, không nhận token trong lời gọi V++.
+`Cầu Nối Qiskit()` mặc định dùng bộ mô phỏng V++ trong cùng chương trình.
+Không cần Python, SDK hoặc tiến trình cầu nối cho backend cục bộ.
+OpenQASM và các API dựng mạch vẫn viết bằng V++.
 
 ```vi
 nhập lượng tử;
 nhập gói/lượng tử/qiskit;
 
-sdk = Cầu Nối Qiskit("/đường/tuyệt/đối/python", "/sdk/gói/lượng tử/cầu nối qiskit.py");
+sdk = Cầu Nối Qiskit();
 kết quả = sdk.mô phỏng(mạch, 1024, 42);
 ```
 
-`Cầu Nối Qiskit(python, tệp cầu nối)` yêu cầu hai chuỗi không rỗng. Dùng đường
-dẫn tuyệt đối để độc lập thư mục làm việc; SDK đã cài chứa cầu nối tại
-`$VPP_HOME/gói/lượng tử/cầu nối qiskit.py`.
+Để dùng dịch vụ SDK bên ngoài, truyền hai đối số
+`Cầu Nối Qiskit(trình chạy, tệp cầu nối)` là chuỗi không rỗng. Dùng đường
+dẫn tuyệt đối để độc lập thư mục làm việc. Toolchain không đóng gói SDK.
+Hai tệp dependency tùy chọn ghi các gói mà ứng dụng ngoài có thể cần.
 
 | API | Input / output / side effect |
 | --- | --- |
-| `mô phỏng(mạch, số lần=1024, hạt giống=1)` | Số lần `1..1000000`, seed `0..2147483647`; mạch cần phép đo. Chạy Aer cục bộ, trả `đếm`, `số lần`, `backend=qiskit-aer`. |
-| `gửi(mạch, backend, số lần=1024)` | Backend là chuỗi không rỗng, số lần như trên, mạch cần phép đo. Transpile theo thiết bị rồi tạo **một** job QPU; trả `job_id`, `backend`, `số lần`. Có thể sử dụng quota/chi phí của tài khoản. |
-| `kết quả(mã job)` | ID không rỗng. Đọc trạng thái; trả `job_id`, `status`, `ready`. DONE thêm `đếm`, `số lần`; các trạng thái khác không chờ hoàn tất. Dừng polling khi ERROR/CANCELLED. |
+| `mô phỏng(mạch, số lần=1024, hạt giống=1)` | Số lần `1..1000000`, seed `0..2147483647`; mạch cần phép đo. Backend mặc định trả `đếm`, `số lần`, `backend=vpp-statevector`. |
+| `gửi(mạch, backend, số lần=1024)` | Backend cục bộ báo cần dịch vụ QPU. Khi cấu hình transport ngoài, gửi một yêu cầu JSON `submit`; dịch vụ chịu trách nhiệm tạo job thực. |
+| `kết quả(mã job)` | Backend cục bộ báo cần dịch vụ QPU. Transport ngoài nhận yêu cầu `result`; ID phải không rỗng. |
 
-Cầu nối nhận một đối số JSON tối đa 24000 ký tự, giao thức 1, stdout chỉ chứa
+Transport ngoài nhận một đối số JSON tối đa 24000 ký tự, giao thức 1, stdout chỉ chứa
 một JSON `protocol/ok/result` hoặc `protocol/ok/error`; diagnostic SDK đi vào
 stderr. Mỗi lời gọi có deadline tiến trình 120000 ms. Timeout chỉ dừng tiến
 trình cục bộ, không hủy job QPU; nếu mất phản hồi sau khi submit, cần kiểm tra
@@ -139,6 +133,8 @@ danh sách job trong tài khoản trước khi gửi lại. Không tự retry ho
 Dependency ranges: Qiskit `>=2.1,<3`, Aer `>=0.17,<1`, IBM Runtime `>=0.40,<1`.
 Đã kiểm tra trên macOS ARM64 với Qiskit 2.6.0, Aer 0.18.0, IBM Runtime 0.50.0; Linux/Windows
 chưa được chạy trong phiên triển khai này. Cài SDK là bước chủ động của người dùng.
+Đây là kết quả lịch sử của harness SDK trước khi gỡ Python, không phải
+chứng nhận đối chiếu Aer cho backend V++ cục bộ hiện tại.
 
 ## Error model
 
@@ -156,31 +152,32 @@ backend khác khi gặp lỗi. Lỗi validation không thêm chỉ dẫn hoặc 
 | AC-01 | FR-01/02 | `kiem_tra_goi_luong_tu.vi`: H², Y², pha S/T/Z, Bell/GHZ, CX hai chiều; sai số 1e-9. |
 | AC-02 | FR-02/03 | Cùng test: 1024 shots Bell, seed tái lập, thứ tự/ánh xạ/ghi đè bit, collapse và reset qubit vướng víu. |
 | AC-03 | FR-01, NFR-01 | Validation trước mutation; 15 đường lỗi input/tài nguyên và kiểm tra snapshot độc lập. |
-| AC-04 | FR-04 | `kiem_tra_luong_tu_openqasm.vi` và `check_quantum.py`: parser Qiskit nạp được mạch xuất; vector trạng thái trùng. |
-| AC-05 | FR-02/04 | `check_quantum.py`: 12 mạch ngẫu nhiên 1–4 qubit đối chiếu biên độ phức với Qiskit, sai số 1e-9. |
-| AC-06 | FR-05/06 | Cầu nối V++ → Aer → V++; mock service xác nhận một submit và polling không gọi result khi chưa DONE. Không gửi job thật trong test. |
-| AC-07 | NFR-02/03 | Protocol từ chối request sai, thiếu SDK trả lỗi rõ, SDK stdout không làm hỏng JSON; import không tạo service. |
+| AC-04 | FR-04 | `kiem_tra_luong_tu_openqasm.vi` kiểm tra xuất OpenQASM bằng V++; không còn oracle parser Qiskit trong repo. |
+| AC-05 | FR-02/04 | Oracle SDK ngẫu nhiên đã được gỡ cùng harness Python; ứng dụng dùng SDK ngoài cần tự kiểm chứng. |
+| AC-06 | FR-05/06 | Validation V++ cho submit/poll vẫn chạy; kiểm chứng Aer/QPU qua cầu nối ngoài không nằm trong CI hiện tại. |
+| AC-07 | NFR-02/03 | Validation chạy trước khi tạo tiến trình; harness protocol Python đã được gỡ. |
 
 ```bash
 ./build/bin/vpp-cli chạy src/tests/kiem_tra_goi_luong_tu.vi
 ./build/bin/vpp-cli chạy src/tests/kiem_tra_luong_tu_openqasm.vi
-.venv-quantum/bin/python scripts/quality/check_quantum.py
-ctest --test-dir build -R vpp-quantum-bridge --output-on-failure
+ctest --test-dir build -R '^vpp-quantum-(validation|vpp-tool)$' --output-on-failure
 ./build/bin/vpp-cli chạy examples/luong-tu/bell.vi
 ./build/bin/vpp-cli chạy examples/luong-tu/ghz.vi
 ```
 
-`check_quantum.py` bỏ qua phần đối chiếu SDK nếu chưa cài dependency tùy chọn;
-kiểm tra protocol vẫn chạy. Đặt `VPP_EXEC` để chọn CLI khác. Ba regression V++
-được đăng ký trong `run_tests.sh`, cũng được harness Windows đọc từ danh sách đó.
+Ba regression V++ được đăng ký trong `run_tests.sh`, cũng được harness
+Windows đọc từ danh sách đó.
 `kiem_tra_luong_tu_qiskit.vi` kiểm tra validation mà không khởi chạy Python.
 
-Chạy ví dụ Aer từ root, với đường dẫn Python tuyệt đối:
+Chạy ví dụ cục bộ từ root:
 
 ```bash
-VPP_QUANTUM_PYTHON="$PWD/.venv-quantum/bin/python" \
-  ./build/bin/vpp-cli chạy examples/luong-tu/qiskit.vi
+./build/bin/vpp-cli chạy examples/luong-tu/qiskit.vi
 ```
+
+Ví dụ chỉ dùng transport ngoài khi đặt cả `VPP_QUANTUM_RUNNER` và
+`VPP_QUANTUM_BRIDGE`. Mô phỏng V++ đã kiểm chứng bằng Bell/reset/seed;
+chưa có đối chiếu Aer hoặc job QPU thực trong lượt chuyển công cụ này.
 
 ## Nguồn đối chiếu và tương thích
 

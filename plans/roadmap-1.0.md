@@ -133,8 +133,10 @@ harness trên cùng máy, kiểm tra regression gate rồi mới đóng P0 và x
   GC pause p95 và peak RSS tăng >15%. Chốt threshold theo case trước khi so candidate, không
   tự cập nhật baseline hoặc nới ngưỡng để làm xanh gate. MAD/median >5% đánh dấu inconclusive,
   cần đo lại trước khi nghiệm thu; thiếu case/sample hoặc khác metadata đo phải báo lỗi.
-  Đã có `scripts/quality/run_benchmarks.py`, `compare_benchmarks.py` và bộ kiểm thử
-  quyết định PASS/FAIL/INCONCLUSIVE/INVALID. Bằng chứng local ngày 24/10 được lưu dưới
+  Runner/comparator và bộ kiểm thử quyết định PASS/FAIL/INCONCLUSIVE/INVALID
+  bằng Python đã được gỡ ngày 30/10/2026. Comparator và self-test đã chuyển
+  sang V++; orchestrator thu mẫu hai revision tự động còn cần chuyển tiếp.
+  Bằng chứng local ngày 24/10 được lưu dưới
   `benchmark/reports/local-2026-10-24/`: 16 PASS, 3 INCONCLUSIVE, 0 FAIL; các case
   nhiễu cần đo lại trước khi nghiệm thu, không đổi ngưỡng để đóng gate.
 - [ ] Nối comparator vào CI với baseline/candidate cùng runner trong một job (hoặc host
@@ -185,8 +187,10 @@ Bộ đo ngày 24/10 đã so sánh hai revision độc lập `cc675ca` và `b399
 benchmark patch trên cùng máy Release, cùng harness/corpus/iterations. Raw samples,
 GC allocation/RSS/p95 và kết quả replay nằm trong `benchmark/reports/local-2026-10-24/`.
 Hai case GC PASS; kết quả toàn bộ vẫn INCONCLUSIVE vì ba case có MAD/median >5%.
-Job `benchmark-gate` đã được thêm vào workflow; chưa có bằng chứng CI runner cho thay
-đổi này, nên các checkbox release gate vẫn để mở.
+Ngày 30/10/2026 đã chuyển comparator sang V++ sau khi gỡ Python.
+Workflow dùng `benchmark-smoke` để build/chạy case và self-test comparator;
+orchestrator thu mẫu hai revision chưa chuyển xong, các checkbox release gate
+vẫn để mở.
 
 ## 1. Đóng băng semantics ngôn ngữ
 

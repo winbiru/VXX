@@ -1,0 +1,147 @@
+// Native i32 V++ owns DNS packets; ASM only crosses the socket ABI.
+// stdin: mode, UDP transaction count. stdout: ephemeral port, served count.
+hàm m32(p, v) { trả về máy ghi số nguyên ba mươi hai bit(p, v); };
+hàm b(p) { trả về máy đọc byte(p); };
+hàm put(p, v) { trả về máy ghi byte(p, v); };
+hàm ctrl(p, port) {
+    lặp(i = 0; i < 128; i++) { put(p + i, 0); };
+    m32(p, -1); m32(p + 8, port); m32(p + 12, 5000);
+    m32(p + 20, 8); m32(p + 24, 4);
+    put(p + 32, 127); put(p + 35, 1); trả về 0;
+};
+hàm copy(dst, src, n) {
+    lặp(i = 0; i < n; i++) { put(dst + i, b(src + i)); };
+    trả về 0;
+};
+hàm ready(port) {
+    biến p = 90000; biến n = 0;
+    khi (port > 0) {
+        put(p + n, 48 + port % 10); port = port / 10; n = n + 1;
+    };
+    lặp(i = 0; i < n; i++) { put(p + 32 + i, b(p + n - i - 1)); };
+    put(p + 32 + n, 10);
+    trả về máy ghi(1, p + 32, n + 1);
+};
+hàm recv_exact(c, p, n) {
+    biến total = 0;
+    khi (total < n) {
+        m32(c + 16, p + total); m32(c + 20, n - total);
+        biến got = máy ổ cắm thô(4, c);
+        nếu (got <= 0) { trả về -1; };
+        total = total + got;
+    };
+    trả về total;
+};
+hàm send_part(c, p, n) {
+    biến total = 0;
+    khi (total < n) {
+        m32(c + 16, p + total); m32(c + 20, n - total);
+        biến got = máy ổ cắm thô(3, c);
+        nếu (got <= 0) { trả về -1; };
+        total = total + got;
+    };
+    trả về total;
+};
+hàm response(q, r, n, mode, index) {
+    copy(r, q, n);
+    put(r + 2, 129); put(r + 3, 128);
+    put(r + 4, 0); put(r + 5, 1); put(r + 6, 0); put(r + 7, 1);
+    put(r + 8, 0); put(r + 9, 0); put(r + 10, 0); put(r + 11, 0);
+    biến rcode = 0;
+    nếu (mode == 2) { rcode = 3; };
+    nếu (mode == 20 && index == 0) { rcode = 2; };
+    nếu (mode == 21 && index == 0) { rcode = 5; };
+    nếu (rcode != 0) { put(r + 3, 128 + rcode); put(r + 7, 0); trả về n; };
+    put(r + n, 192); put(r + n + 1, 12); copy(r + n + 2, q + n - 4, 4);
+    put(r + n + 6, 0); put(r + n + 7, 0); put(r + n + 8, 0); put(r + n + 9, 25);
+    biến size = 4; nếu (b(q + n - 3) == 28) { size = 16; };
+    put(r + n + 10, 0); put(r + n + 11, size);
+    lặp(i = 0; i < size; i++) { put(r + n + 12 + i, 0); };
+    nếu (size == 4) {
+        put(r + n + 12, 203); put(r + n + 13, 0);
+        put(r + n + 14, 113); put(r + n + 15, 47);
+    } hoặc {
+        put(r + n + 12, 32); put(r + n + 13, 1);
+        put(r + n + 14, 13); put(r + n + 15, 184); put(r + n + 27, 1);
+    };
+    nếu (mode == 10 || mode == 32) { put(r, (b(r) + 1) % 256); };
+    nếu (mode == 11 || mode == 33) { put(r + 13, 120); };
+    nếu (mode == 12) { put(r + n + 1, n); };
+    nếu (mode == 13 || mode == 34) { put(r + n - 3, 28); };
+    nếu (mode == 14) { put(r + n - 1, 2); };
+    nếu (mode == 15 || mode == 35) { put(r + 3, 192); };
+    nếu (mode == 16) { put(r + 5, 0); };
+    nếu (mode == 17) { trả về 18; };
+    trả về n + 12 + size;
+};
+hàm chính() {
+    biến mode = đọc số(); biến queries = đọc số();
+    nếu (queries < 1 || queries > 16) { trả về 2; };
+    biến u = 65536; biến l = 65792; biến c = 66048;
+    biến q = 70000; biến r = 74096; biến frame = 78192;
+    ctrl(u, 0);
+    biến fd = máy ổ cắm thô(7, u);
+    nếu (fd == -1 || fd == -13) { trả về 77; };
+    nếu (fd < 0) { trả về 3; };
+    biến port = máy ổ cắm thô(10, u);
+    nếu (port < 1 || port > 65535) { máy ổ cắm thô(5, u); trả về 4; };
+    ctrl(l, port); biến tcp = mode == 1 || mode >= 30;
+    nếu (tcp) {
+        nếu (máy ổ cắm thô(1, l) < 0) { máy ổ cắm thô(5, u); trả về 5; };
+    };
+    nếu (ready(port) < 1) { máy ổ cắm thô(5, u); trả về 6; };
+    biến status = 0; biến served = 0;
+    lặp(index = 0; index < queries; index++) {
+        m32(u + 16, q); m32(u + 20, 4096);
+        biến n = máy ổ cắm thô(8, u);
+        nếu (n < 17) { status = 7; thoát; };
+        served = served + 1;
+        nếu (mode == 3 && b(q + n - 3) == 28) { bỏ qua; };
+        biến size = response(q, r, n, mode, index);
+        nếu (!tcp) {
+            m32(u + 16, r); m32(u + 20, size);
+            nếu (máy ổ cắm thô(9, u) != size) { status = 8; thoát; };
+        } hoặc {
+            copy(r, q, n);
+            put(r + 2, 131); put(r + 3, 128); put(r + 7, 0);
+            m32(u + 16, r); m32(u + 20, n);
+            nếu (máy ổ cắm thô(9, u) != n) { status = 9; thoát; };
+            ctrl(c, 0); m32(c, máy đọc số nguyên ba mươi hai bit(l));
+            biến accepted = máy ổ cắm thô(2, c);
+            nếu (accepted < 0) { status = 10; thoát; };
+            copy(85000, q, n);
+            nếu (recv_exact(c, frame, 2) != 2) { máy ổ cắm thô(5, c); status = 11; thoát; };
+            biến forwarded = b(frame) * 256 + b(frame + 1);
+            nếu (forwarded != n) { máy ổ cắm thô(5, c); status = 12; thoát; };
+            nếu (recv_exact(c, q, n) != n) { máy ổ cắm thô(5, c); status = 13; thoát; };
+            biến same = 1;
+            lặp(i = 0; i < n; i++) { nếu (b(q + i) != b(85000 + i)) { same = 0; }; };
+            nếu (same == 0) { máy ổ cắm thô(5, c); status = 14; thoát; };
+            size = response(q, r, n, mode, index);
+            put(frame, size / 256); put(frame + 1, size % 256); copy(frame + 2, r, size);
+            biến length = size + 2;
+            nếu (mode == 30) { length = 1; };
+            nếu (mode == 31) { length = length - 4; };
+            nếu (mode == 36) { put(frame, 0); put(frame + 1, 1); length = 3; };
+            nếu (mode == 37) { length = 4; };
+            biến sent = 0;
+            khi (sent < length) {
+                biến chunk = 7;
+                nếu (sent < 2 || mode == 37) { chunk = 1; };
+                nếu (sent + chunk > length) { chunk = length - sent; };
+                nếu (send_part(c, frame + sent, chunk) < 0) {
+                    nếu (mode != 37) { status = 15; }; thoát;
+                };
+                sent = sent + chunk;
+                biến delay = 2; nếu (mode == 37) { delay = 150; };
+                máy ngủ thô(delay);
+            };
+            máy ổ cắm thô(5, c);
+            nếu (status != 0) { thoát; };
+        };
+    };
+    máy ổ cắm thô(5, u);
+    nếu (tcp) { máy ổ cắm thô(5, l); };
+    nếu (status != 0) { trả về status; };
+    in served; trả về 0;
+};

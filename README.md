@@ -321,17 +321,19 @@ nên chưa phải phép so sánh hiệu quả bộ nhớ với cùng tổng kh�
 · [Bảng kết quả](benchmark/reports/languages-2026-10-26/summary.txt)
 · [Mã nguồn các workload](benchmark/languages/)
 
-Chạy lại, dùng một thư mục output mới:
+Các kết quả trên là báo cáo lịch sử. Runner so sánh đa ngôn ngữ bằng
+Python đã được gỡ khỏi repository. Để build và chạy các case benchmark
+hiện có:
 
 ```bash
-cmake -S . -B build-performance -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF
-cmake --build build-performance --target vpp-cli --parallel 4
-python3 benchmark/languages/test_runner.py
-python3 benchmark/languages/run.py --vpp build-performance/bin/vpp-cli \
-  --samples 10 --target-ms 100 --output benchmark/reports/languages-rerun
+cmake -S . -B build-performance -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=ON
+cmake --build build-performance --target vpp-benchmark-baseline --parallel 4
+build-performance/bin/vpp-benchmark-baseline --iterations 1
 ```
 
-Runner hiện cần POSIX (`posix_spawn`/`wait4`); lần đo này đã kiểm chứng trên macOS ARM64.
+Lệnh này chỉ kiểm tra các workload, không tái lập phép so sánh thống kê
+đa ngôn ngữ ở bảng trên.
 
 ### Kernel i32 native: đối chiếu trực tiếp với C++
 

@@ -53,7 +53,10 @@ Tiến độ triển khai ngày 24/10/2026: đã có harness-v3, runner/comparat
 GC burst/collect/reuse + explicit trim, allocation requests/bytes, peak RSS và
 GC pause p95. Raw report tại `benchmark/reports/local-2026-10-24/` so sánh
 `cc675ca` với `b39933e` + benchmark patch: **16 PASS, 3 INCONCLUSIVE, 0 FAIL**.
-Job CI `benchmark-gate` đã bổ sung, chưa được chạy trên GitHub ở phiên này.
+Ngày 30/10/2026, runner/comparator Python đã được gỡ theo yêu cầu.
+Comparator thống kê đã được thay bằng V++, có self-test interpreter/native
+và CLI exit 0/1/2/3. CI vẫn là `benchmark-smoke` vì orchestrator thu mẫu
+hai revision tự động chưa chuyển xong; P0.4 chưa nghiệm thu.
 Giữ các mục nghiệm thu bên dưới mở vì còn ba case nhiễu, HTTP/JSON workload,
 variable-map rehash telemetry và bằng chứng CI trên SHA ứng viên.
 

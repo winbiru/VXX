@@ -2,9 +2,12 @@ nhập lượng tử;
 nhập gói / lượng tử / qiskit;
 nhập gói / hệ thống / môi trường;
 hàm chính() {
-    python = đọc biến môi trường("VPP_QUANTUM_PYTHON", "python3");
-    cầu nối = đọc biến môi trường("VPP_QUANTUM_BRIDGE", "../../gói/lượng tử/cầu nối qiskit.py");
-    sdk = Cầu Nối Qiskit(python, cầu nối);
+    trình chạy = đọc biến môi trường("VPP_QUANTUM_RUNNER", "");
+    cầu nối = đọc biến môi trường("VPP_QUANTUM_BRIDGE", "");
+    sdk = Cầu Nối Qiskit();
+    nếu (trình chạy != "" || cầu nối != "") {
+        sdk = Cầu Nối Qiskit(trình chạy, cầu nối);
+    };
     mạch = Mạch Lượng Tử(2);
     mạch.h(0) .cx(0, 1) .đo tất cả();
     kết quả = sdk.mô phỏng(mạch, 1024, 42);

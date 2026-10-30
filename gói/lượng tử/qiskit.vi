@@ -1,30 +1,38 @@
-// Import riêng: tiến trình Python/SDK là dependency tùy chọn của vi.quantum.qiskit.
+// Mặc định mô phỏng ngay bằng V++; tiến trình SDK là lựa chọn tường minh.
 nhập gói/lượng tử/openqasm;
 nhập gói/lượng tử/nền;
+nhập gói/lượng tử/mô phỏng;
 nhập gói/bộ sưu tập/từ điển;
 nhập gói/hệ thống/tiến trình;
 nhập json;
 lớp công khai Cầu Nối Qiskit {
-    // Đường dẫn tường minh: hoạt động cả trong source tree lẫn SDK đã cài.
-    hàm công khai khởi tạo(python, tệp cầu nối) {
-        nếu (loại của(python) != "chuỗi" || python == "" || loại của(tệp cầu nối) != "chuỗi" || tệp cầu nối == "") {
-            ném "qiskit: cần đường dẫn Python và tệp cầu nối qiskit.py";
+    // Không đối số dùng V++; hai đường dẫn bật transport tiến trình ngoài.
+    hàm công khai khởi tạo(trình chạy = rỗng, tệp cầu nối = rỗng) {
+        mình.cục bộ = trình chạy == rỗng && tệp cầu nối == rỗng;
+        nếu (!mình.cục bộ) {
+            nếu (loại của(trình chạy) != "chuỗi" || trình chạy == "" ||
+                loại của(tệp cầu nối) != "chuỗi" || tệp cầu nối == "") {
+                ném "qiskit: cần đường dẫn trình chạy và tệp cầu nối";
+            };
         };
-        mình.python = python;
+        mình.trình chạy = trình chạy;
         mình.tệp = tệp cầu nối;
     };
     hàm riêng tư gọi(yêu cầu) {
+        nếu (mình.cục bộ) {
+            ném "qiskit: gửi/poll QPU cần cấu hình dịch vụ; backend V++ cục bộ chỉ mô phỏng";
+        };
         yêu cầu["protocol"] = 1;
         văn bản = json tạo(yêu cầu);
         // Bounded argv để chạy được trên cả POSIX và Windows; không ghép shell.
         nếu (máy ảo lấy độ dài(văn bản) > 24000) {
             ném "qiskit: yêu cầu vượt giới hạn 24000 ký tự của cầu nối";
         };
-        tiến trình = chạy tiến trình(mình.python, [mình.tệp, văn bản], {
+        tiến trình = chạy tiến trình(mình.trình chạy, [mình.tệp, văn bản], {
         }
         , 120000);
         nếu (!tiến trình["khởi chạy"]) {
-            ném "qiskit: không khởi chạy được Python";
+            ném "qiskit: không khởi chạy được trình chạy cầu nối";
         };
         nếu (tiến trình["mã thoát"] != 0) {
             ném "qiskit: tiến trình thất bại: " + tiến trình["lỗi"];
@@ -67,6 +75,10 @@ lớp công khai Cầu Nối Qiskit {
         mình.kiểm tra phép đo(mạch);
         lượng tử yêu cầu nguyên(số lần, "số lần đo", 1, 1000000);
         lượng tử yêu cầu nguyên(hạt giống, "hạt giống Qiskit", 0, 2147483647);
+        nếu (mình.cục bộ) {
+            bộ = Bộ Mô Phỏng Lượng Tử();
+            trả về bộ.chạy(mạch, số lần, hạt giống);
+        };
         trả về mình.gọi(
             {
                 "action": "simulate", 

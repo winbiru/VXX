@@ -1,5 +1,118 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Khôi phục công cụ bằng V++ và ASM (30/10/2026)
+
+Việc gỡ Python không buộc phải bỏ chức năng. Comparator thống kê đã chuyển
+sang `gói/kiểm thử/so sánh benchmark.vi`, có CLI
+`scripts/quality/compare_benchmarks.sh report.json`. Thuật toán, kiểm tra
+metadata/checksum, mẫu xen kẽ, warmup, median/MAD, pooled GC p95 và quyết
+định PASS/FAIL/INCONCLUSIVE nằm trong V++. Evidence lỗi trả INVALID;
+CLI giữ mã thoát **0/1/2/3**. JSON có factory boolean tùy chọn để comparator
+từ chối `true/false` trong trường số, giữ hành vi JSON 1/0 mặc định.
+
+Máy chủ DNS giả `native_dns_mock.vi` được compiler i32 V++ dựng thành
+executable. ASM chỉ cung cấp UDP bind/recvfrom/sendto và lấy cổng ephemeral
+(operation 7..10 trên boundary hiện có); dữ liệu DNS, lỗi giả lập và chia
+nhỏ frame TCP do V++ điều khiển. Gate `vpp-dns-vpp-mock` kiểm tra
+**23 mode × interpreter/JIT/native**: UDP A/AAAA, TTL, TCP fallback,
+NXDOMAIN, kết quả một loại, failover, SERVFAIL/REFUSED, gói sai và deadline.
+Resolver trên VM/ASM độc lập cũng chạy lại **8 mode** với server V++ này.
+CMake/shell chỉ build, quản lý tiến trình và chờ server sẵn sàng.
+
+`Cầu Nối Qiskit()` nay mặc định gọi `Bộ Mô Phỏng Lượng Tử` trong cùng
+chương trình V++; trả `backend=vpp-statevector`. Không cần trình chạy
+hoặc tệp cầu nối để mô phỏng. Gate `vpp-quantum-vpp-tool` kiểm tra Bell,
+seed, ánh xạ bit/reset trên interpreter và executable native.
+Hai đối số đường dẫn vẫn chọn transport tiến trình ngoài tường minh.
+Backend cục bộ từ chối submit/poll QPU; chưa có tích hợp dịch vụ QPU
+trực tiếp hoặc oracle Aer độc lập thay thế trong repo.
+
+Gate `vpp-benchmark-vpp-tool` chạy comparator bằng interpreter và native,
+kèm kiểm tra bốn mã thoát CLI. CI benchmark bổ sung self-test V++;
+orchestrator thu mẫu hai revision tự động vẫn cần chuyển tiếp, nên job
+`benchmark-smoke` chưa được gọi là gate regression hiệu năng hoàn chỉnh.
+Không khôi phục tệp Python nào.
+
+Kiểm chứng macOS ARM64: cả ba công cụ chạy bằng interpreter và native;
+DNS mock **69 ca PASS**, resolver VM thêm **8 mode PASS**, comparator CLI
+exit 0/1/2/3 PASS. Ví dụ Qiskit mặc định chạy native, trả Bell
+`{"00": 510, "11": 514}` với seed 42. Bốn fixture JSON cũ khớp golden;
+socket regression ARM64/x86-64 PASS và ASM cross-assemble bốn target PASS.
+Linux x86-64 trong Docker trên engine ARM64, không cài Python:
+**5/5 CTest PASS (169,21 giây)**; resolver VM với mock V++ chạy thêm PASS.
+Log ở `build-ci-regression-fix/vpp-*-final.log` và
+`build-linux-x86-validation/vpp-tools-ctest.log`/`vpp-vm-dns-mock.log`.
+Chưa chạy Windows thực tế, toàn bộ CTest hoặc job QPU thật trong lượt này.
+
+## Mốc gỡ Python trước khi bổ sung công cụ V++ (30/10/2026)
+
+Theo yêu cầu, đã xóa 14 tệp `.py`, gồm công cụ kiểm thử/profiler/benchmark
+và cầu nối Qiskit. CMake/CTest và workflow không còn tìm hoặc gọi Python.
+`vpp-integration-backend` dùng `check_integration_backend.cmake`; hai gate
+LSP dùng `check_native_lsp.cmake`, vẫn kiểm tra framing CRLF theo byte,
+UTF-8, UTF-16, buffer chưa lưu, import tương đối và shutdown.
+Oracle quyền thư mục/PID/PPID/UID/GID chuyển sang shell POSIX. Resolver VM
+giữ kiểm tra hosts, GC giữa provider/main và tìm provider cạnh executable
+khi argv0 chỉ có tên và cwd khác.
+
+Ba regression lượng tử V++ trong integration giữ nguyên. Gate
+`vpp-quantum-validation` kiểm tra validation V++ thay cho harness Qiskit
+cũ; repo không còn cung cấp adapter SDK thực thi bằng Python. Ví dụ
+Qiskit yêu cầu `VPP_QUANTUM_BRIDGE` trỏ tới một cầu nối bên ngoài.
+
+Các mock DNS loopback UDP/TCP/failover, oracle SDK Qiskit, profiler có
+giới hạn thời gian và comparator benchmark Python đã được gỡ; chưa có
+bản thay thế tương đương cho toàn bộ các công cụ này. Fixture DNS wire,
+transport, cache, cấu hình, search, hosts và native DNS hiện có vẫn chạy.
+Job `benchmark-smoke` chỉ build/chạy các case benchmark một vòng, không
+đóng vai trò gate thống kê giữa hai revision. Profiler nội bộ VM vẫn dùng
+`VPP_VM_PROFILE=1`. Những mốc bên dưới lưu kết quả lịch sử trước khi gỡ
+công cụ Python; tên công cụ cũ không còn là lệnh chạy hiện hành.
+
+Kiểm chứng bản thay thế: macOS ARM64 `vpp-vm-asm` PASS (196,86 giây),
+backend/validation lượng tử/native DNS PASS; hai gate LSP cùng bootstrap
+**3/3 PASS (6,22 giây)** sau khi chuyển parser framing sang đọc byte HEX.
+Benchmark smoke build thành công và chạy **19 case**, exit 0.
+Ubuntu linux/amd64 trong Docker trên engine ARM64, xác nhận không có
+`python3`: **6/6 CTest PASS (46,48 giây)** cho backend, LSP, validation
+lượng tử, native DNS và bootstrap. Hai harness thư mục/credential và
+resolver chạy thêm riêng đều PASS; log tại
+`build-linux-x86-validation/no-python-{ctest,directory,resolver}.log`.
+Chưa chạy bản thay thế trên Windows thực tế hoặc chạy lại toàn bộ CTest.
+
+## Sửa fixture DNS và tệp kiểm thử thiếu trên CI (30/10/2026)
+
+Log CI Linux mới do người dùng cung cấp đạt **78/80 PASS**. Hai lỗi còn lại
+là lời gọi `thành chuỗi` chưa phân giải trong kết nối DNS và thiếu
+`scripts/quality/check_integration_backend.py`. Tệp Python đã có ở máy
+cục bộ nhưng chưa được Git theo dõi; nay được thêm vào Git index để đi
+cùng đăng ký CTest hiện có, giữ nguyên kiểm tra chọn backend.
+
+Module `gói/mạng/kết nối phân giải tên miền.vi` và fixture của nó nay
+import trực tiếp `gói/lõi/chuyển kiểu`, theo phạm vi ký hiệu của compiler
+V++. Trước sửa, lỗi native được tái hiện trên macOS ngay ở mode `hosts`.
+Fixture interpreter/JIT chọn `run --compiler=cpp` tường minh, giữ đủ bốn
+tổ hợp JIT=0/1 và hosts/không cấu hình. Gate mới
+`vpp-native-socket-dns-vi-fixture` chạy cả hai mode bằng `--compiler=vpp`,
+phụ thuộc fixture bootstrap và dùng tệp hosts riêng. Vì vậy bootstrap
+hoàn tất giữa các lượt kiểm tra không còn thay backend của fixture DNS.
+
+Kiểm chứng macOS ARM64: **4/4 PASS (38,46 giây)**, gồm bootstrap, DNS
+interpreter/JIT, native DNS và backend-selection; log ở
+`build-ci-regression-fix/dns-backend-ci-repair.log`. Backend-selection
+cũng PASS với `LC_ALL=C`, `PYTHONUTF8=0`, `PYTHONCOERCECLOCALE=0`.
+
+Ubuntu linux/amd64 trong Docker trên engine ARM64, có libffi như CI:
+cùng bộ kiểm tra đạt **4/4 PASS (47,12 giây)** với `--parallel 2`.
+Log ở `build-linux-x86-validation/dns-backend-ci-repair.log`. Cả hai
+lượt đều chạy thực tế native DNS, không chỉ kiểm tra cú pháp/import.
+
+Log CI được cung cấp xác nhận thêm `vpp-vm-asm` PASS (226,49 giây),
+`vpp-integration` PASS (198,28 giây) và `vpp-vm-asm-selfhost` PASS
+(1.208,28 giây). Gate selfhost kiểm tra ảnh Stage 1 → 2 → 3 khớp từng
+byte và thực thi chương trình do Stage 3 biên dịch. Đây là kết quả từ
+log CI, không phải lượt tự biên dịch chạy lại cục bộ trong lần sửa này.
+
 ## Sửa hồi quy integration và công cụ Windows (30/10/2026)
 
 Hai log CI cho thấy integration đang chọn native AOT sau khi compiler V++
@@ -238,16 +351,18 @@ phải CPU sampling profiler. `allocations`, `gc` và `free-list-probes`
 là bộ đếm cộng dồn từ lúc bật profiler. Profiler giúp khoanh vùng nhưng
 không đo trực tiếp tỷ lệ thời gian CPU của từng hàm.
 
-Để chạy phép đo có giới hạn thời gian, lưu log cùng báo cáo JSON:
+Profiler nội bộ vẫn có thể ghi log trực tiếp, không cần công cụ Python:
 
 ```sh
-python3 scripts/quality/profile_vm_asm_stage2.py --seconds 45 --name local
+VPP_VM_PROFILE=1 VPP_HOME="$PWD" build/vm-asm-optimized/vpp-vm \
+  build/vm-asm-selfhost/compiler-stage1.vmb build \
+  "gói/biên dịch/dòng lệnh VM.vi" -o build/compiler-stage2-profile.vmb \
+  2> build/stage2-profile.log
 ```
 
-Script mặc định dùng `build/vm-asm-optimized/vpp-vm`, ảnh
-`build/vm-asm-selfhost/compiler-stage1.vmb` và nguồn
-`gói/biên dịch/dòng lệnh VM.vi`; hỗ trợ `--vm`, `--seed`, `--source`,
-`--output-dir` để thay đổi đầu vào. Mọi phép đo dưới đây dùng cùng ảnh
+Helper giới hạn thời gian và xuất báo cáo JSON trước đây đã bị xóa.
+Lệnh trên chạy đến khi compiler kết thúc hoặc người dùng dừng. Các
+phép đo lịch sử dưới đây dùng cùng ảnh
 Stage 1 và máy macOS ARM64, thời gian quan sát khoảng 45 giây. Các số
 liệu so sánh là một lượt đo cục bộ cho từng phiên bản, chưa phải benchmark
 đa lượt với sai số thống kê.

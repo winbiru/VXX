@@ -1,0 +1,28 @@
+nhập gói/lượng tử/qiskit;
+nhập gói/lượng tử/mạch;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/kiểm thử/khẳng định;
+
+hàm chính() {
+    sdk = Cầu Nối Qiskit();
+    bell = Mạch Lượng Tử(2);
+    bell.h(0).cx(0, 1).đo tất cả();
+    a = sdk.mô phỏng(bell, 1024, 42);
+    b = sdk.mô phỏng(bell, 1024, 42);
+    khẳng định bằng(a["backend"], "vpp-statevector");
+    khẳng định bằng(a["đếm"]["00"], b["đếm"]["00"], "seed 00");
+    khẳng định bằng(a["đếm"]["11"], b["đếm"]["11"], "seed 11");
+    khẳng định bằng(a["số lần"], 1024);
+    counts = a["đếm"];
+    khẳng định bằng(lấy từ điển(counts, "00", 0) + lấy từ điển(counts, "11", 0), 1024);
+    // Bit mapping, repeated measurement and reset all use the V++ simulator.
+    dynamic = Mạch Lượng Tử(2, 3);
+    dynamic.x(0).đo(0, 2).đặt lại(0).đo(0, 0).đo(1, 1);
+    result = sdk.mô phỏng(dynamic, 16, 7);
+    khẳng định bằng(result["đếm"]["100"], 16);
+    rejected = 0;
+    thử { sdk.gửi(bell, "remote-device"); } bắt lỗi(e) { rejected += 1; };
+    thử { sdk.kết quả("remote-job"); } bắt lỗi(e) { rejected += 1; };
+    khẳng định bằng(rejected, 2);
+    in "VPP QUANTUM LOCAL OK";
+};

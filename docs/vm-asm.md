@@ -178,21 +178,25 @@ Bảng offset là đối tượng `scan=0` (chỉ chứa số byte offset), đư
 
 ## Đo hiệu năng và giới hạn self-hosting
 
-Chạy test runtime đầy đủ và profiler Stage 2:
+Chạy test runtime đầy đủ và profiler nội bộ Stage 2:
 
 ```sh
 cmake -DVPP_STAGE1="$PWD/build/nativedriver/vpp-native" \
   -DVPP_NATIVE_COMPILER="$PWD/build/native-cli/vpp-native" \
   -DVPP_ROOT="$PWD" -DVPP_OUTPUT_DIR="$PWD/build/vm-asm-optimized" \
   -P scripts/quality/check_vm_asm.cmake
-python3 scripts/quality/profile_vm_asm_stage2.py --seconds 45 --name local
+VPP_VM_PROFILE=1 VPP_HOME="$PWD" build/vm-asm-optimized/vpp-vm \
+  build/vm-asm-selfhost/compiler-stage1.vmb build \
+  "gói/biên dịch/dòng lệnh VM.vi" -o build/compiler-stage2-profile.vmb \
+  2> build/stage2-profile.log
 ```
 
 `VPP_VM_PROFILE=1` ghi stderr sau mỗi 250.000 guest instruction,
 gồm vị trí function/PC, số allocation, GC và số lượt dò free-list.
-`profile_vm_asm_stage2.py` lưu stderr `.log` và số liệu `.json`
-trong thư mục build. Timeout của phép đo giới hạn thời gian là dự
-kiến và chỉ có nghĩa **Stage 2 chưa hoàn thành trong thời gian đó**.
+Helper Python giới hạn thời gian và tạo JSON đã được gỡ khỏi repo.
+Lệnh trên ghi log thô và chạy đến khi xong hoặc người dùng dừng.
+Các phép đo giới hạn thời gian trước đây chỉ có nghĩa
+**Stage 2 chưa hoàn thành trong thời gian quan sát**.
 Bản có fast path và cache tên host quan sát 44,75 triệu guest instruction
 trong 45 giây (so với 44 triệu khi chỉ có bucket allocator); mức tăng
 nhỏ và mới đo một lần, chưa đủ chứng minh cải thiện hiệu năng ổn định.
@@ -251,8 +255,8 @@ API chuẩn, cây sâu, tên Unicode, symlink có dấu `/` cuối, EOF lặp,
 GC, đóng/mở 100 lần, lỗi OS và 10 ca đối số/token sai được đối chiếu
 Stage 0. Harness native kiểm tra bản ghi Linux/Darwin giả lập bị cắt,
 thiếu NUL/UTF-8 sai, nhiều bản ghi, owner khác VM, cleanup khi lỗi và
-biên offset. Khi có Python 3, kiểm thử kiểm tra mode theo umask và
-so PID/PPID với `Popen.pid`/PID của tiến trình cha. VM chạy với PATH rỗng.
+biên offset. Shell POSIX đối chiếu mode theo umask, PID/PPID với PID
+tiến trình con/cha và UID/GID với OS. VM chạy với PATH rỗng.
 
 Release macOS ARM64: **10/10 CTest liên quan PASS**; sau bổ sung ca đường
 dẫn dài, `vpp-vm-asm` tiếp tục PASS. Log ở

@@ -70,21 +70,41 @@ execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "DNS resolver guest compile: ${status}\n${output}\n${errors}")
 endif()
-find_program(resolver_python NAMES python3 REQUIRED)
-execute_process(COMMAND "${resolver_python}" "${VPP_ROOT}/scripts/quality/check_vm_dns_provider.py"
-    "${VPP_VM}" "${dns_image}" "${provider}" "${VPP_OUTPUT_DIR}" hosts
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
-if(NOT status STREQUAL "0")
-    message(FATAL_ERROR "V++ DNS hosts/GC: ${status}\n${output}\n${errors}")
-endif()
-message(STATUS "${output}")
-execute_process(COMMAND "${resolver_python}" "${VPP_ROOT}/scripts/quality/check_vm_dns_provider.py"
-    "${VPP_VM}" "${dns_image}" "${provider}" "${VPP_OUTPUT_DIR}" wire
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
-if(status STREQUAL "77")
-    message(STATUS "V++ DNS wire: sandbox bind denied, SKIP (hosts/GC still tested)")
-elseif(NOT status STREQUAL "0")
-    message(FATAL_ERROR "V++ DNS wire: ${status}\n${output}\n${errors}")
-else()
-    message(STATUS "${output}")
+set(hosts "${VPP_OUTPUT_DIR}/dns-provider-hosts.txt")
+file(WRITE "${hosts}" "203.0.113.47 vpp.example\n2001:db8::1 vpp.example\n")
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/foreign-cwd")
+foreach(mode IN ITEMS explicit sibling)
+    set(configured_provider "${provider}")
+    set(command "${VPP_VM}" "${dns_image}")
+    if(mode STREQUAL "sibling")
+        set(configured_provider "")
+        # Preserve the bare argv[0] case, independently of the working directory.
+        set(command /bin/bash -c "exec -a vpp-vm \"$1\" \"$2\""
+            vpp-dns-hosts "${VPP_VM}" "${dns_image}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH="
+        "VPP_VM_DNS_PROVIDER=${configured_provider}"
+        "VPP_DNS_VI_HOSTS_FILE=${hosts}"
+        "VPP_DNS_VI_SERVER=" "VPP_DNS_VI_SERVERS=" "VPP_DNS_VI_RESOLV_CONF="
+        ${command}
+        WORKING_DIRECTORY "${VPP_OUTPUT_DIR}/foreign-cwd"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    string(REGEX MATCHALL "[^\r\n]+" lines "${output}")
+    list(LENGTH lines count)
+    if(NOT status STREQUAL "0" OR NOT count EQUAL 3)
+        message(FATAL_ERROR "V++ DNS hosts/GC ${mode}: ${status}\n${output}\n${errors}")
+    endif()
+    list(GET lines 2 marker)
+    list(REMOVE_AT lines 2)
+    list(SORT lines)
+    list(GET lines 0 ipv6)
+    list(GET lines 1 ipv4)
+    if(NOT marker STREQUAL "DNS VM VI OK" OR NOT ipv4 STREQUAL "203.0.113.47" OR
+       NOT ipv6 MATCHES "^(2001:db8::1|2001:db8:0:0:0:0:0:1)$")
+        message(FATAL_ERROR "V++ DNS hosts returned unexpected addresses: ${output}")
+    endif()
+endforeach()
+message(STATUS "V++ DNS hosts, nested provider/main GC, sibling provider and bare argv0 PASS")
+if(DEFINED VPP_STAGE1)
+    include("${CMAKE_CURRENT_LIST_DIR}/check_vm_dns_vpp_mock.cmake")
 endif()

@@ -7,7 +7,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_TESTS "Build V++ .vi regression tests" ON)
 set(VPP_NATIVE_I32_SEED "" CACHE FILEPATH "Existing native V++ i32 compiler seed for ASM bootstrap")
-option(VPP_TEST_DNS_LOOPBACK "Enable DNS TCP fallback loopback integration test" OFF)
 option(BUILD_BENCHMARKS "Build repeatable developer benchmarks" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 # Standalone Windows executables must also run on machines without VC Redist.
@@ -551,21 +550,6 @@ if (BUILD_TESTS)
             "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
             "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_hosts_integration.cmake)
-    if (VPP_TEST_DNS_LOOPBACK)
-        find_package(Python3 REQUIRED COMPONENTS Interpreter)
-        add_test(NAME vpp-dns-tcp-loopback
-            COMMAND "${Python3_EXECUTABLE}"
-                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_tcp_fallback.py
-                $<TARGET_FILE:vpp-cli>)
-        add_test(NAME vpp-dns-multiserver-loopback
-            COMMAND "${Python3_EXECUTABLE}"
-                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_multiserver.py
-                $<TARGET_FILE:vpp-cli>)
-        add_test(NAME vpp-dns-structured-transport-loopback
-            COMMAND "${Python3_EXECUTABLE}"
-                ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_structured_transport.py
-                $<TARGET_FILE:vpp-cli>)
-    endif()
     add_test(NAME vpp-directory-vpp-fixture
         COMMAND $<TARGET_FILE:vpp-cli> ${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_ffi_thu_muc.vi)
     if (UNIX)
@@ -936,6 +920,49 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
+        add_test(NAME vpp-native-socket-dns-vi-fixture
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_SOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_BINARY_ROOT=${CMAKE_BINARY_DIR}"
+                "-DVPP_COMPILER=vpp"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_socket_dns_vi.cmake)
+        set_tests_properties(vpp-native-socket-dns-vi-fixture PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 420)
+        foreach(tool IN ITEMS benchmark quantum)
+            if(tool STREQUAL "benchmark")
+                set(tool_source scripts/quality/test_benchmark_gate.vi)
+                set(tool_expected "VPP BENCHMARK GATE OK")
+            else()
+                set(tool_source src/tests/kiem_tra_luong_tu_vpp_local.vi)
+                set(tool_expected "VPP QUANTUM LOCAL OK")
+            endif()
+            add_test(NAME vpp-${tool}-vpp-tool
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/${tool}-vpp-tool"
+                    "-DVPP_FIXTURE=${tool_source}" "-DVPP_EXPECTED=${tool_expected}"
+                    "-DVPP_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vpp_quality_tool.cmake)
+            set_tests_properties(vpp-${tool}-vpp-tool PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
+        endforeach()
+        if(VPP_NATIVE_HARNESS_STAGE1_ARG)
+            add_test(NAME vpp-dns-vpp-mock
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_STAGE1=${VPP_NATIVE_HARNESS_STAGE1}"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/dns-vpp-mock"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_dns_vpp_mock.cmake)
+            set_tests_properties(vpp-dns-vpp-mock PROPERTIES
+                FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 600
+                SKIP_REGULAR_EXPRESSION "DNS MOCK SKIP: loopback bind denied")
+        endif()
         if (VPP_NATIVE_HARNESS_STAGE1_ARG)
             add_test(NAME vpp-vm-asm
                 COMMAND ${CMAKE_COMMAND}
@@ -994,21 +1021,18 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lint.cmake)
         set_tests_properties(vpp-native-lint PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
-        find_package(Python3 QUIET COMPONENTS Interpreter)
-        if (Python3_Interpreter_FOUND)
-            add_test(NAME vpp-native-lsp-format
-                COMMAND "${Python3_EXECUTABLE}"
-                    ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_format.py
-                    $<TARGET_FILE:vpp-cli> ${VPP_NATIVE_CLI_COMPILER} ${CMAKE_SOURCE_DIR})
-            set_tests_properties(vpp-native-lsp-format PROPERTIES
+        foreach(mode IN ITEMS format diagnostics)
+            add_test(NAME vpp-native-lsp-${mode}
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-lsp-${mode}"
+                    "-DVPP_LSP_MODE=${mode}"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp.cmake)
+            set_tests_properties(vpp-native-lsp-${mode} PROPERTIES
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
-            add_test(NAME vpp-native-lsp-diagnostics
-                COMMAND "${Python3_EXECUTABLE}"
-                    ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_lsp_diagnostics.py
-                    $<TARGET_FILE:vpp-cli> ${VPP_NATIVE_CLI_COMPILER} ${CMAKE_SOURCE_DIR})
-            set_tests_properties(vpp-native-lsp-diagnostics PROPERTIES
-                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
-        endif()
+        endforeach()
         add_test(NAME vpp-native-disassemble-parity
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -1132,23 +1156,19 @@ if (BUILD_TESTS)
     endif()
     add_test(NAME vpp-import-precedence-hardening COMMAND vpp-import-precedence-hardening)
 
-    # The pure V++ quantum regressions run in vpp-integration. The bridge
-    # protocol needs Python; SDK comparisons run only when Qiskit is installed.
-    find_package(Python3 QUIET COMPONENTS Interpreter)
-    if (Python3_Interpreter_FOUND)
-        add_test(NAME vpp-integration-backend
-            COMMAND "${Python3_EXECUTABLE}"
-                "${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.py"
-                "$<TARGET_FILE:vpp-cli>" "${CMAKE_SOURCE_DIR}")
-        set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
-        add_test(NAME vpp-quantum-bridge
-            COMMAND ${CMAKE_COMMAND} -E env
-                "VPP_EXEC=$<TARGET_FILE:vpp-cli>"
-                "PYTHONDONTWRITEBYTECODE=1"
-                "${Python3_EXECUTABLE}"
-                "${CMAKE_SOURCE_DIR}/scripts/quality/check_quantum.py")
-        set_tests_properties(vpp-quantum-bridge PROPERTIES TIMEOUT 240)
-    endif()
+    add_test(NAME vpp-integration-backend
+        COMMAND ${CMAKE_COMMAND}
+            "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+            "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/integration-backend"
+            -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_integration_backend.cmake)
+    set_tests_properties(vpp-integration-backend PROPERTIES TIMEOUT 90)
+    add_test(NAME vpp-quantum-validation
+        COMMAND ${CMAKE_COMMAND} -E env "VPP_HOME=${CMAKE_SOURCE_DIR}"
+            $<TARGET_FILE:vpp-cli> run --compiler=cpp
+            "${CMAKE_SOURCE_DIR}/src/tests/kiem_tra_luong_tu_qiskit.vi")
+    set_tests_properties(vpp-quantum-validation PROPERTIES
+        PASS_REGULAR_EXPRESSION "qiskit-validation-without-python: ok" TIMEOUT 90)
 
     if (UNIX AND EXISTS ${CMAKE_SOURCE_DIR}/run_tests.sh)
         add_test(NAME vpp-integration

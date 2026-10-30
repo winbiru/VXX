@@ -5,7 +5,7 @@ foreach(required IN ITEMS VPP_VM VPP_STAGE1 VPP_NATIVE_COMPILER VPP_ROOT VPP_OUT
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(ENV{VPP_HOME} "${VPP_ROOT}")
-find_program(VPP_DIR_PYTHON NAMES python3)
+find_program(VPP_DIR_SHELL NAMES sh REQUIRED)
 set(source "${VPP_OUTPUT_DIR}/directory.vi")
 configure_file("${VPP_ROOT}/src/tests/fixtures/vm_asm_directory.vi" "${source}" COPYONLY)
 set(image "${VPP_OUTPUT_DIR}/directory.vmb")
@@ -41,51 +41,47 @@ foreach(provider IN LISTS providers)
     if (NOT sentinel STREQUAL "preserved")
         message(FATAL_ERROR "Directory ${provider} damaged a symlink target")
     endif()
-    if (VPP_DIR_PYTHON)
-        execute_process(COMMAND "${VPP_DIR_PYTHON}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.py"
-            mode "${VPP_OUTPUT_DIR}/vm-dir-mode"
-            RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 10)
-        if (NOT status STREQUAL "0")
-            message(FATAL_ERROR "Directory ${provider} permissions differ: ${status}\n${errors}")
-        endif()
+    execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+        mode "${VPP_OUTPUT_DIR}/vm-dir-mode"
+        RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 10)
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "Directory ${provider} permissions differ: ${status}\n${errors}")
     endif()
     file(REMOVE_RECURSE "${VPP_OUTPUT_DIR}/vm-dir-mode")
 endforeach()
 
-if (VPP_DIR_PYTHON)
-    file(WRITE "${VPP_OUTPUT_DIR}/pid.vi"
-        "hàm chính() { in máy tiến trình mã tiến trình(); in máy tiến trình mã tiến trình cha(); };\n")
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${VPP_OUTPUT_DIR}/pid.vi"
-        -o "${VPP_OUTPUT_DIR}/pid.vmb"
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
-    if (NOT status STREQUAL "0")
-        message(FATAL_ERROR "PID oracle fixture build failed: ${status}\n${output}\n${errors}")
-    endif()
-    execute_process(COMMAND "${VPP_DIR_PYTHON}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.py"
-        pid "${VPP_VM}" "${VPP_OUTPUT_DIR}/pid.vmb" "${VPP_OUTPUT_DIR}"
-        RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
-    if (NOT status STREQUAL "0")
-        message(FATAL_ERROR "PID/PPID differs from OS parent: ${status}\n${errors}")
-    endif()
-    file(WRITE "${VPP_OUTPUT_DIR}/credentials.vi" [=[hàm chính() {
+file(WRITE "${VPP_OUTPUT_DIR}/pid.vi"
+    "hàm chính() { in máy tiến trình mã tiến trình(); in máy tiến trình mã tiến trình cha(); };\n")
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build "${VPP_OUTPUT_DIR}/pid.vi"
+    -o "${VPP_OUTPUT_DIR}/pid.vmb"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "PID oracle fixture build failed: ${status}\n${output}\n${errors}")
+endif()
+execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+    pid "${VPP_VM}" "${VPP_OUTPUT_DIR}/pid.vmb" "${VPP_OUTPUT_DIR}"
+    RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "PID/PPID differs from OS parent: ${status}\n${errors}")
+endif()
+file(WRITE "${VPP_OUTPUT_DIR}/credentials.vi" [=[hàm chính() {
     in máy tiến trình mã người dùng();
     in máy tiến trình mã người dùng hiệu lực();
     in máy tiến trình mã nhóm();
     in máy tiến trình mã nhóm hiệu lực();
 };
 ]=])
-    execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
-        "${VPP_OUTPUT_DIR}/credentials.vi" -o "${VPP_OUTPUT_DIR}/credentials.vmb"
-        RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 60)
-    if (NOT status STREQUAL "0")
-        message(FATAL_ERROR "Credential fixture build failed: ${status}\n${errors}")
-    endif()
-    execute_process(COMMAND "${VPP_DIR_PYTHON}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.py"
-        credentials "${VPP_VM}" "${VPP_OUTPUT_DIR}/credentials.vmb" "${VPP_OUTPUT_DIR}"
-        RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
-    if (NOT status STREQUAL "0")
-        message(FATAL_ERROR "UID/GID differs from OS: ${status}\n${errors}")
-    endif()
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+    "${VPP_OUTPUT_DIR}/credentials.vi" -o "${VPP_OUTPUT_DIR}/credentials.vmb"
+    RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 60)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "Credential fixture build failed: ${status}\n${errors}")
+endif()
+execute_process(COMMAND "${VPP_DIR_SHELL}" "${VPP_ROOT}/scripts/quality/check_vm_directory_os.sh"
+    credentials "${VPP_VM}" "${VPP_OUTPUT_DIR}/credentials.vmb" "${VPP_OUTPUT_DIR}"
+    RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 20)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "UID/GID differs from OS: ${status}\n${errors}")
 endif()
 
 set(invalid_cases

@@ -6,6 +6,7 @@ nhập gói/mạng/phân giải tên miền;
 nhập gói/mạng/ổ cắm;
 nhập gói/mạng/địa chỉ mạng;
 nhập gói/hệ thống/môi trường;
+nhập gói/lõi/chuyển kiểu;
 
 lớp công khai Bộ Kết Nối DNS VPP {
     hàm công khai khởi tạo() {};

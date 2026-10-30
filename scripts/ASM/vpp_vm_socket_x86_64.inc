@@ -2,7 +2,8 @@
 // offsets. Tokens, type checks and ownership belong to V++.
 // control: fd@0, kind@4, port@8, timeout_ms@12, bytes@16, count@20,
 // ip_count@24, OS errno@28, ip@32..47, sockaddr@48..79, timeval@80..95,
-// pollfd@96, saved flags@104, connection error@108.
+// pollfd@96, saved flags@104, connection error@108, sockaddr length@112.
+// Operations 7/8/9/10 add UDP bind/recvfrom/sendto/local port for V++ mocks.
 // Monotonic deadline is kept on the private ASM stack.
 #ifdef __APPLE__
 #define SOCK_SYM(x) _##x
@@ -48,14 +49,22 @@ SOCK_SYM(vpp_native_os_socket):
     call SOCK_SYM(vpp_native_memory_base)
     testq %rax, %rax
     je .Lsock_invalid_x
-    cmpl $7, %ebx
-    jae .Lsock_invalid_x
+    cmpl $10, %ebx
+    ja .Lsock_invalid_x
     cmpl $(68162560-128), %r13d
     ja .Lsock_invalid_x
     testl $15, %r13d
     jnz .Lsock_invalid_x
     leaq (%rax,%r13), %r12
     movl $0, 28(%r12)
+    cmpl $7, %ebx
+    je .Lsock_udp_bind_x
+    cmpl $8, %ebx
+    je .Lsock_io_x
+    cmpl $9, %ebx
+    je .Lsock_io_x
+    cmpl $10, %ebx
+    je .Lsock_port_x
     cmpl $0, %ebx
     je .Lsock_connect_x
     cmpl $1, %ebx
@@ -99,6 +108,51 @@ SOCK_SYM(vpp_native_os_socket):
     movq 40(%r12), %rax
     movq %rax, 64(%r12)
     ret
+.Lsock_udp_bind_x:
+    movl 8(%r12), %eax
+    testl %eax, %eax
+    js .Lsock_invalid_x
+    cmpl $65535, %eax
+    jg .Lsock_invalid_x
+    movl 12(%r12), %eax
+    testl %eax, %eax
+    jle .Lsock_invalid_x
+    cmpl $300000, %eax
+    jg .Lsock_invalid_x
+    movl $2, %edi
+    call .Lsock_address_x
+    movl $2, %edi
+    movl $2, %esi
+    xorl %edx, %edx
+    call SOCK_LIB(socket)
+    testl %eax, %eax
+    js .Lsock_error_return_x
+    movl %eax, (%r12)
+    call .Lsock_set_timeout_x
+    testl %eax, %eax
+    js .Lsock_close_error_x
+    movl (%r12), %edi
+    leaq 48(%r12), %rsi
+    movl $16, %edx
+    call SOCK_LIB(bind)
+    testl %eax, %eax
+    js .Lsock_errno_close_x
+    movl (%r12), %eax
+    jmp .Lsock_return_x
+.Lsock_port_x:
+    movl (%r12), %edi
+    testl %edi, %edi
+    js .Lsock_invalid_x
+    movl $32, 112(%r12)
+    leaq 48(%r12), %rsi
+    leaq 112(%r12), %rdx
+    call SOCK_LIB(getsockname)
+    testl %eax, %eax
+    js .Lsock_error_return_x
+    movzwl 50(%r12), %eax
+    rolw $8, %ax
+    movl %eax, 8(%r12)
+    jmp .Lsock_return_x
 .Lsock_connect_x:
     movl 24(%r12), %eax
     cmpl $4, %eax
@@ -344,12 +398,34 @@ SOCK_SYM(vpp_native_os_socket):
     movl (%r12), %edi
     movl 20(%r12), %edx
     movl $SOCK_MSGFLAGS, %ecx
+    cmpl $8, %ebx
+    je .Lsock_recvfrom_x
+    cmpl $9, %ebx
+    je .Lsock_sendto_x
     cmpl $3, %ebx
     jne 1f
     call SOCK_LIB(send)
     jmp 2f
 1:  call SOCK_LIB(recv)
 2:  testl %eax, %eax
+    js .Lsock_error_return_x
+    jmp .Lsock_return_x
+.Lsock_recvfrom_x:
+    xorl %ecx, %ecx
+    movl $32, 112(%r12)
+    leaq 48(%r12), %r8
+    leaq 112(%r12), %r9
+    call SOCK_LIB(recvfrom)
+    testl %eax, %eax
+    js .Lsock_error_return_x
+    jmp .Lsock_return_x
+.Lsock_sendto_x:
+    cmpl $16, 112(%r12)
+    jne .Lsock_invalid_x
+    leaq 48(%r12), %r8
+    movl $16, %r9d
+    call SOCK_LIB(sendto)
+    testl %eax, %eax
     js .Lsock_error_return_x
     jmp .Lsock_return_x
 .Lsock_close_x:
