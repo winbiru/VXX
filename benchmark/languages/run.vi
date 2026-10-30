@@ -1,0 +1,213 @@
+// Orchestration, correctness validation and statistics are all V++.
+nhập gói/hệ thống/tiến trình;
+nhập gói/hệ thống/môi trường;
+nhập gói/thời gian/đơn điệu;
+nhập gói/nhập xuất/tệp;
+nhập gói/dữ liệu/json/json;
+nhập gói/lõi/chuyển kiểu;
+nhập gói/lõi/toán học;
+nhập gói/bộ sưu tập/từ điển;
+nhập gói/kiểm thử/so sánh benchmark;
+
+hàm require(ok, message) { nếu (!ok) { ném "language benchmark: " + message; }; };
+hàm checksum_value(text) {
+    require(loại của(text) == "chuỗi", "checksum must be an integer string");
+    require(độ dài(text) > 0 && độ dài(text) <= 14, "checksum extent");
+    bytes = chuỗi thành byte máy ảo(text); value = 0.0;
+    lặp(i = 0; i < độ dài(bytes); i++) {
+        require(bytes[i] >= 48 && bytes[i] <= 57, "checksum digit");
+        value = value * 10.0 + bytes[i] - 48;
+    };
+    trả về value;
+};
+hàm expected_value(name, k) {
+    nếu (name == "arithmetic") { trả về 27 * k + 475; };
+    nếu (name == "branch_loop") { trả về (k * 97 + 11 + 256 * 251) % 65521; };
+    nếu (name == "fibonacci") {
+        values = [6765,10946,17711,28657,46368,75025,121393,196418,
+            317811,514229,832040,1346269,2178309,3524578,5702887,9227465];
+        trả về values[k % 16];
+    };
+    nếu (name == "list_128") { trả về 64 * k + 4032 + (k % 2) * 64; };
+    nếu (name == "unicode_replace") { trả về (k % 4 + 4) * 26 + độ dài(thành chuỗi(k)); };
+    nếu (name == "json_parse") { trả về 17 * k + 130; };
+    ném "unknown correctness oracle";
+};
+hàm measure(runtime, name, iterations, seed, root) {
+    env = {"VPP_HOME": root, "BENCH_CASE": name, "BENCH_ITERATIONS": thành chuỗi(iterations),
+        "BENCH_SEED": thành chuỗi(seed), "VPP_ENABLE_JIT": "0", "VPP_ENABLE_MACHINE_JIT": "0",
+        "VPP_VM_PROFILE": "", "PYTHONDONTWRITEBYTECODE": "1"};
+    start = thời gian đơn điệu mili giây();
+    child = chạy tiến trình(runtime["executable"], runtime["arguments"], env, 180000);
+    wall = thời gian đơn điệu mili giây() - start;
+    require(child["khởi chạy"] && child["mã thoát"] == 0,
+        runtime["name"] + "/" + name + ": " + child["lỗi"] + child["đầu ra"]);
+    row = json phân tích(child["đầu ra"]);
+    require(row["case"] == name && row["iterations"] == iterations && row["seed"] == seed, "record identity");
+    require(row["elapsed_ms"] > 0 && row["ns_per_op"] > 0, "positive elapsed time");
+    require(độ dài(row["checks"]) == 16, "input coverage");
+    unit = 0.0;
+    lặp(i = 0; i < 16; i++) {
+        value = expected_value(name, seed + i);
+        require(row["checks"][i] == value, "wrong result " + runtime["name"] + "/" + name);
+        unit += value % 997;
+    };
+    require(checksum_value(row["checksum"]) == unit * (iterations / 16),
+        "measured checksum " + runtime["name"] + "/" + name);
+    require(độ dài(row["warmup_ms"]) == 3, "warmup coverage");
+    lặp(i = 0; i < 3; i++) { require(row["warmup_ms"][i] > 0, "warmup clock"); };
+    calculated = row["elapsed_ms"] * 1000000.0 / iterations;
+    tolerance = calculated * 0.000001 + 0.01;
+    require(trị tuyệt đối(calculated - row["ns_per_op"]) < tolerance, "time normalization");
+    row["process_wall_ms"] = wall;
+    row["stderr"] = child["lỗi"];
+    trả về row;
+};
+hàm shuffle(values, state) {
+    lặp(i = độ dài(values) - 1; i > 0; i--) {
+        state = (state * 251 + 17) % 65521;
+        j = state % (i + 1);
+        value = values[i]; values[i] = values[j]; values[j] = value;
+    };
+    trả về state;
+};
+hàm describe(values) {
+    median = benchmark percentile(values, 0.5);
+    deviations = [];
+    lặp(i = 0; i < độ dài(values); i++) {
+        máy ảo thêm cuối danh sách(deviations, trị tuyệt đối(values[i] - median));
+    };
+    mad = benchmark percentile(deviations, 0.5);
+    trả về {"median_ns": median, "p95_ns": benchmark percentile(values),
+        "mad_ns": mad, "mad_over_median": mad / median,
+        "noisy": mad / median > 0.05, "samples": độ dài(values)};
+};
+hàm initial_iterations(runtime, name) {
+    // Keep tiny native/JIT kernels above the clock resolution, even in preflight.
+    fast = runtime["name"] == "cpp" || runtime["name"] == "vpp-i32" ||
+        runtime["name"] == "node" || runtime["name"] == "java";
+    numeric = name == "arithmetic" || name == "branch_loop" || name == "fibonacci";
+    nếu (fast && numeric) { trả về 1024; };
+    trả về 16;
+};
+hàm chính() {
+    manifest_path = đọc biến môi trường("VPP_LANGUAGE_MANIFEST", "");
+    output = đọc biến môi trường("VPP_LANGUAGE_OUTPUT", "");
+    require(manifest_path != "" && output != "", "manifest/output are required");
+    manifest = json phân tích(đọc tệp(manifest_path));
+    root = manifest["root"]; runtimes = manifest["runtimes"]; seed = manifest["seed"];
+    samples = manifest["samples"]; target = manifest["target_ms"];
+    require(samples >= 10 && manifest["warmup_batches"] == 3, "sampling policy");
+    ghi tệp(output + "/manifest.json", json tạo(manifest) + "\n");
+    ghi tệp(output + "/pilots.jsonl", "");
+    ghi tệp(output + "/samples.jsonl", "");
+    tasks = [];
+    lặp(r = 0; r < độ dài(runtimes); r++) {
+        cases = runtimes[r]["cases"];
+        lặp(c = 0; c < độ dài(cases); c++) {
+            máy ảo thêm cuối danh sách(tasks, {"runtime_index": r, "case": cases[c], "iterations": 16});
+        };
+    };
+    state = shuffle(tasks, 2026);
+    nếu (đọc biến môi trường("VPP_LANGUAGE_SMOKE", "") == "1") {
+        checked = [];
+        lặp(t = 0; t < độ dài(tasks); t++) {
+            task = tasks[t]; runtime = runtimes[task["runtime_index"]];
+            row = measure(runtime, task["case"], initial_iterations(runtime, task["case"]), seed, root);
+            máy ảo thêm cuối danh sách(checked, {"runtime": runtime["name"], "record": row});
+            in "verified " + runtime["name"] + "/" + task["case"];
+        };
+        ghi tệp(output + "/smoke.json", json tạo(checked));
+        in "LANGUAGE SMOKE OK: " + thành chuỗi(độ dài(checked));
+        trả về rỗng;
+    };
+    lặp(t = 0; t < độ dài(tasks); t++) {
+        task = tasks[t]; runtime = runtimes[task["runtime_index"]];
+        n = initial_iterations(runtime, task["case"]);
+        lặp(pilot = 0; pilot < 5; pilot++) {
+            row = measure(runtime, task["case"], n, seed, root);
+            ghi nối tệp(output + "/pilots.jsonl", json tạo({"runtime": runtime["name"],
+                "pilot": pilot, "record": row}) + "\n");
+            // Freeze a multiple of the input cycle independently for each cell.
+            // V++ integers are i32. Promote before multiplying a large iteration count.
+            estimate = n * 1.0 * target / row["elapsed_ms"];
+            nếu (estimate > 100000000) { estimate = 100000000; };
+            next = làm tròn lên(estimate / 16) * 16;
+            nếu (next < 16) { next = 16; };
+            nếu (row["elapsed_ms"] >= target * 0.6 && row["elapsed_ms"] <= target * 1.6) { thoát; };
+            nếu (next == n || pilot == 4) { thoát; };
+            n = next;
+        };
+        task["iterations"] = n;
+        in "calibrated " + runtime["name"] + "/" + task["case"] + ": " + thành chuỗi(n);
+    };
+    ghi tệp(output + "/plan.json", json tạo({"tasks": tasks, "shuffle_state": state}) + "\n");
+    records = [];
+    lặp(round = 0; round < samples; round++) {
+        order = [];
+        lặp(i = 0; i < độ dài(tasks); i++) { máy ảo thêm cuối danh sách(order, i); };
+        state = shuffle(order, state);
+        lặp(position = 0; position < độ dài(order); position++) {
+            task = tasks[order[position]]; runtime = runtimes[task["runtime_index"]];
+            row = measure(runtime, task["case"], task["iterations"], seed, root);
+            sample = {"round": round, "order": position, "runtime": runtime["name"], "record": row};
+            máy ảo thêm cuối danh sách(records, sample);
+            ghi nối tệp(output + "/samples.jsonl", json tạo(sample) + "\n");
+        };
+        in "completed sample round " + thành chuỗi(round + 1) + "/" + thành chuỗi(samples);
+    };
+    summary = [];
+    lặp(t = 0; t < độ dài(tasks); t++) {
+        task = tasks[t]; runtime = runtimes[task["runtime_index"]];
+        values = []; wall = [];
+        lặp(i = 0; i < độ dài(records); i++) {
+            row = records[i];
+            nếu (row["runtime"] == runtime["name"] && row["record"]["case"] == task["case"]) {
+                máy ảo thêm cuối danh sách(values, row["record"]["ns_per_op"]);
+                máy ảo thêm cuối danh sách(wall, row["record"]["process_wall_ms"]);
+            };
+        };
+        require(độ dài(values) == samples, "incomplete cell");
+        result = describe(values);
+        result["case"] = task["case"]; result["runtime"] = runtime["name"];
+        result["iterations"] = task["iterations"];
+        result["median_process_wall_ms"] = benchmark percentile(wall, 0.5);
+        máy ảo thêm cuối danh sách(summary, result);
+    };
+    report = {"schema": 1, "manifest": manifest, "plan": tasks, "records": records, "summary": summary,
+        "validated_records": độ dài(records),
+        "timing": "in-process batch after 3 warmups; excludes startup/compile/preparation",
+        "noise_threshold": 0.05};
+    ghi tệp(output + "/report.json", json tạo(report) + "\n");
+    table = "runtime | workload | median us/op | MAD/median | independent samples\n";
+    lặp(i = 0; i < độ dài(summary); i++) {
+        row = summary[i];
+        table += row["runtime"] + " | " + row["case"] + " | " +
+            thành chuỗi(row["median_ns"] / 1000) + " | " +
+            thành chuỗi(row["mad_over_median"]) + " | " + thành chuỗi(row["samples"]) + "\n";
+    };
+    ghi tệp(output + "/summary.txt", table);
+    cases = ["arithmetic", "branch_loop", "fibonacci", "list_128", "unicode_replace", "json_parse"];
+    matrix = "| workload";
+    lặp(r = 0; r < độ dài(runtimes); r++) { matrix += " | " + runtimes[r]["name"]; };
+    matrix += " |\n| ---";
+    lặp(r = 0; r < độ dài(runtimes); r++) { matrix += " | ---:"; };
+    matrix += " |\n";
+    lặp(c = 0; c < độ dài(cases); c++) {
+        matrix += "| " + cases[c];
+        lặp(r = 0; r < độ dài(runtimes); r++) {
+            cell = "—";
+            lặp(i = 0; i < độ dài(summary); i++) {
+                row = summary[i];
+                nếu (row["runtime"] == runtimes[r]["name"] && row["case"] == cases[c]) {
+                    cell = thành chuỗi(làm tròn(row["median_ns"] * 100.0) / 100000.0);
+                    nếu (row["noisy"]) { cell += "*"; };
+                };
+            };
+            matrix += " | " + cell;
+        };
+        matrix += " |\n";
+    };
+    ghi tệp(output + "/table.txt", matrix);
+    in "LANGUAGE BENCHMARK OK: " + thành chuỗi(độ dài(records)) + " verified records";
+};

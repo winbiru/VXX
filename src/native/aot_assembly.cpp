@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <iomanip>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 
@@ -11,6 +13,28 @@
 
 namespace vietvm::native::aot {
 namespace {
+// Fold only VM i32 operations whose results are unconditional and precisely
+// defined. Bit reconstruction makes signed overflow wrapping portable.
+bool foldI32(int operation, std::int32_t left, std::int32_t right,
+             std::int32_t &result) {
+    std::uint32_t bits=0;
+    switch(operation) {
+        case OP_CONG:bits=std::uint32_t(left)+std::uint32_t(right);break;
+        case OP_TRU:bits=std::uint32_t(left)-std::uint32_t(right);break;
+        case OP_NHAN:bits=std::uint32_t(left)*std::uint32_t(right);break;
+        case OP_SO_SANH_BANG:result=left==right;return true;
+        case OP_KHAC_BANG:result=left!=right;return true;
+        case OP_LON_HON:result=left>right;return true;
+        case OP_NHO_HON:result=left<right;return true;
+        case OP_LON_HON_HOAC_BANG:result=left>=right;return true;
+        case OP_NHO_HON_HOAC_BANG:result=left<=right;return true;
+        case OP_Logic_VA:result=(left!=0 && right!=0);return true;
+        case OP_Logic_HOAC:result=(left!=0 || right!=0);return true;
+        default:return false;
+    }
+    std::memcpy(&result,&bits,sizeof(result));
+    return true;
+}
 std::string quoted(const std::string &text) {
     std::ostringstream out; out << '"';
     for (unsigned char c : text) {
@@ -32,6 +56,118 @@ constexpr bool arm = false;
 #else
 #error Full native AOT needs an AArch64 or x86-64 host
 #endif
+
+struct CountedScalarLoop {
+    int counter, bound, value, step, threshold, exit;
+};
+struct NumericAddLoop {
+    int counter, bound, left, right, result, exit;
+};
+
+// Recognize the side-effect-free counted loop produced by the bytecode
+// compiler for: for(i = ...; i < bound; i++) {
+//     x += step; if(x >= threshold) x -= threshold;
+// }
+// Keep the complete original region as a deoptimization path. Never match a
+// region with another entry point: a jump/handler can otherwise bypass the
+// scalar guards or enter in the middle of an optimized expression.
+std::optional<CountedScalarLoop> countedScalarLoop(
+    const std::vector<Instruction> &code, const std::vector<bool> &targets,
+    std::size_t i) {
+    if (i + 28 > code.size()) return std::nullopt;
+    const auto op=[&](std::size_t offset,int opcode) {return code[i+offset].op==opcode;};
+    if (!op(0,OP_DIEU_KIEN) || !op(1,OP_TEN_BIEN_GIA_TRI) ||
+        !op(2,OP_BIEN_SO) || !op(3,OP_NHO_HON) ||
+        !op(4,OP_JUMP_IF_FALSE) || !op(5,OP_MO_KHOI) ||
+        !op(6,OP_TEN_BIEN_GIA_TRI) || !op(7,OP_BIEN_SO) ||
+        !op(8,OP_CONG) || !op(9,OP_TEN_BIEN_ID) ||
+        !op(10,OP_GAN) || !op(11,OP_NEU) ||
+        !op(12,OP_TEN_BIEN_GIA_TRI) || !op(13,OP_BIEN_SO) ||
+        !op(14,OP_LON_HON_HOAC_BANG) || !op(15,OP_JUMP_IF_FALSE) ||
+        !op(16,OP_MO_KHOI) || !op(17,OP_TEN_BIEN_GIA_TRI) ||
+        !op(18,OP_BIEN_SO) || !op(19,OP_TRU) ||
+        !op(20,OP_TEN_BIEN_ID) || !op(21,OP_GAN) ||
+        !op(22,OP_DONG_KHOI) || !op(23,OP_DONG_KHOI) ||
+        !op(24,OP_CAP_NHAT) || !op(25,OP_TEN_BIEN_ID) ||
+        !op(26,OP_CONG_MOT) || !op(27,OP_JUMP)) return std::nullopt;
+    const int counter=code[i+1].operandIndex;
+    const int value=code[i+6].operandIndex;
+    if (counter < 0 || value < 0 || counter == value ||
+        code[i+9].operandIndex != value ||
+        code[i+12].operandIndex != value ||
+        code[i+17].operandIndex != value ||
+        code[i+20].operandIndex != value ||
+        code[i+25].operandIndex != counter ||
+        code[i+13].operand != code[i+18].operand ||
+        code[i+4].operand != static_cast<int>(i+28) ||
+        code[i+15].operand != static_cast<int>(i+23) ||
+        code[i+27].operand != static_cast<int>(i)) return std::nullopt;
+    for (std::size_t offset=1;offset<28;++offset)
+        if (targets[i+offset] && offset!=23) return std::nullopt;
+    return CountedScalarLoop{counter,code[i+2].operand,value,
+                             code[i+7].operand,code[i+13].operand,
+                             static_cast<int>(i+28)};
+}
+
+// Simpler arithmetic induction, e.g. lặp(i=0;i<bound;i++){x=x+3;}.
+// Only the exact single-entry 16-opcode region can skip all dynamic ABI calls.
+std::optional<CountedScalarLoop> simpleScalarLoop(
+    const std::vector<Instruction> &code, const std::vector<bool> &targets,
+    std::size_t i) {
+    if(i+16>code.size())return std::nullopt;
+    const auto op=[&](std::size_t offset,int opcode){return code[i+offset].op==opcode;};
+    if(!op(0,OP_DIEU_KIEN)||!op(1,OP_TEN_BIEN_GIA_TRI)||
+       !op(2,OP_BIEN_SO)||!op(3,OP_NHO_HON)||
+       !op(4,OP_JUMP_IF_FALSE)||!op(5,OP_MO_KHOI)||
+       !op(6,OP_TEN_BIEN_GIA_TRI)||!op(7,OP_BIEN_SO)||
+       !(op(8,OP_CONG)||op(8,OP_TRU)||op(8,OP_NHAN))||
+       !op(9,OP_TEN_BIEN_ID)||!op(10,OP_GAN)||
+       !op(11,OP_DONG_KHOI)||!op(12,OP_CAP_NHAT)||
+       !op(13,OP_TEN_BIEN_ID)||!op(14,OP_CONG_MOT)||
+       !op(15,OP_JUMP))return std::nullopt;
+    const int counter=code[i+1].operandIndex;
+    const int value=code[i+6].operandIndex;
+    if(counter<0||value<0||counter==value||
+       code[i+9].operandIndex!=value||code[i+13].operandIndex!=counter||
+       code[i+4].operand!=static_cast<int>(i+16)||
+       code[i+15].operand!=static_cast<int>(i))return std::nullopt;
+    for(std::size_t offset=1;offset<16;++offset)
+        if(targets[i+offset])return std::nullopt;
+    return CountedScalarLoop{counter,code[i+2].operand,value,
+                             code[i+7].operand,code[i+8].op,
+                             static_cast<int>(i+16)};
+}
+
+// i < bound; result = left + right; i++: promote numeric operands once in
+// the runtime, then perform all iterations without repeated ABI transitions.
+// Source slots may alias the result, but the induction slot must not be the
+// destination. An incoming branch into the region disables the shortcut.
+std::optional<NumericAddLoop> numericAddLoop(
+    const std::vector<Instruction> &code, const std::vector<bool> &targets,
+    std::size_t i) {
+    if(i+16>code.size())return std::nullopt;
+    const auto op=[&](std::size_t offset,int opcode){return code[i+offset].op==opcode;};
+    if(!op(0,OP_DIEU_KIEN)||!op(1,OP_TEN_BIEN_GIA_TRI)||
+       !op(2,OP_BIEN_SO)||!op(3,OP_NHO_HON)||
+       !op(4,OP_JUMP_IF_FALSE)||!op(5,OP_MO_KHOI)||
+       !op(6,OP_TEN_BIEN_GIA_TRI)||!op(7,OP_TEN_BIEN_GIA_TRI)||
+       !op(8,OP_CONG)||!op(9,OP_TEN_BIEN_ID)||!op(10,OP_GAN)||
+       !op(11,OP_DONG_KHOI)||!op(12,OP_CAP_NHAT)||
+       !op(13,OP_TEN_BIEN_ID)||!op(14,OP_CONG_MOT)||
+       !op(15,OP_JUMP))return std::nullopt;
+    const int counter=code[i+1].operandIndex;
+    const int result=code[i+9].operandIndex;
+    if(counter<0||result<0||counter==result||
+       code[i+6].operandIndex<0||code[i+7].operandIndex<0||
+       code[i+13].operandIndex!=counter||
+       code[i+4].operand!=static_cast<int>(i+16)||
+       code[i+15].operand!=static_cast<int>(i))return std::nullopt;
+    for(std::size_t offset=1;offset<16;++offset)
+        if(targets[i+offset])return std::nullopt;
+    return NumericAddLoop{counter,code[i+2].operand,
+                          code[i+6].operandIndex,code[i+7].operandIndex,
+                          result,static_cast<int>(i+16)};
+}
 
 class Assembly {
     std::ostringstream &out;
@@ -104,8 +240,171 @@ public:
         :out(stream),stem(std::move(symbol)),code(instructions){fn.parameterCount=1;fn.slotCount=2;}
     void emit() {
         locations.resize(code.size()+1);
+        // AOT peepholes cannot cross an incoming bytecode edge. Build the
+        // destination bitmap once; scanning it per instruction is quadratic.
+        std::vector<bool> branchTargets(code.size()+1,false);
+        const auto mark=[&](int target) {
+            if(target>=0 && static_cast<std::size_t>(target)<branchTargets.size())
+                branchTargets[static_cast<std::size_t>(target)]=true;
+        };
+        for(std::size_t j=0;j<code.size();++j) {
+            const auto &inst=code[j];
+            switch(inst.op) {
+                case OP_JUMP:case OP_JUMP_IF_FALSE:case OP_THOAT:
+                case OP_THU:case OP_THU_KET_THUC:case OP_CHON:mark(inst.operand);break;
+                case OP_CA:case OP_MAC_DINH:mark(inst.operandValue);break;
+                case OP_BO_QUA:mark(continueTarget(j));break;
+                default:break;
+            }
+            if(inst.op==OP_BAT_LOI)branchTargets[j]=true;
+        }
         for(std::size_t i=0;i<code.size();++i) {
             locations[i]=fn.instructions.size();const auto &v=code[i];
+            const auto loop=countedScalarLoop(code,branchTargets,i);
+            const auto simple=loop?std::optional<CountedScalarLoop>{}:
+                                    simpleScalarLoop(code,branchTargets,i);
+            const auto numeric=(loop||simple)?std::optional<NumericAddLoop>{}:
+                                              numericAddLoop(code,branchTargets,i);
+            if (loop||simple||numeric) {
+                // One C ABI transition, then scalar CPU arithmetic in the
+                // runtime's registers; no boxed values in the loop body.
+                // ABI return: 0=optimized, 1=deopt, 2=pending exception.
+                const int loopExit=numeric?numeric->exit:(loop?loop->exit:simple->exit);
+                if(numeric)
+                    rawCall("numeric_add_loop",{numeric->counter,numeric->bound,
+                            numeric->left,numeric->right,numeric->result});
+                else {
+                    const auto &region=loop?*loop:*simple;
+                    rawCall(loop?"counted_scalar_loop":"simple_scalar_loop",
+                            {region.counter,region.bound,region.value,
+                             region.step,region.threshold});
+                }
+                emit(MachineOpcode::StoreSlot,0,1);emit(MachineOpcode::Drop);
+                emit(MachineOpcode::LoadSlot,0,1);emit(MachineOpcode::PushConstant,2);
+                emit(MachineOpcode::Equal);
+                const auto valid=fn.instructions.size();emit(MachineOpcode::BranchZero);
+                errors.push_back(fn.instructions.size());emit(MachineOpcode::Jump);
+                fn.instructions[valid].operand=fn.instructions.size();
+                emit(MachineOpcode::LoadSlot,0,1);
+                fixups.push_back({fn.instructions.size(),loopExit});
+                emit(MachineOpcode::BranchZero);
+                // Back edges must go directly to the original slow header,
+                // so an unsupported type doesn't retry the guard 256 times.
+                locations[i]=fn.instructions.size();
+            }
+            // Compile-time i32/bool folding avoids three dynamic ABI calls
+            // and all temporary tagged values. Never cross incoming edges:
+            // even a pure expression can be a control-flow destination.
+            if(v.op==OP_BIEN_SO && i+2<code.size() &&
+               code[i+1].op==OP_BIEN_SO &&
+               !branchTargets[i+1] && !branchTargets[i+2]) {
+                std::int32_t result=0;
+                if(foldI32(code[i+2].op,v.operand,code[i+1].operand,result)) {
+                    call("integer",{result});
+                    locations[i+1]=locations[i];locations[i+2]=locations[i];
+                    i+=2;continue;
+                }
+            }
+            // A known integer assignment has no observable intermediate
+            // values. Preserve branches into either instruction as barriers.
+            if(v.op==OP_BIEN_SO && i+2<code.size() &&
+               code[i+1].op==OP_TEN_BIEN_ID && code[i+2].op==OP_GAN &&
+               !branchTargets[i+1] && !branchTargets[i+2]) {
+                call("store_integer",{code[i+1].operandIndex,v.operand});
+                locations[i+1]=locations[i];locations[i+2]=locations[i];
+                i+=2;continue;
+            }
+            // Return a known scalar directly without materializing an
+            // operand-stack value or calling the dynamic load helper.
+            if((v.op==OP_BIEN_SO || v.op==OP_TEN_BIEN_GIA_TRI) &&
+               i+1<code.size() && code[i+1].op==OP_TRA_VE &&
+               !branchTargets[i+1]) {
+                call(v.op==OP_BIEN_SO?"return_integer":"return_slot",
+                     {v.op==OP_BIEN_SO?v.operand:v.operandIndex});
+                returns.push_back(fn.instructions.size());emit(MachineOpcode::Jump);
+                locations[i+1]=locations[i];++i;continue;
+            }
+            // A contiguous load/immediate/op/assign sequence has no
+            // observable intermediate values. Fold it to one checked native
+            // call, retaining dynamic type fallback in the callee. Do not
+            // fold across jump destinations or exception handler entries.
+            if(v.op==OP_TEN_BIEN_GIA_TRI && i+4<code.size() &&
+               code[i+1].op==OP_BIEN_SO &&
+               (code[i+2].op==OP_CONG || code[i+2].op==OP_TRU || code[i+2].op==OP_NHAN) &&
+               code[i+3].op==OP_TEN_BIEN_ID && code[i+4].op==OP_GAN &&
+               !branchTargets[i+1] && !branchTargets[i+2] &&
+               !branchTargets[i+3] && !branchTargets[i+4]) {
+                call("update_integer_slot",{v.operandIndex,code[i+1].operand,
+                    code[i+2].op,code[i+3].operandIndex});
+                for(std::size_t k=1;k<=4;++k)locations[i+k]=locations[i];
+                i+=4;continue;
+            }
+            // x = a (+,-,*) b: avoid five runtime calls and temporary boxed
+            // stack values, with a checked dynamic fallback for non-numbers.
+            if(v.op==OP_TEN_BIEN_GIA_TRI && i+4<code.size() &&
+               code[i+1].op==OP_TEN_BIEN_GIA_TRI &&
+               (code[i+2].op==OP_CONG || code[i+2].op==OP_TRU || code[i+2].op==OP_NHAN) &&
+               code[i+3].op==OP_TEN_BIEN_ID && code[i+4].op==OP_GAN &&
+               !branchTargets[i+1] && !branchTargets[i+2] &&
+               !branchTargets[i+3] && !branchTargets[i+4]) {
+                call("update_numeric_slots",{v.operandIndex,code[i+1].operandIndex,
+                    code[i+2].op,code[i+3].operandIndex});
+                for(std::size_t k=1;k<=4;++k)locations[i+k]=locations[i];
+                i+=4;continue;
+            }
+            if(v.op==OP_TEN_BIEN_ID && i+1<code.size() &&
+               code[i+1].op==OP_GAN && !branchTargets[i+1]) {
+                call("assign_slot",{v.operandIndex});
+                locations[i+1]=locations[i];++i;continue;
+            }
+            if(v.op==OP_TEN_BIEN_ID && i+1<code.size() &&
+               (code[i+1].op==OP_CONG_MOT || code[i+1].op==OP_TRU_MOT) &&
+               !branchTargets[i+1]) {
+                call("increment_slot",{v.operandIndex,
+                    code[i+1].op==OP_CONG_MOT?1:-1});
+                locations[i+1]=locations[i];++i;continue;
+            }
+            // Four bytecodes and two runtime temporaries become one checked
+            // scalar comparison. The result ABI is 0=false, 1=true, 2=error.
+            // Keep incoming edges and catch targets as hard barriers.
+            if(v.op==OP_TEN_BIEN_GIA_TRI && i+3<code.size() &&
+               code[i+1].op==OP_BIEN_SO &&
+               (code[i+2].op==OP_SO_SANH_BANG || code[i+2].op==OP_KHAC_BANG ||
+                code[i+2].op==OP_LON_HON || code[i+2].op==OP_NHO_HON ||
+                code[i+2].op==OP_LON_HON_HOAC_BANG || code[i+2].op==OP_NHO_HON_HOAC_BANG) &&
+               code[i+3].op==OP_JUMP_IF_FALSE &&
+               !branchTargets[i+1] && !branchTargets[i+2] && !branchTargets[i+3]) {
+                rawCall("compare_integer_slot",{v.operandIndex,code[i+1].operand,code[i+2].op});
+                emit(MachineOpcode::StoreSlot,0,1);emit(MachineOpcode::Drop);
+                emit(MachineOpcode::LoadSlot,0,1);emit(MachineOpcode::PushConstant,2);
+                emit(MachineOpcode::Equal);
+                const auto good=fn.instructions.size();emit(MachineOpcode::BranchZero);
+                errors.push_back(fn.instructions.size());emit(MachineOpcode::Jump);
+                fn.instructions[good].operand=fn.instructions.size();
+                conditional(code[i+3].operand);
+                for(std::size_t k=1;k<=3;++k)locations[i+k]=locations[i];
+                i+=3;continue;
+            }
+            // Compare two loop-carried variables without creating temporary
+            // StackValues. 0=false, 1=true and 2=an exception to propagate.
+            if(v.op==OP_TEN_BIEN_GIA_TRI && i+3<code.size() &&
+               code[i+1].op==OP_TEN_BIEN_GIA_TRI &&
+               (code[i+2].op==OP_SO_SANH_BANG || code[i+2].op==OP_KHAC_BANG ||
+                code[i+2].op==OP_LON_HON || code[i+2].op==OP_NHO_HON ||
+                code[i+2].op==OP_LON_HON_HOAC_BANG || code[i+2].op==OP_NHO_HON_HOAC_BANG) &&
+               code[i+3].op==OP_JUMP_IF_FALSE &&
+               !branchTargets[i+1] && !branchTargets[i+2] && !branchTargets[i+3]) {
+                rawCall("compare_numeric_slots",{v.operandIndex,code[i+1].operandIndex,code[i+2].op});
+                emit(MachineOpcode::StoreSlot,0,1);emit(MachineOpcode::Drop);
+                emit(MachineOpcode::LoadSlot,0,1);emit(MachineOpcode::PushConstant,2);
+                emit(MachineOpcode::Equal);
+                const auto good=fn.instructions.size();emit(MachineOpcode::BranchZero);
+                errors.push_back(fn.instructions.size());emit(MachineOpcode::Jump);
+                fn.instructions[good].operand=fn.instructions.size();
+                conditional(code[i+3].operand);
+                for(std::size_t k=1;k<=3;++k)locations[i+k]=locations[i];
+                i+=3;continue;
+            }
             switch(v.op) {
                 case OP_HAM:case OP_NEU:case OP_DIEU_KIEN:case OP_LAP:case OP_CAP_NHAT:
                 case OP_DONG_LENH:case OP_MO_NGOAC:case OP_DONG_NGOAC:case OP_MO_KHOI:case OP_DONG_KHOI:break;

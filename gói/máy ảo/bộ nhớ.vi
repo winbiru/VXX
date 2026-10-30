@@ -4,6 +4,60 @@
 // nonmoving managed heap [8388608,67000000). No C/C++ allocator.
 hàm vm_get(p, i) { trả về máy đọc số nguyên ba mươi hai bit(p + i * 4); };
 hàm vm_set(p, i, v) { trả về máy ghi số nguyên ba mươi hai bit(p + i * 4, v); };
+// 128-byte gap before allocation bitmap: four independent CPU timers
+// (start timespec, accumulated seconds/nanoseconds, call count) plus one
+// shared end timespec. Each 64-bit tv_nsec has an unused high i32 word;
+// we use it as recursion depth. All timestamp reads use the low 32 bits.
+// This records each scope's inclusive thread CPU time once per outer call,
+// even when profiling recursively invokes the same scope.
+// Scope 0=vm_alloc, 1=vm_binary, 2=vm_invoke, 3=vm_step.
+hàm vm_profile_begin(scope) {
+    nếu (vm_get(4198464, 12) != 1) { trả về 0; };
+    nếu (scope < 0 || scope >= 4) { trả về -1; };
+    biến start = 4198592 + scope * 28;
+    biến depth = vm_get(start, 3);
+    nếu (depth > 0) {
+        nếu (depth >= 4096) { trả về -1; };
+        vm_set(start, 3, depth + 1);
+        trả về 0;
+    };
+    nếu (máy đồng hồ CPU thô(start) != 0) { trả về -1; };
+    vm_set(start, 3, 1);
+    trả về 0;
+};
+hàm vm_profile_end(scope) {
+    nếu (vm_get(4198464, 12) != 1) { trả về 0; };
+    nếu (scope < 0 || scope >= 4) { trả về -1; };
+    biến start = 4198592 + scope * 28;
+    biến depth = vm_get(start, 3);
+    nếu (depth <= 0) { trả về -1; };
+    vm_set(start, 3, depth - 1);
+    vm_set(start, 6, vm_get(start, 6) + 1);
+    nếu (depth != 1) { trả về 0; };
+    nếu (máy đồng hồ CPU thô(4198704) != 0) { trả về -1; };
+    biến seconds = vm_get(4198704, 0) - vm_get(start, 0);
+    biến nanos = vm_get(4198704, 2) - vm_get(start, 2);
+    nếu (nanos < 0) { seconds = seconds - 1; nanos = nanos + 1000000000; };
+    nếu (seconds >= 0) {
+        nanos = nanos + vm_get(start, 5);
+        nếu (nanos >= 1000000000) { nanos = nanos - 1000000000; seconds = seconds + 1; };
+        vm_set(start, 4, vm_get(start, 4) + seconds);
+        vm_set(start, 5, nanos);
+    };
+    trả về 0;
+};
+hàm vm_profile_report() {
+    nếu (vm_get(4198464, 12) != 1) { trả về 0; };
+    lặp(scope = 0; scope < 4; scope++) {
+        biến start = 4198592 + scope * 28;
+        biến line = vm_concat(vm_literal("VPP_VM_CPU_PROFILE scope="), vm_integer_text(scope));
+        line = vm_concat(line, vm_concat(vm_literal(" calls="), vm_integer_text(vm_get(start, 6))));
+        line = vm_concat(line, vm_concat(vm_literal(" cpu_seconds="), vm_integer_text(vm_get(start, 4))));
+        line = vm_concat(line, vm_concat(vm_literal(" cpu_nanoseconds="), vm_integer_text(vm_get(start, 5))));
+        vm_write(2, vm_concat(line, vm_literal("\n")));
+    };
+    trả về 0;
+};
 hàm vm_error(code) {
     nếu (vm_get(4198464, 1) == 0) {
         vm_set(4198464, 1, code);
@@ -14,6 +68,7 @@ hàm vm_error(code) {
 hàm vm_init() {
     lặp(i = 4; i < 64; i++) { vm_set(16 + i * 32, 0, -1); };
     lặp(i = 0; i < 32; i++) { vm_set(4198464, i, 0); };
+    lặp(i = 0; i < 32; i++) { vm_set(4198592, i, 0); };
     vm_set(4198464, 0, 8388608);
     trả về 0;
 };
@@ -36,6 +91,13 @@ hàm vm_free_push(p) {
     trả về 0;
 };
 hàm vm_alloc(bytes, scan) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_alloc_body(bytes, scan); };
+    vm_profile_begin(0);
+    biến result = vm_alloc_body(bytes, scan);
+    vm_profile_end(0);
+    trả về result;
+};
+hàm vm_alloc_body(bytes, scan) {
     nếu (bytes < 0) { trả về vm_error(1); };
     nếu (bytes > 31000000) { trả về vm_error(1); };
     biến size = máy chia số nguyên ba mươi hai bit(bytes + 31, 16) * 16;

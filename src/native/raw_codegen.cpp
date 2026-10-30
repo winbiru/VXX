@@ -347,8 +347,12 @@ private:
                     return fail("đích gán native không phải biến");
                 const auto found = slots.find(lhs->symbolId);
                 if (found == slots.end()) return fail("biến được gán chưa có slot");
+                // Inlined calls in the RHS temporarily rebind the slot map,
+                // invalidating unordered_map iterators when the map is restored.
+                // Capture the destination index before lowering the RHS.
+                const auto destinationSlot = found->second;
                 if (!value(v->operands[1], nesting + 1)) return false;
-                add(MachineOpcode::StoreSlot, 0, found->second);
+                add(MachineOpcode::StoreSlot, 0, destinationSlot);
                 return true; // Assignment evaluates to the assigned value.
             }
             case V::Unary:
@@ -483,8 +487,15 @@ private:
                     drop();
                 }
                 const auto start = result.instructions.size();
-                if (!value(inst.expressionRoots[isWhile ? 0 : 1])) return false;
-                const auto exit = add(MachineOpcode::BranchZero); --depth;
+                std::int32_t condition=0;
+                const bool fixed=constant(ir,inst.expressionRoots[isWhile?0:1],condition);
+                std::size_t exit=static_cast<std::size_t>(-1);
+                if(fixed) {
+                    if(condition==0)exit=add(MachineOpcode::Jump);
+                } else {
+                    if (!value(inst.expressionRoots[isWhile ? 0 : 1])) return false;
+                    exit=add(MachineOpcode::BranchZero); --depth;
+                }
                 loops.push_back({});
                 if (!statement(inst.children.front())) return false;
                 const auto update = result.instructions.size();
@@ -494,7 +505,7 @@ private:
                 }
                 add(MachineOpcode::Jump, 0, start);
                 const auto end = result.instructions.size();
-                result.instructions[exit].operand = end;
+                if(exit!=static_cast<std::size_t>(-1))result.instructions[exit].operand=end;
                 for (auto jump : loops.back().breaks) result.instructions[jump].operand = end;
                 for (auto jump : loops.back().continues) result.instructions[jump].operand = update;
                 loops.pop_back();

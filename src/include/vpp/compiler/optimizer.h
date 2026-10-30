@@ -9,6 +9,9 @@ namespace vietvm::compiler {
 // Ghi thống kê thay đổi của optimizer, chẳng hạn số no-op bị loại; caller dùng report để kiểm thử và quan sát tác động tối ưu.
 struct OptimizationReport {
     std::size_t removedNoOps = 0;
+    std::size_t foldedI32 = 0;
+    std::size_t specializedScalars = 0;
+    std::size_t inlinedScalarCalls = 0;
 };
 
 // Tối ưu `IrProgram` tại chỗ; hiện optimizer loại no-op và tính lại metadata vùng direct IR để artifact sau tối ưu vẫn nhất quán.

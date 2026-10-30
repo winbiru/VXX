@@ -187,6 +187,10 @@ static int runSnippet(const std::string &source,
             return EXIT_SUCCESS;
         case SnippetMode::Disassemble:
             std::cout << vietvm::tooling::disassembleBytecode(artifacts.bytecode, stringPool);
+            for (const auto &[id, body] : compilationContext.functionBytecode) {
+                std::cout << "\nfunction " << id << ":\n"
+                          << vietvm::tooling::disassembleBytecode(body, stringPool);
+            }
             return EXIT_SUCCESS;
         case SnippetMode::Execute:
             break;

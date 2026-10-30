@@ -75,6 +75,7 @@ lớp công khai Bộ Hạ ASM Động {
         mình.trả = [];
         mình.chuyển = [];
         mình.bắt = [];
+        mình.đích nhánh = [];
     };
     hàm riêng tư phát(mã, hằng = 0, ô = 0, ký hiệu = "") {
         máy ảo thêm cuối danh sách(mình.lệnh, biên dịch mã máy lệnh(mã, hằng, ô, mình.sâu, ký hiệu));
@@ -127,12 +128,289 @@ lớp công khai Bộ Hạ ASM Động {
         };
         ném "AOT V++: continue outside loop";
     };
+    // Bytecode có thể được nhảy đến từ nơi khác, kể cả nhánh bắt lỗi.
+    // Không được gộp qua bất kỳ điểm vào nào của đồ thị điều khiển.
+    hàm riêng tư đánh dấu đích nhánh() {
+        nguồn = mình.nguồn;
+        lặp(j = 0; j <= độ dài(nguồn); j++) { máy ảo thêm cuối danh sách(mình.đích nhánh, 0); };
+        lặp(j = 0; j < độ dài(nguồn); j++) {
+            v = nguồn[j];
+            tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            đích = -1;
+            nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE" || tên == "OP_THOAT" ||
+                tên == "OP_THU" || tên == "OP_THU_KET_THUC" || tên == "OP_CHON") { đích = v[1]; }
+            hoặc nếu (tên == "OP_CA" || tên == "OP_MAC_DINH") { đích = v[3]; }
+            hoặc nếu (tên == "OP_BO_QUA") { đích = mình.đích tiếp tục(j); };
+            nếu (đích >= 0 && đích <= độ dài(nguồn)) { mình.đích nhánh[đích] = 1; };
+            nếu (tên == "OP_BAT_LOI") { mình.đích nhánh[j] = 1; };
+        };
+    };
+    hàm riêng tư phép toán gộp(tên) {
+        trả về tên == "OP_CONG" || tên == "OP_TRU" || tên == "OP_NHAN";
+    };
+    // Pure i32/bool constant folding; integer arithmetic follows the VM's
+    // wrapping i32 semantics. Division is excluded because it can throw.
+    hàm riêng tư gập hằng i32(tên, a, b) {
+        nếu (tên == "OP_CONG") { trả về [đúng, a + b]; };
+        nếu (tên == "OP_TRU") { trả về [đúng, a - b]; };
+        nếu (tên == "OP_NHAN") { trả về [đúng, a * b]; };
+        nếu (tên == "OP_SO_SANH_BANG") { trả về [đúng, a == b]; };
+        nếu (tên == "OP_KHAC_BANG") { trả về [đúng, a != b]; };
+        nếu (tên == "OP_LON_HON") { trả về [đúng, a > b]; };
+        nếu (tên == "OP_NHO_HON") { trả về [đúng, a < b]; };
+        nếu (tên == "OP_LON_HON_HOAC_BANG") { trả về [đúng, a >= b]; };
+        nếu (tên == "OP_NHO_HON_HOAC_BANG") { trả về [đúng, a <= b]; };
+        nếu (tên == "OP_Logic_VA") { trả về [đúng, a != 0 && b != 0]; };
+        nếu (tên == "OP_Logic_HOAC") { trả về [đúng, a != 0 || b != 0]; };
+        trả về [sai, 0];
+    };
+    hàm riêng tư phép so sánh gộp(tên) {
+        trả về tên == "OP_SO_SANH_BANG" || tên == "OP_KHAC_BANG" || tên == "OP_LON_HON" ||
+            tên == "OP_NHO_HON" || tên == "OP_LON_HON_HOAC_BANG" || tên == "OP_NHO_HON_HOAC_BANG";
+    };
+    hàm riêng tư so sánh rồi nhảy(tên, đối số, đích) {
+        // Kết quả ABI: 0=sai, 1=đúng, 2=lỗi; mọi lỗi đi qua catch.
+        mình.gọi thô(tên, đối số);
+        mình.phát("StoreSlot", 0, 1);
+        mình.phát("Drop");
+        mình.phát("LoadSlot", 0, 1);
+        mình.phát("PushConstant", 2);
+        mình.phát("Equal");
+        thành công = độ dài(mình.lệnh);
+        mình.phát("BranchZero");
+        máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+        mình.phát("Jump");
+        mình.lệnh[thành công]["operand"] = độ dài(mình.lệnh);
+        mình.điều kiện(đích);
+    };
+    // Nhận dạng chính xác vòng đếm số học thuần. Mọi bytecode bên trong
+    // vẫn được phát lại làm đường dự phòng nếu kiểu động không phù hợp.
+    // Không gộp nếu có nhánh/catch nhảy vào giữa vùng tối ưu.
+    hàm riêng tư vòng đếm vô hộp(từ) {
+        nguồn = mình.nguồn;
+        nếu (từ + 28 > độ dài(nguồn)) { trả về [sai]; };
+        mẫu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+            "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO",
+            "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN", "OP_NEU",
+            "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_LON_HON_HOAC_BANG",
+            "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI",
+            "OP_BIEN_SO", "OP_TRU", "OP_TEN_BIEN_ID", "OP_GAN",
+            "OP_DONG_KHOI", "OP_DONG_KHOI", "OP_CAP_NHAT",
+            "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
+        lặp(j = 0; j < 28; j++) {
+            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (j > 0 && j != 23 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
+        };
+        bộ đếm = nguồn[từ + 1][2];
+        giá trị = nguồn[từ + 6][2];
+        nếu (bộ đếm < 0 || giá trị < 0 || bộ đếm == giá trị) { trả về [sai]; };
+        nếu (nguồn[từ + 9][2] != giá trị || nguồn[từ + 12][2] != giá trị ||
+            nguồn[từ + 17][2] != giá trị || nguồn[từ + 20][2] != giá trị ||
+            nguồn[từ + 25][2] != bộ đếm ||
+            nguồn[từ + 13][1] != nguồn[từ + 18][1] ||
+            nguồn[từ + 4][1] != từ + 28 ||
+            nguồn[từ + 15][1] != từ + 23 || nguồn[từ + 27][1] != từ) { trả về [sai]; };
+        trả về [đúng, bộ đếm, nguồn[từ + 2][1], giá trị,
+            nguồn[từ + 7][1], nguồn[từ + 13][1], từ + 28];
+    };
+    // Vòng lặp số học đơn giản: x = x (+|-|*) hằng.
+    // Chỉ tối ưu khi toàn bộ vùng có một điểm vào duy nhất.
+    hàm riêng tư vòng đếm đơn giản(từ) {
+        nguồn = mình.nguồn;
+        nếu (từ + 16 > độ dài(nguồn)) { trả về [sai]; };
+        mẫu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+            "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO",
+            "phép toán", "OP_TEN_BIEN_ID", "OP_GAN", "OP_DONG_KHOI",
+            "OP_CAP_NHAT", "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
+        lặp(j = 0; j < 16; j++) {
+            tên = lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "");
+            nếu (j == 8) {
+                nếu (tên != "OP_CONG" && tên != "OP_TRU" && tên != "OP_NHAN") { trả về [sai]; };
+            } hoặc nếu (tên != mẫu[j]) { trả về [sai]; };
+            nếu (j > 0 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
+        };
+        bộ đếm = nguồn[từ + 1][2];
+        giá trị = nguồn[từ + 6][2];
+        nếu (bộ đếm < 0 || giá trị < 0 || bộ đếm == giá trị ||
+            nguồn[từ + 9][2] != giá trị || nguồn[từ + 13][2] != bộ đếm ||
+            nguồn[từ + 4][1] != từ + 16 || nguồn[từ + 15][1] != từ) { trả về [sai]; };
+        trả về [đúng, bộ đếm, nguồn[từ + 2][1], giá trị,
+            nguồn[từ + 7][1], nguồn[từ + 8][0], từ + 16];
+    };
+    // Vòng cộng hai biến: đích = trái + phải. Runtime kiểm tra numeric,
+    // alias và kiểu ổn định trước khi chạy toàn bộ các lượt không boxing.
+    hàm riêng tư vòng đếm cộng hai biến(từ) {
+        nguồn = mình.nguồn;
+        nếu (từ + 16 > độ dài(nguồn)) { trả về [sai]; };
+        mẫu = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+            "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI",
+            "OP_TEN_BIEN_GIA_TRI", "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN",
+            "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
+        lặp(j = 0; j < 16; j++) {
+            nếu (lấy từ điển(mình.bảng, "" + nguồn[từ + j][0], "") != mẫu[j]) { trả về [sai]; };
+            nếu (j > 0 && mình.đích nhánh[từ + j] != 0) { trả về [sai]; };
+        };
+        bộ đếm = nguồn[từ + 1][2];
+        kết quả = nguồn[từ + 9][2];
+        trái = nguồn[từ + 6][2];
+        phải = nguồn[từ + 7][2];
+        nếu (bộ đếm < 0 || kết quả < 0 || trái < 0 || phải < 0 ||
+            bộ đếm == kết quả || nguồn[từ + 13][2] != bộ đếm ||
+            nguồn[từ + 4][1] != từ + 16 || nguồn[từ + 15][1] != từ) { trả về [sai]; };
+        trả về [đúng, bộ đếm, nguồn[từ + 2][1], trái, phải, kết quả, từ + 16];
+    };
     hàm công khai hạ() {
         nguồn = mình.nguồn;
+        mình.đánh dấu đích nhánh();
         lặp(i = 0; i < độ dài(nguồn); i++) {
             máy ảo thêm cuối danh sách(mình.vị trí, độ dài(mình.lệnh));
             v = nguồn[i];
             tên = lấy từ điển(mình.bảng, "" + v[0], "");
+            nếu (tên == "OP_DIEU_KIEN") {
+                vòng = mình.vòng đếm vô hộp(i);
+                kiểu vòng = "counted_scalar_loop";
+                nếu (!vòng[0]) {
+                    vòng = mình.vòng đếm đơn giản(i);
+                    kiểu vòng = "simple_scalar_loop";
+                };
+                nếu (!vòng[0]) {
+                    vòng = mình.vòng đếm cộng hai biến(i);
+                    kiểu vòng = "numeric_add_loop";
+                };
+                nếu (vòng[0]) {
+                    // 0=thành công, 1=quay lại bytecode, 2=bắt lỗi.
+                    mình.gọi thô(kiểu vòng, [vòng[1], vòng[2], vòng[3], vòng[4], vòng[5]]);
+                    mình.phát("StoreSlot", 0, 1);
+                    mình.phát("Drop");
+                    mình.phát("LoadSlot", 0, 1);
+                    mình.phát("PushConstant", 2);
+                    mình.phát("Equal");
+                    thành công = độ dài(mình.lệnh);
+                    mình.phát("BranchZero");
+                    máy ảo thêm cuối danh sách(mình.lỗi, độ dài(mình.lệnh));
+                    mình.phát("Jump");
+                    mình.lệnh[thành công]["operand"] = độ dài(mình.lệnh);
+                    mình.phát("LoadSlot", 0, 1);
+                    máy ảo thêm cuối danh sách(mình.vá, [độ dài(mình.lệnh), vòng[6]]);
+                    mình.phát("BranchZero");
+                    // Nhánh quay lại luôn chạy bytecode gốc, tránh thử lại
+                    // guard nếu giá trị đã đổi kiểu trong cùng một vòng.
+                    mình.vị trí[i] = độ dài(mình.lệnh);
+                };
+            };
+            nếu (tên == "OP_BIEN_SO" && i + 2 < độ dài(nguồn)) {
+                nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0) {
+                    v2 = nguồn[i + 1]; v3 = nguồn[i + 2];
+                    t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
+                    t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
+                    nếu (t2 == "OP_BIEN_SO") {
+                        kết quả = mình.gập hằng i32(t3, v[1], v2[1]);
+                        nếu (kết quả[0]) {
+                            mình.gọi("integer", [kết quả[1]]);
+                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                            i += 2; bỏ qua;
+                        };
+                    };
+                };
+            };
+            // Khi biết đích gán và hằng i32, không tạo giá trị trung gian
+            // trên stack. Các đích nhảy vào giữa phải giữ mã gốc.
+            nếu (tên == "OP_BIEN_SO" && i + 2 < độ dài(nguồn)) {
+                v2 = nguồn[i + 1]; v3 = nguồn[i + 2];
+                nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
+                    lấy từ điển(mình.bảng, "" + v2[0], "") == "OP_TEN_BIEN_ID" &&
+                    lấy từ điển(mình.bảng, "" + v3[0], "") == "OP_GAN") {
+                    mình.gọi("store_integer", [v2[2], v[1]]);
+                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    i += 2; bỏ qua;
+                };
+            };
+            // V++ đánh giá cả hai vế &&, nên tách kiểm tra độ dài trước
+            // khi đọc nguồn[i + 1] (kể cả khi i là lệnh cuối).
+            nếu (tên == "OP_BIEN_SO" || tên == "OP_TEN_BIEN_GIA_TRI") {
+              nếu (i + 1 < độ dài(nguồn)) {
+                nếu (mình.đích nhánh[i + 1] == 0 &&
+                    lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "") == "OP_TRA_VE") {
+                    nếu (tên == "OP_BIEN_SO") {
+                        mình.gọi("return_integer", [v[1]]);
+                    } hoặc {
+                        mình.gọi("return_slot", [v[2]]);
+                    };
+                    máy ảo thêm cuối danh sách(mình.trả, độ dài(mình.lệnh));
+                    mình.phát("Jump");
+                    máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                    i += 1; bỏ qua;
+                };
+              };
+            };
+            // Loop-carried scalar: x = x +/- hằng hoặc x = a op b.
+            // Một ABI call thực hiện luôn phép toán và ghi ô nhớ; runtime
+            // vẫn kiểm tra kiểu động và dùng đường dự phòng khi cần.
+            nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 4 < độ dài(nguồn)) {
+                v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3]; v5 = nguồn[i + 4];
+                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
+                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
+                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
+                t5 = lấy từ điển(mình.bảng, "" + v5[0], "");
+                nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
+                    mình.đích nhánh[i + 3] == 0 && mình.đích nhánh[i + 4] == 0 &&
+                    mình.phép toán gộp(t3) && t4 == "OP_TEN_BIEN_ID" && t5 == "OP_GAN") {
+                    nếu (t2 == "OP_BIEN_SO") {
+                        mình.gọi("update_integer_slot", [v[2], v2[1], v3[0], v4[2]]);
+                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        i += 4; bỏ qua;
+                    };
+                    nếu (t2 == "OP_TEN_BIEN_GIA_TRI") {
+                        mình.gọi("update_numeric_slots", [v[2], v2[2], v3[0], v4[2]]);
+                        lặp(j = 0; j < 4; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        i += 4; bỏ qua;
+                    };
+                };
+            };
+            nếu (tên == "OP_TEN_BIEN_ID") {
+              nếu (i + 1 < độ dài(nguồn)) {
+                nếu (mình.đích nhánh[i + 1] == 0) {
+                    t2 = lấy từ điển(mình.bảng, "" + nguồn[i + 1][0], "");
+                    nếu (t2 == "OP_GAN") {
+                        mình.gọi("assign_slot", [v[2]]);
+                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        i += 1; bỏ qua;
+                    };
+                    nếu (t2 == "OP_CONG_MOT" || t2 == "OP_TRU_MOT") {
+                        delta = 1;
+                        nếu (t2 == "OP_TRU_MOT") { delta = -1; };
+                        mình.gọi("increment_slot", [v[2], delta]);
+                        máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]);
+                        i += 1; bỏ qua;
+                    };
+                };
+              };
+            };
+            // V++ đánh giá cả hai vế &&. Phải kiểm tra giới hạn trong
+            // một khối riêng trước khi đọc ba phần tử kế tiếp.
+            nếu (tên == "OP_TEN_BIEN_GIA_TRI" && i + 3 < độ dài(nguồn)) {
+              nếu (mình.đích nhánh[i + 1] == 0 && mình.đích nhánh[i + 2] == 0 &&
+                  mình.đích nhánh[i + 3] == 0) {
+                v2 = nguồn[i + 1]; v3 = nguồn[i + 2]; v4 = nguồn[i + 3];
+                t2 = lấy từ điển(mình.bảng, "" + v2[0], "");
+                t3 = lấy từ điển(mình.bảng, "" + v3[0], "");
+                t4 = lấy từ điển(mình.bảng, "" + v4[0], "");
+                nếu (mình.phép so sánh gộp(t3) && t4 == "OP_JUMP_IF_FALSE") {
+                    nếu (t2 == "OP_BIEN_SO") {
+                        mình.so sánh rồi nhảy("compare_integer_slot", [v[2], v2[1], v3[0]], v4[1]);
+                        lặp(j = 0; j < 3; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        i += 3; bỏ qua;
+                    };
+                    nếu (t2 == "OP_TEN_BIEN_GIA_TRI") {
+                        mình.so sánh rồi nhảy("compare_numeric_slots", [v[2], v2[2], v3[0]], v4[1]);
+                        lặp(j = 0; j < 3; j++) { máy ảo thêm cuối danh sách(mình.vị trí, mình.vị trí[i]); };
+                        i += 3; bỏ qua;
+                    };
+                };
+              };
+            };
             chọn(tên) {
                 ca "OP_HAM": {} ca "OP_NEU": {} ca "OP_DIEU_KIEN": {} ca "OP_LAP": {}
                 ca "OP_CAP_NHAT": {} ca "OP_DONG_LENH": {} ca "OP_MO_NGOAC": {}

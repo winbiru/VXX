@@ -307,6 +307,13 @@ vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp)
 target_link_libraries(vpp-native-aot PUBLIC vpp-runtime-native)
+if (BUILD_TESTS)
+    add_executable(vpp-native-aot-scalar-loop-semantics
+        scripts/quality/native_aot_scalar_loop_semantics.cpp)
+    target_link_libraries(vpp-native-aot-scalar-loop-semantics PRIVATE vpp-native-aot)
+    add_test(NAME vpp-native-aot-scalar-loop-semantics
+        COMMAND $<TARGET_FILE:vpp-native-aot-scalar-loop-semantics>)
+endif()
 # The AOT driver starts a separate linker CMake project. Carry the actual
 # runtime build's legacy-FFI choice into that project, including installs
 # where the original CMakeCache.txt is unavailable.
@@ -998,6 +1005,16 @@ if (BUILD_TESTS)
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_executable_cli.cmake)
             set_tests_properties(vpp-native-executable-vpp-cli PROPERTIES
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
+            add_test(NAME vpp-native-aot-numeric-add-fastpath
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-numeric-add"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_aot_numeric_add.cmake)
+            set_tests_properties(vpp-native-aot-numeric-add-fastpath PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
         endif()
         add_executable(vpp-native-formatter-cpp-oracle
             scripts/quality/native_formatter_cpp_oracle.cpp)
@@ -1053,6 +1070,10 @@ if (BUILD_TESTS)
             FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
         # The raw CLI tests also dispatch to the bootstrapped V++ compiler.
         # Running them alongside a rebuild can otherwise use a stale binary.
+        # The machine byte-parity test invokes the production CLI for every
+        # target; ensure it sees the current self-hosted emitter as well.
+        set_tests_properties(vpp-native-machine-vpp-parity PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 1200)
         set_tests_properties(vpp-raw-machine-cli-hardening PROPERTIES
             FIXTURES_REQUIRED native-cli-compiler)
         if (TEST vpp-raw-object-host-link)

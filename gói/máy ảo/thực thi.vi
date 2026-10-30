@@ -5,6 +5,13 @@ hàm vm_jump(frame, target) {
     vm_set(frame, 1, target); trả về 0;
 };
 hàm vm_step(state) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_step_body(state); };
+    vm_profile_begin(3);
+    biến result = vm_step_body(state);
+    vm_profile_end(3);
+    trả về result;
+};
+hàm vm_step_body(state) {
     biến frames = vm_get(state, 6); biến frame = vm_at(frames, vm_get(frames, 1) - 1);
     biến stack = vm_get(frame, 2); biến code = vm_get(frame, 0); biến pc = vm_get(frame, 1);
     nếu (pc == vm_get(code, 0)) { trả về vm_return(state, 0); };

@@ -1,0 +1,60 @@
+calibrated vpp-aot/json_parse: 16
+calibrated cpp/fibonacci: 10592752
+calibrated java/branch_loop: 1112560
+calibrated vpp-i32/branch_loop: 655360
+calibrated ruby/arithmetic: 800000
+calibrated vpp-aot/branch_loop: 64
+calibrated node/list_128: 181824
+calibrated node/branch_loop: 510096
+calibrated ruby/json_parse: 45728
+calibrated python/list_128: 18416
+calibrated python/fibonacci: 183744
+calibrated vpp-vm-asm/unicode_replace: 16
+calibrated ruby/branch_loop: 14688
+calibrated vpp-aot/unicode_replace: 16
+calibrated java/unicode_replace: 409136
+calibrated java/fibonacci: 21974880
+calibrated vpp-vm-asm/arithmetic: 2032
+calibrated vpp-vm/fibonacci: 9584
+calibrated cpp/list_128: 288720
+calibrated cpp/arithmetic: 100000000
+calibrated vpp-vm/list_128: 1280
+calibrated node/arithmetic: 86623840
+calibrated python/arithmetic: 711120
+calibrated vpp-i32/arithmetic: 81920000
+calibrated vpp-aot/fibonacci: 352
+calibrated python/unicode_replace: 194944
+calibrated vpp-vm-asm/list_128: 48
+calibrated vpp-i32/fibonacci: 4663248
+calibrated vpp-vm/unicode_replace: 240
+calibrated ruby/list_128: 13024
+calibrated vpp-vm-asm/branch_loop: 48
+calibrated node/fibonacci: 8275104
+calibrated java/arithmetic: 71250752
+calibrated ruby/unicode_replace: 80000
+calibrated node/unicode_replace: 66560
+calibrated node/json_parse: 169152
+calibrated vpp-vm/branch_loop: 1776
+calibrated vpp-vm/json_parse: 64
+calibrated cpp/branch_loop: 492608
+calibrated vpp-aot/arithmetic: 4656
+calibrated vpp-vm-asm/json_parse: 16
+calibrated cpp/unicode_replace: 498768
+calibrated ruby/fibonacci: 106672
+calibrated vpp-vm/arithmetic: 53344
+calibrated vpp-aot/list_128: 64
+calibrated python/branch_loop: 22656
+calibrated java/list_128: 190592
+calibrated python/json_parse: 46560
+calibrated vpp-vm-asm/fibonacci: 256
+completed sample round 1/10
+completed sample round 2/10
+completed sample round 3/10
+completed sample round 4/10
+completed sample round 5/10
+completed sample round 6/10
+completed sample round 7/10
+completed sample round 8/10
+completed sample round 9/10
+completed sample round 10/10
+LANGUAGE BENCHMARK OK: 490 verified records

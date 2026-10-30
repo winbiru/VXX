@@ -272,6 +272,13 @@ hàm vm_text(v) {
     trả về vm_concat(s, vm_literal("]"));
 };
 hàm vm_binary(op, a, b) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_binary_body(op, a, b); };
+    vm_profile_begin(1);
+    biến result = vm_binary_body(op, a, b);
+    vm_profile_end(1);
+    trả về result;
+};
+hàm vm_binary_body(op, a, b) {
     nếu (op == 7) { trả về vm_int(vm_equal(a, b)); };
     nếu (op == 8) { trả về vm_int(1 - vm_equal(a, b)); };
     nếu (op == 4) { trả về vm_int(vm_truth(a) && vm_truth(b)); };

@@ -51,6 +51,29 @@ VM_SYS_SYM(vpp_native_os_clock):
 #endif
     VM_SYS_RETURN
 
+// Allocation-free CPU profiler clock: 16-byte timespec at a checked offset.
+// Unlike the public clock primitive, this always reads thread CPU time.
+.globl VM_SYS_SYM(vpp_native_os_thread_cpu_clock)
+VM_SYS_SYM(vpp_native_os_thread_cpu_clock):
+    mov w1, w0
+    mov w0, #0
+    VM_SYS_ENTER
+    tbnz w20, #31, Lvm_sys_bad_arm
+    mov w10, #0x13f0
+    movk w10, #0x410, lsl #16
+    cmp w20, w10
+    b.hi Lvm_sys_bad_arm
+    add x1, x21, w20, uxtw
+#if defined(__APPLE__)
+    mov w0, #16               // CLOCK_THREAD_CPUTIME_ID on Darwin
+    bl _clock_gettime
+#else
+    mov w0, #3                // CLOCK_THREAD_CPUTIME_ID on Linux
+    mov x8, #113
+    svc #0
+#endif
+    VM_SYS_RETURN
+
 .globl VM_SYS_SYM(vpp_native_os_sleep)
 VM_SYS_SYM(vpp_native_os_sleep):
     VM_SYS_ENTER
@@ -158,6 +181,24 @@ VM_SYS_SYM(vpp_native_os_clock):
 #if defined(__APPLE__)
     call VM_SYS_LIB(clock_gettime)
 #else
+    movl $228, %eax
+    syscall
+#endif
+    VM_SYS_RETURN
+
+.globl VM_SYS_SYM(vpp_native_os_thread_cpu_clock)
+VM_SYS_SYM(vpp_native_os_thread_cpu_clock):
+    movl %edi, %esi
+    xorl %edi, %edi
+    VM_SYS_ENTER
+    cmpl $68162544, %esi
+    ja Lvm_sys_bad_x86
+    addq %r10, %rsi
+#if defined(__APPLE__)
+    movl $16, %edi
+    call VM_SYS_LIB(clock_gettime)
+#else
+    movl $3, %edi
     movl $228, %eax
     syscall
 #endif

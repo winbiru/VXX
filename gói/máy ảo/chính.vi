@@ -66,6 +66,7 @@ hàm chính() {
     vm_socket_close_all(provider);
     vm_process_close_all(provider);
     vm_dir_close_all(provider);
+    vm_profile_report();
     biến error = vm_get(4198464, 1);
     nếu (error != 0) {
         biến message = vm_concat(vm_literal("V++ VM ASM: error="), vm_integer_text(error));

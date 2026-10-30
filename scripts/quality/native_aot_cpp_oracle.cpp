@@ -62,6 +62,39 @@ Snapshot fixture() {
     code.push_back({OP_NEM,0,0,0});code.push_back({OP_FFI_CALL,2,0,0});
     for(const auto &intrinsic:vietvm::bytecode::kVmIntrinsics)
         code.push_back({intrinsic.opcode,0,0,0});
+    // Exercise the entire guarded, unboxed counted-loop lowering in BOTH
+    // backends. The oracle checks assembled object bytes and relocations.
+    const auto scalarLoop=static_cast<int>(code.size());
+    const std::vector<Instruction> scalarBody={
+        {OP_DIEU_KIEN,0,0,0},{OP_TEN_BIEN_GIA_TRI,0,101,0},
+        {OP_BIEN_SO,256,0,0},{OP_NHO_HON,0,0,0},
+        {OP_JUMP_IF_FALSE,scalarLoop+28,0,0},{OP_MO_KHOI,0,0,0},
+        {OP_TEN_BIEN_GIA_TRI,0,102,0},{OP_BIEN_SO,251,0,0},
+        {OP_CONG,0,0,0},{OP_TEN_BIEN_ID,0,102,0},{OP_GAN,0,0,0},
+        {OP_NEU,0,0,0},{OP_TEN_BIEN_GIA_TRI,0,102,0},
+        {OP_BIEN_SO,65521,0,0},{OP_LON_HON_HOAC_BANG,0,0,0},
+        {OP_JUMP_IF_FALSE,scalarLoop+23,0,0},{OP_MO_KHOI,0,0,0},
+        {OP_TEN_BIEN_GIA_TRI,0,102,0},{OP_BIEN_SO,65521,0,0},
+        {OP_TRU,0,0,0},{OP_TEN_BIEN_ID,0,102,0},{OP_GAN,0,0,0},
+        {OP_DONG_KHOI,0,0,0},{OP_DONG_KHOI,0,0,0},
+        {OP_CAP_NHAT,0,0,0},{OP_TEN_BIEN_ID,0,101,0},
+        {OP_CONG_MOT,0,0,0},{OP_JUMP,scalarLoop,0,0}};
+    code.insert(code.end(),scalarBody.begin(),scalarBody.end());
+    // Cross-check both emitters for the shorter arithmetic-only induction
+    // patterns, including all three supported scalar operators.
+    for(int operation:{OP_CONG,OP_TRU,OP_NHAN}) {
+        const auto simple=static_cast<int>(code.size());
+        const std::vector<Instruction> body={
+            {OP_DIEU_KIEN,0,0,0},{OP_TEN_BIEN_GIA_TRI,0,101,0},
+            {OP_BIEN_SO,257,0,0},{OP_NHO_HON,0,0,0},
+            {OP_JUMP_IF_FALSE,simple+16,0,0},{OP_MO_KHOI,0,0,0},
+            {OP_TEN_BIEN_GIA_TRI,0,102,0},{OP_BIEN_SO,3,0,0},
+            {operation,0,0,0},{OP_TEN_BIEN_ID,0,102,0},{OP_GAN,0,0,0},
+            {OP_DONG_KHOI,0,0,0},{OP_CAP_NHAT,0,0,0},
+            {OP_TEN_BIEN_ID,0,101,0},{OP_CONG_MOT,0,0,0},
+            {OP_JUMP,simple,0,0}};
+        code.insert(code.end(),body.begin(),body.end());
+    }
     code.push_back({OP_TRA_VE,0,0,0});code.push_back({OP_DUNG_CHUONG_TRINH,0,0,0});
     const auto end=static_cast<int>(code.size());
     code[branch].operand=static_cast<int>(beginSwitch);
@@ -73,6 +106,14 @@ Snapshot fixture() {
         {OP_PARAM,0,0,0},{OP_PARAM_MAC_DINH,1,1,1},{OP_PARAM,0,2,-1},
         {OP_BIEN_SO,-2147483647-1,0,0},{OP_TRA_VE,0,0,0}}});
     snapshot.functions.emplace(1,FunctionCode{-1,{{OP_RONG_GIA_TRI,0,0,0},{OP_TRA_VE,0,0,0}}});
+    // Exercise direct constant stores, stack-value stores, and both scalar
+    // return peepholes in the independent V++ emitter parity comparison.
+    snapshot.functions.emplace(2,FunctionCode{-1,{
+        {OP_BIEN_SO,21,0,0},{OP_TEN_BIEN_ID,0,9,0},{OP_GAN,0,0,0},
+        {OP_TEN_BIEN_GIA_TRI,0,9,0},{OP_TRA_VE,0,0,0}}});
+    snapshot.functions.emplace(3,FunctionCode{-1,{
+        {OP_CHUOI,0,2,0},{OP_TEN_BIEN_ID,0,10,0},{OP_GAN,0,0,0},
+        {OP_TEN_BIEN_GIA_TRI,0,10,0},{OP_TRA_VE,0,0,0}}});
     snapshot.initializers.push_back({{OP_CHUOI,0,2,0},{OP_IN,0,0,0}});
     vietvm::bytecode::ForeignFunctionDescriptor foreign;
     using T=vietvm::bytecode::ForeignAbiType;

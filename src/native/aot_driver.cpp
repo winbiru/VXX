@@ -366,6 +366,7 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             return result.output;
         };
         program.run();
+        dumpAotCpuProfile();
         if(spec->compiler)return compilerMain(program,argc,argv);
         return 0;
     }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}

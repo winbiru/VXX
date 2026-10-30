@@ -94,8 +94,23 @@ void verifyLowering(const vietvm::compiler::IrProgram &ir,
         if (x.opcode != y.opcode || x.immediate != y.immediate ||
             x.operand != y.operand || x.depthBefore != y.depthBefore ||
             x.symbol != y.symbol) {
-            throw std::runtime_error(name + ": MachineInstruction differs at index " +
-                                     std::to_string(i) + " (opcode/immediate/operand/depth/symbol)");
+            auto describe = [](const vietvm::native::MachineInstruction &inst) {
+                return "opcode=" + std::to_string(static_cast<int>(inst.opcode)) +
+                    ", immediate=" + std::to_string(inst.immediate) +
+                    ", operand=" + std::to_string(inst.operand) +
+                    ", depth=" + std::to_string(inst.depthBefore) +
+                    ", symbol='" + inst.symbol + "'";
+            };
+            std::string details = name + ": MachineInstruction differs at index " +
+                                  std::to_string(i) + "; C++ [" + describe(x) +
+                                  "] V++ [" + describe(y) + "]";
+            const auto begin = i > 3 ? i - 3 : 0;
+            const auto end = std::min(a.instructions.size(), i + 4);
+            for (auto j = begin; j < end; ++j)
+                details += "\n  " + std::to_string(j) + " C++ [" +
+                           describe(a.instructions[j]) + "] V++ [" +
+                           describe(b.instructions[j]) + "]";
+            throw std::runtime_error(details);
         }
     }
 }

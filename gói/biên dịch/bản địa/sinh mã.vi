@@ -61,7 +61,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (độ sâu hiện tại < 1) { trả về -1; };
         }
         hoặc nếu (mã phép toán == 17) {
-            nếu (đối số < -75) { trả về -1; };
+            nếu (đối số < -76) { trả về -1; };
             // The program codegen resolves and bounds-checks function IDs
             // against the complete function table when patching CALLs.
             nếu (đang chờ < 0) { trả về -1; };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstdint>
 #include <functional>
 #include <unordered_map>
 #include <vector>
@@ -17,6 +19,10 @@ struct Program;
 struct Frame;
 using Function = int (*)(int);
 
+// Prints per-thread CPU samples when VPP_AOT_CPU_PROFILE=1. The VM's vm_alloc
+// primitive belongs to its separate .vi runtime, not this C++ AOT runtime.
+void dumpAotCpuProfile();
+
 // Generated functions contain native control flow. This runtime owns values,
 // objects and captured cells; it contains no bytecode execution loop.
 struct FunctionEntry {
@@ -32,6 +38,11 @@ struct Frame {
     std::vector<Value> stack;
     std::vector<Value> arguments;
     std::unordered_map<int, runtime::CellHandle> locals;
+    // Cache the last few resolved bindings. RuntimeCell addresses survive
+    // unordered_map rehashes; parameter/initialize must invalidate entries
+    // when they replace a binding.
+    struct CachedBinding { int slot = 0; runtime::RuntimeCell *cell = nullptr; };
+    std::array<CachedBinding, 8> bindingCache{};
     runtime::InstanceHandle receiver;
     runtime::ClassHandle owner;
     std::vector<std::pair<Value, bool>> switches;
@@ -46,13 +57,41 @@ struct Frame {
     void push(Value value) { stack.push_back(std::move(value)); }
     std::vector<Value> take(int count);
     runtime::CellHandle cell(int slot, bool create = true);
+    void invalidateBinding(int slot);
+    void rememberBinding(int slot, runtime::RuntimeCell *cell);
+    // Stable captured-cell access, avoiding copies on scalar hot paths.
+    Value &valueAt(int slot);
     Value load(int slot);
     void store(int slot, Value value);
     void initialize(int slot);
     void assign();
     void parameter(int slot, int argument, int defaultIndex = -1);
     void increment(int delta);
+    void incrementSlot(int slot, int delta);
     void binary(int operation);
+    // Fused typed loop update: consume a slot and an immediate without
+    // constructing intermediate stack values or performing five ABI calls.
+    void updateIntegerSlot(int source, int immediate, int operation, int target);
+    // Fuse two variable reads, a numeric operation and an assignment into a
+    // single ABI entry; retain dynamic fallback for reassigned variables.
+    void updateNumericSlots(int left, int right, int operation, int target);
+    // Fused load/immediate/compare/condition; returns a boolean. The ABI
+    // encodes a pending exception separately so a false comparison is safe.
+    bool compareIntegerSlot(int source, int immediate, int operation);
+    bool compareNumericSlots(int left, int right, int operation);
+    // Execute a guarded, side-effect-free counted loop with unboxed CPU
+    // scalars. Returning false asks the generated AOT code to run its
+    // original dynamic bytecode path instead.
+    bool runCountedScalarLoop(int counter, int bound, int value,
+                              int step, int threshold);
+    // Simple counted loops can execute all scalar iterations in CPU registers
+    // with a single type check and a single write-back to the live cells.
+    bool runSimpleScalarLoop(int counter, int bound, int value,
+                             int operand, int operation);
+    // A guarded loop for result = left + right. Both sources are primitive
+    // numeric cells, with induction values read from an unboxed counter.
+    bool runNumericAddLoop(int counter, int bound, int left,
+                           int right, int result);
     void index();
     void setIndex();
     void list(int count, int encoded);

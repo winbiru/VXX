@@ -1638,6 +1638,9 @@ struct Emitter {
         }
         DebugRangeGuard debugGuard(*this, output, value->span);
 
+        // Preserve bytecode parity with the self-hosted V++ compiler.
+        // Folded IR annotations are consumed by the native lowering paths;
+        // changing these opcodes would change the public compiler oracle.
         switch (value->opcode) {
             case IrValueOpcode::ConstInt:
                 output.push_back({OP_BIEN_SO, parseI32Literal(value->text), 0, 0});

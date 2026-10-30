@@ -143,7 +143,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
         };
     };
     nếu (mã trạng thái == 0) {
-        lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 75; môi trường thực thi mã định danh++) {
+        lặp (môi trường thực thi mã định danh = 0; môi trường thực thi mã định danh < 76; môi trường thực thi mã định danh++) {
             nếu (có tham chiếu hàm(lời gọi lõi, môi trường thực thi mã định danh) == 1) {
                 nếu (thêm ký hiệu mô đun(các mục ký hiệu, các chuỗi, tên ký hiệu lõi(môi trường thực thi mã định danh), 0, 0) != 0) {
                     mã trạng thái = -1;
@@ -171,7 +171,7 @@ hàm tạo macho mô đun(mã máy, đối tượng, các điểm bắt đầu, 
             nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
             nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
             nếu (mã lõi < 0) { mã trạng thái = -1; thoát; };
-            nếu (mã lõi > 74) { mã trạng thái = -1; thoát; };
+            nếu (mã lõi > 75) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, vị trí gọi lõi) != 0) { mã trạng thái = -1; thoát; };
             nếu (đối tượng i32(các mục tái định vị, 754974720 + chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, toàn cục mã định danh, mã lõi)) != 0) {
                 mã trạng thái = -1;

@@ -53,6 +53,13 @@ hàm vm_bind(frame, slot, value) {
     vm_map_put(vm_get(frame, 3), vm_int(slot), cell); trả về 0;
 };
 hàm vm_invoke(state, id, args, receiver, owner, closure) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_invoke_body(state, id, args, receiver, owner, closure); };
+    vm_profile_begin(2);
+    biến result = vm_invoke_body(state, id, args, receiver, owner, closure);
+    vm_profile_end(2);
+    trả về result;
+};
+hàm vm_invoke_body(state, id, args, receiver, owner, closure) {
     biến functions = vm_get(state, 1);
     nếu (id < 0 || id >= vm_get(functions, 1)) { trả về vm_error(13); };
     biến fn = vm_at(functions, id); biến n = vm_get(args, 1);

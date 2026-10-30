@@ -1,0 +1,12 @@
+// i32-only specialization: the C++ control uses this exact four-i32 C ABI.
+hàm vpp_arithmetic(k, a, b, c) { trả về (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11; };
+hàm vpp_branch_loop(k, a, b, c) {
+    biến x = k * 97 + 11;
+    lặp(i = 0; i < 256; i++) { x = x + 251; nếu (x >= 65521) { x = x - 65521; }; };
+    trả về x;
+};
+hàm vpp_fibonacci(k, x, y, z) {
+    biến a = 0; biến b = 1;
+    lặp(i = 0; i < k % 16 + 20; i++) { biến next = a + b; a = b; b = next; };
+    trả về a;
+};
