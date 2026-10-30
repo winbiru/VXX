@@ -252,7 +252,7 @@ hàm công khai biên dịch chuẩn bị dòng lệnh máy(kế hoạch, thư v
     nếu (lệnh == "disassemble") {
         sản phẩm = biên dịch nguồn tệp tự chủ(đường, thư viện);
         dây = biên dịch nạp sản phẩm biên dịch(sản phẩm);
-        trả về ["complete", biên dịch giải mã bytecode(dây[0], dây[1])];
+        trả về ["complete", biên dịch giải mã chương trình(dây)];
     };
     nếu (lệnh == "dump-ast") {
         trả về ["complete", biên dịch hiển thị cây cú pháp(đọc tệp(đường))];

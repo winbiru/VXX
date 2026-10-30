@@ -185,13 +185,22 @@ static int runSnippet(const std::string &source,
                       << artifacts.unsupportedDirectIrRegions << '\n';
             std::cout << vietvm::tooling::dumpIr(artifacts.ir);
             return EXIT_SUCCESS;
-        case SnippetMode::Disassemble:
+        case SnippetMode::Disassemble: {
             std::cout << vietvm::tooling::disassembleBytecode(artifacts.bytecode, stringPool);
-            for (const auto &[id, body] : compilationContext.functionBytecode) {
+            // unordered_map iteration differs between standard libraries.
+            // Match the native compiler's function table order by numeric ID.
+            std::vector<int> functionIds;
+            for (const auto &entry : compilationContext.functionBytecode) {
+                functionIds.push_back(entry.first);
+            }
+            std::sort(functionIds.begin(), functionIds.end());
+            for (int id : functionIds) {
                 std::cout << "\nfunction " << id << ":\n"
-                          << vietvm::tooling::disassembleBytecode(body, stringPool);
+                          << vietvm::tooling::disassembleBytecode(
+                                 compilationContext.functionBytecode.at(id), stringPool);
             }
             return EXIT_SUCCESS;
+        }
         case SnippetMode::Execute:
             break;
     }

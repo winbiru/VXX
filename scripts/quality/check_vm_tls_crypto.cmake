@@ -5,8 +5,11 @@ execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
 if(NOT status STREQUAL "0")
     message(FATAL_ERROR "V++ TLS crypto compile: ${status}\n${output}\n${errors}")
 endif()
+# The complete CPU-only corpus includes HKDF, every tag-byte mutation and
+# record key derivation. Allow it to share a CI runner with another CTest job;
+# the enclosing vpp-vm-asm test still has its 900-second overall deadline.
 execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${tls_image}"
-    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 240)
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 600)
 if(NOT status STREQUAL "0" OR NOT output STREQUAL "TLS VPP RFC VECTORS OK\n")
     message(FATAL_ERROR "V++ TLS crypto vectors/negative authentication: ${status}\n${output}\n${errors}")
 endif()

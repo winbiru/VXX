@@ -234,3 +234,14 @@ hàm công khai biên dịch giải mã bytecode(bytecode, bể chuỗi) {
     };
     trả về biên dịch lắp ráp nối các phần(các dòng);
 };
+
+// Bảng hàm ABI giữ các ID liên tiếp theo thứ tự số, giống Stage 0.
+hàm công khai biên dịch giải mã chương trình(dây) {
+    các phần = [biên dịch giải mã bytecode(dây[0], dây[1])];
+    lặp(i = 0; i < máy ảo lấy độ dài(dây[2]); i++) {
+        mục = dây[2][i];
+        máy ảo thêm cuối danh sách(các phần, "\nfunction " + thành chuỗi(mục[0]) + ":\n");
+        máy ảo thêm cuối danh sách(các phần, biên dịch giải mã bytecode(mục[2], dây[1]));
+    };
+    trả về biên dịch lắp ráp nối các phần(các phần);
+};
