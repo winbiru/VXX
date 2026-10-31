@@ -6,11 +6,19 @@ foreach(required IN ITEMS VPP_CLI VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR VP
 endforeach()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(wire "")
+# On Windows, CMake's file(WRITE) opens in text mode and expands every LF
+# into CRLF. Writing explicit CRLF there produces CRCRLF, so the LSP server
+# never finds the empty header line. Supply LF on Windows and CRLF elsewhere.
+if(WIN32)
+    set(header_newline "\n")
+else()
+    set(header_newline "\r\n")
+endif()
 function(packet body)
     string(CONFIGURE "${body}" body @ONLY)
     # CMake counts bytes, matching LSP's UTF-8 Content-Length.
     string(LENGTH "${body}" size)
-    set(wire "${wire}Content-Length: ${size}\r\n\r\n${body}" PARENT_SCOPE)
+    set(wire "${wire}Content-Length: ${size}${header_newline}${header_newline}${body}" PARENT_SCOPE)
 endfunction()
 function(expect_json document expected)
     string(JSON actual ERROR_VARIABLE error GET "${document}" ${ARGN})
@@ -67,6 +75,19 @@ packet([=[{"jsonrpc":"2.0","method":"exit"}]=])
 set(input "${VPP_OUTPUT_DIR}/requests.lsp")
 set(output "${VPP_OUTPUT_DIR}/responses.lsp")
 file(WRITE "${input}" "${wire}")
+# Check the on-disk bytes, not CMake's normalized file(READ) text: this
+# catches line-ending changes before the CLI returns a silent EOF.
+set(expected_wire "${wire}")
+if(WIN32)
+    string(REPLACE "\n" "\r\n" expected_wire "${expected_wire}")
+endif()
+string(HEX "${expected_wire}" expected_hex)
+file(READ "${input}" actual_hex HEX)
+if(NOT actual_hex STREQUAL expected_hex)
+    file(SIZE "${input}" actual_size)
+    string(LENGTH "${expected_wire}" expected_size)
+    message(FATAL_ERROR "Invalid LSP request framing: wrote ${actual_size} bytes, expected ${expected_size} bytes of CRLF-framed messages")
+endif()
 # Redirect the byte stream directly into the LSP process. Avoid an
 # intermediate `cmake -E env` process that could interfere with redirected
 # stdin on Windows before the Content-Length packets reach the CLI.
