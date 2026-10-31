@@ -1,4 +1,5 @@
 nhập gói.bộ sưu tập.bộ đệm danh sách.*;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 lớp công khai Danh Sách kế thừa Bộ Đệm Danh Sách {
     hàm công khai khởi tạo(nguồn = rỗng) {

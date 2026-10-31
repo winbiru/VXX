@@ -2,6 +2,7 @@
 nhập gói.biên dịch.sổ đăng ký.*;
 nhập gói.biên dịch.đồ thị mô đun.*;
 nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm chính() {
     nguồn = {"main": "nhập dep như d; hàm chính() {};",

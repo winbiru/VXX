@@ -66,6 +66,33 @@ if (VPP_TARGET MATCHES "^(x86_64|aarch64)-linux-gnu$" OR
             "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-stdio-vpp"
             -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
     set_tests_properties(installed-native-stdio-vpp PROPERTIES TIMEOUT 180)
+
+    # Embedded compiler errors must remain catchable by native V++ code.
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_kich_ban_loi.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-native-kich-ban-loi.vi" COPYONLY)
+    add_test(NAME installed-native-embedded-error
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-native-kich-ban-loi.vi"
+            "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_kich_ban_loi.expected"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-kich-ban-loi"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+    set_tests_properties(installed-native-embedded-error PROPERTIES TIMEOUT 180)
+
+    # The self-host OOP emitter must preserve the C++ oracle's instruction
+    # operands and function metadata without invoking legacy compiler intrinsic 98.
+    configure_file("${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_oop_snapshot.vi"
+        "${CMAKE_CURRENT_BINARY_DIR}/installed-native-oop-snapshot.vi" COPYONLY)
+    add_test(NAME installed-native-oop-snapshot
+        COMMAND "${CMAKE_COMMAND}"
+            "-DVPP_CLI=${VPP_CLI}"
+            "-DVPP_HOME=${VPP_INSTALL_ROOT}"
+            "-DVPP_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/installed-native-oop-snapshot.vi"
+            "-DVPP_EXPECTED=${VPP_SOURCE_ROOT}/src/tests/expected/kiem_tra_native_oop_snapshot.expected"
+            "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-oop-snapshot"
+            -P "${VPP_SOURCE_ROOT}/scripts/quality/check_native_aot_installed.cmake")
+    set_tests_properties(installed-native-oop-snapshot PROPERTIES TIMEOUT 180)
 endif()
 
 # These native fixtures cover anonymous closure metadata, captured exceptions,

@@ -1079,11 +1079,33 @@ void Frame::intrinsic(int operation) {
     }
     if (operation == OP_VM_BYTECODE_CHAY || operation == OP_NATIVE_ARTIFACT_CHAY) {
         if (!program.executeArtifact) fail("native artifact compiler unavailable");
-        push(program.executeArtifact(args)); return;
+        try {
+            push(program.executeArtifact(args));
+        } catch (const runtime::LanguageException &) {
+            throw;
+        } catch (const std::exception &exception) {
+            // The native compiler runs behind the AOT ABI. Its validation
+            // errors must reach V++ try/catch as language exceptions.
+            std::string message = exception.what();
+            if (message.rfind("AOT: unsupported opcode ", 0) == 0)
+                message = "bytecode không hợp lệ: " + message;
+            else if (message == "AOT: instruction requires four fields")
+                message = "bytecode_chay_vm: lệnh phải có đúng 4 trường ABI";
+            throw runtime::LanguageException(make_string_value(message));
+        }
+        return;
     }
     if (operation == OP_VM_KICH_BAN_CHAY) {
         if (!program.executeSource) fail("native embedded compiler unavailable");
-        push(program.executeSource(args)); return;
+        try {
+            push(program.executeSource(args));
+        } catch (const runtime::LanguageException &) {
+            throw;
+        } catch (const std::exception &exception) {
+            // Embedded compiler failures are observable through V++ try/catch.
+            throw runtime::LanguageException(make_string_value(exception.what()));
+        }
+        return;
     }
     if (!representationIntrinsic(static_cast<Opcode>(operation), args, result, error) &&
         !helpers::handleNativeCollectionFunction(static_cast<Opcode>(operation), args, result, error) &&

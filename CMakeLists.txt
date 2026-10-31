@@ -1243,7 +1243,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
 endif()
 if (VPP_NATIVE_CLI_TARGET)
     set(VPP_NATIVE_CLI_DIR "${CMAKE_CURRENT_BINARY_DIR}/native-cli")
-    add_custom_target(vpp-native-cli
+    # Generate the installed compiler in the normal build. Otherwise a plain
+    # cmake --install can silently copy an outdated native-cli/vpp-native.
+    add_custom_target(vpp-native-cli ALL
         COMMAND ${CMAKE_COMMAND}
             "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
             "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
@@ -1265,8 +1267,10 @@ if (VPP_NATIVE_CLI_TARGET)
         BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/native-vm/vpp-vm"
             "${CMAKE_CURRENT_BINARY_DIR}/native-vm/dns-provider.vmb"
         COMMENT "Build standalone VM with V++ and direct ASM primitives")
+    # Supported native targets must install the compiler produced by the
+    # default build; a missing compiler should fail packaging visibly.
     install(PROGRAMS "${VPP_NATIVE_CLI_DIR}/vpp-native"
-        DESTINATION bin OPTIONAL)
+        DESTINATION bin)
 endif()
 
 # Install rules (optional)

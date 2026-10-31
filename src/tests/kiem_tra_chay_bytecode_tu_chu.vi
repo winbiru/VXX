@@ -1,8 +1,11 @@
 // Thực thi mã trung gian do V++ tự phân tích, phát mã và liên kết.
 // So sánh kết quả VM với compiler C++ cho subset đã hỗ trợ.
 nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.liên kết.biên dịch chương trình mô đun tự chủ;
+nhập gói.biên dịch.liên kết.biên dịch chương trình tự chủ;
 nhập gói.lõi.kịch bản.*;
 nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm chính() {
     nguồn = "hàm cộng(a, b) { trả về a + b; }; hàm chính() { in cộng(20, 22); };";

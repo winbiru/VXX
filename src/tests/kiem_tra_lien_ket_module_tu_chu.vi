@@ -1,7 +1,9 @@
 // Kiểm tra emitter/linker đồ thị: function ID, StringPool, initializer,
 // namespace và cả bốn trường opcode phải giữ đúng hợp đồng C++.
 nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm chính() {
     nguồn = {

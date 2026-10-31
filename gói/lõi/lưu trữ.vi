@@ -3,6 +3,7 @@
 // mục và giới hạn giải nén đều thuộc tầng thư viện V++.
 
 nhập gói.nhập xuất.tệp.đọc các byte tệp;
+nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.nhập xuất.tệp.ghi các byte tệp;
 nhập gói.nhập xuất.đường dẫn.đường dẫn nối;
 nhập gói.nhập xuất.đường dẫn.đường dẫn tên;

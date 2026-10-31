@@ -5,6 +5,7 @@
 #include <cstring>
 #include <iomanip>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -537,13 +538,26 @@ Snapshot snapshotFromWire(const std::vector<Value> &wire) {
     Snapshot snapshot;
     snapshot.entry=instructions(wire[0]);
     for(const auto &text:array(wire[1]))snapshot.strings.push_back(std::get<std::string>(text));
+    std::set<int> functionNames;
+    int nextFunctionId=0;
     for(const auto &item:array(wire[2])) {
         const auto &fields=array(item);if(fields.size()!=3)throw std::runtime_error("AOT: function record");
-        if(!snapshot.functions.emplace(number(fields[0]),FunctionCode{number(fields[1]),instructions(fields[2])}).second)
-            throw std::runtime_error("AOT: duplicate function ID");
+        const int id=number(fields[0]);
+        const int name=number(fields[1]);
+        if(id!=nextFunctionId++)throw std::runtime_error("bytecode_chay_vm: function ID phải liên tiếp từ 0");
+        if(name < -1 || (name >= 0 && static_cast<std::size_t>(name) >= snapshot.strings.size()))
+            throw std::runtime_error("bytecode_chay_vm: function name index ngoài StringPool");
+        if(name >= 0 && !functionNames.insert(name).second)
+            throw std::runtime_error("bytecode_chay_vm: trùng function runtime name index");
+        snapshot.functions.emplace(id,FunctionCode{name,instructions(fields[2])});
     }
+    std::set<std::string> initializerNames;
     for(const auto &item:array(wire[3])) {
         const auto &fields=array(item);if(fields.size()!=2)throw std::runtime_error("AOT: initializer record");
+        const std::string identity=string(fields[0]);
+        if(identity.empty())throw std::runtime_error("bytecode_chay_vm: định danh initializer rỗng");
+        if(!initializerNames.insert(identity).second)
+            throw std::runtime_error("bytecode_chay_vm: trùng định danh initializer '"+identity+"'");
         snapshot.initializers.push_back(instructions(fields[1]));
     }
     if(wire.size()==5) {

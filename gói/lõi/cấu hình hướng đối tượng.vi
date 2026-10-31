@@ -1,5 +1,6 @@
 // Giữ ảnh chụp config trong từng instance; tải lại khi cần.
 nhập gói.lõi.cấu hình.đọc cấu hình;
+nhập gói.lõi.chuyển kiểu.loại của;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.từ điển.có khóa;
 nhập gói.bộ sưu tập.từ điển.khóa từ điển;

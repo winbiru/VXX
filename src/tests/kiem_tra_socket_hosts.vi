@@ -1,5 +1,6 @@
 nhập gói.mạng.ổ cắm.*;
 nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Chỉ dùng hosts giả lập. Không yêu cầu DNS, loopback bind hoặc network.
 hàm chính() {

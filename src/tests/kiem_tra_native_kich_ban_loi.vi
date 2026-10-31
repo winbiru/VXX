@@ -1,0 +1,13 @@
+// The native embedded compiler must report failures through V++ try/catch.
+nhập gói.lõi.kịch bản.kịch bản chạy;
+nhập gói.văn bản.chuỗi.chứa chuỗi;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+
+hàm chính() {
+    bắt_được = sai;
+    thử { kịch bản chạy("hàm {"); }
+    bắt lỗi(e) {
+        bắt_được = chứa chuỗi(thành chuỗi(e), "embedded script failed");
+    };
+    in bắt_được;
+};
