@@ -1,3 +1,6 @@
+hàm sinh mã nhánh điều kiện(op) {
+    nếu (op == 9) { trả về 1; }; nếu (op == 28) { trả về 1; }; nếu (op == 29) { trả về 1; }; trả về 0;
+};
 hàm sinh mã nhị phân(mã phép toán) {
     nếu (mã phép toán == 4) { trả về 1; };
     nếu (mã phép toán == 5) { trả về 1; };
@@ -58,7 +61,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (độ sâu hiện tại < 1) { trả về -1; };
         }
         hoặc nếu (mã phép toán == 17) {
-            nếu (đối số < -62) { trả về -1; };
+            nếu (đối số < -76) { trả về -1; };
             // The program codegen resolves and bounds-checks function IDs
             // against the complete function table when patching CALLs.
             nếu (đang chờ < 0) { trả về -1; };
@@ -93,7 +96,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (đối số >= 130000) { trả về -1; };
             độ sâu hiện tại = độ sâu hiện tại + 1;
         }
-        hoặc nếu (mã phép toán == 9) {
+        hoặc nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {
             nếu (độ sâu hiện tại < 1) { trả về -1; };
             nếu (sinh mã nhánh đích đến(biểu diễn trung gian, đối số) != 1) { trả về -1; };
             độ sâu hiện tại = độ sâu hiện tại - 1;
@@ -202,7 +205,7 @@ hàm sinh mã vá các nhánh(biểu diễn trung gian, mã máy, các độ l�
     lặp (pc = 0; pc < byte dài(biểu diễn trung gian); pc = pc + 8) {
         biến mã phép toán = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc);
         biến nhánh = 0;
-        nếu (mã phép toán == 9) { nhánh = 1; };
+        nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) { nhánh = 1; };
         nếu (mã phép toán == 10) { nhánh = 1; };
         nếu (nhánh == 1) {
             biến đích đến = byte đọc số nguyên ba mươi hai bit(biểu diễn trung gian, pc + 4);
@@ -210,16 +213,17 @@ hàm sinh mã vá các nhánh(biểu diễn trung gian, mã máy, các độ l�
             lặp (i = 0; i < đích đến; i = i + 8) { đích đến ô nhớ = đích đến ô nhớ + 4; };
             biến nguồn = byte đọc số nguyên ba mươi hai bit(các độ lệch, nguồn đầu vào ô nhớ);
             biến to = byte đọc số nguyên ba mươi hai bit(các độ lệch, đích đến ô nhớ);
-            nếu (mã phép toán == 9) { nguồn = nguồn + 4; }; // after the condition LDR
+            nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) { nguồn = nguồn + 4; }; // after the condition LDR
             biến chênh lệch = 0;
             lặp (bước = nguồn; bước < to; bước = bước + 4) { chênh lệch = chênh lệch + 1; };
             lặp (bước = nguồn; bước > to; bước = bước - 4) { chênh lệch = chênh lệch - 1; };
             biến từ máy = 0;
-            nếu (mã phép toán == 9) {
+            nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {
                 nếu (chênh lệch < -262144) { trả về -1; };
                 nếu (chênh lệch > 262143) { trả về -1; };
                 nếu (chênh lệch < 0) { chênh lệch = chênh lệch + 524288; };
-                từ máy = 872415241 + chênh lệch * 32; // CBZ W9, imm19
+                từ máy = 872415241 + chênh lệch * 32;
+                nếu (mã phép toán == 29) { từ máy = 889192457 + chênh lệch * 32; }; // CBZ W9, imm19
             } hoặc {
                 nếu (chênh lệch < -33554432) { trả về -1; };
                 nếu (chênh lệch > 33554431) { trả về -1; };
@@ -404,7 +408,7 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 0, base + các ô nhớ + độ sâu hiện tại - 1); };
             đang chờ = -1;
         }
-        hoặc nếu (mã phép toán == 9) {
+        hoặc nếu (sinh mã nhánh điều kiện(mã phép toán) == 1) {
             độ sâu hiện tại = độ sâu hiện tại - 1;
             mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 872415241); }; // CBZ placeholder

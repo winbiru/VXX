@@ -1,0 +1,250 @@
+// Formatter thuần V++: token và vị trí Unicode do lexer V++ cung cấp.
+// Comment được ghép lại từ khoảng cách giữa token; không sửa literal.
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+
+hàm riêng tư định dạng dòng bình luận(chữ) {
+    kết quả = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(chữ); i++) {
+        nếu (chữ[i] == "\r") {
+            kết quả += "\n";
+            nếu (i + 1 < máy ảo lấy độ dài(chữ)) {
+                nếu (chữ[i + 1] == "\n") { i += 1; };
+            };
+        } hoặc { kết quả += chữ[i]; };
+    };
+    trả về kết quả;
+};
+hàm riêng tư định dạng thêm bình luận(kết quả, nguồn, đầu, cuối) {
+    nếu (cuối <= đầu) { trả về; };
+    đoạn = cắt chuỗi(nguồn, đầu, cuối - đầu);
+    n = máy ảo lấy độ dài(đoạn);
+    i = 0;
+    khi (i < n) {
+        kiểu = "";
+        nếu (i + 1 < n) {
+            nếu (đoạn[i] == "/" && đoạn[i + 1] == "/") { kiểu = "dòng"; };
+            nếu (đoạn[i] == "/" && đoạn[i + 1] == "*") { kiểu = "khối"; };
+        };
+        nếu (kiểu == "dòng") {
+            bắt đầu = i;
+            i += 2;
+            khi (i < n) {
+                nếu (đoạn[i] == "\n" || đoạn[i] == "\r") { thoát; };
+                i += 1;
+            };
+            máy ảo thêm cuối danh sách(kết quả, {
+                "loại": "dòng", "văn bản": cắt chuỗi(đoạn, bắt đầu, i - bắt đầu)
+            });
+        } hoặc nếu (kiểu == "khối") {
+            bắt đầu = i;
+            i += 2;
+            khi (i + 1 < n) {
+                nếu (đoạn[i] == "*" && đoạn[i + 1] == "/") { thoát; };
+                i += 1;
+            };
+            nếu (i + 1 < n) { i += 2; };
+            máy ảo thêm cuối danh sách(kết quả, {
+                "loại": "khối", "văn bản": định dạng dòng bình luận(cắt chuỗi(đoạn, bắt đầu, i - bắt đầu))
+            });
+        } hoặc { i += 1; };
+    };
+};
+
+hàm riêng tư định dạng mục(nguồn) {
+    từ tố = biên dịch từ tố hóa(nguồn);
+    kết quả = [];
+    trước = 0;
+    lặp(i = 0; i < máy ảo lấy độ dài(từ tố); i++) {
+        mục = từ tố[i];
+        đầu = mục["vị trí ký tự"];
+        cuối = mục["kết thúc ký tự"];
+        định dạng thêm bình luận(kết quả, nguồn, trước, đầu);
+        máy ảo thêm cuối danh sách(kết quả, {"loại": "từ tố", "văn bản": mục["giá trị"]});
+        trước = cuối;
+    };
+    định dạng thêm bình luận(kết quả, nguồn, trước, máy ảo lấy độ dài(nguồn));
+    trả về kết quả;
+};
+
+hàm riêng tư định dạng toán tử(chữ) {
+    trả về chữ == "=" || chữ == "||" || chữ == "&&" || chữ == "==" ||
+        chữ == "!=" || chữ == "<" || chữ == ">" || chữ == "<=" ||
+        chữ == ">=" || chữ == "+" || chữ == "-" || chữ == "*" ||
+        chữ == "/" || chữ == "%" || chữ == "!" || chữ == "++" ||
+        chữ == "--" || chữ == "+=" || chữ == "-=" || chữ == "*=" ||
+        chữ == "/=" || chữ == "%=";
+};
+
+hàm riêng tư định dạng điều khiển(chữ) {
+    trả về chữ == "nếu" || chữ == "lặp" || chữ == "khi" ||
+        chữ == "chọn" || chữ == "bắt" || chữ == "bắt lỗi";
+};
+
+hàm riêng tư định dạng tiếp khối(các mục, vị trí) {
+    các từ = [];
+    lặp(i = vị trí + 1; i < máy ảo lấy độ dài(các mục) && máy ảo lấy độ dài(các từ) < 2; i++) {
+        nếu (các mục[i]["loại"] != "từ tố") { thoát; };
+        máy ảo thêm cuối danh sách(các từ, các mục[i]["văn bản"]);
+    };
+    nếu (máy ảo lấy độ dài(các từ) == 0) { trả về sai; };
+    nếu (các từ[0] == "hoặc" || các từ[0] == "bắt") { trả về đúng; };
+    nếu (máy ảo lấy độ dài(các từ) < 2) { trả về sai; };
+    trả về các từ[0] == "nếu" && các từ[1] == "không";
+};
+
+hàm riêng tư định dạng ghi(trạng thái, chữ) {
+    nếu (chữ == "") { trả về; };
+    trạng thái["kết quả"] = trạng thái["kết quả"] + chữ;
+    trạng thái["đã ghi"] = đúng;
+    trạng thái["cuối"] = chữ[máy ảo lấy độ dài(chữ) - 1];
+};
+
+hàm riêng tư định dạng thụt(trạng thái) {
+    nếu (!trạng thái["đầu dòng"]) { trả về; };
+    lặp(i = 0; i < trạng thái["thụt"]; i++) {
+        định dạng ghi(trạng thái, "    ");
+    };
+    trạng thái["đầu dòng"] = sai;
+};
+
+hàm riêng tư định dạng xuống dòng(trạng thái) {
+    nếu (!trạng thái["đã ghi"] || trạng thái["cuối"] != "\n") {
+        định dạng ghi(trạng thái, "\n");
+    };
+    trạng thái["đầu dòng"] = đúng;
+    trạng thái["trước"] = "";
+};
+
+hàm riêng tư định dạng cách(trạng thái) {
+    nếu (!trạng thái["đầu dòng"] && trạng thái["đã ghi"] &&
+        trạng thái["cuối"] != " " && trạng thái["cuối"] != "\n") {
+        định dạng ghi(trạng thái, " ");
+    };
+};
+
+// Cùng quy tắc của formatSource Stage 0, nhưng toàn bộ xử lý tại .vi.
+hàm công khai biên dịch định dạng mã nguồn(nguồn) {
+    các mục = định dạng mục(nguồn);
+    s = {"kết quả": "", "thụt": 0, "ngoặc": 0, "đầu dòng": đúng,
+         "đã ghi": sai, "cuối": "", "trước": ""};
+    lặp(i = 0; i < máy ảo lấy độ dài(các mục); i++) {
+        mục = các mục[i];
+        chữ = mục["văn bản"];
+        nếu (mục["loại"] != "từ tố") {
+            nhiều dòng = mục["loại"] == "dòng";
+            lặp(j = 0; j < máy ảo lấy độ dài(chữ); j++) {
+                nếu (chữ[j] == "\n") { nhiều dòng = đúng; thoát; };
+            };
+            nếu (nhiều dòng) {
+                nếu (!s["đầu dòng"]) { định dạng xuống dòng(s); };
+                định dạng thụt(s);
+                định dạng ghi(s, chữ);
+                định dạng xuống dòng(s);
+            } hoặc {
+                định dạng cách(s);
+                định dạng thụt(s);
+                định dạng ghi(s, chữ);
+                s["trước"] = "";
+            };
+            bỏ qua;
+        };
+        nếu (chữ == "") { bỏ qua; };
+        nếu (chữ == "}") {
+            nếu (!s["đầu dòng"]) { định dạng xuống dòng(s); };
+            nếu (s["thụt"] > 0) { s["thụt"] = s["thụt"] - 1; };
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            nếu (!định dạng tiếp khối(các mục, i)) { định dạng xuống dòng(s); };
+            bỏ qua;
+        };
+        nếu (chữ == "{") {
+            định dạng cách(s);
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            s["thụt"] = s["thụt"] + 1;
+            định dạng xuống dòng(s);
+            bỏ qua;
+        };
+        nếu (chữ == ";") {
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            nếu (s["ngoặc"] > 0) { định dạng ghi(s, " "); }
+            hoặc { định dạng xuống dòng(s); };
+            bỏ qua;
+        };
+        nếu (chữ == "," || chữ == ":") {
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            bỏ qua;
+        };
+        nếu (chữ == "(") {
+            nếu (định dạng điều khiển(s["trước"])) { định dạng cách(s); };
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            s["ngoặc"] = s["ngoặc"] + 1;
+            bỏ qua;
+        };
+        nếu (chữ == ")") {
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            nếu (s["ngoặc"] > 0) { s["ngoặc"] = s["ngoặc"] - 1; };
+            bỏ qua;
+        };
+        nếu (chữ == "[") {
+            trước = s["trước"];
+            chỉ mục = trước != "" && trước != "=" && trước != "(" &&
+                trước != "[" && trước != "," && !định dạng toán tử(trước);
+            nếu (!chỉ mục) { định dạng cách(s); };
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            bỏ qua;
+        };
+        nếu (chữ == "]") {
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            s["trước"] = chữ;
+            bỏ qua;
+        };
+        nếu (định dạng toán tử(chữ)) {
+            nếu (chữ != "!" && chữ != "++" && chữ != "--") {
+                định dạng cách(s);
+            };
+            định dạng thụt(s);
+            định dạng ghi(s, chữ);
+            nếu (chữ != "!" && chữ != "++" && chữ != "--") {
+                định dạng ghi(s, " ");
+            };
+            s["trước"] = chữ;
+            bỏ qua;
+        };
+        trước = s["trước"];
+        nếu (!s["đầu dòng"] && trước != "(" && trước != "[" &&
+            trước != "!" && trước != "++" && trước != "--") {
+            định dạng cách(s);
+        };
+        định dạng thụt(s);
+        định dạng ghi(s, chữ);
+        s["trước"] = chữ;
+    };
+    kết quả = s["kết quả"];
+    khi (máy ảo lấy độ dài(kết quả) > 1) {
+        n = máy ảo lấy độ dài(kết quả);
+        nếu (kết quả[n - 1] != "\n" || kết quả[n - 2] != "\n") { thoát; };
+        kết quả = cắt chuỗi(kết quả, 0, máy ảo lấy độ dài(kết quả) - 1);
+    };
+    nếu (kết quả != "") {
+        nếu (kết quả[máy ảo lấy độ dài(kết quả) - 1] != "\n") {
+            kết quả += "\n";
+        };
+    };
+    trả về kết quả;
+};

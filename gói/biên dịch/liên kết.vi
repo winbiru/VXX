@@ -1,13 +1,16 @@
 // Linker bytecode bootstrap thuần V++ cho một đơn vị và đồ thị mô-đun.
 // Hợp đồng ABI theo src/compiler/codegen.cpp::Emitter::emitProgram(true).
 // Đồ thị có initializer độc lập; bộ nạp VM ở gói/biên dịch/bộ nạp.vi.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/biên dịch/kiểu mô đun;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian IR đồ thị lõi;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian thuần;
+nhập gói.biên dịch.nhập chọn lọc.*;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ tìm mô đun;
+nhập gói.biên dịch.sổ đăng ký.biên dịch đăng ký hàm đồ thị hoãn chuỗi;
+nhập gói.biên dịch.kiểu mô đun.Bộ Đăng Ký Kiểu;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch dựng đồ thị nguồn thuần;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Liên Kết Bytecode {
@@ -66,7 +69,9 @@ lớp công khai Bộ Liên Kết Bytecode {
             };
         };
         lặp(i = 0; i < máy ảo lấy độ dài(số khai báo); i++) {
-            nếu (số khai báo[i] != 1) {
+            cần = 1;
+            nếu (lấy từ điển(bảng hàm[i], "ẩn danh", sai)) { cần = 0; };
+            nếu (số khai báo[i] != cần) {
                 ném "biên dịch liên kết: thiếu hoặc trùng OP_HAM cho hàm '" +
                     bảng hàm[i]["tên"] + "'";
             };
@@ -88,18 +93,20 @@ lớp công khai Bộ Liên Kết Bytecode {
             h = các hàm[i];
             tên = lấy từ điển(h, "tên", "");
             mã định danh = lấy từ điển(h, "id", -1);
-            nếu (tên == "" || mã định danh != i) {
+            ẩn danh = lấy từ điển(h, "ẩn danh", sai);
+            nếu ((!ẩn danh && tên == "") || mã định danh != i) {
                 ném "biên dịch liên kết: tên hoặc thứ tự function ID không hợp lệ";
             };
-            nếu (mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) != mã định danh) {
+            nếu (!ẩn danh && mình.biên dịch liên kết tìm ô nhớ(các ô nhớ, tên) != mã định danh) {
                 ném "biên dịch liên kết: ô nhớ hàm không khớp function ID";
             };
             tên chỉ mục = mình.biên dịch liên kết tìm chuỗi(chuỗi, tên);
-            nếu (tên chỉ mục < 0) {
+            nếu (ẩn danh) { tên chỉ mục = -1; };
+            nếu (!ẩn danh && tên chỉ mục < 0) {
                 ném "biên dịch liên kết: thiếu tên hàm trong StringPool";
             };
             lặp(j = 0; j < máy ảo lấy độ dài(bảng hàm); j++) {
-                nếu (bảng hàm[j]["tên"] == tên) {
+                nếu (!ẩn danh && bảng hàm[j]["tên"] == tên) {
                     ném "biên dịch liên kết: trùng tên hàm '" + tên + "'";
                 };
             };
@@ -111,7 +118,7 @@ lớp công khai Bộ Liên Kết Bytecode {
                 thân[máy ảo lấy độ dài(thân) - 1]["op"] != biên dịch mã thao tác("OP_DONG_KHOI")) {
                 ném "biên dịch liên kết: mã trung gian thân hàm không hợp lệ '" + tên + "'";
             };
-            máy ảo thêm cuối danh sách(bảng hàm, {"tên": tên, "id": mã định danh, "tên index": tên chỉ mục,
+            máy ảo thêm cuối danh sách(bảng hàm, {"tên": tên, "id": mã định danh, "tên index": tên chỉ mục, "ẩn danh": ẩn danh,
                              "bytecode": thân});
         };
         mình.biên dịch liên kết kiểm tra khai báo(nguồn, bảng hàm);
@@ -148,6 +155,13 @@ lớp công khai Bộ Liên Kết Bytecode {
         sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
         bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
         bộ kiểu.đăng ký();
+        nếu (biên dịch lọc nhập chọn lọc(sổ, đồ thị)) {
+            // Reassign contiguous IDs only after computing the dependency
+            // closure; omitted declarations never reach IR or serialization.
+            sổ = biên dịch đăng ký hàm đồ thị hoãn chuỗi(đồ thị);
+            bộ kiểu = Bộ Đăng Ký Kiểu(sổ, đồ thị);
+            bộ kiểu.đăng ký();
+        };
         phiên = {"đa mô đun": đúng, "cạnh dùng": [],
                  "đã phát": [], "id tối đa": -1, "ngoại": []};
         tên gốc = đồ thị["điểm vào"];
@@ -164,6 +178,7 @@ lớp công khai Bộ Liên Kết Bytecode {
             máy ảo thêm cuối danh sách(bảng hàm, {"tên": khai["tên"], "id": i,
                   "tên index": khai["tên index"], "mô đun": khai["mô đun"],
                   "tên chạy": khai["tên chạy"],
+                  "ẩn danh": lấy từ điển(khai, "ẩn danh", sai),
                   "tên index runtime": khai["tên index runtime"],
                   "bytecode": []});
         };
@@ -205,7 +220,7 @@ lớp công khai Bộ Liên Kết Bytecode {
                         ném "biên dịch liên kết: hàm global không khớp sổ mô-đun";
                     };
                 } hoặc {
-                    nếu (!lấy từ điển(h, "phương thức", sai)) {
+                    nếu (!lấy từ điển(h, "phương thức", sai) && !lấy từ điển(h, "ẩn danh", sai)) {
                         ném "biên dịch liên kết: thiếu định danh phương thức";
                     };
                 };
@@ -213,7 +228,8 @@ lớp công khai Bộ Liên Kết Bytecode {
                     bảng hàm[mã định danh]["mô đun"] != tên mô đun ||
                     bảng hàm[mã định danh]["tên"] != h["tên"] ||
                     bảng hàm[mã định danh]["tên index"] != h["tên index"] ||
-                    mình.biên dịch liên kết tìm ô nhớ(phần["slots"], h["tên"]) != mã định danh) {
+                    (!lấy từ điển(h, "ẩn danh", sai) &&
+                     mình.biên dịch liên kết tìm ô nhớ(phần["slots"], h["tên"]) != mã định danh)) {
                     ném "biên dịch liên kết: thông tin hàm sai mô-đun/function ID";
                 };
                 thân = h["bytecode"];

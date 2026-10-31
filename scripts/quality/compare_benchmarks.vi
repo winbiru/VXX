@@ -1,0 +1,11 @@
+nhập gói.kiểm thử.so sánh benchmark.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.dữ liệu.json.json.*;
+hàm chính() {
+    thử {
+        path = đọc biến môi trường("VPP_BENCHMARK_REPORT", "");
+        nếu (path == "") { ném "VPP_BENCHMARK_REPORT is required"; };
+        in json tạo(so sánh benchmark(benchmark phân tích báo cáo(đọc tệp(path))));
+    } bắt lỗi(e) { in json tạo({"status": "INVALID", "error": e, "cases": []}); };
+};

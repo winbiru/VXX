@@ -1,0 +1,60 @@
+# Executed with python3 -B -c by the V++ runner; no .py file is generated.
+import json, os, time
+name = os.environ.get("BENCH_CASE", "arithmetic")
+iterations = int(os.environ.get("BENCH_ITERATIONS", "16"))
+seed = int(os.environ.get("BENCH_SEED", "17"))
+assert 16 <= iterations <= 100000000 and iterations % 16 == 0
+data = [""] * 16
+for i in range(16):
+    k = seed + i
+    if name == "unicode_replace":
+        data[k % 16] = "Xin chào Việt Nam 🌿 — Việt! " * (k % 4 + 4) + str(k)
+    if name == "json_parse":
+        data[k % 16] = '{"n":' + str(k) + ',"tên":"Việt Nam 🌿","values":[' + ",".join(str(k+j) for j in range(16)) + "]}"
+def arithmetic(k):
+    return (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11
+def branch_loop(k):
+    x = k * 97 + 11
+    for i in range(256):
+        x += 251
+        if x >= 65521:
+            x -= 65521
+    return x
+def fibonacci(k):
+    a, b = 0, 1
+    for i in range(k % 16 + 20):
+        a, b = b, a + b
+    return a
+def list_128(k):
+    values = []
+    for i in range(128):
+        values.append(k + i)
+    total = 0
+    for i in range(128):
+        if values[i] % 2 == 0:
+            total += values[i]
+    return total
+def unicode_replace(k):
+    return len(data[k % 16].replace("Việt", "V++"))
+def json_parse(k):
+    value = json.loads(data[k % 16])
+    total = value["n"] + len(value["tên"])
+    for i in range(16):
+        total += value["values"][i]
+    return total
+fn = globals()[name]
+checks = [fn(seed + i) for i in range(16)]
+expected = sum(value % 997 for value in checks) * (iterations // 16)
+def batch():
+    total = 0.0
+    start = time.perf_counter_ns()
+    for i in range(iterations):
+        total += fn(seed + i % 16) % 997
+    elapsed_ms = (time.perf_counter_ns() - start) / 1000000
+    assert total == expected and elapsed_ms > 0
+    return total, elapsed_ms
+warmup_ms = [batch()[1] for _ in range(3)]
+checksum, elapsed_ms = batch()
+print(json.dumps(dict(case=name, iterations=iterations, seed=seed, checks=checks,
+    checksum=str(int(checksum)), elapsed_ms=elapsed_ms, ns_per_op=elapsed_ms*1000000/iterations,
+    warmup_ms=warmup_ms), ensure_ascii=False))

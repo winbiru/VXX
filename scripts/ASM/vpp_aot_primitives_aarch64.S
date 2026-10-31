@@ -669,3 +669,9 @@ RUNTIME_EXPORT vpp_native_cache_report_entry, rt_cache_report, 0
 
 .zerofill __DATA,__bss,_vpp_native_arena_base,8,3
 .subsections_via_symbols
+
+#include "vpp_vm_f64_primitives.inc"
+#include "vpp_vm_system_primitives.inc"
+#include "vpp_vm_directory_primitives.inc"
+#include "vpp_vm_process_primitives.inc"
+#include "vpp_vm_socket_primitives.inc"

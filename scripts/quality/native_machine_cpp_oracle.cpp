@@ -94,8 +94,23 @@ void verifyLowering(const vietvm::compiler::IrProgram &ir,
         if (x.opcode != y.opcode || x.immediate != y.immediate ||
             x.operand != y.operand || x.depthBefore != y.depthBefore ||
             x.symbol != y.symbol) {
-            throw std::runtime_error(name + ": MachineInstruction differs at index " +
-                                     std::to_string(i) + " (opcode/immediate/operand/depth/symbol)");
+            auto describe = [](const vietvm::native::MachineInstruction &inst) {
+                return "opcode=" + std::to_string(static_cast<int>(inst.opcode)) +
+                    ", immediate=" + std::to_string(inst.immediate) +
+                    ", operand=" + std::to_string(inst.operand) +
+                    ", depth=" + std::to_string(inst.depthBefore) +
+                    ", symbol='" + inst.symbol + "'";
+            };
+            std::string details = name + ": MachineInstruction differs at index " +
+                                  std::to_string(i) + "; C++ [" + describe(x) +
+                                  "] V++ [" + describe(y) + "]";
+            const auto begin = i > 3 ? i - 3 : 0;
+            const auto end = std::min(a.instructions.size(), i + 4);
+            for (auto j = begin; j < end; ++j)
+                details += "\n  " + std::to_string(j) + " C++ [" +
+                           describe(a.instructions[j]) + "] V++ [" +
+                           describe(b.instructions[j]) + "]";
+            throw std::runtime_error(details);
         }
     }
 }
@@ -304,20 +319,20 @@ int main(int argc, char **argv) {
         if (lowering) {
             verifyLoweringFixture(argv[2],
                 {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong",
-                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh"}, {});
+                 "bo_qua", "phan_loai", "tim_dau", "phu_dinh", "tong_khi", "dieu_khien_khi"}, {});
             verifyLoweringFixture(argv[3],
                 {"goi_bon", "goi_muoi", "tong_muoi", "nhan_sau", "tinh_vong", "ket_hop"}, {});
             verifyLoweringFixture(argv[4],
                 {"min_i32", "max_i32_const", "add_limit", "neg_limit"}, {});
             verifySyntheticBoundaries(argv[4]);
-            std::cout << "Machine IR C++/V++ lowering parity: 26/26 cases\n";
+            std::cout << "Machine IR C++/V++ lowering parity: 28/28 cases\n";
             return 0;
         }
         const std::vector<std::string> targets = {
             "aarch64-apple-darwin", "aarch64-linux-gnu",
             "x86_64-linux-gnu", "x86_64-windows-msvc",
         };
-        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "max_i32", "tong"}, targets);
+        verifyFunctions(argv[1], {"tru_dao", "tong_bon", "dieu_kien", "so_sanh_nho", "so_sanh_lon", "so_sanh_am", "max_i32", "tong", "tong_khi", "dieu_khien_khi", "hoist_vong", "hoist_hai_vong", "hoist_long_nhau"}, targets);
         verifyFunctions(argv[2], {"goi_bon", "goi_muoi", "tong_muoi"}, targets);
     } catch (const std::exception &e) {
         std::cerr << "C++ machine oracle: " << e.what() << '\n';

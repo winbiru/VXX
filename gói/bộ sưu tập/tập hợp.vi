@@ -214,4 +214,4 @@ hàm công khai tập xóa(danh sách đầu vào, giá trị) {
     bộ chuyển tiếp = Tiện Ích Tập Hợp();
     trả về bộ chuyển tiếp.tập xóa(danh sách đầu vào, giá trị);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.loại của;

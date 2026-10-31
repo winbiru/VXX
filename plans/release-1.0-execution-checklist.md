@@ -49,6 +49,24 @@
 
 ## 2. P0 — Benchmark và regression gate (P0.4)
 
+Tiến độ triển khai ngày 24/10/2026: đã có harness-v3, runner/comparator,
+GC burst/collect/reuse + explicit trim, allocation requests/bytes, peak RSS và
+GC pause p95. Raw report tại `benchmark/reports/local-2026-10-24/` so sánh
+`cc675ca` với `b39933e` + benchmark patch: **16 PASS, 3 INCONCLUSIVE, 0 FAIL**.
+Ngày 30/10/2026, runner/comparator Python đã được gỡ theo yêu cầu.
+Comparator thống kê đã được thay bằng V++, có self-test interpreter/native
+và CLI exit 0/1/2/3. Từ 31/10/2026, runner hai revision
+`scripts/quality/run_benchmark_gate.sh`, collector V++
+`scripts/quality/collect_benchmark_gate.vi` và workflow PR
+`.github/workflows/benchmark-regression.yml` đã được thêm vào mã nguồn.
+Smoke trên macOS với `0f77c43`/`f89c2c9` và `vm_verify` (10 mẫu) PASS,
+nhưng hash hai binary trùng nhau nên chỉ kiểm chứng pipeline. GC 40 mẫu
+với binary giống nhau cũng PASS. Chưa có kết quả CI từ xa hoặc regression
+cố ý trên workflow mới; xem [hướng dẫn tái lập](../benchmark/BASELINE.md).
+P0.4 chưa nghiệm thu.
+Giữ các mục nghiệm thu bên dưới mở vì còn ba case nhiễu, HTTP/JSON workload,
+variable-map rehash telemetry và bằng chứng CI trên SHA ứng viên.
+
 - [ ] **REL-04 / P0 — Chuẩn hóa harness.** Rà soát
   `benchmark/benchmark_baseline.cpp` và `benchmark/CMakeLists.txt`:
   `vm_verify`, `vm_dispatch_preverified`, `vm_end_to_end`, các compiler

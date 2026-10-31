@@ -1,9 +1,9 @@
 // No C++ compiler oracle: compile sources, validate and execute artifacts in V++.
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/dữ liệu/json/json;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.mã thao tác.*;
+nhập gói.dữ liệu.json.json.*;
 
 hàm yêu cầu selfhost(điều_kiện, tên) {
     nếu (!điều_kiện) { ném "selfhost artifact: " + tên; };

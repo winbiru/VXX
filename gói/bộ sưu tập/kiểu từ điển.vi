@@ -1,5 +1,5 @@
-nhập gói/bộ sưu tập/giao diện;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.giao diện.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 lớp công khai Từ Điển triển khai Bộ Chứa {
     hàm công khai khởi tạo() { mình.bảng = {}; };

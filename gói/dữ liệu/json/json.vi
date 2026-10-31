@@ -1,12 +1,19 @@
 // Module: mạng.json
 // Mục đích: dựng, phân tích và tuần tự JSON an toàn, gồm object/array lồng nhau.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
-nhập gói/văn bản/chuỗi;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit độ dài đoạn;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.văn bản.chuỗi.bỏ khoảng trắng;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp riêng tư Xử Lý Nội Bộ Json {
@@ -143,7 +150,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         vị trí = lấy từ điển(trạng thái, "vị trí", 0);
         n = máy ảo lấy độ dài(nội dung);
         đang bỏ = đúng;
-        lặp(vòng = 0; vị trí < n && đang bỏ; vòng++) {
+        khi (vị trí < n && đang bỏ) {
             nếu (mình.json là khoảng trắng(nội dung[vị trí])) {
                 vị trí = vị trí + 1;
             } hoặc {
@@ -231,7 +238,7 @@ lớp riêng tư Bộ Xử Lý JSON {
 
         kết quả = "";
         hoàn tất = sai;
-        lặp(vòng = 0; vị trí < n && !hoàn tất; vòng++) {
+        khi (vị trí < n && !hoàn tất) {
             c = nội dung[vị trí];
             vị trí = vị trí + 1;
             đặt từ điển(trạng thái, "vị trí", vị trí);
@@ -355,7 +362,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                 mình.json lỗi(trạng thái, "số không hợp lệ");
             };
             đang đọc = đúng;
-            lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+            khi (vị trí < n && đang đọc) {
                 nếu (mình.json là chữ số(nội dung[vị trí])) {
                     vị trí = vị trí + 1;
                 } hoặc {
@@ -377,7 +384,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "phần thập phân thiếu chữ số");
                 };
                 đang đọc = đúng;
-                lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+                khi (vị trí < n && đang đọc) {
                     nếu (mình.json là chữ số(nội dung[vị trí])) {
                         vị trí = vị trí + 1;
                     } hoặc {
@@ -405,7 +412,7 @@ lớp riêng tư Bộ Xử Lý JSON {
                     mình.json lỗi(trạng thái, "số mũ thiếu chữ số");
                 };
                 đang đọc = đúng;
-                lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+                khi (vị trí < n && đang đọc) {
                     nếu (mình.json là chữ số(nội dung[vị trí])) {
                         vị trí = vị trí + 1;
                     } hoặc {
@@ -449,7 +456,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
 
         hoàn tất = sai;
-        lặp(vòng = 0; !hoàn tất; vòng++) {
+        khi (!hoàn tất) {
             máy ảo thêm cuối danh sách(kết quả, mình.json đọc giá trị(trạng thái));
             mình.json bỏ khoảng trắng(trạng thái);
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
@@ -488,7 +495,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
 
         hoàn tất = sai;
-        lặp(vòng = 0; !hoàn tất; vòng++) {
+        khi (!hoàn tất) {
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
             nếu (vị trí >= n) {
                 mình.json lỗi(trạng thái, "đối tượng thiếu khóa");
@@ -551,12 +558,16 @@ lớp riêng tư Bộ Xử Lý JSON {
         };
         nếu (c == "t") {
             nếu (mình.json khớp hằng văn bản(trạng thái, "true")) {
+                tạo boolean = lấy từ điển(trạng thái, "tạo boolean", rỗng);
+                nếu (tạo boolean != rỗng) { trả về tạo boolean(đúng); };
                 trả về đúng;
             };
             mình.json lỗi(trạng thái, "literal không hợp lệ");
         };
         nếu (c == "f") {
             nếu (mình.json khớp hằng văn bản(trạng thái, "false")) {
+                tạo boolean = lấy từ điển(trạng thái, "tạo boolean", rỗng);
+                nếu (tạo boolean != rỗng) { trả về tạo boolean(sai); };
                 trả về sai;
             };
             mình.json lỗi(trạng thái, "literal không hợp lệ");
@@ -583,7 +594,7 @@ lớp riêng tư Bộ Xử Lý JSON {
         lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(mã ký tự cơ bản, chuỗi từ byte máy ảo([i])); };
         ký tự = [];
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             bước = 1;
             c = "";
             nếu (các byte[vị trí] < 128) {
@@ -611,7 +622,14 @@ lớp riêng tư Bộ Xử Lý JSON {
         nếu (loại của(nội dung) != "chuỗi") {
             ném "json phân tích: nội dung phải là chuỗi";
         };
-        trạng thái = {"nội dung": mình.json ký tự nguồn(nội dung), "vị trí": 0};
+        trả về mình.json phân tích với boolean(nội dung, rỗng);
+    };
+
+    // Optional factory preserves JSON booleans for consumers whose numeric
+    // schemas must distinguish true/false from V++'s ordinary 1/0 mapping.
+    hàm công khai json phân tích với boolean(nội dung, tạo boolean) {
+        nếu (loại của(nội dung) != "chuỗi") { ném "json phân tích: nội dung phải là chuỗi"; };
+        trạng thái = {"nội dung": mình.json ký tự nguồn(nội dung), "vị trí": 0, "tạo boolean": tạo boolean};
         kết quả = mình.json đọc giá trị(trạng thái);
         mình.json bỏ khoảng trắng(trạng thái);
         nếu (lấy từ điển(trạng thái, "vị trí", 0) != máy ảo lấy độ dài(nội dung)) {
@@ -700,6 +718,11 @@ lớp riêng tư Bộ Xử Lý JSON {
 hàm công khai json phân tích(nội dung) {
     bộ chuyển tiếp = Xử Lý Nội Bộ Json();
     trả về bộ chuyển tiếp.json phân tích(nội dung);
+};
+
+hàm công khai json phân tích với boolean(nội dung, tạo boolean) {
+    bộ chuyển tiếp = Bộ Xử Lý JSON();
+    trả về bộ chuyển tiếp.json phân tích với boolean(nội dung, tạo boolean);
 };
 
 // Tài liệu giữ kết quả đã parse, nạp lỗi không làm mất tài liệu trước đó.

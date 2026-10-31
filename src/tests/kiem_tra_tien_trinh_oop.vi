@@ -1,4 +1,4 @@
-nhập gói/hệ thống/chính;
+nhập gói.hệ thống.chính.*;
 
 hàm chính() {
     lệnh = Lệnh Tiến Trình("/bin/echo");

@@ -1,4 +1,4 @@
-nhập gói/mạng/phân giải tên miền;
+nhập gói.mạng.phân giải tên miền.*;
 
 // Fixture tích hợp: máy chủ local trả TC=1 qua UDP, rồi bản tin TCP chia nhỏ.
 hàm chính() {

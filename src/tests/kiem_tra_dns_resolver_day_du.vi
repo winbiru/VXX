@@ -1,6 +1,6 @@
-nhập gói/mạng/phân giải tên miền;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/hệ thống/môi trường;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.hệ thống.môi trường.*;
 
 // Mock DNS trả A/AAAA với TTL khác nhau, hoặc lỗi/negative có chủ đích.
 hàm chính() {

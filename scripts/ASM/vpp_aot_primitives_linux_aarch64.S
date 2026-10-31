@@ -506,3 +506,7 @@ vpp_native_arena_base: .skip 8
 .section .note.GNU-stack,"",@progbits
 
 #include "vpp_vietnamese_runtime_symbols.inc"
+#include "vpp_vm_system_primitives.inc"
+#include "vpp_vm_directory_primitives.inc"
+#include "vpp_vm_process_primitives.inc"
+#include "vpp_vm_socket_primitives.inc"

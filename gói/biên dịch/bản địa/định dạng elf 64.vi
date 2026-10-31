@@ -55,7 +55,7 @@ hàm elf tên định danh(đầu ra, tên định danh) {
     trả về byte thêm(đầu ra, 0);
 };
 
-hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, bản địa các lời gọi) {
+hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, lời gọi lõi) {
     nếu (mã máy == đối tượng) { trả về -1; };
     nếu (đầu tiên < 0) { trả về -1; };
     nếu (cuối cùng <= đầu tiên) { trả về -1; };
@@ -81,7 +81,7 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
             biến điểm bắt đầu = byte đọc số nguyên ba mươi hai bit(các điểm bắt đầu, (chương trình con hiện tại - đầu tiên) * 4);
             nếu (điểm bắt đầu < 0) { mã trạng thái = -1; thoát; };
             nếu (điểm bắt đầu >= n) { mã trạng thái = -1; thoát; };
-            nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng mô đun chương trình con tên định danh(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh), 1, điểm bắt đầu) != 0) {
+            nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu hàm(sổ đăng ký, chương trình con hiện tại, điểm vào mã định danh), 1, điểm bắt đầu) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
@@ -89,14 +89,15 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
     };
     biến toàn cục mã định danh = 0;
     nếu (mã trạng thái == 0) {
-        lặp (độ lệch = 0; độ lệch < byte dài(sổ đăng ký); độ lệch = độ lệch) {
+        biến độ lệch = 0;
+        khi (độ lệch < byte dài(sổ đăng ký)) {
             nếu (độ lệch + 8 > byte dài(sổ đăng ký)) { mã trạng thái = -1; thoát; };
             biến kích cỡ = byte đọc số nguyên ba mươi hai bit(sổ đăng ký, độ lệch);
             nếu (kích cỡ <= 0) { mã trạng thái = -1; thoát; };
             nếu (kích cỡ > byte dài(sổ đăng ký) - độ lệch - 8) { mã trạng thái = -1; thoát; };
-            nếu (đối tượng mô đun đã dùng(các phần nhập, toàn cục mã định danh) == 1) {
+            nếu (có tham chiếu hàm(các phần nhập, toàn cục mã định danh) == 1) {
                 nếu (toàn cục mã định danh >= đầu tiên) { nếu (toàn cục mã định danh < cuối cùng) { mã trạng thái = -1; thoát; }; };
-                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng mô đun chương trình con tên định danh(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh), 0, 0) != 0) {
+                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu hàm(sổ đăng ký, toàn cục mã định danh, điểm vào mã định danh), 0, 0) != 0) {
                     mã trạng thái = -1;
                     thoát;
                 };
@@ -114,9 +115,9 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
         };
     };
     nếu (mã trạng thái == 0) {
-        lặp (bản địa mã định danh = 0; bản địa mã định danh < 62; bản địa mã định danh++) {
-            nếu (đối tượng mô đun đã dùng(bản địa các lời gọi, bản địa mã định danh) == 1) {
-                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, đối tượng bản địa tên định danh(bản địa mã định danh), 0, 0) != 0) {
+        lặp (mã lõi = 0; mã lõi < 76; mã lõi++) {
+            nếu (có tham chiếu hàm(lời gọi lõi, mã lõi) == 1) {
+                nếu (elf mục ký hiệu(các ký hiệu, các chuỗi, tên ký hiệu lõi(mã lõi), 0, 0) != 0) {
                     mã trạng thái = -1;
                     thoát;
                 };
@@ -129,19 +130,19 @@ hàm elf mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đ�
             biến mã định danh = byte đọc số nguyên ba mươi hai bit(các phần nhập, độ dời + 4);
             nếu (tại < 0) { mã trạng thái = -1; thoát; };
             nếu (tại + 4 > n) { mã trạng thái = -1; thoát; };
-            nếu (elf tái định vị bổ sung(các mục tái định vị, tại, 1 + đối tượng mô đun nhập chỉ mục(các phần nhập, đầu tiên, cuối cùng, mã định danh)) != 0) {
+            nếu (elf tái định vị bổ sung(các mục tái định vị, tại, 1 + chỉ mục ký hiệu nhập(các phần nhập, đầu tiên, cuối cùng, mã định danh)) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };
         };
-        lặp (độ dời = 0; độ dời < byte dài(bản địa các lời gọi); độ dời = độ dời + 8) {
-            biến bản địa tại = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, độ dời);
-            biến bản địa mục ký hiệu mã định danh = byte đọc số nguyên ba mươi hai bit(bản địa các lời gọi, độ dời + 4);
-            nếu (bản địa tại < 0) { mã trạng thái = -1; thoát; };
-            nếu (bản địa tại + 4 > n) { mã trạng thái = -1; thoát; };
-            nếu (bản địa mục ký hiệu mã định danh < 0) { mã trạng thái = -1; thoát; };
-            nếu (bản địa mục ký hiệu mã định danh >= 62) { mã trạng thái = -1; thoát; };
-            nếu (elf tái định vị bổ sung(các mục tái định vị, bản địa tại, 1 + đối tượng mô đun bản địa chỉ mục(các phần nhập, bản địa các lời gọi, đầu tiên, cuối cùng, toàn cục mã định danh, bản địa mục ký hiệu mã định danh)) != 0) {
+        lặp (độ dời = 0; độ dời < byte dài(lời gọi lõi); độ dời = độ dời + 8) {
+            biến vị trí gọi lõi = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, độ dời);
+            biến mã ký hiệu lõi = byte đọc số nguyên ba mươi hai bit(lời gọi lõi, độ dời + 4);
+            nếu (vị trí gọi lõi < 0) { mã trạng thái = -1; thoát; };
+            nếu (vị trí gọi lõi + 4 > n) { mã trạng thái = -1; thoát; };
+            nếu (mã ký hiệu lõi < 0) { mã trạng thái = -1; thoát; };
+            nếu (mã ký hiệu lõi >= 76) { mã trạng thái = -1; thoát; };
+            nếu (elf tái định vị bổ sung(các mục tái định vị, vị trí gọi lõi, 1 + chỉ mục ký hiệu lõi mô đun(các phần nhập, lời gọi lõi, đầu tiên, cuối cùng, toàn cục mã định danh, mã ký hiệu lõi)) != 0) {
                 mã trạng thái = -1;
                 thoát;
             };

@@ -1,8 +1,8 @@
-nhập gói/lõi/ngẫu nhiên;
-nhập gói/lõi/thực thi tương tác;
-nhập gói/lõi/đồng thời;
-nhập gói/lõi/quốc tế hóa;
-nhập gói/kiểm thử/chính;
+nhập gói.lõi.ngẫu nhiên.*;
+nhập gói.lõi.thực thi tương tác.*;
+nhập gói.lõi.đồng thời.*;
+nhập gói.lõi.quốc tế hóa.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm chính() {
     a = Bộ Sinh Ngẫu Nhiên(12345);

@@ -1,6 +1,6 @@
 // vi.net.http.server — bề mặt server V++ trên socket primitives của hệ điều hành.
-nhập gói/mạng/ổ cắm;
-nhập gói/mạng/http/máy khách;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.mạng.http.máy khách.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Máy Chủ HTTP {

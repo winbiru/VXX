@@ -6,7 +6,7 @@
 //#  - OP_NEU_KHONG -> "hoặc nếu" (else if / elif; hai token cú pháp)
 //#  - OP_HOAC -> "hoặc" (else); logical OR dùng "||"
 //#  - OP_KHONG -> logical NOT ("không"/"khong")
-//#  - OP_LAP -> loop ("lặp"/"lap") (for/while style)
+//#  - OP_LAP -> loop ("lặp" for-style / "khi" while-style)
 //#  - OP_HAM -> "hàm"/"ham" (function)
 //#  - OP_GOI -> "gọi"/"goi" (call)
 //#  - OP_TRA_VE -> "trả về"/"tra ve" (return)
@@ -23,8 +23,18 @@
 <top_level_list>        ::= <top_level_decl> | <top_level_decl> <top_level_list>
 
 <top_level_decl>        ::= <function_decl>
+                         | <import_decl>
                          | <var_decl>
                          | <statement>
+
+<import_decl>          ::= [ "công khai" ] "nhập" <module_path>
+                          [ "." ( <identifier> | "*" ) ]
+                          [ "như" <identifier> ] ";"
+//# <module_path> uses '.' between directory and module components (legacy
+//# '/' is accepted). The final dot selects an export or '*' for all exports.
+//# A qualified full-module import must end in '.*'. Single-component legacy
+//# imports such as 'nhập lõi;' still work. The .vi suffix is omitted.
+//# Spaces are permitted in directory, module and exported names.
 
 //# Function: hàm <id>( <param_list_opt> ) { <stmt_list> }
 <function_decl>         ::= <FUNC_KW> <identifier> "(" <param_list_opt> ")" <block>
@@ -71,7 +81,7 @@
 
 //# While
 <while_stmt>            ::= <WHILE_KW> "(" <expression> ")" <block>
-<WHILE_KW>              ::= "lặp" | "lap" | "trong khi" | "trongkhi"
+<WHILE_KW>              ::= "khi"
 
 //# For (C-style): lặp (khởi tạo; điều kiện; cập nhật) { ... }
 <for_stmt>              ::= <FOR_KW> "(" <for_init_opt> ";" <expression_opt> ";" <for_update_opt> ")" <block>

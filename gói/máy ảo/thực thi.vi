@@ -1,0 +1,331 @@
+// Bytecode dispatch is V++. Guest calls use an explicit frame stack;
+// C++ VM, dynamic helpers and native callbacks are never linked here.
+hàm vm_jump(frame, target) {
+    nếu (target < 0 || target > vm_get(vm_get(frame, 0), 0)) { trả về vm_error(17); };
+    vm_set(frame, 1, target); trả về 0;
+};
+hàm vm_step(state, frames) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_step_body(state, frames); };
+    vm_profile_begin(3);
+    biến result = vm_step_body(state, frames);
+    vm_profile_end(3);
+    trả về result;
+};
+hàm vm_step_body(state, frames) {
+    // vm_execute only enters a step while frames has at least one element.
+    // Fetch the top frame directly to avoid checked vm_at on every opcode.
+    biến frame_count = máy đọc số nguyên ba mươi hai bit(frames + 4);
+    biến frame_data = máy đọc số nguyên ba mươi hai bit(frames + 12);
+    biến frame = máy đọc số nguyên ba mươi hai bit(frame_data + (frame_count - 1) * 4);
+    biến stack = vm_get(frame, 2); biến code = vm_get(frame, 0);
+    biến pc = máy đọc số nguyên ba mươi hai bit(frame + 4);
+    biến code_length = vm_get(code, 0);
+    nếu (pc == code_length) { trả về vm_return(state, 0); };
+    nếu (pc < 0 || pc > code_length) { trả về vm_error(17); };
+    // Only fetch operands used by the selected instruction. Most loop and
+    // lexer instructions never read the third field, and arithmetic reads none.
+    // Four i32 words per instruction. Reuse its base byte address for each
+    // operand instead of calling vm_get (and multiplying the index) again.
+    biến instruction_base = code + 4 + pc * 16;
+    biến op = máy đọc số nguyên ba mươi hai bit(instruction_base);
+    máy ghi số nguyên ba mươi hai bit(frame + 4, pc + 1);
+    nếu (op <= 5 || (op >= 7 && op <= 12) || op == 64) {
+        // Replace two checked pops and a capacity-checked append with one
+        // in-place reduction. Keep both operands rooted on the stack until
+        // vm_binary has finished allocating its result.
+        biến size = vm_get(stack, 1);
+        nếu (size < 2) { trả về vm_error(5); };
+        biến data = vm_get(stack, 3);
+        biến result = vm_binary(op, vm_get(data, size - 2), vm_get(data, size - 1));
+        vm_set(data, size - 1, 0);
+        vm_set(data, size - 2, result);
+        vm_set(stack, 1, size - 1);
+        trả về 0;
+    };
+    nếu (op == 41) {
+        biến value = vm_int(máy đọc số nguyên ba mươi hai bit(instruction_base + 4));
+        biến size = vm_get(stack, 1);
+        // The stack is a live vector. Most constant pushes fit its existing
+        // allocation; reserve vm_append for the occasional growth case.
+        nếu (size < vm_get(stack, 2)) {
+            vm_set(vm_get(stack, 3), size, value);
+            vm_set(stack, 1, size + 1);
+        } hoặc { vm_append(stack, value); };
+        trả về 0;
+    };
+    // These instructions have no pool/slot operand. Skipping the unused
+    // second word matters on every loop back-edge and conditional branch.
+    nếu (op == 84) { vm_append(stack, 0); trả về 0; };
+    nếu (op == 77 || op == 78) { vm_append(stack, vm_int(op == 77)); trả về 0; };
+    nếu (op == 6 || op == 66) { vm_append(stack, vm_int(vm_truth(vm_pop(stack)) == 0)); trả về 0; };
+    nếu (op == 63) {
+        // The current frame's bytecode length is already checked above.
+        // Avoid another function call and two header reads on each loop edge.
+        biến target = máy đọc số nguyên ba mươi hai bit(instruction_base + 4);
+        nếu (target < 0 || target > code_length) { trả về vm_error(17); };
+        vm_set(frame, 1, target); trả về 0;
+    };
+    nếu (op == 62) {
+        nếu (vm_truth(vm_pop(stack)) == 0) {
+            biến target = máy đọc số nguyên ba mươi hai bit(instruction_base + 4);
+            nếu (target < 0 || target > code_length) { trả về vm_error(17); };
+            vm_set(frame, 1, target);
+        };
+        trả về 0;
+    };
+    biến b = máy đọc số nguyên ba mươi hai bit(instruction_base + 8);
+    nếu (op == 60) { vm_append(stack, vm_int(b)); trả về 0; };
+    nếu (op == 61) { vm_append(stack, vm_load_slot(state, frame, b)); trả về 0; };
+    nếu (op == 65) { vm_append(stack, vm_pool(state, b)); trả về 0; };
+    nếu (op == 79) { vm_append(stack, vm_scalar(100, vm_pool(state, b))); trả về 0; };
+    biến a = máy đọc số nguyên ba mươi hai bit(instruction_base + 4);
+    nếu (op == 27) {
+        biến scope = vm_get(frame, 3); nếu (vm_get(frame, 9) == 1) { scope = vm_get(state, 4); };
+        nếu (vm_get(frame, 9) != 1 || vm_map_find_int(scope, b) < 0) {
+            nếu (scope == 0) {
+                scope = vm_vector(5);
+                nếu (scope == 0) { trả về 0; };
+                vm_set(frame, 3, scope);
+            };
+            biến cell = vm_alloc(16, 1); nếu (cell == 0) { trả về 0; }; vm_set(cell, 0, 10); vm_set(cell, 1, vm_int(0)); vm_map_put(scope, vm_int(b), cell);
+            nếu (vm_get(frame, 9) != 1) { vm_slot_cache_put(frame, b, cell); };
+        }; trả về 0;
+    };
+    nếu (op == 13) {
+        biến id = vm_pop(stack); biến value = vm_pop(stack);
+        nếu (vm_tag(id) == 3 && vm_tag(value) == 1) { biến swap = id; id = value; value = swap; };
+        nếu (vm_tag(id) != 1) { trả về vm_error(2); }; trả về vm_store(state, frame, vm_number(id), value);
+    };
+    nếu (op == 70 || op == 71) {
+        biến id = vm_pop(stack); nếu (vm_tag(id) != 1) { trả về vm_error(2); };
+        biến slot = vm_number(id); biến current = vm_number(vm_load_slot(state, frame, slot));
+        biến delta = 1; nếu (op == 71) { delta = -1; }; biến value = vm_int(current + delta);
+        vm_store(state, frame, slot, value); vm_append(stack, value); trả về 0;
+    };
+    nếu (op == 69 || op == 87) {
+        biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
+        biến value = 0;
+        nếu (c == -1) { value = vm_get(frame, 5); nếu (value == 0) { trả về vm_error(18); }; }
+        hoặc nếu (c >= 0 && c < vm_get(vm_get(frame, 4), 1)) { value = vm_at(vm_get(frame, 4), c); }
+        hoặc nếu (op == 87) {
+            biến encoded = vm_pool(state, a); nếu (vm_get(encoded, 1) < 2) { trả về vm_error(10); };
+            value = vm_scalar(máy đọc byte(vm_get(encoded, 2)), vm_slice(encoded, 2, vm_get(encoded, 1) - 2));
+        } hoặc { trả về vm_error(14); };
+        trả về vm_bind(frame, b, value);
+    };
+    nếu (op == 88 || op == 85) {
+        biến tag = 4; nếu (op == 85) { tag = 5; }; biến value = 0;
+        nếu (b >= 0) { value = vm_decode_literal(vm_pool(state, b), tag); }
+        hoặc {
+            biến count = a; nếu (tag == 5) { count = count * 2; }; biến items = vm_take(stack, count);
+            value = vm_vector(tag);
+            lặp(i = 0; i < count; i++) {
+                nếu (tag == 5) { biến key = vm_at(items, i); i = i + 1; nếu (vm_tag(key) != 3) { trả về vm_error(2); }; vm_map_put(value, key, vm_at(items, i)); }
+                hoặc { vm_append(value, vm_at(items, i)); };
+            };
+        };
+        vm_append(stack, value); trả về 0;
+    };
+    nếu (op == 89) { biến key = vm_pop(stack); biến container = vm_pop(stack); vm_append(stack, vm_index(container, key)); trả về 0; };
+    nếu (op == 90) {
+        biến value = vm_pop(stack); biến key = vm_pop(stack); biến container = vm_pop(stack);
+        nếu (vm_tag(container) == 5) { trả về vm_map_put(container, vm_text(key), value); };
+        nếu (vm_tag(container) != 4 || vm_tag(key) != 1) { trả về vm_error(2); }; trả về vm_put(container, vm_number(key), value);
+    };
+    nếu (op == 97) {
+        biến ids = vm_take(stack, b); biến closure = vm_alloc(16, 1); nếu (closure == 0) { trả về 0; };
+        vm_set(closure, 0, 7); vm_set(closure, 1, a); vm_set(closure, 2, vm_vector(5)); vm_set(closure, 3, vm_get(frame, 6));
+        lặp(i = 0; i < b; i++) {
+            biến id = vm_at(ids, i); nếu (vm_tag(id) != 1) { trả về vm_error(2); };
+            vm_map_put(vm_get(closure, 2), id, vm_cell(state, frame, vm_number(id), 1));
+        };
+        vm_append(stack, closure); trả về 0;
+    };
+    nếu (op == 39 || op == 86) {
+        // Common host intrinsics called by the lexer do not need a temporary
+        // argument vector. Leave dynamic calls and uncommon intrinsics on the
+        // shared arity-checked host path below.
+        nếu (op == 39 && b < 0) {
+            biến primitive = vm_host_cached(state, 0 - b - 1);
+            nếu (primitive == 147 && a == 1) {
+                biến value = vm_pop(stack);
+                vm_append(stack, vm_int(vm_length(value)));
+                trả về 0;
+            };
+            nếu (primitive == 148 && a == 2) {
+                biến value = vm_pop(stack); biến list = vm_pop(stack);
+                nếu (vm_tag(list) != 4) { trả về vm_error(2); };
+                vm_append(list, value); vm_append(stack, 0);
+                trả về 0;
+            };
+        };
+        biến callee = 0; nếu (op == 86) { callee = vm_pop(stack); }; biến args = vm_take(stack, a); biến id = b;
+        nếu (op == 86) {
+            nếu (vm_tag(callee) == 7) { trả về vm_invoke(state, vm_get(callee, 1), args, 0, 0, callee); };
+            nếu (vm_tag(callee) == 3) { id = vm_find_function(state, callee); nếu (id < 0) { trả về vm_error(13); }; }
+            hoặc nếu (vm_tag(callee) == 1) { id = vm_number(callee); } hoặc { trả về vm_error(13); };
+        };
+        nếu (id >= 0 && id < vm_get(vm_get(state, 1), 1)) { trả về vm_invoke(state, id, args, 0, 0, 0); };
+        biến name = id; nếu (id < 0) { name = 0 - id - 1; };
+        biến primitive = vm_host_cached(state, name); nếu (primitive < 0) { trả về vm_error(13); };
+        vm_append(stack, vm_host(state, primitive, args)); trả về 0;
+    };
+    nếu (op == 91) {
+        biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
+        biến name = vm_pool(state, b);
+        nếu (vm_map_get(vm_get(state, 5), name) == 0) {
+            biến base = 0; nếu (c > 0) { base = vm_map_get(vm_get(state, 5), vm_pool(state, c - 1)); nếu (base == 0) { trả về vm_error(18); }; };
+            biến klass = vm_alloc(16, 1); nếu (klass == 0) { trả về 0; };
+            vm_set(klass, 0, 8); vm_set(klass, 1, name); vm_set(klass, 2, base); vm_set(klass, 3, vm_vector(5)); vm_map_put(vm_get(state, 5), name, klass);
+        }; trả về 0;
+    };
+    nếu (op == 92) {
+        biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
+        biến visibility = 0;
+        nếu (c < 0) { c = 0 - (c + 1); visibility = 1; } hoặc nếu (a < 0) { a = 0 - (a + 1); visibility = 2; };
+        biến klass = vm_map_get(vm_get(state, 5), vm_pool(state, a)); nếu (klass == 0) { trả về vm_error(18); };
+        biến method = vm_alloc(16, 1); nếu (method == 0) { trả về 0; }; vm_set(method, 0, c); vm_set(method, 1, klass); vm_set(method, 2, visibility);
+        vm_map_put(vm_get(klass, 3), vm_pool(state, b), method); trả về 0;
+    };
+    nếu (op == 93) {
+        biến args = vm_take(stack, a); biến klass = vm_map_get(vm_get(state, 5), vm_pool(state, b)); nếu (klass == 0) { trả về vm_error(18); };
+        biến instance = vm_alloc(16, 1); nếu (instance == 0) { trả về 0; }; vm_set(instance, 0, 9); vm_set(instance, 1, klass); vm_set(instance, 2, vm_vector(5));
+        biến constructor = vm_map_get(vm_get(klass, 3), vm_literal("khởi tạo"));
+        nếu (constructor == 0) { nếu (a != 0) { trả về vm_error(14); }; vm_append(stack, instance); }
+        hoặc {
+            nếu (vm_access(constructor, vm_get(frame, 6)) == 0) { trả về vm_error(19); };
+            vm_invoke(state, vm_get(constructor, 0), args, instance, klass, 0);
+            nếu (vm_get(4198464, 1) == 0) {
+                biến constructor_frame = vm_at(frames, vm_get(frames, 1) - 1);
+                vm_set(constructor_frame, 9, 2);
+                vm_set(constructor_frame, 10, instance);
+            };
+        }; trả về 0;
+    };
+    nếu (op == 94 || op == 95) {
+        biến value = 0; nếu (op == 95) { value = vm_pop(stack); }; biến instance = vm_pop(stack);
+        nếu (vm_tag(instance) != 9) { trả về vm_error(18); }; biến fields = vm_get(instance, 2); biến key = vm_pool(state, b);
+        nếu (op == 95) { trả về vm_map_put(fields, key, value); };
+        nếu (vm_map_find(fields, key) < 0) { trả về vm_error(18); }; vm_append(stack, vm_map_get(fields, key)); trả về 0;
+    };
+    nếu (op == 96) {
+        biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
+        biến args = vm_take(stack, a); biến instance = vm_pop(stack); nếu (vm_tag(instance) != 9) { trả về vm_error(18); };
+        biến klass = vm_get(instance, 1); biến owner = vm_get(frame, 6);
+        nếu (c != 0) { nếu (owner == 0) { trả về vm_error(18); }; klass = vm_get(owner, 2); };
+        biến name = vm_pool(state, b); biến method = vm_resolve(klass, name); nếu (method == 0) { trả về vm_error(18); };
+        biến allowed = vm_access(method, owner);
+        nếu (allowed == 0 && owner != 0 && vm_get(method, 2) == 2) {
+            nếu (vm_subclass(vm_get(instance, 1), owner) == 1 && vm_subclass(vm_get(method, 1), owner) == 1) {
+                biến declaration = vm_resolve(owner, name); nếu (declaration != 0) { allowed = vm_access(declaration, owner); };
+            };
+        };
+        nếu (allowed == 0) { trả về vm_error(19); };
+        trả về vm_invoke(state, vm_get(method, 0), args, instance, vm_get(method, 1), 0);
+    };
+    nếu (op == 43) { vm_write(1, vm_text(vm_pop(stack))); vm_write(1, vm_literal("\n")); trả về 0; };
+    nếu (op == 40 || op == 44) { biến result = 0; nếu (vm_get(stack, 1) > 0) { result = vm_pop(stack); }; trả về vm_return(state, result); };
+    nếu (op == 32) {
+        biến depth = 0; biến target = -1;
+        lặp(i = pc + 1; i < vm_get(code, 0); i++) {
+            biến next = vm_get(code, 1 + i * 4);
+            nếu (next == 26) { depth = depth + 1; };
+            nếu (next == 29) { nếu (depth == 0) { target = i; thoát; }; depth = depth - 1; };
+        };
+        trả về vm_jump(frame, target);
+    };
+    nếu (op == 33) {
+        nếu (b >= 0) {
+            biến switches = vm_get(frame, 8); nếu (switches == 0 || vm_get(switches, 1) == 0) { trả về vm_error(17); };
+            a = vm_get(vm_at(switches, vm_get(switches, 1) - 1), 2);
+        }; trả về vm_jump(frame, a);
+    };
+    nếu (op == 67) {
+        biến switches = vm_get(frame, 8);
+        nếu (switches == 0) { switches = vm_vector(4); nếu (switches == 0) { trả về 0; }; vm_set(frame, 8, switches); };
+        biến switch = vm_alloc(16, 1); nếu (switch == 0) { trả về 0; }; vm_set(switch, 0, vm_pop(stack)); vm_set(switch, 2, a); vm_append(switches, switch); trả về 0;
+    };
+    nếu (op == 68 || op == 36) {
+        biến c = máy đọc số nguyên ba mươi hai bit(instruction_base + 12);
+        biến switches = vm_get(frame, 8); nếu (switches == 0 || vm_get(switches, 1) == 0) { trả về vm_error(17); };
+        biến switch = vm_at(switches, vm_get(switches, 1) - 1); biến matches = op == 36;
+        nếu (op == 68) {
+            biến label = vm_int(a); nếu (b >= 0) { label = vm_pool(state, b); } hoặc nếu (b == -2) { label = vm_load_slot(state, frame, a); };
+            nếu (b >= 0) { matches = vm_equal(vm_text(vm_get(switch, 0)), label); }
+            hoặc { matches = vm_equal(vm_get(switch, 0), label); };
+        };
+        nếu (vm_get(switch, 1) == 1 || matches == 0) { trả về vm_jump(frame, c); }; vm_set(switch, 1, 1); trả về 0;
+    };
+    nếu (op == 37) {
+        biến switches = vm_get(frame, 8); nếu (switches == 0) { trả về vm_error(17); };
+        vm_pop(switches); trả về 0;
+    };
+    nếu (op == 81) {
+        biến handlers = vm_get(frame, 7);
+        nếu (handlers == 0) { handlers = vm_vector(4); nếu (handlers == 0) { trả về 0; }; vm_set(frame, 7, handlers); };
+        biến switches = vm_get(frame, 8); biến switch_depth = 0;
+        nếu (switches != 0) { switch_depth = vm_get(switches, 1); };
+        biến handler = vm_alloc(16, 0); nếu (handler == 0) { trả về 0; }; vm_set(handler, 0, a); vm_set(handler, 1, vm_get(stack, 1)); vm_set(handler, 2, switch_depth);
+        vm_append(handlers, handler); trả về 0;
+    };
+    nếu (op == 82) {
+        biến handlers = vm_get(frame, 7); nếu (handlers == 0) { trả về vm_error(17); };
+        vm_pop(handlers); trả về vm_jump(frame, a);
+    };
+    nếu (op == 83) { biến value = vm_pop(stack); nếu (b >= 0) { vm_store(state, frame, b, value); }; trả về 0; };
+    nếu (op == 80) { trả về vm_throw(state, vm_pop(stack)); };
+    nếu (op == 14 || op == 15 || op == 16 || op == 17 || op == 20 || op == 22 || op == 26 || op == 28 || op == 29 || op == 38) { trả về 0; };
+    biến arity = vm_host_arity(op);
+    nếu (arity >= 0) { vm_append(stack, vm_host(state, op, vm_take(stack, arity))); trả về 0; };
+    vm_set(4198464, 13, op); trả về vm_error(22);
+};
+hàm vm_execute(state) {
+    // A VM state retains its frame vector for the entire execution, while
+    // calls and returns only mutate the vector's elements and length.
+    biến frames = vm_get(state, 6);
+    biến profile_steps = 0;
+    // Profiling is selected at VM startup. Bypass the profiling wrapper and
+    // its header load on every instruction in the normal execution path.
+    biến profiling = vm_get(4198464, 12) == 1;
+    // The run loop reads these two fixed i32 cells on every bytecode step.
+    // Load the cells directly; vm_get is a separate V++ function call.
+    khi (máy đọc số nguyên ba mươi hai bit(frames + 4) > 0 &&
+         máy đọc số nguyên ba mươi hai bit(4198468) == 0) {
+        nếu (profiling) { vm_step(state, frames); } hoặc { vm_step_body(state, frames); };
+        // DNS transport failures are recoverable guest exceptions inside the
+        // V++ provider, so its retry/failover policy can close the socket and
+        // try another server. Keep malformed arguments/OOM fatal, and keep
+        // the main guest's existing machine-error contract unchanged.
+        nếu (vm_get(4198464, 1) == 20 && state == vm_get(4198464, 4)) {
+            vm_set(4198464, 1, 0);
+            vm_throw(state, vm_literal("DNS: OS transport failed"));
+        };
+        nếu (profiling) {
+            profile_steps = profile_steps + 1;
+            nếu (profile_steps >= 250000) {
+                biến current = 0; biến location = 0;
+                nếu (vm_get(frames, 1) > 0) {
+                    biến frame = vm_at(frames, vm_get(frames, 1) - 1);
+                    current = vm_get(frame, 11); location = vm_get(frame, 1);
+                };
+                biến message = vm_concat(vm_literal("vm-profile: steps=250000 function="), vm_integer_text(current));
+                message = vm_concat(message, vm_concat(vm_literal(" pc="), vm_integer_text(location)));
+                message = vm_concat(message, vm_concat(vm_literal(" allocations="), vm_integer_text(vm_get(4198464, 14))));
+                message = vm_concat(message, vm_concat(vm_literal(" gc="), vm_integer_text(vm_get(4198464, 15))));
+                message = vm_concat(message, vm_concat(vm_literal(" free-list-probes="), vm_integer_text(vm_get(4198464, 16))));
+                vm_write(2, vm_concat(message, vm_literal("\n")));
+                profile_steps = 0;
+            };
+        };
+        nếu (máy đọc số nguyên ba mươi hai bit(4198500) >= 1048576) { vm_collect(state); };
+    };
+    trả về vm_get(state, 7);
+};
+hàm vm_run(state) {
+    biến initializers = vm_get(state, 2);
+    lặp(i = 0; i < vm_get(initializers, 1); i++) {
+        vm_append(vm_get(state, 6), vm_frame(vm_at(initializers, i), vm_empty_args(), 0, 0, 0, 1)); vm_execute(state);
+        nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    };
+    vm_append(vm_get(state, 6), vm_frame(vm_get(state, 3), vm_empty_args(), 0, 0, 0, 1)); trả về vm_execute(state);
+};

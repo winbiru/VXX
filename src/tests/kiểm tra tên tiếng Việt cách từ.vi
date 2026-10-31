@@ -1,4 +1,4 @@
-nhập gói/bộ sưu tập/danh sách như bộ sưu tập;
+nhập gói.bộ sưu tập.danh sách.* như bộ sưu tập;
 
 hàm cộng hai giá trị(giá trị đầu, giá trị sau) {
     biến tổng hai giá trị = giá trị đầu + giá trị sau;

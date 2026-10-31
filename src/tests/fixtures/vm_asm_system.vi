@@ -1,0 +1,36 @@
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.thời gian.giờ quốc tế.*;
+nhập gói.hệ thống.nền tảng.*;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
+
+hàm kiểm tra các byte(các byte, n) {
+    nếu (máy ảo lấy độ dài(các byte) != n) { ném "sai độ dài byte"; };
+    lặp(i = 0; i < n; i++) {
+        nếu (máy ảo lấy loại(các byte[i]) != "số nguyên" ||
+            các byte[i] < 0 || các byte[i] > 255) { ném "byte không hợp lệ"; };
+    };
+};
+
+hàm kiểm tra đồng hồ(các byte) {
+    kiểm tra các byte(các byte, 16);
+    nano = thời gian giờ quốc tế đọc i64(các byte, 8);
+    nếu (nano < 0.0 || nano >= 1000000000.0) { ném "nanosecond không hợp lệ"; };
+};
+
+hàm chính() {
+    kiểm tra đồng hồ(máy đồng hồ đơn điệu());
+    kiểm tra đồng hồ(máy đồng hồ giờ quốc tế());
+    trước = thời gian đơn điệu mili giây();
+    nếu (máy ngủ mili giây(0) != 0) { ném "ngủ 0 thất bại"; };
+    ngủ mili giây(3);
+    sau = thời gian đơn điệu mili giây();
+    nếu (sau - trước < 1.0) { ném "ngủ chưa đủ thời gian"; };
+    kiểm tra các byte(máy nguồn ngẫu nhiên các byte(1), 1);
+    kiểm tra các byte(máy nguồn ngẫu nhiên các byte(256), 256);
+    kiểm tra các byte(nguồn ngẫu nhiên bảo mật các byte(4096), 4096);
+    // Keep a returned OS buffer alive across guest collections.
+    giữ = máy đồng hồ giờ quốc tế();
+    lặp(i = 0; i < 5000; i++) { rác = [i, i]; };
+    kiểm tra đồng hồ(giữ);
+    in "VM ASM SYSTEM OK";
+};

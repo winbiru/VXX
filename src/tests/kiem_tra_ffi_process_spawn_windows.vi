@@ -1,5 +1,5 @@
 // Windows process FFI: thao tác thông qua API V++ có cùng kết quả public.
-nhập gói/hệ thống/tiến trình;
+nhập gói.hệ thống.tiến trình.*;
 
 hàm chính() {
     k = chạy tiến trình("cmd.exe", ["/d", "/c", "echo out & echo err 1>&2 & exit /b 7"]);

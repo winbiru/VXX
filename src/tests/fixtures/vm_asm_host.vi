@@ -1,0 +1,12 @@
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.hệ thống.môi trường.*;
+hàm chính() {
+    đường = "vm-asm-owned.bin";
+    ghi các byte tệp(đường, [0, 255, 10, 52]);
+    in đọc các byte tệp(đường);
+    in là tệp(đường);
+    in đọc biến môi trường("VPP_VM_ASM_TEST", "không có");
+    máy tệp xóa(đường);
+    in "HOST ASM OK";
+};

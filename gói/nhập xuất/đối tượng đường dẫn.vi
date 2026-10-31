@@ -1,5 +1,5 @@
 // Value-object đường dẫn, không giữ handle hệ tệp.
-nhập gói/nhập xuất/đường dẫn như đường giao diện lập trình;
+nhập gói.nhập xuất.đường dẫn.* như đường giao diện lập trình;
 
 lớp công khai Đường Dẫn {
     hàm công khai khởi tạo(đường) {

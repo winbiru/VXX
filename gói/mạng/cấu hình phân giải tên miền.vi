@@ -1,8 +1,8 @@
 // Đọc DNS nameserver theo thứ tự bằng V++, không tra cứu DNS khi parse.
 // Chỉ sử dụng cấu hình Linux khi caller yêu cầu rõ ràng.
-nhập gói/mạng/địa chỉ mạng;
-nhập gói/mạng/gói tin tên miền;
-nhập gói/nhập xuất/bộ đệm tệp;
+nhập gói.mạng.địa chỉ mạng.*;
+nhập gói.mạng.gói tin tên miền.*;
+nhập gói.nhập xuất.bộ đệm tệp.*;
 
 lớp công khai Bộ Cấu Hình DNS {
     hàm công khai khởi tạo() {};

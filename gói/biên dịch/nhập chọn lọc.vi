@@ -1,0 +1,161 @@
+// Compute a conservative dependency closure before IR and bytecode generation.
+// Parsing and semantic diagnostics still cover the complete imported source.
+nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu cây;
+nhập gói.biên dịch.sổ đăng ký.biên dịch sổ cây mô đun;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+
+lớp riêng tư Bộ Chọn Phụ Thuộc Nhập {
+    hàm công khai khởi tạo(sổ, đồ thị) {
+        mình.sổ = sổ; mình.đồ thị = đồ thị;
+        mình.hàm giữ = {}; mình.kiểu giữ = {}; mình.hàng = [];
+        mình.cây = {}; mình.khai hàm = {}; mình.tên hàm = {}; mình.tên kiểu = {};
+    };
+
+    hàm riêng tư giữ hàm(id) {
+        nếu (máy ảo có khóa từ điển(mình.hàm giữ, id)) { trả về; };
+        mình.hàm giữ[id] = đúng;
+        khai = mình.sổ["hàm"][id];
+        máy ảo thêm cuối danh sách(mình.hàng, [khai["mô đun"], mình.khai hàm[id]]);
+    };
+
+    hàm riêng tư giữ kiểu(id) {
+        nếu (máy ảo có khóa từ điển(mình.kiểu giữ, id)) { trả về; };
+        mình.kiểu giữ[id] = đúng;
+        khai = mình.sổ["kiểu"][id];
+        // Retain every method of a live type: virtual/indirect calls can
+        // select a method without a statically named call at the use site.
+        máy ảo thêm cuối danh sách(mình.hàng, [khai["mô đun"], khai["khai"]]);
+    };
+
+    hàm riêng tư tên(mô đun, tên) {
+        bảng hàm thấy = mình.tên hàm[mô đun];
+        nếu (máy ảo có khóa từ điển(bảng hàm thấy, tên)) { mình.giữ hàm(bảng hàm thấy[tên]); };
+        kiểu thấy = mình.tên kiểu[mô đun];
+        nếu (máy ảo có khóa từ điển(kiểu thấy, tên)) { mình.giữ kiểu(kiểu thấy[tên]); };
+    };
+
+    hàm riêng tư thăm(mô đun, nút) {
+        loại = loại của(nút);
+        nếu (loại == "danh sách") {
+            lặp(i = 0; i < độ dài(nút); i++) { mình.thăm(mô đun, nút[i]); };
+            trả về;
+        };
+        nếu (loại != "từ điển") { trả về; };
+        dạng = lấy từ điển(nút, "loại", "");
+        nếu (dạng == "tên") { mình.tên(mô đun, nút["giá trị"]); trả về; };
+        nếu (dạng == "nhập" || dạng == "hằng") { trả về; };
+        nếu (dạng == "lớp" || dạng == "giao diện") {
+            mình.tên(mô đun, lấy từ điển(nút, "lớp cha", ""));
+            quan hệ = lấy từ điển(nút, "triển khai", []);
+            lặp(i = 0; i < độ dài(quan hệ); i++) { mình.tên(mô đun, quan hệ[i]); };
+            quan hệ = lấy từ điển(nút, "giao diện cha", []);
+            lặp(i = 0; i < độ dài(quan hệ); i++) { mình.tên(mô đun, quan hệ[i]); };
+        };
+        khóa = khóa từ điển(nút);
+        lặp(i = 0; i < độ dài(khóa); i++) { mình.thăm(mô đun, nút[khóa[i]]); };
+    };
+
+    hàm riêng tư giữ mô đun(mô đun) {
+        khai = mình.cây[mô đun]["câu lệnh"];
+        lặp(i = 0; i < độ dài(khai); i++) {
+            dạng = lấy từ điển(khai[i], "loại", "");
+            nếu (dạng == "hàm" || dạng == "lớp" || dạng == "giao diện") {
+                mình.tên(mô đun, khai[i]["tên"]);
+            };
+        };
+    };
+
+    hàm công khai lọc() {
+        cạnh = mình.đồ thị["cạnh"];
+        có chọn = sai;
+        lặp(i = 0; i < độ dài(cạnh); i++) {
+            tên chọn = lấy từ điển(cạnh[i], "tên nhập", "");
+            nếu (tên chọn != "" && tên chọn != "*") { có chọn = đúng; };
+        };
+        // Preserve the legacy compiler's exact function IDs and byte output.
+        nếu (!có chọn) { trả về sai; };
+        mô đun = mình.sổ["mô đun"];
+        lặp(i = 0; i < độ dài(mô đun); i++) {
+            mục = mô đun[i]; tên mô đun = mục["định danh"];
+            cây = biên dịch sổ cây mô đun(mình.đồ thị, tên mô đun);
+            mình.cây[tên mô đun] = cây;
+            bảng hàm thấy = {}; kiểu thấy = {};
+            thấy = mục["nhìn thấy"];
+            lặp(j = 0; j < độ dài(thấy); j++) { bảng hàm thấy[thấy[j]["tên"]] = thấy[j]["id"]; };
+            thấy = mục["kiểu nhìn thấy"];
+            lặp(j = 0; j < độ dài(thấy); j++) { kiểu thấy[thấy[j]["tên"]] = thấy[j]["id"]; };
+            mình.tên hàm[tên mô đun] = bảng hàm thấy; mình.tên kiểu[tên mô đun] = kiểu thấy;
+            khai = cây["câu lệnh"];
+            lặp(j = 0; j < độ dài(khai); j++) {
+                nếu (lấy từ điển(khai[j], "loại", "") == "hàm") {
+                    mình.khai hàm[bảng hàm thấy[khai[j]["tên"]]] = khai[j];
+                };
+            };
+            // Do not hide errors inside unselected function bodies.
+            biên dịch kiểm tra ngữ nghĩa thuần(biên dịch kiểu cây(mình.sổ, mình.đồ thị, tên mô đun));
+        };
+        // Every initializer remains a root, including assignments, I/O,
+        // callbacks and registration performed by otherwise unused imports.
+        lặp(i = 0; i < độ dài(mô đun); i++) {
+            tên mô đun = mô đun[i]["định danh"];
+            khai = mình.cây[tên mô đun]["câu lệnh"];
+            lặp(j = 0; j < độ dài(khai); j++) {
+                dạng = lấy từ điển(khai[j], "loại", "");
+                nếu (dạng != "hàm" && dạng != "lớp" && dạng != "giao diện") {
+                    mình.thăm(tên mô đun, khai[j]);
+                };
+            };
+        };
+        // Old module imports and .* keep their complete surface. A selected
+        // edge is the boundary after which references determine retention.
+        đầy = [mình.đồ thị["điểm vào"]]; đã đầy = {};
+        vị trí = 0;
+        khi (vị trí < độ dài(đầy)) {
+            tên mô đun = đầy[vị trí]; vị trí += 1;
+            nếu (máy ảo có khóa từ điển(đã đầy, tên mô đun)) { bỏ qua; };
+            đã đầy[tên mô đun] = đúng;
+            mình.giữ mô đun(tên mô đun);
+            lặp(i = 0; i < độ dài(cạnh); i++) {
+                e = cạnh[i]; tên chọn = lấy từ điển(e, "tên nhập", "");
+                nếu (e["nguồn"] == tên mô đun && (tên chọn == "" || tên chọn == "*")) {
+                    máy ảo thêm cuối danh sách(đầy, e["đích"]);
+                };
+            };
+        };
+        lặp(i = 0; i < độ dài(cạnh); i++) {
+            e = cạnh[i]; tên chọn = lấy từ điển(e, "tên nhập", "");
+            nếu (tên chọn != "" && tên chọn != "*") { mình.tên(e["đích"], tên chọn); };
+        };
+        vị trí = 0;
+        khi (vị trí < độ dài(mình.hàng)) {
+            mục = mình.hàng[vị trí]; vị trí += 1;
+            mình.thăm(mục[0], mục[1]);
+        };
+        lặp(i = 0; i < độ dài(mô đun); i++) {
+            tên mô đun = mô đun[i]["định danh"];
+            cây = mình.cây[tên mô đun]; khai = cây["câu lệnh"]; giữ = [];
+            lặp(j = 0; j < độ dài(khai); j++) {
+                dạng = lấy từ điển(khai[j], "loại", ""); cần = đúng;
+                nếu (dạng == "hàm") {
+                    id = mình.tên hàm[tên mô đun][khai[j]["tên"]];
+                    cần = máy ảo có khóa từ điển(mình.hàm giữ, id);
+                };
+                nếu (dạng == "lớp" || dạng == "giao diện") {
+                    id = mình.tên kiểu[tên mô đun][khai[j]["tên"]];
+                    cần = máy ảo có khóa từ điển(mình.kiểu giữ, id);
+                };
+                nếu (cần) { máy ảo thêm cuối danh sách(giữ, khai[j]); };
+            };
+            cây["câu lệnh"] = giữ;
+        };
+        trả về đúng;
+    };
+};
+
+hàm công khai biên dịch lọc nhập chọn lọc(sổ, đồ thị) {
+    bộ = Bộ Chọn Phụ Thuộc Nhập(sổ, đồ thị);
+    trả về bộ.lọc();
+};

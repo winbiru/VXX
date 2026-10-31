@@ -1,0 +1,49 @@
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.nhập xuất.tệp.*;
+
+hàm xác nhận closure(điều kiện, lỗi) { nếu (!điều kiện) { ném lỗi; }; };
+
+hàm chính() {
+    biến nguồn = đọc tệp("fixtures/anonymous_functions/entry.vi");
+    biến mong đợi = đọc tệp("expected/kiem_tra_ham_an_danh.expected");
+    biến sản phẩm = biên dịch chương trình tự chủ(nguồn);
+    xác nhận closure(biên dịch chạy sản phẩm biên dịch(sản phẩm) == mong đợi,
+        "closure không giữ đúng phạm vi hoặc ô nhớ chung");
+    biến ẩn danh = 0;
+    biến các hàm = sản phẩm["hàm"];
+    lặp(i = 0; i < độ dài(các hàm); i++) {
+        nếu (các hàm[i]["ẩn danh"]) {
+            ẩn danh += 1;
+            xác nhận closure(các hàm[i]["tên index"] == -1, "hàm ẩn danh bị cấp tên runtime");
+        };
+    };
+    xác nhận closure(ẩn danh >= 10, "bị mất hàm ẩn danh khi liên kết");
+    biến văn bản = biên dịch sản phẩm biên dịch tuần tự(sản phẩm);
+    xác nhận closure(biên dịch chạy sản phẩm biên dịch văn bản(văn bản) == mong đợi,
+        "artifact làm mất thông tin closure");
+
+    biến mô đun = biên dịch chương trình mô đun tự chủ("main", {
+        "main": đọc tệp("fixtures/anonymous_modules/entry.vi"),
+        "counter": đọc tệp("fixtures/anonymous_modules/counter.vi")
+    });
+    xác nhận closure(biên dịch chạy sản phẩm biên dịch(mô đun) ==
+        đọc tệp("expected/kiem_tra_ham_an_danh_module.expected"),
+        "closure lồng nhau bị mất biến qua mô-đun nhập");
+
+    biến nguồn sai = [
+        "biến f = hàm(x, x) { trả về x; };",
+        "biến f = hàm(x,) { trả về x; };",
+        "lặp(i = 0; i < 1; i++) { biến f = hàm() { thoát; }; };",
+        "lặp(i = 0; i < 1; i++) { biến f = hàm() { bỏ qua; }; };",
+        "biến f = hàm() { hàm lồng() {}; };",
+        "hàm mục() {}; biến f = hàm() { mục = 1; };"
+    ];
+    lặp(i = 0; i < độ dài(nguồn sai); i++) {
+        biến có lỗi = sai;
+        thử { biên dịch chương trình tự chủ(nguồn sai[i]); } bắt lỗi(e) { có lỗi = đúng; };
+        xác nhận closure(có lỗi, "compiler chấp nhận closure sai ngữ nghĩa");
+    };
+    in "closure tự chủ: đạt";
+};

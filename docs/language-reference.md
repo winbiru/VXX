@@ -79,10 +79,28 @@ lặp(i = 0; i < 10; i++) {
     };
     tổng += i;
 };
+
+i = 0;
+khi (i < 3) {
+    in i;
+    i++;
+};
 ```
 
-`thoát;` rời vòng `lặp` hoặc nhánh `chọn` gần nhất đang bao quanh câu lệnh;
-`bỏ qua;` chuyển sang lượt lặp tiếp theo. Khi lồng `lặp` và `chọn`,
+`khi (điều kiện) { ... }` hoạt động như `while`: kiểm tra điều kiện trước mỗi
+lượt và lặp khi điều kiện đúng. Nếu điều kiện sai ngay từ đầu, thân vòng lặp
+không chạy. Cập nhật biến điều kiện trong thân vòng lặp khi cần.
+
+Dùng `lặp` khi cần đếm lượt, duyệt chỉ số hoặc giới hạn số lần thử. Dùng `khi`
+khi việc tiếp tục phụ thuộc vào trạng thái, con trỏ phân tích hoặc dữ liệu còn
+lại; không thêm biến đếm giả chỉ để viết thành vòng `lặp`.
+
+Với lời gọi độc lập tới hàm có tên bắt đầu bằng từ khóa `khi`, dùng `gọi`
+để phân biệt với vòng lặp, ví dụ `gọi khi đóng luồng(nguồn, dọn dẹp);`.
+
+`thoát;` rời vòng `lặp`, vòng `khi` hoặc nhánh `chọn` gần nhất đang bao quanh câu lệnh;
+`bỏ qua;` chuyển sang lượt lặp tiếp theo; với `khi`, điều kiện được kiểm tra lại.
+Khi lồng các vòng lặp và `chọn`,
 `thoát;` chỉ kết thúc cấu trúc gần nhất, sau đó chương trình tiếp tục
 thực thi các lệnh bên ngoài cấu trúc đó.
 
@@ -124,11 +142,36 @@ vậy mutation sau khi tạo closure vẫn quan sát được từ closure.
 ```vi
 nhập lõi;
 nhập feature_math như toán;
-nhập gói/mạng/rest;
+nhập gói.mạng.http.dịch vụ tài nguyên.*;
+
+// Nhập một hàm hoặc một lớp công khai; tên có thể gồm nhiều từ.
+nhập feature_math.tổng;
+nhập feature_math.căn bậc hai như căn;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+// Nhập toàn bộ bề mặt công khai; có thể đặt namespace bằng `như`.
+nhập feature_math.*;
+nhập feature_math.* như toán;
+nhập gói.biên dịch.chương trình.*;
 ```
 
 Mỗi câu `nhập` nhận một target module/package. Import tương đối được phân giải từ thư mục của
 module đang import. Alias tạo namespace, ví dụ `toán.tổng(2, 3)`.
+
+Dạng `nhập module.tên;` chỉ đưa đúng tên đó vào phạm vi hiện tại. Với dạng này,
+`như tên_mới` đổi tên trực tiếp: `nhập feature_math.tổng như cộng;` cho phép gọi
+`cộng(2, 3)`. `nhập module.*;` đưa mọi tên công khai vào phạm vi; `*` không lấy tên
+riêng tư và không nhập đệ quy mọi file trong thư mục. Các thành phần của đường dẫn
+module cũng dùng dấu chấm: `gói.lõi.chuyển kiểu.thành chuỗi` chọn hàm
+`thành chuỗi` từ tệp `gói/lõi/chuyển kiểu.vi`. Dấu chấm **cuối cùng** luôn là
+ranh giới giữa đường dẫn module và tên được chọn. Với đường dẫn gồm nhiều thành
+phần, thêm `.*` để nhập toàn bộ: `nhập gói.lõi.chuyển kiểu.*;`.
+Dạng cũ `nhập module;` và đường dẫn có `/` tiếp tục tương thích.
+
+Trình biên dịch V++ dùng nhập chọn lọc để giữ hàm đã chọn và các phụ thuộc của nó
+trước khi hạ IR/phát bytecode. Tham chiếu hàm làm giá trị, closure, phần khởi tạo
+module và các phương thức của kiểu được giữ đều được tính đến. Cú pháp/kiểm tra
+ngữ nghĩa vẫn xét toàn nguồn; nhập chọn lọc không bỏ qua lỗi trong thân hàm khác.
+Module được nhập nhiều lần vẫn chỉ khởi tạo một lần, dù mỗi lần chọn tên khác nhau.
 
 Khai báo top-level mặc định/công khai nằm trong bề mặt export; `riêng tư` và `bảo vệ` không
 được export. File điểm vào gói `chính.vi` tự chuyển tiếp các thành phần công khai
@@ -136,11 +179,11 @@ từ các module được nhập trực tiếp (không có alias):
 
 ```vi
 // gói/hệ thống/chính.vi
-nhập gói/hệ thống/môi trường;
-nhập gói/hệ thống/lệnh tiến trình;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.hệ thống.lệnh tiến trình.*;
 ```
 
-Người dùng chỉ cần `nhập gói/hệ thống/chính;` để sử dụng lớp `Lệnh Tiến Trình`.
+Người dùng chỉ cần `nhập gói.hệ thống.chính.*;` để sử dụng lớp `Lệnh Tiến Trình`.
 Import bên trong file thông thường vẫn chỉ dùng nội bộ; cú pháp `công khai nhập`
 cũ tiếp tục được hỗ trợ cho mã hiện có. Import với alias không tự chuyển tiếp,
 để tránh vô tình mở rộng API của gói. Tên lớp và tên file có thể có khoảng trắng.
@@ -316,24 +359,24 @@ trong khi API hàm trước đây vẫn dùng được qua đường dẫn modul
 
 | Thành phần | Import điểm vào | Lớp / API |
 | --- | --- | --- |
-| HTTP Client | `gói/mạng/http/chính` | `Khách HTTP(url_gốc)`: `tạo URL`, `yêu cầu`, `lấy`, `gửi`, `cập nhật`, `xóa`, `đóng` |
-| Database Connection | `gói/dữ liệu/cơ sở dữ liệu/chính` | `Kết Nối Cơ Sở Dữ Liệu(driver, url, tài_khoản, mật_khẩu)`: `thông tin`, `đang kết nối`, `kết nối`, `truy vấn`, `ping`, `đóng` |
-| File Stream | `gói/nhập xuất/chính` | `Luồng Tệp(đường, chế_độ)`: `đang mở`, `đọc các byte`, `đọc hết`, `ghi các byte`, `ghi`, `vị trí`, `dịch`, `đẩy đệm`, `đóng` |
-| Logger | `gói/lõi/chính` | `Bộ Ghi Nhật Ký(đích, đường, mức_tối_thiểu)`: `đổi mức`, `ghi`, `thông tin`, `cảnh báo`, `lỗi`, `đóng` |
-| Collections | `gói/bộ sưu tập/chính` | `Ngăn Xếp`, `Hàng Đợi`, `Tập Hợp`, `Từ Điển` triển khai `Bộ Chứa` (`số lượng`, `trống`) |
-| Compiler AST | `gói/biên dịch/chính` | `Nút Cú Pháp`, `Nút Lớp`, `Nút Hàm`, `Truy Cập Cú Pháp`, `Khách Duyệt Cú Pháp`; factory `tạo nút cú pháp` |
-| Application | `gói/ứng dụng/chính` | `Bộ Điều Khiển Ứng Dụng(tên, phiên_bản)` triển khai `Vòng Đời Ứng Dụng`: `banner`, `chạy`, `dừng`, `đang chạy` |
-| Process | `gói/hệ thống/chính` | `Lệnh Tiến Trình(chương_trình)`: `thêm đối số`, `đặt biến`, `đặt thời hạn`, `chạy`, `kết quả gần nhất` |
-| TCP Socket | `gói/mạng/chính` | `Ổ Cắm TCP(tên_máy, cổng, thời_gian_chờ = 5000)`: `kết nối`, `gửi`, `nhận`, `đặt thời gian chờ`, `đang mở`, `đóng` |
-| Văn bản | `gói/văn bản/chính` | `Bộ Nối Văn Bản(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng)`: `thêm`, `gộp`, `kết quả`, `số phần`, `độ dài` |
-| Phân trang | `gói/dữ liệu/chính` | `Bộ Phân Trang(trang, kích_thước)`: `đặt trang`, `đặt kích thước`, `độ dời`, `tổng trang` |
-| Đường dẫn | `gói/nhập xuất/chính` | `Đường Dẫn(đường)`: `giá trị`, `tên`, `cha`, `nối`, `tồn tại`, `là tệp`, `là thư mục` |
-| Đo thời gian | `gói/thời gian/chính` | `Bộ Bấm Giờ` triển khai `Đo Thời Gian`: `bắt đầu`, `dừng`, `đọc mili giây`, `đặt lại` |
-| Sự kiện | `gói/lõi/chính` | `Bộ Phát Sự Kiện` triển khai `Đóng Được`: `đăng ký`, `hủy`, `phát`, `số người nghe`, `đóng` |
-| Service Registry | `gói/lõi/chính` | `Bộ Nạp Dịch Vụ`: `đăng ký`, `tìm`, `tải` |
-| Luồng dữ liệu | `gói/lõi/chính` | `Luồng Truy Vấn(nguồn)` triển khai `Đóng Được`: `ánh xạ`, `lọc`, `bỏ`, `giới hạn`, `phân biệt`, `gom danh sách`, `đếm`, `đóng` |
-| Cấu hình | `gói/lõi/chính` | `Cấu Hình Tệp(đường_dẫn)`: `tải lại`, `lấy`, `có` |
-| Kiểm thử | `gói/kiểm thử/chính` | `Ca Kiểm Thử(thân, thiết_lập, dọn_dẹp)`: `chạy`, `số lần chạy` |
+| HTTP Client | `gói.mạng.http.chính.*` | `Khách HTTP(url_gốc)`: `tạo URL`, `yêu cầu`, `lấy`, `gửi`, `cập nhật`, `xóa`, `đóng` |
+| Database Connection | `gói.dữ liệu.cơ sở dữ liệu.chính.*` | `Kết Nối Cơ Sở Dữ Liệu(driver, url, tài_khoản, mật_khẩu)`: `thông tin`, `đang kết nối`, `kết nối`, `truy vấn`, `ping`, `đóng` |
+| File Stream | `gói.nhập xuất.chính.*` | `Luồng Tệp(đường, chế_độ)`: `đang mở`, `đọc các byte`, `đọc hết`, `ghi các byte`, `ghi`, `vị trí`, `dịch`, `đẩy đệm`, `đóng` |
+| Logger | `gói.lõi.chính.*` | `Bộ Ghi Nhật Ký(đích, đường, mức_tối_thiểu)`: `đổi mức`, `ghi`, `thông tin`, `cảnh báo`, `lỗi`, `đóng` |
+| Collections | `gói.bộ sưu tập.chính.*` | `Ngăn Xếp`, `Hàng Đợi`, `Tập Hợp`, `Từ Điển` triển khai `Bộ Chứa` (`số lượng`, `trống`) |
+| Compiler AST | `gói.biên dịch.chính.*` | `Nút Cú Pháp`, `Nút Lớp`, `Nút Hàm`, `Truy Cập Cú Pháp`, `Khách Duyệt Cú Pháp`; factory `tạo nút cú pháp` |
+| Application | `gói.ứng dụng.chính.*` | `Bộ Điều Khiển Ứng Dụng(tên, phiên_bản)` triển khai `Vòng Đời Ứng Dụng`: `banner`, `chạy`, `dừng`, `đang chạy` |
+| Process | `gói.hệ thống.chính.*` | `Lệnh Tiến Trình(chương_trình)`: `thêm đối số`, `đặt biến`, `đặt thời hạn`, `chạy`, `kết quả gần nhất` |
+| TCP Socket | `gói.mạng.chính.*` | `Ổ Cắm TCP(tên_máy, cổng, thời_gian_chờ = 5000)`: `kết nối`, `gửi`, `nhận`, `đặt thời gian chờ`, `đang mở`, `đóng` |
+| Văn bản | `gói.văn bản.chính.*` | `Bộ Nối Văn Bản(phân_cách, tiền_tố, hậu_tố, giá_trị_rỗng)`: `thêm`, `gộp`, `kết quả`, `số phần`, `độ dài` |
+| Phân trang | `gói.dữ liệu.chính.*` | `Bộ Phân Trang(trang, kích_thước)`: `đặt trang`, `đặt kích thước`, `độ dời`, `tổng trang` |
+| Đường dẫn | `gói.nhập xuất.chính.*` | `Đường Dẫn(đường)`: `giá trị`, `tên`, `cha`, `nối`, `tồn tại`, `là tệp`, `là thư mục` |
+| Đo thời gian | `gói.thời gian.chính.*` | `Bộ Bấm Giờ` triển khai `Đo Thời Gian`: `bắt đầu`, `dừng`, `đọc mili giây`, `đặt lại` |
+| Sự kiện | `gói.lõi.chính.*` | `Bộ Phát Sự Kiện` triển khai `Đóng Được`: `đăng ký`, `hủy`, `phát`, `số người nghe`, `đóng` |
+| Service Registry | `gói.lõi.chính.*` | `Bộ Nạp Dịch Vụ`: `đăng ký`, `tìm`, `tải` |
+| Luồng dữ liệu | `gói.lõi.chính.*` | `Luồng Truy Vấn(nguồn)` triển khai `Đóng Được`: `ánh xạ`, `lọc`, `bỏ`, `giới hạn`, `phân biệt`, `gom danh sách`, `đếm`, `đóng` |
+| Cấu hình | `gói.lõi.chính.*` | `Cấu Hình Tệp(đường_dẫn)`: `tải lại`, `lấy`, `có` |
+| Kiểm thử | `gói.kiểm thử.chính.*` | `Ca Kiểm Thử(thân, thiết_lập, dọn_dẹp)`: `chạy`, `số lần chạy` |
 
 Hai giao diện AST được khai báo tại `gói/biên dịch/giao diện cú pháp.vi`;
 `gói/biên dịch/nút cú pháp.vi` chỉ chứa các lớp và hàm triển khai. Điểm vào
@@ -358,8 +401,8 @@ dùng API socket/module chuyên biệt.
 Ví dụ import và tạo đối tượng:
 
 ```vi
-nhập gói/mạng/http/chính;
-nhập gói/bộ sưu tập/chính;
+nhập gói.mạng.http.chính.*;
+nhập gói.bộ sưu tập.chính.*;
 
 hàm chính() {
     khách = Khách HTTP("https://example.com/api");

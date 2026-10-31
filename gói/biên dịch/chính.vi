@@ -1,16 +1,16 @@
 // Điểm vào vpp.compiler.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/biên dịch/kết quả;
-nhập gói/biên dịch/giao diện cú pháp;
-nhập gói/biên dịch/nút cú pháp;
-nhập gói/biên dịch/từ vựng;
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/mã máy từ cây;
-nhập gói/biên dịch/bộ biên dịch;
-nhập gói/biên dịch/phiên tự chủ;
-nhập gói/biên dịch/bộ sinh mã bản địa;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.biên dịch.kết quả.*;
+nhập gói.biên dịch.giao diện cú pháp.*;
+nhập gói.biên dịch.nút cú pháp.*;
+nhập gói.biên dịch.từ vựng.*;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
+nhập gói.biên dịch.mã máy từ cây.*;
+nhập gói.biên dịch.bộ biên dịch.*;
+nhập gói.biên dịch.phiên tự chủ.*;
+nhập gói.biên dịch.bộ sinh mã bản địa.*;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
 
 hàm công khai biên dịch kiểm tra(mã nguồn) {
     phiên = Bộ Biên Dịch(mã nguồn, ".");

@@ -1,6 +1,6 @@
-nhập gói/lõi/chính;
-nhập gói/kiểm thử/chính;
-nhập gói/nhập xuất/tệp;
+nhập gói.lõi.chính.*;
+nhập gói.kiểm thử.chính.*;
+nhập gói.nhập xuất.tệp.*;
 
 hàm chính() {
     đếm = 0;

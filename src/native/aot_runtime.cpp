@@ -1,10 +1,24 @@
 #include "vpp/native/aot_runtime.h"
 
 #include <algorithm>
+#include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <vector>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <time.h>
+#endif
 
 #include "common/vm_native_collection_helpers.h"
 #include "common/vm_native_helpers.h"
@@ -26,7 +40,81 @@
 
 namespace vietvm::native::aot {
 namespace {
+std::uint64_t cpuNanoseconds() {
+#if defined(_WIN32)
+    FILETIME created{}, ended{}, kernel{}, user{};
+    if(GetThreadTimes(GetCurrentThread(),&created,&ended,&kernel,&user)) {
+        ULARGE_INTEGER k{},u{};
+        k.LowPart=kernel.dwLowDateTime;k.HighPart=kernel.dwHighDateTime;
+        u.LowPart=user.dwLowDateTime;u.HighPart=user.dwHighDateTime;
+        return (k.QuadPart+u.QuadPart)*100;
+    }
+#elif defined(CLOCK_THREAD_CPUTIME_ID)
+    struct timespec current{};
+    if(clock_gettime(CLOCK_THREAD_CPUTIME_ID,&current)==0)
+        return std::uint64_t(current.tv_sec)*1000000000ull+current.tv_nsec;
+#endif
+    return static_cast<std::uint64_t>(double(std::clock())*1000000000.0/CLOCKS_PER_SEC);
+}
+struct CpuProfiler {
+    bool enabled=[] {
+        const char *value=std::getenv("VPP_AOT_CPU_PROFILE");
+        return value && std::strcmp(value,"1")==0;
+    }();
+    struct Entry { std::uint64_t calls=0, inclusive=0, exclusive=0; };
+    struct Active {const char *name;std::uint64_t start, children=0;};
+    std::map<std::string,Entry> entries;
+    std::vector<Active> active;
+};
+thread_local CpuProfiler cpuProfiler;
+struct CpuScope {
+    bool enabled=cpuProfiler.enabled;
+    explicit CpuScope(const char *name) {
+        if(enabled)cpuProfiler.active.push_back({name,cpuNanoseconds(),0});
+    }
+    ~CpuScope() {
+        if(!enabled)return;
+        const auto end=cpuNanoseconds();
+        const auto current=cpuProfiler.active.back();cpuProfiler.active.pop_back();
+        const auto total=end>=current.start?end-current.start:0;
+        auto &entry=cpuProfiler.entries[current.name];
+        ++entry.calls;entry.inclusive+=total;
+        entry.exclusive+=total>=current.children?total-current.children:0;
+        if(!cpuProfiler.active.empty())cpuProfiler.active.back().children+=total;
+    }
+};
 thread_local std::vector<Frame *> nativeFrames;
+// Local bindings are heap-backed because closures can retain them after a
+// call. Reuse only cells owned exclusively by the finished frame; captured
+// cells stay alive with their original identity. Keep the cache thread-local
+// and bounded so recursive calls and independent Programs cannot share live
+// bindings or retain arbitrarily many allocations.
+struct LocalFrameCache {
+    static constexpr std::size_t maxMaps = 32;
+    static constexpr std::size_t maxCells = 256;
+    static constexpr std::size_t maxStacks = 16;
+    static constexpr std::size_t maxStackCapacity = 512;
+    std::array<std::unordered_map<int, runtime::CellHandle>, maxMaps> maps;
+    std::array<runtime::CellHandle, maxCells> cells;
+    std::array<std::vector<Value>, maxStacks> stacks;
+    std::size_t mapCount = 0, cellCount = 0, stackCount = 0;
+    std::uint64_t reusedMaps = 0, reusedCells = 0, newCells = 0, reusedStacks = 0;
+};
+thread_local LocalFrameCache localFrameCache;
+
+runtime::CellHandle createLocalCell() {
+    auto &cache = localFrameCache;
+    if (cache.cellCount) {
+        ++cache.reusedCells;
+        return std::move(cache.cells[--cache.cellCount]);
+    }
+    ++cache.newCells;
+    return std::make_shared<runtime::RuntimeCell>();
+}
+
+runtime::CellHandle createFrameCell(bool global) {
+    return global ? std::make_shared<runtime::RuntimeCell>() : createLocalCell();
+}
 [[noreturn]] void fail(const std::string &message) {
     throw runtime::RuntimeError("Native AOT: " + message,
                                runtime::RuntimeErrorKind::CallBoundary);
@@ -175,11 +263,47 @@ const std::string &Program::string(int index) const {
     return strings[static_cast<std::size_t>(index)];
 }
 Frame::Frame(Program &p, bool root) : program(p), global(root) {
+    CpuScope profile("frame.register");
+    if (!global && localFrameCache.stackCount) {
+        stack.swap(localFrameCache.stacks[--localFrameCache.stackCount]);
+        ++localFrameCache.reusedStacks;
+    }
+    if (!global && localFrameCache.mapCount) {
+        locals.swap(localFrameCache.maps[--localFrameCache.mapCount]);
+        ++localFrameCache.reusedMaps;
+    }
     program.frames.push_back(this);
     nativeId = static_cast<int>(nativeFrames.size());
     nativeFrames.push_back(this);
 }
-Frame::~Frame() { nativeFrames.pop_back(); program.frames.pop_back(); }
+Frame::~Frame() {
+    CpuScope profile("frame.unregister");
+    nativeFrames.pop_back(); program.frames.pop_back();
+    if (!global) {
+        // The operand stack belongs to this finished activation. Clearing it
+        // releases any object/closure handles before the scalar buffers are
+        // recycled. Only small capacities are kept across invocations.
+        stack.clear();
+        if (stack.capacity() <= LocalFrameCache::maxStackCapacity &&
+            localFrameCache.stackCount < LocalFrameCache::maxStacks)
+            stack.swap(localFrameCache.stacks[localFrameCache.stackCount++]);
+        if (locals.size() <= LocalFrameCache::maxCells) {
+            for (auto &[slot, cell] : locals) {
+                if (cell && cell.use_count() == 1 &&
+                    localFrameCache.cellCount < LocalFrameCache::maxCells) {
+                    // Drop object references before caching, including values
+                    // registered with this Program's tracing heap.
+                    cell->value = Value(0);
+                    localFrameCache.cells[localFrameCache.cellCount++] = std::move(cell);
+                }
+            }
+        }
+        locals.clear();
+        if (locals.bucket_count() <= 512 &&
+            localFrameCache.mapCount < LocalFrameCache::maxMaps)
+            locals.swap(localFrameCache.maps[localFrameCache.mapCount++]);
+    }
+}
 Value Frame::pop() {
     if (stack.empty()) fail("operand stack underflow");
     auto value = std::move(stack.back()); stack.pop_back(); return value;
@@ -196,22 +320,66 @@ runtime::CellHandle Frame::cell(int slot, bool create) {
     auto shared = program.globals.find(slot);
     if (shared != program.globals.end()) return shared->second;
     if (!create) return {};
-    auto result = std::make_shared<runtime::RuntimeCell>(); result->value = 0;
+    auto result = createFrameCell(global); result->value = 0;
     (global ? program.globals : locals)[slot] = result;
     return result;
 }
-Value Frame::load(int slot) {
-    auto existing = cell(slot, false);
-    if (existing) return existing->value;
-    auto result = std::make_shared<runtime::RuntimeCell>(); result->value = 0;
-    program.globals[slot] = result;
-    return result->value;
+void Frame::invalidateBinding(int slot) {
+    auto &entry = bindingCache[static_cast<std::uint32_t>(slot) & (bindingCache.size() - 1)];
+    if (entry.cell && entry.slot == slot) entry.cell = nullptr;
 }
-void Frame::store(int slot, Value value) { cell(slot)->value = std::move(value); }
+void Frame::rememberBinding(int slot, runtime::RuntimeCell *cell) {
+    bindingCache[static_cast<std::uint32_t>(slot) & (bindingCache.size() - 1)] = {slot, cell};
+}
+Value &Frame::valueAt(int slot) {
+    const auto &entry = bindingCache[static_cast<std::uint32_t>(slot) & (bindingCache.size() - 1)];
+    if (entry.cell && entry.slot == slot) return entry.cell->value;
+    if (auto it = locals.find(slot); it != locals.end()) {
+        rememberBinding(slot, it->second.get());
+        return it->second->value;
+    }
+    if (auto it = program.globals.find(slot); it != program.globals.end()) {
+        rememberBinding(slot, it->second.get());
+        return it->second->value;
+    }
+    auto result = createFrameCell(global); result->value = 0;
+    auto *ptr = result.get();
+    (global ? program.globals : locals)[slot] = result;
+    rememberBinding(slot, ptr);
+    return ptr->value;
+}
+Value Frame::load(int slot) {
+    CpuScope profile("cell.load");
+    return valueAt(slot);
+}
+void Frame::store(int slot, Value value) {
+    CpuScope profile("cell.store");
+    const auto &entry = bindingCache[static_cast<std::uint32_t>(slot) & (bindingCache.size() - 1)];
+    if (entry.cell && entry.slot == slot) {
+        entry.cell->value = std::move(value);
+        return;
+    }
+    if (auto it = locals.find(slot); it != locals.end()) {
+        it->second->value = std::move(value);
+        rememberBinding(slot, it->second.get());
+        return;
+    }
+    if (auto it = program.globals.find(slot); it != program.globals.end()) {
+        it->second->value = std::move(value);
+        rememberBinding(slot, it->second.get());
+        return;
+    }
+    auto cell = createFrameCell(global);
+    cell->value = std::move(value);
+    auto *ptr = cell.get();
+    (global ? program.globals : locals)[slot] = std::move(cell);
+    rememberBinding(slot, ptr);
+}
 void Frame::initialize(int slot) {
     auto &scope = global ? program.globals : locals;
     if (!global || !scope.count(slot)) {
-        auto value = std::make_shared<runtime::RuntimeCell>(); value->value = 0;
+        auto value = createFrameCell(global); value->value = 0;
+        invalidateBinding(slot);
         scope[slot] = std::move(value);
     }
 }
@@ -222,6 +390,7 @@ void Frame::assign() {
     store(std::get<int>(id), std::move(value));
 }
 void Frame::parameter(int slot, int index, int fallback) {
+    CpuScope profile("frame.parameter");
     Value value;
     if (index == -1) {
         if (!receiver) fail("method receiver missing");
@@ -229,21 +398,443 @@ void Frame::parameter(int slot, int index, int fallback) {
     } else if (index >= 0 && static_cast<std::size_t>(index) < arguments.size()) value = arguments[index];
     else if (fallback >= 0) value = defaultValue(program.string(fallback));
     else fail("required parameter missing");
-    auto local = std::make_shared<runtime::RuntimeCell>(); local->value = std::move(value);
+    auto local = createLocalCell(); local->value = std::move(value);
+    invalidateBinding(slot);
     locals[slot] = std::move(local);
 }
 void Frame::increment(int delta) {
     const auto id = pop();
     if (!std::holds_alternative<int>(id)) fail("increment requires a variable ID");
-    const int slot = std::get<int>(id);
-    const auto before = load(slot);
-    auto after = evaluateBinaryOperator(OP_CONG, before, Value(delta), 0);
-    store(slot, after); push(std::move(after));
+    incrementSlot(std::get<int>(id), delta);
+}
+void Frame::incrementSlot(int slot, int delta) {
+    CpuScope profile("integer.slot_increment");
+    // The VM converts variable ++/-- through as_int (including truncating
+    // doubles) and stores an i32. Regular binary addition differs here.
+    Value &binding = valueAt(slot);
+    if (auto *integer = std::get_if<int>(&binding)) {
+        *integer = wrapRuntimeInt32(std::int64_t{*integer} + delta);
+        push(*integer);
+        return;
+    }
+    const int current = as_int(binding, delta > 0 ? OP_CONG_MOT : OP_TRU_MOT, -1);
+    const int after = wrapRuntimeInt32(std::int64_t{current} + delta);
+    binding = after;
+    push(after);
 }
 void Frame::binary(int operation) {
+    CpuScope profile("binary.type_and_value");
     auto right = pop(); auto left = pop();
+    // The common i32 path does not need dynamic numeric coercion, string
+    // conversion or ABI-integer checks. Preserve the VM's wrapping semantics.
+    if (const auto *a = std::get_if<int>(&left)) {
+        if (const auto *b = std::get_if<int>(&right)) {
+            switch (operation) {
+                case OP_CONG:
+                    push(wrapRuntimeInt32(std::int64_t{*a} + *b)); return;
+                case OP_TRU:
+                    push(wrapRuntimeInt32(std::int64_t{*a} - *b)); return;
+                case OP_NHAN:
+                    push(wrapRuntimeInt32(std::int64_t{*a} * *b)); return;
+                case OP_SO_SANH_BANG: push(make_int_value(*a == *b)); return;
+                case OP_KHAC_BANG: push(make_int_value(*a != *b)); return;
+                case OP_LON_HON: push(make_int_value(*a > *b)); return;
+                case OP_NHO_HON: push(make_int_value(*a < *b)); return;
+                case OP_LON_HON_HOAC_BANG: push(make_int_value(*a >= *b)); return;
+                case OP_NHO_HON_HOAC_BANG: push(make_int_value(*a <= *b)); return;
+                case OP_Logic_VA: push(make_int_value(*a != 0 && *b != 0)); return;
+                case OP_Logic_HOAC: push(make_int_value(*a != 0 || *b != 0)); return;
+                default: break;
+            }
+        }
+    }
+    // Mixed i32/f64 and pure f64 arithmetic share the VM's numeric promotion
+    // rule. Evaluate primitive scalars directly and keep the dynamic helper
+    // for division (which supplies diagnostic context), ABI integers, strings
+    // and other objects. NaN and signed-zero comparisons use CPU semantics.
+    const double *leftReal = std::get_if<double>(&left);
+    const double *rightReal = std::get_if<double>(&right);
+    if (leftReal || rightReal) {
+        const int *leftInt = std::get_if<int>(&left);
+        const int *rightInt = std::get_if<int>(&right);
+        if ((leftReal || leftInt) && (rightReal || rightInt)) {
+            const double a = leftReal ? *leftReal : static_cast<double>(*leftInt);
+            const double b = rightReal ? *rightReal : static_cast<double>(*rightInt);
+            switch (operation) {
+                case OP_CONG: push(a + b); return;
+                case OP_TRU: push(a - b); return;
+                case OP_NHAN: push(a * b); return;
+                case OP_SO_SANH_BANG: push(make_int_value(a == b)); return;
+                case OP_KHAC_BANG: push(make_int_value(a != b)); return;
+                case OP_LON_HON: push(make_int_value(a > b)); return;
+                case OP_NHO_HON: push(make_int_value(a < b)); return;
+                case OP_LON_HON_HOAC_BANG: push(make_int_value(a >= b)); return;
+                case OP_NHO_HON_HOAC_BANG: push(make_int_value(a <= b)); return;
+                case OP_Logic_VA: push(make_int_value(a != 0.0 && b != 0.0)); return;
+                case OP_Logic_HOAC: push(make_int_value(a != 0.0 || b != 0.0)); return;
+                default: break;
+            }
+        }
+    }
     push(operation == OP_MODULO ? evaluateModuloOperator(left, right, operation, 0)
                                 : evaluateBinaryOperator(operation, left, right, 0));
+}
+void Frame::updateIntegerSlot(int source, int immediate, int operation, int target) {
+    CpuScope profile("integer.slot_update");
+    // Loop-carried scalar: a same-slot update can work against the cell's
+    // in-place variant. This avoids two hash lookups, a Value copy and a
+    // second ABI boundary, while retaining captured-cell aliasing.
+    if(source==target) {
+        runtime::RuntimeCell *cell=nullptr;
+        if(const auto it=locals.find(source);it!=locals.end())cell=it->second.get();
+        else if(const auto it=program.globals.find(source);it!=program.globals.end())
+            cell=it->second.get();
+        if(cell) {
+            if(auto *integer=std::get_if<int>(&cell->value)) {
+                const std::int64_t a=*integer,b=immediate;
+                switch(operation) {
+                    case OP_CONG: *integer=wrapRuntimeInt32(a+b);return;
+                    case OP_TRU: *integer=wrapRuntimeInt32(a-b);return;
+                    case OP_NHAN: *integer=wrapRuntimeInt32(a*b);return;
+                    default: break;
+                }
+            }
+            if(auto *real=std::get_if<double>(&cell->value)) {
+                switch(operation) {
+                    case OP_CONG: *real+=immediate;return;
+                    case OP_TRU: *real-=immediate;return;
+                    case OP_NHAN: *real*=immediate;return;
+                    default: break;
+                }
+            }
+        }
+    }
+    const Value &before = valueAt(source);
+    Value after;
+    if (const auto *integer = std::get_if<int>(&before)) {
+        const std::int64_t a = *integer, b = immediate;
+        switch (operation) {
+            case OP_CONG: after = wrapRuntimeInt32(a + b); break;
+            case OP_TRU: after = wrapRuntimeInt32(a - b); break;
+            case OP_NHAN: after = wrapRuntimeInt32(a * b); break;
+            default: fail("unsupported fused integer operation");
+        }
+    } else {
+        CpuScope fallback("dynamic.integer_slot_update");
+        // Variable bindings are dynamically typed. The fast path may be
+        // reached after a re-assignment to float/string; preserve semantics.
+        after = evaluateBinaryOperator(operation, before, Value(immediate), 0);
+    }
+    store(target, std::move(after));
+}
+void Frame::updateNumericSlots(int leftSlot, int rightSlot, int operation, int targetSlot) {
+    CpuScope profile("numeric.slots_update");
+    // Preserve source evaluation order and cell aliasing (including closures).
+    // Plain scalars live inside StackValue; they require no heap allocation.
+    const Value &left=valueAt(leftSlot), &right=valueAt(rightSlot);
+    Value result;
+    bool specialized=false;
+    if(const auto *a=std::get_if<int>(&left)) {
+        if(const auto *b=std::get_if<int>(&right)) {
+            const std::int64_t x=*a,y=*b;
+            switch(operation) {
+                case OP_CONG:result=wrapRuntimeInt32(x+y);specialized=true;break;
+                case OP_TRU:result=wrapRuntimeInt32(x-y);specialized=true;break;
+                case OP_NHAN:result=wrapRuntimeInt32(x*y);specialized=true;break;
+                default:break;
+            }
+        }
+    }
+    if(!specialized) {
+        const auto *leftReal=std::get_if<double>(&left);
+        const auto *rightReal=std::get_if<double>(&right);
+        if(leftReal || rightReal) {
+            const auto *leftInt=std::get_if<int>(&left);
+            const auto *rightInt=std::get_if<int>(&right);
+            if((leftReal || leftInt) && (rightReal || rightInt)) {
+                const double a=leftReal?*leftReal:static_cast<double>(*leftInt);
+                const double b=rightReal?*rightReal:static_cast<double>(*rightInt);
+                switch(operation) {
+                    case OP_CONG:result=a+b;specialized=true;break;
+                    case OP_TRU:result=a-b;specialized=true;break;
+                    case OP_NHAN:result=a*b;specialized=true;break;
+                    default:break;
+                }
+            }
+        }
+    }
+    if(!specialized) {
+        CpuScope fallback("dynamic.numeric_slots_update");
+        result=evaluateBinaryOperator(operation,left,right,0);
+    }
+    store(targetSlot,std::move(result));
+}
+bool Frame::compareIntegerSlot(int source, int immediate, int operation) {
+    CpuScope profile("integer.slot_compare");
+    const Value &before=valueAt(source);
+    // Ordered floating-point comparisons match the VM's numeric conversion;
+    // NaN remains unordered. Booleans use the VM's i32 representation.
+    if(const auto *integer=std::get_if<int>(&before)) {
+        switch(operation) {
+            case OP_SO_SANH_BANG:return *integer==immediate;
+            case OP_KHAC_BANG:return *integer!=immediate;
+            case OP_LON_HON:return *integer>immediate;
+            case OP_NHO_HON:return *integer<immediate;
+            case OP_LON_HON_HOAC_BANG:return *integer>=immediate;
+            case OP_NHO_HON_HOAC_BANG:return *integer<=immediate;
+            default:break;
+        }
+    }
+    if(const auto *real=std::get_if<double>(&before)) {
+        const double rhs=static_cast<double>(immediate);
+        switch(operation) {
+            case OP_SO_SANH_BANG:return *real==rhs;
+            case OP_KHAC_BANG:return *real!=rhs;
+            case OP_LON_HON:return *real>rhs;
+            case OP_NHO_HON:return *real<rhs;
+            case OP_LON_HON_HOAC_BANG:return *real>=rhs;
+            case OP_NHO_HON_HOAC_BANG:return *real<=rhs;
+            default:break;
+        }
+    }
+    CpuScope fallback("dynamic.integer_slot_compare");
+    return runtime::stackValueTruthy(evaluateBinaryOperator(operation,before,Value(immediate),0));
+}
+bool Frame::compareNumericSlots(int leftSlot, int rightSlot, int operation) {
+    CpuScope profile("numeric.slots_compare");
+    const Value &left=valueAt(leftSlot), &right=valueAt(rightSlot);
+    const auto compare=[&](auto a,auto b) {
+        switch(operation) {
+            case OP_SO_SANH_BANG:return a==b;
+            case OP_KHAC_BANG:return a!=b;
+            case OP_LON_HON:return a>b;
+            case OP_NHO_HON:return a<b;
+            case OP_LON_HON_HOAC_BANG:return a>=b;
+            case OP_NHO_HON_HOAC_BANG:return a<=b;
+            default:fail("unsupported fused numeric comparison");
+        }
+    };
+    if(const auto *a=std::get_if<int>(&left)) {
+        if(const auto *b=std::get_if<int>(&right))return compare(*a,*b);
+    }
+    if(const auto *a=std::get_if<double>(&left)) {
+        if(const auto *b=std::get_if<double>(&right))return compare(*a,*b);
+    }
+    const auto *leftReal=std::get_if<double>(&left);
+    const auto *rightReal=std::get_if<double>(&right);
+    if(leftReal || rightReal) {
+        const auto *leftInt=std::get_if<int>(&left);
+        const auto *rightInt=std::get_if<int>(&right);
+        if((leftReal || leftInt) && (rightReal || rightInt)) {
+            const double a=leftReal?*leftReal:static_cast<double>(*leftInt);
+            const double b=rightReal?*rightReal:static_cast<double>(*rightInt);
+            return compare(a,b);
+        }
+    }
+    CpuScope fallback("dynamic.numeric_slots_compare");
+    return runtime::stackValueTruthy(evaluateBinaryOperator(operation,left,right,0));
+}
+bool Frame::runCountedScalarLoop(int counterSlot, int bound, int valueSlot,
+                                 int step, int threshold) {
+    CpuScope profile("native.counted_scalar_loop");
+    if (counterSlot == valueSlot) return false;
+    // Bound the amount of work between safepoints, including large loops.
+    // Each completed chunk commits its scalar values and increment results
+    // before collection, matching the VM's observable state at a safepoint.
+    // Guards must be read-only. A failed specialization runs the original
+    // bytecode, which may not have evaluated the value binding yet.
+    const auto counterCell = cell(counterSlot, false);
+    if (!counterCell) return false;
+    const auto *counter = std::get_if<int>(&counterCell->value);
+    if (!counter) return false;
+    const std::int64_t iterations = std::int64_t(bound) - *counter;
+    if (iterations > 1'000'000) return false;
+    if (iterations <= 0) return true;
+    const auto valueCell = cell(valueSlot, false);
+    // Captured slots can share the same cell even when their IDs differ.
+    if (!valueCell || valueCell == counterCell ||
+        (!std::holds_alternative<int>(valueCell->value) &&
+         !std::holds_alternative<double>(valueCell->value))) return false;
+    auto &counterValue = counterCell->value;
+    auto &numberValue = valueCell->value;
+    const std::int64_t initialCounter = *counter;
+    // OP_CONG_MOT pushes each new induction value. Preserve those observable
+    // stack results, even when the arithmetic loop body stays unboxed.
+    for (std::int64_t completed = 0; completed < iterations;) {
+        const auto batch = std::min<std::int64_t>(4096, iterations - completed);
+        stack.reserve(stack.size() + static_cast<std::size_t>(batch));
+        if (auto *number = std::get_if<int>(&numberValue)) {
+            std::uint32_t bits = static_cast<std::uint32_t>(*number);
+            for (std::int64_t n = 0; n < batch; ++n) {
+                bits += static_cast<std::uint32_t>(step);
+                std::int32_t signedValue;
+                std::memcpy(&signedValue, &bits, sizeof(bits));
+                if (signedValue >= threshold)
+                    bits -= static_cast<std::uint32_t>(threshold);
+            }
+            std::int32_t result;
+            std::memcpy(&result, &bits, sizeof(result));
+            *number = result;
+        } else if (auto *number = std::get_if<double>(&numberValue)) {
+            double result = *number;
+            for (std::int64_t n = 0; n < batch; ++n) {
+                result += static_cast<double>(step);
+                if (result >= static_cast<double>(threshold))
+                    result -= static_cast<double>(threshold);
+            }
+            *number = result;
+        }
+        const auto previous = completed;
+        completed += batch;
+        counterValue = static_cast<int>(initialCounter + completed);
+        for (std::int64_t n = previous + 1; n <= completed; ++n)
+            stack.emplace_back(static_cast<int>(initialCounter + n));
+        safepoint();
+    }
+    return true;
+}
+bool Frame::runSimpleScalarLoop(int counterSlot, int bound, int valueSlot,
+                                int operand, int operation) {
+    CpuScope profile("native.simple_scalar_loop");
+    if(counterSlot==valueSlot ||
+       (operation!=OP_CONG && operation!=OP_TRU && operation!=OP_NHAN))return false;
+    const auto counterCell=cell(counterSlot,false);
+    if(!counterCell)return false;
+    const auto *counter=std::get_if<int>(&counterCell->value);
+    if(!counter)return false;
+    const std::int64_t iterations=std::int64_t(bound)-*counter;
+    // Guard excessively large stacks, while running ordinary long scalar
+    // loops in chunks to keep collection opportunities bounded.
+    if(iterations>1'000'000)return false;
+    if(iterations<=0)return true;
+    const auto valueCell=cell(valueSlot,false);
+    if(!valueCell || valueCell==counterCell ||
+       (!std::holds_alternative<int>(valueCell->value) &&
+        !std::holds_alternative<double>(valueCell->value)))return false;
+    auto &counterValue=counterCell->value;
+    auto &numberValue=valueCell->value;
+    const std::int64_t initialCounter=*counter;
+    for(std::int64_t completed=0;completed<iterations;) {
+        const auto batch=std::min<std::int64_t>(4096,iterations-completed);
+        stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        if(auto *number=std::get_if<int>(&numberValue)) {
+            std::uint32_t bits=static_cast<std::uint32_t>(*number);
+            const auto rhs=static_cast<std::uint32_t>(operand);
+            // Modulo-2^32 operations permit exact induction folding.
+            // F64 requires sequential rounding below.
+            if(operation==OP_CONG)
+                bits+=rhs*static_cast<std::uint32_t>(batch);
+            else if(operation==OP_TRU)
+                bits-=rhs*static_cast<std::uint32_t>(batch);
+            else {
+                std::uint32_t power=1,base=rhs;
+                auto exponent=static_cast<std::uint32_t>(batch);
+                while(exponent) {
+                    if(exponent&1u)power*=base;
+                    base*=base;
+                    exponent>>=1u;
+                }
+                bits*=power;
+            }
+            std::int32_t result;
+            std::memcpy(&result,&bits,sizeof(result));
+            *number=result;
+        } else if(auto *number=std::get_if<double>(&numberValue)) {
+            double result=*number;
+            const double rhs=static_cast<double>(operand);
+            for(std::int64_t n=0;n<batch;++n) {
+                switch(operation) {
+                    case OP_CONG:result+=rhs;break;
+                    case OP_TRU:result-=rhs;break;
+                    case OP_NHAN:result*=rhs;break;
+                    default:break;
+                }
+            }
+            *number=result;
+        }
+        const auto previous=completed;
+        completed+=batch;
+        counterValue=static_cast<int>(initialCounter+completed);
+        // Match the original OP_CONG_MOT operand-stack side effect.
+        for(std::int64_t n=previous+1;n<=completed;++n)
+            stack.emplace_back(static_cast<int>(initialCounter+n));
+        safepoint();
+    }
+    return true;
+}
+bool Frame::runNumericAddLoop(int counterSlot, int bound, int leftSlot,
+                              int rightSlot, int resultSlot) {
+    CpuScope profile("native.numeric_add_loop");
+    if(counterSlot==resultSlot)return false;
+    const auto counterCell=cell(counterSlot,false);
+    if(!counterCell)return false;
+    const auto *counter=std::get_if<int>(&counterCell->value);
+    if(!counter)return false;
+    const std::int64_t initialCounter=*counter;
+    const std::int64_t iterations=std::int64_t(bound)-initialCounter;
+    if(iterations>1'000'000)return false;
+    if(iterations<=0)return true;
+
+    // Every guard is read-only. The bytecode path must still handle missing
+    // cells, objects, dynamic reassignment and unusual captured aliases.
+    const auto leftCell=cell(leftSlot,false);
+    const auto rightCell=cell(rightSlot,false);
+    const auto resultCell=cell(resultSlot,false);
+    if(!leftCell||!rightCell||!resultCell||resultCell==counterCell)
+        return false;
+    const auto *leftInt=std::get_if<int>(&leftCell->value);
+    const auto *rightInt=std::get_if<int>(&rightCell->value);
+    const auto *leftReal=std::get_if<double>(&leftCell->value);
+    const auto *rightReal=std::get_if<double>(&rightCell->value);
+    if((!leftInt&&!leftReal)||(!rightInt&&!rightReal))return false;
+    // Assigning a promoted f64 into an aliased i32 source would invalidate
+    // the cached typed pointer. Fall back to dynamic bytecode in that case.
+    if((resultCell==leftCell&&leftInt&&rightReal)||
+       (resultCell==rightCell&&rightInt&&leftReal))return false;
+
+    for(std::int64_t completed=0;completed<iterations;) {
+        const auto batch=std::min<std::int64_t>(4096,iterations-completed);
+        stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        // Keep the result in a native register through each chunk. For
+        // captured aliases, read the running result instead of repeatedly
+        // boxing/unboxing the same RuntimeCell on every iteration.
+        if(leftInt&&rightInt) {
+            int result=0;
+            if(leftCell==resultCell)result=*leftInt;
+            else if(rightCell==resultCell)result=*rightInt;
+            for(std::int64_t n=0;n<batch;++n) {
+                const int induction=static_cast<int>(initialCounter+completed+n);
+                const int a=leftCell==counterCell?induction:
+                    leftCell==resultCell?result:*leftInt;
+                const int b=rightCell==counterCell?induction:
+                    rightCell==resultCell?result:*rightInt;
+                result=wrapRuntimeInt32(std::int64_t(a)+b);
+            }
+            resultCell->value=result;
+        } else {
+            double result=0.0;
+            if(leftCell==resultCell)result=*leftReal;
+            else if(rightCell==resultCell)result=*rightReal;
+            for(std::int64_t n=0;n<batch;++n) {
+                const int induction=static_cast<int>(initialCounter+completed+n);
+                const double a=leftReal?
+                    (leftCell==resultCell?result:*leftReal):
+                    static_cast<double>(leftCell==counterCell?induction:*leftInt);
+                const double b=rightReal?
+                    (rightCell==resultCell?result:*rightReal):
+                    static_cast<double>(rightCell==counterCell?induction:*rightInt);
+                result=a+b;
+            }
+            resultCell->value=result;
+        }
+        const auto previous=completed;
+        completed+=batch;
+        counterCell->value=static_cast<int>(initialCounter+completed);
+        for(std::int64_t n=previous+1;n<=completed;++n)
+            stack.emplace_back(static_cast<int>(initialCounter+n));
+        safepoint();
+    }
+    return true;
 }
 void Frame::index() {
     auto key = pop(); auto container = pop();
@@ -302,18 +893,36 @@ void Frame::closure(int function, int count) {
 }
 Value Program::invoke(int id, std::vector<Value> args, runtime::InstanceHandle receiver,
                       runtime::ClassHandle owner, runtime::ClosureHandle closure) {
-    if (id < 0 || static_cast<std::size_t>(id) >= functions.size() || !functions[id].function) fail("function not found");
-    const auto &function = functions[id];
-    if (args.size() < static_cast<std::size_t>(function.required) || args.size() > static_cast<std::size_t>(function.maximum))
-        fail("function arity mismatch: " +
-             (function.nameIndex >= 0 ? string(function.nameIndex) : "anonymous #" + std::to_string(id)));
-    Frame frame(*this); frame.arguments = std::move(args);
-    frame.receiver = std::move(receiver); frame.owner = std::move(owner);
-    if (closure) { frame.locals = closure->captures; frame.owner = closure->methodOwnerClass; }
+    CpuScope callProfile("invoke.total");
+    const FunctionEntry *function = nullptr;
+    {
+        CpuScope profile("invoke.validate");
+        if (id < 0 || static_cast<std::size_t>(id) >= functions.size() || !functions[id].function) fail("function not found");
+        function = &functions[id];
+        if (args.size() < static_cast<std::size_t>(function->required) || args.size() > static_cast<std::size_t>(function->maximum))
+            fail("function arity mismatch: " +
+                 (function->nameIndex >= 0 ? string(function->nameIndex) : "anonymous #" + std::to_string(id)));
+    }
+    Frame frame = [&]() -> Frame {
+        CpuScope profile("invoke.frame_create");
+        return Frame(*this);
+    }();
+    {
+        CpuScope profile("invoke.bind_arguments");
+        frame.arguments = std::move(args);
+        frame.receiver = std::move(receiver); frame.owner = std::move(owner);
+        if (closure) { frame.locals = closure->captures; frame.owner = closure->methodOwnerClass; }
+    }
     runtime::RuntimeHeapScope scope(heap);
-    function.function(frame.nativeId);
+    {
+        CpuScope profile("invoke.native_function");
+        function->function(frame.nativeId);
+    }
     if (pendingError) { auto error = std::exchange(pendingError, {}); std::rethrow_exception(error); }
-    return frame.result;
+    {
+        CpuScope profile("invoke.return_value");
+        return std::move(frame.result);
+    }
 }
 Value Program::invokeName(const std::string &name, std::vector<Value> args) {
     for (std::size_t i = 0; i < functions.size(); ++i)
@@ -323,8 +932,12 @@ Value Program::invokeName(const std::string &name, std::vector<Value> args) {
     fail("function not found: " + name);
 }
 void Frame::call(int target, int count, int nameIndex, bool indirect) {
+    CpuScope callProfile("frame.call_total");
     Value callee; if (indirect) callee = pop();
-    auto args = take(count);
+    auto args = [&]() {
+        CpuScope profile("frame.call_arguments");
+        return take(count);
+    }();
     if (indirect) {
         auto value = std::move(callee);
         if (auto closure = std::get_if<runtime::ClosureHandle>(&value)) {
@@ -339,7 +952,7 @@ void Frame::call(int target, int count, int nameIndex, bool indirect) {
         push(program.invoke(target, std::move(args))); return;
     }
     const auto *primitive = bytecode::intrinsicByName(program.string(nameIndex));
-    if (!primitive) fail("call target not found");
+    if (!primitive) fail("call target not found: " + program.string(nameIndex));
     for (auto &value : args) push(std::move(value));
     intrinsic(primitive->opcode);
 }
@@ -504,6 +1117,7 @@ bool Frame::defaultMatches() {
 void Frame::print() { program.output(sv_to_string(pop()) + "\n"); }
 void Frame::safepoint() { if (program.heap.needsCollection()) program.collect(); }
 void Program::collect() {
+    CpuScope profile("heap.collect");
     std::vector<Value> roots;
     for (const auto &[id, value] : globals) if (value) roots.push_back(value->value);
     for (const auto &[name, klass] : classes) roots.emplace_back(klass);
@@ -539,14 +1153,25 @@ template<class Operation> int boundary(int id, Operation operation) noexcept {
     try { return operation(frame); }
     catch (...) { frame.program.pendingError = std::current_exception(); return 0; }
 }
+// AOT operations without a value result return their error status directly.
+// The code generator can branch on this status without making a second ABI
+// call to vpp_aot_failed. Value-producing condition/case helpers still use
+// boundary() so their boolean results retain their original meaning.
+template<class Operation> int boundaryChecked(int id, Operation operation) noexcept {
+    auto &frame = *nativeFrames[static_cast<std::size_t>(id)];
+    if (frame.program.pendingError) return 1;
+    try { operation(frame); return 0; }
+    catch (...) { frame.program.pendingError = std::current_exception(); return 1; }
+}
 }
 
 // C ABI boundaries always contain C++ exceptions. Generated machine frames
 // route pending language exceptions to native catch labels explicitly.
-#define AOT0(name, body) extern "C" int vpp_aot_##name(int id) noexcept { return boundary(id, [](Frame &f) { body; return 0; }); }
-#define AOT1(name, body) extern "C" int vpp_aot_##name(int id, int a) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
-#define AOT2(name, body) extern "C" int vpp_aot_##name(int id, int a, int b) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
-#define AOT3(name, body) extern "C" int vpp_aot_##name(int id, int a, int b, int c) noexcept { return boundary(id, [=](Frame &f) { body; return 0; }); }
+#define AOT0(name, body) extern "C" int vpp_aot_##name(int id) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [](Frame &f) { body; }); }
+#define AOT1(name, body) extern "C" int vpp_aot_##name(int id, int a) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [=](Frame &f) { body; }); }
+#define AOT2(name, body) extern "C" int vpp_aot_##name(int id, int a, int b) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [=](Frame &f) { body; }); }
+#define AOT3(name, body) extern "C" int vpp_aot_##name(int id, int a, int b, int c) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [=](Frame &f) { body; }); }
+#define AOT4(name, body) extern "C" int vpp_aot_##name(int id, int a, int b, int c, int d) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [=](Frame &f) { body; }); }
 AOT1(integer, f.push(a))
 AOT1(string, f.push(f.program.string(a)))
 AOT1(floating, f.push(std::stod(f.program.string(a))))
@@ -554,9 +1179,16 @@ AOT0(null, f.push(make_null_value()))
 AOT1(load, f.push(f.load(a)))
 AOT1(initialize, f.initialize(a))
 AOT0(assign, f.assign())
+// Fold a known variable ID into the store: no temporary boxed ID or
+// second ABI crossing. The value is still consumed from the operand stack.
+AOT1(assign_slot, f.store(a,f.pop()))
+AOT2(store_integer, f.store(a,Value(b)))
 AOT3(parameter, f.parameter(a,b,c))
 AOT1(increment, f.increment(a))
 AOT1(binary, f.binary(a))
+AOT2(increment_slot, f.incrementSlot(a,b))
+AOT4(update_integer_slot, f.updateIntegerSlot(a,b,c,d))
+AOT4(update_numeric_slots, f.updateNumericSlots(a,b,c,d))
 AOT0(negate, f.push(int(!runtime::stackValueTruthy(f.pop()))))
 AOT2(list, f.list(a,b))
 AOT2(map, f.map(a,b))
@@ -572,6 +1204,8 @@ AOT2(property, f.property(a,b!=0))
 AOT3(method, f.method(a,b,c!=0))
 AOT0(print, f.print())
 AOT0(return_value, f.result=f.stack.empty()?make_null_value():f.pop())
+AOT1(return_slot, f.result=f.load(a))
+AOT1(return_integer, f.result=Value(a))
 AOT1(intrinsic, f.intrinsic(a))
 AOT2(foreign, f.foreign(a,b))
 AOT0(switch_begin, f.switches.emplace_back(f.pop(),false))
@@ -585,19 +1219,63 @@ AOT0(safepoint, f.safepoint())
 #undef AOT1
 #undef AOT2
 #undef AOT3
+#undef AOT4
+extern "C" int vpp_aot_compare_integer_slot(int id,int slot,int immediate,int operation) noexcept {
+    CpuScope profile("abi.compare_integer_slot");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.compareIntegerSlot(slot,immediate,operation)?1:0;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_numeric_slots(int id,int left,int right,int operation) noexcept {
+    CpuScope profile("abi.compare_numeric_slots");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.compareNumericSlots(left,right,operation)?1:0;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_counted_scalar_loop(int id,int counter,int bound,
+                                            int value,int step,int threshold) noexcept {
+    CpuScope profile("abi.counted_scalar_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runCountedScalarLoop(counter,bound,value,step,threshold)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_simple_scalar_loop(int id,int counter,int bound,
+                                           int value,int operand,int operation) noexcept {
+    CpuScope profile("abi.simple_scalar_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runSimpleScalarLoop(counter,bound,value,operand,operation)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_numeric_add_loop(int id,int counter,int bound,
+                                          int left,int right,int result) noexcept {
+    CpuScope profile("abi.numeric_add_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runNumericAddLoop(counter,bound,left,right,result)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
 extern "C" int vpp_aot_condition(int id) noexcept {
+    CpuScope profile("abi.condition");
     return boundary(id, [](Frame &f) { return int(runtime::stackValueTruthy(f.pop())); });
 }
 extern "C" int vpp_aot_case(int id,int a,int b) noexcept {
+    CpuScope profile("abi.case");
     return boundary(id,[=](Frame &f) {return int(f.caseMatches(a,b));});
 }
 extern "C" int vpp_aot_default(int id) noexcept {
+    CpuScope profile("abi.default");
     return boundary(id,[](Frame &f) {return int(f.defaultMatches());});
 }
 extern "C" int vpp_aot_failed(int id) noexcept {
+    CpuScope profile("abi.failed");
     return nativeFrames[static_cast<std::size_t>(id)]->program.pendingError ? 1 : 0;
 }
 extern "C" int vpp_aot_handle_error(int id) noexcept {
+    CpuScope profile("abi.handle_error");
     auto &f=*nativeFrames[static_cast<std::size_t>(id)];
     if (!f.program.pendingError || f.handlers.empty()) return -1;
     try { std::rethrow_exception(f.program.pendingError); }
@@ -606,5 +1284,19 @@ extern "C" int vpp_aot_handle_error(int id) noexcept {
         f.stack.resize(handler.stack); f.switches.resize(handler.switches);
         f.push(error.value()); f.program.pendingError={}; return handler.target;
     } catch(...) { return -1; }
+}
+void dumpAotCpuProfile() {
+    if(!cpuProfiler.enabled)return;
+    std::cerr<<"VPP_AOT_CPU_PROFILE unit=cpu_ns inclusive=may_overlap instrumented=1\n";
+    for(const auto &[name,entry]:cpuProfiler.entries)
+        std::cerr<<"VPP_AOT_CPU_PROFILE "<<name<<" calls="<<entry.calls
+                 <<" inclusive_ns="<<entry.inclusive<<" self_ns="<<entry.exclusive<<'\n';
+    std::cerr<<"VPP_AOT_CPU_PROFILE local_cells_new="<<localFrameCache.newCells
+             <<" local_cells_reused="<<localFrameCache.reusedCells
+             <<" local_maps_reused="<<localFrameCache.reusedMaps
+             <<" operand_stacks_reused="<<localFrameCache.reusedStacks<<'\n';
+    // vm_alloc lives in the separately compiled V++ VM and is not reachable
+    // from this runtime's ABI. Never imply that zero means zero allocations.
+    std::cerr<<"VPP_AOT_CPU_PROFILE vm_alloc=unavailable_in_cpp_aot\n";
 }
 } // namespace vietvm::native::aot

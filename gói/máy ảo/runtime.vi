@@ -1,0 +1,224 @@
+// Runtime policy: cells, scopes, arity, closure capture, classes, visibility,
+// exception unwinding and explicit guest frames are implemented in V++.
+hàm vm_host_cached(state, index) {
+    biến strings = vm_get(state, 0);
+    nếu (index < 0 || index >= vm_get(strings, 1)) { vm_error(12); trả về -1; };
+    biến cache = vm_get(state, 10);
+    biến entry = vm_get(cache, index);
+    nếu (entry == 0) {
+        entry = vm_host_name(vm_at(strings, index)) + 2;
+        vm_set(cache, index, entry);
+    };
+    trả về entry - 2;
+};
+hàm vm_empty_args() {
+    // Guest arguments are read-only after a call; reuse one empty list.
+    // The i32 intern cache has an extra traced word for this singleton.
+    // Header word 31 is reserved for socket tokens.
+    biến cache = vm_get(4198464, 17);
+    nếu (cache == 0) {
+        vm_int(0);
+        cache = vm_get(4198464, 17);
+        nếu (cache == 0) { trả về 0; };
+    };
+    biến empty = vm_get(cache, 272);
+    nếu (empty == 0) {
+        empty = vm_vector(4);
+        vm_set(cache, 272, empty);
+    };
+    trả về empty;
+};
+hàm vm_take(stack, count) {
+    biến n = vm_get(stack, 1);
+    nếu (count < 0 || count > n) { trả về vm_error(5); };
+    nếu (count == 0) { trả về vm_empty_args(); };
+    biến args = vm_vector(4); biến start = n - count;
+    biến data = vm_get(stack, 3);
+    // Keep arguments reachable from the stack while vm_append may allocate.
+    lặp(i = start; i < n; i++) { vm_append(args, vm_get(data, i)); };
+    lặp(i = start; i < n; i++) { vm_set(data, i, 0); };
+    vm_set(stack, 1, start);
+    trả về args;
+};
+hàm vm_frame(code, args, receiver, owner, captures, global) {
+    // Word 10 caches one local cell for ordinary calls. Constructor frames
+    // use it for their pending instance, as indicated by frame kind 2.
+    biến frame = vm_alloc(48, 1); nếu (frame == 0) { trả về 0; };
+    // Most short-lived calls never create local cells or capture variables.
+    // Allocate their scope map only when a cell is first bound.
+    vm_set(frame, 0, code); vm_set(frame, 2, vm_vector(4));
+    vm_set(frame, 4, args); vm_set(frame, 5, receiver); vm_set(frame, 6, owner);
+    // Exception handlers and switch contexts are rare: allocate on first use.
+    vm_set(frame, 9, global);
+    nếu (captures != 0 && vm_get(captures, 1) > 0) {
+        vm_set(frame, 3, vm_vector(5));
+        lặp(i = 0; i < vm_get(captures, 1); i = i + 2) { vm_map_put(vm_get(frame, 3), vm_at(captures, i), vm_at(captures, i + 1)); };
+    };
+    trả về frame;
+};
+hàm vm_slot_cache_put(frame, slot, cell) {
+    nếu (slot < 0 || cell == 0 || vm_get(frame, 9) != 0) { trả về 0; };
+    // Shared cells have two unused words: word 2 keeps the slot key.
+    vm_set(cell, 2, slot);
+    vm_set(frame, 10, cell);
+    trả về 0;
+};
+hàm vm_cell(state, frame, slot, create) {
+    // Cache local cells only; a different frame may rebind global slots.
+    biến cached = vm_get(frame, 10);
+    nếu (vm_get(frame, 9) == 0 && cached != 0 && vm_get(cached, 2) == slot) { trả về cached; };
+    biến scope = vm_get(frame, 3);
+    biến cell = 0;
+    nếu (scope != 0) { cell = vm_map_get_int(scope, slot); };
+    biến is_local = cell != 0;
+    nếu (cell == 0) { cell = vm_map_get_int(vm_get(state, 4), slot); };
+    nếu (cell == 0 && create == 1) {
+        cell = vm_alloc(16, 1); nếu (cell == 0) { trả về 0; }; vm_set(cell, 0, 10); vm_set(cell, 1, vm_int(0));
+        nếu (vm_get(frame, 9) == 1) { scope = vm_get(state, 4); }
+        hoặc nếu (scope == 0) {
+            scope = vm_vector(5);
+            nếu (scope == 0) { trả về 0; };
+            vm_set(frame, 3, scope);
+        };
+        vm_map_put(scope, vm_int(slot), cell);
+        nếu (vm_get(frame, 9) != 1) { is_local = 1; };
+    };
+    nếu (is_local) { vm_slot_cache_put(frame, slot, cell); };
+    trả về cell;
+};
+hàm vm_load_slot(state, frame, slot) {
+    biến cell = vm_cell(state, frame, slot, 0);
+    nếu (cell == 0) {
+        cell = vm_alloc(16, 1); nếu (cell == 0) { trả về 0; }; vm_set(cell, 0, 10); vm_set(cell, 1, vm_int(0));
+        vm_map_put(vm_get(state, 4), vm_int(slot), cell);
+    };
+    trả về vm_get(cell, 1);
+};
+hàm vm_store(state, frame, slot, value) {
+    biến cell = vm_cell(state, frame, slot, 1); nếu (cell == 0) { trả về 0; }; vm_set(cell, 1, value); trả về 0;
+};
+hàm vm_bind(frame, slot, value) {
+    biến scope = vm_get(frame, 3);
+    nếu (scope == 0) {
+        scope = vm_vector(5);
+        nếu (scope == 0) { trả về 0; };
+        vm_set(frame, 3, scope);
+    };
+    biến cell = vm_alloc(16, 1); nếu (cell == 0) { trả về 0; }; vm_set(cell, 0, 10); vm_set(cell, 1, value);
+    vm_map_put(scope, vm_int(slot), cell);
+    vm_slot_cache_put(frame, slot, cell); trả về 0;
+};
+hàm vm_invoke(state, id, args, receiver, owner, closure) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_invoke_body(state, id, args, receiver, owner, closure); };
+    vm_profile_begin(2);
+    biến result = vm_invoke_body(state, id, args, receiver, owner, closure);
+    vm_profile_end(2);
+    trả về result;
+};
+hàm vm_invoke_body(state, id, args, receiver, owner, closure) {
+    biến functions = vm_get(state, 1);
+    nếu (id < 0 || id >= vm_get(functions, 1)) { trả về vm_error(13); };
+    biến fn = vm_at(functions, id); biến n = vm_get(args, 1);
+    nếu (n < vm_get(fn, 2) || n > vm_get(fn, 3)) { trả về vm_error(14); };
+    biến captures = 0;
+    nếu (closure != 0) { captures = vm_get(closure, 2); owner = vm_get(closure, 3); };
+    biến frames = vm_get(state, 6); nếu (vm_get(frames, 1) >= 4096) { trả về vm_error(15); };
+    biến frame = vm_frame(vm_get(fn, 1), args, receiver, owner, captures, 0);
+    vm_set(frame, 11, id);
+    vm_append(frames, frame); trả về 0;
+};
+hàm vm_return(state, result) {
+    biến frames = vm_get(state, 6); biến frame = vm_pop(frames);
+    // A constructor returns the allocated instance, including when its
+    // body explicitly returns another value. Ordinary frames cache cells.
+    nếu (vm_get(frame, 9) == 2) { result = vm_get(frame, 10); };
+    nếu (vm_get(frames, 1) == 0) { vm_set(state, 7, result); }
+    hoặc { vm_append(vm_get(vm_at(frames, vm_get(frames, 1) - 1), 2), result); };
+    trả về 0;
+};
+hàm vm_subclass(child, parent) {
+    khi (child != 0) { nếu (child == parent) { trả về 1; }; child = vm_get(child, 2); }; trả về 0;
+};
+hàm vm_resolve(klass, name) {
+    khi (klass != 0) {
+        biến method = vm_map_get(vm_get(klass, 3), name); nếu (method != 0) { trả về method; }; klass = vm_get(klass, 2);
+    };
+    trả về 0;
+};
+hàm vm_access(method, caller) {
+    biến visibility = vm_get(method, 2); biến owner = vm_get(method, 1);
+    nếu (visibility == 0) { trả về 1; };
+    nếu (caller == 0) { trả về 0; };
+    nếu (visibility == 1) { trả về caller == owner; };
+    trả về vm_subclass(caller, owner);
+};
+hàm vm_throw(state, value) {
+    biến frames = vm_get(state, 6);
+    khi (vm_get(frames, 1) > 0) {
+        biến frame = vm_at(frames, vm_get(frames, 1) - 1); biến handlers = vm_get(frame, 7);
+        nếu (handlers != 0 && vm_get(handlers, 1) > 0) {
+            biến handler = vm_pop(handlers); biến stack = vm_get(frame, 2); biến switches = vm_get(frame, 8);
+            khi (vm_get(stack, 1) > vm_get(handler, 1)) { vm_pop(stack); };
+            nếu (switches != 0) {
+                khi (vm_get(switches, 1) > vm_get(handler, 2)) { vm_pop(switches); };
+            };
+            vm_append(stack, value); vm_set(frame, 1, vm_get(handler, 0)); trả về 0;
+        };
+        vm_pop(frames);
+    };
+    vm_set(4198464, 3, value); trả về vm_error(16);
+};
+hàm vm_parse_int(s) {
+    biến n = vm_get(s, 1); biến at = 0; biến negative = 0; biến value = 0;
+    nếu (n == 0) { trả về vm_error(2); };
+    nếu (máy đọc byte(vm_get(s, 2)) == 45) { negative = 1; at = 1; };
+    nếu (at == n) { trả về vm_error(2); };
+    khi (at < n) {
+        biến digit = máy đọc byte(vm_get(s, 2) + at) - 48;
+        nếu (digit < 0 || digit > 9 || value < -214748364) { trả về vm_error(2); };
+        nếu (value == -214748364 && (digit > 8 || (negative == 0 && digit > 7))) { trả về vm_error(2); };
+        value = value * 10 - digit; at = at + 1;
+    };
+    nếu (negative == 0) { value = 0 - value; }; trả về vm_int(value);
+};
+hàm vm_scalar(tag, s) {
+    nếu (tag == 110) { trả về 0; }; nếu (tag == 115) { trả về s; };
+    nếu (tag == 105) { trả về vm_parse_int(s); };
+    nếu (tag == 100) {
+        biến v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; }; vm_set(v, 0, 2); máy thực đọc(v, vm_get(s, 2)); trả về v;
+    };
+    nếu (tag == 108) { trả về vm_decode_literal(s, 4); };
+    nếu (tag == 109) { trả về vm_decode_literal(s, 5); }; trả về vm_error(10);
+};
+hàm vm_unescape(s) {
+    biến bytes = vm_vector(4);
+    lặp(i = 0; i < vm_get(s, 1); i++) {
+        biến b = máy đọc byte(vm_get(s, 2) + i);
+        nếu (b == 92 && i + 1 < vm_get(s, 1)) {
+            i = i + 1; b = máy đọc byte(vm_get(s, 2) + i);
+            nếu (b == 110) { b = 10; } hoặc nếu (b == 114) { b = 13; } hoặc nếu (b == 116) { b = 9; }
+            hoặc nếu (b == 101) { b = 30; } hoặc nếu (b == 102) { b = 31; };
+        };
+        vm_append(bytes, vm_int(b));
+    };
+    biến result = vm_string(vm_get(bytes, 1)); nếu (result == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(bytes, 1); i++) { máy ghi byte(vm_get(result, 2) + i, vm_number(vm_at(bytes, i))); }; trả về result;
+};
+hàm vm_decode_literal(s, tag) {
+    biến value = vm_vector(tag); biến start = 0;
+    khi (start < vm_get(s, 1)) {
+        biến end = start; khi (end < vm_get(s, 1)) { nếu (máy đọc byte(vm_get(s, 2) + end) == 30) { thoát; }; end = end + 1; };
+        biến first = start; khi (first < end) { nếu (máy đọc byte(vm_get(s, 2) + first) == 31) { thoát; }; first = first + 1; };
+        nếu (first == end) { trả về vm_error(10); };
+        biến type = start; biến field = first + 1; biến key = 0;
+        nếu (tag == 5) {
+            key = vm_unescape(vm_slice(s, start, first - start)); type = field;
+            khi (field < end) { nếu (máy đọc byte(vm_get(s, 2) + field) == 31) { thoát; }; field = field + 1; };
+            nếu (field == end) { trả về vm_error(10); }; field = field + 1;
+        };
+        biến item = vm_scalar(máy đọc byte(vm_get(s, 2) + type), vm_unescape(vm_slice(s, field, end - field)));
+        nếu (tag == 5) { vm_map_put(value, key, item); } hoặc { vm_append(value, item); };
+        start = end + 1;
+    };
+    trả về value;
+};

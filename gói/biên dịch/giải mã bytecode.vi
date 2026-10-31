@@ -1,0 +1,247 @@
+// Trình giải mã bytecode viết bằng V++: chỉ đọc ABI bốn i32, không khởi động VM.
+// Tên opcode đối chiếu với src/bytecode/opcode.cpp; số ABI theo mã thao tác.vi.
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+
+hàm công khai biên dịch tên mã thao tác(mã) {
+    chọn (mã) {
+        ca 0: { trả về "OP_CONG"; }
+        ca 1: { trả về "OP_TRU"; }
+        ca 2: { trả về "OP_NHAN"; }
+        ca 3: { trả về "OP_CHIA"; }
+        ca 4: { trả về "OP_LOGIC_VA"; }
+        ca 5: { trả về "OP_LOGIC_HOAC"; }
+        ca 6: { trả về "OP_KHONG"; }
+        ca 7: { trả về "OP_SO_SANH_BANG"; }
+        ca 8: { trả về "OP_KHAC_BANG"; }
+        ca 9: { trả về "OP_LON_HON"; }
+        ca 10: { trả về "OP_NHO_HON"; }
+        ca 11: { trả về "OP_LON_HON_HOAC_BANG"; }
+        ca 12: { trả về "OP_NHO_HON_HOAC_BANG"; }
+        ca 13: { trả về "OP_GAN"; }
+        ca 14: { trả về "OP_MO_KHOI"; }
+        ca 15: { trả về "OP_DONG_KHOI"; }
+        ca 16: { trả về "OP_MO_NGOAC"; }
+        ca 17: { trả về "OP_DONG_NGOAC"; }
+        ca 18: { trả về "OP_MO_MANG"; }
+        ca 19: { trả về "OP_DONG_MANG"; }
+        ca 20: { trả về "OP_DONG_LENH"; }
+        ca 21: { trả về "OP_PHAY"; }
+        ca 22: { trả về "OP_NEU"; }
+        ca 23: { trả về "OP_HOAC"; }
+        ca 24: { trả về "OP_NEU_KHONG"; }
+        ca 25: { trả về "OP_KET_THUC_NEU"; }
+        ca 26: { trả về "OP_LAP"; }
+        ca 27: { trả về "OP_KHOI_TAO"; }
+        ca 28: { trả về "OP_DIEU_KIEN"; }
+        ca 29: { trả về "OP_CAP_NHAT"; }
+        ca 30: { trả về "OP_KIEM_TRA_SAU"; }
+        ca 31: { trả về "OP_KET_THUC_LAP"; }
+        ca 32: { trả về "OP_BO_QUA"; }
+        ca 33: { trả về "OP_THOAT"; }
+        ca 34: { trả về "OP_CHUYEN"; }
+        ca 35: { trả về "OP_TRUONG_HOP"; }
+        ca 36: { trả về "OP_MAC_DINH"; }
+        ca 37: { trả về "OP_KET_THUC_CHUYEN"; }
+        ca 38: { trả về "OP_HAM"; }
+        ca 39: { trả về "OP_GOI"; }
+        ca 40: { trả về "OP_TRA_VE"; }
+        ca 41: { trả về "OP_BIEN_SO"; }
+        ca 43: { trả về "OP_IN"; }
+        ca 44: { trả về "OP_DUNG_CHUONG_TRINH"; }
+        ca 60: { trả về "OP_TEN_BIEN_ID"; }
+        ca 61: { trả về "OP_TEN_BIEN_GIA_TRI"; }
+        ca 62: { trả về "OP_JUMP_IF_FALSE"; }
+        ca 63: { trả về "OP_JUMP"; }
+        ca 64: { trả về "OP_MODULO"; }
+        ca 65: { trả về "OP_CHUOI"; }
+        ca 66: { trả về "OP_PHU_DINH"; }
+        ca 67: { trả về "OP_CHON"; }
+        ca 68: { trả về "OP_CA"; }
+        ca 69: { trả về "OP_PARAM"; }
+        ca 70: { trả về "OP_CONG_MOT"; }
+        ca 71: { trả về "OP_TRU_MOT"; }
+        ca 72: { trả về "OP_CONG_GAN"; }
+        ca 73: { trả về "OP_TRU_GAN"; }
+        ca 74: { trả về "OP_NHAN_GAN"; }
+        ca 75: { trả về "OP_CHIA_GAN"; }
+        ca 76: { trả về "OP_MODULO_GAN"; }
+        ca 77: { trả về "OP_DUNG_GIA_TRI"; }
+        ca 78: { trả về "OP_SAI_GIA_TRI"; }
+        ca 79: { trả về "OP_BIEN_SO_FLOAT"; }
+        ca 80: { trả về "OP_NEM"; }
+        ca 81: { trả về "OP_THU"; }
+        ca 82: { trả về "OP_THU_KET_THUC"; }
+        ca 83: { trả về "OP_BAT_LOI"; }
+        ca 84: { trả về "OP_RONG_GIA_TRI"; }
+        ca 85: { trả về "OP_MAP_LITERAL"; }
+        ca 86: { trả về "OP_GOI_GIAN_TIEP"; }
+        ca 87: { trả về "OP_PARAM_MAC_DINH"; }
+        ca 88: { trả về "OP_LIST_LITERAL"; }
+        ca 89: { trả về "OP_DOC_CHI_SO"; }
+        ca 90: { trả về "OP_GAN_CHI_SO"; }
+        ca 91: { trả về "OP_TAO_LOP"; }
+        ca 92: { trả về "OP_THEM_PHUONG_THUC"; }
+        ca 93: { trả về "OP_TAO_DOI_TUONG"; }
+        ca 94: { trả về "OP_DOC_THUOC_TINH"; }
+        ca 95: { trả về "OP_GAN_THUOC_TINH"; }
+        ca 96: { trả về "OP_GOI_PHUONG_THUC"; }
+        ca 97: { trả về "OP_TAO_DONG_BAO"; }
+        ca 98: { trả về "OP_VM_BIEN_DICH_PHAN_TICH"; }
+        ca 99: { trả về "OP_VM_DNS_PHAN_GIAI"; }
+        ca 100: { trả về "OP_VM_DOC_BIEN_MOI_TRUONG"; }
+        ca 101: { trả về "OP_VM_DONG_HO_DIA_PHUONG"; }
+        ca 102: { trả về "OP_VM_DONG_HO_UTC"; }
+        ca 103: { trả về "OP_VM_DUONG_DAN_TON_TAI"; }
+        ca 104: { trả về "OP_VM_IO_DOC_BYTES"; }
+        ca 105: { trả về "OP_VM_IO_DOC_FILE"; }
+        ca 106: { trả về "OP_VM_IO_GHI_BYTES"; }
+        ca 107: { trả về "OP_VM_IO_GHI_FILE"; }
+        ca 108: { trả về "OP_VM_IO_GHI_TIEP_FILE"; }
+        ca 109: { trả về "OP_VM_KICH_BAN_CHAY"; }
+        ca 111: { trả về "OP_VM_LA_TEP"; }
+        ca 112: { trả về "OP_VM_LA_THU_MUC_KHONG_THEO_LIEN_KET"; }
+        ca 113: { trả về "OP_VM_LA_THU_MUC"; }
+        ca 114: { trả về "OP_VM_LIET_KE_THU_MUC"; }
+        ca 116: { trả về "OP_VM_NGAU_NHIEN_BAO_MAT_BYTES"; }
+        ca 117: { trả về "OP_VM_NGU_MILI_GIAY"; }
+        ca 118: { trả về "OP_VM_SO_THUC_BITS"; }
+        ca 120: { trả về "OP_VM_SOCKET_CHAP_NHAN"; }
+        ca 121: { trả về "OP_VM_SOCKET_DAT_TIMEOUT"; }
+        ca 122: { trả về "OP_VM_SOCKET_DONG"; }
+        ca 123: { trả về "OP_VM_SOCKET_GUI"; }
+        ca 124: { trả về "OP_VM_SOCKET_NHAN"; }
+        ca 125: { trả về "OP_VM_SOCKET_PHAN_GIAI"; }
+        ca 126: { trả về "OP_VM_SOCKET_TCP_LANG_NGHE"; }
+        ca 127: { trả về "OP_VM_SOCKET_TCP_MO"; }
+        ca 128: { trả về "OP_VM_SOCKET_TLS_NANG_CAP"; }
+        ca 129: { trả về "OP_VM_SOCKET_UDP_MO"; }
+        ca 130: { trả về "OP_VM_TAO_THU_MUC"; }
+        ca 135: { trả về "OP_VM_TEN_NEN_TANG"; }
+        ca 136: { trả về "OP_VM_THOI_GIAN_DON_DIEU_MS"; }
+        ca 137: { trả về "OP_VM_TIEN_TRINH_CHAY"; }
+        ca 138: { trả về "OP_VM_XOA_DUONG_DAN"; }
+        ca 139: { trả về "OP_VM_THREAD_SPAWN"; }
+        ca 140: { trả về "OP_VM_THREAD_WAIT"; }
+        ca 141: { trả về "OP_VM_THREAD_CANCEL"; }
+        ca 142: { trả về "OP_VM_THREAD_STATUS"; }
+        ca 143: { trả về "OP_VM_THREAD_PARK"; }
+        ca 144: { trả về "OP_VM_TUPLE_FROM_LIST"; }
+        ca 145: { trả về "OP_VM_TYPE_OF"; }
+        ca 146: { trả về "OP_VM_IDENTITY_HASH"; }
+        ca 147: { trả về "OP_VM_LENGTH"; }
+        ca 148: { trả về "OP_VM_LIST_APPEND"; }
+        ca 149: { trả về "OP_VM_LIST_REMOVE"; }
+        ca 150: { trả về "OP_VM_MAP_HAS"; }
+        ca 151: { trả về "OP_VM_MAP_REMOVE"; }
+        ca 152: { trả về "OP_VM_MAP_KEYS"; }
+        ca 153: { trả về "OP_VM_STRING_BYTES"; }
+        ca 154: { trả về "OP_VM_STRING_FROM_BYTES"; }
+        ca 155: { trả về "OP_VM_FLOAT_FROM_BITS"; }
+        ca 156: { trả về "OP_FFI_CALL"; }
+        ca 157: { trả về "OP_VM_BYTECODE_CHAY"; }
+        ca 158: { trả về "OP_NATIVE_ARTIFACT_CHAY"; }
+        ca 159: { trả về "OP_VM_MACHINE_FILE_OPEN"; }
+        ca 160: { trả về "OP_VM_MACHINE_FILE_READ"; }
+        ca 161: { trả về "OP_VM_MACHINE_FILE_WRITE"; }
+        ca 162: { trả về "OP_VM_MACHINE_FILE_CLOSE"; }
+        ca 163: { trả về "OP_VM_MACHINE_FILE_SEEK"; }
+        ca 164: { trả về "OP_VM_MACHINE_FILE_TELL"; }
+        ca 165: { trả về "OP_VM_MACHINE_FILE_ERROR"; }
+        ca 166: { trả về "OP_VM_MACHINE_FILE_REMOVE"; }
+        ca 167: { trả về "OP_VM_MACHINE_PROCESS_PID"; }
+        ca 168: { trả về "OP_VM_MACHINE_PROCESS_PPID"; }
+        ca 169: { trả về "OP_VM_MACHINE_PROCESS_UID"; }
+        ca 170: { trả về "OP_VM_MACHINE_PROCESS_EUID"; }
+        ca 171: { trả về "OP_VM_MACHINE_PROCESS_GID"; }
+        ca 172: { trả về "OP_VM_MACHINE_PROCESS_EGID"; }
+        ca 173: { trả về "OP_VM_MACHINE_TIME_SLEEP"; }
+        ca 174: { trả về "OP_VM_MACHINE_TIME_MONOTONIC"; }
+        ca 175: { trả về "OP_VM_MACHINE_TIME_REALTIME"; }
+        ca 176: { trả về "OP_VM_MACHINE_ENTROPY_READ"; }
+        ca 177: { trả về "OP_VM_MACHINE_ENV_GET"; }
+        ca 178: { trả về "OP_VM_MACHINE_TIME_LOCAL"; }
+        ca 179: { trả về "OP_VM_MACHINE_DIR_MKDIR"; }
+        ca 180: { trả về "OP_VM_MACHINE_DIR_REMOVE"; }
+        ca 181: { trả về "OP_VM_MACHINE_DIR_OPEN"; }
+        ca 182: { trả về "OP_VM_MACHINE_DIR_NEXT"; }
+        ca 183: { trả về "OP_VM_MACHINE_DIR_CLOSE"; }
+        ca 184: { trả về "OP_VM_MACHINE_PATH_KIND"; }
+        ca 185: { trả về "OP_VM_MACHINE_SOCKET_KIND"; }
+        ca 186: { trả về "OP_VM_MACHINE_SOCKET_CLOSE"; }
+        ca 187: { trả về "OP_VM_MACHINE_SOCKET_TIMEOUT"; }
+        ca 188: { trả về "OP_VM_MACHINE_SOCKET_SEND"; }
+        ca 189: { trả về "OP_VM_MACHINE_SOCKET_RECV"; }
+        ca 190: { trả về "OP_VM_MACHINE_SOCKET_ACCEPT"; }
+        ca 191: { trả về "OP_VM_MACHINE_SOCKET_LISTEN"; }
+        ca 192: { trả về "OP_VM_MACHINE_SOCKET_CONNECT"; }
+        ca 193: { trả về "OP_VM_MACHINE_PROCESS_NEW"; }
+        ca 194: { trả về "OP_VM_MACHINE_PROCESS_ARG"; }
+        ca 195: { trả về "OP_VM_MACHINE_PROCESS_COMMAND_LINE"; }
+        ca 196: { trả về "OP_VM_MACHINE_PROCESS_ENV"; }
+        ca 197: { trả về "OP_VM_MACHINE_PROCESS_START"; }
+        ca 198: { trả về "OP_VM_MACHINE_PROCESS_POLL"; }
+        ca 199: { trả về "OP_VM_MACHINE_PROCESS_READ"; }
+        ca 200: { trả về "OP_VM_MACHINE_PROCESS_WAIT"; }
+        ca 201: { trả về "OP_VM_MACHINE_PROCESS_ERROR"; }
+        ca 202: { trả về "OP_VM_MACHINE_PROCESS_CLOSE"; }
+        ca 203: { trả về "OP_VM_MACHINE_RESOLVE_OPEN"; }
+        ca 204: { trả về "OP_VM_MACHINE_RESOLVE_NEXT"; }
+        ca 205: { trả về "OP_VM_MACHINE_RESOLVE_CLOSE"; }
+        ca 206: { trả về "OP_VM_MACHINE_TLS_UPGRADE"; }
+        ca 207: { trả về "OP_VM_MACHINE_TLS_SEND"; }
+        ca 208: { trả về "OP_VM_MACHINE_TLS_RECV"; }
+        mặc định: { trả về "UNKNOWN_OPCODE"; }
+    };
+};
+
+// Phân giải nhãn StringPool theo cùng quy ước operand của Stage 0.
+hàm biên dịch nhãn mã thao tác(lệnh, bể chuỗi) {
+    mã = lệnh[0];
+    chỉ mục = -1;
+    nếu (mã == biên dịch mã thao tác("OP_HAM") ||
+        mã == biên dịch mã thao tác("OP_PARAM_MAC_DINH")) {
+        chỉ mục = lệnh[1];
+    } hoặc nếu (mã == biên dịch mã thao tác("OP_CHUOI") ||
+        mã == biên dịch mã thao tác("OP_BIEN_SO_FLOAT") ||
+        mã == biên dịch mã thao tác("OP_MAP_LITERAL")) {
+        chỉ mục = lệnh[2];
+    } hoặc nếu (mã == biên dịch mã thao tác("OP_GOI") && lệnh[2] < 0) {
+        chỉ mục = -lệnh[2] - 1;
+    };
+    nếu (chỉ mục >= 0 && chỉ mục < máy ảo lấy độ dài(bể chuỗi)) {
+        trả về " bể chuỗi=\"" + bể chuỗi[chỉ mục] + "\"";
+    };
+    trả về "";
+};
+
+// Định dạng từng opcode tương thích với --giải-mã của bootstrap C++.
+hàm công khai biên dịch giải mã bytecode(bytecode, bể chuỗi) {
+    các dòng = [];
+    lặp (i = 0; i < máy ảo lấy độ dài(bytecode); i++) {
+        lệnh = bytecode[i];
+        vị trí = thành chuỗi(i);
+        nếu (máy ảo lấy độ dài(vị trí) < 4) { vị trí = " " + vị trí; };
+        nếu (máy ảo lấy độ dài(vị trí) < 4) { vị trí = " " + vị trí; };
+        nếu (máy ảo lấy độ dài(vị trí) < 4) { vị trí = " " + vị trí; };
+        dòng = vị trí + "  " + biên dịch tên mã thao tác(lệnh[0]) +
+            " toán hạng=" + thành chuỗi(lệnh[1]) +
+            " chỉ số=" + thành chuỗi(lệnh[2]) +
+            " giá trị=" + thành chuỗi(lệnh[3]) +
+            biên dịch nhãn mã thao tác(lệnh, bể chuỗi) + "\n";
+        máy ảo thêm cuối danh sách(các dòng, dòng);
+    };
+    trả về biên dịch lắp ráp nối các phần(các dòng);
+};
+
+// Bảng hàm ABI giữ các ID liên tiếp theo thứ tự số, giống Stage 0.
+hàm công khai biên dịch giải mã chương trình(dây) {
+    các phần = [biên dịch giải mã bytecode(dây[0], dây[1])];
+    lặp(i = 0; i < máy ảo lấy độ dài(dây[2]); i++) {
+        mục = dây[2][i];
+        máy ảo thêm cuối danh sách(các phần, "\nfunction " + thành chuỗi(mục[0]) + ":\n");
+        máy ảo thêm cuối danh sách(các phần, biên dịch giải mã bytecode(mục[2], dây[1]));
+    };
+    trả về biên dịch lắp ráp nối các phần(các phần);
+};

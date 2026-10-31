@@ -1,5 +1,5 @@
 // Native module loader for the self-hosted i32 compiler.
-// Supported source form: leading `nhập tên[/tên]*;` declarations.
+// Supported source form: leading dotted module imports (`nhập tên.mô đun.*;`).
 // Paths are relative to the importing file; imports are compiled once in
 // dependency-first order. The current subset uses a single function namespace.
 
@@ -7,7 +7,8 @@
 // Return 0 for missing, 1 for an active dependency, 2 for completed.
 hàm nạp mô đun đã gặp(bảng, đường tệp) {
     biến chiều dài = byte dài(đường tệp);
-    lặp (độ lệch = 0; độ lệch < byte dài(bảng); độ lệch = độ lệch) {
+    biến độ lệch = 0;
+    khi (độ lệch < byte dài(bảng)) {
         nếu (độ lệch + 8 > byte dài(bảng)) { trả về -1; };
         biến kích cỡ = byte đọc số nguyên ba mươi hai bit(bảng, độ lệch);
         nếu (kích cỡ <= 0) { trả về -1; };
@@ -27,10 +28,12 @@ hàm nạp mô đun đã gặp(bảng, đường tệp) {
     trả về 0;
 };
 
-// Build path from the importer's directory and unqualified import tokens.
-// Only identifiers and '/' separators are accepted (no '.', '..', aliases,
-// or absolute imports); the .vi suffix is inferred.
-// Returns token index after ';', or -1 if the directive is malformed.
+// Translate dotted source imports to a filesystem path relative to the importer.
+// `nhập sub.leaf.*;` -> sub/leaf.vi, `nhập ..sub.leaf.*;` -> ../sub/leaf.vi.
+// Plain `nhập leaf;` and slash imports remain valid during migration.
+// Native's current function namespace is shared; selected names are resolved
+// to their module here, while symbol pruning belongs to the full compiler.
+// Returns token index after ';', or -1 for malformed source syntax.
 hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, các từ tố, điểm bắt đầu, con) {
     nếu (byte làm rỗng(con) != 0) { trả về -1; };
     biến cuối cùng dấu gạch chéo = -1;
@@ -40,48 +43,92 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
     lặp (i = 0; i <= cuối cùng dấu gạch chéo; i++) {
         nếu (byte thêm(con, byte lấy(đường tệp, i)) != 0) { trả về -1; };
     };
-    biến con trỏ hiện tại = điểm bắt đầu;
-    lặp (n = 0; n < từ tố số phần tử(các từ tố); n++) {
-        nếu (phân tích định danh(nguồn văn bản, các từ tố, con trỏ hiện tại) != 1) { trả về -1; };
-        biến đầu tiên = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
-        biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
-        lặp (i = đầu tiên; i < điểm kết thúc; i++) {
-            nếu (byte thêm(con, byte lấy(nguồn văn bản, i)) != 0) { trả về -1; };
+    biến số từ tố = từ tố số phần tử(các từ tố);
+    nếu (điểm bắt đầu < 0) { trả về -1; };
+    nếu (điểm bắt đầu >= số từ tố) { trả về -1; };
+    biến kết thúc từ tố = -1;
+    lặp (i = điểm bắt đầu; i < số từ tố; i++) {
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, ";") == 1) {
+            kết thúc từ tố = i;
+            thoát;
         };
-        con trỏ hiện tại = con trỏ hiện tại + 1;
-        // Lexer tách hậu tố thuần số thành token riêng (ví dụ "x86 64").
-        // Cho phép hậu tố ấy trong tên mô-đun, giữ nguyên khoảng trắng trong tên tệp.
-        lặp (s = 0; s < từ tố số phần tử(các từ tố); s++) {
-            nếu (từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 2) != 2) { thoát; };
-            biến đầu số = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 0);
-            biến cuối số = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại, 1);
-            nếu (đầu số <= điểm kết thúc) { trả về -1; };
-            lặp (i = điểm kết thúc; i < đầu số; i++) {
-                biến khoảng trắng = byte lấy(nguồn văn bản, i);
-                nếu (khoảng trắng != 32) { nếu (khoảng trắng != 9) { trả về -1; }; };
-                nếu (byte thêm(con, khoảng trắng) != 0) { trả về -1; };
-            };
-            lặp (i = đầu số; i < cuối số; i++) {
-                biến chữ số = byte lấy(nguồn văn bản, i);
-                nếu (chữ số < 48) { trả về -1; };
-                nếu (chữ số > 57) { trả về -1; };
-                nếu (byte thêm(con, chữ số) != 0) { trả về -1; };
-            };
-            điểm kết thúc = cuối số;
-            con trỏ hiện tại = con trỏ hiện tại + 1;
-        };
-        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, ";") == 1) {
-            biến hậu tố = ".vi";
-            biến mã trạng thái = byte nối(con, hậu tố);
-            byte hủy(hậu tố);
-            nếu (mã trạng thái != 0) { trả về -1; };
-            trả về con trỏ hiện tại + 1;
-        };
-        nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "/") != 1) { trả về -1; };
-        nếu (byte thêm(con, 47) != 0) { trả về -1; };
-        con trỏ hiện tại = con trỏ hiện tại + 1;
+        // Alias/quoted targets are not implemented in the native subset.
+        nếu (từ tố bằng(nguồn văn bản, các từ tố, i, "như") == 1) { trả về -1; };
+        nếu (từ tố trường dữ liệu(các từ tố, i, 2) == 4) { trả về -1; };
     };
-    trả về -1;
+    nếu (kết thúc từ tố <= điểm bắt đầu) { trả về -1; };
+    biến đầu = từ tố trường dữ liệu(các từ tố, điểm bắt đầu, 0);
+    biến cuối = từ tố trường dữ liệu(các từ tố, kết thúc từ tố, 0);
+    khi (cuối > đầu) {
+        biến ký tự cuối = byte lấy(nguồn văn bản, cuối - 1);
+        nếu (ký tự cuối != 32) { nếu (ký tự cuối != 9) { thoát; }; };
+        cuối = cuối - 1;
+    };
+    nếu (cuối <= đầu) { trả về -1; };
+    // A trailing .* imports a complete module; a final .name selects an
+    // export from the preceding module path.
+    biến là toàn bộ = 0;
+    nếu (byte lấy(nguồn văn bản, cuối - 1) == 42) {
+        nếu (cuối - đầu < 3) { trả về -1; };
+        nếu (byte lấy(nguồn văn bản, cuối - 2) != 46) { trả về -1; };
+        là toàn bộ = 1;
+        cuối = cuối - 2;
+    };
+    biến số dấu chấm đầu = 0;
+    khi (đầu + số dấu chấm đầu < cuối) {
+        nếu (byte lấy(nguồn văn bản, đầu + số dấu chấm đầu) != 46) { thoát; };
+        số dấu chấm đầu = số dấu chấm đầu + 1;
+    };
+    nếu (đầu + số dấu chấm đầu >= cuối) { trả về -1; };
+    biến dấu chấm cuối = -1;
+    lặp (i = đầu + số dấu chấm đầu; i < cuối; i++) {
+        nếu (byte lấy(nguồn văn bản, i) == 46) { dấu chấm cuối = i; };
+    };
+    nếu (là toàn bộ == 0) {
+        nếu (dấu chấm cuối >= 0) {
+            // Native handles the containing file; the full compiler prunes
+            // unselected exports. Never treat a selected name as a directory.
+            nếu (dấu chấm cuối + 1 >= cuối) { trả về -1; };
+            nếu (cuối - dấu chấm cuối == 3) {
+                nếu (byte lấy(nguồn văn bản, dấu chấm cuối + 1) == 118) {
+                    nếu (byte lấy(nguồn văn bản, dấu chấm cuối + 2) == 105) { trả về -1; };
+                };
+            };
+            cuối = dấu chấm cuối;
+        };
+    };
+    nếu (đầu + số dấu chấm đầu >= cuối) { trả về -1; };
+    lặp (i = 1; i < số dấu chấm đầu; i++) {
+        nếu (byte thêm(con, 46) != 0) { trả về -1; };
+        nếu (byte thêm(con, 46) != 0) { trả về -1; };
+        nếu (byte thêm(con, 47) != 0) { trả về -1; };
+    };
+    biến ký tự trước = 47;
+    lặp (i = đầu + số dấu chấm đầu; i < cuối; i++) {
+        biến ch = byte lấy(nguồn văn bản, i);
+        nếu (ch == 46) {
+            nếu (ký tự trước == 47) { trả về -1; };
+            ch = 47;
+        };
+        nếu (ch == 47) { nếu (ký tự trước == 47) { trả về -1; }; };
+        nếu (ch == 42) { trả về -1; };
+        nếu (ch == 92) { trả về -1; };
+        nếu (ch == 34) { trả về -1; };
+        nếu (ch == 39) { trả về -1; };
+        nếu (ch == 40) { trả về -1; };
+        nếu (ch == 41) { trả về -1; };
+        nếu (ch == 44) { trả về -1; };
+        nếu (ch == 10) { trả về -1; };
+        nếu (ch == 13) { trả về -1; };
+        nếu (byte thêm(con, ch) != 0) { trả về -1; };
+        ký tự trước = ch;
+    };
+    nếu (ký tự trước == 47) { trả về -1; };
+    biến hậu tố = ".vi";
+    biến mã trạng thái = byte nối(con, hậu tố);
+    byte hủy(hậu tố);
+    nếu (mã trạng thái != 0) { trả về -1; };
+    trả về kết thúc từ tố + 1;
 };
 
 // Recursively collect independent module payloads using the native lexer.
@@ -106,7 +153,7 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
     nếu (các từ tố <= 0) { mã trạng thái = -1; };
     nếu (con <= 0) { mã trạng thái = -1; };
     nếu (mã trạng thái == 0) {
-        nếu (bản địa đọc nguồn đầu vào(đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = -1; };
+        nếu (đọc tệp nguồn(đường tệp, nguồn đầu vào) <= 0) { mã trạng thái = -1; };
     };
     nếu (mã trạng thái == 0) {
         nếu (từ vựng tách từ tố(nguồn đầu vào, các từ tố) < 0) { mã trạng thái = -1; };

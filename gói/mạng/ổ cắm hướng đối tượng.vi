@@ -1,7 +1,7 @@
 // Đối tượng sở hữu duy nhất một socket TCP. Chỉ mở kết nối khi gọi kết nối().
 // Đóng là thao tác cuối cùng, an toàn khi lặp lại.
-nhập gói/mạng/ổ cắm;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 lớp công khai Ổ Cắm TCP triển khai Đóng Được {
     hàm công khai khởi tạo(tên máy, cổng, thời gian chờ = 5000) {

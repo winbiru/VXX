@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     in mạng lấy("http://127.0.0.1:18080/get") == "GET|";

@@ -1,7 +1,7 @@
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/tệp thô;
-nhập gói/nhập xuất/bộ đệm tệp;
-nhập gói/kiểm thử/chính;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.tệp thô.*;
+nhập gói.nhập xuất.bộ đệm tệp.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm khẳng định các byte(thực, kỳ_vọng) {
     khẳng định bằng(độ dài(thực), độ dài(kỳ_vọng), "sai số byte");

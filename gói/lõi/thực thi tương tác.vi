@@ -2,10 +2,10 @@
 // Quản lý phiên được triển khai bằng V++. Chỉ thao tác thực thi mã nguồn dùng
 // primitive `kịch bản chạy`, vì compiler/VM là năng lực thấp tầng của runtime.
 
-nhập bộ sưu tập;
-nhập văn bản;
-nhập kịch bản;
-nhập gói/lõi/giao diện tài nguyên;
+nhập bộ sưu tập.*;
+nhập văn bản.*;
+nhập kịch bản.*;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 hàm riêng tư repl yêu cầu phiên(phiên) {
     nếu (máy ảo có khóa từ điển(phiên, "__repl") == 0 ||

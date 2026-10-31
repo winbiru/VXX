@@ -28,12 +28,17 @@ std::string emitAssembly(const Snapshot &, bool compiler = false);
 Snapshot snapshotFromWire(const std::vector<Value> &wire);
 void compileExecutable(const Snapshot &, const std::filesystem::path &output,
                        const std::filesystem::path &installation, bool compiler = false);
+// Host assembler/linker ABI for source emitted by the V++ compiler itself.
+void compileAssembly(const std::string &, const std::filesystem::path &output,
+                     const std::filesystem::path &installation);
 struct ProcessResult {
     int status = 1;
     std::string output;
 };
 // Invoke a native executable directly, capturing stdout and preserving its exit status.
+// Batch test workers may also capture stderr to retain their golden output.
 ProcessResult runProcess(const std::vector<std::string> &arguments);
+ProcessResult runProcess(const std::vector<std::string> &arguments, bool captureStderr);
 struct FunctionSpec { int name, required, maximum, reserved; Function function; };
 struct StringSpec { const char *data; std::size_t size; };
 struct ExtentSpec { std::size_t parameter; int lengthParameter; int reserved; std::size_t fixed; };

@@ -1,5 +1,5 @@
 // Chạy nhiều Ca Kiểm Thử và thu thập báo cáo, không thay đổi vòng đời từng ca.
-nhập gói/kiểm thử/ca kiểm thử;
+nhập gói.kiểm thử.ca kiểm thử.*;
 
 lớp công khai Bộ Kiểm Thử {
     hàm công khai khởi tạo(dừng khi lỗi = sai) {

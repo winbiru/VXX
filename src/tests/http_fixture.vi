@@ -1,5 +1,5 @@
 // HTTP fixture chạy hoàn toàn bằng V++ cho các integration test.
-nhập gói/mạng/chính;
+nhập gói.mạng.chính.*;
 
 hàm chính() {
     serverId = mạng mở máy chủ giao diện lập trình(18080);

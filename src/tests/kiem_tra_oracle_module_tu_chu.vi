@@ -1,7 +1,7 @@
 // Đối chiếu compiler C++ với linker V++: function ID, tên runtime và đủ
 // bốn trường của từng opcode. Oracle không xuất initializer của dependency.
-nhập gói/biên dịch/kết quả;
-nhập gói/biên dịch/liên kết;
+nhập gói.biên dịch.kết quả.*;
+nhập gói.biên dịch.liên kết.*;
 
 hàm oracle mã trung gian khớp(cũ, mới) {
     nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
@@ -62,13 +62,13 @@ hàm oracle chạy ca(nguồn_gốc) {
 
 hàm chính() {
     // Import một cấp có re-export xuyên qua bí danh.
-    oracle chạy ca("nhập ../lib/feature như api; " +
+    oracle chạy ca("nhập ..lib.feature.* như api; " +
                   "hàm chính() { in api.tính(); in api.số.cộng(); };");
     // Cùng một module xuất hiện qua hai đường, chỉ khởi tạo một lần nhưng
     // mỗi bí danh phải trỏ về cùng function ID và không rơi vào late-binding.
-    oracle chạy ca("nhập ../lib/feature như api; nhập ../lib/math như toán; " +
+    oracle chạy ca("nhập ..lib.feature.* như api; nhập ..lib.math.* như toán; " +
                   "hàm chính() { in api.tính(); in toán.cộng(); in api.số.cộng(); };");
     // Import lại module cấp trên dưới bí danh khác, giữ cả re-export.
-    oracle chạy ca("nhập ../lib/feature như api; nhập ../lib/feature như alt; " +
+    oracle chạy ca("nhập ..lib.feature.* như api; nhập ..lib.feature.* như alt; " +
                   "hàm chính() { in alt.tính(); in alt.số.cộng(); in api.tính(); };");
 };

@@ -2,10 +2,17 @@
 // Locale/resource/properties semantics thuần V++.
 // Không đọc process-global locale và không phụ thuộc native i18n APIs.
 
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.văn bản.chuỗi.chuỗi hoa;
 
 // Các thuật toán không giữ trạng thái là hàm cấp mô-đun; lớp tài nguyên quản lý trạng thái.
 hàm riêng tư quốc tế là chữ mã ký tự cơ bản(c) {
@@ -278,7 +285,7 @@ hàm riêng tư quốc tế ký tự mã(mã) {
 hàm riêng tư quốc tế giải ký tự thoát các thuộc tính(s) {
     kết quả = "";
     i = 0;
-    lặp(vòng = 0; i < máy ảo lấy độ dài(s); vòng++) {
+    khi (i < máy ảo lấy độ dài(s)) {
         c = s[i];
         nếu (c != "\\") {
             kết quả = kết quả + c;
@@ -323,7 +330,7 @@ hàm riêng tư quốc tế dòng tiếp diễn(s) {
     đếm = 0;
     i = máy ảo lấy độ dài(s) - 1;
     đang đếm = đúng;
-    lặp(vòng = 0; đang đếm; vòng++) {
+    khi (đang đếm) {
         nếu (i < 0) {
             đang đếm = sai;
         } hoặc {
@@ -341,7 +348,7 @@ hàm riêng tư quốc tế dòng tiếp diễn(s) {
 hàm riêng tư quốc tế bỏ trắng đầu các thuộc tính(s) {
     i = 0;
     đang bỏ = đúng;
-    lặp(vòng = 0; đang bỏ; vòng++) {
+    khi (đang bỏ) {
         nếu (i >= máy ảo lấy độ dài(s)) {
             đang bỏ = sai;
         } hoặc {
@@ -392,7 +399,7 @@ hàm riêng tư quốc tế phân tích dòng các thuộc tính(dòng) {
     i = vị trí;
     nếu (kiểu == "space") {
         đang bỏ = đúng;
-        lặp(vòng = 0; đang bỏ; vòng++) {
+        khi (đang bỏ) {
             nếu (i >= máy ảo lấy độ dài(s)) {
                 đang bỏ = sai;
             } hoặc {
@@ -410,7 +417,7 @@ hàm riêng tư quốc tế phân tích dòng các thuộc tính(dòng) {
         i += 1;
     };
     đang bỏ = đúng;
-    lặp(vòng = 0; đang bỏ; vòng++) {
+    khi (đang bỏ) {
         nếu (i >= máy ảo lấy độ dài(s)) {
             đang bỏ = sai;
         } hoặc {

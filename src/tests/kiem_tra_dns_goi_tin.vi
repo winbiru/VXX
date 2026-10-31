@@ -1,6 +1,6 @@
-nhập gói/mạng/gói tin tên miền;
-nhập gói/mạng/phân giải tên miền;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.mạng.gói tin tên miền.*;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     bộ = Bộ Mã DNS();

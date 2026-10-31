@@ -1,7 +1,7 @@
 // Khóa thứ tự runtime module initializer: dependency trước importer,
 // rồi mới chạy mã trung gian của entry module.
-nhập modules/lifecycle_mid;
-nhập modules/lifecycle_leaf;
+nhập modules.lifecycle_mid.*;
+nhập modules.lifecycle_leaf.*;
 
 hàm chính() {
     in "entry";

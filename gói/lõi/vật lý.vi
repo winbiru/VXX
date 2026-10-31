@@ -1,6 +1,6 @@
 // Thư viện vi.physics — công thức vật lý nền tảng cho V++.
 // Đơn vị mặc định dùng hệ SI, trừ khi tên hàm ghi rõ khác.
-nhập gói/lõi/toán học;
+nhập gói.lõi.toán học.*;
 
 hàm công khai vận tốc(s, t) {
     nếu (t == 0 || t == 0.0) {

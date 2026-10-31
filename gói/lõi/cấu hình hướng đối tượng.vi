@@ -1,6 +1,8 @@
 // Giữ ảnh chụp config trong từng instance; tải lại khi cần.
-nhập gói/lõi/cấu hình;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.cấu hình.đọc cấu hình;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 lớp công khai Cấu Hình Tệp {
     hàm công khai khởi tạo(đường dẫn) {

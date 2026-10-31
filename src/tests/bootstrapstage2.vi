@@ -1,6 +1,6 @@
 // Compiler Stage 2: compilation happens inside V++ mã trung gian.
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/liên kết;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.biên dịch.liên kết.*;
 
 hàm chính() {
     nguồn = "hàm tổng(n, b = 7) { s = b; lặp(i = 0; i < n; i++) { s += i; }; trả về s; }; " +

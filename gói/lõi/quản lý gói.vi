@@ -4,11 +4,17 @@
 // materialization vẫn là ranh giới toolchain/OS; parse, validation và mutation
 // manifest không cần nằm trong C++.
 
-nhập gói/dữ liệu/json/chính;
-nhập gói/nhập xuất/tệp;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
+nhập gói.dữ liệu.json.chính.*;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.danh sách.tìm chỉ số;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.văn bản.chuỗi.*;
 
 // Hàm cấp mô-đun xử lý manifest và giải dependency; Dự Án Gói giữ trạng thái chỉnh sửa.
 hàm công khai quản lý gói tên hợp lệ(tên) {

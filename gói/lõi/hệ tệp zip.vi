@@ -1,8 +1,9 @@
 // vi.archive.zipfs — facade đường dẫn ảo tối thiểu trên vi.archive.
 // Handle 0.2 là map chứa đường ZIP; mọi thao tác xác minh lại kho trước khi dùng.
-nhập gói/lõi/lưu trữ;
-nhập gói/bộ sưu tập/chính;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.lưu trữ.lưu trữ liệt kê zip;
+nhập gói.lõi.lưu trữ.lưu trữ giải nén zip;
+nhập gói.bộ sưu tập.chính.*;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 // Thao tác ZIP dùng hàm cấp mô-đun; lớp Hệ Tệp ZIP giữ trạng thái đóng/mở.
 hàm công khai zipfs mở(đường zip) {

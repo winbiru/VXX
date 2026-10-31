@@ -101,7 +101,7 @@ hàm từ vựng số mục bỏ qua(nguồn văn bản, độ lệch) {
     nếu (độ lệch < 0) { trả về -1; };
     nếu (độ lệch > n) { trả về -1; };
     biến i = độ lệch;
-    lặp (i = độ lệch; i < n; i = i) {
+    khi (i < n) {
         biến bước = từ vựng unicode tám bit bước(nguồn văn bản, i);
         nếu (bước < 0) { trả về -1; };
         biến c = byte lấy(nguồn văn bản, i);
@@ -113,7 +113,8 @@ hàm từ vựng số mục bỏ qua(nguồn văn bản, độ lệch) {
             nếu (c == 47) {
                 nếu (kế tiếp == 47) {
                     i = i + 2;
-                    lặp (j = i; j < n; j = j) {
+                    biến j = i;
+                    khi (j < n) {
                         nếu (byte lấy(nguồn văn bản, j) == 10) { thoát; };
                         biến độ rộng hiện tại dòng = từ vựng unicode tám bit bước(nguồn văn bản, j);
                         nếu (độ rộng hiện tại dòng < 0) { trả về -1; };
@@ -124,7 +125,8 @@ hàm từ vựng số mục bỏ qua(nguồn văn bản, độ lệch) {
                     nếu (kế tiếp == 42) {
                         i = i + 2;
                         biến đã khép = 0;
-                        lặp (k = i; k < n; k = k) {
+                        biến k = i;
+                        khi (k < n) {
                             biến độ rộng hiện tại khối = từ vựng unicode tám bit bước(nguồn văn bản, k);
                             nếu (độ rộng hiện tại khối < 0) { trả về -1; };
                             nếu (byte lấy(nguồn văn bản, k) == 42) {
@@ -168,7 +170,7 @@ hàm từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu) {
     };
     nếu (từ vựng dấu phân cách(c) == 1) { trả về điểm bắt đầu + 1; };
     biến i = điểm bắt đầu;
-    lặp (i = điểm bắt đầu; i < n; i = i) {
+    khi (i < n) {
         biến độ rộng hiện tại = từ vựng unicode tám bit bước(nguồn văn bản, i);
         nếu (độ rộng hiện tại < 0) { trả về -1; };
         biến hiện hành = byte lấy(nguồn văn bản, i);
@@ -182,7 +184,7 @@ hàm từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu) {
 // Từ khóa mở đầu câu đứng riêng; những từ tiếp theo của định danh có thể
 // chứa từ khóa, giống cách đặt tên nhiều từ của bộ biên dịch đầy đủ.
 hàm từ vựng từ khóa đơn(nguồn văn bản, điểm bắt đầu, điểm kết thúc) {
-    biến từ khóa = "hàm|biến|trả|về|nếu|hoặc|lặp|in|thoát|bỏ|qua|đúng|sai|rỗng|nhập";
+    biến từ khóa = "hàm|biến|trả|về|nếu|hoặc|lặp|khi|in|thoát|bỏ|qua|đúng|sai|rỗng|nhập";
     biến đầu từ = 0;
     biến khớp từ = 0;
     lặp (vị trí = 0; vị trí <= byte dài(từ khóa); vị trí++) {
@@ -237,7 +239,8 @@ hàm từ vựng loại từ tố ghép(nguồn văn bản, điểm bắt đầu
 
 hàm từ vựng nháy điểm kết thúc(nguồn văn bản, điểm bắt đầu, nháy) {
     biến n = byte dài(nguồn văn bản);
-    lặp (i = điểm bắt đầu + 1; i < n; i = i) {
+    biến i = điểm bắt đầu + 1;
+    khi (i < n) {
         biến độ rộng hiện tại = từ vựng unicode tám bit bước(nguồn văn bản, i);
         nếu (độ rộng hiện tại < 0) { trả về -1; };
         biến c = byte lấy(nguồn văn bản, i);

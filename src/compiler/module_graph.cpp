@@ -15,6 +15,20 @@
 #include "vpp/frontend/parser.h"
 
 namespace vietvm::compiler {
+
+bool matchesImportSelection(const vietvm::frontend::AstImportSpec &spec,
+                            std::string_view name) noexcept {
+    return spec.selectedName.empty() || spec.selectedName == "*" ||
+           spec.selectedName == name;
+}
+
+std::string importedSymbolName(const vietvm::frontend::AstImportSpec &spec,
+                               const std::string &name) {
+    if (spec.alias.empty()) return name;
+    return spec.selectedName.empty() || spec.selectedName == "*"
+        ? spec.alias + "." + name : spec.alias;
+}
+
 namespace {
 
 namespace fs = std::filesystem;
@@ -398,8 +412,8 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
             const auto *dependency = module(edge.importedIdentity);
             if (dependency == nullptr) continue;
             for (const auto &candidate : dependency->exports) {
-                const std::string visible = edge.importSpec.alias.empty()
-                    ? candidate.name : edge.importSpec.alias + "." + candidate.name;
+                if (!matchesImportSelection(edge.importSpec, candidate.name)) continue;
+                const std::string visible = importedSymbolName(edge.importSpec, candidate.name);
                 if (visible == name) return candidate;
             }
         }
@@ -464,18 +478,24 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
         if (record == nullptr) continue;
 
         for (const ModuleExportSymbol &exported : record->exports) {
-            const std::string importedName = edge.importSpec.alias.empty()
-                ? exported.name
-                : edge.importSpec.alias + "." + exported.name;
+            const std::string importedName = importedSymbolName(edge.importSpec, exported.name);
+            const bool selected = matchesImportSelection(edge.importSpec, exported.name);
+            // Keep excluded names out of the legacy dynamic-call fallback too.
+            if (!edge.importSpec.selectedName.empty() && edge.importSpec.selectedName != "*" &&
+                (!selected || importedName != exported.name)) {
+                environment.hiddenImportedSymbols.push_back(
+                    {exported.name, record->identity, exported.declaration});
+            }
+            if (!selected) continue;
             if (!seen.insert(importedName).second) continue;
             auto external = describe(exported);
             external.name = importedName;
             environment.importedSymbols.push_back(std::move(external));
         }
         for (const ModuleExportSymbol &hidden : record->hiddenSymbols) {
-            const std::string importedName = edge.importSpec.alias.empty()
-                ? hidden.name
-                : edge.importSpec.alias + "." + hidden.name;
+            const std::string importedName = edge.importSpec.selectedName.empty() ||
+                                            edge.importSpec.selectedName == "*"
+                ? importedSymbolName(edge.importSpec, hidden.name) : hidden.name;
             environment.hiddenImportedSymbols.push_back(
                 SemanticHiddenImportedSymbol{importedName,
                                              record->identity,
@@ -485,28 +505,55 @@ SemanticEnvironment LocalModuleSemanticIndex::semanticEnvironmentFor(
     return environment;
 }
 
-// Bổ sung các export được chuyển tiếp bởi `công khai nhập`. Vì graph đã cấm cycle,
-// thứ tự reverse DFS đảm bảo dependency có bề mặt export hoàn chỉnh trước importer.
+// Resolve dependencies before forwarding their surface, including shared modules
+// first visited through another branch (reverse preorder is insufficient there).
 void applyModuleReExports(LocalModuleSemanticIndex &index) {
-    for (auto recordIt = index.modules.rbegin(); recordIt != index.modules.rend(); ++recordIt) {
-        LocalModuleSemanticRecord &record = *recordIt;
+    const bool selectiveGraph = std::any_of(index.graph.edges.begin(), index.graph.edges.end(),
+        [](const auto &edge) {
+            return !edge.importSpec.selectedName.empty() && edge.importSpec.selectedName != "*";
+        });
+    std::unordered_set<std::string> completed;
+    std::function<void(LocalModuleSemanticRecord &)> forward = [&](LocalModuleSemanticRecord &record) {
+        if (!completed.insert(record.identity).second) return;
         std::unordered_set<std::string> seen;
         for (const ModuleExportSymbol &symbol : record.exports) seen.insert(symbol.name);
 
         for (const LocalModuleEdge &edge : index.graph.edges) {
             if (edge.importerIdentity != record.identity || !edge.importSpec.reExport) continue;
-            const LocalModuleSemanticRecord *dependency = index.module(edge.importedIdentity);
-            if (dependency == nullptr) continue;
+            auto dependency = std::find_if(index.modules.begin(), index.modules.end(),
+                [&](const auto &candidate) { return candidate.identity == edge.importedIdentity; });
+            if (dependency == index.modules.end()) continue;
+            if (selectiveGraph) forward(*dependency);
             for (const ModuleExportSymbol &symbol : dependency->exports) {
+                if (!matchesImportSelection(edge.importSpec, symbol.name)) continue;
                 ModuleExportSymbol forwarded = symbol;
-                if (!edge.importSpec.alias.empty()) {
-                    forwarded.name = edge.importSpec.alias + "." + forwarded.name;
-                }
+                forwarded.name = importedSymbolName(edge.importSpec, symbol.name);
                 if (seen.insert(forwarded.name).second) {
                     record.exports.push_back(std::move(forwarded));
                 }
             }
         }
+    };
+    if (selectiveGraph) {
+        for (auto &record : index.modules) forward(record);
+    } else {
+        // Preserve the original traversal and surface order for legacy graphs.
+        for (auto it = index.modules.rbegin(); it != index.modules.rend(); ++it) forward(*it);
+    }
+}
+
+void validateModuleSelections(const LocalModuleSemanticIndex &index) {
+    for (const auto &edge : index.graph.edges) {
+        const std::string &name = edge.importSpec.selectedName;
+        if (name.empty() || name == "*") continue;
+        const auto *record = index.module(edge.importedIdentity);
+        if (record == nullptr || index.exportedSymbol(record->identity, name)) continue;
+        const bool hidden = std::any_of(record->hiddenSymbols.begin(), record->hiddenSymbols.end(),
+            [&](const auto &symbol) { return symbol.name == name; });
+        throw std::runtime_error(vietvm::messages::formatMessage(
+            hidden ? vietvm::messages::kSemanticModuleSymbolNotExported
+                   : vietvm::messages::kImportSelectedSymbolMissing,
+            {name, edge.importSpec.target}));
     }
 }
 
@@ -552,6 +599,7 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
             index.parsedPrograms.emplace(source.identity, program);
             index.graph.modules.push_back(std::move(source));
         }
+        validateModuleSelections(index);
         return index;
     }
 
@@ -596,6 +644,7 @@ LocalModuleSemanticIndex buildLocalModuleSemanticIndex(
     }
     index.parsedPrograms = std::move(parsedPrograms);
     applyModuleReExports(index);
+    validateModuleSelections(index);
     return index;
 }
 

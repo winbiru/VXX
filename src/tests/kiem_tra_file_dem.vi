@@ -1,5 +1,5 @@
 // Regression cho bài 96–97: ghi/đọc và đếm tệp text.
-nhập gói/nhập xuất/chính;
+nhập gói.nhập xuất.chính.*;
 
 ghi tệp(".tmp_file_count.txt", "mot hai\nba bon\n");
 in đọc tệp(".tmp_file_count.txt");

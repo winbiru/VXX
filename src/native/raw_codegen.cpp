@@ -1,6 +1,7 @@
 #include "vpp/native/raw_codegen.h"
 #include "vpp/native/abi_symbol.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cctype>
 #include <cstdint>
@@ -346,8 +347,12 @@ private:
                     return fail("đích gán native không phải biến");
                 const auto found = slots.find(lhs->symbolId);
                 if (found == slots.end()) return fail("biến được gán chưa có slot");
+                // Inlined calls in the RHS temporarily rebind the slot map,
+                // invalidating unordered_map iterators when the map is restored.
+                // Capture the destination index before lowering the RHS.
+                const auto destinationSlot = found->second;
                 if (!value(v->operands[1], nesting + 1)) return false;
-                add(MachineOpcode::StoreSlot, 0, found->second);
+                add(MachineOpcode::StoreSlot, 0, destinationSlot);
                 return true; // Assignment evaluates to the assigned value.
             }
             case V::Unary:
@@ -473,22 +478,34 @@ private:
                 return true;
             }
             case I::Loop: {
-                if (inst.loopForm != vietvm::frontend::AstLoopForm::ForBlock ||
-                    inst.expressionRoots.size() != 3 || inst.children.size() != 1)
-                    return fail("native chỉ hỗ trợ lặp(init; condition; update) { ... }");
-                if (!value(inst.expressionRoots[0])) return false;
-                drop();
+                const bool isWhile = inst.loopForm == vietvm::frontend::AstLoopForm::WhileBlock;
+                if ((!isWhile && inst.loopForm != vietvm::frontend::AstLoopForm::ForBlock) ||
+                    inst.expressionRoots.size() != (isWhile ? 1u : 3u) || inst.children.size() != 1)
+                    return fail("native cần lặp(init; condition; update) { ... } hoặc khi(condition) { ... }");
+                if (!isWhile) {
+                    if (!value(inst.expressionRoots[0])) return false;
+                    drop();
+                }
                 const auto start = result.instructions.size();
-                if (!value(inst.expressionRoots[1])) return false;
-                const auto exit = add(MachineOpcode::BranchZero); --depth;
+                std::int32_t condition=0;
+                const bool fixed=constant(ir,inst.expressionRoots[isWhile?0:1],condition);
+                std::size_t exit=static_cast<std::size_t>(-1);
+                if(fixed) {
+                    if(condition==0)exit=add(MachineOpcode::Jump);
+                } else {
+                    if (!value(inst.expressionRoots[isWhile ? 0 : 1])) return false;
+                    exit=add(MachineOpcode::BranchZero); --depth;
+                }
                 loops.push_back({});
                 if (!statement(inst.children.front())) return false;
                 const auto update = result.instructions.size();
-                if (!value(inst.expressionRoots[2])) return false;
-                drop();
+                if (!isWhile) {
+                    if (!value(inst.expressionRoots[2])) return false;
+                    drop();
+                }
                 add(MachineOpcode::Jump, 0, start);
                 const auto end = result.instructions.size();
-                result.instructions[exit].operand = end;
+                if(exit!=static_cast<std::size_t>(-1))result.instructions[exit].operand=end;
                 for (auto jump : loops.back().breaks) result.instructions[jump].operand = end;
                 for (auto jump : loops.back().continues) result.instructions[jump].operand = update;
                 loops.pop_back();
@@ -545,7 +562,7 @@ std::string validateMachineStack(const MachineFunction &fn) {
             case Op::Return:
                 if (before == 0) return "machine IR stack underflow";
                 --after; break;
-            case Op::Add: case Op::Sub: case Op::Mul:
+            case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual:
                 if (before < 2) return "machine IR binary stack underflow";
@@ -640,8 +657,39 @@ RawAssemblyResult emitMachineAssembly(const Target &target,
                        abiName;
     const std::string dialect = target.arch == Architecture::X86_64
         ? ".intel_syntax noprefix\n" : "";
+    std::string body = emission.assembly;
+    if (target.arch == Architecture::X86_64) {
+        // GAS/Clang may shorten jumps and memory displacements in mnemonic
+        // assembly. The native V++ emitter uses fixed-width encoded bytes;
+        // preserve the same instructions, leaving CALL operands relocatable.
+        body.clear();
+        std::size_t cursor = 0;
+        const auto appendBytes = [&](std::size_t end) {
+            while (cursor < end) {
+                const auto count = std::min<std::size_t>(16, end - cursor);
+                body += ".byte ";
+                for (std::size_t i = 0; i < count; ++i) {
+                    if (i) body += ", ";
+                    body += std::to_string(emission.bytes[cursor++]);
+                }
+                body += '\n';
+            }
+        };
+        for (const auto &relocation : emission.relocations) {
+            if (relocation.offset <= cursor || relocation.offset + 4 > emission.bytes.size() ||
+                emission.bytes[relocation.offset - 1] != 0xe8 ||
+                !symbolNameSafe(relocation.symbol))
+                return {{}, "x86_64: vị trí hoặc tên relocation không hợp lệ"};
+            appendBytes(relocation.offset - 1);
+            body += "call ";
+            if (target.os == OperatingSystem::MacOS) body += '_';
+            body += relocation.symbol + '\n';
+            cursor = relocation.offset + 4;
+        }
+        appendBytes(emission.bytes.size());
+    }
     return {dialect + ".text\n.globl " + label + "\n" + label + ":\n" +
-            emission.assembly, {}};
+            body, {}};
 }
 
 } // namespace vietvm::native

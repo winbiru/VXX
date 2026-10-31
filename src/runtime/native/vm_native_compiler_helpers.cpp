@@ -118,7 +118,7 @@ StackValue astStatementPrimitive(const vietvm::frontend::AstStatement &statement
     for (const auto &child : statement.children) {
         children.push_back(astStatementPrimitive(child));
     }
-    return make_list_value({
+    std::vector<StackValue> fields{
         make_int_value(kindCode),
         make_string_value(statement.declarationName),
         make_int_value(visibilityCode(statement.visibility)),
@@ -127,7 +127,12 @@ StackValue astStatementPrimitive(const vietvm::frontend::AstStatement &statement
         make_string_value(statement.importSpec.alias),
         make_int_value(statement.importSpec.reExport ? 1 : 0),
         make_list_value(std::move(children)),
-    });
+    };
+    // Preserve the eight-field legacy payload. Explicit selections append
+    // "tên nhập" at 8, leaving children at 7.
+    if (!statement.importSpec.selectedName.empty())
+        fields.push_back(make_string_value(statement.importSpec.selectedName));
+    return make_list_value(std::move(fields));
 }
 
 StackValue astStatementsPrimitive(const vietvm::frontend::AstProgram &program) {
@@ -255,10 +260,11 @@ std::string executeLinkedBytecode(const std::vector<StackValue> &args) {
         if (id != static_cast<int>(i)) {
             throw std::runtime_error("bytecode_chay_vm: function ID phải liên tiếp từ 0");
         }
-        if (nameIndex < 0 || static_cast<std::size_t>(nameIndex) >= pool.size()) {
+        if (nameIndex < -1 || (nameIndex >= 0 && static_cast<std::size_t>(nameIndex) >= pool.size())) {
             throw std::runtime_error("bytecode_chay_vm: function name index ngoài StringPool");
         }
-        if (!functionNames.emplace(nameIndex, id).second) {
+        // Chỉ hàm có tên mới tham gia bảng tra cứu; -1 là hàm ẩn danh trong ABI.
+        if (nameIndex >= 0 && !functionNames.emplace(nameIndex, id).second) {
             throw std::runtime_error("bytecode_chay_vm: trùng function runtime name index");
         }
         functionBytecode.emplace(id, loadWireInstructions(row[2], "thân hàm " + std::to_string(id)));

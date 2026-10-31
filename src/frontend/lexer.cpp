@@ -155,7 +155,7 @@ namespace vietvm::compiler {
         }
 
         static const std::unordered_set<std::string> keywords = {
-            "nếu", "hoặc", "lặp", "khởi tạo", "điều kiện",
+            "nếu", "hoặc", "lặp", "khi", "khởi tạo", "điều kiện",
             "cập nhật", "kiểm tra sau", "chuyển", "trường hợp", "mặc định",
             "hàm", "gọi", "trả về", "biến", "in", "dừng", "bỏ qua",
             "thoát", "chọn", "ca", "đúng", "sai", "rỗng", "ném", "thử",

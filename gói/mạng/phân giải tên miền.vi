@@ -1,16 +1,24 @@
 // vi.naming.dns — phân giải tên bằng resolver của hệ điều hành.
-nhập gói/mạng/ổ cắm;
-nhập gói/mạng/gói tin tên miền;
-nhập gói/mạng/cấu hình phân giải tên miền;
-nhập gói/mạng/bảng tên máy;
-nhập gói/mạng/bộ nhớ đệm tên miền;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/nguồn ngẫu nhiên;
-nhập gói/lõi/toán học;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/hệ thống/môi trường;
-nhập gói/thời gian/đơn điệu;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.mạng.gói tin tên miền.*;
+nhập gói.mạng.cấu hình phân giải tên miền.Bộ Cấu Hình DNS;
+nhập gói.mạng.cấu hình phân giải tên miền.phân giải tên miền tên ứng viên;
+nhập gói.mạng.cấu hình phân giải tên miền.phân giải tên miền đọc cấu hình đầy đủ linux;
+nhập gói.mạng.cấu hình phân giải tên miền.phân giải tên miền phân tích danh sách máy chủ;
+nhập gói.mạng.bảng tên máy.Bộ Bảng Tên Máy DNS;
+nhập gói.mạng.bảng tên máy.phân giải tên miền đọc bảng tên máy;
+nhập gói.mạng.bộ nhớ đệm tên miền.*;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.danh sách.xóa trùng;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phân Giải DNS {
@@ -67,7 +75,7 @@ lớp công khai Bộ Phân Giải DNS {
     // TCP là stream: recv có thể trả ít byte hơn yêu cầu, kể cả header 2 byte.
     hàm riêng tư phân giải tên miền giao vận tin cậy đọc đủ(mã, số byte, hạn chót) {
         dữ liệu = [];
-        lặp(vòng = 0; máy ảo lấy độ dài(dữ liệu) < số byte; vòng++) {
+        khi (máy ảo lấy độ dài(dữ liệu) < số byte) {
             đầu nối đặt thời gian chờ(mã, mình.phân giải tên miền thời gian còn(hạn chót));
             phần = chuỗi thành byte máy ảo(đầu nối nhận(mã, số byte - máy ảo lấy độ dài(dữ liệu)));
             nếu (máy ảo lấy độ dài(phần) == 0) { ném "DNS TCP: kết nối đóng giữa bản tin"; };
@@ -283,12 +291,20 @@ lớp công khai Bộ Phân Giải DNS {
 
     // HOSTS và OS không có TTL DNS; rcode=-1 phân biệt nguồn không phải DNS.
     // complete=false khi một trong hai loại A/AAAA gặp lỗi retryable.
-    hàm công khai phân giải tên miền phân giải đầy đủ(tên máy) {
+    hàm công khai phân giải tên miền phân giải đầy đủ(tên máy, tự chủ = sai) {
         tên máy = đầu nối yêu cầu tên máy(tên máy, "dns_phan_giai");
         máy chủ = đọc biến môi trường("VPP_DNS_VI_SERVER", "");
         danh sách cấu hình = đọc biến môi trường("VPP_DNS_VI_SERVERS", "");
         đường cấu hình = đọc biến môi trường("VPP_DNS_VI_RESOLV_CONF", "");
         đường bảng tên máy = đọc biến môi trường("VPP_DNS_VI_HOSTS_FILE", "");
+        // Standalone provider: parse hosts/resolv.conf in V++ and use the
+        // existing UDP/TCP wire resolver. Never recurse into Machine Resolver.
+        nếu (tự chủ) {
+            nếu (danh sách cấu hình == "" && máy chủ == "" && đường cấu hình == "" && đường bảng tên máy == "") {
+                đường cấu hình = "/etc/resolv.conf";
+            };
+            nếu (đường bảng tên máy == "") { đường bảng tên máy = "/etc/hosts"; };
+        };
         kết quả = [];
         chi tiết = {"status": "NODATA", "addresses": [], "rcode": 0,
                     "ttl": 0, "complete": đúng, "A": {}, "AAAA": {}};
@@ -320,7 +336,7 @@ lớp công khai Bộ Phân Giải DNS {
                 danh sách = cấu hình.phân giải tên miền phân tích danh sách máy chủ(máy chủ);
                 nếu (máy ảo lấy độ dài(danh sách) != 1) { ném "DNS: VPP_DNS_VI_SERVER phải là một IP"; };
             } hoặc {
-                nếu (ten nền tảng máy ảo() != "linux") {
+                nếu (!tự chủ && ten nền tảng máy ảo() != "linux") {
                     ném "DNS: VPP_DNS_VI_RESOLV_CONF chỉ hỗ trợ Linux";
                 };
                 đầy đủ = cấu hình.phân giải tên miền đọc cấu hình đầy đủ linux(đường cấu hình);

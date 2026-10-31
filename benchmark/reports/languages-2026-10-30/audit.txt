@@ -1,0 +1,6 @@
+PASS: 490 samples, 49 cells x 10 independent processes; 49 preflight records; 102 pilot records.
+PASS: every input result, exact checksum string, positive clocks, normalization and frozen iteration count.
+PASS: deterministic task/sample order; V++ median, MAD and p95 independently recalculated in Ruby.
+Statistics allow JSON serialization rounding (1e-8 relative scale, using median for MAD); integer checksum strings require exact equality.
+PASS: 11 source/snapshot hashes, 9 executable hashes and 8 compiler/object/image/class hashes.
+No samples removed, retried or replaced in the completed run; earlier failed experiments excluded in full.

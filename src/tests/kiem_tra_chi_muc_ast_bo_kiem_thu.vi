@@ -1,7 +1,7 @@
 // Kiểm chứng chỉ mục AST theo DFS và bộ chạy ca kiểm thử có thống kê.
-nhập gói/biên dịch/cây cú pháp;
-nhập gói/biên dịch/chính;
-nhập gói/kiểm thử/chính;
+nhập gói.biên dịch.cây cú pháp.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm thân đạt() { trả về 7; };
 hàm thân lỗi() { ném "loi-thu"; };

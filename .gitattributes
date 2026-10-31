@@ -1,2 +1,6 @@
 # Định nghĩa file .vi là ngôn ngữ V++ cho repo này
 *.vi linguist-language=V++
+
+# Golden outputs are compared byte-for-byte by V++ itself. Windows checkouts
+# must retain LF, matching the VM's captured stdout on every platform.
+src/tests/expected/*.expected text eol=lf

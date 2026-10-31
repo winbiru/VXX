@@ -1,0 +1,165 @@
+// Collect independent measurements from two Release binaries on one host.
+// The shell wrapper prepares immutable Git snapshots; sampling and report
+// assembly remain in V++ and reuse the statistical comparator in the stdlib.
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.tệp.ghi nối tệp;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.dữ liệu.json.json.json tạo;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.kiểm thử.so sánh benchmark.so sánh benchmark;
+
+hàm gate_require(ok, message) { nếu (!ok) { ném "benchmark collect: " + message; }; };
+
+hàm gate_split(text, separator) {
+    rows = []; current = "";
+    lặp(i = 0; i < độ dài(text); i++) {
+        nếu (text[i] == separator) {
+            nếu (current != "") { máy ảo thêm cuối danh sách(rows, current); };
+            current = "";
+        } hoặc { current += text[i]; };
+    };
+    nếu (current != "") { máy ảo thêm cuối danh sách(rows, current); };
+    trả về rows;
+};
+
+hàm gate_env(name) {
+    value = đọc biến môi trường(name, "");
+    gate_require(value != "", "missing " + name);
+    trả về value;
+};
+
+hàm gate_count(name, fallback, minimum, maximum) {
+    value = đọc biến môi trường(name, "");
+    nếu (value == "") { trả về fallback; };
+    digits = chuỗi thành byte máy ảo(value);
+    gate_require(độ dài(digits) > 0 && độ dài(digits) <= 6, "invalid " + name);
+    number = 0;
+    lặp(i = 0; i < độ dài(digits); i++) {
+        gate_require(digits[i] >= 48 && digits[i] <= 57, "invalid " + name);
+        number = number * 10 + digits[i] - 48;
+    };
+    gate_require(number >= minimum && number <= maximum, "out of range " + name);
+    trả về number;
+};
+
+hàm gate_run(binary, arguments, root) {
+    env = {"VPP_ENABLE_JIT": "0", "VPP_ENABLE_MACHINE_JIT": "0",
+        "VPP_VM_PROFILE": "", "VPP_HOME": root};
+    result = chạy tiến trình(binary, arguments, env, 180000);
+    gate_require(result["khởi chạy"] && result["mã thoát"] == 0,
+        "process failed " + binary + ": " + result["lỗi"] + result["đầu ra"]);
+    trả về result["đầu ra"];
+};
+
+hàm gate_measure(binary, name, iterations, root) {
+    output = gate_split(gate_run(binary, ["--case", name, "--iterations", thành chuỗi(iterations)], root), "\n");
+    gate_require(độ dài(output) == 2, "expected exactly metadata and measurement lines: " + name);
+    meta = json phân tích(output[0]);
+    record = json phân tích(output[1]);
+    gate_require(meta["meta"] == "harness-v3" && meta["build"] == "Release" &&
+        meta["coverage"] == "OFF", "non-Release or unknown harness");
+    gate_require(record["case"] == name && record["iterations"] == iterations &&
+        record["checksum"] > 0 && record["ns_per_iteration"] > 0 &&
+        record["peak_rss_bytes"] > 0, "invalid measurement " + name);
+    trả về {"meta": meta, "record": record};
+};
+
+hàm chính() {
+    root = gate_env("VPP_GATE_ROOT"); output = gate_env("VPP_GATE_OUTPUT");
+    binaries = [gate_env("VPP_GATE_BASELINE_BIN"), gate_env("VPP_GATE_CANDIDATE_BIN")];
+    sides = ["baseline", "candidate"];
+    count = gate_count("VPP_GATE_SAMPLES", 40, 10, 200);
+    warmups = gate_count("VPP_GATE_WARMUPS", 3, 3, 30);
+    target = gate_count("VPP_GATE_TARGET_MS", 50, 1, 2000);
+    chosen = đọc biến môi trường("VPP_GATE_CASES", "");
+    nếu (chosen == "") { cases = gate_split(gate_run(binaries[0], ["--list"], root), "\n"); }
+    hoặc { cases = gate_split(chosen, ","); };
+    gate_require(độ dài(cases) > 0, "empty benchmark case list");
+    available = gate_split(gate_run(binaries[0], ["--list"], root), "\n");
+    available_candidate = gate_split(gate_run(binaries[1], ["--list"], root), "\n");
+    gate_require(json tạo(available) == json tạo(available_candidate), "benchmark case lists differ");
+    seen = {};
+    lặp(i = 0; i < độ dài(cases); i++) {
+        name = cases[i]; found = sai;
+        lặp(j = 0; j < độ dài(available); j++) {
+            nếu (name == available[j]) { found = đúng; };
+        };
+        gate_require(found && !có khóa(seen, name), "unknown/duplicate case " + name);
+        seen[name] = đúng;
+    };
+    builds = {}; sources = {};
+    lặp(s = 0; s < 2; s++) {
+        side = sides[s]; upper = "BASELINE";
+        nếu (s == 1) { upper = "CANDIDATE"; };
+        commit = gate_env("VPP_GATE_" + upper + "_SHA");
+        sources[side] = {"commit": commit,
+            "snapshot_sha256": gate_env("VPP_GATE_" + upper + "_SNAPSHOT_SHA")};
+        builds[side] = {"binary_sha256": gate_env("VPP_GATE_" + upper + "_BINARY_SHA"),
+            "cmake": {"BUILD_TESTS": "OFF", "BUILD_BENCHMARKS": "ON",
+                "CMAKE_BUILD_TYPE": "Release"}, "meta": {}};
+    };
+    report = {"schema": 1, "protocol": "alternating-independent-processes-v1",
+        "system": {"host": gate_env("VPP_GATE_HOST"),
+            "os": gate_env("VPP_GATE_OS"), "cpu": gate_env("VPP_GATE_CPU")},
+        "environment": {"VPP_ENABLE_JIT": "0", "VPP_ENABLE_MACHINE_JIT": "0"},
+        "harness_sha256": gate_env("VPP_GATE_HARNESS_SHA"),
+        "collector_sha256": gate_env("VPP_GATE_COLLECTOR_SHA"),
+        "comparator_sha256": gate_env("VPP_GATE_COMPARATOR_SHA"),
+        "cli_sha256": gate_env("VPP_GATE_CLI_SHA"),
+        "sample_count": count, "warmup_count": warmups,
+        "sources": sources, "builds": builds,
+        "budget": {"time": 0.10, "rss": 0.15, "gc_p95": 0.15,
+            "allocations": 0.15, "noise": 0.05}, "plan": [], "samples": []};
+    ghi tệp(output + "/samples.jsonl", "");
+    ghi tệp(output + "/pilots.jsonl", "");
+    lặp(c = 0; c < độ dài(cases); c++) {
+        name = cases[c];
+        pilots = [];
+        lặp(s = 0; s < 2; s++) {
+            pilot = gate_measure(binaries[s], name, 1, root);
+            máy ảo thêm cuối danh sách(pilots, pilot);
+            ghi nối tệp(output + "/pilots.jsonl", json tạo({"side": sides[s], "case": name,
+                "record": pilot["record"]}) + "\n");
+            nếu (c == 0) { builds[sides[s]]["meta"] = pilot["meta"]; }
+            hoặc { gate_require(json tạo(builds[sides[s]]["meta"]) == json tạo(pilot["meta"]),
+                "inconsistent metadata for " + name); };
+        };
+        gate_require(pilots[0]["record"]["checksum"] == pilots[1]["record"]["checksum"],
+            "baseline/candidate checksum mismatch for " + name);
+        slow = pilots[0]["record"]["ns_per_iteration"];
+        nếu (pilots[1]["record"]["ns_per_iteration"] > slow) {
+            slow = pilots[1]["record"]["ns_per_iteration"];
+        };
+        iterations = làm tròn xuống(target * 1000000.0 / slow);
+        nếu (iterations < 1) { iterations = 1; };
+        nếu (iterations > 500) { iterations = 500; };
+        // A GC case needs 40 independent processes; every process must also
+        // produce at least one pause sample, matched across revisions.
+        máy ảo thêm cuối danh sách(report["plan"], {"case": name, "iterations": iterations});
+        in "benchmark " + name + ": " + thành chuỗi(iterations) + " iterations/process";
+        phases = ["warmup", "measure"];
+        lặp(p = 0; p < 2; p++) {
+            limit = warmups;
+            nếu (p == 1) { limit = count; };
+            lặp(pair = 0; pair < limit; pair++) {
+                lặp(order = 0; order < 2; order++) {
+                    s = (pair + order) % 2;
+                    result = gate_measure(binaries[s], name, iterations, root);
+                    gate_require(json tạo(result["meta"]) == json tạo(builds[sides[s]]["meta"]),
+                        "metadata changed during sampling");
+                    sample = {"side": sides[s], "phase": phases[p], "pair": pair,
+                        "order": order, "record": result["record"]};
+                    máy ảo thêm cuối danh sách(report["samples"], sample);
+                    ghi nối tệp(output + "/samples.jsonl", json tạo(sample) + "\n");
+                };
+            };
+        };
+    };
+    ghi tệp(output + "/report.json", json tạo(report) + "\n");
+    verdict = so sánh benchmark(report);
+    ghi tệp(output + "/comparison.json", json tạo(verdict) + "\n");
+    in "benchmark gate: " + verdict["status"];
+};

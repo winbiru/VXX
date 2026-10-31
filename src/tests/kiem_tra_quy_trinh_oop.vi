@@ -1,7 +1,7 @@
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/chính;
-nhập fixtures/oop_pipeline/api như api;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.chính.*;
+nhập fixtures.oop_pipeline.api.* như api;
 
 lớp Con Qua Mô Đun kế thừa api.Cha triển khai api.Có Giá Trị {
     hàm khởi tạo(x) { gốc.khởi tạo(x); };
@@ -57,7 +57,7 @@ hàm chính() {
         in bị_chặn;
     };
     đồ_thị = {
-        "app/main": "nhập ../lib/api như api; " +
+        "app/main": "nhập ..lib.api.* như api; " +
             "lớp Con kế thừa api.Cha triển khai api.Có Giá Trị { " +
             "hàm khởi tạo(x) { gốc.khởi tạo(x); }; " +
             "hàm công khai đọc() { trả về gốc.đọc() + 1; }; }; " +
@@ -69,7 +69,7 @@ hàm chính() {
     };
     đa_module = biên dịch chương trình mô đun tự chủ("app/main", đồ_thị);
     in biên dịch chạy sản phẩm biên dịch(đa_module) == "10\n21\n";
-    sai_nhập = biên dịch snapshot nội bộ("nhập fixtures/oop_pipeline/api như api; " +
+    sai_nhập = biên dịch snapshot nội bộ("nhập fixtures.oop_pipeline.api.* như api; " +
         "lớp Thiếu triển khai api.Có Giá Trị {};", "src/tests");
     in sai_nhập["hợp lệ"] == 0;
 };

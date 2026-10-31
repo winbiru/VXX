@@ -1,4 +1,4 @@
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 // Parser thuộc ngôn ngữ V++, test độc lập với quyền tạo socket của sandbox.
 hàm địa chỉ lỗi(bộ, ip) {

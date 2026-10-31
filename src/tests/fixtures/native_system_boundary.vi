@@ -1,0 +1,15 @@
+// Invalid raw offsets must be rejected before forming an OS pointer.
+hàm chính() {
+    nếu (máy đồng hồ thô(2, 4096) != -22) { trả về 1; };
+    nếu (máy đồng hồ thô(0, -1) != -22) { trả về 2; };
+    nếu (máy đồng hồ thô(1, 68162545) != -22) { trả về 3; };
+    nếu (máy entropy thô(-1, 1) != -22) { trả về 4; };
+    nếu (máy entropy thô(4096, 0) != -22) { trả về 5; };
+    nếu (máy entropy thô(4096, 257) != -22) { trả về 6; };
+    nếu (máy entropy thô(68162560, 1) != -22) { trả về 7; };
+    nếu (máy entropy thô(2147483647, 256) != -22) { trả về 8; };
+    nếu (máy ngủ thô(-1) != 22) { trả về 9; };
+    nếu (máy ngủ thô(1000) != 22) { trả về 10; };
+    nếu (máy ngủ thô(0) != 0) { trả về 11; };
+    trả về 0;
+};

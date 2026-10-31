@@ -1,6 +1,7 @@
 // x86_64: phát byte mã máy kiến trúc riêng.
 // Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phát x86 sáu mươi tư {
@@ -55,6 +56,8 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
             ca "Add": { máy ảo thêm cuối danh sách(ra, 1); máy ảo thêm cuối danh sách(ra, 200); }
             ca "Sub": { máy ảo thêm cuối danh sách(ra, 41); máy ảo thêm cuối danh sách(ra, 200); }
             ca "Mul": { máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 175); máy ảo thêm cuối danh sách(ra, 193); }
+            ca "Div": { mình.biên dịch mã máy x86 sáu mươi tư chia dư(ra, sai); }
+            ca "Mod": { mình.biên dịch mã máy x86 sáu mươi tư chia dư(ra, đúng); }
             ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 148); }
             ca "NotEqual": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 149); }
             ca "Less": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 156); }
@@ -64,6 +67,25 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
             mặc định: { ném "x86_64: opcode nhị phân C++ chưa định nghĩa: " + mã thao tác; }
         };
         mình.biên dịch mã máy x86 sáu mươi tư bộ nhớ(ra, sai, 0, ô nhớ + d - 2);
+    };
+
+    hàm riêng tư biên dịch mã máy x86 sáu mươi tư chia dư(ra, lấy dư) {
+        // Signed i32, kết quả chia 0 là -1 như ASM runtime.
+        // idiv r/m64 tránh #DE ở INT32_MIN / -1; lấy 32 bit thấp của thương/dư.
+        // test ecx,ecx; jne calculate; mov eax,-1; jmp done;
+        // calculate: movsxd rax,eax; cqo; movsxd rcx,ecx; idiv rcx;
+        //            (mod: mov eax,edx)
+        bước nhảy = 11;
+        nếu (lấy dư) { bước nhảy = 13; };
+        mã chia = [133, 201, 117, 7, 184, 255, 255, 255, 255, 235, bước nhảy,
+                    72, 99, 192, 72, 153, 72, 99, 201, 72, 247, 249];
+        nếu (lấy dư) {
+            máy ảo thêm cuối danh sách(mã chia, 137);
+            máy ảo thêm cuối danh sách(mã chia, 208);
+        };
+        lặp (k = 0; k < máy ảo lấy độ dài(mã chia); k++) {
+            máy ảo thêm cuối danh sách(ra, mã chia[k]);
+        };
     };
 
     hàm riêng tư biên dịch mã máy x86 sáu mươi tư số sánh(ra, cc) {
@@ -141,6 +163,8 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
                 ca "Add": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Sub": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Mul": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Div": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "Mod": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "NotEqual": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Less": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }

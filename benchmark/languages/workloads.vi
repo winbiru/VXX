@@ -1,0 +1,104 @@
+// Matched application workloads. Preparation, correctness checks and clocks
+// are outside each timed batch; dispatch, allocation and GC remain inside.
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.dữ liệu.json.json.*;
+
+hàm arithmetic(k, data) { trả về (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11; };
+hàm branch_loop(k, data) {
+    x = k * 97 + 11;
+    lặp(i = 0; i < 256; i++) { x += 251; nếu (x >= 65521) { x -= 65521; }; };
+    trả về x;
+};
+hàm fibonacci(k, data) {
+    a = 0; b = 1;
+    lặp(i = 0; i < k % 16 + 20; i++) { next = a + b; a = b; b = next; };
+    trả về a;
+};
+hàm list_128(k, data) {
+    values = [];
+    lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(values, k + i); };
+    sum = 0;
+    lặp(i = 0; i < 128; i++) { nếu (values[i] % 2 == 0) { sum += values[i]; }; };
+    trả về sum;
+};
+hàm unicode_replace(k, data) {
+    trả về độ dài(thay chính xác(data[k % 16], "Việt", "V++"));
+};
+hàm json_parse(k, data) {
+    value = json phân tích(data[k % 16]);
+    sum = value["n"] + độ dài(value["tên"]);
+    values = value["values"];
+    lặp(i = 0; i < 16; i++) { sum += values[i]; };
+    trả về sum;
+};
+hàm batch(fn, data, iterations, seed) {
+    checksum = 0.0;
+    lặp(i = 0; i < iterations; i++) { checksum += fn(seed + i % 16, data) % 997; };
+    trả về checksum;
+};
+hàm checksum_text(value) {
+    nếu (value == 0) { trả về "0"; };
+    text = ""; digits = "0123456789";
+    khi (value > 0) {
+        next = làm tròn xuống(value / 10.0);
+        digit = thành số nguyên(value - next * 10.0);
+        text = digits[digit] + text;
+        value = next;
+    };
+    trả về text;
+};
+hàm chính() {
+    name = đọc biến môi trường("BENCH_CASE", "arithmetic");
+    iterations = thành số nguyên(đọc biến môi trường("BENCH_ITERATIONS", "16"));
+    seed = thành số nguyên(đọc biến môi trường("BENCH_SEED", "17"));
+    nếu (iterations < 16 || iterations % 16 != 0 || iterations > 100000000) { ném "benchmark iterations"; };
+    fn = arithmetic;
+    nếu (name == "branch_loop") { fn = branch_loop; }
+    hoặc nếu (name == "fibonacci") { fn = fibonacci; }
+    hoặc nếu (name == "list_128") { fn = list_128; }
+    hoặc nếu (name == "unicode_replace") { fn = unicode_replace; }
+    hoặc nếu (name == "json_parse") { fn = json_parse; }
+    hoặc nếu (name != "arithmetic") { ném "unknown benchmark"; };
+    data = [];
+    lặp(i = 0; i < 16; i++) { máy ảo thêm cuối danh sách(data, ""); };
+    lặp(i = 0; i < 16; i++) {
+        k = seed + i; text = "";
+        nếu (name == "unicode_replace") {
+            lặp(j = 0; j < k % 4 + 4; j++) { text += "Xin chào Việt Nam 🌿 — Việt! "; };
+            text += thành chuỗi(k);
+        } hoặc nếu (name == "json_parse") {
+            text = "{\"n\":" + thành chuỗi(k) + ",\"tên\":\"Việt Nam 🌿\",\"values\":[";
+            lặp(j = 0; j < 16; j++) {
+                nếu (j != 0) { text += ","; };
+                text += thành chuỗi(k + j);
+            };
+            text += "]}";
+        };
+        data[k % 16] = text;
+    };
+    checks = []; unit = 0.0;
+    lặp(i = 0; i < 16; i++) {
+        value = fn(seed + i, data);
+        máy ảo thêm cuối danh sách(checks, value); unit += value % 997;
+    };
+    expected = unit * (iterations / 16);
+    warm = [];
+    lặp(i = 0; i < 3; i++) {
+        start = thời gian đơn điệu mili giây();
+        checksum = batch(fn, data, iterations, seed);
+        elapsed = thời gian đơn điệu mili giây() - start;
+        nếu (checksum != expected) { ném "warmup checksum"; };
+        máy ảo thêm cuối danh sách(warm, elapsed);
+    };
+    start = thời gian đơn điệu mili giây();
+    checksum = batch(fn, data, iterations, seed);
+    elapsed = thời gian đơn điệu mili giây() - start;
+    nếu (checksum != expected || elapsed <= 0) { ném "measurement/checksum"; };
+    in json tạo({"case": name, "iterations": iterations, "seed": seed,
+        "checks": checks, "checksum": checksum_text(checksum), "elapsed_ms": elapsed,
+        "ns_per_op": elapsed * 1000000.0 / iterations, "warmup_ms": warm});
+};

@@ -1,7 +1,7 @@
 // IR và emitter opcode chạy hoàn toàn qua các mô-đun V++, không gọi native.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/chính;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm khớp opcode(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);
@@ -241,12 +241,15 @@ hàm chính() {
     bắt lỗi (e) { lỗi = đúng; };
     in lỗi;
     // Gọi hàm: tham số được phát trước OP_GOI; function ID đã đăng ký trước.
-    in khớp opcode("hàm f(a) { trả về a + 1; }; in f(2);");
-    in khớp opcode hàm("hàm f(a) { trả về a + 1; }; in f(2);");
-    in khớp opcode("in g(3); hàm g(x) { trả về x; };");
-    in khớp opcode hàm("in g(3); hàm g(x) { trả về x; };");
-    in khớp opcode("hàm f(x) { trả về x; }; in f(1 + 2 * 3);");
-    in khớp opcode("hàm f(x) { trả về x; }; in f(f(2));");
+    // Giữ một binding cục bộ để optimizer C++ không inline thân chỉ có return.
+    // Các ca này kiểm tra emitter lời gọi; ngữ nghĩa inline được kiểm tra ở
+    // kiem_tra_machine_jit.vi qua interpreter, legacy JIT và machine JIT.
+    in khớp opcode("hàm f(a) { biến kết = a + 1; trả về kết; }; in f(2);");
+    in khớp opcode hàm("hàm f(a) { biến kết = a + 1; trả về kết; }; in f(2);");
+    in khớp opcode("in g(3); hàm g(x) { biến kết = x; trả về kết; };");
+    in khớp opcode hàm("in g(3); hàm g(x) { biến kết = x; trả về kết; };");
+    in khớp opcode("hàm f(x) { biến kết = x; trả về kết; }; in f(1 + 2 * 3);");
+    in khớp opcode("hàm f(x) { biến kết = x; trả về kết; }; in f(f(2));");
     in khớp opcode hàm("hàm f(x) { trả về f(x - 1); };");
     in khớp opcode("hàm f() { trả về 1; }; in f;");
     // Loop: kiểm tra đầy đủ target, độ sâu block và số khung try cần thoát.

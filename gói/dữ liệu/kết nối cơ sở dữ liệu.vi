@@ -2,10 +2,11 @@
 // Mục đích: cung cấp API cấu hình và thực thi truy vấn cho nhiều engine DB.
 // Hỗ trợ hiện tại: MySQL, PostgreSQL, SQLite qua JDBC URL + driver class.
 
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
-nhập gói/hệ thống/tiến trình;
-nhập gói/hệ thống/nền tảng;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Trình Điều Khiển Cơ Sở Dữ Liệu {

@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     văn_bản = "a😀Việt";
@@ -105,4 +105,25 @@ hàm chính() {
     } bắt lỗi (e) {
         in e;
     };
+
+    // KMP trên byte phải giữ chỉ số code point và không khớp giữa UTF-8.
+    in tìm chuỗi chính xác("xxaab", "aab") == 2;
+    in tìm chuỗi chính xác("a😀Việt", "Việt", 2) == 2;
+    in tìm chuỗi chính xác("a😀Việt", "Việt", 3) == rỗng;
+    in tìm chuỗi chính xác("a😀", "", 2) == 2;
+    in tìm chuỗi chính xác("abc", "abc") == 0;
+    in thay chính xác("aaaaa", "aa", "X") == "XXa";
+    in thay chính xác("abababa", "aba", "X") == "XbX";
+    in thay chính xác("", "", ":") == ":";
+    in thay chính xác("a😀", "", ":") == ":a:😀:";
+
+    byte sai = chuỗi từ byte máy ảo([169]);
+    văn bản sai = chuỗi từ byte máy ảo([195, 169, 169]);
+    in tìm chuỗi chính xác("é", byte sai) == rỗng;
+    in tìm chuỗi chính xác(văn bản sai, byte sai) == 1;
+    in thay chính xác(văn bản sai, byte sai, "X") == "éX";
+    byte thay = chuỗi thành byte máy ảo(thay chính xác(
+        chuỗi từ byte máy ảo([226, 130]), "", "-"));
+    in độ dài(byte thay) == 5 && byte thay[0] == 45 && byte thay[1] == 226 &&
+       byte thay[2] == 45 && byte thay[3] == 130 && byte thay[4] == 45;
 };

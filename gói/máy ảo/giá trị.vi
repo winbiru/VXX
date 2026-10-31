@@ -1,0 +1,364 @@
+// Tagged values and collections. All references are arena offsets, never
+// truncated native pointers. 0=null, 1=i32, 2=f64, 3=UTF-8, 4=list,
+// 5=map, 6=tuple, 7=closure, 8=class, 9=instance, 10=shared cell,
+// 11=unsigned u32 ABI (only needed when uid_t/gid_t exceeds INT32_MAX).
+hàm vm_tag(v) { nếu (v == 0) { trả về 0; }; trả về vm_get(v, 0); };
+hàm vm_int(n) {
+    // i32 values are immutable, and identity hashing accepts references only.
+    // Intern the most common loop counters, booleans and UTF-8 bytes to avoid
+    // allocating a managed block for each scalar operation.
+    biến cache = 0; biến index = n + 16;
+    nếu (n >= -16 && n <= 255) {
+        cache = vm_get(4198464, 17);
+        nếu (cache == 0) {
+            // 272 cached i32 values plus a managed empty-argument vector
+            // in word 272. Sharing the traced cache avoids colliding with
+            // header word 31, which belongs to the socket token allocator.
+            cache = vm_alloc(1092, 1);
+            nếu (cache == 0) { trả về 0; };
+            vm_set(4198464, 17, cache);
+        };
+        biến existing = vm_get(cache, index);
+        nếu (existing != 0) { trả về existing; };
+    };
+    biến v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; };
+    vm_set(v, 0, 1); vm_set(v, 1, n);
+    nếu (cache != 0) { vm_set(cache, index, v); };
+    trả về v;
+};
+// Preserve the full uid_t/gid_t bit pattern without interpreting an unsigned
+// value >= 2^31 as a negative signed VM integer.
+hàm vm_uint32(bits) {
+    nếu (bits >= 0) { trả về vm_int(bits); };
+    biến v = vm_alloc(16, 0); nếu (v == 0) { trả về 0; };
+    vm_set(v, 0, 11); vm_set(v, 1, bits); trả về v;
+};
+hàm vm_number(v) {
+    nếu (vm_tag(v) == 1) { trả về vm_get(v, 1); };
+    nếu (vm_tag(v) == 2) { trả về máy thực sang nguyên(v); };
+    vm_error(2); trả về 0;
+};
+hàm vm_real(v) {
+    nếu (vm_tag(v) == 2) { trả về v; };
+    biến r = vm_alloc(16, 0); nếu (r == 0) { trả về 0; };
+    vm_set(r, 0, 2); máy thực từ nguyên(r, vm_number(v)); trả về r;
+};
+hàm vm_string(n) {
+    nếu (n < 0 || n > 16000000) { trả về vm_error(3); };
+    biến raw = vm_alloc(n + 1, 0); biến v = vm_alloc(16, 1);
+    nếu (raw == 0 || v == 0) { trả về 0; };
+    // The fourth word is a lazy UTF-8 index: -1 unknown, <= -2 stores
+    // -(codepoint_count + 2), or a managed sparse-offset table pointer.
+    vm_set(v, 0, 3); vm_set(v, 1, n); vm_set(v, 2, raw); vm_set(v, 3, -1); trả về v;
+};
+hàm vm_literal(handle) {
+    biến n = byte dài(handle); biến v = vm_string(n);
+    nếu (v == 0) { byte hủy(handle); trả về 0; };
+    lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(v, 2) + i, byte lấy(handle, i)); };
+    byte hủy(handle); trả về v;
+};
+hàm vm_slice(s, start, n) {
+    nếu (vm_tag(s) != 3 || start < 0 || n < 0) { trả về vm_error(3); };
+    nếu (start > vm_get(s, 1) || n > vm_get(s, 1) - start) { trả về vm_error(3); };
+    biến v = vm_string(n); nếu (v == 0) { trả về 0; };
+    lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(v, 2) + i, máy đọc byte(vm_get(s, 2) + start + i)); };
+    trả về v;
+};
+hàm vm_equal(a, b) {
+    biến ta = vm_tag(a); biến tb = vm_tag(b);
+    nếu (ta == 11 || tb == 11) {
+        nếu (ta == 11 && tb == 11) { trả về vm_get(a, 1) == vm_get(b, 1); };
+        trả về 0;
+    };
+    nếu (ta == 1 && tb == 1) { trả về vm_get(a, 1) == vm_get(b, 1); };
+    nếu ((ta == 1 || ta == 2) && (tb == 1 || tb == 2)) { trả về máy thực so sánh(vm_real(a), vm_real(b)) == 0; };
+    nếu (ta != tb) { trả về 0; };
+    nếu (ta != 3) { trả về a == b; };
+    biến n = vm_get(a, 1); nếu (n != vm_get(b, 1)) { trả về 0; };
+    lặp(i = 0; i < n; i++) {
+        nếu (máy đọc byte(vm_get(a, 2) + i) != máy đọc byte(vm_get(b, 2) + i)) { trả về 0; };
+    };
+    trả về 1;
+};
+hàm vm_truth(v) {
+    biến t = vm_tag(v); nếu (t == 0) { trả về 0; };
+    nếu (t == 1) { trả về vm_get(v, 1) != 0; };
+    nếu (t == 2) { trả về máy thực so sánh(v, vm_real(vm_int(0))) != 0; };
+    nếu (t >= 3 && t <= 6) { trả về vm_get(v, 1) != 0; };
+    trả về 1;
+};
+hàm vm_vector(tag) {
+    // Maps reserve one extra slot for the key index mode: 0=empty,
+    // 1=ordered strings, 2=ordered integers, 3=mixed keys.
+    // Keep the first two elements inline. Ordinary small argument lists and
+    // one-entry scopes no longer need a second managed allocation for data.
+    biến bytes = 16; nếu (tag == 5) { bytes = 20; };
+    biến v = vm_alloc(bytes + 8, 1); nếu (v == 0) { trả về 0; };
+    vm_set(v, 0, tag); vm_set(v, 2, 2); vm_set(v, 3, v + bytes);
+    trả về v;
+};
+hàm vm_at(v, i) {
+    nếu (v == 0 || i < 0) { trả về vm_error(4); };
+    nếu (i >= vm_get(v, 1)) { trả về vm_error(4); };
+    trả về vm_get(vm_get(v, 3), i);
+};
+hàm vm_put(v, i, item) {
+    nếu (v == 0 || i < 0) { trả về vm_error(4); };
+    nếu (i >= vm_get(v, 1)) { trả về vm_error(4); };
+    vm_set(vm_get(v, 3), i, item); trả về 0;
+};
+hàm vm_append(v, item) {
+    nếu (v == 0) { trả về vm_error(4); };
+    biến n = vm_get(v, 1); biến cap = vm_get(v, 2);
+    nếu (n == cap) {
+        cap = cap * 2 + 8;
+        nếu (cap > 2000000) { trả về vm_error(1); };
+        biến raw = vm_alloc(cap * 4, 1); nếu (raw == 0) { trả về 0; };
+        lặp(i = 0; i < n; i++) { vm_set(raw, i, vm_at(v, i)); };
+        // Inline cells remain inside the live vector after it grows. Clear
+        // them so the tracing collector does not retain obsolete references.
+        biến inline_at = v + 16; nếu (vm_get(v, 0) == 5) { inline_at = v + 20; };
+        nếu (vm_get(v, 3) == inline_at) {
+            vm_set(inline_at, 0, 0); vm_set(inline_at, 1, 0);
+        };
+        vm_set(v, 2, cap); vm_set(v, 3, raw);
+    };
+    vm_set(vm_get(v, 3), n, item); vm_set(v, 1, n + 1); trả về 0;
+};
+hàm vm_pop(v) {
+    biến n = vm_get(v, 1); nếu (n <= 0) { trả về vm_error(5); };
+    // n > 0 has already established the element is in bounds. Avoid an
+    // additional checked vm_at call on every VM stack pop.
+    biến data = vm_get(v, 3); biến item = vm_get(data, n - 1);
+    vm_set(data, n - 1, 0); vm_set(v, 1, n - 1); trả về item;
+};
+hàm vm_remove(v, index) {
+    biến n = vm_get(v, 1); nếu (index < 0 || index >= n) { trả về vm_error(4); };
+    biến result = vm_at(v, index);
+    lặp(i = index; i + 1 < n; i++) { vm_put(v, i, vm_at(v, i + 1)); };
+    vm_pop(v); trả về result;
+};
+hàm vm_map_find(v, key) {
+    nếu (vm_tag(v) != 5) { vm_error(2); trả về -1; };
+    biến mode = vm_get(v, 4); biến kind = vm_tag(key);
+    nếu ((mode == 1 && kind == 3) || (mode == 2 && kind == 1)) {
+        biến low = 0; biến high = máy chia số nguyên ba mươi hai bit(vm_get(v, 1), 2);
+        khi (low < high) {
+            biến mid = máy chia số nguyên ba mươi hai bit(low + high, 2);
+            biến existing = vm_at(v, mid * 2); biến cmp = 0;
+            nếu (mode == 1) { cmp = vm_string_compare(existing, key); }
+            hoặc {
+                biến x = vm_number(existing); biến y = vm_number(key);
+                nếu (x < y) { cmp = -1; }; nếu (x > y) { cmp = 1; };
+            };
+            nếu (cmp < 0) { low = mid + 1; } hoặc { high = mid; };
+        };
+        nếu (low * 2 < vm_get(v, 1) && vm_equal(vm_at(v, low * 2), key)) { trả về low * 2; };
+        trả về -1;
+    };
+    lặp(i = 0; i < vm_get(v, 1); i = i + 2) { nếu (vm_equal(vm_at(v, i), key) == 1) { trả về i; }; };
+    trả về -1;
+};
+hàm vm_map_find_int(v, number) {
+    // VM variable slots are i32 keys. Probe their stored payload directly
+    // instead of allocating a short-lived vm_int on every LOAD/STORE.
+    nếu (vm_tag(v) != 5) { vm_error(2); trả về -1; };
+    biến mode = vm_get(v, 4);
+    nếu (mode == 0 || mode == 1) { trả về -1; };
+    nếu (mode == 2) {
+        biến low = 0; biến high = máy chia số nguyên ba mươi hai bit(vm_get(v, 1), 2);
+        khi (low < high) {
+            biến mid = máy chia số nguyên ba mươi hai bit(low + high, 2);
+            biến value = vm_get(vm_at(v, mid * 2), 1);
+            nếu (value < number) { low = mid + 1; } hoặc { high = mid; };
+        };
+        nếu (low * 2 < vm_get(v, 1) && vm_get(vm_at(v, low * 2), 1) == number) { trả về low * 2; };
+        trả về -1;
+    };
+    lặp(i = 0; i < vm_get(v, 1); i = i + 2) {
+        biến key = vm_at(v, i);
+        nếu (vm_tag(key) == 1 && vm_get(key, 1) == number) { trả về i; };
+    };
+    trả về -1;
+};
+hàm vm_map_get(v, key) { biến i = vm_map_find(v, key); nếu (i < 0) { trả về 0; }; trả về vm_at(v, i + 1); };
+hàm vm_map_get_int(v, number) { biến i = vm_map_find_int(v, number); nếu (i < 0) { trả về 0; }; trả về vm_at(v, i + 1); };
+hàm vm_string_compare(a, b) {
+    biến na = vm_get(a, 1); biến nb = vm_get(b, 1); biến n = na; nếu (nb < n) { n = nb; };
+    lặp(i = 0; i < n; i++) {
+        biến x = máy đọc byte(vm_get(a, 2) + i); biến y = máy đọc byte(vm_get(b, 2) + i);
+        nếu (x < y) { trả về -1; }; nếu (x > y) { trả về 1; };
+    };
+    nếu (na < nb) { trả về -1; }; nếu (na > nb) { trả về 1; }; trả về 0;
+};
+hàm vm_map_put(v, key, value) {
+    biến i = vm_map_find(v, key);
+    nếu (i >= 0) { vm_put(v, i + 1, value); }
+    hoặc {
+        biến mode = vm_get(v, 4); biến kind = vm_tag(key);
+        nếu (mode == 0) {
+            mode = 3; nếu (kind == 3) { mode = 1; }; nếu (kind == 1) { mode = 2; };
+        } hoặc nếu ((mode == 1 && kind != 3) || (mode == 2 && kind != 1)) { mode = 3; };
+        vm_set(v, 4, mode);
+        biến at = vm_get(v, 1); vm_append(v, key); vm_append(v, value);
+        nếu (mode == 1 || mode == 2) {
+            khi (at >= 2) {
+                biến cmp = 0;
+                nếu (mode == 1) { cmp = vm_string_compare(vm_at(v, at - 2), key); }
+                hoặc {
+                    biến x = vm_number(vm_at(v, at - 2)); biến y = vm_number(key);
+                    nếu (x < y) { cmp = -1; }; nếu (x > y) { cmp = 1; };
+                };
+                nếu (cmp <= 0) { thoát; };
+                vm_put(v, at, vm_at(v, at - 2)); vm_put(v, at + 1, vm_at(v, at - 1)); at = at - 2;
+            };
+            vm_put(v, at, key); vm_put(v, at + 1, value);
+        };
+    };
+    trả về 0;
+};
+hàm vm_integer_text(n) {
+    biến raw = vm_alloc(16, 0); nếu (raw == 0) { trả về 0; };
+    biến count = 0; biến negative = n < 0;
+    nếu (n > 0) { n = 0 - n; };
+    khi (n <= -10) {
+        biến q = máy chia số nguyên ba mươi hai bit(n, 10);
+        máy ghi byte(raw + count, 48 - (n - q * 10)); count = count + 1; n = q;
+    };
+    máy ghi byte(raw + count, 48 - n); count = count + 1;
+    nếu (negative) { máy ghi byte(raw + count, 45); count = count + 1; };
+    biến s = vm_string(count); nếu (s == 0) { trả về 0; };
+    lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(raw + count - i - 1)); };
+    trả về s;
+};
+// UINT32_MAX = 2*10^9 + 147483648 + (bits - INT32_MIN).
+// All intermediates fit signed i32, including the input 0xffffffff.
+hàm vm_unsigned_text(bits) {
+    nếu (bits >= 0) { trả về vm_integer_text(bits); };
+    biến lowbits = (bits + 2147483647) + 1;
+    biến high = 2 + máy chia số nguyên ba mươi hai bit(lowbits, 1000000000);
+    biến low = lowbits - máy chia số nguyên ba mươi hai bit(lowbits, 1000000000) * 1000000000 + 147483648;
+    nếu (low >= 1000000000) { low = low - 1000000000; high++; };
+    biến suffix = vm_integer_text(low);
+    biến zeros = vm_literal("000000000");
+    trả về vm_concat(vm_integer_text(high), vm_concat(vm_slice(zeros, 0, 9 - vm_get(suffix, 1)), suffix));
+};
+hàm vm_concat(a, b) {
+    biến n = vm_get(a, 1); biến m = vm_get(b, 1); biến s = vm_string(n + m);
+    nếu (s == 0) { trả về 0; };
+    lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(vm_get(a, 2) + i)); };
+    lặp(i = 0; i < m; i++) { máy ghi byte(vm_get(s, 2) + n + i, máy đọc byte(vm_get(b, 2) + i)); };
+    trả về s;
+};
+hàm vm_text(v) {
+    biến t = vm_tag(v);
+    nếu (t == 0) { trả về vm_literal("rỗng"); };
+    nếu (t == 1) { trả về vm_integer_text(vm_get(v, 1)); };
+    nếu (t == 11) { trả về vm_unsigned_text(vm_get(v, 1)); };
+    nếu (t == 2) {
+        biến raw = vm_alloc(512, 0); nếu (raw == 0) { trả về 0; };
+        biến n = máy thực văn bản(v, raw); biến s = vm_string(n);
+        nếu (s == 0) { trả về 0; };
+        lặp(i = 0; i < n; i++) { máy ghi byte(vm_get(s, 2) + i, máy đọc byte(raw + i)); }; trả về s;
+    };
+    nếu (t == 3) { trả về v; };
+    nếu (t == 7) { trả về vm_concat(vm_concat(vm_literal("<closure "), vm_integer_text(vm_get(v, 1))), vm_literal(">")); };
+    nếu (t == 8) { trả về vm_concat(vm_concat(vm_literal("<class "), vm_get(v, 1)), vm_literal(">")); };
+    nếu (t == 9) { trả về vm_concat(vm_concat(vm_literal("<instance "), vm_get(vm_get(v, 1), 1)), vm_literal(">")); };
+    // Render cycles without native recursion through collection values.
+    biến active = vm_get(4198464, 7);
+    nếu (active == 0) { active = vm_vector(4); vm_set(4198464, 7, active); };
+    lặp(i = 0; i < vm_get(active, 1); i++) { nếu (vm_at(active, i) == v) { trả về vm_literal("<cycle>"); }; };
+    vm_append(active, v);
+    biến s = vm_literal("["); nếu (t == 5) { s = vm_literal("{"); }; nếu (t == 6) { s = vm_literal("("); };
+    lặp(i = 0; i < vm_get(v, 1); i++) {
+        nếu (i != 0) { s = vm_concat(s, vm_literal(", ")); };
+        biến item = vm_at(v, i);
+        nếu (t == 5) {
+            s = vm_concat(s, vm_literal("\"")); s = vm_concat(s, vm_text(item)); s = vm_concat(s, vm_literal("\": "));
+            i = i + 1; item = vm_at(v, i);
+            nếu (vm_tag(item) == 3) { s = vm_concat(s, vm_literal("\"")); };
+            s = vm_concat(s, vm_text(item));
+            nếu (vm_tag(item) == 3) { s = vm_concat(s, vm_literal("\"")); };
+        } hoặc { s = vm_concat(s, vm_text(item)); };
+    };
+    vm_pop(active);
+    nếu (t == 6 && vm_get(v, 1) == 1) { s = vm_concat(s, vm_literal(",")); };
+    nếu (t == 5) { trả về vm_concat(s, vm_literal("}")); }; nếu (t == 6) { trả về vm_concat(s, vm_literal(")")); };
+    trả về vm_concat(s, vm_literal("]"));
+};
+hàm vm_binary(op, a, b) {
+    nếu (vm_get(4198464, 12) != 1) { trả về vm_binary_body(op, a, b); };
+    vm_profile_begin(1);
+    biến result = vm_binary_body(op, a, b);
+    vm_profile_end(1);
+    trả về result;
+};
+hàm vm_binary_body(op, a, b) {
+    // Integer arithmetic and comparisons dominate tight loops. Handle two
+    // tagged i32 operands before the generic coercion/UTF-8/real paths.
+    nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
+        biến x = vm_get(a, 1); biến y = vm_get(b, 1);
+        nếu (op == 0) { trả về vm_int(x + y); };
+        nếu (op == 1) { trả về vm_int(x - y); };
+        nếu (op == 2) { trả về vm_int(x * y); };
+        nếu (op == 4) { trả về vm_int(x != 0 && y != 0); };
+        nếu (op == 5) { trả về vm_int(x != 0 || y != 0); };
+        nếu (op == 7) { trả về vm_int(x == y); };
+        nếu (op == 8) { trả về vm_int(x != y); };
+        nếu (op == 9) { trả về vm_int(x > y); };
+        nếu (op == 10) { trả về vm_int(x < y); };
+        nếu (op == 11) { trả về vm_int(x >= y); };
+        nếu (op == 12) { trả về vm_int(x <= y); };
+        nếu (op != 3 && op != 64) { trả về vm_error(2); };
+        nếu (y == 0) { trả về vm_error(6); };
+        nếu (x == -2147483648 && y == -1) {
+            nếu (op == 3) { trả về vm_int(-2147483648); };
+            trả về vm_int(0);
+        };
+        nếu (op == 3) { trả về vm_int(máy chia số nguyên ba mươi hai bit(x, y)); };
+        trả về vm_int(x - máy chia số nguyên ba mươi hai bit(x, y) * y);
+    };
+    nếu (op == 7) { trả về vm_int(vm_equal(a, b)); };
+    nếu (op == 8) { trả về vm_int(1 - vm_equal(a, b)); };
+    nếu (op == 4) { trả về vm_int(vm_truth(a) && vm_truth(b)); };
+    nếu (op == 5) { trả về vm_int(vm_truth(a) || vm_truth(b)); };
+    // UID/GID u32 is intentionally not narrowed to signed i32 for arithmetic.
+    // Tag 11 is only allocated for the upper half [2^31, 2^32-1]; an
+    // ordinary signed i32 always compares lower than it. When both values
+    // have tag 11 their sign bits are set, so signed i32 ordering agrees
+    // with unsigned u32 ordering within that half.
+    nếu (vm_tag(a) == 11 || vm_tag(b) == 11) {
+        nếu (op >= 9 && op <= 12) {
+            biến ta = vm_tag(a); biến tb = vm_tag(b); biến cmp = 0;
+            nếu ((ta != 1 && ta != 11) || (tb != 1 && tb != 11)) { trả về vm_error(2); };
+            nếu (ta == 11 && tb != 11) { cmp = 1; }
+            hoặc nếu (ta != 11 && tb == 11) { cmp = -1; }
+            hoặc nếu (vm_get(a, 1) < vm_get(b, 1)) { cmp = -1; }
+            hoặc nếu (vm_get(a, 1) > vm_get(b, 1)) { cmp = 1; };
+            nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
+            nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
+        };
+        trả về vm_error(2);
+    };
+    nếu (op == 0 && ((vm_tag(a) != 1 && vm_tag(a) != 2) || (vm_tag(b) != 1 && vm_tag(b) != 2))) { trả về vm_concat(vm_text(a), vm_text(b)); };
+    nếu (op >= 9 && op <= 12 && vm_tag(a) == 3 && vm_tag(b) == 3) {
+        biến cmp = vm_string_compare(a, b);
+        nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
+        nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
+    };
+    nếu ((vm_tag(a) != 1 && vm_tag(a) != 2) || (vm_tag(b) != 1 && vm_tag(b) != 2)) { trả về vm_error(2); };
+    nếu (op >= 9 && op <= 12) {
+        biến cmp = 0;
+        nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
+            nếu (vm_get(a, 1) < vm_get(b, 1)) { cmp = -1; }; nếu (vm_get(a, 1) > vm_get(b, 1)) { cmp = 1; };
+        } hoặc { cmp = máy thực so sánh(vm_real(a), vm_real(b)); };
+        nếu (cmp == 2) { trả về vm_int(0); };
+        nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
+        nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
+    };
+    nếu (op == 64) { trả về vm_error(2); };
+    biến r = vm_alloc(16, 0); nếu (r == 0) { trả về 0; }; vm_set(r, 0, 2); vm_set(r, 1, op);
+    nếu (op == 3 && vm_truth(b) == 0) { trả về vm_error(6); };
+    máy thực phép(r, vm_real(a), vm_real(b)); trả về r;
+};

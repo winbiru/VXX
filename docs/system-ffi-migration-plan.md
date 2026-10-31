@@ -802,7 +802,7 @@ không đợi mọi nhóm xong và cũng không xóa trước khi có parity.
   trên Windows/POSIX báo lỗi kể cả khi không bật strict gate.
   `foreign.cpp` vẫn bắt buộc cho POSIX ABI, token, `posix_spawnp` và descriptor.
 - Source gọi trực tiếp `io_*_vm` hoặc `tien_trinh_chay_vm` cần chuyển sang
-  `nhập gói/nhập xuất/tệp;` hoặc `nhập gói/hệ thống/tiến trình;`.
+  `nhập gói.nhập xuất.tệp.*;` hoặc `nhập gói.hệ thống.tiến trình.*;`.
   Theo ADR 0002, bytecode nội bộ chưa có ABI công khai; tuy nhiên hành vi source
   gọi thẳng intrinsic cũ thay đổi, cần migration note khi phát hành.
 - Đợt tiếp theo đã loại khỏi build POSIX các thuật toán native legacy cho

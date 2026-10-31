@@ -15,13 +15,20 @@ CTestTestfile.cmake
 Makefile
 # Compiled binaries
 *.a
+*.o
+*.obj
 *.so
 *.dylib
+*.dll
 *.exe
+*.class
+*.pdb
+*.dSYM/
 bin/
 # Editor
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 *~
@@ -37,6 +44,24 @@ src/tests/.perf_batch/
 dist/
 *.vsix
 
+# Generated benchmark runs (keep reproducible reports and source snapshots)
+benchmark/reports/ci/
+benchmark/reports/*/build/
+benchmark/reports/*/native-comparison
+
+# Logs, temporary files and coverage/profiling outputs
+*.log
+*.tmp
+*.bak
+*.gcda
+*.gcno
+*.profraw
+*.profdata
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
 # Local/generated packaging artifacts
 .tmp/
 _CPack_Packages/
@@ -50,15 +75,34 @@ vdk-*.zip
 # Python tooling
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.venv/
 .venv-quantum/
+venv/
+
+# Generated dependency/cache directories
+node_modules/
+.cache/
 *.md
 !docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md
+!plans/improvement-plan-2026-10-31.md
+!benchmark/BASELINE.md
 !benchmark/NATIVE.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md
+!docs/vm-asm.md
+!docs/tls-vpp.md
 !docs/stdio-vpp.md
 !docs/native-code-generator-implementation.md
 !docs/compiler-self-hosting-status.md
 !docs/native-freestanding-macos.md
 !docs/kien-truc-oop-thu-vien-va-bien-dich.md
+
+# Project reports must stay versioned even when most Markdown files are ignored.
+!report/
+!report/*.md

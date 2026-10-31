@@ -1,6 +1,6 @@
-nhập gói/mạng/cấu hình phân giải tên miền;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/tệp thô;
+nhập gói.mạng.cấu hình phân giải tên miền.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.tệp thô.*;
 
 hàm chính() {
     bộ = Bộ Cấu Hình DNS();

@@ -1,6 +1,6 @@
 // Chạy riêng với TZ=EST5EDT,M3.2.0/2,M11.1.0/2 để kiểm tra DST độc lập OS clock.
 nhập thời gian;
-nhập gói/thời gian/địa phương;
+nhập gói.thời gian.địa phương.*;
 
 hàm chính() {
     // 2024-03-10: mùa hè bắt đầu tại 02:00; đồng hồ nhảy sang 03:00.

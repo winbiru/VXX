@@ -71,7 +71,17 @@ hàm biểu diễn trung gian run(biểu diễn trung gian) {
                             nếu (luận lý toán hạng == 0) { đã chuẩn hóa = 1; };
                             byte ghi số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4, đã chuẩn hóa);
                         } hoặc {
-                            nếu (mã phép toán == 9) {
+                            nếu (mã phép toán == 28) {
+                                nếu (đỉnh < 1) { thoát; };
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                nếu (byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4) == 0) { pc = đối số - 8; }
+                                hoặc { đỉnh = đỉnh - 1; };
+                            } hoặc nếu (mã phép toán == 29) {
+                                nếu (đỉnh < 1) { thoát; };
+                                nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
+                                nếu (byte đọc số nguyên ba mươi hai bit(stack, (đỉnh - 1) * 4) != 0) { pc = đối số - 8; }
+                                hoặc { đỉnh = đỉnh - 1; };
+                            } hoặc nếu (mã phép toán == 9) {
                                 nếu (đỉnh < 1) { thoát; };
                                 nếu (biểu diễn trung gian nhánh đích đến(biểu diễn trung gian, đối số) != 1) { thoát; };
                                 đỉnh = đỉnh - 1;

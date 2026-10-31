@@ -1,4 +1,4 @@
-nhập gói/mạng/định danh tài nguyên;
+nhập gói.mạng.định danh tài nguyên.*;
 
 hàm chính() {
     u = định danh tài nguyên phân tích("HTTP://Example.COM:80/a/../b?q=hello%20world#frag");

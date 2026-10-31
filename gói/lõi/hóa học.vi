@@ -1,6 +1,6 @@
 // Thư viện vi.chemistry — công thức hóa học nền tảng cho V++.
 // Khối lượng mặc định tính bằng gram, thể tích dung dịch bằng lít.
-nhập gói/lõi/toán học;
+nhập gói.lõi.toán học.phần trăm;
 
 hàm công khai số mol từ khối lượng(m, m mol) {
     nếu (m mol == 0 || m mol == 0.0) {

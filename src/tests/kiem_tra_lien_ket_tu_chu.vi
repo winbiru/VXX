@@ -1,6 +1,6 @@
 // Fixture linker V++: đối chiếu với mã trung gian C++ trước giai đoạn nối.
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/chính;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.chính.*;
 
 hàm chính() {
     nguồn = "hàm f(x) { trả về x + 1; }; hàm chính() { in f(2); };";

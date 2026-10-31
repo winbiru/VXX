@@ -1,0 +1,169 @@
+// POSIX subprocess policy for the standalone V++ VM. The ASM primitive owns
+// file descriptors, posix_spawn objects and waitpid; V++ owns token lifetime,
+// argv validation, pipe draining and typed guest values.
+hàm vm_process_string(value) {
+    nếu (vm_tag(value) != 3 || vm_get(value, 1) > 4095) { trả về vm_error(2); };
+    // Reject malformed UTF-8 before passing an argv/env buffer to POSIX.
+    // The directory boundary already provides the strict UTF-8 decoder.
+    nếu (vm_utf8_valid(vm_get(value, 2), vm_get(value, 1)) == 0) { trả về vm_error(2); };
+    lặp(i = 0; i < vm_get(value, 1); i++) {
+        nếu (máy đọc byte(vm_get(value, 2) + i) == 0) { trả về vm_error(2); };
+    };
+    trả về 1;
+};
+hàm vm_process_find(state, token) {
+    nếu (vm_tag(token) != 1 || vm_number(token) <= 0) { vm_error(2); trả về 0; };
+    biến table = vm_get(state, 12);
+    nếu (table != 0) {
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            biến resource = vm_at(table, i);
+            nếu (resource != 0 && vm_get(resource, 0) == vm_number(token)) { trả về resource; };
+        };
+    };
+    vm_error(2); trả về 0;
+};
+hàm vm_process_new(state, program) {
+    nếu (vm_process_string(program) == 0) { trả về 0; };
+    nếu (vm_get(program, 1) == 0) { trả về vm_error(2); };
+    biến table = vm_get(state, 12);
+    nếu (table == 0) { table = vm_vector(4); nếu (table == 0) { trả về 0; }; vm_set(state, 12, table); };
+    biến token = vm_get(4198464, 30);
+    nếu (token == 0) { token = 805306368; };
+    nếu (token >= 2147483000) { trả về vm_error(3); };
+    token = token + 1;
+    biến resource = vm_alloc(32, 1); nếu (resource == 0) { trả về 0; };
+    vm_set(resource, 0, token); vm_set(resource, 1, program);
+    biến args = vm_vector(4); biến env = vm_vector(5);
+    nếu (args == 0 || env == 0) { trả về 0; };
+    vm_set(resource, 2, args); vm_set(resource, 3, env);
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(resource, 7, vm_literal(""));
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    // Allocate the guest token before committing a table entry. An OOM
+    // during append must not expose a partially registered process.
+    biến guest_token = vm_int(token);
+    nếu (guest_token == 0) { trả về 0; };
+    vm_append(table, resource);
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(4198464, 30, token);
+    trả về guest_token;
+};
+hàm vm_process_c_string(s) {
+    biến n = vm_get(s, 1);
+    biến ptr = vm_alloc(n + 1, 0); nếu (ptr == 0) { trả về 0; };
+    lặp(i = 0; i < n; i++) { máy ghi byte(ptr + i, máy đọc byte(vm_get(s, 2) + i)); };
+    máy ghi byte(ptr + n, 0); trả về ptr;
+};
+hàm vm_process_start(resource) {
+    nếu (vm_get(resource, 6) != 0) { trả về vm_error(2); };
+    vm_set(resource, 6, 1);
+    biến args = vm_get(resource, 2); biến argc = vm_get(args, 1) + 1;
+    nếu (argc > 128) { trả về vm_error(2); };
+    biến env = vm_get(resource, 3); biến envcount = máy chia số nguyên ba mươi hai bit(vm_get(env, 1), 2);
+    nếu (envcount > 128) { trả về vm_error(2); };
+    // The control is rooted by the resource even across guest GC passes.
+    // Raw argv offsets and native pointers are only live during spawn.
+    biến control = vm_alloc(1024, 1);
+    biến offsets = vm_alloc(argc * 4, 0);
+    biến pointers = vm_alloc((argc + 1) * 8, 0);
+    nếu (control == 0 || offsets == 0 || pointers == 0) { trả về 0; };
+    vm_set(resource, 4, control);
+    vm_set(control, 0, 0); vm_set(control, 1, -1); vm_set(control, 2, -1);
+    vm_set(control, 3, offsets); vm_set(control, 4, pointers);
+    vm_set(control, 5, argc);
+    lặp(i = 0; i < argc; i++) {
+        biến arg = vm_get(resource, 1);
+        nếu (i > 0) { arg = vm_at(args, i - 1); };
+        biến raw = vm_process_c_string(arg);
+        nếu (raw == 0) { trả về 0; };
+        vm_set(offsets, i, raw);
+    };
+    nếu (envcount > 0) {
+        // Fixed-capacity scratch is held by the control. The ASM boundary
+        // combines inherited entries with these child-only KEY=VALUE entries.
+        // At most 4096 inherited + 128 overrides + terminator are accepted.
+        biến env_offsets = vm_alloc(envcount * 4, 0);
+        biến env_pointers = vm_alloc(33800, 0);
+        nếu (env_offsets == 0 || env_pointers == 0) { trả về 0; };
+        vm_set(control, 6, env_offsets); vm_set(control, 11, envcount);
+        vm_set(control, 14, env_pointers);
+        lặp(i = 0; i < envcount; i++) {
+            biến entry = vm_concat(vm_concat(vm_at(env, i * 2), vm_literal("=")), vm_at(env, i * 2 + 1));
+            nếu (vm_get(entry, 1) > 4095) { trả về vm_error(2); };
+            biến raw = vm_process_c_string(entry);
+            nếu (raw == 0) { trả về 0; };
+            vm_set(env_offsets, i, raw);
+        };
+    };
+    biến status = máy tiến trình thô(0, control);
+    nếu (status != 1) {
+        vm_set(resource, 7, vm_concat(vm_literal("errno="), vm_integer_text(vm_get(control, 12))));
+        trả về vm_int(0);
+    };
+    vm_set(resource, 5, 1); trả về vm_int(1);
+};
+hàm vm_process_host(state, op, a, b, c, d) {
+    nếu (op == 193) { trả về vm_process_new(state, a); };
+    biến resource = vm_process_find(state, a); nếu (resource == 0) { trả về 0; };
+    nếu (op == 194) {
+        nếu (vm_get(resource, 6) != 0 || vm_process_string(b) == 0) { trả về vm_error(2); };
+        vm_append(vm_get(resource, 2), b); trả về vm_int(1);
+    };
+    nếu (op == 195) { trả về vm_error(22); }; // Windows command-line only.
+    nếu (op == 196) {
+        nếu (vm_get(resource, 6) != 0 || vm_process_string(b) == 0 || vm_process_string(c) == 0) { trả về vm_error(2); };
+        nếu (vm_get(b, 1) == 0) { trả về vm_error(2); };
+        lặp(i = 0; i < vm_get(b, 1); i++) { nếu (máy đọc byte(vm_get(b, 2) + i) == 61) { trả về vm_error(2); }; };
+        vm_map_put(vm_get(resource, 3), b, c); trả về vm_int(1);
+    };
+    nếu (op == 201) { trả về vm_get(resource, 7); };
+    biến control = vm_get(resource, 4);
+    nếu (op == 202) {
+        biến table = vm_get(state, 12);
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            nếu (vm_at(table, i) == resource) { vm_put(table, i, 0); thoát; };
+        };
+        nếu (control != 0 && vm_get(resource, 5) == 1) { máy tiến trình thô(4, control); };
+        trả về vm_int(1);
+    };
+    nếu (op == 197) { trả về vm_process_start(resource); };
+    nếu (vm_get(resource, 5) != 1 || control == 0 || vm_get(control, 0) <= 0) { trả về vm_error(2); };
+    nếu (op == 198) {
+        nếu (vm_tag(b) != 1 || vm_number(b) < 0 || vm_number(b) > 5000) { trả về vm_error(2); };
+        vm_set(control, 7, vm_number(b));
+        biến rc = máy tiến trình thô(1, control);
+        nếu (rc < 0) { trả về vm_error(20); };
+        trả về vm_int(rc);
+    };
+    nếu (op == 199) {
+        nếu (vm_tag(b) != 1 || (vm_number(b) != 1 && vm_number(b) != 2) ||
+            vm_tag(c) != 4 || vm_tag(d) != 1 || vm_number(d) < 1 ||
+            vm_number(d) > 4096 || vm_get(c, 1) != vm_number(d)) { trả về vm_error(2); };
+        biến buffer = vm_alloc(vm_number(d), 0); nếu (buffer == 0) { trả về 0; };
+        vm_set(control, 8, buffer); vm_set(control, 9, vm_number(d)); vm_set(control, 10, vm_number(b));
+        biến got = máy tiến trình thô(2, control);
+        nếu (got < 0) { trả về vm_error(20); };
+        lặp(i = 0; i < got; i++) { vm_put(c, i, vm_int(máy đọc byte(buffer + i))); };
+        trả về vm_int(got);
+    };
+    nếu (op == 200) {
+        nếu (vm_get(control, 1) >= 0 || vm_get(control, 2) >= 0) { trả về vm_error(2); };
+        biến rc = máy tiến trình thô(3, control);
+        nếu (rc < 0) { trả về vm_error(20); };
+        trả về vm_int(rc);
+    };
+    trả về vm_error(22);
+};
+hàm vm_process_close_all(state) {
+    nếu (state == 0) { trả về 0; };
+    biến table = vm_get(state, 12);
+    nếu (table == 0) { trả về 0; };
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        biến resource = vm_at(table, i);
+        nếu (resource != 0) {
+            vm_put(table, i, 0);
+            nếu (vm_get(resource, 5) == 1) { máy tiến trình thô(4, vm_get(resource, 4)); };
+        };
+    };
+    trả về 0;
+};

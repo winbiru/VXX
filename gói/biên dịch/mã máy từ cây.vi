@@ -1,18 +1,18 @@
 // AST thuần V++ -> compiler::IrProgram wire schema -> MachineFunction.
 // ABI i32 hỗ trợ AArch64/x86-64 và số tham số động (giới hạn bởi tài nguyên).
 // Không gọi snapshot/IR của C++; mọi node ngoài tập hỗ trợ phải báo lỗi.
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/đối tượng;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
+nhập gói.biên dịch.chương trình.*;
+nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
+nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
-lớp công khai Bộ Hạ Cây Bản Địa {
+lớp công khai Bộ Hạ Cây {
     hàm công khai khởi tạo() {};
 
-    hàm riêng tư biên dịch bản địa lỗi(thông báo) {
+    hàm riêng tư báo lỗi(thông báo) {
         ném "V++ native AST: " + thông báo;
     };
 
@@ -20,10 +20,10 @@ lớp công khai Bộ Hạ Cây Bản Địa {
     // Unicode thành vpp_u_<hex>. Hai tiền tố dành riêng phải được escape
     // thành vpp_a_<hex> để không va chạm với định danh do compiler tạo.
     // Quy tắc này khớp nativeAbiSymbol() trong C++ Stage 0.
-    hàm riêng tư biên dịch bản địa tên ABI(tên) {
+    hàm riêng tư mã hóa tên ABI(tên) {
         các byte = chuỗi thành byte máy ảo(tên);
         nếu (máy ảo lấy độ dài(các byte) == 0) {
-            mình.biên dịch bản địa lỗi("tên symbol native rỗng");
+            mình.báo lỗi("tên symbol native rỗng");
         };
         ascii = đúng;
         đơn giản = đúng;
@@ -31,7 +31,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
             b = các byte[i];
             nếu (b >= 128) { ascii = sai; }
             hoặc nếu (b < 32 || b == 127) {
-                mình.biên dịch bản địa lỗi("tên symbol native chứa ký tự điều khiển");
+                mình.báo lỗi("tên symbol native chứa ký tự điều khiển");
             }
             hoặc nếu (!((b >= 65 && b <= 90) || (b >= 97 && b <= 122) ||
                         b == 95 || (i > 0 && b >= 48 && b <= 57))) {
@@ -58,16 +58,16 @@ lớp công khai Bộ Hạ Cây Bản Địa {
 
     // Symbol ID đã được semantic binding. Chỉ đổi tên xuất object và CALL
     // trước khi lower; mọi định danh trong mã nguồn vẫn giữ nguyên có dấu.
-    hàm riêng tư biên dịch bản địa chuẩn hóa ABI(IR) {
+    hàm riêng tư chuẩn hóa ABI(IR) {
         các hàm = IR["functions"];
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
-            các hàm[i]["name"] = mình.biên dịch bản địa tên ABI(các hàm[i]["name"]);
+            các hàm[i]["name"] = mình.mã hóa tên ABI(các hàm[i]["name"]);
         };
     };
 
     // ABI native dùng handle i32, byte i32; không đưa con trỏ C qua V++.
     // Mọi tên ở đây phải khớp whitelist trong mã máy hạ ir.vi.
-    hàm riêng tư biên dịch bản địa môi trường thực thi ABI(tên) {
+    hàm riêng tư tra ABI hệ thống(tên) {
         nếu (tên == "đọc số") { trả về {"symbol": "vpp_native_read_i32", "arity": 0}; };
         nếu (tên == "trạng thái đọc") { trả về {"symbol": "vpp_native_read_status", "arity": 0}; };
         nếu (tên == "byte mới") { trả về {"symbol": "vpp_native_bytes_new", "arity": 0}; };
@@ -132,8 +132,8 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         trả về rỗng;
     };
 
-    hàm riêng tư biên dịch bản địa tên môi trường thực thi dành riêng(tên) {
-        nếu (mình.biên dịch bản địa môi trường thực thi ABI(tên) != rỗng || tên == "vpp_native_print_i32") {
+    hàm riêng tư tên hệ thống dành riêng(tên) {
+        nếu (mình.tra ABI hệ thống(tên) != rỗng || tên == "vpp_native_print_i32") {
             trả về đúng;
         };
         các tên = ["vpp_native_read_i32", "vpp_native_read_status",
@@ -181,22 +181,22 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         trả về sai;
     };
 
-    hàm riêng tư biên dịch bản địa mục ký hiệu(trạng thái) {
+    hàm riêng tư cấp mã ký hiệu(trạng thái) {
         mã định danh = trạng thái["nextId"];
         trạng thái["nextId"] = mã định danh + 1;
         trả về mã định danh;
     };
 
-    hàm riêng tư biên dịch bản địa vào phạm vi(trạng thái) {
+    hàm riêng tư mở phạm vi(trạng thái) {
         máy ảo thêm cuối danh sách(trạng thái["scopes"], {});
     };
 
-    hàm riêng tư biên dịch bản địa ra phạm vi(trạng thái) {
+    hàm riêng tư đóng phạm vi(trạng thái) {
         phạm vi = trạng thái["scopes"];
         máy ảo xóa vị trí danh sách(phạm vi, máy ảo lấy độ dài(phạm vi) - 1);
     };
 
-    hàm riêng tư biên dịch bản địa tìm biến(trạng thái, tên) {
+    hàm riêng tư tìm biến(trạng thái, tên) {
         phạm vi = trạng thái["scopes"];
         lặp (i = máy ảo lấy độ dài(phạm vi) - 1; i >= 0; i--) {
             mã định danh = lấy từ điển(phạm vi[i], tên, -1);
@@ -205,18 +205,18 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         trả về -1;
     };
 
-    hàm riêng tư biên dịch bản địa khai biến(trạng thái, tên) {
+    hàm riêng tư khai biến(trạng thái, tên) {
         phạm vi = trạng thái["scopes"];
         hiện tại = phạm vi[máy ảo lấy độ dài(phạm vi) - 1];
         nếu (lấy từ điển(hiện tại, tên, -1) != -1) {
-            mình.biên dịch bản địa lỗi("trùng biến/tham số: " + tên);
+            mình.báo lỗi("trùng biến/tham số: " + tên);
         };
-        mã định danh = mình.biên dịch bản địa mục ký hiệu(trạng thái);
+        mã định danh = mình.cấp mã ký hiệu(trạng thái);
         hiện tại[tên] = mã định danh;
         trả về mã định danh;
     };
 
-    hàm riêng tư biên dịch bản địa giá trị(trạng thái, mã thao tác, văn bản = "", các mã phép toán = rỗng, mục ký hiệu = -1, lời triệu hồi = "Invalid") {
+    hàm riêng tư thêm giá trị IR(trạng thái, mã thao tác, văn bản = "", các mã phép toán = rỗng, mục ký hiệu = -1, lời triệu hồi = "Invalid") {
         nếu (các mã phép toán == rỗng) { các mã phép toán = []; };
         danh sách = trạng thái["values"];
         máy ảo thêm cuối danh sách(danh sách, {"opcode": mã thao tác, "text": văn bản, "operands": các mã phép toán,
@@ -224,7 +224,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         trả về máy ảo lấy độ dài(danh sách) - 1;
     };
 
-    hàm riêng tư biên dịch bản địa câu(mã thao tác, các gốc = rỗng, các con = rỗng, mục ký hiệu = -1,
+    hàm riêng tư tạo câu IR(mã thao tác, các gốc = rỗng, các con = rỗng, mục ký hiệu = -1,
                               biểu thức điều kiện = "Unstructured", vòng = "Unstructured") {
         nếu (các gốc == rỗng) { các gốc = []; };
         nếu (các con == rỗng) { các con = []; };
@@ -233,142 +233,146 @@ lớp công khai Bộ Hạ Cây Bản Địa {
                 "conditionalForm": biểu thức điều kiện, "loopForm": vòng};
     };
 
-    hàm riêng tư biên dịch bản địa tên biến(trạng thái, cây) {
+    hàm riêng tư nạp biến(trạng thái, cây) {
         nếu (lấy từ điển(cây, "loại", "") != "tên") {
-            mình.biên dịch bản địa lỗi("phép gán i32 yêu cầu biến cục bộ");
+            mình.báo lỗi("phép gán i32 yêu cầu biến cục bộ");
         };
         tên = cây["giá trị"];
-        mã định danh = mình.biên dịch bản địa tìm biến(trạng thái, tên);
-        nếu (mã định danh == -1) { mình.biên dịch bản địa lỗi("biến chưa khai báo: " + tên); };
-        trả về mình.biên dịch bản địa giá trị(trạng thái, "LoadName", tên, [], mã định danh);
+        mã định danh = mình.tìm biến(trạng thái, tên);
+        nếu (mã định danh == -1) { mình.báo lỗi("biến chưa khai báo: " + tên); };
+        trả về mình.thêm giá trị IR(trạng thái, "LoadName", tên, [], mã định danh);
     };
 
-    hàm riêng tư biên dịch bản địa biểu thức(trạng thái, cây, sâu = 0) {
-        nếu (sâu >= 64 || cây == rỗng) { mình.biên dịch bản địa lỗi("biểu thức i32 rỗng hoặc quá sâu"); };
+    hàm riêng tư hạ biểu thức(trạng thái, cây, sâu = 0) {
+        nếu (sâu >= 64 || cây == rỗng) { mình.báo lỗi("biểu thức i32 rỗng hoặc quá sâu"); };
         loại = lấy từ điển(cây, "loại", "");
         chọn (loại) {
             ca "hằng": {
                 kiểu = lấy từ điển(cây, "kiểu", "");
                 văn bản = cây["giá trị"];
                 nếu (kiểu == "số nguyên") {
-                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", văn bản);
+                    trả về mình.thêm giá trị IR(trạng thái, "ConstInt", văn bản);
                 };
                 nếu (kiểu == "chuỗi") {
                     // Chuỗi literal native là handle tới bộ đệm UTF-8, do caller giải phóng.
-                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstString", văn bản);
+                    trả về mình.thêm giá trị IR(trạng thái, "ConstString", văn bản);
                 };
                 nếu (văn bản == "đúng" || văn bản == "sai") {
-                    trả về mình.biên dịch bản địa giá trị(trạng thái, "ConstBool", văn bản);
+                    trả về mình.thêm giá trị IR(trạng thái, "ConstBool", văn bản);
                 };
-                mình.biên dịch bản địa lỗi("chưa hỗ trợ hằng khác i32/bool: " + văn bản);
+                mình.báo lỗi("chưa hỗ trợ hằng khác i32/bool: " + văn bản);
             }
-            ca "tên": { trả về mình.biên dịch bản địa tên biến(trạng thái, cây); }
+            ca "tên": { trả về mình.nạp biến(trạng thái, cây); }
             ca "một ngôi": {
                 mã phép toán = cây["toán tử"];
                 nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "!") {
-                    mình.biên dịch bản địa lỗi("toán tử một ngôi chưa hỗ trợ: " + mã phép toán);
+                    mình.báo lỗi("toán tử một ngôi chưa hỗ trợ: " + mã phép toán);
                 };
-                trong = mình.biên dịch bản địa biểu thức(trạng thái, cây["toán hạng"], sâu + 1);
-                trả về mình.biên dịch bản địa giá trị(trạng thái, "Unary", mã phép toán, [trong]);
+                trong = mình.hạ biểu thức(trạng thái, cây["toán hạng"], sâu + 1);
+                trả về mình.thêm giá trị IR(trạng thái, "Unary", mã phép toán, [trong]);
             }
             ca "hai ngôi": {
                 mã phép toán = cây["toán tử"];
-                nếu (mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" || mã phép toán == "*=") {
-                    toán hạng trái = mình.biên dịch bản địa tên biến(trạng thái, cây["trái"]);
-                    toán hạng phải = mình.biên dịch bản địa biểu thức(trạng thái, cây["phải"], sâu + 1);
+                nếu (mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" ||
+                    mã phép toán == "*=" || mã phép toán == "/=" || mã phép toán == "%=") {
+                    toán hạng trái = mình.nạp biến(trạng thái, cây["trái"]);
+                    toán hạng phải = mình.hạ biểu thức(trạng thái, cây["phải"], sâu + 1);
                     nếu (mã phép toán != "=") {
                         toán = "+";
                         nếu (mã phép toán == "-=") { toán = "-"; };
                         nếu (mã phép toán == "*=") { toán = "*"; };
-                        toán hạng phải = mình.biên dịch bản địa giá trị(trạng thái, "Binary", toán, [toán hạng trái, toán hạng phải]);
+                        nếu (mã phép toán == "/=") { toán = "/"; };
+                        nếu (mã phép toán == "%=") { toán = "%"; };
+                        toán hạng phải = mình.thêm giá trị IR(trạng thái, "Binary", toán, [toán hạng trái, toán hạng phải]);
                     };
-                    trả về mình.biên dịch bản địa giá trị(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
+                    trả về mình.thêm giá trị IR(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
                 };
-                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "*" && mã phép toán != "==" &&
+                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "*" &&
+                    mã phép toán != "/" && mã phép toán != "%" && mã phép toán != "==" &&
                     mã phép toán != "!=" && mã phép toán != "<" && mã phép toán != "<=" && mã phép toán != ">" && mã phép toán != ">=") {
-                    mình.biên dịch bản địa lỗi("toán tử i32 chưa hỗ trợ: " + mã phép toán);
+                    mình.báo lỗi("toán tử i32 chưa hỗ trợ: " + mã phép toán);
                 };
-                trái = mình.biên dịch bản địa biểu thức(trạng thái, cây["trái"], sâu + 1);
-                phải = mình.biên dịch bản địa biểu thức(trạng thái, cây["phải"], sâu + 1);
-                trả về mình.biên dịch bản địa giá trị(trạng thái, "Binary", mã phép toán, [trái, phải]);
+                trái = mình.hạ biểu thức(trạng thái, cây["trái"], sâu + 1);
+                phải = mình.hạ biểu thức(trạng thái, cây["phải"], sâu + 1);
+                trả về mình.thêm giá trị IR(trạng thái, "Binary", mã phép toán, [trái, phải]);
             }
             ca "cập nhật": {
-                toán hạng trái = mình.biên dịch bản địa tên biến(trạng thái, cây["đối tượng"]);
-                một = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "1");
+                toán hạng trái = mình.nạp biến(trạng thái, cây["đối tượng"]);
+                một = mình.thêm giá trị IR(trạng thái, "ConstInt", "1");
                 mã phép toán = cây["toán tử"];
-                nếu (mã phép toán != "++" && mã phép toán != "--") { mình.biên dịch bản địa lỗi("cập nhật chưa hỗ trợ: " + mã phép toán); };
+                nếu (mã phép toán != "++" && mã phép toán != "--") { mình.báo lỗi("cập nhật chưa hỗ trợ: " + mã phép toán); };
                 phép = "+";
                 nếu (mã phép toán == "--") { phép = "-"; };
-                toán hạng phải = mình.biên dịch bản địa giá trị(trạng thái, "Binary", phép, [toán hạng trái, một]);
+                toán hạng phải = mình.thêm giá trị IR(trạng thái, "Binary", phép, [toán hạng trái, một]);
                 // Postfix dùng được trong vị trí statement/update của vòng lặp.
-                trả về mình.biên dịch bản địa giá trị(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
+                trả về mình.thêm giá trị IR(trạng thái, "StoreName", "=", [toán hạng trái, toán hạng phải]);
             }
             ca "gọi": {
                 đích = cây["hàm"];
                 nếu (lấy từ điển(đích, "loại", "") != "tên") {
-                    mình.biên dịch bản địa lỗi("bản địa chỉ hỗ trợ gọi hàm trực tiếp");
+                    mình.báo lỗi("chỉ hỗ trợ gọi hàm trực tiếp");
                 };
                 tên = đích["giá trị"];
-                nếu (mình.biên dịch bản địa tìm biến(trạng thái, tên) != -1) {
-                    mình.biên dịch bản địa lỗi("không thể gọi biến cục bộ như hàm bản địa: " + tên);
+                nếu (mình.tìm biến(trạng thái, tên) != -1) {
+                    mình.báo lỗi("không thể gọi biến cục bộ như hàm: " + tên);
                 };
-                abi = mình.biên dịch bản địa môi trường thực thi ABI(tên);
+                abi = mình.tra ABI hệ thống(tên);
                 nếu (abi != rỗng) {
                     các đối số = cây["đối số"];
                     nếu (máy ảo lấy độ dài(các đối số) != abi["arity"]) {
                         nếu (abi["arity"] == 0) {
-                            mình.biên dịch bản địa lỗi("runtime native không nhận đối số: " + tên);
+                            mình.báo lỗi("runtime native không nhận đối số: " + tên);
                         };
-                        mình.biên dịch bản địa lỗi("runtime native sai số đối số: " + tên);
+                        mình.báo lỗi("runtime native sai số đối số: " + tên);
                     };
                     các mã phép toán = [];
                     lặp (i = 0; i < máy ảo lấy độ dài(các đối số); i++) {
-                        máy ảo thêm cuối danh sách(các mã phép toán, mình.biên dịch bản địa biểu thức(trạng thái, các đối số[i], sâu + 1));
+                        máy ảo thêm cuối danh sách(các mã phép toán, mình.hạ biểu thức(trạng thái, các đối số[i], sâu + 1));
                     };
-                    trả về mình.biên dịch bản địa giá trị(trạng thái, "Call", abi["symbol"], các mã phép toán,
+                    trả về mình.thêm giá trị IR(trạng thái, "Call", abi["symbol"], các mã phép toán,
                                                          -1, "NativeRuntime");
                 };
                 mã định danh = lấy từ điển(trạng thái["functions"], tên, -1);
-                nếu (mã định danh == -1) { mình.biên dịch bản địa lỗi("hàm bản địa chưa định nghĩa: " + tên); };
+                nếu (mã định danh == -1) { mình.báo lỗi("hàm chưa định nghĩa: " + tên); };
                 các đối số = cây["đối số"];
                 nếu (máy ảo lấy độ dài(các đối số) != lấy từ điển(trạng thái["arity"], tên, -1)) {
-                    mình.biên dịch bản địa lỗi("sai số đối số hàm: " + tên);
+                    mình.báo lỗi("sai số đối số hàm: " + tên);
                 };
-                các mã phép toán = [mình.biên dịch bản địa giá trị(trạng thái, "LoadName", tên, [], mã định danh)];
+                các mã phép toán = [mình.thêm giá trị IR(trạng thái, "LoadName", tên, [], mã định danh)];
                 lặp (i = 0; i < máy ảo lấy độ dài(các đối số); i++) {
-                    máy ảo thêm cuối danh sách(các mã phép toán, mình.biên dịch bản địa biểu thức(trạng thái, các đối số[i], sâu + 1));
+                    máy ảo thêm cuối danh sách(các mã phép toán, mình.hạ biểu thức(trạng thái, các đối số[i], sâu + 1));
                 };
-                trả về mình.biên dịch bản địa giá trị(trạng thái, "Call", "", các mã phép toán, mã định danh, "DirectFunction");
+                trả về mình.thêm giá trị IR(trạng thái, "Call", "", các mã phép toán, mã định danh, "DirectFunction");
             }
-            mặc định: { mình.biên dịch bản địa lỗi("biểu thức chưa hỗ trợ: " + loại); }
+            mặc định: { mình.báo lỗi("biểu thức chưa hỗ trợ: " + loại); }
         };
     };
 
-    hàm riêng tư biên dịch bản địa hạ câu(trạng thái, cây, sâu = 0) {
-        nếu (sâu >= 64) { mình.biên dịch bản địa lỗi("khối lồng quá 64 tầng"); };
+    hàm riêng tư hạ câu lệnh(trạng thái, cây, sâu = 0) {
+        nếu (sâu >= 64) { mình.báo lỗi("khối lồng quá 64 tầng"); };
         loại = lấy từ điển(cây, "loại", "");
         chọn (loại) {
-            ca "trống": { trả về mình.biên dịch bản địa câu("NoOp"); }
+            ca "trống": { trả về mình.tạo câu IR("NoOp"); }
             ca "khối": {
-                mình.biên dịch bản địa vào phạm vi(trạng thái);
+                mình.mở phạm vi(trạng thái);
                 con = [];
                 các câu = cây["câu lệnh"];
                 lặp (i = 0; i < máy ảo lấy độ dài(các câu); i++) {
-                    máy ảo thêm cuối danh sách(con, mình.biên dịch bản địa hạ câu(trạng thái, các câu[i], sâu + 1));
+                    máy ảo thêm cuối danh sách(con, mình.hạ câu lệnh(trạng thái, các câu[i], sâu + 1));
                 };
-                mình.biên dịch bản địa ra phạm vi(trạng thái);
-                trả về mình.biên dịch bản địa câu("Block", [], con);
+                mình.đóng phạm vi(trạng thái);
+                trả về mình.tạo câu IR("Block", [], con);
             }
             ca "biến": {
                 tên = cây["tên"];
-                mã định danh = mình.biên dịch bản địa khai biến(trạng thái, tên);
-                nếu (cây["giá trị"] == rỗng) { mình.biên dịch bản địa lỗi("biến i32 cần giá trị khởi tạo: " + tên); };
-                giá trị = mình.biên dịch bản địa biểu thức(trạng thái, cây["giá trị"]);
-                trả về mình.biên dịch bản địa câu("DeclareVariable", [giá trị], [], mã định danh);
+                mã định danh = mình.khai biến(trạng thái, tên);
+                nếu (cây["giá trị"] == rỗng) { mình.báo lỗi("biến i32 cần giá trị khởi tạo: " + tên); };
+                giá trị = mình.hạ biểu thức(trạng thái, cây["giá trị"]);
+                trả về mình.tạo câu IR("DeclareVariable", [giá trị], [], mã định danh);
             }
             ca "biểu thức": {
-                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
-                trả về mình.biên dịch bản địa câu("Statement", [mã định danh]);
+                mã định danh = mình.hạ biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.tạo câu IR("Statement", [mã định danh]);
             }
             ca "in": {
                 // Native print ABI nhận i32; literal UTF-8 là handle, không
@@ -376,91 +380,98 @@ lớp công khai Bộ Hạ Cây Bản Địa {
                 biểu thức = cây["biểu thức"];
                 nếu (lấy từ điển(biểu thức, "loại", "") == "hằng" &&
                     lấy từ điển(biểu thức, "kiểu", "") == "chuỗi") {
-                    mình.biên dịch bản địa lỗi("in chuỗi native chưa hỗ trợ");
+                    mình.báo lỗi("in chuỗi native chưa hỗ trợ");
                 };
-                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
-                trả về mình.biên dịch bản địa câu("Print", [mã định danh]);
+                mã định danh = mình.hạ biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.tạo câu IR("Print", [mã định danh]);
             }
             ca "trả về": {
-                mã định danh = mình.biên dịch bản địa biểu thức(trạng thái, cây["biểu thức"]);
-                trả về mình.biên dịch bản địa câu("Return", [mã định danh]);
+                mã định danh = mình.hạ biểu thức(trạng thái, cây["biểu thức"]);
+                trả về mình.tạo câu IR("Return", [mã định danh]);
             }
             ca "nếu": {
-                biểu thức điều kiện = mình.biên dịch bản địa biểu thức(trạng thái, cây["điều kiện"]);
-                con = [mình.biên dịch bản địa hạ câu(trạng thái, cây["thân"], sâu + 1)];
+                biểu thức điều kiện = mình.hạ biểu thức(trạng thái, cây["điều kiện"]);
+                con = [mình.hạ câu lệnh(trạng thái, cây["thân"], sâu + 1)];
                 dạng = "IfBlock";
                 nếu (cây["nhánh khác"] != rỗng) {
-                    máy ảo thêm cuối danh sách(con, mình.biên dịch bản địa hạ câu(trạng thái, cây["nhánh khác"], sâu + 1));
+                    máy ảo thêm cuối danh sách(con, mình.hạ câu lệnh(trạng thái, cây["nhánh khác"], sâu + 1));
                     dạng = "IfElseBlocks";
                 };
-                trả về mình.biên dịch bản địa câu("Conditional", [biểu thức điều kiện], con, -1, dạng);
+                trả về mình.tạo câu IR("Conditional", [biểu thức điều kiện], con, -1, dạng);
             }
             ca "lặp": {
-                mình.biên dịch bản địa vào phạm vi(trạng thái);
+                mình.mở phạm vi(trạng thái);
+                nếu (lấy từ điển(cây, "dạng", "") == "khi") {
+                    cond = mình.hạ biểu thức(trạng thái, cây["điều kiện"]);
+                    thân = mình.hạ câu lệnh(trạng thái, cây["thân"], sâu + 1);
+                    mình.đóng phạm vi(trạng thái);
+                    trả về mình.tạo câu IR("Loop", [cond], [thân], -1,
+                                               "Unstructured", "WhileBlock");
+                };
                 bước khởi tạo = cây["khởi tạo"];
                 nếu (bước khởi tạo != rỗng && lấy từ điển(bước khởi tạo, "loại", "") == "hai ngôi" &&
                     lấy từ điển(bước khởi tạo, "toán tử", "") == "=" &&
                     lấy từ điển(bước khởi tạo["trái"], "loại", "") == "tên") {
                     tên = bước khởi tạo["trái"]["giá trị"];
-                    nếu (mình.biên dịch bản địa tìm biến(trạng thái, tên) == -1) {
-                        mình.biên dịch bản địa khai biến(trạng thái, tên);
+                    nếu (mình.tìm biến(trạng thái, tên) == -1) {
+                        mình.khai biến(trạng thái, tên);
                     };
                 };
-                init = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "0");
-                nếu (bước khởi tạo != rỗng) { init = mình.biên dịch bản địa biểu thức(trạng thái, bước khởi tạo); };
-                cond = mình.biên dịch bản địa giá trị(trạng thái, "ConstBool", "đúng");
-                nếu (cây["điều kiện"] != rỗng) { cond = mình.biên dịch bản địa biểu thức(trạng thái, cây["điều kiện"]); };
-                bước cập nhật = mình.biên dịch bản địa giá trị(trạng thái, "ConstInt", "0");
-                nếu (cây["cập nhật"] != rỗng) { bước cập nhật = mình.biên dịch bản địa biểu thức(trạng thái, cây["cập nhật"]); };
-                thân = mình.biên dịch bản địa hạ câu(trạng thái, cây["thân"], sâu + 1);
-                mình.biên dịch bản địa ra phạm vi(trạng thái);
-                trả về mình.biên dịch bản địa câu("Loop", [init, cond, bước cập nhật], [thân], -1,
+                init = mình.thêm giá trị IR(trạng thái, "ConstInt", "0");
+                nếu (bước khởi tạo != rỗng) { init = mình.hạ biểu thức(trạng thái, bước khởi tạo); };
+                cond = mình.thêm giá trị IR(trạng thái, "ConstBool", "đúng");
+                nếu (cây["điều kiện"] != rỗng) { cond = mình.hạ biểu thức(trạng thái, cây["điều kiện"]); };
+                bước cập nhật = mình.thêm giá trị IR(trạng thái, "ConstInt", "0");
+                nếu (cây["cập nhật"] != rỗng) { bước cập nhật = mình.hạ biểu thức(trạng thái, cây["cập nhật"]); };
+                thân = mình.hạ câu lệnh(trạng thái, cây["thân"], sâu + 1);
+                mình.đóng phạm vi(trạng thái);
+                trả về mình.tạo câu IR("Loop", [init, cond, bước cập nhật], [thân], -1,
                                            "Unstructured", "ForBlock");
             }
-            ca "thoát": { trả về mình.biên dịch bản địa câu("Break"); }
-            ca "bỏ qua": { trả về mình.biên dịch bản địa câu("Continue"); }
-            mặc định: { mình.biên dịch bản địa lỗi("câu lệnh native chưa hỗ trợ: " + loại); }
+            ca "thoát": { trả về mình.tạo câu IR("Break"); }
+            ca "bỏ qua": { trả về mình.tạo câu IR("Continue"); }
+            mặc định: { mình.báo lỗi("câu lệnh native chưa hỗ trợ: " + loại); }
         };
     };
 
     // Đây là IR đầu vào độc lập cho bộ hạ native V++, không phải bytecode VM.
-    hàm công khai biên dịch bản địa tạo IR(mã nguồn) {
+    hàm công khai tạo IR(mã nguồn) {
         cây = biên dịch phân tích ngữ nghĩa thuần(mã nguồn);
         trạng thái = {"values": [], "nextId": 1, "functions": {}, "arity": {}, "scopes": []};
         câu lệnh = cây["câu lệnh"];
         lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
             khai báo = câu lệnh[i];
             nếu (khai báo["loại"] != "hàm") {
-                mình.biên dịch bản địa lỗi("bản địa chỉ nhận các khai báo hàm cấp chương trình");
+                mình.báo lỗi("chỉ nhận khai báo hàm cấp chương trình");
             };
             tên = khai báo["tên"];
-            nếu (mình.biên dịch bản địa tên môi trường thực thi dành riêng(tên)) {
-                mình.biên dịch bản địa lỗi("tên hàm dành riêng cho môi trường thực thi bản địa: " + tên);
+            nếu (mình.tên hệ thống dành riêng(tên)) {
+                mình.báo lỗi("tên hàm dành riêng cho hệ thống: " + tên);
             };
             nếu (lấy từ điển(trạng thái["functions"], tên, -1) != -1) {
-                mình.biên dịch bản địa lỗi("trùng tên hàm: " + tên);
+                mình.báo lỗi("trùng tên hàm: " + tên);
             };
-            trạng thái["functions"][tên] = mình.biên dịch bản địa mục ký hiệu(trạng thái);
+            trạng thái["functions"][tên] = mình.cấp mã ký hiệu(trạng thái);
             trạng thái["arity"][tên] = máy ảo lấy độ dài(khai báo["tham số"]);
         };
         các hàm = [];
         lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
             danh sách hàm cây cú pháp = câu lệnh[i];
             trạng thái["scopes"] = [];
-            mình.biên dịch bản địa vào phạm vi(trạng thái);
+            mình.mở phạm vi(trạng thái);
             tham số = [];
             danh sách = danh sách hàm cây cú pháp["tham số"];
             mặc định = lấy từ điển(danh sách hàm cây cú pháp, "mặc định tham số", []);
             lặp (j = 0; j < máy ảo lấy độ dài(danh sách); j++) {
                 nếu (j < máy ảo lấy độ dài(mặc định)) {
                     nếu (mặc định[j] != rỗng) {
-                        mình.biên dịch bản địa lỗi("tham số mặc định chưa hỗ trợ trong ABI i32");
+                        mình.báo lỗi("tham số mặc định chưa hỗ trợ trong ABI i32");
                     };
                 };
-                mã định danh = mình.biên dịch bản địa khai biến(trạng thái, danh sách[j]);
+                mã định danh = mình.khai biến(trạng thái, danh sách[j]);
                 máy ảo thêm cuối danh sách(tham số, {"symbolId": mã định danh, "hasDefault": sai});
             };
-            thân = mình.biên dịch bản địa hạ câu(trạng thái, danh sách hàm cây cú pháp["thân"]);
+            thân = mình.hạ câu lệnh(trạng thái, danh sách hàm cây cú pháp["thân"]);
             máy ảo thêm cuối danh sách(các hàm, {"opcode": "DefineFunction", "name": danh sách hàm cây cú pháp["tên"],
                             "symbolId": trạng thái["functions"][danh sách hàm cây cú pháp["tên"]],
                             "parameters": tham số, "roots": [], "children": [thân],
@@ -470,34 +481,34 @@ lớp công khai Bộ Hạ Cây Bản Địa {
     };
 
     // Pipeline độc lập: nguồn .vi -> AST -> IR -> Machine IR -> ISA bytes.
-    hàm công khai biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
+    hàm công khai sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
-            mình.biên dịch bản địa lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
+            mình.báo lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        biểu diễn trung gian = mình.biên dịch bản địa tạo IR(mã nguồn);
-        mình.biên dịch bản địa chuẩn hóa ABI(biểu diễn trung gian);
-        máy = biên dịch máy hạ IR(biểu diễn trung gian, mình.biên dịch bản địa tên ABI(tên hàm));
+        biểu diễn trung gian = mình.tạo IR(mã nguồn);
+        mình.chuẩn hóa ABI(biểu diễn trung gian);
+        máy = biên dịch máy hạ IR(biểu diễn trung gian, mình.mã hóa tên ABI(tên hàm));
         phát = biên dịch mã máy hàm(kiến trúc, máy, hệ điều hành);
         trả về {"ir": biểu diễn trung gian, "machine": máy, "bytes": phát["bytes"],
                 "relocations": phát["relocations"]};
     };
 
-    hàm công khai biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc,
+    hàm công khai tạo đối tượng hàm(mã nguồn, tên hàm, kiến trúc,
                                        hệ điều hành = "linux", abi = "gnu") {
-        kết quả = mình.biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
+        kết quả = mình.sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
         kết quả["object"] = biên dịch đối tượng(kiến trúc, hệ điều hành, abi,
-            kết quả["bytes"], mình.biên dịch bản địa tên ABI(tên hàm), kết quả["relocations"]);
+            kết quả["bytes"], mình.mã hóa tên ABI(tên hàm), kết quả["relocations"]);
         trả về kết quả;
     };
 
     // Cả chương trình dùng chung một lần parse, semantic và IR; mỗi hàm
     // giữ object/relocation riêng để host linker xử lý các lời gọi chéo.
-    hàm công khai biên dịch bản địa chương trình đối tượng tự chủ(mã nguồn, kiến trúc,
+    hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
                                              hệ điều hành = "linux", abi = "gnu") {
         nếu (kiến trúc != "aarch64" && kiến trúc != "x86_64") {
-            mình.biên dịch bản địa lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
+            mình.báo lỗi("backend tổng quát chỉ hỗ trợ aarch64/x86_64");
         };
-        biểu diễn trung gian = mình.biên dịch bản địa tạo IR(mã nguồn);
+        biểu diễn trung gian = mình.tạo IR(mã nguồn);
         các hàm = biểu diễn trung gian["functions"];
         // Đổi symbol sau khi semantic đã binding bằng symbolId. Nhờ vậy cả
         // hàm đích và CALL tới 'chính' cùng hạ thành ABI symbol 'main'.
@@ -508,13 +519,13 @@ lớp công khai Bộ Hạ Cây Bản Địa {
             nếu (các hàm[i]["name"] == "chính") { có chính = đúng; };
         };
         nếu (có chính && có main) {
-            mình.biên dịch bản địa lỗi("không thể khai báo đồng thời main() và chính()");
+            mình.báo lỗi("không thể khai báo đồng thời main() và chính()");
         };
         lặp (i = 0; i < máy ảo lấy độ dài(các hàm); i++) {
             nếu (các hàm[i]["name"] == "chính") {
                 các hàm[i]["name"] = "main";
             } hoặc {
-                các hàm[i]["name"] = mình.biên dịch bản địa tên ABI(các hàm[i]["name"]);
+                các hàm[i]["name"] = mình.mã hóa tên ABI(các hàm[i]["name"]);
             };
         };
         kết quả = [];
@@ -533,7 +544,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
 
     // Wire format cho CLI: giữ hợp đồng M:/I:/B:/R:/O: của bridge hiện hữu.
     // CLI chỉ vận chuyển dữ liệu, toàn bộ AST/IR/ISA/object được dựng bằng V++.
-    hàm công khai biên dịch bản địa in bản ghi(kết quả) {
+    hàm công khai xuất bản ghi(kết quả) {
         chương trình con hiện tại = kết quả["machine"];
         in "M:" + chương trình con hiện tại["parameterCount"] + ":" + chương trình con hiện tại["slotCount"] + ":" + chương trình con hiện tại["maxStackDepth"];
         lệnh = chương trình con hiện tại["instructions"];
@@ -547,7 +558,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         thập lục phân = "";
         lặp (i = 0; i < máy ảo lấy độ dài(byte); i++) {
             b = byte[i];
-            nếu (b < 0 || b > 255) { mình.biên dịch bản địa lỗi("byte ISA ngoài u8"); };
+            nếu (b < 0 || b > 255) { mình.báo lỗi("byte ISA ngoài u8"); };
             thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
         };
         in "B:" + thập lục phân;
@@ -559,7 +570,7 @@ lớp công khai Bộ Hạ Cây Bản Địa {
         thập lục phân = "";
         lặp (i = 0; i < máy ảo lấy độ dài(đối tượng); i++) {
             b = đối tượng[i];
-            nếu (b < 0 || b > 255) { mình.biên dịch bản địa lỗi("byte object ngoài u8"); };
+            nếu (b < 0 || b > 255) { mình.báo lỗi("byte object ngoài u8"); };
             thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
         };
         in "O:" + thập lục phân;
@@ -567,30 +578,30 @@ lớp công khai Bộ Hạ Cây Bản Địa {
 };
 
 
-hàm công khai biên dịch bản địa tạo IR(mã nguồn) {
-    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
-    trả về bộ chuyển tiếp.biên dịch bản địa tạo IR(mã nguồn);
+hàm công khai tạo IR(mã nguồn) {
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.tạo IR(mã nguồn);
 };
 
-hàm công khai biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
-    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
-    trả về bộ chuyển tiếp.biên dịch bản địa tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
+hàm công khai sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành = "linux") {
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.sinh mã hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành);
 };
 
-hàm công khai biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc,
+hàm công khai tạo đối tượng hàm(mã nguồn, tên hàm, kiến trúc,
                                    hệ điều hành = "linux", abi = "gnu") {
-    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
-    trả về bộ chuyển tiếp.biên dịch bản địa đối tượng tự chủ(mã nguồn, tên hàm, kiến trúc, hệ điều hành, abi);
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.tạo đối tượng hàm(mã nguồn, tên hàm, kiến trúc, hệ điều hành, abi);
 };
 
-hàm công khai biên dịch bản địa chương trình đối tượng tự chủ(mã nguồn, kiến trúc,
+hàm công khai tạo đối tượng chương trình(mã nguồn, kiến trúc,
                                           hệ điều hành = "linux", abi = "gnu") {
-    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
-    trả về bộ chuyển tiếp.biên dịch bản địa chương trình đối tượng tự chủ(
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.tạo đối tượng chương trình(
         mã nguồn, kiến trúc, hệ điều hành, abi);
 };
 
-hàm công khai biên dịch bản địa in bản ghi(kết quả) {
-    bộ chuyển tiếp = Bộ Hạ Cây Bản Địa();
-    trả về bộ chuyển tiếp.biên dịch bản địa in bản ghi(kết quả);
+hàm công khai xuất bản ghi(kết quả) {
+    bộ chuyển tiếp = Bộ Hạ Cây();
+    trả về bộ chuyển tiếp.xuất bản ghi(kết quả);
 };

@@ -14,6 +14,28 @@ hàm tong(n) {
     trả về total;
 }
 
+hàm tong_khi(n) {
+    biến total = 0;
+    biến i = 0;
+    khi (i < n) {
+        total = total + i;
+        i = i + 1;
+    };
+    trả về total;
+}
+
+hàm dieu_khien_khi(n) {
+    biến total = 0;
+    biến i = 0;
+    khi (i < n) {
+        i = i + 1;
+        nếu (i == 2) { bỏ qua; };
+        nếu (i == 6) { thoát; };
+        total = total + i;
+    };
+    trả về total;
+}
+
 hàm max_i32(a, b) {
     nếu (a >= b) { trả về a; }
     hoặc { trả về b; };
@@ -25,6 +47,17 @@ hàm tong_bon(a, b, c, d) {
 
 hàm tru_dao(a, b) {
     trả về b - a;
+}
+
+// Biên dịch phép chia i32 thành lệnh máy trực tiếp, không gọi runtime C++.
+hàm chia_i32(a, b) {
+    trả về a / b;
+}
+
+// Thử đường stack/call ngoài đường ARM64 tối ưu hoàn toàn trong thanh ghi.
+hàm chia_qua_ham(a, b) {
+    biến trung_gian = chia_i32(a, b);
+    trả về trung_gian / 1;
 }
 
 hàm phu_dinh(n) {
@@ -55,6 +88,71 @@ hàm tim_dau(n) {
 hàm dieu_kien(n) {
     nếu (n != 0) { trả về 12; };
     trả về -12;
+}
+
+// CMP immediate nhỏ và CMP với scratch register cho hằng lớn/âm.
+hàm so_sanh_nho(n) {
+    nếu (n < 4095) { trả về 12; };
+    trả về -12;
+}
+
+hàm so_sanh_lon(n) {
+    nếu (n >= 65521) { trả về 12; };
+    trả về -12;
+}
+
+hàm so_sanh_am(n) {
+    nếu (n == -1) { trả về 12; };
+    trả về -12;
+}
+
+// Cùng hằng lớn dùng cho CMP và SUB trong vòng lặp: W10 được tải một lần.
+hàm hoist_vong(seed, n) {
+    biến x = seed;
+    lặp (i = 0; i < n; i = i + 1) {
+        x = x + 251;
+        nếu (x >= 65521) { x = x - 65521; };
+    };
+    trả về x;
+}
+
+// Hai vòng tách biệt có hằng âm và hằng dương ngoài imm12.
+// Một hằng dùng W10; hằng còn lại dùng W9 mà không phá hủy W10.
+hàm hoist_hai_vong(seed, n) {
+    biến x = seed;
+    lặp (i = 0; i < n; i = i + 1) {
+        x = x + (-17);
+        x = x - (-17);
+    };
+    lặp (j = 0; j < n; j = j + 1) {
+        x = x + 8193;
+        x = x - 8193;
+    };
+    trả về x;
+}
+
+// Nhánh bỏ qua trong vòng lặp lồng nhau không được làm sai trạng thái slot.
+hàm hoist_long_nhau(seed, n) {
+    biến x = seed;
+    lặp (i = 0; i < n; i = i + 1) {
+        lặp (j = 0; j < 3; j = j + 1) {
+            nếu (j == 1) { bỏ qua; };
+            x = x + 65521;
+            x = x - 65521;
+        };
+    };
+    trả về x;
+}
+
+// Hàm có CALL phải dùng frame/stack fallback thay vì W10 hoisting.
+hàm hoist_goi(seed, n) {
+    biến x = seed;
+    lặp (i = 0; i < n; i = i + 1) {
+        x = x + 65521;
+        x = x - 65521;
+        x = chia_i32(x, 1);
+    };
+    trả về x;
 }
 
 hàm bo_qua(n) {

@@ -1,0 +1,193 @@
+// Standalone resolver 203..205. Numeric addresses are handled directly;
+// hostnames run the shared V++ DNS wire/hosts library in a provider state.
+// There is no libc addrinfo pointer, external process or C++ callback.
+hàm vm_resolver_ipv4(host) {
+    biến n = vm_get(host, 1);
+    nếu (n < 7 || n > 15) { trả về 0; };
+    biến p = vm_get(host, 2); biến i = 0; biến groups = 0;
+    khi (i < n) {
+        biến start = i; biến number = 0;
+        khi (i < n) {
+            biến c = máy đọc byte(p + i);
+            nếu (c < 48 || c > 57) { thoát; };
+            number = number * 10 + c - 48;
+            i = i + 1;
+            nếu (i - start > 3 || number > 255) { trả về 0; };
+        };
+        nếu (i == start || (i - start > 1 && máy đọc byte(p + start) == 48)) { trả về 0; };
+        groups = groups + 1;
+        nếu (i < n) {
+            nếu (máy đọc byte(p + i) != 46 || groups >= 4) { trả về 0; };
+            i = i + 1;
+            nếu (i == n) { trả về 0; };
+        };
+    };
+    trả về groups == 4;
+};
+hàm vm_resolver_hex(c) {
+    nếu (c >= 48 && c <= 57) { trả về 1; };
+    nếu (c >= 65 && c <= 70) { trả về 1; };
+    nếu (c >= 97 && c <= 102) { trả về 1; };
+    trả về 0;
+};
+hàm vm_resolver_ipv6(host) {
+    biến n = vm_get(host, 1);
+    nếu (n < 2 || n > 39) { trả về 0; };
+    biến p = vm_get(host, 2); biến i = 0; biến groups = 0; biến compressed = 0;
+    nếu (máy đọc byte(p) == 58) {
+        nếu (máy đọc byte(p + 1) != 58) { trả về 0; };
+        compressed = 1; i = 2;
+    };
+    khi (i < n) {
+        biến start = i;
+        khi (i < n && vm_resolver_hex(máy đọc byte(p + i)) == 1) {
+            i = i + 1;
+            nếu (i - start > 4) { trả về 0; };
+        };
+        nếu (i == start) { trả về 0; };
+        groups = groups + 1;
+        nếu (groups > 8) { trả về 0; };
+        nếu (i < n) {
+            nếu (máy đọc byte(p + i) != 58) { trả về 0; };
+            i = i + 1;
+            nếu (i < n && máy đọc byte(p + i) == 58) {
+                nếu (compressed == 1) { trả về 0; };
+                compressed = 1; i = i + 1;
+            } hoặc nếu (i == n) { trả về 0; };
+        };
+    };
+    nếu (compressed == 1) { trả về groups < 8; };
+    trả về groups == 8;
+};
+hàm vm_resolver_find(state, token) {
+    nếu (vm_tag(token) != 1 || vm_number(token) < 1342177281) { vm_error(2); trả về 0; };
+    biến table = vm_get(state, 14);
+    nếu (table != 0) {
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            biến resource = vm_at(table, i);
+            nếu (resource != 0 && vm_get(resource, 0) == vm_number(token)) { trả về resource; };
+        };
+    };
+    vm_error(2); trả về 0;
+};
+hàm vm_resolver_hostname(host) {
+    biến n = vm_get(host, 1); biến p = vm_get(host, 2);
+    nếu (n > 253) { trả về 0; };
+    nếu (n > 0 && máy đọc byte(p + n - 1) == 46) { n = n - 1; };
+    biến label = 0; biến letter = 0;
+    lặp(i = 0; i < n; i++) {
+        biến c = máy đọc byte(p + i);
+        nếu (c == 46) {
+            nếu (label < 1 || label > 63) { trả về 0; };
+            label = 0;
+        } hoặc {
+            nếu ((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) { letter = 1; }
+            hoặc nếu ((c < 48 || c > 57) && c != 45 && c != 95) { trả về 0; };
+            label = label + 1;
+        };
+    };
+    // All-numeric dotted forms belong to the strict IPv4 parser above.
+    trả về label > 0 && label <= 63 && letter == 1;
+};
+hàm vm_resolver_dns(state, host) {
+    biến provider = vm_get(4198464, 4);
+    nếu (provider == 0) {
+        biến args = vm_vector(4); vm_append(args, vm_literal("VPP_VM_DNS_PROVIDER"));
+        biến path = vm_host(state, 177, args);
+        nếu (path == 0 || vm_get(path, 1) == 0) {
+            biến executable = vm_get(4198464, 10); biến slash = -1;
+            lặp(i = 0; i < vm_get(executable, 1); i++) {
+                nếu (máy đọc byte(vm_get(executable, 2) + i) == 47) { slash = i; };
+            };
+            path = vm_concat(vm_slice(executable, 0, slash + 1), vm_literal("dns-provider.vmb"));
+        };
+        biến handle = vm_path_handle(path); nếu (handle < 0) { trả về 0; };
+        provider = vm_load(handle); byte hủy(handle);
+        nếu (provider == 0 || vm_get(4198464, 1) != 0) { trả về 0; };
+        vm_set(4198464, 4, provider);
+        vm_run(provider);
+    };
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    biến id = vm_find_function(provider, vm_literal("vm phân giải DNS thuần vi"));
+    nếu (id < 0) { trả về vm_error(13); };
+    biến args = vm_vector(4); vm_append(args, host);
+    vm_invoke(provider, id, args, 0, 0, 0); vm_execute(provider);
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    biến addresses = vm_get(provider, 7);
+    nếu (vm_tag(addresses) != 4) { trả về vm_error(2); };
+    lặp(i = 0; i < vm_get(addresses, 1); i++) {
+        biến address = vm_at(addresses, i);
+        nếu (vm_tag(address) != 3) { trả về vm_error(2); };
+        nếu (vm_resolver_ipv4(address) == 0 && vm_resolver_ipv6(address) == 0) { trả về vm_error(2); };
+    };
+    trả về addresses;
+};
+hàm vm_resolver_open(state, host, service, datagram) {
+    nếu (vm_tag(host) != 3 || vm_tag(service) != 3 || vm_tag(datagram) != 1 ||
+        vm_get(host, 1) == 0 || vm_get(host, 1) > 1024 ||
+        vm_get(service, 1) > 5 || vm_number(datagram) < 0 || vm_number(datagram) > 1) {
+        trả về vm_error(2);
+    };
+    // A guest string is byte-counted, so reject embedded NUL explicitly.
+    // Malformed UTF-8 must never flow into a future DNS transport provider.
+    nếu (vm_utf8_valid(vm_get(host, 2), vm_get(host, 1)) == 0) {
+        trả về vm_error(2);
+    };
+    lặp(i = 0; i < vm_get(host, 1); i++) {
+        nếu (máy đọc byte(vm_get(host, 2) + i) == 0) { trả về vm_error(2); };
+    };
+    biến port = 0; biến n = vm_get(service, 1);
+    lặp(i = 0; i < n; i++) {
+        biến c = máy đọc byte(vm_get(service, 2) + i);
+        nếu (c < 48 || c > 57) { trả về vm_error(2); };
+        port = port * 10 + c - 48;
+    };
+    nếu (n > 0 && (port == 0 || port > 65535)) { trả về vm_error(2); };
+    biến addresses = 0;
+    nếu (vm_resolver_ipv4(host) == 1 || vm_resolver_ipv6(host) == 1) {
+        addresses = vm_vector(4); vm_append(addresses, host);
+    } hoặc {
+        nếu (vm_resolver_hostname(host) == 0) { trả về vm_error(22); };
+        addresses = vm_resolver_dns(state, host);
+    };
+    nếu (addresses == 0 || vm_get(4198464, 1) != 0) { trả về 0; };
+    biến table = vm_get(state, 14);
+    nếu (table == 0) {
+        table = vm_vector(4); nếu (table == 0) { trả về 0; };
+        vm_set(state, 14, table);
+    };
+    biến token = vm_get(state, 15);
+    nếu (token == 0) { token = 1342177280; };
+    nếu (token >= 2147483000) { trả về vm_error(3); };
+    token = token + 1;
+    biến guest_token = vm_int(token); nếu (guest_token == 0) { trả về 0; };
+    biến resource = vm_alloc(16, 1); nếu (resource == 0) { trả về 0; };
+    vm_set(resource, 0, token); vm_set(resource, 1, addresses);
+    biến reused = 0;
+    lặp(i = 0; i < vm_get(table, 1); i++) {
+        nếu (vm_at(table, i) == 0) { vm_put(table, i, resource); reused = 1; thoát; };
+    };
+    nếu (reused == 0) { vm_append(table, resource); };
+    nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+    vm_set(state, 15, token);
+    nếu (vm_get(4198464, 4) != 0) { vm_set(vm_get(4198464, 4), 7, 0); };
+    trả về guest_token;
+};
+hàm vm_resolver_host(state, op, a, b, c) {
+    nếu (op == 203) { trả về vm_resolver_open(state, a, b, c); };
+    biến resource = vm_resolver_find(state, a); nếu (resource == 0) { trả về 0; };
+    nếu (op == 204) {
+        biến index = vm_get(resource, 2); biến addresses = vm_get(resource, 1);
+        nếu (index >= vm_get(addresses, 1)) { trả về 0; };
+        vm_set(resource, 2, index + 1);
+        trả về vm_at(addresses, index);
+    };
+    nếu (op == 205) {
+        biến table = vm_get(state, 14);
+        lặp(i = 0; i < vm_get(table, 1); i++) {
+            nếu (vm_at(table, i) == resource) { vm_put(table, i, 0); thoát; };
+        };
+        trả về vm_int(1);
+    };
+    trả về vm_error(22);
+};

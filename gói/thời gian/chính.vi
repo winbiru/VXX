@@ -2,10 +2,10 @@
 // Mục đích: cung cấp API thời gian hiện tại cho ứng dụng.
 // Clock/zone là primitive OS; định dạng ISO-8601 nằm hoàn toàn ở V++.
 
-nhập gói/thời gian/lịch;
-nhập gói/thời gian/giờ quốc tế;
-nhập gói/thời gian/địa phương;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.thời gian.lịch.thời gian đệm số;
+nhập gói.thời gian.giờ quốc tế.thời gian đọc giờ quốc tế ffi;
+nhập gói.thời gian.địa phương.thời gian đọc địa phương posix;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Đồng Hồ {
@@ -97,7 +97,12 @@ hàm công khai giờ hiện tại() {
     trả về bộ chuyển tiếp.giờ hiện tại();
 };
 
-nhập gói/thời gian/đơn điệu;
-nhập gói/thời gian/thời lượng;
-nhập gói/thời gian/giao diện đo;
-nhập gói/thời gian/bộ bấm giờ;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.thời gian.thời lượng.*;
+nhập gói.thời gian.giao diện đo.*;
+nhập gói.thời gian.bộ bấm giờ.*;
+// Giữ đầy đủ API công khai của `nhập thời gian;` cho các module con.
+// Các import chọn lọc ở đầu tệp chỉ phục vụ phần cài đặt Đồng Hồ.
+nhập gói.thời gian.lịch.*;
+nhập gói.thời gian.giờ quốc tế.*;
+nhập gói.thời gian.địa phương.*;

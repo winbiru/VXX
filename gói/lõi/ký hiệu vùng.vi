@@ -1,7 +1,8 @@
 // Registry ký hiệu locale deterministic dùng chung cho formatter và vi.locale.
 // Không đọc process locale và không phụ thuộc native locale APIs.
 
-nhập gói/văn bản/chuỗi;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.chuỗi thường;
 
 hàm công khai ký hiệu vùng chuẩn hóa(vùng) {
     nếu (loại của(vùng) != "chuỗi") {

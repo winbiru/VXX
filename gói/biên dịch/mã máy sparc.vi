@@ -1,6 +1,8 @@
 // sparc: phát byte mã máy kiến trúc riêng.
 // Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm thập lục phân;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phát SPARC {

@@ -1,7 +1,7 @@
 // Bài kiểm tra lexer V++ độc lập, đối chiếu kết quả với compiler bootstrap.
-nhập gói/biên dịch/chính;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.bảng mã.*;
 
 lớp Hộp Thu {
     hàm công khai thu thập(x) { trả về x + 1; };

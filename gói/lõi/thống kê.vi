@@ -3,8 +3,10 @@
 
 // Khai báo dependency tại module sở hữu; không dựa vào thư viện mà importer
 // tình cờ nạp sau đó vào namespace chung của bootstrap C++.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/bộ sưu tập/danh sách;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.danh sách.tổng danh sách;
+nhập gói.bộ sưu tập.danh sách.nhỏ nhất danh sách;
+nhập gói.bộ sưu tập.danh sách.lớn nhất danh sách;
 
 hàm công khai thống kê là không phải số(giá trị) {
     nếu (loại của(giá trị) != "số thực") {
@@ -177,4 +179,5 @@ hàm công khai gộp thống kê(a, b) {
         "trung bình": tổng / (đếm + 0.0)
     };
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;

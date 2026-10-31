@@ -1,5 +1,5 @@
 // vpp.archive — công cụ đóng/mở gói tài nguyên trên backend vi.archive.
-nhập lưu trữ;
+nhập lưu trữ.*;
 
 hàm công khai gói tài nguyên tạo(đường gói, danh sách tệp) {
     trả về lưu trữ tạo zip(đường gói, danh sách tệp);

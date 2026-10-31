@@ -1,5 +1,5 @@
 // vi.net.http — HTTP client, server và REST viết bằng V++ trên socket primitives.
-nhập gói/mạng/http/máy khách;
-nhập gói/mạng/http/khách;
-nhập gói/mạng/http/máy chủ;
-nhập gói/mạng/http/dịch vụ tài nguyên;
+nhập gói.mạng.http.máy khách.*;
+nhập gói.mạng.http.khách.*;
+nhập gói.mạng.http.máy chủ.*;
+nhập gói.mạng.http.dịch vụ tài nguyên.*;

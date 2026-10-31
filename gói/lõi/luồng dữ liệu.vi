@@ -1,5 +1,9 @@
-
-
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.danh sách.tìm chỉ số;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Xử Lý Luồng {
     hàm công khai khởi tạo() {};
@@ -360,7 +364,7 @@ lớp công khai Bộ Xử Lý Luồng {
             lấy từ điển(nguồn, "__vpp_stream_generator__", 0) == 1) {
             tiếp = lấy từ điển(nguồn, "tiếp", rỗng);
             còn = đúng;
-            lặp(vòng = 0; còn && tiếp tục; vòng++) {
+            khi (còn && tiếp tục) {
                 bước = tiếp();
                 nếu (loại của(bước) != "từ điển" ||
                     lấy từ điển(bước, "__vpp_stream_step__", 0) != 1) {
@@ -670,4 +674,3 @@ hàm công khai đóng luồng(luồng) {
     bộ chuyển tiếp = Bộ Xử Lý Luồng();
     trả về bộ chuyển tiếp.đóng luồng(luồng);
 };
-nhập gói/lõi/chuyển kiểu;

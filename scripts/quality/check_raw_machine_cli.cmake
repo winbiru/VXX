@@ -26,8 +26,10 @@ foreach(out_of_range IN ITEMS "2147483648" "-2147483649" "-9223372036854775809")
         COMMAND "${VPP_EXEC}" chạy "${VPP_OUTPUT_DIR}/out_of_range.vi"
         RESULT_VARIABLE overflow_result ERROR_VARIABLE overflow_error
         OUTPUT_VARIABLE overflow_output)
+    # Native V++ reports a failed i32 conversion, while Stage 0 includes
+    # the literal-specific overflow diagnostic. Both must reject the input.
     if (overflow_result EQUAL 0 OR
-        NOT overflow_error MATCHES "Số nguyên vượt phạm vi i32")
+        NOT overflow_error MATCHES "Số nguyên vượt phạm vi i32|thành số nguyên: giá trị không thể chuyển đổi")
         message(FATAL_ERROR "integer literal overflow not rejected (${out_of_range}): ${overflow_error}; ${overflow_output}")
     endif()
 endforeach()
@@ -160,12 +162,8 @@ endforeach()
 
 file(REMOVE "${raw_file}")
 file(REMOVE "${asm_file}")
-foreach(unsupported IN ITEMS hang_tran hang_tran_trung_gian hang_chia)
-    if (unsupported STREQUAL "hang_chia")
-        set(expected_diagnostic "toán tử binary native chưa hỗ trợ")
-    else()
-        set(expected_diagnostic "biểu thức hằng native vượt phạm vi i32 hoặc tràn trung gian")
-    endif()
+foreach(unsupported IN ITEMS hang_tran hang_tran_trung_gian)
+    set(expected_diagnostic "biểu thức hằng native vượt phạm vi i32 hoặc tràn trung gian")
     execute_process(
         COMMAND "${VPP_EXEC}" build --target aarch64-apple-darwin --emit-raw
             "${unsupported}" "${VPP_SOURCE}" "${raw_file}"
@@ -177,6 +175,21 @@ foreach(unsupported IN ITEMS hang_tran hang_tran_trung_gian hang_chia)
         message(FATAL_ERROR "unsafe arithmetic must not write output: ${unsupported}")
     endif()
 endforeach()
+# Phép chia hằng đã được Machine IR i32 hỗ trợ; bảo đảm CLI xuất được
+# machine bytes thực tế, thay vì kiểm tra diagnostic lỗi thời của leaf lowerer.
+execute_process(
+    COMMAND "${VPP_EXEC}" build --target aarch64-apple-darwin --emit-raw
+        hang_chia "${VPP_SOURCE}" "${raw_file}"
+    RESULT_VARIABLE result ERROR_VARIABLE error)
+if (NOT result EQUAL 0 OR NOT EXISTS "${raw_file}")
+    message(FATAL_ERROR "native i32 division lowering must emit bytes: ${error}")
+endif()
+file(SIZE "${raw_file}" div_size)
+math(EXPR div_remainder "${div_size} % 4")
+if (div_size LESS 4 OR NOT div_remainder EQUAL 0)
+    message(FATAL_ERROR "native AArch64 i32 division invalid code size: ${div_size}")
+endif()
+file(REMOVE "${raw_file}")
 execute_process(
     COMMAND "${VPP_EXEC}" build --target aarch64-apple-darwin --emit-raw
         tru_dao "${VPP_SOURCE}" "${raw_file}"

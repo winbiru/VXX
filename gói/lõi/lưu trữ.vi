@@ -2,12 +2,22 @@
 // VM chỉ còn primitive file I/O nhị phân; format ZIP, CRC32, kiểm tra tên
 // mục và giới hạn giải nén đều thuộc tầng thư viện V++.
 
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/nhập xuất/thư mục;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.nhập xuất.tệp.đọc các byte tệp;
+nhập gói.nhập xuất.tệp.ghi các byte tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn nối;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tên;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.là tệp;
+nhập gói.nhập xuất.thư mục.tạo thư mục;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.toán học.giới hạn;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Lưu Trữ ZIP {
@@ -319,7 +329,7 @@ lớp công khai Bộ Lưu Trữ ZIP {
         các byte = đọc các byte tệp(đường zip);
         kết quả = [];
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
             nếu (lấy từ điển(điểm vào, "xong", sai)) {
                 trả về kết quả;
@@ -339,7 +349,7 @@ lớp công khai Bộ Lưu Trữ ZIP {
         vị trí = 0;
         tổng = 0;
         số mục = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < máy ảo lấy độ dài(các byte)) {
             điểm vào = mình.lưu trữ đọc local điểm vào(các byte, vị trí);
             nếu (lấy từ điển(điểm vào, "xong", sai)) {
                 trả về số mục;

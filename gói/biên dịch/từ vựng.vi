@@ -1,9 +1,12 @@
 // Lexer viết bằng V++: bước đầu của compiler tự lưu trữ.
 // Vị trí/cột dùng byte UTF-8 như SourceSpan của compiler bootstrap.
 // Cả vị trí theo Unicode code point được giữ trong các trường "... ký tự".
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit độ dài đoạn;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Mỗi phiên giữ nguồn và cache token thô/token đã hợp nhất riêng.
 // Các phương thức nhận nguồn trực tiếp bên dưới vẫn giữ API cũ.
@@ -19,6 +22,22 @@ lớp công khai Bộ Tách Từ Vựng {
         mình.nguồn = mã nguồn;
         mình.từ tố thô = rỗng;
         mình.từ tố đã ghép = rỗng;
+        // A token is classified many times per source, so reuse one keyword
+        // index instead of checking every keyword with sequential compares.
+        mình.bảng từ khóa = {
+            "nếu": đúng, "hoặc": đúng, "lặp": đúng, "khi": đúng,
+            "hàm": đúng, "gọi": đúng, "biến": đúng, "in": đúng,
+            "dừng": đúng, "thoát": đúng, "chọn": đúng, "ca": đúng,
+            "đúng": đúng, "sai": đúng, "rỗng": đúng, "ném": đúng,
+            "thử": đúng, "nhập": đúng, "lớp": đúng, "chuyển": đúng,
+            "mặc định": đúng, "trả về": đúng, "bỏ qua": đúng,
+            "khởi tạo": đúng, "điều kiện": đúng, "cập nhật": đúng,
+            "kiểm tra sau": đúng, "bắt lỗi": đúng, "trường hợp": đúng,
+            "giao diện": đúng, "kế thừa": đúng, "triển khai": đúng,
+            "công khai": đúng, "riêng tư": đúng, "bảo vệ": đúng,
+            "ngoại thư viện": đúng, "ngoại hàm": đúng,
+            "ký hiệu": đúng, "khả năng": đúng
+        };
         trả về mình;
     };
 
@@ -43,10 +62,10 @@ lớp công khai Bộ Tách Từ Vựng {
 
     hàm riêng tư biên dịch từ vựng trắng(c) {
         // Chuỗi escape \v / \f không được V++ diễn giải thành ký tự điều khiển:
-        // dùng code point để tránh nuốt nhầm chữ 'v' và 'f' của định danh.
+        // Hai byte ASCII 11 và 12 nằm giữa LF (10) và CR (13).
+        // So sánh chuỗi UTF-8 trực tiếp, tránh giải mã Unicode ở mỗi ký tự.
         nếu (c == " " || c == "\n" || c == "\r" || c == "\t") { trả về đúng; };
-        mã = mã điểm unicode(c);
-        trả về mã == 11 || mã == 12;
+        trả về c > "\n" && c < "\r";
     };
 
     hàm riêng tư biên dịch từ vựng ngăn cách(c) {
@@ -65,8 +84,8 @@ lớp công khai Bộ Tách Từ Vựng {
 
     hàm riêng tư biên dịch từ vựng chữ số(c) {
         nếu (c == "") { trả về sai; };
-        mã = mã điểm unicode(c);
-        trả về mã >= 48 && mã <= 57;
+        // Cả UTF-8 của ký tự phi ASCII đều nằm ngoài khoảng byte '0'..'9'.
+        trả về c >= "0" && c <= "9";
     };
 
     hàm riêng tư biên dịch từ vựng số(s) {
@@ -91,7 +110,12 @@ lớp công khai Bộ Tách Từ Vựng {
             nếu ((s[0] == "\"" && s[n - 1] == "\"") ||
                 (s[0] == "'" && s[n - 1] == "'")) { trả về "chuỗi"; };
         };
-        số = mình.biên dịch từ vựng số(s);
+        // Most tokens are identifiers/keywords. Only numbers (and the
+        // historically accepted dot token) need numeric classification.
+        số = "";
+        nếu (n > 0 && (s[0] == "." || (s[0] >= "0" && s[0] <= "9"))) {
+            số = mình.biên dịch từ vựng số(s);
+        };
         nếu (số != "") { trả về số; };
         nếu (mình.biên dịch từ vựng hai toán tử(s) || s == "+" || s == "-" ||
             s == "*" || s == "/" || s == "%" || s == "=" ||
@@ -100,18 +124,7 @@ lớp công khai Bộ Tách Từ Vựng {
             s == "[" || s == "]" || s == ";" || s == "," || s == ":") {
             trả về "dấu câu";
         };
-        nếu (s == "nếu" || s == "hoặc" || s == "lặp" || s == "hàm" ||
-            s == "gọi" || s == "biến" || s == "in" || s == "dừng" ||
-            s == "thoát" || s == "chọn" || s == "ca" || s == "đúng" ||
-            s == "sai" || s == "rỗng" || s == "ném" || s == "thử" ||
-            s == "nhập" || s == "lớp" || s == "chuyển" || s == "mặc định" ||
-            s == "trả về" || s == "bỏ qua" ||
-            s == "khởi tạo" || s == "điều kiện" || s == "cập nhật" ||
-            s == "kiểm tra sau" || s == "bắt lỗi" || s == "trường hợp" ||
-            s == "giao diện" || s == "kế thừa" || s == "triển khai" ||
-            s == "công khai" || s == "riêng tư" || s == "bảo vệ" ||
-            s == "ngoại thư viện" || s == "ngoại hàm" || s == "ký hiệu" ||
-            s == "khả năng") { trả về "từ khóa"; };
+        nếu (máy ảo có khóa từ điển(mình.bảng từ khóa, s)) { trả về "từ khóa"; };
         trả về "định danh";
     };
 
@@ -135,6 +148,17 @@ lớp công khai Bộ Tách Từ Vựng {
             thành chuỗi(dòng) + ", cột " + thành chuỗi(cột);
     };
 
+    // Copy each source byte once. Building a token by repeatedly appending
+    // immutable strings performs quadratic copying for long identifiers and
+    // string literals, while byte spans preserve UTF-8 and escape spelling.
+    hàm riêng tư biên dịch từ vựng đoạn(các byte, bắt đầu, kết thúc) {
+        đoạn = [];
+        lặp(j = bắt đầu; j < kết thúc; j++) {
+            máy ảo thêm cuối danh sách(đoạn, các byte[j]);
+        };
+        trả về chuỗi từ byte máy ảo(đoạn);
+    };
+
     // Lex UTF-8 bằng các code point: không tách đôi ký tự tiếng Việt.
     // Chưa dùng trong bootstrap C++; API này là pass độc lập có thể kiểm thử.
     hàm công khai biên dịch từ tố hóa thô(mã nguồn) {
@@ -145,6 +169,8 @@ lớp công khai Bộ Tách Từ Vựng {
         // quét lại toàn bộ prefix và làm thời gian lexer tăng theo bình phương.
         // Duyệt UTF-8 đúng một lượt rồi giữ bảng code point cho các pass sau.
         các byte = chuỗi thành byte máy ảo(mã nguồn);
+        // The source byte length is immutable throughout tokenization.
+        số byte = máy ảo lấy độ dài(các byte);
         ký tự = [];
         mã ký tự cơ bản = [];
         lặp(i = 0; i < 128; i++) { máy ảo thêm cuối danh sách(mã ký tự cơ bản, chuỗi từ byte máy ảo([i])); };
@@ -152,7 +178,7 @@ lớp công khai Bộ Tách Từ Vựng {
         cột byte = [1];
         cột hiện tại = 1;
         vị trí = 0;
-        lặp(vòng = 0; vị trí < máy ảo lấy độ dài(các byte); vòng++) {
+        khi (vị trí < số byte) {
             bước = 1;
             c = "";
             nếu (các byte[vị trí] < 128) {
@@ -176,11 +202,16 @@ lớp công khai Bộ Tách Từ Vựng {
         i = 0;
         dòng = 1;
         cột = 1;
-        lặp(vòng = 0; i < n; vòng++) {
+        khi (i < n) {
             c = ký tự[i];
             tiếp = "";
             nếu (i + 1 < n) { tiếp = ký tự[i + 1]; };
-            nếu (mình.biên dịch từ vựng trắng(c)) {
+            // UTF-8 continuation/leading bytes are >= 128. All whitespace
+            // accepted by the previous helper is ASCII (9..13 or 32).
+            // Read the existing byte-offset table instead of calling a V++
+            // method and comparing several strings for every code point.
+            mã ASCII = các byte[vị trí byte[i]];
+            nếu (mã ASCII == 32 || (mã ASCII >= 9 && mã ASCII <= 13)) {
                 nếu (c == "\n") { dòng += 1; cột = 1; }
                 hoặc { cột += 1; };
                 i += 1;
@@ -188,7 +219,7 @@ lớp công khai Bộ Tách Từ Vựng {
                 nếu (c == "/" && tiếp == "/") {
                     i += 2;
                     cột += 2;
-                    lặp(j = 0; i < n; j++) {
+                    khi (i < n) {
                         nếu (ký tự[i] == "\n") { thoát; };
                         i += 1;
                         cột += 1;
@@ -200,11 +231,11 @@ lớp công khai Bộ Tách Từ Vựng {
                         i += 2;
                         cột += 2;
                         đóng = sai;
-                        lặp(j = 0; i < n && !đóng; j++) {
+                        khi (i < n && !đóng) {
                             a = ký tự[i];
-                            b = "";
-                            nếu (i + 1 < n) { b = ký tự[i + 1]; };
-                            nếu (a == "*" && b == "/") {
+                            tiếp = "";
+                            nếu (i + 1 < n) { tiếp = ký tự[i + 1]; };
+                            nếu (a == "*" && tiếp == "/") {
                                 i += 2;
                                 cột += 2;
                                 đóng = đúng;
@@ -222,50 +253,82 @@ lớp công khai Bộ Tách Từ Vựng {
                         giá trị = "";
                         nếu (c == "\"" || c == "'") {
                             nháy = c;
-                            giá trị = c;
                             i += 1;
                             cột += 1;
                             đóng = sai;
-                            lặp(j = 0; i < n && !đóng; j++) {
+                            khi (i < n && !đóng) {
                                 a = ký tự[i];
-                                b = "";
-                                nếu (i + 1 < n) { b = ký tự[i + 1]; };
                                 nếu (a == "\n") {
                                     mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột);
                                 };
                                 nếu (a == "\\" && i + 1 < n) {
-                                    giá trị = giá trị + a + b;
                                     i += 2;
                                     cột += 2;
                                 } hoặc {
-                                    giá trị = giá trị + a;
                                     i += 1;
                                     cột += 1;
                                     nếu (a == nháy) { đóng = đúng; };
                                 };
                             };
                             nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột); };
+                            giá trị = mình.biên dịch từ vựng đoạn(các byte, vị trí byte[đầu], vị trí byte[i]);
                         } hoặc {
-                            ghép = c + tiếp;
-                            nếu (mình.biên dịch từ vựng hai toán tử(ghép)) {
-                                giá trị = ghép;
+                            // Recognize the thirteen two-byte operators by
+                            // their ASCII bytes. Create the token string only
+                            // when a valid operator has actually been found.
+                            đôi = sai;
+                            nếu (i + 1 < n) {
+                                mã đầu = các byte[vị trí byte[i]];
+                                nếu (mã đầu == 33 || mã đầu == 37 || mã đầu == 38 ||
+                                    (mã đầu >= 42 && mã đầu <= 45) || mã đầu == 47 ||
+                                    (mã đầu >= 60 && mã đầu <= 62) || mã đầu == 124) {
+                                    mã sau = các byte[vị trí byte[i + 1]];
+                                    nếu (mã sau == 61 && (mã đầu == 33 || mã đầu == 37 ||
+                                        mã đầu == 42 || mã đầu == 43 || mã đầu == 45 ||
+                                        mã đầu == 47 || (mã đầu >= 60 && mã đầu <= 62))) {
+                                        đôi = đúng;
+                                    };
+                                    nếu (mã sau == mã đầu && (mã đầu == 38 || mã đầu == 43 ||
+                                        mã đầu == 45 || mã đầu == 124)) { đôi = đúng; };
+                                };
+                            };
+                            nếu (đôi) {
+                                giá trị = c + ký tự[i + 1];
                                 i += 2;
                                 cột += 2;
                             } hoặc {
-                                nếu (mình.biên dịch từ vựng ngăn cách(c)) {
+                                // Exactly the delimiters recognized by the
+                                // original helper; '%' and '.' are not added.
+                                nếu (mã ASCII == 34 || mã ASCII == 39 ||
+                                    mã ASCII == 43 || mã ASCII == 45 || mã ASCII == 42 ||
+                                    mã ASCII == 47 || mã ASCII == 40 || mã ASCII == 41 ||
+                                    mã ASCII == 123 || mã ASCII == 125 ||
+                                    mã ASCII == 91 || mã ASCII == 93 ||
+                                    mã ASCII == 59 || mã ASCII == 44 ||
+                                    mã ASCII == 60 || mã ASCII == 62 ||
+                                    mã ASCII == 61 || mã ASCII == 33 || mã ASCII == 58) {
                                     giá trị = c;
                                     i += 1;
                                     cột += 1;
                                 } hoặc {
-                                    lặp(j = 0; i < n; j++) {
+                                    khi (i < n) {
                                         a = ký tự[i];
-                                        nếu (mình.biên dịch từ vựng trắng(a) || mình.biên dịch từ vựng ngăn cách(a)) {
+                                        mã quét = các byte[vị trí byte[i]];
+                                        nếu (mã quét == 32 || (mã quét >= 9 && mã quét <= 13) ||
+                                            mã quét == 34 || mã quét == 39 ||
+                                            mã quét == 43 || mã quét == 45 || mã quét == 42 ||
+                                            mã quét == 47 || mã quét == 40 || mã quét == 41 ||
+                                            mã quét == 123 || mã quét == 125 ||
+                                            mã quét == 91 || mã quét == 93 ||
+                                            mã quét == 59 || mã quét == 44 ||
+                                            mã quét == 60 || mã quét == 62 ||
+                                            mã quét == 61 || mã quét == 33 || mã quét == 58) {
                                             thoát;
                                         };
-                                        giá trị = giá trị + a;
                                         i += 1;
                                         cột += 1;
                                     };
+                                    giá trị = mình.biên dịch từ vựng đoạn(các byte, vị trí byte[đầu], vị trí byte[i]);
                                 };
                             };
                         };
@@ -299,7 +362,7 @@ lớp công khai Bộ Tách Từ Vựng {
             "kế": đúng, "triển": đúng, "công": đúng, "riêng": đúng,
             "bảo": đúng, "ký": đúng, "khả": đúng};
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(thô); vòng++) {
+        khi (i < máy ảo lấy độ dài(thô)) {
             đầu = thô[i];
             chuỗi ghép = lấy từ điển(đầu, "giá trị", "");
             bước = 1;

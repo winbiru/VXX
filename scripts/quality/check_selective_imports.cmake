@@ -1,0 +1,131 @@
+foreach(required IN ITEMS VPP_NATIVE_COMPILER VPP_ROOT VPP_OUTPUT_DIR)
+    if (NOT DEFINED ${required})
+        message(FATAL_ERROR "Selective imports missing ${required}")
+    endif()
+endforeach()
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
+set(ENV{VPP_HOME} "${VPP_ROOT}")
+if (NOT DEFINED VPP_VM)
+    set(VPP_VM "${VPP_OUTPUT_DIR}/vpp-vm")
+    execute_process(COMMAND "${VPP_STAGE1}" build "${VPP_ROOT}/gói/máy ảo/chính.vi" -o "${VPP_VM}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "Selective import VM build failed: ${status}\n${output}\n${errors}")
+    endif()
+endif()
+set(compiler "${VPP_OUTPUT_DIR}/compiler.vmb")
+execute_process(COMMAND "${VPP_NATIVE_COMPILER}" vm-build
+    "${VPP_ROOT}/gói/biên dịch/dòng lệnh VM.vi" -o "${compiler}"
+    RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 120)
+if (NOT status STREQUAL "0")
+    message(FATAL_ERROR "Selective import compiler build failed: ${status}\n${output}\n${errors}")
+endif()
+
+function(check_case name source expected function_count)
+    set(path "${VPP_OUTPUT_DIR}/${name}.vi")
+    set(image "${VPP_OUTPUT_DIR}/${name}.vmb")
+    file(WRITE "${path}" "${source}\n")
+    execute_process(COMMAND "${VPP_VM}" "${compiler}" build "${path}" -o "${image}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    if (NOT status STREQUAL "0")
+        message(FATAL_ERROR "${name}: compilation failed (${status})\n${output}\n${errors}")
+    endif()
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "PATH=" "${VPP_VM}" "${image}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
+    if (NOT status STREQUAL "0" OR NOT output STREQUAL expected)
+        message(FATAL_ERROR "${name}: output mismatch (${status})\n${output}\n${errors}")
+    endif()
+    if (NOT function_count LESS 0)
+        file(READ "${image}" header LIMIT 16 HEX)
+        string(SUBSTRING "${header}" 24 2 b0)
+        string(SUBSTRING "${header}" 26 2 b1)
+        string(SUBSTRING "${header}" 28 2 b2)
+        string(SUBSTRING "${header}" 30 2 b3)
+        math(EXPR actual "0x${b0} + (0x${b1} << 8) + (0x${b2} << 16) + (0x${b3} << 24)")
+        if (NOT actual EQUAL function_count)
+            message(FATAL_ERROR "${name}: expected ${function_count} retained functions, got ${actual}")
+        endif()
+    endif()
+    message(STATUS "selective imports: ${name} PASS")
+endfunction()
+
+function(check_rejected name source pattern)
+    set(path "${VPP_OUTPUT_DIR}/${name}.vi")
+    set(image "${VPP_OUTPUT_DIR}/${name}.vmb")
+    file(WRITE "${path}" "${source}\n")
+    file(WRITE "${image}" "sentinel")
+    execute_process(COMMAND "${VPP_VM}" "${compiler}" build "${path}" -o "${image}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    file(READ "${image}" remaining)
+    if (status STREQUAL "0" OR NOT "${output}${errors}" MATCHES "${pattern}" OR NOT remaining STREQUAL "sentinel")
+        message(FATAL_ERROR "${name}: invalid import accepted/wrong diagnostic/output changed (${status})\n${output}\n${errors}")
+    endif()
+    message(STATUS "selective imports: ${name} rejected correctly")
+endfunction()
+
+file(WRITE "${VPP_OUTPUT_DIR}/lib.vi" [=[
+hàm công khai dùng() { trả về helper(); };
+hàm riêng tư helper() { trả về 42; };
+hàm công khai khác() { trả về 7; };
+hàm công khai không dùng() { in "UNUSED"; trả về 0; };
+in "INIT";
+]=])
+check_case(selected "nhập lib.dùng; hàm chính() { in dùng(); };" "INIT\n42\n" 3)
+check_case(alias "nhập lib.dùng như tính; hàm chính() { in tính(); };" "INIT\n42\n" 3)
+check_case(two "nhập lib.dùng; nhập lib.khác; hàm chính() { in dùng(); in khác(); };" "INIT\n42\n7\n" 4)
+check_case(duplicate "nhập lib.dùng; nhập lib.dùng như tính; hàm chính() { in dùng(); in tính(); };" "INIT\n42\n42\n" 3)
+check_case(wildcard "nhập lib.*; hàm chính() { in dùng(); in khác(); };" "INIT\n42\n7\n" 5)
+check_case(wildcard_alias "nhập lib.* như api; hàm chính() { in api.dùng(); };" "INIT\n42\n" 5)
+check_case(legacy "nhập lib; hàm chính() { in dùng(); };" "INIT\n42\n" 5)
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/folder/level")
+file(WRITE "${VPP_OUTPUT_DIR}/folder/level/module.vi" [=[
+hàm công khai dùng() { trả về 73; };
+hàm công khai khác() { trả về 29; };
+]=])
+check_case(dotted_nested "nhập folder.level.module.dùng; hàm chính() { in dùng(); };" "73\n" -1)
+check_case(dotted_nested_alias "nhập folder.level.module.dùng như tên khác; hàm chính() { in tên khác(); };" "73\n" -1)
+check_case(dotted_nested_all "nhập folder.level.module.*; hàm chính() { in dùng(); in khác(); };" "73\n29\n" -1)
+check_case(dotted_nested_namespace "nhập folder.level.module.* như api; hàm chính() { in api.dùng(); };" "73\n" -1)
+check_case(legacy_slash_nested "nhập folder/level/module.dùng; hàm chính() { in dùng(); };" "73\n" -1)
+check_case(dotted_relative_current "nhập .folder.level.module.dùng; hàm chính() { in dùng(); };" "73\n" -1)
+check_case(folder/dotted_relative_sibling "nhập .level.module.dùng; hàm chính() { in dùng(); };" "73\n" -1)
+file(WRITE "${VPP_OUTPUT_DIR}/folder/local.vi" "hàm công khai lấy() { trả về 97; };\n")
+check_case(folder/level/dotted_relative_parent "nhập ..local.lấy; hàm chính() { in lấy(); };" "97\n" -1)
+check_case(folder/level/dotted_relative_grandparent "nhập ...folder.local.*; hàm chính() { in lấy(); };" "97\n" -1)
+file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}/tên thư mục")
+file(WRITE "${VPP_OUTPUT_DIR}/tên thư mục/mô đun.vi" "hàm công khai trả giá trị() { trả về 81; };\n")
+check_case(dotted_spaces "nhập tên thư mục.mô đun.trả giá trị; hàm chính() { in trả giá trị(); };" "81\n" -1)
+check_case(mixed "nhập lib.dùng; nhập lib.*; hàm chính() { in khác(); };" "INIT\n7\n" 5)
+file(WRITE "${VPP_OUTPUT_DIR}/bridge.vi" "công khai nhập lib.dùng như api; hàm thừa() {};\n")
+check_case(reexport "nhập bridge.api như tính; hàm chính() { in tính(); };" "INIT\n42\n" 3)
+file(WRITE "${VPP_OUTPUT_DIR}/dep.vi" "hàm f() { trả về 23; }; hàm thừa() { trả về 99; };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/transitive.vi" "nhập dep như api; hàm f() { trả về api.f(); }; hàm thừa() { trả về api.thừa(); };\n")
+check_case(transitive_main "nhập transitive.f; hàm chính() { in f(); };" "23\n" 3)
+file(WRITE "${VPP_OUTPUT_DIR}/closures.vi" "hàm tạo(n) { trả về hàm() { n += 1; trả về n; }; }; hàm thừa() {};\n")
+check_case(closure "nhập closures.tạo; hàm chính() { f = tạo(40); in f(); in f(); };" "41\n42\n" 3)
+file(WRITE "${VPP_OUTPUT_DIR}/types.vi" [=[
+hàm riêng tư helper() { trả về 42; };
+lớp Công Cụ {
+    hàm công khai khởi tạo() { mình.n = helper(); };
+    hàm công khai lấy() { trả về mình.n; };
+};
+hàm thừa() {};
+]=])
+check_case(type_alias "nhập types.Công Cụ như Bộ; hàm chính() { x = Bộ(); in x.lấy(); };" "42\n" 4)
+file(WRITE "${VPP_OUTPUT_DIR}/globals.vi" "hàm helper() { trả về 9; }; f = helper; hàm dùng() { trả về f(); }; hàm thừa() {};\n")
+check_case(global_callback "nhập globals.dùng; hàm chính() { in dùng(); };" "9\n" 3)
+file(WRITE "${VPP_OUTPUT_DIR}/left.vi" "hàm riêng tư helper() { trả về 10; }; hàm f() { trả về helper; };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/right.vi" "hàm riêng tư helper() { trả về 20; }; hàm f() { trả về helper; };\n")
+check_case(function_values "nhập left.f như a; nhập right.f như b; hàm chính() { x = a(); y = b(); in x(); in y(); };" "10\n20\n" 5)
+file(WRITE "${VPP_OUTPUT_DIR}/recursive.vi" "hàm f(n) { nếu (n == 0) { trả về 42; }; trả về g(n - 1); }; hàm g(n) { trả về f(n); }; hàm thừa() {};\n")
+check_case(recursive_main "nhập recursive.f; hàm chính() { in f(3); };" "42\n" 3)
+file(WRITE "${VPP_OUTPUT_DIR}/inheritance.vi" "lớp Cha { hàm công khai lấy() { trả về 42; }; }; lớp Con kế thừa Cha {}; hàm thừa() {};\n")
+check_case(inheritance_main "nhập inheritance.Con; hàm chính() { x = Con(); in x.lấy(); };" "42\n" 2)
+check_rejected(missing "nhập lib.không tồn tại;" "không có tên công khai")
+check_rejected(private "nhập lib.helper;" "không có tên công khai")
+check_rejected(bad_star "nhập lib.*.dùng;" "nhập|mô đun")
+check_rejected(dotted_bad_star "nhập folder.level.*.dùng;" "nhập|mô đun")
+check_rejected(extension "nhập lib.vi;" "đuôi .vi")
+file(WRITE "${VPP_OUTPUT_DIR}/invalid.vi" "hàm dùng() { trả về 1; }; hàm thừa(a, a) {};\n")
+check_rejected(unused_semantic_error "nhập invalid.dùng;" "trùng tham số")
+message(STATUS "V++ selective imports: visibility, transitive closure, aliases, reexports, closures, types and initialization PASS")

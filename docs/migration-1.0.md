@@ -25,7 +25,7 @@ Target import được viết trực tiếp:
 ```vi
 nhập lõi;
 nhập nhập xuất;
-nhập gói/mạng/rest;
+nhập gói.mạng.rest.*;
 nhập feature_math như toán;
 ```
 

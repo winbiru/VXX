@@ -74,22 +74,46 @@ foreach(part IN ITEMS
 endforeach()
 if (stage0_linux)
     file(APPEND "${source}" "\nhàm sinh mã chương trình phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
-    file(APPEND "${source}" "hàm đối tượng mô đun macho mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
+    file(APPEND "${source}" "hàm tạo macho mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 else()
     file(APPEND "${source}" "\nhàm sinh mã chương trình x86 phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
     file(APPEND "${source}" "hàm elf mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 endif()
 if (NOT VPP_USE_PREPARED_COMPILER)
     file(REMOVE "${compiler}")
-    message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
-    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+    if (DEFINED VPP_SEED AND NOT "${VPP_SEED}" STREQUAL "")
+        if (NOT EXISTS "${VPP_SEED}")
+            message(FATAL_ERROR "Native V++ seed not found: ${VPP_SEED}")
+        endif()
+        # Existing pre-migration seeds only parse `nhập module;`. Build the
+        # current compiler from a temporary copy of its entrypoint with the
+        # wildcard suffix removed. The Stage 1 output still contains the
+        # current loader and accepts dotted imports for all later stages.
+        set(seed_source_dir "${VPP_OUTPUT_DIR}/seed-compatible")
+        file(MAKE_DIRECTORY "${seed_source_dir}")
+        file(COPY "${VPP_ROOT}/gói/biên dịch/bản địa/"
+            DESTINATION "${seed_source_dir}")
+        set(seed_entry "${seed_source_dir}/bộ biên dịch.vi")
+        file(READ "${module_entry}" seed_entry_source)
+        string(REGEX REPLACE "(nhập[ \t]+[^;\n]+)\\.\\*;" "\\1;"
+            seed_entry_source "${seed_entry_source}")
+        file(WRITE "${seed_entry}" "${seed_entry_source}")
+        message(STATUS "Native V++ seed -> Stage 1 (direct ASM runtime)")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
+            "${VPP_SEED}" build "${seed_entry}" -o "${compiler}"
+            WORKING_DIRECTORY "${VPP_ROOT}"
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+    else()
+        message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
         "VPP_ENABLE_MACHINE_JIT=1"
         "VPP_NATIVE_STAGE0_PROFILE=1"
         "VPP_NATIVE_PROFILE=1"
         "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
         "${source}" "${compiler}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+    endif()
     if (NOT status EQUAL 0 OR NOT EXISTS "${compiler}")
         message(FATAL_ERROR "native compiler Stage 1 build failed: ${status}\n${output}\n${errors}")
     endif()
@@ -106,7 +130,7 @@ function(run_native_case name code expected)
     set(exe "${VPP_OUTPUT_DIR}/${name}")
     file(WRITE "${input}" "${code}\n")
     file(REMOVE "${exe}")
-    execute_process(COMMAND "${compiler}" build "${input}" -o "${exe}"
+    execute_process(COMMAND "${compiler}" "biên" "dịch" "${input}" "--đầu-ra" "${exe}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
     if (NOT status EQUAL 0 OR NOT EXISTS "${exe}")
@@ -119,6 +143,288 @@ function(run_native_case name code expected)
 endfunction()
 
 run_native_case(program "hàm chính() { trả về 52; };" 52)
+# Keep English and the older Vietnamese alias working for existing scripts.
+foreach(alias IN ITEMS build "dựng" "biên dịch")
+    set(alias_executable "${VPP_OUTPUT_DIR}/program-${alias}")
+    execute_process(COMMAND "${compiler}" "${alias}" "${VPP_OUTPUT_DIR}/program.vi" -o "${alias_executable}"
+        RESULT_VARIABLE alias_status TIMEOUT 30)
+    if (NOT alias_status EQUAL 0 OR NOT EXISTS "${alias_executable}")
+        message(FATAL_ERROR "V++ native compiler rejected build alias ${alias}: ${alias_status}")
+    endif()
+    execute_process(COMMAND "${alias_executable}" RESULT_VARIABLE alias_exit TIMEOUT 30)
+    if (NOT alias_exit EQUAL 52)
+        message(FATAL_ERROR "V++ build alias ${alias} returned ${alias_exit} instead of 52")
+    endif()
+endforeach()
+# Các lệnh CLI căn bản được giải quyết trong executable V++, không cần CLI C++.
+foreach(help_command IN ITEMS "--help" "--trợ-giúp" "trợ giúp" help)
+    execute_process(COMMAND "${compiler}" "${help_command}"
+        RESULT_VARIABLE help_status OUTPUT_VARIABLE help_output TIMEOUT 30)
+    if (NOT help_status EQUAL 0 OR NOT help_output MATCHES "kiểm tra <nguồn.vi>" OR
+        NOT help_output MATCHES "đối tượng <nguồn.vi>")
+        message(FATAL_ERROR "V++ native help failed for ${help_command}: ${help_status} ${help_output}")
+    endif()
+endforeach()
+execute_process(COMMAND "${compiler}" "trợ" "giúp"
+    RESULT_VARIABLE split_help_status OUTPUT_VARIABLE split_help_output TIMEOUT 30)
+if (NOT split_help_status EQUAL 0 OR NOT split_help_output MATCHES "biên dịch <nguồn.vi>")
+    message(FATAL_ERROR "V++ native two-word help failed (${split_help_status})")
+endif()
+foreach(version_command IN ITEMS "--version" "--phiên-bản" "phiên bản" version)
+    execute_process(COMMAND "${compiler}" "${version_command}"
+        RESULT_VARIABLE version_status OUTPUT_VARIABLE version_output TIMEOUT 30)
+    if (NOT version_status EQUAL 0 OR NOT version_output MATCHES "trình biên dịch i32")
+        message(FATAL_ERROR "V++ native version failed for ${version_command}: ${version_status} ${version_output}")
+    endif()
+endforeach()
+execute_process(COMMAND "${compiler}"
+    RESULT_VARIABLE empty_status OUTPUT_VARIABLE empty_output TIMEOUT 30)
+if (NOT empty_status EQUAL 0 OR NOT empty_output MATCHES "trình biên dịch i32")
+    message(FATAL_ERROR "V++ native empty CLI failed (${empty_status})")
+endif()
+set(default_source "${VPP_OUTPUT_DIR}/default-cli.vi")
+set(default_executable "${VPP_OUTPUT_DIR}/default-cli")
+file(WRITE "${default_source}" "hàm chính() { trả về 53; };\n")
+foreach(command IN ITEMS "biên dịch" "dựng" build)
+    file(REMOVE "${default_executable}")
+    execute_process(COMMAND "${compiler}" "${command}" "${default_source}"
+        RESULT_VARIABLE default_status TIMEOUT 60)
+    if (NOT default_status EQUAL 0 OR NOT EXISTS "${default_executable}")
+        message(FATAL_ERROR "V++ native default output for ${command} failed (${default_status})")
+    endif()
+    execute_process(COMMAND "${default_executable}" RESULT_VARIABLE default_exit TIMEOUT 30)
+    if (NOT default_exit EQUAL 53)
+        message(FATAL_ERROR "V++ native default output for ${command} returned ${default_exit}")
+    endif()
+endforeach()
+file(REMOVE "${default_executable}")
+execute_process(COMMAND "${compiler}" "biên" "dịch" "${default_source}"
+    RESULT_VARIABLE split_build_status TIMEOUT 60)
+if (NOT split_build_status EQUAL 0 OR NOT EXISTS "${default_executable}")
+    message(FATAL_ERROR "V++ native two-word implicit build failed (${split_build_status})")
+endif()
+set(default_object "${VPP_OUTPUT_DIR}/default-cli.o")
+foreach(command IN ITEMS object "đối tượng")
+    file(REMOVE "${default_object}")
+    execute_process(COMMAND "${compiler}" "${command}" "${default_source}"
+        RESULT_VARIABLE default_object_status TIMEOUT 60)
+    if (NOT default_object_status EQUAL 0 OR NOT EXISTS "${default_object}")
+        message(FATAL_ERROR "V++ native implicit object for ${command} failed (${default_object_status})")
+    endif()
+endforeach()
+# Đối số và đường dẫn UTF-8 được phân tích trực tiếp trong CLI V++.
+set(utf8_source "${VPP_OUTPUT_DIR}/nguồn có dấu.vi")
+set(utf8_executable "${VPP_OUTPUT_DIR}/chương trình có dấu")
+set(utf8_object "${VPP_OUTPUT_DIR}/đối tượng có dấu.o")
+file(WRITE "${utf8_source}" "hàm chính() { trả về 54; };\n")
+file(REMOVE "${utf8_executable}" "${utf8_object}")
+execute_process(COMMAND "${compiler}" "biên" "dịch" "--đầu-ra"
+    "${utf8_executable}" "${utf8_source}"
+    RESULT_VARIABLE utf8_build_status TIMEOUT 60)
+if (NOT utf8_build_status EQUAL 0 OR NOT EXISTS "${utf8_executable}")
+    message(FATAL_ERROR "V++ native CLI failed for reversed UTF-8 executable arguments (${utf8_build_status})")
+endif()
+execute_process(COMMAND "${utf8_executable}" RESULT_VARIABLE utf8_exit TIMEOUT 30)
+if (NOT utf8_exit EQUAL 54)
+    message(FATAL_ERROR "V++ native CLI UTF-8 executable returned ${utf8_exit}, expected 54")
+endif()
+execute_process(COMMAND "${compiler}" object -o "${utf8_object}" "${utf8_source}"
+    RESULT_VARIABLE utf8_object_status TIMEOUT 60)
+if (NOT utf8_object_status EQUAL 0 OR NOT EXISTS "${utf8_object}")
+    message(FATAL_ERROR "V++ native CLI failed for reversed UTF-8 object arguments (${utf8_object_status})")
+endif()
+execute_process(COMMAND cc "${utf8_object}" -o "${VPP_OUTPUT_DIR}/utf8-object-linked"
+    RESULT_VARIABLE utf8_link_status ERROR_VARIABLE utf8_link_error TIMEOUT 30)
+if (NOT utf8_link_status EQUAL 0)
+    message(FATAL_ERROR "V++ UTF-8 object did not link: ${utf8_link_error}")
+endif()
+execute_process(COMMAND "${VPP_OUTPUT_DIR}/utf8-object-linked" RESULT_VARIABLE utf8_link_exit TIMEOUT 30)
+if (NOT utf8_link_exit EQUAL 54)
+    message(FATAL_ERROR "V++ native CLI UTF-8 object returned ${utf8_link_exit}, expected 54")
+endif()
+foreach(bad_command IN ITEMS "--help" "--version")
+    execute_process(COMMAND "${compiler}" "${bad_command}" unexpected
+        RESULT_VARIABLE extra_info_status TIMEOUT 30)
+    if (NOT extra_info_status EQUAL 2)
+        message(FATAL_ERROR "V++ native CLI accepted trailing arguments after ${bad_command}: ${extra_info_status}")
+    endif()
+endforeach()
+execute_process(COMMAND "${compiler}" check "${utf8_source}" -o "${utf8_object}"
+    RESULT_VARIABLE invalid_check_option_status TIMEOUT 30)
+if (NOT invalid_check_option_status EQUAL 2)
+    message(FATAL_ERROR "V++ native CLI accepted output option for check: ${invalid_check_option_status}")
+endif()
+execute_process(COMMAND "${compiler}" build "${utf8_source}" -o
+    RESULT_VARIABLE missing_option_status TIMEOUT 30)
+if (NOT missing_option_status EQUAL 2)
+    message(FATAL_ERROR "V++ native CLI accepted missing output filename: ${missing_option_status}")
+endif()
+file(REMOVE "${default_object}")
+execute_process(COMMAND "${compiler}" "xuất" "đối tượng" "${default_source}"
+    RESULT_VARIABLE split_object_status TIMEOUT 60)
+if (NOT split_object_status EQUAL 0 OR NOT EXISTS "${default_object}")
+    message(FATAL_ERROR "V++ native two-word implicit object failed (${split_object_status})")
+endif()
+# The native compiler's own CLI validates sources without producing code.
+execute_process(COMMAND "${compiler}" check "${VPP_OUTPUT_DIR}/program.vi"
+    RESULT_VARIABLE check_status TIMEOUT 30)
+if (NOT check_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI check rejected valid source (${check_status})")
+endif()
+execute_process(COMMAND "${compiler}" "kiểm" "tra" "${VPP_OUTPUT_DIR}/program.vi"
+    RESULT_VARIABLE localized_check_status TIMEOUT 30)
+if (NOT localized_check_status EQUAL 0)
+    message(FATAL_ERROR "V++ native localized CLI check rejected valid source (${localized_check_status})")
+endif()
+execute_process(COMMAND "${compiler}" "kiểm tra" "${VPP_OUTPUT_DIR}/program.vi"
+    RESULT_VARIABLE quoted_check_status TIMEOUT 30)
+if (NOT quoted_check_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI check rejected quoted Vietnamese alias (${quoted_check_status})")
+endif()
+# Stage 1's V++ CLI can emit an ordinary relocatable native object itself.
+# No C++ CLI, VM transport, or linker is involved in object creation.
+set(native_object "${VPP_OUTPUT_DIR}/program.o")
+execute_process(COMMAND "${compiler}" object "${VPP_OUTPUT_DIR}/program.vi" -o "${native_object}"
+    WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+    RESULT_VARIABLE object_status OUTPUT_VARIABLE object_stdout ERROR_VARIABLE object_stderr TIMEOUT 60)
+if (NOT object_status EQUAL 0 OR NOT EXISTS "${native_object}")
+    message(FATAL_ERROR "V++ native object CLI failed (${object_status}): ${object_stdout}\n${object_stderr}")
+endif()
+file(SHA256 "${native_object}" english_object_checksum)
+foreach(object_command IN ITEMS "đối tượng" "xuất đối tượng")
+    set(vietnamese_object "${VPP_OUTPUT_DIR}/program-${object_command}.o")
+    if (object_command STREQUAL "xuất đối tượng")
+        execute_process(COMMAND "${compiler}" "xuất" "đối tượng" "${VPP_OUTPUT_DIR}/program.vi" "--đầu-ra" "${vietnamese_object}"
+            RESULT_VARIABLE localized_object_status ERROR_VARIABLE localized_object_error TIMEOUT 60)
+    else()
+        execute_process(COMMAND "${compiler}" "${object_command}" "${VPP_OUTPUT_DIR}/program.vi" "--đầu-ra" "${vietnamese_object}"
+            RESULT_VARIABLE localized_object_status ERROR_VARIABLE localized_object_error TIMEOUT 60)
+    endif()
+    if (NOT localized_object_status EQUAL 0 OR NOT EXISTS "${vietnamese_object}")
+        message(FATAL_ERROR "V++ native ${object_command} failed (${localized_object_status}): ${localized_object_error}")
+    endif()
+    file(SHA256 "${vietnamese_object}" localized_object_checksum)
+    if (NOT english_object_checksum STREQUAL localized_object_checksum)
+        message(FATAL_ERROR "V++ ${object_command} output differs from object compatibility alias")
+    endif()
+endforeach()
+execute_process(COMMAND "${compiler}" "xuất" "đối tượng" "${VPP_OUTPUT_DIR}/program.vi" "--đầu-ra"
+    RESULT_VARIABLE missing_output_status TIMEOUT 30)
+if (missing_output_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI accepted missing Vietnamese output path")
+endif()
+execute_process(COMMAND "${compiler}" "không-hợp-lệ" "${VPP_OUTPUT_DIR}/program.vi" "--đầu-ra" "${VPP_OUTPUT_DIR}/invalid-command"
+    RESULT_VARIABLE unknown_command_status TIMEOUT 30)
+if (unknown_command_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI accepted unknown Vietnamese command")
+endif()
+if (APPLE)
+    file(READ "${native_object}" object_magic HEX LIMIT 4)
+    if (NOT object_magic STREQUAL "cffaedfe")
+        message(FATAL_ERROR "V++ object CLI did not emit Mach-O: ${object_magic}")
+    endif()
+elseif (UNIX)
+    file(READ "${native_object}" object_magic HEX LIMIT 4)
+    if (NOT object_magic STREQUAL "7f454c46")
+        message(FATAL_ERROR "V++ object CLI did not emit ELF: ${object_magic}")
+    endif()
+endif()
+set(object_executable "${VPP_OUTPUT_DIR}/object-linked")
+execute_process(COMMAND cc "${native_object}" -o "${object_executable}"
+    WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
+    RESULT_VARIABLE link_status OUTPUT_VARIABLE link_stdout ERROR_VARIABLE link_stderr TIMEOUT 60)
+if (NOT link_status EQUAL 0)
+    message(FATAL_ERROR "V++ native object cannot link (${link_status}): ${link_stdout}\n${link_stderr}")
+endif()
+execute_process(COMMAND "${object_executable}" RESULT_VARIABLE object_exit TIMEOUT 30)
+if (NOT object_exit EQUAL 52)
+    message(FATAL_ERROR "V++ native object executable expected 52, got ${object_exit}")
+endif()
+file(SHA256 "${native_object}" before_object_checksum)
+# An object output must never clobber its source or a previously valid object
+# on a parser failure. Imported sources are merged into relocatable objects.
+file(WRITE "${VPP_OUTPUT_DIR}/object-invalid.vi" "hàm chính() { trả về not_defined; };\n")
+execute_process(COMMAND "${compiler}" check "${VPP_OUTPUT_DIR}/object-invalid.vi"
+    RESULT_VARIABLE invalid_check_status TIMEOUT 30)
+if (invalid_check_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI check accepted invalid source")
+endif()
+execute_process(COMMAND "${compiler}" object "${VPP_OUTPUT_DIR}/object-invalid.vi" -o "${native_object}"
+    RESULT_VARIABLE invalid_object_status TIMEOUT 30)
+if (invalid_object_status EQUAL 0)
+    message(FATAL_ERROR "V++ object CLI accepted invalid source")
+endif()
+file(SHA256 "${native_object}" after_object_checksum)
+if (NOT before_object_checksum STREQUAL after_object_checksum)
+    message(FATAL_ERROR "V++ object CLI changed an existing object on compile failure")
+endif()
+execute_process(COMMAND "${object_executable}" RESULT_VARIABLE object_preserved_exit TIMEOUT 30)
+if (NOT object_preserved_exit EQUAL 52)
+    message(FATAL_ERROR "V++ object CLI failed to preserve compiled executable")
+endif()
+set(object_input "${VPP_OUTPUT_DIR}/program.vi")
+file(READ "${object_input}" original_object_source)
+execute_process(COMMAND "${compiler}" object "${object_input}" -o "${object_input}"
+    RESULT_VARIABLE alias_object_status TIMEOUT 30)
+file(READ "${object_input}" after_object_source)
+if (alias_object_status EQUAL 0 OR NOT after_object_source STREQUAL original_object_source)
+    message(FATAL_ERROR "V++ object CLI overwrote source")
+endif()
+file(CREATE_LINK "${object_input}" "${VPP_OUTPUT_DIR}/object-hardlink.o" RESULT link_error)
+if (link_error STREQUAL "0")
+    execute_process(COMMAND "${compiler}" object "${object_input}" -o "${VPP_OUTPUT_DIR}/object-hardlink.o"
+        RESULT_VARIABLE hardlink_status TIMEOUT 30)
+    file(READ "${object_input}" after_hardlink_source)
+    if (hardlink_status EQUAL 0 OR NOT after_hardlink_source STREQUAL original_object_source)
+        message(FATAL_ERROR "V++ object CLI overwrote a hard-linked source")
+    endif()
+endif()
+file(WRITE "${VPP_OUTPUT_DIR}/object_library.vi" "hàm tổng(a,b) { trả về a+b; };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/object-dependency.vi"
+    "nhập object_library; hàm chính() { trả về tổng(26,26); };\n")
+execute_process(COMMAND "${compiler}" check "${VPP_OUTPUT_DIR}/object-dependency.vi"
+    RESULT_VARIABLE imported_check_status TIMEOUT 30)
+if (NOT imported_check_status EQUAL 0)
+    message(FATAL_ERROR "V++ native CLI check rejected imported source (${imported_check_status})")
+endif()
+set(merged_object "${VPP_OUTPUT_DIR}/object-dependency.o")
+execute_process(COMMAND "${compiler}" object "${VPP_OUTPUT_DIR}/object-dependency.vi" -o "${merged_object}"
+    RESULT_VARIABLE module_object_status ERROR_VARIABLE module_object_error TIMEOUT 45)
+if (NOT module_object_status EQUAL 0 OR NOT EXISTS "${merged_object}")
+    message(FATAL_ERROR "V++ failed to merge imported modules (${module_object_status}): ${module_object_error}")
+endif()
+file(READ "${merged_object}" merged_magic HEX LIMIT 4)
+if (NOT merged_magic STREQUAL object_magic)
+    message(FATAL_ERROR "V++ multi-module object has wrong object format: ${merged_magic}")
+endif()
+execute_process(COMMAND cc "${merged_object}" -o "${VPP_OUTPUT_DIR}/object-multi-linked"
+    RESULT_VARIABLE multi_link_status ERROR_VARIABLE multi_link_error TIMEOUT 30)
+if (NOT multi_link_status EQUAL 0)
+    message(FATAL_ERROR "V++ merged object cannot link (${multi_link_status}): ${multi_link_error}")
+endif()
+execute_process(COMMAND "${VPP_OUTPUT_DIR}/object-multi-linked" RESULT_VARIABLE multi_exit TIMEOUT 30)
+if (NOT multi_exit EQUAL 52)
+    message(FATAL_ERROR "V++ merged object expected exit 52, got ${multi_exit}")
+endif()
+file(GLOB leaked_multi_objects "${merged_object}.vpp-module-*")
+if (leaked_multi_objects)
+    message(FATAL_ERROR "V++ multi-module object linker leaked temporary objects: ${leaked_multi_objects}")
+endif()
+file(SHA256 "${merged_object}" multi_before_checksum)
+file(WRITE "${VPP_OUTPUT_DIR}/object_library.vi" "hàm tổng(a,b) { trả về không_tồn_tại; };\n")
+execute_process(COMMAND "${compiler}" object "${VPP_OUTPUT_DIR}/object-dependency.vi" -o "${merged_object}"
+    RESULT_VARIABLE bad_multi_status TIMEOUT 30)
+if (bad_multi_status EQUAL 0)
+    message(FATAL_ERROR "V++ accepted invalid imported module")
+endif()
+file(SHA256 "${merged_object}" multi_after_checksum)
+if (NOT multi_before_checksum STREQUAL multi_after_checksum)
+    message(FATAL_ERROR "V++ modified merged object on failed import")
+endif()
+file(GLOB leaked_failed_multi_objects "${merged_object}.vpp-module-*")
+if (leaked_failed_multi_objects)
+    message(FATAL_ERROR "V++ failed multi-module object cleanup: ${leaked_failed_multi_objects}")
+endif()
 run_native_case(entry-main-alias "hàm main() { trả về 52; };" 52)
 run_native_case(runtime-bytes "hàm chính() { biến b = byte mới(); byte thêm(b, 52); biến value = byte lấy(b, 0); byte hủy(b); trả về value; };" 52)
 run_native_case(runtime-string "hàm chính() { biến b = \"Hello\"; trả về byte dài(b) + 47; };" 52)
@@ -168,6 +474,11 @@ run_native_case(loop-postdecrement "hàm chính() { biến x = 0; lặp (i = 52;
 run_native_case(loop-redeclare "hàm chính() { biến x = 0; lặp (i = 0; i < 26; i++) { x = x + 1; }; lặp (i = 0; i < 26; i++) { x = x + 1; }; trả về x; };" 52)
 run_native_case(loop-predeclared "hàm chính() { biến i = 0; lặp (i = 0; i < 52; i++) { }; trả về i; };" 52)
 run_native_case(loop-zero "hàm chính() { biến x = 52; lặp (i = 0; i < 0; i = i + 1) { x = 8; }; trả về x; };" 52)
+run_native_case(while-count "hàm chính() { biến x = 0; khi (x < 52) { x++; }; trả về x; };" 52)
+run_native_case(while-zero "hàm chính() { biến x = 52; khi (sai) { x = 8; }; trả về x; };" 52)
+run_native_case(while-continue-break "hàm chính() { biến x = 0; biến n = 0; khi (x < 100) { x++; nếu (x < 10) { bỏ qua; }; nếu (x == 62) { thoát; }; n++; }; trả về n; };" 52)
+run_native_case(while-nested "hàm chính() { biến n = 0; lặp (i = 0; i < 4; i++) { biến j = 0; khi (j < 13) { j++; khi (đúng) { n++; thoát; }; }; }; trả về n; };" 52)
+run_native_case(while-return "hàm chính() { biến x = 0; khi (đúng) { x++; nếu (x == 52) { trả về x; }; }; trả về 1; };" 52)
 run_native_case(loop-nested "hàm chính() { biến x = 0; lặp (i = 0; i < 4; i = i + 1) { lặp (j = 0; j < 13; j = j + 1) { x = x + 1; }; }; trả về x; };" 52)
 run_native_case(loop-early-return "hàm chính() { lặp (i = 0; i < 100; i = i + 1) { nếu (i == 52) { trả về i; }; }; trả về 1; };" 52)
 run_native_case(loop-break "hàm chính() { biến n = 0; lặp (i = 0; i < 100; i = i + 1) { nếu (i == 52) { thoát; }; n = n + 1; }; trả về n; };" 52)
@@ -343,9 +654,9 @@ set(module_dir "${VPP_OUTPUT_DIR}/native-module-fixtures")
 file(MAKE_DIRECTORY "${module_dir}/sub")
 file(WRITE "${module_dir}/sub/leaf.vi" "hàm gốc() { trả về 40; };\n")
 file(WRITE "${module_dir}/sub/child.vi"
-    "nhập leaf;\nhàm giữa() { trả về gốc() + 10; };\n")
+    "nhập leaf.*;\nhàm giữa() { trả về gốc() + 10; };\n")
 file(WRITE "${module_dir}/main.vi"
-    "nhập sub/child;\nnhập sub/leaf;\nnhập sub/child;\nhàm chính() { trả về giữa() + 2; };\n")
+    "nhập sub.child.*;\nnhập sub.leaf.*;\nnhập sub.child.*;\nhàm chính() { trả về giữa() + 2; };\n")
 set(module_program "${module_dir}/module-main")
 file(REMOVE "${module_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/main.vi" -o "${module_program}"
@@ -358,13 +669,36 @@ if (NOT status EQUAL 52)
     message(FATAL_ERROR "native nested/repeated module imports expected 52, got ${status}")
 endif()
 
+# Dotted imports also cover current/parent-relative modules and one selected
+# function. Each fixture has its own entrypoint so imports stay independent.
+file(WRITE "${module_dir}/relative-current.vi"
+    "nhập .sub.leaf.*;\nhàm chính() { trả về gốc() + 12; };\n")
+file(WRITE "${module_dir}/sub/relative-parent.vi"
+    "nhập ..sub.leaf.*;\nhàm chính() { trả về gốc() + 12; };\n")
+file(WRITE "${module_dir}/selected.vi"
+    "nhập sub.leaf.gốc;\nhàm chính() { trả về gốc() + 12; };\n")
+foreach(case IN ITEMS relative-current sub/relative-parent selected)
+    string(REPLACE "/" "-" exe_name "${case}")
+    set(case_exe "${module_dir}/${exe_name}-exe")
+    file(REMOVE "${case_exe}")
+    execute_process(COMMAND "${compiler}" build "${module_dir}/${case}.vi" -o "${case_exe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${case_exe}")
+        message(FATAL_ERROR "native dotted import ${case} failed: ${status}\n${output}\n${errors}")
+    endif()
+    execute_process(COMMAND "${case_exe}" RESULT_VARIABLE status TIMEOUT 30)
+    if (NOT status EQUAL 52)
+        message(FATAL_ERROR "native dotted import ${case} expected 52, got ${status}")
+    endif()
+endforeach()
+
 # Multiword module paths may end in a numeric token (x86 64, elf 64).
 file(WRITE "${module_dir}/sub/mã máy x86 64.vi"
     "hàm nạp_x86() { trả về 27; };\n")
 file(WRITE "${module_dir}/sub/định dạng elf 64.vi"
     "hàm nạp_elf() { trả về 25; };\n")
 file(WRITE "${module_dir}/numeric-suffix.vi"
-    "nhập sub/mã máy x86 64;\nnhập sub/định dạng elf 64;\nhàm chính() { trả về nạp_x86() + nạp_elf(); };\n")
+    "nhập sub.mã máy x86 64.*;\nnhập sub.định dạng elf 64.*;\nhàm chính() { trả về nạp_x86() + nạp_elf(); };\n")
 set(numeric_suffix_program "${module_dir}/numeric-suffix-exe")
 file(REMOVE "${numeric_suffix_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/numeric-suffix.vi" -o "${numeric_suffix_program}"
@@ -382,7 +716,7 @@ endif()
 file(WRITE "${module_dir}/sub/forward.vi"
     "hàm từ_phụ() { biến x = \"Tiếng Việt\"; biến n = byte dài(x); byte hủy(x); trả về từ_chính() + n - 14; };\n")
 file(WRITE "${module_dir}/forward.vi"
-    "nhập sub/forward;\nhàm chính() { trả về từ_phụ(); };\nhàm từ_chính() { trả về 52; };\n")
+    "nhập sub.forward.*;\nhàm chính() { trả về từ_phụ(); };\nhàm từ_chính() { trả về 52; };\n")
 set(forward_program "${module_dir}/forward-exe")
 file(REMOVE "${forward_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/forward.vi" -o "${forward_program}"
@@ -402,7 +736,7 @@ set(many_sum "18")
 foreach(module_index RANGE 0 33)
     file(WRITE "${module_dir}/many${module_index}.vi"
         "hàm many_fn${module_index}() { trả về 1; };\n")
-    string(APPEND many_imports "nhập many${module_index};\n")
+    string(APPEND many_imports "nhập many${module_index}.*;\n")
     string(APPEND many_sum " + many_fn${module_index}()")
 endforeach()
 file(WRITE "${module_dir}/many-main.vi"
@@ -421,7 +755,7 @@ endif()
 
 # An import-only entrypoint should find `chính` in its dependencies.
 file(WRITE "${module_dir}/sub/entry.vi" "hàm chính() { trả về 52; };\n")
-file(WRITE "${module_dir}/import-only.vi" "nhập sub/entry;\n")
+file(WRITE "${module_dir}/import-only.vi" "nhập sub.entry.*;\n")
 set(import_only "${module_dir}/import-only-exe")
 file(REMOVE "${import_only}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/import-only.vi" -o "${import_only}"
@@ -435,19 +769,23 @@ if (NOT status EQUAL 52)
 endif()
 
 # Import failures must return an error and leave published outputs untouched.
-file(WRITE "${module_dir}/cycle_a.vi" "nhập cycle_b;\nhàm chính() { trả về 0; };\n")
-file(WRITE "${module_dir}/cycle_b.vi" "nhập cycle_a;\n")
-file(WRITE "${module_dir}/missing.vi" "nhập absent_module;\nhàm chính() { trả về 0; };\n")
-file(WRITE "${module_dir}/malformed.vi" "nhập sub/;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/cycle_a.vi" "nhập cycle_b.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/cycle_b.vi" "nhập cycle_a.*;\n")
+file(WRITE "${module_dir}/missing.vi" "nhập absent_module.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/malformed.vi" "nhập sub.;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-double-dot.vi" "nhập sub..leaf.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-wildcard-position.vi" "nhập sub.leaf.*.gốc;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-extension.vi" "nhập sub.leaf.vi;\nhàm chính() { trả về 0; };\n")
 file(WRITE "${module_dir}/duplicate.vi"
-    "nhập sub/leaf;\nhàm gốc() { trả về 1; };\nhàm chính() { trả về gốc(); };\n")
+    "nhập sub.leaf.*;\nhàm gốc() { trả về 1; };\nhàm chính() { trả về gốc(); };\n")
 file(WRITE "${module_dir}/arity.vi"
-    "nhập sub/leaf;\nhàm chính() { trả về gốc(12); };\n")
+    "nhập sub.leaf.*;\nhàm chính() { trả về gốc(12); };\n")
 file(WRITE "${module_dir}/undefined.vi"
-    "nhập sub/leaf;\nhàm chính() { trả về không_tồn_tại(); };\n")
+    "nhập sub.leaf.*;\nhàm chính() { trả về không_tồn_tại(); };\n")
 file(WRITE "${module_dir}/no-main.vi"
-    "nhập sub/leaf;\nhàm trợ_giúp() { trả về gốc(); };\n")
-foreach(failed IN ITEMS cycle_a missing malformed duplicate arity undefined no-main)
+    "nhập sub.leaf.*;\nhàm trợ_giúp() { trả về gốc(); };\n")
+foreach(failed IN ITEMS cycle_a missing malformed bad-double-dot
+        bad-wildcard-position bad-extension duplicate arity undefined no-main)
     execute_process(COMMAND "${compiler}" build "${module_dir}/${failed}.vi" -o "${sentinel}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
     file(READ "${sentinel}" content)

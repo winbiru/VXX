@@ -1,8 +1,11 @@
 // Hạ compiler::IrProgram (đã được semantic binding) sang MachineFunction i32.
 // Hợp đồng serialization ở src/cli/native_vpp_codegen.cpp; C++ lowerer là oracle.
-nhập gói/biên dịch/mã máy nền;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy ký hiệu hợp lệ;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy kiểm tra CFG;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Hạ Mã Máy {
@@ -75,7 +78,7 @@ lớp công khai Bộ Hạ Mã Máy {
         };
         văn bản = "";
         i = 1;
-        lặp (vòng = 0; i < n - 1; vòng++) {
+        khi (i < n - 1) {
             c = từ tố[i];
             nếu (c == "\\" && i + 1 < n - 1) {
                 i += 1;
@@ -352,6 +355,8 @@ lớp công khai Bộ Hạ Mã Máy {
                     ca "+": { mã = "Add"; }
                     ca "-": { mã = "Sub"; }
                     ca "*": { mã = "Mul"; }
+                    ca "/": { mã = "Div"; }
+                    ca "%": { mã = "Mod"; }
                     ca "==": { mã = "Equal"; }
                     ca "!=": { mã = "NotEqual"; }
                     ca "<": { mã = "Less"; }
@@ -381,7 +386,7 @@ lớp công khai Bộ Hạ Mã Máy {
                 };
                 nếu (v["callTarget"] != "DirectFunction" || v["symbolId"] < 0 ||
                     máy ảo lấy độ dài(các mã phép toán) == 0) {
-                    mình.biên dịch máy hạ lỗi("bản địa chỉ hỗ trợ lời gọi hàm direct đã binding");
+                    mình.biên dịch máy hạ lỗi("chỉ hỗ trợ gọi trực tiếp hàm đã xác định");
                 };
                 chương trình được gọi = mình.biên dịch máy hạ giá trị(IR, các mã phép toán[0]);
                 nếu (chương trình được gọi["opcode"] != "LoadName" ||
@@ -496,21 +501,29 @@ lớp công khai Bộ Hạ Mã Máy {
                 };
             }
             ca "Loop": {
-                nếu (câu lệnh hiện tại["loopForm"] != "ForBlock" || máy ảo lấy độ dài(các gốc) != 3 || máy ảo lấy độ dài(con) != 1) {
-                    mình.biên dịch máy hạ lỗi("native chỉ hỗ trợ lặp(init; condition; update) { ... }");
+                vòng khi = câu lệnh hiện tại["loopForm"] == "WhileBlock";
+                số gốc = 3;
+                gốc điều kiện = 1;
+                nếu (vòng khi) { số gốc = 1; gốc điều kiện = 0; };
+                nếu ((!vòng khi && câu lệnh hiện tại["loopForm"] != "ForBlock") || máy ảo lấy độ dài(các gốc) != số gốc || máy ảo lấy độ dài(con) != 1) {
+                    mình.biên dịch máy hạ lỗi("native cần lặp(init; condition; update) { ... } hoặc khi(condition) { ... }");
                 };
-                mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[0]);
-                mình.biên dịch máy hạ bỏ(trạng thái);
+                nếu (!vòng khi) {
+                    mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[0]);
+                    mình.biên dịch máy hạ bỏ(trạng thái);
+                };
                 bắt đầu = máy ảo lấy độ dài(trạng thái["instructions"]);
-                mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[1]);
+                mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[gốc điều kiện]);
                 đích thoát lặp = mình.biên dịch máy hạ lệnh(trạng thái, "BranchZero");
                 trạng thái["depth"] = trạng thái["depth"] - 1;
                 khung = {"breaks": [], "continues": []};
                 máy ảo thêm cuối danh sách(trạng thái["loops"], khung);
                 mình.biên dịch máy hạ câu(IR, trạng thái, con[0]);
                 bước cập nhật = máy ảo lấy độ dài(trạng thái["instructions"]);
-                mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[2]);
-                mình.biên dịch máy hạ bỏ(trạng thái);
+                nếu (!vòng khi) {
+                    mình.biên dịch máy hạ biểu thức(IR, trạng thái, các gốc[2]);
+                    mình.biên dịch máy hạ bỏ(trạng thái);
+                };
                 mình.biên dịch máy hạ lệnh(trạng thái, "Jump", 0, bắt đầu);
                 kết thúc = máy ảo lấy độ dài(trạng thái["instructions"]);
                 trạng thái["instructions"][đích thoát lặp]["operand"] = kết thúc;
@@ -550,7 +563,7 @@ lớp công khai Bộ Hạ Mã Máy {
         con = định nghĩa["children"];
         nếu (định nghĩa["unsupported"] || máy ảo lấy độ dài(định nghĩa["roots"]) != 0 ||
             máy ảo lấy độ dài(con) != 1 || con[0]["opcode"] != "Block") {
-            mình.biên dịch máy hạ lỗi("hàm bản địa phải có thân IR trực tiếp");
+            mình.biên dịch máy hạ lỗi("hàm phải có thân IR trực tiếp");
         };
         các tham số = định nghĩa["parameters"];
         trạng thái = {"slots": [], "instructions": [], "depth": 0,
@@ -563,7 +576,7 @@ lớp công khai Bộ Hạ Mã Máy {
         mình.biên dịch máy hạ khai báo(IR, trạng thái, con[0]);
         mình.biên dịch máy hạ câu(IR, trạng thái, con[0]);
         các ô nhớ = máy ảo lấy độ dài(trạng thái["slots"]);
-        nếu (!trạng thái["hasReturn"]) { mình.biên dịch máy hạ lỗi("hàm bản địa cần trả về i32"); };
+        nếu (!trạng thái["hasReturn"]) { mình.biên dịch máy hạ lỗi("hàm cần trả về i32"); };
         mình.biên dịch máy hạ lệnh(trạng thái, "Trap");
         kết quả = {"parameterCount": máy ảo lấy độ dài(các tham số), "slotCount": các ô nhớ,
                    "maxStackDepth": trạng thái["maxDepth"],

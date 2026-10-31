@@ -1,4 +1,4 @@
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 // Các đường lỗi này không bind/kết nối localhost: chạy được cả khi sandbox
 // cấm tạo socket. Chúng xác nhận policy V++ và kiểm tra từ tố tại FFI.

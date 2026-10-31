@@ -128,6 +128,9 @@ int main() {
             "reject injected assembly symbol");
 
         // Exercise the highest available register and the next-slot fallback.
+        // PushConstant + LoadSlot intentionally keeps both eval registers live:
+        // two adjacent LoadSlot operations would be fused into direct ADD
+        // operands and would no longer exercise w17.
         // A fixed slot assignment must remain within the platform's volatile
         // registers; no platform/callee-saved register may be silently used.
         MachineFunction boundary;
@@ -138,8 +141,8 @@ int main() {
             {MachineOpcode::LoadSlot, 0, 0, 0},
             {MachineOpcode::StoreSlot, 0, 13, 1},
             {MachineOpcode::Drop, 0, 0, 1},
-            {MachineOpcode::LoadSlot, 0, 13, 0},
-            {MachineOpcode::LoadSlot, 0, 1, 1},
+            {MachineOpcode::PushConstant, 0, 0, 0},
+            {MachineOpcode::LoadSlot, 0, 13, 1},
             {MachineOpcode::Add, 0, 0, 2},
             {MachineOpcode::Return, 0, 0, 1},
             {MachineOpcode::Trap, 0, 0, 0},
@@ -184,6 +187,36 @@ int main() {
                                 {RawLeafKind::AddI32Arguments, 0}, "cong"),
                "Windows ARM64 assembly ABI chưa có phải bị từ chối");
     }
+
+    // The assembled x86 function must preserve fixed-width branches and
+    // relocatable calls from the machine-code encoder, even for short jumps.
+    const auto linuxX86 = parseTarget("x86_64-linux-gnu");
+    if (linuxX86.target) {
+        MachineFunction fixture;
+        fixture.maxStackDepth = 1;
+        fixture.instructions = {
+            {MachineOpcode::PushConstant, 1, 0, 0},
+            {MachineOpcode::BranchZero, 0, 4, 1},
+            {MachineOpcode::Call, 0, 0, 0, "vpp_test_external"},
+            {MachineOpcode::Return, 0, 0, 1},
+            {MachineOpcode::PushConstant, 0, 0, 0},
+            {MachineOpcode::Return, 0, 0, 1},
+        };
+        const auto encoded = emitMachineFunction(*linuxX86.target, fixture);
+        if (encoded) {
+            const auto listing = emitMachineAssembly(*linuxX86.target, encoded, "fixture");
+            expect(listing && listing.text.find(".byte ") != std::string::npos &&
+                   listing.text.find("call vpp_test_external\n") != std::string::npos &&
+                   listing.text.find("je ") == std::string::npos &&
+                   encoded.relocations.size() == 1 &&
+                   encoded.bytes[encoded.relocations[0].offset - 1] == 0xe8,
+                   "x86_64 exact assembly bytes with relocatable call");
+            auto invalid = encoded;
+            invalid.relocations[0].offset = 0;
+            expect(!emitMachineAssembly(*linuxX86.target, invalid, "fixture"),
+                   "x86_64 rejects invalid CALL relocation");
+        } else expect(false, "x86_64 fixture machine encoding");
+    } else expect(false, "x86_64 fixture target");
 
     // CFG validation must reject different evaluation-stack heights reaching
     // the same instruction; this cannot be checked with a linear counter.

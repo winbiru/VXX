@@ -1,0 +1,32 @@
+VPP_AOT_CPU_PROFILE unit=cpu_ns inclusive=may_overlap instrumented=1
+VPP_AOT_CPU_PROFILE abi.assign calls=1928 inclusive_ns=3787507 self_ns=2810211
+VPP_AOT_CPU_PROFILE abi.binary calls=17894 inclusive_ns=33278710 self_ns=14786860
+VPP_AOT_CPU_PROFILE abi.call calls=641 inclusive_ns=650817601 self_ns=10066899
+VPP_AOT_CPU_PROFILE abi.condition calls=10549 inclusive_ns=4045999 self_ns=4045999
+VPP_AOT_CPU_PROFILE abi.construct calls=38 inclusive_ns=133377 self_ns=133377
+VPP_AOT_CPU_PROFILE abi.define_class calls=8 inclusive_ns=21623 self_ns=21623
+VPP_AOT_CPU_PROFILE abi.define_method calls=117 inclusive_ns=77837 self_ns=77837
+VPP_AOT_CPU_PROFILE abi.failed calls=10549 inclusive_ns=1546480 self_ns=1546480
+VPP_AOT_CPU_PROFILE abi.floating calls=250 inclusive_ns=106667 self_ns=106667
+VPP_AOT_CPU_PROFILE abi.increment calls=4753 inclusive_ns=12758387 self_ns=10091709
+VPP_AOT_CPU_PROFILE abi.index calls=4915 inclusive_ns=12266406 self_ns=12266406
+VPP_AOT_CPU_PROFILE abi.indirect calls=80 inclusive_ns=2741663 self_ns=1040071
+VPP_AOT_CPU_PROFILE abi.initialize calls=1316 inclusive_ns=827810 self_ns=827810
+VPP_AOT_CPU_PROFILE abi.integer calls=8548 inclusive_ns=3299988 self_ns=3299988
+VPP_AOT_CPU_PROFILE abi.intrinsic calls=5194 inclusive_ns=24155628 self_ns=24155628
+VPP_AOT_CPU_PROFILE abi.list calls=7 inclusive_ns=18666 self_ns=18666
+VPP_AOT_CPU_PROFILE abi.load calls=33142 inclusive_ns=41481381 self_ns=30767812
+VPP_AOT_CPU_PROFILE abi.map calls=1 inclusive_ns=18625 self_ns=18625
+VPP_AOT_CPU_PROFILE abi.method calls=103 inclusive_ns=1247861542 self_ns=55274629
+VPP_AOT_CPU_PROFILE abi.negate calls=4358 inclusive_ns=2962386 self_ns=2962386
+VPP_AOT_CPU_PROFILE abi.null calls=12 inclusive_ns=5332 self_ns=5332
+VPP_AOT_CPU_PROFILE abi.parameter calls=1205 inclusive_ns=1082910 self_ns=1082910
+VPP_AOT_CPU_PROFILE abi.print calls=1 inclusive_ns=39167 self_ns=39167
+VPP_AOT_CPU_PROFILE abi.return_value calls=824 inclusive_ns=525997 self_ns=525997
+VPP_AOT_CPU_PROFILE abi.safepoint calls=4856 inclusive_ns=774028 self_ns=774028
+VPP_AOT_CPU_PROFILE abi.set_index calls=16 inclusive_ns=21415 self_ns=21415
+VPP_AOT_CPU_PROFILE abi.string calls=1450 inclusive_ns=839869 self_ns=839869
+VPP_AOT_CPU_PROFILE binary.type_and_value calls=17894 inclusive_ns=18491850 self_ns=18491850
+VPP_AOT_CPU_PROFILE cell.load calls=37895 inclusive_ns=12124663 self_ns=12124663
+VPP_AOT_CPU_PROFILE cell.store calls=6681 inclusive_ns=2232880 self_ns=2232880
+VPP_AOT_CPU_PROFILE vm_alloc=unavailable_in_cpp_aot

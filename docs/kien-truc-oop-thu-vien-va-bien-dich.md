@@ -72,7 +72,7 @@ trình và regex dùng chung implementation với lớp để tránh hai thuật
 ## Ví dụ sử dụng
 
 ```text
-nhập gói/biên dịch/bộ biên dịch;
+nhập gói.biên dịch.bộ biên dịch.*;
 
 phiên = Bộ Biên Dịch("hàm chính() { in 42; };", ".");
 thống_kê = phiên.thống kê();
@@ -88,9 +88,9 @@ tránh lặp lại công đoạn phân tích.
 Các phần mở rộng có thể gọi trực tiếp:
 
 ```text
-nhập gói/biên dịch/phụ thuộc;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/mạng/rest;
+nhập gói.biên dịch.phụ thuộc.*;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.mạng.rest.*;
 
 phân_tích = Bộ Phân Tích Phụ Thuộc("nhập bộ sưu tập;", ".");
 imports = phân_tích.danh sách();
@@ -116,7 +116,7 @@ khởi tạo sổ mới. Các API hàm tự do `biên dịch đăng ký hàm IR 
 alias/export vẫn theo thứ tự emitter/linker C++ để bảo đảm ABI bytecode.
 
 ```text
-nhập gói/kiểm thử/chính;
+nhập gói.kiểm thử.chính.*;
 
 bộ = Bộ Kiểm Thử(sai);
 ca = Ca Kiểm Thử(hàm() { trả về 1; });
@@ -165,9 +165,9 @@ riêng và cần tiếp tục hoàn thiện theo backend thực tế.
 ## Phiên và adapter thư viện
 
 ```text
-nhập gói/văn bản/quét và tách chuỗi;
-nhập gói/lõi/biểu thức chính quy;
-nhập gói/biên dịch/phiên tự chủ;
+nhập gói.văn bản.quét và tách chuỗi.*;
+nhập gói.lõi.biểu thức chính quy.*;
+nhập gói.biên dịch.phiên tự chủ.*;
 
 bộ_quét = Bộ Quét("12 3.5 Việt");
 số = bộ_quét.đọc số nguyên();

@@ -1,4 +1,4 @@
-nhập gói/bộ sưu tập/chính;
+nhập gói.bộ sưu tập.chính.*;
 
 hàm chính() {
     a = Ngăn Xếp();

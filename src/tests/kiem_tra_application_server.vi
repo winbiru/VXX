@@ -1,4 +1,4 @@
-nhập gói/ứng dụng/cầu nối/giao diện lập trình;
+nhập gói.ứng dụng.cầu nối.giao diện lập trình.*;
 
 hàm chính() {
     ứng dụng in khởi động vpp("V++ API Project", "8080", "mysql://localhost:3306/testVXX");

@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 // A failed POSIX FFI connect must be catchable by the HTTP client's public
 // V++ wrappers even when legacy socket opcodes are forbidden.

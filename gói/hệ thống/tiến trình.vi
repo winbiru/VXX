@@ -1,10 +1,11 @@
 // Chạy executable bằng argv riêng và môi trường riêng cho tiến trình con.
 // Validation/defaults thuộc V++; VM chỉ spawn, đọc pipe và chờ exit status.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/thời gian/đơn điệu;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.ký tự unicode;
+nhập gói.lõi.toán học.làm tròn lên;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 // Định danh đi qua machine opcode, syscall trực tiếp bằng ASM trên POSIX
 // được hỗ trợ. Không cần foreign descriptor / libffi cho sáu hàm này.

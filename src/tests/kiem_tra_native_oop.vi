@@ -1,8 +1,8 @@
-nhập gói/biên dịch/bộ sinh mã bản địa;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy nền;
-nhập gói/biên dịch/đối tượng;
-nhập gói/kiểm thử/chính;
+nhập gói.biên dịch.bộ sinh mã bản địa.*;
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.mã máy nền.*;
+nhập gói.biên dịch.đối tượng.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm so byte OOP(a, b) {
     khẳng định bằng(độ dài(a), độ dài(b));
@@ -10,9 +10,9 @@ hàm so byte OOP(a, b) {
 };
 
 hàm chính() {
-    linux = Bộ Sinh Mã Bản Địa("x86_64-linux-gnu");
-    mac = Bộ Sinh Mã Bản Địa("aarch64-apple-darwin");
-    win = Bộ Sinh Mã Bản Địa("x86_64-pc-windows-msvc");
+    linux = Bộ Sinh Mã Máy("x86_64-linux-gnu");
+    mac = Bộ Sinh Mã Máy("aarch64-apple-darwin");
+    win = Bộ Sinh Mã Máy("x86_64-pc-windows-msvc");
     khẳng định bằng(linux.bộ ba(), "x86_64-unknown-linux-gnu");
     khẳng định bằng(mac.bộ ba(), "aarch64-apple-darwin");
     khẳng định bằng(win.bộ ba(), "x86_64-pc-windows-msvc");

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -13,12 +14,15 @@
 #include <unordered_map>
 #include <filesystem>
 #include <cstdlib>
+#include <cstdio>
 #include <atomic>
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #else
 #include <climits>
 #include <sys/types.h>
@@ -145,6 +149,7 @@ enum class SnippetMode {
 };
 
 static void verifyLockedProjectForSource(const fs::path &sourcePath);
+static int runSourceWithAvailableCompiler(const std::string &filename, bool captureErrors = false);
 
 // Chạy snippet; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runSnippet(const std::string &source,
@@ -180,9 +185,22 @@ static int runSnippet(const std::string &source,
                       << artifacts.unsupportedDirectIrRegions << '\n';
             std::cout << vietvm::tooling::dumpIr(artifacts.ir);
             return EXIT_SUCCESS;
-        case SnippetMode::Disassemble:
+        case SnippetMode::Disassemble: {
             std::cout << vietvm::tooling::disassembleBytecode(artifacts.bytecode, stringPool);
+            // unordered_map iteration differs between standard libraries.
+            // Match the native compiler's function table order by numeric ID.
+            std::vector<int> functionIds;
+            for (const auto &entry : compilationContext.functionBytecode) {
+                functionIds.push_back(entry.first);
+            }
+            std::sort(functionIds.begin(), functionIds.end());
+            for (int id : functionIds) {
+                std::cout << "\nfunction " << id << ":\n"
+                          << vietvm::tooling::disassembleBytecode(
+                                 compilationContext.functionBytecode.at(id), stringPool);
+            }
             return EXIT_SUCCESS;
+        }
         case SnippetMode::Execute:
             break;
     }
@@ -321,7 +339,8 @@ static int runFile(const std::string &filename,
 // process để compiler có thể tái sử dụng cache AST giữa các lượt, nhưng vẫn ghi
 // output/status riêng cho từng file để run_tests.sh giữ nguyên golden semantics.
 static int runBatchTestFiles(const fs::path &outputDir,
-                             const std::vector<fs::path> &testFiles) {
+                             const std::vector<fs::path> &testFiles,
+                             bool forceCpp = false) {
     fs::create_directories(outputDir);
     for (const fs::path &testFile : testFiles) {
         std::ostringstream captured;
@@ -329,7 +348,8 @@ static int runBatchTestFiles(const fs::path &outputDir,
         std::streambuf *oldErr = std::cerr.rdbuf(captured.rdbuf());
         int status = EXIT_FAILURE;
         try {
-            status = runFile(testFile.u8string(), SnippetMode::Execute);
+            status = forceCpp ? runFile(testFile.u8string(), SnippetMode::Execute)
+                              : runSourceWithAvailableCompiler(testFile.u8string(), true);
         } catch (const vietvm::runtime::RuntimeError &error) {
             printErrorMessage(messages::kCliUnhandledException,
                               vietvm::runtime::formatRuntimeError(error));
@@ -411,27 +431,9 @@ static int buildFullNative(const std::string &filename, const std::string &outpu
     return EXIT_SUCCESS;
 }
 
-static std::string vppStringLiteral(const std::string &value) {
-    std::string result = "\"";
-    for (const unsigned char c : value) {
-        switch (c) {
-            case '\\': result += "\\\\"; break;
-            case '"': result += "\\\""; break;
-            case '\n': result += "\\n"; break;
-            case '\r': result += "\\r"; break;
-            case '\t': result += "\\t"; break;
-            default:
-                if (c < 32 || c == 127)
-                    throw std::runtime_error("đối số compiler chứa ký tự điều khiển chưa hỗ trợ");
-                result += static_cast<char>(c);
-        }
-    }
-    return result + '"';
-}
-
 // Only Stage 0 uses the C++ bootstrap. --compiler=vpp must execute an already
 // bootstrapped native V++ compiler, with no implicit VM fallback.
-static fs::path nativeVppCompiler() {
+static fs::path nativeVppCompiler(bool required = true) {
     if (const char *value = std::getenv("VPP_NATIVE_COMPILER"); value && *value) {
         const fs::path configured = fs::absolute(vietvm::core::utf8Path(value));
         if (!fs::is_regular_file(configured))
@@ -449,6 +451,72 @@ static fs::path nativeVppCompiler() {
             if (fs::is_regular_file(candidate)) return candidate;
         }
     }
+    // In a developer build, the bootstrapped V++ compiler is produced next
+    // to the CLI build tree rather than installed under VPP_HOME/bin. Resolve
+    // it relative to the running executable, independent of the caller's cwd.
+    fs::path executableDirectory;
+#if defined(_WIN32)
+    std::wstring executablePath(32768, L'\0');
+    const DWORD executableLength = GetModuleFileNameW(
+        nullptr, executablePath.data(), static_cast<DWORD>(executablePath.size()));
+    if (executableLength != 0 && executableLength < executablePath.size()) {
+        executablePath.resize(executableLength);
+        executableDirectory = fs::path(executablePath).parent_path();
+    }
+#elif defined(__APPLE__)
+    std::uint32_t executableLength = 0;
+    (void)_NSGetExecutablePath(nullptr, &executableLength);
+    if (executableLength != 0) {
+        std::vector<char> executablePath(executableLength);
+        if (_NSGetExecutablePath(executablePath.data(), &executableLength) == 0)
+            executableDirectory = fs::weakly_canonical(fs::path(executablePath.data())).parent_path();
+    }
+#elif defined(__linux__)
+    std::vector<char> executablePath(4096);
+    const auto executableLength = readlink("/proc/self/exe", executablePath.data(), executablePath.size());
+    if (executableLength > 0 && static_cast<std::size_t>(executableLength) < executablePath.size())
+        executableDirectory = fs::path(std::string(executablePath.data(),
+            static_cast<std::size_t>(executableLength))).parent_path();
+#endif
+    // A developer build has a complete V++/ASM toolchain next to the build
+    // directory. Recognize it even without VPP_HOME, so the ordinary CLI
+    // does not silently return to the Stage 0 VM in a source checkout.
+    const char *nativeHome = std::getenv("VPP_HOME");
+    const char *nativeAotRoot = std::getenv("VPP_AOT_ROOT");
+    const fs::path buildDirectory =
+        (executableDirectory.filename() == "Release" ||
+         executableDirectory.filename() == "Debug" ||
+         executableDirectory.filename() == "RelWithDebInfo" ||
+         executableDirectory.filename() == "MinSizeRel")
+        ? executableDirectory.parent_path().parent_path()
+        : executableDirectory.parent_path();
+    const fs::path sourceRoot = buildDirectory.parent_path();
+    const bool hasNativeRoot = (nativeHome && *nativeHome) ||
+        (nativeAotRoot && *nativeAotRoot) ||
+        (fs::is_regular_file(sourceRoot /
+             vietvm::core::utf8Path("gói/biên dịch/dòng lệnh máy.vi")) &&
+         fs::is_directory(sourceRoot / "scripts/quality/native_aot_link"));
+    if (hasNativeRoot && !executableDirectory.empty()) {
+#ifdef _WIN32
+        constexpr const char *nativeName = "vpp-native.exe";
+#else
+        constexpr const char *nativeName = "vpp-native";
+#endif
+        for (const auto &candidate : {
+                 // The compiler bootstrap fixture is rebuilt by CTest; the
+                 // older native-cli fixture may lack newly added commands.
+                 buildDirectory / "native-compiler" / nativeName,
+                 buildDirectory / "native-compiler" / "Release" / nativeName,
+                 buildDirectory / "native-compiler" / "Debug" / nativeName,
+                 buildDirectory / "native-cli" / nativeName,
+                 buildDirectory / "native-cli" / "Release" / nativeName,
+                 buildDirectory / "native-cli" / "Debug" / nativeName,
+                 executableDirectory / "native-compiler" / nativeName,
+                 executableDirectory / nativeName}) {
+            if (fs::is_regular_file(candidate)) return candidate;
+        }
+    }
+    if (!required) return {};
     throw std::runtime_error(
         "Compiler V++ native chưa được bootstrap. Chạy 'vpp --bootstrap-native "
         "gói/biên dịch/dòng lệnh bản địa.vi <VPP_HOME>/bin/vpp-native' ở Stage 0 "
@@ -481,7 +549,8 @@ public:
 };
 
 static int runVppCompiler(const std::string &filename, const std::string &mode,
-                          const std::string &outputName = {}) {
+                          const std::string &outputName = {},
+                          const fs::path &resolutionBase = {}, bool captureErrors = false) {
     const fs::path sourcePath = fs::weakly_canonical(
         fs::absolute(vietvm::core::utf8Path(filename)));
     if (mode != "artifact") verifyLockedProjectForSource(sourcePath);
@@ -498,16 +567,91 @@ static int runVppCompiler(const std::string &filename, const std::string &mode,
         arguments.insert(arguments.end(), {"artifact", input.u8string()});
     } else if (mode == "run") {
         arguments.insert(arguments.end(), {"run", input.u8string()});
+    } else if (mode == "embed") {
+        arguments.insert(arguments.end(), {"embed", input.u8string(), "--base",
+            (resolutionBase.empty() ? fs::current_path() : resolutionBase).u8string()});
     } else if (mode == "build") {
         arguments.insert(arguments.end(), {"build", input.u8string(), "-o",
             (outputPath.empty() ? temporary.path / "output.vbc" : outputPath).u8string(), "--bytecode"});
+    } else if (mode == "disassemble") {
+        arguments.insert(arguments.end(), {"disassemble", input.u8string()});
+    } else if (mode == "dump-ast" || mode == "dump-ir") {
+        arguments.insert(arguments.end(), {mode, input.u8string()});
     } else {
         throw std::invalid_argument("Compiler V++: chế độ chưa hỗ trợ: " + mode);
     }
-    const auto result = vietvm::native::aot::runProcess(arguments);
-    if (result.status != 0) return result.status;
+    // The legacy VM runs source files with relative I/O paths resolved from
+    // the entry file's directory. Preserve that runtime contract when the
+    // V++ compiler launches an ASM executable from a different caller cwd.
+    // Embed/REPL explicitly uses its import base, and artifact execution has
+    // no source-file directory to adopt.
+    vietvm::native::aot::ProcessResult result;
+    if (mode == "run") {
+        RuntimeCwdGuard guard;
+        fs::current_path(sourcePath.parent_path());
+        result = vietvm::native::aot::runProcess(arguments, captureErrors);
+    } else {
+        result = vietvm::native::aot::runProcess(arguments, captureErrors);
+    }
     std::cout << result.output;
-    return EXIT_SUCCESS;
+    return result.status;
+}
+
+// Formatter chạy trong V++ native; host giữ duyệt thư mục và ghi tệp để
+// --check/--write luôn so sánh nội dung trước khi thay đổi nguồn.
+static std::string formatWithAvailableCompiler(const fs::path &path,
+                                                const std::string &source) {
+    const auto compiler = nativeVppCompiler(false);
+    if (compiler.empty()) return vietvm::tooling::formatSource(source);
+    const auto result = vietvm::native::aot::runProcess(
+        {compiler.u8string(), "format", fs::absolute(path).u8string()}, true);
+    if (result.status != EXIT_SUCCESS) {
+        throw std::runtime_error("Formatter V++ native thất bại: " + result.output);
+    }
+#if defined(_WIN32)
+    // The native compiler writes through the CRT text stream. Undo its
+    // LF->CRLF transport conversion before comparing files or embedding text
+    // in a byte-counted LSP response.
+    std::string formatted;
+    formatted.reserve(result.output.size());
+    for (std::size_t i = 0; i < result.output.size(); ++i) {
+        if (result.output[i] == '\r' && i + 1 < result.output.size() &&
+            result.output[i + 1] == '\n') continue;
+        formatted.push_back(result.output[i]);
+    }
+    return formatted;
+#else
+    return result.output;
+#endif
+}
+
+// LSP giữ văn bản chưa lưu trong bộ nhớ. Ghi snapshot tạm để dùng chung
+// formatter V++ với CLI mà không thay đổi tệp thực của người dùng.
+static std::string formatDocumentWithAvailableCompiler(const std::string &source) {
+    if (nativeVppCompiler(false).empty()) return vietvm::tooling::formatSource(source);
+    NativeCompilerTemporaryDirectory temporary;
+    const fs::path sourcePath = temporary.path / "lsp-format.vi";
+    std::ofstream output(sourcePath, std::ios::binary | std::ios::trunc);
+    if (!output || !(output << source)) {
+        throw std::runtime_error("LSP formatter: không ghi được bản nguồn tạm");
+    }
+    output.close();
+    if (!output) throw std::runtime_error("LSP formatter: không đóng được nguồn tạm");
+    return formatWithAvailableCompiler(sourcePath, source);
+}
+
+// Once the native V++ compiler is bootstrapped, ordinary source commands use
+// its V++ frontend and ASM backend. Stage 0 installations without the native
+// binary can still bootstrap using the original C++ pipeline. An explicitly
+// configured but missing compiler is an error (nativeVppCompiler checks it).
+static int runSourceWithAvailableCompiler(const std::string &filename, bool captureErrors) {
+    if (!nativeVppCompiler(false).empty()) return runVppCompiler(filename, "run", {}, {}, captureErrors);
+    return runFile(filename, SnippetMode::Execute);
+}
+
+static int buildSourceWithAvailableCompiler(const std::string &filename) {
+    if (!nativeVppCompiler(false).empty()) return runVppCompiler(filename, "build");
+    return buildFile(filename);
 }
 
 // Opt-in self-host native: frontend AST/IR, Machine IR, ISA và object đều
@@ -668,19 +812,12 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
     const auto temporaryExecutable = temporaryDirectory / "program";
     arguments.push_back("-o");
     arguments.push_back(temporaryExecutable.string());
-    const pid_t child = fork();
-    if (child < 0) throw std::runtime_error("không thể khởi chạy linker native");
-    if (child == 0) {
-        std::vector<char *> argv;
-        for (auto &argument : arguments) argv.push_back(argument.data());
-        argv.push_back(nullptr);
-        execvp(argv[0], argv.data());
-        _exit(127);
-    }
-    int status = 0;
-    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        std::cerr << "Native host linker thất bại (mã "
-                  << (WIFEXITED(status) ? WEXITSTATUS(status) : -1) << ")\n";
+    // Process creation, output capture and exit-code normalization belong to
+    // the shared host ABI; compiler and object generation remain in V++.
+    const auto linked = vietvm::native::aot::runProcess(arguments, true);
+    if (!linked.output.empty()) std::cerr << linked.output;
+    if (linked.status != 0) {
+        std::cerr << "Native host linker thất bại (mã " << linked.status << ")\n";
         return EXIT_FAILURE;
     }
     fs::rename(temporaryExecutable, destination);
@@ -709,21 +846,20 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
     const bool assembly = mode == "--emit-asm";
     const bool object = mode == "--emit-obj";
     const auto compiledLeaf = vietvm::native::compileRawLeafVpp(
-        target, artifacts.ir, functionName, context.importResolutionBase, object);
+        target, artifacts.ir, functionName, context.importResolutionBase, object, assembly);
     const bool generalized = !compiledLeaf && !compiledLeaf.lowered &&
         (target.arch == vietvm::native::Architecture::X86_64 ||
          target.arch == vietvm::native::Architecture::AArch64);
     const auto compiledMachine = generalized
         ? vietvm::native::compileMachineFunctionVpp(
-              target, artifacts.ir, functionName, context.importResolutionBase, object)
+              target, artifacts.ir, functionName, context.importResolutionBase, object, assembly)
         : vietvm::native::VppCompiledMachine{};
     if (!compiledLeaf && (!generalized || !compiledMachine)) {
         std::cerr << "Native V++ compile lỗi: "
                   << (generalized ? compiledMachine.error : compiledLeaf.error) << '\n';
         return EXIT_FAILURE;
     }
-    // One V++ VM run owns lowering, encoding and optional object packing.
-    // C++ only prints ISA assembly; the object writer itself lives in V++.
+    // One V++ VM run owns lowering, encoding and optional object/ASM output.
     auto machineEmission = generalized
         ? compiledMachine.emission
         : vietvm::native::MachineEmission{};
@@ -741,38 +877,15 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
         return EXIT_FAILURE;
     }
     if (assembly && generalized) {
-        const auto cppListing = vietvm::native::emitMachineFunction(target, compiledMachine.function);
-        if (!cppListing) {
-            std::cerr << "C++ assembly printer lỗi: " << cppListing.error << '\n';
-            return EXIT_FAILURE;
-        }
-        if (cppListing.bytes != machineEmission.bytes ||
-            cppListing.relocations.size() != machineEmission.relocations.size()) {
-            std::cerr << "V++ và C++ assembly printer không khớp mã máy/relocation\n";
-            return EXIT_FAILURE;
-        }
-        for (std::size_t i = 0; i < cppListing.relocations.size(); ++i) {
-            if (cppListing.relocations[i].offset != machineEmission.relocations[i].offset ||
-                cppListing.relocations[i].symbol != machineEmission.relocations[i].symbol) {
-                std::cerr << "V++ và C++ assembly printer không khớp CALL relocation\n";
-                return EXIT_FAILURE;
-            }
-        }
-        machineEmission.assembly = cppListing.assembly;
-    }
-    if (assembly && !generalized) {
-        // C++ remains the textual ISA printer; check its independently
-        // encoded bytes against V++ before exposing an assembly listing.
-        const auto reference = vietvm::native::emitRawLeaf(target, compiledLeaf.leaf);
-        if (!reference || reference.bytes != leafEmission.bytes) {
-            std::cerr << "V++ và C++ leaf encoder không khớp byte mã máy\n";
+        if (machineEmission.assembly.empty()) {
+            std::cerr << "V++ assembly printer không trả bản ghi ASM\n";
             return EXIT_FAILURE;
         }
     }
     const auto listing = assembly
         ? (generalized
-            ? vietvm::native::emitMachineAssembly(target, machineEmission, functionName)
-            : vietvm::native::emitRawAssembly(target, compiledLeaf.leaf, functionName))
+            ? vietvm::native::RawAssemblyResult{machineEmission.assembly, {}}
+            : vietvm::native::RawAssemblyResult{compiledLeaf.assembly, {}})
         : vietvm::native::RawAssemblyResult{};
     if (assembly && !listing) {
         std::cerr << "Native assembly lỗi: " << listing.error << '\n';
@@ -798,7 +911,7 @@ static int buildRawLeafFile(const vietvm::native::Target &target,
               << functionName << " -> " << outputName
               << " (" << vietvm::native::canonicalTriple(target) << ", "
               << bytes.size() << " machine bytes; "
-              << (assembly ? "ISA instructions, not linked" : (object ? "relocatable object, not executable" : "function body, not executable"))
+              << (assembly ? "assembly source, not linked" : (object ? "relocatable object, not executable" : "function body, not executable"))
               << ")\n";
     return EXIT_SUCCESS;
 }
@@ -844,7 +957,7 @@ static int runTests(const fs::path &requestedPath) {
         std::cout << messages::messageText(
             messages::kCliTestRunning, {testFile.u8string()}) << std::endl;
         try {
-            if (runFile(testFile.u8string(), SnippetMode::Execute) == EXIT_SUCCESS) {
+            if (runSourceWithAvailableCompiler(testFile.u8string()) == EXIT_SUCCESS) {
                 ++passed;
             }
         } catch (const vietvm::runtime::RuntimeError &error) {
@@ -861,7 +974,9 @@ static int runTests(const fs::path &requestedPath) {
     return passed == testFiles.size() ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-static int runLintPath(const fs::path &path) {
+enum class LintCompiler { Auto, Vpp, Cpp };
+
+static int runLintPath(const fs::path &path, LintCompiler choice = LintCompiler::Auto) {
     if (!fs::exists(path)) {
         std::cerr << messages::formatMessage(
             messages::kCliToolPathMissing, {path.u8string()}) << '\n';
@@ -874,9 +989,57 @@ static int runLintPath(const fs::path &path) {
         return EXIT_FAILURE;
     }
 
+    // Native lint owns parser, semantic checks and recursive import discovery.
+    // The host retains directory iteration, subprocess status and CI summary.
+    const fs::path nativeCompiler = choice == LintCompiler::Cpp
+        ? fs::path{} : nativeVppCompiler(choice == LintCompiler::Vpp);
+    const bool native = !nativeCompiler.empty();
+
     std::size_t errors = 0;
     std::size_t warnings = 0;
     for (const fs::path &sourceFile : sourceFiles) {
+        if (native) {
+            const auto result = vietvm::native::aot::runProcess(
+                {nativeCompiler.u8string(), "lint", fs::absolute(sourceFile).u8string()}, true);
+            if (result.status == EXIT_SUCCESS && result.output.empty()) continue;
+            const auto fileErrorsBefore = errors;
+            std::istringstream lines(result.output);
+            std::string line;
+            while (std::getline(lines, line)) {
+                if (line.empty()) continue;
+                const std::size_t firstColon = line.find(':');
+                const std::size_t secondColon = firstColon == std::string::npos
+                    ? std::string::npos : line.find(':', firstColon + 1);
+                const auto digits = [](const std::string &part) {
+                    return !part.empty() && part.size() <= 9 &&
+                        std::all_of(part.begin(), part.end(), [](unsigned char ch) {
+                            return ch >= '0' && ch <= '9';
+                        });
+                };
+                const std::string lineNumber = firstColon == std::string::npos
+                    ? "" : line.substr(0, firstColon);
+                const std::string columnNumber = secondColon == std::string::npos
+                    ? "" : line.substr(firstColon + 1, secondColon - firstColon - 1);
+                if (!digits(lineNumber) || !digits(columnNumber) ||
+                    secondColon == std::string::npos) {
+                    std::cerr << sourceFile.u8string() << ":1:1: lỗi: " << line << '\n';
+                    ++errors;
+                    continue;
+                }
+                const std::string text = line.substr(secondColon + 1);
+                const bool isWarning = text.rfind(" cảnh báo: ", 0) == 0;
+                if (isWarning) ++warnings;
+                else ++errors;
+                std::cerr << sourceFile.u8string() << ':' << lineNumber << ':'
+                          << columnNumber << ':' << text << '\n';
+            }
+            if (result.status != EXIT_SUCCESS && errors == fileErrorsBefore) {
+                std::cerr << sourceFile.u8string() << ":1:1: lỗi: native lint exited "
+                          << result.status << '\n';
+                ++errors;
+            }
+            continue;
+        }
         const std::string source = readFile(sourceFile.u8string());
         const fs::path resolutionBase = sourceFile.parent_path().empty()
             ? fs::current_path()
@@ -931,7 +1094,7 @@ static int runFormatPath(const fs::path &path,
     std::size_t changed = 0;
     for (const fs::path &sourceFile : sourceFiles) {
         const std::string source = readFile(sourceFile.u8string());
-        const std::string formatted = vietvm::tooling::formatSource(source);
+        const std::string formatted = formatWithAvailableCompiler(sourceFile, source);
         if (formatted != source) {
             ++changed;
             if (checkOnly) {
@@ -959,9 +1122,15 @@ static int runFormatPath(const fs::path &path,
 }
 
 // Chạy repl; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
-static int runRepl() {
+static int runRepl(bool forceCpp = false) {
+    const bool useNative = !forceCpp && !nativeVppCompiler(false).empty();
+    // The V++ compiler accepts an embedded source and an explicit import base.
+    // A temporary file keeps REPL snippets outside the project source tree.
+    std::unique_ptr<NativeCompilerTemporaryDirectory> temporary;
+    if (useNative) temporary = std::make_unique<NativeCompilerTemporaryDirectory>();
     std::cout << messages::messageText(messages::kReplWelcome);
     std::string line;
+    int nativeStatus = EXIT_SUCCESS;
     while (true) {
         std::cout << messages::messageText(messages::kReplPrompt);
         if (!std::getline(std::cin, line)) break;
@@ -974,18 +1143,34 @@ static int runRepl() {
             continue;
         }
 
-        std::string source = "nhập \"stdlib\";\n" + line;
         try {
-            (void)runSnippet(source, fs::current_path(), SnippetMode::Execute,
-                             fs::path("<repl>"));
+            if (useNative) {
+                const fs::path sourcePath = temporary->path / "repl.vi";
+                std::ofstream output(sourcePath, std::ios::binary | std::ios::trunc);
+                if (!output || !(output << line << '\n'))
+                    throw std::runtime_error("REPL: không ghi được nguồn tạm");
+                output.close();
+                if (!output) throw std::runtime_error("REPL: không đóng được nguồn tạm");
+                const int status = runVppCompiler(sourcePath.u8string(), "embed", {}, fs::current_path());
+                if (status != EXIT_SUCCESS) {
+                    nativeStatus = EXIT_FAILURE;
+                    std::cerr << "REPL: compiler V++ thoát với mã " << status << '\n';
+                }
+            } else {
+                const std::string source = "nhập \"stdlib\";\n" + line;
+                (void)runSnippet(source, fs::current_path(), SnippetMode::Execute,
+                                 fs::path("<repl>"));
+            }
         } catch (const vietvm::runtime::RuntimeError &error) {
+            if (useNative) nativeStatus = EXIT_FAILURE;
             printErrorMessage(messages::kReplExecutionFailed,
                               vietvm::runtime::formatRuntimeError(error));
         } catch (const std::exception &ex) {
+            if (useNative) nativeStatus = EXIT_FAILURE;
             printErrorMessage(messages::kReplExecutionFailed, ex.what());
         }
     }
-    return EXIT_SUCCESS;
+    return nativeStatus;
 }
 
 // Tạo đường dẫn tới manifest của package từ thư mục package; hàm ghép root với tên file manifest theo layout chuẩn.
@@ -2152,6 +2337,27 @@ static std::string lspRangeJson(const std::string &text,
            ",\"end\":" + lspPositionJson(lspPositionForOffset(text, span.end.offset)) + "}";
 }
 
+// Native lint reports 1-based UTF-8 byte columns. LSP needs UTF-16 offsets,
+// including for identifiers after multibyte Vietnamese text and emoji.
+static std::string nativeLintRangeJson(const std::string &text,
+                                       std::size_t line, std::size_t column) {
+    std::size_t offset = 0;
+    for (std::size_t row = 1; row < line && offset < text.size(); ++row) {
+        const auto newline = text.find('\n', offset);
+        offset = newline == std::string::npos ? text.size() : newline + 1;
+    }
+    const auto newline = text.find('\n', offset);
+    const std::size_t endOfLine = newline == std::string::npos ? text.size() : newline;
+    const std::size_t start = offset + std::min(column > 0 ? column - 1 : 0,
+                                                endOfLine - offset);
+    std::size_t length = 1;
+    if (start < endOfLine) (void)decodeUtf8CodePoint(text, start, length);
+    const std::size_t end = start < endOfLine
+        ? std::min(start + length, endOfLine) : start;
+    return "{\"start\":" + lspPositionJson(lspPositionForOffset(text, start)) +
+           ",\"end\":" + lspPositionJson(lspPositionForOffset(text, end)) + "}";
+}
+
 static std::string percentDecode(std::string value) {
     std::string decoded;
     decoded.reserve(value.size());
@@ -2605,38 +2811,120 @@ static std::string lspLibraryRootsResult(const fs::path &workspaceRoot) {
     return result.str();
 }
 
-// Gửi `textDocument/publishDiagnostics` qua LSP; hàm chuyển diagnostic compiler thành JSON-RPC notification kèm range/message.
+// Leave the user's file alone: the V++ parser sees the current LSP buffer,
+// while --base resolves imported modules relative to the real document.
+static std::optional<std::string> nativeLspDiagnosticsJson(
+    const std::string &text, const fs::path &resolutionBase) {
+    const fs::path compiler = nativeVppCompiler(false);
+    if (compiler.empty()) return std::nullopt;
+
+    NativeCompilerTemporaryDirectory temporary;
+    const fs::path snapshot = temporary.path / "lsp-lint.vi";
+    {
+        std::ofstream stream(snapshot, std::ios::binary | std::ios::trunc);
+        if (!stream || !(stream << text)) {
+            throw std::runtime_error("LSP lint: không ghi được bộ đệm tạm");
+        }
+    }
+    const auto result = vietvm::native::aot::runProcess(
+        {compiler.u8string(), "lint", snapshot.u8string(), "--base",
+         fs::absolute(resolutionBase).u8string()}, true);
+    if (result.status == EXIT_SUCCESS && result.output.empty()) return "[]";
+
+    std::ostringstream json;
+    json << '[';
+    std::size_t count = 0;
+    auto add = [&](std::size_t line, std::size_t column, int severity,
+                   const std::string &message) {
+        if (count++ != 0) json << ',';
+        json << "{\"range\":" << nativeLintRangeJson(text, line, column)
+             << ",\"severity\":" << severity
+             << ",\"source\":\"vpp\",\"message\":\""
+             << jsonEscape(message) << "\"}";
+    };
+
+    std::istringstream lines(result.output);
+    std::string line;
+    while (std::getline(lines, line)) {
+        if (line.empty()) continue;
+        const auto first = line.find(':');
+        const auto second = first == std::string::npos ? first : line.find(':', first + 1);
+        const auto digits = [](const std::string &value) {
+            return !value.empty() && value.size() <= 9 &&
+                std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+                    return ch >= '0' && ch <= '9';
+                });
+        };
+        const std::string row = first == std::string::npos ? "" : line.substr(0, first);
+        const std::string col = second == std::string::npos
+            ? "" : line.substr(first + 1, second - first - 1);
+        if (second == std::string::npos || !digits(row) || !digits(col)) {
+            add(1, 1, 1, "Native lint: " + line);
+            continue;
+        }
+        std::string message = line.substr(second + 1);
+        const bool warning = message.rfind(" cảnh báo: ", 0) == 0;
+        const std::string prefix = warning ? " cảnh báo: " : " lỗi: ";
+        if (message.rfind(prefix, 0) == 0) message.erase(0, prefix.size());
+        add(std::stoul(row), std::stoul(col), warning ? 2 : 1, message);
+    }
+    if (result.status != EXIT_SUCCESS && count == 0) {
+        add(1, 1, 1, "Native lint exited " + std::to_string(result.status));
+    }
+    json << ']';
+    return json.str();
+}
+
+// Gửi `textDocument/publishDiagnostics` qua LSP với native V++ nếu đã bootstrap.
 static void publishDiagnostics(const std::string &uri, const std::string &text) {
     const fs::path sourcePath = filePathFromUri(uri);
     const fs::path resolutionBase = sourcePath.empty() || sourcePath.parent_path().empty()
         ? fs::current_path()
         : sourcePath.parent_path();
-    const auto diagnostics = vietvm::tooling::lintDiagnostics(text, resolutionBase);
-    std::ostringstream diagnosticJson;
-    diagnosticJson << '[';
-    for (std::size_t index = 0; index < diagnostics.size(); ++index) {
-        if (index != 0) diagnosticJson << ',';
-        const auto &diagnostic = diagnostics[index];
-        const auto &span = diagnostic.span;
-        const int severity =
-            diagnostic.severity == vietvm::tooling::DiagnosticSeverity::Error ? 1 : 2;
-        diagnosticJson
-            << "{\"range\":" << lspRangeJson(text, span)
-            << ",\"severity\":" << severity
-            << ",\"source\":\"vpp\",\"message\":\""
-            << jsonEscape(diagnostic.message) << "\"}";
+    std::string diagnosticJson;
+    try {
+        const auto native = nativeLspDiagnosticsJson(text, resolutionBase);
+        if (native) diagnosticJson = *native;
+    } catch (const std::exception &error) {
+        diagnosticJson = "[{\"range\":" + nativeLintRangeJson(text, 1, 1) +
+            ",\"severity\":1,\"source\":\"vpp\",\"message\":\"" +
+            jsonEscape(error.what()) + "\"}]";
     }
-    diagnosticJson << ']';
+    if (diagnosticJson.empty()) {
+        const auto diagnostics = vietvm::tooling::lintDiagnostics(text, resolutionBase);
+        std::ostringstream stage0;
+        stage0 << '[';
+        for (std::size_t index = 0; index < diagnostics.size(); ++index) {
+            if (index != 0) stage0 << ',';
+            const auto &diagnostic = diagnostics[index];
+            const int severity = diagnostic.severity == vietvm::tooling::DiagnosticSeverity::Error ? 1 : 2;
+            stage0 << "{\"range\":" << lspRangeJson(text, diagnostic.span)
+                   << ",\"severity\":" << severity
+                   << ",\"source\":\"vpp\",\"message\":\""
+                   << jsonEscape(diagnostic.message) << "\"}";
+        }
+        stage0 << ']';
+        diagnosticJson = stage0.str();
+    }
 
     std::ostringstream notif;
     notif << "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{"
           << "\"uri\":\"" << jsonEscape(uri) << "\","
-          << "\"diagnostics\":" << diagnosticJson.str() << "}}";
+          << "\"diagnostics\":" << diagnosticJson << "}}";
     writeLspMessage(notif.str());
 }
 
 // Chạy language máy chủ; hàm điều phối toàn bộ luồng xử lý của tác vụ, gọi các bước con theo thứ tự và trả mã/kết quả cuối cùng.
 static int runLanguageServer() {
+#if defined(_WIN32)
+    // LSP Content-Length counts raw UTF-8 bytes, including CRLF headers.
+    // Windows text streams would turn "\r\n" into "\r\r\n" on stdout and
+    // translate or truncate bytes on stdin.
+    if (_setmode(_fileno(stdin), _O_BINARY) == -1 ||
+        _setmode(_fileno(stdout), _O_BINARY) == -1) {
+        throw std::runtime_error("LSP: không thể mở stdin/stdout ở chế độ binary");
+    }
+#endif
     std::unordered_map<std::string, std::string> openDocuments;
     bool shutdownRequested = false;
     fs::path workspaceRoot;
@@ -2737,7 +3025,17 @@ static int runLanguageServer() {
 
             const std::string &text = document->second;
             if (method == "textDocument/formatting") {
-                const std::string formatted = vietvm::tooling::formatSource(text);
+                std::string formatted;
+                try {
+                    formatted = formatDocumentWithAvailableCompiler(text);
+                } catch (const std::exception &error) {
+                    std::ostringstream response;
+                    response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
+                             << ",\"error\":{\"code\":-32603,\"message\":\""
+                             << jsonEscape(error.what()) << "\"}}";
+                    writeLspMessage(response.str());
+                    continue;
+                }
                 std::ostringstream response;
                 response << "{\"jsonrpc\":\"2.0\",\"id\":" << (id.empty() ? "null" : id)
                          << ",\"result\":";
@@ -2971,18 +3269,28 @@ static int runCli(int argc, char* argv[]) {
                 return buildFullNative(argv[2], argv[3], command == "--bootstrap-native");
             }
             if (command == "--batch-run-tests") {
-                if (argc < 4) return EXIT_FAILURE;
+                int outputArgument = 2;
+                bool forceCpp = false;
+                if (argc > outputArgument &&
+                    std::string(argv[outputArgument]).rfind("--compiler=", 0) == 0) {
+                    const std::string choice = argv[outputArgument++];
+                    if (choice == "--compiler=cpp") forceCpp = true;
+                    else if (choice == "--compiler=vpp") (void)nativeVppCompiler();
+                    else return EXIT_FAILURE;
+                }
+                if (argc < outputArgument + 2) return EXIT_FAILURE;
                 std::vector<fs::path> testFiles;
-                testFiles.reserve(static_cast<std::size_t>(argc - 3));
-                for (int index = 3; index < argc; ++index) {
+                testFiles.reserve(static_cast<std::size_t>(argc - outputArgument - 1));
+                for (int index = outputArgument + 1; index < argc; ++index) {
                     testFiles.push_back(vietvm::core::utf8Path(argv[index]));
                 }
-                return runBatchTestFiles(vietvm::core::utf8Path(argv[2]), testFiles);
+                return runBatchTestFiles(vietvm::core::utf8Path(argv[outputArgument]), testFiles, forceCpp);
             }
             int commandWordOffset = 0;
             if (argc >= 3) {
                 std::string twoWordCommand = command + " " + std::string(argv[2]);
                 if (twoWordCommand == vietvm::cli::kCmdHelpVi || twoWordCommand == vietvm::cli::kCmdVersionVi ||
+                    twoWordCommand == vietvm::cli::kCmdCompileVi ||
                     twoWordCommand == vietvm::cli::kCmdDoctorVi || twoWordCommand == vietvm::cli::kCmdDiagnoseVi ||
                     twoWordCommand == vietvm::cli::kPkgListVi ||
                     twoWordCommand == vietvm::cli::kCmdInitVi || twoWordCommand == vietvm::cli::kPkgInfoVi ||
@@ -3023,7 +3331,17 @@ static int runCli(int argc, char* argv[]) {
             if (command == vietvm::cli::kCmdLsp) {
                 return runLanguageServer();
             }
-            if (command == vietvm::cli::kCmdRepl) {
+            if (command == vietvm::cli::kCmdRepl || command == "repl") {
+                if (argc == 3 && std::string(argv[2]) == "--compiler=cpp")
+                    return runRepl(true);
+                if (argc == 3 && std::string(argv[2]) == "--compiler=vpp") {
+                    (void)nativeVppCompiler();
+                    return runRepl();
+                }
+                if (argc != 2) {
+                    std::cerr << "Cú pháp: vpp repl [--compiler=vpp|cpp]\n";
+                    return EXIT_FAILURE;
+                }
                 return runRepl();
             }
             if (command == vietvm::cli::kCmdRun || command == vietvm::cli::kCmdRunVi) {
@@ -3051,7 +3369,11 @@ static int runCli(int argc, char* argv[]) {
                     std::cerr << messages::formatMessage(messages::kCliRunMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], SnippetMode::Execute);
+                if (argc != firstArgument + 1) {
+                    std::cerr << "Cú pháp: vpp run [--compiler=vpp|cpp] <source.vi>\n";
+                    return EXIT_FAILURE;
+                }
+                return runSourceWithAvailableCompiler(argv[2 + commandWordOffset]);
             }
             if (command == vietvm::cli::kCmdTest || command == vietvm::cli::kCmdTestVi || command == vietvm::cli::kCmdTestViHyphen) {
                 const fs::path path =
@@ -3060,18 +3382,20 @@ static int runCli(int argc, char* argv[]) {
                         : vietvm::core::utf8Path("tests");
                 return runTests(path);
             }
-            if (command == vietvm::cli::kCmdBuild || command == vietvm::cli::kCmdBuildVi) {
+            if (command == vietvm::cli::kCmdBuild || command == vietvm::cli::kCmdBuildVi ||
+                command == vietvm::cli::kCmdCompileVi) {
                 const int firstArgument = 2 + commandWordOffset;
                 if (argc > firstArgument &&
                     std::string(argv[firstArgument]).rfind("--compiler=", 0) == 0) {
                     const std::string choice = argv[firstArgument];
                     const bool withOutput = choice == "--compiler=vpp" &&
                         argc == firstArgument + 4 &&
-                        std::string(argv[firstArgument + 2]) == "-o";
+                        (std::string(argv[firstArgument + 2]) == "-o" ||
+                         std::string(argv[firstArgument + 2]) == "--đầu-ra");
                     if ((!withOutput && argc != firstArgument + 2) ||
                         (choice != "--compiler=vpp" && choice != "--compiler=cpp")) {
-                        std::cerr << "Cú pháp: vpp build --compiler=vpp <source.vi> [-o output.vbc]\n"
-                                  << "   hoặc: vpp build --compiler=cpp <source.vi>\n";
+                        std::cerr << "Cú pháp: vpp biên dịch --compiler=vpp <source.vi> [--đầu-ra output.vbc]\n"
+                                  << "   hoặc: vpp biên dịch --compiler=cpp <source.vi>\n";
                         return EXIT_FAILURE;
                     }
                     if (choice == "--compiler=vpp")
@@ -3082,12 +3406,14 @@ static int runCli(int argc, char* argv[]) {
                 if (argc > firstArgument && std::string(argv[firstArgument]) == "--target") {
                     const bool nativeExecutable = argc >= firstArgument + 3 &&
                         std::string(argv[firstArgument + 2]) == "--emit-exe-selfhost";
+                    const bool nativeVppExecutable = argc >= firstArgument + 3 &&
+                        std::string(argv[firstArgument + 2]) == "--emit-exe-vpp";
                     const bool rawLeaf = argc >= firstArgument + 3 &&
                         (std::string(argv[firstArgument + 2]) == "--emit-raw" ||
                          std::string(argv[firstArgument + 2]) == "--emit-asm" ||
                          std::string(argv[firstArgument + 2]) == "--emit-obj" ||
                          std::string(argv[firstArgument + 2]) == "--emit-obj-selfhost");
-                    if (argc != firstArgument + (rawLeaf ? 6 : nativeExecutable ? 5 : 3)) {
+                    if (argc != firstArgument + (rawLeaf ? 6 : (nativeExecutable || nativeVppExecutable) ? 5 : 3)) {
                         std::cerr << "Cú pháp: vpp build --target <triple> <source.vi>\n"
                                   << "   hoặc: vpp build --target <triple> --emit-raw "
                                      "<function> <source.vi> <output.bin>\n"
@@ -3098,8 +3424,76 @@ static int runCli(int argc, char* argv[]) {
                                   << "   hoặc: vpp build --target <triple> --emit-obj-selfhost "
                                      "<function> <source.vi> <output.o>\n"
                                   << "   hoặc: vpp build --target <triple> --emit-exe-selfhost "
+                                     "<source.vi> <output>\n"
+                                  << "   hoặc: vpp build --target <host-triple> --emit-exe-vpp "
                                      "<source.vi> <output>\n";
                         return EXIT_FAILURE;
+                    }
+                    if (nativeVppExecutable) {
+                        // The bootstrapped V++ compiler owns its frontend and
+                        // ASM emission. Its AOT host still invokes the system
+                        // linker and C/C++ runtime, but this CLI path bypasses
+                        // the legacy executeVppSource() VM codegen bridge.
+                        const auto parsed = vietvm::native::parseTarget(argv[firstArgument + 1]);
+                        if (!parsed.target) {
+                            std::cerr << "Target không hợp lệ: " << parsed.error << '\n';
+                            return EXIT_FAILURE;
+                        }
+                        if (vietvm::native::canonicalTriple(*parsed.target) !=
+                            vietvm::native::canonicalTriple(vietvm::native::hostTarget())) {
+                            std::cerr << "Compiler V++ native chỉ liên kết executable cho host hiện tại\n";
+                            return EXIT_FAILURE;
+                        }
+#if !((defined(__APPLE__) && defined(__aarch64__)) || \
+      (defined(__linux__) && defined(__x86_64__)))
+                        std::cerr << "Compiler V++ native chưa hỗ trợ liên kết executable trên host này\n";
+                        return EXIT_FAILURE;
+#else
+                        const fs::path sourcePath = fs::weakly_canonical(
+                            fs::absolute(vietvm::core::utf8Path(argv[firstArgument + 3])));
+                        const fs::path outputPath = fs::absolute(
+                            vietvm::core::utf8Path(argv[firstArgument + 4])).lexically_normal();
+                        verifyLockedProjectForSource(sourcePath);
+                        if (fs::weakly_canonical(outputPath) == sourcePath ||
+                            (fs::exists(outputPath) && fs::equivalent(sourcePath, outputPath))) {
+                            std::cerr << "Native executable không được ghi đè mã nguồn\n";
+                            return EXIT_FAILURE;
+                        }
+                        const auto compiler = nativeVppCompiler();
+                        const auto result = vietvm::native::aot::runProcess({
+                            compiler.u8string(), "build", sourcePath.u8string(), "-o",
+                            outputPath.u8string()}, true);
+                        if (result.status == EXIT_SUCCESS) std::cout << result.output;
+                        else std::cerr << result.output;
+                        return result.status;
+#endif
+                    }
+                    if (rawLeaf) {
+                        // Use the bootstrapped V++ parser, lowerer, ISA encoder
+                        // and file writer for raw/ASM leaf targets and
+                        // aarch64/x86_64 objects. Other object backends
+                        // still use Stage 0 until their ABI is verified.
+                        const std::string mode = argv[firstArgument + 2];
+                        std::string triple = argv[firstArgument + 1];
+                        std::transform(triple.begin(), triple.end(), triple.begin(),
+                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                        const auto dash = triple.find('-');
+                        const auto arch = triple.substr(0, dash);
+                        const bool nativeArch = arch == "aarch64" || arch == "arm64" ||
+                            arch == "arm64e" || arch == "x86_64" || arch == "amd64" || arch == "x64";
+                        const bool nativeMode = mode == "--emit-raw" || mode == "--emit-asm" ||
+                            (nativeArch && (mode == "--emit-obj-selfhost" ||
+                                            mode == "--emit-obj"));
+                        const auto compiler = nativeVppCompiler(false);
+                        if (nativeMode && !compiler.empty()) {
+                            verifyLockedProjectForSource(vietvm::core::utf8Path(argv[firstArgument + 4]));
+                            const auto result = vietvm::native::aot::runProcess({
+                                compiler.u8string(), "build", "--target", argv[firstArgument + 1],
+                                mode, argv[firstArgument + 3],
+                                argv[firstArgument + 4], argv[firstArgument + 5]});
+                            std::cout << result.output;
+                            return result.status;
+                        }
                     }
                     const auto parsed = vietvm::native::parseTargetVpp(
                         argv[firstArgument + 1], fs::current_path());
@@ -3132,35 +3526,91 @@ static int runCli(int argc, char* argv[]) {
                     std::cerr << messages::formatMessage(messages::kCliBuildMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return buildFile(argv[2 + commandWordOffset]);
-            }
-            if (command == vietvm::cli::kCmdDisassemble || command == vietvm::cli::kCmdDisassembleVi || command == vietvm::cli::kCmdDisassembleViHyphen) {
-                if (argc < (3 + commandWordOffset)) {
-                    std::cerr << messages::formatMessage(messages::kCliDisassembleMissingFile) << '\n';
+                const bool withOutput = argc == firstArgument + 3 &&
+                    (std::string(argv[firstArgument + 1]) == "-o" ||
+                     std::string(argv[firstArgument + 1]) == "--đầu-ra");
+                if (withOutput) {
+                    // Artifact format, path validation, and code generation are
+                    // owned by the bootstrapped V++ compiler.
+                    return runVppCompiler(argv[firstArgument], "build",
+                                          argv[firstArgument + 2]);
+                }
+                if (argc != firstArgument + 1) {
+                    std::cerr << "Cú pháp: vpp build <source.vi> [-o output.vbc]\n";
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], SnippetMode::Disassemble);
+                return buildSourceWithAvailableCompiler(argv[2 + commandWordOffset]);
+            }
+            if (command == vietvm::cli::kCmdDisassemble || command == vietvm::cli::kCmdDisassembleVi || command == vietvm::cli::kCmdDisassembleViHyphen) {
+                const int firstArgument = 2 + commandWordOffset;
+                const bool explicitCompiler = argc == firstArgument + 2 &&
+                    (std::string(argv[firstArgument]) == "--compiler=cpp" ||
+                     std::string(argv[firstArgument]) == "--compiler=vpp");
+                if (argc != firstArgument + 1 && !explicitCompiler) {
+                    std::cerr << "Cú pháp: vpp --giải-mã [--compiler=cpp|vpp] <source.vi>\n";
+                    return EXIT_FAILURE;
+                }
+                const std::string filename = argv[firstArgument + (explicitCompiler ? 1 : 0)];
+                if (explicitCompiler && std::string(argv[firstArgument]) == "--compiler=cpp") {
+                    return runFile(filename, SnippetMode::Disassemble);
+                }
+                if (explicitCompiler || !nativeVppCompiler(false).empty()) {
+                    return runVppCompiler(filename, "disassemble");
+                }
+                return runFile(filename, SnippetMode::Disassemble);
             }
             if (command == vietvm::cli::kCmdDumpAst) {
-                if (argc < (3 + commandWordOffset)) {
+                const int firstArgument = 2 + commandWordOffset;
+                const bool explicitCompiler = argc == firstArgument + 2 &&
+                    (std::string(argv[firstArgument]) == "--compiler=cpp" ||
+                     std::string(argv[firstArgument]) == "--compiler=vpp");
+                if (argc != firstArgument + 1 && !explicitCompiler) {
                     std::cerr << messages::formatMessage(messages::kCliDumpAstMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], SnippetMode::DumpAst);
+                const std::string filename = argv[firstArgument + (explicitCompiler ? 1 : 0)];
+                if (explicitCompiler && std::string(argv[firstArgument]) == "--compiler=cpp")
+                    return runFile(filename, SnippetMode::DumpAst);
+                if (explicitCompiler || !nativeVppCompiler(false).empty())
+                    return runVppCompiler(filename, "dump-ast");
+                return runFile(filename, SnippetMode::DumpAst);
             }
             if (command == vietvm::cli::kCmdDumpIr) {
-                if (argc < (3 + commandWordOffset)) {
+                const int firstArgument = 2 + commandWordOffset;
+                const bool explicitCompiler = argc == firstArgument + 2 &&
+                    (std::string(argv[firstArgument]) == "--compiler=cpp" ||
+                     std::string(argv[firstArgument]) == "--compiler=vpp");
+                if (argc != firstArgument + 1 && !explicitCompiler) {
                     std::cerr << messages::formatMessage(messages::kCliDumpIrMissingFile) << '\n';
                     return EXIT_FAILURE;
                 }
-                return runFile(argv[2 + commandWordOffset], SnippetMode::DumpIr);
+                const std::string filename = argv[firstArgument + (explicitCompiler ? 1 : 0)];
+                if (explicitCompiler && std::string(argv[firstArgument]) == "--compiler=cpp")
+                    return runFile(filename, SnippetMode::DumpIr);
+                if (explicitCompiler || !nativeVppCompiler(false).empty())
+                    return runVppCompiler(filename, "dump-ir");
+                return runFile(filename, SnippetMode::DumpIr);
             }
             if (command == vietvm::cli::kCmdLint || command == vietvm::cli::kCmdLintViHyphen || command == vietvm::cli::kCmdLintVi) {
-                if (argc < (3 + commandWordOffset)) {
-                    std::cerr << messages::formatMessage(messages::kCliLintMissingFile) << '\n';
+                const int firstArgument = 2 + commandWordOffset;
+                LintCompiler compilerChoice = LintCompiler::Auto;
+                int sourceArgument = firstArgument;
+                if (argc > firstArgument &&
+                    std::string(argv[firstArgument]).rfind("--compiler=", 0) == 0) {
+                    const std::string option = argv[firstArgument];
+                    if (option == "--compiler=vpp") compilerChoice = LintCompiler::Vpp;
+                    else if (option == "--compiler=cpp") compilerChoice = LintCompiler::Cpp;
+                    else {
+                        std::cerr << "Cú pháp: vpp --soát-lỗi [--compiler=vpp|cpp] <tệp|thư mục>\n";
+                        return EXIT_FAILURE;
+                    }
+                    ++sourceArgument;
+                }
+                if (argc != sourceArgument + 1) {
+                    std::cerr << "Cú pháp: vpp --soát-lỗi [--compiler=vpp|cpp] <tệp|thư mục>\n";
                     return EXIT_FAILURE;
                 }
-                return runLintPath(vietvm::core::utf8Path(argv[2 + commandWordOffset]));
+                return runLintPath(vietvm::core::utf8Path(argv[sourceArgument]), compilerChoice);
             }
             if (command == vietvm::cli::kCmdFormat || command == vietvm::cli::kCmdFormatVi || command == vietvm::cli::kCmdFormatViHyphen) {
                 if (argc < (3 + commandWordOffset)) {
@@ -3267,7 +3717,7 @@ static int runCli(int argc, char* argv[]) {
         // Trường hợp có đối số (chạy file được chỉ định)
         // -----------------------------
         if (argc == 2) {
-            return runFile(argv[1], SnippetMode::Execute);
+            return runSourceWithAvailableCompiler(argv[1]);
         }
 
         // Regression legacy chỉ được phép chạy khi CLI thực sự không nhận đối
@@ -3283,15 +3733,7 @@ static int runCli(int argc, char* argv[]) {
         // -----------------------------
         const std::string defaultFile = "../../src/tests/kiem_tra_stdlib_tinh_toan.vi";
         if (argc == 1 && fs::exists(defaultFile)) {
-            std::string source = readFile(defaultFile);
-            const fs::path defaultPath = vietvm::core::utf8Path(defaultFile);
-            return runSnippet(
-                source,
-                defaultPath.parent_path().empty()
-                    ? fs::current_path()
-                    : defaultPath.parent_path(),
-                SnippetMode::Execute,
-                defaultPath);
+            return runSourceWithAvailableCompiler(defaultFile);
         }
 
         std::string testDir = "../../src/tests";
@@ -3302,15 +3744,7 @@ static int runCli(int argc, char* argv[]) {
                     std::cout << messages::messageText(messages::kCliTestRunning, {filename})
                               << std::endl;
 
-                    std::string source = readFile(filename);
-                    const fs::path testPath = vietvm::core::utf8Path(filename);
-                    (void)runSnippet(
-                        source,
-                        testPath.parent_path().empty()
-                            ? fs::current_path()
-                            : testPath.parent_path(),
-                        SnippetMode::Execute,
-                        testPath);
+                    (void)runSourceWithAvailableCompiler(filename);
                 }
             }
         } else {

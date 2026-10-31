@@ -1,15 +1,15 @@
 // Sổ hàm của compiler V++: global ID/StringPool; export và alias theo module.
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/phát mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.sổ đăng ký.*;
+nhập gói.biên dịch.đồ thị mô đun.*;
+nhập gói.biên dịch.biểu diễn trung gian.*;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.văn bản.chuỗi.*;
 
 hàm chính() {
     nguồn = {
-        "app/main": "nhập ../lib/math như toán; nhập ../lib/service như api; " +
-                    "nhập ../lib/math như lặp_lại; hàm chính() { in 1; };",
+        "app/main": "nhập ..lib.math.* như toán; nhập ..lib.service.* như api; " +
+                    "nhập ..lib.math.* như lặp_lại; hàm chính() { in 1; };",
         "lib/math": "hàm cộng() { trả về 1; }; hàm nhân() { trả về 2; };",
         "lib/service": "công khai nhập math như phép; hàm báo() { trả về 3; };"
     };

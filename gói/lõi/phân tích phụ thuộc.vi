@@ -1,2 +1,2 @@
 // Đường nhập cũ: phần phân tích phụ thuộc do gói/biên dịch sở hữu.
-công khai nhập gói/biên dịch/phụ thuộc;
+công khai nhập gói.biên dịch.phụ thuộc.*;

@@ -1,0 +1,11 @@
+// Full-language V++ provider executed by the standalone V++/ASM VM.
+// No getaddrinfo/getnameinfo, C++ VM, libc resolver, or compiler callback.
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+hàm công khai vm phân giải DNS thuần vi(tên) {
+    bộ = Bộ Phân Giải DNS();
+    chi tiết = bộ.phân giải tên miền phân giải đầy đủ(tên, đúng);
+    trả về lấy từ điển(chi tiết, "addresses", []);
+};
+hàm chính() {};

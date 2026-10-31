@@ -1,0 +1,103 @@
+// Linter V++ giai đoạn đầu: lexer/parser/semantic thực thi trong .vi.
+// Diagnostic vị trí từ lexer/parser và khai báo có span; những lỗi
+// ngữ nghĩa khác chưa có SourceSpan nên tạm dùng vị trí 1:1.
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
+nhập gói.biên dịch.nguồn tệp.Bộ Nạp Nguồn;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn đồ thị;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.tìm chuỗi chính xác;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+
+hàm riêng tư soát lỗi vị trí(thông báo) {
+    dòng = 1;
+    cột = 1;
+    nhãn = " tại dòng ";
+    vị trí = tìm chuỗi chính xác(thông báo, nhãn);
+    nếu (vị trí == rỗng) { trả về [dòng, cột]; };
+    bắt đầu = vị trí + máy ảo lấy độ dài(nhãn);
+    đoạn = cắt chuỗi(thông báo, bắt đầu, máy ảo lấy độ dài(thông báo) - bắt đầu);
+    ngăn = tìm chuỗi chính xác(đoạn, ", cột ");
+    nếu (ngăn == rỗng) { trả về [dòng, cột]; };
+    chữ dòng = cắt chuỗi(đoạn, 0, ngăn);
+    chữ cột = cắt chuỗi(đoạn, ngăn + 6, máy ảo lấy độ dài(đoạn) - ngăn - 6);
+    thử {
+        dòng = thành số nguyên(chữ dòng);
+        cột = thành số nguyên(chữ cột);
+    } bắt lỗi(e) {
+        trả về [1, 1];
+    };
+    nếu (dòng < 1) { dòng = 1; };
+    nếu (cột < 1) { cột = 1; };
+    trả về [dòng, cột];
+};
+
+hàm công khai biên dịch soát lỗi mã nguồn(nguồn) {
+    chẩn đoán = [];
+    thử {
+        cây = biên dịch phân tích chương trình thuần(nguồn);
+        biên dịch kiểm tra ngữ nghĩa thuần(cây);
+    } bắt lỗi(e) {
+        thông báo = thành chuỗi(e);
+        vị trí = soát lỗi vị trí(thông báo);
+        máy ảo thêm cuối danh sách(chẩn đoán, {
+            "mức": "lỗi", "dòng": vị trí[0], "cột": vị trí[1],
+            "thông báo": thông báo
+        });
+    };
+    trả về chẩn đoán;
+};
+
+// Host ABI nhận trạng thái và văn bản; nội dung chẩn đoán được tạo ở V++.
+hàm công khai biên dịch soát lỗi lệnh(nguồn) {
+    chẩn đoán = biên dịch soát lỗi mã nguồn(nguồn);
+    nếu (máy ảo lấy độ dài(chẩn đoán) == 0) {
+        trả về ["complete", ""];
+    };
+    văn bản = "";
+    lặp(i = 0; i < máy ảo lấy độ dài(chẩn đoán); i++) {
+        mục = chẩn đoán[i];
+        văn bản = văn bản + thành chuỗi(mục["dòng"]) + ":" +
+            thành chuỗi(mục["cột"]) + ": " + mục["mức"] + ": " +
+            mục["thông báo"] + "\n";
+    };
+    trả về ["diagnostic-error", văn bản];
+};
+
+// Lint tệp kiểm tra import đệ quy bằng resolver và parser thuần .vi.
+// Không biên dịch hay chạy mã của module được nhập. Đường CLI này
+// còn giữ format diagnostic văn bản cho host ABI hiện hành.
+hàm công khai biên dịch soát lỗi lệnh tệp(đường, thư viện) {
+    nguồn = đọc tệp(đường);
+    kết quả = biên dịch soát lỗi lệnh(nguồn);
+    nếu (kết quả[0] != "complete") { trả về kết quả; };
+    thử {
+        biên dịch nguồn đồ thị(đường, thư viện);
+    } bắt lỗi(e) {
+        thông báo = thành chuỗi(e);
+        vị trí = soát lỗi vị trí(thông báo);
+        trả về ["diagnostic-error", thành chuỗi(vị trí[0]) + ":" +
+            thành chuỗi(vị trí[1]) + ": lỗi: " + thông báo + "\n"];
+    };
+    trả về kết quả;
+};
+
+// LSP chuyển nội dung bộ đệm chưa lưu và thư mục chứa tệp thật.
+// Dựng import graph trong bộ nhớ để không phải tạo tệp .vi trong dự án.
+hàm công khai biên dịch soát lỗi lệnh bộ đệm(nguồn, gốc, thư viện) {
+    kết quả = biên dịch soát lỗi lệnh(nguồn);
+    nếu (kết quả[0] != "complete") { trả về kết quả; };
+    thử {
+        bộ nạp = Bộ Nạp Nguồn(thư viện);
+        bộ nạp.đồ thị(gốc + "/.vpp-lsp-entry.vi", nguồn);
+    } bắt lỗi(e) {
+        thông báo = thành chuỗi(e);
+        vị trí = soát lỗi vị trí(thông báo);
+        trả về ["diagnostic-error", thành chuỗi(vị trí[0]) + ":" +
+            thành chuỗi(vị trí[1]) + ": lỗi: " + thông báo + "\n"];
+    };
+    trả về kết quả;
+};

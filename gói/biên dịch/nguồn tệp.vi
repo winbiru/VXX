@@ -1,20 +1,32 @@
 // Nạp nguồn và dựng đồ thị import tại tầng V++. CLI chỉ cung cấp đường
 // tuyệt đối của entrypoint và thư mục cài đặt; không phân tích nguồn đích.
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/hệ thống/nền tảng;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.liên kết.biên dịch liên kết đồ thị thuần;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị chuẩn đường;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị quét nhập;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị chu trình;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tên;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.nhập xuất.đường dẫn.là tệp;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Các phép biến đổi không lưu trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch nguồn chuẩn đường(đường) {
+    đường windows = tên nền tảng() == "windows";
+    nếu (máy ảo lấy độ dài(đường) > 1) {
+        nếu (đường[1] == ":" || (đường[0] == "\\" && đường[1] == "\\")) {
+            đường windows = đúng;
+        };
+    };
     văn bản = "";
     lặp(i = 0; i < máy ảo lấy độ dài(đường); i++) {
         c = đường[i];
-        nếu (c == "\\" && tên nền tảng() == "windows") { c = "/"; };
+        nếu (c == "\\" && đường windows) { c = "/"; };
         văn bản += c;
     };
     gốc dữ liệu = "";
@@ -33,6 +45,12 @@ hàm công khai biên dịch nguồn chuẩn đường(đường) {
         };
         gốc dữ liệu = văn bản[0] + ":/";
         bắt đầu = 3;
+    };
+    // Joining a root with "/import.vi" produces C://import.vi (or ///...).
+    // Consume redundant root separators before the relative graph parser.
+    khi (bắt đầu < máy ảo lấy độ dài(văn bản)) {
+        nếu (văn bản[bắt đầu] != "/") { thoát; };
+        bắt đầu += 1;
     };
     đuôi = "";
     lặp(i = bắt đầu; i < máy ảo lấy độ dài(văn bản); i++) { đuôi += văn bản[i]; };
@@ -77,7 +95,7 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
     // Module tường minh của dự án luôn được tìm hết các thư mục cha trước
     // khi áp dụng bí danh và gói của toolchain.
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
+    khi (đúng) {
         tệp = biên dịch nguồn chuẩn đường(thư mục + "/" + đích + ".vi");
         nếu (là tệp(tệp)) { trả về tệp; };
         cha = đường dẫn cha(thư mục);
@@ -85,7 +103,7 @@ hàm riêng tư biên dịch nguồn đích(mô đun nhập, đích, thư viện
         thư mục = cha;
     };
     thư mục = đường dẫn cha(mô đun nhập);
-    lặp(vòng = 0; đúng; vòng++) {
+    khi (đúng) {
         tệp = biên dịch nguồn tìm gói(thư mục, đích);
         nếu (tệp != "") { trả về tệp; };
         cha = đường dẫn cha(thư mục);
@@ -120,9 +138,11 @@ lớp công khai Bộ Nạp Nguồn {
         };
         hành động = "load";
         nếu (mức == 2) { hành động = "duplicate_no_op"; };
-        máy ảo thêm cuối danh sách(trạng thái["cạnh"], {"nguồn": mô đun nhập, "đích": đích,
+        cạnh nhập = {"nguồn": mô đun nhập, "đích": đích,
              "yêu cầu": spec["đích"], "bí danh": spec["bí danh"],
-             "tái xuất": spec["tái xuất"], "hành động": hành động});
+             "tái xuất": spec["tái xuất"], "hành động": hành động};
+        nếu (máy ảo có khóa từ điển(spec, "tên nhập")) { cạnh nhập["tên nhập"] = spec["tên nhập"]; };
+        máy ảo thêm cuối danh sách(trạng thái["cạnh"], cạnh nhập);
         nếu (mức == 2) { trả về đúng; };
         trạng thái["đã thăm"][đích] = 1;
         máy ảo thêm cuối danh sách(trạng thái["ngăn"], đích);

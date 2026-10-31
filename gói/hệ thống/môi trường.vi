@@ -1,7 +1,7 @@
 // Module: hệ thống.môi trường
 // Chính sách tên và giá trị mặc định thuộc V++; VM chỉ đọc môi trường OS.
 
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Môi Trường {

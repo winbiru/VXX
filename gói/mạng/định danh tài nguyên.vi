@@ -1,11 +1,20 @@
 // vi.net.uri — URI parser, normalization, resolution và form encoding thuần V++.
 // URI là dữ liệu; không phát sinh DNS/network I/O khi parse/normalize/resolve.
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/nhập xuất/tệp;
-nhập gói/văn bản/chuỗi;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/mạng/http/máy khách;
+nhập gói.lõi.bảng mã.mã điểm unicode;
+nhập gói.lõi.bảng mã.ký tự unicode;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.phần trăm;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.mạng.http.máy khách.mạng lấy;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Xử Lý URI {
@@ -50,7 +59,7 @@ lớp công khai Bộ Xử Lý URI {
         các byte = [];
         i = 0;
         n = máy ảo lấy độ dài(văn bản);
-        lặp(vòng = 0; i < n; vòng++) {
+        khi (i < n) {
             c = văn bản[i];
             nếu (c == "%") {
                 nếu (i + 2 >= n) {
@@ -471,7 +480,7 @@ lớp công khai Bộ Xử Lý URI {
         };
         các byte = [];
         i = 0;
-        lặp(vòng = 0; i < máy ảo lấy độ dài(văn bản); vòng++) {
+        khi (i < máy ảo lấy độ dài(văn bản)) {
             c = văn bản[i];
             nếu (c == "+") {
                 máy ảo thêm cuối danh sách(các byte, 32);

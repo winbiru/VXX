@@ -1,0 +1,177 @@
+// Portable VM image backend. Compilation, validation and serialization are
+// V++; the resulting image runs on the standalone V++/ASM interpreter.
+nhập gói.biên dịch.sản phẩm biên dịch.Bộ Mã Hóa Sản Phẩm Biên Dịch;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.tệp thô.tệp thô mở;
+nhập gói.nhập xuất.tệp thô.tệp thô đóng;
+nhập gói.nhập xuất.tệp thô.tệp thô mã lỗi;
+nhập gói.nhập xuất.tệp thô.tệp thô lỗi gián đoạn;
+
+hàm riêng tư biên dịch VM i32(bytes, value) {
+    // Phần lớn field opcode/slot là số không âm. Tránh bốn lượt nhánh
+    // và vòng lặp cho từng i32 trong ảnh compiler nhiều trăm KiB.
+    nếu (value >= 0) {
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        value = (value - value % 256) / 256;
+        máy ảo thêm cuối danh sách(bytes, value % 256);
+        trả về;
+    };
+    // Division is truncating: normalize each remainder for negative i32.
+    lặp(i = 0; i < 4; i++) {
+        byte = value % 256;
+        nếu (byte < 0) { byte += 256; };
+        máy ảo thêm cuối danh sách(bytes, byte);
+        value = (value - byte) / 256;
+    };
+};
+
+hàm riêng tư biên dịch VM vùng(bytes, code) {
+    lặp(i = 0; i < độ dài(code); i++) {
+        lặp(j = 0; j < 4; j++) { biên dịch VM i32(bytes, code[i][j]); };
+    };
+};
+
+hàm riêng tư biên dịch VM chuỗi(bytes, text) {
+    encoded = chuỗi thành byte máy ảo(text);
+    biên dịch VM i32(bytes, độ dài(encoded));
+    lặp(i = 0; i < độ dài(encoded); i++) { thêm(bytes, encoded[i]); };
+};
+
+// Image v2 carries the same eight-field foreign descriptors as artifact v2.
+// Keep image v1 byte-for-byte stable for programs without foreign bindings.
+hàm riêng tư biên dịch VM ngoại(bytes, descriptors) {
+    lặp(i = 0; i < độ dài(descriptors); i++) {
+        d = descriptors[i];
+        biên dịch VM i32(bytes, d[0]);
+        biên dịch VM chuỗi(bytes, d[1]); biên dịch VM chuỗi(bytes, d[2]);
+        biên dịch VM i32(bytes, d[5]); biên dịch VM i32(bytes, độ dài(d[3]));
+        lặp(j = 0; j < độ dài(d[3]); j++) { biên dịch VM i32(bytes, d[3][j]); };
+        biên dịch VM i32(bytes, độ dài(d[4]));
+        lặp(j = 0; j < độ dài(d[4]); j++) {
+            lặp(k = 0; k < 3; k++) { biên dịch VM i32(bytes, d[4][j][k]); };
+        };
+        biên dịch VM chuỗi(bytes, d[6]); biên dịch VM chuỗi(bytes, d[7]);
+    };
+};
+
+hàm công khai biên dịch VM mã hóa(dây) {
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
+    codec.kiểm tra dây(dây, "bytecode V++ đồ thị đã liên kết");
+    descriptors = []; nếu (độ dài(dây) == 5) { descriptors = dây[4]; };
+    bytes = [86, 80, 80, 86, 77, 0, 1, 0];
+    nếu (độ dài(descriptors) > 0) { bytes[6] = 2; };
+    biên dịch VM i32(bytes, độ dài(dây[1]));
+    biên dịch VM i32(bytes, độ dài(dây[2]));
+    biên dịch VM i32(bytes, độ dài(dây[3]));
+    biên dịch VM i32(bytes, độ dài(dây[0]));
+    nếu (độ dài(descriptors) > 0) { biên dịch VM i32(bytes, độ dài(descriptors)); };
+    lặp(i = 0; i < độ dài(dây[1]); i++) {
+        encoded = chuỗi thành byte máy ảo(dây[1][i]);
+        biên dịch VM i32(bytes, độ dài(encoded));
+        lặp(j = 0; j < độ dài(encoded); j++) { máy ảo thêm cuối danh sách(bytes, encoded[j]); };
+    };
+    lặp(i = 0; i < độ dài(dây[2]); i++) {
+        function = dây[2][i];
+        biên dịch VM i32(bytes, function[0]); biên dịch VM i32(bytes, function[1]);
+        biên dịch VM i32(bytes, độ dài(function[2])); biên dịch VM vùng(bytes, function[2]);
+    };
+    lặp(i = 0; i < độ dài(dây[3]); i++) {
+        code = dây[3][i][1]; biên dịch VM i32(bytes, độ dài(code)); biên dịch VM vùng(bytes, code);
+    };
+    biên dịch VM vùng(bytes, dây[0]);
+    biên dịch VM ngoại(bytes, descriptors);
+    trả về bytes;
+};
+
+// Bound serialized output independently of compiler size. Keeping a complete
+// list of boxed bytes alongside the IR exhausts the standalone VM heap.
+lớp riêng tư Bộ Ghi Ảnh VM {
+    hàm công khai khởi tạo(tệp) { mình.tệp = tệp; mình.khối = []; };
+    hàm công khai xả() {
+        n = độ dài(mình.khối); đã ghi = 0;
+        khi (đã ghi < n) {
+            phần = mình.khối;
+            nếu (đã ghi > 0) {
+                phần = [];
+                lặp(i = đã ghi; i < n; i++) { thêm(phần, mình.khối[i]); };
+            };
+            ghi = máy tệp ghi(mình.tệp, phần, độ dài(phần));
+            nếu (ghi < 0 && tệp thô mã lỗi() == tệp thô lỗi gián đoạn()) { bỏ qua; };
+            nếu (ghi <= 0) { ném "VM ASM: ghi tệp ảnh thất bại"; };
+            đã ghi += ghi;
+        };
+        mình.khối = [];
+    };
+    hàm công khai byte(value) {
+        thêm(mình.khối, value);
+        nếu (độ dài(mình.khối) >= 16384) { mình.xả(); };
+    };
+    hàm công khai số(value) {
+        biên dịch VM i32(mình.khối, value);
+        nếu (độ dài(mình.khối) >= 16384) { mình.xả(); };
+    };
+    hàm công khai vùng(code) {
+        lặp(i = 0; i < độ dài(code); i++) {
+            lặp(j = 0; j < 4; j++) { mình.số(code[i][j]); };
+        };
+    };
+
+    hàm công khai chuỗi(text) {
+        encoded = chuỗi thành byte máy ảo(text);
+        mình.số(độ dài(encoded));
+        lặp(i = 0; i < độ dài(encoded); i++) { mình.byte(encoded[i]); };
+    };
+
+    hàm công khai ngoại(descriptors) {
+        lặp(i = 0; i < độ dài(descriptors); i++) {
+            d = descriptors[i];
+            mình.số(d[0]); mình.chuỗi(d[1]); mình.chuỗi(d[2]);
+            mình.số(d[5]); mình.số(độ dài(d[3]));
+            lặp(j = 0; j < độ dài(d[3]); j++) { mình.số(d[3][j]); };
+            mình.số(độ dài(d[4]));
+            lặp(j = 0; j < độ dài(d[4]); j++) {
+                lặp(k = 0; k < 3; k++) { mình.số(d[4][j][k]); };
+            };
+            mình.chuỗi(d[6]); mình.chuỗi(d[7]);
+        };
+    };
+};
+
+hàm công khai biên dịch VM ghi(dây, đường) {
+    codec = Bộ Mã Hóa Sản Phẩm Biên Dịch(rỗng);
+    codec.kiểm tra dây(dây, "bytecode V++ đồ thị đã liên kết");
+    descriptors = []; nếu (độ dài(dây) == 5) { descriptors = dây[4]; };
+    tệp = tệp thô mở(đường, 1);
+    nếu (tệp == rỗng) { ném "VM ASM: không mở được tệp ảnh"; };
+    thử {
+        ghi = Bộ Ghi Ảnh VM(tệp);
+        header = [86, 80, 80, 86, 77, 0, 1, 0];
+        nếu (độ dài(descriptors) > 0) { header[6] = 2; };
+        lặp(i = 0; i < 8; i++) { ghi.byte(header[i]); };
+        ghi.số(độ dài(dây[1])); ghi.số(độ dài(dây[2]));
+        ghi.số(độ dài(dây[3])); ghi.số(độ dài(dây[0]));
+        nếu (độ dài(descriptors) > 0) { ghi.số(độ dài(descriptors)); };
+        lặp(i = 0; i < độ dài(dây[1]); i++) {
+            encoded = chuỗi thành byte máy ảo(dây[1][i]);
+            ghi.số(độ dài(encoded));
+            lặp(j = 0; j < độ dài(encoded); j++) { ghi.byte(encoded[j]); };
+        };
+        lặp(i = 0; i < độ dài(dây[2]); i++) {
+            function = dây[2][i];
+            ghi.số(function[0]); ghi.số(function[1]);
+            ghi.số(độ dài(function[2])); ghi.vùng(function[2]);
+        };
+        lặp(i = 0; i < độ dài(dây[3]); i++) {
+            code = dây[3][i][1]; ghi.số(độ dài(code)); ghi.vùng(code);
+        };
+        ghi.vùng(dây[0]); ghi.ngoại(descriptors); ghi.xả();
+    } bắt lỗi(e) {
+        tệp thô đóng(tệp); ném e;
+    };
+    nếu (tệp thô đóng(tệp) != 0) { ném "VM ASM: đóng tệp ảnh thất bại"; };
+    trả về "";
+};

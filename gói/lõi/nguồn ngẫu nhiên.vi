@@ -8,7 +8,7 @@ hàm công khai nguồn ngẫu nhiên bảo mật các byte(số byte) {
     };
     kết quả = [];
     còn lại = số byte;
-    lặp(vòng = 0; còn lại > 0; vòng++) {
+    khi (còn lại > 0) {
         số đọc = còn lại;
         nếu (số đọc > 256) { số đọc = 256; };
         đệm = máy nguồn ngẫu nhiên các byte(số đọc);

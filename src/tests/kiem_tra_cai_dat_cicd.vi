@@ -1,5 +1,5 @@
 // Chạy bằng compiler đã cài đặt để kiểm tra tìm kiếm thư viện chuẩn qua VPP_HOME.
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm chính() {
     nếu (độ dài("V++") != 3) {

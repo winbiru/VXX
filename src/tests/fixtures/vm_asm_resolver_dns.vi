@@ -1,0 +1,12 @@
+// The main state and the nested V++ DNS provider must survive each other's GC.
+hàm chính() {
+    t = máy bộ phân giải mở("vpp.example", "443", 0);
+    lặp(i = 0; i < 6000; i++) { rác = [i, i]; };
+    khi (đúng) {
+        address = máy bộ phân giải tiếp(t);
+        nếu (address == rỗng) { thoát; };
+        in address;
+    };
+    nếu (máy bộ phân giải đóng(t) != 1) { ném "DNS close"; };
+    in "DNS VM VI OK";
+};

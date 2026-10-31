@@ -1,0 +1,133 @@
+nhập gói.kiểm thử.so sánh benchmark.*;
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.hệ thống.môi trường.*;
+
+hàm gate_fixture(count = 40, gc = đúng) {
+    name = "vm_verify";
+    nếu (gc) { name = "gc_burst_collect_reuse"; };
+    report = {"schema": 1, "protocol": "alternating-independent-processes-v1",
+        "system": {"host": "same-host"}, "environment": {"VPP_ENABLE_JIT": "0"},
+        "harness_sha256": "harness", "sample_count": count, "warmup_count": 3,
+        "sources": {}, "builds": {}, "budget": {"time": 0.10, "rss": 0.15,
+        "gc_p95": 0.15, "allocations": 0.15, "noise": 0.05},
+        "plan": [{"case": name, "iterations": 2}], "samples": []};
+    sides = ["baseline", "candidate"];
+    lặp(s = 0; s < 2; s++) {
+        report["sources"][sides[s]] = {"commit": sides[s], "snapshot_sha256": sides[s]};
+        report["builds"][sides[s]] = {"binary_sha256": "binary",
+            "cmake": {"CMAKE_BUILD_TYPE": "Release"}, "meta": {"meta": "harness-v3",
+            "build": "Release", "coverage": "OFF", "flags": "-O3 -DNDEBUG",
+            "compiler": "test compiler", "gc_policy": "explicit"}};
+    };
+    phases = ["warmup", "measure"];
+    lặp(p = 0; p < 2; p++) {
+        limit = count; nếu (p == 0) { limit = 3; };
+        lặp(pair = 0; pair < limit; pair++) {
+            lặp(order = 0; order < 2; order++) {
+                side = sides[(order + pair) % 2];
+                record = {"case": name, "iterations": 2, "checksum": 123,
+                    "ns_per_iteration": 100, "peak_rss_bytes": 10000};
+                nếu (gc) {
+                    record["gc_pauses_ns"] = [80, 100];
+                    record["allocation_count"] = 6000; record["allocation_bytes"] = 200000;
+                    record["gc_allocation_count"] = 30; record["gc_allocation_bytes"] = 15000;
+                    record["managed_allocations"] = 1024; record["stack_resize_count"] = 0;
+                    record["stack_trim_count"] = 0; record["tracked_after"] = 1; record["swept"] = 1024;
+                };
+                máy ảo thêm cuối danh sách(report["samples"], {"side": side, "phase": phases[p],
+                    "pair": pair, "order": order, "record": record});
+            };
+        };
+    };
+    trả về report;
+};
+hàm gate_change(report, field, value) {
+    rows = report["samples"];
+    lặp(i = 0; i < độ dài(rows); i++) {
+        nếu (rows[i]["side"] == "candidate" && rows[i]["phase"] == "measure") {
+            rows[i]["record"][field] = value;
+        };
+    };
+};
+hàm gate_expect(report, expected) {
+    result = so sánh benchmark(report);
+    khẳng định bằng(result["status"], expected, "benchmark decision " + expected);
+};
+hàm gate_invalid(report, label = "") {
+    rejected = sai;
+    thử { so sánh benchmark(report); } bắt lỗi(e) { rejected = đúng; };
+    khẳng định bằng(rejected, đúng, "benchmark accepted invalid evidence " + label);
+};
+hàm chính() {
+    gate_expect(gate_fixture(), "PASS");
+    fields = ["ns_per_iteration", "peak_rss_bytes", "gc_pauses_ns", "allocation_count"];
+    values = [111, 11600, [80, 140], 7000];
+    lặp(i = 0; i < 4; i++) {
+        data = gate_fixture(); gate_change(data, fields[i], values[i]); gate_expect(data, "FAIL");
+    };
+    gate_expect(gate_fixture(10), "INCONCLUSIVE");
+    gate_expect(gate_fixture(10, sai), "PASS");
+    data = gate_fixture(); rows = data["samples"];
+    lặp(i = 0; i < độ dài(rows); i++) {
+        nếu (rows[i]["side"] == "candidate" && rows[i]["phase"] == "measure") {
+            value = 90; nếu (rows[i]["pair"] % 2 == 0) { value = 110; };
+            rows[i]["record"]["ns_per_iteration"] = value;
+        };
+    };
+    gate_expect(data, "INCONCLUSIVE");
+    // Completeness, duplicate identities, metadata and GC invariants.
+    lặp(mode = 0; mode < 15; mode++) {
+        data = gate_fixture(); rows = data["samples"];
+        nếu (mode == 0) {
+            shorter = [];
+            lặp(i = 1; i < độ dài(rows); i++) { máy ảo thêm cuối danh sách(shorter, rows[i]); };
+            data["samples"] = shorter;
+        } hoặc nếu (mode == 1) { máy ảo thêm cuối danh sách(rows, rows[0]); }
+        hoặc nếu (mode == 2) { rows[0]["record"]["case"] = "unexpected"; }
+        hoặc nếu (mode == 3) { data["builds"]["candidate"]["meta"]["compiler"] = "other"; }
+        hoặc nếu (mode == 4) { data["builds"]["candidate"]["meta"]["build"] = "Debug"; }
+        hoặc nếu (mode == 5) { data["builds"]["candidate"]["meta"]["coverage"] = "ON"; }
+        hoặc nếu (mode == 6) {
+            data["builds"]["baseline"]["cmake"]["CMAKE_EXE_LINKER_FLAGS"] = "-fSANITIZE=address";
+            data["builds"]["candidate"]["cmake"]["CMAKE_EXE_LINKER_FLAGS"] = "-fSANITIZE=address";
+        } hoặc nếu (mode == 7) { rows[0]["record"]["checksum"] = 999; }
+        hoặc nếu (mode == 8) { rows[0]["record"]["iterations"] = 1; }
+        hoặc nếu (mode == 9) { rows[0]["record"]["gc_pauses_ns"] = [1]; }
+        hoặc nếu (mode == 10) { rows[0]["record"]["tracked_after"] = 0; }
+        hoặc nếu (mode == 11) { rows[0]["record"]["swept"] = 0; }
+        hoặc nếu (mode == 12) { rows[0]["record"]["stack_trim_count"] = 1; }
+        hoặc nếu (mode == 13) { rows[2]["order"] = 1; }
+        hoặc { data["sample_count"] = đúng; };
+        gate_invalid(data, thành chuỗi(mode));
+    };
+    invalid = [0, -1, "100", benchmark phân tích báo cáo("true"),
+        benchmark phân tích báo cáo("false"), rỗng, thành số thực("nan"), thành số thực("inf")];
+    lặp(i = 0; i < độ dài(invalid); i++) {
+        data = gate_fixture(); data["samples"][0]["record"]["ns_per_iteration"] = invalid[i];
+        gate_invalid(data, "number " + thành chuỗi(i));
+    };
+    gate_invalid({}); gate_invalid([]);
+    data = gate_fixture();
+    data["builds"]["baseline"]["meta"]["custom_boolean"] = benchmark phân tích báo cáo("true");
+    data["builds"]["candidate"]["meta"]["custom_boolean"] = benchmark phân tích báo cáo("true");
+    gate_expect(data, "PASS");
+    data["builds"]["candidate"]["meta"]["custom_boolean"] = benchmark phân tích báo cáo("false");
+    gate_invalid(data, "boolean metadata mismatch");
+    khẳng định bằng(trị tuyệt đối(benchmark percentile([0, 10, 20, 30]) - 28.5) < 0.000000001,
+        đúng, "p95 interpolation");
+    output = đọc biến môi trường("VPP_BENCHMARK_FIXTURES", "");
+    nếu (output != "") {
+        data = gate_fixture();
+        ghi tệp(output + "/pass.json", json tạo(data));
+        gate_change(data, "ns_per_iteration", 111);
+        ghi tệp(output + "/fail.json", json tạo(data));
+        ghi tệp(output + "/inconclusive.json", json tạo(gate_fixture(10)));
+        ghi tệp(output + "/invalid.json", "{}");
+    };
+    in "VPP BENCHMARK GATE OK";
+};

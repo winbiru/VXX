@@ -22,4 +22,14 @@ hàm chính() {
     in a;
     in -(-2147483648);
     in mặc định i32();
+    biến max_inc = 2147483647;
+    max_inc++;
+    in max_inc;
+    max_inc--;
+    in max_inc;
+    biến min_dec = -2147483648;
+    min_dec--;
+    in min_dec;
+    min_dec++;
+    in min_dec;
 };

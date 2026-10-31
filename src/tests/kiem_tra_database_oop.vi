@@ -1,4 +1,4 @@
-nhập gói/dữ liệu/cơ sở dữ liệu/chính;
+nhập gói.dữ liệu.cơ sở dữ liệu.chính.*;
 
 lớp DB Kiểm Thử kế thừa Kết Nối Cơ Sở Dữ Liệu {
     hàm khởi tạo() {

@@ -1,11 +1,15 @@
 // Stage 0 tạo executable compiler V++ qua ASM. Từ Stage 1, mọi pass của
 // nguồn đích và artifact do thư viện V++ này thực hiện, không gọi VM.
-nhập gói/biên dịch/nguồn tệp;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/nhập xuất/tệp;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn chuẩn đường;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn đồ thị;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn tệp tự chủ;
+nhập gói.biên dịch.sản phẩm biên dịch.biên dịch sản phẩm biên dịch tuần tự;
+nhập gói.biên dịch.sản phẩm biên dịch.biên dịch chạy sản phẩm biên dịch văn bản;
+nhập gói.biên dịch.liên kết.biên dịch liên kết đồ thị thuần;
+nhập gói.biên dịch.bộ nạp.biên dịch chạy sản phẩm biên dịch;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Điều khiển một phiên CLI. Trạng thái đường dẫn và cấu hình được giữ trong lớp.
 lớp công khai Trình Điều Khiển Biên Dịch {

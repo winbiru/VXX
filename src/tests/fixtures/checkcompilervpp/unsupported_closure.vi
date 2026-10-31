@@ -1,1 +1,0 @@
-hàm chính() { f = hàm(x) { trả về x; }; in f(1); };

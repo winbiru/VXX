@@ -1,7 +1,7 @@
 // Adapter hướng đối tượng cho AST dạng map của compiler hiện hành.
 // Giữ cấu trúc map tại parser/IR để không phá vỡ đường bootstrap.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/biên dịch/giao diện cú pháp;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.biên dịch.giao diện cú pháp.Truy Cập Cú Pháp;
 
 // Chỉ các map AST mới là nút. Metadata như tên tham số, operator và
 // phần tử rỗng không được bọc thành những nút giả.

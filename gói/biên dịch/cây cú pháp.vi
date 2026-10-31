@@ -1,5 +1,6 @@
 // Chuyển đổi AST thô thành mô hình cú pháp V++ công khai.
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 
 // Các phép chuyển đổi AST thuần là hàm cấp mô-đun.
 hàm công khai biên dịch loại câu lệnh từ mã(mã) {
@@ -35,7 +36,7 @@ hàm công khai biên dịch câu lệnh từ thô(thô) {
     lặp(i = 0; i < máy ảo lấy độ dài(con); i++) {
         máy ảo thêm cuối danh sách(thành viên, biên dịch câu lệnh từ thô(con[i]));
     };
-    trả về {
+    kết quả = {
         "loại": biên dịch loại câu lệnh từ mã(thô[0]),
         "tên": thô[1],
         "phạm vi": biên dịch phạm vi từ mã(thô[2]),
@@ -45,6 +46,10 @@ hàm công khai biên dịch câu lệnh từ thô(thô) {
         "công khai": thô[6],
         "thành viên": thành viên
     };
+    nếu (độ dài(thô) > 8) {
+        nếu (thô[8] != "") { kết quả["tên nhập"] = thô[8]; };
+    };
+    trả về kết quả;
 };
 
 hàm công khai biên dịch cây từ thô(cây thô) {

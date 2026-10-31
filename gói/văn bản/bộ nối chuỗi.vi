@@ -1,4 +1,9 @@
 
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.nối chuỗi;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Nối Chuỗi {
@@ -142,4 +147,3 @@ hàm công khai bộ nối độ dài(bộ) {
     bộ chuyển tiếp = Bộ Nối Chuỗi();
     trả về bộ chuyển tiếp.bộ nối độ dài(bộ);
 };
-nhập gói/lõi/chuyển kiểu;

@@ -1,5 +1,5 @@
-nhập gói/mạng/phân giải tên miền;
-nhập gói/hệ thống/môi trường;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.hệ thống.môi trường.*;
 
 // Mỗi ca đo deadline/validation của MỘT DNS A transaction (2 giây).
 // phân giải tên miền phân giải() có thể thử thêm AAAA để bảo toàn kết quả khi A lỗi mạng.

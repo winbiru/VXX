@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 hàm ghi danh sách(ds) {
     lặp(i = 0; i < độ dài(ds); i++) {

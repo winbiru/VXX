@@ -18,6 +18,7 @@
 #endif
 #endif
 #include "vpp/core/project_layout.h"
+#include "vpp/native/target.h"
 #include "vpp/core/text.h"
 #include "vpp/runtime/error.h"
 
@@ -43,7 +44,7 @@ public:
         previous=now;
     }
 };
-ProcessResult process(const std::vector<std::string> &arguments) {
+ProcessResult process(const std::vector<std::string> &arguments, bool captureStderr = false) {
     ProcessResult result;
 #if defined(_WIN32)
     // Windows CRT quoting, without a shell or command substitution.
@@ -62,7 +63,8 @@ ProcessResult process(const std::vector<std::string> &arguments) {
     if(!CreatePipe(&input,&output,&security,0))throw std::runtime_error("Native AOT: CreatePipe failed");
     SetHandleInformation(input,HANDLE_FLAG_INHERIT,0);
     STARTUPINFOW startup{};startup.cb=sizeof(startup);startup.dwFlags=STARTF_USESTDHANDLES;
-    startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=output;startup.hStdError=GetStdHandle(STD_ERROR_HANDLE);
+    startup.hStdInput=GetStdHandle(STD_INPUT_HANDLE);startup.hStdOutput=output;
+    startup.hStdError=captureStderr?output:GetStdHandle(STD_ERROR_HANDLE);
     PROCESS_INFORMATION child{};
     if(!CreateProcessW(nullptr,command.data(),nullptr,nullptr,TRUE,0,nullptr,nullptr,&startup,&child)) {
         CloseHandle(input);CloseHandle(output);throw std::runtime_error("Native AOT: CreateProcess failed");
@@ -87,7 +89,9 @@ ProcessResult process(const std::vector<std::string> &arguments) {
     const auto child=fork();
     if(child<0){close(descriptors[0]);close(descriptors[1]);throw std::runtime_error("Native AOT: fork failed");}
     if(child==0) {
-        close(descriptors[0]);if(dup2(descriptors[1],STDOUT_FILENO)<0)_exit(127);close(descriptors[1]);
+        close(descriptors[0]);if(dup2(descriptors[1],STDOUT_FILENO)<0)_exit(127);
+        if(captureStderr&&dup2(descriptors[1],STDERR_FILENO)<0)_exit(127);
+        close(descriptors[1]);
         std::vector<char *> argv;for(const auto &argument:arguments)argv.push_back(const_cast<char *>(argument.c_str()));argv.push_back(nullptr);
         execvp(argv[0],argv.data());_exit(127);
     }
@@ -116,8 +120,22 @@ struct TemporaryDirectory {
     }
     ~TemporaryDirectory(){std::error_code ignored;fs::remove_all(path,ignored);}
 };
-fs::path installation() {
+fs::path executableDirectory();
+fs::path installation(bool required=true) {
     for(const char *name:{"VPP_AOT_ROOT","VPP_HOME"})if(const char *root=std::getenv(name);root&&*root)return fs::absolute(core::utf8Path(root));
+    // An uninstalled native compiler in <build>/native-compiler (or its
+    // multi-config subdirectory) can use the source checkout's V++ runtime
+    // and ASM linker without requiring a manually exported VPP_HOME.
+    const auto executable=executableDirectory();
+    if(!executable.empty()) {
+        for(const auto &buildDir:{executable.parent_path(),executable.parent_path().parent_path()}) {
+            const auto sourceRoot=buildDir.parent_path();
+            if(fs::is_regular_file(sourceRoot/core::utf8Path("gói/biên dịch/dòng lệnh máy.vi"))&&
+               fs::is_directory(sourceRoot/"scripts/quality/native_aot_link"))
+                return sourceRoot;
+        }
+    }
+    if(!required)return {};
     throw std::runtime_error("Native AOT: set VPP_HOME to the installed toolchain");
 }
 fs::path executableDirectory() {
@@ -141,94 +159,53 @@ fs::path executableDirectory() {
     return fs::path(std::string(buffer.data(),static_cast<std::size_t>(length))).parent_path();
 #endif
 }
-std::string read(const fs::path &path) {
-    std::ifstream input(path,std::ios::binary);if(!input)throw std::runtime_error("Native AOT: cannot read "+path.u8string());
-    return {std::istreambuf_iterator<char>(input),std::istreambuf_iterator<char>()};
-}
 const std::vector<Value> &values(const Value &value) {
     const auto *list=std::get_if<runtime::ListHandle>(&value);
     if(!list||!*list)throw std::runtime_error("Native AOT: expected wire arrays");return (*list)->elements;
 }
 int compilerMain(Program &program,int argc,char **argv) {
     PhaseTimer profiler;
-    if(argc<3)throw std::runtime_error("Usage: vpp-native build|run|artifact|embed <source.vi|artifact.vbc> [-o output] [--bytecode] [--compiler] [--base directory]");
-    const std::string command=argv[1];const auto source=fs::weakly_canonical(fs::absolute(core::utf8Path(argv[2])));
-    fs::path output,embedBase;bool bytecode=false,compiler=false;
-    for(int i=3;i<argc;++i) {
-        const std::string argument=argv[i];
-        if(argument=="-o"&&i+1<argc)output=fs::absolute(core::utf8Path(argv[++i]));
-        else if(argument=="--bytecode")bytecode=true;
-        else if(argument=="--compiler")compiler=true;
-        else if(argument=="--base"&&i+1<argc)embedBase=fs::absolute(core::utf8Path(argv[++i]));
-        else throw std::runtime_error("Native AOT: unknown option "+argument);
+    std::vector<Value> arguments;
+    for(int i=1;i<argc;++i)arguments.emplace_back(argv[i]);
+    const auto plan=program.invokeName("biên dịch phân tích dòng lệnh máy",
+                                      {make_list_value(std::move(arguments))});
+    auto fields=values(plan);
+    if(fields.size()!=8)throw std::runtime_error("Native AOT: invalid CLI plan");
+    const auto field=[&](std::size_t i)->const std::string & {
+        const auto *value=std::get_if<std::string>(&fields[i]);
+        if(!value)throw std::runtime_error("Native AOT: invalid CLI plan string");
+        return *value;
+    };
+    fs::path output;
+    // Filesystem canonicalization/identity remain a host ABI operation. All
+    // source commands and assembly generation are handled by V++ below.
+    if(field(0)!="message") {
+        const auto source=fs::weakly_canonical(fs::absolute(core::utf8Path(field(1))));
+        output=field(2).empty()?fs::path{}:fs::absolute(core::utf8Path(field(2)));
+        const auto base=field(5).empty()?fs::path{}:
+            fs::weakly_canonical(fs::absolute(core::utf8Path(field(5))));
+        if(!output.empty()&&(fs::weakly_canonical(output)==source||
+                            (fs::exists(output)&&fs::equivalent(output,source))))
+            throw std::runtime_error("Native AOT: output must not overwrite source");
+        fields[1]=source.u8string();fields[2]=output.u8string();fields[5]=base.u8string();
     }
-    if(command!="build"&&command!="run"&&command!="artifact"&&command!="embed")throw std::runtime_error("Native AOT: unknown command");
-    if(command!="embed"&&!embedBase.empty())throw std::runtime_error("Native AOT: --base requires embed");
-    if(!output.empty()&&(fs::weakly_canonical(output)==source||(fs::exists(output)&&fs::equivalent(output,source))))
-        throw std::runtime_error("Native AOT: output must not overwrite source");
-    const auto root=installation();
-    if(command=="artifact") {
-        if(!output.empty()||bytecode||compiler)
-            throw std::runtime_error("Native AOT: artifact command does not accept build options");
-        const auto wire=program.invokeName("biên dịch trước văn bản dạng thô",{read(source)});
-        const auto snapshot=snapshotFromWire(values(wire));
-        TemporaryDirectory temporary(fs::temp_directory_path());
-        const auto executable=temporary.path/
-#if defined(_WIN32)
-            "artifact.exe";
-#else
-            "artifact";
-#endif
-        compileExecutable(snapshot,executable,root);
-        const auto result=process({executable.u8string()});
-        program.output(result.output);
-        return result.status;
+    const auto root=installation(false);
+    const auto prepared=program.invokeName("biên dịch chuẩn bị dòng lệnh máy",
+        {make_list_value(std::move(fields)),root.u8string(),canonicalTriple(hostTarget())});
+    profiler.mark("vpp-cli-and-assembly");
+    const auto &request=values(prepared);
+    if(request.size()!=2||!std::holds_alternative<std::string>(request[0])||
+       !std::holds_alternative<std::string>(request[1]))
+        throw std::runtime_error("Native AOT: invalid host request");
+    const auto &operation=std::get<std::string>(request[0]);
+    const auto &text=std::get<std::string>(request[1]);
+    if(operation=="complete") {program.output(text);return 0;}
+    if(operation=="diagnostic-error") {program.output(text);return 1;}
+    if(operation=="assemble") {
+        compileAssembly(text,output,root);
+        return 0;
     }
-    if(command=="embed") {
-        if(!output.empty()||bytecode||compiler||embedBase.empty()||!fs::is_directory(embedBase))
-            throw std::runtime_error("Native AOT: embed requires --base directory and no build options");
-        const auto text=read(source);
-        if(!core::isValidUtf8(text))throw std::runtime_error("Native AOT: embedded script is not valid UTF-8");
-        const auto artifact=program.invokeName("biên dịch trước nguồn nhúng",
-            {text,fs::weakly_canonical(embedBase).u8string(),root.u8string()});
-        const auto wire=program.invokeName("biên dịch trước sản phẩm dạng thô",{artifact});
-        TemporaryDirectory temporary(fs::temp_directory_path());
-        const auto executable=temporary.path/
-#if defined(_WIN32)
-            "embedded.exe";
-#else
-            "embedded";
-#endif
-        compileExecutable(snapshotFromWire(values(wire)),executable,root);
-        const auto result=process({executable.u8string()});
-        program.output(result.output);
-        return result.status;
-    }
-    if(bytecode) {
-        if(output.empty())throw std::runtime_error("Native AOT: bytecode output required");
-        const auto result=program.invokeName("biên dịch trước dòng lệnh mã trung gian",{source.u8string(),root.u8string(),output.u8string()});
-        program.output(sv_to_string(result));return 0;
-    }
-    Value artifact;
-    if(profiler.active()) {
-        // The regular V++ entrypoint performs these exact two operations.
-        // Separate them only when profiling to locate expensive compiler passes.
-        const auto graph=program.invokeName("biên dịch nguồn đồ thị",{source.u8string(),root.u8string()});
-        profiler.mark("resolve-imports-lex-parse");
-        artifact=program.invokeName("biên dịch liên kết đồ thị thuần",{graph});
-        profiler.mark("semantic-ir-codegen-link");
-    } else {
-        artifact=program.invokeName("biên dịch trước nguồn tệp",{source.u8string(),root.u8string()});
-    }
-    const auto wire=program.invokeName("biên dịch trước sản phẩm dạng thô",{artifact});
-    profiler.mark("artifact-wire");
-    const auto snapshot=snapshotFromWire(values(wire));
-    profiler.mark("snapshot");
-    if(command=="build") {
-        if(output.empty())throw std::runtime_error("Native AOT: executable output required");
-        compileExecutable(snapshot,output,root,compiler);
-        profiler.mark("native-asm-and-link");return 0;
-    }
+    if(operation!="execute")throw std::runtime_error("Native AOT: unknown host operation");
     TemporaryDirectory temporary(fs::temp_directory_path());
     const auto executable=temporary.path/
 #if defined(_WIN32)
@@ -236,22 +213,33 @@ int compilerMain(Program &program,int argc,char **argv) {
 #else
         "program";
 #endif
-    compileExecutable(snapshot,executable,root);const auto result=process({executable.u8string()});
+    compileAssembly(text,executable,root);
+    const auto result=process({executable.u8string()});
     program.output(result.output);return result.status;
 }
 } // namespace
 
 ProcessResult runProcess(const std::vector<std::string> &arguments) {
+    return runProcess(arguments,false);
+}
+ProcessResult runProcess(const std::vector<std::string> &arguments, bool captureStderr) {
     if (arguments.empty()) throw std::invalid_argument("Native AOT: empty process arguments");
-    return process(arguments);
+    return process(arguments,captureStderr);
 }
 
 void compileExecutable(const Snapshot &snapshot,const fs::path &output,const fs::path &root,bool compiler) {
     PhaseTimer profiler;
+    const auto assembly=emitAssembly(snapshot,compiler);
+    profiler.mark("emit-native-assembly");
+    compileAssembly(assembly,output,root);
+}
+
+void compileAssembly(const std::string &text,const fs::path &output,const fs::path &root) {
+    PhaseTimer profiler;
     const auto absolute=fs::absolute(output);if(!fs::is_directory(absolute.parent_path()))throw std::runtime_error("Native AOT: output directory missing");
     TemporaryDirectory temporary(absolute.parent_path());const auto source=temporary.path/"program.S";
-    {std::ofstream assembly(source,std::ios::binary);assembly<<emitAssembly(snapshot,compiler);if(!assembly)throw std::runtime_error("Native AOT: assembly write failed");}
-    profiler.mark("emit-native-assembly");
+    {std::ofstream assembly(source,std::ios::binary);assembly<<text;if(!assembly)throw std::runtime_error("Native AOT: assembly write failed");}
+    profiler.mark("write-native-assembly");
     const auto executable=temporary.path/
 #if defined(_WIN32)
         "program.exe";
@@ -323,7 +311,7 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             for(std::size_t k=0;k<f.extentCount;++k)descriptor.bufferExtents.push_back({f.extents[k].parameter,f.extents[k].lengthParameter,f.extents[k].fixed});
             program.foreignFunctions.push_back(std::move(descriptor));
         }
-        program.executeArtifact=[](const std::vector<Value> &wire)->Value {
+        program.executeArtifact=[&program,spec](const std::vector<Value> &wire)->Value {
             TemporaryDirectory temporary(fs::temp_directory_path());
             const auto executable=temporary.path/
 #if defined(_WIN32)
@@ -331,7 +319,16 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
 #else
                 "artifact";
 #endif
-            compileExecutable(snapshotFromWire(wire),executable,installation());const auto result=process({executable.u8string()});
+            if(spec->compiler) {
+                const auto assembly=program.invokeName("biên dịch asm chương trình",
+                    {make_list_value(wire),canonicalTriple(hostTarget()),make_int_value(0)});
+                if(!std::holds_alternative<std::string>(assembly))
+                    throw std::runtime_error("Native AOT: expected V++ assembly text");
+                compileAssembly(std::get<std::string>(assembly),executable,installation());
+            } else {
+                compileExecutable(snapshotFromWire(wire),executable,installation());
+            }
+            const auto result=process({executable.u8string()});
             if(result.status)throw std::runtime_error("Native AOT: generated artifact failed: "+std::to_string(result.status));
             return result.output;
         };
@@ -369,6 +366,7 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
             return result.output;
         };
         program.run();
+        dumpAotCpuProfile();
         if(spec->compiler)return compilerMain(program,argc,argv);
         return 0;
     }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}

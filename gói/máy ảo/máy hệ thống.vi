@@ -1,0 +1,45 @@
+// Host policy and boxed return values live in V++; ASM only crosses the OS ABI.
+hàm vm_system_bytes(raw, count) {
+    biến bytes = vm_vector(4);
+    nếu (bytes == 0) { trả về 0; };
+    lặp(i = 0; i < count; i++) {
+        vm_append(bytes, vm_int(máy đọc byte(raw + i)));
+    };
+    trả về bytes;
+};
+
+hàm vm_system_clock(kind) {
+    biến raw = vm_alloc(16, 0); nếu (raw == 0) { trả về 0; };
+    nếu (máy đồng hồ thô(kind, raw) != 0) { trả về vm_error(20); };
+    // Both supported POSIX ABIs return two little-endian signed i64 fields.
+    // Nanoseconds must fit 0..999999999; monotonic seconds cannot be negative.
+    nếu (vm_get(raw, 3) != 0 || vm_get(raw, 2) < 0 || vm_get(raw, 2) >= 1000000000) {
+        trả về vm_error(20);
+    };
+    nếu (kind == 0 && vm_get(raw, 1) < 0) { trả về vm_error(20); };
+    trả về vm_system_bytes(raw, 16);
+};
+
+hàm vm_system_sleep(duration) {
+    nếu (vm_tag(duration) != 1) { trả về vm_error(2); };
+    biến milliseconds = vm_number(duration);
+    nếu (milliseconds < 0 || milliseconds > 999) { trả về vm_error(2); };
+    // Return errno from this attempt atomically. The public V++ sleep helper
+    // already owns deadline tracking, chunking and bounded EINTR retries.
+    trả về vm_int(máy ngủ thô(milliseconds));
+};
+
+hàm vm_system_entropy(length) {
+    nếu (vm_tag(length) != 1) { trả về vm_error(2); };
+    biến count = vm_number(length);
+    nếu (count < 1 || count > 256) { trả về vm_error(2); };
+    biến raw = vm_alloc(count, 0); nếu (raw == 0) { trả về 0; };
+    biến filled = 0;
+    khi (filled < count) {
+        biến got = máy entropy thô(raw + filled, count - filled);
+        nếu (got == -4) { bỏ qua; }; // EINTR on POSIX
+        nếu (got <= 0 || got > count - filled) { trả về vm_error(20); };
+        filled = filled + got;
+    };
+    trả về vm_system_bytes(raw, count);
+};

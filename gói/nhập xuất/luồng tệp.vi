@@ -1,7 +1,7 @@
 // API luồng tệp giữ nguyên; buffering và quản lý cursor nằm trong V++.
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/bộ đệm tệp;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.nhập xuất.tệp.tệp chuẩn hóa đường dẫn;
+nhập gói.nhập xuất.bộ đệm tệp.*;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 lớp công khai Luồng Tệp triển khai Đóng Được {
     hàm công khai khởi tạo(đường, chế độ) {

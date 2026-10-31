@@ -1,9 +1,13 @@
 // vi.xml — XML cây đơn giản, không tải DOCTYPE/thực thể ngoài.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/toán học;
-nhập gói/văn bản/chuỗi;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.văn bản.chuỗi.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp riêng tư Xử Lý Nội Bộ Xml {
@@ -129,7 +133,7 @@ lớp riêng tư Bộ Xử Lý XML {
         vị trí = lấy từ điển(trạng thái, "vị trí", 0);
         n = máy ảo lấy độ dài(nội dung);
         đang bỏ = đúng;
-        lặp(vòng = 0; vị trí < n && đang bỏ; vòng++) {
+        khi (vị trí < n && đang bỏ) {
             nếu (mình.xml là khoảng trắng(nội dung[vị trí])) {
                 vị trí = vị trí + 1;
             } hoặc {
@@ -155,7 +159,7 @@ lớp riêng tư Bộ Xử Lý XML {
         n = máy ảo lấy độ dài(nội dung);
         bắt đầu = vị trí;
         đang đọc = đúng;
-        lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+        khi (vị trí < n && đang đọc) {
             c = nội dung[vị trí];
             nếu (mình.xml tên hợp lệ(c)) {
                 vị trí = vị trí + 1;
@@ -227,7 +231,7 @@ lớp riêng tư Bộ Xử Lý XML {
         };
         giá trị = 0;
         hợp lệ = đúng;
-        lặp(vòng = 0; i < n && hợp lệ; vòng++) {
+        khi (i < n && hợp lệ) {
             chữ số = -1;
             nếu (cơ số == 16) {
                 chữ số = mình.xml thập lục phân nửa byte(thực thể[i]);
@@ -256,7 +260,7 @@ lớp riêng tư Bộ Xử Lý XML {
         kết quả = "";
         i = 0;
         n = máy ảo lấy độ dài(văn bản);
-        lặp(vòng = 0; i < n; vòng++) {
+        khi (i < n) {
             nếu (văn bản[i] != "&") {
                 kết quả = kết quả + văn bản[i];
                 i = i + 1;
@@ -315,7 +319,7 @@ lớp riêng tư Bộ Xử Lý XML {
         vị trí = vị trí + 1;
         bắt đầu = vị trí;
         đang đọc = đúng;
-        lặp(vòng = 0; vị trí < n && đang đọc; vòng++) {
+        khi (vị trí < n && đang đọc) {
             nếu (nội dung[vị trí] == nháy) {
                 đang đọc = sai;
             } hoặc {
@@ -377,7 +381,7 @@ lớp riêng tư Bộ Xử Lý XML {
         thuộc tính = {};
         đã mở = sai;
         tự đóng = sai;
-        lặp(vòng = 0; !đã mở && !tự đóng; vòng++) {
+        khi (!đã mở && !tự đóng) {
             mình.xml bỏ khoảng trắng(trạng thái);
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
             nếu (vị trí >= n) {
@@ -415,7 +419,7 @@ lớp riêng tư Bộ Xử Lý XML {
         văn bản = "";
         con = [];
         hoàn tất = sai;
-        lặp(vòng = 0; !hoàn tất; vòng++) {
+        khi (!hoàn tất) {
             vị trí = lấy từ điển(trạng thái, "vị trí", 0);
             nếu (vị trí >= n) {
                 mình.xml lỗi(trạng thái, "phần tử chưa đóng: " + tên);
@@ -455,7 +459,7 @@ lớp riêng tư Bộ Xử Lý XML {
                         } hoặc {
                             bắt đầu = vị trí;
                             đang đọc = đúng;
-                            lặp(vòng văn bản = 0; vị trí < n && đang đọc; vòng văn bản++) {
+                            khi (vị trí < n && đang đọc) {
                                 nếu (nội dung[vị trí] == "<") {
                                     đang đọc = sai;
                                 } hoặc {
@@ -579,4 +583,6 @@ hàm công khai xml tạo(nút) {
     bộ xử lý = Xử Lý Nội Bộ Xml();
     trả về bộ xử lý.xml tạo(nút);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;

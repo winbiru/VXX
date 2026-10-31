@@ -1,7 +1,10 @@
 // Kết nối logic theo instance; backend hiện thực thi từng truy vấn qua DB client.
 // Không cam kết transaction, pooling hay giữ một socket DB giữa các lần gọi.
-nhập gói/dữ liệu/kết nối cơ sở dữ liệu;
-nhập gói/lõi/tài nguyên có trạng thái;
+nhập gói.dữ liệu.kết nối cơ sở dữ liệu.cơ sở dữ liệu phân tích cấu hình;
+nhập gói.dữ liệu.kết nối cơ sở dữ liệu.kết nối cơ sở dữ liệu;
+nhập gói.dữ liệu.kết nối cơ sở dữ liệu.truy vấn cơ sở dữ liệu;
+nhập gói.dữ liệu.kết nối cơ sở dữ liệu.ngắt kết nối cơ sở dữ liệu;
+nhập gói.lõi.tài nguyên có trạng thái.*;
 
 lớp công khai Kết Nối Cơ Sở Dữ Liệu kế thừa Tài Nguyên Có Trạng Thái {
     hàm công khai khởi tạo(trình điều khiển, địa chỉ tài nguyên, tài khoản, mật khẩu) {

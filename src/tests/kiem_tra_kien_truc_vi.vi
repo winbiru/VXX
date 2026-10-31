@@ -1,5 +1,5 @@
 // Xác minh registry kiến trúc self-host và cách từ chối target chưa biết.
-nhập gói/biên dịch/đích;
+nhập gói.biên dịch.đích.*;
 
 hàm chính() {
     danh_sách = biên dịch danh sách kiến trúc();

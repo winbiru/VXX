@@ -1,8 +1,8 @@
 // /etc/hosts thuần V++: chỉ dùng File/Socket Machine ABI, không gọi getaddrinfo.
 // Hosts được bật rõ ràng trong resolver thử nghiệm qua VPP_DNS_VI_HOSTS_FILE.
-nhập gói/mạng/địa chỉ mạng;
-nhập gói/mạng/gói tin tên miền;
-nhập gói/nhập xuất/bộ đệm tệp;
+nhập gói.mạng.địa chỉ mạng.*;
+nhập gói.mạng.gói tin tên miền.*;
+nhập gói.nhập xuất.bộ đệm tệp.*;
 
 lớp công khai Bộ Bảng Tên Máy DNS {
     hàm công khai khởi tạo() {};

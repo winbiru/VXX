@@ -1,0 +1,69 @@
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.hệ thống.tiến trình.*;
+
+bước thư mục = 0;
+hàm yêu cầu thư mục(điều kiện) {
+    bước thư mục += 1;
+    nếu (!điều kiện) { ném "directory/PID regression step " + bước thư mục; };
+};
+hàm chính() {
+    pid = mã tiến trình();
+    yêu cầu thư mục(máy ảo lấy loại(pid) == "số nguyên" && pid > 0);
+    yêu cầu thư mục(mã tiến trình() == pid && mã tiến trình cha() >= 0);
+    thiếu = máy thư mục mở("vm-dir-root/không có");
+    yêu cầu thư mục(thiếu[0] == 0 && thiếu[1] == 2);
+    dài = "a";
+    lặp(i = 0; i < 12; i++) { dài = dài + dài; };
+    quá dài = máy thư mục mở(dài);
+    yêu cầu thư mục(quá dài[0] == 0 && quá dài[1] > 0);
+    tạo dài = máy thư mục tạo(dài);
+    yêu cầu thư mục(tạo dài[0] == -1 && tạo dài[1] == 3 && tạo dài[2] == quá dài[1]);
+    tạo = máy thư mục tạo("vm-dir-root");
+    yêu cầu thư mục(tạo[0] == 0 && tạo[1] == 0 && tạo[2] == 0);
+    trùng = máy thư mục tạo("vm-dir-root");
+    yêu cầu thư mục(trùng[0] == -1 && trùng[1] == 1 && trùng[2] == 17);
+    tạo thư mục("vm-dir-root/cây sâu/trẻ");
+    ghi các byte tệp("vm-dir-root/bé 🐱.txt", [0, 255, 52]);
+    ghi tệp("vm-dir-root/cây sâu/trẻ/a.txt", "nội dung");
+    danh sách = liệt kê thư mục("vm-dir-root");
+    yêu cầu thư mục(độ dài(danh sách) == 2);
+    yêu cầu thư mục(danh sách[0] == "bé 🐱.txt" && danh sách[1] == "cây sâu");
+    không rỗng = máy thư mục xóa("vm-dir-root");
+    yêu cầu thư mục(không rỗng[0] == -1 && không rỗng[1] == 3 && không rỗng[2] != 0);
+    mở = máy thư mục mở("vm-dir-root");
+    token = mở[0]; yêu cầu thư mục(token > 0 && mở[1] == 0);
+    lặp(i = 0; i < 5000; i++) { rác = [i, i]; };
+    số tên = 0;
+    khi (đúng) {
+        mục = máy thư mục kế(token);
+        nếu (mục[0] == 0) { thoát; };
+        yêu cầu thư mục(mục[0] == 1);
+        nếu (mục[1] != "." && mục[1] != "..") { số tên++; };
+    };
+    yêu cầu thư mục(số tên == 2);
+    hết = máy thư mục kế(token);
+    yêu cầu thư mục(hết[0] == 0 && hết[1] == "");
+    đóng = máy thư mục đóng(token);
+    yêu cầu thư mục(đóng[0] == 0 && đóng[1] == 0);
+    lặp(i = 0; i < 100; i++) {
+        mới = máy thư mục mở("vm-dir-root");
+        yêu cầu thư mục(mới[0] != token);
+        token = mới[0];
+        yêu cầu thư mục(máy thư mục đóng(token)[0] == 0);
+    };
+    // CMake prepares this symlink and its external target. Removing link/
+    // must preserve the target and its sentinel file.
+    yêu cầu thư mục(xóa đường dẫn("vm-dir-link/") == 1);
+    yêu cầu thư mục(là tệp("vm-dir-external/sentinel"));
+    yêu cầu thư mục(xóa đường dẫn("vm-dir-root") > 0);
+    xóa thiếu = máy thư mục xóa("vm-dir-root");
+    yêu cầu thư mục(xóa thiếu[0] == -1 && xóa thiếu[1] == 2 && xóa thiếu[2] == 2);
+    quyền = máy thư mục tạo("vm-dir-mode");
+    yêu cầu thư mục(quyền[0] == 0);
+    // An intentionally unclosed directory exercises shutdown cleanup.
+    còn mở = máy thư mục mở(".");
+    yêu cầu thư mục(còn mở[0] > 0);
+    in "VM ASM DIRECTORY/PID OK";
+};
