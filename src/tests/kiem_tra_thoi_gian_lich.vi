@@ -1,4 +1,5 @@
 nhập thời gian;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 hàm chính() {
     in thời gian là năm nhuận(2024);

@@ -101,3 +101,8 @@ nhập gói.thời gian.đơn điệu.*;
 nhập gói.thời gian.thời lượng.*;
 nhập gói.thời gian.giao diện đo.*;
 nhập gói.thời gian.bộ bấm giờ.*;
+// Giữ đầy đủ API công khai của `nhập thời gian;` cho các module con.
+// Các import chọn lọc ở đầu tệp chỉ phục vụ phần cài đặt Đồng Hồ.
+nhập gói.thời gian.lịch.*;
+nhập gói.thời gian.giờ quốc tế.*;
+nhập gói.thời gian.địa phương.*;
