@@ -1,6 +1,7 @@
 // Bộ dựng tiến trình có trạng thái; việc spawn và thu stdout/stderr do
 // `chạy tiến trình` thực hiện đồng bộ, giữ nguyên hành vi của API hàm cũ.
-nhập gói/hệ thống/tiến trình;
+nhập gói.hệ thống.tiến trình.tiến trình yêu cầu chuỗi;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
 
 lớp công khai Lệnh Tiến Trình {
     hàm công khai khởi tạo(chương trình) {

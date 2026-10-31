@@ -17,6 +17,11 @@ namespace vietvm::compiler {
 inline constexpr std::string_view kCurrentCompilationModuleIdentity =
     "entry://current-compilation";
 
+bool matchesImportSelection(const vietvm::frontend::AstImportSpec &spec,
+                            std::string_view name) noexcept;
+std::string importedSymbolName(const vietvm::frontend::AstImportSpec &spec,
+                               const std::string &name);
+
 // Mô tả vị trí một module local đã phân giải, gồm đường dẫn chuẩn và thông tin cần để resolver đọc source ổn định.
 struct LocalModuleLocation {
     std::filesystem::path path;
@@ -140,9 +145,8 @@ struct LocalModuleSemanticIndex {
     const std::string *moduleSource(
         std::string_view moduleIdentity) const noexcept;
 
-    // Produces only direct imports of `importerIdentity`. An import alias
-    // qualifies the exported name (`alias.symbol`); an unaliased import keeps
-    // the legacy flat namespace behavior.
+    // Produces only direct imports of `importerIdentity`. Selected aliases
+    // rename the export; bare/wildcard aliases qualify it (`alias.symbol`).
     // Tạo `SemanticEnvironment` cho một module; hàm gom các export từ dependency đã phân giải thành external symbol mà analyzer có thể nhìn thấy.
     SemanticEnvironment semanticEnvironmentFor(
         std::string_view importerIdentity) const;

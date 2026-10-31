@@ -1,8 +1,12 @@
 // Client HTTP hướng đối tượng. Dùng chung parser, transport và API hàm hiện có.
 // Mỗi instance giữ URL gốc; không sở hữu kết nối socket dùng lâu dài.
-nhập gói/mạng/http/máy khách;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.mạng.http.máy khách.mạng http phân tích địa chỉ tài nguyên;
+nhập gói.mạng.http.máy khách.mạng thực thi yêu cầu;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.con chuỗi;
+nhập gói.văn bản.chuỗi.bắt đầu bằng;
+nhập gói.văn bản.chuỗi.chứa chính xác;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 lớp công khai Khách HTTP triển khai Đóng Được {
     hàm công khai khởi tạo(địa chỉ tài nguyên gốc) {

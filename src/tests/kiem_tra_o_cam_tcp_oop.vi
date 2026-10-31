@@ -1,4 +1,4 @@
-nhập gói/mạng/chính;
+nhập gói.mạng.chính.*;
 
 hàm chính() {
     socket = Ổ Cắm TCP("127.0.0.1", 45678);

@@ -1,9 +1,9 @@
 // Parser biểu thức độc lập viết bằng V++ để tiến tới compiler self-host.
 // Trả AST dưới dạng map/list; không gọi bien_dich_phan_tich_vm.
 // Đây là pass biểu thức, chưa thay parser statement/semantic C++.
-nhập gói/biên dịch/từ vựng;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Phân Tích Biểu Thức {

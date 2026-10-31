@@ -1,6 +1,6 @@
 // vpp.doc — sinh tài liệu Markdown từ AST V++.
-nhập nhập xuất;
-nhập biên dịch;
+nhập nhập xuất.*;
+nhập biên dịch.*;
 
 hàm công khai khởi tạo() {};
 

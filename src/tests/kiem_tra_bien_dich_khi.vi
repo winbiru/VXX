@@ -1,7 +1,7 @@
-nhập gói/biên dịch/chính;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/lõi/kịch bản;
+nhập gói.biên dịch.chính.*;
+nhập gói.biên dịch.chương trình.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.lõi.kịch bản.*;
 nhập kiểm thử;
 
 hàm chính() {

@@ -1,4 +1,4 @@
-nhập gói/mạng/phân giải tên miền;
+nhập gói.mạng.phân giải tên miền.*;
 
 // A thành công, AAAA hết hạn: public API phải giữ kết quả A.
 hàm chính() {

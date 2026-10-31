@@ -1,6 +1,6 @@
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/hệ thống/môi trường;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.hệ thống.môi trường.*;
 hàm chính() {
     đường = "vm-asm-owned.bin";
     ghi các byte tệp(đường, [0, 255, 10, 52]);

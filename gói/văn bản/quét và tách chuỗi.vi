@@ -3,11 +3,17 @@
 // Regex chỉ dùng engine primitive; cursor, delimiter policy và tokenization
 // đều được điều phối ở lớp V++.
 
-nhập gói/lõi/biểu thức chính quy;
-nhập gói/lõi/giao diện tài nguyên;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy khớp;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy tìm;
+nhập gói.lõi.biểu thức chính quy.biểu thức chính quy thay;
+nhập gói.lõi.giao diện tài nguyên.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 
 // Các thuật toán và trợ giúp nằm trong lớp nội bộ, không được xuất qua import.
@@ -648,4 +654,5 @@ hàm công khai tách từ tố biểu thức chính quy(văn bản, mẫu phân
     bộ nội bộ = Máy Quét Nội Bộ();
     trả về bộ nội bộ.tách từ tố biểu thức chính quy(văn bản, mẫu phân cách, giữ phân cách);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;

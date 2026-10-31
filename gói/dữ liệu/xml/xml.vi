@@ -1,9 +1,13 @@
 // vi.xml — XML cây đơn giản, không tải DOCTYPE/thực thể ngoài.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/toán học;
-nhập gói/văn bản/chuỗi;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.văn bản.chuỗi.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp riêng tư Xử Lý Nội Bộ Xml {
@@ -579,4 +583,6 @@ hàm công khai xml tạo(nút) {
     bộ xử lý = Xử Lý Nội Bộ Xml();
     trả về bộ xử lý.xml tạo(nút);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;

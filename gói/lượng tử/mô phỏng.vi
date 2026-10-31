@@ -1,8 +1,9 @@
-nhập gói / lượng tử / mạch;
-nhập gói / lượng tử / nền;
-nhập gói / bộ sưu tập / từ điển;
-nhập gói / lõi / chuyển kiểu;
-nhập ngẫu nhiên;
+nhập gói . lượng tử . mạch.*;
+nhập gói . lượng tử . nền.*;
+nhập gói . bộ sưu tập . từ điển.lấy từ điển;
+nhập gói . bộ sưu tập . từ điển.đặt từ điển;
+nhập gói . lõi . chuyển kiểu.thành số nguyên;
+nhập ngẫu nhiên.*;
 // Vector trạng thái phức thuần V++. Đếm kết quả theo c[n-1]...c[0].
 lớp công khai Bộ Mô Phỏng Lượng Tử {
     hàm công khai khởi tạo(mức trần qubit = 12) {

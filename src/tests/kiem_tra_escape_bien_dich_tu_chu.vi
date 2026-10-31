@@ -1,8 +1,8 @@
 // Đối chiếu bộ giải mã chuỗi V++ với stripQuotes và codegen C++.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/chính;
-nhập gói/lõi/kịch bản;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.lõi.kịch bản.*;
 
 hàm escape cùng mã trung gian(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);

@@ -1,4 +1,4 @@
-nhập gói/chuẩn/chính;
+nhập gói.chuẩn.chính.*;
 
 // Chia dư không được âm thầm cắt phần lẻ của số thực.
 hàm chính() {

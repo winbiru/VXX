@@ -1,8 +1,8 @@
 // Thực thi mã trung gian do V++ tự phân tích, phát mã và liên kết.
 // So sánh kết quả VM với compiler C++ cho subset đã hỗ trợ.
-nhập gói/biên dịch/bộ nạp;
-nhập gói/lõi/kịch bản;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.lõi.kịch bản.*;
+nhập gói.văn bản.chuỗi.*;
 
 hàm chính() {
     nguồn = "hàm cộng(a, b) { trả về a + b; }; hàm chính() { in cộng(20, 22); };";
@@ -10,7 +10,7 @@ hàm chính() {
     in biên dịch chạy chương trình tự chủ(nguồn) == kịch bản chạy(nguồn);
 
     // Literal/biến/khối và thứ tự các initializer dependency.
-    mã = "nhập ../lib/feature như api; nhập ../lib/math như toán; " +
+    mã = "nhập ..lib.feature.* như api; nhập ..lib.math.* như toán; " +
          "hàm chính() { in api.tính(); in toán.cộng(); in api.số.cộng(); };";
     mô_đun = {
         "app/main": mã,
@@ -41,7 +41,7 @@ hàm chính() {
     in biên dịch chạy chương trình tự chủ("in \"xin chào\";") == "xin chào\n";
 
     // StringPool khi literal xen giữa import phải giữ nguyên index C++.
-    xen_chuỗi = "in \"trước\"; nhập ../lib/math như toán; in \"sau\"; " +
+    xen_chuỗi = "in \"trước\"; nhập ..lib.math.* như toán; in \"sau\"; " +
                 "hàm chính() { in \"gốc\"; in toán.cộng(); };";
     chuỗi_đồ_thị = biên dịch chạy chương trình mô đun tự chủ("app/main", {
         "app/main": xen_chuỗi,

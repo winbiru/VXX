@@ -1,11 +1,11 @@
-nhập gói/kiểm thử/so sánh benchmark;
-nhập gói/kiểm thử/khẳng định;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/dữ liệu/json/json;
-nhập gói/nhập xuất/tệp;
-nhập gói/hệ thống/môi trường;
+nhập gói.kiểm thử.so sánh benchmark.*;
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.hệ thống.môi trường.*;
 
 hàm gate_fixture(count = 40, gc = đúng) {
     name = "vm_verify";

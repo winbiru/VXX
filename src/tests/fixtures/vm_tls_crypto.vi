@@ -1,6 +1,6 @@
-nhập gói/bảo mật/bản ghi TLS;
-nhập gói/bảo mật/khóa TLS;
-nhập gói/bảo mật/mật mã;
+nhập gói.bảo mật.bản ghi TLS.*;
+nhập gói.bảo mật.khóa TLS.*;
+nhập gói.bảo mật.mật mã.*;
 
 hàm tls vector hex(text) {
     data = chuỗi thành byte máy ảo(text); output = [];

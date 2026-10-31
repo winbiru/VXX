@@ -1,5 +1,5 @@
 // vi.sql.rowset — tập kết quả độc lập kết nối dùng list<map> của runtime.
-nhập gói/bộ sưu tập/chính;
+nhập gói.bộ sưu tập.chính.*;
 
 hàm công khai tập bản ghi(danh sách hàng) {
     trả về danh sách hàng;

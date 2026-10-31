@@ -6,10 +6,11 @@
 // lại khi máy chủ chưa sẵn sàng. Không tự động gửi lại POST/PUT/DELETE.
 // Cả HTTP và HTTPS đều dùng cùng framing/parsing V++; HTTPS chỉ đổi transport sang TLS.
 
-nhập gói/dữ liệu/json/chính;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/mạng/ổ cắm;
-nhập gói/văn bản/chuỗi;
+nhập gói.dữ liệu.json.chính.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.văn bản.chuỗi.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Giao Thức HTTP {
@@ -1053,4 +1054,6 @@ hàm công khai mạng đóng máy chủ giao diện lập trình(mã máy chủ
     bộ chuyển tiếp = Bộ Giao Thức HTTP();
     trả về bộ chuyển tiếp.mạng đóng máy chủ giao diện lập trình(mã máy chủ);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;

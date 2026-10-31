@@ -1,6 +1,6 @@
 // So sánh ABI mã trung gian OOP compiler tự chủ với C++ (từng toán hạng).
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/chính;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.chính.*;
 
 hàm so_lệnh(c, v, nhãn) {
     nếu (độ dài(c) != độ dài(v)) {

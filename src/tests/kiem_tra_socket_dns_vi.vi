@@ -1,6 +1,6 @@
-nhập gói/mạng/kết nối phân giải tên miền;
-nhập gói/hệ thống/môi trường;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.mạng.kết nối phân giải tên miền.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
 
 hàm chính() {
     // Không dùng hệ thống DNS hay mạng cho các trường hợp này.

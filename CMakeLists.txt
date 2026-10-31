@@ -989,7 +989,18 @@ if (BUILD_TESTS)
                     "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/vm-asm-selfhost"
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_vm_asm_selfhost.cmake)
             set_tests_properties(vpp-vm-asm-selfhost PROPERTIES
-                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 2100)
+                DEPENDS vpp-vm-asm FIXTURES_REQUIRED "native-stage1;native-cli-compiler"
+                PROCESSORS 2 TIMEOUT 2100)
+
+            add_test(NAME vpp-selective-imports
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_STAGE1=${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/selective-imports"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_selective_imports.cmake)
+            set_tests_properties(vpp-selective-imports PROPERTIES
+                FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 300)
 
         endif()
         if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$") OR

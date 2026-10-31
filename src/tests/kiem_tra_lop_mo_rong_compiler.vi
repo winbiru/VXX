@@ -1,9 +1,9 @@
 // Kiểm chứng lớp mới và hàm cũ cùng hoạt động với một định dạng dữ liệu.
-nhập gói/biên dịch/phụ thuộc;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/liên kết;
-nhập gói/mạng/http/dịch vụ tài nguyên;
+nhập gói.biên dịch.phụ thuộc.*;
+nhập gói.biên dịch.đồ thị mô đun.*;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.mạng.http.dịch vụ tài nguyên.*;
 
 hàm chính() {
     mã = "nhập bộ sưu tập; hàm chính() {};";

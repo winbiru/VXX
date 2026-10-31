@@ -1,5 +1,5 @@
-nhập gói/thời gian/giao diện đo;
-nhập gói/thời gian/đơn điệu;
+nhập gói.thời gian.giao diện đo.*;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 lớp công khai Bộ Bấm Giờ triển khai Đo Thời Gian {
     hàm công khai khởi tạo() {

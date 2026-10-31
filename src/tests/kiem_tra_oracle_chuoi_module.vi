@@ -1,6 +1,6 @@
 // Phát hiện StringPool sai thứ tự khi literal nằm xen giữa các import.
-nhập gói/biên dịch/kết quả;
-nhập gói/biên dịch/liên kết;
+nhập gói.biên dịch.kết quả.*;
+nhập gói.biên dịch.liên kết.*;
 
 hàm khớp lệnh(cũ, mới) {
     nếu (độ dài(cũ) != độ dài(mới)) { trả về sai; };
@@ -46,18 +46,18 @@ hàm oracle kiểm thử chuỗi(root) {
 
 hàm chính() {
     // Literal bao quanh import, C++ phân bổ StringPool khi gặp từng lệnh.
-    oracle kiểm thử chuỗi("in \"trước\"; nhập ../lib/math như toán; in \"sau\"; " +
+    oracle kiểm thử chuỗi("in \"trước\"; nhập ..lib.math.* như toán; in \"sau\"; " +
                           "hàm chính() { in \"gốc\"; in toán.cộng(); };");
     // Các biến cũng sinh mã trung gian nạp chuỗi trước và sau import.
-    oracle kiểm thử chuỗi("biến x = \"trước\"; nhập ../lib/math như toán; " +
+    oracle kiểm thử chuỗi("biến x = \"trước\"; nhập ..lib.math.* như toán; " +
                           "biến y = \"sau\"; " +
                           "hàm chính() { in x; in toán.cộng(); in y; };");
     // Import lặp dưới hai alias phải chia sẻ function ID.
-    oracle kiểm thử chuỗi("nhập ../lib/math như toán; in \"giữa\"; " +
-                          "nhập ../lib/math như khác; in \"sau\"; " +
+    oracle kiểm thử chuỗi("nhập ..lib.math.* như toán; in \"giữa\"; " +
+                          "nhập ..lib.math.* như khác; in \"sau\"; " +
                           "hàm chính() { in khác.cộng(); in toán.cộng(); };");
     // Khai báo hàm và chuỗi xuất hiện cả trước và sau dependency.
     oracle kiểm thử chuỗi("hàm f() { in \"đầu\"; }; in \"trước\"; " +
-                          "nhập ../lib/math như toán; " +
+                          "nhập ..lib.math.* như toán; " +
                           "hàm chính() { in f(); in toán.cộng(); in \"cuối\"; };");
 };

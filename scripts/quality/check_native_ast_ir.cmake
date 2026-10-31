@@ -75,7 +75,7 @@ endforeach()
 # these without running any statement or asking the Stage 0 VM for a dump.
 set(complex_source "${VPP_OUTPUT_DIR}/complex-fixture.vi")
 file(WRITE "${complex_source}"
-    "nhập gói/lõi/chuyển kiểu;\n"
+    "nhập gói.lõi.chuyển kiểu.*;\n"
     "lớp Công Cụ { hàm công khai nhân(x) { trả về x * 2; }; };\n"
     "hàm chính() {\n"
     "  biến dữ liệu = [1, 2, 3];\n"

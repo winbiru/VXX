@@ -1,8 +1,10 @@
 // Đồ thị phụ thuộc local-source thuần V++ để chuẩn bị linker nhiều mô-đun.
 // Bộ dựng nhận nguồn đã nạp theo identity POSIX tương đối đã chuẩn hóa.
 // Chưa đụng tới function ID, StringPool, namespace hay bytecode relocation.
-nhập gói/biên dịch/chương trình;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
 
 // Các phép xử lý đồ thị thuần dùng hàm cấp mô-đun.
 // Chuẩn hóa lexical, không gọi filesystem. Khóa trong `nguồn` và import
@@ -134,10 +136,12 @@ lớp công khai Bộ Dựng Đồ Thị Mô Đun {
     };
     hành động = "load";
     nếu (trạng thái đích == 2) { hành động = "duplicate_no_op"; };
-    máy ảo thêm cuối danh sách(trạng thái["cạnh"], {"nguồn": nguồn nhập, "đích": đích,
+    cạnh nhập = {"nguồn": nguồn nhập, "đích": đích,
          "bí danh": lấy từ điển(spec, "bí danh", ""),
          "tái xuất": lấy từ điển(spec, "tái xuất", sai),
-         "hành động": hành động});
+         "hành động": hành động};
+    nếu (máy ảo có khóa từ điển(spec, "tên nhập")) { cạnh nhập["tên nhập"] = spec["tên nhập"]; };
+    máy ảo thêm cuối danh sách(trạng thái["cạnh"], cạnh nhập);
     nếu (trạng thái đích == 2) { trả về đúng; };
     trạng thái["đã thăm"][đích] = 1;
     máy ảo thêm cuối danh sách(trạng thái["ngăn"], đích);

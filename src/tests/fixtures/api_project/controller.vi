@@ -1,7 +1,7 @@
 nhập mạng;
-nhập gói/mạng/kiểm thử/giao diện lập trình;
+nhập gói.mạng.kiểm thử.giao diện lập trình.*;
 nhập service;
-nhập giao_dien/controller;
+nhập giao_dien.controller.*;
 
 // Ghi chú lớp: gom route chuẩn của API project theo kiểu cấu hình tập trung.
 lớp công khai ApiProjectRoutes {

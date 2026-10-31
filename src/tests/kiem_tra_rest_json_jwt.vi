@@ -1,4 +1,4 @@
-nhập gói/mạng/http/dịch vụ tài nguyên;
+nhập gói.mạng.http.dịch vụ tài nguyên.*;
 
 hàm chính() {
     từ tố = "eyJhbGciOiJIUzUxMiJ9.demo-token";

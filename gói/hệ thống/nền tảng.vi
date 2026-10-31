@@ -1,7 +1,7 @@
 // Module: hệ thống.nền tảng
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/thời gian/đơn điệu;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.thời gian.đơn điệu.thời gian đơn điệu mili giây;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Nền Tảng {

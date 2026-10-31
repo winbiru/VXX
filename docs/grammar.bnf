@@ -23,8 +23,18 @@
 <top_level_list>        ::= <top_level_decl> | <top_level_decl> <top_level_list>
 
 <top_level_decl>        ::= <function_decl>
+                         | <import_decl>
                          | <var_decl>
                          | <statement>
+
+<import_decl>          ::= [ "công khai" ] "nhập" <module_path>
+                          [ "." ( <identifier> | "*" ) ]
+                          [ "như" <identifier> ] ";"
+//# <module_path> uses '.' between directory and module components (legacy
+//# '/' is accepted). The final dot selects an export or '*' for all exports.
+//# A qualified full-module import must end in '.*'. Single-component legacy
+//# imports such as 'nhập lõi;' still work. The .vi suffix is omitted.
+//# Spaces are permitted in directory, module and exported names.
 
 //# Function: hàm <id>( <param_list_opt> ) { <stmt_list> }
 <function_decl>         ::= <FUNC_KW> <identifier> "(" <param_list_opt> ")" <block>

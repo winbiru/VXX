@@ -1,16 +1,16 @@
 // Build this entry with the existing i32 native V++ compiler.
 // The binary links only V++-generated objects and platform ASM primitives.
-nhập bộ nhớ;
-nhập giá trị;
-nhập máy hệ thống;
-nhập thư mục máy;
-nhập tiến trình máy;
-nhập ổ cắm máy;
-nhập phân giải máy;
-nhập host ABI;
-nhập nạp chương trình;
-nhập runtime;
-nhập thực thi;
+nhập bộ nhớ.*;
+nhập giá trị.*;
+nhập máy hệ thống.*;
+nhập thư mục máy.*;
+nhập tiến trình máy.*;
+nhập ổ cắm máy.*;
+nhập phân giải máy.*;
+nhập host ABI.*;
+nhập nạp chương trình.*;
+nhập runtime.*;
+nhập thực thi.*;
 
 hàm vm_absolute(s, cwd) {
     nếu (vm_get(s, 1) > 0) { nếu (máy đọc byte(vm_get(s, 2)) == 47) { trả về s; }; };

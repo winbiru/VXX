@@ -1,7 +1,7 @@
-nhập gói/kiểm thử/so sánh benchmark;
-nhập gói/hệ thống/môi trường;
-nhập gói/nhập xuất/tệp;
-nhập gói/dữ liệu/json/json;
+nhập gói.kiểm thử.so sánh benchmark.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.dữ liệu.json.json.*;
 hàm chính() {
     thử {
         path = đọc biến môi trường("VPP_BENCHMARK_REPORT", "");

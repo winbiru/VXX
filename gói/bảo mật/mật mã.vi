@@ -6,10 +6,14 @@
 // - VM chỉ giữ entropy bảo mật của hệ điều hành/OpenSSL.
 // - Digest và random bảo mật trả hex chữ thường.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/nguồn ngẫu nhiên;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.cộng;
+nhập gói.lõi.toán học.lũy thừa;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Mật Mã {

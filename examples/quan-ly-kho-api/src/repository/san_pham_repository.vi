@@ -2,7 +2,7 @@ nhập lõi;
 nhập mạng;
 nhập nhập xuất;
 nhập hop_dong;
-nhập ../domain/san_pham;
+nhập ..domain.san_pham.*;
 
 lớp công khai KhoSảnPhẩmTệp triển khai KhoSảnPhẩm {
     hàm khởi tạo(đườngDẫn) {

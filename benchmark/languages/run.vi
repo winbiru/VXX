@@ -1,13 +1,13 @@
 // Orchestration, correctness validation and statistics are all V++.
-nhập gói/hệ thống/tiến trình;
-nhập gói/hệ thống/môi trường;
-nhập gói/thời gian/đơn điệu;
-nhập gói/nhập xuất/tệp;
-nhập gói/dữ liệu/json/json;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/kiểm thử/so sánh benchmark;
+nhập gói.hệ thống.tiến trình.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.dữ liệu.json.json.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.kiểm thử.so sánh benchmark.*;
 
 hàm require(ok, message) { nếu (!ok) { ném "language benchmark: " + message; }; };
 hàm checksum_value(text) {

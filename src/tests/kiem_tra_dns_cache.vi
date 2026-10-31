@@ -1,5 +1,5 @@
-nhập gói/mạng/bộ nhớ đệm tên miền;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.mạng.bộ nhớ đệm tên miền.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     cache = Bộ Nhớ Đệm DNS(2);

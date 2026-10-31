@@ -1,0 +1,67 @@
+name: V++ performance regression
+
+on:
+  pull_request:
+    branches: [developer]
+  workflow_dispatch:
+    inputs:
+      baseline_ref:
+        description: Git revision for baseline (same benchmark harness required)
+        required: true
+        default: HEAD^
+      candidate_ref:
+        description: Git revision for candidate
+        required: true
+        default: HEAD
+      cases:
+        description: Comma-separated workload names (empty means all)
+        required: false
+        default: vm_verify,vm_dispatch_preverified,compiler_pipeline,gc_burst_collect_reuse
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libssl-dev libjitterentropy3-dev libffi-dev pkg-config
+
+      - name: Build V++ collector runtime
+        run: |
+          cmake -S . -B build-benchmark-gate-cli -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=OFF
+          cmake --build build-benchmark-gate-cli --parallel 2 --target vpp-cli
+
+      - name: Compare two separately built Git revisions
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          INPUT_BASELINE: ${{ inputs.baseline_ref }}
+          INPUT_CANDIDATE: ${{ inputs.candidate_ref }}
+          INPUT_CASES: ${{ inputs.cases }}
+        run: |
+          set -euo pipefail
+          baseline="${PR_BASE_SHA:-${INPUT_BASELINE:-HEAD^}}"
+          candidate="${PR_HEAD_SHA:-${INPUT_CANDIDATE:-HEAD}}"
+          export VPP_EXEC="$PWD/build-benchmark-gate-cli/bin/vpp-cli"
+          export VPP_GATE_SAMPLES=40 VPP_GATE_WARMUPS=3 VPP_GATE_TARGET_MS=50
+          export VPP_GATE_CASES="${INPUT_CASES:-vm_verify,vm_dispatch_preverified,compiler_pipeline,gc_burst_collect_reuse}"
+          bash scripts/quality/run_benchmark_gate.sh "$baseline" "$candidate" \
+            "$PWD/build-benchmark-regression-evidence"
+
+      - name: Upload raw samples, build logs and decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-regression-evidence
+          if-no-files-found: ignore
+          path: build-benchmark-regression-evidence/

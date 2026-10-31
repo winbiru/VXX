@@ -2,10 +2,17 @@
 // Locale/resource/properties semantics thuần V++.
 // Không đọc process-global locale và không phụ thuộc native i18n APIs.
 
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/văn bản/chuỗi;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.văn bản.chuỗi.chuỗi hoa;
 
 // Các thuật toán không giữ trạng thái là hàm cấp mô-đun; lớp tài nguyên quản lý trạng thái.
 hàm riêng tư quốc tế là chữ mã ký tự cơ bản(c) {

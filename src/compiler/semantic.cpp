@@ -587,6 +587,8 @@ private:
         for (const AstStatement &statement : statements) {
             (void)predeclare(statement, scope, ownerClass);
             if (statement.kind == AstStatementKind::Import) {
+                if (!statement.importSpec.selectedName.empty() &&
+                    statement.importSpec.selectedName != "*") continue;
                 const auto alias = statement.importForm ==
                         vietvm::frontend::AstImportForm::LocalSourceFile
                     ? std::make_pair(statement.importSpec.alias,

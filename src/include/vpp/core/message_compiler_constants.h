@@ -102,6 +102,7 @@ inline constexpr std::string_view kImportMultipleTargetsUnsupported = "nhập: m
 inline constexpr std::string_view kImportFileExtensionUnsupported = "nhập: không ghi đuôi .vi; trình biên dịch tự phân giải file nguồn";
 inline constexpr std::string_view kImportCannotOpenFile = "nhập: không thể mở tệp '{0}'";
 inline constexpr std::string_view kImportModuleCycle = "nhập: phát hiện chu trình mô-đun: {0}";
+inline constexpr std::string_view kImportSelectedSymbolMissing = "nhập: không tìm thấy ký hiệu '{0}' trong mô-đun '{1}'";
 inline constexpr std::string_view kInternalImportHandlerMissing = "trình biên dịch nội bộ chưa đăng ký bộ xử lý câu lệnh nhập";
 inline constexpr std::string_view kModuleGraphImportScannerMissing = "LocalModuleGraphBuilder requires an import scanner";
 

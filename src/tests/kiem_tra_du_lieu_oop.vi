@@ -1,8 +1,8 @@
-nhập gói/bộ sưu tập/chính;
-nhập gói/lõi/tập bản ghi;
-nhập gói/dữ liệu/json/chính;
-nhập gói/dữ liệu/xml/cây tài liệu;
-nhập gói/kiểm thử/chính;
+nhập gói.bộ sưu tập.chính.*;
+nhập gói.lõi.tập bản ghi.*;
+nhập gói.dữ liệu.json.chính.*;
+nhập gói.dữ liệu.xml.cây tài liệu.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm chính() {
     nguồn = [1, 2];

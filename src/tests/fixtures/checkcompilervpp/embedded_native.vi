@@ -1,4 +1,4 @@
 hàm chính() {
     in chạy kịch bản máy ảo("in 8;", ".") == "8\n";
-    in chạy kịch bản máy ảo("nhập lib/math như m; in m.cộng(40);", "embedded") == "init\n42\n";
+    in chạy kịch bản máy ảo("nhập lib.math.* như m; in m.cộng(40);", "embedded") == "init\n42\n";
 };

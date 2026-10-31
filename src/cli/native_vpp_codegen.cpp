@@ -209,7 +209,7 @@ std::string makeVppObjectSource(const Target &target,
         throw std::runtime_error("V++ object writer: định dạng object không khớp hệ điều hành");
 
     std::ostringstream source;
-    source << "nhập gói/biên dịch/đối tượng;\n"
+    source << "nhập gói.biên dịch.đối tượng.*;\n"
            << "hàm chính() {\n  code = [";
     for (std::size_t i = 0; i < bytes.size(); ++i) {
         if (i) source << ',';
@@ -246,7 +246,7 @@ std::string makeSelfHostedObjectSource(const Target &target,
     if (!symbolSafe(nativeAbiSymbol(functionName)))
         throw std::runtime_error("tên symbol native không hợp lệ");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy từ cây;\n"
+    code << "nhập gói.biên dịch.mã máy từ cây.*;\n"
          << "hàm chính() {\n"
          << "  kết_quả = tạo đối tượng hàm("
          << quoted(std::string(source)) << ','
@@ -263,7 +263,7 @@ std::string makeSelfHostedProgramSource(const Target &target, std::string_view s
     if (target.arch != Architecture::X86_64 && target.arch != Architecture::AArch64)
         throw std::runtime_error("native AST V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy từ cây;\n"
+    code << "nhập gói.biên dịch.mã máy từ cây.*;\n"
          << "hàm chính() {\n"
          << "  các_hàm = tạo đối tượng chương trình("
          << quoted(std::string(source)) << ','
@@ -290,10 +290,10 @@ std::string makeLoweringSource(const compiler::IrProgram &ir,
         emitTarget->arch != Architecture::AArch64)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;\n";
-    if (emitTarget) code << "nhập gói/biên dịch/mã máy;\n";
-    if (emitObject) code << "nhập gói/biên dịch/đối tượng;\n";
-    if (emitAssembly) code << "nhập gói/biên dịch/lắp ráp;\n";
+    code << "nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.*;\n";
+    if (emitTarget) code << "nhập gói.biên dịch.mã máy.*;\n";
+    if (emitObject) code << "nhập gói.biên dịch.đối tượng.*;\n";
+    if (emitAssembly) code << "nhập gói.biên dịch.lắp ráp.*;\n";
     code << "hàm chính() {\n  ir = {\"values\":[";
     for (std::size_t i = 0; i < ir.values.size(); ++i) {
         const auto &v = ir.values[i];
@@ -404,7 +404,7 @@ std::string makeVppSource(const Target &target, const MachineFunction &function)
         throw std::runtime_error("Machine IR V++ chỉ hỗ trợ x86_64/AArch64");
 
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy;\n"
+    code << "nhập gói.biên dịch.mã máy.*;\n"
          << "hàm chính() {\n  lệnh = [];\n";
     for (const auto &inst : function.instructions) {
         if (!inst.symbol.empty() && !symbolSafe(inst.symbol))
@@ -453,7 +453,7 @@ std::string makeVppLeafSource(const Target &target, const RawLeaf &leaf) {
         default: throw std::runtime_error("V++ leaf encoder: loại hàm chưa định nghĩa");
     }
     std::ostringstream code;
-    code << "nhập gói/biên dịch/mã máy;\n"
+    code << "nhập gói.biên dịch.mã máy.*;\n"
          << "hàm chính() {\n"
          << "  byte = biên dịch mã máy lá(\"" << architectureName(target.arch)
          << "\", \"" << kind << "\", " << leaf.constant << ", \"" << os << "\");\n"
@@ -470,7 +470,7 @@ std::string makeVppLeafSource(const Target &target, const RawLeaf &leaf) {
 
 std::string makeVppTargetSource(std::string_view triple) {
     std::ostringstream code;
-    code << "nhập gói/biên dịch/đích;\n"
+    code << "nhập gói.biên dịch.đích.*;\n"
          << "hàm chính() {\n"
          << "  đích = biên dịch phân tích đích(" << quoted(std::string(triple)) << ");\n"
          << "  in \"T:\" + đích[\"kiến trúc\"] + \":\" + đích[\"hệ điều hành\"] + \":\" + đích[\"ABI\"] + \":\" + đích[\"định dạng\"];\n"

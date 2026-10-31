@@ -1,7 +1,7 @@
 // Compiler frontend thuần V++ phải giữ AST lớp/giao diện/FFI và từ chối
 // cú pháp sai. Bytecode AOT cho các khai báo này vẫn cần backend tương ứng.
-nhập gói/biên dịch/chính;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     nguồn = "giao diện Gốc {}; giao diện Phụ {}; lớp Nền {}; giao diện Khác {}; " +

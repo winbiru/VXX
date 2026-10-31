@@ -1,5 +1,5 @@
 // Lexical path normalization must work on every host, including drive roots.
-nhập gói/biên dịch/nguồn tệp;
+nhập gói.biên dịch.nguồn tệp.*;
 
 hàm chính() {
     paths = [

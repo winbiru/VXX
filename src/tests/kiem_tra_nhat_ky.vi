@@ -1,4 +1,4 @@
-nhập gói/dựng/ứng dụng;
+nhập gói.dựng.ứng dụng.*;
 
 hàm chính() {
     Nhật ký.ghi thông tin("dịch vụ khởi động");

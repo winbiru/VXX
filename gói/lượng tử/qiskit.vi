@@ -1,10 +1,10 @@
 // Mặc định mô phỏng ngay bằng V++; tiến trình SDK là lựa chọn tường minh.
-nhập gói/lượng tử/openqasm;
-nhập gói/lượng tử/nền;
-nhập gói/lượng tử/mô phỏng;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/hệ thống/tiến trình;
-nhập json;
+nhập gói.lượng tử.openqasm.*;
+nhập gói.lượng tử.nền.lượng tử yêu cầu nguyên;
+nhập gói.lượng tử.mô phỏng.*;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.hệ thống.tiến trình.chạy tiến trình;
+nhập json.*;
 lớp công khai Cầu Nối Qiskit {
     // Không đối số dùng V++; hai đường dẫn bật transport tiến trình ngoài.
     hàm công khai khởi tạo(trình chạy = rỗng, tệp cầu nối = rỗng) {

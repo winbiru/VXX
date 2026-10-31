@@ -1485,7 +1485,7 @@ ba vùng mã máy đều 147.908 byte, cùng SHA256 như trên. Script kiểm tr
 phát hiện được sai lệch khi một byte trong `__text` bị thay đổi.
 
 Module loader `gói/biên dịch/bản địa/nạp mô đun.vi` cho phép `nhập tên;`
-và `nhập thư_mục/tên;` ở đầu tệp, tìm `.vi` tương đối với module đang
+và `nhập thư_mục.tên.*;` ở đầu tệp, tìm `.vi` tương đối với module đang
 nhập, loại bỏ import trùng, phát hiện vòng lặp import, module thiếu hoặc
 cú pháp import sai. Kiểm tra chạy trực tiếp bằng compiler Stage 1:
 import lồng nhau/nhập trùng và tệp điểm vào chỉ có import đều trả về 52;
@@ -1682,7 +1682,7 @@ trên VM stack. Bây giờ nhánh đọc chấp nhận thêm `Call`, `CallDynami
 Ca tái hiện đã được sửa:
 
 ```text
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.*;
 hàm chính() {
     danh_sách = [1, 2];
     x = lấy từ điển({"a": danh_sách}, "a", [])[0];

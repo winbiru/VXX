@@ -1,7 +1,7 @@
 // Phiên đăng ký giữ trạng thái riêng, bảo toàn Function ID và StringPool.
-nhập gói/biên dịch/sổ đăng ký;
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.sổ đăng ký.*;
+nhập gói.biên dịch.đồ thị mô đun.*;
+nhập gói.văn bản.chuỗi.*;
 
 hàm chính() {
     nguồn = {"main": "nhập dep như d; hàm chính() {};",

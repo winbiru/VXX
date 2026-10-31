@@ -1,5 +1,5 @@
 // Chuẩn hóa bytecode và các pass phân tích bytecode thuần V++.
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Đọc Mã Lệnh {

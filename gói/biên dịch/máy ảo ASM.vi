@@ -1,8 +1,11 @@
 // Portable VM image backend. Compilation, validation and serialization are
 // V++; the resulting image runs on the standalone V++/ASM interpreter.
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/tệp thô;
+nhập gói.biên dịch.sản phẩm biên dịch.Bộ Mã Hóa Sản Phẩm Biên Dịch;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.tệp thô.tệp thô mở;
+nhập gói.nhập xuất.tệp thô.tệp thô đóng;
+nhập gói.nhập xuất.tệp thô.tệp thô mã lỗi;
+nhập gói.nhập xuất.tệp thô.tệp thô lỗi gián đoạn;
 
 hàm riêng tư biên dịch VM i32(bytes, value) {
     // Phần lớn field opcode/slot là số không âm. Tránh bốn lượt nhánh

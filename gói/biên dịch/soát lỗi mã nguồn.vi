@@ -1,12 +1,16 @@
 // Linter V++ giai đoạn đầu: lexer/parser/semantic thực thi trong .vi.
 // Diagnostic vị trí từ lexer/parser và khai báo có span; những lỗi
 // ngữ nghĩa khác chưa có SourceSpan nên tạm dùng vị trí 1:1.
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/nguồn tệp;
-nhập gói/nhập xuất/tệp;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
+nhập gói.biên dịch.nguồn tệp.Bộ Nạp Nguồn;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn đồ thị;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.chuỗi.tìm chuỗi chính xác;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
 
 hàm riêng tư soát lỗi vị trí(thông báo) {
     dòng = 1;

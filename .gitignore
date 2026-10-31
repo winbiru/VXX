@@ -90,6 +90,8 @@ node_modules/
 *.md
 !docs/thư-viện-vpp/lượng tử/*.md
 !plans/release-1.0-execution-checklist.md
+!plans/improvement-plan-2026-10-31.md
+!benchmark/BASELINE.md
 !benchmark/NATIVE.md
 !docs/system-ffi-migration-plan.md
 !docs/native-boundary-audit.md

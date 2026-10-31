@@ -1,7 +1,7 @@
-nhập gói/lượng tử/qiskit;
-nhập gói/lượng tử/mạch;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/kiểm thử/khẳng định;
+nhập gói.lượng tử.qiskit.*;
+nhập gói.lượng tử.mạch.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.kiểm thử.khẳng định.*;
 
 hàm chính() {
     sdk = Cầu Nối Qiskit();

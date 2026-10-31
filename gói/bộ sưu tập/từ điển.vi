@@ -2,7 +2,7 @@
 // Map MVP: literal và indexing là primitive VM; policy mặc định/thứ tự key
 // được triển khai bằng V++. Chỉ xóa key và liệt kê key còn cần native mutation.
 
-nhập gói/bộ sưu tập/danh sách;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Tiện Ích Từ Điển {

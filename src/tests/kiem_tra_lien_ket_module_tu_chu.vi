@@ -1,11 +1,11 @@
 // Kiểm tra emitter/linker đồ thị: function ID, StringPool, initializer,
 // namespace và cả bốn trường opcode phải giữ đúng hợp đồng C++.
-nhập gói/biên dịch/liên kết;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.văn bản.chuỗi.*;
 
 hàm chính() {
     nguồn = {
-        "app/main": "nhập ../lib/feature như api; nhập ../lib/math như toán; " +
+        "app/main": "nhập ..lib.feature.* như api; nhập ..lib.math.* như toán; " +
                     "hàm chính() { in api.tính(); in toán.cộng(); in api.số.cộng(); };",
         "lib/feature": "công khai nhập math như số; " +
                        "hàm tính() { trả về số.cộng(); };",

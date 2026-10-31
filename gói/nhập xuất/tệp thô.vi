@@ -1,7 +1,7 @@
 // Các hàm V++ thay ngoại hàm tệp. máy_tệp_* là primitive opcode của ngôn ngữ:
 // compiler phát trực tiếp, runtime nối biểu diễn giá trị với ABI ASM của OS.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
 
 hàm riêng tư tệp thô kiểm tra đường(đường) {
     nếu (loại của(đường) != "chuỗi") { ném "tệp thô: đường dẫn phải là chuỗi"; };

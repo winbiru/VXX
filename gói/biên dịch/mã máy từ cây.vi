@@ -1,12 +1,12 @@
 // AST thuần V++ -> compiler::IrProgram wire schema -> MachineFunction.
 // ABI i32 hỗ trợ AArch64/x86-64 và số tham số động (giới hạn bởi tài nguyên).
 // Không gọi snapshot/IR của C++; mọi node ngoài tập hỗ trợ phải báo lỗi.
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/đối tượng;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
+nhập gói.biên dịch.chương trình.*;
+nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
+nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Hạ Cây {

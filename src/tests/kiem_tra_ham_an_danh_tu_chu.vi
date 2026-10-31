@@ -1,7 +1,7 @@
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/nhập xuất/tệp;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.nhập xuất.tệp.*;
 
 hàm xác nhận closure(điều kiện, lỗi) { nếu (!điều kiện) { ném lỗi; }; };
 

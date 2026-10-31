@@ -1,12 +1,13 @@
 // Trình xem dữ liệu parser/IR Stage 1. Mọi phép duyệt chạy trong V++ native;
 // bản dump này phản ánh mô hình map/stack IR V++ (khác schema Stage 0).
-nhập gói/lõi/chuyển kiểu;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/nút cú pháp;
-nhập gói/biên dịch/từ vựng;
-nhập gói/biên dịch/lắp ráp;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR từ cây thuần;
+nhập gói.biên dịch.nút cú pháp.tạo nút cú pháp;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 hàm riêng tư biên dịch hiển thị thụt lề(độ sâu) {
     khoảng = "";

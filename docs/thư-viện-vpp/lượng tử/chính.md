@@ -107,7 +107,7 @@ OpenQASM và các API dựng mạch vẫn viết bằng V++.
 
 ```vi
 nhập lượng tử;
-nhập gói/lượng tử/qiskit;
+nhập gói.lượng tử.qiskit.*;
 
 sdk = Cầu Nối Qiskit();
 kết quả = sdk.mô phỏng(mạch, 1024, 42);

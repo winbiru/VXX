@@ -1,4 +1,4 @@
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 // Không cần mạng: các lỗi đầu vào phải bị V++ từ chối trước connect/handshake.
 hàm chính() {

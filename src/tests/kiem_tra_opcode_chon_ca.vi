@@ -1,5 +1,5 @@
 // Kiem tra chọn/ca tu bang opcode C++ va nhanh mac dinh bao loi.
-nhập gói/biên dịch/mã thao tác;
+nhập gói.biên dịch.mã thao tác.*;
 
 hàm opcode không tồn tại phải báo lỗi(tên) {
     thử {

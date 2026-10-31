@@ -1,7 +1,7 @@
 // Hai đối tượng có trạng thái cho event emitter và service registry.
 // Dùng lại implementation hàm để giữ tương thích với chương trình cũ.
-nhập gói/lõi/giao diện tài nguyên;
-nhập gói/lõi/sự kiện;
+nhập gói.lõi.giao diện tài nguyên.*;
+nhập gói.lõi.sự kiện.*;
 
 lớp công khai Bộ Phát Sự Kiện triển khai Đóng Được {
     hàm công khai khởi tạo(mức trần = 1024, chính sách lỗi = "ném đầu") {

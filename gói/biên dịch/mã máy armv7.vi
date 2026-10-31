@@ -1,6 +1,8 @@
 // armv7: phát byte mã máy kiến trúc riêng.
 // Các phép chưa hỗ trợ phải ném lỗi tại bộ chọn lowering, không phát mã sai.
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm từ máy;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy thêm thập lục phân;
 
 // Bộ phát không giữ trạng thái, nên cung cấp trực tiếp hàm cấp mô-đun.
 hàm công khai biên dịch mã máy phát armv7(loại, hằng, thấp, cao, ít, hệ điều hành) {

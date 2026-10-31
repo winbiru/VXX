@@ -1,8 +1,23 @@
 // Sổ hàm tự chủ. Function ID và StringPool dùng chung trên toàn phiên;
 // bảng slot là trạng thái riêng của từng emitter, không được nối giữa module.
 // API đồ thị lập symbol/exports cho emitter + linker V++; loader tại bộ nạp.vi.
-nhập gói/biên dịch/đồ thị mô đun;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.đồ thị mô đun.biên dịch đồ thị tìm đích;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+
+// Selection changes the visible surface, independently of module load order.
+hàm công khai biên dịch sổ nhận nhập(cạnh, tên) {
+    tên chọn = lấy từ điển(cạnh, "tên nhập", "");
+    trả về tên chọn == "" || tên chọn == "*" || tên chọn == tên;
+};
+hàm công khai biên dịch sổ tên nhập(cạnh, tên) {
+    bí danh = lấy từ điển(cạnh, "bí danh", "");
+    nếu (bí danh == "") { trả về tên; };
+    tên chọn = lấy từ điển(cạnh, "tên nhập", "");
+    nếu (tên chọn != "" && tên chọn != "*") { trả về bí danh; };
+    trả về bí danh + "." + tên;
+};
 
 // Thuật toán không giữ trạng thái dùng hàm cấp mô-đun.
 hàm công khai biên dịch sổ lưu chuỗi(sổ, tên) {
@@ -217,7 +232,10 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             biên dịch sổ thêm tên(trực tiếp, tên, mã định danh, định danh);
             biên dịch sổ thêm tên(nhìn thấy, tên, mã định danh, định danh);
             // Parser bootstrap hiện chỉ nhận hàm mặc định (public).
-            biên dịch sổ thêm tên(xuất, tên, mã định danh, định danh);
+            phạm vi = lấy từ điển(câu lệnh[i], "phạm vi", "");
+            nếu (phạm vi != "riêng tư" && phạm vi != "bảo vệ") {
+                biên dịch sổ thêm tên(xuất, tên, mã định danh, định danh);
+            };
         };
     };
 
@@ -230,7 +248,8 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             các mục xuất = phụ thuộc["xuất"];
             lặp(j = 0; j < máy ảo lấy độ dài(các mục xuất); j++) {
                 tên = các mục xuất[j]["tên"];
-                nếu (tên tiền tố != "") { tên = tên tiền tố + "." + tên; };
+                nếu (!biên dịch sổ nhận nhập(e, tên)) { bỏ qua; };
+                tên = biên dịch sổ tên nhập(e, tên);
                 mã định danh = các mục xuất[j]["id"];
                 biên dịch sổ thêm tên(nhìn thấy, tên, mã định danh, định danh);
                 nếu (lấy từ điển(e, "tái xuất", sai)) {
@@ -239,7 +258,7 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             };
             // Compiler C++ áp bí danh sau khi phát xong module phụ thuộc.
             // Metadata tên chạy tách khỏi tên khai báo/OP_HAM nguyên gốc.
-            nếu (tên tiền tố != "" && e["hành động"] == "load" &&
+            nếu (tên tiền tố != "" && lấy từ điển(e, "tên nhập", "") == "" && e["hành động"] == "load" &&
                 !lấy từ điển(sổ, "hoãn chuỗi", sai)) {
                 trực phụ = phụ thuộc["trực tiếp"];
                 lặp(j = 0; j < máy ảo lấy độ dài(trực phụ); j++) {

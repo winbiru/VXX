@@ -1,8 +1,8 @@
 // Parser câu lệnh viết bằng V++. Đây là AST độc lập cho quá trình bootstrap;
 // chỉ chấp nhận những dạng cú pháp được triển khai, không fallback sang C++.
-nhập gói/biên dịch/biểu thức;
-nhập gói/biên dịch/từ vựng;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.biểu thức.*;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 
 // API parser thuần V++: không gọi snapshot / compiler C++.
@@ -315,17 +315,21 @@ lớp công khai Bộ Phân Tích Cú Pháp {
             nếu (lấy từ điển(từ tố, "loại", "") == "hết" ||
                 (lấy từ điển(từ tố, "loại", "") != "định danh" &&
                  lấy từ điển(từ tố, "loại", "") != "từ khóa" &&
-                 lấy từ điển(từ tố, "loại", "") != "số nguyên" && giá trị != "/")) {
+                 lấy từ điển(từ tố, "loại", "") != "số nguyên" && giá trị != "/" &&
+                 giá trị != "." && giá trị != "*")) {
                 biên dịch biểu thức lỗi(p, "đường dẫn nhập không hợp lệ");
             };
-            nếu (đích != "" && trước != "/" && giá trị != "/") {
-                đích += " ";
+            nếu (đích != "" && trước != "/" && trước != "." &&
+                giá trị != "/" && giá trị != ".") {
+                nếu (đích[máy ảo lấy độ dài(đích) - 1] != ".") {
+                    đích += " ";
+                };
             };
             đích += giá trị;
             trước = giá trị;
             biên dịch biểu thức lấy(p);
         };
-        nếu (đích == "" || trước == "/") {
+        nếu (đích == "" || trước == "/" || trước == ".") {
             biên dịch biểu thức lỗi(p, "thiếu đường dẫn nhập");
         };
         n = máy ảo lấy độ dài(đích);
@@ -335,13 +339,63 @@ lớp công khai Bộ Phân Tích Cú Pháp {
                 biên dịch biểu thức lỗi(p, "đường dẫn nhập không được chứa đuôi .vi");
             };
         };
+        // A final .name selects one export; .* explicitly selects the surface.
+        // The lexer retains dots inside identifiers, including Vietnamese names.
+        tên nhập = "";
+        điểm = -1;
+        lặp(i = 0; i < n; i++) {
+            nếu (đích[i] == ".") { điểm = i; };
+        };
+        nếu (điểm >= 0) {
+            đường = "";
+            lặp(i = 0; i < điểm; i++) { đường += đích[i]; };
+            lặp(i = điểm + 1; i < n; i++) {
+                nếu (tên nhập == "" && đích[i] == " ") { bỏ qua; };
+                tên nhập += đích[i];
+            };
+            nếu (đường == "" || tên nhập == "") { biên dịch biểu thức lỗi(p, "thiếu mô đun hoặc tên nhập"); };
+            đích = đường;
+        };
+        lặp(i = 0; i < máy ảo lấy độ dài(đích); i++) {
+            nếu (đích[i] == "*") { biên dịch biểu thức lỗi(p, "dấu * chỉ được dùng sau mô đun và dấu chấm"); };
+        };
+        nếu (tên nhập != "*") {
+            lặp(i = 0; i < máy ảo lấy độ dài(tên nhập); i++) {
+                nếu (tên nhập[i] == "*" || tên nhập[i] == "/") { biên dịch biểu thức lỗi(p, "tên nhập không hợp lệ"); };
+            };
+        };
+        // Dấu chấm đầu tiên biểu diễn thư mục hiện tại; hai dấu chấm đầu
+        // biểu diễn thư mục cha. Các dấu chấm còn lại chia cấp mô đun.
+        đầu = 0;
+        khi (đầu < máy ảo lấy độ dài(đích)) {
+            nếu (đích[đầu] != ".") { thoát; };
+            đầu += 1;
+        };
+        nếu (đầu == máy ảo lấy độ dài(đích)) {
+            biên dịch biểu thức lỗi(p, "thiếu tên mô đun tương đối");
+        };
+        đường chuẩn = "";
+        nếu (đầu == 1) { đường chuẩn = "./"; }
+        hoặc {
+            lặp(i = 1; i < đầu; i++) { đường chuẩn += "../"; };
+        };
+        lặp(i = đầu; i < máy ảo lấy độ dài(đích); i++) {
+            nếu (đích[i] == ".") {
+                đường chuẩn += "/";
+            } hoặc {
+                đường chuẩn += đích[i];
+            };
+        };
+        đích = đường chuẩn;
         bí danh = "";
         nếu (mình.biên dịch chương trình nhận(p, "như")) {
             bí danh = mình.biên dịch chương trình tên kiểu(p, "bí danh nhập", đúng);
         };
         biên dịch biểu thức chờ(p, ";");
-        trả về {"loại": "nhập", "đích": đích, "bí danh": bí danh,
+        kết quả = {"loại": "nhập", "đích": đích, "bí danh": bí danh,
                 "tái xuất": mức công khai};
+        nếu (tên nhập != "") { kết quả["tên nhập"] = tên nhập; };
+        trả về kết quả;
     };
 
     hàm riêng tư biên dịch chương trình chọn(p) {

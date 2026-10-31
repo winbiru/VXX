@@ -4,14 +4,18 @@
 // V++ sở hữu cả chuyển đổi IEEE-754 thành thập phân và làm tròn.
 // VM chỉ đọc byte biểu diễn số, không dựng thân thập phân hay chạy formatter.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/ký hiệu vùng;
-nhập gói/văn bản/chuỗi;
-nhập gói/lõi/định dạng số thực;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.lõi.ký hiệu vùng.ký hiệu vùng lấy;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.lõi.định dạng số thực.*;
 
 // Thuật toán định dạng không giữ trạng thái được tổ chức thành hàm cấp mô-đun.
 hàm riêng tư định dạng có ký tự(văn bản, ký tự) {

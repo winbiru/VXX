@@ -1,5 +1,8 @@
-nhập gói/bộ sưu tập/giao diện;
-nhập gói/bộ sưu tập/tập hợp;
+nhập gói.bộ sưu tập.giao diện.*;
+nhập gói.bộ sưu tập.tập hợp.tập chứa;
+nhập gói.bộ sưu tập.tập hợp.tập hợp;
+nhập gói.bộ sưu tập.tập hợp.tập thêm;
+nhập gói.bộ sưu tập.tập hợp.tập xóa;
 
 lớp công khai Tập Hợp triển khai Bộ Chứa {
     hàm công khai khởi tạo() { mình.phần tử = []; };

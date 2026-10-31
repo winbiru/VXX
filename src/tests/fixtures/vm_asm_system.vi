@@ -1,7 +1,7 @@
-nhập gói/thời gian/đơn điệu;
-nhập gói/thời gian/giờ quốc tế;
-nhập gói/hệ thống/nền tảng;
-nhập gói/lõi/nguồn ngẫu nhiên;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.thời gian.giờ quốc tế.*;
+nhập gói.hệ thống.nền tảng.*;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
 
 hàm kiểm tra các byte(các byte, n) {
     nếu (máy ảo lấy độ dài(các byte) != n) { ném "sai độ dài byte"; };

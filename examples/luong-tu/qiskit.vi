@@ -1,6 +1,6 @@
 nhập lượng tử;
-nhập gói / lượng tử / qiskit;
-nhập gói / hệ thống / môi trường;
+nhập gói.lượng tử.qiskit.*;
+nhập gói.hệ thống.môi trường.*;
 hàm chính() {
     trình chạy = đọc biến môi trường("VPP_QUANTUM_RUNNER", "");
     cầu nối = đọc biến môi trường("VPP_QUANTUM_BRIDGE", "");

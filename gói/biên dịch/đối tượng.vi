@@ -1,8 +1,9 @@
 // Bộ ghi object tự chủ bằng V++: ELF32/64, Mach-O64, COFF.
 // Hợp đồng byte/section/symbol/relocation tương ứng src/native/object_writer.cpp.
 // Dùng các word signed i32 để tránh tràn số khi ghi header unsigned 32-bit.
-nhập gói/biên dịch/mã máy nền;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy từ máy thập lục phân;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy ký hiệu hợp lệ;
+nhập gói.lõi.bảng mã.mã điểm unicode;
 
 hàm công khai biên dịch đối tượng số(ra, số, rộng, ít) {
     nếu (rộng != 1 && rộng != 2 && rộng != 4) { ném "object: độ rộng số chưa hỗ trợ"; };

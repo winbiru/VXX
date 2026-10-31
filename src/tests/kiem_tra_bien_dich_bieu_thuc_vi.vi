@@ -1,6 +1,6 @@
 // Kiểm thử parser biểu thức self-host: không gọi compilerAnalyzePrimitive.
-nhập gói/biên dịch/biểu thức;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.biểu thức.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     cây = biên dịch phân tích biểu thức("1 + 2 * 3");

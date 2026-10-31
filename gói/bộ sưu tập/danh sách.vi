@@ -2,7 +2,7 @@
 // List MVP: literal, length, read/write index và append/xóa vật lý là primitive runtime.
 // Các thuật toán collection còn lại được triển khai trực tiếp bằng V++.
 
-nhập gói/lõi/trình tự;
+nhập gói.lõi.trình tự.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Tiện Ích Danh Sách {

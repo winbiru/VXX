@@ -2,11 +2,11 @@
 // Chỉ hoạt động khi ứng dụng cấu hình DNS/hosts V++ hoặc cung cấp IP số.
 // Không có nhánh fallback getaddrinfo/libffi; Windows Machine Socket ABI
 // hiện chưa sẵn sàng cho đường kết nối này.
-nhập gói/mạng/phân giải tên miền;
-nhập gói/mạng/ổ cắm;
-nhập gói/mạng/địa chỉ mạng;
-nhập gói/hệ thống/môi trường;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.mạng.phân giải tên miền.phân giải tên miền phân giải;
+nhập gói.mạng.ổ cắm.*;
+nhập gói.mạng.địa chỉ mạng.*;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 lớp công khai Bộ Kết Nối DNS VPP {
     hàm công khai khởi tạo() {};

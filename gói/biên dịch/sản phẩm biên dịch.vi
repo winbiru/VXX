@@ -1,11 +1,17 @@
 // Artifact bytecode có version; serializer và parser đều viết bằng V++.
 // Giữ nguyên ABI Instruction C++: op, operand, operandIndex, operandValue.
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/mã lệnh;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/dữ liệu/json/json;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp danh sách;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;
+nhập gói.biên dịch.bộ nạp.biên dịch chạy sản phẩm biên dịch;
+nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
+nhập gói.biên dịch.mã thao tác.*;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.dữ liệu.json.json.json tạo;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 // Codec giữ artifact đang xử lý; các bước kiểm tra, tuần tự hóa và giải mã
 // sử dụng chung logic ABI và cùng quy tắc kiểm tra dữ liệu.

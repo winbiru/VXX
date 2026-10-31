@@ -1,8 +1,9 @@
 // Một target ABI dùng chung cho phát mã lá, Machine IR và ghi object.
 // Encoder/writer thuần được giữ nguyên để bảo toàn byte và relocation.
-nhập gói/biên dịch/đích;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/đối tượng;
+nhập gói.biên dịch.đích.biên dịch phân tích đích;
+nhập gói.biên dịch.đích.biên dịch bộ ba chuẩn;
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.đối tượng.biên dịch đối tượng;
 
 lớp công khai Bộ Sinh Mã Máy {
     hàm công khai khởi tạo(bộ ba) { mình.đích = biên dịch phân tích đích(bộ ba); };

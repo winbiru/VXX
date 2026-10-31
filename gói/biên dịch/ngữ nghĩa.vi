@@ -1,10 +1,10 @@
 // Kiểm tra ngữ nghĩa trên AST thuần V++ của parser chương trình.
 // Chưa suy luận kiểu hoặc phân giải tên ngoài phạm vi khai báo cục bộ.
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/biểu thức;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu thức.biên dịch biểu thức là phép gán;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.lõi.bảng mã.mã điểm unicode;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Kiểm Tra Ngữ Nghĩa {

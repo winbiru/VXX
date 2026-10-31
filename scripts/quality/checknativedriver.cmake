@@ -85,9 +85,22 @@ if (NOT VPP_USE_PREPARED_COMPILER)
         if (NOT EXISTS "${VPP_SEED}")
             message(FATAL_ERROR "Native V++ seed not found: ${VPP_SEED}")
         endif()
+        # Existing pre-migration seeds only parse `nhập module;`. Build the
+        # current compiler from a temporary copy of its entrypoint with the
+        # wildcard suffix removed. The Stage 1 output still contains the
+        # current loader and accepts dotted imports for all later stages.
+        set(seed_source_dir "${VPP_OUTPUT_DIR}/seed-compatible")
+        file(MAKE_DIRECTORY "${seed_source_dir}")
+        file(COPY "${VPP_ROOT}/gói/biên dịch/bản địa/"
+            DESTINATION "${seed_source_dir}")
+        set(seed_entry "${seed_source_dir}/bộ biên dịch.vi")
+        file(READ "${module_entry}" seed_entry_source)
+        string(REGEX REPLACE "(nhập[ \t]+[^;\n]+)\\.\\*;" "\\1;"
+            seed_entry_source "${seed_entry_source}")
+        file(WRITE "${seed_entry}" "${seed_entry_source}")
         message(STATUS "Native V++ seed -> Stage 1 (direct ASM runtime)")
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-            "${VPP_SEED}" build "${module_entry}" -o "${compiler}"
+            "${VPP_SEED}" build "${seed_entry}" -o "${compiler}"
             WORKING_DIRECTORY "${VPP_ROOT}"
             RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
     else()
@@ -641,9 +654,9 @@ set(module_dir "${VPP_OUTPUT_DIR}/native-module-fixtures")
 file(MAKE_DIRECTORY "${module_dir}/sub")
 file(WRITE "${module_dir}/sub/leaf.vi" "hàm gốc() { trả về 40; };\n")
 file(WRITE "${module_dir}/sub/child.vi"
-    "nhập leaf;\nhàm giữa() { trả về gốc() + 10; };\n")
+    "nhập leaf.*;\nhàm giữa() { trả về gốc() + 10; };\n")
 file(WRITE "${module_dir}/main.vi"
-    "nhập sub/child;\nnhập sub/leaf;\nnhập sub/child;\nhàm chính() { trả về giữa() + 2; };\n")
+    "nhập sub.child.*;\nnhập sub.leaf.*;\nnhập sub.child.*;\nhàm chính() { trả về giữa() + 2; };\n")
 set(module_program "${module_dir}/module-main")
 file(REMOVE "${module_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/main.vi" -o "${module_program}"
@@ -656,13 +669,36 @@ if (NOT status EQUAL 52)
     message(FATAL_ERROR "native nested/repeated module imports expected 52, got ${status}")
 endif()
 
+# Dotted imports also cover current/parent-relative modules and one selected
+# function. Each fixture has its own entrypoint so imports stay independent.
+file(WRITE "${module_dir}/relative-current.vi"
+    "nhập .sub.leaf.*;\nhàm chính() { trả về gốc() + 12; };\n")
+file(WRITE "${module_dir}/sub/relative-parent.vi"
+    "nhập ..sub.leaf.*;\nhàm chính() { trả về gốc() + 12; };\n")
+file(WRITE "${module_dir}/selected.vi"
+    "nhập sub.leaf.gốc;\nhàm chính() { trả về gốc() + 12; };\n")
+foreach(case IN ITEMS relative-current sub/relative-parent selected)
+    string(REPLACE "/" "-" exe_name "${case}")
+    set(case_exe "${module_dir}/${exe_name}-exe")
+    file(REMOVE "${case_exe}")
+    execute_process(COMMAND "${compiler}" build "${module_dir}/${case}.vi" -o "${case_exe}"
+        RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 60)
+    if (NOT status EQUAL 0 OR NOT EXISTS "${case_exe}")
+        message(FATAL_ERROR "native dotted import ${case} failed: ${status}\n${output}\n${errors}")
+    endif()
+    execute_process(COMMAND "${case_exe}" RESULT_VARIABLE status TIMEOUT 30)
+    if (NOT status EQUAL 52)
+        message(FATAL_ERROR "native dotted import ${case} expected 52, got ${status}")
+    endif()
+endforeach()
+
 # Multiword module paths may end in a numeric token (x86 64, elf 64).
 file(WRITE "${module_dir}/sub/mã máy x86 64.vi"
     "hàm nạp_x86() { trả về 27; };\n")
 file(WRITE "${module_dir}/sub/định dạng elf 64.vi"
     "hàm nạp_elf() { trả về 25; };\n")
 file(WRITE "${module_dir}/numeric-suffix.vi"
-    "nhập sub/mã máy x86 64;\nnhập sub/định dạng elf 64;\nhàm chính() { trả về nạp_x86() + nạp_elf(); };\n")
+    "nhập sub.mã máy x86 64.*;\nnhập sub.định dạng elf 64.*;\nhàm chính() { trả về nạp_x86() + nạp_elf(); };\n")
 set(numeric_suffix_program "${module_dir}/numeric-suffix-exe")
 file(REMOVE "${numeric_suffix_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/numeric-suffix.vi" -o "${numeric_suffix_program}"
@@ -680,7 +716,7 @@ endif()
 file(WRITE "${module_dir}/sub/forward.vi"
     "hàm từ_phụ() { biến x = \"Tiếng Việt\"; biến n = byte dài(x); byte hủy(x); trả về từ_chính() + n - 14; };\n")
 file(WRITE "${module_dir}/forward.vi"
-    "nhập sub/forward;\nhàm chính() { trả về từ_phụ(); };\nhàm từ_chính() { trả về 52; };\n")
+    "nhập sub.forward.*;\nhàm chính() { trả về từ_phụ(); };\nhàm từ_chính() { trả về 52; };\n")
 set(forward_program "${module_dir}/forward-exe")
 file(REMOVE "${forward_program}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/forward.vi" -o "${forward_program}"
@@ -700,7 +736,7 @@ set(many_sum "18")
 foreach(module_index RANGE 0 33)
     file(WRITE "${module_dir}/many${module_index}.vi"
         "hàm many_fn${module_index}() { trả về 1; };\n")
-    string(APPEND many_imports "nhập many${module_index};\n")
+    string(APPEND many_imports "nhập many${module_index}.*;\n")
     string(APPEND many_sum " + many_fn${module_index}()")
 endforeach()
 file(WRITE "${module_dir}/many-main.vi"
@@ -719,7 +755,7 @@ endif()
 
 # An import-only entrypoint should find `chính` in its dependencies.
 file(WRITE "${module_dir}/sub/entry.vi" "hàm chính() { trả về 52; };\n")
-file(WRITE "${module_dir}/import-only.vi" "nhập sub/entry;\n")
+file(WRITE "${module_dir}/import-only.vi" "nhập sub.entry.*;\n")
 set(import_only "${module_dir}/import-only-exe")
 file(REMOVE "${import_only}")
 execute_process(COMMAND "${compiler}" build "${module_dir}/import-only.vi" -o "${import_only}"
@@ -733,19 +769,23 @@ if (NOT status EQUAL 52)
 endif()
 
 # Import failures must return an error and leave published outputs untouched.
-file(WRITE "${module_dir}/cycle_a.vi" "nhập cycle_b;\nhàm chính() { trả về 0; };\n")
-file(WRITE "${module_dir}/cycle_b.vi" "nhập cycle_a;\n")
-file(WRITE "${module_dir}/missing.vi" "nhập absent_module;\nhàm chính() { trả về 0; };\n")
-file(WRITE "${module_dir}/malformed.vi" "nhập sub/;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/cycle_a.vi" "nhập cycle_b.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/cycle_b.vi" "nhập cycle_a.*;\n")
+file(WRITE "${module_dir}/missing.vi" "nhập absent_module.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/malformed.vi" "nhập sub.;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-double-dot.vi" "nhập sub..leaf.*;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-wildcard-position.vi" "nhập sub.leaf.*.gốc;\nhàm chính() { trả về 0; };\n")
+file(WRITE "${module_dir}/bad-extension.vi" "nhập sub.leaf.vi;\nhàm chính() { trả về 0; };\n")
 file(WRITE "${module_dir}/duplicate.vi"
-    "nhập sub/leaf;\nhàm gốc() { trả về 1; };\nhàm chính() { trả về gốc(); };\n")
+    "nhập sub.leaf.*;\nhàm gốc() { trả về 1; };\nhàm chính() { trả về gốc(); };\n")
 file(WRITE "${module_dir}/arity.vi"
-    "nhập sub/leaf;\nhàm chính() { trả về gốc(12); };\n")
+    "nhập sub.leaf.*;\nhàm chính() { trả về gốc(12); };\n")
 file(WRITE "${module_dir}/undefined.vi"
-    "nhập sub/leaf;\nhàm chính() { trả về không_tồn_tại(); };\n")
+    "nhập sub.leaf.*;\nhàm chính() { trả về không_tồn_tại(); };\n")
 file(WRITE "${module_dir}/no-main.vi"
-    "nhập sub/leaf;\nhàm trợ_giúp() { trả về gốc(); };\n")
-foreach(failed IN ITEMS cycle_a missing malformed duplicate arity undefined no-main)
+    "nhập sub.leaf.*;\nhàm trợ_giúp() { trả về gốc(); };\n")
+foreach(failed IN ITEMS cycle_a missing malformed bad-double-dot
+        bad-wildcard-position bad-extension duplicate arity undefined no-main)
     execute_process(COMMAND "${compiler}" build "${module_dir}/${failed}.vi" -o "${sentinel}"
         RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 30)
     file(READ "${sentinel}" content)

@@ -1,7 +1,7 @@
-nhập gói/văn bản/chính;
-nhập gói/dữ liệu/chính;
-nhập gói/nhập xuất/chính;
-nhập gói/thời gian/chính;
+nhập gói.văn bản.chính.*;
+nhập gói.dữ liệu.chính.*;
+nhập gói.nhập xuất.chính.*;
+nhập gói.thời gian.chính.*;
 
 hàm chính() {
     bộ = Bộ Nối Văn Bản(",", "[", "]");

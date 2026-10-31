@@ -1,7 +1,7 @@
 // Đối chiếu byte mã máy AArch64 của hàm Machine IR do V++ phát với C++ CLI.
 // Đầu vào phản ánh MachineOpcode trong src/include/vpp/native/raw_codegen.h.
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.mã máy nền.*;
 
 hàm native thêm lệnh(ra, mã, immediate = 0, operand = 0, depthBefore = 0, symbol = "") {
     thêm(ra, biên dịch mã máy lệnh(mã, immediate, operand, depthBefore, symbol));

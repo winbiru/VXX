@@ -2,12 +2,14 @@
 // Tạo, liệt kê và dọn cây thư mục bằng V++.
 // VM chỉ tạo/xóa một mục hoặc đọc trạng thái/danh sách mục của hệ tệp.
 
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/hệ thống/nền tảng;
-nhập gói/văn bản/chuỗi;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
 
 // Machine ABI: mkdir/remove -> [rc, loại lỗi, mã OS].
 // Loại lỗi: 0=thành công, 1=đã tồn tại, 2=không tồn tại, 3=lỗi khác.

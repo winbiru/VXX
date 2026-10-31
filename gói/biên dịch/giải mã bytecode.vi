@@ -1,8 +1,8 @@
 // Trình giải mã bytecode viết bằng V++: chỉ đọc ABI bốn i32, không khởi động VM.
 // Tên opcode đối chiếu với src/bytecode/opcode.cpp; số ABI theo mã thao tác.vi.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/biên dịch/mã thao tác;
-nhập gói/biên dịch/lắp ráp;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
 
 hàm công khai biên dịch tên mã thao tác(mã) {
     chọn (mã) {

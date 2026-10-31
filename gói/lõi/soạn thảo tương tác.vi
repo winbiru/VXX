@@ -1,7 +1,7 @@
 // vpp.editpad — bộ đệm nhiều dòng cho REPL/công cụ tương tác.
-nhập bộ sưu tập;
-nhập văn bản;
-nhập kịch bản;
+nhập bộ sưu tập.*;
+nhập văn bản.*;
+nhập kịch bản.*;
 
 hàm công khai soạn thảo tạo() {
     trả về {"dòng": []};

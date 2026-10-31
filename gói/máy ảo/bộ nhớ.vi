@@ -104,7 +104,8 @@ hàm vm_alloc_body(bytes, scan) {
     biến end = vm_get(4198464, 0);
     // Segregate free blocks by size; the lexer makes millions of tiny
     // allocations, which should not traverse large fragmented free blocks.
-    biến p = 0; biến bucket = vm_free_bucket(size);
+    biến p = 0;
+    biến bucket = vm_free_bucket(size);
     khi (bucket < 10 && p == 0) {
         biến slot = 19 + bucket;
         biến candidate = vm_get(4198464, slot);

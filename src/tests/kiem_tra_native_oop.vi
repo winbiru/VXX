@@ -1,8 +1,8 @@
-nhập gói/biên dịch/bộ sinh mã bản địa;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy nền;
-nhập gói/biên dịch/đối tượng;
-nhập gói/kiểm thử/chính;
+nhập gói.biên dịch.bộ sinh mã bản địa.*;
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.mã máy nền.*;
+nhập gói.biên dịch.đối tượng.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm so byte OOP(a, b) {
     khẳng định bằng(độ dài(a), độ dài(b));

@@ -1,11 +1,11 @@
 // Matched application workloads. Preparation, correctness checks and clocks
 // are outside each timed batch; dispatch, allocation and GC remain inside.
-nhập gói/hệ thống/môi trường;
-nhập gói/thời gian/đơn điệu;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/văn bản/chuỗi;
-nhập gói/dữ liệu/json/json;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.thời gian.đơn điệu.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.*;
+nhập gói.văn bản.chuỗi.*;
+nhập gói.dữ liệu.json.json.*;
 
 hàm arithmetic(k, data) { trả về (k + 17) * 31 + (k * 7 + 3) - (k + 5) * 11; };
 hàm branch_loop(k, data) {

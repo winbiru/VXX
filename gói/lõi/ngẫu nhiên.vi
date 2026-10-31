@@ -1,11 +1,16 @@
 // Module: lõi.ngẫu nhiên
 // Sinh số nguyên trong đoạn đóng [tối thiểu, tối đa]. VM chỉ cung cấp
 // entropy bảo mật dạng byte; việc ánh xạ vào khoảng số nguyên nằm hoàn toàn ở V++.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/nguồn ngẫu nhiên;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.toán học.giới hạn;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.lõi.nguồn ngẫu nhiên.*;
+nhập gói.lõi.giao diện tài nguyên.*;
 
 
 // Các thuật toán và trợ giúp nằm trong lớp nội bộ, không được xuất qua import.

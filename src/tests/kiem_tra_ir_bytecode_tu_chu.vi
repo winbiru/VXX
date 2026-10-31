@@ -1,7 +1,7 @@
 // IR và emitter opcode chạy hoàn toàn qua các mô-đun V++, không gọi native.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/chính;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm khớp opcode(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);

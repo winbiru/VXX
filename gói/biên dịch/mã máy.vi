@@ -1,17 +1,20 @@
 // Bộ chọn ISA: 10 backend V++ ở cùng cấp với mã máy.vi.
 // 16 biến thể target chia sẻ các mã lệnh theo họ CPU.
-nhập gói/biên dịch/đích;
-nhập gói/biên dịch/mã máy nền;
-nhập gói/biên dịch/mã máy x86 64;
-nhập gói/biên dịch/mã máy aarch64;
-nhập gói/biên dịch/mã máy riscv64;
-nhập gói/biên dịch/mã máy armv7;
-nhập gói/biên dịch/mã máy i386;
-nhập gói/biên dịch/mã máy powerpc;
-nhập gói/biên dịch/mã máy mips;
-nhập gói/biên dịch/mã máy loongarch64;
-nhập gói/biên dịch/mã máy s390x;
-nhập gói/biên dịch/mã máy sparc;
+nhập gói.biên dịch.đích.biên dịch thông tin kiến trúc;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy kiểm tra CFG;
+nhập gói.biên dịch.mã máy x86 64.biên dịch mã máy phát x86 sáu mươi tư;
+nhập gói.biên dịch.mã máy x86 64.biên dịch mã máy phát x86 sáu mươi tư hàm;
+nhập gói.biên dịch.mã máy aarch64.biên dịch mã máy phát aarch64;
+nhập gói.biên dịch.mã máy aarch64.biên dịch mã máy phát aarch64 hàm;
+nhập gói.biên dịch.mã máy riscv64.biên dịch mã máy phát riscv64;
+nhập gói.biên dịch.mã máy armv7.*;
+nhập gói.biên dịch.mã máy i386.*;
+nhập gói.biên dịch.mã máy powerpc.biên dịch mã máy phát powerpc;
+nhập gói.biên dịch.mã máy mips.biên dịch mã máy phát mips;
+nhập gói.biên dịch.mã máy loongarch64.biên dịch mã máy phát loongarch64;
+nhập gói.biên dịch.mã máy s390x.biên dịch mã máy phát s390x;
+nhập gói.biên dịch.mã máy sparc.biên dịch mã máy phát sparc;
 
 // Hợp đồng ABI leaf i32: hằng số, cộng hoặc trừ hai tham số (chưa xử lý tràn VM).
 hàm công khai biên dịch mã máy lá(kiến trúc, loại, hằng = 0, hệ điều hành = "linux") {

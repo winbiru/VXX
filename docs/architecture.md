@@ -295,7 +295,7 @@ nhập nhập xuất;
 nhập hệ thống;
 nhập mạng;
 nhập dựng;
-nhập gói/mạng/kiểm thử/giao diện lập trình;
+nhập gói.mạng.kiểm thử.giao diện lập trình.*;
 ```
 
 Bare import ưu tiên package cùng tên của project, rồi mới tìm package bundle

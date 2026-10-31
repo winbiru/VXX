@@ -38,6 +38,8 @@ namespace vietvm::compiler {
         std::unordered_map<std::string, int> stringPoolIndexMap;
         std::unordered_map<int, std::vector<Instruction>> functionBytecode;
         std::unordered_map<int, int> functionNameIndices;
+        // Global name fallback may only see functions owned by the current module.
+        std::unordered_map<int, std::string> functionModuleIdentities;
         std::unordered_map<int, std::vector<vietvm::runtime::RuntimeSourceLocation>>
             functionDebugInfo;
         std::vector<vietvm::bytecode::ForeignFunctionDescriptor> foreignFunctions;
@@ -88,6 +90,7 @@ namespace vietvm::compiler {
             stringPoolIndexMap.clear();
             functionBytecode.clear();
             functionNameIndices.clear();
+            functionModuleIdentities.clear();
             functionDebugInfo.clear();
             foreignFunctions.clear();
             rootBytecodeDebugInfo.clear();

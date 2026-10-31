@@ -119,7 +119,7 @@ foreach(module IN ITEMS "nguồn tệp" "đồ thị mô đun")
     string(APPEND path_helpers "${helper}\n")
 endforeach()
 file(READ "${VPP_ROOT}/src/tests/fixtures/native_source_paths.vi" path_fixture)
-string(REPLACE "nhập gói/biên dịch/nguồn tệp;" "" path_fixture "${path_fixture}")
+string(REPLACE "nhập gói.biên dịch.nguồn tệp.*;" "" path_fixture "${path_fixture}")
 set(path_source "${VPP_OUTPUT_DIR}/source-path-roots.vi")
 file(WRITE "${path_source}"
     "hàm tên nền tảng() { trả về \"windows\"; };\n${path_helpers}\n${path_fixture}")

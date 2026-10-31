@@ -1,12 +1,19 @@
 // Module: mạng.json
 // Mục đích: dựng, phân tích và tuần tự JSON an toàn, gồm object/array lồng nhau.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/toán học;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/bảng mã;
-nhập gói/văn bản/chuỗi;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit độ dài đoạn;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.chuỗi thường;
+nhập gói.văn bản.chuỗi.bỏ khoảng trắng;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp riêng tư Xử Lý Nội Bộ Json {

@@ -1,5 +1,5 @@
 // Smoke tập trung cho bộ ghi ELF/Mach-O/COFF tự chủ V++.
-nhập gói/biên dịch/đối tượng;
+nhập gói.biên dịch.đối tượng.*;
 
 hàm chính() {
     mã = [184, 42, 0, 0, 0, 195];

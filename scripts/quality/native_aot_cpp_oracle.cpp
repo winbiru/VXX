@@ -143,7 +143,7 @@ int main(int argc,char **argv) {
         }
         cpp<<assembly;
         std::ofstream vi(directory/"emitter.vi",std::ios::binary);
-        vi<<u8"nhập gói/biên dịch/asm chương trình;\nnhập gói/nhập xuất/tệp;\nhàm chính() { dây = [";
+        vi<<u8"nhập gói.biên dịch.asm chương trình.*;\nnhập gói.nhập xuất.tệp.*;\nhàm chính() { dây = [";
         writeCode(vi,snapshot.entry);vi<<",[";
         for(std::size_t i=0;i<snapshot.strings.size();++i) {
             if(i)vi<<',';vi<<literal(snapshot.strings[i]);

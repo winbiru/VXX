@@ -51,12 +51,12 @@ assert.equal(
 );
 assert.equal(
   capture(typeRules.imports.patterns[0].patterns[0].match,
-    'gói/bộ sưu tập/chính như sưuTập', 1),
-  'gói/bộ sưu tập/chính'
+    'gói.bộ sưu tập.chính.* như sưuTập', 1),
+  'gói.bộ sưu tập.chính.*'
 );
 assert.equal(
   capture(typeRules.imports.patterns[0].patterns[0].match,
-    'gói/bộ sưu tập/chính như sưuTập', 3),
+    'gói.bộ sưu tập.chính.* như sưuTập', 3),
   'sưuTập'
 );
 assert.equal(
@@ -209,7 +209,7 @@ const signature = ext.signatureAtPosition(documentAt(path.join(root, 'examples/s
 assert.ok(signature?.signatures?.[0]?.label.includes('phân tích dữ liệu phức tạp'));
 assert.equal(signature.activeParameter, 1);
 const source = [
-  'công khai nhập gói/mạng/http/chính;',
+  'công khai nhập gói.mạng.http.chính.*;',
   'ngoại thư viện c_hệ_thống = "system.c";',
   'ngoại hàm getenv(tên: c_chuỗi): c_chuỗi từ c_hệ_thống',
   '    ký hiệu "getenv" abi "c" khả năng "system.env.read";',
@@ -270,18 +270,24 @@ assert.ok(findCompletion(merged, 'phân tích tệp'));
 assert.ok(findCompletion(complete('đốiTượng.', 'đốiTượng.'.length,
   [{ label: 'xử lý', kind: 2 }]), 'xử lý'));
 assert.ok(!findCompletion(complete('đốiTượng.', 'đốiTượng.'.length), 'nếu'));
-assert.ok(!findCompletion(complete('nhập gói/', 'nhập gói/'.length), 'hàm'));
-const moduleDirectory = findCompletion(complete('nhập gói/mạ', 'nhập gói/mạ'.length), 'gói/mạng/');
+assert.ok(!findCompletion(complete('nhập gói.', 'nhập gói.'.length), 'hàm'));
+const moduleDirectory = findCompletion(complete('nhập gói.mạ', 'nhập gói.mạ'.length), 'gói.mạng.');
 assert.equal(moduleDirectory?.kind, 9);
 assert.equal(moduleDirectory?.range.start.character, 'nhập '.length);
-assert.equal(moduleDirectory?.insertText, 'gói/mạng/');
-assert.ok(findCompletion(complete('nhập gói/mạng/chí', 'nhập gói/mạng/chí'.length), 'gói/mạng/chính'));
+assert.equal(moduleDirectory?.insertText, 'gói.mạng.');
+assert.ok(findCompletion(complete('nhập gói.mạng.chí', 'nhập gói.mạng.chí'.length), 'gói.mạng.chính.*'));
+assert.ok(findCompletion(complete('nhập gói.lõi.chuyển kiểu.', 'nhập gói.lõi.chuyển kiểu.'.length),
+  'gói.lõi.chuyển kiểu.*'));
+assert.ok(findCompletion(complete('nhập gói.lõi.chuyển kiểu.thành', 'nhập gói.lõi.chuyển kiểu.thành'.length),
+  'gói.lõi.chuyển kiểu.thành chuỗi', 2));
+assert.ok(!findCompletion(complete('nhập gói.lõi.chuyển kiểu.', 'nhập gói.lõi.chuyển kiểu.'.length),
+  'gói.lõi.chuyển kiểu.chuyển kiểu lỗi số nguyên'));
 assert.deepEqual(complete('// trả v', '// trả v'.length), []);
 assert.deepEqual(complete('in "trả v', 9), []);
 assert.deepEqual(complete('/* chú thích\ntrả v', 5), []);
 
 const imports = ext.importedSourcePaths(documentAt(path.join(root, 'examples/sample.vi'),
-  'công khai nhập gói/mạng/http/chính;\nnhập gói/bộ sưu tập/chính như sưuTập;'));
+  'công khai nhập gói.mạng.http.chính.*;\nnhập gói.bộ sưu tập.chính.* như sưuTập;'));
 assert.ok(imports.includes(path.join(root, 'gói/mạng/http/chính.vi')));
 assert.ok(imports.includes(path.join(root, 'gói/bộ sưu tập/chính.vi')));
 

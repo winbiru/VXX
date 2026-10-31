@@ -1,6 +1,6 @@
 nhập nhật ký;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/thư mục;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.thư mục.*;
 
 hàm chính() {
     đường = ".tmp_nhat_ky_1_0.log";

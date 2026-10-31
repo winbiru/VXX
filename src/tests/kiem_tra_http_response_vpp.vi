@@ -1,5 +1,5 @@
-nhập gói/mạng/http/máy khách;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.mạng.http.máy khách.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     chunked =

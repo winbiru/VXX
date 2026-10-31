@@ -49,7 +49,7 @@ if (VPP_CASE STREQUAL "compiler")
     file(MAKE_DIRECTORY "${relative_dir}")
     file(WRITE "${relative_dir}/relative.txt" "relative-ok")
     file(WRITE "${relative_dir}/main.vi"
-        "nhập gói/nhập xuất/tệp; in đọc tệp(\"relative.txt\");\n")
+        "nhập gói.nhập xuất.tệp.*; in đọc tệp(\"relative.txt\");\n")
     file(WRITE "${VPP_OUTPUT_DIR}/relative.txt" "wrong-directory")
     set(relative_main "${relative_dir}/main.vi")
     vpp_check("relative-ok\n" run --compiler=cpp "${relative_main}")
@@ -236,7 +236,7 @@ if (VPP_CASE STREQUAL "compiler")
         # The script is outside its import base. A native source graph with
         # a virtual entrypoint must work even when the base cannot be written.
         set(embedded_source "${VPP_OUTPUT_DIR}/embedded-source.vi")
-        file(WRITE "${embedded_source}" "nhập lib/math như m; in m.cộng(40);")
+        file(WRITE "${embedded_source}" "nhập lib.math.* như m; in m.cộng(40);")
         file(CHMOD "${VPP_OUTPUT_DIR}/embedded" PERMISSIONS
             OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"

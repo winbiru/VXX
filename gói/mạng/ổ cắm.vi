@@ -2,10 +2,13 @@
 // Các thao tác socket là primitive OS; wrapper công khai nằm ở V++.
 // Handle socket là số nguyên do runtime quản lý; luôn đóng khi dùng xong.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/hệ thống/môi trường;
-nhập gói/mạng/địa chỉ mạng;
-nhập gói/mạng/bảng tên máy;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.mạng.địa chỉ mạng.*;
+nhập gói.mạng.bảng tên máy.Bộ Bảng Tên Máy DNS;
+nhập gói.mạng.bảng tên máy.phân giải tên miền đọc bảng tên máy;
 
 // Resolver Machine ABI giữ getaddrinfo/addrinfo trong OS adapter và trả token
 // sở hữu VM. Thuật toán chọn địa chỉ và xử lý lỗi vẫn nằm trong V++.

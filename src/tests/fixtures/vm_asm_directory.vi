@@ -1,7 +1,7 @@
-nhập gói/nhập xuất/thư mục;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/hệ thống/tiến trình;
+nhập gói.nhập xuất.thư mục.*;
+nhập gói.nhập xuất.tệp.*;
+nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.hệ thống.tiến trình.*;
 
 bước thư mục = 0;
 hàm yêu cầu thư mục(điều kiện) {

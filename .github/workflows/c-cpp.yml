@@ -324,8 +324,50 @@ jobs:
 
       - name: Validate the statistical comparator written in V++
         run: |
-          VPP_HOME="$PWD" build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
+          mkdir -p build-benchmark-smoke/fixtures
+          VPP_HOME="$PWD" VPP_BENCHMARK_FIXTURES="$PWD/build-benchmark-smoke/fixtures" \
+            build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
             scripts/quality/test_benchmark_gate.vi
+
+      - name: Check benchmark gate exit codes for every decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          for entry in pass:0 fail:1 inconclusive:2 invalid:3; do
+            name="${entry%%:*}"
+            expected="${entry##*:}"
+            actual=0
+            VPP_EXEC="$PWD/build-benchmark-smoke/bin/vpp-cli" \
+              sh scripts/quality/compare_benchmarks.sh \
+              "$PWD/build-benchmark-smoke/fixtures/$name.json" \
+              > "$PWD/build-benchmark-smoke/fixtures/$name.out" 2>&1 || actual=$?
+            if [ "$actual" -ne "$expected" ]; then
+              cat "$PWD/build-benchmark-smoke/fixtures/$name.out"
+              echo "unexpected $name benchmark exit code: $actual (expected $expected)" >&2
+              exit 1
+            fi
+          done
+
+      - name: Exercise alternating process collector with identical binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build-benchmark-smoke/collector-check
+          export VPP_GATE_ROOT="$PWD" VPP_GATE_OUTPUT="$PWD/build-benchmark-smoke/collector-check"
+          export VPP_GATE_BASELINE_BIN="$PWD/build-benchmark-smoke/bin/vpp-benchmark-baseline"
+          export VPP_GATE_CANDIDATE_BIN="$VPP_GATE_BASELINE_BIN"
+          export VPP_GATE_BASELINE_SHA="$GITHUB_SHA" VPP_GATE_CANDIDATE_SHA="$GITHUB_SHA"
+          export VPP_GATE_BASELINE_SNAPSHOT_SHA=smoke VPP_GATE_CANDIDATE_SNAPSHOT_SHA=smoke
+          export VPP_GATE_BASELINE_BINARY_SHA="smoke" VPP_GATE_CANDIDATE_BINARY_SHA="smoke"
+          export VPP_GATE_HARNESS_SHA="smoke" VPP_GATE_HOST="$(uname -sm)"
+          export VPP_GATE_COLLECTOR_SHA="smoke" VPP_GATE_COMPARATOR_SHA="smoke"
+          export VPP_GATE_CLI_SHA="smoke" VPP_GATE_CPU="smoke" VPP_GATE_OS="$(uname -sr)"
+          export VPP_GATE_CASES=vm_verify VPP_GATE_SAMPLES=10 VPP_GATE_TARGET_MS=10
+          build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
+            scripts/quality/collect_benchmark_gate.vi
+          VPP_EXEC="$PWD/build-benchmark-smoke/bin/vpp-cli" \
+            sh scripts/quality/compare_benchmarks.sh \
+              "$VPP_GATE_OUTPUT/report.json"
 
       - name: Upload benchmark smoke measurements
         if: always()
@@ -333,7 +375,10 @@ jobs:
         with:
           name: benchmark-smoke
           if-no-files-found: ignore
-          path: build-benchmark-smoke/measurements.jsonl
+          path: |
+            build-benchmark-smoke/measurements.jsonl
+            build-benchmark-smoke/fixtures/
+            build-benchmark-smoke/collector-check/
 
   windows-build:
     runs-on: windows-latest

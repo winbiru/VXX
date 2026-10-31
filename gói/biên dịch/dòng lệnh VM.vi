@@ -1,8 +1,9 @@
 // Full-language compiler entry for the V++/ASM VM. The native launcher
 // supplies argv and VPP_HOME as guest values; no compiler callback exists.
-nhập gói/biên dịch/nguồn tệp;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/máy ảo ASM;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn chuẩn đường;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn tệp tự chủ;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;
+nhập gói.biên dịch.máy ảo ASM.biên dịch VM ghi;
 
 hàm công khai biên dịch dòng lệnh VM(args, thư viện) {
     nếu (độ dài(args) != 4) {

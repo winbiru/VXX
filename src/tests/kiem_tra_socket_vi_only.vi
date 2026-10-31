@@ -1,4 +1,4 @@
-nhập gói/mạng/ổ cắm;
+nhập gói.mạng.ổ cắm.*;
 
 // Không có hosts và không được dùng resolver C/OS; chỉ IP số hợp lệ.
 hàm chính() {

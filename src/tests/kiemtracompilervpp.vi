@@ -1,7 +1,7 @@
 // Compiler V++, artifact và ABI được đối chiếu với bootstrap C++.
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/kết quả;
-nhập gói/biên dịch/nội tại;
+nhập gói.biên dịch.sản phẩm biên dịch.*;
+nhập gói.biên dịch.kết quả.*;
+nhập gói.biên dịch.nội tại.*;
 
 hàm compiler mã trung gian bằng(a, b) {
     nếu (độ dài(a) != độ dài(b)) { trả về sai; };
@@ -25,7 +25,7 @@ hàm chính() {
 
     in biên dịch chạy chương trình tự chủ(
         "hàm đọc mặc định(x) { trả về x; }; hàm chính() { in đọc mặc định(7); };") == "7\n";
-    cây = biên dịch phân tích chương trình thuần("nhập gói/lõi/chuyển kiểu; nhập gói/biên dịch/chương trình;");
+    cây = biên dịch phân tích chương trình thuần("nhập gói.lõi.chuyển kiểu.*; nhập gói.biên dịch.chương trình.*;");
     in cây["câu lệnh"][0]["đích"] == "gói/lõi/chuyển kiểu";
     in compiler mã trung gian bằng(oracle["hàm"][1]["bytecode"], artifact["hàm"][1]["bytecode"]);
 

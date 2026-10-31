@@ -1,22 +1,31 @@
 // Chính sách CLI thuộc V++; host chỉ chuyển argv và thực hiện ABI hệ điều hành.
-nhập gói/biên dịch/mã máy từ cây;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy hạ biểu diễn trung gian;
-nhập gói/biên dịch/lắp ráp;
-nhập gói/biên dịch/đích;
-nhập gói/nhập xuất/tệp;
-nhập gói/biên dịch/nguồn tệp;
-nhập gói/biên dịch/trình điều khiển;
-nhập gói/biên dịch/asm chương trình;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/máy ảo ASM;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/biên dịch/giải mã bytecode;
-nhập gói/biên dịch/hiển thị cây và IR;
-nhập gói/biên dịch/định dạng mã nguồn;
-nhập gói/biên dịch/soát lỗi mã nguồn;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.mã máy từ cây.tạo IR;
+nhập gói.biên dịch.mã máy từ cây.sinh mã hàm;
+nhập gói.biên dịch.mã máy từ cây.tạo đối tượng hàm;
+nhập gói.biên dịch.mã máy.biên dịch mã máy lá;
+nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ lá;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp mã máy;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp lá;
+nhập gói.biên dịch.đích.biên dịch phân tích đích;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.tệp.ghi các byte tệp;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn tệp tự chủ;
+nhập gói.biên dịch.nguồn tệp.biên dịch nguồn nhúng tự chủ;
+nhập gói.biên dịch.trình điều khiển.biên dịch dòng lệnh;
+nhập gói.biên dịch.asm chương trình.biên dịch asm chương trình;
+nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch;
+nhập gói.biên dịch.máy ảo ASM.biên dịch VM ghi;
+nhập gói.biên dịch.sản phẩm biên dịch.biên dịch sản phẩm biên dịch giải mã;
+nhập gói.biên dịch.sản phẩm biên dịch.biên dịch sản phẩm biên dịch giải mã dây;
+nhập gói.biên dịch.giải mã bytecode.biên dịch giải mã chương trình;
+nhập gói.biên dịch.hiển thị cây và IR.*;
+nhập gói.biên dịch.định dạng mã nguồn.*;
+nhập gói.biên dịch.soát lỗi mã nguồn.biên dịch soát lỗi lệnh;
+nhập gói.biên dịch.soát lỗi mã nguồn.biên dịch soát lỗi lệnh tệp;
+nhập gói.biên dịch.soát lỗi mã nguồn.biên dịch soát lỗi lệnh bộ đệm;
+nhập gói.nhập xuất.đường dẫn.là thư mục;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
 
 hàm công khai biên dịch hướng dẫn dòng lệnh máy() {
     trả về "V++ native compiler\n" +

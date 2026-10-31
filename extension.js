@@ -233,7 +233,10 @@ function importedSourcePaths(document) {
   while ((match = importPattern.exec(document.getText())) !== null) {
     const target = match[1]?.replace(/\s+như\s+[\p{L}\p{N}_ ]+$/u, '').trim();
     if (!target) continue;
-    const sourceTarget = `${target}.vi`;
+    const selectedDot = target.lastIndexOf('.');
+    const module = selectedDot > 0 && !/[\\/]/u.test(target.slice(selectedDot + 1))
+      ? target.slice(0, selectedDot) : target;
+    const sourceTarget = `${importModulePath(module)}.vi`;
     let directory = path.dirname(document.uri.fsPath);
     while (true) {
       const candidate = path.resolve(directory, sourceTarget);
@@ -250,6 +253,17 @@ function importedSourcePaths(document) {
     }
   }
   return result;
+}
+
+function importModulePath(module) {
+  // Source declarations use dots; the actual module files still use '/'.
+  if (module.startsWith('../') || module.startsWith('./')) {
+    const prefix = /^((?:\.\.\/|\.\/)+)/u.exec(module)?.[0] || '';
+    return prefix + module.slice(prefix.length).replace(/\./gu, '/');
+  }
+  const leading = /^\.+/u.exec(module)?.[0].length || 0;
+  const relative = leading === 1 ? './' : '../'.repeat(Math.max(0, leading - 1));
+  return relative + module.slice(leading).replace(/\./gu, '/');
 }
 
 async function definitionFromFile(filePath, functionName) {
@@ -445,7 +459,7 @@ const VPP_SNIPPETS = [
   { trigger: 'khi', description: 'Lặp khi điều kiện đúng', body: 'khi (${1:điềuKiện}) {\n\t$0\n}' },
   { trigger: 'chọn', description: 'Rẽ nhánh chọn', body: 'chọn (${1:giáTrị}) {\n\tca ${2:1}: {\n\t\t$0\n\t}\n}' },
   { trigger: 'thử', description: 'Bắt ngoại lệ', body: 'thử {\n\t${1:// Xử lý}\n} bắt lỗi (${2:lỗi}) {\n\t$0\n}' },
-  { trigger: 'nhập', description: 'Nhập mô đun', body: 'nhập ${1:gói/chuẩn/chính};$0' }
+  { trigger: 'nhập', description: 'Nhập mô đun', body: 'nhập ${1:gói.chuẩn.chính}.*;$0' }
 ];
 
 function foldVietnamese(value) {
@@ -504,7 +518,7 @@ function vppImportCompletionItems(document, position, prefix, context) {
   const typedPath = match[1];
   if (!/^[\p{L}\p{N}_./ \t-]*$/u.test(typedPath) || /\s+như\s+/u.test(typedPath)) return [];
 
-  const separator = typedPath.lastIndexOf('/');
+  const separator = typedPath.lastIndexOf('.');
   const directory = typedPath.slice(0, separator + 1);
   const segment = typedPath.slice(separator + 1);
   const roots = [path.dirname(document.uri.fsPath),
@@ -513,8 +527,45 @@ function vppImportCompletionItems(document, position, prefix, context) {
 
   const items = [];
   const seen = new Set();
+  const addImportItem = (label, kind, detail, sortOrder) => {
+    if (seen.has(label)) return;
+    seen.add(label);
+    const item = new vscode.CompletionItem(label, kind);
+    item.detail = detail;
+    item.insertText = label;
+    item.range = new vscode.Range(new vscode.Position(position.line, prefix.length - typedPath.length), position);
+    item.filterText = foldVietnamese(label);
+    item.sortText = `${sortOrder}_${label}`;
+    items.push(item);
+  };
   for (const root of new Set(roots)) {
-    const directoryPath = path.resolve(root, directory);
+    // A dot after an existing .vi module selects a public symbol or '*'.
+    // Inspect the module before interpreting that dot as a folder separator.
+    if (separator >= 0) {
+      const moduleName = typedPath.slice(0, separator);
+      const moduleFile = path.resolve(root, `${importModulePath(moduleName)}.vi`);
+      if (fs.existsSync(moduleFile)) {
+        if ('*'.startsWith(segment)) {
+          addImportItem(`${directory}*`, vscode.CompletionItemKind.Module,
+            'Nhập mọi tên công khai', '0');
+        }
+        try {
+          const source = fs.readFileSync(moduleFile, 'utf8');
+          const declarations = /^(hàm|lớp|giao diện)\s+(?:(công khai|riêng tư|bảo vệ)\s+)?([\p{L}_][\p{L}\p{N}_ ]*?)(?=\s*(?:\(|\{|kế thừa\b|triển khai\b))/gmu;
+          for (const declaration of source.matchAll(declarations)) {
+            if (declaration[2] === 'riêng tư' || declaration[2] === 'bảo vệ') continue;
+            const name = declaration[3].trim();
+            if (!foldVietnamese(name).startsWith(foldVietnamese(segment))) continue;
+            addImportItem(`${directory}${name}`,
+              declaration[1] === 'hàm' ? vscode.CompletionItemKind.Function : vscode.CompletionItemKind.Class,
+              `Tên công khai trong ${moduleName}`, '1');
+          }
+        } catch (_) {
+          // A module may be unreadable during a workspace update.
+        }
+      }
+    }
+    const directoryPath = path.resolve(root, importModulePath(directory));
     let entries;
     try {
       entries = fs.readdirSync(directoryPath, { withFileTypes: true });
@@ -524,20 +575,13 @@ function vppImportCompletionItems(document, position, prefix, context) {
     for (const entry of entries) {
       if (entry.name.startsWith('.') || /^(?:node_modules|build(?:-.*)?|dist|\.git)$/u.test(entry.name)) continue;
       if (!entry.isDirectory() && !(entry.isFile() && /\.(?:vi|vvm)$/u.test(entry.name))) continue;
-      const name = entry.isDirectory() ? `${entry.name}/` : entry.name.replace(/\.(?:vi|vvm)$/u, '');
+      const name = entry.isDirectory() ? `${entry.name}.` : `${entry.name.replace(/\.(?:vi|vvm)$/u, '')}.*`;
       if (!foldVietnamese(name).startsWith(foldVietnamese(segment))) continue;
       const label = `${directory}${name}`;
-      if (seen.has(label)) continue;
-      seen.add(label);
-      const item = new vscode.CompletionItem(label,
-        entry.isDirectory() ? vscode.CompletionItemKind.Folder : vscode.CompletionItemKind.Module);
-      item.detail = entry.isDirectory() ? 'Thư mục mô đun V++' : 'Mô đun V++';
-      item.insertText = label;
-      item.range = new vscode.Range(new vscode.Position(position.line, prefix.length - typedPath.length), position);
-      item.filterText = foldVietnamese(segment) === segment.toLowerCase()
-        ? foldVietnamese(label) : label;
-      item.sortText = `${entry.isDirectory() ? '0' : '1'}_${label}`;
-      items.push(item);
+      addImportItem(label,
+        entry.isDirectory() ? vscode.CompletionItemKind.Folder : vscode.CompletionItemKind.Module,
+        entry.isDirectory() ? 'Thư mục mô đun V++' : 'Mô đun V++',
+        entry.isDirectory() ? '0' : '1');
       if (items.length >= 200) return items;
     }
   }

@@ -1,6 +1,8 @@
 // API hướng đối tượng dùng lại các hàm vòng đời hiện hữu.
-nhập gói/ứng dụng/giao diện;
-nhập gói/ứng dụng/vòng đời;
+nhập gói.ứng dụng.giao diện.*;
+nhập gói.ứng dụng.vòng đời.biểu ngữ ứng dụng;
+nhập gói.ứng dụng.vòng đời.chạy ứng dụng;
+nhập gói.ứng dụng.vòng đời.dừng ứng dụng;
 
 lớp công khai Bộ Điều Khiển Ứng Dụng triển khai Vòng Đời Ứng Dụng {
     hàm công khai khởi tạo(tên, phiên bản) {

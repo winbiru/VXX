@@ -124,6 +124,8 @@ struct AstImportSpec {
     bool hasSemicolon = false;
     // `công khai nhập ...` re-exports the imported module surface.
     bool reExport = false;
+    // Empty: legacy module import; "*": explicit wildcard; otherwise one export.
+    std::string selectedName;
 };
 
 // Biểu diễn một cặp khóa–giá trị trong map literal bằng ExprId, cho phép arena biểu thức giữ cấu trúc lồng nhau ổn định.

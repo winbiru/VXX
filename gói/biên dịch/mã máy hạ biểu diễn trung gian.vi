@@ -1,8 +1,11 @@
 // Hạ compiler::IrProgram (đã được semantic binding) sang MachineFunction i32.
 // Hợp đồng serialization ở src/cli/native_vpp_codegen.cpp; C++ lowerer là oracle.
-nhập gói/biên dịch/mã máy nền;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy ký hiệu hợp lệ;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy kiểm tra CFG;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Bộ Hạ Mã Máy {

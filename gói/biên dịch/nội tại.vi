@@ -1,5 +1,5 @@
 // Tên tiếng Việt và tên tương thích dùng chung mã thao tác, số tham số và quyền gọi.
-nhập gói/biên dịch/mã thao tác;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 hàm công khai biên dịch nội tại(tên) {
     chọn (tên) {
         ca "máy ảo lấy loại": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }

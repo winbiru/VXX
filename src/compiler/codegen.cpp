@@ -1540,6 +1540,7 @@ struct Emitter {
         slots.emplace(instruction.declarationName, functionId);
         registry.functionBytecode[functionId] = {};
         registry.setFunctionNameIndex(functionId, nameIndex);
+        registry.functionModuleIdentities[functionId] = registry.currentSemanticModuleIdentity;
         if (functionId >= nextSlot) nextSlot = functionId + 1;
     }
 
@@ -1865,6 +1866,12 @@ struct Emitter {
                     validateCallableAccess(registry, resolvedName);
                     target = resolveFunctionIdByName(
                         registry, resolvedName, slots, false);
+                    // Imported module functions are linked by ID before their
+                    // runtime names are made private to the module.
+                    if (target < 0 && hasSelectiveImports(registry) &&
+                        !registry.currentSemanticModuleIdentity.empty()) {
+                        target = function->second;
+                    }
                 }
 
                 emitCallArguments(*value, output);
@@ -1964,6 +1971,15 @@ struct Emitter {
                 emitCallArguments(*value, output);
                 const int argumentCount =
                     static_cast<int>(value->operands.size() - 1);
+
+                if (value->callTarget == CallTargetKind::ImportedFunction &&
+                    hasSelectiveImports(registry)) {
+                    const auto imported = registry.importedFunctionAliases.find(value->text);
+                    if (imported != registry.importedFunctionAliases.end()) {
+                        output.push_back({OP_GOI, argumentCount, imported->second, 0});
+                        return;
+                    }
+                }
 
                 // Indirect calls bind to the exact parameter/local symbol,
                 // even when a global function has the same spelling.

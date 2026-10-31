@@ -1,9 +1,15 @@
 // Same-host benchmark evidence validation and statistical decisions in V++.
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/bộ sưu tập/danh sách;
-nhập gói/lõi/toán học;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/dữ liệu/json/json;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.bộ sưu tập.danh sách.thêm;
+nhập gói.bộ sưu tập.danh sách.sắp xếp;
+nhập gói.lõi.toán học.trị tuyệt đối;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.dữ liệu.json.json.json phân tích với boolean;
 
 lớp riêng tư Benchmark Boolean {
     hàm công khai khởi tạo(value) { mình.value = value; };

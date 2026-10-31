@@ -2,11 +2,14 @@
 // Mục đích: đọc tệp properties/ini đơn giản ở tầng thư viện V++.
 // File I/O vẫn là VM primitive; toàn bộ parsing và chuyển kiểu nằm ở V++.
 
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/văn bản/chuỗi;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tồn tại;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.thành số thực;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
 
 hàm riêng tư cấu hình là khoảng trắng(c) {
     trả về c == " " || c == "\t" || c == "\r" || c == "\n";

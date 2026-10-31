@@ -1208,12 +1208,14 @@ void Parser::attachImportForm(AstStatement &statement) {
                     vietvm::messages::kImportMultipleTargetsUnsupported),
                 tokens_[cursor].span);
         }
-        const bool separator = piece == "/" || piece == "\\" || piece == "-";
+        const bool separator = piece == "/" || piece == "\\" || piece == "-" ||
+                               piece == "." || piece == "*";
         if (separator) {
             spec.target += piece;
         } else {
             if (!spec.target.empty() && spec.target.back() != '/' &&
-                spec.target.back() != '\\' && spec.target.back() != '-') {
+                spec.target.back() != '\\' && spec.target.back() != '-' &&
+                spec.target.back() != '.') {
                 spec.target.push_back(' ');
             }
             spec.target += piece;
@@ -1223,19 +1225,62 @@ void Parser::attachImportForm(AstStatement &statement) {
     if (targetBegin == targetEnd) return;
     spec.targetSpan = tokenRangeSpan(tokens_, targetBegin, targetEnd);
 
-    if (hasViSuffix(spec.target)) {
+    if (hasViSuffix(spec.target) || spec.target.find(".vi.") != std::string::npos) {
         throw ParseError(
             vietvm::messages::formatMessage(
                 vietvm::messages::kImportFileExtensionUnsupported),
             spec.targetSpan);
     }
 
-    const std::size_t lastSeparator = spec.target.find_last_of("/\\");
-    const std::size_t lastDot = spec.target.find_last_of('.');
-    const bool hasExtension = lastDot != std::string::npos &&
-                              (lastSeparator == std::string::npos ||
-                               lastDot > lastSeparator);
-    if (hasExtension) return;
+    // The final dot selects a symbol (or `*`); preceding dots separate
+    // module directories. Legacy slash-separated imports keep working.
+    const std::size_t dot = spec.target.find_last_of('.');
+    // Dots in a legacy ../ or ./ prefix are path components, never
+    // symbol separators. Only interpret a dot after the last slash.
+    const std::size_t slash = spec.target.find_last_of("/\\");
+    if (dot != std::string::npos &&
+        (slash == std::string::npos || dot > slash)) {
+        spec.selectedName = spec.target.substr(dot + 1);
+        spec.target.resize(dot);
+        if (spec.selectedName == "vi" || spec.selectedName.rfind("vi.", 0) == 0) {
+            throw ParseError(vietvm::messages::formatMessage(
+                vietvm::messages::kImportFileExtensionUnsupported), spec.targetSpan);
+        }
+        if (spec.target.empty() || spec.selectedName.empty() ||
+            spec.selectedName.find_first_of("./\\()[]{};,:=+-%!<>|&\"'") != std::string::npos) {
+            throw ParseError("nhập: thiếu mô-đun hoặc tên nhập không hợp lệ", spec.targetSpan);
+        }
+    }
+    if (spec.target.find('*') != std::string::npos ||
+        (spec.selectedName != "*" && spec.selectedName.find('*') != std::string::npos)) {
+        throw ParseError("nhập: dấu * chỉ được dùng ở cuối mô-đun sau dấu chấm", spec.targetSpan);
+    }
+    // Leading dots express a relative module path: `.sibling` -> `./sibling`,
+    // `..sibling` -> `../sibling`, `...sibling` -> `../../sibling`.
+    // Convert only source module notation; filesystem paths retain '/'.
+    if (spec.target.rfind("../", 0) == 0 || spec.target.rfind("./", 0) == 0) {
+        // Keep legacy relative filesystem prefixes intact for compatibility.
+        const std::size_t prefixEnd = spec.target.find_first_not_of("./");
+        for (std::size_t i = prefixEnd; i < spec.target.size(); ++i) {
+            if (spec.target[i] == '.') spec.target[i] = '/';
+        }
+    } else {
+        const std::size_t leadingDots = spec.target.find_first_not_of('.');
+        if (leadingDots == std::string::npos) {
+            throw ParseError("nhập: thiếu tên mô-đun", spec.targetSpan);
+        }
+        std::string modulePath = spec.target.substr(leadingDots);
+        for (char &character : modulePath) {
+            if (character == '.') character = '/';
+        }
+        if (leadingDots == 1) modulePath = "./" + modulePath;
+        else if (leadingDots > 1) {
+            std::string parents;
+            for (std::size_t parent = 1; parent < leadingDots; ++parent) parents += "../";
+            modulePath = parents + modulePath;
+        }
+        spec.target = std::move(modulePath);
+    }
 
     if (cursor < end - 1 && tokens_[cursor].lexeme == "như") {
         ++cursor;

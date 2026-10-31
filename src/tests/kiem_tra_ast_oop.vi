@@ -1,4 +1,4 @@
-nhập gói/biên dịch/chính;
+nhập gói.biên dịch.chính.*;
 
 lớp Đếm Nút triển khai Khách Duyệt Cú Pháp {
     hàm khởi tạo() { mình.tổng = 0; };

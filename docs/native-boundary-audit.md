@@ -852,7 +852,7 @@ Windows nay luôn chạy thuật toán V++ qua `system.process.*` FFI; đã gỡ
 `handleNativeProcessPrimitive`, bộ escape argv, dựng môi trường, đọc pipe
 và `CreateProcessW` trùng lặp khỏi `vm_native_helpers.cpp` (401 → 170 dòng).
 Opcode tiến trình legacy bị từ chối trên cả POSIX/Windows; chương trình
-cần `nhập gói/hệ thống/tiến trình;` và gọi API công khai. Bộ adapter
+cần `nhập gói.hệ thống.tiến trình.*;` và gọi API công khai. Bộ adapter
 Win32 trong `foreign.cpp` vẫn quản lý handle, pipe, process group/Job Object
 và UTF-16 tại biên hệ điều hành. Đường FFI Windows **chưa được xác minh
 trên máy Windows**; CI Windows interpreter/JIT, spawn và timeout là gate còn mở.

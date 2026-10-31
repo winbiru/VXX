@@ -1,10 +1,10 @@
 // Phân tích đồ thị phụ thuộc dùng snapshot compiler V++ chung.
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 // vpp.dependencies — phân tích import và kiểm tra đồ thị phụ thuộc bằng compiler V++.
 
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/biên dịch/chính;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
+nhập gói.biên dịch.chính.*;
 
 // Một phiên compiler được dùng chung cho việc kiểm tra và liệt kê import.
 lớp công khai Bộ Phân Tích Phụ Thuộc {

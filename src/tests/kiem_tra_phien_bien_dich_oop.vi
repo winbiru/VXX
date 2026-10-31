@@ -1,9 +1,9 @@
-nhập gói/biên dịch/phiên tự chủ;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/biểu diễn trung gian;
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/liên kết;
-nhập gói/kiểm thử/chính;
+nhập gói.biên dịch.phiên tự chủ.*;
+nhập gói.biên dịch.chương trình.*;
+nhập gói.biên dịch.biểu diễn trung gian.*;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.kiểm thử.chính.*;
 
 hàm kiểm cache pass compiler(bộ, truy_vấn, loại) {
     đầu = truy_vấn();

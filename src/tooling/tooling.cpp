@@ -292,6 +292,9 @@ void writeAstStatement(std::ostringstream &out,
             vietvm::frontend::AstImportForm::LocalSourceFile) {
             out << " đích=" << std::quoted(statement.importSpec.target)
                 << " dấu chấm phẩy=" << coKhong(statement.importSpec.hasSemicolon);
+            if (!statement.importSpec.selectedName.empty()) {
+                out << " tên nhập=" << std::quoted(statement.importSpec.selectedName);
+            }
             if (!statement.importSpec.alias.empty()) {
                 out << " bí danh=" << std::quoted(statement.importSpec.alias);
             }
@@ -388,7 +391,12 @@ void writeIrInstruction(std::ostringstream &out,
     if (instruction.visibility != vietvm::frontend::AstVisibility::Unspecified) {
         out << " phạm vi=" << tenPhamVi(instruction.visibility);
     }
-    if (instruction.opcode == vietvm::compiler::IrOpcode::DefineClass) {
+    if (instruction.opcode == vietvm::compiler::IrOpcode::Import &&
+        !instruction.importSpec.selectedName.empty()) {
+        out << " đích=" << std::quoted(instruction.importSpec.target)
+            << " tên nhập=" << std::quoted(instruction.importSpec.selectedName)
+            << " bí danh=" << std::quoted(instruction.importSpec.alias);
+    } else if (instruction.opcode == vietvm::compiler::IrOpcode::DefineClass) {
         out << " dạng=" << tenDangLop(instruction.classForm);
         if (!instruction.superclassName.empty()) {
             out << " lớp cha=" << std::quoted(instruction.superclassName)

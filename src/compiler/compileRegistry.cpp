@@ -1,6 +1,7 @@
 #include "compiler/compileRegistry.h"
 
 #include <cstdlib>
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -18,6 +19,13 @@
 #include "vpp/core/project_layout.h"
 
 namespace vietvm { namespace compiler {
+    bool hasSelectiveImports(const CompilationRegistryState &state) {
+        if (state.activeModuleSemanticIndex == nullptr) return false;
+        const auto &edges = state.activeModuleSemanticIndex->graph.edges;
+        return std::any_of(edges.begin(), edges.end(), [](const auto &edge) {
+            return !edge.importSpec.selectedName.empty() && edge.importSpec.selectedName != "*";
+        });
+    }
     // Trả tập import của registry cụ thể để production path không phụ thuộc state thread-local.
     std::unordered_set<std::string> &importedFileSet(CompilationRegistryState &state) {
         return state.importedFiles;
@@ -189,7 +197,10 @@ namespace vietvm { namespace compiler {
         const int nameIndex = state.findString(resolvedName);
         if (nameIndex >= 0) {
             for (const auto &entry : state.functionNameIndices) {
-                if (entry.second == nameIndex) return entry.first;
+                const auto owner = state.functionModuleIdentities.find(entry.first);
+                if (entry.second == nameIndex &&
+                    (!hasSelectiveImports(state) || owner == state.functionModuleIdentities.end() ||
+                     owner->second == state.currentSemanticModuleIdentity)) return entry.first;
             }
         }
         return -1;
@@ -213,8 +224,9 @@ namespace vietvm { namespace compiler {
             throw std::runtime_error(vietvm::messages::formatMessage(
                 vietvm::messages::kImportMissingTarget));
         }
-        const std::string &moduleAlias = spec.alias;
         namespace fs = std::filesystem;
+        const bool selectiveGraph = hasSelectiveImports(state) ||
+            (!spec.selectedName.empty() && spec.selectedName != "*");
 
         // Tạo tên nguồn dễ đọc cho debug metadata. Module vẫn dùng đường dẫn
         // tuyệt đối làm khóa runtime, còn stack trace ưu tiên đường dẫn tương đối
@@ -246,8 +258,8 @@ namespace vietvm { namespace compiler {
             const auto surface = state.moduleFunctionExports.find(canonical);
             if (surface == state.moduleFunctionExports.end()) return;
             for (const auto &exported : surface->second) {
-                const std::string visibleName = moduleAlias.empty()
-                    ? exported.name : moduleAlias + "." + exported.name;
+                if (!matchesImportSelection(spec, exported.name)) continue;
+                const std::string visibleName = importedSymbolName(spec, exported.name);
                 const auto [existing, inserted] =
                     state.importedFunctionAliases.emplace(visibleName, exported.functionId);
                 if (!inserted && existing->second != exported.functionId) {
@@ -289,6 +301,11 @@ namespace vietvm { namespace compiler {
             const std::string previousSourceIdentity = state.currentSourceIdentity;
             const std::string previousSemanticModuleIdentity =
                 state.currentSemanticModuleIdentity;
+            std::unordered_map<std::string, int> previousAliases;
+            if (selectiveGraph) {
+                previousAliases = std::move(state.importedFunctionAliases);
+                state.importedFunctionAliases.clear();
+            }
             state.importResolutionBase = abs.parent_path();
             state.currentSourceIdentity = debugIdentityForPath(abs);
             state.currentSemanticModuleIdentity = canonical;
@@ -305,11 +322,13 @@ namespace vietvm { namespace compiler {
                 state.importResolutionBase = previousResolutionBase;
                 state.currentSourceIdentity = previousSourceIdentity;
                 state.currentSemanticModuleIdentity = previousSemanticModuleIdentity;
+                if (selectiveGraph) state.importedFunctionAliases = std::move(previousAliases);
                 throw;
             }
             state.importResolutionBase = previousResolutionBase;
             state.currentSourceIdentity = previousSourceIdentity;
             state.currentSemanticModuleIdentity = previousSemanticModuleIdentity;
+            if (selectiveGraph) state.importedFunctionAliases = std::move(previousAliases);
             auto moduleBytecode = moduleArtifacts.bytecode;
             state.moduleInitializers.push_back(
                 CompiledModuleInitializer{canonical, moduleBytecode,
@@ -352,20 +371,27 @@ namespace vietvm { namespace compiler {
                         !edge.importSpec.reExport) {
                         continue;
                     }
-                    const LocalModuleSemanticRecord *dependency =
-                        semanticIndex->module(edge.importedIdentity);
-                    if (dependency == nullptr) continue;
-                    for (const ModuleExportSymbol &exported : dependency->exports) {
-                        if (exported.kind != SemanticSymbolKind::Function) continue;
-                        const std::string visibleName = edge.importSpec.alias.empty()
-                            ? exported.name
-                            : edge.importSpec.alias + "." + exported.name;
-                        const int visibleNameIndex = state.findString(visibleName);
-                        if (visibleNameIndex < 0) continue;
-                        for (const auto &entry : state.functionNameIndices) {
-                            if (entry.second == visibleNameIndex) {
-                                moduleExports.push_back({visibleName, entry.first});
-                                break;
+                    if (selectiveGraph) {
+                        const auto dependency = state.moduleFunctionExports.find(edge.importedIdentity);
+                        if (dependency == state.moduleFunctionExports.end()) continue;
+                        for (const auto &exported : dependency->second) {
+                            if (!matchesImportSelection(edge.importSpec, exported.name)) continue;
+                            moduleExports.push_back({importedSymbolName(edge.importSpec, exported.name),
+                                                     exported.functionId});
+                        }
+                    } else {
+                        const auto *dependency = semanticIndex->module(edge.importedIdentity);
+                        if (dependency == nullptr) continue;
+                        for (const auto &exported : dependency->exports) {
+                            if (exported.kind != SemanticSymbolKind::Function) continue;
+                            const std::string visibleName = importedSymbolName(edge.importSpec, exported.name);
+                            const int nameIndex = state.findString(visibleName);
+                            if (nameIndex < 0) continue;
+                            for (const auto &entry : state.functionNameIndices) {
+                                if (entry.second == nameIndex) {
+                                    moduleExports.push_back({visibleName, entry.first});
+                                    break;
+                                }
                             }
                         }
                     }
@@ -383,9 +409,10 @@ namespace vietvm { namespace compiler {
             }
             state.moduleFunctionExports[canonical] = std::move(uniqueModuleExports);
 
-            if (!moduleAlias.empty()) {
-                // Namespace mọi function khai báo trực tiếp, kể cả private, để chúng
-                // không rò thành callable không-qualified ở module nhập.
+            if (selectiveGraph || !spec.alias.empty()) {
+                // Runtime names are module-private, independent of the first
+                // selection/alias used to load this module. Public bindings live
+                // in importedFunctionAliases and can share the same function ID.
                 for (const auto &ins : moduleBytecode) {
                     if (ins.op != OP_HAM) continue;
                     const int oldNameIndex = ins.operand;
@@ -395,20 +422,15 @@ namespace vietvm { namespace compiler {
                         continue;
                     }
                     const std::string &funcName = state.getString(oldNameIndex);
-                    const std::string namespaced = moduleAlias + "." + funcName;
+                    const std::string namespaced = selectiveGraph
+                        ? "@module:" + canonical + ":" + funcName : spec.alias + "." + funcName;
                     const int newNameIndex = state.storeString(namespaced);
                     state.setFunctionNameIndex(hamId, newNameIndex);
                 }
-
-                // Re-export không có OP_HAM trong bytecode của module trung gian. Dùng
-                // export metadata để prefix chúng qua alias ngoài cùng, ví dụ
-                // `api.toán.nhân` từ `api` -> `công khai nhập math như toán`.
-                const auto exportedSurface = state.moduleFunctionExports.find(canonical);
-                if (exportedSurface != state.moduleFunctionExports.end()) {
-                    for (const auto &exported : exportedSurface->second) {
-                        const int newNameIndex = state.storeString(
-                            moduleAlias + "." + exported.name);
-                        state.setFunctionNameIndex(exported.functionId, newNameIndex);
+                if (!selectiveGraph) {
+                    for (const auto &exported : state.moduleFunctionExports.at(canonical)) {
+                        const int nameIndex = state.storeString(spec.alias + "." + exported.name);
+                        state.setFunctionNameIndex(exported.functionId, nameIndex);
                     }
                 }
             }

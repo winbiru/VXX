@@ -1,5 +1,5 @@
 // Kiểm tra pipeline native nguồn -> AST/IR V++ -> ISA -> đối tượng.
-nhập gói/biên dịch/chính;
+nhập gói.biên dịch.chính.*;
 
 hàm xác nhận(điều_kiện, thông_báo) {
     nếu (!điều_kiện) { ném "native self-host: " + thông_báo; };

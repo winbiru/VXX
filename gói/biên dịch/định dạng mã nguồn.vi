@@ -1,7 +1,8 @@
 // Formatter thuần V++: token và vị trí Unicode do lexer V++ cung cấp.
 // Comment được ghép lại từ khoảng cách giữa token; không sửa literal.
-nhập gói/biên dịch/từ vựng;
-nhập gói/văn bản/chuỗi;
+nhập gói.biên dịch.từ vựng.biên dịch từ tố hóa;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
 
 hàm riêng tư định dạng dòng bình luận(chữ) {
     kết quả = "";

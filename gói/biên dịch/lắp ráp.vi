@@ -1,7 +1,8 @@
 // Xuất nguồn Assembly từ byte mã máy và relocation do backend V++ tạo.
 // Không chạy lại encoder C++: dữ liệu xuất luôn là byte production.
 // .byte giữ nguyên encoding của từng ISA; CALL giữ relocation thật cho linker.
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy trả về;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy ký hiệu hợp lệ;
 
 // Ghép cân bằng: source ASM của hàm lớn không bị sao chép lại sau mỗi byte.
 hàm công khai biên dịch lắp ráp nối các phần(phần) {

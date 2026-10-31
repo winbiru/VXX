@@ -1,6 +1,8 @@
 // Binary HKDF-SHA256 and TLS 1.3 key derivation in V++ (RFC 5869/8446).
 // This module does not authenticate a peer or enable a TLS connection.
-nhập gói/bảo mật/mật mã;
+nhập gói.bảo mật.mật mã.Bộ Mật Mã;
+nhập gói.bảo mật.mật mã.mật mã xor byte;
+nhập gói.bảo mật.mật mã.mật mã sha256 các byte;
 
 lớp công khai Khóa TLS VPP {
     hàm công khai khởi tạo() { mình.băm = Bộ Mật Mã(); };

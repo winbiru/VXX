@@ -1,6 +1,6 @@
 // So byte mã V++ tự phát với các vector chuẩn của backend C++.
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy nền;
+nhập gói.biên dịch.mã máy.*;
+nhập gói.biên dịch.mã máy nền.*;
 
 hàm kiểm tra mã lá(kiến_trúc, loại, hex, hằng = 42, hệ_điều_hành = "linux") {
     byte = biên dịch mã máy lá(kiến_trúc, loại, hằng, hệ_điều_hành);

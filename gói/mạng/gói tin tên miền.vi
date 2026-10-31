@@ -1,8 +1,9 @@
 // DNS wire format (RFC 1035): bộ mã hóa/giải mã thuần V++.
 // Các hàm này chỉ xử lý bytes, không đọc cấu hình DNS hoặc gọi resolver C.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 lớp công khai Bộ Mã DNS {
     hàm công khai khởi tạo() {};

@@ -2,8 +2,9 @@
 // Toàn bộ thuật toán UTF-8/ASCII/Latin-1 nằm ở V++. VM chỉ có hai opcode
 // biểu diễn: sao chép byte chuỗi <-> danh sách, không giải mã Unicode.
 
-nhập gói/lõi/toán học;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 hàm công khai mã điểm unicode(c) {
     nếu (loại của(c) != "chuỗi" || máy ảo lấy độ dài(c) != 1) {

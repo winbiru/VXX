@@ -1,5 +1,5 @@
 nhập lượng tử;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.*;
 nhập kiểm thử;
 nhập json;
 hàm gần(a, b) {

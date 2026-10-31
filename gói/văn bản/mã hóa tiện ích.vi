@@ -614,4 +614,5 @@ hàm công khai bit xor(a, b) {
     bộ chuyển tiếp = Bộ Mã Hóa Tiện Ích();
     trả về bộ chuyển tiếp.bit xor(a, b);
 };
-nhập gói/lõi/chuyển kiểu;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;

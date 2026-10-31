@@ -6,7 +6,7 @@ Các API đó không còn gọi `fopen`, `fread`, `fwrite`, `ferror`, `fseek`, `
 hay `fflush`.
 
 ```vi
-nhập gói/nhập xuất/chính;
+nhập gói.nhập xuất.chính.*;
 
 hàm chính() {
     tệp = Bộ Đệm Tệp("dữ liệu.bin", "ghi", 4096);

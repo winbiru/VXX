@@ -1,6 +1,7 @@
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Hạ Tầng Sự Kiện {
     hàm công khai khởi tạo() {};

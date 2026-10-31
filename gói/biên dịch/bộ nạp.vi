@@ -1,8 +1,12 @@
 // Bộ nạp artifact: tương thích ABI bốn vùng cũ, native FFI dùng năm vùng.
 // Backend AOT chuyển cả hai giao thức thành mã máy; VM legacy nhận bốn vùng.
-nhập gói/biên dịch/liên kết;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
+nhập gói.biên dịch.liên kết.biên dịch chương trình tự chủ;
+nhập gói.biên dịch.liên kết.biên dịch chương trình mô đun tự chủ;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
 
 // Kiểm tra dữ liệu dùng chung không cần một đối tượng trung gian.
 hàm công khai biên dịch nạp danh sách(giá trị, vị trí) {

@@ -2,7 +2,7 @@
 // Runtime chỉ cung cấp primitive chuỗi/list/map; parser, backtracking, capture,
 // search, replace và split đều nằm ở tầng ngôn ngữ.
 
-nhập gói/bộ sưu tập/danh sách;
+nhập gói.bộ sưu tập.danh sách.thêm;
 
 // Mẫu được phân tích một lần, còn trạng thái backtracking luôn riêng mỗi lần gọi.
 lớp công khai Biểu Thức Chính Quy {

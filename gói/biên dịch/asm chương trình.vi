@@ -1,12 +1,13 @@
 // Full-language AOT: ABI bytecode -> Machine IR -> byte/relocation -> ASM.
 // Không gọi compiler/encoder C++; runtime động được gọi qua symbol ABI.
-nhập gói/biên dịch/mã thao tác;
-nhập gói/biên dịch/mã máy;
-nhập gói/biên dịch/mã máy nền;
-nhập gói/biên dịch/lắp ráp;
-nhập gói/biên dịch/đích;
-nhập gói/biên dịch/sản phẩm biên dịch;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp nối các phần;
+nhập gói.biên dịch.lắp ráp.biên dịch lắp ráp mã máy;
+nhập gói.biên dịch.đích.biên dịch phân tích đích;
+nhập gói.biên dịch.sản phẩm biên dịch.Bộ Mã Hóa Sản Phẩm Biên Dịch;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 hàm công khai biên dịch asm tên nội tại() {
     // BEGIN native intrinsic opcodes: đối chiếu bởi vpp-opcode-abi.

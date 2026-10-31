@@ -1,8 +1,8 @@
 // `gọi name(...)` dành riêng cho statement, giữ ABI/dispatch C++.
-nhập gói/biên dịch/phát mã;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/chính;
-nhập gói/lõi/kịch bản;
+nhập gói.biên dịch.phát mã.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.chính.*;
+nhập gói.lõi.kịch bản.*;
 
 hàm gọi khớp mã trung gian(nguồn) {
     cpp = biên dịch mã trung gian(nguồn);

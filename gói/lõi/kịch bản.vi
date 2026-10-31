@@ -1,7 +1,7 @@
 // vpp.scripting — ABI nhúng chung: VM legacy dùng VM, native AOT gọi
 // compiler V++ và thực thi mã máy; tên intrinsic cũ vẫn tương thích ABI.
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
 
 hàm công khai kịch bản chạy nội bộ(mã nguồn, gốc) {
     nếu (loại của(mã nguồn) != "chuỗi") {

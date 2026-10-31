@@ -1,10 +1,11 @@
 // Thay stdio của libc bằng V++: đệm, EOF, partial I/O và cursor logic.
 // Native chỉ giữ open/read/write/seek/tell/close của OS và token thuộc VM.
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
-nhập gói/lõi/giao diện tài nguyên;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
+nhập gói.lõi.giao diện tài nguyên.*;
 
-nhập gói/nhập xuất/tệp thô;
+nhập gói.nhập xuất.tệp thô.*;
 
 lớp công khai Bộ Đệm Tệp triển khai Đóng Được {
     hàm công khai khởi tạo(đường, chế độ, kích thước = 4096, thao tác = "luồng tệp") {

@@ -1,6 +1,6 @@
 // Pipeline hướng đối tượng trên implementation luồng lazy, single-use.
-nhập gói/lõi/giao diện tài nguyên;
-nhập gói/lõi/luồng dữ liệu như luồng giao diện lập trình;
+nhập gói.lõi.giao diện tài nguyên.*;
+nhập gói.lõi.luồng dữ liệu.* như luồng giao diện lập trình;
 
 lớp công khai Luồng Truy Vấn triển khai Đóng Được {
     hàm công khai khởi tạo(nguồn) {

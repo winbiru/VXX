@@ -1,10 +1,10 @@
 // Kiểm thử kiến trúc OOP của thư viện và compiler, giữ các hàm tự do cũ.
-nhập gói/biên dịch/chính;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/trình điều khiển;
-nhập gói/biên dịch/liên kết;
-nhập gói/bộ sưu tập/ngăn xếp;
-nhập gói/bộ sưu tập/hàng đợi;
+nhập gói.biên dịch.chính.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.trình điều khiển.*;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.bộ sưu tập.ngăn xếp.*;
+nhập gói.bộ sưu tập.hàng đợi.*;
 
 hàm chính() {
     mã = "hàm tính(x) { trả về x + 1; }; hàm chính() { in tính(4); };";

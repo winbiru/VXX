@@ -1,9 +1,12 @@
 // Compiler.cpp
 
 #include "vm/instruction.h"
+#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include "frontend/lexer.h"
 #include "compiler/compileRegistry.h"
@@ -114,6 +117,106 @@ std::vector<vietvm::frontend::AstImportSpec> directLocalSourceImports(
     return imports;
 }
 
+// Legacy graphs retain their exact lowering/cache behavior. Explicit graphs
+// retain each selected public function plus dependencies before constructing IR.
+bool hasExplicitImportGraph(const CompilationRegistryState &state, bool topLevel) {
+    if (topLevel || !hasSelectiveImports(state)) return false;
+    const auto &edges = state.activeModuleSemanticIndex->graph.edges;
+    return !edges.empty() && std::all_of(edges.begin(), edges.end(), [](const auto &edge) {
+        return !edge.importSpec.selectedName.empty();
+    });
+}
+
+vietvm::frontend::AstProgram retainSelectedModuleFunctions(
+    const CompilationRegistryState &state,
+    const vietvm::frontend::AstProgram &program,
+    const SemanticModel &semantic) {
+    using namespace vietvm::frontend;
+    const auto &index = *state.activeModuleSemanticIndex;
+    const auto *record = index.module(state.currentSemanticModuleIdentity);
+    if (record == nullptr) return program;
+
+    std::unordered_map<SymbolId, const AstStatement *> functions;
+    std::unordered_map<std::size_t, SymbolId> declarations;
+    for (const auto &statement : program.statements) {
+        if (statement.kind != AstStatementKind::Function) continue;
+        const int id = semantic.symbolForDeclaration(statement.tokenBegin);
+        if (id < 0) return program;
+        functions.emplace(static_cast<SymbolId>(id), &statement);
+        declarations.emplace(statement.span.begin.offset, static_cast<SymbolId>(id));
+    }
+    std::unordered_set<SymbolId> retained;
+    std::vector<SymbolId> pending;
+    auto retain = [&](SymbolId id) {
+        if (functions.count(id) != 0 && retained.insert(id).second) pending.push_back(id);
+    };
+    for (const auto &edge : index.graph.edges) {
+        if (edge.importedIdentity != record->identity) continue;
+        for (const auto &symbol : record->exports) {
+            if (symbol.kind != SemanticSymbolKind::Function ||
+                !matchesImportSelection(edge.importSpec, symbol.name) ||
+                symbol.sourcePath != record->path) continue;
+            const auto declaration = declarations.find(symbol.declaration.begin.offset);
+            if (declaration != declarations.end()) retain(declaration->second);
+        }
+    }
+
+    bool uncertain = false;
+    std::unordered_set<ExprId> visited;
+    std::function<void(const AstStatement &)> scanStatement;
+    std::function<void(ExprId)> scanExpression = [&](ExprId id) {
+        if (id == kInvalidExprId || !visited.insert(id).second) return;
+        const auto *expression = program.expression(id);
+        if (expression == nullptr) { uncertain = true; return; }
+        if (const auto *binding = semantic.bindingForExpression(id)) retain(binding->symbol);
+        if (expression->kind == AstExpressionKind::Call) {
+            const auto *call = semantic.callBindingForExpression(id);
+            if (call == nullptr || call->kind == CallTargetKind::DynamicName ||
+                call->kind == CallTargetKind::Invalid) uncertain = true;
+        }
+        scanExpression(expression->operand);
+        scanExpression(expression->left);
+        scanExpression(expression->right);
+        scanExpression(expression->callee);
+        for (auto argument : expression->arguments) scanExpression(argument);
+        for (auto element : expression->listElements) scanExpression(element);
+        for (const auto &entry : expression->mapEntries) {
+            scanExpression(entry.key);
+            scanExpression(entry.value);
+        }
+        if (expression->kind == AstExpressionKind::Lambda) {
+            const auto *lambda = program.lambda(expression->lambdaId);
+            if (lambda == nullptr) { uncertain = true; return; }
+            for (const auto &parameter : lambda->parameters)
+                if (parameter.hasDefault) scanExpression(parameter.defaultValue);
+            scanStatement(lambda->body);
+        }
+    };
+    scanStatement = [&](const AstStatement &statement) {
+        if (statement.kind == AstStatementKind::Unknown) uncertain = true;
+        for (auto root : statement.expressionRoots) scanExpression(root);
+        for (const auto &parameter : statement.parameters)
+            if (parameter.hasDefault) scanExpression(parameter.defaultValue);
+        for (const auto &arm : statement.switchArms) scanExpression(arm.label);
+        for (const auto &child : statement.children) scanStatement(child);
+    };
+    // Initializers and every class/interface method remain roots, including
+    // their defaults, closures and references to private top-level helpers.
+    for (const auto &statement : program.statements)
+        if (statement.kind != AstStatementKind::Function) scanStatement(statement);
+    for (std::size_t cursor = 0; cursor < pending.size(); ++cursor)
+        scanStatement(*functions.at(pending[cursor]));
+    if (uncertain) return program;
+
+    auto retainedProgram = program;
+    auto &statements = retainedProgram.statements;
+    statements.erase(std::remove_if(statements.begin(), statements.end(), [&](const auto &statement) {
+        return statement.kind == AstStatementKind::Function &&
+            retained.count(static_cast<SymbolId>(semantic.symbolForDeclaration(statement.tokenBegin))) == 0;
+    }), statements.end());
+    return retainedProgram;
+}
+
 } // namespace
 
 // Đặt lại trạng thái toàn cục của compiler như StringPool, function map, import và class context để lần biên dịch mới độc lập.
@@ -162,8 +265,9 @@ static CompilationArtifacts finishPipelineInRegistry(
     }
     const std::string *moduleSource =
         currentImportedModuleSource(state, topLevel);
+    const bool selectiveRetention = hasExplicitImportGraph(state, topLevel);
     CachedImportedMidEnd *cachedMidEnd = nullptr;
-    if (moduleSource != nullptr) {
+    if (moduleSource != nullptr && !selectiveRetention) {
         const auto found =
             importedMidEndCache.find(state.currentSemanticModuleIdentity);
         if (found != importedMidEndCache.end() &&
@@ -190,13 +294,20 @@ static CompilationArtifacts finishPipelineInRegistry(
             }
         }
 
-        artifacts.ir = lowerToIr(artifacts.ast, artifacts.semantic);
+        // Analyze the full source first: unused functions still report all
+        // semantic errors. Keep the lossless AST while lowering only retention.
+        if (selectiveRetention) {
+            const auto retained = retainSelectedModuleFunctions(state, artifacts.ast, artifacts.semantic);
+            artifacts.ir = lowerToIr(retained, artifacts.semantic);
+        } else {
+            artifacts.ir = lowerToIr(artifacts.ast, artifacts.semantic);
+        }
         artifacts.optimization = optimizeIr(artifacts.ir);
 
         const DirectIrSupport directSupport = analyzeDirectIrSupport(artifacts.ir);
         artifacts.unsupportedDirectIrRegions = directSupport.unsupportedRegions;
 
-        if (moduleSource != nullptr) {
+        if (moduleSource != nullptr && !selectiveRetention) {
             if (importedMidEndCache.size() >= kImportedMidEndCacheLimit &&
                 importedMidEndCache.find(state.currentSemanticModuleIdentity) ==
                     importedMidEndCache.end()) {

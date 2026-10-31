@@ -1,6 +1,7 @@
 // vi.xml.dom — thao tác cây node do vi.xml tạo ra.
-nhập gói/dữ liệu/xml/xml;
-nhập gói/bộ sưu tập/chính;
+nhập gói.dữ liệu.xml.xml.xml phân tích;
+nhập gói.dữ liệu.xml.xml.xml tạo;
+nhập gói.bộ sưu tập.chính.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp riêng tư Xử Lý Nội Bộ Cây Tài Liệu {

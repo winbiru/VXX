@@ -118,7 +118,7 @@ StackValue astStatementPrimitive(const vietvm::frontend::AstStatement &statement
     for (const auto &child : statement.children) {
         children.push_back(astStatementPrimitive(child));
     }
-    return make_list_value({
+    std::vector<StackValue> fields{
         make_int_value(kindCode),
         make_string_value(statement.declarationName),
         make_int_value(visibilityCode(statement.visibility)),
@@ -127,7 +127,12 @@ StackValue astStatementPrimitive(const vietvm::frontend::AstStatement &statement
         make_string_value(statement.importSpec.alias),
         make_int_value(statement.importSpec.reExport ? 1 : 0),
         make_list_value(std::move(children)),
-    });
+    };
+    // Preserve the eight-field legacy payload. Explicit selections append
+    // "tên nhập" at 8, leaving children at 7.
+    if (!statement.importSpec.selectedName.empty())
+        fields.push_back(make_string_value(statement.importSpec.selectedName));
+    return make_list_value(std::move(fields));
 }
 
 StackValue astStatementsPrimitive(const vietvm::frontend::AstProgram &program) {

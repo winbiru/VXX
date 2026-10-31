@@ -1,7 +1,7 @@
 // Kiểm thử linker đồ thị cấp function ID cho phương thức trong từng mô-đun.
-nhập gói/biên dịch/liên kết;
-nhập gói/biên dịch/bộ nạp;
-nhập gói/biên dịch/kết quả;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.kết quả.*;
 
 hàm oop_lệnh_khớp(c, v) {
     nếu (độ dài(c) != độ dài(v)) { trả về sai; };
@@ -18,7 +18,7 @@ hàm oop_lệnh_khớp(c, v) {
 
 hàm chính() {
     nguồn = {
-        "app/main": "nhập ../lib/core như công_cụ; " +
+        "app/main": "nhập ..lib.core.* như công_cụ; " +
                     "lớp Vỏ { hàm công khai giá_trị() { trả về 5; }; }; " +
                     "hàm chính() { v = Vỏ(); in công_cụ.tính(); in v.giá_trị(); };",
         "lib/core": "lớp Lõi { hàm công khai giá_trị() { trả về 7; }; }; " +
@@ -58,7 +58,7 @@ hàm chính() {
 
     // Method trong root được cấp ID tại lớp, trước lần import kế tiếp.
     đảo = "lớp Trước { hàm công khai nhận() { trả về 9; }; }; " +
-          "nhập ../lib/core như công_cụ; " +
+          "nhập ..lib.core.* như công_cụ; " +
           "hàm chính() { a = Trước(); in a.nhận(); in công_cụ.tính(); };";
     đảo_artifact = biên dịch chương trình mô đun tự chủ("app/main", {
         "app/main": đảo, "lib/core": nguồn["lib/core"]
@@ -94,7 +94,7 @@ hàm chính() {
     kế_thừa_ngược = "lớp Con kế thừa Cha { " +
                      "hàm công khai đọc() { trả về gốc.đọc() + 1; }; }; " +
                      "lớp Cha { hàm công khai đọc() { trả về 30; }; }; " +
-                     "nhập ../lib/core như công_cụ; " +
+                     "nhập ..lib.core.* như công_cụ; " +
                      "hàm chính() { c = Con(); in c.đọc(); in công_cụ.tính(); };";
     kế_thừa_artifact = biên dịch chương trình mô đun tự chủ("app/main", {
         "app/main": kế_thừa_ngược, "lib/core": nguồn["lib/core"]

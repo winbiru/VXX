@@ -1,6 +1,6 @@
-nhập gói/mạng/phân giải tên miền;
-nhập gói/hệ thống/môi trường;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
     chế_độ = đọc biến môi trường("VPP_DNS_TEST_MODE", "");

@@ -3,10 +3,11 @@
 // Đa nền tảng: bộ đệm V++ trên primitive tệp thô của hệ điều hành.
 // Đường dẫn phải là UTF-8 hợp lệ tại VM primitive boundary.
 
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
+nhập gói.lõi.chuyển kiểu.thành chuỗi;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.bảng mã unicode tám bit mã hóa;
 
-nhập gói/nhập xuất/bộ đệm tệp;
+nhập gói.nhập xuất.bộ đệm tệp.*;
 
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Hệ Tệp {

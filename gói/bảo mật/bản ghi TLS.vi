@@ -1,9 +1,11 @@
 // TLS_CHACHA20_POLY1305_SHA256 record cryptography, entirely V++.
 // RFC 8439 byte arithmetic avoids unsigned overflow in the i32 VM.
 // A record codec is NOT an authenticated TLS handshake or X.509 validator.
-nhập gói/bảo mật/khóa TLS;
-nhập gói/bảo mật/mật mã;
-nhập gói/lõi/toán học;
+nhập gói.bảo mật.khóa TLS.*;
+nhập gói.bảo mật.mật mã.*;
+nhập gói.lõi.toán học.cộng;
+nhập gói.lõi.toán học.làm tròn xuống;
+nhập gói.lõi.toán học.làm tròn;
 
 lớp công khai Mã Bản Ghi TLS VPP {
     hàm công khai khởi tạo() { mình.khóa = Khóa TLS VPP(); mình.băm = Bộ Mật Mã(); };

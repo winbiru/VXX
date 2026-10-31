@@ -11,7 +11,10 @@ hàm vm_int(n) {
     nếu (n >= -16 && n <= 255) {
         cache = vm_get(4198464, 17);
         nếu (cache == 0) {
-            cache = vm_alloc(1088, 1);
+            // 272 cached i32 values plus a managed empty-argument vector
+            // in word 272. Sharing the traced cache avoids colliding with
+            // header word 31, which belongs to the socket token allocator.
+            cache = vm_alloc(1092, 1);
             nếu (cache == 0) { trả về 0; };
             vm_set(4198464, 17, cache);
         };
@@ -87,8 +90,12 @@ hàm vm_truth(v) {
 hàm vm_vector(tag) {
     // Maps reserve one extra slot for the key index mode: 0=empty,
     // 1=ordered strings, 2=ordered integers, 3=mixed keys.
+    // Keep the first two elements inline. Ordinary small argument lists and
+    // one-entry scopes no longer need a second managed allocation for data.
     biến bytes = 16; nếu (tag == 5) { bytes = 20; };
-    biến v = vm_alloc(bytes, 1); nếu (v == 0) { trả về 0; }; vm_set(v, 0, tag); trả về v;
+    biến v = vm_alloc(bytes + 8, 1); nếu (v == 0) { trả về 0; };
+    vm_set(v, 0, tag); vm_set(v, 2, 2); vm_set(v, 3, v + bytes);
+    trả về v;
 };
 hàm vm_at(v, i) {
     nếu (v == 0 || i < 0) { trả về vm_error(4); };
@@ -108,13 +115,22 @@ hàm vm_append(v, item) {
         nếu (cap > 2000000) { trả về vm_error(1); };
         biến raw = vm_alloc(cap * 4, 1); nếu (raw == 0) { trả về 0; };
         lặp(i = 0; i < n; i++) { vm_set(raw, i, vm_at(v, i)); };
+        // Inline cells remain inside the live vector after it grows. Clear
+        // them so the tracing collector does not retain obsolete references.
+        biến inline_at = v + 16; nếu (vm_get(v, 0) == 5) { inline_at = v + 20; };
+        nếu (vm_get(v, 3) == inline_at) {
+            vm_set(inline_at, 0, 0); vm_set(inline_at, 1, 0);
+        };
         vm_set(v, 2, cap); vm_set(v, 3, raw);
     };
     vm_set(vm_get(v, 3), n, item); vm_set(v, 1, n + 1); trả về 0;
 };
 hàm vm_pop(v) {
     biến n = vm_get(v, 1); nếu (n <= 0) { trả về vm_error(5); };
-    biến item = vm_at(v, n - 1); vm_set(vm_get(v, 3), n - 1, 0); vm_set(v, 1, n - 1); trả về item;
+    // n > 0 has already established the element is in bounds. Avoid an
+    // additional checked vm_at call on every VM stack pop.
+    biến data = vm_get(v, 3); biến item = vm_get(data, n - 1);
+    vm_set(data, n - 1, 0); vm_set(v, 1, n - 1); trả về item;
 };
 hàm vm_remove(v, index) {
     biến n = vm_get(v, 1); nếu (index < 0 || index >= n) { trả về vm_error(4); };
@@ -279,6 +295,30 @@ hàm vm_binary(op, a, b) {
     trả về result;
 };
 hàm vm_binary_body(op, a, b) {
+    // Integer arithmetic and comparisons dominate tight loops. Handle two
+    // tagged i32 operands before the generic coercion/UTF-8/real paths.
+    nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
+        biến x = vm_get(a, 1); biến y = vm_get(b, 1);
+        nếu (op == 0) { trả về vm_int(x + y); };
+        nếu (op == 1) { trả về vm_int(x - y); };
+        nếu (op == 2) { trả về vm_int(x * y); };
+        nếu (op == 4) { trả về vm_int(x != 0 && y != 0); };
+        nếu (op == 5) { trả về vm_int(x != 0 || y != 0); };
+        nếu (op == 7) { trả về vm_int(x == y); };
+        nếu (op == 8) { trả về vm_int(x != y); };
+        nếu (op == 9) { trả về vm_int(x > y); };
+        nếu (op == 10) { trả về vm_int(x < y); };
+        nếu (op == 11) { trả về vm_int(x >= y); };
+        nếu (op == 12) { trả về vm_int(x <= y); };
+        nếu (op != 3 && op != 64) { trả về vm_error(2); };
+        nếu (y == 0) { trả về vm_error(6); };
+        nếu (x == -2147483648 && y == -1) {
+            nếu (op == 3) { trả về vm_int(-2147483648); };
+            trả về vm_int(0);
+        };
+        nếu (op == 3) { trả về vm_int(máy chia số nguyên ba mươi hai bit(x, y)); };
+        trả về vm_int(x - máy chia số nguyên ba mươi hai bit(x, y) * y);
+    };
     nếu (op == 7) { trả về vm_int(vm_equal(a, b)); };
     nếu (op == 8) { trả về vm_int(1 - vm_equal(a, b)); };
     nếu (op == 4) { trả về vm_int(vm_truth(a) && vm_truth(b)); };
@@ -316,14 +356,6 @@ hàm vm_binary_body(op, a, b) {
         nếu (cmp == 2) { trả về vm_int(0); };
         nếu (op == 9) { trả về vm_int(cmp > 0); }; nếu (op == 10) { trả về vm_int(cmp < 0); };
         nếu (op == 11) { trả về vm_int(cmp >= 0); }; trả về vm_int(cmp <= 0);
-    };
-    nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
-        biến x = vm_get(a, 1); biến y = vm_get(b, 1);
-        nếu (op == 0) { trả về vm_int(x + y); }; nếu (op == 1) { trả về vm_int(x - y); }; nếu (op == 2) { trả về vm_int(x * y); };
-        nếu (y == 0) { trả về vm_error(6); };
-        nếu (x == -2147483648 && y == -1) { nếu (op == 3) { trả về vm_int(-2147483648); }; trả về vm_int(0); };
-        nếu (op == 3) { trả về vm_int(máy chia số nguyên ba mươi hai bit(x, y)); };
-        trả về vm_int(x - máy chia số nguyên ba mươi hai bit(x, y) * y);
     };
     nếu (op == 64) { trả về vm_error(2); };
     biến r = vm_alloc(16, 0); nếu (r == 0) { trả về 0; }; vm_set(r, 0, 2); vm_set(r, 1, op);

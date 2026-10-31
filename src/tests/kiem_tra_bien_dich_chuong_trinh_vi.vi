@@ -1,9 +1,9 @@
 // Parser câu lệnh và semantic pass chạy hoàn toàn trong thư viện V++.
-nhập gói/biên dịch/chính;
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.biên dịch.chính.*;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm chính() {
-    nguồn = "nhập gói/bộ sưu tập/từ điển; " +
+    nguồn = "nhập gói.bộ sưu tập.từ điển.*; " +
         "hàm tính tổng(a, b) { biến kết_quả = a + b * 2; " +
         "nếu (kết_quả > 0) { in kết_quả; } hoặc { in 0; }; " +
         "trả về kết_quả; }; " +
@@ -63,7 +63,7 @@ hàm chính() {
         ném "parser tham số phương thức nhiều từ không chính xác";
     };
     cây_tên_từ_khóa = biên dịch phân tích chương trình thuần(
-        "nhập gói/nhập xuất/đường dẫn như đường giao diện lập trình; " +
+        "nhập gói.nhập xuất.đường dẫn.* như đường giao diện lập trình; " +
         "thử {} bắt lỗi(số mục bỏ qua) {};"
     );
     các_lệnh_tên = lấy từ điển(cây_tên_từ_khóa, "câu lệnh", []);
@@ -74,8 +74,8 @@ hàm chính() {
 
     // Tên mô-đun kiến trúc có hậu tố số được tách thành từ tố số nguyên.
     cây_kiến_trúc = biên dịch phân tích chương trình thuần(
-        "nhập gói/biên dịch/mã máy x86 64 như x86; " +
-        "nhập gói/biên dịch/bản địa/định dạng elf 64;"
+        "nhập gói.biên dịch.mã máy x86 64.* như x86; " +
+        "nhập gói.biên dịch.bản địa.định dạng elf 64.*;"
     );
     các_nhập = lấy từ điển(cây_kiến_trúc, "câu lệnh", []);
     nếu (các_nhập[0]["đích"] != "gói/biên dịch/mã máy x86 64" ||
@@ -203,8 +203,8 @@ hàm chính() {
 
     // Bí danh `như` được khai báo theo lexical scope và namespace module C++.
     // So hai trường hợp top-level với oracle C++.
-    mã_trùng_bí_danh = "nhập gói/bộ sưu tập/từ điển như trợ_lý; " +
-        "nhập gói/biên dịch/chính như trợ_lý;";
+    mã_trùng_bí_danh = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
+        "nhập gói.biên dịch.chính.* như trợ_lý;";
     lỗi_vpp = sai;
     thử { biên dịch phân tích ngữ nghĩa thuần(mã_trùng_bí_danh); }
     bắt lỗi (e) { lỗi_vpp = đúng; };
@@ -214,8 +214,8 @@ hàm chính() {
     bắt lỗi (e) { lỗi_cpp = đúng; };
     in lỗi_cpp;
 
-    mã_bí_danh_riêng = "nhập gói/bộ sưu tập/từ điển như trợ_lý; " +
-        "nhập gói/biên dịch/chính như trình_dịch;";
+    mã_bí_danh_riêng = "nhập gói.bộ sưu tập.từ điển.* như trợ_lý; " +
+        "nhập gói.biên dịch.chính.* như trình_dịch;";
     lỗi_vpp = sai;
     thử { biên dịch phân tích ngữ nghĩa thuần(mã_bí_danh_riêng); }
     bắt lỗi (e) { lỗi_vpp = đúng; };

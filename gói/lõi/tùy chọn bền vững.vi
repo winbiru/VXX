@@ -2,16 +2,22 @@
 // Logic namespace/serialization/CRUD nằm ở V++. VM chỉ cung cấp các primitive
 // môi trường, đường dẫn, file I/O và codec UTF-8.
 
-nhập gói/hệ thống/môi trường;
-nhập gói/hệ thống/nền tảng;
-nhập gói/nhập xuất/tệp;
-nhập gói/nhập xuất/đường dẫn;
-nhập gói/nhập xuất/thư mục;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/văn bản/chuỗi;
-nhập gói/văn bản/mã hóa tiện ích;
-nhập gói/lõi/bảng mã;
+nhập gói.hệ thống.môi trường.đọc biến môi trường;
+nhập gói.hệ thống.nền tảng.tên nền tảng;
+nhập gói.nhập xuất.tệp.đọc tệp;
+nhập gói.nhập xuất.tệp.ghi tệp;
+nhập gói.nhập xuất.đường dẫn.đường dẫn nối;
+nhập gói.nhập xuất.đường dẫn.đường dẫn tồn tại;
+nhập gói.nhập xuất.thư mục.tạo thư mục;
+nhập gói.nhập xuất.thư mục.xóa đường dẫn;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.văn bản.chuỗi.độ dài;
+nhập gói.văn bản.chuỗi.cắt chuỗi;
+nhập gói.văn bản.mã hóa tiện ích.thập lục phân mã;
+nhập gói.văn bản.mã hóa tiện ích.thập lục phân giải;
+nhập gói.lõi.bảng mã.mã hóa bảng mã;
+nhập gói.lõi.bảng mã.giải mã bảng mã;
 
 // Hàm bền vững quản lý tệp; lớp Kho Tùy Chọn giữ namespace theo instance.
 hàm riêng tư tùy chọn yêu cầu chuỗi(giá trị, nhãn) {

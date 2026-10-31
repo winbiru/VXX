@@ -1,5 +1,5 @@
 // Index reads must accept the temporary returned by a function call.
-nhập gói/bộ sưu tập/từ điển;
+nhập gói.bộ sưu tập.từ điển.*;
 
 hàm tạo_danh_sách() {
     trả về [10, 20, 30];

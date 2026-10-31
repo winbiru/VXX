@@ -1,9 +1,9 @@
-nhập gói/mạng/phân giải tên miền;
-nhập gói/hệ thống/môi trường;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/kiểm thử/khẳng định;
-nhập gói/thời gian/đơn điệu;
+nhập gói.mạng.phân giải tên miền.*;
+nhập gói.hệ thống.môi trường.*;
+nhập gói.lõi.chuyển kiểu.*;
+nhập gói.bộ sưu tập.từ điển.*;
+nhập gói.kiểm thử.khẳng định.*;
+nhập gói.thời gian.đơn điệu.*;
 hàm chính() {
     mode = thành số nguyên(đọc biến môi trường("VPP_DNS_MOCK_MODE", "0"));
     port = thành số nguyên(đọc biến môi trường("VPP_DNS_VI_PORT", "53"));

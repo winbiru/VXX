@@ -13,8 +13,8 @@ Extension nhận diện tên định danh tiếng Việt có dấu và nhiều t
 System FFI cũng được tô màu theo cú pháp hiện có:
 
 ```vi
-công khai nhập gói/mạng/http/chính;
-nhập gói/bộ sưu tập/chính như sưuTập;
+công khai nhập gói.mạng.http.chính.*;
+nhập gói.bộ sưu tập.chính.* như sưuTập;
 
 ngoại thư viện c_hệ_thống = "system.c";
 ngoại hàm getenv(tên: c_chuỗi): c_chuỗi từ c_hệ_thống
@@ -39,8 +39,9 @@ code (snippet) cho `hàm`, `lớp`, `nếu`, `lặp`, `thử`, ... Chọn gợi 
 `Tab`/`Enter`; dùng `Ctrl+Space` để mở danh sách thủ công.
 
 - Hỗ trợ tên nhiều từ và gõ không dấu, ví dụ `tra v` gợi ý `trả về`.
-- Gõ `nhập gói/` để duyệt thư mục và tên tệp `.vi` của mô đun; phần mở rộng
-  `.vi` được bỏ khi chèn đường dẫn.
+- Gõ `nhập gói.` để duyệt thư mục và mô đun bằng dấu chấm. Gõ tiếp
+  `nhập gói.lõi.chuyển kiểu.` để chọn một hàm công khai hoặc `*` để nhập hết.
+  Phần mở rộng `.vi` được bỏ khi chèn đường dẫn.
 - Khi compiler đang chạy ở chế độ LSP, danh sách còn gồm tên biến, hàm,
   lớp và mô đun theo phạm vi ngữ nghĩa. Gợi ý cơ bản vẫn hoạt động khi
   chưa cài VM hoặc đã tắt LSP.

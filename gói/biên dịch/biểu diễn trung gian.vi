@@ -1,12 +1,16 @@
 // Hạ AST parser/semantic V++ thành IR stack-based độc lập với C++.
 // Mỗi lệnh dùng {"mã": ..., "giá trị": ...}; lệnh có thứ tự thực thi.
 // Những cú pháp chưa lower được phải thất bại ngay tại pass này.
-nhập gói/biên dịch/ngữ nghĩa;
-nhập gói/biên dịch/chương trình;
-nhập gói/biên dịch/biểu thức;
-nhập gói/bộ sưu tập/từ điển;
-nhập gói/lõi/chuyển kiểu;
-nhập gói/lõi/bảng mã;
+nhập gói.biên dịch.ngữ nghĩa.biên dịch kiểm tra ngữ nghĩa thuần;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu thức.biên dịch biểu thức ưu tiên;
+nhập gói.biên dịch.biểu thức.biên dịch biểu thức là phép gán;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+nhập gói.bộ sưu tập.từ điển.có khóa;
+nhập gói.bộ sưu tập.từ điển.khóa từ điển;
+nhập gói.lõi.chuyển kiểu.thành số nguyên;
+nhập gói.lõi.chuyển kiểu.loại của;
+nhập gói.lõi.bảng mã.mã điểm unicode;
 
 // Phiên giữ nguồn và cache kết quả riêng; các phương thức nhận tham số giữ API cũ.
 lớp công khai Bộ Hạ IR {
@@ -765,9 +769,11 @@ lớp công khai Bộ Hạ IR {
                     lấy từ điển(mục, "loại", "") == "ngoại hàm") { bỏ qua; };
                 nếu (lấy từ điển(mục, "loại", "") == "nhập" && số mục bỏ qua nhập) {
                     // Bước phát mã cần biết đúng vị trí import trong nguồn.
-                    máy ảo thêm cuối danh sách(thứ tự, {"loại": "nhập", "đích": mục["đích"],
+                    mục nhập IR = {"loại": "nhập", "đích": mục["đích"],
                         "bí danh": lấy từ điển(mục, "bí danh", ""),
-                        "tái xuất": lấy từ điển(mục, "tái xuất", sai)});
+                        "tái xuất": lấy từ điển(mục, "tái xuất", sai)};
+                    nếu (máy ảo có khóa từ điển(mục, "tên nhập")) { mục nhập IR["tên nhập"] = mục["tên nhập"]; };
+                    máy ảo thêm cuối danh sách(thứ tự, mục nhập IR);
                     bỏ qua;
                 };
                 bắt đầu = máy ảo lấy độ dài(đỉnh);
