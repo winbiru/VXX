@@ -67,12 +67,23 @@ packet([=[{"jsonrpc":"2.0","method":"exit"}]=])
 set(input "${VPP_OUTPUT_DIR}/requests.lsp")
 set(output "${VPP_OUTPUT_DIR}/responses.lsp")
 file(WRITE "${input}" "${wire}")
-execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
-    "VPP_NATIVE_COMPILER=${VPP_NATIVE_COMPILER}" "${VPP_CLI}" --lsp
+# Redirect the byte stream directly into the LSP process. Avoid an
+# intermediate `cmake -E env` process that could interfere with redirected
+# stdin on Windows before the Content-Length packets reach the CLI.
+set(ENV{VPP_HOME} "${VPP_ROOT}")
+set(ENV{VPP_NATIVE_COMPILER} "${VPP_NATIVE_COMPILER}")
+execute_process(COMMAND "${VPP_CLI}" --lsp
     INPUT_FILE "${input}" OUTPUT_FILE "${output}"
     RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 120)
 if(NOT status STREQUAL "0")
-    message(FATAL_ERROR "LSP exited ${status}: ${errors}")
+    file(SIZE "${input}" request_size)
+    if(EXISTS "${output}")
+        file(SIZE "${output}" response_size)
+    else()
+        set(response_size 0)
+    endif()
+    message(FATAL_ERROR
+        "LSP exited ${status} (input ${request_size} bytes, output ${response_size} bytes): ${errors}")
 endif()
 # Both normal file(READ) and OUTPUT_VARIABLE normalize CRLF. Decode HEX so
 # framing and Content-Length are checked against the actual wire bytes.
