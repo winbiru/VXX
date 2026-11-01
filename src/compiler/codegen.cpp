@@ -1,5 +1,6 @@
 #include "vpp/compiler/codegen.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <initializer_list>
