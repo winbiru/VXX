@@ -57,7 +57,7 @@ jobs:
           diagnostics="$(mktemp)"
           trap 'rm -f "$output" "$diagnostics"' EXIT
           VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-            cmake-build-debug/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            cmake-build-debug/bin/vpp-cli run --compiler=cpp src/tests/kiem_tra_machine_jit.vi \
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as x86-64 machine code$' "$diagnostics"
@@ -134,11 +134,12 @@ jobs:
           cmake --build cmake-build-sanitized --parallel 2
           # Release regression and installed smoke cover native self-hosting,
           # linker and machine-code checks without sanitizer instrumentation.
+          # Selective imports needs the excluded native compiler/ASM VM fixtures.
           # Exercise frontend, runtime and integration with ASan/UBSan here.
           ASAN_OPTIONS="detect_leaks=1:halt_on_error=1" \
           UBSAN_OPTIONS="halt_on_error=1" \
             ctest --test-dir cmake-build-sanitized --parallel 2 --output-on-failure --no-tests=error \
-              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
+              --exclude-regex '^(vpp-native-|vpp-raw-machine-cli-hardening$|vpp-raw-object-host-link$|vpp-compiler-vpp-cli$|vpp-oop-pipeline$|vpp-compiler-ffi-artifact$|vpp-vm-asm($|-selfhost$)|vpp-selective-imports$|vpp-dns-vpp-mock$|vpp-(benchmark|quantum)-vpp-tool$)'
 
   linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -188,7 +189,7 @@ jobs:
           diagnostics="$(mktemp)"
           trap 'rm -f "$output" "$diagnostics"' EXIT
           VPP_HOME="$PWD" VPP_ENABLE_MACHINE_JIT=1 VPP_MACHINE_JIT_STATS=1 \
-            build/bin/vpp-cli src/tests/kiem_tra_machine_jit.vi \
+            build/bin/vpp-cli run --compiler=cpp src/tests/kiem_tra_machine_jit.vi \
             >"$output" 2>"$diagnostics"
           diff -u src/tests/expected/kiem_tra_machine_jit.expected "$output"
           grep -Eq '^machine-jit: executed [1-9][0-9]* regions / [1-9][0-9]* bytecode instructions as AArch64 machine code$' "$diagnostics"
@@ -428,7 +429,7 @@ jobs:
           $output = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stdout"
           $diagnostics = Join-Path $env:RUNNER_TEMP "vpp-native-jit.stderr"
           $process = Start-Process -FilePath (Resolve-Path "build/bin/Release/vpp-cli.exe").Path `
-            -ArgumentList @("src/tests/kiem_tra_machine_jit.vi") `
+            -ArgumentList @("run", "--compiler=cpp", "src/tests/kiem_tra_machine_jit.vi") `
             -WorkingDirectory (Get-Location).Path `
             -RedirectStandardOutput $output -RedirectStandardError $diagnostics `
             -NoNewWindow -Wait -PassThru

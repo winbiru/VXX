@@ -1,13 +1,17 @@
-// The native embedded compiler must report failures through V++ try/catch.
+// The native embedded compiler must execute valid source and report parser
+// failures through V++ try/catch. Compare the native error directly so the
+// regression is independent of the V++ Unicode substring implementation.
 nhập gói.lõi.kịch bản.kịch bản chạy;
-nhập gói.văn bản.chuỗi.chứa chuỗi;
-nhập gói.lõi.chuyển kiểu.thành chuỗi;
 
 hàm chính() {
+    chạy_được = kịch bản chạy("in 42;") == "42\n";
     bắt_được = sai;
+    lỗi_nhận_được = "";
     thử { kịch bản chạy("hàm {"); }
     bắt lỗi(e) {
-        bắt_được = chứa chuỗi(thành chuỗi(e), "embedded script failed");
+        lỗi_nhận_được = e;
+        bắt_được = e == "kịch bản chạy: Native AOT: embedded script failed: 1";
     };
-    in bắt_được;
+    nếu (!bắt_được) { in "Unexpected native embedded error: " + lỗi_nhận_được; };
+    in chạy_được && bắt_được;
 };
