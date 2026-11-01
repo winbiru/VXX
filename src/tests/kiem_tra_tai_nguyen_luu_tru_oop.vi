@@ -4,6 +4,8 @@ nhập gói.lõi.tùy chọn bền vững.*;
 nhập gói.lõi.quản lý gói.*;
 nhập gói.nhập xuất.tệp.*;
 nhập gói.nhập xuất.đường dẫn.*;
+nhập gói.nhập xuất.thư mục.xóa đường dẫn;
+nhập gói.bộ sưu tập.từ điển.đặt từ điển;
 nhập gói.kiểm thử.chính.*;
 
 hàm chính() {

@@ -312,10 +312,16 @@ lớp công khai Bộ Phân Tích Cú Pháp {
              mình.biên dịch chương trình giá trị(p) != "như") {
             từ tố = biên dịch biểu thức nhìn(p);
             giá trị = lấy từ điển(từ tố, "giá trị", "");
+            // Lexer giữ dấu chấm cuối trong token số như `64.` (số thực).
+            // Trong đường dẫn `mã máy x86 64.*`, đây là phần tên mô đun.
+            loại từ tố = lấy từ điển(từ tố, "loại", "");
+            số có dấu chấm cuối = loại từ tố == "số thực" &&
+                máy ảo lấy độ dài(giá trị) > 1 &&
+                giá trị[máy ảo lấy độ dài(giá trị) - 1] == ".";
             nếu (lấy từ điển(từ tố, "loại", "") == "hết" ||
-                (lấy từ điển(từ tố, "loại", "") != "định danh" &&
-                 lấy từ điển(từ tố, "loại", "") != "từ khóa" &&
-                 lấy từ điển(từ tố, "loại", "") != "số nguyên" && giá trị != "/" &&
+                (loại từ tố != "định danh" &&
+                 loại từ tố != "từ khóa" &&
+                 loại từ tố != "số nguyên" && !số có dấu chấm cuối && giá trị != "/" &&
                  giá trị != "." && giá trị != "*")) {
                 biên dịch biểu thức lỗi(p, "đường dẫn nhập không hợp lệ");
             };

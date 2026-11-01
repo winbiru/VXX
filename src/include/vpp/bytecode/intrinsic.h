@@ -250,10 +250,24 @@ inline constexpr const IntrinsicDescriptor *intrinsicByName(std::string_view nam
 }
 
 inline constexpr const IntrinsicDescriptor *intrinsicByOpcode(int opcode) noexcept {
+    // Ordinary VM opcodes are below this range. Avoid scanning the intrinsic
+    // registry for every numeric literal, arithmetic instruction and branch.
+    if (opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
+        opcode > OP_VM_MACHINE_TLS_RECV) {
+        return nullptr;
+    }
     for (const auto &intrinsic : kVmIntrinsics) {
         if (static_cast<int>(intrinsic.opcode) == opcode) return &intrinsic;
     }
     return nullptr;
 }
+
+static_assert([] {
+    for (const auto &intrinsic : kVmIntrinsics) {
+        if (intrinsic.opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
+            intrinsic.opcode > OP_VM_MACHINE_TLS_RECV) return false;
+    }
+    return true;
+}(), "Intrinsic opcode fast-path range must cover the full registry");
 
 } // namespace vietvm::bytecode

@@ -1,6 +1,8 @@
 // Gói lõi: các tiện ích không phụ thuộc mạng, dữ liệu hoặc ứng dụng.
 nhập gói.lõi.luận lý.*;
 nhập gói.lõi.nhật ký trạng thái.*;
+công khai nhập gói.lõi.nhật ký.*;
+công khai nhập gói.bộ sưu tập.từ điển.*;
 nhập gói.lõi.giao diện tài nguyên.*;
 nhập gói.lõi.xác thực.*;
 nhập gói.lõi.chuyển kiểu.*;
@@ -19,3 +21,5 @@ nhập gói.lõi.cấu hình hướng đối tượng.*;
 nhập gói.lõi.bảng mã.*;
 nhập gói.lõi.bản địa hóa.*;
 nhập gói.lõi.quốc tế hóa.*;
+// API chuỗi cơ bản được cung cấp qua gói lõi cho lối nhập tên gói.
+nhập gói.văn bản.chuỗi.nối chuỗi;

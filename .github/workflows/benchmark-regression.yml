@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       baseline_ref:
-        description: Git revision for baseline (same benchmark harness required)
+        description: Baseline runtime revision (both builds use the candidate benchmark harness)
         required: true
         default: HEAD^
       candidate_ref:

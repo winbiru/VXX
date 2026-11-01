@@ -2,6 +2,13 @@
 nhập gói.biên dịch.sản phẩm biên dịch.*;
 nhập gói.biên dịch.kết quả.*;
 nhập gói.biên dịch.nội tại.*;
+nhập gói.biên dịch.liên kết.*;
+nhập gói.biên dịch.bộ nạp.*;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.dữ liệu.json.json.json phân tích;
+nhập gói.dữ liệu.json.json.json tạo;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.biên dịch.mã thao tác.biên dịch có mã thao tác;
 
 hàm compiler mã trung gian bằng(a, b) {
     nếu (độ dài(a) != độ dài(b)) { trả về sai; };

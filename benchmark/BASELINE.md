@@ -3,6 +3,9 @@
 Benchmark so sánh **hai bản Git đã commit** bằng hai binary Release được build
 riêng, trên **cùng host**, cùng benchmark harness. Runner thu mẫu bằng V++ và
 dùng comparator V++ trong `gói/kiểm thử/so sánh benchmark.vi`.
+Runner lấy năm tệp harness từ commit candidate và dùng cùng nội dung đó để
+build cả hai revision. Baseline vẫn giữ mã compiler/runtime của chính nó,
+kể cả khi baseline còn dùng harness-v2 và candidate đã chuyển sang harness-v3.
 
 ## Chạy thử
 
@@ -37,13 +40,15 @@ kết luận GC p95). Runner mặc định đo toàn bộ case, có giới hạn
 | Median peak RSS hoặc allocation metric tăng **>15%** | `FAIL` |
 | GC pause p95 tăng **>15%** | `FAIL` nếu có >=40 process độc lập |
 | MAD / median **>5%**, hoặc GC case <40 process | `INCONCLUSIVE` |
-| Dữ liệu thiếu/sai, flags instrumentation, checksum khác, harness Git blob khác | `INVALID` |
+| Dữ liệu thiếu/sai, flags instrumentation, checksum khác, hai build không dùng cùng harness | `INVALID` |
 
 Mã thoát: **0** PASS, **1** FAIL, **2** INCONCLUSIVE, **3** INVALID.
 `INCONCLUSIVE`/`INVALID` phải dừng merge như FAIL. Nhiễu máy CI công cộng
 có thể gây INCONCLUSIVE dù code không thay đổi; chạy lại trên host chuyên
-dụng trước khi đánh giá kết quả. Nếu harness thay đổi, chọn baseline mới với
-cùng các tệp workload đã kiểm tra; không so trực tiếp hai định nghĩa case khác.
+dụng trước khi đánh giá kết quả. Khi harness thay đổi, cả hai revision được đo
+lại bằng harness candidate; không so trực tiếp kết quả cũ từ định nghĩa case
+khác. Nếu harness không biên dịch được với API baseline, build phải dừng để
+chọn một baseline tương thích; không bỏ case hoặc thay mã runtime baseline.
 
 Job `benchmark-smoke` đo cùng một binary hai lần để kiểm tra collector và tính
 hợp lệ của evidence. Job này chấp nhận `PASS` hoặc `INCONCLUSIVE`, lưu mẫu nhiễu
@@ -58,6 +63,11 @@ Runner xuất `identities.txt`, `baseline-build.log`, `candidate-build.log`,
 `decision.json` và `collection.log`. Report chứa SHA commit, SHA-256 archive
 Git **thực sự được giải nén để build**, SHA-256 binary, fingerprint harness,
 SHA-256 mã collector, comparator và CLI, cùng OS/CPU được dùng để đo.
+`harness.tar` và `harness.sha256` lưu harness dùng chung cùng hash từng tệp.
+`baseline-source.tar`/`candidate-source.tar` lưu mã thực sự dùng để build sau
+khi áp harness; hash của chúng nằm trong `sources.*.snapshot_sha256`.
+Hash archive Git nguyên gốc được giữ riêng ở `revision_snapshot_sha256`;
+`harness_source_commit` và `harness_archive_sha256` ghi nguồn harness.
 Khi lưu kết quả cần giữ cả thư mục và đối chiếu phiên bản toolchain trong
 metadata build. Các binary trong scratch bị xóa
 sau chạy; có hash để đối chiếu nhưng không được đóng gói trong evidence.

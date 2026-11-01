@@ -608,6 +608,11 @@ lớp công khai Bộ Hạ IR {
             nếu (giá trị != rỗng) {
                 mình.biên dịch IR biểu thức(giá trị, lệnh);
                 mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "gán tên", tên);
+                // Khởi tạo ngay trong khai báo là DeclareVariable của C++ IR,
+                // không phải StoreName cần khởi tạo lại trước thân hàm.
+                mục = lệnh[máy ảo lấy độ dài(lệnh) - 1];
+                mục["từ khai báo"] = đúng;
+                lệnh[máy ảo lấy độ dài(lệnh) - 1] = mục;
             };
             trả về đúng;
         };

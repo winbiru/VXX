@@ -7,6 +7,7 @@ nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 nhập gói.bộ sưu tập.danh sách.tổng danh sách;
 nhập gói.bộ sưu tập.danh sách.nhỏ nhất danh sách;
 nhập gói.bộ sưu tập.danh sách.lớn nhất danh sách;
+nhập gói.lõi.chuyển kiểu.thành số thực;
 
 hàm công khai thống kê là không phải số(giá trị) {
     nếu (loại của(giá trị) != "số thực") {

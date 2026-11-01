@@ -305,7 +305,8 @@ target_link_libraries(vpp-tooling PUBLIC vpp-compiler vpp-bytecode)
 vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_runtime.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
-    ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp)
+    ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp
+    ${CMAKE_SOURCE_DIR}/src/native/aot_windows_entry.cpp)
 target_link_libraries(vpp-native-aot PUBLIC vpp-runtime-native)
 if (BUILD_TESTS)
     add_executable(vpp-native-aot-scalar-loop-semantics
@@ -927,6 +928,15 @@ if (BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake)
         set_tests_properties(vpp-native-cli-compiler-bootstrap PROPERTIES
             FIXTURES_SETUP native-cli-compiler TIMEOUT 420)
+        add_test(NAME vpp-native-unicode-cli
+            COMMAND ${CMAKE_COMMAND}
+                "-DVPP_CLI=$<TARGET_FILE:vpp-cli>"
+                "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-unicode-cli"
+                -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_unicode_cli.cmake)
+        set_tests_properties(vpp-native-unicode-cli PROPERTIES
+            FIXTURES_REQUIRED native-cli-compiler TIMEOUT 120)
         add_test(NAME vpp-native-socket-dns-vi-fixture
             COMMAND ${CMAKE_COMMAND}
                 "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"

@@ -325,6 +325,7 @@ TESTS=(
   src/tests/kiem_tra_closure_capture.vi
   src/tests/kiem_tra_ham_an_danh_tu_chu.vi
   src/tests/kiem_tra_list_literal.vi
+  src/tests/kiem_tra_khung_bien_module.vi
   src/tests/kiem_tra_collection_bai_63_75.vi
   src/tests/kiem_tra_toan_tu_moi.vi
   src/tests/kiem_tra_lop_truy_cap.vi

@@ -96,7 +96,9 @@ hàm chính() {
         nếu (s == 1) { upper = "CANDIDATE"; };
         commit = gate_env("VPP_GATE_" + upper + "_SHA");
         sources[side] = {"commit": commit,
-            "snapshot_sha256": gate_env("VPP_GATE_" + upper + "_SNAPSHOT_SHA")};
+            "snapshot_sha256": gate_env("VPP_GATE_" + upper + "_SNAPSHOT_SHA"),
+            "revision_snapshot_sha256": đọc biến môi trường("VPP_GATE_" + upper + "_REVISION_SHA",
+                gate_env("VPP_GATE_" + upper + "_SNAPSHOT_SHA"))};
         builds[side] = {"binary_sha256": gate_env("VPP_GATE_" + upper + "_BINARY_SHA"),
             "cmake": {"BUILD_TESTS": "OFF", "BUILD_BENCHMARKS": "ON",
                 "CMAKE_BUILD_TYPE": "Release"}, "meta": {}};
@@ -106,6 +108,8 @@ hàm chính() {
             "os": gate_env("VPP_GATE_OS"), "cpu": gate_env("VPP_GATE_CPU")},
         "environment": {"VPP_ENABLE_JIT": "0", "VPP_ENABLE_MACHINE_JIT": "0"},
         "harness_sha256": gate_env("VPP_GATE_HARNESS_SHA"),
+        "harness_source_commit": đọc biến môi trường("VPP_GATE_HARNESS_COMMIT", ""),
+        "harness_archive_sha256": đọc biến môi trường("VPP_GATE_HARNESS_ARCHIVE_SHA", ""),
         "collector_sha256": gate_env("VPP_GATE_COLLECTOR_SHA"),
         "comparator_sha256": gate_env("VPP_GATE_COMPARATOR_SHA"),
         "cli_sha256": gate_env("VPP_GATE_CLI_SHA"),

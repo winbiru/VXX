@@ -1286,6 +1286,44 @@ void VM::invokeFunction(int argc,
         }
     }
 
+    // Legacy class-qualified calls (Class.method(...)) are also used by
+    // exported V++ modules. Resolve them through the runtime class table so
+    // inherited methods and member visibility use the same rules as instance
+    // dispatch. A class-qualified invocation has no instance receiver; code
+    // that needs `mình` must be called on an instance instead.
+    if (it == hamBytecodeMap.end() && hamIdOrName < 0) {
+        const int nameIndex = -(hamIdOrName + 1);
+        if (nameIndex >= 0 &&
+            nameIndex < static_cast<int>(stringPool.size())) {
+            const std::string &qualified = stringPool[static_cast<std::size_t>(nameIndex)];
+            const std::size_t dot = qualified.rfind('.');
+            if (dot != std::string::npos) {
+                const auto klass = classTable.find(qualified.substr(0, dot));
+                if (klass != classTable.end()) {
+                    const std::string methodName = qualified.substr(dot + 1);
+                    const auto method = vietvm::runtime::resolveMethod(
+                        klass->second, methodName);
+                    if (method.has_value()) {
+                        const ClassHandle callerClass = callStack.empty()
+                            ? nullptr : callStack.back().methodOwnerClass;
+                        if (!canAccessRuntimeMethod(
+                                method->visibility, callerClass, method->owner)) {
+                            throw runtime_error_op(
+                                runtimeMethodAccessMessage(method->visibility, methodName),
+                                op, curPc,
+                                vietvm::runtime::runtimeMemberFacts(
+                                    methodName, true, true, true, true, false));
+                        }
+                        it = hamBytecodeMap.find(method->functionId);
+                        if (it != hamBytecodeMap.end()) {
+                            methodOwnerClass = method->owner;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (it == hamBytecodeMap.end()) {
         const int nameIndex = (hamIdOrName < 0) ? -(hamIdOrName + 1) : hamIdOrName;
         std::string fnName = "?";

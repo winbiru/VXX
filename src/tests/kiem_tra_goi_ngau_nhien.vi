@@ -1,4 +1,5 @@
 nhập ngẫu nhiên;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
 
 hàm chính() {
     a = tạo bộ sinh ngẫu nhiên(2026);

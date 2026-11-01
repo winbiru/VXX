@@ -1,0 +1,6 @@
+nhập gói.bộ sưu tập.tập hợp.Tiện Ích Tập Hợp;
+
+hàm công khai tạo tập với biến cục bộ(đầu vào) {
+    bộ chuyển tiếp = Tiện Ích Tập Hợp();
+    trả về bộ chuyển tiếp.tập hợp(đầu vào);
+};

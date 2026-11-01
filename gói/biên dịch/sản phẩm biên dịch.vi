@@ -5,6 +5,7 @@ nhập gói.biên dịch.bộ nạp.biên dịch nạp sản phẩm biên dịch
 nhập gói.biên dịch.bộ nạp.biên dịch chạy sản phẩm biên dịch;
 nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
 nhập gói.biên dịch.mã thao tác.*;
+nhập gói.biên dịch.nội tại.biên dịch là mã nội tại;
 nhập gói.dữ liệu.json.json.json phân tích;
 nhập gói.dữ liệu.json.json.json tạo;
 nhập gói.bộ sưu tập.từ điển.lấy từ điển;
@@ -32,6 +33,10 @@ lớp công khai Bộ Mã Hóa Sản Phẩm Biên Dịch {
         };
         nếu (!biên dịch có mã thao tác(lệnh[0])) {
             ném "biên dịch artifact: opcode C++ chưa định nghĩa";
+        };
+        nếu ((lệnh[1] != 0 || lệnh[2] != 0 || lệnh[3] != 0) &&
+            biên dịch là mã nội tại(lệnh[0])) {
+            ném "biên dịch artifact: VM primitive không nhận immediate operand";
         };
     };
     trả về vùng;

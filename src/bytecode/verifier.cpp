@@ -121,9 +121,11 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                          messages::messageText(messages::kBytecodeUnknownOpcode));
         }
         const Opcode opcode = static_cast<Opcode>(rawOpcode);
-        if (intrinsicByOpcode(rawOpcode) != nullptr &&
-            (instruction.operand != 0 || instruction.operandIndex != 0 ||
-             instruction.operandValue != 0)) {
+        // Most bytecode instructions carry operands. Only consult the
+        // intrinsic table when an instruction has an immediate to reject.
+        if ((instruction.operand != 0 || instruction.operandIndex != 0 ||
+             instruction.operandValue != 0) &&
+            intrinsicByOpcode(rawOpcode) != nullptr) {
             return issue(index, rawOpcode, "VM primitive không nhận immediate operand");
         }
 

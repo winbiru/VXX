@@ -1,5 +1,6 @@
 // Thuật toán quoting Win32 nằm trong V++, nên kiểm tra được trên mọi nền tảng.
 nhập gói.hệ thống.tiến trình.*;
+nhập gói.lõi.bảng mã.ký tự unicode;
 
 hàm chính() {
     q = "\"";

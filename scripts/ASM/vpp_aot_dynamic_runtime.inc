@@ -11,8 +11,14 @@
 #endif
 .text
 .p2align 2
+#if defined(_WIN32) && (defined(__x86_64__) || defined(_M_X64))
+// The CRT must supply UTF-16 argv before any ANSI code-page conversion.
+.globl wmain
+wmain:
+#else
 .globl AOT_PUBLIC(main)
 AOT_PUBLIC(main):
+#endif
 #if defined(__aarch64__) || defined(__arm64__)
 #if defined(__APPLE__)
     adrp x2, AOT_PUBLIC(vpp_aot_spec)@PAGE
@@ -24,7 +30,7 @@ AOT_PUBLIC(main):
     b AOT_PUBLIC(vpp_aot_main)
 #elif defined(_WIN32)
     leaq AOT_PUBLIC(vpp_aot_spec)(%rip), %r8
-    jmp AOT_PUBLIC(vpp_aot_main)
+    jmp AOT_PUBLIC(vpp_aot_wmain)
 #else
     leaq AOT_PUBLIC(vpp_aot_spec)(%rip), %rdx
     jmp AOT_PUBLIC(vpp_aot_main)

@@ -1,5 +1,7 @@
 
 
+nhập gói.lõi.chuyển kiểu.loại của;
+
 // Lớp sở hữu toàn bộ thuật toán của mô-đun; các hàm bên dưới chỉ giữ API cũ.
 lớp công khai Tiện Ích Tập Hợp {
     hàm công khai khởi tạo() {};
@@ -146,72 +148,58 @@ lớp công khai Tiện Ích Tập Hợp {
 
 
 hàm công khai tập yêu cầu danh sách(danh sách đầu vào) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập yêu cầu danh sách(danh sách đầu vào);
+    trả về Tiện Ích Tập Hợp().tập yêu cầu danh sách(danh sách đầu vào);
 };
 
 hàm công khai tập chứa(danh sách đầu vào, giá trị) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập chứa(danh sách đầu vào, giá trị);
+    trả về Tiện Ích Tập Hợp().tập chứa(danh sách đầu vào, giá trị);
 };
 
 hàm công khai tập hợp(danh sách đầu vào) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập hợp(danh sách đầu vào);
+    trả về Tiện Ích Tập Hợp().tập hợp(danh sách đầu vào);
 };
 
 hàm công khai hợp tập(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.hợp tập(a, b);
+    trả về Tiện Ích Tập Hợp().hợp tập(a, b);
 };
 
 hàm công khai giao tập(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.giao tập(a, b);
+    trả về Tiện Ích Tập Hợp().giao tập(a, b);
 };
 
 hàm công khai rời nhau(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.rời nhau(a, b);
+    trả về Tiện Ích Tập Hợp().rời nhau(a, b);
 };
 
 hàm công khai hiệu tập(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.hiệu tập(a, b);
+    trả về Tiện Ích Tập Hợp().hiệu tập(a, b);
 };
 
 hàm công khai hiệu đối xứng tập(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.hiệu đối xứng tập(a, b);
+    trả về Tiện Ích Tập Hợp().hiệu đối xứng tập(a, b);
 };
 
 hàm công khai tập con(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập con(a, b);
+    trả về Tiện Ích Tập Hợp().tập con(a, b);
 };
 
 hàm công khai tập con thực sự(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập con thực sự(a, b);
+    trả về Tiện Ích Tập Hợp().tập con thực sự(a, b);
 };
 
 hàm công khai tập cha(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập cha(a, b);
+    trả về Tiện Ích Tập Hợp().tập cha(a, b);
 };
 
 hàm công khai tập bằng(a, b) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập bằng(a, b);
+    trả về Tiện Ích Tập Hợp().tập bằng(a, b);
 };
 
 hàm công khai tập thêm(danh sách đầu vào, giá trị) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập thêm(danh sách đầu vào, giá trị);
+    trả về Tiện Ích Tập Hợp().tập thêm(danh sách đầu vào, giá trị);
 };
 
 hàm công khai tập xóa(danh sách đầu vào, giá trị) {
-    bộ chuyển tiếp = Tiện Ích Tập Hợp();
-    trả về bộ chuyển tiếp.tập xóa(danh sách đầu vào, giá trị);
+    trả về Tiện Ích Tập Hợp().tập xóa(danh sách đầu vào, giá trị);
 };
 nhập gói.lõi.chuyển kiểu.loại của;

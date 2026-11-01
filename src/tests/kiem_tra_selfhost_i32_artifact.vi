@@ -3,6 +3,7 @@ nhập gói.biên dịch.sản phẩm biên dịch.*;
 nhập gói.biên dịch.bộ nạp.*;
 nhập gói.biên dịch.liên kết.*;
 nhập gói.biên dịch.mã thao tác.*;
+nhập gói.biên dịch.nội tại.biên dịch là mã nội tại;
 nhập gói.dữ liệu.json.json.*;
 
 hàm yêu cầu selfhost(điều_kiện, tên) {
@@ -71,6 +72,25 @@ hàm chính() {
     gói = json phân tích(văn_bản);
     gói["dây"][0][0][0] = 42;
     yêu cầu từ chối artifact(gói, "opcode không tồn tại");
+    // Opcode intrinsic không được chứa toán hạng trực tiếp, tương tự verifier C++.
+    yêu cầu selfhost(biên dịch là mã nội tại(biên dịch mã thao tác("OP_VM_LENGTH")) &&
+                    biên dịch là mã nội tại(biên dịch mã thao tác("OP_VM_MACHINE_TLS_RECV")) &&
+                    !biên dịch là mã nội tại(biên dịch mã thao tác("OP_FFI_CALL")) &&
+                    !biên dịch là mã nội tại(biên dịch mã thao tác("OP_VM_KY_TU_UNICODE")) &&
+                    !biên dịch là mã nội tại(biên dịch mã thao tác("OP_VM_TASK_WAIT")) &&
+                    !biên dịch là mã nội tại(biên dịch mã thao tác("OP_GOI")),
+                    "phân loại intrinsic theo ABI C++");
+    số nội tại = 0;
+    lặp(mã = 98; mã <= 208; mã++) {
+        nếu (biên dịch là mã nội tại(mã)) { số nội tại++; };
+    };
+    yêu cầu selfhost(số nội tại == 103, "đủ 103 opcode intrinsic C++");
+    gói = json phân tích(văn_bản);
+    gói["dây"][0][0] = [biên dịch mã thao tác("OP_VM_LENGTH"), 1, 0, 0];
+    yêu cầu từ chối artifact(gói, "intrinsic có toán hạng");
+    gói = json phân tích(văn_bản);
+    gói["dây"][0][0] = [biên dịch mã thao tác("OP_VM_MACHINE_TLS_RECV"), 0, 0, -1];
+    yêu cầu từ chối artifact(gói, "intrinsic máy có giá trị tức thời");
     gói = json phân tích(văn_bản);
     gói["dây"][2][0][0] = 0.0;
     yêu cầu từ chối artifact(gói, "function ID số thực");

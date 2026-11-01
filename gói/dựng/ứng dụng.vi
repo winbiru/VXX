@@ -5,3 +5,17 @@ nhập gói.nhập xuất.chính.*;
 nhập gói.mạng.chính.*;
 nhập gói.dữ liệu.chính.*;
 nhập gói.ứng dụng.chính.*;
+// Facade công khai: các tiện ích được ứng dụng nhập trực tiếp từ gói dựng.
+công khai nhập gói.ứng dụng.vòng đời.*;
+công khai nhập gói.dữ liệu.phân trang.*;
+công khai nhập gói.mạng.http.dịch vụ tài nguyên.nối đường dẫn địa chỉ tài nguyên;
+công khai nhập gói.lõi.xác thực.*;
+công khai nhập gói.lõi.nhật ký.Nhật ký;
+công khai nhập gói.lõi.nhật ký.ghi lỗi;
+// Tiện ích starter được xuất công khai kể cả khi các gói phụ là entrypoint.
+công khai nhập gói.nhập xuất.tệp.ghi tệp;
+công khai nhập gói.nhập xuất.tệp.đọc tệp;
+công khai nhập gói.văn bản.chuỗi.là chuỗi rỗng;
+công khai nhập gói.thời gian.chính.giờ hiện tại;
+công khai nhập gói.lõi.toán học.cộng;
+công khai nhập gói.lõi.luận lý.tất cả;

@@ -1,5 +1,16 @@
 // Tên tiếng Việt và tên tương thích dùng chung mã thao tác, số tham số và quyền gọi.
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+
+// Đồng bộ tập opcode intrinsic với kVmIntrinsics trong
+// src/include/vpp/bytecode/intrinsic.h. Các mã đã nghỉ (110, 115, 119,
+// 131..134) và OP_FFI_CALL (156) không nằm trong bảng intrinsic.
+// Chỉ gọi kiểm tra này khi lệnh có immediate khác 0, như verifier C++.
+hàm công khai biên dịch là mã nội tại(mã) {
+    nếu (mã < 98 || mã > 208) { trả về sai; };
+    trả về mã != 110 && mã != 115 && mã != 119 &&
+        (mã < 131 || mã > 134) && mã != 156;
+};
+
 hàm công khai biên dịch nội tại(tên) {
     chọn (tên) {
         ca "máy ảo lấy loại": { trả về [biên dịch mã thao tác("OP_VM_TYPE_OF"), 1, sai]; }

@@ -19,31 +19,32 @@ fi
 baseline_sha=$(git -C "$root" rev-parse --verify "${baseline_ref}^{commit}")
 candidate_sha=$(git -C "$root" rev-parse --verify "${candidate_ref}^{commit}")
 
-# Both revisions must use identical workload code. Changes to the harness
-# require a new baseline; otherwise a timing difference is not attributable
-# to the candidate compiler/runtime.
-for source in benchmark/benchmark_baseline.cpp benchmark/telemetry.cpp \
-              benchmark/telemetry.h benchmark/benchmark_config.h.in benchmark/CMakeLists.txt; do
-  before=$(git -C "$root" rev-parse "${baseline_sha}:${source}")
-  after=$(git -C "$root" rev-parse "${candidate_sha}:${source}")
-  if [ "$before" != "$after" ]; then
-    echo "Benchmark harness changed between revisions ($source); select a compatible baseline" >&2
+# Compile both runtime revisions with one immutable workload definition. The
+# baseline may predate this harness, including its telemetry/JSON protocol.
+harness_sha=$candidate_sha
+harness_sources=(benchmark/benchmark_baseline.cpp benchmark/telemetry.cpp
+                 benchmark/telemetry.h benchmark/benchmark_config.h.in benchmark/CMakeLists.txt)
+for source in "${harness_sources[@]}"; do
+  if ! git -C "$root" cat-file -e "${harness_sha}:${source}" 2>/dev/null; then
+    echo "Candidate benchmark harness is missing $source" >&2
     exit 3
   fi
 done
-
-# The built-in CMake hash utility is supported on both macOS and Linux.
-fingerprint=$(
-  for source in benchmark/benchmark_baseline.cpp benchmark/telemetry.cpp \
-                benchmark/telemetry.h benchmark/benchmark_config.h.in benchmark/CMakeLists.txt; do
-    git -C "$root" rev-parse "${candidate_sha}:${source}"
-  done | cmake -E sha256sum /dev/stdin | cut -d' ' -f1
-)
 
 mkdir -p "$output"
 output=$(CDPATH= cd "$output" && pwd)
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/vpp-gate.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
+git -C "$root" archive "$harness_sha" -- "${harness_sources[@]}" > "$output/harness.tar"
+harness_archive_hash=$(cmake -E sha256sum "$output/harness.tar" | cut -d' ' -f1)
+mkdir -p "$scratch/harness"
+tar -xf "$output/harness.tar" -C "$scratch/harness"
+(
+  cd "$scratch/harness"
+  cmake -E sha256sum "${harness_sources[@]}"
+) > "$output/harness.sha256"
+fingerprint=$(cmake -E sha256sum "$output/harness.sha256" | cut -d' ' -f1)
+printf 'Shared benchmark harness: %s (%s)\n' "$harness_sha" "$fingerprint"
 
 for side in baseline candidate; do
   revision=$baseline_sha
@@ -51,11 +52,24 @@ for side in baseline candidate; do
   mkdir -p "$scratch/$side"
   git -C "$root" archive "$revision" > "$scratch/$side.tar"
   tar -xf "$scratch/$side.tar" -C "$scratch/$side"
-  archive_hash=$(cmake -E sha256sum "$scratch/$side.tar" | cut -d' ' -f1)
+  revision_archive_hash=$(cmake -E sha256sum "$scratch/$side.tar" | cut -d' ' -f1)
+  tar -xf "$output/harness.tar" -C "$scratch/$side"
+  for source in "${harness_sources[@]}"; do
+    if ! cmp -s "$scratch/harness/$source" "$scratch/$side/$source"; then
+      echo "$side does not contain the shared benchmark harness: $source" >&2
+      exit 3
+    fi
+  done
+  # Retain the actual source snapshot used for compilation, including the
+  # shared harness, as well as the identity of the original Git archive.
+  tar -cf "$output/${side}-source.tar" -C "$scratch/$side" .
+  archive_hash=$(cmake -E sha256sum "$output/${side}-source.tar" | cut -d' ' -f1)
   if [ "$side" = baseline ]; then
     baseline_snapshot_hash=$archive_hash
+    baseline_revision_hash=$revision_archive_hash
   else
     candidate_snapshot_hash=$archive_hash
+    candidate_revision_hash=$revision_archive_hash
   fi
   cmake -S "$scratch/$side" -B "$scratch/$side-build" \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=ON \
@@ -79,9 +93,12 @@ export VPP_GATE_BASELINE_BIN="$baseline_bin" VPP_GATE_CANDIDATE_BIN="$candidate_
 export VPP_GATE_BASELINE_SHA="$baseline_sha" VPP_GATE_CANDIDATE_SHA="$candidate_sha"
 export VPP_GATE_BASELINE_SNAPSHOT_SHA="$baseline_snapshot_hash"
 export VPP_GATE_CANDIDATE_SNAPSHOT_SHA="$candidate_snapshot_hash"
+export VPP_GATE_BASELINE_REVISION_SHA="$baseline_revision_hash"
+export VPP_GATE_CANDIDATE_REVISION_SHA="$candidate_revision_hash"
 export VPP_GATE_BASELINE_BINARY_SHA="$baseline_hash"
 export VPP_GATE_CANDIDATE_BINARY_SHA="$candidate_hash"
 export VPP_GATE_HARNESS_SHA="$fingerprint" VPP_GATE_HOST="$(uname -sm)"
+export VPP_GATE_HARNESS_COMMIT="$harness_sha" VPP_GATE_HARNESS_ARCHIVE_SHA="$harness_archive_hash"
 export VPP_GATE_COLLECTOR_SHA="$(cmake -E sha256sum "$root/scripts/quality/collect_benchmark_gate.vi" | cut -d' ' -f1)"
 export VPP_GATE_COMPARATOR_SHA="$(cmake -E sha256sum "$root/gói/kiểm thử/so sánh benchmark.vi" | cut -d' ' -f1)"
 export VPP_GATE_CLI_SHA="$(cmake -E sha256sum "$cli" | cut -d' ' -f1)"
@@ -107,6 +124,9 @@ printf 'baseline=%s\ncandidate=%s\nbaseline_snapshot_sha256=%s\ncandidate_snapsh
   "$fingerprint" "$VPP_GATE_COLLECTOR_SHA" "$VPP_GATE_COMPARATOR_SHA" \
   "$VPP_GATE_CLI_SHA" "$VPP_GATE_OS" "$VPP_GATE_CPU" "$baseline_hash" "$candidate_hash" \
   > "$output/identities.txt"
+printf 'harness_commit=%s\nharness_archive_sha256=%s\nbaseline_revision_snapshot_sha256=%s\ncandidate_revision_snapshot_sha256=%s\n' \
+  "$harness_sha" "$harness_archive_hash" "$baseline_revision_hash" "$candidate_revision_hash" \
+  >> "$output/identities.txt"
 
 "$cli" run --compiler=cpp "$root/scripts/quality/collect_benchmark_gate.vi" \
   | tee "$output/collection.log"

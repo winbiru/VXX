@@ -330,6 +330,9 @@ jobs:
             build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
             scripts/quality/test_benchmark_gate.vi
 
+      - name: Validate shared benchmark harness across Git revisions
+        run: bash scripts/quality/check_benchmark_gate_runner.sh
+
       - name: Check benchmark gate exit codes for every decision
         shell: bash
         run: |

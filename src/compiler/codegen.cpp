@@ -2328,6 +2328,37 @@ struct Emitter {
     std::vector<Instruction> emitFunctionBody(
         const IrInstruction &instruction,
         std::vector<vietvm::runtime::RuntimeSourceLocation> &functionDebugInfo) {
+        // A function's implicitly assigned locals need frame slots before any
+        // statement executes. Otherwise OP_GAN can see a same-numbered global
+        // slot from an importing module and overwrite that global instead.
+        // Collect the slots up front so assignments inside conditional paths
+        // are also protected even when another branch executes first.
+        std::unordered_set<int> assignedLocals;
+        const auto scanValue = [&](const auto &self, IrValueId id) -> void {
+            const IrValue *value = program.value(id);
+            if (value == nullptr) return;
+            if (value->opcode == IrValueOpcode::StoreName &&
+                !value->operands.empty()) {
+                const IrValue *target = program.value(value->operands.front());
+                if (target != nullptr && isLexicalSlotSymbol(target->symbolId)) {
+                    assignedLocals.insert(slotForSymbol(target->symbolId, target->text));
+                }
+            }
+            for (IrValueId child : value->operands) self(self, child);
+        };
+        const auto scanStatement = [&](const auto &self, const IrInstruction &body) -> void {
+            for (IrValueId root : body.expressionRoots) scanValue(scanValue, root);
+            for (const IrInstruction &child : body.children) {
+                if (child.opcode != IrOpcode::DefineFunction &&
+                    child.opcode != IrOpcode::DefineClass) {
+                    self(self, child);
+                }
+            }
+        };
+        scanStatement(scanStatement, instruction.children.front());
+        std::vector<int> localSlots(assignedLocals.begin(), assignedLocals.end());
+        std::sort(localSlots.begin(), localSlots.end());
+
         std::vector<Instruction> functionBytecode;
         auto *previousDebugInfo = activeDebugInfo;
         const std::string previousFunctionName = activeFunctionName;
@@ -2341,6 +2372,9 @@ struct Emitter {
         emittedTryDepth = 0;
         DebugRangeGuard functionGuard(*this, functionBytecode, instruction.span);
         functionBytecode.push_back({OP_MO_KHOI, 0, 0, 0});
+        for (int slot : localSlots) {
+            functionBytecode.push_back({OP_KHOI_TAO, 0, slot, 0});
+        }
         for (std::size_t index = 0;
              index < instruction.implicitReceiverNames.size(); ++index) {
             const int receiverSlot = slotForSymbol(

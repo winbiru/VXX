@@ -258,7 +258,8 @@ hàm công khai biên dịch sổ đăng ký mô đun(sổ, đồ thị, định
             };
             // Compiler C++ áp bí danh sau khi phát xong module phụ thuộc.
             // Metadata tên chạy tách khỏi tên khai báo/OP_HAM nguyên gốc.
-            nếu (tên tiền tố != "" && lấy từ điển(e, "tên nhập", "") == "" && e["hành động"] == "load" &&
+            tên chọn = lấy từ điển(e, "tên nhập", "");
+            nếu (tên tiền tố != "" && (tên chọn == "" || tên chọn == "*") && e["hành động"] == "load" &&
                 !lấy từ điển(sổ, "hoãn chuỗi", sai)) {
                 trực phụ = phụ thuộc["trực tiếp"];
                 lặp(j = 0; j < máy ảo lấy độ dài(trực phụ); j++) {

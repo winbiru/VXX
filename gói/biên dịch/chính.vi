@@ -2,6 +2,7 @@
 nhập gói.bộ sưu tập.từ điển.*;
 nhập gói.biên dịch.kết quả.*;
 nhập gói.biên dịch.giao diện cú pháp.*;
+nhập gói.biên dịch.biểu thức.*;
 nhập gói.biên dịch.nút cú pháp.*;
 nhập gói.biên dịch.từ vựng.*;
 nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
@@ -9,6 +10,12 @@ nhập gói.biên dịch.mã máy từ cây.*;
 nhập gói.biên dịch.bộ biên dịch.*;
 nhập gói.biên dịch.phiên tự chủ.*;
 nhập gói.biên dịch.bộ sinh mã bản địa.*;
+// Xuất khẩu các API bootstrap công khai qua entrypoint của gói.
+nhập gói.biên dịch.mã lệnh.biên dịch thống kê mã thao tác từ mã trung gian;
+nhập gói.biên dịch.chương trình.biên dịch phân tích chương trình thuần;
+nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR thuần;
+nhập gói.biên dịch.phát mã.biên dịch phát mã trung gian thuần;
+nhập gói.biên dịch.liên kết.*;
 nhập gói.nhập xuất.tệp.đọc tệp;
 nhập gói.nhập xuất.đường dẫn.đường dẫn cha;
 
