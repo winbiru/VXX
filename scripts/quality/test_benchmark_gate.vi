@@ -72,6 +72,18 @@ hàm chính() {
     };
     gate_expect(gate_fixture(10), "INCONCLUSIVE");
     gate_expect(gate_fixture(10, sai), "PASS");
+    // A noisy baseline can be inconclusive even when the candidate is faster.
+    noisy = gate_fixture(10, sai); rows = noisy["samples"];
+    lặp(i = 0; i < độ dài(rows); i++) {
+        nếu (rows[i]["phase"] == "measure") {
+            value = 99;
+            nếu (rows[i]["side"] == "baseline") {
+                value = 90; nếu (rows[i]["pair"] % 2 == 0) { value = 110; };
+            };
+            rows[i]["record"]["ns_per_iteration"] = value;
+        };
+    };
+    gate_expect(noisy, "INCONCLUSIVE");
     data = gate_fixture(); rows = data["samples"];
     lặp(i = 0; i < độ dài(rows); i++) {
         nếu (rows[i]["side"] == "candidate" && rows[i]["phase"] == "measure") {
@@ -127,6 +139,7 @@ hàm chính() {
         gate_change(data, "ns_per_iteration", 111);
         ghi tệp(output + "/fail.json", json tạo(data));
         ghi tệp(output + "/inconclusive.json", json tạo(gate_fixture(10)));
+        ghi tệp(output + "/noisy.json", json tạo(noisy));
         ghi tệp(output + "/invalid.json", "{}");
     };
     in "VPP BENCHMARK GATE OK";

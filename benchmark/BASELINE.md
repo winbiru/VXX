@@ -45,6 +45,12 @@ có thể gây INCONCLUSIVE dù code không thay đổi; chạy lại trên host
 dụng trước khi đánh giá kết quả. Nếu harness thay đổi, chọn baseline mới với
 cùng các tệp workload đã kiểm tra; không so trực tiếp hai định nghĩa case khác.
 
+Job `benchmark-smoke` đo cùng một binary hai lần để kiểm tra collector và tính
+hợp lệ của evidence. Job này chấp nhận `PASS` hoặc `INCONCLUSIVE`, lưu mẫu nhiễu
+trong artifact và vẫn dừng khi `FAIL` hoặc `INVALID`. Workflow
+`benchmark-regression.yml` so sánh hai bản Git tiếp tục yêu cầu `PASS`; ngưỡng
+nhiễu 5% và các mã thoát của comparator giữ nguyên.
+
 ## Bằng chứng và phạm vi
 
 Runner xuất `identities.txt`, `baseline-build.log`, `candidate-build.log`,

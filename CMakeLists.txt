@@ -1240,9 +1240,15 @@ if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
     set(VPP_NATIVE_CLI_TARGET "x86_64-linux-gnu")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(VPP_NATIVE_CLI_TARGET "aarch64-linux-gnu")
+elseif (WIN32 AND MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(VPP_NATIVE_CLI_TARGET "x86_64-windows-msvc")
 endif()
 if (VPP_NATIVE_CLI_TARGET)
     set(VPP_NATIVE_CLI_DIR "${CMAKE_CURRENT_BINARY_DIR}/native-cli")
+    set(VPP_NATIVE_CLI_EXECUTABLE "${VPP_NATIVE_CLI_DIR}/vpp-native${CMAKE_EXECUTABLE_SUFFIX}")
     # Generate the installed compiler in the normal build. Otherwise a plain
     # cmake --install can silently copy an outdated native-cli/vpp-native.
     add_custom_target(vpp-native-cli ALL
@@ -1253,8 +1259,17 @@ if (VPP_NATIVE_CLI_TARGET)
             "-DVPP_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
             -P ${CMAKE_SOURCE_DIR}/scripts/quality/prepare_native_compiler.cmake
         DEPENDS vpp-cli
-        BYPRODUCTS "${VPP_NATIVE_CLI_DIR}/vpp-native"
+        BYPRODUCTS "${VPP_NATIVE_CLI_EXECUTABLE}"
         COMMENT "Bootstrap CLI compiler tổng quát V++ (Stage 0)")
+    # Supported native targets must install the compiler produced by the
+    # default build; a missing compiler should fail packaging visibly.
+    install(PROGRAMS "${VPP_NATIVE_CLI_EXECUTABLE}"
+        DESTINATION bin)
+endif()
+
+# The standalone ASM VM still needs the i32 bootstrap supported on these hosts.
+if (VPP_NATIVE_CLI_TARGET STREQUAL "aarch64-apple-darwin" OR
+    VPP_NATIVE_CLI_TARGET STREQUAL "x86_64-linux-gnu")
     add_custom_target(vpp-vm-asm
         COMMAND ${CMAKE_COMMAND}
             "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
@@ -1267,10 +1282,6 @@ if (VPP_NATIVE_CLI_TARGET)
         BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/native-vm/vpp-vm"
             "${CMAKE_CURRENT_BINARY_DIR}/native-vm/dns-provider.vmb"
         COMMENT "Build standalone VM with V++ and direct ASM primitives")
-    # Supported native targets must install the compiler produced by the
-    # default build; a missing compiler should fail packaging visibly.
-    install(PROGRAMS "${VPP_NATIVE_CLI_DIR}/vpp-native"
-        DESTINATION bin)
 endif()
 
 # Install rules (optional)

@@ -17,6 +17,7 @@ if (NOT DEFINED VPP_CLI)
 endif()
 foreach(required_file IN ITEMS
         "${VPP_EXEC}" "${VPP_CLI}"
+        "${VPP_INSTALL_ROOT}/bin/vpp-native${CMAKE_EXECUTABLE_SUFFIX}"
         "${VPP_INSTALL_ROOT}/gói/chuẩn/chính.vi"
         "${VPP_SOURCE_ROOT}/src/tests/kiem_tra_native_calls.vi"
         "${VPP_SOURCE_ROOT}/scripts/quality/native_calls_smoke.c")

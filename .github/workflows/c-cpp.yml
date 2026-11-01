@@ -334,7 +334,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for entry in pass:0 fail:1 inconclusive:2 invalid:3; do
+          for entry in pass:0 fail:1 inconclusive:2 noisy:2 invalid:3; do
             name="${entry%%:*}"
             expected="${entry##*:}"
             actual=0
@@ -366,9 +366,17 @@ jobs:
           export VPP_GATE_CASES=vm_verify VPP_GATE_SAMPLES=10 VPP_GATE_TARGET_MS=10
           build-benchmark-smoke/bin/vpp-cli run --compiler=cpp \
             scripts/quality/collect_benchmark_gate.vi
+          # Identical-binary smoke validates collection and evidence. Shared
+          # runner noise can make valid samples statistically inconclusive.
+          status=0
           VPP_EXEC="$PWD/build-benchmark-smoke/bin/vpp-cli" \
             sh scripts/quality/compare_benchmarks.sh \
-              "$VPP_GATE_OUTPUT/report.json"
+              "$VPP_GATE_OUTPUT/report.json" || status=$?
+          case "$status" in
+            0) ;;
+            2) echo "::notice::Collector smoke produced valid inconclusive evidence; see benchmark-smoke artifacts." ;;
+            *) exit "$status" ;;
+          esac
 
       - name: Upload benchmark smoke measurements
         if: always()
