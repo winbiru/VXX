@@ -947,7 +947,7 @@ lớp công khai Bộ Phát Bytecode {
     // C++ emitFunctionBody cấp trước và khởi tạo các slot được StoreName
     // gán trong thân hàm, kể cả ở nhánh điều kiện chưa thực thi.
     // Chỉ xét gán biểu thức: gán đi kèm khai báo là DeclareVariable.
-    hàm riêng tư biên dịch phát mã khởi tạo biến gán(các lệnh, trạng thái, thân) {
+    hàm riêng tư biên dịch phát mã khởi tạo biến gán(các lệnh, trạng thái, thân, bắt giữ) {
         các slot = [];
         lặp(i = 0; i < máy ảo lấy độ dài(các lệnh); i++) {
             mục = các lệnh[i];
@@ -956,6 +956,13 @@ lớp công khai Bộ Phát Bytecode {
                 mã == "++" || mã == "--") {
                 mã định danh = lấy từ điển(mục, "symbol", -1);
                 nếu (mã định danh >= 0) {
+                    // Closure dùng chung ô nhớ của binding bên ngoài. OP_KHOI_TAO
+                    // sẽ tạo ô mới và cắt đứt phép gán theo tham chiếu.
+                    là bắt giữ = sai;
+                    lặp(k = 0; k < máy ảo lấy độ dài(bắt giữ); k++) {
+                        nếu (bắt giữ[k]["id"] == mã định danh) { là bắt giữ = đúng; thoát; };
+                    };
+                    nếu (là bắt giữ) { bỏ qua; };
                     ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(trạng thái, mục["giá trị"], mã định danh);
                     đã có = sai;
                     lặp(j = 0; j < máy ảo lấy độ dài(các slot); j++) {
@@ -1063,7 +1070,8 @@ lớp công khai Bộ Phát Bytecode {
     hàm riêng tư biên dịch phát mã thân phương thức(danh sách hàm biểu diễn trung gian, trạng thái) {
         thân = [];
         mình.biên dịch phát mã lệnh(thân, biên dịch mã thao tác("OP_MO_KHOI"), 0, 0, 0);
-        mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân);
+        mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân,
+            lấy từ điển(danh sách hàm biểu diễn trung gian, "bắt giữ", []));
         nhận = lấy từ điển(danh sách hàm biểu diễn trung gian, "nhận ngầm", []);
         nhận các mã định danh = lấy từ điển(danh sách hàm biểu diễn trung gian, "nhận symbol", []);
         lặp(j = 0; j < máy ảo lấy độ dài(nhận); j++) {
@@ -1311,7 +1319,7 @@ lớp công khai Bộ Phát Bytecode {
                 danh sách hàm biểu diễn trung gian = các hàm biểu diễn trung gian[local mã định danh];
                 thân = [];
                 mình.biên dịch phát mã lệnh(thân, biên dịch mã thao tác("OP_MO_KHOI"), 0, 0, 0);
-                mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân);
+                mình.biên dịch phát mã khởi tạo biến gán(danh sách hàm biểu diễn trung gian["lệnh"], trạng thái, thân, []);
                 tham số = lấy từ điển(danh sách hàm biểu diễn trung gian, "tham số", []);
                 mặc định = lấy từ điển(danh sách hàm biểu diễn trung gian, "mặc định tham số", []);
                 tham số các mã định danh = lấy từ điển(danh sách hàm biểu diễn trung gian, "tham số symbol", []);
