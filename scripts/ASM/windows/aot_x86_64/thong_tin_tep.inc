@@ -115,6 +115,10 @@ Lduong_tep_chuyen_loi:
 .globl vpp_native_os_fstat
 vpp_native_os_fstat:
     VAO_BO_NHO
+// UCRT gọi invalid-parameter handler (fail-fast 0xC0000409) nếu
+// _get_osfhandle nhận descriptor âm. Trả lỗi theo ABI V++ trước khi gọi CRT.
+    testl %ecx, %ecx
+    js Lbo_nho_loi
     cmpl $3376, %edx
     je 1f
     cmpl $3584, %edx

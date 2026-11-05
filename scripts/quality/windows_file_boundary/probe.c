@@ -48,6 +48,13 @@ extern int vpp_mingw_probe_argc;
     return 1; \
 } } while (0)
 
+// CTest --output-on-failure keeps the last completed stage when UCRT fail-fast
+// terminates the process before REQUIRE can report a failed assertion.
+#define STAGE(label) do { \
+    fprintf(stderr, "Windows file boundary stage: %s\n", label); \
+    fflush(stderr); \
+} while (0)
+
 static uint64_t identity(const unsigned char *arena, size_t offset) {
     uint64_t result;
     memcpy(&result, arena + offset + 8, sizeof(result));
@@ -438,6 +445,7 @@ int main(int argc, char **argv) {
 #ifdef __MINGW32__
     vpp_mingw_probe_argc = argc;
 #endif
+    STAGE("arguments");
     REQUIRE(vpp_native_argc() == argc);
     REQUIRE(vpp_native_os_argument_length(0) == (int)strlen(argv[0]));
     REQUIRE(vpp_native_os_argument_byte(0, 0) == (unsigned char)argv[0][0]);
@@ -457,6 +465,7 @@ int main(int argc, char **argv) {
 
     arena = vpp_native_memory_base();
     REQUIRE(arena != NULL);
+    STAGE("unicode environment");
     REQUIRE(test_unicode_environment(arena) == 0);
     {
         wchar_t wide_executable[4096];
@@ -467,11 +476,15 @@ int main(int argc, char **argv) {
         REQUIRE(vpp_native_os_executable_path(64000) == (int)strlen(utf8_executable));
         REQUIRE(strcmp((char *)arena + 64000, utf8_executable) == 0);
     }
+    STAGE("SHA-256");
     REQUIRE(test_sha(arena) == 0);
     REQUIRE(SetEnvironmentVariableA("VPP_WINDOWS_BOUNDARY_CHILD", "1") != 0);
+    STAGE("process spawning");
     REQUIRE(test_spawn(arena) == 0);
+    STAGE("unicode process spawning");
     REQUIRE(test_unicode_spawn(arena) == 0);
     REQUIRE(SetEnvironmentVariableA("VPP_WINDOWS_BOUNDARY_CHILD", NULL) != 0);
+    STAGE("file operations");
     strcpy((char *)arena + 4096, templ);
     first_fd = vpp_native_os_mkstemp(4096);
     REQUIRE(first_fd >= 0);
@@ -514,12 +527,14 @@ int main(int argc, char **argv) {
     REQUIRE(vpp_native_os_stat(16384, 3376) == 0);
     strcpy((char *)arena + 20480, "invalid-no-X-suffix");
     REQUIRE(vpp_native_os_mkstemp(20480) == -1);
+    STAGE("invalid file descriptor");
     REQUIRE(vpp_native_os_fstat(-1, 3376) == -1);
     REQUIRE(vpp_native_os_stat(20480, 3376) == -1);
     REQUIRE(errno == ENOENT);
     strcpy((char *)arena + 24576, directory);
     REQUIRE(vpp_native_os_lstat(24576, 3376) == 0);
     REQUIRE((mode(arena, 3376) & 0xf000) == 0x4000);
+    STAGE("unicode files");
     REQUIRE(test_unicode_files(arena, directory) == 0);
 
     REQUIRE(DeleteFileA(hardlink) != 0);

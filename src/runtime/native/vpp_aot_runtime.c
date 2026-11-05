@@ -3,6 +3,11 @@
 // primitives provide these symbols. Leave the old implementation here for
 // bootstrap/fallback builds, but compile none of it into a V++ runtime binary.
 // This also retires the former hybrid C cache/link services on that path.
+#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+// Stage 0 compiles this file as strict C11. Request POSIX.1-2008 before
+// including libc headers so lstat, mkstemp, fdopen and readlink are declared.
+#define _POSIX_C_SOURCE 200809L
+#endif
 #if !defined(VPP_NATIVE_VPP_RUNTIME)
 #include <inttypes.h>
 #include <errno.h>
