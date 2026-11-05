@@ -1,0 +1,16 @@
+hàm cộng(a, b) { trả về a + b; };
+
+hàm chính() {
+    // Hàm đặt tên được biểu diễn bằng function id số nguyên.
+    fn = cộng;
+    in fn(2, 3);
+
+    // Chuỗi tên hàm vẫn phải đi qua lookup động.
+    tên = "cộng";
+    in tên(4, 5);
+
+    // Closure phải giữ capture khi callee được đọc trực tiếp từ slot.
+    gốc = 10;
+    closure = hàm(x) { trả về gốc + x; };
+    in closure(8);
+};

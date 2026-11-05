@@ -20,7 +20,7 @@ hàm sinh mã chương trình vá các lời gọi(mã máy, các điểm bắt 
         nếu (nguồn < 0) { trả về -1; };
         nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
         nếu (chương trình con hiện tại < 0) {
-            nếu (chương trình con hiện tại < -76) { trả về -1; };
+            nếu (chương trình con hiện tại < -82) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(ngoại các lời gọi, nguồn) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(ngoại các lời gọi, -chương trình con hiện tại - 1) != 0) { trả về -1; };
             bỏ qua;
@@ -111,7 +111,7 @@ hàm sinh mã chương trình vá mô đun các lời gọi(mã máy, các đi�
         nếu (nguồn < 0) { trả về -1; };
         nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
         nếu (đích đến < 0) {
-            nếu (đích đến < -76) { trả về -1; };
+            nếu (đích đến < -82) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, nguồn) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, -đích đến - 1) != 0) { trả về -1; };
         } hoặc nếu (đích đến < đầu tiên) {
@@ -199,7 +199,7 @@ hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các �
         nếu (nguồn < 0) { trả về -1; };
         nếu (nguồn + 4 > byte dài(mã máy)) { trả về -1; };
         nếu (đích đến < 0) {
-            nếu (đích đến < -76) { trả về -1; };
+            nếu (đích đến < -82) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, nguồn) != 0) { trả về -1; };
             nếu (byte đẩy số nguyên ba mươi hai bit(lời gọi lõi, -đích đến - 1) != 0) { trả về -1; };
         } hoặc nếu (đích đến < đầu tiên) {
@@ -216,7 +216,7 @@ hàm sinh mã chương trình x86 vá mô đun các lời gọi(mã máy, các �
     trả về 0;
 };
 
-hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, lời gọi lõi) {
+hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các hàm, mã máy, đầu tiên, cuối cùng, các điểm bắt đầu, các phần nhập, lời gọi lõi, windows) {
     nếu (mã máy == biểu diễn trung gian) { trả về -1; };
     nếu (đầu tiên < 0) { trả về -1; };
     nếu (cuối cùng <= đầu tiên) { trả về -1; };
@@ -252,7 +252,7 @@ hàm sinh mã chương trình x86 phát mô đun(biểu diễn trung gian, các 
             nếu (mã trạng thái < 0) { thoát; };
             biến điểm bắt đầu = byte dài(mã máy);
             nếu (byte đẩy số nguyên ba mươi hai bit(các điểm bắt đầu, điểm bắt đầu) != 0) { mã trạng thái = -1; thoát; };
-            nếu (sinh mã x86 phát nội bộ(đơn vị, machine, các lời gọi) <= 0) { mã trạng thái = -1; thoát; };
+            nếu (sinh mã x86 phát nội bộ(đơn vị, machine, các lời gọi, windows) <= 0) { mã trạng thái = -1; thoát; };
             lặp (độ lệch = 0; độ lệch < byte dài(các lời gọi); độ lệch = độ lệch + 8) {
                 nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, điểm bắt đầu + byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch)) != 0) { mã trạng thái = -1; thoát; };
                 nếu (byte đẩy số nguyên ba mươi hai bit(các tái định vị, byte đọc số nguyên ba mươi hai bit(các lời gọi, độ lệch + 4)) != 0) { mã trạng thái = -1; thoát; };

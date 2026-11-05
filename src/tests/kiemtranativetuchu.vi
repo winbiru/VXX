@@ -39,8 +39,21 @@ hàm chính() {
           "hàm other(item) { trả về item * 2; };";
     máy = sinh mã hàm(che, "other", "aarch64", "macos");
     xác nhận(máy["machine"]["slotCount"] == 1, "tham số che tên hàm");
-    // Phép chia i32 đã được hỗ trợ; toán tử logic vẫn nằm ngoài tập con này.
-    từ chối("hàm f(a) { trả về a && 1; };", "f");
+    // Hai phép logic cần nhánh ngắn và giá trị bool 0/1 cho cả hai ABI.
+    logic = "hàm f(a, b) { trả về (a && b) || !a; };";
+    mã logic = sinh mã hàm(logic, "f", "aarch64", "macos");
+    lệnh logic = mã logic["machine"]["instructions"];
+    nhánh = 0;
+    nhảy = 0;
+    lặp (i = 0; i < độ dài(lệnh logic); i++) {
+        nếu (lệnh logic[i]["opcode"] == "BranchZero") { nhánh += 1; };
+        nếu (lệnh logic[i]["opcode"] == "Jump") { nhảy += 1; };
+    };
+    xác nhận(nhánh == 2 && nhảy == 2, "toán tử && và || tạo nhánh ngắn");
+    xác nhận(độ dài(tạo đối tượng hàm(logic, "f", "x86_64", "linux", "gnu")["object"]) > 0,
+        "toán tử logic phát ELF x86_64");
+    xác nhận(độ dài(tạo đối tượng hàm(logic, "f", "x86_64", "windows", "msvc")["object"]) > 0,
+        "toán tử logic phát COFF x86_64");
     từ chối("hàm f(a) { trả về unknown + a; };", "f");
     từ chối("hàm f(a) { trả về a(1); };", "f");
     từ chối("hàm f(a = 7) { trả về a; };", "f");

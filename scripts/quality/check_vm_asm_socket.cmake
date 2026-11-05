@@ -70,16 +70,28 @@ foreach(socket_arch IN LISTS socket_arches)
     set(socket_obj "${socket_dir}/socket-${socket_arch}.o")
     set(socket_bin "${socket_dir}/socket-${socket_arch}")
     execute_process(COMMAND "${VPP_SOCKET_CLANG}" ${arch_flags}
-        -x assembler-with-cpp -c "${VPP_ROOT}/scripts/ASM/vpp_vm_socket_primitives.inc"
+        -x assembler-with-cpp -c "${VPP_ROOT}/scripts/ASM/common/posix/vpp_vm_socket_primitives.inc"
         -o "${socket_obj}"
         RESULT_VARIABLE code ERROR_VARIABLE errors TIMEOUT 30)
     if(NOT code STREQUAL "0")
         message(FATAL_ERROR "Socket ${socket_arch} ASM: ${code}\n${errors}")
     endif()
+    set(socket_extra_objects "")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND socket_arch STREQUAL "x86_64")
+        set(syscalls_obj "${socket_dir}/socket-syscalls-${socket_arch}.o")
+        execute_process(COMMAND "${VPP_SOCKET_CLANG}" -c
+            "${VPP_ROOT}/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S"
+            -o "${syscalls_obj}"
+            RESULT_VARIABLE code ERROR_VARIABLE errors TIMEOUT 30)
+        if(NOT code STREQUAL "0")
+            message(FATAL_ERROR "Socket ${socket_arch} syscall ASM: ${code}\n${errors}")
+        endif()
+        list(APPEND socket_extra_objects "${syscalls_obj}")
+    endif()
     execute_process(COMMAND "${VPP_SOCKET_CLANG}" ${arch_flags}
         -Wall -Wextra -Werror
         "${VPP_ROOT}/src/tests/fixtures/vm_asm_socket_harness.c"
-        "${socket_obj}" -o "${socket_bin}"
+        "${socket_obj}" ${socket_extra_objects} -o "${socket_bin}"
         RESULT_VARIABLE code ERROR_VARIABLE errors TIMEOUT 30)
     if(NOT code STREQUAL "0")
         message(FATAL_ERROR "Socket ${socket_arch} harness link: ${code}\n${errors}")

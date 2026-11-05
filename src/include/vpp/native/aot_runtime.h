@@ -18,6 +18,18 @@ using Value = runtime::StackValue;
 struct Program;
 struct Frame;
 using Function = int (*)(int);
+using AotBoundary2Operation = void (*)(Frame &, int, int);
+
+// Shared checked boundary for AOT helpers that live in separate archive
+// objects. Keeping the operation behind a function pointer lets optional
+// helpers stay out of host tools that do not reference their ABI symbol.
+int runAotBoundary2(int id, int a, int b, AotBoundary2Operation operation) noexcept;
+
+struct I32FunctionEntry {
+    const void *function = nullptr;
+    int parameters = 0;
+    int usedMask = 0;
+};
 
 // Prints per-thread CPU samples when VPP_AOT_CPU_PROFILE=1. The VM's vm_alloc
 // primitive belongs to its separate .vi runtime, not this C++ AOT runtime.
@@ -83,22 +95,33 @@ struct Frame {
     // scalars. Returning false asks the generated AOT code to run its
     // original dynamic bytecode path instead.
     bool runCountedScalarLoop(int counter, int bound, int value,
-                              int step, int threshold);
+                              int step, int threshold, bool keep = true);
     // Simple counted loops can execute all scalar iterations in CPU registers
     // with a single type check and a single write-back to the live cells.
     bool runSimpleScalarLoop(int counter, int bound, int value,
-                             int operand, int operation);
+                             int operand, int operation, bool keep = true);
     // A guarded loop for result = left + right. Both sources are primitive
     // numeric cells, with induction values read from an unboxed counter.
     bool runNumericAddLoop(int counter, int bound, int left,
-                           int right, int result);
+                           int right, int result, bool keep = true);
+    bool runListAppendI32Loop(int counter, int bound, int list,
+                              int base, bool keep);
+    bool runListModSumLoop(int counter, int bound, int source, int target,
+                           int divisor, int expected, bool keep);
+    bool runRangeModSumI32Loop(int base, int target, int bound,
+                               int divisor, int expected);
+    bool runIndirectI32FoldLoop(int counter, int bound, int checksum,
+                                int callable, int data, int seed,
+                                int cycle, int divisor);
     void index();
     void setIndex();
     void list(int count, int encoded);
     void map(int count, int encoded);
     void closure(int function, int count);
     void call(int target, int count, int nameIndex, bool indirect = false);
+    void callSlot(int slot, int count);
     void intrinsic(int operation);
+    void nativeCore(int primitive, int count);
     void foreign(int descriptor, int count);
     void defineClass(int name, int superclass);
     void defineMethod(int klass, int name, int function);
@@ -114,6 +137,7 @@ struct Frame {
 struct Program {
     std::vector<std::string> strings;
     std::vector<FunctionEntry> functions;
+    std::vector<I32FunctionEntry> i32Functions;
     std::vector<Function> initializers;
     Function entry = nullptr;
     std::vector<bytecode::ForeignFunctionDescriptor> foreignFunctions;

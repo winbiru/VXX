@@ -62,6 +62,8 @@ struct ProgramSpec {
     int reserved;
     std::size_t foreignCount;
     const ForeignSpec *foreignFunctions;
+    std::size_t i32FunctionCount;
+    const I32FunctionEntry *i32Functions;
 };
 
 } // namespace vietvm::native::aot

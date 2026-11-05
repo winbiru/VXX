@@ -65,6 +65,24 @@ hàm phu_dinh(n) {
     hoặc { trả về 0; };
 }
 
+// Hai toán tử logic trả về 0/1, không trả lại giá trị nguyên của toán hạng.
+hàm logic_va(a, b) { trả về a && b; }
+hàm logic_hoac(a, b) { trả về a || b; }
+hàm logic_long(a, b, c) { trả về (a && b) || (c && !a); }
+
+// Phép chia 0 phải được bỏ qua khi nhánh ngắn đã xác định kết quả.
+hàm logic_tranh_chia(a, b) {
+    trả về (a && (1 / a)) || (b && (1 / b));
+}
+
+// Vế phải có phép gán chỉ được gọi khi thật sự cần thiết.
+hàm logic_vet(a, b) {
+    biến dem = 0;
+    biến x = a && (dem += 1);
+    biến y = b || (dem += 2);
+    trả về x * 100 + y * 10 + dem;
+}
+
 hàm phan_loai(a, b) {
     nếu (a < 0) {
         nếu (b < 0) { trả về -2; }

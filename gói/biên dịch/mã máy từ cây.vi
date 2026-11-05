@@ -2,6 +2,7 @@
 // ABI i32 hỗ trợ AArch64/x86-64 và số tham số động (giới hạn bởi tài nguyên).
 // Không gọi snapshot/IR của C++; mọi node ngoài tập hỗ trợ phải báo lỗi.
 nhập gói.biên dịch.ngữ nghĩa.biên dịch phân tích ngữ nghĩa thuần;
+nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
 nhập gói.biên dịch.chương trình.*;
 nhập gói.biên dịch.mã máy hạ biểu diễn trung gian.biên dịch máy hạ IR;
 nhập gói.biên dịch.mã máy.biên dịch mã máy hàm;
@@ -68,68 +69,7 @@ lớp công khai Bộ Hạ Cây {
     // ABI native dùng handle i32, byte i32; không đưa con trỏ C qua V++.
     // Mọi tên ở đây phải khớp whitelist trong mã máy hạ ir.vi.
     hàm riêng tư tra ABI hệ thống(tên) {
-        nếu (tên == "đọc số") { trả về {"symbol": "vpp_native_read_i32", "arity": 0}; };
-        nếu (tên == "trạng thái đọc") { trả về {"symbol": "vpp_native_read_status", "arity": 0}; };
-        nếu (tên == "byte mới") { trả về {"symbol": "vpp_native_bytes_new", "arity": 0}; };
-        nếu (tên == "byte thêm") { trả về {"symbol": "vpp_native_bytes_append", "arity": 2}; };
-        nếu (tên == "byte nối") { trả về {"symbol": "vpp_native_bytes_concat", "arity": 2}; };
-        nếu (tên == "byte bằng") { trả về {"symbol": "vpp_native_bytes_equal", "arity": 2}; };
-        nếu (tên == "byte cắt") { trả về {"symbol": "vpp_native_bytes_slice", "arity": 3}; };
-        nếu (tên == "byte tìm") { trả về {"symbol": "vpp_native_bytes_find", "arity": 2}; };
-        nếu (tên == "byte làm rỗng") { trả về {"symbol": "vpp_native_bytes_clear", "arity": 1}; };
-        nếu (tên == "byte in") { trả về {"symbol": "vpp_native_bytes_print", "arity": 1}; };
-        nếu (tên == "byte dài") { trả về {"symbol": "vpp_native_bytes_length", "arity": 1}; };
-        nếu (tên == "byte lấy") { trả về {"symbol": "vpp_native_bytes_get", "arity": 2}; };
-        nếu (tên == "byte đẩy số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_push_i32", "arity": 2}; };
-        nếu (tên == "byte đọc số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_load_i32", "arity": 2}; };
-        nếu (tên == "byte ghi số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_bytes_store_i32", "arity": 3}; };
-        nếu (tên == "byte hủy") { trả về {"symbol": "vpp_native_bytes_free", "arity": 1}; };
-        nếu (tên == "tệp mở đọc") { trả về {"symbol": "vpp_native_file_open_read", "arity": 1}; };
-        nếu (tên == "tệp mở ghi") { trả về {"symbol": "vpp_native_file_open_write", "arity": 1}; };
-        nếu (tên == "tệp đọc byte") { trả về {"symbol": "vpp_native_file_read_byte", "arity": 1}; };
-        nếu (tên == "tệp ghi byte") { trả về {"symbol": "vpp_native_file_write_byte", "arity": 2}; };
-        nếu (tên == "tệp đọc khối") { trả về {"symbol": "vpp_native_file_read_block", "arity": 2}; };
-        nếu (tên == "tệp ghi khối") { trả về {"symbol": "vpp_native_file_write_block", "arity": 2}; };
-        nếu (tên == "tệp đóng") { trả về {"symbol": "vpp_native_file_close", "arity": 1}; };
-        nếu (tên == "đối số đếm") { trả về {"symbol": "vpp_native_argc", "arity": 0}; };
-        nếu (tên == "đối số lấy") { trả về {"symbol": "vpp_native_argv", "arity": 1}; };
-        nếu (tên == "liên kết macho") { trả về {"symbol": "vpp_native_link_macho", "arity": 3}; };
-        nếu (tên == "liên kết đối tượng") { trả về {"symbol": "vpp_native_link_macho_modules", "arity": 3}; };
-        nếu (tên == "bộ nhớ đệm đọc") { trả về {"symbol": "vpp_native_cache_read", "arity": 2}; };
-        nếu (tên == "bộ nhớ đệm ghi") { trả về {"symbol": "vpp_native_cache_write", "arity": 2}; };
-        nếu (tên == "máy đọc byte") { trả về {"symbol": "vpp_native_memory_read_byte", "arity": 1}; };
-        nếu (tên == "máy ghi byte") { trả về {"symbol": "vpp_native_memory_write_byte", "arity": 2}; };
-        nếu (tên == "máy đọc số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_memory_read_i32", "arity": 1}; };
-        nếu (tên == "máy ghi số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_memory_write_i32", "arity": 2}; };
-        nếu (tên == "máy gắn địa chỉ") { trả về {"symbol": "vpp_native_memory_bind", "arity": 2}; };
-        nếu (tên == "máy mở") { trả về {"symbol": "vpp_native_os_open", "arity": 2}; };
-        nếu (tên == "máy đọc") { trả về {"symbol": "vpp_native_os_read", "arity": 3}; };
-        nếu (tên == "máy ghi") { trả về {"symbol": "vpp_native_os_write", "arity": 3}; };
-        nếu (tên == "máy đóng") { trả về {"symbol": "vpp_native_os_close", "arity": 1}; };
-        nếu (tên == "máy lỗi") { trả về {"symbol": "vpp_native_os_errno", "arity": 0}; };
-        nếu (tên == "máy đối số dài") { trả về {"symbol": "vpp_native_os_argument_length", "arity": 1}; };
-        nếu (tên == "máy đối số byte") { trả về {"symbol": "vpp_native_os_argument_byte", "arity": 2}; };
-        nếu (tên == "máy chia số nguyên ba mươi hai bit") { trả về {"symbol": "vpp_native_i32_div", "arity": 2}; };
-        nếu (tên == "máy thư mục nhà") { trả về {"symbol": "vpp_native_os_home", "arity": 1}; };
-        nếu (tên == "máy thư mục hiện hành") { trả về {"symbol": "vpp_native_os_cwd", "arity": 1}; };
-        nếu (tên == "máy tạm mở") { trả về {"symbol": "vpp_native_os_mkstemp", "arity": 1}; };
-        nếu (tên == "máy đổi tên") { trả về {"symbol": "vpp_native_os_rename", "arity": 2}; };
-        nếu (tên == "máy khởi chạy clang") { trả về {"symbol": "vpp_native_os_spawn_clang", "arity": 1}; };
-        nếu (tên == "máy đợi") { trả về {"symbol": "vpp_native_os_waitpid", "arity": 2}; };
-        nếu (tên == "máy thông tin tệp") { trả về {"symbol": "vpp_native_os_stat", "arity": 2}; };
-        nếu (tên == "máy thông tin liên kết") { trả về {"symbol": "vpp_native_os_lstat", "arity": 2}; };
-        nếu (tên == "máy quyền chạy") { trả về {"symbol": "vpp_native_os_access_exec", "arity": 1}; };
-        nếu (tên == "máy xóa") { trả về {"symbol": "vpp_native_os_unlink", "arity": 1}; };
-        nếu (tên == "máy giá trị môi trường lấy") { trả về {"symbol": "vpp_native_os_env_copy", "arity": 2}; };
-        nếu (tên == "máy tệp thực thi lấy") { trả về {"symbol": "vpp_native_os_executable_path", "arity": 1}; };
-        nếu (tên == "máy tạo thư mục") { trả về {"symbol": "vpp_native_os_mkdir", "arity": 1}; };
-        nếu (tên == "máy thông tin tệp mở") { trả về {"symbol": "vpp_native_os_fstat", "arity": 2}; };
-        nếu (tên == "máy sha bắt đầu") { trả về {"symbol": "vpp_native_sha_begin", "arity": 0}; };
-        nếu (tên == "máy sha nạp") { trả về {"symbol": "vpp_native_sha_update", "arity": 2}; };
-        nếu (tên == "máy sha kết") { trả về {"symbol": "vpp_native_sha_end", "arity": 1}; };
-        nếu (tên == "máy báo cáo bộ nhớ đệm") { trả về {"symbol": "vpp_native_os_register_cache_report", "arity": 0}; };
-        nếu (tên == "môi trường thực thi nguồn") { trả về {"symbol": "vpp_native_runtime_module_path", "arity": 0}; };
-        trả về rỗng;
+        trả về biên dịch ABI lõi bản địa(tên);
     };
 
     hàm riêng tư tên hệ thống dành riêng(tên) {
@@ -171,6 +111,7 @@ lớp công khai Bộ Hạ Cây {
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_home");
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_cwd");
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_mkstemp");
+        máy ảo thêm cuối danh sách(các tên, "vpp_native_os_fchmod");
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_rename");
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_spawn_clang");
         máy ảo thêm cuối danh sách(các tên, "vpp_native_os_waitpid");
@@ -265,7 +206,7 @@ lớp công khai Bộ Hạ Cây {
             ca "tên": { trả về mình.nạp biến(trạng thái, cây); }
             ca "một ngôi": {
                 mã phép toán = cây["toán tử"];
-                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "!") {
+                nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "!" && mã phép toán != "~") {
                     mình.báo lỗi("toán tử một ngôi chưa hỗ trợ: " + mã phép toán);
                 };
                 trong = mình.hạ biểu thức(trạng thái, cây["toán hạng"], sâu + 1);
@@ -274,7 +215,9 @@ lớp công khai Bộ Hạ Cây {
             ca "hai ngôi": {
                 mã phép toán = cây["toán tử"];
                 nếu (mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" ||
-                    mã phép toán == "*=" || mã phép toán == "/=" || mã phép toán == "%=") {
+                    mã phép toán == "*=" || mã phép toán == "/=" || mã phép toán == "%=" ||
+                    mã phép toán == "&=" || mã phép toán == "|=" || mã phép toán == "^=" ||
+                    mã phép toán == "<<=" || mã phép toán == ">>=") {
                     toán hạng trái = mình.nạp biến(trạng thái, cây["trái"]);
                     toán hạng phải = mình.hạ biểu thức(trạng thái, cây["phải"], sâu + 1);
                     nếu (mã phép toán != "=") {
@@ -282,6 +225,11 @@ lớp công khai Bộ Hạ Cây {
                         nếu (mã phép toán == "-=") { toán = "-"; };
                         nếu (mã phép toán == "*=") { toán = "*"; };
                         nếu (mã phép toán == "/=") { toán = "/"; };
+                        nếu (mã phép toán == "&=") { toán = "&"; };
+                        nếu (mã phép toán == "|=") { toán = "|"; };
+                        nếu (mã phép toán == "^=") { toán = "^"; };
+                        nếu (mã phép toán == "<<=") { toán = "<<"; };
+                        nếu (mã phép toán == ">>=") { toán = ">>"; };
                         nếu (mã phép toán == "%=") { toán = "%"; };
                         toán hạng phải = mình.thêm giá trị IR(trạng thái, "Binary", toán, [toán hạng trái, toán hạng phải]);
                     };
@@ -289,8 +237,12 @@ lớp công khai Bộ Hạ Cây {
                 };
                 nếu (mã phép toán != "+" && mã phép toán != "-" && mã phép toán != "*" &&
                     mã phép toán != "/" && mã phép toán != "%" && mã phép toán != "==" &&
-                    mã phép toán != "!=" && mã phép toán != "<" && mã phép toán != "<=" && mã phép toán != ">" && mã phép toán != ">=") {
-                    mình.báo lỗi("toán tử i32 chưa hỗ trợ: " + mã phép toán);
+                    mã phép toán != "!=" && mã phép toán != "<" && mã phép toán != "<=" &&
+                    mã phép toán != ">" && mã phép toán != ">=" &&
+                    mã phép toán != "&&" && mã phép toán != "||" &&
+                    mã phép toán != "&" && mã phép toán != "|" && mã phép toán != "^" &&
+                    mã phép toán != "<<" && mã phép toán != ">>") {
+                    mình.báo lỗi("toán tử i32 chưa hỗ trợ: " + mã phép toán + " trong hàm " + lấy từ điển(trạng thái, "hàm", "?"));
                 };
                 trái = mình.hạ biểu thức(trạng thái, cây["trái"], sâu + 1);
                 phải = mình.hạ biểu thức(trạng thái, cây["phải"], sâu + 1);
@@ -457,6 +409,7 @@ lớp công khai Bộ Hạ Cây {
         các hàm = [];
         lặp (i = 0; i < máy ảo lấy độ dài(câu lệnh); i++) {
             danh sách hàm cây cú pháp = câu lệnh[i];
+            trạng thái["hàm"] = danh sách hàm cây cú pháp["tên"];
             trạng thái["scopes"] = [];
             mình.mở phạm vi(trạng thái);
             tham số = [];
@@ -542,6 +495,25 @@ lớp công khai Bộ Hạ Cây {
         trả về kết quả;
     };
 
+    // Mỗi byte tạo đúng hai ký tự ASCII hex. Ghép chuỗi bằng += trong vòng
+    // lặp sao chép lại toàn bộ tiền tố ở mỗi lượt, khiến xuất object lớn
+    // mất thời gian bậc hai khi bootstrap Stage 1 dưới x86-64 emulation.
+    // Chuyển danh sách ASCII sang chuỗi một lần, không dùng runtime C++.
+    hàm riêng tư byte thành hex(các byte, loại) {
+        các ký tự = [];
+        lặp (i = 0; i < máy ảo lấy độ dài(các byte); i++) {
+            b = các byte[i];
+            nếu (b < 0 || b > 255) { mình.báo lỗi("byte " + loại + " ngoài u8"); };
+            cao = (b - b % 16) / 16;
+            thấp = b % 16;
+            nếu (cao < 10) { cao += 48; } hoặc { cao += 87; };
+            nếu (thấp < 10) { thấp += 48; } hoặc { thấp += 87; };
+            máy ảo thêm cuối danh sách(các ký tự, cao);
+            máy ảo thêm cuối danh sách(các ký tự, thấp);
+        };
+        trả về chuỗi từ byte máy ảo(các ký tự);
+    };
+
     // Wire format cho CLI: giữ hợp đồng M:/I:/B:/R:/O: của bridge hiện hữu.
     // CLI chỉ vận chuyển dữ liệu, toàn bộ AST/IR/ISA/object được dựng bằng V++.
     hàm công khai xuất bản ghi(kết quả) {
@@ -553,27 +525,14 @@ lớp công khai Bộ Hạ Cây {
             in "I:" + mã phép toán["opcode"] + ":" + mã phép toán["immediate"] + ":" +
                 mã phép toán["operand"] + ":" + mã phép toán["depthBefore"] + ":" + mã phép toán["symbol"];
         };
-        bảng = "0123456789abcdef";
         byte = kết quả["bytes"];
-        thập lục phân = "";
-        lặp (i = 0; i < máy ảo lấy độ dài(byte); i++) {
-            b = byte[i];
-            nếu (b < 0 || b > 255) { mình.báo lỗi("byte ISA ngoài u8"); };
-            thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
-        };
-        in "B:" + thập lục phân;
+        in "B:" + mình.byte thành hex(byte, "ISA");
         các mục tái định vị = kết quả["relocations"];
         lặp (i = 0; i < máy ảo lấy độ dài(các mục tái định vị); i++) {
             in "R:" + các mục tái định vị[i]["offset"] + ":" + các mục tái định vị[i]["symbol"];
         };
         đối tượng = kết quả["object"];
-        thập lục phân = "";
-        lặp (i = 0; i < máy ảo lấy độ dài(đối tượng); i++) {
-            b = đối tượng[i];
-            nếu (b < 0 || b > 255) { mình.báo lỗi("byte object ngoài u8"); };
-            thập lục phân += bảng[(b - b % 16) / 16] + bảng[b % 16];
-        };
-        in "O:" + thập lục phân;
+        in "O:" + mình.byte thành hex(đối tượng, "object");
     };
 };
 

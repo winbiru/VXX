@@ -60,12 +60,14 @@ int parseI32Literal(std::string_view token, bool negated = false) {
 bool isBinaryOperator(const std::string &op) noexcept {
     return op == "+" || op == "-" || op == "*" || op == "/" || op == "%" ||
            op == "==" || op == "!=" || op == "<" || op == ">" ||
-           op == "<=" || op == ">=" || op == "&&" || op == "||";
+           op == "<=" || op == ">=" || op == "&&" || op == "||" ||
+           op == "&" || op == "|" || op == "^" || op == "<<" || op == ">>";
 }
 
 // Kiểm tra điều kiện của `isCompoundAssignment`.
 bool isCompoundAssignment(const std::string &op) noexcept {
-    return op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=";
+    return op == "+=" || op == "-=" || op == "*=" || op == "/=" || op == "%=" ||
+           op == "&=" || op == "|=" || op == "^=" || op == "<<=" || op == ">>=";
 }
 
 // Tách runtime thành viên tên; hàm chia dữ liệu đầu vào theo quy tắc phân cách trong khi tôn trọng cấu trúc lồng nhau nếu có.
@@ -420,14 +422,14 @@ bool isDirectIndexBase(const IrValue *value) noexcept {
             value->opcode == IrValueOpcode::Index);
 }
 
-// Reading an index also accepts a temporary collection returned by a call.
-// emitValue leaves each call result on the VM stack, immediately followed by
-// the index operand, as required by OP_DOC_CHI_SO. The nested supportsValue
-// check still validates the callee, arguments and call target independently.
+// Reading an index also accepts a string literal or a temporary collection
+// returned by a call. emitValue pushes the base followed by the index operand,
+// as required by OP_DOC_CHI_SO. Nested validation checks both independently.
 bool isDirectIndexReadBase(const IrValue *value) noexcept {
     if (isDirectIndexBase(value)) return true;
     if (value == nullptr) return false;
     switch (value->opcode) {
+        case IrValueOpcode::ConstString:
         case IrValueOpcode::Call:
         case IrValueOpcode::Intrinsic:
         case IrValueOpcode::ForeignCall:
@@ -442,6 +444,7 @@ enum class ValueContext {
     Nested,
     ExpressionStatementRoot,
     OtherStatementRoot,
+    ReturnStatementRoot,
     DedicatedCallStatementRoot,
     SimpleAssignmentRhs,
 };
@@ -620,7 +623,7 @@ bool supportsValue(const IrProgram &program,
 
         case IrValueOpcode::Unary:
             if (value->operands.size() != 1) break;
-            if (value->text == "!" || value->text == "+" || value->text == "-") {
+            if (value->text == "!" || value->text == "+" || value->text == "-" || value->text == "~") {
                 supported = supportsValue(program, sourceOwner, context,
                                           value->operands.front(),
                                           ValueContext::Nested, visiting);
@@ -820,7 +823,8 @@ bool supportsValue(const IrProgram &program,
         }
 
         case IrValueOpcode::Lambda: {
-            if (valueContext != ValueContext::SimpleAssignmentRhs ||
+            if ((valueContext != ValueContext::SimpleAssignmentRhs &&
+                 valueContext != ValueContext::ReturnStatementRoot) ||
                 value->lambdaId == kInvalidIrLambdaId) {
                 break;
             }
@@ -1209,7 +1213,7 @@ bool supportsInstruction(const IrProgram &program,
         if (root == nullptr || root->opcode == IrValueOpcode::StoreName) return false;
         std::unordered_set<IrValueId> visiting;
         return supportsValue(program, sourceOwner, context, root->id,
-                             ValueContext::OtherStatementRoot, visiting);
+                             ValueContext::ReturnStatementRoot, visiting);
     }
     if (instruction.opcode != IrOpcode::Print &&
         instruction.opcode != IrOpcode::Statement) {
@@ -1279,6 +1283,11 @@ Opcode binaryOpcode(const std::string &op) {
     if (op == "-") return OP_TRU;
     if (op == "*") return OP_NHAN;
     if (op == "/") return OP_CHIA;
+    if (op == "&") return OP_BIT_VA;
+    if (op == "|") return OP_BIT_HOAC;
+    if (op == "^") return OP_BIT_XOR;
+    if (op == "<<") return OP_DICH_TRAI;
+    if (op == ">>") return OP_DICH_PHAI;
     if (op == "%") return OP_MODULO;
     if (op == "==") return OP_SO_SANH_BANG;
     if (op == "!=") return OP_KHAC_BANG;
@@ -1297,6 +1306,11 @@ Opcode compoundOpcode(const std::string &op) {
     if (op == "-=") return OP_TRU;
     if (op == "*=") return OP_NHAN;
     if (op == "/=") return OP_CHIA;
+    if (op == "&=") return OP_BIT_VA;
+    if (op == "|=") return OP_BIT_HOAC;
+    if (op == "^=") return OP_BIT_XOR;
+    if (op == "<<=") return OP_DICH_TRAI;
+    if (op == ">>=") return OP_DICH_PHAI;
     if (op == "%=") return OP_MODULO;
     throw std::logic_error(std::string(messages::kInternalDirectIrUnsupportedCompoundAssignment));
 }
@@ -1776,6 +1790,9 @@ struct Emitter {
                 emitValue(value->operands.front(), output);
                 if (value->text == "!") {
                     output.push_back({OP_PHU_DINH, 0, 0, 0});
+                } else if (value->text == "~") {
+                    output.push_back({OP_BIEN_SO, -1, 0, 0});
+                    output.push_back({OP_BIT_XOR, 0, 0, 0});
                 } else if (value->text != "+") {
                     throw std::logic_error(std::string(
                         messages::kInternalDirectIrUnsupportedValue));

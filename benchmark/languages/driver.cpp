@@ -10,7 +10,12 @@
 using Kernel = std::int32_t (*)(std::int32_t, std::int32_t, std::int32_t, std::int32_t);
 extern "C" {
 void prepare_workload(int);
-#ifdef VPP_I32_KERNELS
+#if defined(VPP_I32_KERNELS) || defined(VPP_NUMERIC_KERNELS)
+#ifdef VPP_NUMERIC_KERNELS
+#define vpp_arithmetic native_arithmetic
+#define vpp_branch_loop native_branch_loop
+#define vpp_fibonacci native_fibonacci
+#endif
 std::int32_t vpp_arithmetic(std::int32_t,std::int32_t,std::int32_t,std::int32_t);
 std::int32_t vpp_branch_loop(std::int32_t,std::int32_t,std::int32_t,std::int32_t);
 std::int32_t vpp_fibonacci(std::int32_t,std::int32_t,std::int32_t,std::int32_t);
@@ -38,12 +43,12 @@ int main() {
         if (name == "arithmetic") fn = KERNEL(arithmetic);
         else if (name == "branch_loop") fn = KERNEL(branch_loop);
         else if (name == "fibonacci") fn = KERNEL(fibonacci);
-#ifndef VPP_I32_KERNELS
+#if !defined(VPP_I32_KERNELS) && !defined(VPP_NUMERIC_KERNELS)
         else if (name == "list_128") fn = cpp_list_128;
         else if (name == "unicode_replace") fn = cpp_unicode_replace;
 #endif
         if (!fn) throw std::runtime_error("unsupported case");
-#ifndef VPP_I32_KERNELS
+#if !defined(VPP_I32_KERNELS) && !defined(VPP_NUMERIC_KERNELS)
         prepare_workload(seed);
 #endif
         std::vector<int> checks;

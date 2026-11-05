@@ -6,6 +6,7 @@ nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 // 131..134) và OP_FFI_CALL (156) không nằm trong bảng intrinsic.
 // Chỉ gọi kiểm tra này khi lệnh có immediate khác 0, như verifier C++.
 hàm công khai biên dịch là mã nội tại(mã) {
+    nếu (mã == 214 || mã == 216 || mã == 217) { trả về đúng; };
     nếu (mã < 98 || mã > 208) { trả về sai; };
     trả về mã != 110 && mã != 115 && mã != 119 &&
         (mã < 131 || mã > 134) && mã != 156;
@@ -67,6 +68,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "khoa_map": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
         ca "chuoi_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTES"), 1, đúng]; }
         ca "chuoi_tu_bytes_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_FROM_BYTES"), 1, đúng]; }
+        ca "cat_chuoi_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_SLICE"), 3, đúng]; }
+        ca "thay_chuoi_chinh_xac_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_REPLACE_EXACT"), 3, đúng]; }
+        ca "cat_chuoi_byte_vm": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTE_SLICE"), 3, đúng]; }
         ca "so_thuc_tu_bits_vm": { trả về [biên dịch mã thao tác("OP_VM_FLOAT_FROM_BITS"), 1, đúng]; }
         ca "máy_tệp_mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_OPEN"), 2, đúng]; }
         ca "máy_tệp_đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_READ"), 3, đúng]; }
@@ -169,6 +173,9 @@ hàm công khai biên dịch nội tại(tên) {
         ca "khóa từ điển": { trả về [biên dịch mã thao tác("OP_VM_MAP_KEYS"), 1, sai]; }
         ca "chuỗi thành byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTES"), 1, đúng]; }
         ca "chuỗi từ byte máy ảo": { trả về [biên dịch mã thao tác("OP_VM_STRING_FROM_BYTES"), 1, đúng]; }
+        ca "máy ảo cắt chuỗi": { trả về [biên dịch mã thao tác("OP_VM_STRING_SLICE"), 3, đúng]; }
+        ca "máy ảo thay chuỗi chính xác": { trả về [biên dịch mã thao tác("OP_VM_STRING_REPLACE_EXACT"), 3, đúng]; }
+        ca "máy ảo cắt chuỗi theo byte": { trả về [biên dịch mã thao tác("OP_VM_STRING_BYTE_SLICE"), 3, đúng]; }
         ca "số thực từ bit máy ảo": { trả về [biên dịch mã thao tác("OP_VM_FLOAT_FROM_BITS"), 1, đúng]; }
         ca "máy tệp mở": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_OPEN"), 2, đúng]; }
         ca "máy tệp đọc": { trả về [biên dịch mã thao tác("OP_VM_MACHINE_FILE_READ"), 3, đúng]; }

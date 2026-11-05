@@ -185,7 +185,7 @@ reject("missing function" build --target aarch64-apple-darwin --emit-obj-selfhos
 reject("conflicting modes" build --target aarch64-apple-darwin --emit-obj-selfhost vpp_cycle
     --bytecode "${source}" "${preserved}")
 reject("extra input" build "${source}" "${source}" -o "${preserved}")
-file(WRITE "${VPP_OUTPUT_DIR}/invalid.vi" "hàm bad(a) { trả về a && 1; };\n")
+file(WRITE "${VPP_OUTPUT_DIR}/invalid.vi" "hàm bad(a) { trả về unknown + a; };\n")
 reject("unsupported source" build --target aarch64-apple-darwin --emit-obj-selfhost bad
     "${VPP_OUTPUT_DIR}/invalid.vi" "${preserved}")
 reject("unlinked raw CALL" build --target aarch64-apple-darwin --emit-raw chua_ho_tro

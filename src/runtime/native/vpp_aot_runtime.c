@@ -528,6 +528,24 @@ int32_t vpp_native_argv(int32_t index) {
     return -1;
 #endif
 }
+
+// Stage 0 uses the owned argv byte handle above. Keep raw OS pointers behind
+// this i32 ABI so the same callers work when Stage 1 switches to ASM.
+int32_t vpp_native_os_argument_length(int32_t index) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t length = vpp_native_bytes_length(handle);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return length;
+}
+
+int32_t vpp_native_os_argument_byte(int32_t index, int32_t offset) {
+    int32_t handle = vpp_native_argv(index);
+    if (handle < 0) return -1;
+    int32_t value = vpp_native_bytes_get(handle, offset);
+    if (vpp_native_bytes_free(handle) != 0) return -1;
+    return value;
+}
 #endif
 
 // Opaque persistent byte records. Compilation policy and serialization live
@@ -544,6 +562,12 @@ static void vpp_native_cache_report(void) {
     if (stats && strcmp(stats, "1") == 0)
         fprintf(stderr, "native cache: hits=%lu misses=%lu writes=%lu\n",
                 vpp_cache_hits, vpp_cache_misses, vpp_cache_writes);
+}
+
+// Điểm vào C dùng bởi primitive ASM đăng ký atexit ở Stage 0. Runtime V++
+// tự host cung cấp cùng ABI này từ mã V++, còn bootstrap C chỉ chuyển tiếp.
+void vpp_native_cache_report_entry(void) {
+    vpp_native_cache_report();
 }
 
 static int vpp_native_cache_path(const vpp_native_bytes_slot *key,
@@ -736,7 +760,7 @@ static int vpp_native_runtime_file(const char *relative, char *target, size_t ca
     // V++ resolves only the trusted runtime paths. C retains the final OS
     // regular-file check before passing a discovered path to clang.
     int32_t kind = -1;
-    if (strcmp(relative, "scripts/ASM/vpp_aot_primitives_aarch64.S") == 0)
+    if (strcmp(relative, "scripts/ASM/macos/vpp_aot_primitives_aarch64.S") == 0)
         kind = 1;
     else if (strcmp(relative, "src/runtime/native/vpp_aot_runtime.c") == 0)
         kind = 2;
@@ -1079,7 +1103,7 @@ int32_t vpp_native_link_macho_modules(int32_t archive_handle,
         position += length;
     }
 #ifdef VPP_NATIVE_VPP_RUNTIME
-    if (vpp_native_runtime_file("scripts/ASM/vpp_aot_primitives_aarch64.S",
+    if (vpp_native_runtime_file("scripts/ASM/macos/vpp_aot_primitives_aarch64.S",
                                 primitive_path, sizeof primitive_path) != 0)
         goto cleanup_modules;
     if (needs_services && vpp_native_runtime_source(runtime_path, sizeof runtime_path) != 0)

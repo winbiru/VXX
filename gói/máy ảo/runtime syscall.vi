@@ -1,0 +1,4 @@
+// Same native dynamic runtime, with decimal/IEEE-754 conversion in V++.
+// The Linux freestanding ASM boundary supplies startup and direct syscalls.
+nhập runtime AOT.*;
+nhập số thực tự chủ.*;

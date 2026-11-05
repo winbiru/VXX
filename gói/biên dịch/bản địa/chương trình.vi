@@ -17,7 +17,7 @@ hàm chương trình thu thập(nguồn văn bản, các từ tố, các hàm) {
             };
             // Function count is bounded by the byte-buffer capacity, not
             // an arbitrary small limit. The table uses 24 bytes per entry.
-            nếu (byte dài(các hàm) > 1048576 - 24) { trả về -1; };
+            nếu (byte dài(các hàm) > 2097152 - 24) { trả về -1; };
             biến là điểm vào = từ tố bằng(nguồn văn bản, các từ tố, i + 1, "chính");
             nếu (từ tố bằng(nguồn văn bản, các từ tố, i + 1, "main") == 1) { là điểm vào = 1; };
             nếu (là điểm vào == 1) {

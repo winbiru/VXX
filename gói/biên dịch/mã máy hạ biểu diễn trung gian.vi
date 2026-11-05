@@ -39,6 +39,7 @@ lớp công khai Bộ Hạ Mã Máy {
         nếu (mục ký hiệu == "vpp_native_memory_write_byte") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_read_i32") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_memory_write_i32") { trả về 2; };
+        nếu (mục ký hiệu == "vpp_native_memory_zero") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_memory_bind") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_open") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_read") { trả về 3; };
@@ -52,6 +53,7 @@ lớp công khai Bộ Hạ Mã Máy {
         nếu (mục ký hiệu == "vpp_native_os_stat") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_lstat") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_access_exec") { trả về 1; };
+        nếu (mục ký hiệu == "vpp_native_os_fchmod") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_unlink") { trả về 1; };
         nếu (mục ký hiệu == "vpp_native_os_env_copy") { trả về 2; };
         nếu (mục ký hiệu == "vpp_native_os_executable_path") { trả về 1; };
@@ -345,17 +347,61 @@ lớp công khai Bộ Hạ Mã Máy {
                         mình.biên dịch máy hạ lệnh(trạng thái, "Equal");
                         trạng thái["depth"] = trạng thái["depth"] - 1;
                     }
+                    ca "~": {
+                        mình.biên dịch máy hạ biểu thức(IR, trạng thái, các mã phép toán[0], sâu + 1);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "PushConstant", -1);
+                        mình.biên dịch máy hạ đẩy(trạng thái);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "BitXor");
+                        trạng thái["depth"] = trạng thái["depth"] - 1;
+                    }
                     mặc định: { mình.biên dịch máy hạ lỗi("toán tử unary native chưa hỗ trợ: " + v["text"]); }
                 };
             }
             ca "Binary": {
                 nếu (máy ảo lấy độ dài(các mã phép toán) != 2) { mình.biên dịch máy hạ lỗi("binary IR sai số toán hạng"); };
+                nếu (v["text"] == "&&" || v["text"] == "||") {
+                    // Nhánh ngắn: vế phải chỉ được thực thi khi cần, kết quả chuẩn hóa về 0/1.
+                    độ sâu đầu = trạng thái["depth"];
+                    mình.biên dịch máy hạ biểu thức(IR, trạng thái, các mã phép toán[0], sâu + 1);
+                    nhảy khi không = mình.biên dịch máy hạ lệnh(trạng thái, "BranchZero");
+                    trạng thái["depth"] = độ sâu đầu;
+                    nếu (v["text"] == "&&") {
+                        mình.biên dịch máy hạ biểu thức(IR, trạng thái, các mã phép toán[1], sâu + 1);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "PushConstant", 0);
+                        mình.biên dịch máy hạ đẩy(trạng thái);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "NotEqual");
+                        trạng thái["depth"] = trạng thái["depth"] - 1;
+                    } hoặc {
+                        mình.biên dịch máy hạ lệnh(trạng thái, "PushConstant", 1);
+                        mình.biên dịch máy hạ đẩy(trạng thái);
+                    };
+                    nhảy cuối = mình.biên dịch máy hạ lệnh(trạng thái, "Jump");
+                    trạng thái["instructions"][nhảy khi không]["operand"] = máy ảo lấy độ dài(trạng thái["instructions"]);
+                    trạng thái["depth"] = độ sâu đầu;
+                    nếu (v["text"] == "&&") {
+                        mình.biên dịch máy hạ lệnh(trạng thái, "PushConstant", 0);
+                        mình.biên dịch máy hạ đẩy(trạng thái);
+                    } hoặc {
+                        mình.biên dịch máy hạ biểu thức(IR, trạng thái, các mã phép toán[1], sâu + 1);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "PushConstant", 0);
+                        mình.biên dịch máy hạ đẩy(trạng thái);
+                        mình.biên dịch máy hạ lệnh(trạng thái, "NotEqual");
+                        trạng thái["depth"] = trạng thái["depth"] - 1;
+                    };
+                    trạng thái["instructions"][nhảy cuối]["operand"] = máy ảo lấy độ dài(trạng thái["instructions"]);
+                    trả về đúng;
+                };
                 mã = "";
                 chọn (v["text"]) {
                     ca "+": { mã = "Add"; }
                     ca "-": { mã = "Sub"; }
                     ca "*": { mã = "Mul"; }
                     ca "/": { mã = "Div"; }
+                    ca "&": { mã = "BitAnd"; }
+                    ca "|": { mã = "BitOr"; }
+                    ca "^": { mã = "BitXor"; }
+                    ca "<<": { mã = "ShiftLeft"; }
+                    ca ">>": { mã = "ShiftRight"; }
                     ca "%": { mã = "Mod"; }
                     ca "==": { mã = "Equal"; }
                     ca "!=": { mã = "NotEqual"; }

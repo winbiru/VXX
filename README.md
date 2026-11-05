@@ -267,62 +267,66 @@ Windows có thể build bằng MSVC/CMake; hướng dẫn chi tiết nằm trong
 
 ## 📊 Benchmark
 
-Đo lại ngày **30/10/2026** trên **Apple M3 Pro, macOS 26.6.2 ARM64**, 12 CPU
-logic, 36 GiB RAM; source nền `5ef46b3c`. CLI Release `-O3 -DNDEBUG`.
-Runner, oracle và thống kê viết bằng **V++**. Mỗi ô có **10 tiến trình độc
-lập**, ba batch warmup rồi một batch đo, thứ tự các ô được xáo trộn.
-**490/490 mẫu đạt checksum**; MAD/median cao nhất **2,27%**.
+Đo lại ngày **05/11/2026** trên **macOS 26.6.2 ARM64**. Có **387/387 mẫu
+hợp lệ** từ 43 tổ hợp ngôn ngữ/bài đo, mỗi tổ hợp chạy 9 tiến trình độc lập,
+ba batch làm nóng rồi một batch đo. Thứ tự chạy được xáo trộn; số vòng được
+hiệu chỉnh với mục tiêu 100 ms/batch. Kết quả, checksum, trung vị/MAD và
+SHA-256 được kiểm chứng độc lập bằng Ruby; **MAD/trung vị cao nhất 4,12%**.
 
-**Trung vị µs/thao tác; thấp hơn nhanh hơn.** Không tính startup, biên dịch,
-chuẩn bị input và warmup; vẫn tính harness, lời gọi hàm, allocation và GC.
+**Trung vị µs/thao tác; thấp hơn là nhanh hơn.** Ứng dụng V++ được dựng lại
+bằng AOT, dùng **runtime V++/ASM** cho giá trị động, GC, Unicode và JSON;
+executable chỉ liên kết `libSystem`. C/C++ dùng Clang 21 `-O3`, Rust 1.99.1
+dùng `opt-level=3`, không LTO. Node.js 20.11.1 và Java 21.0.2 dùng JIT mặc
+định; Python 3.14.3 và Ruby 2.6.10 dùng cấu hình mặc định. Tất cả chạy ARM64.
 
-| Workload | V++ AOT ứng dụng | C++ `-O3` | Node.js | Java | Python | Ruby |
+| Ngôn ngữ | Số học | Vòng lặp có nhánh | Fibonacci vòng lặp | Danh sách 128 phần tử | Thay Unicode | Phân tích JSON |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Số học | 21.56110 | 0.00081 | 0.00112 | 0.00137 | 0.09782 | 0.08174 |
-| Vòng lặp có nhánh | 1556.26563 | 0.19866 | 0.15329 | 0.06936 | 4.27098 | 6.51089 |
-| Fibonacci vòng lặp | 266.27983 | 0.00908 | 0.01142 | 0.00451 | 0.46393 | 1.07027 |
-| Danh sách 128 phần tử | 1856.73437 | 0.24046 | 0.53138 | 0.34491 | 5.22852 | 7.51156 |
-| Thay chuỗi Unicode | 9505.50000 | 0.18366 | 1.32997 | 0.18833 | 0.45324 | 1.22038 |
-| Phân tích JSON | 24191.53125 | — | 0.41046 | — | 2.01089 | 2.15378 |
+| **V++ AOT + V++/ASM** | **0.001779** | **0.158637** | **0.022305** | **0.128629** | **82.252344** | **1003.270835** |
+| C | 0.000838 | 0.201920 | 0.009191 | — | — | — |
+| Rust | 0.000830 | 0.202038 | 0.009172 | — | — | — |
+| C++ | 0.000837 | 0.203985 | 0.009167 | 0.253461 | 0.190372 | — |
+| Node.js | 0.001149 | 0.156904 | 0.011807 | 0.542440 | 1.357444 | 0.432746 |
+| Java | 0.001401 | 0.070227 | 0.004602 | 0.352566 | 0.192991 | — |
+| Python | 0.101871 | 4.336261 | 0.479938 | 5.162452 | 0.471819 | 2.061762 |
+| Ruby | 0.082067 | 6.597334 | 1.087142 | 7.464361 | 1.278848 | 2.217100 |
 
-**V++ AOT ứng dụng hiện chậm hơn các runtime đối chiếu ở các bài đã đo.**
-Đường này dùng compiler V++ đầy đủ và runtime động V++/ASM; so với VM C++
-tương thích của cùng source, nó mất khoảng **14,65–28,65 lần** thời gian.
-Cần dùng kết quả này khi đánh giá ứng dụng đầy đủ; kernel i32 là đường
-thực thi riêng bên dưới.
+Dấu `—` nghĩa là bộ đo chưa có bài tương ứng: C/Rust chỉ có ba kernel số
+học; C++/Java chưa có bài JSON. Các ngôn ngữ dùng cấu trúc dữ liệu và thư
+viện bản địa tương ứng; JSON so sánh cả hiệu quả của thư viện parser.
 
-| Kernel | C++ `-O3`, ns/op | V++ i32, ns/op | Thời gian V++ / C++ |
+Trong các bài đã đo, danh sách V++ nhanh hơn C++ khoảng **1,97 lần**;
+Fibonacci mất khoảng **2,43 lần thời gian C/Rust**. **Unicode và JSON vẫn
+còn chậm nhiều**: Unicode mất khoảng **432 lần thời gian C++**, JSON mất
+khoảng **2.318 lần thời gian Node.js**. Các tỷ lệ này chỉ áp dụng cho từng
+workload, không phải hệ số tốc độ chung của ngôn ngữ.
+
+Các kernel V++ i32 riêng dùng chung bộ đo C++ và ABI bốn tham số i32 với
+C/Rust, biên dịch ở đơn vị riêng, không LTO. **Đơn vị ns/thao tác**:
+
+| Kernel | V++ i32 | C | Rust |
 | --- | ---: | ---: | ---: |
-| Số học | 0.812 | 1.165 | 1.44× |
-| Vòng lặp có nhánh | 198.658 | 149.352 | 0.75× |
-| Fibonacci vòng lặp | 9.077 | 20.356 | 2.24× |
+| Số học | 1.170 | 0.838 | 0.830 |
+| Vòng lặp có nhánh | 153.566 | 201.920 | 202.038 |
+| Fibonacci vòng lặp | 20.595 | 9.191 | 9.172 |
 
-Kernel i32 V++ dùng cùng harness và ABI C với C++, không LTO. Nó tốn ít hơn
-C++ **24,82% thời gian** ở vòng lặp có nhánh; số học và Fibonacci chậm hơn.
-Không suy rộng ba kernel này thành tốc độ toàn bộ ngôn ngữ.
+Ứng dụng AOT ở bảng đầu dùng bộ đo viết bằng V++; đường kernel i32 dùng
+driver C++. Cấu trúc vòng lặp và tối ưu có thể khác nhau, nên không lấy
+hiệu hai bảng để suy ra chi phí riêng của một lời gọi hàm.
 
-Cùng chu kỳ 16 đầu vào và kiểm tra từng kết quả bằng oracle độc lập. Mỗi
-runtime dùng container/thư viện của nó; JSON V++ dùng parser V++, các
-runtime đối chiếu dùng parser có sẵn. C++/Java chưa có ô JSON. Node/Java
-bật JIT mặc định; V++ VM tắt JIT. Go, Rust và .NET chưa cài nên không có số
-liệu. Đây là microbenchmark trên một máy, chưa đo I/O, đa luồng hoặc RAM;
-không so trực tiếp với workload khác trong các báo cáo lịch sử.
+Kiểm tra bổ sung xác nhận các phép đo ngắn 64 vòng trước đây bị chi phí cố
+định của bộ đo chi phối. Lượt này dùng batch dài khoảng **54,9–171,1 ms**;
+không coi chênh lệch do tăng số vòng là một tối ưu compiler mới.
 
-[Báo cáo đầy đủ, gồm cả hai VM V++](report/benchmark-languages-2026-10-30.md)
-· [Raw samples, môi trường và SHA-256](benchmark/reports/languages-2026-10-30/report.json)
-· [Mã nguồn và runner V++](benchmark/languages/)
+Phép đo không tính khởi động, biên dịch, chuẩn bị đầu vào hay làm nóng;
+vẫn tính vòng lặp bộ đo, gọi hàm, cấp phát và GC còn lại sau tối ưu.
+Đầu vào lặp theo chu kỳ 16 giá trị `17..32`; profiling tắt khi đo.
+Đây là benchmark trên một máy, chưa đo riêng RAM, I/O, đa luồng hay thời
+gian biên dịch.
 
-```sh
-cmake -S . -B build-performance -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTS=OFF -DBUILD_BENCHMARKS=ON -DVPP_ENABLE_COVERAGE=OFF
-cmake --build build-performance --target vpp-cli --parallel 2
-bash benchmark/languages/run.sh "$PWD/benchmark/reports/languages-rerun"
-```
-
-Output phải là thư mục mới. Backend VM V++/ASM bổ sung cần compiler leaf;
-[báo cáo](report/benchmark-languages-2026-10-30.md) có lệnh chuẩn bị và biến
-`VPP_I32_COMPILER`. Python chỉ là runtime đối chiếu, chạy inline từ `.txt`;
-không có tệp `.py` hoặc runner Python.
+[Mã nguồn workload và cấu hình dựng](benchmark/languages/)
+· [Bộ đo, oracle và thống kê](scripts/quality/compare_languages_aot.py).
+Báo cáo và dữ liệu từng mẫu được sinh cục bộ trong `report/` và
+`benchmark/reports/`, đã được đưa vào `.gitignore`.
 
 ## 🧠 Kiến trúc
 

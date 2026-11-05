@@ -30,7 +30,7 @@ hàm biên dịch mô đun thu thập đơn vị(nguồn văn bản, các từ t
             biến điểm kết thúc = từ tố trường dữ liệu(các từ tố, i + 1, 1);
             biến chiều dài = điểm kết thúc - điểm bắt đầu;
             nếu (chiều dài <= 0) { trả về -1; };
-            nếu (byte dài(các hàm) > 1048576 - 24) { trả về -1; };
+            nếu (byte dài(các hàm) > 2097152 - 24) { trả về -1; };
             // Both Vietnamese `chính` and ABI-compatible `main` are valid
             // entry aliases, but a program can declare only one of them.
             biến là điểm vào = từ tố bằng(nguồn văn bản, các từ tố, i + 1, "chính");
@@ -92,7 +92,15 @@ hàm biên dịch mô đun biên dịch đơn vị(nguồn văn bản, các từ
         };
         byte hủy(trạng thái nội bộ);
         byte hủy(đơn vị);
-        nếu (mã trạng thái != 0) { trả về -1; };
+        nếu (mã trạng thái != 0) {
+            thực thi liên kết báo lỗi("AOT-DIAG: lỗi thân hàm: ");
+            biến đầu tên = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại + 1, 0);
+            biến cuối tên = từ tố trường dữ liệu(các từ tố, con trỏ hiện tại + 1, 1);
+            biến đoạn nguồn = thực thi các byte ô nhớ(nguồn văn bản);
+            nếu (đoạn nguồn >= 0 && cuối tên > đầu tên) { máy ghi(2, thực thi nội dung đệm(đoạn nguồn) + đầu tên, cuối tên - đầu tên); };
+            thực thi liên kết báo lỗi("\n");
+            trả về -1;
+        };
         con trỏ hiện tại = kế tiếp;
         mã định danh = mã định danh + 1;
     };
@@ -128,6 +136,7 @@ hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các h
             nếu (kế tiếp nguồn đầu vào < 0) { mã trạng thái = -1; thoát; };
             nếu (từ vựng tách từ tố(nguồn văn bản, các từ tố) <= 0) { mã trạng thái = -1; thoát; };
             nếu (biên dịch mô đun thu thập đơn vị(nguồn văn bản, các từ tố, sổ đăng ký, các hàm, điểm vào) != 0) {
+                thực thi liên kết báo lỗi("AOT-DIAG: lỗi thu thập khai báo\n");
                 mã trạng thái = -1;
                 thoát;
             };
@@ -157,7 +166,7 @@ hàm biên dịch các mô đun(kho lưu trữ, biểu diễn trung gian, các h
             biến cuối cùng = byte đọc số nguyên ba mươi hai bit(mô đun ends, mô đun chỉ mục);
             chương trình con mã định danh = biên dịch đơn vị có đệm(nguồn văn bản, các từ tố, sổ đăng ký, biểu diễn trung gian, các hàm,
                 chương trình con mã định danh, cuối cùng, byte đọc số nguyên ba mươi hai bit(điểm vào, 0));
-            nếu (chương trình con mã định danh < 0) { mã trạng thái = -1; thoát; };
+            nếu (chương trình con mã định danh < 0) { thực thi liên kết báo lỗi("AOT-DIAG: biên dịch đơn vị thất bại\n"); mã trạng thái = -1; thoát; };
             nếu (chương trình con mã định danh != cuối cùng) { mã trạng thái = -1; thoát; };
             mô đun chỉ mục = mô đun chỉ mục + 4;
             độ lệch = kế tiếp mã máy;

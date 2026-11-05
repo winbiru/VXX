@@ -35,8 +35,11 @@ hàm expected_value(name, k) {
 };
 hàm measure(runtime, name, iterations, seed, root) {
     env = {"VPP_HOME": root, "BENCH_CASE": name, "BENCH_ITERATIONS": thành chuỗi(iterations),
-        "BENCH_SEED": thành chuỗi(seed), "VPP_ENABLE_JIT": "0", "VPP_ENABLE_MACHINE_JIT": "0",
+        "BENCH_SEED": thành chuỗi(seed),
         "VPP_VM_PROFILE": "", "PYTHONDONTWRITEBYTECODE": "1"};
+    overrides = runtime["environment"];
+    keys = khóa từ điển(overrides);
+    lặp(i = 0; i < độ dài(keys); i++) { env[keys[i]] = overrides[keys[i]]; };
     start = thời gian đơn điệu mili giây();
     child = chạy tiến trình(runtime["executable"], runtime["arguments"], env, 180000);
     wall = thời gian đơn điệu mili giây() - start;
@@ -83,14 +86,19 @@ hàm describe(values) {
         "noisy": mad / median > 0.05, "samples": độ dài(values)};
 };
 hàm initial_iterations(runtime, name) {
-    // Keep tiny native/JIT kernels above the clock resolution, even in preflight.
+    // Chạy đủ lượt để vượt độ phân giải đồng hồ ngay trong bước kiểm tra đầu.
     fast = runtime["name"] == "cpp" || runtime["name"] == "vpp-i32" ||
+        runtime["name"] == "c" || runtime["name"] == "rust" ||
         runtime["name"] == "node" || runtime["name"] == "java";
     numeric = name == "arithmetic" || name == "branch_loop" || name == "fibonacci";
     nếu (fast && numeric) { trả về 1024; };
     trả về 16;
 };
 hàm chính() {
+    require(đọc biến môi trường("VPP_ENABLE_JIT", rỗng) == rỗng &&
+        đọc biến môi trường("VPP_ENABLE_MACHINE_JIT", rỗng) == rỗng &&
+        đọc biến môi trường("VIETVM_ENABLE_JIT", rỗng) == rỗng,
+        "inherited JIT flags must be unset; use per-runtime environment");
     manifest_path = đọc biến môi trường("VPP_LANGUAGE_MANIFEST", "");
     output = đọc biến môi trường("VPP_LANGUAGE_OUTPUT", "");
     require(manifest_path != "" && output != "", "manifest/output are required");

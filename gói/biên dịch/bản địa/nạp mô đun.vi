@@ -1,3 +1,19 @@
+// Shared native source reader used by the module loader and CLI.
+hàm đọc tệp nguồn(đường tệp, nguồn đầu vào) {
+    biến tệp dữ liệu = tệp mở đọc(đường tệp);
+    nếu (tệp dữ liệu <= 0) { trả về -1; };
+    biến hoàn thành = 0;
+    lặp (i = 0; i < 300; i++) {
+        biến số phần tử = tệp đọc khối(tệp dữ liệu, nguồn đầu vào);
+        nếu (số phần tử < 0) { thoát; };
+        nếu (số phần tử == 0) { hoàn thành = 1; thoát; };
+    };
+    nếu (tệp đóng(tệp dữ liệu) != 0) { trả về -1; };
+    nếu (hoàn thành != 1) { trả về -1; };
+    trả về byte dài(nguồn đầu vào);
+};
+
+
 // Native module loader for the self-hosted i32 compiler.
 // Supported source form: leading dotted module imports (`nhập tên.mô đun.*;`).
 // Paths are relative to the importing file; imports are compiled once in
@@ -5,6 +21,16 @@
 
 // Seen table records: i32 path_length, i32 state (1 visiting, 2 done), bytes.
 // Return 0 for missing, 1 for an active dependency, 2 for completed.
+hàm nạp mô đun báo lỗi(đường tệp) {
+    thực thi liên kết báo lỗi("V++ native module load failed: ");
+    biến ô nhớ = thực thi các byte ô nhớ(đường tệp);
+    nếu (ô nhớ >= 0) {
+        máy ghi(2, thực thi nội dung đệm(ô nhớ), byte dài(đường tệp));
+    };
+    thực thi liên kết báo lỗi("\n");
+    trả về -1;
+};
+
 hàm nạp mô đun đã gặp(bảng, đường tệp) {
     biến chiều dài = byte dài(đường tệp);
     biến độ lệch = 0;
@@ -28,7 +54,7 @@ hàm nạp mô đun đã gặp(bảng, đường tệp) {
     trả về 0;
 };
 
-// Translate dotted source imports to a filesystem path relative to the importer.
+// Chuyển đường nhập mô đun thành đường tệp, ưu tiên thư mục của tệp nguồn.
 // `nhập sub.leaf.*;` -> sub/leaf.vi, `nhập ..sub.leaf.*;` -> ../sub/leaf.vi.
 // Plain `nhập leaf;` and slash imports remain valid during migration.
 // Native's current function namespace is shared; selected names are resolved
@@ -38,11 +64,14 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
     nếu (byte làm rỗng(con) != 0) { trả về -1; };
     biến cuối cùng dấu gạch chéo = -1;
     lặp (i = 0; i < byte dài(đường tệp); i++) {
-        nếu (byte lấy(đường tệp, i) == 47) { cuối cùng dấu gạch chéo = i; };
+        biến dấu ngăn = byte lấy(đường tệp, i);
+        nếu (dấu ngăn == 47) { cuối cùng dấu gạch chéo = i; };
+        nếu (dấu ngăn == 92) { cuối cùng dấu gạch chéo = i; };
     };
     lặp (i = 0; i <= cuối cùng dấu gạch chéo; i++) {
         nếu (byte thêm(con, byte lấy(đường tệp, i)) != 0) { trả về -1; };
     };
+    biến bắt đầu tên mô đun = byte dài(con);
     biến số từ tố = từ tố số phần tử(các từ tố);
     nếu (điểm bắt đầu < 0) { trả về -1; };
     nếu (điểm bắt đầu >= số từ tố) { trả về -1; };
@@ -128,6 +157,43 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
     biến mã trạng thái = byte nối(con, hậu tố);
     byte hủy(hậu tố);
     nếu (mã trạng thái != 0) { trả về -1; };
+    // Nhập gói.* luôn có thể tìm từ thư mục cài V++ nếu tệp nguồn ở ngoài gốc.
+    // Giữ nguyên ưu tiên nhập tương đối, kể cả khi có mô đun cục bộ trùng tên.
+    nếu (số dấu chấm đầu == 0 && byte dài(con) - bắt đầu tên mô đun >= 4) {
+        nếu (byte lấy(con, bắt đầu tên mô đun) == 103 &&
+            byte lấy(con, bắt đầu tên mô đun + 1) == 195 &&
+            byte lấy(con, bắt đầu tên mô đun + 2) == 179 &&
+            byte lấy(con, bắt đầu tên mô đun + 3) == 105) {
+            biến tệp cục bộ = tệp mở đọc(con);
+            nếu (tệp cục bộ > 0) { tệp đóng(tệp cục bộ); }
+            hoặc {
+                biến tệp runtime = thực thi môi trường thực thi mô đun đường tệp();
+                nếu (tệp runtime > 0) {
+                    biến đuôi runtime = "gói/biên dịch/bản địa/môi trường thực thi.vi";
+                    biến nơi bắt đầu = byte tìm(tệp runtime, đuôi runtime);
+                    nếu (nơi bắt đầu >= 0) {
+                        biến thư mục gốc = byte cắt(tệp runtime, 0, nơi bắt đầu);
+                        biến tên tương đối = byte cắt(con, bắt đầu tên mô đun,
+                            byte dài(con) - bắt đầu tên mô đun);
+                        nếu (thư mục gốc > 0 && tên tương đối > 0) {
+                            biến tìm được = thực thi môi trường thực thi ứng viên(thư mục gốc, tên tương đối);
+                            nếu (tìm được > 0) {
+                                nếu (byte làm rỗng(con) != 0 || byte nối(con, tìm được) != 0) {
+                                    mã trạng thái = -1;
+                                };
+                                byte hủy(tìm được);
+                            };
+                        };
+                        nếu (thư mục gốc > 0) { byte hủy(thư mục gốc); };
+                        nếu (tên tương đối > 0) { byte hủy(tên tương đối); };
+                    };
+                    byte hủy(đuôi runtime);
+                    byte hủy(tệp runtime);
+                };
+            };
+        };
+    };
+    nếu (mã trạng thái != 0) { trả về -1; };
     trả về kết thúc từ tố + 1;
 };
 
@@ -135,7 +201,7 @@ hàm nạp mô đun nhập đường tệp(đường tệp, nguồn văn bản, 
 // Import-only files are allowed. Source and token handles remain local to
 // their recursion frame. Cycles, missing modules and malformed imports fail.
 hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu hiện tại) {
-    nếu (độ sâu hiện tại >= 12) { trả về -1; };
+    nếu (độ sâu hiện tại >= 12) { trả về nạp mô đun báo lỗi(đường tệp); };
     biến trạng thái nội bộ = nạp mô đun đã gặp(bảng, đường tệp);
     nếu (trạng thái nội bộ == 2) { trả về 0; };
     nếu (trạng thái nội bộ != 0) { trả về -1; };
@@ -193,6 +259,7 @@ hàm nạp mô đun nạp(đường tệp, đã kết hợp, bảng, độ sâu 
     nếu (nguồn đầu vào > 0) { byte hủy(nguồn đầu vào); };
     nếu (các từ tố > 0) { byte hủy(các từ tố); };
     nếu (con > 0) { byte hủy(con); };
+    nếu (mã trạng thái != 0) { trả về nạp mô đun báo lỗi(đường tệp); };
     trả về mã trạng thái;
 };
 
@@ -202,13 +269,26 @@ hàm nạp mô đun chuẩn bị(đường tệp, đã kết hợp) {
     nếu (bảng <= 0) { trả về -1; };
     biến môi trường thực thi = môi trường thực thi nguồn();
     biến mã trạng thái = -1;
+    biến số đơn vị runtime = 0;
     nếu (môi trường thực thi > 0) {
         mã trạng thái = nạp mô đun nạp(môi trường thực thi, đã kết hợp, bảng, 0);
         byte hủy(môi trường thực thi);
+        nếu (mã trạng thái == 0) {
+            biến nơi = 0;
+            khi (nơi < byte dài(đã kết hợp)) {
+                nếu (nơi > byte dài(đã kết hợp) - 4) { mã trạng thái = -1; thoát; };
+                biến dài = byte đọc số nguyên ba mươi hai bit(đã kết hợp, nơi);
+                nếu (dài < 1) { mã trạng thái = -1; thoát; };
+                nếu (dài > byte dài(đã kết hợp) - nơi - 4) { mã trạng thái = -1; thoát; };
+                nơi = nơi + 4 + dài;
+                số đơn vị runtime = số đơn vị runtime + 1;
+            };
+        };
         nếu (mã trạng thái == 0) { mã trạng thái = nạp mô đun nạp(đường tệp, đã kết hợp, bảng, 0); };
     };
     byte hủy(bảng);
     nếu (mã trạng thái != 0) { byte làm rỗng(đã kết hợp); trả về -1; };
     nếu (byte dài(đã kết hợp) <= 0) { trả về -1; };
-    trả về byte dài(đã kết hợp);
+    // Positive return is the number of implicit runtime units, including imports.
+    trả về số đơn vị runtime;
 };

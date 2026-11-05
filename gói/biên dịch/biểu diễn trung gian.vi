@@ -146,8 +146,16 @@ lớp công khai Bộ Hạ IR {
         nếu (mã == "gọi tên" || mã == "gọi tường minh") {
             trả về mục["giá trị"]["tên"];
         };
-        nếu (mã == "đọc tên" || mã == "khai báo" ||
-            mã == "chuẩn bị gán" || mã == "gán tên" ||
+        nếu (mã == "đọc tên") {
+            tên = mục["giá trị"];
+            // Lexer có thể giữ `đối_tượng.thành_viên` trong một token tên.
+            // Binding phải thuộc receiver để không rơi về slot cùng tên của
+            // một hàm khác khi biểu thức nằm lồng trong đối số lời gọi.
+            thành viên = mình.biên dịch IR tách thành viên(tên);
+            nếu (thành viên != rỗng) { trả về thành viên["nhận"]; };
+            trả về tên;
+        };
+        nếu (mã == "khai báo" || mã == "chuẩn bị gán" || mã == "gán tên" ||
             mã == "++" || mã == "--" || mã == "bắt đầu lặp") {
             trả về mục["giá trị"];
         };
@@ -503,6 +511,12 @@ lớp công khai Bộ Hạ IR {
             };
             nếu (toán tử == "+") {
                 mình.biên dịch IR biểu thức(toán hạng, lệnh);
+                trả về đúng;
+            };
+            nếu (toán tử == "~") {
+                mình.biên dịch IR biểu thức(toán hạng, lệnh);
+                mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "số nguyên", "-1");
+                mình.biên dịch IR máy ảo thêm cuối danh sách(lệnh, "toán tử", "^");
                 trả về đúng;
             };
             nếu (toán tử != "!") {

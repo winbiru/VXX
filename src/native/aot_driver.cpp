@@ -302,6 +302,9 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
         for(std::size_t i=0;i<spec->functionCount;++i) {
             const auto &f=spec->functions[i];program.functions.push_back({f.name,f.required,f.maximum,f.function});
         }
+        if(spec->reserved>=1 && spec->i32Functions) {
+            program.i32Functions.assign(spec->i32Functions,spec->i32Functions+spec->i32FunctionCount);
+        }
         program.initializers.assign(spec->initializers,spec->initializers+spec->initializerCount);program.entry=spec->entry;
         for(std::size_t i=0;i<spec->foreignCount;++i) {
             const auto &f=spec->foreignFunctions[i];bytecode::ForeignFunctionDescriptor descriptor;
@@ -365,9 +368,10 @@ extern "C" int vpp_aot_main(int argc,char **argv,const ProgramSpec *spec) noexce
                 throw std::runtime_error("Native AOT: embedded script failed: "+std::to_string(result.status));
             return result.output;
         };
-        program.run();
+        auto result=program.run();
         dumpAotCpuProfile();
         if(spec->compiler)return compilerMain(program,argc,argv);
+        if(const auto *status=std::get_if<int>(&result))return *status;
         return 0;
     }catch(const std::exception &error){std::cerr<<error.what()<<'\n';return 1;}
     catch(...){std::cerr<<"Native AOT: unknown failure\n";return 1;}

@@ -22,14 +22,31 @@ hàm vm_write(fd, s) {
     trả về 0;
 };
 hàm vm_utf8_width(s, at) {
-    biến b = máy đọc byte(vm_get(s, 2) + at);
-    nếu (b < 128) { trả về 1; }; nếu (b < 224) { trả về 2; }; nếu (b < 240) { trả về 3; }; trả về 4;
+    biến data = vm_get(s, 2); biến n = vm_get(s, 1);
+    biến b = máy đọc byte(data + at);
+    nếu (b < 128) { trả về 1; };
+    // Byte sai là một đơn vị thô, cùng quy tắc với runtime bootstrap.
+    // Không đọc byte tiếp diễn trước khi kiểm tra phần còn lại của chuỗi.
+    nếu (b < 194 || b > 244 || at + 1 >= n) { trả về 1; };
+    biến c = máy đọc byte(data + at + 1);
+    nếu (c < 128 || c > 191) { trả về 1; };
+    nếu (b < 224) { trả về 2; };
+    nếu (at + 2 >= n || (b == 224 && c < 160) || (b == 237 && c > 159)) { trả về 1; };
+    biến d = máy đọc byte(data + at + 2);
+    nếu (d < 128 || d > 191) { trả về 1; };
+    nếu (b < 240) { trả về 3; };
+    nếu (at + 3 >= n || (b == 240 && c < 144) || (b == 244 && c > 143)) { trả về 1; };
+    biến e = máy đọc byte(data + at + 3);
+    nếu (e < 128 || e > 191) { trả về 1; };
+    trả về 4;
 };
 hàm vm_ascii_at(s, at) {
     // Source lexers repeatedly request one-character strings. Intern ASCII
     // codepoints, which are immutable value types in the VM, to avoid two
     // managed allocations (string + bytes) for each source[i] read.
     biến ascii = máy đọc byte(vm_get(s, 2) + at);
+    // Byte UTF-8 sai cũng có độ rộng 1 nhưng không thuộc bảng ASCII 128 ô.
+    nếu (ascii >= 128) { trả về vm_slice(s, at, 1); };
     biến cache = vm_get(4198464, 18);
     nếu (cache == 0) {
         cache = vm_alloc(512, 1);
@@ -55,54 +72,200 @@ hàm vm_length(v) {
         vm_set(v, 3, 0 - n - 2);
         trả về n;
     };
-    nếu (tag >= 4 && tag <= 6) { biến n = vm_get(v, 1); nếu (tag == 5) { n = máy chia số nguyên ba mươi hai bit(n, 2); }; trả về n; };
+    nếu (tag >= 4 && tag <= 6) {
+        biến số phần tử = vm_get(v, 1);
+        nếu (tag == 5) { số phần tử = máy chia số nguyên ba mươi hai bit(số phần tử, 2); };
+        trả về số phần tử;
+    };
     vm_error(2); trả về 0;
+};
+// Đổi vị trí điểm mã thành vị trí byte. Tận dụng bảng chỉ mục khi đã có;
+// chuỗi ASCII bỏ hoàn toàn vòng quét UTF-8.
+hàm vm_utf8_offset(s, vị trí, số điểm) {
+    biến byte_count = vm_get(s, 1);
+    nếu (vị trí == số điểm) { trả về byte_count; };
+    nếu (vm_get(s, 3) == 0 - byte_count - 2) { trả về vị trí; };
+    biến index = vm_get(s, 3);
+    biến offset = 0; biến current = 0;
+    nếu (index > 0) {
+        nếu (byte_count <= 1024) { trả về vm_get(index, 1 + vị trí); };
+        biến block = máy chia số nguyên ba mươi hai bit(vị trí, 64);
+        offset = vm_get(index, 1 + block);
+        current = block * 64;
+    };
+    khi (current < vị trí) {
+        offset = offset + vm_utf8_width(s, offset);
+        current = current + 1;
+    };
+    trả về offset;
+};
+// Cắt cả đoạn trong một lần cấp phát, thay cho vòng nối từng ký tự.
+hàm vm_cut(s, bắt đầu, số lượng) {
+    nếu (vm_tag(s) != 3 || bắt đầu < 0 || số lượng < 0) { trả về vm_error(2); };
+    biến n = vm_length(s);
+    nếu (bắt đầu >= n || số lượng == 0) { trả về vm_string(0); };
+    biến kết thúc = n;
+    nếu (số lượng < n - bắt đầu) { kết thúc = bắt đầu + số lượng; };
+    biến byte_đầu = vm_utf8_offset(s, bắt đầu, n);
+    biến byte_cuối = vm_utf8_offset(s, kết thúc, n);
+    trả về vm_slice(s, byte_đầu, byte_cuối - byte_đầu);
+};
+// Cắt trực tiếp theo byte cho dữ liệu mà tầng V++ đã kiểm tra biên UTF-8.
+hàm vm_cut_byte(s, bắt đầu, số lượng) {
+    nếu (vm_tag(s) != 3 || bắt đầu < 0 || số lượng < 0) { trả về vm_error(2); };
+    biến n = vm_get(s, 1);
+    nếu (bắt đầu >= n || số lượng == 0) { trả về vm_string(0); };
+    nếu (số lượng > n - bắt đầu) { số lượng = n - bắt đầu; };
+    trả về vm_slice(s, bắt đầu, số lượng);
+};
+// So khớp literal tại một biên UTF-8. Byte lỗi là một đơn vị thô nên
+// điểm kết thúc cũng phải trùng đúng biên mà vm_utf8_width nhìn thấy.
+hàm vm_thay_khớp(nguồn, mẫu, tại) {
+    biến n = vm_get(nguồn, 1); biến m = vm_get(mẫu, 1);
+    nếu (m <= 0 || tại < 0 || tại > n - m) { trả về 0; };
+    biến dữ liệu nguồn = vm_get(nguồn, 2); biến dữ liệu mẫu = vm_get(mẫu, 2);
+    lặp(i = 0; i < m; i++) {
+        nếu (máy đọc byte(dữ liệu nguồn + tại + i) != máy đọc byte(dữ liệu mẫu + i)) {
+            trả về 0;
+        };
+    };
+    biến kết thúc = tại + m; biến p = tại;
+    khi (p < kết thúc) { p = p + vm_utf8_width(nguồn, p); };
+    trả về p == kết thúc;
+};
+hàm vm_sao_chép_byte(đích, vị trí đích, nguồn, vị trí nguồn, số lượng) {
+    biến dữ liệu đích = vm_get(đích, 2); biến dữ liệu nguồn = vm_get(nguồn, 2);
+    lặp(i = 0; i < số lượng; i++) {
+        máy ghi byte(dữ liệu đích + vị trí đích + i,
+                     máy đọc byte(dữ liệu nguồn + vị trí nguồn + i));
+    };
+    trả về vị trí đích + số lượng;
+};
+// Thay literal không chồng lấp trong một lần cấp phát kết quả.
+hàm vm_thay_chính_xác(nguồn, mẫu, thay) {
+    nếu (vm_tag(nguồn) != 3 || vm_tag(mẫu) != 3 || vm_tag(thay) != 3) {
+        trả về vm_error(2);
+    };
+    biến n = vm_get(nguồn, 1); biến m = vm_get(mẫu, 1); biến r = vm_get(thay, 1);
+    biến kết quả = 0; biến ra = 0; biến vị trí = 0; biến rộng = 0;
+    nếu (m == 0) {
+        nếu (r == 0) { trả về nguồn; };
+        biến số đơn vị = vm_length(nguồn); biến số khe = số đơn vị + 1;
+        nếu (số khe > máy chia số nguyên ba mươi hai bit(16000000 - n, r)) {
+            trả về vm_error(3);
+        };
+        kết quả = vm_string(n + số khe * r); nếu (kết quả == 0) { trả về 0; };
+        vị trí = 0; ra = 0;
+        ra = vm_sao_chép_byte(kết quả, ra, thay, 0, r);
+        khi (vị trí < n) {
+            rộng = vm_utf8_width(nguồn, vị trí);
+            ra = vm_sao_chép_byte(kết quả, ra, nguồn, vị trí, rộng);
+            ra = vm_sao_chép_byte(kết quả, ra, thay, 0, r);
+            vị trí = vị trí + rộng;
+        };
+        trả về kết quả;
+    };
+
+    biến tổng = n; vị trí = 0; biến số khớp = 0;
+    khi (vị trí < n) {
+        nếu (vm_thay_khớp(nguồn, mẫu, vị trí)) {
+            nếu (r >= m) {
+                biến thêm = r - m;
+                nếu (tổng > 16000000 - thêm) { trả về vm_error(3); };
+                tổng = tổng + thêm;
+            } hoặc {
+                tổng = tổng - (m - r);
+            };
+            số khớp = số khớp + 1;
+            vị trí = vị trí + m;
+        } hoặc {
+            vị trí = vị trí + vm_utf8_width(nguồn, vị trí);
+        };
+    };
+    nếu (số khớp == 0) { trả về nguồn; };
+
+    kết quả = vm_string(tổng); nếu (kết quả == 0) { trả về 0; };
+    ra = 0; vị trí = 0;
+    khi (vị trí < n) {
+        nếu (vm_thay_khớp(nguồn, mẫu, vị trí)) {
+            ra = vm_sao_chép_byte(kết quả, ra, thay, 0, r);
+            vị trí = vị trí + m;
+        } hoặc {
+            rộng = vm_utf8_width(nguồn, vị trí);
+            ra = vm_sao_chép_byte(kết quả, ra, nguồn, vị trí, rộng);
+            vị trí = vị trí + rộng;
+        };
+    };
+    trả về kết quả;
 };
 hàm vm_index(container, key) {
     biến tag = vm_tag(container);
     nếu (tag == 5) { trả về vm_map_get(container, vm_text(key)); };
-    nếu (vm_tag(key) != 1) { trả về vm_error(2); }; biến i = vm_number(key);
+    nếu (vm_tag(key) != 1) { trả về vm_error(2); };
+    trả về vm_index_i32(container, vm_number(key));
+};
+// Nhận chỉ số i32 thô từ AOT, tránh đóng hộp rồi giải hộp ở mỗi lần đọc.
+hàm vm_index_i32(container, i) {
+    biến tag = vm_tag(container);
     nếu (i < 0) { trả về vm_error(4); };
-    nếu (tag == 4 || tag == 6) { trả về vm_at(container, i); };
+    nếu (tag == 4 || tag == 6) {
+        nếu (i >= vm_get(container, 1)) { trả về vm_error(4); };
+        trả về vm_get(vm_get(container, 3), i);
+    };
     nếu (tag == 3) {
-        // Lexer/source text is indexed by Unicode codepoint. Re-scanning the
-        // prefix for every source[i] is quadratic; checkpoint every 64 chars.
-        nếu (vm_get(container, 1) >= 128) {
-            biến index = vm_get(container, 3);
-            nếu (index <= 0) {
-                biến capacity = máy chia số nguyên ba mươi hai bit(vm_get(container, 1), 64) + 1;
-                index = vm_alloc(8 + capacity * 4, 0);
-                nếu (index == 0) { trả về 0; };
-                biến at = 0; biến cp = 0;
-                khi (at < vm_get(container, 1)) {
-                    nếu (cp - máy chia số nguyên ba mươi hai bit(cp, 64) * 64 == 0) {
-                        vm_set(index, 1 + máy chia số nguyên ba mươi hai bit(cp, 64), at);
-                    };
-                    at = at + vm_utf8_width(container, at); cp = cp + 1;
-                };
-                vm_set(index, 0, cp);
-                vm_set(container, 3, index);
-            };
-            nếu (i >= vm_get(index, 0)) { trả về vm_error(4); };
-            biến block = máy chia số nguyên ba mươi hai bit(i, 64);
-            biến at = vm_get(index, 1 + block); biến current = block * 64;
-            khi (current < i) { at = at + vm_utf8_width(container, at); current = current + 1; };
-            biến width = vm_utf8_width(container, at);
-            nếu (width == 1) { trả về vm_ascii_at(container, at); };
-            trả về vm_slice(container, at, width);
-        };
-        biến at = 0; biến current = 0;
-        khi (at < vm_get(container, 1)) {
-            biến width = vm_utf8_width(container, at);
-            nếu (current == i) {
-                nếu (width == 1) { trả về vm_ascii_at(container, at); };
-                trả về vm_slice(container, at, width);
-            };
-            at = at + width; current = current + 1;
-        };
-        trả về vm_error(4);
+        biến at = vm_char_offset(container, i);
+        nếu (vm_get(4198464, 1) != 0) { trả về 0; };
+        biến width = vm_utf8_width(container, at);
+        nếu (width == 1) { trả về vm_ascii_at(container, at); };
+        trả về vm_slice(container, at, width);
     };
     trả về vm_error(2);
+};
+// Xác định byte đầu của một điểm mã, không tạo chuỗi ký tự trung gian.
+// Dùng chung cho lấy ký tự và so sánh trực tiếp trong AOT.
+hàm vm_char_offset(s, i) {
+    nếu (i < 0) { trả về vm_error(4); };
+    biến bytes = vm_get(s, 1);
+    nếu (vm_get(s, 3) == 0 - bytes - 2) {
+        nếu (i >= bytes) { trả về vm_error(4); };
+        trả về i;
+    };
+    // Chuỗi ngắn dùng chỉ mục đầy đủ; chuỗi dài dùng mốc mỗi 64 điểm mã.
+    nếu (bytes >= 48) {
+        biến index = vm_get(s, 3);
+        biến dense = bytes <= 1024;
+        nếu (index <= 0) {
+            biến capacity = máy chia số nguyên ba mươi hai bit(bytes, 64) + 1;
+            nếu (dense) { capacity = bytes + 1; };
+            index = vm_alloc(8 + capacity * 4, 0);
+            nếu (index == 0) { trả về 0; };
+            biến vị_trí_quét = 0; biến điểm_mã = 0;
+            khi (vị_trí_quét < bytes) {
+                nếu (dense) { vm_set(index, 1 + điểm_mã, vị_trí_quét); }
+                hoặc nếu ((điểm_mã & 63) == 0) { vm_set(index, 1 + (điểm_mã >> 6), vị_trí_quét); };
+                vị_trí_quét = vị_trí_quét + vm_utf8_width(s, vị_trí_quét);
+                điểm_mã = điểm_mã + 1;
+            };
+            vm_set(index, 0, điểm_mã);
+            vm_set(s, 3, index);
+        };
+        nếu (i >= vm_get(index, 0)) { trả về vm_error(4); };
+        nếu (dense) { trả về vm_get(index, 1 + i); };
+        biến block = i >> 6;
+        biến mốc_byte = vm_get(index, 1 + block); biến điểm_mốc = block * 64;
+        khi (điểm_mốc < i) {
+            mốc_byte = mốc_byte + vm_utf8_width(s, mốc_byte);
+            điểm_mốc = điểm_mốc + 1;
+        };
+        trả về mốc_byte;
+    };
+    biến vị_trí_chậm = 0; biến điểm_chậm = 0;
+    khi (vị_trí_chậm < bytes) {
+        nếu (điểm_chậm == i) { trả về vị_trí_chậm; };
+        vị_trí_chậm = vị_trí_chậm + vm_utf8_width(s, vị_trí_chậm);
+        điểm_chậm = điểm_chậm + 1;
+    };
+    trả về vm_error(4);
 };
 hàm vm_type(v) {
     biến t = vm_tag(v);
@@ -130,6 +293,15 @@ hàm vm_host(state, op, args) {
         trả về vm_int(a);
     };
     nếu (op == 147) { trả về vm_int(vm_length(a)); };
+    nếu (op == 214) {
+        nếu (vm_tag(b) != 1 || vm_tag(c) != 1) { trả về vm_error(2); };
+        trả về vm_cut(a, vm_number(b), vm_number(c));
+    };
+    nếu (op == 216) { trả về vm_thay_chính_xác(a, b, c); };
+    nếu (op == 217) {
+        nếu (vm_tag(b) != 1 || vm_tag(c) != 1) { trả về vm_error(2); };
+        trả về vm_cut_byte(a, vm_number(b), vm_number(c));
+    };
     nếu (op == 148) { nếu (vm_tag(a) != 4) { trả về vm_error(2); }; vm_append(a, b); trả về 0; };
     nếu (op == 149) { nếu (vm_tag(a) != 4 || vm_tag(b) != 1) { trả về vm_error(2); }; trả về vm_remove(a, vm_number(b)); };
     nếu (op == 150) { trả về vm_int(vm_map_find(a, vm_text(b)) >= 0); };
@@ -146,56 +318,56 @@ hàm vm_host(state, op, args) {
         lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(tuple, vm_at(a, i)); }; trả về tuple;
     };
     nếu (op == 153) {
-        nếu (vm_tag(a) != 3) { trả về vm_error(2); }; biến list = vm_vector(4);
-        lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(list, vm_int(máy đọc byte(vm_get(a, 2) + i))); }; trả về list;
+        nếu (vm_tag(a) != 3) { trả về vm_error(2); }; biến danh_sách_byte = vm_vector(4);
+        lặp(i = 0; i < vm_get(a, 1); i++) { vm_append(danh_sách_byte, vm_int(máy đọc byte(vm_get(a, 2) + i))); }; trả về danh_sách_byte;
     };
     nếu (op == 154 || op == 155) {
         nếu (vm_tag(a) != 4) { trả về vm_error(2); }; biến size = vm_get(a, 1);
         nếu (op == 155 && size != 8) { trả về vm_error(2); };
-        biến value = vm_string(size);
+        biến chuỗi_byte = vm_string(size);
         lặp(i = 0; i < size; i++) {
-            biến item = vm_at(a, i); nếu (vm_tag(item) != 1) { trả về vm_error(2); };
-            biến byte = vm_number(item); nếu (byte < 0 || byte > 255) { trả về vm_error(2); };
-            máy ghi byte(vm_get(value, 2) + i, byte);
+            biến phần_tử_byte = vm_at(a, i); nếu (vm_tag(phần_tử_byte) != 1) { trả về vm_error(2); };
+            biến giá_trị_byte = vm_number(phần_tử_byte); nếu (giá_trị_byte < 0 || giá_trị_byte > 255) { trả về vm_error(2); };
+            máy ghi byte(vm_get(chuỗi_byte, 2) + i, giá_trị_byte);
         };
-        nếu (op == 154) { trả về value; };
-        biến real = vm_alloc(16, 0); nếu (real == 0) { trả về 0; }; vm_set(real, 0, 2);
-        vm_set(real, 2, vm_get(vm_get(value, 2), 0)); vm_set(real, 3, vm_get(vm_get(value, 2), 1)); trả về real;
+        nếu (op == 154) { trả về chuỗi_byte; };
+        biến số_thực_từ_bit = vm_alloc(16, 0); nếu (số_thực_từ_bit == 0) { trả về 0; }; vm_set(số_thực_từ_bit, 0, 2);
+        vm_set(số_thực_từ_bit, 2, vm_get(vm_get(chuỗi_byte, 2), 0)); vm_set(số_thực_từ_bit, 3, vm_get(vm_get(chuỗi_byte, 2), 1)); trả về số_thực_từ_bit;
     };
     nếu (op == 118) {
-        biến real = vm_real(a); biến list = vm_vector(4);
-        lặp(i = 0; i < 8; i++) { vm_append(list, vm_int(máy đọc byte(real + 8 + i))); }; trả về list;
+        biến số_thực_nguồn = vm_real(a); biến danh_sách_bit = vm_vector(4);
+        lặp(i = 0; i < 8; i++) { vm_append(danh_sách_bit, vm_int(máy đọc byte(số_thực_nguồn + 8 + i))); }; trả về danh_sách_bit;
     };
     nếu (op == 135) {
         nếu (vm_get(4198464, 8) == 1) { trả về vm_literal("linux"); }; trả về vm_literal("macos");
     };
     nếu (op == 159) {
-        biến mode = vm_number(b); nếu (mode < 0 || mode > 2) { trả về vm_error(2); };
-        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
-        biến flags = 0; nếu (mode == 1) { flags = 1537; }; nếu (mode == 2) { flags = 521; };
-        biến token = thực thi tệp dữ liệu mở(path, flags); byte hủy(path);
+        biến chế_độ_tệp = vm_number(b); nếu (chế_độ_tệp < 0 || chế_độ_tệp > 2) { trả về vm_error(2); };
+        biến đường_tệp_mở = vm_path_handle(a); nếu (đường_tệp_mở < 0) { trả về 0; };
+        biến flags = 0; nếu (chế_độ_tệp == 1) { flags = 1537; }; nếu (chế_độ_tệp == 2) { flags = 521; };
+        biến token = thực thi tệp dữ liệu mở(đường_tệp_mở, flags); byte hủy(đường_tệp_mở);
         vm_set(state, 9, máy lỗi()); trả về vm_int(token);
     };
     nếu (op == 160 || op == 161) {
-        biến fd = vm_file_fd(vm_number(a)); biến count = vm_number(c);
-        nếu (vm_tag(b) != 4 || count < 1 || count > 65536 || vm_get(b, 1) != count || fd < 0) { trả về vm_int(-1); };
-        biến raw = vm_alloc(count, 0); nếu (raw == 0) { trả về 0; };
+        biến fd = vm_file_fd(vm_number(a)); biến số_byte_io = vm_number(c);
+        nếu (vm_tag(b) != 4 || số_byte_io < 1 || số_byte_io > 65536 || vm_get(b, 1) != số_byte_io || fd < 0) { trả về vm_int(-1); };
+        biến vùng_io = vm_alloc(số_byte_io, 0); nếu (vùng_io == 0) { trả về 0; };
         nếu (op == 161) {
-            lặp(i = 0; i < count; i++) { biến item = vm_at(b, i); biến byte = vm_number(item); nếu (vm_tag(item) != 1 || byte < 0 || byte > 255) { trả về vm_error(2); }; máy ghi byte(raw + i, byte); };
+            lặp(i = 0; i < số_byte_io; i++) { biến phần_tử_io = vm_at(b, i); biến byte_io = vm_number(phần_tử_io); nếu (vm_tag(phần_tử_io) != 1 || byte_io < 0 || byte_io > 255) { trả về vm_error(2); }; máy ghi byte(vùng_io + i, byte_io); };
         };
         biến got = 0;
-        nếu (op == 160) { got = máy đọc(fd, raw, count); }
-        hoặc { got = máy ghi(fd, raw, count); };
+        nếu (op == 160) { got = máy đọc(fd, vùng_io, số_byte_io); }
+        hoặc { got = máy ghi(fd, vùng_io, số_byte_io); };
         vm_set(state, 9, máy lỗi());
-        nếu (op == 160 && got > 0) { lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(raw + i))); }; };
+        nếu (op == 160 && got > 0) { lặp(i = 0; i < got; i++) { vm_put(b, i, vm_int(máy đọc byte(vùng_io + i))); }; };
         trả về vm_int(got);
     };
-    nếu (op == 162) { biến status = tệp đóng(vm_number(a)); vm_set(state, 9, máy lỗi()); trả về vm_int(status); };
+    nếu (op == 162) { biến trạng_thái_đóng = tệp đóng(vm_number(a)); vm_set(state, 9, máy lỗi()); trả về vm_int(trạng_thái_đóng); };
     nếu (op == 165) { nếu (vm_number(a) == 1) { trả về vm_int(4); }; trả về vm_int(vm_get(state, 9)); };
     nếu (op == 166) {
-        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; };
-        biến status = máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(path))); byte hủy(path);
-        vm_set(state, 9, máy lỗi()); trả về vm_int(status);
+        biến đường_xóa = vm_path_handle(a); nếu (đường_xóa < 0) { trả về 0; };
+        biến trạng_thái_xóa = máy xóa(thực thi nội dung đệm(thực thi các byte ô nhớ(đường_xóa))); byte hủy(đường_xóa);
+        vm_set(state, 9, máy lỗi()); trả về vm_int(trạng_thái_xóa);
     };
     nếu (op >= 167 && op <= 172) {
         biến identity = máy tiến trình định danh thô(op - 167);
@@ -209,12 +381,12 @@ hàm vm_host(state, op, args) {
     nếu (op == 175) { trả về vm_system_clock(1); };
     nếu (op == 176) { trả về vm_system_entropy(a); };
     nếu (op == 177) {
-        biến path = vm_path_handle(a); nếu (path < 0) { trả về 0; }; biến raw = vm_alloc(4096, 0);
-        nếu (raw == 0) { byte hủy(path); trả về 0; };
-        biến count = máy giá trị môi trường lấy(thực thi nội dung đệm(thực thi các byte ô nhớ(path)), raw); byte hủy(path);
-        nếu (count < 0) { trả về 0; }; biến value = vm_string(count);
-        nếu (value == 0) { trả về 0; };
-        lặp(i = 0; i < count; i++) { máy ghi byte(vm_get(value, 2) + i, máy đọc byte(raw + i)); }; trả về value;
+        biến tên_biến = vm_path_handle(a); nếu (tên_biến < 0) { trả về 0; }; biến vùng_môi_trường = vm_alloc(4096, 0);
+        nếu (vùng_môi_trường == 0) { byte hủy(tên_biến); trả về 0; };
+        biến số_byte_môi_trường = máy giá trị môi trường lấy(thực thi nội dung đệm(thực thi các byte ô nhớ(tên_biến)), vùng_môi_trường); byte hủy(tên_biến);
+        nếu (số_byte_môi_trường < 0) { trả về 0; }; biến giá_trị_môi_trường = vm_string(số_byte_môi_trường);
+        nếu (giá_trị_môi_trường == 0) { trả về 0; };
+        lặp(i = 0; i < số_byte_môi_trường; i++) { máy ghi byte(vm_get(giá_trị_môi_trường, 2) + i, máy đọc byte(vùng_môi_trường + i)); }; trả về giá_trị_môi_trường;
     };
     nếu (op == 179) { trả về vm_dir_mutate(a, 0); };
     nếu (op == 180) { trả về vm_dir_mutate(a, 1); };
@@ -222,15 +394,15 @@ hàm vm_host(state, op, args) {
     nếu (op == 182) { trả về vm_dir_next(state, a); };
     nếu (op == 183) { trả về vm_dir_close(state, a); };
     nếu (op == 184) {
-        biến path = vm_dir_path(a);
-        nếu (path == -2) { trả về vm_int(-1); };
-        nếu (path < 0) { trả về 0; };
-        biến offset = thực thi nội dung đệm(thực thi các byte ô nhớ(path)); biến status = -1;
-        nếu (vm_number(b) == 1) { status = máy thông tin tệp(offset, 3376); } hoặc { status = máy thông tin liên kết(offset, 3376); };
-        byte hủy(path); nếu (status < 0) { trả về vm_int(-1); };
-        biến mode = máy đọc byte(3380) + máy đọc byte(3381) * 256;
-        nếu (vm_get(4198464, 8) == 1) { mode = vm_get(3376, 6); };
-        trả về vm_int(máy chia số nguyên ba mươi hai bit(mode, 4096));
+        biến đường_thư_mục = vm_dir_path(a);
+        nếu (đường_thư_mục == -2) { trả về vm_int(-1); };
+        nếu (đường_thư_mục < 0) { trả về 0; };
+        biến offset = thực thi nội dung đệm(thực thi các byte ô nhớ(đường_thư_mục)); biến trạng_thái_thông_tin = -1;
+        nếu (vm_number(b) == 1) { trạng_thái_thông_tin = máy thông tin tệp(offset, 3376); } hoặc { trạng_thái_thông_tin = máy thông tin liên kết(offset, 3376); };
+        byte hủy(đường_thư_mục); nếu (trạng_thái_thông_tin < 0) { trả về vm_int(-1); };
+        biến chế_độ_tệp_tin = máy đọc byte(3380) + máy đọc byte(3381) * 256;
+        nếu (vm_get(4198464, 8) == 1) { chế_độ_tệp_tin = vm_get(3376, 6); };
+        trả về vm_int(máy chia số nguyên ba mươi hai bit(chế_độ_tệp_tin, 4096));
     };
     nếu (op >= 185 && op <= 192) {
         trả về vm_socket_host(state, op, a, b, c, d);
@@ -292,6 +464,9 @@ hàm vm_host_arity(op) {
     nếu (op == 145) { trả về 1; }; // OP_VM_TYPE_OF
     nếu (op == 146) { trả về 1; }; // OP_VM_IDENTITY_HASH
     nếu (op == 147) { trả về 1; }; // OP_VM_LENGTH
+    nếu (op == 214) { trả về 3; }; // OP_VM_STRING_SLICE
+    nếu (op == 216) { trả về 3; }; // OP_VM_STRING_REPLACE_EXACT
+    nếu (op == 217) { trả về 3; }; // OP_VM_STRING_BYTE_SLICE
     nếu (op == 148) { trả về 2; }; // OP_VM_LIST_APPEND
     nếu (op == 149) { trả về 2; }; // OP_VM_LIST_REMOVE
     nếu (op == 150) { trả về 2; }; // OP_VM_MAP_HAS
@@ -401,6 +576,9 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("loai_cua")) == 1) { trả về 145; };
     nếu (vm_equal(name, vm_literal("bam_dinh_danh")) == 1) { trả về 146; };
     nếu (vm_equal(name, vm_literal("do_dai")) == 1) { trả về 147; };
+    nếu (vm_equal(name, vm_literal("cat_chuoi_vm")) == 1) { trả về 214; };
+    nếu (vm_equal(name, vm_literal("thay_chuoi_chinh_xac_vm")) == 1) { trả về 216; };
+    nếu (vm_equal(name, vm_literal("cat_chuoi_byte_vm")) == 1) { trả về 217; };
     nếu (vm_equal(name, vm_literal("them")) == 1) { trả về 148; };
     nếu (vm_equal(name, vm_literal("xoa_tai")) == 1) { trả về 149; };
     nếu (vm_equal(name, vm_literal("co_khoa")) == 1) { trả về 150; };
@@ -510,6 +688,9 @@ hàm vm_host_name(name) {
     nếu (vm_equal(name, vm_literal("khóa từ điển")) == 1) { trả về 152; };
     nếu (vm_equal(name, vm_literal("chuỗi thành byte máy ảo")) == 1) { trả về 153; };
     nếu (vm_equal(name, vm_literal("chuỗi từ byte máy ảo")) == 1) { trả về 154; };
+    nếu (vm_equal(name, vm_literal("máy ảo cắt chuỗi")) == 1) { trả về 214; };
+    nếu (vm_equal(name, vm_literal("máy ảo thay chuỗi chính xác")) == 1) { trả về 216; };
+    nếu (vm_equal(name, vm_literal("máy ảo cắt chuỗi theo byte")) == 1) { trả về 217; };
     nếu (vm_equal(name, vm_literal("số thực từ bit máy ảo")) == 1) { trả về 155; };
     nếu (vm_equal(name, vm_literal("máy tệp mở")) == 1) { trả về 159; };
     nếu (vm_equal(name, vm_literal("máy tệp đọc")) == 1) { trả về 160; };

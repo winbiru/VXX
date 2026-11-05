@@ -1,4 +1,5 @@
 #include "vpp/compiler/optimizer.h"
+#include "common/bit_ops.h"
 
 #include <algorithm>
 #include <charconv>
@@ -152,12 +153,13 @@ void specializeValues(IrProgram &program, OptimizationReport &report) {
             } else if(v.opcode==O::ConstFloat) type=IrScalarType::F64;
             else if(v.opcode==O::Unary && v.operands.size()==1) {
                 const auto *arg=program.value(v.operands[0]);
-                if(arg && (v.text=="+"||v.text=="-"||v.text=="!")) {
+                if(arg && (v.text=="+"||v.text=="-"||v.text=="!"||v.text=="~")) {
                     type=v.text=="!"?IrScalarType::I32:arg->scalarType;
                     if(arg->hasFoldedI32) {
                         folded=true;
                         if(v.text=="+") result=arg->foldedI32;
                         else if(v.text=="-") result=fromBits(0u-static_cast<std::uint32_t>(arg->foldedI32));
+                        else if(v.text=="~") result=evaluateI32Bits(OP_BIT_XOR,arg->foldedI32,-1);
                         else result=arg->foldedI32==0;
                     } else if(v.text=="-" && arg->opcode==O::ConstInt &&
                               arg->text=="2147483648") {
@@ -172,9 +174,12 @@ void specializeValues(IrProgram &program, OptimizationReport &report) {
                 const bool compare=v.text=="=="||v.text=="!="||v.text=="<"||
                     v.text==">"||v.text=="<="||v.text==">=";
                 const bool logic=v.text=="&&"||v.text=="||";
+                const bool bit=v.text=="&"||v.text=="|"||v.text=="^"||v.text=="<<"||v.text==">>";
                 if(a && b && a->scalarType!=IrScalarType::Dynamic &&
                    b->scalarType!=IrScalarType::Dynamic) {
                     if(compare||logic)type=IrScalarType::I32;
+                    else if(bit && a->scalarType==IrScalarType::I32 &&
+                            b->scalarType==IrScalarType::I32)type=IrScalarType::I32;
                     else if(arithmetic) type=(a->scalarType==IrScalarType::F64||
                         b->scalarType==IrScalarType::F64)?IrScalarType::F64:IrScalarType::I32;
                     if(a->hasFoldedI32 && b->hasFoldedI32 && type==IrScalarType::I32) {
@@ -183,6 +188,11 @@ void specializeValues(IrProgram &program, OptimizationReport &report) {
                         if(v.text=="+") result=fromBits(std::uint32_t(x)+std::uint32_t(y));
                         else if(v.text=="-") result=fromBits(std::uint32_t(x)-std::uint32_t(y));
                         else if(v.text=="*") result=fromBits(std::uint32_t(x)*std::uint32_t(y));
+                        else if(v.text=="&") result=evaluateI32Bits(OP_BIT_VA,x,y);
+                        else if(v.text=="|") result=evaluateI32Bits(OP_BIT_HOAC,x,y);
+                        else if(v.text=="^") result=evaluateI32Bits(OP_BIT_XOR,x,y);
+                        else if(v.text=="<<") result=evaluateI32Bits(OP_DICH_TRAI,x,y);
+                        else if(v.text==">>") result=evaluateI32Bits(OP_DICH_PHAI,x,y);
                         else if(v.text=="==") result=x==y;
                         else if(v.text=="!=") result=x!=y;
                         else if(v.text=="<") result=x<y;

@@ -231,6 +231,16 @@ enum Opcode {
     OP_VM_MACHINE_TLS_SEND = 207,
     OP_VM_MACHINE_TLS_RECV = 208,
 
+    OP_BIT_VA = 209,             // &
+    OP_BIT_HOAC = 210,           // |
+    OP_BIT_XOR = 211,            // ^; ~x được hạ thành x ^ -1
+    OP_DICH_TRAI = 212,          // <<
+    OP_DICH_PHAI = 213,          // >> giữ dấu
+    OP_VM_STRING_SLICE = 214,    // Cắt UTF-8 theo khoảng điểm mã Unicode
+    OP_GOI_LOI_BAN_DIA = 215,    // Gọi primitive i32 lõi: operand=argc, operandIndex=id
+    OP_VM_STRING_REPLACE_EXACT = 216, // Thay literal UTF-8 tại đúng biên điểm mã
+    OP_VM_STRING_BYTE_SLICE = 217, // Cắt chuỗi theo vị trí byte, dùng cho dữ liệu UTF-8 đã kiểm tra
+
 };
 
 enum CompareOp {

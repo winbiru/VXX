@@ -73,13 +73,15 @@ lớp công khai Bộ Tách Từ Vựng {
             c == "*" || c == "/" || c == "(" || c == ")" ||
             c == "{" || c == "}" || c == "[" || c == "]" ||
             c == ";" || c == "," || c == "<" || c == ">" ||
-            c == "=" || c == "!" || c == ":";
+            c == "=" || c == "!" || c == ":" || c == "%" ||
+            c == "&" || c == "|" || c == "^" || c == "~";
     };
 
     hàm riêng tư biên dịch từ vựng hai toán tử(s) {
         trả về s == "==" || s == "!=" || s == "<=" || s == ">=" ||
             s == "&&" || s == "||" || s == "++" || s == "--" ||
-            s == "+=" || s == "-=" || s == "*=" || s == "/=" || s == "%=";
+            s == "+=" || s == "-=" || s == "*=" || s == "/=" || s == "%=" || s == "&=" || s == "|=" ||
+            s == "^=" || s == "<<" || s == ">>";
     };
 
     hàm riêng tư biên dịch từ vựng chữ số(c) {
@@ -119,7 +121,8 @@ lớp công khai Bộ Tách Từ Vựng {
         nếu (số != "") { trả về số; };
         nếu (mình.biên dịch từ vựng hai toán tử(s) || s == "+" || s == "-" ||
             s == "*" || s == "/" || s == "%" || s == "=" ||
-            s == "!" || s == "<" || s == ">") { trả về "toán tử"; };
+            s == "!" || s == "<" || s == ">" || s == "&" || s == "|" ||
+            s == "^" || s == "~" || s == "<<=" || s == ">>=") { trả về "toán tử"; };
         nếu (s == "(" || s == ")" || s == "{" || s == "}" ||
             s == "[" || s == "]" || s == ";" || s == "," || s == ":") {
             trả về "dấu câu";
@@ -273,32 +276,32 @@ lớp công khai Bộ Tách Từ Vựng {
                             nếu (!đóng) { mình.biên dịch từ vựng lỗi("chuỗi chưa đóng", đầu dòng, đầu cột); };
                             giá trị = mình.biên dịch từ vựng đoạn(các byte, vị trí byte[đầu], vị trí byte[i]);
                         } hoặc {
-                            // Recognize the thirteen two-byte operators by
-                            // their ASCII bytes. Create the token string only
-                            // when a valid operator has actually been found.
+                            // Toán tử dài nhất được nhận trước.
                             đôi = sai;
+                            ba = sai;
                             nếu (i + 1 < n) {
                                 mã đầu = các byte[vị trí byte[i]];
-                                nếu (mã đầu == 33 || mã đầu == 37 || mã đầu == 38 ||
-                                    (mã đầu >= 42 && mã đầu <= 45) || mã đầu == 47 ||
-                                    (mã đầu >= 60 && mã đầu <= 62) || mã đầu == 124) {
-                                    mã sau = các byte[vị trí byte[i + 1]];
-                                    nếu (mã sau == 61 && (mã đầu == 33 || mã đầu == 37 ||
-                                        mã đầu == 42 || mã đầu == 43 || mã đầu == 45 ||
-                                        mã đầu == 47 || (mã đầu >= 60 && mã đầu <= 62))) {
-                                        đôi = đúng;
-                                    };
-                                    nếu (mã sau == mã đầu && (mã đầu == 38 || mã đầu == 43 ||
-                                        mã đầu == 45 || mã đầu == 124)) { đôi = đúng; };
+                                mã sau = các byte[vị trí byte[i + 1]];
+                                nếu (mã sau == 61 && (mã đầu == 33 || mã đầu == 37 ||
+                                    mã đầu == 38 || mã đầu == 42 || mã đầu == 43 ||
+                                    mã đầu == 45 || mã đầu == 47 || mã đầu == 94 ||
+                                    mã đầu == 124 || (mã đầu >= 60 && mã đầu <= 62))) { đôi = đúng; };
+                                nếu (mã sau == mã đầu && (mã đầu == 38 || mã đầu == 43 ||
+                                    mã đầu == 45 || mã đầu == 60 || mã đầu == 62 || mã đầu == 124)) { đôi = đúng; };
+                                nếu (i + 2 < n && mã sau == mã đầu && (mã đầu == 60 || mã đầu == 62)) {
+                                    ba = các byte[vị trí byte[i + 2]] == 61;
                                 };
                             };
-                            nếu (đôi) {
+                            nếu (ba) {
+                                giá trị = c + ký tự[i + 1] + ký tự[i + 2];
+                                i += 3;
+                                cột += 3;
+                            } hoặc nếu (đôi) {
                                 giá trị = c + ký tự[i + 1];
                                 i += 2;
                                 cột += 2;
                             } hoặc {
-                                // Exactly the delimiters recognized by the
-                                // original helper; '%' and '.' are not added.
+                                // Dấu phân cách, gồm phép dư và các phép bit.
                                 nếu (mã ASCII == 34 || mã ASCII == 39 ||
                                     mã ASCII == 43 || mã ASCII == 45 || mã ASCII == 42 ||
                                     mã ASCII == 47 || mã ASCII == 40 || mã ASCII == 41 ||
@@ -306,7 +309,8 @@ lớp công khai Bộ Tách Từ Vựng {
                                     mã ASCII == 91 || mã ASCII == 93 ||
                                     mã ASCII == 59 || mã ASCII == 44 ||
                                     mã ASCII == 60 || mã ASCII == 62 ||
-                                    mã ASCII == 61 || mã ASCII == 33 || mã ASCII == 58) {
+                                    mã ASCII == 61 || mã ASCII == 33 || mã ASCII == 58 ||
+                                    mã ASCII == 37 || mã ASCII == 38 || mã ASCII == 124 || mã ASCII == 94 || mã ASCII == 126) {
                                     giá trị = c;
                                     i += 1;
                                     cột += 1;
@@ -322,7 +326,9 @@ lớp công khai Bộ Tách Từ Vựng {
                                             mã quét == 91 || mã quét == 93 ||
                                             mã quét == 59 || mã quét == 44 ||
                                             mã quét == 60 || mã quét == 62 ||
-                                            mã quét == 61 || mã quét == 33 || mã quét == 58) {
+                                            mã quét == 61 || mã quét == 33 || mã quét == 58 ||
+                                            mã quét == 37 || mã quét == 38 || mã quét == 124 ||
+                                            mã quét == 94 || mã quét == 126) {
                                             thoát;
                                         };
                                         i += 1;

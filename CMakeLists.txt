@@ -223,14 +223,14 @@ target_link_libraries(vpp-compiler PUBLIC vpp-frontend vpp-bytecode vpp-core)
 vpp_add_module(vpp-runtime-native ${VPP_RUNTIME_SOURCES})
 if (UNIX AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|aarch64|arm64)$")
     enable_language(ASM)
-    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_file_primitives.S)
-    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_environment_primitives.S)
-    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_localtime_primitives.S)
-    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_directory_primitives.S)
-    target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_path_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/common/posix/vpp_file_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/common/posix/vpp_environment_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/common/posix/vpp_localtime_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/common/posix/vpp_directory_primitives.S)
+    target_sources(vpp-runtime-native PRIVATE scripts/ASM/common/posix/vpp_path_primitives.S)
     if(APPLE)
-        target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_clock_primitives.S)
-        target_sources(vpp-runtime-native PRIVATE scripts/ASM/vpp_entropy_primitives.S)
+        target_sources(vpp-runtime-native PRIVATE scripts/ASM/macos/vpp_clock_primitives.S)
+        target_sources(vpp-runtime-native PRIVATE scripts/ASM/macos/vpp_entropy_primitives.S)
     endif()
     target_compile_definitions(vpp-runtime-native PRIVATE VPP_FILE_MACHINE_ASM=1)
 endif()
@@ -304,6 +304,7 @@ target_link_libraries(vpp-tooling PUBLIC vpp-compiler vpp-bytecode)
 
 vpp_add_module(vpp-native-aot
     ${CMAKE_SOURCE_DIR}/src/native/aot_runtime.cpp
+    ${CMAKE_SOURCE_DIR}/src/native/aot_native_core.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_assembly.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_driver.cpp
     ${CMAKE_SOURCE_DIR}/src/native/aot_windows_entry.cpp)
@@ -372,6 +373,23 @@ add_custom_command(TARGET vpp-cli POST_BUILD
 # Regression tests are V++ .vi programs under src/tests/.
 if (BUILD_TESTS)
     enable_testing()
+    if ((APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$") OR
+        (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+         CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$"))
+        find_program(VPP_FREESTANDING_CLANG NAMES clang)
+        if (VPP_FREESTANDING_CLANG)
+            add_test(NAME vpp-linux-freestanding-cross-asm
+                COMMAND ${CMAKE_COMMAND} -E env "CC=${VPP_FREESTANDING_CLANG}"
+                    /bin/bash ${CMAKE_SOURCE_DIR}/scripts/quality/check_linux_freestanding_cross.sh
+                    ${CMAKE_CURRENT_BINARY_DIR}/native-freestanding-cross)
+        endif()
+    endif()
+    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+        add_test(NAME vpp-linux-freestanding-syscalls
+            COMMAND /bin/bash ${CMAKE_SOURCE_DIR}/scripts/quality/check_linux_freestanding.sh
+                ${CMAKE_CURRENT_BINARY_DIR}/native-freestanding-smoke)
+    endif()
     if (UNIX AND NOT VPP_ENABLE_LEGACY_LIBFFI)
         add_test(NAME vpp-machine-no-legacy-libffi
             COMMAND ${CMAKE_COMMAND}
@@ -1036,6 +1054,26 @@ if (BUILD_TESTS)
                     -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_aot_numeric_add.cmake)
             set_tests_properties(vpp-native-aot-numeric-add-fastpath PROPERTIES
                 FIXTURES_REQUIRED native-cli-compiler TIMEOUT 180)
+            add_test(NAME vpp-native-aot-i32-expression
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-aot-i32-expression"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_aot_i32_expression.cmake)
+            set_tests_properties(vpp-native-aot-i32-expression PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 240)
+            add_test(NAME vpp-bit-operators
+                COMMAND ${CMAKE_COMMAND}
+                    "-DVPP_EXEC=$<TARGET_FILE:vpp-cli>"
+                    "-DVPP_CPP_ORACLE=$<TARGET_FILE:vpp-native-machine-cpp-oracle>"
+                    "-DVPP_NATIVE_COMPILER=${VPP_NATIVE_CLI_COMPILER}"
+                    "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                    "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/bit-operators"
+                    "-DVPP_CC=${VPP_NATIVE_SMOKE_CC}"
+                    "-DVPP_TARGET=${VPP_NATIVE_SMOKE_TARGET}"
+                    -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_bit_operators.cmake)
+            set_tests_properties(vpp-bit-operators PROPERTIES
+                FIXTURES_REQUIRED native-cli-compiler TIMEOUT 600)
         endif()
         add_executable(vpp-native-formatter-cpp-oracle
             scripts/quality/native_formatter_cpp_oracle.cpp)
@@ -1102,6 +1140,17 @@ if (BUILD_TESTS)
                 FIXTURES_REQUIRED native-cli-compiler)
         endif()
         if (UNIX)
+            if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
+                add_test(NAME vpp-native-dynamic-vpp-runtime
+                    COMMAND ${CMAKE_COMMAND}
+                        "-DVPP_STAGE1=${CMAKE_CURRENT_BINARY_DIR}/nativedriver/vpp-native"
+                        "-DVPP_NATIVE_CLI=${VPP_NATIVE_CLI_COMPILER}"
+                        "-DVPP_ROOT=${CMAKE_SOURCE_DIR}"
+                        "-DVPP_OUTPUT_DIR=${CMAKE_CURRENT_BINARY_DIR}/native-vpp-runtime"
+                        -P ${CMAKE_SOURCE_DIR}/scripts/quality/check_native_dynamic_vpp.cmake)
+                set_tests_properties(vpp-native-dynamic-vpp-runtime PROPERTIES
+                    FIXTURES_REQUIRED "native-stage1;native-cli-compiler" TIMEOUT 1200)
+            endif()
             if (VPP_NATIVE_SMOKE_CC)
                 add_executable(vpp-native-aot-cpp-oracle scripts/quality/native_aot_cpp_oracle.cpp)
                 target_link_libraries(vpp-native-aot-cpp-oracle PRIVATE vpp-runtime vpp-native-aot)
@@ -1320,6 +1369,7 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/ASM/
         DESTINATION scripts/ASM
         FILES_MATCHING
         PATTERN "*.S"
+        PATTERN "*.s"
         PATTERN "*.inc"
         PATTERN "README.md")
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/scripts/quality/native_aot_link/

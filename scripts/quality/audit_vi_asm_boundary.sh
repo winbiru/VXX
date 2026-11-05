@@ -191,7 +191,7 @@ done
 
 cpp_sources=$(find "$root/src" -type f \( -name '*.c' -o -name '*.cc' -o -name '*.cpp' -o -name '*.cxx' \) | wc -l | tr -d '[:space:]')
 ffi_symbols=$(grep -E -o 'ffi_call|dlopen|dlsym' "$root/src/runtime/foreign.cpp" | wc -l | tr -d '[:space:]')
-asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
+asm_calls=$(find "$root/scripts/ASM" -type f \( -name '*.S' -o -name '*.s' -o -name '*.asm' -o -name '*.inc' \) -exec grep -h -E '^[[:space:]]*(bl|blr|call|callq)[[:space:]]+' {} + | wc -l | tr -d '[:space:]')
 printf 'Remaining C/C++ source files in src/: %s\n' "$cpp_sources"
 printf 'foreign.cpp references to ffi_call/dlopen/dlsym: %s\n' "$ffi_symbols"
 printf 'ASM call instructions requiring boundary review: %s\n' "$asm_calls"

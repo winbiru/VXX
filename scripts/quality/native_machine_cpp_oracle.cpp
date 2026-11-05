@@ -298,6 +298,7 @@ void verifyTargetParity(const std::filesystem::path &source) {
 } // namespace
 
 int main(int argc, char **argv) {
+    const bool bitParity = argc == 3 && std::string(argv[1]) == "--bit-parity";
     const bool lowering = argc == 5 && std::string(argv[1]) == "--lowering-parity";
     const bool leafParity = argc == 3 && std::string(argv[1]) == "--leaf-parity";
     const bool targetParity = argc == 3 && std::string(argv[1]) == "--target-parity";
@@ -308,6 +309,34 @@ int main(int argc, char **argv) {
         return 2;
     }
     try {
+        if (bitParity) {
+            const std::filesystem::path source = argv[2];
+            const std::vector<std::string> names = {"bit_va", "bit_hoac", "bit_xor",
+                "dao_bit", "dich_trai", "dich_phai", "uu_tien_bit", "bit_khung"};
+            verifyLoweringFixture(source, names, {});
+            vietvm::compiler::CompilationContext context;
+            context.importResolutionBase = source.parent_path();
+            context.currentSourceIdentity = source.generic_u8string();
+            const auto artifacts = vietvm::compiler::compilePipeline(
+                context, readSource(source), keywordMap, false);
+            for (const auto &name : names) {
+                const auto lowered = vietvm::native::lowerMachineFunction(artifacts.ir, name);
+                if (!lowered) throw std::runtime_error(lowered.error);
+                for (const auto *triple : {"aarch64-apple-darwin", "aarch64-linux-gnu",
+                                          "x86_64-linux-gnu", "x86_64-windows-msvc"}) {
+                    const auto target = vietvm::native::parseTarget(triple);
+                    if (!target.target) throw std::runtime_error(target.error);
+                    const auto cpp = vietvm::native::emitMachineFunction(*target.target, lowered.function);
+                    const auto vpp = vietvm::native::emitMachineFunctionVpp(
+                        *target.target, lowered.function, source.parent_path());
+                    if (!cpp || !vpp || cpp.bytes != vpp.bytes)
+                        throw std::runtime_error(name + "/" + triple + ": mã bit C++/V++ khác nhau; " +
+                                                 cpp.error + " / " + vpp.error);
+                }
+            }
+            std::cout << "Mã bit C++/V++ khớp trên 4 đích\n";
+            return 0;
+        }
         if (targetParity) {
             verifyTargetParity(argv[2]);
             return 0;

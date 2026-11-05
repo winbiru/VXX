@@ -132,11 +132,7 @@ lớp công khai Xử Lý Chuỗi {
         nếu (kết thúc > n) {
             kết thúc = n;
         };
-        kết quả = "";
-        lặp(i = bắt đầu; i < kết thúc; i++) {
-            kết quả = kết quả + văn bản[i];
-        };
-        trả về kết quả;
+        trả về máy ảo cắt chuỗi(văn bản, bắt đầu, kết thúc - bắt đầu);
     };
 
     // Bảng chữ cái public hiện giữ đúng contract runtime 1.0: ASCII và các
@@ -699,61 +695,9 @@ lớp công khai Xử Lý Chuỗi {
         mình.chuỗi yêu cầu(văn bản);
         mình.chuỗi yêu cầu(cũ);
         mình.chuỗi yêu cầu(mới);
-        n = mình.độ dài(văn bản);
-        m = mình.độ dài(cũ);
-
-        nguồn = mình.chuỗi chỉ mục byte(văn bản);
-        các byte = nguồn[0];
-        biên = nguồn[1];
-        vị trí byte = nguồn[2];
-        thay byte = chuỗi thành byte máy ảo(mới);
-        kết quả = [];
-        số byte thay = máy ảo lấy độ dài(thay byte);
-        nếu (m == 0) {
-            lặp(i = 0; i <= n; i++) {
-                lặp(j = 0; j < số byte thay; j++) {
-                    máy ảo thêm cuối danh sách(kết quả, thay byte[j]);
-                };
-                nếu (i < n) {
-                    lặp(j = vị trí byte[i]; j < vị trí byte[i + 1]; j++) {
-                        máy ảo thêm cuối danh sách(kết quả, các byte[j]);
-                    };
-                };
-            };
-            trả về chuỗi từ byte máy ảo(kết quả);
-        };
-
-        mẫu byte = chuỗi thành byte máy ảo(cũ);
-        số byte mẫu = máy ảo lấy độ dài(mẫu byte);
-        số byte nguồn = máy ảo lấy độ dài(các byte);
-        tiền tố = mình.chuỗi bảng tiền tố(mẫu byte);
-        khớp = 0;
-        con trỏ = 0;
-        lặp(i = 0; i < số byte nguồn; i++) {
-            khi (khớp > 0 && các byte[i] != mẫu byte[khớp]) {
-                khớp = tiền tố[khớp - 1];
-            };
-            nếu (các byte[i] == mẫu byte[khớp]) { khớp = khớp + 1; };
-            nếu (khớp == số byte mẫu) {
-                bắt đầu = i + 1 - số byte mẫu;
-                nếu (biên[bắt đầu] >= 0 && biên[i + 1] >= 0) {
-                    lặp(j = con trỏ; j < bắt đầu; j++) {
-                        máy ảo thêm cuối danh sách(kết quả, các byte[j]);
-                    };
-                    lặp(j = 0; j < số byte thay; j++) {
-                        máy ảo thêm cuối danh sách(kết quả, thay byte[j]);
-                    };
-                    con trỏ = i + 1;
-                    khớp = 0;
-                } hoặc {
-                    khớp = tiền tố[khớp - 1];
-                };
-            };
-        };
-        lặp(i = con trỏ; i < số byte nguồn; i++) {
-            máy ảo thêm cuối danh sách(kết quả, các byte[i]);
-        };
-        trả về chuỗi từ byte máy ảo(kết quả);
+        // Runtime quét trực tiếp theo biên đơn vị UTF-8 và chỉ cấp phát kết
+        // quả một lần. Byte UTF-8 lỗi vẫn được giữ như một đơn vị thô.
+        trả về máy ảo thay chuỗi chính xác(văn bản, cũ, mới);
     };
 
     // Split literal, không dùng regex. Separator rỗng tách theo code point.

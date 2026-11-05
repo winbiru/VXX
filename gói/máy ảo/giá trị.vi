@@ -1,20 +1,17 @@
-// Tagged values and collections. All references are arena offsets, never
-// truncated native pointers. 0=null, 1=i32, 2=f64, 3=UTF-8, 4=list,
-// 5=map, 6=tuple, 7=closure, 8=class, 9=instance, 10=shared cell,
-// 11=unsigned u32 ABI (only needed when uid_t/gid_t exceeds INT32_MAX).
+// Giá trị gắn thẻ và tập hợp. Tham chiếu là độ dời trong vùng nhớ máy ảo.
+// 0=rỗng, 1=i32, 2=f64, 3=UTF-8, 4=danh sách, 5=từ điển,
+// 6=bộ, 7=bao đóng, 8=lớp, 9=đối tượng, 10=ô chia sẻ, 11=u32.
 hàm vm_tag(v) { nếu (v == 0) { trả về 0; }; trả về vm_get(v, 0); };
 hàm vm_int(n) {
-    // i32 values are immutable, and identity hashing accepts references only.
-    // Intern the most common loop counters, booleans and UTF-8 bytes to avoid
-    // allocating a managed block for each scalar operation.
+    // Số i32 bất biến: dùng lại các số nhỏ, tránh cấp phát khi tính toán.
+    // Đã đo A/B: -16..4095 giảm cấp phát ở vòng lặp và phân tích JSON.
     biến cache = 0; biến index = n + 16;
-    nếu (n >= -16 && n <= 255) {
+    nếu (n >= -16 && n <= 4095) {
         cache = vm_get(4198464, 17);
         nếu (cache == 0) {
-            // 272 cached i32 values plus a managed empty-argument vector
-            // in word 272. Sharing the traced cache avoids colliding with
-            // header word 31, which belongs to the socket token allocator.
-            cache = vm_alloc(1092, 1);
+            // 4112 số i32 và một ô 4112 cho danh sách tham số rỗng.
+            // Vùng nhớ được GC theo dõi qua ô 17 của phần đầu máy ảo.
+            cache = vm_alloc(16452, 1);
             nếu (cache == 0) { trả về 0; };
             vm_set(4198464, 17, cache);
         };
@@ -111,15 +108,25 @@ hàm vm_append(v, item) {
     nếu (v == 0) { trả về vm_error(4); };
     biến n = vm_get(v, 1); biến cap = vm_get(v, 2);
     nếu (n == cap) {
-        cap = cap * 2 + 8;
+        // Danh sách thường xuyên tăng qua 16/32/128 phần tử. Nới theo
+        // lũy thừa bốn để giảm số lần cấp phát và sao chép vùng tham chiếu;
+        // map, tuple và danh sách tham số vẫn giữ quy tắc nới cũ.
+        nếu (vm_get(v, 0) == 4) { cap = cap * 4; }
+        hoặc { cap = cap * 2 + 8; };
         nếu (cap > 2000000) { trả về vm_error(1); };
+        biến dữ liệu cũ = vm_get(v, 3);
         biến raw = vm_alloc(cap * 4, 1); nếu (raw == 0) { trả về 0; };
-        lặp(i = 0; i < n; i++) { vm_set(raw, i, vm_at(v, i)); };
-        // Inline cells remain inside the live vector after it grows. Clear
-        // them so the tracing collector does not retain obsolete references.
+        // Đã biết n <= dung lượng cũ; sao chép trực tiếp, bỏ kiểm tra chỉ số.
+        lặp(i = 0; i < n; i++) { vm_set(raw, i, vm_get(dữ liệu cũ, i)); };
+        // Xóa toàn bộ ô nội tuyến cũ sau khi nới vùng dữ liệu. Ngăn xếp
+        // trong khung AOT có bốn ô, danh sách thông thường có hai ô.
         biến inline_at = v + 16; nếu (vm_get(v, 0) == 5) { inline_at = v + 20; };
         nếu (vm_get(v, 3) == inline_at) {
             vm_set(inline_at, 0, 0); vm_set(inline_at, 1, 0);
+            nếu (cap == 16) {
+                // Dung lượng cũ = 4; công thức nới là 4 * 2 + 8.
+                vm_set(inline_at, 2, 0); vm_set(inline_at, 3, 0);
+            };
         };
         vm_set(v, 2, cap); vm_set(v, 3, raw);
     };
@@ -160,19 +167,22 @@ hàm vm_map_find(v, key) {
     trả về -1;
 };
 hàm vm_map_find_int(v, number) {
-    // VM variable slots are i32 keys. Probe their stored payload directly
-    // instead of allocating a short-lived vm_int on every LOAD/STORE.
+    // Khóa ô biến là i32. Sau kiểm tra kiểu và biên, đọc thẳng vùng khóa
+    // để tránh vm_at và đóng hộp ở mỗi bước tìm kiếm nhị phân.
     nếu (vm_tag(v) != 5) { vm_error(2); trả về -1; };
     biến mode = vm_get(v, 4);
     nếu (mode == 0 || mode == 1) { trả về -1; };
     nếu (mode == 2) {
-        biến low = 0; biến high = máy chia số nguyên ba mươi hai bit(vm_get(v, 1), 2);
+        biến data = vm_get(v, 3); biến count = vm_get(v, 1);
+        biến low = 0; biến high = count >> 1;
         khi (low < high) {
-            biến mid = máy chia số nguyên ba mươi hai bit(low + high, 2);
-            biến value = vm_get(vm_at(v, mid * 2), 1);
+            biến mid = (low + high) >> 1;
+            biến value = vm_get(vm_get(data, mid * 2), 1);
             nếu (value < number) { low = mid + 1; } hoặc { high = mid; };
         };
-        nếu (low * 2 < vm_get(v, 1) && vm_get(vm_at(v, low * 2), 1) == number) { trả về low * 2; };
+        nếu (low * 2 < count) {
+            nếu (vm_get(vm_get(data, low * 2), 1) == number) { trả về low * 2; };
+        };
         trả về -1;
     };
     lặp(i = 0; i < vm_get(v, 1); i = i + 2) {
@@ -182,7 +192,7 @@ hàm vm_map_find_int(v, number) {
     trả về -1;
 };
 hàm vm_map_get(v, key) { biến i = vm_map_find(v, key); nếu (i < 0) { trả về 0; }; trả về vm_at(v, i + 1); };
-hàm vm_map_get_int(v, number) { biến i = vm_map_find_int(v, number); nếu (i < 0) { trả về 0; }; trả về vm_at(v, i + 1); };
+hàm vm_map_get_int(v, number) { biến i = vm_map_find_int(v, number); nếu (i < 0) { trả về 0; }; trả về vm_get(vm_get(v, 3), i + 1); };
 hàm vm_string_compare(a, b) {
     biến na = vm_get(a, 1); biến nb = vm_get(b, 1); biến n = na; nếu (nb < n) { n = nb; };
     lặp(i = 0; i < n; i++) {
@@ -289,6 +299,22 @@ hàm vm_text(v) {
 };
 hàm vm_binary(op, a, b) {
     nếu (vm_get(4198464, 12) != 1) { trả về vm_binary_body(op, a, b); };
+    biến state = vm_get(4198464, 2);
+    biến bộ đếm = 0;
+    nếu (state != 0) { bộ đếm = vm_get(state, 17); };
+    nếu (bộ đếm != 0 && op >= 0 && op <= 217) {
+        vm_set(bộ đếm, op, vm_get(bộ đếm, op) + 1);
+        biến theo hàm = vm_get(state, 18);
+        biến frames = vm_get(state, 6);
+        nếu (theo hàm != 0 && frames != 0 && vm_get(frames, 1) > 0) {
+            biến frame = vm_get(vm_get(frames, 3), vm_get(frames, 1) - 1);
+            biến id = vm_get(frame, 11);
+            nếu (id >= 231 && id <= 247) {
+                biến ô = (id - 231) * 218 + op;
+                vm_set(theo hàm, ô, vm_get(theo hàm, ô) + 1);
+            };
+        };
+    };
     vm_profile_begin(1);
     biến result = vm_binary_body(op, a, b);
     vm_profile_end(1);
@@ -300,6 +326,11 @@ hàm vm_binary_body(op, a, b) {
     nếu (vm_tag(a) == 1 && vm_tag(b) == 1) {
         biến x = vm_get(a, 1); biến y = vm_get(b, 1);
         nếu (op == 0) { trả về vm_int(x + y); };
+        nếu (op == 209) { trả về vm_int(x & y); };
+        nếu (op == 210) { trả về vm_int(x | y); };
+        nếu (op == 211) { trả về vm_int(x ^ y); };
+        nếu (op == 212) { trả về vm_int(x << y); };
+        nếu (op == 213) { trả về vm_int(x >> y); };
         nếu (op == 1) { trả về vm_int(x - y); };
         nếu (op == 2) { trả về vm_int(x * y); };
         nếu (op == 4) { trả về vm_int(x != 0 && y != 0); };
@@ -319,6 +350,7 @@ hàm vm_binary_body(op, a, b) {
         nếu (op == 3) { trả về vm_int(máy chia số nguyên ba mươi hai bit(x, y)); };
         trả về vm_int(x - máy chia số nguyên ba mươi hai bit(x, y) * y);
     };
+    nếu (op >= 209 && op <= 213) { trả về vm_error(2); };
     nếu (op == 7) { trả về vm_int(vm_equal(a, b)); };
     nếu (op == 8) { trả về vm_int(1 - vm_equal(a, b)); };
     nếu (op == 4) { trả về vm_int(vm_truth(a) && vm_truth(b)); };

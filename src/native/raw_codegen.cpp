@@ -363,6 +363,11 @@ private:
                     if (!value(v->operands[0], nesting + 1)) return false;
                     add(MachineOpcode::Sub); --depth; return true;
                 }
+                if (v->text == "~") {
+                    if (!value(v->operands[0], nesting + 1)) return false;
+                    add(MachineOpcode::PushConstant, -1); push();
+                    add(MachineOpcode::BitXor); --depth; return true;
+                }
                 if (v->text == "!") {
                     if (!value(v->operands[0], nesting + 1)) return false;
                     add(MachineOpcode::PushConstant, 0); push();
@@ -376,6 +381,11 @@ private:
                 if (v->text == "+") op = MachineOpcode::Add;
                 else if (v->text == "-") op = MachineOpcode::Sub;
                 else if (v->text == "*") op = MachineOpcode::Mul;
+                else if (v->text == "&") op = MachineOpcode::BitAnd;
+                else if (v->text == "|") op = MachineOpcode::BitOr;
+                else if (v->text == "^") op = MachineOpcode::BitXor;
+                else if (v->text == "<<") op = MachineOpcode::ShiftLeft;
+                else if (v->text == ">>") op = MachineOpcode::ShiftRight;
                 else if (v->text == "==") op = MachineOpcode::Equal;
                 else if (v->text == "!=") op = MachineOpcode::NotEqual;
                 else if (v->text == "<") op = MachineOpcode::Less;
@@ -562,6 +572,8 @@ std::string validateMachineStack(const MachineFunction &fn) {
             case Op::Return:
                 if (before == 0) return "machine IR stack underflow";
                 --after; break;
+            case Op::BitAnd: case Op::BitOr: case Op::BitXor:
+            case Op::ShiftLeft: case Op::ShiftRight:
             case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual:

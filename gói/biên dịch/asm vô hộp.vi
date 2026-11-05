@@ -1,0 +1,382 @@
+// Chứng minh hàm không đọc ô ngoài, không cấp phát và chỉ trả i32.
+// Tham số ASCII chỉ được so sánh với hằng một byte, không được trả như số.
+nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;
+nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
+nhập gói.bộ sưu tập.từ điển.lấy từ điển;
+
+lớp công khai Bộ Phát Vô Hộp {
+    hàm công khai khởi tạo(số tham số = 0, số ô nhớ = -1) {
+        mình.lệnh = []; mình.sâu = 0; mình.cao = 0;
+        mình.tham số = số tham số;
+        nếu (số ô nhớ < 0) { số ô nhớ = số tham số; };
+        mình.số ô = số ô nhớ;
+    };
+    hàm công khai phát(mã, hằng = 0, ô = 0, ký hiệu = "") {
+        máy ảo thêm cuối danh sách(mình.lệnh, biên dịch mã máy lệnh(mã, hằng, ô, mình.sâu, ký hiệu));
+        nếu (mã == "LoadSlot" || mã == "PushConstant") { mình.sâu = mình.sâu + 1; }
+        hoặc nếu (mã == "Call") { mình.sâu = mình.sâu + 1 - ô; }
+        hoặc nếu (mã != "StoreSlot" && mã != "Jump" && mã != "Trap") { mình.sâu = mình.sâu - 1; };
+        nếu (mình.sâu > mình.cao) { mình.cao = mình.sâu; };
+        trả về độ dài(mình.lệnh) - 1;
+    };
+    hàm công khai vá(vị trí, đích) { mình.lệnh[vị trí]["operand"] = đích; };
+    hàm công khai máy() {
+        trả về {"parameterCount": mình.tham số, "slotCount": mình.số ô,
+            "maxStackDepth": mình.cao, "instructions": mình.lệnh};
+    };
+    hàm công khai kết thúc kín() {
+        hàng = [0]; đã = {};
+        lặp(j = 0; j < độ dài(hàng); j++) {
+            i = hàng[j];
+            nếu (i < 0 || i >= độ dài(mình.lệnh)) { trả về sai; };
+            nếu (lấy từ điển(đã, "" + i, sai)) { bỏ qua; }; đã["" + i] = đúng;
+            lệnh = mình.lệnh[i]; mã = lệnh["opcode"];
+            nếu (mã == "Trap") { trả về sai; };
+            nếu (mã == "Return") { bỏ qua; };
+            nếu (mã == "Jump" || mã == "BranchZero") { máy ảo thêm cuối danh sách(hàng, lệnh["operand"]); };
+            nếu (mã != "Jump") { máy ảo thêm cuối danh sách(hàng, i + 1); };
+        };
+        trả về đúng;
+    };
+};
+
+// Hạ trực tiếp mẫu dãy số cục bộ -> lọc modulo -> cộng tổng thành mã máy i32.
+// Danh sách trung gian chỉ được loại khi toàn bộ thân hàm khớp đúng hình này,
+// vì vậy không có tham chiếu nào khác có thể quan sát danh sách đã bị bỏ.
+hàm riêng tư biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham số, bắt đầu) {
+    n = độ dài(nguồn); đầu = bắt đầu;
+    nếu (đầu + 61 > n || độ dài(tham số) > 4) { trả về rỗng; };
+    mẫu đầu = ["OP_LIST_LITERAL", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
+        "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
+    lặp(j = 0; j < 8; j++) {
+        nếu (lấy từ điển(bảng, "" + nguồn[đầu + j][0], "") != mẫu đầu[j]) { trả về rỗng; };
+    };
+    nếu (nguồn[đầu][1] != 0 || nguồn[đầu + 4][1] != 0) { trả về rỗng; };
+
+    vòng tạo = đầu + 8;
+    mẫu tạo = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+        "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_TEN_BIEN_GIA_TRI",
+        "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_CONG",
+        "intrinsic", "OP_DONG_KHOI", "OP_CAP_NHAT",
+        "OP_TEN_BIEN_ID", "OP_CONG_MOT", "OP_JUMP"];
+    lặp(j = 0; j < 16; j++) {
+        tên = lấy từ điển(bảng, "" + nguồn[vòng tạo + j][0], "");
+        nếu (j == 10) {
+            nếu (nguồn[vòng tạo + j][0] != biên dịch mã thao tác("OP_VM_LIST_APPEND")) { trả về rỗng; };
+        } hoặc nếu (tên != mẫu tạo[j]) { trả về rỗng; };
+    };
+    bộ đếm = nguồn[vòng tạo + 1][2]; giới hạn = nguồn[vòng tạo + 2][1];
+    danh sách = nguồn[vòng tạo + 6][2]; cơ sở = nguồn[vòng tạo + 7][2];
+    nếu (bộ đếm < 0 || danh sách < 0 || cơ sở < 0 || giới hạn < 0 ||
+        nguồn[vòng tạo + 8][2] != bộ đếm || nguồn[vòng tạo + 13][2] != bộ đếm ||
+        nguồn[vòng tạo + 4][1] != vòng tạo + 16 || nguồn[vòng tạo + 15][1] != vòng tạo ||
+        nguồn[đầu + 1][2] != danh sách || nguồn[đầu + 3][2] != bộ đếm ||
+        nguồn[đầu + 5][2] != bộ đếm) { trả về rỗng; };
+
+    giữa = vòng tạo + 16;
+    mẫu giữa = ["OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_KHOI_TAO",
+        "OP_BIEN_SO", "OP_TEN_BIEN_ID", "OP_GAN", "OP_LAP"];
+    lặp(j = 0; j < 8; j++) {
+        nếu (lấy từ điển(bảng, "" + nguồn[giữa + j][0], "") != mẫu giữa[j]) { trả về rỗng; };
+    };
+    tổng = nguồn[giữa + 1][2];
+    nếu (nguồn[giữa][1] != 0 || nguồn[giữa + 4][1] != 0 || tổng < 0 ||
+        tổng == cơ sở || tổng == danh sách || nguồn[giữa + 3][2] != bộ đếm ||
+        nguồn[giữa + 5][2] != bộ đếm) { trả về rỗng; };
+
+    vòng lọc = giữa + 8;
+    mẫu lọc = ["OP_DIEU_KIEN", "OP_TEN_BIEN_GIA_TRI", "OP_BIEN_SO", "OP_NHO_HON",
+        "OP_JUMP_IF_FALSE", "OP_MO_KHOI", "OP_NEU", "OP_TEN_BIEN_GIA_TRI",
+        "OP_TEN_BIEN_GIA_TRI", "OP_DOC_CHI_SO", "OP_BIEN_SO", "OP_MODULO",
+        "OP_BIEN_SO", "OP_SO_SANH_BANG", "OP_JUMP_IF_FALSE", "OP_MO_KHOI",
+        "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI", "OP_TEN_BIEN_GIA_TRI",
+        "OP_DOC_CHI_SO", "OP_CONG", "OP_TEN_BIEN_ID", "OP_GAN",
+        "OP_DONG_KHOI", "OP_DONG_KHOI", "OP_CAP_NHAT", "OP_TEN_BIEN_ID",
+        "OP_CONG_MOT", "OP_JUMP"];
+    lặp(j = 0; j < 29; j++) {
+        nếu (lấy từ điển(bảng, "" + nguồn[vòng lọc + j][0], "") != mẫu lọc[j]) { trả về rỗng; };
+    };
+    chia = nguồn[vòng lọc + 10][1]; mong đợi = nguồn[vòng lọc + 12][1];
+    nếu (chia <= 0 || nguồn[vòng lọc + 1][2] != bộ đếm ||
+        nguồn[vòng lọc + 2][1] != giới hạn || nguồn[vòng lọc + 7][2] != danh sách ||
+        nguồn[vòng lọc + 8][2] != bộ đếm || nguồn[vòng lọc + 16][2] != tổng ||
+        nguồn[vòng lọc + 17][2] != danh sách || nguồn[vòng lọc + 18][2] != bộ đếm ||
+        nguồn[vòng lọc + 21][2] != tổng || nguồn[vòng lọc + 26][2] != bộ đếm ||
+        nguồn[vòng lọc + 4][1] != vòng lọc + 29 || nguồn[vòng lọc + 14][1] != vòng lọc + 24 ||
+        nguồn[vòng lọc + 28][1] != vòng lọc) { trả về rỗng; };
+
+    sau = vòng lọc + 29;
+    khi (sau < n) {
+        tên = lấy từ điển(bảng, "" + nguồn[sau][0], "");
+        nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { thoát; };
+        sau += 1;
+    };
+    nếu (sau + 1 >= n || lấy từ điển(bảng, "" + nguồn[sau][0], "") != "OP_TEN_BIEN_GIA_TRI" ||
+        nguồn[sau][2] != tổng || lấy từ điển(bảng, "" + nguồn[sau + 1][0], "") != "OP_TRA_VE") {
+        trả về rỗng;
+    };
+    lặp(j = sau + 2; j < n; j++) {
+        tên = lấy từ điển(bảng, "" + nguồn[j][0], "");
+        nếu (tên != "OP_DONG_KHOI" && tên != "OP_DONG_LENH") { trả về rỗng; };
+    };
+
+    ô cơ sở = -1;
+    lặp(j = 0; j < độ dài(tham số); j++) {
+        nếu (tham số[j] == cơ sở) { ô cơ sở = j; };
+    };
+    nếu (ô cơ sở < 0) { trả về rỗng; };
+
+    ô đếm = độ dài(tham số); ô tổng = ô đếm + 1;
+    p = Bộ Phát Vô Hộp(độ dài(tham số), ô tổng + 1);
+    p.phát("PushConstant", 0); p.phát("StoreSlot", 0, ô đếm); p.phát("Drop");
+    p.phát("PushConstant", 0); p.phát("StoreSlot", 0, ô tổng); p.phát("Drop");
+    đầu vòng = độ dài(p.lệnh);
+    p.phát("LoadSlot", 0, ô đếm); p.phát("PushConstant", giới hạn); p.phát("Less");
+    hết = p.phát("BranchZero");
+    p.phát("LoadSlot", 0, ô cơ sở); p.phát("LoadSlot", 0, ô đếm); p.phát("Add");
+    p.phát("PushConstant", chia); p.phát("Mod"); p.phát("PushConstant", mong đợi); p.phát("Equal");
+    bỏ cộng = p.phát("BranchZero");
+    p.phát("LoadSlot", 0, ô tổng);
+    p.phát("LoadSlot", 0, ô cơ sở); p.phát("LoadSlot", 0, ô đếm); p.phát("Add"); p.phát("Add");
+    p.phát("StoreSlot", 0, ô tổng); p.phát("Drop");
+    p.vá(bỏ cộng, độ dài(p.lệnh));
+    p.phát("LoadSlot", 0, ô đếm); p.phát("PushConstant", 1); p.phát("Add");
+    p.phát("StoreSlot", 0, ô đếm); p.phát("Drop"); p.phát("Jump", 0, đầu vòng);
+    p.vá(hết, độ dài(p.lệnh)); p.phát("LoadSlot", 0, ô tổng); p.phát("Return");
+    dùng = 1 << ô cơ sở;
+    trả về {"ô": tham số, "máy": p.máy(), "dùng": dùng, "ascii": sai};
+};
+
+hàm công khai biên dịch asm hàm vô hộp(nguồn, bảng, chuỗi, ascii) {
+    n = độ dài(nguồn);
+    nếu (n < 4 || n > 256) { trả về rỗng; };
+    nếu (lấy từ điển(bảng, "" + nguồn[0][0], "") != "OP_MO_KHOI") { trả về rỗng; };
+    tham số = []; cục bộ = []; ô = {}; khai báo = {}; i = 1;
+    khi (i < n) {
+        v = nguồn[i];
+        nếu (lấy từ điển(bảng, "" + v[0], "") != "OP_KHOI_TAO") { thoát; };
+        khóa = "" + v[2];
+        nếu (v[2] < 0 || lấy từ điển(khai báo, khóa, sai)) { trả về rỗng; };
+        khai báo[khóa] = đúng;
+        nếu (i + 1 < n) {
+            sau = nguồn[i + 1];
+            nếu (lấy từ điển(bảng, "" + sau[0], "") == "OP_PARAM") {
+                nếu (sau[2] != v[2] || sau[3] != độ dài(tham số) || độ dài(tham số) >= 4) { trả về rỗng; };
+                ô[khóa] = độ dài(tham số); máy ảo thêm cuối danh sách(tham số, v[2]);
+                i += 2; bỏ qua;
+            };
+        };
+        máy ảo thêm cuối danh sách(cục bộ, v[2]); i += 1;
+    };
+    nếu (!ascii) {
+        dãy lọc tổng = biên dịch dãy lọc tổng vô hộp(nguồn, bảng, tham số, i);
+        nếu (dãy lọc tổng != rỗng) { trả về dãy lọc tổng; };
+    };
+    nếu (ascii && (độ dài(tham số) != 1 || độ dài(cục bộ) != 0)) { trả về rỗng; };
+    lặp(j = 0; j < độ dài(cục bộ); j++) { ô["" + cục bộ[j]] = độ dài(tham số) + j; };
+    nếu (độ dài(cục bộ) > 32) { trả về rỗng; };
+    tạm = độ dài(tham số) + độ dài(cục bộ);
+    phát = Bộ Phát Vô Hộp(độ dài(tham số), tạm + 1);
+    lặp(j = 0; j < độ dài(cục bộ); j++) {
+        phát.phát("PushConstant", 0); phát.phát("StoreSlot", 0, độ dài(tham số) + j); phát.phát("Drop");
+    };
+    bắt đầu = i; vị trí = []; vá = []; đích = {}; kiểu = []; dùng = 0;
+    lặp(j = 0; j < n; j++) {
+        máy ảo thêm cuối danh sách(vị trí, -1);
+        tên = lấy từ điển(bảng, "" + nguồn[j][0], "");
+        nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE") { đích["" + nguồn[j][1]] = đúng; };
+    };
+    lặp(pc = bắt đầu; pc < n; pc++) {
+        vị trí[pc] = độ dài(phát.lệnh); v = nguồn[pc];
+        tên = lấy từ điển(bảng, "" + v[0], "");
+        sâu = độ dài(kiểu); k = lấy từ điển(ô, "" + v[2], -1);
+        nếu (tên == "OP_MO_KHOI" || tên == "OP_DONG_KHOI" || tên == "OP_DONG_LENH" ||
+            tên == "OP_NEU" || tên == "OP_LAP" || tên == "OP_DIEU_KIEN" || tên == "OP_CAP_NHAT") { bỏ qua; };
+        nếu (tên == "OP_KHOI_TAO") {
+            nếu (ascii || k < độ dài(tham số) || k < 0 || sâu != 0) { trả về rỗng; };
+            phát.phát("PushConstant", 0); phát.phát("StoreSlot", 0, k); phát.phát("Drop"); bỏ qua;
+        };
+        nếu (tên == "OP_BIEN_SO" || tên == "OP_DUNG_GIA_TRI" || tên == "OP_SAI_GIA_TRI") {
+            số = v[1]; nếu (tên == "OP_DUNG_GIA_TRI") { số = 1; }; nếu (tên == "OP_SAI_GIA_TRI") { số = 0; };
+            phát.phát("PushConstant", số); máy ảo thêm cuối danh sách(kiểu, 0); bỏ qua;
+        };
+        nếu (tên == "OP_CHUOI") {
+            nếu (!ascii || v[2] < 0 || v[2] >= độ dài(chuỗi)) { trả về rỗng; };
+            byte = chuỗi thành byte máy ảo(chuỗi[v[2]]);
+            nếu (độ dài(byte) != 1) { trả về rỗng; }; nếu (byte[0] >= 128) { trả về rỗng; };
+            phát.phát("PushConstant", byte[0]); máy ảo thêm cuối danh sách(kiểu, 1); bỏ qua;
+        };
+        nếu (tên == "OP_TEN_BIEN_GIA_TRI") {
+            nếu (k < 0) { trả về rỗng; };
+            nếu (k < độ dài(tham số)) { dùng = dùng | (1 << k); };
+            phát.phát("LoadSlot", 0, k); máy ảo thêm cuối danh sách(kiểu, ascii); bỏ qua;
+        };
+        nếu (tên == "OP_TEN_BIEN_ID") {
+            nếu (ascii || k < 0 || pc + 1 >= n) { trả về rỗng; };
+            nếu (lấy từ điển(đích, "" + (pc + 1), sai)) { trả về rỗng; };
+            sau = lấy từ điển(bảng, "" + nguồn[pc + 1][0], "");
+            nếu (sau == "OP_GAN" && sâu == 1) {
+                phát.phát("StoreSlot", 0, k); phát.phát("Drop"); kiểu = [];
+            } hoặc nếu ((sau == "OP_CONG_MOT" || sau == "OP_TRU_MOT") && sâu == 0) {
+                // Chỉ bỏ giá trị tăng/giảm khi nó đứng ngay trước cạnh lùi.
+                nếu (pc + 2 >= n) { trả về rỗng; };
+                nếu (lấy từ điển(bảng, "" + nguồn[pc + 2][0], "") != "OP_JUMP") { trả về rỗng; };
+                phát.phát("LoadSlot", 0, k); phát.phát("PushConstant", 1);
+                phép = "Add"; nếu (sau == "OP_TRU_MOT") { phép = "Sub"; };
+                phát.phát(phép); phát.phát("StoreSlot", 0, k); phát.phát("Drop");
+                nếu (k < độ dài(tham số)) { dùng = dùng | (1 << k); };
+            } hoặc { trả về rỗng; };
+            vị trí[pc + 1] = vị trí[pc]; pc += 1; bỏ qua;
+        };
+        nếu (tên == "OP_JUMP" || tên == "OP_JUMP_IF_FALSE") {
+            nếu (v[1] < bắt đầu || v[1] >= n) { trả về rỗng; };
+            nếu (tên == "OP_JUMP") {
+                nếu (sâu != 0) { trả về rỗng; };
+                máy ảo thêm cuối danh sách(vá, [phát.phát("Jump"), v[1]]);
+            } hoặc {
+                nếu (sâu != 1) { trả về rỗng; }; nếu (kiểu[0] != 0) { trả về rỗng; };
+                máy ảo thêm cuối danh sách(vá, [phát.phát("BranchZero"), v[1]]); kiểu = [];
+            };
+            bỏ qua;
+        };
+        nếu (tên == "OP_TRA_VE") {
+            nếu (sâu != 1) { trả về rỗng; }; nếu (kiểu[0] != 0) { trả về rỗng; };
+            phát.phát("Return"); kiểu = []; bỏ qua;
+        };
+        nếu (tên == "OP_KHONG" || tên == "OP_PHU_DINH") {
+            nếu (sâu < 1) { trả về rỗng; }; nếu (kiểu[sâu - 1] != 0) { trả về rỗng; };
+            phát.phát("PushConstant", 0); phát.phát("Equal"); bỏ qua;
+        };
+        nếu (sâu < 2) { trả về rỗng; };
+        a = kiểu[sâu - 2]; b = kiểu[sâu - 1]; phép = "";
+        chọn(tên) {
+            ca "OP_CONG": { phép = "Add"; } ca "OP_TRU": { phép = "Sub"; }
+            ca "OP_NHAN": { phép = "Mul"; } ca "OP_MODULO": { phép = "Mod"; }
+            ca "OP_CHIA": { phép = "Div"; }
+            ca "OP_BIT_VA": { phép = "BitAnd"; } ca "OP_BIT_HOAC": { phép = "BitOr"; }
+            ca "OP_BIT_XOR": { phép = "BitXor"; } ca "OP_DICH_TRAI": { phép = "ShiftLeft"; }
+            ca "OP_DICH_PHAI": { phép = "ShiftRight"; }
+            ca "OP_SO_SANH_BANG": { phép = "Equal"; } ca "OP_KHAC_BANG": { phép = "NotEqual"; }
+            ca "OP_LON_HON": { phép = "Greater"; } ca "OP_NHO_HON": { phép = "Less"; }
+            ca "OP_LON_HON_HOAC_BANG": { phép = "GreaterEqual"; } ca "OP_NHO_HON_HOAC_BANG": { phép = "LessEqual"; }
+        };
+        so = phép == "Equal" || phép == "NotEqual" || phép == "Less" || phép == "Greater" || phép == "LessEqual" || phép == "GreaterEqual";
+        nếu (a != b || (a == 1 && !so)) { trả về rỗng; };
+        nếu (phép == "Div" || phép == "Mod") {
+            nếu (lấy từ điển(bảng, "" + nguồn[pc - 1][0], "") != "OP_BIEN_SO" || nguồn[pc - 1][1] <= 0) { trả về rỗng; };
+        };
+        nếu (tên == "OP_Logic_VA" || tên == "OP_Logic_HOAC") {
+            phát.phát("PushConstant", 0); phát.phát("NotEqual"); phát.phát("StoreSlot", 0, tạm); phát.phát("Drop");
+            phát.phát("PushConstant", 0); phát.phát("NotEqual"); phát.phát("LoadSlot", 0, tạm);
+            phép = "BitAnd"; nếu (tên == "OP_Logic_HOAC") { phép = "BitOr"; };
+        };
+        nếu (phép == "") { trả về rỗng; };
+        phát.phát(phép); máy ảo xóa vị trí danh sách(kiểu, sâu - 1); kiểu[sâu - 2] = 0;
+    };
+    nếu (độ dài(kiểu) != 0) { trả về rỗng; };
+    phát.phát("Trap");
+    lặp(j = 0; j < độ dài(vá); j++) {
+        đích máy = vị trí[vá[j][1]];
+        nếu (đích máy < 0) { trả về rỗng; };
+        nếu (phát.lệnh[đích máy]["depthBefore"] != 0) { trả về rỗng; };
+        phát.vá(vá[j][0], đích máy);
+    };
+    nếu (!phát.kết thúc kín()) { trả về rỗng; };
+    trả về {"ô": tham số, "máy": phát.máy(), "dùng": dùng, "ascii": ascii};
+};
+
+hàm công khai biên dịch asm bộ chọn vô hộp(các id, dạng, số, phương thức, qua ô = sai) {
+    p = Bộ Phát Vô Hộp(2, 3); chậm = [];
+    // Lời gọi qua biến chỉ truyền khung. Đọc callee ID một lần ngay trong
+    // bộ chọn và giữ ô 1 làm ID như đường phương thức; đối số ABI thứ hai
+    // tại call-site chỉ là đệm để layout máy của hai bộ chọn giống nhau.
+    nếu (!phương thức) {
+        p.phát("LoadSlot", 0, 0);
+        nếu (qua ô) {
+            p.phát("LoadSlot", 0, 1);
+            p.phát("Call", 0, 2, "vpp_native_dynamic_callee_slot_id");
+        } hoặc {
+            p.phát("Call", 0, 1, "vpp_native_dynamic_callee_id");
+        };
+        p.phát("StoreSlot", 0, 1); p.phát("Drop");
+    };
+    bố trí = phương thức; nếu (qua ô) { bố trí = 1; };
+    lặp(i = 0; i < độ dài(các id); i++) {
+        id = các id[i]; mẫu = dạng["" + id];
+        p.phát("LoadSlot", 0, 1); p.phát("PushConstant", id); p.phát("Equal");
+        khác = p.phát("BranchZero");
+        p.phát("LoadSlot", 0, 0); p.phát("PushConstant", số);
+        p.phát("PushConstant", mẫu["dùng"]); p.phát("PushConstant", mẫu["ascii"]);
+        p.phát("PushConstant", bố trí); p.phát("Call", 0, 5, "vpp_native_dynamic_fast_args");
+        máy ảo thêm cuối danh sách(chậm, p.phát("BranchZero"));
+        lặp(j = 0; j < số; j++) {
+            nếu ((mẫu["dùng"] & (1 << j)) != 0) {
+                p.phát("LoadSlot", 0, 0); p.phát("PushConstant", số); p.phát("PushConstant", j);
+                p.phát("PushConstant", mẫu["ascii"]); p.phát("PushConstant", bố trí);
+                p.phát("Call", 0, 5, "vpp_native_dynamic_fast_arg");
+            } hoặc { p.phát("PushConstant", 0); };
+        };
+        p.phát("Call", 0, số, mẫu["ký hiệu"]);
+        p.phát("StoreSlot", 0, 2); p.phát("Drop");
+        p.phát("LoadSlot", 0, 0); p.phát("PushConstant", số); p.phát("LoadSlot", 0, 2);
+        nếu (qua ô) { p.phát("Call", 0, 3, "vpp_native_dynamic_fast_result_slot"); }
+        hoặc { p.phát("Call", 0, 3, "vpp_native_dynamic_fast_result"); };
+        // 0: dự phòng, 1: đã gọi, 2: lỗi đóng hộp kết quả.
+        p.phát("PushConstant", 1); p.phát("Add"); p.phát("Return");
+        p.vá(khác, độ dài(p.lệnh));
+    };
+    lặp(i = 0; i < độ dài(chậm); i++) { p.vá(chậm[i], độ dài(p.lệnh)); };
+    p.phát("PushConstant", 0); p.phát("Return");
+    trả về p.máy();
+};
+
+// Bộ chọn riêng cho mẫu receiver.method(source[index]) khi method một tham
+// số đã được chứng minh chỉ cần một byte ASCII. Receiver vẫn nằm trên stack;
+// helper chỉ đọc source/index theo slot và không tạo chuỗi ký tự trung gian.
+// Trả 0 để caller chạy đường động, 1 khi đã gọi, 2 khi runtime đã báo lỗi.
+hàm công khai biên dịch asm bộ chọn ascii chỉ số(các id, dạng) {
+    // 0=frame, 1=tên method, 2=super, 3=source slot, 4=index slot,
+    // 5=byte ASCII, 6=id method đã resolve.
+    p = Bộ Phát Vô Hộp(5, 7);
+    p.phát("LoadSlot", 0, 0); p.phát("LoadSlot", 0, 3); p.phát("LoadSlot", 0, 4);
+    p.phát("Call", 0, 3, "vpp_native_dynamic_ascii_index_arg");
+    p.phát("StoreSlot", 0, 5); p.phát("Drop");
+
+    // 129: index/source đã phát sinh lỗi thật, không được chạy fallback.
+    p.phát("LoadSlot", 0, 5); p.phát("PushConstant", 129); p.phát("Equal");
+    không lỗi = p.phát("BranchZero");
+    p.phát("PushConstant", 2); p.phát("Return");
+    p.vá(không lỗi, độ dài(p.lệnh));
+
+    // 128: kiểu hoặc ký tự không thuộc miền ASCII đã chứng minh.
+    p.phát("LoadSlot", 0, 5); p.phát("PushConstant", 128); p.phát("Less");
+    là ascii = p.phát("BranchZero");
+
+    // Chỉ resolve method sau khi đối số index đã được đánh giá thành công,
+    // giữ nguyên thứ tự lỗi của lời gọi động gốc.
+    p.phát("LoadSlot", 0, 0); p.phát("LoadSlot", 0, 1); p.phát("LoadSlot", 0, 2);
+    p.phát("Call", 0, 3, "vpp_native_dynamic_method_top_id");
+    p.phát("StoreSlot", 0, 6); p.phát("Drop");
+    p.phát("LoadSlot", 0, 6); p.phát("PushConstant", 0); p.phát("Less");
+    id hợp lệ = p.phát("BranchZero");
+    p.phát("PushConstant", 2); p.phát("Return");
+    p.vá(id hợp lệ, độ dài(p.lệnh));
+
+    lặp(i = 0; i < độ dài(các id); i++) {
+        id = các id[i]; mẫu = dạng["" + id];
+        p.phát("LoadSlot", 0, 6); p.phát("PushConstant", id); p.phát("Equal");
+        khác = p.phát("BranchZero");
+        p.phát("LoadSlot", 0, 5);
+        p.phát("Call", 0, 1, mẫu["ký hiệu"]);
+        p.phát("StoreSlot", 0, 6); p.phát("Drop");
+        p.phát("LoadSlot", 0, 0); p.phát("LoadSlot", 0, 6);
+        p.phát("Call", 0, 2, "vpp_native_dynamic_fast_receiver_result");
+        p.phát("PushConstant", 1); p.phát("Add"); p.phát("Return");
+        p.vá(khác, độ dài(p.lệnh));
+    };
+    p.phát("PushConstant", 0); p.phát("Return");
+
+    p.vá(là ascii, độ dài(p.lệnh));
+    p.phát("PushConstant", 0); p.phát("Return");
+    trả về p.máy();
+};

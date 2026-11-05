@@ -1,6 +1,7 @@
 // Buffer token native: i32 count, rồi (i32 start, i32 end, i32 kind)*count.
 // Offset byte UTF-8, không cấp phát chuỗi/token trên heap cho từng từ.
-// Chỉ dùng với ABI native và lexer.vi (nối file nguồn khi chưa hỗ trợ import).
+// Phụ thuộc lexer được khai báo trực tiếp để linker đa mô-đun gán ID tĩnh.
+nhập phân tích từ vựng.*;
 
 hàm từ tố số phần tử(các từ tố) {
     biến n = byte dài(các từ tố);

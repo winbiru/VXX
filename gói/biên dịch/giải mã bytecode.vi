@@ -54,6 +54,11 @@ hàm công khai biên dịch tên mã thao tác(mã) {
         ca 61: { trả về "OP_TEN_BIEN_GIA_TRI"; }
         ca 62: { trả về "OP_JUMP_IF_FALSE"; }
         ca 63: { trả về "OP_JUMP"; }
+        ca 209: { trả về "OP_BIT_VA"; }
+        ca 210: { trả về "OP_BIT_HOAC"; }
+        ca 211: { trả về "OP_BIT_XOR"; }
+        ca 212: { trả về "OP_DICH_TRAI"; }
+        ca 213: { trả về "OP_DICH_PHAI"; }
         ca 64: { trả về "OP_MODULO"; }
         ca 65: { trả về "OP_CHUOI"; }
         ca 66: { trả về "OP_PHU_DINH"; }
@@ -137,6 +142,10 @@ hàm công khai biên dịch tên mã thao tác(mã) {
         ca 151: { trả về "OP_VM_MAP_REMOVE"; }
         ca 152: { trả về "OP_VM_MAP_KEYS"; }
         ca 153: { trả về "OP_VM_STRING_BYTES"; }
+        ca 214: { trả về "OP_VM_STRING_SLICE"; }
+        ca 215: { trả về "OP_GOI_LOI_BAN_DIA"; }
+        ca 216: { trả về "OP_VM_STRING_REPLACE_EXACT"; }
+        ca 217: { trả về "OP_VM_STRING_BYTE_SLICE"; }
         ca 154: { trả về "OP_VM_STRING_FROM_BYTES"; }
         ca 155: { trả về "OP_VM_FLOAT_FROM_BITS"; }
         ca 156: { trả về "OP_FFI_CALL"; }

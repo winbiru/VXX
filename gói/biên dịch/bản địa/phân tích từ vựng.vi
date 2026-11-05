@@ -34,6 +34,8 @@ hàm từ vựng dấu phân cách(c) {
     nếu (c == 58) { trả về 1; };
     nếu (c == 37) { trả về 1; };
     nếu (c == 38) { trả về 1; };
+    nếu (c == 94) { trả về 1; };
+    nếu (c == 126) { trả về 1; };
     nếu (c == 124) { trả về 1; };
     trả về 0;
 };
@@ -86,7 +88,12 @@ hàm từ vựng hai(a, b) {
         nếu (a == 42) { trả về 1; };
         nếu (a == 47) { trả về 1; };
         nếu (a == 37) { trả về 1; };
+        nếu (a == 38) { trả về 1; };
+        nếu (a == 124) { trả về 1; };
+        nếu (a == 94) { trả về 1; };
     };
+    nếu (a == 60) { nếu (b == 60) { trả về 1; }; };
+    nếu (a == 62) { nếu (b == 62) { trả về 1; }; };
     nếu (a == 38) { nếu (b == 38) { trả về 1; }; };
     nếu (a == 124) { nếu (b == 124) { trả về 1; }; };
     nếu (a == 43) { nếu (b == 43) { trả về 1; }; };
@@ -164,6 +171,12 @@ hàm từ vựng điểm kết thúc(nguồn văn bản, điểm bắt đầu) {
     };
     nếu (c == 39) {
         trả về từ vựng nháy điểm kết thúc(nguồn văn bản, điểm bắt đầu, c);
+    };
+    nếu (điểm bắt đầu + 2 < n) {
+        nếu (c == 60 || c == 62) {
+            nếu (byte lấy(nguồn văn bản, điểm bắt đầu + 1) == c &&
+                byte lấy(nguồn văn bản, điểm bắt đầu + 2) == 61) { trả về điểm bắt đầu + 3; };
+        };
     };
     nếu (điểm bắt đầu + 1 < n) {
         nếu (từ vựng hai(c, byte lấy(nguồn văn bản, điểm bắt đầu + 1)) == 1) { trả về điểm bắt đầu + 2; };

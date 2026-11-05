@@ -214,7 +214,7 @@ AOT tổng quát vẫn là hạng mục cần chuyển tiếp.
 
 `gói/máy ảo/thư mục máy.vi` thực hiện vòng đời tài nguyên thư mục,
 kiểm tra đường dẫn UTF-8, phân loại lỗi và giải mã bản ghi thư mục.
-`scripts/ASM/vpp_vm_directory_primitives.inc` giữ ranh giới OS và con trỏ
+`scripts/ASM/common/posix/vpp_vm_directory_primitives.inc` giữ ranh giới OS và con trỏ
 64 bit. Các opcode có sẵn nay hoạt động trên VM độc lập:
 
 | Opcode | Kết quả |
@@ -286,7 +286,7 @@ kiểm tra thực thi trên Linux.
 bởi VM, argv UTF-8, môi trường con, hai kênh output, poll, read, wait và
 cleanup. Primitive **ID 73** `máy tiến trình thô` gọi
 `vpp_native_os_process(operation, control_offset)` trong
-`scripts/ASM/vpp_vm_process_primitives.inc`. Control block 1024 byte thuộc
+`scripts/ASM/common/posix/vpp_vm_process_primitives.inc`. Control block 1024 byte thuộc
 arena; ASM kiểm tra offset rồi đổi thành con trỏ 64-bit, dùng `posix_spawnp`,
 `pipe`, `fcntl`, `poll`, `read`, `waitpid`, `kill` và file actions POSIX.
 Nhóm tiến trình con dùng `POSIX_SPAWN_SETPGROUP` để cleanup khi timeout
@@ -335,8 +335,8 @@ thoát hoặc gặp lỗi. Opcode **185–192** đi qua host ABI V++ tới nativ
 primitive **ID 74** `máy ổ cắm thô`; tổng bảng intrinsic native i32 hiện
 có **75 ID (0..74)**. Không lộ descriptor OS hay con trỏ 64-bit cho guest.
 
-`scripts/ASM/vpp_vm_socket_primitives.inc` và
-`vpp_vm_socket_x86_64.inc` gọi socket/connect/bind/listen/accept,
+`scripts/ASM/common/posix/vpp_vm_socket_primitives.inc` và
+`common/posix/vpp_vm_socket_x86_64.inc` gọi socket/connect/bind/listen/accept,
 send/recv, setsockopt và close. Bốn target macOS/Linux × ARM64/x86-64
 đã lắp ráp thành công. Địa chỉ IPv4/IPv6 sử dụng layout sockaddr riêng
 cho mỗi OS (AF_INET6 = 30 trên Darwin, 10 trên Linux); Linux gửi
@@ -413,7 +413,7 @@ Chia thời gian ngủ theo đợt và giữ deadline vẫn do `gói/hệ thốn
 thực hiện. API entropy 4096 byte của thư viện chuẩn tiếp tục ghép nhiều
 khối bằng V++. Không thay số opcode hay định dạng ảnh `.vmb`.
 
-`scripts/ASM/vpp_vm_system_primitives.inc` đổi offset arena thành con trỏ
+`scripts/ASM/common/posix/vpp_vm_system_primitives.inc` đổi offset arena thành con trỏ
 64 bit sau khi kiểm tra giới hạn. Linux gọi trực tiếp `clock_gettime`,
 `nanosleep`, `getrandom` bằng syscall; Darwin dùng syscall `poll` cho ngủ
 và API libSystem `clock_gettime`/`getentropy` qua ASM. Đây vẫn là phụ thuộc

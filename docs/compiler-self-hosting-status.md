@@ -1,5 +1,552 @@
 # V++ compiler self-hosting: parser, semantic, IR và bytecode bootstrap
 
+## Mốc kiểm chứng mới nhất — Linux source-only (03/11/2026)
+
+Đã chạy lại thành công **toàn bộ** gate
+`scripts/quality/check_linux_source_bootstrap.sh` với seed Linux stage 2
+ngày 02/11, trên Ubuntu 24.04 AMD64 qua Docker; thư mục kết quả riêng:
+`/private/tmp/vpp-selfhosting-verify-20261103/linux-bootstrap-verified-final`.
+Quá trình xuất phát từ mã nguồn `.vi` và ASM text, không sao chép object
+đầu vào và không gọi các công cụ biên dịch/liên kết ngoài.
+
+`SOURCE_BOOTSTRAP_SEED_ARENA_2M=PASS`, `NATIVE_ELF_REL_REGRESSIONS=PASS`,
+`NATIVE_ASSEMBLER_REGRESSIONS=PASS`, `SOURCE_BOOTSTRAP_PLATFORM_DIR_ONLY=PASS`,
+`SOURCE_BOOTSTRAP_HOST_EXACT_CMP=0`, `SOURCE_BOOTSTRAP_CONVERGENCE=PASS`,
+`SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE`. Stage 1 và Stage 2 của
+**entrypoint compiler đa nền tảng đầy đủ** có cùng SHA-256
+`b1e3a8caa238952f37b17dff963860cecb1d0688b12972ae999a4435451d1ebc`.
+Ba host object có cùng SHA-256
+`3cbdfa901b4309f6347175c70bf2c47b5d540b9899b0a94f3136d849eb45fd06`.
+
+Gate đã được bổ sung kiểm tra dữ liệu tại ranh giới 1 MiB và cuối buffer
+2 MiB, bao gồm tính nguyên vẹn sau lần ghi vượt giới hạn bị từ chối. Bài
+probe mở rộng cũng đã PASS khi biên dịch và chạy độc lập trong Docker.
+
+Mốc này xác nhận đường tự biên dịch native i32 trên Linux. Các bảng phía
+dưới giữ nguyên lịch sử các lần chạy; macOS ARM64 và Windows AMD64 qua Wine
+đã PASS tại các mốc trước, trong khi Windows trực tiếp vẫn chưa chạy PowerShell
+gate trên máy Windows thực.
+
+## Kiểm chứng lại macOS ARM64 và Windows PE AMD64 (03/11/2026)
+
+Gate macOS ARM64 chạy trực tiếp trên máy tại
+`/private/tmp/vpp-selfhosting-verify-20261103/macos-final`: Stage 1 = Stage 2
+byte-for-byte, cùng SHA-256
+`32fb0e2a6869baade1760e51ce053088e189120255154cfc6ea019c3d7080bc9`.
+`MACHO_RUNTIME_LAYOUT=PASS` (61 import),
+`MACOS_NATIVE_EXECUTABLE_SELFHOST=PASS`, các probe Unicode/runtime và
+regression Mach-O bị hỏng đều PASS; không gọi compiler, assembler hay
+linker ngoài trong các thế hệ tự biên dịch. ASM runtime ban đầu vẫn được
+lắp ráp bằng Clang; executable dùng dyld/libSystem và ký ad hoc bằng
+codesign.
+
+Gate Windows PE AMD64 trên Ubuntu/Wine qua Docker chạy tại
+`/private/tmp/vpp-selfhosting-verify-20261103/windows-final`. Ba file
+`stage1.exe`, `stage2.exe`, `stage3.exe` giống nhau byte-for-byte, cùng SHA-256
+`870cbbbf8c6138259fef31aacbca2754cf710444bb45d8954c0ac437f3c1404e`.
+`PE_RUNTIME_LAYOUT=PASS` (38 import), 15 đầu vào COFF sai định dạng đều
+bị từ chối; các probe Unicode/runtime, bảo toàn executable cũ khi liên
+kết thất bại, và `WINDOWS_NATIVE_PE_EXTERNAL_BUILD_TOOLS=NONE` đều đạt.
+Sau khi tăng cường gate Docker kiểm tra **mã lỗi 17** cho COFF hỏng,
+đã chạy lại toàn bộ tại
+`/private/tmp/vpp-selfhosting-verify-20261103/windows-final-after-gate-hardening`;
+ba stage vẫn có cùng hash ở trên, và
+`WINDOWS_NATIVE_PE_ATOMIC_FAILURE=PASS`,
+`WINDOWS_NATIVE_PE_SELFHOST=PASS`.
+Trình biên dịch PE thực thi trong Wine từ thế hệ 1 trở đi; Clang trên
+macOS chỉ tạo boundary ASM ban đầu. Gate Windows trực tiếp bằng
+PowerShell 7 đã được bổ sung kiểm tra PE32+ AMD64, probe runtime và
+atomic failure, nhưng **chưa chạy trên Windows thật**.
+
+## Native i32: executable linker và hội tụ đa nền tảng (02/11/2026, cập nhật)
+
+Entry point đầy đủ `gói/biên dịch/bản địa/bộ biên dịch.vi` đã được tự biên
+dịch qua linker V++ trên Linux x86-64, macOS ARM64 và Windows AMD64 qua
+Wine trong Docker. Các mục cũ bên dưới ghi lại checkpoint lịch sử; nhận định
+chưa có PE linker hoặc Mach-O executable còn cần Apple ld đã được thay thế
+trong đường native có cấu hình runtime object.
+
+| Đường đã chạy | Bằng chứng hội tụ SHA-256 của executable đầy đủ |
+| --- | --- |
+| Linux x86-64, host ASM mới từ nguồn; Stage 1 = Stage 2 | `3009f108d6c907e4a4394a9facc40a8be27b664160c0cc8b2d08353212df71ae` |
+| macOS ARM64, chạy trực tiếp; Stage 1 = Stage 2, kể cả chữ ký | `ff7f24cffe304b403437c1dbbacffb252d287a32b2cd6d173fb029b6671ca5f9` |
+| Windows PE AMD64, chạy qua Wine; Stage 1 = Stage 2 = Stage 3 | `1307e238452a26f83016e77dc13414af9dbbc11baad8b9491340b42d08ad2e33` |
+
+Linux đã kiểm tra archive lớn hơn 1 MiB, đúng 2 MiB, vượt 2 MiB và bị cắt
+gần giới hạn; chương trình được liên kết từ archive lớn trả về 42. Mach-O
+liên kết thêm runtime ASM, các relocation BRANCH26/PAGE21/PAGEOFF12 và
+61 import libSystem. PE liên kết runtime V++, COFF ASM nhiều section, tạo
+import table/IAT/thunk cho 38 API thuộc bốn DLL. Hai gate mới đều kiểm tra
+Unicode, lời gọi runtime, tệp đích cũ, quyền section và không gọi external
+compiler/linker trong các thế hệ tự biên dịch. Regression malformed runtime
+gồm 14 ca Mach-O và 13 ca PE; các chương trình freestanding cũ vẫn PASS.
+
+Gate Linux từ nguồn cũng đạt `SOURCE_BOOTSTRAP_INPUT_OBJECTS=NONE`,
+`NATIVE_ASSEMBLER_REGRESSIONS=PASS`, `SOURCE_BOOTSTRAP_CONVERGENCE=PASS`
+và `SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE`. Host do seed/Stage 1/Stage 2
+assemble đều có SHA-256
+`3cbdfa901b4309f6347175c70bf2c47b5d540b9899b0a94f3136d849eb45fd06`.
+Tệp `.o` cũ trong repository được giữ nguyên; toàn bộ lượt này chạy trong
+bản sao nguồn cách ly với host có vùng nhớ mới.
+
+macOS/Windows còn chuẩn bị ASM một lần bằng Clang; macOS dùng codesign và
+dyld/libSystem. PE hiện là fixed-base, chưa hỗ trợ absolute relocation,
+TLS/COMDAT/unwind. Chưa chạy gate PowerShell trực tiếp trên Windows thật.
+Đây là kết quả cho compiler native **i32**, không phải xác nhận toàn bộ
+ngôn ngữ/VM production đã tự chủ hoàn toàn.
+
+Lệnh tái hiện, giới hạn định dạng và yêu cầu host object Linux được ghi ở
+[native-linker-selfhosting.md](native-linker-selfhosting.md). Đã thêm gate
+PowerShell riêng để chạy lại ba thế hệ PE trên Windows thật.
+
+## Bootstrap Linux theo backend ELF; kiểm chứng Mach-O mới (02/11/2026)
+
+Khi thêm các backend Mach-O/COFF vào cùng entrypoint đa nền tảng
+`gói/biên dịch/bản địa/bộ biên dịch.vi`, trình biên dịch Linux trước đó
+thoát mã `16` trong lúc đóng gói object cho chính compiler. Chạy bản
+chẩn đoán có đánh dấu từng nhánh lỗi xác định được nguyên nhân: archive
+đã chứa **1.041.816 byte**, object kế tiếp dài **81.448 byte** và phép
+`byte nối` vượt giới hạn **1 MiB** mỗi bộ đệm i32. Đây là giới hạn kích
+thước archive khi bootstrap, không phải lỗi phân tích ET_REL của linker.
+
+Thêm entrypoint `bộ biên dịch linux.vi` chỉ nạp backend ELF và
+`nền tảng linux.vi` với các nhánh không dùng cho Mach-O/COFF. Ba gate
+Linux (`check_native_elf_linker.sh`, `check_linux_freestanding_selfhosting.sh`,
+`check_linux_selfhosting_convergence.sh`) nay sử dụng entrypoint ELF.
+`bộ biên dịch.vi` vẫn là entrypoint đầy đủ cho biên dịch đa nền tảng;
+compiler bootstrap Linux chuyên biệt **không hỗ trợ xuất COFF/Mach-O**.
+Cần thiết kế archive theo luồng hoặc nâng giới hạn lưu trữ có kiểm soát
+để bootstrap lại entrypoint đa nền tảng trên Linux.
+
+Gate `check_linux_source_bootstrap.sh` trong Docker Ubuntu 24.04 x86-64
+đã **PASS trọn vẹn** tại
+`build/native-dynamic-vpp-ubuntu-docker/linux-platform-bootstrap-20261102c`:
+`SOURCE_BOOTSTRAP_INPUT_OBJECTS=NONE`,
+`NATIVE_ELF_SOURCE_ONLY_NOEXEC_STACK=PASS`,
+`NATIVE_ELF_SELFHOST_EXACT_CMP=0`,
+`NATIVE_ELF_REL_REGRESSIONS=PASS`,
+`NATIVE_ASSEMBLER_REGRESSIONS=PASS`,
+`SOURCE_BOOTSTRAP_PLATFORM_DIR_ONLY=PASS`,
+`SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE`,
+`SOURCE_BOOTSTRAP_CONVERGENCE=PASS`.
+SHA-256 compiler Stage 1/2 khớp nhau:
+`85248f0c477da857ebfd5198754ebaa99a07e801e93fd102583fdb70887eb1f9`.
+SHA-256 host ASM object do seed/Stage 1/Stage 2 tạo:
+`bd37d318987bcaf2571398ef0fc78150316980e84a18de76ed28e396e1a88fe3`.
+Gate ELF còn giữ nguyên mã lỗi thật của compiler khi bootstrap thất bại.
+
+Gate macOS ARM64 `check_macos_native_macho_linker.sh` chạy lại **PASS**
+trọn vẹn tại `/tmp/vpp-macho-native-linker-gate-v7-20261102` với
+`MACOS_MACHO_NATIVE_LINKER_GATE=PASS`, kiểm thử source/runtime executable
+trả `53`/`52`, Stage 1/2 hội tụ SHA-256 chuẩn hóa
+`49bf1e34e98b15e28288d0e7c0ac23d2137e09c9ddb8b07afe9d7a02970e6801`.
+Mach-O MH_EXECUTE vẫn cần Apple `ld`; Windows PE executable linker chưa có.
+
+## macOS ARM64: Mach-O MH_OBJECT merger thuần V++ (02/11/2026)
+
+Đường `VPP_NATIVE_MACHO_REL_LINK=1` hiện hợp nhất relocatable Mach-O ARM64
+trong V++, không gọi `ld -r`. Bảng symbol đầu ra ưu tiên các định nghĩa,
+giải quyết import kể cả khi định nghĩa nằm ở mô-đun phía sau, gộp các
+import trùng tên và cập nhật BRANCH26 relocation. Validator chỉ chấp nhận
+dạng MH_OBJECT canonical; các trường header, section, string offset,
+symbol, padding và relocation sai đều bị từ chối, bảo toàn tệp đích.
+
+Gate `scripts/quality/check_macos_native_macho_linker.sh` **PASS** từ
+compiler `/tmp/vpp-macho-merger-20261102-stage7`, kết quả tại
+`/tmp/vpp-macho-native-linker-gate-v3-20261102`. Bộ kiểm thử xác nhận
+malformed/duplicate/atomic failure/determinism/symbol resolution/undefined
+dedup; executable đa mô-đun trả `53`, executable dùng runtime trả `52`,
+source object byte-identical, runtime-object hợp lệ, và Stage 1/2
+compiler hội tụ sau chuẩn hóa metadata do Apple linker sinh ra.
+
+Apple `codesign` có thể sinh chữ ký kích thước khác nhau (5800 hoặc
+5808 byte) dù code và dữ liệu của các thế hệ giống nhau. Bộ kiểm tra
+`check_macos_macho_convergence.py` nay chỉ loại bỏ trailer chữ ký, UUID,
+và chuẩn hóa chính xác hai trường kích thước liên quan; từ chối signature
+hoặc __LINKEDIT có phạm vi không nhất quán. Gate mới kiểm tra cả trường
+hợp chữ ký tăng 8 byte và trường hợp mã thực thi bị đổi.
+
+**Giới hạn:** MH_EXECUTE vẫn được Apple `ld` tạo từ các object sau hợp
+nhất, và ASM nền tảng còn được Clang assemble lúc chuẩn bị runtime.
+Chưa có executable linker Mach-O thuần V++ hoàn chỉnh.
+
+## macOS ARM64: tự liên kết qua Apple ld (02/11/2026)
+
+Compiler V++ nay hỗ trợ đường `VPP_MACOS_DIRECT_LD=1` để gọi trực tiếp
+`/usr/bin/ld` qua `posix_spawn`, dùng `VPP_MACOS_SDKROOT` (hoặc `SDKROOT`)
+và object runtime ARM64 tại `VPP_MACOS_RUNTIME_OBJECT` cho executable.
+Đường mặc định vẫn dùng Clang; khi bật `VPP_MACOS_DIRECT_LD=1`, chế độ
+object hợp nhất (`-r`) cũng gọi trực tiếp `/usr/bin/ld` và không cần SDK
+hay runtime ASM object. ASM boundary lấy executable path từ `argv[0]` do V++ dựng.
+
+Gate ngày 02/11/2026 sau khi bổ sung đường `ld -r` đã PASS: hai thế hệ
+compiler tiếp tục hội tụ (hash Mach-O chuẩn hóa
+`89204297dfe4456387f3afa8f6f345b415b990abe66b5eef5901ce74a28e3180`),
+`MACOS_DIRECT_LD_RELOCATABLE_MULTIMODULE`, chương trình đa-mô-đun,
+Unicode, `fchmod` và atomic failure đều PASS. Đã kiểm tra độc lập chế độ
+`runtime-object` xuất Mach-O arm64 qua `ld -r`, không cấp SDK/runtime object;
+gate tái lập đã bao gồm kiểm thử `MACOS_DIRECT_LD_RELOCATABLE_RUNTIME`.
+Hai lần xuất object đa-mô-đun từ cùng nguồn khớp từng byte, SHA-256
+`76067b3f8dc4672a326764199b6e36b4b289af63f25b9c2748f3d886ed4cc96c`;
+gate cũng kiểm tra `MACOS_DIRECT_LD_RELOCATABLE_DETERMINISM`.
+Vẫn cần Apple `ld`, một assembler cho ASM nền tảng, dyld và libSystem để
+chạy executable; linker Mach-O thuần V++ chưa hoàn thành.
+
+Thử nghiệm thủ công đã tạo Stage 9 và 10 bằng `ld` trực tiếp; cả hai compiler
+kiểm tra được nguồn, hội tụ sau chuẩn hóa metadata Mach-O, và qua xác minh
+`codesign --verify`. Hash chuẩn hóa:
+`d1f984423315bf0470ff85e12ab2915cb8be7a1be150ef5a4d4130b6970b8412`.
+Chương trình tối giản trả `52` khi liên kết trực tiếp, không cần Clang
+làm driver. Gate có thể tái lập các bước này từ compiler hỗ trợ
+`posix_spawn(argv[0], ...)`:
+
+```sh
+bash scripts/quality/check_macos_direct_ld_selfhosting.sh \
+  /tmp/vpp-macos-direct-ld-20261102/stage8b \
+  /tmp/vpp-macos-direct-ld-regression-new
+```
+
+Gate ngày 02/11/2026 đã **PASS toàn bộ** từ seed Stage 8b, tạo Stage 1/2
+hội tụ với SHA-256 chuẩn hóa
+`d1f984423315bf0470ff85e12ab2915cb8be7a1be150ef5a4d4130b6970b8412`.
+Các mốc `MACOS_DIRECT_LD_SELFHOST_STAGES`, `MACOS_DIRECT_LD_MULTIMODULE`,
+`MACOS_DIRECT_LD_FCHMOD`, `MACOS_DIRECT_LD_ATOMIC_FAILURE` và
+`MACOS_MACHO_CONVERGENCE` đều PASS. Chương trình đa-mô-đun trả `53`;
+primitive `fchmod(-1)` trả `-1`; đầu ra đã tồn tại được bảo toàn khi link
+thất bại và không sót tệp tạm. Chương trình có đường dẫn chứa Unicode và
+khoảng trắng cũng thực thi thành công (exit `52`); gate giờ bao gồm ca này.
+Chế độ này vẫn cần assembler cho runtime `.S` (gate dùng Clang một lần),
+Apple ld, SDK, dyld và libSystem. Chưa đạt Mach-O linker tự viết bằng V++.
+
+## macOS ARM64: khôi phục self-host từ seed thiếu fchmod (02/11/2026)
+
+Stage 2–4 cũ trả về `exit 14` trong bước kiểm tra nguồn vì thiếu primitive
+`máy đặt quyền tệp mở` (ID 78) mới được thêm để cấp quyền cho ELF linker.
+Giữ nguyên mã nguồn hiện tại và dựng Stage 5 chuyển tiếp trong thư mục tạm:
+chỉ stub lời gọi `fchmod` ở bản sao linker, cùng bản ASM ở đường dẫn cũ
+phù hợp seed trước khi tổ chức thư mục. Stage 5 biên dịch Stage 6 từ toàn bộ
+nguồn thật; Stage 6 biên dịch Stage 7 cũng từ nguồn thật.
+
+Gate `scripts/quality/check_macos_native_selfhosting.sh` đã PASS trên host
+macOS ARM64: Stage 6/7 đều kiểm tra nguồn, tạo Mach-O thực thi trả `52`,
+kiểm tra được mã primitive 78 (`fchmod(-1)` trả `-1`), kiểm tra chữ ký bằng
+`codesign --verify` và chạy chương trình nhập nhiều mô-đun trả `53`.
+Ảnh nhị phân của hai thế hệ giống từng byte sau khi chuẩn hóa đúng các vùng
+`LC_UUID` và `LC_CODE_SIGNATURE` do Apple linker/ký mã tạo ra. Script
+`check_macos_macho_convergence.py` từ chối mọi khác biệt ở các vùng còn lại.
+
+Tái lập bằng `bash scripts/quality/check_macos_native_selfhosting.sh
+build/nativedriver/vpp-native-stage4 /tmp/vpp-macos-bootstrap-new` với thư
+mục đầu ra chưa tồn tại. Gate không thay đổi bất kỳ nguồn hoặc file chưa
+commit trong repository. Đây là **compiler i32 subset self-host được trên
+macOS ARM64**, còn dùng `clang` và Apple linker/SDK để tạo Mach-O; chưa phải
+Mach-O assembler/linker và runtime hoàn toàn độc lập bằng V++.
+
+## Windows x86-64: compiler V++ tự biên dịch và hội tụ COFF (02/11/2026)
+
+Compiler i32 subset tạo **AMD64 COFF trực tiếp bằng V++** đã chạy dưới Wine,
+tạo object cho compiler Stage 2, sau đó Stage 2 tự biên dịch Stage 3.
+`compiler-stage2.obj` và `compiler-stage3.obj` **khớp từng byte**, SHA-256
+`b9d4dcc3500d7d2db6a2d8e15e096141dc1011a03adc594e0a32471d466345ee`.
+Mỗi object có 419 symbols và 8650 relocations. Stage 3 biên dịch fixture
+V++ từ đường dẫn Unicode (có ký tự 4 byte `𠮷`); PE được liên kết chạy và trả exit `52`.
+Lệnh tái lập qua Docker Linux/amd64, MinGW và Wine, dùng seed và runtime
+object đã kiểm chứng tại `/tmp/vpp-coff-extended-20261102/`:
+
+```sh
+bash scripts/quality/check_windows_native_stage_convergence_docker.sh \
+  /tmp/vpp-coff-extended-20261102/vpp-windows-stage1-v5.exe \
+  /tmp/vpp-coff-extended-20261102/vpp-runtime-coff-new.obj
+```
+
+Kết quả: `WINDOWS_COFF_STAGE2_STAGE3_EXACT_CMP=PASS`,
+`WINDOWS_STAGE3_UNICODE_FIXTURE=PASS`,
+`WINDOWS_NATIVE_COFF_CONVERGENCE=PASS`. Script còn xác minh cấu trúc COFF.
+**MinGW `x86_64-w64-mingw32-gcc` vẫn đảm nhiệm liên kết object thành PE**.
+Đây là chứng cứ self-host cho **compiler i32 subset qua Wine**, chưa chứng
+minh PE linker thuần V++, backend đầy đủ, hay hoạt động trên Windows thực.
+
+Đường native Windows ASM trong
+`scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S` dùng API Unicode
+cho `GetCommandLineW`/`CommandLineToArgvW` (chuyển đối số sang UTF-8),
+`CreateFileW`, `MoveFileExW`, `_wopen`, `_wmktemp_s`, `_wunlink`, `_wmkdir`,
+`_waccess`, `_wgetcwd` và `GetModuleFileNameW`. `stat`/`lstat`/`fstat`
+trả về định danh tệp qua Windows handle, hỗ trợ kiểm tra output atomically;
+`mkstemp` sử dụng mở độc quyền, SHA-256 streaming dùng CNG.
+`vpp_native_os_env_copy` và `vpp_native_os_home` cũng dùng
+`GetEnvironmentVariableW` và chuyển kết quả UTF-16 sang UTF-8; trường hợp
+biến rỗng, không tồn tại, UTF-8 không hợp lệ và vượt bộ đệm được kiểm tra.
+Hàm spawn/wait hiện dựa trên `_wspawnvp`/`_cwait`, chuyển từng đối số UTF-8
+qua UTF-16, quote theo quy tắc Windows (kể cả backslash trước dấu ngoặc kép
+và ở cuối chuỗi) và bảo toàn `argv` gốc của caller. Kiểm thử dưới Wine
+đã chạy executable có tên tiếng Việt/ký tự Unicode ngoài BMP/khoảng trắng, đối số Unicode,
+rỗng, trích dẫn, dấu gạch chéo ngược, chuỗi 4095 byte và UTF-8 không hợp lệ.
+`fchmod` vẫn trả `-1` trên Windows vì không có nghĩa POSIX tương ứng.
+
+```sh
+bash scripts/quality/check_windows_file_boundary_docker.sh
+bash scripts/quality/check_aot_primitives.sh
+```
+
+Hai gate đã PASS vào 02/11/2026:
+`WINDOWS_NATIVE_FILE_PROCESS_SHA=PASS`,
+`WINDOWS_DOCKER_WINE_BOUNDARY=PASS` và cross-assembly Windows ABI 0/1
+cùng các target macOS/Linux. `windows-build` của GitHub Actions có test
+Windows native/MSVC tại `scripts/quality/windows_file_boundary/`, nhưng
+**chưa có kết quả xác thực mới trên Windows thực**. Cần tiếp tục phát triển
+PE linker bằng V++, kiểm thử native Stage 2/3 trên Windows, multi-module
+và kiểm tra atomic failure của toàn toolchain. Kiểm thử Unicode spawn mới
+đã có trong native Windows file-boundary CTest nhưng chưa có kết quả CI mới.
+
+## Linux x86-64: xác minh e_shstrndx và bootstrap (02/11/2026)
+
+Đã sửa lỗi general ET_REL→ET_EXEC linker chấp nhận `e_shstrndx` trỏ vào
+`.text`, `.rela.text` hoặc `.symtab`. Khi `e_shstrndx != SHN_UNDEF`, linker
+bắt buộc section được chọn có kiểu `SHT_STRTAB`, offset/kích thước nằm trong
+object, bảng tên có NUL đầu/cuối và mọi `sh_name` đều hợp lệ. General linker
+vẫn hỗ trợ `SHN_UNDEF = 0` khi object không có bảng tên section; validator
+canonical của compiler yêu cầu `e_shstrndx = 5` và cũng kiểm tra bảng tên.
+
+Đã bổ sung **9 ca bảng tên section sai** cho cả partial và final link, và
+ca riêng xác minh chỉ general linker chấp nhận `SHN_UNDEF`. Tổng cộng **62
+ca partial-link âm tính** và **31 ca final-link âm tính** (30 ELF sai và
+1 unresolved symbol) đều PASS. Ghép
+nhiều module/giai đoạn, executable exit 42, giữ nguyên file đích khi lỗi,
+không để lại file tạm và 32 ca assembler đều PASS.
+
+`check_linux_source_bootstrap.sh` đã chạy trọn vẹn trong Docker Ubuntu
+24.04 x86-64 tại
+`/out/native-source-host/verified-shstrndx-hardened-final-20261102/`.
+Gate ghi `SOURCE_BOOTSTRAP_PLATFORM_DIR_ONLY=PASS`,
+`NATIVE_ELF_SELFHOST_EXACT_CMP=0`, `NATIVE_ELF_REL_REGRESSIONS=PASS`,
+`NATIVE_ASSEMBLER_REGRESSIONS=PASS`,
+`SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE` và
+`SOURCE_BOOTSTRAP_CONVERGENCE=PASS`.
+Stage 1/2 giống từng byte với SHA-256
+`60fc6c19578576a96111c75408e4d9300d7b88b0575d0a47b37cda1f652f2be3`;
+host object do seed/Stage 1/Stage 2 tạo ra giống nhau với SHA-256
+`bd37d318987bcaf2571398ef0fc78150316980e84a18de76ed28e396e1a88fe3`.
+Phạm vi được chứng minh: **i32/Linux x86-64** với seed V++ đã xác nhận,
+chưa bao gồm mọi backend/OS hoặc bootstrap không có seed.
+
+## Linux x86-64: siết ET_REL header và kiểm chứng lại self-host (02/11/2026)
+
+Đã tái hiện lỗi native partial linker chấp nhận ET_REL có `e_entry`,
+`e_phoff`, `e_phnum`, `e_phentsize`, `e_flags` hoặc `EI_ABIVERSION` sai.
+Validator object compiler và linker ET_EXEC nay từ chối các header này,
+gồm cả các nửa cao của trường 64-bit; linker ET_EXEC cũng kiểm tra chỉ mục
+bảng tên section. Regression thêm 10 ca header sai cho **cả hai** đường
+ET_REL→ET_REL và ET_REL→ET_EXEC: tổng 52 ca partial lỗi và 21 ca
+final-link lỗi đều bị từ chối, giữ nguyên file đích.
+
+Gate nguồn độc lập đã PASS trong Ubuntu 24.04 linux/amd64 từ seed tin cậy,
+artifact `/out/native-source-host/verified-elf-header-hardening-20261102/`.
+Hai compiler khớp byte, SHA-256
+`f779edd66ecee67c2dac41d8c762c55d259240b1761db47bf26d40a4a959f041`;
+ba host object vẫn có SHA-256
+`bd37d318987bcaf2571398ef0fc78150316980e84a18de76ed28e396e1a88fe3`.
+`NATIVE_ELF_REL_REGRESSIONS=PASS`, `NATIVE_ASSEMBLER_REGRESSIONS=PASS`,
+`SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE` và
+`SOURCE_BOOTSTRAP_CONVERGENCE=PASS`. Seed cũ có thể tra host ở đường dẫn
+ASM phẳng: gate chỉ tạo symlink chuyển tiếp trong workspace tạm sau khi
+tự assemble host từ nguồn, rồi xóa. Đã kiểm tra riêng compiler Stage 2 mới
+biên dịch/chạy smoke `exit 42` và tạo binary giống hệt khi **chỉ còn**
+đường dẫn `scripts/ASM/linux/`.
+
+## Linux x86-64 i32: compiler, assembler, linker và host tự tái tạo từ nguồn (02/11/2026)
+
+Đã bổ sung assembler x86-64 bằng V++ vào compiler qua lệnh `assemble`.
+Nguồn bộ máy độc lập hiện chia theo chức năng trong
+`scripts/ASM/linux/tu_chu_x86_64/`; `vpp_linux_host_x86_64.s` xác định thứ tự
+ghép. `prepare_linux_freestanding_host.sh` ghép các phần trước khi trình biên
+dịch V++ tạo ELF ET_REL từ lệnh và dữ liệu văn bản; không cần bộ tiền xử lý C
+hoặc đối tượng `.o` chuẩn bị sẵn.
+
+Gate `check_linux_source_bootstrap.sh` đã PASS trong Docker Ubuntu 24.04
+amd64, với một seed V++ có assembler và thư mục chỉ chứa nguồn. Object cache
+bị tắt; hai thế hệ compiler giống từng byte; seed và cả hai compiler tạo
+ba host object giống từng byte. Compiler, assembler và linker bên ngoài đều
+bị chặn, gồm cả `cpp`, `llvm-mc`, `objcopy`.
+
+Artifact cuối: `/out/native-source-host/verified-source-bootstrap-final-20261102/`.
+Gate xác nhận `SOURCE_BOOTSTRAP_INPUT_OBJECTS=NONE`,
+`SOURCE_BOOTSTRAP_HOST_EXACT_CMP=0`, `SOURCE_BOOTSTRAP_EXTERNAL_BUILD_TOOLS=NONE`
+và `SOURCE_BOOTSTRAP_CONVERGENCE=PASS`.
+
+Hai compiler có cùng SHA-256
+`933fa8183dcc7079a7168d66ca2fb743539b268c33bb4dc724a5236a893532d3`.
+Ba host object có cùng SHA-256
+`bd37d318987bcaf2571398ef0fc78150316980e84a18de76ed28e396e1a88fe3`.
+32 ca assembler (6 executable, 23 nguồn lỗi, 3 path/alias lỗi), 42 ca ELF
+ET_REL âm tính và 11 ca final-link metadata tương ứng đều PASS. Các ca lỗi
+giữ nguyên output cũ và không để lại tệp tạm.
+
+Mốc này đạt self-host toàn bộ toolchain **i32/Linux x86-64** từ nguồn với
+một seed V++ tin cậy. Các backend/OS khác, frontend đầy đủ và bootstrap
+không có seed không nằm trong kết luận này. Chi tiết và lệnh tái lập:
+[native-freestanding-linux.md](native-freestanding-linux.md).
+
+## Linux x86-64: native ELF linker tự biên dịch không gọi GNU ld (02/11/2026)
+
+Đường `VPP_NATIVE_ELF_LINK=1` đã tạo ELF ET_EXEC bằng V++ trên Docker Ubuntu
+24.04 amd64. Hai vòng compiler self-host giống nhau từng byte, SHA-256
+`6effde437d165ed92cbd24469d396becaf6ddd7fe0b1bd10550fb8c267b27e91`.
+Gate chặn C/C++ compiler, linker và assembler trong `PATH` xác nhận
+`NATIVE_ELF_EXTERNAL_BUILD_TOOLS=NONE`; smoke và kiểm tra runtime trả 42.
+ELF tĩnh có stack NX, tách quyền R/RX/RW, không có thư viện động hoặc loader.
+Đường ET_REL partial linker đã kiểm chứng các phép ghép hai và ba mô-đun,
+liên kết nhiều giai đoạn hội tụ từng byte, executable exit 42 và từ chối
+symbol chưa giải quyết. Có 42 ca ELF lỗi trong regression partial linker,
+gồm 16 fixture mới kiểm tra `sh_addr`, NULL section và canonical section
+metadata. Cả 11 ca final-link malformed tương ứng cũng bị từ chối; tất cả
+giữ nguyên output cũ và không để lại tệp tạm. Full gate ngày 02/11/2026 ghi
+`NATIVE_ELF_REL_REGRESSIONS=PASS` và `NATIVE_ELF_SELFHOST_CONVERGENCE=PASS`.
+Artifact cuối cùng: `/out/native-elf-linker/verified-headers-20261102/`.
+Hash trước khi siết header validator là
+`6c64703f7c541e11e6ae0764fa7c47af1a04df105083f16edf7ee111fdb68c66`.
+
+Module linker, symbol resolution, relocation và ELF writer nằm trong V++;
+`fchmod` cấp quyền executable qua ASM/syscall boundary. Ở mốc native ELF
+này, host `.o` còn được assembler ngoài chuẩn bị trước; mốc source bootstrap
+ở trên đã bỏ phụ thuộc này. Chế độ GNU `ld` tương thích và `ld -r` cho
+object nhiều mô-đun còn được giữ. Mốc native ELF này khi đó chưa tự chủ hoàn
+toàn từ nguồn; mốc source bootstrap phía trên đã thay thế kết luận đó cho
+target i32/Linux x86-64. Chi tiết, giới hạn và lệnh tái lập:
+[native-freestanding-linux.md](native-freestanding-linux.md).
+
+## Linux x86-64: lệnh `build` self-host trực tiếp qua GNU ld (01/11/2026)
+
+Trong Docker Ubuntu 24.04 amd64, V++ freestanding Stage 2 thực thi `build`
+để biên dịch lại chính compiler. Host ASM object đã được chuẩn bị bằng
+`scripts/quality/prepare_linux_freestanding_host.sh`; lệnh `cc` bị chặn
+trong `PATH` để xác nhận compiler gọi `ld` trực tiếp. Bản build tiếp theo
+tiếp tục tự biên dịch; **Stage 3 và Stage 4 giống nhau từng byte**, SHA-256
+`4dcd8d7c726dea34d89b22d0fb47e018dfc8449f7f024116cfdacd560c245354`.
+ELF tĩnh không có PT_INTERP/PT_DYNAMIC/DT_NEEDED hay symbol chưa liên kết;
+chương trình smoke trả mã thoát 42. Khi chưa có host `.o`, đường `build` vẫn
+gọi `cc` để giữ tương thích; biến `VPP_SELFHOST_REQUIRE_LD_ONLY_BUILD=1`
+trong gate yêu cầu bắt buộc dùng `ld`.
+
+Hai compiler build bằng đường `runtime-object` + GNU `ld` trực tiếp cũng
+hội tụ byte, SHA-256
+`2bd02bf0149342df1d99baa35cbec922276bc2152e6b3ad31913616f07ecd09f`.
+Các segment được nạp vào bộ nhớ của compiler từ hai đường giống nhau; khác
+biệt SHA-256 giữa hai đường là thứ tự một số symbol ELF. Còn phụ thuộc
+assembler ngoài để chuẩn bị host object và GNU `ld` để liên kết ET_EXEC,
+nên **chưa đạt toolchain tự chủ 100%**. Chi tiết và lệnh tái lập ở
+[native-freestanding-linux.md](native-freestanding-linux.md).
+
+## Linux x86-64: compiler freestanding tự xây Stage 27–29 (01/11/2026)
+
+Đã kiểm chứng trên Ubuntu 24.04 amd64 chạy trong Docker: compiler V++ không
+cần CRT, libc, libc++, libstdc++, libffi, libcrypto hoặc dynamic loader.
+Stage 27 sinh Stage 28, Stage 28 sinh Stage 29; cả ba executable có SHA-256
+`7b17244800a70e12b0a630d70fdb444d91f0155bd9dc0d2a30bcefcf1fe4bd8f`
+và khớp từng byte. `audit_linux_static_elf.sh` PASS; chương trình mẫu
+do compiler biên dịch chạy trả 42 ở chế độ thông thường và ở chế độ
+`runtime-object` liên kết ELF freestanding. Trong lần kiểm tra mới, một cặp
+Stage 1–2 tái biên dịch cũng khớp từng byte (SHA-256
+`070c6b02fdbbc708ad0f837556698ad2a9012bd9dcf800bde191bbd6aa561f2b`).
+Đã kiểm toán cả executable do lệnh `build` thông thường sinh ra: ELF tĩnh,
+không có `PT_INTERP`, `PT_DYNAMIC`, `DT_NEEDED` hay symbol chưa liên kết;
+chương trình trả mã thoát 42. Gate tái lập:
+`scripts/quality/check_linux_freestanding_selfhosting.sh`.
+
+Đây là **compiler và runtime freestanding đã tự biên dịch**, nhưng chưa phải
+**toolchain tự chủ 100%**: khi ghép object và tạo executable, quy trình còn
+gọi GNU `ld` (hoặc `cc` khi thiếu host object đã tạo sẵn). Cần linker ELF viết
+bằng V++ và thay assembler ngoài, sau đó kiểm chứng
+build không có công cụ hệ thống ngoài. Các mốc Stage 8–9 bên dưới là lịch sử
+của compiler hosted trước khi hoàn tất nhánh freestanding.
+
+## Linux x86-64: Stage 8 và Stage 9 không còn OpenSSL (01/11/2026)
+
+Sau khi thay các lời gọi SHA-256 OpenSSL trong compiler bằng bản Assembly
+`scripts/ASM/linux/vpp_linux_sha256_x86_64.S`, Stage 7 tự xây Stage 8 và Stage 8
+tự xây Stage 9. Kết quả trong Ubuntu 24.04 `linux/amd64` trên Docker:
+
+```text
+Stage 8 SHA-256 5ab4a50821b8eca8aaa6659e798b87196864bae03837ca4e6824e28ffd576426
+Stage 9 SHA-256 5ab4a50821b8eca8aaa6659e798b87196864bae03837ca4e6824e28ffd576426
+SELFHOST_EXACT_CMP=0
+SELFHOST_NO_FILE_SYMBOLS=PASS
+SELFHOST_SMOKE_EXIT=42
+SELFHOST_NO_LIBCRYPTO=PASS
+SELFHOST_CONVERGENCE=PASS
+```
+
+Đã kiểm tra thực tế `readelf -d`: Stage 9 chỉ còn `libc.so.6` và
+`ld-linux-x86-64.so.2`, không còn `libcrypto.so.3`. Đây là compiler
+self-hosting hội tụ nhị phân, **chưa phải compiler freestanding**: libc,
+dynamic loader và linker ngoài `cc` vẫn còn. Runtime freestanding ELF64
+Linux là nhánh kiểm thử riêng, đã chạy các fixture mà không có `PT_INTERP`,
+`PT_DYNAMIC` hay `DT_NEEDED`.
+
+Kiểm chứng lại Stage 8–9 mà không dựng lại compiler:
+
+```sh
+docker exec vpp-freestanding-validation bash \
+  /work/scripts/quality/check_linux_selfhosting_convergence.sh --verify-pair \
+  /out/convergence-after-elf-symbol-fix/vpp-stage8 \
+  /out/convergence-after-elf-symbol-fix/vpp-stage9 \
+  /out/convergence-after-elf-symbol-fix/convergence-no-crypto
+```
+
+GitHub Actions Linux x86-64 đã được thêm gate dùng artifact bootstrap
+Stage 2–3; **chưa có xác nhận job thực tế PASS** sau khi thêm gate này.
+
+## Linux x86-64: Stage 6 và Stage 7 hội tụ nhị phân (01/11/2026)
+
+Trong Ubuntu 24.04 `linux/amd64` trên Docker (macOS Apple Silicon), compiler
+V++ đã lần lượt tạo thành công Stage 3, 4, 5, 6 và 7. Bản vá Linux ở
+`gói/biên dịch/bản địa/môi trường thực thi.vi` truyền `-Wl,-x` khi liên kết
+**executable cuối** nhằm loại bỏ local ELF `STT_FILE` chứa tên object GCC
+ngẫu nhiên (`ccXXXXXX.o`). Các object relocatable (`-r`) không nhận cờ này.
+
+Kiểm chứng trên các binary hiện có:
+
+```text
+Stage 5 SHA-256 5e8bf4c8ab8605664eb80c08ae9e2e4c11ee01fd2d2db0466aa682cd860a9dde
+Stage 6 SHA-256 3fba91571b6812cb47e661502e4402cac58d9a6cba3704861b09423762ee07f8
+Stage 7 SHA-256 3fba91571b6812cb47e661502e4402cac58d9a6cba3704861b09423762ee07f8
+STAGE6_STAGE7_EXACT_CMP=0
+STAGE6_STAGE7_NO_FILE_SYMBOLS=PASS
+STAGE7_SMOKE_EXIT=42
+SELFHOST_CONVERGENCE=PASS
+```
+
+Stage 5 khác Stage 6 vì được xây bằng compiler Stage 4 chưa chứa bản vá;
+Stage 6 và Stage 7 **trùng từng byte**, đồng thời Stage 7 tự biên dịch và
+chạy thành công chương trình V++ tối giản mới. Bài kiểm tra có thể tái lập
+ở `scripts/quality/check_linux_selfhosting_convergence.sh`, dùng `--verify`
+để kiểm tra các artifact đã có và `--build` để dựng lại Stage 5–7. Khi chạy
+trên Docker hiện có:
+
+```sh
+docker exec vpp-freestanding-validation bash \
+  /work/scripts/quality/check_linux_selfhosting_convergence.sh --verify \
+  /out/convergence-after-elf-symbol-fix
+```
+
+**Mốc lịch sử trước khi bỏ OpenSSL:** đây là chứng cứ hội tụ nhị phân trong cấu hình Linux
+x86-64 vừa thử nghiệm, chưa khẳng định build tái lập ở mọi môi trường hoặc
+compiler freestanding hoàn toàn. `readelf -d vpp-stage7` vẫn cho thấy
+`libcrypto.so.3`, `libc.so.6` và `ld-linux-x86-64.so.2` (PT_INTERP).
+Compiler cũng còn gọi `cc` để liên kết mã máy; các phụ thuộc này là công
+việc tiếp theo trước khi có thể công bố self-host freestanding 100%.
+
+## Runtime động AOT V++/ASM thử nghiệm (01/11/2026)
+
+Đã thêm nhánh `VPP_AOT_RUNTIME=vpp` cho macOS ARM64: hàm/nhánh/vòng lặp
+vẫn là mã máy, còn giá trị động, closure, lớp, ngoại lệ và GC dùng V++.
+Hai fixture động chạy đúng, đối chiếu runtime C++; `otool -L` chỉ còn
+`libSystem.B.dylib`, không có `libc++`/`libffi` hay framework C++ host.
+Nhánh này chưa thay mặc định: descriptor foreign, compiler-host, worker
+và DNS provider chưa đủ; chưa có bootstrap Stage 2/3 AOT trên runtime mới.
+Xem [cách dựng, gate và phần còn thiếu](native-dynamic-vpp-runtime.md).
+`libSystem` vẫn là biên OS và yêu cầu của đường Mach-O/dyld hiện tại;
+không gọi mốc này là self-host độc lập 100%.
+
 ## Khôi phục công cụ bằng V++ và ASM (30/10/2026)
 
 Việc gỡ Python không buộc phải bỏ chức năng. Comparator thống kê đã chuyển

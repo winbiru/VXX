@@ -6,28 +6,93 @@ compiler=${VPP_CLANG:-clang}
 work=$(mktemp -d "${TMPDIR:-/tmp}/vpp-asm.XXXXXXXX")
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
+# Generated AOT source from existing self-hosted seeds uses the flat include
+# name; current Stage 0 emits common/name after the ASM directory move.
+# Both must compile with the include flags passed by native_aot_link/CMakeLists.
+for target in arm64-apple-darwin x86_64-unknown-linux-gnu x86_64-pc-windows-msvc; do
+    for layout in legacy organized; do
+        if test "$layout" = legacy; then
+            runtime_include='vpp_aot_dynamic_runtime.inc'
+        else
+            runtime_include='common/vpp_aot_dynamic_runtime.inc'
+        fi
+        printf '#define VPP_NATIVE_DYNAMIC_RUNTIME 1\n#include "%s"\n' \
+            "$runtime_include" > "$work/aot-include.S"
+        "$compiler" -target "$target" -x assembler-with-cpp \
+            -I"$repo_root/scripts/ASM" -I"$repo_root/scripts/ASM/common" \
+            -c "$work/aot-include.S" -o "$work/aot-${layout}-${target}.o"
+        test -s "$work/aot-${layout}-${target}.o"
+        printf 'PASS AOT %s include=%s\n' "$target" "$layout"
+    done
+done
+
 while IFS='|' read -r target source; do
     for abi in 0 1; do
         "$compiler" -target "$target" -DVPP_NATIVE_RUNTIME_STACK_ABI="$abi" \
             -c "$repo_root/scripts/ASM/$source" \
-            -o "$work/${source}.abi${abi}.o"
-        test -s "$work/${source}.abi${abi}.o"
+            -o "$work/${source##*/}.abi${abi}.o"
+        test -s "$work/${source##*/}.abi${abi}.o"
         printf 'PASS %s ABI=%s\n' "$target" "$abi"
     done
 done <<'TARGETS'
-arm64-apple-darwin|vpp_aot_primitives_aarch64.S
-x86_64-apple-darwin|vpp_aot_primitives_macos_x86_64.S
-aarch64-unknown-linux-gnu|vpp_aot_primitives_linux_aarch64.S
-x86_64-unknown-linux-gnu|vpp_aot_primitives_linux_x86_64.S
-x86_64-pc-windows-msvc|vpp_aot_primitives_windows_x86_64.S
+arm64-apple-darwin|macos/vpp_aot_primitives_aarch64.S
+x86_64-apple-darwin|macos/vpp_aot_primitives_macos_x86_64.S
+aarch64-unknown-linux-gnu|linux/vpp_aot_primitives_linux_aarch64.S
+x86_64-unknown-linux-gnu|linux/vpp_aot_primitives_linux_x86_64.S
+x86_64-pc-windows-msvc|windows/vpp_aot_primitives_windows_x86_64.S
 TARGETS
+
+# Nguồn Linux tự chủ phải cho cùng đối tượng khi ghép văn bản hoặc dùng CPP.
+# Đường V++ chỉ dùng cách ghép văn bản; CPP ở đây là đối chứng riêng.
+VPP_LINUX_HOST_COMPILER= VPP_LINUX_HOST_ASSEMBLER="$compiler" \
+    bash "$repo_root/scripts/quality/prepare_linux_freestanding_host.sh" \
+    "$work/linux-host-flat.o"
+"$compiler" -target x86_64-unknown-linux-gnu -x assembler-with-cpp \
+    -c "$repo_root/scripts/ASM/linux/vpp_linux_host_x86_64.s" \
+    -o "$work/linux-host-cpp.o"
+cmp "$work/linux-host-flat.o" "$work/linux-host-cpp.o"
+printf 'PASS Linux: ghép nguồn chức năng khớp CPP từng byte\n'
+
+# Validate that Windows file publication can replace an existing executable
+# and that new parser primitive 78 has a fail-closed COFF ABI entrypoint.
+# Cross-assembly alone does not establish that a Windows executable runs.
+if command -v llvm-objdump >/dev/null 2>&1; then
+    windows_objdump=$(command -v llvm-objdump)
+elif command -v xcrun >/dev/null 2>&1; then
+    windows_objdump=$(xcrun --find llvm-objdump 2>/dev/null || true)
+else
+    windows_objdump=
+fi
+if test -n "$windows_objdump"; then
+    "$windows_objdump" --syms "$work/vpp_aot_primitives_windows_x86_64.S.abi0.o" > "$work/windows-syms"
+    grep -Eq '[[:space:]]MoveFileExW$' "$work/windows-syms"
+    grep -Eq '[[:space:]]vpp_native_os_fchmod$' "$work/windows-syms"
+    for symbol in vpp_native_os_mkstemp vpp_native_os_stat \
+        vpp_native_os_lstat vpp_native_os_fstat _wmktemp_s _get_osfhandle \
+        CreateFileW GetFileInformationByHandle _wspawnvp _cwait \
+        _wopen _wunlink _wmkdir _waccess GetCommandLineW \
+        CommandLineToArgvW MultiByteToWideChar WideCharToMultiByte \
+        GetEnvironmentVariableW SetLastError GetLastError \
+        BCryptOpenAlgorithmProvider BCryptCreateHash BCryptHashData \
+        BCryptFinishHash BCryptDestroyHash BCryptCloseAlgorithmProvider; do
+        grep -Eq "[[:space:]]${symbol}\$" "$work/windows-syms" || {
+            printf 'FAIL Windows boundary missing %s\n' "$symbol" >&2
+            exit 1
+        }
+    done
+    if grep -Eq '[[:space:]]rename$' "$work/windows-syms"; then
+        echo 'FAIL Windows runtime still imports CRT rename' >&2
+        exit 1
+    fi
+    echo 'PASS Windows COFF file identity, exclusive temp creation and publication symbols'
+fi
 
 # Standalone VM machine helpers: validate their pointer conversion and OS
 # calling conventions independently from the larger platform object.
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
     for kind in system directory process socket; do
         "$compiler" -target "$target" -x assembler-with-cpp \
-            -c "$repo_root/scripts/ASM/vpp_vm_${kind}_primitives.inc" \
+            -c "$repo_root/scripts/ASM/common/posix/vpp_vm_${kind}_primitives.inc" \
             -o "$work/vm-${kind}-${target}.o"
         test -s "$work/vm-${kind}-${target}.o"
         printf 'PASS VM %s machine %s\n' "$kind" "$target"
@@ -36,7 +101,7 @@ done
 
 # The same assembler workflow also validates the direct V++ file syscall ABI.
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_file_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/common/posix/vpp_file_primitives.S" \
         -o "$work/file-${target}.o"
     test -s "$work/file-${target}.o"
     printf 'PASS file machine %s\n' "$target"
@@ -44,23 +109,23 @@ done
 # POSIX timezone state is a process-library contract; verify the ABI bridge
 # is assemblable on every supported Unix target.
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_localtime_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/common/posix/vpp_localtime_primitives.S" \
         -o "$work/localtime-${target}.o"
     test -s "$work/localtime-${target}.o"
     printf 'PASS localtime machine %s\n' "$target"
 done
 
 # Darwin directory stream functions branch to libc; Linux uses direct
-# openat/getdents64/close syscalls through vpp_file_primitives.S.
+# openat/getdents64/close syscalls through common/posix/vpp_file_primitives.S.
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_directory_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/common/posix/vpp_directory_primitives.S" \
         -o "$work/directory-${target}.o"
     test -s "$work/directory-${target}.o"
     printf 'PASS directory machine %s\n' "$target"
 done
 
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_path_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/common/posix/vpp_path_primitives.S" \
         -o "$work/path-${target}.o"
     test -s "$work/path-${target}.o"
     printf 'PASS path machine %s\n' "$target"
@@ -99,21 +164,21 @@ fi
 # Darwin clock_gettime uses a public libSystem API at an ASM-only boundary.
 # Verify both CPU ABIs: the x86 tail call and arm64 branch have no C shim.
 for target in arm64-apple-darwin x86_64-apple-darwin; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_clock_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/macos/vpp_clock_primitives.S" \
         -o "$work/clock-${target}.o"
     test -s "$work/clock-${target}.o"
     printf 'PASS clock machine %s\n' "$target"
 done
 
 for target in arm64-apple-darwin x86_64-apple-darwin; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_entropy_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/macos/vpp_entropy_primitives.S" \
         -o "$work/entropy-${target}.o"
     test -s "$work/entropy-${target}.o"
     printf 'PASS entropy machine %s\n' "$target"
 done
 
 for target in arm64-apple-darwin x86_64-apple-darwin aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu; do
-    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/vpp_environment_primitives.S" \
+    "$compiler" -target "$target" -c "$repo_root/scripts/ASM/common/posix/vpp_environment_primitives.S" \
         -o "$work/env-${target}.o"
     test -s "$work/env-${target}.o"
     printf 'PASS environment machine %s\n' "$target"

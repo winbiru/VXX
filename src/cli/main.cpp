@@ -721,11 +721,11 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
     std::string nativeSource = readFile(filename);
     std::string primitiveRelative;
 #if defined(__APPLE__) && defined(__aarch64__)
-    primitiveRelative = "scripts/ASM/vpp_aot_primitives_aarch64.S";
+    primitiveRelative = "scripts/ASM/macos/vpp_aot_primitives_aarch64.S";
 #elif defined(__linux__) && defined(__x86_64__)
-    primitiveRelative = "scripts/ASM/vpp_aot_primitives_linux_x86_64.S";
+    primitiveRelative = "scripts/ASM/linux/vpp_aot_primitives_linux_x86_64.S";
 #elif defined(__linux__) && defined(__aarch64__)
-    primitiveRelative = "scripts/ASM/vpp_aot_primitives_linux_aarch64.S";
+    primitiveRelative = "scripts/ASM/linux/vpp_aot_primitives_linux_aarch64.S";
 #else
     std::cerr << "Native self-host chưa có runtime V++/assembly cho host này\n";
     return EXIT_FAILURE;
@@ -748,8 +748,18 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
         }
         if (nativeRuntimeRoot.empty())
             throw std::runtime_error("thiếu runtime V++/primitive assembly; đặt VPP_HOME tới bộ cài V++");
-        nativeSource = readFile((nativeRuntimeRoot /
-            vietvm::core::utf8Path("gói/biên dịch/bản địa/môi trường thực thi.vi")).string()) + "\n" + nativeSource;
+        // Stage 0 passes a combined source string to the native AST compiler.
+        // Preserve the runtime's new linker dependency explicitly here; its
+        // relative import otherwise loses the runtime module's original path.
+        auto runtimeSource = readFile((nativeRuntimeRoot /
+            vietvm::core::utf8Path("gói/biên dịch/bản địa/môi trường thực thi.vi")).string());
+        const std::string linkerImport = "nhập trình liên kết elf.*;";
+        if (runtimeSource.compare(0, linkerImport.size(), linkerImport) == 0) {
+            runtimeSource.erase(0, linkerImport.size());
+            runtimeSource = readFile((nativeRuntimeRoot /
+                vietvm::core::utf8Path("gói/biên dịch/bản địa/trình liên kết elf.vi")).string()) + "\n" + runtimeSource;
+        }
+        nativeSource = runtimeSource + "\n" + nativeSource;
     }
     const auto compiled = vietvm::native::compileSourceProgramVpp(
         target, nativeSource, input.parent_path());
@@ -806,6 +816,9 @@ static int buildSelfHostedNativeExecutable(const vietvm::native::Target &target,
     arguments.push_back("-DVPP_NATIVE_VPP_RUNTIME=1");
     arguments.push_back((nativeRuntimeRoot / primitiveRelative).string());
 #if defined(__linux__)
+    // Self-hosted ELF objects may omit .note.GNU-stack. Explicitly keep the
+    // temporary bootstrap compiler's stack non-executable during linking.
+    arguments.push_back("-Wl,-z,noexecstack");
     // Assembly calls libcrypto for the SHA-256 primitive.
     arguments.push_back("-lcrypto");
 #endif

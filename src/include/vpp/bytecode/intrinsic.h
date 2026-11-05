@@ -16,7 +16,7 @@ struct IntrinsicDescriptor {
     bool reserved = true;
 };
 
-inline constexpr std::array<IntrinsicDescriptor, 103> kVmIntrinsics{{
+inline constexpr std::array<IntrinsicDescriptor, 106> kVmIntrinsics{{
     {"bien_dich_phan_tich_vm", OP_VM_BIEN_DICH_PHAN_TICH, 2},
     {"bytecode_chay_vm", OP_VM_BYTECODE_CHAY, 4},
     {"bytecode_chay_native", OP_NATIVE_ARTIFACT_CHAY, 5},
@@ -69,6 +69,9 @@ inline constexpr std::array<IntrinsicDescriptor, 103> kVmIntrinsics{{
     {"khoa_map", OP_VM_MAP_KEYS, 1, false},
     {"chuoi_bytes_vm", OP_VM_STRING_BYTES, 1, true},
     {"chuoi_tu_bytes_vm", OP_VM_STRING_FROM_BYTES, 1, true},
+    {"cat_chuoi_vm", OP_VM_STRING_SLICE, 3, true},
+    {"thay_chuoi_chinh_xac_vm", OP_VM_STRING_REPLACE_EXACT, 3, true},
+    {"cat_chuoi_byte_vm", OP_VM_STRING_BYTE_SLICE, 3, true},
     {"so_thuc_tu_bits_vm", OP_VM_FLOAT_FROM_BITS, 1, true},
     {"máy_tệp_mở", OP_VM_MACHINE_FILE_OPEN, 2, true},
     {"máy_tệp_đọc", OP_VM_MACHINE_FILE_READ, 3, true},
@@ -181,6 +184,9 @@ inline constexpr const IntrinsicDescriptor *intrinsicByName(std::string_view nam
         {"khóa từ điển", OP_VM_MAP_KEYS},
         {"chuỗi thành byte máy ảo", OP_VM_STRING_BYTES},
         {"chuỗi từ byte máy ảo", OP_VM_STRING_FROM_BYTES},
+        {"máy ảo cắt chuỗi", OP_VM_STRING_SLICE},
+        {"máy ảo thay chuỗi chính xác", OP_VM_STRING_REPLACE_EXACT},
+        {"máy ảo cắt chuỗi theo byte", OP_VM_STRING_BYTE_SLICE},
         {"số thực từ bit máy ảo", OP_VM_FLOAT_FROM_BITS},
         {"máy tệp mở", OP_VM_MACHINE_FILE_OPEN},
         {"máy tệp đọc", OP_VM_MACHINE_FILE_READ},
@@ -253,7 +259,7 @@ inline constexpr const IntrinsicDescriptor *intrinsicByOpcode(int opcode) noexce
     // Ordinary VM opcodes are below this range. Avoid scanning the intrinsic
     // registry for every numeric literal, arithmetic instruction and branch.
     if (opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
-        opcode > OP_VM_MACHINE_TLS_RECV) {
+        opcode > OP_VM_STRING_BYTE_SLICE) {
         return nullptr;
     }
     for (const auto &intrinsic : kVmIntrinsics) {
@@ -265,7 +271,7 @@ inline constexpr const IntrinsicDescriptor *intrinsicByOpcode(int opcode) noexce
 static_assert([] {
     for (const auto &intrinsic : kVmIntrinsics) {
         if (intrinsic.opcode < OP_VM_BIEN_DICH_PHAN_TICH ||
-            intrinsic.opcode > OP_VM_MACHINE_TLS_RECV) return false;
+            intrinsic.opcode > OP_VM_STRING_BYTE_SLICE) return false;
     }
     return true;
 }(), "Intrinsic opcode fast-path range must cover the full registry");

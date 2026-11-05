@@ -1,0 +1,20 @@
+// Hàm i32 tĩnh từ 0 đến 4 đối số dùng ABI máy; trường hợp động giữ đường chậm.
+hàm số không() { trả về 40 + 2; };
+hàm số một(a) { trả về a * 3 + 1; };
+hàm số ba(a, b, c) { trả về (a + b) * c; };
+hàm số bốn(a, b, c, d) { trả về (a - b) * (c + d); };
+hàm số năm(a, b, c, d, e) { trả về a + b + c + d + e; };
+hàm có mặc định(a, b = 3) { trả về a + b; };
+hàm chính() {
+    in số không();
+    in số một(-7);
+    in số ba(2, 3, 4);
+    in số bốn(9, 4, 5, 2);
+    in số năm(1, 2, 3, 4, 5);
+    in có mặc định(6);
+    x = 6;
+    in số một(x);
+    x = 1.5;
+    in số một(x);
+    in số ba(1, x, 2);
+};

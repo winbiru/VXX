@@ -11,6 +11,11 @@ extern int32_t tru_dao(int32_t a, int32_t b);
 extern int32_t chia_i32(int32_t a, int32_t b);
 extern int32_t chia_qua_ham(int32_t a, int32_t b);
 extern int32_t phu_dinh(int32_t n);
+extern int32_t logic_va(int32_t a, int32_t b);
+extern int32_t logic_hoac(int32_t a, int32_t b);
+extern int32_t logic_long(int32_t a, int32_t b, int32_t c);
+extern int32_t logic_tranh_chia(int32_t a, int32_t b);
+extern int32_t logic_vet(int32_t a, int32_t b);
 extern int32_t phan_loai(int32_t a, int32_t b);
 extern int32_t tim_dau(int32_t n);
 extern int32_t dieu_kien(int32_t n);
@@ -23,6 +28,25 @@ extern int32_t hoist_long_nhau(int32_t seed, int32_t n);
 extern int32_t hoist_goi(int32_t seed, int32_t n);
 
 int main(void) {
+    const int32_t truth_values[] = {-13, -1, 0, 1, 2, 13};
+    for (unsigned i = 0; i < sizeof(truth_values) / sizeof(truth_values[0]); ++i) {
+        for (unsigned j = 0; j < sizeof(truth_values) / sizeof(truth_values[0]); ++j) {
+            const int32_t a = truth_values[i], b = truth_values[j];
+            if (logic_va(a, b) != (a != 0 && b != 0) ||
+                logic_hoac(a, b) != (a != 0 || b != 0) ||
+                logic_long(a, b, 3) != ((a != 0 && b != 0) || (a == 0)) ||
+                logic_tranh_chia(a, b) != ((a != 0 && 1 / a != 0) || (b != 0 && 1 / b != 0))) {
+                fprintf(stderr, "native logical short-circuit mismatch: %d %d\n", a, b);
+                return 14;
+            }
+            const int32_t x = a != 0, y = b != 0;
+            const int32_t changes = (x ? 1 : 0) + (y ? 0 : 2);
+            if (logic_vet(a, b) != x * 100 + (y || !y) * 10 + changes) {
+                fprintf(stderr, "native logical side effect mismatch: %d %d\n", a, b);
+                return 15;
+            }
+        }
+    }
     for (int32_t seed = 0; seed < 65521; seed += 4093) {
         for (int32_t n = 0; n <= 100; n += 7) {
             const int32_t expected = (seed + 251 * n) % 65521;

@@ -56,6 +56,11 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
             ca "Add": { máy ảo thêm cuối danh sách(ra, 1); máy ảo thêm cuối danh sách(ra, 200); }
             ca "Sub": { máy ảo thêm cuối danh sách(ra, 41); máy ảo thêm cuối danh sách(ra, 200); }
             ca "Mul": { máy ảo thêm cuối danh sách(ra, 15); máy ảo thêm cuối danh sách(ra, 175); máy ảo thêm cuối danh sách(ra, 193); }
+            ca "BitAnd": { máy ảo thêm cuối danh sách(ra, 33); máy ảo thêm cuối danh sách(ra, 200); }
+            ca "BitOr": { máy ảo thêm cuối danh sách(ra, 9); máy ảo thêm cuối danh sách(ra, 200); }
+            ca "BitXor": { máy ảo thêm cuối danh sách(ra, 49); máy ảo thêm cuối danh sách(ra, 200); }
+            ca "ShiftLeft": { máy ảo thêm cuối danh sách(ra, 211); máy ảo thêm cuối danh sách(ra, 224); }
+            ca "ShiftRight": { máy ảo thêm cuối danh sách(ra, 211); máy ảo thêm cuối danh sách(ra, 248); }
             ca "Div": { mình.biên dịch mã máy x86 sáu mươi tư chia dư(ra, sai); }
             ca "Mod": { mình.biên dịch mã máy x86 sáu mươi tư chia dư(ra, đúng); }
             ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư số sánh(ra, 148); }
@@ -163,6 +168,11 @@ lớp công khai Bộ Phát x86 sáu mươi tư {
                 ca "Add": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Sub": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Mul": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "BitAnd": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "BitOr": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "BitXor": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "ShiftLeft": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
+                ca "ShiftRight": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Div": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Mod": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }
                 ca "Equal": { mình.biên dịch mã máy x86 sáu mươi tư nhị phân(ra, mã, d, ô nhớ); }

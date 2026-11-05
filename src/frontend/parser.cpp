@@ -72,28 +72,25 @@ bool isCallableNamePiece(const Token &token) {
 // Kiểm tra điều kiện của `isAssignmentOperator`.
 bool isAssignmentOperator(const std::string &lexeme) {
     return lexeme == "=" || lexeme == "+=" || lexeme == "-=" || lexeme == "*=" ||
-           lexeme == "/=" || lexeme == "%=";
+           lexeme == "/=" || lexeme == "%=" || lexeme == "&=" ||
+           lexeme == "|=" || lexeme == "^=" || lexeme == "<<=" || lexeme == ">>=";
 }
 
 // Trả độ ưu tiên liên kết bên trái của toán tử Pratt parser; giá trị này quyết định biểu thức hiện tại có tiếp tục nhận toán tử kế tiếp hay không.
 int leftBindingPower(const std::string &lexeme) {
-    // The legacy shunting-yard parser gives every assignment spelling the
-    // same precedence, but only plain '=' is right-associative. Giving '=' a
-    // distinct left binding power preserves that behavior even when plain and
-    // compound assignments are mixed in one expression.
-    if (lexeme == "+=" || lexeme == "-=" || lexeme == "*=" ||
-        lexeme == "/=" || lexeme == "%=") {
-        return 0;
-    }
+    // Giữ cách kết hợp của phép gán; ưu tiên phép bit theo C.
+    if (isAssignmentOperator(lexeme) && lexeme != "=") return 0;
     if (lexeme == "=") return 1;
     if (lexeme == "||") return 2;
     if (lexeme == "&&") return 3;
-    if (lexeme == "==" || lexeme == "!=" || lexeme == "<" || lexeme == ">" ||
-        lexeme == "<=" || lexeme == ">=") {
-        return 4;
-    }
-    if (lexeme == "+" || lexeme == "-") return 5;
-    if (lexeme == "*" || lexeme == "/" || lexeme == "%") return 6;
+    if (lexeme == "|") return 4;
+    if (lexeme == "^") return 5;
+    if (lexeme == "&") return 6;
+    if (lexeme == "==" || lexeme == "!=") return 7;
+    if (lexeme == "<" || lexeme == ">" || lexeme == "<=" || lexeme == ">=") return 8;
+    if (lexeme == "<<" || lexeme == ">>") return 9;
+    if (lexeme == "+" || lexeme == "-") return 10;
+    if (lexeme == "*" || lexeme == "/" || lexeme == "%") return 11;
     return -1;
 }
 
@@ -302,10 +299,10 @@ private:
         const std::size_t begin = pos_;
         const std::string &lexeme = tokens_[pos_].lexeme;
 
-        if (lexeme == "!" || lexeme == "+" || lexeme == "-") {
+        if (lexeme == "!" || lexeme == "+" || lexeme == "-" || lexeme == "~") {
             const std::string op = lexeme;
             ++pos_;
-            ExprId operand = parseExpression(7);
+            ExprId operand = parseExpression(12);
             if (operand == kInvalidExprId) return kInvalidExprId;
             AstExpression unary;
             unary.kind = AstExpressionKind::Unary;

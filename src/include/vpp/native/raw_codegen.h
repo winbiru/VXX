@@ -28,6 +28,7 @@ enum class MachineOpcode {
     PushConstant, LoadSlot, StoreSlot, Drop,
     Add, Sub, Mul, Div, Mod, Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     BranchZero, Jump, Call, Return, Trap,
+    BitAnd, BitOr, BitXor, ShiftLeft, ShiftRight,
 };
 
 struct MachineInstruction {

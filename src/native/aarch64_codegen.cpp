@@ -47,16 +47,19 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
     }
     auto &code = out.bytes;
     auto &assembly = out.assembly;
-    // A fixed register per local/evaluation slot also works at CFG joins and
-    // back edges: no path-dependent cache state needs to be reconciled. Only
-    // leaf functions qualify, since these registers are caller-clobbered.
-    // W9/W10 remain scratch; W18 (platform register) and W19+ are never used.
-    const bool registerSlots = fn.parameterCount <= 8 &&
-        fn.slotCount + fn.maxStackDepth <= 16 &&
-        std::none_of(fn.instructions.begin(), fn.instructions.end(),
-                     [](const auto &op) { return op.opcode == MachineOpcode::Call; });
-    const auto slotRegister = [](std::size_t slot) {
-        return static_cast<unsigned>(slot < 9 ? slot : slot + 2);
+    // Các ô có thanh ghi cố định nên không phải đồng bộ cache ở nhánh rẽ.
+    // Hàm lá dùng thanh ghi tạm W0-W8, W11-W17. Hàm có lời gọi dùng W19-W28:
+    // ABI bảo toàn X19-X28 qua lời gọi, nên chỉ cần lưu/khôi phục ở đầu/cuối hàm.
+    // W9/W10 là thanh ghi tạm; không được dùng W18 (thanh ghi hệ thống).
+    const bool hasCalls = std::any_of(fn.instructions.begin(), fn.instructions.end(),
+        [](const auto &op) { return op.opcode == MachineOpcode::Call; });
+    const bool savedSlots = hasCalls && fn.parameterCount <= 8 &&
+        fn.slotCount + fn.maxStackDepth <= 10;
+    const bool registerSlots = savedSlots || (!hasCalls && fn.parameterCount <= 8 &&
+        fn.slotCount + fn.maxStackDepth <= 16);
+    const auto slotRegister = [&](std::size_t slot) {
+        return savedSlots ? static_cast<unsigned>(19 + slot) :
+            static_cast<unsigned>(slot < 9 ? slot : slot + 2);
     };
     // CMP followed by BranchZero can branch on the flags directly, provided
     // the branch is not independently reachable through another jump edge.
@@ -171,7 +174,7 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
     }
     bool hasHoistedConstant = false;
     std::int32_t hoistedConstant = 0;
-    if (registerSlots) {
+    if (registerSlots && !hasCalls) {
         for (std::size_t i = 0; i < fn.instructions.size() && !hasHoistedConstant; ++i) {
             const bool candidate = directArithmeticConstant[i] ||
                 (directCompareConstant[i] &&
@@ -236,8 +239,10 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
             }
         }
     }
-    const auto frameSize = registerSlots ? 0u : static_cast<std::uint32_t>(
-        (4 * (fn.slotCount + fn.maxStackDepth) + 15) & ~std::size_t(15));
+    const auto savedCount = savedSlots ? fn.slotCount + fn.maxStackDepth : 0;
+    const auto frameSize = savedSlots ? static_cast<std::uint32_t>((8 * savedCount + 15) & ~std::size_t(15)) :
+        registerSlots ? 0u : static_cast<std::uint32_t>(
+            (4 * (fn.slotCount + fn.maxStackDepth) + 15) & ~std::size_t(15));
     // Darwin ARM64 packs stack-passed i32s at their natural 4-byte alignment.
     // Linux AAPCS64 uses 8-byte stack slots for these integer arguments.
     const std::uint32_t stackArgStride = target.os == OperatingSystem::MacOS ? 4u : 8u;
@@ -294,14 +299,19 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
             stackAccess(load, reg, static_cast<std::uint32_t>(slot * 4));
         }
     };
-    // Register-only leaves need neither a frame nor an LR save. The fallback
-    // retains its fixed aligned frame, including across nested calls.
-    if (!registerSlots) {
+    // Hàm lá không cần frame; hàm có lời gọi luôn bảo toàn LR và căn chỉnh SP.
+    if (!registerSlots || savedSlots) {
         word(0xa9bf7bfdu); word(0x910003fdu); // stp x29,x30; mov x29,sp
         assembly = "stp x29, x30, [sp, #-16]!\nmov x29, sp\n";
     }
     if (frameSize) {
         adjustSP(frameSize, true);
+    }
+    for (std::size_t n = 0; n < savedCount; ++n) {
+        const auto reg = static_cast<unsigned>(19 + n);
+        word(0xf90003e0u | (static_cast<std::uint32_t>(n) << 10) | reg);
+        assembly += "str x" + std::to_string(reg) + ", [sp, #" +
+            std::to_string(8 * n) + "]\n";
     }
     for (std::size_t i = 0; i < fn.parameterCount; ++i) {
         if (i < 8) access(false, static_cast<unsigned>(i), i);
@@ -370,6 +380,8 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
             // is emitted directly by the V++ backend.
             case Op::Div: case Op::Mod:
                 return fail("ARM64 Div/Mod: dùng backend V++ native");
+            case Op::BitAnd: case Op::BitOr: case Op::BitXor:
+            case Op::ShiftLeft: case Op::ShiftRight:
             case Op::Add: case Op::Sub: case Op::Mul:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual: {
@@ -423,6 +435,18 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
                     word(0x4b000000u | operands); assembly += "sub" + registers;
                 } else if (op.opcode == Op::Mul) {
                     word(0x1b007c00u | operands); assembly += "mul" + registers;
+                } else if (op.opcode == Op::BitAnd || op.opcode == Op::BitOr ||
+                           op.opcode == Op::BitXor || op.opcode == Op::ShiftLeft ||
+                           op.opcode == Op::ShiftRight) {
+                    std::uint32_t base = 0; const char *name = "";
+                    switch (op.opcode) {
+                        case Op::BitAnd: base = 0x0a000000u; name = "and"; break;
+                        case Op::BitOr: base = 0x2a000000u; name = "orr"; break;
+                        case Op::BitXor: base = 0x4a000000u; name = "eor"; break;
+                        case Op::ShiftLeft: base = 0x1ac02000u; name = "lsl"; break;
+                        default: base = 0x1ac02800u; name = "asr"; break;
+                    }
+                    word(base | operands); assembly += name + registers;
                 } else {
                     if (compareImm12) {
                         word(0x7100001fu | (static_cast<unsigned>(constant) << 10) | (left << 5));
@@ -489,7 +513,8 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
                 const auto outgoing = static_cast<std::uint32_t>((extra * stackArgStride + 15) & ~std::size_t(15));
                 adjustSP(outgoing, true);
                 for (std::size_t n = 8; n < op.operand; ++n) {
-                    stackAccess(true, 9, outgoing +
+                    if (savedSlots) access(true, 9, eval(depth - op.operand + n));
+                    else stackAccess(true, 9, outgoing +
                         static_cast<std::uint32_t>(eval(depth - op.operand + n) * 4));
                     stackAccess(false, 9, static_cast<std::uint32_t>((n - 8) * stackArgStride));
                 }
@@ -505,10 +530,16 @@ BackendEmission emitAArch64Function(const MachineFunction &fn, const Target &tar
                 if (!depth) return fail("ARM64 return không có giá trị");
                 if (returnSource[i] >= 0) move(0, slotRegister(returnSource[i]));
                 else access(true, 0, eval(depth - 1));
+                for (std::size_t n = 0; n < savedCount; ++n) {
+                    const auto reg = static_cast<unsigned>(19 + n);
+                    word(0xf94003e0u | (static_cast<std::uint32_t>(n) << 10) | reg);
+                    assembly += "ldr x" + std::to_string(reg) + ", [sp, #" +
+                        std::to_string(8 * n) + "]\n";
+                }
                 if (frameSize) {
                     adjustSP(frameSize, false);
                 }
-                if (!registerSlots) {
+                if (!registerSlots || savedSlots) {
                     word(0xa8c17bfdu); assembly += "ldp x29, x30, [sp], #16\n";
                 }
                 word(0xd65f03c0u); assembly += "ret\n";

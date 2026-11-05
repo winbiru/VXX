@@ -141,6 +141,11 @@ const char *opcodeName(MachineOpcode op) {
         case Op::Sub: return "Sub";
         case Op::Mul: return "Mul";
         case Op::Div: return "Div";
+        case Op::BitAnd: return "BitAnd";
+        case Op::BitOr: return "BitOr";
+        case Op::BitXor: return "BitXor";
+        case Op::ShiftLeft: return "ShiftLeft";
+        case Op::ShiftRight: return "ShiftRight";
         case Op::Mod: return "Mod";
         case Op::Equal: return "Equal";
         case Op::NotEqual: return "NotEqual";
@@ -405,6 +410,7 @@ std::string makeVppSource(const Target &target, const MachineFunction &function)
 
     std::ostringstream code;
     code << "nhập gói.biên dịch.mã máy.*;\n"
+         << "nhập gói.biên dịch.mã máy nền.biên dịch mã máy lệnh;\n"
          << "hàm chính() {\n  lệnh = [];\n";
     for (const auto &inst : function.instructions) {
         if (!inst.symbol.empty() && !symbolSafe(inst.symbol))
@@ -486,6 +492,10 @@ std::string executeVppSource(const std::string &source,
     compiler::CompilationContext context;
     context.importResolutionBase = sourceBase.empty() ? std::filesystem::current_path() : sourceBase;
     context.currentSourceIdentity = "<native-machine-bridge>";
+    if (profile && source.size() > 65536) {
+        std::cerr << "native Stage 0 frontend started: source=" << source.size()
+                  << " bytes\n";
+    }
     const auto artifacts = compiler::compilePipeline(context, source, keywordMap, true);
     const auto afterFrontend = std::chrono::steady_clock::now();
     if (profile) {
@@ -559,9 +569,34 @@ std::string executeVppSource(const std::string &source,
                          std::chrono::steady_clock::now() - afterFrontend).count()
                   << " ms\n";
     }
+    // The large Stage 1 bootstrap can time out while executing the generated
+    // compiler under Linux x86-64 emulation. Keep its exact executable on
+    // request so it can be rerun or inspected without rebuilding Stage 0.
+    // Small target-probe bridges must not overwrite the Stage 1 diagnostic.
+    if (source.size() > 65536) {
+        if (const char *saved = std::getenv("VPP_NATIVE_STAGE0_KEEP_BRIDGE");
+            saved && *saved) {
+            const auto destination = std::filesystem::absolute(saved);
+            if (!std::filesystem::is_directory(destination.parent_path()))
+                throw std::runtime_error("Native Stage 0: bridge output directory missing");
+            std::filesystem::copy_file(executable, destination,
+                std::filesystem::copy_options::overwrite_existing);
+            if (profile)
+                std::cerr << "native Stage 0 saved bootstrap bridge: "
+                          << destination.u8string() << '\n';
+        }
+    }
+    const auto beforeExecute = std::chrono::steady_clock::now();
+    if (profile)
+        std::cerr << "native Stage 0 bridge execution started: source="
+                  << source.size() << " bytes\n";
     const auto result = aot::runProcess({executable.u8string()});
     if (profile) {
-        std::cerr << "native Stage 0 bridge exit: " << result.status << '\n';
+        std::cerr << "native Stage 0 bridge exit: " << result.status
+                  << ", elapsed="
+                  << std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now() - beforeExecute).count()
+                  << " ms\n";
     }
     // Native wrappers emit newline-delimited text records. The Windows CRT
     // writes CRLF to stdout, while the target parser and machine/object
@@ -605,7 +640,7 @@ std::int32_t parseI32(const std::string &s) {
 
 MachineOpcode parseMachineOpcode(const std::string &name) {
     for (int i = static_cast<int>(MachineOpcode::PushConstant);
-         i <= static_cast<int>(MachineOpcode::Trap); ++i) {
+         i <= static_cast<int>(MachineOpcode::ShiftRight); ++i) {
         auto op = static_cast<MachineOpcode>(i);
         if (name == opcodeName(op)) return op;
     }

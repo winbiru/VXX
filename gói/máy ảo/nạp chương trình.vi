@@ -40,7 +40,8 @@ hàm vm_load(path) {
     biến strings = vm_read_i32(reader); biến functions = vm_read_i32(reader);
     biến initializers = vm_read_i32(reader); biến entry = vm_read_i32(reader);
     nếu (strings < 0 || strings > 1000000 || functions < 0 || functions > 100000 || initializers < 0 || initializers > 100000) { vm_error(10); };
-    biến state = vm_alloc(64, 1); nếu (state == 0) { tệp đóng(fd); trả về 0; };
+    // Đồng bộ kích thước trạng thái với AOT (ô 16 dành riêng cho kho khung).
+    biến state = vm_alloc(68, 1); nếu (state == 0) { tệp đóng(fd); trả về 0; };
     vm_set(state, 0, vm_vector(4)); vm_set(state, 1, vm_vector(4)); vm_set(state, 2, vm_vector(4));
     vm_set(state, 4, vm_vector(5)); vm_set(state, 5, vm_vector(5)); vm_set(state, 6, vm_vector(4)); vm_set(state, 8, vm_vector(4));
     // Slot 11 is the lazily allocated, GC-rooted directory resource table.

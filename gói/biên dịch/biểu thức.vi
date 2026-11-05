@@ -55,20 +55,25 @@ lớp công khai Bộ Phân Tích Biểu Thức {
     // Mức ưu tiên tương ứng operatorPrecedenceMap trong src/frontend/lexer.cpp.
     // Phép gán kết hợp phải; các toán tử nhị phân còn lại kết hợp trái.
     hàm công khai biên dịch biểu thức ưu tiên(mã phép toán) {
-        nếu (mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" || mã phép toán == "*=" ||
-            mã phép toán == "/=" || mã phép toán == "%=") { trả về 1; };
+        nếu (mình.biên dịch biểu thức là phép gán(mã phép toán)) { trả về 1; };
         nếu (mã phép toán == "||") { trả về 2; };
         nếu (mã phép toán == "&&") { trả về 3; };
-        nếu (mã phép toán == "==" || mã phép toán == "!=" || mã phép toán == "<" || mã phép toán == ">" ||
-            mã phép toán == "<=" || mã phép toán == ">=") { trả về 4; };
-        nếu (mã phép toán == "+" || mã phép toán == "-") { trả về 5; };
-        nếu (mã phép toán == "*" || mã phép toán == "/" || mã phép toán == "%") { trả về 6; };
+        nếu (mã phép toán == "|") { trả về 4; };
+        nếu (mã phép toán == "^") { trả về 5; };
+        nếu (mã phép toán == "&") { trả về 6; };
+        nếu (mã phép toán == "==" || mã phép toán == "!=") { trả về 7; };
+        nếu (mã phép toán == "<" || mã phép toán == ">" || mã phép toán == "<=" || mã phép toán == ">=") { trả về 8; };
+        nếu (mã phép toán == "<<" || mã phép toán == ">>") { trả về 9; };
+        nếu (mã phép toán == "+" || mã phép toán == "-") { trả về 10; };
+        nếu (mã phép toán == "*" || mã phép toán == "/" || mã phép toán == "%") { trả về 11; };
         trả về 0;
     };
 
     hàm công khai biên dịch biểu thức là phép gán(mã phép toán) {
         trả về mã phép toán == "=" || mã phép toán == "+=" || mã phép toán == "-=" || mã phép toán == "*=" ||
-            mã phép toán == "/=" || mã phép toán == "%=";
+            mã phép toán == "/=" || mã phép toán == "%=" ||
+            mã phép toán == "&=" || mã phép toán == "|=" || mã phép toán == "^=" ||
+            mã phép toán == "<<=" || mã phép toán == ">>=";
     };
 
     // Lexer C++ giữ dấu '.' trong định danh (cả m.cộng của module import).
@@ -159,10 +164,10 @@ lớp công khai Bộ Phân Tích Biểu Thức {
             mình.biên dịch biểu thức chờ(p, "}");
             trả về {"loại": "từ điển", "mục": mục};
         };
-        nếu (s == "!" || s == "-" || s == "+") {
+        nếu (s == "!" || s == "-" || s == "+" || s == "~") {
             mình.biên dịch biểu thức lấy(p);
             trả về {"loại": "một ngôi", "toán tử": s,
-                     "toán hạng": mình.biên dịch biểu thức đọc(p, 7)};
+                     "toán hạng": mình.biên dịch biểu thức đọc(p, 12)};
         };
         nếu (loại == "số nguyên" || loại == "số thực" || loại == "chuỗi" ||
             s == "đúng" || s == "sai" || s == "rỗng") {

@@ -360,6 +360,45 @@ static bool executeVmPrimitive(Opcode opcode,
             result = make_list_value(std::move(bytes));
             return true;
         }
+        case OP_VM_STRING_SLICE: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *start = std::get_if<int>(&args[1]);
+            const auto *count = std::get_if<int>(&args[2]);
+            if (!source || !start || !count || *start < 0 || *count < 0) {
+                err = fn + ": cần chuỗi và hai chỉ số nguyên không âm";
+                return true;
+            }
+            result = make_string_value(vietvm::core::utf8CodePointSlice(
+                *source, static_cast<std::size_t>(*start), static_cast<std::size_t>(*count)));
+            return true;
+        }
+        case OP_VM_STRING_BYTE_SLICE: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *start = std::get_if<int>(&args[1]);
+            const auto *count = std::get_if<int>(&args[2]);
+            if (!source || !start || !count || *start < 0 || *count < 0) {
+                err = fn + ": cần chuỗi và hai chỉ số nguyên không âm";
+                return true;
+            }
+            const auto begin = static_cast<std::size_t>(*start);
+            const auto length = static_cast<std::size_t>(*count);
+            result = make_string_value(begin >= source->size() || length == 0
+                ? std::string{}
+                : source->substr(begin, length));
+            return true;
+        }
+        case OP_VM_STRING_REPLACE_EXACT: {
+            const auto *source = std::get_if<std::string>(&args[0]);
+            const auto *pattern = std::get_if<std::string>(&args[1]);
+            const auto *replacement = std::get_if<std::string>(&args[2]);
+            if (!source || !pattern || !replacement) {
+                err = fn + ": cần ba giá trị chuỗi";
+                return true;
+            }
+            result = make_string_value(vietvm::core::utf8ReplaceExact(
+                *source, *pattern, *replacement));
+            return true;
+        }
         case OP_VM_STRING_FROM_BYTES:
         case OP_VM_FLOAT_FROM_BITS: {
             ListHandle list;
@@ -866,6 +905,11 @@ void VM::runJitCompiled() {
                 case OP_SAI_GIA_TRI:
                     program.emplace_back([this]() { stack.push_back(make_int_value(0)); });
                     break;
+                case OP_BIT_VA:
+                case OP_BIT_HOAC:
+                case OP_BIT_XOR:
+                case OP_DICH_TRAI:
+                case OP_DICH_PHAI:
                 case OP_CONG:
                 case OP_TRU:
                 case OP_NHAN:
@@ -2197,6 +2241,11 @@ void VM::executeValueOpcode(const Instruction& instr) {
             stack.push_back(evaluateModuloOperator(a, b, instr.op, static_cast<int>(pc)));
             return;
         }
+        case OP_BIT_VA:
+        case OP_BIT_HOAC:
+        case OP_BIT_XOR:
+        case OP_DICH_TRAI:
+        case OP_DICH_PHAI:
         case OP_CONG: case OP_TRU: case OP_NHAN: case OP_CHIA:
         case OP_Logic_VA: case OP_Logic_HOAC:
         case OP_SO_SANH_BANG: case OP_KHAC_BANG:
@@ -3523,6 +3572,9 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
             case OP_VM_MAP_REMOVE:
             case OP_VM_MAP_KEYS:
             case OP_VM_STRING_BYTES:
+            case OP_VM_STRING_SLICE:
+            case OP_VM_STRING_REPLACE_EXACT:
+            case OP_VM_STRING_BYTE_SLICE:
             case OP_VM_STRING_FROM_BYTES:
             case OP_VM_FLOAT_FROM_BITS:
             case OP_VM_MACHINE_FILE_OPEN:
@@ -3588,6 +3640,11 @@ void VM::runInterpreterLoop(std::optional<std::size_t> stopExecutionDepth) {
 
             case OP_BIEN_SO:
             case OP_TEN_BIEN_ID:
+            case OP_BIT_VA:
+            case OP_BIT_HOAC:
+            case OP_BIT_XOR:
+            case OP_DICH_TRAI:
+            case OP_DICH_PHAI:
             case OP_MODULO:
             case OP_CONG:
             case OP_TRU:

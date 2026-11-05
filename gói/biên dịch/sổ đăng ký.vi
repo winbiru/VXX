@@ -71,6 +71,16 @@ hàm công khai biên dịch sổ cấp hàm(sổ, mô đun, tên) {
         // Khi có khai báo trùng, hàm tìm cũ luôn chọn ID đầu tiên.
         nếu (!máy ảo có khóa từ điển(theo mô đun, tên)) { theo mô đun[tên] = mã định danh; };
     };
+    // Tên duy nhất toàn phiên có thể gọi thẳng bằng function ID dù mô-đun
+    // bootstrap cũ chỉ gom phụ thuộc ở điểm vào. -1 đánh dấu tên mơ hồ.
+    nếu (máy ảo có khóa từ điển(sổ, "chỉ mục tên duy nhất")) {
+        duy nhất = sổ["chỉ mục tên duy nhất"];
+        nếu (!máy ảo có khóa từ điển(duy nhất, tên)) {
+            duy nhất[tên] = mã định danh;
+        } hoặc {
+            duy nhất[tên] = -1;
+        };
+    };
     trả về mã định danh;
 };
 
@@ -310,7 +320,7 @@ lớp công khai Bộ Đăng Ký Hàm {
 
     hàm riêng tư chuẩn bị IR() {
         mình.sổ = {"hàm": [], "chuỗi": [],
-                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {}};
+                    "chỉ mục hàm": {}, "chỉ mục tên duy nhất": {}, "chỉ mục chuỗi": {}};
         mình.các ô nhớ = [];
         mình.tên đã khai = [];
     };
@@ -352,7 +362,7 @@ lớp công khai Bộ Đăng Ký Hàm {
             ném "biên dịch sổ: cần đồ thị mô đun V++";
         };
         mình.sổ = {"loại": "sổ hàm V++", "hàm": [], "chuỗi": [],
-                    "chỉ mục hàm": {}, "chỉ mục chuỗi": {},
+                    "chỉ mục hàm": {}, "chỉ mục tên duy nhất": {}, "chỉ mục chuỗi": {},
                     "mô đun": [], "đã cấp": [], "hoãn chuỗi": mình.hoãn chuỗi};
         mình.các ô nhớ = [];
         mình.tên đã khai = [];

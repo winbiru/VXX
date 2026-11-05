@@ -1,0 +1,11 @@
+hàm gấp đôi(giá trị) { trả về giá trị * 2; };
+hàm chính() {
+    biến văn bản = "V++ syscall runtime";
+    biến bản sao = byte cắt(văn bản, 0, byte dài(văn bản));
+    nếu (byte bằng(văn bản, bản sao) != 1) { trả về 1; };
+    byte hủy(văn bản);
+    byte hủy(bản sao);
+    biến tổng = 0;
+    lặp (i = 0; i < 7; i++) { tổng = tổng + i; };
+    trả về gấp đôi(tổng);
+};

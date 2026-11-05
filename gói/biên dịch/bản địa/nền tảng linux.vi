@@ -1,0 +1,11 @@
+// Các nhánh này chỉ tồn tại để giữ giao diện trình điều khiển chung.
+// Bootstrap Linux cố ý không đưa mã tạo Mach-O/COFF vào archive ELF.
+// Dùng bộ biên dịch.vi khi cần biên dịch chéo Windows hoặc chạy trên macOS.
+hàm coff kho lưu trữ điểm vào(kho, tiền tố) { trả về -1; };
+hàm coff hợp nhất mô đun(kho, kết quả) { trả về -1; };
+hàm macho hợp nhất mô đun(kho, kết quả) { trả về -1; };
+hàm macho tạo executable(đối tượng, kết quả) { trả về -1; };
+hàm macho rt tạo(đối tượng, runtime, kết quả) { trả về -1; };
+hàm pe tạo executable(đối tượng, kết quả) { trả về -1; };
+hàm pe rt tạo(đối tượng, runtime, kết quả) { trả về -1; };
+hàm coff mô đun(mã máy, đối tượng, các điểm bắt đầu, sổ đăng ký, đầu tiên, cuối cùng, điểm vào mã định danh, các phần nhập, lời gọi lõi) { trả về -1; };

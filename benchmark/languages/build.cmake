@@ -31,6 +31,11 @@ function(runtime name executable arguments cases)
     string(JSON item SET "${item}" executable "${q}")
     string(JSON item SET "${item}" arguments "${arguments}")
     string(JSON item SET "${item}" cases "${cases}")
+    set(environment "{}")
+    if(ARGC GREATER 4)
+        set(environment "${ARGV4}")
+    endif()
+    string(JSON item SET "${item}" environment "${environment}")
     file(SHA256 "${executable}" binary_hash)
     quote("${binary_hash}" q)
     string(JSON item SET "${item}" binary_sha256 "${q}")
@@ -42,6 +47,8 @@ set(all_cases "[\"arithmetic\",\"branch_loop\",\"fibonacci\",\"list_128\",\"unic
 set(five_cases "[\"arithmetic\",\"branch_loop\",\"fibonacci\",\"list_128\",\"unicode_replace\"]")
 set(numeric_cases "[\"arithmetic\",\"branch_loop\",\"fibonacci\"]")
 find_program(CXX NAMES clang++ REQUIRED)
+find_program(CC NAMES clang REQUIRED)
+find_program(RUSTC NAMES rustc)
 find_program(NODE NAMES node)
 find_program(JAVA NAMES java)
 find_program(JAVAC NAMES javac)
@@ -52,10 +59,39 @@ run("${CMAKE_COMMAND}" "-DVPP_CLI=${VPP_EXEC}" "-DVPP_ROOT=${VPP_ROOT}"
     "-DVPP_OUTPUT_DIR=${VPP_BENCH_BUILD}/native-compiler" "-DVPP_EXECUTABLE_SUFFIX="
     -P "${VPP_ROOT}/scripts/quality/prepare_native_compiler.cmake")
 set(app "${VPP_BENCH_BUILD}/vpp-application")
-run("${native}" build "${source}/workloads.vi" -o "${app}")
+run("${CMAKE_COMMAND}" -E env VPP_AOT_RUNTIME=cpp
+    "${native}" build "${source}/workloads.vi" -o "${app}")
 quote("${source}/workloads.vi" q)
 runtime(vpp-vm "${VPP_EXEC}" "[\"run\",\"--compiler=cpp\",${q}]" "${all_cases}")
+runtime(vpp-machine-jit "${VPP_EXEC}" "[\"run\",\"--compiler=cpp\",${q}]" "${all_cases}"
+    "{\"VPP_ENABLE_MACHINE_JIT\":\"1\"}")
 runtime(vpp-aot "${app}" "[]" "${all_cases}")
+# Đo riêng AOT dùng bộ thực thi V++/ASM; đối chiếu với cùng nguồn ứng dụng.
+if(DEFINED VPP_BENCH_AOT_VPP_OBJECT AND NOT VPP_BENCH_AOT_VPP_OBJECT STREQUAL "")
+    if(NOT IS_ABSOLUTE "${VPP_BENCH_AOT_VPP_OBJECT}" OR
+       NOT EXISTS "${VPP_BENCH_AOT_VPP_OBJECT}")
+        message(FATAL_ERROR "Cần đường dẫn tuyệt đối tới runtime.o của V++/ASM")
+    endif()
+    set(vpp_app "${VPP_BENCH_BUILD}/vpp-application-vpp")
+    run("${CMAKE_COMMAND}" -E env VPP_AOT_RUNTIME=vpp
+        "VPP_AOT_VPP_OBJECT=${VPP_BENCH_AOT_VPP_OBJECT}"
+        "${native}" build "${source}/workloads.vi" -o "${vpp_app}")
+    execute_process(COMMAND nm -g "${vpp_app}"
+        OUTPUT_VARIABLE symbols RESULT_VARIABLE status)
+    if(NOT status STREQUAL "0" OR
+       symbols MATCHES "__cxa_|_ZSt|_ZNSt|_Z[0-9]|vm_step|vm_step_body|linkedBytecodeRun|executeVpp" OR
+       NOT symbols MATCHES "_vpp_fn_aot_integer" OR
+       NOT symbols MATCHES "_vpp_fn_vm_collect")
+        message(FATAL_ERROR "Ứng dụng benchmark chưa dùng đúng bộ thực thi AOT V++/ASM")
+    endif()
+    execute_process(COMMAND otool -L "${vpp_app}"
+        OUTPUT_VARIABLE libraries RESULT_VARIABLE status)
+    if(NOT status STREQUAL "0" OR libraries MATCHES "libc\\+\\+|libstdc\\+\\+|libffi")
+        message(FATAL_ERROR "Benchmark AOT V++/ASM còn liên kết runtime C++/FFI")
+    endif()
+    file(WRITE "${VPP_BENCH_BUILD}/vpp-application-vpp.dependencies.txt" "${libraries}")
+    runtime(vpp-aot-vpp "${vpp_app}" "[]" "${all_cases}")
+endif()
 if(DEFINED VPP_I32_COMPILER AND EXISTS "${VPP_I32_COMPILER}")
     set(vm "${VPP_BENCH_BUILD}/vpp-vm")
     set(image "${VPP_BENCH_BUILD}/workloads.vmb")
@@ -90,6 +126,22 @@ run("${CXX}" -std=c++17 -O3 -DNDEBUG -c "${source}/driver.cpp" -o "${VPP_BENCH_B
 run("${CXX}" -std=c++17 -O3 -DNDEBUG -c "${source}/workloads.cpp" -o "${VPP_BENCH_BUILD}/workloads.o")
 run("${CXX}" "${VPP_BENCH_BUILD}/driver.o" "${VPP_BENCH_BUILD}/workloads.o" -o "${VPP_BENCH_BUILD}/cpp")
 runtime(cpp "${VPP_BENCH_BUILD}/cpp" "[]" "${five_cases}")
+# C và Rust dùng chung bộ đo, ABI i32, đơn vị biên dịch riêng và không LTO.
+run("${CXX}" -std=c++17 -O3 -DNDEBUG -DVPP_NUMERIC_KERNELS
+    -c "${source}/driver.cpp" -o "${VPP_BENCH_BUILD}/numeric-driver.o")
+run("${CC}" -std=c11 -O3 -fwrapv -c "${source}/workloads.c"
+    -o "${VPP_BENCH_BUILD}/c-workloads.o")
+run("${CXX}" "${VPP_BENCH_BUILD}/numeric-driver.o"
+    "${VPP_BENCH_BUILD}/c-workloads.o" -o "${VPP_BENCH_BUILD}/c")
+runtime(c "${VPP_BENCH_BUILD}/c" "[]" "${numeric_cases}")
+if(RUSTC)
+    run("${RUSTC}" --edition=2024 --crate-type=lib --emit=obj
+        -C opt-level=3 -C overflow-checks=no -C lto=off -C panic=abort
+        "${source}/workloads.rs" -o "${VPP_BENCH_BUILD}/rust-workloads.o")
+    run("${CXX}" "${VPP_BENCH_BUILD}/numeric-driver.o"
+        "${VPP_BENCH_BUILD}/rust-workloads.o" -o "${VPP_BENCH_BUILD}/rust")
+    runtime(rust "${VPP_BENCH_BUILD}/rust" "[]" "${numeric_cases}")
+endif()
 if(NODE)
     quote("${source}/workloads.js" q)
     runtime(node "${NODE}" "[${q}]" "${all_cases}")
@@ -126,7 +178,7 @@ if(NOT changes STREQUAL "")
 endif()
 string(JSON manifest SET "${manifest}" dirty "${dirty}")
 set(versions "{}")
-foreach(tool IN ITEMS CXX NODE JAVA PYTHON RUBY)
+foreach(tool IN ITEMS CC CXX RUSTC NODE JAVA PYTHON RUBY)
     if(${tool})
         set(option --version)
         if(tool STREQUAL "JAVA")
@@ -185,7 +237,14 @@ foreach(path IN LISTS artifact_files)
     string(JSON artifacts SET "${artifacts}" "${name}" "${q}")
 endforeach()
 string(JSON manifest SET "${manifest}" artifact_sha256 "${artifacts}")
-quote("Release -O3 -DNDEBUG; separate C++ units; no LTO; interpreter JIT disabled" q)
+if(DEFINED vpp_app)
+    file(SHA256 "${VPP_BENCH_AOT_VPP_OBJECT}" digest)
+    quote("${VPP_BENCH_AOT_VPP_OBJECT}" q)
+    string(JSON manifest SET "${manifest}" aot_vpp_object "${q}")
+    quote("${digest}" q)
+    string(JSON manifest SET "${manifest}" aot_vpp_object_sha256 "${q}")
+endif()
+quote("Release -O3 -DNDEBUG; separate C++ units; no LTO; V++ interpreter JIT flags absent; machine JIT explicit per runtime; Node/Java default JIT" q)
 string(JSON manifest SET "${manifest}" build_policy "${q}")
 file(WRITE "${VPP_BENCH_BUILD}/manifest.json" "${manifest}\n")
 message(STATUS "Language benchmark manifest ready: ${VPP_BENCH_BUILD}/manifest.json")

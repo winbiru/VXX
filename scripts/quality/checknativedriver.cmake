@@ -4,6 +4,15 @@ if (NOT DEFINED VPP_EXEC OR NOT DEFINED VPP_ROOT OR NOT DEFINED VPP_TARGET OR
     NOT DEFINED VPP_OUTPUT_DIR)
     message(FATAL_ERROR "missing native compiler-driver test arguments")
 endif()
+# Native Stage 0 executes a large, generated V++ compiler program. Under
+# x86-64 emulation this can take much longer than on a native host; keep the
+# existing default for ordinary tests and let integration callers extend it.
+if (NOT DEFINED VPP_STAGE1_TIMEOUT_SECONDS)
+    set(VPP_STAGE1_TIMEOUT_SECONDS 420)
+endif()
+if (NOT VPP_STAGE1_TIMEOUT_SECONDS MATCHES "^[1-9][0-9]*$")
+    message(FATAL_ERROR "VPP_STAGE1_TIMEOUT_SECONDS must be a positive integer")
+endif()
 # All Stage 1 and later invocations must resolve the installed V++ modules.
 set(ENV{VPP_HOME} "${VPP_ROOT}")
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
@@ -25,10 +34,18 @@ foreach(part IN ITEMS
     "gói/biên dịch/bản địa/sinh mã chương trình.vi"
     "gói/biên dịch/bản địa/đối tượng.vi"
     "gói/biên dịch/bản địa/đối tượng mô đun.vi"
+    "gói/biên dịch/bản địa/trình liên kết macho.vi"
+    "gói/biên dịch/bản địa/trình liên kết macho executable.vi"
+    "gói/biên dịch/bản địa/liên kết macho runtime.vi"
     "gói/biên dịch/bản địa/định dạng elf 64.vi"
+    "gói/biên dịch/bản địa/định dạng coff 64.vi"
+    "gói/biên dịch/bản địa/trình liên kết pe.vi"
+    "gói/biên dịch/bản địa/liên kết pe runtime.vi"
     "gói/biên dịch/bản địa/nạp mô đun.vi"
     "gói/biên dịch/bản địa/biên dịch mô đun.vi"
     "gói/biên dịch/bản địa/bộ nhớ đệm.vi"
+    "gói/biên dịch/bản địa/assembler.vi"
+    "gói/biên dịch/bản địa/trình xuất đối tượng.vi"
     "gói/biên dịch/bản địa/trình điều khiển.vi")
     # Stage 0 only needs code for the host ISA. Once bootstrapped, Stage 1
     # resolves the complete, unchanged native/*.vi library for Stage 2.
@@ -70,13 +87,18 @@ foreach(part IN ITEMS
         endif()
         string(SUBSTRING "${contents}" 0 ${cut} contents)
     endif()
+    # Stage 0 compiles one flattened source file. Imports between the pieces
+    # are already satisfied by this ordered list and are not valid top-level
+    # declarations for the bridge AST.
+    string(REGEX REPLACE "(^|\n)[ \t]*nhập[^\n]*;[ \t]*(\n|$)" "\\1"
+        contents "${contents}")
     file(APPEND "${source}" "${contents}\n")
 endforeach()
 if (stage0_linux)
     file(APPEND "${source}" "\nhàm sinh mã chương trình phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
     file(APPEND "${source}" "hàm tạo macho mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 else()
-    file(APPEND "${source}" "\nhàm sinh mã chương trình x86 phát mô đun(a,b,c,d,e,f,g,h) { trả về -1; };\n")
+    file(APPEND "${source}" "\nhàm sinh mã chương trình x86 phát mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
     file(APPEND "${source}" "hàm elf mô đun(a,b,c,d,e,f,g,h,i) { trả về -1; };\n")
 endif()
 if (NOT VPP_USE_PREPARED_COMPILER)
@@ -102,7 +124,9 @@ if (NOT VPP_USE_PREPARED_COMPILER)
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
             "${VPP_SEED}" build "${seed_entry}" -o "${compiler}"
             WORKING_DIRECTORY "${VPP_ROOT}"
-            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors
+            ECHO_ERROR_VARIABLE
+            TIMEOUT ${VPP_STAGE1_TIMEOUT_SECONDS})
     else()
         message(STATUS "Stage 0 -> Stage 1: bootstrap standalone V++ native compiler")
         execute_process(COMMAND "${CMAKE_COMMAND}" -E env "VPP_HOME=${VPP_ROOT}"
@@ -112,7 +136,9 @@ if (NOT VPP_USE_PREPARED_COMPILER)
         "${VPP_EXEC}" build --target "${VPP_TARGET}" --emit-exe-selfhost
         "${source}" "${compiler}"
         WORKING_DIRECTORY "${VPP_OUTPUT_DIR}"
-            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors TIMEOUT 420)
+            RESULT_VARIABLE status OUTPUT_VARIABLE output ERROR_VARIABLE errors
+            ECHO_ERROR_VARIABLE
+            TIMEOUT ${VPP_STAGE1_TIMEOUT_SECONDS})
     endif()
     if (NOT status EQUAL 0 OR NOT EXISTS "${compiler}")
         message(FATAL_ERROR "native compiler Stage 1 build failed: ${status}\n${output}\n${errors}")

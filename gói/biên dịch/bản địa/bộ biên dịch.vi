@@ -1,5 +1,6 @@
 // Điểm vào compiler i32; bộ nạp tự chủ xử lý các mô-đun bên dưới.
 // Các mô-đun dùng chung bảng hàm; phụ thuộc được tập hợp tại điểm vào này.
+nhập môi trường thực thi.*;
 nhập phân tích từ vựng.*;
 nhập từ tố.*;
 nhập phân tích cú pháp.*;
@@ -9,8 +10,16 @@ nhập mã máy x86 64.*;
 nhập sinh mã chương trình.*;
 nhập đối tượng.*;
 nhập đối tượng mô đun.*;
+nhập trình liên kết macho.*;
+nhập trình liên kết macho executable.*;
+nhập liên kết macho runtime.*;
 nhập định dạng elf 64.*;
+nhập định dạng coff 64.*;
+nhập trình liên kết pe.*;
+nhập liên kết pe runtime.*;
 nhập nạp mô đun.*;
 nhập biên dịch mô đun.*;
 nhập bộ nhớ đệm.*;
+nhập assembler.*;
+nhập trình xuất đối tượng.*;
 nhập trình điều khiển.*;

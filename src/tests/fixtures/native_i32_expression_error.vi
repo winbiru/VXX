@@ -1,0 +1,5 @@
+hàm chính() {
+    n = 0;
+    in (2 + 3) * (4 / n + 1);
+    in "không được chạy sau lỗi chia";
+};

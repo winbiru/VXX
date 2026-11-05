@@ -145,6 +145,8 @@ BackendEmission emitX86_64Function(const MachineFunction &fn, const Target &targ
             // is emitted directly by the V++ backend.
             case Op::Div: case Op::Mod:
                 return fail("x86 Div/Mod: dùng backend V++ native");
+            case Op::BitAnd: case Op::BitOr: case Op::BitXor:
+            case Op::ShiftLeft: case Op::ShiftRight:
             case Op::Add: case Op::Sub: case Op::Mul:
             case Op::Equal: case Op::NotEqual: case Op::Less: case Op::LessEqual:
             case Op::Greater: case Op::GreaterEqual: {
@@ -157,6 +159,13 @@ BackendEmission emitX86_64Function(const MachineFunction &fn, const Target &targ
                 } else if (op.opcode == Op::Mul) {
                     byte(0x0f); byte(0xaf); byte(0xc1);
                     assembly += "imul eax, ecx\n";
+                } else if (op.opcode == Op::BitAnd || op.opcode == Op::BitOr || op.opcode == Op::BitXor) {
+                    byte(op.opcode == Op::BitAnd ? 0x21 : op.opcode == Op::BitOr ? 0x09 : 0x31);
+                    byte(0xc8);
+                    assembly += std::string(op.opcode == Op::BitAnd ? "and" : op.opcode == Op::BitOr ? "or" : "xor") + " eax, ecx\n";
+                } else if (op.opcode == Op::ShiftLeft || op.opcode == Op::ShiftRight) {
+                    byte(0xd3); byte(op.opcode == Op::ShiftLeft ? 0xe0 : 0xf8);
+                    assembly += std::string(op.opcode == Op::ShiftLeft ? "shl" : "sar") + " eax, cl\n";
                 } else {
                     byte(0x39); byte(0xc8); assembly += "cmp eax, ecx\n";
                     const char *mnemonic = "";

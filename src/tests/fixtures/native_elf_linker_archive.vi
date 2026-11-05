@@ -1,0 +1,13 @@
+// Direct linker harness for valid and malformed packed ET_REL archives.
+hàm chính() {
+    biến đường vào = đối số lấy(1);
+    biến đường ra = đối số lấy(2);
+    biến kho = byte mới();
+    nếu (elf bản địa đọc tệp(đường vào, kho) != 0) { trả về 2; };
+    biến trạng thái = thực thi liên kết elf bản địa(kho, đường ra);
+    byte hủy(kho);
+    byte hủy(đường vào);
+    byte hủy(đường ra);
+    nếu (trạng thái != 0) { trả về 1; };
+    trả về 0;
+};

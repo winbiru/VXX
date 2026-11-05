@@ -322,6 +322,12 @@ hàm mã hàm lõi(nguồn văn bản, các từ tố, con trỏ hiện tại) {
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy tiến trình thô") == 1) { trả về 73; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy ổ cắm thô") == 1) { trả về 74; };
     nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đồng hồ CPU thô") == 1) { trả về 75; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot thông tin") == 1) { trả về 76; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot gọi") == 1) { trả về 77; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy đặt quyền tệp mở") == 1) { trả về 78; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy xóa vùng nhớ") == 1) { trả về 79; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot gọi i32") == 1) { trả về 80; };
+    nếu (từ tố bằng(nguồn văn bản, các từ tố, con trỏ hiện tại, "máy aot gập i32") == 1) { trả về 81; };
     trả về -1;
 };
 
@@ -402,6 +408,12 @@ hàm số tham số lõi(mã định danh) {
     nếu (mã định danh == 73) { trả về 2; };
     nếu (mã định danh == 74) { trả về 2; };
     nếu (mã định danh == 75) { trả về 1; };
+    nếu (mã định danh == 76) { trả về 3; };
+    nếu (mã định danh == 77) { trả về 3; };
+    nếu (mã định danh == 78) { trả về 2; };
+    nếu (mã định danh == 79) { trả về 2; };
+    nếu (mã định danh == 80) { trả về 3; };
+    nếu (mã định danh == 81) { trả về 2; };
     trả về -1;
 };
 
@@ -504,6 +516,10 @@ hàm phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái n�
         nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
         trả về phân tích phát(biểu diễn trung gian, 25, 0);
     };
+    nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "~") == 1) {
+        nếu (phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        trả về phân tích phát(biểu diễn trung gian, 35, 0);
+    };
     nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "+") == 1) {
         trả về phân tích sơ cấp(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian);
     };
@@ -537,8 +553,21 @@ hàm phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội 
     trả về 0;
 };
 
-hàm phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+hàm phân tích dịch bit(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
     nếu (phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<<") == 1) { mã phép toán = 33; }
+        hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">>") == 1) { mã phép toán = 34; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích dịch bit(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
     lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
         biến mã phép toán = 0;
         nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<") == 1) { mã phép toán = 13; }
@@ -546,7 +575,7 @@ hàm phân tích quan hệ(nguồn văn bản, các từ tố, trạng thái n�
         hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">") == 1) { mã phép toán = 15; }
         hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">=") == 1) { mã phép toán = 16; };
         nếu (mã phép toán == 0) { thoát; };
-        nếu (phân tích tổng(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích dịch bit(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
         nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
     };
     trả về 0;
@@ -565,17 +594,53 @@ hàm phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái n
     trả về 0;
 };
 
+hàm phân tích bit và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "&") == 1) { mã phép toán = 30; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích bit xor(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích bit và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "^") == 1) { mã phép toán = 32; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích bit và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
+hàm phân tích bit hoặc(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
+    nếu (phân tích bit xor(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    lặp (i = 0; i < từ tố số phần tử(các từ tố); i++) {
+        biến mã phép toán = 0;
+        nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "|") == 1) { mã phép toán = 31; };
+        nếu (mã phép toán == 0) { thoát; };
+        nếu (phân tích bit xor(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích phát(biểu diễn trung gian, mã phép toán, 0) != 0) { trả về -1; };
+    };
+    trả về 0;
+};
+
 // IR 28/29 preserve a normalized left value on the taken edge, and
 // consume it on the fallthrough edge. RHS produces the one merged value.
 hàm phân tích luận lý và(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) {
-    nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+    nếu (phân tích bit hoặc(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
     lặp(i = 0; i < từ tố số phần tử(các từ tố); i++) {
         nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "&&") != 1) { thoát; };
         nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
         nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
         biến branch = byte dài(biểu diễn trung gian);
         nếu (phân tích phát(biểu diễn trung gian, 28, 0) != 0) { trả về -1; };
-        nếu (phân tích bằng nhau(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
+        nếu (phân tích bit hoặc(nguồn văn bản, các từ tố, trạng thái nội bộ, biểu diễn trung gian) != 0) { trả về -1; };
         nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
         nếu (phân tích phát(biểu diễn trung gian, 25, 0) != 0) { trả về -1; };
         nếu (byte ghi số nguyên ba mươi hai bit(biểu diễn trung gian, branch + 4, byte dài(biểu diễn trung gian)) != 0) { trả về -1; };
@@ -650,6 +715,11 @@ hàm phân tích vòng lặp bước cập nhật(nguồn văn bản, các từ 
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "*=") == 1) { kết hợp = 6; }
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "/=") == 1) { kết hợp = 26; }
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "%=") == 1) { kết hợp = 27; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "&=") == 1) { kết hợp = 30; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "|=") == 1) { kết hợp = 31; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "^=") == 1) { kết hợp = 32; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<<=") == 1) { kết hợp = 33; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">>=") == 1) { kết hợp = 34; }
     hoặc { trả về -1; };
     nếu (kết hợp != 0) {
         nếu (phân tích phát(bước cập nhật, 2, bước cập nhật ô nhớ) != 0) { trả về -1; };
@@ -873,6 +943,11 @@ hàm phân tích câu lệnh(nguồn văn bản, các từ tố, trạng thái n
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "*=") == 1) { kết hợp = 6; }
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "/=") == 1) { kết hợp = 26; }
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "%=") == 1) { kết hợp = 27; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "&=") == 1) { kết hợp = 30; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "|=") == 1) { kết hợp = 31; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "^=") == 1) { kết hợp = 32; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "<<=") == 1) { kết hợp = 33; }
+    hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, ">>=") == 1) { kết hợp = 34; }
     hoặc nếu (phân tích nhận(nguồn văn bản, các từ tố, trạng thái nội bộ, "++") == 1) {
         kết hợp = 4;
         hậu tố = 1;

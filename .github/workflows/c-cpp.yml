@@ -48,6 +48,14 @@ jobs:
           cmake --build "$smoke" --parallel 2
           ctest --test-dir "$smoke" --output-on-failure --no-tests=error
 
+      - name: Verify Linux x86-64 bit-identical self-hosting and no OpenSSL
+        shell: bash
+        run: |
+          set -euo pipefail
+          bootstrap="$RUNNER_TEMP/vpp-native-smoke/native-aot-bootstrap"
+          bash scripts/quality/check_linux_selfhosting_convergence.sh --verify-pair \
+            "$bootstrap/stage2" "$bootstrap/stage3" "$bootstrap/convergence-ci"
+
       - name: Verify Linux x86-64 native JIT and interpreter parity
         shell: bash
         run: |
@@ -392,11 +400,30 @@ jobs:
             build-benchmark-smoke/fixtures/
             build-benchmark-smoke/collector-check/
 
+  windows-wine-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Windows x64 ABI with MinGW and Wine in Docker
+        shell: bash
+        run: bash scripts/quality/check_windows_file_boundary_docker.sh
+
   windows-build:
     runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Windows x64 native file, process and SHA ABI (COFF + Win32 + UCRT + CNG)
+        shell: pwsh
+        run: |
+          $probe = Join-Path $env:RUNNER_TEMP "vpp-windows-file-boundary"
+          cmake -S scripts/quality/windows_file_boundary -B $probe -A x64
+          if ($LASTEXITCODE -ne 0) { throw "Windows file boundary configure failed" }
+          cmake --build $probe --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { throw "Windows file boundary build failed" }
+          ctest --test-dir $probe -C Release --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { throw "Windows native file boundary test failed" }
 
       - name: Install SQLite CLI
         shell: pwsh

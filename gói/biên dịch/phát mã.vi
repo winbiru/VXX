@@ -6,6 +6,7 @@ nhập gói.biên dịch.biểu diễn trung gian.biên dịch hạ IR thuần;
 nhập gói.biên dịch.mã lệnh.biên dịch mã trung gian từ thô;
 nhập gói.biên dịch.mã thao tác.biên dịch mã thao tác;
 nhập gói.biên dịch.nội tại.*;
+nhập gói.biên dịch.abi lõi bản địa.biên dịch ABI lõi bản địa;
 nhập gói.biên dịch.sổ đăng ký.*;
 nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu cây;
 nhập gói.biên dịch.kiểu mô đun.biên dịch kiểu lớp chạy;
@@ -54,6 +55,11 @@ lớp công khai Bộ Phát Bytecode {
         nếu (toán tử == "<") { trả về biên dịch mã thao tác("OP_NHO_HON"); };
         nếu (toán tử == ">=") { trả về biên dịch mã thao tác("OP_LON_HON_HOAC_BANG"); };
         nếu (toán tử == "<=") { trả về biên dịch mã thao tác("OP_NHO_HON_HOAC_BANG"); };
+        nếu (toán tử == "&") { trả về biên dịch mã thao tác("OP_BIT_VA"); };
+        nếu (toán tử == "|") { trả về biên dịch mã thao tác("OP_BIT_HOAC"); };
+        nếu (toán tử == "^") { trả về biên dịch mã thao tác("OP_BIT_XOR"); };
+        nếu (toán tử == "<<") { trả về biên dịch mã thao tác("OP_DICH_TRAI"); };
+        nếu (toán tử == ">>") { trả về biên dịch mã thao tác("OP_DICH_PHAI"); };
         nếu (toán tử == "%") { trả về biên dịch mã thao tác("OP_MODULO"); };
         ném "biên dịch phát mã: toán tử không hợp lệ '" + toán tử + "'";
     };
@@ -65,6 +71,11 @@ lớp công khai Bộ Phát Bytecode {
         nếu (toán tử == "-=") { trả về biên dịch mã thao tác("OP_TRU"); };
         nếu (toán tử == "*=") { trả về biên dịch mã thao tác("OP_NHAN"); };
         nếu (toán tử == "/=") { trả về biên dịch mã thao tác("OP_CHIA"); };
+        nếu (toán tử == "&=") { trả về biên dịch mã thao tác("OP_BIT_VA"); };
+        nếu (toán tử == "|=") { trả về biên dịch mã thao tác("OP_BIT_HOAC"); };
+        nếu (toán tử == "^=") { trả về biên dịch mã thao tác("OP_BIT_XOR"); };
+        nếu (toán tử == "<<=") { trả về biên dịch mã thao tác("OP_DICH_TRAI"); };
+        nếu (toán tử == ">>=") { trả về biên dịch mã thao tác("OP_DICH_PHAI"); };
         nếu (toán tử == "%=") { trả về biên dịch mã thao tác("OP_MODULO"); };
         ném "biên dịch phát mã: gán kết hợp không hợp lệ '" + toán tử + "'";
     };
@@ -440,8 +451,14 @@ lớp công khai Bộ Phát Bytecode {
         };
         nếu (mã == "đọc tên") {
             tách = biên dịch IR tách thành viên(giá trị);
-            nếu (tách != rỗng && mục ký hiệu < 0) {
-                nhận ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tách["nhận"]);
+            nếu (tách != rỗng) {
+                nhận ô nhớ = -1;
+                nếu (mục ký hiệu >= 0) {
+                    nhận ô nhớ = mình.biên dịch phát mã ô nhớ mục ký hiệu(
+                        trạng thái, tách["nhận"], mục ký hiệu);
+                } hoặc {
+                    nhận ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tách["nhận"]);
+                };
                 nếu (nhận ô nhớ >= 0) {
                     tên chỉ mục = mình.biên dịch phát mã lưu chuỗi(trạng thái, tách["tên"]);
                     mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_TEN_BIEN_GIA_TRI"), 0, nhận ô nhớ, 0);
@@ -468,6 +485,15 @@ lớp công khai Bộ Phát Bytecode {
                     mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
                                          chỉ mục thấy[giá trị], 0, 0);
                     trả về đúng;
+                };
+                duy nhất = lấy từ điển(trạng thái["sổ hàm"], "chỉ mục tên duy nhất", {});
+                nếu (máy ảo có khóa từ điển(duy nhất, giá trị)) {
+                    đích duy nhất = duy nhất[giá trị];
+                    nếu (đích duy nhất >= 0) {
+                        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_BIEN_SO"),
+                                             đích duy nhất, 0, 0);
+                        trả về đúng;
+                    };
                 };
             };
             ô nhớ = mình.biên dịch phát mã ô nhớ(trạng thái, giá trị);
@@ -592,6 +618,18 @@ lớp công khai Bộ Phát Bytecode {
                                          số đối số, chỉ mục thấy[tên], 0);
                     trả về đúng;
                 };
+                // Bootstrap cũ cho các mô-đun dùng chung bảng hàm. Khi tên
+                // chỉ có đúng một khai báo trong toàn phiên, đích gọi đã được
+                // chứng minh và có thể bỏ lookup động theo chuỗi.
+                duy nhất = lấy từ điển(trạng thái["sổ hàm"], "chỉ mục tên duy nhất", {});
+                nếu (máy ảo có khóa từ điển(duy nhất, tên)) {
+                    đích duy nhất = duy nhất[tên];
+                    nếu (đích duy nhất >= 0) {
+                        mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI"),
+                                             số đối số, đích duy nhất, 0);
+                        trả về đúng;
+                    };
+                };
             };
             nếu (mã == "gọi tên") {
                 ô nhớ = mình.biên dịch phát mã tìm receiver(trạng thái, tên);
@@ -617,6 +655,15 @@ lớp công khai Bộ Phát Bytecode {
             nếu (nội tại != rỗng) {
                 nếu (số đối số != nội tại[1]) { ném "biên dịch phát mã: sai số đối số nội tại '" + tên + "'"; };
                 mình.biên dịch phát mã lệnh(thô, nội tại[0], 0, 0, 0);
+                trả về đúng;
+            };
+            abi lõi = biên dịch ABI lõi bản địa(tên);
+            nếu (abi lõi != rỗng) {
+                nếu (số đối số != abi lõi["arity"]) {
+                    ném "biên dịch phát mã: sai số đối số hàm lõi '" + tên + "'";
+                };
+                mình.biên dịch phát mã lệnh(thô, biên dịch mã thao tác("OP_GOI_LOI_BAN_DIA"),
+                    số đối số, abi lõi["id"], 0);
                 trả về đúng;
             };
             nếu (lấy từ điển(trạng thái, "liên mô đun", sai)) {

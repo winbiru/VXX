@@ -138,6 +138,11 @@ lớp công khai Tiện Ích Mã Máy {
             ca "Sub": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Mul": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Div": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "BitAnd": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "BitOr": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "BitXor": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "ShiftLeft": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
+            ca "ShiftRight": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Mod": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "Equal": { trả về mình.biên dịch mã máy stack nhị phân(trước); }
             ca "NotEqual": { trả về mình.biên dịch mã máy stack nhị phân(trước); }

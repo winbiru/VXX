@@ -1,0 +1,23 @@
+// Danh sách nguồn theo chức năng cho bộ biên dịch tự chủ Linux x86-64.
+// prepare_linux_freestanding_host.sh ghép các phần trước khi gọi assembler.vi. ABI: đối số i32 trên
+// ngăn xếp V++, phép toán máy SysV và syscall Linux.
+#include "tu_chu_x86_64/bo_nho.inc"
+#include "tu_chu_x86_64/nhap_xuat.inc"
+#include "tu_chu_x86_64/tep.inc"
+#include "tu_chu_x86_64/tien_trinh_bien_dich.inc"
+#include "tu_chu_x86_64/thong_tin_tep.inc"
+#include "tu_chu_x86_64/moi_truong.inc"
+#include "tu_chu_x86_64/duong_dan.inc"
+#include "tu_chu_x86_64/bao_cao.inc"
+#include "tu_chu_x86_64/so_nguyen.inc"
+#include "tu_chu_x86_64/doi_so.inc"
+#include "tu_chu_x86_64/xuat_ham.inc"
+#include "tu_chu_x86_64/du_lieu.inc"
+#include "tu_chu_x86_64/khoi_dong.inc"
+#include "tu_chu_x86_64/so_thuc.inc"
+#include "tu_chu_x86_64/he_thong.inc"
+#include "tu_chu_x86_64/thu_muc.inc"
+#include "tu_chu_x86_64/tien_trinh.inc"
+#include "tu_chu_x86_64/o_cam.inc"
+#include "tu_chu_x86_64/sha256.inc"
+#include "tu_chu_x86_64/loi_goi_he_thong.inc"

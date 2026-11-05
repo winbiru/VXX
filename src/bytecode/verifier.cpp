@@ -5,6 +5,7 @@
 #include "vpp/bytecode/opcode.h"
 #include "vpp/bytecode/intrinsic.h"
 #include "vpp/core/message_constants.h"
+#include "vpp/native/core_abi.h"
 
 namespace vietvm::bytecode {
 
@@ -264,6 +265,27 @@ std::optional<BytecodeVerificationIssue> verifyBytecode(
                     }
                 }
                 break;
+
+            case OP_GOI_LOI_BAN_DIA: {
+                const int expected = native::nativeCoreArity(instruction.operandIndex);
+                if (instruction.operand < 0) {
+                    return issue(index, rawOpcode,
+                                 "số đối số lời gọi lõi bản địa không được âm");
+                }
+                if (expected < 0) {
+                    return issue(index, rawOpcode,
+                                 "mã primitive lõi bản địa vượt phạm vi");
+                }
+                if (instruction.operand != expected) {
+                    return issue(index, rawOpcode,
+                                 "số đối số lời gọi lõi bản địa khác chữ ký ABI");
+                }
+                if (instruction.operandValue != 0) {
+                    return issue(index, rawOpcode,
+                                 "operandValue của OP_GOI_LOI_BAN_DIA phải bằng 0");
+                }
+                break;
+            }
 
             case OP_GOI_GIAN_TIEP:
                 if (instruction.operand < 0) {

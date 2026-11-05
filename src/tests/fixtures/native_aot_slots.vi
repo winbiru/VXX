@@ -1,0 +1,47 @@
+// Gán trực tiếp phải giữ kiểu động, tham chiếu chung và ô closure.
+hàm sao chép(x) {
+    y = x;
+    x = 99;
+    trả về y;
+};
+hàm tạo bộ đếm() {
+    x = 5000;
+    y = x;
+    đọc = hàm() { trả về y; };
+    x += 1;
+    y = x;
+    trả về đọc;
+};
+lớp Bộ Gọi {
+    hàm công khai lồng(n, giá trị) {
+        nếu (n == 0) {
+            // Vượt ngưỡng GC khi đối số của các khung cha vẫn còn sống.
+            lặp(i = 0; i < 12000; i++) { tạm = [i + 5000, [i]]; };
+            trả về giá trị;
+        };
+        con = mình.lồng(n - 1, [giá trị]);
+        trả về con[0];
+    };
+    hàm công khai bốn(a, b, c, d) { trả về [a, b, c, d]; };
+    hàm công khai năm(a, b, c, d, e) { trả về [a, b, c, d, e]; };
+    hàm công khai lỗi(x) { ném x; };
+    hàm riêng tư kín(x) { trả về x; };
+};
+hàm chính() {
+    in sao chép(5000) == 5000;
+    in sao chép(1.5) == 1.5;
+    in sao chép("Việt 🌿") == "Việt 🌿";
+    in sao chép(rỗng) == rỗng;
+    a = [1]; b = a; b[0] = 7;
+    in a[0] == 7;
+    đếm = tạo bộ đếm();
+    in đếm() == 5001;
+    bộ thử = Bộ Gọi();
+    in bộ thử.lồng(24, "Việt 🌿") == "Việt 🌿";
+    in bộ thử.bốn(1, [2], "á", 4)[2] == "á";
+    in bộ thử.năm(1, 2, 3, 4, [5])[4][0] == 5;
+    bắt được = 0;
+    thử { bộ thử.lỗi(["đúng"]); } bắt lỗi(e) { nếu (e[0] == "đúng") { bắt được += 1; }; };
+    in bắt được == 1;
+    in bộ thử.bốn(5, 6, 7, 8)[0] == 5;
+};

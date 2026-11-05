@@ -1,5 +1,20 @@
 # Ranh giới thư viện V++ và primitive VM
 
+## Windows x64: runtime COFF qua Docker/Wine (02/11/2026)
+
+Gate `scripts/quality/check_windows_file_boundary_docker.sh` hiện PASS
+`WINDOWS_NATIVE_FILE_PROCESS_SHA` và `WINDOWS_DOCKER_WINE_BOUNDARY`.
+Đã sửa đường spawn trong `scripts/ASM/windows/vpp_aot_primitives_windows_x86_64.S`
+để quote `argv[0]` khi truyền vào `_spawnvp`; phép gọi vẫn dùng executable
+path gốc và khôi phục `argv[0]` sau khi trả về. Probe kiểm tra tiến trình
+con có mã thoát 0/7/11, executable chứa khoảng trắng, bảng argv nguyên
+vẹn, lỗi spawn, SHA-256, file identity, và thay thế đích khi rename.
+Kiểm thử giới hạn bộ nhớ và PID Docker, có deadline Wine và tránh spawn
+đệ quy khi argv của child sai. `check_aot_primitives.sh` cũng PASS các
+target cross-assembly. Chưa xác minh runtime trên Windows thật bằng
+MSVC/UCRT/CNG, chưa có PE/COFF linker viết bằng V++ và chưa hội tụ compiler
+self-host Windows.
+
 ## DNS V++, mã hóa bản ghi TLS và bootstrap hội tụ (28/10/2026)
 
 Resolver hostname 203–205 trên standalone VM đã chuyển sang thư viện DNS
@@ -39,7 +54,7 @@ VM độc lập đã nhận UID/EUID/GID/EGID dạng u32 (tag 11 cho giá trị 
 hơn INT32_MAX), process spawn/pipe/poll/read/wait/cleanup (193–202) và
 socket TCP/UDP connect/listen/accept/send/recv/close/timeout (185–192).
 Policy và quyền sở hữu tài nguyên ở `gói/máy ảo/*.vi`, ranh giới OS
-ở `scripts/ASM/vpp_vm_{process,socket}_primitives.inc`; compiler i32
+ở `scripts/ASM/common/posix/vpp_vm_{process,socket}_primitives.inc`; compiler i32
 đã cấp tới native ID 74. Cửa sổ control và token ngăn chương trình guest
 truy cập trực tiếp FD hoặc con trỏ hệ điều hành.
 
@@ -84,7 +99,7 @@ thực tế trong lượt hiện tại.
 VM độc lập xử lý opcode 167/168 và 179..183 bằng V++/ASM. Policy,
 UTF-8, bản ghi thư mục, token/owner và cleanup nằm trong
 `gói/máy ảo/thư mục máy.vi`; syscall và con trỏ OS nằm trong
-`scripts/ASM/vpp_vm_directory_primitives.inc`. Đường này không gọi
+`scripts/ASM/common/posix/vpp_vm_directory_primitives.inc`. Đường này không gọi
 `executeDirectoryMachinePrimitive` hoặc `executeProcessIdentityPrimitive`.
 `mkdir` đã sửa về `[rc, loại lỗi, errno]` và mode `0777` theo umask;
 helper cache native `0700` giữ nguyên.
@@ -103,7 +118,7 @@ Adapter C++ vẫn có caller ở Stage 0/AOT và được giữ làm oracle.
 ## Chuyển Clock/Sleep/Entropy khỏi adapter VM C++ (28/10/2026)
 
 VM độc lập thực thi opcode 173..176 qua `gói/máy ảo/máy hệ thống.vi`
-và `scripts/ASM/vpp_vm_system_primitives.inc`. Kiểm tra kiểu/giới hạn,
+và `scripts/ASM/common/posix/vpp_vm_system_primitives.inc`. Kiểm tra kiểu/giới hạn,
 timespec, tạo list byte và vòng đọc entropy nằm ở V++; ASM chỉ kiểm tra
 offset/con trỏ và gọi OS. Chính sách ngủ có deadline/EINTR vẫn ở thư viện
 V++ hiện có. Các hàm `executeTimeClockPrimitive`, `executeTimeSleepPrimitive`,
@@ -534,7 +549,7 @@ và AOT kiểm tra token trong registry của từng VM, duration i32 trong mi�
 1..300000 ms và quyền riêng; trả `1` khi hai tùy chọn nhận/gửi thành công.
 Trên macOS/Linux ARM64/x86-64, `SO_RCVTIMEO`/`SO_SNDTIMEO` đi qua syscall
 `setsockopt` năm tham số, dùng `vpp_machine_socket_syscall5` trong
-`scripts/ASM/vpp_file_primitives.S`. Trên Windows vẫn dùng WinSock, các
+`scripts/ASM/common/posix/vpp_file_primitives.S`. Trên Windows vẫn dùng WinSock, các
 nền POSIX chưa có ASM giữ đường dự phòng. Adapter kết nối POSIX cũng dùng
 machine timeout này để giảm thêm một phụ thuộc libc.
 
@@ -551,7 +566,7 @@ VM interpreter và native AOT dùng chung `ForeignFileState::sockets` cho
 token socket đã tạo qua TCP/UDP FFI, vì vậy cả TLS session, kiểm tra
 token thuộc VM, lỗi khi đóng hai lần và dọn dẹp khi VM hủy đều tiếp tục
 hoạt động. Trên Unix ARM64/x86-64, đóng raw socket gọi trực tiếp syscall
-`close` qua `scripts/ASM/vpp_file_primitives.S` (đã có); socket TLS vẫn
+`close` qua `scripts/ASM/common/posix/vpp_file_primitives.S` (đã có); socket TLS vẫn
 phải đi qua provider TLS để giải phóng phiên và descriptor đúng cách.
 Windows hiện dùng `closesocket` của WinSock. Dữ liệu/chính sách trong V++
 không được phép truy cập file descriptor thô.
@@ -576,7 +591,7 @@ là `-1` khi không thể lấy trạng thái; trên POSIX là `S_IFMT >> 12`
 cùng một executor, kiểm tra quyền, arity, loại đối số, UTF-8 và byte NUL.
 
 Linux ARM64/x86-64 gọi thẳng `newfstatat` từ Assembly
-(`scripts/ASM/vpp_path_primitives.S`), sử dụng `AT_FDCWD` và
+(`scripts/ASM/common/posix/vpp_path_primitives.S`), sử dụng `AT_FDCWD` và
 `AT_SYMLINK_NOFOLLOW` khi `follow=0`; không cần `stat/lstat` của libc
 trong nhánh này. C++ adapter vẫn giải mã `struct stat` theo ABI của host.
 macOS ARM64/x86-64 còn Assembly branch đến `stat/lstat` của **libSystem**;
@@ -645,7 +660,7 @@ trường `tm_sec`, `tm_min`, `tm_hour`, `tm_mday`, `tm_mon`, `tm_year`,
 Các phép đổi Gregorian, offset giờ/phút, kiểm tra ngày và định dạng tiếp tục
 ở V++. API `thời gian địa phương từ epoch byte ffi/posix` vẫn tương thích.
 
-Trên macOS/Linux ARM64/x86-64, `scripts/ASM/vpp_localtime_primitives.S`
+Trên macOS/Linux ARM64/x86-64, `scripts/ASM/common/posix/vpp_localtime_primitives.S`
 gọi `localtime_r` công khai của libSystem/libc. C++ adapter tạm thời đóng gói
 `struct tm` thành wire layout ổn định, tránh phụ thuộc vào padding của host.
 Trên Windows dùng CRT `localtime_s` qua C++ adapter, `tm_gmtoff` trả 0; V++

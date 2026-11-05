@@ -56,6 +56,61 @@ hàm vm_profile_report() {
         line = vm_concat(line, vm_concat(vm_literal(" cpu_nanoseconds="), vm_integer_text(vm_get(start, 5))));
         vm_write(2, vm_concat(line, vm_literal("\n")));
     };
+    // Số liệu cấp phát và thu gom giúp xác định nút thắt của runtime AOT.
+    biến line = vm_literal("VPP_VM_ALLOC allocations=");
+    line = vm_concat(line, vm_integer_text(vm_get(4198464, 14)));
+    line = vm_concat(line, vm_literal(" collections="));
+    line = vm_concat(line, vm_integer_text(vm_get(4198464, 15)));
+    line = vm_concat(line, vm_literal(" free_probes="));
+    line = vm_concat(line, vm_integer_text(vm_get(4198464, 16)));
+    vm_write(2, vm_concat(line, vm_literal("\n")));
+    biến state = vm_get(4198464, 2);
+    biến bộ đếm = 0;
+    nếu (state != 0) { bộ đếm = vm_get(state, 17); };
+    nếu (bộ đếm != 0) {
+        lặp(op = 0; op <= 217; op++) {
+            biến calls = vm_get(bộ đếm, op);
+            nếu (calls > 0) {
+                biến dòng = vm_concat(vm_literal("VPP_VM_BINARY_OP op="), vm_integer_text(op));
+                dòng = vm_concat(dòng, vm_concat(vm_literal(" calls="), vm_integer_text(calls)));
+                vm_write(2, vm_concat(dòng, vm_literal("\n")));
+            };
+        };
+    };
+    biến theo hàm = 0;
+    nếu (state != 0) { theo hàm = vm_get(state, 18); };
+    nếu (theo hàm != 0) {
+        lặp(id = 231; id <= 247; id++) {
+            lặp(op = 0; op <= 217; op++) {
+                biến calls = vm_get(theo hàm, (id - 231) * 218 + op);
+                nếu (calls > 0) {
+                    biến dòng = vm_concat(vm_literal("VPP_VM_BINARY_FN fn="), vm_integer_text(id));
+                    dòng = vm_concat(dòng, vm_concat(vm_literal(" op="), vm_integer_text(op)));
+                    dòng = vm_concat(dòng, vm_concat(vm_literal(" calls="), vm_integer_text(calls)));
+                    vm_write(2, vm_concat(dòng, vm_literal("\n")));
+                };
+            };
+        };
+    };
+    biến chẩn đoán = 0;
+    nếu (state != 0) { chẩn đoán = vm_get(state, 19); };
+    nếu (chẩn đoán != 0) {
+        biến dòng = vm_literal("VPP_AOT_HELPER_PROFILE update_integer_fallback=");
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 0)));
+        dòng = vm_concat(dòng, vm_literal(" source_not_i32="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 1)));
+        dòng = vm_concat(dòng, vm_literal(" target_missing="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 2)));
+        dòng = vm_concat(dòng, vm_literal(" compare_and_fallback="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 3)));
+        dòng = vm_concat(dòng, vm_literal(" left_not_i32="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 4)));
+        dòng = vm_concat(dòng, vm_literal(" right_not_i32="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 5)));
+        dòng = vm_concat(dòng, vm_literal(" guard_not_i32="));
+        dòng = vm_concat(dòng, vm_integer_text(vm_get(chẩn đoán, 6)));
+        vm_write(2, vm_concat(dòng, vm_literal("\n")));
+    };
     trả về 0;
 };
 hàm vm_error(code) {
@@ -133,10 +188,13 @@ hàm vm_alloc_body(bytes, scan) {
     nếu (p == end) {
         nếu (size > 67000000 - end) { trả về vm_error(1); };
         vm_set(4198464, 0, end + size);
+        // Vùng cấp phát tuần tự chưa từng sử dụng; hệ điều hành đã đặt về 0.
+        // Chỉ xóa nội dung khi tái sử dụng vùng đã được thu gom.
+    } hoặc {
+        lặp(i = 16; i < size; i = i + 4) { máy ghi số nguyên ba mươi hai bit(p + i, 0); };
     };
     vm_set(p, 0, size); vm_set(p, 1, scan); vm_set(p, 2, 0); vm_set(p, 3, 0);
     máy ghi byte(4198720 + máy chia số nguyên ba mươi hai bit(p + 16 - 8388608, 16), 1);
-    lặp(i = 16; i < size; i = i + 4) { máy ghi số nguyên ba mươi hai bit(p + i, 0); };
     vm_set(4198464, 9, vm_get(4198464, 9) + size);
     nếu (vm_get(4198464, 12) == 1) { vm_set(4198464, 14, vm_get(4198464, 14) + 1); };
     trả về p + 16;

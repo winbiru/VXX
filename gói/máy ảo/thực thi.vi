@@ -29,7 +29,7 @@ hàm vm_step_body(state, frames) {
     biến instruction_base = code + 4 + pc * 16;
     biến op = máy đọc số nguyên ba mươi hai bit(instruction_base);
     máy ghi số nguyên ba mươi hai bit(frame + 4, pc + 1);
-    nếu (op <= 5 || (op >= 7 && op <= 12) || op == 64) {
+    nếu (op <= 5 || (op >= 7 && op <= 12) || op == 64 || (op >= 209 && op <= 213)) {
         // Replace two checked pops and a capacity-checked append with one
         // in-place reduction. Keep both operands rooted on the stack until
         // vm_binary has finished allocating its result.

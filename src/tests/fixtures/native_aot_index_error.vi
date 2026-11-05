@@ -1,0 +1,20 @@
+nhập gói.hệ thống.môi trường.*;
+hàm so(nguồn, chỉ số) { trả về nguồn[chỉ số] == "á"; };
+hàm cộng(nguồn, chỉ số) { tổng = 1; tổng += nguồn[chỉ số]; trả về tổng; };
+hàm nhân(nguồn, chỉ số) { tích = 2; tích *= nguồn[chỉ số]; trả về tích; };
+lớp Bộ Lỗi {
+    hàm riêng tư kín(x) { trả về x; };
+    hàm công khai hai(a, b) { trả về a + b; };
+};
+hàm chính() {
+    ca lỗi = đọc biến môi trường("VPP_AOT_TEST_ERROR", "âm");
+    nếu (ca lỗi == "âm") { so("á", -1); }
+    hoặc nếu (ca lỗi == "cuối") { so("á", 1); }
+    hoặc nếu (ca lỗi == "kiểu") { so("á", 0.5); }
+    hoặc nếu (ca lỗi == "utf8") { so(chuỗi từ byte máy ảo([240, 159]), 0); }
+    hoặc nếu (ca lỗi == "danh sách") { cộng([], 0); }
+    hoặc nếu (ca lỗi == "phép toán") { nhân(["á"], 0); }
+    hoặc nếu (ca lỗi == "truy cập") { bộ thử = Bộ Lỗi(); bộ thử.kín([1]); }
+    hoặc nếu (ca lỗi == "tham số") { bộ thử = Bộ Lỗi(); bộ thử.hai([1]); };
+    in "đã bỏ qua lỗi";
+};

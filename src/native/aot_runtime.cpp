@@ -11,6 +11,9 @@
 #include <limits>
 #include <map>
 #include <vector>
+#if defined(__APPLE__)
+#include <execinfo.h>
+#endif
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -119,6 +122,7 @@ runtime::CellHandle createFrameCell(bool global) {
     throw runtime::RuntimeError("Native AOT: " + message,
                                runtime::RuntimeErrorKind::CallBoundary);
 }
+
 Value defaultValue(const std::string &encoded) {
     const auto colon = encoded.find(':');
     if (colon == std::string::npos) fail("invalid default parameter");
@@ -159,6 +163,45 @@ bool representationIntrinsic(Opcode opcode, const std::vector<Value> &args,
         bytes.reserve(source->size());
         for (unsigned char c : *source) bytes.push_back(make_int_value(c));
         result = make_list_value(std::move(bytes));
+        return true;
+    }
+    if (opcode == OP_VM_STRING_SLICE) {
+        const auto *source = std::get_if<std::string>(&args[0]);
+        const auto *start = std::get_if<int>(&args[1]);
+        const auto *count = std::get_if<int>(&args[2]);
+        if (!source || !start || !count || *start < 0 || *count < 0) {
+            error = name + ": cần chuỗi và hai chỉ số nguyên không âm";
+            return true;
+        }
+        result = make_string_value(core::utf8CodePointSlice(
+            *source, static_cast<std::size_t>(*start), static_cast<std::size_t>(*count)));
+        return true;
+    }
+    if (opcode == OP_VM_STRING_BYTE_SLICE) {
+        const auto *source = std::get_if<std::string>(&args[0]);
+        const auto *start = std::get_if<int>(&args[1]);
+        const auto *count = std::get_if<int>(&args[2]);
+        if (!source || !start || !count || *start < 0 || *count < 0) {
+            error = name + ": cần chuỗi và hai chỉ số nguyên không âm";
+            return true;
+        }
+        const auto begin = static_cast<std::size_t>(*start);
+        const auto length = static_cast<std::size_t>(*count);
+        result = make_string_value(begin >= source->size() || length == 0
+            ? std::string{}
+            : source->substr(begin, length));
+        return true;
+    }
+    if (opcode == OP_VM_STRING_REPLACE_EXACT) {
+        const auto *source = std::get_if<std::string>(&args[0]);
+        const auto *pattern = std::get_if<std::string>(&args[1]);
+        const auto *replacement = std::get_if<std::string>(&args[2]);
+        if (!source || !pattern || !replacement) {
+            error = name + ": cần ba giá trị chuỗi";
+            return true;
+        }
+        result = make_string_value(core::utf8ReplaceExact(
+            *source, *pattern, *replacement));
         return true;
     }
     if (opcode == OP_VM_STRING_FROM_BYTES || opcode == OP_VM_FLOAT_FROM_BITS) {
@@ -430,6 +473,12 @@ void Frame::binary(int operation) {
     if (const auto *a = std::get_if<int>(&left)) {
         if (const auto *b = std::get_if<int>(&right)) {
             switch (operation) {
+                case OP_BIT_VA:
+                case OP_BIT_HOAC:
+                case OP_BIT_XOR:
+                case OP_DICH_TRAI:
+                case OP_DICH_PHAI:
+                    push(evaluateI32Bits(operation, *a, *b)); return;
                 case OP_CONG:
                     push(wrapRuntimeInt32(std::int64_t{*a} + *b)); return;
                 case OP_TRU:
@@ -635,8 +684,9 @@ bool Frame::compareNumericSlots(int leftSlot, int rightSlot, int operation) {
     return runtime::stackValueTruthy(evaluateBinaryOperator(operation,left,right,0));
 }
 bool Frame::runCountedScalarLoop(int counterSlot, int bound, int valueSlot,
-                                 int step, int threshold) {
+                                 int step, int threshold, bool keep) {
     CpuScope profile("native.counted_scalar_loop");
+    if(!keep&&!stack.empty())return false;
     if (counterSlot == valueSlot) return false;
     // Bound the amount of work between safepoints, including large loops.
     // Each completed chunk commits its scalar values and increment results
@@ -662,7 +712,7 @@ bool Frame::runCountedScalarLoop(int counterSlot, int bound, int valueSlot,
     // stack results, even when the arithmetic loop body stays unboxed.
     for (std::int64_t completed = 0; completed < iterations;) {
         const auto batch = std::min<std::int64_t>(4096, iterations - completed);
-        stack.reserve(stack.size() + static_cast<std::size_t>(batch));
+        if(keep)stack.reserve(stack.size() + static_cast<std::size_t>(batch));
         if (auto *number = std::get_if<int>(&numberValue)) {
             std::uint32_t bits = static_cast<std::uint32_t>(*number);
             for (std::int64_t n = 0; n < batch; ++n) {
@@ -687,15 +737,18 @@ bool Frame::runCountedScalarLoop(int counterSlot, int bound, int valueSlot,
         const auto previous = completed;
         completed += batch;
         counterValue = static_cast<int>(initialCounter + completed);
-        for (std::int64_t n = previous + 1; n <= completed; ++n)
-            stack.emplace_back(static_cast<int>(initialCounter + n));
+        if(keep) {
+            for (std::int64_t n = previous + 1; n <= completed; ++n)
+                stack.emplace_back(static_cast<int>(initialCounter + n));
+        }
         safepoint();
     }
     return true;
 }
 bool Frame::runSimpleScalarLoop(int counterSlot, int bound, int valueSlot,
-                                int operand, int operation) {
+                                int operand, int operation, bool keep) {
     CpuScope profile("native.simple_scalar_loop");
+    if(!keep&&!stack.empty())return false;
     if(counterSlot==valueSlot ||
        (operation!=OP_CONG && operation!=OP_TRU && operation!=OP_NHAN))return false;
     const auto counterCell=cell(counterSlot,false);
@@ -716,7 +769,7 @@ bool Frame::runSimpleScalarLoop(int counterSlot, int bound, int valueSlot,
     const std::int64_t initialCounter=*counter;
     for(std::int64_t completed=0;completed<iterations;) {
         const auto batch=std::min<std::int64_t>(4096,iterations-completed);
-        stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        if(keep)stack.reserve(stack.size()+static_cast<std::size_t>(batch));
         if(auto *number=std::get_if<int>(&numberValue)) {
             std::uint32_t bits=static_cast<std::uint32_t>(*number);
             const auto rhs=static_cast<std::uint32_t>(operand);
@@ -756,15 +809,18 @@ bool Frame::runSimpleScalarLoop(int counterSlot, int bound, int valueSlot,
         completed+=batch;
         counterValue=static_cast<int>(initialCounter+completed);
         // Match the original OP_CONG_MOT operand-stack side effect.
-        for(std::int64_t n=previous+1;n<=completed;++n)
-            stack.emplace_back(static_cast<int>(initialCounter+n));
+        if(keep) {
+            for(std::int64_t n=previous+1;n<=completed;++n)
+                stack.emplace_back(static_cast<int>(initialCounter+n));
+        }
         safepoint();
     }
     return true;
 }
 bool Frame::runNumericAddLoop(int counterSlot, int bound, int leftSlot,
-                              int rightSlot, int resultSlot) {
+                              int rightSlot, int resultSlot, bool keep) {
     CpuScope profile("native.numeric_add_loop");
+    if(!keep&&!stack.empty())return false;
     if(counterSlot==resultSlot)return false;
     const auto counterCell=cell(counterSlot,false);
     if(!counterCell)return false;
@@ -794,7 +850,7 @@ bool Frame::runNumericAddLoop(int counterSlot, int bound, int leftSlot,
 
     for(std::int64_t completed=0;completed<iterations;) {
         const auto batch=std::min<std::int64_t>(4096,iterations-completed);
-        stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        if(keep)stack.reserve(stack.size()+static_cast<std::size_t>(batch));
         // Keep the result in a native register through each chunk. For
         // captured aliases, read the running result instead of repeatedly
         // boxing/unboxing the same RuntimeCell on every iteration.
@@ -830,32 +886,234 @@ bool Frame::runNumericAddLoop(int counterSlot, int bound, int leftSlot,
         const auto previous=completed;
         completed+=batch;
         counterCell->value=static_cast<int>(initialCounter+completed);
-        for(std::int64_t n=previous+1;n<=completed;++n)
-            stack.emplace_back(static_cast<int>(initialCounter+n));
+        if(keep) {
+            for(std::int64_t n=previous+1;n<=completed;++n)
+                stack.emplace_back(static_cast<int>(initialCounter+n));
+        }
+        safepoint();
+    }
+    return true;
+}
+bool Frame::runListAppendI32Loop(int counterSlot, int bound, int listSlot,
+                                 int baseSlot, bool keep) {
+    CpuScope profile("native.list_append_i32_loop");
+    const auto counterCell=cell(counterSlot,false);
+    if(!counterCell)return false;
+    const auto *counter=std::get_if<int>(&counterCell->value);
+    if(!counter)return false;
+    const std::int64_t first=*counter;
+    const std::int64_t iterations=std::int64_t(bound)-first;
+    if(iterations<=0)return true;
+    if(iterations>1'000'000)return false;
+    const auto listCell=cell(listSlot,false);
+    const auto baseCell=cell(baseSlot,false);
+    if(!listCell||!baseCell)return false;
+    auto *list=std::get_if<runtime::ListHandle>(&listCell->value);
+    const auto *base=std::get_if<int>(&baseCell->value);
+    if(!list||!*list||!base)return false;
+    auto &items=(*list)->elements;
+    const int fixedBase=*base;
+    for(std::int64_t completed=0;completed<iterations;) {
+        const auto batch=std::min<std::int64_t>(4096,iterations-completed);
+        if(keep)stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        for(std::int64_t n=0;n<batch;++n) {
+            const int induction=static_cast<int>(first+completed+n);
+            const int left=baseCell==counterCell?induction:fixedBase;
+            items.emplace_back(wrapRuntimeInt32(std::int64_t(left)+induction));
+        }
+        const auto previous=completed;
+        completed+=batch;
+        counterCell->value=static_cast<int>(first+completed);
+        if(keep) {
+            for(std::int64_t n=previous+1;n<=completed;++n)
+                stack.emplace_back(static_cast<int>(first+n));
+        }
+        safepoint();
+    }
+    return true;
+}
+bool Frame::runListModSumLoop(int counterSlot, int bound, int sourceSlot,
+                              int targetSlot, int divisor, int expected,
+                              bool keep) {
+    CpuScope profile("native.list_mod_sum_loop");
+    const auto counterCell=cell(counterSlot,false);
+    if(!counterCell)return false;
+    const auto *counter=std::get_if<int>(&counterCell->value);
+    if(!counter)return false;
+    const std::int64_t first=*counter;
+    const std::int64_t iterations=std::int64_t(bound)-first;
+    if(iterations<=0)return true;
+    if(first<0||iterations>1'000'000||divisor==0)return false;
+    const auto sourceCell=cell(sourceSlot,false);
+    const auto targetCell=cell(targetSlot,false);
+    if(!sourceCell||!targetCell||targetCell==counterCell)return false;
+    const auto *list=std::get_if<runtime::ListHandle>(&sourceCell->value);
+    auto *target=std::get_if<int>(&targetCell->value);
+    if(!list||!*list||!target||std::int64_t(bound)>std::int64_t((*list)->elements.size()))
+        return false;
+    const auto &items=(*list)->elements;
+    for(std::int64_t i=first;i<bound;++i)
+        if(!std::holds_alternative<int>(items[static_cast<std::size_t>(i)]))
+            return false;
+    int sum=*target;
+    for(std::int64_t completed=0;completed<iterations;) {
+        const auto batch=std::min<std::int64_t>(4096,iterations-completed);
+        if(keep)stack.reserve(stack.size()+static_cast<std::size_t>(batch));
+        for(std::int64_t n=0;n<batch;++n) {
+            const int value=std::get<int>(items[static_cast<std::size_t>(first+completed+n)]);
+            int remainder=0;
+            if(value!=std::numeric_limits<int>::min()||divisor!=-1)
+                remainder=value%divisor;
+            if(remainder==expected)
+                sum=wrapRuntimeInt32(std::int64_t(sum)+value);
+        }
+        targetCell->value=sum;
+        const auto previous=completed;
+        completed+=batch;
+        counterCell->value=static_cast<int>(first+completed);
+        if(keep) {
+            for(std::int64_t n=previous+1;n<=completed;++n)
+                stack.emplace_back(static_cast<int>(first+n));
+        }
+        safepoint();
+    }
+    return true;
+}
+bool Frame::runRangeModSumI32Loop(int baseSlot, int targetSlot, int bound,
+                                  int divisor, int expected) {
+    CpuScope profile("native.range_mod_sum_i32_loop");
+    if(bound<0||bound>1'000'000||divisor==0)return false;
+    const auto baseCell=cell(baseSlot,false);
+    const auto targetCell=cell(targetSlot,false);
+    if(!baseCell||!targetCell||baseCell==targetCell)return false;
+    const auto *base=std::get_if<int>(&baseCell->value);
+    auto *target=std::get_if<int>(&targetCell->value);
+    if(!base||!target)return false;
+    int total=0;
+    for(int i=0;i<bound;++i) {
+        const int value=wrapRuntimeInt32(std::int64_t(*base)+i);
+        int remainder=0;
+        if(value!=std::numeric_limits<int>::min()||divisor!=-1)
+            remainder=value%divisor;
+        if(remainder==expected)
+            total=wrapRuntimeInt32(std::int64_t(total)+value);
+    }
+    targetCell->value=total;
+    return true;
+}
+bool Frame::runIndirectI32FoldLoop(int counterSlot, int boundSlot,
+                                   int checksumSlot, int callableSlot,
+                                   int dataSlot, int seedSlot,
+                                   int cycle, int divisor) {
+    CpuScope profile("native.indirect_i32_fold_loop");
+    if(!stack.empty() || cycle<=0 || divisor<=0)return false;
+    const auto counterCell=cell(counterSlot,false);
+    const auto boundCell=cell(boundSlot,false);
+    const auto checksumCell=cell(checksumSlot,false);
+    const auto callableCell=cell(callableSlot,false);
+    const auto seedCell=cell(seedSlot,false);
+    if(!counterCell||!boundCell||!checksumCell||!callableCell||!seedCell)return false;
+    if(counterCell==boundCell || counterCell==checksumCell || counterCell==callableCell ||
+       counterCell==seedCell || checksumCell==boundCell || checksumCell==callableCell ||
+       checksumCell==seedCell)return false;
+    const auto *counter=std::get_if<int>(&counterCell->value);
+    const auto *bound=std::get_if<int>(&boundCell->value);
+    auto *checksum=std::get_if<double>(&checksumCell->value);
+    const auto *seed=std::get_if<int>(&seedCell->value);
+    if(!counter||!bound||!checksum||!seed)return false;
+    const std::int64_t iterations=std::int64_t(*bound)-*counter;
+    if(iterations<=0)return true;
+    // Giới hạn này chỉ quyết định có dùng specialization hay không. Đường
+    // bytecode vẫn xử lý mọi trường hợp khác, kể cả vòng rất lớn hoặc tràn i32.
+    if(iterations>100'000'000)return false;
+
+    int callee=-1;
+    const auto &callable=callableCell->value;
+    if(const auto p=std::get_if<int>(&callable))callee=*p;
+    else if(const auto p=std::get_if<runtime::ClosureHandle>(&callable)) {
+        // Raw i32 entries have no closure environment or method owner. A
+        // captured cell can change the result even when the function body is
+        // otherwise scalar, so keep such closures on the dynamic path.
+        if(!*p || !(*p)->captures.empty() || (*p)->methodOwnerClass)return false;
+        callee=(*p)->functionId;
+    }
+    else if(const auto p=std::get_if<std::string>(&callable)) {
+        for(std::size_t i=0;i<program.functions.size();++i) {
+            const auto &fn=program.functions[i];
+            if(fn.function && fn.nameIndex>=0 && program.string(fn.nameIndex)==*p) {
+                callee=static_cast<int>(i); break;
+            }
+        }
+    }
+    if(callee<0 || static_cast<std::size_t>(callee)>=program.i32Functions.size())return false;
+    const auto &raw=program.i32Functions[static_cast<std::size_t>(callee)];
+    if(!raw.function || raw.parameters!=2)return false;
+
+    int data=0;
+    if(raw.usedMask&2) {
+        const auto dataCell=cell(dataSlot,false);
+        if(!dataCell || dataCell==counterCell || dataCell==checksumCell)return false;
+        const auto *value=std::get_if<int>(&dataCell->value);
+        if(!value)return false;
+        data=*value;
+    }
+    using Raw2=int (*)(int,int);
+    const auto function=reinterpret_cast<Raw2>(const_cast<void *>(raw.function));
+    const std::int64_t first=*counter;
+    double total=*checksum;
+    for(std::int64_t completed=0;completed<iterations;) {
+        const auto batch=std::min<std::int64_t>(4096,iterations-completed);
+        for(std::int64_t n=0;n<batch;++n) {
+            const int induction=static_cast<int>(first+completed+n);
+            const int offset=induction%cycle;
+            const int argument=wrapRuntimeInt32(std::int64_t(*seed)+offset);
+            total+=function(argument,data)%divisor;
+        }
+        completed+=batch;
+        counterCell->value=static_cast<int>(first+completed);
+        checksumCell->value=total;
         safepoint();
     }
     return true;
 }
 void Frame::index() {
     auto key = pop(); auto container = pop();
+    const auto indexError = [&](std::size_t size, const char *kind) {
+        if (std::getenv("VPP_AOT_INDEX_DEBUG")) {
+            std::cerr << "AOT index debug: " << kind << " length=" << size;
+            if (const auto *number=std::get_if<int>(&key)) std::cerr << " key=" << *number;
+            else {
+                std::cerr << " non-integer key variant=" << key.index();
+                if (auto p=std::get_if<double>(&key)) std::cerr << " double=" << *p;
+                if (auto p=std::get_if<std::string>(&key)) std::cerr << " string=" << *p;
+            }
+            std::cerr << " frames=" << nativeFrames.size() << '\n';
+#if defined(__APPLE__)
+            void *trace[24];
+            const int count=backtrace(trace,24);
+            backtrace_symbols_fd(trace,count,2);
+#endif
+        }
+        fail("index out of range");
+    };
     if (auto map = std::get_if<runtime::MapHandle>(&container)) {
         if (!*map) { push(make_null_value()); return; }
         const auto found = (*map)->entries.find(helpers::argToRawString(key));
         push(found == (*map)->entries.end() ? make_null_value() : found->second); return;
     }
-    if (!std::holds_alternative<int>(key) || std::get<int>(key) < 0) fail("index out of range");
+    if (!std::holds_alternative<int>(key) || std::get<int>(key) < 0) indexError(0, "invalid-key");
     const auto offset = static_cast<std::size_t>(std::get<int>(key));
     if (auto list = std::get_if<runtime::ListHandle>(&container)) {
-        if (!*list || offset >= (*list)->elements.size()) fail("index out of range");
+        if (!*list || offset >= (*list)->elements.size()) indexError(*list ? (*list)->elements.size() : 0, "list");
         push((*list)->elements[offset]); return;
     }
     if (auto tuple = std::get_if<runtime::TupleHandle>(&container)) {
-        if (!*tuple || offset >= (*tuple)->elements.size()) fail("index out of range");
+        if (!*tuple || offset >= (*tuple)->elements.size()) indexError(*tuple ? (*tuple)->elements.size() : 0, "tuple");
         push((*tuple)->elements[offset]); return;
     }
     if (auto string = std::get_if<std::string>(&container)) {
         auto unit = core::utf8CodePointAt(*string, offset);
-        if (!unit) fail("index out of range");
+        if (!unit) indexError(string->size(), "string-bytes");
         push(*unit); return;
     }
     fail("value cannot be indexed");
@@ -954,6 +1212,34 @@ void Frame::call(int target, int count, int nameIndex, bool indirect) {
     const auto *primitive = bytecode::intrinsicByName(program.string(nameIndex));
     if (!primitive) fail("call target not found: " + program.string(nameIndex));
     for (auto &value : args) push(std::move(value));
+    intrinsic(primitive->opcode);
+}
+void Frame::callSlot(int slot, int count) {
+    CpuScope callProfile("frame.call_slot_total");
+    Value value=load(slot);
+    auto args=[&]() {
+        CpuScope profile("frame.call_arguments");
+        return take(count);
+    }();
+    if(auto closure=std::get_if<runtime::ClosureHandle>(&value)) {
+        if(!*closure)fail("null closure");
+        push(program.invoke((*closure)->functionId,std::move(args),{},{},*closure));
+        return;
+    }
+    if(auto text=std::get_if<std::string>(&value)) {
+        push(program.invokeName(*text,std::move(args)));
+        return;
+    }
+    if(!std::holds_alternative<int>(value))fail("value is not callable");
+    const int target=std::get<int>(value);
+    if(target>=0 && static_cast<std::size_t>(target)<program.functions.size() &&
+       program.functions[target].function) {
+        push(program.invoke(target,std::move(args)));
+        return;
+    }
+    const auto *primitive=bytecode::intrinsicByName(program.string(0));
+    if(!primitive)fail("call target not found: "+program.string(0));
+    for(auto &argument:args)push(std::move(argument));
     intrinsic(primitive->opcode);
 }
 void Frame::defineClass(int name, int superclass) {
@@ -1187,6 +1473,10 @@ template<class Operation> int boundaryChecked(int id, Operation operation) noexc
 }
 }
 
+int runAotBoundary2(int id, int a, int b, AotBoundary2Operation operation) noexcept {
+    return boundaryChecked(id, [=](Frame &frame) { operation(frame, a, b); });
+}
+
 // C ABI boundaries always contain C++ exceptions. Generated machine frames
 // route pending language exceptions to native catch labels explicitly.
 #define AOT0(name, body) extern "C" int vpp_aot_##name(int id) noexcept { CpuScope profile("abi." #name);return boundaryChecked(id, [](Frame &f) { body; }); }
@@ -1199,11 +1489,19 @@ AOT1(string, f.push(f.program.string(a)))
 AOT1(floating, f.push(std::stod(f.program.string(a))))
 AOT0(null, f.push(make_null_value()))
 AOT1(load, f.push(f.load(a)))
+// Runtime C++ không dùng layout ô nội tuyến của runtime V++; giữ cùng ABI và
+// ngữ nghĩa, còn runtime V++ tận dụng key/offset để bỏ tra bảng biến.
+AOT3(load_inline, f.push(f.load(a)))
 AOT1(initialize, f.initialize(a))
 AOT0(assign, f.assign())
 // Fold a known variable ID into the store: no temporary boxed ID or
 // second ABI crossing. The value is still consumed from the operand stack.
 AOT1(assign_slot, f.store(a,f.pop()))
+AOT2(copy_slot, {const Value value=f.load(a); f.store(b,value);})
+AOT4(index_update, {
+    f.push(f.load(a)); f.push(f.load(b)); f.push(f.load(c));
+    f.index(); f.binary(d); f.store(a,f.pop());
+})
 AOT2(store_integer, f.store(a,Value(b)))
 AOT3(parameter, f.parameter(a,b,c))
 AOT1(increment, f.increment(a))
@@ -1215,9 +1513,306 @@ AOT0(negate, f.push(int(!runtime::stackValueTruthy(f.pop()))))
 AOT2(list, f.list(a,b))
 AOT2(map, f.map(a,b))
 AOT0(index, f.index())
+// Tương thích bootstrap: dùng đúng quy tắc chỉ số và ngoại lệ của Frame.
+// Ứng dụng V++/ASM sử dụng runtime AOT.vi chuyên biệt cho đường nóng.
+AOT3(index_slot, f.push(f.load(a)); f.push(c ? f.load(b) : Value(b)); f.index())
+extern "C" int vpp_aot_index_compare_integer(int id,int source,int index,int isSlot,
+                                                int immediate,int operation) noexcept {
+    CpuScope profile("abi.index_compare_integer");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        f.push(f.load(source));
+        f.push(isSlot ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(immediate));
+        f.binary(operation);
+        return runtime::stackValueTruthy(f.pop()) ? 1 : 0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_index_compare_integer_outside_range(int id,int source,int index,int isSlot,
+                                                              int low,int high) noexcept {
+    CpuScope profile("abi.index_compare_integer_outside_range");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        f.push(f.load(source));
+        f.push(isSlot ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(low));
+        f.binary(OP_NHO_HON);
+        const bool lower=runtime::stackValueTruthy(f.pop());
+        f.push(f.load(source));
+        f.push(isSlot ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(high));
+        f.binary(OP_LON_HON);
+        const bool upper=runtime::stackValueTruthy(f.pop());
+        return lower||upper ? 1 : 0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_index_compare_integer_pair(int id,int source,int index,int isSlot,
+                                                     int a,int b) noexcept {
+    CpuScope profile("abi.index_compare_integer_pair");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        f.push(f.load(source));
+        f.push(isSlot ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(a));
+        f.binary(OP_SO_SANH_BANG);
+        const bool first=runtime::stackValueTruthy(f.pop());
+        f.push(f.load(source));
+        f.push(isSlot ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(b));
+        f.binary(OP_SO_SANH_BANG);
+        const bool second=runtime::stackValueTruthy(f.pop());
+        return first||second ? 1 : 0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+AOT4(index_store_slot, {
+    f.push(f.load(a));
+    f.push(c ? f.load(b) : Value(b));
+    f.index();
+    f.store(d,f.pop());
+})
+extern "C" int vpp_aot_index_store_integer_op(int id,int containerSlot,int index,
+                                                int sourceSlot,int immediate,int operation) noexcept {
+    CpuScope profile("abi.index_store_integer_op");
+    return boundaryChecked(id,[=](Frame &f) {
+        const Value container=f.load(containerSlot);
+        const Value key(index);
+        const Value source=f.load(sourceSlot);
+        const Value right(immediate);
+        Value result;
+        if(const auto *integer=std::get_if<int>(&source)) {
+            const std::int64_t value=*integer;
+            if(operation==OP_CONG)result=wrapRuntimeInt32(value+immediate);
+            else if(operation==OP_TRU)result=wrapRuntimeInt32(value-immediate);
+            else if(operation==OP_NHAN)result=wrapRuntimeInt32(value*immediate);
+            else fail("index_store_integer_op: unsupported operation");
+        } else {
+            f.push(source);f.push(right);f.binary(operation);result=f.pop();
+        }
+        f.push(container);f.push(key);f.push(std::move(result));f.setIndex();
+    });
+}
+extern "C" int vpp_aot_index_mod_equal(int id,int source,int index,int divisor,
+                                          int expected,int mask) noexcept {
+    return boundaryChecked(id,[=](Frame &f) {
+        f.push(f.load(source));
+        f.push((mask&1) ? f.load(index) : Value(index));
+        f.index();
+        f.push(Value(divisor));
+        f.binary(OP_MODULO);
+        f.push(Value(expected));
+        f.binary((mask&2) ? OP_KHAC_BANG : OP_SO_SANH_BANG);
+    });
+}
+extern "C" int vpp_aot_index_mod_add_if_equal(int id,int source,int index,int target,
+                                                 int divisor,int expected) noexcept {
+    return boundaryChecked(id,[=](Frame &f) {
+        f.push(f.load(source));
+        f.push(f.load(index));
+        f.index();
+        f.push(Value(divisor));
+        f.binary(OP_MODULO);
+        f.push(Value(expected));
+        f.binary(OP_SO_SANH_BANG);
+        const bool equal=runtime::stackValueTruthy(f.pop());
+        if(!equal)return;
+        f.push(f.load(target));
+        f.push(f.load(source));
+        f.push(f.load(index));
+        f.index();
+        f.binary(OP_CONG);
+        f.store(target,f.pop());
+    });
+}
+AOT2(index_string_slot, f.push(f.load(a)); f.push(f.program.string(b)); f.index())
+AOT4(index_equal, {
+    f.push(f.load(a)); f.push((d & 1) ? f.load(b) : Value(b)); f.index();
+    f.push((d & 2) ? f.load(c) : Value(f.program.string(c)));
+    f.binary((d & 4) ? OP_KHAC_BANG : OP_SO_SANH_BANG);
+})
 AOT0(set_index, f.setIndex())
 AOT2(call, f.call(a,b,a<0?-a-1:a))
+// Truyền đối số đơn giản trực tiếp qua ABI máy. Chỉ tạo StackValue khi
+// cần đưa vào khung con; giữ thứ tự đọc ô và cả đường gọi intrinsic.
+static void callSimple(Frame &frame,int target,int count,const int *values,int mask) {
+    for(int index=0;index<count;++index)
+        frame.push((mask&(1<<index)) ? frame.load(values[index]) : Value(values[index]));
+    frame.call(target,count,target<0?-target-1:target);
+}
+extern "C" int vpp_aot_call_small(int id,int target,int count,int first,int second,int mask) noexcept {
+    CpuScope profile("abi.call_small");
+    return boundaryChecked(id,[=](Frame &frame) {
+        if(count<0 || count>2)fail("call_small: arity out of range");
+        const int values[]={first,second};
+        callSimple(frame,target,count,values,mask);
+    });
+}
+extern "C" int vpp_aot_call_quad(int id,int target,int count,int first,int second,
+                                   int third,int fourth,int mask) noexcept {
+    CpuScope profile("abi.call_quad");
+    return boundaryChecked(id,[=](Frame &frame) {
+        if(count<3 || count>4)fail("call_quad: arity out of range");
+        const int values[]={first,second,third,fourth};
+        callSimple(frame,target,count,values,mask);
+    });
+}
+// Lời gọi private method đã được AOT chứng minh đích chính xác. Receiver và
+// tối đa hai đối số đơn giản được đọc thẳng từ ô/hằng/StringPool, bỏ toàn bộ
+// lookup tên method và các ABI load riêng lẻ trước lời gọi.
+extern "C" int vpp_aot_method_direct_small(int id,int target,int receiverSlot,int count,
+                                             int first,int second,int kinds) noexcept {
+    CpuScope profile("abi.method_direct_small");
+    return boundaryChecked(id,[=](Frame &frame) {
+        if(count<0 || count>2)fail("method_direct_small: arity out of range");
+        Value receiver=frame.load(receiverSlot);
+        auto instance=std::get_if<runtime::InstanceHandle>(&receiver);
+        if(!instance || !*instance || !frame.owner ||
+           !runtime::isSubclassOf((*instance)->klass,frame.owner))
+            fail("method_direct_small: receiver mismatch");
+        const int values[]={first,second};
+        std::vector<Value> args;
+        args.reserve(static_cast<std::size_t>(count));
+        for(int index=0;index<count;++index) {
+            const int kind=(kinds>>(index*2))&3;
+            if(kind==0)args.emplace_back(values[index]);
+            else if(kind==1)args.push_back(frame.load(values[index]));
+            else if(kind==2)args.emplace_back(frame.program.string(values[index]));
+            else fail("method_direct_small: invalid argument kind");
+        }
+        frame.push(frame.program.invoke(target,std::move(args),*instance,frame.owner));
+    });
+}
 AOT1(indirect, f.call(0,a,0,true))
+extern "C" int vpp_aot_indirect_slot(int id,int slot,int count) noexcept {
+    CpuScope profile("abi.indirect_slot");
+    return boundaryChecked(id,[=](Frame &frame) { frame.callSlot(slot,count); });
+}
+extern "C" int vpp_aot_callee_id(int id) noexcept {
+    return boundary(id, [](Frame &f) {
+        if(f.stack.empty())return -1;
+        const auto &value=f.stack.back();
+        if(const auto p=std::get_if<int>(&value))return *p;
+        if(const auto p=std::get_if<runtime::ClosureHandle>(&value))return *p ? (*p)->functionId : -1;
+        if(const auto p=std::get_if<std::string>(&value))
+            for(std::size_t i=0;i<f.program.functions.size();++i) {
+                const auto &fn=f.program.functions[i];
+                if(fn.function && fn.nameIndex>=0 && f.program.string(fn.nameIndex)==*p)return int(i);
+            }
+        return -1;
+    });
+}
+extern "C" int vpp_aot_callee_slot_id(int id,int slot) noexcept {
+    CpuScope profile("abi.callee_slot_id");
+    auto &frame=*nativeFrames[static_cast<std::size_t>(id)];
+    if(frame.program.pendingError)return -1;
+    const int result=boundary(id,[=](Frame &f) {
+        const Value value=f.load(slot);
+        if(const auto p=std::get_if<int>(&value))return *p;
+        if(const auto p=std::get_if<runtime::ClosureHandle>(&value))
+            return *p ? (*p)->functionId : -1;
+        if(const auto p=std::get_if<std::string>(&value))
+            for(std::size_t i=0;i<f.program.functions.size();++i) {
+                const auto &fn=f.program.functions[i];
+                if(fn.function && fn.nameIndex>=0 && f.program.string(fn.nameIndex)==*p)
+                    return int(i);
+            }
+        return -1;
+    });
+    return frame.program.pendingError ? -1 : result;
+}
+extern "C" int vpp_aot_fast_args(int id,int count,int mask,int ascii,int method) noexcept {
+    return boundary(id,[=](Frame &f) {
+        if(count<0 || count>4 || f.stack.size()<std::size_t(count+1))return 0;
+        const auto start=f.stack.size()-count-1+method;
+        for(int i=0;i<count;++i)if(mask&(1<<i)) {
+            const auto &v=f.stack[start+i];
+            if(ascii) {
+                const auto p=std::get_if<std::string>(&v);
+                if(!p || p->size()!=1 || static_cast<unsigned char>((*p)[0])>=128)return 0;
+            } else if(!std::holds_alternative<int>(v))return 0;
+        }
+        return 1;
+    });
+}
+extern "C" int vpp_aot_fast_arg(int id,int count,int index,int ascii,int method) noexcept {
+    return boundary(id,[=](Frame &f) {
+        const auto &v=f.stack.at(f.stack.size()-count-1+method+index);
+        return ascii ? int(static_cast<unsigned char>(std::get<std::string>(v)[0])) : std::get<int>(v);
+    });
+}
+extern "C" int vpp_aot_ascii_index_arg(int id,int source,int index) noexcept {
+    CpuScope profile("abi.ascii_index_arg");
+    auto &frame=*nativeFrames[static_cast<std::size_t>(id)];
+    if(frame.program.pendingError)return 129;
+    const int result=boundary(id,[=](Frame &f) {
+        const Value sourceValue=f.load(source);
+        const Value indexValue=f.load(index);
+        const auto *text=std::get_if<std::string>(&sourceValue);
+        const auto *position=std::get_if<int>(&indexValue);
+        if(!text || !position)return 128;
+        if(*position<0)fail("index out of range");
+        const auto unit=core::utf8CodePointAt(*text,static_cast<std::size_t>(*position));
+        if(!unit)fail("index out of range");
+        if(unit->size()!=1)return 128;
+        const auto byte=static_cast<unsigned char>((*unit)[0]);
+        return byte<128 ? int(byte) : 128;
+    });
+    return frame.program.pendingError ? 129 : result;
+}
+static int probeMethodId(Frame &f,const Value &object,int name,int super) {
+    auto instance=std::get_if<runtime::InstanceHandle>(&object);
+    if(!instance || !*instance)return -1;
+    auto searchClass=super ? (f.owner ? f.owner->superclass : nullptr) : (*instance)->klass;
+    if(!searchClass)return -1;
+    auto method=runtime::resolveMethod(searchClass,f.program.string(name));
+    if(!method)return -1;
+    bool allowed=accessible(method->visibility,f.owner,method->owner);
+    if(!allowed && f.owner && method->visibility==runtime::RuntimeMemberVisibility::Protected &&
+       runtime::isSubclassOf((*instance)->klass,f.owner) && runtime::isSubclassOf(method->owner,f.owner)) {
+        auto declaration=runtime::resolveMethod(f.owner,f.program.string(name));
+        allowed=declaration && accessible(declaration->visibility,f.owner,declaration->owner);
+    }
+    return allowed ? method->functionId : -1;
+}
+extern "C" int vpp_aot_method_top_id(int id,int name,int super) noexcept {
+    CpuScope profile("abi.method_top_id");
+    auto &frame=*nativeFrames[static_cast<std::size_t>(id)];
+    if(frame.program.pendingError)return -1;
+    const int result=boundary(id,[=](Frame &f) {
+        if(f.stack.empty())return -1;
+        return probeMethodId(f,f.stack.back(),name,super);
+    });
+    return frame.program.pendingError ? -1 : result;
+}
+AOT1(fast_receiver_result, {
+    if(f.stack.empty())fail("fast_receiver_result: thiếu receiver");
+    f.stack.pop_back(); f.push(a);
+})
+AOT2(fast_result, {
+    if(a<0 || f.stack.size()<std::size_t(a+1))fail("fast_result: thiếu đối số");
+    f.stack.resize(f.stack.size()-a-1); f.push(b);
+})
+AOT2(fast_result_slot, {
+    if(a<0 || f.stack.size()<std::size_t(a))fail("fast_result_slot: thiếu đối số");
+    f.stack.resize(f.stack.size()-a); f.push(b);
+})
+extern "C" int vpp_aot_method_id(int id,int name,int count,int super) noexcept {
+    return boundary(id,[=](Frame &f) {
+        if(count<0 || f.stack.size()<std::size_t(count+1))return -1;
+        const auto &object=f.stack[f.stack.size()-count-1];
+        return probeMethodId(f,object,name,super);
+    });
+}
 AOT2(closure, f.closure(a,b))
 AOT2(define_class, f.defineClass(a,b))
 AOT3(define_method, f.defineMethod(a,b,c))
@@ -1228,6 +1823,25 @@ AOT0(print, f.print())
 AOT0(return_value, f.result=f.stack.empty()?make_null_value():f.pop())
 AOT1(return_slot, f.result=f.load(a))
 AOT1(return_integer, f.result=Value(a))
+AOT1(return_negated_slot, {
+    const Value &value=f.valueAt(a);
+    if(const auto *integer=std::get_if<int>(&value))
+        f.result=Value(wrapRuntimeInt32(-std::int64_t{*integer}));
+    else {
+        f.push(Value(0));
+        f.push(value);
+        f.binary(OP_TRU);
+        f.result=f.pop();
+    }
+})
+// Cùng thứ tự đánh giá như: đọc danh sách, đọc hai số, cộng, thêm cuối.
+// Giữ đường động trong trình biên dịch bootstrap để bảo toàn lỗi kiểu.
+AOT3(list_append_add, {
+    const Value list=f.load(a);
+    f.push(f.load(b)); f.push(f.load(c)); f.binary(OP_CONG);
+    Value item=f.pop();
+    f.push(list); f.push(std::move(item)); f.intrinsic(OP_VM_LIST_APPEND);
+})
 AOT1(intrinsic, f.intrinsic(a))
 AOT2(foreign, f.foreign(a,b))
 AOT0(switch_begin, f.switches.emplace_back(f.pop(),false))
@@ -1242,6 +1856,18 @@ AOT0(safepoint, f.safepoint())
 #undef AOT2
 #undef AOT3
 #undef AOT4
+// Kiểm tra không tạo ô mới; đường dự phòng phải giữ nguyên cách nạp biến.
+extern "C" int vpp_aot_is_i32(int id,int slot) noexcept {
+    CpuScope profile("abi.is_i32");
+    return boundary(id,[=](Frame &f) {
+        const auto cell=f.cell(slot,false);
+        return int(cell && std::holds_alternative<int>(cell->value));
+    });
+}
+extern "C" int vpp_aot_read_i32(int id,int slot) noexcept {
+    CpuScope profile("abi.read_i32");
+    return boundary(id,[=](Frame &f) {return std::get<int>(f.cell(slot,false)->value);});
+}
 extern "C" int vpp_aot_compare_integer_slot(int id,int slot,int immediate,int operation) noexcept {
     CpuScope profile("abi.compare_integer_slot");
     auto &f=*nativeFrames[static_cast<std::size_t>(id)];
@@ -1249,11 +1875,95 @@ extern "C" int vpp_aot_compare_integer_slot(int id,int slot,int immediate,int op
     try {return f.compareIntegerSlot(slot,immediate,operation)?1:0;}
     catch(...) {f.program.pendingError=std::current_exception();return 2;}
 }
+extern "C" int vpp_aot_compare_integer_range(int id,int slot,int low,int high) noexcept {
+    CpuScope profile("abi.compare_integer_range");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool lower=f.compareIntegerSlot(slot,low,OP_LON_HON_HOAC_BANG);
+        const bool upper=f.compareIntegerSlot(slot,high,OP_NHO_HON_HOAC_BANG);
+        return lower&&upper?1:0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_integer_outside_range(int id,int slot,int low,int high) noexcept {
+    CpuScope profile("abi.compare_integer_outside_range");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool lower=f.compareIntegerSlot(slot,low,OP_NHO_HON);
+        const bool upper=f.compareIntegerSlot(slot,high,OP_LON_HON);
+        return lower||upper?1:0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_integer_or_range(int id,int slot,int firstValue,int low,int high) noexcept {
+    CpuScope profile("abi.compare_integer_or_range");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool first=f.compareIntegerSlot(slot,firstValue,OP_SO_SANH_BANG);
+        const bool lower=f.compareIntegerSlot(slot,low,OP_LON_HON_HOAC_BANG);
+        const bool upper=f.compareIntegerSlot(slot,high,OP_NHO_HON_HOAC_BANG);
+        return first || (lower && upper) ? 1 : 0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_integer_set(int id,int slot,int count,int a,int b,int c,int d) noexcept {
+    CpuScope profile("abi.compare_integer_set");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool first=f.compareIntegerSlot(slot,a,OP_SO_SANH_BANG);
+        const bool second=f.compareIntegerSlot(slot,b,OP_SO_SANH_BANG);
+        if(count==2)return first||second?1:0;
+        const bool third=f.compareIntegerSlot(slot,c,OP_SO_SANH_BANG);
+        if(count==3)return first||second||third?1:0;
+        const bool fourth=f.compareIntegerSlot(slot,d,OP_SO_SANH_BANG);
+        return first||second||third||fourth?1:0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_integer_or_and(int id,int slot,int immediate,int firstOperation,
+                                                int left,int right,int tailOperation) noexcept {
+    CpuScope profile("abi.compare_integer_or_and");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool first=f.compareIntegerSlot(slot,immediate,firstOperation);
+        const bool equal=f.compareIntegerSlot(slot,immediate,OP_SO_SANH_BANG);
+        const bool tail=f.compareNumericSlots(left,right,tailOperation);
+        return first || (equal && tail) ? 1 : 0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
 extern "C" int vpp_aot_compare_numeric_slots(int id,int left,int right,int operation) noexcept {
     CpuScope profile("abi.compare_numeric_slots");
     auto &f=*nativeFrames[static_cast<std::size_t>(id)];
     if(f.program.pendingError)return 2;
     try {return f.compareNumericSlots(left,right,operation)?1:0;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_compare_numeric_slots_and(int id,int left,int right,int operation,int guard) noexcept {
+    CpuScope profile("abi.compare_numeric_slots_and");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool comparison=f.compareNumericSlots(left,right,operation);
+        const bool enabled=runtime::stackValueTruthy(f.valueAt(guard));
+        return comparison&&enabled?1:0;
+    }
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_not_slot_and(int id,int left,int right) noexcept {
+    CpuScope profile("abi.not_slot_and");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {
+        const bool leftFalse=!runtime::stackValueTruthy(f.valueAt(left));
+        const bool rightTrue=runtime::stackValueTruthy(f.valueAt(right));
+        return leftFalse&&rightTrue?1:0;
+    }
     catch(...) {f.program.pendingError=std::current_exception();return 2;}
 }
 extern "C" int vpp_aot_counted_scalar_loop(int id,int counter,int bound,
@@ -1264,12 +1974,28 @@ extern "C" int vpp_aot_counted_scalar_loop(int id,int counter,int bound,
     try {return f.runCountedScalarLoop(counter,bound,value,step,threshold)?0:1;}
     catch(...) {f.program.pendingError=std::current_exception();return 2;}
 }
+extern "C" int vpp_aot_counted_scalar_loop_tail(int id,int counter,int bound,
+                                                 int value,int step,int threshold) noexcept {
+    CpuScope profile("abi.counted_scalar_loop_tail");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runCountedScalarLoop(counter,bound,value,step,threshold,false)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
 extern "C" int vpp_aot_simple_scalar_loop(int id,int counter,int bound,
                                            int value,int operand,int operation) noexcept {
     CpuScope profile("abi.simple_scalar_loop");
     auto &f=*nativeFrames[static_cast<std::size_t>(id)];
     if(f.program.pendingError)return 2;
     try {return f.runSimpleScalarLoop(counter,bound,value,operand,operation)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_simple_scalar_loop_tail(int id,int counter,int bound,
+                                                int value,int operand,int operation) noexcept {
+    CpuScope profile("abi.simple_scalar_loop_tail");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runSimpleScalarLoop(counter,bound,value,operand,operation,false)?0:1;}
     catch(...) {f.program.pendingError=std::current_exception();return 2;}
 }
 extern "C" int vpp_aot_numeric_add_loop(int id,int counter,int bound,
@@ -1279,6 +2005,53 @@ extern "C" int vpp_aot_numeric_add_loop(int id,int counter,int bound,
     if(f.program.pendingError)return 2;
     try {return f.runNumericAddLoop(counter,bound,left,right,result)?0:1;}
     catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_numeric_add_loop_tail(int id,int counter,int bound,
+                                               int left,int right,int result) noexcept {
+    CpuScope profile("abi.numeric_add_loop_tail");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runNumericAddLoop(counter,bound,left,right,result,false)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_list_append_i32_loop(int id,int counter,int bound,
+                                             int list,int base,int keep) noexcept {
+    CpuScope profile("abi.list_append_i32_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runListAppendI32Loop(counter,bound,list,base,keep!=0)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_list_mod_sum_loop(int id,int counter,int bound,int source,
+                                          int target,int divisor,int expected,
+                                          int keep) noexcept {
+    CpuScope profile("abi.list_mod_sum_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runListModSumLoop(counter,bound,source,target,divisor,expected,keep!=0)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_range_mod_sum_i32_loop(int id,int base,int target,
+                                                int bound,int divisor,
+                                                int expected) noexcept {
+    CpuScope profile("abi.range_mod_sum_i32_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    try {return f.runRangeModSumI32Loop(base,target,bound,divisor,expected)?0:1;}
+    catch(...) {f.program.pendingError=std::current_exception();return 2;}
+}
+extern "C" int vpp_aot_indirect_i32_fold_loop(int id,int counter,int bound,
+                                                int checksum,int callable,int data,
+                                                int seed,int packed) noexcept {
+    CpuScope profile("abi.indirect_i32_fold_loop");
+    auto &f=*nativeFrames[static_cast<std::size_t>(id)];
+    if(f.program.pendingError)return 2;
+    const int cycle=(packed>>16)&0xffff;
+    const int divisor=packed&0xffff;
+    try {
+        return f.runIndirectI32FoldLoop(counter,bound,checksum,callable,data,seed,
+                                        cycle,divisor)?0:1;
+    } catch(...) {f.program.pendingError=std::current_exception();return 2;}
 }
 extern "C" int vpp_aot_condition(int id) noexcept {
     CpuScope profile("abi.condition");

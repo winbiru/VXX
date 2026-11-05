@@ -1,0 +1,19 @@
+// Direct entrypoint for the V++ ET_REL partial linker. A packed archive is
+// provided by the test runner; mode 1 skips its first object, mode 2 keeps all.
+hàm chính() {
+    biến đường vào = đối số lấy(1);
+    biến đường ra = đối số lấy(2);
+    biến chế độ = đối số lấy(3);
+    biến chọn = 2;
+    nếu (byte bằng(chế độ, "1") == 1) { chọn = 1; }
+    hoặc { nếu (byte bằng(chế độ, "2") != 1) { trả về 2; }; };
+    biến kho = byte mới();
+    nếu (elf bản địa đọc tệp(đường vào, kho) != 0) { trả về 2; };
+    biến trạng thái = thực thi liên kết elf đối tượng bản địa(kho, đường ra, chọn);
+    byte hủy(kho);
+    byte hủy(đường vào);
+    byte hủy(đường ra);
+    byte hủy(chế độ);
+    nếu (trạng thái != 0) { trả về 1; };
+    trả về 0;
+};

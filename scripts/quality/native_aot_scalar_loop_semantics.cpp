@@ -1,4 +1,5 @@
 #include "vpp/native/aot_runtime.h"
+#include "vpp/native/aot.h"
 #include "common/vm_utils.h"
 
 #include <cmath>
@@ -14,10 +15,40 @@ extern "C" int vpp_aot_assign_slot(int, int) noexcept;
 extern "C" int vpp_aot_store_integer(int, int, int) noexcept;
 extern "C" int vpp_aot_return_slot(int, int) noexcept;
 extern "C" int vpp_aot_return_integer(int, int) noexcept;
+extern "C" int vpp_aot_is_i32(int, int) noexcept;
+extern "C" int vpp_aot_read_i32(int, int) noexcept;
 
 namespace {
 void require(bool condition, const char *description) {
     if (!condition) throw std::runtime_error(description);
+}
+
+void verifyI32ExpressionGuards() {
+    Program program;
+    Frame frame(program);
+    frame.push(777);
+    require(vpp_aot_is_i32(frame.nativeId,42)==0,"guard accepted a missing cell");
+    require(frame.locals.empty() && program.globals.empty(),"guard created a binding");
+    frame.store(42,std::numeric_limits<int>::min());
+    require(vpp_aot_is_i32(frame.nativeId,42)==1,"guard rejected an i32");
+    require(vpp_aot_read_i32(frame.nativeId,42)==std::numeric_limits<int>::min(),
+            "raw i32 read changed the sign bit");
+    frame.store(42,3.5);
+    require(vpp_aot_is_i32(frame.nativeId,42)==0,"guard accepted a reassigned double");
+    frame.store(42,std::string("42"));
+    require(vpp_aot_is_i32(frame.nativeId,42)==0,"guard accepted text");
+    require(frame.stack.size()==1 && frame.stack[0]==Value(777),"guard changed operand stack");
+
+    Snapshot snapshot;
+    snapshot.entry={{OP_TEN_BIEN_GIA_TRI,0,42,0},{OP_BIEN_SO,3,0,0},
+                    {OP_CONG,0,0,0},{OP_BIEN_SO,2,0,0},{OP_NHAN,0,0,0},
+                    {OP_IN,0,0,0}};
+    require(emitAssembly(snapshot).find("vpp_native_dynamic_is_i32")!=std::string::npos,
+            "C++ lowering did not specialize a pure i32 expression");
+    // Nhảy vào giữa biểu thức phải ngăn việc gộp qua điểm vào đó.
+    snapshot.entry.insert(snapshot.entry.begin(),{OP_JUMP,4,0,0});
+    require(emitAssembly(snapshot).find("vpp_native_dynamic_is_i32")==std::string::npos,
+            "C++ lowering crossed a branch into an expression");
 }
 
 // Reference implementation using the existing dynamic Frame operations.
@@ -454,6 +485,7 @@ int main() {
         verifyFusedNumericSlotParity();
         verifyFrameCellReuseAndCaptureIsolation();
         verifyCachedBindingReplacements();
+        verifyI32ExpressionGuards();
         std::cout << "AOT scalar loops: optimized and dynamic stack/value parity PASS\n";
         return 0;
     } catch (const std::exception &error) {

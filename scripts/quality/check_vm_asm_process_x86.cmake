@@ -43,15 +43,27 @@ foreach(process_arch IN LISTS process_arches)
     set(process_dir "${VPP_OUTPUT_DIR}/process-${process_arch}")
     file(MAKE_DIRECTORY "${process_dir}")
     execute_process(COMMAND "${VPP_PROCESS_CLANG}" ${target_flags}
-        -x assembler-with-cpp -c "${VPP_ROOT}/scripts/ASM/vpp_vm_process_primitives.inc"
+        -x assembler-with-cpp -c "${VPP_ROOT}/scripts/ASM/common/posix/vpp_vm_process_primitives.inc"
         -o "${process_dir}/process.o"
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 30)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "V++ ${process_arch} process ASM compile failed: ${status}\n${errors}")
     endif()
+    set(process_extra_objects "")
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux" AND process_arch STREQUAL "x86_64")
+        set(syscalls_obj "${process_dir}/process-syscalls.o")
+        execute_process(COMMAND "${VPP_PROCESS_CLANG}" -c
+            "${VPP_ROOT}/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S"
+            -o "${syscalls_obj}"
+            RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 30)
+        if(NOT status STREQUAL "0")
+            message(FATAL_ERROR "V++ ${process_arch} syscall ASM compile failed: ${status}\n${errors}")
+        endif()
+        list(APPEND process_extra_objects "${syscalls_obj}")
+    endif()
     execute_process(COMMAND "${VPP_PROCESS_CLANG}" ${target_flags} -Wall -Wextra -Werror
         "${VPP_ROOT}/src/tests/fixtures/vm_asm_process_x86_harness.c"
-        "${process_dir}/process.o" -o "${process_dir}/process-harness"
+        "${process_dir}/process.o" ${process_extra_objects} -o "${process_dir}/process-harness"
         RESULT_VARIABLE status ERROR_VARIABLE errors TIMEOUT 30)
     if(NOT status STREQUAL "0")
         message(FATAL_ERROR "V++ ${process_arch} process harness link failed: ${status}\n${errors}")

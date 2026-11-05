@@ -6,6 +6,7 @@ hàm sinh mã nhị phân(mã phép toán) {
     nếu (mã phép toán == 5) { trả về 1; };
     nếu (mã phép toán == 6) { trả về 1; };
     nếu (mã phép toán == 26) { trả về 1; };
+    nếu (mã phép toán >= 30 && mã phép toán <= 34) { trả về 1; };
     nếu (mã phép toán == 27) { trả về 1; };
     nếu (mã phép toán >= 11) { nếu (mã phép toán <= 16) { trả về 1; }; };
     trả về 0;
@@ -52,7 +53,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (độ sâu hiện tại < 2) { trả về -1; };
             độ sâu hiện tại = độ sâu hiện tại - 1;
         }
-        hoặc nếu (mã phép toán == 8) {
+        hoặc nếu (mã phép toán == 8 || mã phép toán == 35) {
             nếu (đối số != 0) { trả về -1; };
             nếu (độ sâu hiện tại < 1) { trả về -1; };
         }
@@ -61,7 +62,7 @@ hàm sinh mã khung(biểu diễn trung gian) {
             nếu (độ sâu hiện tại < 1) { trả về -1; };
         }
         hoặc nếu (mã phép toán == 17) {
-            nếu (đối số < -76) { trả về -1; };
+            nếu (đối số < -82) { trả về -1; };
             // The program codegen resolves and bounds-checks function IDs
             // against the complete function table when patching CALLs.
             nếu (đang chờ < 0) { trả về -1; };
@@ -297,6 +298,11 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
                 nếu (mã phép toán == 4) { mã trạng thái = sinh mã từ máy(mã máy, 185205033); };
                 nếu (mã phép toán == 5) { mã trạng thái = sinh mã từ máy(mã máy, 1258946857); };
                 nếu (mã phép toán == 6) { mã trạng thái = sinh mã từ máy(mã máy, 453672233); };
+                nếu (mã phép toán == 30) { mã trạng thái = sinh mã từ máy(mã máy, 168427817); };
+                nếu (mã phép toán == 31) { mã trạng thái = sinh mã từ máy(mã máy, 705298729); };
+                nếu (mã phép toán == 32) { mã trạng thái = sinh mã từ máy(mã máy, 1242169641); };
+                nếu (mã phép toán == 33) { mã trạng thái = sinh mã từ máy(mã máy, 449454377); };
+                nếu (mã phép toán == 34) { mã trạng thái = sinh mã từ máy(mã máy, 449456425); };
                 nếu (mã phép toán == 26) {
                     // CBNZ W10,+8; BRK on divide by zero; SDIV W9,W9,W10.
                     mã trạng thái = sinh mã từ máy(mã máy, 889192522);
@@ -329,6 +335,12 @@ hàm sinh mã phát nội bộ(biểu diễn trung gian, mã máy, các lời g�
         hoặc nếu (mã phép toán == 8) {
             mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 1258882025); };
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
+        }
+        hoặc nếu (mã phép toán == 35) {
+            // MVN W9,W9: đảo toàn bộ 32 bit.
+            mã trạng thái = sinh mã nạp(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1);
+            nếu (mã trạng thái == 0) { mã trạng thái = sinh mã từ máy(mã máy, 707331049); };
             nếu (mã trạng thái == 0) { mã trạng thái = sinh mã lưu(mã máy, 9, base + các ô nhớ + độ sâu hiện tại - 1); };
         }
         hoặc nếu (mã phép toán == 25) {
