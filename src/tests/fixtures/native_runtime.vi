@@ -1,9 +1,9 @@
 hàm chính() {
     nếu (máy đọc byte(-1) != -1) { trả về 1; };
-    nếu (máy đọc byte(68162560) != -1) { trả về 2; };
-    nếu (máy đọc số nguyên ba mươi hai bit(68162557) != -1) { trả về 3; };
-    nếu (máy ghi số nguyên ba mươi hai bit(68162556, -2147483648) != 0) { trả về 4; };
-    nếu (máy đọc số nguyên ba mươi hai bit(68162556) != -2147483648) { trả về 5; };
+    nếu (máy đọc byte(135271424) != -1) { trả về 2; };
+    nếu (máy đọc số nguyên ba mươi hai bit(135271421) != -1) { trả về 3; };
+    nếu (máy ghi số nguyên ba mươi hai bit(135271420, -2147483648) != 0) { trả về 4; };
+    nếu (máy đọc số nguyên ba mươi hai bit(135271420) != -2147483648) { trả về 5; };
     nếu (máy gắn địa chỉ(3, 4096) != -1) { trả về 6; };
     nếu (máy gắn địa chỉ(4000, -1) != -1) { trả về 7; };
     nếu (máy gắn địa chỉ(4000, 4096) != 0) { trả về 8; };
@@ -21,13 +21,13 @@ hàm chính() {
     byte làm rỗng(các byte);
     nếu (byte đọc số nguyên ba mươi hai bit(part, 0) != -2147483648) { trả về 17; };
     byte thêm(các byte, 90);
-    lặp (i = 0; i < 20; i++) {
+    lặp (i = 0; i < 21; i++) {
         nếu (byte nối(các byte, các byte) != 0) { trả về 18; };
     };
-    nếu (byte dài(các byte) != 1048576) { trả về 19; };
+    nếu (byte dài(các byte) != 2097152) { trả về 19; };
     nếu (byte thêm(các byte, 1) != -1) { trả về 20; };
     nếu (byte đẩy số nguyên ba mươi hai bit(các byte, 0) != -1) { trả về 21; };
-    nếu (byte lấy(các byte, 1048575) != 90) { trả về 22; };
+    nếu (byte lấy(các byte, 2097151) != 90) { trả về 22; };
 
     biến handles = byte mới();
     biến count = 0;

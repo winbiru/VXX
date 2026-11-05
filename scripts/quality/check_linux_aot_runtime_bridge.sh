@@ -7,6 +7,10 @@ CC="${CC:-clang}"
 NM=nm
 if [[ "$(uname -s)" == Darwin ]]; then
     NM=llvm-nm
+    if ! command -v "$NM" >/dev/null 2>&1 && command -v xcrun >/dev/null 2>&1; then
+        # Command Line Tools ships llvm-nm outside PATH on macOS CI images.
+        NM="$(xcrun --find llvm-nm 2>/dev/null || true)"
+    fi
 fi
 for utility in "$CC" python3 "$NM"; do
     if ! command -v "$utility" >/dev/null 2>&1; then

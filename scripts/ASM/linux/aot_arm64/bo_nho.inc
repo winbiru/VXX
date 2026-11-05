@@ -11,7 +11,7 @@ vpp_native_memory_base:
     str x30, [sp, #-16]!
     mov x0, #0
     mov x1, #0x1400
-    movk x1, #0x410, lsl #16  // 68162560 byte
+    movk x1, #0x810, lsl #16  // 135271424 byte, 64 byte buffers at 2 MiB each
     mov x2, #3               // PROT_READ | PROT_WRITE
     mov x3, #0x22            // Linux MAP_PRIVATE | MAP_ANONYMOUS
     mov x4, #-1
@@ -48,7 +48,7 @@ vpp_native_memory_base:
     cmp w0, #0
     b.lt Lbo_nho_loi
     mov w10, #(0x1400 - \do_rong)
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w0, w10
     b.hi Lbo_nho_loi
 .endm
@@ -92,7 +92,7 @@ vpp_native_memory_zero:
     cmp w1, #0
     b.lt Lbo_nho_loi
     mov w10, #0x1400
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     subs w10, w10, w1
     b.lo Lbo_nho_loi
     cmp w0, w10
@@ -119,7 +119,7 @@ vpp_native_memory_bind:
     cmp w1, #0
     b.lt Lbo_nho_loi
     mov w10, #0x1400
-    movk w10, #0x410, lsl #16
+    movk w10, #0x810, lsl #16
     cmp w1, w10
     b.hs Lbo_nho_loi
     add x1, x9, w1, uxtw

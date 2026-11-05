@@ -42,6 +42,56 @@ x86_64-unknown-linux-gnu|linux/vpp_aot_primitives_linux_x86_64.S
 x86_64-pc-windows-msvc|windows/vpp_aot_primitives_windows_x86_64.S
 TARGETS
 
+# Stage 0 links the C bootstrap with machine primitives on both Linux ABIs.
+# Compile the isolated objects and inspect exports without a Linux host linker.
+if command -v llvm-nm >/dev/null 2>&1; then
+    linux_stage0_nm=$(command -v llvm-nm)
+elif command -v xcrun >/dev/null 2>&1; then
+    linux_stage0_nm=$(xcrun --find llvm-nm 2>/dev/null || true)
+else
+    linux_stage0_nm=$(command -v nm || true)
+fi
+if test -z "$linux_stage0_nm"; then
+    echo 'FAIL Linux Stage 0 symbol inspection tool missing' >&2
+    exit 1
+fi
+for arch in x86_64 aarch64; do
+    "$compiler" -target "$arch-unknown-linux-gnu" -c \
+        "$repo_root/scripts/ASM/linux/vpp_aot_stage0_machine_${arch}.S" \
+        -o "$work/linux-stage0-${arch}.o"
+    test -s "$work/linux-stage0-${arch}.o"
+    "$linux_stage0_nm" --defined-only "$work/linux-stage0-${arch}.o" \
+        > "$work/linux-stage0-${arch}-syms"
+    for symbol in vpp_native_memory_bind vpp_native_memory_read_byte \
+        vpp_native_memory_write_byte vpp_native_memory_read_i32 \
+        vpp_native_memory_write_i32 vpp_native_i32_div \
+        vpp_native_os_read vpp_native_os_write vpp_native_os_open \
+        vpp_native_os_close vpp_native_os_errno vpp_native_os_mkstemp \
+        vpp_native_os_rename vpp_native_os_fchmod vpp_native_os_fstat \
+        vpp_native_os_lstat vpp_native_os_stat vpp_native_os_access_exec \
+        vpp_native_os_unlink vpp_native_os_mkdir vpp_native_os_spawn_clang \
+        vpp_native_os_waitpid vpp_native_os_env_copy \
+        vpp_native_os_executable_path vpp_native_os_home vpp_native_os_cwd \
+        vpp_native_sha_begin vpp_native_sha_update vpp_native_sha_end \
+        vpp_native_os_register_cache_report; do
+        if ! grep -Eq "[[:space:]][TW][[:space:]]${symbol}\$" \
+            "$work/linux-stage0-${arch}-syms"; then
+            printf 'FAIL Linux %s Stage 0 missing %s\n' "$arch" "$symbol" >&2
+            exit 1
+        fi
+    done
+    for symbol in vpp_native_argc vpp_native_os_argument_length \
+        vpp_native_bytes_new vpp_native_file_open_read; do
+        if grep -Eq "[[:space:]][TW][[:space:]]${symbol}\$" \
+            "$work/linux-stage0-${arch}-syms"; then
+            printf 'FAIL Linux %s Stage 0 duplicates C bootstrap %s\n' \
+                "$arch" "$symbol" >&2
+            exit 1
+        fi
+    done
+    printf 'PASS Linux %s Stage 0 machine primitives\n' "$arch"
+done
+
 # Nguồn Linux tự chủ phải cho cùng đối tượng khi ghép văn bản hoặc dùng CPP.
 # Đường V++ chỉ dùng cách ghép văn bản; CPP ở đây là đối chứng riêng.
 VPP_LINUX_HOST_COMPILER= VPP_LINUX_HOST_ASSEMBLER="$compiler" \

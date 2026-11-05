@@ -11,6 +11,7 @@
 #include <tuple>
 #include <vector>
 
+#include "frontend/lexer.h"
 #include "frontend/keywords.h"
 #include "vpp/compiler/pipeline.h"
 #include "vpp/native/raw_codegen.h"
@@ -23,6 +24,25 @@ std::string readSource(const std::filesystem::path &source) {
     std::ifstream in(source, std::ios::binary);
     if (!in) throw std::runtime_error("Cannot read fixture: " + source.string());
     return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// This oracle inspects Machine IR.  Stop after lowering/optimization: the VM
+// direct-bytecode emitter may reject unrelated functions in the same fixture
+// even when the native machine lowerer supports the functions under test.
+vietvm::compiler::IrProgram compileFixtureIr(const std::filesystem::path &source) {
+    auto tokens = vietvm::compiler::postProcessTokensWithSpans(
+        vietvm::compiler::tokenizeWithSpans(readSource(source)));
+    auto ast = vietvm::frontend::parseTokens(std::move(tokens));
+    auto semantic = vietvm::compiler::analyzeSemantics(
+        ast, vietvm::compiler::SemanticEnvironment{},
+        vietvm::compiler::ResolutionPolicy::PreserveLegacy);
+    for (const auto &diagnostic : semantic.diagnostics) {
+        if (diagnostic.severity == vietvm::compiler::SemanticDiagnosticSeverity::Error)
+            throw std::runtime_error(diagnostic.message);
+    }
+    auto ir = vietvm::compiler::lowerToIr(ast, semantic);
+    vietvm::compiler::optimizeIr(ir);
+    return ir;
 }
 
 std::string toHex(const std::vector<std::uint8_t> &bytes) {
@@ -39,15 +59,10 @@ std::string toHex(const std::vector<std::uint8_t> &bytes) {
 void verifyFunctions(const std::filesystem::path &source,
                      const std::vector<std::string> &names,
                      const std::vector<std::string> &triples) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
 
     for (const auto &name : names) {
-        const auto lowered = vietvm::native::lowerMachineFunction(artifacts.ir, name);
+        const auto lowered = vietvm::native::lowerMachineFunction(ir, name);
         if (!lowered) throw std::runtime_error(name + ": " + lowered.error);
         for (const auto &triple : triples) {
             const auto target = vietvm::native::parseTarget(triple);
@@ -118,18 +133,13 @@ void verifyLowering(const vietvm::compiler::IrProgram &ir,
 void verifyLoweringFixture(const std::filesystem::path &source,
                            const std::vector<std::string> &successes,
                            const std::vector<std::string> &failures) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
     for (const auto &name : successes) {
-        verifyLowering(artifacts.ir, source, name, true);
+        verifyLowering(ir, source, name, true);
         std::cout << "PASS " << name << '\n';
     }
     for (const auto &name : failures) {
-        verifyLowering(artifacts.ir, source, name, false);
+        verifyLowering(ir, source, name, false);
         std::cout << "REJECT " << name << '\n';
     }
 }
@@ -196,12 +206,7 @@ void verifySyntheticBoundaries(const std::filesystem::path &sourceBase) {
 // Both the leaf classifier and ISA encoder are independently implemented in
 // C++ and V++; compare them before exercising the production CLI/object path.
 void verifyLeafParity(const std::filesystem::path &source) {
-    vietvm::compiler::CompilationContext context;
-    context.importResolutionBase = source.parent_path().empty()
-        ? std::filesystem::current_path() : source.parent_path();
-    context.currentSourceIdentity = source.lexically_normal().generic_u8string();
-    const auto artifacts = vietvm::compiler::compilePipeline(
-        context, readSource(source), keywordMap, false);
+    const auto ir = compileFixtureIr(source);
     const std::vector<std::string> targets = {
         "x86_64-linux-gnu", "aarch64-linux-gnu", "riscv64-linux-gnu",
         "armv7-linux-gnueabihf", "i386-linux-gnu", "powerpc-linux-gnu",
@@ -220,8 +225,8 @@ void verifyLeafParity(const std::filesystem::path &source) {
     };
     std::size_t verified = 0;
     for (const auto &name : valid) {
-        const auto cpp = vietvm::native::lowerRawLeaf(artifacts.ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(artifacts.ir, name, context.importResolutionBase);
+        const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
+        const auto vpp = vietvm::native::lowerRawLeafVpp(ir, name, source.parent_path());
         if (!cpp || !vpp || cpp.leaf.kind != vpp.leaf.kind ||
             cpp.leaf.constant != vpp.leaf.constant) {
             throw std::runtime_error(name + ": leaf lowering differs; C++=" +
@@ -233,7 +238,7 @@ void verifyLeafParity(const std::filesystem::path &source) {
             if (!parsed.target) throw std::runtime_error(triple + ": " + parsed.error);
             const auto a = vietvm::native::emitRawLeaf(*parsed.target, cpp.leaf);
             const auto b = vietvm::native::emitRawLeafVpp(*parsed.target, vpp.leaf,
-                                                         context.importResolutionBase);
+                                                         source.parent_path());
             if (!a || !b || a.bytes != b.bytes) {
                 throw std::runtime_error(name + "/" + triple + ": leaf byte mismatch; C++=" +
                                          (a ? toHex(a.bytes) : a.error) + "; V++=" +
@@ -243,9 +248,9 @@ void verifyLeafParity(const std::filesystem::path &source) {
         }
     }
     for (const auto &name : invalid) {
-        const auto cpp = vietvm::native::lowerRawLeaf(artifacts.ir, name);
-        const auto vpp = vietvm::native::lowerRawLeafVpp(artifacts.ir, name,
-                                                        context.importResolutionBase);
+        const auto cpp = vietvm::native::lowerRawLeaf(ir, name);
+        const auto vpp = vietvm::native::lowerRawLeafVpp(ir, name,
+                                                        source.parent_path());
         if (cpp || vpp)
             throw std::runtime_error(name + ": unsupported leaf was accepted");
     }
@@ -314,13 +319,9 @@ int main(int argc, char **argv) {
             const std::vector<std::string> names = {"bit_va", "bit_hoac", "bit_xor",
                 "dao_bit", "dich_trai", "dich_phai", "uu_tien_bit", "bit_khung"};
             verifyLoweringFixture(source, names, {});
-            vietvm::compiler::CompilationContext context;
-            context.importResolutionBase = source.parent_path();
-            context.currentSourceIdentity = source.generic_u8string();
-            const auto artifacts = vietvm::compiler::compilePipeline(
-                context, readSource(source), keywordMap, false);
+            const auto ir = compileFixtureIr(source);
             for (const auto &name : names) {
-                const auto lowered = vietvm::native::lowerMachineFunction(artifacts.ir, name);
+                const auto lowered = vietvm::native::lowerMachineFunction(ir, name);
                 if (!lowered) throw std::runtime_error(lowered.error);
                 for (const auto *triple : {"aarch64-apple-darwin", "aarch64-linux-gnu",
                                           "x86_64-linux-gnu", "x86_64-windows-msvc"}) {

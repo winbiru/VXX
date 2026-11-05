@@ -10,7 +10,7 @@ endif()
 file(MAKE_DIRECTORY "${VPP_OUTPUT_DIR}")
 set(source "${VPP_OUTPUT_DIR}/native-source.vi")
 set(output "${VPP_OUTPUT_DIR}/program with spaces")
-file(WRITE "${source}" "hàm chính() { trả về 42; };\nin chính();\n")
+file(WRITE "${source}" "hàm chính() { in 42; trả về 0; };\n")
 file(REMOVE "${output}")
 
 # A bad VPP_NATIVE_CC validates that the CLI delegates to the bootstrapped

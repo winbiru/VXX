@@ -94,7 +94,7 @@ int32_t vpp_native_read_status(void) {
 // exposed through the current signed-i32 Machine IR ABI.
 #define VPP_NATIVE_BYTES_SLOTS 64
 #define VPP_NATIVE_FILE_SLOTS 64
-#define VPP_NATIVE_BYTES_MAX (1024u * 1024u)
+#define VPP_NATIVE_BYTES_MAX (2u * 1024u * 1024u)
 #define VPP_NATIVE_PATH_MAX 4096u
 #define VPP_NATIVE_IO_CHUNK 4096u
 

@@ -55,7 +55,7 @@ hàm chính() {
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 52) != 0) { trả về 3; };
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 3; };
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 3; };
-    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 4; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls, 0) <= 0) { trả về 4; };
     nếu (byte dài(calls) != 0) { trả về 5; };
     nếu (byte lấy(code, 0) != 85) { trả về 6; };
     nếu (byte lấy(code, 1) != 72) { trả về 6; };
@@ -106,7 +106,7 @@ hàm chính() {
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, -12) != 0) { trả về 13; }; // runtime ID 11
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 13; }; // RETURN
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 13; };
-    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 14; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls, 0) <= 0) { trả về 14; };
     nếu (byte dài(calls) != 8) { trả về 15; };
     nếu (byte đọc số nguyên ba mươi hai bit(calls, 4) != -12) { trả về 15; };
     // Verify both SysV stack stores on every host, including ARM64 where
@@ -148,7 +148,7 @@ hàm chính() {
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, -73) != 0) { trả về 25; }; // raw directory ID 72
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 7) != 0) { trả về 25; };
     nếu (byte đẩy số nguyên ba mươi hai bit(ir, 0) != 0) { trả về 25; };
-    nếu (sinh mã x86 phát nội bộ(ir, code, calls) <= 0) { trả về 26; };
+    nếu (sinh mã x86 phát nội bộ(ir, code, calls, 0) <= 0) { trả về 26; };
     nếu (byte dài(calls) != 8) { trả về 26; };
     nếu (byte đọc số nguyên ba mươi hai bit(calls, 4) != -73) { trả về 26; };
     nếu (byte đẩy số nguyên ba mươi hai bit(native_calls, byte đọc số nguyên ba mươi hai bit(calls, 0)) != 0) { trả về 27; };

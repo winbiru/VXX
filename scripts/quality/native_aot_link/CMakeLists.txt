@@ -187,6 +187,34 @@ if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64)$")
             ${stage0_machine_includes}
         VERBATIM)
     list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/common/posix/aot_x86_64/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_C_COMPILER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_x86_64.S"
+            ${vpp_aot_asm_include_dirs} -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_x86_64.S"
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_linux_sha256_x86_64.S"
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_linux_syscalls_x86_64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+    set(stage0_machine_object "${CMAKE_CURRENT_BINARY_DIR}/stage0-machine.o")
+    file(GLOB stage0_machine_includes CONFIGURE_DEPENDS
+        "${VPP_AOT_ROOT}/scripts/ASM/linux/aot_arm64/*.inc")
+    add_custom_command(OUTPUT "${stage0_machine_object}"
+        COMMAND "${VPP_AOT_C_COMPILER}" -c
+            "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_aarch64.S"
+            ${vpp_aot_asm_include_dirs} -o "${stage0_machine_object}"
+        DEPENDS "${VPP_AOT_ROOT}/scripts/ASM/linux/vpp_aot_stage0_machine_aarch64.S"
+            ${stage0_machine_includes}
+        VERBATIM)
+    list(APPEND vpp_aot_bootstrap_objects "${stage0_machine_object}")
 endif()
 set_source_files_properties(${vpp_aot_bootstrap_objects}
     PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
